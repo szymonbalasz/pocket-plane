@@ -1,0 +1,25 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Future build-phase artefacts (kept out from day one)
+node_modules/
+dist/
+coverage/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/

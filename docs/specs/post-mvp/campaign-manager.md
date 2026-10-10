@@ -1,0 +1,17 @@
+---
+title: Campaign manager
+prefix: CMGR
+status: stub
+owner: —
+phase: post-mvp
+---
+
+# Campaign manager (post-MVP stub)
+
+- **What:** Sessions, timeline, quest board, prep notes. Absorbs the DM's Obsidian session/prep notes.
+- **Builds on:** [campaign-management](../campaign-management.md), [entities](../entities.md) (quests), [dice-roll-log](../dice-roll-log.md), [combat-tracker](../combat-tracker.md).
+- **Open:**
+  - How much session/journal lands in MVP: [ADR-0013](../../architecture/adr/0013-session-journal-scope.md).
+  - In-world calendar/timeline vs real-world session dates.
+
+> TODO (spec phase): expand from [_template.md](../_template.md) after MVP.
