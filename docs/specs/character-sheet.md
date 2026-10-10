@@ -1,32 +1,30 @@
 ---
-title: Character sheet
+title: Character sheet (basics)
 prefix: CHAR
 status: unclaimed
 owner: —
-wave: 3
+wave: 2
 ---
 
-# Character sheet
+# Character sheet (basics)
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
 ## 1. Summary
 
-- Full 5e (2014) character sheet from day one ([ADR-0007](../architecture/adr/0007-product-scope.md)).
-- Player-editable for their own character; DM can edit any.
-- Click-to-roll via [dice-roll-log](dice-roll-log.md).
+- MVP sheet: just enough for a fight ([ADR-0014](../architecture/adr/0014-mvp-scope.md)).
+- Player views their own character; click-to-roll initiative and weapon attack/damage via [dice-roll-log](dice-roll-log.md).
+- Full 5e sheet is the target → [character-sheet-full](post-mvp/character-sheet-full.md). Data model must not block it.
 
 ## 2. Scope
 
-- Abilities, skills, saving throws.
-- AC, HP (current/max/temp), speed, hit dice.
-- Spells and spell slots.
-- Features and traits.
-- Attacks.
-- Inventory and currency.
-- Proficiencies (armour, weapons, tools, languages).
-- Notes.
-- Click-to-roll for checks, saves, attacks, damage, spells.
+- Name, portrait.
+- Armour Class.
+- HP: current / max *(temp HP proposed)*.
+- Initiative bonus.
+- One weapon attack: name, to-hit bonus, damage dice (e.g. shortsword, 1d6). May be hardcoded per fixture.
+- Click-to-roll: initiative, attack, damage.
+- Ability scores *(proposed: stored for display only, if cheap)*.
 
 ## 3. Goals
 
@@ -34,7 +32,8 @@ wave: 3
 
 ## 4. Non-goals
 
-> TODO (spec phase).
+- Spells, saves, skills, features, inventory, currency, proficiencies, hit dice, notes (→ [character-sheet-full](post-mvp/character-sheet-full.md)).
+- Levelling, guided creation (→ [levelling](post-mvp/levelling.md)).
 
 ## 5. User stories
 
@@ -46,23 +45,23 @@ wave: 3
 
 ## 7. UI/UX notes
 
-> TODO (spec phase): sheet layout (tabs vs single page), edit vs play mode, roll affordances. DM vs player view (DM viewing a player's sheet). Per [visual-direction](../design/visual-direction.md).
+> TODO (spec phase): compact sheet panel; roll buttons. DM view (any character) vs player view (own). Per [visual-direction](../design/visual-direction.md).
 
 ## 8. Data model
 
-> TODO (spec phase): blocked on [ADR-0012](../architecture/adr/0012-character-derived-values.md) and [ADR-0009](../architecture/adr/0009-entity-content-model.md).
+> TODO (spec phase): basics fields; depends on [ADR-0009](../architecture/adr/0009-entity-content-model.md) and the basics slice of [ADR-0012](../architecture/adr/0012-character-derived-values.md).
 
 ## 9. API & events
 
-> TODO (spec phase). Visibility rule per event (can other players see my sheet?).
+> TODO (spec phase). Visibility rule per event.
 
 ## 10. Permissions
 
-> TODO (spec phase): player edits own character only (server ownership check, [ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md)).
+> TODO (spec phase): player edits own character only? (server ownership check, [ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md)).
 
 ## 11. Edge cases & failure modes
 
-> TODO (spec phase): player and DM edit same field, HP changed by combat tracker while sheet open, disconnect mid-edit.
+> TODO (spec phase): HP changed by combat while sheet open, disconnect mid-roll.
 
 ## 12. Performance & bandwidth
 
@@ -70,17 +69,16 @@ wave: 3
 
 ## 13. Test plan
 
-> TODO (spec phase): fixture characters (e.g. L1 fighter, L5 wizard with slots, multiclass?). Derivation unit tests. Isolated per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md).
+> TODO (spec phase): fixture `player-1` (e.g. L1 fighter, shortsword 1d6). Isolated per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md).
 
 ## 14. Dependencies
 
 | On | What we need | Status |
 |---|---|---|
-| [ADR-0012](../architecture/adr/0012-character-derived-values.md) | Derived vs stored | proposed |
+| [ADR-0012](../architecture/adr/0012-character-derived-values.md) | Basics: derived vs stored | proposed |
 | [entities](entities.md) | Character as entity kind | open |
-| [compendium](compendium.md) | Spells/items to add to sheet | open |
 | [dice-roll-log](dice-roll-log.md) | Roll API | open |
-| [combat-tracker](combat-tracker.md) | HP/condition sync with combatant | open |
+| [combat-tracker](combat-tracker.md) | HP sync with combatant | open |
 
 ## 15. Open questions
 
@@ -88,13 +86,11 @@ wave: 3
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CHAR-01 | Derived vs stored; homebrew overrides | See [ADR-0012](../architecture/adr/0012-character-derived-values.md) | yes | combat-tracker, dice-roll-log |
-| OQ-CHAR-02 | Single source of truth for HP/conditions: character or combatant? | **Character for PCs; combatant references it** / combatant copies | yes | combat-tracker |
-| OQ-CHAR-03 | Can players see each other's sheets? | **Summary only (name, portrait, HP band)** / full read-only / none | no | live-sync |
-| OQ-CHAR-04 | Multiclassing in MVP? | **Data model supports it; UI basic** / single class only | no | post-mvp/levelling |
-| OQ-CHAR-05 | Character creation flow in MVP | **Manual entry** / guided builder (→ [levelling](post-mvp/levelling.md)) | no | post-mvp/levelling |
+| OQ-CHAR-01 | Basics: stored or derived? | **Stored in MVP (AC, init bonus, to-hit typed in); derivation post-MVP** / derive from ability scores now. See [ADR-0012](../architecture/adr/0012-character-derived-values.md) | yes | combat-tracker |
+| OQ-CHAR-02 | Source of truth for PC HP: character or combatant? | **Character; combatant references it** / combatant copies | yes | combat-tracker |
+| OQ-CHAR-03 | Can players edit their own sheet in MVP? | **HP only; rest via fixtures/DM** / all basics / none | no | — |
+| OQ-CHAR-04 | Can players see each other's sheets? | **No in MVP; HP visible via initiative view** / read-only | no | live-sync, combat-tracker |
 
 ## 16. Out of scope
 
-- Levelling workflows, guided creation → [levelling](post-mvp/levelling.md).
-- Non-5e systems.
+- See §4 Non-goals.

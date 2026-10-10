@@ -12,19 +12,22 @@ wave: 3
 
 ## 1. Summary
 
-- Replaces Shieldmaiden.
-- Encounter builder with CR math; running combat with initiative, HP, conditions, concentration.
-- Per-combatant visibility; player initiative view.
+- MVP: run one fight against **one kind of enemy** ([ADR-0014](../architecture/adr/0014-mvp-scope.md)).
+- Initiative, turns/rounds, attack and damage rolls, HP tracking.
+- Includes the **player-ready indicator**.
+- Encounter builder, CR math, conditions, concentration → [combat-extras](post-mvp/combat-extras.md).
 
 ## 2. Scope
 
-- Encounter builder: add monsters (compendium/entities) and PCs; CR/difficulty math.
-- Start combat from an encounter.
-- Initiative: roll/enter, order, rounds, turns.
-- HP (damage/heal/temp), conditions, concentration.
-- Per-combatant visibility (hidden from players until revealed).
+- Start combat: add PCs and N instances of one monster kind.
+- Initiative: roll (click-to-roll) or enter; sorted order; ties.
+- Rounds and turns: next/previous turn, current-turn highlight.
+- Attack: single weapon attack per combatant (from [character-sheet](character-sheet.md) / monster basics).
+- Damage and healing: apply to HP; down at 0.
+- Remove/defeat combatant; end combat.
 - Player initiative view.
-- Link combatants to tokens on the active scene ([scenes-map](scenes-map.md)).
+- Player-ready indicator.
+- Combatants linked to tokens on the active scene ([scenes-map](scenes-map.md)).
 
 ## 3. Goals
 
@@ -32,7 +35,8 @@ wave: 3
 
 ## 4. Non-goals
 
-> TODO (spec phase).
+- Encounter builder, CR/XP math, conditions, concentration, per-combatant hidden visibility (→ [combat-extras](post-mvp/combat-extras.md)).
+- Rules automation (auto-hit vs AC, auto-apply damage).
 
 ## 5. User stories
 
@@ -44,23 +48,23 @@ wave: 3
 
 ## 7. UI/UX notes
 
-> TODO (spec phase): encounter builder, DM combat panel, player initiative strip. DM vs player view. Per [visual-direction](../design/visual-direction.md) (portrait strip is a long-term motif).
+> TODO (spec phase): DM combat panel; player initiative strip; ready indicator. Per [visual-direction](../design/visual-direction.md).
 
 ## 8. Data model
 
-> TODO (spec phase): encounter, combat, combatant (HP, conditions JSON leaf, concentration, initiative, visibility). Derived: XP budget, difficulty.
+> TODO (spec phase): combat (round, current turn), combatant (entity ref, token ref, initiative, HP). Ready state.
 
 ## 9. API & events
 
-> TODO (spec phase). Visibility rule per event (monster HP, hidden combatants).
+> TODO (spec phase). Visibility rule per event (monster HP to players).
 
 ## 10. Permissions
 
-> TODO (spec phase).
+> TODO (spec phase): who may roll initiative / apply damage for a PC.
 
 ## 11. Edge cases & failure modes
 
-> TODO (spec phase): crash mid-turn, combatant removed mid-round, initiative ties, token deleted while combatant exists, DM disconnect during combat.
+> TODO (spec phase): crash mid-turn (must resume), combatant removed mid-round, token deleted, DM disconnect, player not ready.
 
 ## 12. Performance & bandwidth
 
@@ -68,17 +72,16 @@ wave: 3
 
 ## 13. Test plan
 
-> TODO (spec phase): fixture encounter (party of 4 vs goblins), CR math unit tests, crash-resume integration test. Isolated per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md).
+> TODO (spec phase): fixtures `player-1`, `enemy-1`, `battlemap` scene; crash-resume integration test; seeded dice. Isolated per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md).
 
 ## 14. Dependencies
 
 | On | What we need | Status |
 |---|---|---|
-| [entities](entities.md) | Monsters/NPCs/characters as combatant sources | open |
-| [compendium](compendium.md) | SRD monsters, conditions | open |
-| [character-sheet](character-sheet.md) | PC HP/AC/initiative bonus | open |
-| [dice-roll-log](dice-roll-log.md) | Initiative and damage rolls | open |
-| [live-sync](live-sync.md) | Visibility filter | open |
+| [entities](entities.md) | Monster basics, character ref | open |
+| [character-sheet](character-sheet.md) | PC AC/HP/init/attack | open |
+| [dice-roll-log](dice-roll-log.md) | Initiative, attack, damage rolls | open |
+| [live-sync](live-sync.md) | Events, visibility | open |
 | [scenes-map](scenes-map.md) | Token ↔ combatant binding | open |
 
 ## 15. Open questions
@@ -87,15 +90,13 @@ wave: 3
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CBT-01 | CR/difficulty math | **2014 DMG XP thresholds + multiplier** / simplified CR sum | yes | — |
+| OQ-CBT-01 | What does "player ready" mean? | **Player clicked "ready" for combat (DM sees who's ready before start)** / scene assets loaded / both | yes | scenes-map, assets-pipeline |
 | OQ-CBT-02 | What do players see of monster HP? | **Health band (healthy/bloodied/down)** / nothing / exact | yes | live-sync |
-| OQ-CBT-03 | HP source of truth for PCs | See [OQ-CHAR-02](character-sheet.md#15-open-questions) | yes | character-sheet |
-| OQ-CBT-04 | Monster initiative: individual or grouped by type? | **DM chooses per encounter** / always individual | no | — |
-| OQ-CBT-05 | Can players apply damage/conditions to themselves? | **Own PC only** / DM only | no | character-sheet |
-| OQ-CBT-06 | Concentration prompt on damage: auto-roll or reminder? | **Reminder with DC shown, click-to-roll** / auto-roll | no | dice-roll-log |
-| OQ-CBT-07 | Multiple simultaneous combats? | **One active combat per campaign** / many | no | scenes-map |
+| OQ-CBT-03 | PC HP source of truth | See [OQ-CHAR-02](character-sheet.md#15-open-questions) | yes | character-sheet |
+| OQ-CBT-04 | Who applies damage? | **DM applies to anyone; player may apply to own PC** / DM only | no | character-sheet |
+| OQ-CBT-05 | Monster initiative: individual or one roll for the group? | **One roll for the group (one kind only)** / individual | no | — |
+| OQ-CBT-06 | Does combat start auto-create/bind tokens? | **No; bind existing tokens on the scene** / auto-place | no | scenes-map |
 
 ## 16. Out of scope
 
-- Automated rules resolution (attack vs AC auto-hit, auto-damage).
-- Lighting/vision-based visibility ([ADR-0007](../architecture/adr/0007-product-scope.md)).
+- See §4 Non-goals.

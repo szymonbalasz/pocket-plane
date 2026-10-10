@@ -15,7 +15,7 @@ graph LR
 | Stage | Who | Input | Output | Done when |
 |---|---|---|---|---|
 | Spec | One agent per feature, own worktree | Template, ADRs, glossary | `docs/specs/<feature>.md` at `in-review` | Meets [spec complete](../AGENTS.md#8-definition-of-spec-complete) checklist |
-| Review | Reviewer (not the author) | Spec at `in-review` | Comments or `status: complete` | Checklist ticked |
+| Review | The DM (human) | Spec at `in-review` | Comments or `status: complete` | Checklist ticked |
 | Data model consolidation | Integrator | All `complete` specs' Data model sections | [data-model/](data-model/README.md) | One domain model, no conflicting entities/fields |
 | Protocol consolidation | Integrator | All specs' API & events sections | [protocol/](protocol/README.md) | One REST + WS catalogue with visibility rules |
 | Build | Build-phase agents | Consolidated docs | Code | Build-phase conventions (TBD) |
@@ -23,8 +23,8 @@ graph LR
 ## Roles
 
 - **Spec agent** — writes one spec in one worktree. Edits only that spec + new proposed ADRs.
-- **Reviewer** — checks a spec against the checklist, ADRs, glossary. Sets `complete`.
-- **Integrator** — merges worktrees, numbers proposed ADRs, updates the [spec index](specs/README.md), [glossary](glossary.md) and [decisions log](decisions-log.md).
+- **Reviewer** — the DM (human, not an agent). Checks a spec against the checklist, ADRs, glossary. Sets `complete`. Also accepts/rejects proposed ADRs.
+- **Integrator** — *who: TBD (DM or a main-session agent).* Merges worktrees, numbers proposed ADRs, updates the [spec index](specs/README.md), [glossary](glossary.md) and [decisions log](decisions-log.md).
 
 ## Avoiding conflicting decisions
 

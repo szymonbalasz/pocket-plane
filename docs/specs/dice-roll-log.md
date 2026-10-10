@@ -14,13 +14,13 @@ wave: 2
 
 - Server-side dice rolling via `@dice-roller/rpg-dice-roller` ([ADR-0001](../architecture/adr/0001-tech-stack.md)).
 - Persisted roll log per campaign; survives crash ([ADR-0006](../architecture/adr/0006-persistence.md)).
-- Public and whisper rolls; DM broadcast controls.
+- MVP: public rolls, click-to-roll from sheet/combat, persisted log ([ADR-0014](../architecture/adr/0014-mvp-scope.md)). Whisper/hidden-roll scope is open (OQ-DICE-06).
 
 ## 2. Scope
 
 - Roll from a dice expression (free text and click-to-roll from other features).
-- Public rolls and whispers.
-- DM broadcast controls over roll visibility.
+- Public rolls.
+- Whispers and DM broadcast controls *(MVP scope open: OQ-DICE-06)*.
 - Roll log view, persisted and live-updated.
 - Advantage/disadvantage, roll labels/context (e.g. "Longsword attack"). *(proposed)*
 

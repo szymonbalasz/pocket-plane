@@ -2,7 +2,8 @@
 
 - Status: proposed
 - Date: 2026-10-10
-- Affects: compendium, entities, combat-tracker, character-sheet, post-mvp/compendium-expansion
+- Affects: post-mvp/compendium, entities, combat-tracker, character-sheet, post-mvp/compendium-expansion
+- MVP: not blocking ([ADR-0014](0014-mvp-scope.md)). Shares the adapter pipeline and provenance with [ADR-0015](0015-source-adapters-fixtures.md).
 
 ## Context
 

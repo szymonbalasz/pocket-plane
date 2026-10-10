@@ -1,29 +1,28 @@
 ---
-title: Entities / world builder
+title: Entities (core)
 prefix: ENT
 status: unclaimed
 owner: —
 wave: 2
 ---
 
-# Entities / world builder
+# Entities (core)
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
 ## 1. Summary
 
-- Campaign-owned world records: NPCs, monsters, items, locations, factions, quests, characters.
-- Portraits/assets, search, cross-references.
-- Gradually replaces the DM's Obsidian vault (not ported).
+- The minimal entity layer MVP needs: **characters** and **monsters** that tokens and combatants point at.
+- No world-builder UI in MVP ([ADR-0014](../architecture/adr/0014-mvp-scope.md)). NPCs, locations, factions, quests, search and cross-refs → [world-builder](post-mvp/world-builder.md).
+- The model chosen here must accommodate those later kinds ([ADR-0009](../architecture/adr/0009-entity-content-model.md)).
 
 ## 2. Scope
 
-- CRUD for each entity kind.
-- Portraits and attached assets ([assets-pipeline](assets-pipeline.md)).
-- Search across entities.
-- Cross-references between entities.
-- Per-entity visibility to players (reveal/hide). *(proposed)*
-- Create entity from a compendium entry ([compendium](compendium.md)).
+- Entity kinds in MVP: `character`, `monster`.
+- Name, portrait (via [assets-pipeline](assets-pipeline.md)), kind-specific basics (see [character-sheet](character-sheet.md); monster stat basics: AC, HP, initiative bonus, one attack).
+- Created primarily by fixtures ([fixtures-adapters](fixtures-adapters.md)).
+- DM can view and edit; minimal create/edit UI *(proposed)*.
+- Character owned by a player ([campaign-management](campaign-management.md)).
 
 ## 3. Goals
 
@@ -31,7 +30,8 @@ wave: 2
 
 ## 4. Non-goals
 
-> TODO (spec phase).
+- World-builder kinds, search, cross-references, location ↔ scenes (→ [world-builder](post-mvp/world-builder.md)).
+- Compendium clone/import (→ [compendium](post-mvp/compendium.md)).
 
 ## 5. User stories
 
@@ -43,11 +43,11 @@ wave: 2
 
 ## 7. UI/UX notes
 
-> TODO (spec phase): entity list/browser, editor, search (Command palette?), backlinks. DM vs player view. Per [visual-direction](../design/visual-direction.md).
+> TODO (spec phase): minimal entity list + edit form for DM; player sees own character via [character-sheet](character-sheet.md). Per [visual-direction](../design/visual-direction.md).
 
 ## 8. Data model
 
-> TODO (spec phase): blocked on [ADR-0009](../architecture/adr/0009-entity-content-model.md) and [ADR-0011](../architecture/adr/0011-cross-references.md).
+> TODO (spec phase): blocked on [ADR-0009](../architecture/adr/0009-entity-content-model.md). Monster stat basics shape shared with [combat-tracker](combat-tracker.md).
 
 ## 9. API & events
 
@@ -59,26 +59,25 @@ wave: 2
 
 ## 11. Edge cases & failure modes
 
-> TODO (spec phase): delete referenced entity, reveal entity that references hidden ones, concurrent DM edits in two tabs.
+> TODO (spec phase): delete entity bound to a token/combatant, edit during combat.
 
 ## 12. Performance & bandwidth
 
-> TODO (spec phase): expected entity counts, search latency.
+> TODO (spec phase).
 
 ## 13. Test plan
 
-> TODO (spec phase): fixture world (a few of each kind, with cross-references). Isolated per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md).
+> TODO (spec phase): fixtures `player-1` (character) and `enemy-1` (monster) from [fixtures-adapters](fixtures-adapters.md). Isolated per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md).
 
 ## 14. Dependencies
 
 | On | What we need | Status |
 |---|---|---|
 | [ADR-0009](../architecture/adr/0009-entity-content-model.md) | Content model | proposed |
-| [ADR-0011](../architecture/adr/0011-cross-references.md) | Cross-reference model | proposed |
-| [campaign-management](campaign-management.md) | Campaign scope | open |
+| [campaign-management](campaign-management.md) | Campaign scope, player ownership | open |
 | [live-sync](live-sync.md) | Event/visibility conventions | open |
 | [assets-pipeline](assets-pipeline.md) | Portraits | open |
-| [compendium](compendium.md) | Clone-to-campaign shape | open |
+| [fixtures-adapters](fixtures-adapters.md) | How entities are seeded | open |
 
 ## 15. Open questions
 
@@ -86,15 +85,11 @@ wave: 2
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-ENT-01 | Content model | See [ADR-0009](../architecture/adr/0009-entity-content-model.md) | yes | compendium, character-sheet, combat-tracker |
-| OQ-ENT-02 | Cross-reference model | See [ADR-0011](../architecture/adr/0011-cross-references.md) | yes | compendium |
-| OQ-ENT-03 | Player-visible fields: whole entity reveal, or DM-only notes section within a revealed entity? | **Revealed entity + DM-only notes field** / whole-entity only | yes | live-sync |
-| OQ-ENT-04 | Search: what's indexed, and do players get search? | **SQLite FTS over name + text; players search revealed only** / DM only | no | live-sync |
-| OQ-ENT-05 | Rich-text format for notes | **Markdown** / structured editor JSON | no | post-mvp/obsidian-importer, post-mvp/agent-api |
-| OQ-ENT-06 | Is "monster" an entity kind or only a compendium entry until cloned? | Depends on [ADR-0010](../architecture/adr/0010-compendium-design.md) | yes | compendium, combat-tracker |
+| OQ-ENT-01 | Content model | See [ADR-0009](../architecture/adr/0009-entity-content-model.md) | yes | character-sheet, combat-tracker, fixtures-adapters |
+| OQ-ENT-02 | Monster: one entity per kind ("Goblin") spawning many combatants, or one entity per individual? | **One entity per kind; combatants/tokens are instances** / one per individual | yes | combat-tracker, scenes-map |
+| OQ-ENT-03 | Any create/edit UI in MVP, or fixtures only? | **Minimal DM edit form; create via fixtures** / fixtures only / full CRUD | no | fixtures-adapters |
+| OQ-ENT-04 | Do characters and monsters share the "basics" shape (AC, HP, init, attack)? | **Yes, one shared combat-basics block** / separate | yes | character-sheet, combat-tracker |
 
 ## 16. Out of scope
 
-- Relation graph, region maps → [world-builder-deep](post-mvp/world-builder-deep.md).
-- Obsidian import → [obsidian-importer](post-mvp/obsidian-importer.md).
-- Character sheet details → [character-sheet](character-sheet.md).
+- See §4 Non-goals.

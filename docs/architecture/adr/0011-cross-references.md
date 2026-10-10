@@ -2,7 +2,8 @@
 
 - Status: proposed
 - Date: 2026-10-10
-- Affects: entities, compendium, post-mvp/world-builder-deep, post-mvp/obsidian-importer, post-mvp/agent-api
+- Affects: post-mvp/world-builder, post-mvp/compendium, post-mvp/obsidian-importer, post-mvp/agent-api
+- MVP: not blocking ([ADR-0014](0014-mvp-scope.md)).
 
 ## Context
 

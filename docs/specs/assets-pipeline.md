@@ -12,7 +12,7 @@ wave: 1
 
 ## 1. Summary
 
-- Upload, store and serve binary assets: map images, portraits, handouts.
+- Upload, store and serve binary assets. MVP: map images and token/portrait images ([ADR-0014](../architecture/adr/0014-mvp-scope.md)). Handouts later.
 - Content-hashed storage and derivatives (via `sharp`), aggressive caching.
 - Served from the DM's laptop over a tunnel, so bandwidth matters ([ADR-0003](../architecture/adr/0003-local-hosting.md)).
 
@@ -22,7 +22,7 @@ wave: 1
 - Content-hash addressing; dedupe identical uploads.
 - Derivatives: thumbnails, resized variants, format conversion.
 - HTTP caching (immutable URLs by hash).
-- Preload API used by [scenes-map](scenes-map.md) for the player-ready indicator.
+- Preload of the next scene's map *(MVP need depends on [OQ-CBT-01](combat-tracker.md#15-open-questions))*.
 - Asset metadata and campaign ownership.
 - Visibility: players only fetch assets they're allowed to see.
 
@@ -75,7 +75,7 @@ wave: 1
 | On | What we need | Status |
 |---|---|---|
 | [campaign-management](campaign-management.md) | Campaign scope, auth | open |
-| [live-sync](live-sync.md) | Preload/ready events | open |
+| [live-sync](live-sync.md) | Preload/ready events (if any) | open |
 
 ## 15. Open questions
 
@@ -83,9 +83,9 @@ wave: 1
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-ASSET-01 | Access control for asset URLs (hash is guessable-ish, hidden maps may leak) | **Auth-checked route + visibility check** / unguessable hash only / signed URLs | yes | scenes-map, entities |
+| OQ-ASSET-01 | Access control for asset URLs (inactive scene maps could leak) | **Auth-checked route; visibility check post-MVP** / unguessable hash only / signed URLs | yes | scenes-map, entities |
 | OQ-ASSET-02 | Can players upload (e.g. own portrait)? | **Yes, portrait only** / no / yes, any | no | character-sheet |
-| OQ-ASSET-03 | Derivative set and formats | **Thumb + display size, WebP** / original only / on-demand sizes | no | scenes-map |
+| OQ-ASSET-03 | Derivative set and formats in MVP | **Original + thumbnail only; more later** / thumb + display size WebP / on-demand | no | scenes-map |
 | OQ-ASSET-04 | Asset scope: per campaign or shared library | **Per campaign, dedupe on disk by hash** / global | no | campaign-management |
 | OQ-ASSET-05 | Garbage collection of unreferenced assets | **Manual DM cleanup** / ref-counted auto delete / never | no | — |
 

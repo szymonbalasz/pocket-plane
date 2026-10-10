@@ -30,7 +30,7 @@ Applies to every agent (and human) working in this repo during the spec phase. B
 
 1. Check the [spec index](docs/specs/README.md) and the spec's front matter.
 2. In your worktree, set front matter: `owner: <your-worktree-name>`, `status: claimed`. Commit that change first.
-3. Move status as you go: `claimed → draft → in-review`. Only the reviewer sets `complete`.
+3. Move status as you go: `claimed → draft → in-review`. Only the reviewer (the DM, a human) sets `complete`.
 
 Front matter is the source of truth. The index table is updated by the integrator at merge (avoids merge conflicts).
 

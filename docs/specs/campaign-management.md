@@ -18,7 +18,7 @@ wave: 1
 
 ## 2. Scope
 
-- Create, rename, archive, switch campaigns (DM). *(proposed)*
+- Create and switch campaigns (DM). Rename/archive *(proposed)*.
 - Add/remove players; generate per-player links.
 - DM secret setup and DM login.
 - Player join via link.

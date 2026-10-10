@@ -75,6 +75,7 @@ wave: 1
 | On | What we need | Status |
 |---|---|---|
 | [campaign-management](campaign-management.md) | Auth model for DM secret and player links | open |
+| [fixtures-adapters](fixtures-adapters.md) | Multi-client harness seeds from fixtures | open |
 | All feature specs | Their events and visibility rules (they depend on this spec's conventions) | — |
 
 ## 15. Open questions
@@ -88,7 +89,7 @@ wave: 1
 | OQ-SYNC-03 | Snapshot scope | **Per campaign + active scene** / whole campaign / per feature on demand | yes | all specs |
 | OQ-SYNC-04 | Intents over WS, REST, or both | **Live-play intents over WS; CRUD via Hono RPC** / everything over WS | yes | all specs |
 | OQ-SYNC-05 | Detecting missed events without replay (sequence numbers → force resnapshot?) | **Per-connection seq; gap → resnapshot** / none | no | all specs |
-| OQ-SYNC-06 | Reveal semantics: when a hidden record becomes visible, emit "created" to players? | **Yes, appear as create; hide as delete** / dedicated reveal event | yes | scenes-map, combat-tracker, entities |
+| OQ-SYNC-06 | Reveal semantics: when a hidden record becomes visible, emit "created" to players? (MVP has few hidden records: DM-hidden rolls, inactive scenes) | **Yes, appear as create; hide as delete** / dedicated reveal event | no | dice-roll-log, scenes-map, post-mvp/scene-tools |
 
 ## 16. Out of scope
 

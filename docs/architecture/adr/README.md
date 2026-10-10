@@ -12,13 +12,15 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0004](0004-tenancy-auth-permissions.md) | Tenancy, auth and permissions | accepted |
 | [0005](0005-server-authoritative-sync.md) | Server-authoritative sync | accepted |
 | [0006](0006-persistence.md) | Persistence model | accepted |
-| [0007](0007-product-scope.md) | Product scope and exclusions | accepted |
+| [0007](0007-product-scope.md) | Product scope and exclusions | accepted, partly superseded by 0014 |
 | [0008](0008-parallel-dev-isolation.md) | Parallel dev isolation | accepted |
 | [0009](0009-entity-content-model.md) | Entity content model | proposed |
 | [0010](0010-compendium-design.md) | Compendium design | proposed |
 | [0011](0011-cross-references.md) | Cross-reference model | proposed |
 | [0012](0012-character-derived-values.md) | Character sheet: derived vs stored, homebrew overrides | proposed |
 | [0013](0013-session-journal-scope.md) | Session outcomes / journal: MVP or post-MVP | proposed |
+| [0014](0014-mvp-scope.md) | MVP is a playable session simulation | accepted |
+| [0015](0015-source-adapters-fixtures.md) | Source adapters and fixtures | proposed |
 
 ## Proposing a new ADR
 

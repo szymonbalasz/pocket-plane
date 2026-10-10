@@ -2,7 +2,8 @@
 
 - Status: proposed
 - Date: 2026-10-10
-- Affects: entities, compendium, character-sheet, combat-tracker, scenes-map, post-mvp/agent-api, post-mvp/obsidian-importer
+- Affects: entities, character-sheet, combat-tracker, scenes-map, fixtures-adapters, post-mvp/compendium, post-mvp/world-builder, post-mvp/agent-api, post-mvp/obsidian-importer
+- MVP: **blocking** — characters and monsters are entities ([ADR-0014](0014-mvp-scope.md)). World-builder kinds can follow later but the model must accommodate them.
 
 ## Context
 

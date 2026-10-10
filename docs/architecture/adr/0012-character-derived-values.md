@@ -2,7 +2,8 @@
 
 - Status: proposed
 - Date: 2026-10-10
-- Affects: character-sheet, combat-tracker, dice-roll-log, post-mvp/levelling
+- Affects: character-sheet, combat-tracker, dice-roll-log, post-mvp/character-sheet-full, post-mvp/levelling
+- MVP: blocking only for the basics (AC, HP, initiative, one weapon attack) per [ADR-0014](0014-mvp-scope.md). Choice must not block the full sheet later.
 
 ## Context
 

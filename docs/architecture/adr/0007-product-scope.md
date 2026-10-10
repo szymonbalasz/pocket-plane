@@ -1,6 +1,6 @@
 # 0007 — Product scope and exclusions
 
-- Status: accepted
+- Status: accepted — **partially superseded by [ADR-0014](0014-mvp-scope.md)** (character sheet timing, compendium import timing)
 - Date: 2026-10-10
 - Affects: all specs
 
@@ -12,8 +12,8 @@
 
 **In**
 - D&D 5e, 2014 SRD rules.
-- Compendium import: Open5e first, 5etools-style JSON later.
-- **Full 5e character sheet from the start**: abilities, skills, saves, AC/HP/speed, hit dice, spells and slots, features, attacks, inventory, currency, proficiencies, notes. Expanded over time.
+- Compendium import: Open5e first, 5etools-style JSON later. *Post-MVP per [ADR-0014](0014-mvp-scope.md).*
+- ~~**Full 5e character sheet from the start**~~ → Full 5e sheet is the **target**; MVP ships the basics ([ADR-0014](0014-mvp-scope.md)). Target: abilities, skills, saves, AC/HP/speed, hit dice, spells and slots, features, attacks, inventory, currency, proficiencies, notes.
 
 **Out**
 - Touch / mobile. Laptops only.
@@ -26,4 +26,4 @@
 ## Consequences
 
 - Specs must not add touch gestures, lighting, drawing, audio or plugin hooks.
-- Character sheet spec can't defer core sections to post-MVP.
+- ~~Character sheet spec can't defer core sections to post-MVP.~~ Superseded: see [ADR-0014](0014-mvp-scope.md).

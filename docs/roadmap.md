@@ -1,54 +1,66 @@
 # Roadmap
 
-## Spec writing order
+MVP = playable session simulation ([ADR-0014](architecture/adr/0014-mvp-scope.md), [vision](vision.md#mvp-a-playable-session-simulation)).
 
-Specs in the same wave can be written in parallel. Later waves depend on earlier ones being at least `draft`.
+## Spec writing order (MVP)
+
+Same wave = parallel. Later waves need earlier ones at least `draft`.
 
 | Wave | Specs | Why this order |
 |---|---|---|
-| 0 | Proposed ADRs [0009](architecture/adr/0009-entity-content-model.md)–[0013](architecture/adr/0013-session-journal-scope.md) | Entity/compendium model shapes almost every spec |
-| 1 | [live-sync](specs/live-sync.md), [assets-pipeline](specs/assets-pipeline.md), [campaign-management](specs/campaign-management.md) | Foundations: auth, scope, events, files |
-| 2 | [entities](specs/entities.md), [compendium](specs/compendium.md), [dice-roll-log](specs/dice-roll-log.md) | Content and rolling, used by play features |
-| 3 | [character-sheet](specs/character-sheet.md), [combat-tracker](specs/combat-tracker.md), [scenes-map](specs/scenes-map.md) | Play features, built on everything above |
+| 0 | [ADR-0009](architecture/adr/0009-entity-content-model.md) entity model, [ADR-0015](architecture/adr/0015-source-adapters-fixtures.md) adapters/fixtures, [ADR-0012](architecture/adr/0012-character-derived-values.md) (basics only) | Shape characters, monsters and fixtures |
+| 1 | [live-sync](specs/live-sync.md), [campaign-management](specs/campaign-management.md), [assets-pipeline](specs/assets-pipeline.md), [fixtures-adapters](specs/fixtures-adapters.md) | Foundations: auth, events, files, rebuildable setups |
+| 2 | [entities](specs/entities.md) (core), [character-sheet](specs/character-sheet.md) (basics), [dice-roll-log](specs/dice-roll-log.md) | What tokens and combat act on |
+| 3 | [scenes-map](specs/scenes-map.md), [combat-tracker](specs/combat-tracker.md), [party-loot](specs/party-loot.md) | The session itself |
 
-After wave 3: [data model](data-model/README.md) and [protocol](protocol/README.md) consolidation, then build ([process](process.md)).
+Not blocking MVP: [ADR-0010](architecture/adr/0010-compendium-design.md), [0011](architecture/adr/0011-cross-references.md), [0013](architecture/adr/0013-session-journal-scope.md).
+
+After wave 3: [data model](data-model/README.md) → [protocol](protocol/README.md) consolidation → build ([process](process.md)).
 
 ## Dependencies
 
 ```mermaid
 graph LR
-  ADR[Open ADRs 0009-0013] --> ENT[entities]
-  ADR --> CMP[compendium]
-  ADR --> CHR[character-sheet]
-  SYNC[live-sync] --> ENT
+  A9[ADR-0009] --> ENT[entities core]
+  A15[ADR-0015] --> FIX[fixtures-adapters]
+  A12[ADR-0012] --> CHR[character-sheet basics]
+  CAMP[campaign-management] --> SYNC[live-sync]
   SYNC --> DICE[dice-roll-log]
-  SYNC --> CBT[combat-tracker]
   SYNC --> MAP[scenes-map]
-  CAMP[campaign-management] --> SYNC
-  CAMP --> ENT
-  ASSET[assets-pipeline] --> ENT
-  ASSET --> MAP
-  CMP --> ENT
+  SYNC --> CBT[combat-tracker]
+  SYNC --> LOOT[party-loot]
+  ASSET[assets-pipeline] --> MAP
   ENT --> CHR
   ENT --> CBT
   ENT --> MAP
-  CMP --> CBT
+  FIX --> ENT
+  FIX --> MAP
   DICE --> CHR
   DICE --> CBT
+  CHR --> CBT
   CBT --> MAP
 ```
 
 ## MVP build phases
 
-> TODO (spec phase): confirm after specs reach `complete`. Indicative only.
+> TODO (spec phase): confirm once specs are `complete`. Indicative only.
 
 | Phase | Delivers | Exit check |
 |---|---|---|
-| 1. Skeleton | Campaign, auth, live sync, assets | DM + player connect; snapshot on reconnect |
-| 2. Content | Entities, compendium import (Open5e) | Browse SRD, clone to campaign |
-| 3. Play | Dice, character sheet, combat, scenes | Run a full session end-to-end |
-| 4. Hardening | Crash recovery, preload, perf | Kill server mid-combat, resume intact |
+| 1. Skeleton | Campaign, auth, live sync, fixture pipeline | DM + player connect; snapshot on reconnect; fixture rebuild works |
+| 2. Scenes | Assets, scenes, tokens, ruler, scene switch | Town → battlemap with tokens moved by DM and player |
+| 3. Combat | Sheet basics, dice, combat, ready indicator | One full fight vs one enemy kind |
+| 4. Reward + hardening | Party loot; crash recovery | Full session simulation; kill server mid-combat, resume intact |
 
-## Post-MVP
+## After MVP (v1 candidates, unordered)
 
-Stubs only, unordered: see [specs/post-mvp/](specs/README.md#post-mvp).
+| Stub | From original MVP list |
+|---|---|
+| [compendium](specs/post-mvp/compendium.md) | SRD import, browse, clone, homebrew |
+| [world-builder](specs/post-mvp/world-builder.md) | NPCs, locations, factions, quests, search, cross-refs, location ↔ scenes |
+| [scene-tools](specs/post-mvp/scene-tools.md) | Fog, AoE props, hidden tokens |
+| [character-sheet-full](specs/post-mvp/character-sheet-full.md) | Full 5e sheet |
+| [combat-extras](specs/post-mvp/combat-extras.md) | Encounter builder, CR math, conditions, concentration, visibility |
+| [party-board](specs/post-mvp/party-board.md) | Handouts, party inventory |
+
+Plus the rest of [post-MVP](specs/README.md#post-mvp).

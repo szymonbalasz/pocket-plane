@@ -8,11 +8,11 @@ phase: post-mvp
 
 # Party board (post-MVP stub)
 
-- **What:** Replaces Miro. Shared space for handouts, party inventory, gold ledger, shared info.
-- **Builds on:** [entities](../entities.md), [assets-pipeline](../assets-pipeline.md), [character-sheet](../character-sheet.md) (inventory/currency), [live-sync](../live-sync.md).
+- **What:** Replaces Miro. Shared space for handouts, party inventory, gold ledger, shared info. Grows out of MVP [party loot](../party-loot.md).
+- **Builds on:** [party-loot](../party-loot.md), [world-builder](world-builder.md) (items), [assets-pipeline](../assets-pipeline.md), [character-sheet-full](character-sheet-full.md) (inventory/currency), [live-sync](../live-sync.md).
 - **Open:**
   - Handout reveal model vs entity visibility — same mechanism?
   - Party inventory vs per-character inventory: transfer semantics.
-  - Gold ledger: append-only transactions or balance + history?
+  - Gold ledger: evolve party-loot entries into transactions, or separate?
 
 > TODO (spec phase): expand from [_template.md](../_template.md) after MVP.

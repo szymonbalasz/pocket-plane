@@ -3,6 +3,7 @@
 - Status: proposed
 - Date: 2026-10-10
 - Affects: campaign-management, dice-roll-log, combat-tracker, post-mvp/campaign-manager
+- MVP: not blocking ([ADR-0014](0014-mvp-scope.md)). Option A (post-MVP) is consistent with the MVP definition.
 
 ## Context
 

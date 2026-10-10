@@ -27,11 +27,25 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 19 | Runtime session state lives in DB and survives crashes | Crash mid-session must not lose the table | [0006](architecture/adr/0006-persistence.md) |
 | 20 | Laptops only; no touch/mobile | Known users, known devices | [0007](architecture/adr/0007-product-scope.md) |
 | 21 | No dynamic lighting, freehand drawing, audio or extensions | Scope control; AoE props cover the drawing need | [0007](architecture/adr/0007-product-scope.md) |
-| 22 | Full 5e character sheet from the start | Players need a complete sheet to replace existing tools | [0007](architecture/adr/0007-product-scope.md) |
-| 23 | System is D&D 5e 2014 SRD; Open5e import first, 5etools JSON later | Table's system; SRD licence is clear | [0007](architecture/adr/0007-product-scope.md) |
+| 22 | Full 5e character sheet from the start *(superseded by #37)* | Players need a complete sheet to replace existing tools | [0007](architecture/adr/0007-product-scope.md) |
+| 23 | System is D&D 5e 2014 SRD; Open5e import first, 5etools JSON later *(import post-MVP, #36)* | Table's system; SRD licence is clear | [0007](architecture/adr/0007-product-scope.md) |
 | 24 | Parallel worktree dev: env-driven ports/paths, fixtures, no shared state | Many agents must run and test concurrently | [0008](architecture/adr/0008-parallel-dev-isolation.md) |
 | 25 | Obsidian vault not ported; retired gradually | Migration cost outweighs value; optional importer later | [0007](architecture/adr/0007-product-scope.md) |
 | 26 | MVP visuals: dark only, shadcn defaults; BG2-style theme post-MVP | Function first; theme later without rework | [visual-direction](design/visual-direction.md) |
 | 27 | ADRs grouped one per decision area, not one per bullet | Fewer, more skimmable ADRs | — |
 | 28 | Cross-cutting features (live sync, assets) written as normal specs, first wave | One template for all; ordering via roadmap | [roadmap](roadmap.md) |
 | 29 | Claim status lives in spec front matter, not a shared table | Avoids merge conflicts between worktrees | [AGENTS.md](../AGENTS.md#4-claiming-a-feature) |
+
+## MVP redefinition
+
+| # | Decision | Rationale | ADR |
+|---|---|---|---|
+| 30 | DM (human) is the spec reviewer; no reviewer agent | DM owns the product decisions | [process](process.md#roles) |
+| 31 | MVP = playable session simulation (roleplay, story, combat) | Get a usable product in hand early and iterate | [0014](architecture/adr/0014-mvp-scope.md) |
+| 32 | MVP character sheet = basics: AC, HP, initiative, one weapon attack (shortsword 1d6 may be hardcoded) | Enough for a fight; full sheet stays the target | [0014](architecture/adr/0014-mvp-scope.md) |
+| 33 | MVP combat = one enemy kind, single weapon attack each; initiative, HP, damage, rolls; player-ready indicator | Minimum to run a fight | [0014](architecture/adr/0014-mvp-scope.md) |
+| 34 | MVP scenes = map, grid, pan/zoom, tokens, ruler, scene switching | Town + battlemap is the session's spine | [0014](architecture/adr/0014-mvp-scope.md) |
+| 35 | MVP party reward = shared party loot log (form not fixed to gold) | Need to see a reward given to the party | [0014](architecture/adr/0014-mvp-scope.md) |
+| 36 | Deferred: compendium import, fog, AoE props, hidden tokens, world builder (incl. location ↔ scenes), full sheet, encounter builder/CR math, conditions | Not needed for the session simulation | [0014](architecture/adr/0014-mvp-scope.md) |
+| 37 | Full 5e sheet "from day one" superseded; full sheet remains the target, model must not block it | Speed to a usable product | [0014](architecture/adr/0014-mvp-scope.md) supersedes part of [0007](architecture/adr/0007-product-scope.md) |
+| 38 | MVP fixtures: one player, one enemy, town + battlemap scenes; teardown/rebuild | Fast, repeatable test setup is a working goal | [0014](architecture/adr/0014-mvp-scope.md) |
