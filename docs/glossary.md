@@ -56,8 +56,9 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Roll log** | Persisted, ordered list of rolls in a campaign. | — |
 | **Whisper** | A roll visible only to the roller and DM (or DM-to-player). | — |
 | **Domain event** | Typed record of a committed change, dispatched in-process to listeners (broadcaster, rules…) ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | WS event (the filtered message sent to a client) |
-| **Pending action** | Persisted prompt awaiting resolution by DM or a player (e.g. apply damage, roll a save) ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | — |
-| **Damage card** | A pending action holding a damage result (from a player or DM roll) the DM applies to a target with a modifier: normal, resistant, immune, vulnerable. | Roll |
+| **Notification** | Persisted, toast-like message with a history feed; has a kind, an audience and optionally an action ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | WS event |
+| **Pending action** | A notification whose action (button) is not yet resolved or dismissed (e.g. apply damage, roll a save). | — |
+| **Damage card** | A notification kind with an "apply" action, holding a damage result (from a player or DM roll) the DM applies to a target with a modifier: normal, resistant, immune, vulnerable. | Roll |
 | **Manual roll** | A roll entered from physical dice instead of rolled by the server. Logged and marked manual. | — |
 | **Party loot** | Shared, party-visible log of rewards (gold, items) the DM gives the party. | Party board (post-MVP superset) |
 

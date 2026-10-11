@@ -15,6 +15,7 @@ Template: [_template.md](_template.md). Writing order: [roadmap](../roadmap.md#s
 | 2 | [Entities (core)](entities.md) | ENT | unclaimed | — |
 | 2 | [Character sheet (basics)](character-sheet.md) | CHAR | unclaimed | — |
 | 2 | [Dice and roll log](dice-roll-log.md) | DICE | unclaimed | — |
+| 2 | [Notifications](notifications.md) | NOTE | unclaimed | — |
 | 3 | [Scenes and map](scenes-map.md) | MAP | unclaimed | — |
 | 3 | [Combat tracker](combat-tracker.md) | CBT | unclaimed | — |
 | 3 | [Party loot](party-loot.md) | LOOT | unclaimed | — |

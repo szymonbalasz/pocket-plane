@@ -23,7 +23,7 @@ wave: 3
 - Rounds and turns: next/previous turn, current-turn highlight.
 - Attack: single weapon attack per combatant (from [character-sheet](character-sheet.md) / monster basics).
 - Damage and healing: apply to HP; down at 0.
-- **Damage cards** (a kind of pending action, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): a player's attack + damage roll appears as a pending card for the DM; DM picks target and applies as normal / resistant / immune / vulnerable. DM can also create cards. Rolls may be automated or manual ([dice-roll-log](dice-roll-log.md)).
+- **Damage cards** (a [notification](notifications.md) kind with an apply action, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): a player's attack + damage roll appears as a pending card for the DM; DM picks target and applies as normal / resistant / immune / vulnerable. DM can also create cards. Rolls may be automated or manual ([dice-roll-log](dice-roll-log.md)).
 - Remove/defeat combatant; end combat.
 - Player initiative view.
 - Combatants linked to tokens on the active scene ([scenes-map](scenes-map.md)).
@@ -83,7 +83,7 @@ wave: 3
 | [dice-roll-log](dice-roll-log.md) | Initiative, attack, damage rolls | open |
 | [live-sync](live-sync.md) | Events, visibility | open |
 | [scenes-map](scenes-map.md) | Token ↔ combatant binding | open |
-| [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) | Domain events, pending-action shape (owned here in MVP) | accepted (core) |
+| [notifications](notifications.md) | Notification + action shape for damage cards | open |
 
 ## 15. Open questions
 
@@ -97,7 +97,7 @@ wave: 3
 | OQ-CBT-05 | Monster initiative: individual or one roll for the group? | **One roll for the group (one kind only)** / individual | no | — |
 | OQ-CBT-07 | Who picks the damage card target? | **Player picks (click token); DM confirms on apply** / DM only | yes | scenes-map |
 | OQ-CBT-08 | Does the app compare attack roll vs AC? | **Shows hit/miss hint; DM decides** / no comparison / auto-resolve | no | — |
-| OQ-CBT-09 | Do unapplied cards persist across crash/turn end? | **Yes, persisted until applied or dismissed** / expire at turn end | yes | live-sync |
+| OQ-CBT-09 | Do unapplied cards persist across turn end? (crash-safe regardless, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)) | **Yes, until applied or dismissed** / expire at turn end | no | notifications |
 | OQ-CBT-06 | Does combat start auto-create/bind tokens? | **No; bind existing tokens on the scene** / auto-place | no | scenes-map |
 
 ## 16. Out of scope

@@ -74,6 +74,7 @@ wave: 3
 |---|---|---|
 | [live-sync](live-sync.md) | Events, snapshot | open |
 | [campaign-management](campaign-management.md) | Campaign scope | open |
+| [notifications](notifications.md) | "Loot received" notification kind *(proposed)* | open |
 
 ## 15. Open questions
 
