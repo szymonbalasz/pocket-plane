@@ -14,7 +14,7 @@ wave: 1
 
 - Tear down and rebuild any dev/test setup from fixtures, fast ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)).
 - Test fixtures per [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md); setups are scripts of server commands.
-- The fixed **import pipeline core** (validate → upsert → provenance) that bespoke source adapters feed ([ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md)). MVP inclusion open (OQ-FIX-07).
+- The fixed **import pipeline core** (validate → upsert → provenance) that bespoke source adapters feed ([ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md)). **In MVP, minimal.**
 - Fixtures power the agent build loop: load → test in a browser → discard ([ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md)).
 
 ## 2. Scope
@@ -32,7 +32,7 @@ wave: 1
 - Commands: reset (empty DB + asset dir), load bundle, reset-and-load.
 - **Setup fixtures** (campaign, scenes, tokens, encounters, mid-combat states) are scripts of server commands — same path as the UI.
 - **Pipeline core**: normalised-record schemas (shared with [ADR-0009](../architecture/adr/0009-entity-content-model.md)), validate, upsert by `(source, sourceKey)`, provenance.
-- SRD creature fixtures (goblin, wolf) load through the core as source `fixture` *(if OQ-FIX-07 = yes)*.
+- SRD creature fixtures (goblin, wolf) load through the core as source `fixture` (read-only, like any import).
 
 ## 3. Goals
 
@@ -103,7 +103,7 @@ wave: 1
 | OQ-FIX-04 | Mid-combat fixtures (e.g. "round 2, enemy at half HP")? | **Yes, as bundles layered on `session-sim`** / base state only | no | combat-tracker, live-sync |
 | OQ-FIX-05 | ~~Fixture images~~ **Decided: simple shapes on white (maps), shapes on circles (tokens); tiny committed files or deterministic generation** ([ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md)) | — | — | — |
 | OQ-FIX-06 | ~~DM uses fixtures in real play?~~ **Decided: no — fixtures are test data**; real content comes from the app or importers | — | — | — |
-| OQ-FIX-07 | Pipeline core in MVP? | See [ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md#open) — **yes, minimal** | yes | entities, combat-tracker |
+| OQ-FIX-07 | ~~Pipeline core in MVP?~~ **Decided: yes, minimal** ([ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md#open)) | — | — | — |
 
 ## 16. Out of scope
 

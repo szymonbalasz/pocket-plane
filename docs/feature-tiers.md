@@ -148,7 +148,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Custom actions auto-roll vs selected target(s) | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
 | Multi-target select | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
 | Open5e import | A | [compendium](specs/post-mvp/compendium.md) | Important |
-| **AI paste adapter** (paste text found online → creature/item) | ? | [compendium](specs/post-mvp/compendium.md) | > TODO (spec phase): tier |
+| **AI paste** (paste text found online → prefilled creature/item form) | ? | [compendium](specs/post-mvp/compendium.md) | Form-filling time-saver, not an importer. > TODO (spec phase): tier |
 | DM homebrew file import | A | [compendium](specs/post-mvp/compendium.md) | Formats TBD |
 | Griffon's Saddlebag item import (partial mechanics) | B | [compendium](specs/post-mvp/compendium.md) | Fill in mechanics as items get used |
 | 5etools import | C | [compendium-expansion](specs/post-mvp/compendium-expansion.md) | Separate project |

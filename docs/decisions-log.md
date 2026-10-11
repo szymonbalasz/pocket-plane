@@ -123,3 +123,5 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 95 | Three data origins: imported content (pipeline), test fixtures (ADR-0017), app-generated (UI → commands) | Each has a different lifecycle | [0015](architecture/adr/0015-source-adapters-fixtures.md) |
 | 96 | Known adapters: Open5e SRD (first), AI paste, homebrew, Griffon's Saddlebag; 5etools separate project; character import via once-off scripts later | DM's sources | [0015](architecture/adr/0015-source-adapters-fixtures.md) |
 | 97 | Setup fixtures are scripts of server commands; fixtures are test data only | Exercise real code; no unreachable states | [0017](architecture/adr/0017-agent-verification-fixture-library.md) |
+| 98 | Minimal import pipeline core in MVP; SRD fixture creatures load through it as read-only imports | Read-only vs custom testable from day one | [0015](architecture/adr/0015-source-adapters-fixtures.md) |
+| 99 | AI paste is a form-filling time-saver: prefills the creature/item form, DM saves a custom; not an import | Avoids a fake "source" with no re-import | [0015](architecture/adr/0015-source-adapters-fixtures.md) |

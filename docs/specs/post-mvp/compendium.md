@@ -18,7 +18,7 @@ Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). First 
 | Source | Tier | Notes |
 |---|---|---|
 | Open5e | A | Important; first real adapter |
-| **AI paste** | ? | Paste text found online → AI extracts → creature form prefilled for review → saved as custom |
+| **AI paste** | ? | Time-saver, not an importer: pasted text prefills the creature/item form; DM saves as custom |
 | DM homebrew files | A | > TODO (spec phase): file formats? |
 | Griffon's Saddlebag items | B | Bulk import name/description/rarity; mechanics added one by one as items get used |
 | 5etools JSON | C | Separate project ([compendium-expansion](compendium-expansion.md)) |

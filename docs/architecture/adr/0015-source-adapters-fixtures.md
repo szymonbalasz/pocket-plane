@@ -16,9 +16,9 @@
 
 | Origin | Examples | Path |
 |---|---|---|
-| **Imported reference content** | Open5e SRD, 5etools, homebrew files, pasted text | **Import pipeline** (this ADR) |
+| **Imported reference content** | Open5e SRD, 5etools, homebrew files | **Import pipeline** (this ADR) |
 | **Test fixtures** | Campaign, player, scenes, placed/hidden tokens, encounters | [ADR-0017](0017-agent-verification-fixture-library.md) |
-| **App-generated content** | DM creates an NPC; player creates a character | UI → server commands ([overview](../overview.md#cross-cutting-rules)) |
+| **App-generated content** | DM creates an NPC (optionally AI-prefilled from pasted text); player creates a character | UI → server commands ([overview](../overview.md#cross-cutting-rules)) |
 
 **Import pipeline: fixed core, bespoke adapters**
 
@@ -27,8 +27,8 @@ graph LR
   S1[Open5e] --> A1[Open5e adapter]
   S2[5etools JSON] --> A2[5etools adapter]
   S3[Homebrew files] --> A3[Homebrew adapter]
-  S4[Pasted text] --> A4[AI adapter]
-  A1 & A2 & A3 & A4 --> N[Normalised records<br/>shared zod schemas]
+  S4[Pasted text] -.->|prefills form, not pipeline| F[Creature form → custom]
+  A1 & A2 & A3 --> N[Normalised records<br/>shared zod schemas]
   N --> V[Validate] --> U[Upsert + provenance] --> DB[(Definitions)]
 ```
 
@@ -42,7 +42,7 @@ graph LR
 | Adapter | When | Notes |
 |---|---|---|
 | Open5e SRD | First after MVP (tier A) | Known need |
-| AI paste ("bits and bobs found online") | Post-MVP | Paste text → AI extracts into the normalised schema → DM reviews |
+| AI paste ("bits and bobs found online") | Post-MVP | **Not a pipeline adapter**: prefills the form, DM saves a custom. Time-saver only |
 | Homebrew files | Post-MVP (tier A) | Formats TBD |
 | Griffon's Saddlebag items | Post-MVP (tier B) | Partial mechanics |
 | 5etools | Separate project (tier C) | DM has prior import script (to Obsidian) as reference |
@@ -52,12 +52,12 @@ graph LR
 
 | Question | Options (suggested in bold) |
 |---|---|
-| Is the pipeline core in MVP? | **Yes, minimal: fixture SRD monsters (goblin, wolf) load through it as source `fixture`, so read-only imported vs custom is testable in MVP** / no, all MVP creatures are customs created via commands |
-| AI paste output: read-only import or custom? | **Lands in the creature form prefilled (like derive); DM reviews and saves as a custom.** No stable source to re-import from / read-only import with source `ai-paste` |
+| ~~Is the pipeline core in MVP?~~ **Decided: yes, minimal.** Fixture SRD monsters (goblin, wolf) load through it as source `fixture`, so read-only imported vs custom is testable in MVP. | — |
+| ~~AI paste output~~ **Decided: a form-filling time-saver.** Pasted text prefills the creature (or item) form; DM reviews and saves as a custom. Not an import: no read-only records, no provenance beyond an optional note. | — |
 | Re-import of a changed source entry | **Update the read-only definition; customs derived from it are unaffected (independent copies)** / version it |
 
 ## Consequences
 
 - Adding a source = writing one adapter; core and consumers unchanged.
-- The creature form doubles as the review step for AI-extracted content.
+- The creature form is the single entry point for custom content, whether typed, derived from a base, or AI-prefilled.
 - Test fixtures are **not** an adapter concern ([ADR-0017](0017-agent-verification-fixture-library.md)).

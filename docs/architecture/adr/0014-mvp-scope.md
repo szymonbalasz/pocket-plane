@@ -29,7 +29,7 @@
 | **One play page** ([play-shell](../../specs/play-shell.md)): canvas as base, floating windows over it. Player lands on the active scene; window layout persisted per player | Props (status rings, AoE markers) → [scene-tools](../../specs/post-mvp/scene-tools.md); notes from tokens, player notes → [world-builder](../../specs/post-mvp/world-builder.md) |
 | Assume immediate asset load | Player-ready indicator / load handling → [scene-tools](../../specs/post-mvp/scene-tools.md) |
 | Party loot log: rewards given to the party are visible to all | Full party board → [party-board](../../specs/post-mvp/party-board.md) |
-| Fixtures: one player, enemies, an encounter, two scenes; teardown/rebuild | |
+| Fixtures: one player, enemies, an encounter, two scenes; teardown/rebuild. **Minimal import pipeline core** (SRD fixture creatures load as read-only imports) | Real source adapters (Open5e first) → [compendium](../../specs/post-mvp/compendium.md) |
 | **DM undo of combat log entries** (damage/healing applied, LIFO) via the event log ([ADR-0016](0016-domain-events-pending-actions.md)) | |
 | **Scene list** with folders; duplicate scene | Background scene prep, pause screen (tier A) |
 
