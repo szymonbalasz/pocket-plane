@@ -65,7 +65,7 @@ graph LR
 |---|---|
 | [compendium](specs/post-mvp/compendium.md) | SRD import, browse, clone, homebrew |
 | [world-builder](specs/post-mvp/world-builder.md) | NPCs, locations, factions, quests, search, cross-refs, location ↔ scenes |
-| [scene-tools](specs/post-mvp/scene-tools.md) | Fog, AoE props, hidden tokens |
+| [scene-tools](specs/post-mvp/scene-tools.md) | **Fog first (right after MVP)**, then AoE props, layers, walls |
 | [character-sheet-full](specs/post-mvp/character-sheet-full.md) | Full 5e sheet |
 | [combat-extras](specs/post-mvp/combat-extras.md) | Encounter builder, CR math, conditions, concentration, visibility |
 | [party-board](specs/post-mvp/party-board.md) | Handouts, party inventory |

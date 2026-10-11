@@ -138,7 +138,8 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Hide / reveal token button (Owlbear-style) | S | [scenes-map](specs/scenes-map.md) | Hidden combatants follow |
 | Pre-place encounter tokens on battlemap (some hidden) | S | [combat-tracker](specs/combat-tracker.md) | No auto-placement |
 | Start / end encounter | S | [combat-tracker](specs/combat-tracker.md) | Unit of combat history |
-| Fog of war with shape + polygon tools | A | [scene-tools](specs/post-mvp/scene-tools.md) | > TODO (spec phase): confirm not MVP |
+| Fog of war with shape + polygon tools | A | [scene-tools](specs/post-mvp/scene-tools.md) | Not MVP; **first thing after** |
+| **One interface for adding any creature to an encounter** (SRD, custom, duplicated, fixture) | S | [combat-tracker](specs/combat-tracker.md) | Source-agnostic; see [ADR-0009](architecture/adr/0009-entity-content-model.md) |
 | Custom NPC from SRD monster or existing NPC, then edit | A | [compendium](specs/post-mvp/compendium.md) | Shieldmaiden as reference |
 | Custom actions auto-roll vs selected target(s) | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
 | Multi-target select | A | [combat-extras](specs/post-mvp/combat-extras.md) | |

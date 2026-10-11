@@ -8,7 +8,7 @@ phase: post-mvp
 
 # Scene tools (post-MVP stub)
 
-Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md).
+Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). **Fog of war is the first post-MVP item.**
 
 - **What:** Tier-A map features ([feature tiers](../../feature-tiers.md#1-map-and-tokens)): HP bar/ring on tokens, condition icons, layers (incl. DM-only), doors and walls (movement only). Tier B: map pins linked to notes/locations. Plus: **fog of war drawn with shape and polygon tools** (DM prep), AoE props (cone, sphere, cube, line, cylinder), live drag previews, scene preload, **player-ready indicator** (DM sees who has fully loaded a scene; deferred from MVP, which assumes immediate load).
 - Hidden tokens moved **into MVP** ([scenes-map](../scenes-map.md)).

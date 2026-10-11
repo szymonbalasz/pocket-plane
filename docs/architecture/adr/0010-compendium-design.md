@@ -15,6 +15,7 @@
 - **DM workflow (2026-10-11):**
   - Custom NPCs are made by taking an **SRD monster as a base** and editing, or by **duplicating an existing NPC**. Many per encounter.
   - Sources: **Open5e** (important), **5etools** (separate import project), **own homebrew files**, **Griffon's Saddlebag items** (bulk import; mechanics filled in one by one as items get used).
+  - Adding a creature to an encounter must be **identical for compendium and campaign creatures** (shared interface, [ADR-0009](0009-entity-content-model.md)). Favours options where using an entry directly or via clone looks the same to consumers.
   - → Entries must allow **partial data** (description only) with structured mechanics added later.
 
 ## Options

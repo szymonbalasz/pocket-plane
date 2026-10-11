@@ -20,7 +20,8 @@ wave: 2
 
 - Entity kinds in MVP: `character`, `monster`.
 - Name, portrait (via [assets-pipeline](assets-pipeline.md)), kind-specific basics (see [character-sheet](character-sheet.md); monster stat basics: AC, HP, initiative bonus, one attack, **CR and XP** for the encounter builder).
-- Created primarily by fixtures ([fixtures-adapters](fixtures-adapters.md)).
+- Created by fixtures ([fixtures-adapters](fixtures-adapters.md)) and by the DM (minimal form / duplicate — [OQ-CBT-16](combat-tracker.md#15-open-questions)).
+- **Source-agnostic creature definition**: SRD/imported, custom and duplicated creatures expose the same shape to consumers (encounter builder, tokens, combat). Provenance is metadata, not a different type.
 - DM can view and edit; minimal create/edit UI *(proposed)*.
 - Character owned by a player ([campaign-management](campaign-management.md)).
 
