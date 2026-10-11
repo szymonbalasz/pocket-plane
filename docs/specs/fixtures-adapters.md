@@ -1,8 +1,8 @@
 ---
 title: Fixtures and import pipeline core
 prefix: FIX
-status: unclaimed
-owner: —
+status: claimed
+owner: spec-fixtures-adapters
 wave: 1
 ---
 
