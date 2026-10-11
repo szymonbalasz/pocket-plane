@@ -1,6 +1,6 @@
 # 0009 — Entity content model
 
-- Status: **accepted in part** (2026-10-11) — definition / instance model decided; storage option and open rows below still pending
+- Status: **accepted** (2026-10-11) — definition / instance model, storage option A, derive = fork, PCs follow the same split. Minor rows still open below.
 - Date: 2026-10-10
 - Affects: entities, character-sheet, combat-tracker, scenes-map, fixtures-adapters, post-mvp/compendium, post-mvp/combat-extras, post-mvp/world-builder, post-mvp/agent-api, post-mvp/obsidian-importer
 - MVP: **blocking** — characters and monsters are entities ([ADR-0014](0014-mvp-scope.md)). World-builder kinds can follow later but the model must accommodate them.
@@ -31,7 +31,7 @@ graph LR
 
 **1. Definitions** — the creature database
 - **Imported definitions (SRD, Open5e, …) are read-only.**
-- **Custom definitions** are made by **deriving**: the creature form opens prefilled from a base (SRD monster or another custom), DM edits, saves a new definition. Also creatable from scratch.
+- **Custom definitions** are made by **deriving**: the creature form opens prefilled from a base (SRD monster or another custom), DM edits, saves a new, **independent** definition (no ongoing link to the base). Also creatable from scratch.
 - Editing a custom definition **updates everything that uses it**: planned encounters and placed instances (live link).
 
 **2. Instances** — a creature placed on a map / in combat
@@ -41,13 +41,13 @@ graph LR
 - **Effective stats = definition + instance modifiers.** Definition changes flow through; modifiers stay applied on top.
 - Want a genuinely different creature? Derive a new definition.
 
-**Storage (suggested, pending confirmation):** option A below — common `entity` table; definition stat block as a per-kind JSON column validated by one shared zod creature schema; play state and modifiers as relational columns/rows on token / combatant.
+**Storage (accepted):** option A below — common `entity` table; definition stat block as a per-kind JSON column validated by one shared zod creature schema; play state and modifiers as relational columns/rows on token / combatant.
 
 ## Options (storage)
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. Hybrid typed records** (suggested): `entity` table + per-kind zod/JSON schema + optional markdown notes | Structured where it matters; import maps cleanly | Querying inside JSON is weaker |
+| **A. Hybrid typed records** (accepted): `entity` table + per-kind zod/JSON schema + optional markdown notes | Structured where it matters; import maps cleanly | Querying inside JSON is weaker |
 | B. Generic entity + typed attribute blocks | Composable; agent-friendly | More indirection |
 | C. Pure relational: table per kind and relation | Strongest integrity | Table explosion; import mapping heavy |
 
@@ -55,10 +55,10 @@ graph LR
 
 | Question | Options (suggested in bold) |
 |---|---|
-| Derived definition: snapshot of the base at creation, or keeps inheriting base changes? | **Snapshot (fork) + "derived from" provenance.** SRD bases rarely change; inheritance chains get confusing / inherits unchanged fields from base |
+| ~~Derived definition: snapshot or inherit?~~ **Decided: independent copy.** "Copy from base" only prefills the form; the result is its own definition with no link to the base (optional "derived from" note for provenance). | — |
 | Delete a custom definition that has instances or encounter entries | **Block with "used in N places"** / cascade / archive |
 | Modifier model (MVP needs none; temp HP and buffs are tier A) | **Design for later: instance → list of modifiers (field, op, value, source, duration)**; feeds conditions/durations ([ADR-0016](0016-domain-events-pending-actions.md)) |
-| Do characters (PCs) follow the same definition/instance split? | **Yes: character = definition owned by a player; its token/combatant = instance. PC HP lives on the character** ([OQ-CHAR-02](../../specs/character-sheet.md#15-open-questions)) / separate model |
+| ~~Do PCs follow the same split?~~ **Decided: yes.** Character = definition owned by a player; its token/combatant = instance. **PC HP lives on the character** (damage in combat shows on the sheet). | — |
 | Where does character sheet data sit? | See [ADR-0012](0012-character-derived-values.md) |
 | Full-text search indexing | Deferred (search tier A) |
 

@@ -22,7 +22,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: â€
 | **Entity** | A campaign-owned world record: NPC, monster, item, location, faction, quest, character. Content model is open ([ADR-0009](architecture/adr/0009-entity-content-model.md)). | Compendium entry |
 | **Entity kind** | The type of an entity (npc, monster, item, location, faction, quest, character). MVP uses only **character** and **monster** ([ADR-0014](architecture/adr/0014-mvp-scope.md)). | â€” |
 | **Creature definition** | What a creature *is*: stat block, actions. Imported (read-only) or custom (editable). Same shape for all sources ([ADR-0009](architecture/adr/0009-entity-content-model.md)). | Instance |
-| **Derive** | Create a custom definition from a base via the creature form, prefilled with the base's values. | Duplicate (Ctrl-D on an instance) |
+| **Derive** | Create a new, independent custom definition via the creature form, prefilled from a base (shortcut only; no ongoing link). | Duplicate (Ctrl-D on an instance) |
 | **Instance** | A placed creature (token, combatant) pointing at one definition; holds only display name, play state and modifiers. | Creature definition |
 | **Modifier** | Per-instance adjustment applied on top of the definition (temp HP, buff, debuff). Tier A. | Override (not supported) |
 | **Character** | Entity kind for a player character with a 5e character sheet (basics in MVP, full sheet later). Owned by a player. | Player |

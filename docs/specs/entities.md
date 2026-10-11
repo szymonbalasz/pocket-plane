@@ -89,7 +89,7 @@ wave: 2
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-ENT-01 | Content model | See [ADR-0009](../architecture/adr/0009-entity-content-model.md) | yes | character-sheet, combat-tracker, fixtures-adapters |
+| OQ-ENT-01 | ~~Content model~~ **Decided:** [ADR-0009](../architecture/adr/0009-entity-content-model.md) (definitions/instances, hybrid storage) | — | — | — |
 | OQ-ENT-02 | ~~One entity per kind or per individual?~~ **Decided: one definition per kind; tokens/combatants are instances** ([ADR-0009](../architecture/adr/0009-entity-content-model.md)) | — | — | — |
 | OQ-ENT-03 | Any create/edit UI in MVP, or fixtures only? | **Minimal DM edit form; create via fixtures** / fixtures only / full CRUD | no | fixtures-adapters |
 | OQ-ENT-04 | Do characters and monsters share the "basics" shape (AC, HP, init, attack)? | **Yes, one shared combat-basics block** / separate. See ADR-0009 open row on PCs | yes | character-sheet, combat-tracker |

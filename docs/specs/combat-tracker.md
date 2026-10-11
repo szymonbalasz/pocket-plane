@@ -105,7 +105,7 @@ wave: 3
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-CBT-02 | Health band thresholds | **Healthy > 50%, bloodied ≤ 50%, down = 0** / custom bands | no | live-sync |
-| OQ-CBT-03 | PC HP source of truth | See [OQ-CHAR-02](character-sheet.md#15-open-questions) | yes | character-sheet |
+| OQ-CBT-03 | ~~PC HP source of truth~~ **Decided: the character** ([ADR-0009](../architecture/adr/0009-entity-content-model.md)) | — | — | — |
 | OQ-CBT-04 | Who applies damage? | **DM applies to anyone; player may apply to own PC** / DM only | no | character-sheet |
 | OQ-CBT-05 | One-click monster initiative: one shared roll for the group, or individual rolls? | **Individual rolls, one click** / one shared roll | no | — |
 | OQ-CBT-07 | Who picks the damage card target? | **Player picks (click token); DM confirms on apply** / DM only | yes | scenes-map |

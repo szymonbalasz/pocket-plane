@@ -116,3 +116,6 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 88 | Creature definitions vs instances. Imported (SRD) definitions read-only; custom definitions derived via prefilled form; edits propagate to encounters and instances | Uniform handling; one place to fix a creature | [0009](architecture/adr/0009-entity-content-model.md) |
 | 89 | Instances never edit stats: only name, play state, modifiers. Ctrl-D duplicates an instance. Effective stats = definition + modifiers | Inline editing would blow up complexity | [0009](architecture/adr/0009-entity-content-model.md) |
 | 90 | Compendium re-import safety: imported entries immutable, edits via derived customs | Follows from #88 | [0010](architecture/adr/0010-compendium-design.md) |
+| 91 | Derived definitions are independent copies; "copy from base" only prefills the form | Custom creature is its own thing | [0009](architecture/adr/0009-entity-content-model.md) |
+| 92 | PCs follow definition/instance split; PC HP lives on the character | One model; sheet always shows true HP | [0009](architecture/adr/0009-entity-content-model.md) |
+| 93 | Storage: entity table + per-kind zod-validated JSON stat block; play state/modifiers relational | Hybrid option A | [0009](architecture/adr/0009-entity-content-model.md) |

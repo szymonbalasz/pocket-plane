@@ -87,7 +87,7 @@ wave: 2
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-CHAR-01 | Basics: stored or derived? | **Stored in MVP (AC, init bonus, to-hit typed in); derivation post-MVP** / derive from ability scores now. See [ADR-0012](../architecture/adr/0012-character-derived-values.md) | yes | combat-tracker |
-| OQ-CHAR-02 | Source of truth for PC HP: character or combatant? | **Character; combatant references it** / combatant copies | yes | combat-tracker |
+| OQ-CHAR-02 | ~~Source of truth for PC HP~~ **Decided: the character** (combatant is an instance of it, [ADR-0009](../architecture/adr/0009-entity-content-model.md)) | — | — | — |
 | OQ-CHAR-03 | Can players edit their own sheet in MVP? | **HP only; rest via fixtures/DM** / all basics / none | no | — |
 | OQ-CHAR-04 | Can players see each other's sheets? | **No in MVP; HP visible via initiative view** / read-only | no | live-sync, combat-tracker |
 

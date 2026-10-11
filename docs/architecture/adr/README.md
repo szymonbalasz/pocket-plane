@@ -14,7 +14,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0006](0006-persistence.md) | Persistence model | accepted |
 | [0007](0007-product-scope.md) | Product scope and exclusions | accepted, partly superseded by 0014 |
 | [0008](0008-parallel-dev-isolation.md) | Parallel dev isolation | accepted |
-| [0009](0009-entity-content-model.md) | Entity content model | accepted in part (definition / instance) |
+| [0009](0009-entity-content-model.md) | Entity content model | accepted |
 | [0010](0010-compendium-design.md) | Compendium design | proposed (re-import safety decided) |
 | [0011](0011-cross-references.md) | Cross-reference model | proposed |
 | [0012](0012-character-derived-values.md) | Character sheet: derived vs stored, homebrew overrides | proposed |
