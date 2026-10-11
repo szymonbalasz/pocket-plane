@@ -55,3 +55,5 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 42 | Damage cards in MVP (trial) | Removes "read the damage out loud"; DM will judge in use | [0014](architecture/adr/0014-mvp-scope.md) |
 | 43 | Every roll supports automated or manual (physical dice) entry, for DM and players | DM and players sometimes want real dice | [0014](architecture/adr/0014-mvp-scope.md) |
 | 44 | One play page: canvas base + floating windows (Roll20-style) | Replaces six-window setup; avoids rework when notes/props arrive | [0014](architecture/adr/0014-mvp-scope.md) |
+| 45 | In-process domain event bus from the start; WS broadcaster is a listener | Live sync needs events anyway; reactions (concentration, durations) plug in without rework | [0016](architecture/adr/0016-domain-events-pending-actions.md) |
+| 46 | Rules create persisted pending actions, not silent mutations; game-time triggers only, no wall-clock scheduler | Keeps DM in control; crash-safe; simple | [0016](architecture/adr/0016-domain-events-pending-actions.md) |

@@ -25,6 +25,7 @@ wave: 1
 - Presence: who's connected (DM sees players online). *(proposed)*
 - Client-side connection state UI (connected / reconnecting / offline). *(proposed)*
 - Conventions other specs follow when listing intents/events.
+- WS broadcaster as a listener on the domain event bus ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)).
 
 ## 3. Goals
 

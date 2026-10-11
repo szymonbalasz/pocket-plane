@@ -23,7 +23,7 @@ wave: 3
 - Rounds and turns: next/previous turn, current-turn highlight.
 - Attack: single weapon attack per combatant (from [character-sheet](character-sheet.md) / monster basics).
 - Damage and healing: apply to HP; down at 0.
-- **Damage cards**: a player's attack + damage roll appears as a pending card for the DM; DM picks target and applies as normal / resistant / immune / vulnerable. DM can also create cards. Rolls may be automated or manual ([dice-roll-log](dice-roll-log.md)).
+- **Damage cards** (a kind of pending action, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): a player's attack + damage roll appears as a pending card for the DM; DM picks target and applies as normal / resistant / immune / vulnerable. DM can also create cards. Rolls may be automated or manual ([dice-roll-log](dice-roll-log.md)).
 - Remove/defeat combatant; end combat.
 - Player initiative view.
 - Combatants linked to tokens on the active scene ([scenes-map](scenes-map.md)).
@@ -83,6 +83,7 @@ wave: 3
 | [dice-roll-log](dice-roll-log.md) | Initiative, attack, damage rolls | open |
 | [live-sync](live-sync.md) | Events, visibility | open |
 | [scenes-map](scenes-map.md) | Token ↔ combatant binding | open |
+| [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) | Domain events, pending-action shape (owned here in MVP) | accepted (core) |
 
 ## 15. Open questions
 

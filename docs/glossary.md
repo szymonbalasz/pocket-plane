@@ -55,7 +55,9 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Roll** | A dice expression evaluated server-side, with result. | — |
 | **Roll log** | Persisted, ordered list of rolls in a campaign. | — |
 | **Whisper** | A roll visible only to the roller and DM (or DM-to-player). | — |
-| **Damage card** | A pending, persisted damage result (from a player or DM roll) the DM applies to a target with a modifier: normal, resistant, immune, vulnerable. | Roll |
+| **Domain event** | Typed record of a committed change, dispatched in-process to listeners (broadcaster, rules…) ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | WS event (the filtered message sent to a client) |
+| **Pending action** | Persisted prompt awaiting resolution by DM or a player (e.g. apply damage, roll a save) ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | — |
+| **Damage card** | A pending action holding a damage result (from a player or DM roll) the DM applies to a target with a modifier: normal, resistant, immune, vulnerable. | Roll |
 | **Manual roll** | A roll entered from physical dice instead of rolled by the server. Logged and marked manual. | — |
 | **Party loot** | Shared, party-visible log of rewards (gold, items) the DM gives the party. | Party board (post-MVP superset) |
 
@@ -64,7 +66,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | Term | Meaning |
 |---|---|
 | **Intent** | A client request to change state. Server validates, then mutates. |
-| **Event** | Server-to-client message describing a change to one record. |
+| **Event** (WS event) | Server-to-client message describing a change to one record; produced from a domain event after the visibility filter. |
 | **Visibility filter** | Server-side rule deciding which events/fields each client receives. |
 | **Snapshot** | Full filtered state a client requests on (re)connect. |
 | **Worktree** | An isolated git worktree where one agent works on one feature. |

@@ -40,7 +40,7 @@ Six windows, one game night:
 | **Player notes:** Obsidian-style personal notes with links, referenced from a widget or the whiteboard | Post-MVP; design for it |
 | **Player-placed props:** status rings, AoE markers; move and transform | Post-MVP; design for it |
 | **DM text drops** replacing Discord pastes | Post-MVP |
-| **Timers and reminders** (concentration checks, effect durations) | Under discussion (event model) |
+| **Timers and reminders** (concentration checks, effect durations) | Post-MVP; foundation (domain events + pending actions) in MVP — [ADR-0016](architecture/adr/0016-domain-events-pending-actions.md) |
 
 ## Users
 

@@ -48,6 +48,8 @@ Server-authoritative ([ADR-0005](adr/0005-server-authoritative-sync.md)):
 4. **Visibility filter** decides, per connected client, whether to send it and which fields.
 5. On (re)connect, client requests a **snapshot** (filtered full state), then applies events.
 
+Internally, step 3 is a typed **domain event** on an in-process bus; the broadcaster is one listener, rules (creating **pending actions**) are others ([ADR-0016](adr/0016-domain-events-pending-actions.md)).
+
 ```mermaid
 sequenceDiagram
   participant P as Player client
