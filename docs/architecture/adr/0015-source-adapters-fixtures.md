@@ -18,7 +18,7 @@
 |---|---|---|
 | **Imported reference content** | Open5e SRD, 5etools, homebrew files | **Import pipeline** (this ADR) |
 | **Test fixtures** | Campaign, player, scenes, placed/hidden tokens, encounters | [ADR-0017](0017-agent-verification-fixture-library.md) |
-| **App-generated content** | DM creates an NPC (optionally AI-prefilled from pasted text); player creates a character | UI → server commands ([overview](../overview.md#cross-cutting-rules)) |
+| **App-generated content** | DM creates an NPC (optionally AI-prefilled from pasted text); player creates a character (post-MVP; MVP characters are fixtures) | UI → server commands ([overview](../overview.md#cross-cutting-rules)) |
 
 **Import pipeline: fixed core, bespoke adapters**
 

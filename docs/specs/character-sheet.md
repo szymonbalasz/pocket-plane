@@ -15,6 +15,7 @@ wave: 2
 - MVP sheet: just enough for a fight ([ADR-0014](../architecture/adr/0014-mvp-scope.md)).
 - Player views their own character; click-to-roll initiative and weapon attack/damage via [dice-roll-log](dice-roll-log.md).
 - Full 5e sheet is the target → [character-sheet-full](post-mvp/character-sheet-full.md). Data model must not block it.
+- **MVP characters come from fixtures** (test characters). No player-facing character creation in MVP; character builder is post-MVP ([levelling](post-mvp/levelling.md)).
 
 ## 2. Scope
 
@@ -33,7 +34,7 @@ wave: 2
 ## 4. Non-goals
 
 - Spells, saves, skills, features, inventory, currency, proficiencies, hit dice, notes; roll from any number (→ [character-sheet-full](post-mvp/character-sheet-full.md), tiers in [feature tiers](../feature-tiers.md#3-character-sheet-and-dice)).
-- Levelling, guided creation (→ [levelling](post-mvp/levelling.md)).
+- Character creation by players / character builder, levelling (→ [levelling](post-mvp/levelling.md)). Character import: once-off scripts, way post-MVP.
 
 ## 5. User stories
 
@@ -88,7 +89,7 @@ wave: 2
 |---|---|---|---|---|
 | OQ-CHAR-01 | Basics: stored or derived? | **Stored in MVP (AC, init bonus, to-hit typed in); derivation post-MVP** / derive from ability scores now. See [ADR-0012](../architecture/adr/0012-character-derived-values.md) | yes | combat-tracker |
 | OQ-CHAR-02 | ~~Source of truth for PC HP~~ **Decided: the character** (combatant is an instance of it, [ADR-0009](../architecture/adr/0009-entity-content-model.md)) | — | — | — |
-| OQ-CHAR-03 | Can players edit their own sheet in MVP? | **HP only; rest via fixtures/DM** / all basics / none | no | — |
+| OQ-CHAR-03 | Can players edit their own sheet in MVP? (characters come from fixtures) | **HP only; rest via fixtures/DM** / all basics / none | no | — |
 | OQ-CHAR-04 | Can players see each other's sheets? | **No in MVP; HP visible via initiative view** / read-only | no | live-sync, combat-tracker |
 
 ## 16. Out of scope

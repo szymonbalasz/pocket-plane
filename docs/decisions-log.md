@@ -125,3 +125,4 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 97 | Setup fixtures are scripts of server commands; fixtures are test data only | Exercise real code; no unreachable states | [0017](architecture/adr/0017-agent-verification-fixture-library.md) |
 | 98 | Minimal import pipeline core in MVP; SRD fixture creatures load through it as read-only imports | Read-only vs custom testable from day one | [0015](architecture/adr/0015-source-adapters-fixtures.md) |
 | 99 | AI paste is a form-filling time-saver: prefills the creature/item form, DM saves a custom; not an import | Avoids a fake "source" with no re-import | [0015](architecture/adr/0015-source-adapters-fixtures.md) |
+| 100 | MVP characters come from fixtures; character builder after MVP | DM can play with test characters for a while | [character-sheet](specs/character-sheet.md), [levelling](specs/post-mvp/levelling.md) |
