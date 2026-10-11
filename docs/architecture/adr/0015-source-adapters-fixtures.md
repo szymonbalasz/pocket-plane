@@ -1,40 +1,63 @@
-# 0015 — Source adapters and fixtures
+# 0015 — Import pipeline and source adapters
 
-- Status: proposed
+- Status: accepted (2026-10-11); open rows below
 - Date: 2026-10-10
-- Affects: fixtures-adapters, entities, character-sheet, combat-tracker, scenes-map, post-mvp/compendium, post-mvp/compendium-expansion, post-mvp/obsidian-importer
+- Affects: fixtures-adapters, entities, post-mvp/compendium, post-mvp/compendium-expansion, post-mvp/obsidian-importer
+- Related: [ADR-0009](0009-entity-content-model.md) (definitions), [ADR-0010](0010-compendium-design.md) (compendium), [ADR-0017](0017-agent-verification-fixture-library.md) (test fixtures)
 
 ## Context
 
-- Two working goals from the DM:
-  1. **Lots of fixtures** — tear down and rebuild a test/dev setup at will.
-  2. **Adapters** — automate import of reference material from many sources: Open5e, 5etools JSON (separate project), DM homebrew files, Griffon's Saddlebag items (partial: no need to recreate every roll/feature), later Obsidian.
-- Both load external data into the app DB. Two code paths would drift.
-- Must satisfy [ADR-0008](0008-parallel-dev-isolation.md): isolated per worktree, deterministic.
-
-## Options
-
-| Option | Pros | Cons |
-|---|---|---|
-| A. **Fixtures are a source.** One adapter pipeline: fetch → normalise to our schema (zod) → upsert with provenance. Fixture adapter reads files in the repo. | One path to test; every fixture load exercises the import pipeline; new sources are "just another adapter" | Pipeline must exist in MVP (small) |
-| B. **Separate seed scripts** for fixtures; adapters built later for import | Fastest to first fixture | Two paths; import pipeline untested until post-MVP |
-| C. **SQL/DB snapshots** as fixtures | Fastest load | Brittle across schema changes; opaque in review |
-
-Suggested: **A**.
-
-## Questions to answer
-
-- Adapter interface: stages, inputs, outputs, error reporting.
-- Fixture file format and location (JSON? TS modules with zod?).
-- Fixture composition: small units (player, enemy, scene) combined into bundles (e.g. "session-sim").
-- Stable IDs for idempotent re-load / upsert.
-- Provenance fields shared with [ADR-0010](0010-compendium-design.md).
-- Fixture image assets: source and licence.
+- Reference material will come from many sources; we don't yet know all their shapes.
+- "Don't know what we don't know" → no generic adapter framework up front.
 
 ## Decision
 
-> Undecided.
+**Three origins of data, three paths**
+
+| Origin | Examples | Path |
+|---|---|---|
+| **Imported reference content** | Open5e SRD, 5etools, homebrew files, pasted text | **Import pipeline** (this ADR) |
+| **Test fixtures** | Campaign, player, scenes, placed/hidden tokens, encounters | [ADR-0017](0017-agent-verification-fixture-library.md) |
+| **App-generated content** | DM creates an NPC; player creates a character | UI → server commands ([overview](../overview.md#cross-cutting-rules)) |
+
+**Import pipeline: fixed core, bespoke adapters**
+
+```mermaid
+graph LR
+  S1[Open5e] --> A1[Open5e adapter]
+  S2[5etools JSON] --> A2[5etools adapter]
+  S3[Homebrew files] --> A3[Homebrew adapter]
+  S4[Pasted text] --> A4[AI adapter]
+  A1 & A2 & A3 & A4 --> N[Normalised records<br/>shared zod schemas]
+  N --> V[Validate] --> U[Upsert + provenance] --> DB[(Definitions)]
+```
+
+- **Adapters are bespoke, one per source.** Each is its own code; the only contract is its output: normalised records + provenance. No plugin system, no generic mapping DSL.
+- **Pipeline core is fixed:** validate against the same schemas as [ADR-0009](0009-entity-content-model.md) → upsert by `(source, sourceKey)` → record provenance (source, licence, imported at).
+- **Partial data allowed** (e.g. Griffon's Saddlebag items: name + description now, mechanics later).
+- Imported definitions are **read-only**; DM changes them by deriving a custom ([ADR-0009](0009-entity-content-model.md)).
+
+**Known adapters**
+
+| Adapter | When | Notes |
+|---|---|---|
+| Open5e SRD | First after MVP (tier A) | Known need |
+| AI paste ("bits and bobs found online") | Post-MVP | Paste text → AI extracts into the normalised schema → DM reviews |
+| Homebrew files | Post-MVP (tier A) | Formats TBD |
+| Griffon's Saddlebag items | Post-MVP (tier B) | Partial mechanics |
+| 5etools | Separate project (tier C) | DM has prior import script (to Obsidian) as reference |
+| Existing characters | Way post-MVP | Once-off scripts, not an adapter |
+
+## Open
+
+| Question | Options (suggested in bold) |
+|---|---|
+| Is the pipeline core in MVP? | **Yes, minimal: fixture SRD monsters (goblin, wolf) load through it as source `fixture`, so read-only imported vs custom is testable in MVP** / no, all MVP creatures are customs created via commands |
+| AI paste output: read-only import or custom? | **Lands in the creature form prefilled (like derive); DM reviews and saves as a custom.** No stable source to re-import from / read-only import with source `ai-paste` |
+| Re-import of a changed source entry | **Update the read-only definition; customs derived from it are unaffected (independent copies)** / version it |
 
 ## Consequences
 
-> TODO (spec phase): fill once decided. Spec: [fixtures-adapters](../../specs/fixtures-adapters.md).
+- Adding a source = writing one adapter; core and consumers unchanged.
+- The creature form doubles as the review step for AI-extracted content.
+- Test fixtures are **not** an adapter concern ([ADR-0017](0017-agent-verification-fixture-library.md)).

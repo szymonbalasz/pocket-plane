@@ -8,7 +8,7 @@ phase: post-mvp
 
 # Compendium expansion (post-MVP stub)
 
-- **What:** 5etools-style JSON import (a separate project, tier C); more content types (spells, items, classes, backgrounds…); richer homebrew authoring.
+- **What:** 5etools-style JSON import (a separate project, tier C; DM has a previous 5etools→Obsidian script as reference); more content types (spells, items, classes, backgrounds…); richer homebrew authoring.
 - **Builds on:** [compendium](compendium.md), [fixtures-adapters](../fixtures-adapters.md), [ADR-0010](../../architecture/adr/0010-compendium-design.md).
 - **Open:**
   - Licensing/provenance handling for non-SRD sources.

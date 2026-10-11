@@ -81,6 +81,6 @@ sequenceDiagram
 - Compendium design — [ADR-0010](adr/0010-compendium-design.md)
 - Cross-references — [ADR-0011](adr/0011-cross-references.md)
 - Character derived values — [ADR-0012](adr/0012-character-derived-values.md)
-- Source adapters and fixtures — [ADR-0015](adr/0015-source-adapters-fixtures.md)
+- Compendium scope — [ADR-0010](adr/0010-compendium-design.md) (re-import safety decided)
 
 > TODO (spec phase): add module boundaries once specs and [data model](../data-model/README.md) converge.

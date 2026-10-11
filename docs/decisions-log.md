@@ -119,3 +119,7 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 91 | Derived definitions are independent copies; "copy from base" only prefills the form | Custom creature is its own thing | [0009](architecture/adr/0009-entity-content-model.md) |
 | 92 | PCs follow definition/instance split; PC HP lives on the character | One model; sheet always shows true HP | [0009](architecture/adr/0009-entity-content-model.md) |
 | 93 | Storage: entity table + per-kind zod-validated JSON stat block; play state/modifiers relational | Hybrid option A | [0009](architecture/adr/0009-entity-content-model.md) |
+| 94 | Import = fixed pipeline core + bespoke adapter per source; no generic adapter framework | Unknown sources; avoid overengineering | [0015](architecture/adr/0015-source-adapters-fixtures.md) |
+| 95 | Three data origins: imported content (pipeline), test fixtures (ADR-0017), app-generated (UI → commands) | Each has a different lifecycle | [0015](architecture/adr/0015-source-adapters-fixtures.md) |
+| 96 | Known adapters: Open5e SRD (first), AI paste, homebrew, Griffon's Saddlebag; 5etools separate project; character import via once-off scripts later | DM's sources | [0015](architecture/adr/0015-source-adapters-fixtures.md) |
+| 97 | Setup fixtures are scripts of server commands; fixtures are test data only | Exercise real code; no unreachable states | [0017](architecture/adr/0017-agent-verification-fixture-library.md) |

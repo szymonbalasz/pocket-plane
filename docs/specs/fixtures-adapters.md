@@ -1,20 +1,20 @@
 ---
-title: Fixtures and source adapters
+title: Fixtures and import pipeline core
 prefix: FIX
 status: unclaimed
 owner: —
 wave: 1
 ---
 
-# Fixtures and source adapters
+# Fixtures and import pipeline core
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
 ## 1. Summary
 
 - Tear down and rebuild any dev/test setup from fixtures, fast ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)).
-- One adapter pipeline that later imports reference material from many sources (Open5e, 5etools JSON, homebrew, Obsidian).
-- Whether fixtures go through the same pipeline is proposed in [ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md).
+- Test fixtures per [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md); setups are scripts of server commands.
+- The fixed **import pipeline core** (validate → upsert → provenance) that bespoke source adapters feed ([ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md)). MVP inclusion open (OQ-FIX-07).
 - Fixtures power the agent build loop: load → test in a browser → discard ([ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md)).
 
 ## 2. Scope
@@ -30,9 +30,9 @@ wave: 1
   - `battlemap` scene: simple shapes on white, grid, tokens incl. hidden ones
 - Composition: small fixtures combined into named bundles (e.g. `session-sim`).
 - Commands: reset (empty DB + asset dir), load bundle, reset-and-load.
-- Adapter interface usable by fixtures now and external sources later.
-- Provenance recorded on everything loaded (source, version).
-- Idempotent re-load (stable IDs).
+- **Setup fixtures** (campaign, scenes, tokens, encounters, mid-combat states) are scripts of server commands — same path as the UI.
+- **Pipeline core**: normalised-record schemas (shared with [ADR-0009](../architecture/adr/0009-entity-content-model.md)), validate, upsert by `(source, sourceKey)`, provenance.
+- SRD creature fixtures (goblin, wolf) load through the core as source `fixture` *(if OQ-FIX-07 = yes)*.
 
 ## 3. Goals
 
@@ -40,9 +40,10 @@ wave: 1
 
 ## 4. Non-goals
 
-- Open5e / 5etools adapters themselves (→ [compendium](post-mvp/compendium.md), [compendium-expansion](post-mvp/compendium-expansion.md)).
+- Any real source adapter: Open5e, AI paste, homebrew, Griffon's Saddlebag (→ [compendium](post-mvp/compendium.md)), 5etools (→ [compendium-expansion](post-mvp/compendium-expansion.md)).
 - Obsidian adapter (→ [obsidian-importer](post-mvp/obsidian-importer.md)).
 - In-app import UI.
+- Character import (way post-MVP, once-off scripts).
 
 ## 5. User stories
 
@@ -62,7 +63,7 @@ wave: 1
 
 ## 9. API & events
 
-> TODO (spec phase): adapter interface (stages, inputs, outputs, errors). Whether a running server must emit events / force resnapshot after a load.
+> TODO (spec phase): pipeline core input contract (normalised records + provenance), errors. Whether a running server must emit events / force resnapshot after a load.
 
 ## 10. Permissions
 
@@ -84,8 +85,8 @@ wave: 1
 
 | On | What we need | Status |
 |---|---|---|
-| [ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md) | Pipeline shape | proposed |
-| [ADR-0009](../architecture/adr/0009-entity-content-model.md) | What a character/monster looks like | proposed |
+| [ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md) | Pipeline shape | accepted |
+| [ADR-0009](../architecture/adr/0009-entity-content-model.md) | What a character/monster looks like | accepted |
 | [campaign-management](campaign-management.md) | Campaign, player, link shape | open |
 | [assets-pipeline](assets-pipeline.md) | Ingest fixture images | open |
 | [entities](entities.md), [character-sheet](character-sheet.md), [scenes-map](scenes-map.md), [combat-tracker](combat-tracker.md) | Their records' shapes (fixtures follow them) | open |
@@ -96,12 +97,13 @@ wave: 1
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-FIX-01 | Fixtures through the adapter pipeline? | See [ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md) — **yes** | yes | all specs |
+| OQ-FIX-01 | ~~Fixtures through the adapter pipeline?~~ **Decided: setups are server-command scripts; only reference content uses the pipeline** ([ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md)) | — | — | — |
 | OQ-FIX-02 | Fixture format | **TypeScript modules exporting zod-validated objects** / JSON files + schema / YAML | yes | all specs |
 | OQ-FIX-03 | Fixture location and ownership | **One `fixtures/` tree; each feature spec names the fixtures it adds** / per-feature folders | no | all specs |
 | OQ-FIX-04 | Mid-combat fixtures (e.g. "round 2, enemy at half HP")? | **Yes, as bundles layered on `session-sim`** / base state only | no | combat-tracker, live-sync |
 | OQ-FIX-05 | ~~Fixture images~~ **Decided: simple shapes on white (maps), shapes on circles (tokens); tiny committed files or deterministic generation** ([ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md)) | — | — | — |
-| OQ-FIX-06 | Can the DM use fixtures in real play (e.g. "load my party")? | **Yes — same mechanism as homebrew sources later** / dev/test only | no | post-mvp/compendium |
+| OQ-FIX-06 | ~~DM uses fixtures in real play?~~ **Decided: no — fixtures are test data**; real content comes from the app or importers | — | — | — |
+| OQ-FIX-07 | Pipeline core in MVP? | See [ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md#open) — **yes, minimal** | yes | entities, combat-tracker |
 
 ## 16. Out of scope
 

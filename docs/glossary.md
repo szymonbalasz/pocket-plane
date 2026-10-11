@@ -30,7 +30,8 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Compendium** | Library of rules content (monsters, spells, items…) from external sources or homebrew. Design is open ([ADR-0010](architecture/adr/0010-compendium-design.md)). | Entity |
 | **Compendium entry** | One record in the compendium. | Entity |
 | **Source** | Origin of imported data (e.g. fixtures, Open5e, 5etools JSON, homebrew), with licence/provenance. | Asset |
-| **Adapter** | Code that loads one source into the app: fetch → normalise → upsert with provenance ([ADR-0015](architecture/adr/0015-source-adapters-fixtures.md), proposed). | — |
+| **Adapter** | Bespoke code for one source that turns its data into normalised records for the import pipeline ([ADR-0015](architecture/adr/0015-source-adapters-fixtures.md)). | Import pipeline |
+| **Import pipeline** | Fixed core: validate normalised records → upsert by (source, sourceKey) → provenance. Fed by adapters. | Adapter |
 | **Clone** | A campaign-owned copy of a compendium entry, editable without affecting the original. | — |
 | **Homebrew** | DM-authored content not from an external source. | — |
 | **Cross-reference** | A link from one entity/entry to another. Model is open ([ADR-0011](architecture/adr/0011-cross-references.md)). | — |
@@ -79,4 +80,4 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Visibility filter** | Server-side rule deciding which events/fields each client receives. |
 | **Snapshot** | Full filtered state a client requests on (re)connect. |
 | **Worktree** | An isolated git worktree where one agent works on one feature. |
-| **Fixture** | Deterministic seed data used by tests and dev; loaded as a source via an adapter (proposed, [ADR-0015](architecture/adr/0015-source-adapters-fixtures.md)). |
+| **Fixture** | Deterministic, disposable test data. Setups are scripts of server commands ([ADR-0017](architecture/adr/0017-agent-verification-fixture-library.md)). Not used for real play. |

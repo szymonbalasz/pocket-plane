@@ -3,7 +3,7 @@
 - Status: accepted
 - Date: 2026-10-11
 - Affects: all specs (test plans), fixtures-adapters, build phase
-- Extends: [ADR-0008](0008-parallel-dev-isolation.md), [ADR-0015](0015-source-adapters-fixtures.md)
+- Extends: [ADR-0008](0008-parallel-dev-isolation.md). Related: [ADR-0015](0015-source-adapters-fixtures.md)
 
 ## Context
 
@@ -23,7 +23,7 @@
 **Fixture library**
 - A maintained, versioned **fixture folder** is a first-class part of the codebase, not a test afterthought.
 - Fixtures are small units composed into named bundles (e.g. `session-sim`, `mid-combat`).
-- Loaded through the same import path as real sources ([ADR-0015](0015-source-adapters-fixtures.md), proposed).
+- **Setups are scripts of server commands** (create campaign → add player → upload map → place token → hide → start encounter). Same path as the UI; fixtures can't create states the app can't reach, and double as walkthrough steps.
 - Every feature that adds a record type adds fixtures for it, and a bundle that exercises it.
 
 **Fixture content: simple and clear**
