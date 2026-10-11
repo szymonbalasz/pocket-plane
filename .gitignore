@@ -23,3 +23,6 @@ coverage/
 *.db-wal
 *.db-shm
 data/
+
+# Agent verification evidence (ADR-0017)
+.verify/

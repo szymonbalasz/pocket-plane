@@ -19,6 +19,7 @@ Replaces Owlbear Rodeo (map), Shieldmaiden (combat) and, later, Miro (party boar
 | Know if a feature is in | [docs/feature-tiers.md](docs/feature-tiers.md) |
 | Style a screen | [docs/design/visual-direction.md](docs/design/visual-direction.md) |
 | Know how features get built and verified | [ADR-0017](docs/architecture/adr/0017-agent-verification-fixture-library.md) |
+| Start the agent workflow (Herdr) | [docs/agents/orchestrator-prompt.md](docs/agents/orchestrator-prompt.md) |
 
 ## Layout
 
