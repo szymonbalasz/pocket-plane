@@ -30,7 +30,8 @@ Stubs only. Not to be claimed during MVP spec phase.
 | [World builder](post-mvp/world-builder.md) | WORLD | Incl. location ↔ scenes |
 | [Scene tools](post-mvp/scene-tools.md) | SCN | Fog, hidden tokens, AoE props |
 | [Character sheet (full)](post-mvp/character-sheet-full.md) | CHARX | |
-| [Combat extras](post-mvp/combat-extras.md) | CBTX | Encounter builder, CR, conditions |
+| [Combat extras](post-mvp/combat-extras.md) | CBTX | Conditions, concentration, durations, hidden combatants… |
+| [Stats and summaries](post-mvp/stats.md) | STATS | Data capture starts in MVP |
 | [Party board](post-mvp/party-board.md) | PARTY | |
 | [Campaign manager](post-mvp/campaign-manager.md) | CMGR | |
 | [Compendium expansion](post-mvp/compendium-expansion.md) | CMPX | |

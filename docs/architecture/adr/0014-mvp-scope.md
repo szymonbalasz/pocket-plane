@@ -22,7 +22,9 @@
 | Character sheet **basics**: AC, HP, initiative, one weapon attack (e.g. shortsword 1d6, may be hardcoded) | Spells, saves, skills, features, inventory… → [character-sheet-full](../../specs/post-mvp/character-sheet-full.md) |
 | Combat vs **one kind of enemy**, single weapon attack each | Encounter builder/CR math, conditions, concentration → [combat-extras](../../specs/post-mvp/combat-extras.md) |
 | Initiative, HP, damage, rolls, roll log | |
-| **Damage cards**: player one-click rolls attack + damage → DM applies to a target as normal / resistant / immune / vulnerable | |
+| **Damage cards**: Shieldmaiden-style attack (Shift adv / Ctrl dis) → DM applies to a target as normal / half / none / double, with manual override | Hit/miss hint (tier B) |
+| One-click monster initiative; monster HP as health band to players | Conditions, concentration, durations, temp HP, death saves, hidden combatants (tier A) |
+| **Stats data capture**: all rolls, damage dealt/taken/healed, weapon, overkill | Stats UI, summaries → [stats](../../specs/post-mvp/stats.md) |
 | **Every roll: automated or manual entry** (physical dice), for DM and players | |
 | **One play page**: canvas as base, floating windows over it. Player lands on the active scene; window layout persisted per player | Props (status rings, AoE markers) → [scene-tools](../../specs/post-mvp/scene-tools.md); notes from tokens, player notes → [world-builder](../../specs/post-mvp/world-builder.md) |
 | Assume immediate asset load | Player-ready indicator / load handling → [scene-tools](../../specs/post-mvp/scene-tools.md) |

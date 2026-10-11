@@ -19,15 +19,16 @@ wave: 3
 ## 2. Scope
 
 - Start combat: add PCs and N instances of one monster kind.
-- Initiative: roll (click-to-roll) or enter; sorted order; ties.
-- Rounds and turns: next/previous turn, current-turn highlight.
-- Attack: single weapon attack per combatant (from [character-sheet](character-sheet.md) / monster basics).
-- Damage and healing: apply to HP; down at 0.
-- **Damage cards** (a [notification](notifications.md) kind with an apply action, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): a player's attack + damage roll appears as a pending card for the DM; DM picks target and applies as normal / resistant / immune / vulnerable. DM can also create cards. Rolls may be automated or manual ([dice-roll-log](dice-roll-log.md)).
+- Initiative: roll (click-to-roll) or enter; **roll for all monsters in one click**; sorted order; ties.
+- Rounds and turns: next/previous turn.
+- Whose turn it is: shown in the initiative strip / portrait row. Token highlight on map only if trivial (tier B).
+- **Attack flow (Shieldmaiden-style):** click attack; **Shift = advantage, Ctrl = disadvantage**; attack + damage rolled (automated or manual, [dice-roll-log](dice-roll-log.md)); result described in the log.
+- **Damage cards** (a [notification](notifications.md) kind with an apply action, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): the attack result appears as a pending card for the DM. DM picks target and applies as normal / half (resistant) / none (immune) / double (vulnerable), **and can manually override any value** before applying. DM can also create cards.
+- Healing: apply to HP; down at 0.
 - Remove/defeat combatant; end combat.
-- Player initiative view.
-- Highlight current-turn token on the map *(tier B — MVP timing open, [feature tiers](../feature-tiers.md))*.
+- Player initiative view; **monster HP shown to players as a health band** (healthy / bloodied / down).
 - Combatants linked to tokens on the active scene ([scenes-map](scenes-map.md)).
+- **Capture combat facts for stats** from day one: every applied damage/heal records source, target, attack/weapon, raw roll, modifier, override, applied amount, target HP before/after, overkill ([stats](post-mvp/stats.md), [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)).
 
 ## 3. Goals
 
@@ -35,9 +36,10 @@ wave: 3
 
 ## 4. Non-goals
 
-- Encounter builder, CR/XP math, conditions, concentration, per-combatant hidden visibility (→ [combat-extras](post-mvp/combat-extras.md)).
+- Conditions, concentration, durations, temp HP, death saves, reinforcements, hidden combatants, encounter builder (→ [combat-extras](post-mvp/combat-extras.md); tiers in [feature tiers](../feature-tiers.md#2-combat)).
 - Player-ready / load indicator (→ [scene-tools](post-mvp/scene-tools.md)); MVP assumes immediate load.
-- Rules automation (auto-hit vs AC, auto-apply damage).
+- Rules automation (auto-hit vs AC, auto-apply damage). Hit/miss hint is tier B.
+- Stats UI, end-of-combat summary (→ [stats](post-mvp/stats.md)); only the data capture is MVP.
 
 ## 5. User stories
 
@@ -92,14 +94,15 @@ wave: 3
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CBT-02 | What do players see of monster HP? | **Health band (healthy/bloodied/down)** / nothing / exact | yes | live-sync |
+| OQ-CBT-02 | Health band thresholds | **Healthy > 50%, bloodied ≤ 50%, down = 0** / custom bands | no | live-sync |
 | OQ-CBT-03 | PC HP source of truth | See [OQ-CHAR-02](character-sheet.md#15-open-questions) | yes | character-sheet |
 | OQ-CBT-04 | Who applies damage? | **DM applies to anyone; player may apply to own PC** / DM only | no | character-sheet |
-| OQ-CBT-05 | Monster initiative: individual or one roll for the group? | **One roll for the group (one kind only)** / individual | no | — |
+| OQ-CBT-05 | One-click monster initiative: one shared roll for the group, or individual rolls? | **Individual rolls, one click** / one shared roll | no | — |
 | OQ-CBT-07 | Who picks the damage card target? | **Player picks (click token); DM confirms on apply** / DM only | yes | scenes-map |
-| OQ-CBT-08 | Does the app compare attack roll vs AC? | **Shows hit/miss hint; DM decides** / no comparison / auto-resolve | no | — |
 | OQ-CBT-09 | Do unapplied cards persist across turn end? (crash-safe regardless, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)) | **Yes, until applied or dismissed** / expire at turn end | no | notifications |
 | OQ-CBT-06 | Does combat start auto-create/bind tokens? | **No; bind existing tokens on the scene** / auto-place | no | scenes-map |
+| OQ-CBT-10 | Overkill: record against raw damage or capped at HP? | **Record both (applied = capped, overkill = raw − HP before)** / capped only | yes | post-mvp/stats |
+| OQ-CBT-11 | Can players also use modifier keys / manual entry for their attack? | **Yes, same flow as DM** / DM only | no | dice-roll-log |
 
 ## 16. Out of scope
 

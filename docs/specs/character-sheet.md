@@ -20,7 +20,7 @@ wave: 2
 
 - Name, portrait.
 - Armour Class.
-- HP: current / max *(temp HP proposed)*.
+- HP: current / max. (Temp HP, death saves → [combat-extras](post-mvp/combat-extras.md), tier A.)
 - Initiative bonus.
 - One weapon attack: name, to-hit bonus, damage dice (e.g. shortsword, 1d6). May be hardcoded per fixture.
 - Click-to-roll: initiative, attack, damage.

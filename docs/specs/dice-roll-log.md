@@ -23,7 +23,8 @@ wave: 2
 - Public rolls.
 - Whispers and DM broadcast controls *(MVP scope open: OQ-DICE-06)*.
 - Roll log view, persisted and live-updated.
-- Advantage/disadvantage, roll labels/context (e.g. "Longsword attack"). *(proposed)*
+- Advantage/disadvantage via modifier keys (**Shift = advantage, Ctrl = disadvantage**) on any roll button; roll labels/context (e.g. "Shortsword attack").
+- Every roll persisted with roller, context (attack/weapon, target if known), automated vs manual — feeds [stats](post-mvp/stats.md).
 
 ## 3. Goals
 

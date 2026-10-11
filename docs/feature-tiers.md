@@ -8,7 +8,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 |---|---|---|
 | **S** | Need it ASAP | MVP |
 | **A** | Good to have soon | First post-MVP iterations |
-| **B** | Lightweight, custom, slimmed-down version | Timing per item (see notes) |
+| **B** | Lightweight, simple version — **not MVP**; discuss when needed. If it's near-free during build, fine to include | Post-MVP, on demand |
 | **C** | Some version eventually | Post-MVP backlog |
 | **D** | Unlikely to add | Not planned |
 | **F** | Don't need it | Never (e.g. other game systems) |
@@ -28,8 +28,32 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Condition icons on token | A | [scene-tools](specs/post-mvp/scene-tools.md) | Needs conditions ([combat-extras](specs/post-mvp/combat-extras.md)) |
 | Layers (map / objects / tokens / DM-only) | A | [scene-tools](specs/post-mvp/scene-tools.md) | DM-only layer ≈ hidden tokens |
 | Doors and walls (block movement) | A | [scene-tools](specs/post-mvp/scene-tools.md) | Movement only; no vision ([ADR-0007](architecture/adr/0007-product-scope.md)) |
-| Highlight current-turn token | B | [combat-tracker](specs/combat-tracker.md) | > TODO (spec phase): MVP or later? |
-| Movement measured along drag path, waypoints | B | [scenes-map](specs/scenes-map.md) | > TODO (spec phase): MVP or later? |
+| Highlight current-turn token | B | [combat-tracker](specs/combat-tracker.md) | Initiative strip / portraits show whose turn in MVP; token highlight only if trivial |
+| Movement measured along drag path, waypoints | B | [scenes-map](specs/scenes-map.md) | |
+
+## 2. Combat
+
+| Feature | Tier | Spec | Notes |
+|---|---|---|---|
+| Roll initiative for all monsters in one click | S | [combat-tracker](specs/combat-tracker.md) | |
+| Players see monster health as band (healthy/bloodied/down) | S | [combat-tracker](specs/combat-tracker.md) | |
+| Conditions with expiry | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Concentration + save reminder on damage | A | [combat-extras](specs/post-mvp/combat-extras.md) | Notification with action |
+| Round-based effect durations | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Temp HP | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Death saves | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Add combatants mid-fight | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| **Hidden combatants** (stealthed) | A | [combat-extras](specs/post-mvp/combat-extras.md) | Added by DM |
+| Drag to reorder initiative | B | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Auto-roll attacks + hit/miss hint vs AC | B | [combat-extras](specs/post-mvp/combat-extras.md) | Shieldmaiden-style attack flow is MVP (see below) |
+| End-of-combat summary | B | [stats](specs/post-mvp/stats.md) | Plus campaign-wide stats; discuss after MVP |
+| Legendary / lair actions | C | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Reaction-used tracker | C | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Encounter builder with CR difficulty | ? | [combat-extras](specs/post-mvp/combat-extras.md) | > TODO (spec phase): not yet ranked |
+
+**Attack flow (MVP, part of damage cards):** click attack; Shift = advantage, Ctrl = disadvantage; describe the action; DM applies via a card with normal / half / none / double and can override any value.
+
+**Stats data capture (MVP):** track everything — all rolls, damage dealt/taken/healed, weapon used, overkill — so stats can be built later.
 
 ## Already decided elsewhere
 

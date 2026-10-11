@@ -8,10 +8,26 @@ phase: post-mvp
 
 # Combat extras (post-MVP stub)
 
-Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md).
+Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). Ranking in [feature tiers](../../feature-tiers.md#2-combat).
 
-- **What:** Encounter builder with CR/XP math, multiple enemy kinds, conditions, concentration, per-combatant hidden visibility, multiple attacks/actions per combatant.
-- **Builds on:** [combat-tracker](../combat-tracker.md), [compendium](compendium.md), [character-sheet-full](character-sheet-full.md).
+- **What:**
+
+| Tier | Feature |
+|---|---|
+| A | Conditions (5e list) with expiry |
+| A | Concentration tracking + save reminder on damage (notification with action) |
+| A | Round-based effect durations ("Bless: 8 rounds") |
+| A | Temp HP |
+| A | Death saves |
+| A | Add combatants mid-fight (reinforcements) |
+| A | Hidden combatants (e.g. stealthed) — invisible to players until revealed |
+| B | Drag to reorder initiative (delay/ready) |
+| B | Hit/miss hint vs target AC |
+| C | Legendary / lair action tracker |
+| C | Reaction-used tracker |
+| ? | Encounter builder with CR difficulty — not yet ranked |
+
+- **Builds on:** [combat-tracker](../combat-tracker.md), [notifications](../notifications.md), [ADR-0016](../../architecture/adr/0016-domain-events-pending-actions.md) (durations/concentration as listeners), [compendium](compendium.md), [character-sheet-full](character-sheet-full.md).
 - **Carried-over open questions** (suggested pick in bold):
 
 | Question | Options |

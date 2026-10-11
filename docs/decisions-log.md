@@ -66,3 +66,7 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 |---|---|---|---|
 | 49 | Feature tier list (S/A/B/C/D/F) is the source of truth for scope | DM-ranked, quick to scan | [feature-tiers](feature-tiers.md) |
 | 50 | Map batch: S = snap, token sizes, ping + pull view, laser pointer, lock map, labels, DM control/ownership; A = HP bar, condition icons, layers, doors/walls; B = current-turn highlight, path measurement | DM ranking | [feature-tiers](feature-tiers.md#1-map-and-tokens) |
+| 51 | Tier B = simple version, not MVP, discuss when needed (include if near-free) | DM definition | [feature-tiers](feature-tiers.md#legend) |
+| 52 | Combat batch: S = one-click monster initiative, monster health band; A = conditions, concentration, durations, temp HP, death saves, reinforcements, hidden combatants; B = reorder initiative, hit/miss hint, combat summary; C = legendary/lair, reactions | DM ranking | [feature-tiers](feature-tiers.md#2-combat) |
+| 53 | Attack flow Shieldmaiden-style: click attack, Shift adv / Ctrl dis; apply card with normal/half/none/double + manual override of any value | Matches DM's current workflow | [combat-tracker](specs/combat-tracker.md#2-scope) |
+| 54 | Capture rich combat/roll facts from MVP for later stats (damage dealt/taken/healed, weapon, overkill, all rolls) | Players love stats; can't compute retroactively without the data | [stats](specs/post-mvp/stats.md) |
