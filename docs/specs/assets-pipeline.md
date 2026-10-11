@@ -25,6 +25,8 @@ wave: 1
 - No preload or load tracking in MVP: assume immediate load ([ADR-0014](../architecture/adr/0014-mvp-scope.md)). → [scene-tools](post-mvp/scene-tools.md).
 - Asset metadata and campaign ownership.
 - Visibility: players only fetch assets they're allowed to see.
+- Fixture assets loaded by [fixtures-adapters](fixtures-adapters.md) through the same store.
+- **Design for later:** token art library reused across scenes (tier A) — content-hashed store already dedupes.
 
 ## 3. Goals
 
