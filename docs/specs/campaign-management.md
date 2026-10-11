@@ -1,8 +1,8 @@
 ---
 title: Campaign management
 prefix: CAMP
-status: unclaimed
-owner: —
+status: claimed
+owner: spec-campaign-management
 wave: 1
 ---
 
