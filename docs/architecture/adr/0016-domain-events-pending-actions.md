@@ -52,7 +52,7 @@ graph LR
 | Question | Options (suggested in bold) |
 |---|---|
 | May rules mutate state directly? | **No; only create pending actions** / yes with depth cap |
-| Persist domain events as an append-only log? DM wants rich stats later ([stats](../../specs/post-mvp/stats.md)) | **Yes, append-only log of domain events from MVP; state tables remain the truth for play** / no log, only purpose-built fact tables (roll log, damage facts) / no log |
+| ~~Persist domain events as an append-only log?~~ **Decided: yes — robust append-only event log; stats are computed from it retroactively** ([stats](../../specs/post-mvp/stats.md)). State tables remain the truth for play. Build timing open: must be live before the first real campaign session | — |
 | Listener execution | **Synchronous, same process, after commit** / async microtask |
 | Can an action be resolved by "anyone in audience" or only a named actor? | **Named actor (DM or one player); audience may be wider** / anyone in audience |
 

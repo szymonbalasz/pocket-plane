@@ -82,7 +82,7 @@ wave: 3
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-LOOT-01 | Entry shape | **Free text + optional coin amount (gp/sp/cp)** / free text only / structured items | yes | post-mvp/party-board |
+| OQ-LOOT-01 | Entry shape (must grow into gold ledger + party inventory, tier A) | **Free text + optional coin amount (gp/sp/cp)** / free text only / structured items | yes | post-mvp/party-board |
 | OQ-LOOT-02 | Can entries be edited/removed? | **DM can edit/delete; no history** / append-only with corrections | no | — |
 | OQ-LOOT-03 | Can players add entries (e.g. found loot themselves)? | **No in MVP** / yes | no | — |
 | OQ-LOOT-04 | Can an entry reference an entity (item) later? | **Leave room (nullable ref), not in MVP** / no | no | post-mvp/world-builder |

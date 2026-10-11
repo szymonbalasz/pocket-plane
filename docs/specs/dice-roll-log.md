@@ -23,6 +23,7 @@ wave: 2
 - Public rolls only in MVP.
 - Roll log view, persisted and live-updated.
 - Advantage/disadvantage on **any** roll: clickable toggle in the roll UI **or** modifier keys (**Shift = advantage, Ctrl = disadvantage**); roll labels/context (e.g. "Shortsword attack").
+- **Design for later:** the log is a **game log** (Roll20-style), not roll-only. Entries are typed so text messages and pasted descriptions can join rolls later (chat tier C–D, [feature tiers](../feature-tiers.md#4-notes-handouts-world-and-party)).
 - Every roll persisted with roller, context (attack/weapon, target if known), automated vs manual — feeds [stats](post-mvp/stats.md).
 
 ## 3. Goals

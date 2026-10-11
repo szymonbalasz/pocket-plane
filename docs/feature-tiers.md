@@ -75,6 +75,25 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Inspiration toggle | D | — | Use advantage instead |
 | D&D Beyond character import | F | — | |
 
+## 4. Notes, handouts, world and party
+
+| Feature | Tier | Spec | Notes |
+|---|---|---|---|
+| Handouts: DM reveals image/text to all or chosen players | A | [party-board](specs/post-mvp/party-board.md) | |
+| Wikilinks between notes + backlinks | A | [world-builder](specs/post-mvp/world-builder.md) | Informs [ADR-0011](architecture/adr/0011-cross-references.md) |
+| Party inventory with transfer to characters | A | [party-board](specs/post-mvp/party-board.md) | Grows from [party-loot](specs/party-loot.md) |
+| Gold ledger with split-among-party | A | [party-board](specs/post-mvp/party-board.md) | Grows from [party-loot](specs/party-loot.md) |
+| NPC directory players build as they meet people | A | [world-builder](specs/post-mvp/world-builder.md) | Player-authored notes on revealed NPCs |
+| Search / command palette (Obsidian / VS Code style) | A–B | [play-shell](specs/play-shell.md) | Search + commands in one palette |
+| Journal entries with DM-only / player-visible sections | B | [world-builder](specs/post-mvp/world-builder.md) | |
+| Map pins linked to notes/locations | B | [scene-tools](specs/post-mvp/scene-tools.md) | |
+| Shared party notes | B | [party-board](specs/post-mvp/party-board.md) | |
+| Session recap / journal | B | [campaign-manager](specs/post-mvp/campaign-manager.md) | See [ADR-0013](architecture/adr/0013-session-journal-scope.md) |
+| Quest log with status | C | [world-builder](specs/post-mvp/world-builder.md) | |
+| In-game calendar / time tracking | C | [campaign-manager](specs/post-mvp/campaign-manager.md) | |
+| Text chat | C–D | [dice-roll-log](specs/dice-roll-log.md) | Only as part of the game log (Roll20-style): text and pasted descriptions alongside rolls. No separate chat. |
+| Random tables | D | — | |
+
 ## Already decided elsewhere
 
 | Feature | Tier | Ref |

@@ -16,6 +16,7 @@ Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). Absorb
   - **Locations linked to scenes**: e.g. Neverwinter has many scenes (tavern, docks, sewers).
   - Per-entity reveal to players; DM-only notes.
   - Later: relation graph view, region/world maps.
+  - Tiered ([feature tiers](../../feature-tiers.md#4-notes-handouts-world-and-party)): **wikilinks + backlinks (A)**, **player-built NPC directory (A)**, journal entries with DM-only / player-visible sections (B), quest log (C).
   - Gradually replaces the Obsidian vault.
 - **Builds on:** [entities](../entities.md), [scenes-map](../scenes-map.md), [ADR-0009](../../architecture/adr/0009-entity-content-model.md), [ADR-0011](../../architecture/adr/0011-cross-references.md).
 - **Carried-over open questions** (suggested pick in bold):
