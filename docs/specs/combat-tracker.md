@@ -25,8 +25,13 @@ wave: 3
 - Initiative: roll (click-to-roll) or enter; **roll for all monsters in one click**; sorted order; ties.
 - Rounds and turns: next/previous turn.
 - Whose turn it is: shown in the initiative strip / portrait row. Token highlight on map only if trivial (tier B).
-- **Attack flow (Shieldmaiden-style):** click attack; **Shift = advantage, Ctrl = disadvantage**; attack + damage rolled (automated or manual, [dice-roll-log](dice-roll-log.md)); result written to the **game log** BG2-style ("Goblin attacks Mira: 12 + 4 = 16 — hit! 6 damage"), public or DM-only per the DM's category settings.
-- **Damage cards** (a [notification](notifications.md) kind with an apply action, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): the attack result appears as a pending card for the DM. DM picks target and applies as normal / half (resistant) / none (immune) / double (vulnerable), **and can manually override any value** before applying. DM can also create cards.
+- **Attack flow (Shieldmaiden-style), DM confirms everything:**
+  1. Select a target, click attack (**Shift = advantage, Ctrl = disadvantage**). Rolls automated or manual ([dice-roll-log](dice-roll-log.md)).
+  2. **Attack popup** (DM): attack roll + modifier, **hit/miss computed vs target AC**, damage roll.
+  3. DM adjusts: normal / half / none / double, **manual input to fudge any value** (attack total, hit/miss, damage).
+  4. DM confirms → applied to HP and written to the **game log** BG2-style ("Goblin attacks Mira: 12 + 4 = 16 — hit! 6 damage"); visibility per category settings (player rolls always public).
+  - Player attacks arrive as **damage cards** that open the same popup for the DM.
+- **Damage cards** (a [notification](notifications.md) kind with an apply action, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): the attack result appears as a pending card for the DM. DM picks target and applies as normal / half (resistant) / none (immune) / double (vulnerable), **and can manually override any value** before applying (same attack popup as DM attacks). DM can also create cards.
 - Healing: apply to HP; down at 0.
 - Remove/defeat combatant; end combat.
 - Player initiative view; **monster HP shown to players as a health band** (healthy / bloodied / down).

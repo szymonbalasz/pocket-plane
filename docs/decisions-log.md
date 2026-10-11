@@ -88,3 +88,5 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 70 | Initiative/turn changes not undoable; next/previous turn suffices | Matches Shieldmaiden | [0016](architecture/adr/0016-domain-events-pending-actions.md) |
 | 71 | BG2-style game log in the play view, with DM per-category public/hidden tickboxes changeable live (MVP) | Keeps combat fair; replaces broken Shieldmaiden feature; supersedes "MVP rolls public only" (#57) | [dice-roll-log](specs/dice-roll-log.md) |
 | 72 | Table-specific batch: A = live leaderboard/overkill, session awards; B = kill feed, trophy case, dice luck; D = auto recap from event log; F = live AI follow-along, combat rewind, external log stream | DM ranking | [feature-tiers](feature-tiers.md#6-table-specific) |
+| 73 | Player rolls always public; DM category toggles cover DM/monster rolls only | Fairness; players see their own table | [dice-roll-log](specs/dice-roll-log.md) |
+| 74 | DM confirms every attack via a popup: hit/miss computed vs target AC, damage modifiers, manual fudge of any value | Matches Shieldmaiden flow + fudging | [combat-tracker](specs/combat-tracker.md#2-scope) |

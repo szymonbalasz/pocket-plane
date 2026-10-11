@@ -26,6 +26,7 @@ wave: 2
 - **Public log settings**: DM tickbox per category; changeable any time mid-session; applies live.
   - On → entries in that category appear in every player's game log.
   - Off → DM-only entries (players see nothing, or "DM rolled" — OQ-DICE-09).
+  - **Player rolls are always public** (decided).
 - **Game log lines** composed from roll + context: actor, action, roll breakdown, total, outcome (hit/miss, save succeeded/failed, contest winner), damage. Covers out-of-combat rolls too (e.g. contested Strength).
 - Game log is a window in the [play shell](play-shell.md), not an external feed or stream.
 - Game log window, persisted and live-updated.
@@ -96,11 +97,11 @@ wave: 2
 | OQ-DICE-04 | Snapshot depth of game log | **Last N (e.g. 200), paginate older** / full | no | live-sync |
 | OQ-DICE-05 | Rolls tagged by session? | Depends on [ADR-0013](../architecture/adr/0013-session-journal-scope.md) | no | campaign-management |
 | OQ-DICE-06 | ~~Which roll visibility modes are MVP?~~ **Superseded: per-category public log settings in MVP** (whispers still tier C) | — | — | — |
-| OQ-DICE-08 | Do category toggles apply to DM/monster rolls only, or player rolls too? | **DM/monster rolls only; player rolls always public** / both | yes | combat-tracker |
+| OQ-DICE-08 | ~~Do category toggles apply to player rolls?~~ **Decided: no — player rolls are always public**; toggles apply to DM/monster rolls only | — | — | — |
 | OQ-DICE-09 | When a category is off, what do players see? | **Nothing** / "DM rolled something" line | no | — |
 | OQ-DICE-10 | Toggling a category on: reveal past hidden entries? | **No; applies to new rolls. DM can reveal a single entry** / retroactive | no | live-sync |
 | OQ-DICE-11 | Per-roll override at roll time (e.g. make this one hidden)? | **Yes, quick toggle in roll UI overrides the category default** / category only | no | — |
-| OQ-DICE-12 | "Hit!" in the log: computed vs target AC, or DM's call? | **Computed vs target AC when target known; DM can override** / DM marks hit/miss / don't show | yes | combat-tracker |
+| OQ-DICE-12 | ~~"Hit!" in the log~~ **Decided: computed vs target AC; DM confirms everything** (attack popup, [combat-tracker](combat-tracker.md#2-scope)) before it lands in the log | — | — | — |
 | OQ-DICE-13 | Reveal monster stats in log lines (e.g. "vs AC 15", "+4")? | **Show roll + modifier and outcome, not the monster's AC** / show all / outcome only | no | combat-tracker |
 | OQ-DICE-07 | Manual entry granularity: total only, or per-die? | **Total only, optional per-die** / per-die required | no | combat-tracker |
 
