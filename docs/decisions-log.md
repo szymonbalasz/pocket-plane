@@ -138,3 +138,14 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 105 | Orchestrator runs sub-agents as `opencode`, max 4 working agents at once | DM choice at kickoff | [orchestrator prompt](agents/orchestrator-prompt.md#3-herdr) |
 | 106 | MVP character sheet basics (AC, HP, initiative bonus, one weapon attack) are stored values, not derived; full-sheet derivation decided later | Least work for 4 fields; doesn't block derived-with-overrides later | [0012](architecture/adr/0012-character-derived-values.md) |
 | 107 | Spec index grouped by build phase instead of the old spec waves | Matches just-in-time specs per phase (#103) | [spec index](specs/README.md) |
+
+## Phase 1 gate
+
+| # | Decision | Rationale | Ref |
+|---|---|---|---|
+| 108 | Several campaigns from day one; one active campaign per server, DM switches | DM runs a few campaigns | [campaign-management](specs/campaign-management.md) |
+| 109 | No player removal in MVP; add + rename only | Removal would amount to revoke/kick (tier F) | [campaign-management](specs/campaign-management.md) |
+| 110 | Tooling: TypeScript `tsc --noEmit`, Biome, Playwright MCP for test agents, committed SVG fixture images rasterised with sharp | Not in ADR-0001; DM approved | [AGENTS.md](../AGENTS.md) |
+| 111 | Agents' picks accepted for all blocking foundation OQs (SYNC-01/03/04/07/09, CAMP-01/03/10, FIX-02/08/09/12) | DM accepted at gate | [gate](agents/gate-phase1.md) |
+| 112 | DM secret from env only, never stored | One source of truth | [campaign-management](specs/campaign-management.md) |
+| 113 | Imported definitions (SRD, 5etools, Open5e) are global; custom definitions (custom NPCs) per campaign | Same reference content across campaigns | [0018](architecture/adr/0018-global-imported-content.md) |

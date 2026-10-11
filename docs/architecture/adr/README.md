@@ -23,6 +23,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0015](0015-source-adapters-fixtures.md) | Import pipeline and source adapters | accepted |
 | [0016](0016-domain-events-pending-actions.md) | Domain events and pending actions | accepted (core) |
 | [0017](0017-agent-verification-fixture-library.md) | Agent-driven verification and fixture library | accepted |
+| [0018](0018-global-imported-content.md) | Imported reference content is global; custom content per campaign | accepted |
 
 ## Proposing a new ADR
 
