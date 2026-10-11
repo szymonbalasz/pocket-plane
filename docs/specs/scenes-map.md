@@ -32,7 +32,7 @@ wave: 3
 - See [feature tiers](../feature-tiers.md#1-map-and-tokens) for ranking.
 - Active scene: DM switches; all players follow.
 - **Scene list** with folders; duplicate a scene (tier S).
-- No undo for moves or scene edits: just move it back ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)).
+- No undo for moves or scene edits: just move it back. **Token moves are not recorded in the event log** (state only, still broadcast) ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)).
 - Preparing a non-active scene while players see another is tier A — likely near-free given active-scene model.
 - Create/edit scenes in UI *(proposed; fixtures may be enough)*.
 
@@ -104,7 +104,7 @@ wave: 3
 | OQ-MAP-04 | Live drag broadcasts vs drop-only | **Drop-only in MVP** / throttled live preview | no | live-sync |
 | OQ-MAP-05 | Is the ruler visible to others? | **Local only in MVP** / broadcast | no | live-sync |
 | OQ-MAP-09 | ~~Movement model~~ **Decided: Owlbear-style free drag**, snap on drop, distance shown while dragging; no speed/turn/path enforcement | — | — | — |
-| OQ-MAP-10 | Players move own tokens freely outside combat (decided). **During combat, off their turn?** | **Yes, not enforced** / own turn only | no | combat-tracker |
+| OQ-MAP-10 | ~~Turn-gated movement?~~ **Decided: players can always move tokens they control**, in or out of combat | — | — | — |
 | OQ-MAP-07 | Ping/laser are ephemeral: persisted or broadcast-only? | **Broadcast-only, not persisted (exception to ADR-0006 for transient pointers)** / persisted | yes | live-sync |
 | OQ-MAP-08 | DM "pull view": forced or suggested? | **Forced recentre, player can pan away after** / suggestion toast | no | notifications |
 | OQ-MAP-06 | Scene creation in UI or fixtures only? | **Upload map + calibrate grid in UI; tokens by drag from entity list** / fixtures only | no | fixtures-adapters |

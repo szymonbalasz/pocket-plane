@@ -43,7 +43,7 @@ graph LR
 - Cascades bounded: rules may create pending actions; whether they may emit further mutations is open (below).
 
 **Event log and combat undo** (tier S, so the log is **MVP**)
-- Every domain event is appended to a persisted **event log** (decided). Same transaction as the state change.
+- Domain events are appended to a persisted **event log** (decided). Same transaction as the state change. **Exception: token moves are not logged** (broadcast only; DM doesn't need a move history). Other high-frequency, low-value events may be marked non-logged by their spec.
 - **Undo is basic and combat-only (decided):** the DM can undo combat log entries such as "Player X did 4 damage to creature Y". Not rolls (an Animal Handling roll is just a fact), not token moves, not scene edits.
 - Undoable events carry what's needed to reverse them (e.g. `DamageApplied {target, amount, hpBefore, hpAfter}`).
 - **Undo = append a compensating event** that reverses an earlier one and marks it `undone`. The log stays append-only; state tables stay the truth for play.
@@ -67,7 +67,7 @@ graph LR
 | ~~Persist domain events as an append-only log?~~ **Decided: yes, in MVP** — required by undo; stats computed from it retroactively | — |
 | Undo mechanism | See table above — **A** |
 | ~~Undo scope~~ **Decided: DM only.** Players don't undo; they just redo the action (e.g. move the token back). | — |
-| ~~Which events are undoable?~~ **Decided: combat log entries only** — damage/healing applied. Candidates to confirm: initiative changes, next/previous turn (turn already has "previous"). | — |
+| ~~Which events are undoable?~~ **Decided: combat log entries only** — damage/healing applied. Initiative/turn not undoable; next/previous turn suffices (Shieldmaiden-style). | — |
 | ~~Undo order~~ **Decided: strict LIFO, one step at a time** (to undo step 3 of 5, undo 5, 4, then 3). No cherry-picking. | — |
 | Redo? | **Yes, as re-applying the original event** / no |
 | Listener execution | **Synchronous, same process, after commit** / async microtask |

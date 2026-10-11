@@ -84,3 +84,5 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 66 | Undo is DM-only and strict LIFO (one step at a time, no cherry-picking) | Simple mental model; players just redo actions manually | [0016](architecture/adr/0016-domain-events-pending-actions.md) |
 | 67 | Undo is basic: combat log entries only (damage/healing applied); not rolls, token moves or scene edits | Rolls are facts; moves are trivially redone by hand | [0016](architecture/adr/0016-domain-events-pending-actions.md) |
 | 68 | Movement is Owlbear-style free drag with snap; no rules enforcement; players move own tokens freely outside combat | Matches current table; rules stay with people | [scenes-map](specs/scenes-map.md) |
+| 69 | Players can always move tokens they control (in or out of combat); moves are not recorded in the event log | No value in move history; less log noise | [scenes-map](specs/scenes-map.md), [0016](architecture/adr/0016-domain-events-pending-actions.md) |
+| 70 | Initiative/turn changes not undoable; next/previous turn suffices | Matches Shieldmaiden | [0016](architecture/adr/0016-domain-events-pending-actions.md) |
