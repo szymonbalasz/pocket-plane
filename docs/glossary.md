@@ -55,6 +55,8 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Roll** | A dice expression evaluated server-side, with result. | — |
 | **Roll log** | Persisted, ordered list of rolls in a campaign. | — |
 | **Whisper** | A roll visible only to the roller and DM (or DM-to-player). | — |
+| **Damage card** | A pending, persisted damage result (from a player or DM roll) the DM applies to a target with a modifier: normal, resistant, immune, vulnerable. | Roll |
+| **Manual roll** | A roll entered from physical dice instead of rolled by the server. Logged and marked manual. | — |
 | **Party loot** | Shared, party-visible log of rewards (gold, items) the DM gives the party. | Party board (post-MVP superset) |
 
 ## System

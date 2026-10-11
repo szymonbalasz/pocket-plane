@@ -29,16 +29,18 @@ Six windows, one game night:
 | Physical dice (DM) | DM rolls | Not logged |
 | Obsidian vault (DM) | Notes | Can't reach notes from what's on screen |
 
-## Ideas raised (not yet scoped)
+## Ideas raised
 
-> Captured from discussion. Not decided; each gets assigned to MVP or post-MVP during the feature walkthrough.
-
-- **One play page** (Roll20-style): canvas-centric, with sticky-note windows that pop out over the canvas as needed.
-- **Damage cards:** player one-click rolls attack + damage → DM sees the pending damage and applies it to a target with normal / resistant / immune / vulnerable modifiers.
-- **Notes from the canvas:** click a token (e.g. an NPC) → open its notes. DM notes on anything on screen.
-- **Player notes:** Obsidian-style personal notes with links, referenceable from a widget or straight from the whiteboard.
-- **Player-placed props:** status rings, AoE markers; move and transform.
-- **DM text drops** replacing Discord pastes (handout-like).
+| Idea | Status |
+|---|---|
+| **One play page** (Roll20-style): canvas base, sticky-note windows pop out over it | MVP |
+| **Damage cards:** player one-click rolls attack + damage → DM applies to a target as normal / resistant / immune / vulnerable | MVP (trial) |
+| **Real dice:** every roll can be automated or entered manually, DM and players | MVP |
+| **Notes from the canvas:** click a token (e.g. NPC) → its notes; DM notes on anything on screen | Post-MVP; design for it |
+| **Player notes:** Obsidian-style personal notes with links, referenced from a widget or the whiteboard | Post-MVP; design for it |
+| **Player-placed props:** status rings, AoE markers; move and transform | Post-MVP; design for it |
+| **DM text drops** replacing Discord pastes | Post-MVP |
+| **Timers and reminders** (concentration checks, effect durations) | Under discussion (event model) |
 
 ## Users
 

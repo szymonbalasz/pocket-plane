@@ -19,6 +19,7 @@ wave: 2
 ## 2. Scope
 
 - Roll from a dice expression (free text and click-to-roll from other features).
+- **Manual entry**: any roll can instead be entered as a physical-dice result (DM and players). Logged and marked as manual ([ADR-0014](../architecture/adr/0014-mvp-scope.md)).
 - Public rolls.
 - Whispers and DM broadcast controls *(MVP scope open: OQ-DICE-06)*.
 - Roll log view, persisted and live-updated.
@@ -86,6 +87,8 @@ wave: 2
 | OQ-DICE-03 | Dice seeding for tests | **Injectable RNG at server boundary** / mock library | yes | all specs using rolls |
 | OQ-DICE-04 | Snapshot depth of roll log | **Last N (e.g. 200), paginate older** / full | no | live-sync |
 | OQ-DICE-05 | Rolls tagged by session? | Depends on [ADR-0013](../architecture/adr/0013-session-journal-scope.md) | no | campaign-management |
+| OQ-DICE-06 | Which roll visibility modes are MVP? | **Public + DM-hidden rolls (DM reveals per roll); player whispers post-MVP** / public only / all modes | yes | combat-tracker, live-sync |
+| OQ-DICE-07 | Manual entry granularity: total only, or per-die? | **Total only, optional per-die** / per-die required | no | combat-tracker |
 
 ## 16. Out of scope
 

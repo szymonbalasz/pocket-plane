@@ -50,3 +50,8 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 37 | Full 5e sheet "from day one" superseded; full sheet remains the target, model must not block it | Speed to a usable product | [0014](architecture/adr/0014-mvp-scope.md) supersedes part of [0007](architecture/adr/0007-product-scope.md) |
 | 38 | MVP fixtures: one player, one enemy, town + battlemap scenes; teardown/rebuild | Fast, repeatable test setup is a working goal | [0014](architecture/adr/0014-mvp-scope.md) |
 | 39 | Player-ready indicator deferred; MVP assumes immediate asset load | MVP runs on one machine, so load time is negligible; real readiness handling needed once remote | [0014](architecture/adr/0014-mvp-scope.md) |
+| 40 | Props (status rings, AoE markers) post-MVP; canvas designed to accept them | Not needed to play; known requirement | [0014](architecture/adr/0014-mvp-scope.md) |
+| 41 | Notes (token-linked, player notes) post-MVP; tokens designed to open windows | Known requirement; not needed to play | [0014](architecture/adr/0014-mvp-scope.md) |
+| 42 | Damage cards in MVP (trial) | Removes "read the damage out loud"; DM will judge in use | [0014](architecture/adr/0014-mvp-scope.md) |
+| 43 | Every roll supports automated or manual (physical dice) entry, for DM and players | DM and players sometimes want real dice | [0014](architecture/adr/0014-mvp-scope.md) |
+| 44 | One play page: canvas base + floating windows (Roll20-style) | Replaces six-window setup; avoids rework when notes/props arrive | [0014](architecture/adr/0014-mvp-scope.md) |
