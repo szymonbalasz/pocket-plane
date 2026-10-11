@@ -24,6 +24,7 @@
 - A maintained, versioned **fixture folder** is a first-class part of the codebase, not a test afterthought.
 - Fixtures are small units composed into named bundles (e.g. `session-sim`, `mid-combat`).
 - **Setups are scripts of server commands** (create campaign → add player → upload map → place token → hide → start encounter). Same path as the UI; fixtures can't create states the app can't reach, and double as walkthrough steps.
+- Reference creatures (SRD goblin, wolf) load through the minimal import pipeline core as source `fixture` ([ADR-0015](0015-source-adapters-fixtures.md)).
 - Every feature that adds a record type adds fixtures for it, and a bundle that exercises it.
 
 **Fixture content: simple and clear**
