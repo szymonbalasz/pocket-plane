@@ -22,8 +22,14 @@ wave: 3
 - Grid calibration.
 - Pan/zoom.
 - Tokens bound to entities (and combatants during combat).
-- DM moves any token; player moves own.
+- Snap to grid; token sizes (Large/Huge span squares); token labels.
+- DM moves/controls any token and can reassign token ownership; player moves own.
+- Lock map/background.
 - Ruler with 5e diagonals.
+- Ping (flash a spot for all); DM can pull everyone's view to it.
+- Laser pointer: right-click drag on empty canvas (right-click on a token is reserved for its menu), Owlbear-style, visible to all.
+- Measured movement along drag path *(tier B — MVP timing open, [feature tiers](../feature-tiers.md))*.
+- See [feature tiers](../feature-tiers.md#1-map-and-tokens) for ranking.
 - Active scene: DM switches; all players follow.
 - Create/edit scenes in UI *(proposed; fixtures may be enough)*.
 
@@ -94,6 +100,8 @@ wave: 3
 | OQ-MAP-03 | Are tokens per scene, or does a character's token follow across scenes? | **Per scene (town token and battlemap token are separate)** / one token moves between scenes | yes | combat-tracker |
 | OQ-MAP-04 | Live drag broadcasts vs drop-only | **Drop-only in MVP** / throttled live preview | no | live-sync |
 | OQ-MAP-05 | Is the ruler visible to others? | **Local only in MVP** / broadcast | no | live-sync |
+| OQ-MAP-07 | Ping/laser are ephemeral: persisted or broadcast-only? | **Broadcast-only, not persisted (exception to ADR-0006 for transient pointers)** / persisted | yes | live-sync |
+| OQ-MAP-08 | DM "pull view": forced or suggested? | **Forced recentre, player can pan away after** / suggestion toast | no | notifications |
 | OQ-MAP-06 | Scene creation in UI or fixtures only? | **Upload map + calibrate grid in UI; tokens by drag from entity list** / fixtures only | no | fixtures-adapters |
 
 ## 16. Out of scope

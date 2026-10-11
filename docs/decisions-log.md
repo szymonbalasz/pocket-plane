@@ -59,3 +59,10 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 46 | Rules create persisted pending actions, not silent mutations; game-time triggers only, no wall-clock scheduler | Keeps DM in control; crash-safe; simple | [0016](architecture/adr/0016-domain-events-pending-actions.md) |
 | 47 | Damage cards, reminders and prompts are one concept: notification with history and optional action | Like toasts with a feed; one mechanism for all prompts | [0016](architecture/adr/0016-domain-events-pending-actions.md), [notifications](specs/notifications.md) |
 | 48 | Player lands on the active scene; opens windows freely; window layout/preferences persisted per player | Fast entry; each player keeps their own setup | [0014](architecture/adr/0014-mvp-scope.md) |
+
+## Feature tiers
+
+| # | Decision | Rationale | Ref |
+|---|---|---|---|
+| 49 | Feature tier list (S/A/B/C/D/F) is the source of truth for scope | DM-ranked, quick to scan | [feature-tiers](feature-tiers.md) |
+| 50 | Map batch: S = snap, token sizes, ping + pull view, laser pointer, lock map, labels, DM control/ownership; A = HP bar, condition icons, layers, doors/walls; B = current-turn highlight, path measurement | DM ranking | [feature-tiers](feature-tiers.md#1-map-and-tokens) |

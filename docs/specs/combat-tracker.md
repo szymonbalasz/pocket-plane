@@ -26,6 +26,7 @@ wave: 3
 - **Damage cards** (a [notification](notifications.md) kind with an apply action, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): a player's attack + damage roll appears as a pending card for the DM; DM picks target and applies as normal / resistant / immune / vulnerable. DM can also create cards. Rolls may be automated or manual ([dice-roll-log](dice-roll-log.md)).
 - Remove/defeat combatant; end combat.
 - Player initiative view.
+- Highlight current-turn token on the map *(tier B — MVP timing open, [feature tiers](../feature-tiers.md))*.
 - Combatants linked to tokens on the active scene ([scenes-map](scenes-map.md)).
 
 ## 3. Goals

@@ -10,7 +10,7 @@ phase: post-mvp
 
 Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md).
 
-- **What:** Polygon fog, hidden tokens, AoE props (cone, sphere, cube, line, cylinder), live drag previews, scene preload, **player-ready indicator** (DM sees who has fully loaded a scene; deferred from MVP, which assumes immediate load).
+- **What:** Tier-A map features ([feature tiers](../../feature-tiers.md#1-map-and-tokens)): HP bar/ring on tokens, condition icons, layers (incl. DM-only), doors and walls (movement only). Plus: polygon fog, hidden tokens, AoE props (cone, sphere, cube, line, cylinder), live drag previews, scene preload, **player-ready indicator** (DM sees who has fully loaded a scene; deferred from MVP, which assumes immediate load).
 - **Builds on:** [scenes-map](../scenes-map.md), [live-sync](../live-sync.md) (reveal semantics, OQ-SYNC-06), [assets-pipeline](../assets-pipeline.md).
 - **Carried-over open questions** (suggested pick in bold):
 

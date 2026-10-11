@@ -16,6 +16,7 @@ Replaces Owlbear Rodeo (map), Shieldmaiden (combat) and, later, Miro (party boar
 | Know what's already decided | [docs/decisions-log.md](docs/decisions-log.md), [ADRs](docs/architecture/adr/README.md) |
 | See the system shape | [docs/architecture/overview.md](docs/architecture/overview.md) |
 | See what to spec, in what order | [docs/roadmap.md](docs/roadmap.md), [spec index](docs/specs/README.md) |
+| Know if a feature is in | [docs/feature-tiers.md](docs/feature-tiers.md) |
 | Style a screen | [docs/design/visual-direction.md](docs/design/visual-direction.md) |
 
 ## Layout

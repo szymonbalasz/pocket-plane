@@ -18,7 +18,7 @@
 |---|---|
 | Town scene with map + tokens; switch to a battlemap scene | Fog, AoE props → [scene-tools](../../specs/post-mvp/scene-tools.md) |
 | Grid calibration, pan/zoom, ruler (5e diagonals) | Location ↔ scenes, world builder → [world-builder](../../specs/post-mvp/world-builder.md) |
-| Tokens; DM moves any, player moves own | Compendium + import → [compendium](../../specs/post-mvp/compendium.md) |
+| Tokens; DM moves any, player moves own. Plus tier-S map features in [feature tiers](../../feature-tiers.md) (snap, sizes, labels, ping, laser, lock map, ownership) | Compendium + import → [compendium](../../specs/post-mvp/compendium.md) |
 | Character sheet **basics**: AC, HP, initiative, one weapon attack (e.g. shortsword 1d6, may be hardcoded) | Spells, saves, skills, features, inventory… → [character-sheet-full](../../specs/post-mvp/character-sheet-full.md) |
 | Combat vs **one kind of enemy**, single weapon attack each | Encounter builder/CR math, conditions, concentration → [combat-extras](../../specs/post-mvp/combat-extras.md) |
 | Initiative, HP, damage, rolls, roll log | |
