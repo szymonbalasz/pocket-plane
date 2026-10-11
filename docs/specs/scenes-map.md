@@ -32,7 +32,7 @@ wave: 3
 - See [feature tiers](../feature-tiers.md#1-map-and-tokens) for ranking.
 - Active scene: DM switches; all players follow.
 - **Scene list** with folders; duplicate a scene (tier S).
-- **Undo/redo** token moves and scene edits ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)).
+- **DM undo/redo** (strict LIFO) of DM token moves and scene edits ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). Players don't undo; they move the token back.
 - Preparing a non-active scene while players see another is tier A — likely near-free given active-scene model.
 - Create/edit scenes in UI *(proposed; fixtures may be enough)*.
 
@@ -103,6 +103,8 @@ wave: 3
 | OQ-MAP-03 | Are tokens per scene, or does a character's token follow across scenes? | **Per scene (town token and battlemap token are separate)** / one token moves between scenes | yes | combat-tracker |
 | OQ-MAP-04 | Live drag broadcasts vs drop-only | **Drop-only in MVP** / throttled live preview | no | live-sync |
 | OQ-MAP-05 | Is the ruler visible to others? | **Local only in MVP** / broadcast | no | live-sync |
+| OQ-MAP-09 | Movement model | **Owlbear-style free drag, snaps to grid on drop; no speed/turn enforcement; distance shown while dragging** / strict (speed limits, turn-gated, path rules) | yes | combat-tracker |
+| OQ-MAP-10 | Can players move their token outside their turn in combat? | **Yes (table etiquette, not enforced)** / own turn only | no | combat-tracker |
 | OQ-MAP-07 | Ping/laser are ephemeral: persisted or broadcast-only? | **Broadcast-only, not persisted (exception to ADR-0006 for transient pointers)** / persisted | yes | live-sync |
 | OQ-MAP-08 | DM "pull view": forced or suggested? | **Forced recentre, player can pan away after** / suggestion toast | no | notifications |
 | OQ-MAP-06 | Scene creation in UI or fixtures only? | **Upload map + calibrate grid in UI; tokens by drag from entity list** / fixtures only | no | fixtures-adapters |

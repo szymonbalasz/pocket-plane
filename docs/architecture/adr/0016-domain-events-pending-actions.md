@@ -65,9 +65,11 @@ graph LR
 | May rules mutate state directly? | **No; only create pending actions** / yes with depth cap |
 | ~~Persist domain events as an append-only log?~~ **Decided: yes, in MVP** — required by undo; stats computed from it retroactively | — |
 | Undo mechanism | See table above — **A** |
-| Undo scope: whose actions can be undone, by whom? | **DM undoes anything (stack across all actors); player undoes own last N actions (own token moves)** / DM only / per-user stacks only |
+| ~~Undo scope~~ **Decided: DM only.** Players don't undo; they just redo the action (e.g. move the token back). | — |
 | Which events are undoable? | **State changes (moves, HP, initiative, turn, loot, damage applied). Not rolls — a roll is a fact; undo the damage it caused** / everything incl. rolls |
-| Undo across concurrent changes (DM undoes a damage after a player moved) | **Undo targets a specific event, not "rewind"; conflicts (target changed since) prompt the DM** / strict LIFO rewind |
+| ~~Undo order~~ **Decided: strict LIFO, one step at a time** (to undo step 3 of 5, undo 5, 4, then 3). No cherry-picking. | — |
+| Which actions are on the DM's undo stack? | **DM's own actions only (incl. applying a player's damage card); player actions aren't on it** / every actor's actions in one global stack |
+| Undoing a DM action whose target changed since (DM moved a token, player then moved it) | **Undo still applies; result shown in log** / prompt DM / block |
 | Redo? | **Yes, as re-applying the original event** / no |
 | Listener execution | **Synchronous, same process, after commit** / async microtask |
 | Can an action be resolved by "anyone in audience" or only a named actor? | **Named actor (DM or one player); audience may be wider** / anyone in audience |

@@ -81,3 +81,4 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 63 | MVP encounters support multiple enemy kinds | Tier S | [combat-tracker](specs/combat-tracker.md) |
 | 64 | Event log is MVP (undo depends on it); undo via compensating events (suggested, details open) | Multi-step undo is tier S | [0016](architecture/adr/0016-domain-events-pending-actions.md) |
 | 65 | No player-link revocation; no backup UI | Trusted table; SQLite file copy suffices | [campaign-management](specs/campaign-management.md) |
+| 66 | Undo is DM-only and strict LIFO (one step at a time, no cherry-picking) | Simple mental model; players just redo actions manually | [0016](architecture/adr/0016-domain-events-pending-actions.md) |

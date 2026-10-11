@@ -21,7 +21,7 @@ wave: 3
 - **Encounter builder** (tier S): pick monsters (from entities/fixtures) and quantities; party = campaign characters; shows XP budget and difficulty (easy / medium / hard / deadly) per 2014 DMG.
 - Encounters are saved and prepared before the session; start combat from an encounter.
 - Start combat: PCs + the encounter's monsters (several kinds, N of each).
-- **Undo/redo** any combat change (damage applied, HP, initiative, turn) via [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md).
+- **DM undo/redo** (strict LIFO, one step at a time) of combat changes (damage applied, HP, initiative, turn) via [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md).
 - Initiative: roll (click-to-roll) or enter; **roll for all monsters in one click**; sorted order; ties.
 - Rounds and turns: next/previous turn.
 - Whose turn it is: shown in the initiative strip / portrait row. Token highlight on map only if trivial (tier B).
