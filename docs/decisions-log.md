@@ -46,7 +46,7 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 33 | MVP combat = one enemy kind *(superseded by #63: multiple kinds)*, single weapon attack each; initiative, HP, damage, rolls | Minimum to run a fight | [0014](architecture/adr/0014-mvp-scope.md) |
 | 34 | MVP scenes = map, grid, pan/zoom, tokens, ruler, scene switching | Town + battlemap is the session's spine | [0014](architecture/adr/0014-mvp-scope.md) |
 | 35 | MVP party reward = shared party loot log (form not fixed to gold) | Need to see a reward given to the party | [0014](architecture/adr/0014-mvp-scope.md) |
-| 36 | Deferred: compendium import, fog, AoE props, hidden tokens, world builder (incl. location ↔ scenes), full sheet, encounter builder/CR math, conditions | Not needed for the session simulation | [0014](architecture/adr/0014-mvp-scope.md) |
+| 36 | Deferred: compendium import, fog, AoE props, hidden tokens *(superseded by #76)*, world builder (incl. location ↔ scenes), full sheet, encounter builder/CR math *(superseded by #55)*, conditions | Not needed for the session simulation | [0014](architecture/adr/0014-mvp-scope.md) |
 | 37 | Full 5e sheet "from day one" superseded; full sheet remains the target, model must not block it | Speed to a usable product | [0014](architecture/adr/0014-mvp-scope.md) supersedes part of [0007](architecture/adr/0007-product-scope.md) |
 | 38 | MVP fixtures: one player, one enemy, town + battlemap scenes; teardown/rebuild | Fast, repeatable test setup is a working goal | [0014](architecture/adr/0014-mvp-scope.md) |
 | 39 | Player-ready indicator deferred; MVP assumes immediate asset load | MVP runs on one machine, so load time is negligible; real readiness handling needed once remote | [0014](architecture/adr/0014-mvp-scope.md) |
@@ -135,3 +135,6 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 102 | Browser testing is done by separate, short-lived test agents; builders never run long browser sessions | Protects builder context | [orchestrator prompt](agents/orchestrator-prompt.md#4-context-management) |
 | 103 | Specs written just in time per build phase (Foundation, Scenes, Combat, Reward); next phase specced while current builds; data model + protocol are living docs | Faster to a usable product; keeps a review + consolidation step per phase | [roadmap](roadmap.md#build-order-mvp), [orchestrator prompt](agents/orchestrator-prompt.md#6-phases-and-gates) |
 | 104 | Line endings normalised to LF (`.gitattributes eol=lf`) | Stop CRLF churn across worktrees | — |
+| 105 | Orchestrator runs sub-agents as `opencode`, max 4 working agents at once | DM choice at kickoff | [orchestrator prompt](agents/orchestrator-prompt.md#3-herdr) |
+| 106 | MVP character sheet basics (AC, HP, initiative bonus, one weapon attack) are stored values, not derived; full-sheet derivation decided later | Least work for 4 fields; doesn't block derived-with-overrides later | [0012](architecture/adr/0012-character-derived-values.md) |
+| 107 | Spec index grouped by build phase instead of the old spec waves | Matches just-in-time specs per phase (#103) | [spec index](specs/README.md) |

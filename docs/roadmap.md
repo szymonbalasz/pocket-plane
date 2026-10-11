@@ -13,7 +13,7 @@ Specs are written **just in time**: each phase's specs are written, reviewed by 
 | 3. Combat | [character-sheet](specs/character-sheet.md), [dice-roll-log](specs/dice-roll-log.md), [notifications](specs/notifications.md), [combat-tracker](specs/combat-tracker.md) | Sheet basics, dice + game log, notifications, encounter builder, combat, attack popup, damage cards, undo | One full fight vs mixed enemies; public/hidden log; undo a wrong damage |
 | 4. Reward + hardening | [party-loot](specs/party-loot.md) | Party loot; crash recovery across all features | Full session simulation; kill server mid-combat, resume intact |
 
-Not blocking MVP: [ADR-0010](architecture/adr/0010-compendium-design.md), [0011](architecture/adr/0011-cross-references.md). Still to decide before phase 3: [ADR-0012](architecture/adr/0012-character-derived-values.md) (basics stored vs derived).
+Not blocking MVP: [ADR-0010](architecture/adr/0010-compendium-design.md), [0011](architecture/adr/0011-cross-references.md). [ADR-0012](architecture/adr/0012-character-derived-values.md): MVP basics are stored (decided); full-sheet derivation open, post-MVP.
 
 [Data model](data-model/README.md) and [protocol](protocol/README.md) are **living docs**, extended phase by phase.
 ## Dependencies

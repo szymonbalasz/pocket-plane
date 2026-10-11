@@ -6,20 +6,20 @@ Template: [_template.md](_template.md). Specs are written just in time, per buil
 
 ## MVP
 
-| Wave | Spec | Prefix | Status | Owner |
+| Build phase | Spec | Prefix | Status | Owner |
 |---|---|---|---|---|
-| 1 | [Live sync, reconnect, visibility](live-sync.md) | SYNC | unclaimed | — |
-| 1 | [Campaign management](campaign-management.md) | CAMP | unclaimed | — |
-| 1 | [Assets pipeline](assets-pipeline.md) | ASSET | unclaimed | — |
-| 1 | [Fixtures and source adapters](fixtures-adapters.md) | FIX | unclaimed | — |
-| 2 | [Entities (core)](entities.md) | ENT | unclaimed | — |
-| 2 | [Character sheet (basics)](character-sheet.md) | CHAR | unclaimed | — |
-| 2 | [Dice and game log](dice-roll-log.md) | DICE | unclaimed | — |
-| 2 | [Notifications](notifications.md) | NOTE | unclaimed | — |
-| 2 | [Play shell](play-shell.md) | SHELL | unclaimed | — |
-| 3 | [Scenes and map](scenes-map.md) | MAP | unclaimed | — |
-| 3 | [Combat tracker](combat-tracker.md) | CBT | unclaimed | — |
-| 3 | [Party loot](party-loot.md) | LOOT | unclaimed | — |
+| 1. Foundation | [Live sync, reconnect, visibility](live-sync.md) | SYNC | unclaimed | — |
+| 1. Foundation | [Campaign management](campaign-management.md) | CAMP | unclaimed | — |
+| 1. Foundation | [Fixtures and import pipeline core](fixtures-adapters.md) | FIX | unclaimed | — |
+| 2. Scenes | [Assets pipeline](assets-pipeline.md) | ASSET | unclaimed | — |
+| 2. Scenes | [Entities (core)](entities.md) | ENT | unclaimed | — |
+| 2. Scenes | [Play shell](play-shell.md) | SHELL | unclaimed | — |
+| 2. Scenes | [Scenes and map](scenes-map.md) | MAP | unclaimed | — |
+| 3. Combat | [Character sheet (basics)](character-sheet.md) | CHAR | unclaimed | — |
+| 3. Combat | [Dice and game log](dice-roll-log.md) | DICE | unclaimed | — |
+| 3. Combat | [Notifications](notifications.md) | NOTE | unclaimed | — |
+| 3. Combat | [Combat tracker](combat-tracker.md) | CBT | unclaimed | — |
+| 4. Reward + hardening | [Party loot](party-loot.md) | LOOT | unclaimed | — |
 
 ## Post-MVP
 
