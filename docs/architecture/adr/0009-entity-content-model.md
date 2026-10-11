@@ -21,6 +21,12 @@
 | B. **Generic entity + typed attribute blocks**: entity has N blocks (stat block, notes, inventory…) each with a schema | Composable; same block reused across kinds; agent-friendly | More indirection; harder to enforce "a monster must have a stat block" |
 | C. **Pure relational**: a table per kind and per relation | Strongest integrity and querying | Table explosion; slow to evolve; import mapping heavy |
 
+Suggested: **A**, with this framing (discussed, not yet accepted):
+
+- **Definition** — what a thing *is* (stat block: AC, max HP, init bonus, attacks). Document-shaped; produced by importers/fixtures. Per-kind JSON column, zod-validated.
+- **Play state** — what's happening *now* (current HP, initiative, token position). Changes every turn; relational columns on character / combatant / token.
+- Test case: a goblin takes damage → only its combatant changes; the Goblin definition is untouched.
+
 ## Decision
 
 > Undecided.

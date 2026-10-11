@@ -57,7 +57,7 @@ The DM can run a short session end to end — some roleplay, some story, some co
 ## Success criteria
 
 **MVP**
-- The session simulation above runs start to finish with a DM and at least one player on separate laptops via the tunnel.
+- The session simulation above runs start to finish with a DM and at least one player in separate browser sessions (e.g. normal + incognito, or two browsers) on one machine. Tunnel exposure is assumed solved, not an MVP check.
 - Fixture rebuild: from empty DB to ready-to-play session in one command.
 - Server killed mid-combat → restart → tokens, active scene, initiative, HP, roll log and loot log intact.
 - A player joins from a player link with no setup beyond opening a URL.
