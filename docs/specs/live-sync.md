@@ -1,8 +1,8 @@
 ---
 title: Live sync, reconnect, visibility
 prefix: SYNC
-status: unclaimed
-owner: —
+status: claimed
+owner: spec-live-sync
 wave: 1
 ---
 
