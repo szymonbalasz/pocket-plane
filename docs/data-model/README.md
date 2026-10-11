@@ -1,8 +1,8 @@
 # Data model
 
-Consolidated domain model. Entities and relationships, **not SQL**. Written by the integrator once specs reach `complete` ([process](../process.md#stages)).
+Consolidated domain model. Entities and relationships, **not SQL**. **Living doc**: the integrator extends it after each build phase's specs reach `complete` ([process](../process.md#stages), [roadmap](../roadmap.md#build-order-mvp)).
 
-> TODO (spec phase): populate after wave 3 specs are complete. Don't edit from a feature worktree.
+> TODO (spec phase): populate from Foundation specs first, then extend per phase. Don't edit from a feature worktree.
 
 ## Inputs
 

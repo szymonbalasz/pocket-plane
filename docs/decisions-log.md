@@ -133,3 +133,5 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 |---|---|---|---|
 | 101 | Work is run by a Herdr orchestrator agent acting as integrator; focused spec/build/test/review agents in worktrees | DM reviews; agents keep context small | [orchestrator prompt](agents/orchestrator-prompt.md), [process](process.md#roles) |
 | 102 | Browser testing is done by separate, short-lived test agents; builders never run long browser sessions | Protects builder context | [orchestrator prompt](agents/orchestrator-prompt.md#4-context-management) |
+| 103 | Specs written just in time per build phase (Foundation, Scenes, Combat, Reward); next phase specced while current builds; data model + protocol are living docs | Faster to a usable product; keeps a review + consolidation step per phase | [roadmap](roadmap.md#build-order-mvp), [orchestrator prompt](agents/orchestrator-prompt.md#6-phases-and-gates) |
+| 104 | Line endings normalised to LF (`.gitattributes eol=lf`) | Stop CRLF churn across worktrees | — |

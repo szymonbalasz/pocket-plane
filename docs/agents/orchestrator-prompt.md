@@ -126,20 +126,25 @@ Work through these in order. **Every gate needs my explicit "go".**
 2. Bring me the one MVP-blocking question that's left: [ADR-0012](../architecture/adr/0012-character-derived-values.md), sheet basics stored or derived. The suggested pick is "stored in MVP".
 3. **Gate:** confirm the agent kind and concurrency with me, then start Phase 1.
 
-### Phase 1 — Specs (waves from the [roadmap](../roadmap.md#spec-writing-order-mvp))
-- Wave 1: `live-sync`, `campaign-management`, `assets-pipeline`, `fixtures-adapters`. Run them in parallel, one spec agent each.
-- When each spec reaches `in-review`, run a `review-<feature>` agent, then merge to `main`. Do the integrator follow-ups in a separate commit.
-- **Gate (per wave):** send me one batched review. For each spec: a 3–5 line summary, its blocking questions with picks, and any cross-spec conflicts. I decide; you apply the decisions, or send the spec back with a fresh spec agent. Only I set `complete`.
-- Start the next wave once the previous wave is at least `draft` and its blocking cross-spec questions are answered.
-- Waves 2 and 3: `entities`, `character-sheet`, `dice-roll-log`, `notifications`, `play-shell`, then `scenes-map`, `combat-tracker`, `party-loot`.
+### Specs are written just in time
+We don't spec everything up front. **Each build phase's specs are written, reviewed and consolidated right before that phase is built.** You can write the next phase's specs while the current phase is building.
 
-### Phase 2 — Consolidation
-- One `review-data-model` agent writes [data-model/README.md](../data-model/README.md) from every spec's §8.
-- Then one `review-protocol` agent writes [protocol/README.md](../protocol/README.md) from every spec's §9.
-- Bring conflicts to me in a batch.
-- **Gate:** I approve both.
+| Build phase | Specs |
+|---|---|
+| 1. Foundation | [live-sync](../specs/live-sync.md), [campaign-management](../specs/campaign-management.md), [fixtures-adapters](../specs/fixtures-adapters.md) |
+| 2. Scenes | [assets-pipeline](../specs/assets-pipeline.md), [entities](../specs/entities.md), [play-shell](../specs/play-shell.md), [scenes-map](../specs/scenes-map.md) |
+| 3. Combat | [character-sheet](../specs/character-sheet.md), [dice-roll-log](../specs/dice-roll-log.md), [notifications](../specs/notifications.md), [combat-tracker](../specs/combat-tracker.md) |
+| 4. Reward + hardening | [party-loot](../specs/party-loot.md); crash-recovery pass over everything |
 
-### Phase 3 — Build conventions + skeleton
+**Per-phase cycle**
+1. **Spec**: one `spec-<feature>` agent per spec in the phase, in parallel.
+2. **Review**: one `review-<feature>` agent per spec. Merge the specs to `main`.
+3. **Gate (DM)**: send me one batched review for the phase. For each spec: a 3–5 line summary, its blocking questions with picks, and any conflicts with earlier phases or built code. I decide and set `complete`; you apply the decisions.
+4. **Consolidate**: one `review-consolidate` agent adds this phase's §8 and §9 to the living [data model](../data-model/README.md) and [protocol](../protocol/README.md) docs, and flags conflicts with what's already there or already built. Conflicts go to me. Changing built code needs a `fix/<slug>` task.
+5. **Build**: `build-<feature>` agents, plus `test-<feature>` agents on request (Phase B below).
+6. **Gate (DM)**: send me a demo script, i.e. which bundle and what to click, so I can check it myself.
+
+### Phase 1 — Build conventions + foundation specs
 1. Draft a **build-phase section for AGENTS.md** and send it to me for approval. It must cover:
    - directory layout and path aliases (resolves the [ADR-0002](../architecture/adr/0002-single-package.md) to-do);
    - env var names and the per-worktree port and data-path scheme ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md));
@@ -148,23 +153,31 @@ Work through these in order. **Every gate needs my explicit "go".**
    - test-ID conventions;
    - the browser tooling for test agents;
    - lint and typecheck;
-   - "done" for a build task.
-   Also update the AGENTS.md hard rules so code is allowed.
-2. **Skeleton**, built by one agent on one branch *before any parallel build work*:
-   - Bun + Hono + Vite/React + Drizzle/SQLite + zod, with the DM and player client entry points;
-   - the domain event bus and event log ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md));
-   - the WebSocket hub plus a no-op visibility filter;
-   - the fixture reset/load command and an empty bundle;
-   - `bun test` and Playwright set up;
-   - one walkthrough proving that DM and player can both load a page in separate contexts.
-3. **Gate:** I run the skeleton myself before parallel build starts.
+   - "done" for a build task;
+   - how a builder may touch shared files (schema, event types, protocol).
+   Also update the AGENTS.md hard rules so code is allowed, and so builders may edit `docs/data-model` and `docs/protocol` only via the orchestrator.
+2. In parallel, run steps 1–4 of the per-phase cycle for the **Foundation** specs.
+3. **Gate:** I approve the conventions and the foundation specs.
 
-### Phase 4 — Build ([roadmap build phases](../roadmap.md#mvp-build-phases) 1→4)
+### Phase 2 — Skeleton (= Foundation build)
+- One agent, on one branch, *before any parallel build work*. It builds:
+  - Bun + Hono + Vite/React + Drizzle/SQLite + zod, with the DM and player client entry points;
+  - the domain event bus and event log ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md));
+  - the WebSocket hub, snapshot on reconnect, and the visibility filter hook ([live-sync](../specs/live-sync.md));
+  - campaign, DM secret and player links ([campaign-management](../specs/campaign-management.md));
+  - the fixture reset/load commands, the minimal import pipeline core and the `session-sim` bundle started ([fixtures-adapters](../specs/fixtures-adapters.md));
+  - `bun test` and Playwright set up;
+  - one walkthrough proving that DM and player connect in separate contexts and survive a reload.
+- Meanwhile, write the **Scenes** specs (per-phase cycle, steps 1–4).
+- **Gate:** I run the skeleton myself before parallel build starts.
+
+### Phase B — Building a phase (repeat for Scenes, Combat, Reward + hardening)
 - For each feature: a `build/<feature>` worktree with `build-<feature>`, plus `test-<feature>` started on request.
   - The loop: build slice → test agent walkthrough → builder fixes → repeat.
-- Merge order follows the dependency graph. After each merge, tell the active builders to rebase.
+- Merge order follows the [dependency graph](../roadmap.md#dependencies). After each merge, tell the active builders to rebase.
 - Never merge red tests. If two builders need the same shared file (schema, event types, protocol), sequence them, or have one agent make the shared change first on its own branch.
-- **Gate (per build phase):** send me a short demo script, i.e. which bundle and what to click, so I can check it myself.
+- While a phase builds, write the next phase's specs.
+- **Gate (per phase):** demo script for me.
 
 ### Phase 5 — MVP acceptance
 - A fresh `test-mvp` agent runs the full [session simulation](../vision.md#mvp-a-playable-session-simulation) end to end:
@@ -173,7 +186,6 @@ Work through these in order. **Every gate needs my explicit "go".**
   - party loot.
 - It also runs the crash test: kill the server mid-combat, restart, and confirm state is intact.
 - **Gate:** I playtest with two browsers. Then we decide what comes after the MVP; fog of war is first in line.
-
 ## 7. Reporting to me
 
 - At each gate, and when I ask "status": a table of tasks and states, then decisions needed (max 2 at a time, with picks), then risks. That's it.

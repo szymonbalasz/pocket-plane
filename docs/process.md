@@ -1,12 +1,13 @@
 # Process
 
-Waterfall-style: specs first, build later.
+Specs before code, **just in time per build phase**: each phase's specs are written, reviewed and consolidated right before that phase is built ([roadmap](roadmap.md#build-order-mvp)).
 
 ## Stages
 
 ```mermaid
 graph LR
-  A[Spec] --> B[Review] --> C[Data model consolidation] --> D[Protocol consolidation] --> E[Build]
+  A[Spec phase N] --> B[Review] --> C[Extend data model + protocol] --> E[Build phase N]
+  E -. meanwhile .-> A2[Spec phase N+1]
   B -- changes requested --> A
   C -- conflict found --> A
   D -- conflict found --> A
@@ -16,8 +17,8 @@ graph LR
 |---|---|---|---|---|
 | Spec | One Herdr agent per feature, own worktree | Template, ADRs, glossary | `docs/specs/<feature>.md` at `in-review` | Meets [spec complete](../AGENTS.md#8-definition-of-spec-complete) checklist |
 | Review | The DM (human) | Spec at `in-review` | Comments or `status: complete` | Checklist ticked |
-| Data model consolidation | Integrator | All `complete` specs' Data model sections | [data-model/](data-model/README.md) | One domain model, no conflicting entities/fields |
-| Protocol consolidation | Integrator | All specs' API & events sections | [protocol/](protocol/README.md) | One REST + WS catalogue with visibility rules |
+| Data model consolidation | Integrator | This phase's `complete` specs, §8 | [data-model/](data-model/README.md) (living) | No conflicts with earlier phases or built code |
+| Protocol consolidation | Integrator | This phase's `complete` specs, §9 | [protocol/](protocol/README.md) (living) | Catalogue extended; visibility rules for every event |
 | Build | Builder + test agents per feature, orchestrated in Herdr | Consolidated docs | Code | Build conventions in AGENTS.md (drafted at Phase 3 of the [orchestrator prompt](agents/orchestrator-prompt.md)) |
 
 ## Roles

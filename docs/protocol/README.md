@@ -1,8 +1,8 @@
 # Protocol
 
-Consolidated REST (Hono RPC) + WebSocket event catalogue. Written by the integrator after [data model](../data-model/README.md) consolidation ([process](../process.md#stages)).
+Consolidated REST (Hono RPC) + WebSocket event catalogue. **Living doc**: the integrator extends it after each build phase's specs reach `complete`, alongside the [data model](../data-model/README.md) ([process](../process.md#stages)).
 
-> TODO (spec phase): populate after data model consolidation. Don't edit from a feature worktree.
+> TODO (spec phase): populate from Foundation specs first, then extend per phase. Don't edit from a feature worktree.
 
 ## Inputs
 

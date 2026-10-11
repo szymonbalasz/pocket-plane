@@ -2,7 +2,7 @@
 
 Front matter in each spec is the source of truth. This table is refreshed by the integrator at merge — don't edit it from a feature worktree ([AGENTS.md §4](../../AGENTS.md#4-claiming-a-feature)).
 
-Template: [_template.md](_template.md). Writing order: [roadmap](../roadmap.md#spec-writing-order-mvp). MVP definition: [ADR-0014](../architecture/adr/0014-mvp-scope.md).
+Template: [_template.md](_template.md). Specs are written just in time, per build phase: [roadmap](../roadmap.md#build-order-mvp). MVP definition: [ADR-0014](../architecture/adr/0014-mvp-scope.md).
 
 ## MVP
 
