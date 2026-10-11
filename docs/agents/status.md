@@ -2,22 +2,22 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 1 — Build conventions + foundation specs (step 1: spec)
+**Phase:** 1 — waiting on DM gate ([gate-phase1](gate-phase1.md))
 
 | Task | Agent | Worktree / branch | State | Blockers |
 |---|---|---|---|---|
-| Spec live-sync | spec-live-sync (`wS:p2`) | `spec/live-sync` | working | — |
-| Spec campaign-management | spec-campaign-management (`wT:p2`) | `spec/campaign-management` | working | — |
-| Spec fixtures-adapters | spec-fixtures-adapters (`wV:p2`) | `spec/fixtures-adapters` | working | — |
-| Build conventions (AGENTS.md) | spec-conventions (`wW:p2`) | `spec/build-conventions` | working | — |
+| Spec live-sync | — (ended) | merged to `main` | in-review, reviewed | DM D1, D4 |
+| Spec campaign-management | — (ended) | merged to `main` | in-review, reviewed | DM D1, D2, D4 |
+| Spec fixtures-adapters | — (ended) | merged to `main` | in-review, reviewed | DM D4 |
+| Build conventions (AGENTS.md §9) | — (ended) | `spec/build-conventions` (wW, unmerged) | reviewed | DM D3 |
 
-Next: review-* agents per spec → merge → DM gate (conventions + foundation specs) → consolidate.
+Next: revision agents apply decisions + review findings → DM sets complete → consolidation → Phase 2.
 
-## Pending DM decisions
+## Risks
 
-- —
+- `opencode-claude-auth: Proactive token refresh failed` shown in sub-agent panes; may need `claude` re-auth before long build runs.
 
-## Resolved locally (report at next gate)
+## Resolved locally (report at gate)
 
-- Decisions log #36 annotated as superseded by #55/#76.
-- Spec index regrouped by build phase (#107).
+- Decisions log #36 annotated as superseded by #55/#76; spec index regrouped by build phase (#107).
+- Orchestrator builder brief: event-log order matches ADR-0016.

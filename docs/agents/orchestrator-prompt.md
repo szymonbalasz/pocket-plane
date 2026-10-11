@@ -87,8 +87,8 @@ Report (≤20 lines): summary, blocking questions with your picks, anything that
 You are implementing ONE feature of Pocket Plane: <feature>, build phase <n>.
 Read: AGENTS.md (build conventions), docs/specs/<feature>.md (status: complete), docs/data-model/README.md,
 docs/protocol/README.md, ADR-0016, ADR-0017, and: <relevant ADRs>.
-Rules: tier-S scope only. Every capability is a server command (validated intent → domain event → event log
-→ broadcast through the visibility filter). zod at every boundary. No feature logic in clients.
+Rules: tier-S scope only. Every capability is a server command (validated intent → mutate + append to event log
+in one transaction → dispatch domain event → broadcast through the visibility filter). zod at every boundary. No feature logic in clients.
 Work in thin vertical slices. For each slice: write/extend fixtures (command scripts) → server + tests → UI → `bun test` green.
 When a slice is ready for verification, STOP and report "ready for walkthrough: <which>". Don't run long browser sessions yourself.
 Done = all FR-<PREFIX> covered, bun test + typecheck + lint green, thin Playwright E2E green, walkthrough passed,
