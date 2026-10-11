@@ -66,7 +66,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | 3D dice animation | A | [dice-extras](specs/post-mvp/dice-extras.md) | |
 | Party portrait strip (BG2-style) | A | [theme-system](specs/post-mvp/theme-system.md) | Also a [play-shell](specs/play-shell.md) element |
 | DM requests a roll from players | B | [dice-extras](specs/post-mvp/dice-extras.md) | Notification with roll action |
-| Hidden DM rolls | B | [dice-extras](specs/post-mvp/dice-extras.md) | MVP rolls are public only |
+| Hidden DM rolls | S | [dice-roll-log](specs/dice-roll-log.md) | Via per-category public log settings (section 6) |
 | Spell slots tracker | B | [character-sheet-full](specs/post-mvp/character-sheet-full.md) | |
 | Party HP/AC summary for players | B | [play-shell](specs/play-shell.md) | Pairs with portrait strip |
 | Player whispers roll to DM | C | [dice-extras](specs/post-mvp/dice-extras.md) | |
@@ -112,6 +112,22 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | DM "view as player" | C | [play-shell](specs/play-shell.md) | Visibility filter makes this feasible |
 | Backup / export UI | D | — | Copy SQLite file + asset dir |
 | Revoke / rotate player links, kick | F | — | Trusted table |
+
+## 6. Table-specific
+
+| Feature | Tier | Spec | Notes |
+|---|---|---|---|
+| **BG2-style game log** in the play view ("Goblin attacks Mira: 12 + 4 = 16 — hit! 6 damage") | S | [dice-roll-log](specs/dice-roll-log.md) | Combat and out-of-combat rolls (e.g. contested Strength) |
+| **DM per-category public/hidden log settings** (attack, damage, saves, checks…), changeable live | S | [dice-roll-log](specs/dice-roll-log.md) | Shieldmaiden-style tickboxes; broken there today |
+| Live damage leaderboard + overkill callouts | A | [stats](specs/post-mvp/stats.md) | |
+| Session awards (BG2-style: biggest hit, most damage taken…) | A | [stats](specs/post-mvp/stats.md) | |
+| Kill-feed toasts ("Thorn finished the Ogre, overkill 37") | B | [stats](specs/post-mvp/stats.md) | Notification kind |
+| Character trophy case (campaign stats on sheet) | B | [stats](specs/post-mvp/stats.md) | |
+| Dice luck tracker (avg d20, nat 20s/1s) | B | [stats](specs/post-mvp/stats.md) | |
+| Auto session recap from event log | D | — | Recaps are story, not combat |
+| Live AI follow-along / summariser | F | — | Distinct from [agent-api](specs/post-mvp/agent-api.md) |
+| Combat rewind / timeline replay | F | — | |
+| External stream / overlay of the log | F | — | Log lives in the game client |
 
 ## Already decided elsewhere
 

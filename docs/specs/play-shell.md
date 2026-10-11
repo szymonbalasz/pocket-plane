@@ -21,7 +21,7 @@ wave: 2
 - Landing: player opens their link → play page on the **active scene**; "waiting for DM" if none.
 - DM client and player client shells (two clients, [ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md)).
 - Floating windows: open, close, move, resize, bring to front, minimise.
-- Window registry: features register window types (character sheet, initiative, roll log, notifications, party loot, encounter builder…).
+- Window registry: features register window types (character sheet, initiative, game log, notifications, party loot, encounter builder…).
 - **Per-player persisted layout/preferences** (which windows open, position, size).
 - Launcher (toolbar / bottom bar) to open windows.
 - Connection state indicator ([live-sync](live-sync.md)).

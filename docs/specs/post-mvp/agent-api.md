@@ -10,6 +10,7 @@ phase: post-mvp
 
 - **What:** API (likely MCP) letting an AI DM-assistant read and write campaign data: entities, notes, encounters.
 - **Builds on:** [entities](../entities.md), [ADR-0009](../../architecture/adr/0009-entity-content-model.md), [ADR-0011](../../architecture/adr/0011-cross-references.md), [ADR-0004](../../architecture/adr/0004-tenancy-auth-permissions.md).
+- **Not planned:** live AI follow-along / summariser (tier F).
 - **Open:**
   - Auth: DM-equivalent secret or scoped token?
   - Writes go through the same intent path (validation, events) as clients?

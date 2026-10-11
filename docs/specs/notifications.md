@@ -86,7 +86,7 @@ wave: 2
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-NOTE-01 | Resolver: named actor only, or anyone in audience? | **Named actor; DM can always act** / anyone in audience | yes | combat-tracker |
-| OQ-NOTE-02 | Is the roll log itself a notification feed, or separate? | **Separate windows; rolls may spawn notifications** / merged feed | no | dice-roll-log |
+| OQ-NOTE-02 | Is the game log itself a notification feed, or separate? | **Separate windows; rolls may spawn notifications** / merged feed | no | dice-roll-log |
 | OQ-NOTE-03 | History retention | **Whole campaign, paginated** / current session only | no | — |
 | OQ-NOTE-04 | Do toasts auto-dismiss? | **Info auto-dismiss; pending actions stay until resolved** / all sticky | no | — |
 

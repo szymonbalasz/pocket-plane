@@ -13,7 +13,7 @@
 - **Relational SQLite schema.**
 - **JSON columns only for document-shaped leaf data**, e.g. polygon points, condition lists, stat-block actions. Validated by zod on read/write.
 - **No single-JSON-blob state** (no "whole campaign/scene as one document").
-- **Runtime/session state lives in the app DB**: tokens, fog, initiative, HP, roll log. Must survive a server crash.
+- **Runtime/session state lives in the app DB**: tokens, fog, initiative, HP, game log. Must survive a server crash.
 
 ## Consequences
 

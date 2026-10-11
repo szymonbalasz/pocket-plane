@@ -53,11 +53,13 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Condition** | A 5e condition (e.g. prone, poisoned) applied to a combatant. | — |
 | **Concentration** | Flag on a combatant maintaining a concentration spell; prompts a save on damage. | — |
 | **Roll** | A dice expression evaluated server-side, with result. | — |
-| **Roll log** | Persisted, ordered list of rolls in a campaign. | — |
+| **Game log** | Player-facing, BG2-style log window of rolls and combat outcomes (later also text). Each entry public or DM-only. Formerly "roll log". | Event log (internal) |
+| **Roll category** | Kind of roll: attack, damage, saving throw, ability check, skill check, contested, initiative, healing, other. | — |
+| **Public log settings** | DM's per-category tickboxes deciding which DM rolls appear in players' game log. Changeable live. | Visibility filter (the mechanism that applies them) |
 | **Whisper** | A roll visible only to the roller and DM (or DM-to-player). | — |
 | **Domain event** | Typed record of a committed change, dispatched in-process to listeners (broadcaster, rules…) ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | WS event (the filtered message sent to a client) |
 | **Notification** | Persisted, toast-like message with a history feed; has a kind, an audience and optionally an action ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | WS event |
-| **Event log** | Persisted, append-only log of every domain event; source for undo and stats ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | Roll log / game log (player-facing) |
+| **Event log** | Persisted, append-only log of every domain event; source for undo and stats ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | Game log (player-facing) |
 | **Undo** | DM-only, strict LIFO, combat log entries only (damage/healing applied): appends a compensating event that reverses the latest entry and marks it undone. | — |
 | **Pending action** | A notification whose action (button) is not yet resolved or dismissed (e.g. apply damage, roll a save). | — |
 | **Damage card** | A notification kind with an "apply" action, holding a damage result (from a player or DM roll) the DM applies to a target with a modifier: normal, resistant, immune, vulnerable. | Roll |

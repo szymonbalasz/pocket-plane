@@ -14,7 +14,7 @@ Template: [_template.md](_template.md). Writing order: [roadmap](../roadmap.md#s
 | 1 | [Fixtures and source adapters](fixtures-adapters.md) | FIX | unclaimed | — |
 | 2 | [Entities (core)](entities.md) | ENT | unclaimed | — |
 | 2 | [Character sheet (basics)](character-sheet.md) | CHAR | unclaimed | — |
-| 2 | [Dice and roll log](dice-roll-log.md) | DICE | unclaimed | — |
+| 2 | [Dice and game log](dice-roll-log.md) | DICE | unclaimed | — |
 | 2 | [Notifications](notifications.md) | NOTE | unclaimed | — |
 | 2 | [Play shell](play-shell.md) | SHELL | unclaimed | — |
 | 3 | [Scenes and map](scenes-map.md) | MAP | unclaimed | — |

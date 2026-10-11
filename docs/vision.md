@@ -40,6 +40,7 @@ Six windows, one game night:
 | **Player notes:** Obsidian-style personal notes with links, referenced from a widget or the whiteboard | Post-MVP; design for it |
 | **Player-placed props:** status rings, AoE markers; move and transform | Post-MVP; design for it |
 | **DM text drops** replacing Discord pastes | Post-MVP: text/pasted descriptions in the game log (tier C–D) |
+| **BG2-style game log** with DM per-category public/hidden tickboxes | MVP |
 | **Timers and reminders** (concentration checks, effect durations) | Post-MVP; foundation (domain events + pending actions) in MVP — [ADR-0016](architecture/adr/0016-domain-events-pending-actions.md) |
 
 ## Users
@@ -85,7 +86,7 @@ The DM can run a short session end to end — some roleplay, some story, some co
 **MVP**
 - The session simulation above runs start to finish with a DM and at least one player in separate browser sessions (e.g. normal + incognito, or two browsers) on one machine. Tunnel exposure is assumed solved, not an MVP check.
 - Fixture rebuild: from empty DB to ready-to-play session in one command.
-- Server killed mid-combat → restart → tokens, active scene, initiative, HP, roll log and loot log intact.
+- Server killed mid-combat → restart → tokens, active scene, initiative, HP, game log and loot log intact.
 - A player joins from a player link with no setup beyond opening a URL.
 - Every MVP feature develops and tests in an isolated worktree.
 
