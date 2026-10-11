@@ -16,6 +16,30 @@
 | Miro (party board: items, handouts, shared info) | [Party loot](specs/party-loot.md) (MVP), then [party board](specs/post-mvp/party-board.md) |
 | Obsidian vault (worldbuilding notes) | [World builder](specs/post-mvp/world-builder.md), gradually. **Not ported.** Optional [importer](specs/post-mvp/obsidian-importer.md) later. |
 
+## The table today
+
+Six windows, one game night:
+
+| Window | Used for | Pain |
+|---|---|---|
+| Shieldmaiden (DM) | Prepared encounter, initiative, DM rolls, HP | Players read damage out loud; DM applies it by hand |
+| Owlbear Rodeo (all) | Scene; each player controls own token; players place and transform props (status rings, AoE markers) | Separate from combat state |
+| Discord | DM pastes one-off text | Outside the game |
+| Miro (all) | Inventory | Separate tool |
+| Physical dice (DM) | DM rolls | Not logged |
+| Obsidian vault (DM) | Notes | Can't reach notes from what's on screen |
+
+## Ideas raised (not yet scoped)
+
+> Captured from discussion. Not decided; each gets assigned to MVP or post-MVP during the feature walkthrough.
+
+- **One play page** (Roll20-style): canvas-centric, with sticky-note windows that pop out over the canvas as needed.
+- **Damage cards:** player one-click rolls attack + damage → DM sees the pending damage and applies it to a target with normal / resistant / immune / vulnerable modifiers.
+- **Notes from the canvas:** click a token (e.g. an NPC) → open its notes. DM notes on anything on screen.
+- **Player notes:** Obsidian-style personal notes with links, referenceable from a widget or straight from the whiteboard.
+- **Player-placed props:** status rings, AoE markers; move and transform.
+- **DM text drops** replacing Discord pastes (handout-like).
+
 ## Users
 
 | User | Device | Needs |
