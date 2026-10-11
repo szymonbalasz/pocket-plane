@@ -24,7 +24,7 @@
 | Initiative, HP, damage, rolls, roll log | |
 | **Damage cards**: player one-click rolls attack + damage → DM applies to a target as normal / resistant / immune / vulnerable | |
 | **Every roll: automated or manual entry** (physical dice), for DM and players | |
-| **One play page**: canvas as base, floating windows over it | Props (status rings, AoE markers) → [scene-tools](../../specs/post-mvp/scene-tools.md); notes from tokens, player notes → [world-builder](../../specs/post-mvp/world-builder.md) |
+| **One play page**: canvas as base, floating windows over it. Player lands on the active scene; window layout persisted per player | Props (status rings, AoE markers) → [scene-tools](../../specs/post-mvp/scene-tools.md); notes from tokens, player notes → [world-builder](../../specs/post-mvp/world-builder.md) |
 | Assume immediate asset load | Player-ready indicator / load handling → [scene-tools](../../specs/post-mvp/scene-tools.md) |
 | Party loot log: rewards given to the party are visible to all | Full party board → [party-board](../../specs/post-mvp/party-board.md) |
 | Fixtures: one player, one enemy, two scenes; teardown/rebuild | |
