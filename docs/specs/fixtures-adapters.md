@@ -15,16 +15,19 @@ wave: 1
 - Tear down and rebuild any dev/test setup from fixtures, fast ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)).
 - One adapter pipeline that later imports reference material from many sources (Open5e, 5etools JSON, homebrew, Obsidian).
 - Whether fixtures go through the same pipeline is proposed in [ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md).
+- Fixtures power the agent build loop: load → test in a browser → discard ([ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md)).
 
 ## 2. Scope
 
 - Fixture set for the MVP session simulation ([ADR-0014](../architecture/adr/0014-mvp-scope.md)):
   - campaign + DM secret + one player with a stable player link
   - `player-1`: one character (basics: AC, HP, init, shortsword 1d6)
-  - `enemy-1`, `enemy-2`: two monster kinds (basics: AC, HP, init, one attack, CR/XP)
+  - `enemy-1`, `enemy-2`: two SRD monster kinds, e.g. goblin and wolf (basics: AC, HP, init, one attack, CR/XP)
+  - `enemy-custom`: Elite Goblin Warrior, derived from goblin (exercises the uniform creature interface)
+  - items: shortsword (stock)
   - an encounter mixing both kinds for the party
-  - `town` scene: map image, grid, tokens
-  - `battlemap` scene: map image, grid, tokens
+  - `town` scene: simple shapes on white, grid, tokens (shapes on round circles)
+  - `battlemap` scene: simple shapes on white, grid, tokens incl. hidden ones
 - Composition: small fixtures combined into named bundles (e.g. `session-sim`).
 - Commands: reset (empty DB + asset dir), load bundle, reset-and-load.
 - Adapter interface usable by fixtures now and external sources later.
@@ -75,7 +78,7 @@ wave: 1
 
 ## 13. Test plan
 
-> TODO (spec phase): every fixture loads cleanly into a fresh temp DB; re-load is idempotent; bundles compose. Isolated per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md).
+> TODO (spec phase): every fixture loads cleanly into a fresh temp DB; re-load is idempotent; bundles compose; reset+load within budget. Browser walkthrough: load `session-sim`, open DM and player contexts, see town scene. Isolated per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md), [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md).
 
 ## 14. Dependencies
 
@@ -97,7 +100,7 @@ wave: 1
 | OQ-FIX-02 | Fixture format | **TypeScript modules exporting zod-validated objects** / JSON files + schema / YAML | yes | all specs |
 | OQ-FIX-03 | Fixture location and ownership | **One `fixtures/` tree; each feature spec names the fixtures it adds** / per-feature folders | no | all specs |
 | OQ-FIX-04 | Mid-combat fixtures (e.g. "round 2, enemy at half HP")? | **Yes, as bundles layered on `session-sim`** / base state only | no | combat-tracker, live-sync |
-| OQ-FIX-05 | Fixture map/token images: source and licence | **Simple generated/CC0 images committed to repo** / user-supplied, gitignored | yes | assets-pipeline, scenes-map |
+| OQ-FIX-05 | ~~Fixture images~~ **Decided: simple shapes on white (maps), shapes on circles (tokens); tiny committed files or deterministic generation** ([ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md)) | — | — | — |
 | OQ-FIX-06 | Can the DM use fixtures in real play (e.g. "load my party")? | **Yes — same mechanism as homebrew sources later** / dev/test only | no | post-mvp/compendium |
 
 ## 16. Out of scope

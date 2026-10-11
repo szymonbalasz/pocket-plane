@@ -105,3 +105,6 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 82 | Notes will be markdown + wikilinks (Obsidian-compatible) | DM's agent note-grooming workflow carries over | [world-builder](specs/post-mvp/world-builder.md) |
 | 83 | Fog of war not MVP; first item after MVP | Hide button covers the first playtest | [scene-tools](specs/post-mvp/scene-tools.md) |
 | 84 | One shared, source-agnostic interface for adding creatures to an encounter (SRD, imported, custom, duplicated, fixture) | Uniform prep; compendium plugs in later without changing combat | [0009](architecture/adr/0009-entity-content-model.md), [combat-tracker](specs/combat-tracker.md) |
+| 85 | Custom creature form modelled on Shieldmaiden + duplicate (MVP); picker search only if near-free | DM's preferred prep tool | [combat-tracker](specs/combat-tracker.md) |
+| 86 | Build agents test and iterate in a browser (DM + player contexts) against disposable fixture bundles | Visual, multi-client app; fast feedback | [0017](architecture/adr/0017-agent-verification-fixture-library.md) |
+| 87 | Fixtures are simple and clear: shape maps on white, shape-on-circle tokens, SRD monsters, stock items | Readable, licence-safe, quick to verify | [0017](architecture/adr/0017-agent-verification-fixture-library.md) |

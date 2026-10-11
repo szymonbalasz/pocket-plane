@@ -99,13 +99,15 @@ Entities, not SQL. JSON leaf fields marked per [ADR-0006](../architecture/adr/00
 
 ## 13. Test plan
 
-Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)).
+Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)). Agent build loop per [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md).
 
 | Level | What | Fixtures |
 |---|---|---|
 | Unit | | |
 | Integration | | |
 | E2E (thin) | | |
+
+**Browser walkthrough** (agent, per [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md)): bundle → DM steps → player steps → expected result.
 
 ## 14. Dependencies
 

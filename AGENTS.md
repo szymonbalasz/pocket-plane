@@ -71,7 +71,7 @@ Row in your spec's Open questions table:
 - [ ] Data model lists entities, fields, relations, derived values.
 - [ ] Every WS event lists its visibility rule.
 - [ ] Disconnect, reconnect and server-crash behaviour stated.
-- [ ] Test plan names fixtures and runs isolated per worktree ([ADR-0008](docs/architecture/adr/0008-parallel-dev-isolation.md)).
+- [ ] Test plan names fixtures, a bundle and a browser walkthrough, and runs isolated per worktree ([ADR-0008](docs/architecture/adr/0008-parallel-dev-isolation.md), [ADR-0017](docs/architecture/adr/0017-agent-verification-fixture-library.md)).
 - [ ] No blocking open questions. Non-blocking ones have an owner.
 - [ ] Consistent with all accepted ADRs and the glossary.
 - [ ] Readable in five minutes.

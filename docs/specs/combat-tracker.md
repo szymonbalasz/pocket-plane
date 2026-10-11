@@ -18,7 +18,7 @@ wave: 3
 
 ## 2. Scope
 
-- **Encounter builder** (tier S): pick creatures and quantities through **one shared "add creature" interface**, identical whatever the source (SRD/imported, custom, duplicated NPC, fixture). The encounter only knows "a creature definition", never where it came from; party = campaign characters; shows XP budget and difficulty (easy / medium / hard / deadly) per 2014 DMG.
+- **Encounter builder** (tier S): pick creatures and quantities through **one shared "add creature" interface**, identical whatever the source (SRD/imported, custom, duplicated NPC, fixture). An SRD goblin and a custom Elite Goblin Warrior are treated the same. The encounter only knows "a creature definition", never where it came from; party = campaign characters; shows XP budget and difficulty (easy / medium / hard / deadly) per 2014 DMG.
 - Encounters are saved and prepared before the session. **Encounter lifecycle: planned → started → ended** (DM clicks Start / End encounter). Stats and the game log are grouped per encounter. No session tracking ([ADR-0013](../architecture/adr/0013-session-journal-scope.md)).
 - Start combat: PCs + the encounter's monsters (several kinds, N of each).
 - **DM undo** (strict LIFO, one step at a time) of combat log entries, e.g. "Player X did 4 damage to creature Y" (damage/healing applied), via [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md).
@@ -34,6 +34,7 @@ wave: 3
 - **Damage cards** (a [notification](notifications.md) kind with an apply action, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): the attack result appears as a pending card for the DM. DM picks target and applies as normal / half (resistant) / none (immune) / double (vulnerable), **and can manually override any value** before applying (same attack popup as DM attacks). DM can also create cards.
 - Healing: apply to HP; down at 0.
 - Remove/defeat combatant; end encounter.
+- **Custom creature form** (Shieldmaiden-style) + duplicate an existing creature ([OQ-CBT-16](#15-open-questions)).
 - Player initiative view; **monster HP shown to players as a health band** (healthy / bloodied / down).
 - Combatants bind to tokens the DM **already placed** on the battlemap (some hidden). Starting an encounter does not place tokens ([scenes-map](scenes-map.md)).
 - **Capture combat facts for stats** from day one: every applied damage/heal records source, target, attack/weapon, raw roll, modifier, override, applied amount, target HP before/after, overkill ([stats](post-mvp/stats.md), [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)).
@@ -113,8 +114,8 @@ wave: 3
 | OQ-CBT-10 | Overkill: record against raw damage or capped at HP? | **Record both (applied = capped, overkill = raw − HP before)** / capped only | yes | post-mvp/stats |
 | OQ-CBT-12 | CR math | **2014 DMG: XP by CR, party thresholds by level, group-size multiplier** / simplified CR sum | yes | entities, character-sheet |
 | OQ-CBT-14 | Party for difficulty: all campaign characters or selected? | **Selected (defaults to all)** / all | no | — |
-| OQ-CBT-15 | Creature picker contents in MVP | **All creature definitions in the campaign (fixtures + DM-made), searchable; compendium entries join later via the same picker** / separate lists per source | yes | entities, post-mvp/compendium |
-| OQ-CBT-16 | How does the DM make a custom creature in MVP? | **Minimal form (name, AC, HP, init, CR, one attack) + duplicate existing; full editor tier A** / fixtures only | yes | entities |
+| OQ-CBT-15 | ~~Creature picker contents~~ **Decided: all creature definitions in the campaign, one list regardless of source.** Search only if near-free in MVP; otherwise tier A | — | — | — |
+| OQ-CBT-16 | ~~Custom creature in MVP~~ **Decided: custom creature form, modelled on Shieldmaiden's** ([repo](https://github.com/HarmlessKey/Shieldmaiden); UX reference — check its licence before reusing code). Spec agent defines the MVP field subset; duplicate existing creature included | — | — | — |
 | OQ-CBT-11 | Can players also use modifier keys / manual entry for their attack? | **Yes, same flow as DM** / DM only | no | dice-roll-log |
 
 ## 16. Out of scope

@@ -22,6 +22,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0014](0014-mvp-scope.md) | MVP is a playable session simulation | accepted |
 | [0015](0015-source-adapters-fixtures.md) | Source adapters and fixtures | proposed |
 | [0016](0016-domain-events-pending-actions.md) | Domain events and pending actions | accepted (core) |
+| [0017](0017-agent-verification-fixture-library.md) | Agent-driven verification and fixture library | accepted |
 
 ## Proposing a new ADR
 
