@@ -23,9 +23,10 @@ wave: 3
   - **Grid calibration**: cell size (enlarge/reduce), offset, and grid settings (e.g. visibility, colour/opacity) *(settings list proposed)*.
   - Drag characters and monsters onto the scene (from entity list / encounter); edit token names/labels.
   - Pick token images from previously uploaded art (basic library; full library with folders/tags is tier A).
+  - **Ctrl-D duplicates a token** (same definition) and the copy can be renamed (e.g. "Goblin Chief").
   - **Hide / reveal button** per token, Owlbear-style (tier S): hidden tokens visible to DM only (shown translucent), revealed with one click.
 - Pan/zoom.
-- Tokens bound to entities (and combatants during combat).
+- Tokens are **instances** of a definition ([ADR-0009](../architecture/adr/0009-entity-content-model.md)): display name + play state only; stats come from the definition.
 - Snap to grid; token sizes (Large/Huge span squares); token labels.
 - DM moves/controls any token and can reassign token ownership; player moves own.
 - Lock map/background.

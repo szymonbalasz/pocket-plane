@@ -34,7 +34,7 @@ wave: 3
 - **Damage cards** (a [notification](notifications.md) kind with an apply action, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): the attack result appears as a pending card for the DM. DM picks target and applies as normal / half (resistant) / none (immune) / double (vulnerable), **and can manually override any value** before applying (same attack popup as DM attacks). DM can also create cards.
 - Healing: apply to HP; down at 0.
 - Remove/defeat combatant; end encounter.
-- **Custom creature form** (Shieldmaiden-style) + duplicate an existing creature ([OQ-CBT-16](#15-open-questions)).
+- **Custom creature form** (Shieldmaiden-style): prefilled from a base creature (SRD or custom) → saves a new custom definition. Edits to a custom definition update planned encounters and placed instances ([ADR-0009](../architecture/adr/0009-entity-content-model.md)). No inline stat editing on combatants; per-combatant modifiers (temp HP, buffs) are tier A.
 - Player initiative view; **monster HP shown to players as a health band** (healthy / bloodied / down).
 - Combatants bind to tokens the DM **already placed** on the battlemap (some hidden). Starting an encounter does not place tokens ([scenes-map](scenes-map.md)).
 - **Capture combat facts for stats** from day one: every applied damage/heal records source, target, attack/weapon, raw roll, modifier, override, applied amount, target HP before/after, overkill ([stats](post-mvp/stats.md), [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)).

@@ -1,6 +1,6 @@
 # 0010 — Compendium design
 
-- Status: proposed
+- Status: proposed — re-import safety decided (option i); scope open
 - Date: 2026-10-10
 - Affects: post-mvp/compendium, entities, combat-tracker, character-sheet, post-mvp/compendium-expansion
 - MVP: not blocking ([ADR-0014](0014-mvp-scope.md)). Shares the adapter pipeline and provenance with [ADR-0015](0015-source-adapters-fixtures.md).
@@ -38,7 +38,8 @@
 
 ## Decision
 
-> Undecided.
+- **Re-import safety: option i (decided via [ADR-0009](0009-entity-content-model.md))** — imported entries are read-only; DM edits only by deriving a custom definition (form prefilled from the entry).
+- Scope (A / B / C): undecided. Not MVP-blocking.
 
 ## Questions to answer
 

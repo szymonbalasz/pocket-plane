@@ -108,3 +108,11 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 85 | Custom creature form modelled on Shieldmaiden + duplicate (MVP); picker search only if near-free | DM's preferred prep tool | [combat-tracker](specs/combat-tracker.md) |
 | 86 | Build agents test and iterate in a browser (DM + player contexts) against disposable fixture bundles | Visual, multi-client app; fast feedback | [0017](architecture/adr/0017-agent-verification-fixture-library.md) |
 | 87 | Fixtures are simple and clear: shape maps on white, shape-on-circle tokens, SRD monsters, stock items | Readable, licence-safe, quick to verify | [0017](architecture/adr/0017-agent-verification-fixture-library.md) |
+
+## Entity model
+
+| # | Decision | Rationale | Ref |
+|---|---|---|---|
+| 88 | Creature definitions vs instances. Imported (SRD) definitions read-only; custom definitions derived via prefilled form; edits propagate to encounters and instances | Uniform handling; one place to fix a creature | [0009](architecture/adr/0009-entity-content-model.md) |
+| 89 | Instances never edit stats: only name, play state, modifiers. Ctrl-D duplicates an instance. Effective stats = definition + modifiers | Inline editing would blow up complexity | [0009](architecture/adr/0009-entity-content-model.md) |
+| 90 | Compendium re-import safety: imported entries immutable, edits via derived customs | Follows from #88 | [0010](architecture/adr/0010-compendium-design.md) |
