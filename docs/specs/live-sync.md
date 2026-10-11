@@ -1,7 +1,7 @@
 ---
 title: Live sync, reconnect, visibility
 prefix: SYNC
-status: draft
+status: in-review
 owner: spec-live-sync
 wave: 1
 ---
