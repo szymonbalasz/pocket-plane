@@ -20,7 +20,7 @@
 | Grid calibration, pan/zoom, ruler (5e diagonals) | Location ↔ scenes, world builder → [world-builder](../../specs/post-mvp/world-builder.md) |
 | Tokens; DM moves any, player moves own. Plus tier-S map features in [feature tiers](../../feature-tiers.md) (snap, sizes, labels, ping, laser, lock map, ownership) | Compendium + import → [compendium](../../specs/post-mvp/compendium.md) |
 | Character sheet **basics**: AC, HP, initiative, one weapon attack (e.g. shortsword 1d6, may be hardcoded) | Spells, saves, skills, features, inventory… → [character-sheet-full](../../specs/post-mvp/character-sheet-full.md) |
-| **Encounter builder with CR difficulty** (tier S); combat vs **one kind of enemy**, single weapon attack each | Conditions, concentration → [combat-extras](../../specs/post-mvp/combat-extras.md) |
+| **Encounter builder with CR difficulty** (tier S); **multiple enemy kinds** per encounter (tier S); single weapon attack each | Conditions, concentration → [combat-extras](../../specs/post-mvp/combat-extras.md) |
 | Initiative, HP, damage, rolls, roll log; public rolls only; advantage/disadvantage on any roll (toggle or Shift/Ctrl) | Hidden DM rolls, whispers, roll requests, inline rolls, macros, 3D dice → [dice-extras](../../specs/post-mvp/dice-extras.md) |
 | **Damage cards**: Shieldmaiden-style attack (Shift adv / Ctrl dis) → DM applies to a target as normal / half / none / double, with manual override | Hit/miss hint (tier B) |
 | One-click monster initiative; monster HP as health band to players | Conditions, concentration, durations, temp HP, death saves, hidden combatants (tier A) |
@@ -29,7 +29,9 @@
 | **One play page** ([play-shell](../../specs/play-shell.md)): canvas as base, floating windows over it. Player lands on the active scene; window layout persisted per player | Props (status rings, AoE markers) → [scene-tools](../../specs/post-mvp/scene-tools.md); notes from tokens, player notes → [world-builder](../../specs/post-mvp/world-builder.md) |
 | Assume immediate asset load | Player-ready indicator / load handling → [scene-tools](../../specs/post-mvp/scene-tools.md) |
 | Party loot log: rewards given to the party are visible to all | Full party board → [party-board](../../specs/post-mvp/party-board.md) |
-| Fixtures: one player, one enemy, two scenes; teardown/rebuild | |
+| Fixtures: one player, enemies, an encounter, two scenes; teardown/rebuild | |
+| **Multi-step undo/redo** via the event log ([ADR-0016](0016-domain-events-pending-actions.md)) | |
+| **Scene list** with folders; duplicate scene | Background scene prep, pause screen (tier A) |
 
 - Full 5e sheet remains the **target**. MVP data model must not block it.
 - Entities in MVP: only what tokens and combat need (character, monster). No world-builder UI.

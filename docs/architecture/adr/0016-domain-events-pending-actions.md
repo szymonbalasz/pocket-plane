@@ -42,9 +42,20 @@ graph LR
 - Listeners run after commit; a failing listener never rolls back the mutation.
 - Cascades bounded: rules may create pending actions; whether they may emit further mutations is open (below).
 
-## MVP use
+**Event log and undo** (multi-step undo is tier S, so the log is **MVP**)
+- Every domain event is appended to a persisted **event log** (decided). Same transaction as the state change.
+- Each event carries what's needed to reverse it (e.g. `TokenMoved {from, to}`, `DamageApplied {hpBefore, hpAfter}`).
+- **Undo = append a compensating event** that reverses an earlier one and marks it `undone`. The log stays append-only; state tables stay the truth for play.
+- Stats ([stats](../../specs/post-mvp/stats.md)) ignore undone events.
 
-- Listeners: broadcaster, damage cards (first notification kind with an action).
+| Undo option | Pros | Cons |
+|---|---|---|
+| **A. Compensating events** (suggested) | Fits "state tables are truth"; log stays append-only; undo is visible in history | Each event type needs an inverse; some events can't be cleanly reversed |
+| B. Snapshot/restore to a point | Simple per-step | Coarse; loses unrelated concurrent changes (a player's move) |
+| C. Full event sourcing (state = replay of log) | Undo is trivial; time travel | Rewrites [ADR-0006](0006-persistence.md) model; heavy for MVP |
+
+## MVP use
+- Listeners: broadcaster, event log, damage cards (first notification kind with an action).
 - Concentration, durations, conditions plug in post-MVP ([combat-extras](../../specs/post-mvp/combat-extras.md)) without rework.
 
 ## Open
@@ -52,7 +63,12 @@ graph LR
 | Question | Options (suggested in bold) |
 |---|---|
 | May rules mutate state directly? | **No; only create pending actions** / yes with depth cap |
-| ~~Persist domain events as an append-only log?~~ **Decided: yes — robust append-only event log; stats are computed from it retroactively** ([stats](../../specs/post-mvp/stats.md)). State tables remain the truth for play. Build timing open: must be live before the first real campaign session | — |
+| ~~Persist domain events as an append-only log?~~ **Decided: yes, in MVP** — required by undo; stats computed from it retroactively | — |
+| Undo mechanism | See table above — **A** |
+| Undo scope: whose actions can be undone, by whom? | **DM undoes anything (stack across all actors); player undoes own last N actions (own token moves)** / DM only / per-user stacks only |
+| Which events are undoable? | **State changes (moves, HP, initiative, turn, loot, damage applied). Not rolls — a roll is a fact; undo the damage it caused** / everything incl. rolls |
+| Undo across concurrent changes (DM undoes a damage after a player moved) | **Undo targets a specific event, not "rewind"; conflicts (target changed since) prompt the DM** / strict LIFO rewind |
+| Redo? | **Yes, as re-applying the original event** / no |
 | Listener execution | **Synchronous, same process, after commit** / async microtask |
 | Can an action be resolved by "anyone in audience" or only a named actor? | **Named actor (DM or one player); audience may be wider** / anyone in audience |
 
@@ -61,3 +77,4 @@ graph LR
 - Specs list the domain events they emit and any listeners they add.
 - Notification shape is shared; owned by [notifications](../../specs/notifications.md). Features add kinds.
 - Tests can assert on emitted events without a WS client.
+- Every spec's domain event must define its inverse (or be declared non-undoable).

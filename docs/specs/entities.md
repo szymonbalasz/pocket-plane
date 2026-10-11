@@ -86,7 +86,7 @@ wave: 2
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-ENT-01 | Content model | See [ADR-0009](../architecture/adr/0009-entity-content-model.md) | yes | character-sheet, combat-tracker, fixtures-adapters |
-| OQ-ENT-02 | Monster: one entity per kind ("Goblin") spawning many combatants, or one entity per individual? | **One entity per kind; combatants/tokens are instances** / one per individual | yes | combat-tracker, scenes-map |
+| OQ-ENT-02 | Monster: one entity per kind ("Goblin") spawning many combatants, or one entity per individual? (MVP encounters mix kinds) | **One entity per kind; combatants/tokens are instances** / one per individual | yes | combat-tracker, scenes-map |
 | OQ-ENT-03 | Any create/edit UI in MVP, or fixtures only? | **Minimal DM edit form; create via fixtures** / fixtures only / full CRUD | no | fixtures-adapters |
 | OQ-ENT-04 | Do characters and monsters share the "basics" shape (AC, HP, init, attack)? | **Yes, one shared combat-basics block** / separate | yes | character-sheet, combat-tracker |
 

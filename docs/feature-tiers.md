@@ -94,6 +94,25 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Text chat | C–D | [dice-roll-log](specs/dice-roll-log.md) | Only as part of the game log (Roll20-style): text and pasted descriptions alongside rolls. No separate chat. |
 | Random tables | D | — | |
 
+## 5. DM tools
+
+| Feature | Tier | Spec | Notes |
+|---|---|---|---|
+| Scene list with folders; duplicate scene | S | [scenes-map](specs/scenes-map.md) | |
+| **Multi-step undo** (not just last action) | S | [ADR-0016](architecture/adr/0016-domain-events-pending-actions.md) | Via event log; every spec defines inverses |
+| Multiple enemy kinds in one encounter | S | [combat-tracker](specs/combat-tracker.md) | |
+| Prepare scenes in background | A | [scenes-map](specs/scenes-map.md) | Likely near-free with active-scene model |
+| Pause / intermission screen | A | [play-shell](specs/play-shell.md) | |
+| Homebrew monster editor | A | [compendium](specs/post-mvp/compendium.md) | |
+| Open5e / SRD monster import | A | [compendium](specs/post-mvp/compendium.md) | First real adapter ([ADR-0015](architecture/adr/0015-source-adapters-fixtures.md)) |
+| Token art library, reuse across scenes | A | [assets-pipeline](specs/assets-pipeline.md) | Content-hashed store already dedupes |
+| Monster stat block view on token click | B | [compendium](specs/post-mvp/compendium.md) | |
+| Rules quick reference (DM screen) | B | [compendium](specs/post-mvp/compendium.md) | |
+| Keyboard shortcuts | B | [play-shell](specs/play-shell.md) | Pairs with command palette |
+| DM "view as player" | C | [play-shell](specs/play-shell.md) | Visibility filter makes this feasible |
+| Backup / export UI | D | — | Copy SQLite file + asset dir |
+| Revoke / rotate player links, kick | F | — | Trusted table |
+
 ## Already decided elsewhere
 
 | Feature | Tier | Ref |

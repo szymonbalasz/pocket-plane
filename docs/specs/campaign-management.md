@@ -81,11 +81,11 @@ wave: 1
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-CAMP-01 | Tunnel URL may change per session — how do player links survive? | **Link = path token; DM re-shares base URL** / fixed named tunnel / short redirect | yes | live-sync |
-| OQ-CAMP-02 | Player link revocation / rotation | **DM can regenerate a player's link; old one invalid** / no revocation | yes | live-sync |
+| OQ-CAMP-02 | ~~Player link revocation / rotation~~ **Decided: not needed (tier F)** — trusted table | — | — | — |
 | OQ-CAMP-03 | How DM secret is set and stored | **Env var on first run, hashed in DB** / env only / generated on first run | yes | live-sync |
 | OQ-CAMP-04 | Can multiple campaigns be live at once? | **No, one active campaign per server run** / yes | no | live-sync |
 | OQ-CAMP-05 | Session journal in MVP? | See [ADR-0013](../architecture/adr/0013-session-journal-scope.md) | no | dice-roll-log, combat-tracker |
-| OQ-CAMP-06 | Campaign export/backup | **SQLite file copy documented, no UI** / export UI | no | — |
+| OQ-CAMP-06 | ~~Campaign export/backup UI~~ **Decided: no UI (tier D)**; document copying the SQLite file + asset dir | — | — | — |
 
 ## 16. Out of scope
 

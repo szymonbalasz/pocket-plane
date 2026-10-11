@@ -54,9 +54,9 @@ graph LR
 
 | Phase | Delivers | Exit check |
 |---|---|---|
-| 1. Skeleton | Campaign, auth, live sync, fixture pipeline | DM + player connect; snapshot on reconnect; fixture rebuild works |
+| 1. Skeleton | Campaign, auth, live sync, event bus + event log, fixture pipeline | DM + player connect; snapshot on reconnect; fixture rebuild works |
 | 2. Scenes | Assets, scenes, tokens, ruler, scene switch | Town → battlemap with tokens moved by DM and player |
-| 3. Combat | Sheet basics, dice, combat | One full fight vs one enemy kind |
+| 3. Combat | Sheet basics, dice, combat | One full fight vs mixed enemies; undo a wrong damage |
 | 4. Reward + hardening | Party loot; crash recovery | Full session simulation; kill server mid-combat, resume intact |
 
 ## After MVP (v1 candidates, unordered)

@@ -31,6 +31,9 @@ wave: 3
 - Measured movement along drag path *(tier B — MVP timing open, [feature tiers](../feature-tiers.md))*.
 - See [feature tiers](../feature-tiers.md#1-map-and-tokens) for ranking.
 - Active scene: DM switches; all players follow.
+- **Scene list** with folders; duplicate a scene (tier S).
+- **Undo/redo** token moves and scene edits ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)).
+- Preparing a non-active scene while players see another is tier A — likely near-free given active-scene model.
 - Create/edit scenes in UI *(proposed; fixtures may be enough)*.
 
 ## 3. Goals

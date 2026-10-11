@@ -27,6 +27,5 @@
 ## Consequences
 
 - Each spec lists its player-writable actions and the ownership rule for each.
-- A leaked player link = that player's access; revocation/rotation is needed.
-  > TODO (spec phase): resolve in [campaign-management](../../specs/campaign-management.md).
+- A leaked player link = that player's access. Revocation/rotation **not planned** (tier F, trusted table — [feature tiers](../../feature-tiers.md#5-dm-tools)).
 - Compendium may be shared across campaigns — scope is open in [ADR-0010](0010-compendium-design.md).

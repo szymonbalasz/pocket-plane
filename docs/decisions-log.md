@@ -43,7 +43,7 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 30 | DM (human) is the spec reviewer; no reviewer agent | DM owns the product decisions | [process](process.md#roles) |
 | 31 | MVP = playable session simulation (roleplay, story, combat) | Get a usable product in hand early and iterate | [0014](architecture/adr/0014-mvp-scope.md) |
 | 32 | MVP character sheet = basics: AC, HP, initiative, one weapon attack (shortsword 1d6 may be hardcoded) | Enough for a fight; full sheet stays the target | [0014](architecture/adr/0014-mvp-scope.md) |
-| 33 | MVP combat = one enemy kind, single weapon attack each; initiative, HP, damage, rolls | Minimum to run a fight | [0014](architecture/adr/0014-mvp-scope.md) |
+| 33 | MVP combat = one enemy kind *(superseded by #63: multiple kinds)*, single weapon attack each; initiative, HP, damage, rolls | Minimum to run a fight | [0014](architecture/adr/0014-mvp-scope.md) |
 | 34 | MVP scenes = map, grid, pan/zoom, tokens, ruler, scene switching | Town + battlemap is the session's spine | [0014](architecture/adr/0014-mvp-scope.md) |
 | 35 | MVP party reward = shared party loot log (form not fixed to gold) | Need to see a reward given to the party | [0014](architecture/adr/0014-mvp-scope.md) |
 | 36 | Deferred: compendium import, fog, AoE props, hidden tokens, world builder (incl. location ↔ scenes), full sheet, encounter builder/CR math, conditions | Not needed for the session simulation | [0014](architecture/adr/0014-mvp-scope.md) |
@@ -77,3 +77,7 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 59 | Stats via robust append-only domain event log, computed retroactively; stats UI later | Flexibility: new stats work on past sessions | [0016](architecture/adr/0016-domain-events-pending-actions.md), [stats](specs/post-mvp/stats.md) |
 | 60 | Notes/world/party batch: A = handouts, wikilinks+backlinks, party inventory, gold ledger, player NPC directory, command palette (A–B); B = journal sections, map pins, shared notes, session recap; C = quest log, calendar; C–D = chat (only within game log); D = random tables | DM ranking | [feature-tiers](feature-tiers.md#4-notes-handouts-world-and-party) |
 | 61 | Roll log designed as a typed game log so text/pasted descriptions can join later | Roll20-style chat-in-log, no separate chat | [dice-roll-log](specs/dice-roll-log.md) |
+| 62 | DM tools batch: S = scene list/folders/duplicate, multi-step undo, multiple enemy kinds; A = background scene prep, pause screen, homebrew monster editor, Open5e import, token art library; B = stat block view, rules reference, shortcuts; C = view as player; D = backup UI; F = link revocation | DM ranking | [feature-tiers](feature-tiers.md#5-dm-tools) |
+| 63 | MVP encounters support multiple enemy kinds | Tier S | [combat-tracker](specs/combat-tracker.md) |
+| 64 | Event log is MVP (undo depends on it); undo via compensating events (suggested, details open) | Multi-step undo is tier S | [0016](architecture/adr/0016-domain-events-pending-actions.md) |
+| 65 | No player-link revocation; no backup UI | Trusted table; SQLite file copy suffices | [campaign-management](specs/campaign-management.md) |

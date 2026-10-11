@@ -11,6 +11,7 @@ phase: post-mvp
 Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). First post-MVP candidate.
 
 - **What:** Library of 5e rules content (monsters, spells, items, conditions). SRD import from Open5e, browse/search, clone-to-campaign, homebrew, provenance/licence, re-import without clobbering edits.
+- **Tiered** ([feature tiers](../../feature-tiers.md#5-dm-tools)): Open5e/SRD import (A), homebrew monster editor (A), stat block view on token click (B), rules quick reference (B).
 - **Builds on:** [fixtures-adapters](../fixtures-adapters.md) (Open5e = another adapter), [entities](../entities.md), [ADR-0010](../../architecture/adr/0010-compendium-design.md), [ADR-0015](../../architecture/adr/0015-source-adapters-fixtures.md).
 - **Carried-over open questions** (suggested pick in bold):
 

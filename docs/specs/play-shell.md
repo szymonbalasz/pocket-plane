@@ -25,7 +25,7 @@ wave: 2
 - **Per-player persisted layout/preferences** (which windows open, position, size).
 - Launcher (toolbar / bottom bar) to open windows.
 - Connection state indicator ([live-sync](live-sync.md)).
-- **Design for later:** windows opened from canvas objects (token → notes), multiple windows of one type (several NPC notes), **command palette** (Obsidian / VS Code style: search everything + run commands; tier A–B).
+- **Later (tiered):** pause/intermission screen (A), keyboard shortcuts (B), DM "view as player" (C) — [feature tiers](../feature-tiers.md#5-dm-tools). (token → notes), multiple windows of one type (several NPC notes), **command palette** (Obsidian / VS Code style: search everything + run commands; tier A–B).
 
 ## 3. Goals
 
