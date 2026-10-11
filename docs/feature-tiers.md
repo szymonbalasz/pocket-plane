@@ -99,7 +99,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Feature | Tier | Spec | Notes |
 |---|---|---|---|
 | Scene list with folders; duplicate scene | S | [scenes-map](specs/scenes-map.md) | |
-| **Multi-step undo** (not just last action) | S | [ADR-0016](architecture/adr/0016-domain-events-pending-actions.md) | Via event log; every spec defines inverses |
+| **Multi-step undo** of combat log entries | S | [ADR-0016](architecture/adr/0016-domain-events-pending-actions.md) | DM-only, LIFO; damage/healing applied. Not rolls, moves or scene edits |
 | Multiple enemy kinds in one encounter | S | [combat-tracker](specs/combat-tracker.md) | |
 | Prepare scenes in background | A | [scenes-map](specs/scenes-map.md) | Likely near-free with active-scene model |
 | Pause / intermission screen | A | [play-shell](specs/play-shell.md) | |

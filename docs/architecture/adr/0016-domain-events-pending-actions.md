@@ -42,9 +42,10 @@ graph LR
 - Listeners run after commit; a failing listener never rolls back the mutation.
 - Cascades bounded: rules may create pending actions; whether they may emit further mutations is open (below).
 
-**Event log and undo** (multi-step undo is tier S, so the log is **MVP**)
+**Event log and combat undo** (tier S, so the log is **MVP**)
 - Every domain event is appended to a persisted **event log** (decided). Same transaction as the state change.
-- Each event carries what's needed to reverse it (e.g. `TokenMoved {from, to}`, `DamageApplied {hpBefore, hpAfter}`).
+- **Undo is basic and combat-only (decided):** the DM can undo combat log entries such as "Player X did 4 damage to creature Y". Not rolls (an Animal Handling roll is just a fact), not token moves, not scene edits.
+- Undoable events carry what's needed to reverse them (e.g. `DamageApplied {target, amount, hpBefore, hpAfter}`).
 - **Undo = append a compensating event** that reverses an earlier one and marks it `undone`. The log stays append-only; state tables stay the truth for play.
 - Stats ([stats](../../specs/post-mvp/stats.md)) ignore undone events.
 
@@ -66,10 +67,8 @@ graph LR
 | ~~Persist domain events as an append-only log?~~ **Decided: yes, in MVP** — required by undo; stats computed from it retroactively | — |
 | Undo mechanism | See table above — **A** |
 | ~~Undo scope~~ **Decided: DM only.** Players don't undo; they just redo the action (e.g. move the token back). | — |
-| Which events are undoable? | **State changes (moves, HP, initiative, turn, loot, damage applied). Not rolls — a roll is a fact; undo the damage it caused** / everything incl. rolls |
+| ~~Which events are undoable?~~ **Decided: combat log entries only** — damage/healing applied. Candidates to confirm: initiative changes, next/previous turn (turn already has "previous"). | — |
 | ~~Undo order~~ **Decided: strict LIFO, one step at a time** (to undo step 3 of 5, undo 5, 4, then 3). No cherry-picking. | — |
-| Which actions are on the DM's undo stack? | **DM's own actions only (incl. applying a player's damage card); player actions aren't on it** / every actor's actions in one global stack |
-| Undoing a DM action whose target changed since (DM moved a token, player then moved it) | **Undo still applies; result shown in log** / prompt DM / block |
 | Redo? | **Yes, as re-applying the original event** / no |
 | Listener execution | **Synchronous, same process, after commit** / async microtask |
 | Can an action be resolved by "anyone in audience" or only a named actor? | **Named actor (DM or one player); audience may be wider** / anyone in audience |
@@ -79,4 +78,4 @@ graph LR
 - Specs list the domain events they emit and any listeners they add.
 - Notification shape is shared; owned by [notifications](../../specs/notifications.md). Features add kinds.
 - Tests can assert on emitted events without a WS client.
-- Every spec's domain event must define its inverse (or be declared non-undoable).
+- Only combat-log events (damage/healing applied) need inverses in MVP; everything else is non-undoable.
