@@ -22,7 +22,7 @@
 | Character sheet **basics**: AC, HP, initiative, one weapon attack (e.g. shortsword 1d6, may be hardcoded) | Spells, saves, skills, features, inventory… → [character-sheet-full](../../specs/post-mvp/character-sheet-full.md) |
 | Combat vs **one kind of enemy**, single weapon attack each | Encounter builder/CR math, conditions, concentration → [combat-extras](../../specs/post-mvp/combat-extras.md) |
 | Initiative, HP, damage, rolls, roll log | |
-| Player-ready indicator (part of combat) | |
+| Assume immediate asset load | Player-ready indicator / load handling → [scene-tools](../../specs/post-mvp/scene-tools.md) |
 | Party loot log: rewards given to the party are visible to all | Full party board → [party-board](../../specs/post-mvp/party-board.md) |
 | Fixtures: one player, one enemy, two scenes; teardown/rebuild | |
 

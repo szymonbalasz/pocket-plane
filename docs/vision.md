@@ -29,7 +29,7 @@ The DM can run a short session end to end — some roleplay, some story, some co
 
 1. Players join via player links and see a **town scene** with map and tokens; move their own tokens.
 2. DM switches the active scene to a **battlemap**.
-3. Combat against **one kind of enemy**: initiative, attack rolls with one weapon each, damage, HP. Player-ready indicator before/at combat start.
+3. Combat against **one kind of enemy**: initiative, attack rolls with one weapon each, damage, HP.
 4. DM gives a reward to the party; it shows in a shared **party loot** log.
 5. Everything above can be torn down and rebuilt from **fixtures** (one player, one enemy, two scenes).
 

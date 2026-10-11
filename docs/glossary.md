@@ -45,7 +45,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Fog** | Polygon regions hiding parts of a scene from players. | Lighting (out of scope) |
 | **AoE prop** | A shape (cone, sphere, line, cube…) placed on a scene to show an area of effect. | Freehand drawing (out of scope) |
 | **Ruler** | Measuring tool using 5e diagonal rules. | — |
-| **Player-ready indicator** | Shows the DM which players are ready. Part of combat in MVP; exact meaning open ([combat-tracker](specs/combat-tracker.md#15-open-questions)). | — |
+| **Player-ready indicator** | Shows the DM which players have fully loaded a scene. Post-MVP ([scene-tools](specs/post-mvp/scene-tools.md)); MVP assumes immediate load. | — |
 | **Encounter** | A planned set of combatants with CR/difficulty math, prepared before combat. | Combat |
 | **Combat** | A running encounter: initiative order, rounds, turns. | Encounter |
 | **Combatant** | A participant in a combat, linked to an entity (and a token if on a scene). Holds HP, conditions, concentration. | Token; Entity |

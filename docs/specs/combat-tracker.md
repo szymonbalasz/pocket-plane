@@ -14,7 +14,6 @@ wave: 3
 
 - MVP: run one fight against **one kind of enemy** ([ADR-0014](../architecture/adr/0014-mvp-scope.md)).
 - Initiative, turns/rounds, attack and damage rolls, HP tracking.
-- Includes the **player-ready indicator**.
 - Encounter builder, CR math, conditions, concentration → [combat-extras](post-mvp/combat-extras.md).
 
 ## 2. Scope
@@ -26,7 +25,6 @@ wave: 3
 - Damage and healing: apply to HP; down at 0.
 - Remove/defeat combatant; end combat.
 - Player initiative view.
-- Player-ready indicator.
 - Combatants linked to tokens on the active scene ([scenes-map](scenes-map.md)).
 
 ## 3. Goals
@@ -36,6 +34,7 @@ wave: 3
 ## 4. Non-goals
 
 - Encounter builder, CR/XP math, conditions, concentration, per-combatant hidden visibility (→ [combat-extras](post-mvp/combat-extras.md)).
+- Player-ready / load indicator (→ [scene-tools](post-mvp/scene-tools.md)); MVP assumes immediate load.
 - Rules automation (auto-hit vs AC, auto-apply damage).
 
 ## 5. User stories
@@ -48,11 +47,11 @@ wave: 3
 
 ## 7. UI/UX notes
 
-> TODO (spec phase): DM combat panel; player initiative strip; ready indicator. Per [visual-direction](../design/visual-direction.md).
+> TODO (spec phase): DM combat panel; player initiative strip. Per [visual-direction](../design/visual-direction.md).
 
 ## 8. Data model
 
-> TODO (spec phase): combat (round, current turn), combatant (entity ref, token ref, initiative, HP). Ready state.
+> TODO (spec phase): combat (round, current turn), combatant (entity ref, token ref, initiative, HP).
 
 ## 9. API & events
 
@@ -64,7 +63,7 @@ wave: 3
 
 ## 11. Edge cases & failure modes
 
-> TODO (spec phase): crash mid-turn (must resume), combatant removed mid-round, token deleted, DM disconnect, player not ready.
+> TODO (spec phase): crash mid-turn (must resume), combatant removed mid-round, token deleted, DM disconnect.
 
 ## 12. Performance & bandwidth
 
@@ -90,7 +89,6 @@ wave: 3
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CBT-01 | What does "player ready" mean? | **Player clicked "ready" for combat (DM sees who's ready before start)** / scene assets loaded / both | yes | scenes-map, assets-pipeline |
 | OQ-CBT-02 | What do players see of monster HP? | **Health band (healthy/bloodied/down)** / nothing / exact | yes | live-sync |
 | OQ-CBT-03 | PC HP source of truth | See [OQ-CHAR-02](character-sheet.md#15-open-questions) | yes | character-sheet |
 | OQ-CBT-04 | Who applies damage? | **DM applies to anyone; player may apply to own PC** / DM only | no | character-sheet |

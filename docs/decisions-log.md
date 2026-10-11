@@ -43,9 +43,10 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 30 | DM (human) is the spec reviewer; no reviewer agent | DM owns the product decisions | [process](process.md#roles) |
 | 31 | MVP = playable session simulation (roleplay, story, combat) | Get a usable product in hand early and iterate | [0014](architecture/adr/0014-mvp-scope.md) |
 | 32 | MVP character sheet = basics: AC, HP, initiative, one weapon attack (shortsword 1d6 may be hardcoded) | Enough for a fight; full sheet stays the target | [0014](architecture/adr/0014-mvp-scope.md) |
-| 33 | MVP combat = one enemy kind, single weapon attack each; initiative, HP, damage, rolls; player-ready indicator | Minimum to run a fight | [0014](architecture/adr/0014-mvp-scope.md) |
+| 33 | MVP combat = one enemy kind, single weapon attack each; initiative, HP, damage, rolls | Minimum to run a fight | [0014](architecture/adr/0014-mvp-scope.md) |
 | 34 | MVP scenes = map, grid, pan/zoom, tokens, ruler, scene switching | Town + battlemap is the session's spine | [0014](architecture/adr/0014-mvp-scope.md) |
 | 35 | MVP party reward = shared party loot log (form not fixed to gold) | Need to see a reward given to the party | [0014](architecture/adr/0014-mvp-scope.md) |
 | 36 | Deferred: compendium import, fog, AoE props, hidden tokens, world builder (incl. location ↔ scenes), full sheet, encounter builder/CR math, conditions | Not needed for the session simulation | [0014](architecture/adr/0014-mvp-scope.md) |
 | 37 | Full 5e sheet "from day one" superseded; full sheet remains the target, model must not block it | Speed to a usable product | [0014](architecture/adr/0014-mvp-scope.md) supersedes part of [0007](architecture/adr/0007-product-scope.md) |
 | 38 | MVP fixtures: one player, one enemy, town + battlemap scenes; teardown/rebuild | Fast, repeatable test setup is a working goal | [0014](architecture/adr/0014-mvp-scope.md) |
+| 39 | Player-ready indicator deferred; MVP assumes immediate asset load | MVP runs on one machine, so load time is negligible; real readiness handling needed once remote | [0014](architecture/adr/0014-mvp-scope.md) |

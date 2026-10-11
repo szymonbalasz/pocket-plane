@@ -22,7 +22,7 @@ wave: 1
 - Content-hash addressing; dedupe identical uploads.
 - Derivatives: thumbnails, resized variants, format conversion.
 - HTTP caching (immutable URLs by hash).
-- Preload of the next scene's map *(MVP need depends on [OQ-CBT-01](combat-tracker.md#15-open-questions))*.
+- No preload or load tracking in MVP: assume immediate load ([ADR-0014](../architecture/adr/0014-mvp-scope.md)). → [scene-tools](post-mvp/scene-tools.md).
 - Asset metadata and campaign ownership.
 - Visibility: players only fetch assets they're allowed to see.
 
@@ -52,7 +52,7 @@ wave: 1
 
 ## 9. API & events
 
-> TODO (spec phase): upload, fetch by hash, derivative fetch, preload status events. Visibility rule per event.
+> TODO (spec phase): upload, fetch by hash, derivative fetch. Visibility rule per event.
 
 ## 10. Permissions
 
@@ -75,7 +75,7 @@ wave: 1
 | On | What we need | Status |
 |---|---|---|
 | [campaign-management](campaign-management.md) | Campaign scope, auth | open |
-| [live-sync](live-sync.md) | Preload/ready events (if any) | open |
+| [live-sync](live-sync.md) | Event conventions (if assets emit any) | open |
 
 ## 15. Open questions
 
