@@ -14,16 +14,15 @@ wave: 2
 
 - Server-side dice rolling via `@dice-roller/rpg-dice-roller` ([ADR-0001](../architecture/adr/0001-tech-stack.md)).
 - Persisted roll log per campaign; survives crash ([ADR-0006](../architecture/adr/0006-persistence.md)).
-- MVP: public rolls, click-to-roll from sheet/combat, persisted log ([ADR-0014](../architecture/adr/0014-mvp-scope.md)). Whisper/hidden-roll scope is open (OQ-DICE-06).
+- MVP: public rolls, click-to-roll from sheet/combat, persisted log ([ADR-0014](../architecture/adr/0014-mvp-scope.md)). Hidden DM rolls, whispers etc. → [dice-extras](post-mvp/dice-extras.md).
 
 ## 2. Scope
 
 - Roll from a dice expression (free text and click-to-roll from other features).
 - **Manual entry**: any roll can instead be entered as a physical-dice result (DM and players). Logged and marked as manual ([ADR-0014](../architecture/adr/0014-mvp-scope.md)).
-- Public rolls.
-- Whispers and DM broadcast controls *(MVP scope open: OQ-DICE-06)*.
+- Public rolls only in MVP.
 - Roll log view, persisted and live-updated.
-- Advantage/disadvantage via modifier keys (**Shift = advantage, Ctrl = disadvantage**) on any roll button; roll labels/context (e.g. "Shortsword attack").
+- Advantage/disadvantage on **any** roll: clickable toggle in the roll UI **or** modifier keys (**Shift = advantage, Ctrl = disadvantage**); roll labels/context (e.g. "Shortsword attack").
 - Every roll persisted with roller, context (attack/weapon, target if known), automated vs manual — feeds [stats](post-mvp/stats.md).
 
 ## 3. Goals
@@ -83,15 +82,13 @@ wave: 2
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-DICE-01 | What do "DM broadcast controls" cover? | **DM rolls hidden by default, reveal per roll; DM can make any roll public** / global toggle only | yes | combat-tracker |
-| OQ-DICE-02 | Whisper semantics: player→DM, DM→player, player→player? | **Player→DM and DM→player only** / any | yes | live-sync |
 | OQ-DICE-03 | Dice seeding for tests | **Injectable RNG at server boundary** / mock library | yes | all specs using rolls |
 | OQ-DICE-04 | Snapshot depth of roll log | **Last N (e.g. 200), paginate older** / full | no | live-sync |
 | OQ-DICE-05 | Rolls tagged by session? | Depends on [ADR-0013](../architecture/adr/0013-session-journal-scope.md) | no | campaign-management |
-| OQ-DICE-06 | Which roll visibility modes are MVP? | **Public + DM-hidden rolls (DM reveals per roll); player whispers post-MVP** / public only / all modes | yes | combat-tracker, live-sync |
+| OQ-DICE-06 | ~~Which roll visibility modes are MVP?~~ **Decided: public only** (hidden DM rolls tier B, whispers tier C) | — | — | — |
 | OQ-DICE-07 | Manual entry granularity: total only, or per-die? | **Total only, optional per-die** / per-die required | no | combat-tracker |
 
 ## 16. Out of scope
 
-- 3D dice / animations.
+- 3D dice, inline rolls, macros, roll requests, hidden rolls, whispers (→ [dice-extras](post-mvp/dice-extras.md)).
 - Client-side authoritative rolling.

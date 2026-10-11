@@ -8,7 +8,7 @@ phase: post-mvp
 
 # Combat extras (post-MVP stub)
 
-Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). Ranking in [feature tiers](../../feature-tiers.md#2-combat).
+Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). (Encounter builder moved back into MVP: [combat-tracker](../combat-tracker.md).) Ranking in [feature tiers](../../feature-tiers.md#2-combat).
 
 - **What:**
 
@@ -25,14 +25,12 @@ Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). Rankin
 | B | Hit/miss hint vs target AC |
 | C | Legendary / lair action tracker |
 | C | Reaction-used tracker |
-| ? | Encounter builder with CR difficulty — not yet ranked |
 
 - **Builds on:** [combat-tracker](../combat-tracker.md), [notifications](../notifications.md), [ADR-0016](../../architecture/adr/0016-domain-events-pending-actions.md) (durations/concentration as listeners), [compendium](compendium.md), [character-sheet-full](character-sheet-full.md).
 - **Carried-over open questions** (suggested pick in bold):
 
 | Question | Options |
 |---|---|
-| CR/difficulty math | **2014 DMG XP thresholds + multiplier** / simplified |
 | Concentration on damage | **Reminder with DC, click-to-roll** / auto-roll |
 | Multiple simultaneous combats | **One per campaign** / many |
 | Session tagging of combats | See [ADR-0013](../../architecture/adr/0013-session-journal-scope.md) |

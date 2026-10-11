@@ -21,7 +21,8 @@ wave: 1
 - Fixture set for the MVP session simulation ([ADR-0014](../architecture/adr/0014-mvp-scope.md)):
   - campaign + DM secret + one player with a stable player link
   - `player-1`: one character (basics: AC, HP, init, shortsword 1d6)
-  - `enemy-1`: one monster kind (basics: AC, HP, init, one attack)
+  - `enemy-1`: one monster kind (basics: AC, HP, init, one attack, CR/XP)
+  - an encounter built from `enemy-1` for the party
   - `town` scene: map image, grid, tokens
   - `battlemap` scene: map image, grid, tokens
 - Composition: small fixtures combined into named bundles (e.g. `session-sim`).

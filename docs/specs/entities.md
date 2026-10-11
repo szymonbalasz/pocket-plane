@@ -19,7 +19,7 @@ wave: 2
 ## 2. Scope
 
 - Entity kinds in MVP: `character`, `monster`.
-- Name, portrait (via [assets-pipeline](assets-pipeline.md)), kind-specific basics (see [character-sheet](character-sheet.md); monster stat basics: AC, HP, initiative bonus, one attack).
+- Name, portrait (via [assets-pipeline](assets-pipeline.md)), kind-specific basics (see [character-sheet](character-sheet.md); monster stat basics: AC, HP, initiative bonus, one attack, **CR and XP** for the encounter builder).
 - Created primarily by fixtures ([fixtures-adapters](fixtures-adapters.md)).
 - DM can view and edit; minimal create/edit UI *(proposed)*.
 - Character owned by a player ([campaign-management](campaign-management.md)).

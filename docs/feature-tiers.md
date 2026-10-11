@@ -35,6 +35,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 
 | Feature | Tier | Spec | Notes |
 |---|---|---|---|
+| **Encounter builder with CR difficulty** | S | [combat-tracker](specs/combat-tracker.md) | Needed to build the first MVP encounter |
 | Roll initiative for all monsters in one click | S | [combat-tracker](specs/combat-tracker.md) | |
 | Players see monster health as band (healthy/bloodied/down) | S | [combat-tracker](specs/combat-tracker.md) | |
 | Conditions with expiry | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
@@ -49,11 +50,30 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | End-of-combat summary | B | [stats](specs/post-mvp/stats.md) | Plus campaign-wide stats; discuss after MVP |
 | Legendary / lair actions | C | [combat-extras](specs/post-mvp/combat-extras.md) | |
 | Reaction-used tracker | C | [combat-extras](specs/post-mvp/combat-extras.md) | |
-| Encounter builder with CR difficulty | ? | [combat-extras](specs/post-mvp/combat-extras.md) | > TODO (spec phase): not yet ranked |
 
 **Attack flow (MVP, part of damage cards):** click attack; Shift = advantage, Ctrl = disadvantage; describe the action; DM applies via a card with normal / half / none / double and can override any value.
 
 **Stats data capture (MVP):** track everything — all rolls, damage dealt/taken/healed, weapon used, overkill — so stats can be built later.
+
+## 3. Character sheet and dice
+
+| Feature | Tier | Spec | Notes |
+|---|---|---|---|
+| Advantage/disadvantage on any roll (toggle or Shift/Ctrl) | S | [dice-roll-log](specs/dice-roll-log.md) | Replaces inspiration toggle |
+| Roll from any number on the sheet | A | [character-sheet-full](specs/post-mvp/character-sheet-full.md) | |
+| Inline rolls in text (`[[1d20+5]]`) | A | [dice-extras](specs/post-mvp/dice-extras.md) | |
+| Saved macros / custom roll buttons | A | [dice-extras](specs/post-mvp/dice-extras.md) | |
+| 3D dice animation | A | [dice-extras](specs/post-mvp/dice-extras.md) | |
+| Party portrait strip (BG2-style) | A | [theme-system](specs/post-mvp/theme-system.md) | Also a [play-shell](specs/play-shell.md) element |
+| DM requests a roll from players | B | [dice-extras](specs/post-mvp/dice-extras.md) | Notification with roll action |
+| Hidden DM rolls | B | [dice-extras](specs/post-mvp/dice-extras.md) | MVP rolls are public only |
+| Spell slots tracker | B | [character-sheet-full](specs/post-mvp/character-sheet-full.md) | |
+| Party HP/AC summary for players | B | [play-shell](specs/play-shell.md) | Pairs with portrait strip |
+| Player whispers roll to DM | C | [dice-extras](specs/post-mvp/dice-extras.md) | |
+| Inventory weight / encumbrance | C | [character-sheet-full](specs/post-mvp/character-sheet-full.md) | |
+| Short/long rest buttons | C | [character-sheet-full](specs/post-mvp/character-sheet-full.md) | |
+| Inspiration toggle | D | — | Use advantage instead |
+| D&D Beyond character import | F | — | |
 
 ## Already decided elsewhere
 

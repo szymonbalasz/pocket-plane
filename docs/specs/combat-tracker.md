@@ -12,13 +12,15 @@ wave: 3
 
 ## 1. Summary
 
-- MVP: run one fight against **one kind of enemy** ([ADR-0014](../architecture/adr/0014-mvp-scope.md)).
+- MVP: **build an encounter with CR difficulty**, then run one fight against **one kind of enemy** ([ADR-0014](../architecture/adr/0014-mvp-scope.md)).
 - Initiative, turns/rounds, attack and damage rolls, HP tracking.
-- Encounter builder, CR math, conditions, concentration → [combat-extras](post-mvp/combat-extras.md).
+- Conditions, concentration, durations etc. → [combat-extras](post-mvp/combat-extras.md).
 
 ## 2. Scope
 
-- Start combat: add PCs and N instances of one monster kind.
+- **Encounter builder** (tier S): pick monsters (from entities/fixtures) and quantities; party = campaign characters; shows XP budget and difficulty (easy / medium / hard / deadly) per 2014 DMG.
+- Encounters are saved and prepared before the session; start combat from an encounter.
+- Start combat: PCs + the encounter's monsters (N instances of one kind in MVP).
 - Initiative: roll (click-to-roll) or enter; **roll for all monsters in one click**; sorted order; ties.
 - Rounds and turns: next/previous turn.
 - Whose turn it is: shown in the initiative strip / portrait row. Token highlight on map only if trivial (tier B).
@@ -36,7 +38,7 @@ wave: 3
 
 ## 4. Non-goals
 
-- Conditions, concentration, durations, temp HP, death saves, reinforcements, hidden combatants, encounter builder (→ [combat-extras](post-mvp/combat-extras.md); tiers in [feature tiers](../feature-tiers.md#2-combat)).
+- Conditions, concentration, durations, temp HP, death saves, reinforcements, hidden combatants (→ [combat-extras](post-mvp/combat-extras.md); tiers in [feature tiers](../feature-tiers.md#2-combat)).
 - Player-ready / load indicator (→ [scene-tools](post-mvp/scene-tools.md)); MVP assumes immediate load.
 - Rules automation (auto-hit vs AC, auto-apply damage). Hit/miss hint is tier B.
 - Stats UI, end-of-combat summary (→ [stats](post-mvp/stats.md)); only the data capture is MVP.
@@ -102,6 +104,9 @@ wave: 3
 | OQ-CBT-09 | Do unapplied cards persist across turn end? (crash-safe regardless, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)) | **Yes, until applied or dismissed** / expire at turn end | no | notifications |
 | OQ-CBT-06 | Does combat start auto-create/bind tokens? | **No; bind existing tokens on the scene** / auto-place | no | scenes-map |
 | OQ-CBT-10 | Overkill: record against raw damage or capped at HP? | **Record both (applied = capped, overkill = raw − HP before)** / capped only | yes | post-mvp/stats |
+| OQ-CBT-12 | CR math | **2014 DMG: XP by CR, party thresholds by level, group-size multiplier** / simplified CR sum | yes | entities, character-sheet |
+| OQ-CBT-13 | Builder limited to one monster kind in MVP? | **No limit in builder; MVP only needs/tests one kind** / enforce one kind | no | — |
+| OQ-CBT-14 | Party for difficulty: all campaign characters or selected? | **Selected (defaults to all)** / all | no | — |
 | OQ-CBT-11 | Can players also use modifier keys / manual entry for their attack? | **Yes, same flow as DM** / DM only | no | dice-roll-log |
 
 ## 16. Out of scope

@@ -18,12 +18,12 @@ wave: 2
 
 ## 2. Scope
 
-- Name, portrait.
+- Name, portrait, **level** (needed for encounter difficulty).
 - Armour Class.
 - HP: current / max. (Temp HP, death saves → [combat-extras](post-mvp/combat-extras.md), tier A.)
 - Initiative bonus.
 - One weapon attack: name, to-hit bonus, damage dice (e.g. shortsword, 1d6). May be hardcoded per fixture.
-- Click-to-roll: initiative, attack, damage.
+- Click-to-roll: initiative, attack, damage. Advantage/disadvantage per [dice-roll-log](dice-roll-log.md).
 - Ability scores *(proposed: stored for display only, if cheap)*.
 
 ## 3. Goals
@@ -32,7 +32,7 @@ wave: 2
 
 ## 4. Non-goals
 
-- Spells, saves, skills, features, inventory, currency, proficiencies, hit dice, notes (→ [character-sheet-full](post-mvp/character-sheet-full.md)).
+- Spells, saves, skills, features, inventory, currency, proficiencies, hit dice, notes; roll from any number (→ [character-sheet-full](post-mvp/character-sheet-full.md), tiers in [feature tiers](../feature-tiers.md#3-character-sheet-and-dice)).
 - Levelling, guided creation (→ [levelling](post-mvp/levelling.md)).
 
 ## 5. User stories

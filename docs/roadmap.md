@@ -10,7 +10,7 @@ Same wave = parallel. Later waves need earlier ones at least `draft`.
 |---|---|---|
 | 0 | [ADR-0009](architecture/adr/0009-entity-content-model.md) entity model, [ADR-0015](architecture/adr/0015-source-adapters-fixtures.md) adapters/fixtures, [ADR-0012](architecture/adr/0012-character-derived-values.md) (basics only) | Shape characters, monsters and fixtures |
 | 1 | [live-sync](specs/live-sync.md), [campaign-management](specs/campaign-management.md), [assets-pipeline](specs/assets-pipeline.md), [fixtures-adapters](specs/fixtures-adapters.md) | Foundations: auth, events, files, rebuildable setups |
-| 2 | [entities](specs/entities.md) (core), [character-sheet](specs/character-sheet.md) (basics), [dice-roll-log](specs/dice-roll-log.md), [notifications](specs/notifications.md) | What tokens and combat act on; feed for damage cards |
+| 2 | [entities](specs/entities.md) (core), [character-sheet](specs/character-sheet.md) (basics), [dice-roll-log](specs/dice-roll-log.md), [notifications](specs/notifications.md), [play-shell](specs/play-shell.md) | What tokens and combat act on; feed for damage cards; the page everything lives in |
 | 3 | [scenes-map](specs/scenes-map.md), [combat-tracker](specs/combat-tracker.md), [party-loot](specs/party-loot.md) | The session itself |
 
 Not blocking MVP: [ADR-0010](architecture/adr/0010-compendium-design.md), [0011](architecture/adr/0011-cross-references.md), [0013](architecture/adr/0013-session-journal-scope.md).
@@ -41,6 +41,9 @@ graph LR
   DICE --> NOTE
   NOTE --> CBT
   NOTE --> LOOT
+  SYNC --> SHELL[play-shell]
+  SHELL --> MAP
+  SHELL --> CBT
   CHR --> CBT
   CBT --> MAP
 ```

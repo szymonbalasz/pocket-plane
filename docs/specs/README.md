@@ -16,6 +16,7 @@ Template: [_template.md](_template.md). Writing order: [roadmap](../roadmap.md#s
 | 2 | [Character sheet (basics)](character-sheet.md) | CHAR | unclaimed | — |
 | 2 | [Dice and roll log](dice-roll-log.md) | DICE | unclaimed | — |
 | 2 | [Notifications](notifications.md) | NOTE | unclaimed | — |
+| 2 | [Play shell](play-shell.md) | SHELL | unclaimed | — |
 | 3 | [Scenes and map](scenes-map.md) | MAP | unclaimed | — |
 | 3 | [Combat tracker](combat-tracker.md) | CBT | unclaimed | — |
 | 3 | [Party loot](party-loot.md) | LOOT | unclaimed | — |
@@ -32,6 +33,7 @@ Stubs only. Not to be claimed during MVP spec phase.
 | [Character sheet (full)](post-mvp/character-sheet-full.md) | CHARX | |
 | [Combat extras](post-mvp/combat-extras.md) | CBTX | Conditions, concentration, durations, hidden combatants… |
 | [Stats and summaries](post-mvp/stats.md) | STATS | Data capture starts in MVP |
+| [Dice extras](post-mvp/dice-extras.md) | DICEX | Inline rolls, macros, 3D dice, hidden rolls |
 | [Party board](post-mvp/party-board.md) | PARTY | |
 | [Campaign manager](post-mvp/campaign-manager.md) | CMGR | |
 | [Compendium expansion](post-mvp/compendium-expansion.md) | CMPX | |
