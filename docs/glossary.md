@@ -18,7 +18,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | Term | Meaning | Not to be confused with |
 |---|---|---|
 | **Campaign** | Top-level scope. Every record belongs to exactly one campaign. | Session |
-| **Session** | One sitting of play (an evening). Journal/outcomes scope is open ([ADR-0013](architecture/adr/0013-session-journal-scope.md)). | Campaign; WS connection |
+| **Session** | One sitting of play (an evening). Informal only: **not tracked** by the app ([ADR-0013](architecture/adr/0013-session-journal-scope.md)). | Campaign; WS connection; encounter |
 | **Entity** | A campaign-owned world record: NPC, monster, item, location, faction, quest, character. Content model is open ([ADR-0009](architecture/adr/0009-entity-content-model.md)). | Compendium entry |
 | **Entity kind** | The type of an entity (npc, monster, item, location, faction, quest, character). MVP uses only **character** and **monster** ([ADR-0014](architecture/adr/0014-mvp-scope.md)). | — |
 | **Character** | Entity kind for a player character with a 5e character sheet (basics in MVP, full sheet later). Owned by a player. | Player |
@@ -41,13 +41,13 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Active scene** | The scene currently shown to players. | — |
 | **Grid calibration** | Setting cell size/offset so the grid aligns with the map image. | — |
 | **Token** | A movable piece on a scene, bound to an entity and optionally a combatant. | Combatant |
-| **Hidden token** | Token visible only to the DM. | — |
+| **Hidden token** | Token visible only to the DM (shown translucent to DM) until revealed with the hide/reveal button. MVP. | — |
 | **Fog** | Polygon regions hiding parts of a scene from players. | Lighting (out of scope) |
 | **AoE prop** | A shape (cone, sphere, line, cube…) placed on a scene to show an area of effect. | Freehand drawing (out of scope) |
 | **Ruler** | Measuring tool using 5e diagonal rules. | — |
 | **Player-ready indicator** | Shows the DM which players have fully loaded a scene. Post-MVP ([scene-tools](specs/post-mvp/scene-tools.md)); MVP assumes immediate load. | — |
-| **Encounter** | A planned set of combatants with CR/difficulty math, prepared before combat. | Combat |
-| **Combat** | A running encounter: initiative order, rounds, turns. | Encounter |
+| **Encounter** | A planned set of monsters with CR/difficulty math. Lifecycle: planned → started → ended. The unit of combat history. | Combat; session |
+| **Combat** | The running state of a started encounter: initiative order, rounds, turns. | Encounter |
 | **Combatant** | A participant in a combat, linked to an entity (and a token if on a scene). Holds HP, conditions, concentration. | Token; Entity |
 | **Initiative order** | Ordered list of combatants for the current combat. | — |
 | **Condition** | A 5e condition (e.g. prone, poisoned) applied to a combatant. | — |

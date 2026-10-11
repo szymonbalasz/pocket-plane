@@ -90,3 +90,16 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 72 | Table-specific batch: A = live leaderboard/overkill, session awards; B = kill feed, trophy case, dice luck; D = auto recap from event log; F = live AI follow-along, combat rewind, external log stream | DM ranking | [feature-tiers](feature-tiers.md#6-table-specific) |
 | 73 | Player rolls always public; DM category toggles cover DM/monster rolls only | Fairness; players see their own table | [dice-roll-log](specs/dice-roll-log.md) |
 | 74 | DM confirms every attack via a popup: hit/miss computed vs target AC, damage modifiers, manual fudge of any value | Matches Shieldmaiden flow + fudging | [combat-tracker](specs/combat-tracker.md#2-scope) |
+
+## Prep and sources
+
+| # | Decision | Rationale | Ref |
+|---|---|---|---|
+| 75 | Scenes prepped in the UI: upload map, grid calibration, drag tokens, rename, pick token art, hide/reveal button (MVP) | DM's real prep workflow; fixtures stay for tests | [scenes-map](specs/scenes-map.md) |
+| 76 | Hidden tokens move into MVP (Owlbear-style hide button); hidden combatants follow | DM pre-places hidden enemies | [scenes-map](specs/scenes-map.md) |
+| 77 | DM pre-places encounter tokens; starting an encounter does not place tokens | Matches current Owlbear prep | [combat-tracker](specs/combat-tracker.md) |
+| 78 | No session tracking; encounters (start/end) are the unit of combat history | DM doesn't need sessions; recaps are story | [0013](architecture/adr/0013-session-journal-scope.md) |
+| 79 | Sources: Open5e (A), homebrew files (A), Griffon's Saddlebag items with partial mechanics (B), 5etools as separate project (C) | DM's content sources | [compendium](specs/post-mvp/compendium.md), [0015](architecture/adr/0015-source-adapters-fixtures.md) |
+| 80 | Custom NPCs built from SRD monster or existing NPC; custom actions auto-roll vs selected target(s); multi-target select (A) | Shieldmaiden-style prep | [compendium](specs/post-mvp/compendium.md), [combat-extras](specs/post-mvp/combat-extras.md) |
+| 81 | Every capability is a server command; UI, fixtures, importers and future agents are callers | Keeps future agent features cheap (SOLID) | [overview](architecture/overview.md#cross-cutting-rules) |
+| 82 | Notes will be markdown + wikilinks (Obsidian-compatible) | DM's agent note-grooming workflow carries over | [world-builder](specs/post-mvp/world-builder.md) |

@@ -12,6 +12,8 @@
 - Fully relational modelling of every relation explodes table count.
 - Must support: search, cross-references, external import, future agent/API access.
 - Must fit [ADR-0006](0006-persistence.md): relational, JSON only for document-shaped leaves.
+- Definitions must tolerate **partial data**: an imported item may be only name + description until its mechanics are filled in ([ADR-0010](0010-compendium-design.md) DM workflow).
+- Monster/NPC definitions need **custom actions** that auto-roll against selected target(s) ([combat-extras](../../specs/post-mvp/combat-extras.md)).
 
 ## Options
 

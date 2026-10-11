@@ -25,7 +25,7 @@ Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). Absorb
 |---|---|
 | Player-visible fields | **Revealed entity + DM-only notes field** / whole-entity only |
 | Search | **SQLite FTS over name + text; players search revealed only** / DM only |
-| Rich-text format | **Markdown** / structured editor JSON |
+| Rich-text format | **Markdown + wikilinks** (Obsidian-compatible; DM's agent workflows carry over) / structured editor JSON |
 | Location ↔ scene cardinality | **One location, many scenes; scene has ≤1 location** / many-to-many |
 | Region maps: scenes or separate map type? | — |
 | Graph from typed relations only, or mentions too? | — |

@@ -8,7 +8,7 @@
 
 - Two working goals from the DM:
   1. **Lots of fixtures** — tear down and rebuild a test/dev setup at will.
-  2. **Adapters** — automate import of reference material from many sources (Open5e, 5etools JSON, homebrew, later Obsidian).
+  2. **Adapters** — automate import of reference material from many sources: Open5e, 5etools JSON (separate project), DM homebrew files, Griffon's Saddlebag items (partial: no need to recreate every roll/feature), later Obsidian.
 - Both load external data into the app DB. Two code paths would drift.
 - Must satisfy [ADR-0008](0008-parallel-dev-isolation.md): isolated per worktree, deterministic.
 

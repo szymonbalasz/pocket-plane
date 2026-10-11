@@ -19,7 +19,7 @@ wave: 3
 ## 2. Scope
 
 - **Encounter builder** (tier S): pick monsters (from entities/fixtures) and quantities; party = campaign characters; shows XP budget and difficulty (easy / medium / hard / deadly) per 2014 DMG.
-- Encounters are saved and prepared before the session; start combat from an encounter.
+- Encounters are saved and prepared before the session. **Encounter lifecycle: planned → started → ended** (DM clicks Start / End encounter). Stats and the game log are grouped per encounter. No session tracking ([ADR-0013](../architecture/adr/0013-session-journal-scope.md)).
 - Start combat: PCs + the encounter's monsters (several kinds, N of each).
 - **DM undo** (strict LIFO, one step at a time) of combat log entries, e.g. "Player X did 4 damage to creature Y" (damage/healing applied), via [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md).
 - Initiative: roll (click-to-roll) or enter; **roll for all monsters in one click**; sorted order; ties.
@@ -33,9 +33,9 @@ wave: 3
   - Player attacks arrive as **damage cards** that open the same popup for the DM.
 - **Damage cards** (a [notification](notifications.md) kind with an apply action, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): the attack result appears as a pending card for the DM. DM picks target and applies as normal / half (resistant) / none (immune) / double (vulnerable), **and can manually override any value** before applying (same attack popup as DM attacks). DM can also create cards.
 - Healing: apply to HP; down at 0.
-- Remove/defeat combatant; end combat.
+- Remove/defeat combatant; end encounter.
 - Player initiative view; **monster HP shown to players as a health band** (healthy / bloodied / down).
-- Combatants linked to tokens on the active scene ([scenes-map](scenes-map.md)).
+- Combatants bind to tokens the DM **already placed** on the battlemap (some hidden). Starting an encounter does not place tokens ([scenes-map](scenes-map.md)).
 - **Capture combat facts for stats** from day one: every applied damage/heal records source, target, attack/weapon, raw roll, modifier, override, applied amount, target HP before/after, overkill ([stats](post-mvp/stats.md), [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)).
 
 ## 3. Goals
@@ -44,7 +44,7 @@ wave: 3
 
 ## 4. Non-goals
 
-- Conditions, concentration, durations, temp HP, death saves, reinforcements, hidden combatants (→ [combat-extras](post-mvp/combat-extras.md); tiers in [feature tiers](../feature-tiers.md#2-combat)).
+- Conditions, concentration, durations, temp HP, death saves, reinforcements (→ [combat-extras](post-mvp/combat-extras.md); tiers in [feature tiers](../feature-tiers.md#2-combat)).
 - Player-ready / load indicator (→ [scene-tools](post-mvp/scene-tools.md)); MVP assumes immediate load.
 - Rules automation (auto-hit vs AC, auto-apply damage). Hit/miss hint is tier B.
 - Full monster stat block view on token click (tier B, [compendium](post-mvp/compendium.md)).
@@ -109,7 +109,7 @@ wave: 3
 | OQ-CBT-05 | One-click monster initiative: one shared roll for the group, or individual rolls? | **Individual rolls, one click** / one shared roll | no | — |
 | OQ-CBT-07 | Who picks the damage card target? | **Player picks (click token); DM confirms on apply** / DM only | yes | scenes-map |
 | OQ-CBT-09 | Do unapplied cards persist across turn end? (crash-safe regardless, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)) | **Yes, until applied or dismissed** / expire at turn end | no | notifications |
-| OQ-CBT-06 | Does combat start auto-create/bind tokens? | **No; bind existing tokens on the scene** / auto-place | no | scenes-map |
+| OQ-CBT-06 | ~~Does combat start auto-create tokens?~~ **Decided: no; DM pre-places tokens, some hidden** | — | — | — |
 | OQ-CBT-10 | Overkill: record against raw damage or capped at HP? | **Record both (applied = capped, overkill = raw − HP before)** / capped only | yes | post-mvp/stats |
 | OQ-CBT-12 | CR math | **2014 DMG: XP by CR, party thresholds by level, group-size multiplier** / simplified CR sum | yes | entities, character-sheet |
 | OQ-CBT-14 | Party for difficulty: all campaign characters or selected? | **Selected (defaults to all)** / all | no | — |

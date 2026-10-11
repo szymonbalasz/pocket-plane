@@ -1,6 +1,6 @@
 # 0013 — Session outcomes / journal: MVP or post-MVP
 
-- Status: proposed
+- Status: accepted (2026-10-11) — option A, and no session tracking planned
 - Date: 2026-10-10
 - Affects: campaign-management, dice-roll-log, combat-tracker, post-mvp/campaign-manager
 - MVP: not blocking ([ADR-0014](0014-mvp-scope.md)). Option A (post-MVP) is consistent with the MVP definition.
@@ -21,8 +21,11 @@
 
 ## Decision
 
-> Undecided.
+- **No session tracking.** No session entity, no session tags.
+- **Encounters are the unit of history:** start / end encounter ([combat-tracker](../../specs/combat-tracker.md#2-scope)); game log and stats group by encounter.
+- Story recaps belong to notes/world-building ([world-builder](../../specs/post-mvp/world-builder.md)), not to combat data.
 
 ## Consequences
 
-> TODO (spec phase): fill once decided. If B or C, add a section to [campaign-management](../../specs/campaign-management.md) and update [roadmap](../../roadmap.md).
+- Session recap (tier B) and calendar (C) stay in [campaign-manager](../../specs/post-mvp/campaign-manager.md) as story tools, not combat history.
+- Stats like "this session" use time ranges or encounter lists, not a session record.

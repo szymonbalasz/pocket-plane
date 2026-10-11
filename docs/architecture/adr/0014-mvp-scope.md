@@ -16,14 +16,14 @@
 
 | In MVP | Deferred |
 |---|---|
-| Town scene with map + tokens; switch to a battlemap scene | Fog, AoE props → [scene-tools](../../specs/post-mvp/scene-tools.md) |
-| Grid calibration, pan/zoom, ruler (5e diagonals) | Location ↔ scenes, world builder → [world-builder](../../specs/post-mvp/world-builder.md) |
+| Town scene with map + tokens; switch to a battlemap scene | Fog (shape + polygon tools), AoE props → [scene-tools](../../specs/post-mvp/scene-tools.md) |
+| **Scene prep in the UI**: upload map, grid calibration (size, offset, settings), drag tokens on, rename, pick token art, **hide/reveal button** (Owlbear-style). Pan/zoom, ruler (5e diagonals) | Location ↔ scenes, world builder → [world-builder](../../specs/post-mvp/world-builder.md) |
 | Tokens; free Owlbear-style movement; DM moves any, player moves own tokens anytime, in or out of combat. Plus tier-S map features in [feature tiers](../../feature-tiers.md) (snap, sizes, labels, ping, laser, lock map, ownership) | Compendium + import → [compendium](../../specs/post-mvp/compendium.md) |
 | Character sheet **basics**: AC, HP, initiative, one weapon attack (e.g. shortsword 1d6, may be hardcoded) | Spells, saves, skills, features, inventory… → [character-sheet-full](../../specs/post-mvp/character-sheet-full.md) |
 | **Encounter builder with CR difficulty** (tier S); **multiple enemy kinds** per encounter (tier S); single weapon attack each | Conditions, concentration → [combat-extras](../../specs/post-mvp/combat-extras.md) |
 | Initiative, HP, damage, rolls; advantage/disadvantage on any roll (toggle or Shift/Ctrl). **BG2-style game log** with **DM per-category public/hidden tickboxes** | Whispers, roll requests, inline rolls, macros, 3D dice → [dice-extras](../../specs/post-mvp/dice-extras.md) |
 | **Damage cards**: Shieldmaiden-style attack (Shift adv / Ctrl dis) → DM applies to a target as normal / half / none / double, with manual override | Hit/miss hint (tier B) |
-| One-click monster initiative; monster HP as health band to players | Conditions, concentration, durations, temp HP, death saves, hidden combatants (tier A) |
+| One-click monster initiative; monster HP as health band to players; **start / end encounter**; combatants bind to pre-placed (possibly hidden) tokens | Conditions, concentration, durations, temp HP, death saves; custom NPC actions, multi-target (tier A) |
 | **Stats data capture**: all rolls, damage dealt/taken/healed, weapon, overkill | Stats UI, summaries → [stats](../../specs/post-mvp/stats.md) |
 | **Every roll: automated or manual entry** (physical dice), for DM and players | |
 | **One play page** ([play-shell](../../specs/play-shell.md)): canvas as base, floating windows over it. Player lands on the active scene; window layout persisted per player | Props (status rings, AoE markers) → [scene-tools](../../specs/post-mvp/scene-tools.md); notes from tokens, player notes → [world-builder](../../specs/post-mvp/world-builder.md) |

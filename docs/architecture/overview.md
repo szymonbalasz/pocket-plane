@@ -73,6 +73,7 @@ sequenceDiagram
 - zod schemas at every boundary: HTTP, WS, DB JSON columns, imports.
 - Relational tables; JSON only for document-shaped leaves ([ADR-0006](adr/0006-persistence.md)).
 - All config (ports, DB path, asset path) from env; everything isolatable per worktree ([ADR-0008](adr/0008-parallel-dev-isolation.md)).
+- **Every capability is a server command** (validated intent → domain event). UI, fixtures, importers and future agents are all just callers of the same commands. No feature logic in clients. This is what keeps future agent features ([agent-api](../specs/post-mvp/agent-api.md)) cheap.
 
 ## Open (see proposed ADRs)
 
@@ -80,6 +81,6 @@ sequenceDiagram
 - Compendium design — [ADR-0010](adr/0010-compendium-design.md)
 - Cross-references — [ADR-0011](adr/0011-cross-references.md)
 - Character derived values — [ADR-0012](adr/0012-character-derived-values.md)
-- Session journal scope — [ADR-0013](adr/0013-session-journal-scope.md)
+- Source adapters and fixtures — [ADR-0015](adr/0015-source-adapters-fixtures.md)
 
 > TODO (spec phase): add module boundaries once specs and [data model](../data-model/README.md) converge.

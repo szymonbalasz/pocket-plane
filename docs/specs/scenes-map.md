@@ -14,12 +14,16 @@ wave: 3
 
 - MVP: a **town scene** and a **battlemap scene**; DM switches between them ([ADR-0014](../architecture/adr/0014-mvp-scope.md)).
 - react-konva canvas ([ADR-0001](../architecture/adr/0001-tech-stack.md)); state survives crash ([ADR-0006](../architecture/adr/0006-persistence.md)).
-- Fog, AoE props, hidden tokens → [scene-tools](post-mvp/scene-tools.md). Location ↔ scenes → [world-builder](post-mvp/world-builder.md).
+- **Scenes are prepped in the UI** (decided): upload map, line up grid, drag tokens on, hide some for later reveal. Fog, AoE props → [scene-tools](post-mvp/scene-tools.md). Location ↔ scenes → [world-builder](post-mvp/world-builder.md).
 
 ## 2. Scope
 
-- Map image per scene (via [assets-pipeline](assets-pipeline.md)).
-- Grid calibration.
+- **Scene prep in the UI** (DM):
+  - Upload a map image (via [assets-pipeline](assets-pipeline.md)).
+  - **Grid calibration**: cell size (enlarge/reduce), offset, and grid settings (e.g. visibility, colour/opacity) *(settings list proposed)*.
+  - Drag characters and monsters onto the scene (from entity list / encounter); edit token names/labels.
+  - Pick token images from previously uploaded art (basic library; full library with folders/tags is tier A).
+  - **Hide / reveal button** per token, Owlbear-style (tier S): hidden tokens visible to DM only (shown translucent), revealed with one click.
 - Pan/zoom.
 - Tokens bound to entities (and combatants during combat).
 - Snap to grid; token sizes (Large/Huge span squares); token labels.
@@ -34,7 +38,7 @@ wave: 3
 - **Scene list** with folders; duplicate a scene (tier S).
 - No undo for moves or scene edits: just move it back. **Token moves are not recorded in the event log** (state only, still broadcast) ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)).
 - Preparing a non-active scene while players see another is tier A — likely near-free given active-scene model.
-- Create/edit scenes in UI *(proposed; fixtures may be enough)*.
+- Fixtures still create scenes for tests ([fixtures-adapters](fixtures-adapters.md)); the UI is the DM's prep path.
 
 ## 3. Goals
 
@@ -42,7 +46,7 @@ wave: 3
 
 ## 4. Non-goals
 
-- Fog, AoE props, hidden tokens (→ [scene-tools](post-mvp/scene-tools.md)).
+- Fog (shape + polygon tools), AoE props (→ [scene-tools](post-mvp/scene-tools.md)).
 - Linking scenes to locations (→ [world-builder](post-mvp/world-builder.md)).
 - Lighting, freehand drawing, touch ([ADR-0007](../architecture/adr/0007-product-scope.md)).
 
@@ -105,9 +109,11 @@ wave: 3
 | OQ-MAP-05 | Is the ruler visible to others? | **Local only in MVP** / broadcast | no | live-sync |
 | OQ-MAP-09 | ~~Movement model~~ **Decided: Owlbear-style free drag**, snap on drop, distance shown while dragging; no speed/turn/path enforcement | — | — | — |
 | OQ-MAP-10 | ~~Turn-gated movement?~~ **Decided: players can always move tokens they control**, in or out of combat | — | — | — |
+| OQ-MAP-11 | Hidden token bound to a combatant: also hidden from player initiative view? | **Yes, hidden until revealed; reveal shows both** / initiative always visible | yes | combat-tracker, live-sync |
+| OQ-MAP-12 | Grid calibration method | **Numeric cell size + offset with live preview; optional "drag a box over one cell"** / numeric only | no | — |
 | OQ-MAP-07 | Ping/laser are ephemeral: persisted or broadcast-only? | **Broadcast-only, not persisted (exception to ADR-0006 for transient pointers)** / persisted | yes | live-sync |
 | OQ-MAP-08 | DM "pull view": forced or suggested? | **Forced recentre, player can pan away after** / suggestion toast | no | notifications |
-| OQ-MAP-06 | Scene creation in UI or fixtures only? | **Upload map + calibrate grid in UI; tokens by drag from entity list** / fixtures only | no | fixtures-adapters |
+| OQ-MAP-06 | ~~Scene creation in UI or fixtures only?~~ **Decided: UI** (upload, grid, drag tokens, hide); fixtures for tests | — | — | — |
 
 ## 16. Out of scope
 

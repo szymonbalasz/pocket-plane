@@ -129,6 +129,27 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Combat rewind / timeline replay | F | — | |
 | External stream / overlay of the log | F | — | Log lives in the game client |
 
+## 7. Prep, content and sources
+
+| Feature | Tier | Spec | Notes |
+|---|---|---|---|
+| Scene prep in UI: upload map, grid calibration (size, offset, settings) | S | [scenes-map](specs/scenes-map.md) | |
+| Drag tokens onto scene, rename, pick token art from uploads | S | [scenes-map](specs/scenes-map.md) | Full token library with folders: A |
+| Hide / reveal token button (Owlbear-style) | S | [scenes-map](specs/scenes-map.md) | Hidden combatants follow |
+| Pre-place encounter tokens on battlemap (some hidden) | S | [combat-tracker](specs/combat-tracker.md) | No auto-placement |
+| Start / end encounter | S | [combat-tracker](specs/combat-tracker.md) | Unit of combat history |
+| Fog of war with shape + polygon tools | A | [scene-tools](specs/post-mvp/scene-tools.md) | > TODO (spec phase): confirm not MVP |
+| Custom NPC from SRD monster or existing NPC, then edit | A | [compendium](specs/post-mvp/compendium.md) | Shieldmaiden as reference |
+| Custom actions auto-roll vs selected target(s) | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Multi-target select | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Open5e import | A | [compendium](specs/post-mvp/compendium.md) | Important |
+| DM homebrew file import | A | [compendium](specs/post-mvp/compendium.md) | Formats TBD |
+| Griffon's Saddlebag item import (partial mechanics) | B | [compendium](specs/post-mvp/compendium.md) | Fill in mechanics as items get used |
+| 5etools import | C | [compendium-expansion](specs/post-mvp/compendium-expansion.md) | Separate project |
+| Obsidian vault tie-in to notes | C | [obsidian-importer](specs/post-mvp/obsidian-importer.md) | Story/world-building |
+| Agent features (NPC creation, map work, note grooming) | C | [agent-api](specs/post-mvp/agent-api.md) | Keep design SOLID: everything is a server command |
+| Session tracking | F | [ADR-0013](architecture/adr/0013-session-journal-scope.md) | Encounters instead |
+
 ## Already decided elsewhere
 
 | Feature | Tier | Ref |

@@ -12,6 +12,10 @@
 - Must track provenance and licensing per entry.
 - Re-import must not clobber homebrew edits.
 - Tension with [ADR-0004](0004-tenancy-auth-permissions.md): "every record belongs to a campaign" vs a shared library.
+- **DM workflow (2026-10-11):**
+  - Custom NPCs are made by taking an **SRD monster as a base** and editing, or by **duplicating an existing NPC**. Many per encounter.
+  - Sources: **Open5e** (important), **5etools** (separate import project), **own homebrew files**, **Griffon's Saddlebag items** (bulk import; mechanics filled in one by one as items get used).
+  - → Entries must allow **partial data** (description only) with structured mechanics added later.
 
 ## Options
 

@@ -20,7 +20,9 @@ Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). (Encou
 | A | Temp HP |
 | A | Death saves |
 | A | Add combatants mid-fight (reinforcements) |
-| A | Hidden combatants (e.g. stealthed) — invisible to players until revealed |
+| S | ~~Hidden combatants~~ → **MVP** via the token hide button ([scenes-map](../scenes-map.md)) |
+| A | **Custom monster/NPC actions** that auto-roll against the selected target(s) |
+| A | **Multi-target select** (e.g. one action vs several targets, AoE saves) |
 | B | Drag to reorder initiative (delay/ready) |
 | B | Hit/miss hint vs target AC |
 | C | Legendary / lair action tracker |
