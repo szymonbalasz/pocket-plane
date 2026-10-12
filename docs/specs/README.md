@@ -34,6 +34,7 @@ Stubs only. Not to be claimed during MVP spec phase.
 | [Combat extras](post-mvp/combat-extras.md) | CBTX | Conditions, concentration, durations, hidden combatants… |
 | [Stats and summaries](post-mvp/stats.md) | STATS | Data capture starts in MVP |
 | [Dice extras](post-mvp/dice-extras.md) | DICEX | Inline rolls, macros, 3D dice, hidden rolls |
+| [Gems (homebrew)](post-mvp/gems.md) | GEM | DM-awarded gems; reroll, max damage dice; tier A |
 | [Party board](post-mvp/party-board.md) | PARTY | |
 | [Campaign manager](post-mvp/campaign-manager.md) | CMGR | |
 | [Compendium expansion](post-mvp/compendium-expansion.md) | CMPX | |
