@@ -19,7 +19,13 @@ import { usePhysicalDice } from "./physical";
 
 export interface RollRequest {
   mode: RollMode;
-  /** One per expression, physical-dice mode only. */
+  /**
+   * Physical-dice mode only: exactly one `ManualEntry` per expression, in `expressions` order
+   * (sheet attack = [to-hit, damage]; after a natural 20 with `critExpressions`, the damage
+   * entries are for the crit expressions). Callers map it onto their intent: `dice.roll` sends
+   * `manual[0]`; `char.roll`, `cbt.attack`, `cbt.rollInitiative` send their manual count (1 / 2).
+   * Absent = server rolls (FR-DICE-02).
+   */
   manual?: ManualEntry[];
   /** DM only, and only when the DM changed the switch for this roll. */
   public?: boolean;
