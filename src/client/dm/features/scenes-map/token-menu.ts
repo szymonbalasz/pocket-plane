@@ -2,6 +2,7 @@
 // a feature adds one import and its lines; nothing else changes here. Players get no menu.
 import type { TokenRecord } from "@shared/scenes-map/schemas";
 import type { ComponentType } from "react";
+import { combatTokenMenu } from "../combat-tracker/token-menu-entries";
 import { scenesMapTokenMenu } from "./token-menu-entries";
 
 export interface TokenMenuItemProps {
@@ -38,7 +39,7 @@ export interface TokenDoubleClick {
 /** The token menu. Append your feature's entries. */
 export const tokenMenuEntries: readonly TokenMenuEntry[] = [
   ...scenesMapTokenMenu, // scenes-map (FR-MAP-18)
-  // combat-tracker: "Damage / heal…", "Remove from combat" (FR-CBT-30)
+  ...combatTokenMenu, // combat-tracker: "Damage / heal…", "Remove from combat" (FR-CBT-30)
 ];
 
 /** Token double-click: the first available entry by order runs. Append your feature's line. */
