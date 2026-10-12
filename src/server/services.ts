@@ -2,7 +2,7 @@
 import type { DomainEventDef } from "@shared/events";
 import { domainEvents } from "@shared/events";
 import type { z } from "zod";
-import { type CommandDef, Commands } from "./commands/commands";
+import { type CommandDef, Commands, type CommitHook } from "./commands/commands";
 import { type Clock, type CommandContext, realContext, systemClock } from "./commands/context";
 import type { Config } from "./config";
 import type { Db } from "./db/client";
@@ -55,6 +55,8 @@ export interface Registrar {
   /** The campaign's active scene for the `scene` scope gate (CON-22); one provider. */
   activeScene(resolver: ActiveSceneResolver): void;
   listener(name: string, fn: Listener): void;
+  /** Post-commit, pre-listener cache refresh (CON-23). */
+  afterCommit(name: string, fn: CommitHook): void;
   provideAuth(resolvers: CredentialResolvers): void;
 }
 
@@ -110,6 +112,7 @@ export function createServices(opts: ServicesOptions): Services {
     signal: (def) => services.signals.register(def),
     activeScene: (fn) => services.records.provideActiveScene(fn),
     listener: (name, fn) => bus.subscribe(name, fn),
+    afterCommit: (name, fn) => commands.afterCommit(name, fn),
     provideAuth(r) {
       services.auth = r;
     },

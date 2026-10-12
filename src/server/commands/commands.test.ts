@@ -96,6 +96,40 @@ describe("command layer", () => {
     expect(seen).toHaveLength(2);
   });
 
+  test("CON-23 commit hooks run after commit, for every event of the commit, before any listener", () => {
+    const { db, cmds, bus } = setup();
+    const order: string[] = [];
+    // Listener subscribed before the hook is registered: still runs after it.
+    bus.subscribe("listener", (e) => order.push(`listener:${e.event.type}`));
+    cmds.afterCommit("cache", (e) => {
+      // Committed: a fresh read outside the transaction sees the row.
+      order.push(`hook:${e.event.type}:rows=${db.select().from(campaign).all().length}`);
+    });
+    expect(() => cmds.afterCommit("cache", () => {})).toThrow(/twice/);
+    cmds.run(create, { name: "A" }, { actor: dm, intentId: "i1" });
+    expect(order).toEqual([
+      "hook:TestCreated:rows=1",
+      "hook:TestTransient:rows=1",
+      "listener:TestCreated",
+      "listener:TestTransient",
+    ]);
+  });
+
+  test("CON-23 rollback → no commit hook; a failing hook is logged, never rolls back, listeners still run", () => {
+    const { db, cmds, seen } = setup();
+    const hooked: string[] = [];
+    cmds.afterCommit("boom", () => {
+      throw new Error("hook failure");
+    });
+    cmds.afterCommit("after-boom", (e) => hooked.push(e.event.type));
+    expect(() => cmds.run(create, { name: "A", fail: true }, { actor: dm })).toThrow(CommandError);
+    expect(hooked).toEqual([]);
+    cmds.run(create, { name: "B" }, { actor: dm });
+    expect(hooked).toEqual(["TestCreated", "TestTransient"]);
+    expect(db.select().from(campaign).all()).toHaveLength(1);
+    expect(seen).toHaveLength(2);
+  });
+
   test("FR-SYNC-12/13 unknown → unknown_intent, bad input → invalid, role → forbidden", () => {
     const { cmds } = setup();
     const code = (fn: () => unknown) => {

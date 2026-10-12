@@ -1,11 +1,12 @@
 // Command layer (ADR-0016, FR-SYNC-13/16, FR-CAMP-20): validate → authorize → mutate +
-// event-log append in one transaction → commit → domain events on the bus (synchronous).
+// event-log append in one transaction → commit → commit hooks (caches, CON-23) → domain
+// events on the bus (synchronous).
 import type { DomainEventDef } from "@shared/events";
 import { z } from "zod";
 import type { Db, Tx } from "../db/client";
 import type { EventBus } from "../events/bus";
 import { appendEventLog } from "../events/log";
-import type { Actor, DomainEvent, Role } from "../events/types";
+import type { Actor, DispatchedEvent, DomainEvent, Role } from "../events/types";
 import type { Logger } from "../log";
 import type { CommandContext } from "./context";
 import { CommandError, forbidden, zodIssues } from "./errors";
@@ -43,9 +44,17 @@ export interface RunOptions {
 
 export type CommandResult<C> = C extends CommandDef<z.ZodType, infer R> ? R : never;
 
+/**
+ * Post-commit, pre-listener hook (CON-23): refreshes in-memory caches (e.g. the active-scene
+ * cache) from the DB before any listener, incl. the broadcaster, sees the commit's events.
+ * Must not mutate state or emit; a failure is logged and never rolls back (already committed).
+ */
+export type CommitHook = (e: DispatchedEvent) => void;
+
 export class Commands {
   private defs = new Map<string, CommandDef>();
   private eventDefs = new Map<string, DomainEventDef>();
+  private commitHooks: { name: string; fn: CommitHook }[] = [];
 
   constructor(
     private readonly db: Db,
@@ -62,6 +71,14 @@ export class Commands {
   registerEvent(def: DomainEventDef): void {
     if (this.eventDefs.has(def.type)) throw new Error(`Event "${def.type}" registered twice`);
     this.eventDefs.set(def.type, def);
+  }
+
+  /** Runs after every commit, for each of its events, before the bus dispatches any of them. */
+  afterCommit(name: string, fn: CommitHook): void {
+    if (this.commitHooks.some((h) => h.name === name)) {
+      throw new Error(`Commit hook "${name}" registered twice`);
+    }
+    this.commitHooks.push({ name, fn });
   }
 
   has(name: string): boolean {
@@ -112,12 +129,19 @@ export class Commands {
       throw new CommandError("internal", "Internal error");
     }
 
-    for (const e of events) {
-      this.bus.dispatch({
-        event: e,
-        meta: { actor: opts.actor, intentId, originConnId: opts.originConnId ?? null },
-      });
+    const meta = { actor: opts.actor, intentId, originConnId: opts.originConnId ?? null };
+    const dispatched: DispatchedEvent[] = events.map((event) => ({ event, meta }));
+    // CON-23: caches first (all events of the commit), then listeners.
+    for (const d of dispatched) {
+      for (const h of this.commitHooks) {
+        try {
+          h.fn(d);
+        } catch (err) {
+          this.log.error(`commit hook "${h.name}" failed on ${d.event.type}`, err);
+        }
+      }
     }
+    for (const d of dispatched) this.bus.dispatch(d);
     return result;
   }
 }

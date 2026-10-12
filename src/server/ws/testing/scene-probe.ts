@@ -118,6 +118,20 @@ export function registerSceneProbe(s: Services): SceneProbeFixture {
     },
   });
 
+  // CON-23: cache reloads from the committed state before any listener (incl. the broadcaster).
+  s.commands.afterCommit("scene-probe-cache", (e) => {
+    if (e.event.type !== SceneProbeActivated.type || !e.event.campaignId) return;
+    const cid = e.event.campaignId;
+    const committed = activeInDb.get(cid);
+    if (committed === undefined) activeCache.delete(cid);
+    else activeCache.set(cid, committed);
+  });
+  // FR-SYNC-11: activation resyncs every player connection of the campaign (a listener).
+  s.bus.subscribe("scene-probe-resync", (e) => {
+    if (e.event.type !== SceneProbeActivated.type) return;
+    s.hub?.resync((c) => c.role === "player" && c.campaignId === e.event.campaignId);
+  });
+
   s.commands.register(set as unknown as CommandDef);
   s.commands.register(activate as unknown as CommandDef);
   s.intents.add(set.name);

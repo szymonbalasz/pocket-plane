@@ -112,6 +112,34 @@ test("CON-22 FR-SYNC-19/20 moving a record off the active scene = delete, onto i
   expect(p1.store.records).toEqual(fresh.store.records);
 });
 
+test("CON-23 FR-SYNC-11 activation: cache refreshed after commit, before listeners; players resynced into the new scene", async () => {
+  const { seed, fx, put } = await setup();
+  put("scene-a", "on A");
+  put("scene-b", "on B");
+  const seenByListener: (string | null)[] = [];
+  // Listeners (here: one added like any feature's) already see the refreshed cache.
+  h.s.bus.subscribe("probe-order", (e) => {
+    if (e.event.type === "SceneProbeActivated") {
+      seenByListener.push(h.s.records.activeSceneOf(seed.campaignId));
+    }
+  });
+  const p1 = await h.live({ role: "player", token: seed.p1.linkToken });
+  const dm = await h.live({ role: "dm", secret: TEST_SECRET });
+  expect(texts(p1)).toEqual([]);
+
+  dm.intent("sceneprobe.activate", { sceneId: "scene-a" });
+  await dm.next("ack");
+  expect(fx.activeCache.get(seed.campaignId)).toBe("scene-a");
+  await p1.next("snapshot");
+  expect(texts(p1)).toEqual(["on A"]);
+
+  dm.intent("sceneprobe.activate", { sceneId: "scene-b" });
+  await p1.next("snapshot");
+  expect(texts(p1)).toEqual(["on B"]);
+  expect(seenByListener).toEqual(["scene-a", "scene-b"]);
+  expect(texts(dm)).toEqual(["on A", "on B"]);
+});
+
 test("CON-22 FR-SYNC-11 after the active scene changes, a player resync shows only the new scene", async () => {
   const { seed, fx, put } = await setup();
   fx.activeCache.set(seed.campaignId, "scene-a");
