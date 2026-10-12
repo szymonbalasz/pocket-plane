@@ -7,7 +7,7 @@ import {
   TOKEN_TYPE,
 } from "@shared/scenes-map/schemas";
 import { BaseEmpty } from "@ui/features/play-shell/PlayFrame";
-import { MapCanvas } from "@ui/features/scenes-map/MapCanvas";
+import { LazyMapCanvas as MapCanvas } from "@ui/features/scenes-map/LazyMapCanvas";
 import { ToolRail } from "@ui/features/scenes-map/ToolRail";
 import { useRecords, useSync } from "@ui/sync/store";
 import { useMemo } from "react";

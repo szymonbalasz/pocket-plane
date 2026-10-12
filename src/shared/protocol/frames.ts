@@ -115,6 +115,8 @@ export type ServerSignalFrame = z.infer<typeof ServerSignalFrame>;
 
 /** WS endpoint path (OQ-SYNC-15, proposed). */
 export const WS_PATH = "/ws";
+/** Query param of the reconnect probe: non-upgrade `GET <WS_PATH>?probe=1` → 204 (protocol §3.1). */
+export const WS_PROBE_PARAM = "probe";
 
 /** Timing (FR-SYNC-01/04/05). */
 export const HELLO_TIMEOUT_MS = 5_000;

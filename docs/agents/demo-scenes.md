@@ -39,7 +39,6 @@ The load prints the DM URL, DM secret and player links.
 
 ## Known, not bugs
 
-- Browser console shows a `426 Upgrade Required` on `/ws` per reconnect (the reconnect probe); a fix is queued.
-- Build warns about a large client chunk (the map canvas library); code-splitting is a hardening task.
+- While the server is down, the console logs one `ERR_CONNECTION_REFUSED` per reconnect probe (about 40 a minute). Expected.
 
 Teardown: Ctrl+C the server, `bun run fixtures:reset --profile verify`.
