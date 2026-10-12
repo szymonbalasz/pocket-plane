@@ -4,6 +4,7 @@ import assetAccess from "./asset-access";
 import assetLibrary from "./asset-library";
 import base from "./base";
 import campaignSwitch from "./campaign-switch";
+import characterSheet from "./character-sheet";
 import diceLog from "./dice-log";
 import entities from "./entities";
 import notifications from "./notifications";
@@ -22,4 +23,5 @@ export const bundles: readonly Bundle[] = [
   scenes,
   notifications,
   diceLog,
+  characterSheet,
 ];
