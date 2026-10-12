@@ -53,10 +53,22 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
   const testMode = available.has(SHELL_TEST_KIND);
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-background" data-testid="ui-play-page">
+    // overflow-clip (not hidden): a clipped box can't be scrolled at all, so focusing something
+    // in an off-screen part of a window never shifts the page. The scroll reset is a fallback.
+    <div
+      className="fixed inset-0 overflow-clip bg-background"
+      data-testid="ui-play-page"
+      onScroll={(e) => {
+        e.currentTarget.scrollTop = 0;
+        e.currentTarget.scrollLeft = 0;
+      }}
+    >
       <BaseLayer testMode={testMode}>{base ?? <BaseEmpty client={client} />}</BaseLayer>
 
-      <div className="pointer-events-none absolute inset-0 isolate z-10" data-testid="ui-windows">
+      <div
+        className="pointer-events-none absolute inset-0 isolate z-10 overflow-clip"
+        data-testid="ui-windows"
+      >
         {windows.map((w) => {
           const def = registry.get(w.kind);
           if (!def || w.state !== "open" || !available.has(w.kind)) return null;
@@ -124,7 +136,7 @@ function BaseLayer({ testMode, children }: { testMode: boolean; children: React.
       data-testid="ui-base"
       role="application"
       aria-label="Map"
-      className="absolute inset-0 z-0"
+      className="absolute inset-0 z-0 overflow-clip"
       {...(testMode && { "data-test-last-key": lastKey, "data-test-last-drop": lastDrop })}
       onDragOver={(e) => {
         if (testMode && e.dataTransfer.types.includes(SHELL_TEST_DRAG_MIME)) e.preventDefault();

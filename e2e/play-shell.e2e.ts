@@ -37,6 +37,15 @@ async function resizeWindow(page: Page, kind: string, dx: number, dy: number) {
   await drag(page, { x: r.x + r.width / 2, y: r.y + r.height / 2 }, dx, dy);
 }
 
+/** Resize, then wait until the shell has re-rendered for the new size (resize → React). */
+async function resizeViewport(page: Page, width: number, height: number) {
+  await page.setViewportSize({ width, height });
+  await page.waitForFunction((w) => window.innerWidth === w, width);
+  await page.evaluate(
+    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+  );
+}
+
 const zOf = (page: Page, kind: string) =>
   shellWindow(page, kind).evaluate((el) => Number((el as HTMLElement).style.zIndex));
 
@@ -53,6 +62,7 @@ test("FR-SHELL-01/02/05/06/21 DM frame: top bar, presence badge, Players window 
   await expect(dm.getByTestId("ui-base-empty")).toHaveText("No scenes yet");
   const players = shellWindow(dm, "camp.players");
   await expect(players).toHaveAttribute("data-state", "open");
+  await expect(players.getByRole("heading", { name: "Players" })).toBeHidden(); // title bar only
   const b = await box(dm, "camp.players");
   expect(b.x + b.w).toBeGreaterThan(1280 - 40); // top-right
   expect(b.y).toBeLessThan(100);
@@ -89,10 +99,10 @@ test("FR-SHELL-02/08/10/15/16/19 player: move + resize + front, reload restores;
     "shell.test:main",
   );
   const start = await box(p1, "sync.probes");
-  await moveWindow(p1, "sync.probes", 150, 120);
+  await moveWindow(p1, "sync.probes", 150, -120);
   await resizeWindow(p1, "sync.probes", 60, 40);
   const moved = await box(p1, "sync.probes");
-  expect(moved).toEqual({ x: start.x + 150, y: start.y + 120, w: start.w + 60, h: start.h + 40 });
+  expect(moved).toEqual({ x: start.x + 150, y: start.y - 120, w: start.w + 60, h: start.h + 40 });
   expect(await zOf(p1, "sync.probes")).toBeGreaterThan(await zOf(p1, "shell.test"));
   // Bring Test to front by clicking its title, then Probes again (pointer-down → front).
   await shellWindow(p1, "shell.test").getByTestId("ui-window-title").click();
@@ -135,15 +145,26 @@ test("FR-SHELL-09/11/12/14 launcher toggle, minimise, reset layout, render-only 
   await probesBtn.click();
 
   // Push it mostly off the right edge, shrink the viewport, grow it back.
-  await p.setViewportSize({ width: 1600, height: 900 });
-  await moveWindow(p, "sync.probes", 900, 300);
+  await resizeViewport(p, 1600, 900);
+  await moveWindow(p, "sync.probes", 1500, 200);
   const stored = await box(p, "sync.probes");
-  await p.setViewportSize({ width: 1280, height: 720 });
+  expect(stored.x).toBe(1600 - 120);
+  await resizeViewport(p, 1280, 720);
   const small = await box(p, "sync.probes");
-  expect(small.x).toBeLessThanOrEqual(1280 - 120);
+  expect(small.x).toBe(1280 - 120);
   expect(small.y + 32).toBeLessThanOrEqual(720);
-  await p.setViewportSize({ width: 1600, height: 900 });
+  await resizeViewport(p, 1600, 900);
   expect(await box(p, "sync.probes")).toEqual(stored);
+
+  // Focusing something in the off-screen part never scrolls the page (chrome stays put).
+  await shellWindow(p, "sync.probes").getByTestId("sync-drop-connection").focus();
+  const scrolled = await p.evaluate(() =>
+    [document.scrollingElement, ...document.querySelectorAll("[data-testid^='ui-']")].some(
+      (el) => el && (el.scrollLeft !== 0 || el.scrollTop !== 0),
+    ),
+  );
+  expect(scrolled).toBe(false);
+  expect((await p.getByTestId("ui-topbar").boundingBox())?.x).toBe(0);
 
   // Reset layout → player default (nothing open), and it is written.
   await p.getByTestId("ui-launcher-menu").click();

@@ -1,5 +1,7 @@
 import { expect, mock, test } from "bun:test";
 import { emptyStore } from "@shared/protocol/store";
+import { clampRect } from "@ui/features/play-shell/geometry";
+import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { availableKinds } from "@ui/features/play-shell/registry";
 
 // The players panel pulls in the DM session (localStorage, window.location at import); no DOM
@@ -19,6 +21,26 @@ test("FR-SHELL-21 DM registers camp.players, open by default, top-right", () => 
   expect(players?.defaultOpen).toBe(true);
   expect(players?.defaultPosition.anchor).toBe("top-right");
   expect(players?.launcher?.label).toBe("Players");
+});
+
+test("FR-SHELL-08 DM defaults don't overlap with every window open (1280×720, 1600×900)", () => {
+  const available = availableKinds(dmWindows, testMode);
+  for (const viewport of [
+    { w: 1280, h: 720 },
+    { w: 1600, h: 900 },
+  ]) {
+    const ctx = { registry: dmWindows, viewport, available };
+    let ws = defaultLayout(dmWindows, viewport);
+    for (const kind of available) ws = [...reduce(ws, { type: "open", kind }, ctx)];
+    const rects = ws.map((w) => ({ kind: w.kind, ...clampRect(w, viewport) }));
+    expect(rects).toHaveLength(available.size);
+    for (const a of rects)
+      for (const b of rects) {
+        if (a === b) continue;
+        const overlap = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+        expect(overlap ? `${a.kind} overlaps ${b.kind} at ${viewport.w}` : "ok").toBe("ok");
+      }
+  }
 });
 
 test("FR-SHELL-20 test mode off → shell.test, sync.probes absent; on → present", () => {

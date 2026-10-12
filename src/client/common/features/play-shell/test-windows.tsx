@@ -52,7 +52,7 @@ export const shellTestWindow = defineWindow({
   clients: ["dm", "player"],
   defaultSize: { w: 320, h: 220 },
   minSize: { w: 240, h: 160 },
-  defaultPosition: { anchor: "center", dx: 200 },
+  defaultPosition: { anchor: "bottom-right" },
   launcher: { icon: TestTubeIcon, label: "Test", order: 910 },
   available: isTestMode,
   component: ShellTestBody,
@@ -72,7 +72,8 @@ export const syncProbesWindow = defineWindow({
   clients: ["dm", "player"],
   defaultSize: { w: 560, h: 360 },
   minSize: { w: 320, h: 180 },
-  defaultPosition: { anchor: "top-left" },
+  // Bottom-left: clear of camp.players (top-right) and map.scenes / ent.creatures (top-left).
+  defaultPosition: { anchor: "bottom-left" },
   launcher: { icon: FlaskConicalIcon, label: "Probes", order: 900 },
   available: isTestMode,
   component: ProbesBody,

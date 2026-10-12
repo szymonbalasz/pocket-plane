@@ -6,9 +6,12 @@ import { PlayersPanel } from "../campaign-management/PlayersPanel";
 
 export const PLAYERS_KIND = "camp.players";
 
+/** The window title already says "Players": hide the panel's own CardTitle (h3) here. */
+const NO_TITLE = "[&>div>div:first-child>h3]:hidden";
+
 function PlayersBody() {
   return (
-    <div className={UNCARD}>
+    <div className={`${UNCARD} ${NO_TITLE}`}>
       <PlayersPanel />
     </div>
   );
@@ -18,7 +21,7 @@ export const playersWindow = defineWindow({
   kind: PLAYERS_KIND,
   title: "Players",
   clients: ["dm"],
-  defaultSize: { w: 540, h: 400 },
+  defaultSize: { w: 540, h: 360 },
   minSize: { w: 360, h: 200 },
   defaultPosition: { anchor: "top-right" },
   defaultOpen: true,
