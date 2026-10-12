@@ -16,7 +16,7 @@ import {
 import { CommandError, zodIssues } from "../commands/errors";
 import type { DispatchedEvent, RecordChange, Role } from "../events/types";
 import type { Services } from "../services";
-import type { Viewer, WireChange } from "./records";
+import type { PresenceView, Viewer, WireChange } from "./records";
 import { realTimers, type TimerHandle, type Timers } from "./timers";
 
 export interface SocketLike {
@@ -348,7 +348,8 @@ export class Hub implements HubApi {
     this.send(c, frame);
   }
 
-  private presenceView() {
+  /** Live presence for snapshot providers (also read by the convergence test helpers). */
+  presenceView(): PresenceView {
     return {
       list: (campaignId: string) =>
         [...(this.online.get(campaignId) ?? new Map<string, number>()).entries()].map(
