@@ -63,6 +63,11 @@ export function classify(prev: SyncView | null, next: SyncView): Transition {
  * every row the client holds. Audience is immutable and rows are never deleted, so a new ID in
  * an event is a `NotificationCreated` upsert; the `seq` check excludes the only other case,
  * a state change of a row below the snapshot window floor (ADR-0029).
+ * Inferred from the store (no `cause` hook in the sync client; orchestrator-approved). Known
+ * edge case: a client holding no notification rows at all that receives a below-floor row it
+ * can see being reopened would read it as created. In MVP only `damage-card` is reopened and
+ * its action owner (the only toast target for pending) is the DM, who holds every row, so the
+ * rule is exact; revisit if a reopenable kind ever gets a player action owner.
  */
 export function createdIn(prev: RecordStore, next: RecordStore): NotificationRecord[] {
   const before = prev.records[NOTIFICATION_TYPE] ?? {};

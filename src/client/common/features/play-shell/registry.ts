@@ -53,6 +53,16 @@ export interface WindowDef {
   launcher?: LauncherEntry;
   /** Read from the synced store; false → not rendered, not in the launcher, saved state kept. */
   available?: (store: RecordStore) => boolean;
+  /**
+   * Launcher badge, e.g. unread count (OQ-NOTE-13, #142); ≤ 0 = no badge. May read client state
+   * outside the store; its owner calls `refreshBadges()` (`./badges`) when that changes.
+   */
+  badge?: (store: RecordStore) => number;
+  /**
+   * Always mounted while the kind is available, whatever the window state (e.g. the toast
+   * runtime of `note.history`). Renders its own UI, if any; gets no props.
+   */
+  companion?: ComponentType;
   component: ComponentType<WindowProps>;
 }
 
