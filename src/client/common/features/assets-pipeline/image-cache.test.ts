@@ -70,6 +70,22 @@ describe("asset image loader (FR-ASSET-16)", () => {
     expect(c.get(url).state).toBe("error");
   });
 
+  test("FR-ASSET-16 a later record change re-arms a failed load (retry); other states untouched", () => {
+    const c = fresh();
+    const url = assetPath("D".repeat(22), "display");
+    expect(c.retry(url)).toBe(false); // unknown URL
+    c.get(url);
+    expect(c.retry(url)).toBe(false); // loading
+    FakeImage.made[0]?.fail();
+    expect(c.retry(url)).toBe(true);
+    expect(c.get(url).state).toBe("loading");
+    expect(FakeImage.made).toHaveLength(2);
+    FakeImage.made[1]?.load();
+    expect(c.get(url).state).toBe("ready");
+    expect(c.retry(url)).toBe(false); // ready
+    expect(FakeImage.made).toHaveLength(2);
+  });
+
   test("FR-ASSET-16 a retry can succeed", () => {
     const c = fresh();
     const url = assetPath("C".repeat(22), "display");

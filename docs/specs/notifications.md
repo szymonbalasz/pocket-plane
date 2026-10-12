@@ -184,7 +184,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 6 | — | B sends test "Apply 4 damage?" | A and D: sticky toast with Resolve. B: row Pending, no button, no toast |
 | 7 | A and D click Resolve at once | — | One succeeds; the other "No longer pending". One "Resolved by DM" row everywhere |
 | 8 | A dismisses `pending-dm`, reloads | — | Row "Dismissed"; after reload no summary toast |
-| 9 | A sends info to All and pending to Player 1 while B is dropped | B closes Notifications, then "drop connection" (Probes window) | B reconnects: no per-item toasts; summary "1 pending action"; badge 2 |
+| 9 | A sends info to All and pending to Player 1 while B is dropped | B closes Notifications, then "drop connection" (Probes window) | B reconnects: no per-item toasts; summary "2 pending actions" (new one + `pending-p1`); badge 2 |
 | 10 | Hard-kill + restart server | — | All reconnect; lists identical; B resolves the pending one |
 | 11 | A switches to Second Campaign, then back | — | "No notifications yet", then the full list again |
 

@@ -12,9 +12,9 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | build entities | — (ended) | merged (`5c01b44`) | walkthrough 6/6, 250 tests | — |
 | `fix/combat-core` | — (ended) | merged (`db2dd57`) | 279 tests, e2e 9/9 | — |
 | Spec party-loot (Phase 4) | — (ended) | draft on `main`; review `%TEMP%\opencode\review-loot.md` | in-review | DM: OQ-LOOT-01/02/06 (batch at Scenes gate) |
-| build scenes-map (+ FR-MAP-30 token hooks, token menu registry) | `build-scenes-map` (`w18:p2`) | `w18`, `build/scenes-map`, slot 0 | canvas UI; server slice next | — |
-| build dice-roll-log | `build-dice-roll-log` (`w19:p2`) | `w19`, `build/dice-roll-log`, slot 2 | building | — |
-| build notifications | `build-notifications` (`w1A:p2`) | `w1A`, `build/notifications`, slot 3 | building | — |
+| build scenes-map (+ FR-MAP-30 token hooks, token menu registry) | `build-scenes-map` (`w18:p2`), `test-scenes-map` (`w18:p3`, server `w18:p4`, 4103) | `w18`, `build/scenes-map`, slot 0 | 373 tests, e2e 11/11; §13 walkthrough + assets walkthrough B running | — |
+| build dice-roll-log | `build-dice-roll-log` (`w19:p2`), `test-dice` (`w19:p3`, server `w19:p4`, 4123) | `w19`, `build/dice-roll-log`, slot 2 | walkthrough running; token actors + session-sim line after scenes-map merges | scenes-map |
+| build notifications | — (ended) | merged (`45523cc`) | walkthrough 16/16, 321 tests | — |
 | build character-sheet → combat-tracker | — | — | queued | dice, notifications, scenes-map |
 
 Evidence archived: `%TEMP%\opencode\verify-{skeleton,scenes-core,play-shell,assets}\`.
@@ -22,7 +22,7 @@ Evidence archived: `%TEMP%\opencode\verify-{skeleton,scenes-core,play-shell,asse
 ## Shared-file locks (AGENTS §9.9, sequenced)
 
 - `build/scenes-map`: `src/server/db/schema.ts`, `src/shared/events/`, `fixtures/bundles/session-sim.ts`, `package.json`/`bun.lock` (konva), `src/client/common/features/assets-pipeline/image-cache.ts`, data-model, protocol.
-- `build/notifications`: play-shell window type + launcher (`badge?(store)`).
+- `build/dice-roll-log`: `loader.test.ts` teardown, shell window tests (registry-driven).
 
 ## Pending DM decisions
 

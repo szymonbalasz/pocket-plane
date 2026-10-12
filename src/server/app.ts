@@ -7,6 +7,7 @@ import { serveStatic } from "hono/bun";
 import { assetRoutes } from "./features/assets-pipeline/routes";
 import { campaignRoutes } from "./features/campaign-management/routes";
 import { entityRoutes } from "./features/entities/routes";
+import { sceneRoutes } from "./features/scenes-map/routes";
 import { errorBody, errorResponse } from "./http";
 import type { Services } from "./services";
 
@@ -17,6 +18,7 @@ export function createApi(s: Services) {
       .route("/api", campaignRoutes(s))
       .route("/api", assetRoutes(s))
       .route("/api", entityRoutes(s))
+      .route("/api", sceneRoutes(s))
   );
 }
 

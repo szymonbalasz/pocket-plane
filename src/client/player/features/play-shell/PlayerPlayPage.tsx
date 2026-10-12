@@ -4,6 +4,7 @@
 import { PlayFrame } from "@ui/features/play-shell/PlayFrame";
 import { ShellProvider } from "@ui/features/play-shell/ShellContext";
 import { playerWindows } from "../../windows";
+import { PlayerMapBase, PlayerMapToolRail } from "../scenes-map/PlayerMap";
 
 export function PlayerPlayPage({
   screen,
@@ -19,7 +20,8 @@ export function PlayerPlayPage({
         <PlayFrame
           client="player"
           topLeft={header}
-          // scenes-map: base layer + tool rail props go here (protocol §18).
+          base={<PlayerMapBase />}
+          toolRail={<PlayerMapToolRail />}
         />
       )}
     </ShellProvider>

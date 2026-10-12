@@ -8,6 +8,7 @@
 import type { EntityRecord } from "@shared/entities/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
+import { refreshTokenCopies } from "../scenes-map/definition-hook";
 
 export type HookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor">;
 
@@ -25,7 +26,7 @@ export interface HookRegistration {
 
 /** The registry. Append your feature's line; order = run order. */
 export const definitionChangedHooks: readonly HookRegistration[] = [
-  // scenes-map: token display copies (FR-MAP-20)
+  { name: "scenes-map.token-copies", hook: refreshTokenCopies }, // scenes-map (FR-MAP-20)
   // combat-tracker: combatant copies / HP clamp (OQ-ENT-10)
 ];
 

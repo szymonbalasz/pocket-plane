@@ -6,6 +6,8 @@ import base from "./base";
 import campaignSwitch from "./campaign-switch";
 import diceLog from "./dice-log";
 import entities from "./entities";
+import notifications from "./notifications";
+import scenes from "./scenes";
 import sessionSim from "./session-sim";
 import syncProbe from "./sync-probe";
 
@@ -17,5 +19,7 @@ export const bundles: readonly Bundle[] = [
   assetLibrary,
   assetAccess,
   entities,
+  scenes,
+  notifications,
   diceLog,
 ];

@@ -63,6 +63,19 @@ export class ImageCache<I extends LoadableImage> {
     }
   }
 
+  /**
+   * A later record change carries this asset again (e.g. a scene switch or a token update):
+   * re-arm a failed load. Only `error` entries reload; returns true if a load started.
+   */
+  retry(url: string): boolean {
+    const e = this.entries.get(url);
+    if (e?.state !== "error") return false;
+    e.image = this.create();
+    this.set(e, "loading");
+    this.start(e);
+    return true;
+  }
+
   private start(e: CacheEntry<I>): void {
     const img = e.image;
     img.onload = () => {

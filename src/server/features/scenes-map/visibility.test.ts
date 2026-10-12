@@ -1,0 +1,190 @@
+import { describe, expect, test } from "bun:test";
+import type { SceneFolderRecord, SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
+import { defineRecordType, RecordRegistry, type Viewer } from "../../ws/records";
+import {
+  folderVisibility,
+  redactScene,
+  redactToken,
+  sceneVisibility,
+  tokenVisibility,
+} from "./visibility";
+
+const scene = (id: string, active: boolean): SceneRecord => ({
+  id,
+  campaignId: "c",
+  folderId: "f",
+  seq: 1,
+  name: "Goblin Ambush",
+  mapAssetId: "map",
+  mapWidth: 1400,
+  mapHeight: 980,
+  gridCellSize: 70,
+  gridOffsetX: 0,
+  gridOffsetY: 0,
+  gridVisible: true,
+  gridColor: "#000000",
+  gridOpacity: 0.5,
+  mapLocked: true,
+  active,
+  createdAt: "t",
+  updatedAt: "t",
+});
+const token = (
+  id: string,
+  sceneId: string,
+  hidden: boolean,
+  owner: string | null,
+): TokenRecord => ({
+  id,
+  campaignId: "c",
+  sceneId,
+  definitionId: "def",
+  seq: 1,
+  name: id,
+  imageAssetId: "img",
+  size: "medium",
+  col: 0,
+  row: 0,
+  ownerPlayerId: owner,
+  hidden,
+  createdAt: "t",
+  updatedAt: "t",
+});
+const folder: SceneFolderRecord = {
+  id: "f",
+  campaignId: "c",
+  seq: 1,
+  name: "Act 1",
+  createdAt: "t",
+  updatedAt: "t",
+};
+
+function registry(active: string | null) {
+  const r = new RecordRegistry();
+  r.register(
+    defineRecordType<SceneRecord>({
+      type: "scene",
+      scope: "scene",
+      schema: undefined as never,
+      idOf: (x) => x.id,
+      campaignOf: (x) => x.campaignId,
+      sceneOf: (x) => x.id,
+      visibility: sceneVisibility,
+      redact: redactScene,
+      snapshot: () => [],
+    }),
+  );
+  r.register(
+    defineRecordType<SceneFolderRecord>({
+      type: "scene-folder",
+      scope: "campaign",
+      schema: undefined as never,
+      idOf: (x) => x.id,
+      campaignOf: (x) => x.campaignId,
+      visibility: folderVisibility,
+      snapshot: () => [],
+    }),
+  );
+  r.register(
+    defineRecordType<TokenRecord>({
+      type: "token",
+      scope: "scene",
+      schema: undefined as never,
+      idOf: (x) => x.id,
+      campaignOf: (x) => x.campaignId,
+      sceneOf: (x) => x.sceneId,
+      visibility: tokenVisibility,
+      redact: redactToken,
+      snapshot: () => [],
+    }),
+  );
+  r.provideActiveScene(() => active);
+  return r;
+}
+
+const v = (role: "dm" | "player", playerId: string | null = null): Viewer => ({
+  connId: "x",
+  campaignId: "c",
+  role,
+  playerId,
+});
+const dm = v("dm");
+const owner = v("player", "p1");
+const other = v("player", "p2");
+
+describe("FR-MAP-26 visibility matrix", () => {
+  test("scene: DM full; players redacted on the active scene, hidden elsewhere", () => {
+    const r = registry("s1");
+    expect(r.view("scene", scene("s1", true), dm)).toEqual({
+      vis: "full",
+      data: scene("s1", true),
+    });
+    const seen = r.view("scene", scene("s1", true), owner);
+    expect(seen.vis).toBe("redacted");
+    expect(Object.keys(seen.data as object).sort()).toEqual(
+      [
+        "active",
+        "gridCellSize",
+        "gridColor",
+        "gridOffsetX",
+        "gridOffsetY",
+        "gridOpacity",
+        "gridVisible",
+        "id",
+        "mapAssetId",
+        "mapHeight",
+        "mapWidth",
+      ].sort(),
+    );
+    expect(r.view("scene", scene("s2", false), owner).vis).toBe("hidden");
+    expect(registry(null).view("scene", scene("s1", true), owner).vis).toBe("hidden");
+    // Another campaign: hidden for the DM too.
+    expect(r.view("scene", { ...scene("s1", true), campaignId: "other" }, dm).vis).toBe("hidden");
+  });
+
+  test("scene-folder: DM only", () => {
+    const r = registry("s1");
+    expect(r.view("scene-folder", folder, dm).vis).toBe("full");
+    expect(r.view("scene-folder", folder, owner).vis).toBe("hidden");
+    expect(r.view("scene-folder", folder, other).vis).toBe("hidden");
+  });
+
+  test("token × DM / owner / other player × hidden", () => {
+    const r = registry("s1");
+    const visible = token("mira", "s1", false, "p1");
+    const hidden = token("wolf", "s1", true, null);
+    const hiddenOwned = token("thorn", "s1", true, "p1");
+    const offScene = token("elsewhere", "s2", false, "p1");
+    expect(r.view("token", visible, dm).vis).toBe("full");
+    expect(r.view("token", hidden, dm).vis).toBe("full");
+    expect(r.view("token", offScene, dm).vis).toBe("full");
+    for (const p of [owner, other]) {
+      const seen = r.view("token", visible, p);
+      expect(seen.vis).toBe("redacted");
+      expect(seen.data).not.toHaveProperty("definitionId");
+      expect(seen.data).toMatchObject({ id: "mira", name: "mira", ownerPlayerId: "p1" });
+      expect(r.view("token", hidden, p).vis).toBe("hidden");
+      expect(r.view("token", hiddenOwned, p).vis).toBe("hidden");
+      expect(r.view("token", offScene, p).vis).toBe("hidden");
+    }
+  });
+
+  test("FR-MAP-19 hide → delete, reveal → upsert for players (transition matrix)", () => {
+    const r = registry("s1");
+    const shown = token("wolf", "s1", false, null);
+    const hid = token("wolf", "s1", true, null);
+    expect(r.filterChange({ type: "token", id: "wolf", before: shown, after: hid }, other)).toEqual(
+      {
+        type: "token",
+        id: "wolf",
+        op: "delete",
+      },
+    );
+    expect(
+      r.filterChange({ type: "token", id: "wolf", before: hid, after: shown }, other)?.op,
+    ).toBe("upsert");
+    expect(
+      r.filterChange({ type: "token", id: "wolf", before: hid, after: hid }, other),
+    ).toBeNull();
+  });
+});

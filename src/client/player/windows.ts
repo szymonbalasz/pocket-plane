@@ -3,10 +3,12 @@
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
 import { playerDiceLogWindow } from "./features/dice-roll-log/log-window";
+import { notificationsHistoryWindow } from "./features/notifications/history-window";
 
 const windows: WindowDef[] = [
   syncProbesWindow, // sync.probes, test mode (play-shell, FR-SHELL-21)
   shellTestWindow, // shell.test, test mode (play-shell, FR-SHELL-20)
+  notificationsHistoryWindow, // note.history (notifications, FR-NOTE-17)
   playerDiceLogWindow, // dice.log (dice-roll-log, FR-DICE-21)
 ];
 
