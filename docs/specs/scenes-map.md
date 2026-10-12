@@ -1,8 +1,8 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: unclaimed
-owner: —
+status: claimed
+owner: spec-scenes-map
 wave: 3
 ---
 
