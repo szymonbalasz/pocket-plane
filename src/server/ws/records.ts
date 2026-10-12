@@ -27,6 +27,8 @@ export interface SnapshotSource {
 export interface RecordTypeDef<R> {
   type: string;
   scope: Scope;
+  /** `dm` = never sent to players, not even as an empty snapshot list. */
+  audience?: "dm";
   schema: z.ZodType<R>;
   /** Record id on the wire. */
   idOf(r: R): string;
@@ -79,6 +81,7 @@ export class RecordRegistry {
       if (cid !== v.campaignId) return { vis: "hidden" };
     }
     if (v.role === "dm") return { vis: "full", data: record };
+    if (def.audience === "dm") return { vis: "hidden" };
     const vis = def.visibility(record, v);
     if (vis === "hidden") return { vis };
     if (vis === "redacted") {
@@ -101,6 +104,7 @@ export class RecordRegistry {
   snapshot(src: SnapshotSource, v: Viewer): Record<string, unknown[]> {
     const out: Record<string, unknown[]> = {};
     for (const def of this.types.values()) {
+      if (def.audience === "dm" && v.role !== "dm") continue;
       const list: unknown[] = [];
       for (const r of def.snapshot(src, v)) {
         const seen = this.view(def.type, r, v);

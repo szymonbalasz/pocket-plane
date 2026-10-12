@@ -9,6 +9,7 @@ import type { Db } from "./db/client";
 import { EventBus, type Listener } from "./events/bus";
 import { features } from "./features";
 import type { Logger } from "./log";
+import type { HubApi } from "./ws/hub";
 import { type AnyRecordType, RecordRegistry } from "./ws/records";
 
 /** Resolvers campaign-management provides to live-sync (CAMP §9, protocol §2). */
@@ -35,6 +36,8 @@ export interface Services {
   /** Command names callable as WS intents. */
   intents: Set<string>;
   auth: CredentialResolvers;
+  /** Set once the WS hub exists (after registration). */
+  hub: HubApi | null;
 }
 
 export interface Registrar {
@@ -81,6 +84,7 @@ export function createServices(opts: ServicesOptions): Services {
     records: new RecordRegistry(),
     intents: new Set(),
     auth: missingAuth,
+    hub: null,
   };
   for (const e of domainEvents) commands.registerEvent(e);
 
