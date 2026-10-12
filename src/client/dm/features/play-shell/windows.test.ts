@@ -23,27 +23,13 @@ test("FR-SHELL-21 DM registers camp.players, open by default, top-right", () => 
   expect(players?.launcher?.label).toBe("Players");
 });
 
-const VIEWPORTS = [
-  { w: 1280, h: 720 },
-  { w: 1600, h: 900 },
-];
+const LAPTOP = { w: 1280, h: 720 };
+const DESKTOP = { w: 1600, h: 900 };
+const VIEWPORTS = [LAPTOP, DESKTOP];
 
-/** Default-open windows + test-mode windows (on in test mode, off without it). */
-function packedKinds(): Set<string> {
-  const on = availableKinds(dmWindows, testMode);
-  const off = availableKinds(dmWindows, emptyStore());
-  const out = new Set<string>();
-  for (const kind of on) {
-    if (dmWindows.get(kind)?.defaultOpen || !off.has(kind)) out.add(kind);
-  }
-  return out;
-}
-
-test("FR-SHELL-08 every other DM window's default rect fits the viewport (1280×720, 1600×900)", () => {
-  const packed = packedKinds();
-  const others = dmWindows.defs.filter((d) => !packed.has(d.kind));
+test("FR-SHELL-08 every DM window's default rect fits the viewport (1280×720, 1600×900)", () => {
   for (const viewport of VIEWPORTS) {
-    for (const d of others) {
+    for (const d of dmWindows.defs) {
       const r = defaultRect(d.defaultPosition, d.defaultSize, viewport);
       const fits =
         r.x >= 0 && r.y >= TOP_BAR_H && r.x + r.w <= viewport.w && r.y + r.h <= viewport.h;
@@ -53,31 +39,35 @@ test("FR-SHELL-08 every other DM window's default rect fits the viewport (1280×
 });
 
 /**
- * Overlap groups, derived from the registry: default-open product windows (available without
- * test mode) among themselves, and test-mode windows (available only in test mode) among
- * themselves. A test window may cover a product window; walkthroughs move it if needed.
+ * Overlap groups, derived from the registry (orchestrator ruling): default-open product windows
+ * among themselves at 1600×900 (gated ones included: they open when they become available),
+ * and test-mode windows (available only in test mode) among themselves at both viewports. A
+ * test window may cover a product window; walkthroughs move it if needed.
  */
-function overlapGroups(): Set<string>[] {
+function overlapGroups(): { name: string; kinds: Set<string>; viewports: typeof VIEWPORTS }[] {
   const on = availableKinds(dmWindows, testMode);
   const off = availableKinds(dmWindows, emptyStore());
-  const product = new Set([...off].filter((k) => dmWindows.get(k)?.defaultOpen));
   const testOnly = new Set([...on].filter((k) => !off.has(k)));
-  return [product, testOnly];
+  const product = new Set(
+    dmWindows.defs.filter((d) => d.defaultOpen && !testOnly.has(d.kind)).map((d) => d.kind),
+  );
+  return [
+    { name: "product", kinds: product, viewports: [DESKTOP] },
+    { name: "test-mode", kinds: testOnly, viewports: VIEWPORTS },
+  ];
 }
 
-test("FR-SHELL-08 DM default-open product windows don't overlap; test windows don't overlap each other (1280×720, 1600×900)", () => {
-  for (const viewport of VIEWPORTS) {
-    const ctx = { registry: dmWindows, viewport, available: availableKinds(dmWindows, testMode) };
-    let ws = defaultLayout(dmWindows, viewport);
-    for (const kind of availableKinds(dmWindows, testMode)) {
-      ws = [...reduce(ws, { type: "open", kind }, ctx)];
-    }
-    const rectOf = new Map(ws.map((w) => [w.kind, clampRect(w, viewport)]));
-    for (const group of overlapGroups()) {
-      const rects = [...group].map((kind) => {
-        const r = rectOf.get(kind);
-        if (!r) throw new Error(`${kind} not in the layout`);
-        return { kind, ...r };
+test("FR-SHELL-08 DM default-open product windows don't overlap (1600×900); test windows don't overlap each other", () => {
+  for (const { kinds, viewports } of overlapGroups()) {
+    for (const viewport of viewports) {
+      const all = new Set(dmWindows.defs.map((d) => d.kind));
+      const ctx = { registry: dmWindows, viewport, available: all };
+      let ws = defaultLayout(dmWindows, viewport);
+      for (const kind of kinds) ws = [...reduce(ws, { type: "open", kind }, ctx)];
+      const rects = [...kinds].map((kind) => {
+        const w = ws.find((x) => x.kind === kind);
+        if (!w) throw new Error(`${kind} not in the layout`);
+        return { kind, ...clampRect(w, viewport) };
       });
       for (const a of rects)
         for (const b of rects) {
@@ -104,10 +94,9 @@ test("FR-SHELL-20 test mode off → shell.test, sync.probes absent; on → prese
   }
 });
 
-test("FR-SHELL-14 DM default layout = every default-open available window in the registry", () => {
-  const off = availableKinds(dmWindows, emptyStore());
+test("FR-SHELL-14 DM default layout = every default-open window in the registry (gated ones too)", () => {
   const expected = dmWindows.defs
-    .filter((d) => d.defaultOpen && off.has(d.kind))
+    .filter((d) => d.defaultOpen)
     .map((d) => d.kind)
     .sort();
   for (const viewport of VIEWPORTS) {

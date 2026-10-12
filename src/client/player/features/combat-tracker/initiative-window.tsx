@@ -70,14 +70,10 @@ function PlayerInitiativeBody() {
 export const playerInitiativeWindow = defineWindow({
   ...initiativeWindowBase,
   clients: ["player"],
-  // CBT §7: top-left below the top bar, clear of the tool rail. 300 wide (not 340) so it stays
-  // left of the default-open game log (bottom-left, dx 364).
-  defaultSize: { w: 300, h: 520 },
-  minSize: { w: 280, h: 240 },
+  // CBT §7: top-left below the top bar, clear of the tool rail; 340 wide, default open. 440 high
+  // (not 520) so it ends above dice.log at 1600×900 (interim, pending orchestrator).
+  defaultSize: { w: 340, h: 440 },
   defaultPosition: { anchor: "top-left", dx: 56 },
-  // CBT §7 says default open. Pending shared change: play-shell's FR-SHELL-14 player test counts
-  // only *available* default-open kinds, while `defaultLayout` (rightly) includes gated ones.
-  defaultOpen: false,
   available: (store) => startedIn(store) !== null,
   component: PlayerInitiativeBody,
 });
