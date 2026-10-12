@@ -65,6 +65,12 @@ export function attackLine(a: Attack): string {
 
 export const isDown = (hpCurrent: number): boolean => hpCurrent === 0;
 
+/** HP colour token (`hp.*`, visual-direction): down at 0, bloodied at ≤ half, else full. */
+export function hpState(hpCurrent: number, hpMax: number): "full" | "bloodied" | "down" {
+  if (hpCurrent <= 0) return "down";
+  return hpCurrent * 2 <= hpMax ? "bloodied" : "full";
+}
+
 /** FR-CHAR-10: `clamp(before + delta, 0, hpMax)`. */
 export function clampHp(before: number, delta: number, hpMax: number): number {
   return Math.max(0, Math.min(hpMax, before + delta));

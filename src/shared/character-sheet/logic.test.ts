@@ -5,6 +5,7 @@ import {
   characterRolls,
   clampHp,
   eligibleCharacters,
+  hpState,
   initials,
   isDown,
   levelLine,
@@ -73,6 +74,12 @@ describe("FR-CHAR-03 formatting", () => {
     );
     expect(attackLine({ name: "Club", toHit: -1, damage: "1d4" })).toBe("Club \u22121 \u00b7 1d4");
     expect([isDown(0), isDown(1)]).toEqual([true, false]);
+    expect([hpState(12, 12), hpState(7, 12), hpState(6, 12), hpState(0, 12)]).toEqual([
+      "full",
+      "full",
+      "bloodied",
+      "down",
+    ]);
     expect([initials("Mira"), initials("Pip the Bold"), initials("  ")]).toEqual(["M", "PB", ""]);
   });
 });
