@@ -1,8 +1,8 @@
 ---
 title: Play shell
 prefix: SHELL
-status: unclaimed
-owner: —
+status: claimed
+owner: spec-play-shell
 wave: 2
 ---
 
