@@ -80,4 +80,38 @@ export const syncProbe = sqliteTable(
   (t) => [index("sync_probe_campaign").on(t.campaignId)],
 );
 
-export const schema = { campaign, player, eventLog, syncProbe };
+/**
+ * Asset (assets-pipeline, data model §10). `id` = 128-bit capability from ctx.tokens (CON-19).
+ * `seq` = insertion order, assigned by the DB at insert (CON-20: `assetSeqNext`). `hash` is
+ * server-only. Files live on disk under PP_ASSET_DIR/<hash>/ (FR-ASSET-04).
+ */
+export const asset = sqliteTable(
+  "asset",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    name: text("name").notNull(),
+    hash: text("hash").notNull(),
+    mime: text("mime").notNull(),
+    bytes: integer("bytes").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    displayWidth: integer("display_width").notNull(),
+    displayHeight: integer("display_height").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    // FR-ASSET-03: dedupe per campaign.
+    uniqueIndex("asset_campaign_hash").on(t.campaignId, t.hash),
+    uniqueIndex("asset_seq").on(t.seq),
+    index("asset_campaign").on(t.campaignId),
+  ],
+);
+
+/** CON-20: `seq` value for an asset insert, computed by the DB inside the insert's transaction. */
+export const assetSeqNext = sql<number>`(select coalesce(max(${asset.seq}), 0) + 1 from ${asset})`;
+
+export const schema = { campaign, player, eventLog, syncProbe, asset };

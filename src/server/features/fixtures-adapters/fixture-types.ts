@@ -11,7 +11,8 @@ export interface Refs {
 
 export interface SetupStep {
   command: string;
-  input: unknown | ((refs: Refs) => unknown);
+  /** A function input may be async; the loader awaits it before running the command. */
+  input: unknown | ((refs: Refs) => unknown | Promise<unknown>);
 }
 
 interface FixtureBase {
@@ -51,7 +52,7 @@ export interface FixtureLibrary {
 /** A typed setup step: input checked against the command's schema at compile time. */
 export function step<C extends CommandDef>(
   command: C,
-  input: z.input<C["input"]> | ((refs: Refs) => z.input<C["input"]>),
+  input: z.input<C["input"]> | ((refs: Refs) => z.input<C["input"]> | Promise<z.input<C["input"]>>),
 ): SetupStep {
   return { command: command.name, input };
 }

@@ -44,7 +44,15 @@ export interface Services {
   imports: ImportRegistry;
   /** Set once the WS hub exists (after registration). */
   hub: HubApi | null;
+  /** Server start-up tasks (`r.onStart`), run by `startServer` only. */
+  startHooks: { name: string; fn: StartHook }[];
 }
+
+/**
+ * Runs once when a real server starts: after the schema push, before it listens. Never in the
+ * fixture loader or its preflight (those open other DBs). E.g. the asset store sweep (FR-ASSET-07).
+ */
+export type StartHook = (s: Services) => void | Promise<void>;
 
 export interface Registrar {
   services: Services;
@@ -58,6 +66,8 @@ export interface Registrar {
   /** Post-commit, pre-listener cache refresh (CON-23). */
   afterCommit(name: string, fn: CommitHook): void;
   provideAuth(resolvers: CredentialResolvers): void;
+  /** Server start-up task (see `StartHook`). */
+  onStart(name: string, fn: StartHook): void;
 }
 
 export interface Feature {
@@ -98,6 +108,7 @@ export function createServices(opts: ServicesOptions): Services {
     auth: missingAuth,
     hub: null,
     imports: new ImportRegistry(),
+    startHooks: [],
   };
   for (const e of domainEvents) commands.registerEvent(e);
 
@@ -115,6 +126,12 @@ export function createServices(opts: ServicesOptions): Services {
     afterCommit: (name, fn) => commands.afterCommit(name, fn),
     provideAuth(r) {
       services.auth = r;
+    },
+    onStart(name, fn) {
+      if (services.startHooks.some((h) => h.name === name)) {
+        throw new Error(`Start hook "${name}" registered twice`);
+      }
+      services.startHooks.push({ name, fn });
     },
   };
   for (const f of features) f.register(registrar);
