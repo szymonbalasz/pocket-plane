@@ -9,8 +9,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Agent | Workspace / branch | State | Blockers |
 |---|---|---|---|---|
 | `fix/scenes-core` | — (ended) | merged (`bcdcfb5`, #133) | 116 tests; reconnect walkthroughs 10/10 + 6/6, max rejoin 1.2 s | — |
-| build play-shell | `build-play-shell` (`wY:p2`) | `wY`, `build/play-shell`, slot 0 | building; first slice = window registries | — |
-| build assets-pipeline | `build-assets-pipeline` (`wZ:p2`) | `wZ`, `build/assets-pipeline`, slot 2 | building; window slice waits for play-shell registries | REST campaign middleware (CON-21) = shared change |
+| build play-shell | `build-play-shell` (`wY:p2`), `test-play-shell` (`wY:p3`, server `wY:p4`) | `wY`, `build/play-shell`, slot 0 | 5 slices, 160 tests, e2e 6/6; §13 walkthrough running | — |
+| build assets-pipeline | `build-assets-pipeline` (`wZ:p2`) | `wZ`, `build/assets-pipeline`, slot 2 | slices 1–4 done; window slice + e2e wait for play-shell merge | REST campaign middleware (CON-21) = shared change |
 | build entities, scenes-map | — | — | queued | assets-pipeline; scenes-map also on DM B4/B5 |
 | Combat specs (4 drafts on `main`, in-review) | — (ended) | reviews in `%TEMP%\opencode\review-combat-{1,2}.md` | DM gate | DM decisions B1–B8, P1–P28 |
 

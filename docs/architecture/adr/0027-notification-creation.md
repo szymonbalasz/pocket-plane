@@ -1,6 +1,6 @@
-# NNNN — Notifications are created in the causing command's transaction
+# 0027 — Notifications are created in the causing command's transaction
 
-- Status: proposed
+- Status: accepted (2026-10-12; decisions-log #135, #136, #137)
 - Date: 2026-10-12
 - Affects: [notifications](../../specs/notifications.md), [combat-tracker](../../specs/combat-tracker.md), [party-loot](../../specs/party-loot.md), [post-mvp/combat-extras](../../specs/post-mvp/combat-extras.md)
 - Refines: [ADR-0016](0016-domain-events-pending-actions.md) ("MVP use: … damage cards" as a listener; open row "May rules mutate state directly?")
@@ -22,7 +22,7 @@
 
 ## Decision
 
-> Undecided. Suggested: **C**. MVP uses A only (damage cards, loot received). Post-commit rule listeners (combat-extras) are decided when that spec is written, including how to close the crash gap.
+**C.** MVP uses A only: a notification is created (and resolved) inside the causing command's transaction via `notify` / `resolveNotification` (damage cards: the attack command, #135; loot received). Post-commit rule listeners (combat-extras) are decided when that spec is written, including how to close the crash gap. Only the DM resolves damage cards (#136).
 
 ## Consequences
 
