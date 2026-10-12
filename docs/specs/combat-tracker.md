@@ -1,8 +1,8 @@
 ---
 title: Combat tracker
 prefix: CBT
-status: unclaimed
-owner: —
+status: claimed
+owner: spec-combat-tracker
 wave: 3
 ---
 
