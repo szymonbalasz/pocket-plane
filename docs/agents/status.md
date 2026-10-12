@@ -12,8 +12,9 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Spec character-sheet | — (ended) | draft merged to `main` | in-review | batch review with the other Combat specs |
 | Spec dice-roll-log | — (ended) | draft merged to `main` (+ proposed ADR windowed record types) | in-review | batch review |
 | Spec notifications | — (ended) | draft merged to `main` (+ proposed ADR notification creation) | in-review | batch review |
-| Spec combat-tracker | `spec-combat-tracker` (`wX:p2`) | `wX`, `spec/combat-tracker` | writing | revision pass after dice-roll-log + notifications drafts merge |
-| Review character-sheet + dice-roll-log + notifications | `review-combat-1` (`wR:pH`, tab reviews) | read-only on `main` | reviewing | — |
+| Spec combat-tracker | — (ended) | draft merged to `main` (+ proposed ADR token-changed hooks) | in-review | review-combat-2 |
+| Review character-sheet + dice-roll-log + notifications | — (ended) | findings `%TEMP%\opencode\review-combat-1.md` | done | — |
+| Review combat-tracker + gate question list | `review-combat-2` (`wR:pJ`) | read-only on `main` | reviewing | then DM gate (Combat specs) |
 | Scenes builds: play-shell → assets-pipeline → entities → scenes-map | — | — | queued | `fix/scenes-core` merge |
 
 Walkthrough evidence archived outside the repo: `%TEMP%\opencode\verify-skeleton\`.
