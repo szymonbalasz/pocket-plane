@@ -1,0 +1,78 @@
+import { SceneActivated } from "@shared/events/scenes-map";
+import { LaserData, MAP_SIGNALS, PingData, PullData } from "@shared/scenes-map/schemas";
+import type { CommandDef } from "../../commands/commands";
+import type { Feature } from "../../services";
+import { defineSignal } from "../../ws/signals";
+import { ActiveSceneCache } from "./active-scene";
+import {
+  activateScene,
+  createFolder,
+  createScene,
+  deleteFolder,
+  deleteSceneCommand,
+  deleteTokenCommand,
+  duplicateScene,
+  duplicateToken,
+  moveToken,
+  patchScene,
+  placeToken,
+  renameFolder,
+  setGrid,
+  setLocked,
+  setSceneMap,
+  setTokenHiddenCommand,
+  updateTokenCommand,
+} from "./commands";
+import { sceneRecordTypes } from "./records";
+import { bindTokenHooks, TokenHooks, tokenChangedHooks } from "./token-hooks";
+
+export const scenesMap: Feature = {
+  name: "scenes-map",
+  register(r) {
+    const s = r.services;
+    const hooks = new TokenHooks(tokenChangedHooks);
+    bindTokenHooks(s, hooks);
+
+    // REST-only (MAP §9, ADR-0021 D) — also fixture steps.
+    const rest: CommandDef[] = [
+      createScene,
+      patchScene,
+      duplicateScene,
+      deleteSceneCommand(hooks),
+      createFolder,
+      renameFolder,
+      deleteFolder,
+    ] as unknown as CommandDef[];
+    for (const c of rest) r.command(c);
+    // WS intents (protocol §13).
+    const intents: CommandDef[] = [
+      activateScene,
+      setSceneMap,
+      setGrid,
+      setLocked,
+      placeToken,
+      moveToken,
+      updateTokenCommand(hooks),
+      setTokenHiddenCommand(hooks),
+      duplicateToken,
+      deleteTokenCommand(hooks),
+    ] as unknown as CommandDef[];
+    for (const c of intents) r.command(c, { intent: true });
+
+    for (const t of sceneRecordTypes) r.recordType(t);
+
+    // Signals (FR-MAP-25, ADR-0026): pull is DM only.
+    r.signal(defineSignal({ name: MAP_SIGNALS.ping, schema: PingData, roles: ["dm", "player"] }));
+    r.signal(defineSignal({ name: MAP_SIGNALS.laser, schema: LaserData, roles: ["dm", "player"] }));
+    r.signal(defineSignal({ name: MAP_SIGNALS.pull, schema: PullData, roles: ["dm"] }));
+
+    // FR-MAP-06: cache first (commit hook, CON-23), then resync every player of the campaign.
+    const cache = new ActiveSceneCache(s.db);
+    r.activeScene((cid) => cache.get(cid));
+    r.afterCommit("scenes-map.active-scene", (e) => cache.onCommit(e));
+    r.listener("scenes-map.activation-resync", (e) => {
+      if (e.event.type !== SceneActivated.type) return;
+      s.hub?.resync((c) => c.role === "player" && c.campaignId === e.event.campaignId);
+    });
+  },
+};

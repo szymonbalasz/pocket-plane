@@ -1,0 +1,688 @@
+// scenes-map commands (MAP §6, §9; protocol §13, §16). Each: validated intent → rows + event-log
+// entry in one transaction (except `TokenMoved`, not logged) → domain event. IDs and time from ctx;
+// `seq` from the DB (CON-20). Campaign = `actor.campaignId`, fixed at authentication (CON-21).
+import {
+  SceneActivated,
+  SceneCreated,
+  SceneDeleted,
+  SceneDuplicated,
+  SceneFolderCreated,
+  SceneFolderDeleted,
+  SceneFolderRenamed,
+  SceneUpdated,
+  TokenDeleted,
+  TokenDuplicated,
+  TokenHidden,
+  TokenMoved,
+  TokenPlaced,
+  TokenRevealed,
+  TokenUpdated,
+} from "@shared/events/scenes-map";
+import { copyName, duplicateCell, numberedName, overlapsMap } from "@shared/scenes-map/geometry";
+import {
+  ActivateSceneInput,
+  CreateSceneBody,
+  GRID_DEFAULTS,
+  MAP_INTENTS,
+  MoveTokenInput,
+  PlaceTokenInput,
+  SCENE_FOLDER_TYPE,
+  SCENE_TYPE,
+  SceneFolderBody,
+  type SceneFolderRecord,
+  SceneName,
+  type SceneRecord,
+  SetGridInput,
+  SetLockedInput,
+  SetSceneMapInput,
+  SetTokenHiddenInput,
+  TOKEN_TYPE,
+  TOKENS_PER_CAMPAIGN_MAX,
+  TOKENS_PER_SCENE_MAX,
+  TokenIdInput,
+  type TokenRecord,
+  type TokenSize,
+  UpdateTokenInput,
+} from "@shared/scenes-map/schemas";
+import { and, eq } from "drizzle-orm";
+import { z } from "zod";
+import { type CommandEnv, defineCommand, IdSchema } from "../../commands/commands";
+import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
+import type { Tx } from "../../db/client";
+import {
+  player,
+  scene,
+  sceneFolder,
+  sceneFolderSeqNext,
+  sceneSeqNext,
+  token,
+  tokenSeqNext,
+} from "../../db/schema";
+import type { RecordChange } from "../../events/types";
+import { requireAsset } from "../assets-pipeline/commands";
+import { resolveDefinition } from "../entities/commands";
+import {
+  activeSceneOf,
+  campaignOf,
+  countTokens,
+  findScene,
+  getFolder,
+  getScene,
+  getToken,
+  readFolder,
+  readScene,
+  readToken,
+  sceneTokens,
+} from "./rows";
+import type { TokenHooks } from "./token-hooks";
+
+/** REST-only commands (no WS intent, MAP §9 / ADR-0021 D). */
+export const MAP_REST = {
+  createScene: "map.createScene",
+  updateScene: "map.updateScene",
+  duplicateScene: "map.duplicateScene",
+  deleteScene: "map.deleteScene",
+  createFolder: "map.createFolder",
+  renameFolder: "map.renameFolder",
+  deleteFolder: "map.deleteFolder",
+} as const;
+
+const sceneChange = (before: SceneRecord | null, after: SceneRecord | null): RecordChange => ({
+  type: SCENE_TYPE,
+  id: (after ?? before)?.id as string,
+  before,
+  after,
+});
+const tokenChange = (before: TokenRecord | null, after: TokenRecord | null): RecordChange => ({
+  type: TOKEN_TYPE,
+  id: (after ?? before)?.id as string,
+  before,
+  after,
+});
+const folderChange = (
+  before: SceneFolderRecord | null,
+  after: SceneFolderRecord | null,
+): RecordChange => ({
+  type: SCENE_FOLDER_TYPE,
+  id: (after ?? before)?.id as string,
+  before,
+  after,
+});
+
+/** FR-MAP-13 / -18: owner must be a player of the campaign. */
+function assertOwner(tx: Tx, cid: string, ownerPlayerId: string) {
+  const row = tx
+    .select({ id: player.id })
+    .from(player)
+    .where(and(eq(player.id, ownerPlayerId), eq(player.campaignId, cid)))
+    .get();
+  if (!row) {
+    throw invalid("Owner must be a player of this campaign", [
+      { path: ["ownerPlayerId"], message: "Not a player of this campaign" },
+    ]);
+  }
+}
+
+/** FR-MAP-14: the footprint overlaps the map, else `invalid`. */
+function assertOnMap(s: SceneRecord, col: number, row: number, size: TokenSize) {
+  if (!overlapsMap(s, col, row, size)) {
+    throw invalid("Token must overlap the map", [{ path: ["col"], message: "Off the map" }]);
+  }
+}
+
+/** FR-MAP-14 caps *(proposed, OQ-MAP-20)*. */
+function assertCaps(tx: Tx, cid: string, sceneId: string, adding: number) {
+  if (countTokens(tx, { sceneId }) + adding > TOKENS_PER_SCENE_MAX) {
+    throw conflict(`A scene holds at most ${TOKENS_PER_SCENE_MAX} tokens`);
+  }
+  if (countTokens(tx, { campaignId: cid }) + adding > TOKENS_PER_CAMPAIGN_MAX) {
+    throw conflict(`A campaign holds at most ${TOKENS_PER_CAMPAIGN_MAX} tokens`);
+  }
+}
+
+function assertUnlocked(s: SceneRecord) {
+  if (s.mapLocked) throw conflict("The map is locked");
+}
+
+const assetOrNull = (env: CommandEnv, id: string | null | undefined): string | null =>
+  id === null || id === undefined ? null : requireAsset(env, id).id;
+
+// ---------- scenes (REST) ----------
+
+/** FR-MAP-01: inactive, unlocked, grid defaults; map size = the asset's `display` size. */
+export const createScene = defineCommand({
+  name: MAP_REST.createScene,
+  input: CreateSceneBody,
+  execute(input, env): SceneRecord {
+    const { tx, ctx, actor, emit } = env;
+    const cid = campaignOf(actor);
+    const map = requireAsset(env, input.mapAssetId);
+    const folderId = input.folderId ? getFolder(tx, cid, input.folderId).id : null;
+    const id = ctx.ids.next();
+    const now = ctx.clock.iso();
+    tx.insert(scene)
+      .values({
+        id,
+        campaignId: cid,
+        folderId,
+        seq: sceneSeqNext,
+        name: input.name,
+        mapAssetId: map.id,
+        mapWidth: map.displayWidth,
+        mapHeight: map.displayHeight,
+        gridCellSize: GRID_DEFAULTS.cellSize,
+        gridOffsetX: GRID_DEFAULTS.offsetX,
+        gridOffsetY: GRID_DEFAULTS.offsetY,
+        gridVisible: GRID_DEFAULTS.visible,
+        gridColor: GRID_DEFAULTS.color,
+        gridOpacity: GRID_DEFAULTS.opacity,
+        mapLocked: false,
+        active: false,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    const after = readScene(tx, id);
+    emit({
+      type: SceneCreated.type,
+      campaignId: cid,
+      payload: { sceneId: id },
+      changes: [sceneChange(null, after)],
+    });
+    return after;
+  },
+});
+
+/** Updates scene columns and emits `SceneUpdated` (CON-31). */
+function updateScene(
+  env: CommandEnv,
+  before: SceneRecord,
+  set: Partial<typeof scene.$inferInsert>,
+): SceneRecord {
+  const { tx, ctx, emit } = env;
+  tx.update(scene)
+    .set({ ...set, updatedAt: ctx.clock.iso() })
+    .where(eq(scene.id, before.id))
+    .run();
+  const after = readScene(tx, before.id);
+  emit({
+    type: SceneUpdated.type,
+    campaignId: before.campaignId,
+    payload: { sceneId: before.id },
+    changes: [sceneChange(before, after)],
+  });
+  return after;
+}
+
+/** PATCH body (`PatchSceneBody`) + the path id. */
+export const UpdateSceneInput = z.strictObject({
+  id: IdSchema,
+  name: SceneName.optional(),
+  folderId: IdSchema.nullable().optional(),
+});
+
+/** FR-MAP-03: rename and/or move into a folder / to the root. */
+export const patchScene = defineCommand({
+  name: MAP_REST.updateScene,
+  input: UpdateSceneInput,
+  execute(input, env): SceneRecord {
+    const cid = campaignOf(env.actor);
+    const before = getScene(env.tx, cid, input.id);
+    const set: Partial<typeof scene.$inferInsert> = {};
+    if (input.name !== undefined) set.name = input.name;
+    if (input.folderId !== undefined) {
+      set.folderId = input.folderId === null ? null : getFolder(env.tx, cid, input.folderId).id;
+    }
+    return updateScene(env, before, set);
+  },
+});
+
+/** FR-MAP-04: inactive copy "‹name› (copy)", same folder/map/grid/lock, every token copied. */
+export const duplicateScene = defineCommand({
+  name: MAP_REST.duplicateScene,
+  input: z.strictObject({ id: IdSchema }),
+  execute({ id: sourceId }, env): SceneRecord {
+    const { tx, ctx, actor, emit } = env;
+    const cid = campaignOf(actor);
+    const src = getScene(tx, cid, sourceId);
+    const tokens = sceneTokens(tx, src.id);
+    if (countTokens(tx, { campaignId: cid }) + tokens.length > TOKENS_PER_CAMPAIGN_MAX) {
+      throw conflict(`A campaign holds at most ${TOKENS_PER_CAMPAIGN_MAX} tokens`);
+    }
+    const id = ctx.ids.next();
+    const now = ctx.clock.iso();
+    const { seq: _seq, ...rest } = src;
+    tx.insert(scene)
+      .values({
+        ...rest,
+        id,
+        seq: sceneSeqNext,
+        name: copyName(src.name),
+        active: false,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    const changes: RecordChange[] = [sceneChange(null, readScene(tx, id))];
+    for (const t of tokens) {
+      const tid = ctx.ids.next();
+      const { seq: _s, ...fields } = t;
+      tx.insert(token)
+        .values({
+          ...fields,
+          id: tid,
+          sceneId: id,
+          seq: tokenSeqNext,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+      changes.push(tokenChange(null, readToken(tx, tid)));
+    }
+    emit({
+      type: SceneDuplicated.type,
+      campaignId: cid,
+      payload: { sceneId: id, sourceSceneId: src.id },
+      changes,
+    });
+    return readScene(tx, id);
+  },
+});
+
+/** FR-MAP-05: non-active only; tokens go with it, each through the token-changed hooks first. */
+export function deleteSceneCommand(hooks: TokenHooks) {
+  return defineCommand({
+    name: MAP_REST.deleteScene,
+    input: z.strictObject({ id: IdSchema }),
+    execute({ id }, env): void {
+      const { tx, ctx, actor, emit } = env;
+      const cid = campaignOf(actor);
+      const before = getScene(tx, cid, id);
+      if (before.active) throw conflict("The scene shown to players can't be deleted");
+      const tokens = sceneTokens(tx, id);
+      const changes: RecordChange[] = [];
+      for (const t of tokens) changes.push(...hooks.run({ tx, ctx, actor }, t, null));
+      tx.delete(token).where(eq(token.sceneId, id)).run();
+      tx.delete(scene).where(eq(scene.id, id)).run();
+      emit({
+        type: SceneDeleted.type,
+        campaignId: cid,
+        payload: { sceneId: id },
+        changes: [
+          ...tokens.map((t) => tokenChange(t, null)),
+          ...changes,
+          sceneChange(before, null),
+        ],
+      });
+    },
+  });
+}
+
+// ---------- folders (REST, FR-MAP-02) ----------
+
+export const createFolder = defineCommand({
+  name: MAP_REST.createFolder,
+  input: SceneFolderBody,
+  execute({ name }, { tx, ctx, actor, emit }): SceneFolderRecord {
+    const cid = campaignOf(actor);
+    const id = ctx.ids.next();
+    const now = ctx.clock.iso();
+    tx.insert(sceneFolder)
+      .values({
+        id,
+        campaignId: cid,
+        seq: sceneFolderSeqNext,
+        name,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    const after = readFolder(tx, id);
+    emit({
+      type: SceneFolderCreated.type,
+      campaignId: cid,
+      payload: { folderId: id },
+      changes: [folderChange(null, after)],
+    });
+    return after;
+  },
+});
+
+export const renameFolder = defineCommand({
+  name: MAP_REST.renameFolder,
+  input: SceneFolderBody.extend({ id: IdSchema }),
+  execute({ id, name }, { tx, ctx, actor, emit }): SceneFolderRecord {
+    const cid = campaignOf(actor);
+    const before = getFolder(tx, cid, id);
+    tx.update(sceneFolder)
+      .set({ name, updatedAt: ctx.clock.iso() })
+      .where(eq(sceneFolder.id, id))
+      .run();
+    const after = readFolder(tx, id);
+    emit({
+      type: SceneFolderRenamed.type,
+      campaignId: cid,
+      payload: { folderId: id },
+      changes: [folderChange(before, after)],
+    });
+    return after;
+  },
+});
+
+/** Folder delete moves its scenes to the root in the same transaction. */
+export const deleteFolder = defineCommand({
+  name: MAP_REST.deleteFolder,
+  input: z.strictObject({ id: IdSchema }),
+  execute({ id }, { tx, ctx, actor, emit }): void {
+    const cid = campaignOf(actor);
+    const before = getFolder(tx, cid, id);
+    const moved = tx.select({ id: scene.id }).from(scene).where(eq(scene.folderId, id)).all();
+    const changes: RecordChange[] = [];
+    for (const { id: sid } of moved) {
+      const b = readScene(tx, sid);
+      tx.update(scene)
+        .set({ folderId: null, updatedAt: ctx.clock.iso() })
+        .where(eq(scene.id, sid))
+        .run();
+      changes.push(sceneChange(b, readScene(tx, sid)));
+    }
+    tx.delete(sceneFolder).where(eq(sceneFolder.id, id)).run();
+    emit({
+      type: SceneFolderDeleted.type,
+      campaignId: cid,
+      payload: { folderId: id },
+      changes: [...changes, folderChange(before, null)],
+    });
+  },
+});
+
+// ---------- scene intents (WS, DM) ----------
+
+/** FR-MAP-06: ≤ 1 active scene; one transaction flips both flags. Already active → no event. */
+export const activateScene = defineCommand({
+  name: MAP_INTENTS.activateScene,
+  input: ActivateSceneInput,
+  execute({ sceneId }, { tx, ctx, actor, emit }): void {
+    const cid = campaignOf(actor);
+    const target = getScene(tx, cid, sceneId);
+    if (target.active) return;
+    const prev = activeSceneOf(tx, cid);
+    const now = ctx.clock.iso();
+    const changes: RecordChange[] = [];
+    if (prev) {
+      tx.update(scene).set({ active: false, updatedAt: now }).where(eq(scene.id, prev.id)).run();
+      changes.push(sceneChange(prev, readScene(tx, prev.id)));
+    }
+    tx.update(scene).set({ active: true, updatedAt: now }).where(eq(scene.id, sceneId)).run();
+    changes.push(sceneChange(target, readScene(tx, sceneId)));
+    emit({
+      type: SceneActivated.type,
+      campaignId: cid,
+      payload: { sceneId, previousSceneId: prev?.id ?? null },
+      changes,
+    });
+  },
+});
+
+/** FR-MAP-09: replaces the map and its stored size; tokens keep their cells. */
+export const setSceneMap = defineCommand({
+  name: MAP_INTENTS.setSceneMap,
+  input: SetSceneMapInput,
+  execute({ sceneId, mapAssetId }, env): void {
+    const before = getScene(env.tx, campaignOf(env.actor), sceneId);
+    assertUnlocked(before);
+    const map = requireAsset(env, mapAssetId);
+    updateScene(env, before, {
+      mapAssetId: map.id,
+      mapWidth: map.displayWidth,
+      mapHeight: map.displayHeight,
+    });
+  },
+});
+
+/** FR-MAP-10. */
+export const setGrid = defineCommand({
+  name: MAP_INTENTS.setGrid,
+  input: SetGridInput,
+  execute(g, env): void {
+    const before = getScene(env.tx, campaignOf(env.actor), g.sceneId);
+    assertUnlocked(before);
+    updateScene(env, before, {
+      gridCellSize: g.cellSize,
+      gridOffsetX: g.offsetX,
+      gridOffsetY: g.offsetY,
+      gridVisible: g.visible,
+      gridColor: g.color,
+      gridOpacity: g.opacity,
+    });
+  },
+});
+
+/** FR-MAP-11. */
+export const setLocked = defineCommand({
+  name: MAP_INTENTS.setLocked,
+  input: SetLockedInput,
+  execute({ sceneId, locked }, env): void {
+    const before = getScene(env.tx, campaignOf(env.actor), sceneId);
+    if (before.mapLocked === locked) return;
+    updateScene(env, before, { mapLocked: locked });
+  },
+});
+
+// ---------- token intents (WS) ----------
+
+function insertToken(
+  env: CommandEnv,
+  fields: Omit<typeof token.$inferInsert, "id" | "seq" | "createdAt" | "updatedAt">,
+): TokenRecord {
+  const id = env.ctx.ids.next();
+  const now = env.ctx.clock.iso();
+  env.tx
+    .insert(token)
+    .values({ ...fields, id, seq: tokenSeqNext, createdAt: now, updatedAt: now })
+    .run();
+  return readToken(env.tx, id);
+}
+
+const namesOn = (tx: Tx, sceneId: string) => sceneTokens(tx, sceneId).map((t) => t.name);
+
+/**
+ * FR-MAP-13: name = definition name, numbered (FR-MAP-16); image = portrait or none; size =
+ * `statBlock.size`; owner = the character's owner, else none; visible. Optional overrides
+ * (fixtures) for name, image, owner, hidden; never size.
+ */
+export const placeToken = defineCommand({
+  name: MAP_INTENTS.placeToken,
+  input: PlaceTokenInput,
+  execute(input, env): { tokenId: string } {
+    const { tx, actor, emit } = env;
+    const cid = campaignOf(actor);
+    const s = getScene(tx, cid, input.sceneId);
+    const def = resolveDefinition(env, input.definitionId);
+    const size = def.statBlock.size;
+    assertOnMap(s, input.col, input.row, size);
+    assertCaps(tx, cid, s.id, 1);
+    let ownerPlayerId: string | null = def.kind === "character" ? def.ownerPlayerId : null;
+    if (input.ownerPlayerId !== undefined) {
+      if (input.ownerPlayerId !== null) assertOwner(tx, cid, input.ownerPlayerId);
+      ownerPlayerId = input.ownerPlayerId;
+    }
+    const imageAssetId =
+      input.imageAssetId !== undefined
+        ? assetOrNull(env, input.imageAssetId)
+        : assetOrNull(env, def.portraitAssetId);
+    const after = insertToken(env, {
+      campaignId: cid,
+      sceneId: s.id,
+      definitionId: def.id,
+      name: numberedName(input.name ?? def.name, namesOn(tx, s.id)),
+      imageAssetId,
+      size,
+      col: input.col,
+      row: input.row,
+      ownerPlayerId,
+      hidden: input.hidden ?? false,
+    });
+    emit({
+      type: TokenPlaced.type,
+      campaignId: cid,
+      payload: { tokenId: after.id, sceneId: s.id },
+      changes: [tokenChange(null, after)],
+    });
+    return { tokenId: after.id };
+  },
+});
+
+/**
+ * FR-MAP-21: a player moves a token iff they own it, it is not hidden and on the active scene.
+ * A token the player can't see answers `not_found` (as unknown); visible but not theirs →
+ * `forbidden`. DM moves any token on any scene.
+ */
+export const moveToken = defineCommand({
+  name: MAP_INTENTS.moveToken,
+  input: MoveTokenInput,
+  roles: ["dm", "player"],
+  authorize({ tokenId }, { tx, actor }) {
+    if (actor.role !== "player") return;
+    const cid = campaignOf(actor);
+    const t = getToken(tx, cid, tokenId);
+    const active = activeSceneOf(tx, cid);
+    if (t.hidden || active?.id !== t.sceneId) throw notFound("Token not found");
+    if (t.ownerPlayerId === null || t.ownerPlayerId !== actor.playerId) {
+      throw forbidden("Not your token");
+    }
+  },
+  execute({ tokenId, col, row }, { tx, ctx, actor, emit }): void {
+    const cid = campaignOf(actor);
+    const before = getToken(tx, cid, tokenId);
+    const s = findScene(tx, cid, before.sceneId) as SceneRecord;
+    assertOnMap(s, col, row, before.size);
+    tx.update(token)
+      .set({ col, row, updatedAt: ctx.clock.iso() })
+      .where(eq(token.id, tokenId))
+      .run();
+    const after = readToken(tx, tokenId);
+    emit({
+      type: TokenMoved.type,
+      campaignId: cid,
+      payload: { tokenId, sceneId: before.sceneId, col, row },
+      changes: [tokenChange(before, after)],
+    });
+  },
+});
+
+/** FR-MAP-18: rename, image (custom art), owner; never size. Runs token-changed hooks. */
+export function updateTokenCommand(hooks: TokenHooks) {
+  return defineCommand({
+    name: MAP_INTENTS.updateToken,
+    input: UpdateTokenInput,
+    execute(input, env): void {
+      const { tx, ctx, actor, emit } = env;
+      const cid = campaignOf(actor);
+      const before = getToken(tx, cid, input.tokenId);
+      const set: Partial<typeof token.$inferInsert> = {};
+      if (input.name !== undefined) set.name = input.name;
+      if (input.imageAssetId !== undefined) set.imageAssetId = assetOrNull(env, input.imageAssetId);
+      if (input.ownerPlayerId !== undefined) {
+        if (input.ownerPlayerId !== null) assertOwner(tx, cid, input.ownerPlayerId);
+        set.ownerPlayerId = input.ownerPlayerId;
+      }
+      tx.update(token)
+        .set({ ...set, updatedAt: ctx.clock.iso() })
+        .where(eq(token.id, before.id))
+        .run();
+      const after = readToken(tx, before.id);
+      const hookChanges = hooks.run({ tx, ctx, actor }, before, after);
+      emit({
+        type: TokenUpdated.type,
+        campaignId: cid,
+        payload: { tokenId: before.id, sceneId: before.sceneId },
+        changes: [tokenChange(before, after), ...hookChanges],
+      });
+    },
+  });
+}
+
+/** FR-MAP-19: hide → players get a `delete`; reveal → an `upsert`. Unchanged → no event. */
+export function setTokenHiddenCommand(hooks: TokenHooks) {
+  return defineCommand({
+    name: MAP_INTENTS.setTokenHidden,
+    input: SetTokenHiddenInput,
+    execute({ tokenId, hidden }, env): void {
+      const { tx, ctx, actor, emit } = env;
+      const cid = campaignOf(actor);
+      const before = getToken(tx, cid, tokenId);
+      if (before.hidden === hidden) return;
+      tx.update(token)
+        .set({ hidden, updatedAt: ctx.clock.iso() })
+        .where(eq(token.id, tokenId))
+        .run();
+      const after = readToken(tx, tokenId);
+      const hookChanges = hooks.run({ tx, ctx, actor }, before, after);
+      emit({
+        type: hidden ? TokenHidden.type : TokenRevealed.type,
+        campaignId: cid,
+        payload: { tokenId, sceneId: before.sceneId },
+        changes: [tokenChange(before, after), ...hookChanges],
+      });
+    },
+  });
+}
+
+/**
+ * FR-MAP-17: same definition, image, size, owner, hidden flag; numbered name; at
+ * `col + footprint` same row if valid, else `col − footprint`, else the source cell.
+ */
+export const duplicateToken = defineCommand({
+  name: MAP_INTENTS.duplicateToken,
+  input: TokenIdInput,
+  execute({ tokenId }, env): { tokenId: string } {
+    const { tx, actor, emit } = env;
+    const cid = campaignOf(actor);
+    const src = getToken(tx, cid, tokenId);
+    const s = findScene(tx, cid, src.sceneId) as SceneRecord;
+    resolveDefinition(env, src.definitionId);
+    assertCaps(tx, cid, s.id, 1);
+    const cell = duplicateCell(s, src);
+    const after = insertToken(env, {
+      campaignId: cid,
+      sceneId: s.id,
+      definitionId: src.definitionId,
+      name: numberedName(src.name, namesOn(tx, s.id)),
+      imageAssetId: assetOrNull(env, src.imageAssetId),
+      size: src.size,
+      col: cell.col,
+      row: cell.row,
+      ownerPlayerId: src.ownerPlayerId,
+      hidden: src.hidden,
+    });
+    emit({
+      type: TokenDuplicated.type,
+      campaignId: cid,
+      payload: { tokenId: after.id, sceneId: s.id, sourceTokenId: src.id },
+      changes: [tokenChange(null, after)],
+    });
+    return { tokenId: after.id };
+  },
+});
+
+/** FR-MAP-18: delete (no confirm); token-changed hooks run first and may refuse. */
+export function deleteTokenCommand(hooks: TokenHooks) {
+  return defineCommand({
+    name: MAP_INTENTS.deleteToken,
+    input: TokenIdInput,
+    execute({ tokenId }, env): void {
+      const { tx, ctx, actor, emit } = env;
+      const cid = campaignOf(actor);
+      const before = getToken(tx, cid, tokenId);
+      const hookChanges = hooks.run({ tx, ctx, actor }, before, null);
+      tx.delete(token).where(eq(token.id, tokenId)).run();
+      emit({
+        type: TokenDeleted.type,
+        campaignId: cid,
+        payload: { tokenId, sceneId: before.sceneId },
+        changes: [tokenChange(before, null), ...hookChanges],
+      });
+    },
+  });
+}

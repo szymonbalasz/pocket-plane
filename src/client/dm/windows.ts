@@ -6,6 +6,7 @@ import { assetTestWindow } from "./features/assets-pipeline/asset-test-window";
 import { creaturesWindow } from "./features/entities/creatures-window";
 import { notificationsHistoryWindow } from "./features/notifications/history-window";
 import { playersWindow } from "./features/play-shell/players-window";
+import { scenesWindow } from "./features/scenes-map/scenes-window";
 
 const windows: WindowDef[] = [
   playersWindow, // camp.players (play-shell, FR-SHELL-21)
@@ -13,6 +14,7 @@ const windows: WindowDef[] = [
   shellTestWindow, // shell.test, test mode (play-shell, FR-SHELL-20)
   assetTestWindow, // asset.test, test mode (assets-pipeline, FR-ASSET-19)
   creaturesWindow, // ent.creatures (entities, FR-ENT-18)
+  scenesWindow, // map.scenes (scenes-map, MAP §7)
   notificationsHistoryWindow, // note.history (notifications, FR-NOTE-17)
 ];
 

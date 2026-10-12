@@ -32,7 +32,8 @@ describe("fixture library", () => {
       const r = await loaded(b.name);
       expect(r.manifest.status).toBe("complete");
     }
-  });
+    // One load per bundle, serially; grows with every bundle (scenes rasterises map-large).
+  }, 60_000);
 
   test("FR-FIX-15 bundle contents per FIX §8", async () => {
     const keys = (name: string) =>
@@ -49,6 +50,8 @@ describe("fixture library", () => {
       "enemy-2",
       "enemy-custom",
       "char-mira",
+      "town",
+      "battlemap",
     ]);
     expect(await keys("campaign-switch")).toEqual([
       "campaign",

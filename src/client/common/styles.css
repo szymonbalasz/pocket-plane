@@ -25,6 +25,11 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+  /* Game state tokens (visual-direction: hp.full, hp.bloodied, hp.down, visibility.hidden). */
+  --hp-full: oklch(0.723 0.219 149.579);
+  --hp-bloodied: oklch(0.795 0.184 86.047);
+  --hp-down: oklch(0.637 0.237 25.331);
+  --visibility-hidden: oklch(0.708 0 0 / 55%);
 }
 
 @theme inline {
@@ -51,6 +56,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-hp-full: var(--hp-full);
+  --color-hp-bloodied: var(--hp-bloodied);
+  --color-hp-down: var(--hp-down);
+  --color-visibility-hidden: var(--visibility-hidden);
 }
 
 @layer base {
