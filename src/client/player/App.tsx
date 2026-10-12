@@ -1,8 +1,6 @@
 import type { CampaignRecord, JoinInfo, PlayerRecord } from "@shared/campaign-management/schemas";
 import { ApiError, call, createApi } from "@ui/api";
 import { Skeleton } from "@ui/components/ui/primitives";
-import { ConnectionIndicator, ReconnectBanner } from "@ui/features/live-sync/ConnectionStatus";
-import { ProbePanel } from "@ui/features/live-sync/ProbePanel";
 import { SyncProvider } from "@ui/sync/SyncProvider";
 import { useRecords, useSync } from "@ui/sync/store";
 import { useEffect, useState } from "react";
@@ -11,6 +9,7 @@ import {
   JoinedHeader,
   WaitingScreen,
 } from "./features/campaign-management/screens";
+import { PlayerPlayPage } from "./features/play-shell/PlayerPlayPage";
 
 const api = createApi();
 
@@ -68,25 +67,25 @@ function PlayerShell({ join, token }: { join: JoinInfo; token: string }) {
       .catch(() => {});
   }, [state, token]);
 
-  if (state === "rejected") return <InvalidLinkScreen />;
-  if (state === "waiting") return <WaitingScreen campaignName={waitingName} />;
-  if (!everLive) return <Loading />;
+  // Play shell (FR-SHELL-02/04): these screens replace the whole frame; windows survive them.
+  const screen =
+    state === "rejected" ? (
+      <InvalidLinkScreen />
+    ) : state === "waiting" ? (
+      <WaitingScreen campaignName={waitingName} />
+    ) : !everLive ? (
+      <Loading />
+    ) : null;
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center gap-4 border-b px-6 py-3">
+    <PlayerPlayPage
+      screen={screen}
+      header={
         <JoinedHeader
           playerName={me?.name ?? join.playerName}
           campaignName={campaign?.name ?? join.campaignName}
         />
-        <div className="ml-auto">
-          <ConnectionIndicator />
-        </div>
-      </header>
-      <ReconnectBanner />
-      <main className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-2">
-        <ProbePanel />
-      </main>
-    </div>
+      }
+    />
   );
 }

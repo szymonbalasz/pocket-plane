@@ -2,6 +2,7 @@
 // reveal/hide, player edit, reload survives, invalid link. Bundle: sync-probe.
 import { expect, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { openWindow } from "./support/shell";
 
 test("DM and players: login, join, presence, reveal/hide, edit, reload, invalid link", async ({
   browser,
@@ -20,6 +21,7 @@ test("DM and players: login, join, presence, reveal/hide, edit, reload, invalid 
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   await expect(dm.getByTestId("camp-campaign-name")).toHaveText("Fixture Campaign");
   await expect(dm.getByTestId("camp-player-name")).toHaveText(["Player 1", "Player 2"]);
+  await openWindow(dm, "sync.probes"); // probe panel is a play-shell window (FR-SHELL-21)
   await expect(dm.getByTestId("sync-probe-row")).toHaveCount(3);
   await expect(dm.locator('[data-testid="sync-probe-row"][data-hidden="true"]')).toHaveCount(1);
   await expect(dm.locator('[data-testid="camp-player-online"][data-online="true"]')).toHaveCount(0);
@@ -31,6 +33,8 @@ test("DM and players: login, join, presence, reveal/hide, edit, reload, invalid 
   );
   await p2.goto(link("Player 2"));
   await expect(p2.getByTestId("camp-player-joined")).toBeVisible();
+  await openWindow(p1, "sync.probes");
+  await openWindow(p2, "sync.probes");
   await expect(dm.locator('[data-testid="camp-player-online"][data-online="true"]')).toHaveCount(2);
   await expect(p1.getByTestId("sync-probe-row")).toHaveCount(2);
   await expect(p2.getByTestId("sync-probe-row")).toHaveCount(1);
