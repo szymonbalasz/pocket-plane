@@ -56,7 +56,7 @@ graph LR
 | C. Full event sourcing (state = replay of log) | Undo is trivial; time travel | Rewrites [ADR-0006](0006-persistence.md) model; heavy for MVP |
 
 ## MVP use
-- Listeners: broadcaster, event log, damage cards (first notification kind with an action).
+- Listeners: broadcaster, event log. Damage cards (first notification kind with an action) are created by the attack command via `notify` ([ADR-0027](0027-notification-creation.md)).
 - Concentration, durations, conditions plug in post-MVP ([combat-extras](../../specs/post-mvp/combat-extras.md)) without rework.
 
 ## Open
@@ -65,13 +65,13 @@ graph LR
 |---|---|
 | May rules mutate state directly? | **No; only create pending actions** / yes with depth cap |
 | ~~Persist domain events as an append-only log?~~ **Decided: yes, in MVP** — required by undo; stats computed from it retroactively | — |
-| Undo mechanism | See table above — **A** |
+| ~~Undo mechanism~~ **Decided: A**, compensating events (#139 P4) | — |
 | ~~Undo scope~~ **Decided: DM only.** Players don't undo; they just redo the action (e.g. move the token back). | — |
 | ~~Which events are undoable?~~ **Decided: combat log entries only** — damage/healing applied. Initiative/turn not undoable; next/previous turn suffices (Shieldmaiden-style). | — |
 | ~~Undo order~~ **Decided: strict LIFO, one step at a time** (to undo step 3 of 5, undo 5, 4, then 3). No cherry-picking. | — |
-| Redo? | **Yes, as re-applying the original event** / no |
+| ~~Redo?~~ **Decided: no.** Undo reopens the damage card; the DM re-applies it (#139 P4) | — |
 | ~~Listener execution~~ **Decided: synchronous, same process, after commit** ([ADR-0021](0021-sync-protocol-conventions.md) F) | — |
-| Can an action be resolved by "anyone in audience" or only a named actor? | **Named actor (DM or one player); audience may be wider** / anyone in audience |
+| ~~Who resolves an action?~~ **Decided: the action owner (DM or one player) + the DM; damage cards: DM only** (#136) | — |
 
 ## Consequences
 

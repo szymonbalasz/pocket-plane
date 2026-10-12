@@ -78,7 +78,14 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Event log** | Persisted, append-only log of every domain event; source for undo and stats ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | Game log (player-facing) |
 | **Undo** | DM-only, strict LIFO, combat log entries only (damage/healing applied): appends a compensating event that reverses the latest entry and marks it undone. | — |
 | **Pending action** | A notification whose action (button) is not yet resolved or dismissed (e.g. apply damage, roll a save). | — |
-| **Damage card** | A notification kind with an "apply" action, holding a damage result (from a player or DM roll) the DM applies to a target with a modifier: normal, resistant, immune, vulnerable. | Roll |
+| **Damage card** | A notification kind (`damage-card`) with an "apply" action, holding an attack's to-hit and damage rolls (from a player or DM roll) that the DM applies to a target picked in the attack popup, with a multiplier: normal, half, none, double (#53, #134). | Roll |
+| **Attack popup** | The DM's dialog to pick a damage card's target, check hit vs AC, override values and apply. | Damage card |
+| **Action owner** | Who may act on a pending notification (the DM or one player); the DM may always act. | Actor (a roll's actor in the game log) |
+| **Combat log entry** | One applied HP change in combat (damage or heal): the undo and stats unit. | Game log entry; event log entry |
+| **Health band** | healthy / bloodied / down: what players see of a monster's HP instead of numbers. | — |
+| **Log entry** | One game-log line; may join several rolls (e.g. an attack's to-hit and damage). | Roll; event log entry |
+| **Roll mode** | normal / advantage / disadvantage, applied to the d20. | — |
+| **Physical-dice mode** | Per-browser toggle: every roll through the roll control asks for manual entry. | Manual roll |
 | **Manual roll** | A roll entered from physical dice instead of rolled by the server. Logged and marked manual. | — |
 | **Party loot** | Shared, party-visible log of rewards (gold, items) the DM gives the party. | Party board (post-MVP superset) |
 

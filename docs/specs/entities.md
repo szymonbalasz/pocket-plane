@@ -48,14 +48,14 @@ wave: 2
 | FR-ENT-09 | Derive = create with `derivedFromId`: a monster that is global or in `ctx.campaignId`, else `not_found`. The request carries the full stat block; the server copies nothing. Later base edits never change the result. | ADR-0009 |
 | FR-ENT-10 | Create character: `ownerPlayerId` must be a player of `ctx.campaignId`, else `invalid`; `hpCurrent = hpMax`. MVP callers: fixtures only (decisions #100). | |
 | FR-ENT-11 | Update replaces name, portrait, stat block and (characters) owner as a whole; name and portrait as FR-ENT-08, owner as FR-ENT-10. Kind, campaign, provenance, `derivedFromId` are immutable. `hpCurrent > hpMax` after update → clamped in the same transaction. | |
-| FR-ENT-12 | `resolveDefinition(ctx, id)` (server) returns a definition that is global or in `ctx.campaignId`, else `not_found`. Every command storing a definition reference uses it. | ADR-0018 |
+| FR-ENT-12 | `resolveDefinition(env, id)` (server) returns a definition that is global or in `env.actor.campaignId`, else `not_found`. Every command storing a definition reference uses it. | ADR-0018 |
 | FR-ENT-13 | Instances store the definition id plus only the display copies listed in the [ADR-0024](../architecture/adr/0024-definition-visibility.md); no other stat-block fields. `effectiveStats(def, inst)` in `@shared/entities` returns `def.statBlock` in MVP. | Modifiers hook, tier A |
 | FR-ENT-14 | No delete in MVP: no route or command deletes a definition. Typos are fixed by rename. *(proposed, OQ-ENT-07)* | ADR-0009 open row |
 | FR-ENT-15 | Visibility `entity`: DM full. Player: own character (`ownerPlayerId = ctx.playerId`) full; other characters redacted to `{id, kind, name, portraitAssetId, ownerPlayerId}`; monsters hidden. | #120 |
 | FR-ENT-16 | Visibility `imported-entity`: DM full; players hidden. | #120 |
 | FR-ENT-17 | Every command commits row + event-log entry in one transaction, then emits its domain event (§9). IDs and timestamps only from `ctx.ids` / `ctx.clock`. | ADR-0016, 0022 |
 | FR-ENT-18 | DM Creatures window lists every definition the campaign can use, sorted by name (case-insensitive), then custom before imported, then id. Live ≤ 1 s after commit. Each row is an HTML5 drag source: MIME `application/x-pp-definition`, data JSON `{definitionId}`. *(proposed, OQ-ENT-03)* | scenes-map FR-MAP-13 |
-| FR-ENT-19 | `entities.update` runs every registered **definition-changed hook** `(ctx, before, after) → RecordChange[]` inside its own transaction. Each instance row a hook changes is listed in `EntityUpdated.changes`. A hook error rolls back the whole update. Listeners never mutate state. | #120, ADR-0016, 0021 |
+| FR-ENT-19 | `entities.update` runs every registered **definition-changed hook** `(env, before, after) → RecordChange[]` inside its own transaction. Each instance row a hook changes is listed in `EntityUpdated.changes`. A hook error rolls back the whole update. Listeners never mutate state. | #120, ADR-0016, 0021 |
 | FR-ENT-20 | The Creatures window renders toolbar and row actions from an append-only `creatureActions` registry; entities ships none. *(proposed, OQ-ENT-14)* | combat-tracker form |
 
 ## 7. UI/UX notes

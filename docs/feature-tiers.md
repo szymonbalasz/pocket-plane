@@ -46,7 +46,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Add combatants mid-fight | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
 | **Hidden combatants** (stealthed) | A | [combat-extras](specs/post-mvp/combat-extras.md) | Added by DM |
 | Drag to reorder initiative | B | [combat-extras](specs/post-mvp/combat-extras.md) | |
-| Auto-roll attacks + hit/miss hint vs AC | B | [combat-extras](specs/post-mvp/combat-extras.md) | Shieldmaiden-style attack flow is MVP (see below) |
+| Auto-roll attacks + hit/miss hint vs AC | S | [combat-tracker](specs/combat-tracker.md) | MVP per #74 (DM attack popup) |
 | End-of-combat summary | B | [stats](specs/post-mvp/stats.md) | Plus campaign-wide stats; discuss after MVP |
 | Legendary / lair actions | C | [combat-extras](specs/post-mvp/combat-extras.md) | |
 | Reaction-used tracker | C | [combat-extras](specs/post-mvp/combat-extras.md) | |

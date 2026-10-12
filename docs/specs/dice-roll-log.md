@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: in-review
+status: complete
 owner: spec-dice-roll-log
 wave: 2
 ---
@@ -40,15 +40,8 @@ wave: 2
 
 ## 5. User stories
 
-**DM**
-- As the DM, I want to tick which categories of my rolls players see, so that attack rolls are public but my Perception checks stay secret.
-- As the DM, I want to make one roll hidden or public as I roll it, so that I handle exceptions without changing the settings.
-- As the DM, I want to roll physical dice and type the result, so that I keep my dice and the log stays complete.
-
-**Player**
-- As a player, I want to Shift-click my attack to roll with advantage, so that I don't fiddle with options.
-- As a player, I want to read every public roll in one log, so that combat feels fair and I can catch up after looking away.
-- As a player, I want to enter my physical die result, so that I can roll real dice.
+- **DM:** As the DM, I want to tick which categories of my rolls players see, override one roll as I make it, and type physical dice results, so that secrets stay secret without per-roll effort and the log stays complete.
+- **Player:** As a player, I want to Shift-click for advantage, enter physical dice, and read every public roll in one log, so that combat feels fair and I can catch up after looking away.
 
 ## 6. Functional requirements
 
@@ -59,7 +52,7 @@ wave: 2
 | FR-DICE-03 | **`ctx.dice`** on the command context, beside `ids` / `tokens` / `clock`: an engine `{next(): int32}`. Real = CSPRNG. Seeded = deterministic; the fixture loader reseeds it per fixture key from `(fixed seed, key)`; `bun test` passes a seed. Same factory and disposable guard as [ADR-0022](../architecture/adr/0022-deterministic-seams.md); a running server always uses the real engine. The library's generator is process-global: the roll service sets it to `ctx.dice` for one synchronous evaluation, then restores it. No `Math.random` or default engine in server code (Biome + review). | #137 |
 | FR-DICE-04 | Roll mode `normal` / `advantage` / `disadvantage`. Adv/dis rewrites the first `1d20` term to `2d20kh1` / `2d20kl1`; no `1d20` term → `invalid` "Advantage needs a d20 roll". Both dice stored and shown, dropped die marked. | 5e |
 | FR-DICE-05 | Client: Shift+click / Shift+Enter = advantage, Ctrl+click / Ctrl+Enter = disadvantage, both = normal; keys override the mode toggle for that roll. | Tier S |
-| FR-DICE-06 | `ManualEntry {diceTotal, dice?}` (`@shared/dice`). `diceTotal` = sum of kept dice, within the dice part's min–max; optional `dice` = every die value (count and faces must match; kept computed server-side; sum = `diceTotal`). Without `dice`: one die → its value is `diceTotal`; several → stored with `value: null`. Server adds constants. Out of range / mismatch → `invalid`. Stored and shown as manual. | I3 |
+| FR-DICE-06 | `ManualEntry {diceTotal, dice?}` (`@shared/dice-roll-log`). `diceTotal` = sum of kept dice, within the dice part's min–max; optional `dice` = every die value (count and faces must match; kept computed server-side; sum = `diceTotal`). Without `dice`: one die → its value is `diceTotal`; several → stored with `value: null`. Server adds constants. Out of range / mismatch → `invalid`. Stored and shown as manual. | I3 |
 | FR-DICE-07 | Physical-dice mode: toggle in the game log window, per client, browser storage `pp.dice.v1.<campaignId>.<dm \| playerId>`. On → every roll through the roll control opens the manual popover instead of rolling. | I5 |
 | FR-DICE-08 | Each roll is one immutable `roll` row (§8) storing **each die's result**, written in the calling command's transaction. Never updated or deleted. | #140 |
 | FR-DICE-09 | Intent `dice.roll {expression, mode, category, label?, actor?, manual?, public?}` (DM, player): one roll + one `roll`-kind entry + event-log row in one transaction; emits `DiceRolled`; acks `{rollId, entryId}`. | |
@@ -67,17 +60,16 @@ wave: 2
 | FR-DICE-11 | `label` ≤ 60 chars, trimmed, no control chars, rendered as text. `category` required (default `other`). | |
 | FR-DICE-12 | Public log settings: one row per campaign, one boolean per category; no row = **all hidden**. `dice.setCategoryPublic {category, public}` (DM) emits `PublicLogCategorySet`; same value → no-op, no event. Applies only to entries created after its commit; never retroactive. | #139 P8, P23 |
 | FR-DICE-13 | Entry `public` is stamped once, at creation, by **who rolls** (`env.actor`): player → `true` always (a player-sent `public` → `forbidden`; internal callers' `public` ignored). DM → the `public` override if given, else the entry category's setting at commit. Applies when the DM rolls for a PC too. | #73, #139 P1, P22 |
-| FR-DICE-14 | ~~Reveal / hide one entry~~: moved to tier B (#139 P8). No MVP command changes `public`. | — |
 | FR-DICE-15 | Visibility `game-log-entry`: DM full. Player: `public` → redacted (minus `dmPayload`); else hidden, no placeholder. | #139 P21 |
 | FR-DICE-16 | Visibility `game-log-settings`: `audience: dm`. | |
 | FR-DICE-17 | Entries carry `n`, a per-campaign counter (max + 1 in the transaction); `n` is the entries' [ADR-0022](../architecture/adr/0022-deterministic-seams.md) tiebreak. Registered with `window {orderBy: n, size: 100}` ([ADR-0029](../architecture/adr/0029-windowed-record-types.md)): snapshot = newest 100 by `n`, cut before the visibility filter; players get the visible subset. | #137 |
-| FR-DICE-18 | Log-entry kind registry `src/shared/dice/kinds.ts` (append-only): `kind → {payload schema, dmPayload schema?, formatLine}`. Dice ships `roll`. Unregistered kind on write → `internal`; client renders unknown kinds as "Unsupported entry". | Gate §4.9 |
-| FR-DICE-19 | Internal helpers, in the caller's transaction, `env: CommandEnv` first: `dice.evaluate(env, {expression, mode, category, label?, actor, manual?, source, target?}) → Roll` (FR-DICE-01–08; row only); `gameLog.append(env, {kind, category, actorName, payload, dmPayload?, rollIds, encounterId?, public?}) → RecordChange` (stamps `n`, `at`, roller, `public` per FR-DICE-13); `gameLog.markUndone(env, entryId) → RecordChange`. No events of their own: the caller lists the changes in its event (`CharacterRolled`, combat's events). Campaign and roller from `env.actor`. | I1, I14, I15 |
+| FR-DICE-18 | Log-entry kind registry `src/shared/dice-roll-log/kinds.ts` (append-only): `kind → {payload schema, dmPayload schema?, formatLine}`. Dice ships `roll`. Unregistered kind on write → `internal`; client renders unknown kinds as "Unsupported entry". | Gate §4.9 |
+| FR-DICE-19 | Internal helpers, in the caller's transaction, `env: CommandEnv` first: `dice.evaluate(env, {expression, mode, category, label?, actor: {kind, id, name}, manual?, source, target?}) → Roll` (caller resolves the actor; combat passes the combatant's name) (FR-DICE-01–08; row only); `gameLog.append(env, {kind, category, actorName, payload, dmPayload?, rollIds, encounterId?, public?}) → RecordChange` (stamps `n`, `at`, roller, `public` per FR-DICE-13); `gameLog.markUndone(env, entryId) → RecordChange`. No events of their own: the caller lists the changes in its event (`CharacterRolled`, combat's events). Campaign and roller from `env.actor`. | I1, I14, I15 |
 | FR-DICE-20 | `roll` line (`formatLine`, pure, `@shared`): `<actor> — <label or expression>: <dice> + <constants> = <total>` per roll; adv/dis shows "(adv)" / "(dis)" and the dropped die struck through; a single kept d20 of 20 / 1 appends "— natural 20!" / "— natural 1"; manual shows "physical". | BG2 style |
 | FR-DICE-21 | Window `dice.log`, both clients, default open: entries by `n`, oldest at the top; sticks to the bottom unless scrolled up, then "N new". Live ≤ 1 s after commit. DM: hidden entries muted with an eye-off marker. Undone entries struck through, "undone". | I12 |
 | FR-DICE-22 | Roll bar (window footer): expression, category, label, actor (FR-DICE-27), mode toggle, physical-dice toggle; DM: public switch preset from the category's setting, and a gear for the settings popover (in the window body; no shell change). Enter rolls. `ack` → input clears; `reject` → text stays, message inline. Disabled unless `live`. | [FR-SYNC-24](live-sync.md#6-functional-requirements) |
 | FR-DICE-23 | Settings popover: one checkbox per category; change sends `dice.setCategoryPublic`; other DM tabs reflect it ≤ 1 s. | |
-| FR-DICE-24 | `@ui` roll control: `useRollControl({expressions, critExpressions?, onRoll})` + `RollButton` wrapper. Reads FR-DICE-05 keys and FR-DICE-07 mode. Physical mode → popover with one `ManualEntry` per expression (attack = 2); if the first is a natural 20 and `critExpressions` is set, the rest show those (doubled damage). Then `onRoll(mode, manual?)`; the **caller sends its own intent** (`dice.roll`, `char.roll`, `cbt.attack`, `cbt.rollInitiative`). | I3, #135 |
+| FR-DICE-24 | `@ui` roll control: `useRollControl({expressions, category, critExpressions?, onRoll})` + `RollButton` wrapper; DM: a public toggle preset from `category`'s setting (FR-DICE-13). Reads FR-DICE-05 keys and FR-DICE-07 mode. Physical mode → popover with one `ManualEntry` per expression (attack = 2); if the first is a natural 20 and `critExpressions` is set, the rest show those (doubled damage). Then `onRoll({mode, manual?, public?})` (`public` DM only); the **caller sends its own intent** (`dice.roll`, `char.roll`, `cbt.attack`, `cbt.rollInitiative`). | I3, #135 |
 | FR-DICE-25 | Same seed + same command sequence → identical rolls, entries and `n`. | FR-FIX-08 |
 | FR-DICE-26 | A multi-roll action (sheet attack = to-hit + damage) is **one entry** with several `rollIds` and the action's category (attack). Each roll keeps its own category for stats. Outcome lines are separate entries written by their owner. | I4, I18 |
 | FR-DICE-27 | Actor Select: player → "me" + own characters. DM → "DM", characters, tokens of the active scene. | |
@@ -119,7 +111,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 
 - **Relations:** Campaign 1—* Roll, Entry; Entry → Rolls via `rollIds` (no entry references a roll = never logged → hidden for stats; I24, no `Roll.entryId`); Roll → Player, Entity, Token by id (no FK; names copied).
 - **Derived:** line text (`formatLine`), natural 20/1, effective settings. **Persisted:** rolls, entries, settings. Physical-dice mode: browser only.
-- **Gems later (#140):** a reroll = new roll + new entry, old entry's `supersededBy` set (shown struck through); a modified damage die = new roll row with `replacesRollId`, written by the owning command. No MVP command sets either field.
+- **Gems later (#140):** a reroll = new roll + new entry, old entry's `supersededBy` set (shown struck through); a modified damage die = new roll row with `replacesRollId`, written by the owning command. No MVP command sets either field. Manual rolls stored without per-die values (FR-DICE-06) need them entered before a Combat gem applies.
 
 ## 9. API & events
 
@@ -223,19 +215,14 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 - `package.json`, `bun.lock` — add `@dice-roller/rpg-dice-roller` (ADR-0001). `biome.json` — restricted global `Math.random`, server code only (the client backoff uses it).
 - `src/server/ws/` + `src/shared/protocol/` — optional `window {orderBy, size, pin?}` on registration; convergence + leak-scan helpers honour it (ADR-0029).
 - `src/server/db/` — tables `roll`, `game_log_entry` (unique `campaignId` + `n`), `game_log_settings`. `src/shared/events/` — `DiceRolled`, `PublicLogCategorySet`.
-- Registries (append lines): record types `game-log-entry`, `game-log-settings`; `src/client/{dm,player}/windows.ts` `dice.log`; `fixtures/bundles/index.ts` `dice-log`. New append-only `src/shared/dice/kinds.ts` (created with `roll` by this build) → AGENTS §9.9 list.
+- Registries (append lines): `diceRollLog` in `src/server/features/index.ts`; record types `game-log-entry`, `game-log-settings`; `src/client/{dm,player}/windows.ts` `dice.log`; `fixtures/bundles/index.ts` `dice-log`. New append-only `src/shared/dice-roll-log/kinds.ts` (created with `roll` by this build; on the AGENTS §9.9 list).
 - Docs at merge: protocol rows (intents, types, events, budget), data-model rows, glossary (I13).
 
 ## 15. Open questions
 
-Decided earlier, collapsed: OQ-DICE-05 (no sessions, ADR-0013), -06 (superseded by settings), -08 (#73), -12 (#74).
-
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-DICE-03, -04, -18 | ~~Dice seeding; snapshot depth; shared changes~~ | Decided (#137): `ctx.dice`, CSPRNG real, seeded per fixture key / test on disposable dirs only; newest 100 per ADR-0029, no load-older; shared changes in §14 (gate §4) | — | — |
-| OQ-DICE-09, -10, -11, -13, -14, -15, -20 | ~~Hidden category view; retroactive; per-roll override; monster stats; defaults; contests; limits~~ | Decided (#139): players see nothing (P21); not retroactive, single-entry reveal/hide → tier B (P8); override yes, preset from category (P22); roll + modifier + outcome public, AC and overrides in `dmPayload` (P6); all hidden (P23); two entries, no winner (P24); limits as FR-DICE-01 (P25) | — | — |
-| OQ-DICE-07, -16, -17, -19, -21 | ~~Manual granularity; attack log timing; mixed categories; glossary; physical-dice persistence~~ | Decided (gate I3, I4, I13, I5): total + optional per-die, N expressions, crit swap; roll line at roll time, outcome at apply; one category per entry, hidden attacker or target → hidden; integrator adds Log entry, Roll mode, Physical-dice mode; browser storage | — | — |
-| OQ-DICE-22 | ~~Sheet roll buttons~~ | Decided (#135, I1): out of combat `char.roll`; in a running encounter `cbt.attack` / `cbt.rollInitiative`; both via the roll control | — | — |
+| ~~OQ-DICE-03–22~~ | ~~Seeding; snapshot depth; shared changes; manual; visibility; defaults; contests; limits; log timing; glossary; storage; sheet buttons~~ | Decided: 05 no sessions (ADR-0013), 06 superseded, 08 #73, 12 #74; #137 (`ctx.dice`, newest 100, §14); #139 P6, P8, P21–P25; gate I3–I5, I13; #135 + I1 (`char.roll` out of combat, `cbt.*` in combat) | — | — |
 
 ## 16. Out of scope
 

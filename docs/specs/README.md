@@ -15,10 +15,10 @@ Template: [_template.md](_template.md). Specs are written just in time, per buil
 | 2. Scenes | [Entities (core)](entities.md) | ENT | complete | spec-entities |
 | 2. Scenes | [Play shell](play-shell.md) | SHELL | complete | spec-play-shell |
 | 2. Scenes | [Scenes and map](scenes-map.md) | MAP | complete | spec-scenes-map |
-| 3. Combat | [Character sheet (basics)](character-sheet.md) | CHAR | unclaimed | — |
-| 3. Combat | [Dice and game log](dice-roll-log.md) | DICE | unclaimed | — |
-| 3. Combat | [Notifications](notifications.md) | NOTE | unclaimed | — |
-| 3. Combat | [Combat tracker](combat-tracker.md) | CBT | unclaimed | — |
+| 3. Combat | [Character sheet (basics)](character-sheet.md) | CHAR | complete | spec-character-sheet |
+| 3. Combat | [Dice and game log](dice-roll-log.md) | DICE | complete | spec-dice-roll-log |
+| 3. Combat | [Notifications](notifications.md) | NOTE | complete | spec-notifications |
+| 3. Combat | [Combat tracker](combat-tracker.md) | CBT | complete | spec-combat-tracker |
 | 4. Reward + hardening | [Party loot](party-loot.md) | LOOT | unclaimed | — |
 
 ## Post-MVP
