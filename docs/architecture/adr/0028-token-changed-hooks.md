@@ -16,7 +16,7 @@
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. Server hook registry in scenes-map: `(ctx, before, after \| null) → RecordChange[]`, may throw a reject; run inside `map.updateToken`, `map.setTokenHidden`, `map.deleteToken` and scene delete (per token); returned rows listed in the token event's `changes`** | Same pattern as FR-ENT-19; atomic; scenes-map stays unaware of combat | Every token command must call the registry; scenes-map (complete) gains one FR |
+| **A. Server hook registry in scenes-map: `(env, before, after \| null) → RecordChange[]`, may throw a reject; run inside `map.updateToken`, `map.setTokenHidden`, `map.deleteToken` and scene delete (per token); returned rows listed in the token event's `changes`** | Same pattern as FR-ENT-19; atomic; scenes-map stays unaware of combat | Every token command must call the registry; scenes-map (complete) gains one FR |
 | B. Combat-tracker gets its own hide/reveal intent; DM keeps both in step | No scenes-map change | Double work every reveal; easy to forget → leaks a hidden enemy |
 | C. Visibility fn reads the bound token | No copies | Contradicts ADR-0021; reveal must list dependants |
 

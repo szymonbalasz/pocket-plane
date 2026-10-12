@@ -48,11 +48,11 @@ wave: 2
 |---|---|---|
 | FR-NOTE-01 | Record type `notification`, scope `campaign`, fields per §8. Persisted. Ordered by row `seq` (DB insertion order; not the WS frame `seq`). | CON-20, [ADR-0022](../architecture/adr/0022-deterministic-seams.md) |
 | FR-NOTE-02 | `notify(env, {kind, audience, audiencePlayerId?, text, payload, action?})` inserts the row and emits `NotificationCreated` **in the caller's transaction**. Caller rolls back → no row, event or log entry. IDs and time from `env.ctx`. Returns the ID. | ADR-0027 |
-| FR-NOTE-03 | Server kind registry (`src/server/features/notifications/kinds.ts`, append-only *(proposed, OQ-NOTE-10)*): `kind` (`^[a-z][a-z0-9-]{0,31}$`), owner spec, payload zod, optional resolution zod, `genericResolve` (default false). Unknown kind, invalid payload, payload > 1 KB or resolution > 256 B serialized, or invalid text → helper throws; the caller's command fails `internal` and writes nothing. | Server bug, not user input; OQ-NOTE-10 |
+| FR-NOTE-03 | Server kind registry (`src/server/features/notifications/kinds.ts`, append-only, AGENTS §9.9): `kind` (`^[a-z][a-z0-9-]{0,31}$`), owner spec, payload zod, optional resolution zod, `genericResolve` (default false). Unknown kind, invalid payload, payload > 1 KB or resolution > 256 B serialized, or invalid text → helper throws; the caller's command fails `internal` and writes nothing. | Server bug, not user input; OQ-NOTE-10 |
 | FR-NOTE-04 | Audience: `dm`, `player` + `audiencePlayerId` (a player of `env.actor.campaignId`, else throw), or `all`. The DM sees every notification. Audience never changes. | |
 | FR-NOTE-05 | Optional action: `label` (1–24 chars), owner `dm` or `player` + `actionPlayerId`. A player owner must be in the audience. With an action the state starts `pending`, else `info`. | |
 | FR-NOTE-06 | Visibility: DM `full`. Player `full` iff `audience = all` or (`player` and `audiencePlayerId` = the viewer's player), else `hidden`. No redacted form: a kind addressing players keeps DM-only data out of `text`, `payload` **and** `resolution` (each kind's leak test). | [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md) B |
-| FR-NOTE-07 | States: `info` (final); `pending` → `resolved` \| `dismissed`; `resolved` → `pending` only via FR-NOTE-10. Each change sets `closedAt` / `closedByRole` / `closedByPlayerId` (cleared on reopen) and emits its event in the same transaction. | |
+| FR-NOTE-07 | States: `info` (final); `pending` → `resolved` \| `dismissed`; `resolved` → `pending` only via FR-NOTE-10. Each change sets `closedAt` / `closedByRole` / `closedByPlayerId` (cleared on reopen, with `resolution`) and emits its event in the same transaction. | |
 | FR-NOTE-08 | `resolveNotification(env, id, resolution?)` in the kind owner's command: not in `env.actor.campaignId` → `not_found`; not `pending` → `conflict`; sender is neither the action owner nor the DM → `forbidden`; resolution fails the kind's schema → `invalid`. Any failure rolls back the **whole** command. | Exactly once; #136 |
 | FR-NOTE-09 | Intent `note.resolve {id, resolution?}` (DM, player) for `genericResolve` kinds only (MVP: `test`); other kinds → `forbidden`. Player who can't see it → `not_found`. Then FR-NOTE-08 checks. Emits `NotificationResolved`. | |
 | FR-NOTE-10 | `reopenNotification(env, id)`: `resolved` → `pending`, else `conflict`. Called by the kind owner's undo, **after** the owner's own event. Emits `NotificationReopened`. | #139 P4, I28 |
@@ -64,7 +64,7 @@ wave: 2
 | FR-NOTE-16 | The action button shows while `pending`, the client is `live`, and the client is the action owner or the DM. A click calls the kind's client `onAction`; with no handler, `genericResolve` kinds send `note.resolve`; otherwise no button. | |
 | FR-NOTE-17 | Window type `note.history` "Notifications", both clients, closed by default, launcher bell with unread badge *(proposed, OQ-NOTE-13)*. Body: **Pending** (DM: all; player: pending they own), then **History**, newest first. Row: kind icon, text, time, state badge ("Pending", "Resolved by ‹name›", "Dismissed"), action button. DM rows add an audience tag ("DM", "All", "‹player›") and Dismiss on pending rows. | I12 |
 | FR-NOTE-18 | Unread = notifications addressed to this client (FR-NOTE-13 rule) with row `seq` > last seen. Last seen lives in `localStorage` `pp.note.seen.v1.<campaignId>.<dm \| playerId>`; set to the highest `seq` in the store while `note.history` is open and the tab visible. No entry → baseline = highest `seq` in the first snapshot. Storage failure → memory only. | #139 P27 |
-| FR-NOTE-19 | Client view registry per client (`notification-views.ts`, append-only *(proposed, OQ-NOTE-10)*): kind → icon, optional renderer, optional `onAction`. Unregistered kind → generic row (icon + text), no handler. | OQ-NOTE-10 |
+| FR-NOTE-19 | Client view registry per client (`notification-views.ts`, append-only, AGENTS §9.9): kind → icon, optional renderer, optional `onAction`. Unregistered kind → generic row (icon + text), no handler. | OQ-NOTE-10 |
 | FR-NOTE-20 | A rejected action shows a toast: `conflict` → "No longer pending", else the reject message. The row keeps the server's state. | |
 | FR-NOTE-21 | `text`: plain text, trimmed, control characters removed, 1–280 chars, rendered as text (never HTML). Composed by the kind owner. | |
 | FR-NOTE-22 | Test mode only ([FR-SYNC-27](live-sync.md#6-functional-requirements)): kind `test` (`genericResolve`), intent `note.testSend`, a send form in `note.history`. DM: any audience and action. Player: `{text, actionLabel?}` only (other fields → `invalid`); audience = self, owner = DM (behaves like a damage card). Absent otherwise. | |
@@ -204,8 +204,8 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 **Shared changes needed** (AGENTS §9.9; gate §4):
 - `src/server/db/` — `notification` table, indexes (campaignId, seq), (campaignId, state). `src/shared/events/` — the four `Notification*` events.
 - Record-type registry line `notification` with `window {orderBy: seq, size: 100, pin}` — needs ADR-0029 support in `src/server/ws/` + `src/shared/protocol/` (gate §4 item 4).
-- New append-only registries (created empty by this build; add to AGENTS §9.9): `src/server/features/notifications/kinds.ts`, `src/client/dm/notification-views.ts`, `src/client/player/notification-views.ts`.
-- Existing registries: `note.history` in `src/client/{dm,player}/windows.ts`; `notifications` in `fixtures/bundles/index.ts`. `src/client/common/` shell: `badge?(store)` on window types (FR-SHELL-07).
+- New append-only registries (created empty by this build; on the AGENTS §9.9 list): `src/server/features/notifications/kinds.ts`, `src/client/dm/notification-views.ts`, `src/client/player/notification-views.ts`.
+- Existing registries: `notifications` in `src/server/features/index.ts`; `note.history` in `src/client/{dm,player}/windows.ts`; `notifications` in `fixtures/bundles/index.ts`. `src/client/common/` shell: `badge?(store)` on window types (FR-SHELL-07).
 - Docs (integrator): protocol rows, data-model row, ADR-0016 "MVP use" line (I30).
 
 ## 15. Open questions
@@ -214,13 +214,11 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 |---|---|---|---|---|
 | ~~OQ-NOTE-01~~ | ~~Who may resolve an action?~~ | Decided (#136): only the DM applies or dismisses damage cards (owner `dm`). Mechanism: action owner + DM (ADR-0016 "named actor" row; MVP's only player-owned kind is `test`) | — | combat-tracker, ADR-0016 |
 | ~~OQ-NOTE-02, 04, 06, 08, 09~~ | ~~Game log as feed; toast timing; damage-card owner; `loot-received`; where "seen" lives~~ | Decided: 02 separate windows (I6); 04 info 6 s, paused on hover / hidden tab, pending stays (#139 P26); 06 combat-tracker owns `damage-card` (I7); 08 deferred to the Reward gate (#139 P28); 09 browser `localStorage` per (campaign, owner) (#139 P27) | — | dice-roll-log, combat-tracker, party-loot |
-| ~~OQ-NOTE-03~~ | ~~History retention and reach~~ | Decided (#137, ADR-0029): keep all in DB; snapshot = pending (pinned) + newest 100 closed; no load-older in MVP | — | live-sync |
-| ~~OQ-NOTE-05~~ | ~~How are notifications created?~~ | Decided (#135, ADR-0027): `notify` inside the causing command's transaction | — | combat-tracker |
-| ~~OQ-NOTE-07~~ | ~~Undo of applied damage~~ | Decided (#139 P4): undo reopens the card; no Redo; owner event first (I28) | — | combat-tracker |
-| OQ-NOTE-10 | Server kinds + client views as new append-only registries (paths in §14) | **Yes, add to AGENTS §9.9** (like window registries) / shared files via orchestrator (serialises builds) | no · owner: orchestrator | AGENTS.md, combat-tracker |
+| ~~OQ-NOTE-03, 05, 07~~ | ~~History retention; creation; undo of applied damage~~ | Decided: 03 keep all in DB, snapshot = pending (pinned) + newest 100 closed, no load-older (#137, ADR-0029); 05 `notify` inside the causing command's transaction (#135, ADR-0027); 07 undo reopens the card, no Redo, owner event first (#139 P4, I28) | — | live-sync, combat-tracker |
+| ~~OQ-NOTE-10, 12~~ | ~~Kind + view registries append-only; glossary "Action owner"~~ | Decided (integrator): both registries on the AGENTS §9.9 list (paths §14); glossary adds **Action owner** | — | AGENTS.md, glossary |
 | ~~OQ-NOTE-11~~ | ~~Damage card audience~~ | Decided (#138): rolling player sees the card and its resolution incl. damage applied; DM attacks: `dm` | — | combat-tracker |
-| OQ-NOTE-12 | Glossary: add **Action owner** (who may act on a pending notification) | **Add** / reuse "actor" (clashes with dice's roll actor) | no · owner: integrator | glossary |
 | OQ-NOTE-13 | Launcher unread badge: play-shell window types gain `badge?(store) → number` | **Add** (shared change, gate §4 item 11) / unread count in the window title only | no · owner: orchestrator | play-shell |
+| ~~OQ-NOTE-14~~ | ~~Toast to the rolling player when the DM resolves their card?~~ | Decided (#141): **no**; the card's resolution in `note.history` shows it (FR-NOTE-13, -18 unchanged) | — | combat-tracker |
 
 ## 16. Out of scope
 

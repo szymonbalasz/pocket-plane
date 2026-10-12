@@ -24,7 +24,6 @@ Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). (Encou
 | A | **Custom monster/NPC actions** that auto-roll against the selected target(s) |
 | A | **Multi-target select** (e.g. one action vs several targets, AoE saves) |
 | B | Drag to reorder initiative (delay/ready) |
-| B | Hit/miss hint vs target AC |
 | C | Legendary / lair action tracker |
 | C | Reaction-used tracker |
 

@@ -195,6 +195,15 @@ Scenes consolidation (CON-18+, integrator):
 | CON-20 | `seq` columns "from `ctx`" | [scenes-map](../specs/scenes-map.md) line 67 (FR-MAP-27: "IDs, `seq` and time only from `ctx`") and line 80; [assets-pipeline](../specs/assets-pipeline.md) line 49. `ctx` has no seq seam ([AGENTS §9.3](../../AGENTS.md#93-fixtures): ids, tokens, clock) | Same rule as event-log `seq` (CON-04): `seq` = monotonic integer assigned by the DB at insert (insertion order); deterministic because fixture steps run in order. Amend FR-MAP-27 wording to "IDs and time from `ctx`; `seq` by the DB" | resolved (fix/scenes-core): FR-MAP-27, MAP §8, FR-ASSET-08 amended |
 | CON-21 | Campaign for DM REST creates | [entities](../specs/entities.md) line 43 (FR-ENT-04: "active campaign **at commit**") vs [assets-pipeline](../specs/assets-pipeline.md) line 50 (FR-ASSET-09: "resolved when the request is authenticated") and [scenes-map](../specs/scenes-map.md) line 94 ("fixed at authentication"); FR-ENT-04 says "as FR-ASSET-09" | FR-ENT-04: "`ctx.campaignId` resolved at request authentication (as FR-ASSET-09); none → `conflict`". One rule in the REST middleware | resolved (fix/scenes-core): FR-ENT-04 amended (middleware rule: first Scenes REST builder) |
 
+Combat consolidation (CON-34+, integrator). Not edited in place: `build/entities` is editing §3, §11 and §13 in parallel. Apply after it merges. Line numbers as on `main` @ c579ac1. Protocol side: [protocol §11](../protocol/README.md#11-conflicts-log) (CON-38+).
+
+| ID | Entity / field | Specs in conflict | Suggested fix | Resolution |
+|---|---|---|---|---|
+| CON-34 | Undo fields (§3 Event log entry, line 115) | This doc plans undo fields (compensating event, `undone` marker) on the event log; [combat-tracker §8](../specs/combat-tracker.md#8-data-model) puts the marker on its own `hp_change` table (gate I9, [§17](#17-combat-encounter-combatant-combat-log-entry)) | Line 115 → "undo marker on combat's own `hp_change` table (`undone`, `undoneAt`; the combat log entry) plus compensating event `CombatEntryUndone`, per [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)". The event log stays as is | open (after build/entities) |
+| CON-35 | `resolveDefinition(ctx, id)` (§11, line 339) | [entities](../specs/entities.md) FR-ENT-12 now `resolveDefinition(env, id)`, campaign = `env.actor.campaignId` (gate I14; code: `CommandContext` has no `campaignId`, `CommandEnv.actor` does) | Line 339 → `resolveDefinition(env, id)`. Builders: helpers take `env: CommandEnv` | open (after build/entities); tell the `build/entities` builder |
+| CON-36 | Seam rule (§1, line 23) | §1 lists `ctx.ids`, `ctx.tokens`, `ctx.clock` only; #137 adds `ctx.dice` ([FR-DICE-03](../specs/dice-roll-log.md#6-functional-requirements), [AGENTS §9.3](../../AGENTS.md#93-fixtures)) | Line 23 → "IDs, tokens, timestamps and dice come only from the command context (`ctx.ids`, `ctx.tokens`, `ctx.clock`, `ctx.dice`)…" | open (Foundation section; low) |
+| CON-37 | Stale pointers | Line 9 phase table ("Combat: > Later phase"); §7 line 176 "Later phase" note; §12 line 391 ("Combatant → token FK … Combat phase"); §11 `hpCurrent` row (line 333) names only entities' writers; §13 line 415 code registries lack the token-changed hooks ([ADR-0028](../architecture/adr/0028-token-changed-hooks.md)) | Line 9 → done (at merge); line 176 → pointer to [§18](#18-combat-constraints-not-in-db-derived-visibility-fields); line 391 → pointer to [§17](#17-combat-encounter-combatant-combat-log-entry); line 333 + "and `characters.adjustHp` ([FR-CHAR-13](../specs/character-sheet.md#6-functional-requirements))"; line 415 + "token-changed hooks (FR-MAP-30)" | open (after build/entities) |
+
 ## 9. Scenes: ER diagram
 
 Consolidated 2026-10-12 from the `complete` specs [assets-pipeline](../specs/assets-pipeline.md) (ASSET), [entities](../specs/entities.md) (ENT), [play-shell](../specs/play-shell.md) (SHELL), [scenes-map](../specs/scenes-map.md) (MAP). Foundation sections above amended per CON-18 (fix/scenes-core); phase table flips at merge. Protocol side: [protocol §12–§19](../protocol/README.md#12-scenes-record-types).
@@ -438,3 +447,362 @@ An instance of a creature definition: own name, read-only display copies, play s
 | Scene | `id` vs active scene (scope gate) | Players: `name`, `folderId`, `mapLocked`, `seq` |
 | Scene folder | — (players: always hidden) | — |
 | Token | `hidden`; `sceneId` vs active scene (scope gate) | Players: `definitionId` |
+
+## 14. Combat: ER diagram
+
+Consolidated 2026-10-12 from the Combat specs [character-sheet](../specs/character-sheet.md) (CHAR), [dice-roll-log](../specs/dice-roll-log.md) (DICE), [notifications](../specs/notifications.md) (NOTE), [combat-tracker](../specs/combat-tracker.md) (CBT), after review-combat-3 and decisions #134–#140. Specs are `in-review`; the DM sets `complete`. Earlier sections are not edited here: amendments are conflict rows [CON-34–37](#8-conflicts-log). Protocol side: [protocol §20–§27](../protocol/README.md#20-combat-record-types).
+
+```mermaid
+erDiagram
+  CAMPAIGN ||--o{ ROLL : has
+  CAMPAIGN ||--o{ GAME_LOG_ENTRY : has
+  CAMPAIGN ||--o| GAME_LOG_SETTINGS : "id = campaignId"
+  GAME_LOG_ENTRY }o--o{ ROLL : "rollIds (JSON, no FK)"
+  ENCOUNTER |o--o{ GAME_LOG_ENTRY : "encounterId"
+  CAMPAIGN ||--o{ NOTIFICATION : has
+  PLAYER |o--o{ NOTIFICATION : "audiencePlayerId, actionPlayerId"
+  CAMPAIGN ||--o{ ENCOUNTER : has
+  SCENE |o--o{ ENCOUNTER : "sceneId (set null)"
+  ENCOUNTER ||--o{ ENCOUNTER_ENTRY : "cascade"
+  ENTITY ||--o{ ENCOUNTER_ENTRY : "definitionId"
+  ENCOUNTER ||--o{ COMBATANT : "created at start"
+  ENTITY ||--o{ COMBATANT : "entityId (character or definition)"
+  TOKEN |o--o{ COMBATANT : "tokenId (set null)"
+  ASSET |o--o{ COMBATANT : "imageAssetId"
+  ENCOUNTER ||--o{ HP_CHANGE : has
+  COMBATANT ||--o{ HP_CHANGE : "targetId, attackerId"
+  NOTIFICATION |o--o{ HP_CHANGE : "cardId (damage card)"
+  GAME_LOG_ENTRY ||--o| HP_CHANGE : "entryId"
+  ROLL {
+    ID id PK
+    ID campaignId FK
+    timestamp at
+    string rollerRole "dm | player"
+    ID rollerPlayerId FK "nullable"
+    string actorKind "dm | player | entity | token"
+    ID actorId "nullable, no FK"
+    text actorName "copied at roll time"
+    ID targetEntityId "nullable, no FK"
+    ID targetTokenId "nullable, no FK"
+    text targetName "nullable"
+    string category "9 roll categories"
+    text label "0-60, nullable"
+    string source "dice | char | cbt"
+    text expression "normalised"
+    string mode "normal | advantage | disadvantage"
+    boolean manual
+    json dice "JSON leaf {faces, value, kept}[]"
+    int constant
+    int total
+    int natural "nullable"
+    ID replacesRollId "reserved (gems), null"
+  }
+  GAME_LOG_ENTRY {
+    ID id PK
+    ID campaignId FK "UK with n"
+    int n "per-campaign counter"
+    timestamp at
+    string kind "log-entry kind registry"
+    string category
+    boolean public "stamped once"
+    boolean undone
+    string rollerRole
+    ID rollerPlayerId FK "nullable"
+    text actorName
+    json payload "JSON leaf, per kind, player-safe"
+    json dmPayload "JSON leaf, nullable, DM only"
+    json rollIds "ID[]"
+    ID encounterId FK "nullable"
+    ID supersededBy "reserved (gems), null"
+  }
+  GAME_LOG_SETTINGS {
+    ID id PK "= campaignId"
+    ID campaignId FK
+    boolean attack "one per category, 9 total"
+  }
+  NOTIFICATION {
+    ID id PK
+    ID campaignId FK
+    int seq "insertion order"
+    string kind "kind registry"
+    string audience "dm | player | all, immutable"
+    ID audiencePlayerId FK "nullable"
+    text text "1-280"
+    json payload "JSON leaf <= 1 KB"
+    text actionLabel "nullable"
+    string actionRole "dm | player | null"
+    ID actionPlayerId FK "nullable"
+    string state "info | pending | resolved | dismissed"
+    json resolution "JSON leaf <= 256 B, nullable"
+    timestamp closedAt "nullable"
+    string closedByRole "nullable"
+    ID closedByPlayerId FK "nullable"
+    timestamp createdAt
+    timestamp updatedAt
+  }
+  ENCOUNTER {
+    ID id PK
+    ID campaignId FK
+    int seq
+    text name "1-60"
+    string status "planned | started | ended"
+    ID sceneId FK "nullable"
+    json partyCharacterIds "ID[] | null (= all)"
+    int round "0 = initiative phase"
+    ID turnCombatantId "nullable"
+    ID playerTurnCombatantId "nullable, player copy"
+    timestamp startedAt "nullable"
+    timestamp endedAt "nullable"
+    timestamp createdAt
+    timestamp updatedAt
+  }
+  ENCOUNTER_ENTRY {
+    ID id PK
+    ID encounterId FK "cascade"
+    int seq
+    ID definitionId FK "global or same campaign"
+    int quantity "1-20"
+  }
+  COMBATANT {
+    ID id PK
+    ID campaignId FK
+    ID encounterId FK
+    int seq
+    string kind "pc | monster"
+    ID entityId FK
+    ID tokenId FK "nullable"
+    text name "1-40, display copy"
+    ID imageAssetId FK "nullable, display copy"
+    boolean hidden "copy of the token flag"
+    boolean active "false after End"
+    boolean removed
+    int initiative "nullable"
+    ID initRollId "nullable"
+    int position "server-written"
+    int playerPosition "nullable, server-written"
+    int hpCurrent "monsters only"
+    int hpMax "monsters only"
+  }
+  HP_CHANGE {
+    ID id PK
+    ID campaignId FK
+    ID encounterId FK
+    int seq
+    timestamp at
+    string kind "damage | heal"
+    string source "card | direct"
+    ID cardId FK "nullable"
+    json rollIds "ID[]"
+    ID attackerId "nullable"
+    ID targetId FK
+    ID targetEntityId
+    int targetAc
+    int raw
+    int applied
+    int overkill
+    int hpBefore
+    int hpAfter
+    ID entryId FK
+    boolean undone
+    timestamp undoneAt "nullable"
+  }
+```
+
+- `HP_CHANGE` shows the keys and HP fields only; every column is in [§17](#17-combat-encounter-combatant-combat-log-entry).
+- character-sheet adds **no** table, field or record type: it reads the `entity` row and writes `hpCurrent` only via `characters.adjustHp` ([FR-CHAR-01](../specs/character-sheet.md#6-functional-requirements), [FR-CHAR-13](../specs/character-sheet.md#6-functional-requirements)).
+- `seq` columns: DB-assigned insertion order ([CON-20](#8-conflicts-log)). `n` on game-log entries is the command's own counter (max + 1 in the transaction, [FR-DICE-17](../specs/dice-roll-log.md#6-functional-requirements)).
+- No migrations during build: schema via drizzle-kit push ([AGENTS §9.4](../../AGENTS.md#94-commands-and-scripts)).
+
+## 15. Combat: roll, game log entry, public log settings
+
+### Roll — owner [dice-roll-log](../specs/dice-roll-log.md#8-data-model) (server table, **not** a record type)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, at | ID, ID → Campaign, timestamp | `ctx.ids`, `env.actor.campaignId`, `ctx.clock` | [FR-DICE-08](../specs/dice-roll-log.md#6-functional-requirements), DICE §8 |
+| rollerRole, rollerPlayerId | `dm` \| `player`, ID → Player \| null | From `env.actor` | DICE §8 |
+| actorKind, actorId, actorName | `dm` \| `player` \| `entity` \| `token`, ID \| null (no FK), text | Caller resolves the actor; name copied at roll time (combat passes the combatant's name) | [FR-DICE-10](../specs/dice-roll-log.md#6-functional-requirements), [FR-DICE-19](../specs/dice-roll-log.md#6-functional-requirements) |
+| targetEntityId, targetTokenId, targetName | ID \| null ×2, text \| null | Set by callers only | DICE §8 |
+| category | enum | attack, damage, saving throw, ability check, skill check, contested, initiative, healing, other | [FR-DICE-11](../specs/dice-roll-log.md#6-functional-requirements) |
+| label, source | text ≤ 60 \| null, `dice` \| `char` \| `cbt` | Label trimmed, no control chars | FR-DICE-11 |
+| expression, mode, manual | text (normalised), `normal` \| `advantage` \| `disadvantage`, bool | Grammar + limits; adv/dis rewrites the first `1d20` | [FR-DICE-01](../specs/dice-roll-log.md#6-functional-requirements), [FR-DICE-04](../specs/dice-roll-log.md#6-functional-requirements), [FR-DICE-06](../specs/dice-roll-log.md#6-functional-requirements) |
+| dice | **JSON leaf** `{faces, value: int \| null, kept}[]` | Every die incl. dropped; `null` only for a manual total of several dice | FR-DICE-06, FR-DICE-08, #140 |
+| constant, total, natural | int, int, int \| null | `natural` = the single kept d20 | DICE §8 |
+| replacesRollId | ID \| null | Reserved for gems; null in MVP | #140 |
+
+- **Immutable**: written in the calling command's transaction, never updated or deleted (FR-DICE-08). No `entryId`: entries point at rolls via `rollIds` (gate I24). A roll no entry references was never logged → hidden for stats.
+- Numbers only from `ctx.dice` ([FR-DICE-03](../specs/dice-roll-log.md#6-functional-requirements), #137). Same seed + same commands → identical rolls, entries, `n` ([FR-DICE-25](../specs/dice-roll-log.md#6-functional-requirements)).
+
+### Game log entry (`game-log-entry`) — owner [dice-roll-log](../specs/dice-roll-log.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, at | ID, ID → Campaign, timestamp | `ctx` | DICE §8 |
+| n | int | Per-campaign counter, max + 1 in the transaction; unique `(campaignId, n)`; the [ADR-0022](../architecture/adr/0022-deterministic-seams.md) tiebreak and the window's `orderBy` | [FR-DICE-17](../specs/dice-roll-log.md#6-functional-requirements) |
+| kind | text | Registered in `src/shared/dice-roll-log/kinds.ts`: DICE `roll`; CBT `cbt.attack`, `cbt.hp`. Unregistered on write → `internal` | [FR-DICE-18](../specs/dice-roll-log.md#6-functional-requirements), [FR-CBT-24](../specs/combat-tracker.md#6-functional-requirements) |
+| category | enum | One category per entry; a multi-roll action uses the action's (attack) | [FR-DICE-26](../specs/dice-roll-log.md#6-functional-requirements), gate I4 |
+| public | bool | **Stamped once** at creation by who rolls: player → true; DM → override, else the category setting at commit; combat: false if attacker or target hidden. Never changed in MVP | [FR-DICE-13](../specs/dice-roll-log.md#6-functional-requirements), FR-CBT-24, #73, #139 P8 |
+| undone | bool | Set only by `gameLog.markUndone` (combat undo) | FR-DICE-19, [FR-CBT-25](../specs/combat-tracker.md#6-functional-requirements) |
+| rollerRole, rollerPlayerId, actorName | as Roll | | DICE §8 |
+| payload | **JSON leaf** per kind | Player-safe. `roll`: `{rollId, expression, mode, manual, dice, constant, total, natural, label}[]` (1–20) | DICE §8 |
+| dmPayload | **JSON leaf** \| null | DM-only extras (target AC, computed hit, overrides); stripped for players | [FR-DICE-15](../specs/dice-roll-log.md#6-functional-requirements), #139 P6 |
+| rollIds | **JSON leaf** ID[] | The action's rolls; an attack = one entry, two rolls | FR-DICE-26, [FR-CHAR-08](../specs/character-sheet.md#6-functional-requirements) |
+| encounterId | ID → Encounter \| null | Set by combat-tracker | FR-CBT-24 |
+| supersededBy | ID \| null | Reserved for gem rerolls; null in MVP | #140 |
+
+- Rows kept forever (~1 KB/roll); snapshots bounded by the window ([§18](#18-combat-constraints-not-in-db-derived-visibility-fields)). No edit or delete command ([DICE §10](../specs/dice-roll-log.md#10-permissions)).
+
+### Public log settings (`game-log-settings`) — owner [dice-roll-log](../specs/dice-roll-log.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId | ID (= campaignId), ID → Campaign | One row per campaign, created on first change | [FR-DICE-12](../specs/dice-roll-log.md#6-functional-requirements) |
+| attack … other | bool × 9 | One per category. No row = **all false** (all hidden). Not retroactive | FR-DICE-12, #139 P8, P23 |
+
+## 16. Combat: notification
+
+### Notification (`notification`) — owner [notifications](../specs/notifications.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId | ID, ID → Campaign | `env.ctx.ids`; `env.actor.campaignId` | [FR-NOTE-02](../specs/notifications.md#6-functional-requirements) |
+| seq | int | DB insertion order ([CON-20](#8-conflicts-log)); order and window key (not the WS frame `seq`) | [FR-NOTE-01](../specs/notifications.md#6-functional-requirements) |
+| kind | text `^[a-z][a-z0-9-]{0,31}$` | Registered server kind (`src/server/features/notifications/kinds.ts`). MVP: `damage-card` (CBT), `test` (test mode) | [FR-NOTE-03](../specs/notifications.md#6-functional-requirements), [FR-NOTE-22](../specs/notifications.md#6-functional-requirements) |
+| audience, audiencePlayerId | `dm` \| `player` \| `all`, ID → Player \| null | **Immutable**; player must be in the campaign | [FR-NOTE-04](../specs/notifications.md#6-functional-requirements) |
+| text | text 1–280 | Plain text, trimmed, control chars removed; composed by the kind owner | [FR-NOTE-21](../specs/notifications.md#6-functional-requirements) |
+| payload | **JSON leaf** ≤ 1 KB | Per-kind zod; plain IDs, no FKs; player-safe for player audiences | FR-NOTE-03, [FR-NOTE-06](../specs/notifications.md#6-functional-requirements) |
+| actionLabel, actionRole, actionPlayerId | text 1–24 \| null, `dm` \| `player` \| null, ID \| null | The **action owner**; all null = info. A player owner must be in the audience | [FR-NOTE-05](../specs/notifications.md#6-functional-requirements) |
+| state | `info` \| `pending` \| `resolved` \| `dismissed` | `info` final; `pending` → `resolved` \| `dismissed`; `resolved` → `pending` only via reopen | [FR-NOTE-07](../specs/notifications.md#6-functional-requirements) |
+| resolution | **JSON leaf** ≤ 256 B \| null | Per-kind zod; visible to the audience; cleared on reopen | FR-NOTE-07, FR-NOTE-06 |
+| closedAt, closedByRole, closedByPlayerId | timestamp, `dm` \| `player` \| null, ID \| null | Set on each state change from the command's clock and `env.actor`; cleared on reopen | FR-NOTE-07 |
+| createdAt, updatedAt | timestamp | `env.ctx.clock` | NOTE §8 |
+
+- **Indexes:** `(campaignId, seq)`, `(campaignId, state)` (NOTE §14).
+- Created and resolved **inside the causing command's transaction** ([ADR-0027](../architecture/adr/0027-notification-creation.md), #135). No delete or edit.
+- **Damage card** = kind `damage-card` (owner CBT, gate I7): audience = the rolling player (DM attacks: `dm`); action "Apply", owner `dm` (#136).
+  - `payload`: `{encounterId, attackerId, attackerName, attackName, damageType, mode, crit, toHit {rollId, dice, constant, total, natural, manual}, damage {rollId, dice, constant, total, manual}}`; `dice` = compact `[value, kept]` pairs; ≤ 1 KB at 50 dice ([CBT §8](../specs/combat-tracker.md#8-data-model), #140).
+  - `resolution`: `{targetName | null (null if hidden), hit, multiplier, applied}`; seen by the rolling player (#138). `hp_change.cardId` links back.
+
+## 17. Combat: encounter, combatant, combat log entry
+
+All rows per campaign; `seq` by the DB; timestamps `ctx.clock` ([CBT §8](../specs/combat-tracker.md#8-data-model)).
+
+### Encounter (`encounter`) — owner [combat-tracker](../specs/combat-tracker.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, seq | ID, ID → Campaign, int | | CBT §8 |
+| name | text 1–60 | Trimmed, no control chars; not unique | [FR-CBT-01](../specs/combat-tracker.md#6-functional-requirements) |
+| status | `planned` \| `started` \| `ended` | ≤ 1 `started` per campaign (partial unique). Update / delete only while `planned`; ≤ 30 non-ended per campaign | FR-CBT-01, [FR-CBT-07](../specs/combat-tracker.md#6-functional-requirements), [FR-CBT-10](../specs/combat-tracker.md#6-functional-requirements), #78, #139 P15 |
+| sceneId | ID → Scene \| null | Set at start; `ON DELETE SET NULL` | FR-CBT-07, CBT §8 |
+| partyCharacterIds | **JSON leaf** ID[] \| null | `null` = every character of the campaign at read time; list = characters of the campaign | [FR-CBT-02](../specs/combat-tracker.md#6-functional-requirements), #139 P12 |
+| round, turnCombatantId | int ≥ 0, ID \| null | Round 0 = initiative phase | [FR-CBT-14](../specs/combat-tracker.md#6-functional-requirements) |
+| playerTurnCombatantId | ID \| null | Turn combatant if not hidden or removed, else null; written with the turn, by `setRemoved` and by the token hook | [FR-CBT-31](../specs/combat-tracker.md#6-functional-requirements), gate I20 |
+| startedAt, endedAt, createdAt, updatedAt | timestamp \| null ×2, timestamp ×2 | | CBT §8 |
+
+### Encounter entry (`encounter-entry`) — owner combat-tracker
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, encounterId, seq | ID, ID → Encounter (`ON DELETE CASCADE`), int | Whole replace on update | FR-CBT-01 |
+| definitionId | ID → Entity | Via `resolveDefinition`, kind `monster` (else `invalid`); duplicates merged; live link to the definition | FR-CBT-01, [FR-ENT-12](../specs/entities.md#6-functional-requirements) |
+| quantity | int 1–20 | 0–20 entries, total ≤ 50 | FR-CBT-01 |
+
+### Combatant (`combatant`) — owner combat-tracker
+
+An instance ([ADR-0009](../architecture/adr/0009-entity-content-model.md)); created only by `cbt.start` (no add mid-fight).
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, encounterId, seq, kind | ID, ID, ID → Encounter, int, `pc` \| `monster` | Party characters first, then entries in order × quantity | [FR-CBT-08](../specs/combat-tracker.md#6-functional-requirements) |
+| entityId | ID → Entity | Character, or the monster definition | CBT §8 |
+| tokenId | ID → Token \| null | Next unbound token on the scene with that `definitionId` (token `seq` order); `ON DELETE SET NULL`; deleting a token bound to an **active** combatant → `conflict` (hook) | FR-CBT-08, [FR-CBT-09](../specs/combat-tracker.md#6-functional-requirements), [ADR-0028](../architecture/adr/0028-token-changed-hooks.md), #134 |
+| name, imageAssetId, hidden | text 1–40, **asset ref** \| null, bool | **Display copies** of the token at start and on every token rename / image / hide / reveal (hook); token-less: numbered name (FR-MAP-16 rule), portrait, visible. Portrait copies follow a definition edit while equal to the old portrait | FR-CBT-08, FR-CBT-09, [FR-CBT-06](../specs/combat-tracker.md#6-functional-requirements), gate I23 |
+| active, removed | bool ×2 | `active` false after End; `removed` skips turns, hidden from players | FR-CBT-10, [FR-CBT-15](../specs/combat-tracker.md#6-functional-requirements) |
+| initiative, initRollId | int \| null (−10…50), ID \| null | Roll or set; a player sets own PC's once | [FR-CBT-11](../specs/combat-tracker.md#6-functional-requirements), [FR-CBT-12](../specs/combat-tracker.md#6-functional-requirements), gate I25 |
+| position, playerPosition | int, int \| null | **Server-written** in the commanding transaction for every row whose value changed: `position` 1…n over all; `playerPosition` 1…k over active, non-removed, non-hidden, else null | [FR-CBT-13](../specs/combat-tracker.md#6-functional-requirements), #139 P3 |
+| hpCurrent, hpMax | int \| null ×2 | **Monsters only**: `effectiveStats.hpMax` at start; clamped 0…hpMax; definition edit: new max, current follows if it equalled the old max, else clamped. PC HP lives on the character | FR-CBT-08, FR-CBT-06, [FR-CBT-22](../specs/combat-tracker.md#6-functional-requirements), #92, gate I10 |
+
+### Combat log entry (`hp_change`, record type `hp-change`) — owner combat-tracker
+
+One applied HP change: the undo unit and stats source (#54, gate I9). Written by `cbt.applyCard` and `cbt.applyHp`.
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, encounterId, seq, at | ID, ID, ID → Encounter, int, timestamp | LIFO order by `seq` | [FR-CBT-25](../specs/combat-tracker.md#6-functional-requirements) |
+| kind, source | `damage` \| `heal`, `card` \| `direct` | | [FR-CBT-20](../specs/combat-tracker.md#6-functional-requirements), [FR-CBT-21](../specs/combat-tracker.md#6-functional-requirements) |
+| cardId, rollIds | ID → Notification \| null, **JSON leaf** ID[] | Card and its rolls; rolled values come from the roll rows, never the client | FR-CBT-20 |
+| attackerId, attackerName, attackName, damageType | ID \| null, text \| null ×3 | Copies at the time (gate I18) | CBT §8 |
+| targetId, targetEntityId, targetName, targetAc | ID → Combatant, ID → Entity, text, int | Effective values ([ADR-0009](../architecture/adr/0009-entity-content-model.md)) | CBT §8 |
+| toHitRolled, toHitTotal, natural, hitComputed, hit | int \| null ×3, bool \| null ×2 | Override = rolled ≠ final | [FR-CBT-23](../specs/combat-tracker.md#6-functional-requirements) |
+| damageRolled, damageTotal, multiplier | int \| null, int, `normal` \| `half` \| `none` \| `double` \| null | `raw = hit ? floor(damageTotal × {1, ½, 0, 2}) : 0` | FR-CBT-20, #53 |
+| raw, applied, overkill, hpBefore, hpAfter | int ×5 | `applied = \|hpBefore − hpAfter\|`; `overkill = max(0, raw − hpBefore)` | FR-CBT-22, #139 P11 |
+| entryId | ID → Game log entry | The `cbt.attack` / `cbt.hp` line | FR-CBT-24 |
+| undone, undoneAt | bool, timestamp \| null | **Undo marker** (not on the event log). Undo applies the inverse delta, clamped; marks the row and the game-log entry; reopens the card | FR-CBT-25, gate I2, I9, I28, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) |
+
+- **PC HP** changes go through `characters.adjustHp(env, characterId, delta)` in the caller's transaction (FR-CHAR-13); sheet changes (`char.adjustHp`) are not combat log entries and not undoable ([FR-CHAR-10](../specs/character-sheet.md#6-functional-requirements), #139 P5).
+- Kept after End for stats; Undo after End → "Nothing to undo" (CBT §11).
+
+## 18. Combat: constraints, not in DB, derived, visibility fields
+
+**Constraints the DB enforces**
+
+| Constraint | Source |
+|---|---|
+| `GameLogEntry (campaignId, n)` unique | [FR-DICE-17](../specs/dice-roll-log.md#6-functional-requirements) |
+| `GameLogSettings.id` = `campaignId` (one row per campaign) | [FR-DICE-12](../specs/dice-roll-log.md#6-functional-requirements) |
+| `Encounter`: ≤ 1 `status = started` per campaign (partial unique index) | [FR-CBT-07](../specs/combat-tracker.md#6-functional-requirements), #139 P15 |
+| `EncounterEntry.encounterId` → Encounter `ON DELETE CASCADE` | [CBT §8](../specs/combat-tracker.md#8-data-model) |
+| `Encounter.sceneId` → Scene, `Combatant.tokenId` → Token: `ON DELETE SET NULL` (bound active combatant: the hook answers `conflict` first) | CBT §8, [FR-CBT-09](../specs/combat-tracker.md#6-functional-requirements) |
+| `seq` columns (`notification`, `encounter`, `encounter_entry`, `combatant`, `hp_change`) DB-assigned at insert | [CON-20](#8-conflicts-log) |
+| Indexes `notification (campaignId, seq)`, `(campaignId, state)` | [NOTE §14](../specs/notifications.md#14-dependencies) |
+| `Roll`: no FK on actor / target ids (names copied) | [DICE §8](../specs/dice-roll-log.md#8-data-model) |
+
+**Snapshot windows** ([ADR-0029](../architecture/adr/0029-windowed-record-types.md); cut before the visibility filter, floor identical for every viewer)
+
+| Record type | `orderBy` | `size` | `pin` | Provider | Source |
+|---|---|---|---|---|---|
+| `game-log-entry` | `n` | 100 | — | campaign's entries | FR-DICE-17, #137 |
+| `notification` | `seq` | 100 | `state = pending` | campaign's notifications | [FR-NOTE-12](../specs/notifications.md#6-functional-requirements), #137 |
+| `encounter` | `seq` | 20 | `status ≠ ended` | campaign's encounters | [CBT §9](../specs/combat-tracker.md#9-api--events), gate I26 |
+| `hp-change` | `seq` | 50 | — | the started encounter's rows | CBT §9, gate I22 |
+| `encounter-entry` | not windowed | | | entries of encounters in the `encounter` snapshot | CBT §9 |
+| `combatant` | not windowed | | | combatants of the started encounter | CBT §9 |
+
+**Not in the DB**
+
+| Thing | Where | Source |
+|---|---|---|
+| Dice engine | `ctx.dice` on the command context: CSPRNG real; seeded per fixture key / test, disposable data only | [FR-DICE-03](../specs/dice-roll-log.md#6-functional-requirements), #137, [ADR-0022](../architecture/adr/0022-deterministic-seams.md) |
+| Physical-dice mode | browser storage `pp.dice.v1.<campaignId>.<dm \| playerId>` | [FR-DICE-07](../specs/dice-roll-log.md#6-functional-requirements), gate I5 |
+| Notification seen marker | `localStorage` `pp.note.seen.v1.<campaignId>.<dm \| playerId>`; never sent | [FR-NOTE-18](../specs/notifications.md#6-functional-requirements), #139 P27 |
+| Toasts, timers; sheet picker selection; attack popup edits | client memory (popup edits lost on reload; the card stays) | [FR-NOTE-14](../specs/notifications.md#6-functional-requirements), [FR-CHAR-02](../specs/character-sheet.md#6-functional-requirements), CBT §8 |
+| Log-entry kinds; notification kinds + views; `difficultyMethods`; roll routes; token-changed hooks; token menu entries | code registries ([protocol §26](../protocol/README.md#26-combat-registries-and-seams)) | FR-DICE-18, FR-NOTE-03/19, [FR-CBT-03](../specs/combat-tracker.md#6-functional-requirements), [FR-CHAR-16](../specs/character-sheet.md#6-functional-requirements), [FR-MAP-29/30](../specs/scenes-map.md#6-functional-requirements) |
+
+**Derived values** (computed, never stored)
+
+| Value | From | Source |
+|---|---|---|
+| Log line text | `formatLine(entry)` per kind, pure, `@shared` | [FR-DICE-20](../specs/dice-roll-log.md#6-functional-requirements) |
+| Effective public settings | settings row, else all false | FR-DICE-12 |
+| Difficulty rating, base / adjusted XP, thresholds, total CR | `difficultyMethods` (`dmg-2014`): party levels + monster CRs (XP table, CR 0 = 10) | FR-CBT-03, #136, gate I27 |
+| Party | `partyCharacterIds`, `null` = all characters at read time | FR-CBT-02 |
+| Health band | `down` if hp = 0; `bloodied` if 2 × hp ≤ hpMax; else `healthy`; computed in the visibility fn | [FR-CBT-26](../specs/combat-tracker.md#6-functional-requirements), #139 P9 |
+| Eligible turns; hit hint | not removed and not a monster at 0 HP; nat 20 hit, nat 1 miss, else total ≥ AC | FR-CBT-14, [FR-CBT-19](../specs/combat-tracker.md#6-functional-requirements) |
+| Sheet values | signed bonuses, "Down", roll specs `characterRolls(statBlock, kind)` (`@shared/character-sheet`) | [FR-CHAR-05](../specs/character-sheet.md#6-functional-requirements), CHAR §8 |
+| Pending for me, unread count | notifications × seen marker | FR-NOTE-18 |
+
+Server-written, stored copies (not derived on read): `position`, `playerPosition`, `playerTurnCombatantId`, combatant display copies and `hidden` (§17).
+
+**Visibility-relevant fields** (full rules: [protocol §20](../protocol/README.md#20-combat-record-types))
+
+| Record | Fields the filter reads | Never to players |
+|---|---|---|
+| Roll | — (not a record type) | the whole row; players get payload copies on visible entries |
+| Game log entry | `public` | hidden entries entirely (no placeholder); `dmPayload` |
+| Public log settings | — (`audience: dm`) | all |
+| Notification | `audience`, `audiencePlayerId` vs `ctx.playerId` | other audiences' rows; no redacted form ([FR-NOTE-06](../specs/notifications.md#6-functional-requirements)) |
+| Encounter | `status` | non-started encounters; `name`, `sceneId`, `partyCharacterIds`, `turnCombatantId`, timestamps |
+| Encounter entry, combat log entry | — (`audience: dm`) | all |
+| Combatant | `active`, `removed`, `hidden`, `kind`, `hpCurrent` / `hpMax` (→ band) | hidden / removed / inactive rows; `position`, `seq`, `initRollId`; monsters' `entityId`, `initiative`, HP numbers |
+| Entity (character) | unchanged ([FR-ENT-15](../specs/entities.md#6-functional-requirements)) | other characters' stat block and `hpCurrent` |
