@@ -1,8 +1,8 @@
 ---
 title: Character sheet (basics)
 prefix: CHAR
-status: unclaimed
-owner: —
+status: claimed
+owner: spec-character-sheet
 wave: 2
 ---
 
