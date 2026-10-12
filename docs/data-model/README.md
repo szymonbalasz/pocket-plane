@@ -4,7 +4,7 @@ Consolidated domain model. Entities and relationships, **not SQL**. **Living doc
 
 | Phase | Specs consolidated | Status |
 |---|---|---|
-| Foundation | [live-sync](../specs/live-sync.md), [campaign-management](../specs/campaign-management.md), [fixtures-adapters](../specs/fixtures-adapters.md) | done (2026-10-12) |
+| Foundation | [live-sync](../specs/live-sync.md), [campaign-management](../specs/campaign-management.md), [fixtures-adapters](../specs/fixtures-adapters.md) | done (2026-10-12); CON-01–04 resolved (#118) and built in the skeleton (`src/server/db/schema.ts`) |
 | Scenes | assets-pipeline, entities, play-shell, scenes-map | > Later phase |
 | Combat | character-sheet, dice-roll-log, notifications, combat-tracker | > Later phase |
 | Reward | party-loot | > Later phase |
@@ -21,7 +21,8 @@ Every fact links its source. Protocol side (record types, intents, events): [pro
 | Records in a campaign may point at a global definition or a custom of the **same** campaign, never another campaign's custom | [ADR-0018](../architecture/adr/0018-global-imported-content.md) |
 | Every mutation is a server command: row change + event-log entry in **one transaction** (unless the spec marks the event non-logged) | [FR-CAMP-20](../specs/campaign-management.md#6-functional-requirements), [FR-SYNC-16](../specs/live-sync.md#6-functional-requirements), [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) |
 | IDs, tokens and timestamps come only from the command context (`ctx.ids`, `ctx.tokens`, `ctx.clock`). Seeded values have the same format as real ones | [ADR-0022](../architecture/adr/0022-deterministic-seams.md), [AGENTS §9.3](../../AGENTS.md#93-fixtures) |
-| Time-ordered views: order by timestamp, then insertion order. Never by ID or randomness | [ADR-0022](../architecture/adr/0022-deterministic-seams.md) |
+| Time-ordered views: order by timestamp, then insertion order (event log: `seq`; other tables: row order). Never by ID or randomness | [ADR-0022](../architecture/adr/0022-deterministic-seams.md), CON-04 |
+| Timestamps are ISO-8601 UTC strings from `ctx.clock` | skeleton |
 | No per-record versions | [live-sync §8](../specs/live-sync.md#8-data-model) |
 
 ## 2. ER diagram (Foundation)
@@ -49,7 +50,8 @@ erDiagram
     timestamp updatedAt
   }
   EVENT_LOG_ENTRY {
-    ID id PK
+    int seq PK "monotonic, insertion order"
+    ID id "unique"
     ID campaignId FK "null for global events"
     string type "domain event name"
     timestamp at
@@ -87,7 +89,7 @@ erDiagram
 | active | boolean | At most one `true`, DB-enforced (partial unique index). Survives restart | [FR-CAMP-08](../specs/campaign-management.md#6-functional-requirements), [ADR-0020](../architecture/adr/0020-single-active-campaign.md) |
 | createdAt, updatedAt | timestamp | From `ctx.clock` | CAMP §8, [ADR-0022](../architecture/adr/0022-deterministic-seams.md) |
 
-- Created while none is active → active; otherwise inactive ([FR-CAMP-06](../specs/campaign-management.md#6-functional-requirements)). Switch flips both flags in one transaction ([FR-CAMP-09](../specs/campaign-management.md#6-functional-requirements)).
+- Created while none is active → active, and the create also emits `CampaignActivated {previousCampaignId: null}` (CON-10); otherwise inactive ([FR-CAMP-06](../specs/campaign-management.md#6-functional-requirements)). Switch flips both flags in one transaction ([FR-CAMP-09](../specs/campaign-management.md#6-functional-requirements)).
 - No delete or archive ([CAMP §4](../specs/campaign-management.md#4-non-goals)). No JSON leaves.
 
 ### Player — owner [campaign-management](../specs/campaign-management.md#8-data-model)
@@ -106,12 +108,13 @@ erDiagram
 
 | Field | Type | Rule | Source |
 |---|---|---|---|
-| id | ID | From `ctx.ids` | SYNC §8 |
+| seq | integer | Monotonic insertion order (autoincrement); the time-order tiebreak | CON-04, [ADR-0022](../architecture/adr/0022-deterministic-seams.md) |
+| id | ID | From `ctx.ids`; unique | SYNC §8 |
 | campaignId | ID \| null | Null for global events (imported definitions) | SYNC §8, [FR-FIX-23](../specs/fixtures-adapters.md#6-functional-requirements) |
 | type | string | Domain event name | SYNC §8 |
 | at | timestamp | From `ctx.clock` | SYNC §8 |
 | payload | JSON leaf | Domain event payload | SYNC §8 |
-| actorRole, actorPlayerId | role, ID \| null | Who caused it | SYNC §8 |
+| actorRole, actorPlayerId | `dm` \| `player` \| `system`, ID \| null | Who caused it (fixture loads: `dm`) | SYNC §8 |
 | intentId | string | WS intent that caused it (REST and loader calls have none: [FR-SYNC-15](../specs/live-sync.md#6-functional-requirements), [FR-FIX-13](../specs/fixtures-adapters.md#6-functional-requirements)) | SYNC §8 |
 
 - **Append-only**. Appended in the commit's transaction; rollback → no entry ([FR-SYNC-16](../specs/live-sync.md#6-functional-requirements)). Never holds the DM secret or a link token ([FR-CAMP-03](../specs/campaign-management.md#6-functional-requirements), CAMP §8).
@@ -138,14 +141,15 @@ erDiagram
 | importedAt | timestamp | `ctx.clock` | FR-FIX-21 |
 
 - Global, no campaign; read-only. Derived `readOnly = source != null` ([FIX §8](../specs/fixtures-adapters.md#8-data-model), [ADR-0018](../architecture/adr/0018-global-imported-content.md)). Existing key → `existing`, nothing written ([FR-FIX-20](../specs/fixtures-adapters.md#6-functional-requirements)).
-- > Later phase (Scenes, [entities](../specs/entities.md)): table name, definition fields, per-kind stat-block JSON ([ADR-0009](../architecture/adr/0009-entity-content-model.md) option A), custom definitions per campaign, inline vs separate provenance ([OQ-FIX-15](../specs/fixtures-adapters.md#15-open-questions), pick inline). See [CON-03](#8-conflicts-log).
+- **No definition table in the skeleton** (CON-03): the pipeline core writes through a definition-store interface + kind registry (`ImportRegistry`); the skeleton tests it with a test-only kind. Entities adds the table, kinds and definition event in Scenes.
+- > Later phase (Scenes, [entities](../specs/entities.md)): table name, definition fields, per-kind stat-block JSON ([ADR-0009](../architecture/adr/0009-entity-content-model.md) option A), custom definitions per campaign, inline vs separate provenance ([OQ-FIX-15](../specs/fixtures-adapters.md#15-open-questions), pick inline).
 
 ## 4. Constraints the DB enforces
 
 | Constraint | Source |
 |---|---|
 | `Campaign.active`: at most one `true` (partial unique index) | [FR-CAMP-08](../specs/campaign-management.md#6-functional-requirements) |
-| `Campaign.name` unique, case-insensitive | [FR-CAMP-06](../specs/campaign-management.md#6-functional-requirements), CAMP §11 (racing creates → one error) |
+| `Campaign.name` unique, case-insensitive (unique index on `lower(name)`; commands also compare Unicode-folded names) | [FR-CAMP-06](../specs/campaign-management.md#6-functional-requirements), CAMP §11 (racing creates → one error) |
 | `(Player.campaignId, Player.name)` unique, case-insensitive | [FR-CAMP-12](../specs/campaign-management.md#6-functional-requirements) |
 | `Player.linkToken` unique server-wide | [FR-CAMP-13](../specs/campaign-management.md#6-functional-requirements) |
 | Definition `(source, sourceKey)` unique globally | [FR-FIX-20](../specs/fixtures-adapters.md#6-functional-requirements) |
@@ -156,11 +160,11 @@ erDiagram
 |---|---|---|---|
 | DM secret | env `PP_DM_SECRET` only; never stored, logged or sent | ≥ 12 chars | [FR-CAMP-01/03](../specs/campaign-management.md#6-functional-requirements), [ADR-0019](../architecture/adr/0019-auth-credentials.md) |
 | Connection | server memory | connId, campaignId, role `dm`\|`player`, playerId \| null (immutable); phase `awaiting-hello`\|`snapshotting`\|`live`, seq, lastInboundAt | [SYNC §8](../specs/live-sync.md#8-data-model) |
-| Presence | server memory, derived from live connections | playerId, online | SYNC §8, [FR-SYNC-23](../specs/live-sync.md#6-functional-requirements) |
+| Presence | server memory, derived from live connections | id (= playerId), playerId, campaignId, online | SYNC §8, [FR-SYNC-23](../specs/live-sync.md#6-functional-requirements), CON-07 |
 | DM login throttle counter | server memory, cleared on restart | — | [FR-CAMP-05](../specs/campaign-management.md#6-functional-requirements) *(proposed)* |
 | Active campaign / active scene id | cache, rebuilt at boot | — | SYNC §8 |
-| Load manifest | file in data dir | bundle, fixtures, status `resetting`\|`empty`\|`loading`\|`complete`, records (fixture key → record IDs), dmUrl, playerLinks `{player, url}[]`, startedAt, durationMs. **No DM secret** | [FIX §8](../specs/fixtures-adapters.md#8-data-model), [FR-FIX-09](../specs/fixtures-adapters.md#6-functional-requirements), [FR-FIX-28](../specs/fixtures-adapters.md#6-functional-requirements) |
-| Data-dir lock | `$PP_DATA_DIR/server.lock` | owner `server`\|`loader`, pid, port (server only), startedAt | FIX §8, [FR-FIX-27](../specs/fixtures-adapters.md#6-functional-requirements), [AGENTS §9.2](../../AGENTS.md#92-env-ports-and-data) |
+| Load manifest | `$PP_DATA_DIR/load-manifest.json` (written atomically) | bundle, fixtures, status `resetting`\|`empty`\|`loading`\|`complete`, records (fixture key → record type → IDs), dmUrl, playerLinks `{player, campaign, url}[]`, startedAt, durationMs. **No DM secret** | [FIX §8](../specs/fixtures-adapters.md#8-data-model), [FR-FIX-09](../specs/fixtures-adapters.md#6-functional-requirements), [FR-FIX-28](../specs/fixtures-adapters.md#6-functional-requirements) |
+| Data-dir lock | `$PP_DATA_DIR/server.lock` (JSON, created exclusively) | owner `server`\|`loader`, pid, port (server only, written once bound), startedAt | FIX §8, [FR-FIX-27](../specs/fixtures-adapters.md#6-functional-requirements), [AGENTS §9.2](../../AGENTS.md#92-env-ports-and-data) |
 | Fixture, bundle, import batch, registrations | code | See [FIX §8](../specs/fixtures-adapters.md#8-data-model); registrations: [protocol §5](../protocol/README.md#5-record-type-registry) | FIX §8, SYNC §8 |
 
 ## 6. Derived values
@@ -181,17 +185,17 @@ What each visibility fn reads (record + connection context only, [ADR-0021](../a
 | Campaign | `id` vs `ctx.campaignId` | — |
 | Player | `campaignId` vs `ctx.campaignId` | `linkToken` (no field in the record type) |
 | Sync probe | `hidden`, `ownerPlayerId` vs `ctx.playerId` | — |
-| Presence | (DM only) | — |
+| Presence | (DM only: `audience: dm`) | — |
 
 > Later phase: Scenes (asset, derivative, definition, scene, token, active scene), Combat (character, encounter, combatant, roll / game log, notification, undo fields), Reward (party loot). Add rows here when their specs are `complete`.
 
 ## 8. Conflicts log
 
-Found at Foundation consolidation. Not resolved here; for the DM / orchestrator.
+Found at Foundation consolidation; resolved by the integrator ([decisions-log](../decisions-log.md) #118) and folded into the sections above. Protocol conflicts CON-05–17: [protocol §11](../protocol/README.md#11-conflicts-log).
 
-| ID | Entity / field | Specs in conflict | Suggested fix | Resolution |
-|---|---|---|---|---|
-| CON-01 | Campaign scoping | [glossary](../glossary.md) lines 22 ("Every record belongs to exactly one campaign") and 25 (Entity "campaign-owned") vs [ADR-0018](../architecture/adr/0018-global-imported-content.md) (imported definitions global) | Glossary: add "except imported definitions (ADR-0018)" to Campaign and Entity | resolved (#118): as suggested |
-| CON-02 | Event log `campaignId` | [ADR-0018](../architecture/adr/0018-global-imported-content.md) line 20 (logs per campaign) vs [live-sync](../specs/live-sync.md) line 91 (null for global events) | ADR-0018 consequence: event-log entries of global events have no campaign | resolved (#118): as suggested |
-| CON-03 | Definition table | [fixtures-adapters](../specs/fixtures-adapters.md) lines 21, 63, 67, 88: skeleton ships the pipeline core, but the table, kind registry and definition domain event are owned by [entities](../specs/entities.md) (unclaimed, Scenes) | Orchestrator picks: skeleton builds the pipeline against a test-only kind behind an insert interface, entities adds the table in Scenes; **or** skeleton creates a minimal global definition table now | resolved (#118): option 1, pipeline core against a test-only kind behind an insert interface; entities adds the table in Scenes |
-| CON-04 | Event log ordering | [ADR-0022](../architecture/adr/0022-deterministic-seams.md) line 35 needs insertion order as tiebreak (fixtures share one timestamp, line 40); [live-sync](../specs/live-sync.md) line 91 lists no sequence column, and `id` may not be used | live-sync §8: add a monotonic `seq` (or state that SQLite rowid is the order) | resolved (#118): monotonic integer `seq` column on the event log (insertion order) |
+| ID | Topic | Resolution | Now in |
+|---|---|---|---|
+| CON-01 | Campaign scoping vs global definitions | Every record has a campaign except imported definitions (ADR-0018); glossary wording is the integrator's | §1 |
+| CON-02 | Event log `campaignId` | Null for global events | §3 Event log entry |
+| CON-03 | Definition table | Pipeline core against a test-only kind behind an insert interface; entities adds the table in Scenes | §3 Imported definition |
+| CON-04 | Event log ordering | Monotonic integer `seq` column (insertion order) | §1, §2, §3 Event log entry |

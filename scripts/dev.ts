@@ -59,7 +59,7 @@ for (const c of children) {
   void pipe(c.name, c.proc.stderr, c.name === "server");
 }
 
-console.log(`DM URL (dev): ${localUrl(cfg.host, cfg.vitePort)}/  — Hono on ${cfg.port})`);
+console.log(`DM URL (dev): ${localUrl(cfg.host, cfg.vitePort)}/  (Hono on ${cfg.port})`);
 
 let stopping = false;
 function stopAll(code: number) {
