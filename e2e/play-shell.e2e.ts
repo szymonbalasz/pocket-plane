@@ -40,7 +40,7 @@ async function resizeWindow(page: Page, kind: string, dx: number, dy: number) {
 const zOf = (page: Page, kind: string) =>
   shellWindow(page, kind).evaluate((el) => Number((el as HTMLElement).style.zIndex));
 
-test("DM frame: top bar, presence badge, Players window top-right, base empty state", async ({
+test("FR-SHELL-01/02/05/06/21 DM frame: top bar, presence badge, Players window top-right, base empty state", async ({
   browser,
 }) => {
   const { secret } = e2eEnv();
@@ -64,7 +64,7 @@ test("DM frame: top bar, presence badge, Players window top-right, base empty st
   await expect(players).toBeVisible();
 });
 
-test("player: move + resize + front, reload restores; other player's key gets defaults; no layout on the wire", async ({
+test("FR-SHELL-02/08/10/15/16/19 player: move + resize + front, reload restores; other player's key gets defaults; no layout on the wire", async ({
   browser,
 }) => {
   const { link } = e2eEnv();
@@ -116,7 +116,9 @@ test("player: move + resize + front, reload restores; other player's key gets de
   for (const f of frames) expect(f).not.toContain('"windows"');
 });
 
-test("launcher toggle, minimise, reset layout, render-only clamp", async ({ browser }) => {
+test("FR-SHELL-09/11/12/14 launcher toggle, minimise, reset layout, render-only clamp", async ({
+  browser,
+}) => {
   const { link } = e2eEnv();
   const p = await rolePage(browser);
   await p.goto(link("Player 1"));
@@ -173,4 +175,42 @@ test("FR-SHELL-13 keys from windows never reach the base; window drags drop on t
 
   await win.getByTestId("shell-test-drag").dragTo(p.getByTestId("ui-base-empty"));
   await expect(base).toHaveAttribute("data-test-last-drop", "shell.test:main");
+});
+
+/** `playersOnline`: the switch dialog asks first when players are online (CAMP §7). */
+async function switchCampaign(dm: Page, name: string, playersOnline: boolean) {
+  await dm.getByTestId("camp-campaign-switcher").click();
+  await dm.getByTestId("camp-campaign-option").filter({ hasText: name }).click();
+  if (playersOnline) await dm.getByTestId("camp-switch-confirm").click();
+  await expect(dm.getByTestId("camp-campaign-name")).toHaveText(name);
+}
+
+// Runs last: switches the active campaign and back.
+test("FR-SHELL-04/16 campaign switch: DM layout per campaign; player waits, then windows as before", async ({
+  browser,
+}) => {
+  const { secret, link } = e2eEnv();
+  const dm = await rolePage(browser);
+  const p = await rolePage(browser);
+  await loginDm(dm, secret);
+  await p.goto(link("Player 1"));
+  await openWindow(p, "sync.probes");
+  await moveWindow(p, "sync.probes", 200, 100);
+  const pBox = await box(p, "sync.probes");
+
+  await openWindow(dm, "camp.players");
+  await moveWindow(dm, "camp.players", -500, 150);
+  const dmBox = await box(dm, "camp.players");
+
+  await switchCampaign(dm, "Second Campaign", true);
+  await expect(p.getByTestId("camp-waiting")).toBeVisible();
+  await expect(p.getByTestId("ui-topbar")).toHaveCount(0);
+  await expect(shellWindow(dm, "camp.players")).toBeVisible();
+  expect(await box(dm, "camp.players")).not.toEqual(dmBox); // new campaign → DM default
+
+  await switchCampaign(dm, "Fixture Campaign", false);
+  await expect(shellWindow(dm, "camp.players")).toBeVisible();
+  await expect.poll(() => box(dm, "camp.players")).toEqual(dmBox);
+  await expect(shellWindow(p, "sync.probes")).toBeVisible({ timeout: 15_000 });
+  expect(await box(p, "sync.probes")).toEqual(pBox);
 });
