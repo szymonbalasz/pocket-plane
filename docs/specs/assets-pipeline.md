@@ -192,7 +192,7 @@ Isolated per worktree: `bun test` uses `:memory:` DB + temp asset dir per file; 
 | OQ-ASSET-06 | Upload limits and formats | **25 MB, 50 MP, PNG / JPEG / WebP / SVG** (covers real battlemaps) / higher (slower ingest) | no · owner: DM | — |
 | OQ-ASSET-07 | Grid calibration pixel space | **`display` pixels; asset exposes display size** (what players render; OQ-MAP-15 agrees) / original pixels + scale | no · owner: scenes-map | scenes-map |
 | OQ-ASSET-08 | Where can the DM open the picker outside scene / token / portrait flows? | **Test-mode-only window `asset.test` (like `shell.test`, FR-SHELL-23)** (no product scope; walkthrough A runs before scenes-map) / DM window `asset.images` (≈ tier-A library) / host flows only | no · owner: spec-assets-pipeline | play-shell |
-| OQ-ASSET-09 | Glossary: add **Asset reference** | **"A record field holding an asset ID, set via `assets.require`; a player learns the ID only if they can see the field"** / no term | no · owner: integrator | all specs with images |
+| OQ-ASSET-09 | ~~Glossary: add **Asset reference**~~ | **Decided (integrator, Scenes consolidation):** added to the [glossary](../glossary.md) as suggested | no (decided) | all specs with images |
 | OQ-ASSET-10 | entities: FR-ENT-08/11 call `assets.require` for `portraitAssetId` | **yes** / — | no · owner: spec-entities | entities |
 
 ## 16. Out of scope

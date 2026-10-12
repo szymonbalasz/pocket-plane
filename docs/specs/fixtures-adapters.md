@@ -103,15 +103,21 @@ Fixtures, bundles, manifest and lock are **code/files, not DB records**. Only pr
 | `sync-probes` | setup | Probes `public`, `secret` (hidden, text `SECRET-PROBE`), `mine` (owner `player-1`); test mode only | [live-sync](live-sync.md) | no | Skeleton |
 | `enemy-1` | reference | SRD goblin: AC 15, HP 7, init +2, scimitar +4 / 1d6+2, CR 1/4 | [entities](entities.md) | yes | Scenes |
 | `enemy-2` | reference | SRD wolf: AC 13, HP 11, init +2, bite +4 / 2d4+2, CR 1/4 | entities | yes | Scenes |
-| `enemy-custom` | setup | Elite Goblin Warrior, custom in Fixture Campaign derived from `enemy-1`: AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2 | entities / [combat-tracker](combat-tracker.md) | yes | Whoever ships derive |
+| `enemy-custom` | setup | Elite Goblin Warrior, custom in Fixture Campaign derived from `enemy-1`: AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2 | entities (form: [combat-tracker](combat-tracker.md)) | yes | Scenes (entities ships derive, [OQ-ENT-12](entities.md#15-open-questions)) |
 | `char-mira` | setup | Character "Mira", owned by `player-1`: L1 fighter, AC 16, HP 12/12, init +2, shortsword +4 / 1d6+2 | entities, [character-sheet](character-sheet.md) | yes | Scenes / Combat |
 | `images` | setup | Town map, battlemap (20×14 cells at 70 px); tokens: Mira blue, goblin green, wolf grey, elite dark green | [assets-pipeline](assets-pipeline.md) | yes | Scenes |
 | `town` | setup | Active scene: town map, grid, Mira token | [scenes-map](scenes-map.md) | yes | Scenes |
 | `battlemap` | setup | Inactive scene: Mira + goblin visible, wolf + elite goblin **hidden** | scenes-map | yes | Scenes |
+| `char-thorn` | setup | Character "Thorn", owned by `player-2`: L1 rogue, AC 14, HP 10/10, init +3, dagger +5 / 1d4+3. Requires `player-2` | [entities](entities.md#13-test-plan) | no | Scenes |
+| `enemy-custom-second` | setup | Activates Second Campaign, creates custom "Marsh Troll" (large, AC 15, HP 59, claw +7 / 2d6+4, CR 5), re-activates Fixture Campaign. Requires `campaign-second` | [entities](entities.md#13-test-plan) | no | Scenes |
+| `image-large` | setup | `map-large` 6000 × 4000 SVG (→ `display` 4096 × 2731, `thumb` 512 × 341) | [assets-pipeline](assets-pipeline.md#13-test-plan) | no | Scenes |
+| `images-second` | setup | Activates Second Campaign, ingests `town.svg` as "Town (copy)", re-activates Fixture Campaign. Requires `campaign-second`, `images` | [assets-pipeline](assets-pipeline.md#13-test-plan) | no | Scenes |
+| `scenes-extras` | setup | Folder "Act 1" holding Town + Goblin Ambush; Thorn on both; custom "Cave Ogre" (large) visible on Goblin Ambush; root scene "Cellar" (`map-large`, cell 50, locked) with a goblin. Requires `battlemap`, `char-thorn`, `image-large` | [scenes-map](scenes-map.md#13-test-plan) | no | Scenes |
 | `encounter-1` | setup | Planned: goblin, wolf, Elite Goblin Warrior; party = Mira | combat-tracker | yes | Combat |
 
 - **Bundles (this spec):** `base` = `campaign` + `player-1`; `session-sim` = `base` + rows marked yes.
 - **Bundles (other owners):** `sync-probe` = `base` + `player-2` + `campaign-second` + `sync-probes` ([live-sync](live-sync.md)); `campaign-switch` = `base` + `player-2` + `campaign-second` ([campaign-management](campaign-management.md)); `mid-combat` = `session-sim` + combat state (combat-tracker, [OQ-FIX-04](#15-open-questions)).
+- **Bundles (Scenes owners):** `asset-library` = `base` + `player-2` + `campaign-second` + `images` + `image-large` + `images-second`; `asset-access` = `session-sim` + `player-2` (both [assets-pipeline](assets-pipeline.md#13-test-plan)). `entities` = `base` + `player-2` + `campaign-second` + `enemy-1` + `enemy-2` + `enemy-custom` + `char-mira` + `char-thorn` + `enemy-custom-second` ([entities](entities.md#13-test-plan)). `scenes` = `base` + `player-2` + `char-mira` + `char-thorn` + `enemy-1` + `enemy-2` + `enemy-custom` + `images` + `image-large` + `town` + `battlemap` + `scenes-extras` ([scenes-map](scenes-map.md#13-test-plan)). [play-shell](play-shell.md#13-test-plan) adds none (uses `sync-probe`).
 
 ## 9. API & events
 

@@ -262,7 +262,7 @@ fixtures/
 
 - **Skeleton exception**: the Phase 2 skeleton branch ([orchestrator §6](docs/agents/orchestrator-prompt.md#6-phases-and-gates)) owns and creates every shared file. No other `build/*` branch starts until it merges.
 - **`fix/*`** branches edit only the paths the orchestrator assigns.
-- **Append-only registries** (route mounts in `src/server/app.ts`, listener registry, record-type/visibility registry, `fixtures/bundles/index.ts`): a builder may add its own lines; nothing else.
+- **Append-only registries** (route mounts in `src/server/app.ts`, listener registry, record-type/visibility registry, `fixtures/bundles/index.ts`, client window registries `src/client/dm/windows.ts` and `src/client/player/windows.ts` ([OQ-SHELL-07](docs/specs/play-shell.md#15-open-questions), [ADR-0025](docs/architecture/adr/0025-play-shell-windows.md); the play-shell frame creates them empty before other builders register), entities' server definition-changed hook registry and DM `creatureActions` registry ([OQ-ENT-14](docs/specs/entities.md#15-open-questions))): a builder may add its own lines; nothing else.
 - To change a shared file, the builder **stops** and reports `shared change needed: <path> — <what> — <why>`. The orchestrator picks one:
   1. **Sequence**: the builder makes the change in its branch while no other active branch touches that file. The orchestrator records the lock in `docs/agents/status.md`.
   2. **Shared branch first**: a separate `fix/<slug>` makes the change, merges to `main`, and active builders rebase.
