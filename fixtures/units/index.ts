@@ -7,6 +7,8 @@ import campaign from "./campaign-management/campaign";
 import campaignSecond from "./campaign-management/campaign-second";
 import player1 from "./campaign-management/player-1";
 import player2 from "./campaign-management/player-2";
+import charPip from "./character-sheet/char-pip";
+import charWounds from "./character-sheet/char-wounds";
 import combat1 from "./combat-tracker/combat-1";
 import encounter1 from "./combat-tracker/encounter-1";
 import goblin2 from "./combat-tracker/goblin-2";
@@ -46,6 +48,8 @@ export const units: readonly Fixture[] = [
   notificationsTest,
   diceSettings,
   rolls1,
+  charPip,
+  charWounds,
   encounter1,
   goblin2,
   thornBattlemap,
