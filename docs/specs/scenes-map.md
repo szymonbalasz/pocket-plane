@@ -193,7 +193,7 @@ Isolated per worktree: `bun test` on `:memory:` DB, temp asset dir, port 0; walk
 | ~~OQ-MAP-13~~ | ~~DM views non-active scenes?~~ | **Decided (#122):** yes, client-only viewed scene (FR-MAP-08); integrator amends ADR-0014's deferred row | — | — |
 | OQ-MAP-14 | Token image after a portrait edit (size always follows, #120) | **Tokens still showing the old portrait follow; custom art kept** / always overwrite / never refresh | no · owner: spec-scenes-map | entities |
 | ~~OQ-MAP-16~~ | ~~Signal hooks in live-sync~~ | **Decided (integrator ruling, gate Scenes):** server stamps `from`; DM-only `map.pull`; receivers filter by scene; no server scene check or rate limit. [ADR-0026]($10026-signal-routing.md) awaits acceptance; built as a sequenced shared change after the skeleton, before scenes-map builds | no (build-sequenced) · owner: orchestrator | live-sync, protocol |
-| OQ-MAP-22 | Glossary: add **Ping**, **Pull**, **Laser pointer**, **Scene folder**, **Token owner**, **Viewed scene**; **Token** "bound to an entity" → "instance of a creature definition" | **Add** as in §6 / keep spec-local | no · owner: integrator | glossary |
+| ~~OQ-MAP-22~~ | ~~Glossary: add **Ping**, **Pull**, **Laser pointer**, **Scene folder**, **Token owner**, **Viewed scene**; reword **Token**~~ | **Decided (integrator, Scenes consolidation):** added; Token = "instance of a creature definition" ([glossary](../glossary.md)) | — | — |
 
 ## 16. Out of scope
 
