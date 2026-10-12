@@ -18,7 +18,6 @@ import { useRecords, useSync } from "@ui/sync/store";
 import { UploadIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useDmSession } from "../campaign-management/session";
 import { uploadAsset } from "./upload";
 
 type Upload =
@@ -64,6 +63,8 @@ export function AssetPicker({
   }, [pending, assets]);
 
   async function send(file: File) {
+    // Lazy: the session module reads localStorage at load (keeps window registries importable in tests).
+    const { useDmSession } = await import("../campaign-management/session");
     const secret = useDmSession.getState().secret;
     if (!secret || !live || busy) return;
     setUpload({ phase: "sending", pct: 0 });
