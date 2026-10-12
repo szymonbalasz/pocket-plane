@@ -13,7 +13,7 @@ wave: 2
 ## 1. Summary
 
 - The one play page per client (Roll20-style): scene canvas as the base, **floating windows** over it ([ADR-0014](../architecture/adr/0014-mvp-scope.md), [decisions-log](../decisions-log.md) #44, #48). Replaces the DM's six-window setup ([vision](../vision.md#the-table-today)).
-- Features don't own pages: they register **window types**; the shell opens, arranges and persists them. Plug-in contract: [ADR-0025]($10025-play-shell-windows.md).
+- Features don't own pages: they register **window types**; the shell opens, arranges and persists them. Plug-in contract: [ADR-0025](../architecture/adr/0025-play-shell-windows.md).
 - **Layout** lives in browser storage, per campaign and owner (DM or the link's player); it never reaches the server (#121).
 - Hosts the foundation UI: connection indicator, reconnect banner, presence ([live-sync](live-sync.md)); switcher, players panel, login / waiting / invalid-link screens ([campaign-management](campaign-management.md)).
 
