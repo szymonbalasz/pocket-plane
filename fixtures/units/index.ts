@@ -14,6 +14,9 @@ import enemy2 from "./entities/enemy-2";
 import enemyCustom from "./entities/enemy-custom";
 import enemyCustomSecond from "./entities/enemy-custom-second";
 import syncProbes from "./live-sync/sync-probes";
+import battlemap from "./scenes-map/battlemap";
+import scenesExtras from "./scenes-map/scenes-extras";
+import town from "./scenes-map/town";
 
 export const units: readonly Fixture[] = [
   campaign,
@@ -30,4 +33,7 @@ export const units: readonly Fixture[] = [
   charMira,
   charThorn,
   enemyCustomSecond,
+  town,
+  battlemap,
+  scenesExtras,
 ];

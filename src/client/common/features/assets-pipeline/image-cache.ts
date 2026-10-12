@@ -69,7 +69,7 @@ export class ImageCache<I extends LoadableImage> {
    */
   retry(url: string): boolean {
     const e = this.entries.get(url);
-    if (!e || e.state !== "error") return false;
+    if (e?.state !== "error") return false;
     e.image = this.create();
     this.set(e, "loading");
     this.start(e);
