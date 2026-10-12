@@ -10,18 +10,19 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | build play-shell, assets-pipeline | — (ended) | merged | walkthroughs 11/11, 7/7 | — |
 | build entities | — (ended) | merged (`5c01b44`) | walkthrough 6/6, 250 tests | — |
-| `fix/combat-core` | `build-combat-core` (`w17:p2`) | `w17`, `fix/combat-core`, slot 2 | phase 1 done (ctx.dice, lint rule, ADR-0029 window); phase 2: tables, events, loader test, CON-34–43, per-spec e2e bundles | — |
+| `fix/combat-core` | — (ended) | merged (`db2dd57`) | 279 tests, e2e 9/9 | — |
 | Spec party-loot (Phase 4) | — (ended) | draft on `main`; review `%TEMP%\opencode\review-loot.md` | in-review | DM: OQ-LOOT-01/02/06 (batch at Scenes gate) |
-| build scenes-map (+ FR-MAP-30 token hooks, token menu registry) | `build-scenes-map` (`w18:p2`) | `w18`, `build/scenes-map`, slot 0 | non-schema slices first | schema/events lock after combat-core merges |
-| build dice-roll-log, notifications | — | — | queued | combat-core |
+| build scenes-map (+ FR-MAP-30 token hooks, token menu registry) | `build-scenes-map` (`w18:p2`) | `w18`, `build/scenes-map`, slot 0 | canvas UI; server slice next | — |
+| build dice-roll-log | `build-dice-roll-log` (`w19:p2`) | `w19`, `build/dice-roll-log`, slot 2 | building | — |
+| build notifications | `build-notifications` (`w1A:p2`) | `w1A`, `build/notifications`, slot 3 | building | — |
 | build character-sheet → combat-tracker | — | — | queued | dice, notifications, scenes-map |
 
 Evidence archived: `%TEMP%\opencode\verify-{skeleton,scenes-core,play-shell,assets}\`.
 
 ## Shared-file locks (AGENTS §9.9, sequenced)
 
-- (entities locks released at merge)
-- `fix/combat-core`: `src/server/commands/`, `src/server/ws/`, `src/shared/protocol/`, `package.json`/`bun.lock`, `biome.json`, `scripts/e2e.ts` + `e2e/support/`, `src/server/db/schema.ts`, `src/shared/events/`, fixtures loader, data-model, protocol.
+- `build/scenes-map`: `src/server/db/schema.ts`, `src/shared/events/`, `fixtures/bundles/session-sim.ts`, `package.json`/`bun.lock` (konva), `src/client/common/features/assets-pipeline/image-cache.ts`, data-model, protocol.
+- `build/notifications`: play-shell window type + launcher (`badge?(store)`).
 
 ## Pending DM decisions
 

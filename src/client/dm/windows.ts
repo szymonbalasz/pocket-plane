@@ -4,6 +4,7 @@ import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/re
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
 import { assetTestWindow } from "./features/assets-pipeline/asset-test-window";
 import { creaturesWindow } from "./features/entities/creatures-window";
+import { notificationsHistoryWindow } from "./features/notifications/history-window";
 import { playersWindow } from "./features/play-shell/players-window";
 import { scenesWindow } from "./features/scenes-map/scenes-window";
 
@@ -14,6 +15,7 @@ const windows: WindowDef[] = [
   assetTestWindow, // asset.test, test mode (assets-pipeline, FR-ASSET-19)
   creaturesWindow, // ent.creatures (entities, FR-ENT-18)
   scenesWindow, // map.scenes (scenes-map, MAP §7)
+  notificationsHistoryWindow, // note.history (notifications, FR-NOTE-17)
 ];
 
 export const dmWindows = createWindowRegistry("dm", windows);

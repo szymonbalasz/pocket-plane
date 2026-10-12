@@ -5,6 +5,8 @@ import { DropdownMenu as M } from "radix-ui";
 import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
+import { useSync } from "../../sync/store";
+import { badgeText, useBadgeVersion } from "./badges";
 import { SHELL_ZONE_ATTR } from "./keys";
 import { launcherState, type WindowAction, type Windows } from "./manager";
 import type { WindowDef } from "./registry";
@@ -20,6 +22,8 @@ export function Launcher({
   windows: Windows;
   dispatch: (a: WindowAction) => void;
 }) {
+  const store = useSync((s) => s.store);
+  useBadgeVersion(); // re-render on `refreshBadges()`
   const entries = defs
     .filter((d) => d.launcher)
     .sort((a, b) => (a.launcher?.order ?? 0) - (b.launcher?.order ?? 0));
@@ -36,6 +40,7 @@ export function Launcher({
         if (!l) return null;
         const state = launcherState(windows, d.kind);
         const Icon = l.icon;
+        const badge = badgeText(d.badge && (() => d.badge?.(store) ?? 0));
         return (
           <Tooltip key={d.kind} content={`${l.label} (${STATE_LABEL[state]})`}>
             <Button
@@ -54,6 +59,15 @@ export function Launcher({
             >
               <Icon className="size-4" />
               <span className="text-xs">{l.label}</span>
+              {badge !== null && (
+                <span
+                  data-testid={`${d.kind.split(".")[0]}-launcher-badge`}
+                  data-count={badge}
+                  className="absolute -top-1 -right-1 min-w-4 rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground"
+                >
+                  {badge}
+                </span>
+              )}
               {state !== "closed" && (
                 <span
                   className={cn(

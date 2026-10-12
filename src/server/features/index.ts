@@ -5,6 +5,7 @@ import { campaignManagement } from "./campaign-management";
 import { entities } from "./entities";
 import { fixturesAdapters } from "./fixtures-adapters";
 import { liveSync } from "./live-sync";
+import { notifications } from "./notifications";
 import { scenesMap } from "./scenes-map";
 
 export const features: readonly Feature[] = [
@@ -14,4 +15,5 @@ export const features: readonly Feature[] = [
   assetsPipeline,
   entities,
   scenesMap,
+  notifications,
 ];

@@ -11,9 +11,12 @@ test("FR-SHELL-07 player registry loads; every type is a player window", () => {
 });
 
 test("FR-SHELL-20 test mode off → shell.test, sync.probes absent; on → present", () => {
-  expect([...availableKinds(playerWindows, emptyStore())]).toEqual([]);
+  const off = availableKinds(playerWindows, emptyStore());
+  expect(off.has("shell.test")).toBe(false);
+  expect(off.has("sync.probes")).toBe(false);
   const on = availableKinds(playerWindows, { ...emptyStore(), records: { probe: {} } });
-  expect([...on].sort()).toEqual(["shell.test", "sync.probes"]);
+  expect(on.has("shell.test")).toBe(true);
+  expect(on.has("sync.probes")).toBe(true);
 });
 
 test("FR-SHELL-14 player default layout: no window open in the Scenes phase", () => {
