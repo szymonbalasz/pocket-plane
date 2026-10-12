@@ -184,7 +184,7 @@ export async function processImage(bytes: Uint8Array): Promise<ProcessedImage> {
     const svg = prepareSvg(bytes);
     try {
       original = await sharp(svg.input, { ...SHARP_OPTS, density: 72 })
-        .png({ compressionLevel: 9 })
+        .png()
         .toBuffer();
     } catch {
       throw corrupt("SVG could not be rendered");
