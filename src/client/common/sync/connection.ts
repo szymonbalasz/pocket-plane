@@ -8,6 +8,7 @@ import {
   ServerFrame,
   type ServerSignalFrame,
   WS_PATH,
+  WS_PROBE_PARAM,
 } from "@shared/protocol/frames";
 import { applyEvent, applySnapshot, emptyStore, type RecordStore } from "@shared/protocol/store";
 import { backoffDelay } from "./backoff";
@@ -77,7 +78,7 @@ const PROBE_TIMEOUT_MS = 2_000;
  */
 export function probeUrl(wsUrl: string): string {
   const u = new URL(wsUrl.replace(/^ws/, "http"));
-  u.searchParams.set("probe", "1");
+  u.searchParams.set(WS_PROBE_PARAM, "1");
   return u.toString();
 }
 

@@ -1,6 +1,6 @@
 // Server bootstrap: guards, lock, DB, services, Hono + WS on one port.
 import path from "node:path";
-import { WS_PATH } from "@shared/protocol/frames";
+import { WS_PATH, WS_PROBE_PARAM } from "@shared/protocol/frames";
 import type { Server, ServerWebSocket } from "bun";
 import { createApp } from "./app";
 import type { Clock } from "./commands/context";
@@ -96,7 +96,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
             if (srv.upgrade(req, { data: { conn: null } })) return undefined;
             // Client reconnect probe (protocol §3.1): 2xx so browsers don't log it as an error.
             // No auth, no body.
-            if (url.searchParams.has("probe")) {
+            if (url.searchParams.has(WS_PROBE_PARAM)) {
               return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
             }
             return new Response("Expected a WebSocket upgrade", { status: 426 });
