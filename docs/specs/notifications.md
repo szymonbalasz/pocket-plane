@@ -19,7 +19,7 @@ wave: 2
 ## 2. Scope
 
 - `notification` record type: kind, audience, text, payload, optional action, state, timestamps. Persisted, campaign-scoped, in the snapshot.
-- Server helpers that kind owners call **inside their own command's transaction**: `notify`, `resolveNotification`, `reopenNotification` ([OQ-NOTE-05](#15-open-questions), [proposed ADR](../architecture/adr/proposed-notification-creation.md)).
+- Server helpers that kind owners call **inside their own command's transaction**: `notify`, `resolveNotification`, `reopenNotification` ([OQ-NOTE-05](#15-open-questions), [proposed ADR](../architecture/adr/0027-notification-creation.md)).
 - Intents: `note.dismiss` (DM), `note.resolve` (only for kinds that opt in).
 - Kind registries: server (payload schema) and per-client views (icon, renderer, action handler).
 - Toasts on arrival; history window `note.history` in the [play shell](play-shell.md); per-browser unread badge.
@@ -232,7 +232,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | OQ-NOTE-02 | Is the game log a notification feed? | **Separate windows; a roll creates a notification only through a kind owner** (log stays the record of rolls) / merged feed (one window, but mixes facts with to-dos) | no · owner: dice-roll-log | dice-roll-log |
 | OQ-NOTE-03 | History retention and reach | **Keep all in the DB; snapshot = all pending + last 100; "load older" later (tier B)** (bounded snapshot, nothing lost) / snapshot everything (simple, unbounded) | no · owner: DM | live-sync |
 | OQ-NOTE-04 | Toast timing | **Info hides after 6 s (paused on hover / hidden tab); pending stays** / all sticky (noisy) | no · owner: DM | — |
-| OQ-NOTE-05 | How are notifications created? | **Inside the causing command's transaction via `notify` (atomic, crash-safe, no core change)** / post-commit listener (ADR-0016 wording; lost if the server dies between commit and listener, needs listener-issued commands). [Proposed ADR](../architecture/adr/proposed-notification-creation.md) | yes | combat-tracker, party-loot, ADR-0016 |
+| OQ-NOTE-05 | How are notifications created? | **Inside the causing command's transaction via `notify` (atomic, crash-safe, no core change)** / post-commit listener (ADR-0016 wording; lost if the server dies between commit and listener, needs listener-issued commands). [Proposed ADR](../architecture/adr/0027-notification-creation.md) | yes | combat-tracker, party-loot, ADR-0016 |
 | OQ-NOTE-06 | Damage-card contract (combat-tracker) | **Combat-tracker owns kind `damage-card`: payload schema, DM `onAction` opening the attack popup, and the apply command calling `resolveNotification`** / notifications models damage fields itself (couples us to combat) | no · owner: combat-tracker | combat-tracker |
 | OQ-NOTE-07 | Undoing applied damage: what happens to its card? | **Undo calls `reopenNotification`; the card is pending again for a corrected apply** / card stays resolved (DM recreates it) | no · owner: combat-tracker | combat-tracker |
 | OQ-NOTE-08 | `loot-received` kind | **Yes: party-loot calls `notify` (info, audience `all`) when the DM adds loot** (toast to everyone) / no (loot log window only) | no · owner: party-loot | party-loot |

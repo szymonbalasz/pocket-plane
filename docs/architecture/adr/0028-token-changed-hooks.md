@@ -1,6 +1,6 @@
-# NNNN — Token-changed hooks keep bound instances in step
+# 0028 — Token-changed hooks keep bound instances in step
 
-- Status: proposed
+- Status: accepted (2026-10-12; decisions-log #134, #137)
 - Date: 2026-10-12
 - Affects: [scenes-map](../../specs/scenes-map.md) (FR-MAP-05, -18, -19), [combat-tracker](../../specs/combat-tracker.md) (FR-CBT-09), [protocol](../../protocol/README.md) §17, [AGENTS §9.9](../../../AGENTS.md#99-shared-files)
 - Extends: [ADR-0024](0024-definition-visibility.md) (definition-changed hooks), [ADR-0021](0021-sync-protocol-conventions.md) ("visibility fns read only the record and the connection context")
@@ -22,7 +22,7 @@
 
 ## Decision
 
-> Undecided. Suggested: **A**. Registry is append-only (AGENTS §9.9), created by scenes-map's build or a `fix/*` before combat-tracker builds.
+**A** (#134). scenes-map token commands run registered token-changed hooks inside their own transaction (as definition-changed hooks, FR-ENT-19); combat copies name / image / hidden onto bound combatants; deleting a token bound to a running encounter answers `conflict`. Registry is append-only (AGENTS §9.9), created by `build/scenes-map`.
 
 ## Consequences
 
