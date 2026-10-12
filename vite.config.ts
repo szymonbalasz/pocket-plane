@@ -57,10 +57,17 @@ export default defineConfig(({ command }) => {
     build: {
       outDir: r("dist/client"),
       emptyOutDir: true,
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           dm: r("src/client/dm/index.html"),
           player: r("src/client/player/index.html"),
+        },
+        output: {
+          // React DOM in its own long-cached chunk keeps the shared app chunk under the 500 KB
+          // warning. Konva is not grouped: it stays in the lazy MapCanvas chunk (LazyMapCanvas).
+          codeSplitting: {
+            groups: [{ name: "react-dom", test: /node_modules[\\/](react-dom|scheduler)[\\/]/ }],
+          },
         },
       },
     },
