@@ -68,19 +68,26 @@ export interface ConnectionOptions {
 const PROBE_TIMEOUT_MS = 2_000;
 
 /**
- * Reachability probe: a plain HTTP GET of the WS path. The server answers a non-upgrade request
- * with 426 (protocol §6); a dead server gives a network error, and the dev proxy gives a 5xx.
- * Why: Chromium throttles new WebSockets per renderer by recent *WebSocket* failures
- * (`services/network/websocket_throttler.cc`: up to +5 s per connect after ~16 failures/success).
- * Probing with fetch during an outage keeps WS failures at one per outage (FR-SYNC-05).
+ * Reachability probe: a plain HTTP `GET <ws path>?probe=1`, which the server answers 204
+ * (protocol §3.1; a 2xx, so the browser logs nothing). A dead server gives a network error, the
+ * dev proxy a 5xx. Why: Chromium throttles new WebSockets per renderer by recent *WebSocket*
+ * failures (`services/network/websocket_throttler.cc`: up to +5 s per connect after ~16
+ * failures/success). Probing with fetch during an outage keeps WS failures at one per outage
+ * (FR-SYNC-05).
  */
+export function probeUrl(wsUrl: string): string {
+  const u = new URL(wsUrl.replace(/^ws/, "http"));
+  u.searchParams.set("probe", "1");
+  return u.toString();
+}
+
 export async function httpProbe(wsUrl: string): Promise<boolean> {
   try {
-    const r = await fetch(wsUrl.replace(/^ws/, "http"), {
+    const r = await fetch(probeUrl(wsUrl), {
       cache: "no-store",
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
-    return r.status === 426;
+    return r.status === 204;
   } catch {
     return false;
   }

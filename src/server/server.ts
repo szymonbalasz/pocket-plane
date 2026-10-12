@@ -91,8 +91,14 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
         hostname: config.host,
         port: config.port,
         fetch(req, srv) {
-          if (new URL(req.url).pathname === WS_PATH) {
+          const url = new URL(req.url);
+          if (url.pathname === WS_PATH) {
             if (srv.upgrade(req, { data: { conn: null } })) return undefined;
+            // Client reconnect probe (protocol §3.1): 2xx so browsers don't log it as an error.
+            // No auth, no body.
+            if (url.searchParams.has("probe")) {
+              return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
+            }
             return new Response("Expected a WebSocket upgrade", { status: 426 });
           }
           return app.fetch(req);
