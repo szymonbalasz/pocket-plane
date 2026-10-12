@@ -150,16 +150,26 @@ function emptyManifest(status: Manifest["status"], startedAt: string): Manifest 
 }
 
 function removeFile(file: string): void {
-  try {
-    rmSync(file, { force: true });
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === "EBUSY" || code === "EPERM") {
-      throw new FixtureError(
-        `Cannot delete ${file} (${code}): it is in use. Stop the server or close the DB viewer, then retry.`,
-      );
+  for (let attempt = 0; ; attempt++) {
+    try {
+      rmSync(file, { force: true });
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if ((code === "EBUSY" || code === "EPERM") && attempt < 5) {
+        // A DB this process closed can stay locked on Windows until GC finalizes its prepared
+        // statements (see `closeDb`); collect and retry before blaming another holder.
+        Bun.gc(true);
+        Bun.sleepSync(50);
+        continue;
+      }
+      if (code === "EBUSY" || code === "EPERM") {
+        throw new FixtureError(
+          `Cannot delete ${file} (${code}): it is in use. Stop the server or close the DB viewer, then retry.`,
+        );
+      }
+      throw err;
     }
-    throw err;
   }
 }
 
