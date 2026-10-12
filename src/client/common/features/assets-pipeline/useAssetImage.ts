@@ -29,6 +29,11 @@ export function useAssetReconnectRetry(): void {
   }, [state]);
 }
 
+/** Re-arm a failed load when a later record change carries the asset ID (FR-ASSET-16). */
+export function retryAssetImage(id: string, file: AssetFile): boolean {
+  return cache.retry(assetUrl(id, file));
+}
+
 export interface AssetImage {
   state: ImageState | "none";
   image: HTMLImageElement | null;
