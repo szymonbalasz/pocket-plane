@@ -66,6 +66,13 @@ function setup() {
   return { conn, sockets, clock, wake: () => wake?.() };
 }
 
+const snapshotFrame = JSON.stringify({
+  type: "snapshot",
+  seq: 0,
+  you: { campaignId: "c", role: "player", playerId: "p" },
+  records: {},
+});
+
 test("FR-SYNC-05 a lost connection waits for the backoff", () => {
   const { conn, sockets, clock } = setup();
   conn.start();
@@ -75,30 +82,42 @@ test("FR-SYNC-05 a lost connection waits for the backoff", () => {
   expect(sockets).toHaveLength(2);
 });
 
+test("FR-SYNC-05 SYNC §3 server down for a long time: every retry is ≤ 1.8 s after the last, so rejoin ≤ 2 s after the server answers", () => {
+  const { conn, sockets, clock } = setup();
+  conn.start();
+  // Server unreachable for ~2 minutes of failed attempts.
+  for (let i = 0; i < 60; i++) {
+    sockets.at(-1)?.close(1006);
+    const [wait] = clock.pending();
+    expect(wait).toBeLessThanOrEqual(1_800);
+    clock.advance(wait as number);
+  }
+  // Server back: the next attempt opens within 1.8 s, then a snapshot makes it live.
+  sockets.at(-1)?.close(1006);
+  const n = sockets.length;
+  clock.advance(1_800);
+  expect(sockets).toHaveLength(n + 1);
+  sockets.at(-1)?.onmessage?.({ data: snapshotFrame });
+  expect(conn.snapshot.state).toBe("live");
+});
+
 test("SYNC §3 reconnect goal: online / focus / visible skips the remaining backoff", () => {
   const { conn, sockets, clock, wake } = setup();
   conn.start();
-  // Several failed attempts → long backoff (4–6 s).
+  // Several failed attempts → capped backoff (1.2–1.8 s, #131).
   for (let i = 0; i < 4; i++) {
     sockets.at(-1)?.close(1006);
     clock.advance(10_000);
   }
   sockets.at(-1)?.close(1006);
   const n = sockets.length;
-  expect(Math.min(...clock.pending())).toBeGreaterThan(3_000);
+  expect(Math.min(...clock.pending())).toBeGreaterThanOrEqual(1_200);
   wake();
   expect(sockets).toHaveLength(n + 1);
   expect(clock.pending()).toEqual([]);
   // Attempt in flight → another wake does nothing.
   wake();
   expect(sockets).toHaveLength(n + 1);
-});
-
-const snapshotFrame = JSON.stringify({
-  type: "snapshot",
-  seq: 0,
-  you: { campaignId: "c", role: "player", playerId: "p" },
-  records: {},
 });
 
 test("FR-SYNC-22 signals: sent only while live (never queued); incoming frames reach handlers with from", () => {

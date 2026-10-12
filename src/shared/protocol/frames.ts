@@ -121,6 +121,7 @@ export const HELLO_TIMEOUT_MS = 5_000;
 export const PING_INTERVAL_MS = 10_000;
 export const SERVER_SILENCE_MS = 30_000;
 export const CLIENT_PONG_TIMEOUT_MS = 20_000;
+/** Reconnect backoff: 0.5 s doubling to a 1.5 s cap (decision #131), ±20 % jitter → ≤ 1.8 s. */
 export const BACKOFF_START_MS = 500;
-export const BACKOFF_MAX_MS = 5_000;
+export const BACKOFF_MAX_MS = 1_500;
 export const BACKOFF_JITTER = 0.2;
