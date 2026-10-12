@@ -156,7 +156,10 @@ export function DmMapBase() {
 export function DmMapToolRail() {
   const { viewed, active } = useViewedScene();
   return (
-    <ToolRail pingHint="Click to ping, Shift+click to pull everyone's view">
+    <ToolRail
+      pingHint="Click to ping, Shift+click to pull everyone's view, right-drag for the laser"
+      signalsOff={viewed !== null && active?.id !== viewed.id}
+    >
       {viewed && (
         <div className="flex flex-col gap-1 border-t pt-1">
           <GridTool scene={viewed} />

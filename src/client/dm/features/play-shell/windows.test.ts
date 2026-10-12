@@ -52,20 +52,40 @@ test("FR-SHELL-08 every other DM window's default rect fits the viewport (1280×
   }
 });
 
-test("FR-SHELL-08 DM default-open + test windows don't overlap (1280×720, 1600×900)", () => {
-  const available = packedKinds();
+/**
+ * Overlap groups, derived from the registry: default-open product windows (available without
+ * test mode) among themselves, and test-mode windows (available only in test mode) among
+ * themselves. A test window may cover a product window; walkthroughs move it if needed.
+ */
+function overlapGroups(): Set<string>[] {
+  const on = availableKinds(dmWindows, testMode);
+  const off = availableKinds(dmWindows, emptyStore());
+  const product = new Set([...off].filter((k) => dmWindows.get(k)?.defaultOpen));
+  const testOnly = new Set([...on].filter((k) => !off.has(k)));
+  return [product, testOnly];
+}
+
+test("FR-SHELL-08 DM default-open product windows don't overlap; test windows don't overlap each other (1280×720, 1600×900)", () => {
   for (const viewport of VIEWPORTS) {
     const ctx = { registry: dmWindows, viewport, available: availableKinds(dmWindows, testMode) };
     let ws = defaultLayout(dmWindows, viewport);
-    for (const kind of available) ws = [...reduce(ws, { type: "open", kind }, ctx)];
-    const rects = ws.map((w) => ({ kind: w.kind, ...clampRect(w, viewport) }));
-    expect(rects).toHaveLength(available.size);
-    for (const a of rects)
-      for (const b of rects) {
-        if (a === b) continue;
-        const overlap = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-        expect(overlap ? `${a.kind} overlaps ${b.kind} at ${viewport.w}` : "ok").toBe("ok");
-      }
+    for (const kind of availableKinds(dmWindows, testMode)) {
+      ws = [...reduce(ws, { type: "open", kind }, ctx)];
+    }
+    const rectOf = new Map(ws.map((w) => [w.kind, clampRect(w, viewport)]));
+    for (const group of overlapGroups()) {
+      const rects = [...group].map((kind) => {
+        const r = rectOf.get(kind);
+        if (!r) throw new Error(`${kind} not in the layout`);
+        return { kind, ...r };
+      });
+      for (const a of rects)
+        for (const b of rects) {
+          if (a === b) continue;
+          const overlap = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+          expect(overlap ? `${a.kind} overlaps ${b.kind} at ${viewport.w}` : "ok").toBe("ok");
+        }
+    }
   }
 });
 

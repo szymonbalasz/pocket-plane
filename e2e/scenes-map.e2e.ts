@@ -73,6 +73,7 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
   await expect(dm.getByTestId("map-not-shown-badge")).toBeVisible();
+  await expect(dm.getByTestId("map-tool-ping")).toBeDisabled();
   await expect.poll(async () => (await tokenNode(dm, wolf))?.opacity).toBeLessThan(1);
   await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", town);
 
@@ -87,6 +88,7 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   // Show to players: the player switches; Wolf visible, Elite and the scene name never sent.
   await dm.getByTestId("map-show-to-players").click();
   await expect(dm.getByTestId("map-not-shown-badge")).toHaveCount(0);
+  await expect(dm.getByTestId("map-tool-ping")).toBeEnabled();
   await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
   await expect.poll(() => tokenNode(player, wolf)).not.toBeNull();
   expect(await tokenNode(player, elite)).toBeNull();

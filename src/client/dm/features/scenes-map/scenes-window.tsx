@@ -447,11 +447,9 @@ export const scenesWindow = defineWindow({
   kind: SCENES_KIND,
   title: "Scenes",
   clients: ["dm"],
-  // MAP §7 says 300×480, min 240×240. At 1280×720 the test-mode Probes window (bottom-left)
-  // starts at y 284, so 224 high is what fits next to it (FR-SHELL-08); users resize freely.
+  defaultSize: { w: 300, h: 480 },
+  minSize: { w: 240, h: 240 },
   // dx clears the tool rail, which sits above windows on the left edge.
-  defaultSize: { w: 300, h: 224 },
-  minSize: { w: 240, h: 200 },
   defaultPosition: { anchor: "top-left", dx: 56 },
   defaultOpen: true,
   launcher: { icon: MapIcon, label: "Scenes", order: 20 },
