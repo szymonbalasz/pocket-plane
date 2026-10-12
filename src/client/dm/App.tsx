@@ -1,17 +1,14 @@
 import { CampaignName } from "@shared/campaign-management/schemas";
 import { Button } from "@ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, Skeleton } from "@ui/components/ui/primitives";
-import { ConnectionIndicator, ReconnectBanner } from "@ui/features/live-sync/ConnectionStatus";
-import { ProbePanel } from "@ui/features/live-sync/ProbePanel";
 import { SyncProvider } from "@ui/sync/SyncProvider";
 import { useSync } from "@ui/sync/store";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { CampaignBar } from "./features/campaign-management/CampaignBar";
 import { LoginScreen } from "./features/campaign-management/LoginScreen";
 import { NameDialog } from "./features/campaign-management/NameDialog";
-import { PlayersPanel } from "./features/campaign-management/PlayersPanel";
 import { api, dmCall, useDmSession } from "./features/campaign-management/session";
+import { DmPlayPage } from "./features/play-shell/DmPlayPage";
 
 export function App() {
   const secret = useDmSession((s) => s.secret);
@@ -88,32 +85,12 @@ function DmShell() {
     if (state === "rejected") setSecret(null);
   }, [state, setSecret]);
 
+  // Play shell (FR-SHELL-01/03): skeleton until the first snapshot, then the play page.
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center gap-4 border-b px-6 py-3">
-        <h1 className="text-lg font-semibold">Pocket Plane</h1>
-        <CampaignBar campaigns={campaigns} />
-        <div className="ml-auto flex items-center gap-3">
-          <ConnectionIndicator />
-          <Button
-            variant="ghost"
-            size="sm"
-            data-testid="camp-logout"
-            onClick={() => setSecret(null)}
-          >
-            Log out
-          </Button>
-        </div>
-      </header>
-      <ReconnectBanner />
-      {!everLive || (state !== "live" && campaignId === undefined) ? (
-        <Loading />
-      ) : (
-        <main className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-2">
-          <PlayersPanel />
-          <ProbePanel />
-        </main>
-      )}
-    </div>
+    <DmPlayPage
+      screen={!everLive || (state !== "live" && campaignId === undefined) ? <Loading /> : null}
+      campaigns={campaigns}
+      onLogout={() => setSecret(null)}
+    />
   );
 }
