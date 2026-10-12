@@ -9,9 +9,11 @@ import {
   type RejectFrame,
   SERVER_SILENCE_MS,
   type ServerFrame,
+  type ServerSignalFrame,
+  type SignalFrom,
   type SnapshotFrame,
 } from "@shared/protocol/frames";
-import { CommandError } from "../commands/errors";
+import { CommandError, zodIssues } from "../commands/errors";
 import type { DispatchedEvent, RecordChange, Role } from "../events/types";
 import type { Services } from "../services";
 import type { Viewer, WireChange } from "./records";
@@ -151,8 +153,7 @@ export class Hub implements HubApi {
         if (c.phase === "live") void this.sendSnapshot(c);
         return;
       case "signal":
-        // No signal types in Foundation (docs/protocol §7).
-        return this.reject(c, null, "unknown_intent", `Unknown signal "${f.name}"`);
+        return this.signal(c, f.name, f.data);
       case "intent":
         return this.intent(c, f.intentId, f.name, f.payload);
     }
@@ -287,6 +288,29 @@ export class Hub implements HubApi {
       c,
       result === undefined ? { type: "ack", intentId } : { type: "ack", intentId, result },
     );
+  }
+
+  /**
+   * Signals (FR-SYNC-22, ADR-0026): zod + roles, then forward to every **other** live connection
+   * of the sender's campaign with a server-stamped `from`. No bus, DB, log, snapshot or `seq`.
+   */
+  private signal(c: Connection, name: string, data: unknown): undefined {
+    if (c.phase !== "live" || !c.role || !c.campaignId) {
+      return this.reject(c, null, "invalid", "Connection not live");
+    }
+    const def = this.s.signals.get(name);
+    if (!def) return this.reject(c, null, "unknown_intent", `Unknown signal "${name}"`);
+    if (!def.roles.includes(c.role)) return this.reject(c, null, "forbidden", "Not allowed");
+    const parsed = def.schema.safeParse(data);
+    if (!parsed.success) {
+      return this.reject(c, null, "invalid", "Invalid signal", zodIssues(parsed.error));
+    }
+    const from: SignalFrom =
+      c.role === "dm" ? { role: "dm" } : { role: "player", playerId: c.playerId ?? "" };
+    const frame: ServerSignalFrame = { type: "signal", name, data: parsed.data, from };
+    for (const o of [...this.conns.values()]) {
+      if (o !== c && o.phase === "live" && o.campaignId === c.campaignId) this.send(o, frame);
+    }
   }
 
   /** Bus listener: one `event` frame per connection per domain event (FR-SYNC-17). */

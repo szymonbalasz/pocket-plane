@@ -71,10 +71,18 @@ export const EventFrame = z.object({
   cause: z.object({ name: z.string(), intentId: IntentId.optional() }),
   changes: z.array(WireChange).min(1),
 });
+/** Signal sender, stamped by the server from the connection context, never the payload (ADR-0026). */
+export const SignalFrom = z.discriminatedUnion("role", [
+  z.object({ role: z.literal("dm") }),
+  z.object({ role: z.literal("player"), playerId: z.string() }),
+]);
+export type SignalFrom = z.infer<typeof SignalFrom>;
+
 export const ServerSignalFrame = z.object({
   type: z.literal("signal"),
   name: z.string(),
   data: z.unknown(),
+  from: SignalFrom,
 });
 export const AckFrame = z.object({
   type: z.literal("ack"),
@@ -103,6 +111,7 @@ export type ServerFrame = z.infer<typeof ServerFrame>;
 export type SnapshotFrame = z.infer<typeof SnapshotFrame>;
 export type EventFrame = z.infer<typeof EventFrame>;
 export type RejectFrame = z.infer<typeof RejectFrame>;
+export type ServerSignalFrame = z.infer<typeof ServerSignalFrame>;
 
 /** WS endpoint path (OQ-SYNC-15, proposed). */
 export const WS_PATH = "/ws";
@@ -112,6 +121,7 @@ export const HELLO_TIMEOUT_MS = 5_000;
 export const PING_INTERVAL_MS = 10_000;
 export const SERVER_SILENCE_MS = 30_000;
 export const CLIENT_PONG_TIMEOUT_MS = 20_000;
+/** Reconnect backoff: 0.5 s doubling to a 1.5 s cap (decision #131), ±20 % jitter → ≤ 1.8 s. */
 export const BACKOFF_START_MS = 500;
-export const BACKOFF_MAX_MS = 5_000;
+export const BACKOFF_MAX_MS = 1_500;
 export const BACKOFF_JITTER = 0.2;

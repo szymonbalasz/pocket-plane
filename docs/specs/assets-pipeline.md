@@ -46,7 +46,7 @@ wave: 1
 | FR-ASSET-05 | Derivatives made at ingest: `thumb` WebP, long edge ≤ 512 px; `display` WebP, long edge ≤ 4096 px. Never upscaled; aspect kept; EXIF orientation applied; metadata stripped; alpha kept. | *(proposed)* OQ-ASSET-03 |
 | FR-ASSET-06 | All files are on disk before the row + event-log entry commit in one transaction; `AssetIngested` dispatches after commit ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). | |
 | FR-ASSET-07 | On server start: delete the temp dir and every hash dir no asset row references. An asset missing any file is logged as an error; its files answer 404. | Crash recovery |
-| FR-ASSET-08 | `id` = 128 bits from `ctx.tokens`, base64url (it is the capability, FR-ASSET-11); `seq` = monotonic insertion order; `createdAt` from `ctx.clock` ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)). Name = `name` or filename without extension; trimmed, control characters removed, 1–80 chars (else `invalid`); not unique. | |
+| FR-ASSET-08 | `id` = 128 bits from `ctx.tokens`, base64url (it is the capability, FR-ASSET-11); `seq` = monotonic insertion order, assigned by the DB at insert (CON-20); `createdAt` from `ctx.clock` ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)). Name = `name` or filename without extension; trimmed, control characters removed, 1–80 chars (else `invalid`); not unique. | |
 | FR-ASSET-09 | An asset belongs to `ctx.campaignId`, resolved when the request is authenticated ([FR-CAMP-11](campaign-management.md#6-functional-requirements)). No context ever lists or receives another campaign's `asset` record. | [ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md) |
 | FR-ASSET-10 | Record type `asset`: scope `campaign`; DM `full`, player `hidden`. Snapshot: all the campaign's assets; array order not significant. Picker order: `createdAt` desc, then `seq` desc. | [FR-SYNC-18](live-sync.md#6-functional-requirements) |
 | FR-ASSET-11 | `GET /api/assets/:id/:file`, `file` ∈ `thumb \| display`. No credential: knowing the ID is the permission (#123). Served iff the asset exists and belongs to the active campaign. Originals are never served. | Same for DM and players |
@@ -170,13 +170,13 @@ Isolated per worktree: `bun test` uses `:memory:` DB + temp asset dir per file; 
 
 | On | What we need | Status |
 |---|---|---|
-| [live-sync](live-sync.md) | Register record type `asset` (no registry change). §12 "Assets are URLs" to read "records carry asset IDs; clients build the URL" (integrator) | agreed |
+| [live-sync](live-sync.md) | Register record type `asset` (no registry change). §12 "Assets are URLs" to read "records carry asset IDs; clients build the URL" (integrator) | done (CON-29) |
 | [campaign-management](campaign-management.md) | DM `Bearer` on POST, 401 / 429 (FR-CAMP-04/05); `ctx.campaignId` at authentication (FR-CAMP-11). No player REST credential (#123) | agreed |
 | [scenes-map](scenes-map.md) | `Scene.mapAssetId`, `Token.imageAssetId` set via `assets.require`; sent only on records the player sees (FR-ASSET-12); picker in its flows; map `display`, token `thumb`; OQ-ASSET-07. FR-MAP-19 "fetchable" → "ID reaches players" | open |
-| [entities](entities.md) | `portraitAssetId` set via `assets.require` (FR-ENT-08/11); kept in FR-ENT-15 redaction, so all players learn character portrait IDs; monster portrait IDs reach players only via visible tokens' copies, written in the edit's transaction (#120) | open: OQ-ASSET-10 |
+| [entities](entities.md) | `portraitAssetId` set via `assets.require` (FR-ENT-08/11); kept in FR-ENT-15 redaction, so all players learn character portrait IDs; monster portrait IDs reach players only via visible tokens' copies, written in the edit's transaction (#120) | agreed (OQ-ASSET-10 decided) |
 | [play-shell](play-shell.md) | Window registry (FR-SHELL-07) for `asset.test`; no shell change | agreed |
 | [fixtures-adapters](fixtures-adapters.md) | Loader passes SVG bytes to `assets.ingest`; manifest lists asset IDs by fixture key. Add `image-large`, `images-second`, bundles `asset-library`, `asset-access` to FIX §8 at merge (integrator) | agreed (FR-FIX-17) |
-| [data model](../data-model/README.md) | Asset `id` from `ctx.tokens`, not `ctx.ids` (consolidation, integrator) | open |
+| [data model](../data-model/README.md) | Asset `id` from `ctx.tokens`, not `ctx.ids` (consolidation, integrator) | done ([CON-19](../data-model/README.md#8-conflicts-log)) |
 
 ## 15. Open questions
 
@@ -193,7 +193,7 @@ Isolated per worktree: `bun test` uses `:memory:` DB + temp asset dir per file; 
 | OQ-ASSET-07 | Grid calibration pixel space | **`display` pixels; asset exposes display size** (what players render; OQ-MAP-15 agrees) / original pixels + scale | no · owner: scenes-map | scenes-map |
 | OQ-ASSET-08 | Where can the DM open the picker outside scene / token / portrait flows? | **Test-mode-only window `asset.test` (like `shell.test`, FR-SHELL-23)** (no product scope; walkthrough A runs before scenes-map) / DM window `asset.images` (≈ tier-A library) / host flows only | no · owner: spec-assets-pipeline | play-shell |
 | OQ-ASSET-09 | ~~Glossary: add **Asset reference**~~ | **Decided (integrator, Scenes consolidation):** added to the [glossary](../glossary.md) as suggested | no (decided) | all specs with images |
-| OQ-ASSET-10 | entities: FR-ENT-08/11 call `assets.require` for `portraitAssetId` | **yes** / — | no · owner: spec-entities | entities |
+| ~~OQ-ASSET-10~~ | ~~entities: FR-ENT-08/11 call `assets.require` for `portraitAssetId`~~ | **Decided:** yes; [FR-ENT-08/11](entities.md#6-functional-requirements) call it (CON-27) | — | — |
 
 ## 16. Out of scope
 

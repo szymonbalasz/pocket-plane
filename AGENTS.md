@@ -179,7 +179,7 @@ fixtures/
 | On the command context | Real (default) | Seeded |
 |---|---|---|
 | `ctx.ids` — record IDs | random | deterministic, seeded per **fixture key** (adding a fixture never shifts another's IDs) |
-| `ctx.tokens` — secret tokens (player links) | CSPRNG, ≥ 128 bits | deterministic, same seeding |
+| `ctx.tokens` — secret tokens (player links) and asset IDs ([ADR-0023](docs/architecture/adr/0023-asset-access-by-capability-id.md)) | CSPRNG, ≥ 128 bits | deterministic, same seeding |
 | `ctx.clock` — `now()` | system clock | fixed clock per fixtures-adapters |
 
 - Commands get IDs, tokens and time **only** from `ctx`. Never `crypto.randomUUID`, `getRandomValues`, `Date.now` or `new Date()` in command code (Biome restricted globals + review). Dice: per [dice-roll-log](docs/specs/dice-roll-log.md).

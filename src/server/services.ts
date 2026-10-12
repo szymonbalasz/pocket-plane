@@ -2,7 +2,7 @@
 import type { DomainEventDef } from "@shared/events";
 import { domainEvents } from "@shared/events";
 import type { z } from "zod";
-import { type CommandDef, Commands } from "./commands/commands";
+import { type CommandDef, Commands, type CommitHook } from "./commands/commands";
 import { type Clock, type CommandContext, realContext, systemClock } from "./commands/context";
 import type { Config } from "./config";
 import type { Db } from "./db/client";
@@ -11,7 +11,8 @@ import { features } from "./features";
 import { ImportRegistry } from "./features/fixtures-adapters/import-pipeline";
 import type { Logger } from "./log";
 import type { HubApi } from "./ws/hub";
-import { type AnyRecordType, RecordRegistry } from "./ws/records";
+import { type ActiveSceneResolver, type AnyRecordType, RecordRegistry } from "./ws/records";
+import { type SignalDef, SignalRegistry } from "./ws/signals";
 
 /** Resolvers campaign-management provides to live-sync (CAMP §9, protocol §2). */
 export interface CredentialResolvers {
@@ -36,6 +37,8 @@ export interface Services {
   records: RecordRegistry;
   /** Command names callable as WS intents. */
   intents: Set<string>;
+  /** Transient signals (FR-SYNC-22, ADR-0026). */
+  signals: SignalRegistry;
   auth: CredentialResolvers;
   /** Import pipeline kinds + definition store (entities plugs in here, CON-03). */
   imports: ImportRegistry;
@@ -48,7 +51,12 @@ export interface Registrar {
   command<S extends z.ZodType, R>(def: CommandDef<S, R>, opts?: { intent?: boolean }): void;
   event(def: DomainEventDef): void;
   recordType(def: AnyRecordType): void;
+  signal(def: SignalDef): void;
+  /** The campaign's active scene for the `scene` scope gate (CON-22); one provider. */
+  activeScene(resolver: ActiveSceneResolver): void;
   listener(name: string, fn: Listener): void;
+  /** Post-commit, pre-listener cache refresh (CON-23). */
+  afterCommit(name: string, fn: CommitHook): void;
   provideAuth(resolvers: CredentialResolvers): void;
 }
 
@@ -86,6 +94,7 @@ export function createServices(opts: ServicesOptions): Services {
     commands,
     records: new RecordRegistry(),
     intents: new Set(),
+    signals: new SignalRegistry(),
     auth: missingAuth,
     hub: null,
     imports: new ImportRegistry(),
@@ -100,7 +109,10 @@ export function createServices(opts: ServicesOptions): Services {
     },
     event: (def) => commands.registerEvent(def),
     recordType: (def) => services.records.register(def),
+    signal: (def) => services.signals.register(def),
+    activeScene: (fn) => services.records.provideActiveScene(fn),
     listener: (name, fn) => bus.subscribe(name, fn),
+    afterCommit: (name, fn) => commands.afterCommit(name, fn),
     provideAuth(r) {
       services.auth = r;
     },

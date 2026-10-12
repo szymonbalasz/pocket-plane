@@ -52,20 +52,20 @@ wave: 1
 | FR-SYNC-06 | Player `hello` whose campaign is not active → close `4409 campaign-inactive`, no other frame. Client enters `waiting` (campaign-management's screen), keeps reconnecting, and joins without reload ≤ 10 s after the campaign is activated. | Retryable |
 | FR-SYNC-07 | When a change of active campaign commits, the hub closes every connection whose `campaignId` ≠ the new one with `4409`. The DM client reconnects at once into the new campaign; players wait (FR-SYNC-06). | Campaign never changes on a live connection |
 | FR-SYNC-08 | After a valid `hello`, exactly one `snapshot` (seq 0, with `you {campaignId, role, playerId}`) precedes any `event`. Client replaces its whole store with it and drops optimistic state. | |
-| FR-SYNC-09 | Snapshot = each record type's provider output through the filter. Scopes: `global` (imported definitions, [ADR-0018](../architecture/adr/0018-global-imported-content.md)), `campaign`, `scene` (DM: all scenes; player: active scene only). | OQ-SYNC-03 |
+| FR-SYNC-09 | Snapshot = each record type's provider output through the filter. Scopes: `global` (imported definitions, [ADR-0018](../architecture/adr/0018-global-imported-content.md)), `campaign`, `scene` (DM: all scenes; player: active scene only). The `scene` gate (`sceneOf(record)` = active scene, else hidden for players) applies to snapshots **and** live events. | OQ-SYNC-03, CON-22 |
 | FR-SYNC-10 | Changes committed between snapshot read and send arrive as events after it: none lost, none duplicated. | Hook: FR-SYNC-26 |
 | FR-SYNC-11 | Client `resync` → fresh snapshot. Switching the active scene resyncs every player connection of the campaign. | |
 | FR-SYNC-12 | Intents are zod-validated and dispatched by `name`. Unknown → `reject unknown_intent`; bad payload or JSON → `reject invalid` (issues), connection stays open. Frame > 64 KB → close `1009`. | |
 | FR-SYNC-13 | Handlers declare roles (**default DM only**) and, if players are allowed, an ownership check. Failure → `reject forbidden`, no change, no event. | [ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md) |
 | FR-SYNC-14 | Every intent gets exactly one `ack` or `reject`, sender only, keyed by `intentId`. Events it caused reach the sender **before** the `ack`. | Needs synchronous listeners: [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md) option F (decided: synchronous) |
 | FR-SYNC-15 | Commands called via REST (Hono RPC) produce the same events; the result comes in the HTTP response. | OQ-SYNC-04 |
-| FR-SYNC-16 | Domain events are appended to the event log in the commit's transaction (unless their spec marks them non-logged) and dispatched only after commit. Rollback → no event, no log entry. A listener failure never rolls back. | [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) |
+| FR-SYNC-16 | Domain events are appended to the event log in the commit's transaction (unless their spec marks them non-logged) and dispatched only after commit. Commit hooks (cache refresh only) run after commit, before any listener (CON-23). Rollback → no event, no log entry. A listener failure never rolls back. | [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) |
 | FR-SYNC-17 | Per domain event, each connection gets at most one `event` holding its filtered changes `{type, id, op: upsert \| delete, data?}` (upsert = whole filtered record), applied atomically; nothing if none survive. | OQ-SYNC-07, OQ-SYNC-14 |
 | FR-SYNC-18 | Visibility fn per record type: `(record, ctx) → full \| redacted \| hidden`. DM gets `full`. Unregistered type → hidden for players. | OQ-SYNC-01 |
 | FR-SYNC-19 | Per connection: hidden→visible = `upsert`; visible→hidden = `delete`; visible→visible = `upsert`; hidden→hidden = nothing. | Reveal = appear |
 | FR-SYNC-20 | Snapshot and events share the filter: for any change sequence, a player's store equals a fresh snapshot. | Convergence |
 | FR-SYNC-21 | `event` carries a per-connection `seq` (1, 2, … after each snapshot); gap → client `resync`. Send-buffer overflow or broadcaster error → close `4000`, never drop frames. | |
-| FR-SYNC-22 | **Signals** are not domain events. `signal {name, data}` is checked against its registered type (zod + roles) and forwarded through its visibility fn. No bus, DB, event log, snapshot or `seq`. | [scenes-map](scenes-map.md) ping/laser |
+| FR-SYNC-22 | **Signals** are not domain events. `signal {name, data}` is checked against its registered type (zod + roles; failure → `reject` to the sender, nobody receives it) and forwarded to every **other** live connection of the sender's campaign as `signal {name, data, from {role, playerId?}}`; `from` is stamped by the server from the connection context, never the payload. Receivers filter by scene. No bus, DB, event log, snapshot or `seq`. | [ADR-0026](../architecture/adr/0026-signal-routing.md); [scenes-map](scenes-map.md) ping/laser/pull |
 | FR-SYNC-23 | DM gets a `presence {playerId, online}` record per player: ≤ 1 s after connect or clean close, ≤ 30 s after a silent drop. Not persisted, never sent to players. | |
 | FR-SYNC-24 | Client state `connecting \| live \| reconnecting \| waiting \| rejected`; intent controls disabled unless `live`. "Reconnecting…" banner after 1 s not live; after 60 s it adds "Server unreachable — check with your DM". | |
 | FR-SYNC-25 | Hub, broadcaster and presence hold no play state. After restart on the same DB, snapshots contain every change committed before the kill. | |
@@ -87,7 +87,7 @@ wave: 1
 | | phase, seq, lastInboundAt | `awaiting-hello`\|`snapshotting`\|`live`, int, timestamp | |
 | Presence *(in-memory, derived)* | playerId, online | id, bool | From live connections |
 | Record change *(in a domain event)* | type, id, before, after | string, id, record \| null ×2 | Create: before null; delete: after null |
-| Registrations *(code)* | record type: type, scope, schema, visibility, snapshot; intent: name, schema, roles, authorize, execute; signal: name, schema, roles, visibility | scope `global`\|`campaign`\|`scene` | Intent roles default `[dm]` |
+| Registrations *(code)* | record type: type, scope, schema, campaignOf, sceneOf (scope `scene`), visibility, snapshot; intent: name, schema, roles, authorize, execute; signal: name, schema, roles | scope `global`\|`campaign`\|`scene` | Intent roles default `[dm]`; signal routing per FR-SYNC-22 |
 | Event log entry *(persisted)* | id, campaignId, type, at, payload, actorRole, actorPlayerId, intentId | payload = **JSON leaf** | Append-only; `campaignId` null for global events (imported definitions, [FR-FIX-23](fixtures-adapters.md#6-functional-requirements)); undo fields: [combat-tracker](combat-tracker.md) |
 | Sync probe *(persisted, test)* | id, campaignId, text, hidden, ownerPlayerId | id, id, string, bool, id \| null | Player sees it iff `!hidden && (owner == null \|\| owner == ctx.playerId)` |
 
@@ -107,7 +107,7 @@ wave: 1
 |---|---|---|
 | `snapshot` | `seq 0`, `you`, `records {type: Record[]}` | Each type's fn; scopes per FR-SYNC-09 |
 | `event` | `seq`, `cause {name, intentId?}`, `changes[]` | Each type's fn + FR-SYNC-19; `intentId` on sender's copy only |
-| `signal` | `name`, `data` | Signal type's fn |
+| `signal` | `name`, `data`, `from {role, playerId?}` (server-stamped) | Every other live connection of the sender's campaign (FR-SYNC-22) |
 | `ack` / `reject` / `pong` | `intentId`, `result?` / `code` (`invalid`, `unknown_intent`, `forbidden`, `not_found`, `conflict`, `internal`), `message`, `issues?` | Sender only |
 | record `presence` / `probe` | see §8 | DM only / §8 rule |
 
@@ -135,7 +135,7 @@ wave: 1
 ## 12. Performance & bandwidth
 
 - 1 DM + ≤ 6 players, one process. Commit → frame < 50 ms locally; snapshot ≤ 512 KB JSON for a `session-sim`-sized campaign, < 200 ms (all proposed).
-- Assets are URLs ([assets-pipeline](assets-pipeline.md)). Heartbeat keeps cloudflared from idling; JSON frames, no compression in MVP.
+- Records carry asset IDs; clients build the URL ([assets-pipeline](assets-pipeline.md), [ADR-0023](../architecture/adr/0023-asset-access-by-capability-id.md)). Heartbeat keeps cloudflared from idling; JSON frames, no compression in MVP.
 
 ## 13. Test plan
 

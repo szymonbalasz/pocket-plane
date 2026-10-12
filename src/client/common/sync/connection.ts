@@ -6,12 +6,16 @@ import {
   type Credential,
   PING_INTERVAL_MS,
   ServerFrame,
+  type ServerSignalFrame,
   WS_PATH,
 } from "@shared/protocol/frames";
 import { applyEvent, applySnapshot, emptyStore, type RecordStore } from "@shared/protocol/store";
 import { backoffDelay } from "./backoff";
 
 export type ConnState = "connecting" | "live" | "reconnecting" | "waiting" | "rejected";
+
+/** Incoming signal; `from` is server-stamped (ADR-0026). Receivers filter by scene themselves. */
+export type SignalHandler = (s: ServerSignalFrame) => void;
 
 export class IntentRejected extends Error {
   override name = "IntentRejected";
@@ -57,6 +61,29 @@ export interface ConnectionOptions {
   createSocket?: (url: string) => WebSocket;
   /** Subscribe to "worth retrying now" signals; returns an unsubscribe. Default: browser events. */
   onWake?: (fn: () => void) => () => void;
+  /** Is the WS endpoint reachable? Default: `httpProbe`. May answer synchronously (tests). */
+  probe?: (url: string) => Promise<boolean> | boolean;
+}
+
+const PROBE_TIMEOUT_MS = 2_000;
+
+/**
+ * Reachability probe: a plain HTTP GET of the WS path. The server answers a non-upgrade request
+ * with 426 (protocol §6); a dead server gives a network error, and the dev proxy gives a 5xx.
+ * Why: Chromium throttles new WebSockets per renderer by recent *WebSocket* failures
+ * (`services/network/websocket_throttler.cc`: up to +5 s per connect after ~16 failures/success).
+ * Probing with fetch during an outage keeps WS failures at one per outage (FR-SYNC-05).
+ */
+export async function httpProbe(wsUrl: string): Promise<boolean> {
+  try {
+    const r = await fetch(wsUrl.replace(/^ws/, "http"), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+    return r.status === 426;
+  } catch {
+    return false;
+  }
 }
 
 /** `online`, window focus, page show and the tab becoming visible. */
@@ -85,7 +112,13 @@ export class SyncConnection {
   private pingTimer: unknown = null;
   private lastPongAt = 0;
   private stopped = false;
+  /** WS attempts since the last open that never reached `onopen`; > 0 → probe before the next. */
+  private failedOpens = 0;
+  /** Bumped on stop and on every new attempt; a stale probe result is ignored. */
+  private generation = 0;
+  private probing = false;
   private pending = new Map<string, { resolve(v: unknown): void; reject(e: Error): void }>();
+  private signalHandlers = new Set<SignalHandler>();
   private snap: SyncSnapshot = {
     state: "connecting",
     store: emptyStore(),
@@ -111,6 +144,8 @@ export class SyncConnection {
 
   stop(): void {
     this.stopped = true;
+    this.generation += 1;
+    this.probing = false;
     this.wakeOff?.();
     this.wakeOff = null;
     this.clearTimers();
@@ -128,7 +163,7 @@ export class SyncConnection {
     if (this.snap.state === "live" || this.snap.state === "rejected") return;
     this.clock.clearTimeout(this.retryTimer);
     this.retryTimer = null;
-    this.open();
+    this.reconnect();
   }
 
   /** Test-mode "drop connection" button (FR-SYNC-27): a client-side drop; reconnects. */
@@ -148,6 +183,24 @@ export class SyncConnection {
     });
   }
 
+  /**
+   * Send a transient signal (FR-SYNC-22). Fire-and-forget: no ack, never queued or resent.
+   * Returns false when not live (dropped).
+   */
+  sendSignal(name: string, data: unknown): boolean {
+    if (this.snap.state !== "live" || !this.ws) return false;
+    this.ws.send(JSON.stringify({ type: "signal", name, data }));
+    return true;
+  }
+
+  /** Subscribe to incoming signals of every name; returns an unsubscribe. */
+  onSignal(fn: SignalHandler): () => void {
+    this.signalHandlers.add(fn);
+    return () => {
+      this.signalHandlers.delete(fn);
+    };
+  }
+
   private set(patch: Partial<SyncSnapshot>): void {
     this.snap = { ...this.snap, ...patch };
     this.opts.onChange(this.snap);
@@ -158,7 +211,10 @@ export class SyncConnection {
     const url = this.opts.url ?? defaultWsUrl();
     const ws = this.opts.createSocket ? this.opts.createSocket(url) : new WebSocket(url);
     this.ws = ws;
+    let opened = false;
     ws.onopen = () => {
+      opened = true;
+      this.failedOpens = 0;
       ws.send(JSON.stringify({ type: "hello", credential: this.opts.credential }));
       this.lastPongAt = this.clock.now();
       this.pingTimer = this.clock.setInterval(() => this.heartbeat(), PING_INTERVAL_MS);
@@ -166,6 +222,7 @@ export class SyncConnection {
     ws.onmessage = (e) => this.onFrame(String(e.data));
     ws.onclose = (e) => {
       if (this.ws !== ws) return;
+      if (!opened) this.failedOpens += 1;
       this.onClose(e.code);
     };
   }
@@ -216,6 +273,15 @@ export class SyncConnection {
           this.pending.delete(frame.intentId);
         }
         return;
+      case "signal":
+        for (const fn of [...this.signalHandlers]) {
+          try {
+            fn(frame);
+          } catch (err) {
+            console.error(`signal handler failed on ${frame.name}`, err);
+          }
+        }
+        return;
       default:
         return;
     }
@@ -240,7 +306,10 @@ export class SyncConnection {
         // FR-SYNC-07: DM reconnects at once into the new active campaign.
         this.attempt = 1;
         this.set({ state: "reconnecting", notLiveSince });
-        this.retryTimer = this.clock.setTimeout(() => this.open(), 0);
+        this.retryTimer = this.clock.setTimeout(() => {
+          this.retryTimer = null;
+          this.open(); // server answered: no probe
+        }, 0);
         return;
       }
       this.set({
@@ -250,9 +319,46 @@ export class SyncConnection {
     } else {
       this.set({ state: this.snap.everLive ? "reconnecting" : "connecting", notLiveSince });
     }
+    this.scheduleRetry();
+  }
+
+  /** Backoff wait (FR-SYNC-05), then `reconnect`. */
+  private scheduleRetry(): void {
     const delay = backoffDelay(this.attempt);
     this.attempt += 1;
-    this.retryTimer = this.clock.setTimeout(() => this.open(), delay);
+    this.retryTimer = this.clock.setTimeout(() => {
+      this.retryTimer = null;
+      this.reconnect();
+    }, delay);
+  }
+
+  /**
+   * Open a WebSocket, but after a failed attempt only once the HTTP probe says the endpoint
+   * answers; an unreachable probe waits for the next backoff step without touching WebSocket,
+   * so the browser's WS failure throttle never builds up during an outage (see `httpProbe`).
+   */
+  private reconnect(): void {
+    if (this.stopped || this.ws !== null || this.probing) return;
+    if (this.failedOpens === 0) {
+      this.open();
+      return;
+    }
+    const gen = ++this.generation;
+    this.probing = true;
+    const done = (ok: boolean) => {
+      if (gen !== this.generation || this.stopped) return;
+      this.probing = false;
+      if (ok) this.open();
+      else this.scheduleRetry();
+    };
+    let r: Promise<boolean> | boolean;
+    try {
+      r = (this.opts.probe ?? httpProbe)(this.opts.url ?? defaultWsUrl());
+    } catch {
+      r = false;
+    }
+    if (typeof r === "boolean") done(r);
+    else r.then(done, () => done(false));
   }
 
   private clearTimers(): void {
