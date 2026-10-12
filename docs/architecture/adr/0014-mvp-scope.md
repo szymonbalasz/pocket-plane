@@ -31,7 +31,7 @@
 | Party loot log: rewards given to the party are visible to all | Full party board → [party-board](../../specs/post-mvp/party-board.md) |
 | Fixtures: one player, enemies, an encounter, two scenes; teardown/rebuild. **Minimal import pipeline core** (SRD fixture creatures load as read-only imports) | Real source adapters (Open5e first) → [compendium](../../specs/post-mvp/compendium.md) |
 | **DM undo of combat log entries** (damage/healing applied, LIFO) via the event log ([ADR-0016](0016-domain-events-pending-actions.md)) | |
-| **Scene list** with folders; duplicate scene | Background scene prep, pause screen (tier A) |
+| **Scene list** with folders; duplicate scene; DM views/preps a non-active scene ([decisions #122](../../decisions-log.md)) | Pause screen (tier A) |
 
 - Full 5e sheet remains the **target**. MVP data model must not block it.
 - Entities in MVP: only what tokens and combat need (character, monster). No world-builder UI.

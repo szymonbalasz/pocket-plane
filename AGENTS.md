@@ -217,6 +217,7 @@ fixtures/
 
 - Test agents only; builders don't run long browser sessions ([orchestrator §4](docs/agents/orchestrator-prompt.md#4-context-management)).
 - Tool: **Playwright MCP**, one isolated browser context per role: `dm`, `player-1`, `player-2`… Never share storage or cookies between contexts.
+  - Configured in the repo's `opencode.json` as three servers, one per role: `pw-dm`, `pw-player-1`, `pw-player-2` (headless, in-memory profiles). Use only the server for the role you're driving. A new agent session loads them; a running session needs a restart.
 - Run on the `verify` profile, built client (no HMR mid-walkthrough): `bun run build`, `fixtures:reset-load <bundle> --profile verify`, `start --profile verify`. Code changed since? Stop, rebuild, restart.
 - Evidence under `<worktree>/.verify/<run-id>/` (gitignored), `run-id = <yyyymmdd-hhmmss>-<feature>-<walkthrough>`:
 
