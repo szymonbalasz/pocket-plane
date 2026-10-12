@@ -7,8 +7,12 @@ import campaign from "./campaign-management/campaign";
 import campaignSecond from "./campaign-management/campaign-second";
 import player1 from "./campaign-management/player-1";
 import player2 from "./campaign-management/player-2";
+import charMira from "./entities/char-mira";
+import charThorn from "./entities/char-thorn";
 import enemy1 from "./entities/enemy-1";
 import enemy2 from "./entities/enemy-2";
+import enemyCustom from "./entities/enemy-custom";
+import enemyCustomSecond from "./entities/enemy-custom-second";
 import syncProbes from "./live-sync/sync-probes";
 
 export const units: readonly Fixture[] = [
@@ -22,4 +26,8 @@ export const units: readonly Fixture[] = [
   imagesSecond,
   enemy1,
   enemy2,
+  enemyCustom,
+  charMira,
+  charThorn,
+  enemyCustomSecond,
 ];

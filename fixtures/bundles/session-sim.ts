@@ -7,5 +7,5 @@ import { defineBundle } from "@server/features/fixtures-adapters/fixture-types";
 export default defineBundle({
   name: "session-sim",
   includes: ["base"],
-  fixtures: ["images", "enemy-1", "enemy-2"],
+  fixtures: ["images", "enemy-1", "enemy-2", "enemy-custom", "char-mira"],
 });

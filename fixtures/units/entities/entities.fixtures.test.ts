@@ -51,6 +51,48 @@ describe("entities fixtures (ENT §13)", () => {
     expect(r.log.filter((e) => e.type === "EntityImported")).toHaveLength(2);
   });
 
+  test("ENT §13 setup fixtures: Elite (derived), Mira, Thorn, Marsh Troll in Second Campaign", async () => {
+    const r = await loaded("entities");
+    const fixture = r.campaigns.find((c) => c.name === "Fixture Campaign");
+    const second = r.campaigns.find((c) => c.name === "Second Campaign");
+    expect([fixture?.active, second?.active]).toEqual([true, false]);
+    const by = (n: string) => r.rows.find((e) => e.name === n);
+    const goblin = by("Goblin");
+    expect(by("Elite Goblin Warrior")).toMatchObject({
+      kind: "monster",
+      campaignId: fixture?.id,
+      derivedFromId: goblin?.id,
+      source: null,
+      statBlock: {
+        size: "small",
+        ac: 16,
+        hpMax: 15,
+        initBonus: 2,
+        attacks: [{ name: "Scimitar", toHit: 5, damage: "1d6+3", damageType: "slashing" }],
+        cr: "1/2",
+      },
+    });
+    expect(by("Mira")).toMatchObject({
+      kind: "character",
+      campaignId: fixture?.id,
+      hpCurrent: 12,
+      statBlock: { ac: 16, hpMax: 12, initBonus: 2, level: 1, className: "Fighter" },
+    });
+    expect(by("Thorn")).toMatchObject({
+      hpCurrent: 10,
+      statBlock: { ac: 14, initBonus: 3, attacks: [{ toHit: 5, damage: "1d4+3" }] },
+    });
+    expect(by("Marsh Troll")).toMatchObject({
+      campaignId: second?.id,
+      statBlock: { size: "large", ac: 15, hpMax: 59, initBonus: 1, cr: "5" },
+    });
+    expect(r.manifest.records["char-mira"]?.entity).toEqual([by("Mira")?.id as string]);
+    expect(r.manifest.records["enemy-custom-second"]?.entity).toEqual([
+      by("Marsh Troll")?.id as string,
+    ]);
+    expect(r.rows).toHaveLength(6);
+  });
+
   test("FR-FIX-08 two loads → identical rows; same IDs in session-sim", async () => {
     const a = await loaded("entities");
     const b = await loaded("entities");
@@ -58,5 +100,7 @@ describe("entities fixtures (ENT §13)", () => {
     const s = await loaded("session-sim");
     expect(s.manifest.records["enemy-1"]).toEqual(a.manifest.records["enemy-1"] ?? {});
     expect(s.manifest.records["enemy-2"]).toEqual(a.manifest.records["enemy-2"] ?? {});
+    expect(s.manifest.records["enemy-custom"]).toEqual(a.manifest.records["enemy-custom"] ?? {});
+    expect(s.manifest.records["char-mira"]).toEqual(a.manifest.records["char-mira"] ?? {});
   });
 });

@@ -47,6 +47,8 @@ describe("fixture library", () => {
       "images",
       "enemy-1",
       "enemy-2",
+      "enemy-custom",
+      "char-mira",
     ]);
     expect(await keys("campaign-switch")).toEqual([
       "campaign",
