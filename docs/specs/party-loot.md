@@ -1,8 +1,8 @@
 ---
 title: Party loot
 prefix: LOOT
-status: unclaimed
-owner: —
+status: claimed
+owner: spec-party-loot
 wave: 3
 ---
 
