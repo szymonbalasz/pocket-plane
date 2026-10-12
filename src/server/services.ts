@@ -12,6 +12,7 @@ import { ImportRegistry } from "./features/fixtures-adapters/import-pipeline";
 import type { Logger } from "./log";
 import type { HubApi } from "./ws/hub";
 import { type AnyRecordType, RecordRegistry } from "./ws/records";
+import { type SignalDef, SignalRegistry } from "./ws/signals";
 
 /** Resolvers campaign-management provides to live-sync (CAMP §9, protocol §2). */
 export interface CredentialResolvers {
@@ -36,6 +37,8 @@ export interface Services {
   records: RecordRegistry;
   /** Command names callable as WS intents. */
   intents: Set<string>;
+  /** Transient signals (FR-SYNC-22, ADR-0026). */
+  signals: SignalRegistry;
   auth: CredentialResolvers;
   /** Import pipeline kinds + definition store (entities plugs in here, CON-03). */
   imports: ImportRegistry;
@@ -48,6 +51,7 @@ export interface Registrar {
   command<S extends z.ZodType, R>(def: CommandDef<S, R>, opts?: { intent?: boolean }): void;
   event(def: DomainEventDef): void;
   recordType(def: AnyRecordType): void;
+  signal(def: SignalDef): void;
   listener(name: string, fn: Listener): void;
   provideAuth(resolvers: CredentialResolvers): void;
 }
@@ -86,6 +90,7 @@ export function createServices(opts: ServicesOptions): Services {
     commands,
     records: new RecordRegistry(),
     intents: new Set(),
+    signals: new SignalRegistry(),
     auth: missingAuth,
     hub: null,
     imports: new ImportRegistry(),
@@ -100,6 +105,7 @@ export function createServices(opts: ServicesOptions): Services {
     },
     event: (def) => commands.registerEvent(def),
     recordType: (def) => services.records.register(def),
+    signal: (def) => services.signals.register(def),
     listener: (name, fn) => bus.subscribe(name, fn),
     provideAuth(r) {
       services.auth = r;

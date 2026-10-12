@@ -71,10 +71,18 @@ export const EventFrame = z.object({
   cause: z.object({ name: z.string(), intentId: IntentId.optional() }),
   changes: z.array(WireChange).min(1),
 });
+/** Signal sender, stamped by the server from the connection context, never the payload (ADR-0026). */
+export const SignalFrom = z.discriminatedUnion("role", [
+  z.object({ role: z.literal("dm") }),
+  z.object({ role: z.literal("player"), playerId: z.string() }),
+]);
+export type SignalFrom = z.infer<typeof SignalFrom>;
+
 export const ServerSignalFrame = z.object({
   type: z.literal("signal"),
   name: z.string(),
   data: z.unknown(),
+  from: SignalFrom,
 });
 export const AckFrame = z.object({
   type: z.literal("ack"),
@@ -103,6 +111,7 @@ export type ServerFrame = z.infer<typeof ServerFrame>;
 export type SnapshotFrame = z.infer<typeof SnapshotFrame>;
 export type EventFrame = z.infer<typeof EventFrame>;
 export type RejectFrame = z.infer<typeof RejectFrame>;
+export type ServerSignalFrame = z.infer<typeof ServerSignalFrame>;
 
 /** WS endpoint path (OQ-SYNC-15, proposed). */
 export const WS_PATH = "/ws";

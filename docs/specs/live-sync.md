@@ -65,7 +65,7 @@ wave: 1
 | FR-SYNC-19 | Per connection: hidden→visible = `upsert`; visible→hidden = `delete`; visible→visible = `upsert`; hidden→hidden = nothing. | Reveal = appear |
 | FR-SYNC-20 | Snapshot and events share the filter: for any change sequence, a player's store equals a fresh snapshot. | Convergence |
 | FR-SYNC-21 | `event` carries a per-connection `seq` (1, 2, … after each snapshot); gap → client `resync`. Send-buffer overflow or broadcaster error → close `4000`, never drop frames. | |
-| FR-SYNC-22 | **Signals** are not domain events. `signal {name, data}` is checked against its registered type (zod + roles) and forwarded through its visibility fn. No bus, DB, event log, snapshot or `seq`. | [scenes-map](scenes-map.md) ping/laser |
+| FR-SYNC-22 | **Signals** are not domain events. `signal {name, data}` is checked against its registered type (zod + roles; failure → `reject` to the sender, nobody receives it) and forwarded to every **other** live connection of the sender's campaign as `signal {name, data, from {role, playerId?}}`; `from` is stamped by the server from the connection context, never the payload. Receivers filter by scene. No bus, DB, event log, snapshot or `seq`. | [ADR-0026](../architecture/adr/0026-signal-routing.md); [scenes-map](scenes-map.md) ping/laser/pull |
 | FR-SYNC-23 | DM gets a `presence {playerId, online}` record per player: ≤ 1 s after connect or clean close, ≤ 30 s after a silent drop. Not persisted, never sent to players. | |
 | FR-SYNC-24 | Client state `connecting \| live \| reconnecting \| waiting \| rejected`; intent controls disabled unless `live`. "Reconnecting…" banner after 1 s not live; after 60 s it adds "Server unreachable — check with your DM". | |
 | FR-SYNC-25 | Hub, broadcaster and presence hold no play state. After restart on the same DB, snapshots contain every change committed before the kill. | |
@@ -87,7 +87,7 @@ wave: 1
 | | phase, seq, lastInboundAt | `awaiting-hello`\|`snapshotting`\|`live`, int, timestamp | |
 | Presence *(in-memory, derived)* | playerId, online | id, bool | From live connections |
 | Record change *(in a domain event)* | type, id, before, after | string, id, record \| null ×2 | Create: before null; delete: after null |
-| Registrations *(code)* | record type: type, scope, schema, visibility, snapshot; intent: name, schema, roles, authorize, execute; signal: name, schema, roles, visibility | scope `global`\|`campaign`\|`scene` | Intent roles default `[dm]` |
+| Registrations *(code)* | record type: type, scope, schema, visibility, snapshot; intent: name, schema, roles, authorize, execute; signal: name, schema, roles | scope `global`\|`campaign`\|`scene` | Intent roles default `[dm]`; signal routing per FR-SYNC-22 |
 | Event log entry *(persisted)* | id, campaignId, type, at, payload, actorRole, actorPlayerId, intentId | payload = **JSON leaf** | Append-only; `campaignId` null for global events (imported definitions, [FR-FIX-23](fixtures-adapters.md#6-functional-requirements)); undo fields: [combat-tracker](combat-tracker.md) |
 | Sync probe *(persisted, test)* | id, campaignId, text, hidden, ownerPlayerId | id, id, string, bool, id \| null | Player sees it iff `!hidden && (owner == null \|\| owner == ctx.playerId)` |
 
@@ -107,7 +107,7 @@ wave: 1
 |---|---|---|
 | `snapshot` | `seq 0`, `you`, `records {type: Record[]}` | Each type's fn; scopes per FR-SYNC-09 |
 | `event` | `seq`, `cause {name, intentId?}`, `changes[]` | Each type's fn + FR-SYNC-19; `intentId` on sender's copy only |
-| `signal` | `name`, `data` | Signal type's fn |
+| `signal` | `name`, `data`, `from {role, playerId?}` (server-stamped) | Every other live connection of the sender's campaign (FR-SYNC-22) |
 | `ack` / `reject` / `pong` | `intentId`, `result?` / `code` (`invalid`, `unknown_intent`, `forbidden`, `not_found`, `conflict`, `internal`), `message`, `issues?` | Sender only |
 | record `presence` / `probe` | see §8 | DM only / §8 rule |
 

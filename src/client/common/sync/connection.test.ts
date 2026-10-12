@@ -94,6 +94,37 @@ test("SYNC §3 reconnect goal: online / focus / visible skips the remaining back
   expect(sockets).toHaveLength(n + 1);
 });
 
+const snapshotFrame = JSON.stringify({
+  type: "snapshot",
+  seq: 0,
+  you: { campaignId: "c", role: "player", playerId: "p" },
+  records: {},
+});
+
+test("FR-SYNC-22 signals: sent only while live (never queued); incoming frames reach handlers with from", () => {
+  const { conn, sockets } = setup();
+  conn.start();
+  const s = sockets[0] as FakeSocket;
+  expect(conn.sendSignal("map.ping", { x: 1 })).toBe(false);
+  expect(s.sent).toEqual([]);
+  s.onmessage?.({ data: snapshotFrame });
+  expect(conn.sendSignal("map.ping", { x: 1 })).toBe(true);
+  expect(JSON.parse(s.sent.at(-1) as string)).toEqual({
+    type: "signal",
+    name: "map.ping",
+    data: { x: 1 },
+  });
+  const got: unknown[] = [];
+  const off = conn.onSignal((f) => got.push(f));
+  const frame = { type: "signal", name: "map.ping", data: { x: 2 }, from: { role: "dm" } };
+  s.onmessage?.({ data: JSON.stringify(frame) });
+  // A frame without the server stamp is malformed and ignored.
+  s.onmessage?.({ data: JSON.stringify({ ...frame, from: undefined }) });
+  off();
+  s.onmessage?.({ data: JSON.stringify(frame) });
+  expect(got).toEqual([frame]);
+});
+
 test("wake never reconnects a rejected (4401) or stopped connection", () => {
   const { conn, sockets, wake } = setup();
   conn.start();

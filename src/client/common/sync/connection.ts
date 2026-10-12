@@ -6,12 +6,16 @@ import {
   type Credential,
   PING_INTERVAL_MS,
   ServerFrame,
+  type ServerSignalFrame,
   WS_PATH,
 } from "@shared/protocol/frames";
 import { applyEvent, applySnapshot, emptyStore, type RecordStore } from "@shared/protocol/store";
 import { backoffDelay } from "./backoff";
 
 export type ConnState = "connecting" | "live" | "reconnecting" | "waiting" | "rejected";
+
+/** Incoming signal; `from` is server-stamped (ADR-0026). Receivers filter by scene themselves. */
+export type SignalHandler = (s: ServerSignalFrame) => void;
 
 export class IntentRejected extends Error {
   override name = "IntentRejected";
@@ -86,6 +90,7 @@ export class SyncConnection {
   private lastPongAt = 0;
   private stopped = false;
   private pending = new Map<string, { resolve(v: unknown): void; reject(e: Error): void }>();
+  private signalHandlers = new Set<SignalHandler>();
   private snap: SyncSnapshot = {
     state: "connecting",
     store: emptyStore(),
@@ -146,6 +151,24 @@ export class SyncConnection {
       this.pending.set(intentId, { resolve, reject });
       this.ws?.send(JSON.stringify({ type: "intent", intentId, name, payload }));
     });
+  }
+
+  /**
+   * Send a transient signal (FR-SYNC-22). Fire-and-forget: no ack, never queued or resent.
+   * Returns false when not live (dropped).
+   */
+  sendSignal(name: string, data: unknown): boolean {
+    if (this.snap.state !== "live" || !this.ws) return false;
+    this.ws.send(JSON.stringify({ type: "signal", name, data }));
+    return true;
+  }
+
+  /** Subscribe to incoming signals of every name; returns an unsubscribe. */
+  onSignal(fn: SignalHandler): () => void {
+    this.signalHandlers.add(fn);
+    return () => {
+      this.signalHandlers.delete(fn);
+    };
   }
 
   private set(patch: Partial<SyncSnapshot>): void {
@@ -214,6 +237,15 @@ export class SyncConnection {
             .get(frame.intentId)
             ?.reject(new IntentRejected(frame.code, frame.message, frame.issues));
           this.pending.delete(frame.intentId);
+        }
+        return;
+      case "signal":
+        for (const fn of [...this.signalHandlers]) {
+          try {
+            fn(frame);
+          } catch (err) {
+            console.error(`signal handler failed on ${frame.name}`, err);
+          }
         }
         return;
       default:
