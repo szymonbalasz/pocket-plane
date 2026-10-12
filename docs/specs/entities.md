@@ -10,170 +10,160 @@ wave: 2
 
 ## 1. Summary
 
-- The **creature definition** contract that tokens, combatants and encounter entries point at. MVP kinds: `character`, `monster` ([ADR-0014](../architecture/adr/0014-mvp-scope.md)).
-- One `entity` table, one zod stat-block schema per kind, same shape for SRD, custom and fixture ([ADR-0009](../architecture/adr/0009-entity-content-model.md)). Imported definitions are global and read-only; custom definitions and characters belong to one campaign ([ADR-0018](../architecture/adr/0018-global-imported-content.md)).
-- Owns the commands to create, derive, edit and delete definitions, and their visibility. The creature **form** is [combat-tracker](combat-tracker.md)'s; instances are [scenes-map](scenes-map.md)'s and combat-tracker's.
+- The **creature definition** contract that tokens, combatants and encounter entries point at. MVP kinds: `character`, `monster` ([ADR-0014](../architecture/adr/0014-mvp-scope.md)). One `entity` table, one shared zod creature core, same shape for SRD, custom and fixture ([ADR-0009](../architecture/adr/0009-entity-content-model.md), #124). Imported definitions are global and read-only; customs and characters belong to one campaign ([ADR-0018](../architecture/adr/0018-global-imported-content.md)).
+- **Schema ownership:** entities owns the creature core for both kinds. [character-sheet](character-sheet.md) may only add optional character fields; [combat-tracker](combat-tracker.md)'s creature form edits this schema and may show a subset.
+- Players never see monster definitions; instances carry read-only display copies, refreshed inside the edit's transaction (#120, [proposed ADR](../architecture/adr/proposed-definition-visibility.md)).
 
 ## 2. Scope
 
-- `entity` record with inline provenance, character owner and current HP; shared creature core + per-kind fields; XP from CR. Record types + visibility fns.
-- Commands: create custom monster (from scratch or **derived**), create character (fixtures only in MVP), update, delete *(proposed, OQ-ENT-07)*; internal import write for the pipeline. Read-only and campaign-scope enforcement.
-- DM **Creatures** list window *(proposed, OQ-ENT-03)*. Fixtures `enemy-1`, `enemy-2`, `enemy-custom`, `char-mira` (+ §13).
+- `entity` record, XP from CR, record types + visibility fns; create / derive / update, internal import, definition-changed hooks, `resolveDefinition`; DM **Creatures** window *(proposed, OQ-ENT-03)*; fixtures + bundle `entities`.
 
 ## 3. Goals
 
-- Encounter builder, tokens and combat never branch on where a definition came from; no code path changes an imported one.
-- Players never learn prepared monsters or other players' stats. An edit to a custom definition reaches every instance with no copy to update.
-- Later kinds (npc, item…), full sheet fields and modifiers are additive: no reshaping of MVP data.
+- Encounter builder, tokens and combat never branch on where a definition came from; no code path changes an imported one. Later kinds, sheet fields and modifiers are additive.
+- Players never learn prepared monsters or other players' stats. An edit to a custom definition reaches every instance in the same commit.
 
 ## 4. Non-goals
 
-- World-builder kinds, notes, search, cross-references, location ↔ scenes (→ [world-builder](post-mvp/world-builder.md)). Compendium browse, clone, real adapters, re-import (→ [compendium](post-mvp/compendium.md)).
-- Creature form UI (→ [combat-tracker](combat-tracker.md), tier S). Full monster editor, custom actions, traits, abilities, saves, skills (tier A). Stat block view on token click (tier B).
-- Character builder or player-created characters (→ [levelling](post-mvp/levelling.md)); full sheet (→ [character-sheet-full](post-mvp/character-sheet-full.md)). Instance state (position, hidden, initiative, monster HP) and modifiers (tier A, [combat-extras](post-mvp/combat-extras.md)).
+- World-builder kinds, cross-references (→ [world-builder](post-mvp/world-builder.md)); compendium browse, clone, adapters, re-import (→ [compendium](post-mvp/compendium.md)); character builder (→ [levelling](post-mvp/levelling.md)); full sheet (→ [character-sheet-full](post-mvp/character-sheet-full.md)).
+- Creature form UI (→ combat-tracker, tier S). Full monster editor (tier A). Stat block view on token click (tier B). Deleting definitions (OQ-ENT-07). Instance state and modifiers (→ scenes-map, combat-tracker, [combat-extras](post-mvp/combat-extras.md)).
 
 ## 5. User stories
 
-**DM**
-- As the DM, I want to derive "Elite Goblin Warrior" from the SRD goblin, and fix it mid-session, so every token and combatant uses the new stats.
-- As the DM, I want SRD creatures locked and my prepared monsters invisible to players, so I can't break reference data or spoil encounters.
-
-**Player**
-- As a player, I want my character's numbers (incl. current HP) always current and private from other players.
+- **DM:** As the DM, I want to derive "Elite Goblin Warrior" from the SRD goblin and fix it mid-session, so every token and combatant uses the new stats; and I want SRD creatures locked and my prepared monsters invisible to players.
+- **Player:** As a player, I want my character's numbers (incl. current HP) always current and private from other players.
 
 ## 6. Functional requirements
 
 | ID | Requirement | Notes |
 |---|---|---|
-| FR-ENT-01 | Kind registry in `@shared/entities`: `character`, `monster`, each with a strict zod stat-block schema (§8). Every write validates; reads re-validate (ADR-0006) and an invalid stored row fails loudly (`internal`, logged). Unknown kind or key → `invalid` with field path. | One schema for pipeline, commands, fixtures (FR-FIX-18) |
-| FR-ENT-02 | Both kinds share the creature core (§8). Monster adds `cr`; character adds `level`, `className`. | OQ-ENT-04 |
-| FR-ENT-03 | XP is derived from CR by the SRD table in `@shared/entities`, never stored. CR 0 → 10 XP *(proposed)*. | Used by combat-tracker (OQ-CBT-12) |
-| FR-ENT-04 | Imported definitions have `campaignId = null`. Custom monsters and characters get `ctx.campaignId`; no request field sets a campaign. | ADR-0018 |
-| FR-ENT-05 | Provenance is inline on the row: `source, sourceKey, licence, attribution, importedAt`; unique `(source, sourceKey)`; all null for customs. `readOnly = source != null`. | Answers OQ-FIX-15 |
-| FR-ENT-06 | Only the internal `entities.import` (called by the pipeline, FR-FIX-20) writes rows with a source. It emits one `EntityImported` per created row. No route reaches it. | FR-FIX-23, 24 |
-| FR-ENT-07 | Update or delete of an imported definition → `forbidden` (REST 403) "Imported definitions are read-only. Derive a custom one.", no change, no event, no log entry. | Was FR-FIX-22 |
-| FR-ENT-08 | Create custom monster: name trimmed, 1–60 chars, no control chars, unique (case-insensitive) among the campaign's entities of that kind, else `conflict`. Optional portrait = asset of the same campaign. | |
-| FR-ENT-09 | Derive = create with `derivedFromId`: must be a monster that is global or in `ctx.campaignId`, else `not_found`. The request carries the full stat block; the server copies nothing. The result is independent: later edits or deletion of the base never change it. | ADR-0009 |
-| FR-ENT-10 | Create character: `ownerPlayerId` must be a player of `ctx.campaignId`; `hpCurrent = hpMax`. MVP callers: fixtures only (no UI, decisions #100). | |
-| FR-ENT-11 | Update replaces name, portrait, stat block and (characters) owner as a whole. Kind, campaign, provenance and `derivedFromId` are immutable. Character with `hpCurrent > hpMax` after update → clamped in the same transaction. Instance state is never touched. | OQ-ENT-10 |
-| FR-ENT-12 | `resolveDefinition(ctx, id)` (server) returns a definition that is global or in `ctx.campaignId`, else `not_found`. Every command that stores a definition reference (entities, scenes-map, combat-tracker) uses it. | ADR-0018 |
-| FR-ENT-13 | Instances store only the definition id, never stat-block fields. `effectiveStats(definition, instance)` in `@shared/entities` is the one way to read stats; MVP returns the definition's block unchanged. | Modifiers hook, tier A |
-| FR-ENT-14 | *(proposed, OQ-ENT-07)* Delete: custom monsters only, while nothing references them (DB FK restrict from instance tables) → else `conflict` "In use". Characters cannot be deleted in MVP. | ADR-0009 open row |
-| FR-ENT-15 | Visibility `entity`: DM full. Player: own character (`ownerPlayerId = ctx.playerId`) full; other characters redacted to `{id, kind, name, portraitAssetId, ownerPlayerId}`; monsters hidden. | OQ-ENT-05 |
-| FR-ENT-16 | Visibility `imported-entity`: DM full; players hidden. | OQ-ENT-05 |
-| FR-ENT-17 | Every command commits row + event-log entry in one transaction, then emits its domain event (§9). IDs and timestamps come only from `ctx.ids` / `ctx.clock`. | ADR-0016, 0022 |
-| FR-ENT-18 | DM Creatures window lists every definition the campaign can use: characters, customs, imported. Updates live ≤ 1 s after commit. Rows are drag sources carrying the definition id. | OQ-ENT-03 |
+| FR-ENT-01 | Kind registry in `@shared/entities`: `character`, `monster`, each a strict zod schema (§8). Every write validates; unknown kind or key → `invalid` with field path. Reads re-validate: the snapshot provider omits an invalid stored row and logs an error with its id; a command touching it → `internal`. | One schema for pipeline, commands, fixtures (FR-FIX-18) |
+| FR-ENT-02 | Both kinds share the creature core (§8). Monster adds `cr`; character adds `level`, `className`. | ADR-0009, #124 |
+| FR-ENT-03 | XP is derived from CR by the SRD table in `@shared/entities`, never stored. CR 0 → 10 XP *(proposed, OQ-ENT-11)*. | |
+| FR-ENT-04 | Imported definitions have `campaignId = null`. Customs and characters get `ctx.campaignId`; for DM REST that is the active campaign at commit (as FR-ASSET-09); none → `conflict` "No active campaign". No request field sets a campaign. | ADR-0018 |
+| FR-ENT-05 | Provenance inline on the row: `source, sourceKey, licence, attribution, importedAt`; unique `(source, sourceKey)`; all null for customs. `readOnly = source != null`. *(proposed, OQ-FIX-15)* | |
+| FR-ENT-06 | Only the internal `entities.import` writes rows with a source; it implements the pipeline insert interface (data-model CON-03, #118). Batch record `{kind, sourceKey, data}` → `data = {name, statBlock}`; `source` = descriptor key; `licence`, `attribution` from the descriptor. One `EntityImported` per created row. No route reaches it. | FR-FIX-18–24 |
+| FR-ENT-07 | Update of an imported definition → `forbidden` (403) "Imported definitions are read-only. Derive a custom one."; no change, event or log entry. | |
+| FR-ENT-08 | Name (all kinds, create and rename): trimmed, 1–60 chars, no control chars, unique case-insensitive among the campaign's entities of that kind, else `conflict`. May equal an imported name (e.g. "Goblin"). Optional portrait: `assets.require(ctx, id)` ([FR-ASSET-15](assets-pipeline.md#6-functional-requirements)), else `not_found`. | |
+| FR-ENT-09 | Derive = create with `derivedFromId`: a monster that is global or in `ctx.campaignId`, else `not_found`. The request carries the full stat block; the server copies nothing. Later base edits never change the result. | ADR-0009 |
+| FR-ENT-10 | Create character: `ownerPlayerId` must be a player of `ctx.campaignId`, else `invalid`; `hpCurrent = hpMax`. MVP callers: fixtures only (decisions #100). | |
+| FR-ENT-11 | Update replaces name, portrait, stat block and (characters) owner as a whole; name and portrait as FR-ENT-08, owner as FR-ENT-10. Kind, campaign, provenance, `derivedFromId` are immutable. `hpCurrent > hpMax` after update → clamped in the same transaction. | |
+| FR-ENT-12 | `resolveDefinition(ctx, id)` (server) returns a definition that is global or in `ctx.campaignId`, else `not_found`. Every command storing a definition reference uses it. | ADR-0018 |
+| FR-ENT-13 | Instances store the definition id plus only the display copies listed in the [proposed ADR](../architecture/adr/proposed-definition-visibility.md); no other stat-block fields. `effectiveStats(def, inst)` in `@shared/entities` returns `def.statBlock` in MVP. | Modifiers hook, tier A |
+| FR-ENT-14 | No delete in MVP: no route or command deletes a definition. Typos are fixed by rename. *(proposed, OQ-ENT-07)* | ADR-0009 open row |
+| FR-ENT-15 | Visibility `entity`: DM full. Player: own character (`ownerPlayerId = ctx.playerId`) full; other characters redacted to `{id, kind, name, portraitAssetId, ownerPlayerId}`; monsters hidden. | #120 |
+| FR-ENT-16 | Visibility `imported-entity`: DM full; players hidden. | #120 |
+| FR-ENT-17 | Every command commits row + event-log entry in one transaction, then emits its domain event (§9). IDs and timestamps only from `ctx.ids` / `ctx.clock`. | ADR-0016, 0022 |
+| FR-ENT-18 | DM Creatures window lists every definition the campaign can use, sorted by name (case-insensitive), then custom before imported, then id. Live ≤ 1 s after commit. Each row is an HTML5 drag source: MIME `application/x-pp-definition`, data JSON `{definitionId}`. *(proposed, OQ-ENT-03)* | scenes-map FR-MAP-13 |
+| FR-ENT-19 | `entities.update` runs every registered **definition-changed hook** `(ctx, before, after) → RecordChange[]` inside its own transaction. Each instance row a hook changes is listed in `EntityUpdated.changes`. A hook error rolls back the whole update. Listeners never mutate state. | #120, ADR-0016, 0021 |
+| FR-ENT-20 | The Creatures window renders toolbar and row actions from an append-only `creatureActions` registry; entities ships none. *(proposed, OQ-ENT-14)* | combat-tracker form |
 
 ## 7. UI/UX notes
 
-- **DM view — Creatures window** (per [visual-direction](../design/visual-direction.md), hosted by [play-shell](play-shell.md)'s registry): shadcn Table + Tabs (All / Characters / Monsters). Row: portrait thumb, name, kind, source Badge (`SRD` / `Custom` / owner name for characters), CR + XP (monsters). Imported rows: lock icon, Tooltip "Read-only — derive to customise". Customs with a base: "derived from Goblin" (muted). Combat-tracker adds New / Derive / Edit in Phase 3; scenes-map handles drop onto the canvas.
-- **Test IDs:** `ent-list`, `ent-list-tab-<all|character|monster>`, `ent-list-row` + `data-record-id`, `ent-list-row-lock`.
-- **States:** empty "No creatures yet"; loading skeleton; disconnected: last list stays, live-sync banner. **Player view:** no entities UI. Own character is shown by [character-sheet](character-sheet.md); token labels come from instances ([scenes-map](scenes-map.md)).
+- **DM view — window `ent.creatures`** (per [visual-direction](../design/visual-direction.md), [play-shell](play-shell.md) registry): DM only, default closed, 420×520 at top-left below `map.scenes`, launcher "Creatures".
+- shadcn Table + Tabs (All / Characters / Monsters). Row: portrait thumb, name, kind, source Badge (`SRD` / `Custom` / owner name), CR + XP (monsters). Imported rows: lock icon, Tooltip "Read-only — derive to customise". Derived customs: "derived from Goblin" (muted), or "derived from (unknown)" if the base can't be resolved. New / Derive / Edit come from `creatureActions` (combat-tracker, Combat phase); drop onto the canvas: scenes-map.
+- **States:** empty "No creatures yet"; loading skeleton; disconnected: last list stays + live-sync banner; error: invalid rows omitted (FR-ENT-01), REST errors as Toast. **Test IDs:** `ent-list`, `ent-list-tab-<all|character|monster>`, `ent-list-row` + `data-record-id`, `ent-list-row-lock`, `ent-list-empty`.
+- **Player view:** no entities UI. Own character: [character-sheet](character-sheet.md); token labels from instances ([scenes-map](scenes-map.md)).
 
 ## 8. Data model
 
 | Entity | Field | Type | Notes |
 |---|---|---|---|
-| Entity | id, kind | ID, `character` \| `monster` | `ctx.ids`; kind immutable, later kinds add to the registry |
+| Entity | id, kind | ID, `character` \| `monster` | `ctx.ids`; kind immutable |
 | | campaignId | ID → Campaign \| null | Null iff imported (FR-ENT-04) |
-| | name | text | 1–60 |
-| | portraitAssetId | ID → Asset \| null | Same campaign; always null for imported ([OQ-ASSET-04](assets-pipeline.md#15-open-questions)) |
+| | name | text 1–60 | Unique index (`campaignId`, `kind`, lower(`name`)) where `campaignId` not null |
+| | portraitAssetId | ID → Asset \| null | Asset reference, same campaign; null for imported ([OQ-ASSET-04](assets-pipeline.md#15-open-questions)) |
 | | statBlock | **JSON leaf** | Per-kind schema below |
 | | ownerPlayerId | ID → Player \| null | Required for character, null for monster |
-| | hpCurrent | int \| null | Character only: PC HP lives on the character (ADR-0009). OQ-ENT-08 |
-| | derivedFromId | ID → Entity \| null | Informational; FK `on delete set null` |
+| | hpCurrent | int \| null | Character only: PC HP lives on the character (ADR-0009, OQ-ENT-08) |
+| | derivedFromId | ID \| null | Plain id, no FK (informational) |
 | | source, sourceKey, licence, attribution | text \| null | Provenance; unique `(source, sourceKey)` |
 | | importedAt, createdAt, updatedAt | timestamp | `ctx.clock`; `importedAt` null for customs |
 
-**Stat block** (strict; new fields only ever added as optional)
+**Stat block** (strict; new fields only ever added as optional, so raising limits later is additive)
 
 | Field | Kinds | Type |
 |---|---|---|
 | size | both | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan` |
 | ac, hpMax, initBonus | both | int 0–30; int 1–999; int −10…+20 |
-| attacks | both | 0–8 × `{name 1–40, toHit int −10…+30, damage "NdM±K", damageType?}`; dice: N 1–20, M ∈ 4/6/8/10/12/20/100, K 0–30, a subset of [dice-roll-log](dice-roll-log.md)'s grammar; damageType = a 5e damage type. MVP UI uses the first |
+| attacks | both | 0–1 × `{name 1–40, toHit int −10…+30, damage, damageType?}` (MVP: one weapon attack, ADR-0012) |
 | cr / level, className | monster / character | `"0"`, `"1/8"`, `"1/4"`, `"1/2"`, `"1"`…`"30"` / int 1–20, text 0–40 |
 
-- **Relations:** Campaign 1—* Entity (custom, character); Player 1—* character; Entity 1—* instances (token, combatant, encounter entry; owned by scenes-map / combat-tracker, FK restrict); derived → base (informational).
-- **Derived values:** `readOnly`, `xp`, `effectiveStats` (FR-ENT-03, 05, 13), computed in `@shared`, not sent. **Persisted runtime state:** character `hpCurrent`; the rest is prep data.
-- **Design for later:** non-creature kinds register their own schema (partial data allowed, ADR-0009); modifiers live on instances (ADR-0009 open row); notes column for world-builder.
+- `damage` = `NdM` optionally `+K` or `−K`: N 1–20, M ∈ 4/6/8/10/12/20/100, K 0–30 (e.g. `1d4-1`); a subset of [dice-roll-log](dice-roll-log.md)'s grammar. `damageType` = a 5e damage type.
+- **Relations:** Campaign 1—* Entity (custom, character); Player 1—* character; Entity 1—* instances (token, combatant, encounter entry; FK owned by scenes-map / combat-tracker); derived → base (informational).
+- **Derived values:** `readOnly`, `xp`, `effectiveStats` (FR-ENT-03, 05, 13), computed in `@shared`, not sent. **Persisted runtime state:** character `hpCurrent`; the rest is prep data. **Later:** non-creature kinds register their own schema; modifiers on instances; delete per ADR-0009 open row.
 
 ## 9. API & events
 
-**REST (Hono RPC)** — prep CRUD ([ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md) D); prefix per [OQ-CAMP-15](campaign-management.md#15-open-questions). No GET: the snapshot carries the records. **WS intents / signals:** none. **Internal command:** `entities.import` (pipeline only, FR-ENT-06).
+**REST (Hono RPC)** — prep CRUD ([ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md) D), DM secret (`Authorization: Bearer`); prefix per [OQ-CAMP-15](campaign-management.md#15-open-questions). No GET: the snapshot carries the records. **WS intents / signals:** none. **Internal:** `entities.import` (FR-ENT-06), `resolveDefinition` (FR-ENT-12), hook registry (FR-ENT-19). Errors `{code, message, issues?}`: `invalid` 400, `forbidden` 403, `not_found` 404, `conflict` 409 (protocol CON-09); player token or no secret → 401.
 
-| Method | Path | Who | Purpose |
+| Method | Path | Purpose | Success |
 |---|---|---|---|
-| POST | `/api/entities` | DM | `entities.create {kind, name, portraitAssetId?, statBlock, derivedFromId?, ownerPlayerId?}` |
-| PUT | `/api/entities/:id` | DM | `entities.update` (FR-ENT-11) |
-| DELETE | `/api/entities/:id` | DM | `entities.delete` (FR-ENT-14) |
+| POST | `/api/entities` | `entities.create {kind, name, portraitAssetId?, statBlock, derivedFromId?, ownerPlayerId?}` | `201 {entity}` |
+| PUT | `/api/entities/:id` | `entities.update` (FR-ENT-11) | `200 {entity}` |
 
-**Record types** (generic record changes `{type, id, op, data}` + `cause`)
+**Record types** (generic record changes `{type, id, op, data}` + `cause`) *(proposed, OQ-ENT-06)*
 
 | Type | Scope | Data | Visibility rule | Snapshot |
 |---|---|---|---|---|
-| `entity` | campaign | Row minus provenance (always null) | FR-ENT-15 | Campaign's characters + customs |
+| `entity` | campaign | Row minus provenance (always null); asset reference `portraitAssetId` (a redacted character keeps it, so other players can fetch that portrait, #123; intended) | FR-ENT-15 | Campaign's characters + customs |
 | `imported-entity` | global | Row incl. provenance | FR-ENT-16 | All imported definitions |
 
-**Domain events** (none transient, none undoable; entities adds no listeners)
+**Domain events** (all logged, none transient or undoable; entities adds no listeners)
 
-| Event | Changes | Logged |
-|---|---|---|
-| `EntityImported {entityId, source, sourceKey}` | `imported-entity` upsert | yes, `campaignId` null |
-| `EntityCreated {entityId, kind, derivedFromId?}` / `EntityUpdated {entityId}` / `EntityDeleted {entityId}` | `entity` upsert / upsert (before/after; an owner change flips who sees it full) / delete | yes |
+| Event | Changes |
+|---|---|
+| `EntityImported {entityId, source, sourceKey}` | `imported-entity` upsert; log `campaignId` null |
+| `EntityCreated {entityId, kind, derivedFromId?}` | `entity` upsert |
+| `EntityUpdated {entityId}` | `entity` upsert (before/after; an owner change flips who sees it full) + every hook-changed instance row (FR-ENT-19) |
 
 ## 10. Permissions
 
 | Action | DM | Player | Server check |
 |---|---|---|---|
-| Create custom monster / derive; create character (fixtures in MVP) | ✓ | ✗ | DM credential; FR-ENT-08–10 |
-| Update custom monster or character | ✓ | ✗ (own-sheet edits: [OQ-CHAR-03](character-sheet.md#15-open-questions)) | Not imported (FR-ENT-07); `resolveDefinition` |
-| Update / delete imported | ✗ | ✗ | `forbidden` |
-| Delete custom monster | ✓, unreferenced | ✗ | FK restrict → `conflict` |
+| Create / derive / update custom monster; create (fixtures) / update character | ✓ | ✗ (own-sheet edits: [OQ-CHAR-03](character-sheet.md#15-open-questions)) | DM credential; FR-ENT-04, 07–11; `resolveDefinition` |
+| Update imported; delete anything | ✗ | ✗ | `forbidden` / no route |
 | Receive records | full | own character full; others redacted; monsters hidden | FR-ENT-15, 16 |
 
 ## 11. Edge cases & failure modes
 
-- **Player disconnect / reconnect:** fresh snapshot; own character incl. `hpCurrent` current. Owner reassigned meanwhile → snapshot reflects it.
-- **DM disconnect / reconnect:** REST commands don't depend on the WS. Lost response → retry of create hits the name rule (`conflict`), never a duplicate.
-- **Server crash mid-action:** one transaction per command (row + log): all or nothing. Import batch all-or-nothing (FR-FIX-19). After restart, snapshots equal pre-crash state.
-- **Concurrent edits:** two DM tabs update one definition → last commit wins (whole-block replace, no merge). Base deleted while a derive is in flight → `not_found`. Campaign switch: old customs leave the DM store with the reconnect; `resolveDefinition` rejects them.
-- **Edit during combat:** combatants show new stats at once (FR-ENT-13); combat log keeps the effective values used at the time (ADR-0009). Combatant HP above a lowered max: combat-tracker's call (OQ-ENT-10).
-- **Invalid / malicious input:** strict zod (unknown keys, bounds, dice grammar); names rendered as text; a player hitting entity routes → 401; spoofed `campaignId`/`source` fields → `invalid` (not in schema).
+- **Player disconnect / reconnect:** fresh snapshot; own character incl. `hpCurrent` current; an owner change meanwhile is reflected. Existing tokens keep their own owner; the DM reassigns them (#124, scenes-map).
+- **DM disconnect / reconnect:** REST doesn't depend on the WS. Lost create response → retry hits the unique name index (`conflict`), never a duplicate.
+- **Server crash mid-action:** one transaction per command (row + hook-changed instances + log): all or nothing, so no stale display copies. Import batch all-or-nothing (FR-FIX-19). After restart, snapshots equal pre-crash state.
+- **Concurrent edits:** two DM tabs update one definition → last commit wins (whole replace). Campaign switch: old customs leave the DM store with the resync; `resolveDefinition` rejects them. Edit during combat: instances follow at once (FR-ENT-19); the combat log keeps values used at the time (ADR-0009).
+- **Invalid / malicious input:** strict zod (unknown keys, bounds, dice grammar); names rendered as text; spoofed `campaignId` / `source` → `invalid` (not in schema).
 
 ## 12. Performance & bandwidth
 
-- MVP: ≤ ~20 definitions per campaign, ≤ 2 KB each → ≤ 40 KB of snapshot; edits are rare (prep), events ≤ 2 KB. Hundreds of imported definitions (post-MVP [compendium](post-mvp/compendium.md)) would bloat the DM snapshot: move `imported-entity` to on-demand REST queries then.
+- MVP: ≤ ~20 definitions per campaign, ≤ 2 KB each → ≤ 40 KB of snapshot; edits are rare (prep); events ≤ 2 KB plus hook-changed instances. Hundreds of imported definitions (post-MVP compendium) would bloat the DM snapshot: move `imported-entity` to on-demand REST then.
 
 ## 13. Test plan
 
-**Fixtures** (owner entities; values from [fixtures-adapters §8](fixtures-adapters.md#8-data-model)). Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)); loop per [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md).
+**Fixtures** (owner entities; values per [fixtures-adapters §8](fixtures-adapters.md#8-data-model); setups run as DM, FR-FIX-13). Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)); loop per [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md). **Bundle `entities`** = `base` + `player-2` + `campaign-second` + all six below; `enemy-1`, `enemy-2`, `enemy-custom`, `char-mira` also join `session-sim` (FR-FIX-25).
 
-| Key | Kind | Contents |
-|---|---|---|
-| `enemy-1` | reference | `srd/monster/goblin.ts`: small, AC 15, HP 7, init +2, scimitar +4 / 1d6+2 slashing, CR 1/4. Source `fixture`, SRD 5.1 CC BY 4.0 attribution |
-| `enemy-2` | reference | `srd/monster/wolf.ts`: medium, AC 13, HP 11, init +2, bite +4 / 2d4+2 piercing, CR 1/4 |
-| `enemy-custom` | setup | `entities.create` derived from `enemy-1`: "Elite Goblin Warrior", AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2 |
-| `char-mira` | setup | "Mira", owner `player-1`, medium, L1 fighter, AC 16, HP 12/12, init +2, shortsword +4 / 1d6+2 piercing |
-| `char-thorn` *(new)* | setup | "Thorn", owner `player-2`, L1 rogue, AC 14, HP 10/10, init +3, dagger +5 / 1d4+3 piercing |
-| `enemy-custom-second` *(new)* | setup | In `campaign-second`: activate it, create "Marsh Troll" from scratch (large, AC 15, HP 59, claw +7 / 2d6+4, CR 5), re-activate Fixture Campaign |
-
-- **Bundle `entities`** = `base` + `player-2` + `campaign-second` + all six above. `enemy-1`, `enemy-2`, `enemy-custom`, `char-mira` also join `session-sim` (FR-FIX-25).
+| Key | Kind | Requires | Contents |
+|---|---|---|---|
+| `enemy-1` | reference | — | `srd/monster/goblin.ts`: small, AC 15, HP 7, init +2, scimitar +4 / 1d6+2 slashing, CR 1/4. Source `fixture`, SRD 5.1 CC BY 4.0 attribution |
+| `enemy-2` | reference | — | `srd/monster/wolf.ts`: medium, AC 13, HP 11, init +2, bite +4 / 2d4+2 piercing, CR 1/4 |
+| `enemy-custom` | setup | `enemy-1` | Derived from `enemy-1`: "Elite Goblin Warrior", AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2; other fields as `enemy-1` |
+| `char-mira` | setup | `player-1` | "Mira", owner `player-1`, medium, L1 fighter, AC 16, HP 12/12, init +2, shortsword +4 / 1d6+2 piercing |
+| `char-thorn` | setup | `player-2` | "Thorn", owner `player-2`, medium, L1 rogue, AC 14, HP 10/10, init +3, dagger +5 / 1d4+3 piercing |
+| `enemy-custom-second` | setup | `campaign-second` | Activate it; create "Marsh Troll" (large, AC 15, HP 59, init +1, claw +7 / 2d6+4 slashing, CR 5); re-activate Fixture Campaign |
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | Schemas: bounds, strict keys, dice grammar, CR enum; XP table; `effectiveStats` identity; visibility matrix (DM / owner / other player × character / custom / imported) | In-code |
-| Integration | Each command: row + log + event, IDs from `ctx`; rollback → none. Read-only `forbidden`, no event. Derive cross-campaign → `not_found`; base edit leaves derived unchanged. Name `conflict`. `hpCurrent` clamp. Owner change: old owner gets redacted upsert, new owner full. Delete blocked by a referencing row. **Leak scan:** `player-1` frames never contain "Elite Goblin Warrior", "Marsh Troll", "Goblin" or Thorn's `1d4+3`; restart → identical snapshots | `entities` |
-| E2E (thin) | DM list rows; `player-1` WS frames (`page.on('websocket')`) hold Mira full, no monster records; restart | `entities` |
+| Unit | Schemas: bounds, strict keys, 0–1 attacks, dice grammar incl. `−K`, CR enum; XP table; `effectiveStats` identity; visibility matrix (DM / owner / other player × character / custom / imported); list sort. **Review check:** only `effectiveStats` reads instance stats; no listener mutates state | In-code |
+| Integration | Each command: row + log + event, IDs from `ctx`; rollback → none. Read-only `forbidden`, no event. No active campaign → `conflict`. Derive cross-campaign → `not_found`; base edit leaves derived unchanged. Name `conflict` (create, rename, character); custom "Goblin" allowed. Bad owner → `invalid`. `hpCurrent` clamp. Owner change: old owner gets redacted upsert, new owner full. **Hook:** a test-registered hook's row is in the same commit and in `EntityUpdated.changes`; a throwing hook rolls back the update. Bad stored JSON row → DM snapshot omits it, log line present. **Leak scan:** `player-1` frames never contain "Elite Goblin Warrior", "Marsh Troll", "Goblin" or Thorn's `1d4+3`; restart → identical snapshots | `entities` |
+| E2E (thin) | DM list rows; dropping a row on a test drop target yields its `definitionId`; `player-1` WS frames hold Mira full, no monster records; restart | `entities` |
 
-**Browser walkthrough** — `bun run build`, `fixtures:reset-load entities --profile verify`, `start --profile verify`. Contexts: A + A2 DM, B `player-1`, C `player-2`. The form ships in Phase 3, so DM edits are REST calls from A's page (`fetch` with the stored secret). Player evidence: WS frames captured via Playwright; if the MCP can't, attach the E2E leak spec's frame log. Teardown: stop server, `fixtures:reset --profile verify`.
+**Browser walkthrough** — `bun run build`, `fixtures:reset-load entities --profile verify`, `start --profile verify`. Contexts: A + A2 DM, B `player-1`, C `player-2`. The form ships in Combat, so DM edits are `fetch` calls from A's page with the stored secret. Player evidence: WS frame log captured with `page.on('websocket')`. Teardown: stop server, `fixtures:reset --profile verify`.
 
 | # | DM (A, A2) | Players (B, C) | Expected |
 |---|---|---|---|
 | 1 | Log in; open Creatures | — | Mira (Player 1), Thorn (Player 2), Goblin + Wolf (SRD, lock, CR 1/4, 50 XP), Elite Goblin Warrior (Custom, derived from Goblin, CR 1/2, 100 XP). No Marsh Troll |
-| 2 | — | B, C open links | B: Mira full, Thorn name only, no monsters. C: the reverse |
-| 3 | PUT Goblin; PUT Elite Goblin Warrior HP 20; POST derive "Goblin Boss" from Goblin | — | Goblin: 403 read-only message, unchanged. Others: A2 updates ≤ 1 s; B, C get no frame |
-| 4 | PUT Mira name "Mira Vale" | — | B sees full upsert, C redacted upsert, ≤ 1 s |
+| 2 | — | B, C open links | From B/C frame log: B has Mira full, Thorn name only, no monsters; C the reverse |
+| 3 | PUT Goblin; PUT Elite Goblin Warrior HP 20; POST derive "Goblin Boss" from Goblin | — | Goblin: 403 read-only message, unchanged. Others: A2 updates ≤ 1 s; B, C get no `event` frame |
+| 4 | PUT Mira name "Mira Vale" | — | From frame logs: B full upsert, C redacted upsert, ≤ 1 s |
 | 5 | Reload all; then kill + restart server | — | All reconnect; state includes steps 3–4 |
 | 6 | Switch to Second Campaign, then back | — | List: Marsh Troll + SRD only, then step-5 list. No console errors throughout |
 
@@ -181,28 +171,29 @@ wave: 2
 
 | On | What we need | Status |
 |---|---|---|
-| ADR-0009, 0012, 0015, 0016, 0018, 0021, 0022 | Model, stored basics, pipeline, events, scope, sync, seams | accepted |
-| [live-sync](live-sync.md), [campaign-management](campaign-management.md), [fixtures-adapters](fixtures-adapters.md) | `global` scope, visibility fns, REST → same events; players, `ctx.campaignId`; pipeline calls `entities.import` | complete |
-| [assets-pipeline](assets-pipeline.md), [play-shell](play-shell.md), [scenes-map](scenes-map.md), [combat-tracker](combat-tracker.md), [character-sheet](character-sheet.md), [dice-roll-log](dice-roll-log.md) | Asset id + campaign scope, portrait access (OQ-ASSET-01/04); window registry; instances use `resolveDefinition` + FK restrict; form calls `entities.create/update`; additive character fields + `hpCurrent` commands; dice grammar ⊇ ours | Phase 2–3, open |
+| ADR-0009, 0012, 0015, 0016, 0018, 0021, 0022; #120–124 | Model, basics, pipeline, events, scope, sync, seams, Scenes decisions | accepted |
+| [live-sync](live-sync.md), [campaign-management](campaign-management.md), [fixtures-adapters](fixtures-adapters.md) | `global` scope, visibility fns, REST → same events; players, active campaign; pipeline insert interface | complete |
+| [assets-pipeline](assets-pipeline.md), [play-shell](play-shell.md) | `assets.require` (FR-ASSET-15), campaign-scoped assets; window registry for `ent.creatures`, HTML5 drag events from a window reach the base layer (FR-SHELL-13) | in-review |
+| [scenes-map](scenes-map.md) | Drop handler (FR-MAP-13); `resolveDefinition`; definition-changed hook refreshing token copies (#120; replaces OQ-MAP-14's copy-at-placement pick) | in-review |
+| [combat-tracker](combat-tracker.md), [character-sheet](character-sheet.md), [dice-roll-log](dice-roll-log.md) | Form via `creatureActions`, combatant hook (OQ-ENT-10); optional character fields only + `hpCurrent` commands; dice grammar ⊇ ours | Combat |
 
 ## 15. Open questions
 
-**Bold** option = suggested pick (not decided).
-
-| ID | Question | Options (pick marked) | Blocking? | Affects |
+| ID | Question | Options (pick **bold**, not decided unless struck) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-ENT-01, 02 | ~~Content model; one definition per kind~~ **Decided:** [ADR-0009](../architecture/adr/0009-entity-content-model.md) | — | — | — |
-| OQ-ENT-03 | Entities UI in MVP | **Read-only DM Creatures list (drag source); form = combat-tracker; characters fixtures-only** (one list for both callers) / no entities UI, each feature builds a picker (duplication) | no (owner: spec-entities) | scenes-map, combat-tracker, play-shell |
-| OQ-ENT-04 | Do characters and monsters share the basics shape? | **Yes, one creature core (§8)** (one contract for combat) / separate per kind (combat branches on kind) | yes | character-sheet, combat-tracker |
-| OQ-ENT-05 | What do players see of definitions? | **Own character full; other characters redacted; monsters (custom + imported) hidden** (no prep leak; instances carry display data) / monsters name-only (leaks prepared customs) / all full. [Proposed ADR](../architecture/adr/proposed-definition-visibility.md) | yes | scenes-map, combat-tracker, character-sheet |
-| OQ-ENT-06 | Record types for two scopes | **Two types, one schema: `entity` (campaign), `imported-entity` (global)** (fits the registry as is) / one type with per-record scope (registry change) | no (owner: spec-entities) | live-sync |
-| OQ-ENT-07 | Delete a custom definition in use (ADR-0009 open row) | **Custom monsters only; blocked while referenced (FK restrict → `conflict`)** (safe, cheap) / no delete in MVP / cascade (destroys prep) | no (owner: spec-entities) | scenes-map, combat-tracker |
-| OQ-ENT-08 | Where PC current HP lives | **`hpCurrent` column on `entity` (character only); HP commands owned by combat-tracker / character-sheet** (one row per PC) / separate character-state table | no (owner: character-sheet) | character-sheet, combat-tracker |
-| OQ-ENT-09 | Player-visible instance data, given monster definitions are hidden | **Instances carry display name, image and size; scenes-map refreshes size via an `EntityUpdated` listener** (keeps live link) / size copied at placement (stale after edits) | no (owner: scenes-map) | scenes-map, combat-tracker |
-| OQ-ENT-10 | Combatant HP above a lowered `hpMax` | **Combat-tracker clamps in an `EntityUpdated` listener** / leave until healed | no (owner: combat-tracker) | combat-tracker |
-| OQ-ENT-11 | XP for CR 0 (SRD: "0 or 10") | **10** (DMG table) / 0 / stored per definition | no (owner: combat-tracker) | combat-tracker |
-| OQ-ENT-12 | Answers to fixtures-adapters | **OQ-FIX-15: inline (FR-ENT-05). OQ-FIX-19: entities ships `entities.create` incl. derive and `enemy-custom` in Phase 2; combat-tracker ships the form. Shape owners as listed; `char-mira` record = entities, sheet fields = character-sheet** | no (owner: spec-entities) | fixtures-adapters, combat-tracker, character-sheet |
-| OQ-ENT-13 | Glossary: **Entity** says "campaign-owned" and "content model is open" | **"A world record (character, monster; later npc, item…). Customs and characters belong to one campaign; imported definitions are global ([ADR-0018](../architecture/adr/0018-global-imported-content.md)). Model: [ADR-0009](../architecture/adr/0009-entity-content-model.md)"** / keep | no (owner: integrator) | glossary |
+| OQ-ENT-03 | Entities UI in MVP | **Read-only DM Creatures window (drag source, `creatureActions`)** / each feature builds its own picker | no (owner: spec-entities) | scenes-map, combat-tracker, play-shell |
+| OQ-ENT-04 | ~~Shared basics shape~~ | **Decided (#124):** one creature core (ADR-0009 storage A, #93) | — | — |
+| OQ-ENT-05 | ~~What players see of definitions~~ | **Decided (#120):** monsters hidden; own character full; others name, portrait, owner; instances carry display copies ([proposed ADR](../architecture/adr/proposed-definition-visibility.md)) | — | — |
+| OQ-ENT-06 | Record types for two scopes | **Two types, one schema: `entity` (campaign), `imported-entity` (global)** / one type with per-record scope (registry change) | no (owner: spec-entities) | live-sync |
+| OQ-ENT-07 | Delete a custom definition (ADR-0009 open row) | **No delete in MVP** (rename covers typos; no FK coordination) / block while referenced / cascade | no (owner: spec-entities) | scenes-map, combat-tracker |
+| OQ-ENT-08 | Where PC current HP lives | **`hpCurrent` on `entity`; HP commands by combat-tracker / character-sheet** / separate state table | no (owner: character-sheet) | character-sheet, combat-tracker |
+| OQ-ENT-09 | ~~Player-visible instance data~~ | **Decided (#120):** tokens carry read-only name, image, size copies, refreshed by an in-transaction hook (FR-ENT-19). Which renamed tokens keep their name: scenes-map | — | — |
+| OQ-ENT-10 | Combatant HP above a lowered `hpMax`; combatant display copies | **Combat-tracker clamps and refreshes copies in an in-transaction hook (FR-ENT-19)** / leave until healed | no (owner: combat-tracker) | combat-tracker |
+| OQ-ENT-11 | XP for CR 0 (SRD: "0 or 10") | **10** (DMG table) / 0 | no (owner: combat-tracker) | combat-tracker |
+| OQ-ENT-12 | Answers to fixtures-adapters | **OQ-FIX-15: inline; OQ-FIX-19: entities ships create/derive + `enemy-custom` in Scenes, form in Combat; `char-mira` record + basics = entities, extra sheet fields = character-sheet** | no (owner: spec-entities) | fixtures-adapters |
+| OQ-ENT-13 | Glossary: **Instance** "holds only display name, play state and modifiers" | **"…holds read-only display copies of its definition (name, image, size), play state and modifiers (#120)"**; **Combatant** "Holds HP" → add "for PCs, HP lives on the character" / keep | no (owner: integrator) | glossary |
+| OQ-ENT-14 | AGENTS §9.9: add append-only registries (server definition-changed hooks; DM `creatureActions`) | **Add both** (other specs add lines, never edit entities' code) / combat-tracker edits entities' folder | no (owner: integrator) | AGENTS, scenes-map, combat-tracker |
+| OQ-ENT-15 | Other PCs' HP for players (party view) | **Combat-phase call: nothing in Scenes; combat-tracker picks** (combatant copy / band only / redacted character adds HP) | no (owner: combat-tracker) | combat-tracker, character-sheet |
 
 ## 16. Out of scope
 
