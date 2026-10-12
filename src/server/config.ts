@@ -1,0 +1,178 @@
+// The only module that reads process.env (AGENTS §9.1). Node-compatible: vite.config.ts imports it.
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { z } from "zod";
+
+export const WORKTREE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+export const PROFILES = ["dev", "verify"] as const;
+export type Profile = (typeof PROFILES)[number];
+export type LogLevel = "debug" | "info" | "warn" | "error";
+
+const flag = z
+  .string()
+  .optional()
+  .transform((v) => v === "1");
+const port = z.coerce.number().int().min(0).max(65535).optional();
+const optionalString = z
+  .string()
+  .optional()
+  .transform((v) => (v === undefined || v.trim() === "" ? undefined : v.trim()));
+
+const EnvSchema = z.object({
+  PP_SLOT: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.coerce.number().int().min(0).max(49).optional(),
+  ),
+  PP_PROFILE: z.preprocess((v) => (v === "" ? undefined : v), z.enum(PROFILES).default("dev")),
+  PP_HOST: optionalString.transform((v) => v ?? "127.0.0.1"),
+  PP_PORT: z.preprocess((v) => (v === "" ? undefined : v), port),
+  PP_VITE_PORT: z.preprocess((v) => (v === "" ? undefined : v), port),
+  PP_DATA_DIR: optionalString,
+  PP_DB_PATH: optionalString,
+  PP_ASSET_DIR: optionalString,
+  PP_DATA_DISPOSABLE: flag,
+  PP_TEST_MODE: flag,
+  PP_DM_SECRET: z.string().optional(),
+  PP_PUBLIC_BASE_URL: optionalString.pipe(z.url().optional()),
+  PP_LOG_LEVEL: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.enum(["debug", "info", "warn", "error"]).default("info"),
+  ),
+});
+
+export interface Config {
+  root: string;
+  slot: number | null;
+  profile: Profile;
+  host: string;
+  /** Hono port for this profile; 0 = OS-assigned. */
+  port: number;
+  /** Vite dev port (dev profile only). */
+  vitePort: number;
+  dataDir: string;
+  dbPath: string;
+  assetDir: string;
+  disposable: boolean;
+  testMode: boolean;
+  /** Never log, store or send. Empty string only when `requireSecret: false`. */
+  dmSecret: string;
+  publicBaseUrl: string | null;
+  logLevel: LogLevel;
+}
+
+export class ConfigError extends Error {
+  override name = "ConfigError";
+}
+
+export interface ParseOptions {
+  /** `--profile` flag; overrides PP_PROFILE. */
+  profile?: string;
+  /** dev, start, fixtures:* need a slot unless ports are explicit (AGENTS §9.2). */
+  requireSlot?: boolean;
+  /** Server start refuses without a valid DM secret (FR-CAMP-01). */
+  requireSecret?: boolean;
+  /** Resolve relative paths from here instead of the worktree root (tests). */
+  root?: string;
+}
+
+export const MIN_SECRET_LENGTH = 12;
+
+export function basePort(slot: number): number {
+  return 4100 + 10 * slot;
+}
+
+export function profilePorts(slot: number, profile: Profile): { port: number; vitePort: number } {
+  const base = basePort(slot);
+  return profile === "dev"
+    ? { port: base, vitePort: base + 1 }
+    : { port: base + 2, vitePort: base + 3 };
+}
+
+export function parseConfig(
+  env: Record<string, string | undefined>,
+  opts: ParseOptions = {},
+): Config {
+  const parsed = EnvSchema.safeParse(env);
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    throw new ConfigError(`Invalid environment: ${msg}`);
+  }
+  const e = parsed.data;
+  const root = opts.root ?? WORKTREE_ROOT;
+
+  let profile: Profile = e.PP_PROFILE;
+  if (opts.profile !== undefined) {
+    if (!(PROFILES as readonly string[]).includes(opts.profile)) {
+      throw new ConfigError(`Unknown profile "${opts.profile}" (use ${PROFILES.join(" | ")})`);
+    }
+    profile = opts.profile as Profile;
+  }
+
+  const slot = e.PP_SLOT ?? null;
+  const fromSlot = slot === null ? null : profilePorts(slot, profile);
+  const portValue = e.PP_PORT ?? fromSlot?.port;
+  const vitePortValue = e.PP_VITE_PORT ?? fromSlot?.vitePort;
+  if (opts.requireSlot && slot === null && e.PP_PORT === undefined) {
+    throw new ConfigError("No port slot (PP_SLOT). Run `bun run env:init`.");
+  }
+
+  const dmSecret = e.PP_DM_SECRET ?? "";
+  if (opts.requireSecret && dmSecret.length < MIN_SECRET_LENGTH) {
+    throw new ConfigError(
+      dmSecret.length === 0
+        ? "PP_DM_SECRET is not set. Run `bun run env:init` or set it in .env."
+        : `PP_DM_SECRET must be at least ${MIN_SECRET_LENGTH} characters.`,
+    );
+  }
+
+  if (e.PP_TEST_MODE && !e.PP_DATA_DISPOSABLE) {
+    throw new ConfigError("PP_TEST_MODE=1 requires PP_DATA_DISPOSABLE=1.");
+  }
+
+  const resolve = (p: string) => (path.isAbsolute(p) ? path.normalize(p) : path.resolve(root, p));
+  const dataDir = resolve(e.PP_DATA_DIR ?? path.join("data", profile));
+
+  return {
+    root,
+    slot,
+    profile,
+    host: e.PP_HOST,
+    port: portValue ?? 0,
+    vitePort: vitePortValue ?? 0,
+    dataDir,
+    dbPath: e.PP_DB_PATH ? resolve(e.PP_DB_PATH) : path.join(dataDir, "pocket-plane.db"),
+    assetDir: e.PP_ASSET_DIR ? resolve(e.PP_ASSET_DIR) : path.join(dataDir, "assets"),
+    disposable: e.PP_DATA_DISPOSABLE,
+    testMode: e.PP_TEST_MODE,
+    dmSecret,
+    publicBaseUrl: e.PP_PUBLIC_BASE_URL ?? null,
+    logLevel: e.PP_LOG_LEVEL,
+  };
+}
+
+/** Reads process.env (Bun auto-loads `<worktree>/.env`). */
+export function loadConfig(opts: ParseOptions = {}): Config {
+  return parseConfig(process.env, opts);
+}
+
+/** `--profile <name>` from argv, if given. */
+export function profileArg(argv: readonly string[]): string | undefined {
+  const i = argv.indexOf("--profile");
+  if (i === -1) return undefined;
+  const v = argv[i + 1];
+  if (v === undefined || v.startsWith("--")) throw new ConfigError("--profile needs a value");
+  return v;
+}
+
+/** Fixture guard roots: `<worktree>/data/` and the OS temp dir (AGENTS §9.3). */
+export function disposableRoots(root: string = WORKTREE_ROOT): string[] {
+  return [path.join(root, "data"), os.tmpdir()];
+}
+
+/** Printed URLs always use 127.0.0.1, never localhost (AGENTS §9.2). */
+export function localUrl(host: string, p: number): string {
+  const h = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
+  return `http://${h.includes(":") ? `[${h}]` : h}:${p}`;
+}

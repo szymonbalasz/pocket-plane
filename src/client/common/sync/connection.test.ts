@@ -1,0 +1,110 @@
+import { expect, test } from "bun:test";
+import { type Clock, SyncConnection } from "./connection";
+
+class FakeSocket {
+  readyState = 0;
+  sent: string[] = [];
+  onopen: (() => void) | null = null;
+  onmessage: ((e: { data: string }) => void) | null = null;
+  onclose: ((e: { code: number }) => void) | null = null;
+  send(d: string) {
+    this.sent.push(d);
+  }
+  close(code = 1000) {
+    this.onclose?.({ code });
+  }
+}
+
+function fakeClock() {
+  let now = 0;
+  const timers = new Map<number, { at: number; fn: () => void }>();
+  let id = 0;
+  const clock: Clock & { advance(ms: number): void; pending(): number[] } = {
+    now: () => now,
+    setTimeout(fn, ms) {
+      timers.set(++id, { at: now + ms, fn });
+      return id;
+    },
+    clearTimeout: (h) => void timers.delete(h as number),
+    setInterval: () => 0,
+    clearInterval() {},
+    advance(ms) {
+      now += ms;
+      for (const [k, t] of [...timers]) {
+        if (t.at <= now) {
+          timers.delete(k);
+          t.fn();
+        }
+      }
+    },
+    pending: () => [...timers.values()].map((t) => t.at - now),
+  };
+  return clock;
+}
+
+function setup() {
+  const sockets: FakeSocket[] = [];
+  let wake: (() => void) | null = null;
+  const clock = fakeClock();
+  const conn = new SyncConnection({
+    credential: { role: "player", token: "t" },
+    url: "ws://x/ws",
+    clock,
+    onChange() {},
+    createSocket: () => {
+      const s = new FakeSocket();
+      sockets.push(s);
+      return s as unknown as WebSocket;
+    },
+    onWake: (fn) => {
+      wake = fn;
+      return () => {
+        wake = null;
+      };
+    },
+  });
+  return { conn, sockets, clock, wake: () => wake?.() };
+}
+
+test("FR-SYNC-05 a lost connection waits for the backoff", () => {
+  const { conn, sockets, clock } = setup();
+  conn.start();
+  for (let i = 0; i < 6; i++) sockets.at(-1)?.close(1006);
+  expect(sockets).toHaveLength(1);
+  clock.advance(700);
+  expect(sockets).toHaveLength(2);
+});
+
+test("SYNC §3 reconnect goal: online / focus / visible skips the remaining backoff", () => {
+  const { conn, sockets, clock, wake } = setup();
+  conn.start();
+  // Several failed attempts → long backoff (4–6 s).
+  for (let i = 0; i < 4; i++) {
+    sockets.at(-1)?.close(1006);
+    clock.advance(10_000);
+  }
+  sockets.at(-1)?.close(1006);
+  const n = sockets.length;
+  expect(Math.min(...clock.pending())).toBeGreaterThan(3_000);
+  wake();
+  expect(sockets).toHaveLength(n + 1);
+  expect(clock.pending()).toEqual([]);
+  // Attempt in flight → another wake does nothing.
+  wake();
+  expect(sockets).toHaveLength(n + 1);
+});
+
+test("wake never reconnects a rejected (4401) or stopped connection", () => {
+  const { conn, sockets, wake } = setup();
+  conn.start();
+  sockets.at(-1)?.close(4401);
+  wake();
+  expect(sockets).toHaveLength(1);
+  expect(conn.snapshot.state).toBe("rejected");
+  const b = setup();
+  b.conn.start();
+  b.sockets.at(-1)?.close(1006);
+  b.conn.stop();
+  b.wake();
+  expect(b.sockets).toHaveLength(1);
+});
