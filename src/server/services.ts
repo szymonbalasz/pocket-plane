@@ -11,7 +11,7 @@ import { features } from "./features";
 import { ImportRegistry } from "./features/fixtures-adapters/import-pipeline";
 import type { Logger } from "./log";
 import type { HubApi } from "./ws/hub";
-import { type AnyRecordType, RecordRegistry } from "./ws/records";
+import { type ActiveSceneResolver, type AnyRecordType, RecordRegistry } from "./ws/records";
 import { type SignalDef, SignalRegistry } from "./ws/signals";
 
 /** Resolvers campaign-management provides to live-sync (CAMP §9, protocol §2). */
@@ -52,6 +52,8 @@ export interface Registrar {
   event(def: DomainEventDef): void;
   recordType(def: AnyRecordType): void;
   signal(def: SignalDef): void;
+  /** The campaign's active scene for the `scene` scope gate (CON-22); one provider. */
+  activeScene(resolver: ActiveSceneResolver): void;
   listener(name: string, fn: Listener): void;
   provideAuth(resolvers: CredentialResolvers): void;
 }
@@ -106,6 +108,7 @@ export function createServices(opts: ServicesOptions): Services {
     event: (def) => commands.registerEvent(def),
     recordType: (def) => services.records.register(def),
     signal: (def) => services.signals.register(def),
+    activeScene: (fn) => services.records.provideActiveScene(fn),
     listener: (name, fn) => bus.subscribe(name, fn),
     provideAuth(r) {
       services.auth = r;

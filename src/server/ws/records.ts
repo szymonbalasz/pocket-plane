@@ -34,13 +34,24 @@ export interface RecordTypeDef<R> {
   idOf(r: R): string;
   /** `campaign` / `scene` scope: the record's campaign (scope gate). */
   campaignOf?(r: R): string;
+  /**
+   * Required for `scene` scope: the record's scene (CON-22). Players see a scene-scoped record
+   * only while its scene is the campaign's active scene; DM sees every scene of the campaign.
+   */
+  sceneOf?(r: R): string;
   /** Player visibility; reads record + viewer only. DM always gets `full`. */
   visibility(r: R, v: Viewer): Visibility;
   /** Required when `visibility` can return `redacted`. */
   redact?(r: R, v: Viewer): unknown;
-  /** Bounded snapshot provider: this type's records for the viewer's campaign (pre-filter). */
+  /**
+   * Bounded snapshot provider: this type's records for the viewer's campaign (pre-filter).
+   * Scene scope: return every scene's rows of the campaign; the scene gate filters.
+   */
   snapshot(src: SnapshotSource, v: Viewer): R[];
 }
+
+/** Active scene id of a campaign, or null (CON-22). Must be a cheap in-memory read. */
+export type ActiveSceneResolver = (campaignId: string) => string | null;
 
 /** Type-erased registration (the registry works on unknown records). */
 export type AnyRecordType = RecordTypeDef<unknown>;
@@ -58,10 +69,32 @@ export interface WireChange {
 
 export class RecordRegistry {
   private types = new Map<string, AnyRecordType>();
+  /** No provider (before scenes-map registers one) → no active scene → players see no scene records. */
+  private activeScene: ActiveSceneResolver = () => null;
+  private activeSceneProvided = false;
 
   register(def: AnyRecordType): void {
     if (this.types.has(def.type)) throw new Error(`Record type "${def.type}" registered twice`);
+    if (def.scope !== "global" && !def.campaignOf) {
+      throw new Error(`Record type "${def.type}" (scope ${def.scope}) needs campaignOf`);
+    }
+    if (def.scope === "scene" && !def.sceneOf) {
+      throw new Error(`Record type "${def.type}" (scope scene) needs sceneOf (CON-22)`);
+    }
     this.types.set(def.type, def);
+  }
+
+  /** One provider per server (scenes-map's active-scene cache). `replace`: test fixtures only. */
+  provideActiveScene(fn: ActiveSceneResolver, opts: { replace?: boolean } = {}): void {
+    if (this.activeSceneProvided && !opts.replace) {
+      throw new Error("Active-scene resolver provided twice");
+    }
+    this.activeSceneProvided = true;
+    this.activeScene = fn;
+  }
+
+  activeSceneOf(campaignId: string): string | null {
+    return this.activeScene(campaignId);
   }
 
   get(type: string): AnyRecordType | undefined {
@@ -72,7 +105,11 @@ export class RecordRegistry {
     return [...this.types.values()];
   }
 
-  /** Scope gate + visibility fn. Unregistered → hidden for everyone (no scope to check). */
+  /**
+   * Scope gates + visibility fn. Unregistered → hidden for everyone (no scope to check).
+   * Shared by snapshots and live events (FR-SYNC-20), so the scene gate feeds the transition
+   * matrix: a scene-scoped record off the active scene is `hidden` for players (CON-22).
+   */
   view(type: string, record: unknown, v: Viewer): { vis: Visibility; data?: unknown } {
     const def = this.types.get(type);
     if (!def) return { vis: "hidden" };
@@ -82,6 +119,10 @@ export class RecordRegistry {
     }
     if (v.role === "dm") return { vis: "full", data: record };
     if (def.audience === "dm") return { vis: "hidden" };
+    if (def.scope === "scene") {
+      const active = this.activeSceneOf(v.campaignId);
+      if (active === null || def.sceneOf?.(record) !== active) return { vis: "hidden" };
+    }
     const vis = def.visibility(record, v);
     if (vis === "hidden") return { vis };
     if (vis === "redacted") {

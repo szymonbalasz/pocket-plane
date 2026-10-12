@@ -65,6 +65,44 @@ describe("visibility filter", () => {
     ).toBeNull();
   });
 
+  test("CON-22 scene gate: players see scene records of the active scene only (both sides of a change); DM sees all", () => {
+    type S = { id: string; campaignId: string; sceneId: string };
+    const r = new RecordRegistry();
+    r.register(
+      defineRecordType<S>({
+        type: "tok",
+        scope: "scene",
+        schema: z.any(),
+        idOf: (x) => x.id,
+        campaignOf: (x) => x.campaignId,
+        sceneOf: (x) => x.sceneId,
+        visibility: () => "full",
+        snapshot: () => [
+          { id: "a", campaignId: "c1", sceneId: "A" },
+          { id: "b", campaignId: "c1", sceneId: "B" },
+        ],
+      }),
+    );
+    const on = (sceneId: string): S => ({ id: "t", campaignId: "c1", sceneId });
+    const ch = (b: S | null, a: S | null) => ({ type: "tok", id: "t", before: b, after: a });
+    const src = { db: undefined as never, presence: { list: () => [] } };
+    // No resolver → no active scene → nothing for players.
+    expect(r.filterChange(ch(null, on("A")), player)).toBeNull();
+    expect(r.snapshot(src, player).tok).toEqual([]);
+    let active: string | null = "A";
+    r.provideActiveScene(() => active);
+    expect(() => r.provideActiveScene(() => null)).toThrow(/twice/);
+    expect(r.filterChange(ch(on("B"), on("B")), player)).toBeNull();
+    expect(r.filterChange(ch(on("A"), on("A")), player)?.op).toBe("upsert");
+    expect(r.filterChange(ch(on("A"), on("B")), player)?.op).toBe("delete");
+    expect(r.filterChange(ch(on("B"), on("A")), player)?.op).toBe("upsert");
+    expect(r.filterChange(ch(on("B"), on("B")), dm)?.op).toBe("upsert");
+    expect(r.snapshot(src, player).tok).toEqual([{ id: "a", campaignId: "c1", sceneId: "A" }]);
+    expect(r.snapshot(src, dm).tok).toHaveLength(2);
+    active = null;
+    expect(r.snapshot(src, player).tok).toEqual([]);
+  });
+
   test("FR-SYNC-09 scope gate: another campaign's record never reaches a connection, DM included", () => {
     expect(reg.filterChange(change(null, rec({ campaignId: "c2" })), dm)).toBeNull();
     expect(reg.filterChange(change(null, rec({ campaignId: "c2" })), player)).toBeNull();

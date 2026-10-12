@@ -52,7 +52,7 @@ wave: 1
 | FR-SYNC-06 | Player `hello` whose campaign is not active → close `4409 campaign-inactive`, no other frame. Client enters `waiting` (campaign-management's screen), keeps reconnecting, and joins without reload ≤ 10 s after the campaign is activated. | Retryable |
 | FR-SYNC-07 | When a change of active campaign commits, the hub closes every connection whose `campaignId` ≠ the new one with `4409`. The DM client reconnects at once into the new campaign; players wait (FR-SYNC-06). | Campaign never changes on a live connection |
 | FR-SYNC-08 | After a valid `hello`, exactly one `snapshot` (seq 0, with `you {campaignId, role, playerId}`) precedes any `event`. Client replaces its whole store with it and drops optimistic state. | |
-| FR-SYNC-09 | Snapshot = each record type's provider output through the filter. Scopes: `global` (imported definitions, [ADR-0018](../architecture/adr/0018-global-imported-content.md)), `campaign`, `scene` (DM: all scenes; player: active scene only). | OQ-SYNC-03 |
+| FR-SYNC-09 | Snapshot = each record type's provider output through the filter. Scopes: `global` (imported definitions, [ADR-0018](../architecture/adr/0018-global-imported-content.md)), `campaign`, `scene` (DM: all scenes; player: active scene only). The `scene` gate (`sceneOf(record)` = active scene, else hidden for players) applies to snapshots **and** live events. | OQ-SYNC-03, CON-22 |
 | FR-SYNC-10 | Changes committed between snapshot read and send arrive as events after it: none lost, none duplicated. | Hook: FR-SYNC-26 |
 | FR-SYNC-11 | Client `resync` → fresh snapshot. Switching the active scene resyncs every player connection of the campaign. | |
 | FR-SYNC-12 | Intents are zod-validated and dispatched by `name`. Unknown → `reject unknown_intent`; bad payload or JSON → `reject invalid` (issues), connection stays open. Frame > 64 KB → close `1009`. | |
@@ -87,7 +87,7 @@ wave: 1
 | | phase, seq, lastInboundAt | `awaiting-hello`\|`snapshotting`\|`live`, int, timestamp | |
 | Presence *(in-memory, derived)* | playerId, online | id, bool | From live connections |
 | Record change *(in a domain event)* | type, id, before, after | string, id, record \| null ×2 | Create: before null; delete: after null |
-| Registrations *(code)* | record type: type, scope, schema, visibility, snapshot; intent: name, schema, roles, authorize, execute; signal: name, schema, roles | scope `global`\|`campaign`\|`scene` | Intent roles default `[dm]`; signal routing per FR-SYNC-22 |
+| Registrations *(code)* | record type: type, scope, schema, campaignOf, sceneOf (scope `scene`), visibility, snapshot; intent: name, schema, roles, authorize, execute; signal: name, schema, roles | scope `global`\|`campaign`\|`scene` | Intent roles default `[dm]`; signal routing per FR-SYNC-22 |
 | Event log entry *(persisted)* | id, campaignId, type, at, payload, actorRole, actorPlayerId, intentId | payload = **JSON leaf** | Append-only; `campaignId` null for global events (imported definitions, [FR-FIX-23](fixtures-adapters.md#6-functional-requirements)); undo fields: [combat-tracker](combat-tracker.md) |
 | Sync probe *(persisted, test)* | id, campaignId, text, hidden, ownerPlayerId | id, id, string, bool, id \| null | Player sees it iff `!hidden && (owner == null \|\| owner == ctx.playerId)` |
 
