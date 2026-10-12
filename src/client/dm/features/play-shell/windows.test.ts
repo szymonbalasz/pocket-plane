@@ -97,4 +97,21 @@ test("FR-SHELL-20 test mode off → shell.test, sync.probes absent; on → prese
   const on = availableKinds(dmWindows, testMode);
   expect(on.has("shell.test")).toBe(true);
   expect(on.has("sync.probes")).toBe(true);
+  // Ungated product windows are available either way.
+  for (const d of dmWindows.defs.filter((d) => !d.available)) {
+    expect(off.has(d.kind)).toBe(true);
+    expect(on.has(d.kind)).toBe(true);
+  }
+});
+
+test("FR-SHELL-14 DM default layout = every default-open available window in the registry", () => {
+  const off = availableKinds(dmWindows, emptyStore());
+  const expected = dmWindows.defs
+    .filter((d) => d.defaultOpen && off.has(d.kind))
+    .map((d) => d.kind)
+    .sort();
+  for (const viewport of VIEWPORTS) {
+    const layout = defaultLayout(dmWindows, viewport);
+    expect(layout.map((w) => w.kind).sort()).toEqual(expected);
+  }
 });
