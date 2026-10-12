@@ -1,7 +1,7 @@
 ---
 title: Party loot
 prefix: LOOT
-status: draft
+status: in-review
 owner: spec-party-loot
 wave: 3
 ---
