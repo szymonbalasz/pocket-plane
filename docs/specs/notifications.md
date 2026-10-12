@@ -1,8 +1,8 @@
 ---
 title: Notifications
 prefix: NOTE
-status: unclaimed
-owner: —
+status: claimed
+owner: spec-notifications
 wave: 2
 ---
 
