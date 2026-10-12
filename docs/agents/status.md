@@ -9,8 +9,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Agent | Workspace / branch | State | Blockers |
 |---|---|---|---|---|
 | `fix/scenes-core` | — (ended) | merged (`bcdcfb5`, #133) | 116 tests; reconnect walkthroughs 10/10 + 6/6, max rejoin 1.2 s | — |
-| build play-shell | `build-play-shell` (`wY:p2`), `test-play-shell` (`wY:p3`, server `wY:p4`) | `wY`, `build/play-shell`, slot 0 | 5 slices, 160 tests, e2e 6/6; §13 walkthrough running | — |
-| build assets-pipeline | `build-assets-pipeline` (`wZ:p2`) | `wZ`, `build/assets-pipeline`, slot 2 | slices 1–4 done; window slice + e2e wait for play-shell merge | REST campaign middleware (CON-21) = shared change |
+| build play-shell | — (ended) | merged (`92c985f`) | walkthrough 11/11, 161 tests | — |
+| build assets-pipeline | `build-assets-pipeline` (`wZ:p2`) | `wZ`, `build/assets-pipeline`, slot 2 | slices 1–4 done; window slice + e2e after play-shell merge (in progress) | REST campaign middleware (CON-21) = shared change |
 | build entities, scenes-map | — | — | queued | assets-pipeline; scenes-map also on DM B4/B5 |
 | Combat specs (4 drafts on `main`, in-review) | — (ended) | reviews in `%TEMP%\opencode\review-combat-{1,2}.md` | DM gate | DM decisions B1–B8, P1–P28 |
 
@@ -19,7 +19,7 @@ Walkthrough evidence archived outside the repo: `%TEMP%\opencode\verify-skeleton
 ## Shared-file locks (AGENTS §9.9, sequenced)
 
 - `build/assets-pipeline`: `src/server/db/schema.ts`, `src/shared/events/` (+ index), `src/server/http.ts` (dmCampaign, CON-21), `src/server/services.ts` + `server.ts` (onStart), fixtures loader (async steps), `fixtures/bundles/session-sim.ts`, data-model §10/13, protocol §13/14/19.
-- `build/play-shell`: `src/client/{dm,player}/App.tsx`, `e2e/foundation.e2e.ts`, protocol §18. Creates window registries.
+- (play-shell locks released at merge)
 
 ## Pending DM decisions
 
