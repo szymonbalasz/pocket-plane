@@ -50,7 +50,8 @@ export const probeSet = defineCommand({
         .from(player)
         .where(and(eq(player.id, owner), eq(player.campaignId, actor.campaignId)))
         .get();
-      if (!p) throw forbidden("Owner is not a player of this campaign");
+      // Another campaign's player is invisible to this connection: not_found, not forbidden.
+      if (!p) throw notFound("Owner not found in this campaign");
     }
   },
   execute(input, { tx, ctx, actor, emit }) {
@@ -102,9 +103,9 @@ export const probeEdit = defineCommand({
     const row = tx.select().from(syncProbe).where(eq(syncProbe.id, id)).get();
     if (!row || row.campaignId !== actor.campaignId) throw notFound("Probe not found");
     const p = toProbe(row);
-    if (!probeVisibleTo(p, actor.playerId) || p.ownerPlayerId !== actor.playerId) {
-      throw forbidden("Not your probe");
-    }
+    // Invisible records answer like missing ones, so the reply never confirms an ID exists.
+    if (!probeVisibleTo(p, actor.playerId)) throw notFound("Probe not found");
+    if (p.ownerPlayerId !== actor.playerId) throw forbidden("Not your probe");
   },
   execute({ id, text }, { tx, emit }) {
     const row = tx.select().from(syncProbe).where(eq(syncProbe.id, id)).get();

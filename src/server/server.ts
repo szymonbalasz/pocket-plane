@@ -35,6 +35,8 @@ export interface RunningServer {
   services: Services;
   hub: Hub;
   server: Server<WsData>;
+  /** Closes connections, DB and releases the lock without awaiting anything. */
+  stopSync(): void;
   stop(): Promise<void>;
 }
 
@@ -119,21 +121,30 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     lock?.setPort(port);
     const url = localUrl(config.host, port);
     let stopped = false;
+    // Synchronous on purpose: on Windows a Ctrl+C can tear the process down before any
+    // await resumes, so nothing after the first await is guaranteed to run (AGENTS §9.2).
+    const stopSync = () => {
+      if (stopped) return;
+      stopped = true;
+      try {
+        hub.shutdown();
+        // Not awaited: in Bun 1.3 the promise never settles after a server-initiated WS close.
+        void server.stop(true);
+        if (!opts.db) closeDb(db);
+      } finally {
+        lock?.release();
+      }
+    };
     return {
       port,
       url,
       services,
       hub,
       server,
+      stopSync,
       async stop() {
-        if (stopped) return;
-        stopped = true;
-        hub.shutdown();
-        // Not awaited: in Bun 1.3 the promise never settles after a server-initiated WS close.
-        void server.stop(true);
+        stopSync();
         await Bun.sleep(0);
-        if (!opts.db) closeDb(db);
-        lock?.release();
       },
     };
   } catch (err) {

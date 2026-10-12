@@ -55,6 +55,22 @@ export interface ConnectionOptions {
   clock?: Clock;
   onChange(s: SyncSnapshot): void;
   createSocket?: (url: string) => WebSocket;
+  /** Subscribe to "worth retrying now" signals; returns an unsubscribe. Default: browser events. */
+  onWake?: (fn: () => void) => () => void;
+}
+
+/** `online`, window focus, page show and the tab becoming visible. */
+function browserWake(fn: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const onVisible = () => {
+    if (document.visibilityState === "visible") fn();
+  };
+  for (const t of ["online", "focus", "pageshow"]) window.addEventListener(t, fn);
+  document.addEventListener("visibilitychange", onVisible);
+  return () => {
+    for (const t of ["online", "focus", "pageshow"]) window.removeEventListener(t, fn);
+    document.removeEventListener("visibilitychange", onVisible);
+  };
 }
 
 export function defaultWsUrl(): string {
@@ -77,6 +93,7 @@ export class SyncConnection {
     everLive: false,
   };
   private readonly clock: Clock;
+  private wakeOff: (() => void) | null = null;
 
   constructor(private readonly opts: ConnectionOptions) {
     this.clock = opts.clock ?? browserClock;
@@ -88,14 +105,30 @@ export class SyncConnection {
 
   start(): void {
     this.stopped = false;
+    this.wakeOff = (this.opts.onWake ?? browserWake)(() => this.retryNow());
     this.open();
   }
 
   stop(): void {
     this.stopped = true;
+    this.wakeOff?.();
+    this.wakeOff = null;
     this.clearTimers();
     this.ws?.close(1000);
     this.ws = null;
+  }
+
+  /**
+   * Skip the remaining backoff wait and reconnect now. Called when the browser reports it is
+   * back online or the tab regains focus / becomes visible (live-sync §3 reconnect goal).
+   * No-op while live, rejected, stopped or while an attempt is already in flight.
+   */
+  retryNow(): void {
+    if (this.stopped || this.ws !== null || this.retryTimer === null) return;
+    if (this.snap.state === "live" || this.snap.state === "rejected") return;
+    this.clock.clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+    this.open();
   }
 
   /** Test-mode "drop connection" button (FR-SYNC-27): a client-side drop; reconnects. */

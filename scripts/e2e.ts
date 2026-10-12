@@ -3,6 +3,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { Subprocess } from "bun";
 import { library } from "../fixtures";
 import { parseConfig, WORKTREE_ROOT } from "../src/server/config";
 import { resetAndLoad } from "../src/server/features/fixtures-adapters/loader";
@@ -33,7 +34,7 @@ const env: Record<string, string | undefined> = {
   PP_PUBLIC_BASE_URL: "",
 };
 
-let server: ReturnType<typeof Bun.spawn> | null = null;
+let server: Subprocess | null = null;
 let code = 1;
 try {
   const config = parseConfig(env);
@@ -43,6 +44,8 @@ try {
     env,
     stdout: "inherit",
     stderr: "inherit",
+    ipc() {},
+    serialization: "json",
   });
   let port: number | null = null;
   for (let i = 0; i < 100 && port === null; i++) {
@@ -60,8 +63,15 @@ try {
 } catch (err) {
   console.error(err);
 } finally {
-  server?.kill();
-  await server?.exited;
+  if (server) {
+    // Clean stop over IPC (removes server.lock); hard kill only if it hangs.
+    try {
+      server.send({ type: "shutdown" });
+    } catch {}
+    const t = setTimeout(() => server?.kill(), 3000);
+    await server.exited;
+    clearTimeout(t);
+  }
   rmSync(dir, { recursive: true, force: true });
 }
 process.exit(code);

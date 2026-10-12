@@ -132,17 +132,29 @@ describe("intents", () => {
     expect((await dm.closed).code).toBe(1009);
   });
 
-  test("FR-SYNC-13 player not allowed / not owner → reject forbidden, no change, no event", async () => {
+  test("FR-SYNC-13 not allowed / not owner → forbidden; invisible record → not_found; no change, no event", async () => {
     const seed = await setup();
     const p2 = await h.live({ role: "player", token: seed.p2.linkToken });
     const dm = await h.live({ role: "dm", secret: TEST_SECRET });
     const logBefore = readEventLog(h.db).length;
     p2.intent("probe.set", { text: "hack", hidden: false }, "a");
     expect(await p2.next("reject")).toMatchObject({ code: "forbidden", intentId: "a" });
-    p2.intent("probe.edit", { id: seed.probes.mine, text: "hack" }, "b");
+    // Visible but not owned → forbidden.
+    p2.intent("probe.edit", { id: seed.probes.public, text: "hack" }, "b");
     expect(await p2.next("reject")).toMatchObject({ code: "forbidden", intentId: "b" });
-    p2.intent("probe.edit", { id: seed.probes.secret, text: "hack" }, "c");
-    expect(await p2.next("reject")).toMatchObject({ code: "forbidden" });
+    // Invisible (another player's / hidden) → not_found, same as a missing ID: no existence leak.
+    for (const [id, intentId] of [
+      [seed.probes.mine, "c"],
+      [seed.probes.secret, "d"],
+      ["00000000-0000-4000-8000-000000000000", "e"],
+    ] as const) {
+      p2.intent("probe.edit", { id, text: "hack" }, intentId);
+      const r = await p2.next("reject");
+      expect(r).toMatchObject({ code: "not_found", intentId, message: "Probe not found" });
+    }
+    // DM: owner from another campaign is invisible to this connection → not_found.
+    dm.intent("probe.set", { text: "x", hidden: false, ownerPlayerId: seed.p3.id }, "f");
+    expect(await dm.next("reject")).toMatchObject({ code: "not_found", intentId: "f" });
     await dm.expectNoFrame();
     expect(readEventLog(h.db).length).toBe(logBefore);
   });

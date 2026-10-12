@@ -29,3 +29,6 @@ playwright-report/
 
 # Agent verification evidence (ADR-0017)
 .verify/
+
+# Playwright MCP session artefacts (test agents)
+.playwright-mcp/
