@@ -5,7 +5,7 @@ import { MAX_UPLOAD_BYTES, type UploadResponse } from "@shared/assets-pipeline/s
 import { AssetIngested } from "@shared/events/assets-pipeline";
 import { eq } from "drizzle-orm";
 import { createApp } from "../../app";
-import { manualClock } from "../../commands/context";
+import { manualClock, realDice } from "../../commands/context";
 import { CommandError } from "../../commands/errors";
 import { asset, campaign } from "../../db/schema";
 import { readEventLog } from "../../events/log";
@@ -229,6 +229,7 @@ describe("ingest (FR-ASSET-01, -03, -04, -06, -08)", () => {
         ids: { next: () => `id-${ids++}` },
         tokens: { next: () => tokens.shift() as string },
         clock,
+        dice: realDice(),
       }),
       env: { PP_ASSET_DIR: path.join(h.dir, "other-assets") },
     });
