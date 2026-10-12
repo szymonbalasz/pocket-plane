@@ -53,6 +53,7 @@ describe("fixture library", () => {
       "town",
       "battlemap",
       "dice-settings",
+      "encounter-1",
     ]);
     expect(await keys("campaign-switch")).toEqual([
       "campaign",
