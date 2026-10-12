@@ -41,7 +41,15 @@ describe("fixture library", () => {
         return r.manifest.fixtures;
       });
     expect(await keys("base")).toEqual(["campaign", "player-1"]);
-    expect(await keys("session-sim")).toEqual(["campaign", "player-1", "images"]);
+    expect(await keys("session-sim")).toEqual([
+      "campaign",
+      "player-1",
+      "images",
+      "enemy-1",
+      "enemy-2",
+      "enemy-custom",
+      "char-mira",
+    ]);
     expect(await keys("campaign-switch")).toEqual([
       "campaign",
       "player-1",

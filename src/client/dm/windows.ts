@@ -3,6 +3,7 @@
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
 import { assetTestWindow } from "./features/assets-pipeline/asset-test-window";
+import { creaturesWindow } from "./features/entities/creatures-window";
 import { playersWindow } from "./features/play-shell/players-window";
 
 const windows: WindowDef[] = [
@@ -10,6 +11,7 @@ const windows: WindowDef[] = [
   syncProbesWindow, // sync.probes, test mode (play-shell, FR-SHELL-21)
   shellTestWindow, // shell.test, test mode (play-shell, FR-SHELL-20)
   assetTestWindow, // asset.test, test mode (assets-pipeline, FR-ASSET-19)
+  creaturesWindow, // ent.creatures (entities, FR-ENT-18)
 ];
 
 export const dmWindows = createWindowRegistry("dm", windows);

@@ -4,6 +4,7 @@ import assetAccess from "./asset-access";
 import assetLibrary from "./asset-library";
 import base from "./base";
 import campaignSwitch from "./campaign-switch";
+import entities from "./entities";
 import sessionSim from "./session-sim";
 import syncProbe from "./sync-probe";
 
@@ -14,4 +15,5 @@ export const bundles: readonly Bundle[] = [
   syncProbe,
   assetLibrary,
   assetAccess,
+  entities,
 ];

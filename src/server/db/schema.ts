@@ -114,4 +114,41 @@ export const asset = sqliteTable(
 /** CON-20: `seq` value for an asset insert, computed by the DB inside the insert's transaction. */
 export const assetSeqNext = sql<number>`(select coalesce(max(${asset.seq}), 0) + 1 from ${asset})`;
 
-export const schema = { campaign, player, eventLog, syncProbe, asset };
+/**
+ * Entity (entities, data model §11): one table for imported, custom and character definitions
+ * (ADR-0009 storage A). `campaignId` null iff imported (ADR-0018); provenance inline (CON-18).
+ * `statBlock` is a JSON leaf, validated per kind by `@shared/entities` on write and read.
+ */
+export const entity = sqliteTable(
+  "entity",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind", { enum: ["character", "monster"] }).notNull(),
+    campaignId: text("campaign_id").references((): AnySQLiteColumn => campaign.id),
+    name: text("name").notNull(),
+    portraitAssetId: text("portrait_asset_id").references((): AnySQLiteColumn => asset.id),
+    statBlock: text("stat_block", { mode: "json" }).notNull(),
+    ownerPlayerId: text("owner_player_id").references((): AnySQLiteColumn => player.id),
+    hpCurrent: integer("hp_current"),
+    /** Plain id, no FK (informational). */
+    derivedFromId: text("derived_from_id"),
+    source: text("source"),
+    sourceKey: text("source_key"),
+    licence: text("licence"),
+    attribution: text("attribution"),
+    importedAt: text("imported_at"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    // FR-ENT-08: unique ci per (campaign, kind); imported names don't count.
+    uniqueIndex("entity_campaign_kind_name_ci")
+      .on(t.campaignId, t.kind, sql`lower(${t.name})`)
+      .where(sql`campaign_id is not null`),
+    // FR-ENT-05, FR-FIX-20: provenance unique globally (nulls for customs).
+    uniqueIndex("entity_source_key").on(t.source, t.sourceKey),
+    index("entity_campaign").on(t.campaignId),
+  ],
+);
+
+export const schema = { campaign, player, eventLog, syncProbe, asset, entity };
