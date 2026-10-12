@@ -135,7 +135,7 @@ wave: 1
 ## 12. Performance & bandwidth
 
 - 1 DM + ≤ 6 players, one process. Commit → frame < 50 ms locally; snapshot ≤ 512 KB JSON for a `session-sim`-sized campaign, < 200 ms (all proposed).
-- Assets are URLs ([assets-pipeline](assets-pipeline.md)). Heartbeat keeps cloudflared from idling; JSON frames, no compression in MVP.
+- Records carry asset IDs; clients build the URL ([assets-pipeline](assets-pipeline.md), [ADR-0023](../architecture/adr/0023-asset-access-by-capability-id.md)). Heartbeat keeps cloudflared from idling; JSON frames, no compression in MVP.
 
 ## 13. Test plan
 

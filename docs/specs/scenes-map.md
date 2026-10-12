@@ -62,9 +62,9 @@ wave: 3
 | FR-MAP-22 | Ruler (both): drag cell to cell → line + `max(abs Δcol, abs Δrow) × 5 ft` (#124). Local only *(proposed, OQ-MAP-05)*; cleared on release. | |
 | FR-MAP-23 | Ping tool (both): click sends `map.ping {sceneId, x, y}`; others show a 2 s pulse. DM Shift+click sends `map.pull {sceneId, x, y}`: pulse + player cameras centre on the point, zoom unchanged; players may pan away *(proposed, OQ-MAP-08)*. | |
 | FR-MAP-24 | Laser (both): right-button drag starting off any token sends `map.laser {sceneId, points, end?}` (≤ 20 sends/s, ≤ 32 points each); others draw a trail fading 1 s after the last point. Right-click on a token: DM → menu; player → nothing. Browser context menu suppressed on the canvas. | |
-| FR-MAP-25 | *(proposed, OQ-MAP-16)* Signals: zod `x, y` finite, abs ≤ 16384; roles ping/laser DM + player, pull DM only. The hub forwards to every other connection of the campaign with a server-stamped `from {role, playerId?}`. A receiver draws a signal only if its `sceneId` is the scene it shows (player: active; DM: viewed). No DB, log, snapshot or `seq` ([FR-SYNC-22](live-sync.md#6-functional-requirements)). | |
+| FR-MAP-25 | Signals ([ADR-0026](../architecture/adr/0026-signal-routing.md)): zod `x, y` finite, abs ≤ 16384; roles ping/laser DM + player, pull DM only. The hub forwards to every other connection of the campaign with a server-stamped `from {role, playerId?}`. A receiver draws a signal only if its `sceneId` is the scene it shows (player: active; DM: viewed). No DB, log, snapshot or `seq` ([FR-SYNC-22](live-sync.md#6-functional-requirements)). | |
 | FR-MAP-26 | Visibility per §9: `scene` redacted for players *(proposed, OQ-MAP-17)*; `scene-folder` DM only; `token` hidden from players while `hidden`, else without `definitionId`. | Leak scan §13 |
-| FR-MAP-27 | Every command commits row(s) + an event-log entry in one transaction, except `TokenMoved` (not logged). Nothing undoable. IDs, `seq` and time only from `ctx` ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)). | |
+| FR-MAP-27 | Every command commits row(s) + an event-log entry in one transaction, except `TokenMoved` (not logged). Nothing undoable. IDs and time only from `ctx` ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)); `seq` assigned by the DB at insert (insertion order, as the event log; CON-20). | |
 | FR-MAP-28 | While not `live` ([FR-SYNC-24](live-sync.md#6-functional-requirements)): drag, menus, grid, scene-list actions and signals disabled; pan, zoom, ruler and switching the viewed scene still work. A drag in progress when the connection drops snaps back, unsent. | |
 | FR-MAP-29 | Canvas layers come from an ordered client registry: map < grid < *(reserved: props, fog)* < tokens < pointers (ruler, ping, laser). Token menu entries and token double-click come from a client registry; in MVP only this spec registers. | Design for later |
 
@@ -77,7 +77,7 @@ wave: 3
 
 ## 8. Data model
 
-No JSON leaf fields. All rows per campaign ([ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md)); `seq` = monotonic insertion order per table; timestamps from `ctx.clock`.
+No JSON leaf fields. All rows per campaign ([ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md)); `seq` = monotonic insertion order per table, assigned by the DB (CON-20); timestamps from `ctx.clock`.
 
 | Entity | Field | Type | Notes |
 |---|---|---|---|
@@ -102,9 +102,9 @@ Envelopes, rejects, close codes: [live-sync](live-sync.md). Per ADR-0021 D, scen
 
 | Record type | Scope | Player visibility (DM always `full`) | Snapshot |
 |---|---|---|---|
-| `scene` | scene (gated by `id`) | Redacted to `{id, mapAssetId, mapWidth, mapHeight, grid*, active}` (no name, folder, lock, `seq`) | DM: all; player: active |
+| `scene` | scene, `sceneOf = id` | Redacted to `{id, mapAssetId, mapWidth, mapHeight, grid*, active}` (no name, folder, lock, `seq`) | DM: all; player: active |
 | `scene-folder` | campaign | Hidden | Campaign's folders |
-| `token` | scene (gated by `sceneId`) | `hidden` → hidden; else all fields but `definitionId` | DM: all; player: active scene's |
+| `token` | scene, `sceneOf = sceneId` | `hidden` → hidden; else all fields but `definitionId` | DM: all; player: active scene's |
 
 **Signals** (FR-MAP-25; [ADR-0026](../architecture/adr/0026-signal-routing.md)): `map.ping {sceneId, x, y}` and `map.laser {sceneId, points [x, y][] ≤ 32, end?}` (DM, player); `map.pull {sceneId, x, y}` (DM). Visibility: every other connection of the campaign, with server-stamped `from`.
 
@@ -113,8 +113,10 @@ Envelopes, rejects, close codes: [live-sync](live-sync.md). Per ADR-0021 D, scen
 | Event | Changes | Logged | After commit |
 |---|---|---|---|
 | `SceneCreated` / `Updated` / `Duplicated` / `Deleted`; `SceneFolderCreated` / `Renamed` / `Deleted` | `scene` / `scene-folder` upsert or delete; duplicate and delete include the scene's `token`s; folder delete the moved `scene`s | yes | — |
-| `SceneActivated {sceneId, previousSceneId}` | both `scene` upserts | yes | Cache updated before listeners; resync players |
+| `SceneActivated {sceneId, previousSceneId}` | both `scene` upserts | yes | Cache updated by a commit hook, before listeners ([CON-23](../protocol/README.md#11-conflicts-log)); resync players |
 | `TokenPlaced` / `Updated` / `Duplicated` / `Deleted` / `Hidden` / `Revealed` | `token` upsert / delete (players per [FR-SYNC-19](live-sync.md#6-functional-requirements)) | yes | — |
+
+Command → event (CON-31): `POST /api/scenes` → `SceneCreated`; `PATCH /api/scenes/:id` (rename, move), `map.setSceneMap`, `map.setGrid`, `map.setLocked` → `SceneUpdated`; duplicate → `SceneDuplicated`; `DELETE` → `SceneDeleted`; folder routes → `SceneFolderCreated` / `Renamed` / `Deleted`; `map.activateScene` → `SceneActivated`; `map.placeToken` → `TokenPlaced`; `map.updateToken` → `TokenUpdated`; `map.duplicateToken` → `TokenDuplicated`; `map.deleteToken` → `TokenDeleted`; `map.setTokenHidden` → `TokenHidden` (`hidden: true`) / `TokenRevealed` (`false`); `map.moveToken` → `TokenMoved`.
 | `TokenMoved {tokenId, sceneId, col, row}` | `token` upsert | **no** | — |
 | entities' `EntityUpdated` | + `token` upserts from FR-MAP-20 | yes (entities) | — |
 
@@ -174,7 +176,7 @@ Isolated per worktree: `bun test` on `:memory:` DB, temp asset dir, port 0; walk
 
 | On | What we need | Status |
 |---|---|---|
-| [live-sync](live-sync.md) | `scene` scope gate (needs `sceneOf(record)` at registration: protocol CON for the integrator), active-scene cache, resync on activation, optimistic intents; signal routing change ([ADR-0026](../architecture/adr/0026-signal-routing.md)) | complete; ADR proposed |
+| [live-sync](live-sync.md) | `scene` scope gate (`sceneOf(record)` at registration, CON-22), commit hook for the active-scene cache (CON-23), resync on activation, optimistic intents; signal routing ([ADR-0026](../architecture/adr/0026-signal-routing.md)) | complete; ADR accepted (#125); built in fix/scenes-core |
 | [assets-pipeline](assets-pipeline.md) | `assets.require`, asset-reference fields, picker, `useAssetImage`, `display` size; OQ-ASSET-07 answered by OQ-MAP-15 | in-review |
 | [entities](entities.md) | `resolveDefinition`, drag payload (FR-ENT-18), `statBlock.size`, portrait, definition-changed hooks (FR-ENT-19; registry per OQ-ENT-14), `entities.create` for Cave Ogre. [ADR-0024](../architecture/adr/0024-definition-visibility.md) refines ADR-0009: token holds name, image and size copies, owner (#120) | in-review; ADR decided |
 | [play-shell](play-shell.md) | Base layer + tool-rail slot (FR-SHELL-01 order), window `map.scenes`, empty state, key routing + window drops (FR-SHELL-13) | in-review |
@@ -192,7 +194,7 @@ Isolated per worktree: `bun test` on `:memory:` DB, temp asset dir, port 0; walk
 | OQ-MAP-08, 17, 19, 20 | DM product picks: pull; player-visible scene fields; scene list extras; numbers and gestures | **08: forced recentre, player can pan away** / suggestion Toast. **17: redacted, no name, folder, lock** (names spoil) / full. **19: delete non-active scenes; one folder level; folder delete → root** / no delete / nested. **20: 1 s, 200 tokens/scene, 1,000/campaign, 20 laser sends/s, zoom 10–400 %, grid defaults, Shift+click pull** / DM sets | no · owner: DM | notifications, play-shell |
 | ~~OQ-MAP-13~~ | ~~DM views non-active scenes?~~ | **Decided (#122):** yes, client-only viewed scene (FR-MAP-08); integrator amends ADR-0014's deferred row | — | — |
 | OQ-MAP-14 | Token image after a portrait edit (size always follows, #120) | **Tokens still showing the old portrait follow; custom art kept** / always overwrite / never refresh | no · owner: spec-scenes-map | entities |
-| ~~OQ-MAP-16~~ | ~~Signal hooks in live-sync~~ | **Decided (integrator ruling, gate Scenes):** server stamps `from`; DM-only `map.pull`; receivers filter by scene; no server scene check or rate limit. [ADR-0026](../architecture/adr/0026-signal-routing.md) awaits acceptance; built as a sequenced shared change after the skeleton, before scenes-map builds | no (build-sequenced) · owner: orchestrator | live-sync, protocol |
+| ~~OQ-MAP-16~~ | ~~Signal hooks in live-sync~~ | **Decided (integrator ruling, gate Scenes):** server stamps `from`; DM-only `map.pull`; receivers filter by scene; no server scene check or rate limit. [ADR-0026](../architecture/adr/0026-signal-routing.md) accepted (#125); built in fix/scenes-core before scenes-map builds | no (build-sequenced) · owner: orchestrator | live-sync, protocol |
 | ~~OQ-MAP-22~~ | ~~Glossary: add **Ping**, **Pull**, **Laser pointer**, **Scene folder**, **Token owner**, **Viewed scene**; reword **Token**~~ | **Decided (integrator, Scenes consolidation):** added; Token = "instance of a creature definition" ([glossary](../glossary.md)) | — | — |
 
 ## 16. Out of scope

@@ -43,7 +43,7 @@ wave: 2
 | ID | Requirement | Notes |
 |---|---|---|
 | FR-SHELL-01 | Each client has one play page. Base layer fills the viewport. Stacking, bottom → top: base layer < windows < chrome (top bar, tool rail at the left edge with content from scenes-map, launcher) < reconnect banner, toasts < dialogs, overlays. | |
-| FR-SHELL-02 | Player: valid link + active campaign → loading skeleton, then the shell after the first snapshot with the active scene as base layer. DM: base layer = the DM's viewed scene (#122, [FR-MAP-08](scenes-map.md#6-functional-requirements)). Nothing to show → one empty-state component: player "Waiting for the DM to show a scene", DM "No active scene". Windows still work. | [FR-CAMP-16](campaign-management.md#6-functional-requirements) |
+| FR-SHELL-02 | Player: valid link + active campaign → loading skeleton, then the shell after the first snapshot with the active scene as base layer. DM: base layer = the DM's viewed scene (#122, [FR-MAP-08](scenes-map.md#6-functional-requirements)). Nothing to show → one empty-state component: player "Waiting for the DM to show a scene", DM "No scenes yet" (the DM sees the first scene when none is active, [FR-MAP-08](scenes-map.md#6-functional-requirements); CON-32). Windows still work. | [FR-CAMP-16](campaign-management.md#6-functional-requirements) |
 | FR-SHELL-03 | DM: valid secret + active campaign → shell after the first snapshot. No active campaign → campaign-management's "Create your first campaign" page; no shell, no WS. | |
 | FR-SHELL-04 | Login (DM), invalid-link (`rejected`) and waiting (`waiting`) screens replace the whole shell, with campaign-management's wording. Leaving `waiting` restores the shell without reload, windows as they were. | [FR-SYNC-24](live-sync.md#6-functional-requirements) |
 | FR-SHELL-05 | Top bar, right: connection indicator (both clients). Reconnect banner below the top bar, full width, live-sync's texts. While not `live`, feature intent controls are disabled (live-sync) but window management keeps working. | |
@@ -136,7 +136,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 | # | DM (A) | Players | Expected |
 |---|---|---|---|
-| 1 | Log in | — | Shell; "Connected"; badge "0/2 online"; Players window top-right; base "No active scene" |
+| 1 | Log in | — | Shell; "Connected"; badge "0/2 online"; Players window top-right; base "No scenes yet" |
 | 2 | — | B opens link | B: "Playing as Player 1 in Fixture Campaign"; no windows open; launcher shows Probes, Test. A: "1/2 online" |
 | 3 | — | B opens Probes + Test, moves + resizes Probes, clicks Probes to front, reloads | Same positions, sizes, z-order after reload |
 | 4 | — | C opens link | Default player layout. B's and C's frames contain no layout data |
@@ -155,7 +155,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | [live-sync](live-sync.md) | Connection states, indicator/banner/presence components, probe panel, test-mode signal | agreed |
 | [campaign-management](campaign-management.md) | Login / waiting / invalid-link screens and wording; switcher; players panel; `you.playerId`, `you.campaignId` | agreed |
 | [scenes-map](scenes-map.md) | Base-layer component, viewed/active scene, tool rail content, `map.scenes` window | agreed (OQ-SHELL-05) |
-| [entities](entities.md), [assets-pipeline](assets-pipeline.md) | `ent.creatures` (drag source, FR-SHELL-13), `asset.images` windows | open (OQ-SHELL-06) |
+| [entities](entities.md), [assets-pipeline](assets-pipeline.md) | `ent.creatures` (drag source, FR-SHELL-13), `asset.test` (test mode, [FR-ASSET-19](assets-pipeline.md#6-functional-requirements)) windows | agreed (CON-28) |
 | Combat / Reward specs | Their window types and defaults | open (OQ-SHELL-06) |
 
 ## 15. Open questions
@@ -169,7 +169,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | ~~OQ-SHELL-03~~ | ~~Docked panels?~~ | Removed: non-goal (§4) | — | — |
 | OQ-SHELL-04 | DM layout per campaign or global? | **Per campaign** (fits ADR-0004 scoping) / one DM entry for all campaigns | no · owner: spec-play-shell | — |
 | OQ-SHELL-05 | scenes-map contract | **Agreed by [scenes-map §7](scenes-map.md#7-uiux-notes):** scenes-map exports base-layer canvas + scene; shell owns empty state and tool rail slot; scene list = `map.scenes` | no · owner: scenes-map | scenes-map |
-| OQ-SHELL-06 | Window kinds for other specs | **`ent.creatures` (DM), `asset.images` (DM; picker grid, answers [OQ-ASSET-08](assets-pipeline.md#15-open-questions)), `char.sheet`, `dice.log`, `cbt.initiative`, `note.history`, `loot.log` (both), `cbt.encounters` (DM)**; each spec confirms name, clients, default open | no · owner: each named spec | entities, assets-pipeline, character-sheet, dice-roll-log, combat-tracker, notifications, party-loot |
+| OQ-SHELL-06 | Window kinds for other specs | **`ent.creatures` (DM), `asset.test` (DM, test mode only; picker grid, per [OQ-ASSET-08](assets-pipeline.md#15-open-questions) / [FR-ASSET-19](assets-pipeline.md#6-functional-requirements), CON-28), `char.sheet`, `dice.log`, `cbt.initiative`, `note.history`, `loot.log` (both), `cbt.encounters` (DM)**; each spec confirms name, clients, default open | no · owner: each named spec | entities, assets-pipeline, character-sheet, dice-roll-log, combat-tracker, notifications, party-loot |
 | OQ-SHELL-07 | AGENTS §9.9: window registry lists (`src/client/dm/windows.ts`, `src/client/player/windows.ts`) as append-only registries; build order | **Yes, and the shell frame + empty registries merge before other Scenes builders register windows (or `fix/shell-registry` creates them first)** / shared file via orchestrator (serialises builds) | no · owner: orchestrator | AGENTS.md, Scenes builds |
 | ~~OQ-SHELL-08~~ | ~~Can a fixture step act as a player?~~ | **Decided (integrator ruling, gate Scenes; FR-FIX-13):** fixtures act as DM only; no layout fixture (moot after #121) | — | — |
 | ~~OQ-SHELL-09~~ | ~~Glossary: add **Play page**, **Window**, **Window type**, **Launcher**, **Layout**~~ | **Decided (integrator, Scenes consolidation):** added to the [glossary](../glossary.md) | — | — |
