@@ -9,20 +9,18 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Agent | Workspace / branch | State | Blockers |
 |---|---|---|---|---|
 | build play-shell | — (ended) | merged (`92c985f`) | walkthrough 11/11 | — |
-| build assets-pipeline | `build-assets-pipeline` (`wZ:p2`), `test-assets` (`wZ:p3`, server `wZ:p4`, port 4123) | `wZ`, `build/assets-pipeline`, slot 2 | all slices done; walkthrough A running | — |
-| build entities | — | — | queued | assets-pipeline merge |
+| build assets-pipeline | — (ended) | merged (`83ca96c`) | walkthrough A 7/7, extras 10/11 (fixed: FR-ASSET-07 missing file) | — |
+| build entities | `build-entities` (`w14:p2`) | `w14`, `build/entities`, slot 0 | building | — |
 | build scenes-map | — | — | queued | entities; + ADR-0028 token-changed hook registry (#134) |
-| Revise combat-tracker | `rev-combat-tracker` (`w0:p2`) | `w0`, `spec/combat-tracker` | revising | — |
-| Revise dice-roll-log | `rev-dice-roll-log` (`w11:p2`) | `w11`, `spec/dice-roll-log` | revising | — |
-| Revise notifications | `rev-notifications` (`w12:p2`) | `w12`, `spec/notifications` | revising | — |
-| Revise character-sheet | — | — | queued | agent slot |
+| Revise 4 Combat specs | — (ended) | merged to `main` | in-review | — |
+| Consistency review (Combat) | `review-combat-3` (`wR:pK`) | read-only | reviewing | then consolidation + DM sets complete |
 | Consolidate Combat (data model + protocol) | — | — | queued | 4 revisions merged; DM sets `complete` |
 
 Walkthrough evidence archived outside the repo: `%TEMP%\opencode\verify-{skeleton,scenes-core,play-shell}\`.
 
 ## Shared-file locks (AGENTS §9.9, sequenced)
 
-- `build/assets-pipeline`: `src/server/db/schema.ts`, `src/shared/events/` (+ index), `src/server/http.ts` (dmCampaign, CON-21), `src/server/services.ts` + `server.ts` (onStart), fixtures loader (async steps), `fixtures/bundles/session-sim.ts`, data-model §10/13, protocol §13/14/18/19.
+- `build/entities`: `src/server/db/schema.ts`, `src/shared/events/`, import pipeline core in `src/server/features/fixtures-adapters/`, data-model §3/11/13, protocol §12–17.
 
 ## Pending DM decisions
 
