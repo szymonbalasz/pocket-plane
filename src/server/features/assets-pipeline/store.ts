@@ -63,6 +63,12 @@ export class AssetStore {
     return path.join(this.hashDir(hash), SERVED[file]);
   }
 
+  /** FR-ASSET-07: an asset missing any file serves none of them. */
+  isComplete(hash: string): boolean {
+    const dir = this.hashDir(hash);
+    return FILES.every((f) => existsSync(path.join(dir, f)));
+  }
+
   /**
    * FR-ASSET-04: write the set to a temp dir, then rename into place. An existing hash dir is
    * reused untouched. Synchronous: runs inside the ingest transaction, before the row insert.

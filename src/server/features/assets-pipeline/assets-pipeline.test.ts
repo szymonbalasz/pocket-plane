@@ -195,8 +195,27 @@ describe("ingest (FR-ASSET-01, -03, -04, -06, -08)", () => {
     expect(r.missing).toEqual([ok.body.asset.id]);
     expect(errors.join("\n")).toContain("display.webp");
     expect(errors.join("\n")).not.toContain(ok.body.asset.id);
+    // All of its files answer 404, including the one still on disk (incl. If-None-Match).
     expect((await h.get(ok.body.asset.id, "display")).status).toBe(404);
-    expect((await h.get(ok.body.asset.id, "thumb")).status).toBe(200);
+    expect((await h.get(ok.body.asset.id, "thumb")).status).toBe(404);
+    const inm = { "If-None-Match": `"${ok.body.asset.id}-thumb"` };
+    expect((await h.get(ok.body.asset.id, "thumb", inm)).status).toBe(404);
+  });
+
+  test("FR-ASSET-07 missing thumb or original → every file 404 after restart; others unaffected", async () => {
+    const lostThumb = (await uploadOk(await testPng(30))).body.asset;
+    const lostOriginal = (await uploadOk(await testPng(31))).body.asset;
+    const intact = (await uploadOk(await testPng(32))).body.asset;
+    const hashOf = (id: string) => assetRows().find((r) => r.id === id)?.hash as string;
+    rmSync(path.join(h.assetDir, hashOf(lostThumb.id), "thumb.webp"));
+    rmSync(path.join(h.assetDir, hashOf(lostOriginal.id), "original"));
+    await h.restart();
+    for (const a of [lostThumb, lostOriginal]) {
+      expect((await h.get(a.id, "display")).status).toBe(404);
+      expect((await h.get(a.id, "thumb")).status).toBe(404);
+    }
+    expect((await h.get(intact.id, "display")).status).toBe(200);
+    expect((await h.get(intact.id, "thumb")).status).toBe(200);
   });
 
   test("FR-ASSET-08 id = 128-bit ctx.tokens base64url; createdAt from ctx.clock; seq by insert order", async () => {

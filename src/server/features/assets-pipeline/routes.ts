@@ -1,5 +1,4 @@
 // REST for assets-pipeline (ASSET §9, protocol §13–14). Mounted at /api.
-import { existsSync } from "node:fs";
 import {
   AssetFile,
   AssetId,
@@ -110,8 +109,9 @@ export function assetRoutes(s: Services) {
           .where(and(eq(asset.id, id.data), eq(campaign.active, true)))
           .get();
         if (!row) return c.json(NOT_FOUND_BODY, 404);
+        // FR-ASSET-07: missing any file of the set → every file of the asset answers 404.
+        if (!store.isComplete(row.hash)) return c.json(NOT_FOUND_BODY, 404);
         const p = store.filePath(row.hash, file.data);
-        if (!existsSync(p)) return c.json(NOT_FOUND_BODY, 404);
         const etag = `"${id.data}-${file.data}"`;
         const headers = {
           "Cache-Control": CACHE_CONTROL,
