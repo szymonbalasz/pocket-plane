@@ -2,32 +2,36 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 3. Scenes building; **DM gate: Combat specs** ([gate-phase3-combat](gate-phase3-combat.md)).
+**Phase:** 3. Scenes building; Combat specs in revision after the DM gate (#134–#140).
 
-**Herdr:** orchestrator workspace `wR` (pane `wR:p1`). Always `herdr worktree create --workspace wR …` ([prompt §3](orchestrator-prompt.md#3-herdr)). Clean up worktrees after merge. Test agents get a dedicated server pane (AGENTS §9.6).
+**Herdr:** orchestrator workspace `wR` (pane `wR:p1`). Always `herdr worktree create --workspace wR …` ([prompt §3](orchestrator-prompt.md#3-herdr)). Clean up worktrees after merge. Test agents get a dedicated server pane (AGENTS §9.6). Max 4 working agents.
 
 | Task | Agent | Workspace / branch | State | Blockers |
 |---|---|---|---|---|
-| `fix/scenes-core` | — (ended) | merged (`bcdcfb5`, #133) | 116 tests; reconnect walkthroughs 10/10 + 6/6, max rejoin 1.2 s | — |
-| build play-shell | — (ended) | merged (`92c985f`) | walkthrough 11/11, 161 tests | — |
-| build assets-pipeline | `build-assets-pipeline` (`wZ:p2`) | `wZ`, `build/assets-pipeline`, slot 2 | slices 1–4 done; window slice + e2e after play-shell merge (in progress) | REST campaign middleware (CON-21) = shared change |
-| build entities, scenes-map | — | — | queued | assets-pipeline; scenes-map also on DM B4/B5 |
-| Combat specs (4 drafts on `main`, in-review) | — (ended) | reviews in `%TEMP%\opencode\review-combat-{1,2}.md` | DM gate | DM decisions B1–B8, P1–P28 |
+| build play-shell | — (ended) | merged (`92c985f`) | walkthrough 11/11 | — |
+| build assets-pipeline | `build-assets-pipeline` (`wZ:p2`), `test-assets` (`wZ:p3`, server `wZ:p4`, port 4123) | `wZ`, `build/assets-pipeline`, slot 2 | all slices done; walkthrough A running | — |
+| build entities | — | — | queued | assets-pipeline merge |
+| build scenes-map | — | — | queued | entities; + ADR-0028 token-changed hook registry (#134) |
+| Revise combat-tracker | `rev-combat-tracker` (`w0:p2`) | `w0`, `spec/combat-tracker` | revising | — |
+| Revise dice-roll-log | `rev-dice-roll-log` (`w11:p2`) | `w11`, `spec/dice-roll-log` | revising | — |
+| Revise notifications | `rev-notifications` (`w12:p2`) | `w12`, `spec/notifications` | revising | — |
+| Revise character-sheet | — | — | queued | agent slot |
+| Consolidate Combat (data model + protocol) | — | — | queued | 4 revisions merged; DM sets `complete` |
 
-Walkthrough evidence archived outside the repo: `%TEMP%\opencode\verify-skeleton\`, `%TEMP%\opencode\verify-scenes-core\`.
+Walkthrough evidence archived outside the repo: `%TEMP%\opencode\verify-{skeleton,scenes-core,play-shell}\`.
 
 ## Shared-file locks (AGENTS §9.9, sequenced)
 
-- `build/assets-pipeline`: `src/server/db/schema.ts`, `src/shared/events/` (+ index), `src/server/http.ts` (dmCampaign, CON-21), `src/server/services.ts` + `server.ts` (onStart), fixtures loader (async steps), `fixtures/bundles/session-sim.ts`, data-model §10/13, protocol §13/14/19.
-- (play-shell locks released at merge)
+- `build/assets-pipeline`: `src/server/db/schema.ts`, `src/shared/events/` (+ index), `src/server/http.ts` (dmCampaign, CON-21), `src/server/services.ts` + `server.ts` (onStart), fixtures loader (async steps), `fixtures/bundles/session-sim.ts`, data-model §10/13, protocol §13/14/18/19.
 
 ## Pending DM decisions
 
-- Combat gate: [gate-phase3-combat](gate-phase3-combat.md) §1 (8 blocking), §2.1 (8 product picks), §2.2 (20 bulk-accept). B4/B5 decided (#134).
+- None. Combat gate decided (#134–#139); gems tier A (#140).
 
 ## Resolved locally (report at gate)
 
-- `fix/scenes-core`: owner assigned `src/server/services.ts` (Registrar: signal, afterCommit, activeScene); scene-scoped test record type is tests-only.
-- Reconnect: HTTP probe of `GET /ws` after a failed WS attempt (Chromium throttles WS failures) (#133).
-- Draft specs merge to `main` at in-review so later Combat specs can read them.
-- Integrator-only Combat items: gate doc §3 (I1–I31), applied in the revision pass after the DM gate.
+- `fix/scenes-core`: owner assigned `src/server/services.ts`; reconnect HTTP probe (#133).
+- ADR-0029 amended by the integrator (cut floor before filter, `pin`), accepted with B8 (#137).
+- assets-pipeline: REST errors keep code `invalid` with HTTP 413/415/422; FR-ASSET-16 re-arm on record change deferred to scenes-map; test-mode "Images" launcher.
+- play-shell: toast z-index above dialogs left as is (cosmetic).
+- DM secret kept in browser storage (`pocket-plane.dmSecret`) — campaign-management behaviour, observed by test agent; check against spec at the Scenes gate.
