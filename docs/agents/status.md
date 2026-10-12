@@ -13,8 +13,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | build entities | `build-entities` (`w14:p2`) | `w14`, `build/entities`, slot 0 | building | — |
 | build scenes-map | — | — | queued | entities; + ADR-0028 token-changed hook registry (#134) |
 | Revise 4 Combat specs | — (ended) | merged to `main` | in-review | — |
-| Consistency review (Combat) | `review-combat-3` (`wR:pK`) | read-only | reviewing | then consolidation + DM sets complete |
-| Consolidate Combat (data model + protocol) | — | — | queued | 4 revisions merged; DM sets `complete` |
+| Consistency review (Combat) | — (ended) | `%TEMP%\opencode\review-combat-3.md` | done | — |
+| Consolidate Combat (review-3 edits, data model, protocol, scenes-map ADR-0028 FR, AGENTS 9.3/9.9, glossary, FIX §8) | `consolidate-combat` (`w15:p2`) | `w15`, `spec/consolidate-combat` | working | DM: OQ-CBT-28, applied-card toast |
 
 Walkthrough evidence archived outside the repo: `%TEMP%\opencode\verify-{skeleton,scenes-core,play-shell}\`.
 
