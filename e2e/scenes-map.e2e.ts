@@ -11,10 +11,10 @@ async function cellOf(page: Page, tokenId: string) {
   return page.evaluate((id) => {
     const K = (
       window as unknown as {
-        Konva: { stages: { findOne(s: string): { x(): number; y(): number } | undefined }[] };
+        Konva?: { stages: { findOne(s: string): { x(): number; y(): number } | undefined }[] };
       }
-    ).Konva;
-    const n = K.stages[0]?.findOne(`#${id}`);
+    ).Konva; // undefined until the lazy MapCanvas chunk loads
+    const n = K?.stages[0]?.findOne(`#${id}`);
     return n ? { col: Math.round(n.x() / 70), row: Math.round(n.y() / 70) } : null;
   }, tokenId);
 }
