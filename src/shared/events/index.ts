@@ -7,6 +7,7 @@ import * as diceRollLog from "./dice-roll-log";
 import * as entities from "./entities";
 import * as liveSync from "./live-sync";
 import * as notifications from "./notifications";
+import * as scenesMap from "./scenes-map";
 import { type DomainEventDef, isDomainEventDef } from "./types";
 
 export type { DomainEventDef } from "./types";
@@ -17,6 +18,7 @@ export const domainEvents: readonly DomainEventDef[] = [
   ...Object.values(liveSync),
   ...Object.values(assetsPipeline),
   ...Object.values(entities),
+  ...Object.values(scenesMap),
   // Combat (fix/combat-core). These modules also export enums and payload schemas: keep events only.
   ...[diceRollLog, characterSheet, notifications, combatTracker].flatMap((m) =>
     Object.values(m).filter(isDomainEventDef),

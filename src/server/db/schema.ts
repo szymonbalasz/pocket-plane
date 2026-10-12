@@ -7,6 +7,7 @@ import {
   type AnySQLiteColumn,
   index,
   integer,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -154,11 +155,108 @@ export const entity = sqliteTable(
 );
 
 // ---------------------------------------------------------------------------------------------
+// Scenes (scenes-map, data model §12–§13). `seq` = insertion order, DB-assigned (CON-20).
+// ---------------------------------------------------------------------------------------------
+
+/** Scene folder: one level (FR-MAP-02). */
+export const sceneFolder = sqliteTable(
+  "scene_folder",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    name: text("name").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("scene_folder_seq").on(t.seq),
+    index("scene_folder_campaign").on(t.campaignId),
+  ],
+);
+
+/** Scene: map + grid (FR-MAP-01, -09–11); ≤ 1 active per campaign (FR-MAP-06, OQ-MAP-18). */
+export const scene = sqliteTable(
+  "scene",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    /** Null = root. Folder delete moves its scenes to the root first (same transaction). */
+    folderId: text("folder_id").references((): AnySQLiteColumn => sceneFolder.id),
+    seq: integer("seq").notNull(),
+    name: text("name").notNull(),
+    mapAssetId: text("map_asset_id")
+      .notNull()
+      .references((): AnySQLiteColumn => asset.id),
+    mapWidth: integer("map_width").notNull(),
+    mapHeight: integer("map_height").notNull(),
+    gridCellSize: real("grid_cell_size").notNull(),
+    gridOffsetX: real("grid_offset_x").notNull(),
+    gridOffsetY: real("grid_offset_y").notNull(),
+    gridVisible: integer("grid_visible", { mode: "boolean" }).notNull(),
+    gridColor: text("grid_color").notNull(),
+    gridOpacity: real("grid_opacity").notNull(),
+    mapLocked: integer("map_locked", { mode: "boolean" }).notNull().default(false),
+    active: integer("active", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("scene_seq").on(t.seq),
+    uniqueIndex("scene_one_active").on(t.campaignId).where(sql`active = 1`),
+    index("scene_campaign").on(t.campaignId),
+  ],
+);
+
+/** Token: instance of a creature definition on a scene (FR-MAP-13–21, ADR-0024). */
+export const token = sqliteTable(
+  "token",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    sceneId: text("scene_id")
+      .notNull()
+      .references((): AnySQLiteColumn => scene.id, { onDelete: "cascade" }),
+    definitionId: text("definition_id")
+      .notNull()
+      .references((): AnySQLiteColumn => entity.id),
+    seq: integer("seq").notNull(),
+    name: text("name").notNull(),
+    imageAssetId: text("image_asset_id").references((): AnySQLiteColumn => asset.id),
+    size: text("size", {
+      enum: ["tiny", "small", "medium", "large", "huge", "gargantuan"],
+    }).notNull(),
+    col: integer("col").notNull(),
+    row: integer("row").notNull(),
+    ownerPlayerId: text("owner_player_id").references((): AnySQLiteColumn => player.id),
+    hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("token_seq").on(t.seq),
+    index("token_scene").on(t.sceneId),
+    index("token_campaign").on(t.campaignId),
+    index("token_definition").on(t.definitionId),
+  ],
+);
+
+/** CON-20: `seq` values for scene inserts, computed by the DB inside the insert's transaction. */
+export const sceneFolderSeqNext = sql<number>`(select coalesce(max(${sceneFolder.seq}), 0) + 1 from ${sceneFolder})`;
+export const sceneSeqNext = sql<number>`(select coalesce(max(${scene.seq}), 0) + 1 from ${scene})`;
+export const tokenSeqNext = sql<number>`(select coalesce(max(${token.seq}), 0) + 1 from ${token})`;
+
+// ---------------------------------------------------------------------------------------------
 // Combat (data model §14–§18). Shared definitions only (fix/combat-core); the owning features
 // write the rows. `seq` columns = insertion order, assigned by the DB at insert (CON-20): use the
 // `*SeqNext` expressions. `n` on game-log entries is the command's own per-campaign counter.
-// Scene and token tables don't exist yet: `encounter.sceneId` and `combatant.tokenId` get their
-// `ON DELETE SET NULL` FKs when scenes-map adds those tables.
+// `encounter.sceneId` and `combatant.tokenId` → scene / token, `ON DELETE SET NULL`.
 // ---------------------------------------------------------------------------------------------
 
 const ROLE = ["dm", "player"] as const;
@@ -293,8 +391,9 @@ export const encounter = sqliteTable(
     seq: integer("seq").notNull(),
     name: text("name").notNull(),
     status: text("status", { enum: ["planned", "started", "ended"] }).notNull(),
-    /** → scene, ON DELETE SET NULL once scenes-map adds the table. */
-    sceneId: text("scene_id"),
+    sceneId: text("scene_id").references((): AnySQLiteColumn => scene.id, {
+      onDelete: "set null",
+    }),
     /** JSON leaf ID[] | null (null = every character of the campaign at read time). */
     partyCharacterIds: text("party_character_ids", { mode: "json" }),
     round: integer("round").notNull().default(0),
@@ -349,8 +448,9 @@ export const combatant = sqliteTable(
     entityId: text("entity_id")
       .notNull()
       .references((): AnySQLiteColumn => entity.id),
-    /** → token, ON DELETE SET NULL once scenes-map adds the table. */
-    tokenId: text("token_id"),
+    tokenId: text("token_id").references((): AnySQLiteColumn => token.id, {
+      onDelete: "set null",
+    }),
     name: text("name").notNull(),
     imageAssetId: text("image_asset_id").references((): AnySQLiteColumn => asset.id),
     hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
@@ -435,6 +535,9 @@ export const schema = {
   syncProbe,
   asset,
   entity,
+  sceneFolder,
+  scene,
+  token,
   roll,
   gameLogEntry,
   gameLogSettings,
