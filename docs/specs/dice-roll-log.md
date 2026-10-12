@@ -215,7 +215,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 - `package.json`, `bun.lock` — add `@dice-roller/rpg-dice-roller` (ADR-0001). `biome.json` — restricted global `Math.random`, server code only (the client backoff uses it).
 - `src/server/ws/` + `src/shared/protocol/` — optional `window {orderBy, size, pin?}` on registration; convergence + leak-scan helpers honour it (ADR-0029).
 - `src/server/db/` — tables `roll`, `game_log_entry` (unique `campaignId` + `n`), `game_log_settings`. `src/shared/events/` — `DiceRolled`, `PublicLogCategorySet`.
-- Registries (append lines): `diceRollLog` in `src/server/features/index.ts`; record types `game-log-entry`, `game-log-settings`; `src/client/{dm,player}/windows.ts` `dice.log`; `fixtures/bundles/index.ts` `dice-log`. New append-only `src/shared/dice-roll-log/kinds.ts` (created with `roll` by this build) → AGENTS §9.9 list.
+- Registries (append lines): `diceRollLog` in `src/server/features/index.ts`; record types `game-log-entry`, `game-log-settings`; `src/client/{dm,player}/windows.ts` `dice.log`; `fixtures/bundles/index.ts` `dice-log`. New append-only `src/shared/dice-roll-log/kinds.ts` (created with `roll` by this build; on the AGENTS §9.9 list).
 - Docs at merge: protocol rows (intents, types, events, budget), data-model rows, glossary (I13).
 
 ## 15. Open questions

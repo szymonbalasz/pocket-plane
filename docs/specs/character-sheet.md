@@ -204,7 +204,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 **Shared changes needed** (AGENTS §9.9; gate §4):
 - `src/shared/events/` — `character-sheet.ts` (`CharacterHpAdjusted`, `CharacterRolled`) + its line in `index.ts`. `src/server/db/`: none. Record types: none.
 - Existing append-only registries: `char.sheet` in `src/client/{dm,player}/windows.ts`; `characterSheet` in `src/server/features/index.ts`; `character-sheet` in `fixtures/bundles/index.ts`.
-- New append-only registry (created empty by this build; add to AGENTS §9.9): `src/client/common/features/character-sheet/roll-routes.ts`; combat-tracker adds one line (OQ-CHAR-13).
+- New append-only registry (created empty by this build; on the AGENTS §9.9 list): `src/client/common/features/character-sheet/roll-routes.ts`; combat-tracker adds one line (OQ-CHAR-13).
 - Docs (integrator): protocol rows for `char.roll`, `char.adjustHp`, both events; FIX §8 rows.
 
 ## 15. Open questions
@@ -218,7 +218,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | ~~OQ-CHAR-07, 10~~ | ~~Combat: PC HP writes, player attacks, sheet initiative~~ | Decided (#134, #135): combat writes PC HP only via `characters.adjustHp`; in a running encounter the sheet sends `cbt.attack` / `cbt.rollInitiative` (card in the same tx, no target; DM picks); else `char.roll`. No listener, no `targetTokenId` | — | combat-tracker |
 | ~~OQ-CHAR-08~~ | ~~Undo after a sheet HP change~~ | Decided (I2): inverse delta, clamped | — | combat-tracker |
 | ~~OQ-CHAR-09~~ | ~~DM rolls for a PC: public?~~ | Decided (#139 P1): category setting + per-roll override (P22), like any DM roll | — | dice-roll-log |
-| OQ-CHAR-13 | How combat takes over the sheet buttons (gate §4 item 9) | **New client registry `roll-routes.ts` (CHAR creates, combat adds a line)** / orchestrator assigns combat the sheet's button path | no · owner: orchestrator | combat-tracker, AGENTS |
+| ~~OQ-CHAR-13~~ | ~~How combat takes over the sheet buttons~~ | Decided (integrator): new client registry `roll-routes.ts`, CHAR creates it empty, combat adds a line; on the AGENTS §9.9 append-only list | — | combat-tracker |
 | ~~OQ-CHAR-14~~ | ~~Shared roll control~~ | Decided ([FR-DICE-24](dice-roll-log.md#6-functional-requirements)): dice-roll-log's control, `expressions[]`, `onRoll({mode, manual?, public?})`; the caller sends its own intent | — | — |
 
 ## 16. Out of scope

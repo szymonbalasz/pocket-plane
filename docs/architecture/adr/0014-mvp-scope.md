@@ -22,7 +22,7 @@
 | Character sheet **basics**: AC, HP, initiative, one weapon attack (e.g. shortsword 1d6, may be hardcoded). **Characters come from fixtures** | Character builder → [levelling](../../specs/post-mvp/levelling.md); character import → once-off scripts | Spells, saves, skills, features, inventory… → [character-sheet-full](../../specs/post-mvp/character-sheet-full.md) |
 | **Encounter builder with CR difficulty** (tier S); **multiple enemy kinds** per encounter (tier S); single weapon attack each | Conditions, concentration → [combat-extras](../../specs/post-mvp/combat-extras.md) |
 | Initiative, HP, damage, rolls; advantage/disadvantage on any roll (toggle or Shift/Ctrl). **BG2-style game log** with **DM per-category public/hidden tickboxes** | Whispers, roll requests, inline rolls, macros, 3D dice → [dice-extras](../../specs/post-mvp/dice-extras.md) |
-| **Damage cards**: Shieldmaiden-style attack (Shift adv / Ctrl dis) → DM applies to a target as normal / half / none / double, with manual override | Hit/miss hint (tier B) |
+| **Damage cards**: Shieldmaiden-style attack (Shift adv / Ctrl dis) → DM applies to a target as normal / half / none / double, with manual override | — (hit/miss vs AC is MVP, #74) |
 | One-click monster initiative; monster HP as health band to players; **start / end encounter**; combatants bind to pre-placed (possibly hidden) tokens | Conditions, concentration, durations, temp HP, death saves; custom NPC actions, multi-target (tier A) |
 | **Stats data capture**: all rolls, damage dealt/taken/healed, weapon, overkill | Stats UI, summaries → [stats](../../specs/post-mvp/stats.md) |
 | **Every roll: automated or manual entry** (physical dice), for DM and players | |
