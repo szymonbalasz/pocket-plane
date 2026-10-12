@@ -32,6 +32,9 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0024](0024-definition-visibility.md) | Creature definitions DM-only for players; instances carry read-only display copies | accepted (refines 0009) |
 | [0025](0025-play-shell-windows.md) | Feature UI as play-shell windows; layout in browser storage | accepted |
 | [0026](0026-signal-routing.md) | Signal routing: sender stamp, DM-only pull, receiver scene filter | accepted |
+| [0027](0027-notification-creation.md) | Notifications are created in the causing command's transaction | accepted (refines 0016) |
+| [0028](0028-token-changed-hooks.md) | Token-changed hooks keep bound instances in step | accepted (extends 0024) |
+| [0029](0029-windowed-record-types.md) | Windowed record types: bounded snapshots for append-only logs | accepted (amends FR-SYNC-20) |
 
 ## Proposing a new ADR
 

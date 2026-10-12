@@ -218,7 +218,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 | On | What we need | Status |
 |---|---|---|
-| [live-sync](live-sync.md), [protocol](../protocol/README.md) | Intents, record types, `audience: dm`, transition matrix; windowed snapshot convergence | complete; window → [proposed ADR](../architecture/adr/proposed-windowed-record-types.md) |
+| [live-sync](live-sync.md), [protocol](../protocol/README.md) | Intents, record types, `audience: dm`, transition matrix; windowed snapshot convergence | complete; window → [proposed ADR](../architecture/adr/0029-windowed-record-types.md) |
 | Command context (`src/server/commands/`, shared) | `ctx.dice` seam (FR-DICE-03) | shared change, OQ-DICE-18 |
 | [campaign-management](campaign-management.md) | Player name for actor copies (copied server-side; doesn't need [OQ-CAMP-13](campaign-management.md#15-open-questions)); settings in our own table, no change to `campaign` | complete |
 | [entities](entities.md), [scenes-map](scenes-map.md) | `resolveDefinition`; character owner; token display name | complete |
@@ -234,7 +234,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-DICE-03 | Dice seeding for tests | **`ctx.dice` engine on the command context; CSPRNG real, seeded per fixture key / test seed, disposable only** (one seam like ADR-0022) / mock the library per test (no stable fixture rolls) | yes · owner: DM | all specs using rolls |
-| OQ-DICE-04 | Snapshot depth of the game log | **Newest 100; no older-history UI in MVP** (bounded; history kept in DB) / full log (unbounded snapshot) / 100 + "load older" intent (more scope). Needs [proposed ADR](../architecture/adr/proposed-windowed-record-types.md) for FR-SYNC-20 | yes · owner: integrator | live-sync, notifications, party-loot |
+| OQ-DICE-04 | Snapshot depth of the game log | **Newest 100; no older-history UI in MVP** (bounded; history kept in DB) / full log (unbounded snapshot) / 100 + "load older" intent (more scope). Needs [proposed ADR](../architecture/adr/0029-windowed-record-types.md) for FR-SYNC-20 | yes · owner: integrator | live-sync, notifications, party-loot |
 | OQ-DICE-05 | ~~Rolls tagged by session?~~ **Decided: no sessions** ([ADR-0013](../architecture/adr/0013-session-journal-scope.md), #78); entries carry `encounterId` set by combat-tracker | — | — | — |
 | OQ-DICE-06 | ~~Visibility modes in MVP~~ **Superseded: per-category public log settings** (whispers tier C) | — | — | — |
 | OQ-DICE-07 | Manual entry granularity | **Dice total, optional per-die** (fast; per-die for adv) / per-die required (slower) | no · owner: spec-dice-roll-log | combat-tracker |
