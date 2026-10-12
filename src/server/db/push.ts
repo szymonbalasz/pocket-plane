@@ -47,7 +47,15 @@ export async function pushSchema(sqlite: Database): Promise<{ applied: number }>
   }
   const api = await loadKit();
   const { drizzle } = await import("drizzle-orm/bun-sqlite");
-  const res = await api.pushSQLiteSchema(schema, drizzle(sqlite) as never);
+  // drizzle-kit draws a spinner on stdout; keep server output clean.
+  const write = process.stdout.write;
+  process.stdout.write = (() => true) as typeof write;
+  let res: Awaited<ReturnType<typeof api.pushSQLiteSchema>>;
+  try {
+    res = await api.pushSQLiteSchema(schema, drizzle(sqlite) as never);
+  } finally {
+    process.stdout.write = write;
+  }
   // Expression indexes always show as changed; only act on real changes.
   const real = res.statementsToExecute.filter((s) => !/^(DROP|CREATE UNIQUE) INDEX/.test(s));
   if (real.length === 0) return { applied: 0 };
