@@ -2,7 +2,7 @@ import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
-import { loadConfig, profileArg, WORKTREE_ROOT } from "./src/server/config";
+import { loadConfig, profileArg, WORKTREE_ROOT } from "./src/server/config.ts";
 
 const r = (p: string) => path.resolve(WORKTREE_ROOT, p);
 
