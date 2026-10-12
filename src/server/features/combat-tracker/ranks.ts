@@ -57,15 +57,15 @@ export function syncPlayerTurn(env: Env, encounterId: string): EncounterRecord {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-/** Changes for every combatant row that differs from `before` (same encounter). */
+/** Changes for every row of `before` that differs now (updates only). */
 export function combatantDiff(tx: Tx, before: readonly CombatantRecord[]): RecordChange[] {
   const encounterIds = [...new Set(before.map((r) => r.encounterId))];
   const out: RecordChange[] = [];
   for (const eid of encounterIds) {
     const prev = new Map(before.filter((r) => r.encounterId === eid).map((r) => [r.id, r]));
     for (const now of combatantsOf(tx, eid)) {
-      const b = prev.get(now.id) ?? null;
-      if (b && same(b, now)) continue;
+      const b = prev.get(now.id);
+      if (!b || same(b, now)) continue;
       out.push(combatantChange(b, now));
     }
   }

@@ -8,6 +8,8 @@ import campaignSecond from "./campaign-management/campaign-second";
 import player1 from "./campaign-management/player-1";
 import player2 from "./campaign-management/player-2";
 import encounter1 from "./combat-tracker/encounter-1";
+import goblin2 from "./combat-tracker/goblin-2";
+import thornBattlemap from "./combat-tracker/thorn-battlemap";
 import diceSettings from "./dice-roll-log/dice-settings";
 import rolls1 from "./dice-roll-log/rolls-1";
 import charMira from "./entities/char-mira";
@@ -44,4 +46,6 @@ export const units: readonly Fixture[] = [
   diceSettings,
   rolls1,
   encounter1,
+  goblin2,
+  thornBattlemap,
 ];
