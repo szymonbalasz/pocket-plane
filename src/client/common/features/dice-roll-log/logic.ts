@@ -10,6 +10,7 @@ import {
 } from "@shared/dice-roll-log/grammar";
 import type { GameLogEntryView, ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
 import type { EntityRecord } from "@shared/entities/schemas";
+import type { SceneView, TokenView } from "@shared/scenes-map/schemas";
 
 /** FR-DICE-05: Shift = advantage, Ctrl = disadvantage, both = normal; none → the toggle. */
 export function modeFromKeys(
@@ -37,22 +38,47 @@ export interface ActorOption {
   /** "" = the roller themselves ("me" / "DM"). */
   value: string;
   label: string;
+  group?: "Characters" | "Tokens";
   ref?: { entityId: string } | { tokenId: string };
 }
 
-/** FR-DICE-27: player → "me" + own characters; DM → "DM" + characters (+ scene tokens later). */
+type ActorToken = Pick<TokenView, "id" | "sceneId" | "name" | "seq">;
+
+/**
+ * FR-DICE-27: player → "me" + own characters; DM → "DM" + every character + the tokens of the
+ * active scene (by placement order).
+ */
 export function actorOptions(
   you: { role: "dm" | "player"; playerId: string | null } | null,
   entities: readonly Pick<EntityRecord, "id" | "kind" | "name" | "ownerPlayerId">[],
+  scenes: readonly Pick<SceneView, "id" | "active">[] = [],
+  tokens: readonly ActorToken[] = [],
 ): ActorOption[] {
   if (!you) return [];
   const chars = entities
     .filter((e) => e.kind === "character")
     .filter((e) => you.role === "dm" || e.ownerPlayerId === you.playerId)
     .sort((a, b) => a.name.localeCompare(b.name));
-  return [
+  const out: ActorOption[] = [
     { value: "", label: you.role === "dm" ? "DM" : "Me" },
-    ...chars.map((c) => ({ value: c.id, label: c.name, ref: { entityId: c.id } })),
+    ...chars.map((c) => ({
+      value: c.id,
+      label: c.name,
+      group: "Characters" as const,
+      ref: { entityId: c.id },
+    })),
+  ];
+  if (you.role !== "dm") return out;
+  const active = scenes.find((s) => s.active)?.id;
+  const onScene = tokens.filter((t) => t.sceneId === active).sort((a, b) => a.seq - b.seq);
+  return [
+    ...out,
+    ...onScene.map((t) => ({
+      value: t.id,
+      label: t.name,
+      group: "Tokens" as const,
+      ref: { tokenId: t.id },
+    })),
   ];
 }
 

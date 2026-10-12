@@ -73,13 +73,33 @@ describe("FR-DICE-27 actor select", () => {
   test("FR-DICE-27 player: me + own characters; DM: DM + every character", () => {
     expect(actorOptions({ role: "player", playerId: "p1" }, ents)).toEqual([
       { value: "", label: "Me" },
-      { value: "m", label: "Mira", ref: { entityId: "m" } },
+      { value: "m", label: "Mira", group: "Characters", ref: { entityId: "m" } },
     ]);
     expect(actorOptions({ role: "dm", playerId: null }, ents).map((a) => a.label)).toEqual([
       "DM",
       "Mira",
       "Thorn",
     ]);
+  });
+
+  test("FR-DICE-27 DM also gets the active scene's tokens (placement order); players never", () => {
+    const scenes = [
+      { id: "s1", active: false },
+      { id: "s2", active: true },
+    ];
+    const tokens = [
+      { id: "t3", sceneId: "s2", name: "Goblin 2", seq: 3 },
+      { id: "t1", sceneId: "s1", name: "Wolf", seq: 1 },
+      { id: "t2", sceneId: "s2", name: "Goblin", seq: 2 },
+    ];
+    const dm = actorOptions({ role: "dm", playerId: null }, ents, scenes, tokens);
+    expect(dm.filter((a) => a.group === "Tokens")).toEqual([
+      { value: "t2", label: "Goblin", group: "Tokens", ref: { tokenId: "t2" } },
+      { value: "t3", label: "Goblin 2", group: "Tokens", ref: { tokenId: "t3" } },
+    ]);
+    expect(actorOptions({ role: "dm", playerId: null }, ents, [], tokens)).toHaveLength(3);
+    const p = actorOptions({ role: "player", playerId: "p1" }, ents, scenes, tokens);
+    expect(p.some((a) => a.group === "Tokens")).toBe(false);
   });
 });
 

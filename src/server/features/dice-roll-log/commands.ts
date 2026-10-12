@@ -10,7 +10,7 @@ import { DiceRolled } from "@shared/events/dice-roll-log";
 import { and, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { forbidden, notFound } from "../../commands/errors";
-import { entity, player } from "../../db/schema";
+import { entity, player, token } from "../../db/schema";
 import { resolveDefinition } from "../entities/commands";
 import { type EvaluateInput, evaluate, rollPayloadItem } from "./evaluate";
 import { append } from "./game-log";
@@ -51,8 +51,15 @@ export function resolveRollActor(
     const def = resolveDefinition(env, ref.entityId);
     return { kind: "entity", id: def.id, name: def.name };
   }
-  // Token actors need scenes-map's token table (not on main yet): until then unknown.
-  throw notFound("Token not found");
+  // Any token of the campaign (any scene); its display name is copied (hidden tokens too:
+  // the DM decides with the per-roll public switch, DICE §11).
+  const t = env.tx
+    .select({ name: token.name })
+    .from(token)
+    .where(and(eq(token.id, ref.tokenId), eq(token.campaignId, cid)))
+    .get();
+  if (!t) throw notFound("Token not found");
+  return { kind: "token", id: ref.tokenId, name: t.name };
 }
 
 export const rollCommand = defineCommand({

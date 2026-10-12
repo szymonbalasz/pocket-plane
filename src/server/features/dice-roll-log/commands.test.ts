@@ -310,6 +310,10 @@ describe("FR-DICE-09 dice.roll", () => {
     expect(entries(t.s).map((e) => e.actorName)).toEqual(["Goblin", "Thorn", "DM"]);
     expect(fail(() => run({ entityId: t.strangerId })).code).toBe("not_found");
     expect(fail(() => run({ tokenId: "no-such-token" })).code).toBe("not_found");
+    expect(fail(() => run({ tokenId: t.otherTokenId })).code).toBe("not_found");
+    run({ tokenId: t.tokenId });
+    expect(entries(t.s).at(-1)?.actorName).toBe("Boss");
+    expect(rolls(t.s).at(-1)).toMatchObject({ actorKind: "token", actorId: t.tokenId });
   });
 
   test("FR-DICE-13 DM: override wins, else the category setting at commit; DM for a PC too", () => {

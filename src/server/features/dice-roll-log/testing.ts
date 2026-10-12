@@ -10,6 +10,8 @@ import type { Viewer } from "../../ws/records";
 import { activateCampaign, addPlayer, createCampaign } from "../campaign-management/commands";
 import { createEntity } from "../entities/commands";
 import { goblinBlock, miraBlock, testSource, thornBlock } from "../entities/testing";
+import { createScene, placeToken } from "../scenes-map/commands";
+import { addAsset } from "../scenes-map/testing";
 
 export function diceServices(seed = "dice-test"): { s: Services; ctx: CommandContext } {
   const clock = manualClock();
@@ -62,7 +64,20 @@ export function seedDice(s: Services) {
     },
     { actor: { ...DM_ACTOR, campaignId: second.id } },
   ) as { id: string };
+  const dmSecond: Actor = { ...DM_ACTOR, campaignId: second.id };
+  // A scene + goblin token in each campaign (token actors, FR-DICE-10).
+  const tokenIn = (cid: string, actor: Actor) => {
+    addAsset(s, `map-${cid}`, cid);
+    const sc = run(createScene, { name: "Battle", mapAssetId: `map-${cid}` }, { actor });
+    return run(
+      placeToken,
+      { sceneId: sc.id, definitionId: imported[0]?.id as string, col: 1, row: 1, name: "Boss" },
+      { actor },
+    ).tokenId;
+  };
+  const otherToken = tokenIn(second.id, dmSecond);
   run(activateCampaign, { id: campaign.id }, { actor: DM_ACTOR });
+  const bossToken = tokenIn(campaign.id, dm);
   const player = (id: string): Actor => ({ role: "player", playerId: id, campaignId: campaign.id });
   const viewer = (role: "dm" | "player", playerId: string | null = null, cid = campaign.id) =>
     ({ connId: "test", campaignId: cid, role, playerId }) satisfies Viewer;
@@ -79,6 +94,8 @@ export function seedDice(s: Services) {
     miraId: mira.id,
     thornId: thorn.id,
     strangerId: otherChar.id,
+    tokenId: bossToken,
+    otherTokenId: otherToken,
     viewer,
     snapshot,
   };

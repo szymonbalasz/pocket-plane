@@ -14,6 +14,7 @@ import {
   type RollMode,
 } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
+import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
 import { EyeOffIcon } from "lucide-react";
 import { type ReactNode, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
@@ -80,13 +81,17 @@ function Entry({ e, isDm }: { e: GameLogEntryView; isDm: boolean }) {
       data-record-id={e.id}
       data-public={e.public}
       data-undone={e.undone}
-      className={cn("flex items-start gap-1.5 py-0.5 text-sm leading-snug", hidden && "opacity-60")}
+      // visibility.hidden token (visual-direction): hidden entries muted with an eye-off marker.
+      className={cn(
+        "flex items-start gap-1.5 py-0.5 text-sm leading-snug",
+        hidden && "text-visibility-hidden",
+      )}
     >
       {hidden && (
         <EyeOffIcon
           aria-label="Hidden from players"
           data-testid="dice-log-entry-hidden"
-          className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+          className="mt-0.5 size-3.5 shrink-0 text-visibility-hidden"
         />
       )}
       <Tooltip content={tooltipOf(e)}>
@@ -196,8 +201,15 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const uid = useId();
-  const actors = useMemo(() => actorOptions(you, entities), [you, entities]);
-  const actorRef = actors.find((a) => a.value === actor)?.ref;
+  const scenes = useRecords<SceneView>(SCENE_TYPE);
+  const tokens = useRecords<TokenView>(TOKEN_TYPE);
+  const actors = useMemo(
+    () => actorOptions(you, entities, scenes, tokens),
+    [you, entities, scenes, tokens],
+  );
+  // A token that left the active scene (or a removed character) falls back to the roller.
+  const selected = actors.find((a) => a.value === actor) ?? actors[0];
+  const actorRef = selected?.ref;
 
   const control = useRollControl({
     expressions: [expression],
@@ -275,15 +287,29 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
           data-testid="dice-roll-actor"
           aria-label="Roll as"
           className={cn(SELECT, "max-w-28")}
-          value={actor}
+          value={selected?.value ?? ""}
           disabled={!live}
           onChange={(e) => setActor(e.target.value)}
         >
-          {actors.map((a) => (
-            <option key={a.value} value={a.value}>
-              {a.label}
-            </option>
-          ))}
+          {actors
+            .filter((a) => !a.group)
+            .map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.label}
+              </option>
+            ))}
+          {(["Characters", "Tokens"] as const).map((g) => {
+            const list = actors.filter((a) => a.group === g);
+            return list.length === 0 ? null : (
+              <optgroup key={g} label={g}>
+                {list.map((a) => (
+                  <option key={a.value} value={a.value}>
+                    {a.label}
+                  </option>
+                ))}
+              </optgroup>
+            );
+          })}
         </select>
         <Input
           data-testid="dice-roll-label"
