@@ -4,5 +4,5 @@ import { defineBundle } from "@server/features/fixtures-adapters/fixture-types";
 export default defineBundle({
   name: "mid-combat",
   includes: ["combat"],
-  fixtures: ["combat-1"],
+  fixtures: ["combat-1", "combat-hit", "combat-pending"],
 });

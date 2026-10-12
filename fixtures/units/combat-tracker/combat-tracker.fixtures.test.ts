@@ -1,8 +1,15 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { closeDb } from "@server/db/client";
-import { combatant, encounter, encounterEntry } from "@server/db/schema";
-import { asc } from "drizzle-orm";
+import {
+  combatant,
+  encounter,
+  encounterEntry,
+  entity,
+  hpChange,
+  notification,
+} from "@server/db/schema";
+import { asc, eq } from "drizzle-orm";
 import { loadBundle } from "../../index";
 
 const dirs: string[] = [];
@@ -23,6 +30,9 @@ async function loaded(bundle: string) {
   const db = r.openDb();
   const out = {
     manifest: r.manifest,
+    mira: db.select().from(entity).where(eq(entity.name, "Mira")).get(),
+    hpChanges: db.select().from(hpChange).all(),
+    cards: db.select().from(notification).orderBy(asc(notification.seq)).all(),
     encounters: db.select().from(encounter).orderBy(asc(encounter.seq)).all(),
     entries: db.select().from(encounterEntry).orderBy(asc(encounterEntry.seq)).all(),
     combatants: db.select().from(combatant).orderBy(asc(combatant.position)).all(),
@@ -62,8 +72,23 @@ describe("combat-tracker fixtures (CBT §13)", () => {
     expect(r.combatants).toEqual([]);
   });
 
-  test("CBT §13 mid-combat: combat-1 order, round 1, Wolf's turn (hidden → no player marker)", async () => {
+  test("CBT §13 mid-combat: combat-1 order, round 1, Wolf's turn; combat-hit Mira 6/12; Elite card pending", async () => {
     const r = await loaded("mid-combat");
+    expect(r.mira?.hpCurrent).toBe(6);
+    expect(r.hpChanges).toEqual([
+      expect.objectContaining({
+        targetName: "Mira",
+        attackerName: "Goblin",
+        toHitTotal: 19,
+        damageTotal: 6,
+        applied: 6,
+        hpAfter: 6,
+      }),
+    ]);
+    expect(r.cards.map((c) => [c.text, c.state, c.audience])).toEqual([
+      ["Goblin: 19 to hit, 6 slashing", "resolved", "dm"],
+      ["Elite Goblin Warrior: 24 to hit, 8 slashing", "pending", "dm"],
+    ]);
     expect(r.combatants.map((c) => [c.name, c.initiative, c.playerPosition])).toEqual([
       ["Wolf", 18, null],
       ["Mira", 15, 1],

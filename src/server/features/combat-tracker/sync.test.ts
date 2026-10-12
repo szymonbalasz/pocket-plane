@@ -246,6 +246,25 @@ describe("mid-combat over WS", () => {
       expectedTurnId: enc.turnCombatantId,
     });
     await nextEvent(dm, "TurnChanged");
+    // The pending Elite card (combat-pending) survives and applies to Mira (6 → 0).
+    const pending = Object.values(dm.store.records.notification ?? {}).find((n) => {
+      const x = n as { state: string; text: string };
+      return x.state === "pending" && x.text.startsWith("Elite Goblin Warrior");
+    }) as { id: string; kind: string } | undefined;
+    expect(pending?.kind).toBe("damage-card");
+    const mira = byName(dm, "Mira") as CombatantRecord;
+    dm.intent("cbt.applyCard", {
+      cardId: pending?.id,
+      targetId: mira.id,
+      toHitTotal: 24,
+      hit: true,
+      damageTotal: 9,
+      multiplier: "normal",
+    });
+    const applied = await nextEvent(dm, "AttackApplied");
+    expect(applied.changes.find((c) => c.type === "entity")).toMatchObject({
+      data: { hpCurrent: 0 },
+    });
     dm.close();
   });
 });

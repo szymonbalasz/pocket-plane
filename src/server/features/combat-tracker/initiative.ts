@@ -1,5 +1,5 @@
 // Initiative (FR-CBT-11, FR-CBT-12) and remove / restore (FR-CBT-15).
-import { d20Expression } from "@shared/combat-tracker/rules";
+import { characterRolls } from "@shared/character-sheet/logic";
 import {
   CBT_INTENTS,
   RollInitiativeInput,
@@ -49,11 +49,13 @@ export const rollInitiative = defineCommand({
     const rollIds: string[] = [];
     const entries: RecordChange[] = [];
     for (const { c } of targets) {
+      const spec = characterRolls(statsOf(env, c), "initiative")?.[0];
+      if (!spec) throw new Error("characterRolls: no initiative roll");
       const r = dice.evaluate(env, {
-        expression: d20Expression(statsOf(env, c).initBonus),
+        expression: spec.expression,
         mode: input.mode,
-        category: "initiative",
-        label: "Initiative",
+        category: spec.category,
+        label: spec.label,
         actor: { kind: "entity", id: c.entityId, name: c.name },
         manual: input.manual,
         source: "cbt",

@@ -26,13 +26,13 @@ import {
 import { and, desc, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, notFound } from "../../commands/errors";
-import { combatant, entity, hpChange, hpChangeSeqNext, roll } from "../../db/schema";
+import { combatant, hpChange, hpChangeSeqNext, roll } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
+import { characters } from "../character-sheet";
 import { gameLog } from "../dice-roll-log";
 import { reopenNotification, resolveNotification } from "../notifications";
 import { loadNotification } from "../notifications/helpers";
 import { activeCombatant, statsOf } from "./guards";
-import { adjustPcHp } from "./pc-hp";
 import {
   campaignOf,
   combatantChange,
@@ -45,23 +45,17 @@ import {
   toHpChangeRecord,
 } from "./rows";
 
-type Env = Pick<CommandEnv, "tx" | "ctx" | "actor">;
+type Env = CommandEnv;
 
-/** FR-CBT-22: monster → own HP clamped 0…hpMax; PC → `characters.adjustHp`. */
+/** FR-CBT-22: monster → own HP clamped 0…hpMax; PC → `characters.adjustHp` (FR-CHAR-13). */
 function applyDelta(
   env: Env,
   c: CombatantRecord,
   delta: number,
 ): { hpBefore: number; hpAfter: number; changes: RecordChange[] } {
   if (c.kind === "pc") {
-    if (delta === 0) {
-      const hp =
-        env.tx.select({ hp: entity.hpCurrent }).from(entity).where(eq(entity.id, c.entityId)).get()
-          ?.hp ?? 0;
-      return { hpBefore: hp, hpAfter: hp, changes: [] };
-    }
-    const r = adjustPcHp(env, c.entityId, delta);
-    return { hpBefore: r.hpBefore, hpAfter: r.hpAfter, changes: [r.change] };
+    const r = characters.adjustHp(env, c.entityId, delta);
+    return { hpBefore: r.hpBefore, hpAfter: r.hpAfter, changes: r.change ? [r.change] : [] };
   }
   const before = readCombatant(env.tx, c.id);
   const hpBefore = before.hpCurrent ?? 0;

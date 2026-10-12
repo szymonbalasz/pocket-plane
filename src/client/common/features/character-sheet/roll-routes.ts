@@ -3,6 +3,9 @@
 // Initiative / Attack ask these routes first, in order; no claim → `char.roll`.
 // Contract: `RollRoute` in `./routing`. combat-tracker adds its `cbt.rollInitiative` /
 // `cbt.attack` route here (FR-CBT-30).
+import { combatRollRoute } from "../combat-tracker/roll-route";
 import type { RollRoute } from "./routing";
 
-export const rollRoutes: readonly RollRoute[] = [];
+export const rollRoutes: readonly RollRoute[] = [
+  combatRollRoute, // combat-tracker: cbt.rollInitiative / cbt.attack in combat (FR-CBT-30)
+];

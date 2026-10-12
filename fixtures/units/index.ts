@@ -10,6 +10,8 @@ import player2 from "./campaign-management/player-2";
 import charPip from "./character-sheet/char-pip";
 import charWounds from "./character-sheet/char-wounds";
 import combat1 from "./combat-tracker/combat-1";
+import combatHit from "./combat-tracker/combat-hit";
+import combatPending from "./combat-tracker/combat-pending";
 import encounter1 from "./combat-tracker/encounter-1";
 import goblin2 from "./combat-tracker/goblin-2";
 import thornBattlemap from "./combat-tracker/thorn-battlemap";
@@ -54,4 +56,6 @@ export const units: readonly Fixture[] = [
   goblin2,
   thornBattlemap,
   combat1,
+  combatHit,
+  combatPending,
 ];

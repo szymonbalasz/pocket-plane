@@ -1,7 +1,8 @@
 // `cbt.attack` (FR-CBT-16–18, #135): rolls to-hit + damage server-side, writes the player's roll
 // line, then creates the damage card via `notify` in the same transaction (ADR-0027). No target:
 // the DM picks it in the attack popup (#134).
-import { critExpression, d20Expression } from "@shared/combat-tracker/rules";
+import { characterRolls } from "@shared/character-sheet/logic";
+import { critExpression } from "@shared/combat-tracker/rules";
 import {
   AttackInput,
   type AttackResult,
@@ -29,14 +30,17 @@ export const attackCommand = defineCommand({
   },
   execute(input, env): AttackResult {
     const { c, enc } = activeCombatant(env, input.attackerId, { own: true });
-    const attack = statsOf(env, c).attacks[0];
-    if (!attack) throw conflict("No weapon attack");
+    const stats = statsOf(env, c);
+    const attack = stats.attacks[0];
+    const specs = characterRolls(stats, "attack");
+    const [hitSpec, dmgSpec] = specs ?? [];
+    if (!attack || !hitSpec || !dmgSpec) throw conflict("No weapon attack");
     const actor = { kind: "entity" as const, id: c.entityId, name: c.name };
     const toHit = dice.evaluate(env, {
-      expression: d20Expression(attack.toHit),
+      expression: hitSpec.expression,
       mode: input.mode,
-      category: "attack",
-      label: attack.name,
+      category: hitSpec.category,
+      label: hitSpec.label,
       actor,
       manual: input.manual?.[0],
       source: "cbt",
@@ -44,10 +48,10 @@ export const attackCommand = defineCommand({
     // FR-CBT-16 / -17: natural 20 → damage dice doubled; manual damage is checked against it.
     const crit = toHit.natural === 20;
     const damage = dice.evaluate(env, {
-      expression: crit ? critExpression(attack.damage) : attack.damage,
+      expression: crit ? critExpression(dmgSpec.expression) : dmgSpec.expression,
       mode: "normal",
-      category: "damage",
-      label: `${attack.name} damage`,
+      category: dmgSpec.category,
+      label: dmgSpec.label,
       actor,
       manual: input.manual?.[1],
       source: "cbt",

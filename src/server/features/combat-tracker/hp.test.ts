@@ -304,10 +304,22 @@ describe("FR-CBT-20 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
         }),
       ).code,
     ).toBe("not_found");
-    // PC targets need characters.adjustHp (character-sheet): rejected, nothing written.
+    // Rollback: a failing apply (card of another kind) writes nothing.
     const rows = t.hpRows().length;
     const entries = t.count("game_log_entry");
-    expect(t.err(() => t.apply(r2.cardId, "Mira")).code).toBe("conflict");
+    const other = t.run<{ id: string }>("note.testSend", { text: "x", actionLabel: "Go" });
+    expect(
+      t.err(() =>
+        t.run(applyCard.name, {
+          cardId: other.id,
+          targetId: t.id("Goblin"),
+          toHitTotal: 1,
+          hit: true,
+          damageTotal: 1,
+          multiplier: "normal",
+        }),
+      ).code,
+    ).toBe("not_found");
     expect(t.hpRows()).toHaveLength(rows);
     expect(t.count("game_log_entry")).toBe(entries);
     expect(t.card(r2.cardId)?.state).toBe("pending");
@@ -318,6 +330,54 @@ describe("FR-CBT-20 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
     t.run("note.dismiss", { id: r2.cardId });
     expect(t.card(r2.cardId)?.state).toBe("dismissed");
     expect(t.err(() => t.run(applyCard.name, {}, t.p1)).code).toBe("forbidden");
+  });
+});
+
+describe("FR-CBT-22 PC targets via characters.adjustHp", () => {
+  const miraHp = (t: ReturnType<typeof started>) =>
+    t.s.db.$client
+      .query<{ hp: number }, [string]>("select hp_current as hp from entity where id = ?")
+      .get(t.miraId)?.hp;
+
+  test("FR-CBT-22 apply to Mira: character HP, entity change in the event; owner full, others no HP", () => {
+    const t = started();
+    const r = t.attack("Goblin", 15, 4); // 19 to hit vs AC 16, 6 damage
+    t.apply(r.cardId, "Mira");
+    expect(miraHp(t)).toBe(6);
+    expect(t.hpRows()[0]).toMatchObject({
+      targetAc: 16,
+      hpBefore: 12,
+      hpAfter: 6,
+      applied: 6,
+      targetEntityId: t.miraId,
+    });
+    const ev = t.events.find((e) => e.event.type === "AttackApplied")?.event;
+    const ent = ev?.changes.find((c) => c.type === "entity");
+    expect(ent?.id).toBe(t.miraId);
+    const owner = t.s.records.filterChange(ent as never, t.h.viewer("player", t.h.p1.id));
+    expect(owner?.data).toMatchObject({ hpCurrent: 6 });
+    const other = t.s.records.filterChange(ent as never, t.h.viewer("player", t.h.p2.id));
+    expect(JSON.stringify(other)).not.toContain("hpCurrent");
+  });
+
+  test("FR-CBT-25 undo after a sheet heal restores only its own delta, clamped (I2)", () => {
+    const t = started();
+    const r = t.attack("Goblin", 15, 4);
+    t.apply(r.cardId, "Mira"); // 12 → 6
+    t.run("char.adjustHp", { characterId: t.miraId, delta: 3 }, t.p1); // 9, not a combat log entry
+    expect(t.hpRows()).toHaveLength(1);
+    t.undo(); // +6 → 15, clamped 12
+    expect(miraHp(t)).toBe(12);
+    expect(t.card(r.cardId)?.state).toBe("pending");
+  });
+
+  test("FR-CBT-22 PC overkill; heal at full → no entity change, applied 0", () => {
+    const t = started();
+    t.run(applyHp.name, { combatantId: t.id("Thorn"), kind: "heal", amount: 5 });
+    expect(t.hpRows()[0]).toMatchObject({ applied: 0, hpBefore: 10, hpAfter: 10 });
+    expect(t.events.at(-1)?.event.changes.some((c) => c.type === "entity")).toBe(false);
+    t.run(applyHp.name, { combatantId: t.id("Thorn"), kind: "damage", amount: 25 });
+    expect(t.hpRows()[1]).toMatchObject({ applied: 10, overkill: 15, hpAfter: 0 });
   });
 });
 

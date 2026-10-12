@@ -19,8 +19,8 @@ const send = (name: string, payload: unknown) => {
 };
 
 describe("FR-CHAR-16 roll routing", () => {
-  test("FR-CHAR-16 empty registry → char.roll with the roll control's input", async () => {
-    expect(rollRoutes).toEqual([]);
+  test("FR-CHAR-16 no route claims (no encounter) → char.roll with the roll control's input", async () => {
+    expect(routeFor(rollRoutes, emptyStore(), "mira", "initiative")).toBeNull();
     sent.length = 0;
     const claim = routeFor(rollRoutes, emptyStore(), "mira", "attack");
     expect(claim).toBeNull();
