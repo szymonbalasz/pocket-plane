@@ -35,6 +35,8 @@ export interface RunningServer {
   services: Services;
   hub: Hub;
   server: Server<WsData>;
+  /** Removes server.lock now (one rmSync). Idempotent; stopSync calls it too. */
+  releaseLock(): void;
   /** Closes connections, DB and releases the lock without awaiting anything. */
   stopSync(): void;
   stop(): Promise<void>;
@@ -141,6 +143,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
       services,
       hub,
       server,
+      releaseLock: () => lock?.release(),
       stopSync,
       async stop() {
         stopSync();

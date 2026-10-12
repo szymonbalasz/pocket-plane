@@ -3,12 +3,12 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { Subprocess } from "bun";
 import { library } from "../fixtures";
 import { parseConfig, WORKTREE_ROOT } from "../src/server/config";
 import { resetAndLoad } from "../src/server/features/fixtures-adapters/loader";
 import { readLock } from "../src/server/runtime/lock";
 import { manifestPath } from "../src/server/runtime/manifest";
+import { type ServerProcess, spawnServer } from "./lib/server-process";
 
 const BUNDLE = "sync-probe";
 
@@ -34,19 +34,12 @@ const env: Record<string, string | undefined> = {
   PP_PUBLIC_BASE_URL: "",
 };
 
-let server: Subprocess | null = null;
+let server: ServerProcess | null = null;
 let code = 1;
 try {
   const config = parseConfig(env);
   await resetAndLoad(config, library, BUNDLE);
-  server = Bun.spawn(["bun", "src/server/index.ts", "--client"], {
-    cwd: WORKTREE_ROOT,
-    env,
-    stdout: "inherit",
-    stderr: "inherit",
-    ipc() {},
-    serialization: "json",
-  });
+  server = spawnServer(["--client"], { env });
   let port: number | null = null;
   for (let i = 0; i < 100 && port === null; i++) {
     await Bun.sleep(100);
@@ -63,15 +56,8 @@ try {
 } catch (err) {
   console.error(err);
 } finally {
-  if (server) {
-    // Clean stop over IPC (removes server.lock); hard kill only if it hangs.
-    try {
-      server.send({ type: "shutdown" });
-    } catch {}
-    const t = setTimeout(() => server?.kill(), 3000);
-    await server.exited;
-    clearTimeout(t);
-  }
+  // Clean stop (removes server.lock); hard kill only if it hangs.
+  await server?.stop();
   rmSync(dir, { recursive: true, force: true });
 }
 process.exit(code);

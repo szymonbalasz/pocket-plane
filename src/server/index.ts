@@ -23,21 +23,29 @@ async function main(): Promise<void> {
     log.warn("PP_PUBLIC_BASE_URL is not set: player links use the DM client's origin.");
   }
 
-  // Clean exit removes server.lock (AGENTS §9.2). Fully synchronous so a Windows console
-  // Ctrl+C can't kill the process between "shutting down" and the lock removal.
+  // Clean exit removes server.lock (AGENTS §9.2). On Windows a console Ctrl+C also reaches
+  // `bun run`, which exits at once and takes this child process down with it within a few
+  // ms. So the lock goes first, synchronously, before logging or any other cleanup.
   const stop = (reason: string) => {
-    log.info(`${reason}: shutting down`);
+    running.releaseLock();
+    try {
+      log.info(`${reason}: shutting down`);
+    } catch {
+      // stdout may be a pipe whose reader is already gone
+    }
     running.stopSync();
     process.exit(0);
   };
   process.on("SIGINT", () => stop("SIGINT"));
   process.on("SIGTERM", () => stop("SIGTERM"));
   process.on("SIGBREAK", () => stop("SIGBREAK"));
-  // `scripts/dev.ts` / `scripts/e2e.ts` ask for a clean stop over IPC (Windows has no
-  // catchable kill signal for child processes).
-  process.on("message", (m: unknown) => {
-    if ((m as { type?: unknown } | null)?.type === "shutdown") stop("shutdown request");
-  });
+  // Supervised mode (scripts/lib/server-process.ts): stdin is a pipe from the supervisor;
+  // it closes when the supervisor asks for a stop or dies (e.g. `bun run` killed by Ctrl+C).
+  if (process.argv.includes("--stop-on-stdin-close")) {
+    process.stdin.on("end", () => stop("supervisor closed stdin"));
+    process.stdin.on("close", () => stop("supervisor closed stdin"));
+    process.stdin.resume();
+  }
   // Any other process.exit still releases the lock (idempotent).
   process.on("exit", () => running.stopSync());
   // Hard kills leave a lock whose PID is dead; the next start clears it (FR-FIX-27).
