@@ -37,6 +37,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Import pipeline** | Fixed core: validate normalised records → upsert by (source, sourceKey) → provenance. Fed by adapters. | Adapter |
 | **Clone** | A campaign-owned copy of a compendium entry, editable without affecting the original. | — |
 | **Homebrew** | DM-authored content not from an external source. | — |
+| **Gem** | Homebrew reward the DM awards to a character (Inspiration, Fortune, Combat, Divine Knowledge, Action); spent for an effect. Post-MVP ([gems](specs/post-mvp/gems.md)). | Homebrew |
 | **Cross-reference** | A link from one entity/entry to another. Model is open ([ADR-0011](architecture/adr/0011-cross-references.md)). | — |
 | **Asset** | An uploaded binary (map image, portrait, handout), stored content-hashed. | Entity |
 | **Derivative** | A generated variant of an asset (thumbnail, resized, format-converted). | — |
