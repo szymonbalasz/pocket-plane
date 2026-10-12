@@ -10,9 +10,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | `fix/scenes-core` (ADR-0026 signals, CON-22 scene filter on live events, CON-23 active-scene hook, CON-18–33 doc cleanup, reconnect cap 1.5 s #131) | `build-scenes-core` (`wS:p2`) | `wS`, `fix/scenes-core`, slot 0 | building | — |
 | Spec character-sheet | — (ended) | draft merged to `main` | in-review | batch review with the other Combat specs |
-| Spec dice-roll-log | `spec-dice-roll-log` (`wV:p3`) | `wV`, `spec/dice-roll-log` | writing | — |
-| Spec notifications | `spec-notifications` (`wW:p2`) | `wW`, `spec/notifications` | writing | — |
+| Spec dice-roll-log | — (ended) | draft merged to `main` (+ proposed ADR windowed record types) | in-review | batch review |
+| Spec notifications | — (ended) | draft merged to `main` (+ proposed ADR notification creation) | in-review | batch review |
 | Spec combat-tracker | `spec-combat-tracker` (`wX:p2`) | `wX`, `spec/combat-tracker` | writing | revision pass after dice-roll-log + notifications drafts merge |
+| Review character-sheet + dice-roll-log + notifications | `review-combat-1` (`wR:pH`, tab reviews) | read-only on `main` | reviewing | — |
 | Scenes builds: play-shell → assets-pipeline → entities → scenes-map | — | — | queued | `fix/scenes-core` merge |
 
 Walkthrough evidence archived outside the repo: `%TEMP%\opencode\verify-skeleton\`.
