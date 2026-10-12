@@ -2,18 +2,18 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 2 — consolidation (foundation) + Scenes specs; skeleton build next
+**Phase:** 2 — Skeleton build (Foundation) + Scenes specs (spec / review)
 
 **Herdr:** orchestrator workspace `wR` (pane `wR:p1`). Always `herdr worktree create --workspace wR …` ([prompt §3](orchestrator-prompt.md#3-herdr)). Clean up worktrees after merge.
 
 | Task | Agent | Workspace / branch | State | Blockers |
 |---|---|---|---|---|
-| Consolidate foundation (data model + protocol) | review-consolidate (`w13:p2`) | `w13` / `spec/consolidate-foundation` | working | — |
-| Spec assets-pipeline | spec-assets-pipeline (`w14:p2`) | `w14` / `spec/assets-pipeline` | working | — |
-| Spec entities | spec-entities (`w15:p2`) | `w15` / `spec/entities` | working | — |
-| Spec play-shell | spec-play-shell (`w16:p2`) | `w16` / `spec/play-shell` | working | — |
-| Skeleton build | — | `build/skeleton` (not created) | queued | consolidation merged |
-| Spec scenes-map | — | — | queued | assets, entities, play-shell drafts |
+| Skeleton build | build-skeleton (`w17:p2`) | `w17` / `build/skeleton` | working | — |
+| Spec scenes-map | spec-scenes-map (`w18:p2`) | `w18` / `spec/scenes-map` | working | — |
+| Review assets-pipeline | review-assets-pipeline (`wR:p9`) | `main` (read-only) | working | — |
+| Review entities | review-entities (`wR:pA`) | `main` (read-only) | working | — |
+| Review play-shell | — | — | queued | slot |
+| Spec assets-pipeline, entities, play-shell | — (ended) | merged to `main` | in-review | reviews → DM gate |
 
 ## Risks
 
@@ -21,4 +21,5 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Resolved locally (report at gate)
 
-- ADR to-dos in 0002/0008/0017 now point to AGENTS.md §9.
+- ADR to-dos in 0002/0008/0017 point to AGENTS.md §9.
+- Foundation consolidation conflicts CON-01–17 resolved (#118); CON-03: pipeline core against a test-only kind, entities adds the table.
