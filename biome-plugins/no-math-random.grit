@@ -1,0 +1,7 @@
+// Server code gets randomness only from ctx (ids, tokens, dice): FR-DICE-03, AGENTS §9.3.
+// Scoped in biome.json to server-side paths; the client reconnect backoff may use Math.random.
+language js
+
+`Math.random` as $random where {
+  register_diagnostic(span=$random, message="No Math.random in server code: use ctx.dice / ctx.ids / ctx.tokens (FR-DICE-03, AGENTS §9.3).", severity="error")
+}
