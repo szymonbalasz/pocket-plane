@@ -155,3 +155,12 @@ Append-only. One line per decision. Written by the integrator at merge ([process
 | 117 | ADRs 0019–0022 accepted (auth credentials, single active campaign, sync protocol conventions, deterministic seams); foundation specs complete | Phase 1 gate | [ADR index](architecture/adr/README.md) |
 | 118 | Foundation consolidation conflicts CON-01–17 resolved by the integrator (protocol details: `Authorization: Bearer` DM secret, REST error body, `4408` heartbeat close, frame field `type`, event-log `seq`, …); skeleton builds the import pipeline core against a test-only kind, entities adds the definition table in Scenes | Technical gaps, no product impact; unblocks the skeleton | [protocol](protocol/README.md#11-conflicts-log), [data model](data-model/README.md#8-conflicts-log) |
 | 119 | Extra deps approved for the skeleton: `@vitejs/plugin-react`, `@tailwindcss/vite` (Tailwind v4), `@types/bun`, `@types/react`, `@types/react-dom`; shadcn's usual deps, `react-dom`, `@playwright/test` count as covered; SQLite via `bun:sqlite` | Standard plugins for the ADR-0001 stack | [0001](architecture/adr/0001-tech-stack.md) |
+## Scenes spec gate
+
+| # | Decision | Rationale | Ref |
+|---|---|---|---|
+| 120 | Monster definitions hidden from players; tokens carry read-only copies of display name, image and size, refreshed in the same transaction as a definition edit (refines ADR-0009) | Don't leak prepped monsters; still no inline stat editing | [entities](specs/entities.md), [0009](architecture/adr/0009-entity-content-model.md) |
+| 121 | Window layout persisted in browser storage, keyed by player link / DM | Survives reload and crash; avoids server sync edge cases; cross-browser restore not needed | [play-shell](specs/play-shell.md) |
+| 122 | DM can view and prep a non-active scene while players see the active one (tier A pulled into MVP) | Near-free with the active-scene model | [scenes-map](specs/scenes-map.md) |
+| 123 | Player image access: random unguessable asset IDs are the capability; players learn IDs only via filtered sync | Same practical protection; no player REST credential or custom loader | [assets-pipeline](specs/assets-pipeline.md) |
+| 124 | Accepted: shared creature core (OQ-ENT-04); ruler 5 ft per diagonal (OQ-MAP-01); one owner per token, DM reassigns (OQ-MAP-02); tokens per scene, combatant-on-token-delete rule owned by combat-tracker (OQ-MAP-03) | Agents' picks | [gate](agents/gate-phase2-scenes.md) |
