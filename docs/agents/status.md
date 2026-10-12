@@ -9,7 +9,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Agent | Workspace / branch | State | Blockers |
 |---|---|---|---|---|
 | Skeleton (Foundation build) | — (ended) | merged to `main` (`f0592c1`) | check 96 tests, build, e2e green; walkthroughs 8/8, 9/9, 15/15 | DM run |
-| `fix/scenes-core` (ADR-0026 signals, CON-22 scene filter on live events, CON-23 active-scene hook, CON-18–33 doc cleanup) | — | — | queued | DM gate |
+| `fix/scenes-core` (ADR-0026 signals, CON-22 scene filter on live events, CON-23 active-scene hook, CON-18–33 doc cleanup, reconnect cap 1.5 s #131) | — | — | queued | DM gate |
 | Scenes builds: play-shell → assets-pipeline → entities → scenes-map | — | — | queued | `fix/scenes-core` |
 | Combat specs (character-sheet, dice-roll-log, notifications, combat-tracker) | — | — | queued | DM go |
 
@@ -17,7 +17,7 @@ Walkthrough evidence archived outside the repo: `%TEMP%\opencode\verify-skeleton
 
 ## Pending DM decisions
 
-- Reconnect target: live-sync §3 goal "live ≤ 2 s after the server is reachable" vs FR-SYNC-05 backoff cap 5 s (measured up to 5.3 s). Pick: lower the cap to 1.5 s.
+- None (reconnect cap decided, #131; built in `fix/scenes-core`).
 
 ## Resolved locally (report at gate)
 

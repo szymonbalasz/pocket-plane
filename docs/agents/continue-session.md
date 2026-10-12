@@ -19,12 +19,12 @@ You are the **orchestrator and integrator** for Pocket Plane. Your full role, ru
 | Decisions | Logged up to #130 in [decisions-log](../decisions-log.md). |
 | Worktrees | None besides `main`. `main` has its own `.env` (slot 1: dev 4110/4111, verify 4112). |
 
-**Waiting on the DM:**
-1. DM runs the skeleton with [demo-skeleton.md](demo-skeleton.md) and says go.
-2. Reconnect time: live-sync §3 wants "live ≤ 2 s after the server is reachable"; FR-SYNC-05 backoff caps at 5 s (measured up to 5.3 s). Pick: lower the cap to 1.5 s (spec + code change).
+**Waiting on the DM:** runs the skeleton with [demo-skeleton.md](demo-skeleton.md) and says go.
+
+**Decided (#131):** lower the reconnect backoff cap from 5 s to 1.5 s, so players are live ≤ 2 s after the server is reachable (live-sync §3). Done in `fix/scenes-core` (below).
 
 **Next, in order, after "go":**
-1. `fix/scenes-core` (one builder; shared files): ADR-0026 signal routing (server stamps sender, DM-only `map.pull`, receivers filter by scene); CON-22 (`sceneOf(record)` in record-type registration, scene filter on live events, not only snapshots — otherwise DM edits on an inactive scene leak to players); CON-23 (hook after commit, before listeners, for the active-scene cache); CON-24/25 + remaining open CON-18–33 rows in data-model §8 / protocol §11; the reconnect cap if approved. Walkthrough with the sync-probe bundle, merge.
+1. `fix/scenes-core` (one builder; shared files): ADR-0026 signal routing (server stamps sender, DM-only `map.pull`, receivers filter by scene); CON-22 (`sceneOf(record)` in record-type registration, scene filter on live events, not only snapshots — otherwise DM edits on an inactive scene leak to players); CON-23 (hook after commit, before listeners, for the active-scene cache); CON-24/25 + remaining open CON-18–33 rows in data-model §8 / protocol §11; **reconnect time (#131):** FR-SYNC-05 in [live-sync](../specs/live-sync.md) is already updated on `main` (backoff 0.5 s doubling to a **1.5 s** cap, ±20 % jitter; immediate retry on focus/visible/online). The builder changes the client backoff constant and any server-side assumptions, with a test asserting the cap. Walkthrough with the sync-probe bundle must measure rejoin after a hard kill + restart: **≤ 2 s after the server answers**, DM and both players; record times in `report.md`. Then merge.
 2. Scenes builders in this order (shared registries are append-only, AGENTS §9.9): **play-shell** (creates the window registries) → **assets-pipeline** → **entities** (adds the real definition table; plugs into the import pipeline via `services.imports`) → **scenes-map**. Max 4 working agents total; sequence shared-file changes per AGENTS §9.9.
 3. In parallel when slots allow: **Combat specs** (character-sheet, dice-roll-log, notifications, combat-tracker) through the per-phase cycle: spec → review → DM gate → revise → consolidate. Open questions already waiting for combat-tracker: OQ-MAP-03/11/21, OQ-ENT-10/15, OQ-CHAR-04.
 4. Scenes gate: demo script for the DM (town → battlemap, tokens moved by DM and player, hidden token revealed).
