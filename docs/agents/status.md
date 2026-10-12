@@ -16,9 +16,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 Walkthrough evidence archived outside the repo: `%TEMP%\opencode\verify-skeleton\`, `%TEMP%\opencode\verify-scenes-core\`.
 
+## Shared-file locks (AGENTS §9.9, sequenced)
+
+- `build/assets-pipeline`: `src/server/db/schema.ts`, `src/shared/events/` (+ index), `src/server/http.ts` (dmCampaign, CON-21), `src/server/services.ts` + `server.ts` (onStart), fixtures loader (async steps), `fixtures/bundles/session-sim.ts`, data-model §10/13, protocol §13/14/19.
+- `build/play-shell`: `src/client/{dm,player}/App.tsx`, `e2e/foundation.e2e.ts`, protocol §18. Creates window registries.
+
 ## Pending DM decisions
 
-- Combat gate: [gate-phase3-combat](gate-phase3-combat.md) §1 (8 blocking), §2.1 (8 product picks), §2.2 (20 bulk-accept). B4/B5 change scenes-map; needed before `build/scenes-map`.
+- Combat gate: [gate-phase3-combat](gate-phase3-combat.md) §1 (8 blocking), §2.1 (8 product picks), §2.2 (20 bulk-accept). B4/B5 decided (#134).
 
 ## Resolved locally (report at gate)
 
