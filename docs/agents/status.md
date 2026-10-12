@@ -8,7 +8,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Agent | Workspace / branch | State | Blockers |
 |---|---|---|---|---|
-| `fix/scenes-core` (ADR-0026 signals, CON-22 scene filter on live events, CON-23 active-scene hook, CON-18–33 doc cleanup, reconnect cap 1.5 s #131) | `build-scenes-core` (`wS:p2`) | `wS`, `fix/scenes-core`, slot 0 | building | — |
+| `fix/scenes-core` (ADR-0026 signals, CON-22 scene filter on live events, CON-23 active-scene hook, CON-18–33 doc cleanup, reconnect cap 1.5 s #131) | `build-scenes-core` (`wS:p2`), `test-scenes-core` (`wS:p3`, server pane `wS:p4`) | `wS`, `fix/scenes-core`, slot 0 | 5 slices done, check/build/e2e green; reconnect walkthrough running | — |
 | Spec character-sheet | — (ended) | draft merged to `main` | in-review | batch review with the other Combat specs |
 | Spec dice-roll-log | — (ended) | draft merged to `main` (+ proposed ADR windowed record types) | in-review | batch review |
 | Spec notifications | — (ended) | draft merged to `main` (+ proposed ADR notification creation) | in-review | batch review |
