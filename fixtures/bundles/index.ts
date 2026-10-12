@@ -7,6 +7,7 @@ import campaignSwitch from "./campaign-switch";
 import combat from "./combat";
 import diceLog from "./dice-log";
 import entities from "./entities";
+import midCombat from "./mid-combat";
 import notifications from "./notifications";
 import scenes from "./scenes";
 import sessionSim from "./session-sim";
@@ -24,4 +25,5 @@ export const bundles: readonly Bundle[] = [
   notifications,
   diceLog,
   combat,
+  midCombat,
 ];
