@@ -114,6 +114,14 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
         dispatch={dispatch}
       />
 
+      {/* Companions: mounted while their kind is available, open or not (e.g. toasts). */}
+      {registry.defs.map((d) => {
+        const Companion = d.companion;
+        return Companion && available.has(d.kind) ? (
+          <Companion key={`companion:${d.kind}`} />
+        ) : null;
+      })}
+
       <div className="absolute inset-x-0 z-30 bg-background/90" style={{ top: TOP_BAR_H }}>
         <ReconnectBanner />
       </div>

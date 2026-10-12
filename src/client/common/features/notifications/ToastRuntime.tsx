@@ -1,0 +1,224 @@
+// Always-mounted notifications runtime (FR-NOTE-13/14/15/18): watches sync changes, keeps the
+// toast stack in the shell's bottom-right toast region, sets the seen baseline. Toasts and timers
+// are client memory only.
+import type { NotificationRecord } from "@shared/notifications/schemas";
+import { XIcon } from "lucide-react";
+import { useContext, useEffect, useReducer, useRef } from "react";
+import { Button } from "../../components/ui/button";
+import { SyncContext, useSync } from "../../sync/store";
+import { useOpenWindow } from "../play-shell/ShellContext";
+import {
+  actionButton,
+  classify,
+  HISTORY_KIND,
+  NOTIFICATION_TYPE,
+  type SyncView,
+  summaryCount,
+  summaryText,
+  toastTriggers,
+  viewerOf,
+} from "./logic";
+import type { NoteClient } from "./note-client";
+import { NoteBody, useNoteActions } from "./parts";
+import {
+  addNote,
+  advance,
+  clearToasts,
+  closeToast,
+  initialToasts,
+  nextExpiry,
+  pruneToasts,
+  SUMMARY_KEY,
+  setHidden,
+  setHovered,
+  setSummary,
+  type Toast,
+  type ToastState,
+  visibleToasts,
+} from "./toasts";
+import type { NotificationViews } from "./views";
+
+type Action = (s: ToastState, now: number) => ToastState;
+const reducer = (s: ToastState, a: Action) => a(s, Date.now());
+const hiddenNow = () => typeof document !== "undefined" && document.visibilityState === "hidden";
+
+function NoteToast({
+  t,
+  n,
+  views,
+  actions,
+  onClose,
+}: {
+  t: Extract<Toast, { kind: "note" }>;
+  n: NotificationRecord;
+  views: NotificationViews;
+  actions: ReturnType<typeof useNoteActions>;
+  onClose: () => void;
+}) {
+  const you = useSync((s) => s.store.you);
+  const live = useSync((s) => s.state === "live");
+  const mode = you
+    ? actionButton(n, { role: you.role, playerId: you.playerId }, live, views.get(n.kind))
+    : "none";
+  return (
+    <div
+      role="status"
+      data-testid="note-toast"
+      data-record-id={n.id}
+      data-state={n.state}
+      data-sticky={t.sticky}
+      className="pointer-events-auto flex flex-col gap-2 rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg"
+    >
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <NoteBody n={n} views={views} />
+        </div>
+        <button
+          type="button"
+          data-testid="note-toast-close"
+          aria-label="Close"
+          className="rounded-sm text-muted-foreground hover:text-foreground"
+          onClick={onClose}
+        >
+          <XIcon className="size-4" />
+        </button>
+      </div>
+      {mode !== "none" && (
+        <Button
+          size="sm"
+          className="self-end"
+          data-testid="note-toast-action"
+          disabled={mode === "disabled" || actions.busy.has(n.id)}
+          onClick={() => void actions.run(n)}
+        >
+          {n.actionLabel}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+export function ToastRuntime({ views, note }: { views: NotificationViews; note: NoteClient }) {
+  const sync = useContext(SyncContext);
+  const openWindow = useOpenWindow();
+  const [state, dispatch] = useReducer(reducer, undefined, () =>
+    initialToasts(Date.now(), hiddenNow()),
+  );
+  const rows = useSync((s) => s.store.records[NOTIFICATION_TYPE]) as
+    | Record<string, NotificationRecord>
+    | undefined;
+  const actions = useNoteActions(views);
+  const campaignRef = useRef<string | null>(null);
+
+  // Sync changes, in order (zustand calls this synchronously for every applied frame).
+  useEffect(() => {
+    if (!sync) return;
+    const onChange = (next: SyncView, prev: SyncView | null) => {
+      const t = classify(prev, next);
+      if (t === null) return;
+      const store = next.store;
+      if (t === "connect") {
+        const cid = store.you?.campaignId ?? null;
+        if (cid !== campaignRef.current) dispatch(clearToasts);
+        campaignRef.current = cid;
+        note.baseline(store);
+        const n = summaryCount(t, store);
+        dispatch((s, now) => setSummary(s, n, now));
+      }
+      for (const created of toastTriggers(prev, next, t)) {
+        dispatch((s, now) => addNote(s, created, now));
+      }
+      dispatch((s, now) => pruneToasts(s, store, now));
+      note.markSeen(store);
+    };
+    const first = sync.getState();
+    // Mounted after the first snapshot (loading screen first): treat it as the connect.
+    if (first.state === "live" && viewerOf(first.store)) onChange(first, null);
+    return sync.subscribe((next, prev) => onChange(next, prev));
+  }, [sync, note]);
+
+  // Info toast expiry.
+  const wait = nextExpiry(state);
+  useEffect(() => {
+    if (wait === null) return;
+    const h = setTimeout(() => dispatch(advance), Math.max(0, wait) + 10);
+    return () => clearTimeout(h);
+  }, [wait]);
+
+  // FR-NOTE-14: timers pause while the tab is hidden.
+  useEffect(() => {
+    const on = () => dispatch((s, now) => setHidden(s, hiddenNow(), now));
+    document.addEventListener("visibilitychange", on);
+    return () => document.removeEventListener("visibilitychange", on);
+  }, []);
+
+  const openHistory = () => openWindow(HISTORY_KIND);
+  const { shown, more } = visibleToasts(state);
+  if (state.toasts.length === 0) return null;
+  return (
+    <section
+      aria-label="Notifications"
+      data-testid="note-toasts"
+      className="pointer-events-none fixed right-4 bottom-4 z-40 flex w-80 flex-col gap-2"
+      onMouseEnter={() => dispatch((s, now) => setHovered(s, true, now))}
+      onMouseLeave={() => dispatch((s, now) => setHovered(s, false, now))}
+    >
+      {more > 0 && (
+        <button
+          type="button"
+          data-testid="note-toast-more"
+          className="pointer-events-auto self-end rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow"
+          onClick={openHistory}
+        >
+          +{more} more
+        </button>
+      )}
+      {shown.map((t) => {
+        if (t.kind === "summary") {
+          return (
+            <div
+              key={SUMMARY_KEY}
+              role="status"
+              data-testid="note-toast-pending-summary"
+              data-count={t.count}
+              className="pointer-events-auto flex items-center gap-2 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-lg"
+            >
+              <span className="flex-1">{summaryText(t.count)}</span>
+              <Button
+                size="sm"
+                data-testid="note-toast-open"
+                onClick={() => {
+                  openHistory();
+                  dispatch((s, now) => closeToast(s, SUMMARY_KEY, now));
+                }}
+              >
+                Open
+              </Button>
+              <button
+                type="button"
+                data-testid="note-toast-close"
+                aria-label="Close"
+                className="rounded-sm text-muted-foreground hover:text-foreground"
+                onClick={() => dispatch((s, now) => closeToast(s, SUMMARY_KEY, now))}
+              >
+                <XIcon className="size-4" />
+              </button>
+            </div>
+          );
+        }
+        const n = rows?.[t.notificationId];
+        if (!n) return null;
+        return (
+          <NoteToast
+            key={t.key}
+            t={t}
+            n={n}
+            views={views}
+            actions={actions}
+            onClose={() => dispatch((s, now) => closeToast(s, t.key, now))}
+          />
+        );
+      })}
+    </section>
+  );
+}
