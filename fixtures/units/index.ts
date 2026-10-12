@@ -7,6 +7,8 @@ import campaign from "./campaign-management/campaign";
 import campaignSecond from "./campaign-management/campaign-second";
 import player1 from "./campaign-management/player-1";
 import player2 from "./campaign-management/player-2";
+import diceSettings from "./dice-roll-log/dice-settings";
+import rolls1 from "./dice-roll-log/rolls-1";
 import charMira from "./entities/char-mira";
 import charThorn from "./entities/char-thorn";
 import enemy1 from "./entities/enemy-1";
@@ -30,4 +32,6 @@ export const units: readonly Fixture[] = [
   charMira,
   charThorn,
   enemyCustomSecond,
+  diceSettings,
+  rolls1,
 ];

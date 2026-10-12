@@ -2,6 +2,7 @@
 import type { Feature } from "../services";
 import { assetsPipeline } from "./assets-pipeline";
 import { campaignManagement } from "./campaign-management";
+import { diceRollLog } from "./dice-roll-log";
 import { entities } from "./entities";
 import { fixturesAdapters } from "./fixtures-adapters";
 import { liveSync } from "./live-sync";
@@ -12,4 +13,5 @@ export const features: readonly Feature[] = [
   fixturesAdapters,
   assetsPipeline,
   entities,
+  diceRollLog,
 ];
