@@ -1,6 +1,6 @@
 import { expect, mock, test } from "bun:test";
 import { emptyStore } from "@shared/protocol/store";
-import { clampRect } from "@ui/features/play-shell/geometry";
+import { clampRect, defaultRect, TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { availableKinds } from "@ui/features/play-shell/registry";
 
@@ -23,13 +23,39 @@ test("FR-SHELL-21 DM registers camp.players, open by default, top-right", () => 
   expect(players?.launcher?.label).toBe("Players");
 });
 
-test("FR-SHELL-08 DM defaults don't overlap with every window open (1280×720, 1600×900)", () => {
-  const available = availableKinds(dmWindows, testMode);
-  for (const viewport of [
-    { w: 1280, h: 720 },
-    { w: 1600, h: 900 },
-  ]) {
-    const ctx = { registry: dmWindows, viewport, available };
+const VIEWPORTS = [
+  { w: 1280, h: 720 },
+  { w: 1600, h: 900 },
+];
+
+/** Default-open windows + test-mode windows (on in test mode, off without it). */
+function packedKinds(): Set<string> {
+  const on = availableKinds(dmWindows, testMode);
+  const off = availableKinds(dmWindows, emptyStore());
+  const out = new Set<string>();
+  for (const kind of on) {
+    if (dmWindows.get(kind)?.defaultOpen || !off.has(kind)) out.add(kind);
+  }
+  return out;
+}
+
+test("FR-SHELL-08 every other DM window's default rect fits the viewport (1280×720, 1600×900)", () => {
+  const packed = packedKinds();
+  const others = dmWindows.defs.filter((d) => !packed.has(d.kind));
+  for (const viewport of VIEWPORTS) {
+    for (const d of others) {
+      const r = defaultRect(d.defaultPosition, d.defaultSize, viewport);
+      const fits =
+        r.x >= 0 && r.y >= TOP_BAR_H && r.x + r.w <= viewport.w && r.y + r.h <= viewport.h;
+      expect(fits ? "ok" : `${d.kind} leaves the viewport at ${viewport.w}`).toBe("ok");
+    }
+  }
+});
+
+test("FR-SHELL-08 DM default-open + test windows don't overlap (1280×720, 1600×900)", () => {
+  const available = packedKinds();
+  for (const viewport of VIEWPORTS) {
+    const ctx = { registry: dmWindows, viewport, available: availableKinds(dmWindows, testMode) };
     let ws = defaultLayout(dmWindows, viewport);
     for (const kind of available) ws = [...reduce(ws, { type: "open", kind }, ctx)];
     const rects = ws.map((w) => ({ kind: w.kind, ...clampRect(w, viewport) }));

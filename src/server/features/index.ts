@@ -2,6 +2,7 @@
 import type { Feature } from "../services";
 import { assetsPipeline } from "./assets-pipeline";
 import { campaignManagement } from "./campaign-management";
+import { entities } from "./entities";
 import { fixturesAdapters } from "./fixtures-adapters";
 import { liveSync } from "./live-sync";
 
@@ -10,4 +11,5 @@ export const features: readonly Feature[] = [
   liveSync,
   fixturesAdapters,
   assetsPipeline,
+  entities,
 ];
