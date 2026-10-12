@@ -15,7 +15,7 @@ import { TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { useBaseKeyDown } from "@ui/features/play-shell/hooks";
 import { BaseEmpty } from "@ui/features/play-shell/PlayFrame";
 import { toastReject, useLive, useMapIntent } from "@ui/features/scenes-map/intents";
-import { MapCanvas } from "@ui/features/scenes-map/MapCanvas";
+import { LazyMapCanvas as MapCanvas } from "@ui/features/scenes-map/LazyMapCanvas";
 import { ToolRail } from "@ui/features/scenes-map/ToolRail";
 import { useRecords } from "@ui/sync/store";
 import { EyeOffIcon } from "lucide-react";

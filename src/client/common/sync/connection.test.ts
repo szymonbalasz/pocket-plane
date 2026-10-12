@@ -159,16 +159,29 @@ test("FR-SYNC-05 a probe still in flight when stopped (or a stale one) never ope
   expect(sockets).toHaveLength(1);
 });
 
-test("FR-SYNC-05 httpProbe: reachable iff GET of the WS path answers 426", async () => {
+test("FR-SYNC-05 httpProbe: reachable iff GET <ws path>?probe=1 answers 204", async () => {
+  const seen: string[] = [];
   const mk = (status: number) =>
-    Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("", { status }) });
-  const ok = mk(426);
+    Bun.serve({
+      port: 0,
+      hostname: "127.0.0.1",
+      fetch: (req) => {
+        const u = new URL(req.url);
+        seen.push(`${u.pathname}${u.search}`);
+        return new Response(null, { status });
+      },
+    });
+  const ok = mk(204);
+  const upgradeRequired = mk(426);
   const proxyErr = mk(502);
   try {
     expect(await httpProbe(`ws://127.0.0.1:${ok.port}/ws`)).toBe(true);
+    expect(await httpProbe(`ws://127.0.0.1:${upgradeRequired.port}/ws`)).toBe(false);
     expect(await httpProbe(`ws://127.0.0.1:${proxyErr.port}/ws`)).toBe(false);
+    expect(seen).toEqual(["/ws?probe=1", "/ws?probe=1", "/ws?probe=1"]);
   } finally {
     ok.stop(true);
+    upgradeRequired.stop(true);
     proxyErr.stop(true);
   }
   const closedPort = proxyErr.port;
