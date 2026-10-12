@@ -2,24 +2,23 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 1 — final DM gate (approve conventions, set foundation specs complete)
+**Phase:** 2 — consolidation (foundation) + Scenes specs; skeleton build next
 
-**Herdr:** orchestrator workspace `wR` (pane `wR:p1`). Always `herdr worktree create --workspace wR …` ([prompt §3](orchestrator-prompt.md#3-herdr)).
+**Herdr:** orchestrator workspace `wR` (pane `wR:p1`). Always `herdr worktree create --workspace wR …` ([prompt §3](orchestrator-prompt.md#3-herdr)). Clean up worktrees after merge.
 
 | Task | Agent | Workspace / branch | State | Blockers |
 |---|---|---|---|---|
-| live-sync, campaign-management, fixtures-adapters | — (ended) | revision 2 on `main`; consistency pass on `spec/build-conventions` | in-review, 0 blocking OQs | DM: complete |
-| Build conventions (AGENTS.md §9) + glossary | — (ended) | `spec/build-conventions` (`wW`, unmerged) | revised, cross-checked | DM: approve |
-| Proposed ADRs ×4 | — | same branch | decisions filled in | DM: accept → I number 0019–0022 |
-
-Next on "go": merge `spec/build-conventions` → number ADRs → specs `complete` → `review-consolidate` (data model + protocol) → Phase 2 skeleton (`build/skeleton`), and start Scenes specs in parallel.
+| Consolidate foundation (data model + protocol) | review-consolidate (`w13:p2`) | `w13` / `spec/consolidate-foundation` | working | — |
+| Spec assets-pipeline | spec-assets-pipeline (`w14:p2`) | `w14` / `spec/assets-pipeline` | working | — |
+| Spec entities | spec-entities (`w15:p2`) | `w15` / `spec/entities` | working | — |
+| Spec play-shell | spec-play-shell (`w16:p2`) | `w16` / `spec/play-shell` | working | — |
+| Skeleton build | — | `build/skeleton` (not created) | queued | consolidation merged |
+| Spec scenes-map | — | — | queued | assets, entities, play-shell drafts |
 
 ## Risks
 
-- Claude token refresh rate limit interrupted 3 agents once; resumed fine.
+- Skeleton owns every shared file; no other `build/*` until it merges (AGENTS §9.9).
 
 ## Resolved locally (report at gate)
 
-- Decisions log #36 annotated; spec index by build phase (#107); builder brief event order; `--workspace` rule after a wrong-repo mix-up.
-- 30-item cross-spec consistency pass (timings, FR refs, fixture compositions, stale deps, glossary: 13 terms added, 3 reworded).
-- Gate defaults logged as #114.
+- ADR to-dos in 0002/0008/0017 now point to AGENTS.md §9.
