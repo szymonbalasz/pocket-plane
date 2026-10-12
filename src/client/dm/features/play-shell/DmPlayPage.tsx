@@ -10,6 +10,7 @@ import { ShellProvider, useOpenWindow } from "@ui/features/play-shell/ShellConte
 import { useRecords } from "@ui/sync/store";
 import { dmWindows } from "../../windows";
 import { CampaignBar } from "../campaign-management/CampaignBar";
+import { DmMapBase, DmMapToolRail } from "../scenes-map/DmMap";
 import { PLAYERS_KIND } from "./players-window";
 
 /** "N/M online", tooltip lists names; opens the Players window (FR-SHELL-06, OQ-SHELL-11). */
@@ -58,7 +59,8 @@ export function DmPlayPage({
               Log out
             </Button>
           }
-          // scenes-map: base layer + tool rail props go here (protocol §18).
+          base={<DmMapBase />}
+          toolRail={<DmMapToolRail />}
         />
       )}
     </ShellProvider>
