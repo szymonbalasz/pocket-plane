@@ -1,6 +1,6 @@
-# NNNN — Signal routing: sender stamp, DM-only pull, receiver scene filter
+# 0026 — Signal routing: sender stamp, DM-only pull, receiver scene filter
 
-- Status: proposed (decision per integrator ruling, [gate Scenes](../../agents/gate-phase2-scenes.md#integrator-rulings-no-dm-call-needed); integrator numbers it at merge)
+- Status: accepted (2026-10-12; decisions-log #125)
 - Date: 2026-10-12
 - Affects: [live-sync](../../specs/live-sync.md) (FR-SYNC-22), [protocol §3.3, §7](../../protocol/README.md#7-signals), [scenes-map](../../specs/scenes-map.md) (FR-MAP-23–25)
 - Amends: [ADR-0021](0021-sync-protocol-conventions.md) signal handling. Raised by [OQ-MAP-16](../../specs/scenes-map.md#15-open-questions).

@@ -28,6 +28,10 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0020](0020-single-active-campaign.md) | Several campaigns, one active per server | accepted |
 | [0021](0021-sync-protocol-conventions.md) | Sync protocol conventions | accepted |
 | [0022](0022-deterministic-seams.md) | Deterministic IDs, tokens and clock for fixtures and tests | accepted |
+| [0023](0023-asset-access-by-capability-id.md) | Asset access by capability ID | accepted |
+| [0024](0024-definition-visibility.md) | Creature definitions DM-only for players; instances carry read-only display copies | accepted (refines 0009) |
+| [0025](0025-play-shell-windows.md) | Feature UI as play-shell windows; layout in browser storage | accepted |
+| [0026](0026-signal-routing.md) | Signal routing: sender stamp, DM-only pull, receiver scene filter | accepted |
 
 ## Proposing a new ADR
 

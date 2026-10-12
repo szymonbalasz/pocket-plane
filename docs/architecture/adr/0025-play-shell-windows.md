@@ -1,6 +1,6 @@
-# NNNN — Feature UI as play-shell windows; layout in browser storage
+# 0025 — Feature UI as play-shell windows; layout in browser storage
 
-- Status: proposed
+- Status: accepted (2026-10-12; decisions-log #121)
 - Date: 2026-10-12
 - Affects: [play-shell](../../specs/play-shell.md), every spec with play UI ([scenes-map](../../specs/scenes-map.md), [entities](../../specs/entities.md), [assets-pipeline](../../specs/assets-pipeline.md), [character-sheet](../../specs/character-sheet.md), [dice-roll-log](../../specs/dice-roll-log.md), [combat-tracker](../../specs/combat-tracker.md), [notifications](../../specs/notifications.md), [party-loot](../../specs/party-loot.md)), [AGENTS.md §9.9](../../../AGENTS.md#99-shared-files)
 - Extends: [ADR-0014](0014-mvp-scope.md) (one play page, layout persisted per player). Raised by OQ-SHELL-01, OQ-SHELL-06, OQ-SHELL-07 in [play-shell](../../specs/play-shell.md#15-open-questions)

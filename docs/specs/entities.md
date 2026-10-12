@@ -1,7 +1,7 @@
 ---
 title: Entities (core)
 prefix: ENT
-status: in-review
+status: complete
 owner: spec-entities
 wave: 2
 ---
@@ -12,7 +12,7 @@ wave: 2
 
 - The **creature definition** contract that tokens, combatants and encounter entries point at. MVP kinds: `character`, `monster` ([ADR-0014](../architecture/adr/0014-mvp-scope.md)). One `entity` table, one shared zod creature core, same shape for SRD, custom and fixture ([ADR-0009](../architecture/adr/0009-entity-content-model.md), #124). Imported definitions are global and read-only; customs and characters belong to one campaign ([ADR-0018](../architecture/adr/0018-global-imported-content.md)).
 - **Schema ownership:** entities owns the creature core for both kinds. [character-sheet](character-sheet.md) may only add optional character fields; [combat-tracker](combat-tracker.md)'s creature form edits this schema and may show a subset.
-- Players never see monster definitions; instances carry read-only display copies, refreshed inside the edit's transaction (#120, [proposed ADR](../architecture/adr/proposed-definition-visibility.md)).
+- Players never see monster definitions; instances carry read-only display copies, refreshed inside the edit's transaction (#120, [ADR-0024]($10024-definition-visibility.md)).
 
 ## 2. Scope
 
@@ -49,7 +49,7 @@ wave: 2
 | FR-ENT-10 | Create character: `ownerPlayerId` must be a player of `ctx.campaignId`, else `invalid`; `hpCurrent = hpMax`. MVP callers: fixtures only (decisions #100). | |
 | FR-ENT-11 | Update replaces name, portrait, stat block and (characters) owner as a whole; name and portrait as FR-ENT-08, owner as FR-ENT-10. Kind, campaign, provenance, `derivedFromId` are immutable. `hpCurrent > hpMax` after update → clamped in the same transaction. | |
 | FR-ENT-12 | `resolveDefinition(ctx, id)` (server) returns a definition that is global or in `ctx.campaignId`, else `not_found`. Every command storing a definition reference uses it. | ADR-0018 |
-| FR-ENT-13 | Instances store the definition id plus only the display copies listed in the [proposed ADR](../architecture/adr/proposed-definition-visibility.md); no other stat-block fields. `effectiveStats(def, inst)` in `@shared/entities` returns `def.statBlock` in MVP. | Modifiers hook, tier A |
+| FR-ENT-13 | Instances store the definition id plus only the display copies listed in the [ADR-0024]($10024-definition-visibility.md); no other stat-block fields. `effectiveStats(def, inst)` in `@shared/entities` returns `def.statBlock` in MVP. | Modifiers hook, tier A |
 | FR-ENT-14 | No delete in MVP: no route or command deletes a definition. Typos are fixed by rename. *(proposed, OQ-ENT-07)* | ADR-0009 open row |
 | FR-ENT-15 | Visibility `entity`: DM full. Player: own character (`ownerPlayerId = ctx.playerId`) full; other characters redacted to `{id, kind, name, portraitAssetId, ownerPlayerId}`; monsters hidden. | #120 |
 | FR-ENT-16 | Visibility `imported-entity`: DM full; players hidden. | #120 |
@@ -183,7 +183,7 @@ wave: 2
 |---|---|---|---|---|
 | OQ-ENT-03 | Entities UI in MVP | **Read-only DM Creatures window (drag source, `creatureActions`)** / each feature builds its own picker | no (owner: spec-entities) | scenes-map, combat-tracker, play-shell |
 | OQ-ENT-04 | ~~Shared basics shape~~ | **Decided (#124):** one creature core (ADR-0009 storage A, #93) | — | — |
-| OQ-ENT-05 | ~~What players see of definitions~~ | **Decided (#120):** monsters hidden; own character full; others name, portrait, owner; instances carry display copies ([proposed ADR](../architecture/adr/proposed-definition-visibility.md)) | — | — |
+| OQ-ENT-05 | ~~What players see of definitions~~ | **Decided (#120):** monsters hidden; own character full; others name, portrait, owner; instances carry display copies ([ADR-0024]($10024-definition-visibility.md)) | — | — |
 | OQ-ENT-06 | Record types for two scopes | **Two types, one schema: `entity` (campaign), `imported-entity` (global)** / one type with per-record scope (registry change) | no (owner: spec-entities) | live-sync |
 | OQ-ENT-07 | Delete a custom definition (ADR-0009 open row) | **No delete in MVP** (rename covers typos; no FK coordination) / block while referenced / cascade | no (owner: spec-entities) | scenes-map, combat-tracker |
 | OQ-ENT-08 | Where PC current HP lives | **`hpCurrent` on `entity`; HP commands by combat-tracker / character-sheet** / separate state table | no (owner: character-sheet) | character-sheet, combat-tracker |

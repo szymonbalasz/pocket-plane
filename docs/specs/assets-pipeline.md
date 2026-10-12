@@ -1,7 +1,7 @@
 ---
 title: Assets pipeline
 prefix: ASSET
-status: in-review
+status: complete
 owner: spec-assets-pipeline
 wave: 1
 ---
@@ -12,7 +12,7 @@ wave: 1
 
 - Ingest, store and serve images: map images and token art/portraits ([ADR-0014](../architecture/adr/0014-mvp-scope.md)). One ingest command for DM uploads and fixture SVGs. Files content-hashed, derivatives via `sharp` ([ADR-0001](../architecture/adr/0001-tech-stack.md)).
 - Served from the DM's laptop over the tunnel ([ADR-0003](../architecture/adr/0003-local-hosting.md)): small WebP derivatives, browser-cached forever, never edge-cached.
-- **Player access: the random, unguessable asset ID is the capability; players learn IDs only through the filtered sync** (decided, #123; [proposed ADR](../architecture/adr/proposed-asset-access-by-reference.md)). Hidden tokens and inactive scenes never reveal their image IDs.
+- **Player access: the random, unguessable asset ID is the capability; players learn IDs only through the filtered sync** (decided, #123; [ADR-0023]($10023-asset-access-by-capability-id.md)). Hidden tokens and inactive scenes never reveal their image IDs.
 
 ## 2. Scope
 

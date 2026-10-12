@@ -68,3 +68,4 @@ graph LR
 - [ADR-0010](0010-compendium-design.md): imported entries immutable, edits only via derived customs → re-import never clobbers DM work.
 - Combat log records the **effective** values used at the time (stats stay correct after later definition edits).
 - No per-instance stat overrides to build, sync or explain.
+- **Refined by [ADR-0024](0024-definition-visibility.md):** instances also carry read-only display copies (image, size) refreshed in the definition edit's transaction. The display name is the instance's own (e.g. "Goblin 1", or renamed "Hugo"); definition edits never overwrite it.

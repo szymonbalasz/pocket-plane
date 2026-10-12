@@ -11,10 +11,10 @@ Template: [_template.md](_template.md). Specs are written just in time, per buil
 | 1. Foundation | [Live sync, reconnect, visibility](live-sync.md) | SYNC | complete | spec-live-sync |
 | 1. Foundation | [Campaign management](campaign-management.md) | CAMP | complete | spec-campaign-management |
 | 1. Foundation | [Fixtures and import pipeline core](fixtures-adapters.md) | FIX | complete | spec-fixtures-adapters |
-| 2. Scenes | [Assets pipeline](assets-pipeline.md) | ASSET | unclaimed | — |
-| 2. Scenes | [Entities (core)](entities.md) | ENT | unclaimed | — |
-| 2. Scenes | [Play shell](play-shell.md) | SHELL | unclaimed | — |
-| 2. Scenes | [Scenes and map](scenes-map.md) | MAP | unclaimed | — |
+| 2. Scenes | [Assets pipeline](assets-pipeline.md) | ASSET | complete | spec-assets-pipeline |
+| 2. Scenes | [Entities (core)](entities.md) | ENT | complete | spec-entities |
+| 2. Scenes | [Play shell](play-shell.md) | SHELL | complete | spec-play-shell |
+| 2. Scenes | [Scenes and map](scenes-map.md) | MAP | complete | spec-scenes-map |
 | 3. Combat | [Character sheet (basics)](character-sheet.md) | CHAR | unclaimed | — |
 | 3. Combat | [Dice and game log](dice-roll-log.md) | DICE | unclaimed | — |
 | 3. Combat | [Notifications](notifications.md) | NOTE | unclaimed | — |
