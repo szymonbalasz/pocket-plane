@@ -16,7 +16,7 @@ wave: 1
 
 ## 2. Scope
 
-- **Commands** (names from AGENTS.md build conventions): `reset`, `load <bundle>`, `reset-and-load <bundle>`; `list` *(optional)*. Plus an **in-process loader** for `bun test`.
+- **Commands** (names from AGENTS.md build conventions): `reset`, `load <bundle>`, `reset-and-load <bundle>`. Plus an **in-process loader** for `bun test`.
 - Fixture/bundle format, resolution, determinism, data-dir lock, load manifest; pipeline core (batch contract, validation, insert, provenance).
 - **Bundles** `base` and `session-sim` (§8). Skeleton ships the mechanism, pipeline core and `base`; later phases' builders add the rest of `session-sim`.
 
@@ -44,12 +44,12 @@ Retired IDs: 07 (merged into 06), 16 and 26 (→ review checks, §13), 22 (owned
 | ID | Requirement | Notes |
 |---|---|---|
 | FR-FIX-01 | `reset` empties the DB and asset dir (paths from env) and recreates the empty schema: zero rows, empty asset dir. Re-runnable from any prior state, including a half-finished reset or load. | |
-| FR-FIX-02 | `reset` and `load` refuse (non-zero exit, nothing changed) when: the data dir is not flagged disposable, DB/asset paths are unset, or the data-dir lock is held by a live process. | Flag: build conventions |
+| FR-FIX-02 | `reset` and `load` refuse (non-zero exit, nothing changed) when: the data dir is not flagged disposable, the resolved data dir is not under the worktree's `data/` or the OS temp dir, or the data-dir lock is held by a live process. | Flag: build conventions |
 | FR-FIX-03 | `load <bundle>` applies the resolved fixtures in order. `reset-and-load` = `reset` then `load`, one invocation. | |
 | FR-FIX-04 | Pre-flight, before any write: unknown bundle/fixture key, missing dependency, cycle, missing asset file or invalid reference record → non-zero, nothing written. | |
 | FR-FIX-05 | A step failing mid-load → loader resets to empty, exits non-zero, and names bundle, fixture key, step index, command and validation message. | [OQ-FIX-11](#15-open-questions) |
 | FR-FIX-06 | `load` requires an empty DB (manifest `empty`), else refuses with "reset first". No re-load or layering onto loaded state in MVP. | Composition is at resolution (FR-FIX-15) |
-| FR-FIX-08 | Two `reset-and-load` runs of a bundle give identical record IDs, player link URLs, timestamps and row counts. A fixture's IDs and tokens are identical in every bundle that includes it (e.g. `player-1`'s link in `base`, `session-sim`, `sync-probe`). | [seams ADR](../architecture/adr/proposed-deterministic-seams.md) |
+| FR-FIX-08 | Two `reset-and-load` runs of a bundle give identical record IDs, player link URLs, timestamps and row counts. A fixture's IDs and tokens are identical in every bundle that includes it (e.g. `player-1`'s link in `base`, `session-sim`, `sync-probe`). Fixed clock = one instant for every load, e.g. `2026-01-01T00:00:00Z` *(proposed)*. | [seams ADR](../architecture/adr/proposed-deterministic-seams.md) |
 | FR-FIX-09 | On success the loader writes the load manifest and prints: bundle, fixtures, records per fixture key, DM client URL, DM secret (read from env, never written to the manifest), player link URLs, duration. | [OQ-CAMP-03](campaign-management.md#15-open-questions) |
 | FR-FIX-10 | Budget: CLI `reset-and-load session-sim` ≤ 3 s incl. process start; in-process `session-sim` ≤ 1 s. Tests measure every run, warn above budget, fail above 2× budget. | Tolerates slow machines |
 | FR-FIX-11 | The in-process loader creates a temp data dir flagged disposable, loads a bundle and returns the manifest, opening no ports. Parallel test files and worktrees never share files. | |
@@ -81,14 +81,14 @@ Fixtures, bundles, manifest and lock are **code/files, not DB records**. Only pr
 | Entity | Field | Type | Notes |
 |---|---|---|---|
 | Fixture *(code)* | key, kind, requires, ownerSpec | string, `setup`\|`reference`, key[], spec | Key unique and stable |
-| | steps \| batch; assets | (command, typed input)[] \| import batch; path[] | By kind; assets inside the fixture folder |
+| | steps \| batch; assets | (command, typed input)[] \| import batch; path[] | By kind; asset files under `fixtures/assets/` (AGENTS §9.3) |
 | Bundle *(code)* | name, includes, fixtures | string, bundle[], key[] | |
 | Import batch *(pipeline input)* | source | {key, name, licence, attribution, url?} | Fixtures use key `fixture` |
 | | records | {kind, sourceKey, data}[] | `data` = per-kind schema (JSON leaf); partial allowed where the schema allows |
 | Provenance *(fields on imported definition; table owned by [entities](entities.md))* | source, sourceKey, licence, attribution, importedAt | strings, timestamp | null source = custom. Unique `(source, sourceKey)` |
 | Load manifest *(file in data dir)* | bundle, fixtures, status, records | string, key[], `resetting`\|`empty`\|`loading`\|`complete`, fixture key → record IDs | |
 | | dmUrl, playerLinks, startedAt, durationMs | string, {player, url}[], timestamp, int | No DM secret |
-| Data-dir lock *(file)* | owner, pid, startedAt | `server`\|`loader`, int, timestamp | Liveness check for stale locks |
+| Data-dir lock *(file)* | owner, pid, port, startedAt | `server`\|`loader`, int, int \| null (server only), timestamp | Liveness check for stale locks |
 
 - **Relations:** imported definitions are global, no campaign; customs derived from them belong to one campaign ([ADR-0018](../architecture/adr/0018-global-imported-content.md)). **Derived:** `readOnly = source != null`. **Persisted runtime state:** none owned here. Loaded state is ordinary app state ([ADR-0006](../architecture/adr/0006-persistence.md)).
 
@@ -100,6 +100,7 @@ Fixtures, bundles, manifest and lock are **code/files, not DB records**. Only pr
 | `player-1` | setup | Player "Player 1" in Fixture Campaign, stable link | campaign-management | yes (`base`) | Skeleton |
 | `player-2` | setup | Player "Player 2", stable link. Optional | campaign-management | no | Skeleton |
 | `campaign-second` | setup | Second campaign, inactive (contents owned by CAMP) | campaign-management | no | Skeleton |
+| `sync-probes` | setup | Probes `public`, `secret` (hidden, text `SECRET-PROBE`), `mine` (owner `player-1`); test mode only | [live-sync](live-sync.md) | no | Skeleton |
 | `enemy-1` | reference | SRD goblin: AC 15, HP 7, init +2, scimitar +4 / 1d6+2, CR 1/4 | [entities](entities.md) | yes | Scenes |
 | `enemy-2` | reference | SRD wolf: AC 13, HP 11, init +2, bite +4 / 2d4+2, CR 1/4 | entities | yes | Scenes |
 | `enemy-custom` | setup | Elite Goblin Warrior, custom in Fixture Campaign derived from `enemy-1`: AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2 | entities / [combat-tracker](combat-tracker.md) | yes | Whoever ships derive |
@@ -110,7 +111,7 @@ Fixtures, bundles, manifest and lock are **code/files, not DB records**. Only pr
 | `encounter-1` | setup | Planned: goblin, wolf, Elite Goblin Warrior; party = Mira | combat-tracker | yes | Combat |
 
 - **Bundles (this spec):** `base` = `campaign` + `player-1`; `session-sim` = `base` + rows marked yes.
-- **Bundles (other owners):** `sync-probe` = `base` + `player-2` + probe fixture ([live-sync](live-sync.md)); campaign-switch bundle = `base` + `campaign-second` (name: campaign-management); `mid-combat` = `session-sim` + combat state (combat-tracker, [OQ-FIX-04](#15-open-questions)).
+- **Bundles (other owners):** `sync-probe` = `base` + `player-2` + `campaign-second` + `sync-probes` ([live-sync](live-sync.md)); `campaign-switch` = `base` + `player-2` + `campaign-second` ([campaign-management](campaign-management.md)); `mid-combat` = `session-sim` + combat state (combat-tracker, [OQ-FIX-04](#15-open-questions)).
 
 ## 9. API & events
 
@@ -120,7 +121,7 @@ Fixtures, bundles, manifest and lock are **code/files, not DB records**. Only pr
 
 | Event | Payload | Visibility rule |
 |---|---|---|
-| Definition record change, op `create`, from import | Definition + provenance | **DM only in MVP.** [entities](entities.md) may widen later (e.g. monster names to players) |
+| Definition record change, op `upsert`, from import | Definition + provenance | Per [entities](entities.md) (ADR-0018); hidden from players until entities registers a visibility fn (default deny, FR-SYNC-18) |
 | Record changes from setup steps | As owning specs define | As owning specs define |
 
 ## 10. Permissions
@@ -152,7 +153,7 @@ Isolated per worktree: every run uses its own temp data dir ([ADR-0008](../archi
 | Unit | Resolution: includes, dedupe, order, `base` rule, cycle / unknown / missing dep (FR-FIX-04, 15) | Test-only fixtures |
 | Unit | Pipeline: valid; all errors reported; unknown kind; created / existing; provenance; `readOnly` (FR-FIX-18–21) | Test-only kind; `enemy-1`, `enemy-2` later |
 | Integration | Every bundle and fixture (with deps) loads. Determinism: two runs identical; `player-1` link same in `base` and `session-sim` (FR-FIX-08). Timing: warn > budget, fail > 2× (FR-FIX-10) | All |
-| Integration | Mid-load failure → empty + named error; non-empty → "reset first"; killed reset / load → refusals, then recovery. Guards: not disposable, unset paths, live lock → refuse; stale lock cleared (FR-FIX-02, 05, 06, 27, 28) | `base`, test-only broken fixtures |
+| Integration | Mid-load failure → empty + named error; non-empty → "reset first"; killed reset / load → refusals, then recovery. Guards: not disposable, data dir outside `data/` / temp, live lock → refuse; stale lock cleared (FR-FIX-02, 05, 06, 27, 28) | `base`, test-only broken fixtures |
 | Integration | One event-log entry per mutating step; pipeline events; no route (FR-FIX-13, 23, 24) | `session-sim` |
 | E2E (thin) | Playwright: `reset-and-load session-sim`, DM + `player-1` contexts connect | `session-sim` |
 
@@ -170,9 +171,9 @@ Isolated per worktree: every run uses its own temp data dir ([ADR-0008](../archi
 | On | What we need | Status |
 |---|---|---|
 | ADR-0009, 0015, 0017, 0018 | Creature schema, pipeline shape, fixture library, global imported definitions | accepted |
-| AGENTS.md build conventions | Command names, folder layout, env names, disposable flag, lock + seam mechanism | drafting |
+| AGENTS.md build conventions | Command names, folder layout, env names, disposable flag, lock + seam mechanism | agreed, pending merge |
 | [campaign-management](campaign-management.md) | Create campaign (active/inactive), add player; tokens via the seed seam; `campaign-second` contents | open |
-| [live-sync](live-sync.md) | Generic record changes; snapshot on reconnect; `sync-probe` on `base`; injectable clock/IDs (FR-SYNC-35) | open |
+| [live-sync](live-sync.md) | Generic record changes; snapshot on reconnect; `sync-probe` on `base`; injectable clock and timers (FR-SYNC-26) | open |
 | [entities](entities.md); [assets-pipeline](assets-pipeline.md), [character-sheet](character-sheet.md), [scenes-map](scenes-map.md), [combat-tracker](combat-tracker.md) | Entities: global definition table + provenance, read-only enforcement, definition events, `monster` kind. Others: commands and shapes their fixtures use | open |
 
 ## 15. Open questions
@@ -181,9 +182,9 @@ Isolated per worktree: every run uses its own temp data dir ([ADR-0008](../archi
 |---|---|---|---|---|
 | OQ-FIX-01, 05–07 | ~~Pipeline for fixtures? Images? Real play? Pipeline in MVP?~~ **Decided:** reference content only; committed SVGs via sharp (D3); no; yes, minimal ([ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md), [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md)) | — | — | — |
 | OQ-FIX-02, 08, 09 | ~~Format? Time budget? How the loader calls commands?~~ **Decided (gate D4):** TypeScript modules; CLI ≤ 3 s, in-process ≤ 1 s, tolerant test (FR-FIX-10); in-process, DM authority, no HTTP | — | — | — |
-| OQ-FIX-03 | Fixture location and ownership | **One fixtures tree; each spec names its fixtures** / per-feature folders | no (owner: build conventions) | all specs |
+| OQ-FIX-03 | ~~Fixture location and ownership~~ **Decided (AGENTS §9.3):** one `fixtures/` tree, `units/<feature>/`; this spec owns names | — | — | — |
 | OQ-FIX-04 | Mid-combat fixtures? | **`mid-combat` bundle on `session-sim`, owned by combat-tracker** / base state only | no (owner: combat-tracker) | combat-tracker |
-| OQ-FIX-10 | ~~Load while the server runs?~~ **Decided:** CLI refuses (D4); lock handling FR-FIX-27/28 | — | — | — |
+| OQ-FIX-10 | ~~Load while the server runs?~~ **Decided:** CLI refuses (#114); lock handling FR-FIX-27/28 | — | — | — |
 | OQ-FIX-11 | Failure mid-load | **Wipe to empty, named error** / outer-transaction rollback: fights per-command commits (ADR-0016) | no (owner: spec-fixtures-adapters) | — |
 | OQ-FIX-12 | ~~Deterministic IDs/tokens/clock~~ **Decided:** seeded per fixture, disposable dirs only (D4, [seams ADR](../architecture/adr/proposed-deterministic-seams.md)) | — | — | — |
 | OQ-FIX-13 | ~~DM secret in fixtures~~ **Decided (moot):** env only (OQ-CAMP-03); loader prints the env value | — | — | — |
@@ -193,7 +194,7 @@ Isolated per worktree: every run uses its own temp data dir ([ADR-0008](../archi
 | OQ-FIX-17 | ~~How reset knows data is disposable~~ **Decided:** explicit flag in build conventions (integrator) | — | — | — |
 | OQ-FIX-18 | Re-import of a changed record (ADR-0015 open row) | **MVP: skip (`existing`); update in place when the first real adapter lands** / version it | no (owner: post-mvp/compendium) | entities |
 | OQ-FIX-19 | Confirm §8 shape owners; who ships the derive command for `enemy-custom` | **As listed; entities if it ships create-custom, else combat-tracker** | no (owner: entities, combat-tracker) | listed specs |
-| OQ-FIX-20 | Glossary: add **Fixture bundle**, **Setup fixture** (command script) vs **Reference fixture** (import batch), **Load manifest**, **Import batch**, **Disposable** (data dir flagged safe to wipe and seed) | **Add all** / keep informal | no (owner: integrator) | glossary |
+| OQ-FIX-20 | ~~Glossary~~ **Decided (integrator):** added **Fixture bundle**, **Setup fixture** vs **Reference fixture**, **Load manifest**, **Import batch**, **Disposable** (data dir) | — | — | — |
 
 ## 16. Out of scope
 

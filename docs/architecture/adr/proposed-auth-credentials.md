@@ -3,7 +3,7 @@
 - Status: proposed (picks accepted by the DM at the Phase 1 gate, D4; integrator numbers it)
 - Date: 2026-10-11
 - Affects: campaign-management, live-sync, fixtures-adapters
-- Extends: [ADR-0003](0003-local-hosting.md), [ADR-0004](0004-tenancy-auth-permissions.md)
+- Extends: [ADR-0003](0003-local-hosting.md); refines [ADR-0004](0004-tenancy-auth-permissions.md) (link bound to a player, not a name)
 
 ## Context
 

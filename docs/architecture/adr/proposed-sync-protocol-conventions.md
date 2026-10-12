@@ -1,6 +1,6 @@
 # NNNN — Sync protocol conventions
 
-- Status: proposed (picks A–D accepted by the DM at the Phase 1 gate, [decisions-log](../../decisions-log.md) #111; E is the spec's default)
+- Status: proposed (picks A–D accepted by the DM at the Phase 1 gate, [decisions-log](../../decisions-log.md) #111; E is the spec's default; F pending DM OK)
 - Date: 2026-10-12
 - Affects: all specs with live state; [live-sync](../../specs/live-sync.md), [protocol](../../protocol/README.md)
 - Extends: [ADR-0005](0005-server-authoritative-sync.md) (resolves its filter-granularity and optimistic-UI to-dos), [ADR-0016](0016-domain-events-pending-actions.md)
@@ -50,9 +50,17 @@
 | **Only for intents a spec marks optimistic (e.g. own token move); server result wins, reject reverts, snapshot drops optimistic state** | Snappy where lag shows over the tunnel; rest stays simple | Each optimistic intent needs a revert path and test |
 | Never optimistic | Simplest, no divergence | Every action waits a round trip |
 
+**F. Listener execution ([ADR-0016](0016-domain-events-pending-actions.md) open row)**
+
+| Option | Pros | Cons |
+|---|---|---|
+| **Synchronous, same process, after commit** | Events reach the sender before its `ack` (FR-SYNC-14); simple ordering | A slow listener delays the `ack` |
+| Async microtask | Command returns sooner | `ack` may overtake its events |
+
 ## Decision
 
 - **A, B, C, D:** the bold options (accepted, D4). **E:** the bold option.
+- **F:** the bold option (pick; needs DM OK, resolves ADR-0016 open row).
 - Default deny: unregistered record types are hidden from players; intent handlers are DM-only unless they list `player`.
 - Visibility fns read only the record and the connection context; visibility flags live on the record.
 - Signals (ping, laser) are not domain events: no bus, DB or event log; they still pass their type's visibility fn.
@@ -62,5 +70,5 @@
 
 - Each spec's §9 lists record types (scope + visibility rule), intents (roles + ownership), signals, and domain events (logged? undoable?). No named per-feature WS events.
 - Domain events carry `changes` (before/after per record); any record whose visibility changes must be included.
-- Events reach the sender before its `ack` only if bus listeners run synchronously after commit (ADR-0016 open row; pick synchronous).
+- Events reach the sender before its `ack` only if bus listeners run synchronously after commit (option F; ADR-0016 open row).
 - Integrator seeds [protocol](../../protocol/README.md) with the envelopes and close/reject codes from live-sync.
