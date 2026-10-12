@@ -19,10 +19,10 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 
 | Term | Meaning | Not to be confused with |
 |---|---|---|
-| **Campaign** | Top-level scope. Every record belongs to exactly one campaign. | Session |
+| **Campaign** | Top-level scope. Every record belongs to exactly one campaign, except imported definitions, which are global ([ADR-0018](architecture/adr/0018-global-imported-content.md)). | Session |
 | **Active campaign** | The one campaign the server serves to players; the DM switches it. | — |
 | **Session** | One sitting of play (an evening). Informal only: **not tracked** by the app ([ADR-0013](architecture/adr/0013-session-journal-scope.md)). | Campaign; WS connection; encounter |
-| **Entity** | A campaign-owned world record: NPC, monster, item, location, faction, quest, character. Content model is open ([ADR-0009](architecture/adr/0009-entity-content-model.md)). | Compendium entry |
+| **Entity** | A world record: NPC, monster, item, location, faction, quest, character. Campaign-owned, except imported definitions (global, [ADR-0018](architecture/adr/0018-global-imported-content.md)). Content model: [ADR-0009](architecture/adr/0009-entity-content-model.md). | Compendium entry |
 | **Entity kind** | The type of an entity (npc, monster, item, location, faction, quest, character). MVP uses only **character** and **monster** ([ADR-0014](architecture/adr/0014-mvp-scope.md)). | — |
 | **Creature definition** | What a creature *is*: stat block, actions. Imported (read-only) or custom (editable). Same shape for all sources ([ADR-0009](architecture/adr/0009-entity-content-model.md)). | Instance |
 | **Derive** | Create a new, independent custom definition via the creature form, prefilled from a base (shortcut only; no ongoing link). | Duplicate (Ctrl-D on an instance) |

@@ -25,4 +25,5 @@
 - Instances and encounter entries in a campaign may point at a global definition or at a custom definition of the same campaign, never at another campaign's custom.
 - Deriving from a global definition creates a campaign-scoped custom.
 - Fixture reset wipes the whole disposable DB, so global records need no separate cleanup.
+- Event-log entries of global events (imported definitions) have no campaign (`campaignId` null).
 - Visibility: imported definitions are reference content; per-field rules for players are set by [entities](../../specs/entities.md).
