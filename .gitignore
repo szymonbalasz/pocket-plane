@@ -22,7 +22,10 @@ coverage/
 *.db-journal
 *.db-wal
 *.db-shm
-data/
+# Runtime data root only (anchored: nested source folders named `data` are fine)
+/data/
+test-results/
+playwright-report/
 
 # Agent verification evidence (ADR-0017)
 .verify/
