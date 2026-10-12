@@ -46,6 +46,16 @@ async function resizeViewport(page: Page, width: number, height: number) {
   );
 }
 
+/** Open window keys (`kind:instance`), sorted: the layout as rendered. */
+const openKeys = async (page: Page) =>
+  (
+    await page
+      .getByTestId("ui-window")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id") ?? ""))
+  ).sort();
+
+const TEST_WINDOWS = ["shell.test:main", "sync.probes:main"];
+
 const zOf = (page: Page, kind: string) =>
   shellWindow(page, kind).evaluate((el) => Number((el as HTMLElement).style.zIndex));
 
@@ -89,7 +99,10 @@ test("FR-SHELL-02/08/10/15/16/19 player: move + resize + front, reload restores;
     "Playing as Player 1 in Fixture Campaign",
   );
   await expect(p1.getByTestId("ui-base-empty")).toHaveText("Waiting for the DM to show a scene");
-  await expect(p1.getByTestId("ui-window")).toHaveCount(0); // player default: none open
+  // Player default = the registry's default-open windows (never a test window).
+  await expect(launcherButton(p1, "sync.probes")).toBeVisible();
+  const defaults = await openKeys(p1);
+  for (const k of TEST_WINDOWS) expect(defaults).not.toContain(k);
   await expect(launcherButton(p1, "sync.probes")).toHaveAttribute("data-state", "closed");
   await expect(launcherButton(p1, "shell.test")).toBeVisible();
 
@@ -120,7 +133,7 @@ test("FR-SHELL-02/08/10/15/16/19 player: move + resize + front, reload restores;
   await p1.goto(link("Player 2"));
   await expect(p1.getByTestId("camp-player-joined")).toContainText("Player 2");
   await expect(launcherButton(p1, "sync.probes")).toHaveAttribute("data-state", "closed");
-  await expect(p1.getByTestId("ui-window")).toHaveCount(0);
+  await expect.poll(() => openKeys(p1)).toEqual(defaults);
 
   expect(frames.length).toBeGreaterThan(0);
   for (const f of frames) expect(f).not.toContain('"windows"');
@@ -132,6 +145,8 @@ test("FR-SHELL-09/11/12/14 launcher toggle, minimise, reset layout, render-only 
   const { link } = e2eEnv();
   const p = await rolePage(browser);
   await p.goto(link("Player 1"));
+  await expect(launcherButton(p, "sync.probes")).toBeVisible();
+  const defaults = await openKeys(p);
   await openWindow(p, "sync.probes");
   const probesBtn = launcherButton(p, "sync.probes");
   await expect(probesBtn).toHaveAttribute("data-state", "open");
@@ -166,13 +181,13 @@ test("FR-SHELL-09/11/12/14 launcher toggle, minimise, reset layout, render-only 
   expect(scrolled).toBe(false);
   expect((await p.getByTestId("ui-topbar").boundingBox())?.x).toBe(0);
 
-  // Reset layout → player default (nothing open), and it is written.
+  // Reset layout → player default (the registry's default-open windows), and it is written.
   await p.getByTestId("ui-launcher-menu").click();
   await p.getByTestId("ui-launcher-reset").click();
-  await expect(p.getByTestId("ui-window")).toHaveCount(0);
+  await expect.poll(() => openKeys(p)).toEqual(defaults);
   await p.reload();
   await expect(launcherButton(p, "sync.probes")).toHaveAttribute("data-state", "closed");
-  await expect(p.getByTestId("ui-window")).toHaveCount(0);
+  await expect.poll(() => openKeys(p)).toEqual(defaults);
 });
 
 test("FR-SHELL-13 keys from windows never reach the base; window drags drop on the base", async ({
