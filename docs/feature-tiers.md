@@ -128,6 +128,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Live AI follow-along / summariser | F | — | Distinct from [agent-api](specs/post-mvp/agent-api.md) |
 | Combat rewind / timeline replay | F | — | |
 | External stream / overlay of the log | F | — | Log lives in the game client |
+| **Homebrew gems** (Inspiration, Fortune, Combat, Divine Knowledge, Action): DM awards, player spends; reroll a d20, max damage dice | A | [gems](specs/post-mvp/gems.md) | Max 5 per character, not enforced (#140). MVP dice/combat interfaces allow it |
 
 ## 7. Prep, content and sources
 
