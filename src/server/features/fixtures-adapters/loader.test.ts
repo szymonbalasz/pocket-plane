@@ -17,7 +17,17 @@ import { FixtureError, load, reset, resetAndLoad, resolveBundle } from "./loader
 
 const dirs: string[] = [];
 afterEach(() => {
-  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  for (const d of dirs.splice(0)) {
+    try {
+      // Retries EBUSY / EPERM / ENOTEMPTY a few times (Node's rmSync backoff).
+      rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch (err) {
+      // Windows: a just-closed SQLite handle (or a scanner) can hold a file past the retries;
+      // a leftover OS temp dir is harmless, so teardown must not fail the test.
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "EBUSY" && code !== "EPERM") throw err;
+    }
+  }
 });
 
 function tempConfig(env: Record<string, string> = {}) {
