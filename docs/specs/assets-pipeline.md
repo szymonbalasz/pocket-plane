@@ -1,8 +1,8 @@
 ---
 title: Assets pipeline
 prefix: ASSET
-status: unclaimed
-owner: —
+status: claimed
+owner: spec-assets-pipeline
 wave: 1
 ---
 
