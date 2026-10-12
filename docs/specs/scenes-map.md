@@ -106,7 +106,7 @@ Envelopes, rejects, close codes: [live-sync](live-sync.md). Per ADR-0021 D, scen
 | `scene-folder` | campaign | Hidden | Campaign's folders |
 | `token` | scene (gated by `sceneId`) | `hidden` → hidden; else all fields but `definitionId` | DM: all; player: active scene's |
 
-**Signals** (FR-MAP-25; [ADR-0026]($10026-signal-routing.md)): `map.ping {sceneId, x, y}` and `map.laser {sceneId, points [x, y][] ≤ 32, end?}` (DM, player); `map.pull {sceneId, x, y}` (DM). Visibility: every other connection of the campaign, with server-stamped `from`.
+**Signals** (FR-MAP-25; [ADR-0026](../architecture/adr/0026-signal-routing.md)): `map.ping {sceneId, x, y}` and `map.laser {sceneId, points [x, y][] ≤ 32, end?}` (DM, player); `map.pull {sceneId, x, y}` (DM). Visibility: every other connection of the campaign, with server-stamped `from`.
 
 **Domain events** (FR-MAP-27; none transient or undoable)
 
@@ -174,9 +174,9 @@ Isolated per worktree: `bun test` on `:memory:` DB, temp asset dir, port 0; walk
 
 | On | What we need | Status |
 |---|---|---|
-| [live-sync](live-sync.md) | `scene` scope gate (needs `sceneOf(record)` at registration: protocol CON for the integrator), active-scene cache, resync on activation, optimistic intents; signal routing change ([ADR-0026]($10026-signal-routing.md)) | complete; ADR proposed |
+| [live-sync](live-sync.md) | `scene` scope gate (needs `sceneOf(record)` at registration: protocol CON for the integrator), active-scene cache, resync on activation, optimistic intents; signal routing change ([ADR-0026](../architecture/adr/0026-signal-routing.md)) | complete; ADR proposed |
 | [assets-pipeline](assets-pipeline.md) | `assets.require`, asset-reference fields, picker, `useAssetImage`, `display` size; OQ-ASSET-07 answered by OQ-MAP-15 | in-review |
-| [entities](entities.md) | `resolveDefinition`, drag payload (FR-ENT-18), `statBlock.size`, portrait, definition-changed hooks (FR-ENT-19; registry per OQ-ENT-14), `entities.create` for Cave Ogre. [ADR-0024]($10024-definition-visibility.md) refines ADR-0009: token holds name, image and size copies, owner (#120) | in-review; ADR decided |
+| [entities](entities.md) | `resolveDefinition`, drag payload (FR-ENT-18), `statBlock.size`, portrait, definition-changed hooks (FR-ENT-19; registry per OQ-ENT-14), `entities.create` for Cave Ogre. [ADR-0024](../architecture/adr/0024-definition-visibility.md) refines ADR-0009: token holds name, image and size copies, owner (#120) | in-review; ADR decided |
 | [play-shell](play-shell.md) | Base layer + tool-rail slot (FR-SHELL-01 order), window `map.scenes`, empty state, key routing + window drops (FR-SHELL-13) | in-review |
 | [campaign-management](campaign-management.md), [fixtures-adapters](fixtures-adapters.md) | `player` records for the owner picker; `town`, `battlemap` as §13; add `scenes-extras` + bundle `scenes` to FIX §8 at merge (integrator) | complete |
 | [combat-tracker](combat-tracker.md) | Combatant → token; token-delete rule (#124; suggest restrict → `conflict` "Token is in an encounter"); hidden combatant follows its token (in-transaction); damage-card target = selected token id in the client store ([OQ-CBT-07](combat-tracker.md#15-open-questions)) | Combat phase |
@@ -192,8 +192,8 @@ Isolated per worktree: `bun test` on `:memory:` DB, temp asset dir, port 0; walk
 | OQ-MAP-08, 17, 19, 20 | DM product picks: pull; player-visible scene fields; scene list extras; numbers and gestures | **08: forced recentre, player can pan away** / suggestion Toast. **17: redacted, no name, folder, lock** (names spoil) / full. **19: delete non-active scenes; one folder level; folder delete → root** / no delete / nested. **20: 1 s, 200 tokens/scene, 1,000/campaign, 20 laser sends/s, zoom 10–400 %, grid defaults, Shift+click pull** / DM sets | no · owner: DM | notifications, play-shell |
 | ~~OQ-MAP-13~~ | ~~DM views non-active scenes?~~ | **Decided (#122):** yes, client-only viewed scene (FR-MAP-08); integrator amends ADR-0014's deferred row | — | — |
 | OQ-MAP-14 | Token image after a portrait edit (size always follows, #120) | **Tokens still showing the old portrait follow; custom art kept** / always overwrite / never refresh | no · owner: spec-scenes-map | entities |
-| ~~OQ-MAP-16~~ | ~~Signal hooks in live-sync~~ | **Decided (integrator ruling, gate Scenes):** server stamps `from`; DM-only `map.pull`; receivers filter by scene; no server scene check or rate limit. [ADR-0026]($10026-signal-routing.md) awaits acceptance; built as a sequenced shared change after the skeleton, before scenes-map builds | no (build-sequenced) · owner: orchestrator | live-sync, protocol |
-| OQ-MAP-22 | Glossary: add **Ping**, **Pull**, **Laser pointer**, **Scene folder**, **Token owner**, **Viewed scene**; **Token** "bound to an entity" → "instance of a creature definition" | **Add** as in §6 / keep spec-local | no · owner: integrator | glossary |
+| ~~OQ-MAP-16~~ | ~~Signal hooks in live-sync~~ | **Decided (integrator ruling, gate Scenes):** server stamps `from`; DM-only `map.pull`; receivers filter by scene; no server scene check or rate limit. [ADR-0026](../architecture/adr/0026-signal-routing.md) awaits acceptance; built as a sequenced shared change after the skeleton, before scenes-map builds | no (build-sequenced) · owner: orchestrator | live-sync, protocol |
+| ~~OQ-MAP-22~~ | ~~Glossary: add **Ping**, **Pull**, **Laser pointer**, **Scene folder**, **Token owner**, **Viewed scene**; reword **Token**~~ | **Decided (integrator, Scenes consolidation):** added; Token = "instance of a creature definition" ([glossary](../glossary.md)) | — | — |
 
 ## 16. Out of scope
 

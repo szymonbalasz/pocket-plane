@@ -13,7 +13,7 @@ wave: 2
 ## 1. Summary
 
 - The one play page per client (Roll20-style): scene canvas as the base, **floating windows** over it ([ADR-0014](../architecture/adr/0014-mvp-scope.md), [decisions-log](../decisions-log.md) #44, #48). Replaces the DM's six-window setup ([vision](../vision.md#the-table-today)).
-- Features don't own pages: they register **window types**; the shell opens, arranges and persists them. Plug-in contract: [ADR-0025]($10025-play-shell-windows.md).
+- Features don't own pages: they register **window types**; the shell opens, arranges and persists them. Plug-in contract: [ADR-0025](../architecture/adr/0025-play-shell-windows.md).
 - **Layout** lives in browser storage, per campaign and owner (DM or the link's player); it never reaches the server (#121).
 - Hosts the foundation UI: connection indicator, reconnect banner, presence ([live-sync](live-sync.md)); switcher, players panel, login / waiting / invalid-link screens ([campaign-management](campaign-management.md)).
 
@@ -172,7 +172,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | OQ-SHELL-06 | Window kinds for other specs | **`ent.creatures` (DM), `asset.images` (DM; picker grid, answers [OQ-ASSET-08](assets-pipeline.md#15-open-questions)), `char.sheet`, `dice.log`, `cbt.initiative`, `note.history`, `loot.log` (both), `cbt.encounters` (DM)**; each spec confirms name, clients, default open | no · owner: each named spec | entities, assets-pipeline, character-sheet, dice-roll-log, combat-tracker, notifications, party-loot |
 | OQ-SHELL-07 | AGENTS §9.9: window registry lists (`src/client/dm/windows.ts`, `src/client/player/windows.ts`) as append-only registries; build order | **Yes, and the shell frame + empty registries merge before other Scenes builders register windows (or `fix/shell-registry` creates them first)** / shared file via orchestrator (serialises builds) | no · owner: orchestrator | AGENTS.md, Scenes builds |
 | ~~OQ-SHELL-08~~ | ~~Can a fixture step act as a player?~~ | **Decided (integrator ruling, gate Scenes; FR-FIX-13):** fixtures act as DM only; no layout fixture (moot after #121) | — | — |
-| OQ-SHELL-09 | Glossary: add **Play page**, **Window**, **Window type**, **Launcher**, **Layout** (as in §1, §6, §8) | **Add** / keep spec-local | no · owner: integrator | glossary |
+| ~~OQ-SHELL-09~~ | ~~Glossary: add **Play page**, **Window**, **Window type**, **Launcher**, **Layout**~~ | **Decided (integrator, Scenes consolidation):** added to the [glossary](../glossary.md) | — | — |
 | OQ-SHELL-10 | Numbers: 40 windows, 120 px clamp, 50 fps | **As proposed** / DM sets others | no · owner: DM | — |
 | OQ-SHELL-11 | DM presence badge "N/M online" in the top bar | **Keep** (one glance; opens `camp.players`) / drop (panel's online dots suffice) | no · owner: DM | — |
 

@@ -26,7 +26,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Entity kind** | The type of an entity (npc, monster, item, location, faction, quest, character). MVP uses only **character** and **monster** ([ADR-0014](architecture/adr/0014-mvp-scope.md)). | — |
 | **Creature definition** | What a creature *is*: stat block, actions. Imported (read-only) or custom (editable). Same shape for all sources ([ADR-0009](architecture/adr/0009-entity-content-model.md)). | Instance |
 | **Derive** | Create a new, independent custom definition via the creature form, prefilled from a base (shortcut only; no ongoing link). | Duplicate (Ctrl-D on an instance) |
-| **Instance** | A placed creature (token, combatant) pointing at one definition; holds only display name, play state and modifiers. | Creature definition |
+| **Instance** | A placed creature (token, combatant) pointing at one definition. Holds its own display name, read-only display copies of the definition (image, size; refreshed in the definition edit's transaction), play state and modifiers ([ADR-0024](architecture/adr/0024-definition-visibility.md), decisions #126). | Creature definition |
 | **Modifier** | Per-instance adjustment applied on top of the definition (temp HP, buff, debuff). Tier A. | Override (not supported) |
 | **Character** | Entity kind for a player character with a 5e character sheet (basics in MVP, full sheet later). Owned by a player. | Player |
 | **Character sheet** | The 5e sheet view/data of a character. | — |
@@ -40,6 +40,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Cross-reference** | A link from one entity/entry to another. Model is open ([ADR-0011](architecture/adr/0011-cross-references.md)). | — |
 | **Asset** | An uploaded binary (map image, portrait, handout), stored content-hashed. | Entity |
 | **Derivative** | A generated variant of an asset (thumbnail, resized, format-converted). | — |
+| **Asset reference** | A record field holding an asset ID, set via `assets.require`; a player learns the ID only if they can see the field ([ADR-0023](architecture/adr/0023-asset-access-by-capability-id.md)). | Asset |
 
 ## Play
 
@@ -47,16 +48,22 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 |---|---|---|
 | **Scene** | A map plus its grid and tokens (fog and props post-MVP). Players view the active scene. | Session |
 | **Active scene** | The scene currently shown to players. | — |
+| **Viewed scene** | The scene the DM's canvas shows: any scene, client-only; defaults to the active scene (decisions #122). | Active scene |
+| **Scene folder** | DM-only, one-level grouping of scenes in the scene list. Never sent to players. | — |
 | **Grid calibration** | Setting cell size/offset so the grid aligns with the map image. | — |
-| **Token** | A movable piece on a scene, bound to an entity and optionally a combatant. | Combatant |
+| **Token** | A movable piece on a scene: an instance of a creature definition, optionally bound to a combatant. | Combatant |
+| **Token owner** | The one player (or none) who may move a token. Defaults from the character's owner; the DM reassigns it (decisions #124). | Character's owner |
 | **Hidden token** | Token visible only to the DM (shown translucent to DM) until revealed with the hide/reveal button. MVP. | — |
 | **Fog** | Polygon regions hiding parts of a scene from players. | Lighting (out of scope) |
 | **AoE prop** | A shape (cone, sphere, line, cube…) placed on a scene to show an area of effect. | Freehand drawing (out of scope) |
 | **Ruler** | Measuring tool using 5e diagonal rules. | — |
+| **Ping** | Signal: a click shows a short pulse at a point to every other client showing that scene. | Pull |
+| **Pull** | DM-only ping that also centres every player's camera on the point; players may pan away. | Ping |
+| **Laser pointer** | Signal: a right-drag draws a trail that others see fade shortly after the last point. | Ping |
 | **Player-ready indicator** | Shows the DM which players have fully loaded a scene. Post-MVP ([scene-tools](specs/post-mvp/scene-tools.md)); MVP assumes immediate load. | — |
 | **Encounter** | A planned set of monsters with CR/difficulty math. Lifecycle: planned → started → ended. The unit of combat history. | Combat; session |
 | **Combat** | The running state of a started encounter: initiative order, rounds, turns. | Encounter |
-| **Combatant** | A participant in a combat, linked to an entity (and a token if on a scene). Holds HP, conditions, concentration. | Token; Entity |
+| **Combatant** | A participant in a combat, linked to an entity (and a token if on a scene). Holds HP (for PCs, HP lives on the character), conditions, concentration. | Token; Entity |
 | **Initiative order** | Ordered list of combatants for the current combat. | — |
 | **Condition** | A 5e condition (e.g. prone, poisoned) applied to a combatant. | — |
 | **Concentration** | Flag on a combatant maintaining a concentration spell; prompts a save on damage. | — |
@@ -73,6 +80,16 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Damage card** | A notification kind with an "apply" action, holding a damage result (from a player or DM roll) the DM applies to a target with a modifier: normal, resistant, immune, vulnerable. | Roll |
 | **Manual roll** | A roll entered from physical dice instead of rolled by the server. Logged and marked manual. | — |
 | **Party loot** | Shared, party-visible log of rewards (gold, items) the DM gives the party. | Party board (post-MVP superset) |
+
+## Play page
+
+| Term | Meaning | Not to be confused with |
+|---|---|---|
+| **Play page** | The one page per client: scene canvas as base layer, floating windows over it, top bar, launcher ([ADR-0025](architecture/adr/0025-play-shell-windows.md)). | — |
+| **Window** | A floating, movable, resizable panel on the play page; an open instance of a window type. | Browser window (pop-outs out of scope) |
+| **Window type** | A feature's registered kind of window (`<prefix>.<name>`, clients, defaults, component) in a per-client registry. | Window |
+| **Launcher** | Bottom bar of buttons that open, bring to front or minimise windows. | — |
+| **Layout** | Every window's state, geometry and z-order for one (campaign, owner); stored only in browser `localStorage` (decisions #121). | — |
 
 ## System
 

@@ -218,6 +218,7 @@ fixtures/
 - Test agents only; builders don't run long browser sessions ([orchestrator §4](docs/agents/orchestrator-prompt.md#4-context-management)).
 - Tool: **Playwright MCP**, one isolated browser context per role: `dm`, `player-1`, `player-2`… Never share storage or cookies between contexts.
   - Configured in the repo's `opencode.json` as three servers, one per role: `pw-dm`, `pw-player-1`, `pw-player-2` (headless, in-memory profiles). Use only the server for the role you're driving. A new agent session loads them; a running session needs a restart.
+- **Never start a long-running server from the agent's own shell tool** (on Windows the tool waits on the child's inherited output handles and hangs, even with `Start-Process`). The orchestrator gives each test agent a dedicated Herdr pane: start with `herdr pane run <pane> "<env>; bun run start"`, stop with `herdr pane send-keys <pane> ctrl+c`, read logs with `herdr pane read <pane>`. Parallel test agents in one worktree each get their own `PP_PORT` and `PP_DATA_DIR=data/verify-<name>`.
 - Run on the `verify` profile, built client (no HMR mid-walkthrough): `bun run build`, `fixtures:reset-load <bundle> --profile verify`, `start --profile verify`. Code changed since? Stop, rebuild, restart.
 - Evidence under `<worktree>/.verify/<run-id>/` (gitignored), `run-id = <yyyymmdd-hhmmss>-<feature>-<walkthrough>`:
 
@@ -262,7 +263,7 @@ fixtures/
 
 - **Skeleton exception**: the Phase 2 skeleton branch ([orchestrator §6](docs/agents/orchestrator-prompt.md#6-phases-and-gates)) owns and creates every shared file. No other `build/*` branch starts until it merges.
 - **`fix/*`** branches edit only the paths the orchestrator assigns.
-- **Append-only registries** (route mounts in `src/server/app.ts`, listener registry, record-type/visibility registry, `fixtures/bundles/index.ts`): a builder may add its own lines; nothing else.
+- **Append-only registries** (route mounts in `src/server/app.ts`, listener registry, record-type/visibility registry, `fixtures/bundles/index.ts`, client window registries `src/client/dm/windows.ts` and `src/client/player/windows.ts` ([OQ-SHELL-07](docs/specs/play-shell.md#15-open-questions), [ADR-0025](docs/architecture/adr/0025-play-shell-windows.md); the play-shell frame creates them empty before other builders register), entities' server definition-changed hook registry and DM `creatureActions` registry ([OQ-ENT-14](docs/specs/entities.md#15-open-questions))): a builder may add its own lines; nothing else.
 - To change a shared file, the builder **stops** and reports `shared change needed: <path> — <what> — <why>`. The orchestrator picks one:
   1. **Sequence**: the builder makes the change in its branch while no other active branch touches that file. The orchestrator records the lock in `docs/agents/status.md`.
   2. **Shared branch first**: a separate `fix/<slug>` makes the change, merges to `main`, and active builders rebase.

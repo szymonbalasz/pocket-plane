@@ -2,26 +2,25 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 2 — Skeleton build (slice 6/7: clients); Scenes specs revised, waiting on DM `complete`
+**Phase:** 2 — Skeleton verification (3 walkthroughs); Scenes specs complete + consolidated
 
 **Herdr:** orchestrator workspace `wR` (pane `wR:p1`). Always `herdr worktree create --workspace wR …` ([prompt §3](orchestrator-prompt.md#3-herdr)). Clean up worktrees after merge.
 
 | Task | Agent | Workspace / branch | State | Blockers |
 |---|---|---|---|---|
-| Skeleton build | build-skeleton (`w17:p2`) | `w17` / `build/skeleton` | slices 1–5 committed; 6 (clients) in progress | — |
-| Specs assets-pipeline, entities, play-shell, scenes-map | — (ended) | revision 2 on `main` | in-review, 0 blocking OQs | DM: complete + accept 4 ADRs |
+| Skeleton build | build-skeleton (`w17:p2`) | `w17` / `build/skeleton` | 7 slices done; check, build, e2e green | walkthroughs |
+| Walkthrough campaign-management §13 | test-campaign-management (`w17:p3`) | in `build/skeleton`, port 4103, `data/verify-camp` | working | — |
+| Walkthrough live-sync §13 | test-live-sync (`w17:p4`) | port 4104, `data/verify-sync`, test mode | working | — |
+| Walkthrough fixtures-adapters §13 | test-fixtures-adapters (`w17:p5`) | port 4105, `data/verify-fix` | working | — |
 
-Next on DM "go": number ADRs 0023–0026 → specs `complete` → `review-consolidate` for Scenes (data model, protocol, glossary, FIX §8 fixtures, AGENTS §9.9 registries, ADR-0014 note) → after skeleton merges and DM runs it: `fix/signal-routing`, then Scenes builders (play-shell first).
-
-## Pending integrator notes for the skeleton builder (next stop)
-
-- Player REST credential: moot after #123 (no player REST credential for images).
+Next: fix failures (build-skeleton) → merge skeleton → DM demo → `fix/scenes-core` (ADR-0026 signals, CON-22 scene filter on live events, CON-23 active-scene hook, CON-24/25 doc cleanup) → Scenes builders in order: play-shell → assets-pipeline → entities → scenes-map.
 
 ## Risks
 
-- Scenes build order: skeleton → signal-routing change (live-sync shared files) → play-shell (window registry) → assets / entities → scenes-map.
+- CON-22 (scene-scoped records leaking to players on inactive scenes) must land before scenes-map builds.
+- Orchestrator session must be restarted to load Playwright MCP itself (sub-agents get it on start).
 
 ## Resolved locally (report at gate)
 
-- Token display name is instance state, never refreshed by definition edits; image + size refresh via an in-transaction hook.
-- OQ-SHELL-07 / OQ-ENT-14: window registry, definition-changed hooks and creatureActions registries become append-only registries (AGENTS §9.9) — applied at consolidation.
+- Playwright MCP in repo `opencode.json` (#128); skeleton builder picks (#129).
+- CON-26: ADR links broken by my renumbering script, fixed.

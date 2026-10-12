@@ -12,7 +12,7 @@ wave: 2
 
 - The **creature definition** contract that tokens, combatants and encounter entries point at. MVP kinds: `character`, `monster` ([ADR-0014](../architecture/adr/0014-mvp-scope.md)). One `entity` table, one shared zod creature core, same shape for SRD, custom and fixture ([ADR-0009](../architecture/adr/0009-entity-content-model.md), #124). Imported definitions are global and read-only; customs and characters belong to one campaign ([ADR-0018](../architecture/adr/0018-global-imported-content.md)).
 - **Schema ownership:** entities owns the creature core for both kinds. [character-sheet](character-sheet.md) may only add optional character fields; [combat-tracker](combat-tracker.md)'s creature form edits this schema and may show a subset.
-- Players never see monster definitions; instances carry read-only display copies, refreshed inside the edit's transaction (#120, [ADR-0024]($10024-definition-visibility.md)).
+- Players never see monster definitions; instances carry read-only display copies, refreshed inside the edit's transaction (#120, [ADR-0024](../architecture/adr/0024-definition-visibility.md)).
 
 ## 2. Scope
 
@@ -49,7 +49,7 @@ wave: 2
 | FR-ENT-10 | Create character: `ownerPlayerId` must be a player of `ctx.campaignId`, else `invalid`; `hpCurrent = hpMax`. MVP callers: fixtures only (decisions #100). | |
 | FR-ENT-11 | Update replaces name, portrait, stat block and (characters) owner as a whole; name and portrait as FR-ENT-08, owner as FR-ENT-10. Kind, campaign, provenance, `derivedFromId` are immutable. `hpCurrent > hpMax` after update → clamped in the same transaction. | |
 | FR-ENT-12 | `resolveDefinition(ctx, id)` (server) returns a definition that is global or in `ctx.campaignId`, else `not_found`. Every command storing a definition reference uses it. | ADR-0018 |
-| FR-ENT-13 | Instances store the definition id plus only the display copies listed in the [ADR-0024]($10024-definition-visibility.md); no other stat-block fields. `effectiveStats(def, inst)` in `@shared/entities` returns `def.statBlock` in MVP. | Modifiers hook, tier A |
+| FR-ENT-13 | Instances store the definition id plus only the display copies listed in the [ADR-0024](../architecture/adr/0024-definition-visibility.md); no other stat-block fields. `effectiveStats(def, inst)` in `@shared/entities` returns `def.statBlock` in MVP. | Modifiers hook, tier A |
 | FR-ENT-14 | No delete in MVP: no route or command deletes a definition. Typos are fixed by rename. *(proposed, OQ-ENT-07)* | ADR-0009 open row |
 | FR-ENT-15 | Visibility `entity`: DM full. Player: own character (`ownerPlayerId = ctx.playerId`) full; other characters redacted to `{id, kind, name, portraitAssetId, ownerPlayerId}`; monsters hidden. | #120 |
 | FR-ENT-16 | Visibility `imported-entity`: DM full; players hidden. | #120 |
@@ -183,7 +183,7 @@ wave: 2
 |---|---|---|---|---|
 | OQ-ENT-03 | Entities UI in MVP | **Read-only DM Creatures window (drag source, `creatureActions`)** / each feature builds its own picker | no (owner: spec-entities) | scenes-map, combat-tracker, play-shell |
 | OQ-ENT-04 | ~~Shared basics shape~~ | **Decided (#124):** one creature core (ADR-0009 storage A, #93) | — | — |
-| OQ-ENT-05 | ~~What players see of definitions~~ | **Decided (#120):** monsters hidden; own character full; others name, portrait, owner; instances carry display copies ([ADR-0024]($10024-definition-visibility.md)) | — | — |
+| OQ-ENT-05 | ~~What players see of definitions~~ | **Decided (#120):** monsters hidden; own character full; others name, portrait, owner; instances carry display copies ([ADR-0024](../architecture/adr/0024-definition-visibility.md)) | — | — |
 | OQ-ENT-06 | Record types for two scopes | **Two types, one schema: `entity` (campaign), `imported-entity` (global)** / one type with per-record scope (registry change) | no (owner: spec-entities) | live-sync |
 | OQ-ENT-07 | Delete a custom definition (ADR-0009 open row) | **No delete in MVP** (rename covers typos; no FK coordination) / block while referenced / cascade | no (owner: spec-entities) | scenes-map, combat-tracker |
 | OQ-ENT-08 | Where PC current HP lives | **`hpCurrent` on `entity`; HP commands by combat-tracker / character-sheet** / separate state table | no (owner: character-sheet) | character-sheet, combat-tracker |
@@ -191,7 +191,7 @@ wave: 2
 | OQ-ENT-10 | Combatant HP above a lowered `hpMax`; combatant display copies | **Combat-tracker clamps and refreshes copies in an in-transaction hook (FR-ENT-19)** / leave until healed | no (owner: combat-tracker) | combat-tracker |
 | OQ-ENT-11 | XP for CR 0 (SRD: "0 or 10") | **10** (DMG table) / 0 | no (owner: combat-tracker) | combat-tracker |
 | OQ-ENT-12 | Answers to fixtures-adapters | **OQ-FIX-15: inline; OQ-FIX-19: entities ships create/derive + `enemy-custom` in Scenes, form in Combat; `char-mira` record + basics = entities, extra sheet fields = character-sheet** | no (owner: spec-entities) | fixtures-adapters |
-| OQ-ENT-13 | Glossary: **Instance** "holds only display name, play state and modifiers" | **"…holds read-only display copies of its definition (name, image, size), play state and modifiers (#120)"**; **Combatant** "Holds HP" → add "for PCs, HP lives on the character" / keep | no (owner: integrator) | glossary |
+| OQ-ENT-13 | ~~Glossary: **Instance**; **Combatant**~~ | **Decided (integrator, Scenes consolidation):** [glossary](../glossary.md) updated. Instance holds its own display name (#126), read-only copies of image and size, play state and modifiers; Combatant adds "for PCs, HP lives on the character" | — | — |
 | OQ-ENT-14 | AGENTS §9.9: add append-only registries (server definition-changed hooks; DM `creatureActions`) | **Add both** (other specs add lines, never edit entities' code) / combat-tracker edits entities' folder | no (owner: integrator) | AGENTS, scenes-map, combat-tracker |
 | OQ-ENT-15 | Other PCs' HP for players (party view) | **Combat-phase call: nothing in Scenes; combat-tracker picks** (combatant copy / band only / redacted character adds HP) | no (owner: combat-tracker) | combat-tracker, character-sheet |
 
