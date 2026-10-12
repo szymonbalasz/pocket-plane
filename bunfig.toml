@@ -1,0 +1,4 @@
+[test]
+# Builds the template schema DB once per run (AGENTS §9.4).
+preload = ["./src/server/db/test-preload.ts"]
+root = "."

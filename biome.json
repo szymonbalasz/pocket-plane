@@ -22,7 +22,12 @@
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "overrides": [
     {
-      "includes": ["src/server/features/**", "src/server/commands/**"],
+      "includes": [
+        "src/server/features/**",
+        "src/server/commands/**",
+        "!src/server/commands/context.ts",
+        "!**/*.test.ts"
+      ],
       "linter": {
         "rules": {
           "style": {
