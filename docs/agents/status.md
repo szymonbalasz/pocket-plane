@@ -2,25 +2,24 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 1 — revision round after DM gate ([gate-phase1](gate-phase1.md))
+**Phase:** 1 — final DM gate (approve conventions, set foundation specs complete)
 
 **Herdr:** orchestrator workspace `wR` (pane `wR:p1`). Always `herdr worktree create --workspace wR …` ([prompt §3](orchestrator-prompt.md#3-herdr)).
 
 | Task | Agent | Workspace / branch | State | Blockers |
 |---|---|---|---|---|
-| Revise live-sync | spec-live-sync (`w0:p2`) | `w0` / `spec/live-sync` | working | — |
-| Revise campaign-management | spec-campaign-management (`w11:p2`) | `w11` / `spec/campaign-management` | working | — |
-| Revise fixtures-adapters | spec-fixtures-adapters (`w12:p2`) | `w12` / `spec/fixtures-adapters` | working | — |
-| Revise build conventions | spec-conventions (`wW:p4`) | `wW` / `spec/build-conventions` | working | — |
+| live-sync, campaign-management, fixtures-adapters | — (ended) | revision 2 on `main`; consistency pass on `spec/build-conventions` | in-review, 0 blocking OQs | DM: complete |
+| Build conventions (AGENTS.md §9) + glossary | — (ended) | `spec/build-conventions` (`wW`, unmerged) | revised, cross-checked | DM: approve |
+| Proposed ADRs ×4 | — | same branch | decisions filled in | DM: accept → I number 0019–0022 |
 
-Next: re-check → merge → DM sets complete → number proposed ADRs, glossary → consolidation → Phase 2.
+Next on "go": merge `spec/build-conventions` → number ADRs → specs `complete` → `review-consolidate` (data model + protocol) → Phase 2 skeleton (`build/skeleton`), and start Scenes specs in parallel.
 
 ## Risks
 
-- None open. (Claude auth refreshed by DM.)
+- Claude token refresh rate limit interrupted 3 agents once; resumed fine.
 
 ## Resolved locally (report at gate)
 
-- Decisions log #36 annotated as superseded by #55/#76; spec index regrouped by build phase (#107).
-- Orchestrator builder brief: event-log order matches ADR-0016.
-- Worktrees accidentally created in another repo (missing `--workspace`); removed, branches deleted, no changes there. Prompt §3 now requires `--workspace`.
+- Decisions log #36 annotated; spec index by build phase (#107); builder brief event order; `--workspace` rule after a wrong-repo mix-up.
+- 30-item cross-spec consistency pass (timings, FR refs, fixture compositions, stale deps, glossary: 13 terms added, 3 reworded).
+- Gate defaults logged as #114.
