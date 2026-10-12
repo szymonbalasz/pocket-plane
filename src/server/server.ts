@@ -5,7 +5,7 @@ import type { Server, ServerWebSocket } from "bun";
 import { createApp } from "./app";
 import type { Clock } from "./commands/context";
 import { type Config, localUrl } from "./config";
-import { type Db, openFileDb } from "./db/client";
+import { closeDb, type Db, openFileDb } from "./db/client";
 import { pushSchema } from "./db/push";
 import type { Logger } from "./log";
 import { acquireLock, type HeldLock } from "./runtime/lock";
@@ -132,7 +132,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
         // Not awaited: in Bun 1.3 the promise never settles after a server-initiated WS close.
         void server.stop(true);
         await Bun.sleep(0);
-        if (!opts.db) db.$client.close();
+        if (!opts.db) closeDb(db);
         lock?.release();
       },
     };

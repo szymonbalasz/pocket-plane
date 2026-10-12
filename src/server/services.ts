@@ -8,6 +8,7 @@ import type { Config } from "./config";
 import type { Db } from "./db/client";
 import { EventBus, type Listener } from "./events/bus";
 import { features } from "./features";
+import { ImportRegistry } from "./features/fixtures-adapters/import-pipeline";
 import type { Logger } from "./log";
 import type { HubApi } from "./ws/hub";
 import { type AnyRecordType, RecordRegistry } from "./ws/records";
@@ -36,6 +37,8 @@ export interface Services {
   /** Command names callable as WS intents. */
   intents: Set<string>;
   auth: CredentialResolvers;
+  /** Import pipeline kinds + definition store (entities plugs in here, CON-03). */
+  imports: ImportRegistry;
   /** Set once the WS hub exists (after registration). */
   hub: HubApi | null;
 }
@@ -85,6 +88,7 @@ export function createServices(opts: ServicesOptions): Services {
     intents: new Set(),
     auth: missingAuth,
     hub: null,
+    imports: new ImportRegistry(),
   };
   for (const e of domainEvents) commands.registerEvent(e);
 
