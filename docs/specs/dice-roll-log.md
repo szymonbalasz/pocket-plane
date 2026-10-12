@@ -1,8 +1,8 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: unclaimed
-owner: —
+status: claimed
+owner: spec-dice-roll-log
 wave: 2
 ---
 
