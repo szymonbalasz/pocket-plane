@@ -1,8 +1,8 @@
 ---
 title: Entities (core)
 prefix: ENT
-status: unclaimed
-owner: —
+status: claimed
+owner: spec-entities
 wave: 2
 ---
 
