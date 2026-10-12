@@ -9,7 +9,9 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **DM** | The single dungeon master. Holds the DM secret. Sees everything. | — |
 | **Player** | A named participant in a campaign, identified by a player link. Not a user account. | Character (what the player plays) |
 | **DM secret** | Credential that grants DM access to the server. | — |
-| **Player link** | Per-player invite URL bound to one player name within one campaign. Acts as the player's credential. | — |
+| **Player link** | Per-player invite URL (public base URL + link token) bound to one player within one campaign; renaming the player keeps the token. Acts as the player's credential. | — |
+| **Link token** | Opaque secret in a player link's path; the player's credential. | DM secret |
+| **Public base URL** | External URL (usually the tunnel) used to build player links. | — |
 | **DM client** | The client app used by the DM. Full controls. | — |
 | **Player client** | The client app used by players. Restricted controls, filtered data. | — |
 
@@ -18,6 +20,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | Term | Meaning | Not to be confused with |
 |---|---|---|
 | **Campaign** | Top-level scope. Every record belongs to exactly one campaign. | Session |
+| **Active campaign** | The one campaign the server serves to players; the DM switches it. | — |
 | **Session** | One sitting of play (an evening). Informal only: **not tracked** by the app ([ADR-0013](architecture/adr/0013-session-journal-scope.md)). | Campaign; WS connection; encounter |
 | **Entity** | A campaign-owned world record: NPC, monster, item, location, faction, quest, character. Content model is open ([ADR-0009](architecture/adr/0009-entity-content-model.md)). | Compendium entry |
 | **Entity kind** | The type of an entity (npc, monster, item, location, faction, quest, character). MVP uses only **character** and **monster** ([ADR-0014](architecture/adr/0014-mvp-scope.md)). | — |
@@ -76,8 +79,18 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | Term | Meaning |
 |---|---|
 | **Intent** | A client request to change state. Server validates, then mutates. |
-| **Event** (WS event) | Server-to-client message describing a change to one record; produced from a domain event after the visibility filter. |
+| **Event** (WS event) | Server-to-client message carrying the filtered record changes (one or more records) of one domain event; produced after the visibility filter. |
+| **Record change** | One record's change inside a domain event (before/after); sent to clients as `upsert` or `delete` after filtering. |
 | **Visibility filter** | Server-side rule deciding which events/fields each client receives. |
-| **Snapshot** | Full filtered state a client requests on (re)connect. |
+| **Snapshot** | Full filtered state sent by the server after `hello` and on resync. |
+| **Resync** | Replacing a client's whole state with a fresh snapshot (client request, sequence gap or active-scene switch). |
+| **Signal** | Transient client-to-clients message (ping, laser). Not a domain event: no DB, event log or snapshot; still filtered. |
+| **Presence** | DM-only, in-memory view of which players are online. |
+| **Sync probe** | Test-mode-only record type that proves visibility filtering end to end. |
 | **Worktree** | An isolated git worktree where one agent works on one feature. |
 | **Fixture** | Deterministic, disposable test data. Setups are scripts of server commands ([ADR-0017](architecture/adr/0017-agent-verification-fixture-library.md)). Not used for real play. |
+| **Setup fixture** / **Reference fixture** | Setup: ordered server command steps. Reference: one import batch of reference content (e.g. SRD creatures). |
+| **Fixture bundle** | Named composition of fixtures and other bundles; every bundle builds on `base`. |
+| **Load manifest** | File in the data dir recording a fixture load: bundle, status, record IDs, URLs. |
+| **Import batch** | Pipeline input: a source descriptor plus normalised records. |
+| **Disposable** (data dir) | Data dir flagged safe to wipe and seed; required for reset, load and seeded IDs. |

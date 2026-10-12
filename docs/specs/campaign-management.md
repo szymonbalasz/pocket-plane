@@ -46,21 +46,21 @@ N/A — the goals in §3 are the stories; listing them again adds nothing.
 | FR-CAMP-02 | DM client shows a login screen until a valid DM secret is entered. A wrong secret shows an error and grants nothing. | |
 | FR-CAMP-03 | Compare = `crypto.timingSafeEqual` on SHA-256 digests of the presented and configured secret. The secret is never logged, stored in the DB, or put in any response, event or event log entry. | |
 | FR-CAMP-04 | DM client keeps the secret in localStorage and sends it on every DM REST request and in `hello`; DM stays logged in across reload and restart. Changed secret → 401 / invalid-credential close → login screen. Access is never granted by source address (localhost included). | Tunnel traffic is local |
-| FR-CAMP-05 | After 5 failed DM credential checks (any route, incl. `hello`) within 60 s, server-wide, every DM credential check is refused for 60 s, even a correct one (REST 429; `hello` closed as invalid credential). The counter is in memory and resets on server restart. | [OQ-CAMP-12](#15-open-questions) |
+| FR-CAMP-05 | *(proposed)* After 5 failed DM credential checks (any route, incl. `hello`) within 60 s, server-wide, every DM credential check is refused for 60 s, even a correct one (REST 429; `hello` closed as invalid credential). The counter is in memory and resets on server restart. | [OQ-CAMP-12](#15-open-questions) |
 | FR-CAMP-06 | DM creates a campaign: name trimmed, 1–60 characters, unique (case-insensitive); duplicate → error, nothing created. Created while none is active → becomes active; otherwise inactive. | |
 | FR-CAMP-07 | DM lists all campaigns, active one marked, via REST only. No WS message carries another campaign's data. | |
 | FR-CAMP-08 | At most one campaign is active (DB-enforced). The active campaign survives a server restart. | |
 | FR-CAMP-09 | DM switches the active campaign: one transaction flips both flags. ≤ 1 s after commit the server closes every connection (DM and player) of the previous campaign with close reason `campaign-inactive`; none is re-snapshotted into another campaign. The DM client reconnects and is live in the new campaign ≤ 2 s after the close. | Code: live-sync |
-| FR-CAMP-10 | *(proposed)* DM renames a campaign (FR-CAMP-06 rules). Open connections of that campaign show the new name ≤ 1 s after commit, no reload. | [OQ-CAMP-09](#15-open-questions) |
+| FR-CAMP-10 | DM renames a campaign (FR-CAMP-06 rules). Open connections of that campaign show the new name ≤ 1 s after commit, no reload. | [OQ-CAMP-09](#15-open-questions) |
 | FR-CAMP-11 | A player connection's campaign comes from its link only; a DM connection's is the active campaign at `hello`. Fixed for the connection's life; request input never sets it. | [FR-SYNC-03](live-sync.md#6-functional-requirements) |
 | FR-CAMP-12 | DM adds a player to the active campaign: name trimmed, 1–40 characters, unique (case-insensitive) in the campaign. | |
-| FR-CAMP-13 | Adding a player creates a link token: 128 bits from `crypto.randomBytes`, base64url, unique server-wide. Seeded tokens only via the deterministic seam when the data dir is flagged disposable. The link stays valid across restarts and base URL changes; MVP has no way to invalidate it. | [OQ-CAMP-11](#15-open-questions), D2 |
-| FR-CAMP-14 | DM player list shows name, online state ([live-sync](live-sync.md) presence) and copy link. Copy puts `<public base URL>/p/<token>` on the clipboard; after a base URL change, re-copying gives a working link with the same token. | Path illustrative; [OQ-CAMP-07](#15-open-questions) |
+| FR-CAMP-13 | Adding a player creates a link token: 128 bits from the command context's token generator (CSPRNG in real use), base64url, unique server-wide. Seeded tokens only via the deterministic seam when the data dir is flagged disposable. The link stays valid across restarts and base URL changes; MVP has no way to invalidate it. | [OQ-CAMP-11](#15-open-questions), D2 |
+| FR-CAMP-14 | DM player list shows name, online state ([live-sync](live-sync.md) presence) and copy link. Copy puts `<public base URL>/p/<token>` on the clipboard; after a base URL change, re-copying gives a working link with the same token. | Path per OQ-CAMP-15; [OQ-CAMP-07](#15-open-questions) |
 | FR-CAMP-15 | DM renames a player; the token is unchanged. Open connections of that campaign show the new name ≤ 1 s after commit. | |
 | FR-CAMP-16 | Valid link, active campaign → joined with no input; page shows player and campaign name. Reload keeps the player joined. The same link may be open in several browsers; all connect as that player. | Later: active scene ([play-shell](play-shell.md)) |
 | FR-CAMP-17 | Unknown token → invalid-link screen (§7). REST 404; WS closed as invalid credential before any data frame. | |
 | FR-CAMP-18 | Valid token, inactive campaign (on open or after a switch) → waiting screen naming the campaign. The page joins ≤ 10 s after the DM activates that campaign, no reload. | live-sync retry, cap 5 s ± 20 % |
-| FR-CAMP-19 | Player connections never receive the DM secret, any link token, or another campaign's data. They receive `{id, name}` of every player in their own campaign. | [OQ-CAMP-13](#15-open-questions) |
+| FR-CAMP-19 | Player connections never receive the DM secret, any link token, or another campaign's data. *(proposed)* They receive `{id, name}` of every player in their own campaign. | [OQ-CAMP-13](#15-open-questions) |
 | FR-CAMP-20 | Every mutation is a server command committing in one transaction with its event log entry ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). Fixtures call the same commands. | |
 
 ## 7. UI/UX notes
@@ -70,7 +70,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark onl
 - **DM view** (skeleton: plain DM page; later placement is [play-shell](play-shell.md)'s):
   - Login: password input + submit; inline error; throttled → "Too many attempts. Try again in a minute."
   - Campaign switcher: Select, active marked; "New campaign" Dialog. Players online → confirm Dialog "Switch to **X**? N online players will wait until you switch back." Loading while the DM connection reconnects.
-  - Players panel: Table — name, online dot, copy link (Toast "Link copied"), rename; add-player input below. Shows the base URL used; warns if it is localhost.
+  - Players panel: Table — name, online dot, copy link (Toast "Link copied"), rename; add-player input below. Shows the base URL used; warns if it is a loopback host (`localhost`, `127.0.0.1`, `::1`).
   - Empty: "Create your first campaign" / "Add a player to get a link". Validation inline; server errors as Toast; disconnected banner from [live-sync](live-sync.md).
 - **Player view** (`/p/<token>`, loading first). This spec owns the wording; live-sync's player `rejected` state shows the invalid-link screen.
   - Joined (skeleton): "Playing as **Player 1** in **Fixture Campaign**". Later: the active scene.
@@ -86,7 +86,7 @@ No JSON leaf fields ([ADR-0006](../architecture/adr/0006-persistence.md)). DM se
 | Campaign | id | ID | The scope itself; no `campaignId` |
 | | name | text | 1–60, unique case-insensitive |
 | | active | boolean | At most one `true` (partial unique index) |
-| | createdAt, updatedAt | timestamp | Clock seam ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)) |
+| | createdAt, updatedAt | timestamp | Clock seam ([proposed deterministic-seams](../architecture/adr/proposed-deterministic-seams.md)) |
 | Player | id | ID | Referenced by owned records (characters, tokens) |
 | | campaignId | ID → Campaign | |
 | | name | text | 1–40, unique case-insensitive per campaign |
@@ -97,13 +97,13 @@ No JSON leaf fields ([ADR-0006](../architecture/adr/0006-persistence.md)). DM se
 
 ## 9. API & events
 
-Envelopes, errors and close codes: [live-sync](live-sync.md). CRUD over REST (OQ-SYNC-04). Paths illustrative. **WS intents:** none.
+Envelopes, errors and close codes: [live-sync](live-sync.md). CRUD over REST (OQ-SYNC-04). Paths per OQ-CAMP-15. **WS intents:** none.
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
 | POST | `/api/dm/login` | anyone | Verify DM secret → 204 / 401 / 429 |
 | GET, POST | `/api/campaigns` | DM | List all + active flag; create |
-| PATCH | `/api/campaigns/:id` | DM | Rename *(proposed)* |
+| PATCH | `/api/campaigns/:id` | DM | Rename |
 | POST | `/api/campaigns/:id/activate` | DM | Switch active campaign |
 | GET, POST | `/api/players` | DM | Active campaign's players incl. `linkToken` (only route returning tokens); add |
 | PATCH | `/api/players/:id` | DM | Rename |
@@ -136,7 +136,7 @@ No player-writable actions in this spec.
 - **Player disconnect / reconnect:** reconnects with the URL token; fresh snapshot. Campaign switched meanwhile → waiting screen.
 - **DM disconnect / reconnect:** players unaffected; DM client re-sends the stored secret in `hello` → active campaign's snapshot.
 - **Server crash:** each command is one transaction (row + log): all or nothing. Retried create → unique-name error. Activation flips both flags at once: never zero or two active. Crash after the activation commit: connections drop anyway; old-campaign players then get `campaign-inactive`. After restart: DM still logged in, same active campaign, links work, throttle cleared. Server or tunnel down: page can't load; new tunnel host → DM re-copies links.
-- **Concurrent edits:** two DM tabs → last write wins; racing creates/renames → DB uniqueness gives one success, one error. A switch closes the other DM tabs too; in-flight intents are not resent ([FR-SYNC-17](live-sync.md#6-functional-requirements)).
+- **Concurrent edits:** two DM tabs → last write wins; racing creates/renames → DB uniqueness gives one success, one error. A switch closes the other DM tabs too; in-flight intents are not resent ([FR-SYNC-05](live-sync.md#6-functional-requirements)).
 - **Invalid / malicious input:** zod on every route; names trimmed, control characters rejected, rendered as text. Unknown token → 404, no detail; 128-bit tokens need no join rate limit. A player on the DM route sees only the login screen. Anyone reaching the tunnel can keep the DM locked out in 60 s windows (accepted, trusted table; OQ-CAMP-12).
 
 ## 12. Performance & bandwidth
@@ -147,7 +147,7 @@ No player-writable actions in this spec.
 
 Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from worktree env, data dir flagged disposable ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md), [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md)).
 
-- **Fixtures** from [fixtures-adapters](fixtures-adapters.md): `base` (campaign "Fixture Campaign", active; `player-1` "Player 1"), `player-2` ("Player 2"). **Added here**, on `base`: `campaign-second` = campaign "Second Campaign", inactive, player "Second Player" (stable link via the seeded seam).
+- **Fixtures** from [fixtures-adapters](fixtures-adapters.md): `base` (campaign "Fixture Campaign", active; `player-1` "Player 1"), `player-2` ("Player 2"). **Added here**, on `base`: `campaign-second` = campaign "Second Campaign", inactive, player "Second Player" (stable link via the seeded seam). Steps: create "Second Campaign" (inactive), activate it, add "Second Player", re-activate "Fixture Campaign".
 - **Bundle `campaign-switch`** = `base` + `player-2` + `campaign-second`.
 
 | Level | What | Fixtures |
@@ -171,10 +171,10 @@ Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from wo
 
 | On | What we need | Status |
 |---|---|---|
-| [live-sync](live-sync.md) | `hello` binding via our resolvers; retryable close code for `campaign-inactive` (player: wait + retry; DM: reconnect); drop the `player-removed` close and fixture-load resync; player `rejected` state uses §7 wording; presence; record types `campaign`, `player` | open |
-| [fixtures-adapters](fixtures-adapters.md) | `base`, `player-2`; loader calls our commands; seeded tokens only when disposable; DM secret from env (OQ-FIX-13) | open |
+| [live-sync](live-sync.md) | `hello` binding via our resolvers; retryable close code for `campaign-inactive` (player: wait + retry; DM: reconnect); player `rejected` state uses §7 wording; presence; record types `campaign`, `player` | agreed |
+| [fixtures-adapters](fixtures-adapters.md) | `base`, `player-2`; loader calls our commands; seeded tokens only when disposable; DM secret from env (OQ-FIX-13) | agreed |
 | [play-shell](play-shell.md), [entities](entities.md), [scenes-map](scenes-map.md) | Placement of switcher, players panel and player landing; owned records reference `Player.id` | phase 2 |
-| Build conventions (AGENTS.md) | Env names (DM secret, public base URL); disposable-data flag; seam mechanism | open |
+| Build conventions (AGENTS.md) | `PP_DM_SECRET`, `PP_PUBLIC_BASE_URL`, `PP_DATA_DISPOSABLE`, `ctx.ids/tokens/clock` (AGENTS §9.2–9.3) | agreed, pending merge |
 
 ## 15. Open questions
 
@@ -188,12 +188,13 @@ Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from wo
 | OQ-CAMP-06 | ~~Backup UI~~ **Decided:** no (tier D). | — | — | — |
 | OQ-CAMP-07 | How does the server know the public base URL? | **Env config; unset → DM client's origin + warning** (restart on host change) / DM pastes it in the UI (one more setting) / parse cloudflared output (couples to the tool) | no · owner: spec-campaign-management | — |
 | OQ-CAMP-08 | ~~Remove player~~ **Decided (D2, #109):** no remove in MVP. | — | — | — |
-| OQ-CAMP-09 | Player rename **decided (D2)**. Campaign rename in MVP too? | **Yes** (near-free, fixes typos) / defer | no · owner: spec-campaign-management | — |
+| OQ-CAMP-09 | ~~Rename~~ **Decided (D2, #114):** rename player and campaign in MVP. | — | — | — |
 | OQ-CAMP-10 | ~~Credential transport~~ **Decided (D4):** secret in localStorage, per request + `hello`; token in URL. | — | — | — |
 | OQ-CAMP-11 | ~~Stable fixture links~~ **Decided via OQ-FIX-12** ([proposed ADR](../architecture/adr/proposed-deterministic-seams.md)): seeded only when the data dir is disposable; real tokens from a CSPRNG. | — | — | — |
 | OQ-CAMP-12 | Login throttle policy (FR-CAMP-05) | **Global 5 / 60 s → 60 s lockout** (simple; lockout abusable) / per IP via tunnel header (trusts a header) / none (secret open to the internet) | no · owner: spec-campaign-management | live-sync |
 | OQ-CAMP-13 | Players see other players' names? | **Yes, `{id, name}`** (game log, party UI) / no (others resolve names) | no · owner: spec-campaign-management | dice-roll-log, play-shell |
-| OQ-CAMP-14 | Glossary: add **Active campaign** (the one campaign the server serves to players), **Public base URL** (external URL, usually the tunnel, used to build player links), **Link token** (opaque secret in a player link's path; the player's credential). Reword **Player link** "bound to one player name" → "bound to one player": rename keeps the token, while ADR-0004 says "bound to a player name". | **Add all; reword** / keep spec-local | no · owner: integrator | glossary, ADR-0004 |
+| OQ-CAMP-14 | ~~Glossary~~ **Decided (integrator):** added **Active campaign**, **Public base URL**, **Link token**; **Player link** reworded to "bound to one player" (rename keeps the token; [proposed-auth-credentials](../architecture/adr/proposed-auth-credentials.md) refines ADR-0004). | — | — | — |
+| OQ-CAMP-15 | Routes: DM client, player page, REST prefix | **DM `/`, player `/p/<token>`, REST `/api/*` as in §9** *(proposed)* / other | no · owner: spec-campaign-management | live-sync, AGENTS §9.1 |
 
 ## 16. Out of scope
 

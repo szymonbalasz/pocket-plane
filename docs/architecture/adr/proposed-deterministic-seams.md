@@ -3,7 +3,7 @@
 - Status: proposed; pick A accepted by the DM at the Phase 1 gate (D4, [decisions-log](../../decisions-log.md) #111). Integrator numbers it at merge
 - Date: 2026-10-11
 - Affects: fixtures-adapters, campaign-management, live-sync, all specs that create records
-- Extends: [ADR-0008](0008-parallel-dev-isolation.md) ("non-deterministic inputs need a test seam"). Raised by [OQ-FIX-12](../../specs/fixtures-adapters.md#15-open-questions). Implements the seam behind [FR-SYNC-35](../../specs/live-sync.md#6-functional-requirements) (injectable clock and IDs)
+- Extends: [ADR-0008](0008-parallel-dev-isolation.md) ("non-deterministic inputs need a test seam"). Raised by [OQ-FIX-12](../../specs/fixtures-adapters.md#15-open-questions). Implements the seam behind [FR-SYNC-26](../../specs/live-sync.md#6-functional-requirements) (injectable clock and timers)
 
 ## Context
 
@@ -26,8 +26,8 @@
 
 | Rule | Detail |
 |---|---|
-| One seam | Commands get IDs, tokens and "now" only from the command context. Same seam serves FR-SYNC-35 (clock, IDs, timers) |
-| Seed per fixture key | The loader reseeds the generator at the start of each fixture from `(fixed seed, fixture key)`. A fixture's IDs and tokens are the same in every bundle that includes it, and a later layered load in a new process would match a fresh `reset-and-load` |
+| One seam | Commands get IDs, tokens and "now" only from the command context. Same seam serves FR-SYNC-26 (clock, timers) |
+| Seed per fixture key | The loader reseeds the generator at the start of each fixture from `(fixed seed, fixture key)`. A fixture's IDs and tokens are the same in every bundle that includes it |
 | Disposable only | The seeded generator and fixed clock can only be constructed when the data dir is flagged disposable (or for a test's own temp dir). Otherwise construction fails. Never on real data |
 | Scope | Seeded only inside the fixture loader and test harness. A running server always uses a CSPRNG and the real clock, even on a disposable dir. Real player link tokens always come from a CSPRNG |
 | Same format | Seeded IDs and tokens have the same format and length as real ones; nothing special-cases them |

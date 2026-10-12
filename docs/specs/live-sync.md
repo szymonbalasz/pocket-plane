@@ -18,7 +18,7 @@ wave: 1
 - WS lifecycle (`hello` auth, heartbeat, auto-reconnect, close codes); envelopes; record-type registry with visibility fns.
 - Snapshot on (re)connect; resync on active-scene switch; campaign switch closes other campaigns' connections (one active campaign, [decisions-log](../decisions-log.md) #108).
 - Broadcaster as a domain event bus listener; event log write hook ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)).
-- **Signals** (ping, laser): transient, not domain events; bypass the bus, DB and event log. **Presence** (DM sees who is online): not in [feature tiers](../feature-tiers.md); near-free, kept under the tier B rule (accepted at the Phase 1 gate).
+- **Signals** (ping, laser): transient, not domain events; bypass the bus, DB and event log. **Presence** (DM sees who is online): not in [feature tiers](../feature-tiers.md); near-free, kept under the tier B rule ([decisions-log](../decisions-log.md) #114).
 - Client connection state + reconnect banner; multi-client test harness; test-mode **sync probe** record.
 
 ## 3. Goals
@@ -45,19 +45,19 @@ wave: 1
 | ID | Requirement | Notes |
 |---|---|---|
 | FR-SYNC-01 | One WS endpoint. No `hello` within 5 s of open → close `4408`. | |
-| FR-SYNC-02 | `hello.credential` resolves via campaign-management's resolvers to a context `{connId, campaignId, role, playerId?}`. Invalid → close `4401`, no other frame. DM `campaignId` = active campaign at `hello` (null if none). | [proposed-auth-credentials](../architecture/adr/proposed-auth-credentials.md) |
+| FR-SYNC-02 | `hello.credential` resolves via campaign-management's resolvers to a context `{connId, campaignId, role, playerId?}`. Invalid → close `4401`, no other frame. DM `campaignId` = active campaign at `hello`. Resolver `throttled` → close `4401` (FR-CAMP-05); `noActiveCampaign` → close `4409` (the DM client normally opens no WS then, [campaign-management §9](campaign-management.md#9-api--events)). | [proposed-auth-credentials](../architecture/adr/proposed-auth-credentials.md) |
 | FR-SYNC-03 | Context is fixed for the connection's life; ids or role in payloads are never trusted. Several connections per player or DM each get the same stream. | |
 | FR-SYNC-04 | Client sends `ping` every 10 s; server answers `pong` and closes a connection silent 30 s. Client treats 20 s without `pong` as dropped. | Keeps the tunnel alive |
 | FR-SYNC-05 | Client auto-reconnects forever: backoff 0.5 s doubling to 5 s, ±20 % jitter. Stops only on `4401`. Never resends intents in flight at disconnect. | No double damage |
-| FR-SYNC-06 | Player `hello` whose campaign is not active → close `4409 campaign-inactive`, no other frame. Client enters `waiting` (campaign-management's screen), keeps reconnecting, and joins without reload ≤ 6 s after the campaign is activated. | Retryable |
+| FR-SYNC-06 | Player `hello` whose campaign is not active → close `4409 campaign-inactive`, no other frame. Client enters `waiting` (campaign-management's screen), keeps reconnecting, and joins without reload ≤ 10 s after the campaign is activated. | Retryable |
 | FR-SYNC-07 | When a change of active campaign commits, the hub closes every connection whose `campaignId` ≠ the new one with `4409`. The DM client reconnects at once into the new campaign; players wait (FR-SYNC-06). | Campaign never changes on a live connection |
 | FR-SYNC-08 | After a valid `hello`, exactly one `snapshot` (seq 0, with `you {campaignId, role, playerId}`) precedes any `event`. Client replaces its whole store with it and drops optimistic state. | |
-| FR-SYNC-09 | Snapshot = each record type's provider output through the filter. Scopes: `global` (campaign list; imported definitions, [ADR-0018](../architecture/adr/0018-global-imported-content.md)), `campaign`, `scene` (DM: all scenes; player: active scene only). | OQ-SYNC-03 |
+| FR-SYNC-09 | Snapshot = each record type's provider output through the filter. Scopes: `global` (imported definitions, [ADR-0018](../architecture/adr/0018-global-imported-content.md)), `campaign`, `scene` (DM: all scenes; player: active scene only). | OQ-SYNC-03 |
 | FR-SYNC-10 | Changes committed between snapshot read and send arrive as events after it: none lost, none duplicated. | Hook: FR-SYNC-26 |
 | FR-SYNC-11 | Client `resync` → fresh snapshot. Switching the active scene resyncs every player connection of the campaign. | |
 | FR-SYNC-12 | Intents are zod-validated and dispatched by `name`. Unknown → `reject unknown_intent`; bad payload or JSON → `reject invalid` (issues), connection stays open. Frame > 64 KB → close `1009`. | |
 | FR-SYNC-13 | Handlers declare roles (**default DM only**) and, if players are allowed, an ownership check. Failure → `reject forbidden`, no change, no event. | [ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md) |
-| FR-SYNC-14 | Every intent gets exactly one `ack` or `reject`, sender only, keyed by `intentId`. Events it caused reach the sender **before** the `ack`. | Needs synchronous listeners (§14) |
+| FR-SYNC-14 | Every intent gets exactly one `ack` or `reject`, sender only, keyed by `intentId`. Events it caused reach the sender **before** the `ack`. | Needs synchronous listeners: [proposed ADR](../architecture/adr/proposed-sync-protocol-conventions.md) option F (pick; needs DM OK) |
 | FR-SYNC-15 | Commands called via REST (Hono RPC) produce the same events; the result comes in the HTTP response. | OQ-SYNC-04 |
 | FR-SYNC-16 | Domain events are appended to the event log in the commit's transaction (unless their spec marks them non-logged) and dispatched only after commit. Rollback → no event, no log entry. A listener failure never rolls back. | [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) |
 | FR-SYNC-17 | Per domain event, each connection gets at most one `event` holding its filtered changes `{type, id, op: upsert \| delete, data?}` (upsert = whole filtered record), applied atomically; nothing if none survive. | OQ-SYNC-07, OQ-SYNC-14 |
@@ -83,12 +83,12 @@ wave: 1
 
 | Entity | Field | Type | Notes |
 |---|---|---|---|
-| Connection *(in-memory)* | connId, campaignId, role, playerId | id, id \| null, `dm`\|`player`, id \| null | Immutable |
+| Connection *(in-memory)* | connId, campaignId, role, playerId | id, id, `dm`\|`player`, id \| null | Immutable |
 | | phase, seq, lastInboundAt | `awaiting-hello`\|`snapshotting`\|`live`, int, timestamp | |
 | Presence *(in-memory, derived)* | playerId, online | id, bool | From live connections |
 | Record change *(in a domain event)* | type, id, before, after | string, id, record \| null ×2 | Create: before null; delete: after null |
 | Registrations *(code)* | record type: type, scope, schema, visibility, snapshot; intent: name, schema, roles, authorize, execute; signal: name, schema, roles, visibility | scope `global`\|`campaign`\|`scene` | Intent roles default `[dm]` |
-| Event log entry *(persisted)* | id, campaignId, type, at, payload, actorRole, actorPlayerId, intentId | payload = **JSON leaf** | Append-only; undo fields: [combat-tracker](combat-tracker.md) |
+| Event log entry *(persisted)* | id, campaignId, type, at, payload, actorRole, actorPlayerId, intentId | payload = **JSON leaf** | Append-only; `campaignId` null for global events (imported definitions, [FR-FIX-23](fixtures-adapters.md#6-functional-requirements)); undo fields: [combat-tracker](combat-tracker.md) |
 | Sync probe *(persisted, test)* | id, campaignId, text, hidden, ownerPlayerId | id, id, string, bool, id \| null | Player sees it iff `!hidden && (owner == null \|\| owner == ctx.playerId)` |
 
 - **Relations:** connection → campaign, player ([campaign-management](campaign-management.md)); scene records → scene ([scenes-map](scenes-map.md)).
@@ -111,7 +111,7 @@ wave: 1
 | `ack` / `reject` / `pong` | `intentId`, `result?` / `code` (`invalid`, `unknown_intent`, `forbidden`, `not_found`, `conflict`, `internal`), `message`, `issues?` | Sender only |
 | record `presence` / `probe` | see §8 | DM only / §8 rule |
 
-- **REST:** only the WS upgrade (path from build conventions); auth is in `hello`. **Hub API:** `resync(selector)`, `disconnect(selector, code)`, `connections(campaignId)`.
+- **REST:** only the WS upgrade (path `/ws` *(proposed)*, OQ-SYNC-15); auth is in `hello`. **Hub API:** `resync(selector)`, `disconnect(selector, code)`, `connections(campaignId)`.
 - **Close codes:** `1001` shutdown, `1009` frame too large, `4000` resync required, `4408` no `hello` → reconnect. `4401` credential invalid → `rejected`. `4409 campaign-inactive` (retryable) → DM reconnects now, player `waiting`.
 - **Plug-in conventions (every feature spec):** register record types (scope, schema, visibility fn, bounded snapshot provider) and intents (`<feature>.<verb>`, roles, ownership). Campaign and player are record types of [campaign-management](campaign-management.md). No named per-feature WS events.
 - Visibility reads record + context only (OQ-SYNC-08). Domain events list `changes`, including every record whose visibility changes; per event state logged? and undoable?
@@ -150,7 +150,7 @@ wave: 1
 | Integration | 4408/4401/4409 with no data frame; snapshot race via `pauseSnapshot`; rejects → no event; events before `ack`; rollback → no event/log; convergence per player; **leak scan** for `SECRET-PROBE`; switch closes old campaign, waiting player rejoins; presence; overflow → 4000; restart → identical snapshots | `sync-probe` |
 | E2E (thin) | Playwright, DM + `player-1`: reveal/hide, reload, restart | `sync-probe` |
 
-**Browser walkthrough.** Reset-and-load `sync-probe`, start the app. Separate contexts: **A** DM, **B** `player-1`, **C** `player-2`. Throughout, B's and C's frames contain `SECRET-PROBE` only while `secret` is revealed.
+**Browser walkthrough.** With test mode on (`PP_TEST_MODE=1`, AGENTS §9.2), reset-and-load `sync-probe` and start the app (verify profile). Separate contexts: **A** DM, **B** `player-1`, **C** `player-2`. Throughout, B's and C's frames contain `SECRET-PROBE` only while `secret` is revealed.
 
 | # | DM (A) | Players (B, C) | Expected |
 |---|---|---|---|
@@ -160,19 +160,19 @@ wave: 1
 | 4 | — | B edits `mine` | A and B update; C never sees `mine` |
 | 5 | Edit `public`, reveal `secret` while B is dropped ("drop connection") | B back | B: banner + disabled controls, then both changes, no reload |
 | 6 | Switch to "Second Campaign" | — | A reconnects: no probes. B, C on waiting screen |
-| 7 | Switch back | — | A shows 3 probes; B, C rejoin ≤ 6 s, no reload |
+| 7 | Switch back | — | A shows 3 probes; B, C rejoin ≤ 10 s, no reload |
 | 8 | Hard-kill server, restart on same DB | — | All show "Reconnecting…", then rejoin; state unchanged |
-| 9 | — | New context D: mangled link | Invalid-link screen; frames show only the close |
+| 9 | — | New context D: mangled link | Invalid-link screen ([campaign-management §7](campaign-management.md#7-uiux-notes) wording); no data frame (REST 404; any WS shows only the `4401` close) |
 
 ## 14. Dependencies
 
 | On | What we need | Status |
 |---|---|---|
-| [campaign-management](campaign-management.md) | Resolvers; campaign/player record types; activation domain event; invalid-link + waiting screens; `campaign-second` | open |
-| [fixtures-adapters](fixtures-adapters.md) | `base`, `player-2`; bundles build on `base` | open |
-| [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) open row "Listener execution" | **Synchronous, after commit** (FR-SYNC-14 relies on it) | open — pick synchronous |
+| [campaign-management](campaign-management.md) | Resolvers; campaign/player record types; activation domain event; invalid-link + waiting screens; `campaign-second` | agreed |
+| [fixtures-adapters](fixtures-adapters.md) | `base`, `player-2`; bundles build on `base` | agreed |
+| [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) open row "Listener execution" | **Synchronous, after commit** (FR-SYNC-14 relies on it) | open — pick synchronous ([proposed ADR option F](../architecture/adr/proposed-sync-protocol-conventions.md#options), needs DM OK) |
 | [scenes-map](scenes-map.md) / [play-shell](play-shell.md) | Active scene id + resync on switch, ping/laser as signals / hosts indicator, banner, presence | open |
-| Build conventions (AGENTS.md) | WS path, test-mode and disposable flags, ports | open |
+| Build conventions (AGENTS.md) | `PP_TEST_MODE`, `PP_DATA_DISPOSABLE`, ports: AGENTS §9.2 (agreed, pending merge); WS path: open (OQ-SYNC-15) | agreed, pending merge |
 
 ## 15. Open questions
 
@@ -189,11 +189,12 @@ wave: 1
 | OQ-SYNC-07 | ~~WS event shape~~ **Decided: generic record changes + `cause` for all specs** (D4, integrator) | — | — | — |
 | OQ-SYNC-08 | What may a visibility fn read? | **Record + context only** (pure, testable) / related records (reveal must list dependents) | no — owner: spec-live-sync | scenes-map, combat-tracker |
 | OQ-SYNC-09 | ~~Handshake~~ **Decided: first-frame `hello` carries the credential** (D4) | — | — | — |
-| OQ-SYNC-10 | ~~Presence~~ **Decided: DM-only, in-memory** (gate default) | — | — | — |
+| OQ-SYNC-10 | ~~Presence~~ **Decided: DM-only, in-memory** (#114) | — | — | — |
 | OQ-SYNC-11 | ~~Ping/laser~~ **Decided: signals, not domain events; bypass bus and log** (integrator) | — | — | — |
-| OQ-SYNC-12 | ~~Sync probe~~ **Decided: yes, test mode only** (gate default) | — | — | — |
+| OQ-SYNC-12 | ~~Sync probe~~ **Decided: yes, test mode only** (#114) | — | — | — |
 | OQ-SYNC-13 | Numeric targets (§3, §12) | **As proposed** / DM sets others | no — owner: DM | vision |
-| OQ-SYNC-14 | Glossary: add **signal**, **presence**, **resync**, **record change**; change **Event (WS event)** to "message carrying the filtered record changes of one domain event (one or more records)" | **Add and change** (atomic multi-record events) / drop batching (one record per message; reveals not atomic) | no — owner: integrator | glossary |
+| OQ-SYNC-14 | ~~Glossary~~ **Decided (integrator):** added **signal**, **presence**, **resync**, **record change**, **sync probe**; **WS event** = filtered record changes of one domain event (one or more records); **Snapshot** = sent by the server after `hello` and on `resync` | — | — | — |
+| OQ-SYNC-15 | WS endpoint path | **`/ws`** *(proposed)*, same origin as the clients / other | no — owner: spec-live-sync | AGENTS §9.2, campaign-management OQ-CAMP-15 |
 
 ## 16. Out of scope
 

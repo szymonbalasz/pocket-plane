@@ -108,7 +108,7 @@ One package, no workspaces ([ADR-0002](docs/architecture/adr/0002-single-package
 - **Import boundaries**, enforced by a `bun test` boundary test and Biome restricted imports:
   - `@ui` must not import `@dm` or `@player`. `@dm` and `@player` must not import each other.
   - Clients (`@ui`, `@dm`, `@player`) may only `import type { AppType } from "@server/app"` (Hono RPC, erased at build). Nothing else from `@server`. The player bundle therefore never contains DM or server code.
-- Two Vite entry points: `src/client/dm/index.html`, `src/client/player/index.html`. Build output `dist/client/`, served by Hono. URL routes per [campaign-management](docs/specs/campaign-management.md).
+- Two Vite entry points: `src/client/dm/index.html`, `src/client/player/index.html`. Build output `dist/client/`, served by Hono. URL routes per [campaign-management](docs/specs/campaign-management.md): DM `/`, player `/p/<token>`, REST `/api/*` *(proposed; [OQ-CAMP-15](docs/specs/campaign-management.md#15-open-questions) open)*.
 - Feature code lives in its own `features/<feature>/` folders. Tests sit next to code as `*.test.ts`.
 - Only `src/server/config.ts` reads `process.env`; it parses it with zod and exports a `parseConfig(env)` that tests call directly.
 
@@ -128,7 +128,7 @@ Implements [ADR-0008](docs/architecture/adr/0008-parallel-dev-isolation.md). Val
 | `PP_DATA_DISPOSABLE` | unset | `1` = this data dir may be wiped and seeded ([§9.3](#93-fixtures)). `env:init` writes `1`; a real install never sets it |
 | `PP_TEST_MODE` | unset | `1` = test-only records and routes on (sync probe, [OQ-SYNC-12](docs/specs/live-sync.md#15-open-questions)). Refused unless `PP_DATA_DISPOSABLE=1`. Off by default; set it for probe walkthroughs |
 | `PP_DM_SECRET` | **required** | DM secret, min 12 chars, env only, never stored ([OQ-CAMP-03](docs/specs/campaign-management.md#15-open-questions)). Server refuses to start without it. `env:init` writes a random dev value |
-| `PP_PUBLIC_BASE_URL` | unset | Base for player links ([OQ-CAMP-07](docs/specs/campaign-management.md#15-open-questions)). Unset → DM client's origin + warning |
+| `PP_PUBLIC_BASE_URL` | unset | Base for player links ([OQ-CAMP-07](docs/specs/campaign-management.md#15-open-questions)). Unset → DM client's origin + warning (pick; OQ-CAMP-07 open) |
 | `PP_LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
 
 - **No `PP_TUNNEL`.** The DM runs cloudflared against `PP_PORT` and sets `PP_PUBLIC_BASE_URL` to the tunnel URL; that is ADR-0008's "tunnel on/off".
@@ -141,11 +141,12 @@ Implements [ADR-0008](docs/architecture/adr/0008-parallel-dev-isolation.md). Val
 | (e2e) | `bun run e2e` | `start` on a temp dir | port `0` | fresh temp dir per run |
 | (tests) | `bun test` | in-process | port `0` | `:memory:` DB + temp asset dir per test file |
 
+- WS endpoint path: `/ws` *(proposed; [OQ-SYNC-15](docs/specs/live-sync.md#15-open-questions) open)* ([FR-SYNC-01](docs/specs/live-sync.md#6-functional-requirements)).
 - **DM URL in dev** is the Vite port; Vite proxies `/api` and the WS path to Hono. Everywhere else (verify, e2e, real play, tunnel) one Hono port serves everything; that is the port a tunnel needs.
 - Printed URLs always use `http://127.0.0.1:<port>`, never `localhost` (Windows may resolve it to `::1`).
 - **Fail fast on ports**: Vite `strictPort: true`; Hono exits with a clear error if its port is taken. No fallback ports.
 - **Slot claim** (`bun run env:init`): keeps an existing `.env`. Otherwise picks the lowest slot not claimed in any other worktree's `.env` (via `git worktree list`) whose ports pass a **test bind** on `PP_HOST` (catches Windows reserved ranges), then writes `.env`. Holds a lock file in the git common dir while picking. The orchestrator runs it when creating a `build/*` or `fix/*` worktree, any location (incl. `~/.herdr/worktrees/<repo>/<branch-slug>`).
-- **Server lock**: on start the server writes `$PP_DATA_DIR/server.lock` (PID, port) and removes it on clean exit. A lock whose PID is alive → second server and `fixtures:*` refuse. PID dead → stale lock removed with a warning. E2E reads the actual port from it.
+- **Server lock**: on start the server writes `$PP_DATA_DIR/server.lock` (PID, port) and removes it on clean exit. A lock whose PID is alive → second server and `fixtures:*` refuse. PID dead → stale lock removed with a warning. E2E reads the actual port from it. The loader holds the same lock (owner `loader`); the server refuses to start while it is live, or while the load manifest is `resetting`/`loading` ([FR-FIX-27/28](docs/specs/fixtures-adapters.md#6-functional-requirements)).
 - Builder and test agent share a worktree but not a profile, so a walkthrough never resets the builder's DB.
 
 ### 9.3 Fixtures
@@ -157,7 +158,7 @@ fixtures/
   units/<feature>/<key>.ts    setup (ordered command steps) or reference (import batch)
   bundles/<bundle>.ts         named compositions: base, session-sim, …; all build on base
   bundles/index.ts            bundle registry (append-only, §9.9)
-  srd/<kind>/<slug>.ts        SRD reference data; global, source `fixture`, with licence attribution (ADR-0018)
+  srd/<kind>/<slug>.ts        SRD reference data; global, source `fixture`, with licence attribution (ADR-0018); imported by reference units (e.g. `units/entities/enemy-1.ts` → `srd/monster/goblin.ts`)
   assets/{maps,tokens}/*.svg  committed SVG sources, rasterised with sharp at load
 ```
 
