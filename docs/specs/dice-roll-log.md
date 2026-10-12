@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: in-review
+status: complete
 owner: spec-dice-roll-log
 wave: 2
 ---

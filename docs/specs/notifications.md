@@ -1,7 +1,7 @@
 ---
 title: Notifications
 prefix: NOTE
-status: in-review
+status: complete
 owner: spec-notifications
 wave: 2
 ---
@@ -217,7 +217,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | ~~OQ-NOTE-03, 05, 07~~ | ~~History retention; creation; undo of applied damage~~ | Decided: 03 keep all in DB, snapshot = pending (pinned) + newest 100 closed, no load-older (#137, ADR-0029); 05 `notify` inside the causing command's transaction (#135, ADR-0027); 07 undo reopens the card, no Redo, owner event first (#139 P4, I28) | — | live-sync, combat-tracker |
 | ~~OQ-NOTE-10, 12~~ | ~~Kind + view registries append-only; glossary "Action owner"~~ | Decided (integrator): both registries on the AGENTS §9.9 list (paths §14); glossary adds **Action owner** | — | AGENTS.md, glossary |
 | ~~OQ-NOTE-11~~ | ~~Damage card audience~~ | Decided (#138): rolling player sees the card and its resolution incl. damage applied; DM attacks: `dm` | — | combat-tracker |
-| OQ-NOTE-13 | Launcher unread badge: play-shell window types gain `badge?(store) → number` | **Add** (shared change, gate §4 item 11) / unread count in the window title only | no · owner: orchestrator | play-shell |
+| ~~OQ-NOTE-13~~ | ~~Launcher unread badge: play-shell window types gain `badge?(store) → number` ~~ Decided (#142): add `badge?(store)`; shared change by build/notifications | **Add** (shared change, gate §4 item 11) / unread count in the window title only | no · owner: orchestrator | play-shell |
 | ~~OQ-NOTE-14~~ | ~~Toast to the rolling player when the DM resolves their card?~~ | Decided (#141): **no**; the card's resolution in `note.history` shows it (FR-NOTE-13, -18 unchanged) | — | combat-tracker |
 
 ## 16. Out of scope
