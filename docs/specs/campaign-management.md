@@ -1,7 +1,7 @@
 ---
 title: Campaign management
 prefix: CAMP
-status: in-review
+status: complete
 owner: spec-campaign-management
 wave: 1
 ---
@@ -12,8 +12,8 @@ wave: 1
 
 ## 1. Summary
 
-- Several campaigns, one **active campaign** per server; the DM creates and switches ([ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md), [proposed ADR](../architecture/adr/proposed-single-active-campaign.md)).
-- DM secret for the DM; one player link per player, opened with no other setup ([proposed ADR](../architecture/adr/proposed-auth-credentials.md)). Built first, in the Phase 2 skeleton ([roadmap](../roadmap.md#build-order-mvp)).
+- Several campaigns, one **active campaign** per server; the DM creates and switches ([ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md), [ADR-0020](../architecture/adr/0020-single-active-campaign.md)).
+- DM secret for the DM; one player link per player, opened with no other setup ([ADR-0019](../architecture/adr/0019-auth-credentials.md)). Built first, in the Phase 2 skeleton ([roadmap](../roadmap.md#build-order-mvp)).
 
 ## 2. Scope
 
@@ -86,7 +86,7 @@ No JSON leaf fields ([ADR-0006](../architecture/adr/0006-persistence.md)). DM se
 | Campaign | id | ID | The scope itself; no `campaignId` |
 | | name | text | 1–60, unique case-insensitive |
 | | active | boolean | At most one `true` (partial unique index) |
-| | createdAt, updatedAt | timestamp | Clock seam ([proposed deterministic-seams](../architecture/adr/proposed-deterministic-seams.md)) |
+| | createdAt, updatedAt | timestamp | Clock seam ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)) |
 | Player | id | ID | Referenced by owned records (characters, tokens) |
 | | campaignId | ID → Campaign | |
 | | name | text | 1–40, unique case-insensitive per campaign |
@@ -183,17 +183,17 @@ Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from wo
 | OQ-CAMP-01 | ~~Links across tunnel URL changes~~ **Decided (D4):** opaque token in path; public base URL from config; DM re-copies. | — | — | — |
 | OQ-CAMP-02 | ~~Link revocation / rotation~~ **Decided:** no (tier F). | — | — | — |
 | OQ-CAMP-03 | ~~DM secret storage~~ **Decided (D4, #112):** env only, ≥ 12 chars, never stored. | — | — | — |
-| OQ-CAMP-04 | ~~Several live campaigns?~~ **Decided (D1, #108):** several campaigns, one active, DM switches ([proposed ADR](../architecture/adr/proposed-single-active-campaign.md)). | — | — | — |
+| OQ-CAMP-04 | ~~Several live campaigns?~~ **Decided (D1, #108):** several campaigns, one active, DM switches ([ADR-0020](../architecture/adr/0020-single-active-campaign.md)). | — | — | — |
 | OQ-CAMP-05 | ~~Session journal~~ **Decided:** no ([ADR-0013](../architecture/adr/0013-session-journal-scope.md)). | — | — | — |
 | OQ-CAMP-06 | ~~Backup UI~~ **Decided:** no (tier D). | — | — | — |
 | OQ-CAMP-07 | How does the server know the public base URL? | **Env config; unset → DM client's origin + warning** (restart on host change) / DM pastes it in the UI (one more setting) / parse cloudflared output (couples to the tool) | no · owner: spec-campaign-management | — |
 | OQ-CAMP-08 | ~~Remove player~~ **Decided (D2, #109):** no remove in MVP. | — | — | — |
 | OQ-CAMP-09 | ~~Rename~~ **Decided (D2, #114):** rename player and campaign in MVP. | — | — | — |
 | OQ-CAMP-10 | ~~Credential transport~~ **Decided (D4):** secret in localStorage, per request + `hello`; token in URL. | — | — | — |
-| OQ-CAMP-11 | ~~Stable fixture links~~ **Decided via OQ-FIX-12** ([proposed ADR](../architecture/adr/proposed-deterministic-seams.md)): seeded only when the data dir is disposable; real tokens from a CSPRNG. | — | — | — |
+| OQ-CAMP-11 | ~~Stable fixture links~~ **Decided via OQ-FIX-12** ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)): seeded only when the data dir is disposable; real tokens from a CSPRNG. | — | — | — |
 | OQ-CAMP-12 | Login throttle policy (FR-CAMP-05) | **Global 5 / 60 s → 60 s lockout** (simple; lockout abusable) / per IP via tunnel header (trusts a header) / none (secret open to the internet) | no · owner: spec-campaign-management | live-sync |
 | OQ-CAMP-13 | Players see other players' names? | **Yes, `{id, name}`** (game log, party UI) / no (others resolve names) | no · owner: spec-campaign-management | dice-roll-log, play-shell |
-| OQ-CAMP-14 | ~~Glossary~~ **Decided (integrator):** added **Active campaign**, **Public base URL**, **Link token**; **Player link** reworded to "bound to one player" (rename keeps the token; [proposed-auth-credentials](../architecture/adr/proposed-auth-credentials.md) refines ADR-0004). | — | — | — |
+| OQ-CAMP-14 | ~~Glossary~~ **Decided (integrator):** added **Active campaign**, **Public base URL**, **Link token**; **Player link** reworded to "bound to one player" (rename keeps the token; [ADR-0019](../architecture/adr/0019-auth-credentials.md) refines ADR-0004). | — | — | — |
 | OQ-CAMP-15 | Routes: DM client, player page, REST prefix | **DM `/`, player `/p/<token>`, REST `/api/*` as in §9** *(proposed)* / other | no · owner: spec-campaign-management | live-sync, AGENTS §9.1 |
 
 ## 16. Out of scope

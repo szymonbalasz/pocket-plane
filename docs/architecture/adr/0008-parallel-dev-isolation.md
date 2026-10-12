@@ -22,4 +22,4 @@
 - Non-deterministic inputs (dice, clock, IDs) need a test seam.
   > TODO (spec phase): dice seeding approach, in [dice-roll-log](../../specs/dice-roll-log.md).
 
-> TODO (build phase): env var names, port allocation scheme, fixture format and location.
+- Env vars, port slots, data paths: [AGENTS.md §9.2](../../../AGENTS.md#92-env-ports-and-data). Fixture format and location: [§9.3](../../../AGENTS.md#93-fixtures).

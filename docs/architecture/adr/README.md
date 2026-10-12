@@ -24,6 +24,10 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0016](0016-domain-events-pending-actions.md) | Domain events and pending actions | accepted (core) |
 | [0017](0017-agent-verification-fixture-library.md) | Agent-driven verification and fixture library | accepted |
 | [0018](0018-global-imported-content.md) | Imported reference content is global; custom content per campaign | accepted |
+| [0019](0019-auth-credentials.md) | DM secret and player link credentials | accepted |
+| [0020](0020-single-active-campaign.md) | Several campaigns, one active per server | accepted |
+| [0021](0021-sync-protocol-conventions.md) | Sync protocol conventions | accepted |
+| [0022](0022-deterministic-seams.md) | Deterministic IDs, tokens and clock for fixtures and tests | accepted |
 
 ## Proposing a new ADR
 

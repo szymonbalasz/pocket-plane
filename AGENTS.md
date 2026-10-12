@@ -174,7 +174,7 @@ fixtures/
 - `load` prints the DM URL, DM secret (from env) and player link URL(s) for the profile's port.
 - New record type → new unit(s) + a bundle that exercises it, in the same branch.
 
-**ID / token / clock seam** (implements [OQ-FIX-12](docs/specs/fixtures-adapters.md#15-open-questions) and the [proposed deterministic-seams ADR](docs/architecture/adr/proposed-deterministic-seams.md), option A)
+**ID / token / clock seam** (implements [OQ-FIX-12](docs/specs/fixtures-adapters.md#15-open-questions) and the [ADR-0022](docs/architecture/adr/0022-deterministic-seams.md), option A)
 
 | On the command context | Real (default) | Seeded |
 |---|---|---|

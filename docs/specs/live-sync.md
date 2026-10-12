@@ -1,7 +1,7 @@
 ---
 title: Live sync, reconnect, visibility
 prefix: SYNC
-status: in-review
+status: complete
 owner: spec-live-sync
 wave: 1
 ---
@@ -10,7 +10,7 @@ wave: 1
 
 ## 1. Summary
 
-- Cross-cutting: how every feature's state reaches clients live. Built first, in the Phase 2 skeleton. Features plug in via [§9](#9-api--events) and the [proposed ADR](../architecture/adr/proposed-sync-protocol-conventions.md).
+- Cross-cutting: how every feature's state reaches clients live. Built first, in the Phase 2 skeleton. Features plug in via [§9](#9-api--events) and the [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md).
 - Intent → validate → mutate + commit → domain event → **visibility filter** → WS events ([ADR-0005](../architecture/adr/0005-server-authoritative-sync.md), [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). Reconnect = fresh snapshot; state survives a crash ([ADR-0006](../architecture/adr/0006-persistence.md)).
 
 ## 2. Scope
@@ -45,7 +45,7 @@ wave: 1
 | ID | Requirement | Notes |
 |---|---|---|
 | FR-SYNC-01 | One WS endpoint. No `hello` within 5 s of open → close `4408`. | |
-| FR-SYNC-02 | `hello.credential` resolves via campaign-management's resolvers to a context `{connId, campaignId, role, playerId?}`. Invalid → close `4401`, no other frame. DM `campaignId` = active campaign at `hello`. Resolver `throttled` → close `4401` (FR-CAMP-05); `noActiveCampaign` → close `4409` (the DM client normally opens no WS then, [campaign-management §9](campaign-management.md#9-api--events)). | [proposed-auth-credentials](../architecture/adr/proposed-auth-credentials.md) |
+| FR-SYNC-02 | `hello.credential` resolves via campaign-management's resolvers to a context `{connId, campaignId, role, playerId?}`. Invalid → close `4401`, no other frame. DM `campaignId` = active campaign at `hello`. Resolver `throttled` → close `4401` (FR-CAMP-05); `noActiveCampaign` → close `4409` (the DM client normally opens no WS then, [campaign-management §9](campaign-management.md#9-api--events)). | [ADR-0019](../architecture/adr/0019-auth-credentials.md) |
 | FR-SYNC-03 | Context is fixed for the connection's life; ids or role in payloads are never trusted. Several connections per player or DM each get the same stream. | |
 | FR-SYNC-04 | Client sends `ping` every 10 s; server answers `pong` and closes a connection silent 30 s. Client treats 20 s without `pong` as dropped. | Keeps the tunnel alive |
 | FR-SYNC-05 | Client auto-reconnects forever: backoff 0.5 s doubling to 5 s, ±20 % jitter. Stops only on `4401`. Never resends intents in flight at disconnect. | No double damage |
@@ -57,7 +57,7 @@ wave: 1
 | FR-SYNC-11 | Client `resync` → fresh snapshot. Switching the active scene resyncs every player connection of the campaign. | |
 | FR-SYNC-12 | Intents are zod-validated and dispatched by `name`. Unknown → `reject unknown_intent`; bad payload or JSON → `reject invalid` (issues), connection stays open. Frame > 64 KB → close `1009`. | |
 | FR-SYNC-13 | Handlers declare roles (**default DM only**) and, if players are allowed, an ownership check. Failure → `reject forbidden`, no change, no event. | [ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md) |
-| FR-SYNC-14 | Every intent gets exactly one `ack` or `reject`, sender only, keyed by `intentId`. Events it caused reach the sender **before** the `ack`. | Needs synchronous listeners: [proposed ADR](../architecture/adr/proposed-sync-protocol-conventions.md) option F (pick; needs DM OK) |
+| FR-SYNC-14 | Every intent gets exactly one `ack` or `reject`, sender only, keyed by `intentId`. Events it caused reach the sender **before** the `ack`. | Needs synchronous listeners: [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md) option F (decided: synchronous) |
 | FR-SYNC-15 | Commands called via REST (Hono RPC) produce the same events; the result comes in the HTTP response. | OQ-SYNC-04 |
 | FR-SYNC-16 | Domain events are appended to the event log in the commit's transaction (unless their spec marks them non-logged) and dispatched only after commit. Rollback → no event, no log entry. A listener failure never rolls back. | [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) |
 | FR-SYNC-17 | Per domain event, each connection gets at most one `event` holding its filtered changes `{type, id, op: upsert \| delete, data?}` (upsert = whole filtered record), applied atomically; nothing if none survive. | OQ-SYNC-07, OQ-SYNC-14 |
@@ -98,7 +98,7 @@ wave: 1
 
 | Client → server | Who | Validation / ownership |
 |---|---|---|
-| `hello {credential}` | DM, player | First frame; resolvers per [proposed-auth-credentials](../architecture/adr/proposed-auth-credentials.md) |
+| `hello {credential}` | DM, player | First frame; resolvers per [ADR-0019](../architecture/adr/0019-auth-credentials.md) |
 | `intent {intentId, name, payload}` | DM, player | Handler schema, roles, ownership |
 | `signal {name, data}` / `resync {}` / `ping {}` | DM, player | Signal schema + roles / live connection |
 | *(test)* intents `probe.set {id?, text, hidden, ownerPlayerId?}` / `probe.edit {id, text}` | DM / player | Owner is a player of `ctx.campaignId` / probe visible and `ownerPlayerId == ctx.playerId` |
@@ -170,13 +170,13 @@ wave: 1
 |---|---|---|
 | [campaign-management](campaign-management.md) | Resolvers; campaign/player record types; activation domain event; invalid-link + waiting screens; `campaign-second` | agreed |
 | [fixtures-adapters](fixtures-adapters.md) | `base`, `player-2`; bundles build on `base` | agreed |
-| [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) open row "Listener execution" | **Synchronous, after commit** (FR-SYNC-14 relies on it) | open — pick synchronous ([proposed ADR option F](../architecture/adr/proposed-sync-protocol-conventions.md#options), needs DM OK) |
+| [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) open row "Listener execution" | **Synchronous, after commit** (FR-SYNC-14 relies on it) | open — pick synchronous ([proposed ADR option F](../architecture/adr/0021-sync-protocol-conventions.md#options), needs DM OK) |
 | [scenes-map](scenes-map.md) / [play-shell](play-shell.md) | Active scene id + resync on switch, ping/laser as signals / hosts indicator, banner, presence | open |
 | Build conventions (AGENTS.md) | `PP_TEST_MODE`, `PP_DATA_DISPOSABLE`, ports: AGENTS §9.2 (agreed, pending merge); WS path: open (OQ-SYNC-15) | agreed, pending merge |
 
 ## 15. Open questions
 
-**Bold** = suggested pick. Cross-cutting picks: [proposed ADR](../architecture/adr/proposed-sync-protocol-conventions.md).
+**Bold** = suggested pick. Cross-cutting picks: [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md).
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|

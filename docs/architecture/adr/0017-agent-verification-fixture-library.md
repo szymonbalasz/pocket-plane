@@ -48,4 +48,4 @@
 - Browser tooling: Playwright ([ADR-0001](0001-tech-stack.md)) for scripted E2E; agent's interactive browser tooling chosen at build phase.
 - Selectors/test IDs on interactive UI so agents and Playwright can drive it reliably.
 
-> TODO (build phase): fixture folder layout, reset/load command names, agent browser tooling.
+- Fixture layout and commands: [AGENTS.md §9.3](../../../AGENTS.md#93-fixtures). Browser tooling (Playwright MCP): [§9.6](../../../AGENTS.md#96-browser-verification-test-agents).

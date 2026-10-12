@@ -8,9 +8,9 @@ Template: [_template.md](_template.md). Specs are written just in time, per buil
 
 | Build phase | Spec | Prefix | Status | Owner |
 |---|---|---|---|---|
-| 1. Foundation | [Live sync, reconnect, visibility](live-sync.md) | SYNC | unclaimed | — |
-| 1. Foundation | [Campaign management](campaign-management.md) | CAMP | unclaimed | — |
-| 1. Foundation | [Fixtures and import pipeline core](fixtures-adapters.md) | FIX | unclaimed | — |
+| 1. Foundation | [Live sync, reconnect, visibility](live-sync.md) | SYNC | complete | spec-live-sync |
+| 1. Foundation | [Campaign management](campaign-management.md) | CAMP | complete | spec-campaign-management |
+| 1. Foundation | [Fixtures and import pipeline core](fixtures-adapters.md) | FIX | complete | spec-fixtures-adapters |
 | 2. Scenes | [Assets pipeline](assets-pipeline.md) | ASSET | unclaimed | — |
 | 2. Scenes | [Entities (core)](entities.md) | ENT | unclaimed | — |
 | 2. Scenes | [Play shell](play-shell.md) | SHELL | unclaimed | — |

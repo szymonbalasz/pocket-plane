@@ -1,6 +1,6 @@
-# NNNN — DM secret and player link credentials
+# 0019 — DM secret and player link credentials
 
-- Status: proposed (picks accepted by the DM at the Phase 1 gate, D4; integrator numbers it)
+- Status: accepted (2026-10-12; picks accepted at the Phase 1 gate, D4, decisions-log #111)
 - Date: 2026-10-11
 - Affects: campaign-management, live-sync, fixtures-adapters
 - Extends: [ADR-0003](0003-local-hosting.md); refines [ADR-0004](0004-tenancy-auth-permissions.md) (link bound to a player, not a name)
@@ -35,5 +35,5 @@
 
 - live-sync binds connections via `verifyDmCredential` and `resolvePlayerLink` (campaign-management §9).
 - Build conventions define env names for the DM secret and the public base URL.
-- Fixtures take the DM secret from worktree env. Seeded tokens only when the data dir is flagged disposable ([proposed deterministic seams](proposed-deterministic-seams.md)); real tokens always come from a CSPRNG.
+- Fixtures take the DM secret from worktree env. Seeded tokens only when the data dir is flagged disposable ([ADR-0022](0022-deterministic-seams.md)); real tokens always come from a CSPRNG.
 - No revocation or rotation (tier F): a link stays valid for the player's life; rename keeps the token.

@@ -70,7 +70,7 @@ graph LR
 | ~~Which events are undoable?~~ **Decided: combat log entries only** — damage/healing applied. Initiative/turn not undoable; next/previous turn suffices (Shieldmaiden-style). | — |
 | ~~Undo order~~ **Decided: strict LIFO, one step at a time** (to undo step 3 of 5, undo 5, 4, then 3). No cherry-picking. | — |
 | Redo? | **Yes, as re-applying the original event** / no |
-| Listener execution | **Synchronous, same process, after commit** / async microtask |
+| ~~Listener execution~~ **Decided: synchronous, same process, after commit** ([ADR-0021](0021-sync-protocol-conventions.md) F) | — |
 | Can an action be resolved by "anyone in audience" or only a named actor? | **Named actor (DM or one player); audience may be wider** / anyone in audience |
 
 ## Consequences

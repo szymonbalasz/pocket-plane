@@ -1,10 +1,10 @@
-# NNNN — Sync protocol conventions
+# 0021 — Sync protocol conventions
 
-- Status: proposed (picks A–D accepted by the DM at the Phase 1 gate, [decisions-log](../../decisions-log.md) #111; E is the spec's default; F pending DM OK)
+- Status: accepted (2026-10-12; A–D at the Phase 1 gate, [decisions-log](../../decisions-log.md) #111; E spec default; F decided #115)
 - Date: 2026-10-12
 - Affects: all specs with live state; [live-sync](../../specs/live-sync.md), [protocol](../../protocol/README.md)
 - Extends: [ADR-0005](0005-server-authoritative-sync.md) (resolves its filter-granularity and optimistic-UI to-dos), [ADR-0016](0016-domain-events-pending-actions.md)
-- Handshake (first-frame `hello` with the credential, OQ-SYNC-09): credential format and resolvers live in [proposed-auth-credentials](proposed-auth-credentials.md); not repeated here.
+- Handshake (first-frame `hello` with the credential, OQ-SYNC-09): credential format and resolvers live in [ADR-0019](0019-auth-credentials.md); not repeated here.
 
 ## Context
 
@@ -60,7 +60,7 @@
 ## Decision
 
 - **A, B, C, D:** the bold options (accepted, D4). **E:** the bold option.
-- **F:** the bold option (pick; needs DM OK, resolves ADR-0016 open row).
+- **F:** synchronous, same process, after commit (DM, decisions-log #115; resolves the ADR-0016 open row).
 - Default deny: unregistered record types are hidden from players; intent handlers are DM-only unless they list `player`.
 - Visibility fns read only the record and the connection context; visibility flags live on the record.
 - Signals (ping, laser) are not domain events: no bus, DB or event log; they still pass their type's visibility fn.
@@ -70,5 +70,5 @@
 
 - Each spec's §9 lists record types (scope + visibility rule), intents (roles + ownership), signals, and domain events (logged? undoable?). No named per-feature WS events.
 - Domain events carry `changes` (before/after per record); any record whose visibility changes must be included.
-- Events reach the sender before its `ack` only if bus listeners run synchronously after commit (option F; ADR-0016 open row).
+- Events reach the sender before its `ack` only if bus listeners run synchronously after commit (option F, decided).
 - Integrator seeds [protocol](../../protocol/README.md) with the envelopes and close/reject codes from live-sync.

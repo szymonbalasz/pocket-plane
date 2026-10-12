@@ -1,6 +1,6 @@
-# NNNN — Several campaigns, one active per server
+# 0020 — Several campaigns, one active per server
 
-- Status: proposed (DM decision D1 at the Phase 1 gate; integrator numbers it)
+- Status: accepted (2026-10-12; DM decision D1, decisions-log #108)
 - Date: 2026-10-11
 - Affects: campaign-management, live-sync, all specs (campaign scoping)
 - Extends: [ADR-0004](0004-tenancy-auth-permissions.md)

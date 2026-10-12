@@ -13,7 +13,7 @@
 - One package. No workspaces.
 - Code separated by directory and **path aliases** (e.g. server, DM client, player client, shared schemas).
 
-> TODO (build phase): exact directory layout and alias names.
+- Layout and aliases: [AGENTS.md §9.1](../../../AGENTS.md#91-directory-layout-and-path-aliases).
 
 ## Consequences
 

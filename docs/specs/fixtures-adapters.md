@@ -1,7 +1,7 @@
 ---
 title: Fixtures and import pipeline core
 prefix: FIX
-status: in-review
+status: complete
 owner: spec-fixtures-adapters
 wave: 1
 ---
@@ -49,7 +49,7 @@ Retired IDs: 07 (merged into 06), 16 and 26 (→ review checks, §13), 22 (owned
 | FR-FIX-04 | Pre-flight, before any write: unknown bundle/fixture key, missing dependency, cycle, missing asset file or invalid reference record → non-zero, nothing written. | |
 | FR-FIX-05 | A step failing mid-load → loader resets to empty, exits non-zero, and names bundle, fixture key, step index, command and validation message. | [OQ-FIX-11](#15-open-questions) |
 | FR-FIX-06 | `load` requires an empty DB (manifest `empty`), else refuses with "reset first". No re-load or layering onto loaded state in MVP. | Composition is at resolution (FR-FIX-15) |
-| FR-FIX-08 | Two `reset-and-load` runs of a bundle give identical record IDs, player link URLs, timestamps and row counts. A fixture's IDs and tokens are identical in every bundle that includes it (e.g. `player-1`'s link in `base`, `session-sim`, `sync-probe`). Fixed clock = one instant for every load, e.g. `2026-01-01T00:00:00Z` *(proposed)*. | [seams ADR](../architecture/adr/proposed-deterministic-seams.md) |
+| FR-FIX-08 | Two `reset-and-load` runs of a bundle give identical record IDs, player link URLs, timestamps and row counts. A fixture's IDs and tokens are identical in every bundle that includes it (e.g. `player-1`'s link in `base`, `session-sim`, `sync-probe`). Fixed clock = one instant for every load, e.g. `2026-01-01T00:00:00Z` *(proposed)*. | [ADR-0022](../architecture/adr/0022-deterministic-seams.md) |
 | FR-FIX-09 | On success the loader writes the load manifest and prints: bundle, fixtures, records per fixture key, DM client URL, DM secret (read from env, never written to the manifest), player link URLs, duration. | [OQ-CAMP-03](campaign-management.md#15-open-questions) |
 | FR-FIX-10 | Budget: CLI `reset-and-load session-sim` ≤ 3 s incl. process start; in-process `session-sim` ≤ 1 s. Tests measure every run, warn above budget, fail above 2× budget. | Tolerates slow machines |
 | FR-FIX-11 | The in-process loader creates a temp data dir flagged disposable, loads a bundle and returns the manifest, opening no ports. Parallel test files and worktrees never share files. | |
@@ -138,7 +138,7 @@ Fixtures, bundles, manifest and lock are **code/files, not DB records**. Only pr
 - **Server crash:** lock owner gone → next loader clears the stale lock with a notice (FR-FIX-27); state is ordinary DB state ([ADR-0006](../architecture/adr/0006-persistence.md)). **Crash during reset or load** (e.g. DB wiped, asset dir not yet): manifest stays `resetting` / `loading` → `load` and server start refuse; `reset-and-load` redoes it from scratch (FR-FIX-01, 28).
 - **Concurrent edits:** second loader, or loader + server, on one data dir → lock refusal. Worktrees never share paths ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)).
 - **Invalid input:** bad step → wipe + named error (FR-FIX-05); bad reference record or missing image → pre-flight error (FR-FIX-04). Steps are typed against command schemas; the all-bundles test catches runtime drift.
-- **Real data:** reset refused (FR-FIX-02); seeded IDs/tokens never run there ([seams ADR](../architecture/adr/proposed-deterministic-seams.md)).
+- **Real data:** reset refused (FR-FIX-02); seeded IDs/tokens never run there ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)).
 
 ## 12. Performance & bandwidth
 
@@ -186,7 +186,7 @@ Isolated per worktree: every run uses its own temp data dir ([ADR-0008](../archi
 | OQ-FIX-04 | Mid-combat fixtures? | **`mid-combat` bundle on `session-sim`, owned by combat-tracker** / base state only | no (owner: combat-tracker) | combat-tracker |
 | OQ-FIX-10 | ~~Load while the server runs?~~ **Decided:** CLI refuses (#114); lock handling FR-FIX-27/28 | — | — | — |
 | OQ-FIX-11 | Failure mid-load | **Wipe to empty, named error** / outer-transaction rollback: fights per-command commits (ADR-0016) | no (owner: spec-fixtures-adapters) | — |
-| OQ-FIX-12 | ~~Deterministic IDs/tokens/clock~~ **Decided:** seeded per fixture, disposable dirs only (D4, [seams ADR](../architecture/adr/proposed-deterministic-seams.md)) | — | — | — |
+| OQ-FIX-12 | ~~Deterministic IDs/tokens/clock~~ **Decided:** seeded per fixture, disposable dirs only (D4, [ADR-0022](../architecture/adr/0022-deterministic-seams.md)) | — | — | — |
 | OQ-FIX-13 | ~~DM secret in fixtures~~ **Decided (moot):** env only (OQ-CAMP-03); loader prints the env value | — | — | — |
 | OQ-FIX-14 | ~~Upsert key scope~~ **Decided:** global `(source, sourceKey)` ([ADR-0018](../architecture/adr/0018-global-imported-content.md)) | — | — | — |
 | OQ-FIX-15 | Where provenance lives | **Inline fields on the definition row** / separate tables | no (owner: entities) | entities |
