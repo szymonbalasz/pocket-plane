@@ -1,56 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { defineEvent } from "@shared/events";
-import { sql } from "drizzle-orm";
-import { z } from "zod";
 import { seededContext } from "../../commands/context";
 import { CommandError } from "../../commands/errors";
 import { readEventLog } from "../../events/log";
 import { createTestServices, DM_ACTOR } from "../../testing/services";
-import { type DefinitionStore, isReadOnly } from "./import-pipeline";
+import { isReadOnly } from "./import-pipeline";
 
-// Test-only kind + store behind the insert interface (CON-03); entities ships the real ones.
-const TestDefinitionCreated = defineEvent({
-  type: "TestDefinitionCreated",
-  payload: z.object({ definitionId: z.string(), kind: z.string() }),
-  logged: true,
-  undoable: false,
-});
-
-const testStore: DefinitionStore = {
-  recordType: "test-definition",
-  createdEvent: TestDefinitionCreated,
-  find(tx, source, sourceKey) {
-    const rows = tx.values<[string]>(
-      sql`SELECT id FROM test_definition WHERE source = ${source} AND source_key = ${sourceKey}`,
-    );
-    const id = rows[0]?.[0];
-    return id === undefined ? null : { id };
-  },
-  insert(tx, r) {
-    tx.run(sql`INSERT INTO test_definition (id, kind, data, source, source_key, licence, attribution, imported_at)
-      VALUES (${r.id}, ${r.kind}, ${JSON.stringify(r.data)}, ${r.source}, ${r.sourceKey}, ${r.licence}, ${r.attribution}, ${r.importedAt})`);
-    return { record: { ...r }, payload: { definitionId: r.id, kind: r.kind } };
-  },
-};
-
+// The pipeline core against the real definition store: entities' `entity` table + `monster`
+// kind (CON-03, FR-ENT-06).
 function setup() {
   const s = createTestServices();
-  s.db.$client.run(`CREATE TABLE test_definition (id TEXT PRIMARY KEY, kind TEXT, data TEXT, source TEXT,
-    source_key TEXT, licence TEXT, attribution TEXT, imported_at TEXT, UNIQUE (source, source_key))`);
-  s.imports.registerKind({
-    kind: "test-creature",
-    schema: z.object({
-      name: z.string(),
-      ac: z.number().int().min(1),
-      hp: z.number().int().min(1),
-    }),
-  });
-  s.imports.store = testStore;
-  s.commands.registerEvent(TestDefinitionCreated);
   const rows = () =>
-    s.db.$client
-      .query<Record<string, string>, []>("SELECT * FROM test_definition ORDER BY rowid")
-      .all();
+    s.db.$client.query<Record<string, string>, []>("SELECT * FROM entity ORDER BY rowid").all();
   let n = 0;
   const run = (batch: unknown) =>
     s.commands.run("import.batch", batch, {
@@ -66,12 +26,24 @@ const source = {
   licence: "CC BY 4.0",
   attribution: "SRD 5.1 by Wizards of the Coast, CC BY 4.0",
 };
+const block = (ac: number, hpMax: number) => ({
+  size: "small",
+  ac,
+  hpMax,
+  initBonus: 2,
+  attacks: [],
+  cr: "1/4",
+});
 const goblin = {
-  kind: "test-creature",
+  kind: "monster",
   sourceKey: "goblin",
-  data: { name: "Goblin", ac: 15, hp: 7 },
+  data: { name: "Goblin", statBlock: block(15, 7) },
 };
-const wolf = { kind: "test-creature", sourceKey: "wolf", data: { name: "Wolf", ac: 13, hp: 11 } };
+const wolf = {
+  kind: "monster",
+  sourceKey: "wolf",
+  data: { name: "Wolf", statBlock: block(13, 11) },
+};
 
 describe("import pipeline core", () => {
   test("FR-FIX-18/21 valid batch → created, global, with provenance", () => {
@@ -80,6 +52,7 @@ describe("import pipeline core", () => {
     expect(out.map((o) => o.outcome)).toEqual(["created", "created"]);
     expect(rows()[0]).toMatchObject({
       id: out[0]?.id,
+      campaign_id: null,
       source: "fixture",
       source_key: "goblin",
       licence: "CC BY 4.0",
@@ -96,7 +69,7 @@ describe("import pipeline core", () => {
         source,
         records: [
           goblin,
-          { ...wolf, data: { name: "Wolf", ac: 0 } },
+          { ...wolf, data: { name: "Wolf", statBlock: { ...block(13, 0), ac: 31 } } },
           { kind: "nope", sourceKey: "x", data: {} },
         ],
       });
@@ -105,17 +78,17 @@ describe("import pipeline core", () => {
     }
     expect(err?.code).toBe("invalid");
     const paths = (err?.issues ?? []).map((i) => i.path.join("."));
-    expect(paths).toContain("wolf.data.ac");
-    expect(paths).toContain("wolf.data.hp");
+    expect(paths).toContain("wolf.data.statBlock.ac");
+    expect(paths).toContain("wolf.data.statBlock.hpMax");
     expect(paths).toContain("x.kind");
     expect(rows()).toHaveLength(0);
   });
 
-  test("FR-FIX-18 unknown kind is rejected", () => {
+  test("FR-FIX-18 unknown kind is rejected (character is not importable)", () => {
     const { run } = setup();
-    expect(() => run({ source, records: [{ kind: "monster", sourceKey: "a", data: {} }] })).toThrow(
-      CommandError,
-    );
+    expect(() =>
+      run({ source, records: [{ kind: "character", sourceKey: "a", data: {} }] }),
+    ).toThrow(CommandError);
   });
 
   test("FR-FIX-20 existing (source, sourceKey) → existing, nothing written, same ID", () => {
@@ -123,7 +96,7 @@ describe("import pipeline core", () => {
     const first = run({ source, records: [goblin] });
     const second = run({
       source,
-      records: [{ ...goblin, data: { name: "Changed", ac: 1, hp: 1 } }, wolf],
+      records: [{ ...goblin, data: { name: "Changed", statBlock: block(1, 1) } }, wolf],
     });
     expect(second[0]).toEqual({
       sourceKey: "goblin",
@@ -132,7 +105,7 @@ describe("import pipeline core", () => {
     });
     expect(second[1]?.outcome).toBe("created");
     expect(rows()).toHaveLength(2);
-    expect(JSON.parse(rows()[0]?.data ?? "{}").name).toBe("Goblin");
+    expect(rows()[0]?.name).toBe("Goblin");
   });
 
   test("FR-FIX-23 each created record emits the definition event, logged with campaignId null; existing emits nothing", () => {
@@ -141,7 +114,7 @@ describe("import pipeline core", () => {
     run({ source, records: [goblin] });
     const log = readEventLog(s.db);
     expect(log).toHaveLength(1);
-    expect(log[0]).toMatchObject({ type: "TestDefinitionCreated", campaignId: null });
+    expect(log[0]).toMatchObject({ type: "EntityImported", campaignId: null });
   });
 
   test("readOnly = source != null", () => {

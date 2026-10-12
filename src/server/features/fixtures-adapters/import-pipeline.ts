@@ -1,7 +1,7 @@
 // Import pipeline core (FIX §9, FR-FIX-18–23, ADR-0015, ADR-0018):
 // validate all → insert by global (source, sourceKey) → provenance. All-or-nothing.
 // The definition table, kinds and the definition domain event are owned by entities (CON-03):
-// they plug in through `ImportRegistry`. Until then only test kinds exist.
+// they plug in through `ImportRegistry` (`src/server/features/entities/import-store.ts`).
 import type { DomainEventDef } from "@shared/events";
 import type { Issue } from "@shared/protocol/codes";
 import { z } from "zod";
