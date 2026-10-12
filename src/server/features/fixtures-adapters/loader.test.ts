@@ -1,7 +1,9 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { CommandContext } from "../../commands/context";
+import * as contextModule from "../../commands/context";
 import { parseConfig } from "../../config";
 import { closeDb, openFileDb } from "../../db/client";
 import { campaign } from "../../db/schema";
@@ -160,6 +162,29 @@ describe("reset and load", () => {
     expect(readManifest(config.dataDir)).toBeNull();
     const t = tempConfig();
     await expect(resetAndLoad(t, lib, "zzz")).rejects.toThrow(/Unknown bundle/);
+  });
+});
+
+describe("seeded seams per fixture key (ADR-0022, FR-DICE-03)", () => {
+  test("FR-DICE-03 the loader reseeds ctx (IDs, tokens, dice) per fixture key, disposable only", async () => {
+    const spy = spyOn(contextModule, "seededContext");
+    try {
+      await resetAndLoad(tempConfig(), lib, "two");
+      expect(spy.mock.calls.map(([o]) => [o.key, o.disposable])).toEqual([
+        ["campaign", true],
+        ["p1", true],
+        ["p2", true],
+      ]);
+      // Each fixture's dice stream is the one seeded from its own key, whatever the bundle.
+      for (const [i, key] of ["campaign", "p1", "p2"].entries()) {
+        const ctx = spy.mock.results[i]?.value as CommandContext;
+        const fresh = contextModule.seededDice({ disposable: true, key });
+        const a = Array.from({ length: 8 }, () => ctx.dice.next());
+        expect(a).toEqual(Array.from({ length: 8 }, () => fresh.next()));
+      }
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

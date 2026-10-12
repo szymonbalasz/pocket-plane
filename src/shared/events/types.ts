@@ -10,6 +10,18 @@ export interface DomainEventDef<N extends string = string, S extends z.ZodType =
   undoable: boolean;
 }
 
+/** True for `defineEvent` results (event modules may also export enums and payload schemas). */
+export function isDomainEventDef(v: unknown): v is DomainEventDef {
+  if (typeof v !== "object" || v === null) return false;
+  const d = v as Partial<DomainEventDef>;
+  return (
+    typeof d.type === "string" &&
+    typeof d.logged === "boolean" &&
+    typeof d.undoable === "boolean" &&
+    typeof d.payload === "object"
+  );
+}
+
 export function defineEvent<N extends string, S extends z.ZodType>(
   def: DomainEventDef<N, S>,
 ): DomainEventDef<N, S> {

@@ -19,10 +19,20 @@ export interface TokenSource {
   next(): string;
 }
 
+/**
+ * Dice engine (FR-DICE-03, #137): the random-js engine contract the dice library takes.
+ * `next()` returns a uniformly distributed signed 32-bit integer.
+ */
+export interface DiceEngine {
+  next(): number;
+}
+
 export interface CommandContext {
   ids: IdSource;
   tokens: TokenSource;
   clock: Clock;
+  /** The only source of dice randomness; roll via `rollDice(ctx.dice, …)` (`./dice`). */
+  dice: DiceEngine;
 }
 
 export const systemClock: Clock = {
@@ -60,11 +70,35 @@ export function formatUuid(bytes: Uint8Array): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
+/** Int32 engine over a byte source, 4 bytes per draw (little-endian, signed). */
+function int32Engine(bytes: () => Uint8Array): DiceEngine {
+  let buf: Buffer = Buffer.alloc(0);
+  let at = 0;
+  return {
+    next() {
+      if (at + 4 > buf.length) {
+        const b = bytes();
+        buf = Buffer.from(b.buffer, b.byteOffset, b.byteLength);
+        at = 0;
+      }
+      const v = buf.readInt32LE(at);
+      at += 4;
+      return v;
+    },
+  };
+}
+
+/** Real dice: CSPRNG (FR-DICE-03). The running server always uses this. */
+export function realDice(): DiceEngine {
+  return int32Engine(() => randomBytes(256));
+}
+
 export function realContext(clock: Clock = systemClock): CommandContext {
   return {
     ids: { next: () => randomUUID() },
     tokens: { next: () => randomBytes(16).toString("base64url") },
     clock,
+    dice: realDice(),
   };
 }
 
@@ -95,12 +129,26 @@ export interface SeededOptions {
   clock?: Clock;
 }
 
-export function seededContext(opts: SeededOptions): CommandContext {
-  if (!opts.disposable) {
+function refuseUnlessDisposable(disposable: boolean, what: string): void {
+  if (!disposable) {
     throw new SeedNotAllowedError(
-      "Seeded IDs/tokens need a disposable data dir (PP_DATA_DISPOSABLE=1).",
+      `Seeded ${what} need a disposable data dir (PP_DATA_DISPOSABLE=1).`,
     );
   }
+}
+
+/**
+ * Seeded dice engine (FR-DICE-03): deterministic per `(seed, key)`, its own stream so dice
+ * draws never shift IDs or tokens. Same disposable guard as the seeded context (ADR-0022).
+ */
+export function seededDice(opts: { disposable: boolean; key: string; seed?: string }): DiceEngine {
+  refuseUnlessDisposable(opts.disposable, "dice");
+  return int32Engine(seededStream(opts.seed ?? FIXTURE_SEED, opts.key, "dice"));
+}
+
+/** IDs, tokens and dice reseeded from `(seed, key)`; the fixture loader calls it per fixture key. */
+export function seededContext(opts: SeededOptions): CommandContext {
+  refuseUnlessDisposable(opts.disposable, "IDs/tokens/dice");
   const seed = opts.seed ?? FIXTURE_SEED;
   const idBytes = seededStream(seed, opts.key, "ids");
   const tokenBytes = seededStream(seed, opts.key, "tokens");
@@ -108,5 +156,6 @@ export function seededContext(opts: SeededOptions): CommandContext {
     ids: { next: () => formatUuid(idBytes()) },
     tokens: { next: () => Buffer.from(tokenBytes()).toString("base64url") },
     clock: opts.clock ?? fixedClock(FIXTURE_INSTANT),
+    dice: seededDice({ disposable: opts.disposable, key: opts.key, seed }),
   };
 }

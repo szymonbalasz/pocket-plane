@@ -9,10 +9,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Agent | Workspace / branch | State | Blockers |
 |---|---|---|---|---|
 | build play-shell, assets-pipeline | — (ended) | merged | walkthroughs 11/11, 7/7 | — |
-| build entities | `build-entities` (`w14:p2`) | `w14`, `build/entities`, slot 0 | slices 1–3, e2e next | — |
-| `fix/combat-core` | `build-combat-core` (`w17:p2`) | `w17`, `fix/combat-core`, slot 2 | phase 1 (ctx.dice, lint rule, ADR-0029 window) | phase 2 (tables, events, loader reseed, CON-34–43) after entities merges |
-| Spec party-loot (Phase 4) | `spec-party-loot` (`w16:p2`) | `w16`, `spec/party-loot` | writing | — |
-| build scenes-map (+ FR-MAP-30 token hooks, token menu registry) | — | — | queued | entities + combat-core merged |
+| build entities | — (ended) | merged (`5c01b44`) | walkthrough 6/6, 250 tests | — |
+| `fix/combat-core` | `build-combat-core` (`w17:p2`) | `w17`, `fix/combat-core`, slot 2 | phase 1 done (ctx.dice, lint rule, ADR-0029 window); phase 2: tables, events, loader test, CON-34–43, per-spec e2e bundles | — |
+| Spec party-loot (Phase 4) | — (ended) | draft on `main`; review `%TEMP%\opencode\review-loot.md` | in-review | DM: OQ-LOOT-01/02/06 (batch at Scenes gate) |
+| build scenes-map (+ FR-MAP-30 token hooks, token menu registry) | `build-scenes-map` (`w18:p2`) | `w18`, `build/scenes-map`, slot 0 | non-schema slices first | schema/events lock after combat-core merges |
 | build dice-roll-log, notifications | — | — | queued | combat-core |
 | build character-sheet → combat-tracker | — | — | queued | dice, notifications, scenes-map |
 
@@ -20,8 +20,8 @@ Evidence archived: `%TEMP%\opencode\verify-{skeleton,scenes-core,play-shell,asse
 
 ## Shared-file locks (AGENTS §9.9, sequenced)
 
-- `build/entities`: `src/server/db/schema.ts`, `src/shared/events/`, import pipeline core + loader in `src/server/features/fixtures-adapters/`, `fixtures/bundles/session-sim.ts`, `src/client/dm/features/play-shell/windows.test.ts`, data-model §3/11/13, protocol §12–17.
-- `fix/combat-core`: `src/server/commands/`, `src/server/ws/`, `src/shared/protocol/`, `package.json`/`bun.lock`, `biome.json`; schema/events/loader/docs only after entities merges.
+- (entities locks released at merge)
+- `fix/combat-core`: `src/server/commands/`, `src/server/ws/`, `src/shared/protocol/`, `package.json`/`bun.lock`, `biome.json`, `scripts/e2e.ts` + `e2e/support/`, `src/server/db/schema.ts`, `src/shared/events/`, fixtures loader, data-model, protocol.
 
 ## Pending DM decisions
 

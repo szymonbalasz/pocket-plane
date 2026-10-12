@@ -22,6 +22,10 @@
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "overrides": [
     {
+      "includes": ["src/server/**", "src/shared/**", "fixtures/**"],
+      "plugins": ["./biome-plugins/no-math-random.grit"]
+    },
+    {
       "includes": [
         "src/server/features/**",
         "src/server/commands/**",

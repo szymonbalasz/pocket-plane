@@ -1,4 +1,5 @@
 // Record-type registry with visibility (SYNC §8, FR-SYNC-09/18/19). Default deny.
+import { cutWindow, type RecordWindow, type WindowIds } from "@shared/protocol/window";
 import type { z } from "zod";
 import type { Db } from "../db/client";
 import type { RecordChange, Role } from "../events/types";
@@ -46,8 +47,14 @@ export interface RecordTypeDef<R> {
   /**
    * Bounded snapshot provider: this type's records for the viewer's campaign (pre-filter).
    * Scene scope: return every scene's rows of the campaign; the scene gate filters.
+   * Windowed types return the whole log; the registry cuts it (ADR-0029).
    */
   snapshot(src: SnapshotSource, v: Viewer): R[];
+  /**
+   * Append-only logs (ADR-0029, CON-38): snapshot = pinned rows + newest `size` by `orderBy`,
+   * cut before the scope gate and visibility filter, so the floor is the same for every viewer.
+   */
+  window?: RecordWindow<R>;
 }
 
 /** Active scene id of a campaign, or null (CON-22). Must be a cheap in-memory read. */
@@ -80,6 +87,15 @@ export class RecordRegistry {
     }
     if (def.scope === "scene" && !def.sceneOf) {
       throw new Error(`Record type "${def.type}" (scope scene) needs sceneOf (CON-22)`);
+    }
+    if (def.window) {
+      const { orderBy, size } = def.window;
+      if (typeof orderBy !== "string" || orderBy === "") {
+        throw new Error(`Record type "${def.type}" window needs orderBy (ADR-0029)`);
+      }
+      if (!Number.isInteger(size) || size < 1) {
+        throw new Error(`Record type "${def.type}" window size must be an integer ≥ 1 (ADR-0029)`);
+      }
     }
     this.types.set(def.type, def);
   }
@@ -141,13 +157,44 @@ export class RecordRegistry {
     return null;
   }
 
+  /** Provider rows, cut to the window for windowed types (ADR-0029); pre-filter. */
+  private snapshotRows(def: AnyRecordType, src: SnapshotSource, v: Viewer): unknown[] {
+    const rows = def.snapshot(src, v);
+    return def.window ? cutWindow(rows, def.window).rows : rows;
+  }
+
+  /**
+   * Per windowed type the viewer receives: the record IDs the snapshot is cut to (pinned +
+   * newest `size`, pre-filter) and the floor. Convergence and leak-scan helpers use it.
+   */
+  windowCuts(
+    src: SnapshotSource,
+    v: Viewer,
+  ): Record<string, { ids: string[]; floor: number | null }> {
+    const out: Record<string, { ids: string[]; floor: number | null }> = {};
+    for (const def of this.types.values()) {
+      if (!def.window) continue;
+      if (def.audience === "dm" && v.role !== "dm") continue;
+      const cut = cutWindow(def.snapshot(src, v), def.window);
+      out[def.type] = { ids: cut.rows.map((r) => def.idOf(r)), floor: cut.floor };
+    }
+    return out;
+  }
+
+  /** `windowCuts` as the ID map `windowProjection` takes. */
+  windowIds(src: SnapshotSource, v: Viewer): WindowIds {
+    const out: Record<string, string[]> = {};
+    for (const [type, cut] of Object.entries(this.windowCuts(src, v))) out[type] = cut.ids;
+    return out;
+  }
+
   /** Snapshot records per type through the same filter (FR-SYNC-20). */
   snapshot(src: SnapshotSource, v: Viewer): Record<string, unknown[]> {
     const out: Record<string, unknown[]> = {};
     for (const def of this.types.values()) {
       if (def.audience === "dm" && v.role !== "dm") continue;
       const list: unknown[] = [];
-      for (const r of def.snapshot(src, v)) {
+      for (const r of this.snapshotRows(def, src, v)) {
         const seen = this.view(def.type, r, v);
         if (seen.vis !== "hidden") list.push(seen.data);
       }

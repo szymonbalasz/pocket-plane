@@ -1,5 +1,7 @@
 // Drizzle schema. Shared file (AGENTS §9.9). Entities and rules: docs/data-model/README.md.
 // Timestamps are ISO-8601 UTC strings from ctx.clock.
+import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
+import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
 import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
@@ -151,4 +153,294 @@ export const entity = sqliteTable(
   ],
 );
 
-export const schema = { campaign, player, eventLog, syncProbe, asset, entity };
+// ---------------------------------------------------------------------------------------------
+// Combat (data model §14–§18). Shared definitions only (fix/combat-core); the owning features
+// write the rows. `seq` columns = insertion order, assigned by the DB at insert (CON-20): use the
+// `*SeqNext` expressions. `n` on game-log entries is the command's own per-campaign counter.
+// Scene and token tables don't exist yet: `encounter.sceneId` and `combatant.tokenId` get their
+// `ON DELETE SET NULL` FKs when scenes-map adds those tables.
+// ---------------------------------------------------------------------------------------------
+
+const ROLE = ["dm", "player"] as const;
+
+/** Roll (dice-roll-log, data model §15): server table, not a record type. Immutable. */
+export const roll = sqliteTable(
+  "roll",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    at: text("at").notNull(),
+    rollerRole: text("roller_role", { enum: ROLE }).notNull(),
+    rollerPlayerId: text("roller_player_id").references((): AnySQLiteColumn => player.id),
+    actorKind: text("actor_kind", { enum: ["dm", "player", "entity", "token"] }).notNull(),
+    /** Plain id, no FK: the name is copied (DICE §8). */
+    actorId: text("actor_id"),
+    actorName: text("actor_name").notNull(),
+    targetEntityId: text("target_entity_id"),
+    targetTokenId: text("target_token_id"),
+    targetName: text("target_name"),
+    category: text("category", { enum: ROLL_CATEGORIES }).notNull(),
+    label: text("label"),
+    source: text("source", { enum: ["dice", "char", "cbt"] }).notNull(),
+    expression: text("expression").notNull(),
+    mode: text("mode", { enum: ROLL_MODES }).notNull(),
+    manual: integer("manual", { mode: "boolean" }).notNull(),
+    /** JSON leaf `{faces, value: int | null, kept}[]`, every die incl. dropped (#140). */
+    dice: text("dice", { mode: "json" }).notNull(),
+    constant: integer("constant").notNull(),
+    total: integer("total").notNull(),
+    natural: integer("natural"),
+    /** Reserved for gems (#140); null in MVP. */
+    replacesRollId: text("replaces_roll_id"),
+  },
+  (t) => [index("roll_campaign").on(t.campaignId)],
+);
+
+/** Game log entry (dice-roll-log, `game-log-entry`, data model §15). Window orderBy `n`. */
+export const gameLogEntry = sqliteTable(
+  "game_log_entry",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    /** Per-campaign counter, max + 1 in the transaction (FR-DICE-17). */
+    n: integer("n").notNull(),
+    at: text("at").notNull(),
+    kind: text("kind").notNull(),
+    category: text("category", { enum: ROLL_CATEGORIES }).notNull(),
+    /** Stamped once at creation (FR-DICE-13). */
+    public: integer("public", { mode: "boolean" }).notNull(),
+    undone: integer("undone", { mode: "boolean" }).notNull().default(false),
+    rollerRole: text("roller_role", { enum: ROLE }).notNull(),
+    rollerPlayerId: text("roller_player_id").references((): AnySQLiteColumn => player.id),
+    actorName: text("actor_name").notNull(),
+    /** JSON leaf per kind, player-safe. */
+    payload: text("payload", { mode: "json" }).notNull(),
+    /** JSON leaf, DM only (stripped for players). */
+    dmPayload: text("dm_payload", { mode: "json" }),
+    /** JSON leaf ID[]; no FK (gate I24). */
+    rollIds: text("roll_ids", { mode: "json" }).notNull(),
+    encounterId: text("encounter_id").references((): AnySQLiteColumn => encounter.id),
+    /** Reserved for gems (#140); null in MVP. */
+    supersededBy: text("superseded_by"),
+  },
+  (t) => [uniqueIndex("game_log_entry_campaign_n").on(t.campaignId, t.n)],
+);
+
+/** Public log settings (dice-roll-log, `game-log-settings`): one row per campaign, id = campaignId. */
+export const gameLogSettings = sqliteTable("game_log_settings", {
+  id: text("id").primaryKey(),
+  campaignId: text("campaign_id")
+    .notNull()
+    .unique()
+    .references((): AnySQLiteColumn => campaign.id),
+  attack: integer("attack", { mode: "boolean" }).notNull().default(false),
+  damage: integer("damage", { mode: "boolean" }).notNull().default(false),
+  savingThrow: integer("saving_throw", { mode: "boolean" }).notNull().default(false),
+  abilityCheck: integer("ability_check", { mode: "boolean" }).notNull().default(false),
+  skillCheck: integer("skill_check", { mode: "boolean" }).notNull().default(false),
+  contested: integer("contested", { mode: "boolean" }).notNull().default(false),
+  initiative: integer("initiative", { mode: "boolean" }).notNull().default(false),
+  healing: integer("healing", { mode: "boolean" }).notNull().default(false),
+  other: integer("other", { mode: "boolean" }).notNull().default(false),
+});
+
+/** Notification (notifications, data model §16). Window orderBy `seq`, pin pending. */
+export const notification = sqliteTable(
+  "notification",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    kind: text("kind").notNull(),
+    audience: text("audience", { enum: ["dm", "player", "all"] }).notNull(),
+    audiencePlayerId: text("audience_player_id").references((): AnySQLiteColumn => player.id),
+    text: text("text").notNull(),
+    /** JSON leaf ≤ 1 KB, per-kind zod. */
+    payload: text("payload", { mode: "json" }).notNull(),
+    actionLabel: text("action_label"),
+    actionRole: text("action_role", { enum: ROLE }),
+    actionPlayerId: text("action_player_id").references((): AnySQLiteColumn => player.id),
+    state: text("state", { enum: ["info", "pending", "resolved", "dismissed"] }).notNull(),
+    /** JSON leaf ≤ 256 B, per-kind zod. */
+    resolution: text("resolution", { mode: "json" }),
+    closedAt: text("closed_at"),
+    closedByRole: text("closed_by_role", { enum: ROLE }),
+    closedByPlayerId: text("closed_by_player_id").references((): AnySQLiteColumn => player.id),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("notification_seq").on(t.seq),
+    index("notification_campaign_seq").on(t.campaignId, t.seq),
+    index("notification_campaign_state").on(t.campaignId, t.state),
+  ],
+);
+
+/** Encounter (combat-tracker, data model §17). Window orderBy `seq`, pin status ≠ ended. */
+export const encounter = sqliteTable(
+  "encounter",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    name: text("name").notNull(),
+    status: text("status", { enum: ["planned", "started", "ended"] }).notNull(),
+    /** → scene, ON DELETE SET NULL once scenes-map adds the table. */
+    sceneId: text("scene_id"),
+    /** JSON leaf ID[] | null (null = every character of the campaign at read time). */
+    partyCharacterIds: text("party_character_ids", { mode: "json" }),
+    round: integer("round").notNull().default(0),
+    turnCombatantId: text("turn_combatant_id"),
+    playerTurnCombatantId: text("player_turn_combatant_id"),
+    startedAt: text("started_at"),
+    endedAt: text("ended_at"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("encounter_seq").on(t.seq),
+    // FR-CBT-07: at most one started encounter per campaign.
+    uniqueIndex("encounter_one_started").on(t.campaignId).where(sql`status = 'started'`),
+    index("encounter_campaign").on(t.campaignId),
+  ],
+);
+
+/** Encounter entry (combat-tracker, `encounter-entry`): whole replace on update. */
+export const encounterEntry = sqliteTable(
+  "encounter_entry",
+  {
+    id: text("id").primaryKey(),
+    encounterId: text("encounter_id")
+      .notNull()
+      .references((): AnySQLiteColumn => encounter.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    definitionId: text("definition_id")
+      .notNull()
+      .references((): AnySQLiteColumn => entity.id),
+    quantity: integer("quantity").notNull(),
+  },
+  (t) => [
+    uniqueIndex("encounter_entry_seq").on(t.seq),
+    index("encounter_entry_encounter").on(t.encounterId),
+  ],
+);
+
+/** Combatant (combat-tracker, `combatant`): created only by `cbt.start`. */
+export const combatant = sqliteTable(
+  "combatant",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    encounterId: text("encounter_id")
+      .notNull()
+      .references((): AnySQLiteColumn => encounter.id),
+    seq: integer("seq").notNull(),
+    kind: text("kind", { enum: ["pc", "monster"] }).notNull(),
+    entityId: text("entity_id")
+      .notNull()
+      .references((): AnySQLiteColumn => entity.id),
+    /** → token, ON DELETE SET NULL once scenes-map adds the table. */
+    tokenId: text("token_id"),
+    name: text("name").notNull(),
+    imageAssetId: text("image_asset_id").references((): AnySQLiteColumn => asset.id),
+    hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    removed: integer("removed", { mode: "boolean" }).notNull().default(false),
+    initiative: integer("initiative"),
+    initRollId: text("init_roll_id"),
+    /** Server-written ranks (FR-CBT-13). */
+    position: integer("position").notNull(),
+    playerPosition: integer("player_position"),
+    /** Monsters only (PC HP lives on the character, #92). */
+    hpCurrent: integer("hp_current"),
+    hpMax: integer("hp_max"),
+  },
+  (t) => [uniqueIndex("combatant_seq").on(t.seq), index("combatant_encounter").on(t.encounterId)],
+);
+
+/** Combat log entry (combat-tracker, `hp_change` / record type `hp-change`): undo + stats unit. */
+export const hpChange = sqliteTable(
+  "hp_change",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    encounterId: text("encounter_id")
+      .notNull()
+      .references((): AnySQLiteColumn => encounter.id),
+    seq: integer("seq").notNull(),
+    at: text("at").notNull(),
+    kind: text("kind", { enum: ["damage", "heal"] }).notNull(),
+    source: text("source", { enum: ["card", "direct"] }).notNull(),
+    cardId: text("card_id").references((): AnySQLiteColumn => notification.id),
+    /** JSON leaf ID[]. */
+    rollIds: text("roll_ids", { mode: "json" }).notNull(),
+    attackerId: text("attacker_id").references((): AnySQLiteColumn => combatant.id),
+    attackerName: text("attacker_name"),
+    attackName: text("attack_name"),
+    damageType: text("damage_type"),
+    targetId: text("target_id")
+      .notNull()
+      .references((): AnySQLiteColumn => combatant.id),
+    targetEntityId: text("target_entity_id")
+      .notNull()
+      .references((): AnySQLiteColumn => entity.id),
+    targetName: text("target_name").notNull(),
+    targetAc: integer("target_ac").notNull(),
+    toHitRolled: integer("to_hit_rolled"),
+    toHitTotal: integer("to_hit_total"),
+    natural: integer("natural"),
+    hitComputed: integer("hit_computed", { mode: "boolean" }),
+    hit: integer("hit", { mode: "boolean" }),
+    damageRolled: integer("damage_rolled"),
+    damageTotal: integer("damage_total").notNull(),
+    multiplier: text("multiplier", { enum: DAMAGE_MULTIPLIERS }),
+    raw: integer("raw").notNull(),
+    applied: integer("applied").notNull(),
+    overkill: integer("overkill").notNull(),
+    hpBefore: integer("hp_before").notNull(),
+    hpAfter: integer("hp_after").notNull(),
+    entryId: text("entry_id")
+      .notNull()
+      .references((): AnySQLiteColumn => gameLogEntry.id),
+    /** Undo marker (FR-CBT-25, ADR-0016); the event log stays as is (CON-34). */
+    undone: integer("undone", { mode: "boolean" }).notNull().default(false),
+    undoneAt: text("undone_at"),
+  },
+  (t) => [uniqueIndex("hp_change_seq").on(t.seq), index("hp_change_encounter").on(t.encounterId)],
+);
+
+/** CON-20: `seq` values for Combat inserts, computed by the DB inside the insert's transaction. */
+export const notificationSeqNext = sql<number>`(select coalesce(max(${notification.seq}), 0) + 1 from ${notification})`;
+export const encounterSeqNext = sql<number>`(select coalesce(max(${encounter.seq}), 0) + 1 from ${encounter})`;
+export const encounterEntrySeqNext = sql<number>`(select coalesce(max(${encounterEntry.seq}), 0) + 1 from ${encounterEntry})`;
+export const combatantSeqNext = sql<number>`(select coalesce(max(${combatant.seq}), 0) + 1 from ${combatant})`;
+export const hpChangeSeqNext = sql<number>`(select coalesce(max(${hpChange.seq}), 0) + 1 from ${hpChange})`;
+
+export const schema = {
+  campaign,
+  player,
+  eventLog,
+  syncProbe,
+  asset,
+  entity,
+  roll,
+  gameLogEntry,
+  gameLogSettings,
+  notification,
+  encounter,
+  encounterEntry,
+  combatant,
+  hpChange,
+};
