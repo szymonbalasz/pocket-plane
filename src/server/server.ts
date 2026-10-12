@@ -71,6 +71,14 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
       if (applied > 0) log.info(`schema: applied ${applied} statement(s)`);
     }
     const services = createServices({ config, db, log, clock: opts.clock });
+    // Start hooks (r.onStart): after the schema push, before listening. Real servers only.
+    for (const h of services.startHooks) {
+      try {
+        await h.fn(services);
+      } catch (err) {
+        throw new StartupError(`start hook "${h.name}" failed: ${(err as Error).message}`);
+      }
+    }
     const hub = new Hub(services, opts.hub);
     services.hub = hub;
     const app = createApp(services, {

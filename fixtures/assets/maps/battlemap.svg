@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="980" viewBox="0 0 1400 980">
+  <title>battlemap</title>
+  <!-- Fixture "battlemap" (assets-pipeline §13): 20 x 14 cells at 70 px; no text, no external refs. -->
+  <defs>
+    <pattern id="cell" width="70" height="70" patternUnits="userSpaceOnUse">
+      <rect width="70" height="70" fill="#7a7466"/>
+      <path d="M70 0 H0 V70" fill="none" stroke="#3d3a33" stroke-width="2"/>
+    </pattern>
+  </defs>
+  <rect width="1400" height="980" fill="url(#cell)"/>
+  <g fill="#2b2925">
+    <rect x="0" y="0" width="1400" height="70"/>
+    <rect x="0" y="910" width="1400" height="70"/>
+    <rect x="0" y="0" width="70" height="980"/>
+    <rect x="1330" y="0" width="70" height="980"/>
+    <rect x="490" y="70" width="70" height="350"/>
+    <rect x="490" y="560" width="70" height="350"/>
+    <rect x="840" y="350" width="420" height="70"/>
+  </g>
+  <rect x="980" y="630" width="210" height="140" fill="#4a7bb7" opacity="0.8"/>
+  <circle cx="315" cy="455" r="45" fill="#a33f2b"/>
+</svg>

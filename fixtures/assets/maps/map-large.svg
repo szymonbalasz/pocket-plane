@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="6000" height="4000" viewBox="0 0 6000 4000">
+  <title>map-large</title>
+  <!-- Fixture "image-large" (assets-pipeline §13): display 4096 x 2731, thumb 512 x 341. -->
+  <rect width="6000" height="4000" fill="#3f6b8a"/>
+  <path d="M600 900 C1800 300 3900 500 5300 1200 C5700 2300 5000 3400 3500 3500 C2000 3700 500 3200 600 900 Z" fill="#c9b27c"/>
+  <path d="M1200 1400 C2200 1000 3600 1100 4400 1600 C4700 2300 4100 2900 3000 3000 C1900 3100 1100 2600 1200 1400 Z" fill="#5e8c4a"/>
+  <circle cx="3000" cy="2100" r="380" fill="#7c7c7c" stroke="#3a3a3a" stroke-width="40"/>
+</svg>

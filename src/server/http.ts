@@ -1,10 +1,13 @@
 // REST helpers: error body + status mapping (CON-09), zod validation, DM auth (CON-08, CON-15).
 import { REST_STATUS, type RestError, type RestErrorCode } from "@shared/protocol/codes";
+import { eq } from "drizzle-orm";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { validator } from "hono/validator";
 import type { z } from "zod";
 import { CommandError, zodIssues } from "./commands/errors";
+import { campaign } from "./db/schema";
+import type { Actor } from "./events/types";
 import type { Services } from "./services";
 
 export function errorBody(code: RestErrorCode, message: string, issues?: RestError["issues"]) {
@@ -37,6 +40,32 @@ export function bearer(c: Context): string | null {
   const m = /^Bearer\s+(.+)$/i.exec(h);
   return m?.[1] ?? null;
 }
+
+/** Hono env of routes behind `dmCampaign`: the campaign fixed at authentication (CON-21). */
+export type DmCampaignEnv = { Variables: { campaignId: string } };
+
+/**
+ * CON-21 / FR-ASSET-09: DM REST routes that act in a campaign resolve `ctx.campaignId` once, when
+ * the request is authenticated (not at commit). Mount after `dmOnly`, so 401 / 429 win:
+ * `.post("/x", dm, dmCampaign(s), handler)`. No active campaign → 409 `conflict`.
+ * Handlers read it with `c.get("campaignId")` and pass `dmActor(...)` to commands, which use
+ * `actor.campaignId`; a campaign switch mid-request does not move the write.
+ */
+export function dmCampaign(s: Services) {
+  return createMiddleware<DmCampaignEnv>(async (c, next) => {
+    const row = s.db
+      .select({ id: campaign.id })
+      .from(campaign)
+      .where(eq(campaign.active, true))
+      .get();
+    if (!row) return c.json(errorBody("conflict", "No active campaign"), 409);
+    c.set("campaignId", row.id);
+    await next();
+  });
+}
+
+/** DM actor for a command run from a `dmCampaign` route (CON-21). */
+export const dmActor = (campaignId: string): Actor => ({ role: "dm", playerId: null, campaignId });
 
 /** DM REST routes: `Authorization: Bearer <DM secret>`. Secret only; no active campaign needed. */
 export function dmOnly(s: Services) {

@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
+import { assetRoutes } from "./features/assets-pipeline/routes";
 import { campaignRoutes } from "./features/campaign-management/routes";
 import { errorBody, errorResponse } from "./http";
 import type { Services } from "./services";
@@ -13,6 +14,7 @@ export function createApi(s: Services) {
     new Hono()
       // ---- route mounts (append-only) ----
       .route("/api", campaignRoutes(s))
+      .route("/api", assetRoutes(s))
   );
 }
 

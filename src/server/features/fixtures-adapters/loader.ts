@@ -193,7 +193,7 @@ function urls(config: Config) {
   return { dmUrl, base };
 }
 
-function runFixtures(services: Services, config: Config, bundle: string, order: Fixture[]) {
+async function runFixtures(services: Services, config: Config, bundle: string, order: Fixture[]) {
   const records: Record<string, Record<string, string[]>> = {};
   let current: string | null = null;
   services.bus.subscribe("fixture-records", ({ event }) => {
@@ -225,10 +225,14 @@ function runFixtures(services: Services, config: Config, bundle: string, order: 
     const ctx = seededContext({ disposable: config.disposable, key: f.key });
     const steps =
       f.kind === "setup" ? f.steps : [{ command: "import.batch", input: f.batch as unknown }];
-    steps.forEach((s, i) => {
+    for (const [i, s] of steps.entries()) {
       try {
+        // A step input may be async (e.g. image processing before `assets.ingest`); the
+        // command itself always runs synchronously in its transaction.
         const input =
-          typeof s.input === "function" ? (s.input as (r: Refs) => unknown)(refs) : s.input;
+          typeof s.input === "function"
+            ? await (s.input as (r: Refs) => unknown | Promise<unknown>)(refs)
+            : s.input;
         const active = activeCampaign(services.db);
         services.commands.run(s.command, input, {
           actor: { role: "dm", playerId: null, campaignId: active?.id ?? null },
@@ -247,7 +251,7 @@ function runFixtures(services: Services, config: Config, bundle: string, order: 
           `Load failed: bundle "${bundle}", fixture "${f.key}", step ${i}, command "${s.command}": ${msg}`,
         );
       }
-    });
+    }
   }
   current = null;
   return records;
@@ -274,7 +278,7 @@ async function doLoad(config: Config, lib: FixtureLibrary, bundle: string): Prom
   let playerRows: { name: string; token: string; campaign: string }[];
   try {
     const services = createServices({ config, db, log: silentLogger });
-    records = runFixtures(services, config, bundle, order);
+    records = await runFixtures(services, config, bundle, order);
     playerRows = db
       .select({ name: player.name, token: player.linkToken, campaign: campaign.name })
       .from(player)

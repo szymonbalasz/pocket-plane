@@ -2,12 +2,14 @@
 // import and one line in the list for each of its DM window types; nothing else changes here.
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
+import { assetTestWindow } from "./features/assets-pipeline/asset-test-window";
 import { playersWindow } from "./features/play-shell/players-window";
 
 const windows: WindowDef[] = [
   playersWindow, // camp.players (play-shell, FR-SHELL-21)
   syncProbesWindow, // sync.probes, test mode (play-shell, FR-SHELL-21)
   shellTestWindow, // shell.test, test mode (play-shell, FR-SHELL-20)
+  assetTestWindow, // asset.test, test mode (assets-pipeline, FR-ASSET-19)
 ];
 
 export const dmWindows = createWindowRegistry("dm", windows);

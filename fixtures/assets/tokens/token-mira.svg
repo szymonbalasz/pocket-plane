@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>token-mira</title>
+  <!-- Fixture "token-mira" (assets-pipeline §13): round token, transparent corners. -->
+  <circle cx="128" cy="128" r="120" fill="#3b6fd1" stroke="#1d3c7a" stroke-width="12"/>
+  <circle cx="128" cy="104" r="36" fill="#1d3c7a"/>
+  <path d="M64 200 C76 150 180 150 192 200 Z" fill="#1d3c7a"/>
+</svg>
