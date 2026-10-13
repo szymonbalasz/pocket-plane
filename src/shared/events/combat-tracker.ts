@@ -2,6 +2,7 @@
 // Undoable: `AttackApplied`, `HpApplied` only; undo = compensating `CombatEntryUndone` (ADR-0016).
 // Shared definitions (fix/combat-core); combat-tracker emits them. Payloads the specs leave
 // open (`{encounterId}` CRUD, initiative, remove / restore) are fix/combat-core picks (§22).
+import { Ability } from "@shared/entities/schemas";
 import { z } from "zod";
 import { defineEvent } from "./types";
 
@@ -103,6 +104,23 @@ export const CombatantRestored = defineEvent({
 export const AttackRolled = defineEvent({
   type: "AttackRolled",
   payload: z.object({ cardId: Id, rollIds: z.array(Id).min(1) }).strict(),
+  logged: true,
+  undoable: false,
+});
+
+/** `cbt.rollAbility`: one `game-log-entry` (players iff public; hidden combatant never) (FR-CBT-44). */
+export const CombatantRolled = defineEvent({
+  type: "CombatantRolled",
+  payload: z
+    .object({
+      encounterId: Id,
+      combatantId: Id,
+      kind: z.enum(["check", "save"]),
+      ability: Ability,
+      rollIds: z.array(Id).min(1),
+      entryId: Id,
+    })
+    .strict(),
   logged: true,
   undoable: false,
 });
