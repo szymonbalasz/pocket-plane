@@ -4,9 +4,11 @@
 import type { RecordStore } from "@shared/protocol/store";
 import { FlaskConicalIcon, TestTubeIcon } from "lucide-react";
 import { useState } from "react";
+import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/primitives";
 import { ProbePanel } from "../live-sync/ProbePanel";
 import { defineWindow, type WindowProps } from "./registry";
+import { useShellAlert } from "./ShellContext";
 
 export const SHELL_TEST_KIND = "shell.test";
 export const SHELL_TEST_DRAG_MIME = "application/x-pp-shell-test";
@@ -18,6 +20,7 @@ const UNCARD = "[&>div]:border-0 [&>div]:bg-transparent [&>div]:shadow-none";
 
 function ShellTestBody({ kind, instance }: WindowProps) {
   const [text, setText] = useState("");
+  const alert = useShellAlert();
   return (
     <div className="flex flex-col gap-3 text-sm">
       <p>
@@ -42,6 +45,16 @@ function ShellTestBody({ kind, instance }: WindowProps) {
       >
         Drag me onto the map
       </div>
+      {/* FR-SHELL-27: fires the same alert a feature would (flash, Toast, ping). */}
+      <Button
+        size="sm"
+        variant="outline"
+        className="w-fit"
+        data-testid="shell-test-alert"
+        onClick={() => alert({ id: SHELL_TEST_KIND, title: "Test alert", sound: "ping" })}
+      >
+        Alert
+      </Button>
     </div>
   );
 }
