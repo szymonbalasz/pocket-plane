@@ -9,7 +9,7 @@ import { silentLogger } from "../log";
 import { CloseCode, startTestServer, TEST_SECRET, type TestServer } from "../testing/harness";
 import { seedSyncProbe } from "../testing/seed";
 import { createTestServices, DM_ACTOR } from "../testing/services";
-import { Hub, type SocketLike } from "./hub";
+import { Hub, SNAPSHOT_CEILING, type SocketLike, snapshotTypeBytes } from "./hub";
 import { fakeTimers } from "./timers";
 
 let h: TestServer;
@@ -402,5 +402,43 @@ describe("hub unit", () => {
     );
     expect(closes).toEqual([CloseCode.resyncRequired]);
     void silentLogger;
+  });
+
+  test("#163 snapshot over the CON-44 ceiling → still sent, warn with per-type bytes", () => {
+    const clock = manualClock();
+    const s = createTestServices({ clock });
+    const warns: string[] = [];
+    s.log = { ...silentLogger, warn: (m: string) => warns.push(m) };
+    const hub = new Hub(s, {
+      timers: fakeTimers(clock),
+      snapshotCeiling: { dm: 200, player: 200 },
+    });
+    s.hub = hub;
+    s.commands.run("campaign.create", { name: "C" }, { actor: DM_ACTOR });
+    const sent: string[] = [];
+    const sock: SocketLike = {
+      send: (d) => {
+        sent.push(d);
+        return d.length;
+      },
+      close: () => {},
+      getBufferedAmount: () => 0,
+    };
+    const c = hub.open(sock);
+    hub.message(
+      c,
+      JSON.stringify({ type: "hello", credential: { role: "dm", secret: TEST_SECRET } }),
+    );
+    expect(JSON.parse(sent[0] as string).type).toBe("snapshot");
+    expect(warns).toHaveLength(1);
+    expect(warns[0]).toMatch(
+      /snapshot for dm c1: \d+ B over the 200 B ceiling \(CON-44\); largest: \w/,
+    );
+    expect(warns[0]).toContain("campaign ");
+    expect(SNAPSHOT_CEILING).toEqual({ dm: 786_432, player: 524_288 });
+    expect(snapshotTypeBytes({ a: [1], bb: [] })).toEqual([
+      ["a", 7],
+      ["bb", 7],
+    ]);
   });
 });

@@ -26,6 +26,30 @@ export interface SocketLike {
   getBufferedAmount(): number;
 }
 
+/**
+ * CON-44 snapshot ceilings (#142): DM 768 KiB, players 512 KiB. Not enforced (a bigger snapshot
+ * is still sent); over → `warn` with per-type bytes (#163).
+ */
+export const SNAPSHOT_CEILING = { dm: 768 * 1024, player: 512 * 1024 } as const;
+/**
+ * Send-buffer limit before closing 4000 (FR-SYNC-21) and Bun's `backpressureLimit` /
+ * `maxPayloadLength` (#163): well above the largest allowed snapshot, so a slow tunnel never
+ * turns a big snapshot into a 4000 → reconnect → same snapshot loop.
+ */
+export const SEND_BUFFER_LIMIT = 4 * 1024 * 1024;
+
+const utf8Bytes = (s: string) => Buffer.byteLength(s, "utf8");
+
+/** Per-type bytes of a snapshot's `records`, largest first (the `"type":[…]` member). */
+export function snapshotTypeBytes(records: Record<string, unknown[]>): [string, number][] {
+  return Object.entries(records)
+    .map(([t, rows]): [string, number] => [
+      t,
+      utf8Bytes(JSON.stringify(t)) + 1 + utf8Bytes(JSON.stringify(rows)),
+    ])
+    .sort((a, b) => b[1] - a[1]);
+}
+
 export type Phase = "awaiting-hello" | "snapshotting" | "live" | "closed";
 
 export interface Connection {
@@ -52,6 +76,8 @@ export interface HubOptions {
   beforeSnapshotSend?: (c: Readonly<Connection>) => Promise<void> | void;
   /** Send-buffer limit before closing 4000 (FR-SYNC-21). */
   maxBufferedBytes?: number;
+  /** CON-44 ceilings for the size warning; tests lower them. */
+  snapshotCeiling?: { dm: number; player: number };
   heartbeatCheckMs?: number;
 }
 
@@ -76,7 +102,7 @@ export class Hub implements HubApi {
     private readonly opts: HubOptions = {},
   ) {
     this.timers = opts.timers ?? realTimers;
-    this.maxBuffered = opts.maxBufferedBytes ?? 1024 * 1024;
+    this.maxBuffered = opts.maxBufferedBytes ?? SEND_BUFFER_LIMIT;
     this.heartbeat = this.timers.setInterval(
       () => this.checkSilence(),
       opts.heartbeatCheckMs ?? 1_000,
@@ -247,7 +273,9 @@ export class Hub implements HubApi {
     if (this.opts.beforeSnapshotSend) await this.opts.beforeSnapshotSend(c);
     if (c.phase !== "snapshotting") return; // closed meanwhile
     c.seq = 0;
-    if (!this.send(c, frame)) return;
+    const text = JSON.stringify(frame);
+    this.checkSnapshotSize(c, frame, utf8Bytes(text));
+    if (!this.sendText(c, text)) return;
     c.phase = "live";
     if (!c.presenceCounted && c.role === "player" && c.playerId && c.campaignId) {
       c.presenceCounted = true;
@@ -397,12 +425,30 @@ export class Hub implements HubApi {
     this.send(c, f);
   }
 
+  /** CON-44 ceiling check (#163): over → warn with the largest types. Never blocks the send. */
+  private checkSnapshotSize(c: Connection, frame: SnapshotFrame, bytes: number): void {
+    const ceilings = this.opts.snapshotCeiling ?? SNAPSHOT_CEILING;
+    const ceiling = c.role === "dm" ? ceilings.dm : ceilings.player;
+    if (bytes <= ceiling) return;
+    const types = snapshotTypeBytes(frame.records)
+      .slice(0, 8)
+      .map(([t, b]) => `${t} ${b} B`)
+      .join(", ");
+    this.s.log.warn(
+      `snapshot for ${c.role} ${c.connId}: ${bytes} B over the ${ceiling} B ceiling (CON-44); largest: ${types}`,
+    );
+  }
+
   /** Never drops frames: a dropped or overflowing send closes 4000 (FR-SYNC-21). */
   private send(c: Connection, frame: ServerFrame): boolean {
+    return this.sendText(c, JSON.stringify(frame));
+  }
+
+  private sendText(c: Connection, text: string): boolean {
     if (c.phase === "closed") return false;
     let r: number;
     try {
-      r = c.socket.send(JSON.stringify(frame));
+      r = c.socket.send(text);
     } catch (err) {
       this.s.log.warn(`send failed on ${c.connId}`, err);
       this.close(c, CloseCode.resyncRequired);

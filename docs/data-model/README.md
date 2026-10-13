@@ -789,14 +789,14 @@ One applied HP change to one target: the stats unit (#54, gate I9). Written by `
 | Indexes `notification (campaignId, seq)`, `(campaignId, state)` | [NOTE §14](../specs/notifications.md#14-dependencies) |
 | `Roll`: no FK on actor / target ids (names copied) | [DICE §8](../specs/dice-roll-log.md#8-data-model) |
 
-**Snapshot windows** ([ADR-0029](../architecture/adr/0029-windowed-record-types.md); cut before the visibility filter, floor identical for every viewer). `orderBy` is the name of a numeric field; `size` counts **unpinned** rows only (pinned rows come on top), so "pending + newest 100 closed". Built: `window` on the record-type registration, `cutWindow` in `@shared/protocol/window` (fix/combat-core)
+**Snapshot windows** ([ADR-0029](../architecture/adr/0029-windowed-record-types.md); cut before the visibility filter, floor identical for every viewer). `orderBy` is the name of a numeric field; `size` counts **unpinned** rows only (pinned rows come on top), so "pending + newest 100 closed". Built: `window` on the record-type registration, `cutWindow` in `@shared/protocol/window` (fix/combat-core). Providers of `game-log-entry`, `hp-change` and `notification` cut the window in SQL (#163), so snapshot build time doesn't grow with history; the registry's cut over their rows is a no-op.
 
 | Record type | `orderBy` | `size` | `pin` | Provider | Source |
 |---|---|---|---|---|---|
-| `game-log-entry` | `n` | 100 | — | campaign's entries | FR-DICE-17, #137 |
-| `notification` | `seq` | 100 | `state = pending` | campaign's notifications | [FR-NOTE-12](../specs/notifications.md#6-functional-requirements), #137 |
+| `game-log-entry` | `n` | 100 | — | the newest 100 by `n` (SQL `ORDER BY n DESC LIMIT`, #163) | FR-DICE-17, #137 |
+| `notification` | `seq` | 100 | `state = pending` | pending rows, **newest 50 per audience** (`dm`, `all`, each player; #163) + the newest 100 closed (SQL) | [FR-NOTE-12](../specs/notifications.md#6-functional-requirements), #137, #163 |
 | `encounter` | `seq` | 20 | `status ≠ ended` | campaign's encounters | [CBT §9](../specs/combat-tracker.md#9-api--events), gate I26 |
-| `hp-change` | `seq` | 50 | — | the started encounter's rows | CBT §9, gate I22 |
+| `hp-change` | `seq` | 50 | — | the started encounter's newest 50 (SQL; index `hp_change_encounter (encounter_id, seq)`, #163) | CBT §9, gate I22 |
 | `encounter-entry` | not windowed | | | entries of encounters in the `encounter` snapshot | CBT §9 |
 | `combatant` | not windowed | | | combatants of the started encounter | CBT §9 |
 

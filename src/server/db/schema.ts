@@ -537,7 +537,11 @@ export const hpChange = sqliteTable(
     undone: integer("undone", { mode: "boolean" }).notNull().default(false),
     undoneAt: text("undone_at"),
   },
-  (t) => [uniqueIndex("hp_change_seq").on(t.seq), index("hp_change_encounter").on(t.encounterId)],
+  // (encounter, seq): the snapshot window reads the newest 50 without a sort (#163).
+  (t) => [
+    uniqueIndex("hp_change_seq").on(t.seq),
+    index("hp_change_encounter").on(t.encounterId, t.seq),
+  ],
 );
 
 /**

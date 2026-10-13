@@ -12,7 +12,7 @@ import type { Logger } from "./log";
 import { acquireLock, type HeldLock } from "./runtime/lock";
 import { readManifest } from "./runtime/manifest";
 import { createServices, type Services } from "./services";
-import { type Connection, Hub, type HubOptions } from "./ws/hub";
+import { type Connection, Hub, type HubOptions, SEND_BUFFER_LIMIT } from "./ws/hub";
 
 interface WsData {
   conn: Connection | null;
@@ -121,9 +121,10 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
           return app.fetch(req);
         },
         websocket: {
-          // Hub enforces the 64 KB client-frame limit with close 1009 (FR-SYNC-12).
-          maxPayloadLength: 1024 * 1024,
-          backpressureLimit: 1024 * 1024,
+          // Hub enforces the 64 KB client-frame limit with close 1009 (FR-SYNC-12). Both well
+          // above the largest allowed snapshot (CON-44), so backpressure never closes one (#163).
+          maxPayloadLength: SEND_BUFFER_LIMIT,
+          backpressureLimit: SEND_BUFFER_LIMIT,
           idleTimeout: 120,
           open(ws: ServerWebSocket<WsData>) {
             ws.data.conn = hub.open({
