@@ -155,7 +155,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | 5etools import | C | [compendium-expansion](specs/post-mvp/compendium-expansion.md) | Separate project |
 | Obsidian vault tie-in to notes | C | [obsidian-importer](specs/post-mvp/obsidian-importer.md) | Story/world-building |
 | Agent features (NPC creation, map work, note grooming) | C | [agent-api](specs/post-mvp/agent-api.md) | Keep design SOLID: everything is a server command |
-| Character builder (players create characters) | A | [levelling](specs/post-mvp/levelling.md) | MVP uses fixture characters |
+| Character builder (players create characters); full editing of PCs and NPCs, players fill in their own sheets | A (design for later, #154) | [levelling](specs/post-mvp/levelling.md) | MVP uses fixture characters; speed, scores and saves come from fixtures / the API until then |
 | Import existing characters | C | — | Once-off scripts, way post-MVP |
 | Session tracking | F | [ADR-0013](architecture/adr/0013-session-journal-scope.md) | Encounters instead |
 

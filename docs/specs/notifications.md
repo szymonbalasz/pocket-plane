@@ -71,7 +71,7 @@ wave: 2
 
 ## 7. UI/UX notes
 
-Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's bottom-right region, [FR-SHELL-01](play-shell.md#6-functional-requirements)), Badge, Button, ScrollArea, Separator; dark only; semantic tokens.
+Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toast region, [FR-SHELL-01](play-shell.md#6-functional-requirements): bottom-right for players, top-centre below the top bar for the DM so toasts clear the Initiative rows, #153), Badge, Button, ScrollArea, Separator; dark only; semantic tokens.
 
 - **Screens:** toasts; `note.history` window (default bottom-right above the toast region, 360×480, min 280×240). Pending rows on top with accent border token; closed rows muted with state badge. A toast whose notification leaves `pending` disappears.
 - **States:** empty "No notifications yet"; loading = shell skeleton; disconnected = last list + banner, action and Dismiss disabled; reject → FR-NOTE-20.

@@ -1,11 +1,15 @@
 // Always-mounted notifications runtime (FR-NOTE-13/14/15/18): watches sync changes, keeps the
-// toast stack in the shell's bottom-right toast region, sets the seen baseline. Toasts and timers
-// are client memory only.
+// toast stack in the shell's toast region, sets the seen baseline. Toasts and timers are client
+// memory only. Player: bottom-right. DM: top-centre below the top bar (#149): the DM's right
+// column (`cbt.initiative`, protocol §24) reaches the bottom-right corner, and sticky damage-card
+// toasts covered its lower rows; the map gap between the columns is free in the default layout.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { XIcon } from "lucide-react";
 import { useContext, useEffect, useReducer, useRef } from "react";
 import { Button } from "../../components/ui/button";
+import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
+import { EDGE_GAP, TOP_BAR_H } from "../play-shell/geometry";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import {
   actionButton,
@@ -108,6 +112,7 @@ export function ToastRuntime({ views, note }: { views: NotificationViews; note: 
     | Record<string, NotificationRecord>
     | undefined;
   const actions = useNoteActions(views);
+  const isDm = useSync((s) => s.store.you?.role === "dm");
   const campaignRef = useRef<string | null>(null);
 
   // Sync changes, in order (zustand calls this synchronously for every applied frame).
@@ -159,7 +164,12 @@ export function ToastRuntime({ views, note }: { views: NotificationViews; note: 
     <section
       aria-label="Notifications"
       data-testid="note-toasts"
-      className="pointer-events-none fixed right-4 bottom-4 z-40 flex w-80 flex-col gap-2"
+      data-placement={isDm ? "top-center" : "bottom-right"}
+      className={cn(
+        "pointer-events-none fixed z-40 flex w-80 flex-col gap-2",
+        isDm ? "left-1/2 -translate-x-1/2" : "right-4 bottom-4",
+      )}
+      style={isDm ? { top: TOP_BAR_H + EDGE_GAP } : undefined}
       onMouseEnter={() => dispatch((s, now) => setHovered(s, true, now))}
       onMouseLeave={() => dispatch((s, now) => setHovered(s, false, now))}
     >
