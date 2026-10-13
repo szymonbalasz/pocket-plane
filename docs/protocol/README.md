@@ -642,7 +642,7 @@ Server kind registry `src/server/features/notifications/kinds.ts`; client views 
 
 - Text: "‹attacker›: ‹to-hit› to hit, ‹damage› ‹type›" (FR-CBT-18). Views: DM `onAction` = attack popup ([FR-CBT-19](../specs/combat-tracker.md#6-functional-requirements)); player: pending "Waiting for DM", resolved "Hit ‹target›: N damage" ("Hit: N damage" if `targetName` null) / "Miss" (FR-CBT-30).
 - Toasts: per [FR-NOTE-13–15](../specs/notifications.md#6-functional-requirements): event frames only; pending → the action owner only (so the rolling player gets no toast, on create or resolve; they read the resolution in `note.history`: [OQ-NOTE-14](../specs/notifications.md#15-open-questions), #141).
-- Deferred: `loot-received` (Reward gate, #139 P28).
+- `loot-received`: owned by [party-loot](../specs/party-loot.md) (#146); its row is added by the party-loot build.
 
 ## 24. Combat: windows
 
