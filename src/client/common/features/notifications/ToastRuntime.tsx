@@ -1,11 +1,12 @@
 // Always-mounted notifications runtime (FR-NOTE-13/14/15/18): watches sync changes, keeps the
 // toast stack in the shell's toast region, sets the seen baseline. Toasts and timers are client
-// memory only. Player: bottom-right. DM: top-centre below the top bar (#149): the DM's right
+// memory only (per page, `ToastMemory`). Player: bottom-right. DM: top-centre below the top bar (#149): the DM's right
 // column (`cbt.initiative`, protocol §24) reaches the bottom-right corner, and sticky damage-card
 // toasts covered its lower rows; the map gap between the columns is free in the default layout.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { XIcon } from "lucide-react";
-import { useContext, useEffect, useReducer, useRef } from "react";
+import { useCallback, useContext, useEffect } from "react";
+import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
@@ -17,33 +18,27 @@ import {
   HISTORY_KIND,
   NOTIFICATION_TYPE,
   type SyncView,
-  summaryCount,
   summaryText,
-  toastTriggers,
   viewerOf,
 } from "./logic";
 import type { NoteClient } from "./note-client";
 import { NoteBody, useNoteActions } from "./parts";
 import {
-  addNote,
   advance,
-  clearToasts,
   closeToast,
-  initialToasts,
   nextExpiry,
-  pruneToasts,
   SUMMARY_KEY,
   setHidden,
   setHovered,
-  setSummary,
+  syncToasts,
   type Toast,
+  type ToastMemoryStore,
   type ToastState,
   visibleToasts,
 } from "./toasts";
 import type { NotificationViews } from "./views";
 
 type Action = (s: ToastState, now: number) => ToastState;
-const reducer = (s: ToastState, a: Action) => a(s, Date.now());
 const hiddenNow = () => typeof document !== "undefined" && document.visibilityState === "hidden";
 
 function NoteToast({
@@ -102,18 +97,27 @@ function NoteToast({
   );
 }
 
-export function ToastRuntime({ views, note }: { views: NotificationViews; note: NoteClient }) {
+export function ToastRuntime({
+  views,
+  note,
+  memory,
+}: {
+  views: NotificationViews;
+  note: NoteClient;
+  memory: ToastMemoryStore;
+}) {
   const sync = useContext(SyncContext);
   const openWindow = useOpenWindow();
-  const [state, dispatch] = useReducer(reducer, undefined, () =>
-    initialToasts(Date.now(), hiddenNow()),
+  const state = useStore(memory, (m) => m.toasts);
+  const dispatch = useCallback(
+    (a: Action) => memory.setState((m) => ({ toasts: a(m.toasts, Date.now()) })),
+    [memory],
   );
   const rows = useSync((s) => s.store.records[NOTIFICATION_TYPE]) as
     | Record<string, NotificationRecord>
     | undefined;
   const actions = useNoteActions(views);
   const isDm = useSync((s) => s.store.you?.role === "dm");
-  const campaignRef = useRef<string | null>(null);
 
   // Sync changes, in order (zustand calls this synchronously for every applied frame).
   useEffect(() => {
@@ -121,26 +125,17 @@ export function ToastRuntime({ views, note }: { views: NotificationViews; note: 
     const onChange = (next: SyncView, prev: SyncView | null) => {
       const t = classify(prev, next);
       if (t === null) return;
-      const store = next.store;
-      if (t === "connect") {
-        const cid = store.you?.campaignId ?? null;
-        if (cid !== campaignRef.current) dispatch(clearToasts);
-        campaignRef.current = cid;
-        note.baseline(store);
-        const n = summaryCount(t, store);
-        dispatch((s, now) => setSummary(s, n, now));
-      }
-      for (const created of toastTriggers(prev, next, t)) {
-        dispatch((s, now) => addNote(s, created, now));
-      }
-      dispatch((s, now) => pruneToasts(s, store, now));
-      note.markSeen(store);
+      if (t === "connect") note.baseline(next.store);
+      memory.setState((m) => syncToasts(m, prev, next, t, Date.now()));
+      note.markSeen(next.store);
     };
+    // A remount keeps the stack: the pointer is gone and the tab may have changed visibility.
+    dispatch((s, now) => setHidden(setHovered(s, false, now), hiddenNow(), now));
     const first = sync.getState();
     // Mounted after the first snapshot (loading screen first): treat it as the connect.
     if (first.state === "live" && viewerOf(first.store)) onChange(first, null);
     return sync.subscribe((next, prev) => onChange(next, prev));
-  }, [sync, note]);
+  }, [sync, note, memory, dispatch]);
 
   // Info toast expiry.
   const wait = nextExpiry(state);
@@ -148,14 +143,14 @@ export function ToastRuntime({ views, note }: { views: NotificationViews; note: 
     if (wait === null) return;
     const h = setTimeout(() => dispatch(advance), Math.max(0, wait) + 10);
     return () => clearTimeout(h);
-  }, [wait]);
+  }, [wait, dispatch]);
 
   // FR-NOTE-14: timers pause while the tab is hidden.
   useEffect(() => {
     const on = () => dispatch((s, now) => setHidden(s, hiddenNow(), now));
     document.addEventListener("visibilitychange", on);
     return () => document.removeEventListener("visibilitychange", on);
-  }, []);
+  }, [dispatch]);
 
   const openHistory = () => openWindow(HISTORY_KIND);
   const { shown, more } = visibleToasts(state);

@@ -4,7 +4,15 @@
 // the rest count as "+N more". Client memory only.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import type { RecordStore } from "@shared/protocol/store";
-import { NOTIFICATION_TYPE, pendingForMe } from "./logic";
+import { createStore, type StoreApi } from "zustand";
+import {
+  NOTIFICATION_TYPE,
+  pendingForMe,
+  type SyncView,
+  summaryCount,
+  type Transition,
+  toastTriggers,
+} from "./logic";
 
 export const INFO_TOAST_MS = 6000;
 export const MAX_VISIBLE = 3;
@@ -111,6 +119,52 @@ export function pruneToasts(s: ToastState, store: RecordStore, now: number): Toa
     toasts.push(t);
   }
   return changed ? { ...ran, toasts } : ran;
+}
+
+/**
+ * The page's toast memory: the stack and the campaign it belongs to. Lives outside the runtime
+ * component, so a remount of the shell within one page (the DM's fresh connection after a
+ * throttled 4401, #163) keeps sticky toasts (FR-NOTE-14); a reload starts empty.
+ */
+export interface ToastMemory {
+  toasts: ToastState;
+  campaignId: string | null;
+}
+
+export type ToastMemoryStore = StoreApi<ToastMemory>;
+
+export function createToastMemory(now: number, hidden = false): ToastMemoryStore {
+  return createStore<ToastMemory>()(() => ({
+    toasts: initialToasts(now, hidden),
+    campaignId: null,
+  }));
+}
+
+/**
+ * One classified sync change applied to the stack (FR-NOTE-13/14/15): a `connect` to another
+ * campaign clears it, every `connect` sets the summary; created rows toast; then the stack
+ * follows the store.
+ */
+export function syncToasts(
+  m: ToastMemory,
+  prev: SyncView | null,
+  next: SyncView,
+  t: Transition,
+  now: number,
+): ToastMemory {
+  if (t === null) return m;
+  const store = next.store;
+  let s = m.toasts;
+  let campaignId = m.campaignId;
+  if (t === "connect") {
+    const cid = store.you?.campaignId ?? null;
+    if (cid !== campaignId) s = clearToasts(s, now);
+    campaignId = cid;
+    s = setSummary(s, summaryCount(t, store), now);
+  }
+  for (const n of toastTriggers(prev, next, t)) s = addNote(s, n, now);
+  s = pruneToasts(s, store, now);
+  return s === m.toasts && campaignId === m.campaignId ? m : { toasts: s, campaignId };
 }
 
 /** The newest `MAX_VISIBLE` toasts (oldest first) and how many more are held back. */
