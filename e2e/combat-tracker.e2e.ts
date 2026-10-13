@@ -1,16 +1,35 @@
 // e2e-bundle: combat
 // Thin combat flow (CBT §13 E2E): DM + player-1. Encounter card, Start on Goblin Ambush, roll
-// monsters, Mira's sheet initiative + Attack (routed to cbt.*), round 1, DM targets Goblin in the
-// popup, applies half → player sees the band; Undo. Visibility matrix, hooks, crash-resume:
-// bun test (combat-tracker sync.test.ts).
+// monsters, Mira's sheet initiative + Attack (routed to cbt.*), round 1, DM targets Goblin and
+// Goblin 2 in the non-modal popup (target rings), applies (Goblin half) → player sees the bands;
+// one Undo reverts both; Remove → Out badge for the player. Visibility matrix, hooks, movement,
+// crash-resume: bun test (combat-tracker sync.test.ts, feedback.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { konvaNodes } from "./support/konva";
 import { openWindow, shellWindow } from "./support/shell";
 
 const row = (scope: Page | Locator, id: string) =>
   scope.locator(`[data-testid="cbt-init-row"][data-record-id="${id}"]`);
 
-test("FR-CBT-07 FR-CBT-19 FR-CBT-20 FR-CBT-25 FR-CBT-30 start, sheet rolls, apply half, band, undo", async ({
+/** Token ids with a `map-token-ring` in state `target` (FR-CBT-38). */
+async function targetRings(page: Page) {
+  return page.evaluate(() => {
+    type KNode = {
+      getAttr(a: string): unknown;
+      findAncestor(s: string): KNode | null;
+      id(): string;
+    };
+    type KStage = { find(s: string): KNode[] };
+    const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
+    return (K?.stages[0]?.find(".map-token-ring") ?? [])
+      .filter((n) => n.getAttr("state") === "target")
+      .map((n) => n.findAncestor(".map-token")?.id() ?? "")
+      .sort();
+  });
+}
+
+test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, multi-target apply, band, undo, Out", async ({
   browser,
 }) => {
   const { secret, link, recordId } = e2eEnv();
@@ -97,8 +116,9 @@ test("FR-CBT-07 FR-CBT-19 FR-CBT-20 FR-CBT-25 FR-CBT-30 start, sheet rolls, appl
   await expect(init.getByTestId("cbt-init-round")).toHaveAttribute("data-value", "1");
   await expect(pinit.getByTestId("cbt-init-round")).toHaveAttribute("data-value", "1");
 
-  // Step 5–6: Mira attacks from the sheet → card pending for the DM; target Goblin, hit,
-  // 8 damage, Half → 7 → 3 (bloodied for the player, no HP numbers).
+  // Step 6–7: Mira attacks from the sheet → card pending for the DM. In the non-modal popup the
+  // DM adds Goblin and Goblin 2 (tokens on the viewed scene → selected, target rings); Goblin
+  // hit, 8 damage, Half → 7 → 3; Goblin 2 hit, Normal → 7 → 0 (bands for the player).
   await sheet.getByTestId("char-sheet-roll-attack").click();
   const card = init.getByTestId("cbt-init-card");
   await expect(card).toHaveCount(1);
@@ -106,30 +126,66 @@ test("FR-CBT-07 FR-CBT-19 FR-CBT-20 FR-CBT-25 FR-CBT-30 start, sheet rolls, appl
   await expect(dm.getByTestId("note-toasts")).toHaveAttribute("data-placement", "top-center");
   await card.click();
   const goblin = await idByName(init, "Goblin");
+  const goblin2 = await idByName(init, "Goblin 2");
   const popup = dm.getByTestId("cbt-popup");
   await expect(popup).toBeVisible();
-  await popup.getByTestId("cbt-popup-target").click();
-  await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${goblin}"]`).click();
-  await expect(popup.getByTestId("cbt-popup-vs")).toContainText("vs AC 15");
-  await popup.locator('[data-testid="cbt-popup-hit-option"][data-value="hit"]').click();
+  await expect(popup.getByTestId("cbt-popup-target-row")).toHaveCount(0);
+  for (const id of [goblin, goblin2]) {
+    await popup.getByTestId("cbt-popup-target-add").click();
+    await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${id}"]`).click();
+  }
+  const trow = (id: string) =>
+    popup.locator(`[data-testid="cbt-popup-target-row"][data-record-id="${id}"]`);
+  await expect(trow(goblin)).toHaveAttribute("data-source", "selection");
+  await expect(trow(goblin2)).toHaveAttribute("data-source", "selection");
+  await expect.poll(async () => (await targetRings(dm)).length).toBe(2);
+  await expect(trow(goblin)).toContainText("vs AC 15");
   await popup.getByTestId("cbt-popup-damage").fill("8");
-  await popup.locator('[data-testid="cbt-popup-mult-option"][data-value="half"]').click();
-  await expect(popup.getByTestId("cbt-popup-preview")).toHaveText("Goblin 7 → 3");
+  for (const id of [goblin, goblin2]) {
+    const hit = trow(id).getByTestId("cbt-popup-target-hit");
+    if ((await hit.getAttribute("data-value")) === "miss") await hit.click();
+    await expect(hit).toHaveAttribute("data-value", "hit");
+  }
+  await trow(goblin)
+    .locator('[data-testid="cbt-popup-target-mult-option"][data-value="half"]')
+    .click();
+  await expect(trow(goblin).getByTestId("cbt-popup-target-preview")).toHaveText("Goblin 7 → 3");
+  await expect(trow(goblin2).getByTestId("cbt-popup-target-preview")).toHaveText("Goblin 2 7 → 0");
   await popup.getByTestId("cbt-popup-apply").click();
   await expect(popup).toHaveCount(0);
+  await expect.poll(async () => (await targetRings(dm)).length).toBe(0);
   await expect(row(pinit, goblin).getByTestId("cbt-init-row-band")).toHaveAttribute(
     "data-value",
     "bloodied",
   );
+  await expect(row(pinit, goblin2).getByTestId("cbt-init-row-band")).toHaveAttribute(
+    "data-value",
+    "down",
+  );
   await expect(row(init, goblin).getByTestId("cbt-init-row-hp")).toHaveText("HP 3/7");
+  await expect.poll(async () => (await konvaNodes(player, "cbt-token-down")).length).toBe(1);
 
-  // Undo → band back; the card is pending again.
+  // Step 9: one Undo reverts the whole apply (both targets); the card is pending again.
+  await expect(init.getByTestId("cbt-init-undo")).toHaveAttribute(
+    "aria-label",
+    "Undo: Mira → Goblin, Goblin 2 (2 targets)",
+  );
   await init.getByTestId("cbt-init-undo").click();
   await expect(row(pinit, goblin).getByTestId("cbt-init-row-band")).toHaveAttribute(
     "data-value",
     "healthy",
   );
+  await expect(row(pinit, goblin2).getByTestId("cbt-init-row-band")).toHaveAttribute(
+    "data-value",
+    "healthy",
+  );
   await expect(init.getByTestId("cbt-init-card")).toHaveCount(1);
+
+  // Step 11: Remove Goblin 2 → Out badge for the player; it leaves the player's Initiative.
+  await row(init, goblin2).getByTestId("cbt-init-row-menu").click();
+  await dm.getByTestId("cbt-init-row-remove").click();
+  await expect.poll(async () => (await konvaNodes(player, "cbt-token-out")).length).toBe(1);
+  await expect(row(pinit, goblin2)).toHaveCount(0);
 
   // Step 12: End → the confirm dialog closes; Ended in the list; player Initiative gone.
   const enc2 = await openWindow(dm, "cbt.encounters");

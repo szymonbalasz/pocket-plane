@@ -15,6 +15,7 @@ import {
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { useRecords } from "@ui/sync/store";
 import { useMemo } from "react";
+import { undoLabel } from "./targets";
 
 export function useDefinitions(): Map<string, DefinitionRecord> {
   const entities = useRecords<unknown>(ENTITY_TYPE);
@@ -50,14 +51,11 @@ export function usePendingCards(encounterId: string | null | undefined): Notific
   );
 }
 
-/** FR-CBT-25: the latest non-undone combat log entry of the encounter (by `seq`). */
-export function useLatestUndoable(encounterId: string | null | undefined): HpChangeRecord | null {
+/** FR-CBT-25 / FR-CBT-35: the encounter's undo unit (one apply) as Tooltip text + expected id. */
+export function useUndo(encounterId: string | null | undefined) {
   const rows = useRecords<HpChangeRecord>(HP_CHANGE_TYPE);
   return useMemo(
-    () =>
-      rows
-        .filter((r) => r.encounterId === encounterId && !r.undone)
-        .sort((a, b) => b.seq - a.seq)[0] ?? null,
+    () => undoLabel(rows.filter((r) => r.encounterId === encounterId)),
     [rows, encounterId],
   );
 }
