@@ -55,9 +55,13 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Token** | A movable piece on a scene: an instance of a creature definition, optionally bound to a combatant. | Combatant |
 | **Token owner** | The one player (or none) who may move a token. Defaults from the character's owner; the DM reassigns it (decisions #124). | Character's owner |
 | **Hidden token** | Token visible only to the DM (shown translucent to DM) until revealed with the hide/reveal button. MVP. | — |
+| **Token shape** | How a token is drawn: round (circular crop), square, or none (image as is). Owned by the token; new tokens take the definition's default (decisions #148). | — |
+| **Selection** | The DM's client-only set of selected tokens on the viewed scene (click, Ctrl/Shift-click, box select); never sent. Features read it, e.g. to preselect attack targets (#148). | Target |
+| **Box select** | DM Ctrl/Shift + drag on empty canvas: tokens whose footprint centre lies inside the box join the selection. | — |
+| **Movement indicator** | Local drag label showing a move's distance against the token's speed (in combat: plus movement used); amber past speed, red past twice speed. Never blocks. | Ruler |
 | **Fog** | Polygon regions hiding parts of a scene from players. | Lighting (out of scope) |
 | **AoE prop** | A shape (cone, sphere, line, cube…) placed on a scene to show an area of effect. | Freehand drawing (out of scope) |
-| **Ruler** | Measuring tool using 5e diagonal rules. | — |
+| **Ruler** | Measuring tool using 5/10/5 diagonals (every second diagonal costs 10 ft, decisions #145). | Movement indicator |
 | **Ping** | Signal: a click shows a short pulse at a point to every other client showing that scene. | Pull |
 | **Pull** | DM-only ping that also centres every player's camera on the point; players may pan away. | Ping |
 | **Laser pointer** | Signal: a right-drag draws a trail that others see fade shortly after the last point. | Ping |
@@ -65,6 +69,8 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Encounter** | A planned set of monsters with CR/difficulty math. Lifecycle: planned → started → ended. The unit of combat history. | Combat; session |
 | **Combat** | The running state of a started encounter: initiative order, rounds, turns. | Encounter |
 | **Combatant** | A participant in a combat, linked to an entity (and a token if on a scene). Holds HP (for PCs, HP lives on the character), conditions, concentration. | Token; Entity |
+| **Movement used** | Feet a combatant's token has moved since its turn started (5/10/5 per move, any mover); reset on Next. Indicator only. | Speed |
+| **Turn alert** | The player client's alert (flash, ping, Toast) when one of its own PCs' turn starts. | Notification |
 | **Initiative order** | Ordered list of combatants for the current combat. | — |
 | **Condition** | A 5e condition (e.g. prone, poisoned) applied to a combatant. | — |
 | **Concentration** | Flag on a combatant maintaining a concentration spell; prompts a save on damage. | — |
@@ -76,12 +82,12 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Domain event** | Typed record of a committed change, dispatched in-process to listeners (broadcaster, rules…) ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | WS event (the filtered message sent to a client) |
 | **Notification** | Persisted, toast-like message with a history feed; has a kind, an audience and optionally an action ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | WS event |
 | **Event log** | Persisted, append-only log of every domain event; source for undo and stats ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | Game log (player-facing) |
-| **Undo** | DM-only, strict LIFO, combat log entries only (damage/healing applied): appends a compensating event that reverses the latest entry and marks it undone. | — |
+| **Undo** | DM-only, strict LIFO, combat log entries only (damage/healing applied): appends a compensating event that reverses the latest apply (all its combat log entries: one card apply, or one direct HP change) and marks them undone. | — |
 | **Pending action** | A notification whose action (button) is not yet resolved or dismissed (e.g. apply damage, roll a save). | — |
-| **Damage card** | A notification kind (`damage-card`) with an "apply" action, holding an attack's to-hit and damage rolls (from a player or DM roll) that the DM applies to a target picked in the attack popup, with a multiplier: normal, half, none, double (#53, #134). | Roll |
-| **Attack popup** | The DM's dialog to pick a damage card's target, check hit vs AC, override values and apply. | Damage card |
+| **Damage card** | A notification kind (`damage-card`) with an "apply" action, holding an attack's to-hit and damage rolls (from a player or DM roll) that the DM applies to one or more targets picked in the attack popup, each with its own hit / miss and multiplier: normal, half, none, double (#53, #134, #148). | Roll |
+| **Attack popup** | The DM's non-modal panel to pick a damage card's targets (map selection or list), check hit vs AC per target, override values and apply. | Damage card |
 | **Action owner** | Who may act on a pending notification (the DM or one player); the DM may always act. | Actor (a roll's actor in the game log) |
-| **Combat log entry** | One applied HP change in combat (damage or heal): the undo and stats unit. | Game log entry; event log entry |
+| **Combat log entry** | One applied HP change to one target in combat (damage or heal): the stats unit. Undo reverts one apply, which may hold several entries. | Game log entry; event log entry |
 | **Health band** | healthy / bloodied / down: what players see of a monster's HP instead of numbers. | — |
 | **Log entry** | One game-log line; may join several rolls (e.g. an attack's to-hit and damage). | Roll; event log entry |
 | **Roll mode** | normal / advantage / disadvantage, applied to the d20. | — |
@@ -101,6 +107,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Window** | A floating, movable, resizable panel on the play page; an open instance of a window type. | Browser window (pop-outs out of scope) |
 | **Window type** | A feature's registered kind of window (`<prefix>.<name>`, clients, defaults, component) in a per-client registry. | Window |
 | **Launcher** | Bottom bar of buttons that open, bring to front or minimise windows. | — |
+| **Alert** | The shell's attention signal for one client: screen flash, short UI sound ([ADR-0030](architecture/adr/0030-ui-notification-sounds.md)) and a Toast; per-browser mute and volume. Not persisted. | Notification |
 | **Layout** | Every window's state, geometry and z-order for one (campaign, owner); stored only in browser `localStorage` (decisions #121). | — |
 
 ## System

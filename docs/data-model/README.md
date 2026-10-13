@@ -242,6 +242,7 @@ erDiagram
     ID campaignId FK "null iff imported"
     text name "1-60"
     ID portraitAssetId FK "nullable; null if imported"
+    string tokenShape "nullable; to build"
     json statBlock "JSON leaf, per-kind zod"
     ID ownerPlayerId FK "character only"
     int hpCurrent "character only"
@@ -295,6 +296,8 @@ erDiagram
     int row
     ID ownerPlayerId FK "nullable"
     boolean hidden
+    string shape "round | square | none; to build"
+    int speed "nullable, display copy; to build"
     timestamp createdAt
     timestamp updatedAt
   }
@@ -337,7 +340,8 @@ One table for imported, custom and character definitions ([ADR-0009](../architec
 | campaignId | ID → Campaign \| null | **Null iff imported** (global); customs + characters = `ctx.campaignId`; no request field sets it | [FR-ENT-04](../specs/entities.md#6-functional-requirements), [ADR-0018](../architecture/adr/0018-global-imported-content.md) |
 | name | text 1–60 | Trimmed, no control chars; unique ci per (campaign, kind) for non-null campaign; may equal an imported name | [FR-ENT-08](../specs/entities.md#6-functional-requirements) |
 | portraitAssetId | ID → Asset \| null | Asset reference via `assets.require`; null for imported | FR-ENT-08, [FR-ASSET-15](../specs/assets-pipeline.md#6-functional-requirements) |
-| statBlock | **JSON leaf** | Strict per-kind zod: shared creature core `size, ac, hpMax, initBonus, attacks[0..1]` + monster `cr` / character `level, className`. New fields only optional | [FR-ENT-02](../specs/entities.md#6-functional-requirements), ENT §8, [ADR-0006](../architecture/adr/0006-persistence.md) |
+| tokenShape *(feedback pass, to build)* | `round` \| `square` \| `none` \| null | Column `token_shape` text, nullable (zod checks values); default shape for **new** tokens only; null = round; imported rows null. Whole-replace `PUT` without it → null | [FR-ENT-22](../specs/entities.md#6-functional-requirements), OQ-ENT-17 |
+| statBlock | **JSON leaf** | Strict per-kind zod: shared creature core `size, ac, hpMax, initBonus, attacks[0..1]` + monster `cr` / character `level, className`. New fields only optional. *(feedback pass, to build)*: optional `speed` (int 0–200, multiple of 5), `abilities {str, dex, con, int, wis, cha}` (int 1–30, all six or none), `saveProficiencies` (unique subset; needs `abilities`), both kinds; zod only, no column, no backfill ([FR-ENT-21](../specs/entities.md#6-functional-requirements), [FR-ENT-23](../specs/entities.md#6-functional-requirements)) | [FR-ENT-02](../specs/entities.md#6-functional-requirements), ENT §8, [ADR-0006](../architecture/adr/0006-persistence.md) |
 | ownerPlayerId | ID → Player \| null | Required for character (player of `ctx.campaignId`, else `invalid`); null for monster | [FR-ENT-10](../specs/entities.md#6-functional-requirements) |
 | hpCurrent | int \| null | Character only; `= hpMax` at create; clamped on update. PC HP lives on the character. Written only by entities' create / update and `characters.adjustHp` ([FR-CHAR-13](../specs/character-sheet.md#6-functional-requirements), CON-37) | FR-ENT-10, FR-ENT-11, [ADR-0009](../architecture/adr/0009-entity-content-model.md), [OQ-ENT-08](../specs/entities.md#15-open-questions) |
 | derivedFromId | ID \| null | Plain id, **no FK**; immutable; informational only | [FR-ENT-09](../specs/entities.md#6-functional-requirements) |
@@ -347,6 +351,7 @@ One table for imported, custom and character definitions ([ADR-0009](../architec
 - Imported rows are read-only (update → `forbidden`) ([FR-ENT-07](../specs/entities.md#6-functional-requirements)). No delete in MVP ([FR-ENT-14](../specs/entities.md#6-functional-requirements), *proposed* OQ-ENT-07).
 - References into `entity` (token, combatant, encounter entry) resolve via `resolveDefinition(env, id)` (campaign = `env.actor.campaignId`, CON-35): global or same campaign, else `not_found` ([FR-ENT-12](../specs/entities.md#6-functional-requirements), [ADR-0018](../architecture/adr/0018-global-imported-content.md)).
 - Reads re-validate the JSON leaf: invalid stored row omitted from the snapshot + error log; a command on it → `internal` ([FR-ENT-01](../specs/entities.md#6-functional-requirements)).
+- *(feedback pass, to build)* Character speed, scores and saves come from fixtures / `PUT /api/entities/:id` in MVP; no character edit UI (#154). Redacted characters carry a derived `down` (= `hpCurrent = 0`), computed in the visibility fn, not stored ([FR-ENT-15](../specs/entities.md#6-functional-requirements), #154).
 
 ## 12. Scenes: scene, scene folder, token
 
@@ -393,9 +398,11 @@ An instance of a creature definition: own name, read-only display copies, play s
 | col, row | int | Top-left cell; footprint must overlap the map | [FR-MAP-14](../specs/scenes-map.md#6-functional-requirements) |
 | ownerPlayerId | ID → Player \| null | One owner; defaults from the character's owner; DM reassigns | FR-MAP-13, FR-MAP-18, #124 |
 | hidden | bool | Visibility flag on the record | [FR-MAP-19](../specs/scenes-map.md#6-functional-requirements) |
+| shape *(feedback pass, to build)* | `round` \| `square` \| `none` | Column `shape` text not null default `round`. **Token-owned** instance state: from the definition's `tokenShape` at place, copied by duplicate, set by `map.updateToken {shape}`; never changed by a definition edit | [FR-MAP-35](../specs/scenes-map.md#6-functional-requirements), #148 |
+| speed *(feedback pass, to build)* | int \| null | Column `speed` int, nullable. **Display copy** of `statBlock.speed`, written at place / duplicate and by the definition-changed hook; never per-token editable. Players: own tokens only | [FR-MAP-36](../specs/scenes-map.md#6-functional-requirements), OQ-MAP-24 |
 | createdAt, updatedAt | timestamp | | MAP §8 |
 
-- Only `map.placeToken`, `map.duplicateToken`, scene duplicate and the definition-changed hook write `imageAssetId` / `size` copies; `map.updateToken` may set `imageAssetId` (custom art), never `size` ([ADR-0024](../architecture/adr/0024-definition-visibility.md), FR-MAP-18).
+- Only `map.placeToken`, `map.duplicateToken`, scene duplicate and the definition-changed hook write `imageAssetId` / `size` (and, to build, `speed`) copies; `map.updateToken` may set `imageAssetId` (custom art), never `size` ([ADR-0024](../architecture/adr/0024-definition-visibility.md), FR-MAP-18).
 - Caps *(proposed, OQ-MAP-20)*: ≤ 200 tokens per scene, ≤ 1,000 per campaign → `conflict` (FR-MAP-14).
 - Combatant → token FK and the token-delete rule: [§17](#17-combat-encounter-combatant-combat-log-entry) (CON-37).
 - **Built** (build/scenes-map), tables `scene_folder`, `scene`, `token` in `src/server/db/schema.ts`: `seq` DB-assigned at insert via `sceneFolderSeqNext` / `sceneSeqNext` / `tokenSeqNext` (CON-20), unique indexes `scene_folder_seq`, `scene_seq`, `token_seq`; indexes `scene_folder_campaign`, `scene_campaign`, `token_scene`, `token_campaign`, `token_definition`; `scene_one_active` = unique `(campaign_id) where active = 1`. Grid columns `real`; `token.size` text enum. Rows map 1:1 to the DM wire records ([protocol §12](../protocol/README.md#12-scenes-record-types)).
@@ -426,6 +433,8 @@ An instance of a creature definition: own name, read-only display copies, play s
 | Layout (windows, geometry, z-order) | browser `localStorage` key `pp.layout.v1.<campaignId>.<dm \| playerId>`, zod-parsed, ≤ 40 windows | [FR-SHELL-15/17](../specs/play-shell.md#6-functional-requirements), [ADR-0025](../architecture/adr/0025-play-shell-windows.md) |
 | Window types, canvas layers, token menu entries, `creatureActions`, definition-changed hooks, token-changed hooks ([FR-MAP-30](../specs/scenes-map.md#6-functional-requirements), CON-37), kind registry | code registries | [FR-SHELL-07](../specs/play-shell.md#6-functional-requirements), [FR-MAP-29](../specs/scenes-map.md#6-functional-requirements), [FR-ENT-19/20](../specs/entities.md#6-functional-requirements), [FR-ENT-01](../specs/entities.md#6-functional-requirements) |
 | Viewed scene, camera, selection, ruler, move overlay | client memory | [FR-MAP-08](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-12](../specs/scenes-map.md#6-functional-requirements), MAP §8 |
+| *(feedback pass, to build)* DM selection set + targeting flag; token overlay registry `tokenOverlays` (`src/client/common/features/scenes-map/token-overlays.ts`, append-only) | client memory; code registry | [FR-MAP-31–34](../specs/scenes-map.md#6-functional-requirements) |
+| *(feedback pass, to build)* Sound settings `{muted, volume}` | browser `localStorage` `pp.sound.v1.<campaignId>.<playerId>`, zod-parsed; never sent | [FR-SHELL-24](../specs/play-shell.md#6-functional-requirements) |
 
 **Derived values** (computed, never stored or sent)
 
@@ -439,17 +448,20 @@ An instance of a creature definition: own name, read-only display copies, play s
 | Cell → px | `offset + index × cellSize` (display px) | [MAP §8](../specs/scenes-map.md#8-data-model) |
 | Ruler distance | `5 × (max(dx, dy) + floor(min(dx, dy) / 2))` ft, `dx = abs Δcol`, `dy = abs Δrow` (5/10/5, #145) | [FR-MAP-22](../specs/scenes-map.md#6-functional-requirements) |
 | Rendered window geometry | clamp(stored, viewport), render-only | [FR-SHELL-12](../specs/play-shell.md#6-functional-requirements) |
+| *(feedback pass, to build)* Movement indicator | move = ruler distance; used = first non-null overlay `movedFt` (combat), else 0; tone vs `speed` (≤ speed normal, ≤ 2× dash, > 2× over) | [FR-MAP-37](../specs/scenes-map.md#6-functional-requirements) |
+| *(feedback pass, to build)* Ability helpers | `abilityMod`, `proficiencyBonus(stats)` (level / CR), `checkBonus`, `saveBonus` in `@shared/entities`; take the stat block ([ADR-0032](../architecture/adr/0032-ability-derivation.md)) | [FR-ENT-24](../specs/entities.md#6-functional-requirements) |
+| *(feedback pass, to build)* Redacted character `down` | `hpCurrent = 0`, in the `entity` visibility fn | [FR-ENT-15](../specs/entities.md#6-functional-requirements), #154 |
 
 **Visibility-relevant fields** (full rules: [protocol §12](../protocol/README.md#12-scenes-record-types))
 
 | Record | Fields the filter reads | Never leaves the server / never to players |
 |---|---|---|
 | Asset | — (players: always hidden) | `hash` (no field in the record type) |
-| Entity | `kind`, `ownerPlayerId` vs `ctx.playerId` | Players: monster rows; other characters' stat block + `hpCurrent` |
+| Entity | `kind`, `ownerPlayerId` vs `ctx.playerId`; `hpCurrent` (→ `down`, to build) | Players: monster rows; other characters' stat block + `hpCurrent` (only derived `down`) |
 | Imported entity | — (players: always hidden) | — |
 | Scene | `id` vs active scene (scope gate) | Players: `name`, `folderId`, `mapLocked`, `seq` |
 | Scene folder | — (players: always hidden) | — |
-| Token | `hidden`; `sceneId` vs active scene (scope gate) | Players: `definitionId` |
+| Token | `hidden`; `sceneId` vs active scene (scope gate); `ownerPlayerId` vs `ctx.playerId` (→ `speed`, to build) | Players: `definitionId`; `speed` unless they own the token |
 
 ## 14. Combat: ER diagram
 
@@ -538,7 +550,7 @@ erDiagram
     string actionRole "dm | player | null"
     ID actionPlayerId FK "nullable"
     string state "info | pending | resolved | dismissed"
-    json resolution "JSON leaf <= 256 B, nullable"
+    json resolution "JSON leaf <= 256 B (damage-card 2 KB, to build), nullable"
     timestamp closedAt "nullable"
     string closedByRole "nullable"
     ID closedByPlayerId FK "nullable"
@@ -587,6 +599,7 @@ erDiagram
     int playerPosition "nullable, server-written"
     int hpCurrent "monsters only"
     int hpMax "monsters only"
+    int movedFt "default 0; to build"
   }
   HP_CHANGE {
     ID id PK
@@ -687,6 +700,7 @@ erDiagram
 - **Damage card** = kind `damage-card` (owner CBT, gate I7): audience = the rolling player (DM attacks: `dm`); action "Apply", owner `dm` (#136).
   - `payload`: `{encounterId, attackerId, attackerName, attackName, damageType, mode, crit, toHit {rollId, dice, constant, total, natural, manual}, damage {rollId, dice, constant, total, manual}}`; `dice` = compact `[value, kept]` pairs; ≤ 1 KB at 50 dice ([CBT §8](../specs/combat-tracker.md#8-data-model), #140).
   - `resolution`: `{targetName | null (null if hidden), hit, multiplier, applied}`; seen by the rolling player (#138). `hp_change.cardId` links back.
+  - *(feedback pass, to build)* `resolution` → `{targets: [{targetName | null, hit, multiplier, applied}]}` (1–20, apply order); readers still accept the single-target shape. Needs a per-kind resolution cap above 256 B (`damage-card` 2 KB, [OQ-CBT-39](../specs/combat-tracker.md#15-open-questions), notifications FR-NOTE-03 open).
 
 ## 17. Combat: encounter, combatant, combat log entry
 
@@ -725,19 +739,20 @@ An instance ([ADR-0009](../architecture/adr/0009-entity-content-model.md)); crea
 | entityId | ID → Entity | Character, or the monster definition | CBT §8 |
 | tokenId | ID → Token \| null | Next unbound token on the scene with that `definitionId` (token `seq` order); `ON DELETE SET NULL`; deleting a token bound to an **active** combatant → `conflict` (hook) | FR-CBT-08, [FR-CBT-09](../specs/combat-tracker.md#6-functional-requirements), [ADR-0028](../architecture/adr/0028-token-changed-hooks.md), #134 |
 | name, imageAssetId, hidden | text 1–40, **asset ref** \| null, bool | **Display copies** of the token at start and on every token rename / image / hide / reveal (hook); token-less: numbered name (FR-MAP-16 rule), portrait, visible. Portrait copies follow a definition edit while equal to the old portrait | FR-CBT-08, FR-CBT-09, [FR-CBT-06](../specs/combat-tracker.md#6-functional-requirements), gate I23 |
-| active, removed | bool ×2 | `active` false after End; `removed` skips turns, hidden from players | FR-CBT-10, [FR-CBT-15](../specs/combat-tracker.md#6-functional-requirements) |
+| active, removed | bool ×2 | `active` false after End; `removed` skips turns, hidden from players (*(feedback pass, to build)*: redacted to players with `removed: true`, [FR-CBT-37](../specs/combat-tracker.md#6-functional-requirements)) | FR-CBT-10, [FR-CBT-15](../specs/combat-tracker.md#6-functional-requirements) |
 | initiative, initRollId | int \| null (−10…50), ID \| null | Roll or set; a player sets own PC's once | [FR-CBT-11](../specs/combat-tracker.md#6-functional-requirements), [FR-CBT-12](../specs/combat-tracker.md#6-functional-requirements), gate I25 |
 | position, playerPosition | int, int \| null | **Server-written** in the commanding transaction for every row whose value changed: `position` 1…n over all; `playerPosition` 1…k over active, non-removed, non-hidden, else null | [FR-CBT-13](../specs/combat-tracker.md#6-functional-requirements), #139 P3 |
 | hpCurrent, hpMax | int \| null ×2 | **Monsters only**: `effectiveStats.hpMax` at start; clamped 0…hpMax; definition edit: new max, current follows if it equalled the old max, else clamped. PC HP lives on the character | FR-CBT-08, FR-CBT-06, [FR-CBT-22](../specs/combat-tracker.md#6-functional-requirements), #92, gate I10 |
+| movedFt *(feedback pass, to build)* | int 0–9,999 | Column `moved_ft` int not null default 0. Movement used this turn: + each move's 5/10/5 distance via the token-changed hook on `map.moveToken` ([ADR-0031](../architecture/adr/0031-token-move-hooks.md)), any mover, active non-removed only; 0 on `cbt.nextTurn` for the new turn combatant; `prevTurn` keeps it | [FR-CBT-39](../specs/combat-tracker.md#6-functional-requirements), [FR-CBT-40](../specs/combat-tracker.md#6-functional-requirements), #154 |
 
 ### Combat log entry (`hp_change`, record type `hp-change`) — owner combat-tracker
 
-One applied HP change: the undo unit and stats source (#54, gate I9). Written by `cbt.applyCard` and `cbt.applyHp`.
+One applied HP change to one target: the stats unit (#54, gate I9). Written by `cbt.applyCard` and `cbt.applyHp`. *(feedback pass, to build)*: one row per target of a multi-target apply; rows sharing a non-null `cardId` and not undone = one apply = one undo step ([FR-CBT-34/35](../specs/combat-tracker.md#6-functional-requirements), #154); no new column.
 
 | Field | Type | Rule | Source |
 |---|---|---|---|
 | id, campaignId, encounterId, seq, at | ID, ID, ID → Encounter, int, timestamp | LIFO order by `seq` | [FR-CBT-25](../specs/combat-tracker.md#6-functional-requirements) |
-| kind, source | `damage` \| `heal`, `card` \| `direct` | | [FR-CBT-20](../specs/combat-tracker.md#6-functional-requirements), [FR-CBT-21](../specs/combat-tracker.md#6-functional-requirements) |
+| kind, source | `damage` \| `heal`, `card` \| `direct` | | [FR-CBT-34](../specs/combat-tracker.md#6-functional-requirements) (was FR-CBT-20), [FR-CBT-21](../specs/combat-tracker.md#6-functional-requirements) |
 | cardId, rollIds | ID → Notification \| null, **JSON leaf** ID[] | Card and its rolls; rolled values come from the roll rows, never the client | FR-CBT-20 |
 | attackerId, attackerName, attackName, damageType | ID \| null, text \| null ×3 | Copies at the time (gate I18) | CBT §8 |
 | targetId, targetEntityId, targetName, targetAc | ID → Combatant, ID → Entity, text, int | Effective values ([ADR-0009](../architecture/adr/0009-entity-content-model.md)) | CBT §8 |
@@ -783,7 +798,7 @@ One applied HP change: the undo unit and stats source (#54, gate I9). Written by
 | Dice engine | `ctx.dice` on the command context: CSPRNG real; seeded per fixture key / test, disposable data only | [FR-DICE-03](../specs/dice-roll-log.md#6-functional-requirements), #137, [ADR-0022](../architecture/adr/0022-deterministic-seams.md) |
 | Physical-dice mode | browser storage `pp.dice.v1.<campaignId>.<dm \| playerId>` | [FR-DICE-07](../specs/dice-roll-log.md#6-functional-requirements), gate I5 |
 | Notification seen marker | `localStorage` `pp.note.seen.v1.<campaignId>.<dm \| playerId>`; never sent | [FR-NOTE-18](../specs/notifications.md#6-functional-requirements), #139 P27 |
-| Toasts, timers; sheet picker selection; attack popup edits | client memory (popup edits lost on reload; the card stays) | [FR-NOTE-14](../specs/notifications.md#6-functional-requirements), [FR-CHAR-02](../specs/character-sheet.md#6-functional-requirements), CBT §8 |
+| Toasts, timers; sheet picker selection; attack popup edits and targets | client memory (popup edits lost on reload; the card stays) | [FR-NOTE-14](../specs/notifications.md#6-functional-requirements), [FR-CHAR-02](../specs/character-sheet.md#6-functional-requirements), CBT §8 |
 | Log-entry kinds; notification kinds + views; `difficultyMethods`; roll routes; token-changed hooks; token menu entries | code registries ([protocol §26](../protocol/README.md#26-combat-registries-and-seams)) | FR-DICE-18, FR-NOTE-03/19, [FR-CBT-03](../specs/combat-tracker.md#6-functional-requirements), [FR-CHAR-16](../specs/character-sheet.md#6-functional-requirements), [FR-MAP-29/30](../specs/scenes-map.md#6-functional-requirements) |
 
 **Derived values** (computed, never stored)
@@ -795,8 +810,8 @@ One applied HP change: the undo unit and stats source (#54, gate I9). Written by
 | Difficulty rating, base / adjusted XP, thresholds, total CR | `difficultyMethods` (`dmg-2014`): party levels + monster CRs (XP table, CR 0 = 10) | FR-CBT-03, #136, gate I27 |
 | Party | `partyCharacterIds`, `null` = all characters at read time | FR-CBT-02 |
 | Health band | `down` if hp = 0; `bloodied` if 2 × hp ≤ hpMax; else `healthy`; computed in the visibility fn | [FR-CBT-26](../specs/combat-tracker.md#6-functional-requirements), #139 P9 |
-| Eligible turns; hit hint | not removed and not a monster at 0 HP; nat 20 hit, nat 1 miss, else total ≥ AC | FR-CBT-14, [FR-CBT-19](../specs/combat-tracker.md#6-functional-requirements) |
-| Sheet values | signed bonuses, "Down", roll specs `characterRolls(statBlock, kind)` (`@shared/character-sheet`) | [FR-CHAR-05](../specs/character-sheet.md#6-functional-requirements), CHAR §8 |
+| Eligible turns; hit hint | not removed and not a monster at 0 HP; nat 20 hit, nat 1 miss, else total ≥ AC (per target, to build) | FR-CBT-14, [FR-CBT-33](../specs/combat-tracker.md#6-functional-requirements) |
+| Sheet values | signed bonuses, "Down", roll specs `characterRolls(statBlock, kind, ability?)` (`@shared/character-sheet`; `check` / `save` kinds to build, #149) | [FR-CHAR-05](../specs/character-sheet.md#6-functional-requirements), CHAR §8 |
 | Pending for me, unread count | notifications × seen marker | FR-NOTE-18 |
 
 Server-written, stored copies (not derived on read): `position`, `playerPosition`, `playerTurnCombatantId`, combatant display copies and `hidden` (§17).
@@ -811,12 +826,12 @@ Server-written, stored copies (not derived on read): `position`, `playerPosition
 | Notification | `audience`, `audiencePlayerId` vs `ctx.playerId` | other audiences' rows; no redacted form ([FR-NOTE-06](../specs/notifications.md#6-functional-requirements)) |
 | Encounter | `status` | non-started encounters; `name`, `sceneId`, `partyCharacterIds`, `turnCombatantId`, timestamps |
 | Encounter entry, combat log entry | — (`audience: dm`) | all |
-| Combatant | `active`, `removed`, `hidden`, `kind`, `hpCurrent` / `hpMax` (→ band) | hidden / removed / inactive rows; `position`, `seq`, `initRollId`; monsters' `entityId`, `initiative`, HP numbers |
-| Entity (character) | unchanged ([FR-ENT-15](../specs/entities.md#6-functional-requirements)) | other characters' stat block and `hpCurrent` |
+| Combatant | `active`, `removed`, `hidden`, `kind`, `hpCurrent` / `hpMax` (→ band) | hidden / inactive rows (removed: redacted with `removed: true`, to build); `position`, `seq`, `initRollId`; monsters' `entityId`, `initiative`, HP numbers |
+| Entity (character) | [FR-ENT-15](../specs/entities.md#6-functional-requirements); derived `down` (to build, #154) | other characters' stat block and `hpCurrent` |
 
 ## 19. Reward: loot entry, party pot, wallet
 
-Built by `build/party-loot` from [party-loot](../specs/party-loot.md) (LOOT, `complete`, #146, #150, #152). Protocol side: [protocol §28](../protocol/README.md#28-reward-party-loot).
+Built by `build/party-loot` from [party-loot](../specs/party-loot.md) (LOOT, `complete`, #146, #150, #152). Protocol side: [protocol §29](../protocol/README.md#29-reward-party-loot).
 
 ### Loot entry (`loot_entry`, record type `loot-entry`) — owner [party-loot](../specs/party-loot.md#8-data-model)
 
