@@ -87,7 +87,11 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Roll mode** | normal / advantage / disadvantage, applied to the d20. | — |
 | **Physical-dice mode** | Per-browser toggle: every roll through the roll control asks for manual entry. | Manual roll |
 | **Manual roll** | A roll entered from physical dice instead of rolled by the server. Logged and marked manual. | — |
-| **Party loot** | Shared, party-visible log of rewards (gold, items) the DM gives the party. | Party board (post-MVP superset) |
+| **Party loot** | Shared, party-visible log of the party's coin and rewards: loot the DM gives, party spending, and coin moves between the party pot and wallets. | Party board (post-MVP superset) |
+| **Loot entry** | One row of the party loot log: loot (text + signed coins, DM) or a coin move. | Loot row |
+| **Party pot** | The party's shared coin per denomination, derived from the loot log. | Party purse, treasury |
+| **Wallet** | One character's coin per denomination, derived from coin moves. | Purse |
+| **Coin move** | A logged transfer of coin between the party pot, wallets and outside the party. | Transfer |
 
 ## Play page
 
