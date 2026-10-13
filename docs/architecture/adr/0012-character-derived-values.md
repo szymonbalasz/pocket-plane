@@ -2,6 +2,7 @@
 
 - Status: accepted for MVP basics (2026-10-11): **stored**. Full-sheet derivation still open.
 - Date: 2026-10-10
+- Amended by: [ADR-0032](0032-ability-derivation.md) (ability modifiers, proficiency bonus and check / save bonuses derived, #154)
 - Affects: character-sheet, combat-tracker, dice-roll-log, post-mvp/character-sheet-full, post-mvp/levelling
 - MVP: blocking only for the basics (AC, HP, initiative, one weapon attack) per [ADR-0014](0014-mvp-scope.md). Choice must not block the full sheet later.
 

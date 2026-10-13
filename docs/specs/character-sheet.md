@@ -15,7 +15,7 @@ wave: 2
 - MVP sheet: just enough for a fight ([ADR-0014](../architecture/adr/0014-mvp-scope.md), #32). A **view and controls** over the `character` entity that [entities](entities.md) owns. No new table or record type; the fields it reads are entities' (incl. optional ability scores, FR-ENT-23).
 - Player sees their own character; click-to-roll initiative, attack (to-hit + damage, one click), and the **6 ability checks and 6 saving throws** (#149). Owner and DM adjust current HP.
 - In a running encounter the sheet's buttons send combat intents (#135); outside combat it rolls via `char.roll` and [dice-roll-log](dice-roll-log.md)'s helpers.
-- Stored values ([ADR-0012](../architecture/adr/0012-character-derived-values.md), #106); since #149 ability modifiers, proficiency bonus and save bonuses are derived by fixed 5e formulas ([proposed ADR](../architecture/adr/proposed-ability-derivation.md)). Characters come from fixtures (#100). Full 5e sheet → [character-sheet-full](post-mvp/character-sheet-full.md).
+- Stored values ([ADR-0012](../architecture/adr/0012-character-derived-values.md), #106); since #149 ability modifiers, proficiency bonus and save bonuses are derived by fixed 5e formulas ([ADR-0032](../architecture/adr/0032-ability-derivation.md)). Characters come from fixtures (#100). Full 5e sheet → [character-sheet-full](post-mvp/character-sheet-full.md).
 
 ## 2. Scope
 
@@ -212,7 +212,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | [dice-roll-log](dice-roll-log.md) | `ctx.dice`, `dice.evaluate(env, …)`, `gameLog.append(env, …)` with `public` override, kind `roll`, manual entry, shared roll control with `onRoll` + N expressions (FR-DICE-24), `dice.log` | in-review |
 | [combat-tracker](combat-tracker.md) | Registers roll routes (`cbt.rollInitiative`, `cbt.attack`); uses `characters.adjustHp`, `characterRolls` | in-review |
 | [entities](entities.md) (feedback pass) | Optional `statBlock.speed` ([FR-ENT-21](entities.md#6-functional-requirements)); fixtures `char-mira`, `char-thorn` speed 30 | in-review |
-| [entities](entities.md) (#149) | Optional `abilities`, `saveProficiencies` and the derivation helpers ([FR-ENT-23/24](entities.md#6-functional-requirements)); scores on `char-mira`, `char-thorn`; [proposed ADR](../architecture/adr/proposed-ability-derivation.md) | in-review |
+| [entities](entities.md) (#149) | Optional `abilities`, `saveProficiencies` and the derivation helpers ([FR-ENT-23/24](entities.md#6-functional-requirements)); scores on `char-mira`, `char-thorn`; [ADR-0032](../architecture/adr/0032-ability-derivation.md) | in-review |
 
 **Shared changes needed** (AGENTS §9.9; gate §4):
 - `src/shared/events/` — `character-sheet.ts` (`CharacterHpAdjusted`, `CharacterRolled`) + its line in `index.ts`. `src/server/db/`: none. Record types: none.
@@ -239,7 +239,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | ~~OQ-CHAR-09~~ | ~~DM rolls for a PC: public?~~ | Decided (#139 P1): category setting + per-roll override (P22), like any DM roll | — | dice-roll-log |
 | ~~OQ-CHAR-13~~ | ~~How combat takes over the sheet buttons~~ | Decided (integrator): new client registry `roll-routes.ts`, CHAR creates it empty, combat adds a line; on the AGENTS §9.9 append-only list | — | combat-tracker |
 | ~~OQ-CHAR-14~~ | ~~Shared roll control~~ | Decided ([FR-DICE-24](dice-roll-log.md#6-functional-requirements)): dice-roll-log's control, `expressions[]`, `onRoll({mode, manual?, public?})`; the caller sends its own intent | — | — |
-| OQ-CHAR-16 | Store ability scores or modifiers (#149) | **Scores stored, modifiers derived** (DM: "scores stored"; players expect scores; the full sheet needs them; the modifier is a fixed 5e table, not a homebrew rule) / modifiers stored (no derivation, but no scores shown and re-entry later). Amends ADR-0012's "no derivation": [proposed ADR](../architecture/adr/proposed-ability-derivation.md) | no · owner: DM | entities, combat-tracker, ADR-0012 |
+| OQ-CHAR-16 | Store ability scores or modifiers (#149) | **Scores stored, modifiers derived** (DM: "scores stored"; players expect scores; the full sheet needs them; the modifier is a fixed 5e table, not a homebrew rule) / modifiers stored (no derivation, but no scores shown and re-entry later). Amends ADR-0012's "no derivation": [ADR-0032](../architecture/adr/0032-ability-derivation.md) | no · owner: DM | entities, combat-tracker, ADR-0012 |
 | OQ-CHAR-17 | Proficiency bonus | **Derived from level (PCs) / CR (monsters)** (always right on level-up; one formula) / stored field (homebrew-proof, goes stale) | no · owner: DM | entities |
 | OQ-CHAR-18 | Stored initiative bonus vs DEX | **Keep it stored** (Alert, Jack of All Trades; ADR-0012 basics) / derive from DEX (one fewer field; loses feats) | no · owner: spec-feedback | combat-tracker |
 | OQ-CHAR-15 | Show movement used this turn on the sheet? (F3) | **No: the drag overlay and the DM's initiative row show it; the sheet stays basics** / "Moved 20 / 30 ft" under Speed while in combat (reads the combatant from the store) | no · owner: spec-feedback | combat-tracker |

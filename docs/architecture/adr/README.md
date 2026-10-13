@@ -17,7 +17,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0009](0009-entity-content-model.md) | Entity content model | accepted |
 | [0010](0010-compendium-design.md) | Compendium design | proposed (re-import safety decided) |
 | [0011](0011-cross-references.md) | Cross-reference model | proposed |
-| [0012](0012-character-derived-values.md) | Character sheet: derived vs stored, homebrew overrides | accepted for MVP basics (stored); full sheet open |
+| [0012](0012-character-derived-values.md) | Character sheet: derived vs stored, homebrew overrides | accepted for MVP basics (stored), amended by 0032; full sheet open |
 | [0013](0013-session-journal-scope.md) | Session outcomes / journal: MVP or post-MVP | accepted — no session tracking |
 | [0014](0014-mvp-scope.md) | MVP is a playable session simulation | accepted |
 | [0015](0015-source-adapters-fixtures.md) | Import pipeline and source adapters | accepted |
@@ -33,9 +33,11 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0025](0025-play-shell-windows.md) | Feature UI as play-shell windows; layout in browser storage | accepted |
 | [0026](0026-signal-routing.md) | Signal routing: sender stamp, DM-only pull, receiver scene filter | accepted |
 | [0027](0027-notification-creation.md) | Notifications are created in the causing command's transaction | accepted (refines 0016) |
-| [0028](0028-token-changed-hooks.md) | Token-changed hooks keep bound instances in step | accepted (extends 0024) |
+| [0028](0028-token-changed-hooks.md) | Token-changed hooks keep bound instances in step | accepted (extends 0024), amended by 0031 |
 | [0029](0029-windowed-record-types.md) | Windowed record types: bounded snapshots for append-only logs | accepted (amends FR-SYNC-20) |
 | [0030](0030-ui-notification-sounds.md) | Short UI notification sounds (turn alert) | accepted (amends ADR-0007) |
+| [0031](0031-token-move-hooks.md) | Token-changed hooks also run on token moves | accepted (amends 0028) |
+| [0032](0032-ability-derivation.md) | Ability modifiers, proficiency bonus and save bonuses derived in MVP | accepted (amends 0012) |
 
 ## Proposing a new ADR
 
