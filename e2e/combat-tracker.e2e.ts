@@ -76,6 +76,9 @@ test("FR-CBT-07 FR-CBT-19 FR-CBT-20 FR-CBT-25 FR-CBT-30 start, sheet rolls, appl
 
   // Step 4: Roll monsters; Mira rolls from her sheet (routed to cbt.rollInitiative); DM sets
   // Thorn; Start round 1.
+  // #149: an unset initiative leads with a labelled Roll button, not an empty box.
+  await expect(init.getByTestId("cbt-init-row-roll").first()).toHaveText("Roll");
+  await expect(init.getByTestId("cbt-init-row-init").first()).toHaveAttribute("placeholder", "–");
   await init.getByTestId("cbt-init-roll-monsters").click();
   await expect(init.getByTestId("cbt-init-roll-monsters")).toBeDisabled();
   const mira = await idByName(init, "Mira");
@@ -99,6 +102,8 @@ test("FR-CBT-07 FR-CBT-19 FR-CBT-20 FR-CBT-25 FR-CBT-30 start, sheet rolls, appl
   await sheet.getByTestId("char-sheet-roll-attack").click();
   const card = init.getByTestId("cbt-init-card");
   await expect(card).toHaveCount(1);
+  // #149: the DM's sticky card toast sits top-centre, clear of the Initiative rows.
+  await expect(dm.getByTestId("note-toasts")).toHaveAttribute("data-placement", "top-center");
   await card.click();
   const goblin = await idByName(init, "Goblin");
   const popup = dm.getByTestId("cbt-popup");
