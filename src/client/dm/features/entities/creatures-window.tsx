@@ -173,12 +173,13 @@ export const creaturesWindow = defineWindow({
   kind: CREATURES_KIND,
   title: "Creatures",
   clients: ["dm"],
-  // DM left column, second slot (protocol §18): right of `map.scenes`, above `dice.log` at
-  // 1600×900 (ENT §7's "below map.scenes" doesn't fit 720 px). Shares the slot with
-  // `cbt.encounters`; the second one opened goes to the next free slot (FR-SHELL-08).
+  // Left edge, top (map-first, #162; protocol §18): above `dice.log` at 1600×900. Shares the
+  // spot with `map.scenes` / `cbt.encounters`; the second one opened goes to the next free slot
+  // (FR-SHELL-08).
   defaultSize: { w: 340, h: 512 },
   minSize: { w: 300, h: 240 },
-  defaultPosition: { anchor: "top-left", dx: 368 },
+  defaultPosition: { anchor: "top-left", dx: 56 },
+  keepEdge: true,
   launcher: { icon: PawPrintIcon, label: "Creatures", order: 30 },
   component: CreaturesBody,
 });

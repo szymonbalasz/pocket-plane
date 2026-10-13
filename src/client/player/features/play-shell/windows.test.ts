@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { emptyStore } from "@shared/protocol/store";
 import { clampRect, type Rect, TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
+import { fittedMapRect, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
 import { availableKinds } from "@ui/features/play-shell/registry";
 import { playerWindows } from "../../windows";
@@ -73,6 +74,33 @@ test("FR-SHELL-14 player default layout: sheet + initiative right column, log bo
     // Clear of the map's left half, where the party's tokens usually are (glitch 2).
     expect(init.x).toBeGreaterThan(viewport.w / 2);
     expect(log.x).toBeLessThan(100);
+  }
+});
+
+test("#162 player map-first: ≥ 65% of the battlemap uncovered at 1440×900 (sheet, log and Initiative open)", () => {
+  const viewport = { w: 1440, h: 900 };
+  // The `battlemap` fixture's map (20 × 14 cells at 70 px); the gated Initiative counts (combat).
+  const map = fittedMapRect({ w: 1400, h: 980 }, viewport);
+  const open = defaultLayout(playerWindows, viewport).map((w) => clampRect(w, viewport));
+  expect(open.length).toBe(3);
+  const share = uncoveredShare(map, open, viewport);
+  console.info(
+    `player default layout leaves ${(share * 100).toFixed(1)}% of the battlemap uncovered`,
+  );
+  expect(share).toBeGreaterThanOrEqual(0.65);
+});
+
+test("#162 player Loot opens at the left edge (keepEdge: shorter, not mid-map)", () => {
+  for (const viewport of [LAPTOP, { w: 1280, h: 800 }, { w: 1440, h: 900 }, DESKTOP]) {
+    const all = new Set(playerWindows.defs.map((d) => d.kind));
+    const ws = reduce(
+      defaultLayout(playerWindows, viewport),
+      { type: "open", kind: "loot.log" },
+      { registry: playerWindows, viewport, available: all },
+    );
+    const loot = ws.find((w) => w.kind === "loot.log");
+    if (!loot) throw new Error("loot.log not open");
+    expect(clampRect(loot, viewport).x).toBe(12 + 56);
   }
 });
 

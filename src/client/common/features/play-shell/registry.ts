@@ -54,6 +54,11 @@ export interface WindowDef {
    * spots walkthroughs rely on). Otherwise a first open goes to the next free slot.
    */
   fixedDefault?: boolean;
+  /**
+   * Map-first (#162): when its default spot is taken, a shorter free slot (≥ min height) in its
+   * default column wins over a full-size one elsewhere, so it stays at the edge, off the map.
+   */
+  keepEdge?: boolean;
   /** No entry = no launcher button (open via `openWindow` only). */
   launcher?: LauncherEntry;
   /** Read from the synced store; false → not rendered, not in the launcher, saved state kept. */

@@ -49,6 +49,24 @@ describe("open placement (FR-SHELL-08)", () => {
     expect(overlaps(third, open) || overlaps(third, r)).toBe(false);
   });
 
+  test("#162 keepEdge: a shorter free slot in the default column beats a full-size one elsewhere", () => {
+    // A log at the bottom of the left column leaves 200 px above it: less than the 400 asked.
+    const log = { x: EDGE_GAP, y: 272, w: 300, h: 200 };
+    const tall = def({ defaultSize: { w: 300, h: 400 }, minSize: { w: 200, h: 150 } });
+    const moved = placeRect(tall, vp, [log]);
+    expect(moved.x).toBeGreaterThan(EDGE_GAP); // default rule: full size, further right
+    const kept = placeRect({ ...tall, keepEdge: true }, vp, [log]);
+    expect(kept.x).toBe(EDGE_GAP); // same column, the tallest free slot there (here below)
+    expect(kept.h).toBeLessThan(400);
+    expect(kept.h).toBeGreaterThanOrEqual(150);
+    expect(overlaps(kept, log)).toBe(false);
+    // No room ≥ min height in the column → the default rule.
+    const block = { x: EDGE_GAP, y: 140, w: 300, h: 600 };
+    expect(placeRect({ ...tall, keepEdge: true }, vp, [block])).toEqual(
+      placeRect(tall, vp, [block]),
+    );
+  });
+
   test("fixedDefault (test-mode windows) always opens at its default rect", () => {
     const open = placeRect(def(), vp, []);
     expect(placeRect(def({ fixedDefault: true }), vp, [open])).toEqual(open);

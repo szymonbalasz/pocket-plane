@@ -2,7 +2,7 @@
 // reveal/hide, player edit, reload survives, invalid link. Bundle: sync-probe.
 import { expect, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { openWindow, shellWindow } from "./support/shell";
+import { openWindow } from "./support/shell";
 
 test("DM and players: login, join, presence, reveal/hide, edit, reload, invalid link", async ({
   browser,
@@ -20,6 +20,7 @@ test("DM and players: login, join, presence, reveal/hide, edit, reload, invalid 
   await loginDm(dm, secret);
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   await expect(dm.getByTestId("camp-campaign-name")).toHaveText("Fixture Campaign");
+  await openWindow(dm, "camp.players"); // closed by default (map-first, #162)
   await expect(dm.getByTestId("camp-player-name")).toHaveText(["Player 1", "Player 2"]);
   await openWindow(dm, "sync.probes"); // probe panel is a play-shell window (FR-SHELL-21)
   await expect(dm.getByTestId("sync-probe-row")).toHaveCount(3);
@@ -80,7 +81,8 @@ test("CAMP §7 Players window at default size: both rows, Add player and the loo
     await dm.setViewportSize({ width, height });
     if (width === 1280) await loginDm(dm, secret);
     else await dm.reload();
-    const win = shellWindow(dm, "camp.players");
+    await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+    const win = await openWindow(dm, "camp.players");
     await expect(win.getByTestId("camp-player-row")).toHaveCount(2);
     // The e2e server listens on 127.0.0.1, so the warning is on.
     await expect(win.getByTestId("camp-players-loopback-warning")).toBeVisible();

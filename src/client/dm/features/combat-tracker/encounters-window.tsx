@@ -614,11 +614,12 @@ export const encountersWindow = defineWindow({
   kind: ENCOUNTERS_KIND,
   title: "Encounters",
   clients: ["dm"],
-  // DM left column, second slot (protocol §24): right of `map.scenes`, never over the right
-  // column (`camp.players`, `cbt.initiative`); above `dice.log` at 1600×900.
+  // Left edge, top (map-first, #162; protocol §24): above `dice.log` at 1600×900; shares the
+  // spot with `map.scenes` / `ent.creatures`, the second one opened goes to the next free slot.
   defaultSize: { w: 440, h: 512 },
   minSize: { w: 360, h: 320 },
-  defaultPosition: { anchor: "top-left", dx: 368 },
+  defaultPosition: { anchor: "top-left", dx: 56 },
+  keepEdge: true,
   launcher: { icon: SwordsIcon, label: "Encounters", order: 55 },
   component: EncountersBody,
 });

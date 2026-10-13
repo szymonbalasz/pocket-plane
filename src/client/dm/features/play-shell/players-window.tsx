@@ -13,11 +13,11 @@ export const playersWindow = defineWindow({
   kind: PLAYERS_KIND,
   title: "Players",
   clients: ["dm"],
-  // DM right column, top (protocol §18); `cbt.initiative` below it. Kept small: map first.
+  // Map-first (#162): closed by default; opens at the right edge, below `cbt.initiative`.
   defaultSize: { w: 400, h: 220 },
   minSize: { w: 360, h: 200 },
-  defaultPosition: { anchor: "top-right" },
-  defaultOpen: true,
+  defaultPosition: { anchor: "bottom-right" },
+  keepEdge: true,
   launcher: { icon: UsersIcon, label: "Players", order: 10 },
   component: PlayersBody,
 });

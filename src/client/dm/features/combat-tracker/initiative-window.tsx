@@ -641,11 +641,11 @@ function CombatDialogs() {
 export const dmInitiativeWindow = defineWindow({
   ...initiativeWindowBase,
   clients: ["dm"],
-  // CBT §7: right edge. DM right column, below `camp.players` (400×220); fitted to end above
-  // the launcher (352 px high at 720, 532 at 900). 400 wide so AC / HP never wrap.
-  defaultSize: { w: 400, h: 540 },
+  // CBT §7: right edge, top (map-first, #162: the DM's only default window besides the log).
+  // 400 wide so AC / HP never wrap; rows scroll under the header (six rows at 420 px).
+  defaultSize: { w: 400, h: 420 },
   minSize: { w: 320, h: 240 },
-  defaultPosition: { anchor: "top-right", dy: 232 },
+  defaultPosition: { anchor: "top-right" },
   companion: CombatDialogs,
   component: DmInitiativeBody,
 });

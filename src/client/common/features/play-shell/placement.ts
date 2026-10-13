@@ -1,7 +1,8 @@
 // Open placement for windows without stored geometry (FR-SHELL-08/14). Pure.
 // 1. The default rect, fitted to the usable area (shrunk, never below min size).
 // 2. If it overlaps an open window, the nearest free slot next to one (cascade), else the
-//    tallest free slot ≥ min height, else the spot that covers the least.
+//    tallest free slot ≥ min height, else the spot that covers the least. `keepEdge` windows
+//    first try their default column: free at full size, then the tallest there ≥ min height.
 import {
   defaultRect,
   EDGE_GAP,
@@ -17,7 +18,7 @@ export const RAIL_CLEAR = 68;
 
 export type Placeable = Pick<
   WindowDef,
-  "defaultPosition" | "defaultSize" | "minSize" | "fixedDefault"
+  "defaultPosition" | "defaultSize" | "minSize" | "fixedDefault" | "keepEdge"
 >;
 
 interface Area {
@@ -93,24 +94,26 @@ export function placeRect(def: Placeable, vp: Viewport, obstacles: readonly Rect
   }
   const spots: { x: number; y: number }[] = [{ x: base.x, y: base.y }];
   for (const x of xs) for (const y of ys) spots.push({ x, y });
-  let best: { rect: Rect; rank: [number, number, number] } | null = null;
+  let best: { rect: Rect; rank: [number, number, number, number] } | null = null;
   for (const s of spots) {
     const x = Math.max(minX, Math.min(s.x, a.right - w));
     const y = Math.max(a.top, Math.min(s.y, a.bottom - minH));
     const room = Math.min(base.h, a.bottom - y);
     const free = freeHeight(x, y, w, room, obstacles);
     const dist = Math.abs(x - base.x) + Math.abs(y - base.y);
+    // keepEdge: any free slot (≥ min height) in the default column ranks first.
+    const edge = def.keepEdge && x === base.x && free >= minH ? 0 : 1;
     let rect: Rect;
-    let rank: [number, number, number];
+    let rank: [number, number, number, number];
     if (free >= base.h) {
       rect = { x, y, w, h: base.h };
-      rank = [0, 0, dist];
+      rank = [edge, 0, 0, dist];
     } else if (free >= minH) {
       rect = { x, y, w, h: free };
-      rank = [1, -free, dist];
+      rank = [edge, 1, -free, dist];
     } else {
       rect = { x, y, w, h: Math.max(minH, room) };
-      rank = [2, obstacles.reduce((n, o) => n + overlapArea(rect, o), 0), dist];
+      rank = [edge, 2, obstacles.reduce((n, o) => n + overlapArea(rect, o), 0), dist];
     }
     if (!best || lexLess(rank, best.rank)) best = { rect, rank };
   }

@@ -5,7 +5,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, stageScale, tokenNode } from "./support/konva";
-import { shellWindow } from "./support/shell";
+import { openWindow, shellWindow } from "./support/shell";
 
 /** A token's map-space cell (Town / Goblin Ambush: 70 px cells, offset 0). */
 async function cellOf(page: Page, tokenId: string) {
@@ -77,7 +77,7 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await loginDm(dm, secret);
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", town);
-  const scenes = shellWindow(dm, "map.scenes");
+  const scenes = await openWindow(dm, "map.scenes"); // closed by default (map-first, #162)
   await expect(scenes.getByTestId("map-scene-row")).toHaveCount(3);
   await expect(scenes.getByTestId("map-folder-row")).toHaveCount(1);
   await expect(
@@ -85,8 +85,8 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
       .locator(`[data-testid="map-scene-row"][data-record-id="${town}"]`)
       .getByTestId("map-scene-live"),
   ).toBeVisible();
-  // The Players window (top-right) would cover part of the map.
-  await shellWindow(dm, "camp.players").getByTestId("ui-window-close").click();
+  // The Initiative window (top-right) would cover part of the map.
+  await shellWindow(dm, "cbt.initiative").getByTestId("ui-window-close").click();
 
   const player = await rolePage(browser);
   const frames: string[] = [];
@@ -152,7 +152,8 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
 
   // FR-MAP-31/32: Shift+drag a box around Goblin (12, 6) and Cave Ogre (9, 10); Ctrl+click
   // Goblin; click empty canvas.
-  const empty = await mapToPage(dm, 5 * 70, 12.5 * 70);
+  // Empty canvas clear of the bottom-left game log (map-first layout, #162).
+  const empty = await mapToPage(dm, 10 * 70, 12.5 * 70);
   await dm.mouse.click(empty.x, empty.y);
   await expect.poll(() => selectedIds(dm)).toEqual([]);
   const a = await mapToPage(dm, 8.5 * 70, 5.5 * 70);
