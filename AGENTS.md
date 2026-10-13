@@ -200,6 +200,7 @@ fixtures/
 | `bun run typecheck` | `tsc --noEmit`, whole repo | — |
 | `bun run lint` | `biome check` (lint + format) | — |
 | `bun run check` | `typecheck` + `lint` + `bun test`. Run before every commit | — |
+| `bun run state:digest [--profile p]` | Read-only per-table row counts + SHA-256 of the profile's DB (crash walkthroughs compare digests, #163) | profile data |
 
 - **Portable scripts** (Windows + POSIX): `package.json` scripts call only `bun scripts/<x>.ts` or binaries installed as dependencies (`tsc`, `biome`, `vite`, `playwright`). No `VAR=x cmd`, `rm -rf`, shell globs or `&&` chains; put logic in a Bun script.
 - `scripts/dev.ts` spawns Hono and Vite with `Bun.spawn`, prefixes their output, and stops both when either exits or on Ctrl+C. No `concurrently`.
