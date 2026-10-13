@@ -7,7 +7,7 @@ import type { Clock } from "./commands/context";
 import { armCrashHook } from "./commands/crash";
 import { type Config, formatCrashSpec, localUrl } from "./config";
 import { closeDb, type Db, openFileDb } from "./db/client";
-import { pushSchema } from "./db/push";
+import { pushSchema, SchemaPushError } from "./db/push";
 import type { Logger } from "./log";
 import { acquireLock, type HeldLock } from "./runtime/lock";
 import { readManifest } from "./runtime/manifest";
@@ -68,8 +68,15 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     let db = opts.db;
     if (!db) {
       db = openFileDb(config.dbPath);
-      const { applied } = await pushSchema(db.$client);
-      if (applied > 0) log.info(`schema: applied ${applied} statement(s)`);
+      try {
+        const { applied, backup } = await pushSchema(db.$client);
+        if (backup) log.info(`schema: backed up the DB to ${backup}`);
+        if (applied > 0) log.info(`schema: applied ${applied} statement(s)`);
+      } catch (err) {
+        closeDb(db);
+        if (err instanceof SchemaPushError) throw new StartupError(err.message);
+        throw err;
+      }
     }
     const services = createServices({ config, db, log, clock: opts.clock });
     // Test-mode crash hook (#163): the server arms command / asset points; fixtures:* arms its own.
