@@ -7,18 +7,13 @@ import { z } from "zod";
 export const CHAR_ROLL = "char.roll";
 export const CHAR_ADJUST_HP = "char.adjustHp";
 
-/** Kinds today's `char.roll` server accepts (legacy subset of `SheetRollKind`). */
-export const CHAR_ROLL_KINDS = ["initiative", "attack"] as const;
-export const CharRollKind = z.enum(CHAR_ROLL_KINDS);
-export type CharRollKind = z.infer<typeof CharRollKind>;
-
 /** Ability rolls (#149): `char.roll` (FR-CHAR-21) and `cbt.rollAbility` (FR-CBT-44). */
 export const ABILITY_ROLL_KINDS = ["check", "save"] as const;
 export const AbilityRollKind = z.enum(ABILITY_ROLL_KINDS);
 export type AbilityRollKind = z.infer<typeof AbilityRollKind>;
 
-/** Feedback-pass `char.roll` kinds and the roll-route contract (FR-CHAR-05, FR-CHAR-16). */
-export const SHEET_ROLL_KINDS = [...CHAR_ROLL_KINDS, ...ABILITY_ROLL_KINDS] as const;
+/** `char.roll` kinds and the roll-route contract (FR-CHAR-05, FR-CHAR-16, FR-CHAR-21). */
+export const SHEET_ROLL_KINDS = ["initiative", "attack", ...ABILITY_ROLL_KINDS] as const;
 export const SheetRollKind = z.enum(SHEET_ROLL_KINDS);
 export type SheetRollKind = z.infer<typeof SheetRollKind>;
 
@@ -35,31 +30,9 @@ export const MANUAL_COUNT: Record<SheetRollKind, number> = {
 
 const Id = z.string().min(1).max(64);
 
-/** Intent `char.roll` (FR-CHAR-05–07, FR-CHAR-17). */
-export const CharRollIntent = z
-  .strictObject({
-    characterId: Id,
-    kind: CharRollKind,
-    mode: RollMode.default("normal"),
-    manual: z.array(ManualEntry).min(1).max(2).optional(),
-    public: z.boolean().optional(),
-  })
-  .superRefine((v, ctx) => {
-    const n = MANUAL_COUNT[v.kind];
-    if (v.manual && v.manual.length !== n) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["manual"],
-        message: `Enter ${n} physical ${n === 1 ? "roll" : "rolls"} for ${v.kind}`,
-      });
-    }
-  });
-export type CharRollIntent = z.input<typeof CharRollIntent>;
-
 /**
- * Feedback-pass `char.roll` (FR-CHAR-05, FR-CHAR-21): `check` / `save` need `ability`; `ability`
- * with initiative / attack → `invalid`. Replaces `CharRollIntent` when build/character-sheet-
- * feedback switches the server.
+ * Intent `char.roll` (FR-CHAR-05–07, FR-CHAR-17, FR-CHAR-21): `check` / `save` need `ability`;
+ * `ability` with initiative / attack → `invalid`.
  */
 export const SheetRollIntent = z
   .strictObject({
