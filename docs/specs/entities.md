@@ -18,6 +18,7 @@ wave: 2
 
 - `entity` record, XP from CR, record types + visibility fns; create / derive / update, internal import, definition-changed hooks, `resolveDefinition`; DM **Creatures** window *(proposed, OQ-ENT-03)*; fixtures + bundle `entities`.
 - **Feedback pass** ([feature-tiers §8](../feature-tiers.md#8-dm-feedback-after-the-combat-build-145), #148): optional **speed** in the creature core (movement tracker, F3) and an optional **default token shape** on the definition (F4). Both additive.
+- **#149:** optional **ability scores** and **save proficiencies** in the creature core (both kinds), plus pure derivation helpers (modifier, proficiency bonus, check / save bonus) for the sheet's and combat's check / save buttons.
 
 ## 3. Goals
 
@@ -60,6 +61,8 @@ wave: 2
 | FR-ENT-20 | The Creatures window renders toolbar and row actions from an append-only `creatureActions` registry; entities ships none. *(proposed, OQ-ENT-14)* | combat-tracker form |
 | FR-ENT-21 | The creature core gains optional `speed` (walking speed, ft): int 0–200, a multiple of 5, both kinds *(proposed, OQ-ENT-16)*. Absent = unknown: no movement indicator. Stored rows without it stay valid; no backfill. Tokens carry a display copy, refreshed by scenes-map's definition-changed hook ([FR-MAP-36](scenes-map.md#6-functional-requirements)). | F3, additive |
 | FR-ENT-22 | Every entity gains optional `tokenShape`: `round` \| `square` \| `none`, null = `round` *(proposed, OQ-ENT-17)*. It is the default for **new** tokens only ([FR-MAP-35](scenes-map.md#6-functional-requirements)); a token owns its shape after placement, so an edit never changes placed tokens (as the name, #126). Set by create / update (FR-ENT-11's whole replace includes it); imported rows null. Redacted characters omit it (FR-ENT-15's field list unchanged). | F4 |
+| FR-ENT-23 | Creature core gains optional `abilities {str, dex, con, int, wis, cha}` (all six together, int 1–30) and optional `saveProficiencies` (unique subset of the six; absent = none), **both kinds** *(proposed, OQ-ENT-18)* (#149). `saveProficiencies` without `abilities` → `invalid`. Stored rows without them stay valid. Visibility unchanged: part of the stat block (owner + DM full; redacted characters and monsters never reach other players). | #149, additive |
+| FR-ENT-24 | Pure helpers in `@shared/entities` ([proposed ADR](../architecture/adr/proposed-ability-derivation.md), amends ADR-0012): `abilityMod(score) = floor((score − 10) / 2)`; `proficiencyBonus(def)` = 2 + floor((level − 1) / 4) for characters, SRD CR table for monsters (CR 0–4 +2, 5–8 +3, 9–12 +4, 13–16 +5, 17–20 +6, 21–24 +7, 25–28 +8, 29–30 +9); `checkBonus(def, ability)`, `saveBonus(def, ability)` (+ proficiency if listed). Read through `effectiveStats` (FR-ENT-13). Never stored. | Sheet FR-CHAR-20, combat FR-CBT-44 |
 
 ## 7. UI/UX notes
 
@@ -91,6 +94,8 @@ wave: 2
 | size | both | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan` |
 | ac, hpMax, initBonus | both | int 0–30; int 1–999; int −10…+20 |
 | speed *(optional)* | both | int 0–200, multiple of 5 (ft, walking; FR-ENT-21) |
+| abilities *(optional)* | both | `{str, dex, con, int, wis, cha}` int 1–30 (FR-ENT-23) |
+| saveProficiencies *(optional)* | both | `("str" \| "dex" \| "con" \| "int" \| "wis" \| "cha")[]`, unique; needs `abilities` |
 | attacks | both | 0–1 × `{name 1–40, toHit int −10…+30, damage, damageType?}` (MVP: one weapon attack, ADR-0012) |
 | cr / level, className | monster / character | `"0"`, `"1/8"`, `"1/4"`, `"1/2"`, `"1"`…`"30"` / int 1–20, text 0–40 |
 
@@ -148,16 +153,16 @@ wave: 2
 
 | Key | Kind | Requires | Contents |
 |---|---|---|---|
-| `enemy-1` | reference | — | `srd/monster/goblin.ts`: small, AC 15, HP 7, init +2, speed 30, scimitar +4 / 1d6+2 slashing, CR 1/4. Source `fixture`, SRD 5.1 CC BY 4.0 attribution |
-| `enemy-2` | reference | — | `srd/monster/wolf.ts`: medium, AC 13, HP 11, init +2, speed 40, bite +4 / 2d4+2 piercing, CR 1/4 |
-| `enemy-custom` | setup | `enemy-1` | Derived from `enemy-1`: "Elite Goblin Warrior", AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2, `tokenShape` square; other fields as `enemy-1` |
-| `char-mira` | setup | `player-1` | "Mira", owner `player-1`, medium, L1 fighter, AC 16, HP 12/12, init +2, speed 30, shortsword +4 / 1d6+2 piercing |
-| `char-thorn` | setup | `player-2` | "Thorn", owner `player-2`, medium, L1 rogue, AC 14, HP 10/10, init +3, speed 30, dagger +5 / 1d4+3 piercing |
+| `enemy-1` | reference | — | `srd/monster/goblin.ts`: small, AC 15, HP 7, init +2, speed 30, STR 8 DEX 14 CON 10 INT 10 WIS 8 CHA 8, scimitar +4 / 1d6+2 slashing, CR 1/4. Source `fixture`, SRD 5.1 CC BY 4.0 attribution |
+| `enemy-2` | reference | — | `srd/monster/wolf.ts`: medium, AC 13, HP 11, init +2, speed 40, STR 12 DEX 15 CON 12 INT 3 WIS 12 CHA 6, bite +4 / 2d4+2 piercing, CR 1/4 |
+| `enemy-custom` | setup | `enemy-1` | Derived from `enemy-1`: "Elite Goblin Warrior", AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2, `tokenShape` square, save proficiency DEX; other fields as `enemy-1` |
+| `char-mira` | setup | `player-1` | "Mira", owner `player-1`, medium, L1 fighter, AC 16, HP 12/12, init +2, speed 30, STR 14 DEX 14 CON 14 INT 10 WIS 12 CHA 10, saves STR + CON, shortsword +4 / 1d6+2 piercing |
+| `char-thorn` | setup | `player-2` | "Thorn", owner `player-2`, medium, L1 rogue, AC 14, HP 10/10, init +3, speed 30, STR 8 DEX 16 CON 14 INT 12 WIS 10 CHA 13, saves DEX + INT, dagger +5 / 1d4+3 piercing |
 | `enemy-custom-second` | setup | `campaign-second` | Activate it; create "Marsh Troll" (large, AC 15, HP 59, init +1, speed 30, claw +7 / 2d6+4 slashing, CR 5); re-activate Fixture Campaign |
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | Schemas: bounds, strict keys, 0–1 attacks, dice grammar incl. `−K`, CR enum; `speed` optional (0, 35, 200 ok; 33, 205, −5 `invalid`), a stored block without it still parses; `tokenShape` enum or null; XP table; `effectiveStats` identity; visibility matrix (DM / owner / other player × character / custom / imported); list sort. **Review check:** only `effectiveStats` reads instance stats; no listener mutates state | In-code |
+| Unit | Schemas: bounds, strict keys, 0–1 attacks, dice grammar incl. `−K`, CR enum; `speed` optional (0, 35, 200 ok; 33, 205, −5 `invalid`), a stored block without it still parses; `tokenShape` enum or null; `abilities` all six or none, 0 / 31 `invalid`; `saveProficiencies` duplicate or without `abilities` `invalid`; helpers: `abilityMod` table ends, proficiency by level and CR (1/4 → +2, 5 → +3, 30 → +9), save bonus with / without proficiency; XP table; `effectiveStats` identity; visibility matrix (DM / owner / other player × character / custom / imported); list sort. **Review check:** only `effectiveStats` reads instance stats; no listener mutates state | In-code |
 | Integration | Each command: row + log + event, IDs from `ctx`; rollback → none. Read-only `forbidden`, no event. No active campaign → `conflict`. Derive cross-campaign → `not_found`; base edit leaves derived unchanged. Name `conflict` (create, rename, character); custom "Goblin" allowed. Bad owner → `invalid`. `hpCurrent` clamp. Owner change: old owner gets redacted upsert, new owner full. **Hook:** a test-registered hook's row is in the same commit and in `EntityUpdated.changes`; a throwing hook rolls back the update. Bad stored JSON row → DM snapshot omits it, log line present. **Leak scan:** `player-1` frames never contain "Elite Goblin Warrior", "Marsh Troll", "Goblin" or Thorn's `1d4+3`; restart → identical snapshots | `entities` |
 | E2E (thin) | DM list rows; dropping a row on a test drop target yields its `definitionId`; `player-1` WS frames hold Mira full, no monster records; restart | `entities` |
 
@@ -167,7 +172,7 @@ wave: 2
 |---|---|---|---|
 | 1 | Log in; open Creatures | — | Mira (Player 1), Thorn (Player 2), Goblin + Wolf (SRD, lock, CR 1/4, 50 XP), Elite Goblin Warrior (Custom, derived from Goblin, CR 1/2, 100 XP). No Marsh Troll |
 | 2 | — | B, C open links | From B/C frame log: B has Mira full, Thorn name only, no monsters; C the reverse |
-| 3 | PUT Goblin; PUT Elite Goblin Warrior HP 20, speed 40, `tokenShape` none; same with speed 33; POST derive "Goblin Boss" from Goblin | — | Goblin: 403 read-only message, unchanged. Speed 33: 400, issue path `statBlock.speed`. Others: A2 updates ≤ 1 s; B, C get no `event` frame |
+| 3 | PUT Goblin; PUT Elite Goblin Warrior HP 20, speed 40, `tokenShape` none, saves DEX + WIS; same with speed 33; POST derive "Goblin Boss" from Goblin | — | Goblin: 403 read-only message, unchanged. Speed 33: 400, issue path `statBlock.speed`. Others: A2 updates ≤ 1 s; B, C get no `event` frame |
 | 4 | PUT Mira name "Mira Vale" | — | From frame logs: B full upsert, C redacted upsert, ≤ 1 s |
 | 5 | Reload all; then kill + restart server | — | All reconnect; state includes steps 3–4 |
 | 6 | Switch to Second Campaign, then back | — | List: Marsh Troll + SRD only, then step-5 list. No console errors throughout |
@@ -187,6 +192,7 @@ wave: 2
 - `src/server/db/`: `entity.token_shape` text, nullable (values checked by zod). `speed` lives in the `statBlock` JSON leaf: zod only (`@shared/entities`), no column.
 - Protocol §13: `POST` / `PUT /api/entities` gain `tokenShape?`. Data model §11: `tokenShape` row, stat block `speed`. Record types, events, visibility: unchanged.
 - FIX §8 (integrator): speeds as §13 (`enemy-custom` inherits 30); `enemy-custom` `tokenShape` square.
+- **#149:** `abilities`, `saveProficiencies` live in the `statBlock` JSON leaf: zod only (`@shared/entities`), no column, no migration. Helpers (FR-ENT-24) in `@shared/entities` (entities-owned). Data model §11 stat block rows; FIX §8 scores on `enemy-1`, `enemy-2`, `enemy-custom` (DEX save), `char-mira`, `char-thorn`. [Proposed ADR](../architecture/adr/proposed-ability-derivation.md) amends ADR-0012.
 
 ## 15. Open questions
 
@@ -207,6 +213,7 @@ wave: 2
 | OQ-ENT-15 | Other PCs' HP for players (party view) | **Combat-phase call: nothing in Scenes; combat-tracker picks** (combatant copy / band only / redacted character adds HP) | no (owner: combat-tracker) | combat-tracker, character-sheet |
 | OQ-ENT-16 | `speed` shape (F3) | **One optional walking speed, int 0–200, multiple of 5** (fly / swim / climb later as more optional fields) / object `{walk, fly?, swim?}` now (unused in MVP) / any int | no (owner: spec-feedback) | scenes-map, combat-tracker, character-sheet |
 | OQ-ENT-17 | Where the default token shape lives (F4) | **Nullable `tokenShape` column on `entity`** (presentation, beside the portrait) / optional field in `statBlock` (no column, but it isn't a stat) / no default, DM sets per token | no (owner: spec-feedback) | scenes-map, combat-tracker |
+| OQ-ENT-18 | Monsters get abilities and save proficiencies now too? (#149) | **Yes, same optional core fields for both kinds** (one core, #124; SRD fixtures carry them; the DM rolls monster checks / saves from the initiative row, [FR-CBT-44](combat-tracker.md#6-functional-requirements)) / characters only (monster saves typed into the roll bar until tier A) | no · owner: DM | combat-tracker |
 
 ## 16. Out of scope
 
