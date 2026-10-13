@@ -2,21 +2,22 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** feedback builds. Merged: fixes (#153), party-loot (#156), feedback-core (#157), entities + play-shell (#158), character-sheet + scenes-map (#159). Left: combat-tracker feedback, polish, session-sim regression.
+**Phase:** DM feedback pass fully built and merged (#145–#161). Now: session-sim regression on `main`, then the Phase 4 gate.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Combat-tracker feedback (multi-target, undo per apply, overlays, movedFt, turn alert, rollAbility, shims) | `build/combat-tracker-feedback` (slot 0) | `build-combat-fb` | building | walkthrough → merge → session-sim regression |
-| Phase 4 hardening (crash-recovery pass) | — | — | not started | after feedback + session-sim regression (DM go) |
+| Session-sim regression (all features) | `main` (slot 1, port 4113) | `test-session-2` | running | follow-up `fix/*` for glitches → DM gate for Phase 4 |
+| Follow-ups (#161: form test IDs, pending toast over Encounters close, Save submenu hover) | — | — | queued | one `fix/*` with the regression findings |
+| Phase 4 hardening (crash-recovery pass) | — | — | not started | needs DM go |
 | Phase 5 MVP acceptance | — | — | not started | — |
 
 Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish, party-loot).
 
 ## Shared-file locks
 
-- `src/client/common/sync/connection.ts`, `store.ts` (`onEvent` / `useEventFrame` for FR-CBT-41) → `build/combat-tracker-feedback`.
+- None.
 
 ## Pending DM decisions
 
