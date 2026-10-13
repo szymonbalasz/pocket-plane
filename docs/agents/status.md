@@ -10,16 +10,16 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | Scenes: play-shell, assets-pipeline, entities, scenes-map | — (ended) | merged | walkthroughs 11/11, 7/7 + B 4/4, 6/6, 8/8 | — |
 | Combat core: `fix/combat-core`, notifications, dice-roll-log | — (ended) | merged | e2e green; walkthroughs 16/16, 10/10 | — |
-| `fix/client-polish` (reconnect probe 204, lazy Konva) | `build-polish` (`w1B:p2`) | `w1B`, slot 0 | finishing (protocol §6 row, constant) | — |
-| build character-sheet | `build-character-sheet` (`w1C:p2`) | `w1C`, slot 2 | building | — |
-| build combat-tracker | `build-combat-tracker` (`w1D:p2`) | `w1D`, slot 3 | building non-PC slices | character-sheet merge (adjustHp, roll routes) |
-| Spec party-loot (Phase 4) | — | draft on `main`; review `%TEMP%\opencode\review-loot.md` | in-review | DM: OQ-LOOT-01/02/06 |
+| `fix/client-polish` | — (ended) | merged (`f624772`) | probe 204, lazy Konva | — |
+| build character-sheet | — (ended) | merged (`49fde53`) | walkthrough 10/10, 459 tests | — |
+| build combat-tracker | `build-combat-tracker` (`w1D:p2`), `test-combat` (`w1D:p3`, server `w1D:p4`, 4133) | `w1D`, slot 3 | all slices; §13 walkthrough running | — |
+| Spec party-loot (Phase 4) | — | revised draft on `main` | in-review | DM: OQ-LOOT-01/02/06 |
 
 Evidence archived: `%TEMP%\opencode\verify-{skeleton,scenes-core,play-shell,assets,entities,scenes-map,notifications,dice}\`.
 
 ## Shared-file locks (AGENTS §9.9, sequenced)
 
-- `fix/client-polish`: `src/client/common/sync/`, `/ws` probe route, `vite.config.ts`, `src/shared/protocol/frames.ts`, protocol §3.1/§6, MapCanvas import lines in DmMap/PlayerMap.
+- `build/combat-tracker`: shell window tests, fixtures loader `removeFile` retry, data-model §17 note, `routing.test.ts`.
 - character-sheet / combat-tracker: ask before any shared file.
 
 ## Pending DM decisions (next check-in, not blocking)
