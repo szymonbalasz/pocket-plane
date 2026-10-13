@@ -10,28 +10,29 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 
 **Working mode (DM, #141):** run long autonomous stretches. Merge, fix and sequence on your own; settle technical questions yourself and log them. Come back to the DM only when blocked: product decisions, phase gates, ADR acceptance, new dependencies, anything destructive.
 
-## 1. Where we are (2026-10-13)
+## 1. Where we are (2026-10-13, evening)
 
 | Area | State |
 |---|---|
-| Phases 0–3 | **Built and merged on `main`**: Foundation (skeleton), Scenes (play-shell, assets-pipeline, entities, scenes-map), Combat (dice-roll-log, notifications, character-sheet, combat-tracker) plus `fix/*` passes (scenes-core, combat-core, client-polish, window-layout). 535 tests; `bun run check`, `build`, `e2e` green. Every spec §13 walkthrough PASSed; MVP session-sim integration run 15/15. |
-| DM demos | Run. Feedback F1–F9 in [feedback-phase3](feedback-phase3.md); decisions #145 (diagonal 5/10/5), #146 (party loot). |
-| Specs | All MVP specs `complete` except **party-loot** (revised draft, `in-review`; DM answers in #146 not yet applied). |
-| ADRs | 0001–0029 accepted. **proposed-ui-sounds** awaits the DM (amends ADR-0007 for the turn-alert sound). |
-| Decisions | Up to #147 in [decisions-log](../decisions-log.md). |
-| Worktrees / agents | None. `main` has its own `.env` (slot 1: dev 4110/4111, verify 4112). Run `bun install` on `main` after merges that add deps (konva once broke `bun run build` on a stale `node_modules`). |
+| Phases 0–4 | **Built and merged on `main`**: Foundation, Scenes, Combat, party-loot (Reward), the full DM-feedback pass (F1–F9 + #149 checks/saves: diagonal 5/10/5, turn alert + UI sounds, movement tracker, token shapes, Out/Down overlays, map targeting + multi-target, box select, physical-dice visibility), playtest polish incl. map-first layout, and Phase 4 hardening. ~723 tests; `check`, `build`, `e2e` green. |
+| Verification | Every feature walkthrough PASS (evidence `%TEMP%\opencodeerify-*`). Session-sim regression 12/12 (#162). Crash-recovery walkthrough 12/12 with `PP_TEST_CRASH` + `bun run state:digest` (#166). Snapshot sizes: realistic heavy session DM 62% / players 47% of CON-44 (#164). |
+| Specs / ADRs | All MVP specs `complete`. ADRs 0001–0032 accepted (0030 UI sounds, 0031 token-move hooks, 0032 ability derivation). |
+| Decisions | Up to #167 in [decisions-log](../decisions-log.md). |
+| Agents | Claude Code (`--kind claude -- --permission-mode auto`, `--strict-mcp-config` except test agents; #148). Helper scripts in `%TEMP%\opencode\` (`mkwt.sh`, `startagent.sh`, `poll.sh <agent…>`). |
+| Worktrees | `main` (slot 1: dev 4110/4111, verify 4112). Leftover untracked dirs the DM may delete: `~/.herdr/worktrees/pocket-plane/build-party-loot`, `build-entities-feedback`. |
 
 ## 2. Next, in order
 
-1. **DM batch (one message):** confirm the proposed tiers in [feature-tiers §8](../feature-tiers.md#8-dm-feedback-after-the-combat-build-145) (F1, F3–F8), accept proposed-ui-sounds (number it 0030), and ask whether players may ever target (F7 keeps "DM picks", #134). Picks are in feedback-phase3.
-2. **In parallel, no DM needed:**
-   - `fix/diagonal-rule` (F2, #145): ruler + drag distance = 5 × (max(dx,dy) + floor(min(dx,dy)/2)); update FR-MAP-22/15 wording; tests; tiny walkthrough.
-   - F9 test agent on `main`: reproduce "players must type the roll"; if it is the Physical dice toggle (FR-DICE-07, remembered per browser), add a visible physical-mode badge on roll buttons via a small `fix/*`.
-   - party-loot revision agent: apply #146 (coins, running currency tracker, edit instead of void, notification), then the DM sets `complete`.
-3. **Feedback spec pass** (after the DM batch): revise scenes-map (F2–F4 overlay, F4 shape, F7 selection set, F7.1 box select, F5 if tier A is kept out), combat-tracker (F1 turn event + alert, F3 movement used per turn, F6/F8 token indicators, F7 multi-target with per-target multiplier and undo), entities (optional `speed`, default token shape), character-sheet (show speed), play-shell (flash/alert surface). One review agent across them, then a consolidation agent for data-model/protocol. Specs edited by spec agents, not builders.
-4. **Feedback builds:** shared-core first if schema/events change (one `fix/feedback-core` holding the schema/events lock), then scenes-map feedback build ∥ party-loot build, then combat-tracker feedback build. Walkthrough per build; re-run the session-sim integration run at the end.
-5. **Phase 4 hardening** (needs DM go): crash-recovery pass over every feature (kill mid-command, mid-combat, mid-upload), DM-secret storage check vs campaign-management, perf sanity (snapshot sizes vs ceilings: DM 768 KB, players 512 KB).
-6. **Phase 5 MVP acceptance**: fresh `test-mvp` agent runs the full session simulation incl. party loot and the crash test; then the DM playtests.
+1. Merge `fix/reconnect-toasts` (FR-NOTE-15 pending summary / sticky card after a DM reconnect; friendly wording for REST network failures) after its tests; tiny re-check if UI changed.
+2. **Phase 5 MVP acceptance (DM go, #167):** fresh `test-mvp` agent on final `main`: full session simulation ([vision](../vision.md#mvp-a-playable-session-simulation)) incl. party loot + the crash test; brief template = `%TEMP%\opencoderiefs	est-session-2.md` + `test-crash.md`.
+3. Send the DM a **playtest script** (bundle `session-sim`, `bun run fixtures:reset-load session-sim --profile verify`, `bun run start --profile verify`, DM URL + secret + player links, what to click), then collect feedback.
+4. Afterwards: post-MVP planning with the DM (fog of war first in line; tier A backlog: DM-added sounds, battlemap props, group move, skills, full PC/NPC editing + player-filled sheets).
+
+Lessons from this session:
+- Builders' own permission check may refuse shared-file edits even when the orchestrator approved; only the DM's explicit OK unblocks it (never route the edit through another agent).
+- Never `cd` into a worktree from the orchestrator shell (use `git -C` or a subshell): a held cwd blocks worktree removal.
+- Write the server pane id into a test brief in the same shell command that created the pane (`$srv` is lost between calls).
+- Doc-only merge conflicts in `docs/protocol` / `docs/data-model` are routine when branches mark rows "built"; resolve by keeping both rows' built state.
 
 ## 3. Herdr: how to run agents (learned the hard way)
 

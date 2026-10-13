@@ -2,16 +2,16 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 4 hardening (DM go #162). Feedback pass merged (#145–#161); session-sim regression 12/12.
+**Phase:** 4 done (hardening #163–#164, crash walkthrough 12/12 #166). Next: Phase 5 MVP acceptance (DM gate).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Phase 4 crash-recovery walkthrough (12 steps, audit §5) | `main` (port 4113, `data/verify-crash`) | `test-crash` | running | Phase 4 gate → Phase 5 MVP acceptance |
-| Phase 5 MVP acceptance | — | — | not started | fresh `test-mvp` session simulation + crash test; then DM playtest |
+| Reconnect toasts (FR-NOTE-15 after reconnect; REST "Failed to fetch" wording) | `fix/reconnect-toasts` (slot 0) | `build-reconnect-toasts` | building | merge |
+| Phase 5 MVP acceptance | — | — | waiting for DM go | fresh `test-mvp`: full session simulation + crash test; then DM playtest |
 
-Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish, party-loot).
+Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash).
 
 ## Shared-file locks
 
