@@ -19,7 +19,7 @@ Template: [_template.md](_template.md). Specs are written just in time, per buil
 | 3. Combat | [Dice and game log](dice-roll-log.md) | DICE | complete | spec-dice-roll-log |
 | 3. Combat | [Notifications](notifications.md) | NOTE | complete | spec-notifications |
 | 3. Combat | [Combat tracker](combat-tracker.md) | CBT | complete | spec-combat-tracker |
-| 4. Reward + hardening | [Party loot](party-loot.md) | LOOT | unclaimed | — |
+| 4. Reward + hardening | [Party loot](party-loot.md) | LOOT | complete | spec-party-loot |
 
 ## Post-MVP
 
