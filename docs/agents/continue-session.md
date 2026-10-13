@@ -1,6 +1,6 @@
 # Continue: orchestrator session handover
 
-Paste into a new opencode session started in `C:\Repos\pocket-plane` inside Herdr:
+Start Claude Code (or opencode) in `C:\Repos\pocket-plane` inside Herdr and say:
 
 > Read `docs/agents/continue-session.md` and continue as the orchestrator.
 
@@ -44,20 +44,20 @@ $r = herdr worktree create --workspace <ws> --branch <type>/<slug> --label <slug
 # build/* and fix/*: in the worktree run `bun install` and `bun run env:init` before the agent starts
 $p = herdr pane split $r.result.root_pane.pane_id --direction right --no-focus | ConvertFrom-Json
 Start-Sleep 4   # a fresh shell isn't ready at once; agent start then fails with agent_pane_busy
-herdr agent start <name> --kind opencode --pane $p.result.pane.pane_id --timeout 90000
+herdr agent start <name> --kind claude --pane $p.result.pane.pane_id --timeout 90000 -- --permission-mode auto --strict-mcp-config   # test agents: drop --strict-mcp-config (they need the Playwright MCP servers from .mcp.json)
 ```
 - **Always pass `--workspace`** (without it Herdr once created worktrees in another repo).
 - If `agent start` says `agent_pane_busy`: close that pane, split a new one, wait, retry.
 - Read-only reviewers: a new tab in `<ws>` (`herdr tab create --workspace <ws> --label reviews --no-focus`), no worktree.
 
 **Prompting**
-- Write each brief to `%TEMP%\opencode\briefs\<name>.md`, then send: read it, `-replace '"',"'" -replace '[^\x00-\x7F]','-' -replace "\r?\n"," "`, `herdr agent prompt <name> $text`. ASCII only.
+- Write each brief to `%TEMP%\opencode\briefs\<name>.md`, then send one line: `herdr agent prompt <name> "Read your brief at <path> and follow it exactly."` (claude kind; the opencode-era ASCII flattening is not needed). `--wait` times out while the agent works; check `herdr agent get` instead.
 - PowerShell here-strings: `@'…'@` (literal) for briefs; with `@"…"@` every `$x` interpolates — a hashtable once printed as "System.Collections.Hashtable". Never put `\"` inside a double-quoted string (parse error); use single quotes.
 - Check `herdr agent get <name>` ~10 s after prompting; if still `idle`, the prompt stalled — resend.
 - Poll: loop `herdr agent list` every 30 s, cap ~14 min, stop when any watched agent leaves `working`. `blocked` = a question dialog: read it with `herdr agent read <name> --source visible`; answer with `send-keys` (enter = recommended option) only if it's technical; product questions go to the DM.
 - Read results when idle/done: `herdr agent read <name> --source recent-unwrapped --lines 40`.
 - Long outputs: agents write to `%TEMP%\opencode\<name>.md`. Hand review findings to a revision agent by copying them into its worktree as `.review.md` (it deletes it before committing).
-- The `opencode-claude-auth: Proactive token refresh failed` line in agent panes is harmless; if agents start failing, ask the DM to run `claude` once.
+- Agent kind is **claude** since #148 (opencode before). Every claude agent loads `.mcp.json` = 3 Playwright MCP servers each; builders, spec and review agents start with `--strict-mcp-config` so they load none. Close a finished agent's pane promptly (its MCP children go with it).
 
 **Builders**
 - Brief = orchestrator-prompt §5 builder template plus: own paths (`src/server/features/<f>/`, `src/shared/<f>/`, `src/client/{common,dm,player}/features/<f>/`, `fixtures/units/<f>/`, own bundle, `e2e/<f>.e2e.ts` with a `// e2e-bundle: <name>` header), append-only registries (AGENTS §9.9), and "any other shared file: STOP and report `shared change needed: <path> — <what> — <why>`".
@@ -84,7 +84,7 @@ herdr agent start <name> --kind opencode --pane $p.result.pane.pane_id --timeout
 - Write files with `[IO.File]::WriteAllText($p, $t, (New-Object Text.UTF8Encoding $false))`, LF endings; keep `docs/protocol/README.md` LF.
 - `[regex]::Replace`: write `${1}` when digits follow a backreference.
 - Don't name a helper function `R`. Format new JSON/TS files with `bun x biome format --write <file>`.
-- `opencode.json` (Playwright MCP servers `pw-dm`, `pw-player-1`, `pw-player-2`) is committed; agents load MCP servers at start.
+- Playwright MCP servers `pw-dm`, `pw-player-1`, `pw-player-2` are in `.mcp.json` (claude, enabled by `.claude/settings.json`) and `opencode.json`; agents load MCP servers at start.
 
 ## 5. Test-agent brief template
 
