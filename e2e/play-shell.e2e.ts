@@ -261,6 +261,21 @@ test("FR-SHELL-22/24/25/27 Test window Alert: flash + Toast + ping; mute and vol
   await expect(dm.getByTestId("ui-sound-button")).toHaveCount(0);
 });
 
+test("FR-SHELL-24/25 speaker: the first click on a fresh page unlocks audio and opens the popover", async ({
+  browser,
+}) => {
+  const { link } = e2eEnv();
+  const p = await rolePage(browser);
+  await p.goto(link("Player 2"));
+  const speaker = p.getByTestId("ui-sound-button");
+  await expect(speaker).toHaveAttribute("data-state", "locked");
+  await speaker.click();
+  await expect(speaker).toHaveAttribute("data-state", "on");
+  await expect(speaker).toHaveAttribute("aria-expanded", "true");
+  await expect(p.getByTestId("ui-sound-mute")).toBeVisible();
+  await p.context().close();
+});
+
 /** `playersOnline`: the switch dialog asks first when players are online (CAMP §7). */
 async function switchCampaign(dm: Page, name: string, playersOnline: boolean) {
   await dm.getByTestId("camp-campaign-switcher").click();

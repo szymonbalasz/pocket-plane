@@ -88,7 +88,9 @@ export function SoundControl() {
             data-state={state}
             aria-label={`Sound settings: ${SPEAKER_TIP[state]}`}
           >
-            <Icon className="size-4" />
+            {/* The unlock on this pointerdown swaps the icon; with the svg hit-testable the
+                pressed node would vanish and the click (opening the Popover) would be lost. */}
+            <Icon className="pointer-events-none size-4" />
           </Button>
         </PopoverTrigger>
       </Tooltip>
