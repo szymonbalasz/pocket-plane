@@ -56,9 +56,16 @@ export function overlapsMap(m: MapRect, col: number, row: number, size: TokenSiz
   return x < m.mapWidth && x + side > 0 && y < m.mapHeight && y + side > 0;
 }
 
-/** FR-MAP-22: `max(|Δcol|, |Δrow|) × 5 ft` (#124). */
+/** FR-MAP-22: 5/10/5 diagonals, `5 × (max(dx, dy) + floor(min(dx, dy) / 2))` ft (#145). */
 export function distanceFt(a: { col: number; row: number }, b: { col: number; row: number }) {
-  return Math.max(Math.abs(a.col - b.col), Math.abs(a.row - b.row)) * 5;
+  const dx = Math.abs(a.col - b.col);
+  const dy = Math.abs(a.row - b.row);
+  return 5 * (Math.max(dx, dy) + Math.floor(Math.min(dx, dy) / 2));
+}
+
+/** Ruler (FR-MAP-22) and drag (FR-MAP-15) label text. */
+export function distanceLabel(a: { col: number; row: number }, b: { col: number; row: number }) {
+  return `${distanceFt(a, b)} ft`;
 }
 
 // ---------- names (FR-MAP-16) ----------
