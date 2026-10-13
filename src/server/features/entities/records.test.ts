@@ -14,6 +14,7 @@ const v = (role: "dm" | "player", playerId: string | null): Viewer => ({
 const common = {
   campaignId: "camp",
   portraitAssetId: "portrait-1",
+  tokenShape: null,
   derivedFromId: null,
   createdAt: "t",
   updatedAt: "t",
@@ -48,7 +49,28 @@ describe("entities record types", () => {
       name: "Mira",
       portraitAssetId: "portrait-1",
       ownerPlayerId: "p1",
+      down: false,
     });
+  });
+
+  test("FR-ENT-15 redacted character: derived down true at 0 HP, false above; no HP field (#154)", () => {
+    const at = (hpCurrent: number) => redactCharacter({ ...mira, hpCurrent } as EntityRecord);
+    expect(at(0).down).toBe(true);
+    expect(at(1).down).toBe(false);
+    expect(at(12).down).toBe(false);
+    for (const r of [at(0), at(5)]) {
+      expect(Object.keys(r).sort()).toEqual(
+        ["down", "id", "kind", "name", "ownerPlayerId", "portraitAssetId"].sort(),
+      );
+    }
+    const s = entityServices();
+    const down = { ...mira, tokenShape: "square", hpCurrent: 0 } as EntityRecord;
+    expect(s.records.view("entity", down, v("player", "p2"))).toEqual({
+      vis: "redacted",
+      data: { ...redactCharacter(down), down: true },
+    });
+    expect(s.records.view("entity", down, v("player", "p1"))).toEqual({ vis: "full", data: down });
+    expect(s.records.view("entity", down, v("dm", null))).toEqual({ vis: "full", data: down });
   });
 
   test("FR-ENT-15 the registry gives the DM full, filters players (incl. other campaign)", () => {
