@@ -95,17 +95,10 @@ export function PlayersPanel() {
     <Card data-testid="camp-players-panel">
       <CardHeader>
         <CardTitle>Players</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Links use <span data-testid="camp-players-base-url">{base}</span>
-        </p>
-        {isLoopbackUrl(base) && (
-          <Alert variant="warning" data-testid="camp-players-loopback-warning">
-            Links point at this computer ({new URL(base).hostname}); players elsewhere can't open
-            them. Set PP_PUBLIC_BASE_URL to your tunnel URL.
-          </Alert>
-        )}
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      {/* Rows first: they are what the DM needs at the window's default size; the link base
+          and its warning follow. */}
+      <CardContent className="flex flex-col gap-3">
         {players.length === 0 ? (
           <p className="text-sm text-muted-foreground" data-testid="camp-players-empty">
             Add a player to get a link.
@@ -114,7 +107,7 @@ export function PlayersPanel() {
           <Table data-testid="camp-players-table">
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
+                <TableHead className="w-full">Name</TableHead>
                 <TableHead>Online</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -125,8 +118,15 @@ export function PlayersPanel() {
                 const isOnline = online.has(p.id);
                 return (
                   <TableRow key={p.id} data-testid="camp-player-row" data-record-id={p.id}>
-                    <TableCell data-testid="camp-player-name">{p.name}</TableCell>
-                    <TableCell>
+                    {/* Name takes the free width, one line; long names truncate. */}
+                    <TableCell
+                      data-testid="camp-player-name"
+                      title={p.name}
+                      className="max-w-0 truncate whitespace-nowrap font-medium"
+                    >
+                      {p.name}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
                       <span
                         data-testid="camp-player-online"
                         data-online={isOnline}
@@ -141,7 +141,7 @@ export function PlayersPanel() {
                         {isOnline ? "online" : "offline"}
                       </span>
                     </TableCell>
-                    <TableCell className="flex justify-end gap-2">
+                    <TableCell className="flex justify-end gap-1 whitespace-nowrap">
                       <Button
                         size="sm"
                         variant="outline"
@@ -197,6 +197,15 @@ export function PlayersPanel() {
           <p className="text-sm text-destructive" data-testid="camp-player-add-error">
             {addError}
           </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Links use <span data-testid="camp-players-base-url">{base}</span>
+        </p>
+        {isLoopbackUrl(base) && (
+          <Alert variant="warning" data-testid="camp-players-loopback-warning">
+            Links point at this computer ({new URL(base).hostname}); players elsewhere can't open
+            them. Set PP_PUBLIC_BASE_URL to your tunnel URL.
+          </Alert>
         )}
       </CardContent>
     </Card>

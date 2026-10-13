@@ -6,8 +6,11 @@ import { PlayersPanel } from "../campaign-management/PlayersPanel";
 
 export const PLAYERS_KIND = "camp.players";
 
-/** The window title already says "Players": hide the panel's own CardTitle (h3) here. */
-const NO_TITLE = "[&>div>div:first-child>h3]:hidden";
+/**
+ * The window title already says "Players": hide the panel's own header (title only) and its
+ * card padding here, so the rows show at the default size.
+ */
+const NO_TITLE = "[&>div>div:first-child]:hidden [&>div>div]:p-0";
 
 function PlayersBody() {
   return (

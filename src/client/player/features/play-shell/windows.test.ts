@@ -97,6 +97,38 @@ test("FR-SHELL-08 player Notifications opens clear of the sheet and initiative (
   }
 });
 
+test("FR-SHELL-18 player Initiative appearing on Start avoids an open Notifications (layout check 7)", () => {
+  for (const viewport of VIEWPORTS) {
+    const all = new Set(playerWindows.defs.map((d) => d.kind));
+    const before = new Set([...all].filter((k) => k !== "cbt.initiative"));
+    let ws = reduce(
+      defaultLayout(playerWindows, viewport),
+      { type: "open", kind: "note.history" },
+      { registry: playerWindows, viewport, available: before },
+    );
+    ws = reduce(
+      ws,
+      { type: "appear", kind: "cbt.initiative" },
+      {
+        registry: playerWindows,
+        viewport,
+        available: all,
+      },
+    );
+    const rects = ws
+      .filter((w) => w.state === "open")
+      .map((w) => ({ kind: w.kind, ...clampRect(w, viewport) }));
+    const init = rects.find((r) => r.kind === "cbt.initiative");
+    if (!init) throw new Error("cbt.initiative not open");
+    for (const r of rects) {
+      if (r.kind === init.kind) continue;
+      expect(overlaps(init, r) ? `cbt.initiative overlaps ${r.kind} at ${viewport.w}` : "ok").toBe(
+        "ok",
+      );
+    }
+  }
+});
+
 test("FR-SHELL-08 player default-open product windows don't overlap (1280×720, 1600×900); test windows don't overlap each other", () => {
   const on = availableKinds(playerWindows, testMode);
   const off = availableKinds(playerWindows, emptyStore());

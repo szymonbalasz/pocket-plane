@@ -62,9 +62,11 @@ function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof ac
       <TableCell className="w-10 p-1.5">
         <Portrait row={row} />
       </TableCell>
-      <TableCell className="max-w-0 p-1.5">
+      {/* Name column takes the free width (w-full + max-w-0: truncate inside a table). CR /
+          XP sit on the second line, so a narrow window still shows names. */}
+      <TableCell className="w-full max-w-0 p-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="truncate font-medium" data-testid="ent-list-row-name">
+          <span className="truncate font-medium" data-testid="ent-list-row-name" title={row.name}>
             {row.name}
           </span>
           {row.readOnly && (
@@ -75,21 +77,22 @@ function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof ac
             </Tooltip>
           )}
         </div>
-        <div className="truncate text-xs text-muted-foreground">
+        <div className="truncate text-xs tabular-nums text-muted-foreground">
           {row.kind === "character" ? "Character" : "Monster"}
+          {row.cr !== null && (
+            <>
+              {" · "}
+              <span data-testid="ent-list-row-cr">
+                CR {row.cr} · {row.xp} XP
+              </span>
+            </>
+          )}
           {row.derivedFrom !== null && (
             <span data-testid="ent-list-row-derived"> · derived from {row.derivedFrom}</span>
           )}
         </div>
       </TableCell>
-      <TableCell className="w-px whitespace-nowrap p-1.5 text-right text-xs tabular-nums text-muted-foreground">
-        {row.cr !== null && (
-          <span data-testid="ent-list-row-cr">
-            CR {row.cr} · {row.xp} XP
-          </span>
-        )}
-      </TableCell>
-      <TableCell className="w-px p-1.5">
+      <TableCell className="w-px whitespace-nowrap p-1.5">
         <Badge data-testid="ent-list-row-badge" variant={row.readOnly ? "outline" : "secondary"}>
           {row.badge}
         </Badge>

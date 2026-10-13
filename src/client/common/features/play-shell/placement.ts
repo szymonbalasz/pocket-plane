@@ -81,30 +81,18 @@ export function placeRect(def: Placeable, vp: Viewport, obstacles: readonly Rect
   const { w } = base;
   const minH = Math.min(def.minSize.h, base.h);
   const g = EDGE_GAP;
-  const spots: { x: number; y: number }[] = [{ x: base.x, y: base.y }];
-  for (const o of obstacles) {
-    const right = o.x + o.w + g;
-    const left = o.x - g - w;
-    const below = o.y + o.h + g;
-    spots.push(
-      { x: right, y: o.y },
-      { x: left, y: o.y },
-      { x: right, y: base.y },
-      { x: left, y: base.y },
-      { x: o.x, y: below },
-      { x: o.x + o.w - w, y: below },
-      { x: base.x, y: below },
-    );
-  }
-  spots.push(
-    { x: a.left, y: a.top },
-    { x: a.right - w, y: a.top },
-    { x: a.left, y: a.bottom - base.h },
-    { x: a.right - w, y: a.bottom - base.h },
-  );
-
   // Moved windows stay right of the tool rail (unless their default is already left of it).
   const minX = Math.max(a.left, Math.min(base.x, RAIL_CLEAR));
+  // Every free slot touches an area edge or an open window's edge (+ gap) on its left or
+  // right side and on its top or bottom side: the grid of those lines covers them all.
+  const xs = new Set([base.x, minX, a.right - w]);
+  const ys = new Set([base.y, a.top, a.bottom - base.h, a.bottom - minH]);
+  for (const o of obstacles) {
+    for (const x of [o.x, o.x + o.w + g, o.x - g - w, o.x + o.w - w]) xs.add(x);
+    for (const y of [o.y, o.y + o.h + g, o.y - g - base.h, o.y - g - minH]) ys.add(y);
+  }
+  const spots: { x: number; y: number }[] = [{ x: base.x, y: base.y }];
+  for (const x of xs) for (const y of ys) spots.push({ x, y });
   let best: { rect: Rect; rank: [number, number, number] } | null = null;
   for (const s of spots) {
     const x = Math.max(minX, Math.min(s.x, a.right - w));

@@ -9,6 +9,8 @@ export const dmCharSheetWindow = defineWindow({
   clients: ["dm"],
   // CHAR §7 says "right, below camp.players"; that spot is `cbt.initiative`'s (protocol §24).
   // Right side, left of the right column; the next free slot if taken (FR-SHELL-08).
+  // At 1280×720 no 440-px slot is free beside the default windows: it opens shrunk (≥ min) in
+  // the free slot and the sheet scrolls inside down to Damage / Heal.
   defaultPosition: { anchor: "top-right", dx: 412 },
   launcher: { icon: UserRoundIcon, label: "Sheets", order: 50 },
   component: CharacterSheet,
