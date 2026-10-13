@@ -64,34 +64,48 @@ function InitiativeCell({ c, def }: { c: CombatantView; def: DefinitionRecord | 
     }
     void send("cbt.setInitiative", { combatantId: c.id, value: n });
   };
+  const bonus = def?.statBlock.initBonus ?? 0;
+  const unset = c.initiative == null;
+  // #149: an empty initiative leads with a labelled Roll button; the box is a quiet secondary
+  // way to type a value (reads as a value cell, not a form field).
   return (
-    <div className="flex items-center gap-0.5">
-      <Input
-        data-testid="cbt-init-row-init"
-        data-record-id={c.id}
-        aria-label={`Initiative of ${c.name}`}
-        inputMode="numeric"
-        className="h-7 w-11 px-1.5 text-center text-xs tabular-nums"
-        disabled={disabled}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") commit();
-        }}
-      />
-      <RollButton
-        control={control}
-        data-testid="cbt-init-row-roll"
-        data-record-id={c.id}
-        size="icon"
-        variant="ghost"
-        className="size-7"
-        aria-label={`Roll initiative for ${c.name}`}
-        disabled={disabled}
+    <div className="flex w-[100px] items-center justify-end gap-0.5">
+      <Tooltip content="Set initiative by hand">
+        <Input
+          data-testid="cbt-init-row-init"
+          data-record-id={c.id}
+          aria-label={`Initiative of ${c.name}`}
+          inputMode="numeric"
+          placeholder="–"
+          className="h-7 w-9 border-transparent bg-transparent px-1 text-center text-xs tabular-nums shadow-none placeholder:text-muted-foreground/60 hover:border-input focus-visible:border-input"
+          disabled={disabled}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+          }}
+        />
+      </Tooltip>
+      <Tooltip
+        content={`Roll initiative: d20${bonus < 0 ? "" : "+"}${bonus} (Shift adv, Ctrl dis)`}
       >
-        <DicesIcon className="size-3.5" />
-      </RollButton>
+        <span>
+          <RollButton
+            control={control}
+            data-testid="cbt-init-row-roll"
+            data-record-id={c.id}
+            size={unset ? "sm" : "icon"}
+            variant={unset ? "outline" : "ghost"}
+            className={unset ? "h-7 gap-1 px-2 text-xs" : "size-7"}
+            aria-label={`Roll initiative for ${c.name}`}
+            disabled={disabled}
+          >
+            <DicesIcon className="size-3.5" />
+            {unset && "Roll"}
+          </RollButton>
+        </span>
+      </Tooltip>
     </div>
   );
 }
@@ -357,7 +371,7 @@ function DmInitiativeBody() {
           className="sticky top-0 z-10 flex items-center gap-1 bg-card px-1 pb-0.5 text-[11px] text-muted-foreground"
         >
           <span className="flex-1 pl-[52px]">Combatant</span>
-          <span className="w-[74px] text-center">Init</span>
+          <span className="w-[100px] text-center">Init</span>
           <span className="w-[60px]" />
         </div>
         <ul className="flex flex-col gap-0.5">

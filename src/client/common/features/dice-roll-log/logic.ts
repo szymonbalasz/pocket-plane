@@ -42,11 +42,12 @@ export interface ActorOption {
   ref?: { entityId: string } | { tokenId: string };
 }
 
-type ActorToken = Pick<TokenView, "id" | "sceneId" | "name" | "seq">;
+type ActorToken = Pick<TokenView, "id" | "sceneId" | "name" | "seq" | "definitionId">;
 
 /**
  * FR-DICE-27: player → "me" + own characters; DM → "DM" + every character + the tokens of the
- * active scene (by placement order).
+ * active scene (by placement order). A character's token is left out: the character is already
+ * listed, and both roll under the same name ("Mira" twice, #149).
  */
 export function actorOptions(
   you: { role: "dm" | "player"; playerId: string | null } | null,
@@ -70,7 +71,10 @@ export function actorOptions(
   ];
   if (you.role !== "dm") return out;
   const active = scenes.find((s) => s.active)?.id;
-  const onScene = tokens.filter((t) => t.sceneId === active).sort((a, b) => a.seq - b.seq);
+  const listed = new Set(chars.map((c) => c.id));
+  const onScene = tokens
+    .filter((t) => t.sceneId === active && !(t.definitionId && listed.has(t.definitionId)))
+    .sort((a, b) => a.seq - b.seq);
   return [
     ...out,
     ...onScene.map((t) => ({

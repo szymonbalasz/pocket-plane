@@ -1,6 +1,8 @@
 // Shared roll control (FR-DICE-24): `useRollControl` + `RollButton`. Reads the Shift / Ctrl keys
 // (FR-DICE-05) and physical-dice mode (FR-DICE-07); DM gets a public toggle preset from the
-// category's setting (FR-DICE-13). The caller sends its own intent from `onRoll`.
+// category's setting (FR-DICE-13). The caller sends its own intent from `onRoll`. Physical mode
+// is never a surprise (#149): every `RollButton` carries a marker, and the popover offers
+// "Roll for me" (one server roll; the mode stays on).
 import {
   categoryPublic,
   GAME_LOG_SETTINGS_TYPE,
@@ -9,10 +11,12 @@ import {
   type RollCategory,
   type RollMode,
 } from "@shared/dice-roll-log/schemas";
+import { HandIcon } from "lucide-react";
 import { type ComponentProps, useMemo, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/controls";
 import { Input } from "../../components/ui/primitives";
+import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
 import { type ManualSlot, manualSlots, modeFromKeys, parseManual, slotsAfterFirst } from "./logic";
 import { usePhysicalDice } from "./physical";
@@ -54,6 +58,8 @@ export interface RollControl {
   manual: { mode: RollMode; first: ManualSlot } | null;
   cancelManual(): void;
   submitManual(entries: ManualEntry[]): void;
+  /** Close the popover and let the server roll this one (mode stays on). */
+  rollForMe(): void;
   /** Local error (e.g. an expression the popover can't lay out). */
   error: string | null;
   options: RollControlOptions;
@@ -98,6 +104,9 @@ export function useRollControl(options: RollControlOptions): RollControl {
     cancelManual: () => setManual(null),
     submitManual(entries) {
       if (manual) finish(manual.mode, entries);
+    },
+    rollForMe() {
+      if (manual) finish(manual.mode);
     },
     error,
     options,
@@ -213,6 +222,20 @@ function ManualForm({ control }: { control: RollControl }) {
         <Button type="button" size="sm" variant="ghost" onClick={() => control.cancelManual()}>
           Cancel
         </Button>
+        <Button
+          data-testid="dice-manual-auto"
+          type="button"
+          size="sm"
+          variant="outline"
+          className="mr-auto order-first"
+          onClick={() => {
+            setError(null);
+            setInputs([]);
+            control.rollForMe();
+          }}
+        >
+          Roll for me
+        </Button>
         <Button data-testid="dice-manual-submit" type="submit" size="sm">
           Roll
         </Button>
@@ -221,10 +244,25 @@ function ManualForm({ control }: { control: RollControl }) {
   );
 }
 
+/** FR-DICE-07 marker: a small hand pip on every roll button while physical mode is on. */
+function PhysicalMarker() {
+  return (
+    <span
+      data-testid="dice-physical-marker"
+      aria-hidden
+      className="pointer-events-none absolute -top-1 -right-1 flex size-3.5 items-center justify-center rounded-full bg-warning text-background shadow"
+    >
+      <HandIcon className="size-2.5" />
+    </span>
+  );
+}
+
 /** A button that rolls through `control`; the manual popover anchors to it. */
 export function RollButton({
   control,
   onClick,
+  className,
+  children,
   ...props
 }: { control: RollControl } & ComponentProps<typeof Button>) {
   return (
@@ -237,11 +275,16 @@ export function RollButton({
       <PopoverAnchor asChild>
         <Button
           {...props}
+          data-physical={control.physical}
+          className={cn(className, control.physical && "relative")}
           onClick={(e) => {
             onClick?.(e);
             if (!e.defaultPrevented) control.roll(e);
           }}
-        />
+        >
+          {children}
+          {control.physical && <PhysicalMarker />}
+        </Button>
       </PopoverAnchor>
       <PopoverContent align="end" side="top" className="w-80">
         <ManualForm control={control} />

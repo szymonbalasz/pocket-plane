@@ -258,7 +258,7 @@ fixtures/
 | Domain event types | `src/shared/events/` |
 | Protocol schemas (envelope, intents, record changes, snapshot, errors, close codes) | `src/shared/protocol/` |
 | Server core | `src/server/{config.ts,commands,events,ws}/`, `src/server/index.ts` |
-| Existing shared UI | edits to existing files in `src/client/common/` (new files are fine) |
+| Existing shared UI | edits to existing files in `src/client/common/` (new files are fine). Exception: a feature's own `src/client/common/features/<feature>/` files belong to that feature's builder (#154); play-shell's frame files stay shared |
 | Tooling | `package.json`, `bun.lock`, `tsconfig.json`, `vite.config.ts`, `playwright.config.ts`, `biome.json`, `.env.example`, `.gitignore`, `scripts/` |
 | Docs | `docs/data-model/`, `docs/protocol/`, specs, ADRs, glossary, decisions log, `AGENTS.md` |
 

@@ -15,7 +15,7 @@ import {
 } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
 import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
-import { EyeOffIcon } from "lucide-react";
+import { EyeOffIcon, HandIcon } from "lucide-react";
 import { type ReactNode, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
@@ -346,15 +346,6 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        <span className="flex items-center gap-1.5 text-xs">
-          <Switch
-            id={`${uid}-physical`}
-            data-testid="dice-roll-physical"
-            checked={physical}
-            onCheckedChange={setPhysical}
-          />
-          <label htmlFor={`${uid}-physical`}>Physical dice</label>
-        </span>
         {control.isDm && (
           <span className="flex items-center gap-1.5 text-xs">
             <Switch
@@ -369,11 +360,45 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
         )}
         {dmTools && <div className="ml-auto">{dmTools}</div>}
       </div>
+      {/* #149: own row, away from Adv, so it is hard to flip by accident. */}
+      <div className="flex items-center gap-1.5 border-t pt-1.5 text-xs text-muted-foreground">
+        <Switch
+          id={`${uid}-physical`}
+          data-testid="dice-roll-physical"
+          checked={physical}
+          onCheckedChange={setPhysical}
+        />
+        <label htmlFor={`${uid}-physical`}>Physical dice: type in my own rolls</label>
+      </div>
       {shownError && (
         <p data-testid="dice-roll-error" role="alert" className="text-xs text-destructive">
           {shownError}
         </p>
       )}
+    </div>
+  );
+}
+
+/** FR-DICE-07, #149: while physical mode is on, the top of the log says so (with a way out). */
+function PhysicalBanner() {
+  const [physical, setPhysical] = usePhysicalDice();
+  if (!physical) return null;
+  return (
+    <div
+      data-testid="dice-log-physical"
+      role="status"
+      className="flex shrink-0 items-center gap-1.5 rounded-md border border-warning/50 bg-warning/10 px-2 py-1 text-xs"
+    >
+      <HandIcon className="size-3.5 shrink-0 text-warning" />
+      <span className="flex-1">Physical dice on: rolls ask for your dice</span>
+      <button
+        type="button"
+        data-testid="dice-log-physical-off"
+        className="rounded-sm font-medium underline-offset-2 hover:underline"
+        onClick={() => setPhysical(false)}
+      >
+        Turn off
+      </button>
     </div>
   );
 }
@@ -390,6 +415,7 @@ export function GameLog({ dmTools }: { dmTools?: ReactNode }) {
       aria-label="Game log"
       className="flex h-full min-h-0 flex-col gap-2"
     >
+      <PhysicalBanner />
       {!everLive ? (
         <div className="flex flex-1 flex-col gap-1.5">
           {[0, 1, 2].map((i) => (

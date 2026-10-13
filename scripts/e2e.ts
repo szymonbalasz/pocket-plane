@@ -16,6 +16,7 @@ import { manifestPath } from "../src/server/runtime/manifest";
 import { type ServerProcess, spawnServer } from "./lib/server-process";
 
 const DEFAULT_BUNDLE = "sync-probe";
+const SERVER_START_TIMEOUT_MS = 30_000;
 const BUNDLE_LINE = /^\/\/\s*e2e-bundle:\s*([a-z0-9][a-z0-9-]*)\s*$/m;
 
 async function run(cmd: string[], env: Record<string, string | undefined> = process.env) {
@@ -59,13 +60,24 @@ async function runBundle(bundle: string, files: string[], pwArgs: string[]): Pro
   try {
     await resetAndLoad(parseConfig(env), library, bundle);
     server = spawnServer(["--client"], { env });
+    // Under load (parallel worktrees, cold build cache) startup can take well over 10 s; a server
+    // that exits fails at once instead of waiting out the timeout.
     let port: number | null = null;
-    for (let i = 0; i < 100 && port === null; i++) {
+    const deadline = Date.now() + SERVER_START_TIMEOUT_MS;
+    while (port === null && Date.now() < deadline) {
       await Bun.sleep(100);
+      const { exitCode, signalCode } = server.proc;
+      if (exitCode !== null || signalCode !== null) {
+        throw new Error(`Server exited during startup (${exitCode ?? signalCode})`);
+      }
       const lock = readLock(dir);
       if (lock?.owner === "server" && lock.port) port = lock.port;
     }
-    if (port === null) throw new Error("Server did not start (no port in server.lock)");
+    if (port === null) {
+      throw new Error(
+        `Server did not start within ${SERVER_START_TIMEOUT_MS / 1000} s (no port in server.lock)`,
+      );
+    }
     return await run(["bun", "x", "playwright", "test", ...files, ...pwArgs], {
       ...process.env,
       E2E_BASE_URL: `http://127.0.0.1:${port}`,
