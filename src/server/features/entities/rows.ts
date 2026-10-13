@@ -23,6 +23,7 @@ const base = (r: EntityRow) => ({
   kind: r.kind,
   name: r.name,
   portraitAssetId: r.portraitAssetId,
+  tokenShape: r.tokenShape,
   statBlock: r.statBlock,
   ownerPlayerId: r.ownerPlayerId,
   hpCurrent: r.hpCurrent,

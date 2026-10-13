@@ -43,9 +43,22 @@ describe("entities fixtures (ENT §13)", () => {
       ac: 15,
       hpMax: 7,
       initBonus: 2,
+      speed: 30,
+      abilities: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 },
       attacks: [{ name: "Scimitar", toHit: 4, damage: "1d6+2", damageType: "slashing" }],
       cr: "1/4",
     });
+    expect(imported[1]?.statBlock).toEqual({
+      size: "medium",
+      ac: 13,
+      hpMax: 11,
+      initBonus: 2,
+      speed: 40,
+      abilities: { str: 12, dex: 15, con: 12, int: 3, wis: 12, cha: 6 },
+      attacks: [{ name: "Bite", toHit: 4, damage: "2d4+2", damageType: "piercing" }],
+      cr: "1/4",
+    });
+    expect(imported.map((e) => e.tokenShape)).toEqual([null, null]);
     expect(r.manifest.records["enemy-1"]?.["imported-entity"]).toEqual([imported[0]?.id as string]);
     expect(r.manifest.records["enemy-2"]?.["imported-entity"]).toEqual([imported[1]?.id as string]);
     expect(r.log.filter((e) => e.type === "EntityImported")).toHaveLength(2);
@@ -63,28 +76,59 @@ describe("entities fixtures (ENT §13)", () => {
       campaignId: fixture?.id,
       derivedFromId: goblin?.id,
       source: null,
-      statBlock: {
-        size: "small",
-        ac: 16,
-        hpMax: 15,
-        initBonus: 2,
-        attacks: [{ name: "Scimitar", toHit: 5, damage: "1d6+3", damageType: "slashing" }],
-        cr: "1/2",
-      },
+      tokenShape: "square",
+    });
+    expect(by("Elite Goblin Warrior")?.statBlock).toEqual({
+      size: "small",
+      ac: 16,
+      hpMax: 15,
+      initBonus: 2,
+      speed: 30,
+      abilities: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 },
+      saveProficiencies: ["dex"],
+      attacks: [{ name: "Scimitar", toHit: 5, damage: "1d6+3", damageType: "slashing" }],
+      cr: "1/2",
     });
     expect(by("Mira")).toMatchObject({
       kind: "character",
       campaignId: fixture?.id,
       hpCurrent: 12,
-      statBlock: { ac: 16, hpMax: 12, initBonus: 2, level: 1, className: "Fighter" },
+      tokenShape: null,
     });
-    expect(by("Thorn")).toMatchObject({
-      hpCurrent: 10,
-      statBlock: { ac: 14, initBonus: 3, attacks: [{ toHit: 5, damage: "1d4+3" }] },
+    expect(by("Mira")?.statBlock).toEqual({
+      size: "medium",
+      ac: 16,
+      hpMax: 12,
+      initBonus: 2,
+      speed: 30,
+      abilities: { str: 14, dex: 14, con: 14, int: 10, wis: 12, cha: 10 },
+      saveProficiencies: ["str", "con"],
+      attacks: [{ name: "Shortsword", toHit: 4, damage: "1d6+2", damageType: "piercing" }],
+      level: 1,
+      className: "Fighter",
     });
-    expect(by("Marsh Troll")).toMatchObject({
-      campaignId: second?.id,
-      statBlock: { size: "large", ac: 15, hpMax: 59, initBonus: 1, cr: "5" },
+    expect(by("Thorn")).toMatchObject({ hpCurrent: 10, tokenShape: null });
+    expect(by("Thorn")?.statBlock).toEqual({
+      size: "medium",
+      ac: 14,
+      hpMax: 10,
+      initBonus: 3,
+      speed: 30,
+      abilities: { str: 8, dex: 16, con: 14, int: 12, wis: 10, cha: 13 },
+      saveProficiencies: ["dex", "int"],
+      attacks: [{ name: "Dagger", toHit: 5, damage: "1d4+3", damageType: "piercing" }],
+      level: 1,
+      className: "Rogue",
+    });
+    expect(by("Marsh Troll")).toMatchObject({ campaignId: second?.id, tokenShape: null });
+    expect(by("Marsh Troll")?.statBlock).toEqual({
+      size: "large",
+      ac: 15,
+      hpMax: 59,
+      initBonus: 1,
+      speed: 30,
+      attacks: [{ name: "Claw", toHit: 7, damage: "2d6+4", damageType: "slashing" }],
+      cr: "5",
     });
     expect(r.manifest.records["char-mira"]?.entity).toEqual([by("Mira")?.id as string]);
     expect(r.manifest.records["enemy-custom-second"]?.entity).toEqual([

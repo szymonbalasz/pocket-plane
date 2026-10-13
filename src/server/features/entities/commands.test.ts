@@ -298,9 +298,77 @@ describe("entities commands", () => {
         name: "Mira",
         portraitAssetId: null,
         ownerPlayerId: t.h.p2.id,
+        down: false,
       },
     });
     expect(p2?.data).toMatchObject({ statBlock: miraBlock, hpCurrent: 12 });
+  });
+
+  test("FR-ENT-22 tokenShape: set by create / update; omitted → null; imported null", () => {
+    const t = setup();
+    const imported = t.s.db.transaction((tx) =>
+      resolveDefinition({ tx, actor: t.h.dm }, t.h.goblinId),
+    );
+    expect(imported.tokenShape).toBeNull();
+    expect(t.elite().tokenShape).toBeNull();
+    const sq = t.run(CREATE, {
+      kind: "monster",
+      name: "Square Goblin",
+      tokenShape: "square",
+      statBlock: goblinBlock,
+    });
+    expect(sq.tokenShape).toBe("square");
+    const row = () => t.s.db.select().from(entity).where(eq(entity.id, sq.id)).get();
+    expect(row()?.tokenShape).toBe("square");
+    expect(t.update(sq, { tokenShape: "none" }).tokenShape).toBe("none");
+    // FR-ENT-11 whole replace: a PUT without tokenShape sets null.
+    expect(t.update(sq).tokenShape).toBeNull();
+    expect(row()?.tokenShape).toBeNull();
+    const bad = t.err(() => t.update(sq, { tokenShape: "hex" }));
+    expect([bad.code, bad.issues?.[0]?.path]).toEqual(["invalid", ["tokenShape"]]);
+    const pc = t.run(CREATE, {
+      kind: "character",
+      name: "Mira",
+      ownerPlayerId: t.h.p1.id,
+      tokenShape: "none",
+      statBlock: miraBlock,
+    });
+    expect(pc.tokenShape).toBe("none");
+  });
+
+  test("FR-ENT-21/23 speed, abilities, saves: stored via create / update; bad values invalid with path", () => {
+    const t = setup();
+    const mira = t.mira();
+    expect(mira.statBlock).toMatchObject({
+      speed: 30,
+      abilities: { str: 14, con: 14 },
+      saveProficiencies: ["str", "con"],
+    });
+    const { speed: _s, abilities: _a, saveProficiencies: _p, ...bare } = miraBlock;
+    // Absent fields stay valid (no backfill) and an update may drop them (whole replace).
+    const dropped = t.update(mira, { statBlock: bare });
+    expect(dropped.statBlock as unknown).toEqual(bare);
+    const paths = (patch: object) =>
+      t
+        .err(() => t.update(dropped, { statBlock: { ...bare, ...patch } }))
+        .issues?.map((i) => i.path.join("."));
+    expect(paths({ speed: 33 })).toEqual(["statBlock.speed"]);
+    expect(paths({ saveProficiencies: ["str"] })).toEqual(["statBlock.saveProficiencies"]);
+    expect(paths({ abilities: { ...miraBlock.abilities, wis: 31 } })).toEqual([
+      "statBlock.abilities.wis",
+    ]);
+    const elite = t.update(t.elite(), {
+      statBlock: { ...goblinBlock, speed: 40, saveProficiencies: ["dex", "wis"] },
+    });
+    expect(elite.statBlock).toMatchObject({ speed: 40, saveProficiencies: ["dex", "wis"] });
+    const created = t.err(() =>
+      t.run(CREATE, {
+        kind: "monster",
+        name: "Slow",
+        statBlock: { ...goblinBlock, speed: 33 },
+      }),
+    );
+    expect(created.issues?.map((i) => i.path.join("."))).toEqual(["statBlock.speed"]);
   });
 
   test("FR-ENT-12 resolveDefinition: global or same campaign, else not_found", () => {

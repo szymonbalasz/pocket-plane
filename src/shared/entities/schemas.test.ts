@@ -157,6 +157,9 @@ describe("entities schemas", () => {
     expect(ok({ speed: 30 })).toBe(true);
     expect(ok({ speed: 0 })).toBe(true);
     expect(ok({ speed: 200 })).toBe(true);
+    expect(ok({ speed: 35 })).toBe(true);
+    expect(ok({ speed: 33 })).toBe(false);
+    expect(ok({})).toBe(true);
     expect(ok({ speed: 205 })).toBe(false);
     expect(ok({ speed: 32 })).toBe(false);
     expect(ok({ speed: -5 })).toBe(false);
@@ -166,6 +169,15 @@ describe("entities schemas", () => {
   test("FR-ENT-22 token shape: round | square | none", () => {
     for (const v of ["round", "square", "none"]) expect(TokenShape.safeParse(v).success).toBe(true);
     expect(TokenShape.safeParse("hex").success).toBe(false);
+    // REST bodies: optional, nullable; anything else → invalid.
+    const body = { kind: "monster", name: "G", statBlock: goblin };
+    for (const tokenShape of [undefined, null, "square"]) {
+      expect(CreateEntityBody.safeParse({ ...body, tokenShape }).success).toBe(true);
+    }
+    expect(CreateEntityBody.safeParse({ ...body, tokenShape: "hex" }).success).toBe(false);
+    const put = { name: "G", statBlock: goblin };
+    expect(UpdateEntityBody.safeParse({ ...put, tokenShape: "none" }).success).toBe(true);
+    expect(UpdateEntityBody.safeParse({ ...put, tokenShape: "hex" }).success).toBe(false);
   });
 
   test("FR-ENT-23 abilities all six (1–30), save proficiencies unique and need abilities", () => {
