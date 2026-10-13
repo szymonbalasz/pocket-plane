@@ -8,7 +8,6 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Playtest polish (incl. map-first layout fix 75b7da4) | `fix/playtest-polish` (slot 0) | `test-playtest-polish-2` | layout re-check running | merge (don't rebuild `main` while test-crash runs) |
 | Phase 4 crash-recovery walkthrough (12 steps, audit §5) | `main` (port 4113, `data/verify-crash`) | `test-crash` | running | Phase 4 gate → Phase 5 MVP acceptance |
 | Phase 5 MVP acceptance | — | — | not started | fresh `test-mvp` session simulation + crash test; then DM playtest |
 
@@ -16,7 +15,6 @@ Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish, party-lo
 
 ## Shared-file locks
 
-- play-shell frame files, window registrations (`src/client/{dm,player}/windows.ts` + feature window defs), protocol §24 → `fix/playtest-polish`.
 
 ## Pending DM decisions
 
