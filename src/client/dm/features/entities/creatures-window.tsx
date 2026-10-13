@@ -62,9 +62,11 @@ function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof ac
       <TableCell className="w-10 p-1.5">
         <Portrait row={row} />
       </TableCell>
-      <TableCell className="max-w-0 p-1.5">
+      {/* Name column takes the free width (w-full + max-w-0: truncate inside a table). CR /
+          XP sit on the second line, so a narrow window still shows names. */}
+      <TableCell className="w-full max-w-0 p-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="truncate font-medium" data-testid="ent-list-row-name">
+          <span className="truncate font-medium" data-testid="ent-list-row-name" title={row.name}>
             {row.name}
           </span>
           {row.readOnly && (
@@ -75,21 +77,22 @@ function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof ac
             </Tooltip>
           )}
         </div>
-        <div className="truncate text-xs text-muted-foreground">
+        <div className="truncate text-xs tabular-nums text-muted-foreground">
           {row.kind === "character" ? "Character" : "Monster"}
+          {row.cr !== null && (
+            <>
+              {" · "}
+              <span data-testid="ent-list-row-cr">
+                CR {row.cr} · {row.xp} XP
+              </span>
+            </>
+          )}
           {row.derivedFrom !== null && (
             <span data-testid="ent-list-row-derived"> · derived from {row.derivedFrom}</span>
           )}
         </div>
       </TableCell>
-      <TableCell className="w-px whitespace-nowrap p-1.5 text-right text-xs tabular-nums text-muted-foreground">
-        {row.cr !== null && (
-          <span data-testid="ent-list-row-cr">
-            CR {row.cr} · {row.xp} XP
-          </span>
-        )}
-      </TableCell>
-      <TableCell className="w-px p-1.5">
+      <TableCell className="w-px whitespace-nowrap p-1.5">
         <Badge data-testid="ent-list-row-badge" variant={row.readOnly ? "outline" : "secondary"}>
           {row.badge}
         </Badge>
@@ -170,11 +173,12 @@ export const creaturesWindow = defineWindow({
   kind: CREATURES_KIND,
   title: "Creatures",
   clients: ["dm"],
-  defaultSize: { w: 420, h: 520 },
+  // DM left column, second slot (protocol §18): right of `map.scenes`, above `dice.log` at
+  // 1600×900 (ENT §7's "below map.scenes" doesn't fit 720 px). Shares the slot with
+  // `cbt.encounters`; the second one opened goes to the next free slot (FR-SHELL-08).
+  defaultSize: { w: 340, h: 512 },
   minSize: { w: 300, h: 240 },
-  // ENT §7 says top-left below `map.scenes` (300×480), but 480 + 520 px doesn't fit a laptop
-  // viewport (FR-SHELL-08 fit check). Top-left, right of `map.scenes` instead, so both show.
-  defaultPosition: { anchor: "top-left", dx: 312 },
+  defaultPosition: { anchor: "top-left", dx: 368 },
   launcher: { icon: PawPrintIcon, label: "Creatures", order: 30 },
   component: CreaturesBody,
 });

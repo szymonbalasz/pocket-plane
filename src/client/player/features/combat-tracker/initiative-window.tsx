@@ -21,16 +21,25 @@ function PlayerInitiativeBody() {
     (c: CombatantView) => c.kind === "pc" && mine.has(c.entityId ?? "") && c.initiative == null,
   );
   return (
-    <div data-testid="cbt-init" data-record-id={enc.id} className="flex flex-col gap-2">
-      <span data-testid="cbt-init-round" data-value={enc.round} className="text-sm font-semibold">
+    // Round + hint stay put; the rows scroll inside the window.
+    <div
+      data-testid="cbt-init"
+      data-record-id={enc.id}
+      className="flex h-full min-h-0 flex-col gap-2"
+    >
+      <span
+        data-testid="cbt-init-round"
+        data-value={enc.round}
+        className="shrink-0 text-sm font-semibold"
+      >
         {enc.round === 0 ? "Rolling initiative" : `Round ${enc.round}`}
       </span>
       {ownWithout && (
-        <p data-testid="cbt-init-hint" className="text-xs text-muted-foreground">
+        <p data-testid="cbt-init-hint" className="shrink-0 text-xs text-muted-foreground">
           Roll initiative on your sheet
         </p>
       )}
-      <ul className="flex flex-col gap-0.5">
+      <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
         {rows.map((c) => {
           const turn = enc.playerTurnCombatantId === c.id;
           return (
@@ -40,11 +49,18 @@ function PlayerInitiativeBody() {
               data-record-id={c.id}
               data-turn={turn}
               data-hidden="false"
-              className={cn("flex items-center gap-1.5 rounded-md px-1 py-1", turn && "bg-accent")}
+              className={cn(
+                "flex shrink-0 items-center gap-1 rounded-md px-1 py-0.5",
+                turn && "bg-accent",
+              )}
             >
               <TurnMarker active={turn} />
               <Portrait name={c.name} imageAssetId={c.imageAssetId} />
-              <span className="min-w-0 flex-1 truncate text-sm" data-testid="cbt-init-row-name">
+              <span
+                className="min-w-0 flex-1 truncate text-sm"
+                data-testid="cbt-init-row-name"
+                title={c.name}
+              >
                 {c.name}
               </span>
               {c.kind === "monster" && c.band && (
@@ -70,10 +86,11 @@ function PlayerInitiativeBody() {
 export const playerInitiativeWindow = defineWindow({
   ...initiativeWindowBase,
   clients: ["player"],
-  // CBT §7: top-left below the top bar, clear of the tool rail; 340 wide, default open. 440 high
-  // (not 520) so it ends above dice.log at 1600×900 (interim, pending orchestrator).
-  defaultSize: { w: 340, h: 440 },
-  defaultPosition: { anchor: "top-left", dx: 56 },
+  // Player right column, left of `char.sheet` (protocol §24): off the map's centre-left where
+  // tokens usually start (CBT §7's top-left covered them). Compact: read-only rows.
+  defaultSize: { w: 280, h: 400 },
+  minSize: { w: 240, h: 200 },
+  defaultPosition: { anchor: "top-right", dx: 332 },
   available: (store) => startedIn(store) !== null,
   component: PlayerInitiativeBody,
 });

@@ -1,13 +1,13 @@
 // The play page frame (FR-SHELL-01/02/05). Stacking, bottom → top:
 // base layer (z-0) < windows (z-10) < chrome: top bar, tool rail, launcher (z-20)
 // < reconnect banner (z-30) < dialogs, menus, tooltips (z-50, portalled).
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ConnectionIndicator, ReconnectBanner } from "../live-sync/ConnectionStatus";
 import { TOP_BAR_H } from "./geometry";
 import { useBaseKeyDown, useViewport } from "./hooks";
 import { SHELL_ZONE_ATTR } from "./keys";
 import { Launcher } from "./Launcher";
-import { topWindow } from "./manager";
+import { topWindow, type WindowAction } from "./manager";
 import type { ShellClient } from "./registry";
 import { useAvailableKinds, useRegistry, useShellState, useWindowDispatch } from "./ShellContext";
 import { ShellWindow } from "./ShellWindow";
@@ -51,6 +51,7 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
   const viewport = useViewport();
   const top = topWindow(windows, available);
   const testMode = available.has(SHELL_TEST_KIND);
+  useAppearPlacement(available, dispatch);
 
   return (
     // overflow-clip (not hidden): a clipped box can't be scrolled at all, so focusing something
@@ -127,6 +128,21 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
       </div>
     </div>
   );
+}
+
+/**
+ * A kind that becomes available while the page shows a layout (not on restore) gets an
+ * `appear`: a never-moved default window then avoids the windows already on screen.
+ */
+function useAppearPlacement(available: ReadonlySet<string>, dispatch: (a: WindowAction) => void) {
+  const key = useShellState((s) => s.key);
+  const prev = useRef<{ key: string | null; kinds: ReadonlySet<string> } | null>(null);
+  useEffect(() => {
+    const p = prev.current;
+    prev.current = { key, kinds: available };
+    if (!p || key === null || p.key !== key) return;
+    for (const kind of available) if (!p.kinds.has(kind)) dispatch({ type: "appear", kind });
+  }, [available, key, dispatch]);
 }
 
 /**

@@ -74,5 +74,8 @@ function DmLogBody() {
 export const dmDiceLogWindow = defineWindow({
   ...diceLogWindowBase,
   clients: ["dm"],
+  // DM bottom strip (protocol §24): right of `map.scenes`, left of the right column at 1280.
+  defaultSize: { w: 460, h: 240 },
+  defaultPosition: { anchor: "bottom-left", dx: 368 },
   component: DmLogBody,
 });

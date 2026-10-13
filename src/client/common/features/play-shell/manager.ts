@@ -1,7 +1,8 @@
 // Window manager reducer (FR-SHELL-08–12, 14, 16–18). Pure: no DOM, no storage.
 // Holds every window's *stored* state; rendering clamps (geometry.ts) without writing back.
 import { GEOMETRY_LIMIT, Layout, MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
-import { defaultRect, type Rect, type Viewport } from "./geometry";
+import { clampRect, type Rect, type Viewport } from "./geometry";
+import { fittedDefaultRect, placeRect } from "./placement";
 import type { WindowRegistry } from "./registry";
 
 export type Windows = readonly WindowState[];
@@ -13,6 +14,12 @@ export type WindowAction =
   | { type: "focus"; kind: string; instance?: string }
   | { type: "toggle"; kind: string; instance?: string }
   | { type: "setRect"; kind: string; instance?: string; rect: Rect }
+  /**
+   * The kind just became available (e.g. player `cbt.initiative` on Start). If it is open, still
+   * at its default-layout geometry (never moved) and would cover a window on screen, it goes to
+   * the next free slot instead. A window the user placed keeps its spot (FR-SHELL-18).
+   */
+  | { type: "appear"; kind: string; instance?: string }
   | { type: "reset" };
 
 export interface ManagerContext {
@@ -48,17 +55,38 @@ export function topWindow(ws: Windows, available: ReadonlySet<string>): WindowSt
   return top;
 }
 
-/** This client's default layout: every `defaultOpen` type at its default geometry (FR-SHELL-14). */
+/**
+ * This client's default layout: every `defaultOpen` type at its default geometry, fitted to
+ * the viewport; one that would overlap an earlier one goes to the next free slot (FR-SHELL-14).
+ */
 export function defaultLayout(registry: WindowRegistry, vp: Viewport): WindowState[] {
-  return registry.defs
-    .filter((d) => d.defaultOpen)
-    .map((d, i) => ({
+  const out: WindowState[] = [];
+  for (const d of registry.defs) {
+    if (!d.defaultOpen) continue;
+    out.push({
       kind: d.kind,
       instance: MAIN_INSTANCE,
-      state: "open" as const,
-      ...defaultRect(d.defaultPosition, d.defaultSize, vp),
-      z: i + 1,
-    }));
+      state: "open",
+      ...placeRect(d, vp, out),
+      z: out.length + 1,
+    });
+  }
+  return out;
+}
+
+const overlaps = (a: Rect, b: Rect) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** Rendered rects of the windows on screen now, except (kind, instance). */
+function onScreen(ws: Windows, ctx: ManagerContext, kind: string, instance: string): Rect[] {
+  return ws
+    .filter(
+      (w) =>
+        w.state === "open" &&
+        ctx.available.has(w.kind) &&
+        !(w.kind === kind && w.instance === instance),
+    )
+    .map((w) => clampRect(w, ctx.viewport));
 }
 
 export interface Restored {
@@ -145,9 +173,10 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
 
   switch (action.type) {
     case "open": {
-      // FR-SHELL-08: last geometry, else default; front; minimised → restored.
+      // FR-SHELL-08: last geometry, else default (first free slot, not over an open window);
+      // front; minimised → restored.
       if (find(ws, kind, instance)) return toFront(ws, kind, instance, "open");
-      const rect = defaultRect(def.defaultPosition, def.defaultSize, ctx.viewport);
+      const rect = placeRect(def, ctx.viewport, onScreen(ws, ctx, kind, instance));
       return normaliseZ([...ws, { kind, instance, state: "open", ...rect, z: maxZ(ws) + 1 }]);
     }
     case "close":
@@ -166,6 +195,19 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
       const top = topWindow(ws, ctx.available);
       if (top === cur) return reduce(ws, { type: "minimise", kind, instance }, ctx);
       return toFront(ws, kind, instance);
+    }
+    case "appear": {
+      const cur = find(ws, kind, instance);
+      if (cur?.state !== "open" || !ctx.available.has(kind)) return ws;
+      const others = onScreen(ws, ctx, kind, instance);
+      const shown = clampRect(cur, ctx.viewport);
+      if (!others.some((o) => overlaps(shown, o))) return ws;
+      const same = (r: Rect | undefined) =>
+        r !== undefined && r.x === cur.x && r.y === cur.y && r.w === cur.w && r.h === cur.h;
+      const asDefault = defaultLayout(ctx.registry, ctx.viewport).find((w) => w.kind === kind);
+      if (!same(asDefault) && !same(fittedDefaultRect(def, ctx.viewport))) return ws;
+      const rect = placeRect(def, ctx.viewport, others);
+      return patch(ws, kind, instance, (w) => ({ ...w, ...rect }));
     }
     case "setRect": {
       const r = action.rect;

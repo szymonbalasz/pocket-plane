@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { creatureRows } from "../entities/list";
 import { useDmMap, viewedScene } from "../scenes-map/view-state";
 import { useDefinitions } from "./data";
+import { useOpenEncounter } from "./open-encounter";
 import { combatRest } from "./rest";
 
 interface Draft {
@@ -548,7 +549,8 @@ function EncountersBody() {
   const encounters = useRecords<EncounterRecord>(ENCOUNTER_TYPE);
   const everLive = useSync((s) => s.everLive);
   const live = useSync((s) => s.state === "live");
-  const [selected, setSelected] = useState<string | null>(null);
+  // Survives reloads and close / reopen (browser-local, per campaign).
+  const [selected, setSelected] = useOpenEncounter();
   const sorted = useMemo(
     () =>
       [...encounters].sort(
@@ -612,9 +614,11 @@ export const encountersWindow = defineWindow({
   kind: ENCOUNTERS_KIND,
   title: "Encounters",
   clients: ["dm"],
-  defaultSize: { w: 460, h: 560 },
+  // DM left column, second slot (protocol §24): right of `map.scenes`, never over the right
+  // column (`camp.players`, `cbt.initiative`); above `dice.log` at 1600×900.
+  defaultSize: { w: 440, h: 512 },
   minSize: { w: 360, h: 320 },
-  defaultPosition: { anchor: "center", dx: -200 },
+  defaultPosition: { anchor: "top-left", dx: 368 },
   launcher: { icon: SwordsIcon, label: "Encounters", order: 55 },
   component: EncountersBody,
 });

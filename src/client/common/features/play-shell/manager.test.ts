@@ -64,6 +64,45 @@ describe("window manager", () => {
     expect(order(ws)).toEqual(["a.one", "a.two"]);
   });
 
+  test("FR-SHELL-08 first open never lands on an open window; minimised / unavailable don't count", () => {
+    let ws = run([], { type: "open", kind: "a.two" }, { type: "open", kind: "a.three" });
+    const two = get(ws, "a.two");
+    const three = get(ws, "a.three");
+    expect(two).toMatchObject({ x: 12, y: 60 });
+    const overlap =
+      two.x < three.x + three.w &&
+      three.x < two.x + two.w &&
+      two.y < three.y + three.h &&
+      three.y < two.y + two.h;
+    expect(overlap).toBe(false);
+    // Minimised windows don't block the default slot.
+    ws = run([], { type: "open", kind: "a.two" }, { type: "minimise", kind: "a.two" });
+    ws = run(ws, { type: "open", kind: "a.three" });
+    expect(get(ws, "a.three")).toMatchObject({ x: 12, y: 60 });
+  });
+
+  test("FR-SHELL-18 appear: a never-moved default window avoids open ones; a moved one stays", () => {
+    const reg = createWindowRegistry("dm", [
+      def("a.one"),
+      def("a.late", { defaultOpen: true, available: () => false }),
+    ]);
+    const gone = { registry: reg, viewport: vp, available: new Set(["a.one"]) };
+    const here = { ...gone, available: new Set(["a.one", "a.late"]) };
+    // a.one opens while a.late is unavailable: a.late's default spot is free to it.
+    const ws: Windows = reduce(defaultLayout(reg, vp), { type: "open", kind: "a.one" }, gone);
+    const one = get(ws, "a.one");
+    const covered = (a: WindowState, b: WindowState) =>
+      a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    expect(covered(get(ws, "a.late"), one)).toBe(true);
+    const fixed = get(reduce(ws, { type: "appear", kind: "a.late" }, here), "a.late");
+    expect(covered(fixed, one)).toBe(false);
+    expect(reduce(ws, { type: "appear", kind: "a.late" }, gone)).toBe(ws); // still unavailable
+    // Moved by the user → kept, even if it covers a.one.
+    const rect = { x: one.x + 50, y: one.y + 50, w: 300, h: 200 };
+    const moved = reduce(ws, { type: "setRect", kind: "a.late", rect }, here);
+    expect(reduce(moved, { type: "appear", kind: "a.late" }, here)).toBe(moved);
+  });
+
   test("FR-SHELL-08 reopen uses last geometry", () => {
     let ws = run([], { type: "open", kind: "a.two" });
     ws = run(ws, { type: "setRect", kind: "a.two", rect: { x: 500, y: 400, w: 350, h: 250 } });

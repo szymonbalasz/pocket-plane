@@ -10,6 +10,8 @@ export const TITLE_H = 32;
 export const MIN_VISIBLE_W = 120;
 /** Gap between a default-placed window and the viewport edge / top bar. */
 export const EDGE_GAP = 12;
+/** Strip above the bottom edge kept clear of default-placed windows (the launcher). */
+export const LAUNCHER_CLEAR = 64;
 
 export interface Viewport {
   w: number;
@@ -33,7 +35,7 @@ export function defaultRect(pos: DefaultPosition, size: Size, vp: Viewport): Rec
   const left = EDGE_GAP + dx;
   const right = vp.w - size.w - EDGE_GAP - dx;
   const top = TOP_BAR_H + EDGE_GAP + dy;
-  const bottom = vp.h - size.h - EDGE_GAP - dy - 64; // keep clear of the launcher
+  const bottom = vp.h - size.h - EDGE_GAP - dy - LAUNCHER_CLEAR;
   const [x, y] =
     pos.anchor === "top-left"
       ? [left, top]
