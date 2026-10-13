@@ -1,7 +1,8 @@
-// Pointer overlays of one canvas (ruler, drag target, pings, laser trails): a small store per
+// Pointer overlays of one canvas (ruler, drag target, box select, pings, laser trails): a small store per
 // canvas so 20 laser frames/s re-render only the pointer layer. DOM-free (testable).
 import { createStore, type StoreApi } from "zustand";
 import { LASER_FADE_MS } from "./laser";
+import type { Box } from "./selection-logic";
 
 /** A ping pulse lasts 2 s (FR-MAP-23). */
 export const PING_MS = 2000;
@@ -39,6 +40,8 @@ export interface DragState {
 export interface PointerState {
   ruler: RulerState | null;
   drag: DragState | null;
+  /** DM box select in progress (FR-MAP-32), map px. */
+  box: Box | null;
   pings: Ping[];
   trails: Record<string, Trail>;
 }
@@ -46,7 +49,13 @@ export interface PointerState {
 export type PointerStore = StoreApi<PointerState>;
 
 export const createPointerStore = (): PointerStore =>
-  createStore<PointerState>()(() => ({ ruler: null, drag: null, pings: [], trails: {} }));
+  createStore<PointerState>()(() => ({
+    ruler: null,
+    drag: null,
+    box: null,
+    pings: [],
+    trails: {},
+  }));
 
 let pingSeq = 1;
 

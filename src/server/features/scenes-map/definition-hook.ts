@@ -1,6 +1,7 @@
 // FR-MAP-20: token display copies follow a definition edit, inside `entities.update`'s
-// transaction (FR-ENT-19). Size always follows; the image follows only on tokens still showing
-// the old portrait (#127). Names and cells untouched (#126). Runs no token-changed hooks.
+// transaction (FR-ENT-19). Size and speed (FR-MAP-36) always follow; the image follows only on
+// tokens still showing the old portrait (#127). Names, shapes (FR-MAP-35) and cells untouched
+// (#126). Runs no token-changed hooks.
 import type { EntityRecord } from "@shared/entities/schemas";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { asc, eq } from "drizzle-orm";
@@ -16,8 +17,10 @@ export function refreshTokenCopies(
   after: EntityRecord,
 ): RecordChange[] {
   const sizeChanged = before.statBlock.size !== after.statBlock.size;
+  const speed = after.statBlock.speed ?? null;
+  const speedChanged = (before.statBlock.speed ?? null) !== speed;
   const portraitChanged = before.portraitAssetId !== after.portraitAssetId;
-  if (!sizeChanged && !portraitChanged) return [];
+  if (!sizeChanged && !speedChanged && !portraitChanged) return [];
   // FR-ASSET-15: propagated asset copies go through `assets.require` too.
   if (portraitChanged && after.portraitAssetId) requireAsset(env, after.portraitAssetId);
   const rows = env.tx
@@ -32,6 +35,7 @@ export function refreshTokenCopies(
   for (const t of rows) {
     const set: Partial<typeof token.$inferInsert> = {};
     if (sizeChanged && t.size !== after.statBlock.size) set.size = after.statBlock.size;
+    if (speedChanged && t.speed !== speed) set.speed = speed;
     if (portraitChanged && t.imageAssetId === before.portraitAssetId) {
       set.imageAssetId = after.portraitAssetId;
     }

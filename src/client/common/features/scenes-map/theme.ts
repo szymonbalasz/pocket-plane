@@ -16,6 +16,9 @@ export interface CanvasColors {
   destructive: string;
   /** `visibility.hidden` (DM styling of hidden tokens). */
   hidden: string;
+  /** `hp.bloodied` / `hp.down`: movement dash / over (OQ-MAP-27), overlay badge tones. */
+  hpBloodied: string;
+  hpDown: string;
 }
 
 const FALLBACK: CanvasColors = {
@@ -30,6 +33,8 @@ const FALLBACK: CanvasColors = {
   playerAccent: "#22c55e",
   destructive: "#f87171",
   hidden: "rgba(163,163,163,0.55)",
+  hpBloodied: "#eab308",
+  hpDown: "#ef4444",
 };
 
 function read(name: string, fallback: string): string {
@@ -52,6 +57,8 @@ export function useCanvasColors(): CanvasColors {
       playerAccent: read("--success", FALLBACK.playerAccent),
       destructive: read("--destructive", FALLBACK.destructive),
       hidden: read("--visibility-hidden", FALLBACK.hidden),
+      hpBloodied: read("--hp-bloodied", FALLBACK.hpBloodied),
+      hpDown: read("--hp-down", FALLBACK.hpDown),
     }),
     [],
   );

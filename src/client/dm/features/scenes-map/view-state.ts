@@ -1,4 +1,4 @@
-// DM client-only map state (FR-MAP-08, -10, -17): viewed scene, selection, grid preview.
+// DM client-only map state (FR-MAP-08, -10): viewed scene, grid preview. Selection: `./selection`.
 import { sceneOrder } from "@shared/scenes-map/geometry";
 import type { SceneFolderRecord, SceneRecord } from "@shared/scenes-map/schemas";
 import type { EffectiveGrid } from "@ui/features/scenes-map/canvas-context";
@@ -7,20 +7,16 @@ import { create } from "zustand";
 interface DmMapState {
   /** Requested viewed scene; resolved against the store by `viewedScene`. */
   viewedSceneId: string | null;
-  selectedTokenId: string | null;
   /** Local grid preview (FR-MAP-10): never sent until Save. */
   gridDraft: { sceneId: string; grid: EffectiveGrid } | null;
   view(sceneId: string | null): void;
-  select(tokenId: string | null): void;
   setGridDraft(d: { sceneId: string; grid: EffectiveGrid } | null): void;
 }
 
 export const useDmMap = create<DmMapState>((set) => ({
   viewedSceneId: null,
-  selectedTokenId: null,
   gridDraft: null,
-  view: (viewedSceneId) => set({ viewedSceneId, selectedTokenId: null }),
-  select: (selectedTokenId) => set({ selectedTokenId }),
+  view: (viewedSceneId) => set({ viewedSceneId }),
   setGridDraft: (gridDraft) => set({ gridDraft }),
 }));
 

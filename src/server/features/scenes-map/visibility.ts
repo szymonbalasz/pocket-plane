@@ -30,12 +30,15 @@ export function redactScene(r: SceneRecord): PlayerSceneRecord {
 /** `scene-folder`: DM only. */
 export const folderVisibility = (): Visibility => "hidden";
 
-/** `token`: hidden while `hidden`; else every field but `definitionId`. */
+/**
+ * `token`: hidden while `hidden`; else every field but `definitionId`, and `speed` only on the
+ * viewer's own tokens (FR-MAP-36: a monster's speed is a stat, #120).
+ */
 export function tokenVisibility(r: TokenRecord, _v: Viewer): Visibility {
   return r.hidden ? "hidden" : "redacted";
 }
 
-export function redactToken(r: TokenRecord): PlayerTokenRecord {
-  const { definitionId: _definitionId, ...rest } = r;
-  return rest;
+export function redactToken(r: TokenRecord, v: Viewer): PlayerTokenRecord {
+  const { definitionId: _definitionId, speed, ...rest } = r;
+  return r.ownerPlayerId !== null && r.ownerPlayerId === v.playerId ? { ...rest, speed } : rest;
 }

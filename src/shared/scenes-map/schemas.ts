@@ -188,16 +188,28 @@ const tokenFields = {
   row: z.number().int(),
   ownerPlayerId: z.string().nullable(),
   hidden: z.boolean(),
+  /** Token-owned (FR-MAP-35). */
+  shape: TokenShape,
   createdAt: z.string(),
   updatedAt: z.string(),
 };
 
+/** Display copy of `statBlock.speed` in ft; null = unknown (FR-MAP-36). */
+const TokenSpeed = z.number().int().nullable();
+
 /** `token` (scope scene, `sceneOf = sceneId`), DM full view. */
-export const TokenRecord = z.object({ ...tokenFields, definitionId: z.string() });
+export const TokenRecord = z.object({
+  ...tokenFields,
+  definitionId: z.string(),
+  speed: TokenSpeed,
+});
 export type TokenRecord = z.infer<typeof TokenRecord>;
 
-/** What a player receives of a visible token: every field but `definitionId` (FR-MAP-26). */
-export const PlayerTokenRecord = z.object(tokenFields);
+/**
+ * What a player receives of a visible token: every field but `definitionId` (FR-MAP-26), and
+ * `speed` only on tokens the player owns (FR-MAP-36).
+ */
+export const PlayerTokenRecord = z.object({ ...tokenFields, speed: TokenSpeed.optional() });
 export type PlayerTokenRecord = z.infer<typeof PlayerTokenRecord>;
 
 /** Fields both clients render a token from. */
