@@ -1,15 +1,24 @@
 // The play page frame (FR-SHELL-01/02/05). Stacking, bottom → top:
 // base layer (z-0) < windows (z-10) < chrome: top bar, tool rail, launcher (z-20)
-// < reconnect banner (z-30) < dialogs, menus, tooltips (z-50, portalled).
+// < reconnect banner (z-30) < dialogs, menus, tooltips (z-50, portalled) < alert flash (z-100,
+// portalled, FR-SHELL-22).
 import { useEffect, useRef, useState } from "react";
 import { ConnectionIndicator, ReconnectBanner } from "../live-sync/ConnectionStatus";
+import { AlertFlash, AlertToaster, SoundControl } from "./AlertLayer";
+import { testSoundAttr } from "./alerts";
 import { TOP_BAR_H } from "./geometry";
 import { useBaseKeyDown, useViewport } from "./hooks";
 import { SHELL_ZONE_ATTR } from "./keys";
 import { Launcher } from "./Launcher";
 import { topWindow, type WindowAction } from "./manager";
 import type { ShellClient } from "./registry";
-import { useAvailableKinds, useRegistry, useShellState, useWindowDispatch } from "./ShellContext";
+import {
+  useAlertState,
+  useAvailableKinds,
+  useRegistry,
+  useShellState,
+  useWindowDispatch,
+} from "./ShellContext";
 import { ShellWindow } from "./ShellWindow";
 import { SHELL_TEST_DRAG_MIME, SHELL_TEST_KIND } from "./test-windows";
 
@@ -51,6 +60,7 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
   const viewport = useViewport();
   const top = topWindow(windows, available);
   const testMode = available.has(SHELL_TEST_KIND);
+  const lastSound = useAlertState((s) => s.lastSound);
   useAppearPlacement(available, dispatch);
 
   return (
@@ -89,6 +99,7 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
       <header
         {...{ [SHELL_ZONE_ATTR]: "topbar" }}
         data-testid="ui-topbar"
+        {...testSoundAttr(testMode, lastSound)}
         tabIndex={-1}
         className="outline-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 border-b bg-background/85 px-3 backdrop-blur"
         style={{ height: TOP_BAR_H }}
@@ -96,6 +107,8 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
         <div className="flex min-w-0 items-center gap-2">{topLeft}</div>
         <div className="ml-auto flex items-center gap-2">
           {topRight}
+          {/* FR-SHELL-24: players only; no DM sound control in MVP (#154). */}
+          {client === "player" && <SoundControl />}
           <ConnectionIndicator />
           {topEnd}
         </div>
@@ -126,6 +139,9 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
       <div className="absolute inset-x-0 z-30 bg-background/90" style={{ top: TOP_BAR_H }}>
         <ReconnectBanner />
       </div>
+
+      <AlertToaster client={client} />
+      <AlertFlash />
     </div>
   );
 }
