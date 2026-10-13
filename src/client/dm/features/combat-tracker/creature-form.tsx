@@ -152,7 +152,7 @@ export function formStatBlock(
 
 function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
   return (
-    <div className="grid gap-1" data-testid="cbt-form-field" data-value={id}>
+    <div className="grid gap-1" data-testid="cbt-form-field" data-field={id}>
       <Label htmlFor={`cbt-form-${id}`}>{label}</Label>
       {children}
     </div>
@@ -367,7 +367,7 @@ function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
                 key={k}
                 className="grid justify-items-center gap-1"
                 data-testid="cbt-form-field"
-                data-value={`abilities.${k}`}
+                data-field={`abilities.${k}`}
               >
                 <Label htmlFor={`cbt-form-ability-${k}`} title={ABILITY_NAMES[k]}>
                   {k.toUpperCase()}
@@ -383,7 +383,7 @@ function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
                 />
                 <Checkbox
                   data-testid="cbt-form-field"
-                  data-value={`saves.${k}`}
+                  data-field={`saves.${k}`}
                   aria-label={`${ABILITY_NAMES[k]} save proficiency`}
                   checked={f.saves.includes(k)}
                   onCheckedChange={(v) =>
