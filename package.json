@@ -15,7 +15,8 @@
     "e2e": "bun scripts/e2e.ts",
     "fixtures:reset": "bun scripts/fixtures.ts reset",
     "fixtures:load": "bun scripts/fixtures.ts load",
-    "fixtures:reset-load": "bun scripts/fixtures.ts reset-load"
+    "fixtures:reset-load": "bun scripts/fixtures.ts reset-load",
+    "state:digest": "bun scripts/state-digest.ts"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

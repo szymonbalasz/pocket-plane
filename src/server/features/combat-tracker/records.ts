@@ -16,7 +16,7 @@ import {
   type PlayerEncounterRecord,
 } from "@shared/combat-tracker/schemas";
 import { cutWindow, type RecordWindow } from "@shared/protocol/window";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { combatant, encounter, encounterEntry, hpChange } from "../../db/schema";
 import { defineRecordType, type Visibility } from "../../ws/records";
@@ -144,12 +144,15 @@ export const combatRecordTypes = [
     snapshot: ({ db }, v) => {
       const enc = startedEncounter(db, v.campaignId);
       if (!enc) return [];
+      // The newest 50 by seq, cut in SQL (#163), oldest first; the registry's cut keeps them.
       return db
         .select()
         .from(hpChange)
         .where(and(eq(hpChange.campaignId, v.campaignId), eq(hpChange.encounterId, enc.id)))
-        .orderBy(asc(hpChange.seq))
+        .orderBy(desc(hpChange.seq))
+        .limit(HP_CHANGE_WINDOW)
         .all()
+        .reverse()
         .map(toHpChangeRecord);
     },
     window: { orderBy: "seq", size: HP_CHANGE_WINDOW },

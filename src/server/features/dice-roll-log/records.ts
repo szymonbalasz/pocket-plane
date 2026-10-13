@@ -9,7 +9,7 @@ import {
   type RedactedGameLogEntry,
   GameLogSettingsRecord as SettingsSchema,
 } from "@shared/dice-roll-log/schemas";
-import { asc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { gameLogEntry } from "../../db/schema";
 import { defineRecordType, type Visibility } from "../../ws/records";
 import { toEntryRecord } from "./game-log";
@@ -32,14 +32,17 @@ export const gameLogEntryType = defineRecordType<GameLogEntryRecord>({
   campaignOf: (r) => r.campaignId,
   visibility: entryVisibility,
   redact: redactEntry,
-  // The whole log, oldest first; the registry cuts the newest 100 before the filter (ADR-0029).
+  // The newest 100 by `n`, cut in SQL (#163: build time no longer grows with the log), oldest
+  // first. The registry's cut (ADR-0029) keeps exactly these rows; the floor is the same.
   snapshot: ({ db }, v) =>
     db
       .select()
       .from(gameLogEntry)
       .where(eq(gameLogEntry.campaignId, v.campaignId))
-      .orderBy(asc(gameLogEntry.n))
+      .orderBy(desc(gameLogEntry.n))
+      .limit(GAME_LOG_WINDOW)
       .all()
+      .reverse()
       .map(toEntryRecord),
   window: { orderBy: "n", size: GAME_LOG_WINDOW },
 });

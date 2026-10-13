@@ -1,8 +1,11 @@
 // Push at boot (ADR-0001) onto a DB created before the feedback-pass columns (protocol §28):
 // additive, no data loss, defaults filled in.
 import { Database } from "bun:sqlite";
-import { expect, test } from "bun:test";
-import { createSchema, pushSchema } from "./push";
+import { afterAll, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { applyStatements, createSchema, pushSchema } from "./push";
 
 const AT = "2026-01-01T00:00:00.000Z";
 
@@ -21,8 +24,8 @@ const columns = (db: Database, table: string) =>
     .map((c) => c.name);
 
 /** A DB with today's schema minus the feedback columns, holding one row in each table. */
-async function oldDb(): Promise<Database> {
-  const db = new Database(":memory:", { strict: true });
+async function oldDb(file = ":memory:"): Promise<Database> {
+  const db = new Database(file, { create: true, strict: true });
   await createSchema(db);
   for (const [table, col] of FEEDBACK_COLUMNS) db.run(`ALTER TABLE ${table} DROP COLUMN ${col}`);
   db.run("PRAGMA foreign_keys = ON");
@@ -87,5 +90,89 @@ test("push still refuses a real lossy add (not-null column without a default, ta
   db.run("ALTER TABLE combatant DROP COLUMN position");
   await expect(pushSchema(db)).rejects.toThrow(/would lose data[\s\S]*position/);
   expect(db.query("SELECT count(*) AS n FROM combatant").get()).toEqual({ n: 1 });
+  db.close();
+});
+
+// ---------- #163: backup, one transaction, leftover rebuild tables ----------
+
+const tmp = mkdtempSync(path.join(os.tmpdir(), "pp-push-"));
+afterAll(() => {
+  // Closed DBs stay locked on Windows until their statements are finalized (see `closeDb`).
+  Bun.gc(true);
+  try {
+    rmSync(tmp, { recursive: true, force: true });
+  } catch {
+    // A temp dir the OS cleans up; never fail the run over it.
+  }
+});
+let n = 0;
+const fileDb = () => oldDb(path.join(tmp, `db-${++n}.db`));
+const tables = (db: Database) =>
+  db
+    .query<{ name: string }, []>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+    )
+    .all()
+    .map((r) => r.name);
+const fkOn = (db: Database) => db.query("PRAGMA foreign_keys").get();
+
+test("#163 push backs up a file DB (VACUUM INTO <db>.pre-push-<ts>.bak) before applying a change", async () => {
+  const db = await fileDb();
+  const r = await pushSchema(db, { now: () => new Date("2026-10-13T10:20:30.456Z") });
+  expect(r.applied).toBeGreaterThan(0);
+  expect(r.backup).toBe(`${db.filename}.pre-push-2026-10-13T10-20-30-456Z.bak`);
+  expect(existsSync(r.backup as string)).toBe(true);
+  const bak = new Database(r.backup as string, { readonly: true });
+  // The backup is the DB as it was: old columns, same rows.
+  expect(columns(bak, "token")).not.toContain("shape");
+  expect(bak.query("SELECT name, col FROM token").get()).toEqual({ name: "Goblin", col: 3 });
+  bak.close();
+  expect(columns(db, "token")).toContain("shape");
+  expect(fkOn(db)).toEqual({ foreign_keys: 1 });
+  // No change → no backup.
+  expect(await pushSchema(db)).toEqual({ applied: 0, backup: null });
+  db.close();
+});
+
+test("#163 push statements apply all or nothing: a failing statement rolls back a table rebuild", async () => {
+  const db = await oldDb();
+  const before = tables(db);
+  const rebuild = [
+    "PRAGMA foreign_keys=OFF;",
+    "CREATE TABLE `__new_token` AS SELECT * FROM `token`;",
+    "DROP TABLE `token`;",
+    "ALTER TABLE `__new_token` RENAME TO `token`;",
+    "INSERT INTO `no_such_table` VALUES (1);",
+    "PRAGMA foreign_keys=ON;",
+  ];
+  expect(() => applyStatements(db, rebuild)).toThrow(/no_such_table/);
+  expect(tables(db)).toEqual(before);
+  expect(db.query("SELECT name, col, row FROM token").get()).toEqual({
+    name: "Goblin",
+    col: 3,
+    row: 4,
+  });
+  expect(fkOn(db)).toEqual({ foreign_keys: 1 });
+  db.close();
+});
+
+test("#163 push refuses a change that breaks foreign keys (checked before commit)", async () => {
+  const db = await oldDb();
+  expect(() =>
+    applyStatements(db, [
+      "PRAGMA foreign_keys=OFF;",
+      "UPDATE `token` SET `scene_id` = 'gone';",
+      "PRAGMA foreign_keys=ON;",
+    ]),
+  ).toThrow(/foreign key/);
+  expect(db.query("SELECT scene_id FROM token").get()).toEqual({ scene_id: "s1" });
+  db.close();
+});
+
+test("#163 push refuses to start on leftover __new_* tables from an interrupted change", async () => {
+  const db = await fileDb();
+  db.run("CREATE TABLE `__new_token` (id text)");
+  await expect(pushSchema(db)).rejects.toThrow(/__new_token left by an interrupted schema change/);
+  expect(columns(db, "token")).not.toContain("shape");
   db.close();
 });

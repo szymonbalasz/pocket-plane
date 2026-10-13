@@ -3,10 +3,11 @@ import { Button } from "@ui/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, Skeleton } from "@ui/components/ui/primitives";
 import { SyncProvider } from "@ui/sync/SyncProvider";
 import { useSync } from "@ui/sync/store";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { LoginScreen } from "./features/campaign-management/LoginScreen";
 import { NameDialog } from "./features/campaign-management/NameDialog";
+import { handleDmRejection, THROTTLED_TEXT } from "./features/campaign-management/rejection";
 import { api, dmCall, useDmSession } from "./features/campaign-management/session";
 import { DmPlayPage } from "./features/play-shell/DmPlayPage";
 
@@ -26,6 +27,9 @@ function Loading() {
 }
 
 function DmHome({ secret }: { secret: string }) {
+  // Bumped to open a fresh connection after a throttled 4401 (#163).
+  const [generation, setGeneration] = useState(0);
+  const reconnect = useCallback(() => setGeneration((g) => g + 1), []);
   const campaigns = useDmSession((s) => s.campaigns);
   const loadCampaigns = useDmSession((s) => s.loadCampaigns);
   useEffect(() => {
@@ -61,13 +65,13 @@ function DmHome({ secret }: { secret: string }) {
   }
   // The DM opens its WS only once a campaign is active (CON-10).
   return (
-    <SyncProvider credential={{ role: "dm", secret }}>
-      <DmShell />
+    <SyncProvider key={generation} credential={{ role: "dm", secret }}>
+      <DmShell reconnect={reconnect} />
     </SyncProvider>
   );
 }
 
-function DmShell() {
+function DmShell({ reconnect }: { reconnect: () => void }) {
   const campaigns = useDmSession((s) => s.campaigns) ?? [];
   const loadCampaigns = useDmSession((s) => s.loadCampaigns);
   const setSecret = useDmSession((s) => s.setSecret);
@@ -80,10 +84,19 @@ function DmShell() {
     if (campaignId) void loadCampaigns().catch(() => {});
   }, [campaignId, loadCampaigns]);
 
-  // 4401: secret changed or throttled → back to login (FR-CAMP-04, live-sync §7).
+  // 4401: secret changed or throttled. Only a 401 from the login probe logs out (FR-CAMP-04);
+  // a lockout keeps the secret and retries after a minute (FR-CAMP-05, #163).
   useEffect(() => {
-    if (state === "rejected") setSecret(null);
-  }, [state, setSecret]);
+    if (state !== "rejected") return;
+    return handleDmRejection({
+      probe: () => api.api.dm.login.$post().then((r) => r.status),
+      logout: () => setSecret(null),
+      throttled: () => toast.error(THROTTLED_TEXT, { id: "camp-throttled", duration: 60_000 }),
+      reconnect,
+      setTimeout: (fn, ms) => window.setTimeout(fn, ms),
+      clearTimeout: (h) => window.clearTimeout(h as number),
+    });
+  }, [state, setSecret, reconnect]);
 
   // Play shell (FR-SHELL-01/03): skeleton until the first snapshot, then the play page.
   return (

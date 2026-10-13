@@ -10,14 +10,13 @@ import {
   type NotificationRecord,
   NotificationText,
   notificationVisibleTo,
-  PAYLOAD_MAX_BYTES,
 } from "@shared/notifications/schemas";
 import { and, eq } from "drizzle-orm";
 import type { CommandEnv } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound, zodIssues } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { notification, notificationSeqNext, player } from "../../db/schema";
-import { buildKindMap, type NotificationKindDef, resolutionCapOf } from "./kind";
+import { buildKindMap, type NotificationKindDef, payloadCapOf, resolutionCapOf } from "./kind";
 import { notificationKinds } from "./kinds";
 
 export const NOTIFICATION_TYPE = "notification";
@@ -133,7 +132,7 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
 
   /**
    * FR-NOTE-02/03/04/05: inserts the row and emits `NotificationCreated`. A broken call (unknown
-   * kind, bad payload / text / audience / action, payload > 1 KB) is a server bug: it throws a
+   * kind, bad payload / text / audience / action, payload over the kind's cap) is a server bug: it throws a
    * plain error, so the caller's command fails `internal` and writes nothing.
    */
   function notify(env: CommandEnv, input: NotifyInput): string {
@@ -143,8 +142,9 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
     if (!def) throw new Error(`notify: unknown notification kind "${input.kind}"`);
     const payload = def.payload.safeParse(input.payload);
     if (!payload.success) throw new Error(`notify: invalid payload for kind "${input.kind}"`);
-    if (jsonBytes(payload.data) > PAYLOAD_MAX_BYTES) {
-      throw new Error(`notify: payload of kind "${input.kind}" exceeds ${PAYLOAD_MAX_BYTES} B`);
+    const payloadCap = payloadCapOf(def);
+    if (jsonBytes(payload.data) > payloadCap) {
+      throw new Error(`notify: payload of kind "${input.kind}" exceeds ${payloadCap} B`);
     }
     const text = NotificationText.safeParse(input.text);
     if (!text.success) throw new Error("notify: text must be 1–280 chars of plain text");

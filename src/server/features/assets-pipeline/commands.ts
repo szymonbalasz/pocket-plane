@@ -92,7 +92,11 @@ export function ingestCommand(store: AssetStore) {
         .from(asset)
         .where(and(eq(asset.campaignId, campaignId), eq(asset.hash, image.hash)))
         .get();
-      if (existing) return { asset: toAssetRecord(existing), outcome: "existing" };
+      if (existing) {
+        // Files lost since (FR-ASSET-07 404s): this upload heals them (#163).
+        store.repairFiles(image);
+        return { asset: toAssetRecord(existing), outcome: "existing" };
+      }
 
       store.ensureFiles(image);
 

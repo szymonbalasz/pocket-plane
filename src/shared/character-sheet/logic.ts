@@ -1,6 +1,6 @@
 // character-sheet derived values (CHAR §8): never stored. Pure; the server builds rolls with
 // `characterRolls` (FR-CHAR-05) and combat-tracker reuses it; clients format with the rest.
-import type { RollCategory } from "@shared/dice-roll-log/schemas";
+import { LABEL_MAX, type RollCategory } from "@shared/dice-roll-log/schemas";
 import {
   ABILITIES,
   ABILITY_NAMES,
@@ -78,14 +78,31 @@ export function characterRolls(
   const a = sheetAttack(stats);
   if (!a) return null;
   return [
-    { expression: d20(a.toHit), category: "attack", label: `${a.name} attack`, d20: true },
+    {
+      expression: d20(a.toHit),
+      category: "attack",
+      label: fitLabel(`${a.name} attack`),
+      d20: true,
+    },
     {
       expression: a.damage,
       category: "damage",
-      label: a.damageType ? `${a.name} damage (${a.damageType})` : `${a.name} damage`,
+      label: fitLabel(a.damageType ? `${a.name} damage (${a.damageType})` : `${a.name} damage`),
       d20: false,
     },
   ];
+}
+
+/**
+ * A derived roll label cut to the dice log's `LABEL_MAX` with "…": a legal 40-char attack name
+ * plus "damage (bludgeoning)" is 61 chars. Never splits a surrogate pair.
+ */
+export function fitLabel(s: string): string {
+  if (s.length <= LABEL_MAX) return s;
+  let cut = LABEL_MAX - 1;
+  const last = s.charCodeAt(cut - 1);
+  if (last >= 0xd800 && last <= 0xdbff) cut -= 1;
+  return `${s.slice(0, cut).trimEnd()}…`;
 }
 
 /** Signed bonus for display: `+2`, `−1` (U+2212), `+0`. */

@@ -1,6 +1,7 @@
 // `bun run fixtures:reset | fixtures:load <bundle> | fixtures:reset-load <bundle> [--profile p]`
 import { library } from "../fixtures";
-import { ConfigError, loadConfig, profileArg } from "../src/server/config";
+import { armCrashHook } from "../src/server/commands/crash";
+import { ConfigError, formatCrashSpec, loadConfig, profileArg } from "../src/server/config";
 import {
   FixtureError,
   load,
@@ -30,6 +31,11 @@ async function main() {
   const bundle = rest.find((a, i) => !a.startsWith("--") && rest[i - 1] !== "--profile");
   const config = loadConfig({ profile: profileArg(process.argv), requireSlot: true });
   const notice = (m: string) => console.warn(m);
+  // Test-mode crash hook (#163): only `fixture:<key>` here; command points are the server's.
+  if (config.testCrash?.point === "fixture") {
+    armCrashHook(config.testCrash);
+    notice(`PP_TEST_CRASH armed: the process kills itself at ${formatCrashSpec(config.testCrash)}`);
+  }
   const t0 = performance.now();
   switch (cmd) {
     case "reset":
