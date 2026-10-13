@@ -49,6 +49,11 @@ export interface WindowDef {
   defaultPosition: DefaultPosition;
   /** Part of the client's default layout. */
   defaultOpen?: boolean;
+  /**
+   * Always opens at its default rect, even over other windows (test-mode windows: fixed
+   * spots walkthroughs rely on). Otherwise a first open goes to the next free slot.
+   */
+  fixedDefault?: boolean;
   /** No entry = no launcher button (open via `openWindow` only). */
   launcher?: LauncherEntry;
   /** Read from the synced store; false → not rendered, not in the launcher, saved state kept. */

@@ -49,6 +49,11 @@ describe("open placement (FR-SHELL-08)", () => {
     expect(overlaps(third, open) || overlaps(third, r)).toBe(false);
   });
 
+  test("fixedDefault (test-mode windows) always opens at its default rect", () => {
+    const open = placeRect(def(), vp, []);
+    expect(placeRect(def({ fixedDefault: true }), vp, [open])).toEqual(open);
+  });
+
   test("a moved window stays right of the tool rail", () => {
     const d = def({ defaultPosition: { anchor: "top-left", dx: 356 } });
     const open = placeRect(d, vp, []);

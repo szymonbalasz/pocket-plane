@@ -15,7 +15,10 @@ import type { WindowDef } from "./registry";
 /** Left edge clear of the tool rail (scenes-map's, ≈ 56 px wide) plus a gap. */
 export const RAIL_CLEAR = 68;
 
-export type Placeable = Pick<WindowDef, "defaultPosition" | "defaultSize" | "minSize">;
+export type Placeable = Pick<
+  WindowDef,
+  "defaultPosition" | "defaultSize" | "minSize" | "fixedDefault"
+>;
 
 interface Area {
   left: number;
@@ -73,6 +76,7 @@ function freeHeight(x: number, y: number, w: number, max: number, obstacles: rea
  */
 export function placeRect(def: Placeable, vp: Viewport, obstacles: readonly Rect[]): Rect {
   const base = fittedDefaultRect(def, vp);
+  if (def.fixedDefault) return base;
   const a = usableArea(vp);
   const { w } = base;
   const minH = Math.min(def.minSize.h, base.h);
