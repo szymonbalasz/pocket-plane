@@ -1,17 +1,25 @@
-// Creature form (FR-CBT-05, #85): New (blank), Derive (any monster; name = base, or
-// "‹name› (copy)" for a custom), Edit (customs only). Creature core fields; entities' zod and
-// REST (`POST` / `PUT /api/entities`); server errors shown inline.
+// Creature form (FR-CBT-05, FR-CBT-43, #85): New (blank), Derive (any monster; name = base, or
+// "‹name› (copy)" for a custom), Edit (customs only). Creature core fields + speed, token shape,
+// the six ability scores (all or none) and save proficiencies; entities' zod and REST (`POST` /
+// `PUT /api/entities`); server errors shown inline. PUT is a whole replace: the form always sends
+// `tokenShape` (Default = null) and the whole stat block (source fields kept).
 import {
+  ABILITIES,
+  ABILITY_NAMES,
+  type Ability,
   CR_VALUES,
   DAMAGE_TYPES,
   type DefinitionRecord,
   MonsterStatBlock,
   SIZES,
+  TOKEN_SHAPES,
+  type TokenShape,
   xpForCr,
 } from "@shared/entities/schemas";
 import { copyName } from "@shared/scenes-map/geometry";
 import { ApiError } from "@ui/api";
 import { Button } from "@ui/components/ui/button";
+import { Checkbox } from "@ui/components/ui/controls";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +45,7 @@ type Mode =
   | { kind: "derive"; base: DefinitionRecord }
   | { kind: "edit"; def: DefinitionRecord };
 
-interface Fields {
+export interface Fields {
   name: string;
   size: string;
   ac: string;
@@ -49,9 +57,20 @@ interface Fields {
   toHit: string;
   damage: string;
   damageType: string;
+  speed: string;
+  tokenShape: TokenShape | typeof DEFAULT_SHAPE;
+  abilities: Record<Ability, string>;
+  saves: Ability[];
 }
 
 const NONE = "__none__";
+const DEFAULT_SHAPE = "default";
+const SHAPE_LABEL: Record<TokenShape | typeof DEFAULT_SHAPE, string> = {
+  default: "Default",
+  round: "Round",
+  square: "Square",
+  none: "None",
+};
 
 function initial(mode: Mode): Fields {
   const src = mode.kind === "derive" ? mode.base : mode.kind === "edit" ? mode.def : null;
@@ -75,6 +94,59 @@ function initial(mode: Mode): Fields {
     toHit: a ? String(a.toHit) : "",
     damage: a?.damage ?? "",
     damageType: a?.damageType ?? NONE,
+    speed: sb?.speed === undefined ? "" : String(sb.speed),
+    tokenShape: (src && "tokenShape" in src ? src.tokenShape : null) ?? DEFAULT_SHAPE,
+    abilities: Object.fromEntries(
+      ABILITIES.map((k) => [k, sb?.abilities ? String(sb.abilities[k]) : ""]),
+    ) as Record<Ability, string>,
+    saves: sb?.saveProficiencies ? [...sb.saveProficiencies] : [],
+  };
+}
+
+/** The stat block the form sends: the source's (Edit / Derive) with the shown fields replaced. */
+export function formStatBlock(
+  f: Fields,
+  source: Record<string, unknown> | null,
+): { ok: true; value: unknown } | { ok: false; message: string } {
+  const filled = ABILITIES.filter((k) => f.abilities[k].trim() !== "");
+  if (filled.length !== 0 && filled.length !== ABILITIES.length) {
+    return { ok: false, message: "Ability scores: fill all six or none" };
+  }
+  const { speed: _speed, abilities: _abilities, saveProficiencies: _saves, ...rest } = source ?? {};
+  const attacks =
+    f.attackName.trim() === ""
+      ? []
+      : [
+          {
+            name: f.attackName,
+            toHit: Number(f.toHit),
+            damage: f.damage.trim(),
+            ...(f.damageType !== NONE ? { damageType: f.damageType } : {}),
+          },
+        ];
+  const abilities =
+    filled.length === 0
+      ? undefined
+      : (Object.fromEntries(ABILITIES.map((k) => [k, Number(f.abilities[k])])) as Record<
+          Ability,
+          number
+        >);
+  return {
+    ok: true,
+    value: {
+      ...rest,
+      size: f.size,
+      ac: Number(f.ac),
+      hpMax: Number(f.hpMax),
+      initBonus: Number(f.initBonus),
+      cr: f.cr,
+      attacks,
+      ...(f.speed.trim() !== "" ? { speed: Number(f.speed) } : {}),
+      ...(abilities ? { abilities } : {}),
+      ...(abilities && f.saves.length > 0
+        ? { saveProficiencies: ABILITIES.filter((k) => f.saves.includes(k)) }
+        : {}),
+    },
   };
 }
 
@@ -96,25 +168,17 @@ function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
     setF((x) => ({ ...x, [k]: e.target.value }));
 
   const save = async () => {
-    const attack =
-      f.attackName.trim() === ""
-        ? []
-        : [
-            {
-              name: f.attackName,
-              toHit: Number(f.toHit),
-              damage: f.damage.trim(),
-              ...(f.damageType !== NONE ? { damageType: f.damageType } : {}),
-            },
-          ];
-    const parsed = MonsterStatBlock.safeParse({
-      size: f.size,
-      ac: Number(f.ac),
-      hpMax: Number(f.hpMax),
-      initBonus: Number(f.initBonus),
-      cr: f.cr,
-      attacks: attack,
-    });
+    const src = mode.kind === "derive" ? mode.base : mode.kind === "edit" ? mode.def : null;
+    const block = formStatBlock(
+      f,
+      src?.kind === "monster" ? (src.statBlock as Record<string, unknown>) : null,
+    );
+    if (!block.ok) {
+      setError(block.message);
+      return;
+    }
+    const parsed = MonsterStatBlock.safeParse(block.value);
+    const tokenShape = f.tokenShape === DEFAULT_SHAPE ? null : f.tokenShape;
     if (!parsed.success) {
       const i = parsed.error.issues[0];
       setError(i ? `${i.path.join(".")}: ${i.message}` : "Invalid stat block");
@@ -127,6 +191,7 @@ function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
         await combatRest.updateEntity(mode.def.id, {
           name: f.name,
           portraitAssetId: f.portraitAssetId,
+          tokenShape,
           statBlock: parsed.data,
         });
       } else {
@@ -134,6 +199,7 @@ function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
           kind: "monster",
           name: f.name,
           portraitAssetId: f.portraitAssetId,
+          tokenShape,
           statBlock: parsed.data,
           ...(mode.kind === "derive" ? { derivedFromId: mode.base.id } : {}),
         });
@@ -211,6 +277,35 @@ function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
             onChange={set("initBonus")}
           />
         </Field>
+        <Field id="speed" label="Speed (ft)">
+          <Input
+            id="cbt-form-speed"
+            type="number"
+            min={0}
+            max={200}
+            step={5}
+            placeholder="—"
+            value={f.speed}
+            onChange={set("speed")}
+          />
+        </Field>
+        <Field id="tokenShape" label="Token shape">
+          <Select
+            value={f.tokenShape}
+            onValueChange={(v) => setF((x) => ({ ...x, tokenShape: v as Fields["tokenShape"] }))}
+          >
+            <SelectTrigger id="cbt-form-tokenShape" className="min-w-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[DEFAULT_SHAPE, ...TOKEN_SHAPES].map((s) => (
+                <SelectItem key={s} value={s} data-value={s}>
+                  {SHAPE_LABEL[s as Fields["tokenShape"]]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
         <Field id="portrait" label="Portrait">
           <Button
             id="cbt-form-portrait"
@@ -261,6 +356,46 @@ function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
               </SelectContent>
             </Select>
           </Field>
+        </div>
+        <div className="col-span-2 grid gap-2 rounded-md border p-2">
+          <p className="text-xs text-muted-foreground">
+            Ability scores (all six or none) · save proficiency
+          </p>
+          <div className="grid grid-cols-6 gap-1.5">
+            {ABILITIES.map((k) => (
+              <div
+                key={k}
+                className="grid justify-items-center gap-1"
+                data-testid="cbt-form-field"
+                data-value={`abilities.${k}`}
+              >
+                <Label htmlFor={`cbt-form-ability-${k}`} title={ABILITY_NAMES[k]}>
+                  {k.toUpperCase()}
+                </Label>
+                <Input
+                  id={`cbt-form-ability-${k}`}
+                  inputMode="numeric"
+                  className="h-8 px-1 text-center"
+                  value={f.abilities[k]}
+                  onChange={(e) =>
+                    setF((x) => ({ ...x, abilities: { ...x.abilities, [k]: e.target.value } }))
+                  }
+                />
+                <Checkbox
+                  data-testid="cbt-form-field"
+                  data-value={`saves.${k}`}
+                  aria-label={`${ABILITY_NAMES[k]} save proficiency`}
+                  checked={f.saves.includes(k)}
+                  onCheckedChange={(v) =>
+                    setF((x) => ({
+                      ...x,
+                      saves: v === true ? [...x.saves, k] : x.saves.filter((s) => s !== k),
+                    }))
+                  }
+                />
+              </div>
+            ))}
+          </div>
         </div>
         {error && (
           <p data-testid="cbt-form-error" className="col-span-2 text-sm text-destructive">

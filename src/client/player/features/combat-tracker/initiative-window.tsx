@@ -1,9 +1,11 @@
 // Player `cbt.initiative` (CBT §7), read-only: Round N; rows by `playerPosition` with the turn
-// marker (`playerTurnCombatantId`), portrait, name, band (monsters), initiative (PCs).
+// marker (`playerTurnCombatantId`), portrait, name, band (monsters), initiative (PCs). Removed
+// combatants reach players (FR-CBT-37, map badge) but leave this list. Companion: the turn alert.
 import type { CombatantView } from "@shared/combat-tracker/schemas";
 import { Skeleton } from "@ui/components/ui/primitives";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
+import { TurnAlertRuntime } from "@ui/features/combat-tracker/turn-alert-runtime";
 import { initiativeWindowBase } from "@ui/features/combat-tracker/window";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { cn } from "@ui/lib/utils";
@@ -11,7 +13,7 @@ import { useRecords, useSync } from "@ui/sync/store";
 
 function PlayerInitiativeBody() {
   const enc = useStartedEncounter();
-  const rows = useCombatants(enc?.id);
+  const rows = useCombatants(enc?.id).filter((c) => !c.removed);
   const me = useSync((s) => s.store.you?.playerId ?? null);
   const characters = useRecords<{ id: string; ownerPlayerId?: string | null }>("entity");
   const everLive = useSync((s) => s.everLive);
@@ -93,4 +95,5 @@ export const playerInitiativeWindow = defineWindow({
   defaultPosition: { anchor: "top-right", dx: 332 },
   available: (store) => startedIn(store) !== null,
   component: PlayerInitiativeBody,
+  companion: TurnAlertRuntime,
 });

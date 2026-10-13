@@ -154,6 +154,8 @@ export type CombatantRecord = z.infer<typeof CombatantRecord>;
 export const HealthBand = z.enum(["healthy", "bloodied", "down"]);
 export type HealthBand = z.infer<typeof HealthBand>;
 
+const movedFt = z.int().min(0).max(MOVED_FT_MAX);
+
 /** Player view of a visible PC combatant (FR-CBT-27). */
 export const PlayerPcCombatant = z.object({
   id: z.string(),
@@ -165,6 +167,8 @@ export const PlayerPcCombatant = z.object({
   imageAssetId: z.string().nullable(),
   playerPosition: z.int().nullable(),
   initiative: z.int().nullable(),
+  removed: z.literal(false),
+  movedFt,
 });
 /** Player view of a visible monster combatant: band, never HP numbers (FR-CBT-26). */
 export const PlayerMonsterCombatant = z.object({
@@ -176,10 +180,24 @@ export const PlayerMonsterCombatant = z.object({
   imageAssetId: z.string().nullable(),
   playerPosition: z.int().nullable(),
   band: HealthBand,
+  removed: z.literal(false),
+  movedFt,
+});
+/** Player view of an active, removed, non-hidden combatant: no rank, band or initiative (FR-CBT-37). */
+export const PlayerRemovedCombatant = z.object({
+  id: z.string(),
+  encounterId: z.string(),
+  kind: CombatantKind,
+  tokenId: z.string().nullable(),
+  name: z.string(),
+  imageAssetId: z.string().nullable(),
+  removed: z.literal(true),
+  movedFt,
 });
 export type PlayerCombatant =
   | z.infer<typeof PlayerPcCombatant>
-  | z.infer<typeof PlayerMonsterCombatant>;
+  | z.infer<typeof PlayerMonsterCombatant>
+  | z.infer<typeof PlayerRemovedCombatant>;
 /** A combatant as either client holds it. */
 export type CombatantView = PlayerCombatant & Partial<CombatantRecord> & { band?: HealthBand };
 
@@ -253,26 +271,19 @@ export const DamageCardTargetOutcome = z.strictObject({
 });
 export type DamageCardTargetOutcome = z.infer<typeof DamageCardTargetOutcome>;
 
-/**
- * Legacy single-target resolution (pre-feedback cards). Still written by today's `cbt.applyCard`
- * until build/combat-tracker-feedback switches to `DamageCardTargetsResolution`.
- */
-export const DamageCardResolution = DamageCardTargetOutcome;
-export type DamageCardResolution = DamageCardTargetOutcome;
-
 /** FR-CBT-34: one apply resolves for 1–20 targets, apply order. */
 export const APPLY_TARGETS_MAX = 20;
 
-/** Feedback-pass resolution: one part per target (FR-CBT-42). Over 256 B: see the cap below. */
+/** Resolution: one part per target, apply order (FR-CBT-34, FR-CBT-42). Over 256 B: cap below. */
 export const DamageCardTargetsResolution = z.strictObject({
   targets: z.array(DamageCardTargetOutcome).min(1).max(APPLY_TARGETS_MAX),
 });
 export type DamageCardTargetsResolution = z.infer<typeof DamageCardTargetsResolution>;
 
-/** Per-kind resolution cap the `damage-card` kind declares (FR-NOTE-03, OQ-CBT-39, #155). */
-export const DAMAGE_CARD_RESOLUTION_MAX_BYTES = 2048;
+/** Per-kind resolution cap the `damage-card` kind declares (FR-NOTE-03, OQ-CBT-39, #157). */
+export const DAMAGE_CARD_RESOLUTION_MAX_BYTES = 8192;
 
-/** Readers: either stored shape → `{targets}` (legacy single target = one part). */
+/** Readers: either stored shape → `{targets}` (legacy single-target rows from before = one part). */
 export const DamageCardResolutionRead = z.union([
   DamageCardTargetsResolution,
   DamageCardTargetOutcome.transform((t): DamageCardTargetsResolution => ({ targets: [t] })),
@@ -309,18 +320,6 @@ export const AttackInput = z.strictObject({
 export type AttackInput = z.input<typeof AttackInput>;
 export const AttackResult = z.object({ cardId: z.string(), rollIds: z.array(z.string()) });
 export type AttackResult = z.infer<typeof AttackResult>;
-/** Legacy single-target `cbt.applyCard` (today's server); replaced by `ApplyCardTargetsInput`. */
-export const ApplyCardInput = z.strictObject({
-  cardId: Id,
-  targetId: Id,
-  toHitTotal: z.int().min(-20).max(99),
-  hit: z.boolean(),
-  damageTotal: z.int().min(0).max(999),
-  multiplier: DamageMultiplier,
-  public: z.boolean().optional(),
-});
-export type ApplyCardInput = z.input<typeof ApplyCardInput>;
-
 export const ApplyCardTarget = z.strictObject({
   targetId: Id,
   hit: z.boolean(),
@@ -328,7 +327,7 @@ export const ApplyCardTarget = z.strictObject({
 });
 export type ApplyCardTarget = z.infer<typeof ApplyCardTarget>;
 
-/** Feedback-pass `cbt.applyCard` (FR-CBT-34): 1–20 unique targets, all or nothing. */
+/** `cbt.applyCard` (FR-CBT-34): 1–20 unique targets, all or nothing. */
 export const ApplyCardTargetsInput = z.strictObject({
   cardId: Id,
   toHitTotal: z.int().min(-20).max(99),
@@ -351,10 +350,10 @@ export const ApplyHpInput = z.strictObject({
 });
 export type ApplyHpInput = z.input<typeof ApplyHpInput>;
 export const UndoInput = z.strictObject({ expectedHpChangeId: Id });
-/** Legacy result of `cbt.applyCard` / `cbt.undo`; `cbt.applyHp` keeps it. */
+/** Result of `cbt.applyHp`. */
 export const HpChangeResult = z.object({ hpChangeId: z.string() });
 export type HpChangeResult = z.infer<typeof HpChangeResult>;
-/** Feedback-pass result of `cbt.applyCard` (apply order) and `cbt.undo` (latest first). */
+/** Result of `cbt.applyCard` (apply order) and `cbt.undo` (latest first). */
 export const HpChangesResult = z.object({ hpChangeIds: z.array(z.string()).min(1) });
 export type HpChangesResult = z.infer<typeof HpChangesResult>;
 export const RollIdsResult = z.object({ rollIds: z.array(z.string()) });

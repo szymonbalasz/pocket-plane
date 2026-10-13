@@ -1,14 +1,27 @@
-// DM `cbt.initiative` (CBT §7): round + turns, Undo, Roll monsters, pending cards, rows by
-// `position` (initiative roll / set, AC, HP, band, Attack, Damage / heal, Remove), Removed.
+// DM `cbt.initiative` (CBT §7): round + turns, Undo (one apply, FR-CBT-35), Roll monsters,
+// pending cards, rows by `position` (initiative roll / set, AC, HP, band, moved (FR-CBT-39),
+// Attack; menu Check ▸ / Save ▸ (FR-CBT-44), Damage / heal, Remove), Removed.
+import { signed } from "@shared/character-sheet/logic";
 import { critExpression, d20Expression, healthBand } from "@shared/combat-tracker/rules";
 import type { CombatantView, EncounterView } from "@shared/combat-tracker/schemas";
-import type { DefinitionRecord } from "@shared/entities/schemas";
+import {
+  ABILITIES,
+  ABILITY_NAMES,
+  type Ability,
+  checkBonus,
+  type DefinitionRecord,
+  saveBonus,
+} from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { Button } from "@ui/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@ui/components/ui/menus";
 import { Tooltip } from "@ui/components/ui/overlays";
@@ -21,23 +34,30 @@ import {
 } from "@ui/features/combat-tracker/store";
 import { ENCOUNTERS_KIND, initiativeWindowBase } from "@ui/features/combat-tracker/window";
 import { modeFromKeys } from "@ui/features/dice-roll-log/logic";
-import { RollButton, useRollControl } from "@ui/features/dice-roll-log/roll-control";
+import {
+  RollButton,
+  type RollControl,
+  useRollControl,
+} from "@ui/features/dice-roll-log/roll-control";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
+import { movementIndicator } from "@ui/features/scenes-map/movement";
 import { cn } from "@ui/lib/utils";
 import { useSync } from "@ui/sync/store";
 import {
   DicesIcon,
   EllipsisIcon,
+  EyeIcon,
   EyeOffIcon,
   HeartPulseIcon,
   RotateCcwIcon,
+  ShieldIcon,
   SwordIcon,
   UserMinusIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
-import { useDefinitions, useLatestUndoable, usePendingCards } from "./data";
+import { useDefinitions, usePendingCards, useUndo } from "./data";
 import { HpDialog } from "./hp-dialog";
 import { useCombatDialogs } from "./popup-store";
 
@@ -147,6 +167,136 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
   );
 }
 
+// ---------- checks and saves (FR-CBT-44) ----------
+
+type AbilityKind = "check" | "save";
+
+const KIND_LABEL: Record<AbilityKind, string> = { check: "Check", save: "Save" };
+
+/**
+ * One shared roll control per kind (Shift / Ctrl, physical-dice popover, DM public switch per
+ * category). A menu item picks the ability; the roll runs once the control has re-rendered with
+ * that ability's expression. The physical-dice popover anchors to an invisible button.
+ */
+function useAbilityRoll(c: CombatantView, kind: AbilityKind, bonus: (a: Ability) => number | null) {
+  const { send } = useCbtIntent();
+  const [pick, setPick] = useState<{ ability: Ability; keys: KeyState; n: number } | null>(null);
+  const ability = pick?.ability ?? "str";
+  const control = useRollControl({
+    expressions: [d20Expression(bonus(ability) ?? 0)],
+    category: kind === "check" ? "ability-check" : "saving-throw",
+    onRoll: (r) =>
+      void send("cbt.rollAbility", {
+        combatantId: c.id,
+        kind,
+        ability,
+        mode: r.mode,
+        ...(r.manual ? { manual: r.manual[0] } : {}),
+        ...(r.public !== undefined ? { public: r.public } : {}),
+      }),
+  });
+  const n = pick?.n;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: roll once per pick (n), with the control of that render
+  useEffect(() => {
+    if (pick) control.roll(pick.keys);
+  }, [n]);
+  return {
+    control,
+    roll: (a: Ability, keys: KeyState) =>
+      setPick((p) => ({ ability: a, keys, n: (p?.n ?? 0) + 1 })),
+  };
+}
+
+interface KeyState {
+  shiftKey?: boolean;
+  ctrlKey?: boolean;
+}
+
+function AbilityMenu({
+  c,
+  kind,
+  bonus,
+  roll,
+  control,
+}: {
+  c: CombatantView;
+  kind: AbilityKind;
+  bonus: (a: Ability) => number | null;
+  roll: (a: Ability, keys: KeyState) => void;
+  control: RollControl;
+}) {
+  const keys = useRef<KeyState>({});
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger data-testid={`cbt-init-row-${kind}`} data-record-id={c.id}>
+        <ShieldIcon /> {KIND_LABEL[kind]}
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent>
+        {ABILITIES.map((a) => (
+          <DropdownMenuItem
+            key={a}
+            data-testid={`cbt-init-row-${kind}-option`}
+            data-record-id={c.id}
+            data-value={a}
+            onPointerDown={(e) => {
+              keys.current = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey };
+            }}
+            onSelect={() => {
+              roll(a, keys.current);
+              keys.current = {};
+            }}
+          >
+            <span className="flex-1">{ABILITY_NAMES[a]}</span>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {signed(bonus(a) ?? 0)}
+            </span>
+          </DropdownMenuItem>
+        ))}
+        {control.isDm && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              data-testid={`cbt-init-row-${kind}-public`}
+              data-record-id={c.id}
+              data-value={control.publicValue}
+              onSelect={(e) => {
+                e.preventDefault();
+                control.setPublic(!control.publicValue);
+              }}
+            >
+              {control.publicValue ? <EyeIcon /> : <EyeOffIcon />}
+              {control.publicValue ? "Shown to players" : "DM only"}
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+/** "Moved 40 / 30 ft" in the drag label's tone (FR-CBT-39, FR-MAP-37); "Moved 40 ft" without speed. */
+const TONE_CLASS = {
+  none: "",
+  normal: "",
+  dash: "text-hp-bloodied",
+  over: "text-hp-down",
+} as const;
+
+function Moved({ c, speed }: { c: CombatantView; speed: number | undefined }) {
+  const moved = c.movedFt ?? 0;
+  const tone = speed === undefined ? "none" : movementIndicator(moved, null, speed).tone;
+  return (
+    <span
+      className={cn("shrink-0", TONE_CLASS[tone])}
+      data-testid="cbt-init-row-moved"
+      data-record-id={c.id}
+      data-tone={tone}
+    >
+      {speed === undefined ? `Moved ${moved} ft` : `Moved ${moved} / ${speed} ft`}
+    </span>
+  );
+}
+
 function Row({
   c,
   def,
@@ -162,6 +312,12 @@ function Row({
   const openHp = useCombatDialogs((s) => s.openHp);
   const hp = hpOf(c, defs);
   const ac = acOf(c, defs);
+  const stats = def?.statBlock;
+  const hasScores = stats?.abilities !== undefined;
+  const checkOf = (a: Ability) => (stats ? checkBonus(stats, a) : null);
+  const saveOf = (a: Ability) => (stats ? saveBonus(stats, a) : null);
+  const check = useAbilityRoll(c, "check", checkOf);
+  const save = useAbilityRoll(c, "save", saveOf);
   return (
     <li
       data-testid="cbt-init-row"
@@ -197,10 +353,14 @@ function Row({
           {c.kind === "monster" && hp && (
             <BandBadge band={healthBand(hp.cur, hp.max)} testId="cbt-init-row-band" />
           )}
+          <Moved c={c} speed={stats?.speed} />
         </div>
       </div>
       <InitiativeCell c={c} def={def} />
       <AttackButton c={c} def={def} />
+      {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸. */}
+      <RollButton control={check.control} tabIndex={-1} aria-hidden className={ANCHOR} />
+      <RollButton control={save.control} tabIndex={-1} aria-hidden className={ANCHOR} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -215,6 +375,13 @@ function Row({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {hasScores && (
+            <>
+              <AbilityMenu c={c} kind="check" bonus={checkOf} {...check} />
+              <AbilityMenu c={c} kind="save" bonus={saveOf} {...save} />
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem data-testid="cbt-init-row-hp-adjust" onSelect={() => openHp(c.id)}>
             <HeartPulseIcon /> Damage / heal…
           </DropdownMenuItem>
@@ -231,6 +398,8 @@ function Row({
     </li>
   );
 }
+
+const ANCHOR = "pointer-events-none size-0 overflow-hidden p-0 opacity-0";
 
 function PendingCards({ cards }: { cards: NotificationRecord[] }) {
   const openCard = useCombatDialogs((s) => s.openCard);
@@ -260,16 +429,14 @@ function PendingCards({ cards }: { cards: NotificationRecord[] }) {
 
 function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
   const { send, disabled } = useCbtIntent();
-  const last = useLatestUndoable(enc.id);
+  const undo = useUndo(enc.id);
   const turnArgs = {
     encounterId: enc.id,
     expectedRound: enc.round,
     expectedTurnId: enc.turnCombatantId ?? null,
   };
   const unrolled = rows.filter((c) => c.kind === "monster" && !c.removed && c.initiative == null);
-  const undoText = last
-    ? `Undo: ${last.attackerName ?? "DM"} → ${last.targetName}, ${last.kind === "heal" ? "+" : ""}${last.applied}`
-    : "Nothing to undo";
+  const undoText = undo?.text ?? "Nothing to undo";
   return (
     <div className="flex shrink-0 flex-col gap-1.5">
       <div className="flex items-center gap-2">
@@ -307,8 +474,10 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
               variant="ghost"
               data-testid="cbt-init-undo"
               aria-label={undoText}
-              disabled={disabled || !last}
-              onClick={() => last && void send("cbt.undo", { expectedHpChangeId: last.id })}
+              disabled={disabled || !undo}
+              onClick={() =>
+                undo && void send("cbt.undo", { expectedHpChangeId: undo.expectedHpChangeId })
+              }
             >
               <RotateCcwIcon className="size-3.5" /> Undo
             </Button>

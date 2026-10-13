@@ -5,6 +5,7 @@
 
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
+import { cbtTokenOverlay } from "../combat-tracker/token-overlay";
 
 export interface TokenOverlayView {
   client: "dm" | "player";
@@ -41,4 +42,6 @@ export interface TokenOverlay {
   movedFt?(token: TokenView, store: RecordStore): number | null;
 }
 
-export const tokenOverlays: readonly TokenOverlay[] = [];
+export const tokenOverlays: readonly TokenOverlay[] = [
+  cbtTokenOverlay, // combat-tracker (FR-CBT-38/39)
+];

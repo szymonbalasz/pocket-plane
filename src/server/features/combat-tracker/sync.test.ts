@@ -10,7 +10,7 @@ import {
   ENCOUNTER_TYPE,
   type EncounterRecord,
   HP_CHANGE_TYPE,
-  type HpChangeResult,
+  type HpChangesResult,
 } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import { closeDb, type Db, openFileDb } from "../../db/client";
@@ -130,15 +130,14 @@ describe("mid-combat over WS", () => {
     const goblin = byName(dm, "Goblin") as CombatantRecord;
     dm.intent("cbt.applyCard", {
       cardId,
-      targetId: goblin.id,
       toHitTotal: 25,
-      hit: true,
       damageTotal: 6,
-      multiplier: "normal",
+      targets: [{ targetId: goblin.id, hit: true, multiplier: "normal" }],
     });
     await nextEvent(dm, "AttackApplied");
-    const applied = (await dm.next("ack")).result as HpChangeResult;
-    expect(Object.keys(dm.store.records[HP_CHANGE_TYPE] ?? {})).toContain(applied.hpChangeId);
+    const applied = (await dm.next("ack")).result as HpChangesResult;
+    const hpChangeId = applied.hpChangeIds[0] as string;
+    expect(Object.keys(dm.store.records[HP_CHANGE_TYPE] ?? {})).toContain(hpChangeId);
     const pa = await nextEvent(p1, "AttackApplied");
     expect(pa.changes.find((c) => c.type === COMBATANT_TYPE)).toMatchObject({
       data: { band: "bloodied" },
@@ -146,16 +145,16 @@ describe("mid-combat over WS", () => {
     await nextEvent(p1, "NotificationResolved");
     expect(p1.store.records.notification?.[cardId]).toMatchObject({
       state: "resolved",
-      resolution: { targetName: "Goblin", applied: 6 },
+      resolution: { targets: [{ targetName: "Goblin", applied: 6 }] },
     });
 
-    dm.intent("cbt.undo", { expectedHpChangeId: applied.hpChangeId });
+    dm.intent("cbt.undo", { expectedHpChangeId: hpChangeId });
     await nextEvent(p1, "CombatEntryUndone");
     await nextEvent(p1, "NotificationReopened");
     expect(p1.store.records.notification?.[cardId]).toMatchObject({ state: "pending" });
     expect(byName(p1, "Goblin")).toMatchObject({ band: "healthy" });
     // Double undo → conflict (expected guard).
-    dm.intent("cbt.undo", { expectedHpChangeId: applied.hpChangeId }, "u2");
+    dm.intent("cbt.undo", { expectedHpChangeId: hpChangeId }, "u2");
     expect(await dm.next("reject")).toMatchObject({ intentId: "u2", code: "conflict" });
 
     for (const c of [p1, p2]) {
@@ -195,7 +194,17 @@ describe("mid-combat over WS", () => {
     ).toBe(true);
     dm.intent("cbt.setRemoved", { combatantId: goblin2.id, removed: true });
     await nextEvent(p1, "CombatantRemoved");
-    expect(byName(p1, "Goblin 2")).toBeUndefined();
+    // FR-CBT-37: removed → redacted upsert, no rank or band.
+    expect(byName(p1, "Goblin 2") as unknown).toEqual({
+      id: goblin2.id,
+      encounterId: goblin2.encounterId,
+      kind: "monster",
+      tokenId: goblin2.tokenId,
+      name: "Goblin 2",
+      imageAssetId: goblin2.imageAssetId,
+      removed: true,
+      movedFt: 0,
+    });
     for (const [live, cred] of [
       [p1, p("Player 1")],
       [p2, p("Player 2")],
@@ -209,7 +218,7 @@ describe("mid-combat over WS", () => {
     for (const c of [dm, p1, p2]) c.close();
   });
 
-  test("FR-CBT-28 crash-resume: restart → identical snapshots; next turn still works", async () => {
+  test("FR-CBT-28 FR-CBT-39 crash-resume: restart → identical snapshots incl. movedFt; next turn works", async () => {
     const snap = async () => {
       const out: Record<string, unknown> = {};
       for (const [k, cred] of Object.entries({
@@ -235,6 +244,13 @@ describe("mid-combat over WS", () => {
       }
       return out;
     };
+    // FR-CBT-39: a move commits with its movedFt, so a crash after it keeps the count.
+    const mover = await h.live(DM);
+    const goblin = byName(mover, "Goblin") as CombatantRecord;
+    mover.intent("map.moveToken", { tokenId: goblin.tokenId, col: 14, row: 8 });
+    await nextEvent(mover, "TokenMoved");
+    expect(byName(mover, "Goblin")?.movedFt).toBe(goblin.movedFt + 15);
+    mover.close();
     const before = await snap();
     await h.restart();
     expect(await snap()).toEqual(before);
@@ -255,11 +271,9 @@ describe("mid-combat over WS", () => {
     const mira = byName(dm, "Mira") as CombatantRecord;
     dm.intent("cbt.applyCard", {
       cardId: pending?.id,
-      targetId: mira.id,
       toHitTotal: 24,
-      hit: true,
       damageTotal: 9,
-      multiplier: "normal",
+      targets: [{ targetId: mira.id, hit: true, multiplier: "normal" }],
     });
     const applied = await nextEvent(dm, "AttackApplied");
     expect(applied.changes.find((c) => c.type === "entity")).toMatchObject({

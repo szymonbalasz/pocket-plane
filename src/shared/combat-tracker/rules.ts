@@ -1,7 +1,12 @@
 // Pure combat rules shared by the server (authoritative) and the clients (previews, hints).
 import { parseExpression, type Term, toNotation } from "@shared/dice-roll-log/grammar";
 import { numberedName } from "@shared/scenes-map/geometry";
-import type { CombatantKind, DamageMultiplier, HealthBand } from "./schemas";
+import type {
+  CombatantKind,
+  DamageCardTargetOutcome,
+  DamageMultiplier,
+  HealthBand,
+} from "./schemas";
 
 // ---------- order (FR-CBT-13) ----------
 
@@ -123,6 +128,48 @@ export const MULTIPLIER_LABEL: Record<DamageMultiplier, string> = {
 /** `raw = hit ? floor(damageTotal × factor) : 0`. */
 export function rawDamage(hit: boolean, damageTotal: number, m: DamageMultiplier): number {
   return hit ? Math.floor(damageTotal * MULTIPLIER_FACTOR[m]) : 0;
+}
+
+// ---------- undo unit (FR-CBT-35) ----------
+
+export interface UndoRow {
+  id: string;
+  seq: number;
+  cardId: string | null;
+  undone: boolean;
+}
+
+/**
+ * One undo step = one apply: the latest non-undone combat log entry plus every non-undone
+ * entry of the same card (a card has at most one live apply). Latest first; [] = nothing.
+ */
+export function undoGroup<T extends UndoRow>(rows: readonly T[]): T[] {
+  const live = rows.filter((r) => !r.undone).sort((a, b) => b.seq - a.seq);
+  const last = live[0];
+  if (!last) return [];
+  if (last.cardId === null) return [last];
+  return live.filter((r) => r.cardId === last.cardId);
+}
+
+const MULTIPLIER_SUFFIX: Record<DamageMultiplier, string> = {
+  normal: "",
+  half: " (half)",
+  none: " (none)",
+  double: " (double)",
+};
+
+/**
+ * FR-CBT-42 player resolved view: one part per target, apply order, joined " · ". Hit → "Hit
+ * Goblin: 6" (+ multiplier unless normal), miss → "Miss Goblin"; a null (hidden) name → "Hit: 6"
+ * / "Miss".
+ */
+export function resolutionText(targets: readonly DamageCardTargetOutcome[]): string {
+  return targets
+    .map((t) => {
+      const name = t.targetName === null ? "" : ` ${t.targetName}`;
+      return t.hit ? `Hit${name}: ${t.applied}${MULTIPLIER_SUFFIX[t.multiplier]}` : `Miss${name}`;
+    })
+    .join(" · ");
 }
 
 /** Monster HP after a delta, clamped 0…hpMax. */

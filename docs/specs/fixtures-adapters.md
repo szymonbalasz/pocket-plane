@@ -117,7 +117,7 @@ Fixtures, bundles, manifest and lock are **code/files, not DB records**. Only pr
 | `goblin-2` | setup | Token "Goblin 2" (`enemy-1`) on Goblin Ambush (12, 8), visible. Requires `battlemap` | combat-tracker | yes | Combat |
 | `thorn-battlemap` | setup | Thorn token (owner `player-2`) on Goblin Ambush (2, 9). Requires `battlemap`, `char-thorn` | combat-tracker | no | Combat |
 | `combat-1` | setup | Start `encounter-1` on Goblin Ambush; initiative Wolf 18, Mira 15, Goblin 12, Goblin 2 12, Thorn 10, Elite 8; round 1, Wolf. Requires `encounter-1`, `goblin-2`, `thorn-battlemap` | combat-tracker | no | Combat |
-| `combat-hit` | setup | Goblin attacks Mira (manual 15 / 4), applied → Mira 6/12 (*(feedback pass, to build)*: apply input `targets [{Mira, hit, normal}]`). Requires `combat-1` | combat-tracker | no | Combat |
+| `combat-hit` | setup | Goblin attacks Mira (manual 15 / 4), applied with `targets [{Mira, hit, normal}]` → Mira 6/12. Requires `combat-1` | combat-tracker | no | Combat |
 | `combat-pending` | setup | Elite attacks (manual 19 / 5), card left pending. Requires `combat-hit` | combat-tracker | no | Combat |
 | `char-pip` | setup | Character "Pip", owner `player-1`, L1 wizard, AC 12, HP 8/8, init +2, no attack (*(feedback pass, to build)*: no speed, no ability scores) | [character-sheet](character-sheet.md#13-test-plan) | no | Combat |
 | `char-wounds` | setup | `char.adjustHp` Thorn −7 → 3/10. Requires `char-thorn` | character-sheet | no | Combat |

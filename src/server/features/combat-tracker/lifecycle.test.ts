@@ -189,6 +189,8 @@ describe("FR-CBT-07 FR-CBT-08 FR-CBT-10 start / end", () => {
       imageAssetId: null,
       playerPosition: 3,
       band: "healthy",
+      removed: false,
+      movedFt: 0,
     });
     expect(Object.keys(cs[0] ?? {}).sort()).toEqual(
       [
@@ -198,8 +200,10 @@ describe("FR-CBT-07 FR-CBT-08 FR-CBT-10 start / end", () => {
         "imageAssetId",
         "initiative",
         "kind",
+        "movedFt",
         "name",
         "playerPosition",
+        "removed",
         "tokenId",
       ].sort(),
     );

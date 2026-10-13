@@ -17,6 +17,7 @@ export const eliteBlock = {
   hpMax: 15,
   attacks: [{ name: "Scimitar", toHit: 5, damage: "1d6+3", damageType: "slashing" }],
   cr: "1/2",
+  saveProficiencies: ["dex"],
 } as const;
 
 export function combatSetup() {
