@@ -139,10 +139,13 @@ function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boole
   };
 
   return (
-    <div className="relative min-h-0 flex-1">
+    // FR-SHELL-28 (#153): never shorter than 3 entries; the scroller fills the box absolutely
+    // so the list only grows into free space and the rest of the body (roll bar) scrolls.
+    <div className="relative min-h-20 flex-1">
       <div
         ref={ref}
-        className="h-full overflow-y-auto pr-1"
+        data-testid="dice-log-list"
+        className="absolute inset-0 overflow-y-auto pr-1"
         onScroll={(ev) => {
           const el = ev.currentTarget;
           atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
@@ -413,7 +416,10 @@ export function GameLog({ dmTools }: { dmTools?: ReactNode }) {
     <section
       data-testid="dice-log"
       aria-label="Game log"
-      className="flex h-full min-h-0 flex-col gap-2"
+      // min-h-full, not h-full: with Physical dice on (banner + roll bar) the body grows past
+      // the window and scrolls, entries first (FR-SHELL-28). No scroll anchoring: toggling the
+      // banner would otherwise scroll the body to keep the roll bar put, hiding the entries.
+      className="flex min-h-full flex-col gap-2 [overflow-anchor:none]"
     >
       <PhysicalBanner />
       {!everLive ? (
