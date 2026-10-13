@@ -1,6 +1,7 @@
 // combat-tracker boundary schemas (CBT §8, §9; protocol §20–§23). zod is the source of truth for
 // the wire records, intents, REST bodies and the damage card's payload / resolution.
 import { ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
+import { Ability } from "@shared/entities/schemas";
 import { DamageMultiplier } from "@shared/events/combat-tracker";
 import { z } from "zod";
 
@@ -25,6 +26,8 @@ export const ENCOUNTER_WINDOW = 20;
 export const HP_CHANGE_WINDOW = 50;
 export const INITIATIVE_MIN = -10;
 export const INITIATIVE_MAX = 50;
+/** FR-CBT-39: `movedFt` cap. */
+export const MOVED_FT_MAX = 9999;
 
 /** WS intents (CBT §9). */
 export const CBT_INTENTS = {
@@ -39,6 +42,7 @@ export const CBT_INTENTS = {
   applyCard: "cbt.applyCard",
   applyHp: "cbt.applyHp",
   undo: "cbt.undo",
+  rollAbility: "cbt.rollAbility",
 } as const;
 
 const Id = z.string().min(1).max(64);
@@ -142,6 +146,8 @@ export const CombatantRecord = z.object({
   playerPosition: z.int().nullable(),
   hpCurrent: z.int().nullable(),
   hpMax: z.int().nullable(),
+  /** Movement used this turn, ft (FR-CBT-39). */
+  movedFt: z.int().min(0).max(MOVED_FT_MAX),
 });
 export type CombatantRecord = z.infer<typeof CombatantRecord>;
 
@@ -238,14 +244,39 @@ export const DamageCardPayload = z.strictObject({
 });
 export type DamageCardPayload = z.infer<typeof DamageCardPayload>;
 
-/** Seen by the rolling player (#138): no DM-only ids. */
-export const DamageCardResolution = z.strictObject({
+/** One target's outcome, seen by the rolling player (#138): no DM-only ids. */
+export const DamageCardTargetOutcome = z.strictObject({
   targetName: z.string().nullable(),
   hit: z.boolean(),
   multiplier: DamageMultiplier,
   applied: z.int(),
 });
-export type DamageCardResolution = z.infer<typeof DamageCardResolution>;
+export type DamageCardTargetOutcome = z.infer<typeof DamageCardTargetOutcome>;
+
+/**
+ * Legacy single-target resolution (pre-feedback cards). Still written by today's `cbt.applyCard`
+ * until build/combat-tracker-feedback switches to `DamageCardTargetsResolution`.
+ */
+export const DamageCardResolution = DamageCardTargetOutcome;
+export type DamageCardResolution = DamageCardTargetOutcome;
+
+/** FR-CBT-34: one apply resolves for 1–20 targets, apply order. */
+export const APPLY_TARGETS_MAX = 20;
+
+/** Feedback-pass resolution: one part per target (FR-CBT-42). Over 256 B: see the cap below. */
+export const DamageCardTargetsResolution = z.strictObject({
+  targets: z.array(DamageCardTargetOutcome).min(1).max(APPLY_TARGETS_MAX),
+});
+export type DamageCardTargetsResolution = z.infer<typeof DamageCardTargetsResolution>;
+
+/** Per-kind resolution cap the `damage-card` kind declares (FR-NOTE-03, OQ-CBT-39, #155). */
+export const DAMAGE_CARD_RESOLUTION_MAX_BYTES = 2048;
+
+/** Readers: either stored shape → `{targets}` (legacy single target = one part). */
+export const DamageCardResolutionRead = z.union([
+  DamageCardTargetsResolution,
+  DamageCardTargetOutcome.transform((t): DamageCardTargetsResolution => ({ targets: [t] })),
+]);
 
 // ---------- intents ----------
 
@@ -278,6 +309,7 @@ export const AttackInput = z.strictObject({
 export type AttackInput = z.input<typeof AttackInput>;
 export const AttackResult = z.object({ cardId: z.string(), rollIds: z.array(z.string()) });
 export type AttackResult = z.infer<typeof AttackResult>;
+/** Legacy single-target `cbt.applyCard` (today's server); replaced by `ApplyCardTargetsInput`. */
 export const ApplyCardInput = z.strictObject({
   cardId: Id,
   targetId: Id,
@@ -288,6 +320,29 @@ export const ApplyCardInput = z.strictObject({
   public: z.boolean().optional(),
 });
 export type ApplyCardInput = z.input<typeof ApplyCardInput>;
+
+export const ApplyCardTarget = z.strictObject({
+  targetId: Id,
+  hit: z.boolean(),
+  multiplier: DamageMultiplier,
+});
+export type ApplyCardTarget = z.infer<typeof ApplyCardTarget>;
+
+/** Feedback-pass `cbt.applyCard` (FR-CBT-34): 1–20 unique targets, all or nothing. */
+export const ApplyCardTargetsInput = z.strictObject({
+  cardId: Id,
+  toHitTotal: z.int().min(-20).max(99),
+  damageTotal: z.int().min(0).max(999),
+  targets: z
+    .array(ApplyCardTarget)
+    .min(1)
+    .max(APPLY_TARGETS_MAX)
+    .refine((ts) => new Set(ts.map((t) => t.targetId)).size === ts.length, {
+      message: "Each target at most once",
+    }),
+  public: z.boolean().optional(),
+});
+export type ApplyCardTargetsInput = z.input<typeof ApplyCardTargetsInput>;
 export const ApplyHpInput = z.strictObject({
   combatantId: Id,
   kind: z.enum(["damage", "heal"]),
@@ -296,6 +351,23 @@ export const ApplyHpInput = z.strictObject({
 });
 export type ApplyHpInput = z.input<typeof ApplyHpInput>;
 export const UndoInput = z.strictObject({ expectedHpChangeId: Id });
+/** Legacy result of `cbt.applyCard` / `cbt.undo`; `cbt.applyHp` keeps it. */
 export const HpChangeResult = z.object({ hpChangeId: z.string() });
 export type HpChangeResult = z.infer<typeof HpChangeResult>;
+/** Feedback-pass result of `cbt.applyCard` (apply order) and `cbt.undo` (latest first). */
+export const HpChangesResult = z.object({ hpChangeIds: z.array(z.string()).min(1) });
+export type HpChangesResult = z.infer<typeof HpChangesResult>;
 export const RollIdsResult = z.object({ rollIds: z.array(z.string()) });
+
+/** `cbt.rollAbility` (FR-CBT-44): a combatant's check or save, DM only. */
+export const RollAbilityInput = z.strictObject({
+  combatantId: Id,
+  kind: z.enum(["check", "save"]),
+  ability: Ability,
+  mode: RollMode.default("normal"),
+  manual: ManualEntry.optional(),
+  public: z.boolean().optional(),
+});
+export type RollAbilityInput = z.input<typeof RollAbilityInput>;
+export const RollAbilityResult = z.object({ rollIds: z.array(z.string()), entryId: z.string() });
+export type RollAbilityResult = z.infer<typeof RollAbilityResult>;

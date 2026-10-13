@@ -1,8 +1,16 @@
 // character-sheet derived values (CHAR §8): never stored. Pure; the server builds rolls with
 // `characterRolls` (FR-CHAR-05) and combat-tracker reuses it; clients format with the rest.
 import type { RollCategory } from "@shared/dice-roll-log/schemas";
-import type { Attack, CharacterStatBlock } from "@shared/entities/schemas";
-import type { CharRollKind } from "./schemas";
+import {
+  ABILITY_NAMES,
+  type Ability,
+  type AbilityStats,
+  type Attack,
+  type CharacterStatBlock,
+  checkBonus,
+  saveBonus,
+} from "@shared/entities/schemas";
+import type { CharRollKind, SheetRollKind } from "./schemas";
 
 /** One roll of a sheet action: what `dice.evaluate` gets, minus actor and mode. */
 export interface CharacterRollSpec {
@@ -28,8 +36,35 @@ export const sheetAttack = (s: Pick<CharacterStatBlock, "attacks">): Attack | nu
 /**
  * FR-CHAR-05: initiative = d20 + initBonus (category initiative); attack = d20 + toHit (attack)
  * and the attack's damage (damage). `null` = attack without a weapon attack (caller: `conflict`).
+ * FR-CHAR-21: check / save = d20 + `checkBonus` / `saveBonus` (FR-ENT-24), categories
+ * `ability-check` / `saving-throw`; `null` = no ability scores (caller: `conflict`). Takes any
+ * stat block (combat reuses it for monsters, FR-CBT-44).
  */
-export function characterRolls(stats: RollStats, kind: CharRollKind): CharacterRollSpec[] | null {
+export function characterRolls(stats: RollStats, kind: CharRollKind): CharacterRollSpec[] | null;
+export function characterRolls(
+  stats: RollStats & AbilityStats,
+  kind: SheetRollKind,
+  ability: Ability,
+): CharacterRollSpec[] | null;
+export function characterRolls(
+  stats: RollStats & Partial<AbilityStats>,
+  kind: SheetRollKind,
+  ability?: Ability,
+): CharacterRollSpec[] | null {
+  if (kind === "check" || kind === "save") {
+    if (!ability) return null;
+    const s = stats as AbilityStats;
+    const bonus = kind === "check" ? checkBonus(s, ability) : saveBonus(s, ability);
+    if (bonus === null) return null;
+    return [
+      {
+        expression: d20(bonus),
+        category: kind === "check" ? "ability-check" : "saving-throw",
+        label: `${ABILITY_NAMES[ability]} ${kind}`,
+        d20: true,
+      },
+    ];
+  }
   if (kind === "initiative") {
     return [
       { expression: d20(stats.initBonus), category: "initiative", label: "Initiative", d20: true },

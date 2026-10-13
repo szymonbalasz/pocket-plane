@@ -1,6 +1,9 @@
 // scenes-map boundary schemas (MAP §6, §8, §9; protocol §12, §13, §15): wire records, WS intent
 // payloads, REST bodies and signal data. One schema for server, fixtures and both clients.
+import { TokenShape } from "@shared/entities/schemas";
 import { z } from "zod";
+
+export { TokenShape };
 
 // ---------- record type names ----------
 
@@ -210,7 +213,10 @@ export const SetGridInput = z
 export type SetGridInput = z.input<typeof SetGridInput>;
 export const SetLockedInput = z.strictObject({ sceneId: Id, locked: z.boolean() });
 
-/** Never `size` (#120). Optional fields are for fixtures and the DM menu. */
+/**
+ * Never `size` or `speed` (#120, FR-MAP-36). Optional fields are for fixtures and the DM menu.
+ * `shape` absent → the definition's `tokenShape`, else `round` (FR-MAP-35).
+ */
 export const PlaceTokenInput = z.strictObject({
   sceneId: Id,
   definitionId: Id,
@@ -220,6 +226,7 @@ export const PlaceTokenInput = z.strictObject({
   imageAssetId: Id.nullable().optional(),
   ownerPlayerId: Id.nullable().optional(),
   hidden: z.boolean().optional(),
+  shape: TokenShape.optional(),
 });
 export type PlaceTokenInput = z.input<typeof PlaceTokenInput>;
 
@@ -231,6 +238,8 @@ export const UpdateTokenInput = z.strictObject({
   name: TokenName.optional(),
   imageAssetId: Id.nullable().optional(),
   ownerPlayerId: Id.nullable().optional(),
+  /** FR-MAP-35; never `size` or `speed`. */
+  shape: TokenShape.optional(),
 });
 export type UpdateTokenInput = z.input<typeof UpdateTokenInput>;
 

@@ -11,14 +11,13 @@ import {
   NotificationText,
   notificationVisibleTo,
   PAYLOAD_MAX_BYTES,
-  RESOLUTION_MAX_BYTES,
 } from "@shared/notifications/schemas";
 import { and, eq } from "drizzle-orm";
 import type { CommandEnv } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound, zodIssues } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { notification, notificationSeqNext, player } from "../../db/schema";
-import { buildKindMap, type NotificationKindDef } from "./kind";
+import { buildKindMap, type NotificationKindDef, resolutionCapOf } from "./kind";
 import { notificationKinds } from "./kinds";
 
 export const NOTIFICATION_TYPE = "notification";
@@ -239,8 +238,9 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
       if (!def?.resolution) throw invalid(`Kind "${before.kind}" takes no resolution`);
       const parsed = def.resolution.safeParse(resolution);
       if (!parsed.success) throw invalid("Invalid resolution", zodIssues(parsed.error));
-      if (jsonBytes(parsed.data) > RESOLUTION_MAX_BYTES) {
-        throw new Error(`resolveNotification: resolution exceeds ${RESOLUTION_MAX_BYTES} B`);
+      const cap = resolutionCapOf(def);
+      if (jsonBytes(parsed.data) > cap) {
+        throw new Error(`resolveNotification: resolution exceeds ${cap} B`);
       }
       stored = parsed.data;
     }

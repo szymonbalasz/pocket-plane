@@ -1,5 +1,7 @@
 // Drizzle schema. Shared file (AGENTS §9.9). Entities and rules: docs/data-model/README.md.
 // Timestamps are ISO-8601 UTC strings from ctx.clock.
+
+import { TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
 import { sql } from "drizzle-orm";
@@ -133,6 +135,8 @@ export const entity = sqliteTable(
     statBlock: text("stat_block", { mode: "json" }).notNull(),
     ownerPlayerId: text("owner_player_id").references((): AnySQLiteColumn => player.id),
     hpCurrent: integer("hp_current"),
+    /** Default shape for new tokens; null = round (FR-ENT-22). Values checked by zod. */
+    tokenShape: text("token_shape", { enum: TOKEN_SHAPES }),
     /** Plain id, no FK (informational). */
     derivedFromId: text("derived_from_id"),
     source: text("source"),
@@ -236,6 +240,10 @@ export const token = sqliteTable(
     row: integer("row").notNull(),
     ownerPlayerId: text("owner_player_id").references((): AnySQLiteColumn => player.id),
     hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+    /** Token-owned; from the definition's `tokenShape` at place (FR-MAP-35). */
+    shape: text("shape", { enum: TOKEN_SHAPES }).notNull().default("round"),
+    /** Display copy of `statBlock.speed`; players: own tokens only (FR-MAP-36). */
+    speed: integer("speed"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -365,7 +373,7 @@ export const notification = sqliteTable(
     actionRole: text("action_role", { enum: ROLE }),
     actionPlayerId: text("action_player_id").references((): AnySQLiteColumn => player.id),
     state: text("state", { enum: ["info", "pending", "resolved", "dismissed"] }).notNull(),
-    /** JSON leaf ≤ 256 B, per-kind zod. */
+    /** JSON leaf, per-kind zod; ≤ the kind's `resolutionMaxBytes` (default 256 B, FR-NOTE-03). */
     resolution: text("resolution", { mode: "json" }),
     closedAt: text("closed_at"),
     closedByRole: text("closed_by_role", { enum: ROLE }),
@@ -464,6 +472,8 @@ export const combatant = sqliteTable(
     /** Monsters only (PC HP lives on the character, #92). */
     hpCurrent: integer("hp_current"),
     hpMax: integer("hp_max"),
+    /** Movement used this turn, 0–9,999 (FR-CBT-39); reset on Next for the new turn combatant. */
+    movedFt: integer("moved_ft").notNull().default(0),
   },
   (t) => [uniqueIndex("combatant_seq").on(t.seq), index("combatant_encounter").on(t.encounterId)],
 );
