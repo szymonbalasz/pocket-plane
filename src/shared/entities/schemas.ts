@@ -40,6 +40,42 @@ export const Attack = z.strictObject({
 });
 export type Attack = z.infer<typeof Attack>;
 
+// ---------- abilities (FR-ENT-23) ----------
+
+export const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"] as const;
+export const Ability = z.enum(ABILITIES);
+export type Ability = z.infer<typeof Ability>;
+
+export const ABILITY_NAMES: Readonly<Record<Ability, string>> = {
+  str: "Strength",
+  dex: "Dexterity",
+  con: "Constitution",
+  int: "Intelligence",
+  wis: "Wisdom",
+  cha: "Charisma",
+};
+
+/** All six scores together, int 1–30. */
+export const Abilities = z.strictObject({
+  str: int(1, 30),
+  dex: int(1, 30),
+  con: int(1, 30),
+  int: int(1, 30),
+  wis: int(1, 30),
+  cha: int(1, 30),
+});
+export type Abilities = z.infer<typeof Abilities>;
+
+export const SaveProficiencies = z
+  .array(Ability)
+  .max(ABILITIES.length)
+  .refine((a) => new Set(a).size === a.length, { message: "Save proficiencies must be unique" });
+
+/** Walking speed in ft: 0–200, multiple of 5 (FR-ENT-21). */
+export const Speed = int(0, 200).refine((n) => n % 5 === 0, {
+  message: "Speed must be a multiple of 5",
+});
+
 const core = {
   size: Size,
   ac: int(0, 30),
@@ -47,7 +83,26 @@ const core = {
   initBonus: int(-10, 20),
   /** MVP: one weapon attack (ADR-0012). */
   attacks: z.array(Attack).max(1),
+  /** Absent = unknown: no movement indicator (FR-ENT-21). */
+  speed: Speed.optional(),
+  abilities: Abilities.optional(),
+  /** Absent = none; needs `abilities` (FR-ENT-23). */
+  saveProficiencies: SaveProficiencies.optional(),
 };
+
+/** FR-ENT-23: `saveProficiencies` without `abilities` → `invalid`. */
+function savesNeedAbilities(
+  s: { abilities?: Abilities; saveProficiencies?: Ability[] },
+  c: z.RefinementCtx,
+) {
+  if (s.saveProficiencies !== undefined && s.abilities === undefined) {
+    c.addIssue({
+      code: "custom",
+      path: ["saveProficiencies"],
+      message: "Save proficiencies need ability scores",
+    });
+  }
+}
 
 export const CR_VALUES = [
   "0",
@@ -58,15 +113,23 @@ export const CR_VALUES = [
 ] as const;
 export const Cr = z.enum(CR_VALUES as unknown as [string, ...string[]]);
 
-export const MonsterStatBlock = z.strictObject({ ...core, cr: Cr });
+export const MonsterStatBlock = z.strictObject({ ...core, cr: Cr }).superRefine(savesNeedAbilities);
 export type MonsterStatBlock = z.infer<typeof MonsterStatBlock>;
 
-export const CharacterStatBlock = z.strictObject({
-  ...core,
-  level: int(1, 20),
-  className: z.string().trim().max(40),
-});
+export const CharacterStatBlock = z
+  .strictObject({
+    ...core,
+    level: int(1, 20),
+    className: z.string().trim().max(40),
+  })
+  .superRefine(savesNeedAbilities);
 export type CharacterStatBlock = z.infer<typeof CharacterStatBlock>;
+
+// ---------- token shape (FR-ENT-22, FR-MAP-35) ----------
+
+export const TOKEN_SHAPES = ["round", "square", "none"] as const;
+export const TokenShape = z.enum(TOKEN_SHAPES);
+export type TokenShape = z.infer<typeof TokenShape>;
 
 // ---------- kind registry (FR-ENT-01) ----------
 
@@ -275,6 +338,39 @@ export const isReadOnlyDefinition = (d: { source?: string | null }) =>
  */
 export function effectiveStats<S extends StatBlock>(def: { statBlock: S }, _instance?: unknown): S {
   return def.statBlock;
+}
+
+// ---------- ability derivation (FR-ENT-24, ADR-0032): never stored ----------
+
+/** `floor((score − 10) / 2)`. */
+export const abilityMod = (score: number): number => Math.floor((score - 10) / 2);
+
+/** SRD proficiency bonus by CR: 0–4 +2, 5–8 +3, …, 29–30 +9 (fractions count as 0). */
+function crProficiency(cr: string): number {
+  const n = cr.includes("/") ? 0 : Number(cr);
+  return 2 + Math.floor(Math.max(n - 1, 0) / 4);
+}
+
+type DerivationStats = { abilities?: Abilities; saveProficiencies?: readonly Ability[] } & (
+  | { level: number }
+  | { cr: string }
+);
+
+/** Characters: 2 + floor((level − 1) / 4); monsters: the SRD CR table. */
+export function proficiencyBonus(stats: DerivationStats): number {
+  return "level" in stats ? 2 + Math.floor((stats.level - 1) / 4) : crProficiency(stats.cr);
+}
+
+/** Check bonus = the ability modifier; null without scores. */
+export function checkBonus(stats: DerivationStats, ability: Ability): number | null {
+  return stats.abilities ? abilityMod(stats.abilities[ability]) : null;
+}
+
+/** Save bonus = modifier + proficiency bonus if proficient; null without scores. */
+export function saveBonus(stats: DerivationStats, ability: Ability): number | null {
+  if (!stats.abilities) return null;
+  const prof = stats.saveProficiencies?.includes(ability) ? proficiencyBonus(stats) : 0;
+  return abilityMod(stats.abilities[ability]) + prof;
 }
 
 /**

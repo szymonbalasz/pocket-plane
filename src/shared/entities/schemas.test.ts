@@ -1,14 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import {
+  abilityMod,
   CharacterStatBlock,
   CR_VALUES,
   CreateEntityBody,
+  checkBonus,
   DAMAGE_RE,
   definitionOrder,
   EntityName,
   effectiveStats,
   kindRegistry,
   MonsterStatBlock,
+  proficiencyBonus,
+  saveBonus,
+  TokenShape,
   UpdateEntityBody,
   XP_BY_CR,
   xpForCr,
@@ -40,7 +45,7 @@ describe("entities schemas", () => {
     expect(Object.keys(kindRegistry).sort()).toEqual(["character", "monster"]);
     expect(MonsterStatBlock.safeParse(goblin).success).toBe(true);
     expect(CharacterStatBlock.safeParse(mira).success).toBe(true);
-    expect(paths(MonsterStatBlock.safeParse({ ...goblin, speed: 30 }))).toEqual([""]);
+    expect(paths(MonsterStatBlock.safeParse({ ...goblin, fly: 30 }))).toEqual([""]);
     const bad = MonsterStatBlock.safeParse({
       ...goblin,
       attacks: [{ ...goblin.attacks[0], x: 1 }],
@@ -145,5 +150,93 @@ describe("entities schemas", () => {
       { id: "m", name: "Elite Goblin Warrior", campaignId: "x" },
     ];
     expect([...rows].sort(definitionOrder).map((r) => r.id)).toEqual(["m", "a", "z", "b", "c"]);
+  });
+
+  test("FR-ENT-21 optional speed: int 0–200, multiple of 5, both kinds", () => {
+    const ok = (p: object) => MonsterStatBlock.safeParse({ ...goblin, ...p }).success;
+    expect(ok({ speed: 30 })).toBe(true);
+    expect(ok({ speed: 0 })).toBe(true);
+    expect(ok({ speed: 200 })).toBe(true);
+    expect(ok({ speed: 205 })).toBe(false);
+    expect(ok({ speed: 32 })).toBe(false);
+    expect(ok({ speed: -5 })).toBe(false);
+    expect(CharacterStatBlock.safeParse({ ...mira, speed: 25 }).success).toBe(true);
+  });
+
+  test("FR-ENT-22 token shape: round | square | none", () => {
+    for (const v of ["round", "square", "none"]) expect(TokenShape.safeParse(v).success).toBe(true);
+    expect(TokenShape.safeParse("hex").success).toBe(false);
+  });
+
+  test("FR-ENT-23 abilities all six (1–30), save proficiencies unique and need abilities", () => {
+    const abilities = { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 };
+    const ok = (p: object) => MonsterStatBlock.safeParse({ ...goblin, ...p }).success;
+    expect(ok({ abilities })).toBe(true);
+    expect(ok({ abilities, saveProficiencies: ["dex", "wis"] })).toBe(true);
+    expect(ok({ abilities, saveProficiencies: [] })).toBe(true);
+    expect(ok({ abilities: { ...abilities, cha: undefined } })).toBe(false);
+    expect(ok({ abilities: { ...abilities, str: 0 } })).toBe(false);
+    expect(ok({ abilities: { ...abilities, str: 31 } })).toBe(false);
+    expect(ok({ abilities: { ...abilities, luck: 10 } })).toBe(false);
+    expect(ok({ abilities, saveProficiencies: ["dex", "dex"] })).toBe(false);
+    expect(ok({ abilities, saveProficiencies: ["per"] })).toBe(false);
+    const noScores = MonsterStatBlock.safeParse({ ...goblin, saveProficiencies: ["dex"] });
+    expect(paths(noScores)).toEqual(["saveProficiencies"]);
+    expect(CharacterStatBlock.safeParse({ ...mira, saveProficiencies: ["str"] }).success).toBe(
+      false,
+    );
+  });
+
+  test("FR-ENT-24 abilityMod = floor((score − 10) / 2)", () => {
+    const cases: [number, number][] = [
+      [1, -5],
+      [8, -1],
+      [9, -1],
+      [10, 0],
+      [11, 0],
+      [12, 1],
+      [15, 2],
+      [20, 5],
+      [30, 10],
+    ];
+    for (const [score, mod] of cases) expect(abilityMod(score)).toBe(mod);
+  });
+
+  test("FR-ENT-24 proficiencyBonus: level for characters, SRD CR table for monsters", () => {
+    const pc = (level: number) => proficiencyBonus({ ...mira, level });
+    expect([1, 4, 5, 8, 9, 12, 13, 16, 17, 20].map(pc)).toEqual([2, 2, 3, 3, 4, 4, 5, 5, 6, 6]);
+    const cr = (c: string) => proficiencyBonus({ ...goblin, cr: c });
+    expect(["0", "1/8", "1/4", "1/2", "1", "4"].map(cr)).toEqual([2, 2, 2, 2, 2, 2]);
+    expect(["5", "8", "9", "12", "13", "16", "17", "20"].map(cr)).toEqual([3, 3, 4, 4, 5, 5, 6, 6]);
+    expect(["21", "24", "25", "28", "29", "30"].map(cr)).toEqual([7, 7, 8, 8, 9, 9]);
+  });
+
+  test("FR-ENT-24 checkBonus = mod; saveBonus = mod + PB if proficient; null without scores", () => {
+    const abilities = { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 };
+    const gob = MonsterStatBlock.parse({ ...goblin, abilities });
+    expect(checkBonus(gob, "dex")).toBe(2);
+    expect(checkBonus(gob, "str")).toBe(-1);
+    expect(saveBonus(gob, "dex")).toBe(2);
+    const elite = MonsterStatBlock.parse({
+      ...goblin,
+      cr: "1",
+      abilities,
+      saveProficiencies: ["dex"],
+    });
+    expect(saveBonus(elite, "dex")).toBe(4);
+    expect(saveBonus(elite, "wis")).toBe(-1);
+    expect(checkBonus(elite, "dex")).toBe(2);
+    const pc = CharacterStatBlock.parse({
+      ...mira,
+      level: 5,
+      abilities: { ...abilities, str: 16 },
+      saveProficiencies: ["str", "con"],
+    });
+    expect(saveBonus(pc, "str")).toBe(6);
+    expect(saveBonus(pc, "con")).toBe(3);
+    expect(saveBonus(pc, "dex")).toBe(2);
+    const bare = MonsterStatBlock.parse(goblin);
+    expect(checkBonus(bare, "dex")).toBeNull();
+    expect(saveBonus(bare, "dex")).toBeNull();
   });
 });
