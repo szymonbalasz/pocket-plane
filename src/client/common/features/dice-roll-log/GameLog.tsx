@@ -417,8 +417,9 @@ export function GameLog({ dmTools }: { dmTools?: ReactNode }) {
       data-testid="dice-log"
       aria-label="Game log"
       // min-h-full, not h-full: with Physical dice on (banner + roll bar) the body grows past
-      // the window and scrolls, entries first (FR-SHELL-28).
-      className="flex min-h-full flex-col gap-2"
+      // the window and scrolls, entries first (FR-SHELL-28). No scroll anchoring: toggling the
+      // banner would otherwise scroll the body to keep the roll bar put, hiding the entries.
+      className="flex min-h-full flex-col gap-2 [overflow-anchor:none]"
     >
       <PhysicalBanner />
       {!everLive ? (
