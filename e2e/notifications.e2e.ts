@@ -53,3 +53,37 @@ test("FR-NOTE-13 FR-NOTE-16 FR-NOTE-17 FR-NOTE-22 pending to player-1 → toast 
   await player.context().close();
   await dm.context().close();
 });
+
+test("FR-NOTE-14 FR-NOTE-15 DM reconnect: the sticky toast stays and the summary toast comes back", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  const status = dm.getByTestId("sync-connection-status");
+  await expect(status).toHaveAttribute("data-state", "live");
+  const summary = dm.getByTestId("note-toast-pending-summary");
+  await expect(summary).toBeVisible();
+  const before = Number(await summary.getAttribute("data-count"));
+  await summary.getByTestId("note-toast-close").click();
+  await expect(summary).toHaveCount(0);
+
+  const win = await openWindow(dm, "note.history");
+  await win.getByTestId("note-test-text").fill("Reconnect card");
+  await win.getByTestId("note-test-audience").selectOption("dm");
+  await win.getByTestId("note-test-owner").selectOption("dm");
+  await win.getByTestId("note-test-label").fill("Apply");
+  await win.getByTestId("note-test-send").click();
+  const card = dm.getByTestId("note-toast").filter({ hasText: "Reconnect card" });
+  await expect(card).toHaveAttribute("data-sticky", "true");
+
+  const probes = await openWindow(dm, "sync.probes");
+  await probes.getByTestId("sync-drop-connection").click();
+  await expect(status).not.toHaveAttribute("data-state", "live");
+  await expect(status).toHaveAttribute("data-state", "live");
+  await expect(card).toBeVisible();
+  await expect(summary).toHaveAttribute("data-count", String(before + 1));
+  await expect(dm.getByTestId("note-toast")).toHaveCount(1); // no per-item toasts replayed
+
+  await dm.context().close();
+});

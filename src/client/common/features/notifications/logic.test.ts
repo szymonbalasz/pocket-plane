@@ -28,6 +28,8 @@ import {
   setHidden,
   setHovered,
   setSummary,
+  syncToasts,
+  type ToastMemory,
   visibleToasts,
 } from "./toasts";
 
@@ -153,6 +155,61 @@ describe("summary (FR-NOTE-15)", () => {
     expect(summaryCount("connect", store(P2, rows, 0))).toBe(0);
     expect(summaryText(1)).toBe("1 pending action");
     expect(summaryText(3)).toBe("3 pending actions");
+  });
+});
+
+describe("reconnect and reload (FR-NOTE-14/15, NOTE §11)", () => {
+  // What the runtime does per sync change, over the page's toast memory.
+  const step = (m: ToastMemory, prev: SyncView | null, next: SyncView, now = 0) =>
+    syncToasts(m, prev, next, classify(prev, next), now);
+  const fresh = (): ToastMemory => ({ toasts: initialToasts(0), campaignId: null });
+  const shown = (m: ToastMemory) =>
+    m.toasts.toasts.map((t) => (t.kind === "summary" ? `summary:${t.count}` : t.key));
+
+  // DM live with a damage card that arrived by event → sticky toast.
+  const other = note();
+  const card = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
+  const before = view(store(DM, [other], 4));
+  const withCard = view(store(DM, [other, card], 5));
+  const live = () => step(step(fresh(), null, before), before, withCard);
+
+  test("FR-NOTE-15 FR-NOTE-14 reconnect (server restart): the card toast stays, one summary toast", () => {
+    const m = live();
+    expect(shown(m)).toEqual([card.id]);
+    const down = view(withCard.store, "reconnecting");
+    const back = view(store(DM, [other, card], 0));
+    const after = step(step(m, withCard, down), down, back);
+    expect(shown(after)).toEqual([card.id, `summary:1`]);
+    // Players rejoining (presence events) change nothing.
+    const presence = view({ ...back.store, seq: 1 });
+    expect(shown(step(after, back, presence))).toEqual([card.id, "summary:1"]);
+  });
+
+  test("FR-NOTE-15 runtime mounted after events followed the snapshot: still a connect + summary", () => {
+    const m = step(fresh(), null, view(store(DM, [other, card], 3)));
+    expect(shown(m)).toEqual(["summary:1"]);
+    expect(m.campaignId).toBe("c1");
+  });
+
+  test("FR-NOTE-14 remount on a fresh connection (DM retry after a throttled 4401) keeps the card toast", () => {
+    // Same page memory, new sync store: the runtime's first look is `prev` null.
+    const m = step(live(), null, view(store(DM, [other, card], 2)));
+    expect(shown(m)).toEqual([card.id, "summary:1"]);
+  });
+
+  test("FR-NOTE-13 FR-NOTE-15 reload: no per-item toast, only the summary; card still reachable", () => {
+    const m = step(fresh(), null, view(store(DM, [other, card], 0)));
+    expect(shown(m)).toEqual(["summary:1"]);
+    expect(historySections(store(DM, [other, card])).pending.map((n) => n.id)).toEqual([card.id]);
+  });
+
+  test("FR-NOTE-15 no summary on a resync while live; a campaign switch clears the stack", () => {
+    const m = live();
+    expect(shown(step(m, withCard, view(store(DM, [other, card], 0))))).toEqual([card.id]);
+    const switched = view(store({ ...DM, campaignId: "c2" }, [], 0));
+    const after = step(m, withCard, switched);
+    expect(shown(after)).toEqual([]);
+    expect(after.campaignId).toBe("c2");
   });
 });
 

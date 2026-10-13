@@ -37,7 +37,8 @@ export function maxSeq(store: RecordStore): number {
 /**
  * One sync change, classified (FR-NOTE-13/15):
  * - `connect`: the first snapshot of a page load or a (re)connection (state was not `live`, or
- *   the campaign changed);
+ *   the campaign changed); also the runtime's first look (`prev` null) at a store, even if
+ *   events already followed the snapshot before it mounted;
  * - `resync`: a snapshot while `live` (scene switch, gap);
  * - `event`: one `event` frame applied (store `seq` + 1);
  * - null: no store change.
@@ -45,16 +46,14 @@ export function maxSeq(store: RecordStore): number {
 export type Transition = "connect" | "resync" | "event" | null;
 
 export function classify(prev: SyncView | null, next: SyncView): Transition {
-  if (prev !== null && next.store === prev.store) return null;
   if (!next.store.you) return null;
+  if (prev === null) return "connect";
+  if (next.store === prev.store) return null;
   if (next.store.seq === 0) {
-    const same =
-      prev !== null &&
-      prev.state === "live" &&
-      prev.store.you?.campaignId === next.store.you.campaignId;
+    const same = prev.state === "live" && prev.store.you?.campaignId === next.store.you.campaignId;
     return same ? "resync" : "connect";
   }
-  if (prev !== null && next.store.seq === prev.store.seq + 1) return "event";
+  if (next.store.seq === prev.store.seq + 1) return "event";
   return null;
 }
 
