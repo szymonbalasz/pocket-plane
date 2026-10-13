@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { creatureRows } from "../entities/list";
 import { useDmMap, viewedScene } from "../scenes-map/view-state";
 import { useDefinitions } from "./data";
+import { useOpenEncounter } from "./open-encounter";
 import { combatRest } from "./rest";
 
 interface Draft {
@@ -548,7 +549,8 @@ function EncountersBody() {
   const encounters = useRecords<EncounterRecord>(ENCOUNTER_TYPE);
   const everLive = useSync((s) => s.everLive);
   const live = useSync((s) => s.state === "live");
-  const [selected, setSelected] = useState<string | null>(null);
+  // Survives reloads and close / reopen (browser-local, per campaign).
+  const [selected, setSelected] = useOpenEncounter();
   const sorted = useMemo(
     () =>
       [...encounters].sort(
