@@ -1,6 +1,7 @@
 // e2e-bundle: notifications
 // FR-SHELL-01: one toast region per client. An alert Toast and a notification toast shown at the
-// same time stack in the region; neither covers the other (DM top-centre, player bottom-right).
+// same time stack in the region; neither covers the other (DM top-centre, player bottom-right);
+// both share one toast surface (#159).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
@@ -10,6 +11,13 @@ async function rect(l: Locator) {
   if (!b) throw new Error("not visible");
   return b;
 }
+
+/** Background, border, text colour, radius: the toast surface. */
+const surface = (l: Locator) =>
+  l.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return [s.backgroundColor, s.borderColor, s.color, s.borderRadius];
+  });
 
 /** Alert while the pending summary toast is up: both fully visible, no overlap. */
 async function alertBesideNotification(page: Page) {
@@ -27,6 +35,7 @@ async function alertBesideNotification(page: Page) {
   const n = await rect(note);
   const apart = a.y >= n.y + n.height || n.y >= a.y + a.height;
   expect(apart, `alert ${JSON.stringify(a)} overlaps note ${JSON.stringify(n)}`).toBe(true);
+  expect(await surface(alert)).toEqual(await surface(note));
   return { a, n };
 }
 
