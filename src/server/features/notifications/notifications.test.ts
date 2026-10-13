@@ -50,7 +50,14 @@ const wideKind = defineNotificationKind({
   resolution: z.object({ note: z.string() }).strict(),
   resolutionMaxBytes: 2048,
 });
-const h = createNotificationHelpers([testKind, bigKind, cardKind, wideKind]);
+// Per-kind payload cap above the 1 KB default (FR-NOTE-03, #163: damage-card declares 4 KB).
+const widePayloadKind = defineNotificationKind({
+  kind: "wide-payload",
+  ownerSpec: "test",
+  payload: z.object({ blob: z.string() }).strict(),
+  payloadMaxBytes: 2048,
+});
+const h = createNotificationHelpers([testKind, bigKind, cardKind, wideKind, widePayloadKind]);
 
 function setup(opts: { testMode?: boolean } = {}) {
   const s = createTestServices({ testMode: opts.testMode ?? true });
@@ -404,6 +411,20 @@ describe("state machine and resolve (FR-NOTE-07/08/09/10/11)", () => {
     const bad = (resolutionMaxBytes: number) => buildKindMap([{ ...wideKind, resolutionMaxBytes }]);
     expect(() => bad(0)).toThrow(/resolutionMaxBytes/);
     expect(() => bad(1.5)).toThrow(/resolutionMaxBytes/);
+  });
+
+  test("FR-NOTE-03 per-kind payloadMaxBytes: over 1 KB allowed up to the kind's cap", () => {
+    const t = setup();
+    const base = { kind: "wide-payload", audience: "dm" as const, text: "w" };
+    const note = (n: number) =>
+      codeOf(() => t.notifyAs(t.dm, { ...base, payload: { blob: "é".repeat(n) } }));
+    expect(note(1000)).toBe("ok"); // 2,011 B
+    expect(note(1020)).toBe("internal"); // 2,051 B
+    expect(t.s.db.select().from(notification).all()).toHaveLength(1);
+    const bad = (payloadMaxBytes: number) =>
+      buildKindMap([{ ...widePayloadKind, payloadMaxBytes }]);
+    expect(() => bad(0)).toThrow(/payloadMaxBytes/);
+    expect(() => bad(-1)).toThrow(/payloadMaxBytes/);
   });
 
   test("FR-NOTE-08 player action owner may resolve; DM may resolve any pending", () => {

@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { parseExpression, prepareExpression } from "@shared/dice-roll-log/grammar";
+import { LABEL_MAX, RollLabel } from "@shared/dice-roll-log/schemas";
 import {
   abilityBlock,
   attackLine,
   characterRolls,
   clampHp,
   eligibleCharacters,
+  fitLabel,
   hpState,
   initials,
   isDown,
@@ -49,6 +51,21 @@ describe("FR-CHAR-05 characterRolls", () => {
       { expression: "1d4-1", category: "damage", label: "Club damage", d20: false },
     ]);
     expect(characterRolls({ initBonus: 2, attacks: [] }, "attack")).toBeNull();
+  });
+
+  test("FR-CHAR-08 labels fit LABEL_MAX: 40-char attack name + bludgeoning is cut with …", () => {
+    const name = "A".repeat(40);
+    const club = {
+      initBonus: 0,
+      attacks: [{ name, toHit: 0, damage: "1d4", damageType: "bludgeoning" as const }],
+    };
+    const [hit, dmg] = characterRolls(club, "attack") ?? [];
+    expect(hit?.label).toBe(`${name} attack`);
+    expect(dmg?.label).toHaveLength(LABEL_MAX);
+    expect(dmg?.label).toBe(`${name} damage (bludgeonin…`);
+    expect(RollLabel.safeParse(dmg?.label).success).toBe(true);
+    expect(fitLabel(`${"x".repeat(58)}\u{1F600}yy`)).toBe(`${"x".repeat(58)}…`);
+    expect(fitLabel("Club damage")).toBe("Club damage");
   });
 
   test("FR-CHAR-06 every built expression parses; mode applies to the d20 only", () => {

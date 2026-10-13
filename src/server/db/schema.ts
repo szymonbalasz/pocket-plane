@@ -367,7 +367,7 @@ export const notification = sqliteTable(
     audience: text("audience", { enum: ["dm", "player", "all"] }).notNull(),
     audiencePlayerId: text("audience_player_id").references((): AnySQLiteColumn => player.id),
     text: text("text").notNull(),
-    /** JSON leaf ≤ 1 KB, per-kind zod. */
+    /** JSON leaf, per-kind zod; ≤ the kind's `payloadMaxBytes` (default 1 KB, FR-NOTE-03). */
     payload: text("payload", { mode: "json" }).notNull(),
     actionLabel: text("action_label"),
     actionRole: text("action_role", { enum: ROLE }),
