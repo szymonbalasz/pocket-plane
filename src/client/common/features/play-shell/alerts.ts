@@ -180,17 +180,3 @@ export function flashAnimation(reducedMotion: boolean): {
 /** FR-SHELL-27: `data-test-last-sound` on `ui-topbar`, test mode only. */
 export const testSoundAttr = (testMode: boolean, lastSound: string) =>
   testMode ? { "data-test-last-sound": lastSound } : {};
-
-/**
- * The client's toast region (FR-SHELL-01, #153): players bottom-right; the DM top-centre below
- * the top bar, clear of the right-edge Initiative rows. `top` is px below the viewport top.
- */
-export function toastRegion(
-  client: "dm" | "player",
-  topBarH: number,
-  gap: number,
-): { position: "top-center" | "bottom-right"; top?: number } {
-  return client === "dm"
-    ? { position: "top-center", top: topBarH + gap }
-    : { position: "bottom-right" };
-}

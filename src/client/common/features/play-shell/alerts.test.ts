@@ -6,7 +6,6 @@ import {
   type ShellAlert,
   speakerState,
   testSoundAttr,
-  toastRegion,
 } from "./alerts";
 import { type AudioContextLike, createAudioEngine } from "./audio";
 import {
@@ -245,11 +244,6 @@ describe("alerts", () => {
       "data-test-last-sound": "ping:played:1",
     });
     expect(testSoundAttr(false, "ping:played:1")).toEqual({});
-  });
-
-  test("FR-SHELL-01 toast region: DM top-centre below the top bar, player bottom-right", () => {
-    expect(toastRegion("dm", 48, 12)).toEqual({ position: "top-center", top: 60 });
-    expect(toastRegion("player", 48, 12)).toEqual({ position: "bottom-right" });
   });
 });
 

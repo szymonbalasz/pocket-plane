@@ -4,7 +4,7 @@
 // portalled, FR-SHELL-22).
 import { useEffect, useRef, useState } from "react";
 import { ConnectionIndicator, ReconnectBanner } from "../live-sync/ConnectionStatus";
-import { AlertFlash, AlertToaster, SoundControl } from "./AlertLayer";
+import { AlertFlash, SoundControl } from "./AlertLayer";
 import { testSoundAttr } from "./alerts";
 import { TOP_BAR_H } from "./geometry";
 import { useBaseKeyDown, useViewport } from "./hooks";
@@ -140,7 +140,6 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
         <ReconnectBanner />
       </div>
 
-      <AlertToaster client={client} />
       <AlertFlash />
     </div>
   );

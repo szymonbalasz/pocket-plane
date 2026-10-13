@@ -1,32 +1,14 @@
-// Alert UI (FR-SHELL-22–25): the flash overlay, the alert toaster in the client's toast region
-// and the player's top-bar speaker control. State lives in the alert controller (ShellContext).
+// Alert UI (FR-SHELL-22–25): the flash overlay and the player's top-bar speaker control. Alert
+// Toasts go to the client's one Toaster (ShellToaster). State lives in the alert controller (ShellContext).
 import { Volume2Icon, VolumeOffIcon, VolumeXIcon } from "lucide-react";
 import { useId, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Toaster } from "sonner";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger, Slider, Switch } from "../../components/ui/menus";
 import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
-import { ALERT_TOASTER_ID } from "./alert-toast";
-import { flashAnimation, speakerState, toastRegion } from "./alerts";
-import { EDGE_GAP, TOP_BAR_H } from "./geometry";
-import type { ShellClient } from "./registry";
+import { flashAnimation, speakerState } from "./alerts";
 import { useAlertController, useAlertState } from "./ShellContext";
-
-/** The alert toaster, placed in the client's toast region (FR-SHELL-01). */
-export function AlertToaster({ client }: { client: ShellClient }) {
-  const region = toastRegion(client, TOP_BAR_H, EDGE_GAP);
-  return (
-    <Toaster
-      id={ALERT_TOASTER_ID}
-      theme="dark"
-      position={region.position}
-      offset={region.top === undefined ? undefined : { top: region.top }}
-      containerAriaLabel="Alerts"
-    />
-  );
-}
 
 const prefersReducedMotion = () =>
   typeof window.matchMedia === "function" &&
