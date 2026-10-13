@@ -41,6 +41,7 @@ import {
   TOKENS_PER_SCENE_MAX,
   TokenIdInput,
   type TokenRecord,
+  type TokenShape,
   type TokenSize,
   UpdateTokenInput,
 } from "@shared/scenes-map/schemas";
@@ -50,6 +51,7 @@ import { type CommandEnv, defineCommand, IdSchema } from "../../commands/command
 import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import {
+  entity,
   player,
   scene,
   sceneFolder,
@@ -486,10 +488,21 @@ function insertToken(
 
 const namesOn = (tx: Tx, sceneId: string) => sceneTokens(tx, sceneId).map((t) => t.name);
 
+/** FR-MAP-35: the definition's `tokenShape` (null = round); imported rows have none. */
+function definitionShape(tx: Tx, definitionId: string): TokenShape {
+  const r = tx
+    .select({ tokenShape: entity.tokenShape })
+    .from(entity)
+    .where(eq(entity.id, definitionId))
+    .get();
+  return r?.tokenShape ?? "round";
+}
+
 /**
  * FR-MAP-13: name = definition name, numbered (FR-MAP-16); image = portrait or none; size =
- * `statBlock.size`; owner = the character's owner, else none; visible. Optional overrides
- * (fixtures) for name, image, owner, hidden; never size.
+ * `statBlock.size`; shape = definition `tokenShape`, else round (FR-MAP-35); speed =
+ * `statBlock.speed`, else null (FR-MAP-36); owner = the character's owner, else none; visible.
+ * Optional overrides (fixtures) for name, image, owner, hidden, shape; never size or speed.
  */
 export const placeToken = defineCommand({
   name: MAP_INTENTS.placeToken,
@@ -518,6 +531,8 @@ export const placeToken = defineCommand({
       name: numberedName(input.name ?? def.name, namesOn(tx, s.id)),
       imageAssetId,
       size,
+      shape: input.shape ?? definitionShape(tx, def.id),
+      speed: def.statBlock.speed ?? null,
       col: input.col,
       row: input.row,
       ownerPlayerId,
@@ -536,42 +551,49 @@ export const placeToken = defineCommand({
 /**
  * FR-MAP-21: a player moves a token iff they own it, it is not hidden and on the active scene.
  * A token the player can't see answers `not_found` (as unknown); visible but not theirs →
- * `forbidden`. DM moves any token on any scene.
+ * `forbidden`. DM moves any token on any scene. FR-MAP-38 (ADR-0031): runs the token-changed
+ * hooks in the same transaction, possibly as a player actor; their rows ride on the unlogged
+ * `TokenMoved`. Hooks never reject a move; a throw rolls it back (`internal`).
  */
-export const moveToken = defineCommand({
-  name: MAP_INTENTS.moveToken,
-  input: MoveTokenInput,
-  roles: ["dm", "player"],
-  authorize({ tokenId }, { tx, actor }) {
-    if (actor.role !== "player") return;
-    const cid = campaignOf(actor);
-    const t = getToken(tx, cid, tokenId);
-    const active = activeSceneOf(tx, cid);
-    if (t.hidden || active?.id !== t.sceneId) throw notFound("Token not found");
-    if (t.ownerPlayerId === null || t.ownerPlayerId !== actor.playerId) {
-      throw forbidden("Not your token");
-    }
-  },
-  execute({ tokenId, col, row }, { tx, ctx, actor, emit }): void {
-    const cid = campaignOf(actor);
-    const before = getToken(tx, cid, tokenId);
-    const s = findScene(tx, cid, before.sceneId) as SceneRecord;
-    assertOnMap(s, col, row, before.size);
-    tx.update(token)
-      .set({ col, row, updatedAt: ctx.clock.iso() })
-      .where(eq(token.id, tokenId))
-      .run();
-    const after = readToken(tx, tokenId);
-    emit({
-      type: TokenMoved.type,
-      campaignId: cid,
-      payload: { tokenId, sceneId: before.sceneId, col, row },
-      changes: [tokenChange(before, after)],
-    });
-  },
-});
+export function moveTokenCommand(hooks: TokenHooks) {
+  return defineCommand({
+    name: MAP_INTENTS.moveToken,
+    input: MoveTokenInput,
+    roles: ["dm", "player"],
+    authorize({ tokenId }, { tx, actor }) {
+      if (actor.role !== "player") return;
+      const cid = campaignOf(actor);
+      const t = getToken(tx, cid, tokenId);
+      const active = activeSceneOf(tx, cid);
+      if (t.hidden || active?.id !== t.sceneId) throw notFound("Token not found");
+      if (t.ownerPlayerId === null || t.ownerPlayerId !== actor.playerId) {
+        throw forbidden("Not your token");
+      }
+    },
+    execute({ tokenId, col, row }, env): void {
+      const { tx, ctx, actor, emit } = env;
+      const cid = campaignOf(actor);
+      const before = getToken(tx, cid, tokenId);
+      const s = findScene(tx, cid, before.sceneId) as SceneRecord;
+      assertOnMap(s, col, row, before.size);
+      tx.update(token)
+        .set({ col, row, updatedAt: ctx.clock.iso() })
+        .where(eq(token.id, tokenId))
+        .run();
+      const after = readToken(tx, tokenId);
+      const hookChanges = hooks.run({ tx, ctx, actor }, before, after);
+      emit({
+        type: TokenMoved.type,
+        campaignId: cid,
+        payload: { tokenId, sceneId: before.sceneId, col, row },
+        changes: [tokenChange(before, after), ...hookChanges],
+      });
+    },
+  });
+}
 
-/** FR-MAP-18: rename, image (custom art), owner; never size. Runs token-changed hooks. */
+/** FR-MAP-18: rename, image (custom art), shape (FR-MAP-35), owner; never size or speed. Runs
+ * token-changed hooks. */
 export function updateTokenCommand(hooks: TokenHooks) {
   return defineCommand({
     name: MAP_INTENTS.updateToken,
@@ -587,6 +609,7 @@ export function updateTokenCommand(hooks: TokenHooks) {
         if (input.ownerPlayerId !== null) assertOwner(tx, cid, input.ownerPlayerId);
         set.ownerPlayerId = input.ownerPlayerId;
       }
+      if (input.shape !== undefined) set.shape = input.shape;
       tx.update(token)
         .set({ ...set, updatedAt: ctx.clock.iso() })
         .where(eq(token.id, before.id))
@@ -630,7 +653,7 @@ export function setTokenHiddenCommand(hooks: TokenHooks) {
 }
 
 /**
- * FR-MAP-17: same definition, image, size, owner, hidden flag; numbered name; at
+ * FR-MAP-17: same definition, image, size, shape, speed, owner, hidden flag; numbered name; at
  * `col + footprint` same row if valid, else `col − footprint`, else the source cell.
  */
 export const duplicateToken = defineCommand({
@@ -651,6 +674,8 @@ export const duplicateToken = defineCommand({
       name: numberedName(src.name, namesOn(tx, s.id)),
       imageAssetId: assetOrNull(env, src.imageAssetId),
       size: src.size,
+      shape: src.shape,
+      speed: src.speed,
       col: cell.col,
       row: cell.row,
       ownerPlayerId: src.ownerPlayerId,

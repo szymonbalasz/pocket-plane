@@ -436,9 +436,8 @@ describe("scenes-map commands", () => {
       expect(t.lastEvent()?.changes.map((c) => c.type)).toEqual(["token", "probe-row"]);
       t.run(I.setTokenHidden, { tokenId: g.id, hidden: true });
       expect(t.lastEvent()?.changes.at(-1)?.id).toBe(`for-${g.id}`);
-      // Move, place, duplicate run none.
+      // Place and duplicate run none; moves do (FR-MAP-38, feedback.test.ts).
       const before = calls.length;
-      t.run(I.moveToken, { tokenId: g.id, col: 2, row: 2 });
       const p = t.place(other.id, t.h.wolfId, 1, 1);
       const p2 = t.place(other.id, t.h.goblinId, 3, 3);
       t.run(I.duplicateToken, { tokenId: p.id });

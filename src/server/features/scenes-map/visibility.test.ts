@@ -47,6 +47,8 @@ const token = (
   row: 0,
   ownerPlayerId: owner,
   hidden,
+  shape: "round",
+  speed: 30,
   createdAt: "t",
   updatedAt: "t",
 });
@@ -167,6 +169,23 @@ describe("FR-MAP-26 visibility matrix", () => {
       expect(r.view("token", hiddenOwned, p).vis).toBe("hidden");
       expect(r.view("token", offScene, p).vis).toBe("hidden");
     }
+  });
+
+  test("FR-MAP-36 token speed: DM always; a player only on own tokens", () => {
+    const r = registry("s1");
+    const mira = token("mira", "s1", false, "p1");
+    const goblin = token("goblin", "s1", false, null);
+    expect(r.view("token", mira, dm).data).toMatchObject({ speed: 30, shape: "round" });
+    expect(r.view("token", goblin, dm).data).toMatchObject({ speed: 30 });
+    expect(r.view("token", mira, owner).data).toMatchObject({ speed: 30, shape: "round" });
+    expect(r.view("token", mira, other).data).not.toHaveProperty("speed");
+    expect(r.view("token", mira, other).data).toMatchObject({ shape: "round" });
+    expect(r.view("token", goblin, owner).data).not.toHaveProperty("speed");
+    // Owner reassigned → the new owner gains `speed` with the upsert, the old one loses it.
+    const moved = { ...mira, ownerPlayerId: "p2" };
+    const c = { type: "token", id: "mira", before: mira, after: moved };
+    expect(r.filterChange(c, other)).toMatchObject({ op: "upsert", data: { speed: 30 } });
+    expect((r.filterChange(c, owner) as { data: object }).data).not.toHaveProperty("speed");
   });
 
   test("FR-MAP-19 hide → delete, reveal → upsert for players (transition matrix)", () => {

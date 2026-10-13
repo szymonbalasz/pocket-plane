@@ -125,6 +125,24 @@ describe("scenes-map over REST + WS (scenes bundle)", () => {
     for (const c of [dm, p1]) c.close();
   });
 
+  test("FR-MAP-36 leak property: a player's tokens carry `speed` only where they own them", async () => {
+    const dm = await h.live(dmCred());
+    const p1 = await h.live(p1Cred());
+    const p2 = await h.live(p2Cred());
+    const ogre = (Object.values(dm.store.records.token ?? {}) as Record<string, unknown>[]).find(
+      (t) => t.name === "Cave Ogre",
+    );
+    expect(ogre).toMatchObject({ speed: 40, shape: "none", size: "large" });
+    for (const c of [p1, p2]) {
+      const me = c.store.you?.playerId;
+      const seen = Object.values(c.store.records.token ?? {}) as Record<string, unknown>[];
+      expect(seen.length).toBeGreaterThan(0);
+      for (const t of seen) expect("speed" in t).toBe(t.ownerPlayerId === me);
+      for (const t of seen) expect(t).toHaveProperty("shape");
+    }
+    for (const c of [dm, p1, p2]) c.close();
+  });
+
   test("FR-MAP-15 / -21 move: P1 moves Mira (others see it ≤ 1 s); P2 → forbidden; hidden → not_found", async () => {
     const dm = await h.live(dmCred());
     const p1 = await h.live(p1Cred());

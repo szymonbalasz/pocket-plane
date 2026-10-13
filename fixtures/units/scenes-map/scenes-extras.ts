@@ -12,7 +12,8 @@ import { wolf } from "../../srd/monster/wolf";
 
 /**
  * MAP §13 `scenes-extras`: folder "Act 1" holding Town + Goblin Ambush; Thorn on both; custom
- * "Cave Ogre" (wolf block, large) on Goblin Ambush (9, 10), visible; root scene "Cellar"
+ * "Cave Ogre" (wolf block, large, speed 40, shape none) on Goblin Ambush (9, 10), visible; root
+ * scene "Cellar"
  * (`map-large`, cell 50, offset 25/10, #ffffff 0.3, locked) with a Goblin at (40, 27).
  * Records: scene-folder 0; entity 0 = Cave Ogre; scene 0 = Cellar.
  */
@@ -46,13 +47,16 @@ export default defineFixture({
     step(createEntity, {
       kind: "monster",
       name: "Cave Ogre",
-      statBlock: { ...wolf.statBlock, size: "large" },
+      statBlock: { ...wolf.statBlock, size: "large", speed: 40 },
     }),
     step(placeToken, (r) => ({
       sceneId: r.id("battlemap", "scene"),
       definitionId: r.id("scenes-extras", "entity"),
       col: 9,
       row: 10,
+      // FR-MAP-35: shape none. Moves to the definition (`tokenShape: "none"` on the create step)
+      // once entities' create accepts `tokenShape` (build/entities-feedback).
+      shape: "none" as const,
     })),
     step(createScene, (r) => ({ name: "Cellar", mapAssetId: r.id("image-large", "asset") })),
     step(setGrid, (r) => ({

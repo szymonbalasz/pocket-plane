@@ -1,11 +1,15 @@
 // Token-changed hooks (FR-MAP-30, ADR-0028, protocol §25). APPEND-ONLY (AGENTS §9.9): a feature
 // adds one import and one line to `tokenChangedHooks`; nothing else changes here.
 //
-// A hook runs inside `map.updateToken`, `map.setTokenHidden`, `map.deleteToken` and scene delete
-// (once per token) with `(env, before, after | null)`; `after` is null on delete. It returns the
-// rows it changed; every one is listed in the token event's `changes`. A throw (e.g. a
-// `conflict` for a token bound to a running encounter) rolls the whole command back. Hooks write
-// through `env.tx` only and never emit. Moves, placement and duplicate run no hooks.
+// A hook runs inside `map.updateToken`, `map.setTokenHidden`, `map.deleteToken`, scene delete
+// (once per token) and `map.moveToken` (FR-MAP-38, ADR-0031) with `(env, before, after | null)`;
+// `after` is null on delete. It returns the rows it changed; every one is listed in the token
+// event's `changes`. A throw (e.g. a `conflict` for a token bound to a running encounter) rolls
+// the whole command back. Hooks write through `env.tx` only and never emit. Placement and
+// duplicate run no hooks.
+// On a move (`before.col/row ≠ after.col/row`) the actor may be a **player** on an optimistic
+// intent: a hook must not assume a DM actor and must never reject a move (indicators never
+// block, #145); a throw there answers `internal` and the move rolls back.
 import type { TokenRecord } from "@shared/scenes-map/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
