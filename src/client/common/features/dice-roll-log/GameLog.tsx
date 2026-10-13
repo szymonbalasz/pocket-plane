@@ -28,7 +28,7 @@ import { usePhysicalDice } from "./physical";
 import { RollButton, useRollControl } from "./roll-control";
 
 const SELECT =
-  "h-8 min-w-0 rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
+  "h-7 min-w-0 shrink-0 rounded-md border border-input bg-background px-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 
 function Segment({ s }: { s: LineSegment }) {
   switch (s.style) {
@@ -139,9 +139,10 @@ function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boole
   };
 
   return (
-    // FR-SHELL-28 (#153): never shorter than 3 entries; the scroller fills the box absolutely
-    // so the list only grows into free space and the rest of the body (roll bar) scrolls.
-    <div className="relative min-h-20 flex-1">
+    // The list takes the space above the pinned roll bar and scrolls on its own; the scroller
+    // fills the box absolutely so long entries never push the roll bar out. FR-SHELL-28: the
+    // compact roll bar leaves ≥ 3 entries at every default size (e2e).
+    <div className="relative min-h-10 flex-1">
       <div
         ref={ref}
         data-testid="dice-log-list"
@@ -195,7 +196,6 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const live = useSync((s) => s.state === "live");
   const connection = useSync((s) => s.connection);
   const entities = useRecords<EntityRecord>(ENTITY_TYPE);
-  const [physical, setPhysical] = usePhysicalDice();
   const [expression, setExpression] = useState("");
   const [label, setLabel] = useState("");
   const [category, setCategory] = useState<RollCategory>("other");
@@ -239,10 +239,13 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const disabled = !live || busy;
   const shownError = error ?? control.error;
 
+  // Compact, pinned footer (FR-DICE-22): expression + mode + Roll, then category / actor /
+  // label (+ DM public, gear), then the physical-dice row. Short enough that the DM's 240 px
+  // default still shows ≥ 3 entries above it (FR-SHELL-28).
   return (
-    <div className="flex shrink-0 flex-col gap-1.5 border-t pt-2">
+    <div className="flex shrink-0 flex-col gap-1.5 border-t pt-1.5">
       <form
-        className="flex gap-1.5"
+        className="flex items-center gap-1.5"
         onSubmit={(e) => {
           e.preventDefault();
         }}
@@ -251,7 +254,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
           data-testid="dice-roll-expression"
           aria-label="Dice expression"
           placeholder="1d20+4"
-          className="h-8 flex-1 font-mono text-sm"
+          className="h-7 w-16 min-w-0 flex-1 font-mono text-sm"
           value={expression}
           disabled={!live}
           onChange={(e) => setExpression(e.target.value)}
@@ -261,11 +264,37 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
             control.roll(e);
           }}
         />
+        <ToggleGroup
+          type="single"
+          data-testid="dice-roll-mode"
+          data-value={mode}
+          aria-label="Roll mode"
+          className="shrink-0"
+          value={mode}
+          disabled={!live}
+          onValueChange={(v) => {
+            if (v) setMode(v as RollMode);
+          }}
+        >
+          {(["disadvantage", "normal", "advantage"] as const).map((m) => (
+            <ToggleGroupItem
+              key={m}
+              value={m}
+              data-testid="dice-roll-mode-option"
+              data-value={m}
+              aria-label={m}
+              className="h-7 px-2"
+            >
+              {MODE_LABEL[m]}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
         <RollButton
           control={control}
           data-testid="dice-roll-submit"
           type="button"
           size="sm"
+          className="h-7"
           disabled={disabled || expression.trim() === ""}
         >
           Roll
@@ -319,38 +348,13 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
           aria-label="Label"
           placeholder="Label"
           maxLength={60}
-          className="h-8 w-24 min-w-0 flex-1 text-xs"
+          className="h-7 w-16 min-w-0 flex-1 text-xs"
           value={label}
           disabled={!live}
           onChange={(e) => setLabel(e.target.value)}
         />
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <ToggleGroup
-          type="single"
-          data-testid="dice-roll-mode"
-          data-value={mode}
-          aria-label="Roll mode"
-          value={mode}
-          disabled={!live}
-          onValueChange={(v) => {
-            if (v) setMode(v as RollMode);
-          }}
-        >
-          {(["disadvantage", "normal", "advantage"] as const).map((m) => (
-            <ToggleGroupItem
-              key={m}
-              value={m}
-              data-testid="dice-roll-mode-option"
-              data-value={m}
-              aria-label={m}
-            >
-              {MODE_LABEL[m]}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
         {control.isDm && (
-          <span className="flex items-center gap-1.5 text-xs">
+          <span className="flex shrink-0 items-center gap-1.5 text-xs">
             <Switch
               id={`${uid}-public`}
               data-testid="dice-roll-public"
@@ -361,18 +365,9 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
             <label htmlFor={`${uid}-public`}>Public</label>
           </span>
         )}
-        {dmTools && <div className="ml-auto">{dmTools}</div>}
+        {dmTools && <div className="shrink-0">{dmTools}</div>}
       </div>
-      {/* #149: own row, away from Adv, so it is hard to flip by accident. */}
-      <div className="flex items-center gap-1.5 border-t pt-1.5 text-xs text-muted-foreground">
-        <Switch
-          id={`${uid}-physical`}
-          data-testid="dice-roll-physical"
-          checked={physical}
-          onCheckedChange={setPhysical}
-        />
-        <label htmlFor={`${uid}-physical`}>Physical dice: type in my own rolls</label>
-      </div>
+      <PhysicalRow uid={uid} />
       {shownError && (
         <p data-testid="dice-roll-error" role="alert" className="text-xs text-destructive">
           {shownError}
@@ -382,26 +377,46 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   );
 }
 
-/** FR-DICE-07, #149: while physical mode is on, the top of the log says so (with a way out). */
-function PhysicalBanner() {
+/**
+ * FR-DICE-07, #149: the physical-dice toggle, on its own row away from Adv. While the mode is on
+ * the row turns into the "Physical dice on" strip with "Turn off", so the log always says so
+ * without a second strip taking entry space.
+ */
+function PhysicalRow({ uid }: { uid: string }) {
   const [physical, setPhysical] = usePhysicalDice();
-  if (!physical) return null;
   return (
     <div
-      data-testid="dice-log-physical"
-      role="status"
-      className="flex shrink-0 items-center gap-1.5 rounded-md border border-warning/50 bg-warning/10 px-2 py-1 text-xs"
+      data-testid={physical ? "dice-log-physical" : undefined}
+      role={physical ? "status" : undefined}
+      className={cn(
+        "flex h-7 items-center gap-1.5 rounded-md border px-1.5 text-xs",
+        physical ? "border-warning/50 bg-warning/10" : "border-transparent text-muted-foreground",
+      )}
     >
-      <HandIcon className="size-3.5 shrink-0 text-warning" />
-      <span className="flex-1">Physical dice on: rolls ask for your dice</span>
-      <button
-        type="button"
-        data-testid="dice-log-physical-off"
-        className="rounded-sm font-medium underline-offset-2 hover:underline"
-        onClick={() => setPhysical(false)}
-      >
-        Turn off
-      </button>
+      <Switch
+        id={`${uid}-physical`}
+        data-testid="dice-roll-physical"
+        checked={physical}
+        onCheckedChange={setPhysical}
+      />
+      {physical ? (
+        <>
+          <HandIcon className="size-3.5 shrink-0 text-warning" />
+          <label htmlFor={`${uid}-physical`} className="flex-1 truncate">
+            Physical dice on
+          </label>
+          <button
+            type="button"
+            data-testid="dice-log-physical-off"
+            className="rounded-sm font-medium underline-offset-2 hover:underline"
+            onClick={() => setPhysical(false)}
+          >
+            Turn off
+          </button>
+        </>
+      ) : (
+        <label htmlFor={`${uid}-physical`}>Physical dice: type in my own rolls</label>
+      )}
     </div>
   );
 }
@@ -416,12 +431,10 @@ export function GameLog({ dmTools }: { dmTools?: ReactNode }) {
     <section
       data-testid="dice-log"
       aria-label="Game log"
-      // min-h-full, not h-full: with Physical dice on (banner + roll bar) the body grows past
-      // the window and scrolls, entries first (FR-SHELL-28). No scroll anchoring: toggling the
-      // banner would otherwise scroll the body to keep the roll bar put, hiding the entries.
-      className="flex min-h-full flex-col gap-2 [overflow-anchor:none]"
+      // h-full: the roll bar is a pinned footer and only the entry list scrolls. Below the roll
+      // bar's own height (a window resized near its minimum) the body scrolls as a last resort.
+      className="flex h-full min-h-fit flex-col gap-1.5"
     >
-      <PhysicalBanner />
       {!everLive ? (
         <div className="flex flex-1 flex-col gap-1.5">
           {[0, 1, 2].map((i) => (

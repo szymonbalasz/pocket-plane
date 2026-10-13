@@ -27,7 +27,7 @@ function SettingsPopover() {
           data-testid="dice-settings-open"
           size="icon"
           variant="ghost"
-          className="size-8"
+          className="size-7"
           aria-label="Public log settings"
         >
           <SettingsIcon className="size-4" />
