@@ -7,6 +7,7 @@ import * as diceRollLog from "./dice-roll-log";
 import * as entities from "./entities";
 import * as liveSync from "./live-sync";
 import * as notifications from "./notifications";
+import * as partyLoot from "./party-loot";
 import * as scenesMap from "./scenes-map";
 import { type DomainEventDef, isDomainEventDef } from "./types";
 
@@ -23,6 +24,8 @@ export const domainEvents: readonly DomainEventDef[] = [
   ...[diceRollLog, characterSheet, notifications, combatTracker].flatMap((m) =>
     Object.values(m).filter(isDomainEventDef),
   ),
+  // Reward (build/party-loot): the module also exports the endpoint schema.
+  ...Object.values<unknown>(partyLoot).filter(isDomainEventDef),
 ];
 
 /** `cause.name` of presence changes (not a domain event, CON-07). */
