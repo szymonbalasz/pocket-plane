@@ -64,6 +64,23 @@ describe("window manager", () => {
     expect(order(ws)).toEqual(["a.one", "a.two"]);
   });
 
+  test("FR-SHELL-08 first open never lands on an open window; minimised / unavailable don't count", () => {
+    let ws = run([], { type: "open", kind: "a.two" }, { type: "open", kind: "a.three" });
+    const two = get(ws, "a.two");
+    const three = get(ws, "a.three");
+    expect(two).toMatchObject({ x: 12, y: 60 });
+    const overlap =
+      two.x < three.x + three.w &&
+      three.x < two.x + two.w &&
+      two.y < three.y + three.h &&
+      three.y < two.y + two.h;
+    expect(overlap).toBe(false);
+    // Minimised windows don't block the default slot.
+    ws = run([], { type: "open", kind: "a.two" }, { type: "minimise", kind: "a.two" });
+    ws = run(ws, { type: "open", kind: "a.three" });
+    expect(get(ws, "a.three")).toMatchObject({ x: 12, y: 60 });
+  });
+
   test("FR-SHELL-08 reopen uses last geometry", () => {
     let ws = run([], { type: "open", kind: "a.two" });
     ws = run(ws, { type: "setRect", kind: "a.two", rect: { x: 500, y: 400, w: 350, h: 250 } });

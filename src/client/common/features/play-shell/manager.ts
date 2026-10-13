@@ -1,7 +1,8 @@
 // Window manager reducer (FR-SHELL-08–12, 14, 16–18). Pure: no DOM, no storage.
 // Holds every window's *stored* state; rendering clamps (geometry.ts) without writing back.
 import { GEOMETRY_LIMIT, Layout, MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
-import { defaultRect, type Rect, type Viewport } from "./geometry";
+import { clampRect, type Rect, type Viewport } from "./geometry";
+import { placeRect } from "./placement";
 import type { WindowRegistry } from "./registry";
 
 export type Windows = readonly WindowState[];
@@ -48,17 +49,35 @@ export function topWindow(ws: Windows, available: ReadonlySet<string>): WindowSt
   return top;
 }
 
-/** This client's default layout: every `defaultOpen` type at its default geometry (FR-SHELL-14). */
+/**
+ * This client's default layout: every `defaultOpen` type at its default geometry, fitted to
+ * the viewport; one that would overlap an earlier one goes to the next free slot (FR-SHELL-14).
+ */
 export function defaultLayout(registry: WindowRegistry, vp: Viewport): WindowState[] {
-  return registry.defs
-    .filter((d) => d.defaultOpen)
-    .map((d, i) => ({
+  const out: WindowState[] = [];
+  for (const d of registry.defs) {
+    if (!d.defaultOpen) continue;
+    out.push({
       kind: d.kind,
       instance: MAIN_INSTANCE,
-      state: "open" as const,
-      ...defaultRect(d.defaultPosition, d.defaultSize, vp),
-      z: i + 1,
-    }));
+      state: "open",
+      ...placeRect(d, vp, out),
+      z: out.length + 1,
+    });
+  }
+  return out;
+}
+
+/** Rendered rects of the windows on screen now, except (kind, instance). */
+function onScreen(ws: Windows, ctx: ManagerContext, kind: string, instance: string): Rect[] {
+  return ws
+    .filter(
+      (w) =>
+        w.state === "open" &&
+        ctx.available.has(w.kind) &&
+        !(w.kind === kind && w.instance === instance),
+    )
+    .map((w) => clampRect(w, ctx.viewport));
 }
 
 export interface Restored {
@@ -145,9 +164,10 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
 
   switch (action.type) {
     case "open": {
-      // FR-SHELL-08: last geometry, else default; front; minimised → restored.
+      // FR-SHELL-08: last geometry, else default (first free slot, not over an open window);
+      // front; minimised → restored.
       if (find(ws, kind, instance)) return toFront(ws, kind, instance, "open");
-      const rect = defaultRect(def.defaultPosition, def.defaultSize, ctx.viewport);
+      const rect = placeRect(def, ctx.viewport, onScreen(ws, ctx, kind, instance));
       return normaliseZ([...ws, { kind, instance, state: "open", ...rect, z: maxZ(ws) + 1 }]);
     }
     case "close":
