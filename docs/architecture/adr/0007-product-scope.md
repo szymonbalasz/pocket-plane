@@ -19,7 +19,7 @@
 - Touch / mobile. Laptops only.
 - Dynamic lighting / vision.
 - Freehand drawing (use AoE props).
-- Audio.
+- Audio, except short UI notification sounds ([ADR-0030](0030-ui-notification-sounds.md)).
 - Extension / plugin system.
 - Porting the Obsidian vault (optional importer post-MVP only).
 

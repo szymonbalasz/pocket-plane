@@ -1,6 +1,6 @@
-# NNNN — Short UI notification sounds
+# 0030 — Short UI notification sounds
 
-- Status: proposed
+- Status: accepted (2026-10-13; decisions-log #148)
 - Date: 2026-10-13
 - Amends: [ADR-0007](0007-product-scope.md) (exclusion "Audio")
 - Raised by: DM feedback F1 ([feedback-phase3](../../agents/feedback-phase3.md)): a player's turn alert with a sound
@@ -19,10 +19,10 @@
 
 ## Decision
 
-> Undecided. Suggested: **A**.
+**A.** Short UI notification sounds only. Built-in default ping (tier S); DM-added sounds as audio assets (tier A); per-client mute and volume in browser storage. Music, ambience, soundboard and voice stay excluded.
 
 ## Consequences
 
-- ADR-0007 "Audio" row reads "Audio except short UI notification sounds (ADR-NNNN)".
+- ADR-0007 "Audio" row reads "Audio except short UI notification sounds (ADR-0030)".
 - feature-tiers: turn alert flash + default ping tier S; DM-added sounds tier A (assets-pipeline accepts small audio files then).
 - Browsers block autoplay until the user has interacted with the page; the player client unlocks audio on the first click (e.g. joining) and falls back to flash only.

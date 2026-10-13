@@ -35,6 +35,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0027](0027-notification-creation.md) | Notifications are created in the causing command's transaction | accepted (refines 0016) |
 | [0028](0028-token-changed-hooks.md) | Token-changed hooks keep bound instances in step | accepted (extends 0024) |
 | [0029](0029-windowed-record-types.md) | Windowed record types: bounded snapshots for append-only logs | accepted (amends FR-SYNC-20) |
+| [0030](0030-ui-notification-sounds.md) | Short UI notification sounds (turn alert) | accepted (amends ADR-0007) |
 
 ## Proposing a new ADR
 

@@ -29,7 +29,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Layers (map / objects / tokens / DM-only) | A | [scene-tools](specs/post-mvp/scene-tools.md) | DM-only layer ≈ hidden tokens |
 | Doors and walls (block movement) | A | [scene-tools](specs/post-mvp/scene-tools.md) | Movement only; no vision ([ADR-0007](architecture/adr/0007-product-scope.md)) |
 | Highlight current-turn token | B | [combat-tracker](specs/combat-tracker.md) | Initiative strip / portraits show whose turn in MVP; token highlight only if trivial |
-| Movement measured along drag path, waypoints | B | [scenes-map](specs/scenes-map.md) | |
+| Movement measured along drag path, waypoints | B (indicator vs speed: S, §8) | [scenes-map](specs/scenes-map.md) | |
 
 ## 2. Combat
 
@@ -147,7 +147,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | **One interface for adding any creature to an encounter** (SRD, custom, duplicated, fixture) | S | [combat-tracker](specs/combat-tracker.md) | Source-agnostic; see [ADR-0009](architecture/adr/0009-entity-content-model.md) |
 | Custom NPC from SRD monster or existing NPC, then edit | A | [compendium](specs/post-mvp/compendium.md) | Shieldmaiden as reference |
 | Custom actions auto-roll vs selected target(s) | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
-| Multi-target select | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Multi-target select | S (#148, see §8) | [combat-extras](specs/post-mvp/combat-extras.md) | |
 | Open5e import | A | [compendium](specs/post-mvp/compendium.md) | Important |
 | **AI paste** (paste text found online → prefilled creature/item form) | ? | [compendium](specs/post-mvp/compendium.md) | Form-filling time-saver, not an importer. > TODO (spec phase): tier |
 | DM homebrew file import | A | [compendium](specs/post-mvp/compendium.md) | Formats TBD |
@@ -161,19 +161,19 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 
 ## 8. DM feedback after the Combat build (#145)
 
-Tiers **proposed**, to confirm with the DM; details in [feedback-phase3](agents/feedback-phase3.md).
+Tiers confirmed by the DM (#148); details in [feedback-phase3](agents/feedback-phase3.md).
 
 | Feature | Tier | Spec | Notes |
 |---|---|---|---|
-| Player turn alert: flash + default ping sound | S (proposed) | [combat-tracker](specs/combat-tracker.md), [play-shell](specs/play-shell.md) | Sound needs [proposed-ui-sounds](architecture/adr/proposed-ui-sounds.md) (amends ADR-0007) |
-| DM-added alert sounds | A (proposed) | [assets-pipeline](specs/assets-pipeline.md) | Small audio assets |
+| Player turn alert: flash + default ping sound | S | [combat-tracker](specs/combat-tracker.md), [play-shell](specs/play-shell.md) | Sound per [ADR-0030](architecture/adr/0030-ui-notification-sounds.md) (amends ADR-0007) |
+| DM-added alert sounds | A | [assets-pipeline](specs/assets-pipeline.md) | Small audio assets |
 | Diagonal rule 5/10/5 (every second diagonal 10 ft) | S | [scenes-map](specs/scenes-map.md) | Decided #145; replaces 5 ft per diagonal (#124) |
-| Movement tracker: speed on sheet; amber = dash, red = beyond dash (indicators only, never block); movement used this turn | S (proposed) | [scenes-map](specs/scenes-map.md), [combat-tracker](specs/combat-tracker.md), [entities](specs/entities.md) | Supersedes the tier B "movement along drag path" row for the indicator part |
-| Token shape setting: round crop or image as-is | S (proposed) | [scenes-map](specs/scenes-map.md) | Default round |
-| Drag images onto the battlemap (props, illustrations) | A (proposed) | [scenes-map](specs/scenes-map.md) | Reserved props layer (FR-MAP-29) |
-| Token indicators: removed from combat, down (0 HP) | S (proposed) | [combat-tracker](specs/combat-tracker.md) | |
-| Target from the map; multi-target (Ctrl/Shift) with per-target damage multiplier | S (proposed) | [combat-tracker](specs/combat-tracker.md), [scenes-map](specs/scenes-map.md) | Promotes "Multi-target select" (tier A) |
-| Box select on the map | S (proposed) | [scenes-map](specs/scenes-map.md) | Group move: A (proposed) |
+| Movement tracker: speed on sheet; amber = dash, red = beyond dash (indicators only, never block); movement used this turn | S | [scenes-map](specs/scenes-map.md), [combat-tracker](specs/combat-tracker.md), [entities](specs/entities.md) | Supersedes the tier B "movement along drag path" row for the indicator part |
+| Token shape setting: round crop or image as-is | S | [scenes-map](specs/scenes-map.md) | Default round |
+| Drag images onto the battlemap (props, illustrations) | A | [scenes-map](specs/scenes-map.md) | Reserved props layer (FR-MAP-29) |
+| Token indicators: removed from combat, down (0 HP) | S | [combat-tracker](specs/combat-tracker.md) | |
+| Target from the map; multi-target (Ctrl/Shift) with per-target damage multiplier | S | [combat-tracker](specs/combat-tracker.md), [scenes-map](specs/scenes-map.md) | Promotes "Multi-target select" (tier A) |
+| Box select on the map | S | [scenes-map](specs/scenes-map.md) | Group move: A |
 | Party currency tracker (running coin total) | S | [party-loot](specs/party-loot.md) | Decided #146 |
 
 ## Already decided elsewhere
@@ -182,7 +182,7 @@ Tiers **proposed**, to confirm with the DM; details in [feedback-phase3](agents/
 |---|---|---|
 | Dynamic lighting / vision | F | [ADR-0007](architecture/adr/0007-product-scope.md) |
 | Freehand drawing | F | [ADR-0007](architecture/adr/0007-product-scope.md) |
-| Audio | F | [ADR-0007](architecture/adr/0007-product-scope.md) |
+| Audio (music, ambience, soundboard) | F | [ADR-0007](architecture/adr/0007-product-scope.md); UI notification sounds allowed by [ADR-0030](architecture/adr/0030-ui-notification-sounds.md) |
 | Other game systems | F | [ADR-0007](architecture/adr/0007-product-scope.md) |
 | Fog, AoE props, status rings | C→ post-MVP, design for it | [scene-tools](specs/post-mvp/scene-tools.md) |
 | Notes from tokens, player notes | post-MVP, design for it | [world-builder](specs/post-mvp/world-builder.md) |

@@ -1,0 +1,37 @@
+{
+  "mcpServers": {
+    "pw-dm": {
+      "command": "bun",
+      "args": [
+        "x",
+        "@playwright/mcp@0.0.83",
+        "--isolated",
+        "--headless",
+        "--viewport-size",
+        "1440x900"
+      ]
+    },
+    "pw-player-1": {
+      "command": "bun",
+      "args": [
+        "x",
+        "@playwright/mcp@0.0.83",
+        "--isolated",
+        "--headless",
+        "--viewport-size",
+        "1440x900"
+      ]
+    },
+    "pw-player-2": {
+      "command": "bun",
+      "args": [
+        "x",
+        "@playwright/mcp@0.0.83",
+        "--isolated",
+        "--headless",
+        "--viewport-size",
+        "1440x900"
+      ]
+    }
+  }
+}
