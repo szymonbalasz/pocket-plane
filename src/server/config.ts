@@ -34,6 +34,7 @@ const EnvSchema = z.object({
   PP_ASSET_DIR: optionalString,
   PP_DATA_DISPOSABLE: flag,
   PP_TEST_MODE: flag,
+  PP_TEST_CRASH: optionalString,
   PP_DM_SECRET: z.string().optional(),
   PP_PUBLIC_BASE_URL: optionalString.pipe(z.url().optional()),
   PP_LOG_LEVEL: z.preprocess(
@@ -56,11 +57,47 @@ export interface Config {
   assetDir: string;
   disposable: boolean;
   testMode: boolean;
+  /** Test-mode crash hook (`PP_TEST_CRASH`, #163); null = off. Armed by the entry points. */
+  testCrash: CrashSpec | null;
   /** Never log, store or send. Empty string only when `requireSecret: false`. */
   dmSecret: string;
   publicBaseUrl: string | null;
   logLevel: LogLevel;
 }
+
+/**
+ * `PP_TEST_CRASH` (#163): `<command>:before-commit` (inside the transaction, after the command
+ * and its event-log rows) | `<command>:after-commit` (committed; before caches, listeners, ack) |
+ * `assets.ingest:after-files` (files renamed into place, row not written) | `fixture:<key>`
+ * (fixture load: before the commit of that fixture's first command).
+ */
+export interface CrashSpec {
+  point: "before-commit" | "after-commit" | "after-files" | "fixture";
+  /** Command name, or the fixture key for `fixture`. */
+  target: string;
+}
+
+const COMMAND_NAME = /^[a-z][a-z0-9-]*\.[a-zA-Z][a-zA-Z0-9]*$/;
+const FIXTURE_KEY = /^[a-z0-9][a-z0-9-]*$/;
+
+/** Parses a `PP_TEST_CRASH` value; throws ConfigError on a malformed one. */
+export function parseCrashSpec(v: string): CrashSpec {
+  const i = v.lastIndexOf(":");
+  const [head, tail] = i === -1 ? [v, ""] : [v.slice(0, i), v.slice(i + 1)];
+  if (head === "fixture" && FIXTURE_KEY.test(tail)) return { point: "fixture", target: tail };
+  if (COMMAND_NAME.test(head)) {
+    if (tail === "before-commit" || tail === "after-commit") return { point: tail, target: head };
+    if (tail === "after-files" && head === "assets.ingest") {
+      return { point: "after-files", target: head };
+    }
+  }
+  throw new ConfigError(
+    `PP_TEST_CRASH "${v}": use <command>:before-commit | <command>:after-commit | assets.ingest:after-files | fixture:<key>`,
+  );
+}
+
+export const formatCrashSpec = (c: CrashSpec): string =>
+  c.point === "fixture" ? `fixture:${c.target}` : `${c.target}:${c.point}`;
 
 export class ConfigError extends Error {
   override name = "ConfigError";
@@ -130,6 +167,10 @@ export function parseConfig(
   if (e.PP_TEST_MODE && !e.PP_DATA_DISPOSABLE) {
     throw new ConfigError("PP_TEST_MODE=1 requires PP_DATA_DISPOSABLE=1.");
   }
+  if (e.PP_TEST_CRASH !== undefined && !(e.PP_TEST_MODE && e.PP_DATA_DISPOSABLE)) {
+    throw new ConfigError("PP_TEST_CRASH requires PP_TEST_MODE=1 and PP_DATA_DISPOSABLE=1.");
+  }
+  const testCrash = e.PP_TEST_CRASH === undefined ? null : parseCrashSpec(e.PP_TEST_CRASH);
 
   const resolve = (p: string) => (path.isAbsolute(p) ? path.normalize(p) : path.resolve(root, p));
   const dataDir = resolve(e.PP_DATA_DIR ?? path.join("data", profile));
@@ -146,6 +187,7 @@ export function parseConfig(
     assetDir: e.PP_ASSET_DIR ? resolve(e.PP_ASSET_DIR) : path.join(dataDir, "assets"),
     disposable: e.PP_DATA_DISPOSABLE,
     testMode: e.PP_TEST_MODE,
+    testCrash,
     dmSecret,
     publicBaseUrl: e.PP_PUBLIC_BASE_URL ?? null,
     logLevel: e.PP_LOG_LEVEL,

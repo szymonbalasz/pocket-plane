@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { MAX_UPLOAD_BYTES, type UploadResponse } from "@shared/assets-pipeline/schemas";
 import { AssetIngested } from "@shared/events/assets-pipeline";
@@ -7,6 +7,8 @@ import { eq } from "drizzle-orm";
 import { createApp } from "../../app";
 import { manualClock, realDice } from "../../commands/context";
 import { CommandError } from "../../commands/errors";
+import { closeDb, openFileDb } from "../../db/client";
+import { dbId } from "../../db/meta";
 import { asset, campaign } from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import type { Logger } from "../../log";
@@ -15,7 +17,7 @@ import { createCampaign } from "../campaign-management/commands";
 import { requireAsset } from "./commands";
 import { ingestAsset } from "./ingest";
 import { CACHE_CONTROL } from "./routes";
-import { AssetStore, assetStoreOf } from "./store";
+import { AssetStore, assetStoreOf, DB_MARKER, fsyncDir } from "./store";
 import {
   type AssetServer,
   form,
@@ -200,6 +202,48 @@ describe("ingest (FR-ASSET-01, -03, -04, -06, -08)", () => {
     expect((await h.get(ok.body.asset.id, "thumb")).status).toBe(404);
     const inm = { "If-None-Match": `"${ok.body.asset.id}-thumb"` };
     expect((await h.get(ok.body.asset.id, "thumb", inm)).status).toBe(404);
+  });
+
+  test("#163 re-upload of an asset whose files went missing → `existing`, files rewritten, 200 again", async () => {
+    const png = await testPng(40);
+    const a = (await uploadOk(png)).body.asset;
+    const hash = assetRows()[0]?.hash as string;
+    rmSync(path.join(h.assetDir, hash, "display.webp"));
+    rmSync(path.join(h.assetDir, hash, "original"));
+    expect((await h.get(a.id, "display")).status).toBe(404);
+    const again = await uploadOk(png, "again.png");
+    expect(again.status).toBe(200);
+    expect(again.body.asset).toEqual(a);
+    expect((await h.get(a.id, "display")).status).toBe(200);
+    expect((await h.get(a.id, "thumb")).status).toBe(200);
+    expect(assetStoreOf(h.s).isComplete(hash)).toBe(true);
+    expect(assetRows()).toHaveLength(1);
+    expect(ingestLog()).toHaveLength(1);
+  });
+
+  test("#163 asset dir marker: written with the DB id; another DB's dir → sweep skipped with an error", async () => {
+    const marker = path.join(h.assetDir, DB_MARKER);
+    expect(readFileSync(marker, "utf8").trim()).toBe(dbId(h.db));
+    const orphan = path.join(h.assetDir, "f".repeat(64));
+    mkdirSync(orphan);
+    writeFileSync(marker, "another-db\n");
+    const errors: string[] = [];
+    const log: Logger = { debug() {}, info() {}, warn() {}, error: (m) => errors.push(m) };
+    const r = new AssetStore(h.assetDir, log).sweep(h.db);
+    expect(r).toEqual({ removed: [], missing: [], skipped: true });
+    expect(existsSync(orphan)).toBe(true);
+    expect(errors.join("\n")).toContain("belongs to another DB");
+    // Our own marker again → the sweep runs and removes the orphan set.
+    writeFileSync(marker, `${dbId(h.db)}\n`);
+    expect(new AssetStore(h.assetDir, log).sweep(h.db).removed).toEqual(["f".repeat(64)]);
+  });
+
+  test("#163 durable writes: synchronous = FULL on file DBs; directory fsync works here", () => {
+    const file = path.join(h.dir, "durable.db");
+    const db = openFileDb(file);
+    expect(db.$client.query("PRAGMA synchronous").get()).toEqual({ synchronous: 2 });
+    closeDb(db);
+    expect(() => fsyncDir(h.assetDir)).not.toThrow();
   });
 
   test("FR-ASSET-07 missing thumb or original → every file 404 after restart; others unaffected", async () => {

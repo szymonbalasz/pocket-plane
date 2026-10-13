@@ -4,14 +4,15 @@ import { WS_PATH, WS_PROBE_PARAM } from "@shared/protocol/frames";
 import type { Server, ServerWebSocket } from "bun";
 import { createApp } from "./app";
 import type { Clock } from "./commands/context";
-import { type Config, localUrl } from "./config";
+import { armCrashHook } from "./commands/crash";
+import { type Config, formatCrashSpec, localUrl } from "./config";
 import { closeDb, type Db, openFileDb } from "./db/client";
-import { pushSchema } from "./db/push";
+import { pushSchema, SchemaPushError } from "./db/push";
 import type { Logger } from "./log";
 import { acquireLock, type HeldLock } from "./runtime/lock";
 import { readManifest } from "./runtime/manifest";
 import { createServices, type Services } from "./services";
-import { type Connection, Hub, type HubOptions } from "./ws/hub";
+import { type Connection, Hub, type HubOptions, SEND_BUFFER_LIMIT } from "./ws/hub";
 
 interface WsData {
   conn: Connection | null;
@@ -67,10 +68,26 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     let db = opts.db;
     if (!db) {
       db = openFileDb(config.dbPath);
-      const { applied } = await pushSchema(db.$client);
-      if (applied > 0) log.info(`schema: applied ${applied} statement(s)`);
+      try {
+        const { applied, backup } = await pushSchema(db.$client);
+        if (backup) log.info(`schema: backed up the DB to ${backup}`);
+        if (applied > 0) log.info(`schema: applied ${applied} statement(s)`);
+      } catch (err) {
+        closeDb(db);
+        if (err instanceof SchemaPushError) throw new StartupError(err.message);
+        throw err;
+      }
     }
     const services = createServices({ config, db, log, clock: opts.clock });
+    // Test-mode crash hook (#163): the server arms command / asset points; fixtures:* arms its own.
+    const crash = config.testCrash;
+    if (crash && crash.point !== "fixture") {
+      if (!services.commands.has(crash.target)) {
+        throw new StartupError(`PP_TEST_CRASH: unknown command "${crash.target}"`);
+      }
+      armCrashHook(crash);
+      log.warn(`PP_TEST_CRASH armed: the process kills itself at ${formatCrashSpec(crash)}`);
+    }
     // Start hooks (r.onStart): after the schema push, before listening. Real servers only.
     for (const h of services.startHooks) {
       try {
@@ -104,9 +121,10 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
           return app.fetch(req);
         },
         websocket: {
-          // Hub enforces the 64 KB client-frame limit with close 1009 (FR-SYNC-12).
-          maxPayloadLength: 1024 * 1024,
-          backpressureLimit: 1024 * 1024,
+          // Hub enforces the 64 KB client-frame limit with close 1009 (FR-SYNC-12). Both well
+          // above the largest allowed snapshot (CON-44), so backpressure never closes one (#163).
+          maxPayloadLength: SEND_BUFFER_LIMIT,
+          backpressureLimit: SEND_BUFFER_LIMIT,
           idleTimeout: 120,
           open(ws: ServerWebSocket<WsData>) {
             ws.data.conn = hub.open({

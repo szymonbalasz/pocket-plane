@@ -70,6 +70,15 @@ export const eventLog = sqliteTable(
   (t) => [uniqueIndex("event_log_id").on(t.id), index("event_log_campaign").on(t.campaignId)],
 );
 
+/**
+ * Facts about this DB file, not campaign data (#163). `db-id` = random UUID created on first
+ * read; the asset dir carries it as a marker so a sweep never runs against another DB's files.
+ */
+export const dbMeta = sqliteTable("db_meta", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
 /** Test mode only (FR-SYNC-27). */
 export const syncProbe = sqliteTable(
   "sync_probe",
@@ -367,7 +376,7 @@ export const notification = sqliteTable(
     audience: text("audience", { enum: ["dm", "player", "all"] }).notNull(),
     audiencePlayerId: text("audience_player_id").references((): AnySQLiteColumn => player.id),
     text: text("text").notNull(),
-    /** JSON leaf ≤ 1 KB, per-kind zod. */
+    /** JSON leaf, per-kind zod; ≤ the kind's `payloadMaxBytes` (default 1 KB, FR-NOTE-03). */
     payload: text("payload", { mode: "json" }).notNull(),
     actionLabel: text("action_label"),
     actionRole: text("action_role", { enum: ROLE }),
@@ -528,7 +537,11 @@ export const hpChange = sqliteTable(
     undone: integer("undone", { mode: "boolean" }).notNull().default(false),
     undoneAt: text("undone_at"),
   },
-  (t) => [uniqueIndex("hp_change_seq").on(t.seq), index("hp_change_encounter").on(t.encounterId)],
+  // (encounter, seq): the snapshot window reads the newest 50 without a sort (#163).
+  (t) => [
+    uniqueIndex("hp_change_seq").on(t.seq),
+    index("hp_change_encounter").on(t.encounterId, t.seq),
+  ],
 );
 
 /**
@@ -574,6 +587,7 @@ export const hpChangeSeqNext = sql<number>`(select coalesce(max(${hpChange.seq})
 export const lootEntrySeqNext = sql<number>`(select coalesce(max(${lootEntry.seq}), 0) + 1 from ${lootEntry})`;
 
 export const schema = {
+  dbMeta,
   campaign,
   player,
   eventLog,

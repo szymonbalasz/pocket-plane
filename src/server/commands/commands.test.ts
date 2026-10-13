@@ -9,6 +9,7 @@ import type { DispatchedEvent } from "../events/types";
 import { silentLogger } from "../log";
 import { Commands, defineCommand } from "./commands";
 import { fixedClock, realContext, SeedNotAllowedError, seededContext } from "./context";
+import { armCrashHook } from "./crash";
 import { CommandError } from "./errors";
 
 const TestCreated = defineEvent({
@@ -180,5 +181,82 @@ describe("ID / token / clock seam (ADR-0022)", () => {
     d.tokens.next();
     expect(d.ids.next()).toBe(idA);
     expect(a.clock.iso()).toBe("2026-01-01T00:00:00.000Z");
+  });
+});
+
+describe("test-mode crash hook (#163)", () => {
+  // In-process stand-in for SIGKILL: the fake kill throws, so nothing after the seam runs.
+  class Killed extends Error {}
+  function armed(spec: Parameters<typeof armCrashHook>[0]) {
+    const kills: string[] = [];
+    armCrashHook(spec, (where) => {
+      kills.push(where);
+      throw new Killed(where);
+    });
+    return kills;
+  }
+  const attempt = (fn: () => unknown) => {
+    try {
+      fn();
+      return "ok";
+    } catch (e) {
+      return e instanceof Killed ? "killed" : e instanceof CommandError ? e.code : "error";
+    }
+  };
+
+  test("before-commit: killed inside the transaction → no row, no log entry, no event", () => {
+    const { db, cmds, seen } = setup();
+    const kills = armed({ point: "before-commit", target: "test.create" });
+    try {
+      // The kill inside the transaction rolls it back; Commands reports `internal`.
+      expect(attempt(() => cmds.run(create, { name: "A" }, { actor: dm }))).toBe("internal");
+      expect(kills).toEqual(["test.create:before-commit"]);
+      expect(db.select().from(campaign).all()).toHaveLength(0);
+      expect(readEventLog(db)).toHaveLength(0);
+      expect(seen).toHaveLength(0);
+      // Other commands are untouched.
+      expect(attempt(() => cmds.run(dmOnly, {}, { actor: dm }))).toBe("ok");
+    } finally {
+      armCrashHook(null);
+    }
+  });
+
+  test("after-commit: killed after the commit → row + log entry kept, no listener ran", () => {
+    const { db, cmds, seen } = setup();
+    const kills = armed({ point: "after-commit", target: "test.create" });
+    try {
+      expect(attempt(() => cmds.run(create, { name: "A" }, { actor: dm }))).toBe("killed");
+      expect(kills).toEqual(["test.create:after-commit"]);
+      expect(db.select().from(campaign).all()).toHaveLength(1);
+      expect(readEventLog(db)).toHaveLength(1);
+      expect(seen).toHaveLength(0);
+    } finally {
+      armCrashHook(null);
+    }
+  });
+
+  test("fixture:<key>: killed at that fixture's first command; other keys and real contexts run", () => {
+    const { db, cmds } = setup();
+    const kills = armed({ point: "fixture", target: "enemy-1" });
+    try {
+      const seeded = (key: string) => seededContext({ disposable: true, key });
+      expect(
+        attempt(() => cmds.run(create, { name: "A" }, { actor: dm, ctx: seeded("player-1") })),
+      ).toBe("ok");
+      expect(attempt(() => cmds.run(create, { name: "B" }, { actor: dm }))).toBe("ok");
+      expect(
+        attempt(() => cmds.run(create, { name: "C" }, { actor: dm, ctx: seeded("enemy-1") })),
+      ).toBe("internal");
+      expect(kills).toEqual(["fixture:enemy-1"]);
+      expect(
+        db
+          .select()
+          .from(campaign)
+          .all()
+          .map((r) => r.name),
+      ).toEqual(["A", "B"]);
+    } finally {
+      armCrashHook(null);
+    }
   });
 });

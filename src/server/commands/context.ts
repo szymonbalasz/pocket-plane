@@ -33,6 +33,8 @@ export interface CommandContext {
   clock: Clock;
   /** The only source of dice randomness; roll via `rollDice(ctx.dice, …)` (`./dice`). */
   dice: DiceEngine;
+  /** Seeded contexts only: the fixture / test key (`PP_TEST_CRASH=fixture:<key>`, #163). */
+  fixtureKey?: string;
 }
 
 export const systemClock: Clock = {
@@ -157,5 +159,6 @@ export function seededContext(opts: SeededOptions): CommandContext {
     tokens: { next: () => Buffer.from(tokenBytes()).toString("base64url") },
     clock: opts.clock ?? fixedClock(FIXTURE_INSTANT),
     dice: seededDice({ disposable: opts.disposable, key: opts.key, seed }),
+    fixtureKey: opts.key,
   };
 }

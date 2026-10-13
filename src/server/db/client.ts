@@ -12,7 +12,9 @@ function wrap(sqlite: Database, file: boolean): Db {
   sqlite.run("PRAGMA foreign_keys = ON");
   if (file) {
     sqlite.run("PRAGMA journal_mode = WAL");
-    sqlite.run("PRAGMA synchronous = NORMAL");
+    // FULL (#163): a commit survives an OS crash / power loss too; one fsync per commit is cheap
+    // at a few intents per second.
+    sqlite.run("PRAGMA synchronous = FULL");
     sqlite.run("PRAGMA busy_timeout = 2000");
   }
   return drizzle(sqlite, { schema }) as Db;

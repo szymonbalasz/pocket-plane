@@ -9,6 +9,7 @@ import { appendEventLog } from "../events/log";
 import type { Actor, DispatchedEvent, DomainEvent, Role } from "../events/types";
 import type { Logger } from "../log";
 import type { CommandContext } from "./context";
+import { crashPoint } from "./crash";
 import { CommandError, forbidden, zodIssues } from "./errors";
 
 export interface CommandEnv {
@@ -121,6 +122,9 @@ export class Commands {
           e.payload = ed.payload.parse(e.payload);
           if (ed.logged) appendEventLog(tx, ctx, e, { actor: opts.actor, intentId });
         }
+        // Test-mode crash hook (#163): never armed outside PP_TEST_MODE.
+        crashPoint("before-commit", name);
+        crashPoint("fixture", ctx.fixtureKey);
         return r;
       });
     } catch (err) {
@@ -129,6 +133,7 @@ export class Commands {
       throw new CommandError("internal", "Internal error");
     }
 
+    crashPoint("after-commit", name);
     const meta = { actor: opts.actor, intentId, originConnId: opts.originConnId ?? null };
     const dispatched: DispatchedEvent[] = events.map((event) => ({ event, meta }));
     // CON-23: caches first (all events of the commit), then listeners.

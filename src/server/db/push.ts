@@ -33,17 +33,89 @@ export function isEmptyDb(sqlite: Database): boolean {
   return (row?.n ?? 0) === 0;
 }
 
+/** A refused or failed boot-time schema change; the message says what to do. */
+export class SchemaPushError extends Error {
+  override name = "SchemaPushError";
+}
+
+export interface PushOptions {
+  /**
+   * File DBs: `VACUUM INTO '<db>.pre-push-<timestamp>.bak'` before applying a change (#163).
+   * Default on; in-memory DBs never back up.
+   */
+  backup?: boolean;
+  /** Backup timestamp (tests). */
+  now?: () => Date;
+}
+
+/** Tables a drizzle-kit table rebuild creates and renames away; left over = interrupted push. */
+export function leftoverRebuildTables(sqlite: Database): string[] {
+  return sqlite
+    .query<{ name: string }, []>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND substr(name, 1, 6) = '__new_' ORDER BY name",
+    )
+    .all()
+    .map((r) => r.name);
+}
+
+const isFileDb = (sqlite: Database) => sqlite.filename !== "" && sqlite.filename !== ":memory:";
+
+/** `VACUUM INTO` a consistent copy next to the DB; returns its path. */
+export function backupDb(sqlite: Database, now: Date = new Date()): string {
+  const stamp = now.toISOString().replace(/[:.]/g, "-");
+  const target = `${sqlite.filename}.pre-push-${stamp}.bak`;
+  sqlite.query("VACUUM INTO ?").run(target);
+  return target;
+}
+
+/**
+ * Runs push statements in one transaction (#163). `PRAGMA foreign_keys` is a no-op inside a
+ * transaction, so drizzle-kit's own toggles are dropped and the pragma is switched off around
+ * the transaction instead; `foreign_key_check` must pass before the commit. All or nothing.
+ */
+export function applyStatements(sqlite: Database, stmts: readonly string[]): void {
+  const body = stmts.filter((s) => !/^PRAGMA\s+foreign_keys\s*=/i.test(s.trim()));
+  const fkOn = sqlite.query<{ foreign_keys: number }, []>("PRAGMA foreign_keys").get();
+  sqlite.run("PRAGMA foreign_keys = OFF");
+  try {
+    sqlite.transaction(() => {
+      for (const s of body) sqlite.run(s);
+      const broken = sqlite.query("PRAGMA foreign_key_check").all();
+      if (broken.length > 0) {
+        throw new SchemaPushError(
+          `Schema change would break ${broken.length} foreign key reference(s); nothing applied.`,
+        );
+      }
+    })();
+  } finally {
+    if (fkOn?.foreign_keys === 1) sqlite.run("PRAGMA foreign_keys = ON");
+  }
+}
+
 /**
  * Brings an existing dev DB up to the current schema. Refuses changes that lose data
- * (run `fixtures:reset` on a disposable dir instead).
+ * (run `fixtures:reset` on a disposable dir instead) and DBs an interrupted push left
+ * half-rebuilt. File DBs are backed up first; statements apply in one transaction (#163).
  */
-export async function pushSchema(sqlite: Database): Promise<{ applied: number }> {
+export async function pushSchema(
+  sqlite: Database,
+  opts: PushOptions = {},
+): Promise<{ applied: number; backup: string | null }> {
   if (isEmptyDb(sqlite)) {
     const stmts = await createSchemaStatements();
     sqlite.transaction(() => {
       for (const s of stmts) sqlite.run(s);
     })();
-    return { applied: stmts.length };
+    return { applied: stmts.length, backup: null };
+  }
+  const leftovers = leftoverRebuildTables(sqlite);
+  if (leftovers.length > 0) {
+    const where = isFileDb(sqlite) ? sqlite.filename : "the DB";
+    throw new SchemaPushError(
+      `${where} has table(s) ${leftovers.join(", ")} left by an interrupted schema change. ` +
+        "Stop the server, copy the newest `<db>.pre-push-*.bak` over the DB (delete its -wal / -shm files), " +
+        "or on a disposable dir run `bun run fixtures:reset-load <bundle>`.",
+    );
   }
   const api = await loadKit();
   const { drizzle } = await import("drizzle-orm/bun-sqlite");
@@ -58,21 +130,22 @@ export async function pushSchema(sqlite: Database): Promise<{ applied: number }>
   }
   // Expression indexes always show as changed; only act on real changes.
   const real = res.statementsToExecute.filter((s) => !/^(DROP|CREATE UNIQUE) INDEX/.test(s));
-  if (real.length === 0) return { applied: 0 };
+  if (real.length === 0) return { applied: 0, backup: null };
   const lossy = res.hasDataLoss ? dropFalseTruncates(res.statementsToExecute, res.warnings) : [];
   if (lossy.length > 0) {
-    throw new Error(
+    throw new SchemaPushError(
       `Schema change would lose data:\n${lossy.join("\n")}\nOn a disposable dir run \`bun run fixtures:reset\`.`,
     );
   }
-  await res.apply();
-  return { applied: res.statementsToExecute.length };
+  const backup = opts.backup !== false && isFileDb(sqlite) ? backupDb(sqlite, opts.now?.()) : null;
+  applyStatements(sqlite, res.statementsToExecute);
+  return { applied: res.statementsToExecute.length, backup };
 }
 
 /**
  * drizzle-kit 0.31 reads a falsy default (`DEFAULT 0`) as "no default" when a not-null column
  * is added to a non-empty table: it warns and empties the table first (`delete from t;`). Drops
- * those truncates in place (`apply()` runs this array) when the column's ADD carries a DEFAULT.
+ * those truncates in place (`applyStatements` runs this array) when the column's ADD carries a DEFAULT.
  * Returns the warnings that are real.
  */
 function dropFalseTruncates(stmts: string[], warnings: string[]): string[] {
