@@ -135,7 +135,7 @@ Every frame is a JSON object; field **`type`** names the frame (CON-14).
 | `1001` | `shutdown` | Server shutting down | Reconnect (backoff) |
 | `1009` | `frame-too-large` | Client frame > 64 KB (FR-SYNC-12) | Reconnect |
 | `4000` | `resync-required` | Send-buffer overflow or broadcaster error (FR-SYNC-21) | Reconnect |
-| `4401` | `credential-invalid` | Bad DM secret, throttled, unknown token, malformed `hello` (FR-SYNC-02, FR-CAMP-05/17) | **Stop**; `rejected` (DM: login; player: invalid-link screen) |
+| `4401` | `credential-invalid` | Bad DM secret, throttled, unknown token, malformed `hello` (FR-SYNC-02, FR-CAMP-05/17) | **Stop**; `rejected` (DM: probes `POST /api/dm/login` with the stored secret first: 401 → wipe + login; 429 → keep the secret, CAMP §7 "Too many attempts…", fresh connection after 60 s; other → fresh connection after 1 s (#163). Player: invalid-link screen) |
 | `4408` | `no-hello` | No `hello` within 5 s (FR-SYNC-01); 30 s without any inbound frame (FR-SYNC-04, CON-11) | Reconnect |
 | `4409` | `campaign-inactive` | Player `hello` for inactive campaign; DM `noActiveCampaign`; active campaign switched (FR-SYNC-02/06/07, FR-CAMP-09) | DM: reconnect at once (then backoff). Player: `waiting`, keep retrying, join ≤ 10 s after reactivation |
 
