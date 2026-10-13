@@ -15,11 +15,9 @@ import {
   type TestClient,
   type TestServer,
 } from "../../testing/harness";
-import type { Viewer } from "../../ws/records";
 import { convergence, leakScan } from "../../ws/testing/convergence";
 import { activateCampaign, addPlayer, createCampaign } from "../campaign-management/commands";
 import { noteDismiss, noteResolve, noteTestSend } from "./commands";
-import { PENDING_SNAPSHOT_CAP } from "./records";
 
 let h: TestServer;
 let db: Db;
@@ -303,47 +301,6 @@ describe("ADR-0029 window (FR-NOTE-12)", () => {
       expect(idSet(fresh).has(pendingIds[0] as string)).toBe(false);
       const cv = convergence(t.s, b, fresh);
       expect(cv.live).toEqual(cv.fresh);
-    } finally {
-      await t.stop();
-    }
-  });
-  test("#163 snapshot pending capped at 50 per audience (newest); older ones arrive once newer ones close", async () => {
-    const t = await startTestServer({ testMode: true });
-    try {
-      const dm0: Actor = { role: "dm", playerId: null, campaignId: null };
-      const run = t.s.commands.run.bind(t.s.commands);
-      const c1 = run(createCampaign, { name: "One" }, { actor: dm0 });
-      const p1 = run(addPlayer, { name: "Player 1" }, { actor: dm0 });
-      const dm: Actor = { ...dm0, campaignId: c1.id };
-      const send = (extra: Record<string, unknown>) =>
-        run(noteTestSend, { text: "n", actionLabel: "Ok", ...extra } as never, { actor: dm }).id;
-      const dmPending = Array.from({ length: PENDING_SNAPSHOT_CAP + 3 }, () =>
-        send({ audience: "dm" }),
-      );
-      const p1Pending = [0, 1].map(() => send({ audience: "player", audiencePlayerId: p1.id }));
-      const allPending = [0, 1].map(() => send({ audience: "all" }));
-      const pendingIn = (v: Viewer) =>
-        new Set(
-          (
-            t.s.records.snapshot({ db: t.s.db, presence: { list: () => [] } }, v)
-              .notification as NotificationRecord[]
-          )
-            .filter((n) => n.state === "pending")
-            .map((n) => n.id),
-        );
-      const dmView: Viewer = { connId: "d", campaignId: c1.id, role: "dm", playerId: null };
-      const ids = pendingIn(dmView);
-      expect(ids.size).toBe(PENDING_SNAPSHOT_CAP + 4);
-      for (const id of dmPending.slice(0, 3)) expect(ids.has(id)).toBe(false);
-      for (const id of [...dmPending.slice(3), ...p1Pending, ...allPending])
-        expect(ids.has(id)).toBe(true);
-      const p1View: Viewer = { connId: "p", campaignId: c1.id, role: "player", playerId: p1.id };
-      expect([...pendingIn(p1View)].sort()).toEqual([...p1Pending, ...allPending].sort());
-      // The 3 oldest stay pending in the DB; once 3 newer ones close they are in the snapshot.
-      for (const id of dmPending.slice(-3)) run(noteDismiss, { id }, { actor: dm });
-      const after = pendingIn(dmView);
-      for (const id of dmPending.slice(0, 3)) expect(after.has(id)).toBe(true);
-      expect(after.size).toBe(PENDING_SNAPSHOT_CAP + 4);
     } finally {
       await t.stop();
     }

@@ -794,7 +794,7 @@ One applied HP change to one target: the stats unit (#54, gate I9). Written by `
 | Record type | `orderBy` | `size` | `pin` | Provider | Source |
 |---|---|---|---|---|---|
 | `game-log-entry` | `n` | 100 | — | the newest 100 by `n` (SQL `ORDER BY n DESC LIMIT`, #163) | FR-DICE-17, #137 |
-| `notification` | `seq` | 100 | `state = pending` | pending rows, **newest 50 per audience** (`dm`, `all`, each player; #163) + the newest 100 closed (SQL) | [FR-NOTE-12](../specs/notifications.md#6-functional-requirements), #137, #163 |
+| `notification` | `seq` | 100 | `state = pending` | every pending row + the newest 100 closed (SQL) | [FR-NOTE-12](../specs/notifications.md#6-functional-requirements), #137 |
 | `encounter` | `seq` | 20 | `status ≠ ended` | campaign's encounters | [CBT §9](../specs/combat-tracker.md#9-api--events), gate I26 |
 | `hp-change` | `seq` | 50 | — | the started encounter's newest 50 (SQL; index `hp_change_encounter (encounter_id, seq)`, #163) | CBT §9, gate I22 |
 | `encounter-entry` | not windowed | | | entries of encounters in the `encounter` snapshot | CBT §9 |

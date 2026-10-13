@@ -1,5 +1,5 @@
 // Record type `notification` (FR-NOTE-01/06/12, protocol §20): campaign scope, full or hidden,
-// windowed snapshot = pending rows (newest 50 per audience, #163) + the newest 100 closed rows
+// windowed snapshot = every pending row + the newest 100 closed rows
 // (ADR-0029), both cut in SQL so build time doesn't grow with history.
 import {
   NOTIFICATION_WINDOW,
@@ -14,31 +14,6 @@ import { NOTIFICATION_TYPE, toNotificationRecord } from "./helpers";
 
 /** NOTE §12: more pending rows than this in a snapshot → server warning. */
 export const PENDING_WARN = 100;
-/**
- * #163: a snapshot carries at most this many pending rows per audience (`dm`, `all`, each
- * player), the newest. Older ones stay pending in the DB and are in a later snapshot once
- * newer ones close.
- */
-export const PENDING_SNAPSHOT_CAP = 50;
-
-const audienceKey = (r: NotificationRecord) => `${r.audience}:${r.audiencePlayerId ?? ""}`;
-
-/** Newest `cap` per audience; input and output oldest first. */
-export function capPendingPerAudience(
-  rows: readonly NotificationRecord[],
-  cap = PENDING_SNAPSHOT_CAP,
-): NotificationRecord[] {
-  const seen = new Map<string, number>();
-  const keep = new Set<NotificationRecord>();
-  for (let i = rows.length - 1; i >= 0; i--) {
-    const r = rows[i] as NotificationRecord;
-    const n = seen.get(audienceKey(r)) ?? 0;
-    if (n < cap) keep.add(r);
-    seen.set(audienceKey(r), n + 1);
-  }
-  return rows.filter((r) => keep.has(r));
-}
-
 export function notificationRecordType(log: Logger) {
   return defineRecordType<NotificationRecord>({
     type: NOTIFICATION_TYPE,
@@ -48,7 +23,7 @@ export function notificationRecordType(log: Logger) {
     campaignOf: (r) => r.campaignId,
     visibility: (r, v) =>
       notificationVisibleTo(r, { role: v.role, playerId: v.playerId }) ? "full" : "hidden",
-    // Pending (capped per audience) + the newest 100 closed, oldest first. Viewer-independent
+    // Every pending row + the newest 100 closed, oldest first. Viewer-independent
     // (cut before the filter, ADR-0029); the registry's cut keeps exactly these rows.
     snapshot: ({ db }, v) => {
       const pending = db
@@ -70,7 +45,7 @@ export function notificationRecordType(log: Logger) {
         .limit(NOTIFICATION_WINDOW)
         .all()
         .map(toNotificationRecord);
-      return [...capPendingPerAudience(pending), ...closed].sort((a, b) => a.seq - b.seq);
+      return [...pending, ...closed].sort((a, b) => a.seq - b.seq);
     },
     window: { orderBy: "seq", size: NOTIFICATION_WINDOW, pin: (r) => r.state === "pending" },
   });
