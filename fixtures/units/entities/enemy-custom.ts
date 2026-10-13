@@ -16,10 +16,12 @@ export default defineFixture({
         kind: "monster",
         name: "Elite Goblin Warrior",
         derivedFromId: r.id("enemy-1", "imported-entity"),
+        tokenShape: "square",
         statBlock: {
           ...goblin.statBlock,
           ac: 16,
           hpMax: 15,
+          saveProficiencies: ["dex"],
           attacks: [{ name: "Scimitar", toHit: 5, damage: "1d6+3", damageType: "slashing" }],
           cr: "1/2",
         },

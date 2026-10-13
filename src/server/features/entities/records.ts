@@ -28,6 +28,8 @@ export function redactCharacter(r: EntityRecord): RedactedCharacter {
     name: r.name,
     portraitAssetId: r.portraitAssetId,
     ownerPlayerId: r.ownerPlayerId,
+    // #154: the PC Down indicator for everyone; the HP number stays private.
+    down: r.hpCurrent === 0,
   };
 }
 
