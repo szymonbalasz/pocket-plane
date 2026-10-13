@@ -217,6 +217,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const control = useRollControl({
     expressions: [expression],
     category,
+    label: `${selected?.label ?? "Roll"} — ${label.trim() || CATEGORY_LABEL[category]}`,
     mode,
     onRoll(r) {
       const intent: DiceRollIntent = { expression, mode: r.mode, category };

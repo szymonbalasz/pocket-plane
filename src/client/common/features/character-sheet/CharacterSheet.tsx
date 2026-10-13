@@ -117,6 +117,7 @@ function RollAction({
   const control = useRollControl({
     expressions: specs.map((s) => s.expression),
     category: kind,
+    label: specs[0] ? `${c.name} — ${specs[0].label}` : undefined,
     critExpressions: claim?.critExpressions,
     onRoll(r) {
       flight.run(() => sendSheetRoll((n, p) => connection.sendIntent(n, p), claim, c.id, kind, r));
@@ -188,6 +189,7 @@ function AbilityRoll({
   const control = useRollControl({
     expressions: specs.map((s) => s.expression),
     category: ABILITY_CATEGORY[kind],
+    label: `${c.name} — ${ABILITY_NAMES[ability]} ${kind}`,
     onRoll(r) {
       const input: RollRouteInput =
         control.isDm && publicOverride !== undefined ? { ...r, public: publicOverride } : r;

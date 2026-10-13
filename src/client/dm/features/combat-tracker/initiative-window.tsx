@@ -69,6 +69,7 @@ function InitiativeCell({ c, def }: { c: CombatantView; def: DefinitionRecord | 
   const control = useRollControl({
     expressions: [d20Expression(def?.statBlock.initBonus ?? 0)],
     category: "initiative",
+    label: `${c.name} — Initiative`,
     onRoll: (r) =>
       void send("cbt.rollInitiative", {
         combatantIds: [c.id],
@@ -139,6 +140,7 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
     expressions: attack ? [d20Expression(attack.toHit), attack.damage] : ["1d20"],
     critExpressions: attack ? [critExpression(attack.damage)] : undefined,
     category: "attack",
+    label: attack ? `${c.name} — ${attack.name} attack` : undefined,
     onRoll: async (r) => {
       const res = await send<{ cardId: string }>("cbt.attack", {
         attackerId: c.id,
@@ -186,6 +188,7 @@ function useAbilityRoll(c: CombatantView, kind: AbilityKind, bonus: (a: Ability)
   const control = useRollControl({
     expressions: [d20Expression(bonus(ability) ?? 0)],
     category: kind === "check" ? "ability-check" : "saving-throw",
+    label: `${c.name} — ${ABILITY_NAMES[ability]} ${kind}`,
     onRoll: (r) =>
       void send("cbt.rollAbility", {
         combatantId: c.id,
