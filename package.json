@@ -18,7 +18,6 @@
     "fixtures:reset-load": "bun scripts/fixtures.ts reset-load"
   },
   "dependencies": {
-    "@dice-roller/rpg-dice-roller": "^5.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.4",
@@ -26,6 +25,7 @@
     "konva": "^10.7.1",
     "lucide-react": "^1.55.0",
     "radix-ui": "^1.8.0",
+    "random-js": "2.1.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-konva": "^19.3.0",

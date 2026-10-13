@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { NumberGenerator } from "@dice-roller/rpg-dice-roller";
 import {
   type DiceEngine,
   realContext,
@@ -8,7 +7,7 @@ import {
   seededContext,
   seededDice,
 } from "./context";
-import { rollDice, withDiceEngine } from "./dice";
+import { rollDice } from "./dice";
 
 const draws = (e: DiceEngine, n: number) => Array.from({ length: n }, () => e.next());
 const isInt32 = (v: number) => Number.isInteger(v) && v >= -(2 ** 31) && v < 2 ** 31;
@@ -55,7 +54,7 @@ describe("FR-DICE-03 ctx.dice seam", () => {
   });
 });
 
-describe("FR-DICE-03 dice library behind the seam", () => {
+describe("FR-DICE-03 dice roller behind the seam", () => {
   test("FR-DICE-08 per-die results with kept flags (#140), totals from kept dice + constants", () => {
     const e = seededDice({ disposable: true, key: "per-die" });
     const r = rollDice(e, "2d20kh1 + 3d6 - 2");
@@ -84,18 +83,25 @@ describe("FR-DICE-03 dice library behind the seam", () => {
     expect(r.dice[0]).toHaveLength(4);
   });
 
-  test("FR-DICE-03 the library's global generator is restored; no default engine outside the seam", () => {
-    const before = NumberGenerator.generator.engine;
-    rollDice(seededDice({ disposable: true, key: "x" }), "1d20");
-    expect(NumberGenerator.generator.engine).toBe(before);
-    // Rolling outside withDiceEngine hits the guard, never Math.random.
-    expect(() => NumberGenerator.generator.integer(1, 20)).toThrow(/outside ctx\.dice/);
-    // Restored even when the evaluation throws.
-    expect(() => rollDice(realDice(), "not dice")).toThrow();
-    expect(NumberGenerator.generator.engine).toBe(before);
-    expect(() => withDiceEngine(realDice(), () => Promise.resolve(1) as unknown as number)).toThrow(
-      /synchronous/,
-    );
-    expect(NumberGenerator.generator.engine).toBe(before);
+  test("FR-DICE-03 no default engine: a roll without an engine throws, never Math.random", () => {
+    expect(() => rollDice(undefined as unknown as DiceEngine, "1d20")).toThrow(/outside ctx\.dice/);
+    expect(() => rollDice({} as DiceEngine, "1d20")).toThrow(/outside ctx\.dice/);
+    expect(() => rollDice(realDice(), "not dice")).toThrow(/Invalid dice expression/);
+  });
+
+  test("FR-DICE-03 one engine draw per die, in notation order", () => {
+    const seen: number[] = [];
+    let n = 0;
+    const counting: DiceEngine = {
+      next() {
+        seen.push(n);
+        return n++;
+      },
+    };
+    const r = rollDice(counting, "2d4kl1+3-1d8");
+    expect(seen).toEqual([0, 1, 2]);
+    expect(r.dice.map((g) => g.map((d) => d.value))).toEqual([[1, 2], [3]]);
+    expect(r.dice[0]?.map((d) => d.kept)).toEqual([true, false]);
+    expect(r.total).toBe(1 + 3 - 3);
   });
 });

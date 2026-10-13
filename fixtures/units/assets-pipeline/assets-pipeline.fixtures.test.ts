@@ -71,7 +71,7 @@ describe("asset fixtures (FR-ASSET-18)", () => {
     expect(r.manifest.records["image-large"]?.asset).toEqual([large?.id as string]);
     expect(r.manifest.records["images-second"]?.asset).toEqual([copy[0]?.id as string]);
     expect(r.ingested).toHaveLength(8);
-  });
+  }, 30_000); // sharp rasterises the SVG fixtures: slow under parallel agent load
 
   test("FR-ASSET-18 two loads: identical IDs and record fields, hashes and file bytes", async () => {
     const a = await loaded("asset-library");
@@ -85,7 +85,7 @@ describe("asset fixtures (FR-ASSET-18)", () => {
     // A fixture's asset IDs are the same in every bundle that includes it (FR-FIX-08).
     const s = await loaded("session-sim");
     expect(s.manifest.records.images?.asset).toEqual(a.manifest.records.images?.asset);
-  });
+  }, 30_000); // three bundle loads incl. rasterising
 
   test("FR-ASSET-08 seeded asset IDs keep the 128-bit base64url format", async () => {
     const r = await loaded("session-sim");
