@@ -59,7 +59,7 @@ export function toastIntentError(err: unknown): void {
 
 /**
  * One intent in flight per control (FR-CBT-29): `send` is a no-op while `busy`; errors toast.
- * Resolves with the ack result, or undefined on failure.
+ * Resolves with the ack result (null for intents without one), or undefined on failure.
  */
 export function useCbtIntent() {
   const connection = useSync((s) => s.connection);
@@ -72,7 +72,8 @@ export function useCbtIntent() {
       inFlight.current = true;
       setBusy(true);
       try {
-        return (await connection.sendIntent(name, payload)) as R;
+        // `?? null`: an ack without a result (cbt.end, note.dismiss) is still a success.
+        return ((await connection.sendIntent(name, payload)) ?? null) as R;
       } catch (err) {
         toastIntentError(err);
         return undefined;

@@ -142,7 +142,8 @@ function Picker({ onPick, disabled }: { onPick(id: string): void; disabled: bool
           placeholder="Add creature…"
           disabled={disabled}
           value={q}
-          onFocus={() => setOpen(true)}
+          // Open on click / typing, not on focus: focus returns here after a pick.
+          onClick={() => setOpen(true)}
           onChange={(e) => {
             setQ(e.target.value);
             setOpen(true);
@@ -151,6 +152,7 @@ function Picker({ onPick, disabled }: { onPick(id: string): void; disabled: bool
             if (e.key === "Enter" && shown[0]) {
               onPick(shown[0].id);
               setQ("");
+              setOpen(false);
             }
             if (e.key === "Escape") setOpen(false);
           }}
@@ -160,6 +162,7 @@ function Picker({ onPick, disabled }: { onPick(id: string): void; disabled: bool
         align="start"
         className="max-h-64 w-[var(--radix-popover-trigger-width)] min-w-64 overflow-auto p-1"
         onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
       >
         {shown.length === 0 ? (
           <p className="p-2 text-sm text-muted-foreground">No creature matches</p>

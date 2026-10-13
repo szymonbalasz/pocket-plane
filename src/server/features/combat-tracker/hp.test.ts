@@ -433,6 +433,16 @@ describe("FR-CBT-21 FR-CBT-25 direct HP and undo", () => {
     );
   });
 
+  test("FR-CBT-25 CBT §13 step 12: cbt.undo after End → conflict 'Nothing to undo'; rows kept", () => {
+    const t = started();
+    t.run(applyHp.name, { combatantId: t.id("Wolf"), kind: "damage", amount: 3 });
+    const last = t.hpRows()[0];
+    t.run(endCommand.name, { encounterId: t.enc.id });
+    const e = t.err(() => t.run(undoCommand.name, { expectedHpChangeId: last?.id as string }));
+    expect(e).toMatchObject({ code: "conflict", message: "Nothing to undo" });
+    expect(t.hpRows()).toEqual([expect.objectContaining({ id: last?.id, undone: false })]);
+  });
+
   test("FR-CBT-14 a monster at 0 HP is skipped; FR-CBT-26 band down", () => {
     const t = started();
     for (const [n, v] of [

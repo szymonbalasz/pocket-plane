@@ -43,6 +43,19 @@ test("FR-CBT-07 FR-CBT-19 FR-CBT-20 FR-CBT-25 FR-CBT-30 start, sheet rolls, appl
   await expect(enc.getByTestId("cbt-enc-xp-base")).toHaveText("250");
   await expect(enc.getByTestId("cbt-enc-xp-adjusted")).toHaveText("625");
   await expect(enc.getByTestId("cbt-enc-total-cr")).toHaveText("1.25");
+  // Step 2: picker "wo" → Wolf ×2 (popover closes after the pick), then −1.
+  const wolfDef = recordId("enemy-2", "imported-entity");
+  const wolfEntry = enc.locator(`[data-testid="cbt-enc-entry"][data-record-id="${wolfDef}"]`);
+  await enc.getByTestId("cbt-enc-picker").click();
+  await enc.getByTestId("cbt-enc-picker").fill("wo");
+  await dm.locator(`[data-testid="cbt-enc-picker-option"][data-value="${wolfDef}"]`).click();
+  await expect(dm.getByTestId("cbt-enc-picker-option")).toHaveCount(0);
+  await expect(wolfEntry).toHaveAttribute("data-value", "2");
+  await expect(enc.getByTestId("cbt-enc-xp-adjusted")).toHaveText("750");
+  await wolfEntry.getByTestId("cbt-enc-entry-dec").click();
+  await expect(wolfEntry).toHaveAttribute("data-value", "1");
+  await expect(enc.getByTestId("cbt-enc-xp-adjusted")).toHaveText("625");
+  await dm.waitForTimeout(800); // debounced save lands before Start
   await expect(
     player.locator('[data-testid="ui-launcher-button"][data-record-id="cbt.initiative"]'),
   ).toHaveCount(0);
@@ -112,6 +125,16 @@ test("FR-CBT-07 FR-CBT-19 FR-CBT-20 FR-CBT-25 FR-CBT-30 start, sheet rolls, appl
     "healthy",
   );
   await expect(init.getByTestId("cbt-init-card")).toHaveCount(1);
+
+  // Step 12: End → the confirm dialog closes; Ended in the list; player Initiative gone.
+  const enc2 = await openWindow(dm, "cbt.encounters");
+  const encRow = enc2.locator(`[data-testid="cbt-enc-row"][data-record-id="${encounterId}"]`);
+  if (await encRow.isVisible()) await encRow.click();
+  await enc2.getByTestId("cbt-enc-end").click();
+  await dm.getByTestId("cbt-enc-end-confirm").click();
+  await expect(dm.getByTestId("cbt-enc-end-confirm")).toHaveCount(0);
+  await expect(enc2.getByTestId("cbt-enc-status")).toHaveText("ended");
+  await expect(shellWindow(player, "cbt.initiative")).toHaveCount(0);
 
   const raw = frames.join("\n");
   for (const s of ["Elite Goblin Warrior", "Ambush at the Ford", '"position"', "hp-change"]) {
