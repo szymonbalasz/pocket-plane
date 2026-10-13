@@ -9,7 +9,6 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Combat-tracker feedback (multi-target, undo per apply, overlays, movedFt, turn alert, rollAbility, shims) | `build/combat-tracker-feedback` (slot 0) | `build-combat-fb` | building | walkthrough → merge → session-sim regression |
-| Polish (AssetPicker submit, alert toast style, loot Move empty state) | `fix/polish` (slot 2) | `build-polish` | building | merge |
 | Phase 4 hardening (crash-recovery pass) | — | — | not started | after feedback + session-sim regression (DM go) |
 | Phase 5 MVP acceptance | — | — | not started | — |
 
@@ -17,7 +16,6 @@ Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish, party-lo
 
 ## Shared-file locks
 
-- `AlertLayer.tsx` / `ShellContext.tsx` (toast styling) → `fix/polish`.
 - `src/client/common/sync/connection.ts`, `store.ts` (`onEvent` / `useEventFrame` for FR-CBT-41) → `build/combat-tracker-feedback`.
 
 ## Pending DM decisions
