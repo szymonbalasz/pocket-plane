@@ -243,7 +243,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 9 | Reveal Wolf; try to delete Goblin 2's token; Remove Goblin 2 | — | Wolf appears, ranks shift, for B, C ≤ 1 s; delete → Toast "Token is in a running encounter"; Goblin 2 gone for B, C |
 | 10 | Next while C is dropped | C back | C: banner, then current turn without reload |
 | 11 | Hard-kill + restart | — | All rejoin; round, turn, HP, pending cards, log intact |
-| 12 | End; Undo | — | B, C Initiative unavailable; Ended in list; "Nothing to undo". No leak string, no console errors |
+| 12 | End | — | B, C Initiative unavailable; Ended in list; DM Initiative shows "No encounter running", no Undo (server answers "Nothing to undo"). No leak string; no app console errors (network errors from deliberate outages are expected) |
 
 ## 14. Dependencies
 
