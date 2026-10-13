@@ -124,6 +124,9 @@ Fixtures, bundles, manifest and lock are **code/files, not DB records**. Only pr
 | `dice-settings` | setup | Public log categories on: attack, damage, initiative, healing | [dice-roll-log](dice-roll-log.md#13-test-plan) | yes | Combat |
 | `rolls-1` | setup | Four DM rolls: public attack, hidden damage "DM-SECRET-ROLL", hidden skill, manual Mira initiative. Requires `dice-settings`, `char-mira`, `enemy-1` | dice-roll-log | no | Combat |
 | `notifications-test` | setup | Seven test-kind notifications across audiences and states (text `SECRET-NOTE` on DM-only ones); test mode only. Requires `player-2` | [notifications](notifications.md#13-test-plan) | no | Combat |
+| `loot-1` | setup | Five loot entries: "Goblin chief's pouch" 12 gp 30 sp; "Potion of healing ×2"; "Silver idol" 500 gp edited to 50 gp; 5 pp; "Paid the ferryman" −2 gp. Pot 5 pp, 60 gp, 30 sp. Side effect: 4 `loot-received` notifications | [party-loot](party-loot.md#13-test-plan) | yes | Reward |
+| `loot-wallets` | setup | Coin moves: pot → Mira 20 gp; pot → Thorn 10 gp 30 sp; Thorn → Mira 2 gp; Mira → outside 1 gp. Requires `loot-1`, `char-mira`, `char-thorn`. No notifications | party-loot | yes | Reward |
+| `loot-second` | setup | Second Campaign entry "SECOND-CAMPAIGN-LOOT" 1 gp (leak check). Requires `campaign-second`; 1 notification there | party-loot | no | Reward |
 
 - **Bundles (this spec):** `base` = `campaign` + `player-1`; `session-sim` = `base` + rows marked yes.
 - **Bundles (other owners):** `sync-probe` = `base` + `player-2` + `campaign-second` + `sync-probes` ([live-sync](live-sync.md)); `campaign-switch` = `base` + `player-2` + `campaign-second` ([campaign-management](campaign-management.md)); `mid-combat` = `combat` + `combat-1` + `combat-hit` + `combat-pending` (combat-tracker, [OQ-FIX-04](#15-open-questions)).
