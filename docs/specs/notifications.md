@@ -19,7 +19,7 @@ wave: 2
 - `notification` record type: kind, audience, text, payload, optional action, state, resolution, timestamps. Persisted, campaign-scoped, windowed snapshot ([ADR-0029](../architecture/adr/0029-windowed-record-types.md)).
 - Server helpers for kind owners: `notify`, `resolveNotification`, `reopenNotification`; server kind registry. Intents `note.dismiss` (DM), `note.resolve` (opt-in kinds).
 - Client view registries (icon, renderer, action handler); toasts; history window `note.history` in the [play shell](play-shell.md); per-browser unread badge.
-- Test mode only: kind `test` and intent `note.testSend`, so the loop is built and walked through before combat-tracker exists. MVP kinds: `damage-card` (combat-tracker), `test` (test mode). `loot-received` deferred to the Reward gate (#139 P28).
+- Test mode only: kind `test` and intent `note.testSend`, so the loop is built and walked through before combat-tracker exists. MVP kinds: `damage-card` (combat-tracker), `test` (test mode). `loot-received` owned by [party-loot](party-loot.md) (#146).
 
 ## 3. Goals
 
@@ -213,7 +213,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | ~~OQ-NOTE-01~~ | ~~Who may resolve an action?~~ | Decided (#136): only the DM applies or dismisses damage cards (owner `dm`). Mechanism: action owner + DM (ADR-0016 "named actor" row; MVP's only player-owned kind is `test`) | — | combat-tracker, ADR-0016 |
-| ~~OQ-NOTE-02, 04, 06, 08, 09~~ | ~~Game log as feed; toast timing; damage-card owner; `loot-received`; where "seen" lives~~ | Decided: 02 separate windows (I6); 04 info 6 s, paused on hover / hidden tab, pending stays (#139 P26); 06 combat-tracker owns `damage-card` (I7); 08 deferred to the Reward gate (#139 P28); 09 browser `localStorage` per (campaign, owner) (#139 P27) | — | dice-roll-log, combat-tracker, party-loot |
+| ~~OQ-NOTE-02, 04, 06, 08, 09~~ | ~~Game log as feed; toast timing; damage-card owner; `loot-received`; where "seen" lives~~ | Decided: 02 separate windows (I6); 04 info 6 s, paused on hover / hidden tab, pending stays (#139 P26); 06 combat-tracker owns `damage-card` (I7); 08 `loot-received` owned by party-loot, info to everyone (#146); 09 browser `localStorage` per (campaign, owner) (#139 P27) | — | dice-roll-log, combat-tracker, party-loot |
 | ~~OQ-NOTE-03, 05, 07~~ | ~~History retention; creation; undo of applied damage~~ | Decided: 03 keep all in DB, snapshot = pending (pinned) + newest 100 closed, no load-older (#137, ADR-0029); 05 `notify` inside the causing command's transaction (#135, ADR-0027); 07 undo reopens the card, no Redo, owner event first (#139 P4, I28) | — | live-sync, combat-tracker |
 | ~~OQ-NOTE-10, 12~~ | ~~Kind + view registries append-only; glossary "Action owner"~~ | Decided (integrator): both registries on the AGENTS §9.9 list (paths §14); glossary adds **Action owner** | — | AGENTS.md, glossary |
 | ~~OQ-NOTE-11~~ | ~~Damage card audience~~ | Decided (#138): rolling player sees the card and its resolution incl. damage applied; DM attacks: `dm` | — | combat-tracker |
@@ -223,6 +223,6 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 ## 16. Out of scope
 
 - Concentration, duration and turn reminders; rule listeners → [combat-extras](post-mvp/combat-extras.md), ADR-0027 C.
-- Roll requests → [dice-extras](post-mvp/dice-extras.md) (future kind, player owner). Kill-feed toasts → [stats](post-mvp/stats.md). `loot-received` → party-loot (Reward gate).
+- Roll requests → [dice-extras](post-mvp/dice-extras.md) (future kind, player owner). Kill-feed toasts → [stats](post-mvp/stats.md). `loot-received` → [party-loot](party-loot.md) (#146).
 - [Gems](post-mvp/gems.md) (#140): modifying a pending damage card's dice is combat-tracker's command; if card text must change then, a post-MVP `updateNotification` helper (pending only). No MVP change.
 - Load older history, server read state, cross-browser seen marker.
