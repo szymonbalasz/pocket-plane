@@ -2,14 +2,15 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 3 built + feedback fixes merged (#153: diagonal 5/10/5, F9 polish, own dice roller). Now: party-loot build; feedback specs in review → DM gate (2 proposed ADRs).
+**Phase:** 3 built + fixes merged (#153). Feedback specs complete + merged (#154, #155). Now: party-loot walkthrough → merge → `fix/feedback-core` → feedback builds (plan: protocol §28).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| party-loot | `build/party-loot` (slot 4) | `build-party-loot` | building (spec complete #152) | walkthrough → merge |
-| Feedback spec pass (F1, F3, F4, F6, F7, F7.1, F8, #149 checks + saves) | `spec/feedback` | `spec-feedback` | gate passed (#154); round 3: review fixes + ADR 0031/0032 + consolidation | merge → `fix/feedback-core` (after party-loot) → builds |
+| party-loot | `build/party-loot` (slot 4) | `build-party-loot` + `test-party-loot` | walkthrough running | merge (protocol §28 clash: party-loot section → §29) |
+| Play-shell feedback (alert, sound, FR-SHELL-28) | `build/play-shell-feedback` (slot 0) | `build-play-shell-fb` | building | walkthrough → merge |
+| `fix/feedback-core` (4 columns, events, token-overlays.ts, per-kind cap) | — | — | waits for party-loot merge (schema lock) | then entities ∥ scenes-map → character-sheet → combat-tracker |
 | Phase 4 hardening (crash-recovery pass) | — | — | not started | after feedback builds + party-loot (DM go) |
 | Phase 5 MVP acceptance | — | — | not started | — |
 
@@ -17,6 +18,7 @@ Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish).
 
 ## Shared-file locks
 
+- play-shell frame files (`PlayFrame.tsx`, `ShellContext.tsx`, `test-windows.tsx`, top bar) + `GameLog.tsx` → `build/play-shell-feedback`.
 - `src/server/db/` (loot_entry), `src/shared/events/` (loot events), party-loot rows in data-model + protocol → `build/party-loot`. Feedback core waits and rebases.
 
 ## Pending DM decisions
