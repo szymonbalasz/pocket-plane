@@ -1,7 +1,7 @@
 // e2e-bundle: scenes
 // Thin scenes-map flows (MAP §13 E2E), DM + player-1 in separate contexts: player drags Mira,
-// DM sees it; DM reveals Wolf; feedback: Goblin → square, box select + Ctrl-click + empty click
-// (FR-MAP-31/32/35); DM activates the battlemap; reload.
+// DM sees it; DM reveals Wolf; feedback: Goblin → square (the menu's selection is temporary),
+// box select + Ctrl-click + empty click (FR-MAP-31/32/35); DM activates the battlemap; reload.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, stageScale, tokenNode } from "./support/konva";
@@ -134,12 +134,21 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   const goblin = recordId("battlemap", "token", 1);
   const ogre = recordId("scenes-extras", "token", 2);
   expect(await tokenAttr(dm, ogre, "shape")).toBe("none");
+  // The right-click selects Goblin for its menu only: once the menu closes, the DM's own
+  // selection (Wolf) is back, so no stale target reaches combat's attack popup (FR-CBT-33).
+  const w2 = (await tokenNode(dm, wolf))!;
+  await dm.mouse.click(w2.x, w2.y);
+  await expect.poll(() => selectedIds(dm)).toEqual([wolf]);
   const g = (await tokenNode(dm, goblin))!;
   await dm.mouse.click(g.x, g.y, { button: "right" });
+  await expect.poll(() => selectedIds(dm)).toEqual([goblin]);
   await dm.getByTestId("map-token-menu-shape").click();
   await dm.locator('[data-testid="map-token-shape-option"][data-value="square"]').click();
   await expect.poll(() => tokenAttr(dm, goblin, "shape")).toBe("square");
-  await dm.keyboard.press("Escape");
+  await expect(dm.getByTestId("map-token-menu")).toHaveCount(0); // the pick closed the menu
+  await expect.poll(() => selectedIds(dm)).toEqual([wolf]);
+  await dm.keyboard.press("Escape"); // canvas Esc clears (FR-MAP-31)
+  await expect.poll(() => selectedIds(dm)).toEqual([]);
 
   // FR-MAP-31/32: Shift+drag a box around Goblin (12, 6) and Cave Ogre (9, 10); Ctrl+click
   // Goblin; click empty canvas.
