@@ -2,22 +2,21 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** DM feedback pass fully built and merged (#145–#161). Now: session-sim regression on `main`, then the Phase 4 gate.
+**Phase:** 4 hardening (DM go #162). Feedback pass merged (#145–#161); session-sim regression 12/12.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Session-sim regression (all features) | `main` (slot 1, port 4113) | `test-session-2` | running | follow-up `fix/*` for glitches → DM gate for Phase 4 |
-| Follow-ups (#161: form test IDs, pending toast over Encounters close, Save submenu hover) | — | — | queued | one `fix/*` with the regression findings |
-| Phase 4 hardening (crash-recovery pass) | — | — | not started | needs DM go |
-| Phase 5 MVP acceptance | — | — | not started | — |
+| Playtest polish (regression glitches 1-11 + #161 follow-ups + map-first layout #162) | `fix/playtest-polish` (slot 0) | `build-playtest-polish` | building (holds play-shell frame + window registrations lock) | walkthrough → merge |
+| Phase 4 audit (crash safety per command, DM secret, snapshot sizes, crash walkthrough plan) | `main` (read-only) | `review-hardening` | running | → `fix/hardening` + crash walkthroughs |
+| Phase 5 MVP acceptance | — | — | not started | after Phase 4; then DM playtest |
 
 Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish, party-loot).
 
 ## Shared-file locks
 
-- None.
+- play-shell frame files, window registrations (`src/client/{dm,player}/windows.ts` + feature window defs), protocol §24 → `fix/playtest-polish`.
 
 ## Pending DM decisions
 
