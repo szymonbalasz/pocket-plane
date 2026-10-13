@@ -1,5 +1,6 @@
 // Domain events of character-sheet (CHAR §9, protocol §22). All logged; none undoable.
 // Shared definitions (fix/combat-core); character-sheet emits them.
+import { Ability } from "@shared/entities/schemas";
 import { z } from "zod";
 import { RollMode } from "./dice-roll-log";
 import { defineEvent } from "./types";
@@ -25,7 +26,9 @@ export const CharacterRolled = defineEvent({
   payload: z
     .object({
       characterId: z.string(),
-      kind: z.enum(["initiative", "attack"]),
+      kind: z.enum(["initiative", "attack", "check", "save"]),
+      /** Check / save only (FR-CHAR-21). */
+      ability: Ability.optional(),
       mode: RollMode,
       manual: z.boolean(),
       attackName: z.string().optional(),
