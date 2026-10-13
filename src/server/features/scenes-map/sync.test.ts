@@ -49,7 +49,7 @@ beforeAll(async () => {
     .filter((e) => e.kind === "monster")
     .map((e) => e.id);
   h = await startTestServer({ db, fake: false, testMode: true });
-});
+}, 30_000); // loads the scenes bundle incl. sharp rasterising: > 5 s under parallel agent load
 
 afterAll(async () => {
   await h.stop();
