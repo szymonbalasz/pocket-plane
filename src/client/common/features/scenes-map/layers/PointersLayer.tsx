@@ -1,7 +1,7 @@
 // Pointers layer: drag target + distance (FR-MAP-15/22), ruler (FR-MAP-22), ping pulses
 // (FR-MAP-23) and laser trails (FR-MAP-24). Reads the canvas' pointer store, so 20 laser
 // frames/s re-render only this layer. Konva names: `map-ruler-label`, `map-ping`, `map-laser`.
-import { cellToPx, distanceFt } from "@shared/scenes-map/geometry";
+import { cellToPx, distanceLabel } from "@shared/scenes-map/geometry";
 import { useEffect, useState } from "react";
 import { Circle, Group, Label, Layer, Line, Rect, Tag, Text } from "react-konva";
 import { useStore } from "zustand";
@@ -71,7 +71,7 @@ export function PointersLayer() {
           <DistanceLabel
             name="map-drag-label"
             {...centre(st.drag.to, st.drag.size)}
-            text={`${distanceFt(st.drag.from, st.drag.to)} ft`}
+            text={distanceLabel(st.drag.from, st.drag.to)}
           />
         </Group>
       )}
@@ -91,7 +91,7 @@ export function PointersLayer() {
           <DistanceLabel
             name="map-ruler-label"
             {...centre(st.ruler.to)}
-            text={`${distanceFt(st.ruler.from, st.ruler.to)} ft`}
+            text={distanceLabel(st.ruler.from, st.ruler.to)}
           />
         </Group>
       )}

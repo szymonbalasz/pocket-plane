@@ -437,7 +437,7 @@ An instance of a creature definition: own name, read-only display copies, play s
 | `effectiveStats(def, inst)` | `def.statBlock` in MVP (modifiers hook later) | [FR-ENT-13](../specs/entities.md#6-functional-requirements) |
 | Token footprint | size → 1/1/1/2/3/4 cells | [FR-MAP-14](../specs/scenes-map.md#6-functional-requirements) |
 | Cell → px | `offset + index × cellSize` (display px) | [MAP §8](../specs/scenes-map.md#8-data-model) |
-| Ruler distance | `max(abs Δcol, abs Δrow) × 5 ft` | [FR-MAP-22](../specs/scenes-map.md#6-functional-requirements) |
+| Ruler distance | `5 × (max(dx, dy) + floor(min(dx, dy) / 2))` ft, `dx = abs Δcol`, `dy = abs Δrow` (5/10/5, #145) | [FR-MAP-22](../specs/scenes-map.md#6-functional-requirements) |
 | Rendered window geometry | clamp(stored, viewport), render-only | [FR-SHELL-12](../specs/play-shell.md#6-functional-requirements) |
 
 **Visibility-relevant fields** (full rules: [protocol §12](../protocol/README.md#12-scenes-record-types))

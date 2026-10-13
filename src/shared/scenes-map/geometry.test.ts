@@ -5,6 +5,7 @@ import {
   cellToPx,
   copyName,
   distanceFt,
+  distanceLabel,
   dropCell,
   duplicateCell,
   footprint,
@@ -60,11 +61,33 @@ describe("scenes-map geometry", () => {
     expect(overlapsMap({ ...cellar, gridOffsetX: 0 }, -1, 0, "medium")).toBe(false);
   });
 
-  test("FR-MAP-22 distance: 5 ft per square, diagonal counts 1", () => {
-    expect(distanceFt({ col: 2, row: 7 }, { col: 5, row: 9 })).toBe(15);
-    expect(distanceFt({ col: 5, row: 5 }, { col: 8, row: 5 })).toBe(15);
-    expect(distanceFt({ col: 0, row: 0 }, { col: 0, row: 0 })).toBe(0);
-    expect(distanceFt({ col: 3, row: 3 }, { col: -1, row: 1 })).toBe(20);
+  test("FR-MAP-22 ruler uses 5/10/5 diagonals", () => {
+    const from = { col: 0, row: 0 };
+    const cases: [number, number, number][] = [
+      [0, 0, 0],
+      [1, 1, 5],
+      [2, 2, 15],
+      [3, 3, 20],
+      [4, 4, 30],
+      [5, 2, 30],
+      [2, 5, 30],
+      [3, 0, 15],
+      [0, 3, 15],
+    ];
+    for (const [dx, dy, ft] of cases) {
+      expect(distanceFt(from, { col: dx, row: dy })).toBe(ft);
+      expect(distanceLabel(from, { col: dx, row: dy })).toBe(`${ft} ft`);
+    }
+    // Direction and origin don't matter.
+    expect(distanceFt({ col: 3, row: 3 }, { col: -1, row: -1 })).toBe(30);
+    expect(distanceFt({ col: 7, row: 9 }, { col: 2, row: 7 })).toBe(30);
+  });
+
+  test("FR-MAP-15 drag label uses the ruler's 5/10/5 rule", () => {
+    // Straight 3-cell drag (e2e) and diagonal drags.
+    expect(distanceLabel({ col: 5, row: 5 }, { col: 8, row: 5 })).toBe("15 ft");
+    expect(distanceLabel({ col: 5, row: 5 }, { col: 7, row: 7 })).toBe("15 ft");
+    expect(distanceLabel({ col: 5, row: 5 }, { col: 1, row: 1 })).toBe("30 ft");
   });
 
   test("FR-MAP-16 numbering: Goblin → Goblin 2 → Goblin 3", () => {
