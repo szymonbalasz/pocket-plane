@@ -373,7 +373,7 @@ export const notification = sqliteTable(
     actionRole: text("action_role", { enum: ROLE }),
     actionPlayerId: text("action_player_id").references((): AnySQLiteColumn => player.id),
     state: text("state", { enum: ["info", "pending", "resolved", "dismissed"] }).notNull(),
-    /** JSON leaf ≤ 256 B, per-kind zod. */
+    /** JSON leaf, per-kind zod; ≤ the kind's `resolutionMaxBytes` (default 256 B, FR-NOTE-03). */
     resolution: text("resolution", { mode: "json" }),
     closedAt: text("closed_at"),
     closedByRole: text("closed_by_role", { enum: ROLE }),
