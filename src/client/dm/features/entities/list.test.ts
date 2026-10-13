@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { actionsOf } from "./creature-actions";
 import { creatureRows } from "./list";
 
-const t = { createdAt: "t", updatedAt: "t", portraitAssetId: null };
+const t = { createdAt: "t", updatedAt: "t", portraitAssetId: null, tokenShape: null };
 const monster = (cr: string) => ({
   size: "small",
   ac: 15,
