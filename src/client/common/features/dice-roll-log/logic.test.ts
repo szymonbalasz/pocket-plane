@@ -101,6 +101,17 @@ describe("FR-DICE-27 actor select", () => {
     const p = actorOptions({ role: "player", playerId: "p1" }, ents, scenes, tokens);
     expect(p.some((a) => a.group === "Tokens")).toBe(false);
   });
+
+  test("FR-DICE-27 a character's token on the active scene is not listed twice", () => {
+    const scenes = [{ id: "s1", active: true }];
+    const tokens = [
+      { id: "tm", sceneId: "s1", name: "Mira", seq: 1, definitionId: "m" },
+      { id: "tg", sceneId: "s1", name: "Goblin", seq: 2, definitionId: "g" },
+    ];
+    const dm = actorOptions({ role: "dm", playerId: null }, ents, scenes, tokens);
+    expect(dm.map((a) => a.label)).toEqual(["DM", "Mira", "Thorn", "Goblin"]);
+    expect(dm.find((a) => a.label === "Mira")?.ref).toEqual({ entityId: "m" });
+  });
 });
 
 describe("FR-DICE-21 log order", () => {
