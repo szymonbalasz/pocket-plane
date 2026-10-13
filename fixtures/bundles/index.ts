@@ -10,6 +10,7 @@ import diceLog from "./dice-log";
 import entities from "./entities";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
+import partyLoot from "./party-loot";
 import scenes from "./scenes";
 import sessionSim from "./session-sim";
 import syncProbe from "./sync-probe";
@@ -28,4 +29,5 @@ export const bundles: readonly Bundle[] = [
   characterSheet,
   combat,
   midCombat,
+  partyLoot,
 ];

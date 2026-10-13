@@ -9,6 +9,7 @@ import { dmInitiativeWindow } from "./features/combat-tracker/initiative-window"
 import { dmDiceLogWindow } from "./features/dice-roll-log/log-window";
 import { creaturesWindow } from "./features/entities/creatures-window";
 import { notificationsHistoryWindow } from "./features/notifications/history-window";
+import { dmLootLogWindow } from "./features/party-loot/loot-window";
 import { playersWindow } from "./features/play-shell/players-window";
 import { scenesWindow } from "./features/scenes-map/scenes-window";
 
@@ -24,6 +25,7 @@ const windows: WindowDef[] = [
   dmCharSheetWindow, // char.sheet (character-sheet, FR-CHAR-15)
   dmInitiativeWindow, // cbt.initiative (combat-tracker, CBT §7)
   encountersWindow, // cbt.encounters (combat-tracker, CBT §7)
+  dmLootLogWindow, // loot.log (party-loot, FR-LOOT-15)
 ];
 
 export const dmWindows = createWindowRegistry("dm", windows);

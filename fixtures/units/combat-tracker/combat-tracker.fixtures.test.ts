@@ -32,7 +32,13 @@ async function loaded(bundle: string) {
     manifest: r.manifest,
     mira: db.select().from(entity).where(eq(entity.name, "Mira")).get(),
     hpChanges: db.select().from(hpChange).all(),
-    cards: db.select().from(notification).orderBy(asc(notification.seq)).all(),
+    // Damage cards only: session-sim also carries `loot-1`'s loot-received notifications.
+    cards: db
+      .select()
+      .from(notification)
+      .where(eq(notification.kind, "damage-card"))
+      .orderBy(asc(notification.seq))
+      .all(),
     encounters: db.select().from(encounter).orderBy(asc(encounter.seq)).all(),
     entries: db.select().from(encounterEntry).orderBy(asc(encounterEntry.seq)).all(),
     combatants: db.select().from(combatant).orderBy(asc(combatant.position)).all(),
@@ -57,8 +63,10 @@ describe("combat-tracker fixtures (CBT §13)", () => {
       "dice-settings",
       "encounter-1",
       "goblin-2",
+      "loot-1",
       "player-2",
       "char-thorn",
+      "loot-wallets",
       "thorn-battlemap",
     ]);
     expect(r.encounters).toEqual([

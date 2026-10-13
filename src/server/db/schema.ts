@@ -521,12 +521,47 @@ export const hpChange = sqliteTable(
   (t) => [uniqueIndex("hp_change_seq").on(t.seq), index("hp_change_encounter").on(t.encounterId)],
 );
 
+/**
+ * Loot entry (party-loot, `loot-entry`): DM loot / spend (`world → party`) or a coin move. Window
+ * orderBy `seq` (CON-20). Pot and wallets are derived sums, never stored (FR-LOOT-09).
+ */
+export const lootEntry = sqliteTable(
+  "loot_entry",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    kind: text("kind", { enum: ["loot", "move"] }).notNull(),
+    fromKind: text("from_kind", { enum: ["party", "world", "character"] }).notNull(),
+    /** Plain id, no FK (entities has no delete, FR-ENT-14). */
+    fromCharacterId: text("from_character_id"),
+    toKind: text("to_kind", { enum: ["party", "world", "character"] }).notNull(),
+    toCharacterId: text("to_character_id"),
+    text: text("text").notNull(),
+    /** Columns, not JSON: summed per coin (LOOT §8). */
+    cp: integer("cp").notNull(),
+    sp: integer("sp").notNull(),
+    ep: integer("ep").notNull(),
+    gp: integer("gp").notNull(),
+    pp: integer("pp").notNull(),
+    createdAt: text("created_at").notNull(),
+    editedAt: text("edited_at"),
+  },
+  (t) => [
+    uniqueIndex("loot_entry_seq").on(t.seq),
+    index("loot_entry_campaign_seq").on(t.campaignId, t.seq),
+  ],
+);
+
 /** CON-20: `seq` values for Combat inserts, computed by the DB inside the insert's transaction. */
 export const notificationSeqNext = sql<number>`(select coalesce(max(${notification.seq}), 0) + 1 from ${notification})`;
 export const encounterSeqNext = sql<number>`(select coalesce(max(${encounter.seq}), 0) + 1 from ${encounter})`;
 export const encounterEntrySeqNext = sql<number>`(select coalesce(max(${encounterEntry.seq}), 0) + 1 from ${encounterEntry})`;
 export const combatantSeqNext = sql<number>`(select coalesce(max(${combatant.seq}), 0) + 1 from ${combatant})`;
 export const hpChangeSeqNext = sql<number>`(select coalesce(max(${hpChange.seq}), 0) + 1 from ${hpChange})`;
+export const lootEntrySeqNext = sql<number>`(select coalesce(max(${lootEntry.seq}), 0) + 1 from ${lootEntry})`;
 
 export const schema = {
   campaign,
@@ -546,4 +581,5 @@ export const schema = {
   encounterEntry,
   combatant,
   hpChange,
+  lootEntry,
 };

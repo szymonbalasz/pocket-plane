@@ -25,6 +25,9 @@ import enemyCustom from "./entities/enemy-custom";
 import enemyCustomSecond from "./entities/enemy-custom-second";
 import syncProbes from "./live-sync/sync-probes";
 import notificationsTest from "./notifications/notifications-test";
+import loot1 from "./party-loot/loot-1";
+import lootSecond from "./party-loot/loot-second";
+import lootWallets from "./party-loot/loot-wallets";
 import battlemap from "./scenes-map/battlemap";
 import scenesExtras from "./scenes-map/scenes-extras";
 import town from "./scenes-map/town";
@@ -58,4 +61,7 @@ export const units: readonly Fixture[] = [
   combat1,
   combatHit,
   combatPending,
+  loot1,
+  lootWallets,
+  lootSecond,
 ];

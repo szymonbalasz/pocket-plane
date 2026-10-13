@@ -2,11 +2,13 @@
 // adds one import and one line in the list; nothing else changes here.
 import { testNotificationView } from "@ui/features/notifications/test-view";
 import { createNotificationViews, type NotificationView } from "@ui/features/notifications/views";
+import { lootReceivedView } from "@ui/features/party-loot/note-view";
 import { playerDamageCardView } from "./features/combat-tracker/card-view";
 
 const views: NotificationView[] = [
   testNotificationView, // test (notifications, FR-NOTE-22), test mode
   playerDamageCardView, // damage-card (combat-tracker, FR-CBT-30)
+  lootReceivedView, // loot-received (party-loot, FR-LOOT-14)
 ];
 
 export const playerNotificationViews = createNotificationViews(views);
