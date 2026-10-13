@@ -2,7 +2,7 @@
 // reveal/hide, player edit, reload survives, invalid link. Bundle: sync-probe.
 import { expect, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { openWindow } from "./support/shell";
+import { openWindow, shellWindow } from "./support/shell";
 
 test("DM and players: login, join, presence, reveal/hide, edit, reload, invalid link", async ({
   browser,
@@ -66,4 +66,44 @@ test("DM and players: login, join, presence, reveal/hide, edit, reload, invalid 
   await expect(p4.getByTestId("camp-invalid-link")).toHaveText(
     "This link isn't recognised. Check that you opened the whole link your DM sent.",
   );
+});
+
+test("CAMP §7 Players window at default size: both rows, Add player and the loopback warning fully shown", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  for (const [width, height] of [
+    [1280, 720],
+    [1600, 900],
+  ] as const) {
+    await dm.setViewportSize({ width, height });
+    if (width === 1280) await loginDm(dm, secret);
+    else await dm.reload();
+    const win = shellWindow(dm, "camp.players");
+    await expect(win.getByTestId("camp-player-row")).toHaveCount(2);
+    // The e2e server listens on 127.0.0.1, so the warning is on.
+    await expect(win.getByTestId("camp-players-loopback-warning")).toBeVisible();
+    const clipped = await win.evaluate(
+      (w, ids) => {
+        const box = w.getBoundingClientRect();
+        return ids.flatMap((id) =>
+          [...w.querySelectorAll(`[data-testid='${id}']`)]
+            .filter((el) => {
+              const r = el.getBoundingClientRect();
+              return r.height === 0 || r.top < box.top - 0.5 || r.bottom > box.bottom + 0.5;
+            })
+            .map(() => id),
+        );
+      },
+      [
+        "camp-player-row",
+        "camp-player-add-name",
+        "camp-player-add-submit",
+        "camp-players-loopback-warning",
+      ],
+    );
+    expect(clipped).toEqual([]);
+  }
+  await dm.context().close();
 });

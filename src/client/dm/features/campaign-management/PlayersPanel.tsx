@@ -9,20 +9,7 @@ import {
 import type { PresenceRecord } from "@shared/live-sync/schemas";
 import { ApiError } from "@ui/api";
 import { Button } from "@ui/components/ui/button";
-import {
-  Alert,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Input,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@ui/components/ui/primitives";
+import { Alert, Input, Table, TableBody, TableCell, TableRow } from "@ui/components/ui/primitives";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
 import { CopyIcon } from "lucide-react";
@@ -92,26 +79,17 @@ export function PlayersPanel() {
   }
 
   return (
-    <Card data-testid="camp-players-panel">
-      <CardHeader>
-        <CardTitle>Players</CardTitle>
-      </CardHeader>
-      {/* Rows first: they are what the DM needs at the window's default size; the link base
-          and its warning follow. */}
-      <CardContent className="flex flex-col gap-3">
+    // The `camp.players` window body (its title says "Players"). Rows scroll; the add-player
+    // row and the link base / loopback warning are a pinned footer, so all of it shows at the
+    // window's default size with two players (CAMP §7).
+    <section data-testid="camp-players-panel" className="flex h-full min-h-fit flex-col gap-2">
+      <div className="min-h-9 flex-1 overflow-y-auto">
         {players.length === 0 ? (
           <p className="text-sm text-muted-foreground" data-testid="camp-players-empty">
             Add a player to get a link.
           </p>
         ) : (
-          <Table data-testid="camp-players-table">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-full">Name</TableHead>
-                <TableHead>Online</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+          <Table data-testid="camp-players-table" aria-label="Players">
             <TableBody>
               {players.map((p) => {
                 const token = tokenOf(p.id);
@@ -122,11 +100,11 @@ export function PlayersPanel() {
                     <TableCell
                       data-testid="camp-player-name"
                       title={p.name}
-                      className="max-w-0 truncate whitespace-nowrap font-medium"
+                      className="w-full max-w-0 truncate whitespace-nowrap px-1 py-1 font-medium"
                     >
                       {p.name}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">
+                    <TableCell className="whitespace-nowrap px-1 py-1">
                       <span
                         data-testid="camp-player-online"
                         data-online={isOnline}
@@ -141,10 +119,11 @@ export function PlayersPanel() {
                         {isOnline ? "online" : "offline"}
                       </span>
                     </TableCell>
-                    <TableCell className="flex justify-end gap-1 whitespace-nowrap">
+                    <TableCell className="flex justify-end gap-1 whitespace-nowrap px-1 py-1">
                       <Button
                         size="sm"
                         variant="outline"
+                        className="h-7"
                         data-testid="camp-player-copy-link"
                         data-link={token ? playerLinkUrl(base, token) : undefined}
                         disabled={!token}
@@ -161,7 +140,7 @@ export function PlayersPanel() {
                         submitLabel="Rename"
                         disabled={!live}
                         trigger={
-                          <Button size="sm" variant="ghost">
+                          <Button size="sm" variant="ghost" className="h-7">
                             Rename
                           </Button>
                         }
@@ -178,10 +157,13 @@ export function PlayersPanel() {
             </TableBody>
           </Table>
         )}
+      </div>
+      <div className="flex shrink-0 flex-col gap-2">
         <form className="flex gap-2" onSubmit={add}>
           <Input
             data-testid="camp-player-add-name"
             placeholder="Player name"
+            className="h-8"
             value={newName}
             onChange={(e) => {
               setNewName(e.target.value);
@@ -189,7 +171,7 @@ export function PlayersPanel() {
             }}
             aria-invalid={addError !== null}
           />
-          <Button data-testid="camp-player-add-submit" type="submit" disabled={!live}>
+          <Button data-testid="camp-player-add-submit" type="submit" size="sm" disabled={!live}>
             Add player
           </Button>
         </form>
@@ -198,16 +180,21 @@ export function PlayersPanel() {
             {addError}
           </p>
         )}
-        <p className="text-xs text-muted-foreground">
-          Links use <span data-testid="camp-players-base-url">{base}</span>
-        </p>
-        {isLoopbackUrl(base) && (
-          <Alert variant="warning" data-testid="camp-players-loopback-warning">
-            Links point at this computer ({new URL(base).hostname}); players elsewhere can't open
-            them. Set PP_PUBLIC_BASE_URL to your tunnel URL.
+        {isLoopbackUrl(base) ? (
+          <Alert
+            variant="warning"
+            data-testid="camp-players-loopback-warning"
+            className="px-2 py-1 text-xs"
+          >
+            Links use <span data-testid="camp-players-base-url">{base}</span>: this computer only.
+            Set PP_PUBLIC_BASE_URL to your tunnel URL for players elsewhere.
           </Alert>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Links use <span data-testid="camp-players-base-url">{base}</span>
+          </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

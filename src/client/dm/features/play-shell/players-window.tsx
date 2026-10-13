@@ -1,23 +1,12 @@
 // `camp.players`: campaign-management's players panel as a DM window (FR-SHELL-21).
 import { defineWindow } from "@ui/features/play-shell/registry";
-import { UNCARD } from "@ui/features/play-shell/test-windows";
 import { UsersIcon } from "lucide-react";
 import { PlayersPanel } from "../campaign-management/PlayersPanel";
 
 export const PLAYERS_KIND = "camp.players";
 
-/**
- * The window title already says "Players": hide the panel's own header (title only) and its
- * card padding here, so the rows show at the default size.
- */
-const NO_TITLE = "[&>div>div:first-child]:hidden [&>div>div]:p-0";
-
 function PlayersBody() {
-  return (
-    <div className={`${UNCARD} ${NO_TITLE}`}>
-      <PlayersPanel />
-    </div>
-  );
+  return <PlayersPanel />;
 }
 
 export const playersWindow = defineWindow({
