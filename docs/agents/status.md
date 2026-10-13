@@ -2,13 +2,13 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 4 done (hardening #163–#164, crash walkthrough 12/12 #166). Next: Phase 5 MVP acceptance (DM gate).
+**Phase:** 5 MVP acceptance running (#167). All feature + hardening work merged (#145–#168).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Phase 5 MVP acceptance | — | — | waiting for DM go | fresh `test-mvp`: full session simulation + crash test; then DM playtest |
+| Phase 5 MVP acceptance (session simulation + crash test on final `main`) | `main` (port 4113, `data/verify-mvp`) | `test-mvp` | running | verdict → playtest script for the DM |
 
 Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash).
 
