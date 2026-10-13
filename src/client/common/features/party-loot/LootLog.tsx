@@ -35,6 +35,7 @@ import { timeOf } from "../notifications/parts";
 import {
   type CharacterRef,
   type CoinDraft,
+  canMove,
   draftOf,
   EMPTY_DRAFT,
   editPayload,
@@ -47,6 +48,7 @@ import {
   lootPayload,
   type MoveViewer,
   movePayload,
+  NO_MOVE_TEXT,
   newestFirst,
   submitEnabled,
   toOptions,
@@ -236,6 +238,25 @@ function MoveForm({
     }
   };
   const message = error ?? (!parsed.ok && dirty(text, draft) ? parsed.message : null);
+  if (!canMove(chars, viewer)) {
+    return (
+      <form
+        data-testid="loot-move"
+        onSubmit={(e) => e.preventDefault()}
+        className="flex flex-col gap-1"
+      >
+        <SectionTitle>Move coin</SectionTitle>
+        <div className="flex items-center gap-1">
+          <span data-testid="loot-move-empty" className="flex-1 text-xs text-muted-foreground">
+            {NO_MOVE_TEXT}
+          </span>
+          <Button type="submit" size="sm" data-testid="loot-move-submit" disabled>
+            Move
+          </Button>
+        </div>
+      </form>
+    );
+  }
   return (
     <form data-testid="loot-move" onSubmit={submit} className="flex flex-col gap-1">
       <SectionTitle>Move coin</SectionTitle>

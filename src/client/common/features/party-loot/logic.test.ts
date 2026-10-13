@@ -4,6 +4,7 @@ import type { LootEntryRecord, WalletRecord } from "@shared/party-loot/schemas";
 import { IntentRejected } from "../../sync/connection";
 import {
   type CharacterRef,
+  canMove,
   draftOf,
   EMPTY_DRAFT,
   editedSuffix,
@@ -177,6 +178,14 @@ describe("FR-LOOT-18 Move form options", () => {
     expect(keys(fromOptions(chars, p2))).toEqual(["char:a", "char:t", "party"]);
     expect(keys(toOptions(chars, p2, "party"))).toEqual(["char:a", "char:t"]);
     expect(fromOptions([], p1).map((o) => o.label)).toEqual(["Party pot"]);
+  });
+
+  test("FR-LOOT-18 no characters: no From → To pair (empty state, no Move)", () => {
+    expect(canMove([], dm)).toBe(false);
+    expect(canMove([], p1)).toBe(false);
+    expect(canMove(chars, dm)).toBe(true);
+    expect(canMove(chars, p1)).toBe(true);
+    expect(canMove([{ id: "x", name: "Xan", ownerPlayerId: "p9" }], dm)).toBe(true);
   });
 
   test("FR-LOOT-18 payload mirrors FR-LOOT-06/07", () => {

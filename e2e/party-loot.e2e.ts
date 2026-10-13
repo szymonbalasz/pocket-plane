@@ -74,3 +74,27 @@ test("FR-LOOT-03 FR-LOOT-13 FR-LOOT-15 FR-LOOT-18 DM adds 50 gp → player-1 row
   await player.context().close();
   await dm.context().close();
 });
+
+// Runs last: switches the active campaign and back.
+test("FR-LOOT-18 DM Move form in a campaign without characters: empty state, Move disabled", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const switchTo = async (name: string) => {
+    await dm.getByTestId("camp-campaign-switcher").click();
+    await dm.getByTestId("camp-campaign-option").filter({ hasText: name }).click();
+    await expect(dm.getByTestId("camp-campaign-name")).toHaveText(name);
+  };
+  await switchTo("Second Campaign");
+  const move = (await openWindow(dm, "loot.log")).getByTestId("loot-move");
+  await expect(move.getByTestId("loot-move-empty")).toHaveText(
+    "No characters to move coin to/from",
+  );
+  await expect(move.getByTestId("loot-move-from")).toHaveCount(0);
+  await expect(move.getByTestId("loot-move-submit")).toBeDisabled();
+  await switchTo("Fixture Campaign");
+  await dm.context().close();
+});

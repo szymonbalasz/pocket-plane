@@ -181,6 +181,13 @@ export function toOptions(
   return [PARTY, ...sorted.map(charOption).filter((o) => o.key !== from)];
 }
 
+/** Some From → To pair exists (none in a campaign without characters: every move has one). */
+export function canMove(chars: readonly CharacterRef[], v: MoveViewer): boolean {
+  return fromOptions(chars, v).some((o) => toOptions(chars, v, o.key).length > 0);
+}
+
+export const NO_MOVE_TEXT = "No characters to move coin to/from";
+
 /** FR-LOOT-18: the move's payload, valid per FR-LOOT-06/07, or why not. */
 export function movePayload(
   chars: readonly CharacterRef[],

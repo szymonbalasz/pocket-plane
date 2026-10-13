@@ -115,6 +115,7 @@ export function AssetPicker({
     >
       <div className="flex items-center gap-2">
         <Button
+          type="button"
           size="sm"
           variant="secondary"
           data-testid="asset-picker-upload"
@@ -136,7 +137,9 @@ export function AssetPicker({
           }}
         />
         <span className="text-xs text-muted-foreground">or drop an image here</span>
+        {/* type="button": hosts embed the picker in their own form (New scene, MAP §7). */}
         <Button
+          type="button"
           size="sm"
           className="ml-auto"
           data-testid="asset-picker-select"
