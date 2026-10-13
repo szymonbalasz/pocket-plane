@@ -70,10 +70,11 @@ function PlayerInitiativeBody() {
 export const playerInitiativeWindow = defineWindow({
   ...initiativeWindowBase,
   clients: ["player"],
-  // CBT §7: top-left below the top bar, clear of the tool rail; 340 wide, default open. 440 high
-  // (not 520) so it ends above dice.log at 1600×900 (interim, pending orchestrator).
-  defaultSize: { w: 340, h: 440 },
-  defaultPosition: { anchor: "top-left", dx: 56 },
+  // Player right column, left of `char.sheet` (protocol §24): off the map's centre-left where
+  // tokens usually start (CBT §7's top-left covered them). Compact: read-only rows.
+  defaultSize: { w: 280, h: 400 },
+  minSize: { w: 240, h: 200 },
+  defaultPosition: { anchor: "top-right", dx: 332 },
   available: (store) => startedIn(store) !== null,
   component: PlayerInitiativeBody,
 });

@@ -170,11 +170,12 @@ export const creaturesWindow = defineWindow({
   kind: CREATURES_KIND,
   title: "Creatures",
   clients: ["dm"],
-  defaultSize: { w: 420, h: 520 },
+  // DM left column, second slot (protocol §18): right of `map.scenes`, above `dice.log` at
+  // 1600×900 (ENT §7's "below map.scenes" doesn't fit 720 px). Shares the slot with
+  // `cbt.encounters`; the second one opened goes to the next free slot (FR-SHELL-08).
+  defaultSize: { w: 340, h: 512 },
   minSize: { w: 300, h: 240 },
-  // ENT §7 says top-left below `map.scenes` (300×480), but 480 + 520 px doesn't fit a laptop
-  // viewport (FR-SHELL-08 fit check). Top-left, right of `map.scenes` instead, so both show.
-  defaultPosition: { anchor: "top-left", dx: 312 },
+  defaultPosition: { anchor: "top-left", dx: 368 },
   launcher: { icon: PawPrintIcon, label: "Creatures", order: 30 },
   component: CreaturesBody,
 });

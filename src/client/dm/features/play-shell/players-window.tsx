@@ -21,7 +21,8 @@ export const playersWindow = defineWindow({
   kind: PLAYERS_KIND,
   title: "Players",
   clients: ["dm"],
-  defaultSize: { w: 540, h: 360 },
+  // DM right column, top (protocol §18); `cbt.initiative` below it. Kept small: map first.
+  defaultSize: { w: 400, h: 220 },
   minSize: { w: 360, h: 200 },
   defaultPosition: { anchor: "top-right" },
   defaultOpen: true,

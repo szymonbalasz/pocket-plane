@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { EDGE_GAP, LAUNCHER_CLEAR, type Rect, TOP_BAR_H } from "./geometry";
-import { fittedDefaultRect, placeRect, usableArea } from "./placement";
+import { fittedDefaultRect, placeRect, RAIL_CLEAR, usableArea } from "./placement";
 
 const vp = { w: 1600, h: 900 };
 const small = { w: 1280, h: 720 };
@@ -47,6 +47,14 @@ describe("open placement (FR-SHELL-08)", () => {
     // A third one cascades again and covers neither.
     const third = placeRect(def(), vp, [open, r]);
     expect(overlaps(third, open) || overlaps(third, r)).toBe(false);
+  });
+
+  test("a moved window stays right of the tool rail", () => {
+    const d = def({ defaultPosition: { anchor: "top-left", dx: 356 } });
+    const open = placeRect(d, vp, []);
+    for (const obstacles of [[open], [open, { ...open, y: open.y + open.h + EDGE_GAP }]]) {
+      expect(placeRect(d, vp, obstacles).x).toBeGreaterThanOrEqual(RAIL_CLEAR);
+    }
   });
 
   test("no full-size slot → tallest free slot ≥ min height", () => {

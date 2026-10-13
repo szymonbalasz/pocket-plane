@@ -394,11 +394,11 @@ function CombatDialogs() {
 export const dmInitiativeWindow = defineWindow({
   ...initiativeWindowBase,
   clients: ["dm"],
-  // CBT §7 says right edge, 340×520. At 1600×900 any right-edge 340×520 rect overlaps
-  // camp.players (top-right 540×360); interim (pending orchestrator): left of camp.players,
-  // 340×440 so it ends above dice.log.
-  defaultSize: { w: 340, h: 440 },
-  defaultPosition: { anchor: "top-right", dx: 552 },
+  // CBT §7: right edge. DM right column, below `camp.players` (400×220); fitted to end above
+  // the launcher (352 px high at 720, 532 at 900). 400 wide so AC / HP never wrap.
+  defaultSize: { w: 400, h: 540 },
+  minSize: { w: 320, h: 240 },
+  defaultPosition: { anchor: "top-right", dy: 232 },
   companion: CombatDialogs,
   component: DmInitiativeBody,
 });

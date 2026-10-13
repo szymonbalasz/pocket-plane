@@ -12,6 +12,9 @@ import {
 } from "./geometry";
 import type { WindowDef } from "./registry";
 
+/** Left edge clear of the tool rail (scenes-map's, ≈ 56 px wide) plus a gap. */
+export const RAIL_CLEAR = 68;
+
 export type Placeable = Pick<WindowDef, "defaultPosition" | "defaultSize" | "minSize">;
 
 interface Area {
@@ -96,9 +99,11 @@ export function placeRect(def: Placeable, vp: Viewport, obstacles: readonly Rect
     { x: a.right - w, y: a.bottom - base.h },
   );
 
+  // Moved windows stay right of the tool rail (unless their default is already left of it).
+  const minX = Math.max(a.left, Math.min(base.x, RAIL_CLEAR));
   let best: { rect: Rect; rank: [number, number, number] } | null = null;
   for (const s of spots) {
-    const x = Math.max(a.left, Math.min(s.x, a.right - w));
+    const x = Math.max(minX, Math.min(s.x, a.right - w));
     const y = Math.max(a.top, Math.min(s.y, a.bottom - minH));
     const room = Math.min(base.h, a.bottom - y);
     const free = freeHeight(x, y, w, room, obstacles);
