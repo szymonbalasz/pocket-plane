@@ -5,7 +5,6 @@ import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
-import { eq } from "drizzle-orm";
 import { closeDb, type Db, openFileDb } from "../../db/client";
 import { entity, player } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
@@ -93,24 +92,6 @@ describe("character-sheet bundle over WS", () => {
         .all()
         .map((e) => [e.name, e.id]),
     );
-    // In-test scores per CHAR §13 (the fixture scores are entities'); Pip keeps none.
-    const scores: Record<string, Record<string, unknown>> = {
-      Mira: {
-        speed: 30,
-        abilities: { str: 14, dex: 14, con: 14, int: 10, wis: 12, cha: 10 },
-        saveProficiencies: ["str", "con"],
-      },
-      Thorn: {
-        abilities: { str: 8, dex: 16, con: 14, int: 12, wis: 10, cha: 13 },
-        saveProficiencies: ["dex", "int"],
-      },
-    };
-    for (const [name, extra] of Object.entries(scores)) {
-      const id = ids[name] as string;
-      const row = db.select().from(entity).where(eq(entity.id, id)).get();
-      const statBlock = { ...(row?.statBlock as object), ...extra };
-      db.update(entity).set({ statBlock }).where(eq(entity.id, id)).run();
-    }
     h = await startTestServer({ db, fake: false });
   });
 

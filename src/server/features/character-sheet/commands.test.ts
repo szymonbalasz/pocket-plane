@@ -17,6 +17,9 @@ import { miraBlock } from "../entities/testing";
 import { charAdjustHp, charRoll } from "./commands";
 import { characters } from "./index";
 
+// Pip (CHAR §13): Mira's block without attack, speed or ability scores.
+const { speed: _sp, abilities: _ab, saveProficiencies: _sv, ...pipBase } = miraBlock;
+
 function setup(seed?: string) {
   const { s } = diceServices(seed);
   const seeded = seedDice(s);
@@ -26,7 +29,7 @@ function setup(seed?: string) {
       kind: "character",
       name: "Pip",
       ownerPlayerId: seeded.p1.id,
-      statBlock: { ...miraBlock, attacks: [], className: "Wizard", hpMax: 8 },
+      statBlock: { ...pipBase, attacks: [], className: "Wizard", hpMax: 8 },
     },
     { actor: seeded.dm },
   );
@@ -201,15 +204,7 @@ describe("FR-CHAR-05 FR-CHAR-08 char.roll", () => {
   });
 });
 
-/** In-test scores per CHAR §13 (fixture scores are entities'); Pip keeps none. */
-const MIRA_SCORES = {
-  abilities: { str: 14, dex: 14, con: 14, int: 10, wis: 12, cha: 10 },
-  saveProficiencies: ["str", "con"],
-};
-const THORN_SCORES = {
-  abilities: { str: 8, dex: 16, con: 14, int: 12, wis: 10, cha: 13 },
-  saveProficiencies: ["dex", "int"],
-};
+/** Replaces a character's scores (null = none): stat block edited between click and commit. */
 function withScores(s: Services, id: string, extra: Record<string, unknown> | null) {
   const row = s.db.select().from(entity).where(eq(entity.id, id)).get();
   if (!row) throw new Error(`no entity ${id}`);
@@ -224,12 +219,6 @@ function withScores(s: Services, id: string, extra: Record<string, unknown> | nu
     .where(eq(entity.id, id))
     .run();
 }
-function scored(seed?: string) {
-  const t = setup(seed);
-  withScores(t.s, t.miraId, MIRA_SCORES);
-  withScores(t.s, t.thornId, THORN_SCORES);
-  return t;
-}
 const lineText = (e: { kind: string; actorName: string; payload: unknown } | undefined) =>
   formatEntry(e as EntryLike)
     .segments.map((x) => x.text)
@@ -237,7 +226,7 @@ const lineText = (e: { kind: string; actorName: string; payload: unknown } | und
 
 describe("FR-CHAR-21 checks and saves", () => {
   test("FR-CHAR-21 save / check: category, label, derived bonus, one roll + entry + CharacterRolled {ability}", () => {
-    const t = scored();
+    const t = setup();
     const res = t.s.commands.run(
       charRoll,
       { characterId: t.miraId, kind: "save", ability: "dex", mode: "advantage" },
@@ -283,7 +272,7 @@ describe("FR-CHAR-21 checks and saves", () => {
   });
 
   test("FR-CHAR-21 FR-CHAR-07 manual = 1 entry; line 'Mira — Wisdom save: 15 + 1 = 16', physical", () => {
-    const t = scored();
+    const t = setup();
     t.s.commands.run(
       charRoll,
       { characterId: t.miraId, kind: "save", ability: "wis", manual: [{ diceTotal: 15 }] },
@@ -317,7 +306,7 @@ describe("FR-CHAR-21 checks and saves", () => {
   });
 
   test("FR-CHAR-17 FR-CHAR-21 DM save hidden with defaults, public after setCategoryPublic; player save public", () => {
-    const t = scored();
+    const t = setup();
     const save = (actor: Actor, characterId: string, extra: Record<string, unknown> = {}) =>
       t.s.commands.run(
         "char.roll",
@@ -352,7 +341,7 @@ describe("FR-CHAR-21 checks and saves", () => {
   });
 
   test("FR-CHAR-09 FR-CHAR-21 no scores → conflict; ability missing / on attack / unknown → invalid; nothing written", () => {
-    const t = scored();
+    const t = setup();
     const run = (input: Record<string, unknown>, actor: Actor = t.p1Actor) =>
       t.s.commands.run("char.roll", input, { actor });
     const pip = fail(() => run({ characterId: t.pipId, kind: "check", ability: "dex" }));

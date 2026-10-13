@@ -34,6 +34,11 @@ test("FR-CHAR-10 FR-CHAR-08 player-1 damages Mira and attacks; DM and player-2 s
   await expect(sheet1.getByTestId("char-sheet-attack")).toHaveText(
     "Shortsword +4 \u00b7 1d6+2 piercing",
   );
+  await expect(sheet1.getByTestId("char-sheet-speed")).toHaveText("30 ft");
+  await expect(sheet1.getByTestId("char-sheet-prof")).toHaveText("Prof +2");
+  await expect(
+    sheet1.locator('[data-testid="char-sheet-roll-save"][data-value="str"]'),
+  ).toContainText("+4");
   const dmSheet = await openWindow(dm, "char.sheet");
   await expect(dmSheet.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
   await expect(dmSheet.getByTestId("char-sheet-hp")).toHaveText("12 / 12");
