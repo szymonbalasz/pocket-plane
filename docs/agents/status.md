@@ -8,18 +8,17 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| party-loot | `build/party-loot` (slot 4) | `build-party-loot` + `test-party-loot` | walkthrough running | merge (protocol §28 clash: party-loot section → §29) |
 | Play-shell feedback (alert, sound, FR-SHELL-28) | `build/play-shell-feedback` (slot 0) | `build-play-shell-fb` | building | walkthrough → merge |
-| `fix/feedback-core` (4 columns, events, token-overlays.ts, per-kind cap) | — | — | waits for party-loot merge (schema lock) | then entities ∥ scenes-map → character-sheet → combat-tracker |
+| `fix/feedback-core` (4 columns, events, token-overlays.ts, per-kind cap) | `fix/feedback-core` | `build-feedback-core` | building (holds schema / events / protocol lock) | then entities ∥ scenes-map → character-sheet → combat-tracker |
 | Phase 4 hardening (crash-recovery pass) | — | — | not started | after feedback builds + party-loot (DM go) |
 | Phase 5 MVP acceptance | — | — | not started | — |
 
-Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish).
+Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish, party-loot).
 
 ## Shared-file locks
 
+- `src/server/db/`, `src/shared/events/`, `src/shared/notifications/`, `src/shared/protocol/`, feedback rows in data-model + protocol → `fix/feedback-core`.
 - play-shell frame files (`PlayFrame.tsx`, `ShellContext.tsx`, `test-windows.tsx`, top bar) + `GameLog.tsx` → `build/play-shell-feedback`.
-- `src/server/db/` (loot_entry), `src/shared/events/` (loot events), party-loot rows in data-model + protocol → `build/party-loot`. Feedback core waits and rebases.
 
 ## Pending DM decisions
 
