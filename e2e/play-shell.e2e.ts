@@ -213,6 +213,54 @@ test("FR-SHELL-13 keys from windows never reach the base; window drags drop on t
   await expect(base).toHaveAttribute("data-test-last-drop", "shell.test:main");
 });
 
+test("FR-SHELL-22/24/25/27 Test window Alert: flash + Toast + ping; mute and volume persist per player; no DM speaker", async ({
+  browser,
+}) => {
+  const { secret, link } = e2eEnv();
+  const p = await rolePage(browser);
+  await p.goto(link("Player 1"));
+  const topbar = p.getByTestId("ui-topbar");
+  const speaker = p.getByTestId("ui-sound-button");
+  await expect(speaker).toHaveAttribute("data-state", "locked"); // no interaction yet
+  await expect(topbar).toHaveAttribute("data-test-last-sound", "");
+
+  const win = await openWindow(p, "shell.test"); // the launcher click unlocks audio
+  await expect(speaker).toHaveAttribute("data-state", "on");
+  await win.getByTestId("shell-test-alert").click();
+  const flash = p.getByTestId("ui-alert-flash");
+  await expect(flash).toHaveAttribute("data-alert-id", "shell.test");
+  await expect(p.getByTestId("ui-alert-toast")).toHaveText("Test alert");
+  await expect(topbar).toHaveAttribute("data-test-last-sound", "ping:played:1");
+  await expect(flash).toHaveCount(0); // ends by itself (≈ 1.2 s)
+
+  // Volume 40 + mute, reload: settings restored from this player's entry; alert stays silent.
+  await speaker.click();
+  const thumb = p.getByTestId("ui-sound-volume").getByRole("slider");
+  await thumb.focus();
+  await thumb.press("Home");
+  for (let i = 0; i < 4; i++) await thumb.press("PageUp");
+  await expect(p.getByTestId("ui-sound-volume")).toHaveAttribute("data-value", "40");
+  await p.getByTestId("ui-sound-mute").click();
+  await expect(speaker).toHaveAttribute("data-state", "muted");
+  await p.reload();
+  await expect(speaker).toHaveAttribute("data-state", "muted");
+  await speaker.click();
+  await expect(p.getByTestId("ui-sound-volume")).toHaveAttribute("data-value", "40");
+  await p.keyboard.press("Escape");
+  await openWindow(p, "shell.test");
+  await shellWindow(p, "shell.test").getByTestId("shell-test-alert").click();
+  await expect(topbar).toHaveAttribute("data-test-last-sound", "ping:muted:1");
+
+  // Another player's entry is separate (defaults); the DM has no speaker (#154).
+  const p2 = await rolePage(browser);
+  await p2.goto(link("Player 2"));
+  await expect(p2.getByTestId("ui-sound-button")).toHaveAttribute("data-state", "locked");
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("ui-topbar")).toBeVisible();
+  await expect(dm.getByTestId("ui-sound-button")).toHaveCount(0);
+});
+
 /** `playersOnline`: the switch dialog asks first when players are online (CAMP §7). */
 async function switchCampaign(dm: Page, name: string, playersOnline: boolean) {
   await dm.getByTestId("camp-campaign-switcher").click();
