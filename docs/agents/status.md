@@ -10,7 +10,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | F2 diagonal 5/10/5 | `fix/diagonal-rule` (slot 0) | — (builder closed) | code done, unit tests green | rerun check + e2e, tiny walkthrough, merge |
 | F9 + polish (physical badge, safer toggle, DM Init box, Roll-as dup, Goblin log line, toasts over Initiative, e2e wait 30 s) | `fix/dice-polish` (slot 2) | `build-dice-polish` | building | walkthrough → merge |
-| party-loot round 2 (#150 wallets, no guard, review fixes) | `spec/party-loot` | `spec-party-loot` | revising | DM sets complete → consolidate → build |
+| party-loot | `build/party-loot` (slot 4) | `build-party-loot` | building (spec complete #152) | walkthrough → merge |
+| Dice library → own roller (#151) | `fix/dice-engine` (slot 3) | `build-dice-engine` | building | merge first (faster server start for everyone) |
 | Feedback spec pass (F1, F3, F4, F6, F7, F7.1, F8) | `spec/feedback` | `spec-feedback` | writing | + addendum #149 (sheet checks + saves) → review → consolidation |
 | Phase 4 hardening (crash-recovery pass) | — | — | not started | after feedback builds + party-loot (DM go) |
 | Phase 5 MVP acceptance | — | — | not started | — |
@@ -20,6 +21,8 @@ Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9).
 ## Shared-file locks
 
 - `scripts/e2e.ts` → `fix/dice-polish` (server wait 10 s → 30 s).
+- `package.json`, `bun.lock`, `src/server/commands/dice.ts` → `fix/dice-engine`.
+- `src/server/db/` (loot_entry), `src/shared/events/` (loot events), party-loot rows in data-model + protocol → `build/party-loot`. Feedback core waits and rebases.
 
 ## Pending DM decisions
 
@@ -32,4 +35,4 @@ Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9).
 - Feedback spec pass runs as **one** agent across five specs (F3, F7 span several).
 - FR-MAP-22 wording for #145 edited on `main` by the integrator.
 - Physical-dice popover gets a one-off "Roll for me" action (F9 polish).
-- Known flake: `src/server/shutdown.test.ts` and asset fixture tests time out under heavy load (many agents).
+- Server start ~10 s was mathjs via the dice library (#151), not load; fixed by `fix/dice-engine`.
