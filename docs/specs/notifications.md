@@ -135,7 +135,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 
 - **Action owner offline:** the notification waits, no timeout. On reconnect: summary toast, unread badge. The DM can dismiss it meanwhile.
 - **Player disconnect / reconnect:** snapshot restores the list; no per-item toasts; unread from the seen marker. In-flight intents are not resent ([FR-SYNC-05](live-sync.md#6-functional-requirements)); clicking again gives `conflict` if it already committed.
-- **DM disconnect / reconnect:** players unaffected; cards pile up in Pending; one summary toast on return.
+- **DM disconnect / reconnect:** players unaffected; cards pile up in Pending; one summary toast on return. A reconnect within the page keeps sticky (pending) toasts; a reload shows only the summary, pending cards stay under Pending (FR-NOTE-13, #168).
 - **Server crash:** a notification commits with its cause or not at all; a resolve commits with its effect or not at all. After restart: identical snapshots, pending still pending.
 - **Concurrent:** two tabs or a double click → commands run one at a time; the first wins, the rest get `conflict` and roll back. Two tabs of one owner both toast; seen marker last-write-wins.
 - **Target gone before apply:** the kind owner's command fails; the card stays pending; the DM dismisses it.

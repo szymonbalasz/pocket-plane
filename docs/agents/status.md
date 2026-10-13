@@ -8,7 +8,6 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Reconnect toasts (FR-NOTE-15 after reconnect; REST "Failed to fetch" wording) | `fix/reconnect-toasts` (slot 0) | `build-reconnect-toasts` | building | merge |
 | Phase 5 MVP acceptance | — | — | waiting for DM go | fresh `test-mvp`: full session simulation + crash test; then DM playtest |
 
 Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash).
