@@ -1,7 +1,7 @@
 ---
 title: Party loot
 prefix: LOOT
-status: in-review
+status: complete
 owner: spec-party-loot
 wave: 3
 ---
@@ -224,14 +224,14 @@ A **bold** option is the suggested pick unless the row says Decided.
 | OQ-LOOT-03, 04 | 03: Can players add loot entries? 04: Should an entry reference an item entity? | 03: **No in MVP** (additive `addedByPlayerId` later) / yes. 04: **No MVP column; nullable `itemEntityId` later** / reserve the column now | no · owner: spec-party-loot | post-mvp/party-board, post-mvp/world-builder |
 | OQ-LOOT-07 | Is `loot.log` open by default? | **Closed; the toast and the launcher open it** / open for players | no · owner: spec-party-loot | play-shell |
 | OQ-LOOT-08 | Gems (DM award, per character) and the loot log? | **Gems own their counters; a gem award may also call `partyLoot.add`; no MVP field** / gems as loot entries | no · owner: gems | post-mvp/gems |
-| OQ-LOOT-09 | Glossary: amend **Party loot** to "Shared, party-visible log of the party's coin and rewards: loot the DM gives, party spending, and coin moves between the party pot and wallets". Add **Loot entry** ("one row of the party loot log: loot (text + signed coins, DM) or a coin move"), **Party pot** ("the party's shared coin per denomination, derived from the log"), **Wallet** ("one character's coin per denomination, derived from coin moves") and **Coin move** ("a logged transfer of coin between the party pot, wallets and outside the party") | **Amend + add all four** / reuse "party loot" only | no · owner: integrator | glossary |
+| ~~OQ-LOOT-09~~ | ~~Glossary terms~~ | **Decided (#152):** glossary amends **Party loot** and adds **Loot entry**, **Party pot**, **Wallet**, **Coin move** | — | glossary |
 | ~~OQ-LOOT-10~~ | ~~Does the tracker record spending, and is there a guard?~~ | **Decided (#150):** signed coins; no below-zero guard; negatives shown with "−"; the DM edits typos | — | post-mvp/party-board |
 | ~~OQ-LOOT-11~~ | ~~Edit details~~ | **Decided (#150):** no notification on edit; "Edited" Badge for all; no delete. Spec adds the "(edited)" suffix on the notification row (FR-LOOT-14) | — | notifications |
-| OQ-LOOT-12 | [OQ-NOTE-08](notifications.md#15-open-questions), notifications §2 and [protocol §23](../protocol/README.md#23-combat-notification-kinds) still read "deferred to the Reward gate" | **The integrator marks OQ-NOTE-08 decided by #146 and adds the `loot-received` row at merge** / revise the notifications spec | no · owner: integrator | notifications, protocol |
-| OQ-LOOT-13 | Do players see other PCs' wallets? | **Yes, full: a trusted table plans purchases together, and moves already name both ends** / own wallet only (moves between others hidden too; needs a denormalised `ownerPlayerId` on rows, refreshed on owner change) | no · owner: DM | entities (ADR-0024 covers sheets, not wallets) |
-| OQ-LOOT-14 | How does coin leave or enter a wallet from outside the party (shop, direct award)? | **DM only, via a move with a `world` end ("Outside the party")** / players may spend their own wallet to `world` too / no `world` end (DM moves the coin to the pot, then adds a negative loot entry) | no · owner: DM | post-mvp/party-board |
-| OQ-LOOT-15 | Moves: notify? editable? | **No notification (the log + live wallets show it); not editable, corrected by a reverse move** / info to the receiving character's owner / editable like loot | no · owner: DM | notifications |
-| OQ-LOOT-16 | Should `char.sheet` also show the character's wallet? | **Not in MVP; the loot window shows it** / a read-only coin row on the sheet that reads `wallet` (a [character-sheet](character-sheet.md) change) | no · owner: spec-character-sheet | character-sheet |
+| ~~OQ-LOOT-12~~ | ~~Stale "deferred" text in notifications / protocol~~ | **Decided (#152):** integrator marked OQ-NOTE-08 decided by #146; the build adds the `loot-received` row to protocol §23 | — | notifications, protocol |
+| ~~OQ-LOOT-13~~ | ~~Do players see other PCs' wallets?~~ | **Decided (#152):** yes, every wallet (trusted table; moves already name both ends) | — | — |
+| ~~OQ-LOOT-14~~ | ~~Coin from / to outside the party~~ | **Decided (#152):** DM only, via a move with a `world` end ("Outside the party") | — | — |
+| ~~OQ-LOOT-15~~ | ~~Moves: notify? editable?~~ | **Decided (#152):** no notification; not editable, corrected by a reverse move | — | — |
+| ~~OQ-LOOT-16~~ | ~~Wallet on `char.sheet`?~~ | **Decided (#152):** not in MVP; the loot window shows wallets | — | character-sheet |
 
 ## 16. Out of scope
 
