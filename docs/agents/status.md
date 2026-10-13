@@ -2,14 +2,17 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 3 built + fixes merged (#153). Feedback specs complete + merged (#154, #155). Now: party-loot walkthrough → merge → `fix/feedback-core` → feedback builds (plan: protocol §28).
+**Phase:** feedback builds (#157). Merged: fixes (#153), party-loot (#156), feedback-core (#157). Plan: protocol §28.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Play-shell feedback (alert, sound, FR-SHELL-28) | `build/play-shell-feedback` (slot 0) | `build-play-shell-fb` | building | walkthrough → merge |
-| `fix/feedback-core` (4 columns, events, token-overlays.ts, per-kind cap) | `fix/feedback-core` | `build-feedback-core` | building (holds schema / events / protocol lock) | then entities ∥ scenes-map → character-sheet → combat-tracker |
+| Play-shell feedback (alert, sound, FR-SHELL-28) | `build/play-shell-feedback` (slot 0) | `test-play-shell-fb` | walkthrough running | merge |
+| Entities feedback (speed, scores, saves, tokenShape, down, fixtures) | `build/entities-feedback` (slot 2) | `build-entities-fb` | building | walkthrough → merge (before character-sheet) |
+| Scenes-map feedback (selection, box, overlays, shape, speed, movement label, ADR-0031 hooks) | `build/scenes-map-feedback` (slot 3) | `build-scenes-map-fb` | building | walkthrough → merge |
+| Character-sheet feedback (speed, checks + saves, FR-CBT-45 route) | `build/character-sheet-feedback` (slot 4) | `build-char-sheet-fb` | building | merge after entities → walkthrough |
+| Combat-tracker feedback | — | — | waits for play-shell, scenes-map, character-sheet | then session-sim regression |
 | Phase 4 hardening (crash-recovery pass) | — | — | not started | after feedback builds + party-loot (DM go) |
 | Phase 5 MVP acceptance | — | — | not started | — |
 
@@ -17,7 +20,6 @@ Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish, party-lo
 
 ## Shared-file locks
 
-- `src/server/db/`, `src/shared/events/`, `src/shared/notifications/`, `src/shared/protocol/`, feedback rows in data-model + protocol → `fix/feedback-core`.
 - play-shell frame files (`PlayFrame.tsx`, `ShellContext.tsx`, `test-windows.tsx`, top bar) + `GameLog.tsx` → `build/play-shell-feedback`.
 
 ## Pending DM decisions
