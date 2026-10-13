@@ -13,7 +13,7 @@ import {
   selectCharacter,
   signed,
 } from "./logic";
-import { CharAdjustHpIntent, CharRollIntent } from "./schemas";
+import { CharAdjustHpIntent, CharRollIntent, SheetRollIntent } from "./schemas";
 
 const mira = {
   initBonus: 2,
@@ -166,5 +166,50 @@ describe("FR-CHAR-02 eligibility", () => {
     expect(selectCharacter(list, "gone")?.id).toBe("a");
     expect(selectCharacter(list, null)?.id).toBe("a");
     expect(selectCharacter([], "a")).toBeNull();
+  });
+});
+
+describe("FR-CHAR-21 checks and saves (feedback pass)", () => {
+  const abilities = { str: 8, dex: 15, con: 12, int: 10, wis: 13, cha: 8 };
+  const pc = { ...mira, level: 5, abilities, saveProficiencies: ["dex" as const] };
+
+  test("FR-CHAR-21 check = d20 + mod, save = d20 + mod (+ PB if proficient); labels, categories", () => {
+    expect(characterRolls(pc, "check", "dex")).toEqual([
+      { expression: "1d20+2", category: "ability-check", label: "Dexterity check", d20: true },
+    ]);
+    expect(characterRolls(pc, "save", "dex")).toEqual([
+      { expression: "1d20+5", category: "saving-throw", label: "Dexterity save", d20: true },
+    ]);
+    expect(characterRolls(pc, "save", "str")?.[0]?.expression).toBe("1d20-1");
+    expect(characterRolls(pc, "check", "int")?.[0]?.expression).toBe("1d20");
+    for (const kind of ["check", "save"] as const) {
+      for (const r of characterRolls(pc, kind, "wis") ?? []) {
+        expect(parseExpression(r.expression).ok).toBe(true);
+        expect(prepareExpression(r.expression, "disadvantage").ok).toBe(true);
+      }
+    }
+  });
+
+  test("FR-CHAR-21 no ability scores → null (caller: conflict); monsters use the CR table", () => {
+    expect(characterRolls({ ...mira, level: 1 }, "check", "dex")).toBeNull();
+    const elite = { ...mira, cr: "1", abilities, saveProficiencies: ["dex" as const] };
+    expect(characterRolls(elite, "save", "dex")?.[0]?.expression).toBe("1d20+4");
+  });
+
+  test("FR-CHAR-05 / FR-CHAR-21 SheetRollIntent: ability required for check / save, else invalid", () => {
+    const ok = (v: object) => SheetRollIntent.safeParse({ characterId: "c", ...v }).success;
+    expect(ok({ kind: "check", ability: "dex" })).toBe(true);
+    expect(ok({ kind: "save", ability: "cha", mode: "advantage", public: true })).toBe(true);
+    expect(ok({ kind: "save", ability: "dex", manual: [{ diceTotal: 12 }] })).toBe(true);
+    expect(ok({ kind: "save", ability: "dex", manual: [{ diceTotal: 1 }, { diceTotal: 2 }] })).toBe(
+      false,
+    );
+    expect(ok({ kind: "check" })).toBe(false);
+    expect(ok({ kind: "save", ability: "luck" })).toBe(false);
+    expect(ok({ kind: "attack", ability: "str" })).toBe(false);
+    expect(ok({ kind: "initiative" })).toBe(true);
+    expect(ok({ kind: "check", ability: "dex", bonus: 3 })).toBe(false);
+    // Today's server schema still refuses the new kinds until the feature build switches.
+    expect(CharRollIntent.safeParse({ characterId: "c", kind: "check" }).success).toBe(false);
   });
 });

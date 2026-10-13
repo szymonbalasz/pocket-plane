@@ -351,23 +351,24 @@ function crProficiency(cr: string): number {
   return 2 + Math.floor(Math.max(n - 1, 0) / 4);
 }
 
-type DerivationStats = { abilities?: Abilities; saveProficiencies?: readonly Ability[] } & (
+/** What the ability helpers read: scores, save proficiencies and `level` (character) or `cr` (monster). */
+export type AbilityStats = { abilities?: Abilities; saveProficiencies?: readonly Ability[] } & (
   | { level: number }
   | { cr: string }
 );
 
 /** Characters: 2 + floor((level − 1) / 4); monsters: the SRD CR table. */
-export function proficiencyBonus(stats: DerivationStats): number {
+export function proficiencyBonus(stats: AbilityStats): number {
   return "level" in stats ? 2 + Math.floor((stats.level - 1) / 4) : crProficiency(stats.cr);
 }
 
 /** Check bonus = the ability modifier; null without scores. */
-export function checkBonus(stats: DerivationStats, ability: Ability): number | null {
+export function checkBonus(stats: AbilityStats, ability: Ability): number | null {
   return stats.abilities ? abilityMod(stats.abilities[ability]) : null;
 }
 
 /** Save bonus = modifier + proficiency bonus if proficient; null without scores. */
-export function saveBonus(stats: DerivationStats, ability: Ability): number | null {
+export function saveBonus(stats: AbilityStats, ability: Ability): number | null {
   if (!stats.abilities) return null;
   const prof = stats.saveProficiencies?.includes(ability) ? proficiencyBonus(stats) : 0;
   return abilityMod(stats.abilities[ability]) + prof;
