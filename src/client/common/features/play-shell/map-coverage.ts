@@ -2,7 +2,21 @@
 // the scene opens (FR-MAP-12), stays uncovered by windows and the top bar. Pure geometry; the
 // layout tests run it on each client's default layout.
 import { fitCamera } from "../scenes-map/camera";
-import { type Rect, TOP_BAR_H, type Viewport } from "./geometry";
+import { EDGE_GAP, LAUNCHER_CLEAR, type Rect, TOP_BAR_H, type Viewport } from "./geometry";
+import { RAIL_CLEAR } from "./placement";
+
+/**
+ * Which screen edge a window touches, if any: left (at the edge or right of the tool rail),
+ * right, top (under the top bar) or bottom (above the launcher). Product windows must be at
+ * the left or right edge (#162); top / bottom alone is mid-map for a landscape map.
+ */
+export function touchedEdge(r: Rect, vp: Viewport): "left" | "right" | "top" | "bottom" | null {
+  if (r.x <= RAIL_CLEAR) return "left";
+  if (r.x + r.w >= vp.w - EDGE_GAP) return "right";
+  if (r.y <= TOP_BAR_H + EDGE_GAP) return "top";
+  if (r.y + r.h >= vp.h - EDGE_GAP - LAUNCHER_CLEAR) return "bottom";
+  return null;
+}
 
 /** The map's on-screen rect right after the scene opens (the canvas fills the viewport). */
 export function fittedMapRect(map: { w: number; h: number }, vp: Viewport): Rect {

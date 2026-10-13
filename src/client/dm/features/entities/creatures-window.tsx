@@ -179,7 +179,6 @@ export const creaturesWindow = defineWindow({
   defaultSize: { w: 340, h: 512 },
   minSize: { w: 300, h: 240 },
   defaultPosition: { anchor: "top-left", dx: 56 },
-  keepEdge: true,
   launcher: { icon: PawPrintIcon, label: "Creatures", order: 30 },
   component: CreaturesBody,
 });

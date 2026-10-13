@@ -17,7 +17,6 @@ export const playersWindow = defineWindow({
   defaultSize: { w: 400, h: 220 },
   minSize: { w: 360, h: 200 },
   defaultPosition: { anchor: "bottom-right" },
-  keepEdge: true,
   launcher: { icon: UsersIcon, label: "Players", order: 10 },
   component: PlayersBody,
 });

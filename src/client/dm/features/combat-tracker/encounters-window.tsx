@@ -619,7 +619,6 @@ export const encountersWindow = defineWindow({
   defaultSize: { w: 440, h: 512 },
   minSize: { w: 360, h: 320 },
   defaultPosition: { anchor: "top-left", dx: 56 },
-  keepEdge: true,
   launcher: { icon: SwordsIcon, label: "Encounters", order: 55 },
   component: EncountersBody,
 });

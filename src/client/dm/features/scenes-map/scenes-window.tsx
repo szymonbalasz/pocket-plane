@@ -448,7 +448,6 @@ export const scenesWindow = defineWindow({
   defaultSize: { w: 260, h: 440 },
   minSize: { w: 240, h: 240 },
   defaultPosition: { anchor: "top-left", dx: 56 },
-  keepEdge: true,
   launcher: { icon: MapIcon, label: "Scenes", order: 20 },
   component: ScenesBody,
 });

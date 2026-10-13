@@ -7,11 +7,10 @@ import { UserRoundIcon } from "lucide-react";
 export const dmCharSheetWindow = defineWindow({
   ...charSheetWindowBase,
   clients: ["dm"],
-  // CHAR §7 says "right, below camp.players"; the right edge is `cbt.initiative`'s (protocol
-  // §24). Top edge, left of it; the next free slot if taken (FR-SHELL-08).
-  // At 1280×720 no 440-px slot is free beside the default windows: it opens shrunk (≥ min) in
-  // the free slot and the sheet scrolls inside down to Damage / Heal.
-  defaultPosition: { anchor: "top-right", dx: 412 },
+  // CHAR §7: right edge (map-first, #162: never mid-map). Bottom-right, so below
+  // `cbt.initiative`, shrunk (≥ min) where it is short; no room there (1280×720) → the left
+  // edge (protocol §24). The sheet scrolls inside down to Damage / Heal.
+  defaultPosition: { anchor: "bottom-right" },
   launcher: { icon: UserRoundIcon, label: "Sheets", order: 50 },
   component: CharacterSheet,
 });

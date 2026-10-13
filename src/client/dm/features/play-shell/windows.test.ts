@@ -2,7 +2,7 @@ import { expect, mock, test } from "bun:test";
 import { emptyStore } from "@shared/protocol/store";
 import { clampRect, type Rect, TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
-import { fittedMapRect, uncoveredShare } from "@ui/features/play-shell/map-coverage";
+import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
 import { availableKinds } from "@ui/features/play-shell/registry";
 
@@ -29,6 +29,7 @@ test("FR-SHELL-21 DM registers camp.players; map-first (#162): closed by default
 const BATTLEMAP = { w: 1400, h: 980 };
 
 const LAPTOP = { w: 1280, h: 720 };
+const WIDE = { w: 1440, h: 900 };
 const DESKTOP = { w: 1600, h: 900 };
 const VIEWPORTS = [LAPTOP, DESKTOP];
 
@@ -80,8 +81,8 @@ test("FR-SHELL-14 DM default layout, map-first (#162): Initiative top-right, log
   }
 });
 
-test("#162 DM Loot, Encounters, Creatures, Scenes open at the left edge (keepEdge: shorter, not mid-map)", () => {
-  for (const viewport of [LAPTOP, { w: 1280, h: 800 }, { w: 1440, h: 900 }, DESKTOP]) {
+test("#162 DM Loot, Encounters, Creatures, Scenes open at the left edge (shorter, not mid-map)", () => {
+  for (const viewport of [LAPTOP, { w: 1280, h: 800 }, WIDE, DESKTOP]) {
     for (const kind of ["loot.log", "cbt.encounters", "ent.creatures", "map.scenes"]) {
       const r = openOnDefaults([kind], viewport).find((w) => w.kind === kind);
       expect({ kind, x: r?.x }).toEqual({ kind, x: 12 + 56 });
@@ -89,12 +90,39 @@ test("#162 DM Loot, Encounters, Creatures, Scenes open at the left edge (keepEdg
   }
 });
 
-test("#162 DM map-first: ≥ 70% of the battlemap uncovered at 1440×900 by the default layout", () => {
-  const viewport = { w: 1440, h: 900 };
-  const map = fittedMapRect(BATTLEMAP, viewport);
-  const share = uncoveredShare(map, openOnDefaults([], viewport), viewport);
-  console.info(`DM default layout leaves ${(share * 100).toFixed(1)}% of the battlemap uncovered`);
-  expect(share).toBeGreaterThanOrEqual(0.7);
+test("#162 every DM window type opens at the left / right edge on the default layout, clear of it (1280×720, 1440×900, 1600×900)", () => {
+  // Registry-driven. Test-mode windows (fixed walkthrough spots) only need some edge.
+  const product = availableKinds(dmWindows, emptyStore());
+  for (const viewport of [LAPTOP, WIDE, DESKTOP]) {
+    for (const d of dmWindows.defs) {
+      const rects = openOnDefaults([d.kind], viewport);
+      const r = rects.find((w) => w.kind === d.kind);
+      if (!r) throw new Error(`${d.kind} not open`);
+      const edge = touchedEdge(r, viewport);
+      const ok = product.has(d.kind) ? edge === "left" || edge === "right" : edge !== null;
+      const at = `${viewport.w}×${viewport.h}`;
+      expect(ok ? "ok" : `${d.kind} opens mid-map at ${at}: x${r.x} y${r.y}`).toBe("ok");
+      if (!product.has(d.kind)) continue;
+      for (const b of rects) {
+        if (b.kind === d.kind) continue;
+        expect(overlaps(r, b) ? `${d.kind} overlaps ${b.kind} at ${at}` : "ok").toBe("ok");
+      }
+    }
+  }
+});
+
+test("#162 DM map-first: battlemap uncovered by the default layout ≥ 70% at 1440×900, ≥ 60% at 1280×720", () => {
+  for (const [viewport, min] of [
+    [WIDE, 0.7],
+    [LAPTOP, 0.6],
+  ] as const) {
+    const map = fittedMapRect(BATTLEMAP, viewport);
+    const share = uncoveredShare(map, openOnDefaults([], viewport), viewport);
+    console.info(
+      `DM default layout at ${viewport.w}×${viewport.h} leaves ${(share * 100).toFixed(1)}% of the battlemap uncovered`,
+    );
+    expect(share).toBeGreaterThanOrEqual(min);
+  }
 });
 
 const RIGHT_COLUMN = new Set(["camp.players", "cbt.initiative"]);
