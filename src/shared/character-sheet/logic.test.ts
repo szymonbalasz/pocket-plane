@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { parseExpression, prepareExpression } from "@shared/dice-roll-log/grammar";
 import {
+  abilityBlock,
   attackLine,
   characterRolls,
   clampHp,
@@ -12,8 +13,9 @@ import {
   parseHpAmount,
   selectCharacter,
   signed,
+  speedText,
 } from "./logic";
-import { CharAdjustHpIntent, CharRollIntent, SheetRollIntent } from "./schemas";
+import { CharAdjustHpIntent, SheetRollIntent } from "./schemas";
 
 const mira = {
   initBonus: 2,
@@ -84,6 +86,48 @@ describe("FR-CHAR-03 formatting", () => {
   });
 });
 
+describe("FR-CHAR-18 FR-CHAR-19 FR-CHAR-20 FR-CHAR-22 speed and abilities block", () => {
+  test("FR-CHAR-18 speed: '30 ft'; absent → '—'", () => {
+    expect(speedText(30)).toBe("30 ft");
+    expect(speedText(0)).toBe("0 ft");
+    expect(speedText(undefined)).toBe("—");
+  });
+
+  test("FR-CHAR-19 FR-CHAR-20 FR-CHAR-22 six cells STR…CHA with derived mod, check, save, proficiency", () => {
+    const stats = {
+      level: 1,
+      abilities: { str: 14, dex: 14, con: 14, int: 10, wis: 12, cha: 10 },
+      saveProficiencies: ["str", "con"] as const,
+    };
+    const b = abilityBlock(stats);
+    expect(b?.proficiency).toBe(2);
+    expect(b?.cells.map((c) => [c.abbr, c.score, c.mod, c.check, c.save, c.proficient])).toEqual([
+      ["STR", 14, 2, 2, 4, true],
+      ["DEX", 14, 2, 2, 2, false],
+      ["CON", 14, 2, 2, 4, true],
+      ["INT", 10, 0, 0, 0, false],
+      ["WIS", 12, 1, 1, 1, false],
+      ["CHA", 10, 0, 0, 0, false],
+    ]);
+    // Level 5 → PB +3; score 1 → −5, 30 → +10.
+    const high = abilityBlock({
+      level: 5,
+      abilities: { str: 1, dex: 30, con: 10, int: 11, wis: 9, cha: 8 },
+      saveProficiencies: ["dex"],
+    });
+    expect(high?.proficiency).toBe(3);
+    expect(high?.cells.map((c) => [c.mod, c.save])).toEqual([
+      [-5, -5],
+      [10, 13],
+      [0, 0],
+      [0, 0],
+      [-1, -1],
+      [-1, -1],
+    ]);
+    expect(abilityBlock({ level: 1 })).toBeNull();
+  });
+});
+
 describe("FR-CHAR-10 clamp", () => {
   test("FR-CHAR-10 clamp(before + delta, 0, hpMax)", () => {
     expect(clampHp(12, -5, 12)).toBe(7);
@@ -116,7 +160,7 @@ describe("FR-CHAR-10 clamp", () => {
 
 describe("FR-CHAR-07 char.roll intent", () => {
   const parse = (v: Record<string, unknown>) =>
-    CharRollIntent.safeParse({ characterId: "c", ...v });
+    SheetRollIntent.safeParse({ characterId: "c", ...v });
   test("FR-CHAR-05 strict: no expression / bonus / damage kind; mode defaults normal", () => {
     const p = parse({ kind: "initiative" });
     expect(p.success && p.data.mode).toBe("normal");
@@ -209,7 +253,5 @@ describe("FR-CHAR-21 checks and saves (feedback pass)", () => {
     expect(ok({ kind: "attack", ability: "str" })).toBe(false);
     expect(ok({ kind: "initiative" })).toBe(true);
     expect(ok({ kind: "check", ability: "dex", bonus: 3 })).toBe(false);
-    // Today's server schema still refuses the new kinds until the feature build switches.
-    expect(CharRollIntent.safeParse({ characterId: "c", kind: "check" }).success).toBe(false);
   });
 });

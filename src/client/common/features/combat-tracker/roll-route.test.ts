@@ -70,4 +70,10 @@ describe("FR-CBT-30 sheet roll routing", () => {
     expect(routeFor(rollRoutes, store(null), "mira", "attack")).toBeNull();
     expect(routeFor(rollRoutes, store(mira), "thorn", "attack")).toBeNull();
   });
+
+  test("FR-CBT-45 checks and saves are never claimed: char.roll even in combat", () => {
+    expect(routeFor(rollRoutes, store(mira), "mira", "check")).toBeNull();
+    expect(routeFor(rollRoutes, store(mira), "mira", "save")).toBeNull();
+    expect(routeFor(rollRoutes, store(mira), "mira", "initiative")).not.toBeNull();
+  });
 });

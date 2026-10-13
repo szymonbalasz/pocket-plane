@@ -10,6 +10,7 @@ import {
   type RollRoute,
   routeFor,
   sendSheetRoll,
+  sheetBadge,
 } from "./routing";
 
 const sent: [string, unknown][] = [];
@@ -81,6 +82,60 @@ describe("FR-CHAR-16 roll routing", () => {
     expect(routeFor(routes, emptyStore(), "thorn", "attack")).toBeNull();
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+describe("FR-CHAR-16 FR-CHAR-23 checks and saves", () => {
+  const initOnly: RollRoute = {
+    name: "init-only",
+    claim: (_store, characterId, kind) =>
+      characterId === "mira" && kind === "initiative"
+        ? { badge: "In combat", send: (s) => s("cbt.rollInitiative", { combatantIds: ["cb"] }) }
+        : null,
+  };
+
+  test("FR-CHAR-23 a route claiming only initiative leaves check / save to char.roll (+ ability)", async () => {
+    sent.length = 0;
+    const store = emptyStore();
+    for (const kind of ["check", "save"] as const) {
+      const claim = routeFor([initOnly], store, "mira", kind);
+      expect(claim).toBeNull();
+      await sendSheetRoll(send, claim, "mira", kind, { mode: "advantage" }, "dex");
+    }
+    await sendSheetRoll(
+      send,
+      null,
+      "mira",
+      "save",
+      {
+        mode: "normal",
+        manual: [{ diceTotal: 15 }],
+        public: true,
+      },
+      "wis",
+    );
+    expect(sent).toEqual([
+      ["char.roll", { characterId: "mira", kind: "check", ability: "dex", mode: "advantage" }],
+      ["char.roll", { characterId: "mira", kind: "save", ability: "dex", mode: "advantage" }],
+      [
+        "char.roll",
+        {
+          characterId: "mira",
+          kind: "save",
+          ability: "wis",
+          mode: "normal",
+          manual: [{ diceTotal: 15 }],
+          public: true,
+        },
+      ],
+    ]);
+  });
+
+  test("FR-CHAR-16 header badge iff a route claims at least one kind; empty registry = plain sheet", () => {
+    expect(sheetBadge([], emptyStore(), "mira")).toBeNull();
+    expect(sheetBadge(rollRoutes, emptyStore(), "mira")).toBeNull();
+    expect(sheetBadge([initOnly], emptyStore(), "mira")).toBe("In combat");
+    expect(sheetBadge([initOnly], emptyStore(), "thorn")).toBeNull();
   });
 });
 

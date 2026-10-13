@@ -1,14 +1,20 @@
 // Sheet roll routing (FR-CHAR-16, #135) and intent helpers (FR-CHAR-12). Pure: no React.
 // The registry list lives in `./roll-routes` (append-only); this file holds the contract.
-import { CHAR_ROLL, type CharRollIntent, type CharRollKind } from "@shared/character-sheet/schemas";
+import {
+  CHAR_ROLL,
+  SHEET_ROLL_KINDS,
+  type SheetRollIntent,
+  type SheetRollKind,
+} from "@shared/character-sheet/schemas";
 import type { ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
+import type { Ability } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { IntentRejected } from "../../sync/connection";
 
 /** What the shared roll control hands the sheet (FR-DICE-24). */
 export interface RollRouteInput {
   mode: RollMode;
-  /** One per expression: initiative 1, attack 2 (to-hit, damage). */
+  /** One per expression: initiative, check, save 1; attack 2 (to-hit, damage). */
   manual?: ManualEntry[];
   /** DM override only. */
   public?: boolean;
@@ -32,7 +38,7 @@ export interface RollRouteClaim {
  */
 export interface RollRoute {
   name: string;
-  claim(store: RecordStore, characterId: string, kind: CharRollKind): RollRouteClaim | null;
+  claim(store: RecordStore, characterId: string, kind: SheetRollKind): RollRouteClaim | null;
 }
 
 /** FR-CHAR-16: the first route that claims, else null (→ `char.roll`). A throwing route passes. */
@@ -40,7 +46,7 @@ export function routeFor(
   routes: readonly RollRoute[],
   store: RecordStore,
   characterId: string,
-  kind: CharRollKind,
+  kind: SheetRollKind,
 ): RollRouteClaim | null {
   for (const r of routes) {
     try {
@@ -53,28 +59,47 @@ export function routeFor(
   return null;
 }
 
+/**
+ * FR-CHAR-16: the header badge iff a route claims at least one kind for this character (combat:
+ * initiative, attack); the first such claim's badge. Null = plain sheet.
+ */
+export function sheetBadge(
+  routes: readonly RollRoute[],
+  store: RecordStore,
+  characterId: string,
+): string | null {
+  for (const kind of SHEET_ROLL_KINDS) {
+    const c = routeFor(routes, store, characterId, kind);
+    if (c) return c.badge;
+  }
+  return null;
+}
+
 /** `char.roll` payload from the roll control's input; only fields that are set. */
 export function charRollPayload(
   characterId: string,
-  kind: CharRollKind,
+  kind: SheetRollKind,
   input: RollRouteInput,
-): CharRollIntent {
-  const p: CharRollIntent = { characterId, kind, mode: input.mode };
+  ability?: Ability,
+): SheetRollIntent {
+  const p: SheetRollIntent = { characterId, kind, mode: input.mode };
+  if (ability) p.ability = ability;
   if (input.manual) p.manual = input.manual;
   if (input.public !== undefined) p.public = input.public;
   return p;
 }
 
-/** FR-CHAR-16: routed intent if a route claims, else `char.roll`. */
+/** FR-CHAR-16: routed intent if a route claims, else `char.roll` (+ `ability` for check / save). */
 export function sendSheetRoll(
   sendIntent: SendIntent,
   claim: RollRouteClaim | null,
   characterId: string,
-  kind: CharRollKind,
+  kind: SheetRollKind,
   input: RollRouteInput,
+  ability?: Ability,
 ): Promise<unknown> {
   if (claim) return claim.send(sendIntent, input);
-  return sendIntent(CHAR_ROLL, charRollPayload(characterId, kind, input));
+  return sendIntent(CHAR_ROLL, charRollPayload(characterId, kind, input, ability));
 }
 
 export const CONNECTION_LOST = "Connection lost \u2014 check the game log / HP before trying again";

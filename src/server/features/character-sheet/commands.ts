@@ -1,4 +1,4 @@
-// `char.roll` (FR-CHAR-05–09, FR-CHAR-17) and `char.adjustHp` (FR-CHAR-09, FR-CHAR-10).
+// `char.roll` (FR-CHAR-05–09, FR-CHAR-17, FR-CHAR-21) and `char.adjustHp` (FR-CHAR-09, FR-CHAR-10).
 // One transaction each: rolls + one log entry + `CharacterRolled`; HP row + `CharacterHpAdjusted`.
 import { characterRolls, sheetAttack } from "@shared/character-sheet/logic";
 import {
@@ -6,8 +6,9 @@ import {
   CHAR_ROLL,
   CharAdjustHpIntent,
   type CharAdjustHpResult,
-  CharRollIntent,
   type CharRollResult,
+  isAbilityRollKind,
+  SheetRollIntent,
 } from "@shared/character-sheet/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import type { CharacterRecord } from "@shared/entities/schemas";
@@ -31,7 +32,7 @@ export function authorizedCharacter(env: CommandEnv, characterId: string): Chara
 
 export const charRoll = defineCommand({
   name: CHAR_ROLL,
-  input: CharRollIntent,
+  input: SheetRollIntent,
   roles: ["dm", "player"],
   authorize(input, env) {
     // FR-CHAR-17: player rolls are always public; a player-sent `public` → forbidden.
@@ -41,8 +42,12 @@ export const charRoll = defineCommand({
   },
   execute(input, env): CharRollResult {
     const c = authorizedCharacter(env, input.characterId);
-    const specs = characterRolls(c.statBlock, input.kind);
-    if (!specs) throw conflict("No weapon attack");
+    // The schema guarantees `ability` for check / save (FR-CHAR-21); stats are read at commit.
+    const ability = isAbilityRollKind(input.kind) ? input.ability : undefined;
+    const specs = ability
+      ? characterRolls(c.statBlock, input.kind, ability)
+      : characterRolls(c.statBlock, input.kind as "initiative" | "attack");
+    if (!specs) throw conflict(ability ? "No ability scores" : "No weapon attack");
     const actor = { kind: "entity" as const, id: c.id, name: c.name };
     const rolls = specs.map((s, i) =>
       dice.evaluate(env, {
@@ -58,7 +63,8 @@ export const charRoll = defineCommand({
     const rollIds = rolls.map((r) => r.id);
     const change = gameLog.append(env, {
       kind: ROLL_KIND,
-      category: input.kind,
+      // attack: the to-hit's category (FR-DICE-26); check / save: ability-check / saving-throw.
+      category: (specs[0] as (typeof specs)[number]).category,
       actorName: c.name,
       payload: rolls.map((r) => dice.rollPayloadItem(r)),
       rollIds,
@@ -73,6 +79,7 @@ export const charRoll = defineCommand({
         kind: input.kind,
         mode: input.mode,
         manual: input.manual !== undefined,
+        ...(ability ? { ability } : {}),
         ...(attack ? { attackName: attack.name } : {}),
         ...(attack?.damageType ? { damageType: attack.damageType } : {}),
         rollIds,

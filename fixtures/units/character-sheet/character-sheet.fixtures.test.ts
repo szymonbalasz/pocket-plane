@@ -18,7 +18,7 @@ afterAll(() => {
 });
 
 describe("character-sheet fixtures (CHAR §13)", () => {
-  test("CHAR §13 character-sheet bundle loads from empty: Mira, Thorn 3/10, Pip without attack", async () => {
+  test("CHAR §13 character-sheet bundle loads from empty: Mira, Thorn 3/10, Pip without attack, speed or scores", async () => {
     const r = await loadBundle("character-sheet");
     dirs.push(r.dir);
     const db = r.openDb();
@@ -53,6 +53,10 @@ describe("character-sheet fixtures (CHAR §13)", () => {
       initBonus: 2,
       attacks: [],
     });
+    // FR-CHAR-18/19: Pip has no speed, scores or save proficiencies.
+    expect(pip?.statBlock).not.toHaveProperty("speed");
+    expect(pip?.statBlock).not.toHaveProperty("abilities");
+    expect(pip?.statBlock).not.toHaveProperty("saveProficiencies");
     expect(log.filter((e) => e.type === "CharacterHpAdjusted")).toHaveLength(1);
     // Game-log settings at defaults (no row = all hidden); no rolls.
     expect(settings).toEqual([]);
