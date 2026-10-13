@@ -155,7 +155,7 @@ function Row({
       data-turn={turn}
       data-hidden={c.hidden === true}
       className={cn(
-        "flex items-center gap-1.5 rounded-md px-1 py-1",
+        "flex items-center gap-1 rounded-md px-1 py-0.5",
         turn && "bg-accent",
         c.hidden && "opacity-70",
       )}
@@ -163,17 +163,21 @@ function Row({
       <TurnMarker active={turn} />
       <Portrait name={c.name} imageAssetId={c.imageAssetId} />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1">
-          <span className="truncate text-sm font-medium" data-testid="cbt-init-row-name">
+        <div className="flex min-w-0 items-center gap-1">
+          <span
+            className="truncate text-sm font-medium"
+            data-testid="cbt-init-row-name"
+            title={c.name}
+          >
             {c.name}
           </span>
           {c.hidden && (
             <EyeOffIcon className="size-3.5 shrink-0 text-muted-foreground" aria-label="Hidden" />
           )}
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
-          <span>AC {ac ?? "—"}</span>
-          <span data-testid="cbt-init-row-hp" data-record-id={c.id}>
+        <div className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+          <span className="shrink-0">AC {ac ?? "—"}</span>
+          <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>
             HP {hp ? `${hp.cur}/${hp.max}` : "—"}
           </span>
           {c.kind === "monster" && hp && (
@@ -218,7 +222,10 @@ function PendingCards({ cards }: { cards: NotificationRecord[] }) {
   const openCard = useCombatDialogs((s) => s.openCard);
   if (cards.length === 0) return null;
   return (
-    <section aria-label="Pending attacks" className="flex flex-col gap-1">
+    <section
+      aria-label="Pending attacks"
+      className="flex max-h-28 shrink-0 flex-col gap-1 overflow-y-auto"
+    >
       <h3 className="text-xs font-medium text-muted-foreground">Pending ({cards.length})</h3>
       {cards.map((n) => (
         <Button
@@ -250,7 +257,7 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
     ? `Undo: ${last.attackerName ?? "DM"} → ${last.targetName}, ${last.kind === "heal" ? "+" : ""}${last.applied}`
     : "Nothing to undo";
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex shrink-0 flex-col gap-1.5">
       <div className="flex items-center gap-2">
         <span className="truncate text-sm font-semibold">{enc.name}</span>
         <span
@@ -336,47 +343,62 @@ function DmInitiativeBody() {
   const active = rows.filter((c) => !c.removed);
   const removed = rows.filter((c) => c.removed);
   return (
-    <div data-testid="cbt-init" data-record-id={enc.id} className="flex min-h-0 flex-col gap-2">
+    // Header + pending cards stay put; the rows scroll inside the window (glitch 3).
+    <div
+      data-testid="cbt-init"
+      data-record-id={enc.id}
+      className="flex h-full min-h-0 flex-col gap-2"
+    >
       <Header enc={enc} rows={rows} />
       <PendingCards cards={cards} />
-      <ul className="flex flex-col gap-0.5">
-        {active.map((c) => (
-          <Row
-            key={c.id}
-            c={c}
-            def={c.entityId ? defs.get(c.entityId) : undefined}
-            turn={enc.turnCombatantId === c.id}
-            defs={defs}
-          />
-        ))}
-      </ul>
-      {removed.length > 0 && (
-        <section aria-label="Removed" className="flex flex-col gap-1">
-          <h3 className="text-xs font-medium text-muted-foreground">Removed</h3>
-          {removed.map((c) => (
-            <div
+      <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+        <div
+          aria-hidden
+          className="sticky top-0 z-10 flex items-center gap-1 bg-card px-1 pb-0.5 text-[11px] text-muted-foreground"
+        >
+          <span className="flex-1 pl-[52px]">Combatant</span>
+          <span className="w-[74px] text-center">Init</span>
+          <span className="w-[60px]" />
+        </div>
+        <ul className="flex flex-col gap-0.5">
+          {active.map((c) => (
+            <Row
               key={c.id}
-              data-testid="cbt-init-row"
-              data-record-id={c.id}
-              data-removed="true"
-              className="flex items-center gap-2 px-1 text-sm text-muted-foreground"
-            >
-              <Portrait name={c.name} imageAssetId={c.imageAssetId} />
-              <span className="flex-1 truncate">{c.name}</span>
-              <Button
-                size="sm"
-                variant="ghost"
-                data-testid="cbt-init-row-restore"
-                data-record-id={c.id}
-                disabled={disabled}
-                onClick={() => void send("cbt.setRemoved", { combatantId: c.id, removed: false })}
-              >
-                Restore
-              </Button>
-            </div>
+              c={c}
+              def={c.entityId ? defs.get(c.entityId) : undefined}
+              turn={enc.turnCombatantId === c.id}
+              defs={defs}
+            />
           ))}
-        </section>
-      )}
+        </ul>
+        {removed.length > 0 && (
+          <section aria-label="Removed" className="flex flex-col gap-1">
+            <h3 className="text-xs font-medium text-muted-foreground">Removed</h3>
+            {removed.map((c) => (
+              <div
+                key={c.id}
+                data-testid="cbt-init-row"
+                data-record-id={c.id}
+                data-removed="true"
+                className="flex items-center gap-2 px-1 text-sm text-muted-foreground"
+              >
+                <Portrait name={c.name} imageAssetId={c.imageAssetId} />
+                <span className="flex-1 truncate">{c.name}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  data-testid="cbt-init-row-restore"
+                  data-record-id={c.id}
+                  disabled={disabled}
+                  onClick={() => void send("cbt.setRemoved", { combatantId: c.id, removed: false })}
+                >
+                  Restore
+                </Button>
+              </div>
+            ))}
+          </section>
+        )}
+      </div>
     </div>
   );
 }
