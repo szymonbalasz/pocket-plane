@@ -88,11 +88,12 @@ function PlayerInitiativeBody() {
 export const playerInitiativeWindow = defineWindow({
   ...initiativeWindowBase,
   clients: ["player"],
-  // Player right column, left of `char.sheet` (protocol §24): off the map's centre-left where
-  // tokens usually start (CBT §7's top-left covered them). Compact: read-only rows.
+  // Player right edge, below `char.sheet` (map-first, #162; protocol §24), shrunk (≥ min)
+  // to the room there; none (1280×720) → the left edge, above `dice.log`. Never mid-map: it
+  // auto-opens on Start, over the tokens. Compact: read-only rows.
   defaultSize: { w: 280, h: 400 },
   minSize: { w: 240, h: 200 },
-  defaultPosition: { anchor: "top-right", dx: 332 },
+  defaultPosition: { anchor: "bottom-right" },
   available: (store) => startedIn(store) !== null,
   component: PlayerInitiativeBody,
   companion: TurnAlertRuntime,

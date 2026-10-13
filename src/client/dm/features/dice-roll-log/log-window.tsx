@@ -27,7 +27,7 @@ function SettingsPopover() {
           data-testid="dice-settings-open"
           size="icon"
           variant="ghost"
-          className="size-8"
+          className="size-7"
           aria-label="Public log settings"
         >
           <SettingsIcon className="size-4" />
@@ -74,8 +74,8 @@ function DmLogBody() {
 export const dmDiceLogWindow = defineWindow({
   ...diceLogWindowBase,
   clients: ["dm"],
-  // DM bottom strip (protocol §24): right of `map.scenes`, left of the right column at 1280.
+  // DM: bottom-left, clear of the tool rail (map-first, #162; protocol §24).
   defaultSize: { w: 460, h: 240 },
-  defaultPosition: { anchor: "bottom-left", dx: 368 },
+  defaultPosition: { anchor: "bottom-left", dx: 56 },
   component: DmLogBody,
 });

@@ -59,7 +59,7 @@ const TEST_WINDOWS = ["shell.test:main", "sync.probes:main"];
 const zOf = (page: Page, kind: string) =>
   shellWindow(page, kind).evaluate((el) => Number((el as HTMLElement).style.zIndex));
 
-test("FR-SHELL-01/02/05/06/21 DM frame: top bar, presence badge, Players window top-right, base empty state", async ({
+test("FR-SHELL-01/02/05/06/21 DM frame: top bar, presence badge, Players window (map-first: closed, opens bottom-right), base empty state", async ({
   browser,
 }) => {
   const { secret } = e2eEnv();
@@ -70,16 +70,18 @@ test("FR-SHELL-01/02/05/06/21 DM frame: top bar, presence badge, Players window 
   // Earlier specs' player pages may still be connected: assert the shape, not the count.
   await expect(dm.getByTestId("ui-presence-badge")).toHaveText(/^[0-2]\/2 online$/);
   await expect(dm.getByTestId("ui-base-empty")).toHaveText("No scenes yet");
+  // Map-first (#162): Players starts closed; the presence badge opens it (FR-SHELL-06).
   const players = shellWindow(dm, "camp.players");
+  await expect(players).toHaveCount(0);
+  await expect(launcherButton(dm, "camp.players")).toHaveAttribute("data-state", "closed");
+  await dm.getByTestId("ui-presence-badge").click();
   await expect(players).toHaveAttribute("data-state", "open");
   await expect(players.getByRole("heading", { name: "Players" })).toBeHidden(); // title bar only
   const b = await box(dm, "camp.players");
-  expect(b.x + b.w).toBeGreaterThan(1280 - 40); // top-right
-  expect(b.y).toBeLessThan(100);
-  // Close it; the presence badge reopens it (FR-SHELL-06).
+  expect(b.x + b.w).toBeGreaterThan(1280 - 40); // right edge
+  // Close it; the badge opens it again.
   await players.getByTestId("ui-window-close").click();
   await expect(players).toHaveCount(0);
-  await expect(launcherButton(dm, "camp.players")).toHaveAttribute("data-state", "closed");
   await dm.getByTestId("ui-presence-badge").click();
   await expect(players).toBeVisible();
 });
@@ -304,8 +306,8 @@ test("FR-SHELL-04/16 campaign switch: DM layout per campaign; player waits, then
   await switchCampaign(dm, "Second Campaign", true);
   await expect(p.getByTestId("camp-waiting")).toBeVisible();
   await expect(p.getByTestId("ui-topbar")).toHaveCount(0);
-  await expect(shellWindow(dm, "camp.players")).toBeVisible();
-  expect(await box(dm, "camp.players")).not.toEqual(dmBox); // new campaign → DM default
+  await expect(dm.getByTestId("ui-topbar")).toBeVisible();
+  await expect(shellWindow(dm, "camp.players")).toHaveCount(0); // new campaign → DM default (closed)
 
   await switchCampaign(dm, "Fixture Campaign", false);
   await expect(shellWindow(dm, "camp.players")).toBeVisible();

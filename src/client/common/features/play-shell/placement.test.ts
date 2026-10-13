@@ -49,6 +49,26 @@ describe("open placement (FR-SHELL-08)", () => {
     expect(overlaps(third, open) || overlaps(third, r)).toBe(false);
   });
 
+  test("#162 edge-first: default column, then the other edge column, then least overlap at an edge; never mid-map", () => {
+    const a = usableArea(vp);
+    const tall = def({ defaultSize: { w: 300, h: 400 }, minSize: { w: 200, h: 150 } });
+    // A log in the left column leaves 200 px above it and 340 below: less than the 400 asked,
+    // yet a shorter slot in the default column beats a full-size one further right.
+    const log = { x: EDGE_GAP, y: 272, w: 300, h: 200 };
+    const kept = placeRect(tall, vp, [log]);
+    expect(kept).toEqual({ x: EDGE_GAP, y: log.y + log.h + EDGE_GAP, w: 300, h: 340 });
+    // No room ≥ min height in the default column → the right edge, full size.
+    const block = { x: EDGE_GAP, y: 140, w: 300, h: 600 };
+    expect(placeRect(tall, vp, [block])).toEqual({ x: a.right - 300, y: a.top, w: 300, h: 400 });
+    // Both edge columns taken, the middle free → overlap at an edge, never mid-map.
+    const right = { x: a.right - 400, y: 0, w: 400, h: vp.h };
+    const left = { x: 0, y: 0, w: 400, h: 740 };
+    const r = placeRect(tall, vp, [left, right]);
+    expect(r.x === EDGE_GAP || r.x + r.w === a.right ? "edge" : `mid-map x${r.x}`).toBe("edge");
+    // Least overlap: min height at the bottom of the left column, over the block's last 66 px.
+    expect(r).toEqual({ x: EDGE_GAP, y: a.bottom - 150, w: 300, h: 150 });
+  });
+
   test("fixedDefault (test-mode windows) always opens at its default rect", () => {
     const open = placeRect(def(), vp, []);
     expect(placeRect(def({ fixedDefault: true }), vp, [open])).toEqual(open);

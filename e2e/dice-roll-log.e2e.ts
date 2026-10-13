@@ -78,7 +78,10 @@ test("FR-DICE-05 FR-DICE-09 FR-DICE-15 player adv roll reaches DM; DM hidden rol
   await expect(plog.getByTestId("dice-roll-submit")).toHaveAttribute("data-physical", "true");
   await plog.getByTestId("dice-roll-expression").fill("1d20");
   await plog.getByTestId("dice-roll-submit").getByTestId("dice-physical-marker").waitFor();
+  await plog.getByTestId("dice-roll-category").selectOption("saving-throw");
   await plog.getByTestId("dice-roll-submit").click();
+  // The popover says what the roll is for (actor — label or category), not just "1d20".
+  await expect(player.getByTestId("dice-manual-label")).toHaveText("Mira — Saving throw");
   await player.getByTestId("dice-manual-auto").click();
   await expect(entries(player)).toHaveCount(5);
   await expect(entries(player).nth(4).getByTestId("dice-log-entry-manual")).toHaveCount(0);

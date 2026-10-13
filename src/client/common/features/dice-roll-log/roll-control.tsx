@@ -4,6 +4,7 @@
 // is never a surprise (#149): every `RollButton` carries a marker, and the popover offers
 // "Roll for me" (one server roll; the mode stays on).
 import {
+  CATEGORY_LABEL,
   categoryPublic,
   GAME_LOG_SETTINGS_TYPE,
   type GameLogSettingsRecord,
@@ -39,6 +40,11 @@ export interface RollControlOptions {
   /** Expressions rolled together (sheet attack = to-hit + damage). */
   expressions: readonly string[];
   category: RollCategory;
+  /**
+   * What the roll is for, e.g. "Mira — Dexterity save": the physical-dice popover's heading
+   * (FR-DICE-07). Absent = the category's label.
+   */
+  label?: string;
   /** Shown instead of `expressions[1…]` when the first is a natural 20 (doubled damage). */
   critExpressions?: readonly string[];
   /** The mode toggle's value; Shift / Ctrl override it for one roll. Default normal. */
@@ -168,7 +174,12 @@ function ManualForm({ control }: { control: RollControl }) {
         control.submitManual(entries);
       }}
     >
-      <p className="text-sm font-medium">Physical dice</p>
+      <div className="flex flex-col gap-0.5">
+        <p className="text-xs text-muted-foreground">Physical dice</p>
+        <p data-testid="dice-manual-label" className="text-sm font-medium">
+          {control.options.label ?? CATEGORY_LABEL[control.options.category]}
+        </p>
+      </div>
       {slots.map((slot, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: one slot per expression position
         <div key={`${i}-${slot.expression}`} className="flex flex-col gap-1.5">

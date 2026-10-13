@@ -118,17 +118,23 @@ function TokenOutline({
 const badgeFill = (c: CanvasContextValue["colors"], tone: TokenBadge["tone"]) =>
   tone === "down" ? c.hpDown : tone === "bloodied" ? c.hpBloodied : c.muted;
 
+/** Badge font, padding and pill height for a footprint `side` at camera `scale`. */
+function badgeMetrics(side: number, scale: number) {
+  const font = Math.max(10 / scale, Math.min(side * 0.2, 13));
+  const pad = font * 0.3;
+  return { font, pad, h: font + 2 * pad };
+}
+
 /** Overlay badges in a row, centred on the footprint's bottom edge (FR-MAP-34). */
 function TokenBadges({ t, side, badges }: { t: TokenView; side: number; badges: TokenBadge[] }) {
   const { colors, cam } = useCanvas();
   if (badges.length === 0) return null;
-  const font = Math.max(10 / cam.scale, Math.min(side * 0.2, 13));
-  const pad = font * 0.3;
+  const { font, pad, h } = badgeMetrics(side, cam.scale);
   const widths = badges.map((b) => b.label.length * font * 0.6 + 2 * pad);
   const gap = font * 0.25;
   const total = widths.reduce((a, b) => a + b, 0) + gap * (badges.length - 1);
   let x = (side - total) / 2;
-  const y = side - (font + 2 * pad) / 2;
+  const y = side - h / 2;
   return (
     <>
       {badges.map((b, i) => {
@@ -176,6 +182,8 @@ function TokenNode({ t }: { t: TokenView }) {
   });
   const ring = deco.ring === "target" ? "target" : selected ? "selected" : null;
   const labelSize = Math.max(11 / cam.scale, Math.min(14, side / 5));
+  // The badge row straddles the bottom edge: the name label moves below its lower half.
+  const badgeBelow = deco.badges.length > 0 ? badgeMetrics(side, cam.scale).h / 2 : 0;
   const setCursor =
     (cursor: string) => (e: { target: { getStage(): { container(): HTMLElement } | null } }) => {
       const stage = e.target.getStage();
@@ -224,9 +232,10 @@ function TokenNode({ t }: { t: TokenView }) {
       <TokenBadges t={t} side={side} badges={deco.badges} />
       <Text
         name="map-token-label"
+        id={t.id}
         text={t.name}
         x={-side}
-        y={side + 2 / cam.scale}
+        y={side + badgeBelow + 2 / cam.scale}
         width={side * 3}
         align="center"
         fontSize={labelSize}

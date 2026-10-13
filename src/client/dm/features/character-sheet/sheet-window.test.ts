@@ -11,5 +11,5 @@ test("FR-CHAR-15 DM char.sheet: closed by default, launcher Sheets, 320×440 (mi
   expect(d?.launcher?.label).toBe("Sheets");
   expect(d?.defaultSize).toEqual({ w: 320, h: 440 });
   expect(d?.minSize).toEqual({ w: 280, h: 320 });
-  expect(d?.defaultPosition.anchor).toBe("top-right"); // left of the right column (§24)
+  expect(d?.defaultPosition.anchor).toBe("bottom-right"); // right edge, below Initiative (§24)
 });

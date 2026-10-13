@@ -1,11 +1,11 @@
 // e2e-bundle: scenes
 // Thin scenes-map flows (MAP §13 E2E), DM + player-1 in separate contexts: player drags Mira,
-// DM sees it; DM reveals Wolf; feedback: Goblin → square, box select + Ctrl-click + empty click
-// (FR-MAP-31/32/35); DM activates the battlemap; reload.
+// DM sees it; DM reveals Wolf; feedback: Goblin → square (the menu's selection is temporary),
+// box select + Ctrl-click + empty click (FR-MAP-31/32/35); DM activates the battlemap; reload.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, stageScale, tokenNode } from "./support/konva";
-import { shellWindow } from "./support/shell";
+import { openWindow, shellWindow } from "./support/shell";
 
 /** A token's map-space cell (Town / Goblin Ambush: 70 px cells, offset 0). */
 async function cellOf(page: Page, tokenId: string) {
@@ -77,7 +77,7 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await loginDm(dm, secret);
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", town);
-  const scenes = shellWindow(dm, "map.scenes");
+  const scenes = await openWindow(dm, "map.scenes"); // closed by default (map-first, #162)
   await expect(scenes.getByTestId("map-scene-row")).toHaveCount(3);
   await expect(scenes.getByTestId("map-folder-row")).toHaveCount(1);
   await expect(
@@ -85,8 +85,8 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
       .locator(`[data-testid="map-scene-row"][data-record-id="${town}"]`)
       .getByTestId("map-scene-live"),
   ).toBeVisible();
-  // The Players window (top-right) would cover part of the map.
-  await shellWindow(dm, "camp.players").getByTestId("ui-window-close").click();
+  // The Initiative window (top-right) would cover part of the map.
+  await shellWindow(dm, "cbt.initiative").getByTestId("ui-window-close").click();
 
   const player = await rolePage(browser);
   const frames: string[] = [];
@@ -134,16 +134,26 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   const goblin = recordId("battlemap", "token", 1);
   const ogre = recordId("scenes-extras", "token", 2);
   expect(await tokenAttr(dm, ogre, "shape")).toBe("none");
+  // The right-click selects Goblin for its menu only: once the menu closes, the DM's own
+  // selection (Wolf) is back, so no stale target reaches combat's attack popup (FR-CBT-33).
+  const w2 = (await tokenNode(dm, wolf))!;
+  await dm.mouse.click(w2.x, w2.y);
+  await expect.poll(() => selectedIds(dm)).toEqual([wolf]);
   const g = (await tokenNode(dm, goblin))!;
   await dm.mouse.click(g.x, g.y, { button: "right" });
+  await expect.poll(() => selectedIds(dm)).toEqual([goblin]);
   await dm.getByTestId("map-token-menu-shape").click();
   await dm.locator('[data-testid="map-token-shape-option"][data-value="square"]').click();
   await expect.poll(() => tokenAttr(dm, goblin, "shape")).toBe("square");
-  await dm.keyboard.press("Escape");
+  await expect(dm.getByTestId("map-token-menu")).toHaveCount(0); // the pick closed the menu
+  await expect.poll(() => selectedIds(dm)).toEqual([wolf]);
+  await dm.keyboard.press("Escape"); // canvas Esc clears (FR-MAP-31)
+  await expect.poll(() => selectedIds(dm)).toEqual([]);
 
   // FR-MAP-31/32: Shift+drag a box around Goblin (12, 6) and Cave Ogre (9, 10); Ctrl+click
   // Goblin; click empty canvas.
-  const empty = await mapToPage(dm, 5 * 70, 12.5 * 70);
+  // Empty canvas clear of the bottom-left game log (map-first layout, #162).
+  const empty = await mapToPage(dm, 10 * 70, 12.5 * 70);
   await dm.mouse.click(empty.x, empty.y);
   await expect.poll(() => selectedIds(dm)).toEqual([]);
   const a = await mapToPage(dm, 8.5 * 70, 5.5 * 70);

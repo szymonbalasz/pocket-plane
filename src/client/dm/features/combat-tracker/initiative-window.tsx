@@ -49,6 +49,7 @@ import {
   EllipsisIcon,
   EyeIcon,
   EyeOffIcon,
+  FootprintsIcon,
   HeartPulseIcon,
   RotateCcwIcon,
   ShieldIcon,
@@ -68,6 +69,7 @@ function InitiativeCell({ c, def }: { c: CombatantView; def: DefinitionRecord | 
   const control = useRollControl({
     expressions: [d20Expression(def?.statBlock.initBonus ?? 0)],
     category: "initiative",
+    label: `${c.name} — Initiative`,
     onRoll: (r) =>
       void send("cbt.rollInitiative", {
         combatantIds: [c.id],
@@ -138,6 +140,7 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
     expressions: attack ? [d20Expression(attack.toHit), attack.damage] : ["1d20"],
     critExpressions: attack ? [critExpression(attack.damage)] : undefined,
     category: "attack",
+    label: attack ? `${c.name} — ${attack.name} attack` : undefined,
     onRoll: async (r) => {
       const res = await send<{ cardId: string }>("cbt.attack", {
         attackerId: c.id,
@@ -185,6 +188,7 @@ function useAbilityRoll(c: CombatantView, kind: AbilityKind, bonus: (a: Ability)
   const control = useRollControl({
     expressions: [d20Expression(bonus(ability) ?? 0)],
     category: kind === "check" ? "ability-check" : "saving-throw",
+    label: `${c.name} — ${ABILITY_NAMES[ability]} ${kind}`,
     onRoll: (r) =>
       void send("cbt.rollAbility", {
         combatantId: c.id,
@@ -212,6 +216,30 @@ interface KeyState {
   ctrlKey?: boolean;
 }
 
+/** Close delay of a row-menu submenu, ms: long enough to cross from the trigger to an item. */
+const SUB_CLOSE_DELAY = 300;
+
+/**
+ * Hover-safe submenu state. At the screen's right edge the submenu flips left, and Radix closes
+ * it when the pointer leaves the trigger in any other direction than its last move (a direct
+ * move from "Save" to "Dexterity"). A close waits `SUB_CLOSE_DELAY`; entering the submenu keeps
+ * it open. Opening is immediate.
+ */
+function useHoverSafeSub() {
+  const [open, setOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return {
+    open,
+    onOpenChange(next: boolean) {
+      clearTimeout(timer.current);
+      if (next) setOpen(true);
+      else timer.current = setTimeout(() => setOpen(false), SUB_CLOSE_DELAY);
+    },
+    keep: () => clearTimeout(timer.current),
+  };
+}
+
 function AbilityMenu({
   c,
   kind,
@@ -226,12 +254,13 @@ function AbilityMenu({
   control: RollControl;
 }) {
   const keys = useRef<KeyState>({});
+  const sub = useHoverSafeSub();
   return (
-    <DropdownMenuSub>
+    <DropdownMenuSub open={sub.open} onOpenChange={sub.onOpenChange}>
       <DropdownMenuSubTrigger data-testid={`cbt-init-row-${kind}`} data-record-id={c.id}>
         <ShieldIcon /> {KIND_LABEL[kind]}
       </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent>
+      <DropdownMenuSubContent onPointerEnter={sub.keep}>
         {ABILITIES.map((a) => (
           <DropdownMenuItem
             key={a}
@@ -274,7 +303,11 @@ function AbilityMenu({
   );
 }
 
-/** "Moved 40 / 30 ft" in the drag label's tone (FR-CBT-39, FR-MAP-37); "Moved 40 ft" without speed. */
+/**
+ * Movement used in the drag label's tone (FR-CBT-39, FR-MAP-37): a footprints icon + "40 / 30 ft"
+ * ("40 ft" without speed), labelled "Moved 40 / 30 ft". Compact so the row's name keeps its room.
+ * Only for a combatant bound to a token: nothing else can move.
+ */
 const TONE_CLASS = {
   none: "",
   normal: "",
@@ -283,16 +316,24 @@ const TONE_CLASS = {
 } as const;
 
 function Moved({ c, speed }: { c: CombatantView; speed: number | undefined }) {
+  if (c.tokenId === null) return null;
   const moved = c.movedFt ?? 0;
   const tone = speed === undefined ? "none" : movementIndicator(moved, null, speed).tone;
+  const text = speed === undefined ? `${moved} ft` : `${moved} / ${speed} ft`;
   return (
     <span
-      className={cn("shrink-0", TONE_CLASS[tone])}
+      className={cn(
+        "ml-auto flex shrink-0 items-center gap-0.5 pl-1 text-xs whitespace-nowrap text-muted-foreground tabular-nums",
+        TONE_CLASS[tone],
+      )}
       data-testid="cbt-init-row-moved"
       data-record-id={c.id}
       data-tone={tone}
+      title={`Moved ${text}`}
     >
-      {speed === undefined ? `Moved ${moved} ft` : `Moved ${moved} / ${speed} ft`}
+      <FootprintsIcon className="size-3" aria-hidden />
+      <span className="sr-only">Moved </span>
+      {text}
     </span>
   );
 }
@@ -344,6 +385,8 @@ function Row({
           {c.hidden && (
             <EyeOffIcon className="size-3.5 shrink-0 text-muted-foreground" aria-label="Hidden" />
           )}
+          {/* On the name line, right-aligned: the AC / HP / band line has no room left. */}
+          <Moved c={c} speed={stats?.speed} />
         </div>
         <div className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs text-muted-foreground tabular-nums">
           <span className="shrink-0">AC {ac ?? "—"}</span>
@@ -353,7 +396,6 @@ function Row({
           {c.kind === "monster" && hp && (
             <BandBadge band={healthBand(hp.cur, hp.max)} testId="cbt-init-row-band" />
           )}
-          <Moved c={c} speed={stats?.speed} />
         </div>
       </div>
       <InitiativeCell c={c} def={def} />
@@ -599,11 +641,11 @@ function CombatDialogs() {
 export const dmInitiativeWindow = defineWindow({
   ...initiativeWindowBase,
   clients: ["dm"],
-  // CBT §7: right edge. DM right column, below `camp.players` (400×220); fitted to end above
-  // the launcher (352 px high at 720, 532 at 900). 400 wide so AC / HP never wrap.
-  defaultSize: { w: 400, h: 540 },
+  // CBT §7: right edge, top (map-first, #162: the DM's only default window besides the log).
+  // 400 wide so AC / HP never wrap; rows scroll under the header (six rows at 420 px).
+  defaultSize: { w: 400, h: 420 },
   minSize: { w: 320, h: 240 },
-  defaultPosition: { anchor: "top-right", dy: 232 },
+  defaultPosition: { anchor: "top-right" },
   companion: CombatDialogs,
   component: DmInitiativeBody,
 });

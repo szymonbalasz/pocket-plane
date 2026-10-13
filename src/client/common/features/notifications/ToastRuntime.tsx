@@ -9,8 +9,8 @@ import { useContext, useEffect, useReducer, useRef } from "react";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
-import { EDGE_GAP, TOP_BAR_H } from "../play-shell/geometry";
 import { useOpenWindow } from "../play-shell/ShellContext";
+import { DM_TOAST_TOP } from "../play-shell/toast-region";
 import {
   actionButton,
   classify,
@@ -169,7 +169,7 @@ export function ToastRuntime({ views, note }: { views: NotificationViews; note: 
         "pointer-events-none fixed z-40 flex w-80 flex-col gap-2",
         isDm ? "left-1/2 -translate-x-1/2" : "right-4 bottom-4",
       )}
-      style={isDm ? { top: TOP_BAR_H + EDGE_GAP } : undefined}
+      style={isDm ? { top: DM_TOAST_TOP } : undefined}
       onMouseEnter={() => dispatch((s, now) => setHovered(s, true, now))}
       onMouseLeave={() => dispatch((s, now) => setHovered(s, false, now))}
     >

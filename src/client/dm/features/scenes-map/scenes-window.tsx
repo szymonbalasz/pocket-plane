@@ -443,11 +443,11 @@ export const scenesWindow = defineWindow({
   kind: SCENES_KIND,
   title: "Scenes",
   clients: ["dm"],
-  defaultSize: { w: 300, h: 480 },
+  // Map-first (#162): closed by default, narrow; opens at the left edge. dx clears the tool
+  // rail, which sits above windows on the left edge.
+  defaultSize: { w: 260, h: 440 },
   minSize: { w: 240, h: 240 },
-  // dx clears the tool rail, which sits above windows on the left edge.
   defaultPosition: { anchor: "top-left", dx: 56 },
-  defaultOpen: true,
   launcher: { icon: MapIcon, label: "Scenes", order: 20 },
   component: ScenesBody,
 });

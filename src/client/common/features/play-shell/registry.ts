@@ -51,7 +51,8 @@ export interface WindowDef {
   defaultOpen?: boolean;
   /**
    * Always opens at its default rect, even over other windows (test-mode windows: fixed
-   * spots walkthroughs rely on). Otherwise a first open goes to the next free slot.
+   * spots walkthroughs rely on). Otherwise a first open goes to the next free slot in its
+   * default column or at the left / right edge, never mid-map (`placement.ts`, #162).
    */
   fixedDefault?: boolean;
   /** No entry = no launcher button (open via `openWindow` only). */

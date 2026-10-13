@@ -20,6 +20,7 @@ test("DM and players: login, join, presence, reveal/hide, edit, reload, invalid 
   await loginDm(dm, secret);
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   await expect(dm.getByTestId("camp-campaign-name")).toHaveText("Fixture Campaign");
+  await openWindow(dm, "camp.players"); // closed by default (map-first, #162)
   await expect(dm.getByTestId("camp-player-name")).toHaveText(["Player 1", "Player 2"]);
   await openWindow(dm, "sync.probes"); // probe panel is a play-shell window (FR-SHELL-21)
   await expect(dm.getByTestId("sync-probe-row")).toHaveCount(3);
@@ -66,4 +67,45 @@ test("DM and players: login, join, presence, reveal/hide, edit, reload, invalid 
   await expect(p4.getByTestId("camp-invalid-link")).toHaveText(
     "This link isn't recognised. Check that you opened the whole link your DM sent.",
   );
+});
+
+test("CAMP §7 Players window at default size: both rows, Add player and the loopback warning fully shown", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  for (const [width, height] of [
+    [1280, 720],
+    [1600, 900],
+  ] as const) {
+    await dm.setViewportSize({ width, height });
+    if (width === 1280) await loginDm(dm, secret);
+    else await dm.reload();
+    await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+    const win = await openWindow(dm, "camp.players");
+    await expect(win.getByTestId("camp-player-row")).toHaveCount(2);
+    // The e2e server listens on 127.0.0.1, so the warning is on.
+    await expect(win.getByTestId("camp-players-loopback-warning")).toBeVisible();
+    const clipped = await win.evaluate(
+      (w, ids) => {
+        const box = w.getBoundingClientRect();
+        return ids.flatMap((id) =>
+          [...w.querySelectorAll(`[data-testid='${id}']`)]
+            .filter((el) => {
+              const r = el.getBoundingClientRect();
+              return r.height === 0 || r.top < box.top - 0.5 || r.bottom > box.bottom + 0.5;
+            })
+            .map(() => id),
+        );
+      },
+      [
+        "camp-player-row",
+        "camp-player-add-name",
+        "camp-player-add-submit",
+        "camp-players-loopback-warning",
+      ],
+    );
+    expect(clipped).toEqual([]);
+  }
+  await dm.context().close();
 });

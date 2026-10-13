@@ -20,7 +20,7 @@ import { LazyMapCanvas as MapCanvas } from "@ui/features/scenes-map/LazyMapCanva
 import { ToolRail } from "@ui/features/scenes-map/ToolRail";
 import { useRecords } from "@ui/sync/store";
 import { EyeOffIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GridTool, LockTool, ShowToPlayers } from "./DmTools";
 import {
   dispatchSelection,
@@ -58,6 +58,17 @@ export function DmMapBase() {
   const send = useMapIntent();
   const [menu, setMenu] = useState<Open>(null);
   const [dialog, setDialog] = useState<{ entryId: string; tokenId: string } | null>(null);
+  // A right-click on an unselected token selects it for its menu only: once the menu and any
+  // dialog it opened close, the previous selection comes back (unless the DM changed it since),
+  // so a token-menu action never leaves a stale selection for combat's attack popup (FR-CBT-33).
+  const borrowed = useRef<{ prev: readonly string[]; tokenId: string } | null>(null);
+  useEffect(() => {
+    const b = borrowed.current;
+    if (menu || dialog || !b) return;
+    borrowed.current = null;
+    const now = getMapSelection().tokenIds;
+    if (now.length === 1 && now[0] === b.tokenId) setMapSelection(b.prev);
+  }, [menu, dialog]);
 
   const onScene = useMemo(
     () => (viewed ? tokens.filter((t) => t.sceneId === viewed.id) : []),
@@ -119,7 +130,11 @@ export function DmMapBase() {
         onEmptyClick={() => dispatchSelection({ type: "clear" })}
         onBoxSelect={(ids) => dispatchSelection({ type: "add", ids })}
         onTokenMenu={(t, at) => {
-          if (!getMapSelection().tokenIds.includes(t.id)) setMapSelection([t.id]);
+          const prev = getMapSelection().tokenIds;
+          if (!prev.includes(t.id)) {
+            borrowed.current = { prev: borrowed.current?.prev ?? prev, tokenId: t.id };
+            setMapSelection([t.id]);
+          }
           setMenu({ tokenId: t.id, at });
         }}
         onTokenDoubleClick={(t) => {
