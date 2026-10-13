@@ -18,6 +18,7 @@ Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish, party-lo
 ## Shared-file locks
 
 - `AlertLayer.tsx` / `ShellContext.tsx` (toast styling) → `fix/polish`.
+- `src/client/common/sync/connection.ts`, `store.ts` (`onEvent` / `useEventFrame` for FR-CBT-41) → `build/combat-tracker-feedback`.
 
 ## Pending DM decisions
 
