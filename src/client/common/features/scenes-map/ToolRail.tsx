@@ -16,12 +16,17 @@ export const SIGNALS_OFF_HINT = "Only on the scene players see";
 
 export function ToolRail({
   pingHint = "Click to ping, right-drag for the laser",
+  selectHint,
   signalsOff = false,
+  selectOnly = false,
   children,
 }: {
   pingHint?: string;
+  selectHint?: string;
   /** Greys out Ping (and with it pull + laser). */
   signalsOff?: boolean;
+  /** DM targeting (FR-MAP-33): the tool is forced to Select; the others are off. */
+  selectOnly?: boolean;
   children?: React.ReactNode;
 }) {
   const tool = useMapTool((s) => s.tool);
@@ -43,8 +48,17 @@ export function ToolRail({
         aria-label="Map tools"
       >
         {TOOLS.map((t) => {
-          const off = t.tool === "ping" && signalsOff;
-          const hint = off ? SIGNALS_OFF_HINT : t.tool === "ping" ? pingHint : (t.hint ?? "");
+          const off = (t.tool === "ping" && signalsOff) || (selectOnly && t.tool !== "select");
+          const hint =
+            t.tool === "ping" && signalsOff
+              ? SIGNALS_OFF_HINT
+              : selectOnly && t.tool !== "select"
+                ? "Off while picking targets"
+                : t.tool === "ping"
+                  ? pingHint
+                  : t.tool === "select"
+                    ? (selectHint ?? t.hint ?? "")
+                    : (t.hint ?? "");
           const item = (
             <ToggleGroupItem
               value={t.tool}
@@ -59,7 +73,7 @@ export function ToolRail({
             <Tooltip key={t.tool} content={`${t.label} — ${hint}`}>
               {/* A disabled button gets no pointer events: the wrapper carries the tooltip. */}
               {off ? (
-                <span data-testid="map-tool-ping-off" className="inline-flex">
+                <span data-testid={`map-tool-${t.tool}-off`} className="inline-flex">
                   {item}
                 </span>
               ) : (

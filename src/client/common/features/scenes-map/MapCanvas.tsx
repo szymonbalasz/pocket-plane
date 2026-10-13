@@ -1,7 +1,8 @@
 // The base-layer canvas (MAP §7), shared by both clients: react-konva Stage with the layer
 // registry (FR-MAP-29), per-client camera (FR-MAP-12), drop-only moves with an optimistic overlay
 // (FR-MAP-15), ruler (FR-MAP-22), ping / pull (FR-MAP-23), laser (FR-MAP-24), definition drops
-// (FR-MAP-13, DM) and the not-live rules (FR-MAP-28). No feature logic: the server decides.
+// (FR-MAP-13, DM), DM selection + box select + targeting (FR-MAP-31–33) and the not-live rules
+// (FR-MAP-28). No feature logic: the server decides.
 import { DEFINITION_DRAG_MIME, DefinitionDragData } from "@shared/entities/schemas";
 import {
   cellToPx,
@@ -38,6 +39,7 @@ import {
   startMove,
 } from "./overlay";
 import { addPing, addTrailPoints, createPointerStore, senderKey } from "./pointers";
+import { isClick, tokensInBox } from "./selection-logic";
 import { useCanvasColors } from "./theme";
 import { useMapTool } from "./tool-store";
 
@@ -51,8 +53,16 @@ export interface MapCanvasProps {
   signalsOn: boolean;
   /** Grid preview while the DM edits it (FR-MAP-10). */
   gridOverride?: EffectiveGrid | null;
-  selectedTokenId?: string | null;
-  onSelectToken?(id: string | null): void;
+  /** DM selection (FR-MAP-31); absent on the player client (no selection). */
+  selectedTokenIds?: readonly string[];
+  /** FR-MAP-33: crosshair cursor, token drag off. */
+  targeting?: boolean;
+  /** DM: left click on a token; `toggle` = Ctrl or Shift held. Also a drag start of an unselected token. */
+  onTokenClick?(t: TokenView, toggle: boolean): void;
+  /** DM: a click (< 4 px travel) on empty canvas with the Select tool. */
+  onEmptyClick?(): void;
+  /** DM: Ctrl/Shift + left-drag on empty canvas; the ids whose footprint centre is inside. */
+  onBoxSelect?(tokenIds: string[]): void;
   /** DM: right-click on a token (FR-MAP-18). */
   onTokenMenu?(t: TokenView, at: { x: number; y: number }): void;
   onTokenDoubleClick?(t: TokenView): void;
@@ -139,10 +149,16 @@ export function MapCanvas(props: MapCanvasProps) {
     laser.current = null;
   }, [live, pointers]);
 
+  const targeting = props.targeting ?? false;
   const canMove = useCallback(
-    (t: TokenView) => client === "dm" || (myPlayerId !== null && t.ownerPlayerId === myPlayerId),
-    [client, myPlayerId],
+    (t: TokenView) =>
+      !targeting && (client === "dm" || (myPlayerId !== null && t.ownerPlayerId === myPlayerId)),
+    [client, myPlayerId, targeting],
   );
+  const selectedIds = props.selectedTokenIds;
+  const selected = useMemo(() => new Set(selectedIds ?? []), [selectedIds]);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
 
   const move = useCallback(
     (t: TokenView, col: number, row: number) => {
@@ -158,7 +174,7 @@ export function MapCanvas(props: MapCanvasProps) {
     [sendIntent],
   );
 
-  const { onSelectToken, onTokenDoubleClick } = props;
+  const { onTokenClick, onTokenDoubleClick } = props;
   const tokenHandlers = useMemo<CanvasContextValue["token"]>(
     () => ({
       dragStart(t, node) {
@@ -171,7 +187,7 @@ export function MapCanvas(props: MapCanvasProps) {
             to: { col: t.col, row: t.row },
           },
         });
-        onSelectToken?.(t.id);
+        if (!selectedRef.current.has(t.id)) onTokenClick?.(t, false);
         const c = node.getStage()?.container();
         if (c) c.style.cursor = "grabbing";
       },
@@ -193,14 +209,14 @@ export function MapCanvas(props: MapCanvasProps) {
         node.position(cellToPx(gridRef.current, to.col, to.row));
         move(t, to.col, to.row);
       },
-      click(t) {
-        onSelectToken?.(t.id);
+      click(t, toggle) {
+        onTokenClick?.(t, toggle);
       },
       dblClick(t) {
         onTokenDoubleClick?.(t);
       },
     }),
-    [pointers, onSelectToken, onTokenDoubleClick, move],
+    [pointers, onTokenClick, onTokenDoubleClick, move],
   );
 
   // ---- incoming signals (FR-MAP-25): only for the scene this client shows ----
@@ -235,21 +251,76 @@ export function MapCanvas(props: MapCanvasProps) {
   // ---- pointer gestures ----
   const signalsLive = signalsOn && live;
   const ruling = useRef(false);
-  const endGestures = useCallback(() => {
-    if (ruling.current) {
-      ruling.current = false;
-      pointers.setState({ ruler: null });
-    }
-    if (laser.current) {
-      laser.current.end();
-      laser.current = null;
-      addTrailPoints(pointers, "self", client, [], true, performance.now());
-    }
-  }, [pointers, client]);
+  /** Left press with the Select tool: empty-canvas click detection (FR-MAP-31). */
+  const press = useRef<{ x: number; y: number; onToken: boolean } | null>(null);
+  /** DM box select in progress (FR-MAP-32). */
+  const boxing = useRef(false);
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
+  const { onEmptyClick, onBoxSelect } = props;
+  const endBox = useCallback(() => {
+    boxing.current = false;
+    pointers.setState({ box: null });
+    stageRef.current?.draggable(useMapTool.getState().tool === "select");
+  }, [pointers]);
+  /** Box corner follows the pointer anywhere on the page (windows may cover the canvas). */
+  const trackBox = useCallback(
+    (e: PointerEvent) => {
+      const stage = stageRef.current;
+      const box = pointers.getState().box;
+      if (!boxing.current || !stage || !box) return;
+      stage.setPointersPositions(e);
+      const p = stage.getRelativePointerPosition();
+      if (p) pointers.setState({ box: { ...box, x1: p.x, y1: p.y } });
+    },
+    [pointers],
+  );
+  useEffect(() => {
+    window.addEventListener("pointermove", trackBox);
+    return () => window.removeEventListener("pointermove", trackBox);
+  }, [trackBox]);
+  const endGestures = useCallback(
+    (e?: PointerEvent) => {
+      const p = press.current;
+      press.current = null;
+      if (p && e) {
+        const click = isClick(e.clientX - p.x, e.clientY - p.y);
+        trackBox(e);
+        const box = pointers.getState().box;
+        if (boxing.current && box && !click) {
+          onBoxSelect?.(tokensInBox(shownRef.current, gridRef.current, box));
+        } else if (click && !p.onToken) {
+          onEmptyClick?.();
+        }
+      }
+      if (boxing.current) endBox();
+      if (ruling.current) {
+        ruling.current = false;
+        pointers.setState({ ruler: null });
+      }
+      if (laser.current) {
+        laser.current.end();
+        laser.current = null;
+        addTrailPoints(pointers, "self", client, [], true, performance.now());
+      }
+    },
+    [pointers, client, onBoxSelect, onEmptyClick, endBox, trackBox],
+  );
   useEffect(() => {
     window.addEventListener("pointerup", endGestures);
     return () => window.removeEventListener("pointerup", endGestures);
   }, [endGestures]);
+  // FR-MAP-32: Esc mid-drag cancels the box only (capture: before the DM's Esc-clears handler).
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || !boxing.current) return;
+      e.stopPropagation();
+      press.current = null;
+      endBox();
+    };
+    window.addEventListener("keydown", on, true);
+    return () => window.removeEventListener("keydown", on, true);
+  }, [endBox]);
 
   const mapPoint = () => stageRef.current?.getRelativePointerPosition() ?? null;
 
@@ -275,8 +346,14 @@ export function MapCanvas(props: MapCanvasProps) {
       const pull = client === "dm" && e.evt.shiftKey;
       sendSignal(pull ? MAP_SIGNALS.pull : MAP_SIGNALS.ping, data);
       addPing(pointers, p.x, p.y, client, performance.now());
-    } else if (!onToken) {
-      onSelectToken?.(null);
+    } else {
+      press.current = { x: e.evt.clientX, y: e.evt.clientY, onToken };
+      if (!onToken && onBoxSelect && (e.evt.ctrlKey || e.evt.shiftKey)) {
+        // Box select instead of pan (FR-MAP-12 / -32).
+        boxing.current = true;
+        stageRef.current?.draggable(false);
+        pointers.setState({ box: { x0: p.x, y0: p.y, x1: p.x, y1: p.y } });
+      }
     }
   };
 
@@ -321,7 +398,9 @@ export function MapCanvas(props: MapCanvasProps) {
     tool,
     live,
     myPlayerId,
-    selectedTokenId: props.selectedTokenId ?? null,
+    selected,
+    targeting,
+    store,
     canMove,
     token: tokenHandlers,
   };
@@ -339,8 +418,9 @@ export function MapCanvas(props: MapCanvasProps) {
       aria-label="Map canvas"
       data-scene-id={scene.id}
       data-tool={tool}
+      data-targeting={targeting}
       className="absolute inset-0"
-      style={{ cursor: tool === "select" ? undefined : "crosshair" }}
+      style={{ cursor: tool === "select" && !targeting ? undefined : "crosshair" }}
       onContextMenu={(e) => e.preventDefault()}
       onDragOver={(e) => {
         if (!acceptsDrop(e)) return;

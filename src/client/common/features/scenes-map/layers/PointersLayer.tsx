@@ -1,13 +1,17 @@
-// Pointers layer: drag target + distance (FR-MAP-15/22), ruler (FR-MAP-22), ping pulses
-// (FR-MAP-23) and laser trails (FR-MAP-24). Reads the canvas' pointer store, so 20 laser
-// frames/s re-render only this layer. Konva names: `map-ruler-label`, `map-ping`, `map-laser`.
-import { cellToPx, distanceLabel } from "@shared/scenes-map/geometry";
+// Pointers layer: drag target + movement indicator (FR-MAP-15/22/37), ruler (FR-MAP-22), DM box
+// select (FR-MAP-32), ping pulses (FR-MAP-23) and laser trails (FR-MAP-24). Reads the canvas'
+// pointer store, so 20 laser frames/s re-render only this layer. Konva names: `map-move-label`
+// (attr `tone`), `map-ruler-label`, `map-select-box`, `map-ping`, `map-laser`.
+import { cellToPx, distanceFt, distanceLabel } from "@shared/scenes-map/geometry";
 import { useEffect, useState } from "react";
 import { Circle, Group, Label, Layer, Line, Rect, Tag, Text } from "react-konva";
 import { useStore } from "zustand";
 import { useCanvas } from "../canvas-context";
+import { movedFtOf } from "../decorations";
 import { LASER_FADE_MS } from "../laser";
+import { type MoveTone, movementIndicator } from "../movement";
 import { PING_MS, prune } from "../pointers";
+import { tokenOverlays } from "../token-overlays";
 
 /** Re-renders every animation frame while `active`. */
 function useFrameClock(active: boolean): number {
@@ -25,20 +29,53 @@ function useFrameClock(active: boolean): number {
   return now;
 }
 
-function DistanceLabel({ x, y, text, name }: { x: number; y: number; text: string; name: string }) {
+function DistanceLabel({
+  x,
+  y,
+  text,
+  name,
+  tone,
+}: {
+  x: number;
+  y: number;
+  text: string;
+  name: string;
+  tone?: MoveTone;
+}) {
   const { cam, colors } = useCanvas();
+  // OQ-MAP-27: dash = `hp.bloodied`, over = `hp.down`; else foreground.
+  const fill =
+    tone === "dash" ? colors.hpBloodied : tone === "over" ? colors.hpDown : colors.foreground;
   return (
-    <Label x={x} y={y} name={name} listening={false}>
+    <Label x={x} y={y} name={name} tone={tone} listening={false}>
       <Tag fill={colors.background} opacity={0.85} cornerRadius={4 / cam.scale} />
       <Text
         text={text}
         fontSize={13 / cam.scale}
         padding={4 / cam.scale}
-        fill={colors.foreground}
+        fill={fill}
+        fontStyle={tone === "dash" || tone === "over" ? "bold" : "normal"}
         name={`${name}-text`}
       />
     </Label>
   );
+}
+
+/** FR-MAP-37: speed from the token record at render; `used` from the overlay registry. */
+function MoveLabel({
+  drag,
+  x,
+  y,
+}: {
+  drag: { tokenId: string; from: { col: number; row: number }; to: { col: number; row: number } };
+  x: number;
+  y: number;
+}) {
+  const { tokens, store } = useCanvas();
+  const t = tokens.find((k) => k.id === drag.tokenId);
+  const used = t ? movedFtOf(tokenOverlays, t, store) : null;
+  const m = movementIndicator(distanceFt(drag.from, drag.to), used, t?.speed);
+  return <DistanceLabel name="map-move-label" x={x} y={y} text={m.text} tone={m.tone} />;
 }
 
 export function PointersLayer() {
@@ -68,12 +105,23 @@ export function PointersLayer() {
             strokeWidth={2 / cam.scale}
             dash={[6 / cam.scale, 4 / cam.scale]}
           />
-          <DistanceLabel
-            name="map-drag-label"
-            {...centre(st.drag.to, st.drag.size)}
-            text={distanceLabel(st.drag.from, st.drag.to)}
-          />
+          <MoveLabel drag={st.drag} {...centre(st.drag.to, st.drag.size)} />
         </Group>
+      )}
+      {st.box && (
+        <Rect
+          name="map-select-box"
+          x={Math.min(st.box.x0, st.box.x1)}
+          y={Math.min(st.box.y0, st.box.y1)}
+          width={Math.abs(st.box.x1 - st.box.x0)}
+          height={Math.abs(st.box.y1 - st.box.y0)}
+          stroke={colors.primary}
+          strokeWidth={1.5 / cam.scale}
+          dash={[6 / cam.scale, 4 / cam.scale]}
+          fill={colors.primary}
+          opacity={0.6}
+          fillEnabled={false}
+        />
       )}
       {st.ruler && (
         <Group name="map-ruler">

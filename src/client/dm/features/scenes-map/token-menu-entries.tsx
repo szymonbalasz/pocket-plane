@@ -1,7 +1,7 @@
-// scenes-map's token menu entries (FR-MAP-18): rename, image, owner, hide/reveal, duplicate,
-// delete (no confirm). No size entry (#120). Each sends one `map.*` intent; the server decides.
+// scenes-map's token menu entries (FR-MAP-18): rename, image, shape (FR-MAP-35), owner,
+// hide/reveal, duplicate, delete (no confirm). No size entry (#120). Each sends one `map.*` intent; the server decides.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
-import { MAP_INTENTS, TokenName } from "@shared/scenes-map/schemas";
+import { MAP_INTENTS, TokenName, type TokenShape } from "@shared/scenes-map/schemas";
 import {
   DropdownMenuItem,
   DropdownMenuRadioGroup,
@@ -19,15 +19,22 @@ import {
   EyeOffIcon,
   ImageIcon,
   PencilIcon,
+  ShapesIcon,
   Trash2Icon,
   UserIcon,
 } from "lucide-react";
 import { AssetPickerDialog } from "../assets-pipeline/AssetPicker";
 import { NameFormDialog } from "./NameFormDialog";
+import { setMapSelection } from "./selection";
 import type { TokenMenuDialogProps, TokenMenuEntry, TokenMenuItemProps } from "./token-menu";
-import { useDmMap } from "./view-state";
 
 const NONE = "__none__";
+
+const SHAPES: { value: TokenShape; label: string }[] = [
+  { value: "round", label: "Round" },
+  { value: "square", label: "Square" },
+  { value: "none", label: "None" },
+];
 
 function useSend() {
   const send = useMapIntent();
@@ -78,6 +85,39 @@ export const scenesMapTokenMenu: readonly TokenMenuEntry[] = [
             void send(MAP_INTENTS.updateToken, { tokenId: token.id, imageAssetId: id })
           }
         />
+      );
+    },
+  },
+  {
+    id: "map.shape",
+    order: 25,
+    Item: function ShapeItem({ token }: TokenMenuItemProps) {
+      const send = useSend();
+      return (
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger data-testid="map-token-menu-shape">
+            <ShapesIcon /> Shape
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuRadioGroup
+              value={token.shape}
+              onValueChange={(v) =>
+                void send(MAP_INTENTS.updateToken, { tokenId: token.id, shape: v as TokenShape })
+              }
+            >
+              {SHAPES.map((sh) => (
+                <DropdownMenuRadioItem
+                  key={sh.value}
+                  value={sh.value}
+                  data-testid="map-token-shape-option"
+                  data-value={sh.value}
+                >
+                  {sh.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       );
     },
   },
@@ -148,13 +188,12 @@ export const scenesMapTokenMenu: readonly TokenMenuEntry[] = [
     order: 50,
     Item: function DuplicateItem({ token }: TokenMenuItemProps) {
       const send = useMapIntent();
-      const select = useDmMap((s) => s.select);
       return (
         <DropdownMenuItem
           data-testid="map-token-menu-duplicate"
           onSelect={() =>
             send(MAP_INTENTS.duplicateToken, { tokenId: token.id }).then(
-              (r) => select((r as { tokenId: string }).tokenId),
+              (r) => setMapSelection([(r as { tokenId: string }).tokenId]),
               toastReject,
             )
           }

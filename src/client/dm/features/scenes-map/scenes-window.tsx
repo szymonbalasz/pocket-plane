@@ -79,7 +79,6 @@ function SceneRow({
   onRename(r: Rename): void;
 }) {
   const view = useDmMap((s) => s.view);
-  const select = useDmMap((s) => s.select);
   return (
     <li
       data-testid="map-scene-row"
@@ -167,10 +166,7 @@ function SceneRow({
               scenesRest
                 .deleteScene(scene.id)
                 .then(() => {
-                  if (viewed) {
-                    view(null);
-                    select(null);
-                  }
+                  if (viewed) view(null);
                 })
                 .catch(fail)
             }

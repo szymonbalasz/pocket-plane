@@ -1,6 +1,7 @@
 // e2e-bundle: scenes
 // Thin scenes-map flows (MAP §13 E2E), DM + player-1 in separate contexts: player drags Mira,
-// DM sees it; DM reveals Wolf; DM activates the battlemap; reload.
+// DM sees it; DM reveals Wolf; feedback: Goblin → square, box select + Ctrl-click + empty click
+// (FR-MAP-31/32/35); DM activates the battlemap; reload.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, stageScale, tokenNode } from "./support/konva";
@@ -17,6 +18,49 @@ async function cellOf(page: Page, tokenId: string) {
     const n = K?.stages[0]?.findOne(`#${id}`);
     return n ? { col: Math.round(n.x() / 70), row: Math.round(n.y() / 70) } : null;
   }, tokenId);
+}
+
+/** Map px → page px on the first stage. */
+async function mapToPage(page: Page, x: number, y: number) {
+  return page.evaluate(
+    ([x, y]) => {
+      type KStage = { container(): HTMLElement; x(): number; y(): number; scaleX(): number };
+      const st = (window as unknown as { Konva: { stages: KStage[] } }).Konva.stages[0] as KStage;
+      const box = st.container().getBoundingClientRect();
+      return { x: box.left + st.x() + x * st.scaleX(), y: box.top + st.y() + y * st.scaleX() };
+    },
+    [x, y] as const,
+  );
+}
+
+/** Konva attr `attr` of the token group, e.g. `shape` (FR-MAP-35). */
+async function tokenAttr(page: Page, tokenId: string, attr: string) {
+  return page.evaluate(
+    ([id, attr]) => {
+      type KNode = { getAttr(a: string): unknown };
+      type KStage = { findOne(s: string): KNode | undefined };
+      const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
+      return (K?.stages[0]?.findOne(`#${id}`)?.getAttr(attr) as string | undefined) ?? null;
+    },
+    [tokenId, attr] as const,
+  );
+}
+
+/** Selection rings (FR-MAP-31): token ids with a `map-token-ring` in state `selected`. */
+async function selectedIds(page: Page) {
+  return page.evaluate(() => {
+    type KNode = {
+      getAttr(a: string): unknown;
+      findAncestor(s: string): KNode | null;
+      id(): string;
+    };
+    type KStage = { find(s: string): KNode[] };
+    const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
+    return (K?.stages[0]?.find(".map-token-ring") ?? [])
+      .filter((n) => n.getAttr("state") === "selected")
+      .map((n) => n.findAncestor(".map-token")?.id() ?? "")
+      .sort();
+  });
 }
 
 test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", async ({
@@ -59,9 +103,10 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await player.mouse.move(m.x, m.y);
   await player.mouse.down();
   for (let i = 1; i <= 6; i++) await player.mouse.move(m.x + (cell * 3 * i) / 6, m.y);
+  // FR-MAP-37: "15 ft" without a speed, "15 / ‹speed› ft" with one.
   await expect
-    .poll(async () => (await konvaNodes(player, "map-drag-label-text"))[0]?.text)
-    .toBe("15 ft");
+    .poll(async () => (await konvaNodes(player, "map-move-label-text"))[0]?.text)
+    .toMatch(/^15( \/ \d+)? ft$/);
   await player.mouse.up();
   await expect.poll(() => cellOf(dm, miraTown)).toEqual({ col: 8, row: 5 });
   await expect.poll(() => cellOf(player, miraTown)).toEqual({ col: 8, row: 5 });
@@ -85,6 +130,41 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await dm.getByTestId("map-token-menu-hide").click();
   await expect.poll(async () => (await tokenNode(dm, wolf))?.opacity).toBe(1);
 
+  // FR-MAP-35: Goblin's menu → Shape → Square. Cave Ogre is shape none (scenes-extras).
+  const goblin = recordId("battlemap", "token", 1);
+  const ogre = recordId("scenes-extras", "token", 2);
+  expect(await tokenAttr(dm, ogre, "shape")).toBe("none");
+  const g = (await tokenNode(dm, goblin))!;
+  await dm.mouse.click(g.x, g.y, { button: "right" });
+  await dm.getByTestId("map-token-menu-shape").click();
+  await dm.locator('[data-testid="map-token-shape-option"][data-value="square"]').click();
+  await expect.poll(() => tokenAttr(dm, goblin, "shape")).toBe("square");
+  await dm.keyboard.press("Escape");
+
+  // FR-MAP-31/32: Shift+drag a box around Goblin (12, 6) and Cave Ogre (9, 10); Ctrl+click
+  // Goblin; click empty canvas.
+  const empty = await mapToPage(dm, 5 * 70, 12.5 * 70);
+  await dm.mouse.click(empty.x, empty.y);
+  await expect.poll(() => selectedIds(dm)).toEqual([]);
+  const a = await mapToPage(dm, 8.5 * 70, 5.5 * 70);
+  const b = await mapToPage(dm, 13.6 * 70, 11.6 * 70);
+  await dm.keyboard.down("Shift");
+  await dm.mouse.move(a.x, a.y);
+  await dm.mouse.down();
+  for (let i = 1; i <= 5; i++) {
+    await dm.mouse.move(a.x + ((b.x - a.x) * i) / 5, a.y + ((b.y - a.y) * i) / 5);
+  }
+  await dm.mouse.up();
+  await dm.keyboard.up("Shift");
+  await expect.poll(() => selectedIds(dm)).toEqual([goblin, ogre].sort());
+  const g2 = (await tokenNode(dm, goblin))!;
+  await dm.keyboard.down("Control");
+  await dm.mouse.click(g2.x, g2.y);
+  await dm.keyboard.up("Control");
+  await expect.poll(() => selectedIds(dm)).toEqual([ogre]);
+  await dm.mouse.click(empty.x, empty.y);
+  await expect.poll(() => selectedIds(dm)).toEqual([]);
+
   // Show to players: the player switches; Wolf visible, Elite and the scene name never sent.
   await dm.getByTestId("map-show-to-players").click();
   await expect(dm.getByTestId("map-not-shown-badge")).toHaveCount(0);
@@ -92,6 +172,7 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
   await expect.poll(() => tokenNode(player, wolf)).not.toBeNull();
   expect(await tokenNode(player, elite)).toBeNull();
+  await expect.poll(() => tokenAttr(player, goblin, "shape")).toBe("square");
   const raw = frames.join("\n");
   for (const s of ["Elite Goblin Warrior", "Goblin Ambush", "Cellar", "Act 1", elite]) {
     expect({ s, leaked: raw.includes(s) }).toEqual({ s, leaked: false });

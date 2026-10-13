@@ -1,5 +1,7 @@
 // What every canvas layer reads (FR-MAP-29): the shown scene, effective grid, tokens at their
-// shown cells, camera, colours, pointer store and the token handlers of the host canvas.
+// shown cells, camera, colours, pointer store, record store (token overlays, FR-MAP-34), DM
+// selection + targeting (FR-MAP-31/33) and the token handlers of the host canvas.
+import type { RecordStore } from "@shared/protocol/store";
 import type { SceneView, TokenView } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { createContext, useContext } from "react";
@@ -21,7 +23,8 @@ export interface TokenHandlers {
   dragStart(t: TokenView, node: Konva.Node): void;
   dragMove(t: TokenView, node: Konva.Node): void;
   dragEnd(t: TokenView, node: Konva.Node): void;
-  click(t: TokenView): void;
+  /** Left click; `toggle` = Ctrl or Shift held (FR-MAP-31). */
+  click(t: TokenView, toggle: boolean): void;
   dblClick(t: TokenView): void;
 }
 
@@ -37,7 +40,11 @@ export interface CanvasContextValue {
   tool: MapTool;
   live: boolean;
   myPlayerId: string | null;
-  selectedTokenId: string | null;
+  /** DM selection on this scene (FR-MAP-31); always empty on the player client. */
+  selected: ReadonlySet<string>;
+  /** FR-MAP-33: crosshair, token drag off. */
+  targeting: boolean;
+  store: RecordStore;
   canMove(t: TokenView): boolean;
   token: TokenHandlers;
 }
