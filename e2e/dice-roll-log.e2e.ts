@@ -70,6 +70,23 @@ test("FR-DICE-05 FR-DICE-09 FR-DICE-15 player adv roll reaches DM; DM hidden rol
   expect(frames.join("\n")).not.toContain("E2E-SECRET");
   expect(frames.join("\n")).not.toContain("DM-SECRET-ROLL");
 
+  // FR-DICE-07 (#149): physical mode on → banner + marker on the Roll button; "Roll for me"
+  // rolls server-side once (no "physical" badge) and the mode stays on; the banner turns it off.
+  await expect(plog.getByTestId("dice-log-physical")).toHaveCount(0);
+  await plog.getByTestId("dice-roll-physical").click();
+  await expect(plog.getByTestId("dice-log-physical")).toBeVisible();
+  await expect(plog.getByTestId("dice-roll-submit")).toHaveAttribute("data-physical", "true");
+  await plog.getByTestId("dice-roll-expression").fill("1d20");
+  await plog.getByTestId("dice-roll-submit").getByTestId("dice-physical-marker").waitFor();
+  await plog.getByTestId("dice-roll-submit").click();
+  await player.getByTestId("dice-manual-auto").click();
+  await expect(entries(player)).toHaveCount(5);
+  await expect(entries(player).nth(4).getByTestId("dice-log-entry-manual")).toHaveCount(0);
+  await expect(plog.getByTestId("dice-roll-physical")).toHaveAttribute("data-state", "checked");
+  await plog.getByTestId("dice-log-physical-off").click();
+  await expect(plog.getByTestId("dice-roll-physical")).toHaveAttribute("data-state", "unchecked");
+  await expect(plog.getByTestId("dice-roll-submit")).toHaveAttribute("data-physical", "false");
+
   // Later specs share the server: leave nobody online.
   await player.context().close();
   await dm.context().close();
