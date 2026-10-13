@@ -9,7 +9,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | party-loot | `build/party-loot` (slot 4) | `build-party-loot` | building (spec complete #152) | walkthrough → merge |
-| Feedback spec pass (F1, F3, F4, F6, F7, F7.1, F8, #149 checks + saves) | `spec/feedback` | `review-feedback` | in review | DM gate: proposed-token-move-hooks, proposed-ability-derivation, OQs → consolidation → builds |
+| Feedback spec pass (F1, F3, F4, F6, F7, F7.1, F8, #149 checks + saves) | `spec/feedback` | `spec-feedback` | gate passed (#154); round 3: review fixes + ADR 0031/0032 + consolidation | merge → `fix/feedback-core` (after party-loot) → builds |
 | Phase 4 hardening (crash-recovery pass) | — | — | not started | after feedback builds + party-loot (DM go) |
 | Phase 5 MVP acceptance | — | — | not started | — |
 
