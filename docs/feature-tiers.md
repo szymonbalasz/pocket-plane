@@ -159,6 +159,23 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Import existing characters | C | — | Once-off scripts, way post-MVP |
 | Session tracking | F | [ADR-0013](architecture/adr/0013-session-journal-scope.md) | Encounters instead |
 
+## 8. DM feedback after the Combat build (#145)
+
+Tiers **proposed**, to confirm with the DM; details in [feedback-phase3](agents/feedback-phase3.md).
+
+| Feature | Tier | Spec | Notes |
+|---|---|---|---|
+| Player turn alert: flash + default ping sound | S (proposed) | [combat-tracker](specs/combat-tracker.md), [play-shell](specs/play-shell.md) | Sound needs [proposed-ui-sounds](architecture/adr/proposed-ui-sounds.md) (amends ADR-0007) |
+| DM-added alert sounds | A (proposed) | [assets-pipeline](specs/assets-pipeline.md) | Small audio assets |
+| Diagonal rule 5/10/5 (every second diagonal 10 ft) | S | [scenes-map](specs/scenes-map.md) | Decided #145; replaces 5 ft per diagonal (#124) |
+| Movement tracker: speed on sheet; amber = dash, red = beyond dash (indicators only, never block); movement used this turn | S (proposed) | [scenes-map](specs/scenes-map.md), [combat-tracker](specs/combat-tracker.md), [entities](specs/entities.md) | Supersedes the tier B "movement along drag path" row for the indicator part |
+| Token shape setting: round crop or image as-is | S (proposed) | [scenes-map](specs/scenes-map.md) | Default round |
+| Drag images onto the battlemap (props, illustrations) | A (proposed) | [scenes-map](specs/scenes-map.md) | Reserved props layer (FR-MAP-29) |
+| Token indicators: removed from combat, down (0 HP) | S (proposed) | [combat-tracker](specs/combat-tracker.md) | |
+| Target from the map; multi-target (Ctrl/Shift) with per-target damage multiplier | S (proposed) | [combat-tracker](specs/combat-tracker.md), [scenes-map](specs/scenes-map.md) | Promotes "Multi-target select" (tier A) |
+| Box select on the map | S (proposed) | [scenes-map](specs/scenes-map.md) | Group move: A (proposed) |
+| Party currency tracker (running coin total) | S | [party-loot](specs/party-loot.md) | Decided #146 |
+
 ## Already decided elsewhere
 
 | Feature | Tier | Ref |

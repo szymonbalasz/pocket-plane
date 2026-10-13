@@ -2,39 +2,31 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 3 built. **DM gate:** demos [demo-scenes](demo-scenes.md), [demo-combat](demo-combat.md); party-loot questions; Phase 4 go. DM asked for long autonomous stretches (#141): report only when blocked.
+**Phase:** 3 built (Scenes + Combat on `main`). DM ran the demos and gave feedback ([feedback-phase3](feedback-phase3.md), #145–#146). Session handed over (#147): see [continue-session](continue-session.md).
 
-**Herdr:** orchestrator workspace `wR` (pane `wR:p1`). Always `herdr worktree create --workspace wR …`. Clean up worktrees after merge. Test agents get a dedicated server pane (AGENTS §9.6). Max 4 working agents.
+**Herdr:** orchestrator workspace was `wR` (IDs can change; check `herdr pane current --current`). No worktrees, no agents running.
 
-| Task | Agent | Workspace / branch | State | Blockers |
-|---|---|---|---|---|
-| Scenes: play-shell, assets-pipeline, entities, scenes-map | — (ended) | merged | walkthroughs 11/11, 7/7 + B 4/4, 6/6, 8/8 | — |
-| Combat core: `fix/combat-core`, notifications, dice-roll-log | — (ended) | merged | e2e green; walkthroughs 16/16, 10/10 | — |
-| `fix/client-polish` | — (ended) | merged (`f624772`) | probe 204, lazy Konva | — |
-| build character-sheet | — (ended) | merged (`49fde53`) | walkthrough 10/10, 459 tests | — |
-| build combat-tracker | — (ended) | merged (`22862e9`) | walkthrough 12/12 after fixes, 519 tests | — |
-| MVP session-sim integration run | — (ended) | `main`; evidence `%TEMP%\opencode\verify-session\` | 15/15 PASS; 5 layout glitches | — |
-| `fix/window-layout` | — (ended) | merged (`61aa422`) | layout check fixes; 535 tests, e2e green | — |
-| Spec party-loot (Phase 4) | — | revised draft on `main` | in-review | DM: OQ-LOOT-01/02/06 |
+| Task | State | Next |
+|---|---|---|
+| Foundation, Scenes, Combat builds | merged; 535 tests, build + e2e green; every spec walkthrough PASS; session-sim integration 15/15 | — |
+| DM feedback F1–F9 | captured, tiers **proposed** (feature-tiers §8) | DM confirms tiers + [proposed-ui-sounds](../architecture/adr/proposed-ui-sounds.md) |
+| F2 diagonal 5/10/5 | decided (#145) | `fix/diagonal-rule` |
+| F9 "players type rolls" | click-to-roll is built; suspect Physical dice toggle | test agent repro |
+| party-loot spec | revised draft on `main`; DM answered (#146) | revision agent applies #146 → DM sets complete → consolidate → build |
+| Phase 4 hardening (crash-recovery pass) | not started | after feedback pass + party-loot |
+| Phase 5 MVP acceptance | not started | — |
 
-Evidence archived: `%TEMP%\opencode\verify-{skeleton,scenes-core,play-shell,assets,entities,scenes-map,notifications,dice}\`.
+Evidence archived: `%TEMP%\opencode\verify-*\` (skeleton, scenes-core, play-shell, assets, entities, scenes-map, notifications, dice, char, combat, session, layout).
 
-## Shared-file locks (AGENTS §9.9, sequenced)
+## Shared-file locks
 
-- None (no active builds).
-- character-sheet / combat-tracker: ask before any shared file.
+- None.
 
-## Pending DM decisions (next check-in, not blocking)
+## Pending DM decisions
 
-- party-loot: OQ-LOOT-01 entry shape (pick: free text + optional coin columns), OQ-LOOT-02 corrections (pick: void, struck through), OQ-LOOT-06 notification (pick: info toast to all + history).
-- Scenes gate demo ready: [demo-scenes](demo-scenes.md).
+- Confirm proposed tiers F1, F3–F8 (feature-tiers §8) and accept proposed-ui-sounds (amends ADR-0007).
 
 ## Resolved locally (report at gate)
 
-- OQ-NOTE-13 badge; CON-44 DM snapshot 768 KB; Combat specs `complete` (#142).
-- Shell window tests are registry-driven (overlap only within default-open product windows, and within test windows).
-- Loader-test EBUSY flake: retry + swallow on teardown (cherry-picked to `main`).
-- notifications §13 step 9 expected count corrected to 2.
-- e2e specs choose their bundle via `// e2e-bundle: <name>` header (combat-core).
-- assets: REST errors keep code `invalid` + 413/415/422; play-shell: toast z-index left as is.
-- DM secret kept in browser storage (`pocket-plane.dmSecret`) — check against campaign-management.
+- Integrator picks #142–#144 (badge, snapshot ceilings, registry-driven shell tests, reconnect probe 204, lazy Konva, window layout).
+- DM secret kept in browser storage (`pocket-plane.dmSecret`) — check against campaign-management in Phase 4.
