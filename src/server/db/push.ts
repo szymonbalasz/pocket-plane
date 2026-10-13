@@ -59,11 +59,40 @@ export async function pushSchema(sqlite: Database): Promise<{ applied: number }>
   // Expression indexes always show as changed; only act on real changes.
   const real = res.statementsToExecute.filter((s) => !/^(DROP|CREATE UNIQUE) INDEX/.test(s));
   if (real.length === 0) return { applied: 0 };
-  if (res.hasDataLoss) {
+  const lossy = res.hasDataLoss ? dropFalseTruncates(res.statementsToExecute, res.warnings) : [];
+  if (lossy.length > 0) {
     throw new Error(
-      `Schema change would lose data:\n${res.warnings.join("\n")}\nOn a disposable dir run \`bun run fixtures:reset\`.`,
+      `Schema change would lose data:\n${lossy.join("\n")}\nOn a disposable dir run \`bun run fixtures:reset\`.`,
     );
   }
   await res.apply();
   return { applied: res.statementsToExecute.length };
+}
+
+/**
+ * drizzle-kit 0.31 reads a falsy default (`DEFAULT 0`) as "no default" when a not-null column
+ * is added to a non-empty table: it warns and empties the table first (`delete from t;`). Drops
+ * those truncates in place (`apply()` runs this array) when the column's ADD carries a DEFAULT.
+ * Returns the warnings that are real.
+ */
+function dropFalseTruncates(stmts: string[], warnings: string[]): string[] {
+  const addedWithDefault = new Map<string, string>();
+  for (const s of stmts) {
+    const m = /^ALTER TABLE `(\w+)` ADD `(\w+)` .* DEFAULT .* NOT NULL;$/.exec(s);
+    if (m?.[1] && m[2]) addedWithDefault.set(m[2], m[1]);
+  }
+  const truncates = new Set<string>();
+  const real = warnings.filter((w) => {
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: drizzle-kit underlines names with ANSI codes.
+    const plain = w.replace(/\u001b\[\d+m/g, "");
+    const col = /add not-null (\S+) column without default value,/.exec(plain)?.[1];
+    const table = col ? addedWithDefault.get(col) : undefined;
+    if (table) truncates.add(`delete from ${table};`);
+    return !table;
+  });
+  if (real.length > 0) return real;
+  for (let i = stmts.length - 1; i >= 0; i--) {
+    if (truncates.has(stmts[i] ?? "")) stmts.splice(i, 1);
+  }
+  return [];
 }
