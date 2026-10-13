@@ -18,5 +18,7 @@ export default defineBundle({
     "dice-settings",
     "encounter-1",
     "goblin-2",
+    "loot-1",
+    "loot-wallets",
   ],
 });

@@ -98,14 +98,17 @@ export function add(env: CommandEnv, raw: LootAddIntent): LootResult {
     input.text,
     coins,
   );
+  const potAfter = partyPot(env.tx, cid);
+  const changes: RecordChange[] = [
+    { type: LOOT_ENTRY_TYPE, id: entry.id, before: null, after: entry },
+  ];
+  // As edits: the pot only when its value changed (text-only loot leaves it as is).
+  if (!sameCoins(potBefore, potAfter)) changes.push(potChange(potBefore, potAfter));
   env.emit({
     type: LootAdded.type,
     campaignId: cid,
     payload: { entryId: entry.id, text: entry.text, ...coins },
-    changes: [
-      { type: LOOT_ENTRY_TYPE, id: entry.id, before: null, after: entry },
-      potChange(potBefore, partyPot(env.tx, cid)),
-    ],
+    changes,
   });
   if (notifiesLoot(coins)) {
     notify(env, {

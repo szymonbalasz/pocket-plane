@@ -55,6 +55,10 @@ describe("fixture library", () => {
       "dice-settings",
       "encounter-1",
       "goblin-2",
+      "loot-1",
+      "player-2",
+      "char-thorn",
+      "loot-wallets",
     ]);
     expect(await keys("campaign-switch")).toEqual([
       "campaign",

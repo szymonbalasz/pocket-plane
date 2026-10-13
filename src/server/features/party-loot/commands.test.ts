@@ -87,6 +87,19 @@ describe("loot.add (FR-LOOT-01–03, FR-LOOT-13)", () => {
     ]);
   });
 
+  test("FR-LOOT-03 LootAdded lists the party-pot only when its value changed", () => {
+    const t = seedLoot();
+    t.events.length = 0;
+    add(t, { text: "Potion of healing ×2" });
+    const textOnly = t.events.find((e) => e.event.type === "LootAdded")?.event;
+    expect(textOnly?.changes.map((c) => c.type)).toEqual([LOOT_ENTRY_TYPE]);
+    t.events.length = 0;
+    add(t, { text: "Pouch", gp: 12 });
+    const withCoins = t.events.find((e) => e.event.type === "LootAdded")?.event;
+    expect(withCoins?.changes.map((c) => c.type)).toEqual([LOOT_ENTRY_TYPE, PARTY_POT_TYPE]);
+    expect(withCoins?.changes[1]).toMatchObject({ before: { gp: 0 }, after: { gp: 12 } });
+  });
+
   test("FR-LOOT-13 notify decision: spends and change-making create none; text / coin variants", () => {
     const t = seedLoot();
     add(t, { text: "Paid the ferryman", gp: -2 });

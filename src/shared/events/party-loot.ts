@@ -17,7 +17,7 @@ const Coin = z.int();
 const Coins = { cp: Coin, sp: Coin, ep: Coin, gp: Coin, pp: Coin };
 const LootValues = z.strictObject({ text: z.string(), ...Coins });
 
-/** `partyLoot.add`: changes = `loot-entry` (before null) + `party-pot`. */
+/** `partyLoot.add`: changes = `loot-entry` (before null) + `party-pot` iff its value changed. */
 export const LootAdded = defineEvent({
   type: "LootAdded",
   payload: z.strictObject({ entryId: Id, text: z.string(), ...Coins }),
