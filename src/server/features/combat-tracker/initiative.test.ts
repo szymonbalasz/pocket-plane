@@ -219,7 +219,7 @@ describe("FR-CBT-14 FR-CBT-31 FR-CBT-15 turns and removal", () => {
     expect(t.enc0()).toMatchObject({ round: 2, turnCombatantId: t.id("Wolf") });
   });
 
-  test("FR-CBT-15 FR-CBT-31 remove: player delete, ranks + turn copy; restore", () => {
+  test("FR-CBT-15 FR-CBT-31 FR-CBT-37 remove: player upsert removed, ranks + turn copy; restore", () => {
     const t = started();
     t.standard();
     t.turn("next");
@@ -230,14 +230,33 @@ describe("FR-CBT-14 FR-CBT-31 FR-CBT-15 turns and removal", () => {
     expect(t.enc0().playerTurnCombatantId).toBeNull();
     const v = t.h.viewer("player", t.h.p2.id);
     const wire = (ev?.changes ?? []).map((c) => t.s.records.filterChange(c, v));
-    expect(wire).toContainEqual({ type: COMBATANT_TYPE, id: t.id("Mira"), op: "delete" });
+    expect(wire).toContainEqual({
+      type: COMBATANT_TYPE,
+      id: t.id("Mira"),
+      op: "upsert",
+      data: {
+        id: t.id("Mira"),
+        encounterId: t.enc.id,
+        kind: "pc",
+        tokenId: t.tokens.mira,
+        name: "Mira",
+        imageAssetId: "art-mira",
+        removed: true,
+        movedFt: 0,
+      },
+    });
     expect(wire.some((w) => w?.type === ENCOUNTER_TYPE)).toBe(true);
     expect(t.byName(t.enc.id).Goblin?.playerPosition).toBe(1);
     t.turn("next");
     expect(t.enc0().turnCombatantId).toBe(t.id("Goblin"));
-    // Removed: player can't see it; restore brings it back.
+    // Restore: an upsert with rank and initiative again.
     t.run(setRemoved.name, { combatantId: t.id("Mira"), removed: false });
-    expect(t.events.at(-1)?.event.type).toBe("CombatantRestored");
+    const restored = t.events.at(-1)?.event;
+    expect(restored?.type).toBe("CombatantRestored");
+    const back = (restored?.changes ?? [])
+      .map((c) => t.s.records.filterChange(c, v))
+      .find((w) => w?.id === t.id("Mira"));
+    expect(back).toMatchObject({ op: "upsert", data: { removed: false, playerPosition: 1 } });
     expect(t.byName(t.enc.id).Mira?.playerPosition).toBe(1);
     // Unchanged → no event.
     const n = t.events.length;

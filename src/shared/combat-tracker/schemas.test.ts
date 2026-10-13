@@ -1,10 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
-  ApplyCardInput,
   ApplyCardTargetsInput,
   CombatantRecord,
   DAMAGE_CARD_RESOLUTION_MAX_BYTES,
-  DamageCardResolution,
   DamageCardResolutionRead,
   DamageCardTargetsResolution,
   HpChangesResult,
@@ -31,9 +29,9 @@ describe("combat-tracker schemas (feedback pass)", () => {
     expect(ok({ targets: [t("a"), t("a")] })).toBe(false);
     expect(ok({ targets: [t("a")], targetId: "a" })).toBe(false);
     expect(ok({ targets: [{ ...t("a"), multiplier: "triple" }] })).toBe(false);
-    // Legacy single-target shape still parses for today's server.
+    // The old single-target shape is gone (protocol §28 shim switched).
     const legacy = { ...base, targetId: "a", hit: true, multiplier: "normal" };
-    expect(ApplyCardInput.safeParse(legacy).success).toBe(true);
+    expect(ApplyCardTargetsInput.safeParse(legacy).success).toBe(false);
     expect(HpChangesResult.safeParse({ hpChangeIds: ["h1", "h2"] }).success).toBe(true);
     expect(HpChangesResult.safeParse({ hpChangeIds: [] }).success).toBe(false);
   });
@@ -44,20 +42,24 @@ describe("combat-tracker schemas (feedback pass)", () => {
     expect(DamageCardTargetsResolution.safeParse({ targets: [] }).success).toBe(false);
     expect(DamageCardResolutionRead.parse(multi)).toEqual(multi);
     const legacy = { targetName: null, hit: true, multiplier: "normal" as const, applied: 6 };
-    expect(DamageCardResolution.safeParse(legacy).success).toBe(true);
+    expect(DamageCardTargetsResolution.safeParse(legacy).success).toBe(false);
     expect(DamageCardResolutionRead.parse(legacy)).toEqual({ targets: [legacy] });
     expect(DamageCardResolutionRead.safeParse({ ...legacy, targetId: "k" }).success).toBe(false);
   });
 
-  // #155 picked 2 KB. Typical cards fit; the worst case does not (20 × 60-code-point names,
-  // up to 4 UTF-8 bytes each, ≈ 6 KB): raised to the orchestrator, combat build must decide.
-  test("OQ-CBT-39: 20 typical targets need more than 256 B and fit the damage-card cap", () => {
+  // #157: 8 KB covers the worst case: 20 targets × 40-code-point names (combatant name max),
+  // 4 UTF-8 bytes each.
+  test("OQ-CBT-39: 20 targets need more than 256 B; worst case fits the 8 KB damage-card cap", () => {
+    const bytes = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
     const twenty = { targets: Array.from({ length: 20 }, (_, i) => outcome(i, 16)) };
-    const bytes = new TextEncoder().encode(
-      JSON.stringify(DamageCardTargetsResolution.parse(twenty)),
-    ).length;
-    expect(bytes).toBeGreaterThan(256);
-    expect(bytes).toBeLessThanOrEqual(DAMAGE_CARD_RESOLUTION_MAX_BYTES);
+    expect(bytes(DamageCardTargetsResolution.parse(twenty))).toBeGreaterThan(256);
+    const worst = {
+      targets: Array.from({ length: 20 }, () => ({ ...outcome(0), targetName: "𝔊".repeat(40) })),
+    };
+    expect(DAMAGE_CARD_RESOLUTION_MAX_BYTES).toBe(8192);
+    expect(bytes(DamageCardTargetsResolution.parse(worst))).toBeLessThanOrEqual(
+      DAMAGE_CARD_RESOLUTION_MAX_BYTES,
+    );
   });
 
   test("FR-CBT-44 cbt.rollAbility: check | save + ability; no bonus field", () => {

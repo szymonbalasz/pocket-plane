@@ -6,7 +6,7 @@ import { COMBAT_1 } from "./combat-1";
 
 /**
  * CBT §13 `combat-hit`: Goblin attacks, manual 15 / 4 (19 to hit, 6 slashing) → card; the DM
- * applies it to Mira (AC 16): hit, normal → Mira 6 / 12.
+ * applies it with targets `[{Mira (AC 16), hit, normal}]` → Mira 6 / 12.
  */
 export default defineFixture({
   key: "combat-hit",
@@ -20,11 +20,15 @@ export default defineFixture({
     })),
     step(applyCard, (r) => ({
       cardId: r.id("combat-hit", "notification"),
-      targetId: r.id("combat-1", COMBATANT_TYPE, COMBAT_1.mira),
       toHitTotal: 19,
-      hit: true,
       damageTotal: 6,
-      multiplier: "normal" as const,
+      targets: [
+        {
+          targetId: r.id("combat-1", COMBATANT_TYPE, COMBAT_1.mira),
+          hit: true,
+          multiplier: "normal" as const,
+        },
+      ],
     })),
   ],
 });

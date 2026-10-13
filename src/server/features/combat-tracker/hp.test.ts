@@ -6,7 +6,7 @@ import {
   COMBATANT_TYPE,
   DamageCardPayload,
   type HpChangeRecord,
-  type HpChangeResult,
+  type HpChangesResult,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
@@ -35,18 +35,28 @@ function started() {
       { attackerId: id(name), mode, manual: [{ diceTotal: toHit }, { diceTotal: damage }] },
       actor,
     );
-  const apply = (cardId: string, target: string, o: Record<string, unknown> = {}) => {
+  type TargetOpts = { hit?: boolean; multiplier?: string };
+  /** Apply to targets by name; `o` = shared overrides plus `hit` / `multiplier` for every target. */
+  const applyTo = (
+    cardId: string,
+    targets: readonly (string | [string, TargetOpts])[],
+    o: Record<string, unknown> = {},
+  ) => {
     const p = DamageCardPayload.parse(card(cardId)?.payload);
-    return t.run<HpChangeResult>(applyCard.name, {
+    const { hit = true, multiplier = "normal", ...shared } = o;
+    return t.run<HpChangesResult>(applyCard.name, {
       cardId,
-      targetId: id(target),
       toHitTotal: p.toHit.total,
-      hit: true,
       damageTotal: p.damage.total,
-      multiplier: "normal",
-      ...o,
+      targets: targets.map((x) => {
+        const [name, per] = typeof x === "string" ? [x, {}] : x;
+        return { targetId: id(name), hit, multiplier, ...per };
+      }),
+      ...shared,
     });
   };
+  const apply = (cardId: string, target: string, o: Record<string, unknown> = {}) =>
+    applyTo(cardId, [target], o);
   const hpRows = () => t.s.db.select().from(hpChange).all() as HpChangeRecord[];
   const entry = (eid: string) =>
     t.s.db.select().from(gameLogEntry).where(eq(gameLogEntry.id, eid)).get();
@@ -54,9 +64,9 @@ function started() {
     const last = hpRows()
       .filter((r) => !r.undone)
       .sort((a, b) => b.seq - a.seq)[0];
-    return t.run<HpChangeResult>(undoCommand.name, { expectedHpChangeId: last?.id ?? "x" });
+    return t.run<HpChangesResult>(undoCommand.name, { expectedHpChangeId: last?.id ?? "x" });
   };
-  return { ...t, enc, id, card, attack, apply, hpRows, entry, undo };
+  return { ...t, enc, id, card, attack, apply, applyTo, hpRows, entry, undo };
 }
 
 const types = (t: ReturnType<typeof started>, from: number) =>
@@ -178,8 +188,8 @@ describe("FR-CBT-16 FR-CBT-17 FR-CBT-18 attack", () => {
   });
 });
 
-describe("FR-CBT-20 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
-  test("FR-CBT-20 DM applies a card to Goblin: HP, combat log entry, line, card resolved", () => {
+describe("FR-CBT-34 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
+  test("FR-CBT-34 DM applies a card to Goblin: HP, combat log entry, line, card resolved", () => {
     const t = started();
     t.run("dice.setCategoryPublic", { category: "attack", public: true });
     const r = t.attack("Mira", 15, 4, t.p1);
@@ -189,7 +199,7 @@ describe("FR-CBT-20 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
     expect(t.byName(t.enc.id).Goblin).toMatchObject({ hpCurrent: 1 });
     const row = t.hpRows()[0];
     expect(row).toMatchObject({
-      id: res.hpChangeId,
+      id: res.hpChangeIds[0],
       kind: "damage",
       source: "card",
       cardId: r.cardId,
@@ -213,7 +223,7 @@ describe("FR-CBT-20 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
       undone: false,
     });
     const ev = t.events[n]?.event;
-    expect(ev?.payload).toMatchObject({ hpChangeId: res.hpChangeId, applied: 6, targetAc: 15 });
+    expect(ev?.payload).toMatchObject({ hpChangeId: res.hpChangeIds[0], applied: 6, targetAc: 15 });
     const e = t.entry(row?.entryId as string);
     expect(e).toMatchObject({ kind: "cbt.attack", category: "attack", public: true });
     expect(e?.encounterId).toBe(t.enc.id);
@@ -222,7 +232,9 @@ describe("FR-CBT-20 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
     );
     expect(t.card(r.cardId)).toMatchObject({
       state: "resolved",
-      resolution: { targetName: "Goblin", hit: true, multiplier: "normal", applied: 6 },
+      resolution: {
+        targets: [{ targetName: "Goblin", hit: true, multiplier: "normal", applied: 6 }],
+      },
     });
     // Players: band upsert, no HP numbers, no hp-change.
     const v = t.h.viewer("player", t.h.p2.id);
@@ -233,7 +245,7 @@ describe("FR-CBT-20 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
     expect(JSON.stringify(wire)).toContain('"band":"bloodied"');
   });
 
-  test("FR-CBT-20 rolled values from the rows; overrides flagged; half rounds down; overkill", () => {
+  test("FR-CBT-34 rolled values from the rows; overrides flagged; half rounds down; overkill", () => {
     const t = started();
     const r = t.attack("Goblin", 3, 5); // 7 to hit, 7 damage
     t.apply(r.cardId, "Wolf", {
@@ -278,13 +290,13 @@ describe("FR-CBT-20 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
     t.apply(c4.cardId, "Wolf", { public: true });
     expect(pub(c4.cardId)).toBe(false);
     // Hidden target → resolution names nobody.
-    expect(t.card(c4.cardId)?.resolution).toMatchObject({ targetName: null });
+    expect(t.card(c4.cardId)?.resolution).toMatchObject({ targets: [{ targetName: null }] });
     const c5 = t.attack("Mira", 10, 3, t.p1);
     t.apply(c5.cardId, "Goblin", { public: false });
     expect(pub(c5.cardId)).toBe(true);
   });
 
-  test("FR-CBT-20 double apply, ended, removed target, other campaign; rollback leaves nothing", () => {
+  test("FR-CBT-34 double apply, ended, removed target, other campaign; rollback leaves nothing", () => {
     const t = started();
     const r = t.attack("Goblin", 10, 3);
     t.apply(r.cardId, "Goblin 2");
@@ -296,11 +308,9 @@ describe("FR-CBT-20 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
       t.err(() =>
         t.run(applyCard.name, {
           cardId: r2.cardId,
-          targetId: "nope",
           toHitTotal: 1,
-          hit: true,
           damageTotal: 1,
-          multiplier: "normal",
+          targets: [{ targetId: "nope", hit: true, multiplier: "normal" }],
         }),
       ).code,
     ).toBe("not_found");
@@ -312,11 +322,9 @@ describe("FR-CBT-20 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
       t.err(() =>
         t.run(applyCard.name, {
           cardId: other.id,
-          targetId: t.id("Goblin"),
           toHitTotal: 1,
-          hit: true,
           damageTotal: 1,
-          multiplier: "normal",
+          targets: [{ targetId: t.id("Goblin"), hit: true, multiplier: "normal" }],
         }),
       ).code,
     ).toBe("not_found");

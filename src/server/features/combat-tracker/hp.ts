@@ -1,18 +1,21 @@
-// HP changes (FR-CBT-20–25): apply a damage card, direct damage / heal, strict-LIFO undo. Each
-// is one transaction: HP + combat log entry + game-log line + card state.
+// HP changes (FR-CBT-21–25, FR-CBT-34–36): apply a damage card to 1–20 targets, direct damage /
+// heal, strict-LIFO undo of one apply at a time. Each is one transaction: HP + combat log entries
+// + game-log lines + card state.
 
 import type { AttackLogDmPayload, AttackLogPayload } from "@shared/combat-tracker/log-kinds";
-import { clampHp, hitHint, rawDamage } from "@shared/combat-tracker/rules";
+import { clampHp, hitHint, rawDamage, undoGroup } from "@shared/combat-tracker/rules";
 import {
-  ApplyCardInput,
+  ApplyCardTargetsInput,
   ApplyHpInput,
   CBT_INTENTS,
   type CombatantRecord,
   DAMAGE_CARD_KIND,
   DamageCardPayload,
-  type DamageCardResolution,
+  type DamageCardTargetOutcome,
+  type DamageCardTargetsResolution,
   type HpChangeRecord,
   type HpChangeResult,
+  type HpChangesResult,
   LOG_KIND_ATTACK,
   LOG_KIND_HP,
   UndoInput,
@@ -98,110 +101,114 @@ function rollTotal(env: Env, id: string): { total: number; natural: number | nul
 
 export const applyCard = defineCommand({
   name: CBT_INTENTS.applyCard,
-  input: ApplyCardInput,
-  execute(input, env): HpChangeResult {
+  input: ApplyCardTargetsInput,
+  execute(input, env): HpChangesResult {
     const card = loadNotification(env, input.cardId);
     if (card.kind !== DAMAGE_CARD_KIND) throw notFound("Damage card not found");
     if (card.state !== "pending") throw conflict("No longer pending");
     const p = DamageCardPayload.parse(card.payload);
     const enc = readEncounter(env.tx, p.encounterId);
     if (enc.status !== "started") throw conflict("Encounter has ended");
-    const { c: target } = activeCombatant(env, input.targetId);
+    // FR-CBT-34: every target active and non-removed, checked before anything is written.
+    const targets = input.targets.map((t) => ({ ...t, c: activeCombatant(env, t.targetId).c }));
     const attacker = getCombatant(env.tx, enc.campaignId, p.attackerId);
-    // FR-CBT-20: rolled values come from the card's roll rows, never the client (gems: FR-CBT-32).
+    // Rolled values come from the card's roll rows, never the client (gems: FR-CBT-32).
     const toHitRoll = rollTotal(env, p.toHit.rollId);
     const damageRoll = rollTotal(env, p.damage.rollId);
-    const targetAc = statsOf(env, target).ac;
-    const hitComputed = hitHint(toHitRoll.natural, input.toHitTotal, targetAc);
-    const raw = rawDamage(input.hit, input.damageTotal, input.multiplier);
-    const hp = applyDelta(env, target, -raw);
-    const applied = Math.abs(hp.hpBefore - hp.hpAfter);
-    const overkill = Math.max(0, raw - hp.hpBefore);
-    // FR-CBT-24: hidden attacker or target → never public; a player's card → public.
-    const hidden = attacker.hidden || target.hidden;
     const playerCard = card.audience === "player";
-    const logPayload: AttackLogPayload = {
-      targetName: target.name,
-      attackName: p.attackName,
-      damageType: p.damageType,
-      toHit: {
-        dice: input.toHitTotal === toHitRoll.total ? toHitRoll.total - p.toHit.constant : null,
-        constant: p.toHit.constant,
-        total: input.toHitTotal,
+    const rollIds = [p.toHit.rollId, p.damage.rollId];
+    const hpChangeIds: string[] = [];
+    const outcomes: DamageCardTargetOutcome[] = [];
+    for (const { c: target, hit, multiplier } of targets) {
+      const targetAc = statsOf(env, target).ac;
+      const hitComputed = hitHint(toHitRoll.natural, input.toHitTotal, targetAc);
+      const raw = rawDamage(hit, input.damageTotal, multiplier);
+      const hp = applyDelta(env, target, -raw);
+      const applied = Math.abs(hp.hpBefore - hp.hpAfter);
+      const overkill = Math.max(0, raw - hp.hpBefore);
+      const logPayload: AttackLogPayload = {
+        targetName: target.name,
+        attackName: p.attackName,
+        damageType: p.damageType,
+        toHit: {
+          dice: input.toHitTotal === toHitRoll.total ? toHitRoll.total - p.toHit.constant : null,
+          constant: p.toHit.constant,
+          total: input.toHitTotal,
+          natural: toHitRoll.natural,
+        },
+        hit,
+        damage: raw,
+        multiplier,
+        crit: p.crit,
+      };
+      const dmPayload: AttackLogDmPayload = {
+        targetAc,
+        hitComputed,
+        toHitRolled: toHitRoll.total,
+        damageRolled: damageRoll.total,
+        damageTotal: input.damageTotal,
+        applied,
+        overkill,
+        overrides: {
+          toHit: input.toHitTotal !== toHitRoll.total,
+          hit: hit !== hitComputed,
+          damage: input.damageTotal !== damageRoll.total,
+        },
+      };
+      // FR-CBT-36: one line per target; never public if the attacker or this target is hidden,
+      // else a player's card is public, else the DM's choice / category setting (FR-CBT-24).
+      const entry = gameLog.append(env, {
+        kind: LOG_KIND_ATTACK,
+        category: "attack",
+        actorName: p.attackerName,
+        payload: logPayload,
+        dmPayload,
+        rollIds,
+        encounterId: enc.id,
+        public: attacker.hidden || target.hidden ? false : playerCard ? true : input.public,
+      });
+      const facts: FactsInput = {
+        encounterId: enc.id,
+        kind: "damage",
+        source: "card",
+        cardId: card.id,
+        rollIds,
+        attackerId: p.attackerId,
+        attackerName: p.attackerName,
+        attackName: p.attackName,
+        damageType: p.damageType,
+        targetId: target.id,
+        targetEntityId: target.entityId,
+        targetName: target.name,
+        targetAc,
+        toHitRolled: toHitRoll.total,
+        toHitTotal: input.toHitTotal,
         natural: toHitRoll.natural,
-      },
-      hit: input.hit,
-      damage: raw,
-      multiplier: input.multiplier,
-      crit: p.crit,
-    };
-    const dmPayload: AttackLogDmPayload = {
-      targetAc,
-      hitComputed,
-      toHitRolled: toHitRoll.total,
-      damageRolled: damageRoll.total,
-      damageTotal: input.damageTotal,
-      applied,
-      overkill,
-      overrides: {
-        toHit: input.toHitTotal !== toHitRoll.total,
-        hit: input.hit !== hitComputed,
-        damage: input.damageTotal !== damageRoll.total,
-      },
-    };
-    const entry = gameLog.append(env, {
-      kind: LOG_KIND_ATTACK,
-      category: "attack",
-      actorName: p.attackerName,
-      payload: logPayload,
-      dmPayload,
-      rollIds: [p.toHit.rollId, p.damage.rollId],
-      encounterId: enc.id,
-      public: hidden ? false : playerCard ? true : input.public,
-    });
-    const facts: FactsInput = {
-      encounterId: enc.id,
-      kind: "damage",
-      source: "card",
-      cardId: card.id,
-      rollIds: [p.toHit.rollId, p.damage.rollId],
-      attackerId: p.attackerId,
-      attackerName: p.attackerName,
-      attackName: p.attackName,
-      damageType: p.damageType,
-      targetId: target.id,
-      targetEntityId: target.entityId,
-      targetName: target.name,
-      targetAc,
-      toHitRolled: toHitRoll.total,
-      toHitTotal: input.toHitTotal,
-      natural: toHitRoll.natural,
-      hitComputed,
-      hit: input.hit,
-      damageRolled: damageRoll.total,
-      damageTotal: input.damageTotal,
-      multiplier: input.multiplier,
-      raw,
-      applied,
-      overkill,
-      hpBefore: hp.hpBefore,
-      hpAfter: hp.hpAfter,
-    };
-    const row = insertHpChange(env, facts, entry.id);
-    env.emit({
-      type: AttackApplied.type,
-      campaignId: enc.campaignId,
-      payload: { hpChangeId: row.id, ...facts },
-      changes: [...hp.changes, hpChangeChange(null, row), entry],
-    });
-    const resolution: DamageCardResolution = {
-      targetName: target.hidden ? null : target.name,
-      hit: input.hit,
-      multiplier: input.multiplier,
-      applied,
-    };
+        hitComputed,
+        hit,
+        damageRolled: damageRoll.total,
+        damageTotal: input.damageTotal,
+        multiplier,
+        raw,
+        applied,
+        overkill,
+        hpBefore: hp.hpBefore,
+        hpAfter: hp.hpAfter,
+      };
+      const row = insertHpChange(env, facts, entry.id);
+      env.emit({
+        type: AttackApplied.type,
+        campaignId: enc.campaignId,
+        payload: { hpChangeId: row.id, ...facts },
+        changes: [...hp.changes, hpChangeChange(null, row), entry],
+      });
+      hpChangeIds.push(row.id);
+      // #138: the rolling player sees each outcome; a hidden target's name never.
+      outcomes.push({ targetName: target.hidden ? null : target.name, hit, multiplier, applied });
+    }
+    const resolution: DamageCardTargetsResolution = { targets: outcomes };
     resolveNotification(env, card.id, resolution);
-    return { hpChangeId: row.id };
+    return { hpChangeIds };
   },
 });
 
@@ -264,43 +271,46 @@ export const applyHp = defineCommand({
   },
 });
 
-/** FR-CBT-25: the latest non-undone combat log entry of the started encounter, by `seq`. */
-export function latestUndoable(env: Pick<CommandEnv, "tx">, encounterId: string) {
-  const r = env.tx
+/** FR-CBT-35: the encounter's undo unit (latest non-undone entry + its card's), latest first. */
+export function undoUnit(env: Pick<CommandEnv, "tx">, encounterId: string): HpChangeRecord[] {
+  const rows = env.tx
     .select()
     .from(hpChange)
     .where(and(eq(hpChange.encounterId, encounterId), eq(hpChange.undone, false)))
     .orderBy(desc(hpChange.seq))
-    .limit(1)
-    .get();
-  return r ? toHpChangeRecord(r) : null;
+    .all()
+    .map(toHpChangeRecord);
+  return undoGroup(rows);
 }
 
 export const undoCommand = defineCommand({
   name: CBT_INTENTS.undo,
   input: UndoInput,
-  execute({ expectedHpChangeId }, env): HpChangeResult {
+  execute({ expectedHpChangeId }, env): HpChangesResult {
     const enc = startedEncounter(env.tx, campaignOf(env.actor));
-    const last = enc ? latestUndoable(env, enc.id) : null;
+    const unit = enc ? undoUnit(env, enc.id) : [];
+    const last = unit[0];
     if (!enc || !last) throw conflict("Nothing to undo");
     if (last.id !== expectedHpChangeId) throw conflict("Something else changed — check Undo");
-    const target = readCombatant(env.tx, last.targetId);
-    // I2: the inverse delta, clamped; it restores only this entry's own change.
-    const hp = applyDelta(env, target, last.kind === "damage" ? last.applied : -last.applied);
-    env.tx
-      .update(hpChange)
-      .set({ undone: true, undoneAt: env.ctx.clock.iso() })
-      .where(eq(hpChange.id, last.id))
-      .run();
-    const entry = gameLog.markUndone(env, last.entryId);
-    env.emit({
-      type: CombatEntryUndone.type,
-      campaignId: enc.campaignId,
-      payload: { hpChangeId: last.id },
-      changes: [...hp.changes, hpChangeChange(last, readHpChange(env.tx, last.id)), entry],
-    });
-    // I28: the owner's event first, then the card back to pending.
+    for (const row of unit) {
+      const target = readCombatant(env.tx, row.targetId);
+      // I2: the inverse delta, clamped; it restores only this entry's own change.
+      const hp = applyDelta(env, target, row.kind === "damage" ? row.applied : -row.applied);
+      env.tx
+        .update(hpChange)
+        .set({ undone: true, undoneAt: env.ctx.clock.iso() })
+        .where(eq(hpChange.id, row.id))
+        .run();
+      const entry = gameLog.markUndone(env, row.entryId);
+      env.emit({
+        type: CombatEntryUndone.type,
+        campaignId: enc.campaignId,
+        payload: { hpChangeId: row.id },
+        changes: [...hp.changes, hpChangeChange(row, readHpChange(env.tx, row.id)), entry],
+      });
+    }
+    // I28: the owner's events first, then the card back to pending (once per apply).
     if (last.cardId) reopenNotification(env, last.cardId);
-    return { hpChangeId: last.id };
+    return { hpChangeIds: unit.map((r) => r.id) };
   },
 });

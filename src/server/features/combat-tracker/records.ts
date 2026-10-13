@@ -58,9 +58,10 @@ export function redactEncounter(r: EncounterRecord): PlayerEncounterRecord {
 }
 
 export function combatantVisibility(r: CombatantRecord): Visibility {
-  return !r.active || r.removed || r.hidden ? "hidden" : "redacted";
+  return !r.active || r.hidden ? "hidden" : "redacted";
 }
 
+/** FR-CBT-37: removed → no rank, band or initiative; else the PC / monster redaction. */
 export function redactCombatant(r: CombatantRecord): PlayerCombatant {
   const base = {
     id: r.id,
@@ -68,12 +69,14 @@ export function redactCombatant(r: CombatantRecord): PlayerCombatant {
     tokenId: r.tokenId,
     name: r.name,
     imageAssetId: r.imageAssetId,
-    playerPosition: r.playerPosition,
+    movedFt: r.movedFt,
   };
+  if (r.removed) return { ...base, kind: r.kind, removed: true };
+  const ranked = { ...base, playerPosition: r.playerPosition, removed: false as const };
   if (r.kind === "pc") {
-    return { ...base, kind: "pc", entityId: r.entityId, initiative: r.initiative };
+    return { ...ranked, kind: "pc", entityId: r.entityId, initiative: r.initiative };
   }
-  return { ...base, kind: "monster", band: healthBand(r.hpCurrent ?? 0, r.hpMax ?? 1) };
+  return { ...ranked, kind: "monster", band: healthBand(r.hpCurrent ?? 0, r.hpMax ?? 1) };
 }
 
 export const combatRecordTypes = [

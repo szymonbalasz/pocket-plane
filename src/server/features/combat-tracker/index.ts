@@ -3,6 +3,7 @@
 // (registered in scenes-map's / entities' append-only registries).
 import type { CommandDef } from "../../commands/commands";
 import type { Feature } from "../../services";
+import { rollAbility } from "./abilities";
 import { attackCommand } from "./attack";
 import { createEncounter, deleteEncounter, updateEncounter } from "./encounters";
 import { applyCard, applyHp, undoCommand } from "./hp";
@@ -29,6 +30,7 @@ export const combatTracker: Feature = {
       applyCard,
       applyHp,
       undoCommand,
+      rollAbility,
     ];
     for (const c of intents) r.command(c, { intent: true });
     for (const t of combatRecordTypes) r.recordType(t);
