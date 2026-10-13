@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 3. **Scenes built** (demo: [demo-scenes](demo-scenes.md)); Combat building. DM asked for long autonomous stretches (#141): report only when blocked.
+**Phase:** 3 built. **DM gate:** demos [demo-scenes](demo-scenes.md), [demo-combat](demo-combat.md); party-loot questions; Phase 4 go. DM asked for long autonomous stretches (#141): report only when blocked.
 
 **Herdr:** orchestrator workspace `wR` (pane `wR:p1`). Always `herdr worktree create --workspace wR …`. Clean up worktrees after merge. Test agents get a dedicated server pane (AGENTS §9.6). Max 4 working agents.
 
@@ -12,14 +12,16 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Combat core: `fix/combat-core`, notifications, dice-roll-log | — (ended) | merged | e2e green; walkthroughs 16/16, 10/10 | — |
 | `fix/client-polish` | — (ended) | merged (`f624772`) | probe 204, lazy Konva | — |
 | build character-sheet | — (ended) | merged (`49fde53`) | walkthrough 10/10, 459 tests | — |
-| build combat-tracker | `build-combat-tracker` (`w1D:p2`), `test-combat` (`w1D:p3`, server `w1D:p4`, 4133) | `w1D`, slot 3 | all slices; §13 walkthrough running | — |
+| build combat-tracker | — (ended) | merged (`22862e9`) | walkthrough 12/12 after fixes, 519 tests | — |
+| MVP session-sim integration run | — (ended) | `main`; evidence `%TEMP%\opencode\verify-session\` | 15/15 PASS; 5 layout glitches | — |
+| `fix/window-layout` | `build-layout` (`w1F:p2`) | `w1F`, slot 0 | building | — |
 | Spec party-loot (Phase 4) | — | revised draft on `main` | in-review | DM: OQ-LOOT-01/02/06 |
 
 Evidence archived: `%TEMP%\opencode\verify-{skeleton,scenes-core,play-shell,assets,entities,scenes-map,notifications,dice}\`.
 
 ## Shared-file locks (AGENTS §9.9, sequenced)
 
-- `build/combat-tracker`: shell window tests, fixtures loader `removeFile` retry, data-model §17 note, `routing.test.ts`.
+- `fix/window-layout`: window geometry in all features, play-shell placement, shell window tests, Initiative/Encounters layout, protocol §18/§24 geometry rows.
 - character-sheet / combat-tracker: ask before any shared file.
 
 ## Pending DM decisions (next check-in, not blocking)
