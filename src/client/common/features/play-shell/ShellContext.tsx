@@ -1,16 +1,36 @@
 // Shell provider: one window manager per play page, restored from browser storage after the
 // first snapshot and after `you.campaignId` changes (FR-SHELL-16). Stays mounted across the
-// waiting / reconnect screens so windows come back as they were (FR-SHELL-04).
+// waiting / reconnect screens so windows come back as they were (FR-SHELL-04). Also owns the
+// page's alert controller (FR-SHELL-22–25): one per play page, both clients.
 import { layoutKey } from "@shared/play-shell/layout";
-import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useStore } from "zustand";
 import { SyncContext, useSync } from "../../sync/store";
+import { showAlertToast } from "./alert-toast";
+import {
+  type AlertController,
+  type AlertState,
+  createAlertController,
+  createTitleMarker,
+  type ShellAlert,
+} from "./alerts";
+import { browserAudioContext, createAudioEngine } from "./audio";
 import type { WindowAction } from "./manager";
 import { availableKinds, type WindowRegistry } from "./registry";
 import { createShellController, type ShellController, type ShellState } from "./shell-store";
+import { browserSoundSettingsStorage, soundKey } from "./sound-settings";
 import { browserLayoutStorage } from "./storage";
 
 const ShellContext = createContext<ShellController | null>(null);
+const AlertContext = createContext<AlertController | null>(null);
 
 const browserViewport = () => ({ w: window.innerWidth, h: window.innerHeight });
 
@@ -39,13 +59,82 @@ export function ShellProvider({
   useLayoutEffect(() => {
     if (key) controller.restore(key);
   }, [controller, key]);
-  return <ShellContext.Provider value={controller}>{children}</ShellContext.Provider>;
+  const alerts = useAlertRuntime(
+    you?.role === "player" && you.playerId ? soundKey(you.campaignId, you.playerId) : null,
+  );
+  return (
+    <ShellContext.Provider value={controller}>
+      <AlertContext.Provider value={alerts}>{children}</AlertContext.Provider>
+    </ShellContext.Provider>
+  );
+}
+
+/**
+ * The page's alert controller: sound settings of `soundOwner` (player key; DM null → defaults,
+ * no control), audio unlocked by the first `pointerdown` / `keydown` (FR-SHELL-25), title mark
+ * cleared when the page is visible again (FR-SHELL-23).
+ */
+function useAlertRuntime(soundOwner: string | null): AlertController {
+  const [rt] = useState(() => {
+    const title = createTitleMarker(document);
+    const alerts = createAlertController({
+      audio: createAudioEngine({ create: browserAudioContext }),
+      storage: browserSoundSettingsStorage(),
+      toast: showAlertToast,
+      title,
+    });
+    return { alerts, title };
+  });
+  const { alerts, title } = rt;
+  useLayoutEffect(() => alerts.setOwner(soundOwner), [alerts, soundOwner]);
+  useEffect(() => {
+    const opts = { capture: true } as const;
+    const off = () => {
+      window.removeEventListener("pointerdown", on, opts);
+      window.removeEventListener("keydown", on, opts);
+    };
+    const on = () => {
+      alerts.unlock();
+      off();
+    };
+    window.addEventListener("pointerdown", on, opts);
+    window.addEventListener("keydown", on, opts);
+    return off;
+  }, [alerts]);
+  useEffect(() => {
+    const on = () => {
+      if (!document.hidden) title.visible();
+    };
+    document.addEventListener("visibilitychange", on);
+    return () => document.removeEventListener("visibilitychange", on);
+  }, [title]);
+  return alerts;
 }
 
 function useController(): ShellController {
   const c = useContext(ShellContext);
   if (!c) throw new Error("play-shell hook outside ShellProvider");
   return c;
+}
+
+export function useAlertController(): AlertController {
+  const c = useContext(AlertContext);
+  if (!c) throw new Error("play-shell hook outside ShellProvider");
+  return c;
+}
+
+export function useAlertState<T>(selector: (s: AlertState) => T): T {
+  return useStore(useAlertController().store, selector);
+}
+
+/**
+ * Feature API (FR-SHELL-22): `useShellAlert()({id, title, detail?, sound?})` flashes the screen,
+ * shows a Toast, plays the sound (if unlocked and not muted) and marks the title while hidden.
+ * Call it only for live events the client received, never on a snapshot.
+ */
+export function useShellAlert(): (alert: ShellAlert) => void {
+  const c = useAlertController();
+  return useCallback((a: ShellAlert) => c.alert(a), [c]);
 }
 
 export function useShellState<T>(selector: (s: ShellState) => T): T {

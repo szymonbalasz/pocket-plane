@@ -1,8 +1,8 @@
 import "@ui/styles.css";
 import { TooltipProvider } from "@ui/components/ui/overlays";
+import { ShellToaster } from "@ui/features/play-shell/ShellToaster";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { Toaster } from "sonner";
 import { App } from "./App";
 
 const root = document.getElementById("root");
@@ -11,7 +11,8 @@ createRoot(root).render(
   <StrictMode>
     <TooltipProvider delayDuration={200}>
       <App />
-      <Toaster theme="dark" position="bottom-right" />
+      {/* FR-SHELL-01: the player's one toast region, bottom-right. */}
+      <ShellToaster client="player" />
     </TooltipProvider>
   </StrictMode>,
 );
