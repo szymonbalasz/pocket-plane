@@ -11,6 +11,7 @@ import { type RunningServer, startServer } from "../../server";
 import { connectClient, type TestClient } from "../../testing/harness";
 import { createTestServices, DM_ACTOR, TEST_SECRET } from "../../testing/services";
 import { activateCampaign, addPlayer, createCampaign } from "../campaign-management/commands";
+import { DB_MARKER } from "./store";
 
 export { TEST_SECRET };
 
@@ -104,9 +105,10 @@ export async function startAssetServer(opts: AssetServerOptions = {}) {
         return [];
       }
     },
+    /** Everything on disk except the DB marker (#163). */
     entries: () => {
       try {
-        return readdirSync(assetDir);
+        return readdirSync(assetDir).filter((n) => n !== DB_MARKER);
       } catch {
         return [];
       }
