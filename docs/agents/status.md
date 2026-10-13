@@ -14,14 +14,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | build character-sheet | — (ended) | merged (`49fde53`) | walkthrough 10/10, 459 tests | — |
 | build combat-tracker | — (ended) | merged (`22862e9`) | walkthrough 12/12 after fixes, 519 tests | — |
 | MVP session-sim integration run | — (ended) | `main`; evidence `%TEMP%\opencode\verify-session\` | 15/15 PASS; 5 layout glitches | — |
-| `fix/window-layout` | `build-layout` (`w1F:p2`) | `w1F`, slot 0 | building | — |
+| `fix/window-layout` | — (ended) | merged (`61aa422`) | layout check fixes; 535 tests, e2e green | — |
 | Spec party-loot (Phase 4) | — | revised draft on `main` | in-review | DM: OQ-LOOT-01/02/06 |
 
 Evidence archived: `%TEMP%\opencode\verify-{skeleton,scenes-core,play-shell,assets,entities,scenes-map,notifications,dice}\`.
 
 ## Shared-file locks (AGENTS §9.9, sequenced)
 
-- `fix/window-layout`: window geometry in all features, play-shell placement, shell window tests, Initiative/Encounters layout, protocol §18/§24 geometry rows.
+- None (no active builds).
 - character-sheet / combat-tracker: ask before any shared file.
 
 ## Pending DM decisions (next check-in, not blocking)
