@@ -1,7 +1,7 @@
 ---
 title: Character sheet (basics)
 prefix: CHAR
-status: complete
+status: in-review
 owner: spec-character-sheet
 wave: 2
 ---
@@ -19,7 +19,7 @@ wave: 2
 
 ## 2. Scope
 
-- Window `char.sheet` (both clients): name, portrait, level + class, AC, HP current / max, initiative bonus, the one weapon attack.
+- Window `char.sheet` (both clients): name, portrait, level + class, AC, HP current / max, initiative bonus, speed (feedback F3, #148), the one weapon attack.
 - Click-to-roll initiative and attack. Roll mode (Shift / Ctrl or toggle) and manual entry on every roll, via dice-roll-log's shared roll control.
 - Adjust current HP: damage / heal by an amount; owner and DM (#139 P5). Not undoable.
 - Character picker when a client may view several characters.
@@ -58,7 +58,7 @@ wave: 2
 
 | ID | Requirement | Notes |
 |---|---|---|
-| FR-CHAR-01 | The sheet reads only the `entity` record of kind `character` ([entities §8](entities.md#8-data-model)): `name`, `portraitAssetId`, `statBlock.{level, className, ac, hpMax, initBonus, attacks[0]}`, `hpCurrent`. No new field, table or record type. | ADR-0012 |
+| FR-CHAR-01 | The sheet reads only the `entity` record of kind `character` ([entities §8](entities.md#8-data-model)): `name`, `portraitAssetId`, `statBlock.{level, className, ac, hpMax, initBonus, attacks[0]}`, `hpCurrent`; feedback pass adds optional `statBlock.speed` (FR-CHAR-18). No new field, table or record type. | ADR-0012 |
 | FR-CHAR-02 | Eligible characters: player = `character` entities with `ownerPlayerId` = own player id; DM = every character of the campaign. Picker shown iff > 1 eligible; sorted by name (case-insensitive), then id; default the first. Selection is client memory only. | |
 | FR-CHAR-03 | Shows name, portrait (asset `thumb`, else initials), "Level N Class" (class omitted if empty), AC, HP `current / max`, initiative bonus signed (`+2`, `−1`), attack row `name  +toHit  ·  damage damageType`. `hpCurrent = 0` → "Down" badge. Any committed change to the record shows ≤ 1 s, whatever caused it. | |
 | FR-CHAR-04 | Empty states: player with none "No character yet — ask your DM"; DM with none "No characters in this campaign". Selected character no longer eligible (owner change, campaign switch) → first eligible, else empty state. | |
@@ -75,6 +75,7 @@ wave: 2
 | FR-CHAR-15 | Window `char.sheet` registered in both client registries per §7. | ADR-0025 |
 | FR-CHAR-16 | **Roll routing** (#135): Initiative and Attack first ask the client roll-route registry; the first route that claims `(store, characterId, kind)` sends its own intent built from the same `{mode, manual, public}` input, dropping fields its intent doesn't take, and may supply `critExpressions` to the roll control (combat-tracker: `cbt.rollInitiative` / `cbt.attack` per [FR-CBT-30](combat-tracker.md#6-functional-requirements); no target, the DM picks it, #134). No claim → `char.roll`. A claimed sheet shows the route's badge ("In combat"). Empty registry = plain sheet. | [ADR-0027](../architecture/adr/0027-notification-creation.md) |
 | FR-CHAR-17 | Public stamping per [FR-DICE-13](dice-roll-log.md#6-functional-requirements): player roll → public (#73); DM roll for a PC → category setting, or `public` (DM-only per-roll override, preset from the category). Player sending `public` → `forbidden`. | #139 P1, P22 |
+| FR-CHAR-18 | Speed: the stat row shows `statBlock.speed` as "Speed 30 ft"; absent → "Speed —". Read-only, like the other basics. Movement used this turn is **not** on the sheet: the map's drag overlay ([FR-MAP-37](scenes-map.md#6-functional-requirements)) and the DM's initiative row ([FR-CBT-39](combat-tracker.md#6-functional-requirements)) show it *(proposed, OQ-CHAR-15)*. | F3, [FR-ENT-21](entities.md#6-functional-requirements) |
 
 ## 7. UI/UX notes
 
@@ -84,11 +85,11 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, de
 |---|---|---|---|---|
 | `char.sheet` | DM, player | player **yes**; DM no | player top-right below the top bar (clear of tool rail, `dice.log` bottom-left, toasts); DM right, below `camp.players`; 320×440, min 280×320 | "Sheet" (player), "Sheets" (DM) |
 
-- **Layout** (one Card): header = portrait Avatar, name, "Level 1 Fighter", "In combat" Badge (FR-CHAR-16), picker Select. Stat row = AC, HP `12 / 12` (+ "Down" Badge), Init `+2` with **Initiative** Button. Attack row = "Shortsword +4 · 1d6+2 piercing" with **Attack** Button; hidden if no attack. HP row = number Input + Damage / Heal Buttons + caption.
+- **Layout** (one Card): header = portrait Avatar, name, "Level 1 Fighter", "In combat" Badge (FR-CHAR-16), picker Select. Stat row = AC, HP `12 / 12` (+ "Down" Badge), Speed `30 ft`, Init `+2` with **Initiative** Button. Attack row = "Shortsword +4 · 1d6+2 piercing" with **Attack** Button; hidden if no attack. HP row = number Input + Damage / Heal Buttons + caption.
 - **Roll buttons** use dice-roll-log's shared roll control (roll mode keys / toggle, physical-dice popover over N expressions, DM public override) with an `onRoll` callback ([FR-DICE-24](dice-roll-log.md#6-functional-requirements)). Results appear in the game log (`dice.log`), not on the sheet.
 - **DM view:** any character (picker shows owner name); DM public override on rolls. **Player view:** own characters only; others never listed.
 - **States:** loading = skeleton until first snapshot; empty per FR-CHAR-04; reconnecting = last values + shell banner, controls disabled; error = Toast (FR-CHAR-12).
-- **Test IDs:** `char-sheet` (+ `data-record-id` = character id), `char-sheet-picker`, `-name`, `-portrait`, `-level`, `-ac`, `-hp`, `-down`, `-combat`, `-init`, `-roll-init`, `-attack`, `-roll-attack`, `-hp-input`, `-hp-damage`, `-hp-heal`, `-empty` (all prefixed `char-sheet`).
+- **Test IDs:** `char-sheet` (+ `data-record-id` = character id), `char-sheet-picker`, `-name`, `-portrait`, `-level`, `-ac`, `-hp`, `-down`, `-speed`, `-combat`, `-init`, `-roll-init`, `-attack`, `-roll-attack`, `-hp-input`, `-hp-damage`, `-hp-heal`, `-empty` (all prefixed `char-sheet`).
 - **Later:** open from a token double-click ([FR-MAP-29](scenes-map.md#6-functional-requirements)); one window per character; a gem counter block in the header ([gems](post-mvp/gems.md), #140; no MVP UI or field).
 
 ## 8. Data model
@@ -100,6 +101,7 @@ No new entity, field or migration. Reads and writes (via FR-CHAR-10/13) the [ent
 | Entity (kind `character`) | name, portraitAssetId, ownerPlayerId | text, asset ref, ID → Player | Header; eligibility (FR-CHAR-02) |
 | | statBlock.level, className | int 1–20, text 0–40 | "Level N Class"; combat's difficulty |
 | | statBlock.ac, hpMax, initBonus | int | Display; initiative roll |
+| | statBlock.speed *(optional)* | int 0–200, multiple of 5 (entities, FR-ENT-21) | Display only (FR-CHAR-18) |
 | | statBlock.attacks[0] `{name, toHit, damage, damageType?}` | JSON leaf (entities) | Attack row and roll |
 | | hpCurrent | int 0…hpMax | Display; written only per FR-CHAR-13 |
 
@@ -165,14 +167,14 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 |---|---|---|---|---|---|
 | `char-mira` | setup | `player-1` | per [entities §13](entities.md#13-test-plan): L1 fighter, AC 16, HP 12/12, init +2, shortsword +4 / 1d6+2 piercing | entities | yes (already) |
 | `char-thorn` | setup | `player-2` | per entities §13: L1 rogue, AC 14, HP 10/10, init +3, dagger +5 / 1d4+3 | entities | no |
-| `char-pip` *(new)* | setup | `player-1` | "Pip", owner `player-1`, L1 wizard, AC 12, HP 8/8, init +2, **no attack** | character-sheet | no |
+| `char-pip` *(new)* | setup | `player-1` | "Pip", owner `player-1`, L1 wizard, AC 12, HP 8/8, init +2, **no attack, no speed** | character-sheet | no |
 | `char-wounds` *(new)* | setup | `char-thorn` | `char.adjustHp` Thorn −7 → 3/10 | character-sheet | no |
 
 **Bundle `character-sheet`** = `base` + `player-2` + `char-mira` + `char-thorn` + `char-pip` + `char-wounds`. Game-log settings at defaults (all hidden, #139 P23). No scenes.
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | `characterRolls` per kind (signs, `1d20-1`, damage `1d4-1`); mode only on d20; manual count; clamp math; eligibility + sort; formatting; in-flight lock; roll routing (empty registry → `char.roll`; test route claims → its intent + badge) | In-code |
+| Unit | `characterRolls` per kind (signs, `1d20-1`, damage `1d4-1`); mode only on d20; manual count; clamp math; eligibility + sort; formatting (incl. speed "30 ft" / "—"); in-flight lock; roll routing (empty registry → `char.roll`; test route claims → its intent + badge) | In-code |
 | Integration | `char.roll`: rolls, categories, labels; attack = 2 rolls + 1 entry + one `CharacterRolled` in one tx, dice failure → none. Public: player → public; DM → category, override both ways; player `public` → `forbidden`. Authorize matrix (DM / owner / other player / monster / other campaign / no attack). Strict schema rejects `expression`, `toHit`, `kind: damage`. `char.adjustHp`: clamps, no-op → no event, event + log row. `characters.adjustHp` rolls back with its caller's tx. **Leak scan:** `player-2` frames never contain Mira's `hpCurrent`, `hpMax`, `ac` or stat block in `entity` records (roll lines excluded, #73); restart → identical snapshots | `character-sheet` |
 | E2E (thin) | `player-1`: Damage 3 → DM's sheet shows 9/12; Attack → one line (to-hit + damage) in `dice.log` for DM and `player-2` | `character-sheet` |
 
@@ -181,10 +183,10 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | # | DM (A) | Players (B, C) | Expected |
 |---|---|---|---|
 | 1 | Log in, open Sheets | — | Picker: Mira (Player 1), Pip (Player 1), Thorn (Player 2). Thorn: 3 / 10, AC 14, Dagger +5 · 1d4+3 piercing |
-| 2 | — | B, C open links | B: sheet open, Mira: Level 1 Fighter, AC 16, 12 / 12, Init +2, Shortsword +4 · 1d6+2 piercing; picker Mira, Pip only; no "In combat" badge. C: Thorn 3 / 10, no picker. C frames: no Mira `entity` stats or HP |
+| 2 | — | B, C open links | B: sheet open, Mira: Level 1 Fighter, AC 16, 12 / 12, Speed 30 ft, Init +2, Shortsword +4 · 1d6+2 piercing; picker Mira, Pip only; no "In combat" badge. C: Thorn 3 / 10, no picker. C frames: no Mira `entity` stats or HP |
 | 3 | — | B: Initiative; then Shift+Attack | Log (A, B, C): initiative d20+2; one attack line: to-hit with advantage (two d20, higher kept) +4 and damage 1d6+2; totals in range |
 | 4 | — | B: Physical dice on (game log), Attack, enter two values | One line, both rolls marked manual with the entered values |
-| 5 | — | B: pick Pip | No attack row; Initiative works |
+| 5 | — | B: pick Pip | No attack row; "Speed —"; Initiative works |
 | 6 | Thorn: Initiative (no override) | — | A sees the line; B, C see nothing (category hidden) |
 | 7 | — | B on Mira: Damage 5; Heal 20; Damage 15 | A and B ≤ 1 s: 7 / 12, 12 / 12 (clamped), 0 / 12 + "Down". C frames: no Mira HP |
 | 8 | Thorn: Heal 2 | — | C shows 5 / 10 ≤ 1 s |
@@ -200,12 +202,14 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | [play-shell](play-shell.md), [live-sync](live-sync.md), [fixtures-adapters](fixtures-adapters.md) | Window registry, disabled-when-not-live; intents, rejects; bundles; FIX §8 rows `char-pip`, `char-wounds`, `character-sheet` (integrator, at merge) | complete |
 | [dice-roll-log](dice-roll-log.md) | `ctx.dice`, `dice.evaluate(env, …)`, `gameLog.append(env, …)` with `public` override, kind `roll`, manual entry, shared roll control with `onRoll` + N expressions (FR-DICE-24), `dice.log` | in-review |
 | [combat-tracker](combat-tracker.md) | Registers roll routes (`cbt.rollInitiative`, `cbt.attack`); uses `characters.adjustHp`, `characterRolls` | in-review |
+| [entities](entities.md) (feedback pass) | Optional `statBlock.speed` ([FR-ENT-21](entities.md#6-functional-requirements)); fixtures `char-mira`, `char-thorn` speed 30 | in-review |
 
 **Shared changes needed** (AGENTS §9.9; gate §4):
 - `src/shared/events/` — `character-sheet.ts` (`CharacterHpAdjusted`, `CharacterRolled`) + its line in `index.ts`. `src/server/db/`: none. Record types: none.
 - Existing append-only registries: `char.sheet` in `src/client/{dm,player}/windows.ts`; `characterSheet` in `src/server/features/index.ts`; `character-sheet` in `fixtures/bundles/index.ts`.
 - New append-only registry (created empty by this build; on the AGENTS §9.9 list): `src/client/common/features/character-sheet/roll-routes.ts`; combat-tracker adds one line (OQ-CHAR-13).
 - Docs (integrator): protocol rows for `char.roll`, `char.adjustHp`, both events; FIX §8 rows.
+- **Feedback pass:** none. Speed is entities' field (FR-ENT-21); the sheet only reads it. No schema, event, protocol or registry change; `char-pip` stays without speed.
 
 ## 15. Open questions
 
@@ -220,6 +224,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | ~~OQ-CHAR-09~~ | ~~DM rolls for a PC: public?~~ | Decided (#139 P1): category setting + per-roll override (P22), like any DM roll | — | dice-roll-log |
 | ~~OQ-CHAR-13~~ | ~~How combat takes over the sheet buttons~~ | Decided (integrator): new client registry `roll-routes.ts`, CHAR creates it empty, combat adds a line; on the AGENTS §9.9 append-only list | — | combat-tracker |
 | ~~OQ-CHAR-14~~ | ~~Shared roll control~~ | Decided ([FR-DICE-24](dice-roll-log.md#6-functional-requirements)): dice-roll-log's control, `expressions[]`, `onRoll({mode, manual?, public?})`; the caller sends its own intent | — | — |
+| OQ-CHAR-15 | Show movement used this turn on the sheet? (F3) | **No: the drag overlay and the DM's initiative row show it; the sheet stays basics** / "Moved 20 / 30 ft" under Speed while in combat (reads the combatant from the store) | no · owner: spec-feedback | combat-tracker |
 
 ## 16. Out of scope
 
