@@ -5,6 +5,7 @@
 // Toolbar actions render in the window's toolbar; row actions render at the end of each row.
 // Actions talk to the server through their own REST calls; the list updates from sync.
 import type { ComponentType } from "react";
+import { combatCreatureActions } from "../combat-tracker/creature-form";
 import type { CreatureRow, CreatureTab } from "./list";
 
 export interface CreatureToolbarAction {
@@ -24,7 +25,7 @@ export interface CreatureRowAction {
 export type CreatureAction = CreatureToolbarAction | CreatureRowAction;
 
 export const creatureActions: readonly CreatureAction[] = [
-  // combat-tracker: creature form (New / Derive / Edit)
+  ...combatCreatureActions, // combat-tracker: creature form New / Derive / Edit (FR-CBT-05)
 ];
 
 export function actionsOf(actions: readonly CreatureAction[]) {

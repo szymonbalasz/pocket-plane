@@ -3,6 +3,7 @@ import type { Feature } from "../services";
 import { assetsPipeline } from "./assets-pipeline";
 import { campaignManagement } from "./campaign-management";
 import { characterSheet } from "./character-sheet";
+import { combatTracker } from "./combat-tracker";
 import { diceRollLog } from "./dice-roll-log";
 import { entities } from "./entities";
 import { fixturesAdapters } from "./fixtures-adapters";
@@ -20,4 +21,5 @@ export const features: readonly Feature[] = [
   notifications,
   diceRollLog,
   characterSheet,
+  combatTracker,
 ];

@@ -1,10 +1,13 @@
 // Log-entry kind registry (FR-DICE-18, protocol §26). APPEND-ONLY (AGENTS §9.9): a feature adds
 // one import and one line in the list for each of its kinds; nothing else changes here.
+import { attackLogKind, hpLogKind } from "../combat-tracker/log-kinds";
 import type { AnyLogKind } from "./kind-types";
 import { rollKind } from "./roll-kind";
 
 const kinds: AnyLogKind[] = [
   rollKind, // roll (dice-roll-log, FR-DICE-20)
+  attackLogKind, // cbt.attack (combat-tracker, FR-CBT-24)
+  hpLogKind, // cbt.hp (combat-tracker, FR-CBT-24)
 ];
 
 const byKind = new Map<string, AnyLogKind>();

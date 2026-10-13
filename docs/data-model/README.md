@@ -713,6 +713,8 @@ All rows per campaign; `seq` by the DB; timestamps `ctx.clock` ([CBT §8](../spe
 | definitionId | ID → Entity | Via `resolveDefinition`, kind `monster` (else `invalid`); duplicates merged; live link to the definition | FR-CBT-01, [FR-ENT-12](../specs/entities.md#6-functional-requirements) |
 | quantity | int 1–20 | 0–20 entries, total ≤ 50 | FR-CBT-01 |
 
+- **Wire record** (built, build/combat-tracker): the full row **plus the encounter's `campaignId`** (no such column; stamped from the encounter) so the record-type registry's campaign scope gate can place live changes. DM only (`audience: dm`).
+
 ### Combatant (`combatant`) — owner combat-tracker
 
 An instance ([ADR-0009](../architecture/adr/0009-entity-content-model.md)); created only by `cbt.start` (no add mid-fight).

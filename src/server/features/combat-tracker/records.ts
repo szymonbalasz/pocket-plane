@@ -1,0 +1,154 @@
+// Record types (CBT §9, protocol §20). Campaign scope; DM always full. Visibility fns read only
+// the record and the viewer (FR-CBT-27).
+import { healthBand } from "@shared/combat-tracker/rules";
+import {
+  COMBATANT_TYPE,
+  CombatantRecord,
+  ENCOUNTER_ENTRY_TYPE,
+  ENCOUNTER_TYPE,
+  ENCOUNTER_WINDOW,
+  EncounterEntryRecord,
+  EncounterRecord,
+  HP_CHANGE_TYPE,
+  HP_CHANGE_WINDOW,
+  HpChangeRecord,
+  type PlayerCombatant,
+  type PlayerEncounterRecord,
+} from "@shared/combat-tracker/schemas";
+import { cutWindow, type RecordWindow } from "@shared/protocol/window";
+import { and, asc, eq, inArray } from "drizzle-orm";
+import type { Db } from "../../db/client";
+import { combatant, encounter, encounterEntry, hpChange } from "../../db/schema";
+import { defineRecordType, type Visibility } from "../../ws/records";
+import {
+  startedEncounter,
+  toCombatantRecord,
+  toEncounterRecord,
+  toEntryRecord,
+  toHpChangeRecord,
+} from "./rows";
+
+export const encounterWindow: RecordWindow<EncounterRecord> = {
+  orderBy: "seq",
+  size: ENCOUNTER_WINDOW,
+  pin: (r) => r.status !== "ended",
+};
+
+function campaignEncounters(db: Db, cid: string): EncounterRecord[] {
+  return db
+    .select()
+    .from(encounter)
+    .where(eq(encounter.campaignId, cid))
+    .orderBy(asc(encounter.seq))
+    .all()
+    .map(toEncounterRecord);
+}
+
+export function encounterVisibility(r: EncounterRecord): Visibility {
+  return r.status === "started" ? "redacted" : "hidden";
+}
+
+export function redactEncounter(r: EncounterRecord): PlayerEncounterRecord {
+  return {
+    id: r.id,
+    status: r.status,
+    round: r.round,
+    playerTurnCombatantId: r.playerTurnCombatantId,
+  };
+}
+
+export function combatantVisibility(r: CombatantRecord): Visibility {
+  return !r.active || r.removed || r.hidden ? "hidden" : "redacted";
+}
+
+export function redactCombatant(r: CombatantRecord): PlayerCombatant {
+  const base = {
+    id: r.id,
+    encounterId: r.encounterId,
+    tokenId: r.tokenId,
+    name: r.name,
+    imageAssetId: r.imageAssetId,
+    playerPosition: r.playerPosition,
+  };
+  if (r.kind === "pc") {
+    return { ...base, kind: "pc", entityId: r.entityId, initiative: r.initiative };
+  }
+  return { ...base, kind: "monster", band: healthBand(r.hpCurrent ?? 0, r.hpMax ?? 1) };
+}
+
+export const combatRecordTypes = [
+  defineRecordType<EncounterRecord>({
+    type: ENCOUNTER_TYPE,
+    scope: "campaign",
+    schema: EncounterRecord,
+    idOf: (r) => r.id,
+    campaignOf: (r) => r.campaignId,
+    visibility: encounterVisibility,
+    redact: redactEncounter,
+    snapshot: ({ db }, v) => campaignEncounters(db, v.campaignId),
+    window: encounterWindow,
+  }),
+  defineRecordType<EncounterEntryRecord>({
+    type: ENCOUNTER_ENTRY_TYPE,
+    scope: "campaign",
+    audience: "dm",
+    schema: EncounterEntryRecord,
+    idOf: (r) => r.id,
+    campaignOf: (r) => r.campaignId,
+    visibility: () => "hidden",
+    snapshot: ({ db }, v) => {
+      const ids = cutWindow(campaignEncounters(db, v.campaignId), encounterWindow).rows.map(
+        (e) => e.id,
+      );
+      if (ids.length === 0) return [];
+      return db
+        .select()
+        .from(encounterEntry)
+        .where(inArray(encounterEntry.encounterId, ids))
+        .orderBy(asc(encounterEntry.seq))
+        .all()
+        .map((r) => toEntryRecord(r, v.campaignId));
+    },
+  }),
+  defineRecordType<CombatantRecord>({
+    type: COMBATANT_TYPE,
+    scope: "campaign",
+    schema: CombatantRecord,
+    idOf: (r) => r.id,
+    campaignOf: (r) => r.campaignId,
+    visibility: combatantVisibility,
+    redact: redactCombatant,
+    snapshot: ({ db }, v) => {
+      const enc = startedEncounter(db, v.campaignId);
+      if (!enc) return [];
+      return db
+        .select()
+        .from(combatant)
+        .where(eq(combatant.encounterId, enc.id))
+        .orderBy(asc(combatant.seq))
+        .all()
+        .map(toCombatantRecord);
+    },
+  }),
+  defineRecordType<HpChangeRecord>({
+    type: HP_CHANGE_TYPE,
+    scope: "campaign",
+    audience: "dm",
+    schema: HpChangeRecord,
+    idOf: (r) => r.id,
+    campaignOf: (r) => r.campaignId,
+    visibility: () => "hidden",
+    snapshot: ({ db }, v) => {
+      const enc = startedEncounter(db, v.campaignId);
+      if (!enc) return [];
+      return db
+        .select()
+        .from(hpChange)
+        .where(and(eq(hpChange.campaignId, v.campaignId), eq(hpChange.encounterId, enc.id)))
+        .orderBy(asc(hpChange.seq))
+        .all()
+        .map(toHpChangeRecord);
+    },
+    window: { orderBy: "seq", size: HP_CHANGE_WINDOW },
+  }),
+];

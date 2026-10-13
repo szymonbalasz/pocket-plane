@@ -16,5 +16,7 @@ export default defineBundle({
     "town",
     "battlemap",
     "dice-settings",
+    "encounter-1",
+    "goblin-2",
   ],
 });

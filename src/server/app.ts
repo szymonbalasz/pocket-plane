@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { assetRoutes } from "./features/assets-pipeline/routes";
 import { campaignRoutes } from "./features/campaign-management/routes";
+import { encounterRoutes } from "./features/combat-tracker/routes";
 import { entityRoutes } from "./features/entities/routes";
 import { sceneRoutes } from "./features/scenes-map/routes";
 import { errorBody, errorResponse } from "./http";
@@ -19,6 +20,7 @@ export function createApi(s: Services) {
       .route("/api", assetRoutes(s))
       .route("/api", entityRoutes(s))
       .route("/api", sceneRoutes(s))
+      .route("/api", encounterRoutes(s))
   );
 }
 
