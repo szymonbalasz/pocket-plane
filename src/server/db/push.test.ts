@@ -96,7 +96,15 @@ test("push still refuses a real lossy add (not-null column without a default, ta
 // ---------- #163: backup, one transaction, leftover rebuild tables ----------
 
 const tmp = mkdtempSync(path.join(os.tmpdir(), "pp-push-"));
-afterAll(() => rmSync(tmp, { recursive: true, force: true }));
+afterAll(() => {
+  // Closed DBs stay locked on Windows until their statements are finalized (see `closeDb`).
+  Bun.gc(true);
+  try {
+    rmSync(tmp, { recursive: true, force: true });
+  } catch {
+    // A temp dir the OS cleans up; never fail the run over it.
+  }
+});
 let n = 0;
 const fileDb = () => oldDb(path.join(tmp, `db-${++n}.db`));
 const tables = (db: Database) =>
