@@ -82,7 +82,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Handouts: DM reveals image/text to all or chosen players | A | [party-board](specs/post-mvp/party-board.md) | |
 | Wikilinks between notes + backlinks | A | [world-builder](specs/post-mvp/world-builder.md) | Informs [ADR-0011](architecture/adr/0011-cross-references.md) |
 | Party inventory with transfer to characters | A | [party-board](specs/post-mvp/party-board.md) | Grows from [party-loot](specs/party-loot.md) |
-| Gold ledger with split-among-party | A | [party-board](specs/post-mvp/party-board.md) | Grows from [party-loot](specs/party-loot.md) |
+| Gold ledger with split-among-party | A (wallets + moves: S, #150) | [party-board](specs/post-mvp/party-board.md) | Grows from [party-loot](specs/party-loot.md) |
 | NPC directory players build as they meet people | A | [world-builder](specs/post-mvp/world-builder.md) | Player-authored notes on revealed NPCs |
 | Search / command palette (Obsidian / VS Code style) | A–B | [play-shell](specs/play-shell.md) | Search + commands in one palette |
 | Journal entries with DM-only / player-visible sections | B | [world-builder](specs/post-mvp/world-builder.md) | |
@@ -175,6 +175,8 @@ Tiers confirmed by the DM (#148); details in [feedback-phase3](agents/feedback-p
 | Target from the map; multi-target (Ctrl/Shift) with per-target damage multiplier | S | [combat-tracker](specs/combat-tracker.md), [scenes-map](specs/scenes-map.md) | Promotes "Multi-target select" (tier A) |
 | Box select on the map | S | [scenes-map](specs/scenes-map.md) | Group move: A |
 | Party currency tracker (running coin total) | S | [party-loot](specs/party-loot.md) | Decided #146 |
+| Character wallets (cp–pp per PC) + coin moves between party pot and wallets; DM moves any, a player moves from own wallet or takes from the pot; no below-zero guard | S | [party-loot](specs/party-loot.md) | Decided #150 |
+| Sheet click-to-roll for 6 ability checks + 6 saves (stores ability scores + save proficiencies); Physical-dice mode visible on roll buttons | S | [character-sheet](specs/character-sheet.md), [dice-roll-log](specs/dice-roll-log.md) | Decided #149; skills stay A |
 
 ## Already decided elsewhere
 
