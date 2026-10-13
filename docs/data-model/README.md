@@ -550,7 +550,7 @@ erDiagram
     string actionRole "dm | player | null"
     ID actionPlayerId FK "nullable"
     string state "info | pending | resolved | dismissed"
-    json resolution "JSON leaf <= per-kind cap (default 256 B; damage-card 2 KB), nullable"
+    json resolution "JSON leaf <= per-kind cap (default 256 B; damage-card 8 KB), nullable"
     timestamp closedAt "nullable"
     string closedByRole "nullable"
     ID closedByPlayerId FK "nullable"
