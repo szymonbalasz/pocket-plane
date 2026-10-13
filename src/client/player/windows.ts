@@ -6,6 +6,7 @@ import { playerCharSheetWindow } from "./features/character-sheet/sheet-window";
 import { playerInitiativeWindow } from "./features/combat-tracker/initiative-window";
 import { playerDiceLogWindow } from "./features/dice-roll-log/log-window";
 import { notificationsHistoryWindow } from "./features/notifications/history-window";
+import { playerLootLogWindow } from "./features/party-loot/loot-window";
 
 const windows: WindowDef[] = [
   syncProbesWindow, // sync.probes, test mode (play-shell, FR-SHELL-21)
@@ -14,6 +15,7 @@ const windows: WindowDef[] = [
   playerDiceLogWindow, // dice.log (dice-roll-log, FR-DICE-21)
   playerCharSheetWindow, // char.sheet (character-sheet, FR-CHAR-15)
   playerInitiativeWindow, // cbt.initiative (combat-tracker, CBT §7)
+  playerLootLogWindow, // loot.log (party-loot, FR-LOOT-15)
 ];
 
 export const playerWindows = createWindowRegistry("player", windows);

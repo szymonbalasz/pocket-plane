@@ -1,0 +1,38 @@
+// View of kind `loot-received` (FR-LOOT-14), both clients: coins icon; the generic text plus
+// " (edited)" while the entry is in the store and edited, and an "Open" link to `loot.log`.
+import type { NotificationRecord } from "@shared/notifications/schemas";
+import { LOOT_ENTRY_TYPE, LOOT_RECEIVED_KIND } from "@shared/party-loot/schemas";
+import { CoinsIcon } from "lucide-react";
+import { Button } from "../../components/ui/button";
+import { useSync } from "../../sync/store";
+import { defineNotificationView } from "../notifications/views";
+import { useOpenWindow } from "../play-shell/ShellContext";
+import { editedSuffix, LOOT_LOG_KIND } from "./logic";
+
+function LootReceived({ notification: n }: { notification: NotificationRecord }) {
+  const entries = useSync((s) => s.store.records[LOOT_ENTRY_TYPE]);
+  const openWindow = useOpenWindow();
+  return (
+    <span className="flex flex-col items-start gap-1">
+      <span>
+        {n.text}
+        {editedSuffix(n.payload, entries)}
+      </span>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 px-1.5"
+        data-testid="loot-note-open"
+        onClick={() => openWindow(LOOT_LOG_KIND)}
+      >
+        Open
+      </Button>
+    </span>
+  );
+}
+
+export const lootReceivedView = defineNotificationView({
+  kind: LOOT_RECEIVED_KIND,
+  icon: CoinsIcon,
+  render: LootReceived,
+});
