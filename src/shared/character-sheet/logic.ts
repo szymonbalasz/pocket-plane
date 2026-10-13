@@ -2,15 +2,18 @@
 // `characterRolls` (FR-CHAR-05) and combat-tracker reuses it; clients format with the rest.
 import type { RollCategory } from "@shared/dice-roll-log/schemas";
 import {
+  ABILITIES,
   ABILITY_NAMES,
   type Ability,
   type AbilityStats,
   type Attack,
+  abilityMod,
   type CharacterStatBlock,
   checkBonus,
+  proficiencyBonus,
   saveBonus,
 } from "@shared/entities/schemas";
-import type { CharRollKind, SheetRollKind } from "./schemas";
+import type { AbilityRollKind, SheetRollKind } from "./schemas";
 
 /** One roll of a sheet action: what `dice.evaluate` gets, minus actor and mode. */
 export interface CharacterRollSpec {
@@ -22,6 +25,8 @@ export interface CharacterRollSpec {
 }
 
 type RollStats = Pick<CharacterStatBlock, "initBonus" | "attacks">;
+/** Kinds that need no ability: initiative, attack. */
+type ActionRollKind = Exclude<SheetRollKind, AbilityRollKind>;
 
 /** `1d20+2`, `1d20-1`, `1d20` (FR-CHAR-05). */
 export function d20(bonus: number): string {
@@ -40,7 +45,7 @@ export const sheetAttack = (s: Pick<CharacterStatBlock, "attacks">): Attack | nu
  * `ability-check` / `saving-throw`; `null` = no ability scores (caller: `conflict`). Takes any
  * stat block (combat reuses it for monsters, FR-CBT-44).
  */
-export function characterRolls(stats: RollStats, kind: CharRollKind): CharacterRollSpec[] | null;
+export function characterRolls(stats: RollStats, kind: ActionRollKind): CharacterRollSpec[] | null;
 export function characterRolls(
   stats: RollStats & AbilityStats,
   kind: SheetRollKind,
@@ -96,6 +101,42 @@ export function levelLine(level: number, className: string): string {
 export function attackLine(a: Attack): string {
   const dmg = a.damageType ? `${a.damage} ${a.damageType}` : a.damage;
   return `${a.name} ${signed(a.toHit)} \u00b7 ${dmg}`;
+}
+
+/** FR-CHAR-18: "30 ft"; absent → "—". */
+export const speedText = (speed: number | undefined): string =>
+  speed === undefined ? "—" : `${speed} ft`;
+
+/** One cell of the abilities block (FR-CHAR-22); bonuses derived, never stored (FR-CHAR-20). */
+export interface AbilityCell {
+  ability: Ability;
+  /** "STR" … "CHA". */
+  abbr: string;
+  score: number;
+  mod: number;
+  check: number;
+  save: number;
+  proficient: boolean;
+}
+
+/** FR-CHAR-19/22: proficiency bonus + six cells in STR … CHA order; null without scores. */
+export function abilityBlock(
+  stats: AbilityStats,
+): { proficiency: number; cells: AbilityCell[] } | null {
+  const scores = stats.abilities;
+  if (!scores) return null;
+  return {
+    proficiency: proficiencyBonus(stats),
+    cells: ABILITIES.map((a) => ({
+      ability: a,
+      abbr: a.toUpperCase(),
+      score: scores[a],
+      mod: abilityMod(scores[a]),
+      check: checkBonus(stats, a) as number,
+      save: saveBonus(stats, a) as number,
+      proficient: stats.saveProficiencies?.includes(a) ?? false,
+    })),
+  };
 }
 
 export const isDown = (hpCurrent: number): boolean => hpCurrent === 0;

@@ -2,7 +2,10 @@ import { createEntity } from "@server/features/entities/commands";
 import { defineFixture, step } from "@server/features/fixtures-adapters/fixture-types";
 import type { CreateEntityBody } from "@shared/entities/schemas";
 
-/** Character "Pip", owned by `player-1`: L1 wizard with **no attack** (CHAR §13). */
+/**
+ * Character "Pip", owned by `player-1`: L1 wizard with **no attack, no speed, no ability
+ * scores** (CHAR §13): the sheet's "Speed —" and "No ability scores" states (FR-CHAR-18/19).
+ */
 export default defineFixture({
   key: "char-pip",
   kind: "setup",

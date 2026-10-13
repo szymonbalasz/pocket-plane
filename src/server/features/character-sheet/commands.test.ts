@@ -1,5 +1,6 @@
 // character-sheet commands and `characters.adjustHp` on in-memory services (CHAR §13 integration).
 import { describe, expect, test } from "bun:test";
+import { type EntryLike, formatEntry } from "@shared/dice-roll-log/line";
 import type { RollEntryPayload } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { asc, eq } from "drizzle-orm";
@@ -16,6 +17,9 @@ import { miraBlock } from "../entities/testing";
 import { charAdjustHp, charRoll } from "./commands";
 import { characters } from "./index";
 
+// Pip (CHAR §13): Mira's block without attack, speed or ability scores.
+const { speed: _sp, abilities: _ab, saveProficiencies: _sv, ...pipBase } = miraBlock;
+
 function setup(seed?: string) {
   const { s } = diceServices(seed);
   const seeded = seedDice(s);
@@ -25,7 +29,7 @@ function setup(seed?: string) {
       kind: "character",
       name: "Pip",
       ownerPlayerId: seeded.p1.id,
-      statBlock: { ...miraBlock, attacks: [], className: "Wizard", hpMax: 8 },
+      statBlock: { ...pipBase, attacks: [], className: "Wizard", hpMax: 8 },
     },
     { actor: seeded.dm },
   );
@@ -197,6 +201,178 @@ describe("FR-CHAR-05 FR-CHAR-08 char.roll", () => {
       expect({ extra, code: err.code }).toEqual({ extra, code: "invalid" });
     }
     expect(rolls(t.s)).toHaveLength(0);
+  });
+});
+
+/** Replaces a character's scores (null = none): stat block edited between click and commit. */
+function withScores(s: Services, id: string, extra: Record<string, unknown> | null) {
+  const row = s.db.select().from(entity).where(eq(entity.id, id)).get();
+  if (!row) throw new Error(`no entity ${id}`);
+  const {
+    abilities: _a,
+    saveProficiencies: _s,
+    ...rest
+  } = row.statBlock as Record<string, unknown>;
+  s.db
+    .update(entity)
+    .set({ statBlock: { ...rest, ...extra } })
+    .where(eq(entity.id, id))
+    .run();
+}
+const lineText = (e: { kind: string; actorName: string; payload: unknown } | undefined) =>
+  formatEntry(e as EntryLike)
+    .segments.map((x) => x.text)
+    .join("");
+
+describe("FR-CHAR-21 checks and saves", () => {
+  test("FR-CHAR-21 save / check: category, label, derived bonus, one roll + entry + CharacterRolled {ability}", () => {
+    const t = setup();
+    const res = t.s.commands.run(
+      charRoll,
+      { characterId: t.miraId, kind: "save", ability: "dex", mode: "advantage" },
+      { actor: t.p1Actor },
+    );
+    const [r] = rolls(t.s);
+    const [e] = entries(t.s);
+    expect(res).toEqual({ rollIds: [r?.id as string], entryId: e?.id as string });
+    expect(r).toMatchObject({
+      expression: "2d20kh1+2",
+      category: "saving-throw",
+      label: "Dexterity save",
+      mode: "advantage",
+      source: "char",
+      actorName: "Mira",
+    });
+    expect(e).toMatchObject({ kind: "roll", category: "saving-throw", actorName: "Mira" });
+    expect(t.events.map((x) => x.event.payload)).toEqual([
+      {
+        characterId: t.miraId,
+        kind: "save",
+        ability: "dex",
+        mode: "advantage",
+        manual: false,
+        rollIds: [r?.id],
+        entryId: e?.id,
+      },
+    ]);
+    expect(logRows(t.s, "CharacterRolled")).toHaveLength(1);
+
+    // Proficient save adds PB (+2 at level 1); check = modifier; 0 → plain d20; negative → 1d20-1.
+    const exprOf = (characterId: string, kind: string, ability: string) => {
+      t.s.commands.run("char.roll", { characterId, kind, ability }, { actor: t.dm });
+      return rolls(t.s).at(-1)?.expression;
+    };
+    expect(exprOf(t.miraId, "save", "str")).toBe("1d20+4");
+    expect(exprOf(t.miraId, "save", "con")).toBe("1d20+4");
+    expect(exprOf(t.miraId, "check", "wis")).toBe("1d20+1");
+    expect(exprOf(t.miraId, "check", "int")).toBe("1d20");
+    expect(exprOf(t.thornId, "check", "str")).toBe("1d20-1");
+    expect(exprOf(t.thornId, "save", "dex")).toBe("1d20+5");
+    expect(entries(t.s).at(-2)).toMatchObject({ category: "ability-check" });
+  });
+
+  test("FR-CHAR-21 FR-CHAR-07 manual = 1 entry; line 'Mira — Wisdom save: 15 + 1 = 16', physical", () => {
+    const t = setup();
+    t.s.commands.run(
+      charRoll,
+      { characterId: t.miraId, kind: "save", ability: "wis", manual: [{ diceTotal: 15 }] },
+      { actor: t.p1Actor },
+    );
+    expect(rolls(t.s).map((r) => [r.manual, r.total])).toEqual([[true, 16]]);
+    expect(lineText(entries(t.s)[0])).toBe("Mira — Wisdom save: 15 + 1 = 16 physical");
+    t.s.commands.run(
+      charRoll,
+      { characterId: t.miraId, kind: "check", ability: "str", manual: [{ diceTotal: 20 }] },
+      { actor: t.p1Actor },
+    );
+    expect(lineText(entries(t.s)[1])).toBe(
+      "Mira — Strength check: 20 + 2 = 22 — natural 20! physical",
+    );
+    expect(
+      fail(() =>
+        t.s.commands.run(
+          "char.roll",
+          {
+            characterId: t.miraId,
+            kind: "save",
+            ability: "dex",
+            manual: [{ diceTotal: 3 }, { diceTotal: 4 }],
+          },
+          { actor: t.p1Actor },
+        ),
+      ).code,
+    ).toBe("invalid");
+    expect(rolls(t.s)).toHaveLength(2);
+  });
+
+  test("FR-CHAR-17 FR-CHAR-21 DM save hidden with defaults, public after setCategoryPublic; player save public", () => {
+    const t = setup();
+    const save = (actor: Actor, characterId: string, extra: Record<string, unknown> = {}) =>
+      t.s.commands.run(
+        "char.roll",
+        { characterId, kind: "save", ability: "dex", ...extra },
+        { actor },
+      );
+    save(t.dm, t.thornId);
+    save(t.p2Actor, t.thornId);
+    save(t.dm, t.thornId, { public: true });
+    t.s.commands.run(
+      setCategoryPublic,
+      { category: "saving-throw", public: true },
+      { actor: t.dm },
+    );
+    save(t.dm, t.thornId);
+    save(t.dm, t.thornId, { public: false });
+    // The check category is separate ("Ability check" tickbox).
+    t.s.commands.run(
+      "char.roll",
+      { characterId: t.thornId, kind: "check", ability: "dex" },
+      { actor: t.dm },
+    );
+    expect(entries(t.s).map((e) => [e.category, e.public])).toEqual([
+      ["saving-throw", false],
+      ["saving-throw", true],
+      ["saving-throw", true],
+      ["saving-throw", true],
+      ["saving-throw", false],
+      ["ability-check", false],
+    ]);
+    expect(fail(() => save(t.p2Actor, t.thornId, { public: true })).code).toBe("forbidden");
+  });
+
+  test("FR-CHAR-09 FR-CHAR-21 no scores → conflict; ability missing / on attack / unknown → invalid; nothing written", () => {
+    const t = setup();
+    const run = (input: Record<string, unknown>, actor: Actor = t.p1Actor) =>
+      t.s.commands.run("char.roll", input, { actor });
+    const pip = fail(() => run({ characterId: t.pipId, kind: "check", ability: "dex" }));
+    expect([pip.code, pip.message]).toEqual(["conflict", "No ability scores"]);
+    expect(fail(() => run({ characterId: t.pipId, kind: "save", ability: "str" })).code).toBe(
+      "conflict",
+    );
+    for (const bad of [
+      { kind: "check" },
+      { kind: "save" },
+      { kind: "attack", ability: "str" },
+      { kind: "initiative", ability: "dex" },
+      { kind: "save", ability: "luck" },
+      { kind: "check", ability: "dex", bonus: 5 },
+      { kind: "save", ability: "dex", expression: "1d20+30" },
+    ]) {
+      const err = fail(() => run({ characterId: t.miraId, ...bad }));
+      expect({ bad, code: err.code }).toEqual({ bad, code: "invalid" });
+    }
+    // Ownership as for any roll.
+    expect(fail(() => run({ characterId: t.thornId, kind: "save", ability: "dex" })).code).toBe(
+      "forbidden",
+    );
+    // Scores removed between click and commit → conflict (CHAR §11).
+    withScores(t.s, t.miraId, null);
+    expect(fail(() => run({ characterId: t.miraId, kind: "save", ability: "dex" })).code).toBe(
+      "conflict",
+    );
+    expect(rolls(t.s)).toHaveLength(0);
+    expect(entries(t.s)).toHaveLength(0);
+    expect(t.events).toHaveLength(0);
   });
 });
 

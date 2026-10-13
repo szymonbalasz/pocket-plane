@@ -12,7 +12,17 @@ import { TEST_SECRET } from "../../testing/services";
 import { convergence, leakScan } from "../../ws/testing/convergence";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
-const SHEET_KEYS = ["hpCurrent", "statBlock", "hpMax", "ac", "initBonus", "attacks"];
+const SHEET_KEYS = [
+  "hpCurrent",
+  "statBlock",
+  "hpMax",
+  "ac",
+  "initBonus",
+  "attacks",
+  "speed",
+  "abilities",
+  "saveProficiencies",
+];
 
 async function nextEvent(c: TestClient, cause: string) {
   for (;;) {
@@ -156,6 +166,47 @@ describe("character-sheet bundle over WS", () => {
     expect(await p1.next("reject")).toMatchObject({ intentId: "pub", code: "forbidden" });
     p1.intent("char.roll", { characterId: ids.Pip, kind: "attack" }, "pip");
     expect(await p1.next("reject")).toMatchObject({ intentId: "pip", code: "conflict" });
+    for (const c of [dm, p1, p2]) c.close();
+  });
+
+  test("FR-CHAR-21 FR-CHAR-17 checks / saves: player save public to all; DM save per category; Pip conflict", async () => {
+    const dm = await h.live(DM);
+    const p1 = await h.live(p("Player 1"));
+    const p2 = await h.live(p("Player 2"));
+    p1.intent("char.roll", { characterId: ids.Mira, kind: "save", ability: "dex" }, "sv");
+    const ack = await p1.next("ack", 1000);
+    const { entryId } = ack.result as { entryId: string };
+    for (const c of [dm, p2]) {
+      const e = await nextEvent(c, "CharacterRolled");
+      expect(e.changes).toEqual([expect.objectContaining({ id: entryId, op: "upsert" })]);
+    }
+    expect(entriesOf(p2).at(-1)).toMatchObject({
+      id: entryId,
+      category: "saving-throw",
+      actorName: "Mira",
+      public: true,
+    });
+
+    // DM rolls Thorn's WIS save with defaults → DM only; then tick "Saving throw" → public.
+    dm.intent("char.roll", { characterId: ids.Thorn, kind: "save", ability: "wis" }, "h");
+    const hidden = ((await dm.next("ack", 1000)).result as { entryId: string }).entryId;
+    await barrier(p1);
+    await barrier(p2);
+    for (const c of [p1, p2]) expect(c.raw()).not.toContain(hidden);
+    dm.intent("dice.setCategoryPublic", { category: "saving-throw", public: true }, "set");
+    await dm.next("ack", 1000);
+    dm.intent("char.roll", { characterId: ids.Thorn, kind: "save", ability: "dex" }, "pub");
+    const shown = ((await dm.next("ack", 1000)).result as { entryId: string }).entryId;
+    await nextEvent(p1, "CharacterRolled");
+    expect(p1.store.records[GAME_LOG_ENTRY_TYPE]?.[shown]).toMatchObject({
+      actorName: "Thorn",
+      public: true,
+    });
+
+    p1.intent("char.roll", { characterId: ids.Pip, kind: "check", ability: "str" }, "pip");
+    expect(await p1.next("reject")).toMatchObject({ intentId: "pip", code: "conflict" });
+    dm.intent("dice.setCategoryPublic", { category: "saving-throw", public: false }, "reset");
+    await dm.next("ack", 1000);
     for (const c of [dm, p1, p2]) c.close();
   });
 
