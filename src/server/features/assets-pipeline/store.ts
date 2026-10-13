@@ -3,6 +3,7 @@
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { AssetFile } from "@shared/assets-pipeline/schemas";
+import { crashPoint } from "../../commands/crash";
 import type { Db } from "../../db/client";
 import { asset } from "../../db/schema";
 import type { Logger } from "../../log";
@@ -85,6 +86,7 @@ export class AssetStore {
       renameDirSync(tmp, target);
     }
     this.afterFilesWritten?.();
+    crashPoint("after-files", "assets.ingest"); // test-mode crash hook (#163)
   }
 
   /**

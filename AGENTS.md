@@ -127,6 +127,7 @@ Implements [ADR-0008](docs/architecture/adr/0008-parallel-dev-isolation.md). Val
 | `PP_ASSET_DIR` | `$PP_DATA_DIR/assets` | Asset store |
 | `PP_DATA_DISPOSABLE` | unset | `1` = this data dir may be wiped and seeded ([§9.3](#93-fixtures)). `env:init` writes `1`; a real install never sets it |
 | `PP_TEST_MODE` | unset | `1` = test-only records and routes on (sync probe, [OQ-SYNC-12](docs/specs/live-sync.md#15-open-questions)). Refused unless `PP_DATA_DISPOSABLE=1`. Off by default; set it for probe walkthroughs |
+| `PP_TEST_CRASH` | unset | Test-only crash hook (#163): `<command>:before-commit` / `<command>:after-commit` / `assets.ingest:after-files` (server) or `fixture:<key>` (`fixtures:*`, before that fixture's first commit). The process SIGKILLs itself there (no exit handlers; lock left stale). Refused unless `PP_TEST_MODE=1` and `PP_DATA_DISPOSABLE=1` |
 | `PP_DM_SECRET` | **required** | DM secret, min 12 chars, env only, never stored ([OQ-CAMP-03](docs/specs/campaign-management.md#15-open-questions)). Server refuses to start without it. `env:init` writes a random dev value |
 | `PP_PUBLIC_BASE_URL` | unset | Base for player links ([OQ-CAMP-07](docs/specs/campaign-management.md#15-open-questions)). Unset → DM client's origin + warning (pick; OQ-CAMP-07 open) |
 | `PP_LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |

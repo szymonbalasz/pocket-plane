@@ -230,6 +230,7 @@ CAMP has **no WS intents**; FIX has none ([FR-FIX-24](../specs/fixtures-adapters
 | Setup fixture steps | Fixture loader | Any registered server command, DM authority (actor campaign = active campaign), same validation / events / log as UI; no `intentId` | [FR-FIX-13](../specs/fixtures-adapters.md#6-functional-requirements) |
 
 - The pipeline writes through a definition store + kind registry that entities plugs in (Scenes); the skeleton ships the core and tests it with a test-only kind (CON-03).
+- **Crash hook** *(test mode only, #163)*: `PP_TEST_CRASH` ([AGENTS §9.2](../../AGENTS.md#92-env-ports-and-data)) makes the process SIGKILL itself at one seam: `<command>:before-commit` (in `Commands.run`, after `execute` and the event-log append, before commit: the transaction never commits), `<command>:after-commit` (committed; before commit hooks, listeners and the `ack`), `assets.ingest:after-files` (files renamed into place, no row: next start sweeps the orphan set) or `fixture:<key>` (`fixtures:*` only: before the commit of that fixture's first command; manifest stays `loading`). Refused at config parse unless `PP_TEST_MODE=1` and `PP_DATA_DISPOSABLE=1`; an unknown command refuses server start. `src/server/commands/crash.ts`; no wire change.
 
 ## 7. Signals
 

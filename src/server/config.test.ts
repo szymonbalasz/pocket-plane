@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import os from "node:os";
 import path from "node:path";
-import { ConfigError, parseConfig, profileArg } from "./config";
+import { ConfigError, formatCrashSpec, parseConfig, profileArg } from "./config";
 
 const SECRET = "a-dm-secret-123";
 const root = path.join(os.tmpdir(), "pp-config-test");
@@ -41,6 +41,46 @@ describe("parseConfig", () => {
     const c = parseConfig({ PP_TEST_MODE: "1", PP_DATA_DISPOSABLE: "1" });
     expect(c.testMode).toBe(true);
     expect(c.disposable).toBe(true);
+  });
+
+  test("PP_TEST_CRASH (#163): parsed only with test mode + disposable; malformed refused", () => {
+    const on = { PP_TEST_MODE: "1", PP_DATA_DISPOSABLE: "1" };
+    expect(parseConfig(on).testCrash).toBeNull();
+    expect(() => parseConfig({ PP_TEST_CRASH: "cbt.applyCard:before-commit" })).toThrow(
+      /PP_TEST_CRASH requires PP_TEST_MODE=1 and PP_DATA_DISPOSABLE=1/,
+    );
+    expect(() =>
+      parseConfig({ PP_DATA_DISPOSABLE: "1", PP_TEST_CRASH: "cbt.applyCard:after-commit" }),
+    ).toThrow(/PP_TEST_CRASH requires/);
+    const crash = (v: string) => parseConfig({ ...on, PP_TEST_CRASH: v }).testCrash;
+    expect(crash("cbt.applyCard:before-commit")).toEqual({
+      point: "before-commit",
+      target: "cbt.applyCard",
+    });
+    expect(crash("sync-probe.set:after-commit")).toEqual({
+      point: "after-commit",
+      target: "sync-probe.set",
+    });
+    expect(crash("assets.ingest:after-files")).toEqual({
+      point: "after-files",
+      target: "assets.ingest",
+    });
+    expect(crash("fixture:enemy-1")).toEqual({ point: "fixture", target: "enemy-1" });
+    expect(crash(" ")).toBeNull();
+    for (const bad of [
+      "cbt.applyCard",
+      "cbt.applyCard:during",
+      "map.moveToken:after-files",
+      "fixture:",
+      "fixture:Bad Key",
+      "nodot:before-commit",
+    ]) {
+      expect(() => crash(bad)).toThrow(ConfigError);
+    }
+    expect(formatCrashSpec({ point: "fixture", target: "enemy-1" })).toBe("fixture:enemy-1");
+    expect(formatCrashSpec({ point: "after-commit", target: "loot.move" })).toBe(
+      "loot.move:after-commit",
+    );
   });
 
   test("relative paths resolve from the worktree root, not the cwd", () => {

@@ -4,7 +4,8 @@ import { WS_PATH, WS_PROBE_PARAM } from "@shared/protocol/frames";
 import type { Server, ServerWebSocket } from "bun";
 import { createApp } from "./app";
 import type { Clock } from "./commands/context";
-import { type Config, localUrl } from "./config";
+import { armCrashHook } from "./commands/crash";
+import { type Config, formatCrashSpec, localUrl } from "./config";
 import { closeDb, type Db, openFileDb } from "./db/client";
 import { pushSchema } from "./db/push";
 import type { Logger } from "./log";
@@ -71,6 +72,15 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
       if (applied > 0) log.info(`schema: applied ${applied} statement(s)`);
     }
     const services = createServices({ config, db, log, clock: opts.clock });
+    // Test-mode crash hook (#163): the server arms command / asset points; fixtures:* arms its own.
+    const crash = config.testCrash;
+    if (crash && crash.point !== "fixture") {
+      if (!services.commands.has(crash.target)) {
+        throw new StartupError(`PP_TEST_CRASH: unknown command "${crash.target}"`);
+      }
+      armCrashHook(crash);
+      log.warn(`PP_TEST_CRASH armed: the process kills itself at ${formatCrashSpec(crash)}`);
+    }
     // Start hooks (r.onStart): after the schema push, before listening. Real servers only.
     for (const h of services.startHooks) {
       try {
