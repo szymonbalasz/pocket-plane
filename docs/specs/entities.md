@@ -1,7 +1,7 @@
 ---
 title: Entities (core)
 prefix: ENT
-status: complete
+status: in-review
 owner: spec-entities
 wave: 2
 ---
@@ -17,6 +17,7 @@ wave: 2
 ## 2. Scope
 
 - `entity` record, XP from CR, record types + visibility fns; create / derive / update, internal import, definition-changed hooks, `resolveDefinition`; DM **Creatures** window *(proposed, OQ-ENT-03)*; fixtures + bundle `entities`.
+- **Feedback pass** ([feature-tiers §8](../feature-tiers.md#8-dm-feedback-after-the-combat-build-145), #148): optional **speed** in the creature core (movement tracker, F3) and an optional **default token shape** on the definition (F4). Both additive.
 
 ## 3. Goals
 
@@ -57,6 +58,8 @@ wave: 2
 | FR-ENT-18 | DM Creatures window lists every definition the campaign can use, sorted by name (case-insensitive), then custom before imported, then id. Live ≤ 1 s after commit. Each row is an HTML5 drag source: MIME `application/x-pp-definition`, data JSON `{definitionId}`. *(proposed, OQ-ENT-03)* | scenes-map FR-MAP-13 |
 | FR-ENT-19 | `entities.update` runs every registered **definition-changed hook** `(env, before, after) → RecordChange[]` inside its own transaction. Each instance row a hook changes is listed in `EntityUpdated.changes`. A hook error rolls back the whole update. Listeners never mutate state. | #120, ADR-0016, 0021 |
 | FR-ENT-20 | The Creatures window renders toolbar and row actions from an append-only `creatureActions` registry; entities ships none. *(proposed, OQ-ENT-14)* | combat-tracker form |
+| FR-ENT-21 | The creature core gains optional `speed` (walking speed, ft): int 0–200, a multiple of 5, both kinds *(proposed, OQ-ENT-16)*. Absent = unknown: no movement indicator. Stored rows without it stay valid; no backfill. Tokens carry a display copy, refreshed by scenes-map's definition-changed hook ([FR-MAP-36](scenes-map.md#6-functional-requirements)). | F3, additive |
+| FR-ENT-22 | Every entity gains optional `tokenShape`: `round` \| `square` \| `none`, null = `round` *(proposed, OQ-ENT-17)*. It is the default for **new** tokens only ([FR-MAP-35](scenes-map.md#6-functional-requirements)); a token owns its shape after placement, so an edit never changes placed tokens (as the name, #126). Set by create / update (FR-ENT-11's whole replace includes it); imported rows null. Redacted characters omit it (FR-ENT-15's field list unchanged). | F4 |
 
 ## 7. UI/UX notes
 
@@ -73,6 +76,7 @@ wave: 2
 | | campaignId | ID → Campaign \| null | Null iff imported (FR-ENT-04) |
 | | name | text 1–60 | Unique index (`campaignId`, `kind`, lower(`name`)) where `campaignId` not null |
 | | portraitAssetId | ID → Asset \| null | Asset reference, same campaign; null for imported ([OQ-ASSET-04](assets-pipeline.md#15-open-questions)) |
+| | tokenShape | `round` \| `square` \| `none` \| null | Default shape for new tokens (FR-ENT-22); null = round |
 | | statBlock | **JSON leaf** | Per-kind schema below |
 | | ownerPlayerId | ID → Player \| null | Required for character, null for monster |
 | | hpCurrent | int \| null | Character only: PC HP lives on the character (ADR-0009, OQ-ENT-08) |
@@ -86,6 +90,7 @@ wave: 2
 |---|---|---|
 | size | both | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan` |
 | ac, hpMax, initBonus | both | int 0–30; int 1–999; int −10…+20 |
+| speed *(optional)* | both | int 0–200, multiple of 5 (ft, walking; FR-ENT-21) |
 | attacks | both | 0–1 × `{name 1–40, toHit int −10…+30, damage, damageType?}` (MVP: one weapon attack, ADR-0012) |
 | cr / level, className | monster / character | `"0"`, `"1/8"`, `"1/4"`, `"1/2"`, `"1"`…`"30"` / int 1–20, text 0–40 |
 
@@ -99,8 +104,8 @@ wave: 2
 
 | Method | Path | Purpose | Success |
 |---|---|---|---|
-| POST | `/api/entities` | `entities.create {kind, name, portraitAssetId?, statBlock, derivedFromId?, ownerPlayerId?}` | `201 {entity}` |
-| PUT | `/api/entities/:id` | `entities.update` (FR-ENT-11) | `200 {entity}` |
+| POST | `/api/entities` | `entities.create {kind, name, portraitAssetId?, tokenShape?, statBlock, derivedFromId?, ownerPlayerId?}` | `201 {entity}` |
+| PUT | `/api/entities/:id` | `entities.update` (FR-ENT-11; `tokenShape?` as create) | `200 {entity}` |
 
 **Record types** (generic record changes `{type, id, op, data}` + `cause`) *(proposed, OQ-ENT-06)*
 
@@ -143,16 +148,16 @@ wave: 2
 
 | Key | Kind | Requires | Contents |
 |---|---|---|---|
-| `enemy-1` | reference | — | `srd/monster/goblin.ts`: small, AC 15, HP 7, init +2, scimitar +4 / 1d6+2 slashing, CR 1/4. Source `fixture`, SRD 5.1 CC BY 4.0 attribution |
-| `enemy-2` | reference | — | `srd/monster/wolf.ts`: medium, AC 13, HP 11, init +2, bite +4 / 2d4+2 piercing, CR 1/4 |
-| `enemy-custom` | setup | `enemy-1` | Derived from `enemy-1`: "Elite Goblin Warrior", AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2; other fields as `enemy-1` |
-| `char-mira` | setup | `player-1` | "Mira", owner `player-1`, medium, L1 fighter, AC 16, HP 12/12, init +2, shortsword +4 / 1d6+2 piercing |
-| `char-thorn` | setup | `player-2` | "Thorn", owner `player-2`, medium, L1 rogue, AC 14, HP 10/10, init +3, dagger +5 / 1d4+3 piercing |
-| `enemy-custom-second` | setup | `campaign-second` | Activate it; create "Marsh Troll" (large, AC 15, HP 59, init +1, claw +7 / 2d6+4 slashing, CR 5); re-activate Fixture Campaign |
+| `enemy-1` | reference | — | `srd/monster/goblin.ts`: small, AC 15, HP 7, init +2, speed 30, scimitar +4 / 1d6+2 slashing, CR 1/4. Source `fixture`, SRD 5.1 CC BY 4.0 attribution |
+| `enemy-2` | reference | — | `srd/monster/wolf.ts`: medium, AC 13, HP 11, init +2, speed 40, bite +4 / 2d4+2 piercing, CR 1/4 |
+| `enemy-custom` | setup | `enemy-1` | Derived from `enemy-1`: "Elite Goblin Warrior", AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2, `tokenShape` square; other fields as `enemy-1` |
+| `char-mira` | setup | `player-1` | "Mira", owner `player-1`, medium, L1 fighter, AC 16, HP 12/12, init +2, speed 30, shortsword +4 / 1d6+2 piercing |
+| `char-thorn` | setup | `player-2` | "Thorn", owner `player-2`, medium, L1 rogue, AC 14, HP 10/10, init +3, speed 30, dagger +5 / 1d4+3 piercing |
+| `enemy-custom-second` | setup | `campaign-second` | Activate it; create "Marsh Troll" (large, AC 15, HP 59, init +1, speed 30, claw +7 / 2d6+4 slashing, CR 5); re-activate Fixture Campaign |
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | Schemas: bounds, strict keys, 0–1 attacks, dice grammar incl. `−K`, CR enum; XP table; `effectiveStats` identity; visibility matrix (DM / owner / other player × character / custom / imported); list sort. **Review check:** only `effectiveStats` reads instance stats; no listener mutates state | In-code |
+| Unit | Schemas: bounds, strict keys, 0–1 attacks, dice grammar incl. `−K`, CR enum; `speed` optional (0, 35, 200 ok; 33, 205, −5 `invalid`), a stored block without it still parses; `tokenShape` enum or null; XP table; `effectiveStats` identity; visibility matrix (DM / owner / other player × character / custom / imported); list sort. **Review check:** only `effectiveStats` reads instance stats; no listener mutates state | In-code |
 | Integration | Each command: row + log + event, IDs from `ctx`; rollback → none. Read-only `forbidden`, no event. No active campaign → `conflict`. Derive cross-campaign → `not_found`; base edit leaves derived unchanged. Name `conflict` (create, rename, character); custom "Goblin" allowed. Bad owner → `invalid`. `hpCurrent` clamp. Owner change: old owner gets redacted upsert, new owner full. **Hook:** a test-registered hook's row is in the same commit and in `EntityUpdated.changes`; a throwing hook rolls back the update. Bad stored JSON row → DM snapshot omits it, log line present. **Leak scan:** `player-1` frames never contain "Elite Goblin Warrior", "Marsh Troll", "Goblin" or Thorn's `1d4+3`; restart → identical snapshots | `entities` |
 | E2E (thin) | DM list rows; dropping a row on a test drop target yields its `definitionId`; `player-1` WS frames hold Mira full, no monster records; restart | `entities` |
 
@@ -162,7 +167,7 @@ wave: 2
 |---|---|---|---|
 | 1 | Log in; open Creatures | — | Mira (Player 1), Thorn (Player 2), Goblin + Wolf (SRD, lock, CR 1/4, 50 XP), Elite Goblin Warrior (Custom, derived from Goblin, CR 1/2, 100 XP). No Marsh Troll |
 | 2 | — | B, C open links | From B/C frame log: B has Mira full, Thorn name only, no monsters; C the reverse |
-| 3 | PUT Goblin; PUT Elite Goblin Warrior HP 20; POST derive "Goblin Boss" from Goblin | — | Goblin: 403 read-only message, unchanged. Others: A2 updates ≤ 1 s; B, C get no `event` frame |
+| 3 | PUT Goblin; PUT Elite Goblin Warrior HP 20, speed 40, `tokenShape` none; same with speed 33; POST derive "Goblin Boss" from Goblin | — | Goblin: 403 read-only message, unchanged. Speed 33: 400, issue path `statBlock.speed`. Others: A2 updates ≤ 1 s; B, C get no `event` frame |
 | 4 | PUT Mira name "Mira Vale" | — | From frame logs: B full upsert, C redacted upsert, ≤ 1 s |
 | 5 | Reload all; then kill + restart server | — | All reconnect; state includes steps 3–4 |
 | 6 | Switch to Second Campaign, then back | — | List: Marsh Troll + SRD only, then step-5 list. No console errors throughout |
@@ -176,6 +181,12 @@ wave: 2
 | [assets-pipeline](assets-pipeline.md), [play-shell](play-shell.md) | `assets.require` (FR-ASSET-15), campaign-scoped assets; window registry for `ent.creatures`, HTML5 drag events from a window reach the base layer (FR-SHELL-13) | in-review |
 | [scenes-map](scenes-map.md) | Drop handler (FR-MAP-13); `resolveDefinition`; definition-changed hook refreshing token copies (#120; replaces OQ-MAP-14's copy-at-placement pick) | in-review |
 | [combat-tracker](combat-tracker.md), [character-sheet](character-sheet.md), [dice-roll-log](dice-roll-log.md) | Form via `creatureActions`, combatant hook (OQ-ENT-10); optional character fields only + `hpCurrent` commands; dice grammar ⊇ ours | Combat |
+| Feedback pass | scenes-map copies `speed` onto tokens and reads `tokenShape` at placement (FR-MAP-35/36); character-sheet shows speed (FR-CHAR-18); combat-tracker's form edits both (FR-CBT-43) | in-review |
+
+**Shared changes** (feedback pass; the consolidation agent writes data-model / protocol):
+- `src/server/db/`: `entity.token_shape` text, nullable (values checked by zod). `speed` lives in the `statBlock` JSON leaf: zod only (`@shared/entities`), no column.
+- Protocol §13: `POST` / `PUT /api/entities` gain `tokenShape?`. Data model §11: `tokenShape` row, stat block `speed`. Record types, events, visibility: unchanged.
+- FIX §8 (integrator): speeds as §13 (`enemy-custom` inherits 30); `enemy-custom` `tokenShape` square.
 
 ## 15. Open questions
 
@@ -194,6 +205,8 @@ wave: 2
 | OQ-ENT-13 | ~~Glossary: **Instance**; **Combatant**~~ | **Decided (integrator, Scenes consolidation):** [glossary](../glossary.md) updated. Instance holds its own display name (#126), read-only copies of image and size, play state and modifiers; Combatant adds "for PCs, HP lives on the character" | — | — |
 | OQ-ENT-14 | AGENTS §9.9: add append-only registries (server definition-changed hooks; DM `creatureActions`) | **Add both** (other specs add lines, never edit entities' code) / combat-tracker edits entities' folder | no (owner: integrator) | AGENTS, scenes-map, combat-tracker |
 | OQ-ENT-15 | Other PCs' HP for players (party view) | **Combat-phase call: nothing in Scenes; combat-tracker picks** (combatant copy / band only / redacted character adds HP) | no (owner: combat-tracker) | combat-tracker, character-sheet |
+| OQ-ENT-16 | `speed` shape (F3) | **One optional walking speed, int 0–200, multiple of 5** (fly / swim / climb later as more optional fields) / object `{walk, fly?, swim?}` now (unused in MVP) / any int | no (owner: spec-feedback) | scenes-map, combat-tracker, character-sheet |
+| OQ-ENT-17 | Where the default token shape lives (F4) | **Nullable `tokenShape` column on `entity`** (presentation, beside the portrait) / optional field in `statBlock` (no column, but it isn't a stat) / no default, DM sets per token | no (owner: spec-feedback) | scenes-map, combat-tracker |
 
 ## 16. Out of scope
 
