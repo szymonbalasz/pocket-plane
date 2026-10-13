@@ -92,6 +92,17 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await expect(init.locator('[data-testid="cbt-init-row"][data-hidden="true"]')).toHaveCount(2);
   const pinit = await openWindow(player, "cbt.initiative");
   await expect(pinit.getByTestId("cbt-init-row")).toHaveCount(4);
+  // FR-CBT-39: every bound row shows its whole movement used, "0 / 30 ft" (nothing clipped).
+  await expect(init.getByTestId("cbt-init-row-moved")).toHaveCount(6);
+  const clippedMoved = await init.evaluate(
+    (w) =>
+      [...w.querySelectorAll("[data-testid='cbt-init-row-moved']")].filter((el) => {
+        const r = el.getBoundingClientRect();
+        const box = (el.parentElement as HTMLElement).getBoundingClientRect();
+        return r.width === 0 || r.left < box.left - 0.5 || r.right > box.right + 0.5;
+      }).length,
+  );
+  expect(clippedMoved).toBe(0);
 
   // Step 4: Roll monsters; Mira rolls from her sheet (routed to cbt.rollInitiative); DM sets
   // Thorn; Start round 1.

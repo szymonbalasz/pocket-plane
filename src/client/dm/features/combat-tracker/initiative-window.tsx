@@ -49,6 +49,7 @@ import {
   EllipsisIcon,
   EyeIcon,
   EyeOffIcon,
+  FootprintsIcon,
   HeartPulseIcon,
   RotateCcwIcon,
   ShieldIcon,
@@ -274,7 +275,11 @@ function AbilityMenu({
   );
 }
 
-/** "Moved 40 / 30 ft" in the drag label's tone (FR-CBT-39, FR-MAP-37); "Moved 40 ft" without speed. */
+/**
+ * Movement used in the drag label's tone (FR-CBT-39, FR-MAP-37): a footprints icon + "40 / 30 ft"
+ * ("40 ft" without speed), labelled "Moved 40 / 30 ft". Compact so the row's name keeps its room.
+ * Only for a combatant bound to a token: nothing else can move.
+ */
 const TONE_CLASS = {
   none: "",
   normal: "",
@@ -283,16 +288,24 @@ const TONE_CLASS = {
 } as const;
 
 function Moved({ c, speed }: { c: CombatantView; speed: number | undefined }) {
+  if (c.tokenId === null) return null;
   const moved = c.movedFt ?? 0;
   const tone = speed === undefined ? "none" : movementIndicator(moved, null, speed).tone;
+  const text = speed === undefined ? `${moved} ft` : `${moved} / ${speed} ft`;
   return (
     <span
-      className={cn("shrink-0", TONE_CLASS[tone])}
+      className={cn(
+        "ml-auto flex shrink-0 items-center gap-0.5 pl-1 text-xs whitespace-nowrap text-muted-foreground tabular-nums",
+        TONE_CLASS[tone],
+      )}
       data-testid="cbt-init-row-moved"
       data-record-id={c.id}
       data-tone={tone}
+      title={`Moved ${text}`}
     >
-      {speed === undefined ? `Moved ${moved} ft` : `Moved ${moved} / ${speed} ft`}
+      <FootprintsIcon className="size-3" aria-hidden />
+      <span className="sr-only">Moved </span>
+      {text}
     </span>
   );
 }
@@ -344,6 +357,8 @@ function Row({
           {c.hidden && (
             <EyeOffIcon className="size-3.5 shrink-0 text-muted-foreground" aria-label="Hidden" />
           )}
+          {/* On the name line, right-aligned: the AC / HP / band line has no room left. */}
+          <Moved c={c} speed={stats?.speed} />
         </div>
         <div className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs text-muted-foreground tabular-nums">
           <span className="shrink-0">AC {ac ?? "—"}</span>
@@ -353,7 +368,6 @@ function Row({
           {c.kind === "monster" && hp && (
             <BandBadge band={healthBand(hp.cur, hp.max)} testId="cbt-init-row-band" />
           )}
-          <Moved c={c} speed={stats?.speed} />
         </div>
       </div>
       <InitiativeCell c={c} def={def} />
