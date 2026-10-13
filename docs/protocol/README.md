@@ -241,6 +241,7 @@ Routing ([ADR-0026](../architecture/adr/0026-signal-routing.md)):
 - A valid signal goes to every **other** live connection of the sender's campaign (DM and players, incl. the sender's other tabs) as `signal {name, data, from}`; never back to the sender. `from` = `{role: "dm"}` or `{role: "player", playerId}` from the connection context.
 - No per-signal visibility fn, no server scene check, no rate limit. Receivers filter: act only if `data.sceneId` is the scene they show (player: active; DM: viewed).
 - Client: `connection.sendSignal(name, data)` (dropped when not live, never queued), `useSignal(name, handler)`.
+- Client: `connection.onEvent(fn)` / `useEventFrame(handler)`: every applied live `event` frame with its `cause` and the new store; never a snapshot, resync or seq-gap frame (FR-CBT-41 turn alert; built by `build/combat-tracker-feedback`, #160).
 
 | Signal | Owner | Roles |
 |---|---|---|

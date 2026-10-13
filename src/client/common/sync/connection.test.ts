@@ -231,6 +231,34 @@ test("FR-SYNC-22 signals: sent only while live (never queued); incoming frames r
   expect(got).toEqual([frame]);
 });
 
+test("FR-CBT-41 onEvent: applied event frames reach handlers with cause and the new store; never snapshot, seq gap or after unsubscribe", () => {
+  const { conn, sockets } = setup();
+  conn.start();
+  const s = sockets[0] as FakeSocket;
+  const got: { cause: string; seq: number; storeSeq: number; rec: unknown }[] = [];
+  const off = conn.onEvent((f, store) =>
+    got.push({ cause: f.cause.name, seq: f.seq, storeSeq: store.seq, rec: store.records.x?.a }),
+  );
+  s.onmessage?.({ data: snapshotFrame });
+  expect(got).toEqual([]);
+  const event = (seq: number, v: number) =>
+    JSON.stringify({
+      type: "event",
+      seq,
+      cause: { name: "TurnChanged" },
+      changes: [{ type: "x", id: "a", op: "upsert", data: { v } }],
+    });
+  s.onmessage?.({ data: event(1, 1) });
+  expect(got).toEqual([{ cause: "TurnChanged", seq: 1, storeSeq: 1, rec: { v: 1 } }]);
+  // Seq gap: not applied, no handler call, resync requested instead.
+  s.onmessage?.({ data: event(3, 3) });
+  expect(got).toHaveLength(1);
+  expect(JSON.parse(s.sent.at(-1) as string)).toEqual({ type: "resync" });
+  off();
+  s.onmessage?.({ data: event(2, 2) });
+  expect(got).toHaveLength(1);
+});
+
 test("wake never reconnects a rejected (4401) or stopped connection", () => {
   const { conn, sockets, wake } = setup();
   conn.start();

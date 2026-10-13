@@ -4,6 +4,7 @@ import { CloseCode } from "@shared/protocol/codes";
 import {
   CLIENT_PONG_TIMEOUT_MS,
   type Credential,
+  type EventFrame,
   PING_INTERVAL_MS,
   ServerFrame,
   type ServerSignalFrame,
@@ -17,6 +18,12 @@ export type ConnState = "connecting" | "live" | "reconnecting" | "waiting" | "re
 
 /** Incoming signal; `from` is server-stamped (ADR-0026). Receivers filter by scene themselves. */
 export type SignalHandler = (s: ServerSignalFrame) => void;
+
+/**
+ * An applied `event` frame (with its `cause`) and the store after it. Never called for a
+ * snapshot, a resync or a frame dropped for a seq gap (features react to live events only).
+ */
+export type EventHandler = (f: EventFrame, store: RecordStore) => void;
 
 export class IntentRejected extends Error {
   override name = "IntentRejected";
@@ -127,6 +134,7 @@ export class SyncConnection {
   private probing = false;
   private pending = new Map<string, { resolve(v: unknown): void; reject(e: Error): void }>();
   private signalHandlers = new Set<SignalHandler>();
+  private eventHandlers = new Set<EventHandler>();
   private snap: SyncSnapshot = {
     state: "connecting",
     store: emptyStore(),
@@ -209,6 +217,14 @@ export class SyncConnection {
     };
   }
 
+  /** Subscribe to applied event frames (see `EventHandler`); returns an unsubscribe. */
+  onEvent(fn: EventHandler): () => void {
+    this.eventHandlers.add(fn);
+    return () => {
+      this.eventHandlers.delete(fn);
+    };
+  }
+
   private set(patch: Partial<SyncSnapshot>): void {
     this.snap = { ...this.snap, ...patch };
     this.opts.onChange(this.snap);
@@ -265,8 +281,18 @@ export class SyncConnection {
         return;
       case "event": {
         const r = applyEvent(this.snap.store, frame);
-        if (r.ok) this.set({ store: r.store });
-        else this.ws?.send(JSON.stringify({ type: "resync" })); // seq gap (FR-SYNC-21)
+        if (!r.ok) {
+          this.ws?.send(JSON.stringify({ type: "resync" })); // seq gap (FR-SYNC-21)
+          return;
+        }
+        this.set({ store: r.store });
+        for (const fn of [...this.eventHandlers]) {
+          try {
+            fn(frame, r.store);
+          } catch (err) {
+            console.error(`event handler failed on ${frame.cause.name}`, err);
+          }
+        }
         return;
       }
       case "ack":

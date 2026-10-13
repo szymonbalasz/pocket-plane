@@ -3,7 +3,12 @@ import type { Credential } from "@shared/protocol/frames";
 import { recordsOf } from "@shared/protocol/store";
 import { createContext, useCallback, useContext, useEffect, useRef } from "react";
 import { createStore, type StoreApi, useStore } from "zustand";
-import { type SignalHandler, SyncConnection, type SyncSnapshot } from "./connection";
+import {
+  type EventHandler,
+  type SignalHandler,
+  SyncConnection,
+  type SyncSnapshot,
+} from "./connection";
 
 export interface SyncState extends SyncSnapshot {
   connection: SyncConnection;
@@ -51,6 +56,15 @@ export function useSignal(name: string, handler: SignalHandler): void {
       }),
     [store, name],
   );
+}
+
+/** Calls `handler` for every applied event frame (live only; never a snapshot or resync). */
+export function useEventFrame(handler: EventHandler): void {
+  const store = useContext(SyncContext);
+  if (!store) throw new Error("useEventFrame outside SyncContext");
+  const ref = useRef(handler);
+  ref.current = handler;
+  useEffect(() => store.getState().connection.onEvent((f, s) => ref.current(f, s)), [store]);
 }
 
 /** Sends a signal; false when not live (dropped, never queued). */
