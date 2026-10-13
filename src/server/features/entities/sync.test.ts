@@ -82,7 +82,7 @@ describe("entities over REST + WS (entities bundle)", () => {
     expect(view(p1)).toHaveLength(2);
     expect(mira(p1)).toMatchObject({ hpCurrent: 12, statBlock: { ac: 16 } });
     expect(Object.keys(thorn(p1) ?? {}).sort()).toEqual(
-      ["id", "kind", "name", "ownerPlayerId", "portraitAssetId"].sort(),
+      ["down", "id", "kind", "name", "ownerPlayerId", "portraitAssetId"].sort(),
     );
     expect(thorn(p2)).toMatchObject({ hpCurrent: 10 });
     expect(Object.keys(mira(p2) ?? {})).not.toContain("statBlock");
@@ -120,6 +120,37 @@ describe("entities over REST + WS (entities bundle)", () => {
     });
     expect(dup.status).toBe(409);
     expect((await api("PUT", "/entities/nope", { name: "x", statBlock: {} })).status).toBe(404);
+  });
+
+  test("FR-ENT-22 REST tokenShape: fixture square; PUT none; PUT without tokenShape → null", async () => {
+    const elite = byName["Elite Goblin Warrior"] as EntityRecord;
+    expect(elite.tokenShape).toBe("square");
+    const body = async (r: Response) => ((await r.json()) as { entity: EntityRecord }).entity;
+    const none = await put(elite, { tokenShape: "none" });
+    expect(none.status).toBe(200);
+    expect((await body(none)).tokenShape).toBe("none");
+    const omitted = await put(elite);
+    expect(omitted.status).toBe(200);
+    expect((await body(omitted)).tokenShape).toBeNull();
+    const bad = await put(elite, { tokenShape: "hex" });
+    expect(bad.status).toBe(400);
+    // Restore the fixture value for the tests below.
+    const restored = await put(elite, { tokenShape: "square" });
+    byName["Elite Goblin Warrior"] = await body(restored);
+    const created = await api("POST", "/entities", {
+      kind: "monster",
+      name: "Round Goblin",
+      statBlock: (byName.Goblin as EntityRecord).statBlock,
+    });
+    expect((await body(created)).tokenShape).toBeNull();
+  });
+
+  test("FR-ENT-21 REST speed 33 → 400 with issue path statBlock.speed", async () => {
+    const elite = byName["Elite Goblin Warrior"] as EntityRecord;
+    const r = await put(elite, { statBlock: { ...elite.statBlock, speed: 33 } });
+    expect(r.status).toBe(400);
+    const issues = ((await r.json()) as { issues: { path: string[] }[] }).issues;
+    expect(issues.map((i) => i.path.join("."))).toEqual(["statBlock.speed"]);
   });
 
   test("FR-ENT-18 monster edits reach the DM ≤ 1 s; players get no event frame", async () => {
@@ -166,8 +197,27 @@ describe("entities over REST + WS (entities bundle)", () => {
       name: "Mira Vale",
       portraitAssetId: null,
       ownerPlayerId: mira.ownerPlayerId,
+      down: false,
     });
     for (const c of [p1, p2]) c.close();
+  });
+
+  test("FR-ENT-15 Mira at 0 HP: P2's redacted upsert has down true, no hpCurrent (#154)", async () => {
+    const p1 = await h.live({ role: "player", token: tokens["Player 1"] as string });
+    const p2 = await h.live({ role: "player", token: tokens["Player 2"] as string });
+    const dm = await h.live({ role: "dm", secret: TEST_SECRET });
+    dm.intent("char.adjustHp", { characterId: id("Mira"), delta: -12 }, "down");
+    const e1 = await p1.next("event", 1000);
+    const e2 = await p2.next("event", 1000);
+    expect(e1.changes.find((c) => c.type === "entity")?.data).toMatchObject({ hpCurrent: 0 });
+    const redacted = e2.changes.find((c) => c.type === "entity")?.data as Record<string, unknown>;
+    expect(redacted).toMatchObject({ id: id("Mira"), down: true });
+    expect(Object.keys(redacted)).not.toContain("hpCurrent");
+    // Back above 0 → down false again.
+    dm.intent("char.adjustHp", { characterId: id("Mira"), delta: 12 }, "up");
+    const up = await p2.next("event", 1000);
+    expect(up.changes.find((c) => c.type === "entity")?.data).toMatchObject({ down: false });
+    for (const c of [p1, p2, dm]) c.close();
   });
 
   test("ENT §13 leak scan + restart: player-1 never sees monster names or Thorn's dice; snapshots survive", async () => {

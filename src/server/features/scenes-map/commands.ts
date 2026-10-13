@@ -41,7 +41,6 @@ import {
   TOKENS_PER_SCENE_MAX,
   TokenIdInput,
   type TokenRecord,
-  type TokenShape,
   type TokenSize,
   UpdateTokenInput,
 } from "@shared/scenes-map/schemas";
@@ -51,7 +50,6 @@ import { type CommandEnv, defineCommand, IdSchema } from "../../commands/command
 import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import {
-  entity,
   player,
   scene,
   sceneFolder,
@@ -488,16 +486,6 @@ function insertToken(
 
 const namesOn = (tx: Tx, sceneId: string) => sceneTokens(tx, sceneId).map((t) => t.name);
 
-/** FR-MAP-35: the definition's `tokenShape` (null = round); imported rows have none. */
-function definitionShape(tx: Tx, definitionId: string): TokenShape {
-  const r = tx
-    .select({ tokenShape: entity.tokenShape })
-    .from(entity)
-    .where(eq(entity.id, definitionId))
-    .get();
-  return r?.tokenShape ?? "round";
-}
-
 /**
  * FR-MAP-13: name = definition name, numbered (FR-MAP-16); image = portrait or none; size =
  * `statBlock.size`; shape = definition `tokenShape`, else round (FR-MAP-35); speed =
@@ -531,7 +519,7 @@ export const placeToken = defineCommand({
       name: numberedName(input.name ?? def.name, namesOn(tx, s.id)),
       imageAssetId,
       size,
-      shape: input.shape ?? definitionShape(tx, def.id),
+      shape: input.shape ?? def.tokenShape ?? "round",
       speed: def.statBlock.speed ?? null,
       col: input.col,
       row: input.row,

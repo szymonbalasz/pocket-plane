@@ -18,6 +18,7 @@ export default defineFixture({
         ac: 15,
         hpMax: 59,
         initBonus: 1,
+        speed: 30,
         attacks: [{ name: "Claw", toHit: 7, damage: "2d6+4", damageType: "slashing" }],
         cr: "5",
       },

@@ -79,12 +79,15 @@ describe("scenes-map fixtures (MAP §13)", () => {
       ["Cave Ogre", 9, 10, "large", false],
     ]);
     expect(on("Cellar")).toEqual([["Goblin", 40, 27, "small", false]]);
-    // FR-MAP-35 / -36: Cave Ogre speed 40, shape none; the rest round.
+    // FR-MAP-35 / -36: shapes from the definitions' tokenShape (Cave Ogre none, Elite square).
     expect(r.tokens.find((t) => t.name === "Cave Ogre")).toMatchObject({
       speed: 40,
       shape: "none",
     });
-    expect(r.tokens.filter((t) => t.shape !== "round").map((t) => t.name)).toEqual(["Cave Ogre"]);
+    expect(r.tokens.filter((t) => t.shape !== "round").map((t) => t.name)).toEqual([
+      "Elite Goblin Warrior",
+      "Cave Ogre",
+    ]);
     const mira = r.tokens.find((t) => t.name === "Mira");
     expect(mira?.imageAssetId).toBe(r.manifest.records.images?.asset?.[2] as string);
     expect(mira?.ownerPlayerId).not.toBeNull();

@@ -117,6 +117,7 @@ export const createEntity = defineCommand({
         campaignId: cid,
         name: input.name,
         portraitAssetId,
+        tokenShape: input.tokenShape ?? null,
         statBlock: input.statBlock,
         ownerPlayerId,
         hpCurrent,
@@ -191,6 +192,8 @@ export function updateEntityCommand(hooks: DefinitionHooks) {
         .set({
           name: input.name,
           portraitAssetId,
+          // FR-ENT-11/22: whole replace; omitted → null. Placed tokens keep their shape.
+          tokenShape: input.tokenShape ?? null,
           statBlock,
           ownerPlayerId,
           hpCurrent,

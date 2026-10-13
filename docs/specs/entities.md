@@ -178,7 +178,7 @@ Other writers of a character's `hpCurrent` (character-sheet's `CharacterHpAdjust
 | 1 | Log in; open Creatures | — | Mira (Player 1), Thorn (Player 2), Goblin + Wolf (SRD, lock, CR 1/4, 50 XP), Elite Goblin Warrior (Custom, derived from Goblin, CR 1/2, 100 XP). No Marsh Troll |
 | 2 | — | B, C open links | From B/C frame log: B has Mira full, Thorn name only, no monsters; C the reverse |
 | 3 | PUT Goblin; PUT Elite Goblin Warrior HP 20, speed 40, `tokenShape` none, saves DEX + WIS; same with speed 33; POST derive "Goblin Boss" from Goblin | — | Goblin: 403 read-only message, unchanged. Speed 33: 400, issue path `statBlock.speed`. Others: A2 updates ≤ 1 s; B, C get no `event` frame |
-| 4 | PUT Mira name "Mira Vale"; then PUT Mira with HP current 0 (fixture-style `fetch`) | — | From frame logs: B full upsert, C redacted upsert, ≤ 1 s. HP 0: C's redacted upsert has `down: true`, no `hpCurrent` |
+| 4 | PUT Mira name "Mira Vale"; then bring Mira to HP 0 with `char.adjustHp` (the PUT body has no `hpCurrent`) | — | From frame logs: B full upsert, C redacted upsert, ≤ 1 s. HP 0: C's redacted upsert has `down: true`, no `hpCurrent` |
 | 5 | Reload all; then kill + restart server | — | All reconnect; state includes steps 3–4 |
 | 6 | Switch to Second Campaign, then back | — | List: Marsh Troll + SRD only, then step-5 list. No console errors throughout |
 

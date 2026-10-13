@@ -48,15 +48,13 @@ export default defineFixture({
       kind: "monster",
       name: "Cave Ogre",
       statBlock: { ...wolf.statBlock, size: "large", speed: 40 },
+      tokenShape: "none",
     }),
     step(placeToken, (r) => ({
       sceneId: r.id("battlemap", "scene"),
       definitionId: r.id("scenes-extras", "entity"),
       col: 9,
       row: 10,
-      // FR-MAP-35: shape none. Moves to the definition (`tokenShape: "none"` on the create step)
-      // once entities' create accepts `tokenShape` (build/entities-feedback).
-      shape: "none" as const,
     })),
     step(createScene, (r) => ({ name: "Cellar", mapAssetId: r.id("image-large", "asset") })),
     step(setGrid, (r) => ({

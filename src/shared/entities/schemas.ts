@@ -174,6 +174,8 @@ const recordBase = {
   id: z.string(),
   name: z.string(),
   portraitAssetId: z.string().nullable(),
+  /** Default shape for new tokens; null = round (FR-ENT-22). Imported rows null. */
+  tokenShape: TokenShape.nullable(),
   derivedFromId: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -202,13 +204,17 @@ export type EntityRecord = z.infer<typeof EntityRecord>;
 export type MonsterRecord = Extract<EntityRecord, { kind: "monster" }>;
 export type CharacterRecord = Extract<EntityRecord, { kind: "character" }>;
 
-/** What a player receives of another player's character (FR-ENT-15). */
+/**
+ * What a player receives of another player's character (FR-ENT-15). `down` = `hpCurrent = 0`,
+ * derived in the visibility fn; never the HP number (#154). No `tokenShape` (FR-ENT-22).
+ */
 export const RedactedCharacter = z.object({
   id: z.string(),
   kind: z.literal("character"),
   name: z.string(),
   portraitAssetId: z.string().nullable(),
   ownerPlayerId: z.string(),
+  down: z.boolean(),
 });
 export type RedactedCharacter = z.infer<typeof RedactedCharacter>;
 
@@ -247,6 +253,8 @@ export const importData = {
 // ---------- REST bodies (ENT §9) ----------
 
 const portrait = Id.nullable().optional();
+/** FR-ENT-22: omitted or null = round; an update without it sets null (FR-ENT-11). */
+const tokenShape = TokenShape.nullable().optional();
 
 /** POST /api/entities. Strict: spoofed `campaignId` / `source` / … → `invalid`. */
 export const CreateEntityBody = z.discriminatedUnion("kind", [
@@ -254,6 +262,7 @@ export const CreateEntityBody = z.discriminatedUnion("kind", [
     kind: z.literal("monster"),
     name: EntityName,
     portraitAssetId: portrait,
+    tokenShape,
     statBlock: MonsterStatBlock,
     derivedFromId: Id.optional(),
   }),
@@ -261,6 +270,7 @@ export const CreateEntityBody = z.discriminatedUnion("kind", [
     kind: z.literal("character"),
     name: EntityName,
     portraitAssetId: portrait,
+    tokenShape,
     statBlock: CharacterStatBlock,
     ownerPlayerId: Id,
   }),
@@ -274,6 +284,7 @@ export type CreateEntityBody = z.input<typeof CreateEntityBody>;
 export const UpdateEntityBody = z.strictObject({
   name: EntityName,
   portraitAssetId: portrait,
+  tokenShape,
   statBlock: z.record(z.string(), z.unknown()),
   ownerPlayerId: Id.optional(),
 });

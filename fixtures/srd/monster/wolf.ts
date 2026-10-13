@@ -8,6 +8,8 @@ export const wolf = {
     ac: 13,
     hpMax: 11,
     initBonus: 2,
+    speed: 40,
+    abilities: { str: 12, dex: 15, con: 12, int: 3, wis: 12, cha: 6 },
     attacks: [{ name: "Bite", toHit: 4, damage: "2d4+2", damageType: "piercing" }],
     cr: "1/4",
   } satisfies MonsterStatBlock,

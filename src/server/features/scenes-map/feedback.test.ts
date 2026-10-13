@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import type { SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
 import { MAP_INTENTS as I } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
-import { entity, token } from "../../db/schema";
+import { token } from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import type { Actor } from "../../events/types";
 import { createEntity, UPDATE } from "../entities/commands";
@@ -30,9 +30,8 @@ function setup() {
       kind: "monster",
       name: "Cave Ogre",
       statBlock: { ...wolfBlock, size: "large", speed: 40 },
+      tokenShape: "none",
     });
-    // `tokenShape` on the definition (FR-ENT-22) is written by entities' REST; set the column.
-    t.s.db.update(entity).set({ tokenShape: "none" }).where(eq(entity.id, ogre.id)).run();
     return ogre.id;
   };
   const lastEvent = () => t.events.at(-1)?.event;
@@ -46,7 +45,14 @@ describe("scenes-map feedback: shape + speed copies", () => {
     const ogre = t.place(s.id, t.caveOgre(), 9, 10);
     expect(ogre).toMatchObject({ shape: "none", speed: 40, size: "large" });
     const goblin = t.place(s.id, t.h.goblinId, 1, 1);
-    expect(goblin).toMatchObject({ shape: "round", speed: null });
+    expect(goblin).toMatchObject({ shape: "round", speed: 30 });
+    const { speed: _speed, ...noSpeed } = wolfBlock;
+    const unknown = t.run<{ id: string }>(createEntity.name, {
+      kind: "monster",
+      name: "Shade",
+      statBlock: noSpeed,
+    });
+    expect(t.place(s.id, unknown.id, 4, 4)).toMatchObject({ shape: "round", speed: null });
     // Fixture override; never `speed` or `size`.
     expect(t.place(s.id, t.h.goblinId, 2, 2, { shape: "square" }).shape).toBe("square");
     expect(
@@ -79,11 +85,11 @@ describe("scenes-map feedback: shape + speed copies", () => {
     const ogreId = t.caveOgre();
     const a = t.place(s.id, ogreId, 9, 10);
     const b = t.place(s.id, ogreId, 5, 10, { shape: "square" });
-    t.s.db.update(entity).set({ tokenShape: "round" }).where(eq(entity.id, ogreId)).run();
     t.run(UPDATE, {
       id: ogreId,
       name: "Cave Ogre",
       statBlock: { ...wolfBlock, size: "large", speed: 30 },
+      tokenShape: "round",
     });
     expect(t.tokenRow(a.id)).toMatchObject({ speed: 30, shape: "none" });
     expect(t.tokenRow(b.id)).toMatchObject({ speed: 30, shape: "square" });
@@ -91,9 +97,10 @@ describe("scenes-map feedback: shape + speed copies", () => {
     expect(ev?.type).toBe("EntityUpdated");
     expect(ev?.changes.filter((c) => c.type === "token").map((c) => c.id)).toEqual([a.id, b.id]);
     // Speed removed → null; an unchanged speed writes nothing.
-    t.run(UPDATE, { id: ogreId, name: "Cave Ogre", statBlock: { ...wolfBlock, size: "large" } });
+    const { speed: _speed, ...noSpeed } = wolfBlock;
+    t.run(UPDATE, { id: ogreId, name: "Cave Ogre", statBlock: { ...noSpeed, size: "large" } });
     expect(t.tokenRow(a.id).speed).toBeNull();
-    t.run(UPDATE, { id: ogreId, name: "Cave Ogre 2", statBlock: { ...wolfBlock, size: "large" } });
+    t.run(UPDATE, { id: ogreId, name: "Cave Ogre 2", statBlock: { ...noSpeed, size: "large" } });
     expect(t.lastEvent()?.changes.map((c) => c.type)).toEqual(["entity"]);
   });
 
