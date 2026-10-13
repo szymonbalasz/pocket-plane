@@ -2,6 +2,7 @@
 
 - Status: accepted (2026-10-12; decisions-log #134, #137)
 - Date: 2026-10-12
+- Amended by: [ADR-0031](0031-token-move-hooks.md) (hooks also run in `map.moveToken`, #154)
 - Affects: [scenes-map](../../specs/scenes-map.md) (FR-MAP-05, -18, -19), [combat-tracker](../../specs/combat-tracker.md) (FR-CBT-09), [protocol](../../protocol/README.md) §17, [AGENTS §9.9](../../../AGENTS.md#99-shared-files)
 - Extends: [ADR-0024](0024-definition-visibility.md) (definition-changed hooks), [ADR-0021](0021-sync-protocol-conventions.md) ("visibility fns read only the record and the connection context")
 - Raised by: [OQ-CBT-17](../../specs/combat-tracker.md#15-open-questions); answers OQ-MAP-03, OQ-MAP-11 (decisions #124)

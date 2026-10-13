@@ -68,7 +68,7 @@ graph LR
 | ~~Undo mechanism~~ **Decided: A**, compensating events (#139 P4) | — |
 | ~~Undo scope~~ **Decided: DM only.** Players don't undo; they just redo the action (e.g. move the token back). | — |
 | ~~Which events are undoable?~~ **Decided: combat log entries only** — damage/healing applied. Initiative/turn not undoable; next/previous turn suffices (Shieldmaiden-style). | — |
-| ~~Undo order~~ **Decided: strict LIFO, one step at a time** (to undo step 3 of 5, undo 5, 4, then 3). No cherry-picking. | — |
+| ~~Undo order~~ **Decided: strict LIFO, one step at a time** (to undo step 3 of 5, undo 5, 4, then 3). No cherry-picking. A step = one apply (all its combat log entries; multi-target cards, #154). | — |
 | ~~Redo?~~ **Decided: no.** Undo reopens the damage card; the DM re-applies it (#139 P4) | — |
 | ~~Listener execution~~ **Decided: synchronous, same process, after commit** ([ADR-0021](0021-sync-protocol-conventions.md) F) | — |
 | ~~Who resolves an action?~~ **Decided: the action owner (DM or one player) + the DM; damage cards: DM only** (#136) | — |

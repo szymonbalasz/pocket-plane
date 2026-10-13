@@ -101,25 +101,25 @@ Fixtures, bundles, manifest and lock are **code/files, not DB records**. Only pr
 | `player-2` | setup | Player "Player 2", stable link. Optional | campaign-management | no | Skeleton |
 | `campaign-second` | setup | Second campaign, inactive (contents owned by CAMP) | campaign-management | no | Skeleton |
 | `sync-probes` | setup | Probes `public`, `secret` (hidden, text `SECRET-PROBE`), `mine` (owner `player-1`); test mode only | [live-sync](live-sync.md) | no | Skeleton |
-| `enemy-1` | reference | SRD goblin: AC 15, HP 7, init +2, scimitar +4 / 1d6+2, CR 1/4 | [entities](entities.md) | yes | Scenes |
-| `enemy-2` | reference | SRD wolf: AC 13, HP 11, init +2, bite +4 / 2d4+2, CR 1/4 | entities | yes | Scenes |
-| `enemy-custom` | setup | Elite Goblin Warrior, custom in Fixture Campaign derived from `enemy-1`: AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2 | entities (form: [combat-tracker](combat-tracker.md)) | yes | Scenes (entities ships derive, [OQ-ENT-12](entities.md#15-open-questions)) |
-| `char-mira` | setup | Character "Mira", owned by `player-1`: L1 fighter, AC 16, HP 12/12, init +2, shortsword +4 / 1d6+2 | entities, [character-sheet](character-sheet.md) | yes | Scenes / Combat |
+| `enemy-1` | reference | SRD goblin: AC 15, HP 7, init +2, scimitar +4 / 1d6+2, CR 1/4. *(feedback pass, to build)*: speed 30; STR 8 DEX 14 CON 10 INT 10 WIS 8 CHA 8 | [entities](entities.md) | yes | Scenes |
+| `enemy-2` | reference | SRD wolf: AC 13, HP 11, init +2, bite +4 / 2d4+2, CR 1/4. *(feedback pass, to build)*: speed 40; STR 12 DEX 15 CON 12 INT 3 WIS 12 CHA 6 | entities | yes | Scenes |
+| `enemy-custom` | setup | Elite Goblin Warrior, custom in Fixture Campaign derived from `enemy-1`: AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2. *(feedback pass, to build)*: speed 30 and scores as `enemy-1`; save proficiency DEX; `tokenShape` square | entities (form: [combat-tracker](combat-tracker.md)) | yes | Scenes (entities ships derive, [OQ-ENT-12](entities.md#15-open-questions)) |
+| `char-mira` | setup | Character "Mira", owned by `player-1`: L1 fighter, AC 16, HP 12/12, init +2, shortsword +4 / 1d6+2. *(feedback pass, to build)*: speed 30; STR 14 DEX 14 CON 14 INT 10 WIS 12 CHA 10; saves STR, CON | entities, [character-sheet](character-sheet.md) | yes | Scenes / Combat |
 | `images` | setup | Town map, battlemap (20×14 cells at 70 px); tokens: Mira blue, goblin green, wolf grey, elite dark green | [assets-pipeline](assets-pipeline.md) | yes | Scenes |
 | `town` | setup | Active scene: town map, grid, Mira token | [scenes-map](scenes-map.md) | yes | Scenes |
 | `battlemap` | setup | Inactive scene: Mira + goblin visible, wolf + elite goblin **hidden** | scenes-map | yes | Scenes |
-| `char-thorn` | setup | Character "Thorn", owned by `player-2`: L1 rogue, AC 14, HP 10/10, init +3, dagger +5 / 1d4+3. Requires `player-2` | [entities](entities.md#13-test-plan) | no | Scenes |
-| `enemy-custom-second` | setup | Activates Second Campaign, creates custom "Marsh Troll" (large, AC 15, HP 59, claw +7 / 2d6+4, CR 5), re-activates Fixture Campaign. Requires `campaign-second` | [entities](entities.md#13-test-plan) | no | Scenes |
+| `char-thorn` | setup | Character "Thorn", owned by `player-2`: L1 rogue, AC 14, HP 10/10, init +3, dagger +5 / 1d4+3. Requires `player-2`. *(feedback pass, to build)*: speed 30; STR 8 DEX 16 CON 14 INT 12 WIS 10 CHA 13; saves DEX, INT | [entities](entities.md#13-test-plan) | no | Scenes |
+| `enemy-custom-second` | setup | Activates Second Campaign, creates custom "Marsh Troll" (large, AC 15, HP 59, claw +7 / 2d6+4, CR 5; *(feedback pass, to build)* speed 30), re-activates Fixture Campaign. Requires `campaign-second` | [entities](entities.md#13-test-plan) | no | Scenes |
 | `image-large` | setup | `map-large` 6000 × 4000 SVG (→ `display` 4096 × 2731, `thumb` 512 × 341) | [assets-pipeline](assets-pipeline.md#13-test-plan) | no | Scenes |
 | `images-second` | setup | Activates Second Campaign, ingests `town.svg` as "Town (copy)", re-activates Fixture Campaign. Requires `campaign-second`, `images` | [assets-pipeline](assets-pipeline.md#13-test-plan) | no | Scenes |
-| `scenes-extras` | setup | Folder "Act 1" holding Town + Goblin Ambush; Thorn on both; custom "Cave Ogre" (large) visible on Goblin Ambush; root scene "Cellar" (`map-large`, cell 50, locked) with a goblin. Requires `battlemap`, `char-thorn`, `image-large` | [scenes-map](scenes-map.md#13-test-plan) | no | Scenes |
+| `scenes-extras` | setup | Folder "Act 1" holding Town + Goblin Ambush; Thorn on both; custom "Cave Ogre" (large; *(feedback pass, to build)* speed 40, `tokenShape` none) visible on Goblin Ambush; root scene "Cellar" (`map-large`, cell 50, locked) with a goblin. Requires `battlemap`, `char-thorn`, `image-large` | [scenes-map](scenes-map.md#13-test-plan) | no | Scenes |
 | `encounter-1` | setup | Planned "Ambush at the Ford": Goblin × 2, Wolf, Elite Goblin Warrior; party `null` (all). Requires `enemy-1`, `enemy-2`, `enemy-custom` | [combat-tracker](combat-tracker.md#13-test-plan) | yes | Combat |
 | `goblin-2` | setup | Token "Goblin 2" (`enemy-1`) on Goblin Ambush (12, 8), visible. Requires `battlemap` | combat-tracker | yes | Combat |
 | `thorn-battlemap` | setup | Thorn token (owner `player-2`) on Goblin Ambush (2, 9). Requires `battlemap`, `char-thorn` | combat-tracker | no | Combat |
 | `combat-1` | setup | Start `encounter-1` on Goblin Ambush; initiative Wolf 18, Mira 15, Goblin 12, Goblin 2 12, Thorn 10, Elite 8; round 1, Wolf. Requires `encounter-1`, `goblin-2`, `thorn-battlemap` | combat-tracker | no | Combat |
-| `combat-hit` | setup | Goblin attacks Mira (manual 15 / 4), applied → Mira 6/12. Requires `combat-1` | combat-tracker | no | Combat |
+| `combat-hit` | setup | Goblin attacks Mira (manual 15 / 4), applied → Mira 6/12 (*(feedback pass, to build)*: apply input `targets [{Mira, hit, normal}]`). Requires `combat-1` | combat-tracker | no | Combat |
 | `combat-pending` | setup | Elite attacks (manual 19 / 5), card left pending. Requires `combat-hit` | combat-tracker | no | Combat |
-| `char-pip` | setup | Character "Pip", owner `player-1`, L1 wizard, AC 12, HP 8/8, init +2, no attack | [character-sheet](character-sheet.md#13-test-plan) | no | Combat |
+| `char-pip` | setup | Character "Pip", owner `player-1`, L1 wizard, AC 12, HP 8/8, init +2, no attack (*(feedback pass, to build)*: no speed, no ability scores) | [character-sheet](character-sheet.md#13-test-plan) | no | Combat |
 | `char-wounds` | setup | `char.adjustHp` Thorn −7 → 3/10. Requires `char-thorn` | character-sheet | no | Combat |
 | `dice-settings` | setup | Public log categories on: attack, damage, initiative, healing | [dice-roll-log](dice-roll-log.md#13-test-plan) | yes | Combat |
 | `rolls-1` | setup | Four DM rolls: public attack, hidden damage "DM-SECRET-ROLL", hidden skill, manual Mira initiative. Requires `dice-settings`, `char-mira`, `enemy-1` | dice-roll-log | no | Combat |
