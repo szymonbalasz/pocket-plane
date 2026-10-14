@@ -1,5 +1,6 @@
 // Server notification kind contract (FR-NOTE-03). Kinds are listed in `./kinds.ts`
 // (append-only, AGENTS §9.9); kind owners define theirs with `defineNotificationKind`.
+import { checkEndRule, type EncounterEndRule } from "@shared/notifications/end-rule";
 import {
   NOTIFICATION_KIND_RE,
   PAYLOAD_MAX_BYTES,
@@ -22,6 +23,11 @@ export interface NotificationKindDef {
   resolutionMaxBytes?: number;
   /** `note.resolve` may resolve it (FR-NOTE-09). Default false. */
   genericResolve?: boolean;
+  /**
+   * FR-NOTE-23: pending rows close when their encounter ends (`dismissForEncounter`). The kind
+   * owner's shared constant, also on its client views. Absent = pending until resolved / dismissed.
+   */
+  endRule?: EncounterEndRule;
 }
 
 /** The kind's resolution cap (FR-NOTE-03): its own, else 256 B. */
@@ -52,6 +58,7 @@ export function buildKindMap(
         throw new Error(`Notification kind "${d.kind}": ${field} must be a positive integer`);
       }
     }
+    checkEndRule(d.kind, d.endRule);
     map.set(d.kind, d);
   }
   return map;

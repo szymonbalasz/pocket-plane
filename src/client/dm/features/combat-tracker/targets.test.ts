@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import type { HpChangeRecord } from "@shared/combat-tracker/schemas";
 import { MonsterStatBlock } from "@shared/entities/schemas";
 import { type Fields, formStatBlock } from "./creature-form";
-import { addAction, presetHit, targetList, undoLabel } from "./targets";
+import { addAction, naturalContradiction, presetHit, targetList, undoLabel } from "./targets";
 
 const k = (id: string, tokenId: string | null, o: object = {}) => ({
   id,
@@ -171,5 +171,29 @@ describe("FR-CBT-43 creature form stat block", () => {
     const r = formStatBlock(fields({ speed: "" }), { speed: 40, legendary: 3, ac: 12 });
     expect(r.ok && r.value).toMatchObject({ legendary: 3, ac: 17 });
     expect(r.ok && "speed" in (r.value as object)).toBe(false);
+  });
+});
+
+describe("FR-CBT-57 popup natural", () => {
+  test("FR-CBT-57 popup natural: contradiction note on Hit at nat 1 and Miss at nat 20 only", () => {
+    expect(naturalContradiction(1, true)).toEqual({
+      natural: 1,
+      hint: "Players see: DM ruled hit",
+    });
+    expect(naturalContradiction(20, false)).toEqual({
+      natural: 20,
+      hint: "Players see: DM ruled miss",
+    });
+    // Agreeing with the natural roll, or any other roll: no note.
+    expect(naturalContradiction(1, false)).toBeNull();
+    expect(naturalContradiction(20, true)).toBeNull();
+    expect(naturalContradiction(9, true)).toBeNull();
+    expect(naturalContradiction(9, false)).toBeNull();
+    expect(naturalContradiction(null, true)).toBeNull();
+  });
+
+  test("FR-CBT-57 popup natural: hit preset unchanged (nat 1 miss, nat 20 hit)", () => {
+    expect(presetHit(1, 30, 15)).toBe(false);
+    expect(presetHit(20, 5, 15)).toBe(true);
   });
 });

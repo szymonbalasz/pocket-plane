@@ -336,8 +336,7 @@ describe("FR-CBT-34 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
     t.run(endCommand.name, { encounterId: t.enc.id });
     const e = t.err(() => t.apply(r2.cardId, "Goblin"));
     expect(e).toMatchObject({ code: "conflict", message: "Encounter has ended" });
-    // Pending cards stay; the DM dismisses.
-    t.run("note.dismiss", { id: r2.cardId });
+    // FR-CBT-59: End dismissed the pending card.
     expect(t.card(r2.cardId)?.state).toBe("dismissed");
     expect(t.err(() => t.run(applyCard.name, {}, t.p1)).code).toBe("forbidden");
   });

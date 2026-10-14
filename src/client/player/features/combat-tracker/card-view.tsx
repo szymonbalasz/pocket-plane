@@ -1,5 +1,7 @@
 // Player view of `damage-card` (FR-CBT-30, FR-CBT-42): pending "Waiting for DM"; resolved one
 // part per target, "Hit Goblin: 6 · Hit Goblin 2: 3 (half) · Miss". The player has no action.
+
+import { DAMAGE_CARD_END_RULE } from "@shared/combat-tracker/end-rule";
 import { resolutionText } from "@shared/combat-tracker/rules";
 import { DAMAGE_CARD_KIND, DamageCardResolutionRead } from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
@@ -33,4 +35,5 @@ export const playerDamageCardView = defineNotificationView({
   kind: DAMAGE_CARD_KIND,
   icon: SwordIcon,
   render: PlayerCard,
+  endRule: DAMAGE_CARD_END_RULE, // FR-CBT-59, same constant as the server kind
 });

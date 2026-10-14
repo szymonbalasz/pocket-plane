@@ -333,6 +333,20 @@ describe("unread (FR-NOTE-18)", () => {
     expect(seenKey(store(P1, []))).toBe("pp.note.seen.v1.c1.p1");
   });
 
+  test("FR-NOTE-24 unread: pending card unread → resolved / dismissed not → reopened again; info row unchanged", () => {
+    const info = note({ audience: "all" });
+    const card = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
+    const at = (state: NotificationRecord["state"]) => [info, { ...card, state }];
+    expect(unreadCount(store(DM, at("pending")), 0)).toBe(2);
+    expect(unreadCount(store(DM, at("resolved")), 0)).toBe(1);
+    expect(unreadCount(store(DM, at("dismissed")), 0)).toBe(1);
+    // Reopened (undo) → counts again while its seq > last seen.
+    expect(unreadCount(store(DM, at("pending")), 0)).toBe(2);
+    expect(unreadCount(store(DM, at("pending")), card.seq)).toBe(0);
+    // The info row counts by audience whatever happens to action rows.
+    expect(unreadCount(store(P1, at("dismissed")), 0)).toBe(1);
+  });
+
   test("FR-NOTE-18 seen store: localStorage-like backend; failure → memory only, one warning", () => {
     const data = new Map<string, string>();
     const ok = createSeenStore(() => ({

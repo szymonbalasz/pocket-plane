@@ -3,7 +3,7 @@
 // player toast with Done → click → DM row "Resolved by Player 1". Other rules: bun test.
 import { expect, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { openWindow } from "./support/shell";
+import { openWindow, shellWindow } from "./support/shell";
 
 test("FR-NOTE-13 FR-NOTE-16 FR-NOTE-17 FR-NOTE-22 pending to player-1 → toast → Done → DM row resolved", async ({
   browser,
@@ -85,5 +85,41 @@ test("FR-NOTE-14 FR-NOTE-15 DM reconnect: the sticky toast stays and the summary
   await expect(summary).toHaveAttribute("data-count", String(before + 1));
   await expect(dm.getByTestId("note-toast")).toHaveCount(1); // no per-item toasts replayed
 
+  await dm.context().close();
+});
+
+test("FR-NOTE-24 a handled action leaves the bell: 1 while pending, none after Resolve (NOTE §13 step 12)", async ({
+  browser,
+}) => {
+  const { secret, link } = e2eEnv();
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  // A opens Notifications (marks everything seen), then closes it.
+  await openWindow(dm, "note.history");
+  const badge = dm.getByTestId("note-launcher-badge");
+  await expect(badge).toHaveCount(0);
+  await shellWindow(dm, "note.history").getByTestId("ui-window-close").click();
+
+  // B sends a test notification with an action; its owner is the DM.
+  const player = await rolePage(browser);
+  await player.goto(link("Player 1"));
+  await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const pwin = await openWindow(player, "note.history");
+  await pwin.getByTestId("note-test-text").fill("Apply 2 damage?");
+  await pwin.getByTestId("note-test-label").fill("Apply");
+  await pwin.getByTestId("note-test-send").click();
+
+  const toast = dm.getByTestId("note-toast").filter({ hasText: "Apply 2 damage?" });
+  await expect(toast).toHaveAttribute("data-sticky", "true");
+  await expect(badge).toHaveAttribute("data-count", "1");
+  await toast.getByTestId("note-toast-action").click();
+  await expect(toast).toHaveCount(0);
+  await expect(badge).toHaveCount(0);
+  const win = await openWindow(dm, "note.history");
+  const row = win.getByTestId("note-history-row").filter({ hasText: "Apply 2 damage?" });
+  await expect(row.getByTestId("note-history-state")).toHaveText("Resolved by DM");
+
+  await player.context().close();
   await dm.context().close();
 });

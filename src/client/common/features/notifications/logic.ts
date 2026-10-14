@@ -111,9 +111,13 @@ export function summaryText(n: number): string {
   return `${n} pending action${n === 1 ? "" : "s"}`;
 }
 
-/** FR-NOTE-18: addressed to this client by the FR-NOTE-13 rule (owner for actions). */
+/**
+ * FR-NOTE-18: addressed to this client by the FR-NOTE-13 rule (owner for actions). FR-NOTE-24
+ * (#178): an action row counts only while `pending`; applied, dismissed or closed at End leaves
+ * the bell, reopened counts again.
+ */
 export function addressedForUnread(n: NotificationRecord, v: NoteViewer): boolean {
-  return n.actionRole !== null ? isActionOwner(n, v) : addressedTo(n, v);
+  return n.actionRole !== null ? n.state === "pending" && isActionOwner(n, v) : addressedTo(n, v);
 }
 
 /** FR-NOTE-18: addressed notifications with row `seq` > last seen. */

@@ -3,12 +3,13 @@
 // monsters, Mira's sheet initiative + Attack (routed to cbt.*), round 1, DM targets Goblin and
 // Goblin 2 in the non-modal popup (target rings), applies (Goblin half) → player sees the bands;
 // one Undo reverts both; Remove → Out badge for the player; End from Initiative (#171: no roll
-// controls from round 1, Down cross). Visibility matrix, hooks, movement,
+// controls from round 1, Down cross; polish: Start / End move the DM's windows, End dismisses the
+// reopened card). Visibility matrix, hooks, movement,
 // crash-resume: bun test (combat-tracker sync.test.ts, feedback.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, tokenNode } from "./support/konva";
-import { openWindow, shellWindow } from "./support/shell";
+import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 const row = (scope: Page | Locator, id: string) =>
   scope.locator(`[data-testid="cbt-init-row"][data-record-id="${id}"]`);
@@ -85,8 +86,9 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await expect(dm.getByTestId("cbt-enc-binding")).toHaveCount(6);
   await expect(dm.locator('[data-testid="cbt-enc-binding"][data-bound="false"]')).toHaveCount(0);
   await dm.getByTestId("cbt-enc-start-confirm").click();
-  await expect(enc.getByTestId("cbt-enc-status")).toHaveText("started");
-  await shellWindow(dm, "cbt.encounters").getByTestId("ui-window-close").click();
+  // FR-CBT-60: after the ack Initiative opens in front and Encounters minimises.
+  await expect(launcherButton(dm, "cbt.encounters")).toHaveAttribute("data-state", "minimised");
+  await expect(launcherButton(dm, "cbt.initiative")).toHaveAttribute("data-state", "open");
 
   const init = await openWindow(dm, "cbt.initiative");
   await expect(init.getByTestId("cbt-init-row")).toHaveCount(6);
@@ -149,6 +151,8 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   const goblin2 = await idByName(init, "Goblin 2");
   const popup = dm.getByTestId("cbt-popup");
   await expect(popup).toBeVisible();
+  // FR-CBT-56: no rows; Mira's likely targets (the monsters) are right of centre → left edge.
+  await expect(popup).toHaveAttribute("data-side", "left");
   await expect(popup.getByTestId("cbt-popup-target-row")).toHaveCount(0);
   for (const id of [goblin, goblin2]) {
     await popup.getByTestId("cbt-popup-target-add").click();
@@ -219,12 +223,23 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await expect.poll(async () => (await konvaNodes(player, "cbt-token-out")).length).toBe(1);
   await expect(row(pinit, goblin2)).toHaveCount(0);
 
-  // Step 14: End from the Initiative header (FR-CBT-51) → confirm; the dialog closes; DM
-  // Initiative empty; Ended in the list; player Initiative gone.
+  // Step 14: End from the Initiative header (FR-CBT-51) → confirm names the reopened card
+  // (FR-CBT-59); the dialog closes; the card is dismissed; DM Initiative minimised (FR-CBT-60),
+  // empty when reopened; Ended in the list; player Initiative gone.
   await init.getByTestId("cbt-init-end").click();
+  await expect(dm.getByTestId("cbt-init-end-pending")).toHaveAttribute("data-value", "1");
+  await expect(dm.getByTestId("cbt-init-end-pending")).toHaveText(
+    "1 pending card will be dismissed: apply them first if they count.",
+  );
   await dm.getByTestId("cbt-init-end-confirm").click();
   await expect(dm.getByTestId("cbt-init-end-confirm")).toHaveCount(0);
-  await expect(init.getByTestId("cbt-init-empty")).toBeVisible();
+  await expect(launcherButton(dm, "cbt.initiative")).toHaveAttribute("data-state", "minimised");
+  const init2 = await openWindow(dm, "cbt.initiative");
+  await expect(init2.getByTestId("cbt-init-empty")).toBeVisible();
+  const history = await openWindow(dm, "note.history");
+  await expect(
+    history.getByTestId("note-history-row").filter({ hasText: "Mira:" }).first(),
+  ).toHaveAttribute("data-state", "dismissed");
   const enc2 = await openWindow(dm, "cbt.encounters");
   const encRow = enc2.locator(`[data-testid="cbt-enc-row"][data-record-id="${encounterId}"]`);
   if (await encRow.isVisible()) await encRow.click();

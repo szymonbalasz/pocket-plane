@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { creatureRows } from "../entities/list";
 import { useDmMap, viewedScene } from "../scenes-map/view-state";
 import { useDefinitions } from "./data";
+import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { useOpenEncounter } from "./open-encounter";
 import { combatRest } from "./rest";
 
@@ -217,7 +218,8 @@ function StartDialog({
   const scene = viewedScene(scenes, folders, requested);
   const defs = useDefinitions();
   const characters = useCharacters();
-  const { send, disabled } = useCbtIntent();
+  const { disabled } = useCbtIntent();
+  const startEnd = useStartEnd();
   const bindings = useMemo(() => {
     if (!scene) return [];
     const party =
@@ -280,10 +282,11 @@ function StartDialog({
           </Button>
           <Button
             data-testid="cbt-enc-start-confirm"
-            disabled={disabled || !scene}
+            disabled={disabled || startEnd.disabled || !scene}
             onClick={async () => {
               if (!scene) return;
-              const r = await send("cbt.start", { encounterId: encounter.id, sceneId: scene.id });
+              // FR-CBT-60: once acked, Initiative opens in front, Encounters minimises, map refits.
+              const r = await startEnd.start(encounter.id, scene.id);
               if (r !== undefined) onOpenChange(false);
             }}
           >
@@ -302,12 +305,13 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
   const defs = useDefinitions();
   const characters = useCharacters();
   const live = useSync((s) => s.state === "live");
-  const { send, disabled } = useCbtIntent();
+  const { disabled } = useCbtIntent();
   const server = useMemo(() => draftOf(encounter, allEntries), [encounter, allEntries]);
   const [draft, setDraft] = useState<Draft>(server);
   const [nameError, setNameError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [ending, setEnding] = useState(false);
+  const startEnd = useStartEnd();
   const dirty = useRef(false);
   const planned = encounter.status === "planned";
   const readOnly = !planned || !live;
@@ -517,9 +521,7 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
         <DialogContent>
           <DialogHeader>
             <DialogTitle>End “{encounter.name}”?</DialogTitle>
-            <DialogDescription>
-              Combatants leave the initiative list. Pending cards stay until you dismiss them.
-            </DialogDescription>
+            <EndConfirmDescription encounterId={encounter.id} testId="cbt-enc-end-pending" />
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEnding(false)}>
@@ -528,9 +530,10 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
             <Button
               variant="destructive"
               data-testid="cbt-enc-end-confirm"
-              disabled={disabled}
+              disabled={disabled || startEnd.disabled}
               onClick={async () => {
-                const r = await send("cbt.end", { encounterId: encounter.id });
+                // FR-CBT-60: once acked, this tab's Initiative minimises.
+                const r = await startEnd.end(encounter.id);
                 if (r !== undefined) setEnding(false);
               }}
             >

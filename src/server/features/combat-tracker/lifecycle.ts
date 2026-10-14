@@ -1,4 +1,4 @@
-// Start / End (FR-CBT-07, FR-CBT-08, FR-CBT-10).
+// Start / End (FR-CBT-07, FR-CBT-08, FR-CBT-10; End dismisses pending cards, FR-CBT-59/61).
 import { type BindSlot, planBindings } from "@shared/combat-tracker/rules";
 import { CBT_INTENTS, EndInput, StartInput } from "@shared/combat-tracker/schemas";
 import { effectiveStats, entityNameKey, type StatBlock } from "@shared/entities/schemas";
@@ -8,6 +8,7 @@ import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict } from "../../commands/errors";
 import { combatant, combatantSeqNext, encounter, entity } from "../../db/schema";
 import { resolveDefinition } from "../entities/commands";
+import { dismissForEncounter } from "../notifications";
 import { getScene, sceneTokens } from "../scenes-map/rows";
 import { rerank } from "./ranks";
 import {
@@ -154,5 +155,8 @@ export const endCommand = defineCommand({
         ...rows.map((r) => combatantChange(r, { ...r, active: false })),
       ],
     });
+    // FR-CBT-59 / FR-CBT-61: after `EncounterEnded`, one `NotificationDismissed` per pending card
+    // of this encounter whose kind opts in (`damage-card`); same transaction.
+    dismissForEncounter(env, encounterId);
   },
 });

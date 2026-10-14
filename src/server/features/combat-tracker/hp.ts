@@ -120,10 +120,11 @@ export const applyCard = defineCommand({
   execute(input, env): HpChangesResult {
     const card = loadNotification(env, input.cardId);
     if (card.kind !== DAMAGE_CARD_KIND) throw notFound("Damage card not found");
-    if (card.state !== "pending") throw conflict("No longer pending");
     const p = DamageCardPayload.parse(card.payload);
     const enc = readEncounter(env.tx, p.encounterId);
+    // FR-CBT-10: End also dismissed the card (FR-CBT-59); the ended encounter is the reason.
     if (enc.status !== "started") throw conflict("Encounter has ended");
+    if (card.state !== "pending") throw conflict("No longer pending");
     // FR-CBT-34: every target active and non-removed, checked before anything is written.
     const targets = input.targets.map((t) => ({ ...t, c: activeCombatant(env, t.targetId).c }));
     const attacker = getCombatant(env.tx, enc.campaignId, p.attackerId);

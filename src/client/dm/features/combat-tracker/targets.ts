@@ -2,6 +2,7 @@
 // Rows = selection rows (combatants bound to a selected token, selection order) ∪ added rows
 // (picked in "Add target", add order). Only eligible combatants: active, non-removed, of the
 // started encounter, not the attacker. Client memory only; the server re-checks on apply.
+import { naturalMark, publicRuling } from "@shared/combat-tracker/log-kinds";
 import { hitHint, undoGroup } from "@shared/combat-tracker/rules";
 import { APPLY_TARGETS_MAX, type HpChangeRecord } from "@shared/combat-tracker/schemas";
 
@@ -87,6 +88,19 @@ export function addAction(
 /** Per-target hit preset: nat 20 hit, nat 1 miss, else total ≥ AC; unknown AC → hit. */
 export function presetHit(natural: number | null, toHitTotal: number, ac: number | null): boolean {
   return ac === null ? true : hitHint(natural, toHitTotal, ac);
+}
+
+/**
+ * FR-CBT-57 (R4): a target row whose Hit / Miss contradicts the natural roll (Hit on a natural 1,
+ * Miss on a natural 20): the mark beside the toggle and the players' wording (FR-CBT-58).
+ */
+export function naturalContradiction(
+  natural: number | null,
+  hit: boolean,
+): { natural: 1 | 20; hint: string } | null {
+  const mark = naturalMark(natural);
+  if (mark === null || !publicRuling(natural, hit)) return null;
+  return { natural: mark, hint: `Players see: DM ruled ${hit ? "hit" : "miss"}` };
 }
 
 /**
