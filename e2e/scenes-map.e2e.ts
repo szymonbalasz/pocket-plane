@@ -157,7 +157,9 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await dm.mouse.click(g.x, g.y, { button: "right" });
   await expect.poll(() => selectedIds(dm)).toEqual([goblin]);
   await dm.getByTestId("map-token-menu-shape").click();
-  await dm.locator('[data-testid="map-token-shape-option"][data-value="square"]').click();
+  // By keyboard: the map fit (FR-MAP-44) may put Goblin near the right edge, where the submenu
+  // flips over its parent and a pointer jump to the option would close it.
+  await dm.locator('[data-testid="map-token-shape-option"][data-value="square"]').press("Enter");
   await expect.poll(() => tokenAttr(dm, goblin, "shape")).toBe("square");
   await expect(dm.getByTestId("map-token-menu")).toHaveCount(0); // the pick closed the menu
   await expect.poll(() => selectedIds(dm)).toEqual([wolf]);
