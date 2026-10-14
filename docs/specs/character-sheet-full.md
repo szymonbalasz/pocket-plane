@@ -1,7 +1,7 @@
 ---
 title: Character sheet (full)
 prefix: CHARX
-status: draft
+status: in-review
 owner: spec-character-sheet-full
 phase: post-mvp-1
 ---
