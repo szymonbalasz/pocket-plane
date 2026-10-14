@@ -11,12 +11,11 @@ import {
 import { deathSave, deathStateOf } from "@shared/combat-extras/rules";
 import type { DeathCounters } from "@shared/combat-extras/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
-import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import { DeathSaveRolled, DeathSavesSet, TempHpSet } from "@shared/events/combat-extras";
 import { eq } from "drizzle-orm";
 import { defineCommand } from "../../commands/commands";
 import { conflict, forbidden } from "../../commands/errors";
-import { combatant, entity, gameLogEntry } from "../../db/schema";
+import { combatant, entity } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { authorizedCharacter } from "../character-sheet/commands";
 import { getCharacter } from "../character-sheet/hp";
@@ -106,26 +105,16 @@ export const rollDeathSave = defineCommand({
     const pc = pcCombatant(env.tx, c.campaignId, c.id);
     // FR-CBTX-23: a PC hidden from players (#141) rolls DM-only, whoever rolls.
     const hidden = pc?.hidden ?? false;
-    let entry = gameLog.append(env, {
+    const entry = gameLog.append(env, {
       kind: ROLL_KIND,
       category: "saving-throw",
       actorName: c.name,
       payload: [dice.rollPayloadItem(r)],
       rollIds: [r.id],
       encounterId: pc?.encounterId ?? null,
-      public: hidden ? false : input.public,
+      public: input.public,
+      forcePrivate: hidden,
     });
-    // `gameLog.append` stamps a player's roll public (FR-DICE-13); the hidden-PC rule overrides
-    // it on this command's own fresh entry, in the same transaction.
-    if (hidden && (entry.after as { public: boolean }).public) {
-      env.tx.update(gameLogEntry).set({ public: false }).where(eq(gameLogEntry.id, entry.id)).run();
-      entry = {
-        type: GAME_LOG_ENTRY_TYPE,
-        id: entry.id,
-        before: null,
-        after: { ...(entry.after as object), public: false },
-      };
-    }
     const natural = r.natural ?? r.total;
     const before = countersOf(c);
     const save = deathSave(before, natural);

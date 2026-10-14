@@ -397,7 +397,15 @@ describe("FR-DICE-15 FR-DICE-17 visibility and window", () => {
 
 describe("FR-DICE-19 internal helpers", () => {
   const ProbePayload = z.strictObject({ text: z.string() });
-  const helperCommand = (opts: { fail?: boolean; kind?: string; undo?: string } = {}) =>
+  const helperCommand = (
+    opts: {
+      fail?: boolean;
+      kind?: string;
+      undo?: string;
+      forcePrivate?: boolean;
+      public?: boolean;
+    } = {},
+  ) =>
     defineCommand({
       name: "test.helper",
       input: z.object({}),
@@ -435,7 +443,8 @@ describe("FR-DICE-19 internal helpers", () => {
           actorName: "Mira",
           payload: [dice.rollPayloadItem(toHit), dice.rollPayloadItem(dmg)],
           rollIds: [toHit.id, dmg.id],
-          public: false,
+          public: opts.public ?? false,
+          ...(opts.forcePrivate ? { forcePrivate: true } : {}),
         });
         env.emit({
           type: "DiceRolled",
@@ -504,6 +513,18 @@ describe("FR-DICE-19 internal helpers", () => {
     t.s.commands.register(cmd);
     t.s.commands.run(cmd, {}, { actor: t.p1Actor });
     expect(entries(t.s)[0]).toMatchObject({ public: true, rollerRole: "player" });
+  });
+
+  test("FR-DICE-19 FR-CBTX-23 forcePrivate: DM-only entry whoever rolls, over `public` and the player stamp", () => {
+    const t = setup();
+    const cmd = helperCommand({ forcePrivate: true, public: true });
+    t.s.commands.register(cmd);
+    t.s.commands.run(cmd, {}, { actor: t.p1Actor });
+    t.s.commands.run(cmd, {}, { actor: t.dm });
+    expect(entries(t.s).map((e) => [e.public, e.rollerRole])).toEqual([
+      [false, "player"],
+      [false, "dm"],
+    ]);
   });
 
   test("FR-DICE-19 markUndone sets undone in the caller's tx; other campaign → not_found", () => {
