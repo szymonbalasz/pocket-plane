@@ -299,6 +299,9 @@ describe("entities commands", () => {
         portraitAssetId: null,
         ownerPlayerId: t.h.p2.id,
         down: false,
+        level: 1,
+        className: "Fighter",
+        species: null,
       },
     });
     expect(p2?.data).toMatchObject({ statBlock: miraBlock, hpCurrent: 12 });

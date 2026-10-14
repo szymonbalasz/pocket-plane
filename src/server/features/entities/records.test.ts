@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import type { EntityRecord } from "@shared/entities/schemas";
+import {
+  type EntityRecord,
+  REDACTED_CHARACTER_KEYS,
+  RedactedCharacter,
+} from "@shared/entities/schemas";
 import { readEventLog } from "../../events/log";
 import type { Viewer } from "../../ws/records";
 import { entityVisibility, redactCharacter } from "./records";
@@ -50,6 +54,9 @@ describe("entities record types", () => {
       portraitAssetId: "portrait-1",
       ownerPlayerId: "p1",
       down: false,
+      level: 1,
+      className: "Fighter",
+      species: null,
     });
   });
 
@@ -59,9 +66,8 @@ describe("entities record types", () => {
     expect(at(1).down).toBe(false);
     expect(at(12).down).toBe(false);
     for (const r of [at(0), at(5)]) {
-      expect(Object.keys(r).sort()).toEqual(
-        ["down", "id", "kind", "name", "ownerPlayerId", "portraitAssetId"].sort(),
-      );
+      expect(Object.keys(r)).not.toContain("hpCurrent");
+      expect(Object.keys(r)).not.toContain("statBlock");
     }
     const s = entityServices();
     const down = { ...mira, tokenShape: "square", hpCurrent: 0 } as EntityRecord;
@@ -71,6 +77,34 @@ describe("entities record types", () => {
     });
     expect(s.records.view("entity", down, v("player", "p1"))).toEqual({ vis: "full", data: down });
     expect(s.records.view("entity", down, v("dm", null))).toEqual({ vis: "full", data: down });
+  });
+
+  test("FR-CHARX-35 redacted Mira has exactly the ADR-0036 whitelist keys (deathState: CBTX)", () => {
+    const full = {
+      ...mira,
+      statBlock: {
+        ...mira.statBlock,
+        species: "Human",
+        skills: { athletics: "proficient" },
+        overrides: { "passive.perception": { value: 14, note: "MIRA-NOTE-7" } },
+        classes: [{ name: "Fighter", level: 1, hitDie: "d10" }],
+      },
+    } as EntityRecord;
+    for (const r of [mira, full]) {
+      const red = redactCharacter(r);
+      // deathState is CBTX's key: in the list, absent until combat-extras fills it.
+      expect(Object.keys(red).sort()).toEqual(
+        REDACTED_CHARACTER_KEYS.filter((k) => k !== "deathState").sort(),
+      );
+      expect(RedactedCharacter.safeParse(red).success).toBe(true);
+    }
+    expect(REDACTED_CHARACTER_KEYS).toContain("deathState");
+    const red = redactCharacter(full);
+    expect(red).toMatchObject({ level: 1, className: "Fighter", species: "Human" });
+    const json = JSON.stringify(red);
+    for (const leak of ["MIRA-NOTE-7", "athletics", "hpMax", "abilities", "Shortsword", "d10"]) {
+      expect(json).not.toContain(leak);
+    }
   });
 
   test("FR-ENT-15 the registry gives the DM full, filters players (incl. other campaign)", () => {

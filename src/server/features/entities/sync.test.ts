@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
-import type { EntityRecord } from "@shared/entities/schemas";
+import { type EntityRecord, REDACTED_CHARACTER_KEYS } from "@shared/entities/schemas";
 import type { ServerFrame } from "@shared/protocol/frames";
 import { asc, sql } from "drizzle-orm";
 import { closeDb, type Db, openFileDb } from "../../db/client";
@@ -81,8 +81,9 @@ describe("entities over REST + WS (entities bundle)", () => {
     const thorn = (c: TestClient) => view(c).find((r) => r.name === "Thorn");
     expect(view(p1)).toHaveLength(2);
     expect(mira(p1)).toMatchObject({ hpCurrent: 12, statBlock: { ac: 16 } });
+    // FR-CHARX-35: the one whitelist (deathState: combat-extras, absent until built).
     expect(Object.keys(thorn(p1) ?? {}).sort()).toEqual(
-      ["down", "id", "kind", "name", "ownerPlayerId", "portraitAssetId"].sort(),
+      REDACTED_CHARACTER_KEYS.filter((k) => k !== "deathState").sort(),
     );
     expect(thorn(p2)).toMatchObject({ hpCurrent: 10 });
     expect(Object.keys(mira(p2) ?? {})).not.toContain("statBlock");
@@ -198,6 +199,9 @@ describe("entities over REST + WS (entities bundle)", () => {
       portraitAssetId: null,
       ownerPlayerId: mira.ownerPlayerId,
       down: false,
+      level: 1,
+      className: "Fighter",
+      species: null,
     });
     for (const c of [p1, p2]) c.close();
   });
