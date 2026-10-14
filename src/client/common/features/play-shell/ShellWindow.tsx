@@ -6,10 +6,10 @@ import { MinusIcon, XIcon } from "lucide-react";
 import { Component, type ErrorInfo, type ReactNode, useRef } from "react";
 import { cn } from "../../lib/utils";
 import {
-  clampRect,
   moveRect,
   type Rect,
   type ResizeEdge,
+  renderedRect,
   resizeRect,
   type Viewport,
 } from "./geometry";
@@ -66,7 +66,9 @@ export function ShellWindow({
   dispatch: (a: WindowAction) => void;
 }) {
   const ref = useRef<HTMLElement>(null);
-  const rect = clampRect(win, viewport);
+  // Render-only fit to the work area, then clamp (FR-SHELL-29, -12); a gesture starts here and
+  // its end stores the result with the current work area.
+  const rect = renderedRect(win, def.minSize, viewport);
   const id = { kind: win.kind, instance: win.instance };
   const Body = def.component;
 

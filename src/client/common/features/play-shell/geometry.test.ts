@@ -3,11 +3,16 @@ import {
   clampRect,
   defaultRect,
   EDGE_GAP,
+  fitRect,
+  LAUNCHER_CLEAR,
   MIN_VISIBLE_W,
   moveRect,
+  type Rect,
+  renderedRect,
   resizeRect,
   TITLE_H,
   TOP_BAR_H,
+  workArea,
 } from "./geometry";
 
 const vp = { w: 1600, h: 900 };
@@ -57,6 +62,76 @@ describe("geometry", () => {
     expect(small.x).toBeLessThanOrEqual(1280 - MIN_VISIBLE_W);
     expect(small.y).toBeLessThanOrEqual(720 - TITLE_H);
     expect(clampRect(stored, vp)).toEqual(stored);
+  });
+
+  describe("FR-SHELL-29 fit", () => {
+    const big = { w: 1440, h: 900 };
+    const small = { w: 1280, h: 720 };
+    const area = workArea(big);
+    const min = { w: 200, h: 150 };
+    const render = (r: Rect, vp: { w: number; h: number }) => renderedRect({ ...r, area }, min, vp);
+    const inWorkArea = (r: Rect, vp: { w: number; h: number }) =>
+      r.x >= 0 && r.x + r.w <= vp.w && r.y >= TOP_BAR_H && r.y + r.h <= TOP_BAR_H + workArea(vp).h;
+
+    test("work area = viewport below the top bar, above the launcher", () => {
+      expect(workArea(big)).toEqual({ w: 1440, h: 900 - TOP_BAR_H - LAUNCHER_CLEAR });
+    });
+
+    test("1440×900 → 1280×720: right-edge window keeps its gap, ends above the launcher", () => {
+      // shell.test's default (bottom-right, 320×220): 12 px from the right and the launcher.
+      const r = defaultRect({ anchor: "bottom-right" }, { w: 320, h: 220 }, big);
+      const out = render(r, small);
+      expect(out).toEqual({
+        x: 1280 - EDGE_GAP - 320,
+        y: 720 - LAUNCHER_CLEAR - EDGE_GAP - 220,
+        w: 320,
+        h: 220,
+      });
+      expect(inWorkArea(out, small)).toBe(true);
+    });
+
+    test("1440×900 → 1280×720: a mid window moves only as far as needed", () => {
+      expect(render({ x: 900, y: 400, w: 400, h: 300 }, small)).toEqual({
+        x: 1280 - 400,
+        y: TOP_BAR_H + workArea(small).h - 300,
+        w: 400,
+        h: 300,
+      });
+      // Fits already: unchanged.
+      const fits = { x: 300, y: 200, w: 400, h: 300 };
+      expect(render(fits, small)).toEqual(fits);
+    });
+
+    test("1440×900 → 1280×720: then shrinks, never below min size", () => {
+      const tall = { x: 12, y: TOP_BAR_H + 12, w: 400, h: 700 };
+      const out = render(tall, small);
+      expect(out).toMatchObject({ y: TOP_BAR_H, h: workArea(small).h });
+      expect(inWorkArea(out, small)).toBe(true);
+      // Min size larger than the work area: fit stops at min, the clamp does the rest.
+      const fitted = fitRect(tall, area, { w: 200, h: 700 }, small);
+      expect(fitted.h).toBe(700);
+    });
+
+    test("parked window (stored partly outside) and no `area`: clamp only", () => {
+      const parked = { x: 1300, y: 300, w: 400, h: 300 };
+      expect(render(parked, small)).toEqual(clampRect(parked, small));
+      const old = { x: 900, y: 400, w: 400, h: 300 };
+      expect(renderedRect(old, min, small)).toEqual(clampRect(old, small));
+    });
+
+    test("render-only: back at the stored work area the window is at its stored geometry", () => {
+      const r = { x: 900, y: 400, w: 400, h: 300 };
+      render(r, small);
+      expect(render(r, big)).toEqual(r);
+      // A larger work area than the stored one changes nothing either.
+      expect(render(r, { w: 1920, h: 1080 })).toEqual(r);
+    });
+
+    test("per axis: only the width smaller → only x / w change", () => {
+      const r = { x: 900, y: 600, w: 400, h: 200 };
+      expect(render(r, { w: 1280, h: 900 })).toEqual({ x: 880, y: 600, w: 400, h: 200 });
+      expect(render(r, { w: 1440, h: 720 })).toMatchObject({ x: 900, w: 400 });
+    });
   });
 
   test("FR-SHELL-10 move by title bar, clamped", () => {

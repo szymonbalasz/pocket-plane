@@ -1,4 +1,5 @@
-// Window geometry: default placement, render-only clamp, drag and resize math (FR-SHELL-10/12).
+// Window geometry: default placement, render-only fit and clamp, drag and resize math
+// (FR-SHELL-10/12/29).
 import { GEOMETRY_LIMIT } from "@shared/play-shell/layout";
 import type { DefaultPosition, Size } from "./registry";
 
@@ -60,6 +61,62 @@ export function clampRect(r: Rect, vp: Viewport): Rect {
   const x = clampNum(r.x, visible - w, vp.w - visible);
   const y = clampNum(r.y, TOP_BAR_H, Math.max(TOP_BAR_H, vp.h - TITLE_H));
   return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
+}
+
+/**
+ * Work area size (FR-SHELL-29): the viewport below the top bar and above the launcher's top
+ * edge. It starts at (0, TOP_BAR_H).
+ */
+export function workArea(vp: Viewport): Viewport {
+  return { w: Math.max(1, vp.w), h: Math.max(1, vp.h - TOP_BAR_H - LAUNCHER_CLEAR) };
+}
+
+/**
+ * A window within this distance of the work area's right (bottom) edge is attached to it and
+ * keeps its gap when the area shrinks (FR-SHELL-29). Spec: "touched (≤ 8 px)"; measured beyond
+ * the default edge gap, so default-placed edge windows (12 px gap) count as attached.
+ */
+export const EDGE_TOUCH = EDGE_GAP + 8;
+
+/**
+ * One axis of the fit: (pos, len) lay wholly inside [0, stored]; returns it inside [0, cur].
+ * Attached to the far edge → keeps that gap; else moves back only as far as needed; then
+ * shrinks, never below `min` (what still doesn't fit is the clamp's job).
+ */
+function fitAxis(pos: number, len: number, min: number, stored: number, cur: number) {
+  const gap = stored - (pos + len);
+  const end = gap <= EDGE_TOUCH ? cur - gap : cur;
+  const p = Math.max(0, Math.min(pos, end - len));
+  const l = Math.max(Math.min(min, len), Math.min(len, end - p));
+  return [p, l] as const;
+}
+
+/**
+ * Fit on render (FR-SHELL-29), per window and per axis, against the work area the window's
+ * geometry was set in (`area`). Only a smaller current work area changes anything; a window
+ * without `area`, or stored partly outside its work area (parked), is returned as is (then
+ * FR-SHELL-12 clamps it). Render-only: never written back.
+ */
+export function fitRect(r: Rect, area: Viewport | undefined, min: Size, vp: Viewport): Rect {
+  if (!area) return r;
+  const y = r.y - TOP_BAR_H; // work-area coordinates
+  const inside = r.x >= 0 && r.x + r.w <= area.w && y >= 0 && y + r.h <= area.h;
+  if (!inside) return r;
+  const cur = workArea(vp);
+  let { x, w, h } = r;
+  let wy = y;
+  if (cur.w < area.w) [x, w] = fitAxis(r.x, r.w, min.w, area.w, cur.w);
+  if (cur.h < area.h) [wy, h] = fitAxis(y, r.h, min.h, area.h, cur.h);
+  return { x, y: wy + TOP_BAR_H, w, h };
+}
+
+/** What a stored window renders at: fit to the work area, then clamped (FR-SHELL-29, -12). */
+export function renderedRect(
+  win: Rect & { area?: Viewport | undefined },
+  min: Size,
+  vp: Viewport,
+): Rect {
+  return clampRect(fitRect(win, win.area, min, vp), vp);
 }
 
 /** Title-bar drag from `start` (the rendered rect) by (dx, dy); result clamped. */
