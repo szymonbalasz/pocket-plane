@@ -9,6 +9,10 @@ import player1 from "./campaign-management/player-1";
 import player2 from "./campaign-management/player-2";
 import charPip from "./character-sheet/char-pip";
 import charWounds from "./character-sheet/char-wounds";
+import charMiraFull from "./character-sheet-full/char-mira-full";
+import charMiraLocked from "./character-sheet-full/char-mira-locked";
+import charSela from "./character-sheet-full/char-sela";
+import npcEliteSheet from "./character-sheet-full/npc-elite-sheet";
 import cbtxEffects from "./combat-extras/cbtx-effects";
 import cbtxReinforcement from "./combat-extras/cbtx-reinforcement";
 import cbtxTemp from "./combat-extras/cbtx-temp";
@@ -69,6 +73,10 @@ export const units: readonly Fixture[] = [
   lootWallets,
   lootSecond,
   thornTown,
+  charMiraFull,
+  charMiraLocked,
+  charSela,
+  npcEliteSheet,
   cbtxEffects,
   cbtxTemp,
   cbtxReinforcement,

@@ -7,7 +7,7 @@ import {
   type SheetRollKind,
 } from "@shared/character-sheet/schemas";
 import type { ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
-import type { Ability } from "@shared/entities/schemas";
+import type { Ability, Skill } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { IntentRejected } from "../../sync/connection";
 
@@ -92,31 +92,43 @@ export function sheetBadge(
   return null;
 }
 
+/** The row a `char.roll` names (FR-CHARX-20): an ability, a skill, an attack or a spell row. */
+export interface SheetRollRef {
+  ability?: Ability;
+  skill?: Skill;
+  attackId?: string;
+  spellId?: string;
+}
+
 /** `char.roll` payload from the roll control's input; only fields that are set. */
 export function charRollPayload(
   characterId: string,
   kind: SheetRollKind,
   input: RollRouteInput,
-  ability?: Ability,
+  ref?: Ability | SheetRollRef,
 ): SheetRollIntent {
+  const r: SheetRollRef = typeof ref === "string" ? { ability: ref } : (ref ?? {});
   const p: SheetRollIntent = { characterId, kind, mode: input.mode };
-  if (ability) p.ability = ability;
+  if (r.ability) p.ability = r.ability;
+  if (r.skill) p.skill = r.skill;
+  if (r.attackId) p.attackId = r.attackId;
+  if (r.spellId) p.spellId = r.spellId;
   if (input.manual) p.manual = input.manual;
   if (input.public !== undefined) p.public = input.public;
   return p;
 }
 
-/** FR-CHAR-16: routed intent if a route claims, else `char.roll` (+ `ability` for check / save). */
+/** FR-CHAR-16: routed intent if a route claims, else `char.roll` (+ its ability / row ref). */
 export function sendSheetRoll(
   sendIntent: SendIntent,
   claim: RollRouteClaim | null,
   characterId: string,
   kind: SheetRollKind,
   input: RollRouteInput,
-  ability?: Ability,
+  ref?: Ability | SheetRollRef,
 ): Promise<unknown> {
   if (claim) return claim.send(sendIntent, input);
-  return sendIntent(CHAR_ROLL, charRollPayload(characterId, kind, input, ability));
+  return sendIntent(CHAR_ROLL, charRollPayload(characterId, kind, input, ref));
 }
 
 export const CONNECTION_LOST = "Connection lost \u2014 check the game log / HP before trying again";
