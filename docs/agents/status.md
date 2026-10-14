@@ -8,18 +8,19 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| P R1 map fit | `fix/polish-map-fit` (ws w25, slot 0) | build-polish-map-fit | Building | Walkthrough MAP 12 |
-| P R3 game log | `fix/polish-game-log` (ws w26, slot 2) | build-polish-game-log | Building | Walkthrough DICE 12 |
-| P R2/R4/R5 combat | `fix/polish-combat` | — | Waits for map-fit (noteAppearance) | Before any D build |
-| S core (schema, entities, events) | `fix/charx-core` (ws w27, slot 3) | build-charx-core | Building | Then `fix/cbtx-core` |
-| D core | `fix/cbtx-core` | — | Waits for charx-core + polish-combat | — |
+| P R1 map fit | — | — | **Merged** (walkthrough 23/23) | — |
+| S core | — | — | **Merged** (core, no walkthrough) | — |
+| P R3 game log | `fix/polish-game-log` (ws w26, slot 2) | build-polish-game-log | Fixed FR-DICE-21 after walkthrough FAIL; retest running (test-game-log-2) | Merge |
+| P R2/R4/R5 combat | `fix/polish-combat` (ws w28, slot 4) | build-polish-combat | Building | Walkthrough CBT 3/8/9a/9b/14, NOTE 12 |
+| D core | `fix/cbtx-core` (ws w29, slot 0) | build-cbtx-core | Building | Merge, then D + S builds |
 | S build / D build / S combat routes | — | — | Queued (#179 order) | — |
 
 Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-14-evening)). Briefs in `briefs\`. Evidence: `verify-*\` (session-sim-3 evidence only in the main checkout: `.verify/20261014-131140-session-sim-3/`; the `%TEMP%` copy was cleared).
 
 ## Shared-file locks
 
-- `fix/charx-core`: `src/server/db/`, `src/shared/events/`, `src/shared/entities/`, `src/server/features/entities/`, snapshot-size test files, CHARX data-model / protocol rows.
+- `fix/polish-combat`: notifications server files (`kind.ts`, `helpers.ts`, `index.ts`), combat-tracker server `attack.ts` / `hp.ts` / `lifecycle.ts` / `card-kind.ts`, `@shared/combat-tracker/log-kinds.ts`.
+- `fix/cbtx-core`: `src/server/db/`, `src/shared/events/`, `src/shared/entities/`, entities `records.ts`, `@shared/combat-tracker/schemas.ts`, scenes-map overlay files (`token-overlays.ts`, `decorations.ts`, `layers/TokensLayer.tsx`), snapshot-size files.
 
 ## Pending DM decisions
 
