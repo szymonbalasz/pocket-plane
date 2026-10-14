@@ -18,7 +18,7 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 
 ## Shared-file locks
 
-- Play-shell frame (`geometry.ts`, `ShellWindow.tsx`, `storage.ts`), `src/client/common/sync/{store,connection}.ts`, combat `window.ts` default size → `fix/playtest-glitches`
+- Play-shell frame (`geometry.ts`, `ShellWindow.tsx`, `storage.ts`, `manager.ts`), `src/shared/play-shell/layout.ts` (WindowState `area`, granted on request), `src/client/common/sync/{store,connection}.ts`, combat `window.ts` default size → `fix/playtest-glitches`
 
 ## Pending DM decisions
 
