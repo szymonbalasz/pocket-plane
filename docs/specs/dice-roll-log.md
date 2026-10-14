@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: in-review
+status: complete
 owner: spec-dice-roll-log
 wave: 2
 ---
@@ -78,7 +78,7 @@ wave: 2
 | **Playtest pass** (#171) | | |
 | FR-DICE-28 | **DM-only detail and tags in any kind** (P5, G7, G8): a kind's `formatLine(entry)` receives `dmPayload` only on the DM client (players' entries never carry it, FR-DICE-15); facts the owning kind declares DM-only (target AC, the computed hit, overrides, and for `cbt.attack` the damage dice breakdown and kept / dropped d20s) go **only** in `dmPayload`, never in `payload` or text built from it. Public dice stay public: a public DM `roll` entry (FR-DICE-13) and `cbt.attack`'s "d20 + modifier" text (FR-CBT-24) are by design. A kind whose line shows dice from a manual roll marks them with the same "physical" badge segment as `roll` (FR-DICE-20, test id `dice-log-entry-manual`); kinds reuse `rollSegments` for dice parts. A DM-only entry (internal caller passing `public: false`, e.g. combat's monster attack roll, [FR-CBT-52](combat-tracker.md#6-functional-requirements)) is shown to the DM muted with the eye-off marker like any hidden entry (FR-DICE-21). No new field, kind or registry change. | P5, G7 |
 | FR-DICE-29 | (decided #172, OQ-DICE-23) The natural 20 / 1 marker (FR-DICE-20) is not added to `initiative`-category rolls (a natural 1 has no rule meaning there and read as an error at the table, G12). | G12 |
-| **Polish pass** (sprint 1, R3; agent pick, OQ-DICE-25) | | |
+| **Polish pass** (sprint 1, R3; decided #178, OQ-DICE-25) | | |
 | FR-DICE-30 | **Compact roll bar** (both clients; amends FR-DICE-22, FR-DICE-07 placement): the pinned footer is **one row**: expression, mode toggle, DM: public toggle as an eye / eye-off icon Button (preset from the category, Tooltip "Public" / "Hidden"), Roll, and an **Options** chevron. Options open a second row: category, actor, label, DM gear, physical-dice toggle. The chevron shows a dot while category ≠ `other`, an actor or label is set, or the DM's public toggle differs from the category preset. While Physical dice is on, its "Physical dice on" strip with "Turn off" shows below the first row whether Options are open or not (FR-DICE-07). Options open / closed is stored per browser beside the FR-DICE-07 entry: key `pp.dice.options.v1.<campaignId>.<dm \| playerId>` = `"1"` / `"0"`, default closed. Only the entry list scrolls; history numbers: [FR-SHELL-35](play-shell.md#6-functional-requirements). | R3 |
 
 ## 7. UI/UX notes
@@ -243,7 +243,7 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 |---|---|---|---|---|
 | ~~OQ-DICE-03–22~~ | ~~Seeding; snapshot depth; shared changes; manual; visibility; defaults; contests; limits; log timing; glossary; storage; sheet buttons~~ | Decided: 05 no sessions (ADR-0013), 06 superseded, 08 #73, 12 #74; #137 (`ctx.dice`, newest 100, §14); #139 P6, P8, P21–P25; gate I3–I5, I13; #135 + I1 (`char.roll` out of combat, `cbt.*` in combat) | — | — |
 | ~~OQ-DICE-23~~ | ~~Natural marker on initiative lines (G12)~~ | **Decided (#172):** no natural marker on initiative lines (FR-DICE-29) | — | combat-tracker |
-| OQ-DICE-25 | **R3:** DM Game log history shows ~3 lines (roll bar takes most of the 240 px); multi-line outcome lines are cut | **Agent pick: collapse the roll bar to one row, options behind a chevron** (FR-DICE-30; one extra click for category / actor / label) / taller DM default (fights R1 and the #162 coverage floors) / wider default (fewer wraps, covers more map) | no · owner: DM (confirm at the gate) | play-shell |
+| ~~OQ-DICE-25~~ | ~~R3: DM Game log history shows ~3 lines; multi-line outcome lines are cut~~ | **Decided #178:** collapse the roll bar to one row, options behind a chevron (FR-DICE-30). Rejected: taller or wider DM default (covers more map, R1) | — | play-shell |
 | ~~OQ-DICE-24~~ | ~~G12 verdicts (dice part)~~ | **Decided (#172):** verdicts accepted: "— natural 1" per FR-DICE-20 except initiative (FR-DICE-29); no group roll (each combatant rolls, FR-CBT-11); fixture clock by design (FR-FIX-08) | — | fixtures-adapters |
 
 ## 16. Out of scope
