@@ -167,6 +167,43 @@ export const entity = sqliteTable(
   ],
 );
 
+/**
+ * Creature sheet (character-sheet-full, `creature-sheet`, data model §20): the sheet data that is
+ * not rules numbers, 1:1 with a campaign entity (character or custom monster; never imported).
+ * A missing row = defaults (ready, unlocked, empty). JSON leaves validated by CHARX's zod on
+ * write and read; ≤ 48 KB per row (FR-CHARX-03). `ownerPlayerId` copies the entity's, written
+ * only with it (FR-CHARX-13).
+ */
+export const creatureSheet = sqliteTable(
+  "creature_sheet",
+  {
+    entityId: text("entity_id")
+      .primaryKey()
+      .references((): AnySQLiteColumn => entity.id),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    ownerPlayerId: text("owner_player_id").references((): AnySQLiteColumn => player.id),
+    status: text("status", { enum: ["draft", "ready"] }).notNull(),
+    locked: integer("locked", { mode: "boolean" }).notNull().default(false),
+    background: text("background").notNull().default(""),
+    alignment: text("alignment").notNull().default(""),
+    /** `{armor, weapons, tools, languages}` */
+    proficiencyNotes: text("proficiency_notes", { mode: "json" }).notNull(),
+    spells: text("spells", { mode: "json" }).notNull(),
+    features: text("features", { mode: "json" }).notNull(),
+    items: text("items", { mode: "json" }).notNull(),
+    notes: text("notes").notNull().default(""),
+    /** `{"1"…"9": int}` */
+    slotsUsed: text("slots_used", { mode: "json" }).notNull(),
+    /** `{d6…d12: int}` */
+    hitDiceUsed: text("hit_dice_used", { mode: "json" }).notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("creature_sheet_campaign").on(t.campaignId)],
+);
+
 // ---------------------------------------------------------------------------------------------
 // Scenes (scenes-map, data model §12–§13). `seq` = insertion order, DB-assigned (CON-20).
 // ---------------------------------------------------------------------------------------------
@@ -606,4 +643,5 @@ export const schema = {
   combatant,
   hpChange,
   lootEntry,
+  creatureSheet,
 };
