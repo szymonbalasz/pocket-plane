@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   actorOptions,
   createFlagStore,
+  createStickToBottom,
   type FlagBackend,
   manualNatural,
   manualSlots,
@@ -214,5 +215,38 @@ describe("FR-DICE-27 actor select", () => {
 describe("FR-DICE-21 log order", () => {
   test("FR-DICE-21 oldest at the top by n", () => {
     expect(sortEntries([{ n: 3 }, { n: 1 }, { n: 2 }]).map((e) => e.n)).toEqual([1, 2, 3]);
+  });
+});
+
+describe("FR-DICE-21 stick to the bottom", () => {
+  const m = (scrollTop: number, clientHeight: number, scrollHeight = 300) => ({
+    scrollTop,
+    clientHeight,
+    scrollHeight,
+  });
+
+  test("FR-DICE-21 footer grows (Options row / Physical strip): a pinned list stays at the bottom", () => {
+    const s = createStickToBottom();
+    expect(s.resized(m(160, 140))).toBe(300); // first observation, pinned
+    // The bar grows by 34 px: the old scrollTop leaves the newest entry cut off. A scroll
+    // event fired before the resize is seen must not unpin it.
+    expect(s.scrolled(m(160, 106))).toBe(true);
+    expect(s.resized(m(160, 106))).toBe(300);
+    expect(s.scrolled(m(194, 106))).toBe(true);
+    // And back: shrinking the bar keeps it pinned too.
+    expect(s.resized(m(194, 140))).toBe(300);
+    expect(s.atBottom).toBe(true);
+  });
+
+  test("FR-DICE-21 scrolled up: a resize leaves the position alone; back at the bottom re-pins", () => {
+    const s = createStickToBottom();
+    s.resized(m(160, 140));
+    expect(s.scrolled(m(40, 140))).toBe(false);
+    expect(s.resized(m(40, 106))).toBeNull();
+    expect(s.atBottom).toBe(false);
+    expect(s.scrolled(m(190, 106))).toBe(true); // within the slack of the bottom
+    s.scrolled(m(0, 106));
+    s.pin(); // "N new" clicked
+    expect(s.atBottom).toBe(true);
   });
 });

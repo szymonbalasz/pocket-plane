@@ -24,7 +24,7 @@ import { Badge, Input, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
-import { actorOptions, optionsDirty, sortEntries } from "./logic";
+import { actorOptions, createStickToBottom, optionsDirty, sortEntries } from "./logic";
 import { usePhysicalDice, useRollOptionsOpen } from "./physical";
 import { RollButton, useRollControl } from "./roll-control";
 
@@ -110,10 +110,13 @@ function Entry({ e, isDm }: { e: GameLogEntryView; isDm: boolean }) {
   );
 }
 
-/** FR-DICE-21: oldest at the top; sticks to the bottom unless scrolled up, then "N new". */
+/**
+ * FR-DICE-21: oldest at the top; sticks to the bottom unless scrolled up, then "N new". The
+ * roll bar's height changes (Options row, Physical strip; FR-DICE-30) keep a pinned list pinned.
+ */
 function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
-  const atBottom = useRef(true);
+  const [stick] = useState(createStickToBottom);
   const seen = useRef<number>(0);
   const [unseen, setUnseen] = useState(0);
   const lastN = entries.at(-1)?.n ?? 0;
@@ -121,20 +124,31 @@ function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boole
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (atBottom.current) {
+    if (stick.atBottom) {
       el.scrollTop = el.scrollHeight;
       seen.current = lastN;
       setUnseen(0);
     } else {
       setUnseen(entries.filter((x) => x.n > seen.current).length);
     }
-  }, [lastN, entries]);
+  }, [lastN, entries, stick]);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const top = stick.resized(el);
+      if (top !== null) el.scrollTop = top;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [stick]);
 
   const toBottom = () => {
     const el = ref.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-    atBottom.current = true;
+    stick.pin();
     seen.current = lastN;
     setUnseen(0);
   };
@@ -147,11 +161,9 @@ function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boole
       <div
         ref={ref}
         data-testid="dice-log-list"
-        className="absolute inset-0 overflow-y-auto pr-1"
+        className="absolute inset-0 overflow-y-auto pr-1 [overflow-anchor:none]"
         onScroll={(ev) => {
-          const el = ev.currentTarget;
-          atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
-          if (atBottom.current) {
+          if (stick.scrolled(ev.currentTarget)) {
             seen.current = lastN;
             setUnseen(0);
           }
@@ -361,6 +373,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
           </Button>
         </Tooltip>
       </form>
+      {physical && <PhysicalStrip onOff={() => setPhysical(false)} />}
       {optionsOpen && (
         <div id={`${uid}-options`} className="flex flex-wrap items-center gap-1.5">
           <select
@@ -432,7 +445,6 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
           </Tooltip>
         </div>
       )}
-      {physical && <PhysicalStrip onOff={() => setPhysical(false)} />}
       {shownError && (
         <p data-testid="dice-roll-error" role="alert" className="text-xs text-destructive">
           {shownError}

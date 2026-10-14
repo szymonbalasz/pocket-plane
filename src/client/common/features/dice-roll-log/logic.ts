@@ -271,3 +271,47 @@ export function createFlagStore(getBackend: () => FlagBackend | undefined): Flag
     },
   };
 }
+
+export interface ScrollMetrics {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+}
+
+export interface StickToBottom {
+  readonly atBottom: boolean;
+  /** A scroll event. Ignored while the viewport height changed and its resize is pending. */
+  scrolled(m: ScrollMetrics): boolean;
+  /** The viewport resized (footer / strip grew or shrank): the scrollTop to set, or null. */
+  resized(m: ScrollMetrics): number | null;
+  /** Pinned by the app (new entries while at the bottom, "N new" clicked). */
+  pin(): void;
+}
+
+/**
+ * FR-DICE-21: the list sticks to the bottom unless the user scrolled up. A viewport resize
+ * (FR-DICE-30 Options row, Physical strip) keeps a pinned list pinned; a scroll event fired
+ * before the resize is seen (scroll anchoring, clamping) can't unpin it.
+ */
+export function createStickToBottom(slack = 8): StickToBottom {
+  let atBottom = true;
+  let height: number | null = null;
+  return {
+    get atBottom() {
+      return atBottom;
+    },
+    scrolled(m) {
+      if (height === null || m.clientHeight === height) {
+        atBottom = m.scrollHeight - m.scrollTop - m.clientHeight < slack;
+      }
+      return atBottom;
+    },
+    resized(m) {
+      height = m.clientHeight;
+      return atBottom ? m.scrollHeight : null;
+    },
+    pin() {
+      atBottom = true;
+    },
+  };
+}
