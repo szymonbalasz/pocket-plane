@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: complete
+status: in-review
 owner: spec-dice-roll-log
 wave: 2
 ---
@@ -17,6 +17,7 @@ wave: 2
 - **Public log settings** (tier S): one DM tickbox per roll category decides whether DM rolls reach players. Player rolls are always public (#73).
 - character-sheet and combat-tracker roll and log through this spec's internal helpers, **log-entry kinds** and the shared roll control.
 - **Playtest pass** (#171; FR-DICE-28, 29): one rule for **DM-only detail** in any kind's line (facts a kind declares DM-only, e.g. AC, "DM ruled hit", an NPC's damage dice, live in `dmPayload`, shown on the DM client only) and for the "physical" tag across kinds (P5, G7, G8); no "natural 1" noise on initiative lines (G12).
+- **Polish pass** (sprint 1, R3; FR-DICE-30): the roll bar collapses to one row, so the Game log shows ≥ 6 lines of history at default size ([FR-SHELL-35](play-shell.md#6-functional-requirements)).
 
 ## 2. Scope
 
@@ -54,7 +55,7 @@ wave: 2
 | FR-DICE-04 | Roll mode `normal` / `advantage` / `disadvantage`. Adv/dis rewrites the first `1d20` term to `2d20kh1` / `2d20kl1`; no `1d20` term → `invalid` "Advantage needs a d20 roll". Both dice stored and shown, dropped die marked. | 5e |
 | FR-DICE-05 | Client: Shift+click / Shift+Enter = advantage, Ctrl+click / Ctrl+Enter = disadvantage, both = normal; keys override the mode toggle for that roll. | Tier S |
 | FR-DICE-06 | `ManualEntry {diceTotal, dice?}` (`@shared/dice-roll-log`). `diceTotal` = sum of kept dice, within the dice part's min–max; optional `dice` = every die value (count and faces must match; kept computed server-side; sum = `diceTotal`). Without `dice`: one die → its value is `diceTotal`; several → stored with `value: null`. Server adds constants. Out of range / mismatch → `invalid`. Stored and shown as manual. | I3 |
-| FR-DICE-07 | Physical-dice mode: toggle in the game log window, per client, browser storage `pp.dice.v1.<campaignId>.<dm \| playerId>`. On → every roll through the roll control opens the manual popover instead of rolling. While on: every RollButton shows a physical marker, the game log's physical-dice row (in the pinned roll bar) turns into a "Physical dice on" strip with "Turn off", and the popover offers a one-off "Roll for me" (server roll, mode stays on). The toggle sits on its own row of the roll bar, away from Adv (#149). | I5 |
+| FR-DICE-07 | Physical-dice mode: toggle in the game log window, per client, browser storage `pp.dice.v1.<campaignId>.<dm \| playerId>`. On → every roll through the roll control opens the manual popover instead of rolling. While on: every RollButton shows a physical marker, the game log's physical-dice row (in the pinned roll bar) turns into a "Physical dice on" strip with "Turn off", and the popover offers a one-off "Roll for me" (server roll, mode stays on). The toggle sits on its own row of the roll bar, away from Adv (#149) *(R3: in the options row, FR-DICE-30; the strip shows whenever the mode is on)*. | I5 |
 | FR-DICE-08 | Each roll is one immutable `roll` row (§8) storing **each die's result**, written in the calling command's transaction. Never updated or deleted. | #140 |
 | FR-DICE-09 | Intent `dice.roll {expression, mode, category, label?, actor?, manual?, public?}` (DM, player): one roll + one `roll`-kind entry + event-log row in one transaction; emits `DiceRolled`; acks `{rollId, entryId}`. | |
 | FR-DICE-10 | Actor: player → omitted (= own player name) or `{entityId}` of a character they own (else `forbidden`; not visible → `not_found`). DM → omitted (= "DM"), `{entityId}` (via `resolveDefinition`) or `{tokenId}` in the campaign. Display name copied into roll and entry at roll time. | [FR-ENT-12](entities.md#6-functional-requirements) |
@@ -68,7 +69,7 @@ wave: 2
 | FR-DICE-19 | Internal helpers, in the caller's transaction, `env: CommandEnv` first: `dice.evaluate(env, {expression, mode, category, label?, actor: {kind, id, name}, manual?, source, target?}) → Roll` (caller resolves the actor; combat passes the combatant's name) (FR-DICE-01–08; row only); `gameLog.append(env, {kind, category, actorName, payload, dmPayload?, rollIds, encounterId?, public?}) → RecordChange` (stamps `n`, `at`, roller, `public` per FR-DICE-13); `gameLog.markUndone(env, entryId) → RecordChange`. No events of their own: the caller lists the changes in its event (`CharacterRolled`, combat's events). Campaign and roller from `env.actor`. | I1, I14, I15 |
 | FR-DICE-20 | `roll` line (`formatLine`, pure, `@shared`): `<actor> — <label or expression>: <dice> + <constants> = <total>` per roll; adv/dis shows "(adv)" / "(dis)" and the dropped die struck through; a single kept d20 of 20 / 1 appends "— natural 20!" / "— natural 1" (*#171:* not on initiative, FR-DICE-29); manual shows "physical". | BG2 style |
 | FR-DICE-21 | Window `dice.log`, both clients, default open: entries by `n`, oldest at the top; sticks to the bottom unless scrolled up, then "N new". Live ≤ 1 s after commit. DM: hidden entries muted with an eye-off marker. Undone entries struck through, "undone". | I12 |
-| FR-DICE-22 | Roll bar (window footer): expression, category, label, actor (FR-DICE-27), mode toggle, physical-dice toggle; DM: public switch preset from the category's setting, and a gear for the settings popover (in the window body; no shell change). Enter rolls. `ack` → input clears; `reject` → text stays, message inline. Disabled unless `live`. | [FR-SYNC-24](live-sync.md#6-functional-requirements) |
+| FR-DICE-22 | Roll bar (window footer): expression, category, label, actor (FR-DICE-27), mode toggle, physical-dice toggle; DM: public switch preset from the category's setting, and a gear for the settings popover (in the window body; no shell change) *(R3: layout per FR-DICE-30)*. Enter rolls. `ack` → input clears; `reject` → text stays, message inline. Disabled unless `live`. | [FR-SYNC-24](live-sync.md#6-functional-requirements) |
 | FR-DICE-23 | Settings popover: one checkbox per category; change sends `dice.setCategoryPublic`; other DM tabs reflect it ≤ 1 s. | |
 | FR-DICE-24 | `@ui` roll control: `useRollControl({expressions, category, critExpressions?, onRoll})` + `RollButton` wrapper; DM: a public toggle preset from `category`'s setting (FR-DICE-13). Reads FR-DICE-05 keys and FR-DICE-07 mode. Physical mode → popover with one `ManualEntry` per expression (attack = 2); if the first is a natural 20 and `critExpressions` is set, the rest show those (doubled damage). Then `onRoll({mode, manual?, public?})` (`public` DM only); the **caller sends its own intent** (`dice.roll`, `char.roll`, `cbt.attack`, `cbt.rollInitiative`). | I3, #135 |
 | FR-DICE-25 | Same seed + same command sequence → identical rolls, entries and `n`. | FR-FIX-08 |
@@ -77,6 +78,8 @@ wave: 2
 | **Playtest pass** (#171) | | |
 | FR-DICE-28 | **DM-only detail and tags in any kind** (P5, G7, G8): a kind's `formatLine(entry)` receives `dmPayload` only on the DM client (players' entries never carry it, FR-DICE-15); facts the owning kind declares DM-only (target AC, the computed hit, overrides, and for `cbt.attack` the damage dice breakdown and kept / dropped d20s) go **only** in `dmPayload`, never in `payload` or text built from it. Public dice stay public: a public DM `roll` entry (FR-DICE-13) and `cbt.attack`'s "d20 + modifier" text (FR-CBT-24) are by design. A kind whose line shows dice from a manual roll marks them with the same "physical" badge segment as `roll` (FR-DICE-20, test id `dice-log-entry-manual`); kinds reuse `rollSegments` for dice parts. A DM-only entry (internal caller passing `public: false`, e.g. combat's monster attack roll, [FR-CBT-52](combat-tracker.md#6-functional-requirements)) is shown to the DM muted with the eye-off marker like any hidden entry (FR-DICE-21). No new field, kind or registry change. | P5, G7 |
 | FR-DICE-29 | (decided #172, OQ-DICE-23) The natural 20 / 1 marker (FR-DICE-20) is not added to `initiative`-category rolls (a natural 1 has no rule meaning there and read as an error at the table, G12). | G12 |
+| **Polish pass** (sprint 1, R3; agent pick, OQ-DICE-25) | | |
+| FR-DICE-30 | **Compact roll bar** (both clients; amends FR-DICE-22, FR-DICE-07 placement): the pinned footer is **one row**: expression, mode toggle, DM: public toggle as an eye / eye-off icon Button (preset from the category, Tooltip "Public" / "Hidden"), Roll, and an **Options** chevron. Options open a second row: category, actor, label, DM gear, physical-dice toggle. The chevron shows a dot while category ≠ `other`, an actor or label is set, or the DM's public toggle differs from the category preset. While Physical dice is on, its "Physical dice on" strip with "Turn off" shows below the first row whether Options are open or not (FR-DICE-07). Options open / closed is stored per browser in the FR-DICE-07 entry (`pp.dice.v1.<campaignId>.<dm \| playerId>`, optional field `options`, default closed; old entries parse). Only the entry list scrolls; history numbers: [FR-SHELL-35](play-shell.md#6-functional-requirements). | R3 |
 
 ## 7. UI/UX notes
 
@@ -84,11 +87,11 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 
 - **Window `dice.log`** "Game log": both clients, default open, bottom-left above the launcher, 420×320, min 300×200, launcher "Log" (OQ-SHELL-06, I12).
 - **Line:** actor bold, body text, total bold; category as a small muted Badge; Tooltip = time + expression + all dice. "physical" Badge for manual.
-- **Roll bar:** Input (expression), Select (category), Input (label), Select (actor), ToggleGroup (Dis / Normal / Adv), Switch "Physical dice"; DM: Switch "Public", gear Button. Manual popover: per expression a read-only expression + dice total Input (+ optional per-die Inputs).
+- **Roll bar:** Input (expression), Select (category), Input (label), Select (actor), ToggleGroup (Dis / Normal / Adv), Switch "Physical dice"; DM: Switch "Public", gear Button. *(R3, FR-DICE-30)* Row 1: expression, mode, DM eye toggle, Roll, Options chevron (lucide `chevron-up` / `-down`); row 2 (Options): the rest. Manual popover: per expression a read-only expression + dice total Input (+ optional per-die Inputs).
 - **States:** empty "No rolls yet"; loading skeleton; disconnected: log stays, banner, roll bar disabled; reject: inline error under the bar.
 - **DM view:** all entries, hidden ones muted + eye-off; public switch; gear. **Player view:** public entries only; no markers, switch or gear.
 - **Keyboard:** Enter / Shift+Enter / Ctrl+Enter in the expression input. macOS Ctrl+click opens a context menu: Mac users use the toggle (laptops per ADR-0007; accepted).
-- **Test IDs:** `dice-log`, `dice-log-empty`, `dice-log-new`, `dice-log-entry` + `data-record-id` + `data-public` + `data-undone`, `dice-log-entry-manual`; `dice-roll-expression`, `-category`, `-label`, `-actor`, `-mode` (+ `data-value=normal|advantage|disadvantage`), `-physical`, `-public`, `-submit`, `-error`; `dice-manual-total`, `dice-manual-die` (+ `data-value` = expression position), `dice-manual-submit`; `dice-settings-open`, `dice-settings-category` + `data-value=<category>`.
+- **Test IDs:** `dice-log`, `dice-log-empty`, `dice-log-new`, `dice-log-entry` + `data-record-id` + `data-public` + `data-undone`, `dice-log-entry-manual`; `dice-roll-expression`, `-category`, `-label`, `-actor`, `-mode` (+ `data-value=normal|advantage|disadvantage`), `-physical`, `-public`, `-submit`, `-error`; `dice-manual-total`, `dice-manual-die` (+ `data-value` = expression position), `dice-manual-submit`; `dice-settings-open`, `dice-settings-category` + `data-value=<category>`. *(R3)* `dice-roll-options` (+ `data-state=open|closed`, `data-dirty`); `dice-roll-public` is the eye toggle (+ `data-state=public|hidden`).
 
 ## 8. Data model
 
@@ -162,6 +165,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - **DM-only detail (#171):** a kind that leaks into `payload` what belongs in `dmPayload` is a leak; the kind contract test and combat's leak tests catch it. Reconnect / crash: detail is stored on the entry, so the DM's snapshot shows it again; players never had it.
 - **Hidden actor:** a public DM roll for a hidden token shows its name; the DM uses the per-roll switch. Combat presets hidden for a hidden attacker or target (I4). Later token hide / rename ([ADR-0028](../architecture/adr/0028-token-changed-hooks.md)) doesn't touch entries: names are copied at roll time.
 - **Invalid / malicious input:** `1000d1000`, `1d20*5`, functions, 61+ chars → `invalid` before the library; library throw → `invalid`. Manual out of range / wrong die count → `invalid`. Player `public` or another's character → `forbidden`. Labels rendered as text.
+- **Compact bar (R3):** a DM rolling with Options closed still gets the category preset for Public (the eye shows it), so a hidden roll can't go public by surprise; the dot warns when a hidden option is set. Storage unavailable → Options closed, in memory. Disconnect: bar disabled as before; Options toggle still works (client only).
 - **Log growth:** rows kept forever (~1 KB/roll; 10 k rolls ≈ 10 MB); snapshots stay bounded (FR-DICE-17).
 
 ## 12. Performance & bandwidth
@@ -184,7 +188,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | Grammar + limits (`1000d1000`, `1d20*2`, `kh` bounds, messages); adv/dis rewrite + no-d20 error; Shift/Ctrl/both → mode; manual range, die count, kept calc; `formatLine` (adv, dis, nat 20, nat 1, manual, multi-roll, undone); visibility matrix (DM / player × public / hidden; `dmPayload` stripped); FR-DICE-13 stamping (player forced public, DM override, DM for a PC); roll control: N expressions, crit swap on nat 20; seeded determinism; real factory refuses seeding on a non-disposable dir. **Playtest (#171):** `FR-DICE-28 kind contract` (for every registered kind: fill every `dmPayload` field with the sentinel `"DMONLY"` (numbers: a sentinel value) and assert `formatLine` without `dmPayload` never outputs it; a manual roll segment carries the "physical" badge); `FR-DICE-29` (initiative nat 1 / nat 20 → no marker; attack and save keep it) | In-code |
+| Unit | Grammar + limits (`1000d1000`, `1d20*2`, `kh` bounds, messages); adv/dis rewrite + no-d20 error; Shift/Ctrl/both → mode; manual range, die count, kept calc; `formatLine` (adv, dis, nat 20, nat 1, manual, multi-roll, undone); visibility matrix (DM / player × public / hidden; `dmPayload` stripped); FR-DICE-13 stamping (player forced public, DM override, DM for a PC); roll control: N expressions, crit swap on nat 20; seeded determinism; real factory refuses seeding on a non-disposable dir. **Playtest (#171):** `FR-DICE-28 kind contract` (for every registered kind: fill every `dmPayload` field with the sentinel `"DMONLY"` (numbers: a sentinel value) and assert `formatLine` without `dmPayload` never outputs it; a manual roll segment carries the "physical" badge); `FR-DICE-29` (initiative nat 1 / nat 20 → no marker; attack and save keep it). **Polish (R3):** `FR-DICE-30 compact bar` (closed by default: one row, ≤ 44 px; Options toggles row 2; dot per dirty rule; Physical on → strip with Options closed; stored `options` round-trips, old entry without it parses as closed, throwing storage → memory; DM eye preset follows the category) | In-code |
 | Integration | `dice.roll`: roll + entry + log row in one tx, event before `ack`, rollback → none. Ownership: `player-1` as Mira ✓, as Thorn `forbidden`, with `public` `forbidden`. Category change not retroactive; same value → no event. Settings never in player frames. Window: 105 entries → newest 100; floor cut before the filter; `markUndone` below the floor; convergence per ADR-0029. Test-registered kind via `gameLog.append` + `markUndone` commits / rolls back with its caller; multi-roll entry. **Leak scan:** player frames never contain "DM-SECRET-ROLL" or `dmPayload`. Restart → identical snapshots | `dice-log` |
 | E2E (thin) | DM + `player-1`: player Shift+Enter roll appears for DM; DM hidden roll absent from player frames; DM public roll appears for player | `dice-log` |
 
@@ -203,6 +207,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 9 | Roll public damage while C is dropped ("drop connection") | C back | C: banner, then the entry without reload |
 | 10 | Hard-kill + restart server | — | All rejoin; logs, markers and settings unchanged; no console errors |
 | 11 | Roll bar: expression `1d20+2`, label "Initiative", category initiative, actor Mira, Physical dice on, enter 1 | — | Line "Mira — Initiative: 1 + 2 = 3 physical", no "natural 1" (FR-DICE-29) |
+| 12 | *(R3)* Physical dice off; Options closed; Launcher "Reset layout" (default 460×240 at 1440×900); roll `1d4` 8 times | B: Reset layout; same | A, B: roll bar one row, ≥ 6 single-line entries fully visible above it (FR-SHELL-35); Options → row 2 (category, actor, label, gear, physical) and the dot after picking Skill check; Physical on with Options closed → strip shows, ≥ 4 entries visible. Reload: Options state kept |
 
 DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outcome lines) is walked in [combat-tracker §13](combat-tracker.md#13-test-plan) step 9a.
 
@@ -228,12 +233,17 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 **Shared changes — playtest pass** (#171): none. FR-DICE-28 is a contract on kinds (combat's kind in `@shared/combat-tracker/log-kinds.ts` does the work); FR-DICE-29 is in `@shared/dice-roll-log/roll-kind.ts` (feature-owned). `kinds.ts`, schema, events, protocol unchanged; protocol §26 log-kinds row may cite FR-DICE-28 at consolidation.
 
+**Shared changes — polish pass** (sprint 1, R3): none shared. Feature-owned: `src/client/common/features/dice-roll-log/{GameLog.tsx (bar layout), physical.ts (`options` field in the stored entry)}`. No DB, event, protocol or record change; the browser entry gains an optional field. Docs at consolidation: protocol §24 `dice.log` row (collapsed bar).
+
+**Combat lines (R4, sprint 1):** [combat-tracker](combat-tracker.md) FR-CBT-57/58 add natural markers to `cbt.attack` lines from public `payload` fields only, so FR-DICE-28 holds unchanged.
+
 ## 15. Open questions
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | ~~OQ-DICE-03–22~~ | ~~Seeding; snapshot depth; shared changes; manual; visibility; defaults; contests; limits; log timing; glossary; storage; sheet buttons~~ | Decided: 05 no sessions (ADR-0013), 06 superseded, 08 #73, 12 #74; #137 (`ctx.dice`, newest 100, §14); #139 P6, P8, P21–P25; gate I3–I5, I13; #135 + I1 (`char.roll` out of combat, `cbt.*` in combat) | — | — |
 | ~~OQ-DICE-23~~ | ~~Natural marker on initiative lines (G12)~~ | **Decided (#172):** no natural marker on initiative lines (FR-DICE-29) | — | combat-tracker |
+| OQ-DICE-25 | **R3:** DM Game log history shows ~3 lines (roll bar takes most of the 240 px); multi-line outcome lines are cut | **Agent pick: collapse the roll bar to one row, options behind a chevron** (FR-DICE-30; one extra click for category / actor / label) / taller DM default (fights R1 and the #162 coverage floors) / wider default (fewer wraps, covers more map) | no · owner: DM (confirm at the gate) | play-shell |
 | ~~OQ-DICE-24~~ | ~~G12 verdicts (dice part)~~ | **Decided (#172):** verdicts accepted: "— natural 1" per FR-DICE-20 except initiative (FR-DICE-29); no group roll (each combatant rolls, FR-CBT-11); fixture clock by design (FR-FIX-08) | — | fixtures-adapters |
 
 ## 16. Out of scope
