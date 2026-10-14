@@ -5,7 +5,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
-import { openWindow, shellWindow } from "./support/shell";
+import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 const WIDE = { width: 1440, height: 900 };
 const LAPTOP = { width: 1280, height: 720 };
@@ -98,7 +98,8 @@ test("FR-MAP-44 / -45 FR-SHELL-34 fit to the free area: open, reload, pan + Fit,
   await enc.locator(`[data-testid="cbt-enc-row"][data-record-id="${encounterId}"]`).click();
   await enc.getByTestId("cbt-enc-start").click();
   await dm.getByTestId("cbt-enc-start-confirm").click();
-  await expect(enc.getByTestId("cbt-enc-status")).toHaveText("started");
+  // FR-CBT-60: the DM's own Start minimises Encounters once acked.
+  await expect(launcherButton(dm, "cbt.encounters")).toHaveAttribute("data-state", "minimised");
   await expect(shellWindow(player, "cbt.initiative")).toBeVisible();
   await expectUncovered(player, 4);
 });
