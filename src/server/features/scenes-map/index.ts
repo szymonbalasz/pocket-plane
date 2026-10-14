@@ -1,5 +1,5 @@
 import { SceneActivated } from "@shared/events/scenes-map";
-import { LaserData, MAP_SIGNALS, PingData, PullData } from "@shared/scenes-map/schemas";
+import { DragData, LaserData, MAP_SIGNALS, PingData, PullData } from "@shared/scenes-map/schemas";
 import type { CommandDef } from "../../commands/commands";
 import type { Feature } from "../../services";
 import { defineSignal } from "../../ws/signals";
@@ -23,6 +23,7 @@ import {
   setTokenHiddenCommand,
   updateTokenCommand,
 } from "./commands";
+import { dragAudience } from "./drag";
 import { sceneRecordTypes } from "./records";
 import { bindTokenHooks, TokenHooks, tokenChangedHooks } from "./token-hooks";
 
@@ -65,6 +66,15 @@ export const scenesMap: Feature = {
     r.signal(defineSignal({ name: MAP_SIGNALS.ping, schema: PingData, roles: ["dm", "player"] }));
     r.signal(defineSignal({ name: MAP_SIGNALS.laser, schema: LaserData, roles: ["dm", "player"] }));
     r.signal(defineSignal({ name: MAP_SIGNALS.pull, schema: PullData, roles: ["dm"] }));
+    // Drag preview (FR-MAP-39–41): routed per token by its audience hook (FR-SYNC-28, ADR-0033).
+    r.signal(
+      defineSignal({
+        name: MAP_SIGNALS.drag,
+        schema: DragData,
+        roles: ["dm", "player"],
+        audience: dragAudience,
+      }),
+    );
 
     // FR-MAP-06: cache first (commit hook, CON-23), then resync every player of the campaign.
     const cache = new ActiveSceneCache(s.db);
