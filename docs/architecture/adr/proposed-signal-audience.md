@@ -28,11 +28,14 @@
 
 | Rule | Detail |
 |---|---|
-| Signature | `audience?(data, sender {role, playerId?, campaignId}, read) → "all" \| "dm"`; `read` = read-only DB access + the active-scene cache; no writes, no transaction |
+| Signature | `audience?(data, sender {role, playerId?, campaignId}, read) → "all" \| "dm"`; `read` = the same context record visibility / snapshot code gets (`{db, activeSceneOf(campaignId)}`), not a new shape; no transaction |
+| Synchronous | No `await` (bun:sqlite is synchronous), so the hub keeps per-connection frame order |
+| Read-only | A convention, not enforced: review check + a test that table row counts are unchanged after signals |
 | Order | Hub: live → registered → role → zod → `audience` → forward. A thrown reject (`not_found`, `forbidden`, `invalid`) goes to the sender only; nobody receives the signal |
 | `"all"` | Every other live connection of the campaign (ADR-0026 rule) |
 | `"dm"` | Every other live **DM** connection of the campaign only (e.g. the DM's second tab) |
 | No hook | ADR-0026 unchanged (ping, laser, pull) |
+| Hook error | `reject internal` to the sender; logged at most once per (connection, signal name) per 10 s |
 | Still not added | Rate limit (post-MVP); per-receiver filtering |
 
 ## Consequences
@@ -40,4 +43,6 @@
 - live-sync: FR-SYNC-28 (hook); FR-SYNC-22 refers to it. protocol §7 routing rules gain the hook; §15 gains `map.drag`. Signal registration (`src/server/ws/signals.ts`, hub) is shared core (AGENTS §9.9): one sequenced shared change, before the scenes-map playtest build.
 - scenes-map registers `map.drag` with an `audience` that applies FR-MAP-21 to players and routes hidden / non-active-scene tokens to the DM only.
 - Tests: a test-registered signal with `"dm"` reaches only other DM connections; a reject reaches only the sender; `map.drag` of the hidden Wolf never appears in player frames (leak scan); hook absent → ADR-0026 behaviour.
+- **Limitation:** `"all" | "dm"` is enough only while every player sees the same tokens. Per-player visibility (fog / vision, post-MVP) needs per-receiver filtering (option B) and a new ADR.
+- **ADR-0026 lines amended:** "No server `sceneId` check, no `authorize` hook" → a signal type may register `audience`; its test bullet "signals touch no DB, log or `seq`" → "no DB **write**, log or `seq`".
 - [ADR-0021](0021-sync-protocol-conventions.md)'s line "signals still pass their type's visibility fn" now has a concrete form for signals that need it.
