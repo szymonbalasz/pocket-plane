@@ -321,12 +321,21 @@ export const TurnInput = z.strictObject({
 });
 export type TurnInput = z.input<typeof TurnInput>;
 export const SetRemovedInput = z.strictObject({ combatantId: Id, removed: z.boolean() });
-export const AttackInput = z.strictObject({
-  attackerId: Id,
-  mode: RollMode.default("normal"),
-  /** FR-CBT-17: two entries, to-hit first. */
-  manual: z.array(ManualEntry).length(2).optional(),
-});
+export const AttackInput = z
+  .strictObject({
+    attackerId: Id,
+    mode: RollMode.default("normal"),
+    /** FR-CBT-17: two entries, to-hit first. */
+    manual: z.array(ManualEntry).length(2).optional(),
+    /** FR-CHARX-24 (OQ-CBT-47): one attack row; absent (and no `spellId`) = the first attack. */
+    attackId: Id.optional(),
+    /** FR-CHARX-24: a sheet spell with `roll: attack` and damage. */
+    spellId: Id.optional(),
+  })
+  .refine((v) => v.attackId === undefined || v.spellId === undefined, {
+    path: ["spellId"],
+    message: "Either an attack or a spell",
+  });
 export type AttackInput = z.input<typeof AttackInput>;
 export const AttackResult = z.object({ cardId: z.string(), rollIds: z.array(z.string()) });
 export type AttackResult = z.infer<typeof AttackResult>;

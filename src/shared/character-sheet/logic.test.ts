@@ -4,6 +4,7 @@ import { LABEL_MAX, RollLabel } from "@shared/dice-roll-log/schemas";
 import {
   abilityBlock,
   attackLine,
+  attackRollSpecs,
   characterRolls,
   clampHp,
   eligibleCharacters,
@@ -13,11 +14,13 @@ import {
   isDown,
   levelLine,
   parseHpAmount,
+  resolveSheetAttack,
   selectCharacter,
   signed,
   speedText,
 } from "./logic";
 import { CharAdjustHpIntent, SheetRollIntent } from "./schemas";
+import type { SpellRow } from "./sheet";
 
 const mira = {
   initBonus: 2,
@@ -270,5 +273,90 @@ describe("FR-CHAR-21 checks and saves (feedback pass)", () => {
     expect(ok({ kind: "attack", ability: "str" })).toBe(false);
     expect(ok({ kind: "initiative" })).toBe(true);
     expect(ok({ kind: "check", ability: "dex", bonus: 3 })).toBe(false);
+  });
+});
+
+describe("FR-CHARX-24 resolveSheetAttack (combat's sheetAttack)", () => {
+  const stats = {
+    initBonus: 0,
+    abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 16, cha: 10 },
+    level: 1,
+    spellcasting: { ability: "wis" as const, slots: {} },
+    attacks: [
+      { id: "a1", name: "Mace", toHit: 2, damage: "1d6" },
+      {
+        id: "a2",
+        name: "Light crossbow",
+        toHit: 4,
+        damage: "1d8+2",
+        damageType: "piercing" as const,
+      },
+    ],
+  };
+  const spell = (id: string, o: object) =>
+    ({
+      id,
+      name: id,
+      level: 1,
+      prepared: true,
+      concentration: false,
+      ritual: false,
+      roll: "attack",
+      effect: "damage",
+      notes: "",
+      ...o,
+    }) as SpellRow;
+  const sheet = {
+    spells: [
+      spell("bolt", { damage: "4d6", damageType: "radiant" }),
+      spell("touch", {}),
+      spell("flame", { roll: "save", saveAbility: "dex", damage: "1d8" }),
+    ],
+  };
+
+  test("FR-CHARX-24 no ref = first attack; attackId = that row; spellId = spell attack bonus + damage", () => {
+    expect(resolveSheetAttack(stats, sheet, {})).toEqual({
+      ok: true,
+      attack: { name: "Mace", toHit: 2, damage: "1d6", damageType: null },
+    });
+    expect(resolveSheetAttack(stats, sheet, { attackId: "a2" })).toEqual({
+      ok: true,
+      attack: { name: "Light crossbow", toHit: 4, damage: "1d8+2", damageType: "piercing" },
+    });
+    // WIS 16 (+3) + PB 2.
+    expect(resolveSheetAttack(stats, sheet, { spellId: "bolt" })).toEqual({
+      ok: true,
+      attack: { name: "bolt", toHit: 5, damage: "4d6", damageType: "radiant" },
+    });
+  });
+
+  test("FR-CHARX-24 a spell attack without damage is not combat's; save spells, unknown rows, no attack rejected", () => {
+    const code = (ref: object, s: typeof sheet | null = sheet, st: typeof stats = stats) => {
+      const r = resolveSheetAttack(st, s, ref);
+      return r.ok ? "ok" : `${r.code}: ${r.message}`;
+    };
+    expect(code({ spellId: "touch" })).toBe("conflict: No damage roll for touch");
+    expect(code({ spellId: "flame" })).toBe("conflict: No attack roll for flame");
+    expect(code({ spellId: "bolt" }, null)).toBe("not_found: Spell was deleted");
+    expect(code({ attackId: "gone" })).toBe("not_found: Attack was deleted");
+    expect(code({}, sheet, { ...stats, attacks: [] })).toBe("conflict: No weapon attack");
+    const { spellcasting: _, ...noCasting } = stats;
+    expect(code({ spellId: "bolt" }, sheet, noCasting as typeof stats)).toBe(
+      "conflict: No spellcasting",
+    );
+  });
+
+  test("FR-CHAR-05 attackRollSpecs: to-hit (d20, attack) then damage, labels as char.roll's", () => {
+    expect(
+      attackRollSpecs({ name: "Guiding Bolt", toHit: 5, damage: "4d6", damageType: "radiant" }),
+    ).toEqual([
+      { expression: "1d20+5", category: "attack", label: "Guiding Bolt attack", d20: true },
+      {
+        expression: "4d6",
+        category: "damage",
+        label: "Guiding Bolt damage (radiant)",
+        d20: false,
+      },
+    ]);
   });
 });

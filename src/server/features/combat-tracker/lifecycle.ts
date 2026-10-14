@@ -7,7 +7,7 @@ import { EncounterEnded, EncounterStarted } from "@shared/events/combat-tracker"
 import { and, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict } from "../../commands/errors";
-import { combatant, combatantSeqNext, encounter, entity } from "../../db/schema";
+import { combatant, combatantSeqNext, creatureSheet, encounter, entity } from "../../db/schema";
 import { resolveDefinition } from "../entities/commands";
 import { dismissForEncounter } from "../notifications";
 import { getScene, sceneTokens } from "../scenes-map/rows";
@@ -24,7 +24,10 @@ import {
 } from "./rows";
 import { CombatRuleHooks } from "./rule-hooks";
 
-/** FR-CBT-02: `null` = every character of the campaign now; by name (case-insensitive), id. */
+/**
+ * FR-CBT-02: `null` = every character of the campaign now, drafts left out (FR-CHARX-11,
+ * OQ-CBT-46); an explicit list may hold drafts. By name (case-insensitive), id.
+ */
 export function partyOf(env: Pick<CommandEnv, "tx">, cid: string, ids: string[] | null) {
   const all = env.tx
     .select({
@@ -32,13 +35,15 @@ export function partyOf(env: Pick<CommandEnv, "tx">, cid: string, ids: string[] 
       name: entity.name,
       portraitAssetId: entity.portraitAssetId,
       statBlock: entity.statBlock,
+      status: creatureSheet.status,
     })
     .from(entity)
+    .leftJoin(creatureSheet, eq(creatureSheet.entityId, entity.id))
     .where(and(eq(entity.campaignId, cid), eq(entity.kind, "character")))
     .all();
   const wanted = ids === null ? null : new Set(ids);
   return all
-    .filter((c) => wanted === null || wanted.has(c.id))
+    .filter((c) => (wanted === null ? c.status !== "draft" : wanted.has(c.id)))
     .sort((a, b) => {
       const ka = entityNameKey(a.name);
       const kb = entityNameKey(b.name);

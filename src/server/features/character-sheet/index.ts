@@ -1,8 +1,10 @@
 // character-sheet (CHAR + CHARX): intents `char.roll`, `char.adjustHp`, the CHARX lifecycle, edit,
 // row and counter intents; record type `creature-sheet` (FR-CHARX-36); internal API
-// `characters.adjustHp` (FR-CHAR-13) for combat-tracker. Rules numbers stay in `entity`.
+// `characters.adjustHp` (FR-CHAR-13) and `characters.sheetAttack` (FR-CHARX-24) for combat-tracker.
+// Rules numbers stay in `entity`.
 import type { Feature } from "../../services";
 import { definitionHooksOf } from "../entities/definition-hooks";
+import { sheetAttack } from "./attack";
 import { charAdjustHp, charRoll } from "./commands";
 import {
   charDeleteRowCommand,
@@ -17,8 +19,11 @@ import { charUseResource } from "./resources";
 
 export type { AdjustHpResult } from "./hp";
 
-/** `characters.adjustHp(env, characterId, delta) → {hpBefore, hpAfter, change}`; no event. */
-export const characters = { adjustHp } as const;
+/**
+ * `characters.adjustHp(env, characterId, delta) → {hpBefore, hpAfter, change}`; no event.
+ * `characters.sheetAttack(env, creatureId, ref) → {name, toHit, damage, damageType}` (OQ-CHARX-12).
+ */
+export const characters = { adjustHp, sheetAttack } as const;
 
 export const characterSheet: Feature = {
   name: "character-sheet",
