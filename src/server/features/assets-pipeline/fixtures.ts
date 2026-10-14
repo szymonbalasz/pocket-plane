@@ -6,7 +6,26 @@ import { WORKTREE_ROOT } from "../../config";
 import type { SetupStep } from "../fixtures-adapters/fixture-types";
 import { ASSETS_ROOT } from "../fixtures-adapters/loader";
 import { INGEST } from "./commands";
-import { prepareIngest } from "./ingest";
+import { type ProcessedImage, processImage } from "./image";
+
+/**
+ * Processed fixture images, per process, keyed by file and content hash. Processing is
+ * deterministic and is most of a bundle load (sharp renders each SVG, ~1 s for `map-large`);
+ * `bun test` loads bundles dozens of times per run (fix/test-speed). Nothing mutates an image.
+ */
+const processed = new Map<string, Promise<ProcessedImage>>();
+
+function processFixtureImage(file: string): Promise<ProcessedImage> {
+  const bytes = readFileSync(path.join(WORKTREE_ROOT, ASSETS_ROOT, file));
+  const key = `${file}:${Bun.hash(bytes)}`;
+  let hit = processed.get(key);
+  if (!hit) {
+    hit = processImage(bytes);
+    hit.catch(() => processed.delete(key));
+    processed.set(key, hit);
+  }
+  return hit;
+}
 
 /**
  * Setup step ingesting `fixtures/assets/<file>` as the DM, in the active campaign. The input is
@@ -15,11 +34,10 @@ import { prepareIngest } from "./ingest";
 export function ingestStep(file: string, name?: string): SetupStep {
   return {
     command: INGEST,
-    input: () =>
-      prepareIngest({
-        bytes: readFileSync(path.join(WORKTREE_ROOT, ASSETS_ROOT, file)),
-        filename: path.basename(file),
-        ...(name !== undefined ? { name } : {}),
-      }),
+    input: async () => ({
+      image: await processFixtureImage(file),
+      filename: path.basename(file),
+      ...(name !== undefined ? { name } : {}),
+    }),
   };
 }
