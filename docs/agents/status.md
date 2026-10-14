@@ -10,7 +10,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | P R1 map fit | — | — | **Merged** (walkthrough 23/23) | — |
 | S core | — | — | **Merged** (core, no walkthrough) | — |
-| P R3 game log | `fix/polish-game-log` (ws w26, slot 2) | build-polish-game-log | Fixed FR-DICE-21 after walkthrough FAIL; retest running (test-game-log-2) | Merge |
+| P R3 game log | — | — | **Merged** (walkthrough 16/16 after the FR-DICE-21 fix) | — |
 | P R2/R4/R5 combat | `fix/polish-combat` (ws w28, slot 4) | build-polish-combat | Building | Walkthrough CBT 3/8/9a/9b/14, NOTE 12 |
 | D core | `fix/cbtx-core` (ws w29, slot 0) | build-cbtx-core | Building | Merge, then D + S builds |
 | S build / D build / S combat routes | — | — | Queued (#179 order) | — |
@@ -20,7 +20,7 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 ## Shared-file locks
 
 - `fix/polish-combat`: notifications server files (`kind.ts`, `helpers.ts`, `index.ts`), combat-tracker server `attack.ts` / `hp.ts` / `lifecycle.ts` / `card-kind.ts`, `@shared/combat-tracker/log-kinds.ts`.
-- `fix/cbtx-core`: `src/server/db/`, `src/shared/events/`, `src/shared/entities/`, entities `records.ts`, `@shared/combat-tracker/schemas.ts`, scenes-map overlay files (`token-overlays.ts`, `decorations.ts`, `layers/TokensLayer.tsx`), snapshot-size files.
+- `fix/cbtx-core`: `src/server/db/`, `src/shared/events/`, `src/shared/entities/`, entities `records.ts`, `@shared/combat-tracker/schemas.ts`, scenes-map overlay files (`token-overlays.ts`, `decorations.ts`, `layers/TokensLayer.tsx`, `theme.ts`, `layers/tone.ts`), entities `rows.ts`, snapshot-size files.
 
 ## Pending DM decisions
 
