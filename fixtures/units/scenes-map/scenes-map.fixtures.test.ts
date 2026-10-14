@@ -124,6 +124,13 @@ describe("scenes-map fixtures (MAP §13)", () => {
       [by("Town"), 4, 5, false, p2?.id ?? null],
       [by("Goblin Ambush"), 2, 9, false, p2?.id ?? null],
     ]);
+    // G11: both carry `token-thorn` (images index 6).
+    const thornArt = r.manifest.records.images?.asset?.[6] ?? null;
+    expect(thornArt).toBeString();
+    expect(r.tokens.filter((t) => t.name === "Thorn").map((t) => t.imageAssetId)).toEqual([
+      thornArt,
+      thornArt,
+    ]);
     // `scenes` keeps its own placements: Thorn once on Town.
     const s = first ?? (await loaded("scenes"));
     const town = s.scenes.find((x) => x.name === "Town")?.id;
