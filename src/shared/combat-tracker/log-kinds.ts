@@ -63,6 +63,8 @@ export const AttackLogDmPayload = z.strictObject({
   overrides: z.strictObject({ toHit: z.boolean(), hit: z.boolean(), damage: z.boolean() }),
   /** Old rows: absent. */
   rolls: AttackLogRolls.optional(),
+  /** combat-extras (FR-CBTX-39): damage taken by temp HP; absent / 0 = none. DM only. */
+  absorbed: z.int().min(0).optional(),
 });
 export type AttackLogDmPayload = z.infer<typeof AttackLogDmPayload>;
 
@@ -77,7 +79,13 @@ export const HpLogDmPayload = z.strictObject({
   applied: z.int(),
   hpBefore: z.int(),
   hpAfter: z.int(),
+  /** combat-extras (FR-CBTX-39): damage taken by temp HP; absent / 0 = none. */
+  absorbed: z.int().min(0).optional(),
 });
+
+/** FR-CBTX-39: the DM line's "(3 absorbed by temp HP)"; players' line unchanged. */
+const absorbedSegments = (dm: { absorbed?: number } | null | undefined): LineSegment[] =>
+  dm?.absorbed ? [{ text: ` (${dm.absorbed} absorbed by temp HP)`, style: "muted" }] : [];
 
 const MULT_TEXT = { normal: "", half: " (half)", none: " (none)", double: " (double)" } as const;
 
@@ -144,6 +152,7 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
       }
       if (dm?.rolls) out.push(...rollBreakdownSegments(dm.rolls.damage));
       if (p.manual?.damage) out.push(...PHYSICAL);
+      out.push(...absorbedSegments(dm));
     } else {
       out.push({ text: ruled ? " — DM ruled miss" : " — miss" });
     }
@@ -156,7 +165,7 @@ export const hpLogKind = defineLogKind<HpLogPayload, z.infer<typeof HpLogDmPaylo
   kind: LOG_KIND_HP,
   payload: HpLogPayload,
   dmPayload: HpLogDmPayload,
-  formatLine({ actorName, payload: p }) {
+  formatLine({ actorName, payload: p, dmPayload: dm }) {
     return [
       { text: actorName, style: "actor" },
       { text: " — " },
@@ -165,6 +174,7 @@ export const hpLogKind = defineLogKind<HpLogPayload, z.infer<typeof HpLogDmPaylo
       },
       { text: String(p.amount), style: "total" },
       { text: p.kind === "damage" ? " damage" : " HP" },
+      ...absorbedSegments(dm),
     ];
   },
 });

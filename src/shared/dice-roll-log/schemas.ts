@@ -112,6 +112,11 @@ export const RollPayloadItem = z.strictObject({
   total: z.int(),
   natural: z.int().nullable(),
   label: z.string().max(LABEL_MAX).nullable(),
+  /**
+   * The roll's outcome, set by the owning command once it is known, e.g. a death save's
+   * "success (2 / 0)" (FR-CBTX-39); shown after the total. Absent on plain rolls.
+   */
+  note: z.string().max(80).optional(),
 });
 export type RollPayloadItem = z.infer<typeof RollPayloadItem>;
 

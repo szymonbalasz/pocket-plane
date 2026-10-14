@@ -25,6 +25,11 @@ export interface AppendInput {
   encounterId?: string | null;
   /** DM rollers only (FR-DICE-13); ignored when the roller is a player. */
   public?: boolean;
+  /**
+   * The roll's actor is hidden from players (e.g. a hidden PC's death save, FR-CBTX-23): the
+   * entry is DM-only whoever rolls; wins over `public` and the player stamp.
+   */
+  forcePrivate?: boolean;
 }
 
 type EntryRow = typeof gameLogEntry.$inferSelect;
@@ -48,8 +53,10 @@ function getEntry(tx: Pick<Tx, "select">, campaignId: string, id: string): Entry
 /**
  * FR-DICE-13: `public` stamped once, by who rolls. Player → always true. DM (and the fixture
  * loader, which runs as DM) → the override if given, else the category's setting at commit.
+ * `forcePrivate` → false for anyone.
  */
 function stampPublic(env: CommandEnv, cid: string, input: AppendInput): boolean {
+  if (input.forcePrivate) return false;
   if (env.actor.role === "player") return true;
   return input.public ?? categoryPublic(readSettings(env.tx, cid), input.category);
 }

@@ -3,6 +3,7 @@
 // `position` (initiative roll / set, AC, HP, band or PC Down (FR-CBT-49), moved (FR-CBT-39),
 // Attack; menu Check ▸ / Save ▸ (FR-CBT-44), Damage / heal, Remove), Removed.
 import { signed } from "@shared/character-sheet/logic";
+import { notRestoredText } from "@shared/combat-extras/rules";
 import {
   canRollInitiative,
   critExpression,
@@ -10,10 +11,14 @@ import {
   healthBand,
   showRollMonsters,
   skippedOnStep,
-  skippedText,
   unrolledMonsters,
 } from "@shared/combat-tracker/rules";
-import type { CombatantView, EncounterView } from "@shared/combat-tracker/schemas";
+import type {
+  CombatantView,
+  EncounterView,
+  TurnResult,
+  UndoResult,
+} from "@shared/combat-tracker/schemas";
 import {
   ABILITIES,
   ABILITY_NAMES,
@@ -43,6 +48,8 @@ import {
   Tooltip,
 } from "@ui/components/ui/overlays";
 import { Input, Skeleton } from "@ui/components/ui/primitives";
+import { characterOf, deadPc, deathStateFor } from "@ui/features/combat-extras/logic";
+import { RowName } from "@ui/features/combat-extras/parts";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
 import {
   useCbtIntent,
@@ -74,9 +81,22 @@ import {
   SkipForwardIcon,
   SwordIcon,
   UserMinusIcon,
+  UserPlusIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+  DeathSaveAnchor,
+  RowDeath,
+  RowEffects,
+  RowMenuItems,
+  RowTemp,
+  useDeadPc,
+  useDeathSaveRoll,
+} from "../combat-extras/row";
+import { CbtxRuntime } from "../combat-extras/runtime";
+import { skipText } from "../combat-extras/skip";
+import { useCbtxDialogs } from "../combat-extras/store";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
@@ -397,10 +417,17 @@ function Row({
   const saveOf = (a: Ability) => (stats ? saveBonus(stats, a) : null);
   const check = useAbilityRoll(c, "check", checkOf);
   const save = useAbilityRoll(c, "save", saveOf);
-  // FR-CBT-49 (G9): a PC at 0 HP shows "Down" where monsters show their band.
+  // FR-CBT-49 (G9): a PC at 0 HP shows "Down" where monsters show their band; combat-extras'
+  // death state (Dying / Stable / Dead, FR-CBTX-33) replaces it once the PC has one.
   const down = useSync((s) => pcDown(s.store, c));
-  // FR-CBT-50 (G4): Next / Prev skip a monster at 0 HP; its row is muted with a skip icon.
-  const skipped = c.kind === "monster" && !c.removed && c.hpCurrent === 0;
+  const dead = useDeadPc(c);
+  const hasDeathState = useSync(
+    (s) => c.kind === "pc" && deathStateFor(characterOf(s.store, c.entityId ?? "")) !== null,
+  );
+  const deathRoll = useDeathSaveRoll(c);
+  // FR-CBT-50 (G4): Next / Prev skip a monster at 0 HP — and a dead PC (FR-CBTX-25); the row is
+  // muted with a skip icon.
+  const skipped = (c.kind === "monster" && !c.removed && c.hpCurrent === 0) || dead;
   return (
     <li
       data-testid="cbt-init-row"
@@ -419,27 +446,27 @@ function Row({
       <Portrait name={c.name} imageAssetId={c.imageAssetId} />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1">
-          <span
-            className="truncate text-sm font-medium"
-            data-testid="cbt-init-row-name"
-            title={c.name}
-          >
-            {c.name}
-          </span>
+          {/* Middle-truncated, number kept ("Gob… 2"): names win over chips. */}
+          <RowName name={c.name} testId="cbt-init-row-name" className="text-sm font-medium" />
           {c.hidden && (
             <EyeOffIcon className="size-3.5 shrink-0 text-muted-foreground" aria-label="Hidden" />
           )}
           {skipped && (
-            <Tooltip content="Skipped while down">
+            <Tooltip content={dead ? "Skipped while dead" : "Skipped while down"}>
               <span
                 data-testid="cbt-init-row-skip"
                 data-record-id={c.id}
                 className="flex shrink-0 text-muted-foreground"
               >
-                <SkipForwardIcon className="size-3.5" aria-label="Skipped while down" />
+                <SkipForwardIcon
+                  className="size-3.5"
+                  aria-label={dead ? "Skipped while dead" : "Skipped while down"}
+                />
               </span>
             </Tooltip>
           )}
+          {/* FR-CBTX-33: effect chips, one line ("+N" for the rest). */}
+          <RowEffects c={c} round={round} />
           {/* On the name line, right-aligned: the AC / HP / band line has no room left. */}
           <Moved c={c} speed={stats?.speed} />
         </div>
@@ -448,10 +475,12 @@ function Row({
           <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>
             HP {hp ? `${hp.cur}/${hp.max}` : "—"}
           </span>
+          <RowTemp c={c} />
           {c.kind === "monster" && hp && (
             <BandBadge band={healthBand(hp.cur, hp.max)} testId="cbt-init-row-band" />
           )}
-          {down && <BandBadge band="down" testId="cbt-init-row-band" />}
+          {down && !hasDeathState && <BandBadge band="down" testId="cbt-init-row-band" />}
+          <RowDeath c={c} />
         </div>
       </div>
       <InitiativeCell c={c} def={def} round={round} />
@@ -459,6 +488,7 @@ function Row({
       {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸. */}
       <RollButton control={check.control} tabIndex={-1} aria-hidden className={ANCHOR} />
       <RollButton control={save.control} tabIndex={-1} aria-hidden className={ANCHOR} />
+      {c.kind === "pc" && <DeathSaveAnchor control={deathRoll} />}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -480,6 +510,7 @@ function Row({
               <DropdownMenuSeparator />
             </>
           )}
+          <RowMenuItems c={c} deathRoll={deathRoll} />
           <DropdownMenuItem data-testid="cbt-init-row-hp-adjust" onSelect={() => openHp(c.id)}>
             <HeartPulseIcon /> Damage / heal…
           </DropdownMenuItem>
@@ -537,21 +568,42 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
   const undoText = undo?.text ?? "Nothing to undo";
   const [ending, setEnding] = useState(false);
   const startEnd = useStartEnd();
-  /** FR-CBT-50: skipped names from the order at send time, toasted once the step is acked. */
+  const store = useSync((s) => s.store);
+  const openAdd = useCbtxDialogs((s) => s.openAdd);
+  /**
+   * FR-CBT-50: skipped names from the order at send time, toasted once the step is acked. A dead
+   * PC skips like a monster at 0 (FR-CBTX-25): "Skipped Thorn (dead)".
+   */
   const step = async (direction: "next" | "prev") => {
+    const dead = new Set(rows.filter((c) => deadPc(store, c)).map((c) => c.name));
     const turnRows = rows.map((c) => ({
       id: c.id,
       name: c.name,
       position: c.position ?? 0,
-      kind: c.kind,
+      kind: dead.has(c.name) ? ("monster" as const) : c.kind,
       removed: c.removed === true,
-      hpCurrent: c.hpCurrent ?? null,
+      hpCurrent: dead.has(c.name) ? 0 : (c.hpCurrent ?? null),
       initiative: c.initiative ?? null,
     }));
     const skipped = skippedOnStep(turnRows, enc.round, enc.turnCombatantId ?? null, direction);
-    const r = await send(direction === "next" ? "cbt.nextTurn" : "cbt.prevTurn", turnArgs);
+    const r = await send<TurnResult>(
+      direction === "next" ? "cbt.nextTurn" : "cbt.prevTurn",
+      turnArgs,
+    );
     if (r !== undefined && skipped) {
-      toast(<span data-testid="cbt-init-skipped">{skippedText(skipped)}</span>);
+      toast(<span data-testid="cbt-init-skipped">{skipText(skipped, dead)}</span>);
+    }
+    // FR-CBTX-07: Prev could not restore an effect whose slot is taken.
+    if (r?.notRestored?.length) {
+      toast(<span data-testid="cbtx-not-restored">{notRestoredText(r.notRestored)}</span>);
+    }
+  };
+  const undoNow = async () => {
+    if (!undo) return;
+    const r = await send<UndoResult>("cbt.undo", { expectedHpChangeId: undo.expectedHpChangeId });
+    // FR-CBTX-22: effects the apply ended whose slot is taken stay ended.
+    if (r?.notRestored?.length) {
+      toast(<span data-testid="cbtx-not-restored">{notRestoredText(r.notRestored)}</span>);
     }
   };
   return (
@@ -628,9 +680,7 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
               data-testid="cbt-init-undo"
               aria-label={undoText}
               disabled={disabled || !undo}
-              onClick={() =>
-                undo && void send("cbt.undo", { expectedHpChangeId: undo.expectedHpChangeId })
-              }
+              onClick={() => void undoNow()}
             >
               <RotateCcwIcon className="size-3.5" /> Undo
             </Button>
@@ -652,6 +702,17 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
             <DicesIcon className="size-3.5" /> Roll monsters
           </Button>
         )}
+        {/* FR-CBTX-33: add combatants mid-fight (picker × quantity). */}
+        <Button
+          size="sm"
+          variant="ghost"
+          data-testid="cbtx-init-add"
+          className="ml-auto"
+          disabled={disabled}
+          onClick={openAdd}
+        >
+          <UserPlusIcon className="size-3.5" /> Add…
+        </Button>
       </div>
     </div>
   );
@@ -748,6 +809,7 @@ function CombatDialogs() {
     <>
       <AttackPopup />
       <HpDialog />
+      <CbtxRuntime />
     </>
   );
 }

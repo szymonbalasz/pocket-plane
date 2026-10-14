@@ -1,18 +1,18 @@
 // HP changes (FR-CBT-21–25, FR-CBT-34–36): apply a damage card to 1–20 targets, direct damage /
 // heal, strict-LIFO undo of one apply at a time. Each is one transaction: HP + combat log entries
-// + game-log lines + card state.
+// + game-log lines + card state. HP, temp HP, death counters and concentration go through
+// combat-extras' `hpRules` (FR-CBTX-01/02): owner event first, then its cards (FR-CBTX-17).
 
 import type {
   AttackLogDmPayload,
   AttackLogPayload,
   AttackLogRolls,
 } from "@shared/combat-tracker/log-kinds";
-import { clampHp, hitHint, rawDamage, undoGroup } from "@shared/combat-tracker/rules";
+import { hitHint, rawDamage, undoGroup } from "@shared/combat-tracker/rules";
 import {
   ApplyCardTargetsInput,
   ApplyHpInput,
   CBT_INTENTS,
-  type CombatantRecord,
   DAMAGE_CARD_KIND,
   DamageCardPayload,
   type DamageCardTargetOutcome,
@@ -23,6 +23,7 @@ import {
   LOG_KIND_ATTACK,
   LOG_KIND_HP,
   UndoInput,
+  type UndoResult,
 } from "@shared/combat-tracker/schemas";
 import type { DieResult } from "@shared/dice-roll-log/schemas";
 import {
@@ -34,16 +35,15 @@ import {
 import { and, desc, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, notFound } from "../../commands/errors";
-import { combatant, hpChange, hpChangeSeqNext, roll } from "../../db/schema";
-import type { RecordChange } from "../../events/types";
-import { characters } from "../character-sheet";
+import { hpChange, hpChangeSeqNext, roll } from "../../db/schema";
+import type { DomainEvent, RecordChange } from "../../events/types";
+import { type Applied, hpRules, hpTargetOf } from "../combat-extras/hp-rules";
 import { gameLog } from "../dice-roll-log";
 import { reopenNotification, resolveNotification } from "../notifications";
 import { loadNotification } from "../notifications/helpers";
 import { activeCombatant, statsOf } from "./guards";
 import {
   campaignOf,
-  combatantChange,
   getCombatant,
   hpChangeChange,
   readCombatant,
@@ -55,28 +55,17 @@ import {
 
 type Env = CommandEnv;
 
-/** FR-CBT-22: monster → own HP clamped 0…hpMax; PC → `characters.adjustHp` (FR-CHAR-13). */
-function applyDelta(
-  env: Env,
-  c: CombatantRecord,
-  delta: number,
-): { hpBefore: number; hpAfter: number; changes: RecordChange[] } {
-  if (c.kind === "pc") {
-    const r = characters.adjustHp(env, c.entityId, delta);
-    return { hpBefore: r.hpBefore, hpAfter: r.hpAfter, changes: r.change ? [r.change] : [] };
-  }
-  const before = readCombatant(env.tx, c.id);
-  const hpBefore = before.hpCurrent ?? 0;
-  const hpAfter = clampHp(hpBefore, delta, before.hpMax ?? 0);
-  if (hpAfter === hpBefore) return { hpBefore, hpAfter, changes: [] };
-  env.tx.update(combatant).set({ hpCurrent: hpAfter }).where(eq(combatant.id, c.id)).run();
-  return { hpBefore, hpAfter, changes: [combatantChange(before, readCombatant(env.tx, c.id))] };
-}
-
 type FactsInput = Omit<HpChangeFacts, "hpChangeId">;
 
-function insertHpChange(env: Env, facts: FactsInput, entryId: string): HpChangeRecord {
-  const id = env.ctx.ids.next();
+/** FR-CBTX-21: the combat-extras columns of a row, from `hpRules.apply`. */
+const playFacts = (a: Applied) => ({
+  tempBefore: a.tempBefore,
+  tempAfter: a.tempAfter,
+  deathBefore: a.deathBefore,
+  deathAfter: a.deathAfter,
+});
+
+function insertHpChange(env: Env, id: string, facts: FactsInput, entryId: string): HpChangeRecord {
   const row = env.tx
     .insert(hpChange)
     .values({
@@ -85,6 +74,7 @@ function insertHpChange(env: Env, facts: FactsInput, entryId: string): HpChangeR
       seq: hpChangeSeqNext,
       at: env.ctx.clock.iso(),
       ...facts,
+      noteIds: [],
       entryId,
       undone: false,
       undoneAt: null,
@@ -92,6 +82,34 @@ function insertHpChange(env: Env, facts: FactsInput, entryId: string): HpChangeR
     .returning()
     .get();
   return toHpChangeRecord(row);
+}
+
+/**
+ * Emits the owner event, then `hpRules.after` (cards follow it, FR-CBTX-17); the cards it made
+ * go into the row's and the event's `noteIds` (the event is validated at commit).
+ */
+function emitWithCards(
+  env: Env,
+  type: string,
+  a: Applied,
+  row: HpChangeRecord,
+  facts: FactsInput,
+  extra: RecordChange[],
+): void {
+  const payload: HpChangeFacts = { hpChangeId: row.id, ...facts, noteIds: [] };
+  const rowChange = hpChangeChange(null, row);
+  const event: DomainEvent = {
+    type,
+    campaignId: row.campaignId,
+    payload,
+    changes: [...a.changes, rowChange, ...extra],
+  };
+  env.emit(event);
+  const noteIds = hpRules.after(env, a, { encounterId: row.encounterId, hpChangeId: row.id });
+  if (noteIds.length === 0) return;
+  env.tx.update(hpChange).set({ noteIds }).where(eq(hpChange.id, row.id)).run();
+  payload.noteIds = noteIds;
+  rowChange.after = readHpChange(env.tx, row.id);
 }
 
 /** A card's roll row: totals for apply, dice for the DM's line (FR-CBT-53). */
@@ -155,9 +173,17 @@ export const applyCard = defineCommand({
       const targetAc = statsOf(env, target).ac;
       const hitComputed = hitHint(toHitRoll.natural, input.toHitTotal, targetAc);
       const raw = rawDamage(hit, input.damageTotal, multiplier);
-      const hp = applyDelta(env, target, -raw);
+      // Allocated first: effects ended `down` point at this row (FR-CBTX-16, -22).
+      const hpChangeId = env.ctx.ids.next();
+      const hp = hpRules.apply(env, hpTargetOf(target), {
+        kind: "damage",
+        raw,
+        crit: p.crit,
+        hpChangeId,
+      });
+      // `applied` = HP lost; temp HP took `absorbed` first (FR-CBTX-15).
       const applied = Math.abs(hp.hpBefore - hp.hpAfter);
-      const overkill = Math.max(0, raw - hp.hpBefore);
+      const overkill = Math.max(0, raw - hp.absorbed - hp.hpBefore);
       const logPayload: AttackLogPayload = {
         targetName: target.name,
         attackName: p.attackName,
@@ -188,6 +214,7 @@ export const applyCard = defineCommand({
           damage: input.damageTotal !== damageRoll.total,
         },
         rolls,
+        ...(hp.absorbed > 0 ? { absorbed: hp.absorbed } : {}),
       };
       // FR-CBT-36: one line per target; never public if the attacker or this target is hidden,
       // else a player's card is public, else the DM's choice / category setting (FR-CBT-24).
@@ -228,17 +255,19 @@ export const applyCard = defineCommand({
         overkill,
         hpBefore: hp.hpBefore,
         hpAfter: hp.hpAfter,
+        ...playFacts(hp),
       };
-      const row = insertHpChange(env, facts, entry.id);
-      env.emit({
-        type: AttackApplied.type,
-        campaignId: enc.campaignId,
-        payload: { hpChangeId: row.id, ...facts },
-        changes: [...hp.changes, hpChangeChange(null, row), entry],
-      });
+      const row = insertHpChange(env, hpChangeId, facts, entry.id);
+      emitWithCards(env, AttackApplied.type, hp, row, facts, [entry]);
       hpChangeIds.push(row.id);
-      // #138: the rolling player sees each outcome; a hidden target's name never.
-      outcomes.push({ targetName: target.hidden ? null : target.name, hit, multiplier, applied });
+      // #138: the rolling player sees each outcome; a hidden target's name never. FR-CBTX-15:
+      // `applied` = damage dealt (HP lost + absorbed), so a target's temp HP never shows.
+      outcomes.push({
+        targetName: target.hidden ? null : target.name,
+        hit,
+        multiplier,
+        applied: applied + hp.absorbed,
+      });
     }
     const resolution: DamageCardTargetsResolution = { targets: outcomes };
     resolveNotification(env, card.id, resolution);
@@ -252,16 +281,26 @@ export const applyHp = defineCommand({
   execute(input, env): HpChangeResult {
     const { c: target, enc } = activeCombatant(env, input.combatantId);
     const targetAc = statsOf(env, target).ac;
-    const delta = input.kind === "damage" ? -input.amount : input.amount;
-    const hp = applyDelta(env, target, delta);
+    const hpChangeId = env.ctx.ids.next();
+    const hp = hpRules.apply(env, hpTargetOf(target), {
+      kind: input.kind,
+      raw: input.amount,
+      hpChangeId,
+    });
     const applied = Math.abs(hp.hpBefore - hp.hpAfter);
-    const overkill = input.kind === "damage" ? Math.max(0, input.amount - hp.hpBefore) : 0;
+    const overkill =
+      input.kind === "damage" ? Math.max(0, input.amount - hp.absorbed - hp.hpBefore) : 0;
     const entry = gameLog.append(env, {
       kind: LOG_KIND_HP,
       category: input.kind === "damage" ? "damage" : "healing",
       actorName: "DM",
       payload: { targetName: target.name, kind: input.kind, amount: input.amount },
-      dmPayload: { applied, hpBefore: hp.hpBefore, hpAfter: hp.hpAfter },
+      dmPayload: {
+        applied,
+        hpBefore: hp.hpBefore,
+        hpAfter: hp.hpAfter,
+        ...(hp.absorbed > 0 ? { absorbed: hp.absorbed } : {}),
+      },
       rollIds: [],
       encounterId: enc.id,
       public: target.hidden ? false : input.public,
@@ -293,14 +332,10 @@ export const applyHp = defineCommand({
       overkill,
       hpBefore: hp.hpBefore,
       hpAfter: hp.hpAfter,
+      ...playFacts(hp),
     };
-    const row = insertHpChange(env, facts, entry.id);
-    env.emit({
-      type: HpApplied.type,
-      campaignId: enc.campaignId,
-      payload: { hpChangeId: row.id, ...facts },
-      changes: [...hp.changes, hpChangeChange(null, row), entry],
-    });
+    const row = insertHpChange(env, hpChangeId, facts, entry.id);
+    emitWithCards(env, HpApplied.type, hp, row, facts, [entry]);
     return { hpChangeId: row.id };
   },
 });
@@ -320,16 +355,19 @@ export function undoUnit(env: Pick<CommandEnv, "tx">, encounterId: string): HpCh
 export const undoCommand = defineCommand({
   name: CBT_INTENTS.undo,
   input: UndoInput,
-  execute({ expectedHpChangeId }, env): HpChangesResult {
+  execute({ expectedHpChangeId }, env): UndoResult {
     const enc = startedEncounter(env.tx, campaignOf(env.actor));
     const unit = enc ? undoUnit(env, enc.id) : [];
     const last = unit[0];
     if (!enc || !last) throw conflict("Nothing to undo");
     if (last.id !== expectedHpChangeId) throw conflict("Something else changed — check Undo");
+    const notRestored: string[] = [];
     for (const row of unit) {
       const target = readCombatant(env.tx, row.targetId);
-      // I2: the inverse delta, clamped; it restores only this entry's own change.
-      const hp = applyDelta(env, target, row.kind === "damage" ? row.applied : -row.applied);
+      // I2: the inverse delta, clamped; it restores only this entry's own change. FR-CBTX-22:
+      // temp HP, death counters by delta, effects it ended (free slots only).
+      const hp = hpRules.revert(env, row, target);
+      notRestored.push(...hp.notRestored);
       env.tx
         .update(hpChange)
         .set({ undone: true, undoneAt: env.ctx.clock.iso() })
@@ -342,9 +380,11 @@ export const undoCommand = defineCommand({
         payload: { hpChangeId: row.id },
         changes: [...hp.changes, hpChangeChange(row, readHpChange(env.tx, row.id)), entry],
       });
+      // FR-CBTX-22: this row's pending concentration cards close `undone` after its event.
+      hpRules.afterRevert(env, hp);
     }
     // I28: the owner's events first, then the card back to pending (once per apply).
     if (last.cardId) reopenNotification(env, last.cardId);
-    return { hpChangeIds: unit.map((r) => r.id) };
+    return { hpChangeIds: unit.map((r) => r.id), notRestored };
   },
 });

@@ -13,6 +13,9 @@ import charMiraFull from "./character-sheet-full/char-mira-full";
 import charMiraLocked from "./character-sheet-full/char-mira-locked";
 import charSela from "./character-sheet-full/char-sela";
 import npcEliteSheet from "./character-sheet-full/npc-elite-sheet";
+import cbtxEffects from "./combat-extras/cbtx-effects";
+import cbtxReinforcement from "./combat-extras/cbtx-reinforcement";
+import cbtxTemp from "./combat-extras/cbtx-temp";
 import combat1 from "./combat-tracker/combat-1";
 import combatHit from "./combat-tracker/combat-hit";
 import combatPending from "./combat-tracker/combat-pending";
@@ -74,4 +77,7 @@ export const units: readonly Fixture[] = [
   charMiraLocked,
   charSela,
   npcEliteSheet,
+  cbtxEffects,
+  cbtxTemp,
+  cbtxReinforcement,
 ];

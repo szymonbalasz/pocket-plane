@@ -7,6 +7,7 @@ import campaignSwitch from "./campaign-switch";
 import characterSheet from "./character-sheet";
 import characterSheetFull from "./character-sheet-full";
 import combat from "./combat";
+import combatExtras from "./combat-extras";
 import diceLog from "./dice-log";
 import entities from "./entities";
 import midCombat from "./mid-combat";
@@ -32,4 +33,5 @@ export const bundles: readonly Bundle[] = [
   midCombat,
   partyLoot,
   characterSheetFull,
+  combatExtras,
 ];
