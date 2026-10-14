@@ -19,7 +19,14 @@ import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/cont
 import { Input } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
-import { type ManualSlot, manualSlots, modeFromKeys, parseManual, slotsAfterFirst } from "./logic";
+import {
+  type ManualSlot,
+  manualSlots,
+  modeFromKeys,
+  parseManual,
+  publicState,
+  slotsAfterFirst,
+} from "./logic";
 import { usePhysicalDice } from "./physical";
 
 export interface RollRequest {
@@ -58,6 +65,8 @@ export interface RollControl {
   isDm: boolean;
   /** DM public switch value: the override, else the category's setting. */
   publicValue: boolean;
+  /** DM: the category's setting (FR-DICE-13); `publicValue` differs = an override is set. */
+  publicPreset: boolean;
   setPublic(v: boolean): void;
   physical: boolean;
   /** Open manual popover state, or null. */
@@ -76,7 +85,7 @@ export function useRollControl(options: RollControlOptions): RollControl {
   const settings = useRecords<GameLogSettingsRecord>(GAME_LOG_SETTINGS_TYPE)[0];
   const preset = settings ? categoryPublic(settings, options.category) : false;
   const [override, setOverride] = useState<{ category: RollCategory; value: boolean } | null>(null);
-  const active = override && override.category === options.category ? override : null;
+  const pub = publicState(preset, options.category, override);
   const [physical] = usePhysicalDice();
   const [manual, setManual] = useState<RollControl["manual"]>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +93,7 @@ export function useRollControl(options: RollControlOptions): RollControl {
   const finish = (mode: RollMode, entries?: ManualEntry[]) => {
     const req: RollRequest = { mode };
     if (entries) req.manual = entries;
-    if (isDm && active) req.public = active.value;
+    if (isDm && pub.overridden) req.public = pub.value;
     setOverride(null);
     setManual(null);
     options.onRoll(req);
@@ -103,7 +112,8 @@ export function useRollControl(options: RollControlOptions): RollControl {
       setManual({ mode, first: slots[0] as ManualSlot });
     },
     isDm,
-    publicValue: active ? active.value : preset,
+    publicValue: pub.value,
+    publicPreset: preset,
     setPublic: (value) => setOverride({ category: options.category, value }),
     physical,
     manual,
