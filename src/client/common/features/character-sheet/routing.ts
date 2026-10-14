@@ -37,13 +37,31 @@ export interface RollRouteClaim {
   send(sendIntent: SendIntent, input: RollRouteInput): Promise<unknown>;
 }
 
+/** FR-CHARX-24: the row a routed roll names (attack / damage rows, spell rows); none = first. */
+export type RollRouteRef =
+  | { attackId: string; spellId?: never }
+  | { spellId: string; attackId?: never };
+
 /**
  * One registry entry. `claim` reads only the synced store (e.g. "a started encounter has this
  * PC as an active combatant") and returns null to pass. First claim wins, in list order.
+ * `ref` (FR-CHARX-24) names the sheet row; a route that sends its own intent passes it on.
  */
 export interface RollRoute {
   name: string;
-  claim(store: RecordStore, characterId: string, kind: SheetRollKind): RollRouteClaim | null;
+  claim(
+    store: RecordStore,
+    characterId: string,
+    kind: SheetRollKind,
+    ref?: RollRouteRef,
+  ): RollRouteClaim | null;
+}
+
+/** The route ref of a sheet roll's row (attack or spell), else none. */
+export function routeRef(ref: SheetRollRef | undefined): RollRouteRef | undefined {
+  if (ref?.attackId !== undefined) return { attackId: ref.attackId };
+  if (ref?.spellId !== undefined) return { spellId: ref.spellId };
+  return undefined;
 }
 
 /** FR-CHAR-16: the first route that claims, else null (→ `char.roll`). A throwing route passes. */
@@ -52,10 +70,11 @@ export function routeFor(
   store: RecordStore,
   characterId: string,
   kind: SheetRollKind,
+  ref?: RollRouteRef,
 ): RollRouteClaim | null {
   for (const r of routes) {
     try {
-      const c = r.claim(store, characterId, kind);
+      const c = r.claim(store, characterId, kind, ref);
       if (c) return c;
     } catch (err) {
       console.warn(`roll route ${r.name}: claim() threw`, err);

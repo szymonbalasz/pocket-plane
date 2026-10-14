@@ -1,7 +1,8 @@
 // `cbt.attack` (FR-CBT-16–18, FR-CBT-52, #135): rolls to-hit + damage server-side, writes the roll
 // line, then creates the damage card via `notify` in the same transaction (ADR-0027). No target:
-// the DM picks it in the attack popup (#134).
-import { characterRolls } from "@shared/character-sheet/logic";
+// the DM picks it in the attack popup (#134). FR-CHARX-24 (OQ-CBT-47): `attackId?` / `spellId?`
+// name the sheet row, resolved by CHARX's `sheetAttack`; neither = the first attack.
+import { attackRollSpecs } from "@shared/character-sheet/logic";
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { critExpression } from "@shared/combat-tracker/rules";
 import {
@@ -14,11 +15,11 @@ import {
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import { AttackRolled } from "@shared/events/combat-tracker";
 import { defineCommand } from "../../commands/commands";
-import { conflict } from "../../commands/errors";
 import type { DomainEvent, RecordChange } from "../../events/types";
+import { characters } from "../character-sheet";
 import { dice, gameLog, type Roll } from "../dice-roll-log";
 import { notify } from "../notifications";
-import { activeCombatant, statsOf } from "./guards";
+import { activeCombatant } from "./guards";
 
 const cardDice = (r: Roll) => r.dice.map((d) => [d.value, d.kept] as [number | null, boolean]);
 
@@ -31,11 +32,12 @@ export const attackCommand = defineCommand({
   },
   execute(input, env): AttackResult {
     const { c, enc } = activeCombatant(env, input.attackerId, { own: true });
-    const stats = statsOf(env, c);
-    const attack = stats.attacks[0];
-    const specs = characterRolls(stats, "attack");
-    const [hitSpec, dmgSpec] = specs ?? [];
-    if (!attack || !hitSpec || !dmgSpec) throw conflict("No weapon attack");
+    // The attacker's own definition only: a row of another creature is `not_found` here.
+    const attack = characters.sheetAttack(env, c.entityId, {
+      attackId: input.attackId,
+      spellId: input.spellId,
+    });
+    const [hitSpec, dmgSpec] = attackRollSpecs(attack);
     const actor = { kind: "entity" as const, id: c.entityId, name: c.name };
     const toHit = dice.evaluate(env, {
       expression: hitSpec.expression,
@@ -79,7 +81,7 @@ export const attackCommand = defineCommand({
       attackerId: c.id,
       attackerName: c.name,
       attackName: attack.name,
-      damageType: attack.damageType ?? null,
+      damageType: attack.damageType,
       mode: input.mode,
       crit,
       toHit: {

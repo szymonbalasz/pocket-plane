@@ -62,8 +62,86 @@ export type SheetRollResult =
 
 const NO_SCORES = "No ability scores";
 
-const damageLabel = (name: string, damageType: string | undefined) =>
+const damageLabel = (name: string, damageType: string | null | undefined) =>
   damageType ? `${name} damage (${damageType})` : `${name} damage`;
+
+/**
+ * What combat rolls for one sheet row (FR-CHARX-24, OQ-CHARX-12): a weapon attack, or a spell
+ * with `roll: attack` and `damage` (to-hit = the spell attack bonus).
+ */
+export interface SheetAttack {
+  name: string;
+  toHit: number;
+  damage: string;
+  damageType: string | null;
+}
+
+/** The row `cbt.attack` names: an attack row, a spell row, or neither (= the first attack). */
+export interface SheetAttackRef {
+  attackId?: string;
+  spellId?: string;
+}
+
+export type SheetAttackResult =
+  | { ok: true; attack: SheetAttack }
+  | { ok: false; code: "not_found" | "conflict"; message: string };
+
+/**
+ * FR-CHARX-24: the attack a ref names, from committed data (overrides honoured). No ref → the
+ * first attack (MVP clients and combat). Unknown row → `not_found`; a spell without an attack
+ * roll or without damage, or no spellcasting → `conflict` (a spell attack without damage is
+ * never combat's: it stays a plain `char.roll`).
+ */
+export function resolveSheetAttack(
+  stats: RollStats & AbilityStats,
+  sheet: RollSheet,
+  ref: SheetAttackRef,
+): SheetAttackResult {
+  const fail = (code: "not_found" | "conflict", message: string): SheetAttackResult => ({
+    ok: false,
+    code,
+    message,
+  });
+  if (ref.spellId !== undefined) {
+    const s = sheet?.spells.find((x) => x.id === ref.spellId);
+    if (!s) return fail("not_found", "Spell was deleted");
+    if (s.roll !== "attack") return fail("conflict", `No attack roll for ${s.name}`);
+    if (!s.damage) return fail("conflict", `No damage roll for ${s.name}`);
+    const bonus = spellAttackBonus(stats);
+    if (bonus === null) return fail("conflict", "No spellcasting");
+    const attack = { name: s.name, toHit: bonus, damage: s.damage };
+    return { ok: true, attack: { ...attack, damageType: s.damageType ?? null } };
+  }
+  const a =
+    ref.attackId === undefined
+      ? sheetAttack(stats)
+      : (stats.attacks.find((x) => x.id === ref.attackId) ?? null);
+  if (!a) {
+    return ref.attackId === undefined
+      ? fail("conflict", "No weapon attack")
+      : fail("not_found", "Attack was deleted");
+  }
+  const attack = { name: a.name, toHit: a.toHit, damage: a.damage };
+  return { ok: true, attack: { ...attack, damageType: a.damageType ?? null } };
+}
+
+/** To-hit (d20, category `attack`) then damage (category `damage`) of one attack (FR-CHAR-05). */
+export function attackRollSpecs(a: SheetAttack): [CharacterRollSpec, CharacterRollSpec] {
+  return [
+    {
+      expression: d20(a.toHit),
+      category: "attack",
+      label: fitLabel(`${a.name} attack`),
+      d20: true,
+    },
+    {
+      expression: a.damage,
+      category: "damage",
+      label: fitLabel(damageLabel(a.name, a.damageType)),
+      d20: false,
+    },
+  ];
+}
 
 /**
  * FR-CHAR-05: initiative = d20 + initBonus (category initiative); attack = d20 + toHit (attack)
@@ -144,18 +222,10 @@ function sheetRolls(
     }
     case "attack":
     case "damage": {
-      const a =
-        ref.attackId === undefined
-          ? sheetAttack(stats)
-          : (stats.attacks.find((x) => x.id === ref.attackId) ?? null);
-      if (!a) {
-        return ref.attackId === undefined
-          ? fail("conflict", "No weapon attack")
-          : fail("not_found", "Attack was deleted");
-      }
-      const dmg = spec(a.damage, "damage", damageLabel(a.name, a.damageType), false);
-      if (kind === "damage") return ok([dmg]);
-      return ok([spec(d20(a.toHit), "attack", `${a.name} attack`, true), dmg]);
+      const r = resolveSheetAttack(stats, sheet, { attackId: ref.attackId });
+      if (!r.ok) return r;
+      const [hit, dmg] = attackRollSpecs(r.attack);
+      return ok(kind === "damage" ? [dmg] : [hit, dmg]);
     }
     case "spellAttack":
     case "spellDamage": {

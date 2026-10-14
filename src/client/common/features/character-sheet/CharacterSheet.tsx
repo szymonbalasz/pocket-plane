@@ -21,7 +21,7 @@ import { CreateCharacterDialog } from "./CreateCharacter";
 import { SELECT } from "./fields";
 import { rollRoutes } from "./roll-routes";
 import { ROLL_HINT, type SheetRollProps, useSheetRollControl } from "./rolls";
-import { rollActionView, routeFor } from "./routing";
+import { rollActionView, routeFor, routeRef } from "./routing";
 import { SheetView } from "./SheetView";
 import { SummaryCard } from "./SummaryCard";
 import { clearEditRequest, selectSheet, sheetSelection } from "./selection";
@@ -34,7 +34,11 @@ const NEW = "__new";
 // The tabs import these from here; they render only inside a sheet (module cycle is
 // render-time only).
 
-/** One sheet roll through `char.roll` (checks, saves, skills, attacks by row, spells). */
+/**
+ * One sheet roll (checks, saves, skills, attacks by row, spells): `char.roll`, unless a roll
+ * route claims it with the row's ref (FR-CHARX-24: combat claims an attack row's or a damaging
+ * spell's Attack). A hidden claim renders nothing (FR-CHAR-24).
+ */
 export function SheetRoll({
   kind,
   rollRef,
@@ -44,13 +48,17 @@ export function SheetRoll({
   children,
   ...button
 }: SheetRollProps) {
+  const ctx = useSheet();
+  const store = useSync((s) => s.store);
+  const claim = routeFor(rollRoutes, store, ctx.creature.id, kind, routeRef(rollRef));
   const { control, disabled } = useSheetRollControl({
     kind,
     rollRef,
     title,
     overrides,
-    claim: null,
+    claim,
   });
+  if (rollActionView(claim, kind) !== "button") return null;
   return (
     <Tooltip content={hint ? `${hint} · ${ROLL_HINT}` : ROLL_HINT}>
       <RollButton

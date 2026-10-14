@@ -2,6 +2,7 @@
 // difficulty card); Start on the viewed scene (binding preview) / End (confirm). Planned
 // encounters save themselves (debounced whole replace); started / ended are read-only.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
+import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { difficultyMethods, formatCr, totalCr } from "@shared/combat-tracker/difficulty";
 import { type BindSlot, planBindings } from "@shared/combat-tracker/rules";
 import {
@@ -39,6 +40,7 @@ import { useDmMap, viewedScene } from "../scenes-map/view-state";
 import { useDefinitions } from "./data";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { useOpenEncounter } from "./open-encounter";
+import { partyMembers, toggleParty } from "./party";
 import { combatRest } from "./rest";
 
 interface Draft {
@@ -64,6 +66,15 @@ function useCharacters() {
   );
 }
 
+/** Character ids whose sheet is a draft (FR-CHARX-11): not in the whole party. */
+function useDraftIds(): ReadonlySet<string> {
+  const sheets = useRecords<CreatureSheetRecord>(CREATURE_SHEET_TYPE);
+  return useMemo(
+    () => new Set(sheets.filter((s) => s.status === "draft").map((s) => s.entityId)),
+    [sheets],
+  );
+}
+
 function draftOf(e: EncounterRecord, entries: EncounterEntryRecord[]): Draft {
   return {
     name: e.name,
@@ -80,10 +91,8 @@ function draftOf(e: EncounterRecord, entries: EncounterEntryRecord[]): Draft {
 function DifficultyCard({ draft }: { draft: Draft }) {
   const defs = useDefinitions();
   const characters = useCharacters();
-  const party =
-    draft.partyCharacterIds === null
-      ? characters
-      : characters.filter((c) => draft.partyCharacterIds?.includes(c.id));
+  const drafts = useDraftIds();
+  const party = partyMembers(characters, draft.partyCharacterIds, drafts);
   const levels = party.map((c) => (c.kind === "character" ? c.statBlock.level : 1));
   const crs = draft.entries.flatMap((e) => {
     const d = defs.get(e.definitionId);
@@ -218,14 +227,12 @@ function StartDialog({
   const scene = viewedScene(scenes, folders, requested);
   const defs = useDefinitions();
   const characters = useCharacters();
+  const drafts = useDraftIds();
   const { disabled } = useCbtIntent();
   const startEnd = useStartEnd();
   const bindings = useMemo(() => {
     if (!scene) return [];
-    const party =
-      draft.partyCharacterIds === null
-        ? characters
-        : characters.filter((c) => draft.partyCharacterIds?.includes(c.id));
+    const party = partyMembers(characters, draft.partyCharacterIds, drafts);
     const slots: BindSlot[] = [
       ...party.map((c) => ({
         kind: "pc" as const,
@@ -248,7 +255,7 @@ function StartDialog({
       slots,
       tokens.filter((t) => t.sceneId === scene.id),
     );
-  }, [scene, tokens, draft, defs, characters]);
+  }, [scene, tokens, draft, defs, characters, drafts]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="cbt-enc-start-dialog">
@@ -304,6 +311,7 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
   const allEntries = useRecords<EncounterEntryRecord>(ENCOUNTER_ENTRY_TYPE);
   const defs = useDefinitions();
   const characters = useCharacters();
+  const drafts = useDraftIds();
   const live = useSync((s) => s.state === "live");
   const { disabled } = useCbtIntent();
   const server = useMemo(() => draftOf(encounter, allEntries), [encounter, allEntries]);
@@ -348,7 +356,7 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
         .map((e) => (e.definitionId === id ? { ...e, quantity: q } : e))
         .filter((e) => e.quantity > 0),
     }));
-  const partyIds = draft.partyCharacterIds ?? characters.map((c) => c.id);
+  const partyIds = partyMembers(characters, draft.partyCharacterIds, drafts).map((c) => c.id);
 
   return (
     <div
@@ -461,20 +469,23 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
                 disabled={readOnly}
                 checked={partyIds.includes(c.id)}
                 onCheckedChange={(v) =>
-                  edit((d) => {
-                    const cur = d.partyCharacterIds ?? characters.map((x) => x.id);
-                    const next = v === true ? [...cur, c.id] : cur.filter((x) => x !== c.id);
-                    return {
-                      ...d,
-                      partyCharacterIds: next.length === characters.length ? null : next,
-                    };
-                  })
+                  edit((d) => ({
+                    ...d,
+                    partyCharacterIds: toggleParty(
+                      characters,
+                      d.partyCharacterIds,
+                      drafts,
+                      c.id,
+                      v === true,
+                    ),
+                  }))
                 }
               />
               <Label htmlFor={id} className="font-normal">
                 {c.name}{" "}
                 <span className="text-xs text-muted-foreground">
                   (level {c.kind === "character" ? c.statBlock.level : "?"})
+                  {drafts.has(c.id) && " · Draft"}
                 </span>
               </Label>
             </div>

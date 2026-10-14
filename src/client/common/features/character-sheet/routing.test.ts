@@ -10,6 +10,7 @@ import {
   type RollRoute,
   rollActionView,
   routeFor,
+  routeRef,
   sendSheetRoll,
   sheetBadge,
 } from "./routing";
@@ -262,5 +263,38 @@ describe("FR-CHAR-12 in flight and errors", () => {
     expect(CONNECTION_LOST).toBe(
       "Connection lost \u2014 check the game log / HP before trying again",
     );
+  });
+});
+
+describe("FR-CHARX-24 route ref", () => {
+  test("FR-CHARX-24 routeFor hands each route the row ref; routeRef keeps only attackId / spellId", () => {
+    const seen: unknown[] = [];
+    const spy: RollRoute = {
+      name: "spy",
+      claim: (_s, _id, kind, ref) => {
+        seen.push([kind, ref]);
+        return null;
+      },
+    };
+    routeFor([spy], emptyStore(), "mira", "attack", routeRef({ attackId: "a2" }));
+    routeFor([spy], emptyStore(), "mira", "spellAttack", routeRef({ spellId: "bolt" }));
+    routeFor([spy], emptyStore(), "mira", "skill", routeRef({ skill: "stealth" }));
+    routeFor([spy], emptyStore(), "mira", "check", routeRef({ ability: "dex" }));
+    expect(seen).toEqual([
+      ["attack", { attackId: "a2" }],
+      ["spellAttack", { spellId: "bolt" }],
+      ["skill", undefined],
+      ["check", undefined],
+    ]);
+  });
+
+  test("FR-CHARX-24 not claimed → char.roll carries the row (attackId / spellId)", async () => {
+    sent.length = 0;
+    await sendSheetRoll(send, null, "mira", "attack", { mode: "normal" }, { attackId: "a2" });
+    await sendSheetRoll(send, null, "mira", "spellAttack", { mode: "normal" }, { spellId: "t" });
+    expect(sent).toEqual([
+      ["char.roll", { characterId: "mira", kind: "attack", mode: "normal", attackId: "a2" }],
+      ["char.roll", { characterId: "mira", kind: "spellAttack", mode: "normal", spellId: "t" }],
+    ]);
   });
 });
