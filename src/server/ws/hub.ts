@@ -17,6 +17,7 @@ import { CommandError, zodIssues } from "../commands/errors";
 import type { DispatchedEvent, RecordChange, Role } from "../events/types";
 import type { Services } from "../services";
 import type { PresenceView, Viewer, WireChange } from "./records";
+import type { SignalAudience, SignalRead, SignalSender } from "./signals";
 import { realTimers, type TimerHandle, type Timers } from "./timers";
 
 export interface SocketLike {
@@ -37,6 +38,15 @@ export const SNAPSHOT_CEILING = { dm: 768 * 1024, player: 512 * 1024 } as const;
  * turns a big snapshot into a 4000 → reconnect → same snapshot loop.
  */
 export const SEND_BUFFER_LIMIT = 4 * 1024 * 1024;
+
+/** Codes an `audience` hook may reject with (ADR-0033); anything else → `internal`. */
+const SIGNAL_REJECT_CODES: ReadonlySet<RejectFrame["code"]> = new Set([
+  "not_found",
+  "forbidden",
+  "invalid",
+]);
+/** Hook errors log at most once per (connection, signal name) per window (ADR-0033). */
+export const SIGNAL_ERROR_LOG_MS = 10_000;
 
 const utf8Bytes = (s: string) => Buffer.byteLength(s, "utf8");
 
@@ -96,6 +106,10 @@ export class Hub implements HubApi {
   private readonly heartbeat: TimerHandle;
   private readonly maxBuffered: number;
   private readonly unsubscribe: () => void;
+  /** Read access for signal `audience` hooks (ADR-0033). */
+  private readonly signalRead: SignalRead;
+  /** connId → signal name → last logged hook error (ms). */
+  private signalErrorAt = new Map<string, Map<string, number>>();
 
   constructor(
     private readonly s: Services,
@@ -108,6 +122,10 @@ export class Hub implements HubApi {
       opts.heartbeatCheckMs ?? 1_000,
     );
     this.unsubscribe = s.bus.subscribe("broadcaster", (e) => this.broadcast(e));
+    this.signalRead = {
+      db: s.db,
+      activeSceneOf: (campaignId) => s.records.activeSceneOf(campaignId),
+    };
   }
 
   // ---------- transport callbacks ----------
@@ -319,8 +337,9 @@ export class Hub implements HubApi {
   }
 
   /**
-   * Signals (FR-SYNC-22, ADR-0026): zod + roles, then forward to every **other** live connection
-   * of the sender's campaign with a server-stamped `from`. No bus, DB, log, snapshot or `seq`.
+   * Signals (FR-SYNC-22, ADR-0026): zod + roles, then the type's `audience` hook (FR-SYNC-28,
+   * ADR-0033), then forward to every **other** live connection of the sender's campaign (`"dm"`:
+   * DM connections only) with a server-stamped `from`. No bus, DB write, log, snapshot or `seq`.
    */
   private signal(c: Connection, name: string, data: unknown): undefined {
     if (c.phase !== "live" || !c.role || !c.campaignId) {
@@ -333,12 +352,45 @@ export class Hub implements HubApi {
     if (!parsed.success) {
       return this.reject(c, null, "invalid", "Invalid signal", zodIssues(parsed.error));
     }
+    let audience: SignalAudience = "all";
+    if (def.audience) {
+      const sender: SignalSender = { role: c.role, campaignId: c.campaignId };
+      if (c.playerId) sender.playerId = c.playerId;
+      try {
+        audience = def.audience(parsed.data, sender, this.signalRead);
+        if (audience !== "all" && audience !== "dm") {
+          throw new Error(`audience returned ${JSON.stringify(audience)}`);
+        }
+      } catch (err) {
+        if (err instanceof CommandError && SIGNAL_REJECT_CODES.has(err.code)) {
+          return this.reject(c, null, err.code, err.message, err.issues);
+        }
+        this.logSignalError(c, name, err);
+        return this.reject(c, null, "internal", "Internal error");
+      }
+    }
     const from: SignalFrom =
       c.role === "dm" ? { role: "dm" } : { role: "player", playerId: c.playerId ?? "" };
     const frame: ServerSignalFrame = { type: "signal", name, data: parsed.data, from };
     for (const o of [...this.conns.values()]) {
-      if (o !== c && o.phase === "live" && o.campaignId === c.campaignId) this.send(o, frame);
+      if (o === c || o.phase !== "live" || o.campaignId !== c.campaignId) continue;
+      if (audience === "dm" && o.role !== "dm") continue;
+      this.send(o, frame);
     }
+  }
+
+  /** Hook errors: logged at most once per (connection, signal name) per 10 s (ADR-0033). */
+  private logSignalError(c: Connection, name: string, err: unknown): void {
+    const now = this.s.clock.now();
+    let byName = this.signalErrorAt.get(c.connId);
+    if (!byName) {
+      byName = new Map();
+      this.signalErrorAt.set(c.connId, byName);
+    }
+    const last = byName.get(name);
+    if (last !== undefined && now - last < SIGNAL_ERROR_LOG_MS) return;
+    byName.set(name, now);
+    this.s.log.error(`signal ${name} audience failed on ${c.connId}`, err);
   }
 
   /** Bus listener: one `event` frame per connection per domain event (FR-SYNC-17). */
@@ -488,6 +540,7 @@ export class Hub implements HubApi {
     if (c.helloTimer !== null) this.timers.clearTimeout(c.helloTimer);
     c.helloTimer = null;
     this.conns.delete(c.connId);
+    this.signalErrorAt.delete(c.connId);
     if (c.presenceCounted && c.playerId && c.campaignId) {
       c.presenceCounted = false;
       this.presenceDelta(c.campaignId, c.playerId, -1);
