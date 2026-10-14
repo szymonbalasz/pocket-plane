@@ -2,7 +2,10 @@
 // heavy" session built through commands. DM ≤ 768 KiB, players ≤ 512 KiB, DM build < 200 ms.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
+import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
+import { COMBATANT_TYPE } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_WINDOW } from "@shared/dice-roll-log/schemas";
+import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { SNAPSHOT_CEILING } from "./hub";
 import {
   buildRealisticHeavy,
@@ -10,6 +13,7 @@ import {
   dmBuildMs,
   HEAVY,
   servicesFromBundle,
+  snapshotFrames,
   snapshotSizes,
   type ViewerSize,
 } from "./testing/snapshot-size";
@@ -55,6 +59,7 @@ describe("CON-44 snapshot ceilings (#163)", () => {
         encounters: HEAVY.encounters,
         pendingCards: HEAVY.pendingCards,
         sheets: HEAVY.sheets,
+        effects: HEAVY.effects,
       });
       // Applied cards add one line per target; session-sim brings its own loot.
       expect(counts.logEntries).toBeGreaterThanOrEqual(HEAVY.logEntries);
@@ -78,6 +83,39 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect(perSheet).toBeGreaterThan(5_000);
       expect(perSheet).toBeLessThan(15_000);
       expectUnderCeilings(sizes);
+    });
+
+    test("CBTX §12 effect rows: DM every active one, players the non-secret non-hidden ones; ceilings hold", () => {
+      const sizes = snapshotSizes(b.s);
+      const fx = sizes.map((v) => v.types[EFFECT_TYPE]);
+      expect(fx.map((t) => t?.rows)).toEqual([
+        HEAVY.effects,
+        ...Array(HEAVY.players).fill(HEAVY.playerEffects),
+      ]);
+      // Per effect with max-length label / source name and UUID ids: ≈ 700 B DM, ≈ 280 B player
+      // (CBTX §12 estimated 300 / 200 B with short strings).
+      expect((fx[0]?.bytes ?? 0) / HEAVY.effects).toBeLessThan(800);
+      expect((fx[1]?.bytes ?? 0) / HEAVY.playerEffects).toBeLessThan(400);
+      expectUnderCeilings(sizes);
+    });
+
+    test("FR-CBTX-31/32 leak scan: no player frame has combatant tempHp, others' counters, effect links", () => {
+      for (const f of snapshotFrames(b.s).filter((x) => x.viewer.role === "player")) {
+        for (const c of (f.records[COMBATANT_TYPE] ?? []) as Record<string, unknown>[]) {
+          expect(Object.keys(c)).not.toContain("tempHp");
+        }
+        for (const e of (f.records[ENTITY_TYPE] ?? []) as Record<string, unknown>[]) {
+          if (e.ownerPlayerId === f.viewer.playerId) continue;
+          for (const k of ["tempHp", "deathSuccesses", "deathFailures", "hpCurrent"]) {
+            expect(Object.keys(e)).not.toContain(k);
+          }
+          expect(Object.keys(e)).toContain("deathState");
+        }
+        const fx = JSON.stringify(f.records[EFFECT_TYPE] ?? []);
+        for (const leak of ["sourceCombatantId", "anchorCombatantId", "concentrationId", "Hex "]) {
+          expect(fx).not.toContain(leak);
+        }
+      }
     });
 
     test("SQL windows: providers return the window, not the history (build time flat)", () => {
