@@ -1,10 +1,10 @@
 # DM feedback after the MVP playtest (2026-10-14)
 
-Work list for the next phase. **Not started.** Tiers and notes are **proposed**: confirm with the DM in one batch before building. Log as decisions at that point.
+Work list for the next phase. **Tiers confirmed by the DM (#171): all five tier S, part of MVP.** P3 / P4 answers in the notes.
 
 ## Playtest requests
 
-| # | Request (DM's words, short) | Today | Proposed tier | Specs touched | Notes |
+| # | Request (DM's words, short) | Today | Tier | Specs touched | Notes |
 |---|---|---|---|---|---|
 | P1 | **Tooltip delay** (~400 ms) on **all** tooltips. They clash with popups, e.g. Roll initiative → the roll dialog and the button's tooltip fight for space while the mouse is still on the button | Tooltips show at once | **S** | play-shell (shared tooltip) | One shared default in `src/client/common/` (shared file, §9.9). Also hide the tooltip when a popover opens from that button |
 | P2 | **Token labels**: move up so they sit in the gap between grid cells, not over the top of the cell below; draw them **above** all tokens (today the lower token hides the upper token's label). **Down** becomes a semi-transparent **X** centred over the token, not a label | Label under the token, in token z-order; "Down" label where the name label will now go | **S** | scenes-map (label position + layer), combat-tracker (Down decoration, F8) | Labels on their own layer above the token layer. Check the "Out" overlay (F6) and the token overlays registry (FR-MAP-34) still fit. Related: G9 |
@@ -14,7 +14,7 @@ Work list for the next phase. **Not started.** Tiers and notes are **proposed**:
 
 ## Acceptance glitches still open (#169)
 
-From the [acceptance report](../../.verify/20261013-222244-mvp-acceptance/report.md) (local). Planned as one `fix/*`; fold in with P1–P5 where they touch the same code.
+From the [acceptance report](../../.verify/20261013-222244-mvp-acceptance/report.md) (local; archived at `%TEMP%\pocket-plane\verify-mvp-acceptance\`). Planned as one `fix/*`; fold in with P1–P5 where they touch the same code.
 
 | # | Glitch | Goes with |
 |---|---|---|
@@ -33,7 +33,7 @@ From the [acceptance report](../../.verify/20261013-222244-mvp-acceptance/report
 
 ## Suggested sequencing
 
-1. ~~DM confirms the open points (P3 label, P4 scope).~~ Answered 2026-10-14. Tiers still to confirm.
+1. ~~DM confirms tiers and the open points (P3 label, P4 scope).~~ Done 2026-10-14 (#171).
 2. Spec revisions (one agent): scenes-map (P2, P3), combat-tracker (P2 Down, P4, G4, G6, G9), dice-roll-log (P5, G7, G8), play-shell (P1), live-sync (P3 event).
 3. Builds: `fix/tooltip-delay` (P1, tiny, first) → scenes-map build (P2, P3) → combat/log build (P4, P5, G4–G9) → `fix/playtest-glitches` (the rest).
 4. Then post-MVP planning ([continue-session §2.4](continue-session.md#2-next-in-order)).

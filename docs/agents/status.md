@@ -2,15 +2,15 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 5 accepted (#169). DM playtest done 2026-10-14; feedback P1–P5 + glitches G1–G12 in [feedback-playtest](feedback-playtest.md). **Not started**: waiting for the DM to confirm tiers before the next phase.
+**Phase:** playtest feedback pass (MVP polish). P1–P5 tier S confirmed (#171); spec revisions running. Work list: [feedback-playtest](feedback-playtest.md).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Playtest feedback | `main` | — | **Captured, not started** | DM confirms tiers + open points in [feedback-playtest](feedback-playtest.md), then spec revisions → builds |
+| Playtest spec pass (P1–P5, G-verdicts) | `spec/playtest-feedback` | `spec-playtest` | **Running** | Review agent → DM gate → consolidate data-model/protocol → builds |
 
-Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-13-evening)). Evidence: `verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash).
+Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-13-evening)). Brief: `briefs\spec-playtest.md`; summary will be `spec-playtest.md`. Evidence: `verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash, mvp-acceptance).
 
 ## Shared-file locks
 
