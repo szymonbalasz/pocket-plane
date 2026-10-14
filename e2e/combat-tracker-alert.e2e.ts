@@ -22,18 +22,28 @@ test("FR-CBT-41 FR-SHELL-25 turn alert Toast after a player reload with audio lo
   const init = await openWindow(dm, "cbt.initiative");
   const turn = init.locator('[data-testid="cbt-init-row"][data-turn="true"]');
   const toast = player.getByTestId("ui-alert-toast");
-  await init.getByTestId("cbt-init-next").click();
-  await expect(turn).toHaveAttribute("data-record-id", mira);
+  /** Step the turn onto Mira from someone else's (the bundle's turn depends on earlier specs). */
+  const toMira = async () => {
+    if ((await turn.getAttribute("data-record-id")) === mira) {
+      await init.getByTestId("cbt-init-prev").click();
+      await expect(turn).not.toHaveAttribute("data-record-id", mira);
+    }
+    for (let i = 0; i < 10; i++) {
+      const before = await turn.getAttribute("data-record-id");
+      await init.getByTestId("cbt-init-next").click();
+      await expect(turn).not.toHaveAttribute("data-record-id", before ?? "");
+      if ((await turn.getAttribute("data-record-id")) === mira) return;
+    }
+    throw new Error("Mira's turn never came");
+  };
+  await toMira();
   await expect(toast).toContainText("Your turn — Mira", { timeout: 1000 });
 
   // Reload: a fresh page, audio locked until an interaction (none follows).
   await player.reload();
   await expect(live).toHaveAttribute("data-state", "live");
   await expect(toast).toHaveCount(0);
-  await init.getByTestId("cbt-init-prev").click();
-  await expect(turn).not.toHaveAttribute("data-record-id", mira);
-  await init.getByTestId("cbt-init-next").click();
-  await expect(turn).toHaveAttribute("data-record-id", mira);
+  await toMira();
   await expect(toast).toContainText("Your turn — Mira", { timeout: 1000 });
   await expect(player.getByTestId("ui-topbar")).toHaveAttribute(
     "data-test-last-sound",
