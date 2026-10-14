@@ -4,7 +4,6 @@ import {
   type CampaignRecord,
   type CampaignSummary,
 } from "@shared/campaign-management/schemas";
-import type { PresenceRecord } from "@shared/live-sync/schemas";
 import { Button } from "@ui/components/ui/button";
 import {
   Dialog,
@@ -19,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@ui/components/ui/overlays";
-import { useRecords, useSync } from "@ui/sync/store";
+import { usePresence, useRecords, useSync } from "@ui/sync/store";
 import { useState } from "react";
 import { toast } from "sonner";
 import { NameDialog } from "./NameDialog";
@@ -28,11 +27,12 @@ import { api, dmCall, useDmSession } from "./session";
 export function CampaignBar({ campaigns }: { campaigns: CampaignSummary[] }) {
   const loadCampaigns = useDmSession((s) => s.loadCampaigns);
   const liveCampaign = useRecords<CampaignRecord>("campaign")[0];
-  const presence = useRecords<PresenceRecord>("presence");
+  const presence = usePresence();
   const state = useSync((s) => s.state);
   const active = campaigns.find((c) => c.active);
   const [pending, setPending] = useState<CampaignSummary | null>(null);
-  const online = presence.filter((p) => p.online).length;
+  // Unknown while not live (FR-SYNC-29); switching needs live anyway.
+  const online = presence.known ? presence.online.size : 0;
 
   async function activate(c: CampaignSummary) {
     setPending(null);

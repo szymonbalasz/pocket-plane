@@ -125,6 +125,23 @@ test("#162 DM map-first: battlemap uncovered by the default layout ≥ 70% at 14
   }
 });
 
+/**
+ * DM Initiative body height for header + `rows` rows, from its classes: window border 2,
+ * title 32, padding 24; header = name 20 + gap 6 + buttons 32, wrapped to two lines at round 0
+ * (+ 4 + 32); gap 8; column header 19; rows 40 each (py-0.5 + name / stats lines), gap 2.
+ */
+const initiativeHeightFor = (rows: number) =>
+  2 + 32 + 24 + (20 + 6 + 32 + 4 + 32) + 8 + 19 + rows * 40 + (rows - 1) * 2;
+
+test("FR-SHELL-32 DM Initiative default shows header + 6 rows at 1440×900; fits the work area at 1280×720", () => {
+  const init = openOnDefaults([], WIDE).find((w) => w.kind === "cbt.initiative");
+  expect(init?.h).toBe(500);
+  expect(init?.h ?? 0).toBeGreaterThanOrEqual(initiativeHeightFor(6));
+  const small = openOnDefaults([], LAPTOP).find((w) => w.kind === "cbt.initiative");
+  if (!small) throw new Error("cbt.initiative not open");
+  expect(small.y + small.h).toBeLessThanOrEqual(LAPTOP.h - 64); // above the launcher; rows scroll
+});
+
 const RIGHT_COLUMN = new Set(["camp.players", "cbt.initiative"]);
 
 test("FR-SHELL-08 DM launcher windows open clear of the default-open ones (glitch 1)", () => {
@@ -148,9 +165,11 @@ test("FR-SHELL-08 DM launcher windows open clear of the default-open ones (glitc
         const a = rects.find((r) => r.kind === kind);
         if (!a) throw new Error(`${kind} not open`);
         for (const b of rects) {
-          // Both at once don't fit 1280 px between Scenes and the right column: there they
-          // only stay off the right column (Initiative's "Roll monsters", Players).
-          const cramped = kinds.length > 1 && viewport === LAPTOP;
+          // Two at once don't fit 1280 px between Scenes and the right column, and since
+          // FR-SHELL-32 (Initiative 500 high) the right column has no 320 px slot left for
+          // Encounters at 1600×900 either: then they only stay off the right column
+          // (Initiative's "Roll monsters", Players) and cascade at the left edge.
+          const cramped = kinds.length > 1;
           const guard = cramped
             ? RIGHT_COLUMN.has(b.kind)
             : defaults.has(b.kind) || kinds.includes(b.kind);

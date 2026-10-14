@@ -1,7 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
   <title>token-elite</title>
-  <!-- Fixture "token-elite" (assets-pipeline §13): round token, transparent corners. -->
+  <!-- Fixture "token-elite" (assets-pipeline §13): round token, transparent corners.
+       Silhouette (G11): Elite Goblin Warrior, spiked helmet, broad pauldrons, scimitar overhead. -->
   <circle cx="128" cy="128" r="120" fill="#1f4d2b" stroke="#0c2412" stroke-width="12"/>
-  <circle cx="128" cy="104" r="36" fill="#0c2412"/>
-  <path d="M64 200 C76 150 180 150 192 200 Z" fill="#0c2412"/>
+  <!-- scimitar arcing over the head -->
+  <path d="M52 150 C52 70 120 30 196 46 C140 50 84 86 68 150 Z" fill="#d9d9d9"/>
+  <rect x="44" y="148" width="32" height="10" rx="3" fill="#c9a227"/>
+  <!-- short ears under the helmet -->
+  <path d="M106 112 L66 104 L104 128 Z" fill="#0c2412"/>
+  <path d="M150 112 L190 104 L152 128 Z" fill="#0c2412"/>
+  <!-- head + spiked helmet -->
+  <circle cx="128" cy="118" r="28" fill="#0c2412"/>
+  <path d="M96 112 C96 84 160 84 160 112 Z" fill="#c9a227"/>
+  <path d="M120 90 L128 52 L136 90 Z" fill="#c9a227"/>
+  <!-- pauldrons and armoured body -->
+  <path d="M74 216 L84 160 C96 146 160 146 172 160 L182 216 Z" fill="#0c2412"/>
+  <ellipse cx="84" cy="160" rx="22" ry="14" fill="#c9a227"/>
+  <ellipse cx="172" cy="160" rx="22" ry="14" fill="#c9a227"/>
 </svg>
