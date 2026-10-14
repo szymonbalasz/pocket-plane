@@ -233,7 +233,7 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 **Shared changes — playtest pass** (#171): none. FR-DICE-28 is a contract on kinds (combat's kind in `@shared/combat-tracker/log-kinds.ts` does the work); FR-DICE-29 is in `@shared/dice-roll-log/roll-kind.ts` (feature-owned). `kinds.ts`, schema, events, protocol unchanged; protocol §26 log-kinds row may cite FR-DICE-28 at consolidation.
 
-**Shared changes — polish pass** (sprint 1, R3): none shared. Feature-owned: `src/client/common/features/dice-roll-log/{GameLog.tsx (bar layout), physical.ts (`options` field in the stored entry)}`. No DB, event, protocol or record change; the browser entry gains an optional field. Docs at consolidation: protocol §24 `dice.log` row (collapsed bar).
+**Shared changes — polish pass** (sprint 1, R3): none shared. Feature-owned: `src/client/common/features/dice-roll-log/{GameLog.tsx (bar layout), physical.ts (helper for the new key)}`. No DB, event, protocol or record change; one new browser key `pp.dice.options.v1.*`. Docs at consolidation: protocol §24 `dice.log` row (collapsed bar).
 
 **Combat lines (R4, sprint 1):** [combat-tracker](combat-tracker.md) FR-CBT-57/58 add natural markers to `cbt.attack` lines from public `payload` fields only, so FR-DICE-28 holds unchanged.
 
