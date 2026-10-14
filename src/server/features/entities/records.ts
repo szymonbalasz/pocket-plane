@@ -1,4 +1,5 @@
 // Record types `entity` (campaign) and `imported-entity` (global) (ENT §9, FR-ENT-15/16).
+import { deathStateOf } from "@shared/combat-extras/rules";
 import {
   type CharacterRecord,
   ENTITY_TYPE,
@@ -37,8 +38,8 @@ const REDACT: { [K in keyof RedactedCharacter]-?: (r: CharacterRecord) => Redact
   level: (r) => r.statBlock.level,
   className: (r) => r.statBlock.className,
   species: (r) => r.statBlock.species ?? null,
-  // combat-extras fills this (FR-CBTX-32); absent until then.
-  deathState: () => undefined,
+  // FR-CBTX-32: the derived state only; never the counters or temp HP.
+  deathState: (r) => deathStateOf(r.hpCurrent, r.deathSuccesses, r.deathFailures),
 };
 
 export function redactCharacter(r: EntityRecord): RedactedCharacter {

@@ -27,6 +27,10 @@ const base = (r: EntityRow) => ({
   statBlock: r.statBlock,
   ownerPlayerId: r.ownerPlayerId,
   hpCurrent: r.hpCurrent,
+  // Character play state (combat-extras); the monster / imported schemas strip them.
+  tempHp: r.tempHp,
+  deathSuccesses: r.deathSuccesses,
+  deathFailures: r.deathFailures,
   derivedFromId: r.derivedFromId,
   createdAt: r.createdAt,
   updatedAt: r.updatedAt,
