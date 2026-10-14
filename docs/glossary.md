@@ -56,6 +56,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Token owner** | The one player (or none) who may move a token. Defaults from the character's owner; the DM reassigns it (decisions #124). | Character's owner |
 | **Hidden token** | Token visible only to the DM (shown translucent to DM) until revealed with the hide/reveal button. MVP. | — |
 | **Token shape** | How a token is drawn: round (circular crop), square, or none (image as is). Owned by the token; new tokens take the definition's default (decisions #148). | — |
+| **Token label** | A token's name drawn on the grid line below it, on a layer above every token; overlay badges (e.g. Out) sit in the same row (decisions #172). | Movement indicator |
 | **Selection** | The DM's client-only set of selected tokens on the viewed scene (click, Ctrl/Shift-click, box select); never sent. Features read it, e.g. to preselect attack targets (#148). | Target |
 | **Box select** | DM Ctrl/Shift + drag on empty canvas: tokens whose footprint centre lies inside the box join the selection. | — |
 | **Movement indicator** | Local drag label showing a move's distance against the token's speed (in combat: plus movement used); amber past speed, red past twice speed. Never blocks. | Ruler |
@@ -65,6 +66,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Ping** | Signal: a click shows a short pulse at a point to every other client showing that scene. | Pull |
 | **Pull** | DM-only ping that also centres every player's camera on the point; players may pan away. | Ping |
 | **Laser pointer** | Signal: a right-drag draws a trail that others see fade shortly after the last point. | Ping |
+| **Drag preview** | Signal: others see a token move while it is dragged, without the movement label; never logged or persisted; a hidden token's drag reaches the DM only (decisions #171, #172). | Move (committed on drop) |
 | **Player-ready indicator** | Shows the DM which players have fully loaded a scene. Post-MVP ([scene-tools](specs/post-mvp/scene-tools.md)); MVP assumes immediate load. | — |
 | **Encounter** | A planned set of monsters with CR/difficulty math. Lifecycle: planned → started → ended. The unit of combat history. | Combat; session |
 | **Combat** | The running state of a started encounter: initiative order, rounds, turns. | Encounter |
@@ -107,6 +109,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Window** | A floating, movable, resizable panel on the play page; an open instance of a window type. | Browser window (pop-outs out of scope) |
 | **Window type** | A feature's registered kind of window (`<prefix>.<name>`, clients, defaults, component) in a per-client registry. | Window |
 | **Launcher** | Bottom bar of buttons that open, bring to front or minimise windows. | — |
+| **Work area** | The part of the viewport below the top bar and above the launcher; windows and the attack popup fit into it (decisions #172). | Viewport |
 | **Alert** | The shell's attention signal for one client: screen flash, short UI sound ([ADR-0030](architecture/adr/0030-ui-notification-sounds.md)) and a Toast; per-browser mute and volume. Not persisted. | Notification |
 | **Layout** | Every window's state, geometry and z-order for one (campaign, owner); stored only in browser `localStorage` (decisions #121). | — |
 
@@ -120,7 +123,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Visibility filter** | Server-side rule deciding which events/fields each client receives. |
 | **Snapshot** | Full filtered state sent by the server after `hello` and on resync. |
 | **Resync** | Replacing a client's whole state with a fresh snapshot (client request, sequence gap or active-scene switch). |
-| **Signal** | Transient client-to-clients message (ping, laser). Not a domain event: no DB, event log or snapshot; still filtered. |
+| **Signal** | Transient client-to-clients message (ping, laser, drag preview). Not a domain event: no DB write, event log or snapshot; still filtered (a signal type's audience may limit it to the DM, [ADR-0033](architecture/adr/0033-signal-audience.md)). |
 | **Presence** | DM-only, in-memory view of which players are online. |
 | **Sync probe** | Test-mode-only record type that proves visibility filtering end to end. |
 | **Worktree** | An isolated git worktree where one agent works on one feature. |
