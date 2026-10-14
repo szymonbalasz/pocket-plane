@@ -2,18 +2,24 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** playtest feedback pass (MVP polish). P1–P5 tier S confirmed (#171); spec revisions running. Work list: [feedback-playtest](feedback-playtest.md).
+**Phase:** playtest feedback pass (MVP polish). Specs complete and merged (#172, `4c45af3`); builds per [protocol §30](../protocol/README.md#30-playtest-pass-to-build). Work list: [feedback-playtest](feedback-playtest.md).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Playtest spec pass (P1–P5, G-verdicts) | `spec/playtest-feedback` | `spec-playtest` | **Finalising** (gate #172: ADR-0033, P4 amended, picks accepted) | Specs `complete` + data-model/protocol consolidated → merge → `fix/tooltip-delay`, `fix/signal-audience` |
+| P1 tooltip delay | `fix/tooltip-delay` (ws `w1W`, slot 0) | `build-tooltip-delay` | **Building** | Walkthrough play-shell 16, char-sheet 11 → merge |
+| ADR-0033 signal audience | `fix/signal-audience` (ws `w1X`, slot 2) | `build-signal-audience` | **Building** | Merge → `build/scenes-map-playtest` |
+| Scenes-map (P2, P3, G1) | — | — | Waits on `fix/signal-audience` | |
+| Combat + sheet + dice (P4, P5, G4–G9) | — | — | Waits on tooltip + scenes-map | |
+| Glitches (G2, G3, G10, G11) | — | — | Waits on tooltip | |
 
-Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-13-evening)). Brief: `briefs\spec-playtest.md`; summary will be `spec-playtest.md`. Evidence: `verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash, mvp-acceptance).
+Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-13-evening)). Briefs `briefs\build-*.md`; spec summary `spec-playtest.md`. Evidence: `verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash, mvp-acceptance).
 
 ## Shared-file locks
 
+- `src/client/common/components/ui/overlays.tsx` (+ `menus.tsx` / `controls.tsx` if needed), `src/client/{dm,player}/main.tsx` → `fix/tooltip-delay`
+- `src/server/ws/signals.ts`, `src/server/ws/hub.ts` → `fix/signal-audience`
 
 ## Pending DM decisions
 
