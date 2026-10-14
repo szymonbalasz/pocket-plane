@@ -1,6 +1,8 @@
 // Concentration and death saves, temp HP, in-process: FR-CBTX-14, FR-CBTX-18, FR-CBTX-23,
 // FR-CBTX-24, FR-CBTX-42.
 import { describe, expect, test } from "bun:test";
+import { lineText } from "@shared/dice-roll-log/kind-types";
+import { rollKind } from "@shared/dice-roll-log/roll-kind";
 import type { GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
 import { eq } from "drizzle-orm";
 import { gameLogEntry } from "../../db/schema";
@@ -190,5 +192,43 @@ describe("FR-CBTX-14 temp HP", () => {
     expect(t.err(() => set({ characterId: t.thornId }, 1000)).code).toBe("invalid");
     set({ combatantId: t.id("Goblin") }, 4);
     expect(t.byName(t.enc.id).Goblin?.tempHp).toBe(4);
+  });
+});
+
+describe("FR-CBTX-39 save log lines", () => {
+  const line = (t: ReturnType<typeof cbtxSetup>, id: string) =>
+    lineText(rollKind.formatLine(entry(t, id) as never));
+
+  test("FR-CBTX-39 death save line notes the outcome and counters: success, failure, natural 1, natural 20", () => {
+    const t = cbtxSetup();
+    t.hp("Thorn", "damage", 99);
+    const save = (diceTotal: number) =>
+      t.run<{ entryId: string }>(
+        rollDeathSave.name,
+        { characterId: t.thornId, manual: { diceTotal } },
+        t.p2,
+      ).entryId;
+    expect(line(t, save(15))).toBe("Thorn — Death save: 15 = 15 — success (1 / 0) (physical)");
+    expect(line(t, save(4))).toBe("Thorn — Death save: 4 = 4 — failure (1 / 1) (physical)");
+    expect(line(t, save(1))).toBe(
+      "Thorn — Death save: 1 = 1 — natural 1 — failure (1 / 3) (physical)",
+    );
+    t.run(setDeathSaves.name, { characterId: t.thornId, successes: 0, failures: 0 });
+    expect(line(t, save(20))).toBe(
+      "Thorn — Death save: 20 = 20 — natural 20! — back to 1 HP (physical)",
+    );
+  });
+
+  test("FR-CBTX-39 concentration save line: kept / lost", () => {
+    const t = withCard();
+    const r = t.roll(8);
+    expect(line(t, r.entryId)).toBe(
+      "Mira — Concentration save (DC 10): 8 + 4 = 12 — kept (physical)",
+    );
+    const lost = t.run<{ entryId: string }>(rollConcentration.name, {
+      notificationId: t.second,
+      manual: { diceTotal: 1 },
+    });
+    expect(line(t, lost.entryId)).toContain("= 5 — natural 1 — lost");
   });
 });

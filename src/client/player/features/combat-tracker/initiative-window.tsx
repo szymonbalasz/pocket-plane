@@ -14,7 +14,7 @@ import {
   deathStateFor,
   effectsOn,
 } from "@ui/features/combat-extras/logic";
-import { DeathBadge, DeathPips, EffectChips } from "@ui/features/combat-extras/parts";
+import { DeathBadge, DeathPips, EffectChips, RowName } from "@ui/features/combat-extras/parts";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
@@ -87,13 +87,7 @@ function PlayerInitiativeBody() {
               <TurnMarker active={turn} />
               <Portrait name={c.name} imageAssetId={c.imageAssetId} />
               <div className="flex min-w-0 flex-1 items-center gap-1">
-                <span
-                  className="min-w-0 truncate text-sm"
-                  data-testid="cbt-init-row-name"
-                  title={c.name}
-                >
-                  {c.name}
-                </span>
+                <RowName name={c.name} testId="cbt-init-row-name" className="text-sm" />
                 <EffectChips
                   effects={effectsOn(fx, creatureOf(c))}
                   round={enc.round}

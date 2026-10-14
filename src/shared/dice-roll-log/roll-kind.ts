@@ -79,6 +79,7 @@ export function rollSegments(
     if (item.natural === 20) out.push({ text: " — natural 20!" });
     if (item.natural === 1) out.push({ text: " — natural 1" });
   }
+  if (item.note) out.push({ text: ` — ${item.note}` });
   if (item.manual) out.push({ text: " " }, { text: "physical", style: "badge" });
   return out;
 }

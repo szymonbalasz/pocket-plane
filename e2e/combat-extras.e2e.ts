@@ -159,3 +159,104 @@ test("FR-CBTX-17 FR-CBTX-18 FR-CBTX-28 FR-CBTX-29 bar + icons for both; concentr
   await player.context().close();
   await dm.context().close();
 });
+
+test("walkthrough fixes: row names stay distinct (chips collapse first), Conditions submenu by mouse, sheet Concentrate… dialog", async ({
+  browser,
+}) => {
+  const { secret, link } = e2eEnv();
+  const dm = await rolePage(browser);
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const init = await openWindow(dm, "cbt.initiative");
+  const goblin = await idByName(init, "Goblin");
+  const goblin2 = await idByName(init, "Goblin 2");
+  const row = (id: string) => init.locator(`[data-testid="cbt-init-row"][data-record-id="${id}"]`);
+
+  // FR-CBTX-33 (walkthrough ruling): Goblin and Goblin 2 both carry chips; at the default width
+  // the chips collapse to "+N" before the names, and Goblin 2's number is never cut off.
+  await dm.keyboard.press("Escape");
+  for (const id of [goblin, goblin2]) {
+    await row(id).getByTestId("cbt-init-row-menu").click();
+    await row(id).page().getByTestId("cbtx-init-row-conditions").hover();
+    await dm
+      .locator('[data-testid="cbtx-init-row-conditions-option"][data-value="frightened"]')
+      .click();
+    await expect(
+      row(id).locator('[data-testid="cbtx-init-row-effect"][data-value="frightened"]'),
+    ).toHaveCount(1);
+  }
+  const fit = await init.evaluate((w) => {
+    const rows = [
+      ...w.querySelectorAll<HTMLElement>("[data-testid='cbt-init-row']:not([data-removed])"),
+    ];
+    return rows.map((r) => {
+      const name = r.querySelector<HTMLElement>("[data-testid='cbt-init-row-name']") as HTMLElement;
+      const box = name.getBoundingClientRect();
+      const base = name.querySelector<HTMLElement>("[data-name-base]")?.getBoundingClientRect();
+      const suffix = name.querySelector<HTMLElement>("[data-name-suffix]")?.getBoundingClientRect();
+      const moved = r.querySelector<HTMLElement>("[data-testid='cbt-init-row-moved']");
+      const line = moved?.parentElement?.getBoundingClientRect();
+      const m = moved?.getBoundingClientRect();
+      return {
+        name: name.dataset.value,
+        height: Math.round(r.getBoundingClientRect().height),
+        baseWidth: Math.round(base?.width ?? 0),
+        suffixShown: suffix ? suffix.width > 0 && suffix.right <= box.right + 0.5 : null,
+        movedClipped: m && line ? m.right > line.right + 0.5 || m.width === 0 : false,
+        lineHeight: Math.round(line?.height ?? 0),
+      };
+    });
+  });
+  const byName = Object.fromEntries(fit.map((f) => [f.name, f]));
+  expect(byName["Goblin 2"]?.suffixShown).toBe(true);
+  for (const f of fit) {
+    expect({ name: f.name, base: f.baseWidth >= 14, clipped: f.movedClipped }).toEqual({
+      name: f.name,
+      base: true,
+      clipped: false,
+    });
+  }
+  // One line of chips: no row grows past Wolf's (a monster row with no effect), so FR-SHELL-32's
+  // 6 rows hold; the name line stays one line.
+  const wolfHeight = byName.Wolf?.height ?? 0;
+  for (const f of fit)
+    expect({ name: f.name, grew: f.height > wolfHeight }).toEqual({ name: f.name, grew: false });
+  for (const f of fit)
+    expect({ name: f.name, line: f.lineHeight <= 24 }).toEqual({ name: f.name, line: true });
+
+  // Walkthrough step 12 (mouse): Initiative row → Conditions ▸ Stunned by mouse click.
+  await row(goblin).getByTestId("cbt-init-row-menu").click();
+  await dm.getByTestId("cbtx-init-row-conditions").hover();
+  const stunned = dm.locator(
+    '[data-testid="cbtx-init-row-conditions-option"][data-value="stunned"]',
+  );
+  await stunned.hover();
+  await stunned.click();
+  await expect(
+    row(goblin).locator('[data-testid="cbtx-init-row-effect"][data-value="stunned"]'),
+  ).toHaveCount(1);
+
+  // §7.1: player-2's own sheet → effects menu → Concentrate… opens a dialog; Thorn concentrates.
+  const player = await rolePage(browser);
+  await player.goto(link("Player 2"));
+  await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const sheet = await openWindow(player, "char.sheet");
+  await sheet.getByTestId("cbtx-sheet-effects-menu").click();
+  await player.getByTestId("cbtx-sheet-concentrate").click();
+  const dialog = player.getByTestId("cbtx-sheet-conc-dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByTestId("cbtx-conc-label").fill("Shield of Faith");
+  await dialog.getByTestId("cbtx-conc-save").click();
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    sheet.locator('[data-testid="cbtx-sheet-effect"][data-value="concentration"]'),
+  ).toHaveCount(1);
+  const thorn = await idByName(init, "Thorn");
+  await expect(
+    row(thorn).locator('[data-testid="cbtx-init-row-effect"][data-value="concentration"]'),
+  ).toHaveCount(1);
+
+  await player.context().close();
+  await dm.context().close();
+});

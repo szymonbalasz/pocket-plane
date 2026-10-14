@@ -90,3 +90,9 @@ export const DEATH_LABEL: Record<DeathState, string> = {
   stable: "Stable",
   dead: "Dead",
 };
+
+/** "Goblin 2" → {base "Goblin", suffix " 2"}; no trailing number → suffix "". */
+export function splitNumbered(name: string): { base: string; suffix: string } {
+  const m = / \d+$/.exec(name);
+  return m ? { base: name.slice(0, m.index), suffix: m[0] } : { base: name, suffix: "" };
+}

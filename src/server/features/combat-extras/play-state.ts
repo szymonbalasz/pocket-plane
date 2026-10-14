@@ -79,6 +79,12 @@ export const setTempHp = defineCommand({
   },
 });
 
+/** FR-CBTX-39 line note: "success (2 / 0)", "failure (0 / 2)", "back to 1 HP". */
+export function deathSaveNote(s: ReturnType<typeof deathSave>): string {
+  if (s.outcome === "revive") return "back to 1 HP";
+  return `${s.outcome} (${s.after.successes} / ${s.after.failures})`;
+}
+
 export const rollDeathSave = defineCommand({
   name: CBTX_INTENTS.rollDeathSave,
   input: RollDeathSaveInput,
@@ -105,19 +111,20 @@ export const rollDeathSave = defineCommand({
     const pc = pcCombatant(env.tx, c.campaignId, c.id);
     // FR-CBTX-23: a PC hidden from players (#141) rolls DM-only, whoever rolls.
     const hidden = pc?.hidden ?? false;
+    const natural = r.natural ?? r.total;
+    const before = countersOf(c);
+    const save = deathSave(before, natural);
     const entry = gameLog.append(env, {
       kind: ROLL_KIND,
       category: "saving-throw",
       actorName: c.name,
-      payload: [dice.rollPayloadItem(r)],
+      // FR-CBTX-39: "Mira — Death save: 14 — success (2 / 0)".
+      payload: [{ ...dice.rollPayloadItem(r), note: deathSaveNote(save) }],
       rollIds: [r.id],
       encounterId: pc?.encounterId ?? null,
       public: input.public,
       forcePrivate: hidden,
     });
-    const natural = r.natural ?? r.total;
-    const before = countersOf(c);
-    const save = deathSave(before, natural);
     const changes: RecordChange[] = [];
     if (save.outcome === "revive") {
       // Natural 20: 1 HP through the HP rules (counters reset, FR-CBTX-20).

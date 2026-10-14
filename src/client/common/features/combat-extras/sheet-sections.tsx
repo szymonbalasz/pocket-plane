@@ -8,13 +8,19 @@ import type { RecordStore } from "@shared/protocol/store";
 import { BrainIcon, DicesIcon, EllipsisIcon, TrashIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/controls";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../../components/ui/menus";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
@@ -246,7 +252,7 @@ export function EffectsSection({ creatureId }: SectionProps) {
         }
       />
       {may && (
-        <Popover open={open} onOpenChange={setOpen}>
+        <>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -260,6 +266,7 @@ export function EffectsSection({ creatureId }: SectionProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {/* A Dialog, not a popover: the menu's focus return would dismiss a popover at once. */}
               <DropdownMenuItem data-testid="cbtx-sheet-concentrate" onSelect={() => setOpen(true)}>
                 <BrainIcon /> Concentrate…
               </DropdownMenuItem>
@@ -275,57 +282,60 @@ export function EffectsSection({ creatureId }: SectionProps) {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-          <PopoverTrigger asChild>
-            <span />
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-64">
-            <form
-              className="grid gap-2"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!valid) return;
-                const r = await send(CBTX_INTENTS.setConcentration, {
-                  target: { characterId: creatureId },
-                  label: label.trim(),
-                  ...(rounds !== null ? { durationRounds: rounds } : {}),
-                });
-                if (r !== undefined) {
-                  setOpen(false);
-                  setLabel("");
-                  setDuration("");
-                }
-              }}
-            >
-              <Label htmlFor="cbtx-conc-label-sheet">Spell</Label>
-              <Input
-                id="cbtx-conc-label-sheet"
-                data-testid="cbtx-conc-label"
-                maxLength={40}
-                autoFocus
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-              />
-              <Label htmlFor="cbtx-conc-duration-sheet">Duration (rounds)</Label>
-              <Input
-                id="cbtx-conc-duration-sheet"
-                data-testid="cbtx-conc-duration"
-                inputMode="numeric"
-                placeholder="Until removed"
-                disabled={!enc}
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-              />
-              <Button
-                type="submit"
-                size="sm"
-                data-testid="cbtx-conc-save"
-                disabled={disabled || !valid}
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogContent data-testid="cbtx-sheet-conc-dialog" className="sm:max-w-xs">
+              <DialogHeader>
+                <DialogTitle>Concentrate</DialogTitle>
+                <DialogDescription>Replaces any concentration this character has</DialogDescription>
+              </DialogHeader>
+              <form
+                className="grid gap-2"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!valid) return;
+                  const r = await send(CBTX_INTENTS.setConcentration, {
+                    target: { characterId: creatureId },
+                    label: label.trim(),
+                    ...(rounds !== null ? { durationRounds: rounds } : {}),
+                  });
+                  if (r !== undefined) {
+                    setOpen(false);
+                    setLabel("");
+                    setDuration("");
+                  }
+                }}
               >
-                Concentrate
-              </Button>
-            </form>
-          </PopoverContent>
-        </Popover>
+                <Label htmlFor="cbtx-conc-label-sheet">Spell</Label>
+                <Input
+                  id="cbtx-conc-label-sheet"
+                  data-testid="cbtx-conc-label"
+                  maxLength={40}
+                  autoFocus
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                />
+                <Label htmlFor="cbtx-conc-duration-sheet">Duration (rounds)</Label>
+                <Input
+                  id="cbtx-conc-duration-sheet"
+                  data-testid="cbtx-conc-duration"
+                  inputMode="numeric"
+                  placeholder="Until removed"
+                  disabled={!enc}
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  data-testid="cbtx-conc-save"
+                  disabled={disabled || !valid}
+                >
+                  Concentrate
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </>
       )}
     </div>
   );

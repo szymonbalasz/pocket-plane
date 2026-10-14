@@ -49,6 +49,7 @@ import {
 } from "@ui/components/ui/overlays";
 import { Input, Skeleton } from "@ui/components/ui/primitives";
 import { characterOf, deadPc, deathStateFor } from "@ui/features/combat-extras/logic";
+import { RowName } from "@ui/features/combat-extras/parts";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
 import {
   useCbtIntent,
@@ -445,13 +446,8 @@ function Row({
       <Portrait name={c.name} imageAssetId={c.imageAssetId} />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1">
-          <span
-            className="truncate text-sm font-medium"
-            data-testid="cbt-init-row-name"
-            title={c.name}
-          >
-            {c.name}
-          </span>
+          {/* Middle-truncated, number kept ("Gob… 2"): names win over chips. */}
+          <RowName name={c.name} testId="cbt-init-row-name" className="text-sm font-medium" />
           {c.hidden && (
             <EyeOffIcon className="size-3.5 shrink-0 text-muted-foreground" aria-label="Hidden" />
           )}

@@ -42,7 +42,7 @@ import {
   TrashIcon,
   TrophyIcon,
 } from "lucide-react";
-import { useMemo, useRef } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { type Target, useCbtxDialogs } from "./store";
 
 /** The row's creature as an intent target. */
@@ -161,6 +161,40 @@ export function DeathSaveAnchor({ control }: { control: RollControl }) {
   );
 }
 
+/** Close delay of a submenu, ms: long enough to cross from the trigger to an item. */
+const SUB_CLOSE_DELAY = 300;
+
+/**
+ * A hover-safe submenu (as combat's Check ▸ / Save ▸): near the screen's right edge the submenu
+ * flips left and Radix closes it when the pointer leaves the trigger in another direction than
+ * its last move, so a mouse click on an item never landed. A close waits `SUB_CLOSE_DELAY`;
+ * entering the submenu keeps it open; opening is immediate.
+ */
+function SafeSub({ trigger, children }: { trigger: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return (
+    <DropdownMenuSub
+      open={open}
+      onOpenChange={(next) => {
+        clearTimeout(timer.current);
+        if (next) setOpen(true);
+        else timer.current = setTimeout(() => setOpen(false), SUB_CLOSE_DELAY);
+      }}
+    >
+      {trigger}
+      <DropdownMenuSubContent
+        className="max-h-[70vh] overflow-y-auto"
+        onPointerEnter={() => clearTimeout(timer.current)}
+        onPointerMove={() => clearTimeout(timer.current)}
+      >
+        {children}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
 /**
  * FR-CBTX-35 / -33: Conditions ▸ — 15 toggles over `targets` (checked when all have it; toggling
  * on adds to all, off ends each one's); exhaustion has a level submenu.
@@ -189,18 +223,22 @@ export function ConditionsMenu({
     });
   };
   return (
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger data-testid={testId}>
-        <SparklesIcon /> Conditions
-      </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent className="max-h-[70vh] overflow-y-auto">
-        {CONDITIONS.map((k) => {
-          const Icon = conditionIcon(k);
-          const all = has(k).every(Boolean);
-          if (k === "exhaustion") {
-            const lvl = has(k)[0]?.level ?? null;
-            return (
-              <DropdownMenuSub key={k}>
+    <SafeSub
+      trigger={
+        <DropdownMenuSubTrigger data-testid={testId}>
+          <SparklesIcon /> Conditions
+        </DropdownMenuSubTrigger>
+      }
+    >
+      {CONDITIONS.map((k) => {
+        const Icon = conditionIcon(k);
+        const all = has(k).every(Boolean);
+        if (k === "exhaustion") {
+          const lvl = has(k)[0]?.level ?? null;
+          return (
+            <SafeSub
+              key={k}
+              trigger={
                 <DropdownMenuSubTrigger
                   data-testid={`${testId}-option`}
                   data-value={k}
@@ -209,51 +247,50 @@ export function ConditionsMenu({
                   <Icon /> {CONDITION_INFO[k].name}
                   {lvl !== null && <span className="ml-auto text-xs">{lvl}</span>}
                 </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
-                    <DropdownMenuItem
-                      key={n}
-                      data-testid={`${testId}-level`}
-                      data-value={n}
-                      disabled={disabled}
-                      onSelect={() => void toggle(k, n)}
-                    >
-                      Level {n} {lvl === n && <CheckIcon className="ml-auto" />}
-                    </DropdownMenuItem>
-                  ))}
-                  {has(k).some(Boolean) && (
-                    <DropdownMenuItem
-                      variant="destructive"
-                      disabled={disabled}
-                      onSelect={async () => {
-                        for (const e of has(k)) {
-                          if (e) await send(CBTX_INTENTS.endEffect, { effectId: e.id });
-                        }
-                      }}
-                    >
-                      <TrashIcon /> Remove
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            );
-          }
-          return (
-            <DropdownMenuItem
-              key={k}
-              data-testid={`${testId}-option`}
-              data-value={k}
-              data-checked={all}
-              disabled={disabled}
-              onSelect={() => void toggle(k)}
+              }
             >
-              <Icon /> {CONDITION_INFO[k].name}
-              {all && <CheckIcon className="ml-auto" />}
-            </DropdownMenuItem>
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <DropdownMenuItem
+                  key={n}
+                  data-testid={`${testId}-level`}
+                  data-value={n}
+                  disabled={disabled}
+                  onSelect={() => void toggle(k, n)}
+                >
+                  Level {n} {lvl === n && <CheckIcon className="ml-auto" />}
+                </DropdownMenuItem>
+              ))}
+              {has(k).some(Boolean) && (
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={disabled}
+                  onSelect={async () => {
+                    for (const e of has(k)) {
+                      if (e) await send(CBTX_INTENTS.endEffect, { effectId: e.id });
+                    }
+                  }}
+                >
+                  <TrashIcon /> Remove
+                </DropdownMenuItem>
+              )}
+            </SafeSub>
           );
-        })}
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
+        }
+        return (
+          <DropdownMenuItem
+            key={k}
+            data-testid={`${testId}-option`}
+            data-value={k}
+            data-checked={all}
+            disabled={disabled}
+            onSelect={() => void toggle(k)}
+          >
+            <Icon /> {CONDITION_INFO[k].name}
+            {all && <CheckIcon className="ml-auto" />}
+          </DropdownMenuItem>
+        );
+      })}
+    </SafeSub>
   );
 }
 

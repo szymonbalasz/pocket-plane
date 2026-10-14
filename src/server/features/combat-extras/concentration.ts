@@ -88,17 +88,18 @@ export const rollConcentration = defineCommand({
       manual: input.manual,
       source: "cbt",
     });
+    const success = r.total >= p.dc;
     // FR-CBTX-18: player → public (stamped); a hidden creature's save → never.
     const entry = gameLog.append(env, {
       kind: ROLL_KIND,
       category: "saving-throw",
       actorName: name,
-      payload: [dice.rollPayloadItem(r)],
+      // FR-CBTX-39: "… Concentration save (DC 10): 12 — kept".
+      payload: [{ ...dice.rollPayloadItem(r), note: success ? "kept" : "lost" }],
       rollIds: [r.id],
       encounterId: p.encounterId,
       public: hidden ? false : input.public,
     });
-    const success = r.total >= p.dc;
     const ended = success ? null : endEffects(env, [conc], "save-failed");
     env.emit({
       type: ConcentrationRolled.type,

@@ -8,7 +8,7 @@ import type { TokenView } from "@shared/scenes-map/schemas";
 import { turnAlertFor } from "../combat-tracker/turn-alert";
 import type { TokenOverlayView } from "../scenes-map/token-overlays";
 import { concentrationOutcome } from "./concentration";
-import { chipOrder, chipText, deadPc, deathStateFor } from "./logic";
+import { chipOrder, chipText, deadPc, deathStateFor, splitNumbered } from "./logic";
 import { deathSavesAvailable } from "./sheet-sections";
 import { cbtxTokenOverlay } from "./token-overlay";
 
@@ -256,5 +256,16 @@ describe("FR-CBTX-41 sheet sections", () => {
     expect(at(miraFull)).toBe(false);
     expect(at({ ...miraFull, hpCurrent: 0 })).toBe(true);
     expect(at({ ...miraRedacted, deathState: "stable" })).toBe(true);
+  });
+});
+
+describe("FR-CBTX-33 row names (walkthrough ruling)", () => {
+  test("FR-CBTX-33 names split for middle truncation: the number is kept", () => {
+    expect(splitNumbered("Goblin 2")).toEqual({ base: "Goblin", suffix: " 2" });
+    expect(splitNumbered("Elite Goblin Warrior")).toEqual({
+      base: "Elite Goblin Warrior",
+      suffix: "",
+    });
+    expect(splitNumbered("Wolf 12")).toEqual({ base: "Wolf", suffix: " 12" });
   });
 });

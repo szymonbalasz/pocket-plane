@@ -9,7 +9,7 @@ import { Tooltip } from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { EffectIcon, effectValue } from "./icons";
-import { chipOrder, chipText, DEATH_LABEL } from "./logic";
+import { chipOrder, chipText, DEATH_LABEL, splitNumbered } from "./logic";
 
 /** Width kept for the "+N" chip when some chips don't fit, px. */
 const MORE_W = 30;
@@ -104,8 +104,8 @@ export function EffectChips({
     <div
       ref={ref}
       className={cn(
-        // Never narrower than the "+N" chip: a long name shrinks first.
-        "relative flex min-w-[2.25rem] flex-1 flex-nowrap items-center gap-0.5 overflow-hidden",
+        // Never narrower than the "+N" chip; chips collapse before the name truncates.
+        "relative flex min-w-7 flex-1 flex-nowrap items-center gap-0.5 overflow-hidden",
         className,
       )}
     >
@@ -184,6 +184,35 @@ export function DeathPips({ c, className }: { c: DeathCounters; className?: stri
     >
       <span className="text-hp-full">{pips(c.successes, "●")}</span>{" "}
       <span className="text-hp-down">{pips(c.failures, "✗")}</span>
+    </span>
+  );
+}
+
+/**
+ * A combatant name that truncates in the middle and keeps its number: "Gob… 2" (Initiative row
+ * ruling, CBTX walkthrough): Goblin and Goblin 2 stay distinct at any width. The text content
+ * is the full name.
+ */
+export function RowName({
+  name,
+  testId,
+  className,
+}: {
+  name: string;
+  testId: string;
+  className?: string;
+}) {
+  const { base, suffix } = splitNumbered(name);
+  return (
+    <span className="flex min-w-0 truncate" data-testid={testId} data-value={name} title={name}>
+      <span data-name-base className={cn("min-w-[3ch] truncate", className)}>
+        {base}
+      </span>
+      {suffix && (
+        <span data-name-suffix className={cn("shrink-0 whitespace-pre", className)}>
+          {suffix}
+        </span>
+      )}
     </span>
   );
 }
