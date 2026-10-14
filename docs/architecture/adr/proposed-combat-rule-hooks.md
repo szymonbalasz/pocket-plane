@@ -3,7 +3,7 @@
 - Status: proposed (spec-combat-extras, [OQ-CBTX-01](../../specs/combat-extras.md#15-open-questions)); number at merge
 - Date: 2026-10-14
 - Affects: [combat-extras](../../specs/combat-extras.md), [combat-tracker](../../specs/combat-tracker.md), [character-sheet](../../specs/character-sheet.md), [notifications](../../specs/notifications.md), [AGENTS §9.9](../../../AGENTS.md#99-shared-files)
-- Refines: [ADR-0016](0016-domain-events-pending-actions.md) ("Rules → pending actions" as listeners; open row "May rules mutate state directly?"), [ADR-0027](0027-notification-creation.md) C ("post-commit rule listeners … decided when combat-extras is written, including how to close the crash gap")
+- Refines: [ADR-0009](0009-entity-content-model.md) (where instance play state and modifiers live; see "Refines ADR-0009" below), [ADR-0016](0016-domain-events-pending-actions.md) ("Rules → pending actions" as listeners; open row "May rules mutate state directly?"), [ADR-0027](0027-notification-creation.md) C ("post-commit rule listeners … decided when combat-extras is written, including how to close the crash gap")
 
 ## Context
 
@@ -23,6 +23,14 @@
 ## Decision (proposed)
 
 **A.** Rules never write state after commit. `hpRules` (combat-extras, server) is the only path that changes HP, temp HP and death saves from damage or healing (callers: `cbt.applyCard`, `cbt.applyHp`, `cbt.undo`, `char.adjustHp`). `combatRuleHooks` lives in `src/server/features/combat-tracker/rule-hooks.ts`, created empty by the combat-extras build, append-only (AGENTS §9.9). A hook error rolls back the command. ADR-0016's open row "May rules mutate state directly?" is answered: **only inside the causing command's transaction, never from a listener**.
+
+## Refines ADR-0009
+
+ADR-0009 puts play state and modifiers (temp HP, buffs / debuffs) "as relational columns / rows on token / combatant", with "instance → list of modifiers (field, op, value, source, duration)" as design-for-later. combat-extras refines this without contradicting it:
+
+- **Monster** play state (`tempHp`) is a column on the combatant, as ADR-0009 says.
+- **PC** play state (`tempHp`, `deathSuccesses`, `deathFailures`) lives on the character entity, as `hpCurrent` already does (#92), because it outlives one encounter and the sheet shows it outside combat (orchestrator's D/S seam).
+- **Effects** (conditions, labelled custom effects, concentration) are rows in a new `effect` table targeting a combatant (monster) or a character (PC). They carry no numbers. ADR-0009's field / op / value modifiers stay design-for-later; "Effect" replaces the glossary's "Modifier" for these rows (OQ-CBTX-19).
 
 ## Consequences
 

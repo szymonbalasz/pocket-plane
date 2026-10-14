@@ -98,7 +98,7 @@ All commands: rows + event-log entry + domain event in one transaction; IDs, tim
 | FR-CBTX-30 | **Death badge** (existing `badges`, label row): PC token with `deathState` dying → "Dying" (`hp.down`), stable → "Stable" (neutral), dead → "Dead" (`hp.down`), for everyone who receives the token (players from the redacted `deathState`, FR-CBTX-32). | as FR-CBT-38 |
 | **Visibility** | | |
 | FR-CBTX-31 | `effect` record (scope `campaign`): DM full. Player: hidden if `secret`, `hidden`, or ended; else redacted `{id, kind, condition, level, label, targetCombatantId, targetCharacterId, encounterId, endsRound}` (no source, anchor or concentration link: they may name hidden creatures). Snapshot: active effects (not windowed; capped by FR-CBTX-04). | ADR-0021 |
-| FR-CBTX-32 | `tempHp` on `combatant`: never in a player redaction. On `entity` (character): DM + owner full; other players' redaction ([FR-ENT-15](entities.md#6-functional-requirements)) gains `deathState` (no counters, no temp HP). | #138, #154; OQ-CBTX-09 |
+| FR-CBTX-32 | `tempHp` on `combatant`: never in a player redaction. On `entity` (character): DM + owner full; other players get the **one shared whitelist** in entities' visibility fn ([FR-ENT-15](entities.md#6-functional-requirements)), listed in CHARX's [proposed-full-sheet-derivation](../architecture/adr/proposed-full-sheet-derivation.md) ("Refines ADR-0024"); CBTX's key there is `deathState` (no counters, no temp HP). CBTX's leak test asserts against that list, not its own. | #138, #154; OQ-CBTX-09 |
 | **Client** | | |
 | FR-CBTX-33 | **DM Initiative row** additions (`cbt.initiative`): temp HP "+5" after HP; effect chips on the name line (icon + label / condition, "3r" if timed, eye-off if secret; click → menu Edit / End), **one line only**: chips that don't fit collapse into "+N" (full list on hover and in the row menu), so a row never grows and FR-SHELL-32's 6 rows at 1440×900 hold; PC death pips (●●○ / ✗✗○) and state. Row menu gains **Conditions ▸** (15 toggles, exhaustion level submenu), **Effect…**, **Concentration…**, **Temp HP…**; for a dying PC **Death save** (roll control) and **Stabilise**; **Set death saves…**. Header **Add…** (Dialog: picker over monsters + characters × quantity, binding preview as Start). | CBT §7 |
 | FR-CBTX-34 | **Player Initiative row**: effect chips the player receives (rounds left; one line + "+N", hover lists all); PCs' death state Badge (own PC with pips). | |
@@ -122,7 +122,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, de
 - **Player view:** chips on visible creatures; bar on own PC; band bars on monsters only if OQ-CBTX-08 picks A; own concentration cards as sticky toasts; own sheet sections (§7.1).
 - **Map layout:** bar on the footprint's top edge inside the token group (moves with drags and previews); icons in a row below it, top-left; death badge in the label row. Exact pixels per scenes-map's renderer; screenshot at §13 step 1.
 - **States:** no encounter: DM effect / temp HP / death controls still work on characters (sheet sections); Initiative empty as CBT. Disconnected: last state + banner, controls disabled. Errors: Toast.
-- **Test IDs:** `cbtx-init-row-<temp|effect|death|conditions|effect-new|concentration|temp-set|death-roll|stabilise|death-set>` (`effect` + `data-record-id` = effect id, `data-value` = key or `custom`; `death` + `data-value` = state), `cbtx-init-add`, `cbtx-add-<picker|qty|binding|confirm>`, `cbtx-effect-<tab|label|duration|source|link|secret|save|end>`, `cbtx-conc-<label|duration|save>`, `cbtx-temp-<input|save>`, `cbtx-death-<success|failure|state>`, `cbtx-token-menu-<conditions|effect|temp|add>`, `cbtx-note-roll`; Konva `cbtx-token-bar` (attr `tone`, `fraction`), `cbtx-token-effect`, `cbtx-token-death` (id = token id).
+- **Test IDs:** `cbtx-init-row-<temp|effect|death|conditions|effect-new|concentration|temp-set|death-roll|stabilise|death-set>` (`effect` + `data-record-id` = effect id, `data-value` = key or `custom`; `death` + `data-value` = state), `cbtx-init-add`, `cbtx-add-<picker|qty|binding|confirm>`, `cbtx-effect-<tab|label|duration|source|link|secret|save|end>`, `cbtx-conc-<label|duration|save>`, `cbtx-temp-<input|save>`, `cbtx-death-<success|failure|state>`, `cbtx-token-menu-<conditions|effect|temp|add>`, `cbtx-note-roll`, `cbtx-expired-toast`; Konva `cbtx-token-bar` (attr `tone`, `fraction`), `cbtx-token-effect`, `cbtx-token-death` (id = token id).
 
 ### 7.1 Character sheet seam (CHARX boundary)
 
@@ -159,6 +159,7 @@ Settled by the orchestrator (D/S seam). CBTX owns data, rules, intents and visib
 | Concentration card (`notification`, kind `cbtx-concentration`) | payload (≤ 1 KB) | **JSON leaf** | `{effectId, targetName, dc, damage, hpChangeId \| null, encounterId \| null}` |
 | | resolution | **JSON leaf** | `{total, dc, success}` \| `{outcome: "ended" \| "undone"}` |
 
+- **ADR-0009:** refined, not contradicted ([proposed ADR](../architecture/adr/proposed-combat-rule-hooks.md) "Refines ADR-0009"): PC play state lives on the character (as `hpCurrent` already does); monster play state on the combatant; effects are condition / label rows, not ADR-0009's field / op / value modifiers, which stay design-for-later.
 - **Constraints:** one active concentration per target, one active condition per (target, key): partial unique indexes on rows with `endedAt` null. FKs: `targetCombatantId` / `concentrationId` set null on delete (combatants are never deleted today).
 - **Relations:** Effect → Combatant or Character; Effect → Effect (concentration); combat log entry → its concentration cards.
 - **Derived:** `deathState` (FR-CBTX-19), rounds left, bar fraction / tone, DC, whether a PC is skipped (dead).
@@ -243,7 +244,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 | Key | Requires | Contents |
 |---|---|---|
-| `cbtx-effects` | `combat-1` | Mira concentrates on "Bless" 10 rounds; Bless (custom, source Mira, linked) on Mira and Thorn; Goblin prone; Elite (hidden) poisoned; Goblin 2 custom "Hex" **secret** |
+| `cbtx-effects` | `combat-1` | Mira concentrates on "Bless" 10 rounds; Bless (custom, source Mira, linked) on Mira and Thorn; Goblin prone; Elite (hidden) poisoned; Goblin 2 custom "Hex" **secret**; Thorn custom "Marked" (no duration, no source) |
 | `cbtx-temp` | `combat-1` | Thorn temp HP 5; Goblin temp HP 3 |
 | `cbtx-reinforcement` | `combat-1` | Unbound tokens on Goblin Ambush: "Goblin 3" (`enemy-1`, visible, (14, 8)), "Wolf 2" (`enemy-2`, hidden, (15, 3)) |
 
@@ -260,10 +261,11 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 | # | DM (A) | Players (B, C) | Expected |
 |---|---|---|---|
-| 1 | Open Initiative; screenshot map | B, C open links | A: Mira "Concentrating: Bless 10r", Bless chips on Mira, Thorn; Goblin prone + "+3"; Elite poisoned (eye-off row); Goblin 2 "Hex" eye-off; bars on all bound tokens. B: own bar proportional, Goblin band bar, no bar on Thorn, prone icon; C likewise with Thorn's bar "+5". No leak string |
+| 1 | Open Initiative; screenshot map | B, C open links | A: Mira "Concentrating: Bless 10r", Bless chips on Mira, Thorn; "Marked" on Thorn; Goblin prone + "+3"; Elite poisoned (eye-off row); Goblin 2 "Hex" eye-off; bars on all bound tokens. B: own bar proportional, Goblin band bar, no bar on Thorn, prone icon; C likewise with Thorn's bar "+5". No leak string |
 | 2 | Box-select Goblin, Goblin 2 → token menu Conditions ▸ Frightened | — | Both tokens + rows show Frightened for A, B, C ≤ 1 s |
 | 3 | Next (Mira). Add effect via Mira's row: Custom "Bane", 1 round, target Goblin 2 | — | "Bane 1r" on Goblin 2 for A, B, C (source hidden from B, C) |
-| 4 | Goblin row → Attack; popup: target Mira, Hit, damage total 3, Apply | B: Roll save on the sticky toast, manual 8 | Mira 9 / 12. B: toast "Mira: concentration save DC 10 (Bless)"; A sees it pending. B: 8 + 4 = 12 → "kept" for A, B; public line "Mira — Concentration save (DC 10): …" for A, B, C |
+| 4 | Goblin row → Attack; popup: target Mira, Hit, damage total 3, Apply | — | Mira 9 / 12. B: sticky toast "Mira: concentration save DC 10 (Bless)"; A sees it under Pending |
+| 4a | Hard-kill + restart (card still pending) | B: after rejoin, Notifications → Roll save, manual 8 | All rejoin; the card is still pending (A: Pending; B: summary toast "1 pending action", FR-NOTE-15); effects, temp HP, bars, icons intact. B: 8 + 4 = 12 → "kept" for A, B; public line "Mira — Concentration save (DC 10): …" for A, B, C |
 | 5 | Elite row → Attack; target Mira, Hit, damage total 5, Apply | B: Roll save, manual 2 | Mira 4 / 12. 2 + 4 = 6 → "lost"; Bless chips gone on Mira and Thorn (A, B, C); concentration chip gone |
 | 6 | Goblin row → Attack; target Thorn, Hit, damage total 4, Apply; then Undo | C: before it, sheet Temp HP 8 → Set | C: temp 8 → 4, HP 10 / 10 unchanged; A's outcome line "(4 absorbed by temp HP)", B, C's line without it. Undo → temp 8 for C ≤ 1 s |
 | 7 | Next × N to Mira's turn in round 2 | — | At Mira's turn: Bane gone (A, B, C); A Toast "Ended: Bane (Goblin 2)", no new Notifications row. A: Prev → Bane back "1r"; Next → gone again |
@@ -272,8 +274,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 10 | Mira's token Damage 99; Mira row → Stabilise | B: sees section | Mira "Dying" then "Stable" (A, B, C); B pips 3 / 0 |
 | 11 | Select Goblin 3 + Wolf 2 → token menu Add to combat; Roll monsters; Initiative Add… → Goblin × 1 | — | Two rows sorted last with Roll, then ranked; B, C see Goblin 3 only (no "Wolf 2" anywhere); "Goblin 4" token-less row; no Roll for others |
 | 12 | Goblin row → Concentration… "Hold Person"; then Conditions ▸ Stunned | — | Concentration chip, then gone with Stunned (A, B, C) |
-| 13 | Hard-kill + restart | — | All rejoin; effects, temp HP, pips, bars, icons, any pending card intact |
-| 14 | End encounter (confirm) | — | Monster effects and Bane-style timed effects gone; Mira's Stunned (no duration) stays on her sheet section; bars and icons gone; no leak string; no app console errors |
+| 13 | End encounter (confirm) | — | Monster effects (Frightened, Hex, Bane-style timed ones) gone; Thorn's "Marked" (PC, no duration) stays: chip in C's sheet section, still in A's and B's stores; bars, icons and death badges gone; no leak string; no app console errors |
 
 ## 14. Dependencies
 
@@ -289,16 +290,20 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 ### Shared changes
 
-Builders report `shared change needed:`. The db, `src/shared/events/` and record-type registry changes go in a shared branch first (`fix/cbtx-core`); it and CHARX's `fix/charx-core` are sequenced by the orchestrator, never at the same time. P's combat fixes merge before this build.
+Builders report `shared change needed:`. **Build order** (fixed by the orchestrator, `status.md`): P fixes → `fix/charx-core` → `fix/cbtx-core` → S build (a, b) ∥ D build → S slice 4 (combat routes) last. `fix/cbtx-core` (shared branch first) carries the db, events, shared record schemas, the `entity` visibility fn, the overlay contract and the notifications helper flag; the D build carries the rest.
 
 - **`src/server/db/`:** table `effect` (+ partial unique indexes); `combatant.temp_hp`; `entity.temp_hp`, `death_successes`, `death_failures`; `hp_change.temp_before`, `temp_after`, `death_before`, `death_after`, `note_ids`. All default-safe for push on old dev DBs.
-- **`src/shared/events/`:** `combat-extras.ts` (9 events) + `index.ts` line; `HpChangeFacts` gains the new columns.
-- **Record types / visibility:** `effect` line (CBTX fn); `combatant` fn unchanged (its player whitelists omit `tempHp`); `entity` fn adds `deathState`, strips the new fields for other players (ENT's file).
-- **New append-only registry:** `combatRuleHooks` (`src/server/features/combat-tracker/rule-hooks.ts`, created empty by this build; add to the AGENTS §9.9 list).
-- **Append-only lines:** server features `combatExtras`; notification kind `cbtx-concentration` (+ both client view files); `tokenOverlays` `cbtx`; token-changed hooks `cbtx` (hidden copy); token menu entries; bundle `combat-extras`; CHARX's `sheetSections` registry (3 entries, §7.1).
-- **Contract change (scenes-map's files):** `TokenDecoration` gains `bar {id, fraction \| null, temp?, tone}` and `icons [{id, icon, tone, label}]` + renderer (`token-overlays.ts` and the token renderer).
-- **Other features' files this build edits** (orchestrator assigns, after P): combat-tracker `hp.ts` (apply / applyHp / undo via `hpRules`), `turns.ts` (eligibility, hooks), `lifecycle.ts` (hooks), `card-kind` untouched, `log-kinds.ts` (`absorbed`), DM / player `initiative-window.tsx`, turn alert detail; character-sheet `char.adjustHp` via `hpRules` (or CHARX's successor).
-- **Docs** (integrator): data model §11 / §17 + new CBTX section; protocol new section; glossary (OQ-CBTX-19); AGENTS §9.9 registry list; FIX §8 rows.
+- **`src/shared/events/`:** `combat-extras.ts` (9 events) + `index.ts` line; `combat-tracker.ts` `HpChangeFacts` gains the new columns; `character-sheet.ts` `CharacterHpAdjusted` gains optional `tempBefore`, `tempAfter`, `deathBefore`, `deathAfter`, `noteIds`.
+- **Shared record schemas:** `src/shared/combat-tracker/schemas.ts` (combatant record `tempHp`, DM only, player whitelists omit it; `cbt.undo` / `cbt.prevTurn` results gain `notRestored: string[]`; damage-card resolution `applied` meaning, FR-CBTX-15); `src/shared/entities/schemas.ts` (character columns; redacted character gains `deathState`). `@shared/combat-extras/` is CBTX's own.
+- **Visibility:** record types are registered per feature (`r.recordType` in each feature's `index.ts`); CBTX registers `effect` in its own. The other-player character redaction is **one whitelist** in entities' visibility fn (`src/server/features/entities/records.ts`), listed key by key in CHARX's [proposed-full-sheet-derivation](../architecture/adr/proposed-full-sheet-derivation.md) ("Refines ADR-0024"); CBTX adds `deathState` there. `combatant` fn unchanged.
+- **Notifications:** `resolveNotification(…, {byRule: true})` skips the action-owner check (`src/server/features/notifications/helpers.ts`, FR-CBTX-43).
+- **New append-only registry:** `combatRuleHooks` (`src/server/features/combat-tracker/rule-hooks.ts`, created empty by `fix/cbtx-core`; add to the AGENTS §9.9 list).
+- **Append-only lines:** `src/server/features/index.ts` `combatExtras`; notification kind `cbtx-concentration` (server `kinds.ts` + `src/client/{dm,player}/notification-views.ts`); `tokenOverlays` `cbtx`; token-changed hooks `cbtx` (hidden copy); token menu entries; `fixtures/bundles/index.ts` `combat-extras`; CHARX's `sheetSections` (3 entries, §7.1).
+- **scenes-map files** (lock; after P's `fix/polish-map-fit`): `src/client/common/features/scenes-map/token-overlays.ts` (`TokenDecoration` gains `bar {id, fraction \| null, temp?, tone}`, `icons [{id, icon, tone, label}]`), `decorations.ts` (merge), `layers/TokensLayer.tsx` (draw).
+- **combat-tracker files** (D build, after P): server `hp.ts` (apply / applyHp / undo via `hpRules`, resolution `applied`), `turns.ts` (dead-PC eligibility, `turnChanged` hook, `notRestored`), `lifecycle.ts` (`started`, `ended` hooks), `ranks.ts` (added combatants); `src/shared/combat-tracker/log-kinds.ts` (`absorbed` in dmPayload); client `src/client/dm/features/combat-tracker/{initiative-window.tsx, token-menu-entries.tsx}`, `src/client/player/features/combat-tracker/initiative-window.tsx`, `src/client/common/features/combat-tracker/{turn-alert.ts, token-overlay.ts}` (dead-PC skip cue, alert detail).
+- **character-sheet files** (D build; S's build inherits the folder): `src/server/features/character-sheet/commands.ts` (`char.adjustHp` via `hpRules`), `hp.ts` (`characters.adjustHp` stays the PC HP writer `hpRules` calls).
+- **entities files** (`fix/cbtx-core`): `src/server/features/entities/records.ts` (redaction), `src/shared/entities/schemas.ts`.
+- **Docs** (integrator): data model §11 / §17 + new CBTX section; protocol new section + §23 note (resolution `applied`); glossary (OQ-CBTX-19); AGENTS §9.9 registry list; FIX §8 rows.
 
 ## 15. Open questions
 
@@ -314,7 +319,7 @@ Builders report `shared change needed:`. The db, `src/shared/events/` and record
 | OQ-CBTX-06 | Condition mechanics | **Only incapacitating conditions end concentration; rest are reminders** / also preset adv / dis on rolls (more rules, more code) | no · DM | combat-tracker, dice-roll-log |
 | OQ-CBTX-07 | Player rights on own PC | **Temp HP, death save roll, concentration start / end; conditions DM only** / players also add own conditions | no · DM | character-sheet-full |
 | OQ-CBTX-08 | Monster HP bar for players: amends #138 ("only a health band, never HP or a bar") | **A: full-width bar in band tone, no proportion** (glanceable on the map; amends #138) / B: no monster bar for players, band in the Initiative row only (#138 as is). Both specified in FR-CBTX-28 | **yes** · DM | #138, scenes-map |
-| OQ-CBTX-09 | Other players see a PC's death saves | **`deathState` only (dying / stable / dead)** / counters too / nothing beyond Down | no · DM | entities |
+| OQ-CBTX-09 | Other players see a PC's death saves (widens ADR-0024's redaction; goes to the DM together with OQ-CHARX-05) | **`deathState` only (dying / stable / dead)** / counters too / nothing beyond Down | no · DM (with OQ-CHARX-05) | entities, ADR-0024 |
 | OQ-CBTX-10 | Dead PCs skip turns (amends FR-CBT-14 / -50) | **Yes** / no, DM presses Next | no · DM | [combat-tracker](combat-tracker.md) |
 | OQ-CBTX-11 | Massive damage (overkill ≥ HP max → dead) | **Not automated; DM sets failures 3** / automated | no · DM | — |
 | OQ-CBTX-12 | How temp HP stays hidden from players: outcome lines and the damage card's `applied` (#138 shows `applied` to the rolling player) | **(a) Absorbed only in the DM line; card resolution `applied` = damage dealt incl. absorbed** (no temp HP leak; changes the resolution's meaning, protocol §23 note) / (b) resolution keeps HP lost; list the temp HP hint as an accepted leak like overkill | no · DM | combat-tracker, dice-roll-log |
@@ -324,7 +329,7 @@ Builders report `shared change needed:`. The db, `src/shared/events/` and record
 | OQ-CBTX-16 | Auto-add Unconscious to a PC at 0 HP | **No** (Down X + Dying say it) / yes, removed on heal | no · DM | — |
 | OQ-CBTX-17 | Mid-fight additions update encounter entries (XP) | **No: entries are the plan, combatants and the log are what happened** / yes | no · owner: spec-combat-extras | stats |
 | ~~OQ-CBTX-18~~ | ~~Where PC play state lives~~ | **Settled by the orchestrator, see D/S seam:** pick stands: CBTX-owned play-state columns on `entity` (character), like `hpCurrent`; never in `statBlock` or CHARX's `creature-sheet`; effects in CBTX's `effect` table | — | entities, data model |
-| OQ-CBTX-19 | Glossary | **Add** Effect, Temp HP, Death save, Concentration card, Rule hook; **amend** Combatant ("conditions" → effects on combatant or character), Condition, Concentration | no · owner: integrator | glossary |
+| OQ-CBTX-19 | Glossary | **Add** Effect (condition / label / concentration row with optional duration; **replaces "Modifier" for these**), Temp HP, Death save, Concentration card, Rule hook; **redefine** Modifier as the design-for-later field / op / value adjustment of [ADR-0009](../architecture/adr/0009-entity-content-model.md) (not built); **amend** Combatant ("conditions" → effects on combatant or character), Condition, Concentration | no · owner: integrator | glossary, ADR-0009 |
 | OQ-CBTX-20 | Undo scope | **HP path only (temp, death counters, effects ended by that damage follow the apply)**; effect / temp / death commands corrected by their inverse / undo every CBTX command | no · DM | ADR-0016 |
 | OQ-CBTX-21 | Token overlay contract gains `bar`, `icons` | **Yes, scenes-map renders both** (lock on scenes-map's renderer) / reuse `badges` (pills in the label row, crowded) | no · owner: orchestrator | [scenes-map](scenes-map.md) FR-MAP-34/43 |
 | ~~Carried over~~ | ~~Multiple simultaneous combats; session tagging~~ | Decided earlier: one started encounter per campaign (#139 P15); encounters, not sessions ([ADR-0013](../architecture/adr/0013-session-journal-scope.md)) | — | — |
@@ -336,3 +341,5 @@ Builders report `shared change needed:`. The db, `src/shared/events/` and record
 - Advantage / disadvantage from conditions, condition immunities, exhaustion effects, massive damage (OQ-CBTX-06, -11).
 - Effects on tokens or monsters outside an encounter; end-of-turn durations (OQ-CBTX-03); concentration on non-creatures.
 - Spells, slots, hit dice (→ character-sheet-full / levelling); stats UI (→ [stats](post-mvp/stats.md)).
+- Sheet spells marked concentration (CHARX `spells[].concentration`) don't start CBTX concentration; the player uses **Concentrate…** with a free-text label.
+- Field / op / value modifiers on instances (ADR-0009 design-for-later); effects carry no numbers.
