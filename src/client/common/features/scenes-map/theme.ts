@@ -19,6 +19,8 @@ export interface CanvasColors {
   /** `hp.bloodied` / `hp.down`: movement dash / over (OQ-MAP-27), overlay badge tones. */
   hpBloodied: string;
   hpDown: string;
+  /** `hp.full`: overlay bar tone (FR-CBTX-28). */
+  hpFull: string;
 }
 
 const FALLBACK: CanvasColors = {
@@ -35,6 +37,7 @@ const FALLBACK: CanvasColors = {
   hidden: "rgba(163,163,163,0.55)",
   hpBloodied: "#eab308",
   hpDown: "#ef4444",
+  hpFull: "#22c55e",
 };
 
 function read(name: string, fallback: string): string {
@@ -59,6 +62,7 @@ export function useCanvasColors(): CanvasColors {
       hidden: read("--visibility-hidden", FALLBACK.hidden),
       hpBloodied: read("--hp-bloodied", FALLBACK.hpBloodied),
       hpDown: read("--hp-down", FALLBACK.hpDown),
+      hpFull: read("--hp-full", FALLBACK.hpFull),
     }),
     [],
   );

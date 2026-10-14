@@ -81,10 +81,8 @@ describe("entities over REST + WS (entities bundle)", () => {
     const thorn = (c: TestClient) => view(c).find((r) => r.name === "Thorn");
     expect(view(p1)).toHaveLength(2);
     expect(mira(p1)).toMatchObject({ hpCurrent: 12, statBlock: { ac: 16 } });
-    // FR-CHARX-35: the one whitelist (deathState: combat-extras, absent until built).
-    expect(Object.keys(thorn(p1) ?? {}).sort()).toEqual(
-      REDACTED_CHARACTER_KEYS.filter((k) => k !== "deathState").sort(),
-    );
+    // FR-CHARX-35 / FR-CBTX-32: the one whitelist, deathState included.
+    expect(Object.keys(thorn(p1) ?? {}).sort()).toEqual([...REDACTED_CHARACTER_KEYS].sort());
     expect(thorn(p2)).toMatchObject({ hpCurrent: 10 });
     expect(Object.keys(mira(p2) ?? {})).not.toContain("statBlock");
     expect(p1.store.records["imported-entity"]).toBeUndefined();
@@ -202,6 +200,7 @@ describe("entities over REST + WS (entities bundle)", () => {
       level: 1,
       className: "Fighter",
       species: null,
+      deathState: null,
     });
     for (const c of [p1, p2]) c.close();
   });
