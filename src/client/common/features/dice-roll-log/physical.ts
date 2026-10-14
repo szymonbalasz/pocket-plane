@@ -2,7 +2,7 @@
 // toggle and every roll control in this tab (same-tab listeners + the `storage` event).
 import { useCallback, useSyncExternalStore } from "react";
 import { useSync } from "../../sync/store";
-import { physicalKey } from "./logic";
+import { createFlagStore, optionsKey, physicalKey } from "./logic";
 
 const listeners = new Set<() => void>();
 
@@ -49,4 +49,35 @@ export function usePhysicalDice(): [boolean, (on: boolean) => void] {
     [key],
   );
   return [on, set];
+}
+
+// FR-DICE-30: roll-bar Options open / closed, per browser beside the FR-DICE-07 entry.
+const optionsStore = createFlagStore(() => globalThis.localStorage);
+const optionsListeners = new Set<() => void>();
+
+function subscribeOptions(fn: () => void): () => void {
+  optionsListeners.add(fn);
+  return () => {
+    optionsListeners.delete(fn);
+  };
+}
+
+/** `[open, set]` for this client's campaign; closed by default (and before the first snapshot). */
+export function useRollOptionsOpen(): [boolean, (open: boolean) => void] {
+  const you = useSync((s) => s.store.you);
+  const key = you ? optionsKey(you.campaignId, you.role, you.playerId) : null;
+  const open = useSyncExternalStore(
+    subscribeOptions,
+    () => (key ? optionsStore.read(key) : false),
+    () => false,
+  );
+  const set = useCallback(
+    (v: boolean) => {
+      if (!key) return;
+      optionsStore.write(key, v);
+      for (const fn of [...optionsListeners]) fn();
+    },
+    [key],
+  );
+  return [open, set];
 }

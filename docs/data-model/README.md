@@ -8,6 +8,7 @@ Consolidated domain model. Entities and relationships, **not SQL**. **Living doc
 | Scenes | assets-pipeline, entities, play-shell, scenes-map | consolidated (2026-10-12): [§9–§13](#9-scenes-er-diagram); CON-18–21 resolved (fix/scenes-core) |
 | Combat | character-sheet, dice-roll-log, notifications, combat-tracker | consolidated (2026-10-12, #142): [§14–§18](#14-combat-er-diagram); CON-34–37 resolved; all Combat tables built as shared definitions in `src/server/db/schema.ts` (fix/combat-core) |
 | Reward | [party-loot](../specs/party-loot.md) | built (build/party-loot): [§19](#19-reward-loot-entry-party-pot-wallet) |
+| Sprint 1 | [character-sheet-full](../specs/character-sheet-full.md) (CHARX, #178) | core built (fix/charx-core): [§20](#20-sprint-1-creature-sheet), stat-block additions in [§11](#11-scenes-entity); record type, commands, hook, fixtures *(sprint 1, to build)* |
 
 Every fact links its source. Protocol side (record types, intents, events): [protocol](../protocol/README.md).
 
@@ -350,7 +351,7 @@ One table for imported, custom and character definitions ([ADR-0009](../architec
 | name | text 1–60 | Trimmed, no control chars; unique ci per (campaign, kind) for non-null campaign; may equal an imported name | [FR-ENT-08](../specs/entities.md#6-functional-requirements) |
 | portraitAssetId | ID → Asset \| null | Asset reference via `assets.require`; null for imported | FR-ENT-08, [FR-ASSET-15](../specs/assets-pipeline.md#6-functional-requirements) |
 | tokenShape *(feedback pass, built)* | `round` \| `square` \| `none` \| null | Column `token_shape` text, nullable (zod checks values); default shape for **new** tokens only; null = round; imported rows null. Whole-replace `PUT` without it → null | [FR-ENT-22](../specs/entities.md#6-functional-requirements), OQ-ENT-17 |
-| statBlock | **JSON leaf** | Strict per-kind zod: shared creature core `size, ac, hpMax, initBonus, attacks[0..1]` + monster `cr` / character `level, className`. New fields only optional. *(feedback pass, built)*: optional `speed` (int 0–200, multiple of 5), `abilities {str, dex, con, int, wis, cha}` (int 1–30, all six or none), `saveProficiencies` (unique subset; needs `abilities`), both kinds; zod only, no column, no backfill ([FR-ENT-21](../specs/entities.md#6-functional-requirements), [FR-ENT-23](../specs/entities.md#6-functional-requirements)) | [FR-ENT-02](../specs/entities.md#6-functional-requirements), ENT §8, [ADR-0006](../architecture/adr/0006-persistence.md) |
+| statBlock | **JSON leaf** | Strict per-kind zod: shared creature core `size, ac, hpMax, initBonus, attacks[0..1]` + monster `cr` / character `level, className`. New fields only optional. *(feedback pass, built)*: optional `speed` (int 0–200, multiple of 5), `abilities {str, dex, con, int, wis, cha}` (int 1–30, all six or none), `saveProficiencies` (unique subset; needs `abilities`), both kinds; zod only, no column, no backfill ([FR-ENT-21](../specs/entities.md#6-functional-requirements), [FR-ENT-23](../specs/entities.md#6-functional-requirements)). *(sprint 1, built, fix/charx-core)*: `attacks` 0–**20** rows, each with an optional unique `id`; optional `skills` (18 SRD skills → `proficient` \| `expertise`), `overrides` (fixed key list → `{value −20…40, note? ≤ 60}`), `spellcasting {ability, slots {1…9: 0–9}}` (both kinds; `skills` / `spellcasting` need `abilities`); character `classes` (1–4 × `{name, level, hitDie, subclass?}`, Σ levels ≤ 20, names joined "/" ≤ 40; every entities write sets `level` / `className` from them) and `species` (≤ 40); whole block ≤ 12 KB, else "Sheet is full" ([CHARX §8.1](../specs/character-sheet-full.md#81-stat-block-additions-entities-json-leaf-zod-only-no-column), [FR-CHARX-01/03/04](../specs/character-sheet-full.md#6-functional-requirements)) | [FR-ENT-02](../specs/entities.md#6-functional-requirements), ENT §8, [ADR-0006](../architecture/adr/0006-persistence.md) |
 | ownerPlayerId | ID → Player \| null | Required for character (player of `ctx.campaignId`, else `invalid`); null for monster | [FR-ENT-10](../specs/entities.md#6-functional-requirements) |
 | hpCurrent | int \| null | Character only; `= hpMax` at create; clamped on update. PC HP lives on the character. Written only by entities' create / update and `characters.adjustHp` ([FR-CHAR-13](../specs/character-sheet.md#6-functional-requirements), CON-37) | FR-ENT-10, FR-ENT-11, [ADR-0009](../architecture/adr/0009-entity-content-model.md), [OQ-ENT-08](../specs/entities.md#15-open-questions) |
 | derivedFromId | ID \| null | Plain id, **no FK**; immutable; informational only | [FR-ENT-09](../specs/entities.md#6-functional-requirements) |
@@ -361,6 +362,8 @@ One table for imported, custom and character definitions ([ADR-0009](../architec
 - References into `entity` (token, combatant, encounter entry) resolve via `resolveDefinition(env, id)` (campaign = `env.actor.campaignId`, CON-35): global or same campaign, else `not_found` ([FR-ENT-12](../specs/entities.md#6-functional-requirements), [ADR-0018](../architecture/adr/0018-global-imported-content.md)).
 - Reads re-validate the JSON leaf: invalid stored row omitted from the snapshot + error log; a command on it → `internal` ([FR-ENT-01](../specs/entities.md#6-functional-requirements)).
 - *(feedback pass, built)* Character speed, scores and saves come from fixtures / `PUT /api/entities/:id` in MVP; no character edit UI (#154). Redacted characters carry a derived `down` (= `hpCurrent = 0`), computed in the visibility fn, not stored ([FR-ENT-15](../specs/entities.md#6-functional-requirements), #154).
+- *(sprint 1, built, fix/charx-core)* Other players get a character redacted to **one whitelist** (`RedactedCharacter` / `REDACTED_CHARACTER_KEYS` in `@shared/entities`, built by `redactCharacter`): `id, kind, name, portraitAssetId, ownerPlayerId, down, level, className, species` (null when unset) + `deathState` (combat-extras fills it; absent until built) ([ADR-0036](../architecture/adr/0036-full-sheet-derivation.md), [FR-CHARX-35](../specs/character-sheet-full.md#6-functional-requirements)).
+- *(sprint 1, built)* Internal `createIn` / `updateIn` (entities' `POST` / `PUT` path minus HTTP and event) let CHARX write the row; `updateIn` takes an optional `hpCurrent` (FR-CHARX-15, `followHpMax`), still clamped. `PUT` keeps FR-ENT-11's clamp ([protocol §31](../protocol/README.md#31-sprint-1-character-sheet-full)).
 
 ## 12. Scenes: scene, scene folder, token
 
@@ -459,6 +462,7 @@ An instance of a creature definition: own name, read-only display copies, play s
 | Rendered window geometry | clamp(stored, viewport), render-only | [FR-SHELL-12](../specs/play-shell.md#6-functional-requirements) |
 | *(feedback pass, built)* Movement indicator | move = ruler distance; used = first non-null overlay `movedFt` (combat), else 0; tone vs `speed` (≤ speed normal, ≤ 2× dash, > 2× over) | [FR-MAP-37](../specs/scenes-map.md#6-functional-requirements) |
 | *(feedback pass, built)* Ability helpers | `abilityMod`, `proficiencyBonus(stats)` (level / CR), `checkBonus`, `saveBonus` in `@shared/entities`; take the stat block ([ADR-0032](../architecture/adr/0032-ability-derivation.md)) | [FR-ENT-24](../specs/entities.md#6-functional-requirements) |
+| *(sprint 1, built)* Full-sheet values with overrides | `skillBonus` (mod + PB × 0/1/2), `passiveScore` (10 + skill), `spellAttackBonus` (PB + mod), `spellSaveDc` (8 + PB + mod), `hitDice` (Σ class levels per die), `concentrationSaveBonus` (= `saveBonus(stats, "con")`), `sheetValue(stats, key)`; `overrides[key]` replaces the derived value in every helper, the four above included (`proficiency` feeds the others; a leaf without scores / spellcasting stays null); `isOverridden`, `withoutOverride` ([ADR-0036](../architecture/adr/0036-full-sheet-derivation.md)) | [FR-CHARX-05–07](../specs/character-sheet-full.md#6-functional-requirements) |
 | *(feedback pass, built)* Redacted character `down` | `hpCurrent = 0`, in the `entity` visibility fn | [FR-ENT-15](../specs/entities.md#6-functional-requirements), #154 |
 
 **Visibility-relevant fields** (full rules: [protocol §12](../protocol/README.md#12-scenes-record-types))
@@ -466,7 +470,7 @@ An instance of a creature definition: own name, read-only display copies, play s
 | Record | Fields the filter reads | Never leaves the server / never to players |
 |---|---|---|
 | Asset | — (players: always hidden) | `hash` (no field in the record type) |
-| Entity | `kind`, `ownerPlayerId` vs `ctx.playerId`; `hpCurrent` (→ `down`) | Players: monster rows; other characters' stat block + `hpCurrent` (only derived `down`) |
+| Entity | `kind`, `ownerPlayerId` vs `ctx.playerId`; `hpCurrent` (→ `down`) | Players: monster rows; other characters' stat block + `hpCurrent` (only derived `down`; *(sprint 1, built)* plus `level`, `className`, `species` from the whitelist) |
 | Imported entity | — (players: always hidden) | — |
 | Scene | `id` vs active scene (scope gate) | Players: `name`, `folderId`, `mapLocked`, `seq` |
 | Scene folder | — (players: always hidden) | — |
@@ -882,3 +886,31 @@ Built by `build/party-loot` from [party-loot](../specs/party-loot.md) (LOOT, `co
 | `loot-1` | `campaign` | e1 "Goblin chief's pouch" 12 gp 30 sp; e2 "Potion of healing ×2"; e3 "Silver idol" 500 gp, edited to 50 gp; e4 5 pp; e5 "Paid the ferryman" −2 gp. Pot 5 pp, 60 gp, 30 sp | 4 `loot-received` notifications (e1–e4); e3's text still says 500 gp |
 | `loot-wallets` | `loot-1`, `char-mira`, `char-thorn` | m1 pot → Mira 20 gp; m2 pot → Thorn 10 gp 30 sp; m3 Thorn → Mira 2 gp "Rations"; m4 Mira → outside 1 gp "Rope". Pot 5 pp, 30 gp; Mira 21 gp; Thorn 8 gp 30 sp | none |
 | `loot-second` | `campaign-second` | Activates Second Campaign, adds "SECOND-CAMPAIGN-LOOT" 1 gp, re-activates Fixture Campaign | 1 notification in the Second Campaign |
+
+## 20. Sprint 1: creature sheet
+
+From [character-sheet-full](../specs/character-sheet-full.md) (CHARX, `complete`, #178; [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md) C + 1). **Built (fix/charx-core):** the table (`creatureSheet` in `src/server/db/schema.ts`, drizzle push, no migration). *(sprint 1, to build, build/character-sheet-full)*: the zod row schema, the `creature-sheet` record type (registered in `src/server/features/character-sheet/index.ts`), every writer. Protocol side: [protocol §31](../protocol/README.md#31-sprint-1-character-sheet-full).
+
+### Creature sheet (`creature_sheet`, record type `creature-sheet`) — owner [character-sheet-full](../specs/character-sheet-full.md#82-creature-sheet-new-table-creature_sheet-charx)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| entityId | ID → Entity, **PK** | 1:1 with a campaign entity (character or custom monster; never imported). Missing row = defaults (`ready`, unlocked, empty) | [FR-CHARX-02](../specs/character-sheet-full.md#6-functional-requirements) |
+| campaignId | ID → Campaign | Scope; index `creature_sheet_campaign` | CHARX §8.2 |
+| ownerPlayerId | ID → Player \| null | Copy of the entity's; null for monsters; written only with the entity's owner (CHARX definition-changed hook) | [FR-CHARX-13](../specs/character-sheet-full.md#6-functional-requirements) |
+| status | `draft` \| `ready` | Characters; monsters `ready` | [FR-CHARX-08/10](../specs/character-sheet-full.md#6-functional-requirements) |
+| locked | bool, default false | DM only | [FR-CHARX-12](../specs/character-sheet-full.md#6-functional-requirements) |
+| background, alignment | text 0–40, default "" | | CHARX §8.2 |
+| proficiencyNotes | **JSON leaf** `{armor, weapons, tools, languages}` ≤ 200 each | Display only | CHARX §8.2 |
+| spells | **JSON leaf** 0–40 rows `{id, name, level 0–9, prepared, concentration, ritual, roll none\|attack\|save, saveAbility?, damage?, effect damage\|healing, damageType?, notes}` | `saveAbility` iff `roll: save`; `roll: attack` ⇒ `effect: damage` | CHARX §8.2 |
+| features | **JSON leaf** 0–30 rows `{id, name, source, text ≤ 600, usesMax? 1–20, used, reset? short\|long}` | `reset` is a label | CHARX §8.2 |
+| items | **JSON leaf** 0–80 rows `{id, name, qty 0–9999, equipped, notes ≤ 120}` | No weight | CHARX §8.2 |
+| notes | text ≤ 4000, default "" | Rendered as text | CHARX §8.2 |
+| slotsUsed, hitDiceUsed | **JSON leaf** `{1…9: int}`, `{d6…d12: int}` | ≤ slot max / levels with that die; lowering a max clamps `used` in the same tx | [FR-CHARX-17](../specs/character-sheet-full.md#6-functional-requirements) |
+| createdAt, updatedAt | timestamp | `ctx.clock` | CHARX §8.2 |
+
+- **Caps:** row ≤ 48 KB, stat block ≤ 12 KB, else `invalid` "Sheet is full" ([FR-CHARX-03](../specs/character-sheet-full.md#6-functional-requirements)). Typical 5–15 KB.
+- **Visibility** ([FR-CHARX-36](../specs/character-sheet-full.md#6-functional-requirements)): DM full; player full iff `ownerPlayerId = ctx.playerId` (the row's copy); otherwise hidden (other players' sheets, every NPC sheet).
+- **Migration:** none. New table via push; MVP characters (`char-mira` etc.) have no row and load unchanged; legacy attacks get ids on their first CHARX write ([CHARX §8](../specs/character-sheet-full.md#8-data-model)).
+- **Snapshot size** (CON-44): the heavy scenario carries 16 typical sheets (6 PCs + 10 NPC sheets, ≈ 12.6 KB each): DM ≈ 714 KB (ceiling 768 KiB), each player ≈ 260 KB (512 KiB). Until the record type is registered the test counts the table rows each viewer will get (`src/server/ws/testing/snapshot-size.ts`).
+- **Derived** (`@shared/entities`, never stored): [§13](#13-scenes-constraints-not-in-db-derived-visibility-fields) "Full-sheet values with overrides". Draft / Locked display, roll specs and the summary card: CHARX build.

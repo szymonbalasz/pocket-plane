@@ -5,7 +5,16 @@ import { DamageCardPayload } from "@shared/combat-tracker/schemas";
 import { eq } from "drizzle-orm";
 import type { Config } from "../../config";
 import { closeDb, type Db, openMemoryDb } from "../../db/client";
-import { asset, campaign, combatant, entity, notification, player, scene } from "../../db/schema";
+import {
+  asset,
+  campaign,
+  combatant,
+  creatureSheet,
+  entity,
+  notification,
+  player,
+  scene,
+} from "../../db/schema";
 import type { Actor } from "../../events/types";
 import { silentLogger } from "../../log";
 import { createServices, type Services } from "../../services";
@@ -37,7 +46,7 @@ export function snapshotSizes(s: Services): ViewerSize[] {
     })),
   ];
   return viewers.map(({ label, v }) => {
-    const records = s.records.snapshot({ db: s.db, presence }, v);
+    const records = { ...s.records.snapshot({ db: s.db, presence }, v), ...pendingSheets(s, v) };
     const you = { campaignId: v.campaignId, role: v.role, playerId: v.playerId };
     const frame = { type: "snapshot", seq: 0, you, records };
     const types: ViewerSize["types"] = {};
@@ -52,6 +61,24 @@ export function snapshotSizes(s: Services): ViewerSize[] {
       types,
     };
   });
+}
+
+export const CREATURE_SHEET_TYPE = "creature-sheet";
+
+/**
+ * `creature-sheet` rows (CHARX §12) before character-sheet-full registers the record type: the
+ * rows the viewer will receive (DM all, a player their own, FR-CHARX-36) counted as their
+ * table rows. Empty once the type is registered: then the real snapshot carries them.
+ */
+function pendingSheets(s: Services, v: Viewer): Record<string, unknown[]> {
+  if (s.records.get(CREATURE_SHEET_TYPE)) return {};
+  const rows = s.db
+    .select()
+    .from(creatureSheet)
+    .where(eq(creatureSheet.campaignId, v.campaignId))
+    .all()
+    .filter((r) => v.role === "dm" || r.ownerPlayerId === v.playerId);
+  return rows.length ? { [CREATURE_SHEET_TYPE]: rows } : {};
 }
 
 /** DM snapshot build time in ms: one warm-up, then the median of `runs`. */
@@ -112,6 +139,8 @@ export const HEAVY = {
   logEntries: 100,
   pendingCards: 20,
   loot: 100,
+  /** CHARX §12: one per PC + 10 NPC sheets, typical size. */
+  sheets: 16,
 } as const;
 
 /**
@@ -145,6 +174,20 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
     damage: "2d6+5",
     damageType: "bludgeoning",
   });
+  // Full-sheet stat-block fields (CHARX §8.1) at typical size: 4 attacks, skills, overrides.
+  const attacks = (n: string) =>
+    Array.from({ length: 4 }, (_, k) => ({
+      ...attack(`${n}${k} `),
+      id: fill(`atk-${n}${k}-`, 36),
+    }));
+  const sheetStats = {
+    skills: { athletics: "proficient", perception: "proficient", stealth: "expertise" },
+    overrides: {
+      "passive.perception": { value: 16, note: fill("Alert ", 60) },
+      "save.con": { value: 7, note: fill("Ring ", 60) },
+    },
+    spellcasting: { ability: "wis", slots: { "1": 4, "2": 3, "3": 2 } },
+  };
 
   // One max-string PC per player (session-sim's Mira / Thorn stay; they get no token here).
   const pcIds = players
@@ -160,11 +203,14 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
           hpMax: 120,
           initBonus: 3,
           speed: 30,
-          attacks: [attack(`Blade ${i + 1} `)],
+          attacks: attacks(`Blade ${i + 1} `),
           abilities,
           saveProficiencies: ["str", "con"],
+          ...sheetStats,
           level: 12,
           className: fill("Class ", 40),
+          classes: [{ name: fill("Class ", 30), level: 12, hitDie: "d10" }],
+          species: fill("Species ", 40),
         },
       }),
     )
@@ -180,13 +226,44 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
         hpMax: 85,
         initBonus: 2,
         speed: 40,
-        attacks: [attack(`Claw ${i + 1} `)],
+        attacks: attacks(`Claw ${i + 1} `),
         abilities,
         saveProficiencies: ["dex"],
+        ...sheetStats,
         cr: "5",
       },
     }),
   ).map((r) => r.id);
+
+  // Creature sheets (CHARX §12): one per PC + one per custom monster. No CHARX command exists
+  // in this core branch, so rows go straight to the table (`typicalSheet`).
+  const now = "2026-01-01T00:00:00.000Z";
+  for (const [i, id] of pcIds.entries()) {
+    db.insert(creatureSheet)
+      .values({
+        ...typicalSheet(`PC${i + 1}`),
+        entityId: id,
+        campaignId: cid,
+        ownerPlayerId: players[i]?.id ?? null,
+        status: "ready",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+  }
+  for (const [i, id] of monIds.entries()) {
+    db.insert(creatureSheet)
+      .values({
+        ...typicalSheet(`NPC${i + 1}`),
+        entityId: id,
+        campaignId: cid,
+        ownerPlayerId: null,
+        status: "ready",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+  }
 
   // Scenes: up to 30, 5 folders; a new one becomes the active battle scene.
   const mapAsset = db.select().from(scene).where(eq(scene.campaignId, cid)).get()?.mapAssetId;
@@ -330,5 +407,57 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
         )
         .get(cid)?.n ?? 0,
     loot: n("loot_entry"),
+    sheets: n("creature_sheet"),
+  };
+}
+
+/**
+ * A typical creature-sheet row (CHARX §8.2, §12: typical 5–15 KB): 10 spells, 8 features,
+ * 20 items, mid-length texts. Max-length names; ASCII.
+ */
+export function typicalSheet(tag: string) {
+  const id = (k: string, i: number) => fill(`${tag}-${k}${i}-`, 36);
+  return {
+    locked: false,
+    background: fill(`Background ${tag} `, 40),
+    alignment: fill("Neutral good ", 40),
+    proficiencyNotes: {
+      armor: fill("Light, medium, shields ", 100),
+      weapons: fill("Simple, martial ", 100),
+      tools: fill("Thieves' tools ", 60),
+      languages: fill("Common, Elvish ", 60),
+    },
+    spells: Array.from({ length: 10 }, (_, i) => ({
+      id: id("s", i),
+      name: fill(`Spell ${i} `, 60),
+      level: i % 4,
+      prepared: true,
+      concentration: i % 3 === 0,
+      ritual: false,
+      roll: "attack",
+      damage: "4d6",
+      effect: "damage",
+      damageType: "radiant",
+      notes: fill("Spell notes ", 60),
+    })),
+    features: Array.from({ length: 8 }, (_, i) => ({
+      id: id("f", i),
+      name: fill(`Feature ${i} `, 60),
+      source: fill("Class ", 40),
+      text: fill(`Feature text ${i} `, 200),
+      usesMax: 2,
+      used: 1,
+      reset: "short",
+    })),
+    items: Array.from({ length: 20 }, (_, i) => ({
+      id: id("i", i),
+      name: fill(`Item ${i} `, 60),
+      qty: i + 1,
+      equipped: i < 4,
+      notes: fill("Item notes ", 60),
+    })),
+    notes: fill(`Notes ${tag} `, 1000),
+    slotsUsed: { "1": 2, "2": 1 },
+    hitDiceUsed: { d10: 3 },
   };
 }

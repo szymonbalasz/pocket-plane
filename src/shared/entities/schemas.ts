@@ -32,13 +32,30 @@ export const Damage = z.string().regex(DAMAGE_RE, { message: "Damage must look l
 
 const int = (min: number, max: number) => z.number().int().min(min).max(max);
 
+const Id = z.string().min(1).max(64);
+
 export const Attack = z.strictObject({
+  /** Row id from `ctx.ids` (FR-CHARX-16); legacy rows have none until their first sheet write. */
+  id: Id.optional(),
   name: z.string().trim().min(1).max(40),
   toHit: int(-10, 30),
   damage: Damage,
   damageType: DamageType.optional(),
 });
 export type Attack = z.infer<typeof Attack>;
+
+/** FR-CHARX-01: 0–20 attack rows (was 0–1); ids unique where set. */
+export const ATTACKS_MAX = 20;
+export const Attacks = z
+  .array(Attack)
+  .max(ATTACKS_MAX)
+  .refine(
+    (rows) => {
+      const ids = rows.flatMap((r) => (r.id === undefined ? [] : [r.id]));
+      return new Set(ids).size === ids.length;
+    },
+    { message: "Attack ids must be unique" },
+  );
 
 // ---------- abilities (FR-ENT-23) ----------
 
@@ -76,30 +93,183 @@ export const Speed = int(0, 200).refine((n) => n % 5 === 0, {
   message: "Speed must be a multiple of 5",
 });
 
+// ---------- skills, overrides, spellcasting, classes (FR-CHARX-01, CHARX §8.1) ----------
+
+/** The 18 SRD skills (camelCase keys) and the ability each uses. */
+export const SKILL_ABILITY = {
+  acrobatics: "dex",
+  animalHandling: "wis",
+  arcana: "int",
+  athletics: "str",
+  deception: "cha",
+  history: "int",
+  insight: "wis",
+  intimidation: "cha",
+  investigation: "int",
+  medicine: "wis",
+  nature: "int",
+  perception: "wis",
+  performance: "cha",
+  persuasion: "cha",
+  religion: "int",
+  sleightOfHand: "dex",
+  stealth: "dex",
+  survival: "wis",
+} as const satisfies Record<string, Ability>;
+export type Skill = keyof typeof SKILL_ABILITY;
+export const SKILLS = Object.keys(SKILL_ABILITY) as [Skill, ...Skill[]];
+export const SkillName = z.enum(SKILLS);
+
+export const SKILL_NAMES: Readonly<Record<Skill, string>> = {
+  acrobatics: "Acrobatics",
+  animalHandling: "Animal Handling",
+  arcana: "Arcana",
+  athletics: "Athletics",
+  deception: "Deception",
+  history: "History",
+  insight: "Insight",
+  intimidation: "Intimidation",
+  investigation: "Investigation",
+  medicine: "Medicine",
+  nature: "Nature",
+  perception: "Perception",
+  performance: "Performance",
+  persuasion: "Persuasion",
+  religion: "Religion",
+  sleightOfHand: "Sleight of Hand",
+  stealth: "Stealth",
+  survival: "Survival",
+};
+
+export const PASSIVE_SKILLS = ["perception", "investigation", "insight"] as const;
+export type PassiveSkill = (typeof PASSIVE_SKILLS)[number];
+
+export const SkillProficiency = z.enum(["proficient", "expertise"]);
+export type SkillProficiency = z.infer<typeof SkillProficiency>;
+/** Absent skill = not proficient; needs `abilities`. */
+export const Skills = z.partialRecord(SkillName, SkillProficiency);
+export type Skills = z.infer<typeof Skills>;
+
+/** FR-CHARX-06: the fixed override key list. */
+export const OVERRIDE_KEYS = [
+  "proficiency",
+  ...ABILITIES.map((a) => `check.${a}` as const),
+  ...ABILITIES.map((a) => `save.${a}` as const),
+  ...SKILLS.map((s) => `skill.${s}` as const),
+  ...PASSIVE_SKILLS.map((s) => `passive.${s}` as const),
+  "spellAttack",
+  "spellDc",
+] as const;
+export type OverrideKey = (typeof OVERRIDE_KEYS)[number];
+export const OverrideKeyName = z.enum(OVERRIDE_KEYS);
+
+export const Override = z.strictObject({
+  value: int(-20, 40),
+  note: z.string().trim().max(60).optional(),
+});
+export type Override = z.infer<typeof Override>;
+export const Overrides = z.partialRecord(OverrideKeyName, Override);
+export type Overrides = z.infer<typeof Overrides>;
+
+export const SPELL_LEVELS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
+export const SpellLevelKey = z.enum(SPELL_LEVELS);
+export type SpellLevelKey = z.infer<typeof SpellLevelKey>;
+
+/** Slot maxima per spell level (absent = 0); needs `abilities`. */
+export const Spellcasting = z.strictObject({
+  ability: Ability,
+  slots: z.partialRecord(SpellLevelKey, int(0, 9)),
+});
+export type Spellcasting = z.infer<typeof Spellcasting>;
+
+export const HIT_DICE = ["d6", "d8", "d10", "d12"] as const;
+export const HitDie = z.enum(HIT_DICE);
+export type HitDie = z.infer<typeof HitDie>;
+
+export const ClassRow = z.strictObject({
+  name: z.string().trim().min(1).max(30),
+  level: int(1, 20),
+  hitDie: HitDie,
+  subclass: z.string().trim().max(30).optional(),
+});
+export type ClassRow = z.infer<typeof ClassRow>;
+
+export const CLASS_NAME_MAX = 40;
+export const LEVEL_MAX = 20;
+
+/** FR-CHARX-03: serialized stat block cap (UTF-8 bytes of its JSON). */
+export const STAT_BLOCK_MAX_BYTES = 12 * 1024;
+export const SHEET_FULL_MESSAGE = "Sheet is full";
+
+const jsonBytes = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
+
 const core = {
   size: Size,
   ac: int(0, 30),
   hpMax: int(1, 999),
   initBonus: int(-10, 20),
-  /** MVP: one weapon attack (ADR-0012). */
-  attacks: z.array(Attack).max(1),
+  attacks: Attacks,
   /** Absent = unknown: no movement indicator (FR-ENT-21). */
   speed: Speed.optional(),
   abilities: Abilities.optional(),
   /** Absent = none; needs `abilities` (FR-ENT-23). */
   saveProficiencies: SaveProficiencies.optional(),
+  /** FR-CHARX-01: needs `abilities`. */
+  skills: Skills.optional(),
+  /** FR-CHARX-06: replace the derived value of each key. */
+  overrides: Overrides.optional(),
+  /** FR-CHARX-01: needs `abilities`. */
+  spellcasting: Spellcasting.optional(),
 };
 
-/** FR-ENT-23: `saveProficiencies` without `abilities` → `invalid`. */
-function savesNeedAbilities(
-  s: { abilities?: Abilities; saveProficiencies?: Ability[] },
+/**
+ * FR-ENT-23 / FR-CHARX-01: `saveProficiencies`, `skills`, `spellcasting` without `abilities` →
+ * `invalid`. FR-CHARX-03: the whole block ≤ 12 KB.
+ */
+function coreRules(
+  s: {
+    abilities?: Abilities;
+    saveProficiencies?: Ability[];
+    skills?: Skills;
+    spellcasting?: Spellcasting;
+  },
   c: z.RefinementCtx,
 ) {
-  if (s.saveProficiencies !== undefined && s.abilities === undefined) {
+  if (s.abilities === undefined) {
+    const needs = [
+      ["saveProficiencies", "Save proficiencies need ability scores"],
+      ["skills", "Skills need ability scores"],
+      ["spellcasting", "Spellcasting needs ability scores"],
+    ] as const;
+    for (const [key, message] of needs) {
+      if (s[key] !== undefined) c.addIssue({ code: "custom", path: [key], message });
+    }
+  }
+  if (jsonBytes(s) > STAT_BLOCK_MAX_BYTES) {
+    c.addIssue({ code: "custom", path: [], message: SHEET_FULL_MESSAGE });
+  }
+}
+
+/** FR-CHARX-04: what the server writes for `level` / `className` when `classes` is set. */
+export function classTotals(classes: readonly ClassRow[]): { level: number; className: string } {
+  return {
+    level: classes.reduce((n, c) => n + c.level, 0),
+    className: classes.map((c) => c.name).join("/"),
+  };
+}
+
+/** FR-CHARX-04: Σ levels ≤ 20, joined names ≤ 40. */
+function classRules(s: { classes?: ClassRow[] }, c: z.RefinementCtx) {
+  if (!s.classes) return;
+  const t = classTotals(s.classes);
+  if (t.level > LEVEL_MAX) {
+    c.addIssue({ code: "custom", path: ["classes"], message: "Total level must be at most 20" });
+  }
+  if (t.className.length > CLASS_NAME_MAX) {
     c.addIssue({
       code: "custom",
-      path: ["saveProficiencies"],
-      message: "Save proficiencies need ability scores",
+      path: ["classes"],
+      message: `Class names together must be at most ${CLASS_NAME_MAX} characters`,
     });
   }
 }
@@ -113,17 +283,34 @@ export const CR_VALUES = [
 ] as const;
 export const Cr = z.enum(CR_VALUES as unknown as [string, ...string[]]);
 
-export const MonsterStatBlock = z.strictObject({ ...core, cr: Cr }).superRefine(savesNeedAbilities);
+export const MonsterStatBlock = z.strictObject({ ...core, cr: Cr }).superRefine(coreRules);
 export type MonsterStatBlock = z.infer<typeof MonsterStatBlock>;
 
 export const CharacterStatBlock = z
   .strictObject({
     ...core,
-    level: int(1, 20),
-    className: z.string().trim().max(40),
+    level: int(1, LEVEL_MAX),
+    className: z.string().trim().max(CLASS_NAME_MAX),
+    /** FR-CHARX-04: 1–4 rows; when set, `level` / `className` are written from them. */
+    classes: z.array(ClassRow).min(1).max(4).optional(),
+    species: z.string().trim().max(40).optional(),
   })
-  .superRefine(savesNeedAbilities);
+  .superRefine((s, c) => {
+    coreRules(s, c);
+    classRules(s, c);
+  });
 export type CharacterStatBlock = z.infer<typeof CharacterStatBlock>;
+
+/** FR-CHARX-04: a character block with `level` / `className` written from `classes` (if set). */
+export function withClassTotals<S extends CharacterStatBlock>(s: S): S {
+  return s.classes ? { ...s, ...classTotals(s.classes) } : s;
+}
+
+/** FR-CHARX-16: legacy attacks without `id` get one from `nextId` (`ctx.ids`); others kept. */
+export function withAttackIds<S extends { attacks: Attack[] }>(s: S, nextId: () => string): S {
+  if (s.attacks.every((a) => a.id !== undefined)) return s;
+  return { ...s, attacks: s.attacks.map((a) => (a.id === undefined ? { ...a, id: nextId() } : a)) };
+}
 
 // ---------- token shape (FR-ENT-22, FR-MAP-35) ----------
 
@@ -166,8 +353,6 @@ export const EntityName = z
 /** Case-insensitive name key for uniqueness (FR-ENT-08). */
 export const entityNameKey = (s: string) => s.normalize("NFC").toLowerCase();
 
-const Id = z.string().min(1).max(64);
-
 // ---------- wire records (ENT §9) ----------
 
 const recordBase = {
@@ -204,19 +389,36 @@ export type EntityRecord = z.infer<typeof EntityRecord>;
 export type MonsterRecord = Extract<EntityRecord, { kind: "monster" }>;
 export type CharacterRecord = Extract<EntityRecord, { kind: "character" }>;
 
+/** FR-CBTX-19: derived by combat-extras from its death-save columns; null = not at 0 HP. */
+export const DeathState = z.enum(["dying", "stable", "dead"]);
+export type DeathState = z.infer<typeof DeathState>;
+
 /**
- * What a player receives of another player's character (FR-ENT-15). `down` = `hpCurrent = 0`,
- * derived in the visibility fn; never the HP number (#154). No `tokenShape` (FR-ENT-22).
+ * What a player receives of another player's character: the **one whitelist** (ADR-0036
+ * "Refines ADR-0024", FR-CHARX-35, FR-CBTX-32). Every spec adding a key amends this schema; its
+ * keys are `REDACTED_CHARACTER_KEYS`. `down` = `hpCurrent = 0`, derived in the visibility fn;
+ * never the HP number (#154). No `tokenShape` (FR-ENT-22), stat-block numbers or text.
  */
-export const RedactedCharacter = z.object({
+export const RedactedCharacter = z.strictObject({
+  // ADR-0024 (#120)
   id: z.string(),
   kind: z.literal("character"),
   name: z.string(),
   portraitAssetId: z.string().nullable(),
   ownerPlayerId: z.string(),
+  // #154, FR-ENT-15
   down: z.boolean(),
+  // FR-CHARX-35 (OQ-CHARX-05); `species` null when unset
+  level: z.number().int(),
+  className: z.string(),
+  species: z.string().nullable(),
+  // combat-extras (OQ-CBTX-09): filled by CBTX; absent until it is built
+  deathState: DeathState.nullable().optional(),
 });
 export type RedactedCharacter = z.infer<typeof RedactedCharacter>;
+export const REDACTED_CHARACTER_KEYS = Object.keys(
+  RedactedCharacter.shape,
+) as readonly (keyof RedactedCharacter)[];
 
 export const Provenance = z.object({
   source: z.string(),
@@ -362,27 +564,129 @@ function crProficiency(cr: string): number {
   return 2 + Math.floor(Math.max(n - 1, 0) / 4);
 }
 
-/** What the ability helpers read: scores, save proficiencies and `level` (character) or `cr` (monster). */
-export type AbilityStats = { abilities?: Abilities; saveProficiencies?: readonly Ability[] } & (
-  | { level: number }
-  | { cr: string }
-);
+/**
+ * What the derivation helpers read: scores, proficiencies, overrides, spellcasting and `level`
+ * (character) or `cr` (monster). Any stat block of either kind fits.
+ */
+export type AbilityStats = {
+  abilities?: Abilities;
+  saveProficiencies?: readonly Ability[];
+  skills?: Skills;
+  overrides?: Overrides;
+  spellcasting?: Spellcasting;
+} & ({ level: number } | { cr: string });
 
-/** Characters: 2 + floor((level − 1) / 4); monsters: the SRD CR table. */
+// ---------- full-sheet derivation with overrides (FR-CHARX-05–07, ADR-0036) ----------
+//
+// Every helper takes the stat block and returns the number the sheet shows, the server rolls and
+// combat uses. An override (`overrides[key].value`) replaces the derived value; `proficiency`
+// feeds every PB-based value, the other keys are leaves. A leaf whose base data is missing
+// (no scores; no spellcasting) stays null even with an override: null = "not on this sheet".
+
+/** The override value for `key`, if set. */
+export const overrideOf = (stats: AbilityStats, key: OverrideKey): number | undefined =>
+  stats.overrides?.[key]?.value;
+
+export const isOverridden = (stats: AbilityStats, key: OverrideKey): boolean =>
+  overrideOf(stats, key) !== undefined;
+
+/** The same stats without the override for `key` (the "Derived +3" value of a tooltip). */
+export function withoutOverride<S extends AbilityStats>(stats: S, key: OverrideKey): S {
+  if (!stats.overrides || !(key in stats.overrides)) return stats;
+  const { [key]: _dropped, ...rest } = stats.overrides;
+  return { ...stats, overrides: rest };
+}
+
+/** Characters: 2 + floor((level − 1) / 4); monsters: the SRD CR table. Override `proficiency`. */
 export function proficiencyBonus(stats: AbilityStats): number {
-  return "level" in stats ? 2 + Math.floor((stats.level - 1) / 4) : crProficiency(stats.cr);
+  return (
+    overrideOf(stats, "proficiency") ??
+    ("level" in stats ? 2 + Math.floor((stats.level - 1) / 4) : crProficiency(stats.cr))
+  );
 }
 
-/** Check bonus = the ability modifier; null without scores. */
+/** Check bonus = the ability modifier; null without scores. Override `check.<ability>`. */
 export function checkBonus(stats: AbilityStats, ability: Ability): number | null {
-  return stats.abilities ? abilityMod(stats.abilities[ability]) : null;
+  if (!stats.abilities) return null;
+  return overrideOf(stats, `check.${ability}`) ?? abilityMod(stats.abilities[ability]);
 }
 
-/** Save bonus = modifier + proficiency bonus if proficient; null without scores. */
+/**
+ * Save bonus = modifier + proficiency bonus if proficient; null without scores. Override
+ * `save.<ability>`. Combat-extras' concentration save is `saveBonus(stats, "con")` (§7.1).
+ */
 export function saveBonus(stats: AbilityStats, ability: Ability): number | null {
   if (!stats.abilities) return null;
+  const o = overrideOf(stats, `save.${ability}`);
+  if (o !== undefined) return o;
   const prof = stats.saveProficiencies?.includes(ability) ? proficiencyBonus(stats) : 0;
   return abilityMod(stats.abilities[ability]) + prof;
+}
+
+/** Combat-extras' concentration save (CHARX §7.1): exactly the sheet's CON save. */
+export const concentrationSaveBonus = (stats: AbilityStats): number | null =>
+  saveBonus(stats, "con");
+
+const SKILL_MULTIPLIER: Readonly<Record<SkillProficiency, number>> = {
+  proficient: 1,
+  expertise: 2,
+};
+
+/** Skill = mod + PB × {none 0, proficient 1, expertise 2}; null without scores. Override `skill.<skill>`. */
+export function skillBonus(stats: AbilityStats, skill: Skill): number | null {
+  if (!stats.abilities) return null;
+  const o = overrideOf(stats, `skill.${skill}`);
+  if (o !== undefined) return o;
+  const p = stats.skills?.[skill];
+  const mult = p ? SKILL_MULTIPLIER[p] : 0;
+  return abilityMod(stats.abilities[SKILL_ABILITY[skill]]) + mult * proficiencyBonus(stats);
+}
+
+/** Passive = 10 + skill bonus (overrides of the skill included); null without scores. Override `passive.<skill>`. */
+export function passiveScore(stats: AbilityStats, skill: PassiveSkill): number | null {
+  const bonus = skillBonus(stats, skill);
+  if (bonus === null) return null;
+  return overrideOf(stats, `passive.${skill}`) ?? 10 + bonus;
+}
+
+/** Spell attack = PB + mod(spellcasting ability); null without spellcasting or scores. Override `spellAttack`. */
+export function spellAttackBonus(stats: AbilityStats): number | null {
+  if (!stats.spellcasting || !stats.abilities) return null;
+  return (
+    overrideOf(stats, "spellAttack") ??
+    proficiencyBonus(stats) + abilityMod(stats.abilities[stats.spellcasting.ability])
+  );
+}
+
+/** Spell save DC = 8 + PB + mod(spellcasting ability); null without spellcasting or scores. Override `spellDc`. */
+export function spellSaveDc(stats: AbilityStats): number | null {
+  if (!stats.spellcasting || !stats.abilities) return null;
+  return (
+    overrideOf(stats, "spellDc") ??
+    8 + proficiencyBonus(stats) + abilityMod(stats.abilities[stats.spellcasting.ability])
+  );
+}
+
+/**
+ * The value behind any override key, overrides honoured (the sheet's Override popover:
+ * `sheetValue(withoutOverride(stats, key), key)` = "Derived +3").
+ */
+export function sheetValue(stats: AbilityStats, key: OverrideKey): number | null {
+  if (key === "proficiency") return proficiencyBonus(stats);
+  if (key === "spellAttack") return spellAttackBonus(stats);
+  if (key === "spellDc") return spellSaveDc(stats);
+  const [group, name] = key.split(".") as [string, string];
+  if (group === "check") return checkBonus(stats, name as Ability);
+  if (group === "save") return saveBonus(stats, name as Ability);
+  if (group === "skill") return skillBonus(stats, name as Skill);
+  return passiveScore(stats, name as PassiveSkill);
+}
+
+/** Hit dice per die size = Σ class levels with that die; `{}` without `classes` (no block). */
+export function hitDice(stats: { classes?: readonly ClassRow[] }): Partial<Record<HitDie, number>> {
+  const out: Partial<Record<HitDie, number>> = {};
+  for (const c of stats.classes ?? []) out[c.hitDie] = (out[c.hitDie] ?? 0) + c.level;
+  return out;
 }
 
 /**

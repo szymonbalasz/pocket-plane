@@ -1,4 +1,4 @@
-// Pure client helpers for the game log and the roll control (FR-DICE-05, 07, 21, 24, 27).
+// Pure client helpers for the game log and the roll control (FR-DICE-05, 07, 21, 24, 27, 30).
 // Input convenience only: the server re-checks everything (FR-DICE-01, 06).
 
 import {
@@ -8,7 +8,12 @@ import {
   prepareExpression,
   toNotation,
 } from "@shared/dice-roll-log/grammar";
-import type { GameLogEntryView, ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
+import type {
+  GameLogEntryView,
+  ManualEntry,
+  RollCategory,
+  RollMode,
+} from "@shared/dice-roll-log/schemas";
 import type { EntityRecord } from "@shared/entities/schemas";
 import type { SceneView, TokenView } from "@shared/scenes-map/schemas";
 
@@ -28,6 +33,44 @@ export function modeFromKeys(
 /** FR-DICE-07: physical-dice mode key, per client and campaign. */
 export function physicalKey(campaignId: string, role: "dm" | "player", playerId: string | null) {
   return `pp.dice.v1.${campaignId}.${role === "dm" ? "dm" : (playerId ?? "unknown")}`;
+}
+
+/** FR-DICE-30: roll-bar Options open / closed key, beside the FR-DICE-07 entry. */
+export function optionsKey(campaignId: string, role: "dm" | "player", playerId: string | null) {
+  return `pp.dice.options.v1.${campaignId}.${role === "dm" ? "dm" : (playerId ?? "unknown")}`;
+}
+
+/**
+ * FR-DICE-13 / FR-DICE-30: the DM's public toggle. Preset from the category's setting; an
+ * override counts only for the category it was set on, so changing category re-presets it.
+ */
+export function publicState(
+  preset: boolean,
+  category: RollCategory,
+  override: { category: RollCategory; value: boolean } | null,
+): { value: boolean; overridden: boolean } {
+  const active = override && override.category === category ? override : null;
+  return { value: active ? active.value : preset, overridden: active !== null };
+}
+
+/**
+ * FR-DICE-30: the Options chevron's dot — a hidden option is set: category ≠ other, an actor
+ * or a label, or (DM) the public toggle differs from the category preset.
+ */
+export function optionsDirty(o: {
+  category: RollCategory;
+  actor: string;
+  label: string;
+  isDm: boolean;
+  publicValue: boolean;
+  publicPreset: boolean;
+}): boolean {
+  return (
+    o.category !== "other" ||
+    o.actor !== "" ||
+    o.label.trim() !== "" ||
+    (o.isDm && o.publicValue !== o.publicPreset)
+  );
 }
 
 /** FR-DICE-21: entries oldest first by `n`. */
@@ -192,4 +235,83 @@ export function parseManual(
     }
   }
   return dice ? { diceTotal: total, dice } : { diceTotal: total };
+}
+
+export type FlagBackend = Pick<Storage, "getItem" | "setItem">;
+
+export interface FlagStore {
+  /** Stored `"1"` → true; no entry, or storage unreadable and nothing in memory → false. */
+  read(key: string): boolean;
+  /** Writes `"1"` / `"0"`; storage unavailable → kept in memory for this tab. Never throws. */
+  write(key: string, on: boolean): void;
+}
+
+/** FR-DICE-30: per-browser on / off flag (Options open), with an in-memory fallback. */
+export function createFlagStore(getBackend: () => FlagBackend | undefined): FlagStore {
+  const memory = new Map<string, boolean>();
+  return {
+    read(key) {
+      const kept = memory.get(key);
+      if (kept !== undefined) return kept;
+      try {
+        return getBackend()?.getItem(key) === "1";
+      } catch {
+        return false;
+      }
+    },
+    write(key, on) {
+      try {
+        const backend = getBackend();
+        if (!backend) throw new Error("no storage");
+        backend.setItem(key, on ? "1" : "0");
+        memory.delete(key);
+      } catch {
+        memory.set(key, on);
+      }
+    },
+  };
+}
+
+export interface ScrollMetrics {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+}
+
+export interface StickToBottom {
+  readonly atBottom: boolean;
+  /** A scroll event. Ignored while the viewport height changed and its resize is pending. */
+  scrolled(m: ScrollMetrics): boolean;
+  /** The viewport resized (footer / strip grew or shrank): the scrollTop to set, or null. */
+  resized(m: ScrollMetrics): number | null;
+  /** Pinned by the app (new entries while at the bottom, "N new" clicked). */
+  pin(): void;
+}
+
+/**
+ * FR-DICE-21: the list sticks to the bottom unless the user scrolled up. A viewport resize
+ * (FR-DICE-30 Options row, Physical strip) keeps a pinned list pinned; a scroll event fired
+ * before the resize is seen (scroll anchoring, clamping) can't unpin it.
+ */
+export function createStickToBottom(slack = 8): StickToBottom {
+  let atBottom = true;
+  let height: number | null = null;
+  return {
+    get atBottom() {
+      return atBottom;
+    },
+    scrolled(m) {
+      if (height === null || m.clientHeight === height) {
+        atBottom = m.scrollHeight - m.scrollTop - m.clientHeight < slack;
+      }
+      return atBottom;
+    },
+    resized(m) {
+      height = m.clientHeight;
+      return atBottom ? m.scrollHeight : null;
+    },
+    pin() {
+      atBottom = true;
+    },
+  };
 }

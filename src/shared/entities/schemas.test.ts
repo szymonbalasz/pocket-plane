@@ -63,7 +63,7 @@ describe("entities schemas", () => {
     expect(CharacterStatBlock.safeParse({ ...core, level: 1, className: "" }).success).toBe(true);
   });
 
-  test("FR-ENT-01 bounds: ac 0–30, hpMax 1–999, initBonus −10…+20, toHit −10…+30, 0–1 attacks", () => {
+  test("FR-ENT-01 bounds: ac 0–30, hpMax 1–999, initBonus −10…+20, toHit −10…+30, 0–20 attacks (FR-CHARX-01)", () => {
     const ok = (p: object) => MonsterStatBlock.safeParse({ ...goblin, ...p }).success;
     expect(ok({ ac: 0 })).toBe(true);
     expect(ok({ ac: 31 })).toBe(false);
@@ -74,7 +74,9 @@ describe("entities schemas", () => {
     expect(ok({ initBonus: 21 })).toBe(false);
     expect(ok({ ac: 1.5 })).toBe(false);
     expect(ok({ attacks: [] })).toBe(true);
-    expect(ok({ attacks: [goblin.attacks[0], goblin.attacks[0]] })).toBe(false);
+    expect(ok({ attacks: [goblin.attacks[0], goblin.attacks[0]] })).toBe(true);
+    expect(ok({ attacks: Array.from({ length: 20 }, () => goblin.attacks[0]) })).toBe(true);
+    expect(ok({ attacks: Array.from({ length: 21 }, () => goblin.attacks[0]) })).toBe(false);
     const atk = (p: object) => ok({ attacks: [{ ...goblin.attacks[0], ...p }] });
     expect(atk({ toHit: 30 })).toBe(true);
     expect(atk({ toHit: 31 })).toBe(false);
