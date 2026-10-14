@@ -1,10 +1,12 @@
 // Player `cbt.initiative` (CBT §7), read-only: Round N; rows by `playerPosition` with the turn
-// marker (`playerTurnCombatantId`), portrait, name, band (monsters), initiative (PCs). Removed
+// marker (`playerTurnCombatantId`), portrait, name, band (monsters) or Down (PCs, FR-CBT-49),
+// initiative (PCs). Removed
 // combatants reach players (FR-CBT-37, map badge) but leave this list. Companion: the turn alert.
 import type { CombatantView } from "@shared/combat-tracker/schemas";
 import { Skeleton } from "@ui/components/ui/primitives";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
+import { pcDown } from "@ui/features/combat-tracker/token-overlay";
 import { TurnAlertRuntime } from "@ui/features/combat-tracker/turn-alert-runtime";
 import { initiativeWindowBase } from "@ui/features/combat-tracker/window";
 import { defineWindow } from "@ui/features/play-shell/registry";
@@ -17,6 +19,7 @@ function PlayerInitiativeBody() {
   const me = useSync((s) => s.store.you?.playerId ?? null);
   const characters = useRecords<{ id: string; ownerPlayerId?: string | null }>("entity");
   const everLive = useSync((s) => s.everLive);
+  const store = useSync((s) => s.store);
   if (!everLive || !enc) return <Skeleton className="h-24" />;
   const mine = new Set(characters.filter((c) => c.ownerPlayerId === me).map((c) => c.id));
   const ownWithout = rows.some(
@@ -68,6 +71,8 @@ function PlayerInitiativeBody() {
               {c.kind === "monster" && c.band && (
                 <BandBadge band={c.band} testId="cbt-init-row-band" />
               )}
+              {/* FR-CBT-49 (#172): a PC at 0 HP (own HP, else the redacted `down`). */}
+              {pcDown(store, c) && <BandBadge band="down" testId="cbt-init-row-band" />}
               {c.kind === "pc" && (
                 <span
                   data-testid="cbt-init-row-init"

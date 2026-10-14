@@ -2,12 +2,12 @@
 // predicate (FR-CBT-41), player resolved-view text (FR-CBT-42).
 import { describe, expect, test } from "bun:test";
 import { resolutionText } from "@shared/combat-tracker/rules";
-import { DamageCardResolutionRead } from "@shared/combat-tracker/schemas";
+import { type CombatantView, DamageCardResolutionRead } from "@shared/combat-tracker/schemas";
 import type { You } from "@shared/protocol/frames";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import type { TokenOverlayView } from "../scenes-map/token-overlays";
-import { cbtTokenOverlay, useTargetingAttacker } from "./token-overlay";
+import { cbtTokenOverlay, pcDown, useTargetingAttacker } from "./token-overlay";
 import { turnAlertFor } from "./turn-alert";
 
 const dmYou: You = { campaignId: "c", role: "dm", playerId: null };
@@ -80,29 +80,54 @@ describe("FR-CBT-38 FR-CBT-39 token overlay cbt", () => {
     expect(decorate("t-gob", inactive, dmView())).toBeNull();
   });
 
-  test("FR-CBT-38 Down: monster HP 0 (DM) / band down (player); healthy → nothing", () => {
+  test("FR-CBT-48 Down → cross: monster HP 0 (DM) / band down (player); healthy → nothing", () => {
     const dm = store(dmYou, { combatants: [{ ...goblin, hpCurrent: 0 }] });
-    expect(decorate("t-gob", dm, dmView())?.badges).toEqual([
-      expect.objectContaining({ id: "cbt-token-down", tone: "down", label: "Down" }),
-    ]);
+    expect(decorate("t-gob", dm, dmView())).toEqual({
+      cross: { id: "cbt-token-down", tone: "down" },
+    });
     const { hpCurrent: _c, hpMax: _m, ...redacted } = goblin;
     const pl = store(p1You, { combatants: [{ ...redacted, band: "down" }] });
-    expect(decorate("t-gob", pl, playerView)?.badges?.[0]?.id).toBe("cbt-token-down");
+    expect(decorate("t-gob", pl, playerView)?.cross?.id).toBe("cbt-token-down");
+    expect(decorate("t-gob", pl, playerView)?.badges).toBeUndefined();
     const ok = store(p1You, { combatants: [{ ...redacted, band: "bloodied" }] });
     expect(decorate("t-gob", ok, playerView)).toBeNull();
   });
 
-  test("FR-CBT-38 PC Down for DM / owner (character HP) and other players (redacted down)", () => {
+  test("FR-CBT-48 PC Down cross for DM / owner (character HP) and other players (redacted down)", () => {
     const full = { id: "mira", kind: "character", ownerPlayerId: "p1", hpCurrent: 0 };
     for (const you of [dmYou, p1You]) {
       const s = store(you, { combatants: [mira], entities: [full] });
-      expect(decorate("t-mira", s, dmView())?.badges?.[0]?.id).toBe("cbt-token-down");
+      expect(decorate("t-mira", s, dmView())?.cross?.id).toBe("cbt-token-down");
     }
     const other = { id: "mira", kind: "character", ownerPlayerId: "p1", down: true };
     const s2 = store(p2You, { combatants: [mira], entities: [other] });
-    expect(decorate("t-mira", s2, playerView)?.badges?.[0]?.id).toBe("cbt-token-down");
+    expect(decorate("t-mira", s2, playerView)?.cross?.id).toBe("cbt-token-down");
     const up = store(p2You, { combatants: [mira], entities: [{ ...other, down: false }] });
     expect(decorate("t-mira", up, playerView)).toBeNull();
+  });
+
+  test("FR-CBT-49 PC Down Badge: DM / owner by HP, other players by redacted down; never a monster", () => {
+    const full = { id: "mira", kind: "character", ownerPlayerId: "p1", hpCurrent: 0 };
+    for (const you of [dmYou, p1You]) {
+      expect(pcDown(store(you, { entities: [full] }), mira as CombatantView)).toBe(true);
+      const up = store(you, { entities: [{ ...full, hpCurrent: 4 }] });
+      expect(pcDown(up, mira as CombatantView)).toBe(false);
+    }
+    const other = { id: "mira", kind: "character", ownerPlayerId: "p1", down: true };
+    expect(pcDown(store(p2You, { entities: [other] }), mira as CombatantView)).toBe(true);
+    expect(
+      pcDown(store(p2You, { entities: [{ ...other, down: false }] }), mira as CombatantView),
+    ).toBe(false);
+    expect(pcDown(store(dmYou), { ...goblin, hpCurrent: 0 } as CombatantView)).toBe(false);
+  });
+
+  test("FR-CBT-48 removed and down → dim + Out badge + cross", () => {
+    const s = store(dmYou, { combatants: [{ ...goblin, removed: true, hpCurrent: 0 }] });
+    expect(decorate("t-gob", s, dmView())).toEqual({
+      dim: true,
+      badges: [expect.objectContaining({ id: "cbt-token-out", label: "Out" })],
+      cross: { id: "cbt-token-down", tone: "down" },
+    });
   });
 
   test("FR-CBT-38 target ring only while targeting a selected eligible token; never the attacker", () => {

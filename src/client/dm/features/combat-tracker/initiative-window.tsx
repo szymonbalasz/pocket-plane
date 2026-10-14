@@ -1,5 +1,6 @@
-// DM `cbt.initiative` (CBT §7): round + turns, Undo (one apply, FR-CBT-35), Roll monsters,
-// pending cards, rows by `position` (initiative roll / set, AC, HP, band, moved (FR-CBT-39),
+// DM `cbt.initiative` (CBT §7): round + turns (skip cue, FR-CBT-50), Undo (one apply,
+// FR-CBT-35), Roll monsters (FR-CBT-46), End encounter (FR-CBT-51), pending cards, rows by
+// `position` (initiative roll / set, AC, HP, band or PC Down (FR-CBT-49), moved (FR-CBT-39),
 // Attack; menu Check ▸ / Save ▸ (FR-CBT-44), Damage / heal, Remove), Removed.
 import { signed } from "@shared/character-sheet/logic";
 import {
@@ -8,6 +9,8 @@ import {
   d20Expression,
   healthBand,
   showRollMonsters,
+  skippedOnStep,
+  skippedText,
   unrolledMonsters,
 } from "@shared/combat-tracker/rules";
 import type { CombatantView, EncounterView } from "@shared/combat-tracker/schemas";
@@ -31,7 +34,15 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@ui/components/ui/menus";
-import { Tooltip } from "@ui/components/ui/overlays";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Tooltip,
+} from "@ui/components/ui/overlays";
 import { Input, Skeleton } from "@ui/components/ui/primitives";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
 import {
@@ -39,6 +50,7 @@ import {
   useCombatants,
   useStartedEncounter,
 } from "@ui/features/combat-tracker/store";
+import { pcDown } from "@ui/features/combat-tracker/token-overlay";
 import { ENCOUNTERS_KIND, initiativeWindowBase } from "@ui/features/combat-tracker/window";
 import { modeFromKeys } from "@ui/features/dice-roll-log/logic";
 import {
@@ -60,10 +72,12 @@ import {
   HeartPulseIcon,
   RotateCcwIcon,
   ShieldIcon,
+  SkipForwardIcon,
   SwordIcon,
   UserMinusIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
 import { HpDialog } from "./hp-dialog";
@@ -383,16 +397,22 @@ function Row({
   const saveOf = (a: Ability) => (stats ? saveBonus(stats, a) : null);
   const check = useAbilityRoll(c, "check", checkOf);
   const save = useAbilityRoll(c, "save", saveOf);
+  // FR-CBT-49 (G9): a PC at 0 HP shows "Down" where monsters show their band.
+  const down = useSync((s) => pcDown(s.store, c));
+  // FR-CBT-50 (G4): Next / Prev skip a monster at 0 HP; its row is muted with a skip icon.
+  const skipped = c.kind === "monster" && !c.removed && c.hpCurrent === 0;
   return (
     <li
       data-testid="cbt-init-row"
       data-record-id={c.id}
       data-turn={turn}
       data-hidden={c.hidden === true}
+      data-skipped={skipped}
       className={cn(
         "flex items-center gap-1 rounded-md px-1 py-0.5",
         turn && "bg-accent",
         c.hidden && "opacity-70",
+        skipped && "opacity-50",
       )}
     >
       <TurnMarker active={turn} />
@@ -409,6 +429,17 @@ function Row({
           {c.hidden && (
             <EyeOffIcon className="size-3.5 shrink-0 text-muted-foreground" aria-label="Hidden" />
           )}
+          {skipped && (
+            <Tooltip content="Skipped while down">
+              <span
+                data-testid="cbt-init-row-skip"
+                data-record-id={c.id}
+                className="flex shrink-0 text-muted-foreground"
+              >
+                <SkipForwardIcon className="size-3.5" aria-label="Skipped while down" />
+              </span>
+            </Tooltip>
+          )}
           {/* On the name line, right-aligned: the AC / HP / band line has no room left. */}
           <Moved c={c} speed={stats?.speed} />
         </div>
@@ -420,6 +451,7 @@ function Row({
           {c.kind === "monster" && hp && (
             <BandBadge band={healthBand(hp.cur, hp.max)} testId="cbt-init-row-band" />
           )}
+          {down && <BandBadge band="down" testId="cbt-init-row-band" />}
         </div>
       </div>
       <InitiativeCell c={c} def={def} round={round} />
@@ -503,6 +535,24 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
   };
   const unrolled = unrolledMonsters(rows);
   const undoText = undo?.text ?? "Nothing to undo";
+  const [ending, setEnding] = useState(false);
+  /** FR-CBT-50: skipped names from the order at send time, toasted once the step is acked. */
+  const step = async (direction: "next" | "prev") => {
+    const turnRows = rows.map((c) => ({
+      id: c.id,
+      name: c.name,
+      position: c.position ?? 0,
+      kind: c.kind,
+      removed: c.removed === true,
+      hpCurrent: c.hpCurrent ?? null,
+      initiative: c.initiative ?? null,
+    }));
+    const skipped = skippedOnStep(turnRows, enc.round, enc.turnCombatantId ?? null, direction);
+    const r = await send(direction === "next" ? "cbt.nextTurn" : "cbt.prevTurn", turnArgs);
+    if (r !== undefined && skipped) {
+      toast(<span data-testid="cbt-init-skipped">{skippedText(skipped)}</span>);
+    }
+  };
   return (
     <div className="flex shrink-0 flex-col gap-1.5">
       <div className="flex items-center gap-2">
@@ -514,14 +564,51 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
         >
           {enc.round === 0 ? "Initiative" : `Round ${enc.round}`}
         </span>
+        {/* FR-CBT-51 (G6): End from the Initiative header, confirmed as in Encounters. */}
+        <Button
+          size="sm"
+          variant="ghost"
+          data-testid="cbt-init-end"
+          className="ml-auto h-7 shrink-0 px-2 text-xs text-destructive hover:text-destructive"
+          disabled={disabled}
+          onClick={() => setEnding(true)}
+        >
+          End encounter
+        </Button>
       </div>
+      <Dialog open={ending} onOpenChange={setEnding}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>End “{enc.name}”?</DialogTitle>
+            <DialogDescription>
+              Combatants leave the initiative list. Pending cards stay until you dismiss them.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEnding(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              data-testid="cbt-init-end-confirm"
+              disabled={disabled}
+              onClick={async () => {
+                const r = await send("cbt.end", { encounterId: enc.id });
+                if (r !== undefined) setEnding(false);
+              }}
+            >
+              End
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="flex flex-wrap items-center gap-1">
         <Button
           size="sm"
           variant="outline"
           data-testid="cbt-init-prev"
           disabled={disabled || enc.round === 0}
-          onClick={() => void send("cbt.prevTurn", turnArgs)}
+          onClick={() => void step("prev")}
         >
           Prev
         </Button>
@@ -529,7 +616,7 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
           size="sm"
           data-testid="cbt-init-next"
           disabled={disabled}
-          onClick={() => void send("cbt.nextTurn", turnArgs)}
+          onClick={() => void step("next")}
         >
           {enc.round === 0 ? "Start round 1" : "Next"}
         </Button>
