@@ -1,21 +1,93 @@
 // shadcn/ui Popover, Switch, Checkbox, ToggleGroup on radix-ui (new file; dice-roll-log first user).
 import { CheckIcon } from "lucide-react";
 import { Checkbox as C, Popover as P, Switch as S, ToggleGroup as T } from "radix-ui";
-import type * as React from "react";
+import * as React from "react";
 import { cn } from "../../lib/utils";
+import { OVERLAY_OPEN_ATTR } from "./overlays";
 
 // ---- Popover ----
-export const Popover = P.Root;
+interface PopoverState {
+  open: boolean;
+  /** The `PopoverAnchor` element, if any. */
+  anchor: React.RefObject<HTMLElement | null>;
+  /** The popover closed by a pointer / focus interaction outside it. */
+  outside: React.RefObject<boolean>;
+}
+const PopoverStateContext = React.createContext<PopoverState | null>(null);
+
+/**
+ * FR-SHELL-31: Radix returns focus on close only to a `PopoverTrigger`; an anchored popover
+ * returns it to its anchor the same way (not after an outside interaction, which keeps focus
+ * where the user clicked). The anchor's Tooltip stays shut on that focus return.
+ */
+export function returnFocusToAnchor(
+  event: Event,
+  anchor: HTMLElement | null,
+  interactedOutside: boolean,
+): void {
+  if (event.defaultPrevented || interactedOutside || !anchor?.isConnected) return;
+  event.preventDefault();
+  anchor.focus({ preventScroll: true });
+}
+
+/** Radix Popover root that tells its `PopoverAnchor` whether it is open (FR-SHELL-31). */
+export function Popover({
+  open,
+  defaultOpen,
+  onOpenChange,
+  ...props
+}: React.ComponentProps<typeof P.Root>) {
+  const [inner, setInner] = React.useState(defaultOpen ?? false);
+  const actual = open ?? inner;
+  const anchor = React.useRef<HTMLElement | null>(null);
+  const outside = React.useRef(false);
+  const state = React.useMemo(() => ({ open: actual, anchor, outside }), [actual]);
+  return (
+    <PopoverStateContext.Provider value={state}>
+      <P.Root
+        open={actual}
+        onOpenChange={(o) => {
+          setInner(o);
+          onOpenChange?.(o);
+        }}
+        {...props}
+      />
+    </PopoverStateContext.Provider>
+  );
+}
 export const PopoverTrigger = P.Trigger;
-export const PopoverAnchor = P.Anchor;
+
+/** Marks the anchor while its popover is open so the anchor's Tooltip stays shut (FR-SHELL-31). */
+export function PopoverAnchor({ ref, ...props }: React.ComponentProps<typeof P.Anchor>) {
+  const state = React.useContext(PopoverStateContext);
+  const setRef = React.useCallback(
+    (el: HTMLDivElement | null) => {
+      if (state) state.anchor.current = el;
+      if (typeof ref === "function") ref(el);
+      else if (ref) ref.current = el;
+    },
+    [state, ref],
+  );
+  return (
+    <P.Anchor
+      {...{ [OVERLAY_OPEN_ATTR]: state?.open ? "true" : undefined }}
+      {...props}
+      ref={setRef}
+    />
+  );
+}
 export const PopoverClose = P.Close;
 
 export function PopoverContent({
   className,
   align = "center",
   sideOffset = 4,
+  onOpenAutoFocus,
+  onInteractOutside,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof P.Content>) {
+  const state = React.useContext(PopoverStateContext);
   return (
     <P.Portal>
       <P.Content
@@ -25,6 +97,20 @@ export function PopoverContent({
           "z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none",
           className,
         )}
+        onOpenAutoFocus={(e) => {
+          if (state) state.outside.current = false;
+          onOpenAutoFocus?.(e);
+        }}
+        onInteractOutside={(e) => {
+          onInteractOutside?.(e);
+          if (state && !e.defaultPrevented) state.outside.current = true;
+        }}
+        onCloseAutoFocus={(e) => {
+          onCloseAutoFocus?.(e);
+          if (!state) return;
+          returnFocusToAnchor(e, state.anchor.current, state.outside.current);
+          state.outside.current = false;
+        }}
         {...props}
       />
     </P.Portal>

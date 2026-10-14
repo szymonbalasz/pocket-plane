@@ -3,6 +3,7 @@
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { useContext, useEffect, useLayoutEffect } from "react";
 import { Button } from "../../components/ui/button";
+import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
@@ -51,9 +52,11 @@ function Row({
     >
       <NoteBody n={n} views={views} />
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <time dateTime={n.createdAt} title={time.full} className="text-muted-foreground">
-          {time.short}
-        </time>
+        <Tooltip content={time.full}>
+          <time dateTime={n.createdAt} className="text-muted-foreground">
+            {time.short}
+          </time>
+        </Tooltip>
         {you.role === "dm" && (
           <Badge variant="outline" data-testid="note-history-audience">
             {audienceLabel(n, nameOf)}

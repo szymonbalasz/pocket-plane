@@ -109,9 +109,8 @@ export function DropdownMenuRadioItem({
 }
 
 // ---- Popover ----
-export const Popover = P.Root;
-export const PopoverTrigger = P.Trigger;
-export const PopoverAnchor = P.Anchor;
+// One Popover root + anchor for both files: the anchor's Tooltip suppression (FR-SHELL-31).
+export { Popover, PopoverAnchor, PopoverTrigger } from "./controls";
 
 export function PopoverContent({
   className,
