@@ -1,6 +1,6 @@
-# Proposed — Signal audience hook (server-side signal routing per signal type)
+# 0033 — Signal audience hook (server-side signal routing per signal type)
 
-- Status: proposed (spec/playtest-feedback; integrator numbers it at merge)
+- Status: accepted (2026-10-14; decisions-log #172)
 - Date: 2026-10-14
 - Amends: [ADR-0026](0026-signal-routing.md) ("No server `sceneId` check, no `authorize` hook")
 - Affects: [live-sync](../../specs/live-sync.md) (FR-SYNC-22, FR-SYNC-28), [scenes-map](../../specs/scenes-map.md) (FR-MAP-39–41), [protocol §7, §15](../../protocol/README.md#7-signals)
@@ -22,9 +22,9 @@
 | C. Client-only: DM client never sends drags of hidden tokens | No shared change | Not a guarantee; players could spoof previews |
 | D. Drag preview as a non-persisted record type through the visibility filter | Reuses the filter | Records are domain-event changes: bus, `seq`, convergence for 20 frames/s; contradicts "signals bypass the bus" |
 
-## Decision (proposed)
+## Decision
 
-**A.**
+**A** (DM, #172): optional per-signal `audience` hook, `"all"` / `"dm"`.
 
 | Rule | Detail |
 |---|---|
