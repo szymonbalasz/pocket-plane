@@ -1,15 +1,25 @@
 // Applying the token overlay registry (FR-MAP-34, -43): results merged in registry order (first
-// non-null `cross` wins); a throw is logged once per overlay and ignored (token drawn plain).
+// non-null `cross` and `bar` win; badges and icons concatenate); a throw is logged once per
+// overlay and ignored (token drawn plain).
 // DOM-free so it runs under `bun test`.
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
-import type { TokenBadge, TokenCross, TokenOverlay, TokenOverlayView } from "./token-overlays";
+import type {
+  TokenBadge,
+  TokenBar,
+  TokenCross,
+  TokenIcon,
+  TokenOverlay,
+  TokenOverlayView,
+} from "./token-overlays";
 
 export interface MergedDecoration {
   dim: boolean;
   badges: TokenBadge[];
   ring: "target" | null;
   cross: TokenCross | null;
+  bar: TokenBar | null;
+  icons: TokenIcon[];
 }
 
 export const plainDecoration: MergedDecoration = {
@@ -17,6 +27,8 @@ export const plainDecoration: MergedDecoration = {
   badges: [],
   ring: null,
   cross: null,
+  bar: null,
+  icons: [],
 };
 
 export type OverlayErrorReporter = (overlayId: string, err: unknown) => void;
@@ -48,11 +60,13 @@ export function decorateToken(
       continue;
     }
     if (!d) continue;
-    out ??= { dim: false, badges: [], ring: null, cross: null };
+    out ??= { dim: false, badges: [], ring: null, cross: null, bar: null, icons: [] };
     if (d.dim) out.dim = true;
     if (d.badges) out.badges.push(...d.badges);
     if (d.ring === "target") out.ring = "target";
     if (d.cross && !out.cross) out.cross = d.cross;
+    if (d.bar && !out.bar) out.bar = d.bar;
+    if (d.icons) out.icons.push(...d.icons);
   }
   return out ?? plainDecoration;
 }
