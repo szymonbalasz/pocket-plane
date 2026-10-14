@@ -31,13 +31,14 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0023](0023-asset-access-by-capability-id.md) | Asset access by capability ID | accepted |
 | [0024](0024-definition-visibility.md) | Creature definitions DM-only for players; instances carry read-only display copies | accepted (refines 0009) |
 | [0025](0025-play-shell-windows.md) | Feature UI as play-shell windows; layout in browser storage | accepted |
-| [0026](0026-signal-routing.md) | Signal routing: sender stamp, DM-only pull, receiver scene filter | accepted |
+| [0026](0026-signal-routing.md) | Signal routing: sender stamp, DM-only pull, receiver scene filter | accepted, amended by 0033 |
 | [0027](0027-notification-creation.md) | Notifications are created in the causing command's transaction | accepted (refines 0016) |
 | [0028](0028-token-changed-hooks.md) | Token-changed hooks keep bound instances in step | accepted (extends 0024), amended by 0031 |
 | [0029](0029-windowed-record-types.md) | Windowed record types: bounded snapshots for append-only logs | accepted (amends FR-SYNC-20) |
 | [0030](0030-ui-notification-sounds.md) | Short UI notification sounds (turn alert) | accepted (amends ADR-0007) |
 | [0031](0031-token-move-hooks.md) | Token-changed hooks also run on token moves | accepted (amends 0028) |
 | [0032](0032-ability-derivation.md) | Ability modifiers, proficiency bonus and save bonuses derived in MVP | accepted (amends 0012) |
+| [0033](0033-signal-audience.md) | Signal audience hook: a signal type routes to everyone or DM only, or refuses the sender | accepted (amends 0026) |
 
 ## Proposing a new ADR
 

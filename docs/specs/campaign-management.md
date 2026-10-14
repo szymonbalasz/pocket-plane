@@ -71,6 +71,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark onl
   - Login: password input + submit; inline error; throttled → "Too many attempts. Try again in a minute."
   - Campaign switcher: Select, active marked; "New campaign" Dialog. Players online → confirm Dialog "Switch to **X**? N online players will wait until you switch back." Loading while the DM connection reconnects.
   - Players panel: Table — name, online dot, copy link (Toast "Link copied"), rename; add-player input below. Shows the base URL used; warns if it is a loopback host (`localhost`, `127.0.0.1`, `::1`).
+  - *(playtest pass, to build; #171 G10)* Online dots muted (no dot, "–") while the DM client is not `live`: presence is unknown then ([FR-SYNC-29](live-sync.md#6-functional-requirements)).
   - Empty: "Create your first campaign" / "Add a player to get a link". Validation inline; server errors as Toast; disconnected banner from [live-sync](live-sync.md).
 - **Player view** (`/p/<token>`, loading first). This spec owns the wording; live-sync's player `rejected` state shows the invalid-link screen.
   - Joined (skeleton): "Playing as **Player 1** in **Fixture Campaign**". Later: the active scene.

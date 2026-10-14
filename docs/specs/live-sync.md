@@ -12,6 +12,7 @@ wave: 1
 
 - Cross-cutting: how every feature's state reaches clients live. Built first, in the Phase 2 skeleton. Features plug in via [§9](#9-api--events) and the [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md).
 - Intent → validate → mutate + commit → domain event → **visibility filter** → WS events ([ADR-0005](../architecture/adr/0005-server-authoritative-sync.md), [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). Reconnect = fresh snapshot; state survives a crash ([ADR-0006](../architecture/adr/0006-persistence.md)).
+- **Playtest pass** (#171; FR-SYNC-28, 29): a signal type may route itself (DM only vs everyone) or refuse a sender, so scenes-map's live **drag preview** never leaks a hidden token ([ADR-0033](../architecture/adr/0033-signal-audience.md)); presence is "unknown" while the DM is not live (G10).
 
 ## 2. Scope
 
@@ -65,12 +66,15 @@ wave: 1
 | FR-SYNC-19 | Per connection: hidden→visible = `upsert`; visible→hidden = `delete`; visible→visible = `upsert`; hidden→hidden = nothing. | Reveal = appear |
 | FR-SYNC-20 | Snapshot and events share the filter: for any change sequence, a player's store equals a fresh snapshot; for windowed types ([ADR-0029](../architecture/adr/0029-windowed-record-types.md)) only pinned rows and rows at or above the window floor are compared. | Convergence |
 | FR-SYNC-21 | `event` carries a per-connection `seq` (1, 2, … after each snapshot); gap → client `resync`. Send-buffer overflow or broadcaster error → close `4000`, never drop frames. | |
-| FR-SYNC-22 | **Signals** are not domain events. `signal {name, data}` is checked against its registered type (zod + roles; failure → `reject` to the sender, nobody receives it) and forwarded to every **other** live connection of the sender's campaign as `signal {name, data, from {role, playerId?}}`; `from` is stamped by the server from the connection context, never the payload. Receivers filter by scene. No bus, DB, event log, snapshot or `seq`. | [ADR-0026](../architecture/adr/0026-signal-routing.md); [scenes-map](scenes-map.md) ping/laser/pull |
+| FR-SYNC-22 | **Signals** are not domain events. `signal {name, data}` is checked against its registered type (zod + roles; failure → `reject` to the sender, nobody receives it) and forwarded to every **other** live connection of the sender's campaign as `signal {name, data, from {role, playerId?}}`; `from` is stamped by the server from the connection context, never the payload. Receivers filter by scene. No bus, DB, event log, snapshot or `seq`. A type with an `audience` hook routes per FR-SYNC-28. | [ADR-0026](../architecture/adr/0026-signal-routing.md); [scenes-map](scenes-map.md) ping/laser/pull; amended #171 |
 | FR-SYNC-23 | DM gets a `presence {playerId, online}` record per player: ≤ 1 s after connect or clean close, ≤ 30 s after a silent drop. Not persisted, never sent to players. | |
 | FR-SYNC-24 | Client state `connecting \| live \| reconnecting \| waiting \| rejected`; intent controls disabled unless `live`. "Reconnecting…" banner after 1 s not live; after 60 s it adds "Server unreachable — check with your DM". | |
 | FR-SYNC-25 | Hub, broadcaster and presence hold no play state. After restart on the same DB, snapshots contain every change committed before the kill. | |
 | FR-SYNC-26 | Test seams: injectable clock and timers (heartbeat, backoff); a test-only hook pauses a snapshot between read and send so a test can commit in that window. | [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md) |
 | FR-SYNC-27 | Test mode only: **sync probe** record type, its intents (§9), a probe panel and a "drop connection" button in both clients. Absent otherwise. | |
+| **Playtest pass** (#171) | | |
+| FR-SYNC-28 | **Signal audience** ([ADR-0033](../architecture/adr/0033-signal-audience.md), decided #172): a signal type may register `audience(data, sender {role, playerId?, campaignId}, read) → "all" \| "dm"`; `read` = read-only DB access + active-scene cache, no writes. The hub runs it once per signal after the zod + roles checks. A thrown reject (`not_found`, `forbidden`, `invalid`) goes to the sender only; nobody receives the signal. `"all"` = FR-SYNC-22 forwarding; `"dm"` = every other live **DM** connection of the campaign only. No hook = FR-SYNC-22 unchanged. A hook error is logged at most once per (connection, signal name) per 10 s. Still no bus, DB write, log, snapshot, `seq` or rate limit. First user: scenes-map `map.drag` ([FR-MAP-41](scenes-map.md#6-functional-requirements)). | P3; amends ADR-0026 |
+| FR-SYNC-29 | **Presence while not live** (G10): presence is only known while the client is `live`. The client marks it unknown on leaving `live` (drop, server outage, `waiting`) and takes it from the next snapshot; every presence display shows "unknown", never stale values (DM badge: [FR-SHELL-33](play-shell.md#6-functional-requirements)). Client-only; server presence rules (FR-SYNC-23) unchanged. | G10 |
 
 ## 7. UI/UX notes
 
@@ -87,7 +91,7 @@ wave: 1
 | | phase, seq, lastInboundAt | `awaiting-hello`\|`snapshotting`\|`live`, int, timestamp | |
 | Presence *(in-memory, derived)* | playerId, online | id, bool | From live connections |
 | Record change *(in a domain event)* | type, id, before, after | string, id, record \| null ×2 | Create: before null; delete: after null |
-| Registrations *(code)* | record type: type, scope, schema, campaignOf, sceneOf (scope `scene`), visibility, snapshot; intent: name, schema, roles, authorize, execute; signal: name, schema, roles | scope `global`\|`campaign`\|`scene` | Intent roles default `[dm]`; signal routing per FR-SYNC-22 |
+| Registrations *(code)* | record type: type, scope, schema, campaignOf, sceneOf (scope `scene`), visibility, snapshot; intent: name, schema, roles, authorize, execute; signal: name, schema, roles, `audience?` (#171) | scope `global`\|`campaign`\|`scene` | Intent roles default `[dm]`; signal routing per FR-SYNC-22, FR-SYNC-28 |
 | Event log entry *(persisted)* | id, campaignId, type, at, payload, actorRole, actorPlayerId, intentId | payload = **JSON leaf** | Append-only; `campaignId` null for global events (imported definitions, [FR-FIX-23](fixtures-adapters.md#6-functional-requirements)); undo fields: [combat-tracker](combat-tracker.md) |
 | Sync probe *(persisted, test)* | id, campaignId, text, hidden, ownerPlayerId | id, id, string, bool, id \| null | Player sees it iff `!hidden && (owner == null \|\| owner == ctx.playerId)` |
 
@@ -107,7 +111,7 @@ wave: 1
 |---|---|---|
 | `snapshot` | `seq 0`, `you`, `records {type: Record[]}` | Each type's fn; scopes per FR-SYNC-09 |
 | `event` | `seq`, `cause {name, intentId?}`, `changes[]` | Each type's fn + FR-SYNC-19; `intentId` on sender's copy only |
-| `signal` | `name`, `data`, `from {role, playerId?}` (server-stamped) | Every other live connection of the sender's campaign (FR-SYNC-22) |
+| `signal` | `name`, `data`, `from {role, playerId?}` (server-stamped) | Every other live connection of the sender's campaign (FR-SYNC-22); a type's `audience` may narrow it to DM connections or refuse it (FR-SYNC-28) |
 | `ack` / `reject` / `pong` | `intentId`, `result?` / `code` (`invalid`, `unknown_intent`, `forbidden`, `not_found`, `conflict`, `internal`), `message`, `issues?` | Sender only |
 | record `presence` / `probe` | see §8 | DM only / §8 rule |
 
@@ -131,6 +135,7 @@ wave: 1
 - **Campaign switch:** old campaign's players → `waiting`, rejoin on reactivation. A connection mid-snapshot is closed too.
 - **Server crash mid-action:** open transaction rolls back → no event, log entry or `ack`. Crash after commit → change is in the next snapshot.
 - **Concurrent edits:** serialised transactions, last commit wins; features guard non-idempotent actions (`conflict`). **Invalid / malicious input:** zod rejects; oversize frames close; spoofed ids ignored; unknown types hidden.
+- **Playtest pass:** an `audience` hook throwing a non-reject error → `reject internal` to the sender, nobody receives it, connection stays open. Signals in flight at a crash or drop are lost (as FR-SYNC-22); receivers clear signal-driven state on a snapshot (feature rule, e.g. FR-MAP-40). Presence during a DM drop or server outage: "unknown" (FR-SYNC-29); players are unaffected.
 
 ## 12. Performance & bandwidth
 
@@ -146,8 +151,9 @@ wave: 1
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | Envelopes; transition matrix; default deny; scope gate; backoff (fake clock); reducer incl. seq gap | In-code |
+| Unit | Envelopes; transition matrix; default deny; scope gate; backoff (fake clock); reducer incl. seq gap. **Playtest:** `FR-SYNC-29 presence unknown` (leaving `live` marks it unknown; snapshot restores; `waiting` → unknown) | In-code |
 | Integration | 4408/4401/4409 with no data frame; snapshot race via `pauseSnapshot`; rejects → no event; events before `ack`; rollback → no event/log; convergence per player; **leak scan** for `SECRET-PROBE`; switch closes old campaign, waiting player rejoins; presence; overflow → 4000; restart → identical snapshots | `sync-probe` |
+| Integration (playtest) | `FR-SYNC-28 audience`, with a test-registered signal whose hook reads a probe: probe hidden → `"dm"`: a second DM connection receives it, `player-1` / `player-2` don't (`expectNoFrame`); visible → all others; hook rejects → only the sender gets `reject`, nobody else a frame; hook throws → `reject internal`; no hook → ADR-0026 forwarding; no DB write, log row or `seq` change | `sync-probe` |
 | E2E (thin) | Playwright, DM + `player-1`: reveal/hide, reload, restart | `sync-probe` |
 
 **Browser walkthrough.** With test mode on (`PP_TEST_MODE=1`, AGENTS §9.2), reset-and-load `sync-probe` and start the app (verify profile). Separate contexts: **A** DM, **B** `player-1`, **C** `player-2`. Throughout, B's and C's frames contain `SECRET-PROBE` only while `secret` is revealed.
@@ -161,8 +167,10 @@ wave: 1
 | 5 | Edit `public`, reveal `secret` while B is dropped ("drop connection") | B back | B: banner + disabled controls, then both changes, no reload |
 | 6 | Switch to "Second Campaign" | — | A reconnects: no probes. B, C on waiting screen |
 | 7 | Switch back | — | A shows 3 probes; B, C rejoin ≤ 10 s, no reload |
-| 8 | Hard-kill server, restart on same DB | — | All show "Reconnecting…", then rejoin; state unchanged |
+| 8 | Hard-kill server, restart on same DB | — | All show "Reconnecting…", then rejoin; state unchanged. During the outage A's presence shows "unknown" (badge "– / 2 online", no online dots), not "2/2 online" (FR-SYNC-29) |
 | 9 | — | New context D: mangled link | Invalid-link screen ([campaign-management §7](campaign-management.md#7-uiux-notes) wording); no data frame (REST 404; any WS shows only the `4401` close) |
+
+The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map §13](scenes-map.md#13-test-plan) step 10: the hidden Wolf's drag never reaches B, C).
 
 ## 14. Dependencies
 
@@ -173,6 +181,13 @@ wave: 1
 | [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) open row "Listener execution" | **Synchronous, after commit** (FR-SYNC-14 relies on it) | open — pick synchronous ([proposed ADR option F](../architecture/adr/0021-sync-protocol-conventions.md#options), needs DM OK) |
 | [scenes-map](scenes-map.md) / [play-shell](play-shell.md) | Active scene id + resync on switch, ping/laser as signals / hosts indicator, banner, presence | open |
 | Build conventions (AGENTS.md) | `PP_TEST_MODE`, `PP_DATA_DISPOSABLE`, ports: AGENTS §9.2 (agreed, pending merge); WS path: open (OQ-SYNC-15) | agreed, pending merge |
+| [scenes-map](scenes-map.md) (playtest) | `map.drag` registers the first `audience` hook (FR-MAP-41) | complete (#172) |
+| [campaign-management](campaign-management.md) | FR-CAMP-14 / §7: online dot hidden (muted "–") while the DM client is not `live` (FR-SYNC-29); CAMP §7 amended at consolidation (#172) | agreed |
+
+**Shared changes** (playtest pass, #171; shared core, orchestrator routes per AGENTS §9.9):
+- `src/server/ws/signals.ts` (`SignalDef.audience?`), `src/server/ws/hub.ts` (run it; `"dm"` routing; reject / `internal`); hub gets read-only DB + active-scene cache access for the hook. `src/shared/protocol/`: none (frames unchanged).
+- Client: `src/client/common/sync/store.ts` or `connection.ts`: presence marked unknown while not `live` (a `usePresence()` returning `{known, records}`), used by the DM badge (play-shell) and players panel (campaign-management).
+- Docs consolidated (#172, protocol §30): protocol §7 routing (hook, `"dm"` audience), §15 (`map.drag`); [ADR-0033](../architecture/adr/0033-signal-audience.md). No schema, event or record-type change.
 
 ## 15. Open questions
 
@@ -195,6 +210,7 @@ wave: 1
 | OQ-SYNC-13 | Numeric targets (§3, §12) | **As proposed** / DM sets others | no — owner: DM | vision |
 | OQ-SYNC-14 | ~~Glossary~~ **Decided (integrator):** added **signal**, **presence**, **resync**, **record change**, **sync probe**; **WS event** = filtered record changes of one domain event (one or more records); **Snapshot** = sent by the server after `hello` and on `resync` | — | — | — |
 | OQ-SYNC-15 | WS endpoint path | **`/ws`** *(proposed)*, same origin as the clients / other | no — owner: spec-live-sync | AGENTS §9.2, campaign-management OQ-CAMP-15 |
+| ~~OQ-SYNC-16~~ | ~~How a hidden token's drag preview stays off players' sockets (P3)~~ | **Decided (#172):** per-signal `audience` hook, `"all"` / `"dm"` + sender reject ([ADR-0033](../architecture/adr/0033-signal-audience.md), option A); no longer blocking | — | scenes-map, protocol §7, §15 |
 
 ## 16. Out of scope
 
