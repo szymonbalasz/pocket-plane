@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: complete
+status: in-review
 owner: spec-dice-roll-log
 wave: 2
 ---
@@ -16,6 +16,7 @@ wave: 2
 - **Game log** (tier S): a play-shell window with BG2-style lines, e.g. *"Goblin attacks Mira: 12 + 4 = 16 — hit! 6 slashing damage."* Persisted per campaign; survives a crash ([ADR-0006](../architecture/adr/0006-persistence.md)).
 - **Public log settings** (tier S): one DM tickbox per roll category decides whether DM rolls reach players. Player rolls are always public (#73).
 - character-sheet and combat-tracker roll and log through this spec's internal helpers, **log-entry kinds** and the shared roll control.
+- **Playtest pass** (#171; FR-DICE-28, 29): one rule for **DM-only detail** in any kind's line (NPC dice, AC, "DM ruled hit" live in `dmPayload`, shown on the DM client only) and for the "physical" tag across kinds (P5, G7, G8); no "natural 1" noise on initiative lines (G12).
 
 ## 2. Scope
 
@@ -65,7 +66,7 @@ wave: 2
 | FR-DICE-17 | Entries carry `n`, a per-campaign counter (max + 1 in the transaction); `n` is the entries' [ADR-0022](../architecture/adr/0022-deterministic-seams.md) tiebreak. Registered with `window {orderBy: n, size: 100}` ([ADR-0029](../architecture/adr/0029-windowed-record-types.md)): snapshot = newest 100 by `n`, cut before the visibility filter; players get the visible subset. | #137 |
 | FR-DICE-18 | Log-entry kind registry `src/shared/dice-roll-log/kinds.ts` (append-only): `kind → {payload schema, dmPayload schema?, formatLine}`. Dice ships `roll`. Unregistered kind on write → `internal`; client renders unknown kinds as "Unsupported entry". | Gate §4.9 |
 | FR-DICE-19 | Internal helpers, in the caller's transaction, `env: CommandEnv` first: `dice.evaluate(env, {expression, mode, category, label?, actor: {kind, id, name}, manual?, source, target?}) → Roll` (caller resolves the actor; combat passes the combatant's name) (FR-DICE-01–08; row only); `gameLog.append(env, {kind, category, actorName, payload, dmPayload?, rollIds, encounterId?, public?}) → RecordChange` (stamps `n`, `at`, roller, `public` per FR-DICE-13); `gameLog.markUndone(env, entryId) → RecordChange`. No events of their own: the caller lists the changes in its event (`CharacterRolled`, combat's events). Campaign and roller from `env.actor`. | I1, I14, I15 |
-| FR-DICE-20 | `roll` line (`formatLine`, pure, `@shared`): `<actor> — <label or expression>: <dice> + <constants> = <total>` per roll; adv/dis shows "(adv)" / "(dis)" and the dropped die struck through; a single kept d20 of 20 / 1 appends "— natural 20!" / "— natural 1"; manual shows "physical". | BG2 style |
+| FR-DICE-20 | `roll` line (`formatLine`, pure, `@shared`): `<actor> — <label or expression>: <dice> + <constants> = <total>` per roll; adv/dis shows "(adv)" / "(dis)" and the dropped die struck through; a single kept d20 of 20 / 1 appends "— natural 20!" / "— natural 1" (*#171:* not on initiative, FR-DICE-29); manual shows "physical". | BG2 style |
 | FR-DICE-21 | Window `dice.log`, both clients, default open: entries by `n`, oldest at the top; sticks to the bottom unless scrolled up, then "N new". Live ≤ 1 s after commit. DM: hidden entries muted with an eye-off marker. Undone entries struck through, "undone". | I12 |
 | FR-DICE-22 | Roll bar (window footer): expression, category, label, actor (FR-DICE-27), mode toggle, physical-dice toggle; DM: public switch preset from the category's setting, and a gear for the settings popover (in the window body; no shell change). Enter rolls. `ack` → input clears; `reject` → text stays, message inline. Disabled unless `live`. | [FR-SYNC-24](live-sync.md#6-functional-requirements) |
 | FR-DICE-23 | Settings popover: one checkbox per category; change sends `dice.setCategoryPublic`; other DM tabs reflect it ≤ 1 s. | |
@@ -73,6 +74,9 @@ wave: 2
 | FR-DICE-25 | Same seed + same command sequence → identical rolls, entries and `n`. | FR-FIX-08 |
 | FR-DICE-26 | A multi-roll action (sheet attack = to-hit + damage) is **one entry** with several `rollIds` and the action's category (attack). Each roll keeps its own category for stats. Outcome lines are separate entries written by their owner. | I4, I18 |
 | FR-DICE-27 | Actor Select: player → "me" + own characters. DM → "DM", characters, tokens of the active scene (a character's own token is not listed again, #149). | |
+| **Playtest pass** (#171) | | |
+| FR-DICE-28 | **DM-only detail and tags in any kind** (P5, G7, G8): a kind's `formatLine(entry)` receives `dmPayload` only on the DM client (players' entries never carry it, FR-DICE-15); facts players must not see (target AC, the computed hit, overrides, a DM roll's dice) go **only** in `dmPayload`, never in `payload` or text built from it. A kind whose line shows dice from a manual roll marks them with the same "physical" badge segment as `roll` (FR-DICE-20, test id `dice-log-entry-manual`); kinds reuse `rollSegments` for dice parts. A DM-only entry (internal caller passing `public: false`, e.g. combat's monster attack roll, [FR-CBT-52](combat-tracker.md#6-functional-requirements)) is shown to the DM muted with the eye-off marker like any hidden entry (FR-DICE-21). No new field, kind or registry change. | P5, G7 |
+| FR-DICE-29 | *(proposed, OQ-DICE-23)* The natural 20 / 1 marker (FR-DICE-20) is not added to `initiative`-category rolls (a natural 1 has no rule meaning there and read as an error at the table, G12). | G12 |
 
 ## 7. UI/UX notes
 
@@ -155,6 +159,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - **Server crash mid-action:** roll + entry + event-log row commit together or not at all. After restart, snapshots equal pre-crash state.
 - **Concurrent edits:** rolls serialise; `n` = commit order. Two DM tabs toggle a category → last commit wins, both converge. A category toggled between a roll and its commit → the setting at commit applies. Campaign switch → only the new campaign's log and settings.
 - **Window:** a player may get fewer than 100 entries when many are hidden (accepted, ADR-0029). `markUndone` on an entry below the floor is delivered live; a fresh snapshot omits it; convergence compares only `n` ≥ floor.
+- **DM-only detail (#171):** a kind that leaks into `payload` what belongs in `dmPayload` is a leak; the kind contract test and combat's leak tests catch it. Reconnect / crash: detail is stored on the entry, so the DM's snapshot shows it again; players never had it.
 - **Hidden actor:** a public DM roll for a hidden token shows its name; the DM uses the per-roll switch. Combat presets hidden for a hidden attacker or target (I4). Later token hide / rename ([ADR-0028](../architecture/adr/0028-token-changed-hooks.md)) doesn't touch entries: names are copied at roll time.
 - **Invalid / malicious input:** `1000d1000`, `1d20*5`, functions, 61+ chars → `invalid` before the library; library throw → `invalid`. Manual out of range / wrong die count → `invalid`. Player `public` or another's character → `forbidden`. Labels rendered as text.
 - **Log growth:** rows kept forever (~1 KB/roll; 10 k rolls ≈ 10 MB); snapshots stay bounded (FR-DICE-17).
@@ -179,7 +184,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | Grammar + limits (`1000d1000`, `1d20*2`, `kh` bounds, messages); adv/dis rewrite + no-d20 error; Shift/Ctrl/both → mode; manual range, die count, kept calc; `formatLine` (adv, dis, nat 20, nat 1, manual, multi-roll, undone); visibility matrix (DM / player × public / hidden; `dmPayload` stripped); FR-DICE-13 stamping (player forced public, DM override, DM for a PC); roll control: N expressions, crit swap on nat 20; seeded determinism; real factory refuses seeding on a non-disposable dir | In-code |
+| Unit | Grammar + limits (`1000d1000`, `1d20*2`, `kh` bounds, messages); adv/dis rewrite + no-d20 error; Shift/Ctrl/both → mode; manual range, die count, kept calc; `formatLine` (adv, dis, nat 20, nat 1, manual, multi-roll, undone); visibility matrix (DM / player × public / hidden; `dmPayload` stripped); FR-DICE-13 stamping (player forced public, DM override, DM for a PC); roll control: N expressions, crit swap on nat 20; seeded determinism; real factory refuses seeding on a non-disposable dir. **Playtest (#171):** `FR-DICE-28 kind contract` (for every registered kind: `formatLine` without `dmPayload` emits no segment derived from it; a manual roll segment carries the "physical" badge); `FR-DICE-29` (initiative nat 1 / nat 20 → no marker; attack and save keep it) | In-code |
 | Integration | `dice.roll`: roll + entry + log row in one tx, event before `ack`, rollback → none. Ownership: `player-1` as Mira ✓, as Thorn `forbidden`, with `public` `forbidden`. Category change not retroactive; same value → no event. Settings never in player frames. Window: 105 entries → newest 100; floor cut before the filter; `markUndone` below the floor; convergence per ADR-0029. Test-registered kind via `gameLog.append` + `markUndone` commits / rolls back with its caller; multi-roll entry. **Leak scan:** player frames never contain "DM-SECRET-ROLL" or `dmPayload`. Restart → identical snapshots | `dice-log` |
 | E2E (thin) | DM + `player-1`: player Shift+Enter roll appears for DM; DM hidden roll absent from player frames; DM public roll appears for player | `dice-log` |
 
@@ -197,6 +202,9 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 8 | — | B: `1000d1000`; Ctrl+Enter on `2d6` | Inline errors; no entry anywhere |
 | 9 | Roll public damage while C is dropped ("drop connection") | C back | C: banner, then the entry without reload |
 | 10 | Hard-kill + restart server | — | All rejoin; logs, markers and settings unchanged; no console errors |
+| 11 | Actor Mira, category initiative, Physical dice on, enter 1 | — | Line "Mira — Initiative: 1 + 2 = 3 physical", no "natural 1" (FR-DICE-29) |
+
+DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outcome lines) is walked in [combat-tracker §13](combat-tracker.md#13-test-plan) step 9a.
 
 ## 14. Dependencies
 
@@ -218,11 +226,15 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 - Registries (append lines): `diceRollLog` in `src/server/features/index.ts`; record types `game-log-entry`, `game-log-settings`; `src/client/{dm,player}/windows.ts` `dice.log`; `fixtures/bundles/index.ts` `dice-log`. New append-only `src/shared/dice-roll-log/kinds.ts` (created with `roll` by this build; on the AGENTS §9.9 list).
 - Docs at merge: protocol rows (intents, types, events, budget), data-model rows, glossary (I13).
 
+**Shared changes — playtest pass** (#171): none. FR-DICE-28 is a contract on kinds (combat's kind in `@shared/combat-tracker/log-kinds.ts` does the work); FR-DICE-29 is in `@shared/dice-roll-log/roll-kind.ts` (feature-owned). `kinds.ts`, schema, events, protocol unchanged; protocol §26 log-kinds row may cite FR-DICE-28 at consolidation.
+
 ## 15. Open questions
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | ~~OQ-DICE-03–22~~ | ~~Seeding; snapshot depth; shared changes; manual; visibility; defaults; contests; limits; log timing; glossary; storage; sheet buttons~~ | Decided: 05 no sessions (ADR-0013), 06 superseded, 08 #73, 12 #74; #137 (`ctx.dice`, newest 100, §14); #139 P6, P8, P21–P25; gate I3–I5, I13; #135 + I1 (`char.roll` out of combat, `cbt.*` in combat) | — | — |
+| OQ-DICE-23 | Natural marker on initiative lines (G12) | **Drop it on initiative** (no rule meaning; read as a bug) / keep everywhere (one rule; FR-DICE-20 as built) | no · owner: DM | combat-tracker |
+| OQ-DICE-24 | G12 verdicts (dice part) | **"— natural 1" wording:** as spec'd (FR-DICE-20); only initiative changes, OQ-DICE-23. **"Shared group roll":** not one: each combatant rolls separately (FR-CBT-11); two natural 1s were chance, no "group" text needed. **Fixture clock "02:00":** by design (FIX FR-FIX-08 fixed instant `2026-01-01T00:00Z`, shown in local time); any change is fixtures-adapters' | no · owner: spec-playtest | fixtures-adapters |
 
 ## 16. Out of scope
 
