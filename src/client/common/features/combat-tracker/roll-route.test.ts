@@ -3,11 +3,15 @@ import { emptyStore, type RecordStore } from "@shared/protocol/store";
 import { rollRoutes } from "../character-sheet/roll-routes";
 import { routeFor } from "../character-sheet/routing";
 
-function store(combatant: Record<string, unknown> | null, status = "started"): RecordStore {
+function store(
+  combatant: Record<string, unknown> | null,
+  status = "started",
+  round = 1,
+): RecordStore {
   return {
     ...emptyStore(),
     records: {
-      encounter: { e1: { id: "e1", status, round: 1, playerTurnCombatantId: null } },
+      encounter: { e1: { id: "e1", status, round, playerTurnCombatantId: null } },
       combatant: combatant ? { [combatant.id as string]: combatant } : {},
       entity: {
         mira: {
@@ -75,5 +79,18 @@ describe("FR-CBT-30 sheet roll routing", () => {
     expect(routeFor(rollRoutes, store(mira), "mira", "check")).toBeNull();
     expect(routeFor(rollRoutes, store(mira), "mira", "save")).toBeNull();
     expect(routeFor(rollRoutes, store(mira), "mira", "initiative")).not.toBeNull();
+  });
+
+  test("FR-CBT-46 route answers hidden iff round ≥ 1 and initiative set; Attack never hidden", () => {
+    const set = { ...mira, initiative: 15 };
+    const hidden = (s: RecordStore, kind: "initiative" | "attack" = "initiative") =>
+      routeFor(rollRoutes, s, "mira", kind)?.hidden ?? false;
+    expect(hidden(store(set, "started", 0))).toBe(false);
+    expect(hidden(store(set, "started", 1))).toBe(true);
+    expect(hidden(store(set, "started", 4))).toBe(true);
+    expect(hidden(store(mira, "started", 1))).toBe(false);
+    expect(hidden(store(set, "started", 1), "attack")).toBe(false);
+    // The badge stays while hidden.
+    expect(routeFor(rollRoutes, store(set), "mira", "initiative")?.badge).toBe("In combat");
   });
 });

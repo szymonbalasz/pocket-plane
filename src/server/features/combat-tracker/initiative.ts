@@ -1,4 +1,4 @@
-// Initiative (FR-CBT-11, FR-CBT-12) and remove / restore (FR-CBT-15).
+// Initiative (FR-CBT-11, FR-CBT-12, FR-CBT-47) and remove / restore (FR-CBT-15).
 import { characterRolls } from "@shared/character-sheet/logic";
 import {
   CBT_INTENTS,
@@ -33,7 +33,7 @@ export const rollInitiative = defineCommand({
     if (input.public !== undefined) throw forbidden("Player rolls are always public");
     if (input.combatantIds.length !== 1) throw forbidden("Roll for your own character only");
     const { c } = activeCombatant(env, input.combatantIds[0] as string, { own: true });
-    if (c.initiative !== null) throw conflict("Initiative is already set");
+    if (c.initiative !== null) throw alreadySet([c]);
   },
   execute(input, env): { rollIds: string[] } {
     const cid = campaignOf(env.actor);
@@ -44,7 +44,13 @@ export const rollInitiative = defineCommand({
       ]);
     }
     const targets = ids.map((id) => activeCombatant(env, id, { allowRemoved: true }));
-    const encounterId = (targets[0] as (typeof targets)[number]).enc.id;
+    const { enc } = targets[0] as (typeof targets)[number];
+    const encounterId = enc.id;
+    // FR-CBT-47 (#172): from round 1 nobody re-rolls; the whole intent fails.
+    if (enc.round >= 1) {
+      const set = targets.map((t) => t.c).filter((c) => c.initiative !== null);
+      if (set.length > 0) throw alreadySet(set);
+    }
     const before = combatantsOf(env.tx, encounterId);
     const rollIds: string[] = [];
     const entries: RecordChange[] = [];
@@ -94,6 +100,9 @@ export const rollInitiative = defineCommand({
     return { rollIds };
   },
 });
+
+const alreadySet = (cs: { name: string }[]) =>
+  conflict(`Initiative already set: ${cs.map((c) => c.name).join(", ")}`);
 
 export const setInitiative = defineCommand({
   name: CBT_INTENTS.setInitiative,

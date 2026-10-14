@@ -2,7 +2,11 @@
 // heal, strict-LIFO undo of one apply at a time. Each is one transaction: HP + combat log entries
 // + game-log lines + card state.
 
-import type { AttackLogDmPayload, AttackLogPayload } from "@shared/combat-tracker/log-kinds";
+import type {
+  AttackLogDmPayload,
+  AttackLogPayload,
+  AttackLogRolls,
+} from "@shared/combat-tracker/log-kinds";
 import { clampHp, hitHint, rawDamage, undoGroup } from "@shared/combat-tracker/rules";
 import {
   ApplyCardTargetsInput,
@@ -20,6 +24,7 @@ import {
   LOG_KIND_HP,
   UndoInput,
 } from "@shared/combat-tracker/schemas";
+import type { DieResult } from "@shared/dice-roll-log/schemas";
 import {
   AttackApplied,
   CombatEntryUndone,
@@ -89,14 +94,24 @@ function insertHpChange(env: Env, facts: FactsInput, entryId: string): HpChangeR
   return toHpChangeRecord(row);
 }
 
-function rollTotal(env: Env, id: string): { total: number; natural: number | null } {
+/** A card's roll row: totals for apply, dice for the DM's line (FR-CBT-53). */
+function cardRoll(env: Env, id: string) {
   const r = env.tx
-    .select({ total: roll.total, natural: roll.natural })
+    .select({
+      total: roll.total,
+      natural: roll.natural,
+      expression: roll.expression,
+      mode: roll.mode,
+      manual: roll.manual,
+      dice: roll.dice,
+      constant: roll.constant,
+    })
     .from(roll)
     .where(and(eq(roll.id, id), eq(roll.campaignId, campaignOf(env.actor))))
     .get();
   if (!r) throw new Error(`Damage card roll ${id} missing`);
-  return r;
+  const dice = (r.dice as DieResult[]).map((d) => [d.value, d.kept] as [number | null, boolean]);
+  return { ...r, dice };
 }
 
 export const applyCard = defineCommand({
@@ -113,8 +128,24 @@ export const applyCard = defineCommand({
     const targets = input.targets.map((t) => ({ ...t, c: activeCombatant(env, t.targetId).c }));
     const attacker = getCombatant(env.tx, enc.campaignId, p.attackerId);
     // Rolled values come from the card's roll rows, never the client (gems: FR-CBT-32).
-    const toHitRoll = rollTotal(env, p.toHit.rollId);
-    const damageRoll = rollTotal(env, p.damage.rollId);
+    const toHitRoll = cardRoll(env, p.toHit.rollId);
+    const damageRoll = cardRoll(env, p.damage.rollId);
+    // FR-CBT-53: physical flags for everyone; the dice breakdown for the DM only (FR-DICE-28).
+    const manual = { toHit: toHitRoll.manual, damage: damageRoll.manual };
+    const rolls: AttackLogRolls = {
+      toHit: {
+        expression: toHitRoll.expression,
+        mode: toHitRoll.mode,
+        dice: toHitRoll.dice,
+        constant: toHitRoll.constant,
+      },
+      damage: {
+        expression: damageRoll.expression,
+        dice: damageRoll.dice,
+        constant: damageRoll.constant,
+        crit: p.crit,
+      },
+    };
     const playerCard = card.audience === "player";
     const rollIds = [p.toHit.rollId, p.damage.rollId];
     const hpChangeIds: string[] = [];
@@ -140,6 +171,7 @@ export const applyCard = defineCommand({
         damage: raw,
         multiplier,
         crit: p.crit,
+        manual,
       };
       const dmPayload: AttackLogDmPayload = {
         targetAc,
@@ -154,6 +186,7 @@ export const applyCard = defineCommand({
           hit: hit !== hitComputed,
           damage: input.damageTotal !== damageRoll.total,
         },
+        rolls,
       };
       // FR-CBT-36: one line per target; never public if the attacker or this target is hidden,
       // else a player's card is public, else the DM's choice / category setting (FR-CBT-24).

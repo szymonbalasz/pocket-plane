@@ -8,6 +8,7 @@ import {
   createInFlight,
   intentErrorText,
   type RollRoute,
+  rollActionView,
   routeFor,
   sendSheetRoll,
   sheetBadge,
@@ -136,6 +137,84 @@ describe("FR-CHAR-16 FR-CHAR-23 checks and saves", () => {
     expect(sheetBadge(rollRoutes, emptyStore(), "mira")).toBeNull();
     expect(sheetBadge([initOnly], emptyStore(), "mira")).toBe("In combat");
     expect(sheetBadge([initOnly], emptyStore(), "thorn")).toBeNull();
+  });
+});
+
+describe("FR-CHAR-24 hidden routed button", () => {
+  let hide = true;
+  const hiding: RollRoute = {
+    name: "hiding",
+    claim: (_store, characterId, kind) =>
+      characterId === "mira" && (kind === "initiative" || kind === "attack")
+        ? { badge: "In combat", hidden: hide, send: (s) => s("cbt.rollInitiative", {}) }
+        : null,
+  };
+
+  test("FR-CHAR-24 a route answering hidden → no Initiative button, 'Initiative set', badge kept; flip back → button", () => {
+    hide = true;
+    const store = emptyStore();
+    expect(rollActionView(routeFor([hiding], store, "mira", "initiative"), "initiative")).toBe(
+      "locked",
+    );
+    // Another hidden kind renders nothing (no button, no public switch).
+    expect(rollActionView(routeFor([hiding], store, "mira", "attack"), "attack")).toBe("none");
+    expect(sheetBadge([hiding], store, "mira")).toBe("In combat");
+    hide = false;
+    expect(rollActionView(routeFor([hiding], store, "mira", "initiative"), "initiative")).toBe(
+      "button",
+    );
+    // Unclaimed (not in the encounter) keeps its plain char.roll button.
+    hide = true;
+    expect(rollActionView(routeFor([hiding], store, "thorn", "initiative"), "initiative")).toBe(
+      "button",
+    );
+  });
+
+  function combatStore(
+    mira: Record<string, unknown> | null,
+    round: number,
+  ): ReturnType<typeof emptyStore> {
+    return {
+      ...emptyStore(),
+      records: {
+        encounter: { e1: { id: "e1", status: "started", round, playerTurnCombatantId: null } },
+        combatant: mira ? { [mira.id as string]: mira } : {},
+      },
+    };
+  }
+  const miraCb = {
+    id: "cb-mira",
+    encounterId: "e1",
+    kind: "pc",
+    entityId: "mira",
+    name: "Mira",
+    initiative: 15,
+  };
+  const view = (store: ReturnType<typeof emptyStore>, id = "mira") =>
+    rollActionView(routeFor(rollRoutes, store, id, "initiative"), "initiative");
+
+  test("FR-CHAR-24 with combat's route: round ≥ 1 + initiative set → hidden; null → routed button", () => {
+    expect(view(combatStore(miraCb, 1))).toBe("locked");
+    expect(view(combatStore(miraCb, 3))).toBe("locked");
+    expect(view(combatStore({ ...miraCb, initiative: null }, 1))).toBe("button");
+    expect(
+      routeFor(rollRoutes, combatStore({ ...miraCb, initiative: null }, 1), "mira", "initiative"),
+    ).not.toBeNull();
+    // Round 0: everyone may roll (the DM overwrites).
+    expect(view(combatStore(miraCb, 0))).toBe("button");
+  });
+
+  test("FR-CHAR-24 OQ-CHAR-19 unclaimed characters keep a plain char.roll button after round 1", () => {
+    // (a) not in the started encounter.
+    expect(view(combatStore(miraCb, 1), "thorn")).toBe("button");
+    expect(routeFor(rollRoutes, combatStore(miraCb, 1), "thorn", "initiative")).toBeNull();
+    // (b) a PC hidden from its owner: no combatant in the player's store.
+    expect(routeFor(rollRoutes, combatStore(null, 1), "mira", "initiative")).toBeNull();
+    expect(view(combatStore(null, 1))).toBe("button");
+    // (c) a removed PC.
+    const removed = combatStore({ ...miraCb, removed: true }, 1);
+    expect(routeFor(rollRoutes, removed, "mira", "initiative")).toBeNull();
+    expect(view(removed)).toBe("button");
   });
 });
 

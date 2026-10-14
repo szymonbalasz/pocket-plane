@@ -1,8 +1,10 @@
 // Log-entry kinds `cbt.attack` and `cbt.hp` (FR-CBT-24, FR-DICE-18). Public text = actors, roll
-// + modifier, outcome, damage; AC, the computed hit and overrides stay in `dmPayload`.
+// + modifier, outcome, damage, "physical" tags; AC, the computed hit, overrides and the dice
+// breakdown stay in `dmPayload` (FR-CBT-53, FR-DICE-28).
 import { defineLogKind, type LineSegment } from "@shared/dice-roll-log/kind-types";
+import { rollBreakdownSegments } from "@shared/dice-roll-log/roll-kind";
 import { z } from "zod";
-import { LOG_KIND_ATTACK, LOG_KIND_HP } from "./schemas";
+import { CardDie, LOG_KIND_ATTACK, LOG_KIND_HP } from "./schemas";
 
 const Multiplier = z.enum(["normal", "half", "none", "double"]);
 
@@ -22,8 +24,33 @@ export const AttackLogPayload = z.strictObject({
   damage: z.int(),
   multiplier: Multiplier,
   crit: z.boolean(),
+  /** FR-CBT-53 (a), #171: physical-dice flags, shown as "physical" to everyone. Old rows: absent. */
+  manual: z.strictObject({ toHit: z.boolean(), damage: z.boolean() }).optional(),
 });
 export type AttackLogPayload = z.infer<typeof AttackLogPayload>;
+
+/**
+ * Compact per-die results `[value, kept]` (#140), as on the card (same limit, so whatever fits
+ * the card fits the line); value null = a physical total of several dice.
+ */
+const CompactDice = z.array(CardDie).max(51);
+
+/** FR-CBT-53 (b): the card's roll rows, DM-only (FR-DICE-28). */
+export const AttackLogRolls = z.strictObject({
+  toHit: z.strictObject({
+    expression: z.string().max(80),
+    mode: z.enum(["normal", "advantage", "disadvantage"]),
+    dice: CompactDice,
+    constant: z.int(),
+  }),
+  damage: z.strictObject({
+    expression: z.string().max(80),
+    dice: CompactDice,
+    constant: z.int(),
+    crit: z.boolean(),
+  }),
+});
+export type AttackLogRolls = z.infer<typeof AttackLogRolls>;
 
 export const AttackLogDmPayload = z.strictObject({
   targetAc: z.int(),
@@ -34,6 +61,8 @@ export const AttackLogDmPayload = z.strictObject({
   applied: z.int(),
   overkill: z.int(),
   overrides: z.strictObject({ toHit: z.boolean(), hit: z.boolean(), damage: z.boolean() }),
+  /** Old rows: absent. */
+  rolls: AttackLogRolls.optional(),
 });
 export type AttackLogDmPayload = z.infer<typeof AttackLogDmPayload>;
 
@@ -52,12 +81,19 @@ export const HpLogDmPayload = z.strictObject({
 
 const MULT_TEXT = { normal: "", half: " (half)", none: " (none)", double: " (double)" } as const;
 
-/** "Goblin attacks Mira: 12 + 4 = 16 — hit! 6 slashing damage". */
+const PHYSICAL: LineSegment[] = [{ text: " " }, { text: "physical", style: "badge" }];
+
+/**
+ * "Goblin attacks Mira: 12 + 4 = 16 — hit! 6 slashing damage" (FR-CBT-24); "physical" after a
+ * manual roll (FR-CBT-53 a). DM only (FR-CBT-53 b, c; FR-DICE-28: built from `dmPayload` alone):
+ * "(DM set; rolled 13)" after an edited total, kept / dropped d20s and the damage dice in a muted
+ * run, "vs AC 15", and "— DM ruled hit" / "— DM ruled miss" when the DM overrode the hit.
+ */
 export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof AttackLogDmPayload>>({
   kind: LOG_KIND_ATTACK,
   payload: AttackLogPayload,
   dmPayload: AttackLogDmPayload,
-  formatLine({ actorName, payload: p, dmPayload }) {
+  formatLine({ actorName, payload: p, dmPayload: dm }) {
     const out: LineSegment[] = [
       { text: actorName, style: "actor" },
       { text: ` attacks ${p.targetName}: ` },
@@ -70,15 +106,29 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
       out.push({ text: " = " });
     }
     out.push({ text: String(t.total), style: "total" });
+    // An edited total (dice null) is not the physical roll; a damage edit stays DM-only.
+    if (p.manual?.toHit && t.dice !== null) out.push(...PHYSICAL);
+    if (dm) {
+      if (dm.overrides.toHit) {
+        out.push({ text: ` (DM set; rolled ${dm.toHitRolled})`, style: "muted" });
+      }
+      // Kept and dropped d20s: the public "d20 + modifier" already shows a single die.
+      const r = dm.rolls?.toHit;
+      if (r && r.mode !== "normal") out.push(...rollBreakdownSegments(r));
+      out.push({ text: ` vs AC ${dm.targetAc}` });
+    }
+    const ruled = dm?.overrides.hit === true;
     if (p.hit) {
-      out.push({ text: p.crit ? " — critical hit! " : " — hit! " });
+      out.push({ text: ruled ? " — DM ruled hit " : p.crit ? " — critical hit! " : " — hit! " });
       const type = p.damageType ? ` ${p.damageType}` : "";
       out.push({ text: `${p.damage}${type} damage${MULT_TEXT[p.multiplier]}` });
+      if (dm?.overrides.damage) {
+        out.push({ text: ` (DM set; rolled ${dm.damageRolled})`, style: "muted" });
+      }
+      if (dm?.rolls) out.push(...rollBreakdownSegments(dm.rolls.damage));
+      if (p.manual?.damage) out.push(...PHYSICAL);
     } else {
-      out.push({ text: " — miss" });
-    }
-    if (dmPayload) {
-      out.push({ text: " " }, { text: `vs AC ${dmPayload.targetAc}`, style: "badge" });
+      out.push({ text: ruled ? " — DM ruled miss" : " — miss" });
     }
     return out;
   },

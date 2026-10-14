@@ -1,6 +1,6 @@
-// Combat's token overlay `cbt` (FR-CBT-38, FR-CBT-39; registry FR-MAP-34): on a token bound to an
-// active combatant of the started encounter, Out (removed: dim + badge), Down (0 HP: a monster's
-// HP or band, a PC's character HP or redacted `down`), the target ring while the DM targets, and
+// Combat's token overlay `cbt` (FR-CBT-38, FR-CBT-39, FR-CBT-48; registry FR-MAP-34): on a token
+// bound to an active combatant of the started encounter, Out (removed: dim + badge), Down (a cross;
+// 0 HP: a monster's HP or band, a PC's character HP or redacted `down`), the target ring while the DM targets, and
 // movement used this turn. Pure over the record store each client already holds, so players see
 // badges only on what they receive, and nothing after End.
 import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
@@ -8,7 +8,12 @@ import { ENTITY_TYPE } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import { create } from "zustand";
-import type { TokenBadge, TokenDecoration, TokenOverlay } from "../scenes-map/token-overlays";
+import type {
+  TokenBadge,
+  TokenCross,
+  TokenDecoration,
+  TokenOverlay,
+} from "../scenes-map/token-overlays";
 import { startedIn } from "./store";
 
 /** The attacker of the DM's open attack popup: never a target, so no ring (FR-CBT-33). */
@@ -22,12 +27,8 @@ export const OUT_BADGE: TokenBadge = {
   tone: "neutral",
   label: "Out",
 };
-export const DOWN_BADGE: TokenBadge = {
-  id: "cbt-token-down",
-  icon: "skull",
-  tone: "down",
-  label: "Down",
-};
+/** FR-CBT-48 (#171): Down is a translucent X in `hp.down`, no longer a badge. */
+export const DOWN_CROSS: TokenCross = { id: "cbt-token-down", tone: "down" };
 
 /** The active combatant of the started encounter bound to the token, if any. */
 export function boundCombatant(store: RecordStore, tokenId: string): CombatantView | null {
@@ -53,17 +54,22 @@ export function isDown(store: RecordStore, c: CombatantView): boolean {
   return typeof e.hpCurrent === "number" ? e.hpCurrent <= 0 : e.down === true;
 }
 
+/** FR-CBT-49 (G9): the Initiative row's "Down" Badge for a PC (DM, owner: HP; others: `down`). */
+export const pcDown = (store: RecordStore, c: CombatantView) => c.kind === "pc" && isDown(store, c);
+
 export const cbtTokenOverlay: TokenOverlay = {
   id: "cbt",
   decorate(token: TokenView, store, view): TokenDecoration | null {
     const c = boundCombatant(store, token.id);
     if (!c) return null;
-    if (c.removed) return { dim: true, badges: [OUT_BADGE] };
-    const out: TokenDecoration = isDown(store, c) ? { badges: [DOWN_BADGE] } : {};
+    // FR-CBT-48: Down = translucent X; Out = dim + badge; removed and down → both.
+    const out: TokenDecoration = {};
+    if (isDown(store, c)) out.cross = DOWN_CROSS;
+    if (c.removed) return { ...out, dim: true, badges: [OUT_BADGE] };
     if (view.targeting && view.selected && c.id !== useTargetingAttacker.getState().attackerId) {
       out.ring = "target";
     }
-    return out.badges || out.ring ? out : null;
+    return out.cross || out.ring ? out : null;
   },
   movedFt(token, store) {
     return boundCombatant(store, token.id)?.movedFt ?? null;

@@ -3,7 +3,7 @@
 // selection (targeting on: click, Ctrl/Shift-click, box), added rows come from "Add target".
 // Per row: hit vs AC (preset, toggle), multiplier, preview. Apply sends 1–20 targets in list
 // order (FR-CBT-34); Later keeps the card pending; Dismiss closes it. Close → targeting off,
-// selection kept.
+// selection kept, except after a successful Apply (FR-CBT-54). Placement: FR-CBT-55.
 
 import { clampHp, MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
 import {
@@ -29,8 +29,14 @@ import { useTargetingAttacker } from "@ui/features/combat-tracker/token-overlay"
 import { useRecords } from "@ui/sync/store";
 import { EyeOffIcon, XIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { setMapSelection, setTargeting, useMapSelection } from "../scenes-map/selection";
+import {
+  getMapSelection,
+  setMapSelection,
+  setTargeting,
+  useMapSelection,
+} from "../scenes-map/selection";
 import { useDefinitions } from "./data";
+import { measurePlacement, type Placement } from "./popup-placement";
 import { useCombatDialogs } from "./popup-store";
 import { addAction, eligibleTargets, presetHit, targetList } from "./targets";
 
@@ -224,7 +230,11 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
       damageTotal,
       targets: rows.map((x) => ({ targetId: x.c.id, hit: x.hit, multiplier: x.mult })),
     });
-    if (r !== undefined) close();
+    if (r === undefined) return;
+    // FR-CBT-54 (G5): a successful Apply clears the map selection, so the next popup opens with
+    // no stale rows; Later, Dismiss, close and a reject keep it.
+    setMapSelection([]);
+    close();
   };
   const dismiss = async () => {
     const r = await send("note.dismiss", { id: card.id });
@@ -405,6 +415,27 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
 }
 
 /**
+ * FR-CBT-55: placement fixed when the popup opens, from the selection rows' tokens at that moment
+ * (the panel never jumps while the DM edits the selection).
+ */
+function useOpenPlacement(card: NotificationRecord): Placement {
+  const p = DamageCardPayload.safeParse(card.payload);
+  const combatants = useCombatants(p.data?.encounterId);
+  const [placement] = useState(() => {
+    if (!p.success) return measurePlacement([]);
+    const { rows } = targetList({
+      combatants,
+      encounterId: p.data.encounterId,
+      attackerId: p.data.attackerId,
+      selectedTokenIds: getMapSelection().tokenIds,
+      added: [],
+    });
+    return measurePlacement(rows.flatMap((r) => (r.c.tokenId ? [r.c.tokenId] : [])));
+  });
+  return placement;
+}
+
+/**
  * Mounted once (companion of `cbt.initiative`); opened from the card, its toast, the Pending
  * list or the DM's own attack. Non-modal: a fixed panel, no overlay, no focus trap.
  */
@@ -414,6 +445,11 @@ export function AttackPopup() {
   const notes = useRecords<NotificationRecord>("notification");
   const card = cardId ? notes.find((n) => n.id === cardId) : undefined;
   if (card?.state !== "pending") return null;
+  return <PopupPanel key={card.id} card={card} close={close} />;
+}
+
+function PopupPanel({ card, close }: { card: NotificationRecord; close(): void }) {
+  const at = useOpenPlacement(card);
   return (
     <div
       role="dialog"
@@ -421,7 +457,10 @@ export function AttackPopup() {
       aria-label="Attack"
       data-testid="cbt-popup"
       data-record-id={card.id}
-      className="fixed top-14 left-1/2 z-40 flex max-h-[calc(100vh-7rem)] w-[min(440px,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-y-auto rounded-lg border bg-card p-3 text-card-foreground shadow-lg"
+      data-side={at.side}
+      // FR-CBT-55: centred in the work area at its left / right edge; not draggable.
+      style={{ left: at.x, top: (at.top + at.bottom) / 2, maxHeight: at.bottom - at.top }}
+      className="fixed z-40 flex w-[min(440px,calc(100vw-2rem))] -translate-y-1/2 flex-col overflow-y-auto rounded-lg border bg-card p-3 text-card-foreground shadow-lg"
       // Esc with focus in the popup closes it; Esc on the canvas clears the selection (FR-MAP-31).
       onKeyDown={(e) => {
         if (e.key === "Escape") {
@@ -430,7 +469,7 @@ export function AttackPopup() {
         }
       }}
     >
-      <PopupBody key={card.id} card={card} close={close} />
+      <PopupBody card={card} close={close} />
     </div>
   );
 }
