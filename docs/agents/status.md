@@ -2,14 +2,14 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** playtest feedback pass (MVP polish). Specs complete and merged (#172, `4c45af3`); builds per [protocol §30](../protocol/README.md#30-playtest-pass-to-build). Work list: [feedback-playtest](feedback-playtest.md).
+**Phase:** playtest feedback pass **done** (#171–#176, `main` @ `e29e704`+docs). **Paused for a recap + planning session with the DM** before any new work.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Playtest pass builds (P1–P5, G1–G12, ADR-0033, test flakes) | — | — | **All merged** (#173–#175; `e29e704`) | — |
-| Session-sim regression on final `main` | `main` (tab `wR` regress, port 4113) | `test-session-3` | **Running** | Then **pause: recap + plan with the DM** |
+| Session-sim regression on final `main` | — | — | **PASS 9/9** + reload, reconnect, leak scan, identical digest across a hard kill; 9 usability glitches ranked (evidence `verify-session-sim-3`) | Recap with the DM |
 
 Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-13-evening)). Briefs `briefs\build-*.md`; spec summary `spec-playtest.md`. Evidence: `verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash, mvp-acceptance).
 
@@ -19,8 +19,7 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 
 ## Pending DM decisions
 
-- **DM: after the playtest pass merges, pause and recap together** (what was built, what's next, plan the way forward). Don't start new work beyond the pass.
-- Recap agenda item 1: promote "add combatants mid-fight" (summons, reinforcements) from tier A to S? Combat build proceeds as specced (tier A) meanwhile.
+- **Recap + plan with the DM (now).** Agenda: (1) mid-fight add (summons, reinforcements) tier A → S?; (2) regression glitches R1–R9 (session-sim-3 report): which to fix; (3) what's next: second table playtest vs post-MVP (fog of war first; compendium; tier A backlog).
 
 ## Resolved locally (report at gate)
 
