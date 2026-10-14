@@ -114,7 +114,8 @@ describe("import boundaries (AGENTS §9.1)", () => {
       }
     }
     expect(violations).toEqual([]);
-  });
+    // ~470 synchronous file reads (~0.1 s): a GC pause or a Windows AV scan landing here once took 5.6 s.
+  }, 30_000);
 
   test("the checker catches violations", () => {
     expect(target("src/client/dm/x.ts", "@player/App")).toBe("player");
