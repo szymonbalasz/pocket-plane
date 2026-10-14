@@ -6,6 +6,7 @@ import { cellToPx, footprint, initials } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import { useEffect } from "react";
 import { Circle, Group, Image, Label, Layer, Line, Rect, Tag, Text } from "react-konva";
+import { useStore } from "zustand";
 import { retryAssetImage, useAssetImage } from "../../assets-pipeline/useAssetImage";
 import { type CanvasContextValue, useCanvas } from "../canvas-context";
 import { decorateToken, type MergedDecoration } from "../decorations";
@@ -170,8 +171,10 @@ function TokenNode({ t }: { t: TokenView }) {
   useEffect(() => {
     if (t.imageAssetId) retryAssetImage(t.imageAssetId, "thumb");
   }, [t]);
+  // FR-MAP-40: another client's drag of T draws it at the previewed spot (only this group re-renders).
+  const preview = useStore(c.previews, (s) => s.previews[t.id]);
   const side = footprint(t.size) * grid.gridCellSize;
-  const { x, y } = cellToPx(grid, t.col, t.row);
+  const { x, y } = preview ?? cellToPx(grid, t.col, t.row);
   const movable = c.canMove(t);
   const draggable = movable && c.live && c.tool === "select";
   const selected = c.selected.has(t.id);
@@ -195,6 +198,7 @@ function TokenNode({ t }: { t: TokenView }) {
       name="map-token"
       id={t.id}
       shape={t.shape}
+      preview={preview ? true : undefined}
       x={x}
       y={y}
       draggable={draggable}

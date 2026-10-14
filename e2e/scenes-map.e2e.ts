@@ -40,7 +40,9 @@ async function tokenAttr(page: Page, tokenId: string, attr: string) {
       type KNode = { getAttr(a: string): unknown };
       type KStage = { findOne(s: string): KNode | undefined };
       const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
-      return (K?.stages[0]?.findOne(`#${id}`)?.getAttr(attr) as string | undefined) ?? null;
+      return (
+        (K?.stages[0]?.findOne(`#${id}`)?.getAttr(attr) as string | boolean | undefined) ?? null
+      );
     },
     [tokenId, attr] as const,
   );
@@ -107,7 +109,13 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await expect
     .poll(async () => (await konvaNodes(player, "map-move-label-text"))[0]?.text)
     .toMatch(/^15( \/ \d+)? ft$/);
+  // FR-MAP-40 (#171): while the player holds, the DM draws Mira from the drag preview at the held
+  // spot, with no movement label of its own.
+  await expect.poll(() => tokenAttr(dm, miraTown, "preview")).toBe(true);
+  await expect.poll(() => cellOf(dm, miraTown)).toEqual({ col: 8, row: 5 });
+  expect(await konvaNodes(dm, "map-move-label")).toHaveLength(0);
   await player.mouse.up();
+  await expect.poll(() => tokenAttr(dm, miraTown, "preview")).toBeNull();
   await expect.poll(() => cellOf(dm, miraTown)).toEqual({ col: 8, row: 5 });
   await expect.poll(() => cellOf(player, miraTown)).toEqual({ col: 8, row: 5 });
 

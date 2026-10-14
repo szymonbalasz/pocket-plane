@@ -1,8 +1,8 @@
 // The base-layer canvas (MAP §7), shared by both clients: react-konva Stage with the layer
 // registry (FR-MAP-29), per-client camera (FR-MAP-12), drop-only moves with an optimistic overlay
 // (FR-MAP-15), ruler (FR-MAP-22), ping / pull (FR-MAP-23), laser (FR-MAP-24), definition drops
-// (FR-MAP-13, DM), DM selection + box select + targeting (FR-MAP-31–33) and the not-live rules
-// (FR-MAP-28). No feature logic: the server decides.
+// (FR-MAP-13, DM), DM selection + box select + targeting (FR-MAP-31–33), the not-live rules
+// (FR-MAP-28) and the live drag preview (FR-MAP-39/40). No feature logic: the server decides.
 import { DEFINITION_DRAG_MIME, DefinitionDragData } from "@shared/entities/schemas";
 import {
   cellToPx,
@@ -12,6 +12,7 @@ import {
   tokenDrawOrder,
 } from "@shared/scenes-map/geometry";
 import {
+  DragData,
   LaserData,
   MAP_INTENTS,
   MAP_SIGNALS,
@@ -22,10 +23,19 @@ import {
 import type Konva from "konva";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Stage } from "react-konva";
-import { SyncContext, useSendSignal, useSignal, useSync } from "../../sync/store";
+import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
 import { type Camera, centreOn, fitCamera, zoomAt } from "./camera";
 import { CanvasContext, type CanvasContextValue, type EffectiveGrid } from "./canvas-context";
 import { canvasLayers } from "./canvas-layers";
+import {
+  clearPreviews,
+  createPreviewStore,
+  escapeTarget,
+  prunePreviews,
+  receiveDrag,
+  TokenDrag,
+  tokenIdsOf,
+} from "./drag-preview";
 import { toastReject, useLive, useMapIntent } from "./intents";
 import { LaserSender } from "./laser";
 import {
@@ -109,9 +119,14 @@ export function MapCanvas(props: MapCanvasProps) {
   const sendIntent = useMapIntent();
   const sendSignal = useSendSignal();
   const [pointers] = useState(createPointerStore);
+  const [previews] = useState(createPreviewStore);
   const grid = props.gridOverride ?? gridOf(scene);
   const gridRef = useRef(grid);
   gridRef.current = grid;
+  const sceneIdRef = useRef(scene.id);
+  sceneIdRef.current = scene.id;
+  /** This client's token drag in progress (FR-MAP-39), if any. */
+  const dragRef = useRef<TokenDrag | null>(null);
 
   // ---- camera (FR-MAP-12): fit when a scene opens ----
   const [cam, setCam] = useState<Camera>({ x: 0, y: 0, scale: 1 });
@@ -129,9 +144,21 @@ export function MapCanvas(props: MapCanvasProps) {
   const store = useSync((s) => s.store);
   const prevStore = useRef(store);
   useEffect(() => {
-    if (isSnapshotStore(prevStore.current, store)) setOverlay(clearOverlay());
+    if (isSnapshotStore(prevStore.current, store)) {
+      setOverlay(clearOverlay());
+      clearPreviews(previews);
+    }
     prevStore.current = store;
-  }, [store]);
+  }, [store, previews]);
+
+  // ---- drag previews (FR-MAP-40): dropped on a `token` change, a scene switch or 3 s silence ----
+  useEventFrame((f) => clearPreviews(previews, tokenIdsOf(f.changes)));
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a scene switch drops every preview.
+  useEffect(() => clearPreviews(previews), [scene.id, previews]);
+  useEffect(() => {
+    const id = setInterval(() => prunePreviews(previews, performance.now()), 250);
+    return () => clearInterval(id);
+  }, [previews]);
 
   const shown = useMemo(
     () => tokens.map((t) => shownCell(overlay, t)).sort(tokenDrawOrder),
@@ -187,11 +214,18 @@ export function MapCanvas(props: MapCanvasProps) {
             to: { col: t.col, row: t.row },
           },
         });
+        // FR-MAP-39: preview frames for others; others' previews of T are ignored meanwhile.
+        dragRef.current = new TokenDrag(sceneIdRef.current, t.id, { col: t.col, row: t.row }, (d) =>
+          sendSignal(MAP_SIGNALS.drag, d),
+        );
+        previews.setState({ local: { tokenId: t.id, x: node.x(), y: node.y() } });
         if (!selectedRef.current.has(t.id)) onTokenClick?.(t, false);
         const c = node.getStage()?.container();
         if (c) c.style.cursor = "grabbing";
       },
-      dragMove(_t, node) {
+      dragMove(t, node) {
+        dragRef.current?.move(node.x(), node.y());
+        previews.setState({ local: { tokenId: t.id, x: node.x(), y: node.y() } });
         const to = dropCell(gridRef.current, node.x(), node.y());
         const d = pointers.getState().drag;
         if (d && (d.to.col !== to.col || d.to.row !== to.row))
@@ -199,15 +233,18 @@ export function MapCanvas(props: MapCanvasProps) {
       },
       dragEnd(t, node) {
         pointers.setState({ drag: null });
+        previews.setState({ local: null });
+        clearPreviews(previews, [t.id]);
         const c = node.getStage()?.container();
         if (c) c.style.cursor = "";
-        const to = dropCell(gridRef.current, node.x(), node.y());
-        if (!liveRef.current || (to.col === t.col && to.row === t.row)) {
-          node.position(cellToPx(gridRef.current, t.col, t.row));
-          return;
-        }
-        node.position(cellToPx(gridRef.current, to.col, to.row));
-        move(t, to.col, to.row);
+        const drag = dragRef.current;
+        dragRef.current = null;
+        const drop = dropCell(gridRef.current, node.x(), node.y());
+        // Drop → `map.moveToken`, then `end`; Esc, not live or unmoved → snap back (FR-MAP-15/28/39).
+        const at = drag
+          ? drag.finish(drop, liveRef.current, (to) => move(t, to.col, to.row))
+          : { col: t.col, row: t.row };
+        node.position(cellToPx(gridRef.current, at.col, at.row));
       },
       click(t, toggle) {
         onTokenClick?.(t, toggle);
@@ -216,7 +253,7 @@ export function MapCanvas(props: MapCanvasProps) {
         onTokenDoubleClick?.(t);
       },
     }),
-    [pointers, onTokenClick, onTokenDoubleClick, move],
+    [pointers, previews, onTokenClick, onTokenDoubleClick, move, sendSignal],
   );
 
   // ---- incoming signals (FR-MAP-25): only for the scene this client shows ----
@@ -244,6 +281,22 @@ export function MapCanvas(props: MapCanvasProps) {
       s.from.role,
       d.data.points,
       d.data.end ?? false,
+      performance.now(),
+    );
+  });
+  const tokensRef = useRef(tokens);
+  tokensRef.current = tokens;
+  useSignal(MAP_SIGNALS.drag, (s) => {
+    const d = DragData.safeParse(s.data);
+    if (!d.success) return;
+    receiveDrag(
+      previews,
+      d.data,
+      {
+        sceneId: scene.id,
+        hasToken: (id) => tokensRef.current.some((t) => t.id === id),
+        draggingId: dragRef.current?.tokenId ?? null,
+      },
       performance.now(),
     );
   });
@@ -310,11 +363,22 @@ export function MapCanvas(props: MapCanvasProps) {
     window.addEventListener("pointerup", endGestures);
     return () => window.removeEventListener("pointerup", endGestures);
   }, [endGestures]);
-  // FR-MAP-32: Esc mid-drag cancels the box only (capture: before the DM's Esc-clears handler).
+  // Esc mid-drag cancels the token drag (FR-MAP-15) or the box (FR-MAP-32) and stops there, so
+  // the selection is kept (capture: before the DM's Esc-clears handler).
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || !boxing.current) return;
+      if (e.key !== "Escape") return;
+      const target = escapeTarget(dragRef.current !== null, boxing.current);
+      if (!target) return;
       e.stopPropagation();
+      if (target === "drag") {
+        dragRef.current?.cancel();
+        // Konva fires `dragend`: the token snaps back and `end` goes out (dragEnd above).
+        for (const n of stageRef.current?.find(".map-token") ?? []) {
+          if (n.isDragging()) n.stopDrag();
+        }
+        return;
+      }
       press.current = null;
       endBox();
     };
@@ -395,6 +459,7 @@ export function MapCanvas(props: MapCanvasProps) {
     cam,
     colors,
     pointers,
+    previews,
     tool,
     live,
     myPlayerId,
