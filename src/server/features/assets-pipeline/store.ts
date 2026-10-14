@@ -8,7 +8,6 @@ import {
   openSync,
   readdirSync,
   readFileSync,
-  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -19,6 +18,7 @@ import type { Db } from "../../db/client";
 import { dbId } from "../../db/meta";
 import { asset } from "../../db/schema";
 import type { Logger } from "../../log";
+import { renameRetrying } from "../../runtime/rename";
 import type { ProcessedImage } from "./image";
 
 const HASH = /^[0-9a-f]{64}$/;
@@ -27,24 +27,6 @@ const TMP = ".tmp";
 export const DB_MARKER = ".pocket-plane-db";
 const FILES = ["original", "display.webp", "thumb.webp"] as const;
 const SERVED: Record<AssetFile, string> = { display: "display.webp", thumb: "thumb.webp" };
-
-/**
- * Directory rename with retries: on Windows a just-written dir can be briefly locked (virus
- * scanner, indexer) and rename fails with EPERM / EACCES / EBUSY. Same approach as graceful-fs.
- */
-function renameDirSync(from: string, to: string): void {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      renameSync(from, to);
-      return;
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code;
-      const transient = code === "EPERM" || code === "EACCES" || code === "EBUSY";
-      if (!transient || attempt >= 20) throw err;
-      Bun.sleepSync(Math.min(10 * (attempt + 1), 100));
-    }
-  }
-}
 
 /** Write + fsync (#163): the files are on disk before the row that points at them commits. */
 function writeDurable(file: string, data: Uint8Array): void {
@@ -135,7 +117,7 @@ export class AssetStore {
       writeDurable(path.join(tmp, "display.webp"), img.display.data);
       writeDurable(path.join(tmp, "thumb.webp"), img.thumb.data);
       fsyncDir(tmp);
-      renameDirSync(tmp, target);
+      renameRetrying(tmp, target);
       // The rename itself: the hash dir and its entry in the asset dir (#163).
       fsyncDir(target);
       fsyncDir(this.dir);

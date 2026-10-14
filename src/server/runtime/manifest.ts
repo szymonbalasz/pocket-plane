@@ -1,7 +1,8 @@
 // Load manifest `$PP_DATA_DIR/load-manifest.json` (FIX §8, FR-FIX-09/28). Never holds the DM secret.
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
+import { renameRetrying } from "./rename";
 
 export const MANIFEST_FILE = "load-manifest.json";
 
@@ -38,5 +39,5 @@ export function writeManifest(dataDir: string, m: Manifest): void {
   const file = manifestPath(dataDir);
   const tmp = `${file}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(Manifest.parse(m), null, 2)}\n`);
-  renameSync(tmp, file);
+  renameRetrying(tmp, file);
 }
