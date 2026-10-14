@@ -37,7 +37,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -80,6 +79,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
+import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpDialog } from "./hp-dialog";
 import { useCombatDialogs } from "./popup-store";
 
@@ -536,6 +536,7 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
   const unrolled = unrolledMonsters(rows);
   const undoText = undo?.text ?? "Nothing to undo";
   const [ending, setEnding] = useState(false);
+  const startEnd = useStartEnd();
   /** FR-CBT-50: skipped names from the order at send time, toasted once the step is acked. */
   const step = async (direction: "next" | "prev") => {
     const turnRows = rows.map((c) => ({
@@ -580,9 +581,7 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>End “{enc.name}”?</DialogTitle>
-            <DialogDescription>
-              Combatants leave the initiative list. Pending cards stay until you dismiss them.
-            </DialogDescription>
+            <EndConfirmDescription encounterId={enc.id} testId="cbt-init-end-pending" />
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEnding(false)}>
@@ -591,9 +590,10 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
             <Button
               variant="destructive"
               data-testid="cbt-init-end-confirm"
-              disabled={disabled}
+              disabled={disabled || startEnd.disabled}
               onClick={async () => {
-                const r = await send("cbt.end", { encounterId: enc.id });
+                // FR-CBT-60: once acked, this tab's Initiative minimises.
+                const r = await startEnd.end(enc.id);
                 if (r !== undefined) setEnding(false);
               }}
             >
