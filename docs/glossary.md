@@ -27,9 +27,14 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Creature definition** | What a creature *is*: stat block, actions. Imported (read-only) or custom (editable). Same shape for all sources ([ADR-0009](architecture/adr/0009-entity-content-model.md)). | Instance |
 | **Derive** | Create a new, independent custom definition via the creature form, prefilled from a base (shortcut only; no ongoing link). | Duplicate (Ctrl-D on an instance) |
 | **Instance** | A placed creature (token, combatant) pointing at one definition. Holds its own display name, read-only display copies of the definition (image, size; refreshed in the definition edit's transaction), play state and modifiers ([ADR-0024](architecture/adr/0024-definition-visibility.md), decisions #126). | Creature definition |
-| **Modifier** | Per-instance adjustment applied on top of the definition (temp HP, buff, debuff). Tier A. | Override (not supported) |
+| **Modifier** | Design for later ([ADR-0009](architecture/adr/0009-entity-content-model.md)): a field / op / value adjustment on an instance (e.g. +2 AC from a spell). Not built; conditions and labelled buffs are **Effects** ([ADR-0035](architecture/adr/0035-combat-rule-hooks.md)). | Effect; Override |
+| **Override** | A stored value that replaces a derived sheet value (fixed key list, e.g. `save.con`), with an optional note ([ADR-0036](architecture/adr/0036-full-sheet-derivation.md)). | Modifier |
 | **Character** | Entity kind for a player character with a 5e character sheet (basics in MVP, full sheet later). Owned by a player. | Player |
 | **Character sheet** | The 5e sheet view/data of a character. | — |
+| **Draft** (character) | A player-created character the DM has not approved yet; editable by its owner, excluded from "whole party" encounters ([character-sheet-full](specs/character-sheet-full.md)). | — |
+| **Sheet lock** | DM switch on a character: only the DM edits its sheet data; counters and play state stay usable by the owner. | — |
+| **Sheet section** | A block another feature registers into the character sheet (slot header / vitals / main / tab) through the append-only `sheetSections` registry. | Window |
+| **NPC sheet** | The character sheet opened by the DM on a custom creature definition for full editing. | `npc` entity kind |
 | **Compendium** | Library of rules content (monsters, spells, items…) from external sources or homebrew. Design is open ([ADR-0010](architecture/adr/0010-compendium-design.md)). | Entity |
 | **Compendium entry** | One record in the compendium. | Entity |
 | **Source** | Origin of imported data (e.g. fixtures, Open5e, 5etools JSON, homebrew), with licence/provenance. | Asset |
@@ -70,12 +75,17 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Player-ready indicator** | Shows the DM which players have fully loaded a scene. Post-MVP ([scene-tools](specs/post-mvp/scene-tools.md)); MVP assumes immediate load. | — |
 | **Encounter** | A planned set of monsters with CR/difficulty math. Lifecycle: planned → started → ended. The unit of combat history. | Combat; session |
 | **Combat** | The running state of a started encounter: initiative order, rounds, turns. | Encounter |
-| **Combatant** | A participant in a combat, linked to an entity (and a token if on a scene). Holds HP (for PCs, HP lives on the character), conditions, concentration. | Token; Entity |
+| **Combatant** | A participant in a combat, linked to an entity (and a token if on a scene). Holds HP and temp HP (for PCs, both live on the character); effects target the combatant (monsters) or the character (PCs). | Token; Entity |
 | **Movement used** | Feet a combatant's token has moved since its turn started (5/10/5 per move, any mover); reset on Next. Indicator only. | Speed |
 | **Turn alert** | The player client's alert (flash, ping, Toast) when one of its own PCs' turn starts. | Notification |
 | **Initiative order** | Ordered list of combatants for the current combat. | — |
-| **Condition** | A 5e condition (e.g. prone, poisoned) applied to a combatant. | — |
-| **Concentration** | Flag on a combatant maintaining a concentration spell; prompts a save on damage. | — |
+| **Condition** | A 5e condition (e.g. prone, poisoned; exhaustion with a level), stored as an Effect on a combatant or character. Reminder only, except incapacitating ones end concentration. | Effect |
+| **Effect** | A row on a creature in play: a condition, a custom label, or a concentration; optional duration in rounds ([combat-extras](specs/combat-extras.md)). | Modifier |
+| **Concentration** | An Effect marking that a creature maintains a concentration spell (one per creature); damage raises a Concentration card. | — |
+| **Concentration card** | A notification kind with a "Roll save" action (DC max(10, half the damage)) sent to the PC's owner or the DM. | Damage card |
+| **Temp HP** | Temporary hit points on a character or combatant; absorb damage first, don't stack. | — |
+| **Death save** | A PC's d20 roll at 0 HP; three successes = stable, three failures = dead (nat 1 = two failures, nat 20 = 1 HP). | — |
+| **Rule hook** | A combat rule (expiry, concentration, death failures) run inside the causing command's transaction through `hpRules` / the `combatRuleHooks` registry ([ADR-0035](architecture/adr/0035-combat-rule-hooks.md)). | Listener |
 | **Roll** | A dice expression evaluated server-side, with result. | — |
 | **Game log** | Player-facing, BG2-style log window of rolls and combat outcomes (later also text). Each entry public or DM-only. Formerly "roll log". | Event log (internal) |
 | **Roll category** | Kind of roll: attack, damage, saving throw, ability check, skill check, contested, initiative, healing, other. | — |
@@ -110,6 +120,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Window type** | A feature's registered kind of window (`<prefix>.<name>`, clients, defaults, component) in a per-client registry. | Window |
 | **Launcher** | Bottom bar of buttons that open, bring to front or minimise windows. | — |
 | **Work area** | The part of the viewport below the top bar and above the launcher; windows and the attack popup fit into it (decisions #172). | Viewport |
+| **Free area** | The largest part of the work area, right of the tool rail, that no open window covers; the map frames its tokens there (FR-SHELL-34, FR-MAP-44). | Work area |
 | **Alert** | The shell's attention signal for one client: screen flash, short UI sound ([ADR-0030](architecture/adr/0030-ui-notification-sounds.md)) and a Toast; per-browser mute and volume. Not persisted. | Notification |
 | **Layout** | Every window's state, geometry and z-order for one (campaign, owner); stored only in browser `localStorage` (decisions #121). | — |
 

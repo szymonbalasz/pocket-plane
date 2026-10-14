@@ -1,6 +1,6 @@
 # 0024 — Creature definitions DM-only for players; instances carry read-only display copies
 
-- Status: accepted (2026-10-12; decisions-log #120)
+- Status: accepted (2026-10-12; decisions-log #120). Other-player character whitelist refined by [ADR-0036](0036-full-sheet-derivation.md) (#178)
 - Date: 2026-10-12
 - Refines: [ADR-0009](0009-entity-content-model.md) (instance field list)
 - Affects: entities, scenes-map, combat-tracker, character-sheet, post-mvp/compendium; ADR-0009 (refines instance fields); [ADR-0018](0018-global-imported-content.md) (answers its per-field visibility rules)

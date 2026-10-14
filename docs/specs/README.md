@@ -21,6 +21,15 @@ Template: [_template.md](_template.md). Specs are written just in time, per buil
 | 3. Combat | [Combat tracker](combat-tracker.md) | CBT | complete | spec-combat-tracker |
 | 4. Reward + hardening | [Party loot](party-loot.md) | LOOT | complete | spec-party-loot |
 
+## Sprint 1 (post-MVP)
+
+| Spec | Prefix | Status | Owner |
+|---|---|---|---|
+| [Combat extras](combat-extras.md) | CBTX | complete | spec-combat-extras |
+| [Character sheet (full)](character-sheet-full.md) | CHARX | complete | spec-character-sheet-full |
+
+Sprint 1 also revised scenes-map, play-shell, combat-tracker, dice-roll-log and notifications (polish R1–R5, #178).
+
 ## Post-MVP
 
 Stubs only. Not to be claimed during MVP spec phase.
@@ -30,8 +39,6 @@ Stubs only. Not to be claimed during MVP spec phase.
 | [Compendium](post-mvp/compendium.md) | CMP | First candidate after MVP |
 | [World builder](post-mvp/world-builder.md) | WORLD | Incl. location ↔ scenes |
 | [Scene tools](post-mvp/scene-tools.md) | SCN | Fog, hidden tokens, AoE props |
-| [Character sheet (full)](post-mvp/character-sheet-full.md) | CHARX | |
-| [Combat extras](post-mvp/combat-extras.md) | CBTX | Conditions, concentration, durations, hidden combatants… |
 | [Stats and summaries](post-mvp/stats.md) | STATS | Data capture starts in MVP |
 | [Dice extras](post-mvp/dice-extras.md) | DICEX | Inline rolls, macros, 3D dice, hidden rolls |
 | [Gems (homebrew)](post-mvp/gems.md) | GEM | DM-awarded gems; reroll, max damage dice; tier A |

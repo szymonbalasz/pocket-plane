@@ -12,7 +12,7 @@ Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). First 
 
 - **What:** Library of 5e rules content (monsters, spells, items, conditions). SRD import from Open5e, browse/search, clone-to-campaign, homebrew, provenance/licence, re-import without clobbering edits.
 - **Tiered** ([feature tiers](../../feature-tiers.md#5-dm-tools)): Open5e/SRD import (A), homebrew monster editor (A), stat block view on token click (B), rules quick reference (B).
-- **NPC workflow (DM):** create a custom NPC from an **SRD monster as base** or by **duplicating an existing NPC**, then edit stats and add **custom actions** (auto-roll vs selected target(s) in combat — [combat-extras](combat-extras.md)). Many custom NPCs per encounter. Shieldmaiden is the reference.
+- **NPC workflow (DM):** create a custom NPC from an **SRD monster as base** or by **duplicating an existing NPC**, then edit stats and add **custom actions** (auto-roll vs selected target(s) in combat — [combat-extras](../combat-extras.md)). Many custom NPCs per encounter. Shieldmaiden is the reference.
 - **Importers** (each a bespoke adapter feeding the fixed pipeline core, [ADR-0015](../../architecture/adr/0015-source-adapters-fixtures.md)):
 
 | Source | Tier | Notes |

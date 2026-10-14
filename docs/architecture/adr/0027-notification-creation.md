@@ -1,8 +1,8 @@
 # 0027 — Notifications are created in the causing command's transaction
 
-- Status: accepted (2026-10-12; decisions-log #135, #136, #137)
+- Status: accepted (2026-10-12; decisions-log #135, #136, #137). Refined by [ADR-0034](0034-encounter-scoped-notifications.md) and [ADR-0035](0035-combat-rule-hooks.md) (#178): rule hooks close C's crash gap
 - Date: 2026-10-12
-- Affects: [notifications](../../specs/notifications.md), [combat-tracker](../../specs/combat-tracker.md), [party-loot](../../specs/party-loot.md), [post-mvp/combat-extras](../../specs/post-mvp/combat-extras.md)
+- Affects: [notifications](../../specs/notifications.md), [combat-tracker](../../specs/combat-tracker.md), [party-loot](../../specs/party-loot.md), [combat-extras](../../specs/combat-extras.md)
 - Refines: [ADR-0016](0016-domain-events-pending-actions.md) ("MVP use: … damage cards" as a listener; open row "May rules mutate state directly?")
 
 ## Context

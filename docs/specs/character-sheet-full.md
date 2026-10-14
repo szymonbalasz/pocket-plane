@@ -14,7 +14,7 @@ phase: post-mvp-1
 
 - **Player-owned sheets** (sprint 1, track S, #177): a player creates and fills in their own character by hand (no compendium, no class data). The DM approves it, edits any PC or NPC, and can lock a sheet.
 - **Roll from any number** on the sheet: checks, saves, skills, initiative, every attack, every spell (to-hit, damage, save DC).
-- **Derived with overrides** ([ADR-0012](../architecture/adr/0012-character-derived-values.md) option C, [proposed ADR](../architecture/adr/proposed-full-sheet-derivation.md)): modifiers, proficiency, saves, skills, passives and spell numbers are computed; any of them can be overridden.
+- **Derived with overrides** ([ADR-0012](../architecture/adr/0012-character-derived-values.md) option C, [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md)): modifiers, proficiency, saves, skills, passives and spell numbers are computed; any of them can be overridden.
 - **Storage split**: rules numbers stay in entities' `statBlock`. Long text, inventory, spells, counters, draft and lock state go in a new `creature-sheet` record, so a combat HP change never resends the whole sheet.
 - **Other players see a summary only.** Combat-extras shows temp HP, death saves and conditions through a client **sheet sections** registry this spec owns ([§7.1](#71-sheet-sections-seam-combat-extras)).
 
@@ -70,7 +70,7 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | FR-CHARX-02 | New record `creature-sheet` (§8.2), 1:1 with a campaign entity (character or custom monster; never imported): `status`, `locked`, `ownerPlayerId` copy, background, alignment, proficiency notes, spells, features, items, notes, counters. A missing row = defaults (`ready`, unlocked, empty). Created by `char.create` or by the first CHARX write to that creature. | ADR proposed |
 | FR-CHARX-03 | Limits per §8 field tables. Serialized stat block ≤ 12 KB and `creature-sheet` ≤ 48 KB, else `invalid` "Sheet is full". | §12 |
 | FR-CHARX-04 | Multiclass (model supports, UI basic): `classes` 1–4 rows `{name, level, hitDie, subclass?}`. When set, the server writes `level` = Σ levels (≤ 20, else `invalid`) and `className` = names joined "/" (≤ 40) in the same write; combat keeps reading `level`, `className`. Absent = legacy single class, no hit dice block. | #178 (OQ-CHARX-07) |
-| **Derivation** ([proposed ADR](../architecture/adr/proposed-full-sheet-derivation.md)) | | |
+| **Derivation** ([ADR-0036](../architecture/adr/0036-full-sheet-derivation.md)) | | |
 | FR-CHARX-05 | Derived, never stored, pure in `@shared/entities`, both kinds, taking the stat block: ability mod, proficiency bonus, check, save (FR-ENT-24); **skill** = mod + PB × {none 0, proficient 1, expertise 2}; **passive** Perception / Investigation / Insight = 10 + skill bonus; **spell attack** = PB + mod(spellcasting ability); **spell save DC** = 8 + PB + mod; **hit dice** = per die size, Σ class levels. Stored, not derived: AC, HP max, initiative bonus (#154), speed, attack to-hit and damage, slot maxima. | Option C, #178 (OQ-CHARX-01) |
 | FR-CHARX-06 | `overrides[key] = {value, note?}` replaces the derived value everywhere: sheet labels, server rolls, combat's `cbt.rollAbility`. Keys: `proficiency`, `check.<ability>`, `save.<ability>`, `skill.<skill>`, `passive.<perception\|investigation\|insight>`, `spellAttack`, `spellDc`. A `proficiency` override feeds every PB-based value; the others are leaves. Clearing returns to derived. | Homebrew; #178 (OQ-CHARX-01) |
 | FR-CHARX-07 | Helper signatures stay (stat block in, number out). Callers (combat FR-CBT-44, combat-extras) get overrides for free. | ADR-0032 deviation now fixable |
@@ -106,7 +106,7 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | FR-CHARX-33 | Inventory tab shows the character's wallet read-only from party-loot's `wallet` record (missing = all zero), with "Move coin in Party loot". | OQ-LOOT-16 follow-up |
 | FR-CHARX-34 | Sheet sections registry and rendering: [§7.1](#71-sheet-sections-seam-combat-extras). | Seam |
 | **Visibility** | | |
-| FR-CHARX-35 | Other players get a character redacted to **one whitelist** in entities' visibility fn (ENT-owned), defined in the [proposed ADR](../architecture/adr/proposed-full-sheet-derivation.md) ("Refines ADR-0024"): base `id, kind, name, portraitAssetId, ownerPlayerId` + `down` (#154) + `level, className, species` (CHARX) + `deathState` (CBTX). No other field. Tests assert against that shared list. | Entities' visibility line; #178 G6 |
+| FR-CHARX-35 | Other players get a character redacted to **one whitelist** in entities' visibility fn (ENT-owned), defined in the [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md) ("Refines ADR-0024"): base `id, kind, name, portraitAssetId, ownerPlayerId` + `down` (#154) + `level, className, species` (CHARX) + `deathState` (CBTX). No other field. Tests assert against that shared list. | Entities' visibility line; #178 G6 |
 | FR-CHARX-36 | `creature-sheet`: DM full; player full iff `ownerPlayerId = ctx.playerId` (the row's copy); otherwise hidden (other players' sheets, every NPC sheet). | ADR-0021 |
 | FR-CHARX-37 | Every CHARX command lists every record whose visibility changes (owner change: `entity` + `creature-sheet`). | FR-CBT-27 rule |
 | **Robustness** | | |
@@ -216,7 +216,7 @@ interface SheetSection {
 
 ## 9. API & events
 
-**REST**: none new. Sheet edits use WS intents for both roles, characters **and** NPC sheets: one per-field-merge path. That refines ADR-0021 D (prep CRUD over REST) for NPC sheet edits; the refinement is in the [ADR](../architecture/adr/proposed-full-sheet-derivation.md) (accepted #178). Entities' `POST` / `PUT /api/entities` stay for the creature form (FR-CBT-43): a whole replace that carries the new stat-block fields it read. **Coexistence:** both write the same row in commit order. `char.edit` overwrites only the fields it names; a later `PUT` overwrites the whole stat block with what the form loaded (last write wins per field vs whole). `PUT` never touches `creature-sheet`.
+**REST**: none new. Sheet edits use WS intents for both roles, characters **and** NPC sheets: one per-field-merge path. That refines ADR-0021 D (prep CRUD over REST) for NPC sheet edits; the refinement is in the [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md) (accepted #178). Entities' `POST` / `PUT /api/entities` stay for the creature form (FR-CBT-43): a whole replace that carries the new stat-block fields it read. **Coexistence:** both write the same row in commit order. `char.edit` overwrites only the fields it names; a later `PUT` overwrites the whole stat block with what the form loaded (last write wins per field vs whole). `PUT` never touches `creature-sheet`.
 
 **WS intents** (default deny; none optimistic)
 
@@ -326,7 +326,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | On | What we need | Status |
 |---|---|---|
 | ADR-0004, 0009, 0012, 0016, 0021, 0022, 0024, 0025, 0029, 0032; #106, #139, #149, #154, #177 | Ownership, model, derivation, events, sync, seams, visibility, windows, log window | accepted |
-| [proposed ADR full-sheet derivation](../architecture/adr/proposed-full-sheet-derivation.md) | Option C + storage split; refines ADR-0021 D, ADR-0024 | accepted #178 (numbered at merge) |
+| [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md) | Option C + storage split; refines ADR-0021 D, ADR-0024 | accepted #178 (numbered at merge) |
 | [character-sheet](character-sheet.md) | Window, roll routes, `char.roll`, `char.adjustHp`, `characters.adjustHp`, roll control usage | complete, built |
 | [entities](entities.md) | New optional core fields, attacks 0–20, helpers + overrides, summary redaction, internal create / update API, hook + `creatureActions` lines (OQ-CHARX-19) | complete; changes needed |
 | [combat-tracker](combat-tracker.md) | Route passes `ref`; `cbt.attack` gains `attackId?` / `spellId?` via `sheetAttack`; drafts out of whole-party (OQ-CHARX-12/13) | complete; changes needed |
@@ -368,7 +368,7 @@ All decided; no open question remains.
 
 | ID | Question | Decision | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CHARX-01 | ADR-0012 full-sheet derivation | **Decided #178:** C, derived with overrides, fixed key list ([proposed ADR](../architecture/adr/proposed-full-sheet-derivation.md), accepted; A all-stored and D modifier-list rejected) | — | entities, combat-tracker, combat-extras, levelling |
+| OQ-CHARX-01 | ADR-0012 full-sheet derivation | **Decided #178:** C, derived with overrides, fixed key list ([ADR-0036](../architecture/adr/0036-full-sheet-derivation.md), accepted; A all-stored and D modifier-list rejected) | — | entities, combat-tracker, combat-extras, levelling |
 | OQ-CHARX-02 | Where sheet data lives | **Decided #178** (same ADR): rules in `statBlock`, the rest in the new `creature-sheet` record | — | entities, live-sync |
 | OQ-CHARX-03 | How a player gets a character | **Decided #178 (G5):** the player makes a draft, the DM approves; the DM can also create one | — | combat-tracker |
 | OQ-CHARX-05 | What other players see | **Decided #178 (G6, with OQ-CBTX-09):** one whitelist: name, portrait, owner, Down, level, class, species, `deathState` | — | entities, combat-extras |

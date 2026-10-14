@@ -25,7 +25,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Token labels (name, "Goblin 2") | S | [scenes-map](specs/scenes-map.md) | |
 | DM controls any token; reassigns ownership | S | [scenes-map](specs/scenes-map.md) | |
 | HP bar/ring on token | A | [scene-tools](specs/post-mvp/scene-tools.md) | |
-| Condition icons on token | A | [scene-tools](specs/post-mvp/scene-tools.md) | Needs conditions ([combat-extras](specs/post-mvp/combat-extras.md)) |
+| Condition icons on token | A | [scene-tools](specs/post-mvp/scene-tools.md) | Needs conditions ([combat-extras](specs/combat-extras.md)) |
 | Layers (map / objects / tokens / DM-only) | A | [scene-tools](specs/post-mvp/scene-tools.md) | DM-only layer ≈ hidden tokens |
 | Doors and walls (block movement) | A | [scene-tools](specs/post-mvp/scene-tools.md) | Movement only; no vision ([ADR-0007](architecture/adr/0007-product-scope.md)) |
 | Highlight current-turn token | B | [combat-tracker](specs/combat-tracker.md) | Initiative strip / portraits show whose turn in MVP; token highlight only if trivial |
@@ -38,18 +38,18 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | **Encounter builder with CR difficulty** | S | [combat-tracker](specs/combat-tracker.md) | Needed to build the first MVP encounter |
 | Roll initiative for all monsters in one click | S | [combat-tracker](specs/combat-tracker.md) | |
 | Players see monster health as band (healthy/bloodied/down) | S | [combat-tracker](specs/combat-tracker.md) | |
-| Conditions with expiry | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
-| Concentration + save reminder on damage | A | [combat-extras](specs/post-mvp/combat-extras.md) | Notification with action |
-| Round-based effect durations | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
-| Temp HP | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
-| Death saves | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
-| Add combatants mid-fight | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
-| **Hidden combatants** (stealthed) | A | [combat-extras](specs/post-mvp/combat-extras.md) | Added by DM |
-| Drag to reorder initiative | B | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Conditions with expiry | A | [combat-extras](specs/combat-extras.md) | |
+| Concentration + save reminder on damage | A | [combat-extras](specs/combat-extras.md) | Notification with action |
+| Round-based effect durations | A | [combat-extras](specs/combat-extras.md) | |
+| Temp HP | A | [combat-extras](specs/combat-extras.md) | |
+| Death saves | A | [combat-extras](specs/combat-extras.md) | |
+| Add combatants mid-fight | A | [combat-extras](specs/combat-extras.md) | |
+| **Hidden combatants** (stealthed) | A | [combat-extras](specs/combat-extras.md) | Added by DM |
+| Drag to reorder initiative | B | [combat-extras](specs/combat-extras.md) | |
 | Auto-roll attacks + hit/miss hint vs AC | S | [combat-tracker](specs/combat-tracker.md) | MVP per #74 (DM attack popup) |
 | End-of-combat summary | B | [stats](specs/post-mvp/stats.md) | Plus campaign-wide stats; discuss after MVP |
-| Legendary / lair actions | C | [combat-extras](specs/post-mvp/combat-extras.md) | |
-| Reaction-used tracker | C | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Legendary / lair actions | C | [combat-extras](specs/combat-extras.md) | |
+| Reaction-used tracker | C | [combat-extras](specs/combat-extras.md) | |
 
 **Attack flow (MVP, part of damage cards):** click attack; Shift = advantage, Ctrl = disadvantage; describe the action; DM applies via a card with normal / half / none / double and can override any value.
 
@@ -60,18 +60,18 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Feature | Tier | Spec | Notes |
 |---|---|---|---|
 | Advantage/disadvantage on any roll (toggle or Shift/Ctrl) | S | [dice-roll-log](specs/dice-roll-log.md) | Replaces inspiration toggle |
-| Roll from any number on the sheet | A | [character-sheet-full](specs/post-mvp/character-sheet-full.md) | |
+| Roll from any number on the sheet | A | [character-sheet-full](specs/character-sheet-full.md) | |
 | Inline rolls in text (`[[1d20+5]]`) | A | [dice-extras](specs/post-mvp/dice-extras.md) | |
 | Saved macros / custom roll buttons | A | [dice-extras](specs/post-mvp/dice-extras.md) | |
 | 3D dice animation | A | [dice-extras](specs/post-mvp/dice-extras.md) | |
 | Party portrait strip (BG2-style) | A | [theme-system](specs/post-mvp/theme-system.md) | Also a [play-shell](specs/play-shell.md) element |
 | DM requests a roll from players | B | [dice-extras](specs/post-mvp/dice-extras.md) | Notification with roll action |
 | Hidden DM rolls | S | [dice-roll-log](specs/dice-roll-log.md) | Via per-category public log settings (section 6) |
-| Spell slots tracker | B | [character-sheet-full](specs/post-mvp/character-sheet-full.md) | |
+| Spell slots tracker | B | [character-sheet-full](specs/character-sheet-full.md) | |
 | Party HP/AC summary for players | B | [play-shell](specs/play-shell.md) | Pairs with portrait strip |
 | Player whispers roll to DM | C | [dice-extras](specs/post-mvp/dice-extras.md) | |
-| Inventory weight / encumbrance | C | [character-sheet-full](specs/post-mvp/character-sheet-full.md) | |
-| Short/long rest buttons | C | [character-sheet-full](specs/post-mvp/character-sheet-full.md) | |
+| Inventory weight / encumbrance | C | [character-sheet-full](specs/character-sheet-full.md) | |
+| Short/long rest buttons | C | [character-sheet-full](specs/character-sheet-full.md) | |
 | Inspiration toggle | D | — | Use advantage instead |
 | D&D Beyond character import | F | — | |
 
@@ -141,13 +141,13 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Start / end encounter | S | [combat-tracker](specs/combat-tracker.md) | Unit of combat history |
 | Fog of war with shape + polygon tools | A | [scene-tools](specs/post-mvp/scene-tools.md) | Not MVP; **first thing after** |
 | Ctrl-D duplicate token (same definition), rename | S | [scenes-map](specs/scenes-map.md) | |
-| Per-instance modifiers (temp HP, buffs/debuffs) | A | [combat-extras](specs/post-mvp/combat-extras.md) | No inline stat editing on instances |
+| Per-instance modifiers (temp HP, buffs/debuffs) | A | [combat-extras](specs/combat-extras.md) | No inline stat editing on instances |
 | **Custom creature form** (Shieldmaiden-style), prefilled from a base | S | [combat-tracker](specs/combat-tracker.md) | Full editor (SRD base, custom actions) tier A |
 | Search in creature picker | A | [combat-tracker](specs/combat-tracker.md) | MVP only if near-free |
 | **One interface for adding any creature to an encounter** (SRD, custom, duplicated, fixture) | S | [combat-tracker](specs/combat-tracker.md) | Source-agnostic; see [ADR-0009](architecture/adr/0009-entity-content-model.md) |
 | Custom NPC from SRD monster or existing NPC, then edit | A | [compendium](specs/post-mvp/compendium.md) | Shieldmaiden as reference |
-| Custom actions auto-roll vs selected target(s) | A | [combat-extras](specs/post-mvp/combat-extras.md) | |
-| Multi-target select | S (#148, see §8) | [combat-extras](specs/post-mvp/combat-extras.md) | |
+| Custom actions auto-roll vs selected target(s) | A | [combat-extras](specs/combat-extras.md) | |
+| Multi-target select | S (#148, see §8) | [combat-extras](specs/combat-extras.md) | |
 | Open5e import | A | [compendium](specs/post-mvp/compendium.md) | Important |
 | **AI paste** (paste text found online → prefilled creature/item form) | ? | [compendium](specs/post-mvp/compendium.md) | Form-filling time-saver, not an importer. > TODO (spec phase): tier |
 | DM homebrew file import | A | [compendium](specs/post-mvp/compendium.md) | Formats TBD |

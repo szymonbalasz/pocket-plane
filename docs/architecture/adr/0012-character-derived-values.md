@@ -1,9 +1,9 @@
 # 0012 — Character sheet: derived vs stored values, homebrew overrides
 
-- Status: accepted for MVP basics (2026-10-11): **stored**. Full-sheet derivation still open.
+- Status: accepted for MVP basics (2026-10-11): **stored**. Full sheet decided by [ADR-0036](0036-full-sheet-derivation.md) (#178): C, derived with overrides.
 - Date: 2026-10-10
 - Amended by: [ADR-0032](0032-ability-derivation.md) (ability modifiers, proficiency bonus and check / save bonuses derived, #154)
-- Affects: character-sheet, combat-tracker, dice-roll-log, post-mvp/character-sheet-full, post-mvp/levelling
+- Affects: character-sheet, combat-tracker, dice-roll-log, character-sheet-full, post-mvp/levelling
 - MVP: blocking only for the basics (AC, HP, initiative, one weapon attack) per [ADR-0014](0014-mvp-scope.md). Choice must not block the full sheet later.
 
 ## Context
@@ -25,7 +25,7 @@
 ## Decision
 
 - **MVP basics: stored (option A, decided 2026-10-11).** AC, max/current HP, initiative bonus, and one weapon attack (attack bonus, damage dice + bonus) are plain stored numbers on the character, set by fixtures.
-- **Full sheet: undecided.** Choose among A–D when [character-sheet-full](../../specs/post-mvp/character-sheet-full.md) is specced. If C or D is chosen, the MVP stored values become overrides/base values; MVP must not assume they can never be derived.
+- **Full sheet: undecided.** Choose among A–D when [character-sheet-full](../../specs/character-sheet-full.md) is specced. If C or D is chosen, the MVP stored values become overrides/base values; MVP must not assume they can never be derived.
 
 ## Questions to answer
 

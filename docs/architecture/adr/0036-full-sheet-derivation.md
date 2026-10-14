@@ -1,6 +1,6 @@
-# proposed — Full character sheet: derived with overrides; rules data vs sheet record
+# 0036 — Full character sheet: derived with overrides; rules data vs sheet record
 
-- Status: accepted (DM decision #178, 2026-10-14); the integrator numbers it at merge
+- Status: accepted (DM decision #178, 2026-10-14)
 - Date: 2026-10-14
 - Decides: [ADR-0012](0012-character-derived-values.md) "Full sheet: undecided"; extends [ADR-0032](0032-ability-derivation.md)
 - Refines: [ADR-0021](0021-sync-protocol-conventions.md) D (transport) and [ADR-0024](0024-definition-visibility.md) (redacted character fields); see the last two Decision bullets

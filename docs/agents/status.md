@@ -2,15 +2,18 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** MVP done (#176). **Sprint 1 (post-MVP) spec phase running** (#177): [sprint-1](sprint-1.md): tracks P polish R1–R5, D combat depth (CBTX), S player-owned sheets (CHARX), all in parallel. Specs written, D/S seam settled, reviewed (review-sprint1, fixes applied). **Waiting on the DM spec gate** (`%TEMP%\pocket-plane\gate-sprint1.md`).
+**Phase:** Sprint 1 (post-MVP, #177). **Spec gate passed (#178, all picks)**; specs merged, ADRs 0034–0036 accepted. **Build phase** per #179 order.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| P: polish R1–R5 spec revisions | `spec/polish-r` (ws w22) | spec-polish-r | In review, fixes applied | DM gate |
-| D: combat depth, `combat-extras` (CBTX) | `spec/combat-extras` (ws w23) | spec-combat-extras | In review, fixes applied | DM gate |
-| S: player-owned sheets, `character-sheet-full` (CHARX) | `spec/character-sheet-full` (ws w24) | spec-character-sheet-full | In review, fixes applied | DM gate |
+| P R1 map fit | `fix/polish-map-fit` | build-polish-map-fit | Starting | Walkthrough MAP 12 |
+| P R3 game log | `fix/polish-game-log` | build-polish-game-log | Starting | Walkthrough DICE 12 |
+| P R2/R4/R5 combat | `fix/polish-combat` | — | Waits for map-fit (noteAppearance) | Before any D build |
+| S core (schema, entities, events) | `fix/charx-core` | build-charx-core | Starting | Then `fix/cbtx-core` |
+| D core | `fix/cbtx-core` | — | Waits for charx-core + polish-combat | — |
+| S build / D build / S combat routes | — | — | Queued (#179 order) | — |
 
 Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-14-evening)). Briefs in `briefs\`. Evidence: `verify-*\` (session-sim-3 evidence only in the main checkout: `.verify/20261014-131140-session-sim-3/`; the `%TEMP%` copy was cleared).
 
@@ -20,7 +23,7 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 
 ## Pending DM decisions
 
-- Sprint-1 spec gate: G1–G7 + scope + bulk picks, in `%TEMP%\pocket-plane\gate-sprint1.md` (input staged in `.verify/review-sprint1/`).
+- None.
 
 ## Resolved locally (report at gate)
 

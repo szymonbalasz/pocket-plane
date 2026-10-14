@@ -1,8 +1,8 @@
 # 0009 — Entity content model
 
-- Status: **accepted** (2026-10-11) — definition / instance model, storage option A, derive = fork, PCs follow the same split. Minor rows still open below.
+- Status: **accepted** (2026-10-11) — definition / instance model, storage option A, derive = fork, PCs follow the same split. Minor rows still open below. Refined by [ADR-0035](0035-combat-rule-hooks.md) (#178): PC play state on the character, effect rows.
 - Date: 2026-10-10
-- Affects: entities, character-sheet, combat-tracker, scenes-map, fixtures-adapters, post-mvp/compendium, post-mvp/combat-extras, post-mvp/world-builder, post-mvp/agent-api, post-mvp/obsidian-importer
+- Affects: entities, character-sheet, combat-tracker, scenes-map, fixtures-adapters, post-mvp/compendium, combat-extras, post-mvp/world-builder, post-mvp/agent-api, post-mvp/obsidian-importer
 - MVP: **blocking** — characters and monsters are entities ([ADR-0014](0014-mvp-scope.md)). World-builder kinds can follow later but the model must accommodate them.
 
 ## Context
@@ -14,7 +14,7 @@
 - Must fit [ADR-0006](0006-persistence.md): relational, JSON only for document-shaped leaves.
 - Definitions must tolerate **partial data**: an imported item may be only name + description until its mechanics are filled in ([ADR-0010](0010-compendium-design.md) DM workflow).
 - **One shared interface for creatures**: an SRD goblin and a custom Elite Goblin Warrior are treated the same by the encounter builder. Provenance is metadata.
-- Monster/NPC definitions need **custom actions** that auto-roll against selected target(s) ([combat-extras](../../specs/post-mvp/combat-extras.md)).
+- Monster/NPC definitions need **custom actions** that auto-roll against selected target(s) ([combat-extras](../../specs/combat-extras.md)).
 
 ## Decision — creature model (accepted)
 

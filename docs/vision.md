@@ -12,7 +12,7 @@
 | Today | Replaced by |
 |---|---|
 | Owlbear Rodeo (map / whiteboard) | [Scenes & map](specs/scenes-map.md), later [scene tools](specs/post-mvp/scene-tools.md) |
-| Shieldmaiden (combat tracker) | [Combat tracker](specs/combat-tracker.md), later [combat extras](specs/post-mvp/combat-extras.md) |
+| Shieldmaiden (combat tracker) | [Combat tracker](specs/combat-tracker.md), later [combat extras](specs/combat-extras.md) |
 | Miro (party board: items, handouts, shared info) | [Party loot](specs/party-loot.md) (MVP), then [party board](specs/post-mvp/party-board.md) |
 | Obsidian vault (worldbuilding notes) | [World builder](specs/post-mvp/world-builder.md), gradually. **Not ported.** Optional [importer](specs/post-mvp/obsidian-importer.md) later. |
 

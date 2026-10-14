@@ -30,7 +30,7 @@ Not in this sprint (log only): Undo tooltip copy, DM fiat damage public in logs,
 
 ## Track D: combat depth → spec `combat-extras` (prefix CBTX)
 
-Expand [post-mvp/combat-extras](../specs/post-mvp/combat-extras.md) from the template into a full spec (move it to `docs/specs/combat-extras.md`, front matter `phase: post-mvp-1`). Proposed scope (DM confirms at the gate):
+Expand [combat-extras](../specs/combat-extras.md) from the template into a full spec (move it to `docs/specs/combat-extras.md`, front matter `phase: post-mvp-1`). Proposed scope (DM confirms at the gate):
 
 - Conditions (5e list) with expiry in rounds; condition icons on tokens (token overlays registry, FR-MAP-34/43).
 - HP ring / bar on tokens (players: health band only, #138).
@@ -43,7 +43,7 @@ Expand [post-mvp/combat-extras](../specs/post-mvp/combat-extras.md) from the tem
 
 ## Track S: player-owned sheets → spec `character-sheet-full` (prefix CHARX)
 
-Expand [post-mvp/character-sheet-full](../specs/post-mvp/character-sheet-full.md) into a full spec (`docs/specs/character-sheet-full.md`, `phase: post-mvp-1`). Proposed scope:
+Expand [character-sheet-full](../specs/character-sheet-full.md) into a full spec (`docs/specs/character-sheet-full.md`, `phase: post-mvp-1`). Proposed scope:
 
 - Players **create and edit their own character** (manual entry; no compendium, no class data): abilities, proficiencies, skills, saves, AC, HP max, speed, hit dice, attacks, spells as hand-entered rows (slots tracked), features, inventory, notes.
 - DM edits any PC and NPC (full editing, #154 design-for-later becomes real); DM can lock a sheet.

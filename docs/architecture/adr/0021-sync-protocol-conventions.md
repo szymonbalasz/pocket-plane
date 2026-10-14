@@ -1,6 +1,6 @@
 # 0021 — Sync protocol conventions
 
-- Status: accepted (2026-10-12; A–D at the Phase 1 gate, [decisions-log](../../decisions-log.md) #111; E spec default; F decided #115)
+- Status: accepted (2026-10-12; A–D at the Phase 1 gate, [decisions-log](../../decisions-log.md) #111; E spec default; F decided #115). D refined by [ADR-0036](0036-full-sheet-derivation.md) (#178): sheet edits over WS
 - Date: 2026-10-12
 - Affects: all specs with live state; [live-sync](../../specs/live-sync.md), [protocol](../../protocol/README.md)
 - Extends: [ADR-0005](0005-server-authoritative-sync.md) (resolves its filter-granularity and optimistic-UI to-dos), [ADR-0016](0016-domain-events-pending-actions.md)

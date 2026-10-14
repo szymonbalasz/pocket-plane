@@ -1,9 +1,9 @@
 # 0016 — Domain events and pending actions
 
-- Status: accepted (core); details open below
+- Status: accepted (core); details open below. Refined by [ADR-0034](0034-encounter-scoped-notifications.md) and [ADR-0035](0035-combat-rule-hooks.md) (#178)
 - Decided 2026-10-11: damage cards, reminders and prompts are **one concept** (notification, optional action).
 - Date: 2026-10-11
-- Affects: live-sync, combat-tracker, dice-roll-log, party-loot, post-mvp/combat-extras, post-mvp/campaign-manager, post-mvp/agent-api
+- Affects: live-sync, combat-tracker, dice-roll-log, party-loot, combat-extras, post-mvp/campaign-manager, post-mvp/agent-api
 
 ## Context
 
@@ -57,7 +57,7 @@ graph LR
 
 ## MVP use
 - Listeners: broadcaster, event log. Damage cards (first notification kind with an action) are created by the attack command via `notify` ([ADR-0027](0027-notification-creation.md)).
-- Concentration, durations, conditions plug in post-MVP ([combat-extras](../../specs/post-mvp/combat-extras.md)) without rework.
+- Concentration, durations, conditions plug in post-MVP ([combat-extras](../../specs/combat-extras.md)) without rework.
 
 ## Open
 

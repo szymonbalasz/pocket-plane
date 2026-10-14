@@ -28,8 +28,8 @@ wave: 2
 
 ## 4. Non-goals
 
-- World-builder kinds, cross-references (→ [world-builder](post-mvp/world-builder.md)); compendium browse, clone, adapters, re-import (→ [compendium](post-mvp/compendium.md)); character builder (→ [levelling](post-mvp/levelling.md)); full sheet (→ [character-sheet-full](post-mvp/character-sheet-full.md)).
-- Creature form UI (→ combat-tracker, tier S). Full monster editor (tier A). Stat block view on token click (tier B). Deleting definitions (OQ-ENT-07). Instance state and modifiers (→ scenes-map, combat-tracker, [combat-extras](post-mvp/combat-extras.md)).
+- World-builder kinds, cross-references (→ [world-builder](post-mvp/world-builder.md)); compendium browse, clone, adapters, re-import (→ [compendium](post-mvp/compendium.md)); character builder (→ [levelling](post-mvp/levelling.md)); full sheet (→ [character-sheet-full](character-sheet-full.md)).
+- Creature form UI (→ combat-tracker, tier S). Full monster editor (tier A). Stat block view on token click (tier B). Deleting definitions (OQ-ENT-07). Instance state and modifiers (→ scenes-map, combat-tracker, [combat-extras](combat-extras.md)).
 
 ## 5. User stories
 
@@ -224,4 +224,4 @@ Other writers of a character's `hpCurrent` (character-sheet's `CharacterHpAdjust
 
 ## 16. Out of scope
 
-- See §4. Instance records → [scenes-map](scenes-map.md), [combat-tracker](combat-tracker.md). Modifiers → [combat-extras](post-mvp/combat-extras.md). Re-import ([OQ-FIX-18](fixtures-adapters.md#15-open-questions)) → [compendium](post-mvp/compendium.md).
+- See §4. Instance records → [scenes-map](scenes-map.md), [combat-tracker](combat-tracker.md). Modifiers → [combat-extras](combat-extras.md). Re-import ([OQ-FIX-18](fixtures-adapters.md#15-open-questions)) → [compendium](post-mvp/compendium.md).

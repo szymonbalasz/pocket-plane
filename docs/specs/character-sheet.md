@@ -15,7 +15,7 @@ wave: 2
 - MVP sheet: just enough for a fight ([ADR-0014](../architecture/adr/0014-mvp-scope.md), #32). A **view and controls** over the `character` entity that [entities](entities.md) owns. No new table or record type; the fields it reads are entities' (incl. optional ability scores, FR-ENT-23).
 - Player sees their own character; click-to-roll initiative, attack (to-hit + damage, one click), and the **6 ability checks and 6 saving throws** (#149). Owner and DM adjust current HP.
 - In a running encounter the sheet's buttons send combat intents (#135); outside combat it rolls via `char.roll` and [dice-roll-log](dice-roll-log.md)'s helpers.
-- Stored values ([ADR-0012](../architecture/adr/0012-character-derived-values.md), #106); since #149 ability modifiers, proficiency bonus and save bonuses are derived by fixed 5e formulas ([ADR-0032](../architecture/adr/0032-ability-derivation.md)). Characters come from fixtures (#100). Full 5e sheet → [character-sheet-full](post-mvp/character-sheet-full.md).
+- Stored values ([ADR-0012](../architecture/adr/0012-character-derived-values.md), #106); since #149 ability modifiers, proficiency bonus and save bonuses are derived by fixed 5e formulas ([ADR-0032](../architecture/adr/0032-ability-derivation.md)). Characters come from fixtures (#100). Full 5e sheet → [character-sheet-full](character-sheet-full.md).
 - **Playtest pass** (#171; FR-CHAR-24, 25): a roll route may **hide** a button: from round 1 combat hides Initiative once the PC has initiative, so nobody re-rolls (P4, amended #172); roll hints are shared Tooltips that stay shut while the roll popover is open (P1).
 
 ## 2. Scope
@@ -36,8 +36,8 @@ wave: 2
 
 ## 4. Non-goals
 
-- Spells, skills (tier A), features, inventory, currency, proficiencies other than saves, hit dice, notes (#139 P18; saves and ability scores are in since #149); roll from any number, incl. a standalone damage roll (tier A) → [character-sheet-full](post-mvp/character-sheet-full.md).
-- Temp HP, death saves, conditions → [combat-extras](post-mvp/combat-extras.md). Crit rule: combat only ([combat-tracker](combat-tracker.md) FR-CBT-16).
+- Spells, skills (tier A), features, inventory, currency, proficiencies other than saves, hit dice, notes (#139 P18; saves and ability scores are in since #149); roll from any number, incl. a standalone damage roll (tier A) → [character-sheet-full](character-sheet-full.md).
+- Temp HP, death saves, conditions → [combat-extras](combat-extras.md). Crit rule: combat only ([combat-tracker](combat-tracker.md) FR-CBT-16).
 - Character creation, levelling, editing basics in the UI (#139 P20) → [levelling](post-mvp/levelling.md). Speed, scores and saves come from fixtures / `PUT /api/entities` in MVP; full PC / NPC editing and player-filled sheets are design-for-later (#154).
 - Damage cards, targets, hit/miss, initiative order → [combat-tracker](combat-tracker.md). Notation, game log → [dice-roll-log](dice-roll-log.md).
 - Other PCs' HP for players (#139 P7); [gems](post-mvp/gems.md) (#140, tier A).
