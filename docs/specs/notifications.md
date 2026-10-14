@@ -33,7 +33,7 @@ wave: 2
 ## 4. Non-goals
 
 - Wall-clock timers, scheduling, expiry ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). Chat, browser/OS push, sounds.
-- Notifications from post-commit rule listeners (concentration, durations: [combat-extras](post-mvp/combat-extras.md); ADR-0027 C).
+- Notifications from post-commit rule listeners (concentration, durations: [combat-extras](combat-extras.md); ADR-0027 C).
 - Read state synced across browsers. Loading history older than the snapshot window. Editing or deleting notifications. Pushing windows open on other clients ([OQ-SHELL-02](play-shell.md#15-open-questions)).
 
 ## 5. User stories
@@ -71,7 +71,7 @@ wave: 2
 | FR-NOTE-21 | `text`: plain text, trimmed, control characters removed, 1–280 chars, rendered as text (never HTML). Composed by the kind owner. | |
 | FR-NOTE-22 | Test mode only ([FR-SYNC-27](live-sync.md#6-functional-requirements)): kind `test` (`genericResolve`), intent `note.testSend`, a send form in `note.history`. DM: any audience and action. Player: `{text, actionLabel?}` only (other fields → `invalid`); audience = self, owner = DM (behaves like a damage card). Absent otherwise. | |
 | **Polish pass** (sprint 1, R5) | | |
-| FR-NOTE-23 | **Encounter-scoped kinds** (*pending DM gate, [OQ-CBT-45](combat-tracker.md#15-open-questions)*): a kind may declare `onEncounterEnd: "dismiss"` (absent = its rows stay pending, today's rule); its payload schema must then carry `encounterId` (checked when the registry loads; a test covers every kind). Server helper `dismissForEncounter(env, encounterId) → RecordChange[]`, called by the command that ends the encounter, in its transaction, after its own event: every `pending` notification of `env.actor.campaignId` whose kind declares it and whose `payload.encounterId` = `encounterId` → `dismissed` (`closedAt` from the clock, `closedByRole` / `closedByPlayerId` from `env.actor`), one `NotificationDismissed` each, in row `seq` order. None → no change, no event. MVP user: `damage-card` ([FR-CBT-59](combat-tracker.md#6-functional-requirements)); later kinds (combat-extras) choose per kind. | R5; [proposed ADR](../architecture/adr/proposed-encounter-scoped-notifications.md) |
+| FR-NOTE-23 | **Encounter-scoped kinds** (*pending DM gate, [OQ-CBT-45](combat-tracker.md#15-open-questions)*): a kind may declare an **end rule** `EncounterEndRule = {onEncounterEnd: "dismiss", encounterIdOf(payload) → string}` (type in `@shared/notifications`; absent = its rows stay pending, today's rule). The rule is a **shared constant** exported by the kind owner from `@shared/<feature>` and referenced by both the server kind definition (FR-NOTE-03) and the kind's client view entries (FR-NOTE-19), so clients can tell which pending rows End will close (combat's confirm count, FR-CBT-59). Load check + test: every kind with `onEncounterEnd` has `encounterIdOf`, and its server definition and client views reference the same rule. Server helper `dismissForEncounter(env, encounterId) → RecordChange[]`, called by the command that ends the encounter, in its transaction, after its own event: every `pending` notification of `env.actor.campaignId` whose kind has the rule and whose `encounterIdOf(payload)` = `encounterId` → `dismissed` (`closedAt` from the clock, `closedByRole` / `closedByPlayerId` from `env.actor`), one `NotificationDismissed` each, in row `seq` order. None → no change, no event. MVP user: `damage-card` ([FR-CBT-59](combat-tracker.md#6-functional-requirements)); later kinds (combat-extras) choose per kind. | R5; [proposed ADR](../architecture/adr/proposed-encounter-scoped-notifications.md) |
 | FR-NOTE-24 | **Handled actions aren't unread** (amends FR-NOTE-18; agent pick, holds for every OQ-CBT-45 option): a notification with an action counts as unread only while `pending`; info rows as before. A card applied, dismissed or closed at End leaves the action owner's bell; reopened (undo) → counts again if its `seq` > last seen. | R5 |
 
 ## 7. UI/UX notes
@@ -99,7 +99,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 | | resolution | **JSON leaf** ≤ 256 B \| null | Per-kind zod; visible to the audience |
 | | closedAt, closedByRole, closedByPlayerId | timestamp, `dm` \| `player` \| null, ID \| null | From the command's clock and `env.actor` |
 | | createdAt, updatedAt | timestamp | `env.ctx.clock` |
-| Kind / View *(code)* | server: kind, ownerSpec, payload, resolution?, genericResolve, *(R5)* onEncounterEnd?; client: kind, icon, render?, onAction? | — | Registries, not stored |
+| Kind / View *(code)* | server: kind, ownerSpec, payload, resolution?, genericResolve, *(R5)* endRule?; client: kind, icon, render?, onAction?, *(R5)* endRule? (same shared constant) | — | Registries, not stored |
 | Seen marker *(browser)* | lastSeenSeq | int | Per (campaign, owner); never sent |
 
 - **Relations:** campaign 1–n notification; player 0..1 as audience or action owner. Payload IDs are checked by the kind owner when the action runs.
@@ -174,9 +174,9 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | Visibility fn per audience × role; state machine; kind registry (unknown kind, payload > 1 KB, resolution > 256 B, bad text). Client: toast trigger (event vs snapshot, audience, owner), 6 s timer paused on hover / hidden tab, 3-toast cap, summary toast on load/reconnect only (not on resync while `live`), button rules, unread + baseline + storage failure. **Polish (R5):** `FR-NOTE-24 unread` (pending card unread → resolved / dismissed not → reopened again; info row unchanged); `FR-NOTE-23 registry` (a kind with `onEncounterEnd: "dismiss"` and no `encounterId` in its payload schema throws at load) | In-code |
+| Unit | Visibility fn per audience × role; state machine; kind registry (unknown kind, payload > 1 KB, resolution > 256 B, bad text). Client: toast trigger (event vs snapshot, audience, owner), 6 s timer paused on hover / hidden tab, 3-toast cap, summary toast on load/reconnect only (not on resync while `live`), button rules, unread + baseline + storage failure. **Polish (R5):** `FR-NOTE-24 unread` (pending card unread → resolved / dismissed not → reopened again; info row unchanged); `FR-NOTE-23 registry` (an end rule without `encounterIdOf` throws at load; for every kind with an end rule the server definition and both client views hold the same constant; `encounterIdOf` of the damage-card payload = its `encounterId`) | In-code |
 | Integration | DM sees 7; `player-1` sees `info-all`, `info-p1`, `pending-p1`, `resolved-all`; `player-2` sees `info-all`, `resolved-all`; `SECRET-NOTE` never in a player frame. Test command: `notify` then throw → no row, event or log. Test command changing a probe + resolve, run twice → second `conflict`, probe changed once. `note.resolve` by player-2 on `pending-p1` → `not_found`; by player on a non-generic kind → `forbidden`; `note.dismiss` by player → `forbidden`; player `testSend` with `audience` → `invalid`. Reopen after owner event (order). Window: 105 closed + 3 pending → DM 103; floor identical for all viewers; players get the visible subset. Convergence per ADR-0029 helper. Restart on same DB → identical snapshots; resolve after restart works | `notifications` |
-| Integration (polish) | `FR-NOTE-23 dismissForEncounter`, test-registered kinds `t-enc` (`onEncounterEnd: "dismiss"`, payload `{encounterId}`) and `t-keep`: pending `t-enc` for E1 (×2) and E2, resolved `t-enc` for E1, pending `t-keep` for E1 → helper(E1) dismisses the two pending E1 rows only, `NotificationDismissed` × 2 in `seq` order after the caller's event; caller throws → nothing; `player-1` audience row upsert reaches `player-1` only. The real end-to-end is combat's `FR-CBT-59` test | `notifications` |
+| Integration (polish) | `FR-NOTE-23 dismissForEncounter`, test-registered kinds `t-enc` (end rule `{onEncounterEnd: "dismiss", encounterIdOf: p => p.encounterId}`) and `t-keep`: pending `t-enc` for E1 (×2) and E2, resolved `t-enc` for E1, pending `t-keep` for E1 → helper(E1) dismisses the two pending E1 rows only, `NotificationDismissed` × 2 in `seq` order after the caller's event; caller throws → nothing; `player-1` audience row upsert reaches `player-1` only. The real end-to-end is combat's `FR-CBT-59` test | `notifications` |
 | E2E (thin) | DM `note.testSend` pending to player-1 → player toast → Done → DM row "Resolved by Player 1" | `notifications` |
 
 **Browser walkthrough** — `PP_TEST_MODE=1`; `bun run build`; `fixtures:reset-load notifications --profile verify`; `start --profile verify` in the test agent's pane; evidence per [AGENTS §9.6](../../AGENTS.md#96-browser-verification-test-agents). Contexts **A** DM, **B** `player-1`, **C** `player-2`, **D** DM second tab. Changes show ≤ 1 s.
@@ -218,9 +218,9 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 - Docs (integrator): protocol rows, data-model row, ADR-0016 "MVP use" line (I30).
 
 **Shared changes — polish pass** (sprint 1, R5; after the DM gate):
-- Notifications-owned server files: `kind.ts` (kind type gains optional `onEncounterEnd` + the load check), `helpers.ts` (new `dismissForEncounter` beside `notify` / `resolveNotification`). Combat sets `onEncounterEnd: "dismiss"` in its own `card-kind.ts` and calls the helper from `cbt.end`; `kinds.ts` untouched (same `fix/*`; must merge **before the combat-extras build**).
+- Notifications-owned files: `@shared/notifications` gains type `EncounterEndRule` (beside `schemas.ts`); `kind.ts` (kind type gains optional `endRule` + the load check), `helpers.ts` (new `dismissForEncounter` beside `notify` / `resolveNotification`); client view type (`views.ts`) gains optional `endRule`. Combat exports `DAMAGE_CARD_END_RULE` from `@shared/combat-tracker`, references it in its own `card-kind.ts` and `card-view.ts`, and calls the helper from `cbt.end`; the append-only `kinds.ts` / `notification-views.ts` untouched (same `fix/*`; must merge **before the combat-extras build**).
 - Client (own files): `logic.ts` `unreadCount` / `addressedForUnread` (FR-NOTE-24).
-- **None:** DB columns, events, record types, visibility, intents. Docs at consolidation: protocol §23 (kind table: `onEncounterEnd` column), notifications row in §26 if needed. ADR: [proposed-encounter-scoped-notifications](../architecture/adr/proposed-encounter-scoped-notifications.md) (amends ADR-0016 / ADR-0027 consequences; number at merge).
+- **None:** DB columns, events, record types, visibility, intents. Docs at consolidation: protocol §23 (kind table: end-rule column), notifications row in §26 if needed. ADR: [proposed-encounter-scoped-notifications](../architecture/adr/proposed-encounter-scoped-notifications.md) (amends ADR-0016 / ADR-0027 consequences; number at merge).
 
 ## 15. Open questions
 
@@ -237,7 +237,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 
 ## 16. Out of scope
 
-- Concentration, duration and turn reminders; rule listeners → [combat-extras](post-mvp/combat-extras.md), ADR-0027 C.
+- Concentration, duration and turn reminders; rule listeners → [combat-extras](combat-extras.md), ADR-0027 C.
 - Roll requests → [dice-extras](post-mvp/dice-extras.md) (future kind, player owner). Kill-feed toasts → [stats](post-mvp/stats.md). `loot-received` → [party-loot](party-loot.md) (#146).
 - [Gems](post-mvp/gems.md) (#140): modifying a pending damage card's dice is combat-tracker's command; if card text must change then, a post-MVP `updateNotification` helper (pending only). No MVP change.
 - Load older history, server read state, cross-browser seen marker.
