@@ -3,7 +3,6 @@
 import {
   CBTX_INTENTS,
   ConcentrationCardPayload,
-  ConcentrationCardResolution,
   RollConcentrationInput,
   type RollConcentrationResult,
 } from "@shared/combat-extras/intents";

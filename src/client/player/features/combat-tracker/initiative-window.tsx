@@ -1,9 +1,20 @@
 // Player `cbt.initiative` (CBT §7), read-only: Round N; rows by `playerPosition` with the turn
 // marker (`playerTurnCombatantId`), portrait, name, band (monsters) or Down (PCs, FR-CBT-49),
-// initiative (PCs). Removed
-// combatants reach players (FR-CBT-37, map badge) but leave this list. Companion: the turn alert.
+// initiative (PCs); effect chips the player receives (one line + "+N") and PCs' death state
+// (own PC with pips, FR-CBTX-34). Removed combatants reach players (FR-CBT-37, map badge) but
+// leave this list. Companion: the turn alert + the concentration roll host (FR-CBTX-37).
 import type { CombatantView } from "@shared/combat-tracker/schemas";
 import { Skeleton } from "@ui/components/ui/primitives";
+import { ConcentrationRollHost } from "@ui/features/combat-extras/concentration";
+import {
+  activeEffects,
+  characterOf,
+  countersFor,
+  creatureOf,
+  deathStateFor,
+  effectsOn,
+} from "@ui/features/combat-extras/logic";
+import { DeathBadge, DeathPips, EffectChips } from "@ui/features/combat-extras/parts";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
@@ -13,6 +24,16 @@ import { defineWindow } from "@ui/features/play-shell/registry";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
 
+/** Mounted while an encounter runs: turn alert (FR-CBT-41), concentration roll host (FR-CBTX-37). */
+function PlayerCombatRuntime() {
+  return (
+    <>
+      <TurnAlertRuntime />
+      <ConcentrationRollHost />
+    </>
+  );
+}
+
 function PlayerInitiativeBody() {
   const enc = useStartedEncounter();
   const rows = useCombatants(enc?.id).filter((c) => !c.removed);
@@ -21,6 +42,7 @@ function PlayerInitiativeBody() {
   const everLive = useSync((s) => s.everLive);
   const store = useSync((s) => s.store);
   if (!everLive || !enc) return <Skeleton className="h-24" />;
+  const fx = activeEffects(store);
   const mine = new Set(characters.filter((c) => c.ownerPlayerId === me).map((c) => c.id));
   const ownWithout = rows.some(
     (c: CombatantView) => c.kind === "pc" && mine.has(c.entityId ?? "") && c.initiative == null,
@@ -47,6 +69,9 @@ function PlayerInitiativeBody() {
       <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
         {rows.map((c) => {
           const turn = enc.playerTurnCombatantId === c.id;
+          const ch = c.kind === "pc" ? characterOf(store, c.entityId ?? "") : undefined;
+          const death = deathStateFor(ch);
+          const counters = countersFor(ch);
           return (
             <li
               key={c.id}
@@ -62,17 +87,30 @@ function PlayerInitiativeBody() {
               <TurnMarker active={turn} />
               <Portrait name={c.name} imageAssetId={c.imageAssetId} />
               <span
-                className="min-w-0 flex-1 truncate text-sm"
+                className="max-w-[50%] shrink-0 truncate text-sm"
                 data-testid="cbt-init-row-name"
                 title={c.name}
               >
                 {c.name}
               </span>
+              <EffectChips
+                effects={effectsOn(fx, creatureOf(c))}
+                round={enc.round}
+                testId="cbtx-init-row-effect"
+              />
               {c.kind === "monster" && c.band && (
                 <BandBadge band={c.band} testId="cbt-init-row-band" />
               )}
-              {/* FR-CBT-49 (#172): a PC at 0 HP (own HP, else the redacted `down`). */}
-              {pcDown(store, c) && <BandBadge band="down" testId="cbt-init-row-band" />}
+              {/* FR-CBTX-34: a PC's death state (own PC with pips) replaces the plain Down. */}
+              {death ? (
+                <>
+                  {counters && <DeathPips c={counters} />}
+                  <DeathBadge state={death} testId="cbtx-init-row-death" />
+                </>
+              ) : (
+                // FR-CBT-49 (#172): a PC at 0 HP (own HP, else the redacted `down`).
+                pcDown(store, c) && <BandBadge band="down" testId="cbt-init-row-band" />
+              )}
               {c.kind === "pc" && (
                 <span
                   data-testid="cbt-init-row-init"
@@ -101,5 +139,5 @@ export const playerInitiativeWindow = defineWindow({
   defaultPosition: { anchor: "bottom-right" },
   available: (store) => startedIn(store) !== null,
   component: PlayerInitiativeBody,
-  companion: TurnAlertRuntime,
+  companion: PlayerCombatRuntime,
 });
