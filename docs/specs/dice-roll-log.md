@@ -76,7 +76,7 @@ wave: 2
 | FR-DICE-27 | Actor Select: player → "me" + own characters. DM → "DM", characters, tokens of the active scene (a character's own token is not listed again, #149). | |
 | **Playtest pass** (#171) | | |
 | FR-DICE-28 | **DM-only detail and tags in any kind** (P5, G7, G8): a kind's `formatLine(entry)` receives `dmPayload` only on the DM client (players' entries never carry it, FR-DICE-15); facts the owning kind declares DM-only (target AC, the computed hit, overrides, and for `cbt.attack` the damage dice breakdown and kept / dropped d20s) go **only** in `dmPayload`, never in `payload` or text built from it. Public dice stay public: a public DM `roll` entry (FR-DICE-13) and `cbt.attack`'s "d20 + modifier" text (FR-CBT-24) are by design. A kind whose line shows dice from a manual roll marks them with the same "physical" badge segment as `roll` (FR-DICE-20, test id `dice-log-entry-manual`); kinds reuse `rollSegments` for dice parts. A DM-only entry (internal caller passing `public: false`, e.g. combat's monster attack roll, [FR-CBT-52](combat-tracker.md#6-functional-requirements)) is shown to the DM muted with the eye-off marker like any hidden entry (FR-DICE-21). No new field, kind or registry change. | P5, G7 |
-| FR-DICE-29 | *(proposed, OQ-DICE-23)* The natural 20 / 1 marker (FR-DICE-20) is not added to `initiative`-category rolls (a natural 1 has no rule meaning there and read as an error at the table, G12). | G12 |
+| FR-DICE-29 | (decided #172, OQ-DICE-23) The natural 20 / 1 marker (FR-DICE-20) is not added to `initiative`-category rolls (a natural 1 has no rule meaning there and read as an error at the table, G12). | G12 |
 
 ## 7. UI/UX notes
 
@@ -233,8 +233,8 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | ~~OQ-DICE-03–22~~ | ~~Seeding; snapshot depth; shared changes; manual; visibility; defaults; contests; limits; log timing; glossary; storage; sheet buttons~~ | Decided: 05 no sessions (ADR-0013), 06 superseded, 08 #73, 12 #74; #137 (`ctx.dice`, newest 100, §14); #139 P6, P8, P21–P25; gate I3–I5, I13; #135 + I1 (`char.roll` out of combat, `cbt.*` in combat) | — | — |
-| OQ-DICE-23 | Natural marker on initiative lines (G12) | **Drop it on initiative** (no rule meaning; read as a bug) / keep everywhere (one rule; FR-DICE-20 as built) | no · owner: DM | combat-tracker |
-| OQ-DICE-24 | G12 verdicts (dice part) | **"— natural 1" wording:** as spec'd (FR-DICE-20); only initiative changes, OQ-DICE-23. **"Shared group roll":** not one: each combatant rolls separately (FR-CBT-11); two natural 1s were chance, no "group" text needed. **Fixture clock "02:00":** by design (FIX FR-FIX-08 fixed instant `2026-01-01T00:00Z`, shown in local time); any change is fixtures-adapters' | no · owner: spec-playtest | fixtures-adapters |
+| ~~OQ-DICE-23~~ | ~~Natural marker on initiative lines (G12)~~ | **Decided (#172):** no natural marker on initiative lines (FR-DICE-29) | — | combat-tracker |
+| ~~OQ-DICE-24~~ | ~~G12 verdicts (dice part)~~ | **Decided (#172):** verdicts accepted: "— natural 1" per FR-DICE-20 except initiative (FR-DICE-29); no group roll (each combatant rolls, FR-CBT-11); fixture clock by design (FR-FIX-08) | — | fixtures-adapters |
 
 ## 16. Out of scope
 

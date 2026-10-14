@@ -12,7 +12,7 @@ wave: 1
 
 - Cross-cutting: how every feature's state reaches clients live. Built first, in the Phase 2 skeleton. Features plug in via [§9](#9-api--events) and the [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md).
 - Intent → validate → mutate + commit → domain event → **visibility filter** → WS events ([ADR-0005](../architecture/adr/0005-server-authoritative-sync.md), [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). Reconnect = fresh snapshot; state survives a crash ([ADR-0006](../architecture/adr/0006-persistence.md)).
-- **Playtest pass** (#171; FR-SYNC-28, 29): a signal type may route itself (DM only vs everyone) or refuse a sender, so scenes-map's live **drag preview** never leaks a hidden token ([proposed ADR](../architecture/adr/proposed-signal-audience.md)); presence is "unknown" while the DM is not live (G10).
+- **Playtest pass** (#171; FR-SYNC-28, 29): a signal type may route itself (DM only vs everyone) or refuse a sender, so scenes-map's live **drag preview** never leaks a hidden token ([ADR-0033](../architecture/adr/0033-signal-audience.md)); presence is "unknown" while the DM is not live (G10).
 
 ## 2. Scope
 
@@ -73,7 +73,7 @@ wave: 1
 | FR-SYNC-26 | Test seams: injectable clock and timers (heartbeat, backoff); a test-only hook pauses a snapshot between read and send so a test can commit in that window. | [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md) |
 | FR-SYNC-27 | Test mode only: **sync probe** record type, its intents (§9), a probe panel and a "drop connection" button in both clients. Absent otherwise. | |
 | **Playtest pass** (#171) | | |
-| FR-SYNC-28 | **Signal audience** *(proposed ADR, OQ-SYNC-16)*: a signal type may register `audience(data, sender {role, playerId?, campaignId}, read) → "all" \| "dm"`; `read` = read-only DB access + active-scene cache, no writes. The hub runs it once per signal after the zod + roles checks. A thrown reject (`not_found`, `forbidden`, `invalid`) goes to the sender only; nobody receives the signal. `"all"` = FR-SYNC-22 forwarding; `"dm"` = every other live **DM** connection of the campaign only. No hook = FR-SYNC-22 unchanged. A hook error is logged at most once per (connection, signal name) per 10 s. Still no bus, DB write, log, snapshot, `seq` or rate limit. First user: scenes-map `map.drag` ([FR-MAP-41](scenes-map.md#6-functional-requirements)). | P3; amends ADR-0026 |
+| FR-SYNC-28 | **Signal audience** ([ADR-0033](../architecture/adr/0033-signal-audience.md), decided #172): a signal type may register `audience(data, sender {role, playerId?, campaignId}, read) → "all" \| "dm"`; `read` = read-only DB access + active-scene cache, no writes. The hub runs it once per signal after the zod + roles checks. A thrown reject (`not_found`, `forbidden`, `invalid`) goes to the sender only; nobody receives the signal. `"all"` = FR-SYNC-22 forwarding; `"dm"` = every other live **DM** connection of the campaign only. No hook = FR-SYNC-22 unchanged. A hook error is logged at most once per (connection, signal name) per 10 s. Still no bus, DB write, log, snapshot, `seq` or rate limit. First user: scenes-map `map.drag` ([FR-MAP-41](scenes-map.md#6-functional-requirements)). | P3; amends ADR-0026 |
 | FR-SYNC-29 | **Presence while not live** (G10): presence is only known while the client is `live`. The client marks it unknown on leaving `live` (drop, server outage, `waiting`) and takes it from the next snapshot; every presence display shows "unknown", never stale values (DM badge: [FR-SHELL-33](play-shell.md#6-functional-requirements)). Client-only; server presence rules (FR-SYNC-23) unchanged. | G10 |
 
 ## 7. UI/UX notes
@@ -187,7 +187,7 @@ The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map 
 **Shared changes** (playtest pass, #171; shared core, orchestrator routes per AGENTS §9.9):
 - `src/server/ws/signals.ts` (`SignalDef.audience?`), `src/server/ws/hub.ts` (run it; `"dm"` routing; reject / `internal`); hub gets read-only DB + active-scene cache access for the hook. `src/shared/protocol/`: none (frames unchanged).
 - Client: `src/client/common/sync/store.ts` or `connection.ts`: presence marked unknown while not `live` (a `usePresence()` returning `{known, records}`), used by the DM badge (play-shell) and players panel (campaign-management).
-- Docs at consolidation: protocol §7 routing (hook, `"dm"` audience), §15 (`map.drag`); ADR from [proposed-signal-audience](../architecture/adr/proposed-signal-audience.md). No schema, event or record-type change.
+- Docs at consolidation: protocol §7 routing (hook, `"dm"` audience), §15 (`map.drag`); ADR from [ADR-0033](../architecture/adr/0033-signal-audience.md). No schema, event or record-type change.
 
 ## 15. Open questions
 
@@ -210,7 +210,7 @@ The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map 
 | OQ-SYNC-13 | Numeric targets (§3, §12) | **As proposed** / DM sets others | no — owner: DM | vision |
 | OQ-SYNC-14 | ~~Glossary~~ **Decided (integrator):** added **signal**, **presence**, **resync**, **record change**, **sync probe**; **WS event** = filtered record changes of one domain event (one or more records); **Snapshot** = sent by the server after `hello` and on `resync` | — | — | — |
 | OQ-SYNC-15 | WS endpoint path | **`/ws`** *(proposed)*, same origin as the clients / other | no — owner: spec-live-sync | AGENTS §9.2, campaign-management OQ-CAMP-15 |
-| OQ-SYNC-16 | How a hidden token's drag preview stays off players' sockets (P3) | **Per-signal `audience` hook, `"all"` / `"dm"` + sender reject ([proposed ADR](../architecture/adr/proposed-signal-audience.md))** (one indexed read per signal) / per-receiver visibility fn on signals (a call per connection per frame) / client-only "don't send" (no guarantee; players can spoof) | **yes** (DM gate: FR-SYNC-28 contradicts accepted ADR-0026 until the proposed ADR is accepted; also build-sequenced before the scenes-map playtest build) — owner: DM (ADR) | scenes-map, protocol §7, §15 |
+| ~~OQ-SYNC-16~~ | ~~How a hidden token's drag preview stays off players' sockets (P3)~~ | **Decided (#172):** per-signal `audience` hook, `"all"` / `"dm"` + sender reject ([ADR-0033](../architecture/adr/0033-signal-audience.md), option A); no longer blocking | — | scenes-map, protocol §7, §15 |
 
 ## 16. Out of scope
 
