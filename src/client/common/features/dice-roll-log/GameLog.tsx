@@ -1,5 +1,5 @@
-// Window `dice.log` body, both clients (FR-DICE-21, 22, 27; DICE §7). Entries from the synced
-// store; rolls go out as `dice.roll` intents. DM-only parts (public switch, settings gear)
+// Window `dice.log` body, both clients (FR-DICE-21, 22, 27, 30; DICE §7). Entries from the synced
+// store; rolls go out as `dice.roll` intents. DM-only parts (public eye toggle, settings gear)
 // render from `you.role` / the `dmTools` slot.
 import type { LineSegment } from "@shared/dice-roll-log/kind-types";
 import { formatEntry } from "@shared/dice-roll-log/line";
@@ -15,16 +15,17 @@ import {
 } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
 import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
-import { EyeOffIcon, HandIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon, EyeIcon, EyeOffIcon, HandIcon } from "lucide-react";
 import { type ReactNode, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Button } from "../../components/ui/button";
 import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Input, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
-import { actorOptions, sortEntries } from "./logic";
-import { usePhysicalDice } from "./physical";
+import { actorOptions, optionsDirty, sortEntries } from "./logic";
+import { usePhysicalDice, useRollOptionsOpen } from "./physical";
 import { RollButton, useRollControl } from "./roll-control";
 
 const SELECT =
@@ -83,7 +84,7 @@ function Entry({ e, isDm }: { e: GameLogEntryView; isDm: boolean }) {
       data-undone={e.undone}
       // visibility.hidden token (visual-direction): hidden entries muted with an eye-off marker.
       className={cn(
-        "flex items-start gap-1.5 py-0.5 text-sm leading-snug",
+        "flex items-start gap-1.5 py-px text-sm leading-snug",
         hidden && "text-visibility-hidden",
       )}
     >
@@ -140,8 +141,8 @@ function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boole
 
   return (
     // The list takes the space above the pinned roll bar and scrolls on its own; the scroller
-    // fills the box absolutely so long entries never push the roll bar out. FR-SHELL-28: the
-    // compact roll bar leaves ≥ 3 entries at every default size (e2e).
+    // fills the box absolutely so long entries never push the roll bar out. FR-SHELL-35: with
+    // the one-row bar, ≥ 6 single-line entries at the default size, ≥ 4 with Physical dice on (e2e).
     <div className="relative min-h-10 flex-1">
       <div
         ref={ref}
@@ -190,7 +191,7 @@ function errorText(err: unknown): string {
   return err instanceof Error ? err.message : "Roll failed";
 }
 
-/** FR-DICE-22: the roll bar (window footer). */
+/** FR-DICE-22 / FR-DICE-30: the roll bar (window footer). */
 function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const you = useSync((s) => s.store.you);
   const live = useSync((s) => s.state === "live");
@@ -239,10 +240,20 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   });
   const disabled = !live || busy;
   const shownError = error ?? control.error;
+  const [optionsOpen, setOptionsOpen] = useRollOptionsOpen();
+  const [physical, setPhysical] = usePhysicalDice();
+  const dirty = optionsDirty({
+    category,
+    actor: selected?.value ?? "",
+    label,
+    isDm: control.isDm,
+    publicValue: control.publicValue,
+    publicPreset: control.publicPreset,
+  });
 
-  // Compact, pinned footer (FR-DICE-22): expression + mode + Roll, then category / actor /
-  // label (+ DM public, gear), then the physical-dice row. Short enough that the DM's 240 px
-  // default still shows ≥ 3 entries above it (FR-SHELL-28).
+  // FR-DICE-30: a one-row pinned footer (expression, mode, DM eye, Roll, Options chevron), so
+  // the entry list keeps the window's height (FR-SHELL-35). Options open a second row; the
+  // "Physical dice on" strip shows below the first row whenever the mode is on (FR-DICE-07).
   return (
     <div className="flex shrink-0 flex-col gap-1.5 border-t pt-1.5">
       <form
@@ -290,6 +301,28 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
+        {control.isDm && (
+          <Tooltip content={control.publicValue ? "Public" : "Hidden"}>
+            <Button
+              type="button"
+              data-testid="dice-roll-public"
+              data-state={control.publicValue ? "public" : "hidden"}
+              aria-label={control.publicValue ? "Public" : "Hidden"}
+              aria-pressed={control.publicValue}
+              size="icon"
+              variant="ghost"
+              className={cn("size-7 shrink-0", !control.publicValue && "text-visibility-hidden")}
+              disabled={!live}
+              onClick={() => control.setPublic(!control.publicValue)}
+            >
+              {control.publicValue ? (
+                <EyeIcon className="size-4" />
+              ) : (
+                <EyeOffIcon className="size-4" />
+              )}
+            </Button>
+          </Tooltip>
+        )}
         <RollButton
           control={control}
           data-testid="dice-roll-submit"
@@ -300,75 +333,106 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
         >
           Roll
         </RollButton>
+        <Tooltip content={optionsOpen ? "Hide roll options" : "Roll options"}>
+          <Button
+            type="button"
+            data-testid="dice-roll-options"
+            data-state={optionsOpen ? "open" : "closed"}
+            data-dirty={dirty}
+            aria-label="Roll options"
+            aria-expanded={optionsOpen}
+            aria-controls={`${uid}-options`}
+            size="icon"
+            variant="ghost"
+            className="relative size-7 shrink-0"
+            onClick={() => setOptionsOpen(!optionsOpen)}
+          >
+            {optionsOpen ? (
+              <ChevronUpIcon className="size-4" />
+            ) : (
+              <ChevronDownIcon className="size-4" />
+            )}
+            {dirty && (
+              <span
+                aria-hidden
+                className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary"
+              />
+            )}
+          </Button>
+        </Tooltip>
       </form>
-      <div className="flex flex-wrap items-center gap-1.5">
-        <select
-          data-testid="dice-roll-category"
-          aria-label="Category"
-          className={SELECT}
-          value={category}
-          disabled={!live}
-          onChange={(e) => setCategory(e.target.value as RollCategory)}
-        >
-          {ROLL_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {CATEGORY_LABEL[c]}
-            </option>
-          ))}
-        </select>
-        <select
-          data-testid="dice-roll-actor"
-          aria-label="Roll as"
-          className={cn(SELECT, "max-w-28")}
-          value={selected?.value ?? ""}
-          disabled={!live}
-          onChange={(e) => setActor(e.target.value)}
-        >
-          {actors
-            .filter((a) => !a.group)
-            .map((a) => (
-              <option key={a.value} value={a.value}>
-                {a.label}
+      {optionsOpen && (
+        <div id={`${uid}-options`} className="flex flex-wrap items-center gap-1.5">
+          <select
+            data-testid="dice-roll-category"
+            aria-label="Category"
+            className={cn(SELECT, "max-w-28")}
+            value={category}
+            disabled={!live}
+            onChange={(e) => setCategory(e.target.value as RollCategory)}
+          >
+            {ROLL_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_LABEL[c]}
               </option>
             ))}
-          {(["Characters", "Tokens"] as const).map((g) => {
-            const list = actors.filter((a) => a.group === g);
-            return list.length === 0 ? null : (
-              <optgroup key={g} label={g}>
-                {list.map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {a.label}
-                  </option>
-                ))}
-              </optgroup>
-            );
-          })}
-        </select>
-        <Input
-          data-testid="dice-roll-label"
-          aria-label="Label"
-          placeholder="Label"
-          maxLength={60}
-          className="h-7 w-16 min-w-0 flex-1 text-xs"
-          value={label}
-          disabled={!live}
-          onChange={(e) => setLabel(e.target.value)}
-        />
-        {control.isDm && (
-          <span className="flex shrink-0 items-center gap-1.5 text-xs">
-            <Switch
-              id={`${uid}-public`}
-              data-testid="dice-roll-public"
-              checked={control.publicValue}
-              disabled={!live}
-              onCheckedChange={control.setPublic}
-            />
-            <label htmlFor={`${uid}-public`}>Public</label>
-          </span>
-        )}
-        {dmTools && <div className="shrink-0">{dmTools}</div>}
-      </div>
-      <PhysicalRow uid={uid} />
+          </select>
+          <select
+            data-testid="dice-roll-actor"
+            aria-label="Roll as"
+            className={cn(SELECT, "max-w-24")}
+            value={selected?.value ?? ""}
+            disabled={!live}
+            onChange={(e) => setActor(e.target.value)}
+          >
+            {actors
+              .filter((a) => !a.group)
+              .map((a) => (
+                <option key={a.value} value={a.value}>
+                  {a.label}
+                </option>
+              ))}
+            {(["Characters", "Tokens"] as const).map((g) => {
+              const list = actors.filter((a) => a.group === g);
+              return list.length === 0 ? null : (
+                <optgroup key={g} label={g}>
+                  {list.map((a) => (
+                    <option key={a.value} value={a.value}>
+                      {a.label}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
+          </select>
+          <Input
+            data-testid="dice-roll-label"
+            aria-label="Label"
+            placeholder="Label"
+            maxLength={60}
+            className="h-7 w-12 min-w-0 flex-1 text-xs"
+            value={label}
+            disabled={!live}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          {dmTools && <div className="shrink-0">{dmTools}</div>}
+          <Tooltip content="Physical dice: type in my own rolls">
+            <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+              <Switch
+                id={`${uid}-physical`}
+                data-testid="dice-roll-physical"
+                aria-label="Physical dice"
+                checked={physical}
+                onCheckedChange={setPhysical}
+              />
+              <label htmlFor={`${uid}-physical`}>
+                <HandIcon className="size-3.5" aria-hidden />
+              </label>
+            </span>
+          </Tooltip>
+        </div>
+      )}
+      {physical && <PhysicalStrip onOff={() => setPhysical(false)} />}
       {shownError && (
         <p data-testid="dice-roll-error" role="alert" className="text-xs text-destructive">
           {shownError}
@@ -379,45 +443,26 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
 }
 
 /**
- * FR-DICE-07, #149: the physical-dice toggle, on its own row away from Adv. While the mode is on
- * the row turns into the "Physical dice on" strip with "Turn off", so the log always says so
- * without a second strip taking entry space.
+ * FR-DICE-07 / FR-DICE-30: while physical-dice mode is on, a "Physical dice on" strip with
+ * "Turn off" sits below the first row, Options open or not, so the mode is never a surprise.
  */
-function PhysicalRow({ uid }: { uid: string }) {
-  const [physical, setPhysical] = usePhysicalDice();
+function PhysicalStrip({ onOff }: { onOff: () => void }) {
   return (
     <div
-      data-testid={physical ? "dice-log-physical" : undefined}
-      role={physical ? "status" : undefined}
-      className={cn(
-        "flex h-7 items-center gap-1.5 rounded-md border px-1.5 text-xs",
-        physical ? "border-warning/50 bg-warning/10" : "border-transparent text-muted-foreground",
-      )}
+      data-testid="dice-log-physical"
+      role="status"
+      className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-warning/50 bg-warning/10 px-1.5 text-xs"
     >
-      <Switch
-        id={`${uid}-physical`}
-        data-testid="dice-roll-physical"
-        checked={physical}
-        onCheckedChange={setPhysical}
-      />
-      {physical ? (
-        <>
-          <HandIcon className="size-3.5 shrink-0 text-warning" />
-          <label htmlFor={`${uid}-physical`} className="flex-1 truncate">
-            Physical dice on
-          </label>
-          <button
-            type="button"
-            data-testid="dice-log-physical-off"
-            className="rounded-sm font-medium underline-offset-2 hover:underline"
-            onClick={() => setPhysical(false)}
-          >
-            Turn off
-          </button>
-        </>
-      ) : (
-        <label htmlFor={`${uid}-physical`}>Physical dice: type in my own rolls</label>
-      )}
+      <HandIcon className="size-3.5 shrink-0 text-warning" />
+      <span className="flex-1 truncate">Physical dice on</span>
+      <button
+        type="button"
+        data-testid="dice-log-physical-off"
+        className="rounded-sm font-medium underline-offset-2 hover:underline"
+        onClick={onOff}
+      >
+        Turn off
+      </button>
     </div>
   );
 }
