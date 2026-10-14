@@ -1,4 +1,4 @@
-# Proposed — Pending combat notifications end with their encounter, per kind
+# Pending combat notifications end with their encounter, per kind
 
 - Status: accepted (2026-10-14; decisions-log #178; raised by spec-polish-r, sprint-1 R5, [OQ-CBT-45](../../specs/combat-tracker.md#15-open-questions)); number at merge
 - Date: 2026-10-14
@@ -27,6 +27,6 @@
 ## Consequences
 
 - notifications: FR-NOTE-23 (end rule type, load check + helper), FR-NOTE-24 (unread). combat-tracker: FR-CBT-59 (`DAMAGE_CARD_END_RULE`; `cbt.end` calls the helper; the confirm counts only kinds with the rule), FR-CBT-61 (event order).
-- combat-extras: each new kind states whether it has an end rule (concentration: none, so it stays pending, matching OQ-CBTX-15). If [proposed-combat-rule-hooks](proposed-combat-rule-hooks.md) (branch `spec/combat-extras`) is accepted, the call may move into an `ended` hook; same transaction, same order (FR-CBT-61).
+- combat-extras: each new kind states whether it has an end rule (concentration: none, so it stays pending, matching OQ-CBTX-15). [proposed-combat-rule-hooks](proposed-combat-rule-hooks.md) is accepted too (#178): the call may move into an `ended` hook; same transaction, same order (FR-CBT-61).
 - protocol §23 kind table gains the column. No DB, event or record-type change.
 - ADR-0016 "pending until resolved or dismissed" stands: dismissal on End is a dismissal by the DM's End command.
