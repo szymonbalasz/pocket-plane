@@ -1,5 +1,6 @@
-// `char.roll` (FR-CHAR-05–09, FR-CHAR-17, FR-CHAR-21) and `char.adjustHp` (FR-CHAR-09, FR-CHAR-10).
-// One transaction each: rolls + one log entry + `CharacterRolled`; HP row + `CharacterHpAdjusted`.
+// `char.roll` (FR-CHAR-05–09, FR-CHAR-17, FR-CHAR-21, FR-CHARX-20–22) and `char.adjustHp`
+// (FR-CHAR-09, FR-CHAR-10). One transaction each: rolls + one log entry + `CharacterRolled`; HP
+// row + `CharacterHpAdjusted`.
 import { characterRolls, sheetAttack } from "@shared/character-sheet/logic";
 import {
   CHAR_ADJUST_HP,
@@ -14,9 +15,11 @@ import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import type { CharacterRecord } from "@shared/entities/schemas";
 import { CharacterHpAdjusted, CharacterRolled } from "@shared/events/character-sheet";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
-import { conflict, forbidden } from "../../commands/errors";
+import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import { dice, gameLog } from "../dice-roll-log";
+import { rollTarget } from "./access";
 import { adjustHp, getCharacter } from "./hp";
+import { getSheet } from "./sheet-rows";
 
 /**
  * FR-CHAR-09: DM → any character of `actor.campaignId`; player → own only. Unknown, monster,
@@ -41,13 +44,31 @@ export const charRoll = defineCommand({
     }
   },
   execute(input, env): CharRollResult {
-    const c = authorizedCharacter(env, input.characterId);
-    // The schema guarantees `ability` for check / save (FR-CHAR-21); stats are read at commit.
-    const ability = isAbilityRollKind(input.kind) ? input.ability : undefined;
-    const specs = ability
-      ? characterRolls(c.statBlock, input.kind, ability)
-      : characterRolls(c.statBlock, input.kind as "initiative" | "attack");
-    if (!specs) throw conflict(ability ? "No ability scores" : "No weapon attack");
+    // FR-CHARX-22: the DM may roll for any definition (NPC sheet); players for own characters.
+    const c = rollTarget(env, input.characterId);
+    const definition = c.kind === "monster";
+    if (definition && input.public !== undefined) {
+      throw invalid("NPC sheet rolls are DM-only", [
+        { path: ["public"], message: "Not allowed for definitions" },
+      ]);
+    }
+    // FR-CHARX-21: specs from committed data (stat block + sheet rows), overrides honoured.
+    const sheet = c.campaignId === null ? null : getSheet(env.tx, c.id);
+    const ref = {
+      ability: isAbilityRollKind(input.kind) ? input.ability : undefined,
+      skill: input.skill,
+      attackId: input.attackId,
+      spellId: input.spellId,
+    };
+    const res = characterRolls(c.statBlock, sheet, input.kind, ref);
+    if (!res.ok) throw res.code === "not_found" ? notFound(res.message) : conflict(res.message);
+    const specs = res.specs;
+    if (input.manual && input.manual.length !== specs.length) {
+      throw invalid("Invalid input", [
+        { path: ["manual"], message: `Enter ${specs.length} physical rolls for ${input.kind}` },
+      ]);
+    }
+    const ability = ref.ability;
     const actor = { kind: "entity" as const, id: c.id, name: c.name };
     const rolls = specs.map((s, i) =>
       dice.evaluate(env, {
@@ -68,18 +89,27 @@ export const charRoll = defineCommand({
       actorName: c.name,
       payload: rolls.map((r) => dice.rollPayloadItem(r)),
       rollIds,
-      public: input.public,
+      // FR-CHARX-22: a definition's name can leak a renamed or hidden creature (ADR-0024).
+      public: definition ? false : input.public,
     });
-    const attack = input.kind === "attack" ? sheetAttack(c.statBlock) : null;
+    const attack =
+      input.kind !== "attack" && input.kind !== "damage"
+        ? null
+        : input.attackId === undefined
+          ? sheetAttack(c.statBlock)
+          : (c.statBlock.attacks.find((a) => a.id === input.attackId) ?? null);
     env.emit({
       type: CharacterRolled.type,
-      campaignId: c.campaignId,
+      campaignId: env.actor.campaignId,
       payload: {
         characterId: c.id,
         kind: input.kind,
         mode: input.mode,
         manual: input.manual !== undefined,
         ...(ability ? { ability } : {}),
+        ...(input.skill ? { skill: input.skill } : {}),
+        ...(input.attackId ? { attackId: input.attackId } : {}),
+        ...(input.spellId ? { spellId: input.spellId } : {}),
         ...(attack ? { attackName: attack.name } : {}),
         ...(attack?.damageType ? { damageType: attack.damageType } : {}),
         rollIds,

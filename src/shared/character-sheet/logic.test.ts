@@ -178,13 +178,13 @@ describe("FR-CHAR-10 clamp", () => {
 describe("FR-CHAR-07 char.roll intent", () => {
   const parse = (v: Record<string, unknown>) =>
     SheetRollIntent.safeParse({ characterId: "c", ...v });
-  test("FR-CHAR-05 strict: no expression / bonus / damage kind; mode defaults normal", () => {
+  test("FR-CHAR-05 FR-CHARX-20 strict: no expression / bonus; wrong kind + ref; mode defaults normal", () => {
     const p = parse({ kind: "initiative" });
     expect(p.success && p.data.mode).toBe("normal");
     for (const bad of [
       { kind: "initiative", expression: "1d20+30" },
       { kind: "attack", toHit: 20 },
-      { kind: "damage" },
+      { kind: "damage", skill: "stealth" },
       { kind: "attack", mode: "super" },
     ]) {
       expect(parse(bad).success).toBe(false);

@@ -8,6 +8,7 @@
 import type { EntityRecord } from "@shared/entities/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
+import { creatureSheetDefinitionHook } from "../character-sheet/definition-hook";
 import { combatantDefinitionHook } from "../combat-tracker/hooks";
 import { refreshTokenCopies } from "../scenes-map/definition-hook";
 
@@ -29,6 +30,7 @@ export interface HookRegistration {
 export const definitionChangedHooks: readonly HookRegistration[] = [
   { name: "scenes-map.token-copies", hook: refreshTokenCopies }, // scenes-map (FR-MAP-20)
   { name: "combat-tracker.combatant-copies", hook: combatantDefinitionHook }, // combat-tracker (FR-CBT-06)
+  { name: "character-sheet.sheet-copies", hook: creatureSheetDefinitionHook }, // CHARX owner copy + counter clamp (FR-CHARX-13/17)
 ];
 
 /** Per-server hook list, seeded from the registry; tests may add hooks via `register`. */

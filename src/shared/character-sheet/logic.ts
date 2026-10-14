@@ -11,9 +11,15 @@ import {
   type CharacterStatBlock,
   checkBonus,
   proficiencyBonus,
+  SKILL_NAMES,
+  type Skill,
   saveBonus,
+  skillBonus,
+  spellAttackBonus,
+  spellSaveDc,
 } from "@shared/entities/schemas";
-import type { AbilityRollKind, SheetRollKind } from "./schemas";
+import type { SheetRollKind } from "./schemas";
+import type { SpellRow } from "./sheet";
 
 /** One roll of a sheet action: what `dice.evaluate` gets, minus actor and mode. */
 export interface CharacterRollSpec {
@@ -26,7 +32,7 @@ export interface CharacterRollSpec {
 
 type RollStats = Pick<CharacterStatBlock, "initBonus" | "attacks">;
 /** Kinds that need no ability: initiative, attack. */
-type ActionRollKind = Exclude<SheetRollKind, AbilityRollKind>;
+type ActionRollKind = "initiative" | "attack";
 
 /** `1d20+2`, `1d20-1`, `1d20` (FR-CHAR-05). */
 export function d20(bonus: number): string {
@@ -34,9 +40,30 @@ export function d20(bonus: number): string {
   return bonus > 0 ? `1d20+${bonus}` : `1d20${bonus}`;
 }
 
-/** The sheet's one weapon attack (ADR-0012), or null. */
+/** The sheet's first weapon attack (ADR-0012; MVP clients and combat), or null. */
 export const sheetAttack = (s: Pick<CharacterStatBlock, "attacks">): Attack | null =>
   s.attacks[0] ?? null;
+
+/** The row a roll names (FR-CHARX-20): `attackId` / `spellId`, a skill or an ability. */
+export interface RollRef {
+  ability?: Ability;
+  skill?: Skill;
+  attackId?: string;
+  spellId?: string;
+}
+
+/** What `characterRolls` needs of the `creature-sheet` (null = no row: defaults, no spells). */
+export type RollSheet = { spells: readonly SpellRow[] } | null;
+
+/** FR-CHARX-21: the specs, or why not (the server maps `code` to its reject). */
+export type SheetRollResult =
+  | { ok: true; specs: CharacterRollSpec[] }
+  | { ok: false; code: "not_found" | "conflict"; message: string };
+
+const NO_SCORES = "No ability scores";
+
+const damageLabel = (name: string, damageType: string | undefined) =>
+  damageType ? `${name} damage (${damageType})` : `${name} damage`;
 
 /**
  * FR-CHAR-05: initiative = d20 + initBonus (category initiative); attack = d20 + toHit (attack)
@@ -44,6 +71,10 @@ export const sheetAttack = (s: Pick<CharacterStatBlock, "attacks">): Attack | nu
  * FR-CHAR-21: check / save = d20 + `checkBonus` / `saveBonus` (FR-ENT-24), categories
  * `ability-check` / `saving-throw`; `null` = no ability scores (caller: `conflict`). Takes any
  * stat block (combat reuses it for monsters, FR-CBT-44).
+ *
+ * FR-CHARX-21: `characterRolls(stats, sheet, kind, ref)` builds every kind of the CHARX table
+ * from committed data (overrides honoured): unknown row → `not_found`; a spell without the roll
+ * asked for → `conflict`.
  */
 export function characterRolls(stats: RollStats, kind: ActionRollKind): CharacterRollSpec[] | null;
 export function characterRolls(
@@ -52,45 +83,103 @@ export function characterRolls(
   ability: Ability,
 ): CharacterRollSpec[] | null;
 export function characterRolls(
-  stats: RollStats & Partial<AbilityStats>,
+  stats: RollStats & AbilityStats,
+  sheet: RollSheet,
   kind: SheetRollKind,
-  ability?: Ability,
-): CharacterRollSpec[] | null {
-  if (kind === "check" || kind === "save") {
-    if (!ability) return null;
-    const s = stats as AbilityStats;
-    const bonus = kind === "check" ? checkBonus(s, ability) : saveBonus(s, ability);
-    if (bonus === null) return null;
-    return [
-      {
-        expression: d20(bonus),
-        category: kind === "check" ? "ability-check" : "saving-throw",
-        label: `${ABILITY_NAMES[ability]} ${kind}`,
-        d20: true,
-      },
-    ];
+  ref: RollRef,
+): SheetRollResult;
+export function characterRolls(
+  stats: RollStats & Partial<AbilityStats>,
+  a: SheetRollKind | RollSheet,
+  b?: Ability | SheetRollKind,
+  ref?: RollRef,
+): CharacterRollSpec[] | null | SheetRollResult {
+  if (typeof a === "string") {
+    const kind = a;
+    if ((kind === "check" || kind === "save") && !b) return null;
+    const r = sheetRolls(stats as RollStats & AbilityStats, null, kind, {
+      ability: b as Ability | undefined,
+    });
+    return r.ok ? r.specs : null;
   }
-  if (kind === "initiative") {
-    return [
-      { expression: d20(stats.initBonus), category: "initiative", label: "Initiative", d20: true },
-    ];
+  return sheetRolls(stats as RollStats & AbilityStats, a, b as SheetRollKind, ref ?? {});
+}
+
+function sheetRolls(
+  stats: RollStats & AbilityStats,
+  sheet: RollSheet,
+  kind: SheetRollKind,
+  ref: RollRef,
+): SheetRollResult {
+  const ok = (specs: CharacterRollSpec[]): SheetRollResult => ({ ok: true, specs });
+  const fail = (code: "not_found" | "conflict", message: string): SheetRollResult => ({
+    ok: false,
+    code,
+    message,
+  });
+  const spec = (
+    expression: string,
+    category: RollCategory,
+    label: string,
+    isD20: boolean,
+  ): CharacterRollSpec => ({ expression, category, label: fitLabel(label), d20: isD20 });
+
+  switch (kind) {
+    case "initiative":
+      return ok([spec(d20(stats.initBonus), "initiative", "Initiative", true)]);
+    case "check":
+    case "save": {
+      if (!ref.ability) return fail("conflict", "Pick an ability");
+      const bonus =
+        kind === "check" ? checkBonus(stats, ref.ability) : saveBonus(stats, ref.ability);
+      if (bonus === null) return fail("conflict", NO_SCORES);
+      const category = kind === "check" ? "ability-check" : "saving-throw";
+      return ok([spec(d20(bonus), category, `${ABILITY_NAMES[ref.ability]} ${kind}`, true)]);
+    }
+    case "skill": {
+      if (!ref.skill) return fail("conflict", "Pick a skill");
+      const bonus = skillBonus(stats, ref.skill);
+      if (bonus === null) return fail("conflict", NO_SCORES);
+      return ok([spec(d20(bonus), "skill-check", `${SKILL_NAMES[ref.skill]} check`, true)]);
+    }
+    case "attack":
+    case "damage": {
+      const a =
+        ref.attackId === undefined
+          ? sheetAttack(stats)
+          : (stats.attacks.find((x) => x.id === ref.attackId) ?? null);
+      if (!a) {
+        return ref.attackId === undefined
+          ? fail("conflict", "No weapon attack")
+          : fail("not_found", "Attack was deleted");
+      }
+      const dmg = spec(a.damage, "damage", damageLabel(a.name, a.damageType), false);
+      if (kind === "damage") return ok([dmg]);
+      return ok([spec(d20(a.toHit), "attack", `${a.name} attack`, true), dmg]);
+    }
+    case "spellAttack":
+    case "spellDamage": {
+      const s = sheet?.spells.find((x) => x.id === ref.spellId);
+      if (!s) return fail("not_found", "Spell was deleted");
+      const category: RollCategory = s.effect === "healing" ? "healing" : "damage";
+      const effectLabel =
+        s.effect === "healing" ? `${s.name} healing` : damageLabel(s.name, s.damageType);
+      if (kind === "spellAttack") {
+        if (s.roll !== "attack") return fail("conflict", `No attack roll for ${s.name}`);
+        const bonus = spellAttackBonus(stats);
+        if (bonus === null) return fail("conflict", "No spellcasting");
+        const hit = spec(d20(bonus), "attack", `${s.name} attack`, true);
+        return ok(s.damage ? [hit, spec(s.damage, category, effectLabel, false)] : [hit]);
+      }
+      if (!s.damage) return fail("conflict", `No damage roll for ${s.name}`);
+      const dc = s.roll === "save" && s.saveAbility ? spellSaveDc(stats) : null;
+      const label =
+        dc !== null && s.saveAbility
+          ? `${effectLabel}, DC ${dc} ${s.saveAbility.toUpperCase()}`
+          : effectLabel;
+      return ok([spec(s.damage, category, label, false)]);
+    }
   }
-  const a = sheetAttack(stats);
-  if (!a) return null;
-  return [
-    {
-      expression: d20(a.toHit),
-      category: "attack",
-      label: fitLabel(`${a.name} attack`),
-      d20: true,
-    },
-    {
-      expression: a.damage,
-      category: "damage",
-      label: fitLabel(a.damageType ? `${a.name} damage (${a.damageType})` : `${a.name} damage`),
-      d20: false,
-    },
-  ];
 }
 
 /**

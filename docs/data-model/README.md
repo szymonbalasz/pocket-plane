@@ -8,7 +8,7 @@ Consolidated domain model. Entities and relationships, **not SQL**. **Living doc
 | Scenes | assets-pipeline, entities, play-shell, scenes-map | consolidated (2026-10-12): [§9–§13](#9-scenes-er-diagram); CON-18–21 resolved (fix/scenes-core) |
 | Combat | character-sheet, dice-roll-log, notifications, combat-tracker | consolidated (2026-10-12, #142): [§14–§18](#14-combat-er-diagram); CON-34–37 resolved; all Combat tables built as shared definitions in `src/server/db/schema.ts` (fix/combat-core) |
 | Reward | [party-loot](../specs/party-loot.md) | built (build/party-loot): [§19](#19-reward-loot-entry-party-pot-wallet) |
-| Sprint 1 | [character-sheet-full](../specs/character-sheet-full.md) (CHARX, #178) | core built (fix/charx-core): [§20](#20-sprint-1-creature-sheet), stat-block additions in [§11](#11-scenes-entity); record type, commands, hook, fixtures *(sprint 1, to build)* |
+| Sprint 1 | [character-sheet-full](../specs/character-sheet-full.md) (CHARX, #178) | core built (fix/charx-core): [§20](#20-sprint-1-creature-sheet), stat-block additions in [§11](#11-scenes-entity); record type, commands, hook, fixtures **built** (build/character-sheet-full); combat routes *(sprint 1, to build, slice 4)* |
 | Sprint 1 | [combat-extras](../specs/combat-extras.md) (CBTX, #178) | core built (fix/cbtx-core): [§21](#21-sprint-1-effect-and-combat-play-state), play-state columns in [§11](#11-scenes-entity) and [§17](#17-combat-encounter-combatant-combat-log-entry); commands, rules, record-type registration, fixtures *(sprint 1, to build)* |
 
 Every fact links its source. Protocol side (record types, intents, events): [protocol](../protocol/README.md).
@@ -895,7 +895,7 @@ Built by `build/party-loot` from [party-loot](../specs/party-loot.md) (LOOT, `co
 
 ## 20. Sprint 1: creature sheet
 
-From [character-sheet-full](../specs/character-sheet-full.md) (CHARX, `complete`, #178; [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md) C + 1). **Built (fix/charx-core):** the table (`creatureSheet` in `src/server/db/schema.ts`, drizzle push, no migration). *(sprint 1, to build, build/character-sheet-full)*: the zod row schema, the `creature-sheet` record type (registered in `src/server/features/character-sheet/index.ts`), every writer. Protocol side: [protocol §31](../protocol/README.md#31-sprint-1-character-sheet-full).
+From [character-sheet-full](../specs/character-sheet-full.md) (CHARX, `complete`, #178; [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md) C + 1). **Built (fix/charx-core):** the table (`creatureSheet` in `src/server/db/schema.ts`, drizzle push, no migration). **Built (build/character-sheet-full):** the zod record (`CreatureSheetRecord` in `@shared/character-sheet/sheet`), the `creature-sheet` record type (registered in `src/server/features/character-sheet/index.ts`), every writer (`writeSheet` in `src/server/features/character-sheet/sheet-rows.ts`) and the definition-changed hook line. Protocol side: [protocol §31](../protocol/README.md#31-sprint-1-character-sheet-full).
 
 ### Creature sheet (`creature_sheet`, record type `creature-sheet`) — owner [character-sheet-full](../specs/character-sheet-full.md#82-creature-sheet-new-table-creature_sheet-charx)
 
@@ -919,7 +919,8 @@ From [character-sheet-full](../specs/character-sheet-full.md) (CHARX, `complete`
 - **Visibility** ([FR-CHARX-36](../specs/character-sheet-full.md#6-functional-requirements)): DM full; player full iff `ownerPlayerId = ctx.playerId` (the row's copy); otherwise hidden (other players' sheets, every NPC sheet).
 - **Migration:** none. New table via push; MVP characters (`char-mira` etc.) have no row and load unchanged; legacy attacks get ids on their first CHARX write ([CHARX §8](../specs/character-sheet-full.md#8-data-model)).
 - **Snapshot size** (CON-44): the heavy scenario carries 16 typical sheets (6 PCs + 10 NPC sheets, ≈ 12.6 KB each): DM ≈ 714 KB (ceiling 768 KiB), each player ≈ 260 KB (512 KiB). Until the record type is registered the test counts the table rows each viewer will get (`src/server/ws/testing/snapshot-size.ts`).
-- **Derived** (`@shared/entities`, never stored): [§13](#13-scenes-constraints-not-in-db-derived-visibility-fields) "Full-sheet values with overrides". Draft / Locked display, roll specs and the summary card: CHARX build.
+- **Wire record** *(built)*: the row + `id` (= `entityId`; wire records are keyed by `id`, like `wallet`). Rows that fail the zod record are omitted from snapshots and logged.
+- **Derived** (`@shared/entities`, never stored): [§13](#13-scenes-constraints-not-in-db-derived-visibility-fields) "Full-sheet values with overrides". *(built)* Roll specs `characterRolls(stats, sheet, kind, ref)` (`@shared/character-sheet/logic`), counters (`@shared/character-sheet/counters`: `clampCounters`, `counterOf`); Draft / Locked display and the summary card: CHARX client.
 
 ## 21. Sprint 1: effect and combat play state
 
