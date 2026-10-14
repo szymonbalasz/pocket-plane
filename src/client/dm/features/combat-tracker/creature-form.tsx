@@ -31,6 +31,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
 } from "@ui/components/ui/overlays";
 import { Input, Label } from "@ui/components/ui/primitives";
 import { CopyPlusIcon, PencilIcon, PlusIcon } from "lucide-react";
@@ -369,9 +370,9 @@ function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
                 data-testid="cbt-form-field"
                 data-field={`abilities.${k}`}
               >
-                <Label htmlFor={`cbt-form-ability-${k}`} title={ABILITY_NAMES[k]}>
-                  {k.toUpperCase()}
-                </Label>
+                <Tooltip content={ABILITY_NAMES[k]}>
+                  <Label htmlFor={`cbt-form-ability-${k}`}>{k.toUpperCase()}</Label>
+                </Tooltip>
                 <Input
                   id={`cbt-form-ability-${k}`}
                   inputMode="numeric"

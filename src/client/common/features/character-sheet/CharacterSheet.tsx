@@ -35,6 +35,7 @@ import { type ReactNode, useId, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
 import { Switch } from "../../components/ui/controls";
+import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Card, Input, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
@@ -54,6 +55,9 @@ const SELECT =
   "h-8 min-w-0 max-w-36 rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 
 const HP_CLASS = { full: "text-hp-full", bloodied: "text-hp-bloodied", down: "text-hp-down" };
+
+/** FR-CHAR-25: roll hint, a shared Tooltip (never a native `title`). */
+const ROLL_HINT = "Shift: advantage · Ctrl: disadvantage";
 
 /** FR-CHAR-12: one intent in flight per control; failures → Toast. */
 function useInFlight() {
@@ -138,17 +142,18 @@ function RollAction({
           <label htmlFor={`${uid}-public`}>Public</label>
         </span>
       )}
-      <RollButton
-        control={control}
-        data-testid={testId}
-        type="button"
-        size="sm"
-        variant="secondary"
-        title="Shift: advantage · Ctrl: disadvantage"
-        disabled={!live || flight.busy || specs.length === 0}
-      >
-        {label}
-      </RollButton>
+      <Tooltip content={ROLL_HINT}>
+        <RollButton
+          control={control}
+          data-testid={testId}
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={!live || flight.busy || specs.length === 0}
+        >
+          {label}
+        </RollButton>
+      </Tooltip>
       {control.error && <span className="text-xs text-destructive">{control.error}</span>}
     </div>
   );
@@ -200,33 +205,39 @@ function AbilityRoll({
     },
   });
   const name = `${ABILITY_NAMES[ability]} ${kind}`;
+  // FR-CHAR-25: one Tooltip per button; the "Proficient" mark sits inside it, so it joins the
+  // button's hint rather than nesting a second trigger.
+  const hint = `${name}${kind === "save" && proficient ? " · Proficient" : ""} · ${ROLL_HINT}`;
   return (
-    <RollButton
-      control={control}
-      data-testid={`char-sheet-roll-${kind}`}
-      data-value={ability}
-      type="button"
-      size="sm"
-      variant="secondary"
-      className="h-6 w-full justify-between gap-1 px-2 text-xs"
-      title={`${name} · Shift: advantage · Ctrl: disadvantage`}
-      aria-label={`${name} ${signed(bonus)}`}
-      disabled={!live || flight.busy || specs.length === 0}
-    >
-      <span>{kind === "check" ? "Check" : "Save"}</span>
-      <span className="flex items-center gap-1 tabular-nums">
-        {signed(bonus)}
-        {kind === "save" && (
-          <span
-            data-testid="char-sheet-save-prof"
-            data-value={ability}
-            data-proficient={proficient ? "true" : "false"}
-            title={proficient ? "Proficient" : undefined}
-            className={cn("size-1.5 rounded-full", proficient ? "bg-foreground" : "bg-transparent")}
-          />
-        )}
-      </span>
-    </RollButton>
+    <Tooltip content={hint}>
+      <RollButton
+        control={control}
+        data-testid={`char-sheet-roll-${kind}`}
+        data-value={ability}
+        type="button"
+        size="sm"
+        variant="secondary"
+        className="h-6 w-full justify-between gap-1 px-2 text-xs"
+        aria-label={`${name} ${signed(bonus)}`}
+        disabled={!live || flight.busy || specs.length === 0}
+      >
+        <span>{kind === "check" ? "Check" : "Save"}</span>
+        <span className="flex items-center gap-1 tabular-nums">
+          {signed(bonus)}
+          {kind === "save" && (
+            <span
+              data-testid="char-sheet-save-prof"
+              data-value={ability}
+              data-proficient={proficient ? "true" : "false"}
+              className={cn(
+                "size-1.5 rounded-full",
+                proficient ? "bg-foreground" : "bg-transparent",
+              )}
+            />
+          )}
+        </span>
+      </RollButton>
+    </Tooltip>
   );
 }
 

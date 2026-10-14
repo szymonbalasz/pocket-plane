@@ -321,20 +321,21 @@ function Moved({ c, speed }: { c: CombatantView; speed: number | undefined }) {
   const tone = speed === undefined ? "none" : movementIndicator(moved, null, speed).tone;
   const text = speed === undefined ? `${moved} ft` : `${moved} / ${speed} ft`;
   return (
-    <span
-      className={cn(
-        "ml-auto flex shrink-0 items-center gap-0.5 pl-1 text-xs whitespace-nowrap text-muted-foreground tabular-nums",
-        TONE_CLASS[tone],
-      )}
-      data-testid="cbt-init-row-moved"
-      data-record-id={c.id}
-      data-tone={tone}
-      title={`Moved ${text}`}
-    >
-      <FootprintsIcon className="size-3" aria-hidden />
-      <span className="sr-only">Moved </span>
-      {text}
-    </span>
+    <Tooltip content={`Moved ${text}`}>
+      <span
+        className={cn(
+          "ml-auto flex shrink-0 items-center gap-0.5 pl-1 text-xs whitespace-nowrap text-muted-foreground tabular-nums",
+          TONE_CLASS[tone],
+        )}
+        data-testid="cbt-init-row-moved"
+        data-record-id={c.id}
+        data-tone={tone}
+      >
+        <FootprintsIcon className="size-3" aria-hidden />
+        <span className="sr-only">Moved </span>
+        {text}
+      </span>
+    </Tooltip>
   );
 }
 
