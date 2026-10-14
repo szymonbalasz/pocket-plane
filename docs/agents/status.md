@@ -9,8 +9,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | P1 tooltip delay | `fix/tooltip-delay` (ws `w1W`, slot 0) | `build-tooltip-delay` | **Building** | Walkthrough play-shell 16, char-sheet 11 → merge |
-| ADR-0033 signal audience | `fix/signal-audience` (ws `w1X`, slot 2) | `build-signal-audience` | **Building** | Merge → `build/scenes-map-playtest` |
-| Scenes-map (P2, P3, G1) | — | — | Waits on `fix/signal-audience` | |
+| ADR-0033 signal audience | — | — | **Merged** `36f0bf6` (738 tests) | — |
+| Scenes-map (P2, P3, G1) | `build/scenes-map-playtest` (ws `w1Y`, slot 2) | `build-scenes-map-playtest` | **Building** | Walkthrough scenes-map 10–11 → merge |
 | Combat + sheet + dice (P4, P5, G4–G9) | — | — | Waits on tooltip + scenes-map | |
 | Glitches (G2, G3, G10, G11) | — | — | Waits on tooltip | |
 
@@ -19,11 +19,10 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 ## Shared-file locks
 
 - `src/client/common/components/ui/overlays.tsx` (+ `menus.tsx` / `controls.tsx` if needed), `src/client/{dm,player}/main.tsx` → `fix/tooltip-delay`
-- `src/server/ws/signals.ts`, `src/server/ws/hub.ts` → `fix/signal-audience`
 
 ## Pending DM decisions
 
-- None. (Playtest spec gate passed, #172.)
+- Promote "add combatants mid-fight" (summons, reinforcements) from tier A to S? Asked 2026-10-14; pick: keep A (pre-placed hidden tokens revealed mid-fight cover reinforcements). Affects only `build/combat-playtest` (not started).
 
 ## Resolved locally (report at gate)
 
