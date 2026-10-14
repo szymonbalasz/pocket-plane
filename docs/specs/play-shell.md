@@ -206,7 +206,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 - **Existing common UI** (shared): `src/client/common/components/ui/overlays.tsx`: Tooltip delay constant, FR-SHELL-31 suppression, `ui-tooltip`; Popover / DropdownMenu wrappers in the same folder (`menus.tsx`, `controls.tsx`) only if suppression needs an "opened from" hook. `src/client/dm/main.tsx`, `src/client/player/main.tsx`: provider takes the shared constant (today `delayDuration={200}`).
 - **Play-shell frame** (shared, #154): `geometry.ts`, `ShellWindow.tsx`, `storage.ts` (per-window `area`) for FR-SHELL-29. `placement.ts` already fits to the area above the launcher (protocol §18); at most it exports the work-area helper.
 - **Feature files the playtest builds touch** (feature-owned; native `title` → Tooltip, FR-SHELL-30): `CharacterSheet.tsx` (roll hints), `HistoryWindow.tsx` (Pending / History), DM `initiative-window.tsx` (Moved cell), `CampaignBar.tsx` / `PlayersPanel.tsx` (campaign-management: icon buttons; presence badge FR-SHELL-33), `scenes-window.tsx`, `token-menu-entries.tsx`, `creature-form.tsx` where a `title` sits on a button.
-- **Protocol §24 / §18** (docs at consolidation): DM `cbt.initiative` default geometry 400 × ≈ 500 (exact height set by the build to meet FR-SHELL-32); §18 "Default layout" gains the work-area / fit rule and the 6-row check. No data-model change.
+- **Protocol §24 / §18** (consolidated #172, protocol §30): DM `cbt.initiative` default geometry 400 × ≈ 500 (exact height set by the build to meet FR-SHELL-32); §18 "Default layout" gains the work-area / fit rule and the 6-row check. No data-model change.
 
 ## 15. Open questions
 

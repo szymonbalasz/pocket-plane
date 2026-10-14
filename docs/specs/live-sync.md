@@ -182,12 +182,12 @@ The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map 
 | [scenes-map](scenes-map.md) / [play-shell](play-shell.md) | Active scene id + resync on switch, ping/laser as signals / hosts indicator, banner, presence | open |
 | Build conventions (AGENTS.md) | `PP_TEST_MODE`, `PP_DATA_DISPOSABLE`, ports: AGENTS §9.2 (agreed, pending merge); WS path: open (OQ-SYNC-15) | agreed, pending merge |
 | [scenes-map](scenes-map.md) (playtest) | `map.drag` registers the first `audience` hook (FR-MAP-41) | in review |
-| [campaign-management](campaign-management.md) | FR-CAMP-14 / §7: online dot hidden (muted "–") while the DM client is not `live` (FR-SYNC-29); integrator amends CAMP at consolidation | to amend |
+| [campaign-management](campaign-management.md) | FR-CAMP-14 / §7: online dot hidden (muted "–") while the DM client is not `live` (FR-SYNC-29); CAMP §7 amended at consolidation (#172) | agreed |
 
 **Shared changes** (playtest pass, #171; shared core, orchestrator routes per AGENTS §9.9):
 - `src/server/ws/signals.ts` (`SignalDef.audience?`), `src/server/ws/hub.ts` (run it; `"dm"` routing; reject / `internal`); hub gets read-only DB + active-scene cache access for the hook. `src/shared/protocol/`: none (frames unchanged).
 - Client: `src/client/common/sync/store.ts` or `connection.ts`: presence marked unknown while not `live` (a `usePresence()` returning `{known, records}`), used by the DM badge (play-shell) and players panel (campaign-management).
-- Docs at consolidation: protocol §7 routing (hook, `"dm"` audience), §15 (`map.drag`); ADR from [ADR-0033](../architecture/adr/0033-signal-audience.md). No schema, event or record-type change.
+- Docs consolidated (#172, protocol §30): protocol §7 routing (hook, `"dm"` audience), §15 (`map.drag`); [ADR-0033](../architecture/adr/0033-signal-audience.md). No schema, event or record-type change.
 
 ## 15. Open questions
 
