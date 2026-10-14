@@ -1,0 +1,176 @@
+import { describe, expect, test } from "bun:test";
+import type { WindowState } from "@shared/play-shell/layout";
+import {
+  freeArea,
+  isAppearance,
+  noteAppearance,
+  notedAppearances,
+  railArea,
+  renderedWindowRects,
+} from "./free-area";
+import { createWindowRegistry, defineWindow } from "./registry";
+
+const VP = { w: 1440, h: 900 };
+/** Work area right of the rail at 1440×900: x 68…1440, y 48…836. */
+const RAIL = { x: 68, y: 48, w: 1372, h: 788 };
+
+describe("FR-SHELL-34 free area", () => {
+  test("FR-SHELL-34 no windows → the work area right of the rail", () => {
+    expect(railArea(VP)).toEqual(RAIL);
+    expect(freeArea([], VP)).toEqual(RAIL);
+  });
+
+  test("FR-SHELL-34 largest rect beside a right-edge window", () => {
+    const init = { x: 1028, y: 60, w: 400, h: 500 };
+    expect(freeArea([init], VP)).toEqual({ x: 68, y: 48, w: 960, h: 788 });
+  });
+
+  test("FR-SHELL-34 DM default layout at 1440×900: left of Initiative, above the log", () => {
+    const init = { x: 1028, y: 60, w: 400, h: 500 };
+    const log = { x: 68, y: 584, w: 460, h: 240 };
+    expect(freeArea([init, log], VP)).toEqual({ x: 68, y: 48, w: 960, h: 536 });
+  });
+
+  test("FR-SHELL-34 overlapping windows count once", () => {
+    const a = { x: 900, y: 60, w: 400, h: 400 };
+    const b = { x: 1000, y: 100, w: 440, h: 400 };
+    expect(freeArea([a, b], VP)).toEqual({ x: 68, y: 48, w: 832, h: 788 });
+  });
+
+  test("FR-SHELL-34 the rail strip is excluded; a window over it doesn't count there", () => {
+    const left = { x: 0, y: 48, w: 200, h: 788 };
+    expect(freeArea([left], VP)).toEqual({ x: 200, y: 48, w: 1240, h: 788 });
+  });
+
+  test("FR-SHELL-34 tie → the higher, then the more left one", () => {
+    // A full-width band across the middle: equal halves above and below → the upper one.
+    const band = { x: 0, y: 418, w: 1440, h: 48 };
+    expect(freeArea([band], VP)).toEqual({ x: 68, y: 48, w: 1372, h: 370 });
+    // A full-height column in the middle: equal halves left and right → the left one.
+    const col = { x: 704, y: 0, w: 100, h: 900 };
+    expect(freeArea([col], { w: 1440, h: 900 })).toEqual({ x: 68, y: 48, w: 636, h: 788 });
+  });
+
+  test("FR-SHELL-34 window wider than the area → the larger strip it leaves", () => {
+    const wide = { x: -100, y: 300, w: 2000, h: 300 };
+    expect(freeArea([wide], VP)).toEqual({ x: 68, y: 48, w: 1372, h: 252 });
+  });
+
+  test("FR-SHELL-34 < 320×240 or < 25 % of the work area → the work area right of the rail", () => {
+    // Only a 1372 × 200 strip is left: too low.
+    const big = { x: 0, y: 248, w: 1440, h: 700 };
+    expect(freeArea([big], VP)).toEqual(RAIL);
+    // 600 × 400 is ≥ 320×240 but < 25 % of 1440 × 788.
+    const frame = [
+      { x: 0, y: 48, w: 1440, h: 200 },
+      { x: 0, y: 648, w: 1440, h: 200 },
+      { x: 668, y: 0, w: 800, h: 900 },
+    ];
+    expect(freeArea(frame, VP)).toEqual(RAIL);
+  });
+});
+
+const Body = () => null;
+const registry = createWindowRegistry("player", [
+  defineWindow({
+    kind: "char.sheet",
+    title: "Sheet",
+    clients: ["player"],
+    defaultSize: { w: 320, h: 440 },
+    minSize: { w: 280, h: 320 },
+    defaultPosition: { anchor: "top-right" },
+    component: Body,
+  }),
+  defineWindow({
+    kind: "cbt.initiative",
+    title: "Initiative",
+    clients: ["player"],
+    defaultSize: { w: 280, h: 400 },
+    minSize: { w: 240, h: 200 },
+    defaultPosition: { anchor: "bottom-right" },
+    available: (s) => s.records.encounter !== undefined,
+    component: Body,
+  }),
+  defineWindow({
+    kind: "note.history",
+    title: "Notifications",
+    clients: ["player"],
+    defaultSize: { w: 360, h: 300 },
+    minSize: { w: 280, h: 240 },
+    defaultPosition: { anchor: "bottom-right" },
+    component: Body,
+  }),
+]);
+
+const win = (kind: string, state: WindowState["state"], x: number, z: number): WindowState => ({
+  kind,
+  instance: "main",
+  state,
+  x,
+  y: 60,
+  w: 300,
+  h: 300,
+  z,
+});
+
+describe("FR-SHELL-34 rendered windows", () => {
+  test("FR-SHELL-34 minimised, closed and unavailable windows don't cover", () => {
+    const ws = [
+      win("char.sheet", "minimised", 100, 1),
+      win("note.history", "closed", 500, 2),
+      win("cbt.initiative", "open", 900, 3),
+    ];
+    const none = new Set(["char.sheet", "note.history"]);
+    expect(renderedWindowRects(ws, registry, none, VP)).toEqual([]);
+    expect(freeArea(renderedWindowRects(ws, registry, none, VP), VP)).toEqual(RAIL);
+    const all = new Set([...none, "cbt.initiative"]);
+    expect(renderedWindowRects(ws, registry, all, VP)).toEqual([{ x: 900, y: 60, w: 300, h: 300 }]);
+  });
+});
+
+describe("FR-SHELL-34 appearances", () => {
+  const key = "pp.layout.v1.c1.player.p1";
+  const before = { key, kinds: new Set(["char.sheet", "note.history"]) };
+  const withInit = { key, kinds: new Set([...before.kinds, "cbt.initiative"]) };
+  const open = [win("char.sheet", "open", 100, 1), win("cbt.initiative", "open", 900, 2)];
+
+  test("FR-SHELL-34 an open window whose kind becomes available is one appearance", () => {
+    expect(isAppearance(before, withInit, open)).toBe(true);
+  });
+
+  test("FR-SHELL-34 a minimised window becoming available is not (nothing rendered)", () => {
+    const ws = [win("cbt.initiative", "minimised", 900, 1)];
+    expect(isAppearance(before, withInit, ws)).toBe(false);
+  });
+
+  test("FR-SHELL-34 two kinds first available in one reconnect snapshot count once", () => {
+    const prev = { key, kinds: new Set(["char.sheet"]) };
+    const ws = [...open, win("note.history", "open", 500, 3)];
+    // One store change (the snapshot) → one boolean → one appearance.
+    expect(isAppearance(prev, withInit, ws)).toBe(true);
+  });
+
+  test("FR-SHELL-34 a snapshot with no newly available kind doesn't count", () => {
+    expect(isAppearance(withInit, { key, kinds: new Set(withInit.kinds) }, open)).toBe(false);
+    expect(isAppearance(withInit, before, open)).toBe(false); // End: kind goes away
+  });
+
+  test("FR-SHELL-34 user open / restore doesn't count (availability unchanged)", () => {
+    const after = [...open, win("note.history", "open", 500, 3)];
+    expect(isAppearance(withInit, withInit, after)).toBe(false);
+  });
+
+  test("FR-SHELL-34 a layout restore (first snapshot, campaign switch) doesn't count", () => {
+    expect(isAppearance(null, withInit, open)).toBe(false);
+    expect(isAppearance({ key: null, kinds: new Set() }, withInit, open)).toBe(false);
+    const other = { key: "pp.layout.v1.c2.player.p1", kinds: new Set<string>() };
+    expect(isAppearance(other, withInit, open)).toBe(false);
+  });
+
+  test("FR-SHELL-34 noteAppearance() counts one per call", () => {
+    const n = notedAppearances();
+    noteAppearance();
+    noteAppearance();
+    expect(notedAppearances()).toBe(n + 2);
+  });
+});
