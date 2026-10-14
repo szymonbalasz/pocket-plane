@@ -446,7 +446,7 @@ function Row({
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1">
           <span
-            className="max-w-[55%] shrink-0 truncate text-sm font-medium"
+            className="truncate text-sm font-medium"
             data-testid="cbt-init-row-name"
             title={c.name}
           >

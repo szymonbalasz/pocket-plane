@@ -104,7 +104,8 @@ export function EffectChips({
     <div
       ref={ref}
       className={cn(
-        "relative flex min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-hidden",
+        // Never narrower than the "+N" chip: a long name shrinks first.
+        "relative flex min-w-[2.25rem] flex-1 flex-nowrap items-center gap-0.5 overflow-hidden",
         className,
       )}
     >

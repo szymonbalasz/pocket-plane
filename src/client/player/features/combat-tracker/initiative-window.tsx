@@ -86,18 +86,20 @@ function PlayerInitiativeBody() {
             >
               <TurnMarker active={turn} />
               <Portrait name={c.name} imageAssetId={c.imageAssetId} />
-              <span
-                className="max-w-[50%] shrink-0 truncate text-sm"
-                data-testid="cbt-init-row-name"
-                title={c.name}
-              >
-                {c.name}
-              </span>
-              <EffectChips
-                effects={effectsOn(fx, creatureOf(c))}
-                round={enc.round}
-                testId="cbtx-init-row-effect"
-              />
+              <div className="flex min-w-0 flex-1 items-center gap-1">
+                <span
+                  className="min-w-0 truncate text-sm"
+                  data-testid="cbt-init-row-name"
+                  title={c.name}
+                >
+                  {c.name}
+                </span>
+                <EffectChips
+                  effects={effectsOn(fx, creatureOf(c))}
+                  round={enc.round}
+                  testId="cbtx-init-row-effect"
+                />
+              </div>
               {c.kind === "monster" && c.band && (
                 <BandBadge band={c.band} testId="cbt-init-row-band" />
               )}
