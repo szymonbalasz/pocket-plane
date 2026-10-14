@@ -115,8 +115,8 @@ Fixtures, bundles, manifest and lock are **code/files, not DB records**. Only pr
 | `scenes-extras` | setup | Folder "Act 1" holding Town + Goblin Ambush; Thorn on both; custom "Cave Ogre" (large; *(feedback pass, to build)* speed 40, `tokenShape` none) visible on Goblin Ambush; root scene "Cellar" (`map-large`, cell 50, locked) with a goblin. Requires `battlemap`, `char-thorn`, `image-large` | [scenes-map](scenes-map.md#13-test-plan) | no | Scenes |
 | `encounter-1` | setup | Planned "Ambush at the Ford": Goblin × 2, Wolf, Elite Goblin Warrior; party `null` (all). Requires `enemy-1`, `enemy-2`, `enemy-custom` | [combat-tracker](combat-tracker.md#13-test-plan) | yes | Combat |
 | `goblin-2` | setup | Token "Goblin 2" (`enemy-1`) on Goblin Ambush (12, 8), visible. Requires `battlemap` | combat-tracker | yes | Combat |
-| `thorn-battlemap` | setup | Thorn token (owner `player-2`) on Goblin Ambush (2, 9). Requires `battlemap`, `char-thorn` | combat-tracker | ~~no~~ yes *(playtest pass, to build; G1)* | Combat |
-| `thorn-town` | setup | *(playtest pass, to build; G1)* Thorn token (owner `player-2`) on Town (4, 5), visible. Requires `town`, `char-thorn` | [scenes-map](scenes-map.md#13-test-plan) | yes | Playtest |
+| `thorn-battlemap` | setup | Thorn token (owner `player-2`) on Goblin Ambush (2, 9). Requires `battlemap`, `char-thorn` | combat-tracker | ~~no~~ yes *(playtest pass, built; G1)* | Combat |
+| `thorn-town` | setup | *(playtest pass, built; G1)* Thorn token (owner `player-2`) on Town (4, 5), visible. Requires `town`, `char-thorn` | [scenes-map](scenes-map.md#13-test-plan) | yes | Playtest |
 | `combat-1` | setup | Start `encounter-1` on Goblin Ambush; initiative Wolf 18, Mira 15, Goblin 12, Goblin 2 12, Thorn 10, Elite 8; round 1, Wolf. Requires `encounter-1`, `goblin-2`, `thorn-battlemap` | combat-tracker | no | Combat |
 | `combat-hit` | setup | Goblin attacks Mira (manual 15 / 4), applied with `targets [{Mira, hit, normal}]` → Mira 6/12. Requires `combat-1` | combat-tracker | no | Combat |
 | `combat-pending` | setup | Elite attacks (manual 19 / 5), card left pending. Requires `combat-hit` | combat-tracker | no | Combat |

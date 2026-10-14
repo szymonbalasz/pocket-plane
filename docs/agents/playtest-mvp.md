@@ -14,7 +14,6 @@ bun run start --profile verify
 The load prints the **DM URL**, **DM secret** and **two player links** (`http://127.0.0.1:4112/…`). Open the DM URL, paste the secret; open each player link in its own browser. Optional: `$env:PP_TEST_MODE='1'` before `start` for the Probes window ("drop connection").
 
 **Known before you start** (from the acceptance run):
-- Thorn has no token in `session-sim`: drag Thorn from **Creatures** onto Town and the battlemap before play.
 - Windows start at the edges, map-first; open the rest from the dock. Window layout is remembered per browser.
 
 ## A. Town and joining
