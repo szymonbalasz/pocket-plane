@@ -1,7 +1,7 @@
 ---
 title: Character sheet (full)
 prefix: CHARX
-status: in-review
+status: complete
 owner: spec-character-sheet-full
 phase: post-mvp-1
 ---
@@ -20,24 +20,15 @@ phase: post-mvp-1
 
 ## 2. Scope
 
-- Players create their own character; the DM creates one for a player.
-- Edit, inline: identity (species, background, alignment, classes), abilities, AC, HP max, initiative, speed, save and skill proficiencies (incl. expertise), other proficiencies (text), attacks (0–20), spellcasting + spells (hand-entered rows) + slots, features (with optional uses), inventory, notes. Plus overrides on derived values.
+Scope accepted by the DM (#178), including the items beyond sprint-1's first proposal.
+
+- Players create their own character as a **draft**; the DM approves it. The DM can also create one for a player, ready or as a draft.
+- Edit, inline: identity (species, background, alignment, classes; multiclass in the model, basic UI), abilities, AC, HP max, initiative, speed, save and skill proficiencies (incl. expertise), other proficiencies (text), attacks (0–20), spellcasting + spells (hand-entered rows) + slots, features (with optional uses), inventory, notes. Plus overrides on derived values.
 - Counters: spell slots used, hit dice used, feature uses. Owner and DM, also on a locked sheet.
-- DM: lock / unlock, full editing of any PC.
-- Roll every number (§6 table); several attacks per character (roll routes gain a row reference).
-- Other players see a summary only. Sheet sections registry (seam for [combat-extras](combat-extras.md)). Fixtures + bundle `character-sheet-full`.
-
-**Proposed, beyond sprint-1's proposal** (the DM may cut each at the gate; cutting one removes its FRs):
-
-| Item | FRs | OQ |
-|---|---|---|
-| Draft → DM approve workflow (else: a player's new character is ready at once) | 08 (draft part), 10, 11 | OQ-CHARX-03 |
-| Owner reassignment from the sheet | 13 | — |
-| NPC sheets (custom definitions opened in the sheet) | 22, 31 | OQ-CHARX-06 |
-| Read-only wallet line from [party-loot](party-loot.md) | 33 | — |
-| Multiclass model (class rows) | 04 | OQ-CHARX-07 |
-| Level, class, species in other players' summary (else: today's name, portrait, Down) | 32, 35 | OQ-CHARX-05 |
-| Spell attacks routed into combat | 24 (`spellAttack`) | OQ-CHARX-12 |
+- DM: approve, lock / unlock, reassign the owner, full editing of any PC and of **NPC sheets** (custom creature definitions opened in the sheet).
+- Roll every number (§6 table); several attacks per character and spell attacks routed into combat (roll routes gain a row reference).
+- Other players see a summary (name, portrait, owner, level + class, species, Down / `deathState`). Read-only wallet line from [party-loot](party-loot.md).
+- Sheet sections registry (seam for [combat-extras](combat-extras.md)). Fixtures + bundle `character-sheet-full`.
 
 ## 3. Goals
 
@@ -78,16 +69,16 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | FR-CHARX-01 | Entities' creature core gains optional fields (§8.1): `skills`, `overrides`, `spellcasting`; character only `classes`, `species`. `attacks` becomes 0–20 rows, each with an optional `id`. Additive: stored rows stay valid, no backfill. | Entities' schema (OQ-CHARX-19) |
 | FR-CHARX-02 | New record `creature-sheet` (§8.2), 1:1 with a campaign entity (character or custom monster; never imported): `status`, `locked`, `ownerPlayerId` copy, background, alignment, proficiency notes, spells, features, items, notes, counters. A missing row = defaults (`ready`, unlocked, empty). Created by `char.create` or by the first CHARX write to that creature. | ADR proposed |
 | FR-CHARX-03 | Limits per §8 field tables. Serialized stat block ≤ 12 KB and `creature-sheet` ≤ 48 KB, else `invalid` "Sheet is full". | §12 |
-| FR-CHARX-04 | Multiclass (model supports, UI basic): `classes` 1–4 rows `{name, level, hitDie, subclass?}`. When set, the server writes `level` = Σ levels (≤ 20, else `invalid`) and `className` = names joined "/" (≤ 40) in the same write; combat keeps reading `level`, `className`. Absent = legacy single class, no hit dice block. | Pending DM gate (OQ-CHARX-07) |
+| FR-CHARX-04 | Multiclass (model supports, UI basic): `classes` 1–4 rows `{name, level, hitDie, subclass?}`. When set, the server writes `level` = Σ levels (≤ 20, else `invalid`) and `className` = names joined "/" (≤ 40) in the same write; combat keeps reading `level`, `className`. Absent = legacy single class, no hit dice block. | #178 (OQ-CHARX-07) |
 | **Derivation** ([proposed ADR](../architecture/adr/proposed-full-sheet-derivation.md)) | | |
-| FR-CHARX-05 | Derived, never stored, pure in `@shared/entities`, both kinds, taking the stat block: ability mod, proficiency bonus, check, save (FR-ENT-24); **skill** = mod + PB × {none 0, proficient 1, expertise 2}; **passive** Perception / Investigation / Insight = 10 + skill bonus; **spell attack** = PB + mod(spellcasting ability); **spell save DC** = 8 + PB + mod; **hit dice** = per die size, Σ class levels. Stored, not derived: AC, HP max, initiative bonus (#154), speed, attack to-hit and damage, slot maxima. | Option C; pending DM gate (OQ-CHARX-01) |
-| FR-CHARX-06 | `overrides[key] = {value, note?}` replaces the derived value everywhere: sheet labels, server rolls, combat's `cbt.rollAbility`. Keys: `proficiency`, `check.<ability>`, `save.<ability>`, `skill.<skill>`, `passive.<perception\|investigation\|insight>`, `spellAttack`, `spellDc`. A `proficiency` override feeds every PB-based value; the others are leaves. Clearing returns to derived. | Pending DM gate (OQ-CHARX-01) |
+| FR-CHARX-05 | Derived, never stored, pure in `@shared/entities`, both kinds, taking the stat block: ability mod, proficiency bonus, check, save (FR-ENT-24); **skill** = mod + PB × {none 0, proficient 1, expertise 2}; **passive** Perception / Investigation / Insight = 10 + skill bonus; **spell attack** = PB + mod(spellcasting ability); **spell save DC** = 8 + PB + mod; **hit dice** = per die size, Σ class levels. Stored, not derived: AC, HP max, initiative bonus (#154), speed, attack to-hit and damage, slot maxima. | Option C, #178 (OQ-CHARX-01) |
+| FR-CHARX-06 | `overrides[key] = {value, note?}` replaces the derived value everywhere: sheet labels, server rolls, combat's `cbt.rollAbility`. Keys: `proficiency`, `check.<ability>`, `save.<ability>`, `skill.<skill>`, `passive.<perception\|investigation\|insight>`, `spellAttack`, `spellDc`. A `proficiency` override feeds every PB-based value; the others are leaves. Clearing returns to derived. | Homebrew; #178 (OQ-CHARX-01) |
 | FR-CHARX-07 | Helper signatures stay (stat block in, number out). Callers (combat FR-CBT-44, combat-extras) get overrides for free. | ADR-0032 deviation now fixable |
 | **Creation and lifecycle** | | |
-| FR-CHARX-08 | `char.create`. Player: `{name}`, owner = `env.actor.playerId`, `status: draft`; a player with an open draft → `conflict` "Finish your draft first: the DM approves it". DM: `{name, ownerPlayerId, draft?}` (default ready). Name per FR-ENT-08. Starting block: medium, AC 10, HP max 1, init +0, no attacks, level 1, class "", all six scores 10; `hpCurrent = hpMax`. Entity (entities' internal create) + `creature-sheet` row in one transaction; `CharacterCreated`. Result `{characterId}`. | Draft part pending DM gate (OQ-CHARX-03) |
+| FR-CHARX-08 | `char.create`. Player: `{name}`, owner = `env.actor.playerId`, `status: draft`; a player with an open draft → `conflict` "Finish your draft first: the DM approves it". DM: `{name, ownerPlayerId, draft?}` (default ready). Name per FR-ENT-08. Starting block: medium, AC 10, HP max 1, init +0, no attacks, level 1, class "", all six scores 10; `hpCurrent = hpMax`. Entity (entities' internal create) + `creature-sheet` row in one transaction; `CharacterCreated`. Result `{characterId}`. | #178 G5 (OQ-CHARX-03) |
 | FR-CHARX-09 | Binding: the owner comes only from the connection's player (the link) or the DM's pick; the link token is never stored on or sent with a character. Renaming a player changes nothing. | ADR-0004 |
-| FR-CHARX-10 | `char.approve {characterId}` (DM): draft → ready, `CharacterApproved`; already ready → success, no event. | Pending DM gate (OQ-CHARX-03) |
-| FR-CHARX-11 | A draft behaves as ready (edit, roll, HP, tokens) except: "Draft" badge (owner, DM) and **not** in an encounter's whole-party list (`partyCharacterIds: null`, FR-CBT-02). | Pending DM gate (OQ-CHARX-03); OQ-CHARX-13 (combat) |
+| FR-CHARX-10 | `char.approve {characterId}` (DM): draft → ready, `CharacterApproved`; already ready → success, no event. | #178 G5 (OQ-CHARX-03) |
+| FR-CHARX-11 | A draft behaves as ready (edit, roll, HP, tokens) except: "Draft" badge (owner, DM) and **not** in an encounter's whole-party list (`partyCharacterIds: null`, FR-CBT-02). | #178 (OQ-CHARX-03, -13) |
 | FR-CHARX-12 | `char.setLock {characterId, locked}` (DM); same value → no event. Locked: a player's edit intents (FR-CHARX-15/16) → `forbidden` "Locked by the DM". Rolls, HP (FR-CHAR-10) and counters (FR-CHARX-17) stay with the owner. The DM is never locked out. `CharacterLockSet`. | |
 | FR-CHARX-13 | Owner change: DM only, `char.edit` key `ownerPlayerId` (player → `forbidden`) or entities' `PUT`. The `creature-sheet` owner copy changes in the same transaction (CHARX's definition-changed hook, FR-ENT-19); the event lists both records: old owner gets the redacted `entity` + `creature-sheet` delete, new owner both full. | FR-ENT-11 |
 | FR-CHARX-14 | No delete: a stray draft is renamed and reused, or reassigned by the DM. | FR-ENT-14, OQ-CHARX-17 |
@@ -100,7 +91,7 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | **Rolls** | | |
 | FR-CHARX-20 | `char.roll` gains kinds `skill`, `damage`, `spellAttack`, `spellDamage` and fields `skill?`, `attackId?`, `spellId?`; wrong combinations → `invalid`. `attack` / `damage` without `attackId` = the first attack (MVP clients and combat keep working). | Amends FR-CHAR-05 |
 | FR-CHARX-21 | Roll specs, built server-side from committed data by `characterRolls(stats, sheet, kind, ref)` (`@shared/character-sheet`), table below. Unknown row → `not_found`; `spellAttack` needs `roll: attack` and `spellDamage` needs `damage`, else `conflict` ("No attack roll for Shield"). Mode on the d20 only; manual count per table; public per FR-CHAR-17. | |
-| FR-CHARX-22 | The DM may `char.roll` for a custom or imported monster definition (NPC sheet): actor name = definition name; always `public: false` (a `public` field → `invalid`; the NPC sheet shows no public switches), because the definition name can leak a renamed or hidden creature ([ADR-0024](../architecture/adr/0024-definition-visibility.md)). Players: monsters stay `not_found`. | Amends FR-CHAR-09; pending DM gate (OQ-CHARX-06) |
+| FR-CHARX-22 | The DM may `char.roll` for a custom or imported monster definition (NPC sheet): actor name = definition name; always `public: false` (a `public` field → `invalid`; the NPC sheet shows no public switches), because the definition name can leak a renamed or hidden creature ([ADR-0024](../architecture/adr/0024-definition-visibility.md)). Players: monsters stay `not_found`. | Amends FR-CHAR-09; #178 (OQ-CHARX-06) |
 | FR-CHARX-23 | Every rollable number on the sheet is a shared roll control ([FR-DICE-24](dice-roll-log.md#6-functional-requirements)): 6 checks, 6 saves, 18 skills, initiative, per attack Attack + Damage, per spell its rolls. Passives, AC, DC and speed are display only. DM public switches: one per category in each block header (FR-CHAR-22's rule). | Tier A |
 | FR-CHARX-24 | Roll routes: `RollRoute.claim(store, characterId, kind, ref?)`, `ref` = `{attackId}` \| `{spellId}`; `SheetRollKind` gains the new kinds. Combat's route claims `initiative`, `attack` and (OQ-CHARX-12) `spellAttack` **only for a spell with `damage`**, passing `ref` to `cbt.attack`; a spell attack without damage rolls plainly via `char.roll`. `damage`, `spellDamage`, `skill` are never claimed. FR-CHAR-16/24 otherwise unchanged. | Extends OQ-CHAR-13 registry |
 | FR-CHARX-25 | A `char.roll` never changes a counter or HP. Slots are ticked by hand. (Other features' rolls may, e.g. CBTX's death save.) | OQ-CHARX-09 |
@@ -110,12 +101,12 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | FR-CHARX-28 | Remote change: a committed change shows ≤ 1 s in every field not being edited. A focused field whose value changed remotely (an `event` not caused by this client's own intent) keeps the local draft and shows a hint (`charx-field-changed`); committing it overwrites (FR-CHARX-15). Frames carry no actor, so the hint is inferred: player client → "Changed by the DM" (only the DM and the owner edit); DM client → "Changed by ‹owner name›" (NPC sheet: "Changed in another tab"). The owner's own other tab also reads "Changed by the DM": accepted. | Concurrency; protocol §3.3 |
 | FR-CHARX-29 | Picker. Player: own characters, then a "Party" group of other PCs (summary card, FR-CHARX-32), then "New character…" (hidden while they have a draft). DM: every character (owner name, Draft / Locked marks), "New character…" (name + owner Select + "Start as draft"), and the NPC last opened via FR-CHARX-31. Sort per FR-CHAR-02 within each group. | Amends FR-CHAR-02 |
 | FR-CHARX-30 | Player with no character: FR-CHAR-04 text gains a **Create character** Button → name Dialog → the new draft opens in edit mode with the hint "Fill in class, ability scores, AC and HP. Your DM approves the sheet." | |
-| FR-CHARX-31 | NPC sheet: entities' `creatureActions` gains "Sheet" (DM): opens `char.sheet` on that definition. Custom: editable as above, CR + XP instead of level, HP max only (no HP control, no counters, no hit dice). Imported: read-only, lock icon, "Derive to customise". | Pending DM gate (OQ-CHARX-06) |
-| FR-CHARX-32 | Summary card (other players' PCs): portrait, name, owner, "Level N Class", species, Down badge (CBTX's `deathState` when present, §7.1). Nothing else: no temp HP, death-save counts or effects. | Pending DM gate (OQ-CHARX-05 with OQ-CBTX-09) |
+| FR-CHARX-31 | NPC sheet: entities' `creatureActions` gains "Sheet" (DM): opens `char.sheet` on that definition. Custom: editable as above, CR + XP instead of level, HP max only (no HP control, no counters, no hit dice). Imported: read-only, lock icon, "Derive to customise". | #178 (OQ-CHARX-06) |
+| FR-CHARX-32 | Summary card (other players' PCs): portrait, name, owner, "Level N Class", species, Down badge (CBTX's `deathState` when present, §7.1). Nothing else: no temp HP, death-save counts or effects. | #178 G6 (OQ-CHARX-05, OQ-CBTX-09) |
 | FR-CHARX-33 | Inventory tab shows the character's wallet read-only from party-loot's `wallet` record (missing = all zero), with "Move coin in Party loot". | OQ-LOOT-16 follow-up |
 | FR-CHARX-34 | Sheet sections registry and rendering: [§7.1](#71-sheet-sections-seam-combat-extras). | Seam |
 | **Visibility** | | |
-| FR-CHARX-35 | Other players get a character redacted to **one whitelist** in entities' visibility fn (ENT-owned), defined in the [proposed ADR](../architecture/adr/proposed-full-sheet-derivation.md) ("Refines ADR-0024"): base `id, kind, name, portraitAssetId, ownerPlayerId` + `down` (#154) + `level, className, species` (CHARX) + `deathState` (CBTX). No other field. Tests assert against that shared list. *Pending DM gate (OQ-CHARX-05 with OQ-CBTX-09).* | Entities' visibility line |
+| FR-CHARX-35 | Other players get a character redacted to **one whitelist** in entities' visibility fn (ENT-owned), defined in the [proposed ADR](../architecture/adr/proposed-full-sheet-derivation.md) ("Refines ADR-0024"): base `id, kind, name, portraitAssetId, ownerPlayerId` + `down` (#154) + `level, className, species` (CHARX) + `deathState` (CBTX). No other field. Tests assert against that shared list. | Entities' visibility line; #178 G6 |
 | FR-CHARX-36 | `creature-sheet`: DM full; player full iff `ownerPlayerId = ctx.playerId` (the row's copy); otherwise hidden (other players' sheets, every NPC sheet). | ADR-0021 |
 | FR-CHARX-37 | Every CHARX command lists every record whose visibility changes (owner change: `entity` + `creature-sheet`). | FR-CBT-27 rule |
 | **Robustness** | | |
@@ -225,7 +216,7 @@ interface SheetSection {
 
 ## 9. API & events
 
-**REST**: none new. Sheet edits use WS intents for both roles, characters **and** NPC sheets: one per-field-merge path. That refines ADR-0021 D (prep CRUD over REST) for NPC sheet edits; the refinement is in the [proposed ADR](../architecture/adr/proposed-full-sheet-derivation.md), *pending DM gate (OQ-CHARX-14)*. Entities' `POST` / `PUT /api/entities` stay for the creature form (FR-CBT-43): a whole replace that carries the new stat-block fields it read. **Coexistence:** both write the same row in commit order. `char.edit` overwrites only the fields it names; a later `PUT` overwrites the whole stat block with what the form loaded (last write wins per field vs whole). `PUT` never touches `creature-sheet`.
+**REST**: none new. Sheet edits use WS intents for both roles, characters **and** NPC sheets: one per-field-merge path. That refines ADR-0021 D (prep CRUD over REST) for NPC sheet edits; the refinement is in the [ADR](../architecture/adr/proposed-full-sheet-derivation.md) (accepted #178). Entities' `POST` / `PUT /api/entities` stay for the creature form (FR-CBT-43): a whole replace that carries the new stat-block fields it read. **Coexistence:** both write the same row in commit order. `char.edit` overwrites only the fields it names; a later `PUT` overwrites the whole stat block with what the form loaded (last write wins per field vs whole). `PUT` never touches `creature-sheet`.
 
 **WS intents** (default deny; none optimistic)
 
@@ -335,7 +326,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | On | What we need | Status |
 |---|---|---|
 | ADR-0004, 0009, 0012, 0016, 0021, 0022, 0024, 0025, 0029, 0032; #106, #139, #149, #154, #177 | Ownership, model, derivation, events, sync, seams, visibility, windows, log window | accepted |
-| [proposed ADR full-sheet derivation](../architecture/adr/proposed-full-sheet-derivation.md) | Option C + storage split | **proposed** |
+| [proposed ADR full-sheet derivation](../architecture/adr/proposed-full-sheet-derivation.md) | Option C + storage split; refines ADR-0021 D, ADR-0024 | accepted #178 (numbered at merge) |
 | [character-sheet](character-sheet.md) | Window, roll routes, `char.roll`, `char.adjustHp`, `characters.adjustHp`, roll control usage | complete, built |
 | [entities](entities.md) | New optional core fields, attacks 0–20, helpers + overrides, summary redaction, internal create / update API, hook + `creatureActions` lines (OQ-CHARX-19) | complete; changes needed |
 | [combat-tracker](combat-tracker.md) | Route passes `ref`; `cbt.attack` gains `attackId?` / `spellId?` via `sheetAttack`; drafts out of whole-party (OQ-CHARX-12/13) | complete; changes needed |
@@ -373,27 +364,27 @@ Per AGENTS §9.9; the orchestrator routes each. Shared-branch-first changes mark
 
 ## 15. Open questions
 
-**Bold** = suggested pick (not decided). "DM" = needs the DM at the gate.
+All decided; no open question remains.
 
-| ID | Question | Options (pick marked) | Blocking? | Affects |
+| ID | Question | Decision | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CHARX-01 | ADR-0012 full-sheet derivation (DM) | **C: derived with overrides, fixed key list** (automation + homebrew escape; overrides can go stale) / A: all stored (typing, drift) / D: modifier list (needs a modifier vocabulary; items not modelled) → [proposed ADR](../architecture/adr/proposed-full-sheet-derivation.md) | yes | entities, combat-tracker, combat-extras, levelling |
-| OQ-CHARX-02 | Where sheet data lives | **Rules in `statBlock`, rest in new `creature-sheet`** (small HP upserts; one more record type) / all in `statBlock` (simplest; 10–48 KB per HP change) / all in a new table (combat reads two places for numbers). In the same ADR | yes (ADR) | entities, live-sync |
-| OQ-CHARX-03 | How a player gets a character (DM) | **Player makes a draft; DM approves; DM can also create** (self-serve, DM keeps control; one more state) / live at once (junk joins "whole party") / DM creates only, player fills (no self-serve) | yes | combat-tracker |
-| OQ-CHARX-05 | What other players see (DM; carried-over "summary only"); goes to the DM **together with OQ-CBTX-09** (`deathState`) | **One whitelist: name, portrait, owner, Down + level, class, species (CHARX) + `deathState` (CBTX)** (party feel, no numbers; ADR-0024 refined in the proposed ADR) / as today: name, portrait, Down / full read-only | no · owner: spec-character-sheet-full | entities, combat-extras |
-| OQ-CHARX-06 | What an "NPC sheet" is for full editing (DM) | **The sheet opened on a custom creature definition by the DM** (no new kind; reuses visibility) / owner-less `character` (joins "whole party", touches combat) / new `npc` kind (world-builder's) | no · owner: spec-character-sheet-full | entities, glossary |
-| OQ-CHARX-07 | Multiclassing (DM; carried-over) | **Model supports class rows; UI basic (list)** / single class only | no · owner: spec-character-sheet-full | levelling |
-| OQ-CHARX-08 | Rest buttons (tier C) (DM) | **Out: manual counters + per-block Reset** (no rest rules) / short + long rest buttons (hit-die heal, slot reset: ~1 slice) | no · owner: spec-character-sheet-full | — |
-| OQ-CHARX-09 | Casting uses a slot? | **No: pips ticked by hand** (no upcast rules) / roll asks for a slot level | no · owner: spec-character-sheet-full | — |
-| ~~OQ-CHARX-10~~ | ~~Seam with combat-extras: temp HP, death saves, conditions on the sheet; CON save for concentration~~ | **Settled by the orchestrator, see D/S seam:** `sheet-sections.ts` registry per §7.1 (CHARX's contract); CBTX registers `cbtx.temp-hp`, `cbtx.death-saves` (`vitals`) and `cbtx.effects` (`header`); concentration uses `saveBonus(stats, "con")` from `fix/charx-core`, overrides honoured (also settles OQ-CBTX-14) | — | combat-extras |
-| ~~OQ-CHARX-11~~ | ~~Sheet Damage vs temp HP~~ | **Settled by the orchestrator, see D/S seam:** the sheet keeps `char.adjustHp`; CBTX wires it through `hpRules.apply` (temp HP absorbs, death-save failures at 0 HP, concentration cards). CHARX models no temp HP, death-save or condition fields (also settles OQ-CBTX-13) | — | character-sheet, combat-extras |
-| OQ-CHARX-12 | Combat with several attacks and spell attacks | **Route claims `attack` + `spellAttack` with `ref`; `cbt.attack` gains `attackId?` / `spellId?`, resolved by `sheetAttack`; DM row picker for NPC attacks is combat's** / only weapon attacks route, spells roll plain (DM applies HP by hand) | no · owner: combat-tracker | combat-tracker, combat-extras |
-| OQ-CHARX-13 | Drafts in encounters | **Excluded from `partyCharacterIds: null`; explicit lists may include them** / no difference | no · owner: combat-tracker | combat-tracker |
-| OQ-CHARX-14 | Transport for sheet edits (ADR-0021 D: prep CRUD over REST) (DM, with the ADR) | **WS `char.edit` for characters and NPC sheets** (one per-field-merge path; "Refines ADR-0021 D" in the proposed ADR; `PUT` stays for the creature form, §9 coexistence) / NPC sheet edits over REST `PUT` with merge, WS for characters only | no · pending DM gate with OQ-CHARX-01 | protocol |
-| OQ-CHARX-15 | Code ownership | **CHARX's build inherits CHAR's feature folders** / new `character-sheet-full` folders (two features in one window) | no · owner: orchestrator | — |
-| OQ-CHARX-16 | Glossary | **Add: Draft (character), Sheet lock, Sheet section, NPC sheet (the sheet on a custom creature definition; not the `npc` entity kind); add Override (a stored value replacing a derived one, ADR-0012 C) and drop "Override (not supported)" from Modifier's avoid-column (different meaning)** | no · owner: integrator | glossary |
-| OQ-CHARX-17 | Deleting characters (DM) | **No delete (FR-ENT-14); rename / reassign** / owner discards an unreferenced draft | no · owner: spec-character-sheet-full | entities |
-| OQ-CHARX-19 | Entities changes (§8.1, attacks 0–20, summary redaction, internal `createIn` / `updateIn`, hook + `creatureActions` lines) | **Accept; land in `fix/charx-core`** / CHARX keeps its own copy of the rules (two schemas) | no · owner: integrator | entities |
+| OQ-CHARX-01 | ADR-0012 full-sheet derivation | **Decided #178:** C, derived with overrides, fixed key list ([proposed ADR](../architecture/adr/proposed-full-sheet-derivation.md), accepted; A all-stored and D modifier-list rejected) | — | entities, combat-tracker, combat-extras, levelling |
+| OQ-CHARX-02 | Where sheet data lives | **Decided #178** (same ADR): rules in `statBlock`, the rest in the new `creature-sheet` record | — | entities, live-sync |
+| OQ-CHARX-03 | How a player gets a character | **Decided #178 (G5):** the player makes a draft, the DM approves; the DM can also create one | — | combat-tracker |
+| OQ-CHARX-05 | What other players see | **Decided #178 (G6, with OQ-CBTX-09):** one whitelist: name, portrait, owner, Down, level, class, species, `deathState` | — | entities, combat-extras |
+| OQ-CHARX-06 | What an "NPC sheet" is | **Decided #178:** the sheet opened by the DM on a custom creature definition (no new kind) | — | entities, glossary |
+| OQ-CHARX-07 | Multiclassing | **Decided #178:** the model supports class rows; basic list UI | — | levelling |
+| OQ-CHARX-08 | Rest buttons (tier C) | **Decided #178:** out; manual counters + per-block Reset | — | — |
+| OQ-CHARX-09 | Casting uses a slot? | **Decided #178:** no; pips ticked by hand | — | — |
+| OQ-CHARX-10 | Seam with combat-extras; CON save for concentration | **Decided (D/S seam):** `sheet-sections.ts` per §7.1; CBTX registers `cbtx.temp-hp`, `cbtx.death-saves` (`vitals`), `cbtx.effects` (`header`); concentration uses `saveBonus(stats, "con")` from `fix/charx-core`, overrides honoured | — | combat-extras |
+| OQ-CHARX-11 | Sheet Damage vs temp HP | **Decided (D/S seam):** the sheet keeps `char.adjustHp`; CBTX wires it through `hpRules.apply`; CHARX models no temp HP, death-save or condition fields | — | character-sheet, combat-extras |
+| OQ-CHARX-12 | Combat with several attacks and spell attacks | **Decided #178:** the route claims `attack` + `spellAttack` (spells with damage) with `ref`; `cbt.attack` gains `attackId?` / `spellId?` via `sheetAttack`; a DM attack picker for NPC rows is combat's | — | combat-tracker, combat-extras |
+| OQ-CHARX-13 | Drafts in encounters | **Decided #178:** excluded from `partyCharacterIds: null`; explicit lists may include them | — | combat-tracker |
+| OQ-CHARX-14 | Transport for sheet edits | **Decided #178** (ADR accepted, refines ADR-0021 D): WS `char.edit` for characters and NPC sheets; `PUT` stays for the creature form (§9) | — | protocol |
+| OQ-CHARX-15 | Code ownership | **Decided #178:** CHARX's build inherits CHAR's feature folders | — | — |
+| OQ-CHARX-16 | Glossary | **Decided #178:** add Draft (character), Sheet lock, Sheet section, NPC sheet (not the `npc` entity kind), Override; drop "Override (not supported)" from Modifier's avoid-column (integrator) | — | glossary |
+| OQ-CHARX-17 | Deleting characters | **Decided #178:** no delete (FR-ENT-14); rename / reassign | — | entities |
+| OQ-CHARX-19 | Entities changes | **Decided #178:** accepted; they land in `fix/charx-core` | — | entities |
 
 OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while drafting).
 

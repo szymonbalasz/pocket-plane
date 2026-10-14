@@ -1,6 +1,6 @@
 # proposed — Full character sheet: derived with overrides; rules data vs sheet record
 
-- Status: proposed (spec-character-sheet-full, sprint 1 track S)
+- Status: accepted (DM decision #178, 2026-10-14); the integrator numbers it at merge
 - Date: 2026-10-14
 - Decides: [ADR-0012](0012-character-derived-values.md) "Full sheet: undecided"; extends [ADR-0032](0032-ability-derivation.md)
 - Refines: [ADR-0021](0021-sync-protocol-conventions.md) D (transport) and [ADR-0024](0024-definition-visibility.md) (redacted character fields); see the last two Decision bullets
@@ -33,7 +33,7 @@
 | 2. Everything in `statBlock` | No new table | Every HP change resends the whole sheet; notes in the creature core |
 | 3. Everything in a new table | Entities untouched | Combat and helpers read numbers from two places |
 
-## Decision (proposed)
+## Decision (#178)
 
 - **C + 1.**
 - **Derived** (pure, `@shared/entities`, both kinds, never stored): ability mod, proficiency bonus, check, save, skill (none / proficient / expertise), passive Perception / Investigation / Insight, spell attack, spell save DC, hit dice per die size.
@@ -50,7 +50,7 @@
 | `level`, `className`, `species` | FR-CHARX-35 (OQ-CHARX-05) |
 | `deathState` | combat-extras (OQ-CBTX-09) |
 
-  No HP, AC, scores, counters or text. OQ-CHARX-05 and OQ-CBTX-09 go to the DM together.
+  No HP, AC, scores, counters or text. Decided with OQ-CHARX-05 and OQ-CBTX-09 (#178, G6).
 
 ## Consequences
 
