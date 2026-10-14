@@ -30,6 +30,7 @@ import lootSecond from "./party-loot/loot-second";
 import lootWallets from "./party-loot/loot-wallets";
 import battlemap from "./scenes-map/battlemap";
 import scenesExtras from "./scenes-map/scenes-extras";
+import thornTown from "./scenes-map/thorn-town";
 import town from "./scenes-map/town";
 
 export const units: readonly Fixture[] = [
@@ -64,4 +65,5 @@ export const units: readonly Fixture[] = [
   loot1,
   lootWallets,
   lootSecond,
+  thornTown,
 ];

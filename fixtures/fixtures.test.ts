@@ -59,6 +59,8 @@ describe("fixture library", () => {
       "player-2",
       "char-thorn",
       "loot-wallets",
+      "thorn-town",
+      "thorn-battlemap",
     ]);
     expect(await keys("campaign-switch")).toEqual([
       "campaign",

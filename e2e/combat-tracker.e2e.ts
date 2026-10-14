@@ -175,14 +175,14 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   );
   await expect(row(init, goblin).getByTestId("cbt-init-row-hp")).toHaveText("HP 3/7");
   await expect.poll(async () => (await konvaNodes(player, "cbt-token-down")).length).toBe(1);
-  // FR-MAP-34: the name label sits below the badge row, never under it.
+  // FR-MAP-43: the badge sits in the label row, after the name.
   for (const page of [dm, player]) {
     const [down] = await konvaNodes(page, "cbt-token-down");
     const [label] = await konvaNodes(page, "map-token-label", down?.id);
     expect(down && label).toBeTruthy();
     if (!down || !label) continue;
-    // The label's client rect includes its 3 px shadow blur.
-    expect(label.y - label.height / 2).toBeGreaterThanOrEqual(down.y + down.height / 2 - 3.5);
+    expect(Math.abs(down.y - label.y)).toBeLessThan(2);
+    expect(down.x - down.width / 2).toBeGreaterThanOrEqual(label.x + label.width / 2);
   }
 
   // Step 9: one Undo reverts the whole apply (both targets); the card is pending again.

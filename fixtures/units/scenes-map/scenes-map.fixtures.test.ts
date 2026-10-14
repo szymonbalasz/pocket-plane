@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { seededContext } from "@server/commands/context";
 import { closeDb } from "@server/db/client";
-import { scene, sceneFolder, token } from "@server/db/schema";
+import { player, scene, sceneFolder, token } from "@server/db/schema";
 import { resolveBundle } from "@server/features/fixtures-adapters/loader";
 import { asc } from "drizzle-orm";
 import { library, loadBundle } from "../../index";
@@ -103,5 +103,30 @@ describe("scenes-map fixtures (MAP §13)", () => {
     expect(keys).toContain("town");
     expect(keys).toContain("battlemap");
     expect(keys).not.toContain("scenes-extras");
+  });
+
+  test("G1 thorn-town: session-sim puts Thorn (player-2) on Town (4, 5) and Goblin Ambush (2, 9)", async () => {
+    const r = await loaded("session-sim");
+    const keys = resolveBundle(library, "session-sim").map((f) => f.key);
+    expect(keys).toEqual(expect.arrayContaining(["thorn-town", "thorn-battlemap"]));
+    const db = r.openDb();
+    const p2 = db
+      .select()
+      .from(player)
+      .all()
+      .find((p) => p.name === "Player 2");
+    closeDb(db);
+    const by = (n: string) => r.scenes.find((s) => s.name === n)?.id ?? null;
+    const thorns = r.tokens
+      .filter((t) => t.name === "Thorn")
+      .map((t) => [t.sceneId, t.col, t.row, t.hidden, t.ownerPlayerId]);
+    expect(thorns).toEqual([
+      [by("Town"), 4, 5, false, p2?.id ?? null],
+      [by("Goblin Ambush"), 2, 9, false, p2?.id ?? null],
+    ]);
+    // `scenes` keeps its own placements: Thorn once on Town.
+    const s = first ?? (await loaded("scenes"));
+    const town = s.scenes.find((x) => x.name === "Town")?.id;
+    expect(s.tokens.filter((t) => t.name === "Thorn" && t.sceneId === town)).toHaveLength(1);
   });
 });

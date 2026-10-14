@@ -39,6 +39,7 @@ beforeAll(async () => {
   for (const t of db.select().from(token).orderBy(asc(token.seq)).all()) {
     if (t.sceneId === ambush) tokenId[t.name] = t.id;
     if (t.sceneId === sceneId.Town) tokenId[`town:${t.name}`] = t.id;
+    if (t.sceneId === sceneId.Cellar) tokenId[`cellar:${t.name}`] = t.id;
     if (t.name === "Elite Goblin Warrior") eliteImage = t.imageAssetId as string;
     if (t.name === "Wolf") wolfImage = t.imageAssetId as string;
   }
@@ -246,6 +247,90 @@ describe("scenes-map over REST + WS (scenes bundle)", () => {
     ).toEqual(["map.ping", "map.laser", "map.pull"]);
     expect(readEventLog(db).length).toBe(logs);
     for (const c of [dm, p1, p2]) c.close();
+  });
+
+  test("FR-MAP-41 drag routing: hidden / non-active → other DM tabs only; FR-MAP-21 rejects to the sender; no DB, log or seq", async () => {
+    // Goblin Ambush is active since the FR-MAP-06 test; the Wolf and the Elite are hidden.
+    const dm = await h.live(dmCred());
+    const dm2 = await h.live(dmCred());
+    const p1 = await h.live(p1Cred());
+    const p2 = await h.live(p2Cred());
+    const all = [dm, dm2, p1, p2];
+    const mark = new Map(all.map((c) => [c, c.frames.length]));
+    const since = (c: TestClient) => c.frames.slice(mark.get(c));
+    const dragged = (c: TestClient) =>
+      since(c)
+        .filter((f) => f.type === "signal" && f.name === MAP_SIGNALS.drag)
+        .map((f) => (f.type === "signal" ? (f.data as { tokenId: string }).tokenId : ""));
+    const rejects = (c: TestClient) =>
+      since(c).flatMap((f) =>
+        f.type === "reject" ? [{ code: f.code as string, message: f.message }] : [],
+      );
+    const tokensBefore = db.select().from(token).all();
+    const logs = readEventLog(db).length;
+    const seqs = all.map((c) => c.store.seq);
+
+    const ambush = sceneId["Goblin Ambush"] as string;
+    const drag = (c: TestClient, id: string, scene = ambush) =>
+      c.send({
+        type: "signal",
+        name: MAP_SIGNALS.drag,
+        data: { sceneId: scene, tokenId: id, x: 101.5, y: 202 },
+      });
+    const wolf = tokenId.Wolf as string;
+    const elite = tokenId["Elite Goblin Warrior"] as string;
+    const goblin = tokenId.Goblin as string;
+    const mira = tokenId.Mira as string;
+    const cellarGoblin = tokenId["cellar:Goblin"] as string;
+    // DM: hidden Wolf + Elite and a Cellar token (non-active) → DM tab only; Goblin → all.
+    drag(dm, wolf);
+    dm.send({
+      type: "signal",
+      name: MAP_SIGNALS.drag,
+      data: { sceneId: ambush, tokenId: wolf, end: true },
+    });
+    drag(dm, elite);
+    drag(dm, cellarGoblin, sceneId.Cellar);
+    drag(dm, goblin);
+    drag(dm, "no-such-token");
+    drag(dm, goblin, sceneId.Cellar);
+    // player-1: own Mira → all others; Goblin forbidden; Wolf (any scene id) and unknown not_found.
+    drag(p1, mira);
+    drag(p1, goblin);
+    drag(p1, wolf);
+    drag(p1, wolf, sceneId.Town);
+    drag(p1, "no-such-token", sceneId.Town);
+    drag(p1, mira, sceneId.Town);
+    drag(p1, cellarGoblin, sceneId.Cellar);
+    for (const c of [dm, p1, dm2, p2]) await barrier(c);
+
+    expect(dragged(dm2)).toEqual([wolf, wolf, elite, cellarGoblin, goblin, mira]);
+    expect(dragged(dm)).toEqual([mira]);
+    expect(dragged(p1)).toEqual([goblin]);
+    expect(dragged(p2)).toEqual([goblin, mira]);
+    const fromP1 = since(dm2).find(
+      (f) => f.type === "signal" && (f.data as { tokenId: string }).tokenId === mira,
+    );
+    expect(fromP1).toMatchObject({ from: { role: "player", playerId: p1.store.you?.playerId } });
+    expect(rejects(dm).map((r) => r.code)).toEqual(["not_found", "invalid"]);
+    const notFound = { code: "not_found", message: "Token not found" };
+    expect(rejects(p1)).toEqual([
+      { code: "forbidden", message: "Not your token" },
+      notFound,
+      notFound, // the Wolf's id with a wrong sceneId: same as an unknown id (#130)
+      notFound,
+      { code: "invalid", message: "Token is not on that scene" },
+      notFound,
+    ]);
+    for (const c of [dm2, p2]) expect(rejects(c)).toEqual([]);
+    // Leak scan: no player frame names a hidden token's id.
+    for (const c of [p1, p2]) {
+      for (const id of [wolf, elite, cellarGoblin]) expect(c.raw()).not.toContain(id);
+    }
+    expect(db.select().from(token).all()).toEqual(tokensBefore);
+    expect(readEventLog(db).length).toBe(logs);
+    expect(all.map((c) => c.store.seq)).toEqual(seqs);
+    for (const c of all) c.close();
   });
 
   test("MAP §9 REST: auth, create / patch / duplicate / delete, folders; players see nothing", async () => {

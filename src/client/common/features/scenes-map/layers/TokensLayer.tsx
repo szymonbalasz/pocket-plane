@@ -1,17 +1,21 @@
-// Tokens layer (FR-MAP-14–19, -31, -34, -35): image or initials per shape, name label below, DM
-// hidden styling, selection / target ring, overlay badges and dim (inside the token's group, so
-// they move with a drag). Konva node `name` = `map-token`, `id` = token id, attr `shape`
-// (AGENTS §9.5); ring `map-token-ring` (attr `state`); badges named by their test id.
+// Tokens layer (FR-MAP-14–19, -31, -34, -35, -43): image or initials per shape, DM hidden styling,
+// selection / target ring, overlay cross and dim (inside the token's group, so they move with a
+// drag and show in drag previews). Names and badges are on the labels layer (FR-MAP-42). Konva
+// node `name` = `map-token`, `id` = token id, attrs `shape`, `preview` (FR-MAP-40); ring
+// `map-token-ring` (attr `state`); crosses named by their overlay id.
 import { cellToPx, footprint, initials } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import { useEffect } from "react";
-import { Circle, Group, Image, Label, Layer, Line, Rect, Tag, Text } from "react-konva";
+import { Circle, Group, Image, Layer, Line, Rect, Shape, Text } from "react-konva";
+import { useStore } from "zustand";
 import { retryAssetImage, useAssetImage } from "../../assets-pipeline/useAssetImage";
-import { type CanvasContextValue, useCanvas } from "../canvas-context";
+import { useCanvas } from "../canvas-context";
 import { decorateToken, type MergedDecoration } from "../decorations";
+import { CROSS_OPACITY, crossGeometry } from "../label";
 import { containRect, coverCrop, initialsBackdropOf, outlineOf } from "../shape";
-import type { TokenBadge } from "../token-overlays";
+import type { TokenCross } from "../token-overlays";
 import { tokenOverlays } from "../token-overlays";
+import { toneColor } from "./tone";
 
 const INSET = 0.92;
 
@@ -115,51 +119,31 @@ function TokenOutline({
   );
 }
 
-const badgeFill = (c: CanvasContextValue["colors"], tone: TokenBadge["tone"]) =>
-  tone === "down" ? c.hpDown : tone === "bloodied" ? c.hpBloodied : c.muted;
-
-/** Badge font, padding and pill height for a footprint `side` at camera `scale`. */
-function badgeMetrics(side: number, scale: number) {
-  const font = Math.max(10 / scale, Math.min(side * 0.2, 13));
-  const pad = font * 0.3;
-  return { font, pad, h: font + 2 * pad };
-}
-
-/** Overlay badges in a row, centred on the footprint's bottom edge (FR-MAP-34). */
-function TokenBadges({ t, side, badges }: { t: TokenView; side: number; badges: TokenBadge[] }) {
-  const { colors, cam } = useCanvas();
-  if (badges.length === 0) return null;
-  const { font, pad, h } = badgeMetrics(side, cam.scale);
-  const widths = badges.map((b) => b.label.length * font * 0.6 + 2 * pad);
-  const gap = font * 0.25;
-  const total = widths.reduce((a, b) => a + b, 0) + gap * (badges.length - 1);
-  let x = (side - total) / 2;
-  const y = side - h / 2;
+/** FR-MAP-43: a translucent X over the footprint, one path so the crossing isn't darker. */
+function TokenCrossMark({ t, side, cross }: { t: TokenView; side: number; cross: TokenCross }) {
+  const { colors } = useCanvas();
+  const g = crossGeometry(side);
   return (
-    <>
-      {badges.map((b, i) => {
-        const at = x;
-        x += (widths[i] ?? 0) + gap;
-        const fill = badgeFill(colors, b.tone);
-        return (
-          <Label key={b.id} name={b.id} id={t.id} x={at} y={y} icon={b.icon} listening={false}>
-            <Tag
-              fill={fill}
-              cornerRadius={font / 2}
-              stroke={colors.background}
-              strokeWidth={1 / cam.scale}
-            />
-            <Text
-              text={b.label}
-              fontSize={font}
-              fontStyle="bold"
-              padding={pad}
-              fill={b.tone === "neutral" ? colors.foreground : colors.background}
-            />
-          </Label>
-        );
-      })}
-    </>
+    <Shape
+      name={cross.id}
+      id={t.id}
+      tone={cross.tone}
+      width={side}
+      height={side}
+      stroke={toneColor(colors, cross.tone)}
+      strokeWidth={g.strokeWidth}
+      lineCap="round"
+      opacity={CROSS_OPACITY}
+      listening={false}
+      sceneFunc={(ctx, shape) => {
+        ctx.beginPath();
+        for (const [x0, y0, x1, y1] of g.segments) {
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+        }
+        ctx.strokeShape(shape);
+      }}
+    />
   );
 }
 
@@ -170,8 +154,10 @@ function TokenNode({ t }: { t: TokenView }) {
   useEffect(() => {
     if (t.imageAssetId) retryAssetImage(t.imageAssetId, "thumb");
   }, [t]);
+  // FR-MAP-40: another client's drag of T draws it at the previewed spot (only this group re-renders).
+  const preview = useStore(c.previews, (s) => s.previews[t.id]);
   const side = footprint(t.size) * grid.gridCellSize;
-  const { x, y } = cellToPx(grid, t.col, t.row);
+  const { x, y } = preview ?? cellToPx(grid, t.col, t.row);
   const movable = c.canMove(t);
   const draggable = movable && c.live && c.tool === "select";
   const selected = c.selected.has(t.id);
@@ -181,9 +167,6 @@ function TokenNode({ t }: { t: TokenView }) {
     targeting: c.targeting,
   });
   const ring = deco.ring === "target" ? "target" : selected ? "selected" : null;
-  const labelSize = Math.max(11 / cam.scale, Math.min(14, side / 5));
-  // The badge row straddles the bottom edge: the name label moves below its lower half.
-  const badgeBelow = deco.badges.length > 0 ? badgeMetrics(side, cam.scale).h / 2 : 0;
   const setCursor =
     (cursor: string) => (e: { target: { getStage(): { container(): HTMLElement } | null } }) => {
       const stage = e.target.getStage();
@@ -195,6 +178,7 @@ function TokenNode({ t }: { t: TokenView }) {
       name="map-token"
       id={t.id}
       shape={t.shape}
+      preview={preview ? true : undefined}
       x={x}
       y={y}
       draggable={draggable}
@@ -212,6 +196,7 @@ function TokenNode({ t }: { t: TokenView }) {
       {/* Hit area: the whole footprint, whatever the art's alpha. */}
       <Rect width={side} height={side} fill="transparent" />
       <TokenBody t={t} side={side} image={img.image} />
+      {deco.cross && <TokenCrossMark t={t} side={side} cross={deco.cross} />}
       <TokenOutline t={t} side={side} state={ring} />
       {t.hidden && (
         // Eye-off mark in `visibility.hidden` (only the DM ever receives hidden tokens).
@@ -229,22 +214,6 @@ function TokenNode({ t }: { t: TokenView }) {
           />
         </Group>
       )}
-      <TokenBadges t={t} side={side} badges={deco.badges} />
-      <Text
-        name="map-token-label"
-        id={t.id}
-        text={t.name}
-        x={-side}
-        y={side + badgeBelow + 2 / cam.scale}
-        width={side * 3}
-        align="center"
-        fontSize={labelSize}
-        fill={colors.foreground}
-        shadowColor={colors.background}
-        shadowBlur={3 / cam.scale}
-        shadowOpacity={1}
-        listening={false}
-      />
     </Group>
   );
 }

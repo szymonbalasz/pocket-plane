@@ -40,7 +40,9 @@ async function tokenAttr(page: Page, tokenId: string, attr: string) {
       type KNode = { getAttr(a: string): unknown };
       type KStage = { findOne(s: string): KNode | undefined };
       const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
-      return (K?.stages[0]?.findOne(`#${id}`)?.getAttr(attr) as string | undefined) ?? null;
+      return (
+        (K?.stages[0]?.findOne(`#${id}`)?.getAttr(attr) as string | boolean | undefined) ?? null
+      );
     },
     [tokenId, attr] as const,
   );
@@ -100,6 +102,12 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await expect.poll(() => tokenNode(player, miraTown)).not.toBeNull();
   const m = (await tokenNode(player, miraTown))!;
   const cell = 70 * (await stageScale(player));
+  // FR-MAP-42 (#171): the name label is centred on the token's bottom grid line, on the labels layer.
+  const [label] = await konvaNodes(player, "map-token-label", miraTown);
+  expect(label?.text).toBe("Mira");
+  expect(Math.abs((label?.y ?? 0) - (m.y + cell / 2))).toBeLessThan(2);
+  expect(Math.abs((label?.x ?? 0) - m.x)).toBeLessThan(2);
+  expect(label?.height ?? 0).toBeLessThan(cell * 0.5);
   await player.mouse.move(m.x, m.y);
   await player.mouse.down();
   for (let i = 1; i <= 6; i++) await player.mouse.move(m.x + (cell * 3 * i) / 6, m.y);
@@ -107,7 +115,13 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await expect
     .poll(async () => (await konvaNodes(player, "map-move-label-text"))[0]?.text)
     .toMatch(/^15( \/ \d+)? ft$/);
+  // FR-MAP-40 (#171): while the player holds, the DM draws Mira from the drag preview at the held
+  // spot, with no movement label of its own.
+  await expect.poll(() => tokenAttr(dm, miraTown, "preview")).toBe(true);
+  await expect.poll(() => cellOf(dm, miraTown)).toEqual({ col: 8, row: 5 });
+  expect(await konvaNodes(dm, "map-move-label")).toHaveLength(0);
   await player.mouse.up();
+  await expect.poll(() => tokenAttr(dm, miraTown, "preview")).toBeNull();
   await expect.poll(() => cellOf(dm, miraTown)).toEqual({ col: 8, row: 5 });
   await expect.poll(() => cellOf(player, miraTown)).toEqual({ col: 8, row: 5 });
 

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   CreateSceneBody,
+  DragData,
   LaserData,
   PatchSceneBody,
   PingData,
@@ -76,5 +77,18 @@ describe("scenes-map schemas", () => {
     expect(LaserData.safeParse({ sceneId: "s", points: pts(32) }).success).toBe(true);
     expect(LaserData.safeParse({ sceneId: "s", points: pts(33) }).success).toBe(false);
     expect(LaserData.safeParse({ sceneId: "s", points: [], end: true }).success).toBe(true);
+  });
+
+  test("FR-MAP-41 map.drag schema: finite, |x| ≤ 16384, `end` only as true, nothing else", () => {
+    const at = { sceneId: "s", tokenId: "t", x: 1.5, y: -2 };
+    expect(DragData.safeParse(at).success).toBe(true);
+    expect(DragData.safeParse({ sceneId: "s", tokenId: "t", end: true }).success).toBe(true);
+    expect(DragData.safeParse({ sceneId: "s", tokenId: "t", end: false }).success).toBe(false);
+    expect(DragData.safeParse({ ...at, x: 16385 }).success).toBe(false);
+    expect(DragData.safeParse({ ...at, y: Number.NaN }).success).toBe(false);
+    expect(DragData.safeParse({ ...at, x: Infinity }).success).toBe(false);
+    expect(DragData.safeParse({ ...at, end: true }).success).toBe(false);
+    expect(DragData.safeParse({ ...at, from: "dm" }).success).toBe(false);
+    expect(DragData.safeParse({ sceneId: "s", x: 1, y: 2 }).success).toBe(false);
   });
 });
