@@ -5,8 +5,14 @@ import {
   DAMAGE_CARD_RESOLUTION_MAX_BYTES,
   DamageCardResolutionRead,
   DamageCardTargetsResolution,
+  HpChangeRecord,
   HpChangesResult,
+  PlayerMonsterCombatant,
+  PlayerPcCombatant,
+  PlayerRemovedCombatant,
   RollAbilityInput,
+  TurnResult,
+  UndoResult,
 } from "./schemas";
 
 const outcome = (n: number, nameLength = 40) => ({
@@ -92,10 +98,73 @@ describe("combat-tracker schemas (feedback pass)", () => {
       playerPosition: 0,
       hpCurrent: 7,
       hpMax: 7,
+      tempHp: 0,
     };
     expect(CombatantRecord.safeParse({ ...row, movedFt: 0 }).success).toBe(true);
     expect(CombatantRecord.safeParse({ ...row, movedFt: 9999 }).success).toBe(true);
     expect(CombatantRecord.safeParse({ ...row, movedFt: 10000 }).success).toBe(false);
     expect(CombatantRecord.safeParse(row).success).toBe(false);
+  });
+
+  test("FR-CBTX-14 combatant tempHp: int 0–999, required on the DM record", () => {
+    const row = {
+      id: "k",
+      campaignId: "c",
+      encounterId: "e",
+      seq: 1,
+      kind: "monster",
+      entityId: "g",
+      tokenId: null,
+      name: "Goblin",
+      imageAssetId: null,
+      hidden: false,
+      active: true,
+      removed: false,
+      initiative: null,
+      initRollId: null,
+      position: 0,
+      playerPosition: 0,
+      hpCurrent: 7,
+      hpMax: 7,
+      movedFt: 0,
+    };
+    expect(CombatantRecord.safeParse({ ...row, tempHp: 0 }).success).toBe(true);
+    expect(CombatantRecord.safeParse({ ...row, tempHp: 999 }).success).toBe(true);
+    expect(CombatantRecord.safeParse({ ...row, tempHp: 1000 }).success).toBe(false);
+    expect(CombatantRecord.safeParse({ ...row, tempHp: -1 }).success).toBe(false);
+    expect(CombatantRecord.safeParse(row).success).toBe(false);
+  });
+
+  test("FR-CBTX-32 no player combatant view has a tempHp field", () => {
+    for (const s of [PlayerPcCombatant, PlayerMonsterCombatant, PlayerRemovedCombatant]) {
+      expect(Object.keys(s.shape)).not.toContain("tempHp");
+      expect(Object.keys(s.shape)).not.toContain("hpCurrent");
+    }
+  });
+
+  test("FR-CBTX-21 hp-change record: temp before / after, death counters | null, noteIds", () => {
+    const keys = Object.keys(HpChangeRecord.shape);
+    for (const k of ["tempBefore", "tempAfter", "deathBefore", "deathAfter", "noteIds"]) {
+      expect(keys).toContain(k);
+    }
+    const death = HpChangeRecord.shape.deathAfter;
+    expect(death.safeParse(null).success).toBe(true);
+    expect(death.safeParse({ successes: 0, failures: 2 }).success).toBe(true);
+    expect(death.safeParse({ successes: 0, failures: 4 }).success).toBe(false);
+  });
+
+  test("FR-CBTX-07/22 undo and turn results gain notRestored, default []", () => {
+    expect(UndoResult.parse({ hpChangeIds: ["h"] })).toEqual({
+      hpChangeIds: ["h"],
+      notRestored: [],
+    });
+    expect(
+      UndoResult.parse({ hpChangeIds: ["h"], notRestored: ["Bless (Mira)"] }).notRestored,
+    ).toEqual(["Bless (Mira)"]);
+    expect(UndoResult.safeParse({ hpChangeIds: [], notRestored: [] }).success).toBe(false);
+    expect(TurnResult.parse({})).toEqual({ notRestored: [] });
+    expect(TurnResult.parse({ notRestored: ["Frightened (Goblin)"] })).toEqual({
+      notRestored: ["Frightened (Goblin)"],
+    });
   });
 });

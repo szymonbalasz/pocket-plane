@@ -1,8 +1,14 @@
 // Snapshot size + build time (CON-44, live-sync §12, #163): the exact `snapshot` frame per
 // viewer through `RecordRegistry.snapshot` (= Hub.sendSnapshot), and a "realistic heavy"
 // session built only through commands on top of `session-sim`, with max-length ASCII strings.
+import {
+  EFFECT_TYPE,
+  type EffectRecord,
+  effectVisibleToPlayers,
+  redactEffect,
+} from "@shared/combat-extras/schemas";
 import { DamageCardPayload } from "@shared/combat-tracker/schemas";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { Config } from "../../config";
 import { closeDb, type Db, openMemoryDb } from "../../db/client";
 import {
@@ -10,6 +16,8 @@ import {
   campaign,
   combatant,
   creatureSheet,
+  effect,
+  effectSeqNext,
   entity,
   notification,
   player,
@@ -29,8 +37,14 @@ export interface ViewerSize {
   types: Record<string, { rows: number; bytes: number }>;
 }
 
+export interface ViewerFrame {
+  label: string;
+  viewer: Viewer;
+  records: Record<string, unknown[]>;
+}
+
 /** Every viewer of the active campaign: DM, then players in creation order. */
-export function snapshotSizes(s: Services): ViewerSize[] {
+export function snapshotFrames(s: Services): ViewerFrame[] {
   const active = s.db.select().from(campaign).where(eq(campaign.active, true)).get();
   if (!active) throw new Error("no active campaign");
   const players = s.db.select().from(player).where(eq(player.campaignId, active.id)).all();
@@ -45,8 +59,20 @@ export function snapshotSizes(s: Services): ViewerSize[] {
       v: { connId: p.id, campaignId: active.id, role: "player" as const, playerId: p.id },
     })),
   ];
-  return viewers.map(({ label, v }) => {
-    const records = { ...s.records.snapshot({ db: s.db, presence }, v), ...pendingSheets(s, v) };
+  return viewers.map(({ label, v }) => ({
+    label,
+    viewer: v,
+    records: {
+      ...s.records.snapshot({ db: s.db, presence }, v),
+      ...pendingSheets(s, v),
+      ...pendingEffects(s, v),
+    },
+  }));
+}
+
+/** The exact `snapshot` frame size per viewer, and per record type. */
+export function snapshotSizes(s: Services): ViewerSize[] {
+  return snapshotFrames(s).map(({ label, viewer: v, records }) => {
     const you = { campaignId: v.campaignId, role: v.role, playerId: v.playerId };
     const frame = { type: "snapshot", seq: 0, you, records };
     const types: ViewerSize["types"] = {};
@@ -79,6 +105,23 @@ function pendingSheets(s: Services, v: Viewer): Record<string, unknown[]> {
     .all()
     .filter((r) => v.role === "dm" || r.ownerPlayerId === v.playerId);
   return rows.length ? { [CREATURE_SHEET_TYPE]: rows } : {};
+}
+
+/**
+ * `effect` rows (CBTX §12) before combat-extras registers the record type: active effects only
+ * (FR-CBTX-31: not windowed), DM full, players the redaction of the ones they may see. Empty
+ * once the type is registered: then the real snapshot carries them.
+ */
+function pendingEffects(s: Services, v: Viewer): Record<string, unknown[]> {
+  if (s.records.get(EFFECT_TYPE)) return {};
+  const rows = s.db
+    .select()
+    .from(effect)
+    .where(and(eq(effect.campaignId, v.campaignId), isNull(effect.endedAt)))
+    .orderBy(effect.seq)
+    .all() as EffectRecord[];
+  const out = v.role === "dm" ? rows : rows.filter(effectVisibleToPlayers).map(redactEffect);
+  return out.length ? { [EFFECT_TYPE]: out } : {};
 }
 
 /** DM snapshot build time in ms: one warm-up, then the median of `runs`. */
@@ -141,6 +184,12 @@ export const HEAVY = {
   loot: 100,
   /** CHARX §12: one per PC + 10 NPC sheets, typical size. */
   sheets: 16,
+  /** CBTX §12: active effects (6 concentrations + 6 linked, 20 conditions, 4 secret, 4 hidden). */
+  effects: 40,
+  /** Of those, players receive all but the secret and hidden ones. */
+  playerEffects: 32,
+  /** Soft-ended effects (Prev / undo history): never in a snapshot. */
+  endedEffects: 20,
 } as const;
 
 /**
@@ -366,6 +415,88 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
     }
   }
 
+  // Effects (CBTX §12): no CBTX command exists in this core branch, so rows go straight to the
+  // table. Max-length labels; play state on PCs and monsters for the leak scan (FR-CBTX-32).
+  let fxN = 0;
+  // UUID-length ids, like ctx.ids.
+  const fxId = () => fill(`fx-${++fxN}-`, 36);
+  const fx = (v: Partial<typeof effect.$inferInsert>) =>
+    db
+      .insert(effect)
+      .values({
+        id: fxId(),
+        campaignId: cid,
+        seq: effectSeqNext,
+        kind: "condition",
+        encounterId: main,
+        createdAt: now,
+        updatedAt: now,
+        ...v,
+      })
+      .run();
+  const monsters = cmb.filter((c) => c.kind === "monster");
+  const pcCombatant = (entityId: string) => cmb.find((c) => c.entityId === entityId);
+  const label = (n: string) => fill(n, 40);
+  for (const [i, pcId] of pcIds.entries()) {
+    const src = pcCombatant(pcId);
+    const concId = fxId();
+    const base = { sourceCombatantId: src?.id ?? null, sourceName: fill(`Hero ${i + 1} `, 60) };
+    fx({
+      ...base,
+      id: concId,
+      kind: "concentration",
+      label: label(`Conc ${i} `),
+      targetCharacterId: pcId,
+      durationRounds: 10,
+      endsRound: 11,
+      anchorCombatantId: src?.id ?? null,
+    });
+    const other = pcIds[(i + 1) % pcIds.length] as string;
+    fx({
+      ...base,
+      kind: "custom",
+      label: label(`Bless ${i} `),
+      targetCharacterId: other,
+      concentrationId: concId,
+      durationRounds: 10,
+      endsRound: 11,
+      anchorCombatantId: src?.id ?? null,
+    });
+  }
+  const keys = ["prone", "frightened", "poisoned", "restrained", "blinded"] as const;
+  for (const [i, m] of monsters.slice(0, 20).entries()) {
+    fx({ condition: keys[i % keys.length], targetCombatantId: m.id });
+  }
+  for (const m of monsters.slice(20, 24)) {
+    fx({ kind: "custom", label: label("Hex "), targetCombatantId: m.id, secret: true });
+  }
+  for (const m of monsters.slice(24, 28)) {
+    fx({ condition: "stunned", targetCombatantId: m.id, hidden: true });
+  }
+  for (const m of monsters.slice(0, HEAVY.endedEffects)) {
+    fx({
+      condition: "grappled",
+      targetCombatantId: m.id,
+      endedAt: now,
+      endedReason: "expired",
+      endedRound: 1,
+      endedTurnId: m.id,
+    });
+  }
+  db.update(combatant)
+    .set({ tempHp: 999 })
+    .where(
+      inArray(
+        combatant.id,
+        monsters.map((m) => m.id),
+      ),
+    )
+    .run();
+  db.update(entity)
+    .set({ tempHp: 999, deathSuccesses: 2, deathFailures: 1 })
+    .where(inArray(entity.id, pcIds))
+    .run();
+
   // Game log: fill up to 100 entries with max-label public DM rolls.
   const logCount = () =>
     s.db.$client
@@ -408,6 +539,12 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
         .get(cid)?.n ?? 0,
     loot: n("loot_entry"),
     sheets: n("creature_sheet"),
+    effects:
+      s.db.$client
+        .query<{ n: number }, [string]>(
+          "SELECT count(*) AS n FROM effect WHERE campaign_id = ? AND ended_at IS NULL",
+        )
+        .get(cid)?.n ?? 0,
   };
 }
 

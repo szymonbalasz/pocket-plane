@@ -1,5 +1,6 @@
 // combat-tracker boundary schemas (CBT §8, §9; protocol §20–§23). zod is the source of truth for
 // the wire records, intents, REST bodies and the damage card's payload / resolution.
+import { DeathCounters, TempHp } from "@shared/combat-extras/schemas";
 import { ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
 import { Ability } from "@shared/entities/schemas";
 import { DamageMultiplier } from "@shared/events/combat-tracker";
@@ -148,6 +149,8 @@ export const CombatantRecord = z.object({
   hpMax: z.int().nullable(),
   /** Movement used this turn, ft (FR-CBT-39). */
   movedFt: z.int().min(0).max(MOVED_FT_MAX),
+  /** Monsters' temp HP (FR-CBTX-14). DM only: no player view below carries it (FR-CBTX-32). */
+  tempHp: TempHp,
 });
 export type CombatantRecord = z.infer<typeof CombatantRecord>;
 
@@ -232,6 +235,13 @@ export const HpChangeRecord = z.object({
   overkill: z.int(),
   hpBefore: z.int(),
   hpAfter: z.int(),
+  /** combat-extras (FR-CBTX-21): temp HP around the change, death counters (null = unchanged). */
+  tempBefore: z.int(),
+  tempAfter: z.int(),
+  deathBefore: DeathCounters.nullable(),
+  deathAfter: DeathCounters.nullable(),
+  /** `cbtx-concentration` cards this change created. */
+  noteIds: z.array(z.string()),
   entryId: z.string(),
   undone: z.boolean(),
   undoneAt: z.string().nullable(),
@@ -356,6 +366,17 @@ export type HpChangeResult = z.infer<typeof HpChangeResult>;
 /** Result of `cbt.applyCard` (apply order) and `cbt.undo` (latest first). */
 export const HpChangesResult = z.object({ hpChangeIds: z.array(z.string()).min(1) });
 export type HpChangesResult = z.infer<typeof HpChangesResult>;
+/**
+ * combat-extras: names of effects a restore skipped because the slot is taken (FR-CBTX-07,
+ * FR-CBTX-22); the DM client toasts them. Absent = none.
+ */
+const NotRestored = z.array(z.string()).default([]);
+/** Result of `cbt.undo` (FR-CBT-35, FR-CBTX-22). */
+export const UndoResult = HpChangesResult.extend({ notRestored: NotRestored });
+export type UndoResult = z.input<typeof UndoResult>;
+/** Result of `cbt.nextTurn` / `cbt.prevTurn` (FR-CBTX-07); Next never fills it. */
+export const TurnResult = z.object({ notRestored: NotRestored });
+export type TurnResult = z.input<typeof TurnResult>;
 export const RollIdsResult = z.object({ rollIds: z.array(z.string()) });
 
 /** `cbt.rollAbility` (FR-CBT-44): a combatant's check or save, DM only. */

@@ -1,7 +1,8 @@
 // Token overlay registry (FR-MAP-34, protocol §26). APPEND-ONLY (AGENTS §9.9): a feature adds
 // one import and one line; nothing else changes here. scenes-map merges the results in registry
-// order and draws dim, ring and cross inside the token's group, badges in the label row (FR-MAP-43).
-// combat-tracker adds `cbt` (Out, Down, target ring, `movedFt`; FR-CBT-38/39).
+// order and draws dim, ring, cross, bar and icons inside the token's group, badges in the label row
+// (FR-MAP-43; bar + icons: OQ-CBTX-21). combat-tracker adds `cbt` (Out, Down, target ring,
+// `movedFt`; FR-CBT-38/39).
 
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
@@ -32,6 +33,37 @@ export interface TokenCross {
   tone: TokenBadge["tone"];
 }
 
+/**
+ * A bar on the footprint's top edge, inside the token group (OQ-CBTX-21, FR-CBTX-28), e.g.
+ * combat-extras' HP bar. Konva `name` = `id`, `id` attr = token id, attrs `tone`, `fraction`.
+ */
+export interface TokenBar {
+  /** Test id; Konva `name` of the bar. */
+  id: string;
+  /** Filled share 0–1 over a muted track; null = full width with no track (no proportion). */
+  fraction: number | null;
+  /** A neutral segment after the fill, as a share of the width; fill + temp capped at 1. */
+  temp?: number;
+  /** `full` = `hp.full`, `bloodied` = `hp.bloodied`. */
+  tone: "full" | "bloodied";
+}
+
+/**
+ * A small icon in a row below the bar, top-left (FR-CBTX-29). At most 4 are drawn, then "+N".
+ * Konva `name` = `id`, `id` attr = token id, attrs `value`, `icon`, `tone`, `label`.
+ */
+export interface TokenIcon {
+  /** Test id; Konva `name` of the icon. */
+  id: string;
+  /** Icon name (lucide); kept as an attribute, drawn as the label's initials. */
+  icon: string;
+  tone: TokenBadge["tone"];
+  /** Full text (hover / tests); also the source of the drawn initials, e.g. "Exhaustion 2" → "E2". */
+  label: string;
+  /** Konva attr `value`, e.g. a condition key (`data-value` for tests). */
+  value?: string;
+}
+
 export interface TokenDecoration {
   /** Token group opacity × 0.5 (the label row stays at full opacity). */
   dim?: boolean;
@@ -41,6 +73,10 @@ export interface TokenDecoration {
   ring?: "target";
   /** Centred X inside the token group, above the image; first non-null wins. */
   cross?: TokenCross;
+  /** Top-edge bar inside the token group; first non-null wins. */
+  bar?: TokenBar;
+  /** Icon row below the bar; concatenated in registry order. */
+  icons?: readonly TokenIcon[];
 }
 
 /** Pure functions; a throw is logged once and ignored (token drawn plain). */

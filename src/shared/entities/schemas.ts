@@ -1,5 +1,6 @@
 // entities boundary schemas (ENT §6, §8, §9): kind registry, creature core, wire records,
 // REST bodies, derived values. One schema for pipeline, commands, fixtures and clients.
+import { DeathSaveCount, TempHp } from "@shared/combat-extras/schemas";
 import { z } from "zod";
 
 // ---------- creature core (FR-ENT-02, ENT §8) ----------
@@ -383,13 +384,19 @@ export const EntityRecord = z.discriminatedUnion("kind", [
     statBlock: CharacterStatBlock,
     ownerPlayerId: z.string(),
     hpCurrent: z.number().int(),
+    // combat-extras play state (FR-CBTX-14/19), like `hpCurrent`: DM + owner only (FR-CBTX-32).
+    // Never in `statBlock`; `PUT /api/entities` never writes them. Default 0 = the DB default
+    // (records built before CBTX still parse).
+    tempHp: TempHp.default(0),
+    deathSuccesses: DeathSaveCount.default(0),
+    deathFailures: DeathSaveCount.default(0),
   }),
 ]);
 export type EntityRecord = z.infer<typeof EntityRecord>;
 export type MonsterRecord = Extract<EntityRecord, { kind: "monster" }>;
 export type CharacterRecord = Extract<EntityRecord, { kind: "character" }>;
 
-/** FR-CBTX-19: derived by combat-extras from its death-save columns; null = not at 0 HP. */
+/** FR-CBTX-19: derived from the death-save columns (`deathStateOf`); null = not at 0 HP. */
 export const DeathState = z.enum(["dying", "stable", "dead"]);
 export type DeathState = z.infer<typeof DeathState>;
 
@@ -412,8 +419,9 @@ export const RedactedCharacter = z.strictObject({
   level: z.number().int(),
   className: z.string(),
   species: z.string().nullable(),
-  // combat-extras (OQ-CBTX-09): filled by CBTX; absent until it is built
-  deathState: DeathState.nullable().optional(),
+  // combat-extras (OQ-CBTX-09, FR-CBTX-32): derived from the counters + HP; null = not at 0 HP.
+  // Never the counters or temp HP.
+  deathState: DeathState.nullable(),
 });
 export type RedactedCharacter = z.infer<typeof RedactedCharacter>;
 export const REDACTED_CHARACTER_KEYS = Object.keys(

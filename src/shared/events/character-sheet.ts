@@ -1,6 +1,7 @@
 // Domain events of character-sheet (CHAR §9, protocol §22) and character-sheet-full (CHARX §9,
 // protocol §31). All logged; none undoable (FR-CHARX-19). Shared definitions (fix/combat-core,
 // fix/charx-core); character-sheet emits them.
+import { DeathCounters } from "@shared/combat-extras/schemas";
 import { Ability, HitDie, SkillName } from "@shared/entities/schemas";
 import { z } from "zod";
 import { RollMode } from "./dice-roll-log";
@@ -8,7 +9,11 @@ import { defineEvent } from "./types";
 
 const Id = z.string().min(1).max(64);
 
-/** `char.adjustHp`: changes = `entity` upsert. Not a combat log entry (#139 P5). */
+/**
+ * `char.adjustHp`: changes = `entity` upsert. Not a combat log entry (#139 P5). Through
+ * combat-extras' `hpRules` it also reports temp HP, death counters (null = unchanged) and the
+ * concentration cards it created (FR-CBTX-02, -21); optional, absent before CBTX.
+ */
 export const CharacterHpAdjusted = defineEvent({
   type: "CharacterHpAdjusted",
   payload: z
@@ -17,6 +22,11 @@ export const CharacterHpAdjusted = defineEvent({
       delta: z.number().int(),
       hpBefore: z.number().int(),
       hpAfter: z.number().int(),
+      tempBefore: z.number().int().optional(),
+      tempAfter: z.number().int().optional(),
+      deathBefore: DeathCounters.nullable().optional(),
+      deathAfter: DeathCounters.nullable().optional(),
+      noteIds: z.array(Id).optional(),
     })
     .strict(),
   logged: true,

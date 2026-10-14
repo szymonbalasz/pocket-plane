@@ -31,6 +31,9 @@ const mira: EntityRecord = {
   statBlock: miraBlock as unknown as Extract<EntityRecord, { kind: "character" }>["statBlock"],
   ownerPlayerId: "p1",
   hpCurrent: 12,
+  tempHp: 0,
+  deathSuccesses: 0,
+  deathFailures: 0,
 };
 const elite: EntityRecord = {
   ...common,
@@ -57,6 +60,7 @@ describe("entities record types", () => {
       level: 1,
       className: "Fighter",
       species: null,
+      deathState: null,
     });
   });
 
@@ -92,10 +96,7 @@ describe("entities record types", () => {
     } as EntityRecord;
     for (const r of [mira, full]) {
       const red = redactCharacter(r);
-      // deathState is CBTX's key: in the list, absent until combat-extras fills it.
-      expect(Object.keys(red).sort()).toEqual(
-        REDACTED_CHARACTER_KEYS.filter((k) => k !== "deathState").sort(),
-      );
+      expect(Object.keys(red).sort()).toEqual([...REDACTED_CHARACTER_KEYS].sort());
       expect(RedactedCharacter.safeParse(red).success).toBe(true);
     }
     expect(REDACTED_CHARACTER_KEYS).toContain("deathState");
@@ -105,6 +106,44 @@ describe("entities record types", () => {
     for (const leak of ["MIRA-NOTE-7", "athletics", "hpMax", "abilities", "Shortsword", "d10"]) {
       expect(json).not.toContain(leak);
     }
+  });
+
+  test("FR-CBTX-32 other players get deathState only; owner and DM the counters and temp HP", () => {
+    const s = entityServices();
+    const at = (hpCurrent: number, deathSuccesses: number, deathFailures: number) =>
+      ({ ...mira, hpCurrent, tempHp: 7, deathSuccesses, deathFailures }) as EntityRecord;
+    const states = [at(12, 0, 0), at(0, 1, 2), at(0, 3, 0), at(0, 0, 3)].map((r) => {
+      const view = s.records.view("entity", r, v("player", "p2"));
+      expect(view.vis).toBe("redacted");
+      const json = JSON.stringify(view.data);
+      for (const leak of ["tempHp", "deathSuccesses", "deathFailures", "hpCurrent"]) {
+        expect(json).not.toContain(leak);
+      }
+      expect(Object.keys(view.data as object).sort()).toEqual([...REDACTED_CHARACTER_KEYS].sort());
+      // DM and owner: the full record, counters and temp HP included.
+      for (const viewer of [v("dm", null), v("player", "p1")]) {
+        expect(s.records.view("entity", r, viewer)).toEqual({ vis: "full", data: r });
+      }
+      return (view.data as RedactedCharacter).deathState;
+    });
+    expect(states).toEqual([null, "dying", "stable", "dead"]);
+  });
+
+  test("FR-CBTX-32 the whitelist is exactly ADR-0036's eight keys + id / kind", () => {
+    expect([...REDACTED_CHARACTER_KEYS].sort() as string[]).toEqual(
+      [
+        "id",
+        "kind",
+        "name",
+        "portraitAssetId",
+        "ownerPlayerId",
+        "down",
+        "level",
+        "className",
+        "species",
+        "deathState",
+      ].sort(),
+    );
   });
 
   test("FR-ENT-15 the registry gives the DM full, filters players (incl. other campaign)", () => {

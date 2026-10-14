@@ -1,6 +1,12 @@
 // Drizzle schema. Shared file (AGENTS §9.9). Entities and rules: docs/data-model/README.md.
 // Timestamps are ISO-8601 UTC strings from ctx.clock.
 
+import { CONDITIONS } from "@shared/combat-extras/conditions";
+import {
+  type DeathCounters,
+  EFFECT_ENDED_REASONS,
+  EFFECT_KINDS,
+} from "@shared/combat-extras/schemas";
 import { TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
@@ -144,6 +150,10 @@ export const entity = sqliteTable(
     statBlock: text("stat_block", { mode: "json" }).notNull(),
     ownerPlayerId: text("owner_player_id").references((): AnySQLiteColumn => player.id),
     hpCurrent: integer("hp_current"),
+    /** Character play state (combat-extras, FR-CBTX-14/19), like `hpCurrent`; monsters keep 0. */
+    tempHp: integer("temp_hp").notNull().default(0),
+    deathSuccesses: integer("death_successes").notNull().default(0),
+    deathFailures: integer("death_failures").notNull().default(0),
     /** Default shape for new tokens; null = round (FR-ENT-22). Values checked by zod. */
     tokenShape: text("token_shape", { enum: TOKEN_SHAPES }),
     /** Plain id, no FK (informational). */
@@ -520,6 +530,8 @@ export const combatant = sqliteTable(
     hpMax: integer("hp_max"),
     /** Movement used this turn, 0–9,999 (FR-CBT-39); reset on Next for the new turn combatant. */
     movedFt: integer("moved_ft").notNull().default(0),
+    /** Monsters only, 0–999 (FR-CBTX-14); PCs' lives on the character. Never sent to players. */
+    tempHp: integer("temp_hp").notNull().default(0),
   },
   (t) => [uniqueIndex("combatant_seq").on(t.seq), index("combatant_encounter").on(t.encounterId)],
 );
@@ -567,6 +579,14 @@ export const hpChange = sqliteTable(
     overkill: integer("overkill").notNull(),
     hpBefore: integer("hp_before").notNull(),
     hpAfter: integer("hp_after").notNull(),
+    /** combat-extras (FR-CBTX-21): temp HP around this change; undo restores the difference. */
+    tempBefore: integer("temp_before").notNull().default(0),
+    tempAfter: integer("temp_after").notNull().default(0),
+    /** JSON leaf `{successes, failures}` | null when this change left the counters unchanged. */
+    deathBefore: text("death_before", { mode: "json" }).$type<DeathCounters | null>(),
+    deathAfter: text("death_after", { mode: "json" }).$type<DeathCounters | null>(),
+    /** JSON leaf ID[]: the concentration cards this change created (undo closes pending ones). */
+    noteIds: text("note_ids", { mode: "json" }).$type<string[]>().notNull().default([]),
     entryId: text("entry_id")
       .notNull()
       .references((): AnySQLiteColumn => gameLogEntry.id),
@@ -615,12 +635,80 @@ export const lootEntry = sqliteTable(
   ],
 );
 
+/**
+ * Effect (combat-extras, `effect`, data model §21): a condition, custom effect or concentration
+ * on a monster's combatant or a PC's character. Soft end (`endedAt` + reason) so Prev and undo
+ * restore. Partial unique indexes: one active concentration per target, one active condition per
+ * (target, key) (CBTX §8). Exactly one target is checked by zod and the commands: a CHECK
+ * constraint makes drizzle-kit push rebuild every table. `sourceCombatantId`, `anchorCombatantId`, `endedTurnId` and
+ * `endedByHpChangeId` are plain ids (copies at the time).
+ */
+export const effect = sqliteTable(
+  "effect",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    kind: text("kind", { enum: EFFECT_KINDS }).notNull(),
+    condition: text("condition", { enum: CONDITIONS }),
+    level: integer("level"),
+    label: text("label"),
+    targetCombatantId: text("target_combatant_id").references((): AnySQLiteColumn => combatant.id, {
+      onDelete: "set null",
+    }),
+    targetCharacterId: text("target_character_id").references((): AnySQLiteColumn => entity.id),
+    encounterId: text("encounter_id").references((): AnySQLiteColumn => encounter.id),
+    sourceCombatantId: text("source_combatant_id"),
+    sourceName: text("source_name"),
+    concentrationId: text("concentration_id").references((): AnySQLiteColumn => effect.id, {
+      onDelete: "set null",
+    }),
+    durationRounds: integer("duration_rounds"),
+    endsRound: integer("ends_round"),
+    anchorCombatantId: text("anchor_combatant_id"),
+    secret: integer("secret", { mode: "boolean" }).notNull().default(false),
+    hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+    endedAt: text("ended_at"),
+    endedReason: text("ended_reason", { enum: EFFECT_ENDED_REASONS }),
+    endedRound: integer("ended_round"),
+    endedTurnId: text("ended_turn_id"),
+    endedByHpChangeId: text("ended_by_hp_change_id"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("effect_seq").on(t.seq),
+    index("effect_campaign").on(t.campaignId),
+    index("effect_encounter").on(t.encounterId),
+    index("effect_target_combatant").on(t.targetCombatantId),
+    index("effect_target_character").on(t.targetCharacterId),
+    index("effect_concentration").on(t.concentrationId),
+    // FR-CBTX-09: one active concentration per target. Nulls are distinct, so one index per side.
+    uniqueIndex("effect_one_concentration_combatant")
+      .on(t.targetCombatantId)
+      .where(sql`kind = 'concentration' and ended_at is null`),
+    uniqueIndex("effect_one_concentration_character")
+      .on(t.targetCharacterId)
+      .where(sql`kind = 'concentration' and ended_at is null`),
+    // FR-CBTX-04: one active condition per (target, key).
+    uniqueIndex("effect_one_condition_combatant")
+      .on(t.targetCombatantId, t.condition)
+      .where(sql`kind = 'condition' and ended_at is null`),
+    uniqueIndex("effect_one_condition_character")
+      .on(t.targetCharacterId, t.condition)
+      .where(sql`kind = 'condition' and ended_at is null`),
+  ],
+);
+
 /** CON-20: `seq` values for Combat inserts, computed by the DB inside the insert's transaction. */
 export const notificationSeqNext = sql<number>`(select coalesce(max(${notification.seq}), 0) + 1 from ${notification})`;
 export const encounterSeqNext = sql<number>`(select coalesce(max(${encounter.seq}), 0) + 1 from ${encounter})`;
 export const encounterEntrySeqNext = sql<number>`(select coalesce(max(${encounterEntry.seq}), 0) + 1 from ${encounterEntry})`;
 export const combatantSeqNext = sql<number>`(select coalesce(max(${combatant.seq}), 0) + 1 from ${combatant})`;
 export const hpChangeSeqNext = sql<number>`(select coalesce(max(${hpChange.seq}), 0) + 1 from ${hpChange})`;
+export const effectSeqNext = sql<number>`(select coalesce(max(${effect.seq}), 0) + 1 from ${effect})`;
 export const lootEntrySeqNext = sql<number>`(select coalesce(max(${lootEntry.seq}), 0) + 1 from ${lootEntry})`;
 
 export const schema = {
@@ -644,4 +732,5 @@ export const schema = {
   hpChange,
   lootEntry,
   creatureSheet,
+  effect,
 };

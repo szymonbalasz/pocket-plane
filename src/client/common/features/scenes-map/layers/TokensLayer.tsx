@@ -1,8 +1,10 @@
 // Tokens layer (FR-MAP-14–19, -31, -34, -35, -43): image or initials per shape, DM hidden styling,
-// selection / target ring, overlay cross and dim (inside the token's group, so they move with a
-// drag and show in drag previews). Names and badges are on the labels layer (FR-MAP-42). Konva
-// node `name` = `map-token`, `id` = token id, attrs `shape`, `preview` (FR-MAP-40); ring
-// `map-token-ring` (attr `state`); crosses named by their overlay id.
+// selection / target ring, overlay cross, bar, icons and dim (inside the token's group, so they
+// move with a drag and show in drag previews). Names and badges are on the labels layer
+// (FR-MAP-42). Konva node `name` = `map-token`, `id` = token id, attrs `shape`, `preview`
+// (FR-MAP-40); ring `map-token-ring` (attr `state`); crosses, bars and icons named by their
+// overlay id (bar attrs `tone`, `fraction`; icon attrs `value`, `icon`, `tone`, `label`); "+N"
+// `map-token-icons-more` (attr `count`).
 import { cellToPx, footprint, initials } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import { useEffect } from "react";
@@ -13,7 +15,8 @@ import { useCanvas } from "../canvas-context";
 import { decorateToken, type MergedDecoration } from "../decorations";
 import { CROSS_OPACITY, crossGeometry } from "../label";
 import { containRect, coverCrop, initialsBackdropOf, outlineOf } from "../shape";
-import type { TokenCross } from "../token-overlays";
+import { barGeometry, iconRow } from "../token-decor";
+import type { TokenBar, TokenCross, TokenIcon } from "../token-overlays";
 import { tokenOverlays } from "../token-overlays";
 import { toneColor } from "./tone";
 
@@ -147,6 +150,122 @@ function TokenCrossMark({ t, side, cross }: { t: TokenView; side: number; cross:
   );
 }
 
+/** OQ-CBTX-21: bar on the top edge (fill in tone, temp as a neutral segment, muted track). */
+function TokenBarMark({ t, side, bar }: { t: TokenView; side: number; bar: TokenBar }) {
+  const { colors } = useCanvas();
+  const g = barGeometry(side, bar);
+  const r = g.height / 2;
+  return (
+    <Group name={bar.id} id={t.id} tone={bar.tone} fraction={bar.fraction} listening={false}>
+      <Rect
+        x={g.x}
+        y={g.y}
+        width={g.width}
+        height={g.height}
+        cornerRadius={r}
+        fill={colors.background}
+        opacity={g.track ? 0.75 : 0}
+      />
+      {g.fill && (
+        <Rect
+          x={g.fill.x}
+          y={g.y}
+          width={g.fill.width}
+          height={g.height}
+          cornerRadius={r}
+          fill={toneColor(colors, bar.tone)}
+        />
+      )}
+      {g.temp && (
+        <Rect
+          x={g.temp.x}
+          y={g.y}
+          width={g.temp.width}
+          height={g.height}
+          cornerRadius={r}
+          fill={toneColor(colors, "neutral")}
+          opacity={0.7}
+        />
+      )}
+    </Group>
+  );
+}
+
+function IconDisc(p: { x: number; y: number; size: number; text: string; color: string }) {
+  const { colors } = useCanvas();
+  return (
+    <>
+      <Circle
+        x={p.x + p.size / 2}
+        y={p.y + p.size / 2}
+        radius={p.size / 2}
+        fill={colors.background}
+        stroke={p.color}
+        strokeWidth={p.size * 0.08}
+      />
+      <Text
+        text={p.text}
+        x={p.x}
+        y={p.y + p.size * 0.26}
+        width={p.size}
+        align="center"
+        fontSize={p.size * 0.48}
+        fontStyle="bold"
+        fill={p.color}
+      />
+    </>
+  );
+}
+
+/** OQ-CBTX-21: up to 4 icon discs (initials in the tone colour) below the bar, then "+N". */
+function TokenIconRow({
+  t,
+  side,
+  icons,
+}: {
+  t: TokenView;
+  side: number;
+  icons: readonly TokenIcon[];
+}) {
+  const { colors } = useCanvas();
+  const row = iconRow(side, icons);
+  return (
+    <>
+      {row.items.map((c) => (
+        <Group
+          key={c.x}
+          name={c.icon.id}
+          id={t.id}
+          value={c.icon.value}
+          icon={c.icon.icon}
+          tone={c.icon.tone}
+          label={c.icon.label}
+          listening={false}
+        >
+          <IconDisc
+            x={c.x}
+            y={c.y}
+            size={c.size}
+            text={c.text}
+            color={toneColor(colors, c.icon.tone)}
+          />
+        </Group>
+      ))}
+      {row.more && (
+        <Group name="map-token-icons-more" id={t.id} count={row.more.count} listening={false}>
+          <IconDisc
+            x={row.more.x}
+            y={row.more.y}
+            size={row.more.size}
+            text={row.more.text}
+            color={toneColor(colors, "neutral")}
+          />
+        </Group>
+      )}
+    </>
+  );
+}
+
 function TokenNode({ t }: { t: TokenView }) {
   const c = useCanvas();
   const { grid, colors, cam } = c;
@@ -198,6 +317,8 @@ function TokenNode({ t }: { t: TokenView }) {
       <TokenBody t={t} side={side} image={img.image} />
       {deco.cross && <TokenCrossMark t={t} side={side} cross={deco.cross} />}
       <TokenOutline t={t} side={side} state={ring} />
+      {deco.bar && <TokenBarMark t={t} side={side} bar={deco.bar} />}
+      {deco.icons.length > 0 && <TokenIconRow t={t} side={side} icons={deco.icons} />}
       {t.hidden && (
         // Eye-off mark in `visibility.hidden` (only the DM ever receives hidden tokens).
         <Group x={side - 9 / cam.scale} y={9 / cam.scale} listening={false} name="map-token-hidden">
