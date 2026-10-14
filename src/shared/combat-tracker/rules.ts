@@ -102,6 +102,62 @@ export function stepTurn(
   return { ok: true, round: round - 1, turnCombatantId: (ok.at(-1) as TurnRow).id };
 }
 
+// ---------- playtest pass (#171): roll controls, skip cue ----------
+
+/**
+ * FR-CBT-46 (#172): a roll-initiative control shows in round 0 (the DM may overwrite), and from
+ * round 1 only for a combatant without initiative (nobody re-rolls).
+ */
+export const canRollInitiative = (round: number, initiative: number | null | undefined) =>
+  round === 0 || initiative == null;
+
+/** FR-CBT-11 / -46: "Roll monsters" sends every non-removed monster without initiative. */
+export function unrolledMonsters<
+  T extends { kind: CombatantKind; removed?: boolean; initiative?: number | null },
+>(rows: readonly T[]): T[] {
+  return rows.filter((c) => c.kind === "monster" && !c.removed && c.initiative == null);
+}
+
+/** FR-CBT-46: round 0 always shows "Roll monsters" (disabled when none); from round 1 iff any. */
+export const showRollMonsters = (round: number, unrolled: number) => round === 0 || unrolled > 0;
+
+/** FR-CBT-50: a combatant Next / Prev skips while down (a monster at 0 HP, not removed). */
+export const skippedWhileDown = (r: TurnRow) => !r.removed && !eligible(r);
+
+/**
+ * FR-CBT-50 skip cue, computed from the order at send time: the down combatants the turn passes
+ * over from `turnId` to the step's target, in passing order (removed ones are not named), and
+ * the new round if it changed. Null when the step fails or skips nobody.
+ */
+export function skippedOnStep<T extends TurnRow & { name: string }>(
+  rows: readonly T[],
+  round: number,
+  turnId: string | null,
+  direction: "next" | "prev",
+): { names: string[]; round: number | null } | null {
+  const step = stepTurn(rows, round, turnId, direction);
+  if (!step.ok) return null;
+  const order = [...rows].sort((a, b) => a.position - b.position);
+  const n = order.length;
+  const from = round === 0 ? -1 : order.findIndex((r) => r.id === turnId);
+  const d = direction === "next" ? 1 : -1;
+  const names: string[] = [];
+  let i = from;
+  for (let k = 0; k < n; k++) {
+    i = (((i + d) % n) + n) % n;
+    const r = order[i] as T;
+    if (r.id === step.turnCombatantId) break;
+    if (skippedWhileDown(r)) names.push(r.name);
+  }
+  if (names.length === 0) return null;
+  return { names, round: round !== 0 && step.round !== round ? step.round : null };
+}
+
+/** FR-CBT-50 DM Toast: "Skipped Goblin, Goblin 2 (down)" (+ " · Round 2"). */
+export function skippedText(s: { names: readonly string[]; round: number | null }): string {
+  return `Skipped ${s.names.join(", ")} (down)${s.round !== null ? ` · Round ${s.round}` : ""}`;
+}
+
 // ---------- attack maths (FR-CBT-19, FR-CBT-20, FR-CBT-22) ----------
 
 /** Hit hint: natural 20 hits, natural 1 misses, else total ≥ AC. */

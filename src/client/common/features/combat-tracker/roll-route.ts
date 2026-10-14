@@ -25,6 +25,11 @@ function combatantOf(store: RecordStore, characterId: string): CombatantView | n
   );
 }
 
+/** FR-CBT-46: roll-initiative controls only while round 0 or the combatant has none. */
+export function initiativeLocked(store: RecordStore, c: CombatantView): boolean {
+  return (startedIn(store)?.round ?? 0) >= 1 && c.initiative != null;
+}
+
 function damageOf(store: RecordStore, characterId: string): string | null {
   const e = store.records.entity?.[characterId] as
     | { statBlock?: { attacks?: { damage: string }[] } }
@@ -41,6 +46,9 @@ export const combatRollRoute: RollRoute = {
     if (kind === "initiative") {
       return {
         badge: "In combat",
+        // FR-CHAR-24, FR-CBT-46 (#172): from round 1 nobody re-rolls; a PC without initiative
+        // (restored, later a mid-fight joiner) keeps the button and rolls once.
+        hidden: initiativeLocked(store, c),
         send: (sendIntent, input) =>
           sendIntent("cbt.rollInitiative", {
             combatantIds: [c.id],

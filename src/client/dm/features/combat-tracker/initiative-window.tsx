@@ -2,7 +2,14 @@
 // pending cards, rows by `position` (initiative roll / set, AC, HP, band, moved (FR-CBT-39),
 // Attack; menu Check ▸ / Save ▸ (FR-CBT-44), Damage / heal, Remove), Removed.
 import { signed } from "@shared/character-sheet/logic";
-import { critExpression, d20Expression, healthBand } from "@shared/combat-tracker/rules";
+import {
+  canRollInitiative,
+  critExpression,
+  d20Expression,
+  healthBand,
+  showRollMonsters,
+  unrolledMonsters,
+} from "@shared/combat-tracker/rules";
 import type { CombatantView, EncounterView } from "@shared/combat-tracker/schemas";
 import {
   ABILITIES,
@@ -62,7 +69,15 @@ import { useDefinitions, usePendingCards, useUndo } from "./data";
 import { HpDialog } from "./hp-dialog";
 import { useCombatDialogs } from "./popup-store";
 
-function InitiativeCell({ c, def }: { c: CombatantView; def: DefinitionRecord | undefined }) {
+function InitiativeCell({
+  c,
+  def,
+  round,
+}: {
+  c: CombatantView;
+  def: DefinitionRecord | undefined;
+  round: number;
+}) {
   const { send, disabled } = useCbtIntent();
   const [draft, setDraft] = useState(c.initiative == null ? "" : String(c.initiative));
   useEffect(() => setDraft(c.initiative == null ? "" : String(c.initiative)), [c.initiative]);
@@ -88,6 +103,9 @@ function InitiativeCell({ c, def }: { c: CombatantView; def: DefinitionRecord | 
   };
   const bonus = def?.statBlock.initBonus ?? 0;
   const unset = c.initiative == null;
+  // FR-CBT-46 (#172): from round 1 only a combatant without initiative rolls; the number input
+  // stays the DM's override in every round.
+  const canRoll = canRollInitiative(round, c.initiative);
   // #149: an empty initiative leads with a labelled Roll button; the box is a quiet secondary
   // way to type a value (reads as a value cell, not a form field).
   return (
@@ -96,9 +114,10 @@ function InitiativeCell({ c, def }: { c: CombatantView; def: DefinitionRecord | 
         <Input
           data-testid="cbt-init-row-init"
           data-record-id={c.id}
+          data-missing={unset}
           aria-label={`Initiative of ${c.name}`}
           inputMode="numeric"
-          placeholder="–"
+          placeholder={unset && round >= 1 ? "Set" : "–"}
           className="h-7 w-9 border-transparent bg-transparent px-1 text-center text-xs tabular-nums shadow-none placeholder:text-muted-foreground/60 hover:border-input focus-visible:border-input"
           disabled={disabled}
           value={draft}
@@ -109,25 +128,27 @@ function InitiativeCell({ c, def }: { c: CombatantView; def: DefinitionRecord | 
           }}
         />
       </Tooltip>
-      <Tooltip
-        content={`Roll initiative: d20${bonus < 0 ? "" : "+"}${bonus} (Shift adv, Ctrl dis)`}
-      >
-        <span>
-          <RollButton
-            control={control}
-            data-testid="cbt-init-row-roll"
-            data-record-id={c.id}
-            size={unset ? "sm" : "icon"}
-            variant={unset ? "outline" : "ghost"}
-            className={unset ? "h-7 gap-1 px-2 text-xs" : "size-7"}
-            aria-label={`Roll initiative for ${c.name}`}
-            disabled={disabled}
-          >
-            <DicesIcon className="size-3.5" />
-            {unset && "Roll"}
-          </RollButton>
-        </span>
-      </Tooltip>
+      {canRoll && (
+        <Tooltip
+          content={`Roll initiative: d20${bonus < 0 ? "" : "+"}${bonus} (Shift adv, Ctrl dis)`}
+        >
+          <span>
+            <RollButton
+              control={control}
+              data-testid="cbt-init-row-roll"
+              data-record-id={c.id}
+              size={unset ? "sm" : "icon"}
+              variant={unset ? "outline" : "ghost"}
+              className={unset ? "h-7 gap-1 px-2 text-xs" : "size-7"}
+              aria-label={`Roll initiative for ${c.name}`}
+              disabled={disabled}
+            >
+              <DicesIcon className="size-3.5" />
+              {unset && "Roll"}
+            </RollButton>
+          </span>
+        </Tooltip>
+      )}
     </div>
   );
 }
@@ -343,11 +364,13 @@ function Row({
   c,
   def,
   turn,
+  round,
   defs,
 }: {
   c: CombatantView;
   def: DefinitionRecord | undefined;
   turn: boolean;
+  round: number;
   defs: Map<string, DefinitionRecord>;
 }) {
   const { send, disabled } = useCbtIntent();
@@ -399,7 +422,7 @@ function Row({
           )}
         </div>
       </div>
-      <InitiativeCell c={c} def={def} />
+      <InitiativeCell c={c} def={def} round={round} />
       <AttackButton c={c} def={def} />
       {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸. */}
       <RollButton control={check.control} tabIndex={-1} aria-hidden className={ANCHOR} />
@@ -478,7 +501,7 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
     expectedRound: enc.round,
     expectedTurnId: enc.turnCombatantId ?? null,
   };
-  const unrolled = rows.filter((c) => c.kind === "monster" && !c.removed && c.initiative == null);
+  const unrolled = unrolledMonsters(rows);
   const undoText = undo?.text ?? "Nothing to undo";
   return (
     <div className="flex shrink-0 flex-col gap-1.5">
@@ -526,20 +549,22 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
             </Button>
           </span>
         </Tooltip>
-        <Button
-          size="sm"
-          variant="ghost"
-          data-testid="cbt-init-roll-monsters"
-          disabled={disabled || unrolled.length === 0}
-          onClick={(e) =>
-            void send("cbt.rollInitiative", {
-              combatantIds: unrolled.map((c) => c.id),
-              mode: modeFromKeys(e, "normal"),
-            })
-          }
-        >
-          <DicesIcon className="size-3.5" /> Roll monsters
-        </Button>
+        {showRollMonsters(enc.round, unrolled.length) && (
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="cbt-init-roll-monsters"
+            disabled={disabled || unrolled.length === 0}
+            onClick={(e) =>
+              void send("cbt.rollInitiative", {
+                combatantIds: unrolled.map((c) => c.id),
+                mode: modeFromKeys(e, "normal"),
+              })
+            }
+          >
+            <DicesIcon className="size-3.5" /> Roll monsters
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -593,6 +618,7 @@ function DmInitiativeBody() {
               c={c}
               def={c.entityId ? defs.get(c.entityId) : undefined}
               turn={enc.turnCombatantId === c.id}
+              round={enc.round}
               defs={defs}
             />
           ))}

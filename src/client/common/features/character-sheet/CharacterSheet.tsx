@@ -45,7 +45,9 @@ import { rollRoutes } from "./roll-routes";
 import {
   createInFlight,
   intentErrorText,
+  type RollRouteClaim,
   type RollRouteInput,
+  rollActionView,
   routeFor,
   sendSheetRoll,
   sheetBadge,
@@ -97,24 +99,43 @@ function Stat({ label, children, testId }: { label: string; children: ReactNode;
   );
 }
 
-/** Initiative / Attack button through the shared roll control (FR-DICE-24, FR-CHAR-16). */
-function RollAction({
-  c,
-  kind,
-  testId,
-  publicTestId,
-  label,
-}: {
+interface RollActionProps {
   c: CharacterRecord;
   kind: "initiative" | "attack";
   testId: string;
   publicTestId: string;
   label: string;
-}) {
-  const live = useSync((s) => s.state === "live");
+}
+
+/**
+ * Initiative / Attack button through the shared roll control (FR-DICE-24, FR-CHAR-16). A claim
+ * answering `hidden` renders no button and no public switch; Initiative shows "Initiative set"
+ * (FR-CHAR-24). Re-evaluated on every store change.
+ */
+function RollAction(props: RollActionProps) {
   const store = useSync((s) => s.store);
+  const claim = routeFor(rollRoutes, store, props.c.id, props.kind);
+  const view = rollActionView(claim, props.kind);
+  if (view === "locked") {
+    return (
+      <span data-testid="char-sheet-init-locked" className="text-xs text-muted-foreground">
+        Initiative set
+      </span>
+    );
+  }
+  return view === "button" ? <RollActionControl {...props} claim={claim} /> : null;
+}
+
+function RollActionControl({
+  c,
+  kind,
+  testId,
+  publicTestId,
+  label,
+  claim,
+}: RollActionProps & { claim: RollRouteClaim | null }) {
+  const live = useSync((s) => s.state === "live");
   const connection = useSync((s) => s.connection);
-  const claim = routeFor(rollRoutes, store, c.id, kind);
   const specs = characterRolls(c.statBlock, kind) ?? [];
   const flight = useInFlight();
   const uid = useId();

@@ -142,6 +142,107 @@ describe("FR-CBT-11 FR-CBT-12 initiative", () => {
   });
 });
 
+describe("FR-CBT-46 FR-CBT-47 playtest: no re-rolls from round 1", () => {
+  /** combat-1 order without Goblin 2: removed in round 0 before any roll, then round 1. */
+  function lateJoiner() {
+    const t = started();
+    t.run(setRemoved.name, { combatantId: t.id("Goblin 2"), removed: true });
+    for (const [n, v] of [
+      ["Wolf", 18],
+      ["Mira", 15],
+      ["Goblin", 12],
+      ["Thorn", 10],
+      ["Elite Goblin Warrior", 8],
+    ] as const) {
+      t.set(n, v);
+    }
+    t.turn("next");
+    expect(t.enc0().round).toBe(1);
+    return t;
+  }
+
+  test("FR-CBT-47 refuses re-rolls from round 1", () => {
+    const t = started();
+    t.standard();
+    // Round 0: the DM may still overwrite.
+    t.run(rollInitiative.name, { combatantIds: [t.id("Goblin")], manual: { diceTotal: 5 } });
+    expect(t.byName(t.enc.id).Goblin?.initiative).toBe(7);
+    t.set("Goblin", 12);
+    t.turn("next");
+    const n = t.events.length;
+    const dm = t.err(() => t.run(rollInitiative.name, { combatantIds: [t.id("Goblin")] }));
+    expect([dm.code, dm.message]).toEqual(["conflict", "Initiative already set: Goblin"]);
+    const pl = t.err(() => t.run(rollInitiative.name, { combatantIds: [t.id("Mira")] }, t.p1));
+    expect([pl.code, pl.message]).toEqual(["conflict", "Initiative already set: Mira"]);
+    const both = t.err(() =>
+      t.run(rollInitiative.name, { combatantIds: [t.id("Goblin"), t.id("Wolf")] }),
+    );
+    expect(both.message).toBe("Initiative already set: Goblin, Wolf");
+    expect(t.events.length).toBe(n);
+    expect(t.byName(t.enc.id).Goblin?.initiative).toBe(12);
+  });
+
+  test("FR-CBT-47 whole intent: one listed combatant with initiative → nothing written", () => {
+    const t = lateJoiner();
+    t.run(setRemoved.name, { combatantId: t.id("Goblin 2"), removed: false });
+    const n = t.events.length;
+    const e = t.err(() =>
+      t.run(rollInitiative.name, { combatantIds: [t.id("Goblin 2"), t.id("Goblin")] }),
+    );
+    expect([e.code, e.message]).toEqual(["conflict", "Initiative already set: Goblin"]);
+    expect(t.events.length).toBe(n);
+    expect(t.byName(t.enc.id)["Goblin 2"]?.initiative).toBeNull();
+  });
+
+  test("FR-CBT-46 late joiner rolls once: restored, sorts last, roll ranks, set 9 overrides", () => {
+    const t = lateJoiner();
+    t.run(setRemoved.name, { combatantId: t.id("Goblin 2"), removed: false });
+    const g2 = () => t.byName(t.enc.id)["Goblin 2"];
+    expect(g2()?.initiative).toBeNull();
+    expect(g2()?.position).toBe(6);
+    t.run(rollInitiative.name, { combatantIds: [t.id("Goblin 2")], manual: { diceTotal: 20 } });
+    expect(g2()?.initiative).toBe(22);
+    expect(g2()?.position).toBe(1);
+    // The turn stays on Wolf (FR-CBT-14).
+    expect(t.enc0().turnCombatantId).toBe(t.id("Wolf"));
+    expect(t.err(() => t.run(rollInitiative.name, { combatantIds: [t.id("Goblin 2")] })).code).toBe(
+      "conflict",
+    );
+    t.set("Goblin 2", 9);
+    expect(g2()?.initiative).toBe(9);
+    expect(
+      Object.values(t.byName(t.enc.id))
+        .sort((a, b) => a.position - b.position)
+        .map((c) => c.name),
+    ).toEqual(["Wolf", "Mira", "Goblin", "Thorn", "Goblin 2", "Elite Goblin Warrior"]);
+  });
+
+  test("FR-CBT-46 PC late joiner: Thorn restored in round 1 → player-2 rolls once", () => {
+    const t = started();
+    t.run(setRemoved.name, { combatantId: t.id("Thorn"), removed: true });
+    for (const [n, v] of [
+      ["Wolf", 18],
+      ["Mira", 15],
+      ["Goblin", 12],
+      ["Goblin 2", 12],
+      ["Elite Goblin Warrior", 8],
+    ] as const) {
+      t.set(n, v);
+    }
+    t.turn("next");
+    t.run(setRemoved.name, { combatantId: t.id("Thorn"), removed: false });
+    const r = t.run<{ rollIds: string[] }>(
+      rollInitiative.name,
+      { combatantIds: [t.id("Thorn")] },
+      t.p2,
+    );
+    expect(r.rollIds).toHaveLength(1);
+    expect(t.byName(t.enc.id).Thorn?.initiative).not.toBeNull();
+    const again = t.err(() => t.run(rollInitiative.name, { combatantIds: [t.id("Thorn")] }, t.p2));
+    expect([again.code, again.message]).toEqual(["conflict", "Initiative already set: Thorn"]);
+  });
+});
+
 describe("FR-CBT-14 FR-CBT-31 FR-CBT-15 turns and removal", () => {
   test("FR-CBT-14 round 0 needs every initiative; then round 1 first; wrap; prev", () => {
     const t = started();

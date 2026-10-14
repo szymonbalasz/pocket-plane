@@ -28,6 +28,11 @@ export interface RollRouteClaim {
   badge: string;
   /** Damage expressions after a natural 20, for the manual popover (combat only). */
   critExpressions?: readonly string[];
+  /**
+   * FR-CHAR-24: the sheet renders no button (nor public switch) for this kind; Initiative shows
+   * a muted "Initiative set". The badge stays.
+   */
+  hidden?: boolean;
   /** Send the route's intent from the same input, dropping fields it doesn't take. */
   send(sendIntent: SendIntent, input: RollRouteInput): Promise<unknown>;
 }
@@ -57,6 +62,18 @@ export function routeFor(
     }
   }
   return null;
+}
+
+/**
+ * FR-CHAR-24: what the sheet renders for a roll kind: the roll button (with its DM public
+ * switch), "Initiative set" for a hidden Initiative, or nothing for another hidden kind.
+ */
+export function rollActionView(
+  claim: RollRouteClaim | null,
+  kind: SheetRollKind,
+): "button" | "locked" | "none" {
+  if (!claim?.hidden) return "button";
+  return kind === "initiative" ? "locked" : "none";
 }
 
 /**
