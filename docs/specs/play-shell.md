@@ -1,7 +1,7 @@
 ---
 title: Play shell
 prefix: SHELL
-status: in-review
+status: complete
 owner: spec-play-shell
 wave: 2
 ---
@@ -196,7 +196,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | Combat / Reward specs | Their window types and defaults | open (OQ-SHELL-06) |
 | [combat-tracker](combat-tracker.md) (feedback) | First `alert()` caller: player turn alert ([FR-CBT-41](combat-tracker.md#6-functional-requirements)); [ADR-0030](../architecture/adr/0030-ui-notification-sounds.md) accepted (#148) | complete |
 | [dice-roll-log](dice-roll-log.md), [notifications](notifications.md) | `dice.log` default size meets FR-SHELL-28 (#153); toast region placement (built, #153) | complete |
-| Playtest pass (#171) | [live-sync](live-sync.md) FR-SYNC-29 (presence unknown while not live); [combat-tracker](combat-tracker.md) `cbt.initiative` rows for FR-SHELL-32; every feature with hover hints moves to the shared Tooltip (FR-SHELL-30) | in review |
+| Playtest pass (#171) | [live-sync](live-sync.md) FR-SYNC-29 (presence unknown while not live); [combat-tracker](combat-tracker.md) `cbt.initiative` rows for FR-SHELL-32; every feature with hover hints moves to the shared Tooltip (FR-SHELL-30) | complete (#172) |
 
 **Shared changes** (feedback pass):
 - **Existing common files this build edits:** play-shell's frame files stay shared (AGENTS §9.9, #154), so route via the orchestrator: `src/client/common/features/play-shell/{PlayFrame.tsx (flash overlay layer, player top-bar speaker Button), ShellContext.tsx (alert API), test-windows.tsx (`shell-test-alert`)}`. FR-SHELL-28: `src/client/common/features/dice-roll-log/{GameLog.tsx, window.ts}` (dice-roll-log-owned; fold into this build or a `fix/*`). New files (free): alert store, sound engine + `ping`, sound settings storage.

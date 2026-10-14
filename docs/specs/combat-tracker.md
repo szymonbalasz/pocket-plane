@@ -1,7 +1,7 @@
 ---
 title: Combat tracker
 prefix: CBT
-status: in-review
+status: complete
 owner: spec-combat-tracker
 wave: 3
 ---
@@ -316,7 +316,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | [dice-roll-log](dice-roll-log.md) | `ctx.dice`, `dice.evaluate` (per-die results), `gameLog.append` / `markUndone`, kind registry, `encounterId`, `dmPayload`, N-expression manual popover; categories `ability-check`, `saving-throw` | complete |
 | [notifications](notifications.md) | `notify` / `resolveNotification` / `reopenNotification`, `note.dismiss`, kind + view registries, resolution visible to the audience (#138); post-MVP payload update for gems. Feedback: a `damage-card` resolution up to 8 KB (OQ-CBT-39, #157) | complete; FR-NOTE-03 per-kind cap built |
 | [live-sync](live-sync.md), [play-shell](play-shell.md), [fixtures-adapters](fixtures-adapters.md) | Registries incl. `window`, windows, bundles. Feedback: `alert()` with flash + sound, mute / volume, audio unlock ([FR-SHELL-22–27](play-shell.md#6-functional-requirements)) | complete |
-| Playtest pass (#171) | [scenes-map](scenes-map.md) overlay `cross` + badges in the label row (FR-MAP-43); [character-sheet](character-sheet.md) route `hidden` (FR-CHAR-24); [play-shell](play-shell.md) work area (FR-SHELL-29), Initiative height (FR-SHELL-32); [dice-roll-log](dice-roll-log.md) DM-view convention (FR-DICE-28) | in review |
+| Playtest pass (#171) | [scenes-map](scenes-map.md) overlay `cross` + badges in the label row (FR-MAP-43); [character-sheet](character-sheet.md) route `hidden` (FR-CHAR-24); [play-shell](play-shell.md) work area (FR-SHELL-29), Initiative height (FR-SHELL-32); [dice-roll-log](dice-roll-log.md) DM-view convention (FR-DICE-28) | complete (#172) |
 
 **Shared-file changes, Phase 3** (built, #139–#141): tables, events, record types, routes and registry lines as in [protocol §20–26](../protocol/README.md#26-combat-registries-and-seams) and [data model §17](../data-model/README.md).
 

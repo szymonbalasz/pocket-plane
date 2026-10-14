@@ -1,7 +1,7 @@
 ---
 title: Live sync, reconnect, visibility
 prefix: SYNC
-status: in-review
+status: complete
 owner: spec-live-sync
 wave: 1
 ---
@@ -181,7 +181,7 @@ The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map 
 | [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) open row "Listener execution" | **Synchronous, after commit** (FR-SYNC-14 relies on it) | open — pick synchronous ([proposed ADR option F](../architecture/adr/0021-sync-protocol-conventions.md#options), needs DM OK) |
 | [scenes-map](scenes-map.md) / [play-shell](play-shell.md) | Active scene id + resync on switch, ping/laser as signals / hosts indicator, banner, presence | open |
 | Build conventions (AGENTS.md) | `PP_TEST_MODE`, `PP_DATA_DISPOSABLE`, ports: AGENTS §9.2 (agreed, pending merge); WS path: open (OQ-SYNC-15) | agreed, pending merge |
-| [scenes-map](scenes-map.md) (playtest) | `map.drag` registers the first `audience` hook (FR-MAP-41) | in review |
+| [scenes-map](scenes-map.md) (playtest) | `map.drag` registers the first `audience` hook (FR-MAP-41) | complete (#172) |
 | [campaign-management](campaign-management.md) | FR-CAMP-14 / §7: online dot hidden (muted "–") while the DM client is not `live` (FR-SYNC-29); CAMP §7 amended at consolidation (#172) | agreed |
 
 **Shared changes** (playtest pass, #171; shared core, orchestrator routes per AGENTS §9.9):

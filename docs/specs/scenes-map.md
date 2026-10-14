@@ -1,7 +1,7 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: in-review
+status: complete
 owner: spec-scenes-map
 wave: 3
 ---
@@ -232,8 +232,8 @@ Isolated per worktree: `bun test` on `:memory:` DB, temp asset dir, port 0; walk
 | [campaign-management](campaign-management.md), [fixtures-adapters](fixtures-adapters.md) | `player` records for the owner picker; `town`, `battlemap` as §13; add `scenes-extras` + bundle `scenes` to FIX §8 at merge (integrator) | complete |
 | [combat-tracker](combat-tracker.md) | Combatant → token; token-changed hook ([ADR-0028](../architecture/adr/0028-token-changed-hooks.md)): copies name / image / hidden, token bound to a running encounter → `conflict` on delete (#124, #134); token menu entries (FR-MAP-29); the popup preselects the map selection (FR-MAP-33, #148; DM only). Feedback: overlay lines (out, down, target ring, `movedFt`) and the move hook ([FR-CBT-38, 39, 42](combat-tracker.md#6-functional-requirements)) | complete |
 | [entities](entities.md) (feedback) | `statBlock.speed`, `tokenShape` ([FR-ENT-21/22](entities.md#6-functional-requirements)) | complete |
-| [live-sync](live-sync.md) (playtest) | Signal `audience` hook ([FR-SYNC-28](live-sync.md#6-functional-requirements), [ADR-0033](../architecture/adr/0033-signal-audience.md)) before this spec's playtest build | in review |
-| [combat-tracker](combat-tracker.md) (playtest) | Down as `cross` ([FR-CBT-48](combat-tracker.md#6-functional-requirements)); `thorn-battlemap` in `session-sim` (G1) | in review |
+| [live-sync](live-sync.md) (playtest) | Signal `audience` hook ([FR-SYNC-28](live-sync.md#6-functional-requirements), [ADR-0033](../architecture/adr/0033-signal-audience.md)) before this spec's playtest build | complete (#172) |
+| [combat-tracker](combat-tracker.md) (playtest) | Down as `cross` ([FR-CBT-48](combat-tracker.md#6-functional-requirements)); `thorn-battlemap` in `session-sim` (G1) | complete (#172) |
 
 **Shared changes** (feedback pass; the consolidation agent writes data-model / protocol; builders report `shared change needed:` per AGENTS §9.9):
 - `src/server/db/` — `token.shape` text not null default `round`; `token.speed` int null.
