@@ -1,9 +1,11 @@
-// Tool rail content (MAP §7): Select, Ruler, Ping for both clients; DM extras as children.
-import { MousePointer2Icon, RadarIcon, RulerIcon } from "lucide-react";
+// Tool rail content (MAP §7): Select, Ruler, Ping and Fit (FR-MAP-45) for both clients; DM extras
+// as children.
+import { MousePointer2Icon, RadarIcon, RulerIcon, ScanIcon } from "lucide-react";
 import { useEffect } from "react";
+import { Button } from "../../components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "../../components/ui/menus";
 import { Tooltip } from "../../components/ui/overlays";
-import { type MapTool, useMapTool } from "./tool-store";
+import { type MapTool, useMapFit, useMapTool } from "./tool-store";
 
 const TOOLS: { tool: MapTool; label: string; icon: typeof RulerIcon; hint?: string }[] = [
   { tool: "select", label: "Select", icon: MousePointer2Icon, hint: "Drag tokens, pan the map" },
@@ -31,6 +33,7 @@ export function ToolRail({
 }) {
   const tool = useMapTool((s) => s.tool);
   const setTool = useMapTool((s) => s.setTool);
+  const requestFit = useMapFit((s) => s.requestFit);
   useEffect(() => {
     if (signalsOff && tool === "ping") setTool("select");
   }, [signalsOff, tool, setTool]);
@@ -83,6 +86,19 @@ export function ToolRail({
           );
         })}
       </ToggleGroup>
+      {/* FR-MAP-45: camera only, so it works while not live too. */}
+      <Tooltip content="Fit tokens to the free area">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-9"
+          aria-label="Fit"
+          data-testid="map-tool-fit"
+          onClick={requestFit}
+        >
+          <ScanIcon className="size-4" />
+        </Button>
+      </Tooltip>
       {children}
     </div>
   );
