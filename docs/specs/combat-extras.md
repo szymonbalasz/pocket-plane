@@ -1,7 +1,7 @@
 ---
 title: Combat extras
 prefix: CBTX
-status: in-review
+status: complete
 owner: spec-combat-extras
 phase: post-mvp-1
 ---
@@ -13,20 +13,20 @@ phase: post-mvp-1
 ## 1. Summary
 
 - Combat depth on top of the MVP tracker: **effects** (5e conditions, custom round-based effects like "Bless: 10 rounds", **concentration**), **temp HP**, **death saves**, **add combatants mid-fight**, and two token overlays: **HP bar** and **condition icons**.
-- Every capability is a server command ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). Rules (expiry, concentration prompts, death-save failures, temp HP absorption) run **inside the causing command's transaction** as rule hooks and the HP rules helper; no post-commit listener writes state (proposed ADR, OQ-CBTX-01). A crash loses nothing.
+- Every capability is a server command ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). Rules (expiry, concentration prompts, death-save failures, temp HP absorption) run **inside the causing command's transaction** as rule hooks and the HP rules helper; no post-commit listener writes state ([combat-rule-hooks](../architecture/adr/proposed-combat-rule-hooks.md), accepted #178). A crash loses nothing.
 - Players see what the table sees: conditions and effects on visible creatures, their own PC's numbers, a monster's health band only (#138), other PCs' death state but no HP.
 
 ## 2. Scope
 
-Proposed for the DM gate (#177). *(proposed)* = picked here, not in the brief.
+Accepted by the DM (#178, all picks; sprint plan #177).
 
-- **Effects**: 15 conditions (5e list incl. exhaustion 1–6), custom effects with a label and optional duration in rounds, concentration (one per creature). Effects on monsters (combatant) and PCs (character; persist outside combat *(proposed, OQ-CBTX-05)*).
-- **Durations**: round-based, end at the start of the anchor's turn; auto-expire on Next, restored on Prev *(proposed, OQ-CBTX-02/04)*. Effects linked to a concentration end with it.
+- **Effects**: 15 conditions (5e list incl. exhaustion 1–6), custom effects with a label and optional duration in rounds, concentration (one per creature). Effects on monsters (combatant) and PCs (character; persist outside combat, OQ-CBTX-05).
+- **Durations**: round-based, end at the start of the anchor's turn; auto-expire on Next, restored on Prev (OQ-CBTX-02/04). Effects linked to a concentration end with it.
 - **Concentration**: on damage, a **concentration card** (notification with action "Roll save", DC = max(10, ⌊damage / 2⌋)); click-to-roll CON save; fail → concentration and linked effects end.
 - **Temp HP**: PCs and monsters; absorbs damage first; undo-safe.
 - **Death saves** (PCs at 0 HP): successes / failures, nat 1 = 2 failures, nat 20 = 1 HP, 3 successes = stable, 3 failures = dead; damage at 0 HP = 1 failure (crit 2); DM stabilise.
 - **Add combatants mid-fight**: tokens from the map, characters or monsters from a picker; initiative per [FR-CBT-46/47](combat-tracker.md#6-functional-requirements) (#172).
-- **Token overlays**: HP bar (DM: all; player: own PC proportional; monsters band-tone bar or none, pending DM gate OQ-CBTX-08), condition / effect icons, PC death badge.
+- **Token overlays**: HP bar (DM: all; player: own PC proportional; monsters a band-tone bar, no proportion, #178), condition / effect icons, PC death badge.
 - **UI**: Initiative rows and menus (DM, player), token menu entries, notification views, and three sheet sections registered through character-sheet-full's seam (§7.1).
 
 ## 3. Goals
@@ -60,7 +60,7 @@ All commands: rows + event-log entry + domain event in one transaction; IDs, tim
 | ID | Requirement | Notes |
 |---|---|---|
 | **Rule mechanism** | | |
-| FR-CBTX-01 | **Rules run in the causing command's transaction** (OQ-CBTX-01, proposed ADR [combat-rule-hooks](../architecture/adr/proposed-combat-rule-hooks.md)). Two seams: (a) `hpRules.apply(env, target, {kind, raw, crit, source})` (CBTX, server) is the **only** path that changes a creature's HP, temp HP or death saves from damage / heal; (b) `combatRuleHooks` (append-only server registry, created by this build) with hook points `started`, `added`, `turnChanged`, `ended`, each `(env, encounter, detail) → RecordChange[]`, may call `notify`; rows go into the causing event's `changes`. A hook error rolls back the command. No listener writes state. | ADR-0027 C |
+| FR-CBTX-01 | **Rules run in the causing command's transaction** (OQ-CBTX-01, ADR [combat-rule-hooks](../architecture/adr/proposed-combat-rule-hooks.md), accepted #178). Two seams: (a) `hpRules.apply(env, target, {kind, raw, crit, source})` (CBTX, server) is the **only** path that changes a creature's HP, temp HP or death saves from damage / heal; (b) `combatRuleHooks` (append-only server registry, created by this build) with hook points `started`, `added`, `turnChanged`, `ended`, each `(env, encounter, detail) → RecordChange[]`, may call `notify`; rows go into the causing event's `changes`. A hook error rolls back the command. No listener writes state. | ADR-0027 C |
 | FR-CBTX-02 | Callers of `hpRules.apply`: `cbt.applyCard`, `cbt.applyHp` (replaces [FR-CBT-22](combat-tracker.md#6-functional-requirements)'s HP step), `cbt.undo` (`hpRules.revert`), `char.adjustHp` (the sheet keeps the intent; CBTX wires it through, D/S seam). It writes monster HP on the combatant and PC HP via `characters.adjustHp` ([FR-CHAR-13](character-sheet.md#6-functional-requirements)), and returns the facts in FR-CBTX-21. Hook callers: `cbt.start` (`started`), `cbtx.addCombatants` (`added`), `cbt.nextTurn` / `prevTurn` (`turnChanged`), `cbt.end` (`ended`). | |
 | **Effects** | | |
 | FR-CBTX-03 | **Effect** = one row: `kind` `condition` \| `custom` \| `concentration`, a target (combatant for monsters, character for PCs), optional duration, optional link to a concentration, `secret` flag (§8). Conditions: blinded, charmed, deafened, frightened, grappled, incapacitated, invisible, paralysed, petrified, poisoned, prone, restrained, stunned, unconscious, exhaustion (level 1–6). Keys and one-line reminder text in `@shared/combat-extras/conditions.ts` (own words, no rules text). | 5e 2014 list |
@@ -76,7 +76,7 @@ All commands: rows + event-log entry + domain event in one transaction; IDs, tim
 | FR-CBTX-13 | **Hidden copy**: `effect.hidden` = the target's bound combatant `hidden` (PCs: their active combatant's; none → false). Written by `addEffect`, the `started` / `added` hooks and CBTX's token-changed hook line ([ADR-0028](../architecture/adr/0028-token-changed-hooks.md)) on hide / reveal, in the token command's transaction. | ADR-0021: fns read only the record |
 | **Temp HP** | | |
 | FR-CBTX-14 | `tempHp` int 0–999 (default 0) on monster combatants and on characters. `cbtx.setTempHp {target: ref, value}` (DM; owning player: own PC) **replaces** the value (5e: no stacking; the UI hints "keep the higher"). `TempHpSet`; not a combat log entry, no game-log line, not undoable. Same value → no-op, no event. | OQ-CBTX-07 |
-| FR-CBTX-15 | **Absorption** (`hpRules.apply`, damage): `absorbed = min(tempHp, raw)`; `tempHp −= absorbed`; HP loses `raw − absorbed` (clamped). `hp_change.applied` keeps its meaning (HP lost); `overkill = max(0, raw − absorbed − hpBefore)`. Heal never touches temp HP. Health band uses `hpCurrent` only. **Damage-card resolution** (seen by the rolling player, #138): per target `applied` = HP lost + absorbed (damage dealt), so a target's temp HP never shows (*pending DM gate, OQ-CBTX-12*; amends [FR-CBT-34](combat-tracker.md#6-functional-requirements)'s resolution; protocol §23 note). | FR-CBT-22 |
+| FR-CBTX-15 | **Absorption** (`hpRules.apply`, damage): `absorbed = min(tempHp, raw)`; `tempHp −= absorbed`; HP loses `raw − absorbed` (clamped). `hp_change.applied` keeps its meaning (HP lost); `overkill = max(0, raw − absorbed − hpBefore)`. Heal never touches temp HP. Health band uses `hpCurrent` only. **Damage-card resolution** (seen by the rolling player, #138): per target `applied` = HP lost + absorbed (damage dealt), so a target's temp HP never shows (OQ-CBTX-12, #178; amends [FR-CBT-34](combat-tracker.md#6-functional-requirements)'s resolution; protocol §23 note). | FR-CBT-22 |
 | **HP rules and undo** | | |
 | FR-CBTX-16 | **0 HP ends concentration**: damage that leaves the target at 0 HP ends its concentration (`endedReason: down`, `endedByHpChangeId` = the row). | 5e: unconscious |
 | FR-CBTX-17 | **Concentration card**: damage with `raw > 0` (before absorption) to a target with active concentration and HP > 0 afterwards → `notify` kind `cbtx-concentration`, one per damage row: text "‹name›: concentration save DC N (‹label›)", payload §8, action "Roll save". PC → audience `player` = owner, action owner the owner; PC with no owner, or hidden from its owner (#141) → `dm`; monster → `dm`. Emitted after the row's owner event (`AttackApplied` / `HpApplied` / `CharacterHpAdjusted`). | ADR-0027 A |
@@ -93,12 +93,12 @@ All commands: rows + event-log entry + domain event in one transaction; IDs, tim
 | FR-CBTX-26 | `cbtx.addCombatants {encounterId, items [{tokenId} \| {characterId} \| {definitionId}] 1–20}` (DM): encounter `started` (any round), total combatants ≤ 56 (`conflict`). `tokenId`: on the encounter's scene, not bound to an active combatant of it, its `definitionId` a monster or character; `characterId`: a character of the campaign; `definitionId`: a monster (`resolveDefinition`). A character already an active combatant → `conflict` "Mira is already in combat". All or nothing. | |
 | FR-CBTX-27 | Binding as [FR-CBT-08](combat-tracker.md#6-functional-requirements): a token item binds that token; character / definition items take the next unbound token on the scene with that `definitionId`, else token-less (FR-MAP-16 numbering, portrait, visible). Monsters `hpMax = hpCurrent = effectiveStats.hpMax`, `tempHp 0`, `movedFt 0`. `initiative` null: sorts last, rolls once per FR-CBT-46/47, no change there. Ranks (FR-CBT-13) and `playerTurnCombatantId` rewritten; `added` hook (FR-CBTX-13). Emits `CombatantsAdded {encounterId, combatantIds}`. Encounter entries unchanged (OQ-CBTX-17). | #172 |
 | **Token overlays** (`tokenOverlays` line `cbtx`, [FR-MAP-34](scenes-map.md#6-functional-requirements); tokens bound to an active combatant of the started encounter) | | |
-| FR-CBTX-28 | **HP bar** (new overlay field `bar`, OQ-CBTX-21): DM: every bound token, `hpCurrent / hpMax` in band tone (`hp.full` / `hp.bloodied`; none at 0, the Down X shows it), temp HP as a neutral segment after it (≤ 100 % total). Player: own PC (full `entity`) the same; other PCs none. Monsters, *pending DM gate (OQ-CBTX-08; would amend #138)*: option A **full-width bar in the band's tone, no proportion**; option B (fallback, as #138 stands) **no bar on monster tokens for players**, the band stays in the Initiative row and the Down X shows 0 HP. Either option: no HP number or proportion ever reaches a player. | #138 |
+| FR-CBTX-28 | **HP bar** (new overlay field `bar`, OQ-CBTX-21): DM: every bound token, `hpCurrent / hpMax` in band tone (`hp.full` / `hp.bloodied`; none at 0, the Down X shows it), temp HP as a neutral segment after it (≤ 100 % total). Player: own PC (full `entity`) the same; other PCs none; monsters a **full-width bar in the band's tone, no proportion** (healthy / bloodied; none at 0, the Down X shows it). No HP number or proportion ever reaches a player. Rejected: no monster bar for players. | amended #178 (amends #138; OQ-CBTX-08) |
 | FR-CBTX-29 | **Effect icons** (new overlay field `icons`): one icon per active effect the viewer receives (conditions: per-key lucide icon; custom: one generic icon; concentration: its own icon; exhaustion with level), max 4 then "+N", test id `cbtx-token-effect` + `data-value` = key. Not shown for ended or secret effects to players. | |
 | FR-CBTX-30 | **Death badge** (existing `badges`, label row): PC token with `deathState` dying → "Dying" (`hp.down`), stable → "Stable" (neutral), dead → "Dead" (`hp.down`), for everyone who receives the token (players from the redacted `deathState`, FR-CBTX-32). | as FR-CBT-38 |
 | **Visibility** | | |
 | FR-CBTX-31 | `effect` record (scope `campaign`): DM full. Player: hidden if `secret`, `hidden`, or ended; else redacted `{id, kind, condition, level, label, targetCombatantId, targetCharacterId, encounterId, endsRound}` (no source, anchor or concentration link: they may name hidden creatures). Snapshot: active effects (not windowed; capped by FR-CBTX-04). | ADR-0021 |
-| FR-CBTX-32 | `tempHp` on `combatant`: never in a player redaction. On `entity` (character): DM + owner full; other players get the **one shared whitelist** in entities' visibility fn ([FR-ENT-15](entities.md#6-functional-requirements)), listed in CHARX's [proposed-full-sheet-derivation](../architecture/adr/proposed-full-sheet-derivation.md) ("Refines ADR-0024"); CBTX's key there is `deathState` (no counters, no temp HP). CBTX's leak test asserts against that list, not its own. | #138, #154; OQ-CBTX-09 |
+| FR-CBTX-32 | `tempHp` on `combatant`: never in a player redaction. On `entity` (character): DM + owner full; other players get the **one shared whitelist** (#178: name, portrait, owner, Down, level, class, species, `deathState`) in entities' visibility fn ([FR-ENT-15](entities.md#6-functional-requirements)), listed in CHARX's [proposed-full-sheet-derivation](../architecture/adr/proposed-full-sheet-derivation.md) ("Refines ADR-0024"); CBTX's key there is `deathState` (no counters, no temp HP). CBTX's leak test asserts against that list, not its own. | #138, #154; OQ-CBTX-09 |
 | **Client** | | |
 | FR-CBTX-33 | **DM Initiative row** additions (`cbt.initiative`): temp HP "+5" after HP; effect chips on the name line (icon + label / condition, "3r" if timed, eye-off if secret; click → menu Edit / End), **one line only**: chips that don't fit collapse into "+N" (full list on hover and in the row menu), so a row never grows and FR-SHELL-32's 6 rows at 1440×900 hold; PC death pips (●●○ / ✗✗○) and state. Row menu gains **Conditions ▸** (15 toggles, exhaustion level submenu), **Effect…**, **Concentration…**, **Temp HP…**; for a dying PC **Death save** (roll control) and **Stabilise**; **Set death saves…**. Header **Add…** (Dialog: picker over monsters + characters × quantity, binding preview as Start). | CBT §7 |
 | FR-CBTX-34 | **Player Initiative row**: effect chips the player receives (rounds left; one line + "+N", hover lists all); PCs' death state Badge (own PC with pips). | |
@@ -119,7 +119,7 @@ All commands: rows + event-log entry + domain event in one transaction; IDs, tim
 Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, dense; `hp.full` / `hp.bloodied` / `hp.down`, `visibility.hidden`; lucide icons. No new window.
 
 - **DM view:** Initiative rows carry chips and pips (FR-CBTX-33); chips stay on one line (truncated, "+N"), so FR-SHELL-32's 6 rows at 1440×900 hold. Token bars + icons on every bound token; concentration cards in Pending and as sticky toasts only when the DM is the action owner (monsters).
-- **Player view:** chips on visible creatures; bar on own PC; band bars on monsters only if OQ-CBTX-08 picks A; own concentration cards as sticky toasts; own sheet sections (§7.1).
+- **Player view:** chips on visible creatures; bar on own PC; band-tone bars on monsters (#178); own concentration cards as sticky toasts; own sheet sections (§7.1).
 - **Map layout:** bar on the footprint's top edge inside the token group (moves with drags and previews); icons in a row below it, top-left; death badge in the label row. Exact pixels per scenes-map's renderer; screenshot at §13 step 1.
 - **States:** no encounter: DM effect / temp HP / death controls still work on characters (sheet sections); Initiative empty as CBT. Disconnected: last state + banner, controls disabled. Errors: Toast.
 - **Test IDs:** `cbtx-init-row-<temp|effect|death|conditions|effect-new|concentration|temp-set|death-roll|stabilise|death-set>` (`effect` + `data-record-id` = effect id, `data-value` = key or `custom`; `death` + `data-value` = state), `cbtx-init-add`, `cbtx-add-<picker|qty|binding|confirm>`, `cbtx-effect-<tab|label|duration|source|link|secret|save|end>`, `cbtx-conc-<label|duration|save>`, `cbtx-temp-<input|save>`, `cbtx-death-<success|failure|state>`, `cbtx-token-menu-<conditions|effect|temp|add>`, `cbtx-note-roll`, `cbtx-expired-toast`; Konva `cbtx-token-bar` (attr `tone`, `fraction`), `cbtx-token-effect`, `cbtx-token-death` (id = token id).
@@ -159,7 +159,7 @@ Settled by the orchestrator (D/S seam). CBTX owns data, rules, intents and visib
 | Concentration card (`notification`, kind `cbtx-concentration`) | payload (≤ 1 KB) | **JSON leaf** | `{effectId, targetName, dc, damage, hpChangeId \| null, encounterId \| null}` |
 | | resolution | **JSON leaf** | `{total, dc, success}` \| `{outcome: "ended" \| "undone"}` |
 
-- **ADR-0009:** refined, not contradicted ([proposed ADR](../architecture/adr/proposed-combat-rule-hooks.md) "Refines ADR-0009"): PC play state lives on the character (as `hpCurrent` already does); monster play state on the combatant; effects are condition / label rows, not ADR-0009's field / op / value modifiers, which stay design-for-later.
+- **ADR-0009:** refined, not contradicted ([combat-rule-hooks](../architecture/adr/proposed-combat-rule-hooks.md) "Refines ADR-0009", accepted #178): PC play state lives on the character (as `hpCurrent` already does); monster play state on the combatant; effects are condition / label rows, not ADR-0009's field / op / value modifiers, which stay design-for-later.
 - **Constraints:** one active concentration per target, one active condition per (target, key): partial unique indexes on rows with `endedAt` null. FKs: `targetCombatantId` / `concentrationId` set null on delete (combatants are never deleted today).
 - **Relations:** Effect → Combatant or Character; Effect → Effect (concentration); combat log entry → its concentration cards.
 - **Derived:** `deathState` (FR-CBTX-19), rounds left, bar fraction / tone, DC, whether a PC is skipped (dead).
@@ -227,7 +227,7 @@ Settled by the orchestrator (D/S seam). CBTX owns data, rules, intents and visib
 - **Undo** after a later sheet heal or death save: inverse deltas, clamped (I2); temp restore clamped; death counters by delta, so later rolls survive (FR-CBTX-22). **Restore into a taken slot** (undo or Prev reactivating a concentration or condition the target has again): skipped and named in `notRestored`; the command still succeeds.
 - **Removed combatant:** effects stay (shown with Out); expiry still runs. **Token deleted / unbound:** effects stay on the combatant; no icon.
 - **Added mid-fight to a hidden token:** hidden combatant; its effects `hidden`. Reveal → token hook upserts both.
-- **Leaks accepted:** the band bar if OQ-CBTX-08 picks A (players had the band); a PC's `deathState` (players see Down already, #154); the rolling player's own card shows damage dealt (#138) and a concentration card names the DC (owner only); effect chips on visible monsters ("Goblin: Bless") reveal what the party saw.
+- **Leaks accepted:** the band-tone bar (#178; players had the band); a PC's `deathState` (players see Down already, #154); the rolling player's own card shows damage dealt (#138) and a concentration card names the DC (owner only); effect chips on visible monsters ("Goblin: Bless") reveal what the party saw.
 - **Invalid input:** strict zod; labels as text; a player can't target another PC, a monster, or send `public`.
 
 ## 12. Performance & bandwidth
@@ -281,7 +281,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | On | What we need | Status |
 |---|---|---|
 | ADR-0016, 0021, 0022, 0024, 0027, 0028, 0029, 0032; #134–#141, #154, #172 | Events + undo, sync, seams, in-tx notifications, token hooks, windows, save bonus | accepted |
-| Proposed [combat-rule-hooks](../architecture/adr/proposed-combat-rule-hooks.md) | Rules in-tx; no post-commit state writes | proposed (OQ-CBTX-01) |
+| [combat-rule-hooks](../architecture/adr/proposed-combat-rule-hooks.md) | Rules in-tx; no post-commit state writes | accepted #178 (numbered at merge) |
 | [combat-tracker](combat-tracker.md) | Apply / undo / turns / start / end call `hpRules` and `combatRuleHooks`; Initiative window, token menu, alert; FR-CBT-46/47 roll rule | complete; track P revising (R2, R4, R5) |
 | [character-sheet](character-sheet.md) / [character-sheet-full](character-sheet-full.md) | `characters.adjustHp`; `char.adjustHp` through `hpRules`; `sheetSections` registry; save resolver with overrides (`fix/charx-core`, merges before this build) | complete / in spec (track S); seam settled (D/S seam) |
 | [scenes-map](scenes-map.md) | `tokenOverlays` + `bar`, `icons` fields; token menu; token-changed hooks; selection | complete; contract change |
@@ -307,32 +307,32 @@ Builders report `shared change needed:`. **Build order** (fixed by the orchestra
 
 ## 15. Open questions
 
-**Bold** = suggested pick (not decided). "DM" = needs the DM at the gate.
+All decided: the DM accepted every pick (#178); the D/S seam rows were settled by the orchestrator before the gate and accepted with it.
 
-| ID | Question | Options (pick marked) | Blocking? | Affects |
+| ID | Question | Decision | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CBTX-01 | How do rules (expiry, concentration, death failures) close ADR-0027 C's crash gap? | **In the causing command's transaction: `hpRules` + `combatRuleHooks`** (atomic, as token hooks) / post-commit listener + boot reconciliation (decoupled; needs core re-entrancy) | yes · owner: integrator → DM ([proposed ADR](../architecture/adr/proposed-combat-rule-hooks.md)) | ADR-0016, ADR-0027, combat-tracker |
-| OQ-CBTX-02 | Timed effect reaches its end | **Auto-end on Next + DM Toast** (no notification row) / pending prompt "Bless ends — remove?" (one click per expiry) | no · DM | — |
-| OQ-CBTX-03 | Duration timing | **Start of the anchor's turn only** (covers "1 minute", "until your next turn") / also "end of turn" (another field, more UI) | no · DM | — |
-| OQ-CBTX-04 | Prev after an expiry | **Restore what that Next expired** / DM re-adds (simpler) | no · DM | combat-tracker (as FR-CBT-40) |
-| OQ-CBTX-05 | Effects outside combat | **PC effects live on the character and survive End unless timed; monster effects end at End** / every effect ends at End (no sheet persistence) | no · DM | character-sheet-full |
-| OQ-CBTX-06 | Condition mechanics | **Only incapacitating conditions end concentration; rest are reminders** / also preset adv / dis on rolls (more rules, more code) | no · DM | combat-tracker, dice-roll-log |
-| OQ-CBTX-07 | Player rights on own PC | **Temp HP, death save roll, concentration start / end; conditions DM only** / players also add own conditions | no · DM | character-sheet-full |
-| OQ-CBTX-08 | Monster HP bar for players: amends #138 ("only a health band, never HP or a bar") | **A: full-width bar in band tone, no proportion** (glanceable on the map; amends #138) / B: no monster bar for players, band in the Initiative row only (#138 as is). Both specified in FR-CBTX-28 | **yes** · DM | #138, scenes-map |
-| OQ-CBTX-09 | Other players see a PC's death saves (widens ADR-0024's redaction; goes to the DM together with OQ-CHARX-05) | **`deathState` only (dying / stable / dead)** / counters too / nothing beyond Down | no · DM (with OQ-CHARX-05) | entities, ADR-0024 |
-| OQ-CBTX-10 | Dead PCs skip turns (amends FR-CBT-14 / -50) | **Yes** / no, DM presses Next | no · DM | [combat-tracker](combat-tracker.md) |
-| OQ-CBTX-11 | Massive damage (overkill ≥ HP max → dead) | **Not automated; DM sets failures 3** / automated | no · DM | — |
-| OQ-CBTX-12 | How temp HP stays hidden from players: outcome lines and the damage card's `applied` (#138 shows `applied` to the rolling player) | **(a) Absorbed only in the DM line; card resolution `applied` = damage dealt incl. absorbed** (no temp HP leak; changes the resolution's meaning, protocol §23 note) / (b) resolution keeps HP lost; list the temp HP hint as an accepted leak like overkill | no · DM | combat-tracker, dice-roll-log |
-| ~~OQ-CBTX-13~~ | ~~Sheet damage (`char.adjustHp`) through `hpRules`~~ | **Settled by the orchestrator, see D/S seam:** the sheet keeps `char.adjustHp`; CBTX wires it through `hpRules.apply` (temp HP, death-save failures, concentration cards); CHARX models none of these fields (also OQ-CHARX-11) | — | [character-sheet](character-sheet.md), [character-sheet-full](character-sheet-full.md) |
-| ~~OQ-CBTX-14~~ | ~~Sheet seam with character-sheet-full: registry; CON save bonus source~~ | **Settled by the orchestrator, see D/S seam:** CHARX's `sheetSections` registry (`slot`, `order`, `kinds`, `available`, `component`), CBTX entries per §7.1; CON save bonus = CHARX's save resolver in `@shared/entities`, overrides honoured, from `fix/charx-core` (merges before the CBTX build) (also OQ-CHARX-10) | — | [character-sheet-full](character-sheet-full.md) |
-| ~~OQ-CBTX-15~~ | ~~Pending concentration cards at End (track P R5 decides damage cards)~~ | **Settled, consistent with OQ-CBT-45 / FR-NOTE-23** (track P R5 option A, pending the DM gate): kinds opt in to dismissal at End with `onEncounterEnd: "dismiss"`; `cbtx-concentration` doesn't declare it, so its cards stay pending (concentration outlives combat; FR-CBTX-10 closes them when it ends). Expiry has no notification kind (FR-CBTX-06, DM Toast only) | — | [combat-tracker](combat-tracker.md), [notifications](notifications.md) |
-| OQ-CBTX-16 | Auto-add Unconscious to a PC at 0 HP | **No** (Down X + Dying say it) / yes, removed on heal | no · DM | — |
-| OQ-CBTX-17 | Mid-fight additions update encounter entries (XP) | **No: entries are the plan, combatants and the log are what happened** / yes | no · owner: spec-combat-extras | stats |
-| ~~OQ-CBTX-18~~ | ~~Where PC play state lives~~ | **Settled by the orchestrator, see D/S seam:** pick stands: CBTX-owned play-state columns on `entity` (character), like `hpCurrent`; never in `statBlock` or CHARX's `creature-sheet`; effects in CBTX's `effect` table | — | entities, data model |
-| OQ-CBTX-19 | Glossary | **Add** Effect (condition / label / concentration row with optional duration; **replaces "Modifier" for these**), Temp HP, Death save, Concentration card, Rule hook; **redefine** Modifier as the design-for-later field / op / value adjustment of [ADR-0009](../architecture/adr/0009-entity-content-model.md) (not built); **amend** Combatant ("conditions" → effects on combatant or character), Condition, Concentration | no · owner: integrator | glossary, ADR-0009 |
-| OQ-CBTX-20 | Undo scope | **HP path only (temp, death counters, effects ended by that damage follow the apply)**; effect / temp / death commands corrected by their inverse / undo every CBTX command | no · DM | ADR-0016 |
-| OQ-CBTX-21 | Token overlay contract gains `bar`, `icons` | **Yes, scenes-map renders both** (lock on scenes-map's renderer) / reuse `badges` (pills in the label row, crowded) | no · owner: orchestrator | [scenes-map](scenes-map.md) FR-MAP-34/43 |
-| ~~Carried over~~ | ~~Multiple simultaneous combats; session tagging~~ | Decided earlier: one started encounter per campaign (#139 P15); encounters, not sessions ([ADR-0013](../architecture/adr/0013-session-journal-scope.md)) | — | — |
+| OQ-CBTX-01 | How do rules (expiry, concentration, death failures) close ADR-0027 C's crash gap? | **Decided #178:** in the causing command's transaction, `hpRules` + `combatRuleHooks` ([combat-rule-hooks](../architecture/adr/proposed-combat-rule-hooks.md) accepted). Rejected: post-commit listener + boot reconciliation | — | ADR-0016, ADR-0027, combat-tracker |
+| OQ-CBTX-02 | Timed effect reaches its end | **Decided #178:** auto-end on Next + DM Toast, no notification row (FR-CBTX-06) | — | — |
+| OQ-CBTX-03 | Duration timing | **Decided #178:** start of the anchor's turn only; no end-of-turn durations | — | — |
+| OQ-CBTX-04 | Prev after an expiry | **Decided #178:** Prev restores what that Next expired (FR-CBTX-07) | — | combat-tracker |
+| OQ-CBTX-05 | Effects outside combat | **Decided #178:** PC effects live on the character and survive End unless timed; monster and timed effects end at End (FR-CBTX-12) | — | character-sheet-full |
+| OQ-CBTX-06 | Condition mechanics | **Decided #178:** only incapacitating conditions end concentration; the rest are reminders; no adv / dis presets | — | combat-tracker, dice-roll-log |
+| OQ-CBTX-07 | Player rights on own PC | **Decided #178:** temp HP, death save roll, concentration start / end; conditions DM only | — | character-sheet-full |
+| OQ-CBTX-08 | Monster HP bar for players | **Decided #178 (G4, amends #138):** full-width bar in band tone, no proportion (FR-CBTX-28) | — | #138, scenes-map |
+| OQ-CBTX-09 | Other players see a PC's death saves | **Decided #178 (G6, with OQ-CHARX-05):** `deathState` only, in the one whitelist (name, portrait, owner, Down, level, class, species, `deathState`) | — | entities, ADR-0024 |
+| OQ-CBTX-10 | Dead PCs skip turns | **Decided #178:** yes (FR-CBTX-25; amends FR-CBT-14 / -50) | — | [combat-tracker](combat-tracker.md) |
+| OQ-CBTX-11 | Massive damage | **Decided #178:** not automated; the DM sets failures 3 | — | — |
+| OQ-CBTX-12 | How temp HP stays hidden from players | **Decided #178: (a)** absorbed only in the DM's outcome line; damage-card resolution `applied` = damage dealt incl. absorbed (FR-CBTX-15, protocol §23 note) | — | combat-tracker, dice-roll-log |
+| OQ-CBTX-13 | Sheet damage (`char.adjustHp`) through `hpRules` | **Decided (D/S seam; #178):** the sheet keeps `char.adjustHp`; CBTX wires it through `hpRules.apply`; CHARX models no temp HP / death / condition fields (also OQ-CHARX-11) | — | [character-sheet](character-sheet.md), [character-sheet-full](character-sheet-full.md) |
+| OQ-CBTX-14 | Sheet seam: registry; CON save bonus source | **Decided (D/S seam; #178):** CHARX's `sheetSections` registry, CBTX entries per §7.1; CON save bonus = CHARX's save resolver, overrides honoured, from `fix/charx-core` (also OQ-CHARX-10) | — | [character-sheet-full](character-sheet-full.md) |
+| OQ-CBTX-15 | Pending concentration cards at End | **Decided #178 (with OQ-CBT-45 / FR-NOTE-23, option A):** kinds opt in with `onEncounterEnd: "dismiss"`; `cbtx-concentration` doesn't, so its cards stay pending until the concentration ends (FR-CBTX-10) | — | [combat-tracker](combat-tracker.md), [notifications](notifications.md) |
+| OQ-CBTX-16 | Auto-add Unconscious to a PC at 0 HP | **Decided #178:** no; the Down X and Dying badge say it | — | — |
+| OQ-CBTX-17 | Mid-fight additions update encounter entries | **Decided #178:** no; entries are the plan, combatants and the log are what happened | — | stats |
+| OQ-CBTX-18 | Where PC play state lives | **Decided (D/S seam; #178):** CBTX-owned play-state columns on `entity` (character), like `hpCurrent`; effects in the `effect` table | — | entities, data model |
+| OQ-CBTX-19 | Glossary | **Decided #178 (integrator applies):** add Effect (replaces "Modifier" for condition / label / concentration rows), Temp HP, Death save, Concentration card, Rule hook; redefine Modifier as ADR-0009's design-for-later field / op / value adjustment; amend Combatant, Condition, Concentration | — | glossary, ADR-0009 |
+| OQ-CBTX-20 | Undo scope | **Decided #178:** HP path only (temp HP, death counters, effects ended by that damage follow the apply); other CBTX commands are corrected by their inverse | — | ADR-0016 |
+| OQ-CBTX-21 | Token overlay contract gains `bar`, `icons` | **Decided #178:** yes, scenes-map renders both (lock on scenes-map's renderer) | — | [scenes-map](scenes-map.md) FR-MAP-34/43 |
+| Carried over | Multiple simultaneous combats; session tagging | Decided earlier: one started encounter per campaign (#139 P15); encounters, not sessions ([ADR-0013](../architecture/adr/0013-session-journal-scope.md)) | — | — |
 
 ## 16. Out of scope
 
