@@ -2,6 +2,7 @@
 // Undoable: `AttackApplied`, `HpApplied` only; undo = compensating `CombatEntryUndone` (ADR-0016).
 // Shared definitions (fix/combat-core); combat-tracker emits them. Payloads the specs leave
 // open (`{encounterId}` CRUD, initiative, remove / restore) are fix/combat-core picks (§22).
+import { DeathCounters } from "@shared/combat-extras/schemas";
 import { Ability } from "@shared/entities/schemas";
 import { z } from "zod";
 import { defineEvent } from "./types";
@@ -125,7 +126,11 @@ export const CombatantRolled = defineEvent({
   undoable: false,
 });
 
-/** FR-CBT-23: the combat log entry's facts (rolled and final values, overrides, AC used). */
+/**
+ * FR-CBT-23: the combat log entry's facts (rolled and final values, overrides, AC used).
+ * combat-extras (FR-CBTX-21) adds temp HP, death counters and the cards created; optional, so
+ * payloads logged before CBTX still parse.
+ */
 export const HpChangeFacts = z
   .object({
     hpChangeId: Id,
@@ -155,6 +160,13 @@ export const HpChangeFacts = z
     overkill: Int,
     hpBefore: Int,
     hpAfter: Int,
+    tempBefore: Int.optional(),
+    tempAfter: Int.optional(),
+    /** Null when the change left the counters unchanged. */
+    deathBefore: DeathCounters.nullable().optional(),
+    deathAfter: DeathCounters.nullable().optional(),
+    /** `cbtx-concentration` cards created by this change. */
+    noteIds: z.array(Id).optional(),
   })
   .strict();
 export type HpChangeFacts = z.infer<typeof HpChangeFacts>;

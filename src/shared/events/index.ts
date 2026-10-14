@@ -2,6 +2,7 @@
 import * as assetsPipeline from "./assets-pipeline";
 import * as campaignManagement from "./campaign-management";
 import * as characterSheet from "./character-sheet";
+import * as combatExtras from "./combat-extras";
 import * as combatTracker from "./combat-tracker";
 import * as diceRollLog from "./dice-roll-log";
 import * as entities from "./entities";
@@ -26,6 +27,8 @@ export const domainEvents: readonly DomainEventDef[] = [
   ),
   // Reward (build/party-loot): the module also exports the endpoint schema.
   ...Object.values<unknown>(partyLoot).filter(isDomainEventDef),
+  // combat-extras (fix/cbtx-core).
+  ...Object.values<unknown>(combatExtras).filter(isDomainEventDef),
 ];
 
 /** `cause.name` of presence changes (not a domain event, CON-07). */
