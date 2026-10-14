@@ -8,18 +8,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| P1 tooltip delay | — | — | **Merged** `85cf681` (walkthrough PASS after a focus-return fix; evidence `verify-tooltip-delay`) | — |
-| ADR-0033 signal audience | — | — | **Merged** `36f0bf6` (738 tests) | — |
-| Scenes-map (P2, P3, G1) | — | — | **Merged** `efbae2e` (walkthrough PASS; evidence `verify-scenes-map-playtest`) | — |
-| Combat + sheet + dice (P4, P5, G4–G9, G12) | `build/combat-playtest` (ws `w10`, slot 2) | `test-combat-playtest` | **Walkthrough running** (817 tests; main merged in) | Merge after the flake fix → session-sim regression → **pause, recap with DM** |
-| Test flakes (CON-44 SQLITE_BUSY, boundaries timeout) | `fix/test-flakes` (ws `w21`, slot 0) | `fix-test-flakes` | **Fixing**: main fails 1 of 2 full runs | 5 green full runs → merge |
-| Glitches (G2, G3, G10, G11) | — | — | **Merged** `5dde100` (9/9 PASS; evidence `verify-playtest-glitches`) | — |
+| Playtest pass builds (P1–P5, G1–G12, ADR-0033, test flakes) | — | — | **All merged** (#173–#175; `e29e704`) | — |
+| Session-sim regression on final `main` | `main` (tab `wR` regress, port 4113) | `test-session-3` | **Running** | Then **pause: recap + plan with the DM** |
 
 Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-13-evening)). Briefs `briefs\build-*.md`; spec summary `spec-playtest.md`. Evidence: `verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash, mvp-acceptance).
 
 ## Shared-file locks
 
-- `src/server/db/client.ts`, test preload, fixture loader internals → `fix/test-flakes`
+- None.
 
 ## Pending DM decisions
 
