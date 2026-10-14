@@ -1,11 +1,13 @@
 // Record types `entity` (campaign) and `imported-entity` (global) (ENT §9, FR-ENT-15/16).
 import {
+  type CharacterRecord,
   ENTITY_TYPE,
   type EntityRecord,
   EntityRecord as EntityRecordSchema,
   IMPORTED_ENTITY_TYPE,
   type ImportedEntityRecord,
   ImportedEntityRecord as ImportedSchema,
+  REDACTED_CHARACTER_KEYS,
   type RedactedCharacter,
 } from "@shared/entities/schemas";
 import { asc, eq, isNull, sql } from "drizzle-orm";
@@ -20,17 +22,33 @@ export function entityVisibility(r: EntityRecord, v: Viewer): Visibility {
   return r.ownerPlayerId === v.playerId ? "full" : "redacted";
 }
 
+/**
+ * The one whitelist (ADR-0036 "Refines ADR-0024", FR-CHARX-35): one entry per key of
+ * `RedactedCharacter`, nothing else. A key whose value is `undefined` is left out.
+ */
+const REDACT: { [K in keyof RedactedCharacter]-?: (r: CharacterRecord) => RedactedCharacter[K] } = {
+  id: (r) => r.id,
+  kind: (r) => r.kind,
+  name: (r) => r.name,
+  portraitAssetId: (r) => r.portraitAssetId,
+  ownerPlayerId: (r) => r.ownerPlayerId,
+  // #154: the PC Down indicator for everyone; the HP number stays private.
+  down: (r) => r.hpCurrent === 0,
+  level: (r) => r.statBlock.level,
+  className: (r) => r.statBlock.className,
+  species: (r) => r.statBlock.species ?? null,
+  // combat-extras fills this (FR-CBTX-32); absent until then.
+  deathState: () => undefined,
+};
+
 export function redactCharacter(r: EntityRecord): RedactedCharacter {
   if (r.kind !== "character") throw new Error("Only characters are redacted");
-  return {
-    id: r.id,
-    kind: r.kind,
-    name: r.name,
-    portraitAssetId: r.portraitAssetId,
-    ownerPlayerId: r.ownerPlayerId,
-    // #154: the PC Down indicator for everyone; the HP number stays private.
-    down: r.hpCurrent === 0,
-  };
+  const out: Record<string, unknown> = {};
+  for (const k of REDACTED_CHARACTER_KEYS) {
+    const v = REDACT[k](r);
+    if (v !== undefined) out[k] = v;
+  }
+  return out as RedactedCharacter;
 }
 
 /** Maps rows, omitting (and logging) rows that fail their schema (FR-ENT-01). */
