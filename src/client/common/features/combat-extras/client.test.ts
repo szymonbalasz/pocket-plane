@@ -9,6 +9,7 @@ import { turnAlertFor } from "../combat-tracker/turn-alert";
 import type { TokenOverlayView } from "../scenes-map/token-overlays";
 import { concentrationOutcome } from "./concentration";
 import { chipOrder, chipText, deadPc, deathStateFor } from "./logic";
+import { deathSavesAvailable } from "./sheet-sections";
 import { cbtxTokenOverlay } from "./token-overlay";
 
 const dmYou: You = { campaignId: "c", role: "dm", playerId: null };
@@ -245,5 +246,15 @@ describe("FR-CBTX-37 FR-CBTX-38", () => {
     expect(turnAlertFor(frame, alive)?.detail).toBe("Mira");
     const dying = store(p1You, { combatants: [miraC], entities: [{ ...miraFull, hpCurrent: 0 }] });
     expect(turnAlertFor(frame, dying)?.detail).toBe("Mira (death save)");
+  });
+});
+
+describe("FR-CBTX-41 sheet sections", () => {
+  test("FR-CBTX-41 cbtx.death-saves available iff deathState != null (owner counters or redacted)", () => {
+    const at = (e: object) =>
+      deathSavesAvailable(store(p1You, { combatants: [], entities: [e] }), "mira");
+    expect(at(miraFull)).toBe(false);
+    expect(at({ ...miraFull, hpCurrent: 0 })).toBe(true);
+    expect(at({ ...miraRedacted, deathState: "stable" })).toBe(true);
   });
 });

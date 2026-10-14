@@ -24,8 +24,12 @@ const ctx = (p: Partial<SectionContext> = {}): SectionContext => ({
 const ids = (list: SheetSection[]) => list.map((x) => x.id);
 
 describe("FR-CHARX-34 sheet sections", () => {
-  test("FR-CHARX-34 registry is created empty (combat-extras appends its lines)", () => {
-    expect(sheetSections).toEqual([]);
+  test("FR-CHARX-34 FR-CBTX-41 registry holds combat-extras' three lines", () => {
+    expect(sheetSections.map((x) => [x.id, x.slot])).toEqual([
+      ["cbtx.temp-hp", "vitals"],
+      ["cbtx.death-saves", "vitals"],
+      ["cbtx.effects", "header"],
+    ]);
   });
 
   test("FR-CHARX-34 slot filter; ascending order, ties by id", () => {

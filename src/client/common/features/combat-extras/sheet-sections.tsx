@@ -1,7 +1,7 @@
 // combat-extras' character sheet sections (FR-CBTX-41, CBTX §7.1): `cbtx.temp-hp` (vitals),
 // `cbtx.death-saves` (vitals, while `deathState != null`), `cbtx.effects` (header). Both clients,
 // characters only. They read only the store and send only CBTX intents; registered in
-// character-sheet-full's `sheetSections` registry once it exists.
+// character-sheet-full's `sheetSections` registry (D/S seam).
 import { CBTX_INTENTS } from "@shared/combat-extras/intents";
 import { DEATH_SAVES_MAX } from "@shared/combat-extras/schemas";
 import type { RecordStore } from "@shared/protocol/store";
@@ -18,6 +18,7 @@ import {
 import { Input, Label } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
+import type { SheetSection } from "../character-sheet/sections";
 import { useCbtIntent, useStartedEncounter } from "../combat-tracker/store";
 import { RollButton, useRollControl } from "../dice-roll-log/roll-control";
 import {
@@ -329,3 +330,27 @@ export function EffectsSection({ creatureId }: SectionProps) {
     </div>
   );
 }
+
+/** The three registry entries (FR-CBTX-41); not locked by the sheet lock (play state). */
+export const cbtxTempHpSection: SheetSection = {
+  id: "cbtx.temp-hp",
+  slot: "vitals",
+  order: 50,
+  kinds: ["character"],
+  component: TempHpSection,
+};
+export const cbtxDeathSavesSection: SheetSection = {
+  id: "cbtx.death-saves",
+  slot: "vitals",
+  order: 60,
+  kinds: ["character"],
+  available: deathSavesAvailable,
+  component: DeathSavesSection,
+};
+export const cbtxEffectsSection: SheetSection = {
+  id: "cbtx.effects",
+  slot: "header",
+  order: 50,
+  kinds: ["character"],
+  component: EffectsSection,
+};
