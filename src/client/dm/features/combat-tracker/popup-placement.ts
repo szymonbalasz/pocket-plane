@@ -1,7 +1,7 @@
-// Attack popup placement (FR-CBT-55, G2): vertically centred at the left or right edge of the
-// work area, on the side farther from the centre of its selection rows' tokens (none: the
-// attacker's likely targets, FR-CBT-56; none either: left); on the right it sits just left of an
-// open Initiative window. Fixed once per open; not draggable. `popupPlacement` and
+// Attack popup placement (FR-CBT-55, G2): vertically centred in the work area, never over an open
+// Initiative window, at the candidate position that covers the least of its selection rows'
+// tokens (none: the attacker's likely targets, FR-CBT-56); ties: the side farther from their
+// centre (none: left). Fixed once per open; not draggable. `popupPlacement` and
 // `placementTokenIds` are pure; `measurePlacement` reads the live screen.
 import type { CombatantKind } from "@shared/combat-tracker/schemas";
 import { INITIATIVE_KIND } from "@ui/features/combat-tracker/window";
@@ -42,10 +42,18 @@ export function placementTokenIds<C extends TargetCandidate & { kind: CombatantK
 /** Popup width, px (the panel is `min(440px, 100vw - 2rem)`). */
 export const POPUP_W = 440;
 
+/** A token's on-screen box, px. */
+export interface TokenBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface PlacementInput {
   viewport: { w: number; h: number };
-  /** Screen x of each selection row's token centre. */
-  tokenXs: readonly number[];
+  /** On-screen boxes of the tokens the popup must not cover (FR-CBT-55/56). */
+  tokens: readonly TokenBox[];
   /** Screen rect of the DM's open Initiative window, if any. */
   initiative: { x: number; w: number } | null;
   width: number;
@@ -60,18 +68,59 @@ export interface Placement {
   bottom: number;
 }
 
+/**
+ * FR-CBT-55/56 (walkthrough step 8 ruling): candidate left edges are the work area's left edge,
+ * just left of the Initiative window (or the right edge), and beside each token (the popup sits
+ * above other windows, so they don't constrain it). Each is scored by the area of the tokens it
+ * covers, the popup taken as the work area's full height (its height is unknown at open); the
+ * least overlap wins. Ties keep the side rule (farther from the tokens' mean x; none → left),
+ * then the edges, then the candidate nearest that side's edge.
+ */
 export function popupPlacement(i: PlacementInput): Placement {
   const top = TOP_BAR_H + EDGE_GAP;
   const bottom = i.viewport.h - LAUNCHER_CLEAR;
   const left = RAIL_CLEAR;
   const centre = (left + i.viewport.w - EDGE_GAP) / 2;
-  const n = i.tokenXs.length;
-  const mean = n > 0 ? i.tokenXs.reduce((s, x) => s + x, 0) / n : null;
-  // Tokens right of centre → the popup goes left, and vice versa; no token → left.
-  const side = mean !== null && mean < centre ? "right" : "left";
-  if (side === "left") return { side, x: left, top, bottom };
   const edge = i.initiative ? i.initiative.x - EDGE_GAP : i.viewport.w - EDGE_GAP;
-  return { side, x: Math.max(left, edge - i.width), top, bottom };
+  const right = Math.max(left, edge - i.width);
+  const clamp = (x: number) => Math.min(right, Math.max(left, x));
+  const n = i.tokens.length;
+  const mean = n > 0 ? i.tokens.reduce((s, t) => s + t.x + t.w / 2, 0) / n : null;
+  // Tokens right of centre → the popup goes left, and vice versa; no token → left.
+  const ruleX = mean !== null && mean < centre ? right : left;
+  const covered = (x: number) =>
+    i.tokens.reduce(
+      (sum, t) =>
+        sum +
+        Math.max(0, Math.min(x + i.width, t.x + t.w) - Math.max(x, t.x)) *
+          Math.max(0, Math.min(bottom, t.y + t.h) - Math.max(top, t.y)),
+      0,
+    );
+  const candidates = [
+    ruleX,
+    left,
+    right,
+    ...i.tokens.flatMap((t) => [clamp(t.x + t.w + EDGE_GAP), clamp(t.x - EDGE_GAP - i.width)]),
+  ];
+  let best = ruleX;
+  let bestArea = covered(ruleX);
+  for (const x of candidates) {
+    const area = covered(x);
+    // Strictly less wins, so ties keep the side rule, then the edges (listed first).
+    if (area < bestArea) {
+      best = x;
+      bestArea = area;
+    }
+  }
+  const side =
+    best === left
+      ? "left"
+      : best === right
+        ? "right"
+        : best + i.width / 2 < centre
+          ? "left"
+          : "right";
+  return { side, x: best, top, bottom };
 }
 
 interface KonvaNode {
@@ -83,8 +132,8 @@ interface KonvaStage {
   find(selector: string): KonvaNode[];
 }
 
-/** Screen x of each token's centre on the DM's map canvas (Konva `name` / `id`, AGENTS §9.5). */
-function tokenScreenXs(tokenIds: readonly string[]): number[] {
+/** On-screen box of each token on the DM's map canvas (Konva `name` / `id`, AGENTS §9.5). */
+function tokenScreenBoxes(tokenIds: readonly string[]): TokenBox[] {
   if (tokenIds.length === 0) return [];
   const K = (window as unknown as { Konva?: { stages: KonvaStage[] } }).Konva;
   const stage = K?.stages.find((s) => s.container().isConnected);
@@ -96,7 +145,7 @@ function tokenScreenXs(tokenIds: readonly string[]): number[] {
     .filter((n) => want.has(n.id()))
     .map((n) => {
       const r = n.getClientRect();
-      return box.left + r.x + r.width / 2;
+      return { x: box.left + r.x, y: box.top + r.y, w: r.width, h: r.height };
     });
 }
 
@@ -108,7 +157,7 @@ export function measurePlacement(tokenIds: readonly string[]): Placement {
   const r = win?.getBoundingClientRect();
   return popupPlacement({
     viewport,
-    tokenXs: tokenScreenXs(tokenIds),
+    tokens: tokenScreenBoxes(tokenIds),
     initiative: r && r.width > 0 ? { x: r.left, w: r.width } : null,
     width: Math.min(POPUP_W, viewport.w - 32),
   });
