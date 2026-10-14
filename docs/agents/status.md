@@ -2,22 +2,27 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** playtest feedback pass (MVP polish). P1–P5 tier S confirmed (#171); spec revisions running. Work list: [feedback-playtest](feedback-playtest.md).
+**Phase:** playtest feedback pass (MVP polish). Specs complete and merged (#172, `4c45af3`); builds per [protocol §30](../protocol/README.md#30-playtest-pass-to-build). Work list: [feedback-playtest](feedback-playtest.md).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Playtest spec pass (P1–P5, G-verdicts) | `spec/playtest-feedback` | `spec-playtest` | **Finalising** (gate #172: ADR-0033, P4 amended, picks accepted) | Specs `complete` + data-model/protocol consolidated → merge → `fix/tooltip-delay`, `fix/signal-audience` |
+| P1 tooltip delay | `fix/tooltip-delay` (ws `w1W`, slot 0) | `build-tooltip-delay` | **Building** | Walkthrough play-shell 16, char-sheet 11 → merge |
+| ADR-0033 signal audience | — | — | **Merged** `36f0bf6` (738 tests) | — |
+| Scenes-map (P2, P3, G1) | `build/scenes-map-playtest` (ws `w1Y`, slot 2) | `build-scenes-map-playtest` | **Building** | Walkthrough scenes-map 10–11 → merge |
+| Combat + sheet + dice (P4, P5, G4–G9) | — | — | Waits on tooltip + scenes-map | |
+| Glitches (G2, G3, G10, G11) | — | — | Waits on tooltip | |
 
-Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-13-evening)). Brief: `briefs\spec-playtest.md`; summary will be `spec-playtest.md`. Evidence: `verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash, mvp-acceptance).
+Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-13-evening)). Briefs `briefs\build-*.md`; spec summary `spec-playtest.md`. Evidence: `verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash, mvp-acceptance).
 
 ## Shared-file locks
 
+- `src/client/common/components/ui/overlays.tsx` (+ `menus.tsx` / `controls.tsx` if needed), `src/client/{dm,player}/main.tsx` → `fix/tooltip-delay`
 
 ## Pending DM decisions
 
-- None. (Playtest spec gate passed, #172.)
+- Promote "add combatants mid-fight" (summons, reinforcements) from tier A to S? Asked 2026-10-14; pick: keep A (pre-placed hidden tokens revealed mid-fight cover reinforcements). Affects only `build/combat-playtest` (not started).
 
 ## Resolved locally (report at gate)
 
