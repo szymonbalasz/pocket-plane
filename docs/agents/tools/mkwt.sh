@@ -2,6 +2,7 @@
 # usage: mkwt.sh <branch> <label> [build]  - create a Herdr worktree for <branch> off main; with "build": bun install + env:init
 # Workspace: $HERDR_WORKSPACE, else the caller's own (herdr pane current). Run from the main checkout (orchestrator only).
 set -euo pipefail
+jq() { command jq "$@" | tr -d '\r'; } # Windows jq ends lines with CRLF
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(basename "$(dirname "$(git -C "$here" rev-parse --path-format=absolute --git-common-dir)")")
 ws="${HERDR_WORKSPACE:-$(herdr pane current --current | jq -r '.result.pane.workspace_id')}"
