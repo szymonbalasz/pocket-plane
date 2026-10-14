@@ -1,4 +1,4 @@
-// `cbt.attack` (FR-CBT-16–18, #135): rolls to-hit + damage server-side, writes the player's roll
+// `cbt.attack` (FR-CBT-16–18, FR-CBT-52, #135): rolls to-hit + damage server-side, writes the roll
 // line, then creates the damage card via `notify` in the same transaction (ADR-0027). No target:
 // the DM picks it in the attack popup (#134).
 import { characterRolls } from "@shared/character-sheet/logic";
@@ -59,19 +59,20 @@ export const attackCommand = defineCommand({
     const rollIds = [toHit.id, damage.id];
     const changes: RecordChange[] = [];
     const isPlayer = env.actor.role === "player";
-    if (isPlayer) {
-      // FR-CBT-18: a player's attack → one public roll line now; a DM's → only at apply.
-      changes.push(
-        gameLog.append(env, {
-          kind: ROLL_KIND,
-          category: "attack",
-          actorName: c.name,
-          payload: [dice.rollPayloadItem(toHit), dice.rollPayloadItem(damage)],
-          rollIds,
-          encounterId: enc.id,
-        }),
-      );
-    }
+    // FR-CBT-18: a player's attack → one public roll line now. FR-CBT-52 (#171): a DM's attack
+    // (monster or PC) → the same line, always DM-only whatever the Attack tickbox; the outcome
+    // line at apply carries the public rule (FR-CBT-24). Rolls are facts: Undo never strikes it.
+    changes.push(
+      gameLog.append(env, {
+        kind: ROLL_KIND,
+        category: "attack",
+        actorName: c.name,
+        payload: [dice.rollPayloadItem(toHit), dice.rollPayloadItem(damage)],
+        rollIds,
+        encounterId: enc.id,
+        ...(isPlayer ? {} : { public: false }),
+      }),
+    );
     const payload: DamageCardPayload = {
       encounterId: enc.id,
       attackerId: c.id,

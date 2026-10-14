@@ -1,5 +1,6 @@
 // Log-entry kind contract (FR-DICE-18). A kind = payload schema (+ optional DM-only payload
 // schema) + a pure `formatLine`. Registered in `./kinds.ts` (append-only).
+import type { RollCategory } from "@shared/events/dice-roll-log";
 import type { z } from "zod";
 
 /** One styled run of a log line; clients map styles to markup, tests read `lineText`. */
@@ -14,6 +15,8 @@ export interface LineInput<P, D> {
   payload: P;
   /** DM only; absent / null for players. */
   dmPayload?: D | null;
+  /** The entry's category, when known (FR-DICE-29: no natural marker on initiative). */
+  category?: RollCategory;
 }
 
 export interface LogKindDef<P = unknown, D = unknown> {

@@ -1,9 +1,15 @@
 // The `roll` log-entry kind (FR-DICE-20): "<actor> — <label or expression>: <dice> + <constants>
-// = <total>" per roll; "(adv)" / "(dis)" with the dropped die struck through; natural 20 / 1;
-// "physical" for manual rolls. Other kinds may reuse `rollSegments` for their roll parts.
+// = <total>" per roll; "(adv)" / "(dis)" with the dropped die struck through; natural 20 / 1
+// (not on initiative, FR-DICE-29); "physical" for manual rolls. Other kinds may reuse
+// `rollSegments` / `rollBreakdownSegments` for their roll parts (FR-DICE-28).
 import { parseExpression } from "./grammar";
 import { defineLogKind, type LineSegment } from "./kind-types";
-import { RollEntryPayload, type RollPayloadItem } from "./schemas";
+import {
+  type RollCategory,
+  RollEntryPayload,
+  type RollMode,
+  type RollPayloadItem,
+} from "./schemas";
 
 export const ROLL_KIND = "roll";
 
@@ -44,33 +50,83 @@ function diceSegments(item: RollPayloadItem): LineSegment[] {
   return out;
 }
 
-export function rollSegments(item: RollPayloadItem): LineSegment[] {
+/** "<dice> + <constants>" of one roll (no total); [] → nothing to show. */
+function termSegments(item: RollPayloadItem): LineSegment[] {
+  const out = diceSegments(item);
+  if (item.constant !== 0 || out.length === 0) {
+    const abs = Math.abs(item.constant);
+    if (out.length === 0) out.push({ text: String(item.constant) });
+    else out.push({ text: item.constant < 0 ? ` - ${abs}` : ` + ${abs}` });
+  }
+  return out;
+}
+
+/**
+ * One roll's segments. FR-DICE-29 (#172): no natural 20 / 1 marker on an `initiative`-category
+ * roll (a natural 1 has no rule meaning there).
+ */
+export function rollSegments(
+  item: RollPayloadItem,
+  opts: { category?: RollCategory } = {},
+): LineSegment[] {
   const out: LineSegment[] = [{ text: item.label ?? item.expression }];
   if (item.mode === "advantage") out.push({ text: " (adv)" });
   if (item.mode === "disadvantage") out.push({ text: " (dis)" });
   out.push({ text: ": " });
-  const dice = diceSegments(item);
-  out.push(...dice);
-  if (item.constant !== 0 || dice.length === 0) {
-    const abs = Math.abs(item.constant);
-    if (dice.length === 0) out.push({ text: String(item.constant) });
-    else out.push({ text: item.constant < 0 ? ` - ${abs}` : ` + ${abs}` });
-  }
+  out.push(...termSegments(item));
   out.push({ text: " = " }, { text: String(item.total), style: "total" });
-  if (item.natural === 20) out.push({ text: " — natural 20!" });
-  if (item.natural === 1) out.push({ text: " — natural 1" });
+  if (opts.category !== "initiative") {
+    if (item.natural === 20) out.push({ text: " — natural 20!" });
+    if (item.natural === 1) out.push({ text: " — natural 1" });
+  }
   if (item.manual) out.push({ text: " " }, { text: "physical", style: "badge" });
   return out;
+}
+
+/** A stored roll's dice as another kind keeps them (FR-DICE-28): compact `[value, kept]` pairs. */
+export interface RollBreakdown {
+  expression: string;
+  mode?: RollMode;
+  dice: readonly (readonly [number | null, boolean])[];
+  constant: number;
+}
+
+/**
+ * FR-DICE-28: a DM-only dice run for other kinds' lines, e.g. "(1d6+2: 4 + 2)" or
+ * "(2d20kh1+4 adv: 15 ~7~ + 4)", muted, dropped dice struck through. Dice without values (a
+ * physical total of several dice) → [] (nothing to show).
+ */
+export function rollBreakdownSegments(r: RollBreakdown): LineSegment[] {
+  if (r.dice.length === 0 || r.dice.some(([v]) => v === null)) return [];
+  const item: RollPayloadItem = {
+    rollId: "-",
+    expression: r.expression,
+    mode: r.mode ?? "normal",
+    manual: false,
+    dice: r.dice.map(([value, kept]) => ({ faces: 2, value, kept })),
+    constant: r.constant,
+    total: 0,
+    natural: null,
+    label: null,
+  };
+  const mode = r.mode === "advantage" ? " adv" : r.mode === "disadvantage" ? " dis" : "";
+  const muted = (s: LineSegment): LineSegment =>
+    s.style === "dropped" ? s : { text: s.text, style: "muted" };
+  return [
+    { text: ` (${r.expression}${mode}: `, style: "muted" },
+    ...termSegments(item).map(muted),
+    { text: ")", style: "muted" },
+  ];
 }
 
 export const rollKind = defineLogKind({
   kind: ROLL_KIND,
   payload: RollEntryPayload,
-  formatLine({ actorName, payload }) {
+  formatLine({ actorName, payload, category }) {
     const out: LineSegment[] = [{ text: actorName, style: "actor" }, { text: " — " }];
     payload.forEach((item, i) => {
       if (i > 0) out.push({ text: "; " });
-      out.push(...rollSegments(item));
+      out.push(...rollSegments(item, { category }));
     });
     return out;
   },

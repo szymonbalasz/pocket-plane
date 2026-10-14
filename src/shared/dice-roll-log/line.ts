@@ -1,5 +1,6 @@
 // Entry → line (FR-DICE-18, FR-DICE-20, FR-DICE-21). Unknown kinds or payloads render as
 // "Unsupported entry"; undone entries get an "undone" badge (clients also strike the line).
+import type { RollCategory } from "@shared/events/dice-roll-log";
 import type { LineSegment } from "./kind-types";
 import { getLogKind } from "./kinds";
 
@@ -11,6 +12,7 @@ export interface EntryLike {
   payload: unknown;
   dmPayload?: unknown;
   undone?: boolean;
+  category?: RollCategory;
 }
 
 export function formatEntry(entry: EntryLike): { segments: LineSegment[]; supported: boolean } {
@@ -26,7 +28,12 @@ export function formatEntry(entry: EntryLike): { segments: LineSegment[]; suppor
   }
   let segments: LineSegment[];
   try {
-    segments = def.formatLine({ actorName: entry.actorName, payload: payload.data, dmPayload });
+    segments = def.formatLine({
+      actorName: entry.actorName,
+      payload: payload.data,
+      dmPayload,
+      category: entry.category,
+    });
   } catch {
     return { segments: [{ text: UNSUPPORTED_ENTRY, style: "muted" }], supported: false };
   }

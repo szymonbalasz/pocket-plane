@@ -102,11 +102,13 @@ describe("FR-CBT-16 FR-CBT-17 FR-CBT-18 attack", () => {
     });
   });
 
-  test("FR-CBT-18 DM attack: no log entry until apply; card audience dm", () => {
+  test("FR-CBT-18 FR-CBT-52 DM attack: one DM-only roll entry (#171); card audience dm", () => {
     const t = started();
     const n = t.events.length;
     const r = t.attack("Goblin", 10, 3);
-    expect(t.events[n]?.event.changes).toEqual([]);
+    expect(
+      t.events[n]?.event.changes.map((c) => [c.type, (c.after as GameLogEntryRecord).public]),
+    ).toEqual([[GAME_LOG_ENTRY_TYPE, false]]);
     expect(t.card(r.cardId)).toMatchObject({ audience: "dm", audiencePlayerId: null });
   });
 
@@ -228,7 +230,7 @@ describe("FR-CBT-34 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
     expect(e).toMatchObject({ kind: "cbt.attack", category: "attack", public: true });
     expect(e?.encounterId).toBe(t.enc.id);
     expect(lineText(attackLogKind.formatLine({ actorName: "Mira", payload: e?.payload }))).toBe(
-      "Mira attacks Goblin: 15 + 4 = 19 — hit! 6 piercing damage",
+      "Mira attacks Goblin: 15 + 4 = 19 (physical) — hit! 6 piercing damage (physical)",
     );
     expect(t.card(r.cardId)).toMatchObject({
       state: "resolved",
