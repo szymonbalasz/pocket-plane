@@ -1,11 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import {
   actorOptions,
+  createFlagStore,
+  type FlagBackend,
   manualNatural,
   manualSlots,
   modeFromKeys,
+  optionsDirty,
+  optionsKey,
   parseManual,
   physicalKey,
+  publicState,
   slotsAfterFirst,
   sortEntries,
 } from "./logic";
@@ -24,6 +29,98 @@ describe("FR-DICE-07 physical-dice mode", () => {
   test("FR-DICE-07 storage key per campaign and client", () => {
     expect(physicalKey("c1", "dm", null)).toBe("pp.dice.v1.c1.dm");
     expect(physicalKey("c1", "player", "p9")).toBe("pp.dice.v1.c1.p9");
+  });
+});
+
+function memoryBackend() {
+  const data = new Map<string, string>();
+  const backend: FlagBackend = {
+    getItem: (k) => data.get(k) ?? null,
+    setItem: (k, v) => {
+      data.set(k, v);
+    },
+  };
+  return { data, backend };
+}
+
+describe("FR-DICE-30 compact roll bar", () => {
+  test("FR-DICE-30 options key per campaign and client, beside the FR-DICE-07 entry", () => {
+    expect(optionsKey("c1", "dm", null)).toBe("pp.dice.options.v1.c1.dm");
+    expect(optionsKey("c1", "player", "p9")).toBe("pp.dice.options.v1.c1.p9");
+    expect(optionsKey("c2", "player", "p9")).not.toBe(optionsKey("c1", "player", "p9"));
+  });
+
+  test("FR-DICE-30 options state round-trips per (campaign, owner); no entry → closed", () => {
+    const { data, backend } = memoryBackend();
+    const store = createFlagStore(() => backend);
+    const dm = optionsKey("c1", "dm", null);
+    const p1 = optionsKey("c1", "player", "p1");
+    const other = optionsKey("c2", "dm", null);
+    expect(store.read(dm)).toBe(false);
+    store.write(dm, true);
+    expect(data.get(dm)).toBe("1");
+    expect(store.read(dm)).toBe(true);
+    expect(store.read(p1)).toBe(false);
+    expect(store.read(other)).toBe(false);
+    // Read back by a fresh store (a reload) from the same storage.
+    expect(createFlagStore(() => backend).read(dm)).toBe(true);
+    store.write(dm, false);
+    expect(data.get(dm)).toBe("0");
+    expect(createFlagStore(() => backend).read(dm)).toBe(false);
+  });
+
+  test("FR-DICE-30 throwing storage → closed by default, toggles kept in memory", () => {
+    const throwing: FlagBackend = {
+      getItem: () => {
+        throw new Error("SecurityError");
+      },
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+    };
+    const store = createFlagStore(() => throwing);
+    const key = optionsKey("c1", "dm", null);
+    expect(store.read(key)).toBe(false);
+    store.write(key, true);
+    expect(store.read(key)).toBe(true);
+    const none = createFlagStore(() => undefined);
+    expect(none.read(key)).toBe(false);
+    none.write(key, true);
+    expect(none.read(key)).toBe(true);
+    const getterThrows = createFlagStore(() => {
+      throw new Error("blocked");
+    });
+    expect(getterThrows.read(key)).toBe(false);
+  });
+
+  test("FR-DICE-30 hidden-option dot: category, actor, label, DM public ≠ preset", () => {
+    const base = {
+      category: "other",
+      actor: "",
+      label: "",
+      isDm: true,
+      publicValue: false,
+      publicPreset: false,
+    } as const;
+    expect(optionsDirty(base)).toBe(false);
+    expect(optionsDirty({ ...base, category: "skill-check" })).toBe(true);
+    expect(optionsDirty({ ...base, actor: "entity:e1" })).toBe(true);
+    expect(optionsDirty({ ...base, label: "Stealth" })).toBe(true);
+    expect(optionsDirty({ ...base, label: "   " })).toBe(false);
+    expect(optionsDirty({ ...base, publicValue: true })).toBe(true);
+    expect(optionsDirty({ ...base, publicValue: true, publicPreset: true })).toBe(false);
+    // Players have no public toggle.
+    expect(optionsDirty({ ...base, isDm: false, publicValue: true })).toBe(false);
+  });
+
+  test("FR-DICE-30 DM eye toggle preset from the category; an override sticks to its category", () => {
+    expect(publicState(true, "damage", null)).toEqual({ value: true, overridden: false });
+    expect(publicState(false, "skill-check", null)).toEqual({ value: false, overridden: false });
+    const hid = { category: "damage", value: false } as const;
+    expect(publicState(true, "damage", hid)).toEqual({ value: false, overridden: true });
+    // Changing category drops the override: the eye shows the new category's preset.
+    expect(publicState(false, "skill-check", hid)).toEqual({ value: false, overridden: false });
+    expect(publicState(true, "attack", hid)).toEqual({ value: true, overridden: false });
   });
 });
 
