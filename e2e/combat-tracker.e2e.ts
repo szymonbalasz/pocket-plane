@@ -2,11 +2,12 @@
 // Thin combat flow (CBT §13 E2E): DM + player-1. Encounter card, Start on Goblin Ambush, roll
 // monsters, Mira's sheet initiative + Attack (routed to cbt.*), round 1, DM targets Goblin and
 // Goblin 2 in the non-modal popup (target rings), applies (Goblin half) → player sees the bands;
-// one Undo reverts both; Remove → Out badge for the player. Visibility matrix, hooks, movement,
+// one Undo reverts both; Remove → Out badge for the player; End from Initiative (#171: no roll
+// controls from round 1, Down cross). Visibility matrix, hooks, movement,
 // crash-resume: bun test (combat-tracker sync.test.ts, feedback.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { konvaNodes } from "./support/konva";
+import { konvaNodes, tokenNode } from "./support/konva";
 import { openWindow, shellWindow } from "./support/shell";
 
 const row = (scope: Page | Locator, id: string) =>
@@ -126,6 +127,14 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await init.getByTestId("cbt-init-next").click();
   await expect(init.getByTestId("cbt-init-round")).toHaveAttribute("data-value", "1");
   await expect(pinit.getByTestId("cbt-init-round")).toHaveAttribute("data-value", "1");
+  // FR-CBT-46 / FR-CHAR-24 (#172): from round 1 everyone has initiative, so nobody re-rolls:
+  // no row Roll, no "Roll monsters", and the sheet's Initiative reads "Initiative set".
+  await expect(init.getByTestId("cbt-init-row-roll")).toHaveCount(0);
+  await expect(init.getByTestId("cbt-init-roll-monsters")).toHaveCount(0);
+  await expect(init.getByTestId("cbt-init-row-init")).toHaveCount(6);
+  await expect(sheet.getByTestId("char-sheet-roll-init")).toHaveCount(0);
+  await expect(sheet.getByTestId("char-sheet-init-locked")).toHaveText("Initiative set");
+  await expect(sheet.getByTestId("char-sheet-combat")).toBeVisible();
 
   // Step 6–7: Mira attacks from the sheet → card pending for the DM. In the non-modal popup the
   // DM adds Goblin and Goblin 2 (tokens on the viewed scene → selected, target rings); Goblin
@@ -175,15 +184,18 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   );
   await expect(row(init, goblin).getByTestId("cbt-init-row-hp")).toHaveText("HP 3/7");
   await expect.poll(async () => (await konvaNodes(player, "cbt-token-down")).length).toBe(1);
-  // FR-MAP-43: the badge sits in the label row, after the name.
+  // FR-CBT-48: Down is a translucent X centred on Goblin 2's token, for the DM and the player.
   for (const page of [dm, player]) {
     const [down] = await konvaNodes(page, "cbt-token-down");
-    const [label] = await konvaNodes(page, "map-token-label", down?.id);
-    expect(down && label).toBeTruthy();
-    if (!down || !label) continue;
-    expect(Math.abs(down.y - label.y)).toBeLessThan(2);
-    expect(down.x - down.width / 2).toBeGreaterThanOrEqual(label.x + label.width / 2);
+    const tok = down ? await tokenNode(page, down.id) : null;
+    expect(down && tok).toBeTruthy();
+    if (!down || !tok) continue;
+    expect(Math.abs(down.x - tok.x)).toBeLessThan(2);
+    expect(Math.abs(down.y - tok.y)).toBeLessThan(2);
+    expect(down.opacity).toBeLessThan(1);
   }
+  // FR-CBT-49: no PC is down, so no PC row carries a Down Badge.
+  await expect(row(init, mira).getByTestId("cbt-init-row-band")).toHaveCount(0);
 
   // Step 9: one Undo reverts the whole apply (both targets); the card is pending again.
   await expect(init.getByTestId("cbt-init-undo")).toHaveAttribute(
@@ -207,13 +219,15 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await expect.poll(async () => (await konvaNodes(player, "cbt-token-out")).length).toBe(1);
   await expect(row(pinit, goblin2)).toHaveCount(0);
 
-  // Step 12: End → the confirm dialog closes; Ended in the list; player Initiative gone.
+  // Step 14: End from the Initiative header (FR-CBT-51) → confirm; the dialog closes; DM
+  // Initiative empty; Ended in the list; player Initiative gone.
+  await init.getByTestId("cbt-init-end").click();
+  await dm.getByTestId("cbt-init-end-confirm").click();
+  await expect(dm.getByTestId("cbt-init-end-confirm")).toHaveCount(0);
+  await expect(init.getByTestId("cbt-init-empty")).toBeVisible();
   const enc2 = await openWindow(dm, "cbt.encounters");
   const encRow = enc2.locator(`[data-testid="cbt-enc-row"][data-record-id="${encounterId}"]`);
   if (await encRow.isVisible()) await encRow.click();
-  await enc2.getByTestId("cbt-enc-end").click();
-  await dm.getByTestId("cbt-enc-end-confirm").click();
-  await expect(dm.getByTestId("cbt-enc-end-confirm")).toHaveCount(0);
   await expect(enc2.getByTestId("cbt-enc-status")).toHaveText("ended");
   await expect(shellWindow(player, "cbt.initiative")).toHaveCount(0);
 
