@@ -6,6 +6,7 @@ import { GAME_LOG_WINDOW } from "@shared/dice-roll-log/schemas";
 import { SNAPSHOT_CEILING } from "./hub";
 import {
   buildRealisticHeavy,
+  CREATURE_SHEET_TYPE,
   dmBuildMs,
   HEAVY,
   servicesFromBundle,
@@ -53,6 +54,7 @@ describe("CON-44 snapshot ceilings (#163)", () => {
         tokens: HEAVY.tokens,
         encounters: HEAVY.encounters,
         pendingCards: HEAVY.pendingCards,
+        sheets: HEAVY.sheets,
       });
       // Applied cards add one line per target; session-sim brings its own loot.
       expect(counts.logEntries).toBeGreaterThanOrEqual(HEAVY.logEntries);
@@ -64,6 +66,18 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect(sizes).toHaveLength(1 + HEAVY.players);
       expectUnderCeilings(sizes);
       expect(dmBuildMs(b.s)).toBeLessThan(BUILD_MS);
+    });
+
+    test("CHARX §12 creature-sheet rows: DM all 16, each player only their own; ceilings hold", () => {
+      const sizes = snapshotSizes(b.s);
+      const sheets = sizes.map((v) => v.types[CREATURE_SHEET_TYPE]);
+      expect(sheets.map((t) => t?.rows)).toEqual([HEAVY.sheets, 1, 1, 1, 1, 1, 1]);
+      // Typical size (CHARX §12: 5–15 KB per sheet).
+      const dm = sheets[0];
+      const perSheet = (dm?.bytes ?? 0) / HEAVY.sheets;
+      expect(perSheet).toBeGreaterThan(5_000);
+      expect(perSheet).toBeLessThan(15_000);
+      expectUnderCeilings(sizes);
     });
 
     test("SQL windows: providers return the window, not the history (build time flat)", () => {
