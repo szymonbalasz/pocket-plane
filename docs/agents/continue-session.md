@@ -6,34 +6,42 @@ Start your agent CLI (any Herdr agent kind; Claude Code today) in `C:\Repos\pock
 
 ---
 
-You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, brief templates and phase plan are in [orchestrator-prompt.md](orchestrator-prompt.md). Read it first, then this file, then [status.md](status.md) and [feedback-phase3.md](feedback-phase3.md). Follow [AGENTS.md](../../AGENTS.md) §1: short replies; 1–2 questions at a time, each with options and your pick.
+You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, brief templates and phase plan are in [orchestrator-prompt.md](orchestrator-prompt.md). Read it first, then this file, then [status.md](status.md) and the current sprint plan [sprint-1.md](sprint-1.md). Follow [AGENTS.md](../../AGENTS.md) §1: short replies; 1–2 questions at a time, each with options and your pick.
 
 **Working mode (DM, #141):** run long autonomous stretches. Merge, fix and sequence on your own; settle technical questions yourself and log them. Come back to the DM only when blocked: product decisions, phase gates, ADR acceptance, new dependencies, anything destructive.
 
-## 1. Where we are (2026-10-13, evening)
+## 1. Where we are (2026-10-14, evening)
 
 | Area | State |
 |---|---|
-| Phases 0–4 | **Built and merged on `main`**: Foundation, Scenes, Combat, party-loot (Reward), the full DM-feedback pass (F1–F9 + #149 checks/saves: diagonal 5/10/5, turn alert + UI sounds, movement tracker, token shapes, Out/Down overlays, map targeting + multi-target, box select, physical-dice visibility), playtest polish incl. map-first layout, and Phase 4 hardening. ~723 tests; `check`, `build`, `e2e` green. |
-| Verification | Every feature walkthrough PASS (evidence `%TEMP%\pocket-plane\verify-*`). Session-sim regression 12/12 (#162). Crash-recovery walkthrough 12/12 with `PP_TEST_CRASH` + `bun run state:digest` (#166). Snapshot sizes: realistic heavy session DM 62% / players 47% of CON-44 (#164). |
-| Specs / ADRs | All MVP specs `complete`. ADRs 0001–0032 accepted (0030 UI sounds, 0031 token-move hooks, 0032 ability derivation). |
-| Decisions | Up to #170 in [decisions-log](../decisions-log.md). |
+| MVP | **Done.** Phases 0–5 built and accepted; DM playtest feedback pass (P1–P5, G1–G12, #171–#176) merged. `main` green: 838 tests, full e2e 28/28 (8 bundles), `check` 5× in a row after the flake fix (#175). |
+| Verification | Every feature walkthrough PASS; session-sim regression on final `main` 9/9 + reload, reconnect, leak scan, identical `state:digest` across a hard kill (#176). Evidence `%TEMP%\pocket-plane\verify-*` (latest: `verify-session-sim-3`). |
+| Specs / ADRs | All MVP specs `complete`. ADRs 0001–0033 accepted (0033 signal audience). Post-MVP specs are stubs until sprint 1 expands two of them. |
+| Decisions | Up to #177 in [decisions-log](../decisions-log.md). |
 | Agents | Herdr kind `claude` since #148 (`-- --permission-mode auto`, `--strict-mcp-config` except test agents). |
-| Helpers | [`docs/agents/tools/`](tools/), orchestrator only, run from the main checkout by absolute path (`bash /c/Repos/pocket-plane/docs/agents/tools/<x>.sh`): `mkwt.sh <branch> <label> [build]` (workspace = `$HERDR_WORKSPACE` or your own), `startagent.sh <pane> <name> <brief> [test]` (kind from `AGENT_KIND`, default `claude`), `poll.sh <agent…>`. Change them on `main` only. |
+| Helpers | [`docs/agents/tools/`](tools/), orchestrator only, run from the main checkout by absolute path (`bash /c/Repos/pocket-plane/docs/agents/tools/<x>.sh`): `mkwt.sh <branch> <label> [build]` (workspace = `$HERDR_WORKSPACE` or your own; prints `ws= root= dir=`), `startagent.sh <pane> <name> <brief> [test]` (kind from `AGENT_KIND`, default `claude`), `poll.sh <agent…>` (fails loudly on an unknown name). Change them on `main` only. |
 | Scratch | `%TEMP%\pocket-plane\` (Git Bash: `$TEMP/pocket-plane/`): per-run output only, named after the project, never the agent tool: `briefs/`, agent reports `<name>.md`, archived evidence `verify-*/`. Storage Sense may clear `%TEMP%`; nothing here is needed to continue. |
-| Worktrees | `main` (slot 1: dev 4110/4111, verify 4112). Leftover untracked dirs the DM may delete: `~/.herdr/worktrees/pocket-plane/build-party-loot`, `build-entities-feedback`. |
+| Worktrees | `main` only (slot 1: dev 4110/4111, verify 4112; test agents on `main` use 4113). Leftover untracked dirs the DM may delete: `~/.herdr/worktrees/pocket-plane/build-party-loot`, `build-entities-feedback`; `data/verify-*` test data in the main checkout. |
 
 ## 2. Next, in order
 
-1. Merge `fix/reconnect-toasts` (FR-NOTE-15 pending summary / sticky card after a DM reconnect; friendly wording for REST network failures) after its tests; tiny re-check if UI changed.
-2. **Phase 5 MVP acceptance (DM go, #167):** fresh `test-mvp` agent on final `main`: full session simulation ([vision](../vision.md#mvp-a-playable-session-simulation)) incl. party loot + the crash test; brief template = `%TEMP%\pocket-plane\briefs\test-session-2.md` + `test-crash.md`.
-3. Send the DM a **playtest script** (bundle `session-sim`, `bun run fixtures:reset-load session-sim --profile verify`, `bun run start --profile verify`, DM URL + secret + player links, what to click), then collect feedback.
-4. Afterwards: post-MVP planning with the DM (fog of war first in line; tier A backlog: DM-added sounds, battlemap props, group move, skills, full PC/NPC editing + player-filled sheets).
+**Sprint 1 (post-MVP), DM decision #177: [sprint-1.md](sprint-1.md).** Three tracks in parallel: **P** polish (R1–R5), **D** combat depth (`combat-extras`, CBTX), **S** player-owned sheets (`character-sheet-full`, CHARX).
 
-Lessons from this session:
+1. Spec phase, all three at once: one spec agent per track (`spec/polish-r`, `spec/combat-extras`, `spec/character-sheet-full`). P revises the owning MVP specs; D and S expand their stubs from `_template.md` into full specs (claim, `status: claimed → draft → in-review`). Settle the D ↔ S boundary (temp HP, death saves, conditions on the sheet) before the gate.
+2. One review agent per spec (or one across all three), fixes applied by the authors.
+3. **DM spec gate**: scope of D and S, every pick, the R1 / R4 / R5 questions. Then consolidate data-model / protocol, number ADRs, merge the spec branches.
+4. Builds in parallel per sprint-1's hotspot rules: P fixes first where they touch combat code; schema changes by shared branch first; D after P's combat fixes; S alongside.
+5. Walkthroughs per feature, then a session-sim regression on final `main`, then **pause and recap with the DM** (sprint 2 candidates in sprint-1 §Gates; fog of war goes with battlemap props + structure).
+
+Lessons from the playtest pass (2026-10-14):
+- Run the **full** `bun run e2e` (all bundles) before every UI merge, not only the feature's own e2e. A layout change in one branch broke another feature's e2e on `main` once (#175).
+- Builders ask for shared files via **cross-session messages** (`shared change needed: …`). Check the other active branches' diffs (`git -C <wt> diff --name-only main...HEAD`), grant with `SendMessage` to the sender's `from` address, and record the lock in status.md.
+- Specs can promise something out of scope (P4 "mid-combat joiners" vs tier-A "add combatants"): the spec agent flags it; bring it to the DM rather than widening scope silently.
+- A builder's "check green" can hide a flake; when a full suite fails, run it on `main` too before blaming the branch. CON-44 / FR-FIX-05 SQLITE_BUSY was a real bug (statements finalized only by GC), fixed in #175.
+- Windows `jq` ends lines with CRLF: pipe IDs through `tr -d '\r'` (the tools do this).
 - Builders' own permission check may refuse shared-file edits even when the orchestrator approved; only the DM's explicit OK unblocks it (never route the edit through another agent).
-- Never `cd` into a worktree from the orchestrator shell (use `git -C` or a subshell): a held cwd blocks worktree removal.
-- Write the server pane id into a test brief in the same shell command that created the pane (`$srv` is lost between calls).
+- Never `cd` into a worktree from the orchestrator shell (use `git -C` or a subshell): a held cwd blocks worktree removal. If `worktree remove` fails half-way, the folder is left empty: `rmdir` it, then `git branch -d`.
+- Write the server pane id into a test brief in the same shell command that created the pane (`$srv` is lost between calls); a `{{SRVPANE}}` placeholder + `sed` works.
 - Doc-only merge conflicts in `docs/protocol` / `docs/data-model` are routine when branches mark rows "built"; resolve by keeping both rows' built state.
 
 ## 3. Herdr: how to run agents (learned the hard way)
