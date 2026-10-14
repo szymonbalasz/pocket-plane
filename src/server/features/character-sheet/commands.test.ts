@@ -187,12 +187,12 @@ describe("FR-CHAR-05 FR-CHAR-08 char.roll", () => {
     expect(logRows(t.s, "CharacterRolled")).toHaveLength(0);
   });
 
-  test("FR-CHAR-05 strict schema: expression, toHit, kind damage → invalid", () => {
+  test("FR-CHAR-05 FR-CHARX-20 strict schema: expression, toHit, wrong kind + ref → invalid", () => {
     const t = setup();
     for (const extra of [
       { kind: "initiative", expression: "1d20+30" },
       { kind: "attack", toHit: 25 },
-      { kind: "damage" },
+      { kind: "damage", skill: "stealth" },
       { kind: "initiative", hp: 3 },
     ]) {
       const err = fail(() =>
@@ -377,7 +377,7 @@ describe("FR-CHAR-21 checks and saves", () => {
 });
 
 describe("FR-CHAR-09 authorize", () => {
-  test("FR-CHAR-09 matrix: DM any PC; owner; other player forbidden; monster / unknown / other campaign not_found; no attack conflict", () => {
+  test("FR-CHAR-09 FR-CHARX-22 matrix: DM any PC or definition; owner; other player forbidden; player monster / unknown / other campaign not_found; no attack conflict", () => {
     const t = setup();
     const run = (actor: Actor, characterId: string, kind = "initiative") =>
       t.s.commands.run("char.roll", { characterId, kind }, { actor });
@@ -388,14 +388,19 @@ describe("FR-CHAR-09 authorize", () => {
     run(t.p1Actor, t.pipId);
     expect(fail(() => run(t.p1Actor, t.thornId)).code).toBe("forbidden");
     expect(fail(() => run(t.p2Actor, t.miraId)).code).toBe("forbidden");
-    for (const id of [t.goblinId, "nope", t.strangerId]) {
+    for (const id of ["nope", t.strangerId]) {
       expect(fail(() => run(t.dm, id)).code).toBe("not_found");
+    }
+    for (const id of [t.goblinId, "nope", t.strangerId]) {
       expect(fail(() => run(t.p1Actor, id)).code).toBe("not_found");
     }
     const noAttack = fail(() => run(t.p1Actor, t.pipId, "attack"));
     expect([noAttack.code, noAttack.message]).toEqual(["conflict", "No weapon attack"]);
-    expect(entries(t.s)).toHaveLength(5);
-    expect(t.events).toHaveLength(5);
+    // FR-CHARX-22: the DM rolls for an imported definition (NPC sheet), DM-only.
+    run(t.dm, t.goblinId);
+    expect(entries(t.s)).toHaveLength(6);
+    expect(entries(t.s).at(-1)).toMatchObject({ actorName: "Goblin", public: false });
+    expect(t.events).toHaveLength(6);
 
     // Same rule for char.adjustHp.
     const hp = (actor: Actor, characterId: string) =>
@@ -407,7 +412,7 @@ describe("FR-CHAR-09 authorize", () => {
     }
     expect(hpOf(t.s, t.thornId)).toBe(10);
     expect(hpOf(t.s, t.miraId)).toBe(12);
-    expect(t.events).toHaveLength(5);
+    expect(t.events).toHaveLength(6);
   });
 });
 

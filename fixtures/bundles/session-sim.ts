@@ -22,5 +22,7 @@ export default defineBundle({
     "loot-wallets",
     "thorn-town", // G1 (#171): player 2 has a token on Town …
     "thorn-battlemap", // … and on Goblin Ambush
+    "char-mira-full", // CHARX §13: Mira's full sheet
+    "npc-elite-sheet", // CHARX §13: Elite Goblin Warrior's NPC sheet
   ],
 });

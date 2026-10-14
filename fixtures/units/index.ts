@@ -9,6 +9,10 @@ import player1 from "./campaign-management/player-1";
 import player2 from "./campaign-management/player-2";
 import charPip from "./character-sheet/char-pip";
 import charWounds from "./character-sheet/char-wounds";
+import charMiraFull from "./character-sheet-full/char-mira-full";
+import charMiraLocked from "./character-sheet-full/char-mira-locked";
+import charSela from "./character-sheet-full/char-sela";
+import npcEliteSheet from "./character-sheet-full/npc-elite-sheet";
 import combat1 from "./combat-tracker/combat-1";
 import combatHit from "./combat-tracker/combat-hit";
 import combatPending from "./combat-tracker/combat-pending";
@@ -66,4 +70,8 @@ export const units: readonly Fixture[] = [
   lootWallets,
   lootSecond,
   thornTown,
+  charMiraFull,
+  charMiraLocked,
+  charSela,
+  npcEliteSheet,
 ];

@@ -29,6 +29,9 @@ function expectUnderCeilings(sizes: ViewerSize[]) {
   }
 }
 
+/** session-sim's own sheets (CHARX §13): `char-mira-full` (Player 1) + `npc-elite-sheet` (DM). */
+const SIM_SHEETS = 2;
+
 describe("CON-44 snapshot ceilings (#163)", () => {
   test("session-sim: every viewer under its ceiling; DM build < 200 ms", async () => {
     const b = await sessionSim();
@@ -58,7 +61,7 @@ describe("CON-44 snapshot ceilings (#163)", () => {
         tokens: HEAVY.tokens,
         encounters: HEAVY.encounters,
         pendingCards: HEAVY.pendingCards,
-        sheets: HEAVY.sheets,
+        sheets: HEAVY.sheets + SIM_SHEETS,
         effects: HEAVY.effects,
       });
       // Applied cards add one line per target; session-sim brings its own loot.
@@ -73,13 +76,16 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect(dmBuildMs(b.s)).toBeLessThan(BUILD_MS);
     });
 
-    test("CHARX §12 creature-sheet rows: DM all 16, each player only their own; ceilings hold", () => {
+    test("CHARX §12 creature-sheet rows: DM all 16 + session-sim's 2, each player only their own; ceilings hold", () => {
       const sizes = snapshotSizes(b.s);
       const sheets = sizes.map((v) => v.types[CREATURE_SHEET_TYPE]);
-      expect(sheets.map((t) => t?.rows)).toEqual([HEAVY.sheets, 1, 1, 1, 1, 1, 1]);
+      // Player 1 also owns session-sim's Mira (char-mira-full); the Elite NPC sheet is DM-only.
+      const [dmRows, ...playerRows] = sheets.map((t) => t?.rows ?? 0);
+      expect(dmRows).toBe(HEAVY.sheets + SIM_SHEETS);
+      expect(playerRows.sort()).toEqual([1, 1, 1, 1, 1, 2]);
       // Typical size (CHARX §12: 5–15 KB per sheet).
       const dm = sheets[0];
-      const perSheet = (dm?.bytes ?? 0) / HEAVY.sheets;
+      const perSheet = (dm?.bytes ?? 0) / (HEAVY.sheets + SIM_SHEETS);
       expect(perSheet).toBeGreaterThan(5_000);
       expect(perSheet).toBeLessThan(15_000);
       expectUnderCeilings(sizes);

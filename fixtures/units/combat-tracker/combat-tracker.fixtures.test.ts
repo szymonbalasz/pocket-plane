@@ -69,6 +69,8 @@ describe("combat-tracker fixtures (CBT §13)", () => {
       "loot-wallets",
       "thorn-town",
       "thorn-battlemap",
+      "char-mira-full",
+      "npc-elite-sheet",
     ]);
     expect(r.encounters).toEqual([
       expect.objectContaining({

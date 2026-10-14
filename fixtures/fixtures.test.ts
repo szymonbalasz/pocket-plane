@@ -61,6 +61,8 @@ describe("fixture library", () => {
       "loot-wallets",
       "thorn-town",
       "thorn-battlemap",
+      "char-mira-full",
+      "npc-elite-sheet",
     ]);
     expect(await keys("campaign-switch")).toEqual([
       "campaign",
