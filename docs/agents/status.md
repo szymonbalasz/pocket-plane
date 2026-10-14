@@ -8,19 +8,19 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| P R1 map fit, R3 game log | — | — | **Merged** (walkthroughs 23/23, 16/16) | — |
-| S core, D core | — | — | **Merged** (no walkthrough) | — |
-| P R2/R4/R5 combat | `fix/polish-combat` (ws w28, slot 4) | build-polish-combat | Notifications walkthrough 12/12; combat walkthrough running (test-polish-combat) | Merge, then D build |
+| P polish R1–R5 | — | — | **Merged** (#180; walkthroughs MAP 23/23, DICE 16/16, NOTE 12/12, CBT 17/17) | — |
+| S core, D core | — | — | **Merged** | — |
 | S build (a, b) | `build/character-sheet-full` (ws w2A, slot 0) | build-character-sheet-full | Building | Walkthrough CHARX 1–10 |
-| D build | — | — | Waits for polish-combat merge | — |
+| D build | `build/combat-extras` (ws w2B, slot 2) | build-combat-extras | Building | Walkthrough CBTX 1–14 |
 | S combat routes (slice 4) | — | — | After D build | — |
+| Session-sim regression | — | — | After all merges | DM recap |
 
 Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-14-evening)). Briefs in `briefs\`. Evidence: `verify-*\` (session-sim-3 evidence only in the main checkout: `.verify/20261014-131140-session-sim-3/`; the `%TEMP%` copy was cleared).
 
 ## Shared-file locks
 
-- `fix/polish-combat`: notifications server files, combat-tracker server `attack.ts` / `hp.ts` / `lifecycle.ts` / `card-kind.ts`, `@shared/combat-tracker/log-kinds.ts`.
-- `build/character-sheet-full`: character-sheet feature folders except `hp.ts` / `char.adjustHp` (reserved for the D build), one line each in `creature-actions.ts` and entities `definition-hooks.ts`.
+- `build/character-sheet-full`: character-sheet feature folders except `hp.ts` / `char.adjustHp`, one line each in `creature-actions.ts` and entities `definition-hooks.ts`, creates `sheet-sections.ts`.
+- `build/combat-extras`: combat-tracker files per CBTX "Shared changes", character-sheet `hp.ts` + `char.adjustHp`, notifications `helpers.ts` (byRule); adds its sheet-section lines only after CHARX merges.
 
 ## Pending DM decisions
 
