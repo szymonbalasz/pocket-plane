@@ -1,13 +1,42 @@
 // shadcn/ui Popover, Switch, Checkbox, ToggleGroup on radix-ui (new file; dice-roll-log first user).
 import { CheckIcon } from "lucide-react";
 import { Checkbox as C, Popover as P, Switch as S, ToggleGroup as T } from "radix-ui";
-import type * as React from "react";
+import * as React from "react";
 import { cn } from "../../lib/utils";
+import { OVERLAY_OPEN_ATTR } from "./overlays";
 
 // ---- Popover ----
-export const Popover = P.Root;
+const PopoverOpenContext = React.createContext(false);
+
+/** Radix Popover root that tells its `PopoverAnchor` whether it is open (FR-SHELL-31). */
+export function Popover({
+  open,
+  defaultOpen,
+  onOpenChange,
+  ...props
+}: React.ComponentProps<typeof P.Root>) {
+  const [inner, setInner] = React.useState(defaultOpen ?? false);
+  const actual = open ?? inner;
+  return (
+    <PopoverOpenContext.Provider value={actual}>
+      <P.Root
+        open={actual}
+        onOpenChange={(o) => {
+          setInner(o);
+          onOpenChange?.(o);
+        }}
+        {...props}
+      />
+    </PopoverOpenContext.Provider>
+  );
+}
 export const PopoverTrigger = P.Trigger;
-export const PopoverAnchor = P.Anchor;
+
+/** Marks the anchor while its popover is open so the anchor's Tooltip stays shut (FR-SHELL-31). */
+export function PopoverAnchor(props: React.ComponentProps<typeof P.Anchor>) {
+  const open = React.useContext(PopoverOpenContext);
+  return <P.Anchor {...{ [OVERLAY_OPEN_ATTR]: open ? "true" : undefined }} {...props} />;
+}
 export const PopoverClose = P.Close;
 
 export function PopoverContent({

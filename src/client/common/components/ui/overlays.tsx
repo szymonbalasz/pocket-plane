@@ -1,7 +1,7 @@
 // shadcn/ui Dialog, Select, Tooltip on radix-ui.
 import { CheckIcon, ChevronDownIcon, XIcon } from "lucide-react";
 import { Dialog as D, Select as S, Tooltip as T } from "radix-ui";
-import type * as React from "react";
+import * as React from "react";
 import { cn } from "../../lib/utils";
 
 // ---- Dialog ----
@@ -115,7 +115,194 @@ export function SelectItem({ className, children, ...props }: React.ComponentPro
 }
 
 // ---- Tooltip ----
-export const TooltipProvider = T.Provider;
+// FR-SHELL-30/31: one open delay for every hover hint, a skip delay between triggers, and no
+// tooltip while (or right after) its trigger's overlay is open. Timing and suppression live in
+// `TooltipController` (unit-tested with fake timers); Radix only positions and renders.
+
+/** FR-SHELL-30: the one open delay (decided #172). */
+export const TOOLTIP_DELAY_MS = 400;
+/** FR-SHELL-30: moving to the next trigger within this window opens it at once (#172). */
+export const TOOLTIP_SKIP_DELAY_MS = 300;
+/**
+ * FR-SHELL-31: "true" on an element whose overlay is open but which has no `aria-expanded`
+ * (a `PopoverAnchor`); Radix triggers already set `aria-expanded`.
+ */
+export const OVERLAY_OPEN_ATTR = "data-overlay-open";
+
+/** True while a popover / dialog / menu opened from `el` is open. */
+export function overlayOpenOn(el: Element | null): boolean {
+  return (
+    el?.getAttribute("aria-expanded") === "true" || el?.getAttribute(OVERLAY_OPEN_ATTR) === "true"
+  );
+}
+
+/** One per provider: the skip-delay window and the single open tooltip. */
+export class TooltipGroup {
+  private warm = false;
+  private skipTimer: ReturnType<typeof setTimeout> | undefined;
+  private current: TooltipController | null = null;
+
+  constructor(
+    readonly delay = TOOLTIP_DELAY_MS,
+    readonly skipDelay = TOOLTIP_SKIP_DELAY_MS,
+  ) {}
+
+  /** A tooltip is open or closed less than `skipDelay` ago → the next one opens at once. */
+  get skipping(): boolean {
+    return this.warm;
+  }
+
+  opened(t: TooltipController): void {
+    if (this.current && this.current !== t) this.current.dismiss();
+    this.current = t;
+    clearTimeout(this.skipTimer);
+    this.warm = true;
+  }
+
+  closed(t: TooltipController): void {
+    if (this.current !== t) return;
+    this.current = null;
+    clearTimeout(this.skipTimer);
+    this.skipTimer = setTimeout(() => {
+      this.warm = false;
+    }, this.skipDelay);
+  }
+
+  dispose(): void {
+    clearTimeout(this.skipTimer);
+  }
+}
+
+/**
+ * One tooltip's open state. Opens `delay` ms after the pointer enters (or keyboard focus lands
+ * on) the trigger, at once inside the group's skip window. Pressing the trigger closes it and
+ * keeps it shut until the pointer leaves; so does an overlay opened from the trigger, which also
+ * covers focus returning to the trigger when that overlay closes (FR-SHELL-31).
+ */
+export class TooltipController {
+  open = false;
+  private hovering = false;
+  private latched = false;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+
+  constructor(
+    private readonly group: TooltipGroup,
+    private readonly overlayOpen: () => boolean,
+    private readonly onChange: (open: boolean) => void,
+  ) {}
+
+  /** Pointer moved over the trigger; only the first move after entering counts. */
+  pointerMove(): void {
+    if (this.hovering) return;
+    this.hovering = true;
+    this.request();
+  }
+
+  pointerLeave(): void {
+    this.hovering = false;
+    this.latched = false;
+    this.close();
+  }
+
+  /** Pointer down, Enter or Space on the trigger. */
+  press(): void {
+    this.latched = true;
+    this.close();
+  }
+
+  /** Focus on the trigger; only keyboard (`:focus-visible`) focus opens. */
+  focus(visible: boolean): void {
+    if (visible) this.request();
+  }
+
+  blur(): void {
+    // Focus moving into the trigger's own overlay keeps the latch for its return.
+    if (!this.overlayOpen()) this.latched = false;
+    this.close();
+  }
+
+  /** The trigger's overlay opened or closed. */
+  overlayChanged(): void {
+    if (!this.overlayOpen()) return;
+    this.latched = true;
+    this.close();
+  }
+
+  /** Escape, scroll, another tooltip opening, unmount. */
+  dismiss(): void {
+    this.close();
+  }
+
+  private blocked(): boolean {
+    return this.latched || this.overlayOpen();
+  }
+
+  private request(): void {
+    if (this.open || this.timer !== undefined || this.blocked()) return;
+    if (this.group.skipping) {
+      this.show();
+      return;
+    }
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      if (!this.blocked()) this.show();
+    }, this.group.delay);
+  }
+
+  private show(): void {
+    this.open = true;
+    this.group.opened(this);
+    this.onChange(true);
+  }
+
+  private close(): void {
+    clearTimeout(this.timer);
+    this.timer = undefined;
+    if (!this.open) return;
+    this.open = false;
+    this.group.closed(this);
+    this.onChange(false);
+  }
+}
+
+const TooltipGroupContext = React.createContext<TooltipGroup | null>(null);
+const fallbackGroup = new TooltipGroup();
+
+/** One per client (FR-SHELL-30); both `main.tsx` pass the shared constants. */
+export function TooltipProvider({
+  delayDuration,
+  skipDelayDuration,
+  children,
+}: {
+  delayDuration: number;
+  skipDelayDuration: number;
+  children: React.ReactNode;
+}) {
+  const group = React.useMemo(
+    () => new TooltipGroup(delayDuration, skipDelayDuration),
+    [delayDuration, skipDelayDuration],
+  );
+  React.useEffect(() => () => group.dispose(), [group]);
+  return (
+    <T.Provider
+      delayDuration={delayDuration}
+      skipDelayDuration={skipDelayDuration}
+      disableHoverableContent
+    >
+      <TooltipGroupContext.Provider value={group}>{children}</TooltipGroupContext.Provider>
+    </T.Provider>
+  );
+}
+
+function isFocusVisible(el: Element): boolean {
+  try {
+    return el.matches(":focus-visible");
+  } catch {
+    return false;
+  }
+}
+
+/** The shared hover hint (FR-SHELL-30). `children` must take a ref and DOM event props. */
 export function Tooltip({
   content,
   children,
@@ -123,11 +310,52 @@ export function Tooltip({
   content: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const group = React.useContext(TooltipGroupContext) ?? fallbackGroup;
+  const [trigger, setTrigger] = React.useState<HTMLElement | null>(null);
+  const triggerRef = React.useRef<HTMLElement | null>(null);
+  triggerRef.current = trigger;
+  const [open, setOpen] = React.useState(false);
+  const ctl = React.useMemo(
+    () => new TooltipController(group, () => overlayOpenOn(triggerRef.current), setOpen),
+    [group],
+  );
+  React.useEffect(() => () => ctl.dismiss(), [ctl]);
+  React.useEffect(() => {
+    if (!trigger) return;
+    const observer = new MutationObserver(() => ctl.overlayChanged());
+    observer.observe(trigger, {
+      attributes: true,
+      attributeFilter: ["aria-expanded", OVERLAY_OPEN_ATTR],
+    });
+    return () => observer.disconnect();
+  }, [trigger, ctl]);
   return (
-    <T.Root>
-      <T.Trigger asChild>{children}</T.Trigger>
+    <T.Root
+      open={open}
+      onOpenChange={(o) => {
+        // Radix's own open requests are ignored; the controller decides when to open.
+        if (!o) ctl.dismiss();
+      }}
+    >
+      <T.Trigger
+        asChild
+        ref={setTrigger}
+        onPointerMove={(e) => {
+          if (e.pointerType !== "touch") ctl.pointerMove();
+        }}
+        onPointerLeave={() => ctl.pointerLeave()}
+        onPointerDown={() => ctl.press()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") ctl.press();
+        }}
+        onFocus={(e) => ctl.focus(isFocusVisible(e.currentTarget))}
+        onBlur={() => ctl.blur()}
+      >
+        {children}
+      </T.Trigger>
       <T.Portal>
         <T.Content
+          data-testid="ui-tooltip"
           sideOffset={4}
           className="z-50 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground"
         >
