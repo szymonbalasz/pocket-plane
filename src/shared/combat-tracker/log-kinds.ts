@@ -83,11 +83,26 @@ const MULT_TEXT = { normal: "", half: " (half)", none: " (none)", double: " (dou
 
 const PHYSICAL: LineSegment[] = [{ text: " " }, { text: "physical", style: "badge" }];
 
+/** FR-CBT-57/58: the natural 1 / 20 a to-hit carries, else null. */
+export function naturalMark(natural: number | null): 1 | 20 | null {
+  return natural === 1 || natural === 20 ? natural : null;
+}
+
+/**
+ * FR-CBT-58 (R4, #178): a ruling against a natural roll (hit on a natural 1, miss on a natural
+ * 20) is public; built from `payload` alone (a natural roll ignores AC, so no AC fact leaks).
+ */
+export function publicRuling(natural: number | null, hit: boolean): boolean {
+  return (natural === 1 && hit) || (natural === 20 && !hit);
+}
+
 /**
  * "Goblin attacks Mira: 12 + 4 = 16 — hit! 6 slashing damage" (FR-CBT-24); "physical" after a
- * manual roll (FR-CBT-53 a). DM only (FR-CBT-53 b, c; FR-DICE-28: built from `dmPayload` alone):
- * "(DM set; rolled 13)" after an edited total, kept / dropped d20s and the damage dice in a muted
- * run, "vs AC 15", and "— DM ruled hit" / "— DM ruled miss" when the DM overrode the hit.
+ * manual roll (FR-CBT-53 a); " (natural 1)" / " (natural 20)" after that, and "— DM ruled hit" /
+ * "— DM ruled miss" for everyone when the hit contradicts the natural roll (FR-CBT-58). DM only
+ * (FR-CBT-53 b, c; FR-DICE-28: built from `dmPayload` alone): "(DM set; rolled 13)" after an
+ * edited total, kept / dropped d20s and the damage dice in a muted run, "vs AC 15", and "— DM
+ * ruled hit" / "— DM ruled miss" when the DM overrode the hit of any other roll.
  */
 export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof AttackLogDmPayload>>({
   kind: LOG_KIND_ATTACK,
@@ -108,6 +123,8 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
     out.push({ text: String(t.total), style: "total" });
     // An edited total (dice null) is not the physical roll; a damage edit stays DM-only.
     if (p.manual?.toHit && t.dice !== null) out.push(...PHYSICAL);
+    const natural = naturalMark(t.natural);
+    if (natural !== null) out.push({ text: ` (natural ${natural})` });
     if (dm) {
       if (dm.overrides.toHit) {
         out.push({ text: ` (DM set; rolled ${dm.toHitRolled})`, style: "muted" });
@@ -117,7 +134,7 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
       if (r && r.mode !== "normal") out.push(...rollBreakdownSegments(r));
       out.push({ text: ` vs AC ${dm.targetAc}` });
     }
-    const ruled = dm?.overrides.hit === true;
+    const ruled = dm?.overrides.hit === true || publicRuling(t.natural, p.hit);
     if (p.hit) {
       out.push({ text: ruled ? " — DM ruled hit " : p.crit ? " — critical hit! " : " — hit! " });
       const type = p.damageType ? ` ${p.damageType}` : "";

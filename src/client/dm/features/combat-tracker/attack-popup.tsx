@@ -5,6 +5,7 @@
 // order (FR-CBT-34); Later keeps the card pending; Dismiss closes it. Close → targeting off,
 // selection kept, except after a successful Apply (FR-CBT-54). Placement: FR-CBT-55.
 
+import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { clampHp, MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
 import {
   APPLY_TARGETS_MAX,
@@ -38,7 +39,7 @@ import {
 import { useDefinitions } from "./data";
 import { measurePlacement, type Placement, placementTokenIds } from "./popup-placement";
 import { useCombatDialogs } from "./popup-store";
-import { addAction, eligibleTargets, presetHit, targetList } from "./targets";
+import { addAction, eligibleTargets, naturalContradiction, presetHit, targetList } from "./targets";
 
 const MULTS: DamageMultiplier[] = ["normal", "half", "none", "double"];
 
@@ -197,6 +198,7 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
     (c) => !inList.has(c.id),
   );
   const toHitTotal = intOr(toHit, p.toHit.total);
+  const natural = naturalMark(p.toHit.natural);
   const damageTotal = intOr(damage, p.damage.total);
   const rows = list.rows.map(({ c, source }) => {
     const ac = acOf(c, defs);
@@ -205,7 +207,8 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
     const hit = st.hit ?? preset;
     const raw = rawDamage(hit, damageTotal, st.mult);
     const hp = hpOf(c, defs);
-    return { c, source, ac, preset, hit, mult: st.mult, raw, hp };
+    const contra = naturalContradiction(p.toHit.natural, hit);
+    return { c, source, ac, preset, hit, mult: st.mult, raw, hp, contra };
   });
   const setRow = (id: string, patch: Partial<PerTarget>) =>
     setPer((s) => ({ ...s, [id]: { ...(s[id] ?? { hit: null, mult: "normal" }), ...patch } }));
@@ -258,6 +261,21 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
           <Label htmlFor="cbt-popup-tohit" className="flex-wrap text-xs">
             To hit <Dice dice={p.toHit.dice} /> {p.toHit.constant >= 0 ? "+" : "−"}
             {Math.abs(p.toHit.constant)}
+            {natural !== null && (
+              // FR-CBT-57 (R4): `hp.down` for a natural 1, `hp.full` for a natural 20.
+              <Badge
+                variant="outline"
+                data-testid="cbt-popup-natural"
+                data-value={natural}
+                className={
+                  natural === 1
+                    ? "border-hp-down/50 text-hp-down"
+                    : "border-hp-full/40 text-hp-full"
+                }
+              >
+                natural {natural}
+              </Badge>
+            )}
             {toHitTotal !== p.toHit.total && <Badge variant="secondary">edited</Badge>}
           </Label>
           <Input
@@ -334,6 +352,16 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                   >
                     {x.hit ? "Hit" : "Miss"}
                   </Button>
+                  {x.contra && (
+                    <span
+                      data-testid="cbt-popup-target-natural"
+                      data-record-id={x.c.id}
+                      data-value={x.contra.natural}
+                      className="text-xs font-medium text-hp-bloodied"
+                    >
+                      natural {x.contra.natural}
+                    </span>
+                  )}
                   <Button
                     size="icon"
                     variant="ghost"
@@ -346,6 +374,10 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                     <XIcon className="size-3.5" />
                   </Button>
                 </div>
+                {x.contra && (
+                  // FR-CBT-57/58: a ruling against a natural roll is public.
+                  <p className="text-xs text-hp-bloodied">{x.contra.hint}</p>
+                )}
                 <div className="flex items-center gap-2">
                   <ToggleGroup
                     type="single"

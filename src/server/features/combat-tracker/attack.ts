@@ -2,6 +2,7 @@
 // line, then creates the damage card via `notify` in the same transaction (ADR-0027). No target:
 // the DM picks it in the attack popup (#134).
 import { characterRolls } from "@shared/character-sheet/logic";
+import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { critExpression } from "@shared/combat-tracker/rules";
 import {
   AttackInput,
@@ -107,11 +108,14 @@ export const attackCommand = defineCommand({
     };
     env.emit(rolled);
     const type = attack.damageType ? ` ${attack.damageType}` : "";
+    // FR-CBT-57 (R4): " (natural 1)" / " (natural 20)" after the to-hit.
+    const natural = naturalMark(toHit.natural);
+    const nat = natural === null ? "" : ` (natural ${natural})`;
     const cardId = notify(env, {
       kind: DAMAGE_CARD_KIND,
       audience: isPlayer ? "player" : "dm",
       audiencePlayerId: isPlayer ? env.actor.playerId : null,
-      text: `${c.name}: ${toHit.total} to hit, ${damage.total}${type}${crit ? " (critical)" : ""}`,
+      text: `${c.name}: ${toHit.total} to hit${nat}, ${damage.total}${type}${crit ? " (critical)" : ""}`,
       payload,
       action: { label: "Apply", role: "dm" },
     });
