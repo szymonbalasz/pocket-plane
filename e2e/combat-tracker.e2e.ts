@@ -255,8 +255,9 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
 });
 
 async function idByName(scope: Locator, name: string): Promise<string> {
+  // By the full name: the row splits "Goblin 2" into "Goblin" + " 2" (CBTX `RowName`).
   const r = scope.locator('[data-testid="cbt-init-row"]').filter({
-    has: scope.page().getByTestId("cbt-init-row-name").getByText(name, { exact: true }),
+    has: scope.page().locator(`[data-testid="cbt-init-row-name"][data-value="${name}"]`),
   });
   return (await r.first().getAttribute("data-record-id")) as string;
 }

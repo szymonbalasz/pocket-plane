@@ -15,8 +15,9 @@ const row = (scope: Locator, id: string) =>
   scope.locator(`[data-testid="cbt-init-row"][data-record-id="${id}"]`);
 
 async function idByName(scope: Locator, name: string): Promise<string> {
+  // By the full name: the row splits "Goblin 2" into "Goblin" + " 2" (CBTX `RowName`).
   const r = scope.locator('[data-testid="cbt-init-row"]').filter({
-    has: scope.page().getByTestId("cbt-init-row-name").getByText(name, { exact: true }),
+    has: scope.page().locator(`[data-testid="cbt-init-row-name"][data-value="${name}"]`),
   });
   return (await r.first().getAttribute("data-record-id")) as string;
 }
@@ -80,12 +81,8 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
   await expect(bindings.filter({ hasText: "Brin" })).toHaveCount(0);
   await dm.getByTestId("cbt-enc-start-confirm").click();
   const init = await openWindow(dm, "cbt.initiative");
-  await expect(
-    init.getByTestId("cbt-init-row-name").getByText("Mira", { exact: true }),
-  ).toHaveCount(1);
-  await expect(
-    init.getByTestId("cbt-init-row-name").getByText("Brin", { exact: true }),
-  ).toHaveCount(0);
+  await expect(init.locator('[data-testid="cbt-init-row-name"][data-value="Mira"]')).toHaveCount(1);
+  await expect(init.locator('[data-testid="cbt-init-row-name"][data-value="Brin"]')).toHaveCount(0);
 
   // Mira's Light crossbow (2nd attack) from the Actions tab → cbt.attack → the DM's card.
   await expect(sheet.getByTestId("char-sheet-combat")).toBeVisible();
