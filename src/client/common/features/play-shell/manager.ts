@@ -1,7 +1,8 @@
-// Window manager reducer (FR-SHELL-08–12, 14, 16–18). Pure: no DOM, no storage.
-// Holds every window's *stored* state; rendering clamps (geometry.ts) without writing back.
+// Window manager reducer (FR-SHELL-08–12, 14, 16–18, 29). Pure: no DOM, no storage.
+// Holds every window's *stored* state; rendering fits and clamps (geometry.ts) without writing
+// back. Every geometry it sets is stamped with the work area it was set in (`area`).
 import { GEOMETRY_LIMIT, Layout, MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
-import { clampRect, type Rect, type Viewport } from "./geometry";
+import { clampRect, type Rect, renderedRect, type Viewport, workArea } from "./geometry";
 import { fittedDefaultRect, placeRect } from "./placement";
 import type { WindowRegistry } from "./registry";
 
@@ -69,6 +70,7 @@ export function defaultLayout(registry: WindowRegistry, vp: Viewport): WindowSta
       state: "open",
       ...placeRect(d, vp, out),
       z: out.length + 1,
+      area: workArea(vp),
     });
   }
   return out;
@@ -76,6 +78,12 @@ export function defaultLayout(registry: WindowRegistry, vp: Viewport): WindowSta
 
 const overlaps = (a: Rect, b: Rect) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** Where a stored window renders now (fit + clamp); unknown kinds clamp only. */
+function shownRect(w: WindowState, ctx: ManagerContext): Rect {
+  const def = ctx.registry.get(w.kind);
+  return def ? renderedRect(w, def.minSize, ctx.viewport) : clampRect(w, ctx.viewport);
+}
 
 /** Rendered rects of the windows on screen now, except (kind, instance). */
 function onScreen(ws: Windows, ctx: ManagerContext, kind: string, instance: string): Rect[] {
@@ -86,7 +94,7 @@ function onScreen(ws: Windows, ctx: ManagerContext, kind: string, instance: stri
         ctx.available.has(w.kind) &&
         !(w.kind === kind && w.instance === instance),
     )
-    .map((w) => clampRect(w, ctx.viewport));
+    .map((w) => shownRect(w, ctx));
 }
 
 export interface Restored {
@@ -143,7 +151,9 @@ function patch(
     next.y === cur.y &&
     next.w === cur.w &&
     next.h === cur.h &&
-    next.z === cur.z
+    next.z === cur.z &&
+    next.area?.w === cur.area?.w &&
+    next.area?.h === cur.area?.h
   ) {
     return ws;
   }
@@ -177,7 +187,8 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
       // front; minimised → restored.
       if (find(ws, kind, instance)) return toFront(ws, kind, instance, "open");
       const rect = placeRect(def, ctx.viewport, onScreen(ws, ctx, kind, instance));
-      return normaliseZ([...ws, { kind, instance, state: "open", ...rect, z: maxZ(ws) + 1 }]);
+      const area = workArea(ctx.viewport);
+      return normaliseZ([...ws, { kind, instance, state: "open", ...rect, z: maxZ(ws) + 1, area }]);
     }
     case "close":
       return patch(ws, kind, instance, (w) => ({ ...w, state: "closed" }));
@@ -200,14 +211,14 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
       const cur = find(ws, kind, instance);
       if (cur?.state !== "open" || !ctx.available.has(kind)) return ws;
       const others = onScreen(ws, ctx, kind, instance);
-      const shown = clampRect(cur, ctx.viewport);
+      const shown = shownRect(cur, ctx);
       if (!others.some((o) => overlaps(shown, o))) return ws;
       const same = (r: Rect | undefined) =>
         r !== undefined && r.x === cur.x && r.y === cur.y && r.w === cur.w && r.h === cur.h;
       const asDefault = defaultLayout(ctx.registry, ctx.viewport).find((w) => w.kind === kind);
       if (!same(asDefault) && !same(fittedDefaultRect(def, ctx.viewport))) return ws;
       const rect = placeRect(def, ctx.viewport, others);
-      return patch(ws, kind, instance, (w) => ({ ...w, ...rect }));
+      return patch(ws, kind, instance, (w) => ({ ...w, ...rect, area: workArea(ctx.viewport) }));
     }
     case "setRect": {
       const r = action.rect;
@@ -217,6 +228,7 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
         y: bound(r.y, -GEOMETRY_LIMIT),
         w: bound(Math.max(def.minSize.w, r.w), 1),
         h: bound(Math.max(def.minSize.h, r.h), 1),
+        area: workArea(ctx.viewport),
       }));
     }
   }

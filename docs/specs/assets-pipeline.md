@@ -135,7 +135,7 @@ Isolated per worktree: `bun test` uses `:memory:` DB + temp asset dir per file; 
 
 | Fixture | Contents | In `session-sim` |
 |---|---|---|
-| `images` | Fixture Campaign: `town` (1400 × 980 *(proposed)*), `battlemap` (1400 × 980 = 20 × 14 at 70 px), `token-mira` blue, `token-goblin` green, `token-wolf` grey, `token-elite` dark green (256 × 256 round) | yes |
+| `images` | Fixture Campaign: `town` (1400 × 980 *(proposed)*), `battlemap` (1400 × 980 = 20 × 14 at 70 px), `token-mira` blue, `token-goblin` green, `token-wolf` grey, `token-elite` dark green, `token-thorn` *(playtest pass, G11, #174)* (256 × 256 round; each a distinct silhouette, not only a colour) | yes |
 | `image-large` | `map-large` 6000 × 4000 SVG → `display` 4096 × 2731, `thumb` 512 × 341 | no |
 | `images-second` | Activates Second Campaign, ingests `town.svg` as "Town (copy)", re-activates Fixture Campaign. Requires `campaign-second`, `images` | no |
 

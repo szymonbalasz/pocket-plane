@@ -756,8 +756,9 @@ export const dmInitiativeWindow = defineWindow({
   ...initiativeWindowBase,
   clients: ["dm"],
   // CBT §7: right edge, top (map-first, #162: the DM's only default window besides the log).
-  // 400 wide so AC / HP never wrap; rows scroll under the header (six rows at 420 px).
-  defaultSize: { w: 400, h: 420 },
+  // 400 wide so AC / HP never wrap; rows scroll under the header. 500 high: header + the six
+  // `session-sim` rows with no pending card, no scroll, at 1440×900 (FR-SHELL-32, G2).
+  defaultSize: { w: 400, h: 500 },
   minSize: { w: 320, h: 240 },
   defaultPosition: { anchor: "top-right" },
   companion: CombatDialogs,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { WindowState } from "@shared/play-shell/layout";
-import { clampRect } from "./geometry";
+import { clampRect, renderedRect, TOP_BAR_H, workArea } from "./geometry";
 import {
   defaultLayout,
   launcherState,
@@ -49,8 +49,90 @@ describe("window manager", () => {
   test("FR-SHELL-14 default layout: defaultOpen types at default geometry", () => {
     const ws = defaultLayout(registry, vp);
     expect(ws).toEqual([
-      { kind: "a.one", instance: "main", state: "open", x: 1288, y: 60, w: 300, h: 200, z: 1 },
+      {
+        kind: "a.one",
+        instance: "main",
+        state: "open",
+        x: 1288,
+        y: 60,
+        w: 300,
+        h: 200,
+        z: 1,
+        area: workArea(vp),
+      },
     ]);
+  });
+
+  describe("FR-SHELL-29 per-window work area", () => {
+    const big = { w: 1440, h: 900 };
+    const small = { w: 1280, h: 720 };
+    const at = (viewport: { w: number; h: number }) => ({ ...ctx, viewport });
+    const shown = (w: WindowState, viewport: { w: number; h: number }) =>
+      renderedRect(w, { w: 200, h: 100 }, viewport);
+    const inside = (r: { x: number; y: number; w: number; h: number }, v: typeof small) =>
+      r.x >= 0 && r.x + r.w <= v.w && r.y + r.h <= TOP_BAR_H + workArea(v).h;
+
+    test("open, appear, reset and setRect stamp the current work area", () => {
+      let ws = reduce(defaultLayout(registry, big), { type: "open", kind: "a.two" }, at(big));
+      expect(get(ws, "a.one").area).toEqual(workArea(big));
+      expect(get(ws, "a.two").area).toEqual(workArea(big));
+      ws = reduce(
+        ws,
+        { type: "setRect", kind: "a.two", rect: { x: 500, y: 300, w: 300, h: 200 } },
+        at(small),
+      );
+      expect(get(ws, "a.two").area).toEqual(workArea(small));
+      expect(reduce(ws, { type: "reset" }, at(small))[0]?.area).toEqual(workArea(small));
+    });
+
+    test("15b: at 1280×720 move one window → the others keep their 1440×900 area and still fit", () => {
+      let ws = run([], { type: "open", kind: "a.two" });
+      ws = reduce(
+        ws,
+        { type: "setRect", kind: "a.two", rect: { x: 1100, y: 600, w: 300, h: 200 } },
+        at(big),
+      );
+      ws = reduce(ws, { type: "open", kind: "a.three" }, at(big));
+      ws = reduce(
+        ws,
+        { type: "setRect", kind: "a.three", rect: { x: 100, y: 200, w: 300, h: 200 } },
+        at(small),
+      );
+      const two = get(ws, "a.two");
+      expect(two.area).toEqual(workArea(big));
+      expect(two).toMatchObject({ x: 1100, y: 600 }); // stored geometry untouched
+      expect(inside(shown(two, small), small)).toBe(true);
+      // Back at 1440×900: untouched window at its stored spot, the moved one where it was moved.
+      expect(shown(two, big)).toMatchObject({ x: 1100, y: 600, w: 300, h: 200 });
+      expect(shown(get(ws, "a.three"), big)).toMatchObject({ x: 100, y: 200 });
+    });
+
+    test("an area-only change survives patch (written, not dropped as a no-op)", () => {
+      let ws = reduce([], { type: "open", kind: "a.two" }, at(big));
+      const rect = { x: 100, y: 200, w: 300, h: 200 };
+      ws = reduce(ws, { type: "setRect", kind: "a.two", rect }, at(big));
+      const next = reduce(ws, { type: "setRect", kind: "a.two", rect }, at(small));
+      expect(next).not.toBe(ws);
+      expect(get(next, "a.two").area).toEqual(workArea(small));
+      expect(reduce(next, { type: "setRect", kind: "a.two", rect }, at(small))).toBe(next);
+    });
+
+    test("FR-SHELL-15 entries without `area` still parse; `area` round-trips", () => {
+      const old = { kind: "a.two", instance: "main", state: "open", x: 10, y: 60, w: 300, h: 200 };
+      const raw = JSON.stringify({
+        windows: [
+          { ...old, z: 1 },
+          { ...old, kind: "a.three", z: 2, area: { w: 1440, h: 788 } },
+        ],
+      });
+      const r = restoreLayout(registry, raw, vp);
+      expect(r.warning).toBeUndefined();
+      expect(get(r.windows, "a.two").area).toBeUndefined();
+      expect(get(r.windows, "a.three").area).toEqual({ w: 1440, h: 788 });
+      expect(serialise(r.windows, registry).windows[1]?.area).toEqual({ w: 1440, h: 788 });
+      const bad = JSON.stringify({ windows: [{ ...old, z: 1, area: { w: 0, h: 788 } }] });
+      expect(restoreLayout(registry, bad, vp).warning).toBeString();
+    });
   });
 
   test("FR-SHELL-08 open at default, then front; already open → front; minimised → restored", () => {

@@ -35,6 +35,11 @@ export const WindowState = z.object({
   h: size,
   /** Stacking order; higher = in front. */
   z: coord,
+  /**
+   * Work area size when this window's geometry was last set (FR-SHELL-15/29). Optional:
+   * entries stored before it still parse (fit then skips the window).
+   */
+  area: z.object({ w: size, h: size }).optional(),
 });
 export type WindowState = z.infer<typeof WindowState>;
 
