@@ -1,6 +1,6 @@
 # Proposed — Pending combat notifications end with their encounter, per kind
 
-- Status: proposed (spec-polish-r, sprint-1 R5, [OQ-CBT-45](../../specs/combat-tracker.md#15-open-questions)); number at merge
+- Status: accepted (2026-10-14; decisions-log #178; raised by spec-polish-r, sprint-1 R5, [OQ-CBT-45](../../specs/combat-tracker.md#15-open-questions)); number at merge
 - Date: 2026-10-14
 - Affects: [notifications](../../specs/notifications.md) (FR-NOTE-23, 24), [combat-tracker](../../specs/combat-tracker.md) (FR-CBT-59), [combat-extras](../../specs/combat-extras.md) (its kinds choose; OQ-CBTX-15)
 - Refines: [ADR-0016](0016-domain-events-pending-actions.md) (a pending action waits "until resolved or dismissed"), [ADR-0027](0027-notification-creation.md) (notifications change in the causing command's transaction)
@@ -20,9 +20,9 @@
 | C. Ask in the End confirm (checkbox "Dismiss N pending cards") | DM chooses | A choice with no use: a kept card can't be applied after End |
 | D. Combat dismisses its own cards in `cbt.end` by kind name, no registry field | Smallest code | No general rule; combat-extras would hard-code kinds in combat-tracker |
 
-## Decision (proposed)
+## Decision
 
-**A** (pending DM gate). `damage-card` opts in. Kinds that don't declare it keep today's rule (pending until resolved or dismissed). The helper dismisses only `pending` rows of the campaign whose kind opts in and whose `encounterIdOf(payload)` matches, one `NotificationDismissed` each, after the ending command's own event (and, with combat-extras, after its `NotificationResolved` rows; order in FR-CBT-61). Handled action rows no longer count as unread (FR-NOTE-24), so the bell clears too.
+**A** (DM, #178). `damage-card` opts in. Kinds that don't declare it keep today's rule (pending until resolved or dismissed). The helper dismisses only `pending` rows of the campaign whose kind opts in and whose `encounterIdOf(payload)` matches, one `NotificationDismissed` each, after the ending command's own event (and, with combat-extras, after its `NotificationResolved` rows; order in FR-CBT-61). Handled action rows no longer count as unread (FR-NOTE-24), so the bell clears too.
 
 ## Consequences
 

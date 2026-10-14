@@ -1,7 +1,7 @@
 ---
 title: Notifications
 prefix: NOTE
-status: in-review
+status: complete
 owner: spec-notifications
 wave: 2
 ---
@@ -13,7 +13,7 @@ wave: 2
 - **Notification**: a persisted, toast-like message with a history feed. It has a kind, an audience and optionally an action ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md), [decisions #47](../decisions-log.md)). With an action it is a **pending action** until resolved or dismissed (e.g. a damage card's "Apply"). Without one it is info.
 - This spec owns the mechanism: record type, states, server helpers, toasts, history window. Kinds and payloads belong to the features that create them ([combat-tracker](combat-tracker.md): damage card).
 - Created and resolved **inside the causing command's transaction** ([ADR-0027](../architecture/adr/0027-notification-creation.md), #135).
-- **Polish pass** (sprint 1, R5; FR-NOTE-23, 24): a kind may declare that its pending rows are **dismissed when their encounter ends** (damage cards do; *pending DM gate, [OQ-CBT-45](combat-tracker.md#15-open-questions)*); handled action rows no longer count as unread.
+- **Polish pass** (sprint 1, R5; FR-NOTE-23, 24): a kind may declare that its pending rows are **dismissed when their encounter ends** (damage cards do; decided #178, [OQ-CBT-45](combat-tracker.md#15-open-questions)); handled action rows no longer count as unread.
 
 ## 2. Scope
 
@@ -65,14 +65,14 @@ wave: 2
 | FR-NOTE-15 | After the first snapshot of a page load or of a (re)connection — not on resyncs while `live` (scene switch, gap) — if ≥ 1 pending notification has this client as action owner: one toast "N pending action(s)" with "Open" (opens `note.history`). | I19 |
 | FR-NOTE-16 | The action button shows while `pending`, the client is `live`, and the client is the action owner or the DM. A click calls the kind's client `onAction`; with no handler, `genericResolve` kinds send `note.resolve`; otherwise no button. | |
 | FR-NOTE-17 | Window type `note.history` "Notifications", both clients, closed by default, launcher bell with unread badge *(proposed, OQ-NOTE-13)*. Body: **Pending** (DM: all; player: pending they own), then **History**, newest first. Row: kind icon, text, time, state badge ("Pending", "Resolved by ‹name›", "Dismissed"), action button. DM rows add an audience tag ("DM", "All", "‹player›") and Dismiss on pending rows. | I12 |
-| FR-NOTE-18 | Unread = notifications addressed to this client (FR-NOTE-13 rule) with row `seq` > last seen *(R5: action rows only while `pending`, FR-NOTE-24)*. Last seen lives in `localStorage` `pp.note.seen.v1.<campaignId>.<dm \| playerId>`; set to the highest `seq` in the store while `note.history` is open and the tab visible. No entry → baseline = highest `seq` in the first snapshot. Storage failure → memory only. | #139 P27 |
+| FR-NOTE-18 | Unread = notifications addressed to this client (FR-NOTE-13 rule) with row `seq` > last seen (action rows only while `pending`, FR-NOTE-24; amended #178). Last seen lives in `localStorage` `pp.note.seen.v1.<campaignId>.<dm \| playerId>`; set to the highest `seq` in the store while `note.history` is open and the tab visible. No entry → baseline = highest `seq` in the first snapshot. Storage failure → memory only. | #139 P27 |
 | FR-NOTE-19 | Client view registry per client (`notification-views.ts`, append-only, AGENTS §9.9): kind → icon, optional renderer, optional `onAction`. Unregistered kind → generic row (icon + text), no handler. | OQ-NOTE-10 |
 | FR-NOTE-20 | A rejected action shows a toast: `conflict` → "No longer pending", else the reject message. The row keeps the server's state. | |
 | FR-NOTE-21 | `text`: plain text, trimmed, control characters removed, 1–280 chars, rendered as text (never HTML). Composed by the kind owner. | |
 | FR-NOTE-22 | Test mode only ([FR-SYNC-27](live-sync.md#6-functional-requirements)): kind `test` (`genericResolve`), intent `note.testSend`, a send form in `note.history`. DM: any audience and action. Player: `{text, actionLabel?}` only (other fields → `invalid`); audience = self, owner = DM (behaves like a damage card). Absent otherwise. | |
 | **Polish pass** (sprint 1, R5) | | |
-| FR-NOTE-23 | **Encounter-scoped kinds** (*pending DM gate, [OQ-CBT-45](combat-tracker.md#15-open-questions)*): a kind may declare an **end rule** `EncounterEndRule = {onEncounterEnd: "dismiss", encounterIdOf(payload) → string}` (type in `@shared/notifications`; absent = its rows stay pending, today's rule). The rule is a **shared constant** exported by the kind owner from `@shared/<feature>` and referenced by both the server kind definition (FR-NOTE-03) and the kind's client view entries (FR-NOTE-19), so clients can tell which pending rows End will close (combat's confirm count, FR-CBT-59). Load check + test: every kind with `onEncounterEnd` has `encounterIdOf`, and its server definition and client views reference the same rule. Server helper `dismissForEncounter(env, encounterId) → RecordChange[]`, called by the command that ends the encounter, in its transaction, after its own event: every `pending` notification of `env.actor.campaignId` whose kind has the rule and whose `encounterIdOf(payload)` = `encounterId` → `dismissed` (`closedAt` from the clock, `closedByRole` / `closedByPlayerId` from `env.actor`), one `NotificationDismissed` each, in row `seq` order. None → no change, no event. MVP user: `damage-card` ([FR-CBT-59](combat-tracker.md#6-functional-requirements)); later kinds (combat-extras) choose per kind. | R5; [proposed ADR](../architecture/adr/proposed-encounter-scoped-notifications.md) |
-| FR-NOTE-24 | **Handled actions aren't unread** (amends FR-NOTE-18; agent pick, holds for every OQ-CBT-45 option): a notification with an action counts as unread only while `pending`; info rows as before. A card applied, dismissed or closed at End leaves the action owner's bell; reopened (undo) → counts again if its `seq` > last seen. | R5 |
+| FR-NOTE-23 | **Encounter-scoped kinds** (decided #178, [OQ-CBT-45](combat-tracker.md#15-open-questions)): a kind may declare an **end rule** `EncounterEndRule = {onEncounterEnd: "dismiss", encounterIdOf(payload) → string}` (type in `@shared/notifications`; absent = its rows stay pending, today's rule). The rule is a **shared constant** exported by the kind owner from `@shared/<feature>` and referenced by both the server kind definition (FR-NOTE-03) and the kind's client view entries (FR-NOTE-19), so clients can tell which pending rows End will close (combat's confirm count, FR-CBT-59). Load check + test: every kind with `onEncounterEnd` has `encounterIdOf`, and its server definition and client views reference the same rule. Server helper `dismissForEncounter(env, encounterId) → RecordChange[]`, called by the command that ends the encounter, in its transaction, after its own event: every `pending` notification of `env.actor.campaignId` whose kind has the rule and whose `encounterIdOf(payload)` = `encounterId` → `dismissed` (`closedAt` from the clock, `closedByRole` / `closedByPlayerId` from `env.actor`), one `NotificationDismissed` each, in row `seq` order. None → no change, no event. MVP user: `damage-card` ([FR-CBT-59](combat-tracker.md#6-functional-requirements)); later kinds (combat-extras) choose per kind. | R5; [proposed ADR](../architecture/adr/proposed-encounter-scoped-notifications.md) |
+| FR-NOTE-24 | **Handled actions aren't unread** (amends FR-NOTE-18; decided #178): a notification with an action counts as unread only while `pending`; info rows as before. A card applied, dismissed or closed at End leaves the action owner's bell; reopened (undo) → counts again if its `seq` > last seen. | R5 |
 
 ## 7. UI/UX notes
 
@@ -115,7 +115,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 | `note.resolve {id, resolution?}` | DM, player | FR-NOTE-09 | — |
 | `note.testSend {text, audience?, audiencePlayerId?, actionLabel?, actionRole?, actionPlayerId?}` *(test mode)* | DM, player | DM: FR-NOTE-04/05. Player: FR-NOTE-22 (strict) | `{id}` |
 
-**Server API** (in-process): `notify`, `resolveNotification`, `reopenNotification` (FR-NOTE-02/08/10); kind registry (FR-NOTE-03); *(R5, pending)* `dismissForEncounter` (FR-NOTE-23): same `NotificationDismissed` event and record visibility (FR-NOTE-06) as `note.dismiss`; no new event, field or intent.
+**Server API** (in-process): `notify`, `resolveNotification`, `reopenNotification` (FR-NOTE-02/08/10); kind registry (FR-NOTE-03); *(R5)* `dismissForEncounter` (FR-NOTE-23): same `NotificationDismissed` event and record visibility (FR-NOTE-06) as `note.dismiss`; no new event, field or intent.
 
 **WS events** (generic record changes, [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md) A)
 
@@ -232,7 +232,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | ~~OQ-NOTE-10, 12~~ | ~~Kind + view registries append-only; glossary "Action owner"~~ | Decided (integrator): both registries on the AGENTS §9.9 list (paths §14); glossary adds **Action owner** | — | AGENTS.md, glossary |
 | ~~OQ-NOTE-11~~ | ~~Damage card audience~~ | Decided (#138): rolling player sees the card and its resolution incl. damage applied; DM attacks: `dm` | — | combat-tracker |
 | ~~OQ-NOTE-13~~ | ~~Launcher unread badge: play-shell window types gain `badge?(store) → number` ~~ Decided (#142): add `badge?(store)`; shared change by build/notifications | **Add** (shared change, gate §4 item 11) / unread count in the window title only | no · owner: orchestrator | play-shell |
-| OQ-NOTE-15 | **R5:** what happens to pending notifications when their encounter ends? | Asked once, as [OQ-CBT-45](combat-tracker.md#15-open-questions) (**A: kinds opt in to dismissal on End**, FR-NOTE-23). FR-NOTE-24 (handled actions leave the bell) is an agent pick for every option | **yes** (with OQ-CBT-45) · owner: DM | combat-tracker, combat-extras |
+| ~~OQ-NOTE-15~~ | ~~R5: what happens to pending notifications when their encounter ends?~~ | **Decided #178** (with [OQ-CBT-45](combat-tracker.md#15-open-questions)): **A**, kinds opt in to dismissal on End with an end rule (FR-NOTE-23); handled actions leave the bell (FR-NOTE-24) | — | combat-tracker, combat-extras |
 | ~~OQ-NOTE-14~~ | ~~Toast to the rolling player when the DM resolves their card?~~ | Decided (#141): **no**; the card's resolution in `note.history` shows it (FR-NOTE-13, -18 unchanged) | — | combat-tracker |
 
 ## 16. Out of scope
