@@ -67,6 +67,7 @@ describe("combat-tracker fixtures (CBT §13)", () => {
       "player-2",
       "char-thorn",
       "loot-wallets",
+      "thorn-town",
       "thorn-battlemap",
     ]);
     expect(r.encounters).toEqual([
