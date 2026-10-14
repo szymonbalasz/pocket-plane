@@ -8,7 +8,7 @@ Consolidated domain model. Entities and relationships, **not SQL**. **Living doc
 | Scenes | assets-pipeline, entities, play-shell, scenes-map | consolidated (2026-10-12): [§9–§13](#9-scenes-er-diagram); CON-18–21 resolved (fix/scenes-core) |
 | Combat | character-sheet, dice-roll-log, notifications, combat-tracker | consolidated (2026-10-12, #142): [§14–§18](#14-combat-er-diagram); CON-34–37 resolved; all Combat tables built as shared definitions in `src/server/db/schema.ts` (fix/combat-core) |
 | Reward | [party-loot](../specs/party-loot.md) | built (build/party-loot): [§19](#19-reward-loot-entry-party-pot-wallet) |
-| Sprint 1 | [character-sheet-full](../specs/character-sheet-full.md) (CHARX, #178) | core built (fix/charx-core): [§20](#20-sprint-1-creature-sheet), stat-block additions in [§11](#11-scenes-entity); record type, commands, hook, fixtures **built** (build/character-sheet-full); combat routes *(sprint 1, to build, slice 4)* |
+| Sprint 1 | [character-sheet-full](../specs/character-sheet-full.md) (CHARX, #178) | core built (fix/charx-core): [§20](#20-sprint-1-creature-sheet), stat-block additions in [§11](#11-scenes-entity); record type, commands, hook, fixtures **built** (build/character-sheet-full); combat routes **built** (fix/charx-combat-routes, slice 4) |
 | Sprint 1 | [combat-extras](../specs/combat-extras.md) (CBTX, #178) | core built (fix/cbtx-core): [§21](#21-sprint-1-effect-and-combat-play-state), play-state columns in [§11](#11-scenes-entity) and [§17](#17-combat-encounter-combatant-combat-log-entry); commands, rules, record-type registration, fixtures built (build/combat-extras) |
 
 Every fact links its source. Protocol side (record types, intents, events): [protocol](../protocol/README.md).
@@ -729,7 +729,7 @@ All rows per campaign; `seq` by the DB; timestamps `ctx.clock` ([CBT §8](../spe
 | name | text 1–60 | Trimmed, no control chars; not unique | [FR-CBT-01](../specs/combat-tracker.md#6-functional-requirements) |
 | status | `planned` \| `started` \| `ended` | ≤ 1 `started` per campaign (partial unique). Update / delete only while `planned`; ≤ 30 non-ended per campaign | FR-CBT-01, [FR-CBT-07](../specs/combat-tracker.md#6-functional-requirements), [FR-CBT-10](../specs/combat-tracker.md#6-functional-requirements), #78, #139 P15 |
 | sceneId | ID → Scene \| null | Set at start; `ON DELETE SET NULL` | FR-CBT-07, CBT §8 |
-| partyCharacterIds | **JSON leaf** ID[] \| null | `null` = every character of the campaign at read time; list = characters of the campaign | [FR-CBT-02](../specs/combat-tracker.md#6-functional-requirements), #139 P12 |
+| partyCharacterIds | **JSON leaf** ID[] \| null | `null` = every character of the campaign at read time (*(sprint 1, built, fix/charx-combat-routes)* drafts left out, FR-CHARX-11 / OQ-CBT-46); list = characters of the campaign (drafts allowed) | [FR-CBT-02](../specs/combat-tracker.md#6-functional-requirements), #139 P12 |
 | round, turnCombatantId | int ≥ 0, ID \| null | Round 0 = initiative phase | [FR-CBT-14](../specs/combat-tracker.md#6-functional-requirements) |
 | playerTurnCombatantId | ID \| null | Turn combatant if not hidden or removed, else null; written with the turn, by `setRemoved` and by the token hook | [FR-CBT-31](../specs/combat-tracker.md#6-functional-requirements), gate I20 |
 | startedAt, endedAt, createdAt, updatedAt | timestamp \| null ×2, timestamp ×2 | | CBT §8 |
@@ -829,7 +829,7 @@ One applied HP change to one target: the stats unit (#54, gate I9). Written by `
 | Log line text | `formatLine(entry)` per kind, pure, `@shared` | [FR-DICE-20](../specs/dice-roll-log.md#6-functional-requirements) |
 | Effective public settings | settings row, else all false | FR-DICE-12 |
 | Difficulty rating, base / adjusted XP, thresholds, total CR | `difficultyMethods` (`dmg-2014`): party levels + monster CRs (XP table, CR 0 = 10) | FR-CBT-03, #136, gate I27 |
-| Party | `partyCharacterIds`, `null` = all characters at read time | FR-CBT-02 |
+| Party | `partyCharacterIds`, `null` = all characters at read time (*(sprint 1, built, fix/charx-combat-routes)* but drafts, a `creature-sheet` with `status: draft`) | FR-CBT-02 |
 | Health band | `down` if hp = 0; `bloodied` if 2 × hp ≤ hpMax; else `healthy`; computed in the visibility fn | [FR-CBT-26](../specs/combat-tracker.md#6-functional-requirements), #139 P9 |
 | Eligible turns; hit hint | not removed and not a monster at 0 HP; nat 20 hit, nat 1 miss, else total ≥ AC (per target) | FR-CBT-14, [FR-CBT-33](../specs/combat-tracker.md#6-functional-requirements) |
 | Sheet values | signed bonuses, "Down", roll specs `characterRolls(statBlock, kind, ability?)` (`@shared/character-sheet`; `check` / `save` kinds and `char.roll` built, #149) | [FR-CHAR-05](../specs/character-sheet.md#6-functional-requirements), CHAR §8 |
