@@ -258,7 +258,12 @@ async function runFixtures(services: Services, config: Config, bundle: string, o
   return records;
 }
 
-async function doLoad(config: Config, lib: FixtureLibrary, bundle: string): Promise<Manifest> {
+async function doLoad(
+  config: Config,
+  lib: FixtureLibrary,
+  bundle: string,
+  durable = true,
+): Promise<Manifest> {
   const m = readManifest(config.dataDir);
   if (m?.status !== "empty") {
     throw new FixtureError(
@@ -275,6 +280,8 @@ async function doLoad(config: Config, lib: FixtureLibrary, bundle: string): Prom
   });
 
   const db = openFileDb(config.dbPath);
+  // One fsync per step commit is most of a load's DB time; a throwaway dir doesn't need it.
+  if (!durable) db.$client.run("PRAGMA synchronous = OFF");
   let records: Record<string, Record<string, string[]>>;
   let playerRows: { name: string; token: string; campaign: string }[];
   try {
@@ -316,6 +323,8 @@ async function doLoad(config: Config, lib: FixtureLibrary, bundle: string): Prom
 
 export interface LoaderOptions {
   notice?: (msg: string) => void;
+  /** `false`: step commits skip fsync (`synchronous = OFF`); for throwaway dirs only. */
+  durable?: boolean;
 }
 
 export async function reset(config: Config, opts: LoaderOptions = {}): Promise<void> {
@@ -354,7 +363,7 @@ export async function resetAndLoad(
   const lock = acquireLock(config.dataDir, "loader", systemClock.iso(), opts.notice);
   try {
     await doReset(config);
-    return await doLoad(config, lib, bundle);
+    return await doLoad(config, lib, bundle, opts.durable);
   } finally {
     lock.release();
   }
@@ -374,7 +383,8 @@ export async function loadInProcess(
     PP_TEST_MODE: opts.testMode ? "1" : "",
     PP_DM_SECRET: opts.dmSecret ?? "in-process-dm-secret",
   });
-  const manifest = await resetAndLoad(config, lib, bundle);
+  // The temp dir dies with the test: power-loss durability buys nothing here (fix/test-speed).
+  const manifest = await resetAndLoad(config, lib, bundle, { durable: false });
   return {
     config,
     manifest,
