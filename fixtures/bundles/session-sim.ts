@@ -20,5 +20,7 @@ export default defineBundle({
     "goblin-2",
     "loot-1",
     "loot-wallets",
+    "thorn-town", // G1 (#171): player 2 has a token on Town …
+    "thorn-battlemap", // … and on Goblin Ambush
   ],
 });

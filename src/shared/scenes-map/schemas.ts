@@ -26,7 +26,12 @@ export const MAP_INTENTS = {
   deleteToken: "map.deleteToken",
 } as const;
 
-export const MAP_SIGNALS = { ping: "map.ping", laser: "map.laser", pull: "map.pull" } as const;
+export const MAP_SIGNALS = {
+  ping: "map.ping",
+  laser: "map.laser",
+  pull: "map.pull",
+  drag: "map.drag",
+} as const;
 
 // ---------- names (FR-MAP-01, -02, -16) ----------
 
@@ -305,3 +310,19 @@ export const LaserData = z.strictObject({
   end: z.boolean().optional(),
 });
 export type LaserData = z.infer<typeof LaserData>;
+
+// ---------- drag preview (FR-MAP-39–41, protocol §15) ----------
+
+/** Sender: at most one frame per 50 ms while moving (decided #172, OQ-MAP-30). */
+export const DRAG_INTERVAL_MS = 50;
+/** Sender: repeat the last position every 1 s while the pointer rests. */
+export const DRAG_REPEAT_MS = 1000;
+/** Receiver: a preview without a frame for 3 s drops. */
+export const DRAG_TIMEOUT_MS = 3000;
+
+/** `map.drag`: T's top-left in map `display` px (unsnapped), or `end: true` on drop / cancel. */
+export const DragData = z.union([
+  z.strictObject({ sceneId: Id, tokenId: Id, x: Coord, y: Coord }),
+  z.strictObject({ sceneId: Id, tokenId: Id, end: z.literal(true) }),
+]);
+export type DragData = z.infer<typeof DragData>;

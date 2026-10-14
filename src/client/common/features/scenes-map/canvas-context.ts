@@ -1,11 +1,12 @@
 // What every canvas layer reads (FR-MAP-29): the shown scene, effective grid, tokens at their
-// shown cells, camera, colours, pointer store, record store (token overlays, FR-MAP-34), DM
-// selection + targeting (FR-MAP-31/33) and the token handlers of the host canvas.
+// shown cells, camera, colours, pointer store, drag-preview store (FR-MAP-40), record store (token
+// overlays, FR-MAP-34), DM selection + targeting (FR-MAP-31/33) and the host's token handlers.
 import type { RecordStore } from "@shared/protocol/store";
 import type { SceneView, TokenView } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { createContext, useContext } from "react";
 import type { Camera } from "./camera";
+import type { PreviewStore } from "./drag-preview";
 import type { PointerStore } from "./pointers";
 import type { CanvasColors } from "./theme";
 import type { MapTool } from "./tool-store";
@@ -37,6 +38,8 @@ export interface CanvasContextValue {
   cam: Camera;
   colors: CanvasColors;
   pointers: PointerStore;
+  /** Others' drag previews + this client's own drag position (FR-MAP-40/42). */
+  previews: PreviewStore;
   tool: MapTool;
   live: boolean;
   myPlayerId: string | null;

@@ -101,7 +101,12 @@ describe("FR-MAP-34 overlay merge", () => {
     expect(decorateToken(overlays, t, store, { ...view, selected: true }, () => {}).ring).toBe(
       "target",
     );
-    expect(decorateToken([], t, store, view)).toEqual({ dim: false, badges: [], ring: null });
+    expect(decorateToken([], t, store, view)).toEqual({
+      dim: false,
+      badges: [],
+      ring: null,
+      cross: null,
+    });
   });
   test("FR-MAP-37 first non-null movedFt wins; throws ignored; none → null", () => {
     const errors: string[] = [];
