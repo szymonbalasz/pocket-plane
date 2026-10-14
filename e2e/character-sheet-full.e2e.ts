@@ -11,6 +11,58 @@ const live = (page: Page) =>
 const field = (sheet: Locator, path: string) =>
   sheet.locator(`[data-testid="charx-field"][data-value="${path}"]`);
 
+/** Tab → an element only that tab's panel shows (Mira, CHARX §13 fixtures). */
+const TAB_PROBES = [
+  ["actions", "charx-attack"],
+  ["features", "charx-feature"],
+  ["inventory", "charx-wallet"],
+  ["notes", "charx-notes"],
+  ["main", "charx-skill"],
+] as const;
+
+for (const vp of [
+  { width: 1280, height: 720 },
+  { width: 1440, height: 900 },
+]) {
+  test(`FR-CHARX-26 every tab is reachable by mouse, DM and player, ${vp.width}×${vp.height}`, async ({
+    browser,
+  }) => {
+    const { secret, link, recordId } = e2eEnv();
+    const miraId = recordId("char-mira", "entity");
+    const dm = await rolePage(browser);
+    await dm.setViewportSize(vp);
+    await loginDm(dm, secret);
+    await live(dm);
+    const p1 = await rolePage(browser);
+    await p1.setViewportSize(vp);
+    await p1.goto(link("Player 1"));
+    await live(p1);
+    for (const page of [p1, dm]) {
+      const win = await openWindow(page, "char.sheet");
+      await expect(win.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
+      // CHAR §7 default geometry (shrunk only where the viewport has no room).
+      const box = await win.boundingBox();
+      if (vp.height >= 900) expect([box?.width, box?.height]).toEqual([320, 440]);
+      const strip = win.getByRole("tablist");
+      expect((await strip.boundingBox())?.height ?? 0).toBeGreaterThan(20);
+      for (const [tab, probe] of TAB_PROBES) {
+        const trigger = win.locator(`[data-testid="charx-tab"][data-value="${tab}"]`);
+        // The strip scrolls at 320 px; then a real mouse click at the trigger's centre.
+        await trigger.scrollIntoViewIfNeeded();
+        const b = await trigger.boundingBox();
+        expect(b?.height ?? 0).toBeGreaterThan(0);
+        await page.mouse.click(
+          (b?.x ?? 0) + (b?.width ?? 0) / 2,
+          (b?.y ?? 0) + (b?.height ?? 0) / 2,
+        );
+        await expect(trigger).toHaveAttribute("aria-selected", "true");
+        await expect(win.getByTestId(probe).first()).toBeVisible();
+      }
+    }
+    for (const page of [p1, dm]) await page.context().close();
+  });
+}
+
 test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-10 FR-CHARX-32 Brin: create, edit, roll Stealth, approve; player-2 summary", async ({
   browser,
 }) => {

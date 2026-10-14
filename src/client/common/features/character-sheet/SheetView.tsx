@@ -123,6 +123,7 @@ function HeaderActions({
           data-testid="charx-edit-toggle"
           data-state={editing ? "on" : "off"}
           aria-pressed={editing}
+          disabled={!live}
           onClick={toggleEdit}
         >
           {editing ? "Done" : "Edit"}
@@ -274,8 +275,9 @@ export function SheetView({
             </button>
           </p>
         )}
-        <Tabs value={current} onValueChange={setTab} className="flex min-h-0 flex-col gap-2">
-          <div className="overflow-x-auto">
+        {/* The Card scrolls; nothing in it may shrink (an overflow-x box would collapse to 0 px). */}
+        <Tabs value={current} onValueChange={setTab} className="flex shrink-0 flex-col gap-2">
+          <div className="shrink-0 overflow-x-auto pb-0.5">
             <TabsList className="w-max">
               {tabs.map(([v, label]) => (
                 <TabsTrigger key={v} value={v} data-testid="charx-tab" data-value={v}>
