@@ -3,6 +3,7 @@
 // A layer is a component rendering one Konva `<Layer>` that reads `useCanvas()`.
 import { LAYER_ORDER, type LayerDef, orderLayers } from "./layers";
 import { GridLayer } from "./layers/GridLayer";
+import { LabelsLayer } from "./layers/LabelsLayer";
 import { MapLayer } from "./layers/MapLayer";
 import { PointersLayer } from "./layers/PointersLayer";
 import { TokensLayer } from "./layers/TokensLayer";
@@ -11,5 +12,6 @@ export const canvasLayers: readonly LayerDef<object>[] = orderLayers<object>([
   { id: "map", order: LAYER_ORDER.map, component: MapLayer },
   { id: "grid", order: LAYER_ORDER.grid, component: GridLayer },
   { id: "tokens", order: LAYER_ORDER.tokens, component: TokensLayer },
+  { id: "labels", order: LAYER_ORDER.labels, component: LabelsLayer },
   { id: "pointers", order: LAYER_ORDER.pointers, component: PointersLayer },
 ]);

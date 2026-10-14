@@ -102,6 +102,12 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await expect.poll(() => tokenNode(player, miraTown)).not.toBeNull();
   const m = (await tokenNode(player, miraTown))!;
   const cell = 70 * (await stageScale(player));
+  // FR-MAP-42 (#171): the name label is centred on the token's bottom grid line, on the labels layer.
+  const [label] = await konvaNodes(player, "map-token-label", miraTown);
+  expect(label?.text).toBe("Mira");
+  expect(Math.abs((label?.y ?? 0) - (m.y + cell / 2))).toBeLessThan(2);
+  expect(Math.abs((label?.x ?? 0) - m.x)).toBeLessThan(2);
+  expect(label?.height ?? 0).toBeLessThan(cell * 0.5);
   await player.mouse.move(m.x, m.y);
   await player.mouse.down();
   for (let i = 1; i <= 6; i++) await player.mouse.move(m.x + (cell * 3 * i) / 6, m.y);

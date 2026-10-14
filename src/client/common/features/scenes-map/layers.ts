@@ -1,5 +1,5 @@
 // Canvas layer registry core (FR-MAP-29): an ordered list, map < grid < (reserved: props, fog)
-// < tokens < pointers. Later features (scene-tools) add layers at the reserved slots without
+// < tokens < labels < pointers. Later features (scene-tools) add layers at the reserved slots without
 // touching scene or token code. DOM-free so it runs under `bun test`.
 
 /** Reserved order slots; a new layer picks a free number between its neighbours. */
@@ -9,6 +9,8 @@ export const LAYER_ORDER = {
   props: 20,
   fog: 30,
   tokens: 40,
+  /** Token name labels + overlay badges, above every token (FR-MAP-42). */
+  labels: 45,
   pointers: 50,
 } as const;
 
