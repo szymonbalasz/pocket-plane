@@ -1,11 +1,43 @@
 // Attack popup placement (FR-CBT-55, G2): vertically centred at the left or right edge of the
-// work area, on the side farther from the centre of its selection rows' tokens (none: left);
-// on the right it sits just left of an open Initiative window. Fixed once per open; not
-// draggable. `popupPlacement` is pure; `measurePlacement` reads the live screen.
+// work area, on the side farther from the centre of its selection rows' tokens (none: the
+// attacker's likely targets, FR-CBT-56; none either: left); on the right it sits just left of an
+// open Initiative window. Fixed once per open; not draggable. `popupPlacement` and
+// `placementTokenIds` are pure; `measurePlacement` reads the live screen.
+import type { CombatantKind } from "@shared/combat-tracker/schemas";
 import { INITIATIVE_KIND } from "@ui/features/combat-tracker/window";
 import { EDGE_GAP, LAUNCHER_CLEAR, TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { windowId } from "@ui/features/play-shell/manager";
 import { RAIL_CLEAR } from "@ui/features/play-shell/placement";
+import type { TargetCandidate } from "./targets";
+
+/**
+ * FR-CBT-55/56: the tokens the popup side is measured from, at open. Selection rows' tokens win;
+ * with none, the attacker's **likely targets**: active, non-removed combatants of the encounter
+ * of the other kind (monster → PCs, PC → monsters) bound to a token on the viewed scene.
+ */
+export function placementTokenIds<C extends TargetCandidate & { kind: CombatantKind }>(o: {
+  rowTokenIds: readonly string[];
+  combatants: readonly C[];
+  encounterId: string;
+  attackerId: string;
+  tokenSceneOf(tokenId: string): string | null;
+  viewedSceneId: string | null;
+}): string[] {
+  if (o.rowTokenIds.length > 0) return [...o.rowTokenIds];
+  const attacker = o.combatants.find((c) => c.id === o.attackerId);
+  if (!attacker || !o.viewedSceneId) return [];
+  return o.combatants.flatMap((c) =>
+    c.encounterId === o.encounterId &&
+    c.id !== o.attackerId &&
+    c.active !== false &&
+    !c.removed &&
+    c.kind !== attacker.kind &&
+    c.tokenId &&
+    o.tokenSceneOf(c.tokenId) === o.viewedSceneId
+      ? [c.tokenId]
+      : [],
+  );
+}
 
 /** Popup width, px (the panel is `min(440px, 100vw - 2rem)`). */
 export const POPUP_W = 440;

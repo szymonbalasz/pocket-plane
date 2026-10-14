@@ -36,7 +36,7 @@ import {
   useMapSelection,
 } from "../scenes-map/selection";
 import { useDefinitions } from "./data";
-import { measurePlacement, type Placement } from "./popup-placement";
+import { measurePlacement, type Placement, placementTokenIds } from "./popup-placement";
 import { useCombatDialogs } from "./popup-store";
 import { addAction, eligibleTargets, presetHit, targetList } from "./targets";
 
@@ -415,22 +415,34 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
 }
 
 /**
- * FR-CBT-55: placement fixed when the popup opens, from the selection rows' tokens at that moment
- * (the panel never jumps while the DM edits the selection).
+ * FR-CBT-55/56: placement fixed when the popup opens, from the selection rows' tokens at that
+ * moment, else the attacker's likely targets (the panel never jumps while the DM edits the
+ * selection, switches scene or moves a token).
  */
 function useOpenPlacement(card: NotificationRecord): Placement {
   const p = DamageCardPayload.safeParse(card.payload);
   const combatants = useCombatants(p.data?.encounterId);
+  const tokens = useRecords<{ id: string; sceneId: string }>(TOKEN_TYPE);
   const [placement] = useState(() => {
     if (!p.success) return measurePlacement([]);
+    const selection = getMapSelection();
     const { rows } = targetList({
       combatants,
       encounterId: p.data.encounterId,
       attackerId: p.data.attackerId,
-      selectedTokenIds: getMapSelection().tokenIds,
+      selectedTokenIds: selection.tokenIds,
       added: [],
     });
-    return measurePlacement(rows.flatMap((r) => (r.c.tokenId ? [r.c.tokenId] : [])));
+    return measurePlacement(
+      placementTokenIds({
+        rowTokenIds: rows.flatMap((r) => (r.c.tokenId ? [r.c.tokenId] : [])),
+        combatants,
+        encounterId: p.data.encounterId,
+        attackerId: p.data.attackerId,
+        tokenSceneOf: (id) => tokens.find((t) => t.id === id)?.sceneId ?? null,
+        viewedSceneId: selection.sceneId,
+      }),
+    );
   });
   return placement;
 }
