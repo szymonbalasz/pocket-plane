@@ -218,7 +218,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 - Docs (integrator): protocol rows, data-model row, ADR-0016 "MVP use" line (I30).
 
 **Shared changes — polish pass** (sprint 1, R5; after the DM gate):
-- Notifications-owned server files: kind-registry type gains optional `onEncounterEnd` + the load check; new helper `dismissForEncounter` beside `notify` / `resolveNotification`. Combat adds `onEncounterEnd: "dismiss"` to its own `damage-card` line in the append-only `kinds.ts` and calls the helper from `cbt.end` (same `fix/*` or right after; must merge **before the combat-extras build**).
+- Notifications-owned server files: `kind.ts` (kind type gains optional `onEncounterEnd` + the load check), `helpers.ts` (new `dismissForEncounter` beside `notify` / `resolveNotification`). Combat sets `onEncounterEnd: "dismiss"` in its own `card-kind.ts` and calls the helper from `cbt.end`; `kinds.ts` untouched (same `fix/*`; must merge **before the combat-extras build**).
 - Client (own files): `logic.ts` `unreadCount` / `addressedForUnread` (FR-NOTE-24).
 - **None:** DB columns, events, record types, visibility, intents. Docs at consolidation: protocol §23 (kind table: `onEncounterEnd` column), notifications row in §26 if needed. ADR: [proposed-encounter-scoped-notifications](../architecture/adr/proposed-encounter-scoped-notifications.md) (amends ADR-0016 / ADR-0027 consequences; number at merge).
 

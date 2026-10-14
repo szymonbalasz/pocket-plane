@@ -357,7 +357,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 **Shared changes — polish pass** (sprint 1; after the DM gate; builders report `shared change needed:`). **Merges before the combat-extras build** (sprint-1 boundaries):
 - **None** in `src/server/db/`, `src/shared/events/`, record types, visibility fns, intents or payload / dmPayload schemas.
-- Server (own folder): `attack.ts` card text (FR-CBT-57); `cbt.end` command calls `dismissForEncounter` (FR-CBT-59; needs notifications' helper first or in the same branch); `damage-card` line in the append-only `src/server/features/notifications/kinds.ts` gains `onEncounterEnd: "dismiss"` (edits combat's own line).
+- Server (own folder): `attack.ts` card text (FR-CBT-57); `lifecycle.ts` `cbt.end` calls `dismissForEncounter` (FR-CBT-59; needs notifications' helper first or in the same branch); `card-kind.ts` (`damage-card` definition) gains `onEncounterEnd: "dismiss"`; the append-only `kinds.ts` is untouched.
 - Shared kind (feature-owned): `@shared/combat-tracker/log-kinds.ts` `formatLine` (FR-CBT-58).
 - Client (own files): `popup-placement.ts` + `attack-popup.tsx` (likely targets, natural badges; FR-CBT-56/57); DM `initiative-window.tsx`, `encounters-window.tsx` (confirm copy, FR-CBT-59; minimise / open, FR-CBT-60 via `useOpenWindow` / `useWindowDispatch`, existing exports).
 - Docs at consolidation: protocol §21 (`cbt.end` dismisses), §22 (`EncounterEnded` + `NotificationDismissed`), §23 (`damage-card` text, `onEncounterEnd`); data model: none. No fixture or bundle change (walkthrough uses `combat`; integration `combat`, `mid-combat`).
