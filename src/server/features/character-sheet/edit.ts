@@ -176,7 +176,11 @@ export function charEditCommand(hooks: DefinitionHooks) {
         if (isSheetField(k)) return !sameValue(sheetValues[k], set[k]);
         return !sameValue((c.statBlock as Record<string, unknown>)[k], block[k]);
       });
-      // Nothing changed → success, no event (FR-CHARX-15).
+      // Nothing changed → success, no event (FR-CHARX-15). Legacy attacks still without ids
+      // get them on this write (FR-CHARX-16): the client sends a same-value `set` for that.
+      const legacyAttacks = c.statBlock.attacks.some((a) => a.id === undefined);
+      if (changed.length === 0 && !legacyAttacks) return {};
+      if (changed.length === 0) changed.push(...keys.filter((k) => !isSheetField(k)));
       if (changed.length === 0) return {};
 
       // Entity first (owner, names, assets validated; hooks copy the owner into an existing sheet

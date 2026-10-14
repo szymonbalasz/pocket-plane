@@ -364,6 +364,21 @@ describe("FR-CHARX-16 rows", () => {
     });
   });
 
+  test("FR-CHARX-16 a same-value set gives legacy attacks their ids once; then no-op", () => {
+    const t = setup();
+    expect(t.ent(t.t.thornId).statBlock.attacks).toEqual([
+      { name: "Dagger", toHit: 5, damage: "1d4+3", damageType: "piercing" },
+    ]);
+    t.run(I.edit, { creatureId: t.t.thornId, set: { initBonus: 3 } }, t.t.p2Actor);
+    const [a] = t.ent(t.t.thornId).statBlock.attacks as { id?: string }[];
+    expect(typeof a?.id).toBe("string");
+    expect(t.events.map((e) => e.event.payload)).toEqual([
+      { creatureId: t.t.thornId, op: "set", fields: ["initBonus"] },
+    ]);
+    t.run(I.edit, { creatureId: t.t.thornId, set: { initBonus: 3 } }, t.t.p2Actor);
+    expect(t.events).toHaveLength(1);
+  });
+
   test("FR-CHARX-16 feature used is a counter: kept on replace, clamped to new uses", () => {
     const t = setup();
     const f = t.run<{ rowId: string }>(I.putRow, {
