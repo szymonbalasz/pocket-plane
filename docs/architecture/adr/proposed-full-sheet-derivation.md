@@ -3,6 +3,7 @@
 - Status: proposed (spec-character-sheet-full, sprint 1 track S)
 - Date: 2026-10-14
 - Decides: [ADR-0012](0012-character-derived-values.md) "Full sheet: undecided"; extends [ADR-0032](0032-ability-derivation.md)
+- Refines: [ADR-0021](0021-sync-protocol-conventions.md) D (transport) and [ADR-0024](0024-definition-visibility.md) (redacted character fields); see the last two Decision bullets
 - Affects: [character-sheet-full](../../specs/character-sheet-full.md), [character-sheet](../../specs/character-sheet.md), [entities](../../specs/entities.md), [combat-tracker](../../specs/combat-tracker.md), [combat-extras](../../specs/combat-extras.md), [levelling](../../specs/post-mvp/levelling.md), [data model](../../data-model/README.md)
 - Raised by: OQ-CHARX-01, OQ-CHARX-02
 
@@ -39,6 +40,17 @@
 - **Stored base**: scores, levels / classes, proficiencies, AC, HP max, initiative bonus (#154), speed, attack to-hit and damage, slot maxima.
 - **Overrides**: `statBlock.overrides[key] = {value, note?}` for `proficiency`, `check.*`, `save.*`, `skill.*`, `passive.*`, `spellAttack`, `spellDc`. An override replaces the derived value everywhere (labels, server rolls, combat); `proficiency` feeds the others. Helpers keep their signatures, so callers get overrides for free.
 - **Computed** in the shared module on server and clients (server authority for rolls, ADR-0005); never persisted. Monsters use the same functions (ADR-0012's third question), so ADR-0032's known deviation for SRD monster saves can be fixed by an override on a custom definition.
+- **Refines ADR-0021 D:** sheet edits go over WS (`char.edit`, row and counter intents) for both roles and for **both characters and NPC sheets** (custom definitions). They give one per-field-merge path; a player's edits in play are live play anyway. Entities' `PUT /api/entities` stays for the creature form (whole replace). Both write in commit order: per-field last write wins vs whole-block last write wins. `PUT` never touches `creature-sheet`. (OQ-CHARX-14)
+- **Refines ADR-0024:** other players receive a character redacted to **one whitelist**, kept in entities' visibility fn (ENT-owned; every spec adding a key amends this list):
+
+| Key | Source |
+|---|---|
+| `id`, `kind`, `name`, `portraitAssetId`, `ownerPlayerId` | ADR-0024 (#120) |
+| `down` | #154, FR-ENT-15 |
+| `level`, `className`, `species` | FR-CHARX-35 (OQ-CHARX-05) |
+| `deathState` | combat-extras (OQ-CBTX-09) |
+
+  No HP, AC, scores, counters or text. OQ-CHARX-05 and OQ-CBTX-09 go to the DM together.
 
 ## Consequences
 
