@@ -2,14 +2,22 @@
 // Thin dice-roll-log flows (DICE §13 E2E): DM + player-1. Player Shift+Enter roll reaches the
 // DM; a DM hidden roll never reaches player frames; a DM public roll does. Visibility matrix,
 // window, restart: bun test (dice-roll-log sync.test.ts).
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
 
 const entries = (page: Page) => page.getByTestId("dice-log-entry");
 
+/** FR-DICE-30: category, actor, label and the physical toggle sit behind Options. */
+async function openOptions(log: Locator) {
+  const options = log.getByTestId("dice-roll-options");
+  if ((await options.getAttribute("data-state")) !== "open") await options.click();
+  await expect(options).toHaveAttribute("data-state", "open");
+}
+
 async function roll(page: Page, expression: string, opts: { category?: string; label?: string }) {
   const log = await openWindow(page, "dice.log");
+  if (opts.category || opts.label) await openOptions(log);
   if (opts.category) await log.getByTestId("dice-roll-category").selectOption(opts.category);
   if (opts.label) await log.getByTestId("dice-roll-label").fill(opts.label);
   await log.getByTestId("dice-roll-expression").fill(expression);
@@ -51,12 +59,12 @@ test("FR-DICE-05 FR-DICE-09 FR-DICE-15 player adv roll reaches DM; DM hidden rol
   await expect(entries(dm).nth(4).locator("s")).toHaveCount(1);
   await expect(entries(player)).toHaveCount(3);
 
-  // DM: hidden roll (Public switched off for this roll) → muted for the DM, absent for players.
+  // DM: hidden roll (eye switched off for this roll) → muted for the DM, absent for players.
   const dlog = await roll(dm, "1d6", { category: "damage", label: "E2E-SECRET" });
   const pub = dlog.getByTestId("dice-roll-public");
-  await expect(pub).toHaveAttribute("data-state", "checked");
+  await expect(pub).toHaveAttribute("data-state", "public");
   await pub.click();
-  await expect(pub).toHaveAttribute("data-state", "unchecked");
+  await expect(pub).toHaveAttribute("data-state", "hidden");
   await dlog.getByTestId("dice-roll-expression").press("Enter");
   await expect(entries(dm)).toHaveCount(6);
   await expect(entries(dm).nth(5)).toHaveAttribute("data-public", "false");
@@ -91,6 +99,142 @@ test("FR-DICE-05 FR-DICE-09 FR-DICE-15 player adv roll reaches DM; DM hidden rol
   await expect(plog.getByTestId("dice-roll-submit")).toHaveAttribute("data-physical", "false");
 
   // Later specs share the server: leave nobody online.
+  await player.context().close();
+  await dm.context().close();
+});
+
+test("FR-DICE-30 compact roll bar: one row, Options row, dot, eye preset, stored per browser", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const log = await openWindow(dm, "dice.log");
+  const options = log.getByTestId("dice-roll-options");
+  const pub = log.getByTestId("dice-roll-public");
+
+  // Closed by default: one row ≤ 44 px; no hidden option set.
+  await expect(options).toHaveAttribute("data-state", "closed");
+  await expect(options).toHaveAttribute("data-dirty", "false");
+  await expect(log.getByTestId("dice-roll-category")).toHaveCount(0);
+  const barHeight = await log
+    .getByTestId("dice-roll-expression")
+    .evaluate((el) => el.closest("form")?.parentElement?.getBoundingClientRect().height ?? 0);
+  expect(barHeight).toBeGreaterThan(0);
+  expect(barHeight).toBeLessThanOrEqual(44);
+
+  // The eye is preset from the category (`other` is hidden in dice-settings); a change = dot.
+  await expect(pub).toHaveAttribute("data-state", "hidden");
+  await pub.click();
+  await expect(pub).toHaveAttribute("data-state", "public");
+  await expect(options).toHaveAttribute("data-dirty", "true");
+  await pub.click();
+  await expect(options).toHaveAttribute("data-dirty", "false");
+
+  // Options → row 2: category, actor, label, gear, physical.
+  await options.click();
+  await expect(options).toHaveAttribute("data-state", "open");
+  for (const id of [
+    "dice-roll-category",
+    "dice-roll-actor",
+    "dice-roll-label",
+    "dice-settings-open",
+    "dice-roll-physical",
+  ]) {
+    await expect(log.getByTestId(id)).toBeVisible();
+  }
+  const category = log.getByTestId("dice-roll-category");
+  await category.selectOption("skill-check");
+  await expect(pub).toHaveAttribute("data-state", "hidden");
+  await expect(options).toHaveAttribute("data-dirty", "true");
+  await category.selectOption("damage");
+  await expect(pub).toHaveAttribute("data-state", "public");
+  await category.selectOption("other");
+  await expect(options).toHaveAttribute("data-dirty", "false");
+  await log.getByTestId("dice-roll-label").fill("Stealth");
+  await expect(options).toHaveAttribute("data-dirty", "true");
+  await log.getByTestId("dice-roll-label").fill("");
+  await expect(options).toHaveAttribute("data-dirty", "false");
+
+  // Open / closed survives a reload (per browser, per campaign + owner).
+  await dm.reload();
+  await expect(options).toHaveAttribute("data-state", "open");
+  await expect(log.getByTestId("dice-roll-category")).toBeVisible();
+  await log.getByTestId("dice-roll-physical").click();
+  await options.click();
+  await expect(options).toHaveAttribute("data-state", "closed");
+  // Physical dice on with Options closed → the strip still shows.
+  await expect(log.getByTestId("dice-log-physical")).toBeVisible();
+  await dm.reload();
+  await expect(options).toHaveAttribute("data-state", "closed");
+  await expect(log.getByTestId("dice-log-physical")).toBeVisible();
+  await log.getByTestId("dice-log-physical-off").click();
+  await expect(log.getByTestId("dice-log-physical")).toHaveCount(0);
+  await dm.context().close();
+});
+
+/** The newest entry is fully inside the list's scroll box (the list is at the bottom). */
+const newestShown = (log: Locator) =>
+  log.evaluate((win) => {
+    const list = win.querySelector("[data-testid='dice-log-list']");
+    const last = list?.querySelector("[data-testid='dice-log-entry']:last-child");
+    if (!list || !last) return false;
+    const l = list.getBoundingClientRect();
+    const r = last.getBoundingClientRect();
+    return r.top >= l.top - 0.5 && r.bottom <= l.bottom + 0.5;
+  });
+
+test("FR-DICE-21 footer resize: a list at the bottom stays there when Options / the Physical strip open", async ({
+  browser,
+}) => {
+  const { secret, link } = e2eEnv();
+  const dm = await rolePage(browser);
+  await dm.setViewportSize({ width: 1280, height: 720 });
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const player = await rolePage(browser);
+  await player.goto(link("Player 1"));
+  await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const log = await openWindow(dm, "dice.log");
+  const plog = await openWindow(player, "dice.log");
+  const options = log.getByTestId("dice-roll-options");
+
+  for (let i = 0; i < 8; i++) {
+    const before = await entries(dm).count();
+    await log.getByTestId("dice-roll-expression").fill("1d4");
+    await log.getByTestId("dice-roll-expression").press("Enter");
+    await expect(entries(dm)).toHaveCount(before + 1);
+  }
+  await expect.poll(() => newestShown(log)).toBe(true);
+
+  // Footer grows: Options row, then the Physical strip with Options closed, then both.
+  await options.click();
+  await expect(log.getByTestId("dice-roll-category")).toBeVisible();
+  await expect.poll(() => newestShown(log)).toBe(true);
+  await log.getByTestId("dice-roll-physical").click();
+  await expect(log.getByTestId("dice-log-physical")).toBeVisible();
+  await expect.poll(() => newestShown(log)).toBe(true);
+  await options.click();
+  await expect(options).toHaveAttribute("data-state", "closed");
+  await expect.poll(() => newestShown(log)).toBe(true);
+
+  // Others' rolls still scroll in (no "N new" for a DM who never scrolled up).
+  for (let i = 0; i < 3; i++) {
+    const before = await entries(dm).count();
+    await plog.getByTestId("dice-roll-expression").fill("1d4");
+    await plog.getByTestId("dice-roll-expression").press("Enter");
+    await expect(entries(dm)).toHaveCount(before + 1);
+  }
+  await expect.poll(() => newestShown(log)).toBe(true);
+  await expect(log.getByTestId("dice-log-new")).toHaveCount(0);
+
+  // Footer shrinks again: still at the bottom.
+  await log.getByTestId("dice-log-physical-off").click();
+  await expect(log.getByTestId("dice-log-physical")).toHaveCount(0);
+  await expect.poll(() => newestShown(log)).toBe(true);
+  await expect(log.getByTestId("dice-log-new")).toHaveCount(0);
+
   await player.context().close();
   await dm.context().close();
 });
