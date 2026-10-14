@@ -8,7 +8,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Playtest spec pass (P1–P5, G-verdicts) | `spec/playtest-feedback` | `spec-playtest` | **Running** | Review agent → DM gate → consolidate data-model/protocol → builds |
+| Playtest spec pass (P1–P5, G-verdicts) | `spec/playtest-feedback` | `spec-playtest` | **Finalising** (gate #172: ADR-0033, P4 amended, picks accepted) | Specs `complete` + data-model/protocol consolidated → merge → `fix/tooltip-delay`, `fix/signal-audience` |
 
 Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-13-evening)). Brief: `briefs\spec-playtest.md`; summary will be `spec-playtest.md`. Evidence: `verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash, mvp-acceptance).
 
@@ -17,7 +17,7 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 
 ## Pending DM decisions
 
-- None.
+- None. (Playtest spec gate passed, #172.)
 
 ## Resolved locally (report at gate)
 
