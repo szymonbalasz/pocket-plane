@@ -1,12 +1,16 @@
 // Sheet roll route (FR-CBT-30, #135): while the character is an active, non-removed combatant of
 // the started encounter in this client's store, the sheet's Initiative sends
-// `cbt.rollInitiative` and Attack sends `cbt.attack` (no `public`). Checks and saves are never
-// claimed: they stay `char.roll` (FR-CBT-45). A PC hidden from its owner isn't in the player's
-// store, so the sheet falls back to `char.roll` (OQ-CBT-28).
+// `cbt.rollInitiative` and Attack sends `cbt.attack` (no `public`). FR-CHARX-24 (OQ-CBT-47):
+// every attack row's Attack and a spell's Attack (only a spell with damage) send `cbt.attack`
+// with the row's `ref`. Checks, saves, skills, Damage and spell Damage are never claimed: they
+// stay `char.roll` (FR-CBT-45). A PC hidden from its owner isn't in the player's store, so the
+// sheet falls back to `char.roll` (OQ-CBT-28).
+import { type RollSheet, resolveSheetAttack } from "@shared/character-sheet/logic";
+import { CREATURE_SHEET_TYPE } from "@shared/character-sheet/sheet";
 import { critExpression } from "@shared/combat-tracker/rules";
 import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
 import type { RecordStore } from "@shared/protocol/store";
-import type { RollRoute } from "../character-sheet/routing";
+import type { RollRoute, RollRouteRef } from "../character-sheet/routing";
 import { startedIn } from "./store";
 
 function combatantOf(store: RecordStore, characterId: string): CombatantView | null {
@@ -30,17 +34,27 @@ export function initiativeLocked(store: RecordStore, c: CombatantView): boolean 
   return (startedIn(store)?.round ?? 0) >= 1 && c.initiative != null;
 }
 
-function damageOf(store: RecordStore, characterId: string): string | null {
+/**
+ * The row's damage expression from this client's store (full entity + `creature-sheet`, DM and
+ * owner), or null: unknown row, no damage, or not in the store.
+ */
+function damageOf(store: RecordStore, characterId: string, ref?: RollRouteRef): string | null {
   const e = store.records.entity?.[characterId] as
-    | { statBlock?: { attacks?: { damage: string }[] } }
+    | { statBlock?: Parameters<typeof resolveSheetAttack>[0] }
     | undefined;
-  return e?.statBlock?.attacks?.[0]?.damage ?? null;
+  if (!e?.statBlock?.attacks) return null;
+  const sheet = (store.records[CREATURE_SHEET_TYPE]?.[characterId] ?? null) as RollSheet;
+  const r = resolveSheetAttack(e.statBlock, sheet, ref ?? {});
+  return r.ok ? r.attack.damage : null;
 }
 
 export const combatRollRoute: RollRoute = {
   name: "combat-tracker",
-  claim(store, characterId, kind) {
-    if (kind !== "initiative" && kind !== "attack") return null;
+  claim(store, characterId, kind, ref) {
+    if (kind !== "initiative" && kind !== "attack" && kind !== "spellAttack") return null;
+    // A spell attack needs its row; one without damage rolls plainly via `char.roll`.
+    if (kind === "spellAttack" && ref?.spellId === undefined) return null;
+    if (kind === "attack" && ref?.spellId !== undefined) return null;
     const c = combatantOf(store, characterId);
     if (!c) return null;
     if (kind === "initiative") {
@@ -58,7 +72,8 @@ export const combatRollRoute: RollRoute = {
           }),
       };
     }
-    const damage = damageOf(store, characterId);
+    const damage = damageOf(store, characterId, ref);
+    if (kind === "spellAttack" && !damage) return null;
     return {
       badge: "In combat",
       ...(damage ? { critExpressions: [critExpression(damage)] } : {}),
@@ -67,6 +82,8 @@ export const combatRollRoute: RollRoute = {
           attackerId: c.id,
           mode: input.mode,
           ...(input.manual ? { manual: input.manual } : {}),
+          ...(ref?.attackId !== undefined ? { attackId: ref.attackId } : {}),
+          ...(ref?.spellId !== undefined ? { spellId: ref.spellId } : {}),
         }),
     };
   },
