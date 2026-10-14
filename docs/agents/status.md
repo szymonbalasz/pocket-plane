@@ -22,7 +22,8 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 
 ## Pending DM decisions
 
-- Promote "add combatants mid-fight" (summons, reinforcements) from tier A to S? Asked 2026-10-14; pick: keep A (pre-placed hidden tokens revealed mid-fight cover reinforcements). Affects only `build/combat-playtest` (not started).
+- **DM: after the playtest pass merges, pause and recap together** (what was built, what's next, plan the way forward). Don't start new work beyond the pass.
+- Recap agenda item 1: promote "add combatants mid-fight" (summons, reinforcements) from tier A to S? Combat build proceeds as specced (tier A) meanwhile.
 
 ## Resolved locally (report at gate)
 
