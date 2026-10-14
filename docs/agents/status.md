@@ -2,15 +2,15 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** 5 accepted: playtest ready (#169). Waiting for the DM playtest.
+**Phase:** 5 accepted (#169). DM playtest done 2026-10-14; feedback P1–P5 + glitches G1–G12 in [feedback-playtest](feedback-playtest.md). **Not started**: waiting for the DM to confirm tiers before the next phase.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Phase 5 MVP acceptance | `main` | — | **PLAYTEST READY** (#169) | DM playtest ([playtest-mvp](playtest-mvp.md)); glitches G1–G12 → one `fix/*` (DM's call: before or after the playtest) |
+| Playtest feedback | `main` | — | **Captured, not started** | DM confirms tiers + open points in [feedback-playtest](feedback-playtest.md), then spec revisions → builds |
 
-Evidence archived: `%TEMP%\opencode\verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash).
+Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-13-evening)). Evidence: `verify-*\` (… layout, f9, polish, party-loot, *-fb feature walkthroughs, session-sim-2, crash).
 
 ## Shared-file locks
 
