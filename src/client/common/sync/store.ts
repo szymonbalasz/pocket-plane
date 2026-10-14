@@ -1,7 +1,7 @@
 // Zustand binding for the sync connection. One per client app.
 import type { Credential } from "@shared/protocol/frames";
-import { recordsOf } from "@shared/protocol/store";
-import { createContext, useCallback, useContext, useEffect, useRef } from "react";
+import { emptyStore, recordsOf } from "@shared/protocol/store";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import { createStore, type StoreApi, useStore } from "zustand";
 import {
   type EventHandler,
@@ -9,6 +9,7 @@ import {
   SyncConnection,
   type SyncSnapshot,
 } from "./connection";
+import { type PresenceView, presenceOf } from "./presence";
 
 export interface SyncState extends SyncSnapshot {
   connection: SyncConnection;
@@ -41,6 +42,23 @@ export function useRecords<T>(type: string): T[] {
 
 export function useHasType(type: string): boolean {
   return useSync((s) => s.store.records[type] !== undefined);
+}
+
+/**
+ * Presence for display (FR-SYNC-29): unknown while not `live`, else the online player IDs of
+ * the current store. Stable per (live, presence records).
+ */
+export function usePresence(): PresenceView {
+  const live = useSync((s) => s.state === "live");
+  const byId = useSync((s) => s.store.records.presence);
+  return useMemo(
+    () =>
+      presenceOf(live ? "live" : "reconnecting", {
+        ...emptyStore(),
+        records: byId ? { presence: byId } : {},
+      }),
+    [live, byId],
+  );
 }
 
 /** Calls `handler` for every incoming signal named `name` (FR-SYNC-22, ADR-0026). */

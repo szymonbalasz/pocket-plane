@@ -6,12 +6,12 @@ import {
   type PlayerWithLink,
   playerLinkUrl,
 } from "@shared/campaign-management/schemas";
-import type { PresenceRecord } from "@shared/live-sync/schemas";
 import { ApiError } from "@ui/api";
 import { Button } from "@ui/components/ui/button";
 import { Alert, Input, Table, TableBody, TableCell, TableRow } from "@ui/components/ui/primitives";
 import { cn } from "@ui/lib/utils";
-import { useRecords, useSync } from "@ui/sync/store";
+import { onlineDot } from "@ui/sync/presence";
+import { usePresence, useRecords, useSync } from "@ui/sync/store";
 import { CopyIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -44,13 +44,12 @@ function usePlayerLinks(players: PlayerRecord[]) {
 
 export function PlayersPanel() {
   const players = useRecords<PlayerRecord>("player");
-  const presence = useRecords<PresenceRecord>("presence");
+  const presence = usePresence();
   const live = useSync((s) => s.state === "live");
   const links = usePlayerLinks(players);
   const [newName, setNewName] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
   const base = links?.publicBaseUrl ?? window.location.origin;
-  const online = new Set(presence.filter((p) => p.online).map((p) => p.playerId));
   const tokenOf = (id: string) => links?.players.find((p) => p.id === id)?.linkToken;
 
   async function add(e: React.FormEvent) {
@@ -93,7 +92,7 @@ export function PlayersPanel() {
             <TableBody>
               {players.map((p) => {
                 const token = tokenOf(p.id);
-                const isOnline = online.has(p.id);
+                const dot = onlineDot(presence, p.id);
                 return (
                   <TableRow key={p.id} data-testid="camp-player-row" data-record-id={p.id}>
                     {/* Name takes the free width, one line; long names truncate. */}
@@ -105,18 +104,29 @@ export function PlayersPanel() {
                       {p.name}
                     </TableCell>
                     <TableCell className="whitespace-nowrap px-1 py-1">
+                      {/* Presence unknown while not live: no dot, muted "–" (FR-SYNC-29). */}
                       <span
                         data-testid="camp-player-online"
-                        data-online={isOnline}
+                        data-online={dot === "unknown" ? undefined : dot === "online"}
+                        data-state={dot === "unknown" ? "unknown" : "known"}
                         className="inline-flex items-center gap-2 text-xs text-muted-foreground"
                       >
-                        <span
-                          className={cn(
-                            "size-2 rounded-full",
-                            isOnline ? "bg-success" : "bg-muted-foreground/40",
-                          )}
-                        />
-                        {isOnline ? "online" : "offline"}
+                        {dot === "unknown" ? (
+                          <>
+                            <span aria-hidden>–</span>
+                            <span className="sr-only">Unknown while reconnecting</span>
+                          </>
+                        ) : (
+                          <>
+                            <span
+                              className={cn(
+                                "size-2 rounded-full",
+                                dot === "online" ? "bg-success" : "bg-muted-foreground/40",
+                              )}
+                            />
+                            {dot}
+                          </>
+                        )}
                       </span>
                     </TableCell>
                     <TableCell className="flex justify-end gap-1 whitespace-nowrap px-1 py-1">
