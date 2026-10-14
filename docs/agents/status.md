@@ -8,10 +8,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| P R1 map fit | `fix/polish-map-fit` | build-polish-map-fit | Starting | Walkthrough MAP 12 |
-| P R3 game log | `fix/polish-game-log` | build-polish-game-log | Starting | Walkthrough DICE 12 |
+| P R1 map fit | `fix/polish-map-fit` (ws w25, slot 0) | build-polish-map-fit | Building | Walkthrough MAP 12 |
+| P R3 game log | `fix/polish-game-log` (ws w26, slot 2) | build-polish-game-log | Building | Walkthrough DICE 12 |
 | P R2/R4/R5 combat | `fix/polish-combat` | — | Waits for map-fit (noteAppearance) | Before any D build |
-| S core (schema, entities, events) | `fix/charx-core` | build-charx-core | Starting | Then `fix/cbtx-core` |
+| S core (schema, entities, events) | `fix/charx-core` (ws w27, slot 3) | build-charx-core | Building | Then `fix/cbtx-core` |
 | D core | `fix/cbtx-core` | — | Waits for charx-core + polish-combat | — |
 | S build / D build / S combat routes | — | — | Queued (#179 order) | — |
 
@@ -19,7 +19,7 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 
 ## Shared-file locks
 
-- None.
+- `fix/charx-core`: `src/server/db/`, `src/shared/events/`, `src/shared/entities/`, `src/server/features/entities/`, snapshot-size test files, CHARX data-model / protocol rows.
 
 ## Pending DM decisions
 
