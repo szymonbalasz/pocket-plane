@@ -4,6 +4,7 @@ import { noteDismiss, noteResolve, noteTestSend } from "./commands";
 import { notificationRecordType } from "./records";
 
 export {
+  dismissForEncounter,
   type NotifyInput,
   notify,
   reopenNotification,

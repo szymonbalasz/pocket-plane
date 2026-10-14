@@ -2,6 +2,8 @@
 // caller's transaction, take `env` first and emit their own event via `env.emit`; call them
 // **after** emitting the owner's event (protocol §22 event order). Campaign and actor come from
 // `env.actor`; IDs and time from `env.ctx`.
+
+import { endsWithEncounter } from "@shared/notifications/end-rule";
 import {
   ActionLabel,
   type ActionRole,
@@ -11,11 +13,12 @@ import {
   NotificationText,
   notificationVisibleTo,
 } from "@shared/notifications/schemas";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import type { CommandEnv } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound, zodIssues } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { notification, notificationSeqNext, player } from "../../db/schema";
+import type { RecordChange } from "../../events/types";
 import { buildKindMap, type NotificationKindDef, payloadCapOf, resolutionCapOf } from "./kind";
 import { notificationKinds } from "./kinds";
 
@@ -93,7 +96,7 @@ function transition(
   before: NotificationRecord,
   patch: Partial<NotificationRecord>,
   eventType: "NotificationResolved" | "NotificationDismissed" | "NotificationReopened",
-): NotificationRecord {
+): RecordChange {
   const after: NotificationRecord = { ...before, ...patch, updatedAt: env.ctx.clock.iso() };
   env.tx
     .update(notification)
@@ -107,13 +110,14 @@ function transition(
     })
     .where(eq(notification.id, before.id))
     .run();
+  const change: RecordChange = { type: NOTIFICATION_TYPE, id: before.id, before, after };
   env.emit({
     type: eventType,
     campaignId: before.campaignId,
     payload: { notificationId: before.id, kind: before.kind },
-    changes: [{ type: NOTIFICATION_TYPE, id: before.id, before, after }],
+    changes: [change],
   });
-  return after;
+  return change;
 }
 
 /** Closed-by fields for a close at the command's clock (FR-NOTE-07). */
@@ -277,7 +281,46 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
     transition(env, before, { state: "dismissed", ...closedFields(env) }, "NotificationDismissed");
   }
 
-  return { notify, resolveNotification, reopenNotification, dismissNotification, kindOf };
+  /**
+   * FR-NOTE-23 (ADR-0034): called by the command that ends an encounter, in its transaction,
+   * after its own event. Every `pending` row of the actor's campaign whose kind has an end rule
+   * and whose `encounterIdOf(payload)` = `encounterId` → `dismissed` (closed by the actor), one
+   * `NotificationDismissed` each, in row `seq` order. None → no change, no event.
+   */
+  function dismissForEncounter(env: CommandEnv, encounterId: string): RecordChange[] {
+    const campaignId = env.actor.campaignId;
+    if (!campaignId) throw new Error("dismissForEncounter: no campaign in env.actor");
+    map ??= buildKindMap(kinds);
+    const ruled = [...map.values()].filter((d) => d.endRule).map((d) => d.kind);
+    if (ruled.length === 0) return [];
+    const rows = env.tx
+      .select()
+      .from(notification)
+      .where(
+        and(
+          eq(notification.campaignId, campaignId),
+          eq(notification.state, "pending"),
+          inArray(notification.kind, ruled),
+        ),
+      )
+      .orderBy(asc(notification.seq))
+      .all();
+    return rows
+      .map(toNotificationRecord)
+      .filter((n) => endsWithEncounter(kindOf(n.kind)?.endRule, n.payload, encounterId))
+      .map((n) =>
+        transition(env, n, { state: "dismissed", ...closedFields(env) }, "NotificationDismissed"),
+      );
+  }
+
+  return {
+    notify,
+    resolveNotification,
+    reopenNotification,
+    dismissNotification,
+    dismissForEncounter,
+    kindOf,
+  };
 }
 
 export type NotificationHelpers = ReturnType<typeof createNotificationHelpers>;
@@ -289,4 +332,5 @@ export const notify = helpers.notify;
 export const resolveNotification = helpers.resolveNotification;
 export const reopenNotification = helpers.reopenNotification;
 export const dismissNotification = helpers.dismissNotification;
+export const dismissForEncounter = helpers.dismissForEncounter;
 export const notificationKindOf = helpers.kindOf;

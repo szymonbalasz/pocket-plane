@@ -1,5 +1,6 @@
 // Polish pass (sprint 1, #178) over real sockets on `mid-combat`: FR-CBT-58 rulings against a
-// natural roll reach players only as client-built text from `payload`.
+// natural roll reach players only as client-built text from `payload`; FR-CBT-59 End dismisses
+// pending cards (player frames, restart).
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
@@ -7,11 +8,14 @@ import {
   type AttackResult,
   COMBATANT_TYPE,
   type CombatantRecord,
+  ENCOUNTER_TYPE,
+  type EncounterRecord,
   LOG_KIND_ATTACK,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryView } from "@shared/dice-roll-log/schemas";
+import type { NotificationRecord } from "@shared/notifications/schemas";
 import { closeDb, type Db, openFileDb } from "../../db/client";
 import { player } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
@@ -119,5 +123,64 @@ describe("polish over WS (mid-combat)", () => {
       for (const leak of ["DM ruled", "DM set", "dmPayload"]) expect(c.raw()).not.toContain(leak);
     }
     for (const c of [dm, p1, p2]) c.close();
+  });
+
+  test("FR-CBT-59 End over WS: pending cards dismissed; player-1 gets its card dismissed, player-2 nothing; restart → identical", async () => {
+    const dm = await h.live(DM);
+    const p1 = await h.live(p("Player 1"));
+    const p2 = await h.live(p("Player 2"));
+    const mira = byName(p1, "Mira") as CombatantRecord;
+    p1.intent("cbt.attack", { attackerId: mira.id, manual: [{ diceTotal: 12 }, { diceTotal: 3 }] });
+    const { cardId } = (await p1.next("ack")).result as AttackResult;
+    await nextEvent(dm, "NotificationCreated");
+    const notes = (c: TestClient) =>
+      Object.values(c.store.records.notification ?? {}) as NotificationRecord[];
+    const pending = notes(dm).filter((n) => n.state === "pending");
+    // The `mid-combat` Elite card (combat-pending) and Mira's new card.
+    expect(pending.map((n) => n.text.split(":")[0]).sort()).toEqual([
+      "Elite Goblin Warrior",
+      "Mira",
+    ]);
+    const enc = Object.values(dm.store.records[ENCOUNTER_TYPE] ?? {})[0] as EncounterRecord;
+    for (const c of [p1, p2]) await barrier(c);
+    const p2Frames = p2.raw().length;
+
+    dm.intent("cbt.end", { encounterId: enc.id });
+    expect((await nextEvent(dm, "EncounterEnded")).cause.name).toBe("EncounterEnded");
+    const d1 = await nextEvent(dm, "NotificationDismissed");
+    const d2 = await nextEvent(dm, "NotificationDismissed");
+    expect([d1, d2].map((e) => e.changes[0]?.id).sort()).toEqual(pending.map((n) => n.id).sort());
+    await dm.next("ack");
+    expect(notes(dm).filter((n) => n.state === "pending")).toEqual([]);
+
+    await nextEvent(p1, "EncounterEnded");
+    const own = await nextEvent(p1, "NotificationDismissed");
+    expect(own.changes).toEqual([
+      expect.objectContaining({
+        id: cardId,
+        data: expect.objectContaining({ state: "dismissed" }),
+      }),
+    ]);
+    await barrier(p2);
+    const p2Since = p2.raw().slice(p2Frames);
+    expect(p2Since).toContain("EncounterEnded");
+    expect(p2Since).not.toContain("NotificationDismissed");
+    expect(p2Since).not.toContain(cardId);
+    for (const c of [dm, p1, p2]) c.close();
+
+    const snap = async () => {
+      const out: Record<string, unknown> = {};
+      for (const [k, cred] of Object.entries({ dm: DM, p1: p("Player 1"), p2: p("Player 2") })) {
+        const client = await h.live(cred);
+        out[k] = [ENCOUNTER_TYPE, COMBATANT_TYPE, "notification"].map(
+          (type) => client.store.records[type],
+        );
+        client.close();
+      }
+      return out;
+    };
+    const before = await snap();
+    await h.restart();
+    expect(await snap()).toEqual(before);
   });
 });

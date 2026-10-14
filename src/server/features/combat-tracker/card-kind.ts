@@ -1,7 +1,9 @@
 // Notification kind `damage-card` (protocol §23): created by `cbt.attack` via `notify`, resolved
 // by `cbt.applyCard`, reopened by `cbt.undo`; never by `note.resolve` (#136). Resolution
 // `{targets […]}` (1–20) is over notifications' 256 B default: the kind declares 8 KB (#157).
-// Payload: a crit card with non-ASCII names passes the 1 KB default: 4 KB (#163).
+// Payload: a crit card with non-ASCII names passes the 1 KB default: 4 KB (#163). End rule:
+// dismissed when its encounter ends (FR-CBT-59).
+import { DAMAGE_CARD_END_RULE } from "@shared/combat-tracker/end-rule";
 import {
   DAMAGE_CARD_KIND,
   DAMAGE_CARD_RESOLUTION_MAX_BYTES,
@@ -21,4 +23,6 @@ export const damageCardKind = defineNotificationKind({
   resolution: DamageCardTargetsResolution,
   resolutionMaxBytes: DAMAGE_CARD_RESOLUTION_MAX_BYTES,
   genericResolve: false,
+  // FR-CBT-59: pending cards are dismissed when their encounter ends.
+  endRule: DAMAGE_CARD_END_RULE,
 });
