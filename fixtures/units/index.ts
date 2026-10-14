@@ -9,6 +9,9 @@ import player1 from "./campaign-management/player-1";
 import player2 from "./campaign-management/player-2";
 import charPip from "./character-sheet/char-pip";
 import charWounds from "./character-sheet/char-wounds";
+import cbtxEffects from "./combat-extras/cbtx-effects";
+import cbtxReinforcement from "./combat-extras/cbtx-reinforcement";
+import cbtxTemp from "./combat-extras/cbtx-temp";
 import combat1 from "./combat-tracker/combat-1";
 import combatHit from "./combat-tracker/combat-hit";
 import combatPending from "./combat-tracker/combat-pending";
@@ -66,4 +69,7 @@ export const units: readonly Fixture[] = [
   lootWallets,
   lootSecond,
   thornTown,
+  cbtxEffects,
+  cbtxTemp,
+  cbtxReinforcement,
 ];

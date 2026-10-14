@@ -15,8 +15,10 @@ import type { CharacterRecord } from "@shared/entities/schemas";
 import { CharacterHpAdjusted, CharacterRolled } from "@shared/events/character-sheet";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, forbidden } from "../../commands/errors";
+import { hpRules } from "../combat-extras/hp-rules";
+import { startedEncounter } from "../combat-tracker/rows";
 import { dice, gameLog } from "../dice-roll-log";
-import { adjustHp, getCharacter } from "./hp";
+import { getCharacter } from "./hp";
 
 /**
  * FR-CHAR-09: DM → any character of `actor.campaignId`; player → own only. Unknown, monster,
@@ -97,15 +99,37 @@ export const charAdjustHp = defineCommand({
   roles: ["dm", "player"],
   execute(input, env): CharAdjustHpResult {
     const c = authorizedCharacter(env, input.characterId);
-    const { hpBefore, hpAfter, change } = adjustHp(env, c.id, input.delta);
-    // FR-CHAR-10: clamp leaves HP unchanged → success, no change, no event.
-    if (change) {
+    // FR-CBTX-02 (D/S seam): through combat-extras' `hpRules` — temp HP absorbs, death-save
+    // failures at 0 HP, concentration ends at 0 / asks for a save. Not a combat log entry.
+    const a = hpRules.apply(
+      env,
+      { kind: "character", id: c.id },
+      { kind: input.delta < 0 ? "damage" : "heal", raw: Math.abs(input.delta), hpChangeId: null },
+    );
+    const { hpBefore, hpAfter } = a;
+    // FR-CHAR-10: nothing changed (HP clamped, no temp HP / counters) → success, no event.
+    if (a.changes.length > 0) {
+      // The CBTX facts (FR-CBTX-21) only when temp HP, the counters or a card were involved.
+      const payload: Record<string, unknown> = {
+        entityId: c.id,
+        delta: input.delta,
+        hpBefore,
+        hpAfter,
+        ...(a.tempBefore !== a.tempAfter
+          ? { tempBefore: a.tempBefore, tempAfter: a.tempAfter }
+          : {}),
+        ...(a.deathBefore ? { deathBefore: a.deathBefore, deathAfter: a.deathAfter } : {}),
+      };
       env.emit({
         type: CharacterHpAdjusted.type,
         campaignId: c.campaignId,
-        payload: { entityId: c.id, delta: input.delta, hpBefore, hpAfter },
-        changes: [change],
+        payload,
+        changes: a.changes,
       });
+      // Cards follow the owner event (FR-CBTX-17); their ids land in its payload before commit.
+      const enc = startedEncounter(env.tx, c.campaignId);
+      const noteIds = hpRules.after(env, a, { encounterId: enc?.id ?? null, hpChangeId: null });
+      if (noteIds.length > 0) payload.noteIds = noteIds;
     }
     return { hpBefore, hpAfter };
   },

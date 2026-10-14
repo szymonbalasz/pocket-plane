@@ -13,6 +13,7 @@
 import type { TokenRecord } from "@shared/scenes-map/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
+import { cbtxTokenHook } from "../combat-extras/rule-hooks";
 import { combatantTokenHook } from "../combat-tracker/hooks";
 
 export type TokenHookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor">;
@@ -32,6 +33,7 @@ export interface TokenHookRegistration {
 /** The registry. Append your feature's line; order = run order. */
 export const tokenChangedHooks: readonly TokenHookRegistration[] = [
   { name: "combat-tracker.combatant-copies", hook: combatantTokenHook }, // combat-tracker (FR-CBT-09)
+  { name: "combat-extras.hidden-copy", hook: cbtxTokenHook }, // combat-extras (FR-CBTX-13)
 ];
 
 /** Per-server hook list, seeded from the registry; tests may add hooks via `register`. */

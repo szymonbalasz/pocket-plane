@@ -228,11 +228,18 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
    * FR-NOTE-08: `pending` → `resolved` in the kind owner's command. Fails `not_found` (not in
    * the actor's campaign), `conflict` (not pending), `forbidden` (neither action owner nor DM),
    * `invalid` (resolution fails the kind's schema); any failure rolls back the whole command.
+   * `byRule` (FR-CBTX-43): a closure made by a rule of the kind owner (not the actor's own
+   * action) skips the action-owner check; state and schema checks stay.
    */
-  function resolveNotification(env: CommandEnv, id: string, resolution?: unknown): void {
+  function resolveNotification(
+    env: CommandEnv,
+    id: string,
+    resolution?: unknown,
+    opts: { byRule?: boolean } = {},
+  ): void {
     const before = loadNotification(env, id);
     if (before.state !== "pending") throw conflict("No longer pending");
-    if (env.actor.role === "player") {
+    if (env.actor.role === "player" && !opts.byRule) {
       const owner = before.actionRole === "player" && before.actionPlayerId === env.actor.playerId;
       if (!owner) throw forbidden("Only the action owner or the DM can do this");
     }

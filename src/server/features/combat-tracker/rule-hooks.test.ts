@@ -1,6 +1,6 @@
 // Combat rule hook registry (FR-CBTX-01, ADR-0035): created empty, append-only; run order =
 // registry order; rows concatenated for the caller's event; a throw reaches the caller (which
-// rolls its transaction back). Not yet called from any command.
+// rolls its transaction back). Called by start / turns / end and `cbtx.addCombatants`.
 import { describe, expect, test } from "bun:test";
 import type { EncounterRecord } from "@shared/combat-tracker/schemas";
 import type { RecordChange } from "../../events/types";
@@ -24,10 +24,10 @@ const turn = {
 };
 
 describe("combat rule hooks (ADR-0035)", () => {
-  test("FR-CBTX-01 the registry is created empty; four hook points", () => {
-    expect(combatRuleHooks).toEqual([]);
+  test("FR-CBTX-01 the registry holds combat-extras' line; four hook points", () => {
+    expect(combatRuleHooks.map((h) => h.name)).toEqual(["combat-extras.rules"]);
     expect(COMBAT_RULE_POINTS).toEqual(["started", "added", "turnChanged", "ended"]);
-    expect(new CombatRuleHooks().run("turnChanged", env, enc, turn)).toEqual([]);
+    expect(new CombatRuleHooks([]).run("turnChanged", env, enc, turn)).toEqual([]);
   });
 
   test("FR-CBTX-01 runs one point of every hook in registry order; rows concatenated", () => {
