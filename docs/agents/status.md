@@ -9,17 +9,17 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | P polish R1–R5 | — | — | **Merged** (#180) | — |
-| S core, D core | — | — | **Merged** | — |
-| S build (a, b) | — | — | **Merged** (#181; walkthrough 10/10 + tab fix) | — |
-| D build | `build/combat-extras` (ws w2B, slot 2) | build-combat-extras | Adding sheet-section lines after S merge | Walkthrough CBTX 1–14 |
-| S combat routes (slice 4) | `fix/charx-combat-routes` | — | After D merge | Walkthrough |
+| S core, D core, S build (a, b) | — | — | **Merged** (#181) | — |
+| D build | — | — | **Merged** (#183; retest 14/14) | — |
+| Test suite speed / flake | `fix/test-speed` (ws w2C, slot 0) | fix-test-speed | Investigating (main red 2/3: scenes-map fixture tests time out) | Merge, then slice 4 |
+| S combat routes (slice 4) | `fix/charx-combat-routes` | — | After fix/test-speed | Walkthrough |
 | Session-sim regression | — | — | After all merges | DM recap |
 
 Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-14-evening)). Briefs in `briefs\`. Evidence: `verify-*\` (session-sim-3 evidence only in the main checkout: `.verify/20261014-131140-session-sim-3/`; the `%TEMP%` copy was cleared).
 
 ## Shared-file locks
 
-- `build/combat-extras`: combat-tracker files per CBTX "Shared changes", character-sheet `hp.ts` + `char.adjustHp`, notifications `helpers.ts` (byRule), dice-roll-log `gameLog.append` option, three `sheet-sections.ts` lines.
+- `fix/test-speed`: test files, bun test preload, fixture loader internals, fixtures/assets handling, scripts/ test helpers.
 
 ## Pending DM decisions
 
