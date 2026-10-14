@@ -233,7 +233,7 @@ In-combat hiding (FR-CHAR-24) is walked in [combat-tracker §13](combat-tracker.
   - DB, record types, visibility: none. dice-roll-log: none (categories `ability-check`, `saving-throw` and their tickboxes exist).
   - Docs: protocol §21 (`char.roll`), §22 (`CharacterRolled`); FIX §8 `char-mira`, `char-thorn` scores (entities' rows), `char-pip` "no ability scores".
 - **Existing common files this build edits** (feature-owned since #154, AGENTS §9.9): `src/client/common/features/character-sheet/{CharacterSheet.tsx, routing.ts, roll-routes.ts}` (abilities block, `CharRollKind` + `check` / `save`, badge rule). Must merge together with combat's route fix (FR-CBT-45).
-- **Playtest pass (#171):** no schema, event, protocol or record change. Feature-owned: the roll-route contract in `routing.ts` / `roll-routes.ts` gains an optional `hidden` answer (combat's line uses it, [FR-CBT-46](combat-tracker.md#6-functional-requirements): this change merges first or in the same build); `CharacterSheet.tsx` renders "Set by DM" and moves its `title` hints to the shared Tooltip (play-shell's shared `overlays.tsx` change lands first, FR-SHELL-30). Docs: protocol §26 roll-routes row ("may answer `hidden`").
+- **Playtest pass (#171):** no schema, event, protocol or record change. Feature-owned: the roll-route contract in `routing.ts` / `roll-routes.ts` gains an optional `hidden` answer (combat's line uses it, [FR-CBT-46](combat-tracker.md#6-functional-requirements): this change merges first or in the same build); `CharacterSheet.tsx` renders "Initiative set" and moves its `title` hints to the shared Tooltip (play-shell's shared `overlays.tsx` change lands first, FR-SHELL-30). Docs: protocol §26 roll-routes row ("may answer `hidden`").
 
 ## 15. Open questions
 
