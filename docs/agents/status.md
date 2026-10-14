@@ -12,14 +12,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | S core, D core, S build (a, b) | — | — | **Merged** (#181) | — |
 | D build | — | — | **Merged** (#183; retest 14/14) | — |
 | Test suite speed / flake | — | — | **Merged** (#184) | — |
-| S combat routes (slice 4) | `fix/charx-combat-routes` (ws w2D, slot 0) | build-charx-combat-routes | Building | Walkthrough |
-| Session-sim regression | — | — | After all merges | DM recap |
+| S combat routes (slice 4) | — | — | **Merged** (#185; walkthrough 6/6) | — |
+| Session-sim regression | `main` | test-session-4 | Running | DM recap |
 
 Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-14-evening)). Briefs in `briefs\`. Evidence: `verify-*\` (session-sim-3 evidence only in the main checkout: `.verify/20261014-131140-session-sim-3/`; the `%TEMP%` copy was cleared).
 
 ## Shared-file locks
 
-- `fix/charx-combat-routes`: combat-tracker `roll-route.ts`, `attack.ts`, `@shared/combat-tracker/schemas.ts`, `lifecycle.ts`, Initiative attack picker; character-sheet feature files.
+- None.
 
 ## Pending DM decisions
 
