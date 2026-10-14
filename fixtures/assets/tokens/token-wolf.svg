@@ -1,7 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
   <title>token-wolf</title>
-  <!-- Fixture "token-wolf" (assets-pipeline §13): round token, transparent corners. -->
+  <!-- Fixture "token-wolf" (assets-pipeline §13): round token, transparent corners.
+       Silhouette (G11): wolf head, tall pointed ears, long snout, ruff; no body. -->
   <circle cx="128" cy="128" r="120" fill="#8a8a8a" stroke="#454545" stroke-width="12"/>
-  <circle cx="128" cy="104" r="36" fill="#454545"/>
-  <path d="M64 200 C76 150 180 150 192 200 Z" fill="#454545"/>
+  <!-- ears -->
+  <path d="M76 110 L70 34 L118 84 Z" fill="#454545"/>
+  <path d="M180 110 L186 34 L138 84 Z" fill="#454545"/>
+  <!-- skull, ruff and long snout -->
+  <path d="M60 132 C60 96 92 74 128 74 C164 74 196 96 196 132 L176 168 L150 166 L140 214 L116 214 L106 166 L80 168 Z" fill="#454545"/>
+  <!-- eyes and nose -->
+  <path d="M96 122 L118 128 L100 134 Z" fill="#f0c040"/>
+  <path d="M160 122 L138 128 L156 134 Z" fill="#f0c040"/>
+  <ellipse cx="128" cy="206" rx="12" ry="8" fill="#1a1a1a"/>
 </svg>

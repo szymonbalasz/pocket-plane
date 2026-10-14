@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>token-thorn</title>
+  <!-- Fixture "token-thorn" (assets-pipeline §13): round token, transparent corners.
+       Silhouette (G11): rogue, pointed hood with a shadowed face, flared cloak, crossed daggers. -->
+  <circle cx="128" cy="128" r="120" fill="#7a3f9e" stroke="#341650" stroke-width="12"/>
+  <!-- flared cloak -->
+  <path d="M60 220 C80 170 96 140 128 136 C160 140 176 170 196 220 Z" fill="#341650"/>
+  <!-- pointed hood -->
+  <path d="M86 140 C86 96 104 60 140 40 C134 60 170 86 170 140 Z" fill="#341650"/>
+  <!-- face shadow with eyes -->
+  <ellipse cx="128" cy="114" rx="22" ry="20" fill="#120624"/>
+  <circle cx="120" cy="112" r="3.5" fill="#e6d3f5"/>
+  <circle cx="136" cy="112" r="3.5" fill="#e6d3f5"/>
+  <!-- crossed daggers -->
+  <path d="M84 206 L166 150 L176 148 L170 158 L90 212 Z" fill="#e6d3f5"/>
+  <path d="M172 206 L90 150 L80 148 L86 158 L166 212 Z" fill="#e6d3f5"/>
+</svg>

@@ -8,12 +8,16 @@ const FILES = [
   "tokens/token-goblin.svg",
   "tokens/token-wolf.svg",
   "tokens/token-elite.svg",
+  "tokens/token-thorn.svg",
 ] as const;
 
 /**
  * Fixture Campaign images (assets-pipeline §13): `town`, `battlemap` (1400 x 980 = 20 x 14 at
- * 70 px), tokens Mira blue, goblin green, wolf grey, elite dark green (256 x 256 round).
- * Asset IDs by index in the manifest: town 0, battlemap 1, mira 2, goblin 3, wolf 4, elite 5.
+ * 70 px), tokens (256 x 256 round), each its own silhouette and colour (G11): Mira blue fighter
+ * (shield, sword), goblin green (big ears), wolf grey (wolf head), elite dark green (spiked
+ * helmet, scimitar), Thorn purple rogue (hood, daggers).
+ * Asset IDs by index in the manifest: town 0, battlemap 1, mira 2, goblin 3, wolf 4, elite 5,
+ * thorn 6 (appended: earlier indexes and their seeded IDs unchanged).
  */
 export default defineFixture({
   key: "images",

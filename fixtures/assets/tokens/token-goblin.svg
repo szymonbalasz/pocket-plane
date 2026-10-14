@@ -1,7 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
   <title>token-goblin</title>
-  <!-- Fixture "token-goblin" (assets-pipeline §13): round token, transparent corners. -->
+  <!-- Fixture "token-goblin" (assets-pipeline §13): round token, transparent corners.
+       Silhouette (G11): small bald head with huge sideways ears, hunched little body. -->
   <circle cx="128" cy="128" r="120" fill="#3fa34a" stroke="#1f5a25" stroke-width="12"/>
-  <circle cx="128" cy="104" r="36" fill="#1f5a25"/>
-  <path d="M64 200 C76 150 180 150 192 200 Z" fill="#1f5a25"/>
+  <!-- ears -->
+  <path d="M104 104 L34 76 L96 132 Z" fill="#1f5a25"/>
+  <path d="M152 104 L222 76 L160 132 Z" fill="#1f5a25"/>
+  <!-- head -->
+  <ellipse cx="128" cy="116" rx="36" ry="32" fill="#1f5a25"/>
+  <!-- eyes and grin -->
+  <path d="M106 108 L122 114 L106 118 Z" fill="#f2e85c"/>
+  <path d="M150 108 L134 114 L150 118 Z" fill="#f2e85c"/>
+  <path d="M110 130 Q128 144 146 130 Q128 138 110 130 Z" fill="#f2e85c"/>
+  <!-- hunched body -->
+  <path d="M92 212 C92 170 104 150 128 150 C152 150 164 170 164 212 Z" fill="#1f5a25"/>
 </svg>

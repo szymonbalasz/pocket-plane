@@ -47,6 +47,7 @@ describe("asset fixtures (FR-ASSET-18)", () => {
       "token-goblin",
       "token-wolf",
       "token-elite",
+      "token-thorn",
       "map-large",
     ]);
     const by = (n: string) => mine.find((a) => a.name === n);
@@ -67,10 +68,10 @@ describe("asset fixtures (FR-ASSET-18)", () => {
     expect(copy[0]?.id).not.toBe(by("town")?.id as string);
 
     // Manifest lists asset IDs by fixture key (FIX §8); one log entry per created asset.
-    expect(r.manifest.records.images?.asset).toEqual(mine.slice(0, 6).map((a) => a.id));
+    expect(r.manifest.records.images?.asset).toEqual(mine.slice(0, 7).map((a) => a.id));
     expect(r.manifest.records["image-large"]?.asset).toEqual([large?.id as string]);
     expect(r.manifest.records["images-second"]?.asset).toEqual([copy[0]?.id as string]);
-    expect(r.ingested).toHaveLength(8);
+    expect(r.ingested).toHaveLength(9);
   }, 30_000); // sharp rasterises the SVG fixtures: slow under parallel agent load
 
   test("FR-ASSET-18 two loads: identical IDs and record fields, hashes and file bytes", async () => {
@@ -89,7 +90,20 @@ describe("asset fixtures (FR-ASSET-18)", () => {
 
   test("FR-ASSET-08 seeded asset IDs keep the 128-bit base64url format", async () => {
     const r = await loaded("session-sim");
-    expect(r.rows).toHaveLength(6);
+    expect(r.rows).toHaveLength(7);
     for (const row of r.rows) expect(row.id).toMatch(/^[A-Za-z0-9_-]{22}$/);
+  });
+});
+
+describe("token art (G11)", () => {
+  test("G11 each creature token has its own silhouette, not only its own colour", () => {
+    const names = ["mira", "thorn", "goblin", "elite", "wolf"];
+    // Silhouette = the shapes with every colour, comment and title removed.
+    const shape = (n: string) =>
+      readFileSync(path.join(import.meta.dir, `../../assets/tokens/token-${n}.svg`), "utf8")
+        .replace(/<!--[\s\S]*?-->|<title>[^<]*<\/title>/g, "")
+        .replace(/(fill|stroke)="[^"]*"/g, "")
+        .replace(/\s+/g, " ");
+    expect(new Set(names.map(shape)).size).toBe(names.length);
   });
 });
