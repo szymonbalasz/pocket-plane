@@ -100,7 +100,7 @@ Terms: **creature** = a `character` or a custom `monster` definition (NPC); **sh
 | FR-CHARX-29 | Picker. Player: own characters, then a "Party" group of other PCs (summary card, FR-CHARX-32), then "New character…" (hidden while they have a draft). DM: every character (owner name, Draft / Locked marks), "New character…" (name + owner Select + "Start as draft"), and the NPC last opened via FR-CHARX-31. Sort per FR-CHAR-02 within each group. | Amends FR-CHAR-02 |
 | FR-CHARX-30 | Player with no character: FR-CHAR-04 text gains a **Create character** Button → name Dialog → the new draft opens in edit mode with the hint "Fill in class, ability scores, AC and HP. Your DM approves the sheet." | |
 | FR-CHARX-31 | NPC sheet: entities' `creatureActions` gains "Sheet" (DM): opens `char.sheet` on that definition. Custom: editable as above, CR + XP instead of level, HP max only (no HP control, no counters, no hit dice). Imported: read-only, lock icon, "Derive to customise". | OQ-CHARX-06 |
-| FR-CHARX-32 | Summary card (other players' PCs): portrait, name, owner, "Level N Class", species, Down badge. Nothing else. | OQ-CHARX-05 |
+| FR-CHARX-32 | Summary card (other players' PCs): portrait, name, owner, "Level N Class", species, Down badge (CBTX's `deathState` when present, §7.1). Nothing else: no temp HP, death-save counts or effects. | OQ-CHARX-05, OQ-CBTX-09 |
 | FR-CHARX-33 | Inventory tab shows the character's wallet read-only from party-loot's `wallet` record (missing = all zero), with "Move coin in Party loot". | OQ-LOOT-16 follow-up |
 | FR-CHARX-34 | Sheet sections registry and rendering: [§7.1](#71-sheet-sections-seam-combat-extras). | Seam |
 | **Visibility** | | |
@@ -141,7 +141,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, de
 
 ### 7.1 Sheet sections seam (combat-extras)
 
-Combat-extras owns temp HP, death saves and conditions (data, rules, commands, events, visibility). This spec owns where they appear. Settled with [combat-extras](combat-extras.md) via OQ-CHARX-10.
+Combat-extras owns temp HP, death saves and conditions (data, rules, commands, events, visibility). This spec owns where they appear. Settled by the orchestrator (D/S seam) with [combat-extras](combat-extras.md); this contract supersedes CBTX's earlier `{id, render(store, characterId, client)}`.
 
 - **Registry** (append-only, created empty by the CHARX build, add to AGENTS §9.9): `src/client/common/features/character-sheet/sheet-sections.ts`, `export const sheetSections: readonly SheetSection[]`. Contract in `./sections.ts` (feature-owned).
 - **Entry shape**
@@ -162,8 +162,18 @@ interface SheetSection {
 
 - **Slots**: `header` = chip row under the name (e.g. condition chips); `vitals` = directly under the HP row (temp HP, death saves); `main` = end of the Main tab; `tab` = own tab after Notes.
 - **Rules**: the sheet passes identity only; components read the synced store and send their own intents, with their own test IDs and prefix. Rendered in view and edit mode alike; a section owns its own editing and lock rule. A throwing section renders nothing and logs a console warning; the sheet keeps working. Summary cards and imported-definition sheets render no sections.
-- **What CHARX exposes** for sections (pure, `@shared/entities`, overrides honoured): `abilityMod`, `proficiencyBonus`, `saveBonus(stats, "con")` (concentration), `checkBonus`, `spellSaveDc`, `spellAttackBonus`; record fields `hpCurrent`, `statBlock.hpMax`; on `creature-sheet` (owner + DM only) `spells[].concentration`.
-- **Not here**: no temp HP, death-save or condition fields in CHARX's schema. The HP control stays CHAR's `char.adjustHp`; whether temp HP absorbs sheet damage is combat-extras' rule (OQ-CHARX-11).
+- **CBTX's sections** (settled; kinds `["character"]`, both clients; permissions per [CBTX §7.1](combat-extras.md), OQ-CBTX-07):
+
+| Section id | Slot | `available` | Shows |
+|---|---|---|---|
+| `cbtx.temp-hp` | `vitals` | always | Temp HP |
+| `cbtx.death-saves` | `vitals` | `deathState != null` | Death-save successes / failures |
+| `cbtx.effects` | `header` | always | Condition / effect chips; owner "Concentrate…", DM add / edit / end from the chip row's menu |
+
+- **What CHARX exposes** for sections (pure, `@shared/entities`, overrides honoured): `abilityMod`, `proficiencyBonus`, `saveBonus(stats, ability)`, `checkBonus`, `spellSaveDc`, `spellAttackBonus`; record fields `hpCurrent`, `statBlock.hpMax`; on `creature-sheet` (owner + DM only) `spells[].concentration`.
+- **Concentration save**: CBTX uses `saveBonus(stats, "con")`; a `save.con` override wins. That is exactly what the sheet's CON Save button rolls. The resolver lands in `fix/charx-core`, which merges before the CBTX build.
+- **HP control**: the sheet keeps `char.adjustHp`. CBTX wires it through its `hpRules.apply`: temp HP absorbs first, a hit at 0 HP adds a death-save failure, concentration cards. The sheet UI does not change.
+- **Play state vs sheet data**: `tempHp`, `deathSuccesses` and `deathFailures` are CBTX-owned play-state columns on `entity`, like `hpCurrent`. Effects live in CBTX's `effect` table. None of them is in `statBlock` or `creature-sheet`, and CHARX models no such field. The summary card (FR-CHARX-32) shows only Down / `deathState` from CBTX's data.
 
 ## 8. Data model
 
@@ -204,7 +214,7 @@ interface SheetSection {
 
 ## 9. API & events
 
-**REST**: none new. Entities' `POST` / `PUT /api/entities` keep working; their whole-replace carries the new stat-block fields (combat's form sends the whole block, FR-CBT-43). Sheet edits use WS intents for both roles (players have no REST write path; precedent party-loot; OQ-CHARX-14).
+**REST**: none new. Entities' `POST` / `PUT /api/entities` keep working; their whole-replace carries the new stat-block fields (combat's form sends the whole block, FR-CBT-43). Sheet edits use WS intents for both roles: edits during play are live play under ADR-0021 D (precedent party-loot; OQ-CHARX-14, settled).
 
 **WS intents** (default deny; none optimistic)
 
@@ -314,12 +324,12 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | [character-sheet](character-sheet.md) | Window, roll routes, `char.roll`, `char.adjustHp`, `characters.adjustHp`, roll control usage | complete, built |
 | [entities](entities.md) | New optional core fields, attacks 0–20, helpers + overrides, summary redaction, internal create / update API, hook + `creatureActions` lines (OQ-CHARX-19) | complete; changes needed |
 | [combat-tracker](combat-tracker.md) | Route passes `ref`; `cbt.attack` gains `attackId?` / `spellId?` via `sheetAttack`; drafts out of whole-party (OQ-CHARX-12/13) | complete; changes needed |
-| [combat-extras](combat-extras.md) | Uses §7.1; decides temp HP vs sheet damage (OQ-CHARX-10/11) | in spec (parallel) |
+| [combat-extras](combat-extras.md) | Registers `cbtx.temp-hp`, `cbtx.death-saves`, `cbtx.effects` (§7.1); wires `char.adjustHp` through `hpRules.apply`; consumes `saveBonus` | in spec; seam settled (D/S seam) |
 | [dice-roll-log](dice-roll-log.md), [play-shell](play-shell.md), [party-loot](party-loot.md), [fixtures-adapters](fixtures-adapters.md) | Roll control, categories `skill-check` / `damage` / `healing`; window registry; `wallet` record; bundles. No change | complete |
 
 ### Shared changes
 
-Per AGENTS §9.9; the orchestrator routes each. Shared-branch-first candidates marked ★ (never at the same time as combat-extras' schema work, [sprint-1 boundaries](../agents/sprint-1.md#boundaries-and-hotspots-orchestrator-sequence-these)).
+Per AGENTS §9.9; the orchestrator routes each. Shared-branch-first candidates marked ★, all in `fix/charx-core`. It and combat-extras' `fix/cbtx-core` both touch db, `src/shared/events/` and the record-type registry: sequenced by the orchestrator, never at the same time ([sprint-1 boundaries](../agents/sprint-1.md#boundaries-and-hotspots-orchestrator-sequence-these)). `fix/charx-core` merges before the CBTX build, which needs its save resolver.
 
 | Path | Change | Owner today |
 |---|---|---|
@@ -357,11 +367,11 @@ Per AGENTS §9.9; the orchestrator routes each. Shared-branch-first candidates m
 | OQ-CHARX-07 | Multiclassing (DM; carried-over) | **Model supports class rows; UI basic (list)** / single class only | no · owner: spec-character-sheet-full | levelling |
 | OQ-CHARX-08 | Rest buttons (tier C) (DM) | **Out: manual counters + per-block Reset** (no rest rules) / short + long rest buttons (hit-die heal, slot reset: ~1 slice) | no · owner: spec-character-sheet-full | — |
 | OQ-CHARX-09 | Casting uses a slot? | **No: pips ticked by hand** (no upcast rules) / roll asks for a slot level | no · owner: spec-character-sheet-full | — |
-| OQ-CHARX-10 | Seam with combat-extras: temp HP, death saves, conditions on the sheet | **`sheet-sections.ts` registry, slots `header` / `vitals` / `main` / `tab` (§7.1); CBTX registers its sections** / CHARX renders CBTX fields itself (two specs own one UI) | yes (orchestrator settles with CBTX) | combat-extras |
-| OQ-CHARX-11 | Sheet Damage vs temp HP | **Combat-extras decides; if temp HP absorbs sheet damage it amends `characters.adjustHp`** / sheet damage bypasses temp HP | no · owner: combat-extras | character-sheet, combat-extras |
+| ~~OQ-CHARX-10~~ | ~~Seam with combat-extras: temp HP, death saves, conditions on the sheet; CON save for concentration~~ | **Settled by the orchestrator, see D/S seam:** `sheet-sections.ts` registry per §7.1 (CHARX's contract); CBTX registers `cbtx.temp-hp`, `cbtx.death-saves` (`vitals`) and `cbtx.effects` (`header`); concentration uses `saveBonus(stats, "con")` from `fix/charx-core`, overrides honoured (also settles OQ-CBTX-14) | — | combat-extras |
+| ~~OQ-CHARX-11~~ | ~~Sheet Damage vs temp HP~~ | **Settled by the orchestrator, see D/S seam:** the sheet keeps `char.adjustHp`; CBTX wires it through `hpRules.apply` (temp HP absorbs, death-save failures at 0 HP, concentration cards). CHARX models no temp HP, death-save or condition fields (also settles OQ-CBTX-13) | — | character-sheet, combat-extras |
 | OQ-CHARX-12 | Combat with several attacks and spell attacks | **Route claims `attack` + `spellAttack` with `ref`; `cbt.attack` gains `attackId?` / `spellId?`, resolved by `sheetAttack`; DM row picker for NPC attacks is combat's** / only weapon attacks route, spells roll plain (DM applies HP by hand) | no · owner: combat-tracker | combat-tracker, combat-extras |
 | OQ-CHARX-13 | Drafts in encounters | **Excluded from `partyCharacterIds: null`; explicit lists may include them** / no difference | no · owner: combat-tracker | combat-tracker |
-| OQ-CHARX-14 | Transport for DM sheet edits (ADR-0021 D: prep CRUD over REST) | **WS intents for both roles** (one path, live; as party-loot) / REST for DM, WS for players | no · owner: integrator | protocol |
+| ~~OQ-CHARX-14~~ | ~~Transport for DM sheet edits (ADR-0021 D: prep CRUD over REST)~~ | **Settled by the orchestrator, see D/S seam:** WS intents for both roles; sheet edits during play are live play under ADR-0021 D (precedent party-loot) | — | protocol |
 | OQ-CHARX-15 | Code ownership | **CHARX's build inherits CHAR's feature folders** / new `character-sheet-full` folders (two features in one window) | no · owner: orchestrator | — |
 | OQ-CHARX-16 | Glossary | **Add: Draft (character), Sheet lock, Override, Sheet section; "NPC" = custom creature definition used as a named NPC** | no · owner: integrator | glossary |
 | OQ-CHARX-17 | Deleting characters (DM) | **No delete (FR-ENT-14); rename / reassign** / owner discards an unreferenced draft | no · owner: spec-character-sheet-full | entities |
