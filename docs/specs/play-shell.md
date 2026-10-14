@@ -1,7 +1,7 @@
 ---
 title: Play shell
 prefix: SHELL
-status: complete
+status: in-review
 owner: spec-play-shell
 wave: 2
 ---
@@ -17,12 +17,14 @@ wave: 2
 - **Layout** lives in browser storage, per campaign and owner (DM or the link's player); it never reaches the server (#121).
 - Hosts the foundation UI: connection indicator, reconnect banner, presence ([live-sync](live-sync.md)); switcher, players panel, login / waiting / invalid-link screens ([campaign-management](campaign-management.md)).
 - **Feedback pass** (F1, #148; [ADR-0030](../architecture/adr/0030-ui-notification-sounds.md)): an **alert** surface for features (screen flash + short UI sound + Toast); first caller: combat's player turn alert ([FR-CBT-41](combat-tracker.md#6-functional-requirements)). Per-browser mute + volume.
+- **Playtest pass** (#171; FR-SHELL-29–33): one shared **tooltip** delay (≈ 400 ms) and no tooltip fighting a popover (P1); windows **fit the work area** on smaller viewports (G3); the DM's Initiative default shows a full encounter (G2); presence reads "unknown" while the DM is not live (G10).
 
 ## 2. Scope
 
 - Page frame for DM and player clients: base layer, top bar, tool rail slot, launcher, banner, toast region. Window manager: open, close, move, resize, bring to front, minimise; clamp to viewport; reset layout *(proposed)*.
 - Window registry (client code) and `openWindow(kind, instance?)` for features; `instance` key ready for several windows of one type (tokens open notes later, ADR-0014), MVP uses `main` only.
 - **Alerts** (FR-SHELL-22–27): `alert()` API, flash, built-in ping, player sound control (mute, volume), audio unlock on first interaction, test-mode hooks.
+- **Playtest pass** (FR-SHELL-29–33): shared Tooltip rules for both clients; render-time fit of windows to the work area; DM Initiative default height; presence badge while not live.
 - **Later, not built** (nothing here may block them): command palette, shortcuts, portrait strip, pause overlay, DM "view as player". They plug in via the registry, a reserved strip slot above the launcher and an overlay layer.
 
 ## 3. Goals
@@ -51,16 +53,16 @@ wave: 2
 | FR-SHELL-03 | DM: valid secret + active campaign → shell after the first snapshot. No active campaign → campaign-management's "Create your first campaign" page; no shell, no WS. | |
 | FR-SHELL-04 | Login (DM), invalid-link (`rejected`) and waiting (`waiting`) screens replace the whole shell, with campaign-management's wording. Leaving `waiting` restores the shell without reload, windows as they were. | [FR-SYNC-24](live-sync.md#6-functional-requirements) |
 | FR-SHELL-05 | Top bar, right: connection indicator (both clients). Reconnect banner below the top bar, full width, live-sync's texts. While not `live`, feature intent controls are disabled (live-sync) but window management keeps working. | |
-| FR-SHELL-06 | DM top bar: campaign switcher (CAMP §7); *(proposed, OQ-SHELL-11)* presence badge "N/M online" (tooltip: names), click opens `camp.players`. Player top bar: campaign-management's wording, "Playing as **‹player›** in **‹campaign›**"; renames show ≤ 1 s. | Presence: [FR-SYNC-23](live-sync.md#6-functional-requirements) |
+| FR-SHELL-06 | DM top bar: campaign switcher (CAMP §7); *(proposed, OQ-SHELL-11)* presence badge "N/M online" (tooltip: names), click opens `camp.players`. Player top bar: campaign-management's wording, "Playing as **‹player›** in **‹campaign›**"; renames show ≤ 1 s. While not `live`: FR-SHELL-33. | Presence: [FR-SYNC-23](live-sync.md#6-functional-requirements) |
 | FR-SHELL-07 | A window type registers: `kind` (`<prefix>.<name>`), title, clients (`dm` / `player` / both), default + min size, default position, default open, launcher icon/label/order, optional `available(store)`, component. Only registered, available kinds for this client render. | OQ-SHELL-07 |
 | FR-SHELL-08 | Open (launcher or `openWindow`): opens at the window's last geometry, else its default, or the first free slot if the default is covered by an open window (#144; built geometry in [protocol §18](../protocol/README.md#18-scenes-client-registries), which supersedes the §7 positions in feature specs); brings it to front. Already open → brought to front; minimised → restored. One instance per kind in MVP (`main`). | |
 | FR-SHELL-09 | Launcher button: closed / minimised → open + front; open but behind → front; open on top → minimise. Button shows open / minimised state. | |
 | FR-SHELL-10 | Move by dragging the title bar; resize by edges and corner, never below min size or beyond the viewport. Pointer-down anywhere in a window brings it to front. | |
 | FR-SHELL-11 | Minimise hides the window (launcher marks it); close unmounts it. Both keep its geometry for the next open. | |
-| FR-SHELL-12 | Clamp on restore, open and viewport resize: window ≤ viewport size; whole title bar height and ≥ 120 px of its width inside the viewport, below the top bar. Clamping is render-only: it never writes the layout; writes carry each untouched window's stored geometry. | |
+| FR-SHELL-12 | Clamp on restore, open and viewport resize: window ≤ viewport size; whole title bar height and ≥ 120 px of its width inside the viewport, below the top bar. Clamping is render-only: it never writes the layout; writes carry each untouched window's stored geometry. Smaller viewport than the one a window was stored at: FR-SHELL-29 first. | Amended #171 (G3) |
 | FR-SHELL-13 | Pointer events reach the base layer only outside windows and chrome. Exception: an HTML5 drag that starts in a window and ends over the base layer delivers its drop to the base layer (e.g. [FR-ENT-18](entities.md#6-functional-requirements) rows). Key events whose target is inside a window, the top bar, the launcher, a dialog or any editable element never reach canvas handlers. | Ctrl-D ([FR-MAP-17](scenes-map.md#6-functional-requirements)) |
 | FR-SHELL-14 | *(proposed)* Launcher menu "Reset layout" → this client's default layout, written. | Recovery |
-| FR-SHELL-15 | The layout (every window's kind, instance, state `open` / `minimised` / `closed`, geometry, z-order) is one `localStorage` entry per (campaign, owner): key `pp.layout.v1.<campaignId>.<dm \| playerId>`, `playerId` from `you`. Written synchronously on each change: open, close, minimise, move end, resize end, bring to front. Never sent to the server. | #121 |
+| FR-SHELL-15 | The layout (every window's kind, instance, state `open` / `minimised` / `closed`, geometry, z-order) is one `localStorage` entry per (campaign, owner): key `pp.layout.v1.<campaignId>.<dm \| playerId>`, `playerId` from `you`. Written synchronously on each change: open, close, minimise, move end, resize end, bring to front. Never sent to the server. *(#171)* Each write also stores the work-area size it was made at (`area {w, h}`, FR-SHELL-29); entries without it still parse. | #121 |
 | FR-SHELL-16 | The entry is applied after the first snapshot after page load and after the first snapshot after `you.campaignId` changes; no entry → default layout. Other snapshots (reconnect, resync, scene switch) never open, close or move windows. A change is written to the key of the campaign it was made in. | No jumps |
 | FR-SHELL-17 | On read the entry is parsed with zod: ≤ 40 windows, unique (kind, instance), kind `^[a-z]+\.[a-z0-9-]+$` ≤ 64 chars, integer geometry within ±10 000 px. Invalid → default layout + console warning; the next change overwrites it. Storage unavailable or throwing → layout kept in memory only, console warning, no error UI. | |
 | FR-SHELL-18 | Saved windows of unknown or unavailable kinds are skipped on restore without error; unknown ones are dropped at the next write, unavailable ones kept. When a kind becomes available it renders in its saved state; when it becomes unavailable it unmounts and keeps its saved state. | |
@@ -75,6 +77,12 @@ wave: 2
 | FR-SHELL-26 | Sounds come from a client sound list `{id, label, play(ctx, gain)}`; MVP ships **`ping`**, synthesised with Web Audio (two short sine tones, ≤ 400 ms; no file, no licence) (OQ-SHELL-12). Unknown id → `ping` (test mode records the sound actually played). **Design for later** (tier A): DM-added sounds = small audio assets ([assets-pipeline](assets-pipeline.md)) added as sound ids; a campaign setting picks the turn-alert sound, players may override per browser. Callers pass a sound id, so nothing changes for them. | ADR-0030 |
 | FR-SHELL-27 | **Test mode** (as FR-SHELL-20): `ui-topbar` carries `data-test-last-sound="<id>:<played \| muted \| locked \| failed>:<n>"` (`n` counts alerts with a sound); `shell.test` gains an **Alert** button: `alert({id: "shell.test", title: "Test alert", sound: "ping"})`. | Walkthroughs |
 | FR-SHELL-28 | **Content first at default size:** a window type's default size shows ≥ 3 rows of its primary content with all its optional chrome on. First case (#153): the DM's `dice.log` with Physical dice on (strip + roll bar) showed no entries; its build raises the DM default height or gives the log area a minimum (≥ 3 entries) and lets the roll bar scroll with the body. | #153 nit |
+| **Playtest pass** (#171) | | |
+| FR-SHELL-29 | **Fit on render** (G3; amends FR-SHELL-12). *Work area* = viewport below the top bar and above the launcher bar's top edge. When the work area is smaller than the stored `area` (FR-SHELL-15), a window that lay wholly inside the stored work area renders wholly inside the current one: a window that touched (≤ 8 px) the stored right or bottom edge keeps that gap to the current edge; any other moves left / up only as far as needed; then it shrinks, never below min size. If min size still doesn't fit, FR-SHELL-12 applies. A window stored partly outside the work area (parked by the user) gets FR-SHELL-12 only. Render-only, like FR-SHELL-12: nothing written; back at the stored size the window is at its stored geometry. Entries without `area` (written before this pass): FR-SHELL-12 only until the next write stores it. Default layouts are built for the current work area (placement, protocol §18). | G3; OQ-SHELL-17 |
+| FR-SHELL-30 | **Tooltips** (P1): every hover hint in both clients is the shared `Tooltip` (`@ui/components/ui/overlays`) under one provider per client with **one open delay, 400 ms** (a single exported constant; *(proposed, OQ-SHELL-16)* skip delay 300 ms: moving straight from one trigger to the next opens at once). Native `title` is not used on interactive elements (it can't be delayed or suppressed); it stays only on non-interactive truncated text. Tooltip content carries `data-testid="ui-tooltip"`. | P1 |
+| FR-SHELL-31 | **Tooltip vs overlay** (P1): pressing a trigger (pointer down, Enter, Space) closes its tooltip and cancels a pending open; it stays closed until the pointer leaves the trigger. While a popover, dialog, dropdown or context menu opened from a trigger is open, that trigger's tooltip never opens; focus returned to the trigger when the overlay closes doesn't open it either. Tooltips inside the open overlay work normally. | P1: Roll initiative → popover |
+| FR-SHELL-32 | **Default size shows a full encounter** (G2; extends FR-SHELL-28): the DM's `cbt.initiative` default height fits its header and **6 combatant rows** (the `session-sim` encounter) with no pending card, without scrolling, at 1440×900; FR-SHELL-29 fits it at 1280×720 (rows scroll). The map-first coverage floors (protocol §24: DM ≥ 70 % at 1440×900, ≥ 60 % at 1280×720) still hold. | G2; geometry in Shared changes |
+| FR-SHELL-33 | **Presence while not live** (G10): while the DM client is not `live`, presence is unknown ([FR-SYNC-29](live-sync.md#6-functional-requirements)): the badge reads "– / M online", muted, Tooltip "Unknown while reconnecting", `data-state="unknown"`. Back to "N / M online" from the next snapshot. | G10 |
 
 ## 7. UI/UX notes
 
@@ -82,13 +90,14 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark onl
 
 - **Top bar** (thin, overlays the canvas): left = campaign (DM: switcher Select + "New campaign" Dialog; player: "Playing as …"); right = DM presence Badge, player speaker Button (lucide volume / volume-x icon, FR-SHELL-24), connection indicator (Badge + Tooltip).
 - **Alert flash** (FR-SHELL-22): overlay layer above dialogs, inset frame + translucent fill in an accent placeholder token (theme-system names it); Toast in the existing region. **Tool rail**: left edge, below the top bar; slot filled by scenes-map, empty otherwise.
+- **Tooltips** (FR-SHELL-30/31): shadcn Tooltip only, small panel surface, side top by default; same delay everywhere; e.g. the sheet's "Shift: advantage · Ctrl: disadvantage" hint becomes a Tooltip and stays shut while the roll popover is open.
 - **Launcher**: bottom-centre bar of icon Buttons with Tooltips (BG2 "bottom action bar" motif later via theme); trailing "⋯" menu with "Reset layout". **Toasts**: one region per client: player bottom-right; DM top-centre below the top bar (FR-SHELL-01).
 - **Window**: panel surface; title bar (title, minimise, close), scrolling body, resize handle; focused window uses a semantic border token (names: [theme-system](post-mvp/theme-system.md)).
 - **No new dependency**: pointer events + CSS transform. A drag/resize library needs the DM's OK (AGENTS §3).
 - **Defaults** (DM): `camp.players` top-right, `map.scenes` top-left (scenes-map). Player: none open in Scenes phase; Combat specs set `defaultOpen` for theirs (OQ-SHELL-06).
 - **States:** `connecting` = skeleton over the page; `live` = shell; `reconnecting` = last view + banner, windows usable; `waiting` / `rejected` = campaign-management screens; nothing to show = base empty state.
 - **DM view:** switcher + presence; DM window types; base = viewed scene. **Player view:** name + campaign; player window types; base = active scene.
-- **Test IDs** (`ui-` per AGENTS §9.5): `ui-topbar`, `ui-presence-badge`, `ui-tool-rail`, `ui-launcher`, `ui-launcher-button` + `data-record-id=<kind>`, `ui-launcher-menu`, `ui-launcher-reset`, `ui-window` + `data-record-id=<kind>:<instance>` + `data-state`, `ui-window-title`, `-minimise`, `-close`, `-resize`, `ui-base-empty`, `ui-alert-flash` (+ `data-alert-id`), `ui-sound-button` (+ `data-state`), `ui-sound-mute`, `ui-sound-volume`, `ui-sound-test`; test mode `shell-test-alert`. Indicator keeps live-sync's `sync-connection-status`.
+- **Test IDs** (`ui-` per AGENTS §9.5): `ui-topbar`, `ui-presence-badge`, `ui-tool-rail`, `ui-launcher`, `ui-launcher-button` + `data-record-id=<kind>`, `ui-launcher-menu`, `ui-launcher-reset`, `ui-window` + `data-record-id=<kind>:<instance>` + `data-state`, `ui-window-title`, `-minimise`, `-close`, `-resize`, `ui-base-empty`, `ui-alert-flash` (+ `data-alert-id`), `ui-sound-button` (+ `data-state`), `ui-sound-mute`, `ui-sound-volume`, `ui-sound-test`; test mode `shell-test-alert`; `ui-tooltip` (tooltip content); `ui-presence-badge` gains `data-state` = `known` \| `unknown`. Indicator keeps live-sync's `sync-connection-status`.
 
 ## 8. Data model
 
@@ -98,12 +107,13 @@ No server entity, record type or migration (#121). Client-side only:
 |---|---|---|---|
 | Layout *(browser `localStorage`)* | key | `pp.layout.v1.<campaignId>.<dm \| playerId>` | One per (origin, campaign, owner); no secret token in the key |
 | | windows | WindowState[] | zod-parsed on read (FR-SHELL-17); ≤ ~4 KB |
+| | area *(#171)* | `{w, h}` int, optional | Work-area size at the last write (FR-SHELL-29) |
 | WindowState *(in `windows`)* | kind, instance, state, x, y, w, h, z | string, string (`main`), `open` \| `minimised` \| `closed`, int ×5 | px from viewport top-left; z = stacking order |
 | Window type *(client code)* | FR-SHELL-07 fields | — | Per-client registry; not sent or stored |
 | Sound settings *(browser `localStorage`)* | key; muted, volume | `pp.sound.v1.<campaignId>.<playerId>`; bool, int 0–100 | FR-SHELL-24; defaults unmuted, 70 |
 | Sound *(client code)* | id, label, play | — | FR-SHELL-26; MVP `ping` only |
 
-- **Relations:** key names a Campaign and Player ([campaign-management](campaign-management.md)) by ID only; kinds name window types, not records. **Derived:** rendered geometry = clamp(stored, viewport); launcher states. **Persisted runtime state:** the Layout entry; window manager state is client memory, rebuilt from it on load.
+- **Relations:** key names a Campaign and Player ([campaign-management](campaign-management.md)) by ID only; kinds name window types, not records. **Derived:** rendered geometry = clamp(fit(stored, area, work area), viewport) (FR-SHELL-29, -12); launcher states; presence known iff `live`. **Persisted runtime state:** the Layout entry; window manager state is client memory, rebuilt from it on load.
 
 ## 9. API & events
 
@@ -128,6 +138,7 @@ No server entity, record type or migration (#121). Client-side only:
 - **Two tabs, same owner:** last write wins, no live jumps (FR-SHELL-19). **Two players on one browser** (different links): separate keys.
 - **Viewport change:** clamp, render-only (FR-SHELL-12). **Removed or unavailable window type:** FR-SHELL-18. **Corrupt or full storage:** FR-SHELL-17.
 - **Shared computer:** entries hold only window geometry and kinds, no game data.
+- **Playtest pass:** viewport shrinks mid-session → windows refit at once, render-only; a drag / resize in progress is refit at pointer up. Layout from a bigger screen opened on a laptop → fits; reopened on the big screen → as stored. Tooltip pending when the connection drops: unaffected (client only). Presence: disconnect → "unknown" at once; reconnect → snapshot presence; server crash → "unknown" until rejoin (no stale "2/2 online").
 - **Alerts:** audio still locked (no interaction yet) → flash + Toast only; the speaker shows `locked`. Two tabs of one player → both alert and play (accepted). Tab hidden → title mark (FR-SHELL-23); the sound plays if unlocked. Disconnect / reconnect: alerts come only from live events, so nothing replays on a snapshot (callers' rule, e.g. FR-CBT-41). Server crash: no effect on settings. Corrupt or missing sound settings → defaults.
 
 ## 12. Performance & bandwidth
@@ -144,9 +155,9 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | **Alerts:** same-id restart; reduced motion → glow; title prefix while hidden, cleared on visible; sound outcome with a stub AudioContext (locked before first pointerdown, then played; muted; volume 0; throwing → failed); sound settings parse (bad JSON, volume 101 → defaults; throwing storage → memory); unknown sound id → ping; `data-test-last-sound` only in test mode. Window manager reducer: open/close/minimise/focus, launcher toggle, z-order, clamp math (render-only; untouched windows keep stored geometry), default layout, unknown/unavailable kinds and availability flips. Storage: key per (campaign, owner); write after campaign switch goes to the old key; zod bounds (41 windows, duplicate (kind, instance), bad kind, geometry > 10 000 → default); corrupt JSON → default; throwing storage → memory only. FR-SHELL-13: Ctrl+D typed in a window input, top bar, dialog never reaches a stub base key handler; drag from a window delivers drop to a stub base drop target. Test mode off → `shell.test`, `sync.probes` not in registry or launcher. Toast region placement per client (DM top-centre, player bottom-right) | In-code |
+| Unit | **Alerts:** same-id restart; reduced motion → glow; title prefix while hidden, cleared on visible; sound outcome with a stub AudioContext (locked before first pointerdown, then played; muted; volume 0; throwing → failed); sound settings parse (bad JSON, volume 101 → defaults; throwing storage → memory); unknown sound id → ping; `data-test-last-sound` only in test mode. Window manager reducer: open/close/minimise/focus, launcher toggle, z-order, clamp math (render-only; untouched windows keep stored geometry), default layout, unknown/unavailable kinds and availability flips. Storage: key per (campaign, owner); write after campaign switch goes to the old key; zod bounds (41 windows, duplicate (kind, instance), bad kind, geometry > 10 000 → default); corrupt JSON → default; throwing storage → memory only. FR-SHELL-13: Ctrl+D typed in a window input, top bar, dialog never reaches a stub base key handler; drag from a window delivers drop to a stub base drop target. Test mode off → `shell.test`, `sync.probes` not in registry or launcher. Toast region placement per client (DM top-centre, player bottom-right). **Playtest (#171):** `FR-SHELL-29 fit` (stored at 1440×900 → 1280×720: right-edge window keeps its gap, bottom window ends above the launcher, mid window moves only as needed, shrink stops at min, parked window clamps only, no `area` → clamp only, nothing written, back to 1440×900 = stored); `FR-SHELL-30 delay` (fake timers: no `ui-tooltip` at 399 ms, shown at 400 ms; one constant used by both providers); `FR-SHELL-31` (pointer down closes and stays closed until leave; trigger opens a Popover → no tooltip while open; Escape returns focus → no tooltip); `FR-SHELL-33` (badge "– / 2" with `data-state="unknown"` while `reconnecting`, "1 / 2" after snapshot); lint-style test: no `title=` on `button`, `a` or `[role=button]` in `src/client/**` | In-code |
 | Integration | N/A: no server code. Covered by unit (client) and E2E | — |
-| E2E (thin) | Playwright, `player-1`: move + resize a window, reload → restored; same context opens `player-2`'s link → default layout; no WS frame contains a `windows` field. Reset-only DB: DM login → create page, no WS opened. Test window **Alert** → `ui-alert-flash` shown, `ping:played:1`. FR-SHELL-28: DM `dice.log` at default size, Physical dice on → ≥ 3 `dice-log-entry` rows visible | `sync-probe`; `dice-log` |
+| E2E (thin) | Playwright, `player-1`: move + resize a window, reload → restored; same context opens `player-2`'s link → default layout; no WS frame contains a `windows` field. Reset-only DB: DM login → create page, no WS opened. Test window **Alert** → `ui-alert-flash` shown, `ping:played:1`. FR-SHELL-28: DM `dice.log` at default size, Physical dice on → ≥ 3 `dice-log-entry` rows visible. FR-SHELL-32: DM at 1440×900 after Start → 6 `cbt-init-row` fully visible, no scroll | `sync-probe`; `dice-log`; `combat` |
 
 **Review checks:** adding a window type touches only the client's registry list; no drag/resize dependency added.
 
@@ -167,6 +178,11 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 11 | — | Mangled link | Invalid-link screen; no top bar, launcher or windows |
 | 12 | — | B: speaker → volume 40, Mute; reload; Test window **Alert** | After reload: muted, 40. Alert: flash + Toast "Test alert", `data-test-last-sound` `ping:muted:1`, no audio |
 | 13 | — | B: unmute; **Alert** again; C: Alert (C clicked before) | B: `ping:played:2`. C: `ping:played:1` at volume 70 (own entry). The DM top bar has no speaker. No console errors |
+| 14 | Hover a launcher button: screenshot at ≈ 200 ms, then at ≈ 600 ms; move straight to the next button | — | No `ui-tooltip` at 200 ms; shown at 600 ms; next button's tooltip at once (skip delay) |
+| 15 | — | B: open Probes, park it half off the right edge; open Test at its default; viewport 1440×900 → 1280×720 | Test window wholly inside the work area (above the launcher, right edge in view); Probes clamped only (title bar ≥ 120 px in view). Back at 1440×900: both at their stored spots; reload → same |
+| 16 | Hard-kill the server; read the badge; restart | — | During the outage: badge "– / 2 online", `data-state="unknown"`, next to "Reconnecting…". After rejoin: "N / 2 online" |
+
+**Tooltip vs popover** (FR-SHELL-31) is walked where the clash was seen: [character-sheet §13](character-sheet.md#13-test-plan) step 11 (Physical dice on, hover Initiative, click → popover, no tooltip). FR-SHELL-32 at 1440×900: [combat-tracker §13](combat-tracker.md#13-test-plan) step 3.
 
 ## 14. Dependencies
 
@@ -179,10 +195,17 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | Combat / Reward specs | Their window types and defaults | open (OQ-SHELL-06) |
 | [combat-tracker](combat-tracker.md) (feedback) | First `alert()` caller: player turn alert ([FR-CBT-41](combat-tracker.md#6-functional-requirements)); [ADR-0030](../architecture/adr/0030-ui-notification-sounds.md) accepted (#148) | complete |
 | [dice-roll-log](dice-roll-log.md), [notifications](notifications.md) | `dice.log` default size meets FR-SHELL-28 (#153); toast region placement (built, #153) | complete |
+| Playtest pass (#171) | [live-sync](live-sync.md) FR-SYNC-29 (presence unknown while not live); [combat-tracker](combat-tracker.md) `cbt.initiative` rows for FR-SHELL-32; every feature with hover hints moves to the shared Tooltip (FR-SHELL-30) | in review |
 
 **Shared changes** (feedback pass):
 - **Existing common files this build edits:** play-shell's frame files stay shared (AGENTS §9.9, #154), so route via the orchestrator: `src/client/common/features/play-shell/{PlayFrame.tsx (flash overlay layer, player top-bar speaker Button), ShellContext.tsx (alert API), test-windows.tsx (`shell-test-alert`)}`. FR-SHELL-28: `src/client/common/features/dice-roll-log/{GameLog.tsx, window.ts}` (dice-roll-log-owned; fold into this build or a `fix/*`). New files (free): alert store, sound engine + `ping`, sound settings storage.
 - No server, schema, event, protocol or record change; data-model / protocol unchanged. Glossary: OQ-SHELL-15.
+
+**Shared changes** (playtest pass, #171; orchestrator routes per AGENTS §9.9):
+- **Existing common UI** (shared): `src/client/common/components/ui/overlays.tsx`: Tooltip delay constant, FR-SHELL-31 suppression, `ui-tooltip`; Popover / DropdownMenu wrappers in the same folder (`menus.tsx`, `controls.tsx`) only if suppression needs an "opened from" hook. `src/client/dm/main.tsx`, `src/client/player/main.tsx`: provider takes the shared constant (today `delayDuration={200}`).
+- **Play-shell frame** (shared, #154): `geometry.ts`, `ShellWindow.tsx`, `storage.ts` (`area`), `placement.ts` (work area excludes the launcher) for FR-SHELL-29.
+- **Feature files the playtest builds touch** (feature-owned; native `title` → Tooltip, FR-SHELL-30): `CharacterSheet.tsx` (roll hints), `HistoryWindow.tsx` (Pending / History), DM `initiative-window.tsx` (Moved cell), `CampaignBar.tsx` / `PlayersPanel.tsx` (campaign-management: icon buttons; presence badge FR-SHELL-33), `scenes-window.tsx`, `token-menu-entries.tsx`, `creature-form.tsx` where a `title` sits on a button.
+- **Protocol §24 / §18** (docs at consolidation): DM `cbt.initiative` default geometry 400 × ≈ 500 (exact height set by the build to meet FR-SHELL-32); §18 "Default layout" gains the work-area / fit rule and the 6-row check. No data-model change.
 
 ## 15. Open questions
 
@@ -204,6 +227,9 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | OQ-SHELL-12 | Default ping source (F1) | **Synthesised with Web Audio** (no file, no licence, no download) / a bundled short audio file (needs a licence and a decoder path) | no · owner: spec-feedback | assets-pipeline (tier A sounds) |
 | ~~OQ-SHELL-13, 14~~ | ~~Sound control placement; flash style~~ | **Decided (#154):** player top-bar speaker + Popover, settings per (campaign, player), no DM control; two pulses ≈ 1.2 s, frame + translucent fill, reduced motion → steady glow | — | visual-direction |
 | ~~OQ-SHELL-15~~ | ~~Glossary: add **Alert**~~ | **Decided (integrator, feedback consolidation):** added to the [glossary](../glossary.md) | — | — |
+| OQ-SHELL-16 | Tooltip timing (P1) | **400 ms open, 300 ms skip delay** (scanning a toolbar stays quick) / 400 ms and no skip (every tooltip waits; slower to scan) | no · owner: DM | all clients |
+| OQ-SHELL-17 | How windows reflow on a smaller screen (G3) | **Store the work-area size with the layout; windows wholly inside keep edge gaps, then move / shrink (FR-SHELL-29)** (keeps windows the user parked off-screen) / always fit every window into the work area (simpler; parked windows jump back in) / accept as is (roll input behind the launcher at 1280×720) | no · owner: spec-play-shell | protocol §18 |
+| OQ-SHELL-18 | Glitch verdicts G2, G3, G10 (playtest) | **G2:** spec silent on list length → FR-SHELL-32 (Initiative 6 rows); windows opening over tokens stays accepted (#144, #162); the apply popup covering a target → [FR-CBT-56](combat-tracker.md#6-functional-requirements). **G3:** spec gap → FR-SHELL-29. **G10:** spec silent → FR-SHELL-33 + FR-SYNC-29; campaign-management's online dots: [OQ-SYNC-17](live-sync.md#15-open-questions) | no · owner: spec-playtest | combat-tracker, live-sync |
 
 ## 16. Out of scope
 
