@@ -1,10 +1,12 @@
 import { expect, test } from "bun:test";
 import { emptyStore } from "@shared/protocol/store";
-import { clampRect, type Rect, TOP_BAR_H } from "@ui/features/play-shell/geometry";
+import { freeArea, renderedWindowRects } from "@ui/features/play-shell/free-area";
+import { clampRect, type Rect, TOP_BAR_H, workArea } from "@ui/features/play-shell/geometry";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
 import { availableKinds } from "@ui/features/play-shell/registry";
+import { contentBox, fitContent } from "@ui/features/scenes-map/camera";
 import { playerWindows } from "../../windows";
 
 // Registry-driven: later builders append windows without touching these tests.
@@ -107,6 +109,55 @@ test("#162 player map-first: battlemap uncovered ≥ 65% at 1440×900 and 1280×
       `player default layout at ${viewport.w}×${viewport.h} leaves ${(share * 100).toFixed(1)}% of the battlemap uncovered`,
     );
     expect(share).toBeGreaterThanOrEqual(0.65);
+  }
+});
+
+/** `session-sim` Goblin Ambush tokens a player holds (FIX `battlemap`, `goblin-2`, `thorn-battlemap`). */
+const VISIBLE_TOKENS = [
+  { name: "Mira", col: 2, row: 7 },
+  { name: "Goblin", col: 12, row: 6 },
+  { name: "Goblin 2", col: 12, row: 8 },
+  { name: "Thorn", col: 2, row: 9 },
+].map((t) => ({ ...t, size: "medium" as const }));
+const CELL = 70;
+const BATTLEMAP = { w: 1400, h: 980 };
+
+test("FR-SHELL-34 default layout leaves tokens uncovered: player, the four visible Goblin Ambush tokens fitted per FR-MAP-44, before and after Initiative appears (1280×720, 1440×900, 1600×900)", () => {
+  const grid = { gridCellSize: CELL, gridOffsetX: 0, gridOffsetY: 0 };
+  for (const viewport of [LAPTOP, WIDE, DESKTOP]) {
+    const all = new Set(playerWindows.defs.map((d) => d.kind));
+    const before = new Set([...all].filter((k) => k !== "cbt.initiative"));
+    const layout = defaultLayout(playerWindows, viewport);
+    // Start: Initiative becomes available and appears (FR-SHELL-18), then the map refits.
+    const appeared = reduce(
+      layout,
+      { type: "appear", kind: "cbt.initiative" },
+      { registry: playerWindows, viewport, available: all },
+    );
+    for (const [when, ws, available] of [
+      ["before Start", layout, before],
+      ["after Initiative appears", appeared, all],
+    ] as const) {
+      const rects = renderedWindowRects(ws, playerWindows, available, viewport);
+      expect(rects.length).toBe(when === "before Start" ? 2 : 3);
+      const free = freeArea(rects, viewport);
+      const box = contentBox(VISIBLE_TOKENS, grid, BATTLEMAP);
+      const cam = fitContent(box, free, BATTLEMAP, workArea(viewport));
+      for (const t of VISIBLE_TOKENS) {
+        const c = {
+          x: cam.x + (t.col + 0.5) * CELL * cam.scale,
+          y: cam.y + (t.row + 0.5) * CELL * cam.scale,
+        };
+        const at = `${t.name} ${when} at ${viewport.w}×${viewport.h}`;
+        const under = rects.find(
+          (r) => c.x > r.x && c.x < r.x + r.w && c.y > r.y && c.y < r.y + r.h,
+        );
+        expect(under ? `${at} under a window` : "ok").toBe("ok");
+        const inFree =
+          c.x > free.x && c.x < free.x + free.w && c.y > free.y && c.y < free.y + free.h;
+        expect(inFree ? "ok" : `${at} outside the free area`).toBe("ok");
+      }
+    }
   }
 });
 

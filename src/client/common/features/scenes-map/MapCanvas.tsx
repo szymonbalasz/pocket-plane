@@ -24,7 +24,18 @@ import type Konva from "konva";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Stage } from "react-konva";
 import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
-import { type Camera, centreOn, fitCamera, zoomAt } from "./camera";
+import { useFreeArea } from "../play-shell/free-area";
+import { workArea } from "../play-shell/geometry";
+import {
+  type Camera,
+  type CameraEvent,
+  type CameraMode,
+  cameraOn,
+  centreOn,
+  contentBox,
+  fitContent,
+  zoomAt,
+} from "./camera";
 import { CanvasContext, type CanvasContextValue, type EffectiveGrid } from "./canvas-context";
 import { canvasLayers } from "./canvas-layers";
 import {
@@ -51,7 +62,7 @@ import {
 import { addPing, addTrailPoints, createPointerStore, senderKey } from "./pointers";
 import { isClick, tokensInBox } from "./selection-logic";
 import { useCanvasColors } from "./theme";
-import { useMapTool } from "./tool-store";
+import { useMapFit, useMapTool } from "./tool-store";
 
 export interface MapCanvasProps {
   client: "dm" | "player";
@@ -128,14 +139,52 @@ export function MapCanvas(props: MapCanvasProps) {
   /** This client's token drag in progress (FR-MAP-39), if any. */
   const dragRef = useRef<TokenDrag | null>(null);
 
-  // ---- camera (FR-MAP-12): fit when a scene opens ----
+  // ---- camera (FR-MAP-12, -44, -45): fit the tokens into the free area ----
   const [cam, setCam] = useState<Camera>({ x: 0, y: 0, scale: 1 });
+  const [cameraMode, setCameraMode] = useState<CameraMode>("fitted");
+  const cameraModeRef = useRef(cameraMode);
+  const free = useFreeArea();
+  const fitNow = useRef(() => {});
+  fitNow.current = () => {
+    if (size.w === 0) return;
+    const map = { w: scene.mapWidth, h: scene.mapHeight };
+    const box = contentBox(tokens, grid, map);
+    setCam(fitContent(box, free.area, map, workArea(size)));
+  };
+  /** Applies a camera event; fits now (or next frame, once the window change is laid out). */
+  const onCamera = useCallback((e: CameraEvent, deferred = false) => {
+    const next = cameraOn(cameraModeRef.current, e);
+    cameraModeRef.current = next.mode;
+    setCameraMode(next.mode);
+    if (!next.fit) return;
+    if (!deferred) fitNow.current();
+    else
+      requestAnimationFrame(() => {
+        if (cameraModeRef.current === "fitted") fitNow.current();
+      });
+  }, []);
+  // (a) a scene opens on this page, after the layout is applied (FR-SHELL-16).
   const fittedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (size.w === 0 || fittedFor.current === scene.id) return;
+    if (size.w === 0 || !free.ready || fittedFor.current === scene.id) return;
     fittedFor.current = scene.id;
-    setCam(fitCamera({ w: scene.mapWidth, h: scene.mapHeight }, size));
-  }, [scene.id, scene.mapWidth, scene.mapHeight, size]);
+    onCamera("open");
+  }, [scene.id, size, free.ready, onCamera]);
+  // (b) an appearance refits while `fitted`; the window lands (FR-SHELL-18 `appear`) first.
+  const seenAppearances = useRef(free.appearances);
+  useEffect(() => {
+    if (free.appearances === seenAppearances.current) return;
+    seenAppearances.current = free.appearances;
+    onCamera("appearance", true);
+  }, [free.appearances, onCamera]);
+  // FR-MAP-45: the rail's Fit button.
+  useEffect(
+    () =>
+      useMapFit.subscribe((s, prev) => {
+        if (s.requests !== prev.requests) onCamera("fit");
+      }),
+    [onCamera],
+  );
 
   // ---- optimistic move overlay (FR-MAP-15): any snapshot drops it ----
   const [overlay, setOverlay] = useState<MoveOverlay>(emptyOverlay);
@@ -270,7 +319,9 @@ export function MapCanvas(props: MapCanvasProps) {
     if (!d) return;
     addPing(pointers, d.x, d.y, s.from.role, performance.now());
     // Forced recentre, zoom unchanged; players may pan away (OQ-MAP-08).
-    if (client === "player") setCam((c) => centreOn(c, d, size));
+    if (client !== "player") return;
+    setCam((c) => centreOn(c, d, size));
+    onCamera("pull");
   });
   useSignal(MAP_SIGNALS.laser, (s) => {
     const d = LaserData.safeParse(s.data);
@@ -448,7 +499,9 @@ export function MapCanvas(props: MapCanvasProps) {
   const onWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
     const p = stageRef.current?.getPointerPosition();
-    if (p) setCam((c) => zoomAt(c, p, e.evt.deltaY));
+    if (!p) return;
+    setCam((c) => zoomAt(c, p, e.evt.deltaY));
+    onCamera("zoom");
   };
 
   const ctx: CanvasContextValue = {
@@ -484,6 +537,7 @@ export function MapCanvas(props: MapCanvasProps) {
       data-scene-id={scene.id}
       data-tool={tool}
       data-targeting={targeting}
+      data-camera={cameraMode}
       className="absolute inset-0"
       style={{ cursor: tool === "select" && !targeting ? undefined : "crosshair" }}
       onContextMenu={(e) => e.preventDefault()}
@@ -524,7 +578,9 @@ export function MapCanvas(props: MapCanvasProps) {
           draggable={tool === "select"}
           onDragEnd={(e) => {
             const stage = stageRef.current;
-            if (stage && e.target === stage) setCam((c) => ({ ...c, x: stage.x(), y: stage.y() }));
+            if (!stage || e.target !== stage) return;
+            setCam((c) => ({ ...c, x: stage.x(), y: stage.y() }));
+            onCamera("pan");
           }}
           onWheel={onWheel}
           onMouseDown={onMouseDown}
