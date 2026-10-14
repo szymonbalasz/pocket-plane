@@ -8,25 +8,28 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| P R1 map fit | — | — | **Merged** (walkthrough 23/23) | — |
-| S core | — | — | **Merged** (core, no walkthrough) | — |
-| P R3 game log | — | — | **Merged** (walkthrough 16/16 after the FR-DICE-21 fix) | — |
-| P R2/R4/R5 combat | `fix/polish-combat` (ws w28, slot 4) | build-polish-combat | Building | Walkthrough CBT 3/8/9a/9b/14, NOTE 12 |
-| D core | `fix/cbtx-core` (ws w29, slot 0) | build-cbtx-core | Building | Merge, then D + S builds |
-| S build / D build / S combat routes | — | — | Queued (#179 order) | — |
+| P R1 map fit, R3 game log | — | — | **Merged** (walkthroughs 23/23, 16/16) | — |
+| S core, D core | — | — | **Merged** (no walkthrough) | — |
+| P R2/R4/R5 combat | `fix/polish-combat` (ws w28, slot 4) | build-polish-combat | Notifications walkthrough 12/12; combat walkthrough running (test-polish-combat) | Merge, then D build |
+| S build (a, b) | `build/character-sheet-full` (ws w2A, slot 0) | build-character-sheet-full | Building | Walkthrough CHARX 1–10 |
+| D build | — | — | Waits for polish-combat merge | — |
+| S combat routes (slice 4) | — | — | After D build | — |
 
 Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-14-evening)). Briefs in `briefs\`. Evidence: `verify-*\` (session-sim-3 evidence only in the main checkout: `.verify/20261014-131140-session-sim-3/`; the `%TEMP%` copy was cleared).
 
 ## Shared-file locks
 
-- `fix/polish-combat`: notifications server files (`kind.ts`, `helpers.ts`, `index.ts`), combat-tracker server `attack.ts` / `hp.ts` / `lifecycle.ts` / `card-kind.ts`, `@shared/combat-tracker/log-kinds.ts`.
-- `fix/cbtx-core`: `src/server/db/`, `src/shared/events/`, `src/shared/entities/`, entities `records.ts`, `@shared/combat-tracker/schemas.ts`, scenes-map overlay files (`token-overlays.ts`, `decorations.ts`, `layers/TokensLayer.tsx`, `theme.ts`, `layers/tone.ts`), entities `rows.ts`, snapshot-size files.
+- `fix/polish-combat`: notifications server files, combat-tracker server `attack.ts` / `hp.ts` / `lifecycle.ts` / `card-kind.ts`, `@shared/combat-tracker/log-kinds.ts`.
+- `build/character-sheet-full`: character-sheet feature folders except `hp.ts` / `char.adjustHp` (reserved for the D build), one line each in `creature-actions.ts` and entities `definition-hooks.ts`.
 
 ## Pending DM decisions
 
 - None.
 
 ## Resolved locally (report at gate)
+
+- Sprint 1: CON-44 headroom is tight (heavy DM snapshot 746 KB vs 768 KiB after cbtx-core). D build: snapshot only active effects; never raise a ceiling without a look.
+- Sprint 1 nit (not a FAIL): Notifications window opens ~250 px tall vs spec §7 360×480 (test-polish-notes).
 
 - Known flake: `snapshot-size.test.ts` (CON-44) fails with SQLITE_BUSY when several worktrees run the suite at once; passes alone and on re-run. Builders re-run before treating it as real.
 
