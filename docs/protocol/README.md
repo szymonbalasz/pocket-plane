@@ -185,10 +185,11 @@ Registration: `type, scope, schema, idOf, campaignOf (campaign/scene scope, requ
 | `presence` | SYNC | campaign; in-memory, not persisted; `audience: dm` | `{id, playerId, campaignId, online}` (`id` = `playerId`) | **never sent** (DM only) | DM: one per player of the campaign, `online` from live connections. Changes go in `event` frames with `cause.name: "presence"` (CON-07) |
 | `probe` *(test mode only)* | SYNC | campaign (CON-06) | `{id, campaignId, text, hidden, ownerPlayerId}` | full iff `!hidden && (owner == null \|\| owner == ctx.playerId)`, else hidden | the campaign's probes, insertion order (CON-06) |
 | `entity`, `imported-entity` | entities | campaign, global | see [§12](#12-scenes-record-types) (CON-25) | | |
+| `creature-sheet` | CHARX | campaign | `creature_sheet` row ([data model §20](../data-model/README.md#20-sprint-1-creature-sheet)); table **built** (fix/charx-core); record type *(sprint 1, to build)*, registered in `src/server/features/character-sheet/index.ts` | **full** iff `ownerPlayerId = ctx.playerId` (the row's copy), else **hidden** (other players' sheets, every NPC sheet) ([FR-CHARX-36](../specs/character-sheet-full.md#6-functional-requirements)) | the campaign's rows | see [§31](#31-sprint-1-character-sheet-full) |
 
 Sources: [CAMP §9](../specs/campaign-management.md#9-api--events), [FR-CAMP-19](../specs/campaign-management.md#6-functional-requirements), [SYNC §8–9](../specs/live-sync.md#9-api--events), [FR-SYNC-23](../specs/live-sync.md#6-functional-requirements), [FR-SYNC-27](../specs/live-sync.md#6-functional-requirements), [FIX §9](../specs/fixtures-adapters.md#9-api--events).
 
-Scenes types: [§12](#12-scenes-record-types). Combat types: [§20](#20-combat-record-types). Reward types: [§29](#29-reward-party-loot).
+Scenes types: [§12](#12-scenes-record-types). Combat types: [§20](#20-combat-record-types). Reward types: [§29](#29-reward-party-loot). Sprint 1 types: [§31](#31-sprint-1-character-sheet-full).
 
 ## 6. Intents and commands
 
@@ -265,6 +266,11 @@ Each lists `changes` (before/after per record; create: before null, delete: afte
 | `EntityImported` | FIX → entities | see [§16](#16-scenes-domain-events) (CON-25) | `imported-entity` upsert (global) | yes, `campaignId` null | no | no | — (only for `created`; `existing` emits nothing) |
 | `ProbeSet` *(test mode)* | SYNC | `{probeId, text, hidden, ownerPlayerId}` | `probe` upsert (before null on create) | yes | no | no | — (CON-05) |
 | `ProbeEdited` *(test mode)* | SYNC | `{probeId, text}` | `probe` upsert | yes | no | no | — (CON-05) |
+| `CharacterCreated` | CHARX | `{characterId, ownerPlayerId, status}` | `entity` + `creature-sheet` upserts | yes | no | no | — |
+| `CharacterApproved` | CHARX | `{characterId}` | `creature-sheet` upsert | yes | no | no | — |
+| `CharacterLockSet` | CHARX | `{characterId, locked}` | `creature-sheet` upsert | yes | no | no | — |
+| `CharacterSheetEdited` | CHARX | `{creatureId, op: set \| putRow \| deleteRow \| moveRow, fields?, list?, rowId?}` (keys and ids, never values) | `entity` and / or `creature-sheet` + hook-changed instances | yes | no | no | — |
+| `CharacterResourceUsed` | CHARX | `{characterId, resource: {slot} \| {hitDie} \| {feature}, before, after}` | `creature-sheet` upsert | yes | no | no | — |
 
 Sources: [CAMP §9](../specs/campaign-management.md#9-api--events), [FR-CAMP-09](../specs/campaign-management.md#6-functional-requirements), [FR-SYNC-07](../specs/live-sync.md#6-functional-requirements), [FR-FIX-23](../specs/fixtures-adapters.md#6-functional-requirements), [ADR-0018](../architecture/adr/0018-global-imported-content.md).
 
@@ -272,7 +278,7 @@ Sources: [CAMP §9](../specs/campaign-management.md#9-api--events), [FR-CAMP-09]
 - Known non-logged: token moves ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). Undoable in MVP: combat damage/healing applied only.
 - **Helper events** (CON-40, gate I15): a helper whose record needs its own `cause` (e.g. `notify`) emits its own event via `env.emit`, after the owner's event; other helpers return `RecordChange[]` for the caller's event. Each is its own `event` frame, all before the sender's `ack`.
 
-Scenes events: [§16](#16-scenes-domain-events). Combat events (undoable + compensating, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): [§22](#22-combat-domain-events). > Later phase: Reward.
+CHARX rows: schemas **built** (fix/charx-core, `src/shared/events/character-sheet.ts`, registered); emitted by the CHARX commands *(sprint 1, to build)*; visibility per [§31](#31-sprint-1-character-sheet-full). Scenes events: [§16](#16-scenes-domain-events). Combat events (undoable + compensating, [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): [§22](#22-combat-domain-events). > Later phase: Reward.
 
 ## 9. How a feature plugs in
 
@@ -350,7 +356,7 @@ DM always `full`. Generic record changes only ([ADR-0021](../architecture/adr/00
 | Type | Owner | Scope | Wire fields (DM) | Player visibility | Snapshot provider | Source |
 |---|---|---|---|---|---|---|
 | `asset` | ASSET | campaign | `{id, campaignId, seq, name, mime, bytes, width, height, displayWidth, displayHeight, createdAt}` (no `hash`) | **hidden** | all of the campaign's assets | [FR-ASSET-10](../specs/assets-pipeline.md#6-functional-requirements), ASSET §9 |
-| `entity` | ENT | campaign | row minus provenance (+ `tokenShape`, feedback pass) | own character (`ownerPlayerId = ctx.playerId`) **full**; other characters **redacted** `{id, kind, name, portraitAssetId, ownerPlayerId}` (+ derived `down` = `hpCurrent = 0`, feedback pass, #154); monsters **hidden** | campaign's characters + customs | [FR-ENT-15](../specs/entities.md#6-functional-requirements), [ADR-0024](../architecture/adr/0024-definition-visibility.md) |
+| `entity` | ENT | campaign | row minus provenance (+ `tokenShape`, feedback pass) | own character (`ownerPlayerId = ctx.playerId`) **full**; other characters **redacted** `{id, kind, name, portraitAssetId, ownerPlayerId}` (+ derived `down` = `hpCurrent = 0`, feedback pass, #154; *(sprint 1, built, fix/charx-core)* + `level, className, species` and CBTX's `deathState`: the **one whitelist** `RedactedCharacter` / `REDACTED_CHARACTER_KEYS`, [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md), [FR-CHARX-35](../specs/character-sheet-full.md#6-functional-requirements)); monsters **hidden** | campaign's characters + customs | [FR-ENT-15](../specs/entities.md#6-functional-requirements), [ADR-0024](../architecture/adr/0024-definition-visibility.md) |
 | `imported-entity` | ENT | global, `audience: dm` (players get no list, not even empty; [ADR-0024](../architecture/adr/0024-definition-visibility.md)) | row incl. provenance | **hidden** | all imported definitions | [FR-ENT-16](../specs/entities.md#6-functional-requirements), [ADR-0018](../architecture/adr/0018-global-imported-content.md) |
 | `scene` | MAP | scene, `sceneOf = id` ([CON-22](#11-conflicts-log)) | full row | **redacted** `{id, mapAssetId, mapWidth, mapHeight, grid*, active}` (no name, folder, lock, `seq`) *(proposed, OQ-MAP-17)* | DM: all; player: active | [FR-MAP-26](../specs/scenes-map.md#6-functional-requirements), MAP §9 |
 | `scene-folder` | MAP | campaign | full row | **hidden** | campaign's folders | FR-MAP-26 |
@@ -627,7 +633,7 @@ All logged in the command's transaction; none transient. **Undoable: `AttackAppl
 | `DiceRolled` | DICE | `dice.roll` | `{entryId, rollIds}` | `game-log-entry` upsert (players iff public) | no | [DICE §9](../specs/dice-roll-log.md#9-api--events) |
 | `PublicLogCategorySet` | DICE | `dice.setCategoryPublic` | `{category, public}` | `game-log-settings` upsert (DM only) | no | FR-DICE-12 |
 | `CharacterHpAdjusted` | CHAR | `char.adjustHp` | `{entityId, delta, hpBefore, hpAfter}` | `entity` upsert (DM + owner full; others redacted, no HP) | no (not a combat log entry) | [CHAR §9](../specs/character-sheet.md#9-api--events) |
-| `CharacterRolled` | CHAR | `char.roll` | `{characterId, kind, mode, manual, attackName?, damageType?, rollIds, entryId}`; *(feedback pass, built)* `kind` + `check`, `save`; `ability?` | `game-log-entry` upsert | no (#67) | CHAR §9, gate I1 |
+| `CharacterRolled` | CHAR | `char.roll` | `{characterId, kind, mode, manual, attackName?, damageType?, rollIds, entryId}`; *(feedback pass, built)* `kind` + `check`, `save`; `ability?`; *(sprint 1, schema built, fix/charx-core)* `kind` + `skill`, `damage`, `spellAttack`, `spellDamage`; `skill?`, `attackId?`, `spellId?`, each only on its kind ([FR-CHARX-20](../specs/character-sheet-full.md#6-functional-requirements)) | `game-log-entry` upsert | no (#67) | CHAR §9, gate I1 |
 | `NotificationCreated` | NOTE | `notify` | `{notificationId, kind, audience, audiencePlayerId, hasAction}` | `notification` upsert (before null) | no | [NOTE §9](../specs/notifications.md#9-api--events) |
 | `NotificationResolved`, `NotificationDismissed`, `NotificationReopened` | NOTE | `resolveNotification` (`cbt.applyCard`, `note.resolve`), `note.dismiss`, `reopenNotification` (`cbt.undo`) | `{notificationId, kind}` | `notification` upsert | no | NOTE §9 |
 | `EncounterCreated` / `Updated` / `Deleted` | CBT | REST | | `encounter` (+ `encounter-entry`) — DM only while planned | no | [CBT §9](../specs/combat-tracker.md#9-api--events) |
@@ -853,3 +859,32 @@ Consolidated 2026-10-14 from the playtest revisions (#171, gate #172) of [play-s
 | 4 | `build/combat-playtest` (+ character-sheet FR-CHAR-24/25, dice FR-DICE-28/29) | 1, 3 | none shared: combat, character-sheet (`routing.ts`, `roll-routes.ts` contract), dice `roll-kind.ts`, `@shared/combat-tracker/log-kinds.ts` |
 | 5 | `fix/playtest-glitches` (G2, G3, G10, G11) (done) | 1 | play-shell frame (`geometry.ts`, `ShellWindow.tsx`, `manager.ts`, `@shared/play-shell/layout.ts`); `src/client/common/sync/store.ts` + new `presence.ts`; `DmPlayPage.tsx` (PresenceBadge); campaign-management `CampaignBar.tsx`, `PlayersPanel.tsx`; DM `initiative-window.tsx` default height; token SVGs + `images` unit (`token-thorn`) |
 | 6 | Walkthroughs | 1–5 | play-shell (16 + 15b), scenes-map (11), combat-tracker (14 + 4a, 4b, 9a, 12a, 12b), character-sheet (11), dice-roll-log (11), then a `session-sim` regression; orchestrator updates [playtest-mvp](../agents/playtest-mvp.md) |
+
+## 31. Sprint 1: character-sheet-full
+
+From [character-sheet-full](../specs/character-sheet-full.md) (CHARX, `complete`, #178, #179; [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md)). **Built by `fix/charx-core`** (shared branch first, slice 1): marked *built*. Everything else is *(sprint 1, to build)* by `build/character-sheet-full` (slices 2–4) after `fix/cbtx-core`. Data side: [data model §20](../data-model/README.md#20-sprint-1-creature-sheet), [§11](../data-model/README.md#11-scenes-entity).
+
+**Record types**
+
+| Type | Status | Visibility | Source |
+|---|---|---|---|
+| `creature-sheet` | table built; record type + zod row schema to build | DM full; owner (row's `ownerPlayerId` copy) full; others hidden | [FR-CHARX-36](../specs/character-sheet-full.md#6-functional-requirements) |
+| `entity` | redaction **built**: other players get the one whitelist `id, kind, name, portraitAssetId, ownerPlayerId, down, level, className, species` (+ `deathState` when CBTX fills it); a key whose value is `undefined` is left out | FR-ENT-15 + whitelist | [FR-CHARX-35](../specs/character-sheet-full.md#6-functional-requirements) |
+
+**WS intents** (default deny; none optimistic) *(sprint 1, to build)*: `char.create`, `char.approve`, `char.setLock`, `char.edit`, `char.putRow` / `char.deleteRow` / `char.moveRow`, `char.useResource`, `char.roll` gains `skill?`, `attackId?`, `spellId?` and the new kinds. Payloads, roles and results: [CHARX §9](../specs/character-sheet-full.md#9-api--events). `char.edit` `set` keys = `SHEET_EDIT_FIELDS`; row lists = `SHEET_ROW_LISTS`; counters = `SheetResource` (all **built**, `src/shared/events/character-sheet.ts`).
+
+**Domain events**: [§8](#8-domain-events) rows; `CharacterRolled` amendment in [§22](#22-combat-domain-events). Schemas **built**; emitters to build. All logged, none undoable ([FR-CHARX-19](../specs/character-sheet-full.md#6-functional-requirements)).
+
+**Internal server APIs** (in the caller's transaction; emit nothing)
+
+| API | Owner | Status | Contract | Source |
+|---|---|---|---|---|
+| `createIn(env, body) → {record, change}` | ENT | built | `POST /api/entities` minus HTTP and event: validated `CreateEntityBody` in; name, owner, portrait, derive checks; character `hpCurrent = hpMax`; `level` / `className` from `classes` | OQ-CHARX-19, [FR-CHARX-08](../specs/character-sheet-full.md#6-functional-requirements) |
+| `updateIn(env, id, next, hooks) → {before, record, changes}` | ENT | built | `PUT` minus HTTP and event, definition-changed hooks included (`changes` = `entity` change, then hook rows). `next` = `UpdateEntityBody` + optional `hpCurrent` (character), clamped 0…hpMax; absent → FR-ENT-11 clamp. Imported → `forbidden`, other campaign → `not_found`. `hooks` = `definitionHooksOf(services)` | OQ-CHARX-19, [FR-CHARX-13/15](../specs/character-sheet-full.md#6-functional-requirements) |
+| `followHpMax(before {hpCurrent, hpMax}, hpMaxAfter, {draft})` | ENT | built | FR-CHARX-15: draft → new max; full HP → new max; else clamp. CHARX passes the result as `updateIn`'s `hpCurrent` | [FR-CHARX-15](../specs/character-sheet-full.md#6-functional-requirements) |
+| `withClassTotals`, `withAttackIds(block, nextId)` | ENT (`@shared/entities`) | built | `level` = Σ class levels, `className` = names joined "/" (every entities write applies it); legacy attacks get `ctx.ids` ids (CHARX's first write) | [FR-CHARX-04/16](../specs/character-sheet-full.md#6-functional-requirements) |
+| Derivation helpers | ENT (`@shared/entities`) | built | `proficiencyBonus`, `checkBonus`, `saveBonus`, `skillBonus`, `passiveScore`, `spellAttackBonus`, `spellSaveDc`, `hitDice`, `sheetValue`, `overrideOf`, `isOverridden`, `withoutOverride`; signatures unchanged (stat block in), overrides honoured. **CBTX concentration:** `saveBonus(stats, "con")` = `concentrationSaveBonus(stats)`, a `save.con` override wins | [FR-CHARX-05–07](../specs/character-sheet-full.md#6-functional-requirements), [§7.1](../specs/character-sheet-full.md#71-sheet-sections-seam-combat-extras) |
+| `sheetAttack(env, creatureId, ref) → {name, toHit, damage, damageType}` | CHARX | to build | For `cbt.attack` (`attackId?` / `spellId?`) | OQ-CHARX-12 |
+| `characterRolls(stats, sheet, kind, ref)` | CHARX (`@shared/character-sheet`) | to build | Roll specs per [CHARX §6 table](../specs/character-sheet-full.md#6-functional-requirements) | [FR-CHARX-21](../specs/character-sheet-full.md#6-functional-requirements) |
+
+**Hooks and registries** *(sprint 1, to build)*: CHARX's definition-changed hook line in `src/server/features/entities/definition-hooks.ts` (owner copy, counter clamp; FR-CHARX-13/17) lands with the record type; client sheet sections `src/client/common/features/character-sheet/sheet-sections.ts` (created empty, [§7.1](../specs/character-sheet-full.md#71-sheet-sections-seam-combat-extras)); roll routes `claim(store, characterId, kind, ref?)` (FR-CHARX-24); `creatureActions` "Sheet" (DM).
