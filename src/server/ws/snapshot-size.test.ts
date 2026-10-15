@@ -7,6 +7,12 @@ import { COMBATANT_TYPE } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_WINDOW } from "@shared/dice-roll-log/schemas";
 import { EFFECT_PRESET_TYPE } from "@shared/effect-modifiers/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
+import {
+  AOE_TEMPLATE_TYPE,
+  MAP_SETTINGS_TYPE,
+  SCENE_PROP_TYPE,
+  SCENE_STRUCTURE_TYPE,
+} from "@shared/scene-tools/schemas";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { SNAPSHOT_CEILING } from "./hub";
 import {
@@ -108,6 +114,34 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect(loads).toHaveLength(HEAVY.scenes);
       expect(loads.reduce((n, l) => n + (l.rows[TOKEN_TYPE] ?? 0), 0)).toBe(HEAVY.tokens);
       expect(loads[0]?.bytes).toBeLessThan(SCENE_LOAD_MAX);
+    });
+
+    test("SCN §12 one typical prepped active scene: DM all rows, players doors / visible only; ≈ 7.4 KB DM; ceilings hold", () => {
+      const sizes = snapshotSizes(b.s);
+      const scn = [SCENE_STRUCTURE_TYPE, SCENE_PROP_TYPE, AOE_TEMPLATE_TYPE, MAP_SETTINGS_TYPE];
+      const rows = (v: ViewerSize) => scn.map((t) => v.types[t]?.rows ?? 0);
+      const bytes = (v: ViewerSize) => scn.reduce((n, t) => n + (v.types[t]?.bytes ?? 0), 0);
+      const [dm, ...players] = sizes as [ViewerSize, ...ViewerSize[]];
+      expect(rows(dm)).toEqual([1, HEAVY.scnProps, HEAVY.scnTemplates, 1]);
+      for (const p of players) {
+        expect(rows(p)).toEqual([
+          1,
+          HEAVY.scnProps - HEAVY.scnHiddenProps,
+          HEAVY.scnTemplates - HEAVY.scnHiddenTemplates,
+          1,
+        ]);
+      }
+      // SCN §12 measured the prototype rows at 7,384 B (DM); players ≈ 3.6 KB per scene.
+      expect(bytes(dm)).toBeLessThan(9_000);
+      for (const p of players) expect(bytes(p)).toBeLessThan(4_500);
+      console.log(
+        `SCN typical scene: DM ${bytes(dm)} B (${scn.map((t) => `${t} ${dm.types[t]?.bytes}`).join(", ")}); P1 ${bytes(players[0] as ViewerSize)} B; heavy DM ${dm.bytes} B, players ${Math.min(...players.map((p) => p.bytes))}–${Math.max(...players.map((p) => p.bytes))} B`,
+      );
+      expectUnderCeilings(sizes);
+      // The scene loads carry the active scene's SCN rows too (ADR-0041).
+      const battle = sceneLoadSizes(b.s).find((l) => (l.rows[SCENE_PROP_TYPE] ?? 0) > 0);
+      expect(battle?.rows[SCENE_STRUCTURE_TYPE]).toBe(1);
+      expect(battle?.rows[AOE_TEMPLATE_TYPE]).toBe(HEAVY.scnTemplates);
     });
 
     test("CHARX §12 creature-sheet rows: DM all 16 + session-sim's 2, each player only their own; ceilings hold", () => {
