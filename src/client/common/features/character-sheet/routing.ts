@@ -14,7 +14,7 @@ import { IntentRejected } from "../../sync/connection";
 /** What the shared roll control hands the sheet (FR-DICE-24). */
 export interface RollRouteInput {
   mode: RollMode;
-  /** One per expression: initiative, check, save 1; attack 2 (to-hit, damage). */
+  /** One per expression: attack (Attack + damage) 2 (to-hit, damage); toHit, damage, … 1. */
   manual?: ManualEntry[];
   /** DM override only. */
   public?: boolean;

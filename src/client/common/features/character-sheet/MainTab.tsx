@@ -1,16 +1,9 @@
-// Main tab (CHARX §7): stat row + HP, Initiative and the first attack (FR-CHAR-03), hit dice,
-// vitals sections, Abilities block (FR-CHAR-22), Skills block + passives, main sections. Edit
-// mode: identity, scores, proficiencies, stats and overrides in place (FR-CHARX-27).
+// Main tab (CHARX §7): stat row + HP, Initiative (FR-CHAR-03; no attack row, FR-CHARX-44), hit
+// dice, vitals sections, Abilities block (FR-CHAR-22), Skills block + passives, main sections.
+// Edit mode: identity, scores, proficiencies, stats and overrides in place (FR-CHARX-27).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
-import {
-  attackLine,
-  hpState,
-  isDown,
-  parseHpAmount,
-  signed,
-  speedText,
-} from "@shared/character-sheet/logic";
+import { hpState, isDown, parseHpAmount, signed, speedText } from "@shared/character-sheet/logic";
 import { CHAR_ADJUST_HP } from "@shared/character-sheet/schemas";
 import { CHARX_INTENTS } from "@shared/character-sheet/sheet";
 import {
@@ -232,62 +225,35 @@ function HpControl() {
   );
 }
 
-/** Initiative + the first attack (FR-CHAR-03), routed like the MVP sheet (FR-CHAR-16/24). */
+/**
+ * Initiative, routed like the MVP sheet (FR-CHAR-16/24). No attack row: attacks are rolled on
+ * the Actions tab only (FR-CHARX-44, N4).
+ */
 function QuickActions() {
   const ctx = useSheet();
   const store = useSync((s) => s.store);
   const overrides = usePublicOverrides();
   const initClaim = routeFor(rollRoutes, store, ctx.creature.id, "initiative");
-  const atkClaim = routeFor(rollRoutes, store, ctx.creature.id, "attack");
-  const attack = ctx.stats.attacks[0];
   // FR-CHAR-24: a hidden claim shows no button and no public switch.
   const showInit = rollActionView(initClaim, "initiative") === "button";
-  const showAtk = rollActionView(atkClaim, "attack") === "button";
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-end gap-2">
-        {showInit && (
-          <PublicSwitch
-            category="initiative"
-            label="Public"
-            testId="char-sheet-public-init"
-            overrides={overrides}
-          />
-        )}
-        <RoutedRoll
-          kind="initiative"
-          title="Initiative"
+    <div className="flex items-center justify-end gap-2">
+      {showInit && (
+        <PublicSwitch
+          category="initiative"
+          label="Public"
+          testId="char-sheet-public-init"
           overrides={overrides}
-          data-testid="char-sheet-roll-init"
-        >
-          Initiative
-        </RoutedRoll>
-      </div>
-      {attack && (
-        <div className="flex items-center justify-between gap-2 border-t pt-1.5">
-          <span data-testid="char-sheet-attack" className="min-w-0 truncate text-sm">
-            {attackLine(attack)}
-          </span>
-          <span className="flex items-center gap-2">
-            {showAtk && (
-              <PublicSwitch
-                category="attack"
-                label="Public"
-                testId="char-sheet-public-attack"
-                overrides={overrides}
-              />
-            )}
-            <RoutedRoll
-              kind="attack"
-              title={`${attack.name} attack`}
-              overrides={overrides}
-              data-testid="char-sheet-roll-attack"
-            >
-              Attack
-            </RoutedRoll>
-          </span>
-        </div>
+        />
       )}
+      <RoutedRoll
+        kind="initiative"
+        title="Initiative"
+        overrides={overrides}
+        data-testid="char-sheet-roll-init"
+      >
+        Initiative
+      </RoutedRoll>
     </div>
   );
 }

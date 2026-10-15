@@ -4,6 +4,7 @@
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import { hitDieMax, slotMax } from "@shared/character-sheet/counters";
 import { levelLine, signed } from "@shared/character-sheet/logic";
+import type { SheetRollKind } from "@shared/character-sheet/schemas";
 import {
   type CreatureSheetRecord,
   defaultSheetData,
@@ -243,6 +244,47 @@ export function spellGroups(spells: readonly SpellRow[]): { level: number; spell
 
 export const spellLevelLabel = (level: number) => (level === 0 ? "Cantrips" : `Level ${level}`);
 
+/** One roll button of an attack or spell row (CHARX §6.1, N7). */
+export interface RowRollButton {
+  kind: SheetRollKind;
+  label: string;
+  testId: string;
+}
+
+/**
+ * FR-CHARX-41 (§6.1): every attack row shows Attack (to-hit only), Damage, Attack + damage, in
+ * that order. The same on DM and player, PC and NPC sheets.
+ */
+export function attackButtons(): RowRollButton[] {
+  return [
+    { kind: "toHit", label: "Attack", testId: "charx-roll-attack" },
+    { kind: "damage", label: "Damage", testId: "charx-roll-damage" },
+    { kind: "attack", label: "Attack + damage", testId: "charx-roll-attack-damage" },
+  ];
+}
+
+/**
+ * FR-CHARX-41 (§6.1) for a spell row: Attack iff `roll: attack`; Damage ("Healing" for
+ * `effect: healing`) iff it has damage (any `roll`); Attack + damage iff both. Same order.
+ */
+export function spellButtons(s: Pick<SpellRow, "roll" | "damage" | "effect">): RowRollButton[] {
+  const attack = s.roll === "attack";
+  const out: RowRollButton[] = [];
+  if (attack) out.push({ kind: "spellToHit", label: "Attack", testId: "charx-roll-spell-attack" });
+  if (s.damage) {
+    const label = s.effect === "healing" ? "Healing" : "Damage";
+    out.push({ kind: "spellDamage", label, testId: "charx-roll-spell-damage" });
+  }
+  if (attack && s.damage) {
+    out.push({
+      kind: "spellAttack",
+      label: "Attack + damage",
+      testId: "charx-roll-spell-attack-damage",
+    });
+  }
+  return out;
+}
+
 /** Slot pips per level with max > 0 (CHARX §7). */
 export function slotPips(
   stats: { spellcasting?: Spellcasting },
@@ -265,6 +307,25 @@ export function hitDicePips(
     max: hitDieMax(stats, die),
     used: sheet.hitDiceUsed[die] ?? 0,
   })).filter((p) => p.max > 0);
+}
+
+/** FR-CHARX-48: what stays pinned: the whole header + tab strip, or name row + tab strip. */
+export type PinnedPart = "full" | "compact";
+
+/** Pixels the full header must shrink below half the body before compact turns full again. */
+export const PIN_HYSTERESIS_PX = 16;
+
+/**
+ * FR-CHARX-48: the full header (name row, badges, buttons, picker, `header` sections) + tab
+ * strip stay pinned while they take at most half the window body; else only the name row and
+ * the tab strip ("compact"). `fullPx` is the full part's height wherever it currently sits.
+ * The hysteresis keeps a scrollbar-width reflow from flipping it back and forth. Not measured
+ * yet (body 0) → unchanged.
+ */
+export function pinnedPart(fullPx: number, bodyPx: number, current: PinnedPart): PinnedPart {
+  if (bodyPx <= 0) return current;
+  const room = bodyPx - (current === "compact" ? PIN_HYSTERESIS_PX : 0);
+  return fullPx * 2 <= room ? "full" : "compact";
 }
 
 /** A pip click (CHARX §7): click = use one, Shift+click = restore one. */

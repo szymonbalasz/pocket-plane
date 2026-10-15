@@ -14,7 +14,8 @@ export type AbilityRollKind = z.infer<typeof AbilityRollKind>;
 
 /**
  * `char.roll` kinds and the roll-route contract (FR-CHAR-05, FR-CHAR-16, FR-CHAR-21); CHARX adds
- * `skill`, `damage`, `spellAttack`, `spellDamage` (FR-CHARX-20).
+ * `skill`, `damage`, `spellAttack`, `spellDamage` (FR-CHARX-20) and the to-hit-only `toHit`,
+ * `spellToHit` (FR-CHARX-42, N7). `attack` / `spellAttack` stay to-hit + damage.
  */
 export const SHEET_ROLL_KINDS = [
   "initiative",
@@ -24,6 +25,8 @@ export const SHEET_ROLL_KINDS = [
   "damage",
   "spellAttack",
   "spellDamage",
+  "toHit",
+  "spellToHit",
 ] as const;
 export const SheetRollKind = z.enum(SHEET_ROLL_KINDS);
 export type SheetRollKind = z.infer<typeof SheetRollKind>;
@@ -31,9 +34,18 @@ export type SheetRollKind = z.infer<typeof SheetRollKind>;
 export const isAbilityRollKind = (k: SheetRollKind): k is AbilityRollKind =>
   k === "check" || k === "save";
 
+/** Kinds that may name an attack row (`attackId`; absent = the first attack). */
+export const isAttackRowKind = (k: SheetRollKind): boolean =>
+  k === "attack" || k === "damage" || k === "toHit";
+
+/** Kinds that need a spell row (`spellId`). */
+export const isSpellRowKind = (k: SheetRollKind): boolean =>
+  k === "spellAttack" || k === "spellDamage" || k === "spellToHit";
+
 /**
- * FR-CHAR-07, FR-CHAR-21, FR-CHARX-21: one manual entry per roll — attack 2 (to-hit, damage),
- * else 1. `spellAttack` is 1 or 2 (damage if the spell has it): checked against the roll specs.
+ * FR-CHAR-07, FR-CHAR-21, FR-CHARX-21, FR-CHARX-42: one manual entry per roll — attack 2
+ * (to-hit, damage), else 1. `spellAttack` is 1 or 2 (damage if the spell has it): checked
+ * against the roll specs.
  */
 export const MANUAL_COUNT: Record<Exclude<SheetRollKind, "spellAttack">, number> = {
   initiative: 1,
@@ -43,14 +55,17 @@ export const MANUAL_COUNT: Record<Exclude<SheetRollKind, "spellAttack">, number>
   skill: 1,
   damage: 1,
   spellDamage: 1,
+  toHit: 1,
+  spellToHit: 1,
 };
 
 const Id = z.string().min(1).max(64);
 
 /**
- * Intent `char.roll` (FR-CHAR-05–07, FR-CHAR-17, FR-CHAR-21, FR-CHARX-20): `ability` iff
- * check / save; `skill` iff skill; `attackId` only with attack / damage (absent = the first
- * attack); `spellId` iff spellAttack / spellDamage. Wrong combinations → `invalid`.
+ * Intent `char.roll` (FR-CHAR-05–07, FR-CHAR-17, FR-CHAR-21, FR-CHARX-20, -42): `ability` iff
+ * check / save; `skill` iff skill; `attackId` only with attack / damage / toHit (absent = the
+ * first attack); `spellId` iff spellAttack / spellDamage / spellToHit. Wrong combinations →
+ * `invalid`.
  */
 export const SheetRollIntent = z
   .strictObject({
@@ -86,10 +101,10 @@ export const SheetRollIntent = z
         message: v.kind === "skill" ? "Pick a skill" : `No skill for ${v.kind}`,
       });
     }
-    if (v.attackId !== undefined && v.kind !== "attack" && v.kind !== "damage") {
+    if (v.attackId !== undefined && !isAttackRowKind(v.kind)) {
       ctx.addIssue({ code: "custom", path: ["attackId"], message: `No attack for ${v.kind}` });
     }
-    const spellKind = v.kind === "spellAttack" || v.kind === "spellDamage";
+    const spellKind = isSpellRowKind(v.kind);
     if (spellKind !== (v.spellId !== undefined)) {
       ctx.addIssue({
         code: "custom",

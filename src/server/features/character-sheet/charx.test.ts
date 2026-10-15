@@ -782,6 +782,57 @@ describe("FR-CHARX-20 FR-CHARX-21 char.roll kinds", () => {
     expect(rolled[1]).toMatchObject({ kind: "damage", attackName: "Shortsword" });
     expect(t.events.at(-1)?.event.changes.map((c) => c.type)).toEqual([GAME_LOG_ENTRY_TYPE]);
   });
+
+  test("FR-CHARX-42 toHit / spellToHit: one roll, one entry, CharacterRolled with the row; player public, DM per category", () => {
+    const t = sela();
+    const lc = t.run<{ rowId: string }>(I.putRow, {
+      creatureId: t.t.miraId,
+      list: "attacks",
+      row: { name: "Light crossbow", toHit: 4, damage: "1d8+2", damageType: "piercing" },
+    }).rowId;
+    t.events.length = 0;
+    const p1 = t.t.p1Actor;
+    t.run(
+      "char.roll",
+      { characterId: t.t.miraId, kind: "toHit", attackId: lc, mode: "advantage" },
+      p1,
+    );
+    t.run("char.roll", { characterId: t.id, kind: "spellToHit", spellId: t.gb }, t.t.p2Actor);
+    t.run("char.roll", { characterId: t.t.miraId, kind: "toHit", attackId: lc });
+    t.run("char.roll", { characterId: t.t.miraId, kind: "toHit", public: true });
+    expect(lastRolls(t)).toEqual([
+      ["2d20kh1+4", "attack", "Light crossbow attack", "advantage"],
+      ["1d20+5", "attack", "Guiding Bolt attack", "normal"],
+      ["1d20+4", "attack", "Light crossbow attack", "normal"],
+      ["1d20+4", "attack", "Shortsword attack", "normal"],
+    ]);
+    const entries = t.s.db.select().from(gameLogEntry).orderBy(asc(sql`rowid`)).all();
+    expect(entries.map((e) => [e.category, (e.rollIds as string[]).length, e.public])).toEqual([
+      ["attack", 1, true],
+      ["attack", 1, true],
+      ["attack", 1, false],
+      ["attack", 1, true],
+    ]);
+    const rolled = t.events
+      .filter((e) => e.event.type === "CharacterRolled")
+      .map((e) => e.event.payload);
+    expect(rolled[0]).toMatchObject({
+      kind: "toHit",
+      attackId: lc,
+      attackName: "Light crossbow",
+      damageType: "piercing",
+      mode: "advantage",
+    });
+    expect(rolled[1]).toMatchObject({ kind: "spellToHit", spellId: t.gb });
+    expect(rolled[3]).toMatchObject({ kind: "toHit", attackName: "Shortsword" });
+    // Physical dice: one entry; a save spell has no attack roll; wrong refs → invalid.
+    const r = (p: object) => t.run("char.roll", { characterId: t.id, ...p }, t.t.p2Actor);
+    r({ kind: "spellToHit", spellId: t.gb, manual: [{ diceTotal: 11 }] });
+    const noAtk = t.fail(() => r({ kind: "spellToHit", spellId: t.sf }));
+    expect([noAtk.code, noAtk.message]).toEqual(["conflict", "No attack roll for Sacred Flame"]);
+    expect(t.fail(() => r({ kind: "toHit", spellId: t.gb })).code).toBe("invalid");
+    expect(t.fail(() => r({ kind: "spellToHit", spellId: t.gb, manual: [] })).code).toBe("invalid");
+  });
 });
 
 describe("FR-CHARX-39 crash", () => {

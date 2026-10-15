@@ -9,6 +9,7 @@ import {
   type CharAdjustHpResult,
   type CharRollResult,
   isAbilityRollKind,
+  isAttackRowKind,
   SheetRollIntent,
 } from "@shared/character-sheet/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
@@ -94,12 +95,11 @@ export const charRoll = defineCommand({
       // FR-CHARX-22: a definition's name can leak a renamed or hidden creature (ADR-0024).
       public: definition ? false : input.public,
     });
-    const attack =
-      input.kind !== "attack" && input.kind !== "damage"
-        ? null
-        : input.attackId === undefined
-          ? sheetAttack(c.statBlock)
-          : (c.statBlock.attacks.find((a) => a.id === input.attackId) ?? null);
+    const attack = !isAttackRowKind(input.kind)
+      ? null
+      : input.attackId === undefined
+        ? sheetAttack(c.statBlock)
+        : (c.statBlock.attacks.find((a) => a.id === input.attackId) ?? null);
     env.emit({
       type: CharacterRolled.type,
       campaignId: env.actor.campaignId,
