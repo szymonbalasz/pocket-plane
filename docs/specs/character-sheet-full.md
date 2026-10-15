@@ -340,7 +340,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | `char-sela` | `player-2` | **Draft** "Sela" for `player-2` (as a player would make it): Cleric 1 d8, species "Dwarf", WIS 16, Medicine + Insight, spellcasting WIS, slots 1: 2; spells Sacred Flame (save DEX, 1d8 radiant), Guiding Bolt (attack, 4d6 radiant), Cure Wounds (`roll: none`, 1d8+3 healing), notes "SELA-NOTE-3" | no |
 | `npc-elite-sheet` | `enemy-custom` | DM edits Elite Goblin Warrior: Stealth expertise, 2nd attack "Shortbow" +5 / 1d6+3 piercing, feature "Nimble Escape", notes "NPC-NOTE-9" | yes |
 
-**Bundle `character-sheet-full`** = bundle `character-sheet` + `enemy-1` + `enemy-custom` + `char-mira-full` + `char-mira-locked` + `char-sela` + `npc-elite-sheet` + `loot-1` + `loot-wallets`. Game-log settings at defaults (all hidden).
+**Bundle `character-sheet-full`** = bundle `character-sheet` + `enemy-1` + `enemy-custom` + `char-mira-full` + `char-mira-locked` + `char-sela` + `npc-elite-sheet` + `loot-1` + `loot-wallets`. Game-log settings at defaults (all hidden). *Sprint 2:* no new fixture or bundle; G8 cards come from players' creates in the walkthrough (fixture drafts are made as DM, so they carry no card).
 
 | Level | What | Fixtures |
 |---|---|---|
