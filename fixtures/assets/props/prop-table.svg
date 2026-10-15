@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="256" viewBox="0 0 128 256">
+  <title>prop-table</title>
+  <!-- Fixture "prop-table" (scene-tools §13): a long wooden table seen from above, portrait
+       (1 × 2 drawn; the fixture rotates it 90° onto a 2 × 1 footprint). Planks and a cloth runner. -->
+  <rect x="8" y="8" width="112" height="240" rx="10" fill="#9c6b3c" stroke="#4a3018" stroke-width="8"/>
+  <path d="M45 12 V244 M83 12 V244" stroke="#6e4723" stroke-width="4"/>
+  <rect x="50" y="24" width="28" height="208" fill="#7a2e2e" opacity="0.85"/>
+  <circle cx="64" cy="70" r="10" fill="#d9c27a"/>
+  <circle cx="64" cy="186" r="10" fill="#d9c27a"/>
+</svg>
