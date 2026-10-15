@@ -63,7 +63,7 @@ for (const vp of [
   });
 }
 
-test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-45 FR-CHARX-46 FR-CHARX-10 FR-CHARX-32 Brin: create, edit, roll Stealth, draft card, approve; player-2 summary", async ({
+test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-45 FR-CHARX-46 FR-CHARX-10 FR-CHARX-32 FR-CHARX-47 Brin: create, edit, roll Stealth, draft card, approve; player-2 summary; picker memory", async ({
   browser,
 }) => {
   const { secret, link } = e2eEnv();
@@ -145,6 +145,15 @@ test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-45 FR-CHARX-46 FR-CHARX-10 FR-CHARX-32 Br
   // G8: no draft card and no approval card ever reached player 2.
   expect(frames).not.toContain('"kind":"charx-draft"');
   expect(frames).not.toContain('"kind":"charx-approved"');
+
+  // FR-CHARX-47: Player 1 picks Mira (the default would be Brin, first by name); a reload keeps it.
+  const miraId = e2eEnv().recordId("char-mira", "entity");
+  await sheet1.getByTestId("char-sheet-picker").selectOption({ label: "Mira · Locked" });
+  await expect(sheet1.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
+  await p1.reload();
+  await live(p1);
+  const again = await openWindow(p1, "char.sheet");
+  await expect(again.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
 
   for (const page of [p2, p1, dm]) await page.context().close();
 });
