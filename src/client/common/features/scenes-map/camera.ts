@@ -1,5 +1,6 @@
 // Per-client camera (FR-MAP-12): pan/zoom never sent. Map px → screen px = p × scale + (x, y).
-// A scene opens framed in the free area (FR-MAP-44, R1).
+// A scene opens framed in the free area (FR-MAP-44, R1), never below a readable cell (FR-MAP-46);
+// a viewport resize refits while fitted (FR-MAP-47).
 import { footprint, type Grid } from "@shared/scenes-map/geometry";
 import type { TokenSize } from "@shared/scenes-map/schemas";
 
@@ -38,17 +39,12 @@ export interface Box {
   h: number;
 }
 
-/**
- * FR-MAP-44 content box (map px): the bounding box of the footprints of `tokens`, grown by one
- * cell per side, cut to the map rectangle. No tokens (or none on the map) → the map rectangle.
- */
-export function contentBox(
+/** Bounding box (map px) of the footprints of `tokens`; none → null. */
+export function footprintBox(
   tokens: readonly { col: number; row: number; size: TokenSize }[],
   grid: Grid,
-  map: Size,
-): Box {
-  const whole = { x: 0, y: 0, w: map.w, h: map.h };
-  if (tokens.length === 0) return whole;
+): Box | null {
+  if (tokens.length === 0) return null;
   const c = grid.gridCellSize;
   let x0 = Number.POSITIVE_INFINITY;
   let y0 = Number.POSITIVE_INFINITY;
@@ -63,10 +59,26 @@ export function contentBox(
     x1 = Math.max(x1, x + n * c);
     y1 = Math.max(y1, y + n * c);
   }
-  const bx0 = Math.max(0, x0 - c);
-  const by0 = Math.max(0, y0 - c);
-  const bx1 = Math.min(map.w, x1 + c);
-  const by1 = Math.min(map.h, y1 + c);
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+/**
+ * FR-MAP-44 content box (map px): the bounding box of the footprints of `tokens`, grown by one
+ * cell per side, cut to the map rectangle. No tokens (or none on the map) → the map rectangle.
+ */
+export function contentBox(
+  tokens: readonly { col: number; row: number; size: TokenSize }[],
+  grid: Grid,
+  map: Size,
+): Box {
+  const whole = { x: 0, y: 0, w: map.w, h: map.h };
+  const fp = footprintBox(tokens, grid);
+  if (!fp) return whole;
+  const c = grid.gridCellSize;
+  const bx0 = Math.max(0, fp.x - c);
+  const by0 = Math.max(0, fp.y - c);
+  const bx1 = Math.min(map.w, fp.x + fp.w + c);
+  const by1 = Math.min(map.h, fp.y + fp.h + c);
   if (bx1 <= bx0 || by1 <= by0) return whole;
   return { x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 };
 }
@@ -74,35 +86,73 @@ export function contentBox(
 /** FR-MAP-44 margin inside the free area (px). */
 export const FIT_MARGIN = 16;
 
+/** FR-MAP-46 fit floor: a fit never draws a grid cell smaller than this (screen px). */
+export const FIT_MIN_CELL_PX = 48;
+
+/** A fit camera; `floor` = the FR-MAP-46 floor set the scale (`data-fit-floor`). */
+export interface Fit extends Camera {
+  floor: boolean;
+}
+
+/**
+ * Pans `at` (the screen start of a span of length `len`) the least so the span lies in
+ * [lo, hi]; a span longer than that is centred in it instead.
+ */
+const panInto = (at: number, len: number, lo: number, hi: number) =>
+  len > hi - lo ? (lo + hi - len) / 2 : Math.min(Math.max(at, lo), hi - len);
+
 /**
  * FR-MAP-44 fit: `box` (map px) centred in `free` (screen px), as large as fits with a 16 px
  * margin, but never above the whole-map fit into the work area (`work`), so it only zooms out
- * from the FR-MAP-12 zoom.
+ * from the FR-MAP-12 zoom. FR-MAP-46: never below a `FIT_MIN_CELL_PX` cell (`cell` = grid cell,
+ * map px; capped by the max zoom), which beats the cap; then the camera pans the least so `pcs`
+ * (the PC tokens' footprint box, map px) lies in the free area minus the margin, centred on it
+ * per axis where it can't.
  */
-export function fitContent(box: Box, free: Box, map: Size, work: Size): Camera {
+export function fitContent(
+  box: Box,
+  free: Box,
+  map: Size,
+  work: Size,
+  cell: number,
+  pcs: Box | null,
+): Fit {
   const cap = fitCamera(map, work).scale;
+  const min = cell > 0 ? Math.min(ZOOM_MAX, FIT_MIN_CELL_PX / cell) : 0;
   if (box.w <= 0 || box.h <= 0 || free.w <= 0 || free.h <= 0) {
-    return { x: free.x, y: free.y, scale: cap };
+    return { x: free.x, y: free.y, scale: Math.max(cap, min), floor: min > cap };
   }
-  const scale = clampScale(
+  const fits = clampScale(
     Math.min(cap, (free.w - 2 * FIT_MARGIN) / box.w, (free.h - 2 * FIT_MARGIN) / box.h),
   );
-  return {
-    x: free.x + free.w / 2 - (box.x + box.w / 2) * scale,
-    y: free.y + free.h / 2 - (box.y + box.h / 2) * scale,
-    scale,
-  };
+  const floor = fits < min;
+  const scale = floor ? min : fits;
+  let x = free.x + free.w / 2 - (box.x + box.w / 2) * scale;
+  let y = free.y + free.h / 2 - (box.y + box.h / 2) * scale;
+  if (floor && pcs) {
+    const m = Math.min(FIT_MARGIN, free.w / 2, free.h / 2);
+    x +=
+      panInto(x + pcs.x * scale, pcs.w * scale, free.x + m, free.x + free.w - m) -
+      (x + pcs.x * scale);
+    y +=
+      panInto(y + pcs.y * scale, pcs.h * scale, free.y + m, free.y + free.h - m) -
+      (y + pcs.y * scale);
+  }
+  return { x, y, scale, floor };
 }
 
 /** `data-camera` (FR-MAP-44 (b)): where the last fit put it, or moved by the user since. */
 export type CameraMode = "fitted" | "moved";
 
-/** What can happen to the camera; window, token, snapshot and resize changes are not here. */
-export type CameraEvent = "open" | "fit" | "appearance" | "pan" | "zoom" | "pull";
+/**
+ * What can happen to the camera; window, token and snapshot changes are not here. `resize` = a
+ * browser viewport resize, settled (FR-MAP-47).
+ */
+export type CameraEvent = "open" | "fit" | "appearance" | "resize" | "pan" | "zoom" | "pull";
 
 /**
- * FR-MAP-44/45 triggers: a scene open and the Fit button always fit; an appearance refits only
- * while `fitted`; pan, wheel zoom and pull mark the camera `moved`.
+ * FR-MAP-44/45/47 triggers: a scene open and the Fit button always fit; an appearance or a
+ * viewport resize refits only while `fitted`; pan, wheel zoom and pull mark the camera `moved`.
  */
 export function cameraOn(mode: CameraMode, e: CameraEvent): { mode: CameraMode; fit: boolean } {
   switch (e) {
@@ -110,10 +160,56 @@ export function cameraOn(mode: CameraMode, e: CameraEvent): { mode: CameraMode; 
     case "fit":
       return { mode: "fitted", fit: true };
     case "appearance":
+    case "resize":
       return { mode, fit: mode === "fitted" };
     default:
       return { mode: "moved", fit: false };
   }
+}
+
+/** FR-MAP-47: a viewport resize refits this long after the last `resize` event. */
+export const RESIZE_REFIT_MS = 200;
+
+export interface Timers {
+  set(fn: () => void, ms: number): unknown;
+  clear(handle: unknown): void;
+}
+
+const realTimers: Timers = {
+  set: (fn, ms) => setTimeout(fn, ms),
+  clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+};
+
+/**
+ * FR-MAP-47: `resize()` on each viewport `resize` event; `refit` runs once, `RESIZE_REFIT_MS`
+ * after the last one (it applies the `resize` camera event, so `moved` never refits). Settled
+ * during a token drag (`dragging()`): it waits for `drop()`.
+ */
+export function createResizeRefit(refit: () => void, dragging: () => boolean, timers = realTimers) {
+  let handle: unknown = null;
+  let afterDrop = false;
+  const fire = () => {
+    handle = null;
+    if (dragging()) afterDrop = true;
+    else refit();
+  };
+  return {
+    resize() {
+      if (handle !== null) timers.clear(handle);
+      afterDrop = false;
+      handle = timers.set(fire, RESIZE_REFIT_MS);
+    },
+    drop() {
+      if (!afterDrop) return;
+      afterDrop = false;
+      refit();
+    },
+    dispose() {
+      if (handle !== null) timers.clear(handle);
+      handle = null;
+      afterDrop = false;
+    },
+  };
 }
 
 /** Wheel zoom about the pointer (screen px): the map point under it stays put. */
