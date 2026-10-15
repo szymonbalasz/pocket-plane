@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { coveredArea } from "@ui/features/play-shell/token-boxes";
 import {
   clampIntoWorkArea,
   dragPopup,
@@ -290,5 +291,43 @@ describe("FR-CBT-56 FR-CBT-75 P3 glitch 2: free area away from the likely target
     });
     expect(over.side).not.toBe("origin");
     for (const t of goblins) expect(covers(over, 300, t)).toBe(false);
+  });
+
+  test("FR-CBT-75 origin covers a likely target → the nearest free spot, not the far side (sim-6 d02)", () => {
+    // Mira's card: the toast sat top-left (68, 100), clear of the monsters; the 440 px popup there
+    // clips hidden Goblin 4. It opened bottom centre (577, 577); it now drops just below Goblin 4.
+    const monsters = [g4, ...goblins, box(815, 160)];
+    for (const init of [initiative, null]) {
+      const p = popupPlacement({
+        viewport: { w: 1440, h: 900 },
+        tokens: monsters,
+        others: [[], pcs],
+        initiative: init,
+        width: 440,
+        height: 258,
+        prefer: { x: 68, y: 100 },
+      });
+      expect(p).toMatchObject({ side: "left", x: 68, y: 319 });
+      for (const t of monsters) expect(covers(p, 258, t)).toBe(false);
+    }
+  });
+
+  test("FR-CBT-75 no spot clear of the likely targets → the usual pick", () => {
+    // A wall of targets across the whole work area: nothing is free, so tiers decide.
+    const wall = Array.from({ length: 30 }, (_, k) =>
+      box(68 + (k % 6) * 230, 60 + Math.floor(k / 6) * 160),
+    );
+    const p = popupPlacement({
+      viewport: { w: 1440, h: 900 },
+      tokens: wall,
+      initiative: null,
+      width: 440,
+      height: 300,
+      prefer: { x: 68, y: 100 },
+    });
+    expect(p.side).not.toBe("origin");
+    const area = (q: { x: number; y?: number }) =>
+      coveredArea({ x: q.x, y: q.y ?? 0, w: 440, h: 300 }, wall);
+    expect(area(p)).toBeLessThan(area({ x: 68, y: 100 }));
   });
 });

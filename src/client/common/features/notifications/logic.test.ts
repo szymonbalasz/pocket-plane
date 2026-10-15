@@ -209,6 +209,19 @@ describe("reconnect and reload (FR-NOTE-14/15, NOTE §11)", () => {
     ]);
   });
 
+  test("FR-NOTE-15 FR-NOTE-26 sim-6 glitch 3: after a restart a card whose toast was hidden (its popup opened) adds no summary next to the other cards' toasts", () => {
+    const card2 = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
+    // Live: two card toasts; the DM opened card2's popup from Pending (`hideToast`), then Later.
+    const two = view(store(DM, [other, card, card2], 6));
+    let m = step(live(), withCard, two);
+    expect(shown(m)).toEqual([card.id, card2.id]);
+    m = { ...m, toasts: hideNote(m.toasts, card2.id, 0) };
+    // Server restart: one toast per card, no "1 pending action" for the hidden one.
+    const down = view(two.store, "reconnecting");
+    const back = view(store(DM, [other, card, card2], 0));
+    expect(shown(step(step(m, two, down), down, back))).toEqual([card.id]);
+  });
+
   test("FR-NOTE-15 runtime mounted after events followed the snapshot: still a connect + summary", () => {
     const m = step(fresh(), null, view(store(DM, [other, card], 3)));
     expect(shown(m)).toEqual(["summary:1"]);

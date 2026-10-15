@@ -38,6 +38,17 @@ describe("FR-CBT-79 pending list", () => {
     expect(pendingForEncounter(rows, null, views)).toEqual([]);
   });
 
+  test("FR-CBT-79 FR-CBT-77 sim-6 glitch 1: a linked action newer than 3 damage cards sorts first, inside the 3-row cap", () => {
+    const cards = [5, 6, 7].map((seq) => ({ ...card, id: `card-${seq}`, seq }));
+    const newer = { ...conc, seq: 8 };
+    expect(pendingForEncounter([...cards, newer], "e1", views).map((n) => n.id)).toEqual([
+      "conc",
+      "card-5",
+      "card-6",
+      "card-7",
+    ]);
+  });
+
   test("FR-CBT-79 row text: player-owned → 'Waiting for Mira: …'; DM-owned and damage cards as their text", () => {
     expect(pendingRowText(conc)).toBe("Waiting for Mira: concentration save DC 10 (Bless)");
     expect(pendingRowText({ ...conc, actionRole: "dm" })).toBe(conc.text);
