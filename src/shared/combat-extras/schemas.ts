@@ -1,6 +1,12 @@
 // combat-extras boundary schemas (CBTX §8, §9; protocol §32): the `effect` wire record, its
 // player redaction, play-state limits and the shapes CBTX's domain events carry. Intents and
 // notification payloads come with the CBTX build.
+import {
+  BUILTIN_PRESET_KEYS,
+  Modifiers,
+  PRESET_KEY_MAX,
+  playerPresetKey,
+} from "@shared/effect-modifiers/schemas";
 import { z } from "zod";
 import { Condition, ExhaustionLevel } from "./conditions";
 
@@ -80,6 +86,10 @@ export const EffectRecordShape = z.object({
   endedRound: z.int().nullable(),
   endedTurnId: Id.nullable(),
   endedByHpChangeId: Id.nullable(),
+  /** effect-modifiers (FR-MOD-03): `custom` effects only; copied from a preset or set by the DM. */
+  modifiers: Modifiers,
+  /** Built-in preset key or preset id it was applied from (FR-MOD-09); `custom` only. */
+  presetKey: z.string().min(1).max(PRESET_KEY_MAX).nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -93,12 +103,16 @@ export const EffectRecord = EffectRecordShape.superRefine((r, ctx) => {
   if ((r.level !== null) !== (r.condition === "exhaustion")) issue("Level iff exhaustion");
   if ((r.kind === "condition") === (r.label !== null)) issue("Label iff custom / concentration");
   if ((r.endedAt === null) !== (r.endedReason === null)) issue("Ended at iff ended reason");
+  if (r.kind !== "custom" && (r.modifiers.length > 0 || r.presetKey !== null)) {
+    issue("Modifiers and preset key on custom effects only");
+  }
 });
 export type EffectRecord = z.infer<typeof EffectRecordShape>;
 
 /**
  * What a player receives (FR-CBTX-31): no source, anchor or concentration link (they may name
- * hidden creatures), no secret / hidden flags or end facts.
+ * hidden creatures), no secret / hidden flags or end facts. FR-MOD-21: `modifiers` and
+ * `presetKey` only on PC effects (`targetCharacterId` set), `presetKey` built-in keys only.
  */
 export const PlayerEffectRecord = EffectRecordShape.pick({
   id: true,
@@ -110,6 +124,9 @@ export const PlayerEffectRecord = EffectRecordShape.pick({
   targetCharacterId: true,
   encounterId: true,
   endsRound: true,
+}).extend({
+  modifiers: Modifiers.optional(),
+  presetKey: z.enum(BUILTIN_PRESET_KEYS).nullable().optional(),
 });
 export type PlayerEffectRecord = z.infer<typeof PlayerEffectRecord>;
 /** An effect as either client holds it. */
@@ -120,7 +137,7 @@ export const effectVisibleToPlayers = (r: EffectRecord): boolean =>
   !r.secret && !r.hidden && r.endedAt === null;
 
 export function redactEffect(r: EffectRecord): PlayerEffectRecord {
-  return {
+  const out: PlayerEffectRecord = {
     id: r.id,
     kind: r.kind,
     condition: r.condition,
@@ -131,4 +148,8 @@ export function redactEffect(r: EffectRecord): PlayerEffectRecord {
     encounterId: r.encounterId,
     endsRound: r.endsRound,
   };
+  // FR-MOD-21 (OQ-MOD-06): PC effects carry modifiers to every player who receives them; no
+  // preset id ever reaches a player; monster effects carry neither key.
+  if (r.targetCharacterId === null) return out;
+  return { ...out, modifiers: r.modifiers, presetKey: playerPresetKey(r.presetKey) };
 }

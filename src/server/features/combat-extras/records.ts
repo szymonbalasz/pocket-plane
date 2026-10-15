@@ -1,5 +1,6 @@
 // Record type `effect` (FR-CBTX-31, protocol §32). Campaign scope; DM full; players get the
-// redaction of non-secret, non-hidden, active effects. Snapshot: active effects only (ended ones
+// redaction of non-secret, non-hidden, active effects; PC effects add `modifiers` and a built-in
+// `presetKey` (FR-MOD-21, `redactEffect`). Snapshot: active effects only (ended ones
 // are history, not state); capped at 300 per campaign (FR-CBTX-04), so not windowed.
 import {
   EFFECT_TYPE,
