@@ -2,23 +2,27 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 2 phase 1 complete (#194, #195; DM playtest pending). Phase 2 specs F (fog-of-war) + B (scene-tools) written, seams settled, reviewed (2 blockers + 12 major, applied; CON-44 measured). **Waiting: DM gate 2** (`%TEMP%/pocket-plane/gate-sprint2-phase2.md`).
+**Phase:** Sprint 2 **phase 2 builds** (gate 2 #196; specs merged; ADR-0039 to 0041). Order: `fix/active-scene-window` → `fix/fog-core` → `fix/scn-core` → SCN slices ∥ fog server / client → `build/scene-tools-settings`; P3 polish in parallel. Then session-sim regression, 'Playtest: sprint 2 features', pause and recap.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Phase 1 | merged | — | Done (#189-#195) | DM playtest |
-| F: fog of war | `spec/fog-of-war` (w2Y) | spec-fog-of-war | Reviewed, in-review | Gate 2, merge, builds |
-| B: scene tools | `spec/scene-tools` (w2Z) | spec-scene-tools | Reviewed, in-review | Gate 2, merge, builds |
+| CON-44 window (ADR-0041) | `fix/active-scene-window` (w31) | build-active-scene-window | Building | Walkthrough, then fog-core |
+| P3 polish (sim-5 leftovers) | `fix/p3-polish` (w32) | build-p3-polish | Building | Walkthrough |
+| Fog core / server / client | `fix/fog-core`, `build/fog-*` | — | After window | — |
+| Scene tools core + slices | `fix/scn-core`, `build/scene-tools-*` | — | After fog-core | — |
 
 ## Shared-file locks
 
-- None (no build branch active).
+- ws / snapshot, live-sync client store, scenes-map client viewing: fix/active-scene-window.
+- Play-shell frame (placement), combat DM popup / Initiative, notifications client: fix/p3-polish.
+- Schema: fix/fog-core → fix/scn-core (later).
 
 ## Pending DM decisions
 
-- Gate 2: E1 CON-44 (pick B token + SCN active-scene window, measured 110 KB free), E2-E8 fog / scene-tools picks, E9 three ADRs, E10 session-sim-5 glitches as a P3 track.
+- None (gate 2 answered #196). DM playtest of phase 1 pending.
 
 ## Resolved locally (report at gate)
 
