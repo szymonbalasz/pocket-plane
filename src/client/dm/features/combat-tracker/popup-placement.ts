@@ -2,7 +2,8 @@
 // at the candidate spot that covers the least of its selection rows' tokens (none: the attacker's
 // likely targets, FR-CBT-56), then of the likely targets, then of the other combatants' tokens
 // (P3 glitch 2); ties: the side farther from the first tier's centre (none: left), centred.
-// Opened from a notification: over it unless that covers a target (FR-CBT-75). Placed once per
+// Opened from a notification: over it unless that covers a target, then the nearest free spot
+// (FR-CBT-75). Placed once per
 // open; then the DM may drag it (FR-CBT-76), always clamped into the work area. `popupPlacement`,
 // `placementTiers`, `clampIntoWorkArea` and `dragPopup` are pure; `measurePlacement` reads the
 // live screen.
@@ -102,7 +103,8 @@ export interface PlacementInput {
   height?: number;
   /**
    * FR-CBT-75: its notification's top-left (clamped). Kept unless the popup there covers a token
-   * of the first two tiers; then the usual pick.
+   * of the first two tiers; then the candidate spot clear of those nearest it (none: the usual
+   * pick).
    */
   prefer?: { x: number; y: number };
 }
@@ -169,14 +171,16 @@ export function popupPlacement(i: PlacementInput): Placement {
     top,
     bottom,
   });
-  if (i.prefer) {
-    const [t0 = 0, t1 = 0] = score(i.prefer.x, i.prefer.y);
-    if (t0 === 0 && t1 === 0) return result(i.prefer.x, i.prefer.y, true);
-  }
+  const free = (x: number, y: number) => {
+    const [t0 = 0, t1 = 0] = score(x, y);
+    return t0 === 0 && t1 === 0;
+  };
+  if (i.prefer && free(i.prefer.x, i.prefer.y)) return result(i.prefer.x, i.prefer.y, true);
   const xs = [
     ruleX,
     left,
     right,
+    ...(i.prefer ? [clamp(i.prefer.x)] : []),
     ...all.flatMap((t) => [clamp(t.x + t.w + EDGE_GAP), clamp(t.x - EDGE_GAP - i.width)]),
   ];
   const ys =
@@ -186,8 +190,26 @@ export function popupPlacement(i: PlacementInput): Placement {
           clampY(top + (bottom - top - h) / 2),
           top,
           bottom - h,
+          ...(i.prefer ? [clampY(i.prefer.y)] : []),
           ...all.flatMap((t) => [clampY(t.y + t.h + EDGE_GAP), clampY(t.y - EDGE_GAP - h)]),
         ];
+  // FR-CBT-75 (sim-6 N8): its notification's spot covers a likely target → the free spot (clear
+  // of the first two tiers, as the origin must be) nearest the origin; lower tiers break ties.
+  if (i.prefer) {
+    const o = i.prefer;
+    let near: { x: number; y: number; d: number; s: number[] } | null = null;
+    for (const x of xs) {
+      for (const y of ys) {
+        if (!free(x, y)) continue;
+        const d = Math.hypot(x - o.x, y - o.y);
+        const s = score(x, y);
+        if (near === null || d < near.d || (d === near.d && less(s, near.s))) {
+          near = { x, y, d, s };
+        }
+      }
+    }
+    if (near) return result(near.x, near.y);
+  }
   let best = { x: ruleX, y: ys[0] ?? top };
   let bestScore = score(best.x, best.y);
   for (const x of xs) {

@@ -8,7 +8,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
-import { launcherButton, openWindow } from "./support/shell";
+import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 async function idByName(scope: Locator, name: string): Promise<string> {
   const r = scope.locator('[data-testid="cbt-init-row"]').filter({
@@ -388,6 +388,163 @@ test("FR-NOTE-14 FR-NOTE-32 P3 E3: at 1280×720 a 4-card toast stack (3 + '+1 mo
   await player.context().close();
   await dm.context().close();
 });
+
+/** The drawn tokens' boxes (Konva group rects, as the placement reads them) and their names. */
+async function tokenBoxes(dm: Page) {
+  const labels = await konvaNodes(dm, "map-token-label");
+  const boxes = await dm.evaluate(() => {
+    type KNode = {
+      id(): string;
+      getClientRect(): { x: number; y: number; width: number; height: number };
+    };
+    type KStage = { container(): HTMLElement; find(s: string): KNode[] };
+    const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
+    const stage = K?.stages.find((s) => s.container().isConnected);
+    if (!stage) return [];
+    const c = stage.container().getBoundingClientRect();
+    return stage.find(".map-token").map((n) => {
+      const r = n.getClientRect();
+      return { id: n.id(), x: c.left + r.x, y: c.top + r.y, w: r.width, h: r.height };
+    });
+  });
+  return boxes.map((b) => ({ ...b, name: labels.find((l) => l.id === b.id)?.text ?? "" }));
+}
+
+type Box = { x: number; y: number; w: number; h: number };
+const overlaps = (a: Box, b: Box) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** The newest card toast's box once the stack holds still (it re-places when the map settles). */
+async function settledToast(dm: Page, known: Set<string>) {
+  const toast = dm
+    .getByTestId("note-toast")
+    .filter({ has: dm.getByTestId("note-toast-action") })
+    .last();
+  await expect
+    .poll(async () => known.has((await toast.getAttribute("data-record-id")) ?? ""))
+    .toBe(false);
+  await expect
+    .poll(
+      async () => {
+        const a = await toast.boundingBox();
+        await dm.waitForTimeout(500);
+        const b = await toast.boundingBox();
+        return a !== null && b !== null && a.x === b.x && a.y === b.y;
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  const box = await toast.boundingBox();
+  if (!box) throw new Error("no toast box");
+  const id = (await toast.getAttribute("data-record-id")) as string;
+  known.add(id);
+  return { toast, id, box: { x: box.x, y: box.y, w: box.width, h: box.height } };
+}
+
+for (const [width, height] of [
+  [1440, 900],
+  [1280, 720],
+] as const) {
+  test(`FR-CBT-75 sim-6 N8 at ${width}×${height}: the popup opens over its toast, or (that covers a likely target) at the nearest free spot`, async ({
+    browser,
+  }) => {
+    const { dm, player, recordId } = await setup(browser, width, height);
+    await viewAmbush(dm, player, recordId("battlemap", "scene"));
+    // Initiative closed: the monsters it would cover stay grabbable on the map.
+    const initWin = shellWindow(dm, "cbt.initiative");
+    if (await initWin.isVisible()) await initWin.getByTestId("ui-window-close").click();
+    const sheet = await openWindow(player, "char.sheet");
+    await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
+    const known = new Set(
+      await dm
+        .getByTestId("note-toast")
+        .evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id") ?? "")),
+    );
+    // Mira's likely targets: the monsters' tokens (every token but the PCs').
+    const monsters = async () =>
+      (await tokenBoxes(dm)).filter(
+        (t) => t.name !== "" && t.name !== "Mira" && t.name !== "Thorn",
+      );
+    const popup = dm.getByTestId("cbt-popup");
+
+    // 1. A card toast: the popup opens with its top-left on the toast's, unless that covers a monster.
+    await sheet.getByTestId("charx-roll-attack-damage").first().click();
+    const first = await settledToast(dm, known);
+    await first.toast.getByTestId("note-toast-action").click();
+    await expect(popup).toHaveAttribute("data-record-id", first.id);
+    const p1 = await popup.boundingBox();
+    if (!p1) throw new Error("no popup box");
+    const size = { w: p1.width, h: p1.height };
+    const atOrigin = { ...first.box, ...size };
+    if ((await monsters()).some((t) => overlaps(atOrigin, t))) {
+      await expect(popup).not.toHaveAttribute("data-side", "origin");
+    } else {
+      await expect(popup).toHaveAttribute("data-side", "origin");
+      expect(Math.abs(p1.x - first.box.x)).toBeLessThan(2);
+      expect(Math.abs(p1.y - first.box.y)).toBeLessThan(2);
+    }
+    await popup.getByTestId("cbt-popup-dismiss").click();
+    await expect(popup).toHaveCount(0);
+
+    // 2. A monster just right of the toast, inside the popup's width there but clear of the toast:
+    // the stack stays put, the popup over it would cover a likely target.
+    const cell = Number(await dm.getByTestId("map-canvas").getAttribute("data-cell-px"));
+    let card = first;
+    let blocked = false;
+    for (let attempt = 0; attempt < 3 && !blocked; attempt++) {
+      // A monster the DM can grab (not under a window), the lowest one.
+      const grabbable: Awaited<ReturnType<typeof monsters>> = [];
+      for (const t of await monsters()) {
+        const onMap = await dm.evaluate(
+          ([x, y]) =>
+            document.elementFromPoint(x, y)?.closest('[data-testid="map-canvas"]') !== null,
+          [t.x + t.w / 2, t.y + t.h / 2] as const,
+        );
+        if (onMap) grabbable.push(t);
+      }
+      const m = grabbable.reduce((a, b) => (b.y > a.y ? b : a));
+      const cx = m.x + m.w / 2;
+      const cy = m.y + m.h / 2;
+      // Cell centres lie on the token grid: the cell right of the toast, within 440 of its left
+      // edge, level with the toast's middle.
+      const wantX = card.box.x + card.box.w + 12 + cell / 2;
+      const tx = cx + Math.ceil((wantX - cx) / cell) * cell;
+      const ty = cy + Math.round((card.box.y + card.box.h / 2 - cy) / cell) * cell;
+      await dm.mouse.move(cx, cy);
+      await dm.mouse.down();
+      for (let i = 1; i <= 6; i++) {
+        await dm.mouse.move(cx + ((tx - cx) * i) / 6, cy + ((ty - cy) * i) / 6);
+      }
+      await dm.mouse.up();
+      await expect
+        .poll(async () => {
+          const t = (await tokenBoxes(dm)).find((b) => b.id === m.id);
+          return t ? Math.abs(t.x + t.w / 2 - tx) < 4 && Math.abs(t.y + t.h / 2 - ty) < 4 : false;
+        })
+        .toBe(true);
+      await sheet.getByTestId("charx-roll-attack-damage").first().click();
+      card = await settledToast(dm, known);
+      const over = { ...card.box, ...size };
+      blocked = (await monsters()).some((t) => overlaps(over, t));
+    }
+    expect(blocked).toBe(true);
+    await card.toast.getByTestId("note-toast-action").click();
+    await expect(popup).toHaveAttribute("data-record-id", card.id);
+    await expect(popup).not.toHaveAttribute("data-side", "origin");
+    const p2 = await popup.boundingBox();
+    if (!p2) throw new Error("no popup box");
+    const placed = { x: p2.x, y: p2.y, w: p2.width, h: p2.height };
+    // Clear of every likely target, and near the toast (sim-6: it went to the far bottom centre).
+    for (const t of await monsters()) expect(overlaps(placed, t)).toBe(false);
+    const d = Math.hypot(placed.x - card.box.x, placed.y - card.box.y);
+    expect(d).toBeLessThanOrEqual(2 * cell + 2 * 12 + card.box.h);
+    await popup.getByTestId("cbt-popup-dismiss").click();
+    await expect(popup).toHaveCount(0);
+
+    await player.context().close();
+    await dm.context().close();
+  });
+}
 
 test("FR-CBTX-50 a PC at 0 HP keeps the Down X and its death badge after End, for the DM and the player", async ({
   browser,
