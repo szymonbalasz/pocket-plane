@@ -30,13 +30,21 @@ export const rollAbility = defineCommand({
       actor: { kind: "entity", id: c.entityId, name: c.name },
       manual: input.manual,
       source: "cbt",
+      // FR-MOD-15: a PC combatant's subject is its character.
+      subject: {
+        creature: c.kind === "pc" ? { characterId: c.entityId } : { combatantId: c.id },
+        roll: input.kind,
+        ability: input.ability,
+      },
     });
+    const rollIds = dice.rollIdsOf(r);
     const entry = gameLog.append(env, {
       kind: ROLL_KIND,
       category: spec.category,
       actorName: c.name,
       payload: [dice.rollPayloadItem(r)],
-      rollIds: [r.id],
+      dmPayload: dice.rollDmPayload([r]),
+      rollIds,
       encounterId: enc.id,
       public: c.hidden ? false : input.public,
     });
@@ -48,11 +56,11 @@ export const rollAbility = defineCommand({
         combatantId: c.id,
         kind: input.kind,
         ability: input.ability,
-        rollIds: [r.id],
+        rollIds,
         entryId: entry.id,
       },
       changes: [entry],
     });
-    return { rollIds: [r.id], entryId: entry.id };
+    return { rollIds, entryId: entry.id };
   },
 });

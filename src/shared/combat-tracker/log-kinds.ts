@@ -3,6 +3,8 @@
 // breakdown stay in `dmPayload` (FR-CBT-53, FR-DICE-28).
 import { defineLogKind, type LineSegment } from "@shared/dice-roll-log/kind-types";
 import { rollBreakdownSegments } from "@shared/dice-roll-log/roll-kind";
+import { DmModPart, ROLL_MODS_MAX, RollModPart } from "@shared/dice-roll-log/schemas";
+import { modSegments } from "@shared/effect-modifiers/line";
 import { z } from "zod";
 import { CardDie, LOG_KIND_ATTACK, LOG_KIND_HP } from "./schemas";
 
@@ -20,6 +22,8 @@ export const AttackLogPayload = z.strictObject({
     .strictObject({
       dice: z.int().nullable(),
       constant: z.int(),
+      /** effect-modifiers (FR-MOD-19/20): parts after the constant (player-safe labels). */
+      mods: z.array(RollModPart).min(1).max(ROLL_MODS_MAX).optional(),
       total: z.int(),
       natural: z.int().nullable(),
     })
@@ -75,6 +79,16 @@ export const AttackLogDmPayload = z.strictObject({
   rolls: AttackLogRolls.optional(),
   /** combat-extras (FR-CBTX-39): damage taken by temp HP; absent / 0 = none. DM only. */
   absorbed: z.int().min(0).optional(),
+  /**
+   * effect-modifiers (FR-MOD-20): the DM's names of the to-hit parts (same index as
+   * `payload.toHit.mods`) and the damage parts, named, after the damage breakdown.
+   */
+  mods: z
+    .strictObject({
+      toHit: z.array(DmModPart).max(ROLL_MODS_MAX).optional(),
+      damage: z.array(RollModPart).min(1).max(ROLL_MODS_MAX).optional(),
+    })
+    .optional(),
 });
 export type AttackLogDmPayload = z.infer<typeof AttackLogDmPayload>;
 
@@ -129,6 +143,7 @@ function damageSegments(
     out.push({ text: ` (DM set${rolled})`, style: "muted" });
   }
   if (dm?.rolls?.damage) out.push(...rollBreakdownSegments(dm.rolls.damage));
+  if (dm?.mods?.damage) out.push(...modSegments(dm.mods.damage));
   return out;
 }
 
@@ -166,6 +181,8 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
       out.push({ text: String(t.dice) });
       if (t.constant !== 0)
         out.push({ text: t.constant < 0 ? ` - ${-t.constant}` : ` + ${t.constant}` });
+      // FR-MOD-20: "12 + 4 − 2 Bane = 14"; the DM's line names every part.
+      out.push(...modSegments(t.mods, dm?.mods?.toHit));
       out.push({ text: " = " });
     }
     out.push({ text: String(t.total), style: "total" });

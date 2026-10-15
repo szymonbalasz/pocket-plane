@@ -9,6 +9,7 @@ import characterSheetFull from "./character-sheet-full";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
 import diceLog from "./dice-log";
+import effectModifiers from "./effect-modifiers";
 import entities from "./entities";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
@@ -34,4 +35,5 @@ export const bundles: readonly Bundle[] = [
   partyLoot,
   characterSheetFull,
   combatExtras,
+  effectModifiers,
 ];

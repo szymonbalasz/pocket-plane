@@ -13,7 +13,9 @@ import {
   SheetRollIntent,
 } from "@shared/character-sheet/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
-import type { CharacterRecord } from "@shared/entities/schemas";
+import type { RollCategory } from "@shared/dice-roll-log/schemas";
+import type { RollSubject } from "@shared/effect-modifiers/schemas";
+import { type CharacterRecord, SKILL_ABILITY } from "@shared/entities/schemas";
 import { CharacterHpAdjusted, CharacterRolled } from "@shared/events/character-sheet";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
@@ -34,6 +36,29 @@ export function authorizedCharacter(env: CommandEnv, characterId: string): Chara
     throw forbidden("Not your character");
   }
   return c;
+}
+
+/**
+ * FR-MOD-15: a character's roll subject by the spec's category: attack / damage (`via` spell for
+ * spell rows), save / check of the ability (a skill → its ability), initiative. Healing and a
+ * definition's (NPC sheet) rolls have none.
+ */
+function subjectOf(
+  c: { id: string; kind: string },
+  category: RollCategory,
+  input: { kind: string; ability?: RollSubject["ability"]; skill?: keyof typeof SKILL_ABILITY },
+): RollSubject | undefined {
+  if (c.kind !== "character") return undefined;
+  const creature = { characterId: c.id };
+  const via = input.kind.startsWith("spell") ? ("spell" as const) : ("weapon" as const);
+  if (category === "attack" || category === "damage") return { creature, roll: category, via };
+  if (category === "saving-throw") return { creature, roll: "save", ability: input.ability };
+  if (category === "ability-check") return { creature, roll: "check", ability: input.ability };
+  if (category === "skill-check" && input.skill) {
+    return { creature, roll: "check", ability: SKILL_ABILITY[input.skill] };
+  }
+  if (category === "initiative") return { creature, roll: "initiative" };
+  return undefined;
 }
 
 export const charRoll = defineCommand({
@@ -73,8 +98,9 @@ export const charRoll = defineCommand({
     }
     const ability = ref.ability;
     const actor = { kind: "entity" as const, id: c.id, name: c.name };
-    const rolls = specs.map((s, i) =>
-      dice.evaluate(env, {
+    const rolls = specs.map((s, i) => {
+      const subject = subjectOf(c, s.category, { ...input, ability });
+      return dice.evaluate(env, {
         expression: s.expression,
         mode: s.d20 ? input.mode : "normal",
         category: s.category,
@@ -82,15 +108,18 @@ export const charRoll = defineCommand({
         actor,
         manual: input.manual?.[i],
         source: "char",
-      }),
-    );
-    const rollIds = rolls.map((r) => r.id);
+        ...(subject ? { subject } : {}),
+      });
+    });
+    // FR-MOD-14: bonus-die rows follow their base roll (FR-DICE-26).
+    const rollIds = rolls.flatMap((r) => dice.rollIdsOf(r));
     const change = gameLog.append(env, {
       kind: ROLL_KIND,
       // attack: the to-hit's category (FR-DICE-26); check / save: ability-check / saving-throw.
       category: (specs[0] as (typeof specs)[number]).category,
       actorName: c.name,
       payload: rolls.map((r) => dice.rollPayloadItem(r)),
+      dmPayload: dice.rollDmPayload(rolls),
       rollIds,
       // FR-CHARX-22: a definition's name can leak a renamed or hidden creature (ADR-0024).
       public: definition ? false : input.public,

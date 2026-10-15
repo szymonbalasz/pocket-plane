@@ -6,10 +6,12 @@ import {
   cbtxEffectsSection,
   cbtxTempHpSection,
 } from "../combat-extras/sheet-sections";
+import { modEffectsSection } from "../effect-modifiers/section";
 import type { SheetSection } from "./sections";
 
 export const sheetSections: readonly SheetSection[] = [
   cbtxTempHpSection, // cbtx.temp-hp, vitals (combat-extras, FR-CBTX-41)
   cbtxDeathSavesSection, // cbtx.death-saves, vitals (combat-extras, FR-CBTX-41)
   cbtxEffectsSection, // cbtx.effects, header (combat-extras, FR-CBTX-41)
+  modEffectsSection, // mod.effects, tab "Active effects" (effect-modifiers, FR-MOD-26)
 ];

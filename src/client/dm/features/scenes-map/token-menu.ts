@@ -4,6 +4,7 @@ import type { TokenRecord } from "@shared/scenes-map/schemas";
 import type { ComponentType } from "react";
 import { cbtxTokenMenu } from "../combat-extras/token-menu-entries";
 import { combatTokenMenu } from "../combat-tracker/token-menu-entries";
+import { modTokenMenu } from "../effect-modifiers/token-menu-entries";
 import { scenesMapTokenMenu } from "./token-menu-entries";
 
 export interface TokenMenuItemProps {
@@ -42,6 +43,7 @@ export const tokenMenuEntries: readonly TokenMenuEntry[] = [
   ...scenesMapTokenMenu, // scenes-map (FR-MAP-18)
   ...combatTokenMenu, // combat-tracker: "Damage / heal…", "Remove from combat" (FR-CBT-30)
   ...cbtxTokenMenu, // combat-extras: Conditions ▸, Effect…, Temp HP…, Add to combat (FR-CBTX-35)
+  ...modTokenMenu, // effect-modifiers: Apply effect ▸, Effect modifiers… (FR-MOD-28)
 ];
 
 /** Token double-click: the first available entry by order runs. Append your feature's line. */

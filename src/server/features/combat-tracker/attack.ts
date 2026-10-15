@@ -19,6 +19,7 @@ import { type CommandEnv, defineCommand } from "../../commands/commands";
 import type { DomainEvent } from "../../events/types";
 import { characters } from "../character-sheet";
 import { dice, gameLog } from "../dice-roll-log";
+import { withCardMods } from "../effect-modifiers/card";
 import { notify } from "../notifications";
 import { cardRollOf, cardToHitOf, damageCardText } from "./card-kind";
 import { activeCombatant, statsOf } from "./guards";
@@ -52,8 +53,16 @@ export const attackCommand = defineCommand({
     const [hitSpec, dmgSpec] = attackRollSpecs(attack);
     const actor = { kind: "entity" as const, id: c.entityId, name: c.name };
     const toHitOnly = input.rolls === "toHit";
+    // FR-MOD-15: who rolls (a PC combatant = its character), weapon or spell row.
+    const creature = c.kind === "pc" ? { characterId: c.entityId } : { combatantId: c.id };
+    const via = input.spellId !== undefined ? ("spell" as const) : ("weapon" as const);
     // Every roll of the command goes through here (one place for later roll options).
-    const rollOf = (spec: typeof hitSpec, expression: string, i: number) =>
+    const rollOf = (
+      spec: typeof hitSpec,
+      expression: string,
+      i: number,
+      subject: { roll: "attack" | "damage"; crit?: boolean },
+    ) =>
       dice.evaluate(env, {
         expression,
         mode: spec.d20 ? input.mode : "normal",
@@ -62,15 +71,20 @@ export const attackCommand = defineCommand({
         actor,
         manual: input.manual?.[i],
         source: "cbt",
+        subject: { creature, via, ...subject },
       });
-    const toHit = rollOf(hitSpec, hitSpec.expression, 0);
+    const toHit = rollOf(hitSpec, hitSpec.expression, 0, { roll: "attack" });
     // FR-CBT-16 / -17: natural 20 → damage dice doubled; manual damage is checked against it.
     const crit = toHit.natural === 20;
     const damage = toHitOnly
       ? null
-      : rollOf(dmgSpec, crit ? critExpression(dmgSpec.expression) : dmgSpec.expression, 1);
+      : rollOf(dmgSpec, crit ? critExpression(dmgSpec.expression) : dmgSpec.expression, 1, {
+          roll: "damage",
+          crit,
+        });
     const rolls = damage ? [toHit, damage] : [toHit];
-    const rollIds = rolls.map((r) => r.id);
+    // FR-MOD-14: bonus-die rows follow their base roll (FR-DICE-26).
+    const rollIds = rolls.flatMap((r) => dice.rollIdsOf(r));
     const isPlayer = env.actor.role === "player";
     // FR-CBT-18: a player's attack → one public roll line now. FR-CBT-52 (#171): a DM's attack
     // (monster or PC) → the same line, always DM-only whatever the Attack tickbox; the outcome
@@ -81,6 +95,7 @@ export const attackCommand = defineCommand({
       category: "attack",
       actorName: c.name,
       payload: rolls.map((r) => dice.rollPayloadItem(r)),
+      dmPayload: dice.rollDmPayload(rolls),
       rollIds,
       encounterId: enc.id,
       ...(isPlayer ? {} : { public: false }),
@@ -93,8 +108,9 @@ export const attackCommand = defineCommand({
       damageType: attack.damageType,
       mode: input.mode,
       crit,
-      toHit: cardToHitOf(toHit),
-      damage: damage ? cardRollOf(damage) : null,
+      // FR-MOD-16/19: the card's totals include the parts, `mods` name them.
+      toHit: withCardMods(cardToHitOf(toHit), toHit),
+      damage: damage ? withCardMods(cardRollOf(damage), damage) : null,
       ...cardRowRef(env, c, ref),
     };
     // Owner event first, the card's `NotificationCreated` after (protocol §22). The card id is

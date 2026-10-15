@@ -39,6 +39,7 @@ import { hpChange, hpChangeSeqNext, roll } from "../../db/schema";
 import type { DomainEvent, RecordChange } from "../../events/types";
 import { type Applied, hpRules, hpTargetOf } from "../combat-extras/hp-rules";
 import { gameLog } from "../dice-roll-log";
+import { cardRollIds, dmModNames, rolledOf } from "../effect-modifiers/card";
 import { reopenNotification, resolveNotification } from "../notifications";
 import { loadNotification } from "../notifications/helpers";
 import { activeCombatant, statsOf } from "./guards";
@@ -158,6 +159,24 @@ export const applyCard = defineCommand({
     // Rolled values come from the card's roll rows, never the client (gems: FR-CBT-32).
     const toHitRoll = p.toHit ? cardRoll(env, p.toHit.rollId) : null;
     const damageRoll = p.damage ? cardRoll(env, p.damage.rollId) : null;
+    // FR-MOD-16: rolled = base row + the card part's mods (bonus dice are part rows, never
+    // summed into the base), so an unedited effect-modified total never reads as "DM set".
+    const toHitRolled = toHitRoll ? rolledOf(toHitRoll.total, p.toHit) : null;
+    const damageRolled = damageRoll ? rolledOf(damageRoll.total, p.damage) : null;
+    // FR-MOD-20: the DM line names every part (from the roll line's `dmPayload`).
+    const toHitNames = p.toHit?.mods ? dmModNames(env, p.toHit.rollId) : null;
+    const damageNames = p.damage?.mods ? dmModNames(env, p.damage.rollId) : null;
+    const dmMods: AttackLogDmPayload["mods"] = {
+      ...(toHitNames ? { toHit: toHitNames } : {}),
+      ...(p.damage?.mods
+        ? {
+            damage: p.damage.mods.map((m, i) => ({
+              ...m,
+              label: damageNames?.[i]?.label ?? m.label,
+            })),
+          }
+        : {}),
+    };
     // FR-CBT-53: physical flags for everyone; the dice breakdown for the DM only (FR-DICE-28).
     const manual = { toHit: toHitRoll?.manual ?? false, damage: damageRoll?.manual ?? false };
     const rolls: AttackLogRolls = {
@@ -183,14 +202,14 @@ export const applyCard = defineCommand({
         : {}),
     };
     const playerCard = card.audience === "player";
-    const rollIds = [p.toHit?.rollId, p.damage?.rollId].filter((id): id is string => !!id);
+    const rollIds = [...cardRollIds(p.toHit), ...cardRollIds(p.damage)];
     const hpChangeIds: string[] = [];
     const outcomes: DamageCardTargetOutcome[] = [];
     for (const { c: target, hit, multiplier } of targets) {
       const targetAc = statsOf(env, target).ac;
       // FR-CBT-72: a damage-only card has no to-hit facts (null in the row and the line).
       const hitComputed = toHitRoll
-        ? hitHint(toHitRoll.natural, toHitTotal ?? toHitRoll.total, targetAc)
+        ? hitHint(toHitRoll.natural, toHitTotal ?? (toHitRolled as number), targetAc)
         : null;
       const raw = rawDamage(hit, damageTotal, multiplier);
       // Allocated first: effects ended `down` point at this row (FR-CBTX-16, -22).
@@ -207,8 +226,9 @@ export const applyCard = defineCommand({
       const lineToHit =
         toHitRoll && p.toHit && toHitTotal !== undefined
           ? {
-              dice: toHitTotal === toHitRoll.total ? toHitRoll.total - p.toHit.constant : null,
+              dice: toHitTotal === toHitRolled ? toHitRoll.total - p.toHit.constant : null,
               constant: p.toHit.constant,
+              ...(p.toHit.mods && toHitTotal === toHitRolled ? { mods: p.toHit.mods } : {}),
               total: toHitTotal,
               natural: toHitRoll.natural,
             }
@@ -227,18 +247,19 @@ export const applyCard = defineCommand({
       const dmPayload: AttackLogDmPayload = {
         targetAc,
         hitComputed,
-        toHitRolled: toHitRoll?.total ?? null,
-        damageRolled: damageRoll?.total ?? null,
+        toHitRolled,
+        damageRolled,
         damageTotal,
         applied,
         overkill,
         overrides: {
-          toHit: toHitRoll !== null && toHitTotal !== toHitRoll.total,
+          toHit: toHitRoll !== null && toHitTotal !== toHitRolled,
           hit: hitComputed !== null && hit !== hitComputed,
           // An all-miss apply without a total sets nothing.
-          damage: input.damageTotal !== undefined && damageTotal !== damageRoll?.total,
+          damage: input.damageTotal !== undefined && damageTotal !== damageRolled,
         },
         rolls,
+        ...(dmMods.toHit || dmMods.damage ? { mods: dmMods } : {}),
         ...(hp.absorbed > 0 ? { absorbed: hp.absorbed } : {}),
       };
       // FR-CBT-36: one line per target; never public if the attacker or this target is hidden,
@@ -267,12 +288,12 @@ export const applyCard = defineCommand({
         targetEntityId: target.entityId,
         targetName: target.name,
         targetAc,
-        toHitRolled: toHitRoll?.total ?? null,
+        toHitRolled,
         toHitTotal: toHitRoll ? (toHitTotal ?? null) : null,
         natural: toHitRoll?.natural ?? null,
         hitComputed,
         hit,
-        damageRolled: damageRoll?.total ?? null,
+        damageRolled,
         damageTotal,
         multiplier,
         raw,

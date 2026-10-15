@@ -10,6 +10,7 @@
 import type { RollCategory } from "@shared/dice-roll-log/schemas";
 import type { RollSubject } from "@shared/effect-modifiers/schemas";
 import type { CommandEnv } from "../../commands/commands";
+import { modRollHook } from "../effect-modifiers/roll-hook";
 import type { Roll, RollSource } from "./evaluate";
 
 export type { RollSubject };
@@ -63,4 +64,6 @@ export interface RollHook {
 }
 
 /** The registry. Append your feature's line; order = run order = part order. */
-export const rollHooks: readonly RollHook[] = [];
+export const rollHooks: readonly RollHook[] = [
+  modRollHook, // effect-modifiers: effect parts (FR-MOD-14)
+];

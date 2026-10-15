@@ -87,8 +87,19 @@ export const rollConcentration = defineCommand({
       actor: { kind: "entity", id: actorId, name },
       manual: input.manual,
       source: "cbt",
+      // FR-MOD-15: a concentration save is a CON save of the concentrating creature.
+      subject: {
+        creature: conc.targetCharacterId
+          ? { characterId: conc.targetCharacterId }
+          : { combatantId: conc.targetCombatantId as string },
+        roll: "save",
+        ability: "con",
+      },
     });
-    const success = r.total >= p.dc;
+    // FR-MOD-16: the total vs the DC includes the parts.
+    const total = r.total + (r.mods?.modTotal ?? 0);
+    const rollIds = dice.rollIdsOf(r);
+    const success = total >= p.dc;
     // FR-CBTX-18: player → public (stamped); a hidden creature's save → never.
     const entry = gameLog.append(env, {
       kind: ROLL_KIND,
@@ -96,7 +107,8 @@ export const rollConcentration = defineCommand({
       actorName: name,
       // FR-CBTX-39: "… Concentration save (DC 10): 12 — kept".
       payload: [{ ...dice.rollPayloadItem(r), note: success ? "kept" : "lost" }],
-      rollIds: [r.id],
+      dmPayload: dice.rollDmPayload([r]),
+      rollIds,
       encounterId: p.encounterId,
       public: hidden ? false : input.public,
     });
@@ -107,17 +119,17 @@ export const rollConcentration = defineCommand({
       payload: {
         notificationId: card.id,
         effectId: conc.id,
-        rollIds: [r.id],
+        rollIds,
         entryId: entry.id,
-        total: r.total,
+        total,
         dc: p.dc,
         success,
       },
       changes: [entry, ...(ended?.changes ?? [])],
     });
-    resolveNotification(env, card.id, { total: r.total, dc: p.dc, success });
+    resolveNotification(env, card.id, { total, dc: p.dc, success });
     // FR-CBTX-10: a lost concentration closes its other open cards (same transaction).
     if (ended) closeCardsOfEnded(env, ended);
-    return { rollIds: [r.id], entryId: entry.id, success };
+    return { rollIds, entryId: entry.id, success };
   },
 });
