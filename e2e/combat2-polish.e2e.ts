@@ -267,6 +267,70 @@ test("FR-CBT-77 a short window: Initiative grows to the work area, '↓ N more' 
   await dm.context().close();
 });
 
+test("FR-CBTX-46 P3 glitch 6: '+N' lists the hidden effects (hover and click) on both clients", async ({
+  browser,
+}) => {
+  const { dm, player, recordId } = await setup(browser);
+  await viewAmbush(dm, player, recordId("battlemap", "scene"));
+  const init = await openWindow(dm, "cbt.initiative");
+  const pinit = await openWindow(player, "cbt.initiative");
+  const mira = await idByName(init, "Mira");
+  // Three more conditions on Mira: her chips no longer fit on either client.
+  for (const condition of ["blinded", "deafened", "poisoned"]) {
+    await row(init, mira).getByTestId("cbt-init-row-menu").click();
+    await dm.getByTestId("cbtx-init-row-conditions").hover();
+    await dm
+      .locator(`[data-testid="cbtx-init-row-conditions-option"][data-value="${condition}"]`)
+      .click();
+    await dm.keyboard.press("Escape");
+    await expect(
+      row(init, mira).locator(`[data-testid="cbtx-init-row-effect"][data-value="${condition}"]`),
+    ).toHaveCount(1);
+  }
+  for (const [page, scope] of [
+    [dm, init],
+    [player, pinit],
+  ] as const) {
+    const more = row(scope, mira).getByTestId("cbtx-init-row-effect-more");
+    await expect(more).toBeVisible();
+    const n = Number(await more.getAttribute("data-value"));
+    // The hidden chips are the invisible ones, in order.
+    const hidden = await row(scope, mira)
+      .locator('[data-testid="cbtx-init-row-effect"]')
+      .evaluateAll((els) =>
+        els
+          .filter((e) => e.closest("[data-chip]")?.getAttribute("aria-hidden") === "true")
+          .map((e) => e.getAttribute("data-record-id")),
+      );
+    expect(hidden.length).toBe(n);
+    await more.click();
+    const items = page.getByTestId("cbtx-init-row-effect-more-item");
+    await expect(items).toHaveCount(n);
+    expect(
+      await items.evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id"))),
+    ).toEqual(hidden);
+    if (page === dm) {
+      // DM: each hidden effect keeps its chip menu (Edit… / End).
+      await items.first().hover();
+      await expect(dm.getByTestId("cbtx-init-row-effect-edit")).toBeVisible();
+    }
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+  }
+  // Clean up: the conditions end again.
+  for (const condition of ["blinded", "deafened", "poisoned"]) {
+    await row(init, mira).getByTestId("cbt-init-row-menu").click();
+    await dm.getByTestId("cbtx-init-row-conditions").hover();
+    await dm
+      .locator(`[data-testid="cbtx-init-row-conditions-option"][data-value="${condition}"]`)
+      .click();
+    await dm.keyboard.press("Escape");
+  }
+  await expect(row(init, mira).getByTestId("cbtx-init-row-effect-more")).toHaveCount(0);
+  await player.context().close();
+  await dm.context().close();
+});
+
 test("FR-CBTX-50 a PC at 0 HP keeps the Down X and its death badge after End, for the DM and the player", async ({
   browser,
 }) => {
