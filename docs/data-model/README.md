@@ -1101,6 +1101,9 @@ From [scene-tools](../specs/scene-tools.md#8-data-model) (SCN, `complete`; DM ga
 | diagonalRule | `5-10-5` \| `5` | No row = `5-10-5` | FR-SCN-29, -30 |
 | updatedAt | timestamp | | SCN §8 |
 
+- **Written by** `scn.setDiagonalRule` (DM; upsert on `campaignId`; the rule already in effect writes nothing) *(built, build/scene-tools-settings; protocol §36)*. Read by the client's ruler and movement indicator (the store row) and server-side by `diagonalRuleOf` (combat `movedFt`, FR-CBT-39).
+- **Client only, never stored server-side:** the DM's Layers popover switches (FR-SCN-05), per campaign in browser storage `pp.layers.v1.<campaignId>` = `{off: string[]}`; all on by default.
+
 - **Constraints the DB enforces:** one structure row per scene, one settings row per campaign (PKs); scene tables cascade with their scene; FKs to campaign, asset (prop), player (template); `prop.seq`, `aoe_template.seq` unique; indexes `scene_structure_campaign`, `prop_scene`, `prop_campaign`, `aoe_template_scene`, `aoe_template_campaign`. Segment, prop and template caps are command checks.
 - **Wire** (compact): no `seq` (except on props: draw order, FR-SCN-18), no timestamps; `campaignId` on the DM wire only (the registry's scope gate reads it from the record).
 - **Derived** (never stored): `propCells`, `templateCells(t, scene, {cut})`, `doorCells`, blocking segments (`blockingSegments`, FR-SCN-10), `distanceFt(a, b, rule)`.
