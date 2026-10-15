@@ -10,7 +10,7 @@ import { TOP_BAR_H } from "./geometry";
 import { useBaseKeyDown, useViewport } from "./hooks";
 import { SHELL_ZONE_ATTR } from "./keys";
 import { Launcher } from "./Launcher";
-import { topWindow, type WindowAction } from "./manager";
+import { mountedWindows, topWindow, type WindowAction } from "./manager";
 import type { ShellClient } from "./registry";
 import {
   useAlertState,
@@ -80,9 +80,10 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
         className="pointer-events-none absolute inset-0 isolate z-10 overflow-clip"
         data-testid="ui-windows"
       >
-        {windows.map((w) => {
+        {/* FR-SHELL-36: minimised windows stay mounted (hidden), so they keep their state. */}
+        {mountedWindows(windows, available).map((w) => {
           const def = registry.get(w.kind);
-          if (!def || w.state !== "open" || !available.has(w.kind)) return null;
+          if (!def) return null;
           return (
             <ShellWindow
               key={`${w.kind}:${w.instance}`}

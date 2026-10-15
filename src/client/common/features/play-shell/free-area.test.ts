@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { WindowState } from "@shared/play-shell/layout";
 import {
+  contentHeights,
   freeArea,
   isAppearance,
   noteAppearance,
   notedAppearances,
   railArea,
   renderedWindowRects,
+  reportContentHeight,
 } from "./free-area";
 import { createWindowRegistry, defineWindow } from "./registry";
 
@@ -125,6 +127,47 @@ describe("FR-SHELL-34 rendered windows", () => {
     expect(freeArea(renderedWindowRects(ws, registry, none, VP), VP)).toEqual(RAIL);
     const all = new Set([...none, "cbt.initiative"]);
     expect(renderedWindowRects(ws, registry, all, VP)).toEqual([{ x: 900, y: 60, w: 300, h: 300 }]);
+  });
+});
+
+describe("FR-SHELL-39 rendered rects use the measured grown height", () => {
+  const growing = createWindowRegistry("dm", [
+    defineWindow({
+      kind: "cbt.initiative",
+      title: "Initiative",
+      clients: ["dm"],
+      defaultSize: { w: 400, h: 300 },
+      minSize: { w: 320, h: 240 },
+      defaultPosition: { anchor: "top-right" },
+      growToContent: true,
+      component: Body,
+    }),
+  ]);
+  const init = { ...win("cbt.initiative", "open", 1028, 1), w: 400 };
+  const all = new Set(["cbt.initiative"]);
+
+  test("FR-SHELL-39 grown height (not the stored h) reaches renderedWindowRects and freeArea", () => {
+    const stored = renderedWindowRects([init], growing, all, VP, new Map());
+    expect(stored).toEqual([{ x: 1028, y: 60, w: 400, h: 300 }]);
+    const measured = new Map([["cbt.initiative:main", 620]]);
+    const grown = renderedWindowRects([init], growing, all, VP, measured);
+    expect(grown).toEqual([{ x: 1028, y: 60, w: 400, h: 620 }]);
+    // A full-width window: the free area below it shrinks as it grows.
+    const wide = { ...init, x: 68, w: 1372 };
+    const at = (m: Map<string, number>) =>
+      freeArea(renderedWindowRects([wide], growing, all, VP, m), VP);
+    expect(at(new Map())).toEqual({ x: 68, y: 360, w: 1372, h: 476 });
+    expect(at(new Map([["cbt.initiative:main", 500]]))).toEqual({ x: 68, y: 560, w: 1372, h: 276 });
+  });
+
+  test("FR-SHELL-39 the reported heights are what consumers read by default", () => {
+    reportContentHeight("cbt.initiative:main", 500);
+    expect(contentHeights().get("cbt.initiative:main")).toBe(500);
+    expect(renderedWindowRects([init], growing, all, VP)[0]?.h).toBe(500);
+    // After a user resize (`fixedH`) the stored height wins.
+    expect(renderedWindowRects([{ ...init, fixedH: true }], growing, all, VP)[0]?.h).toBe(300);
+    reportContentHeight("cbt.initiative:main", null);
+    expect(renderedWindowRects([init], growing, all, VP)[0]?.h).toBe(300);
   });
 });
 

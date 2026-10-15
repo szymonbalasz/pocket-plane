@@ -46,11 +46,11 @@ async function resizeViewport(page: Page, width: number, height: number) {
   );
 }
 
-/** Open window keys (`kind:instance`), sorted: the layout as rendered. */
+/** Open window keys (`kind:instance`), sorted: the layout as rendered (minimised ones are parked). */
 const openKeys = async (page: Page) =>
   (
     await page
-      .getByTestId("ui-window")
+      .locator('[data-testid="ui-window"][data-state="open"]')
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id") ?? ""))
   ).sort();
 
@@ -170,7 +170,9 @@ test("FR-SHELL-09/11/12/14 launcher toggle, minimise, reset layout, render-only 
   await expect(probesBtn).toHaveAttribute("data-state", "open");
   await probesBtn.click(); // open on top → minimise
   await expect(probesBtn).toHaveAttribute("data-state", "minimised");
-  await expect(shellWindow(p, "sync.probes")).toHaveCount(0);
+  // FR-SHELL-36: parked, not unmounted.
+  await expect(shellWindow(p, "sync.probes")).toHaveAttribute("data-state", "minimised");
+  await expect(shellWindow(p, "sync.probes")).toBeHidden();
   await probesBtn.click(); // minimised → open
   await expect(shellWindow(p, "sync.probes")).toBeVisible();
   await shellWindow(p, "sync.probes").getByTestId("ui-window-minimise").click();
