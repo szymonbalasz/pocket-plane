@@ -44,3 +44,25 @@ describe("FR-CBT-79 pending list", () => {
     expect(pendingRowText({ ...card, actionRole: "player" })).toBe(card.text);
   });
 });
+
+describe("FR-CBT-75 opened from a notification", () => {
+  test("FR-CBT-75 placement: the card's action opens the popup at the origin rect and closes its toast", async () => {
+    const { useCombatDialogs } = await import("./popup-store");
+    let closed = 0;
+    const rect = { x: 560, y: 92, w: 320, h: 90 };
+    dmDamageCardView.onAction?.(note("card", 1, { kind: "damage-card" }), {
+      send: async () => undefined,
+      openWindow: () => {},
+      origin: { source: "toast", rect },
+      closeToast: () => {
+        closed += 1;
+      },
+    });
+    expect(useCombatDialogs.getState()).toMatchObject({ cardId: "card", origin: rect });
+    expect(closed).toBe(1);
+    // Pending row / own attack: no origin → FR-CBT-55/56 placement (the popup hides the toast).
+    useCombatDialogs.getState().openCard("card");
+    expect(useCombatDialogs.getState().origin).toBeNull();
+    useCombatDialogs.getState().closeCard();
+  });
+});

@@ -20,7 +20,9 @@ import {
 import type { NoteClient } from "./note-client";
 import { NoteBody, timeOf, useNoteActions, usePlayerNames } from "./parts";
 import { TestSendForm } from "./TestSendForm";
-import type { NotificationViews } from "./views";
+import { type NotificationViews, originOf } from "./views";
+
+const ROW_SELECTOR = '[data-testid="note-history-row"]';
 
 function Row({
   n,
@@ -77,7 +79,9 @@ function Row({
               size="sm"
               data-testid="note-history-action"
               disabled={action === "disabled" || busy}
-              onClick={() => void actions.run(n)}
+              onClick={(e) =>
+                void actions.run(n, originOf("history", e.currentTarget.closest(ROW_SELECTOR)))
+              }
             >
               {n.actionLabel}
             </Button>

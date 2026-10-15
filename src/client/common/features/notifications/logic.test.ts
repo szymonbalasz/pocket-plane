@@ -21,10 +21,14 @@ import { createSeenStore } from "./seen";
 import {
   addNote,
   closeToast,
+  createToastMemory,
+  hideNote,
+  hideToast,
   INFO_TOAST_MS,
   initialToasts,
   nextExpiry,
   pruneToasts,
+  registerToastMemory,
   setHidden,
   setHovered,
   setSummary,
@@ -210,6 +214,33 @@ describe("reconnect and reload (FR-NOTE-14/15, NOTE §11)", () => {
     const after = step(m, withCard, switched);
     expect(shown(after)).toEqual([]);
     expect(after.campaignId).toBe("c2");
+  });
+});
+
+describe("hidden toasts (FR-NOTE-26)", () => {
+  test("FR-NOTE-26 toast hidden by closeToast() / hideToast(id) stays hidden while pending; row and bell unchanged", () => {
+    const card = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
+    let s = addNote(initialToasts(0), card, 0);
+    s = hideNote(s, card.id, 1);
+    expect(s.toasts).toHaveLength(0);
+    // Added again (e.g. a later created frame) → stays hidden.
+    expect(addNote(s, card, 2).toasts).toHaveLength(0);
+    // Pruning keeps nothing back; the row is still pending in the store and counts on the bell.
+    const st = store(DM, [card], 3);
+    expect(pruneToasts(s, st, 3).toasts).toHaveLength(0);
+    expect(unreadCount(st, 0)).toBe(1);
+    // `hideToast(id)` reaches every mounted runtime's memory.
+    const m = createToastMemory(0);
+    m.setState((x) => ({ toasts: addNote(x.toasts, card, 0) }));
+    const off = registerToastMemory(m);
+    hideToast(card.id);
+    expect(m.getState().toasts.toasts).toHaveLength(0);
+    expect(m.getState().toasts.hiddenIds).toEqual([card.id]);
+    off();
+    const other = note();
+    m.setState((x) => ({ toasts: addNote(x.toasts, other, 0) }));
+    hideToast(other.id); // unregistered → no effect
+    expect(m.getState().toasts.toasts).toHaveLength(1);
   });
 });
 

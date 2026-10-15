@@ -3,7 +3,8 @@
 // selection (targeting on: click, Ctrl/Shift-click, box), added rows come from "Add target".
 // Per row: hit vs AC (preset, toggle), multiplier, preview. Apply sends 1–20 targets in list
 // order (FR-CBT-34); Later keeps the card pending; Dismiss closes it. Close → targeting off,
-// selection kept, except after a successful Apply (FR-CBT-54). Placement: FR-CBT-55.
+// selection kept, except after a successful Apply (FR-CBT-54). Placement: FR-CBT-55/56, over its
+// notification (FR-CBT-75); movable by its header (FR-CBT-76); its card's toast stays hidden.
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
@@ -28,9 +29,11 @@ import {
 import { Badge, Input, Label } from "@ui/components/ui/primitives";
 import { useCbtIntent, useCombatants } from "@ui/features/combat-tracker/store";
 import { useTargetingAttacker } from "@ui/features/combat-tracker/token-overlay";
+import { hideToast } from "@ui/features/notifications/toasts";
+import type { Viewport } from "@ui/features/play-shell/geometry";
 import { useRecords } from "@ui/sync/store";
 import { EyeOffIcon, XIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   getMapSelection,
   setMapSelection,
@@ -38,8 +41,15 @@ import {
   useMapSelection,
 } from "../scenes-map/selection";
 import { useDefinitions } from "./data";
-import { measurePlacement, type Placement, placementTokenIds } from "./popup-placement";
-import { useCombatDialogs } from "./popup-store";
+import {
+  clampIntoWorkArea,
+  dragPopup,
+  measurePlacement,
+  originPlacement,
+  type Placement,
+  placementTokenIds,
+} from "./popup-placement";
+import { type PopupOrigin, useCombatDialogs } from "./popup-store";
 import {
   addAction,
   eligibleTargets,
@@ -261,7 +271,8 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
 
   return (
     <div className="flex min-h-0 flex-col gap-3">
-      <div>
+      {/* FR-CBT-76: the header drags the popup (handled by the panel). */}
+      <div data-testid="cbt-popup-drag" className="-mx-3 -mt-3 cursor-move select-none px-3 pt-3">
         <h2 className="text-sm font-semibold">
           {p.attackerName} — {p.attackName}
         </h2>
@@ -499,26 +510,107 @@ function useOpenPlacement(card: NotificationRecord): Placement {
  */
 export function AttackPopup() {
   const cardId = useCombatDialogs((s) => s.cardId);
+  const origin = useCombatDialogs((s) => s.origin);
+  const openSeq = useCombatDialogs((s) => s.openSeq);
   const close = useCombatDialogs((s) => s.closeCard);
   const notes = useRecords<NotificationRecord>("notification");
   const card = cardId ? notes.find((n) => n.id === cardId) : undefined;
   if (card?.state !== "pending") return null;
-  return <PopupPanel key={card.id} card={card} close={close} />;
+  return <PopupPanel key={`${card.id}:${openSeq}`} card={card} origin={origin} close={close} />;
 }
 
-function PopupPanel({ card, close }: { card: NotificationRecord; close(): void }) {
+const viewport = (): Viewport => ({ w: window.innerWidth, h: window.innerHeight });
+
+function PopupPanel({
+  card,
+  origin,
+  close,
+}: {
+  card: NotificationRecord;
+  origin: PopupOrigin | null;
+  close(): void;
+}) {
   const at = useOpenPlacement(card);
+  const ref = useRef<HTMLDivElement>(null);
+  // Top-left once placed over its notification (FR-CBT-75) or dragged (FR-CBT-76); null = the
+  // FR-CBT-55/56 spot, centred. Client memory until the popup closes.
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const posRef = useRef(pos);
+  posRef.current = pos;
+
+  // Item 11: a card's toast never shows while its popup is open (FR-CBT-75, FR-NOTE-26).
+  useEffect(() => hideToast(card.id), [card.id]);
+
+  // FR-CBT-75: over its origin, clamped once the panel's size is known; re-clamped when the
+  // panel or the viewport changes size, so it stays in the work area.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: placed once per open
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const size = () => {
+      const r = el.getBoundingClientRect();
+      return { w: r.width, h: r.height };
+    };
+    if (origin) setPos(originPlacement(origin, size(), viewport()));
+    const reclamp = () => {
+      const p = posRef.current;
+      if (p) setPos(clampIntoWorkArea({ ...p, ...size() }, viewport()));
+    };
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(reclamp);
+    ro?.observe(el);
+    window.addEventListener("resize", reclamp);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", reclamp);
+    };
+  }, []);
+
+  /** FR-CBT-76: drag by the header (`cbt-popup-drag`), clamped into the work area. */
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    const handle = (e.target as Element).closest('[data-testid="cbt-popup-drag"]');
+    if (e.button !== 0 || !el || !handle) return;
+    e.preventDefault();
+    const r = el.getBoundingClientRect();
+    const start = { x: r.left, y: r.top, w: r.width, h: r.height };
+    const sx = e.clientX;
+    const sy = e.clientY;
+    const target = e.currentTarget;
+    target.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      const next = dragPopup(start, ev.clientX - sx, ev.clientY - sy, viewport());
+      setPos({ x: next.x, y: next.y });
+    };
+    const end = () => {
+      target.removeEventListener("pointermove", move);
+      target.removeEventListener("pointerup", end);
+      target.removeEventListener("pointercancel", end);
+    };
+    target.addEventListener("pointermove", move);
+    target.addEventListener("pointerup", end);
+    target.addEventListener("pointercancel", end);
+  };
+
+  const maxHeight = at.bottom - at.top;
   return (
     <div
+      ref={ref}
       role="dialog"
       aria-modal="false"
       aria-label="Attack"
       data-testid="cbt-popup"
       data-record-id={card.id}
-      data-side={at.side}
-      // FR-CBT-55: centred in the work area at its left / right edge; not draggable.
-      style={{ left: at.x, top: (at.top + at.bottom) / 2, maxHeight: at.bottom - at.top }}
-      className="fixed z-40 flex w-[min(440px,calc(100vw-2rem))] -translate-y-1/2 flex-col overflow-y-auto rounded-lg border bg-card p-3 text-card-foreground shadow-lg"
+      data-side={origin ? "origin" : at.side}
+      // FR-CBT-55: centred in the work area at its left / right edge; FR-CBT-75/76: at `pos`.
+      style={
+        pos
+          ? { left: pos.x, top: pos.y, maxHeight }
+          : origin
+            ? { left: origin.x, top: origin.y, maxHeight }
+            : { left: at.x, top: (at.top + at.bottom) / 2, maxHeight, translate: "0 -50%" }
+      }
+      className="fixed z-40 flex w-[min(440px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-lg border bg-card p-3 text-card-foreground shadow-lg"
+      onPointerDown={onPointerDown}
       // Esc with focus in the popup closes it; Esc on the canvas clears the selection (FR-MAP-31).
       onKeyDown={(e) => {
         if (e.key === "Escape") {

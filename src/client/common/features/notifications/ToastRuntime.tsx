@@ -27,6 +27,7 @@ import {
   advance,
   closeToast,
   nextExpiry,
+  registerToastMemory,
   SUMMARY_KEY,
   setHidden,
   setHovered,
@@ -36,9 +37,10 @@ import {
   type ToastState,
   visibleToasts,
 } from "./toasts";
-import type { NotificationViews } from "./views";
+import { type NotificationViews, originOf } from "./views";
 
 type Action = (s: ToastState, now: number) => ToastState;
+const TOAST_SELECTOR = '[data-testid="note-toast"]';
 const hiddenNow = () => typeof document !== "undefined" && document.visibilityState === "hidden";
 
 function NoteToast({
@@ -88,7 +90,9 @@ function NoteToast({
           className="self-end"
           data-testid="note-toast-action"
           disabled={mode === "disabled" || actions.busy.has(n.id)}
-          onClick={() => void actions.run(n)}
+          onClick={(e) =>
+            void actions.run(n, originOf("toast", e.currentTarget.closest(TOAST_SELECTOR)))
+          }
         >
           {n.actionLabel}
         </Button>
@@ -136,6 +140,9 @@ export function ToastRuntime({
     if (first.state === "live" && viewerOf(first.store)) onChange(first, null);
     return sync.subscribe((next, prev) => onChange(next, prev));
   }, [sync, note, memory, dispatch]);
+
+  // FR-NOTE-26: `hideToast(id)` reaches this page's stack.
+  useEffect(() => registerToastMemory(memory), [memory]);
 
   // Info toast expiry.
   const wait = nextExpiry(state);

@@ -66,6 +66,7 @@ import {
 } from "@ui/features/dice-roll-log/roll-control";
 import { actionButton } from "@ui/features/notifications/logic";
 import { useNoteActions } from "@ui/features/notifications/parts";
+import { originOf } from "@ui/features/notifications/views";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { movementIndicator } from "@ui/features/scenes-map/movement";
@@ -642,7 +643,8 @@ function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteAction
           data-testid="cbt-init-pending-action"
           data-record-id={n.id}
           disabled={mode === "disabled" || actions.busy.has(n.id)}
-          onClick={() => void actions.run(n)}
+          // A list row like Notifications' (FR-NOTE-26 origin); its kind decides what it means.
+          onClick={(e) => void actions.run(n, originOf("history", e.currentTarget.closest("li")))}
         >
           {n.actionLabel}
         </Button>
