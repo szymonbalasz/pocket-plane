@@ -3,7 +3,7 @@
 - Status: proposed (spec-polish-2a, sprint 2 phase 1; integrator numbers it at merge)
 - Date: 2026-10-15
 - Refines: [ADR-0016](0016-domain-events-pending-actions.md) (a pending action's payload can change while it is pending), [ADR-0027](0027-notification-creation.md) (notifications change only in the causing command's transaction; now also an update)
-- Affects: [combat-tracker](../../specs/combat-tracker.md) (FR-CBT-70–74, §6.1), [notifications](../../specs/notifications.md) (FR-NOTE-25; drops "editing" from the non-goals for pending rows), [character-sheet-full](../../specs/character-sheet-full.md) (FR-CHARX-21 `attack` row, FR-CHARX-24 claim list; OQ-CBT-51), [protocol §21–23](../../protocol/README.md#23-combat-notification-kinds)
+- Affects: [combat-tracker](../../specs/combat-tracker.md) (FR-CBT-70–74, §6.1), [notifications](../../specs/notifications.md) (FR-NOTE-25; drops "editing" from the non-goals for pending rows), [character-sheet-full](../../specs/character-sheet-full.md) (new kinds `toHit` / `spellToHit`, FR-CHARX-24 claim list; seam settled S1, OQ-CBT-51 / OQ-CHARX-21), [protocol §21–23](../../protocol/README.md#23-combat-notification-kinds)
 - Raised by: DM playtest note N7 (#188): "Main's Attack also rolls damage; Actions' Attack / Damage differ in and out of combat. Add a third button, **Attack + damage**, and make the three behave the same everywhere."
 
 ## Context
@@ -29,6 +29,6 @@
 
 - notifications: FR-NOTE-25; the "editing" non-goal now excludes kind-owner updates of pending rows; users still can't edit. protocol §8 / §22 gain `NotificationUpdated`.
 - combat-tracker: FR-CBT-70–74 and the §6.1 table; card payload `toHit` / `damage` nullable (never both), plus `attackId?` / `spellId?` / `saveDc?`; new `DamageRolled` event; outcome lines for to-hit-only (miss) and damage-only applies.
-- character-sheet-full: `attack` means to-hit only, a new combined kind (names per OQ-CBT-51); combat's route claims all three per row while in combat.
+- character-sheet-full (settled S1): new kinds `toHit` / `spellToHit` (Attack); `damage` / `spellDamage` (Damage); `attack` / `spellAttack` keep their stored meaning (Attack + damage), so old `CharacterRolled` events and log entries read the same. Combat's route claims all three per row while in combat; P2b's sheet build merges first (unclaimed `toHit` = a plain roll).
 - Undo: unchanged (one apply = one undo step; completing a card is not undoable, like rolling it).
 - Gems ([gems](../../specs/post-mvp/gems.md), FR-CBT-32) can use the same helper later.
