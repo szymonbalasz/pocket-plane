@@ -7,6 +7,7 @@ import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
+import { useWindowShown } from "../play-shell/ShellWindow";
 import { isTestMode } from "../play-shell/test-windows";
 import {
   actionButton,
@@ -133,7 +134,11 @@ export function HistoryBody({ views, note }: { views: NotificationViews; note: N
   const testMode = isTestMode(store);
 
   // FR-NOTE-18: open → mark seen now (layout effect: the launcher badge clears with this paint).
+  // A minimised window stays mounted (FR-SHELL-36) but isn't open to the user: nothing is seen
+  // until it is shown again.
+  const shown = useWindowShown();
   useLayoutEffect(() => {
+    if (!shown) return;
     const read = () => sync?.getState().store;
     const s = read();
     if (s) note.setHistoryOpen(true, s);
@@ -147,10 +152,10 @@ export function HistoryBody({ views, note }: { views: NotificationViews; note: N
       const cur = read();
       if (cur) note.setHistoryOpen(false, cur);
     };
-  }, [note, sync]);
+  }, [note, sync, shown]);
   useEffect(() => {
-    note.markSeen(store);
-  }, [note, store]);
+    if (shown) note.markSeen(store);
+  }, [note, store, shown]);
 
   if (!viewerOf(store) || !everLive) {
     return (

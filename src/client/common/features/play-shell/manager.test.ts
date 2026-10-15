@@ -4,10 +4,13 @@ import { clampRect, renderedRect, TOP_BAR_H, workArea } from "./geometry";
 import {
   defaultLayout,
   launcherState,
+  launcherTooltip,
   type ManagerContext,
+  mountedWindows,
   reduce,
   restoreLayout,
   serialise,
+  topWindow,
   type WindowAction,
   type Windows,
 } from "./manager";
@@ -349,5 +352,116 @@ describe("layout restore (FR-SHELL-17)", () => {
   test("FR-SHELL-17 40 windows is accepted", () => {
     const raw = valid(Array.from({ length: 40 }, (_, i) => w({ kind: `a.k${i}`, z: i })));
     expect(restoreLayout(registry, raw, vp).warning).toBeUndefined();
+  });
+});
+
+describe("FR-SHELL-39 grow to content: fixedH", () => {
+  const grows = createWindowRegistry("dm", [
+    def("cbt.initiative", { growToContent: true }),
+    def("a.plain"),
+  ]);
+  const gctx: ManagerContext = {
+    ...ctx,
+    registry: grows,
+    available: new Set(["cbt.initiative", "a.plain"]),
+  };
+  const go = (ws: Windows, ...actions: WindowAction[]) =>
+    actions.reduce((acc, a) => reduce(acc, a, gctx), ws);
+  const rect = { x: 100, y: 100, w: 320, h: 400 };
+
+  test("FR-SHELL-39 resize end sets fixedH and writes h; a move doesn't", () => {
+    let ws = go([], { type: "open", kind: "cbt.initiative" });
+    ws = go(ws, { type: "setRect", kind: "cbt.initiative", rect });
+    expect(get(ws, "cbt.initiative").fixedH).toBeUndefined();
+    ws = go(ws, { type: "setRect", kind: "cbt.initiative", rect, resized: true });
+    expect(get(ws, "cbt.initiative")).toMatchObject({ ...rect, fixedH: true });
+    ws = go(ws, { type: "setRect", kind: "cbt.initiative", rect: { ...rect, x: 300 } });
+    expect(get(ws, "cbt.initiative").fixedH).toBe(true); // a later move keeps it
+  });
+
+  test("FR-SHELL-39 a fixedH-only change is written (not dropped as a no-op)", () => {
+    let ws = go([], { type: "open", kind: "cbt.initiative" });
+    ws = go(ws, { type: "setRect", kind: "cbt.initiative", rect });
+    const next = go(ws, { type: "setRect", kind: "cbt.initiative", rect, resized: true });
+    expect(next).not.toBe(ws);
+  });
+
+  test("FR-SHELL-39 only opted-in types get fixedH", () => {
+    let ws = go([], { type: "open", kind: "a.plain" });
+    ws = go(ws, { type: "setRect", kind: "a.plain", rect, resized: true });
+    expect(get(ws, "a.plain").fixedH).toBeUndefined();
+  });
+
+  test("FR-SHELL-39 reset clears it", () => {
+    let ws = go([], { type: "open", kind: "cbt.initiative" });
+    ws = go(
+      ws,
+      { type: "setRect", kind: "cbt.initiative", rect, resized: true },
+      { type: "reset" },
+    );
+    expect(ws.some((w) => w.fixedH)).toBe(false);
+  });
+
+  test("FR-SHELL-39 entries without fixedH parse; fixedH round-trips; other values are invalid", () => {
+    const w = { kind: "cbt.initiative", instance: "main", state: "open", ...rect, z: 1 };
+    const back = (x: object) => restoreLayout(grows, JSON.stringify({ windows: [x] }), vp);
+    expect(back(w).warning).toBeUndefined();
+    expect(get(back(w).windows, "cbt.initiative").fixedH).toBeUndefined();
+    const fixed = back({ ...w, fixedH: true });
+    expect(get(fixed.windows, "cbt.initiative").fixedH).toBe(true);
+    expect(serialise(fixed.windows, grows).windows[0]?.fixedH).toBe(true);
+    expect(back({ ...w, fixedH: false }).warning).toBeString();
+  });
+});
+
+describe("FR-SHELL-36/37 minimised = parked", () => {
+  const keys = (ws: Windows, available = ctx.available) =>
+    mountedWindows(ws, available).map((w) => `${w.kind}:${w.state}`);
+
+  test("FR-SHELL-36 minimised stays mounted; close unmounts; geometry kept for the next open", () => {
+    let ws = run([], { type: "open", kind: "a.two" }, { type: "open", kind: "a.three" });
+    ws = run(ws, { type: "minimise", kind: "a.two" });
+    expect(keys(ws)).toEqual(["a.two:minimised", "a.three:open"]);
+    const parked = get(ws, "a.two");
+    ws = run(ws, { type: "open", kind: "a.two" }); // restore: the same mounted window
+    expect(keys(ws)).toEqual(["a.two:open", "a.three:open"]);
+    ws = run(ws, { type: "close", kind: "a.two" });
+    expect(keys(ws)).toEqual(["a.three:open"]);
+    ws = run(ws, { type: "open", kind: "a.two" }); // fresh mount, last geometry
+    expect(get(ws, "a.two")).toMatchObject({ x: parked.x, y: parked.y, w: parked.w, h: parked.h });
+  });
+
+  test("FR-SHELL-36 unavailable kinds unmount whatever their state", () => {
+    const ws = run([], { type: "open", kind: "a.two" }, { type: "open", kind: "a.three" });
+    const parked = run(ws, { type: "minimise", kind: "a.three" });
+    expect(keys(parked, new Set(["a.one"]))).toEqual([]);
+    expect(keys(parked, new Set(["a.three"]))).toEqual(["a.three:minimised"]);
+  });
+
+  test("FR-SHELL-36 a minimised window is not the focused one and isn't on screen for placement", () => {
+    let ws = run([], { type: "open", kind: "a.two" }, { type: "open", kind: "a.three" });
+    ws = run(ws, { type: "minimise", kind: "a.three" });
+    expect(topWindow(ws, ctx.available)?.kind).toBe("a.two");
+    expect(run(ws, { type: "focus", kind: "a.three" })).toBe(ws);
+  });
+
+  test("FR-SHELL-36 a layout restored after reload keeps minimised windows minimised", () => {
+    const ws = run([], { type: "open", kind: "a.two" }, { type: "minimise", kind: "a.two" });
+    const raw = JSON.stringify(serialise(ws, registry));
+    const back = restoreLayout(registry, raw, vp).windows;
+    expect(keys(back)).toEqual(["a.two:minimised"]);
+  });
+
+  test("FR-SHELL-37 launcher states and Tooltips", () => {
+    let ws = run([], { type: "open", kind: "a.two" });
+    expect(launcherState(ws, "a.two")).toBe("open");
+    expect(launcherTooltip("Log", "open")).toBe("Log (open)");
+    ws = run(ws, { type: "toggle", kind: "a.two" });
+    expect(launcherState(ws, "a.two")).toBe("minimised");
+    expect(launcherTooltip("Log", "minimised")).toBe("Log (minimised — click to restore)");
+    ws = run(ws, { type: "close", kind: "a.two" });
+    expect(launcherState(ws, "a.two")).toBe("closed");
+    expect(launcherState(ws, "a.three")).toBe("closed");
+    expect(launcherTooltip("Log", "closed")).toBe("Log");
   });
 });

@@ -40,6 +40,11 @@ export const WindowState = z.object({
    * entries stored before it still parse (fit then skips the window).
    */
   area: z.object({ w: size, h: size }).optional(),
+  /**
+   * Set at a user resize end on a `growToContent` window type (FR-SHELL-39): the stored height
+   * wins, no growth. Absent = grows; entries stored before it still parse.
+   */
+  fixedH: z.literal(true).optional(),
 });
 export type WindowState = z.infer<typeof WindowState>;
 
