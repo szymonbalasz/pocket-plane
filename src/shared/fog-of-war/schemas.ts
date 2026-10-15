@@ -96,3 +96,28 @@ export const PlayerFogRecord = z.object({
   runs: z.string(),
 });
 export type PlayerFogRecord = z.infer<typeof PlayerFogRecord>;
+
+/** WS intents (FOG §9; DM only, ADR-0021 D). */
+export const FOG_INTENTS = {
+  edit: "fog.edit",
+  setAll: "fog.setAll",
+  undo: "fog.undo",
+} as const;
+
+const Id = z.string().min(1).max(64);
+
+/** FR-FOG-05: reveal or hide the cells of a rectangle or polygon. */
+export const FogEditInput = z.strictObject({ sceneId: Id, op: FogOp, shape: FogShape });
+export type FogEditInput = z.input<typeof FogEditInput>;
+
+/** FR-FOG-06: Fog all (`fogged: true`) / Reveal all (`false`). */
+export const FogSetAllInput = z.strictObject({ sceneId: Id, fogged: z.boolean() });
+export type FogSetAllInput = z.input<typeof FogSetAllInput>;
+
+/** FR-FOG-07: undo the latest edit, guarded by its id. */
+export const FogUndoInput = z.strictObject({ sceneId: Id, expectedEditId: Id });
+export type FogUndoInput = z.input<typeof FogUndoInput>;
+
+/** `fog.edit` / `fog.setAll` ack: the new undo entry, or null when no cell changed. */
+export const FogEditResult = z.object({ editId: z.string().nullable() });
+export type FogEditResult = z.infer<typeof FogEditResult>;
