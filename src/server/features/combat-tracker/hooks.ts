@@ -4,13 +4,14 @@
 
 import { MOVED_FT_MAX } from "@shared/combat-tracker/schemas";
 import type { EntityRecord } from "@shared/entities/schemas";
-import { distanceFt } from "@shared/scenes-map/geometry";
+import { distanceFt } from "@shared/scene-tools/geometry";
 import type { TokenRecord } from "@shared/scenes-map/schemas";
 import { and, eq } from "drizzle-orm";
 import { conflict } from "../../commands/errors";
 import { combatant } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import type { HookEnv } from "../entities/definition-hooks";
+import { diagonalRuleOf } from "../scene-tools/rows";
 import type { TokenHookEnv } from "../scenes-map/token-hooks";
 import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 import { combatantDiff, encounterDiff, rerank, syncPlayerTurn } from "./ranks";
@@ -60,7 +61,9 @@ export function combatantTokenHook(
     return combatantDiff(env.tx, bound);
   }
   const out: RecordChange[] = [];
-  const ft = distanceFt(before, after);
+  // FR-SCN-30: the campaign's diagonal rule (`map-settings`, no row = 5/10/5). A move refused by a
+  // move guard (FR-SCN-11) never reaches the hooks, so it adds nothing.
+  const ft = distanceFt(before, after, diagonalRuleOf(env.tx, before.campaignId));
   const hidden = tokenHiddenForPlayers(after);
   for (const c of bound) {
     // FR-CBT-39: before the copy check (which skips on a move); removed combatants gain nothing.
