@@ -136,6 +136,11 @@ test("FR-CBTX-46 FR-CBT-78 FR-NOTE-27 FR-CBT-79 FR-NOTE-30 chips fit; temp HP pr
   await expect(pending.getByTestId("cbt-init-pending-text")).toHaveText(
     /^Waiting for Mira: concentration save DC 10 \(Bless\)$/,
   );
+  // P3 glitch 10: the whole text on hover when the row cuts it.
+  await expect(pending.getByTestId("cbt-init-pending-text")).toHaveAttribute(
+    "title",
+    "Waiting for Mira: concentration save DC 10 (Bless)",
+  );
   await expect(pending.getByTestId("cbt-init-pending-action")).toHaveText("Roll save");
   // FR-NOTE-27: the DM's bell counts it; no DM toast for it.
   await expect.poll(async () => Number(await bell.textContent())).toBeGreaterThan(bellBefore);

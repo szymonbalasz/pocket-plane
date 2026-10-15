@@ -4,7 +4,6 @@
 // toggle) hosted by each client's always-mounted combat companion; no host mounted (a player
 // after End) → the server rolls at once.
 
-import { signed } from "@shared/character-sheet/logic";
 import {
   CBTX_INTENTS,
   ConcentrationCardPayload,

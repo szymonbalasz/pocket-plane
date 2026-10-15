@@ -122,6 +122,7 @@ export function EffectChips({
   return (
     <div
       ref={ref}
+      data-chip-row
       className={cn(
         // Never narrower than the "+N" chip; chips collapse before the name truncates.
         "relative flex min-w-7 flex-1 flex-nowrap items-center gap-0.5 overflow-hidden",
