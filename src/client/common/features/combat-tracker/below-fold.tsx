@@ -29,6 +29,22 @@ function scrollerOf(el: Element | null): HTMLElement | null {
 }
 
 /**
+ * Boxes whose size moves the fold: the root, its rows and row list, and every ancestor up to and
+ * including the shell window (body, content wrapper, window section).
+ */
+export function foldBoxes(root: HTMLElement | null): HTMLElement[] {
+  if (!root) return [];
+  const out: HTMLElement[] = [root, ...root.querySelectorAll<HTMLElement>(ROW_SELECTOR)];
+  const list = root.querySelector<HTMLElement>(ROW_SELECTOR)?.parentElement;
+  if (list && list !== root) out.push(list);
+  for (let p = root.parentElement; p; p = p.parentElement) {
+    out.push(p);
+    if (p.dataset.testid === "ui-window") break;
+  }
+  return out;
+}
+
+/**
  * `rootRef` = the Initiative body; `rowIds` = the rows in list order; `pendingShown` = the DM's
  * Pending section is there. Returns the count below the fold and the footer's scroll action.
  */
@@ -46,10 +62,12 @@ export function useBelowFold(
   const foldOf = useCallback(() => {
     const scroller = scrollerOf(rootRef.current?.querySelector(ROW_SELECTOR) ?? null);
     if (!scroller) return null;
-    // The sticky footer covers the scroller's bottom only when it scrolls with it (growing window).
+    // The sticky footer covers the scroller's bottom only when it scrolls with it (growing
+    // window): then the fold is its top edge (wherever padding puts it).
+    const bottom = scroller.getBoundingClientRect().bottom;
     const f = footerRef.current;
-    const footer = f && scroller.contains(f) ? f.getBoundingClientRect().height : 0;
-    return scroller.getBoundingClientRect().bottom - footer;
+    if (!f || f.hidden || !scroller.contains(f)) return bottom;
+    return Math.min(bottom, f.getBoundingClientRect().top);
   }, [rootRef, footerRef]);
   const below = useCallback(() => {
     const fold = foldOf();
@@ -69,25 +87,31 @@ export function useBelowFold(
     );
   }, [foldOf, rowsOf]);
 
+  // Re-measure whenever any box between the rows and the window changes size: the window grows
+  // to its content a frame after the rows change (FR-SHELL-39), which resizes the body / list but
+  // not the root, so observing the root alone left the count stale (walkthrough G4).
+  const key = rowIds.join();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-observe when the rows change
   useEffect(() => {
     measure();
     const root = rootRef.current;
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    if (root) ro?.observe(root);
+    for (const el of foldBoxes(root)) ro?.observe(el);
+    const frame = requestAnimationFrame(measure);
     // `scroll` doesn't bubble; capture sees the body's and the list's.
     document.addEventListener("scroll", measure, true);
     window.addEventListener("resize", measure);
     return () => {
+      cancelAnimationFrame(frame);
       ro?.disconnect();
       document.removeEventListener("scroll", measure, true);
       window.removeEventListener("resize", measure);
     };
-  }, [measure, rootRef]);
+  }, [measure, rootRef, key]);
 
   // New rows (and the Pending section's first appearance) scroll into view when below the fold.
   const prev = useRef<readonly string[]>([]);
   const hadPending = useRef(pendingShown);
-  const key = rowIds.join();
   // biome-ignore lint/correctness/useExhaustiveDependencies: on row-set and Pending changes
   useLayoutEffect(() => {
     const added = newIds(prev.current, rowIds);

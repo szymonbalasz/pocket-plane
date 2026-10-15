@@ -223,8 +223,39 @@ test("FR-CBT-77 a short window: Initiative grows to the work area, '↓ N more' 
   // Grown to the work area's bottom (above the launcher).
   const box = await init.boundingBox();
   expect(Math.round((box?.y ?? 0) + (box?.height ?? 0))).toBeGreaterThan(480 - 64 - 4);
+  // The count is what is really below the fold (rows not wholly above the footer).
+  const below = (win: Locator) =>
+    win.evaluate((w) => {
+      const f = w.querySelector<HTMLElement>('[data-testid="cbt-init-more"]');
+      const body = w.querySelector<HTMLElement>('[data-testid="ui-window-content"]')?.parentElement;
+      const bottom = Math.min(
+        (body ?? w).getBoundingClientRect().bottom,
+        f && !f.hidden ? f.getBoundingClientRect().top : Infinity,
+      );
+      return [...w.querySelectorAll('[data-testid="cbt-init-row"]')].filter(
+        (r) => r.getBoundingClientRect().bottom > bottom + 1,
+      ).length;
+    });
+  const shown = async (win: Locator) =>
+    Number(await win.getByTestId("cbt-init-more").getAttribute("data-value"));
+  await expect.poll(async () => (await shown(init)) - (await below(init))).toBe(0);
   await more.click();
   await expect.poll(async () => Number(await more.getAttribute("data-value"))).toBeLessThan(n);
+
+  // Walkthrough G4 regression: the window grows (here: a taller viewport) with no scroll and no
+  // row change → the count follows at once and the footer hides when nothing is below the fold;
+  // the player's window likewise.
+  const pinit = await openWindow(player, "cbt.initiative");
+  for (const page of [dm, player]) await page.setViewportSize({ width: 1280, height: 1000 });
+  for (const win of [init, pinit]) {
+    await expect(win.getByTestId("cbt-init-more")).toBeHidden();
+    await expect(win.getByTestId("cbt-init-more")).toHaveAttribute("data-value", "0");
+    expect(await below(win)).toBe(0);
+  }
+  // Back to short: the DM's count reappears and matches the rows below.
+  await dm.setViewportSize({ width: 1280, height: 480 });
+  await expect(more).toBeVisible();
+  await expect.poll(async () => (await shown(init)) - (await below(init))).toBe(0);
 
   await player.context().close();
   await dm.context().close();
