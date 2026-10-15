@@ -26,6 +26,7 @@ import {
   useStartedEncounter,
 } from "@ui/features/combat-tracker/store";
 import { useFreeArea } from "@ui/features/play-shell/free-area";
+import { useSceneLoaded } from "@ui/features/scenes-map/scene-window";
 import { useRecords } from "@ui/sync/store";
 import { MinusIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -93,6 +94,8 @@ export function AddForm() {
   const [createTokens, setCreateTokens] = useState(true);
   const [hidden, setHidden] = useState(true);
   const scene = scenes.find((s) => s.id === enc?.sceneId) ?? null;
+  // ADR-0041: the preview reads the encounter scene's tokens; load them if it isn't held.
+  const sceneLoaded = useSceneLoaded(scene?.id ?? null);
   const opts = addOptionsState({ createTokens, hasScene: scene !== null });
   const onOtherScene = scene !== null && viewed?.id !== scene.id;
 
@@ -239,7 +242,12 @@ export function AddForm() {
           <span className="text-xs text-muted-foreground">Tokens go to {scene.name}</span>
         )}
       </div>
-      {preview.length > 0 && (
+      {!sceneLoaded && (
+        <span data-testid="cbtx-add-scene-loading" className="text-xs text-muted-foreground">
+          Loading scene…
+        </span>
+      )}
+      {sceneLoaded && preview.length > 0 && (
         <ul className="flex max-h-56 flex-col gap-1 overflow-auto text-sm">
           {preview.map((b, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: one row per new combatant
@@ -253,7 +261,7 @@ export function AddForm() {
         </Button>
         <Button
           data-testid="cbtx-add-confirm"
-          disabled={disabled || !enc || total === 0 || total > ADD_INSTANCES_MAX}
+          disabled={disabled || !enc || !sceneLoaded || total === 0 || total > ADD_INSTANCES_MAX}
           onClick={async () => {
             if (!enc) return;
             // FR-CBT-65: `at` only while this tab views the encounter's scene.

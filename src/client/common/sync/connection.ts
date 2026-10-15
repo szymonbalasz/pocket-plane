@@ -11,6 +11,13 @@ import {
   WS_PATH,
   WS_PROBE_PARAM,
 } from "@shared/protocol/frames";
+import {
+  LoadSceneResult,
+  mergeRecords,
+  type SceneWindowState,
+  SYNC_LOAD_SCENE,
+  sceneWindowAfterSnapshot,
+} from "@shared/protocol/scene-window";
 import { applyEvent, applySnapshot, emptyStore, type RecordStore } from "@shared/protocol/store";
 import { backoffDelay } from "./backoff";
 
@@ -58,6 +65,11 @@ export interface SyncSnapshot {
   /** Epoch ms when the connection last stopped being live; null while live or never live. */
   notLiveSince: number | null;
   everLive: boolean;
+  /**
+   * DM active-scene window (ADR-0041): scenes whose flagged rows the store holds in full (the
+   * snapshot's active scene + loaded ones) and loads in flight. Reset by every snapshot.
+   */
+  scenes: SceneWindowState;
 }
 
 export interface ConnectionOptions {
@@ -133,6 +145,8 @@ export class SyncConnection {
   private generation = 0;
   private probing = false;
   private pending = new Map<string, { resolve(v: unknown): void; reject(e: Error): void }>();
+  /** Bumped by every snapshot; a load answered for an older one is dropped. */
+  private epoch = 0;
   private signalHandlers = new Set<SignalHandler>();
   private eventHandlers = new Set<EventHandler>();
   private snap: SyncSnapshot = {
@@ -140,6 +154,7 @@ export class SyncConnection {
     store: emptyStore(),
     notLiveSince: null,
     everLive: false,
+    scenes: { loaded: [], loading: [] },
   };
   private readonly clock: Clock;
   private wakeOff: (() => void) | null = null;
@@ -196,6 +211,54 @@ export class SyncConnection {
     return new Promise((resolve, reject) => {
       this.pending.set(intentId, { resolve, reject });
       this.ws?.send(JSON.stringify({ type: "intent", intentId, name, payload }));
+    });
+  }
+
+  /**
+   * DM: load a scene's flagged rows with `sync.loadScene` (ADR-0041). The ack's records are
+   * merged into the store in frame order (synchronously, before the next frame). Returns null
+   * when nothing is sent: not live, not the DM (players hold their scene in full), or the scene
+   * is already loaded or loading (one load in flight per scene). A reject leaves the scene
+   * unloaded; the caller toasts and retries on the next view.
+   */
+  loadScene(sceneId: string): Promise<void> | null {
+    const { scenes, state, store } = this.snap;
+    if (state !== "live" || !this.ws || store.you?.role !== "dm") return null;
+    if (scenes.loaded.includes(sceneId) || scenes.loading.includes(sceneId)) return null;
+    const epoch = this.epoch;
+    const intentId = crypto.randomUUID();
+    this.set({ scenes: { ...scenes, loading: [...scenes.loading, sceneId] } });
+    return new Promise((resolve, reject) => {
+      const done = (loaded: boolean, patch: Partial<SyncSnapshot> = {}) => {
+        if (epoch !== this.epoch) return;
+        const s = this.snap.scenes;
+        this.set({
+          ...patch,
+          scenes: {
+            loaded: loaded && !s.loaded.includes(sceneId) ? [...s.loaded, sceneId] : s.loaded,
+            loading: s.loading.filter((x) => x !== sceneId),
+          },
+        });
+      };
+      this.pending.set(intentId, {
+        resolve: (result) => {
+          const parsed = LoadSceneResult.safeParse(result);
+          if (!parsed.success) {
+            done(false);
+            reject(new IntentRejected("invalid", "Bad scene load result"));
+            return;
+          }
+          done(true, { store: mergeRecords(this.snap.store, parsed.data.records) });
+          resolve();
+        },
+        reject: (err) => {
+          done(false);
+          reject(err);
+        },
+      });
+      this.ws?.send(
+        JSON.stringify({ type: "intent", intentId, name: SYNC_LOAD_SCENE, payload: { sceneId } }),
+      );
     });
   }
 
@@ -270,15 +333,19 @@ export class SyncConnection {
     }
     this.lastPongAt = this.clock.now();
     switch (frame.type) {
-      case "snapshot":
+      case "snapshot": {
         this.attempt = 0;
+        this.epoch += 1;
+        const store = applySnapshot(frame);
         this.set({
           state: "live",
-          store: applySnapshot(frame),
+          store,
           notLiveSince: null,
           everLive: true,
+          scenes: sceneWindowAfterSnapshot(store),
         });
         return;
+      }
       case "event": {
         const r = applyEvent(this.snap.store, frame);
         if (!r.ok) {
