@@ -1,8 +1,9 @@
 // Tool rail content (MAP §7): Select, Ruler, Ping, then the canvas tool registry's tools for this
 // client (FR-SCN-06; off while not live, FR-SCN-34) and Fit (FR-MAP-45); DM extras as children.
-// The active registry tool's panel shows beside the rail.
+// The active registry tool's panel shows beside the rail, below shell windows (`ToolPanel`).
 import { MousePointer2Icon, RadarIcon, RulerIcon, ScanIcon } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "../../components/ui/menus";
 import { Tooltip } from "../../components/ui/overlays";
@@ -21,6 +22,70 @@ const TOOLS: { tool: MapTool; label: string; icon: typeof RulerIcon; hint?: stri
 export const SIGNALS_OFF_HINT = "Only on the scene players see";
 /** FR-SCN-34: canvas tools are off while not live. */
 export const NOT_LIVE_HINT = "Off while reconnecting";
+
+/**
+ * Stacking of the tool panel in the play page (PlayFrame: base z-0 < windows z-10 < chrome z-20):
+ * between the base and the windows, so a shell window opened over it is on top and gets its
+ * clicks; the panel still sits above the canvas.
+ */
+export const TOOL_PANEL_Z = 5;
+
+/** The panel's spot in `host` coordinates: beside the rail, 8 px right of it, top-aligned. */
+export function panelSpot(
+  rail: { top: number; right: number },
+  host: { top: number; left: number },
+): { top: number; left: number } {
+  return { top: rail.top - host.top, left: rail.right - host.left + 8 };
+}
+
+/**
+ * The active tool's panel. The rail lives in the chrome (z-20), so a panel inside it would cover
+ * shell windows; it is portalled into the play page at `TOOL_PANEL_Z`, placed beside the rail.
+ * Outside a play page (no host) it renders inline.
+ */
+function ToolPanel({
+  rail,
+  id,
+  children,
+}: {
+  rail: React.RefObject<HTMLDivElement | null>;
+  id: string;
+  children: React.ReactNode;
+}) {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  const [spot, setSpot] = useState<{ top: number; left: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = rail.current;
+    const page = el?.closest<HTMLElement>('[data-testid="ui-play-page"]') ?? null;
+    setHost(page);
+    if (!el || !page) return;
+    const place = () => {
+      const r = el.getBoundingClientRect();
+      const h = page.getBoundingClientRect();
+      setSpot(panelSpot(r, h));
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(el);
+    window.addEventListener("resize", place);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", place);
+    };
+  }, [rail]);
+  const panel = (inline: boolean) => (
+    <div
+      data-testid="map-tool-panel"
+      data-tool={id}
+      className={inline ? "absolute top-0 left-full ml-2" : "absolute"}
+      style={inline ? undefined : { ...spot, zIndex: TOOL_PANEL_Z }}
+    >
+      {children}
+    </div>
+  );
+  if (!host) return panel(true);
+  return spot ? createPortal(panel(false), host) : null;
+}
 
 export function ToolRail({
   pingHint = "Click to ping, right-drag for the laser",
@@ -48,8 +113,10 @@ export function ToolRail({
     if (signalsOff && tool === "ping") setTool("select");
   }, [signalsOff, tool, setTool]);
   const Panel = current?.panel as React.ComponentType | undefined;
+  const railRef = useRef<HTMLDivElement>(null);
   return (
     <div
+      ref={railRef}
       data-testid="map-tool-rail"
       className="relative ml-2 flex flex-col gap-1 rounded-md border bg-background/85 p-1 backdrop-blur"
     >
@@ -138,13 +205,9 @@ export function ToolRail({
       </Tooltip>
       {children}
       {Panel && current && (
-        <div
-          data-testid="map-tool-panel"
-          data-tool={current.id}
-          className="absolute top-0 left-full ml-2"
-        >
+        <ToolPanel rail={railRef} id={current.id}>
           <Panel />
-        </div>
+        </ToolPanel>
       )}
     </div>
   );
