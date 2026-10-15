@@ -2,18 +2,15 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 1 complete** (#186): P polish, D combat-extras, S character-sheet-full all merged; session-sim-4 regression PASS. **Paused for the DM recap** and the sprint 2 pick.
+**Phase:** Sprint 1 complete (#186). **Sprint 2 planned, not started** (#187): [sprint-2](sprint-2.md): P2 glitch polish, F fog of war (FOG), B props + structure (SCN), all in parallel. Next: spec phase, three spec agents.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| P polish R1–R5 | — | — | **Merged** (#180) | — |
-| S core, D core, S build (a, b) | — | — | **Merged** (#181) | — |
-| D build | — | — | **Merged** (#183; retest 14/14) | — |
-| Test suite speed / flake | — | — | **Merged** (#184) | — |
-| S combat routes (slice 4) | — | — | **Merged** (#185; walkthrough 6/6) | — |
-| Session-sim regression | — | — | **PASS** (#186; evidence `.verify/20261014-194223-session-sim-4/`) | DM recap |
+| P2: glitch polish (session-sim-4) | `spec/polish-2` | — | Not started | Spec agent |
+| F: fog of war, `fog-of-war` (FOG) | `spec/fog-of-war` | — | Not started | Spec agent |
+| B: props + structure, `scene-tools` (SCN) | `spec/scene-tools` | — | Not started | Spec agent |
 
 Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-14-evening)). Briefs in `briefs\`. Evidence: `verify-*\` (session-sim-3 evidence only in the main checkout: `.verify/20261014-131140-session-sim-3/`; the `%TEMP%` copy was cleared).
 
@@ -23,7 +20,7 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 
 ## Pending DM decisions
 
-- Sprint 1 recap: what to do with the 17 session-sim-4 glitches; sprint 2 pick ([sprint-1 §Gates](sprint-1.md#gates)).
+- None now. At the sprint-2 spec gate: F / B scope, picks, P2 G2 (map size when fitting).
 
 ## Resolved locally (report at gate)
 

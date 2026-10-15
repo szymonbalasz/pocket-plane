@@ -26,8 +26,9 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 
 ## 2. Next, in order
 
-1. **DM recap of sprint 1** and the session-sim-4 glitch list; then pick sprint 2 (candidates in [sprint-1 §Gates](sprint-1.md#gates): battlemap props + structure + **fog of war**, party board + handouts, table flavour, compendium; plus a polish pass for the glitches).
-2. Write the sprint-2 plan doc (like [sprint-1](sprint-1.md)), log it, then run it the same way: spec agents → seam settled → one review agent → one DM gate → builds per hotspot rules → walkthroughs → session-sim regression → recap.
+**Sprint 2, DM decision #187: [sprint-2](sprint-2.md).** Three tracks in parallel: **P2** polish of the session-sim-4 glitches, **F** fog of war (new spec `fog-of-war`, FOG), **B** props + structure (`scene-tools`, SCN). Follow sprint-2's "Orchestrator: how to run this sprint" and its hotspot table; the sprint-1 loop below is the template.
+
+The DM's own playtest script for sprint 1: [sprint-1 §Playtest](sprint-1.md#playtest-sprint-1-features). Write the same for sprint 2 at its sprint gate.
 
 Lessons from sprint 1 (2026-10-14), on top of the earlier ones:
 - **Agents can't read outside their working directory** without a prompt (`blockReadsOutsideWorkingDirectories`). Copy inputs (evidence, review summaries) into the agent's worktree or the main checkout's `.verify/` and point the brief there. Writes to `%TEMP%\pocket-plane\` work.
