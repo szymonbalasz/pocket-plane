@@ -17,6 +17,7 @@ phase: post-mvp-1
 - **Derived with overrides** ([ADR-0012](../architecture/adr/0012-character-derived-values.md) option C, [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md)): modifiers, proficiency, saves, skills, passives and spell numbers are computed; any of them can be overridden.
 - **Storage split**: rules numbers stay in entities' `statBlock`. Long text, inventory, spells, counters, draft and lock state go in a new `creature-sheet` record, so a combat HP change never resends the whole sheet.
 - **Other players see a summary only.** Combat-extras shows temp HP, death saves and conditions through a client **sheet sections** registry this spec owns ([§7.1](#71-sheet-sections-seam-combat-extras)).
+- **Sprint 2 phase 1** (P2b; FR-CHARX-41–48): every attack has three buttons, **Attack / Damage / Attack + damage**, the same everywhere ([§6.1](#61-n7-sheet-buttons), N7); attacks live on the Actions tab only (N4); a player's new draft gives the DM a pending card and approval tells the player (G8); the picker remembers its character and the header stays put (report items 13, 16).
 
 ## 2. Scope
 
@@ -29,6 +30,7 @@ Scope accepted by the DM (#178), including the items beyond sprint-1's first pro
 - Roll every number (§6 table); several attacks per character and spell attacks routed into combat (roll routes gain a row reference).
 - Other players see a summary (name, portrait, owner, level + class, species, Down / `deathState`). Read-only wallet line from [party-loot](party-loot.md).
 - Sheet sections registry (seam for [combat-extras](combat-extras.md)). Fixtures + bundle `character-sheet-full`.
+- **Sprint 2 phase 1:** the three attack buttons and `char.roll` kinds `toHit` / `spellToHit`; Main without attacks; notification kinds `charx-draft`, `charx-approved`; picker memory; pinned header. Track M's "Active effects" block registers through `sheetSections` (effect-modifiers spec, MOD, in review); this spec adds no effects block.
 
 ## 3. Goals
 
@@ -92,14 +94,14 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | FR-CHARX-20 | `char.roll` gains kinds `skill`, `damage`, `spellAttack`, `spellDamage` and fields `skill?`, `attackId?`, `spellId?`; wrong combinations → `invalid`. `attack` / `damage` without `attackId` = the first attack (MVP clients and combat keep working). | Amends FR-CHAR-05 |
 | FR-CHARX-21 | Roll specs, built server-side from committed data by `characterRolls(stats, sheet, kind, ref)` (`@shared/character-sheet`), table below. Unknown row → `not_found`; `spellAttack` needs `roll: attack` and `spellDamage` needs `damage`, else `conflict` ("No attack roll for Shield"). Mode on the d20 only; manual count per table; public per FR-CHAR-17. | |
 | FR-CHARX-22 | The DM may `char.roll` for a custom or imported monster definition (NPC sheet): actor name = definition name; always `public: false` (a `public` field → `invalid`; the NPC sheet shows no public switches), because the definition name can leak a renamed or hidden creature ([ADR-0024](../architecture/adr/0024-definition-visibility.md)). Players: monsters stay `not_found`. | Amends FR-CHAR-09; #178 (OQ-CHARX-06) |
-| FR-CHARX-23 | Every rollable number on the sheet is a shared roll control ([FR-DICE-24](dice-roll-log.md#6-functional-requirements)): 6 checks, 6 saves, 18 skills, initiative, per attack Attack + Damage, per spell its rolls. Passives, AC, DC and speed are display only. DM public switches: one per category in each block header (FR-CHAR-22's rule). | Tier A |
-| FR-CHARX-24 | Roll routes: `RollRoute.claim(store, characterId, kind, ref?)`, `ref` = `{attackId}` \| `{spellId}`; `SheetRollKind` gains the new kinds. Combat's route claims `initiative`, `attack` and (OQ-CHARX-12) `spellAttack` **only for a spell with `damage`**, passing `ref` to `cbt.attack`; a spell attack without damage rolls plainly via `char.roll`. `damage`, `spellDamage`, `skill` are never claimed. FR-CHAR-16/24 otherwise unchanged. | Extends OQ-CHAR-13 registry |
+| FR-CHARX-23 | Every rollable number on the sheet is a shared roll control ([FR-DICE-24](dice-roll-log.md#6-functional-requirements)): 6 checks, 6 saves, 18 skills, initiative, per attack ~~Attack + Damage~~ *(N7: Attack, Damage, Attack + damage, FR-CHARX-41)*, per spell its rolls. Passives, AC, DC and speed are display only. DM public switches: one per category in each block header (FR-CHAR-22's rule). | Tier A |
+| FR-CHARX-24 | Roll routes: `RollRoute.claim(store, characterId, kind, ref?)`, `ref` = `{attackId}` \| `{spellId}`; `SheetRollKind` gains the new kinds. Combat's route claims `initiative`, `attack` and (OQ-CHARX-12) `spellAttack` **only for a spell with `damage`**, passing `ref` to `cbt.attack`; a spell attack without damage rolls plainly via `char.roll`. `damage`, `spellDamage`, `skill` are never claimed. FR-CHAR-16/24 otherwise unchanged. *(N7: `SheetRollKind` gains `toHit`, `spellToHit`; every attack button asks the routes (FR-CHARX-43), so which of `toHit`, `damage`, `attack` and their spell forms combat claims is combat-tracker's ([OQ-CHARX-21](#15-open-questions)); `skill` stays unclaimed.)* | Extends OQ-CHAR-13 registry; amended N7 |
 | FR-CHARX-25 | A `char.roll` never changes a counter or HP. Slots are ticked by hand. (Other features' rolls may, e.g. CBTX's death save.) | OQ-CHARX-09 |
 | **UI** | | |
-| FR-CHARX-26 | Window `char.sheet` keeps its kind and CHAR §7 geometry (320×440, min 280×320): no layout-floor change (#162). The tab strip scrolls horizontally at 320 px; content scrolls; the player may enlarge the window. Tabs: **Main**, **Actions**, **Features**, **Inventory**, **Notes**, then section tabs (§7.1). Header as FR-CHAR-03 plus "Draft" / "Locked" badges, an **Edit** toggle (hidden while the viewer may not edit), DM **Approve** (drafts) and **Lock** toggle. Layout per §7. | Amends CHAR §7 (content only) |
+| FR-CHARX-26 | Window `char.sheet` keeps its kind and CHAR §7 geometry (320×440, min 280×320): no layout-floor change (#162). The tab strip scrolls horizontally at 320 px; content scrolls; the player may enlarge the window. Tabs: **Main**, **Actions**, **Features**, **Inventory**, **Notes**, then section tabs (§7.1). Header as FR-CHAR-03 plus "Draft" / "Locked" badges, an **Edit** toggle (hidden while the viewer may not edit), DM **Approve** (drafts) and **Lock** toggle. Layout per §7. *(Sprint 2: Main has no attack row, FR-CHARX-44; header and tab strip pinned, FR-CHARX-48.)* | Amends CHAR §7 (content only) |
 | FR-CHARX-27 | Edit mode: inputs in place. Scalars commit on blur / Enter; long text (notes, feature text) on Save. A client mirror of the zod rules blocks invalid input inline (nothing sent). Every edit control is disabled while not `live` and while its own intent is in flight. Leaving edit mode never discards a committed value. | FR-CHAR-12 |
 | FR-CHARX-28 | Remote change: a committed change shows ≤ 1 s in every field not being edited. A focused field whose value changed remotely (an `event` not caused by this client's own intent) keeps the local draft and shows a hint (`charx-field-changed`); committing it overwrites (FR-CHARX-15). Frames carry no actor, so the hint is inferred: player client → "Changed by the DM" (only the DM and the owner edit); DM client → "Changed by ‹owner name›" (NPC sheet: "Changed in another tab"). The owner's own other tab also reads "Changed by the DM": accepted. | Concurrency; protocol §3.3 |
-| FR-CHARX-29 | Picker. Player: own characters, then a "Party" group of other PCs (summary card, FR-CHARX-32), then "New character…" (hidden while they have a draft). DM: every character (owner name, Draft / Locked marks), "New character…" (name + owner Select + "Start as draft"), and the NPC last opened via FR-CHARX-31. Sort per FR-CHAR-02 within each group. | Amends FR-CHAR-02 |
+| FR-CHARX-29 | Picker. Player: own characters, then a "Party" group of other PCs (summary card, FR-CHARX-32), then "New character…" (hidden while they have a draft). DM: every character (owner name, Draft / Locked marks), "New character…" (name + owner Select + "Start as draft"), and the NPC last opened via FR-CHARX-31. Sort per FR-CHAR-02 within each group. *(Sprint 2: the selection survives a reload, FR-CHARX-47.)* | Amends FR-CHAR-02 |
 | FR-CHARX-30 | Player with no character: FR-CHAR-04 text gains a **Create character** Button → name Dialog → the new draft opens in edit mode with the hint "Fill in class, ability scores, AC and HP. Your DM approves the sheet." | |
 | FR-CHARX-31 | NPC sheet: entities' `creatureActions` gains "Sheet" (DM): opens `char.sheet` on that definition. Custom: editable as above, CR + XP instead of level, HP max only (no HP control, no counters, no hit dice). Imported: read-only, lock icon, "Derive to customise". | #178 (OQ-CHARX-06) |
 | FR-CHARX-32 | Summary card (other players' PCs): portrait, name, owner, "Level N Class", species, Down badge (CBTX's `deathState` when present, §7.1). Nothing else: no temp HP, death-save counts or effects. | #178 G6 (OQ-CHARX-05, OQ-CBTX-09) |
@@ -113,6 +115,15 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | FR-CHARX-38 | In-flight intent lost to a disconnect: a `set` edit is idempotent, so its field keeps the draft marked "Not saved" (`charx-field-unsaved`) and re-commits on the next blur / Enter once `live`. Create, row create and counter deltas are not idempotent: Toast "Connection lost — check the sheet before trying again" (FR-CHAR-12). | FR-SYNC-05 |
 | FR-CHARX-39 | One transaction per command: entity row, sheet row, hook-changed instances, rolls / log entry and event-log row commit together or not at all. No sheet state in server memory. | FR-CBT-28 rule |
 | FR-CHARX-40 | Fixtures and bundle `character-sheet-full` per §13; `fixtures:reset-load character-sheet-full` works from empty and is deterministic. | ADR-0017 |
+| **Sprint 2 phase 1** (P2b) | | |
+| FR-CHARX-41 | **Three attack buttons** (N7, DM-specified #188): every attack row and every spell with `roll: attack` shows **Attack**, **Damage**, **Attack + damage**, in that order, with the meaning, labels and test IDs of [§6.1](#61-n7-sheet-buttons), for DM and player, on PC and NPC sheets. Out of combat each sends `char.roll` with the §6.1 kind. | N7 |
+| FR-CHARX-42 | `char.roll` kinds **`toHit`** (`attackId?`; absent = first attack) and **`spellToHit`** (`spellId`; the spell needs `roll: attack`, else `conflict` "No attack roll for ‹spell›"): one roll `1d20 + toHit` / `1d20 + spell attack`, category `attack`, label "Light crossbow attack" / "Guiding Bolt attack", one `roll` entry, manual = 1, mode on the d20. `attack` and `spellAttack` keep their meaning (to-hit + damage, one entry). `CharacterRolled.kind` gains both. Wrong ref combinations → `invalid` (FR-CHARX-20 rules). | Amends FR-CHARX-20/21 |
+| FR-CHARX-43 | Each of the three buttons asks the roll routes (FR-CHAR-16, FR-CHARX-24) with its kind and `ref`; no claim → `char.roll`. A route may claim, supply `critExpressions`, or hide a button (FR-CHAR-24). **What combat claims and sends for each kind is combat-tracker's** (OQ-CHARX-21); until it decides, today's route stays (claims `attack`, `spellAttack` with damage; `toHit` and `damage` roll plainly). | N7 seam with P2a |
+| FR-CHARX-44 | **Attacks on the Actions tab only** (N4; amends FR-CHAR-03, CHAR §7, FR-CHARX-26 Main): the Main tab drops the first-attack row (and its DM public switch); it keeps AC, HP, Speed, Init + **Initiative**, Prof, vitals, abilities, skills, main sections. Why: Main's Attack duplicated the Actions row with a different button set (it rolled to-hit + damage under the label "Attack"), which is N7's confusion. | N4 |
+| FR-CHARX-45 | **DM cue for a draft** (G8): a **player's** `char.create` also calls `notify` (FR-NOTE-02) in its transaction: kind `charx-draft`, audience `dm`, text "‹player› made a character: ‹name›. Awaiting your approval", payload `{characterId}`, action `{label: "Review", owner: dm}` (pending). DM client view (FR-NOTE-19): "Review" opens `char.sheet` on that character (`openSheetFor`, no intent). `char.approve` of a draft resolves its pending `charx-draft` row(s) in the same transaction, after `CharacterApproved` (`{outcome: "approved"}`); approving a ready character changes nothing (no resolve, so no `conflict`). DM-created drafts get no card. No end rule (not encounter-scoped). The DM's Dismiss closes the card; the draft stays a draft. | G8 |
+| FR-CHARX-46 | **Player cue on approval** (G8): `char.approve` that turns a draft ready also notifies the owner: kind `charx-approved`, audience `player` (`audiencePlayerId` = owner), info, text "‹name› was approved by the DM: ready to play", payload `{characterId}`. The owner gets an info toast (FR-NOTE-13/14) and a history row; offline → history + unread badge on return (no toast from a snapshot). | G8 |
+| FR-CHARX-47 | **Picker memory** (report item 13; amends FR-CHAR-02): the selected creature is stored per browser, `localStorage` `pp.sheet.v1.<campaignId>.<dm \| playerId>` = `{selectedId}` (zod; id ≤ 64 chars), written on every picker change, `openSheetFor` and create. Applied after the first snapshot of a page load: still eligible (FR-CHARX-29, incl. the DM's last NPC) → selected, else FR-CHAR-04's default. Invalid or unavailable storage → memory only, console warning (FR-SHELL-17's rule). Never sent. | Item 13 |
+| FR-CHARX-48 | **Pinned header** (report item 16): the sheet header (name row, badges, Edit / Approve / Lock, picker, `header` sections) and the tab strip stay at the top of the window; only the tab content scrolls. If the pinned part would take more than half the window body (small window), it scrolls with the content as before. Window size and geometry unchanged (FR-CHARX-26; growing the window for creation: OQ-CHARX-22). | Item 16 |
 
 **Roll specs** (FR-CHARX-21). Bonus strings per FR-CHAR-21 (`1d20`, `1d20+3`, `1d20-1`).
 
@@ -123,6 +134,24 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | `damage` | `attackId?` | damage only | `damage` | "Light crossbow damage (piercing)" | 1 |
 | `spellAttack` | `spellId` | 1d20 + spell attack; damage if set (one entry, FR-DICE-26) | attack; damage / `healing` | "Guiding Bolt attack", "Guiding Bolt damage (radiant)" | 1–2 |
 | `spellDamage` | `spellId` | damage / healing only (any `roll`; DC appended iff `roll: save`) | `damage` / `healing` | "Sacred Flame damage (radiant), DC 13 DEX", "Cure Wounds healing" | 1 |
+| `toHit` *(N7)* | `attackId?` | 1d20 + toHit only | attack | "Light crossbow attack" | 1 |
+| `spellToHit` *(N7)* | `spellId` | 1d20 + spell attack only (`roll: attack`) | attack | "Guiding Bolt attack" | 1 |
+
+### 6.1 N7 sheet buttons
+
+DM-specified (#188): a third button **Attack + damage**, and the three behave the same everywhere. P2b owns where they show, labels, the out-of-combat roll and test IDs; P2a ([combat-tracker](combat-tracker.md)) owns what each does when routed into combat (OQ-CHARX-21).
+
+| Button (order) | Shows on | Out of combat (`char.roll`) | Rolls → entry | Manual | Shift / Ctrl | Test ID (+ `data-record-id` = row id) |
+|---|---|---|---|---|---|---|
+| **Attack** | every attack row; spells with `roll: attack` | `toHit` / `spellToHit` | d20 + to-hit → one `attack` entry | 1 | adv / dis | `charx-roll-attack` / `charx-roll-spell-attack` *(meaning changes: to-hit only)* |
+| **Damage** ("Healing" for `effect: healing`) | every attack row; spells with `damage` (any `roll`) | `damage` / `spellDamage` | damage only → one `damage` / `healing` entry (DC in the label iff `roll: save`) | 1 | ignored (no d20) | `charx-roll-damage` / `charx-roll-spell-damage` |
+| **Attack + damage** | every attack row; spells with `roll: attack` **and** `damage` | `attack` / `spellAttack` | to-hit + damage → one entry (FR-DICE-26) | 2 | adv / dis on the d20 | `charx-roll-attack-damage` / `charx-roll-spell-attack-damage` *(new)* |
+| *In combat* | same buttons | roll routes first (FR-CHARX-43); semantics: combat-tracker | — | — | — | same IDs |
+
+- **Where:** Actions tab only (FR-CHARX-44): attack rows and spell rows; the NPC sheet the same (DM-only rolls, FR-CHARX-22). No button for a spell with `roll: attack` and no damage except Attack; `roll: save` / `none` spells only Damage / Healing (as today).
+- **Crit:** out of combat none (FR-CHAR-05; [OQ-CHARX-20](#15-open-questions)). In combat a route may pass `critExpressions` to Attack + damage (or Damage) per combat-tracker.
+- **Public:** DM public switch per category in the block header (FR-CHAR-22 rule): `charx-public-attack` for Attack and Attack + damage, `charx-public-damage` for Damage.
+- **Layout:** name and numbers on the first line, the three buttons right-aligned on the second (fits 280 px min width).
 
 ## 7. UI/UX notes
 
@@ -132,14 +161,15 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, de
 |---|---|---|---|---|
 | `char.sheet` | DM, player | player yes; DM no | unchanged: CHAR §7, 320×440, min 280×320 (#162 floors kept) | unchanged |
 
-- **Main**: stat row (AC, HP + control, Speed, Init, Prof), then vitals sections (§7.1), Abilities block (FR-CHAR-22), **Skills** block (18 rows: proficiency dot / double dot for expertise, name, ability abbreviation, signed bonus = roll button; passives under it), main sections.
-- **Actions**: Attacks (row: name, "+4 · 1d8+2 piercing", **Attack**, **Damage**); Spellcasting header (ability, "Spell attack +5 · DC 13", slot pips per level 1–9 with max > 0, click = use, Shift+click = restore, "Reset"); Spells grouped by level (cantrips first): name, C / R / prepared marks, roll buttons per row.
+- **Main**: stat row (AC, HP + control, Speed, Init, Prof), then vitals sections (§7.1), Abilities block (FR-CHAR-22), **Skills** block (18 rows: proficiency dot / double dot for expertise, name, ability abbreviation, signed bonus = roll button; passives under it), main sections. No attack row (N4, FR-CHARX-44).
+- **Pinned** (FR-CHARX-48): header + tab strip stay at the top; the tab content scrolls under them.
+- **Actions**: Attacks (row: name, "+4 · 1d8+2 piercing", then **Attack**, **Damage**, **Attack + damage**, §6.1); Spellcasting header (ability, "Spell attack +5 · DC 13", slot pips per level 1–9 with max > 0, click = use, Shift+click = restore, "Reset"); Spells grouped by level (cantrips first): name, C / R / prepared marks, roll buttons per row.
 - **Features**: rows: name, source, text, uses pips (+ Reset). **Inventory**: wallet line, items (name, qty, equipped mark, notes), proficiency notes. **Notes**: background, alignment, notes text.
 - **Edit mode**: the same layout with inputs; rows get Add / delete / drag handle; overrides via a small "Override" popover on each derived number (value + note, "Clear"). Overridden numbers show a marker; Tooltip "Derived +3 · Override: Bracers of Defence".
 - **Locked** (player): no Edit toggle; header Badge "Locked" with Tooltip "Locked by the DM". Counters, HP and rolls still work.
 - **DM view**: any character or NPC sheet; Approve, Lock, owner Select in edit mode. **Player view**: own sheets full; others as summary cards; never a monster.
 - **States**: loading skeleton; empty per FR-CHARX-30; reconnecting = last values, controls disabled, banner; error Toast; unsaved field marked (FR-CHARX-38); sheet full → inline "Sheet is full".
-- **Test IDs** (prefix `charx-`, new parts only; CHAR's `char-sheet-*` stay): `charx-tab` (+ `data-value`), `charx-edit-toggle`, `charx-draft`, `charx-locked`, `charx-approve`, `charx-lock-toggle`, `charx-create`, `charx-create-name`, `charx-create-owner`, `charx-create-draft`, `charx-create-submit`, `charx-picker-new`, `charx-summary` (+ `data-record-id`), `charx-skill` (+ `data-value` = skill key), `charx-skill-bonus`, `charx-roll-skill`, `charx-passive` (+ `data-value`), `charx-attack` / `charx-spell` / `charx-feature` / `charx-item` (+ `data-record-id` = row id), `charx-roll-attack`, `charx-roll-damage`, `charx-roll-spell-attack`, `charx-roll-spell-damage`, `charx-row-add` / `charx-row-delete` / `charx-row-move` (+ `data-value` = list), `charx-slot` (+ `data-value` = level, `data-used`), `charx-hitdie` (+ `data-value`), `charx-feature-use`, `charx-resource-reset`, `charx-field` (+ `data-value` = field path), `charx-field-changed`, `charx-field-unsaved`, `charx-override` (+ `data-value` = key), `charx-overridden`, `charx-wallet`, `charx-public-skill`, `charx-public-damage`, `charx-section` (+ `data-record-id` = section id), `charx-full`.
+- **Test IDs** (prefix `charx-`, new parts only; CHAR's `char-sheet-*` stay): `charx-tab` (+ `data-value`), `charx-edit-toggle`, `charx-draft`, `charx-locked`, `charx-approve`, `charx-lock-toggle`, `charx-create`, `charx-create-name`, `charx-create-owner`, `charx-create-draft`, `charx-create-submit`, `charx-picker-new`, `charx-summary` (+ `data-record-id`), `charx-skill` (+ `data-value` = skill key), `charx-skill-bonus`, `charx-roll-skill`, `charx-passive` (+ `data-value`), `charx-attack` / `charx-spell` / `charx-feature` / `charx-item` (+ `data-record-id` = row id), `charx-roll-attack`, `charx-roll-damage`, `charx-roll-spell-attack`, `charx-roll-spell-damage`, `charx-row-add` / `charx-row-delete` / `charx-row-move` (+ `data-value` = list), `charx-slot` (+ `data-value` = level, `data-used`), `charx-hitdie` (+ `data-value`), `charx-feature-use`, `charx-resource-reset`, `charx-field` (+ `data-value` = field path), `charx-field-changed`, `charx-field-unsaved`, `charx-override` (+ `data-value` = key), `charx-overridden`, `charx-wallet`, `charx-public-skill`, `charx-public-damage`, `charx-section` (+ `data-record-id` = section id), `charx-full`. *(Sprint 2)* `charx-roll-attack-damage`, `charx-roll-spell-attack-damage` (+ `data-record-id`); `charx-roll-attack` / `charx-roll-spell-attack` now mean to-hit only (§6.1); `charx-header` (pinned part, `data-pinned` = `true` \| `false`). The G8 cards use notifications' IDs (`note-toast`, `note-toast-action`, `note-history-row` + `data-record-id`); walkthroughs match their text.
 
 ### 7.1 Sheet sections seam (combat-extras)
 
@@ -211,7 +241,7 @@ interface SheetSection {
 
 - **Relations**: Entity 1—0..1 creature-sheet; Player 1—* character (unchanged). Wallet: party-loot's derived `wallet` (read only).
 - **Derived** (`@shared`, never stored): FR-CHARX-05 values, overridden flags, Draft / Locked display, roll specs, summary card.
-- **Persisted runtime state**: `hpCurrent` (entity, CHAR), counters (sheet). Edit drafts and picker selection: client memory only.
+- **Persisted runtime state**: `hpCurrent` (entity, CHAR), counters (sheet). Edit drafts: client memory only. ~~Picker selection: client memory only.~~ *(Sprint 2)* Picker selection: browser `localStorage` `pp.sheet.v1.<campaignId>.<dm \| playerId>` (FR-CHARX-47), never sent. G8 cards are `notification` rows (notifications' table, kinds `charx-draft`, `charx-approved`); no new field, table or record type.
 - **Migration of MVP data**: none needed. New stat-block fields are optional; the attacks limit only grows; `creature_sheet` is a new table (drizzle push now, generated migration at release). Existing characters (char-mira etc., real data) have no sheet row → ready, unlocked, empty groups; legacy attacks get ids on first write. No backfill.
 
 ## 9. API & events
@@ -228,7 +258,7 @@ interface SheetSection {
 | `char.edit {creatureId, set}` | DM, player (own, unlocked) | FR-CHARX-15, §10. `set` keys: `name, species, background, alignment, classes, ac, hpMax, initBonus, speed, abilities, saveProficiencies, skills, overrides, proficiencyNotes, spellcasting, notes`; `level`, `className` only while `classes` is absent (else `invalid`); NPC `cr`. **DM only** (player → `forbidden`): `ownerPlayerId`; `size` (token footprints follow via hooks); `portraitAssetId` (via `assets.require`, FR-ENT-08; players have no asset library, ADR-0023) | `{}` |
 | `char.putRow {creatureId, list, row}` / `char.deleteRow {…, rowId}` / `char.moveRow {…, rowId, toIndex}` | DM, player (own, unlocked) | FR-CHARX-16 | `{rowId}` / `{}` / `{}` |
 | `char.useResource {characterId, resource, delta?, reset?}` | DM, player (own; locked ok) | FR-CHARX-17; exactly one of `delta`, `reset` | `{before, after}` |
-| `char.roll {…, skill?, attackId?, spellId?}` | DM, player | FR-CHARX-20–22 | `{rollIds, entryId}` |
+| `char.roll {…, skill?, attackId?, spellId?}` | DM, player | FR-CHARX-20–22; *(N7)* kinds `toHit`, `spellToHit` (FR-CHARX-42) | `{rollIds, entryId}` |
 
 **Record types**
 
@@ -248,10 +278,17 @@ interface SheetSection {
 | `CharacterLockSet` | `{characterId, locked}` | `creature-sheet` → DM, owner | yes | no |
 | `CharacterSheetEdited` | `{creatureId, op: set \| putRow \| deleteRow \| moveRow, fields?, list?, rowId?}` (keys and ids, never values) | `entity` and / or `creature-sheet` + hook-changed instances (tokens, combatants) → each by its own rule | yes | no |
 | `CharacterResourceUsed` | `{characterId, resource, before, after}` | `creature-sheet` → DM, owner | yes | no |
-| `CharacterRolled` (CHAR) | gains `skill?`, `attackId?`, `spellId?`; `kind` gains the new kinds | `game-log-entry` per FR-DICE-13/15 | yes | no |
+| `CharacterRolled` (CHAR) | gains `skill?`, `attackId?`, `spellId?`; `kind` gains the new kinds *(N7: + `toHit`, `spellToHit`)* | `game-log-entry` per FR-DICE-13/15 | yes | no |
+
+**Sprint 2 (G8):** `char.create` by a player also lists the `charx-draft` `notification` upsert and emits `NotificationCreated` after `CharacterCreated`; `char.approve` of a draft lists the resolved `charx-draft` row(s) (`NotificationResolved`) and the new `charx-approved` row (`NotificationCreated`), after `CharacterApproved`. Same transaction each.
+
+| Notification kind (server registry, FR-NOTE-03) | Payload | Action | DM | Owning player | Other players |
+|---|---|---|---|---|---|
+| `charx-draft` | `{characterId}` | "Review", owner DM (pending) | full; toast + bell Pending | hidden (audience `dm`) | hidden |
+| `charx-approved` | `{characterId}` | none (info) | full (history; no toast) | full; info toast | hidden (audience = owner) |
 
 - **Internal (new, needed from entities, OQ-CHARX-19):** `entities.createIn(env, body)` and `entities.updateIn(env, id, next) → RecordChange[]` (the `POST` / `PUT` path minus HTTP, hooks included). **CHARX provides:** `sheetAttack(env, creatureId, ref) → {name, toHit, damage, damageType}` for combat's `cbt.attack` (OQ-CHARX-12); a definition-changed hook (owner copy, counter clamp).
-- **Client registries:** sheet sections (new, §7.1); roll routes (extended contract, FR-CHARX-24); `creatureActions` "Sheet" line (DM).
+- **Client registries:** sheet sections (new, §7.1); roll routes (extended contract, FR-CHARX-24; *N7:* kinds `toHit`, `spellToHit`); `creatureActions` "Sheet" line (DM); *(G8)* notification views: DM `charx-draft` ("Review" handler) + `charx-approved`, player `charx-approved`.
 
 ## 10. Permissions
 
@@ -260,6 +297,8 @@ interface SheetSection {
 | View | full, any creature | own sheet full | summary only; NPCs never | FR-ENT-15 + FR-CHARX-35/36 |
 | Create character | for any player, ready or draft | own, draft, one open draft | — | FR-CHARX-08 |
 | Approve, lock / unlock, change owner | ✓ | ✗ | ✗ | FR-CHARX-10/12/13 |
+| Draft card: see, Review, Dismiss (G8) | ✓ | ✗ (never receives it) | ✗ | FR-NOTE-06/11; FR-CHARX-45 |
+| Approval card (G8) | sees | sees (own) | ✗ | FR-NOTE-06; FR-CHARX-46 |
 | Edit fields and rows | any character, custom NPC | own, **unless locked** | ✗ | FR-CHARX-15/16/18 |
 | Counters, current HP | any character | own, also locked | ✗ | FR-CHARX-17, FR-CHAR-09 |
 | Roll | any character (public override); any definition (always DM-only) | own; always public | ✗ | FR-CHAR-09/17, FR-CHARX-22 |
@@ -277,6 +316,8 @@ interface SheetSection {
 - **Edit vs roll race:** rolls use values at commit; a deleted row → `not_found` Toast.
 - **Creature form vs sheet (DM):** §9 coexistence: per field vs whole, commit order; `creature-sheet` untouched by `PUT`.
 - **Invalid / malicious input:** strict zod on every intent (unknown keys, bounds, dice grammar, row limits, size caps); player sending `ownerPlayerId`, `draft`, `public`, `size` or `portraitAssetId` → `invalid` / `forbidden`; `public` on a definition roll → `invalid`; names and text rendered as text.
+- **Sprint 2 (G8):** DM offline when a player makes a draft → the card waits (pending rows are pinned in the snapshot, FR-NOTE-12); on rejoin "1 pending action" (FR-NOTE-15). Player offline at approval → history row + unread badge, no toast. Crash: create + card, approve + resolve + approval card each commit together or not at all. Two DM tabs approve at once → the second is a no-op (already ready: no resolve, no second approval card). Draft renamed or re-owned before approval → the card's text keeps the old words; Review opens the current sheet. Drafts made before this build have no card (accepted). Character name in the text: only the DM (`charx-draft`) and the owner (`charx-approved`) receive it.
+- **Sprint 2 (N7):** `toHit` on a row deleted meanwhile → `not_found` Toast (as other rolls). Physical dice: Attack and Damage ask for one entry, Attack + damage for two. Damage ignores Shift / Ctrl (no d20; FR-DICE-04 would refuse it). Picker memory (FR-CHARX-47): the stored character lost eligibility (reassigned, other campaign) → default, entry overwritten at the next change.
 
 ## 12. Performance & bandwidth
 
@@ -284,6 +325,7 @@ interface SheetSection {
 - Snapshot growth: DM ≈ Σ sheets (6 PCs + 10 NPC sheets ≈ 150 KB typical); a player ≈ their own sheet(s). Against the DM ceiling of 768 KiB (protocol CON-44, #142): the heavy DM snapshot is ≈ 491 KB today, +150 KB ≈ 640 KB fits; caps bound the worst case. `snapshot-size.test.ts`'s heavy scenario gains `creature-sheet` rows (§13).
 - Edits commit on blur / Save, not per keystroke: ≤ a few per minute. Event-log rows carry before / after of changed records (≤ 2 × 48 KB worst, typical ≤ 20 KB).
 - Target: commit → other client ≤ 1 s over the tunnel.
+- Sprint 2: G8 adds ≤ 2 small `notification` rows (< 0.5 KB) per character's lifetime; pending `charx-draft` rows are pinned in the DM snapshot until approved or dismissed (a handful; CON-44 unaffected). `toHit` = one roll, one entry.
 
 ## 13. Test plan
 
@@ -302,24 +344,27 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | Schemas: every §8 bound, row limits, size caps, `skills` / `spellcasting` need `abilities`, `saveAbility` iff `roll: save`, `roll: attack` with `effect: healing` → `invalid`, classes Σ ≤ 20 and `className` ≤ 40. Derivation: skill none / prof / expertise, passive, spell attack / DC, hit dice, each override key, `proficiency` override feeding saves and skills, clear → derived. `characterRolls` per kind (labels, categories, manual counts, `healing`, DC in label). Roll-route `ref` passed; `damage` / `skill` never claimed; a spell attack without damage not claimed. FR-CHARX-28 hint text per client. Sections: order, slot, `clients`, `kinds`, `available`, throwing section isolated. Field draft + "Changed by" logic; unsaved re-commit only for `set` | In-code |
-| Integration | Each command: rows + event + log in one tx, IDs from `ctx`, rollback → none. **Permission matrix** (DM / owner / other player × character / draft / locked / custom NPC / imported / other campaign × every intent). Player `ownerPlayerId` / `draft` / `public` / `size` / `portraitAssetId` → rejected. DM roll on a definition: entry `public: false`; `public` → `invalid`. **FR-CHARX-15 HP:** new draft HP max 1 → 9 → `hpCurrent` 9; ready character at full HP 10 → 12 → 12; at 7/10 → 12 → 7; 10 → 6 → 6. One-open-draft `conflict`. Approve no-op. Lock: player edit `forbidden`, counters + HP + roll ok. Per-field merge: DM `ac` and player `hpMax` edits interleaved → both kept. Row put / delete / move; unknown id `not_found`; limits `conflict`. Counters clamp; lowering slot max clamps used. Owner change: old owner gets `creature-sheet` delete, new owner full. `PUT` keeps sheet data; hook clamps counters. Name edit refreshes token / combatant copies (FR-ENT-19). Draft excluded from whole-party start (with combat, OQ-CHARX-13). **Leak scan:** `player-2` frames never contain Mira's `statBlock` fields, "MIRA-NOTE-7", "NPC-NOTE-9", any `creature-sheet` row but Sela's; `player-1` never "SELA-NOTE-3"; redacted Mira has exactly the keys of entities' shared whitelist (FR-CHARX-35; the test imports the list, not a copy). Convergence; restart → identical snapshots. **Snapshot size:** `src/server/ws/snapshot-size.test.ts` heavy scenario gains 6 `creature-sheet` rows at typical size and stays ≤ 768 KiB (CON-44) | `character-sheet-full` |
-| E2E (thin) | `player-1`: create "Brin", set DEX 16 + Stealth proficient, roll Stealth → line "+5"; DM approves; `player-2` sees Brin's summary card only | `character-sheet-full` |
+| Unit | Schemas: every §8 bound, row limits, size caps, `skills` / `spellcasting` need `abilities`, `saveAbility` iff `roll: save`, `roll: attack` with `effect: healing` → `invalid`, classes Σ ≤ 20 and `className` ≤ 40. Derivation: skill none / prof / expertise, passive, spell attack / DC, hit dice, each override key, `proficiency` override feeding saves and skills, clear → derived. `characterRolls` per kind (labels, categories, manual counts, `healing`, DC in label). Roll-route `ref` passed; `damage` / `skill` never claimed; a spell attack without damage not claimed. FR-CHARX-28 hint text per client. Sections: order, slot, `clients`, `kinds`, `available`, throwing section isolated. Field draft + "Changed by" logic; unsaved re-commit only for `set`. **Sprint 2:** `FR-CHARX-41 three buttons` (per attack row and per spell form (`attack` + damage, `attack` without damage, `save`, `none` + healing): which buttons render, order, labels, test IDs; NPC sheet the same, no public switch); `FR-CHARX-42 toHit specs` (labels, category, manual 1, `spellToHit` on a `save` spell → `conflict`, `toHit` with `spellId` → `invalid`); `FR-CHARX-43 routing` (each button asks the routes with its kind + ref; a test route claiming only `toHit` takes Attack, leaves the other two plain; `hidden` hides that button only); `FR-CHARX-44 Main has no attack` (no `char-sheet-roll-attack`; Actions lists every attack incl. legacy); `FR-CHARX-47 picker memory` (round trip per (campaign, owner); ineligible id → default; corrupt / throwing storage → memory); `FR-CHARX-48 pinned header` (content scrolls, header stays; pinned part > half the body → unpinned) | In-code |
+| Integration | Each command: rows + event + log in one tx, IDs from `ctx`, rollback → none. **Permission matrix** (DM / owner / other player × character / draft / locked / custom NPC / imported / other campaign × every intent). Player `ownerPlayerId` / `draft` / `public` / `size` / `portraitAssetId` → rejected. DM roll on a definition: entry `public: false`; `public` → `invalid`. **FR-CHARX-15 HP:** new draft HP max 1 → 9 → `hpCurrent` 9; ready character at full HP 10 → 12 → 12; at 7/10 → 12 → 7; 10 → 6 → 6. One-open-draft `conflict`. Approve no-op. Lock: player edit `forbidden`, counters + HP + roll ok. Per-field merge: DM `ac` and player `hpMax` edits interleaved → both kept. Row put / delete / move; unknown id `not_found`; limits `conflict`. Counters clamp; lowering slot max clamps used. Owner change: old owner gets `creature-sheet` delete, new owner full. `PUT` keeps sheet data; hook clamps counters. Name edit refreshes token / combatant copies (FR-ENT-19). Draft excluded from whole-party start (with combat, OQ-CHARX-13). **Leak scan:** `player-2` frames never contain Mira's `statBlock` fields, "MIRA-NOTE-7", "NPC-NOTE-9", any `creature-sheet` row but Sela's; `player-1` never "SELA-NOTE-3"; redacted Mira has exactly the keys of entities' shared whitelist (FR-CHARX-35; the test imports the list, not a copy). Convergence; restart → identical snapshots. **Snapshot size:** `src/server/ws/snapshot-size.test.ts` heavy scenario gains 6 `creature-sheet` rows at typical size and stays ≤ 768 KiB (CON-44). **Sprint 2:** `FR-CHARX-42 toHit` (one roll, one entry, `CharacterRolled {kind: toHit, attackId}`; player public, DM per category); `FR-CHARX-45 draft card` (player `char.create` → `charx-draft` pending, audience `dm`, in the same tx, rollback → neither; DM `char.create {draft: true}` → no card; `char.approve` → card `resolved {outcome: approved}` + `charx-approved` info to the owner in one tx; approve again → no event; DM Dismiss → draft unchanged); `FR-CHARX-46` (approval card audience = owner). **Leak scan (G8):** `player-1` and `player-2` frames never carry a `charx-draft` row; `player-1` never `player-2`'s `charx-approved`. Restart with a pending draft card → still pending in the DM snapshot | `character-sheet-full` |
+| E2E (thin) | `player-1`: create "Brin", set DEX 16 + Stealth proficient, roll Stealth → line "+5"; DM ~~approves~~ *(G8)* gets the `charx-draft` toast, Review → Brin's sheet, Approve; `player-1` gets the approval toast; `player-2` sees Brin's summary card only. *(N7)* `player-1` Mira's Light crossbow: Attack → a to-hit-only line; Damage → damage line; Attack + damage → one line with both | `character-sheet-full` |
 
 **Browser walkthrough** — `bun run build`; `fixtures:reset-load character-sheet-full --profile verify`; `start --profile verify` (Herdr pane). Contexts A DM (`pw-dm`), B `player-1`, C `player-2`; B's and C's WS frames logged via `page.on('websocket')`. Teardown: stop, `fixtures:reset --profile verify`.
 
 | # | DM (A) | Players (B, C) | Expected |
 |---|---|---|---|
 | 1 | Log in, Sheets | B, C open links | A picker: Mira (Locked), Pip, Sela (Draft), Thorn. B: own Mira (Locked badge, no Edit) and Pip; Party group: Thorn, Sela. C: own Sela (Draft, editable) and Thorn; Party group: Mira, Pip |
-| 2 | — | B: Mira, Skills: Shift+Athletics; Actions: Light crossbow Attack; Features: use Second Wind | Log: "Mira — Athletics check (adv): … + 4"; one line "+4" to-hit and 1d8+2; Second Wind 1/1 used. Passive Perception shows 14 with override marker |
-| 3 | — | B: New character → "Brin"; edit: Rogue 1 d8, DEX 16, Stealth expertise, AC 14, HP max 9, Dagger +5 / 1d4+3, note "BRIN-NOTE-1"; override Stealth to +8 note "Test", then Clear; roll Stealth | Draft badge; HP 9 / 9 (draft follows HP max); override marker + Tooltip "Derived +7 · Override: Test", gone after Clear; Stealth +7 (3 + 2 × 2); line "Brin — Stealth check: … + 7" |
+| 2 | — | B: Mira, Skills: Shift+Athletics; Actions: Light crossbow **Attack + damage**; Features: use Second Wind | Log: "Mira — Athletics check (adv): … + 4"; one line "+4" to-hit and 1d8+2; Second Wind 1/1 used. Passive Perception shows 14 with override marker. Main tab: no attack row (N4) |
+| 3 | *(G8)* Watch the toast region; then the bell | B: New character → "Brin"; edit: Rogue 1 d8, DEX 16, Stealth expertise, AC 14, HP max 9, Dagger +5 / 1d4+3, note "BRIN-NOTE-1"; override Stealth to +8 note "Test", then Clear; roll Stealth | Draft badge; HP 9 / 9 (draft follows HP max); override marker + Tooltip "Derived +7 · Override: Test", gone after Clear; Stealth +7 (3 + 2 × 2); line "Brin — Stealth check: … + 7". A ≤ 1 s after create: sticky toast "Player 1 made a character: Brin. Awaiting your approval" with **Review**; bell Pending lists it. B, C: no such toast or row (frames: no `charx-draft`) |
 | 4 | — | C: picker → Brin | Summary card: name, "Level 1 Rogue", owner Player 1; no numbers. C frames: no Brin stat block, no "BRIN-NOTE-1", no Brin `creature-sheet` |
 | 5 | Brin: Edit, AC 15, while B edits HP max 10 | B: commits HP max 10 | Both: AC 15, HP 10 / 10 (≤ 1 s each side) |
-| 6 | Approve Brin, then Lock | B in edit mode | Draft badge gone; B's edit mode closes, Locked badge; B still rolls Stealth and uses HP Damage 2 → 8/10 |
-| 7 | — | C: Sela: Guiding Bolt Attack; Sacred Flame Damage; tick slot 1 | Lines "+5" (2 + 3) with 4d6 radiant; "Sacred Flame damage (radiant), DC 13 DEX"; slot pip 1/2 used |
+| 6 | Toast **Review** (opens Brin's sheet); Approve Brin, then Lock | B in edit mode | Draft badge gone; A's card "Resolved", toast gone. B: info toast "Brin was approved by the DM: ready to play" (G8); C: none. B's edit mode closes, Locked badge; B still rolls Stealth and uses HP Damage 2 → 8/10 |
+| 7 | — | C: Sela: Guiding Bolt **Attack + damage**; Sacred Flame Damage; tick slot 1 | Lines "+5" (2 + 3) with 4d6 radiant; "Sacred Flame damage (radiant), DC 13 DEX"; slot pip 1/2 used |
 | 8 | Creatures → Elite Goblin Warrior → Sheet; roll Stealth; edit Shortbow +6. Then Creatures → Goblin (SRD) → Sheet | — | Stealth row expertise; no public switch on the NPC sheet; DM-only line; edit committed. Goblin sheet read-only: lock icon, "Derive to customise", no Edit. B, C frames: no monster records |
 | 9 | New character… "Kell", owner Player 2, not a draft; then edit Kell's owner → Player 1 | — | C sees Kell full, no Draft badge ≤ 1 s; after reassign C gets Kell as summary only, B gets Kell full; C frames end with a `creature-sheet` delete for Kell |
 | 10 | Kill server, restart | B, C: controls disabled meanwhile | Banner; after rejoin state of steps 2–9 intact (lock, counters, rows, owners); no console errors |
+| 11 | *(N7)* Elite Goblin Warrior NPC sheet: Shortbow Attack, Damage, Attack + damage | B: Mira's Light crossbow: Shift+**Attack**, **Damage**, **Attack + damage**; C: Sela's Guiding Bolt: **Attack**; Sacred Flame row | Every attack row and Guiding Bolt show Attack · Damage · Attack + damage in that order; Sacred Flame Damage only. Lines: "Mira — Light crossbow attack (adv): …" (to-hit only, no damage); "Light crossbow damage (piercing)"; one line with both. Guiding Bolt Attack: to-hit only. A's NPC lines DM-only. Screenshots of both rows |
+| 12 | *(G8, draft card across a crash)* Close the toast, don't act; then hard-kill + restart | B: New character → "Quill" (Brin was approved in step 6, so B has no open draft) | After rejoin A: "1 pending action" toast; bell Pending: Quill's card. B, C frames: no `charx-draft` |
+| 13 | *(items 13, 16)* — | C: picker → Thorn; reload. Then open Notes on Sela in edit mode with a long note; scroll | After reload C still on Thorn (was: jumped to Sela). While scrolling, name, badges and the tab strip stay at the top (`charx-header` `data-pinned="true"`) |
 
 ## 14. Dependencies
 
@@ -332,6 +377,10 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | [combat-tracker](combat-tracker.md) | Route passes `ref`; `cbt.attack` gains `attackId?` / `spellId?` via `sheetAttack`; drafts out of whole-party (OQ-CHARX-12/13) | complete; changes needed |
 | [combat-extras](combat-extras.md) | Registers `cbtx.temp-hp`, `cbtx.death-saves`, `cbtx.effects` (§7.1); wires `char.adjustHp` through `hpRules.apply`; consumes `saveBonus` | in spec; seam settled (D/S seam) |
 | [dice-roll-log](dice-roll-log.md), [play-shell](play-shell.md), [party-loot](party-loot.md), [fixtures-adapters](fixtures-adapters.md) | Roll control, categories `skill-check` / `damage` / `healing`; window registry; `wallet` record; bundles. No change | complete |
+| [combat-tracker](combat-tracker.md) (N7) | Route semantics for Attack / Damage / Attack + damage in combat (OQ-CHARX-21); e2e / walkthrough clicks move off the retired Main-tab IDs | open (P2a) |
+| [notifications](notifications.md) (G8) | Existing `notify` / `resolveNotification`, kind registry and client views (append-only lines). No notifications spec change | complete |
+| [campaign-management](campaign-management.md) (N3) | Consumes `openSheetFor` and the passive helpers for the players panel (FR-CAMP-21/22) | in review |
+| effect-modifiers (M, in review) | Registers "Active effects" through `sheetSections`; no CHARX change | in review |
 
 ### Shared changes
 
@@ -353,6 +402,21 @@ Per AGENTS §9.9; the orchestrator routes each. Shared-branch-first changes mark
 | Feature-owned CHAR folders (`src/{shared,server/features,client/common/features}/character-sheet/`) | CHARX's build inherits them (OQ-CHARX-15); `creature-sheet` registers in `src/server/features/character-sheet/index.ts`. CBTX's slice 1 also rewires `char.adjustHp` (`hp.ts`) in this folder: build order below keeps them apart | character-sheet |
 | Docs (integrator) | Data model §11 + new table; protocol §5/§6/§8/§26 rows; FIX §8 rows; AGENTS §9.9; glossary (OQ-CHARX-16); CHAR FR-CHAR-02/05/09 amendments | — |
 
+**Sprint 2 phase 1** (P2b; after DM gate 1; the orchestrator routes each per AGENTS §9.9)
+
+| Path | Change | Owner today |
+|---|---|---|
+| `src/shared/events/character-sheet.ts` (shared) | `CharacterRolled.kind` + `toHit`, `spellToHit` | shared |
+| `src/shared/character-sheet/{schemas,logic}.ts` | `char.roll` kinds, `characterRolls` specs | CHARX (feature-owned) |
+| `src/client/common/features/character-sheet/{ActionsTab,MainTab,SheetView,CharacterSheet,routing,selection}.tsx/ts` | three buttons, Main without attack, pinned header, `SheetRollKind`, picker memory | CHARX (hotspot: one branch at a time) |
+| `src/server/features/character-sheet/lifecycle.ts` (create, approve), new `draft-kinds.ts` | G8 cards in `char.create` / `char.approve` | CHARX |
+| `src/server/features/notifications/kinds.ts`, `src/client/{dm,player}/notification-views.ts` | one line per kind | append-only |
+| `src/client/common/features/combat-tracker/roll-route.ts` | per OQ-CHARX-21 | combat-tracker (P2a's build) |
+| `e2e/character-sheet.e2e.ts`, `e2e/combat-tracker.e2e.ts`, `e2e/combat-tracker-charx.e2e.ts` | clicks move to `charx-roll-attack-damage` (Main IDs retired; `charx-roll-attack` is to-hit only) | e2e (each build that changes the buttons) |
+| Docs (integrator) | protocol §21 / §22 (`char.roll` kinds, `CharacterRolled`), §23 (kinds `charx-draft`, `charx-approved`), §26 (roll routes: kinds). No data-model change | — |
+
+- **None:** DB, record types, snapshot shape, window geometry (protocol §18 / §24 unchanged). Glossary: OQ-CHARX-23.
+
 **Suggested build slices**
 
 | # | Branch | Does | Shared files |
@@ -364,7 +428,7 @@ Per AGENTS §9.9; the orchestrator routes each. Shared-branch-first changes mark
 
 ## 15. Open questions
 
-All decided; no open question remains.
+Sprint-1 rows all decided. Sprint 2 phase 1 rows (OQ-CHARX-20–23) below them; none needs the DM.
 
 | ID | Question | Decision | Blocking? | Affects |
 |---|---|---|---|---|
@@ -385,6 +449,10 @@ All decided; no open question remains.
 | OQ-CHARX-16 | Glossary | **Decided #178:** add Draft (character), Sheet lock, Sheet section, NPC sheet (not the `npc` entity kind), Override; drop "Override (not supported)" from Modifier's avoid-column (integrator) | — | glossary |
 | OQ-CHARX-17 | Deleting characters | **Decided #178:** no delete (FR-ENT-14); rename / reassign | — | entities |
 | OQ-CHARX-19 | Entities changes | **Decided #178:** accepted; they land in `fix/charx-core` | — | entities |
+| OQ-CHARX-20 | Crit damage out of combat (N7): a player rolls Attack (natural 20), then Damage | **None, as FR-CHAR-05** (no crit rule outside combat; the DM rules it) / a "Critical" tick in Damage's physical popover and roll (doubles dice; one more control on every Damage) | no · owner: spec-polish-2b | dice-roll-log |
+| OQ-CHARX-21 | **Combat-tracker (N7 seam):** in a running encounter, what does each sheet button do? The sheet sends kinds `toHit` / `damage` / `attack` (spell: `spellToHit` / `spellDamage` / `spellAttack`) with `ref` through the roll routes (FR-CHARX-43); combat answers per kind: claim + intent, `critExpressions`, or `hidden`. Same answer for the DM attack picker and NPC rows so the three behave the same everywhere | Owner P2a; no pick from P2b. P2b needs per kind: claimed or not, the intent, crit, hidden. Today: `attack` / `spellAttack` (with damage) → `cbt.attack` card; `toHit`, `damage` plain | yes (seam before review) · owner: spec-polish-2a | combat-tracker, combat-extras |
+| OQ-CHARX-22 | Sheet window cramped for building a character (report item 16) | **Pinned header now (FR-CHARX-48); the player resizes; no auto-grow** / grow to 480×640 on entering edit mode (fit to the work area) through a new shell `resizeWindow` (frame change, writes the layout) | no · owner: spec-polish-2b | play-shell |
+| OQ-CHARX-23 | Glossary: add "**Attack + damage**: the sheet button that rolls to-hit and damage as one action; **Attack** rolls to-hit only, **Damage** damage only" | **Add at merge** / none | no · owner: integrator | glossary |
 
 OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while drafting).
 
