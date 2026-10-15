@@ -194,7 +194,7 @@ Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from wo
 | Build conventions (AGENTS.md) | `PP_DM_SECRET`, `PP_PUBLIC_BASE_URL`, `PP_DATA_DISPOSABLE`, `ctx.ids/tokens/clock` (AGENTS §9.2–9.3) | agreed, pending merge |
 | [character-sheet-full](character-sheet-full.md), [entities](entities.md), [combat-extras](combat-extras.md) (N3) | `passiveScore` (overrides), stored `level` / `ac` / `hpMax`, `hpCurrent`; `entity.tempHp` (CBTX, read only); `openSheetFor` (FR-CHARX-47). No change to those specs | built |
 
-**Shared changes** (sprint 2 phase 1, N3): none shared. Feature-owned: `src/client/dm/features/campaign-management/PlayersPanel.tsx` + a pure `party-lines.ts` (view model, tested). Imports `@shared/entities` helpers and `@ui/features/character-sheet/selection` (allowed, AGENTS §9.1). No DB, event, protocol, record type or window geometry change (unless OQ-CAMP-16 picks a taller default: protocol §24 `camp.players` row + layout tests).
+**Shared changes** (sprint 2 phase 1, N3): none shared. Built in `fix/charx-cues` (after `fix/charx-buttons`; it needs `openSheetFor` + picker memory, FR-CHARX-47). Feature-owned: `src/client/dm/features/campaign-management/PlayersPanel.tsx` + a pure `party-lines.ts` (view model, tested). Imports `@shared/entities` helpers and `@ui/features/character-sheet/selection` (allowed, AGENTS §9.1). No DB, event, protocol, record type or window geometry change (unless OQ-CAMP-16 picks a taller default: protocol §24 `camp.players` row + layout tests).
 
 ## 15. Open questions
 
