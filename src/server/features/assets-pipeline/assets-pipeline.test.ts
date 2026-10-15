@@ -5,7 +5,7 @@ import { MAX_UPLOAD_BYTES, type UploadResponse } from "@shared/assets-pipeline/s
 import { AssetIngested } from "@shared/events/assets-pipeline";
 import { eq } from "drizzle-orm";
 import { createApp } from "../../app";
-import { manualClock, realDice } from "../../commands/context";
+import { manualClock, realDice, seededContext } from "../../commands/context";
 import { CommandError } from "../../commands/errors";
 import { closeDb, openFileDb } from "../../db/client";
 import { dbId } from "../../db/meta";
@@ -291,6 +291,27 @@ describe("ingest (FR-ASSET-01, -03, -04, -06, -08)", () => {
     const real = await uploadOk(await testPng(11));
     expect(real.body.asset.id).toMatch(/^[A-Za-z0-9_-]{22}$/);
     expect(Buffer.from(real.body.asset.id, "base64url")).toHaveLength(16);
+  });
+
+  test("FR-ASSET-14 FR-ASSET-18 seeded IDs: new bytes at the same fixture position get a new ID", async () => {
+    // A fixture reload after its art changed (N2): the same seeded token draw must not name
+    // different bytes, or the browser keeps the old `immutable` copy under the old URL.
+    const load = async (n: number, bytes: Uint8Array) => {
+      const s = createTestServices({
+        testMode: false,
+        ctx: () => seededContext({ disposable: true, key: "images" }),
+        env: { PP_ASSET_DIR: path.join(h.dir, `seeded-${n}`) },
+      });
+      const c = s.commands.run(createCampaign, { name: "C" }, { actor: DM_ACTOR });
+      const actor = { ...DM_ACTOR, campaignId: c.id };
+      return (await ingestAsset(s, { bytes, filename: "token.svg" }, { actor })).asset.id;
+    };
+    const before = await load(1, svgBytes('width="64" height="64"'));
+    const changed = await load(2, svgBytes('width="64" height="64"', '<circle r="9"/>'));
+    const again = await load(3, svgBytes('width="64" height="64"'));
+    expect(changed).not.toBe(before);
+    expect(again).toBe(before);
+    expect(before).toMatch(/^[A-Za-z0-9_-]{22}$/);
   });
 
   test("FR-ASSET-09 campaign fixed at authentication, not at commit", async () => {

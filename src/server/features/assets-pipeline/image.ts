@@ -34,6 +34,8 @@ export interface Derivative {
 export interface ProcessedImage {
   /** SHA-256 hex of `original` (FR-ASSET-03). */
   hash: string;
+  /** SHA-256 hex of the bytes as given (an SVG before rendering); seeds fixture asset IDs. */
+  sourceHash: string;
   /** Stored original's type; SVG is stored as PNG (FR-ASSET-02). */
   mime: "image/png" | "image/jpeg" | "image/webp";
   original: Uint8Array;
@@ -222,5 +224,15 @@ export async function processImage(bytes: Uint8Array): Promise<ProcessedImage> {
     throw corrupt();
   }
   const hash = createHash("sha256").update(original).digest("hex");
-  return { hash, mime, original: new Uint8Array(original), width, height, display, thumb };
+  const sourceHash = createHash("sha256").update(bytes).digest("hex");
+  return {
+    hash,
+    sourceHash,
+    mime,
+    original: new Uint8Array(original),
+    width,
+    height,
+    display,
+    thumb,
+  };
 }
