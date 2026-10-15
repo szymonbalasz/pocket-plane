@@ -231,3 +231,27 @@ describe("FR-MAP-40 preview store", () => {
     expect(prunePreviews(s, 5000)).toBe(false);
   });
 });
+
+describe("FR-MAP-28 drag aborted without a dragend", () => {
+  test("FR-MAP-28 abort stops the 1 s repeat and the throttle; later moves and finish send nothing", () => {
+    const { clock, drag, frames, sent, sendMove } = setup();
+    drag.move(10, 10);
+    clock.advance(10);
+    drag.move(12, 10); // throttled, pending
+    drag.abort();
+    expect(clock.pending()).toBe(0);
+    clock.advance(10_000);
+    drag.move(30, 30);
+    clock.advance(10_000);
+    expect(frames()).toEqual([{ sceneId: "s1", tokenId: "goblin", x: 10, y: 10 }]);
+    expect(drag.finish({ col: 5, row: 5 }, true, sendMove)).toEqual({ col: 2, row: 3 });
+    expect(sent.some((d) => "intent" in d)).toBe(false);
+  });
+
+  test("FR-MAP-28 without abort or finish the last frame repeats every second (the stuck-drag symptom)", () => {
+    const { clock, drag, frames } = setup();
+    drag.move(10, 10);
+    clock.advance(5_000);
+    expect(frames().length).toBe(6);
+  });
+});

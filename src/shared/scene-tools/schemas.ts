@@ -245,6 +245,15 @@ export const RemoveSegmentsInput = z.strictObject({
   sceneId: Id,
   ns: z.array(SegmentN).min(1).max(REMOVE_SEGMENTS_MAX),
 });
+/**
+ * `scn.addWalls` ack: one `n` per input segment, in order; a segment identical to one already
+ * there (or earlier in the batch) gets that one's `n` (FR-SCN-07 dedupe). Undo remaps by position.
+ */
+export const AddWallsResult = z.object({ ns: z.array(SegmentN) });
+export type AddWallsResult = z.infer<typeof AddWallsResult>;
+/** `scn.addDoor` ack. */
+export const AddDoorResult = z.object({ n: SegmentN });
+export type AddDoorResult = z.infer<typeof AddDoorResult>;
 
 export const PlacePropInput = z.strictObject({
   sceneId: Id,

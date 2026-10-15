@@ -18,18 +18,9 @@ import {
   usePropTool,
   zChange,
 } from "./prop-tool";
-import {
-  popUndo,
-  propUndo,
-  pushUndo,
-  recordUndo,
-  remapIds,
-  remapOf,
-  UNDO_MAX,
-  type UndoStacks,
-  undoLast,
-  useUndoStacks,
-} from "./prop-undo";
+import { propUndo, recordUndo, undoLast } from "./prop-undo";
+import { popUndo, pushUndo, UNDO_MAX, type UndoStacks } from "./undo";
+import { recordUndo as recordShared, scnUndo } from "./undo-store";
 
 const GRID = { gridCellSize: 70, gridOffsetX: 0, gridOffsetY: 0 };
 const SCENE = { id: "s1", ...GRID } as unknown as SceneView;
@@ -93,12 +84,12 @@ function pointer(
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 afterEach(() => {
-  useUndoStacks.setState({ stacks: {} });
+  scnUndo.setState({ stacks: {}, busy: false });
   publishProps(null, []);
   usePropTool.setState({ imageId: null, picking: null });
 });
 
-describe("FR-SCN-15 undo (generic stack, prop entries)", () => {
+describe("FR-SCN-15 undo (one per-scene stack, prop entries)", () => {
   test("FR-SCN-15 prop inverses: place → delete, update → previous fields, hide → flag, delete → re-place (+ restore)", () => {
     expect(propUndo.place("p").steps).toEqual([{ name: S.deleteProp, input: { propId: "p" } }]);
     expect(propUndo.update("p", { col: 5, rotation: 0 }).steps).toEqual([
@@ -112,25 +103,26 @@ describe("FR-SCN-15 undo (generic stack, prop entries)", () => {
         {
           name: S.placeProp,
           input: { sceneId: "s1", assetId: "barrel", col: 5, row: 3, w: 2, h: 1, hidden: true },
+          recreates: { propId: "p" },
         },
         { name: S.updateProp, input: { propId: "p", rotation: 90, z: 0, locked: false } },
       ],
-      remap: { ackField: "propId", key: "propId", from: ["p"] },
     });
     expect(propUndo.delete(prop("p")).steps).toHaveLength(1);
   });
 
   test("FR-SCN-15 per scene, newest first, cap 50", () => {
+    const e = (sceneId: string, id: string) => ({ sceneId, ...propUndo.place(id) });
     let s: UndoStacks = {};
-    for (let i = 0; i < UNDO_MAX + 5; i++) s = pushUndo(s, "s1", propUndo.place(`p${i}`));
-    s = pushUndo(s, "s2", propUndo.place("other"));
+    for (let i = 0; i < UNDO_MAX + 5; i++) s = pushUndo(s, e("s1", `p${i}`));
+    s = pushUndo(s, e("s2", "other"));
     expect(s.s1).toHaveLength(UNDO_MAX);
-    expect(s.s1?.[0]).toEqual(propUndo.place("p5"));
-    const { entry, stacks } = popUndo(s, "s1");
-    expect(entry).toEqual(propUndo.place(`p${UNDO_MAX + 4}`));
-    expect(stacks.s1).toHaveLength(UNDO_MAX - 1);
-    expect(stacks.s2).toHaveLength(1);
-    expect(popUndo({}, "s1").entry).toBeNull();
+    expect(s.s1?.[0]).toEqual(e("s1", "p5"));
+    const popped = popUndo(s, "s1");
+    expect(popped?.entry).toEqual(e("s1", `p${UNDO_MAX + 4}`));
+    expect(popped?.stacks.s1).toHaveLength(UNDO_MAX - 1);
+    expect(popped?.stacks.s2).toHaveLength(1);
+    expect(popUndo({}, "s1")).toBeNull();
   });
 
   test("FR-SCN-15 place, move, delete; Undo, Undo, Undo: the re-placed prop's new id is remapped so the chain works", async () => {
@@ -168,54 +160,41 @@ describe("FR-SCN-15 undo (generic stack, prop entries)", () => {
     const { send } = fakeSend((n) => undoing && n === S.setPropHidden);
     recordUndo("s1", propUndo.place("p1"));
     await setHidden(send, prop("p1"), true);
-    expect(useUndoStacks.getState().stacks.s1).toHaveLength(2);
+    expect(scnUndo.getState().stacks.s1).toHaveLength(2);
     undoing = true;
     await expect(undoLast(send, "s1")).rejects.toThrow("rejected");
-    expect(useUndoStacks.getState().stacks.s1).toEqual([propUndo.place("p1")]);
+    expect(scnUndo.getState().stacks.s1).toEqual([{ sceneId: "s1", ...propUndo.place("p1") }]);
   });
 
   test("FR-SCN-15 a rejected edit records nothing; an unchanged update sends nothing", async () => {
     const { send, calls } = fakeSend(() => true);
     await expect(updatePropFields(send, prop("p1"), { col: 9 })).rejects.toThrow();
-    expect(useUndoStacks.getState().stacks.s1 ?? []).toEqual([]);
+    expect(scnUndo.getState().stacks.s1 ?? []).toEqual([]);
     calls.length = 0;
     await updatePropFields(send, prop("p1"), { col: 5, rotation: 0 });
     expect(calls).toEqual([]);
   });
 
-  test("FR-SCN-15 generic remap: keyed, scalar or array, every scene, never other keys", () => {
-    const s: UndoStacks = {
-      s1: [{ steps: [{ name: "x.set", input: { n: 4, state: 4 } }] }],
-      s2: [
-        { steps: [{ name: "x.remove", input: { ns: [4, 9] } }] },
-        {
-          steps: [{ name: "x.add", input: { col: 4 } }],
-          remap: { ackField: "ns", key: "ns", from: [4, 9] },
-        },
-      ],
+  test("FR-SCN-15 one stack per scene: structure and prop edits undo newest first, either tool", async () => {
+    const calls: string[] = [];
+    const send = async (name: string, input: unknown) => {
+      calls.push(`${name} ${JSON.stringify(input)}`);
+      return name === S.placeProp ? { propId: "new-1" } : null;
     };
-    const r = remapIds(s, "n", new Map([[4, 12]]));
-    expect(r.s1?.[0]?.steps[0]?.input).toEqual({ n: 12, state: 4 });
-    const r2 = remapIds(
-      s,
-      "ns",
-      new Map([
-        [4, 12],
-        [9, 13],
-      ]),
-    );
-    expect(r2.s2?.[0]?.steps[0]?.input).toEqual({ ns: [12, 13] });
-    expect(r2.s2?.[1]?.steps[0]?.input).toEqual({ col: 4 });
-    expect(r2.s2?.[1]?.remap?.from).toEqual([12, 13]);
-    expect(
-      remapOf({ steps: [], remap: { ackField: "ns", key: "ns", from: [1, 2] } }, { ns: [7, 8] }),
-    ).toEqual(
-      new Map([
-        [1, 7],
-        [2, 8],
-      ]),
-    );
-    expect(remapOf({ steps: [], remap: { ackField: "ns", key: "ns", from: [1] } }, {})).toBeNull();
+    recordUndo("s1", propUndo.place("p1"));
+    recordShared({
+      sceneId: "s1",
+      steps: [{ name: S.removeSegments, input: { sceneId: "s1", ns: [6] } }],
+    });
+    await remove(send, prop("p1"));
+    calls.length = 0;
+    for (let i = 0; i < 3; i++) await undoLast(send, "s1");
+    expect(calls.map((c) => c.split(" ")[0])).toEqual([
+      S.placeProp,
+      S.removeSegments,
+      S.deleteProp,
+    ]);
+    expect(calls[2]).toBe(`${S.deleteProp} {"propId":"new-1"}`);
   });
 });
 
@@ -239,8 +218,8 @@ describe("FR-SCN-16 / -17 Props tool pointer", () => {
     await flush();
     expect(calls).toEqual([{ name: S.updateProp, input: { propId: "barrel", col: 7, row: 5 } }]);
     expect(usePropTool.getState().gesture).toBeNull();
-    expect(useUndoStacks.getState().stacks.s1).toEqual([
-      propUndo.update("barrel", { col: 5, row: 3 }),
+    expect(scnUndo.getState().stacks.s1).toEqual([
+      { sceneId: "s1", ...propUndo.update("barrel", { col: 5, row: 3 }) },
     ]);
     // A click without moving sends nothing.
     p.down(pointer({ col: 5, row: 3 }, send));
@@ -289,7 +268,7 @@ describe("FR-SCN-16 / -17 Props tool pointer", () => {
       { name: S.placeProp, input: { sceneId: "s1", assetId: "img-1", col: 6, row: 12 } },
     ]);
     expect(usePropTool.getState().selectedId).toBe("new-1");
-    expect(useUndoStacks.getState().stacks.s1).toEqual([propUndo.place("new-1")]);
+    expect(scnUndo.getState().stacks.s1).toEqual([{ sceneId: "s1", ...propUndo.place("new-1") }]);
     // No image: an empty click clears the selection, sends nothing.
     usePropTool.setState({ imageId: null });
     p.down(pointer({ col: 0, row: 0 }, send));
@@ -305,7 +284,7 @@ describe("FR-SCN-16 / -17 Props tool pointer", () => {
     p.down(pointer({ col: 6, row: 12 }, send));
     await flush();
     expect(errors).toHaveLength(1);
-    expect(useUndoStacks.getState().stacks.s1 ?? []).toEqual([]);
+    expect(scnUndo.getState().stacks.s1 ?? []).toEqual([]);
   });
 
   test("FR-SCN-06 Esc drops a gesture first, then the selection; a scene switch drops both", () => {
