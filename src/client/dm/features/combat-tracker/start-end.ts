@@ -25,7 +25,10 @@ export function endPendingCount(
 /** The End confirm's second sentence; 0 → none (first sentence only). */
 export function endPendingText(n: number): string {
   if (n === 0) return "";
-  return `${n} pending card${n === 1 ? "" : "s"} will be dismissed: apply them first if they count.`;
+  // P3 glitch 9: one card reads in the singular.
+  return n === 1
+    ? "1 pending card will be dismissed: apply it first if it counts."
+    : `${n} pending cards will be dismissed: apply them first if they count.`;
 }
 
 export const END_FIRST_SENTENCE = "Combatants leave the initiative list.";
@@ -61,4 +64,16 @@ export async function endAndFollow(
   if (r === undefined) return r;
   fx.dispatch({ type: "minimise", kind: INITIATIVE_KIND });
   return r;
+}
+
+/**
+ * P3 glitch 3 (amends FR-CBT-60): once per page load, at the first live store with the layout
+ * applied, an open Initiative with no started encounter minimises (empty, it only covered the
+ * map; the launcher keeps it), and one appearance is noted so a fitted map refits into the room.
+ * Opened again by the DM, it stays open.
+ */
+export function idleInitiativeOnLoad(o: { started: boolean; open: boolean }, fx: ShellEffects) {
+  if (o.started || !o.open) return;
+  fx.dispatch({ type: "minimise", kind: INITIATIVE_KIND });
+  fx.noteAppearance();
 }

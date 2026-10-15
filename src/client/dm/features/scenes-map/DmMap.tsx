@@ -178,8 +178,13 @@ export function DmMapBase() {
             style={{ left: menu?.at.x ?? 0, top: menu?.at.y ?? 0 }}
           />
         </DropdownMenuTrigger>
+        {/* P3 E2: opens towards the roomier side, stays inside the viewport and scrolls when
+            taller than the room there (a 517 px menu at y 453 on 900 px ran off-screen). */}
         <DropdownMenuContent
           align="start"
+          side={menu && menu.at.y > window.innerHeight / 2 ? "top" : "bottom"}
+          collisionPadding={8}
+          className="max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-auto"
           data-testid="map-token-menu"
           data-record-id={menuToken?.id}
         >

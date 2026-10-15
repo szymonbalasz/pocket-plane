@@ -131,3 +131,38 @@ describe("open placement (FR-SHELL-08)", () => {
     expect(r.y + r.h).toBeLessThanOrEqual(a.bottom);
   });
 });
+
+describe("P3 glitch 13: new windows keep clear of map tokens", () => {
+  // Notifications-like window (360×480, minOpenH 480) at 1440×900, the right edge taken.
+  const notes = def({
+    defaultPosition: { anchor: "bottom-right" },
+    defaultSize: { w: 360, h: 480 },
+    minSize: { w: 280, h: 240 },
+    minOpenH: 480,
+  });
+  const wide = { w: 1440, h: 900 };
+  const log = { x: 68, y: 584, w: 460, h: 240 };
+
+  test("FR-SHELL-08 two full-size free slots: the one over fewer tokens wins, whatever the column", () => {
+    // Free at both edges; tokens near the right edge (the default column).
+    const tokens = [{ x: 1200, y: 400, w: 50, h: 50 }];
+    const r = placeRect(notes, wide, [log], tokens);
+    expect(r.h).toBe(480);
+    expect(tokens.some((t) => overlaps(r, t))).toBe(false);
+    expect(overlaps(r, log)).toBe(false);
+    // No tokens: the default column, as before.
+    expect(placeRect(notes, wide, [log], []).x).toBe(placeRect(notes, wide, [log]).x);
+    expect(placeRect(notes, wide, [log]).x).toBeGreaterThan(1000);
+  });
+
+  test("FR-SHELL-08 a free full-size slot still beats covering a window, even over tokens", () => {
+    const init = { x: 1028, y: 60, w: 400, h: 600 };
+    const pcs = [
+      { x: 180, y: 320, w: 50, h: 50 },
+      { x: 180, y: 425, w: 50, h: 50 },
+    ];
+    const r = placeRect(notes, wide, [init, log], pcs);
+    expect(r.h).toBe(480);
+    expect(overlaps(r, init) || overlaps(r, log)).toBe(false);
+  });
+});

@@ -7,7 +7,7 @@
 // hpRules: bun test (combat-tracker charx-routes.test.ts, roll-route.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { openWindow } from "./support/shell";
+import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
@@ -74,14 +74,35 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
   await expect(party(miraId)).toHaveAttribute("data-state", "checked");
   await expect(enc.locator(`label[for="cbt-party-${brinId}"]`)).toContainText("Draft");
   await dm.waitForTimeout(800); // debounced save lands before Start
+  // P3 glitch 7: the builder rates the PCs Start adds by default, so both cards agree.
+  const builderXp = await enc.getByTestId("cbt-enc-xp-adjusted").textContent();
   await enc.getByTestId("cbt-enc-start").click();
+  await expect(dm.getByRole("dialog").getByTestId("cbt-enc-xp-adjusted")).toHaveText(
+    builderXp ?? "",
+  );
   const bindings = dm.getByTestId("cbt-enc-binding");
   await expect(bindings.filter({ hasText: "Mira" })).toHaveCount(1);
   await expect(bindings.filter({ hasText: "Brin" })).toHaveCount(0);
   await dm.getByTestId("cbt-enc-start-confirm").click();
-  const init = await openWindow(dm, "cbt.initiative");
+  // FR-CBT-60: the acked Start opens Initiative (it loaded minimised: no encounter, P3 glitch 3).
+  const init = shellWindow(dm, "cbt.initiative");
+  await expect(init).toBeVisible();
   await expect(init.locator('[data-testid="cbt-init-row-name"][data-value="Mira"]')).toHaveCount(1);
   await expect(init.locator('[data-testid="cbt-init-row-name"][data-value="Brin"]')).toHaveCount(0);
+  // P3 glitch 10, ruling A: in round 0 (Roll buttons in the Init column, no Moved) long names
+  // such as "Elite Goblin Warrior" stay whole.
+  await expect(
+    init.locator('[data-testid="cbt-init-row-name"][data-value="Elite Goblin Warrior"]'),
+  ).toHaveCount(1);
+  await expect
+    .poll(() =>
+      init
+        .locator('[data-testid="cbt-init-row-name"] [data-name-base]')
+        .evaluateAll((els) =>
+          els.filter((e) => e.scrollWidth > e.clientWidth + 0.5).map((e) => e.textContent),
+        ),
+    )
+    .toEqual([]);
 
   // Mira's Light crossbow (2nd attack) from the Actions tab: Attack + damage → cbt.attack → the
   // DM's card (Attack is to-hit only since N7, FR-CHARX-41).

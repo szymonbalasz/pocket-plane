@@ -10,6 +10,7 @@ import {
   endAndFollow,
   endPendingCount,
   endPendingText,
+  idleInitiativeOnLoad,
   startAndFollow,
 } from "./start-end";
 
@@ -47,7 +48,7 @@ describe("FR-CBT-59 confirm count", () => {
       "3 pending cards will be dismissed: apply them first if they count.",
     );
     expect(endPendingText(1)).toBe(
-      "1 pending card will be dismissed: apply them first if they count.",
+      "1 pending card will be dismissed: apply it first if it counts.",
     );
     expect(endPendingText(0)).toBe("");
   });
@@ -91,6 +92,36 @@ describe("FR-CBT-60 windows follow the DM's own Start / End", () => {
     const f = fx();
     await startAndFollow(async () => undefined, f);
     await endAndFollow(async () => undefined, f);
+    expect(f.actions).toEqual([]);
+    expect(f.appearances()).toBe(0);
+  });
+});
+
+describe("P3 glitch 3: an empty Initiative opens minimised", () => {
+  const fx = () => {
+    const actions: WindowAction[] = [];
+    let appearances = 0;
+    return {
+      actions,
+      appearances: () => appearances,
+      dispatch: (a: WindowAction) => void actions.push(a),
+      noteAppearance: () => {
+        appearances += 1;
+      },
+    };
+  };
+
+  test("FR-CBT-60 page load, no started encounter, Initiative open → minimised, map refits", () => {
+    const f = fx();
+    idleInitiativeOnLoad({ started: false, open: true }, f);
+    expect(f.actions).toEqual([{ type: "minimise", kind: "cbt.initiative" }]);
+    expect(f.appearances()).toBe(1);
+  });
+
+  test("FR-CBT-60 page load in combat, or Initiative not open → nothing", () => {
+    const f = fx();
+    idleInitiativeOnLoad({ started: true, open: true }, f);
+    idleInitiativeOnLoad({ started: false, open: false }, f);
     expect(f.actions).toEqual([]);
     expect(f.appearances()).toBe(0);
   });

@@ -3,10 +3,13 @@
 // token's `dim`; DM: hidden tokens' labels styled `visibility.hidden`. A label follows its token's
 // own drag and others' drag previews; only that label re-renders per frame. The moving tokens'
 // labels draw last, so a dragged token's label is on top. Konva names: layer `map-labels`, name
-// `map-token-label` (id = token id), badges by their test id (id = token id).
+// `map-token-label` (id = token id), badges by their test id (id = token id). P3 glitch 10: a cut
+// name shows in full on hover (the canvas' native title); the layer keeps not listening, so
+// clicks and drags still reach the token below.
 import { cellToPx, footprint } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
-import { useMemo } from "react";
+import type Konva from "konva";
+import { useEffect, useMemo, useRef } from "react";
 import { Group, Layer, Rect, Text } from "react-konva";
 import { useStore } from "zustand";
 import { useCanvas } from "../canvas-context";
@@ -44,6 +47,7 @@ function Pill({
   bold,
   icon,
   dashed,
+  full,
 }: {
   name: string;
   id: string;
@@ -59,10 +63,12 @@ function Pill({
   bold: boolean;
   icon?: string;
   dashed?: string;
+  /** The full name when `text` is cut (hover shows it). */
+  full?: string;
 }) {
   const { cam } = useCanvas();
   return (
-    <Group name={name} id={id} x={x} y={y} icon={icon}>
+    <Group name={name} id={id} x={x} y={y} icon={icon} full={full}>
       <Rect
         width={width}
         height={height}
@@ -117,6 +123,7 @@ function TokenLabel({ t }: { t: TokenView }) {
         color={t.hidden ? colors.mutedForeground : colors.foreground}
         bold={false}
         dashed={t.hidden ? colors.hidden : undefined}
+        full={row.name.text !== t.name ? t.name : undefined}
       />
       {row.badges.map((p) => {
         const b = byId.get(p.id);
@@ -140,8 +147,49 @@ function TokenLabel({ t }: { t: TokenView }) {
   );
 }
 
+/**
+ * P3 glitch 10: while the pointer is over a cut name pill, the canvas' title is the full name.
+ * Hit-tested from the stage's own pointer moves, so the layer stays non-listening.
+ */
+function useFullNameOnHover(layer: React.RefObject<Konva.Layer | null>) {
+  useEffect(() => {
+    const stage = layer.current?.getStage();
+    if (!stage) return;
+    const el = stage.container();
+    let shown: string | null = null;
+    const set = (full: string | null) => {
+      if (full === shown) return;
+      if (full) el.title = full;
+      else if (shown !== null) el.removeAttribute("title");
+      shown = full;
+    };
+    const move = () => {
+      const p = stage.getPointerPosition();
+      const pills = layer.current?.find(".map-token-label") ?? [];
+      const hit = p
+        ? pills.find((n) => {
+            if (!n.getAttr("full")) return false;
+            const r = n.getClientRect();
+            return p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height;
+          })
+        : undefined;
+      set((hit?.getAttr("full") as string | undefined) ?? null);
+    };
+    const leave = () => set(null);
+    stage.on("pointermove.labels", move);
+    stage.on("pointerleave.labels", leave);
+    return () => {
+      stage.off("pointermove.labels");
+      stage.off("pointerleave.labels");
+      set(null);
+    };
+  }, [layer]);
+}
+
 export function LabelsLayer() {
   const { tokens, previews } = useCanvas();
+  const layer = useRef<Konva.Layer>(null);
+  useFullNameOnHover(layer);
   // Changes only when a drag or preview starts / stops, not per frame.
   const movingKey = useStore(previews, (s) =>
     [s.local?.tokenId ?? "", ...Object.keys(s.previews)].join(" "),
@@ -152,7 +200,7 @@ export function LabelsLayer() {
     return [...tokens.filter((t) => !moving.has(t.id)), ...tokens.filter((t) => moving.has(t.id))];
   }, [tokens, movingKey]);
   return (
-    <Layer name="map-labels" listening={false}>
+    <Layer ref={layer} name="map-labels" listening={false}>
       {ordered.map((t) => (
         <TokenLabel key={t.id} t={t} />
       ))}

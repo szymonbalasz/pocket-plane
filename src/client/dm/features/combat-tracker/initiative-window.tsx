@@ -48,7 +48,7 @@ import {
   Tooltip,
 } from "@ui/components/ui/overlays";
 import { Input, Skeleton } from "@ui/components/ui/primitives";
-import { characterOf, deadPc, deathStateFor } from "@ui/features/combat-extras/logic";
+import { characterOf, deadPc, deathStateFor, MORE_W } from "@ui/features/combat-extras/logic";
 import { RowName } from "@ui/features/combat-extras/parts";
 import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
@@ -60,7 +60,11 @@ import {
   useStartedEncounter,
 } from "@ui/features/combat-tracker/store";
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
-import { ENCOUNTERS_KIND, initiativeWindowBase } from "@ui/features/combat-tracker/window";
+import {
+  ENCOUNTERS_KIND,
+  INITIATIVE_KIND,
+  initiativeWindowBase,
+} from "@ui/features/combat-tracker/window";
 import { modeFromKeys } from "@ui/features/dice-roll-log/logic";
 import {
   RollButton,
@@ -70,8 +74,13 @@ import {
 import { actionButton } from "@ui/features/notifications/logic";
 import { useNoteActions } from "@ui/features/notifications/parts";
 import { originOf } from "@ui/features/notifications/views";
+import { noteAppearance } from "@ui/features/play-shell/free-area";
 import { defineWindow } from "@ui/features/play-shell/registry";
-import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
+import {
+  useOpenWindow,
+  useShellState,
+  useWindowDispatch,
+} from "@ui/features/play-shell/ShellContext";
 import { movementIndicator } from "@ui/features/scenes-map/movement";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
@@ -89,7 +98,7 @@ import {
   UserMinusIcon,
   UserPlusIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { dmNotificationViews } from "../../notification-views";
 import {
@@ -111,6 +120,7 @@ import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpDialog } from "./hp-dialog";
 import { isDamageCard, pendingRowText } from "./pending";
 import { useCombatDialogs } from "./popup-store";
+import { idleInitiativeOnLoad } from "./start-end";
 
 /**
  * FR-CBTX-46 (G1): the Init column is wide while some row can roll (round 0, a late joiner
@@ -517,6 +527,53 @@ function Moved({ c, speed }: { c: CombatantView; speed: number | undefined }) {
   );
 }
 
+const sumWidths = (els: readonly Element[], gap: number) =>
+  els.reduce((w, el) => w + el.getBoundingClientRect().width, 0) +
+  Math.max(0, els.length - 1) * gap;
+
+/**
+ * P3 glitch 10 (names keep priority, #182): the Moved indicator stays on the name line while the
+ * full name, its icons, a "+N"'s room (if chips) and Moved fit there; otherwise it moves to the
+ * AC / HP line when that line has room for it. Natural widths only, so it never flips back and
+ * forth; re-measured on resize and when the row changes.
+ */
+function useMovedBelow(rowRef: RefObject<HTMLLIElement | null>, deps: unknown): boolean {
+  const [below, setBelow] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the row changes
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    const line = row?.querySelector<HTMLElement>("[data-name-line]");
+    const stats = row?.querySelector<HTMLElement>("[data-stats-line]");
+    if (!row || !line || !stats) return;
+    const measure = () => {
+      const moved = row.querySelector<HTMLElement>('[data-testid="cbt-init-row-moved"]');
+      const name = line.querySelector<HTMLElement>('[data-testid="cbt-init-row-name"]');
+      if (!moved || !name || line.clientWidth === 0) {
+        setBelow(false);
+        return;
+      }
+      const base = name.querySelector<HTMLElement>("[data-name-base]");
+      const suffix = name.querySelector<HTMLElement>("[data-name-suffix]");
+      const nameW = (base?.scrollWidth ?? 0) + (suffix?.offsetWidth ?? 0);
+      const others = [...line.children].filter(
+        (k) => k !== name && k !== moved && !k.hasAttribute("data-chip-row"),
+      );
+      const chips = line.querySelector("[data-chip-row]") ? MORE_W : 0;
+      const gap = 4; // gap-1
+      const parts = 2 + others.length + (chips ? 1 : 0);
+      const needLine = nameW + sumWidths(others, 0) + chips + moved.offsetWidth + (parts - 1) * gap;
+      const statsKids = [...stats.children].filter((k) => k !== moved);
+      const needStats = sumWidths(statsKids, 6) + 6 + moved.offsetWidth; // gap-1.5
+      setBelow(needLine > line.clientWidth && needStats <= stats.clientWidth);
+    };
+    measure();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    ro?.observe(line);
+    return () => ro?.disconnect();
+  }, [deps]);
+  return below;
+}
+
 function Row({
   c,
   def,
@@ -553,8 +610,14 @@ function Row({
   // FR-CBT-50 (G4): Next / Prev skip a monster at 0 HP — and a dead PC (FR-CBTX-25); the row is
   // muted with a skip icon.
   const skipped = (c.kind === "monster" && !c.removed && c.hpCurrent === 0) || dead;
+  const rowRef = useRef<HTMLLIElement>(null);
+  const movedBelow = useMovedBelow(
+    rowRef,
+    `${c.name}:${c.movedFt}:${round}:${wideInit}:${skipped}:${c.hidden}:${hp?.cur}:${down}:${hasDeathState}`,
+  );
   return (
     <li
+      ref={rowRef}
       data-testid="cbt-init-row"
       data-record-id={c.id}
       data-turn={turn}
@@ -570,8 +633,8 @@ function Row({
       <TurnMarker active={turn} />
       <Portrait name={c.name} imageAssetId={c.imageAssetId} />
       <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-1">
-          {/* Middle-truncated, number kept ("Gob… 2"): names win over chips. */}
+        <div data-name-line className="flex min-w-0 items-center gap-1">
+          {/* Middle-truncated, number kept ("Gob… 2"): names win over chips and Moved. */}
           <RowName name={c.name} testId="cbt-init-row-name" className="text-sm font-medium" />
           {c.hidden && (
             <EyeOffIcon className="size-3.5 shrink-0 text-muted-foreground" aria-label="Hidden" />
@@ -592,10 +655,14 @@ function Row({
           )}
           {/* FR-CBTX-33: effect chips, one line ("+N" for the rest). */}
           <RowEffects c={c} round={round} />
-          {/* On the name line, right-aligned: the AC / HP / band line has no room left. */}
-          <Moved c={c} speed={stats?.speed} />
+          {/* On the name line, right-aligned; below when the name needs the room. From round 1
+              only: before the first turn nothing has moved in combat (P3 glitch 10, ruling A). */}
+          {round >= 1 && !movedBelow && <Moved c={c} speed={stats?.speed} />}
         </div>
-        <div className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+        <div
+          data-stats-line
+          className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs text-muted-foreground tabular-nums"
+        >
           <span className="shrink-0">AC {ac ?? "—"}</span>
           <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>
             HP {hp ? `${hp.cur}/${hp.max}` : "—"}
@@ -606,6 +673,7 @@ function Row({
           )}
           {down && !hasDeathState && <BandBadge band="down" testId="cbt-init-row-band" />}
           <RowDeath c={c} />
+          {round >= 1 && movedBelow && <Moved c={c} speed={stats?.speed} />}
         </div>
       </div>
       <InitiativeCell c={c} def={def} round={round} wide={wideInit} />
@@ -670,16 +738,19 @@ function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteAction
   if (isDamageCard(n)) {
     return (
       <li>
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="cbt-init-card"
-          data-record-id={n.id}
-          className="w-full justify-start truncate"
-          onClick={() => openCard(n.id)}
-        >
-          <SwordIcon className="size-3.5" /> {n.text}
-        </Button>
+        {/* P3 glitch 10: the full text on hover when the row cuts it. */}
+        <Tooltip content={n.text}>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="cbt-init-card"
+            data-record-id={n.id}
+            className="w-full justify-start truncate"
+            onClick={() => openCard(n.id)}
+          >
+            <SwordIcon className="size-3.5" /> <span className="min-w-0 truncate">{n.text}</span>
+          </Button>
+        </Tooltip>
       </li>
     );
   }
@@ -693,7 +764,11 @@ function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteAction
       className="flex h-8 items-center gap-1.5 rounded-md border px-2 text-sm"
     >
       <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 flex-1 truncate" data-testid="cbt-init-pending-text">
+      <span
+        className="min-w-0 flex-1 truncate"
+        data-testid="cbt-init-pending-text"
+        title={pendingRowText(n)}
+      >
         {pendingRowText(n)}
       </span>
       {mode !== "none" && (
@@ -704,7 +779,7 @@ function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteAction
           data-testid="cbt-init-pending-action"
           data-record-id={n.id}
           disabled={mode === "disabled" || actions.busy.has(n.id)}
-          // A list row like Notifications' (FR-NOTE-26 origin); its kind decides what it means.
+          // A list row like those in Notifications (FR-NOTE-26 origin); its kind decides what it means.
           onClick={(e) => void actions.run(n, originOf("history", e.currentTarget.closest("li")))}
         >
           {n.actionLabel}
@@ -785,7 +860,9 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
   return (
     <div className="flex shrink-0 flex-col gap-1.5">
       <div className="flex items-center gap-2">
-        <span className="truncate text-sm font-semibold">{enc.name}</span>
+        <span className="truncate text-sm font-semibold" title={enc.name}>
+          {enc.name}
+        </span>
         <span
           data-testid="cbt-init-round"
           data-value={enc.round}
@@ -967,7 +1044,9 @@ function DmInitiativeBody() {
                 className="flex items-center gap-2 px-1 text-sm text-muted-foreground"
               >
                 <Portrait name={c.name} imageAssetId={c.imageAssetId} />
-                <span className="flex-1 truncate">{c.name}</span>
+                <span className="flex-1 truncate" title={c.name}>
+                  {c.name}
+                </span>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -988,8 +1067,26 @@ function DmInitiativeBody() {
   );
 }
 
+/** P3 glitch 3: once per page load, an empty Initiative minimises (`idleInitiativeOnLoad`). */
+function useIdleInitiativeOnLoad() {
+  const ready = useShellState((s) => s.key !== null);
+  const live = useSync((s) => s.state === "live");
+  const started = useSync((s) => startedIn(s.store) !== null);
+  const open = useShellState((s) =>
+    s.windows.some((w) => w.kind === INITIATIVE_KIND && w.state === "open"),
+  );
+  const dispatch = useWindowDispatch();
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current || !ready || !live) return;
+    done.current = true;
+    idleInitiativeOnLoad({ started, open }, { dispatch, noteAppearance });
+  }, [ready, live, started, open, dispatch]);
+}
+
 /** Dialogs hosted while the window type is available (popup opens from cards and rows). */
 function CombatDialogs() {
+  useIdleInitiativeOnLoad();
   return (
     <>
       <AttackPopup />

@@ -85,9 +85,18 @@ test("FR-MOD-15 FR-MOD-16 FR-MOD-20 FR-MOD-28 sheet attack with Bless → line +
     .locator('[data-testid="cbtx-init-row-effect"][data-value="custom"]');
   await expect(chips).toHaveCount(0); // "Cursed" is secret
   await expect.poll(async () => (await tokenNode(dm, goblin2Token)) !== null).toBe(true);
+  // P3 E2: the token menu (taller than the room below or above Goblin 2) stays inside the
+  // viewport, flipped / clamped and scrolling.
+  const size = dm.viewportSize() ?? { width: 1280, height: 800 };
   const g = (await tokenNode(dm, goblin2Token))!;
   await dm.mouse.click(g.x, g.y, { button: "right" });
-  await expect(dm.getByTestId("map-token-menu")).toBeVisible();
+  const menu = dm.getByTestId("map-token-menu");
+  await expect(menu).toBeVisible();
+  const box = await menu.boundingBox();
+  expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
+  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(size.height);
+  await menu.getByTestId("mod-token-menu-apply").scrollIntoViewIfNeeded();
+  await expect(menu.getByTestId("mod-token-menu-apply")).toBeInViewport();
   await dm.getByTestId("mod-token-menu-apply").click();
   await dm.locator('[data-testid="mod-apply-preset"][data-value="bane"]').click();
   const apply = dm.getByTestId("mod-apply");

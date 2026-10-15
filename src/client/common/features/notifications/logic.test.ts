@@ -177,16 +177,36 @@ describe("reconnect and reload (FR-NOTE-14/15, NOTE §11)", () => {
   const withCard = view(store(DM, [other, card], 5));
   const live = () => step(step(fresh(), null, before), before, withCard);
 
-  test("FR-NOTE-15 FR-NOTE-14 reconnect (server restart): the card toast stays, one summary toast", () => {
+  test("FR-NOTE-15 FR-NOTE-14 reconnect (server restart): the card toast stays, no summary for it (P3 glitch 8)", () => {
     const m = live();
     expect(shown(m)).toEqual([card.id]);
     const down = view(withCard.store, "reconnecting");
     const back = view(store(DM, [other, card], 0));
     const after = step(step(m, withCard, down), down, back);
-    expect(shown(after)).toEqual([card.id, `summary:1`]);
+    expect(shown(after)).toEqual([card.id]);
     // Players rejoining (presence events) change nothing.
     const presence = view({ ...back.store, seq: 1 });
-    expect(shown(step(after, back, presence))).toEqual([card.id, "summary:1"]);
+    expect(shown(step(after, back, presence))).toEqual([card.id]);
+  });
+
+  test("FR-NOTE-15 P3 glitch 8: the summary counts only pending rows without a toast; closing the card toast lets it count", () => {
+    const card2 = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
+    // Reconnect with one toasted card and one that never toasted → "1 pending action".
+    const m = live();
+    const down = view(withCard.store, "reconnecting");
+    const back = view(store(DM, [other, card, card2], 0));
+    const after = step(step(m, withCard, down), down, back);
+    expect(shown(after)).toEqual([card.id, "summary:1"]);
+    // A new pending card while live toasts and leaves the summary's count alone.
+    const card3 = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
+    const more = view(store(DM, [other, card, card2, card3], 1));
+    expect(shown(step(after, back, more))).toEqual([card.id, "summary:1", card3.id]);
+    // The card toast closed by the user: the next reconnect's summary counts it again.
+    const closed = { ...after, toasts: closeToast(after.toasts, card.id, 0) };
+    const again = view(store(DM, [other, card, card2], 0));
+    expect(shown(step(step(closed, back, view(back.store, "reconnecting")), down, again))).toEqual([
+      "summary:2",
+    ]);
   });
 
   test("FR-NOTE-15 runtime mounted after events followed the snapshot: still a connect + summary", () => {
@@ -198,7 +218,7 @@ describe("reconnect and reload (FR-NOTE-14/15, NOTE §11)", () => {
   test("FR-NOTE-14 remount on a fresh connection (DM retry after a throttled 4401) keeps the card toast", () => {
     // Same page memory, new sync store: the runtime's first look is `prev` null.
     const m = step(live(), null, view(store(DM, [other, card], 2)));
-    expect(shown(m)).toEqual([card.id, "summary:1"]);
+    expect(shown(m)).toEqual([card.id]);
   });
 
   test("FR-NOTE-13 FR-NOTE-15 reload: no per-item toast, only the summary; card still reachable", () => {
@@ -281,6 +301,10 @@ describe("toast timers and cap (FR-NOTE-14)", () => {
     const v = visibleToasts(s);
     expect(v.more).toBe(2);
     expect(v.shown.map((t) => t.key)).toEqual(ns.slice(2).map((n) => n.id));
+    // P3 E3: a short viewport lowers the cap; the newest stay, at least one shows.
+    expect(visibleToasts(s, 2)).toMatchObject({ more: 3 });
+    expect(visibleToasts(s, 2).shown.map((t) => t.key)).toEqual(ns.slice(3).map((n) => n.id));
+    expect(visibleToasts(s, 0).shown).toHaveLength(1);
   });
 
   test("FR-NOTE-15 summary toast follows the pending-for-me count", () => {

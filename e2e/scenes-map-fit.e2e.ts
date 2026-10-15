@@ -76,7 +76,8 @@ test("FR-MAP-44 / -45 FR-SHELL-34 fit to the free area: open, reload, pan + Fit,
   await dm.getByTestId("map-show-to-players").click();
   await expect(dm.getByTestId("map-not-shown-badge")).toHaveCount(0);
   await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
-  await expect(shellWindow(dm, "cbt.initiative")).toBeVisible(); // default layout
+  // P3 glitch 3: no encounter running → the empty Initiative opened minimised (launcher keeps it).
+  await expect(launcherButton(dm, "cbt.initiative")).toHaveAttribute("data-state", "minimised");
   // Six tokens, the hidden Wolf and Elite included.
   await expectUncovered(dm, 6, pcs);
 
@@ -120,6 +121,18 @@ test("FR-MAP-44 / -45 FR-SHELL-34 fit to the free area: open, reload, pan + Fit,
   }
   await expectUncovered(dm, 6, pcs);
   await expectUncovered(player, 4, pcs);
+  // P3 glitch 10: a cut map label ("Elite Goblin Wa…") shows the full name on hover.
+  const cut = (await konvaNodes(dm, "map-token-label")).find((l) => l.text?.endsWith("…"));
+  if (!cut) throw new Error("no cut label at 1280×720");
+  await dm.mouse.move(cut.x, cut.y);
+  const title = () =>
+    dm.evaluate(() => {
+      const K = (window as unknown as { Konva?: { stages: { container(): HTMLElement }[] } }).Konva;
+      return K?.stages.find((st) => st.container().isConnected)?.container().title ?? null;
+    });
+  await expect.poll(title).toBe("Elite Goblin Warrior");
+  await dm.mouse.move(5, 300);
+  await expect.poll(title).toBe("");
   await pan(dm);
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-camera", "moved");
   await dm.getByTestId("map-tool-fit").click();

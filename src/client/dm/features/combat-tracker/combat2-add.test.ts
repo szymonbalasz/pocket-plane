@@ -6,6 +6,7 @@ import { MonsterStatBlock } from "@shared/entities/schemas";
 import { type Fields, formStatBlock, formulaAverage } from "./creature-form";
 import {
   addOptionsState,
+  defaultJoiningIds,
   hpLabel,
   type JoinSlot,
   notOnMap,
@@ -108,6 +109,13 @@ describe("FR-CBT-66 not on this map", () => {
       excludeCharacterIds: ["thorn"],
     });
     expect(startBody("e", "s", [], new Set(), null)).toEqual({ encounterId: "e", sceneId: "s" });
+  });
+
+  test("FR-CBT-66 P3 glitch 7: the builder rates the PCs Start adds by default (token on the scene)", () => {
+    const tokens = [{ definitionId: "mira" }, { definitionId: "thorn" }, { definitionId: "gob" }];
+    expect(defaultJoiningIds(["mira", "sela", "thorn"], tokens)).toEqual(["mira", "thorn"]);
+    expect(defaultJoiningIds(["sela"], tokens)).toEqual([]);
+    expect(defaultJoiningIds([], tokens)).toEqual([]);
   });
 });
 

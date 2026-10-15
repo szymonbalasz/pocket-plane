@@ -13,8 +13,10 @@ import {
   chipLabel,
   chipOrder,
   chipText,
+  concentrationSaveText,
   deadPc,
   deathStateFor,
+  endsHint,
   fitChips,
   MORE_W,
   splitNumbered,
@@ -349,5 +351,52 @@ describe("FR-CBTX-33 row names (walkthrough ruling)", () => {
       suffix: "",
     });
     expect(splitNumbered("Wolf 12")).toEqual({ base: "Wolf", suffix: " 12" });
+  });
+});
+
+describe("P3 glitch 9 copy", () => {
+  test("FR-CBTX-36 FR-MOD-09 ends hint: source, else the turn combatant, else the one target, else each target", () => {
+    const o = { sourceName: null, turnName: null, targetNames: ["Mira", "Thorn"], endsRound: 11 };
+    expect(endsHint({ ...o, sourceName: "Mira" })).toBe(
+      "Ends at the start of Mira's turn, round 11",
+    );
+    expect(endsHint({ ...o, turnName: "Goblin" })).toBe(
+      "Ends at the start of Goblin's turn, round 11",
+    );
+    expect(endsHint({ ...o, targetNames: ["Thorn"] })).toBe(
+      "Ends at the start of Thorn's turn, round 11",
+    );
+    expect(endsHint(o)).toBe("Ends at the start of each target's turn, round 11");
+  });
+
+  test("FR-CBTX-42 concentration dialog formula names the effect dice a Con save picks up", () => {
+    const fx = (id: string, label: string, modifiers: object[], o: object = {}) =>
+      ({
+        id,
+        kind: "custom",
+        label,
+        targetCharacterId: "mira",
+        targetCombatantId: null,
+        endedAt: null,
+        modifiers,
+        ...o,
+      }) as never;
+    const bless = fx("e1", "Bless", [
+      { kind: "dice", on: { roll: "attack" }, dice: "1d4", sign: 1 },
+      { kind: "dice", on: { roll: "save" }, dice: "1d4", sign: 1 },
+    ]);
+    const bane = fx("e2", "Bane", [{ kind: "dice", on: { roll: "save" }, dice: "1d4", sign: -1 }]);
+    const dexOnly = fx("e3", "Haste", [
+      { kind: "flat", on: { roll: "save", abilities: ["dex"] }, value: 2 },
+    ]);
+    const other = fx("e4", "Ward", [{ kind: "flat", on: { roll: "save" }, value: 1 }], {
+      targetCharacterId: "thorn",
+    });
+    const mira = { characterId: "mira" };
+    expect(concentrationSaveText(4, [bless], mira, 10)).toBe("d20 + 4 + 1d4 Bless vs DC 10");
+    expect(concentrationSaveText(4, [bless, bane, dexOnly, other], mira, 12)).toBe(
+      "d20 + 4 + 1d4 Bless − 1d4 Bane vs DC 12",
+    );
+    expect(concentrationSaveText(-1, [], mira, null)).toBe("d20 − 1 vs DC ?");
   });
 });

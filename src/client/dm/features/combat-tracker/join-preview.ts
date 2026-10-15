@@ -63,6 +63,23 @@ export function notOnMap<C extends { id: string }>(
 }
 
 /**
+ * P3 glitch 7: the planned party ids Start adds when the DM ticks nothing: those with a token on
+ * the scene ("Not on this map" PCs start unticked, FR-CBT-66). The builder's rating uses them.
+ */
+export function defaultJoiningIds(
+  partyIds: readonly string[],
+  sceneTokens: readonly { definitionId: string }[],
+): string[] {
+  const off = new Set(
+    notOnMap(
+      partyIds.map((id) => ({ id })),
+      sceneTokens,
+    ).map((c) => c.id),
+  );
+  return partyIds.filter((id) => !off.has(id));
+}
+
+/**
  * The Start intent (FR-CBT-64–66): `at` only when the DM views the scene it starts on (always,
  * from the Start dialog, when measured); unticked "Not on this map" PCs → `excludeCharacterIds`.
  */
