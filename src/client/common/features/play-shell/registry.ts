@@ -65,6 +65,18 @@ export interface WindowDef {
    */
   badge?: (store: RecordStore) => number;
   /**
+   * "New" dot while minimised (FR-SHELL-38, `./activity`): a pure read of the synced store. The
+   * launcher shows a dot while the value differs from the one at minimise; restore or close
+   * clears it. Independent of `badge`.
+   */
+  activity?: (store: RecordStore) => string | number | null;
+  /**
+   * Grow to content (FR-SHELL-39): until the user resizes it (`fixedH`), the rendered height
+   * follows the measured content, up to the work area; render-only. The body is laid out at its
+   * natural height (a root `h-full` resolves to auto), so the whole body scrolls past the cap.
+   */
+  growToContent?: true;
+  /**
    * Always mounted while the kind is available, whatever the window state (e.g. the toast
    * runtime of `note.history`). Renders its own UI, if any; gets no props.
    */

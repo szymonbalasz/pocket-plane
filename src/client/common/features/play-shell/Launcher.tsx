@@ -6,12 +6,11 @@ import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
+import { useActivityDots } from "./activity";
 import { badgeText, useBadgeVersion } from "./badges";
 import { SHELL_ZONE_ATTR } from "./keys";
-import { launcherState, type WindowAction, type Windows } from "./manager";
+import { launcherState, launcherTooltip, type WindowAction, type Windows } from "./manager";
 import type { WindowDef } from "./registry";
-
-const STATE_LABEL = { open: "open", minimised: "minimised", closed: "closed" } as const;
 
 export function Launcher({
   defs,
@@ -24,6 +23,7 @@ export function Launcher({
 }) {
   const store = useSync((s) => s.store);
   useBadgeVersion(); // re-render on `refreshBadges()`
+  const dots = useActivityDots(windows);
   const entries = defs
     .filter((d) => d.launcher)
     .sort((a, b) => (a.launcher?.order ?? 0) - (b.launcher?.order ?? 0));
@@ -42,7 +42,7 @@ export function Launcher({
         const Icon = l.icon;
         const badge = badgeText(d.badge && (() => d.badge?.(store) ?? 0));
         return (
-          <Tooltip key={d.kind} content={`${l.label} (${STATE_LABEL[state]})`}>
+          <Tooltip key={d.kind} content={launcherTooltip(l.label, state)}>
             <Button
               variant="ghost"
               size="sm"
@@ -68,12 +68,24 @@ export function Launcher({
                   {badge}
                 </span>
               )}
-              {state !== "closed" && (
+              {/* FR-SHELL-38: "new" dot, top-left (the badge keeps top-right). */}
+              {dots.has(d.kind) && (
                 <span
-                  className={cn(
-                    "absolute bottom-0.5 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full",
-                    state === "open" ? "bg-foreground" : "bg-muted-foreground/60",
-                  )}
+                  data-testid="ui-launcher-activity"
+                  className="absolute -top-0.5 -left-0.5 size-2 rounded-full bg-warning"
+                />
+              )}
+              {/* FR-SHELL-37: open = solid bar, minimised = hollow ring, closed = nothing. */}
+              {state === "open" && (
+                <span
+                  data-marker="open"
+                  className="absolute bottom-0.5 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-foreground"
+                />
+              )}
+              {state === "minimised" && (
+                <span
+                  data-marker="minimised"
+                  className="absolute bottom-0 left-1/2 size-1.5 -translate-x-1/2 rounded-full border border-muted-foreground"
                 />
               )}
             </Button>

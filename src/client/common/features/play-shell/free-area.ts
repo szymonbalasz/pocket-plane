@@ -3,9 +3,9 @@
 // its kind became available while open, or a feature-driven open noted by `noteAppearance()`).
 // The map frames its tokens there (FR-MAP-44). Read-only: nothing stored or sent.
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { type Rect, renderedRect, TOP_BAR_H, type Viewport, workArea } from "./geometry";
+import { type Rect, TOP_BAR_H, type Viewport, windowRect, workArea } from "./geometry";
 import { useViewport } from "./hooks";
-import type { Windows } from "./manager";
+import { type Windows, windowId } from "./manager";
 import { RAIL_CLEAR } from "./placement";
 import type { WindowRegistry } from "./registry";
 import { useAvailableKinds, useRegistry, useShellState } from "./ShellContext";
@@ -21,18 +21,56 @@ export function railArea(vp: Viewport): Rect {
   return { x: RAIL_CLEAR, y: TOP_BAR_H, w: Math.max(1, wa.w - RAIL_CLEAR), h: wa.h };
 }
 
-/** What each rendered window covers: open, available, fitted and clamped as `ShellWindow` draws it. */
+// ---- measured content heights (FR-SHELL-39) ----
+
+/** Window id (`kind:instance`) → window height its content asks for, reported by `ShellWindow`. */
+let heights: ReadonlyMap<string, number> = new Map();
+const heightListeners = new Set<() => void>();
+
+/** `ShellWindow` of a `growToContent` type reports its needed height; null = gone / not growing. */
+export function reportContentHeight(id: string, h: number | null): void {
+  if (h === null ? !heights.has(id) : heights.get(id) === h) return;
+  const next = new Map(heights);
+  if (h === null) next.delete(id);
+  else next.set(id, h);
+  heights = next;
+  for (const fn of [...heightListeners]) fn();
+}
+
+/** The heights reported so far on this page (a new Map on every change). */
+export function contentHeights(): ReadonlyMap<string, number> {
+  return heights;
+}
+
+const subscribeHeights = (fn: () => void) => {
+  heightListeners.add(fn);
+  return () => {
+    heightListeners.delete(fn);
+  };
+};
+
+/** Re-renders when a grown window's content height changes. */
+export function useContentHeights(): ReadonlyMap<string, number> {
+  return useSyncExternalStore(subscribeHeights, contentHeights, contentHeights);
+}
+
+/**
+ * What each rendered window covers: open, available, fitted and clamped as `ShellWindow` draws it,
+ * a `growToContent` window at its measured grown height (FR-SHELL-39). Every consumer of window
+ * rects (free area, toast keep-out, attack popup) reads them here.
+ */
 export function renderedWindowRects(
   windows: Windows,
   registry: WindowRegistry,
   available: ReadonlySet<string>,
   vp: Viewport,
+  measured: ReadonlyMap<string, number> = contentHeights(),
 ): Rect[] {
   const out: Rect[] = [];
   for (const w of windows) {
     const def = registry.get(w.kind);
     if (!def || w.state !== "open" || !available.has(w.kind)) continue;
-    out.push(renderedRect(w, def.minSize, vp));
+    out.push(windowRect(w, def, vp, measured.get(windowId(w.kind, w.instance))));
   }
   return out;
 }
@@ -160,9 +198,10 @@ export function useFreeArea(): FreeAreaState {
   const key = useShellState((s) => s.key);
   const available = useAvailableKinds();
   const vp = useViewport();
+  const measured = useContentHeights();
   const area = useMemo(
-    () => freeArea(renderedWindowRects(windows, registry, available, vp), vp),
-    [windows, registry, available, vp],
+    () => freeArea(renderedWindowRects(windows, registry, available, vp, measured), vp),
+    [windows, registry, available, vp, measured],
   );
   const notedNow = useSyncExternalStore(subscribeNoted, notedAppearances);
   const [flips, setFlips] = useState(0);
