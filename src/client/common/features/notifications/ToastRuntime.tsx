@@ -4,15 +4,25 @@
 // memory only (per page, `ToastMemory`). Player: bottom-right. DM: top-centre below the top bar (#149): the DM's right
 // column (`cbt.initiative`, protocol §24) reaches the bottom-right corner, and sticky damage-card
 // toasts covered its lower rows; the map gap between the columns is free in the default layout.
+// Wherever Initiative is, the DM stack keeps clear of it (FR-NOTE-32, `keep-out.ts`).
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { XIcon } from "lucide-react";
-import { useCallback, useContext, useEffect } from "react";
+import { useCallback, useContext, useEffect, useMemo } from "react";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
-import { useOpenWindow } from "../play-shell/ShellContext";
-import { DM_TOAST_TOP } from "../play-shell/toast-region";
+import { INITIATIVE_KIND } from "../combat-tracker/window";
+import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
+import type { Rect } from "../play-shell/geometry";
+import { useViewport } from "../play-shell/hooks";
+import {
+  useAvailableKinds,
+  useOpenWindow,
+  useRegistry,
+  useShellState,
+} from "../play-shell/ShellContext";
+import { dmStackPlacement } from "./keep-out";
 import {
   actionButton,
   classify,
@@ -103,6 +113,20 @@ function NoteToast({
   );
 }
 
+/** FR-NOTE-32: the open, non-minimised `cbt.initiative` window's rendered rect (DM), else null. */
+function useInitiativeRect(isDm: boolean): Rect | null {
+  const registry = useRegistry();
+  const windows = useShellState((s) => s.windows);
+  const available = useAvailableKinds();
+  const vp = useViewport();
+  const measured = useContentHeights();
+  return useMemo(() => {
+    if (!isDm) return null;
+    const win = windows.filter((w) => w.kind === INITIATIVE_KIND && w.state === "open");
+    return renderedWindowRects(win, registry, available, vp, measured)[0] ?? null;
+  }, [isDm, windows, registry, available, vp, measured]);
+}
+
 export function ToastRuntime({
   views,
   note,
@@ -163,6 +187,11 @@ export function ToastRuntime({
     return () => document.removeEventListener("visibilitychange", on);
   }, [dispatch]);
 
+  // FR-NOTE-32: the DM's stack keeps clear of the rendered Initiative window.
+  const initiative = useInitiativeRect(isDm);
+  const vp = useViewport();
+  const at = dmStackPlacement(vp, initiative);
+
   const openHistory = () => openWindow(HISTORY_KIND);
   const { shown, more } = visibleToasts(state);
   if (state.toasts.length === 0) return null;
@@ -171,11 +200,13 @@ export function ToastRuntime({
       aria-label="Notifications"
       data-testid="note-toasts"
       data-placement={isDm ? "top-center" : "bottom-right"}
+      data-left={isDm ? at.left : undefined}
+      data-top={isDm ? at.top : undefined}
       className={cn(
         "pointer-events-none fixed z-40 flex w-80 flex-col gap-2",
-        isDm ? "left-1/2 -translate-x-1/2" : "right-4 bottom-4",
+        !isDm && "right-4 bottom-4",
       )}
-      style={isDm ? { top: DM_TOAST_TOP } : undefined}
+      style={isDm ? { left: at.left, top: at.top } : undefined}
       onMouseEnter={() => dispatch((s, now) => setHovered(s, true, now))}
       onMouseLeave={() => dispatch((s, now) => setHovered(s, false, now))}
     >
