@@ -1,6 +1,6 @@
 # Proposed — Effect modifiers: typed riders on effect rows, applied by a roll hook
 
-- Status: proposed (2026-10-15; raised by [effect-modifiers](../../specs/effect-modifiers.md) OQ-MOD-07, -08, -15, -17; DM note N9, #188). Integrator numbers it at merge.
+- Status: proposed (2026-10-15; raised by [effect-modifiers](../../specs/effect-modifiers.md) OQ-MOD-07, -08, -15, -17; DM note N9, #188). Decisions 1 and 2 settled by the orchestrator as picked (OQ-MOD-07, -08), subject to the DM accepting this ADR at gate 1. Integrator numbers it at merge.
 - Date: 2026-10-15
 - Affects: [effect-modifiers](../../specs/effect-modifiers.md), [combat-extras](../../specs/combat-extras.md), [dice-roll-log](../../specs/dice-roll-log.md), [combat-tracker](../../specs/combat-tracker.md), [character-sheet-full](../../specs/character-sheet-full.md), [data model](../../data-model/README.md), [protocol](../../protocol/README.md), [AGENTS §9.9](../../../AGENTS.md#99-shared-files)
 - Makes real: [ADR-0009](0009-entity-content-model.md) open row "Modifier model: design for later: instance → list of modifiers (field, op, value, source, duration)"
