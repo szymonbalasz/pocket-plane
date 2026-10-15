@@ -2,16 +2,22 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 1 complete (#186). **Sprint 2 phase 1 running** (#187, #188): [sprint-2](sprint-2.md). Q merged (#189 pending log). P2a / P2b / M specs written, seams settled (`.verify/review-phase1/seams.md`), reviewed (1 blocker + 11 major + 31 minor, all applied per `rulings.md`). **Waiting: DM gate 1** (`%TEMP%/pocket-plane/gate-sprint2-phase1.md`).
+**Phase:** Sprint 2 phase 1 builds (#190 gate 1 'go with picks'; specs merged, ADR-0037 / 0038). Wave 1 = four P2b branches; P2a core waits for map-fit-floor; M last. Plan: phase-1 review build graph (`.verify/review-phase1/review.md` "Build order").
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Q: token art cache bug (N2) | merged a23af22 | — | Done (walkthrough 8/8; main check 1140 + e2e green) | — |
-| P2a: combat notes + glitches | `spec/polish-2a` (w2F) | spec-polish-2a | Reviewed, in-review | DM gate 1, then merge + builds |
-| P2b: sheet + shell notes + glitches | `spec/polish-2b` (w2G) | spec-polish-2b | Reviewed, in-review | DM gate 1, then merge + builds |
-| M: effect modifiers (N9) | `spec/effect-modifiers` (w2H) | spec-effect-modifiers | Reviewed, in-review | DM gate 1, then merge + builds |
+| G2 / G3 map fit | `fix/map-fit-floor` (w2J, slot 0) | build-map-fit-floor | Building | Walkthrough scenes-map 12, 13 |
+| G6 + FR-DICE-34 | `fix/physical-crit` (w2K, slot 2) | build-physical-crit | Building | Walkthrough dice 13, 14 |
+| N4 / N7 sheet / item 16 | `fix/charx-buttons` (w2M, slot 3) | build-charx-buttons | Building | Walkthrough CHARX |
+| N1 + growToContent | `fix/shell-minimise` (w2N, slot 4) | build-shell-minimise | Building | Walkthrough shell 17, 18 |
+| P2a core (schema, scenes-map seams, token characterId) | `fix/combat2-core` | — | After map-fit-floor | — |
+| P2a add (N5, N6, 15, 17) | `fix/combat2-add` | — | After core | — |
+| P2a polish (N8, N11, G1, G4, G5, G7, G9, G10) | `fix/combat2-polish` | — | After core + shell-minimise | — |
+| P2a split attack (N7 combat) | `fix/combat2-split-attack` | — | After polish, charx-buttons, physical-crit | — |
+| P2b cues (G8, 13, N3) | `fix/charx-cues` | — | After charx-buttons | — |
+| M tier 1 | `fix/mod-core`, `build/effect-modifiers` | — | After combat2-add + physical-crit; slices 3-4 last | — |
 | F: fog of war (phase 2) | `spec/fog-of-war` | — | After phase 1 | — |
 | B: props + structure (phase 2) | `spec/scene-tools` | — | After phase 1 | — |
 
@@ -19,11 +25,15 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 
 ## Shared-file locks
 
-- None.
+- Canvas (scenes-map camera / MapCanvas): fix/map-fit-floor → fix/combat2-core → phase 2.
+- Play-shell frame: fix/shell-minimise.
+- `src/shared/events/character-sheet.ts` + character-sheet folder: fix/charx-buttons → fix/charx-cues → M.
+- Roll control / dice-roll-log: fix/physical-crit → combat2-split-attack → M.
+- Schema: fix/combat2-core → fix/mod-core.
 
 ## Pending DM decisions
 
-- DM gate 1: N1, G2, M scope / timing / physical dice / buffing / conditions / CON-44, OQ-CBT-49 / -50 / -54, two proposed ADRs (split-attack-damage, effect-modifiers).
+- None. Gate 1 answered (#190).
 
 ## Resolved locally (report at gate)
 
