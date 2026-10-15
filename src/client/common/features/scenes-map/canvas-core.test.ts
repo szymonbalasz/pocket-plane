@@ -118,9 +118,8 @@ const tool = (t: Partial<CanvasToolDef> & Pick<CanvasToolDef, "id" | "order">): 
 });
 
 describe("FR-SCN-06 canvas tools", () => {
-  test("FR-SCN-06 the registry is sorted by order (SCN lines append); entries validate and sort", () => {
-    const orders = canvasTools.map((t) => t.order);
-    expect(orders).toEqual([...orders].sort((a, b) => a - b));
+  test("FR-SCN-06 the registry is valid and sorted; entries validate and sort", () => {
+    expect(orderTools(canvasTools)).toEqual([...canvasTools]);
     const tools = orderTools([
       tool({ id: "aoe", order: 30, clients: ["dm", "player"], pointer: {} }),
       tool({ id: "structure", order: 10, pointer: {} }),

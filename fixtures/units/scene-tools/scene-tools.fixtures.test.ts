@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { closeDb } from "@server/db/client";
-import { scene, sceneStructure } from "@server/db/schema";
+import { aoeTemplate, player, scene, sceneStructure } from "@server/db/schema";
+import { asc } from "drizzle-orm";
 import { loadBundle } from "../../index";
 
 const dirs: string[] = [];
@@ -17,6 +18,53 @@ afterAll(() => {
 });
 
 describe("scene-tools fixtures (SCN §13)", () => {
+  test("SCN §13 bundle `scene-tools` loads from empty: scn-templates on Goblin Ambush", async () => {
+    const r = await loadBundle("scene-tools");
+    dirs.push(r.dir);
+    const db = r.openDb();
+    const ambush = db
+      .select()
+      .from(scene)
+      .all()
+      .find((s) => s.name === "Goblin Ambush");
+    const p1 = db
+      .select()
+      .from(player)
+      .all()
+      .find((p) => p.name === "Player 1");
+    const templates = db.select().from(aoeTemplate).orderBy(asc(aoeTemplate.seq)).all();
+    closeDb(db);
+    expect(r.manifest.fixtures).toContain("scn-templates");
+    expect(templates.map(({ id, seq, createdAt, updatedAt, campaignId, ...t }) => t)).toEqual([
+      {
+        sceneId: ambush?.id as string,
+        shape: "sphere",
+        x: 3,
+        y: 8,
+        size: 15,
+        width: null,
+        angle: 0,
+        label: "Spirit Guardians",
+        placedByPlayerId: p1?.id as string,
+        hidden: false,
+        fogged: false,
+      },
+      {
+        sceneId: ambush?.id as string,
+        shape: "cube",
+        x: 12,
+        y: 12,
+        size: 10,
+        width: null,
+        angle: 0,
+        label: "Glyph",
+        placedByPlayerId: null,
+        hidden: true,
+        fogged: false,
+      },
+    ]);
+  });
+
   test("SCN §13 bundle `scene-tools` loads from empty: scn-walls on Goblin Ambush", async () => {
     const r = await loadBundle("scene-tools");
     dirs.push(r.dir);
@@ -24,7 +72,7 @@ describe("scene-tools fixtures (SCN §13)", () => {
     const scenes = db.select().from(scene).all();
     const rows = db.select().from(sceneStructure).all();
     closeDb(db);
-    expect(r.manifest.fixtures.at(-1)).toBe("scn-walls");
+    expect(r.manifest.fixtures).toContain("scn-walls");
     const ambush = scenes.find((s) => s.name === "Goblin Ambush");
     expect(rows.map((s) => s.sceneId)).toEqual([ambush?.id as string]);
     expect(rows[0]).toMatchObject({

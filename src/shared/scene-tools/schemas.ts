@@ -200,6 +200,13 @@ export const AoeTemplateRecord = z.object({
 });
 export type AoeTemplateRecord = z.infer<typeof AoeTemplateRecord>;
 
+/** What a player receives of a visible template: no campaign (SCN §8 compact wire). */
+export const PlayerAoeTemplateRecord = AoeTemplateRecord.omit({ campaignId: true });
+export type PlayerAoeTemplateRecord = z.infer<typeof PlayerAoeTemplateRecord>;
+
+/** Fields both clients render a kept template from. */
+export type TemplateRecordView = PlayerAoeTemplateRecord & { campaignId?: string };
+
 /** `map-settings` (scope campaign, `id` = campaignId): everyone receives it (FR-SCN-29). */
 export const MapSettingsRecord = z.object({
   id: z.string(),

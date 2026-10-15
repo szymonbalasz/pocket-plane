@@ -41,6 +41,7 @@ import notificationsTest from "./notifications/notifications-test";
 import loot1 from "./party-loot/loot-1";
 import lootSecond from "./party-loot/loot-second";
 import lootWallets from "./party-loot/loot-wallets";
+import scnTemplates from "./scene-tools/scn-templates";
 import scnWalls from "./scene-tools/scn-walls";
 import battlemap from "./scenes-map/battlemap";
 import scenesExtras from "./scenes-map/scenes-extras";
@@ -94,4 +95,5 @@ export const units: readonly Fixture[] = [
   fogAmbush,
   fogAmbushPartial,
   scnWalls,
+  scnTemplates,
 ];
