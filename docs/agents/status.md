@@ -9,20 +9,15 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Phase 1 | merged | — | Done (#189-#195) | DM playtest |
-| Window, fog core / server, SCN core | merged | — | Done (#197) | — |
-| P3 polish | `fix/p3-polish` (w32) | build-p3-polish | Fixing E1 / E2 | Retest |
-| SCN structure | `build/scene-tools-structure` (w36) | build-scn-structure | Building | Walkthrough |
-| SCN props | `build/scene-tools-props` (w37) | build-scn-props | Building | Walkthrough |
-| SCN templates | `build/scene-tools-templates` (w38) | build-scn-templates | Building | Walkthrough |
-| Fog client | `build/fog-client` | — | When a slot frees | — |
-| Fog visibility (switch on) + fog-scn | `build/fog-visibility` | — | Last fog slice | — |
-| SCN settings | `build/scene-tools-settings` | — | After fog-visibility | — |
+| Window, fog core / server / client, SCN core / templates / props / structure, P3 | merged | — | Done (#197, #198) | — |
+| Fog visibility (players) + fog-scn | `build/fog-visibility` (w3A) | build-fog-visibility | Building | Walkthrough FOG 1-11 |
+| SCN settings (layers, diagonal rule) | `build/scene-tools-settings` | build-scn-settings | Building; combat movedFt after fog-visibility | Walkthrough |
+| Sprint close | main | — | After both | session-sim-6, 'Playtest: sprint 2 features', recap |
 
 ## Shared-file locks
 
-- Registries (canvas-layers, canvas-tools, move-guards, scene-hooks, visibility-hooks, token menu): append-only for all slices.
-- LabelsLayer + token context menu: fix/p3-polish.
-- Schema: free.
+- Combat (lifecycle / token hook / add-combatants / bind-token): build/fog-visibility → then settings' movedFt.
+- ToolRail: build/scene-tools-settings (Tooltip data-state fix).
 
 ## Pending DM decisions
 
