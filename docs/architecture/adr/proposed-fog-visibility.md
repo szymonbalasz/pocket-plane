@@ -1,6 +1,6 @@
-# Proposed — Fog visibility: server-written `fogged` copies, scene visibility and lifecycle hook registries
+# Fog visibility: server-written `fogged` copies, scene visibility and lifecycle hook registries
 
-- Status: proposed (spec-fog-of-war; integrator numbers it at acceptance)
+- Status: accepted (DM gate 2, decisions-log #196); integrator numbers it
 - Date: 2026-10-15
 - Affects: [fog-of-war](../../specs/fog-of-war.md), [scenes-map](../../specs/scenes-map.md) (token fn, `map.drag` audience, scene create / duplicate / delete, size refresh), [scene-tools](../../specs/scene-tools.md) (props, AoE templates, doors, `sceneHooks`), [combat-tracker](../../specs/combat-tracker.md) / [combat-extras](../../specs/combat-extras.md) (hidden copies), [protocol](../../protocol/README.md), [AGENTS §9.9](../../../AGENTS.md#99-shared-files)
 - Extends: [ADR-0021](0021-sync-protocol-conventions.md) (visibility reads record + context), [ADR-0024](0024-definition-visibility.md) (display copies), [ADR-0028](0028-token-changed-hooks.md) / [ADR-0031](0031-token-move-hooks.md) (token-changed hooks), [ADR-0033](0033-signal-audience.md) (signal audience)
@@ -33,7 +33,7 @@
 | B. ADR-0016 compensating events | One mechanism | Needs inverse diffs per edit; ADR-0016 says scene edits are not undoable |
 | C. No undo | Nothing to build | A slip spoils the next room |
 
-## Decision (proposed)
+## Decision
 
 **A** and **undo A.**
 
@@ -73,9 +73,9 @@
 - Scenes-map's token fn and scene-tools' prop / template fns return `hidden` when `hidden` or any `hides` is true.
 - `map.drag` routes `"dm"` when any `dragToDm` is true.
 - A DM-placed ephemeral template wholly in fog routes `"dm"`.
-- Walls are not fog subjects. Doors: a per-door flag set by fog's re-derive and `scn.addDoor`, dropped by the player redaction (scene-tools OQ-SCN-06 pick).
-- **Combat:** every write of a combatant's or effect's hidden copy uses `tokenHiddenForPlayers` (subject to OQ-FOG-07). Fog commands and the definition-changed size refresh run the token-changed hooks for tokens whose fog-hidden value flips.
-- **Undo:** fog undo is a per-scene stack, separate from ADR-0016 undo. ADR-0016's "not scene edits" gains "fog edits (own stack)" and, if the DM agrees, scene-tools' client inverse intents (OQ-SCN-08).
+- Walls are not fog subjects. Doors: a per-door flag set by fog's re-derive and `scn.addDoor`, dropped by the player redaction (OQ-SCN-06, decided #196).
+- **Combat:** every write of a combatant's or effect's hidden copy uses `tokenHiddenForPlayers` (OQ-FOG-07, decided #196). Fog commands and the definition-changed size refresh run the token-changed hooks for tokens whose fog-hidden value flips.
+- **Undo:** fog undo is a per-scene stack, separate from ADR-0016 undo. ADR-0016's "not scene edits" gains "fog edits (own stack)" and scene-tools' client inverse intents (OQ-FOG-08 = OQ-SCN-08, decided #196).
 
 ## Consequences
 
@@ -85,7 +85,7 @@
   - AGENTS §9.9 gains `visibility-hooks.ts`, `scene-hooks.ts`, `move-guards.ts`, `canvas-tools.ts`.
 - ADR-0028 / 0031: token-changed hooks also run inside fog commands and the size refresh, per flipped token.
 - ADR-0033: the `map.drag` and `scn.template` audiences consult the registry.
-- Combat-tracker (FR-CBT-08, -09, -64, -65) and combat-extras (FR-CBTX-13, -44, -45) are amended if OQ-FOG-07 picks it.
+- Combat-tracker (FR-CBT-08, -09, -64, -65) and combat-extras (FR-CBTX-13, -44, -45) are amended (OQ-FOG-07, decided #196).
 - Protocol:
   - a new record type `fog` (scope `scene`, never windowed);
   - the token wire gains `fogged`, sent only when true;
