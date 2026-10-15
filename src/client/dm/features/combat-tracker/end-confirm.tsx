@@ -1,6 +1,7 @@
 // DM Start / End wiring shared by Encounters and Initiative: the End confirm's copy with the
 // pending-card count (FR-CBT-59) and the windows that follow this tab's own Start / End
 // (FR-CBT-60). Logic in `./start-end`.
+import type { StartInput } from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { DialogDescription } from "@ui/components/ui/overlays";
 import { useCbtIntent } from "@ui/features/combat-tracker/store";
@@ -42,11 +43,8 @@ export function useStartEnd() {
   const { send, disabled } = useCbtIntent();
   const dispatch = useWindowDispatch();
   const start = useCallback(
-    (encounterId: string, sceneId: string) =>
-      startAndFollow(() => send("cbt.start", { encounterId, sceneId }), {
-        dispatch,
-        noteAppearance,
-      }),
+    (body: StartInput) =>
+      startAndFollow(() => send("cbt.start", body), { dispatch, noteAppearance }),
     [send, dispatch],
   );
   const end = useCallback(

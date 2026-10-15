@@ -28,7 +28,7 @@ function reinforced() {
 }
 
 describe("FR-CBTX-26 FR-CBTX-27 add combatants mid-fight", () => {
-  test("FR-CBTX-27 tokens bind with their name / hidden flag; initiative null sorts last; ranks rewritten", () => {
+  test("FR-CBTX-27 FR-CBTX-44 tokens bind with their name / hidden flag; initiative rolled on the way in; ranks rewritten", () => {
     const t = reinforced();
     const n = t.events.length;
     const { combatantIds } = t.add([{ tokenId: t.goblin3 }, { tokenId: t.wolf2 }]);
@@ -39,17 +39,17 @@ describe("FR-CBTX-26 FR-CBTX-27 add combatants mid-fight", () => {
       kind: "monster",
       tokenId: t.goblin3,
       hidden: false,
-      initiative: null,
+      initiative: expect.any(Number),
       hpCurrent: 7,
       hpMax: 7,
       tempHp: 0,
-      position: 7,
-      playerPosition: 5,
     });
-    expect(rows["Wolf 2"]).toMatchObject({ hidden: true, position: 8, playerPosition: null });
-    // FR-CBT-46/47: rolled once from round 1, then refused.
-    t.run(rollInitiative.name, { combatantIds: [combatantIds[0]], manual: { diceTotal: 10 } });
-    expect(t.byName(t.enc.id)["Goblin 3"]?.initiative).toBe(12);
+    expect(rows["Goblin 3"]?.playerPosition).toBeNumber();
+    expect(rows["Wolf 2"]).toMatchObject({ hidden: true, playerPosition: null });
+    expect(rows["Wolf 2"]?.initiative).toBeNumber();
+    // FR-CBT-69: the entries are DM-only; FR-CBT-46/47: nobody re-rolls them.
+    const lines = (t.events.at(-1)?.event.changes ?? []).filter((c) => c.type === "game-log-entry");
+    expect(lines.map((c) => (c.after as { public: boolean }).public)).toEqual([false, false]);
     const again = t.err(() => t.run(rollInitiative.name, { combatantIds: [combatantIds[0]] }));
     expect(again.code).toBe("conflict");
   });

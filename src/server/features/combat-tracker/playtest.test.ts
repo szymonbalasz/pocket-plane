@@ -82,7 +82,8 @@ describe("FR-CBT-52 DM attack roll line", () => {
     t.run(attackCommand.name, { attackerId: t.id("Thorn") });
     t.run(attackCommand.name, { attackerId: t.id("Mira") });
     t.run(attackCommand.name, { attackerId: t.id("Mira") }, t.p1);
-    expect(t.entries().map((e) => [e.actorName, e.rollerRole, e.public])).toEqual([
+    const attacks = t.entries().filter((e) => e.category === "attack");
+    expect(attacks.map((e) => [e.actorName, e.rollerRole, e.public])).toEqual([
       ["Thorn", "dm", false],
       ["Mira", "dm", false],
       ["Mira", "player", true],
@@ -100,10 +101,10 @@ describe("FR-CBT-52 DM attack roll line", () => {
       },
     });
     t.s.commands.register(failing);
+    const counts = () => [t.count("roll"), t.count("game_log_entry"), t.count("notification")];
+    const before = counts(); // Start's monster initiative rolls (FR-CBT-64)
     expect(t.err(() => t.run(failing.name, { attackerId: t.id("Goblin") })).code).toBe("conflict");
-    expect([t.count("roll"), t.count("game_log_entry"), t.count("notification")]).toEqual([
-      0, 0, 0,
-    ]);
+    expect(counts()).toEqual(before);
   });
 
   test("FR-CBT-52 the roll line stays after Undo and after Dismiss (rolls are facts)", () => {
@@ -112,7 +113,7 @@ describe("FR-CBT-52 DM attack roll line", () => {
       attackerId: t.id("Goblin"),
       manual: [{ diceTotal: 15 }, { diceTotal: 4 }],
     });
-    const rollLine = t.entries()[0] as GameLogEntryRecord;
+    const rollLine = t.entries().find((e) => e.category === "attack") as GameLogEntryRecord;
     const p = t.cardPayload(r.cardId);
     const res = t.run<HpChangesResult>(applyCard.name, {
       cardId: r.cardId,
@@ -125,7 +126,7 @@ describe("FR-CBT-52 DM attack roll line", () => {
     expect(after?.undone).toBe(false);
     const r2 = t.run<AttackResult>(attackCommand.name, { attackerId: t.id("Goblin") });
     t.run("note.dismiss", { id: r2.cardId });
-    expect(t.entries().filter((e) => e.kind === "roll")).toHaveLength(2);
+    expect(t.entries().filter((e) => e.kind === "roll" && e.category === "attack")).toHaveLength(2);
   });
 });
 

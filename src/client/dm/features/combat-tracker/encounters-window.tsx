@@ -1,23 +1,24 @@
-// DM `cbt.encounters` (CBT §7): list + New; editor (name, creature picker, entries, party,
-// difficulty card); Start on the viewed scene (binding preview) / End (confirm). Planned
-// encounters save themselves (debounced whole replace); started / ended are read-only.
+// DM `cbt.encounters` (CBT §7): list + New; editor (name, creature lookup, entries with HP mode,
+// add options, party, difficulty card); Start on the viewed scene (binding preview, "Not on this
+// map" PCs, `at`) / End (confirm). Planned encounters save themselves (debounced whole replace);
+// started / ended are read-only. Sprint 2: FR-CBT-62–66.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { difficultyMethods, formatCr, totalCr } from "@shared/combat-tracker/difficulty";
-import { type BindSlot, planBindings } from "@shared/combat-tracker/rules";
 import {
   ENCOUNTER_ENTRY_TYPE,
   ENCOUNTER_TYPE,
   type EncounterEntryRecord,
   EncounterName,
   type EncounterRecord,
+  type HpMode,
   QUANTITY_MAX,
 } from "@shared/combat-tracker/schemas";
 import { entityNameKey } from "@shared/entities/schemas";
 import type { SceneFolderRecord, SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
 import { ApiError } from "@ui/api";
 import { Button } from "@ui/components/ui/button";
-import { Checkbox, Popover, PopoverAnchor, PopoverContent } from "@ui/components/ui/controls";
+import { Checkbox } from "@ui/components/ui/controls";
 import {
   Dialog,
   DialogContent,
@@ -27,8 +28,11 @@ import {
   DialogTitle,
 } from "@ui/components/ui/overlays";
 import { Badge, Card, Input, Label, Skeleton } from "@ui/components/ui/primitives";
+import type { LookupRow } from "@ui/features/combat-tracker/lookup";
+import { CreatureLookup } from "@ui/features/combat-tracker/parts";
 import { useCbtIntent } from "@ui/features/combat-tracker/store";
 import { ENCOUNTERS_KIND } from "@ui/features/combat-tracker/window";
+import { useFreeArea } from "@ui/features/play-shell/free-area";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
@@ -39,14 +43,20 @@ import { creatureRows } from "../entities/list";
 import { useDmMap, viewedScene } from "../scenes-map/view-state";
 import { useDefinitions } from "./data";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
+import { HpSelect, JoinPreviewRow } from "./join-parts";
+import { type JoinSlot, notOnMap, previewJoin, startBody } from "./join-preview";
 import { useOpenEncounter } from "./open-encounter";
 import { partyMembers, toggleParty } from "./party";
+import { freeAreaCell } from "./place-at";
 import { combatRest } from "./rest";
 
 interface Draft {
   name: string;
   partyCharacterIds: string[] | null;
-  entries: { definitionId: string; quantity: number }[];
+  entries: { definitionId: string; quantity: number; hpMode: HpMode }[];
+  /** FR-CBT-62: applied at Start. */
+  createTokens: boolean;
+  addHidden: boolean;
 }
 
 const STATUS_ORDER = { started: 0, planned: 1, ended: 2 } as const;
@@ -82,17 +92,22 @@ function draftOf(e: EncounterRecord, entries: EncounterEntryRecord[]): Draft {
     entries: entries
       .filter((x) => x.encounterId === e.id)
       .sort((a, b) => a.seq - b.seq)
-      .map((x) => ({ definitionId: x.definitionId, quantity: x.quantity })),
+      .map((x) => ({ definitionId: x.definitionId, quantity: x.quantity, hpMode: x.hpMode })),
+    createTokens: e.createTokens,
+    addHidden: e.addHidden,
   };
 }
 
 // ---------- difficulty card (FR-CBT-03) ----------
 
-function DifficultyCard({ draft }: { draft: Draft }) {
+/** `partyIds`: the Start dialog's joining PCs only (FR-CBT-66); else the planned party. */
+function DifficultyCard({ draft, partyIds }: { draft: Draft; partyIds?: readonly string[] }) {
   const defs = useDefinitions();
   const characters = useCharacters();
   const drafts = useDraftIds();
-  const party = partyMembers(characters, draft.partyCharacterIds, drafts);
+  const party = partyIds
+    ? characters.filter((c) => partyIds.includes(c.id))
+    : partyMembers(characters, draft.partyCharacterIds, drafts);
   const levels = party.map((c) => (c.kind === "character" ? c.statBlock.level : 1));
   const crs = draft.entries.flatMap((e) => {
     const d = defs.get(e.definitionId);
@@ -130,80 +145,23 @@ function DifficultyCard({ draft }: { draft: Draft }) {
   );
 }
 
-// ---------- creature picker (FR-CBT-04) ----------
+// ---------- creature lookup (FR-CBT-63) ----------
 
-function Picker({ onPick, disabled }: { onPick(id: string): void; disabled: boolean }) {
+/** Every monster the campaign can use, FR-ENT-18 order, as lookup rows. */
+function useMonsterLookupRows(): LookupRow[] {
   const entities = useRecords<unknown>("entity");
   const imported = useRecords<unknown>("imported-entity");
   const players = useRecords<PlayerRecord>("player");
-  const rows = useMemo(
-    () => creatureRows(entities, imported, players, "monster"),
+  return useMemo(
+    () =>
+      creatureRows(entities, imported, players, "monster").map((r) => ({
+        id: r.id,
+        name: r.name,
+        cr: r.cr,
+        xp: r.xp,
+        badge: r.badge,
+      })),
     [entities, imported, players],
-  );
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
-  const shown = rows.filter((r) => r.name.toLowerCase().includes(q.trim().toLowerCase()));
-  return (
-    <Popover open={open && !disabled} onOpenChange={setOpen}>
-      <PopoverAnchor asChild>
-        <Input
-          data-testid="cbt-enc-picker"
-          role="combobox"
-          aria-expanded={open}
-          placeholder="Add creature…"
-          disabled={disabled}
-          value={q}
-          // Open on click / typing, not on focus: focus returns here after a pick.
-          onClick={() => setOpen(true)}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setOpen(true);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && shown[0]) {
-              onPick(shown[0].id);
-              setQ("");
-              setOpen(false);
-            }
-            if (e.key === "Escape") setOpen(false);
-          }}
-        />
-      </PopoverAnchor>
-      <PopoverContent
-        align="start"
-        className="max-h-64 w-[var(--radix-popover-trigger-width)] min-w-64 overflow-auto p-1"
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-      >
-        {shown.length === 0 ? (
-          <p className="p-2 text-sm text-muted-foreground">No creature matches</p>
-        ) : (
-          <ul>
-            {shown.map((r) => (
-              <li key={r.id}>
-                <button
-                  type="button"
-                  data-testid="cbt-enc-picker-option"
-                  data-value={r.id}
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-                  onClick={() => {
-                    onPick(r.id);
-                    setQ("");
-                    setOpen(false);
-                  }}
-                >
-                  <span className="flex-1 truncate">{r.name}</span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    CR {r.cr} · {r.xp} XP
-                  </span>
-                  <Badge variant="outline">{r.badge}</Badge>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </PopoverContent>
-    </Popover>
   );
 }
 
@@ -230,32 +188,48 @@ function StartDialog({
   const drafts = useDraftIds();
   const { disabled } = useCbtIntent();
   const startEnd = useStartEnd();
-  const bindings = useMemo(() => {
-    if (!scene) return [];
-    const party = partyMembers(characters, draft.partyCharacterIds, drafts);
-    const slots: BindSlot[] = [
-      ...party.map((c) => ({
-        kind: "pc" as const,
-        entityId: c.id,
-        name: c.name,
-        portraitAssetId: c.portraitAssetId,
-      })),
-      ...draft.entries.flatMap((e) => {
-        const d = defs.get(e.definitionId);
-        if (!d) return [];
-        return Array.from({ length: e.quantity }, () => ({
-          kind: "monster" as const,
-          entityId: d.id,
-          name: d.name,
-          portraitAssetId: d.portraitAssetId,
-        }));
-      }),
-    ];
-    return planBindings(
-      slots,
-      tokens.filter((t) => t.sceneId === scene.id),
-    );
-  }, [scene, tokens, draft, defs, characters, drafts]);
+  const free = useFreeArea();
+  // FR-CBT-66: "Not on this map" PCs are unticked each time the dialog opens.
+  const [joining, setJoining] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    if (open) setJoining(new Set());
+  }, [open]);
+  const sceneTokens = useMemo(
+    () => (scene ? tokens.filter((t) => t.sceneId === scene.id) : []),
+    [scene, tokens],
+  );
+  const party = partyMembers(characters, draft.partyCharacterIds, drafts);
+  const offMap = notOnMap(party, sceneTokens);
+  const joiningParty = party.filter((c) => !offMap.includes(c) || joining.has(c.id));
+  const slots: JoinSlot[] = [
+    ...joiningParty.map((c) => ({
+      kind: "pc" as const,
+      entityId: c.id,
+      name: c.name,
+      portraitAssetId: c.portraitAssetId,
+      hpMode: "average" as const,
+      hasFormula: false,
+    })),
+    ...draft.entries.flatMap((e) => {
+      const d = defs.get(e.definitionId);
+      if (!d) return [];
+      return Array.from({ length: e.quantity }, () => ({
+        kind: "monster" as const,
+        entityId: d.id,
+        name: d.name,
+        portraitAssetId: d.portraitAssetId,
+        hpMode: e.hpMode,
+        hasFormula: Boolean(d.statBlock.hpFormula),
+      }));
+    }),
+  ];
+  const rows = scene
+    ? previewJoin(slots, sceneTokens, {
+        createTokens: draft.createTokens,
+        hidden: draft.addHidden,
+        sceneTokenNames: sceneTokens.map((t) => t.name),
+      })
+    : [];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="cbt-enc-start-dialog">
@@ -268,21 +242,43 @@ function StartDialog({
           </DialogDescription>
         </DialogHeader>
         <ul className="flex max-h-72 flex-col gap-1 overflow-auto text-sm">
-          {bindings.map((b, i) => (
-            <li
-              // biome-ignore lint/suspicious/noArrayIndexKey: one row per combatant slot
-              key={i}
-              data-testid="cbt-enc-binding"
-              data-record-id={b.tokenId ?? ""}
-              data-bound={b.tokenId !== null}
-              className="flex items-center gap-2"
-            >
-              <span className="flex-1 truncate">{b.name}</span>
-              {b.hidden && <Badge variant="outline">hidden</Badge>}
-              {b.tokenId === null && <Badge variant="secondary">no token</Badge>}
-            </li>
+          {rows.map((r, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: one row per combatant slot
+            <JoinPreviewRow key={i} row={r} testId="cbt-enc-binding" />
           ))}
         </ul>
+        {offMap.length > 0 && (
+          <fieldset className="flex flex-col gap-1">
+            <legend className="mb-1 text-xs font-medium text-muted-foreground">
+              Not on this map
+            </legend>
+            {offMap.map((c) => {
+              const id = `cbt-offmap-${c.id}`;
+              return (
+                <div key={c.id} className="flex items-center gap-2">
+                  <Checkbox
+                    id={id}
+                    data-testid="cbt-enc-not-on-map"
+                    data-record-id={c.id}
+                    checked={joining.has(c.id)}
+                    onCheckedChange={(v) =>
+                      setJoining((cur) => {
+                        const next = new Set(cur);
+                        if (v === true) next.add(c.id);
+                        else next.delete(c.id);
+                        return next;
+                      })
+                    }
+                  />
+                  <Label htmlFor={id} className="font-normal">
+                    {c.name} <span className="text-xs text-muted-foreground">(no token)</span>
+                  </Label>
+                </div>
+              );
+            })}
+          </fieldset>
+        )}
+        <DifficultyCard draft={draft} partyIds={joiningParty.map((c) => c.id)} />
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
@@ -292,8 +288,11 @@ function StartDialog({
             disabled={disabled || startEnd.disabled || !scene}
             onClick={async () => {
               if (!scene) return;
+              // FR-CBT-65: created tokens go around the centre of this tab's free area.
+              const at = freeAreaCell(free.area, scene);
+              const body = startBody(encounter.id, scene.id, offMap, joining, at);
               // FR-CBT-60: once acked, Initiative opens in front, Encounters minimises, map refits.
-              const r = await startEnd.start(encounter.id, scene.id);
+              const r = await startEnd.start(body);
               if (r !== undefined) onOpenChange(false);
             }}
           >
@@ -357,6 +356,7 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
         .filter((e) => e.quantity > 0),
     }));
   const partyIds = partyMembers(characters, draft.partyCharacterIds, drafts).map((c) => c.id);
+  const lookupRows = useMonsterLookupRows();
 
   return (
     <div
@@ -382,7 +382,8 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
       </div>
       {nameError && <p className="text-xs text-destructive">{nameError}</p>}
       {planned && (
-        <Picker
+        <CreatureLookup
+          rows={lookupRows}
           disabled={readOnly}
           onPick={(id) =>
             edit((d) =>
@@ -395,7 +396,10 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
                         : e,
                     ),
                   }
-                : { ...d, entries: [...d.entries, { definitionId: id, quantity: 1 }] },
+                : {
+                    ...d,
+                    entries: [...d.entries, { definitionId: id, quantity: 1, hpMode: "average" }],
+                  },
             )
           }
         />
@@ -440,6 +444,21 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
               >
                 <PlusIcon className="size-3.5" />
               </Button>
+              <HpSelect
+                value={e.hpMode}
+                hasFormula={d?.kind === "monster" && Boolean(d.statBlock.hpFormula)}
+                disabled={readOnly}
+                testId="cbt-enc-entry-hp"
+                recordId={e.definitionId}
+                onChange={(hpMode) =>
+                  edit((x) => ({
+                    ...x,
+                    entries: x.entries.map((y) =>
+                      y.definitionId === e.definitionId ? { ...y, hpMode } : y,
+                    ),
+                  }))
+                }
+              />
               <Button
                 size="icon"
                 variant="ghost"
@@ -456,6 +475,33 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
           );
         })}
       </ul>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="cbt-enc-create-tokens"
+            data-testid="cbt-enc-create-tokens"
+            disabled={readOnly}
+            checked={draft.createTokens}
+            onCheckedChange={(v) => edit((d) => ({ ...d, createTokens: v === true }))}
+          />
+          <Label htmlFor="cbt-enc-create-tokens" className="font-normal">
+            Create tokens
+          </Label>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* OQ-CBTX-22: disabled while Create tokens is off. */}
+          <Checkbox
+            id="cbt-enc-add-hidden"
+            data-testid="cbt-enc-add-hidden"
+            disabled={readOnly || !draft.createTokens}
+            checked={draft.addHidden}
+            onCheckedChange={(v) => edit((d) => ({ ...d, addHidden: v === true }))}
+          />
+          <Label htmlFor="cbt-enc-add-hidden" className="font-normal">
+            Add hidden
+          </Label>
+        </div>
+      </div>
       <fieldset className="flex flex-col gap-1">
         <legend className="mb-1 text-xs font-medium text-muted-foreground">Party</legend>
         {characters.map((c) => {

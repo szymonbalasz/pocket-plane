@@ -1,15 +1,11 @@
 // DM combat-extras dialogs (FR-CBTX-33/36): Effect (Condition / Custom, duration, source, link,
-// hidden), Concentration, Temp HP, Set death saves, Add combatants (picker × quantity, binding
-// preview as Start). Hosted by `cbt.initiative`'s companion; they send intents, nothing else.
+// hidden), Concentration, Temp HP, Set death saves, Add combatants (`./add-dialog`: lookup,
+// count, HP mode, created tokens; preview as Start). Hosted by `cbt.initiative`'s companion; they send intents, nothing else.
 
-import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import { CONDITION_INFO, CONDITIONS, type Condition } from "@shared/combat-extras/conditions";
-import { type AddCombatantItem, CBTX_INTENTS } from "@shared/combat-extras/intents";
+import { CBTX_INTENTS } from "@shared/combat-extras/intents";
 import { effectName, endsRoundOf } from "@shared/combat-extras/rules";
 import { EFFECT_TYPE, type EffectView } from "@shared/combat-extras/schemas";
-import { planBindings } from "@shared/combat-tracker/rules";
-import type { CombatantView } from "@shared/combat-tracker/schemas";
-import type { TokenRecord } from "@shared/scenes-map/schemas";
 import { Button } from "@ui/components/ui/button";
 import { Checkbox, ToggleGroup, ToggleGroupItem } from "@ui/components/ui/controls";
 import {
@@ -25,18 +21,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@ui/components/ui/overlays";
-import { Badge, Input, Label } from "@ui/components/ui/primitives";
+import { Input, Label } from "@ui/components/ui/primitives";
 import { activeEffects, creatureOf, effectsOn } from "@ui/features/combat-extras/logic";
 import {
   useCbtIntent,
   useCombatants,
   useStartedEncounter,
 } from "@ui/features/combat-tracker/store";
-import { useRecords, useSync } from "@ui/sync/store";
+import { useSync } from "@ui/sync/store";
 import { TrashIcon } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
-import { useDefinitions } from "../combat-tracker/data";
-import { creatureRows } from "../entities/list";
+import { type ReactNode, useState } from "react";
+import { AddForm } from "./add-dialog";
 import { type Target, useCbtxDialogs } from "./store";
 
 const NONE = "none";
@@ -513,136 +508,7 @@ function DeathSetDialog() {
   );
 }
 
-// ---------- Add… (FR-CBTX-26/27) ----------
-
-interface Pick {
-  id: string;
-  name: string;
-  kind: "monster" | "character";
-  qty: number;
-}
-
-function AddForm() {
-  const close = useCbtxDialogs((s) => s.close);
-  const { send, disabled } = useCbtIntent();
-  const enc = useStartedEncounter();
-  const rows = useCombatants(enc?.id);
-  const entities = useRecords<unknown>("entity");
-  const imported = useRecords<unknown>("imported-entity");
-  const players = useRecords<PlayerRecord>("player");
-  const tokens = useRecords<TokenRecord>("token");
-  const defs = useDefinitions();
-  const options = useMemo(() => {
-    const inCombat = new Set(rows.filter((c) => c.kind === "pc").map((c) => c.entityId));
-    return creatureRows(entities, imported, players, "all").filter(
-      (r) => r.kind === "monster" || !inCombat.has(r.id),
-    );
-  }, [entities, imported, players, rows]);
-  const [picked, setPicked] = useState<Pick[]>([]);
-  const [choice, setChoice] = useState<string>("");
-  const [qty, setQty] = useState("1");
-  const add = () => {
-    const r = options.find((o) => o.id === choice);
-    const n = Number(qty);
-    if (!r || !Number.isInteger(n) || n < 1 || n > 20) return;
-    const kind = r.kind === "character" ? "character" : "monster";
-    setPicked((p) => [...p, { id: r.id, name: r.name, kind, qty: kind === "character" ? 1 : n }]);
-  };
-  const items: AddCombatantItem[] = picked.flatMap((p) =>
-    Array.from({ length: p.qty }, () =>
-      p.kind === "character" ? { characterId: p.id } : { definitionId: p.id },
-    ),
-  );
-  // Binding preview as Start (FR-CBT-08): unbound tokens of the encounter's scene, seq order.
-  const bound = new Set(rows.map((c: CombatantView) => c.tokenId));
-  const free = tokens.filter((t) => t.sceneId === enc?.sceneId && !bound.has(t.id));
-  const preview = planBindings(
-    picked.flatMap((p) =>
-      Array.from({ length: p.qty }, () => ({
-        kind: p.kind === "character" ? ("pc" as const) : ("monster" as const),
-        entityId: p.id,
-        name: p.name,
-        portraitAssetId: defs.get(p.id)?.portraitAssetId ?? null,
-      })),
-    ),
-    free,
-  );
-  return (
-    <>
-      <DialogHeader>
-        <DialogTitle>Add to combat</DialogTitle>
-        <DialogDescription>
-          Joins with no initiative (sorts last); roll once. Tokens bind in placement order.
-        </DialogDescription>
-      </DialogHeader>
-      <div className="flex items-end gap-2">
-        <div className="grid flex-1 gap-1.5">
-          <Label>Creature</Label>
-          <Select value={choice} onValueChange={setChoice}>
-            <SelectTrigger data-testid="cbtx-add-picker">
-              <SelectValue placeholder="Pick a monster or character" />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map((o) => (
-                <SelectItem
-                  key={o.id}
-                  value={o.id}
-                  data-testid="cbtx-add-picker-option"
-                  data-value={o.id}
-                >
-                  {o.name} · {o.badge}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Input
-          data-testid="cbtx-add-qty"
-          aria-label="Quantity"
-          inputMode="numeric"
-          className="h-9 w-16"
-          value={qty}
-          onChange={(e) => setQty(e.target.value)}
-        />
-        <Button variant="outline" data-testid="cbtx-add-pick" disabled={!choice} onClick={add}>
-          Add
-        </Button>
-      </div>
-      <ul className="flex max-h-56 flex-col gap-1 overflow-auto text-sm">
-        {preview.map((b, i) => (
-          <li
-            // biome-ignore lint/suspicious/noArrayIndexKey: one row per new combatant
-            key={i}
-            data-testid="cbtx-add-binding"
-            data-record-id={b.tokenId ?? ""}
-            data-bound={b.tokenId !== null}
-            className="flex items-center gap-2"
-          >
-            <span className="flex-1 truncate">{b.tokenId ? b.name : `${b.name} (new)`}</span>
-            {b.hidden && <Badge variant="outline">hidden</Badge>}
-            {b.tokenId === null && <Badge variant="secondary">no token</Badge>}
-          </li>
-        ))}
-      </ul>
-      <DialogFooter>
-        <Button variant="ghost" onClick={() => setPicked([])} disabled={picked.length === 0}>
-          Clear
-        </Button>
-        <Button
-          data-testid="cbtx-add-confirm"
-          disabled={disabled || !enc || items.length === 0 || items.length > 20}
-          onClick={async () => {
-            if (!enc) return;
-            const r = await send(CBTX_INTENTS.addCombatants, { encounterId: enc.id, items });
-            if (r !== undefined) close();
-          }}
-        >
-          Add {items.length || ""}
-        </Button>
-      </DialogFooter>
-    </>
-  );
-}
+// ---------- Add… (FR-CBTX-26/27, -44: `./add-dialog`) ----------
 
 function AddDialog() {
   const open = useCbtxDialogs((s) => s.add);

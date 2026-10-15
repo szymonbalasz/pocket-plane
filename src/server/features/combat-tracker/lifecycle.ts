@@ -1,16 +1,20 @@
-// Start / End (FR-CBT-07, FR-CBT-08, FR-CBT-10; End dismisses pending cards, FR-CBT-59/61).
+// Start / End (FR-CBT-07, FR-CBT-08, FR-CBT-10; End dismisses pending cards, FR-CBT-59/61;
+// sprint 2: Start options, created tokens, HP modes, monster initiative, FR-CBT-64–66).
 // `started` / `ended` rule hooks run after the event (FR-CBTX-01, ADR-0035).
 import { type BindSlot, planBindings } from "@shared/combat-tracker/rules";
-import { CBT_INTENTS, EndInput, StartInput } from "@shared/combat-tracker/schemas";
-import { effectiveStats, entityNameKey, type StatBlock } from "@shared/entities/schemas";
+import { CBT_INTENTS, EndInput, type HpMode, StartInput } from "@shared/combat-tracker/schemas";
+import { type DefinitionRecord, entityNameKey } from "@shared/entities/schemas";
 import { EncounterEnded, EncounterStarted } from "@shared/events/combat-tracker";
 import { and, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
-import { conflict } from "../../commands/errors";
+import { conflict, invalid } from "../../commands/errors";
 import { combatant, combatantSeqNext, creatureSheet, encounter, entity } from "../../db/schema";
+import type { RecordChange } from "../../events/types";
 import { resolveDefinition } from "../entities/commands";
 import { dismissForEncounter } from "../notifications";
 import { getScene, sceneTokens } from "../scenes-map/rows";
+import { rollInitiativeFor } from "./initiative";
+import { monsterHp, TokenPlacer } from "./join";
 import { rerank } from "./ranks";
 import {
   campaignOf,
@@ -52,11 +56,19 @@ export function partyOf(env: Pick<CommandEnv, "tx">, cid: string, ids: string[] 
     });
 }
 
+type StartSlot = BindSlot & { def: DefinitionRecord | null; hpMode: HpMode };
+
+/**
+ * FR-CBT-07 / -08, sprint 2 FR-CBT-64–66: party PCs (minus `excludeCharacterIds`) by name, then
+ * entries in order × quantity. Per instance: the next unbound placed token → bound; else (monsters,
+ * `createTokens`) a created token (`hidden` = `addHidden`) around `at`, bound; else token-less.
+ * HP per entry `hpMode`; every monster rolls initiative before the event (DM-only, FR-CBT-69).
+ */
 export const startCommandWith = (hooks: CombatRuleHooks) =>
   defineCommand({
     name: CBT_INTENTS.start,
     input: StartInput,
-    execute({ encounterId, sceneId }, env): void {
+    execute({ encounterId, sceneId, at, excludeCharacterIds }, env): void {
       const { tx, ctx } = env;
       const cid = campaignOf(env.actor);
       const before = getEncounter(tx, cid, encounterId);
@@ -64,32 +76,63 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
       if (startedEncounter(tx, cid)) throw conflict("Another encounter is running");
       const scene = getScene(tx, cid, sceneId);
 
-      const slots: (BindSlot & { hpMax: number | null })[] = [];
-      for (const c of partyOf(env, cid, before.partyCharacterIds)) {
+      const party = partyOf(env, cid, before.partyCharacterIds);
+      const excluded = new Set(excludeCharacterIds ?? []);
+      const members = new Set(party.map((c) => c.id));
+      [...excluded].forEach((id, i) => {
+        if (!members.has(id)) {
+          throw invalid("Only party members can be left out", [
+            { path: ["excludeCharacterIds", i], message: "Not a party member" },
+          ]);
+        }
+      });
+      const slots: StartSlot[] = [];
+      for (const c of party) {
+        if (excluded.has(c.id)) continue;
         slots.push({
           kind: "pc",
           entityId: c.id,
           name: c.name,
           portraitAssetId: c.portraitAssetId,
-          hpMax: null,
+          def: null,
+          hpMode: "average",
         });
       }
       for (const e of entriesOf(tx, before)) {
         const def = resolveDefinition(env, e.definitionId);
-        const hpMax = effectiveStats(def as { statBlock: StatBlock }).hpMax;
         for (let i = 0; i < e.quantity; i++) {
           slots.push({
             kind: "monster",
             entityId: def.id,
             name: def.name,
             portraitAssetId: def.portraitAssetId,
-            hpMax,
+            def,
+            hpMode: e.hpMode,
           });
         }
       }
-      const bindings = planBindings(slots, sceneTokens(tx, scene.id));
+      const placer = new TokenPlacer(env, scene, at);
+      const bindings = planBindings(slots, sceneTokens(tx, scene.id)).map((b, i) => {
+        const def = slots[i]?.def;
+        if (b.tokenId !== null || !def || !before.createTokens) return b;
+        const t = placer.place(def, before.addHidden);
+        return {
+          ...b,
+          tokenId: t.id,
+          name: t.name,
+          imageAssetId: t.imageAssetId,
+          hidden: t.hidden,
+        };
+      });
+      const hpEntries: RecordChange[] = [];
       bindings.forEach((b, i) => {
-        const hpMax = slots[i]?.hpMax ?? null;
+        const slot = slots[i] as StartSlot;
+        let hp: number | null = null;
+        if (slot.def) {
+          const r = monsterHp(env, slot.def, slot.hpMode, b.name, encounterId);
+          hp = r.hp;
+          if (r.entry) hpEntries.push(r.entry);
+        }
         tx.insert(combatant)
           .values({
             id: ctx.ids.next(),
@@ -108,11 +151,14 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
             initRollId: null,
             position: i + 1,
             playerPosition: null,
-            hpCurrent: hpMax,
-            hpMax,
+            hpCurrent: hp,
+            hpMax: hp,
           })
           .run();
       });
+      // FR-CBT-64: monsters roll initiative in Start's transaction, so Initiative opens ranked.
+      const monsters = combatantsOf(tx, encounterId).filter((c) => c.kind === "monster");
+      const init = rollInitiativeFor(env, monsters, encounterId, { mode: "normal" });
       rerank(tx, encounterId);
       const now = ctx.clock.iso();
       tx.update(encounter)
@@ -131,8 +177,11 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
       const rows = combatantsOf(tx, encounterId);
       const combatantIds = rows.map((r) => r.id);
       const changes = [
+        ...placer.changes,
         encounterChange(before, after),
         ...rows.map((r) => combatantChange(null, r)),
+        ...hpEntries,
+        ...init.entries,
       ];
       env.emit({
         type: EncounterStarted.type,

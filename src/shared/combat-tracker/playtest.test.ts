@@ -19,14 +19,16 @@ describe("FR-CBT-46 roll controls by round × initiative", () => {
     expect(canRollInitiative(2, undefined)).toBe(true);
   });
 
-  test("FR-CBT-46 Roll monsters: non-removed monsters without initiative; hidden from round 1 when none", () => {
+  test("FR-CBT-46 Roll monsters: non-removed monsters without initiative; hidden when none", () => {
     const rows = [
       { id: "g", kind: "monster" as const, removed: false, initiative: 12 },
       { id: "g2", kind: "monster" as const, removed: true, initiative: null },
       { id: "m", kind: "pc" as const, removed: false, initiative: null },
     ];
     expect(unrolledMonsters(rows)).toEqual([]);
-    expect(showRollMonsters(0, 0)).toBe(true);
+    // Sprint 2 (FR-CBT-64): round 0 hides it too when nothing is left to roll.
+    expect(showRollMonsters(0, 0)).toBe(false);
+    expect(showRollMonsters(0, 2)).toBe(true);
     expect(showRollMonsters(1, 0)).toBe(false);
     const restored = rows.map((r) => (r.id === "g2" ? { ...r, removed: false } : r));
     expect(unrolledMonsters(restored).map((r) => r.id)).toEqual(["g2"]);

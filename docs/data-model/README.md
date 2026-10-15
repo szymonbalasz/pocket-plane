@@ -736,7 +736,7 @@ All rows per campaign; `seq` by the DB; timestamps `ctx.clock` ([CBT §8](../spe
 | round, turnCombatantId | int ≥ 0, ID \| null | Round 0 = initiative phase | [FR-CBT-14](../specs/combat-tracker.md#6-functional-requirements) |
 | playerTurnCombatantId | ID \| null | Turn combatant if not hidden or removed, else null; written with the turn, by `setRemoved` and by the token hook | [FR-CBT-31](../specs/combat-tracker.md#6-functional-requirements), gate I20 |
 | startedAt, endedAt, createdAt, updatedAt | timestamp \| null ×2, timestamp ×2 | | CBT §8 |
-| createTokens, addHidden *(sprint 2, built, fix/combat2-core)* | bool ×2 | Columns `create_tokens`, `add_hidden` int (bool) not null default 1 (push-safe). Builder options: Start creates missing monster tokens, hidden. DM only | [FR-CBT-62](../specs/combat-tracker.md#6-functional-requirements), FR-CBT-64 |
+| createTokens, addHidden *(sprint 2, built, fix/combat2-core)* | bool ×2 | Columns `create_tokens`, `add_hidden` int (bool) not null default 1 (push-safe). Builder options: Start creates missing monster tokens, hidden (applied at Start, built fix/combat2-add). DM only | [FR-CBT-62](../specs/combat-tracker.md#6-functional-requirements), FR-CBT-64 |
 
 ### Encounter entry (`encounter-entry`) — owner combat-tracker
 
@@ -745,7 +745,7 @@ All rows per campaign; `seq` by the DB; timestamps `ctx.clock` ([CBT §8](../spe
 | id, encounterId, seq | ID, ID → Encounter (`ON DELETE CASCADE`), int | Whole replace on update | FR-CBT-01 |
 | definitionId | ID → Entity | Via `resolveDefinition`, kind `monster` (else `invalid`); duplicates merged; live link to the definition | FR-CBT-01, [FR-ENT-12](../specs/entities.md#6-functional-requirements) |
 | quantity | int 1–20 | 0–20 entries, total ≤ 50 | FR-CBT-01 |
-| hpMode *(sprint 2, built, fix/combat2-core)* | `average` \| `rolled` | Column `hp_mode` text not null default `average` (push-safe). `rolled` needs the definition's `hpFormula` (else `invalid`, fix/combat2-add) | [FR-CBT-62](../specs/combat-tracker.md#6-functional-requirements), [FR-ENT-25](../specs/entities.md#6-functional-requirements) |
+| hpMode *(sprint 2, built, fix/combat2-core)* | `average` \| `rolled` | Column `hp_mode` text not null default `average` (push-safe). `rolled` needs the definition's `hpFormula` (else `invalid`, built fix/combat2-add) | [FR-CBT-62](../specs/combat-tracker.md#6-functional-requirements), [FR-ENT-25](../specs/entities.md#6-functional-requirements) |
 
 - **Wire record** (built, build/combat-tracker): the full row **plus the encounter's `campaignId`** (no such column; stamped from the encounter) so the record-type registry's campaign scope gate can place live changes. DM only (`audience: dm`).
 
@@ -968,4 +968,5 @@ From the sprint-2 "Shared changes" of [combat-tracker](../specs/combat-tracker.m
 - `combatant`, `hp_change`: no change. No new record type or visibility fn; `encounter` / `encounter-entry` stay DM-only for the new fields.
 - *(fix/combat2-polish, no column change)* `game_log_entry.payload[].note` of a death save: state words only, "success" / "failure" / "success — stable" / "failure — dead" / "natural 20, conscious" (that item's `natural` null, so the line names it once) (FR-CBTX-47); rows written before keep "(n / n)" (no backfill). `notification` resolved with `closed_by_role` null = closed by a rule: History badge "Closed" (FR-NOTE-28). Client memory only: hidden toasts (FR-NOTE-26), the 4 s action cue (FR-NOTE-30), the popup's dragged position (FR-CBT-76).
 - **Derived** (never stored): `hpAverage(hpFormula)` (form hint; Average HP stays `statBlock.hpMax`).
-- **Snapshot size** (CON-44, after fix/combat2-core, heavy scenario): DM 757,283 B (739.5 KiB, ceiling 768 KiB); players 270,045–273,055 B (ceiling 512 KiB). `characterId` adds ≈ 20 B per token to every viewer.
+- **Snapshot size** (CON-44, after fix/combat2-core, heavy scenario): DM 757,283 B (739.5 KiB, ceiling 768 KiB); players 270,045–273,055 B (ceiling 512 KiB). `characterId` adds ≈ 20 B per token to every viewer. *(After fix/combat2-add: DM 757,394 B; players 270,155–273,165 B: Start's DM-only monster initiative entries; the heavy scenario's placed tokens bind every monster, so Start creates none.)*
+- *(fix/combat2-add, built)* Start and `cbtx.addCombatants` add no column: created tokens are ordinary `token` rows (they stay after End); rolled HP lands in `combatant.hp_max` / `hp_current`; HP and monster initiative rolls are `roll` rows plus DM-only `game_log_entry` rows (`other` / `initiative`). `cbtx.bindToken` writes `combatant.token_id` and the name / image / hidden copies.
