@@ -1064,10 +1064,13 @@ From [scene-tools](../specs/scene-tools.md#8-data-model) (SCN, `complete`; DM ga
 | Field | Type | Rule | Source |
 |---|---|---|---|
 | sceneId (PK), campaignId | ID → Scene (`ON DELETE CASCADE`), ID → Campaign | One row per scene, created on the first edit; wire `id` = `sceneId` | SCN §8 |
-| rev, nextN | int, int | `rev` +1 per edit; `n` taken from `nextN`, unique per scene | FR-SCN-07 |
-| walls | **JSON** `[n, x1, y1, x2, y2][]` | Vertex to vertex, length > 0, endpoints in the vertex range ± 1, deduped (either direction) | FR-SCN-07 |
-| doors | **JSON** `[n, x1, y1, x2, y2, state, f][]` | `state` 0 open / 1 closed / 2 locked; `f` server-written fog flag | FR-SCN-07, [FR-SCN-36](../specs/scene-tools.md#6-functional-requirements) |
+| rev, nextN | int, int | `rev` +1 per edit; `n` taken from `nextN`, unique per scene, never reused after a remove; an edit that changes nothing writes nothing *(built, build/scene-tools-structure)* | FR-SCN-07 |
+| walls | **JSON** `[n, x1, y1, x2, y2][]` | Vertex to vertex, length > 0, endpoints in the vertex range ± 1, deduped (either direction, against walls and doors); walls + doors ≤ 2,000 per scene | FR-SCN-07 |
+| doors | **JSON** `[n, x1, y1, x2, y2, state, f][]` | `state` 0 open / 1 closed / 2 locked; `f` server-written fog flag: set by `scn.addDoor` (via `deriveSceneObject`, before the write), kept by `scn.setDoor`, re-derived by FOG; a door on an existing segment → `conflict` | FR-SCN-07, [FR-SCN-36](../specs/scene-tools.md#6-functional-requirements) |
 | updatedAt | timestamp | `ctx.clock` | SCN §8 |
+
+- **Written by** `scn.addWalls` / `addDoor` / `setDoor` / `removeSegments` (by `n`, never a whole-list replace) and the scene hooks *(built, build/scene-tools-structure; protocol §36)*. Read by the wall move guard (cached per scene by the row head). Fixture `scn-walls`.
+- **Client only, never stored:** the DM's drawing undo stack (one per scene for structure and prop edits, 50 entries, inverse intents with `n` / prop id remap; lost on reload, FR-SCN-15), a polyline or door in progress, the erase box.
 
 ### Prop (`prop`) — owner scene-tools
 
