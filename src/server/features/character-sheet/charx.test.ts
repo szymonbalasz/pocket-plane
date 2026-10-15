@@ -1,6 +1,7 @@
 // character-sheet-full commands on in-memory services (CHARX §13 integration): lifecycle, per-field
 // edit, rows, counters, owner change, hooks, rolls, the permission matrix, rollback and crash.
 import { describe, expect, test } from "bun:test";
+import { CHARX_APPROVED_KIND, CHARX_DRAFT_KIND } from "@shared/character-sheet/notes";
 import { CHARX_INTENTS, CREATURE_SHEET_TYPE } from "@shared/character-sheet/sheet";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, type EntityRecord, REDACTED_CHARACTER_KEYS } from "@shared/entities/schemas";
@@ -8,7 +9,15 @@ import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { asc, eq, sql } from "drizzle-orm";
 import { armCrashHook } from "../../commands/crash";
 import { CommandError } from "../../commands/errors";
-import { creatureSheet, entity, eventLog, gameLogEntry, roll, scene } from "../../db/schema";
+import {
+  creatureSheet,
+  entity,
+  eventLog,
+  gameLogEntry,
+  notification,
+  roll,
+  scene,
+} from "../../db/schema";
 import type { Actor, DispatchedEvent, RecordChange } from "../../events/types";
 import type { Viewer } from "../../ws/records";
 import { diceServices, seedDice } from "../dice-roll-log/testing";
@@ -82,7 +91,8 @@ describe("FR-CHARX-08 char.create", () => {
       className: "",
     });
     expect(t.sheet(id)).toMatchObject({ status: "draft", locked: false, ownerPlayerId: t.t.p1.id });
-    expect(t.events.map((x) => x.event.type)).toEqual(["CharacterCreated"]);
+    // G8: the DM's draft card follows in the same transaction (FR-CHARX-45).
+    expect(t.events.map((x) => x.event.type)).toEqual(["CharacterCreated", "NotificationCreated"]);
     const ev = t.events[0]?.event;
     expect(ev?.payload).toEqual({ characterId: id, ownerPlayerId: t.t.p1.id, status: "draft" });
     expect(types(ev?.changes ?? [])).toEqual([ENTITY_TYPE, CREATURE_SHEET_TYPE]);
@@ -135,7 +145,12 @@ describe("FR-CHARX-10 FR-CHARX-12 approve and lock", () => {
     expect(t.sheet(id)?.status).toBe("ready");
     t.run(I.approve, { characterId: id });
     t.run(I.approve, { characterId: t.t.miraId });
-    expect(t.events.map((e) => e.event.type)).toEqual(["CharacterApproved"]);
+    // G8: card resolved + owner's info (FR-CHARX-45/46); the no-ops emit nothing.
+    expect(t.events.map((e) => e.event.type)).toEqual([
+      "CharacterApproved",
+      "NotificationResolved",
+      "NotificationCreated",
+    ]);
     expect(t.events[0]?.event.payload).toEqual({ characterId: id });
     expect(t.sheet(t.t.miraId)).toBeNull();
   });
@@ -832,6 +847,133 @@ describe("FR-CHARX-20 FR-CHARX-21 char.roll kinds", () => {
     expect([noAtk.code, noAtk.message]).toEqual(["conflict", "No attack roll for Sacred Flame"]);
     expect(t.fail(() => r({ kind: "toHit", spellId: t.gb })).code).toBe("invalid");
     expect(t.fail(() => r({ kind: "spellToHit", spellId: t.gb, manual: [] })).code).toBe("invalid");
+  });
+});
+
+describe("FR-CHARX-45 FR-CHARX-46 G8 draft cues", () => {
+  const notes = (t: ReturnType<typeof setup>) =>
+    t.s.db.select().from(notification).orderBy(asc(notification.seq)).all();
+  const noteIds = (t: ReturnType<typeof setup>, v: Viewer) =>
+    ((t.t.snapshot(v).notification ?? []) as { id: string }[]).map((n) => n.id);
+
+  test("FR-CHARX-45 player char.create → pending charx-draft for the DM in the same tx; DM drafts get none", () => {
+    const t = setup();
+    const id = t.create("Brin");
+    expect(notes(t)).toEqual([
+      expect.objectContaining({
+        kind: CHARX_DRAFT_KIND,
+        audience: "dm",
+        audiencePlayerId: null,
+        text: "Player 1 made a character: Brin. Awaiting your approval",
+        payload: { characterId: id },
+        actionLabel: "Review",
+        actionRole: "dm",
+        state: "pending",
+      }),
+    ]);
+    const ev = t.events.find((e) => e.event.type === "NotificationCreated")?.event;
+    expect(ev?.campaignId).toBe(t.t.campaignId);
+    // DM-created drafts and ready characters: no card.
+    t.create("Dru", t.t.dm, { ownerPlayerId: t.t.p2.id, draft: true });
+    t.create("Kell", t.t.dm, { ownerPlayerId: t.t.p2.id });
+    expect(notes(t)).toHaveLength(1);
+  });
+
+  test("FR-CHARX-45 visibility: the draft card reaches only the DM", () => {
+    const t = setup();
+    t.create("Brin");
+    const card = notes(t)[0]?.id as string;
+    expect(noteIds(t, t.t.viewer("dm"))).toContain(card);
+    for (const p of [t.t.p1, t.t.p2]) {
+      expect(noteIds(t, t.t.viewer("player", p.id))).not.toContain(card);
+    }
+  });
+
+  test("FR-CHARX-45 crash before commit: neither character nor card", () => {
+    const t = setup();
+    const n = t.logCount();
+    armCrashHook({ point: "before-commit", target: I.create }, (w) => {
+      throw new Error(w);
+    });
+    try {
+      expect(t.fail(() => t.create("Brin")).code).toBe("internal");
+    } finally {
+      armCrashHook(null);
+    }
+    expect(notes(t)).toEqual([]);
+    expect(t.logCount()).toBe(n);
+    expect(t.s.db.select().from(creatureSheet).all()).toEqual([]);
+  });
+
+  test("FR-CHARX-45 FR-CHARX-46 approve: card resolved {approved} + charx-approved to the owner in one tx; again → nothing", () => {
+    const t = setup();
+    const id = t.create("Brin");
+    // Renamed before approval: the card keeps its create-time words.
+    t.run(I.edit, { creatureId: id, set: { name: "Brinna" } }, t.t.p1Actor);
+    t.events.length = 0;
+    t.run(I.approve, { characterId: id });
+    const [card, info] = notes(t);
+    expect(card).toMatchObject({
+      kind: CHARX_DRAFT_KIND,
+      state: "resolved",
+      resolution: { outcome: "approved" },
+      closedByRole: "dm",
+      text: "Player 1 made a character: Brin. Awaiting your approval",
+    });
+    expect(info).toMatchObject({
+      kind: CHARX_APPROVED_KIND,
+      audience: "player",
+      audiencePlayerId: t.t.p1.id,
+      state: "info",
+      actionLabel: null,
+      text: "Brinna was approved by the DM: ready to play",
+      payload: { characterId: id },
+    });
+    expect(t.events.map((e) => e.event.type)).toEqual([
+      "CharacterApproved",
+      "NotificationResolved",
+      "NotificationCreated",
+    ]);
+    // Visibility: only the owner (and the DM) get the approval.
+    expect(noteIds(t, t.t.viewer("player", t.t.p1.id))).toContain(info?.id as string);
+    expect(noteIds(t, t.t.viewer("player", t.t.p2.id))).not.toContain(info?.id as string);
+    expect(noteIds(t, t.t.viewer("dm"))).toContain(info?.id as string);
+    // Two approvals (two DM tabs): the second is a no-op.
+    t.events.length = 0;
+    t.run(I.approve, { characterId: id });
+    expect(t.events).toEqual([]);
+    expect(notes(t)).toHaveLength(2);
+  });
+
+  test("FR-CHARX-45 FR-CHARX-46 crash before approve commits: still a draft, card pending, no approval", () => {
+    const t = setup();
+    const id = t.create("Brin");
+    armCrashHook({ point: "before-commit", target: I.approve }, (w) => {
+      throw new Error(w);
+    });
+    try {
+      expect(t.fail(() => t.run(I.approve, { characterId: id })).code).toBe("internal");
+    } finally {
+      armCrashHook(null);
+    }
+    expect(t.sheet(id)?.status).toBe("draft");
+    expect(notes(t).map((n) => [n.kind, n.state])).toEqual([[CHARX_DRAFT_KIND, "pending"]]);
+  });
+
+  test("FR-CHARX-45 DM Dismiss closes the card, the draft stays a draft; approving later still informs the owner", () => {
+    const t = setup();
+    const id = t.create("Brin");
+    const card = notes(t)[0]?.id as string;
+    t.run("note.dismiss", { id: card });
+    expect(t.sheet(id)?.status).toBe("draft");
+    expect(notes(t)[0]?.state).toBe("dismissed");
+    t.events.length = 0;
+    t.run(I.approve, { characterId: id });
+    expect(t.events.map((e) => e.event.type)).toEqual(["CharacterApproved", "NotificationCreated"]);
+    expect(notes(t).map((n) => [n.kind, n.state])).toEqual([
+      [CHARX_DRAFT_KIND, "dismissed"],
+      [CHARX_APPROVED_KIND, "info"],
+    ]);
   });
 });
 
