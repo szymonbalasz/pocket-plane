@@ -1,6 +1,7 @@
-// FR-FOG-10/12/13/15/24 seams (ADR-0039): the scene visibility and lifecycle registries ship
-// empty, so nothing changes; a test hook shows every call site consults them in the right order.
-import { afterEach, describe, expect, test } from "bun:test";
+// FR-FOG-10/12/13/15/24 seams (ADR-0039): a test hook shows every call site consults the scene
+// visibility and lifecycle registries in the right order. Fog's real lines are lifted out for each
+// case (and put back after), so only the test hook acts; fog's own tests cover its lines.
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { EntityRecord } from "@shared/entities/schemas";
 import type { SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
 import { MAP_INTENTS as I } from "@shared/scenes-map/schemas";
@@ -14,6 +15,7 @@ import type { RecordChange } from "../../events/types";
 import type { SignalSender } from "../../ws/signals";
 import { createEntity, UPDATE } from "../entities/commands";
 import { goblinBlock } from "../entities/testing";
+import { fogSceneHook, fogVisibilityHook } from "../fog-of-war/hooks";
 import { placeTokenIn, MAP_REST as R } from "./commands";
 import { dragAudience } from "./drag";
 import { lifecycleHooks, sceneHooks } from "./scene-hooks";
@@ -49,7 +51,14 @@ const fog = (sceneId: string, ...cells: [number, number][]) => {
 const derived: { obj: SceneObject; row: TokenRecord | undefined }[] = [];
 const drags: { tokenId: string; at: { col: number; row: number } | null }[] = [];
 
+beforeEach(() => {
+  visibilityHooks.unregister(fogVisibilityHook.name);
+  lifecycleHooks.unregister(fogSceneHook.name);
+});
+
 afterEach(() => {
+  visibilityHooks.register(fogVisibilityHook);
+  lifecycleHooks.register(fogSceneHook);
   visibilityHooks.unregister("test.fog");
   lifecycleHooks.unregister("test.lifecycle");
   tokenHooks.unregister("test.spy");
@@ -133,14 +142,20 @@ function setup() {
 }
 
 describe("FR-FOG-24 registries (fog's server lines only)", () => {
-  test("FR-FOG-24 fog registers derive + duplicated / deleting only; no fog row → nothing changes", () => {
-    // build/fog-server: `derive` and the lifecycle lines; `hides`, `dragToDm`, `created` come
-    // with build/fog-visibility (FOG §14), so nothing is hidden and new scenes get no row.
+  test("FR-FOG-24 fog registers derive, hides, dragToDm and created / duplicated / deleting; without them nothing changes", () => {
+    // build/fog-visibility completes fog's lines (FOG §14).
     expect(sceneVisibilityHooks.map((h) => h.name)).toEqual(["fog-of-war.fogged"]);
-    expect(sceneVisibilityHooks.some((h) => h.hides || h.dragToDm)).toBe(false);
+    const [line] = sceneVisibilityHooks;
+    expect([!!line?.derive, !!line?.hides, !!line?.dragToDm]).toEqual([true, false, false]);
     // scene-tools' line (FR-SCN-31) only lists SCN rows, and these scenes have none.
     expect(sceneHooks.map((h) => h.name)).toEqual(["fog-of-war.fog-row", "scene-tools.scene-rows"]);
-    expect(sceneHooks.some((h) => h.created)).toBe(false);
+    const [fogLine] = sceneHooks;
+    expect([!!fogLine?.created, !!fogLine?.duplicated, !!fogLine?.deleting]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    // With fog's lines lifted out (beforeEach): no row, nothing changes.
     const t = setup();
     const s = t.newScene();
     expect(t.lastEvent()?.changes.map((c) => c.type)).toEqual(["scene"]);

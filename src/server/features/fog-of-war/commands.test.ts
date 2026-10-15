@@ -25,6 +25,7 @@ import { tokenHooks } from "../scenes-map/token-hooks";
 import { visibilityHooks } from "../scenes-map/visibility-hooks";
 import { FOG_CHANGED, FOG_NOTHING_TO_UNDO, FOG_TOO_DETAILED, fogUndoStack } from "./commands";
 import { readFogRecord } from "./rows";
+import { dropFogRow } from "./testing";
 
 afterEach(() => {
   visibilityHooks.unregister("test.hides");
@@ -37,8 +38,12 @@ const AT = "2026-01-01T00:00:00.000Z";
 function setup() {
   const cap = captureLogger();
   const t = scenesSetup(cap.log);
-  const newScene = (name = "Goblin Ambush", mapAssetId = "map-battle") =>
-    t.run<SceneRecord>(R.createScene, { name, mapAssetId });
+  // Scenes as before this build (no fog row); FR-FOG-02's fogged start is in hooks.test.ts.
+  const newScene = (name = "Goblin Ambush", mapAssetId = "map-battle") => {
+    const s = t.run<SceneRecord>(R.createScene, { name, mapAssetId });
+    dropFogRow(t.s.db, s.id);
+    return s;
+  };
   const ambush = newScene();
   const ogre = t.run<{ id: string }>(createEntity.name, {
     kind: "monster",
@@ -544,7 +549,9 @@ describe("FR-FOG-09 permissions and scope", () => {
       expect(t.err(() => t.run(name, moved)).code).toBe("not_found");
     }
     // Works on an inactive scene (prep): the ambush was never activated.
-    expect(t.s.db.select().from(sceneFog).all()).toHaveLength(1);
+    expect(
+      t.s.db.select().from(sceneFog).where(eq(sceneFog.sceneId, t.ambush.id)).all(),
+    ).toHaveLength(1);
     expect(t.s.intents.has(F.edit) && t.s.intents.has(F.setAll) && t.s.intents.has(F.undo)).toBe(
       true,
     );

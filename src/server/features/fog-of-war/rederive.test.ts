@@ -11,9 +11,13 @@ import {
 } from "@shared/scene-tools/schemas";
 import { readProp, readStructure, readTemplate } from "../scene-tools/rows";
 import { scnSetup } from "../scene-tools/testing";
+import { dropFogRow } from "./testing";
 
 function setup() {
   const t = scnSetup();
+  // Scenes as before this build (no fog row): every subject starts clear.
+  dropFogRow(t.s.db, t.ambush.id);
+  dropFogRow(t.s.db, t.cellar.id);
   const rows = t.prep(t.ambush.id);
   const setAll = (fogged: boolean) =>
     t.run<{ editId: string | null }>(F.setAll, { sceneId: t.ambush.id, fogged }).editId;

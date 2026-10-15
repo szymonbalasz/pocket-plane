@@ -4,10 +4,10 @@
 //   closed, FR-FOG-04).
 // - `scene-hooks.ts` `duplicated` (the source's row, not its undo stack; no row → none,
 //   FR-FOG-02) and `deleting` (the `fog` delete, so `SceneDeleted` lists it, FR-FOG-23).
-// `hides`, `dragToDm` and `created` come with build/fog-visibility (FOG §14). Leaf module: it
-// must not import scenes-map's commands or registries (they import it).
-import { type FogRow, footprintFogged, maskOf } from "@shared/fog-of-war/mask";
-import { FOG_TYPE } from "@shared/fog-of-war/schemas";
+// - `scene-hooks.ts` `created`: a new scene's fully fogged row (FR-FOG-02).
+// Leaf module: it must not import scenes-map's commands or registries (they import it).
+import { type FogRow, fogBox, footprintFogged, maskOf } from "@shared/fog-of-war/mask";
+import { FOG_TYPE, type FogBox } from "@shared/fog-of-war/schemas";
 import { eq } from "drizzle-orm";
 import { sceneFog } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
@@ -21,6 +21,8 @@ export function readFogRow(read: SceneRead, sceneId: string): FogRow | null {
   return r ? { fill: r.fill, box: [r.col0, r.row0, r.cols, r.rows], runs: r.runs } : null;
 }
 
+const boxColumns = ([col0, row0, cols, rows]: FogBox) => ({ col0, row0, cols, rows });
+
 /** FR-FOG-10: `derive` line. */
 export const fogVisibilityHook: SceneVisibilityHook = {
   name: "fog-of-war.fogged",
@@ -31,9 +33,23 @@ export const fogVisibilityHook: SceneVisibilityHook = {
   },
 };
 
-/** FR-FOG-02 (duplicate) / FR-FOG-23 (delete): lifecycle lines. */
+/** FR-FOG-02 (create, duplicate) / FR-FOG-23 (delete): lifecycle lines. */
 export const fogSceneHook: SceneHook = {
   name: "fog-of-war.fog-row",
+  /** FR-FOG-02: a new scene starts fully fogged (`{fill: fog, runs: ""}`), no undo entry. */
+  created({ tx, ctx }, scene): RecordChange[] {
+    tx.insert(sceneFog)
+      .values({
+        sceneId: scene.id,
+        campaignId: scene.campaignId,
+        fill: "fog",
+        ...boxColumns(fogBox(scene)),
+        runs: "",
+        updatedAt: ctx.clock.iso(),
+      })
+      .run();
+    return [{ type: FOG_TYPE, id: scene.id, before: null, after: readFogRecord(tx, scene.id) }];
+  },
   duplicated({ tx, ctx }, source, copy): RecordChange[] {
     const src = tx.select().from(sceneFog).where(eq(sceneFog.sceneId, source.id)).get();
     if (!src) return [];

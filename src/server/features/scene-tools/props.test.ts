@@ -124,7 +124,8 @@ describe("FR-SCN-16 scn.placeProp", () => {
     expect(err.message).toContain("campaign");
     expect(t.count("prop")).toBe(PROPS_PER_CAMPAIGN_MAX);
     expect(t.events.length).toBe(events2);
-    expect(events2).toBe(events + 2); // the Cellar prop + the new scene
+    // The Cellar prop + the new scene + its reveal (FR-FOG-25 ripple).
+    expect(events2).toBe(events + 3);
   });
 
   test("FR-SCN-16 players are refused every prop intent", () => {

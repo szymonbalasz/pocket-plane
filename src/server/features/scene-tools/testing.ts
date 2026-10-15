@@ -2,6 +2,8 @@
 // with SCN rows written directly (fix/scn-core has no commands yet) in the shape of the SCN §13
 // fixtures: `scn-walls`, `scn-props` (barrel, table, hidden chest), `scn-templates` (Spirit
 // Guardians kept by player-1, hidden DM "Glyph").
+
+import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import type {
   AoeTemplateRecord,
   Door,
@@ -38,8 +40,12 @@ export function scnSetup() {
   const t = scenesSetup();
   const cid = t.h.campaignId;
   for (const id of ["prop-barrel", "prop-table", "prop-chest"]) addAsset(t.s, id, cid);
-  const newScene = (name: string) =>
-    t.run<SceneRecord>(MAP_REST.createScene, { name, mapAssetId: "map-battle" });
+  // FR-FOG-25 ripple: new scenes start fogged; revealed unless `revealed` is false.
+  const newScene = (name: string, revealed = true) => {
+    const s = t.run<SceneRecord>(MAP_REST.createScene, { name, mapAssetId: "map-battle" });
+    if (revealed) t.run(FOG_INTENTS.setAll, { sceneId: s.id, fogged: false });
+    return s;
+  };
   const ambush = newScene("Goblin Ambush");
   const cellar = newScene("Cellar");
 

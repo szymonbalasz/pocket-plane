@@ -15,6 +15,7 @@ import { scenesSetup } from "../scenes-map/testing";
 import { tokenVisibility } from "../scenes-map/visibility";
 import { fogUndoStack } from "./commands";
 import { readFogRecord } from "./rows";
+import { dropFogRow } from "./testing";
 
 const placeOne = defineCommand({
   name: "test.placeOne",
@@ -34,8 +35,14 @@ const placeOne = defineCommand({
 function setup() {
   const t = scenesSetup();
   t.s.commands.register(placeOne as unknown as CommandDef);
-  const newScene = (name = "Goblin Ambush") =>
+  // Scenes as before this build (no fog row); `fresh` keeps FR-FOG-02's fully fogged row.
+  const fresh = (name: string) =>
     t.run<SceneRecord>(R.createScene, { name, mapAssetId: "map-battle" });
+  const newScene = (name = "Goblin Ambush") => {
+    const s = fresh(name);
+    dropFogRow(t.s.db, s.id);
+    return s;
+  };
   const ambush = newScene();
   const place = (col: number, row: number, definitionId = t.h.goblinId, sceneId = ambush.id) =>
     t.run<{ tokenId: string }>(I.placeToken, { sceneId, definitionId, col, row }).tokenId;
@@ -53,7 +60,7 @@ function setup() {
   const setAll = (f: boolean, sceneId = ambush.id) =>
     t.run<{ editId: string | null }>(F.setAll, { sceneId, fogged: f }).editId;
   const lastEvent = () => t.events.at(-1)?.event;
-  return { ...t, newScene, ambush, place, fogged, rect, edit, setAll, lastEvent };
+  return { ...t, fresh, newScene, ambush, place, fogged, rect, edit, setAll, lastEvent };
 }
 
 describe("FR-FOG-10 derive (fog's line)", () => {
@@ -223,10 +230,36 @@ describe("FR-FOG-02 / -23 lifecycle (fog's lines)", () => {
     expect(t.lastEvent()?.changes.map((c) => c.type)).toEqual(["scene"]);
   });
 
-  test("FR-FOG-02 no `created` line yet: a new scene has no fog row (build/fog-visibility adds it)", () => {
+  test("FR-FOG-02 created: a new scene starts fully fogged (row in SceneCreated, no undo entry); tokens placed on it are fogged", () => {
     const t = setup();
-    const s = t.newScene("Fresh");
-    expect(readFogRecord(t.s.db, s.id)).toBeNull();
-    expect(t.lastEvent()?.changes.map((c) => c.type)).toEqual(["scene"]);
+    const s = t.fresh("Fresh");
+    const rec = readFogRecord(t.s.db, s.id) as FogRecord;
+    expect(rec).toEqual({
+      id: s.id,
+      campaignId: t.h.campaignId,
+      fill: "fog",
+      box: [0, 0, 20, 14],
+      runs: "",
+      undo: null,
+    });
+    const ev = t.lastEvent();
+    expect(ev?.type).toBe("SceneCreated");
+    expect(ev?.changes.map((c) => c.type)).toEqual(["scene", "fog"]);
+    expect(ev?.changes[1]).toEqual({ type: "fog", id: s.id, before: null, after: rec });
+    expect(fogUndoStack(t.s.db, s.id)).toEqual([]);
+    expect(t.fogged(t.place(3, 3, t.h.goblinId, s.id))).toBe(true);
+    // The DM can Reveal all at once: one entry, every cell clear.
+    t.setAll(false, s.id);
+    expect(readFogRecord(t.s.db, s.id)).toMatchObject({ fill: "clear", undo: { n: 1 } });
+  });
+
+  test("FR-FOG-02 a duplicate of a new scene keeps it fogged; a create that rolls back leaves no row", () => {
+    const t = setup();
+    const s = t.fresh("Fresh");
+    const copy = t.run<SceneRecord>(R.duplicateScene, { id: s.id });
+    expect(readFogRecord(t.s.db, copy.id)).toMatchObject({ fill: "fog", runs: "", undo: null });
+    const rows = t.s.db.select().from(sceneFog).all().length;
+    expect(() => t.run(R.createScene, { name: "Bad", mapAssetId: "nope" })).toThrow();
+    expect(t.s.db.select().from(sceneFog).all()).toHaveLength(rows);
   });
 });

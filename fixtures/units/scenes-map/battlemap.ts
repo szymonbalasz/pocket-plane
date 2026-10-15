@@ -1,12 +1,13 @@
 import { defineFixture, type Refs, step } from "@server/features/fixtures-adapters/fixture-types";
 import { createScene, placeToken } from "@server/features/scenes-map/commands";
+import { fog } from "../fog-of-war/commands";
 import { IMG } from "./town";
 
 const scene = (r: Refs) => r.id("battlemap", "scene");
 
 /**
  * MAP §13 `battlemap`: "Goblin Ambush", map `battlemap` (20 × 14 at 70 px), inactive. Mira (2, 7);
- * Goblin (12, 6); hidden: Wolf (14, 4), Elite Goblin Warrior (15, 8).
+ * Goblin (12, 6); hidden: Wolf (14, 4), Elite Goblin Warrior (15, 8). Revealed last (FR-FOG-25).
  */
 export default defineFixture({
   key: "battlemap",
@@ -48,5 +49,6 @@ export default defineFixture({
       imageAssetId: r.id("images", "asset", IMG.elite),
       hidden: true,
     })),
+    step(fog.setAll, (r) => ({ sceneId: scene(r), fogged: false })),
   ],
 });

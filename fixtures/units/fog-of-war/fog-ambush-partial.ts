@@ -5,8 +5,8 @@ import { fog } from "./commands";
 /**
  * FOG §13 `fog-ambush-partial`: reveal rect (0, 3)–(7, 11) (Mira, Thorn); reveal polygon
  * [(8, 9), (13, 9), (8, 14)] (Cave Ogre: its (10, 11) centre lies on the diagonal = inside).
- * Fogged: Goblin (12, 6), Goblin 2 (12, 8), Lurker; hidden + fogged: Wolf, Elite. Undo depth 3
- * (4 once the ripple's Reveal all lands, build/fog-visibility).
+ * Fogged: Goblin (12, 6), Goblin 2 (12, 8), Lurker; hidden + fogged: Wolf, Elite. Undo depth 4
+ * (incl. the ripple's Reveal all, FR-FOG-25).
  */
 export default defineFixture({
   key: "fog-ambush-partial",

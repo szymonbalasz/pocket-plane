@@ -101,10 +101,13 @@ describe("fog bundle over WS (build/fog-server)", () => {
     const dm = await h.live(DM);
     const p1 = await h.live(p("Player 1"));
     const fog = fogOf(dm, ambushId) as FogRecord;
-    expect(fog).toMatchObject({ fill: "fog", box: [0, 0, 20, 14], undo: { n: 3 } });
+    expect(fog).toMatchObject({ fill: "fog", box: [0, 0, 20, 14], undo: { n: 4 } });
     expect(fog.undo?.kind).toBe("reveal-polygon");
-    expect(fogOf(dm, townId)).toBeUndefined();
-    expect(p1.store.records[FOG_TYPE] ?? {}).toEqual({});
+    // FR-FOG-25 ripple: Town was revealed after create (one "reveal all" entry).
+    expect(fogOf(dm, townId)).toMatchObject({ fill: "clear", runs: "", undo: { n: 1 } });
+    expect(p1.store.records[FOG_TYPE] ?? {}).toEqual({
+      [townId]: { id: townId, fill: "clear", box: (fogOf(dm, townId) as FogRecord).box, runs: "" },
+    });
     // Player refused on every fog intent.
     for (const [name, payload] of [
       [F.setAll, { sceneId: ambushId, fogged: false }],
@@ -176,7 +179,7 @@ describe("fog bundle over WS (build/fog-server)", () => {
     expect(
       (await answer(dm, dm.intent(F.undo, { sceneId: ambushId, expectedEditId: editId }))).type,
     ).toBe("ack");
-    await until(() => (fogOf(dm, ambushId) as FogRecord).undo?.n === 3);
+    await until(() => (fogOf(dm, ambushId) as FogRecord).undo?.n === 4);
     await until(() => tokenOf(dm, goblin)?.fogged === true);
     // No-op edit: ack with editId null, no event.
     const noop = await answer(
@@ -296,7 +299,7 @@ describe("fog bundle over WS (build/fog-server)", () => {
     expect(await snap()).toEqual(before);
     const dm = await h.live(DM);
     const fog = fogOf(dm, ambushId) as FogRecord;
-    expect(fog.undo?.n).toBe(3);
+    expect(fog.undo?.n).toBe(4);
     const ack = await answer(
       dm,
       dm.intent(F.undo, { sceneId: ambushId, expectedEditId: fog.undo?.editId }),
