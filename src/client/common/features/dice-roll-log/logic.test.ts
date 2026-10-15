@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { RollMode } from "@shared/dice-roll-log/schemas";
 import {
   actorOptions,
+  actorSelection,
   checkGroup,
   computedTotal,
   createFlagStore,
@@ -451,6 +452,33 @@ describe("FR-DICE-34 roll as token-less combatants", () => {
       combatants,
     );
     expect(p.some((a) => a.group === "Combatants")).toBe(false);
+  });
+});
+
+describe("FR-DICE-34 a pick that left the list", () => {
+  const dm = { value: "", label: "DM" };
+  const goblin3 = {
+    value: "c3",
+    label: "Goblin 3",
+    group: "Combatants" as const,
+    ref: { combatantId: "c3" },
+  };
+
+  test("FR-DICE-34 removed between pick and roll → still sent (server not_found), never the roller", () => {
+    expect(actorSelection([dm, goblin3], null)).toEqual({
+      options: [dm, goblin3],
+      selected: dm,
+    });
+    expect(actorSelection([dm, goblin3], goblin3).selected).toEqual(goblin3);
+    // Goblin 3 removed from combat: the Select keeps it, disabled and marked stale, and the
+    // roll still carries its ref, so the answer is not_found instead of a roll as "DM".
+    const gone = actorSelection([dm], goblin3);
+    expect(gone.selected).toEqual({ ...goblin3, stale: true });
+    expect(gone.selected?.ref).toEqual({ combatantId: "c3" });
+    expect(gone.options).toEqual([dm, { ...goblin3, stale: true }]);
+    // Restored before the roll: the live entry again (fresh label).
+    const renamed = { ...goblin3, label: "Goblin 3*" };
+    expect(actorSelection([dm, renamed], goblin3).selected).toEqual(renamed);
   });
 });
 

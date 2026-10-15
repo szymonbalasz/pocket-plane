@@ -31,7 +31,14 @@ import { Badge, Input, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
-import { actorOptions, createStickToBottom, optionsDirty, sortEntries } from "./logic";
+import {
+  type ActorOption,
+  actorOptions,
+  actorSelection,
+  createStickToBottom,
+  optionsDirty,
+  sortEntries,
+} from "./logic";
 import { usePhysicalDice, useRollOptionsOpen } from "./physical";
 import { RollButton, useRollControl } from "./roll-control";
 
@@ -219,7 +226,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const [expression, setExpression] = useState("");
   const [label, setLabel] = useState("");
   const [category, setCategory] = useState<RollCategory>("other");
-  const [actor, setActor] = useState("");
+  const [actor, setActor] = useState<ActorOption | null>(null);
   const [mode, setMode] = useState<RollMode>("normal");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -234,7 +241,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   );
   // A token that left the active scene, a removed character or an ended / removed combatant
   // (FR-DICE-34) falls back to the roller.
-  const selected = actors.find((a) => a.value === actor) ?? actors[0];
+  const { options: actorList, selected } = actorSelection(actors, actor);
   const actorRef = selected?.ref;
 
   const control = useRollControl({
@@ -256,7 +263,11 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
           setExpression("");
           setLabel("");
         })
-        .catch((err: unknown) => setError(errorText(err)))
+        .catch((err: unknown) => {
+          setError(errorText(err));
+          // FR-DICE-34: the answer to a pick that left the list (not_found) drops it.
+          if (selected?.stale) setActor(null);
+        })
         .finally(() => setBusy(false));
     },
   });
@@ -406,9 +417,9 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
             className={cn(SELECT, "max-w-24")}
             value={selected?.value ?? ""}
             disabled={!live}
-            onChange={(e) => setActor(e.target.value)}
+            onChange={(e) => setActor(actors.find((a) => a.value === e.target.value) ?? null)}
           >
-            {actors
+            {actorList
               .filter((a) => !a.group)
               .map((a) => (
                 <option key={a.value} value={a.value}>
@@ -416,12 +427,12 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
                 </option>
               ))}
             {(["Characters", "Tokens", "Combatants"] as const).map((g) => {
-              const list = actors.filter((a) => a.group === g);
+              const list = actorList.filter((a) => a.group === g);
               return list.length === 0 ? null : (
                 <optgroup key={g} label={g}>
                   {list.map((a) => (
-                    <option key={a.value} value={a.value}>
-                      {a.label}
+                    <option key={a.value} value={a.value} disabled={a.stale}>
+                      {a.stale ? `${a.label} (gone)` : a.label}
                     </option>
                   ))}
                 </optgroup>

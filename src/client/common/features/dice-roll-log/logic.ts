@@ -84,6 +84,25 @@ export interface ActorOption {
   label: string;
   group?: "Characters" | "Tokens" | "Combatants";
   ref?: { entityId: string } | { tokenId: string } | { combatantId: string };
+  /** FR-DICE-34: picked, but no longer in the list (shown disabled until the roll answers). */
+  stale?: boolean;
+}
+
+/**
+ * FR-DICE-34: the actor Select's state. A pick that left the list since (combatant removed,
+ * encounter ended, token or character deleted) stays picked and marked stale: the roll is sent
+ * as it, so the server answers `not_found` inline instead of the roll silently going out as the
+ * roller; the caller drops it after that answer. No pick → the roller ("DM" / "Me").
+ */
+export function actorSelection(
+  actors: readonly ActorOption[],
+  picked: ActorOption | null,
+): { options: ActorOption[]; selected: ActorOption | undefined } {
+  if (!picked || picked.value === "") return { options: [...actors], selected: actors[0] };
+  const current = actors.find((a) => a.value === picked.value);
+  if (current) return { options: [...actors], selected: current };
+  const stale = { ...picked, stale: true };
+  return { options: [...actors, stale], selected: stale };
 }
 
 type ActorToken = Pick<TokenView, "id" | "sceneId" | "name" | "seq" | "definitionId">;

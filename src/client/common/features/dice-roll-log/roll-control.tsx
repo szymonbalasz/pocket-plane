@@ -159,7 +159,7 @@ function GroupInputs({
   autoFocus: boolean;
   onChange(patch: Partial<GroupInput>): void;
 }) {
-  const prefix = extra ? "dice-manual-extra" : "dice-manual";
+  const prefix = extra ? "dice-manual-crit" : "dice-manual";
   const computed = computedTotal(slot, input);
   const name = extra ? `${slot.expression} (critical)` : slot.expression;
   return (
@@ -167,7 +167,7 @@ function GroupInputs({
       <div className="flex items-center gap-2">
         {extra ? (
           <span
-            data-testid="dice-manual-extra-label"
+            data-testid="dice-manual-crit-label"
             data-value={index}
             className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
           >
@@ -252,7 +252,7 @@ function ManualForm({ control }: { control: RollControl }) {
         if (!r.ok) {
           setError(r.message);
           const { slot, group, die } = r.focus;
-          const id = `dice-manual${group === "extra" ? "-extra" : ""}-${die === null ? "total" : "die"}`;
+          const id = `dice-manual${group === "extra" ? "-crit" : ""}-${die === null ? "total" : "die"}`;
           const at = die === null ? "" : `[data-index="${die}"]`;
           formRef.current
             ?.querySelector<HTMLInputElement>(`[data-testid="${id}"][data-value="${slot}"]${at}`)
@@ -283,7 +283,7 @@ function ManualForm({ control }: { control: RollControl }) {
           />
           {slot.extra && (
             <div
-              data-testid="dice-manual-extra"
+              data-testid="dice-manual-crit"
               data-value={i}
               className="flex flex-col gap-1.5 border-l-2 border-muted pl-2"
             >
