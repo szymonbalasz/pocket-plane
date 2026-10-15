@@ -118,7 +118,18 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
     "Elite Goblin Warrior — Shortbow",
   );
 
+  // FR-CBT-54 (sim-5 glitch 1): the DM targets Mira (her token → a selection row), then
+  // Dismisses; the next card's popup opens without her: no stale targets.
+  const miraCombatant = await idByName(init, "Mira");
+  await popup.getByTestId("cbt-popup-target-add").click();
+  await dm
+    .locator(`[data-testid="cbt-popup-target-option"][data-value="${miraCombatant}"]`)
+    .click();
+  await expect(
+    popup.locator(`[data-testid="cbt-popup-target-row"][data-record-id="${miraCombatant}"]`),
+  ).toHaveAttribute("data-source", "selection");
   await dm.getByTestId("cbt-popup-dismiss").click();
+  await expect(popup).toHaveCount(0);
 
   // FR-CBT-74: Attack ▸ Shortbow "Attack" → a to-hit-only card ("Waiting for damage"); Later;
   // "Damage" completes it (the same card, damage filled).
@@ -132,6 +143,7 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
   };
   await option("toHit");
   await expect(popup.getByTestId("cbt-popup-waiting-damage")).toBeVisible();
+  await expect(popup.getByTestId("cbt-popup-target-row")).toHaveCount(0);
   const splitCard = await popup.getAttribute("data-record-id");
   await dm.getByTestId("cbt-popup-later").click();
   await option("damage");
