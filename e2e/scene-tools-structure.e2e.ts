@@ -216,6 +216,20 @@ test("FR-MAP-28 a drag in progress when the connection drops snaps back unsent; 
   expect(dragFrames).toBe(after);
   expect(await attr(dm, "map-token", mira, "preview")).toBeNull();
 
+  // Leave the bundle as loaded for the next spec on this server: Mira at (2, 7), Town shown.
+  await dragTo(dm, mira, 2, 7);
+  await expect.poll(() => cellOf(player, mira)).toEqual({ col: 2, row: 7 });
+  const scenes = await openWindow(dm, "map.scenes");
+  await scenes
+    .locator(`[data-testid="map-scene-row"][data-record-id="${recordId("town", "scene")}"] button`)
+    .first()
+    .click();
+  await dm.getByTestId("map-show-to-players").click();
+  await expect(player.getByTestId("map-canvas")).toHaveAttribute(
+    "data-scene-id",
+    recordId("town", "scene"),
+  );
+
   await player.context().close();
   await dm.context().close();
 });
