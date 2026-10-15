@@ -6,7 +6,12 @@ import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
 import { availableKinds } from "@ui/features/play-shell/registry";
-import { contentBox, fitContent } from "@ui/features/scenes-map/camera";
+import {
+  contentBox,
+  FIT_MIN_CELL_PX,
+  fitContent,
+  footprintBox,
+} from "@ui/features/scenes-map/camera";
 import { playerWindows } from "../../windows";
 
 // Registry-driven: later builders append windows without touching these tests.
@@ -114,15 +119,15 @@ test("#162 player map-first: battlemap uncovered ≥ 65% at 1440×900 and 1280×
 
 /** `session-sim` Goblin Ambush tokens a player holds (FIX `battlemap`, `goblin-2`, `thorn-battlemap`). */
 const VISIBLE_TOKENS = [
-  { name: "Mira", col: 2, row: 7 },
-  { name: "Goblin", col: 12, row: 6 },
-  { name: "Goblin 2", col: 12, row: 8 },
-  { name: "Thorn", col: 2, row: 9 },
+  { name: "Mira", col: 2, row: 7, pc: true },
+  { name: "Goblin", col: 12, row: 6, pc: false },
+  { name: "Goblin 2", col: 12, row: 8, pc: false },
+  { name: "Thorn", col: 2, row: 9, pc: true },
 ].map((t) => ({ ...t, size: "medium" as const }));
 const CELL = 70;
 const BATTLEMAP = { w: 1400, h: 980 };
 
-test("FR-SHELL-34 default layout leaves tokens uncovered: player, the four visible Goblin Ambush tokens fitted per FR-MAP-44, before and after Initiative appears (1280×720, 1440×900, 1600×900)", () => {
+test("FR-SHELL-34 default layout leaves tokens uncovered: player, the four visible Goblin Ambush tokens fitted per FR-MAP-44, before and after Initiative appears (1280×720, 1440×900, 1600×900); at the FR-MAP-46 floor only the PCs", () => {
   const grid = { gridCellSize: CELL, gridOffsetX: 0, gridOffsetY: 0 };
   for (const viewport of [LAPTOP, WIDE, DESKTOP]) {
     const all = new Set(playerWindows.defs.map((d) => d.kind));
@@ -142,8 +147,14 @@ test("FR-SHELL-34 default layout leaves tokens uncovered: player, the four visib
       expect(rects.length).toBe(when === "before Start" ? 2 : 3);
       const free = freeArea(rects, viewport);
       const box = contentBox(VISIBLE_TOKENS, grid, BATTLEMAP);
-      const cam = fitContent(box, free, BATTLEMAP, workArea(viewport));
-      for (const t of VISIBLE_TOKENS) {
+      const pcs = footprintBox(
+        VISIBLE_TOKENS.filter((t) => t.pc),
+        grid,
+      );
+      const cam = fitContent(box, free, BATTLEMAP, workArea(viewport), CELL, pcs);
+      expect(cam.scale * CELL).toBeGreaterThanOrEqual(FIT_MIN_CELL_PX - 1e-9);
+      // FR-MAP-46 (G2): at the floor, edge monsters may sit under a window; the PCs may not.
+      for (const t of VISIBLE_TOKENS.filter((t) => t.pc || !cam.floor)) {
         const c = {
           x: cam.x + (t.col + 0.5) * CELL * cam.scale,
           y: cam.y + (t.row + 0.5) * CELL * cam.scale,
