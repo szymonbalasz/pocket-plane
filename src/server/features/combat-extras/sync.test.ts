@@ -126,6 +126,8 @@ describe("combat-extras over WS", () => {
             "level",
             "targetCharacterId",
             "targetCombatantId",
+            // FR-MOD-21: PC effects only.
+            ...(e.targetCharacterId ? ["modifiers", "presetKey"] : []),
           ].sort(),
         );
       }

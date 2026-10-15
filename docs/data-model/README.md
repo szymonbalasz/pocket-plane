@@ -10,6 +10,7 @@ Consolidated domain model. Entities and relationships, **not SQL**. **Living doc
 | Reward | [party-loot](../specs/party-loot.md) | built (build/party-loot): [§19](#19-reward-loot-entry-party-pot-wallet) |
 | Sprint 1 | [character-sheet-full](../specs/character-sheet-full.md) (CHARX, #178) | core built (fix/charx-core): [§20](#20-sprint-1-creature-sheet), stat-block additions in [§11](#11-scenes-entity); record type, commands, hook, fixtures **built** (build/character-sheet-full); combat routes **built** (fix/charx-combat-routes, slice 4) |
 | Sprint 1 | [combat-extras](../specs/combat-extras.md) (CBTX, #178) | core built (fix/cbtx-core): [§21](#21-sprint-1-effect-and-combat-play-state), play-state columns in [§11](#11-scenes-entity) and [§17](#17-combat-encounter-combatant-combat-log-entry); commands, rules, record-type registration, fixtures built (build/combat-extras) |
+| Sprint 2 | [effect-modifiers](../specs/effect-modifiers.md) (MOD tier 1, #190) | core built (fix/mod-core): [§23](#23-sprint-2-effect-modifiers-tier-1), `effect` columns in [§21](#21-sprint-1-effect-and-combat-play-state); commands, hook, record-type registration, fixtures: build/effect-modifiers |
 
 Every fact links its source. Protocol side (record types, intents, events): [protocol](../protocol/README.md).
 
@@ -678,7 +679,7 @@ erDiagram
 | public | bool | **Stamped once** at creation by who rolls: player → true; DM → override, else the category setting at commit; combat: false if attacker or target hidden; *(built, build/combat-playtest)* a DM-sent `cbt.attack`'s roll entry always false ([FR-CBT-52](../specs/combat-tracker.md#6-functional-requirements)). Never changed in MVP | [FR-DICE-13](../specs/dice-roll-log.md#6-functional-requirements), FR-CBT-24, #73, #139 P8 |
 | undone | bool | Set only by `gameLog.markUndone` (combat undo) | FR-DICE-19, [FR-CBT-25](../specs/combat-tracker.md#6-functional-requirements) |
 | rollerRole, rollerPlayerId, actorName | as Roll | | DICE §8 |
-| payload | **JSON leaf** per kind | Player-safe. `roll`: `{rollId, expression, mode, manual, dice, constant, total, natural, label}[]` (1–20) | DICE §8 |
+| payload | **JSON leaf** per kind | Player-safe. `roll`: `{rollId, expression, mode, manual, dice, constant, total, natural, label}[]` (1–20); *(sprint 2, built, fix/mod-core)* + optional `mods`, `modes`, [§23](#23-sprint-2-effect-modifiers-tier-1) | DICE §8 |
 | dmPayload | **JSON leaf** \| null | DM-only extras (target AC, computed hit, overrides; *(built, build/combat-playtest)* `cbt.attack` `rolls`, see §17 note); stripped for players. Only facts the kind declares DM-only ([FR-DICE-28](../specs/dice-roll-log.md#6-functional-requirements)) | [FR-DICE-15](../specs/dice-roll-log.md#6-functional-requirements), #139 P6 |
 | rollIds | **JSON leaf** ID[] | The action's rolls; an attack = one entry, two rolls | FR-DICE-26, [FR-CHAR-08](../specs/character-sheet.md#6-functional-requirements) |
 | encounterId | ID → Encounter \| null | Set by combat-tracker | FR-CBT-24 |
@@ -946,6 +947,7 @@ From [combat-extras](../specs/combat-extras.md) (CBTX, `complete`, #178; [ADR-00
 | secret, hidden | bool ×2, default false | `hidden` = copy of the target's bound combatant `hidden` | FR-CBTX-13, FR-CBTX-31 |
 | endedAt, endedReason, endedRound, endedTurnId, endedByHpChangeId | timestamp \| null, `removed` \| `expired` \| `replaced` \| `concentration` \| `incapacitated` \| `save-failed` \| `down` \| `encounter-ended` \| null, int \| null, ID \| null ×2 (plain ids) | **Soft end** (Prev and undo restore); `endedAt` iff `endedReason` | FR-CBTX-06/07/22 |
 | createdAt, updatedAt | timestamp | `ctx.clock` | CBTX §8 |
+| *(sprint 2, built, fix/mod-core)* modifiers, presetKey | JSON leaf Modifier[] 0–6 (default `[]`), text ≤ 40 \| null | `custom` effects only; players get them on PC effects only, `presetKey` built-in keys only ([§23](#23-sprint-2-effect-modifiers-tier-1)) | [FR-MOD-03/21](../specs/effect-modifiers.md#6-functional-requirements) |
 
 - **Constraints the DB enforces:** partial unique indexes on rows with `ended_at is null`: one `concentration` per target (`effect_one_concentration_combatant`, `…_character`), one `condition` per (target, key) (`effect_one_condition_combatant`, `…_character`); one index per target side because SQLite treats nulls as distinct. Indexes on campaign, encounter, each target, concentration; `seq` unique.
 - **Visibility** ([FR-CBTX-31](../specs/combat-extras.md#6-functional-requirements)): DM full; players **hidden** if `secret`, `hidden` or ended, else **redacted** `{id, kind, condition, level, label, targetCombatantId, targetCharacterId, encounterId, endsRound}` (`PlayerEffectRecord`, `redactEffect`, `effectVisibleToPlayers`). Snapshot: active effects only, not windowed (capped by FR-CBTX-04: ≤ 20 per target, ≤ 300 per campaign).
@@ -970,3 +972,35 @@ From the sprint-2 "Shared changes" of [combat-tracker](../specs/combat-tracker.m
 - **Derived** (never stored): `hpAverage(hpFormula)` (form hint; Average HP stays `statBlock.hpMax`).
 - **Snapshot size** (CON-44, after fix/combat2-core, heavy scenario): DM 757,283 B (739.5 KiB, ceiling 768 KiB); players 270,045–273,055 B (ceiling 512 KiB). `characterId` adds ≈ 20 B per token to every viewer. *(After fix/combat2-add: DM 757,394 B; players 270,155–273,165 B: Start's DM-only monster initiative entries; the heavy scenario's placed tokens bind every monster, so Start creates none.)*
 - *(fix/combat2-add, built)* Start and `cbtx.addCombatants` add no column: created tokens are ordinary `token` rows (they stay after End); rolled HP lands in `combatant.hp_max` / `hp_current`; HP and monster initiative rolls are `roll` rows plus DM-only `game_log_entry` rows (`other` / `initiative`). `cbtx.bindToken` writes `combatant.token_id` and the name / image / hidden copies.
+
+## 23. Sprint 2: effect modifiers (tier 1)
+
+From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD, `complete`; DM gate 1, #190: tier 1; [ADR-0038](../architecture/adr/0038-effect-modifiers.md), refines ADR-0009's modifier row). **Built by `fix/mod-core`**: the columns and table below (drizzle push), the zod shapes (`@shared/effect-modifiers/schemas`), the `effect` record + redaction amendments (`@shared/combat-extras/schemas`), the `roll` payload `mods` / `modes`. Commands that write them: build/effect-modifiers. Protocol side: [protocol §34](../protocol/README.md#34-sprint-2-phase-1-effect-modifiers-tier-1).
+
+| Table / leaf | Change | Default (push-safe) | Visibility | Source |
+|---|---|---|---|---|
+| `effect` | + `modifiers` (**JSON leaf** Modifier[] 0–6), `preset_key` (text ≤ 40 \| null: built-in key or preset id, soft) | `[]`, null | DM full; players iff PC effect (`targetCharacterId` set), `presetKey` built-in keys only | [FR-MOD-03](../specs/effect-modifiers.md#6-functional-requirements), [FR-MOD-21](../specs/effect-modifiers.md#6-functional-requirements) |
+| `effect_preset` (new, record type `effect-preset`) | see below | — | DM full; player own rows (`ownerPlayerId`) | [FR-MOD-22](../specs/effect-modifiers.md#6-functional-requirements) |
+| `game_log_entry.payload` (`roll` items) | + optional `mods [{label \| null, value, expression?, auto?, rollId?}]`, `modes [label \| null]`; `total` includes the parts | absent; old rows parse | as the payload (labels null for effects players don't receive) | [FR-MOD-19](../specs/effect-modifiers.md#6-functional-requirements) |
+| `game_log_entry.dmPayload` (`roll`) | new: `{items: [{mods: [{effectId, label}], modes?}]}` | null (no parts) | DM only | FR-MOD-19, [FR-DICE-28](../specs/dice-roll-log.md#6-functional-requirements) |
+| `roll` | no change: a bonus die is its own row (`label` = effect label, same category / source / actor as the base) | — | server table | MOD §8.2 |
+
+### Effect preset (`effect_preset`, record type `effect-preset`) — owner [effect-modifiers](../specs/effect-modifiers.md#82-records)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, seq | ID, ID → Campaign, int | `seq` DB-assigned (`effectPresetSeqNext`, CON-20), unique | MOD §8.2 |
+| key | text ≤ 40 \| null | Campaign presets only: the built-in key it customises; **unique (`campaign_id`, `key`) where not null** (`effect_preset_campaign_key`) | [FR-MOD-06](../specs/effect-modifiers.md#6-functional-requirements) |
+| characterId, ownerPlayerId | ID → Entity (`ON DELETE CASCADE`) \| null, ID → Player \| null | null = campaign preset; owner = copy of the character's owner | [FR-MOD-07](../specs/effect-modifiers.md#6-functional-requirements) |
+| name | text 1–40 | Becomes the effect label | FR-MOD-09 |
+| modifiers | **JSON leaf** Modifier[] 1–6 | Built tiers only (zod) | FR-MOD-01 |
+| durationRounds, concentration | int 1–100 \| null, bool (default false) | Defaults for apply / toggle | FR-MOD-09/10 |
+| activeEffectId | ID → Effect (`ON DELETE SET NULL`) \| null | Character presets: the effect the last toggle-on made (toggle state) | [FR-MOD-11](../specs/effect-modifiers.md#6-functional-requirements) |
+| usesFeatureId | text \| null | Character presets; soft id of a sheet `features` row (tier 3) | FR-MOD-12 |
+| note | text ≤ 200, default "" | Own words | MOD §8.2 |
+| createdAt, updatedAt | timestamp | `ctx.clock` | MOD §8.2 |
+
+- **Constraints the DB enforces:** the partial unique key index, FKs (campaign, character cascade, owner player, active effect set null), `seq` unique. Caps (40 campaign, 6 per character) and "key / owner / toggle / uses on the right kind of preset" are zod / command checks (`EffectPresetRecord`).
+- **Modifier** (JSON leaf, MOD §8.1): `dice {on: RollSel, dice, sign}`, `flat {on: RollSel, value}` (tier 1); `mode`, `defense`, `flat` on AC (tier 2) are `invalid` until built (`BUILT_TIER`). `RollSel = {roll: attack | damage | save | check | initiative, abilities?, via?}`.
+- **Derived** (never stored): active modifiers of a creature, parts per roll, toggle state (`activeEffectId` names an active effect), built-ins at the built tier.
+- **Snapshot size** (CON-44, heavy scenario after fix/mod-core): + 16 effect presets at max length (10 campaign, 5 of them customising a built-in; 1 per PC; 6 longest modifiers, 200-char notes, UUID ids: ≈ 1.15 KB each, 18.5 KB) and 12 custom effects with 2 longest modifiers (6 on PCs, 4 secret + 2 Bane on monsters; effects 42 rows, 33 KB). DM 780,950 B (762.6 KiB; ceiling 768 KiB = 786,432 B, headroom ≈ 5.4 KiB); players 273,478–276,488 B (own preset ≈ 1.2 KB, PC effect modifiers). MOD §12 estimated ≈ 13 KB at ≈ 744 KiB; max-length modifiers are larger than its compact-key estimate.

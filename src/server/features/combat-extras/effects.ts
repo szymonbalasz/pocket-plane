@@ -55,6 +55,7 @@ export function checkLimits(
   }
 }
 
+/** One effect row; `modifiers` (default []) and `presetKey` for `custom` effects (FR-MOD-03, -09). */
 export function insertEffect(env: Env, v: NewEffect): EffectRecord {
   const now = env.ctx.clock.iso();
   const row = env.tx

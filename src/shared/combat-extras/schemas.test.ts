@@ -34,9 +34,27 @@ const bless: EffectRecord = {
   endedRound: null,
   endedTurnId: null,
   endedByHpChangeId: null,
+  modifiers: [],
+  presetKey: null,
   createdAt: "t",
   updatedAt: "t",
 };
+
+/** The same effect on a monster's combatant. */
+const onGoblin: EffectRecord = { ...bless, targetCharacterId: null, targetCombatantId: "k-gob" };
+const blessDie = { kind: "dice", on: { roll: "attack" }, dice: "1d4", sign: 1 } as const;
+
+const WHITELIST = [
+  "id",
+  "kind",
+  "condition",
+  "level",
+  "label",
+  "targetCombatantId",
+  "targetCharacterId",
+  "encounterId",
+  "endsRound",
+];
 
 const roundTrip = (s: { parse(v: unknown): unknown }, v: unknown) =>
   expect(s.parse(JSON.parse(JSON.stringify(v)))).toEqual(v);
@@ -86,19 +104,8 @@ describe("combat-extras shared schemas", () => {
 
   test("FR-CBTX-31 player redaction: whitelisted fields only; secret, hidden, ended never sent", () => {
     const red = redactEffect(bless);
-    expect(Object.keys(red).sort()).toEqual(
-      [
-        "id",
-        "kind",
-        "condition",
-        "level",
-        "label",
-        "targetCombatantId",
-        "targetCharacterId",
-        "encounterId",
-        "endsRound",
-      ].sort(),
-    );
+    expect(Object.keys(red).sort()).toEqual([...WHITELIST, "modifiers", "presetKey"].sort());
+    expect(Object.keys(redactEffect(onGoblin)).sort()).toEqual([...WHITELIST].sort());
     roundTrip(PlayerEffectRecord, red);
     const json = JSON.stringify(red);
     for (const leak of ["sourceCombatantId", "anchorCombatantId", "concentrationId", "k-mira"]) {
@@ -108,6 +115,44 @@ describe("combat-extras shared schemas", () => {
     expect(effectVisibleToPlayers({ ...bless, secret: true })).toBe(false);
     expect(effectVisibleToPlayers({ ...bless, hidden: true })).toBe(false);
     expect(effectVisibleToPlayers({ ...bless, endedAt: "t", endedReason: "removed" })).toBe(false);
+  });
+
+  test("FR-MOD-03 modifiers and presetKey on custom effects only; bounds per FR-MOD-01", () => {
+    const ok = (p: Partial<EffectRecord>) => EffectSchema.safeParse({ ...bless, ...p }).success;
+    expect(ok({ modifiers: [blessDie], presetKey: "bless" })).toBe(true);
+    expect(ok({ modifiers: Array(6).fill(blessDie) })).toBe(true);
+    expect(ok({ modifiers: Array(7).fill(blessDie) })).toBe(false);
+    expect(ok({ presetKey: "x".repeat(41) })).toBe(false);
+    expect(ok({ presetKey: "" })).toBe(false);
+    // Tier 2 kinds are not built (FR-MOD-01).
+    expect(ok({ modifiers: [{ kind: "flat", on: { roll: "ac" }, value: 2 }] as never })).toBe(
+      false,
+    );
+    const cond = { kind: "condition" as const, label: null, condition: "prone" as const };
+    expect(ok(cond)).toBe(true);
+    expect(ok({ ...cond, modifiers: [blessDie] })).toBe(false);
+    expect(ok({ ...cond, presetKey: "bless" })).toBe(false);
+    expect(ok({ kind: "concentration", modifiers: [blessDie] })).toBe(false);
+    expect(ok({ kind: "concentration", presetKey: "bless" })).toBe(false);
+  });
+
+  test("FR-MOD-21 PC effects carry modifiers + built-in presetKey to players; monster effects neither; ids → null", () => {
+    const pc = { ...bless, modifiers: [blessDie], presetKey: "bless" };
+    expect(redactEffect(pc)).toMatchObject({ modifiers: [blessDie], presetKey: "bless" });
+    const fromCampaign = redactEffect({ ...pc, presetKey: "0d2c-campaign-preset-id" });
+    expect(fromCampaign.presetKey).toBeNull();
+    expect(JSON.stringify(fromCampaign)).not.toContain("0d2c-campaign-preset-id");
+    const bane = { ...onGoblin, label: "Bane", modifiers: [{ ...blessDie, sign: -1 as const }] };
+    const monster = redactEffect({ ...bane, presetKey: "bane" });
+    expect("modifiers" in monster).toBe(false);
+    expect("presetKey" in monster).toBe(false);
+    expect(JSON.stringify(monster)).not.toContain("1d4");
+    roundTrip(PlayerEffectRecord, redactEffect(pc));
+    roundTrip(PlayerEffectRecord, monster);
+    // A player record never carries a preset id.
+    expect(PlayerEffectRecord.safeParse({ ...redactEffect(pc), presetKey: "pr-1" }).success).toBe(
+      false,
+    );
   });
 
   test("FR-CBTX-19 deathState: dead at 3 failures, stable at 0 HP + 3 successes, dying at 0 HP", () => {

@@ -8,6 +8,7 @@ import {
   redactEffect,
 } from "@shared/combat-extras/schemas";
 import { parseFullCard } from "@shared/combat-tracker/schemas";
+import { EFFECT_PRESET_TYPE, type Modifier } from "@shared/effect-modifiers/schemas";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { Config } from "../../config";
 import { closeDb, type Db, openMemoryDb } from "../../db/client";
@@ -17,6 +18,8 @@ import {
   combatant,
   creatureSheet,
   effect,
+  effectPreset,
+  effectPresetSeqNext,
   effectSeqNext,
   entity,
   notification,
@@ -66,6 +69,7 @@ export function snapshotFrames(s: Services): ViewerFrame[] {
       ...s.records.snapshot({ db: s.db, presence }, v),
       ...pendingSheets(s, v),
       ...pendingEffects(s, v),
+      ...pendingPresets(s, v),
     },
   }));
 }
@@ -122,6 +126,23 @@ function pendingEffects(s: Services, v: Viewer): Record<string, unknown[]> {
     .all() as EffectRecord[];
   const out = v.role === "dm" ? rows : rows.filter(effectVisibleToPlayers).map(redactEffect);
   return out.length ? { [EFFECT_TYPE]: out } : {};
+}
+
+/**
+ * `effect-preset` rows (MOD §12) before effect-modifiers registers the record type: DM all,
+ * a player the rows they own (FR-MOD-22), counted as their table rows. Empty once the type is
+ * registered: then the real snapshot carries them.
+ */
+function pendingPresets(s: Services, v: Viewer): Record<string, unknown[]> {
+  if (s.records.get(EFFECT_PRESET_TYPE)) return {};
+  const rows = s.db
+    .select()
+    .from(effectPreset)
+    .where(eq(effectPreset.campaignId, v.campaignId))
+    .orderBy(effectPreset.seq)
+    .all()
+    .filter((r) => v.role === "dm" || (r.ownerPlayerId !== null && r.ownerPlayerId === v.playerId));
+  return rows.length ? { [EFFECT_PRESET_TYPE]: rows } : {};
 }
 
 /** DM snapshot build time in ms: one warm-up, then the median of `runs`. */
@@ -184,18 +205,38 @@ export const HEAVY = {
   loot: 100,
   /** CHARX §12: one per PC + 10 NPC sheets, typical size. */
   sheets: 16,
-  /** CBTX §12: active effects (6 concentrations + 6 linked, 20 conditions, 4 secret, 4 hidden). */
-  effects: 40,
+  /**
+   * CBTX §12: active effects (6 concentrations + 6 linked, 20 conditions, 4 secret, 4 hidden),
+   * + MOD §12's 2 Bane on monsters.
+   */
+  effects: 42,
   /** Of those, players receive all but the secret and hidden ones. */
-  playerEffects: 32,
+  playerEffects: 34,
   /** Soft-ended effects (Prev / undo history): never in a snapshot. */
   endedEffects: 20,
+  /** MOD §12: custom effects with 2 max-length modifiers (6 linked, 4 secret, 2 Bane). */
+  modEffects: 12,
+  /** Of those, on PCs (the 6 linked "Bless"): the only ones players get modifiers of. */
+  pcModEffects: 6,
+  /** MOD §12: max-length presets: 10 campaign (5 customise a built-in), 1 per PC. */
+  campaignPresets: 10,
+  characterPresets: 6,
 } as const;
+
+/** MOD §12: the longest tier-1 modifiers (all abilities; signed max dice; flat via weapon). */
+const MAX_DICE_MOD: Modifier = {
+  kind: "dice",
+  on: { roll: "save", abilities: ["str", "dex", "con", "int", "wis", "cha"] },
+  dice: "4d12",
+  sign: -1,
+};
+const MAX_FLAT_MOD: Modifier = { kind: "flat", on: { roll: "damage", via: "weapon" }, value: -10 };
 
 /**
  * "Realistic heavy" (#163), on top of `session-sim`, commands only: 6 players / PCs, 30 scenes,
  * 300 tokens (60 on the active scene), 20 encounters (10 ended, 1 started with 46 combatants),
- * 100 game-log entries, 20 pending damage cards (+ 10 applied to 3 targets), 100 loot entries.
+ * 100 game-log entries, 20 pending damage cards (+ 10 applied to 3 targets), 100 loot entries,
+ * 42 active effects (12 with 2 modifiers), 16 effect presets (MOD §12).
  * Every name / label / text at its max length (ASCII).
  */
 export function buildRealisticHeavy(s: Services): Record<string, number> {
@@ -461,14 +502,22 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
       durationRounds: 10,
       endsRound: 11,
       anchorCombatantId: src?.id ?? null,
+      // MOD §12: PC effects carry their modifiers to every player.
+      modifiers: [MAX_DICE_MOD, MAX_FLAT_MOD],
+      presetKey: "hunters-mark",
     });
   }
   const keys = ["prone", "frightened", "poisoned", "restrained", "blinded"] as const;
   for (const [i, m] of monsters.slice(0, 20).entries()) {
     fx({ condition: keys[i % keys.length], targetCombatantId: m.id });
   }
+  // Applied from a campaign preset: `presetKey` = a UUID-length preset id (DM only).
+  const mods = { modifiers: [MAX_DICE_MOD, MAX_FLAT_MOD], presetKey: fill("preset-hex-", 36) };
   for (const m of monsters.slice(20, 24)) {
-    fx({ kind: "custom", label: label("Hex "), targetCombatantId: m.id, secret: true });
+    fx({ kind: "custom", label: label("Hex "), targetCombatantId: m.id, secret: true, ...mods });
+  }
+  for (const m of monsters.slice(28, 30)) {
+    fx({ kind: "custom", label: label("Bane "), targetCombatantId: m.id, ...mods });
   }
   for (const m of monsters.slice(24, 28)) {
     fx({ condition: "stunned", targetCombatantId: m.id, hidden: true });
@@ -483,6 +532,32 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
       endedTurnId: m.id,
     });
   }
+  // Effect presets (MOD §12): no MOD command exists in this core branch, so rows go straight
+  // to the table. Max-length names, notes and 6 max-length modifiers each.
+  let prN = 0;
+  const preset = (v: Partial<typeof effectPreset.$inferInsert>) =>
+    db
+      .insert(effectPreset)
+      .values({
+        id: fill(`pr-${++prN}-`, 36),
+        campaignId: cid,
+        seq: effectPresetSeqNext,
+        name: label(`Preset ${prN} `),
+        modifiers: Array.from({ length: 6 }, (_, k) => (k % 2 ? MAX_FLAT_MOD : MAX_DICE_MOD)),
+        durationRounds: 100,
+        concentration: true,
+        note: fill(`Note ${prN} `, 200),
+        createdAt: now,
+        updatedAt: now,
+        ...v,
+      })
+      .run();
+  const customised = ["bless", "bane", "rage", "hunters-mark", "guidance"];
+  for (let i = 0; i < HEAVY.campaignPresets; i++) preset({ key: customised[i] ?? null });
+  for (const [i, pcId] of pcIds.entries()) {
+    preset({ characterId: pcId, ownerPlayerId: players[i]?.id ?? null, concentration: false });
+  }
+
   db.update(combatant)
     .set({ tempHp: 999 })
     .where(
@@ -539,6 +614,13 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
         .get(cid)?.n ?? 0,
     loot: n("loot_entry"),
     sheets: n("creature_sheet"),
+    presets: n("effect_preset"),
+    modEffects:
+      s.db.$client
+        .query<{ n: number }, [string]>(
+          "SELECT count(*) AS n FROM effect WHERE campaign_id = ? AND ended_at IS NULL AND modifiers <> '[]'",
+        )
+        .get(cid)?.n ?? 0,
     effects:
       s.db.$client
         .query<{ n: number }, [string]>(

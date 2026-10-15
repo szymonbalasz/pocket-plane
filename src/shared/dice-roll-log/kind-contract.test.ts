@@ -30,7 +30,20 @@ const rollItem = (p: Partial<RollPayloadItem> = {}): RollPayloadItem => ({
  * sentinel. A new kind must add its row here (the registry test below fails otherwise).
  */
 const SAMPLES: Record<string, { payload: unknown; dmPayload: unknown | null }> = {
-  roll: { payload: [rollItem({ manual: true })], dmPayload: null },
+  // FR-MOD-19: a part of an effect players don't receive is named only in `dmPayload`.
+  roll: {
+    payload: [
+      rollItem({
+        manual: true,
+        total: 13,
+        mods: [{ label: null, value: -3, expression: "1d4", rollId: "r2", auto: true }],
+        modes: [null],
+      }),
+    ],
+    dmPayload: {
+      items: [{ mods: [{ effectId: S, label: S }], modes: [{ effectId: S, label: S }] }],
+    },
+  },
   "cbt.attack": {
     payload: {
       targetName: "Mira",
@@ -95,6 +108,16 @@ describe("FR-DICE-28 kind contract", () => {
     const player = formatEntry({ kind: "cbt.attack", actorName: "Goblin", payload: s.payload });
     const badges = player.segments.filter((x) => x.style === "badge").map((x) => x.text);
     expect(badges).toEqual(["physical", "physical"]);
+  });
+
+  test("FR-DICE-28 / FR-MOD-20 roll: the DM line names every part; players read (DM)", () => {
+    const s = SAMPLES.roll as (typeof SAMPLES)[string];
+    const dm = lineText(formatEntry({ kind: "roll", actorName: "Goblin", ...s }).segments);
+    expect(dm).toContain(`− 3 ${S} (rolled for you)`);
+    const player = lineText(
+      formatEntry({ kind: "roll", actorName: "Goblin", payload: s.payload }).segments,
+    );
+    expect(player).toContain("− 3 (DM) (rolled for you)");
   });
 
   test("FR-DICE-28 a manual roll segment carries the physical badge", () => {

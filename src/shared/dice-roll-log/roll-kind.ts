@@ -1,12 +1,17 @@
 // The `roll` log-entry kind (FR-DICE-20): "<actor> — <label or expression>: <dice> + <constants>
 // = <total>" per roll; "(adv)" / "(dis)" with the dropped die struck through; natural 20 / 1
 // (not on initiative, FR-DICE-29); "physical" for manual rolls. Other kinds may reuse
-// `rollSegments` / `rollBreakdownSegments` for their roll parts (FR-DICE-28).
+// `rollSegments` / `rollBreakdownSegments` for their roll parts (FR-DICE-28). Roll-hook parts
+// (FR-MOD-19/20) follow the constant ("14 + 4 + 3 Bless = 21"); the DM's line names every part
+// from `dmPayload`, players see "(DM)" for parts of effects they don't receive.
+import { modeLabels, modSegments, modsTotal } from "@shared/effect-modifiers/line";
 import { parseExpression } from "./grammar";
 import { defineLogKind, type LineSegment } from "./kind-types";
 import {
   type RollCategory,
+  RollEntryDmPayload,
   RollEntryPayload,
+  type RollItemDmMods,
   type RollMode,
   type RollPayloadItem,
 } from "./schemas";
@@ -21,7 +26,7 @@ function diceSegments(item: RollPayloadItem): LineSegment[] {
     // Manual total of several dice (values unknown), or an unparsable stored expression.
     if (item.dice.length === 0) return [];
     const sum = allNull
-      ? item.total - item.constant
+      ? item.total - item.constant - modsTotal(item.mods)
       : item.dice.reduce((s, d) => s + (d.kept ? (d.value ?? 0) : 0), 0);
     return [{ text: String(sum) }];
   }
@@ -63,17 +68,21 @@ function termSegments(item: RollPayloadItem): LineSegment[] {
 
 /**
  * One roll's segments. FR-DICE-29 (#172): no natural 20 / 1 marker on an `initiative`-category
- * roll (a natural 1 has no rule meaning there).
+ * roll (a natural 1 has no rule meaning there). `dm` = the item's `dmPayload` names (FR-MOD-20).
  */
 export function rollSegments(
   item: RollPayloadItem,
-  opts: { category?: RollCategory } = {},
+  opts: { category?: RollCategory; dm?: RollItemDmMods | null } = {},
 ): LineSegment[] {
   const out: LineSegment[] = [{ text: item.label ?? item.expression }];
-  if (item.mode === "advantage") out.push({ text: " (adv)" });
-  if (item.mode === "disadvantage") out.push({ text: " (dis)" });
+  const mode = item.mode === "advantage" ? "adv" : item.mode === "disadvantage" ? "dis" : null;
+  if (mode) {
+    const why = item.modes ? `: ${modeLabels(item.modes, opts.dm?.modes)}` : "";
+    out.push({ text: ` (${mode}${why})` });
+  }
   out.push({ text: ": " });
   out.push(...termSegments(item));
+  out.push(...modSegments(item.mods, opts.dm?.mods));
   out.push({ text: " = " }, { text: String(item.total), style: "total" });
   if (opts.category !== "initiative") {
     if (item.natural === 20) out.push({ text: " — natural 20!" });
@@ -123,11 +132,12 @@ export function rollBreakdownSegments(r: RollBreakdown): LineSegment[] {
 export const rollKind = defineLogKind({
   kind: ROLL_KIND,
   payload: RollEntryPayload,
-  formatLine({ actorName, payload, category }) {
+  dmPayload: RollEntryDmPayload,
+  formatLine({ actorName, payload, dmPayload, category }) {
     const out: LineSegment[] = [{ text: actorName, style: "actor" }, { text: " — " }];
     payload.forEach((item, i) => {
       if (i > 0) out.push({ text: "; " });
-      out.push(...rollSegments(item, { category }));
+      out.push(...rollSegments(item, { category, dm: dmPayload?.items[i] }));
     });
     return out;
   },

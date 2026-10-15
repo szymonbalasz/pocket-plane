@@ -5,6 +5,7 @@ import { loadBundle } from "@fixtures/index";
 import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
 import { COMBATANT_TYPE } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_WINDOW } from "@shared/dice-roll-log/schemas";
+import { EFFECT_PRESET_TYPE } from "@shared/effect-modifiers/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { SNAPSHOT_CEILING } from "./hub";
 import {
@@ -63,6 +64,8 @@ describe("CON-44 snapshot ceilings (#163)", () => {
         pendingCards: HEAVY.pendingCards,
         sheets: HEAVY.sheets + SIM_SHEETS,
         effects: HEAVY.effects,
+        modEffects: HEAVY.modEffects,
+        presets: HEAVY.campaignPresets + HEAVY.characterPresets,
       });
       // Applied cards add one line per target; session-sim brings its own loot.
       expect(counts.logEntries).toBeGreaterThanOrEqual(HEAVY.logEntries);
@@ -103,6 +106,52 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect((fx[0]?.bytes ?? 0) / HEAVY.effects).toBeLessThan(800);
       expect((fx[1]?.bytes ?? 0) / HEAVY.playerEffects).toBeLessThan(400);
       expectUnderCeilings(sizes);
+    });
+
+    test("MOD §12 effect-preset rows + effect modifiers: DM all 16 presets, each player own 1; ceilings hold", () => {
+      const sizes = snapshotSizes(b.s);
+      const presets = sizes.map((v) => v.types[EFFECT_PRESET_TYPE]);
+      expect(presets.map((t) => t?.rows ?? 0)).toEqual([
+        HEAVY.campaignPresets + HEAVY.characterPresets,
+        ...Array(HEAVY.players).fill(1),
+      ]);
+      // Per preset at max length (UUID ids, 6 longest modifiers, 200-char note): ≈ 1.15 KB
+      // (MOD §12 estimated ≤ 720 B with compact keys).
+      const perPreset = (presets[0]?.bytes ?? 0) / (HEAVY.campaignPresets + HEAVY.characterPresets);
+      expect(perPreset).toBeLessThan(1_200);
+      // Modifiers add ≤ 2 × 140 B to the 12 custom effects that carry them.
+      const fx = sizes[0]?.types[EFFECT_TYPE];
+      expect((fx?.bytes ?? 0) / HEAVY.effects).toBeLessThan(900);
+      expectUnderCeilings(sizes);
+    });
+
+    test("FR-MOD-21/22 leak scan: no monster-effect modifiers, preset ids or other presets in player frames", () => {
+      const presetIds = new Set<string>();
+      for (const f of snapshotFrames(b.s)) {
+        if (f.viewer.role !== "dm") continue;
+        for (const p of (f.records[EFFECT_PRESET_TYPE] ?? []) as { id: string }[]) {
+          presetIds.add(p.id);
+        }
+      }
+      for (const f of snapshotFrames(b.s).filter((x) => x.viewer.role === "player")) {
+        for (const e of (f.records[EFFECT_TYPE] ?? []) as Record<string, unknown>[]) {
+          if (e.targetCombatantId !== null) {
+            expect(Object.keys(e)).not.toContain("modifiers");
+            expect(Object.keys(e)).not.toContain("presetKey");
+          } else {
+            expect(Array.isArray(e.modifiers)).toBe(true);
+            expect([null, "hunters-mark"]).toContain(e.presetKey as string | null);
+          }
+        }
+        const own = (f.records[EFFECT_PRESET_TYPE] ?? []) as Record<string, unknown>[];
+        expect(own.map((p) => p.ownerPlayerId)).toEqual([f.viewer.playerId]);
+        expect(own.every((p) => p.characterId !== null)).toBe(true);
+        const fx = JSON.stringify(f.records[EFFECT_TYPE] ?? []);
+        // The 6 PC "Bless" effects carry theirs; no monster effect's reaches a player.
+        expect(fx.match(/"modifiers":\[\{/g)).toHaveLength(HEAVY.pcModEffects);
+        expect(fx).not.toContain("preset-hex-");
+        for (const id of presetIds) expect(fx).not.toContain(id);
+      }
     });
 
     test("FR-CBTX-31/32 leak scan: no player frame has combatant tempHp, others' counters, effect links", () => {
