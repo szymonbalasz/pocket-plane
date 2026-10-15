@@ -1,6 +1,6 @@
 # Proposed — Attack and damage as separate rolls on one damage card
 
-- Status: proposed (spec-polish-2a, sprint 2 phase 1; integrator numbers it at merge)
+- Status: accepted (DM gate 1, decision #190, 2026-10-15; raised by spec-polish-2a; integrator numbers it at merge)
 - Date: 2026-10-15
 - Refines: [ADR-0016](0016-domain-events-pending-actions.md) (a pending action's payload can change while it is pending), [ADR-0027](0027-notification-creation.md) (notifications change only in the causing command's transaction; now also an update)
 - Affects: [combat-tracker](../../specs/combat-tracker.md) (FR-CBT-70–74, §6.1), [notifications](../../specs/notifications.md) (FR-NOTE-25; drops "editing" from the non-goals for pending rows), [character-sheet-full](../../specs/character-sheet-full.md) (new kinds `toHit` / `spellToHit`, FR-CHARX-24 claim list; seam settled S1, OQ-CBT-51 / OQ-CHARX-21), [protocol §21–23](../../protocol/README.md#23-combat-notification-kinds)
@@ -21,7 +21,7 @@
 | C. Attack (to-hit) never makes a card in combat: a plain roll line; only Damage and Attack + damage make cards | No new shapes | The DM can't rule hit / miss on a card; damage-only cards for every split attack lose the to-hit facts (stats #54, natural markers) |
 | D. Keep one combined action in combat (Attack = Attack + damage) | No change | Contradicts N7 ("the same everywhere") |
 
-## Decision (proposed)
+## Decision
 
 **A.** `cbt.attack` gains `rolls: "toHit"`; new `cbt.rollDamage` completes or creates a card; `cbt.applyCard` accepts a missing damage total only when every target misses; notifications gain `updateNotification` for **pending** rows only, called by the kind owner in its transaction, emitting `NotificationUpdated` (no toast, same `seq`). Out of combat the sheet's `char.roll` rolls exactly the same dice without a card. Healing never routes.
 

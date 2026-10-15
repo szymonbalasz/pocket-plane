@@ -1,7 +1,7 @@
 ---
 title: Entities (core)
 prefix: ENT
-status: in-review
+status: complete
 owner: spec-entities
 wave: 2
 ---
@@ -232,7 +232,7 @@ Other writers of a character's `hpCurrent` (character-sheet's `CharacterHpAdjust
 | OQ-ENT-15 | Other PCs' HP for players (party view) | **Combat-phase call: nothing in Scenes; combat-tracker picks** (combatant copy / band only / redacted character adds HP) | no (owner: combat-tracker) | combat-tracker, character-sheet |
 | OQ-ENT-16, 17 | `speed` shape (F3); where the default token shape lives (F4) | **16: one optional walking speed, int 0–200, multiple of 5** (fly / swim / climb later as more optional fields) / object `{walk, fly?, swim?}` now. **17: nullable `tokenShape` column on `entity`** (presentation, beside the portrait) / optional field in `statBlock` | no (owner: spec-feedback) | scenes-map, combat-tracker, character-sheet |
 | ~~OQ-ENT-18~~ | ~~Monsters get abilities and save proficiencies now too? (#149)~~ | **Decided (#154):** yes, same optional core fields for both kinds; the DM rolls monster checks / saves from the initiative row ([FR-CBT-44](combat-tracker.md#6-functional-requirements)) | — | combat-tracker |
-| OQ-ENT-20 | HP formula shape (N5) | **Optional string `hpFormula` in the stat block (`2d8+2`, entities' dice subset); `hpMax` stays the Average value** / structured `{count, die, bonus}` (easier maths, a second format beside `damage`) / derive `hpMax` from the formula (breaks homebrew HP and every stored row) | no · owner: spec-polish-2a | combat-tracker, combat-extras, fixtures-adapters |
+| ~~OQ-ENT-20~~ | ~~HP formula shape (N5)~~ | **Decided (#190):** optional string `hpFormula` in the stat block (`2d8+2`, entities' dice subset); `hpMax` stays the Average value. Rejected: structured `{count, die, bonus}`; deriving `hpMax` from the formula | — | combat-tracker, combat-extras, fixtures-adapters |
 | OQ-ENT-21 | Glossary: **HP formula** ("dice expression for a creature's hit points; Average = the stat block's HP max, Rolled = the formula rolled when the creature joins combat") | **Add** | no · owner: integrator | glossary |
 | ~~OQ-ENT-19~~ | ~~Character data without an edit UI (review #11)~~ | **Decided (#154):** fixtures / `PUT /api/entities` in MVP; full PC / NPC editing and player-filled sheets design-for-later | — | character-sheet |
 
