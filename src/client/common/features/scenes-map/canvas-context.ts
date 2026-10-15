@@ -10,6 +10,7 @@ import type { PreviewStore } from "./drag-preview";
 import type { PointerStore } from "./pointers";
 import type { CanvasColors } from "./theme";
 import type { MapTool } from "./tool-store";
+import type { CanvasToolDef } from "./tools";
 
 export interface EffectiveGrid {
   gridCellSize: number;
@@ -41,6 +42,10 @@ export interface CanvasContextValue {
   /** Others' drag previews + this client's own drag position (FR-MAP-40/42). */
   previews: PreviewStore;
   tool: MapTool;
+  /** The active registry tool (FR-SCN-06), or null for a base tool. */
+  activeTool: CanvasToolDef | null;
+  /** A drawing tool is active: tokens ignore left-press; `scn-edit` mounts (FR-SCN-02). */
+  drawing: boolean;
   live: boolean;
   myPlayerId: string | null;
   /** DM selection on this scene (FR-MAP-31); always empty on the player client. */
@@ -60,5 +65,8 @@ export function useCanvas(): CanvasContextValue {
   return c;
 }
 
-/** The layer component contract (FR-MAP-29): a Konva `<Layer>` reading `useCanvas()`. */
+/**
+ * The layer component contract (FR-MAP-29): a Konva `<Layer>` reading `useCanvas()`; a grouped
+ * entry (FR-SCN-03 `group`) renders a Konva `<Group>` instead.
+ */
 export type CanvasLayerComponent = () => React.ReactNode;
