@@ -132,6 +132,7 @@ export function FogBar() {
       data-disabled={off}
       className="flex items-center gap-1 rounded-md border bg-background/85 p-1 shadow-sm backdrop-blur"
     >
+      {/* Each item sits in a span: the Tooltip trigger's `data-state` would hide the item's "on". */}
       <ToggleGroup
         type="single"
         value={op}
@@ -140,14 +141,18 @@ export function FogBar() {
         aria-label="Fog mode"
       >
         <Tooltip content="Reveal — clear fog for players">
-          <ToggleGroupItem value="reveal" aria-label="Reveal" data-testid="fog-mode-reveal">
-            <EyeIcon />
-          </ToggleGroupItem>
+          <span className="inline-flex">
+            <ToggleGroupItem value="reveal" aria-label="Reveal" data-testid="fog-mode-reveal">
+              <EyeIcon />
+            </ToggleGroupItem>
+          </span>
         </Tooltip>
         <Tooltip content="Hide — cover with fog">
-          <ToggleGroupItem value="hide" aria-label="Hide" data-testid="fog-mode-hide">
-            <EyeOffIcon />
-          </ToggleGroupItem>
+          <span className="inline-flex">
+            <ToggleGroupItem value="hide" aria-label="Hide" data-testid="fog-mode-hide">
+              <EyeOffIcon />
+            </ToggleGroupItem>
+          </span>
         </Tooltip>
       </ToggleGroup>
       <div className="mx-0.5 h-6 w-px bg-border" />
@@ -159,14 +164,18 @@ export function FogBar() {
         aria-label="Fog shape"
       >
         <Tooltip content="Rectangle — drag cell to cell">
-          <ToggleGroupItem value="rect" aria-label="Rectangle" data-testid="fog-shape-rect">
-            <SquareIcon />
-          </ToggleGroupItem>
+          <span className="inline-flex">
+            <ToggleGroupItem value="rect" aria-label="Rectangle" data-testid="fog-shape-rect">
+              <SquareIcon />
+            </ToggleGroupItem>
+          </span>
         </Tooltip>
         <Tooltip content="Polygon — click corners; Enter or the first corner closes">
-          <ToggleGroupItem value="polygon" aria-label="Polygon" data-testid="fog-shape-polygon">
-            <PentagonIcon />
-          </ToggleGroupItem>
+          <span className="inline-flex">
+            <ToggleGroupItem value="polygon" aria-label="Polygon" data-testid="fog-shape-polygon">
+              <PentagonIcon />
+            </ToggleGroupItem>
+          </span>
         </Tooltip>
       </ToggleGroup>
       <div className="mx-0.5 h-6 w-px bg-border" />
