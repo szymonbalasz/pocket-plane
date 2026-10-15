@@ -15,7 +15,7 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 | Area | State |
 |---|---|
 | MVP, sprint 1 | Done (#176, #177–#186). |
-| Sprint 2 | **Builds done (#187–#199).** Phase 1: DM playtest notes N1–N11, session-sim-4 glitches G1–G10, effect modifiers tier 1 (MOD), P3 polish. Phase 2: fog of war (FOG), scene tools (SCN: walls / doors, props, AoE templates, layers, diagonal rule), DM active-scene window (ADR-0041). `main` green: 1877 tests, full e2e 58/58 (15 bundles). Session-sim-6 17/18 (one popup regression, `fix/sim6-popup`), leak scan clean. Playtest scripts: [sprint-2 §Playtest: phase 1 fixes](sprint-2.md#playtest-phase-1-fixes), [§Playtest: sprint 2 features](sprint-2.md#playtest-sprint-2-features). |
+| Sprint 2 | **Builds done (#187–#199).** Phase 1: DM playtest notes N1–N11, session-sim-4 glitches G1–G10, effect modifiers tier 1 (MOD), P3 polish. Phase 2: fog of war (FOG), scene tools (SCN: walls / doors, props, AoE templates, layers, diagonal rule), DM active-scene window (ADR-0041).  Session-sim-6 17/18, its FAIL fixed by `fix/sim6-popup` (#200); final `main` 1884 tests, e2e 61/61; leak scan clean. Playtest scripts: [sprint-2 §Playtest: phase 1 fixes](sprint-2.md#playtest-phase-1-fixes), [§Playtest: sprint 2 features](sprint-2.md#playtest-sprint-2-features). |
 | Verification | Evidence `%TEMP%\pocket-planeerify-*` (latest `verify-session-sim-6`; also `.verify/20261015-232530-session-sim-6/` in the main checkout, 12 ranked glitches). |
 | Specs / ADRs | All specs `complete`. ADRs 0001–0041 accepted (0037 split attack / damage, 0038 effect modifiers, 0039 fog visibility, 0040 token move guards, 0041 active-scene window). |
 | Decisions | Up to #199 in [decisions-log](../decisions-log.md). |

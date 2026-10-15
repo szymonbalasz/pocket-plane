@@ -206,3 +206,71 @@ Starts in combat (round 1, Wolf's turn): Bless on Mira and Thorn (Mira concentra
 ```powershell
 bun run fixtures:reset --profile verify
 ```
+
+## Playtest: sprint 2 features
+
+Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~20 minutes per part. **DM** (normal browser) + **Player 1** (incognito, Mira) + **Player 2** (another browser, Thorn). Regression run: [session-sim-6 report](../../.verify/20261015-232530-session-sim-6/report.md) (local, gitignored): 17 / 18 PASS, leak scan clean with fog, walls, props and templates in play; the one FAIL is fixed in `fix/sim6-popup` (#200, popup over its toast; also the concentration row first in Pending and toasts clear of open windows). Phase-1 fixes: see [Playtest: phase 1 fixes](#playtest-phase-1-fixes) above.
+
+### Setup
+
+```powershell
+bun install
+bun run build
+bun run fixtures:reset-load fog --profile verify
+bun run start --profile verify
+```
+
+Open the printed DM URL (paste the secret) and each player link in its own browser. To switch bundles: `Ctrl+C`, `bun run fixtures:reset-load <bundle> --profile verify`, `bun run start --profile verify`; player links change on every load.
+
+### Part 1: fog of war (`fog`)
+
+Goblin Ambush starts fully fogged (Goblin Lurker hidden in a corner); Town has no fog.
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | View Goblin Ambush, **Show to players** | You see the map under 50 % fog with a "Fog" badge on Goblin, Goblin 2, Lurker; players see opaque fog with only Mira, Thorn and the Cave Ogre |
+| 2 | Tool rail → **Fog** → Reveal, Rectangle; drag over the Goblin | The Goblin appears for players within a second |
+| 3 | Polygon: click corners around the Lurker, then the first corner | The Lurker appears; **Undo** ("Undo: reveal polygon") hides it again |
+| 4 | Hold **Space** and drag | The map pans; nothing is drawn |
+| 5 | Drag a revealed Goblin into fog, and Goblin 2 out of fog | Players: the first vanishes on the drop, the second appears on the drop; never shown inside fog |
+| 6 | Hide a rectangle over the party; Player 1 moves Mira inside it | Players still see Mira and Thorn (own tokens stay visible to everyone) |
+| 7 | Start "Ambush at the Ford"; **Fog all** (confirm), then **Reveal all**, then Undo | A fog-hidden monster has no Initiative row for players; reveal adds row and token together |
+| 8 | Scenes → **New scene** | It starts fully fogged; Town still has no fog |
+| 9 | Stop the server (`Ctrl+C`) and start it again | Fog, undo depth and what players see are unchanged |
+
+### Part 2: walls, doors, props, templates (`scene-tools`)
+
+Goblin Ambush has walls, two doors (d1 closed, d2 locked), a barrel and a chest; the battlemap is the active scene.
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Player 1 drags Mira through a wall | Refused: she snaps back, the cell flashes, "Blocked by a wall or door" |
+| 2 | You drag a Goblin through the same wall | Allowed, with a "through wall" hint while dragging |
+| 3 | Double-click door d1; lock / unlock d2 from its menu | d1 opens for everyone; Mira can now walk through; a locked door looks closed to players |
+| 4 | **Structure** tool: draw a 3-segment wall, add a door, erase it; **Undo** a few times | Each Undo reverts the last edit (walls and props share one undo stack per scene) |
+| 5 | **Props** tool: place a barrel, resize 2 × 2, rotate, hide it; lock the chest and try to drag it | The hidden barrel disappears for players; the locked chest doesn't move |
+| 6 | Player 2: **AoE** tool → cone 15 ft, drag its direction, **Keep**; Player 1: a sphere, then closes the tab | Everyone sees the cone's squares live; the kept cone stays; the sphere vanishes when its player leaves |
+| 7 | Ruler panel → **Diagonals 5 ft**; Player 1 measures a diagonal | Distances follow the campaign rule (5/10/5 vs 5 ft), also the combat "Moved" value |
+| 8 | **Layers** popover: Walls & doors off, DM-only items off | Hidden on your screen only (incl. hidden tokens); players unaffected; remembered after reload |
+| 9 | View another scene (e.g. Cellar) | "Loading scene…", then its tokens and walls (your snapshot carries only the active scene now) |
+
+### Part 3: fog over scene tools (`fog-scn`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Reveal a rectangle over the fogged room in the north-east | The barrel, the DM template "Trap" and the door there appear for players only on the reveal |
+| 2 | Player 2 places a template inside fog | Everyone sees it (players' own templates are never hidden by fog) |
+
+### Known gaps / later
+
+- Fog: no brush, stepped diagonal edges, no vision / lighting / line of sight; the map image itself still reaches players whole.
+- Scene tools: "Select creatures inside a template" was left out (#196); map pins, freehand drawing and AoE automation are later tiers.
+- Session-sim-6 glitches for the recap: Fit with the Game log open cuts the top rows of Goblin Ambush and leaves space below (Town crops on the right); "Start round 1" does nothing silently while PCs lack initiative; round-0 movement counts toward round 1; a Dying badge can cover a neighbour's name label; chips still collapse to "+N" in narrow Initiative rows; "Clear templates" has no confirm and removes players' kept templates; the New scene dialog shows "Map:" with no name after choosing a map; Konva warns about 9 canvas layers on load.
+
+### Teardown
+
+`Ctrl+C` the server, then:
+
+```powershell
+bun run fixtures:reset --profile verify
+```

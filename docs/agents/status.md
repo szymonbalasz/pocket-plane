@@ -2,14 +2,13 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 2 **builds complete** (#199; main green 1877 / e2e 58). Session-sim-6 regression on `main` running; then 'Playtest: sprint 2 features' in sprint-2 and **pause + recap with the DM** before sprint 3.
+**Phase:** **Sprint 2 complete (#200).** Paused for the DM recap and the sprint-3 pick ([continue-session §2](continue-session.md#2-next-in-order)). Main green: 1884 tests, full e2e 61/61.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Sprint 2 phase 1 + phase 2 | merged | — | Done (#189-#199) | — |
-| Session-sim-6 | main (port 4113) | test-session-6 | Running | Playtest section, recap |
+| Sprint 2 | merged | — | Done (#187-#200) | DM playtest + recap |
 
 ## Shared-file locks
 
@@ -17,7 +16,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Pending DM decisions
 
-- None (gate 2 answered #196). DM playtest of phase 1 pending.
+- Sprint-2 recap: playtest feedback (phase 1 + sprint 2 scripts in sprint-2), session-sim-6 glitches, sprint-3 pick.
 
 ## Resolved locally (report at gate)
 
