@@ -88,7 +88,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, th
 - **States:** empty = no fog row or fully fogged (players: black map, party tokens). Loading = scene loading ([FR-MAP-07](scenes-map.md#6-functional-requirements)). Error = Toast on reject, draft removed. Disconnected = fog bar disabled, gestures dropped (FR-FOG-22), fog stays drawn.
 - **DM view:** all tokens; fog translucent; "Fog" badge; draft shape; Undo Tooltip names the step; works on scenes not shown to players.
 - **Player view:** opaque fog; only records not fog-hidden; party tokens and own templates over the fog. No fog controls.
-- **Test IDs:** `fog-tool`, `fog-bar`, `fog-mode-reveal`, `fog-mode-hide`, `fog-shape-rect`, `fog-shape-polygon`, `fog-reveal-all`, `fog-fog-all`, `fog-fog-all-confirm`, `fog-undo` (attr `data-depth`). Konva: layer `fog-layer`; shape `fog-mask` (attrs `fill`, `fogged-cells`); `fog-draft`, `fog-draft-vertex` (`id` = index); badge `fog-token-fogged` (`id` = token id).
+- **Test IDs:** `map-tool-fog` (rail button, built by the core ToolRail, #198), `fog-bar`, `fog-mode-reveal`, `fog-mode-hide`, `fog-shape-rect`, `fog-shape-polygon`, `fog-reveal-all`, `fog-fog-all`, `fog-fog-all-confirm`, `fog-undo` (attr `data-depth`). Konva: layer `fog-layer`; shape `fog-mask` (attrs `fill`, `fogged-cells`); `fog-draft`, `fog-draft-vertex` (`id` = index); badge `fog-token-fogged` (`id` = token id).
 
 ## 8. Data model
 

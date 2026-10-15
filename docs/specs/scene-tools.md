@@ -343,7 +343,7 @@ All decided at DM gate 2 (#196, "go with picks") or settled earlier. Glossary ro
 ## Appendix A: test IDs
 
 - **DOM:**
-  - Tools: `scn-tool-<structure|props|aoe|layers>`, `scn-structure-mode-<wall|door|erase>`, `scn-undo`.
+  - Tools: rail buttons `map-tool-<structure|props|aoe|layers>` (built by the core ToolRail, #198; `scn-tool-props` sits on the Props panel root), `scn-structure-mode-<wall|door|erase>`, `scn-undo`.
   - Door menu: `scn-door-menu-<open|close|lock|unlock|delete>`.
   - Props: `scn-prop-menu-<rotate|hide|lock|front|back|duplicate|image|delete>`, `scn-prop-image`.
   - AoE: `scn-aoe-shape-<cone|sphere|cylinder|cube|line>`, `scn-aoe-<size|width|label|keep|clear>`, `scn-template-menu-<hide|delete>`.

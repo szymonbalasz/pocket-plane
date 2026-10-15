@@ -2,22 +2,18 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 2 **phase 2 builds** (gate 2 #196; specs merged; ADR-0039 to 0041). Order: `fix/active-scene-window` → `fix/fog-core` → `fix/scn-core` → SCN slices ∥ fog server / client → `build/scene-tools-settings`; P3 polish in parallel. Then session-sim regression, 'Playtest: sprint 2 features', pause and recap.
+**Phase:** Sprint 2 **builds complete** (#199; main green 1877 / e2e 58). Session-sim-6 regression on `main` running; then 'Playtest: sprint 2 features' in sprint-2 and **pause + recap with the DM** before sprint 3.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Phase 1 | merged | — | Done (#189-#195) | DM playtest |
-| Window, fog core / server / client, SCN core / templates / props / structure, P3 | merged | — | Done (#197, #198) | — |
-| Fog visibility (players) + fog-scn | `build/fog-visibility` (w3A) | build-fog-visibility | Building | Walkthrough FOG 1-11 |
-| SCN settings (layers, diagonal rule) | `build/scene-tools-settings` | build-scn-settings | Building; combat movedFt after fog-visibility | Walkthrough |
-| Sprint close | main | — | After both | session-sim-6, 'Playtest: sprint 2 features', recap |
+| Sprint 2 phase 1 + phase 2 | merged | — | Done (#189-#199) | — |
+| Session-sim-6 | main (port 4113) | test-session-6 | Running | Playtest section, recap |
 
 ## Shared-file locks
 
-- Combat (lifecycle / token hook / add-combatants / bind-token): build/fog-visibility → then settings' movedFt.
-- ToolRail: build/scene-tools-settings (Tooltip data-state fix).
+- None.
 
 ## Pending DM decisions
 
