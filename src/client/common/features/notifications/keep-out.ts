@@ -4,10 +4,11 @@
 // left of it → below its bottom edge. P3 glitch 2: then, of the spots clear of Initiative, the one
 // covering the least of the toasts' tokens to avoid (a card's likely targets) wins; ties keep the
 // default. Pure; players keep bottom-right.
-import { coveredArea, type TokenBox } from "../combat-tracker/token-boxes";
+
 import { EDGE_GAP, type Rect, type Viewport } from "../play-shell/geometry";
 import { RAIL_CLEAR } from "../play-shell/placement";
 import { DM_TOAST_TOP } from "../play-shell/toast-region";
+import { coveredArea, type TokenBox } from "../play-shell/token-boxes";
 
 /** The stack's width, px (`w-80`). */
 export const STACK_W = 320;

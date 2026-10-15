@@ -21,7 +21,6 @@ import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
-import { tokenScreenBoxes } from "../combat-tracker/token-boxes";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
 import type { Rect } from "../play-shell/geometry";
@@ -32,6 +31,7 @@ import {
   useRegistry,
   useShellState,
 } from "../play-shell/ShellContext";
+import { tokenScreenBoxes } from "../play-shell/token-boxes";
 import { dmStackPlacement } from "./keep-out";
 import {
   actionButton,

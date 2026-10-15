@@ -1,5 +1,6 @@
-// Token screen boxes for placing panels clear of the tokens the DM needs to click (FR-CBT-56 popup,
-// FR-NOTE-32 toast stack). `coveredArea` is pure; `tokenScreenBoxes` reads the live map canvas.
+// Token screen boxes for placing things clear of the tokens on the map (FR-CBT-56 popup, FR-NOTE-32
+// toast stack, open placement of new windows; P3 glitches 2 and 13). `coveredArea` is pure;
+// `tokenScreenBoxes` reads the live map canvas.
 
 /** A token's on-screen box, px. */
 export interface TokenBox {
@@ -33,19 +34,19 @@ interface KonvaStage {
 }
 
 /**
- * On-screen box of each drawn token in `tokenIds` on the map canvas (Konva `name` / `id`, AGENTS
- * §9.5); tokens not drawn (other scene, no canvas) are left out.
+ * On-screen box of each drawn token in `tokenIds` (`"all"`: every drawn token) on the map canvas
+ * (Konva `name` / `id`, AGENTS §9.5); tokens not drawn (other scene, no canvas) are left out.
  */
-export function tokenScreenBoxes(tokenIds: readonly string[]): TokenBox[] {
+export function tokenScreenBoxes(tokenIds: readonly string[] | "all"): TokenBox[] {
   if (tokenIds.length === 0 || typeof window === "undefined") return [];
   const K = (window as unknown as { Konva?: { stages: KonvaStage[] } }).Konva;
   const stage = K?.stages.find((s) => s.container().isConnected);
   if (!stage) return [];
   const box = stage.container().getBoundingClientRect();
-  const want = new Set(tokenIds);
+  const want = tokenIds === "all" ? null : new Set(tokenIds);
   return stage
     .find(".map-token")
-    .filter((n) => want.has(n.id()))
+    .filter((n) => want === null || want.has(n.id()))
     .map((n) => {
       const r = n.getClientRect();
       return { x: box.left + r.x, y: box.top + r.y, w: r.width, h: r.height };

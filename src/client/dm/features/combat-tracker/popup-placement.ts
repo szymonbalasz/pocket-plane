@@ -7,11 +7,6 @@
 // `placementTiers`, `clampIntoWorkArea` and `dragPopup` are pure; `measurePlacement` reads the
 // live screen.
 import type { CombatantKind } from "@shared/combat-tracker/schemas";
-import {
-  coveredArea,
-  type TokenBox,
-  tokenScreenBoxes,
-} from "@ui/features/combat-tracker/token-boxes";
 import { INITIATIVE_KIND } from "@ui/features/combat-tracker/window";
 import {
   EDGE_GAP,
@@ -24,6 +19,7 @@ import {
 } from "@ui/features/play-shell/geometry";
 import { windowId } from "@ui/features/play-shell/manager";
 import { RAIL_CLEAR } from "@ui/features/play-shell/placement";
+import { coveredArea, type TokenBox, tokenScreenBoxes } from "@ui/features/play-shell/token-boxes";
 import type { TargetCandidate } from "./targets";
 
 export type { TokenBox };
