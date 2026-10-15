@@ -613,7 +613,7 @@ function Row({
   const rowRef = useRef<HTMLLIElement>(null);
   const movedBelow = useMovedBelow(
     rowRef,
-    `${c.name}:${c.movedFt}:${wideInit}:${skipped}:${c.hidden}:${hp?.cur}:${down}:${hasDeathState}`,
+    `${c.name}:${c.movedFt}:${round}:${wideInit}:${skipped}:${c.hidden}:${hp?.cur}:${down}:${hasDeathState}`,
   );
   return (
     <li
@@ -655,8 +655,9 @@ function Row({
           )}
           {/* FR-CBTX-33: effect chips, one line ("+N" for the rest). */}
           <RowEffects c={c} round={round} />
-          {/* On the name line, right-aligned; below when the name needs the room (P3 glitch 10). */}
-          {!movedBelow && <Moved c={c} speed={stats?.speed} />}
+          {/* On the name line, right-aligned; below when the name needs the room. From round 1
+              only: before the first turn nothing has moved in combat (P3 glitch 10, ruling A). */}
+          {round >= 1 && !movedBelow && <Moved c={c} speed={stats?.speed} />}
         </div>
         <div
           data-stats-line
@@ -672,7 +673,7 @@ function Row({
           )}
           {down && !hasDeathState && <BandBadge band="down" testId="cbt-init-row-band" />}
           <RowDeath c={c} />
-          {movedBelow && <Moved c={c} speed={stats?.speed} />}
+          {round >= 1 && movedBelow && <Moved c={c} speed={stats?.speed} />}
         </div>
       </div>
       <InitiativeCell c={c} def={def} round={round} wide={wideInit} />

@@ -89,6 +89,20 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
   await expect(init).toBeVisible();
   await expect(init.locator('[data-testid="cbt-init-row-name"][data-value="Mira"]')).toHaveCount(1);
   await expect(init.locator('[data-testid="cbt-init-row-name"][data-value="Brin"]')).toHaveCount(0);
+  // P3 glitch 10, ruling A: in round 0 (Roll buttons in the Init column, no Moved) long names
+  // such as "Elite Goblin Warrior" stay whole.
+  await expect(
+    init.locator('[data-testid="cbt-init-row-name"][data-value="Elite Goblin Warrior"]'),
+  ).toHaveCount(1);
+  await expect
+    .poll(() =>
+      init
+        .locator('[data-testid="cbt-init-row-name"] [data-name-base]')
+        .evaluateAll((els) =>
+          els.filter((e) => e.scrollWidth > e.clientWidth + 0.5).map((e) => e.textContent),
+        ),
+    )
+    .toEqual([]);
 
   // Mira's Light crossbow (2nd attack) from the Actions tab: Attack + damage → cbt.attack → the
   // DM's card (Attack is to-hit only since N7, FR-CHARX-41).

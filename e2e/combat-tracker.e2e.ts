@@ -108,17 +108,8 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await expect(init.locator('[data-testid="cbt-init-row"][data-hidden="true"]')).toHaveCount(2);
   const pinit = await openWindow(player, "cbt.initiative");
   await expect(pinit.getByTestId("cbt-init-row")).toHaveCount(4);
-  // FR-CBT-39: every bound row shows its whole movement used, "0 / 30 ft" (nothing clipped).
-  await expect(init.getByTestId("cbt-init-row-moved")).toHaveCount(6);
-  const clippedMoved = await init.evaluate(
-    (w) =>
-      [...w.querySelectorAll("[data-testid='cbt-init-row-moved']")].filter((el) => {
-        const r = el.getBoundingClientRect();
-        const box = (el.parentElement as HTMLElement).getBoundingClientRect();
-        return r.width === 0 || r.left < box.left - 0.5 || r.right > box.right + 0.5;
-      }).length,
-  );
-  expect(clippedMoved).toBe(0);
+  // P3 ruling A (FR-CBT-39): round 0 shows no movement (no turn yet), so long names stay whole.
+  await expect(init.getByTestId("cbt-init-row-moved")).toHaveCount(0);
 
   // Step 4: monsters rolled at Start (FR-CBT-64), so no "Roll monsters"; Mira rolls from her
   // sheet (routed to cbt.rollInitiative); DM sets Thorn; Start round 1.
@@ -145,6 +136,18 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await init.getByTestId("cbt-init-next").click();
   await expect(init.getByTestId("cbt-init-round")).toHaveAttribute("data-value", "1");
   await expect(pinit.getByTestId("cbt-init-round")).toHaveAttribute("data-value", "1");
+  // FR-CBT-39: from round 1 every bound row shows its whole movement used, "0 / 30 ft" (nothing
+  // clipped; on the name line or, for a long name, the AC / HP line).
+  await expect(init.getByTestId("cbt-init-row-moved")).toHaveCount(6);
+  const clippedMoved = await init.evaluate(
+    (w) =>
+      [...w.querySelectorAll("[data-testid='cbt-init-row-moved']")].filter((el) => {
+        const r = el.getBoundingClientRect();
+        const box = (el.parentElement as HTMLElement).getBoundingClientRect();
+        return r.width === 0 || r.left < box.left - 0.5 || r.right > box.right + 0.5;
+      }).length,
+  );
+  expect(clippedMoved).toBe(0);
   // FR-CBT-46 / FR-CHAR-24 (#172): from round 1 everyone has initiative, so nobody re-rolls:
   // no row Roll, no "Roll monsters", and the sheet's Initiative reads "Initiative set".
   await expect(init.getByTestId("cbt-init-row-roll")).toHaveCount(0);
