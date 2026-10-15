@@ -28,6 +28,7 @@ describe("FR-SCN-02/03 canvas layers", () => {
       ["grid", 10],
       ["scn-props", 20],
       ["scn-structure", 26],
+      ["fog", 30],
       ["scn-templates", 35],
       ["tokens", 40],
       ["labels", 45],
@@ -44,6 +45,7 @@ describe("FR-SCN-02/03 canvas layers", () => {
       ["map"],
       ["grid"],
       ["scn-props", "scn-structure"],
+      ["fog"],
       ["scn-templates"],
       ["tokens"],
       ["labels"],
@@ -53,10 +55,10 @@ describe("FR-SCN-02/03 canvas layers", () => {
     expect(dm[2]?.group).toBe("scn-objects");
     const player = layerSlots(canvasLayers, "player");
     expect(player.flatMap((s) => s.layers.map((l) => l.id))).not.toContain("scn-edit");
-    // scn-edit renders a Konva layer only while drawing; FOG adds one (order 30).
+    // scn-edit renders a Konva layer only while drawing; FOG's is one of them (order 30).
     const always = dm.filter((s) => s.layers[0]?.id !== "scn-edit").length;
-    expect(always + 1).toBeLessThanOrEqual(8);
-    expect(always + 2).toBeLessThanOrEqual(9);
+    expect(always).toBeLessThanOrEqual(8);
+    expect(always + 1).toBeLessThanOrEqual(9);
   });
 
   test("FR-SCN-05 toggles: off drops the entry on the DM client only; an empty group drops its layer", () => {
@@ -118,8 +120,9 @@ const tool = (t: Partial<CanvasToolDef> & Pick<CanvasToolDef, "id" | "order">): 
 });
 
 describe("FR-SCN-06 canvas tools", () => {
-  test("FR-SCN-06 the registry ships empty; entries validate and sort", () => {
-    expect(canvasTools).toEqual([]);
+  test("FR-SCN-06 the registry validates and sorts; entries validate and sort", () => {
+    // Registry-agnostic (each slice appends a line): already ordered and valid.
+    expect(orderTools(canvasTools)).toEqual([...canvasTools]);
     const tools = orderTools([
       tool({ id: "aoe", order: 30, clients: ["dm", "player"], pointer: {} }),
       tool({ id: "structure", order: 10, pointer: {} }),

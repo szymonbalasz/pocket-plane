@@ -2,6 +2,7 @@
 // import and one line, at a free order between its neighbours (`LAYER_ORDER`; fog 30 is FOG's).
 // A layer is a component rendering one Konva `<Layer>` that reads `useCanvas()`; entries with a
 // `group` render a Konva `<Group>` and share one `<Layer>` with their same-group neighbours.
+import { FogLayer } from "../fog-of-war/FogLayer";
 import { ScnEditLayer } from "../scene-tools/layers/EditLayer";
 import { ScnPropsLayer } from "../scene-tools/layers/PropsLayer";
 import { ScnStructureLayer } from "../scene-tools/layers/StructureLayer";
@@ -41,4 +42,6 @@ export const canvasLayers: readonly LayerDef<object>[] = orderLayers<object>([
     toggle: { key: "templates", label: "Templates", layer: "objects" },
   },
   { id: "scn-edit", order: LAYER_ORDER.scnEdit, component: ScnEditLayer, clients: ["dm"] },
+  // fog-of-war (FR-FOG-20): DM render + Fog tool draft; build/fog-visibility opens it to players.
+  { id: "fog", order: LAYER_ORDER.fog, component: FogLayer, clients: ["dm"] },
 ]);
