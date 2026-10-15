@@ -88,8 +88,9 @@ test("FR-SHELL-01/02/05/06/21 DM frame: top bar, presence badge, Players window 
   await dm.getByTestId("ui-presence-badge").click();
   await expect(players).toBeVisible();
 
-  // 1440×900 (the default layout's design size), fresh page and layout: right edge, below
-  // `cbt.initiative`.
+  // 1440×900 (the default layout's design size), fresh page and layout: Initiative restored,
+  // then Players opens full size (400×340, P3 glitch 5) at an edge, clear of Initiative (#193:
+  // a full-size free slot beats a shrunk one below it).
   const wide = await rolePage(browser);
   await wide.setViewportSize({ width: 1440, height: 900 });
   await loginDm(wide, secret);
@@ -102,8 +103,11 @@ test("FR-SHELL-01/02/05/06/21 DM frame: top bar, presence badge, Players window 
   await expect(shellWindow(wide, "camp.players")).toHaveAttribute("data-state", "open");
   const init = await box(wide, "cbt.initiative");
   const w = await box(wide, "camp.players");
-  expect(w.x + w.w).toBeGreaterThan(1440 - 40); // right edge
-  expect(w.y).toBeGreaterThanOrEqual(init.y + init.h); // below Initiative
+  expect(Math.round(w.h)).toBe(340);
+  expect(w.x < 80 || w.x + w.w > 1440 - 40).toBe(true); // an edge
+  const clear =
+    w.x + w.w <= init.x || init.x + init.w <= w.x || w.y + w.h <= init.y || init.y + init.h <= w.y;
+  expect(clear).toBe(true);
   await wide.context().close();
 });
 

@@ -504,7 +504,7 @@ Server registry owned by entities, **append-only** ([AGENTS §9.9](../../AGENTS.
 
 | Kind | Owner | Clients | Default open | Default geometry | Launcher | Gate | Source |
 |---|---|---|---|---|---|---|---|
-| `camp.players` | SHELL (CAMP content) | DM | no (map-first, #162) | bottom-right (right edge, below `cbt.initiative`), 400×220, min 360×200; no 200 px there (1280×720) → left edge | Players | — | [FR-SHELL-21](../specs/play-shell.md#6-functional-requirements) |
+| `camp.players` | SHELL (CAMP content) | DM | no (map-first, #162) | bottom-right (right edge, below `cbt.initiative`), ~~400×220~~ *(P3 polish, fix/p3-polish)* 400×340 (two players × two party lines, the add row and the link note unscrolled at 1440×900; no longer fits below an open 500-high Initiative, so then a full-size edge slot wins, #193), min 360×200; no 200 px there (1280×720) → left edge | Players | — | [FR-SHELL-21](../specs/play-shell.md#6-functional-requirements) |
 | `map.scenes` | MAP | DM | no (map-first, #162) | top-left `dx` 56 (clear of the tool rail), 260×440, min 240×240 | Scenes | — | [MAP §7](../specs/scenes-map.md#7-uiux-notes) |
 | `ent.creatures` | ENT | DM | no | top-left `dx` 56 (left edge, as `map.scenes` / `cbt.encounters`; above `dice.log`, shorter where needed, #162), 340×512, min 300×240 | Creatures (order 30) | — | [ENT §7](../specs/entities.md#7-uiux-notes), [FR-ENT-18](../specs/entities.md#6-functional-requirements) |
 | `asset.test` | ASSET | DM | no | bottom-left +568 px (between `sync.probes` and `shell.test`), 360×224, min 300×200 | Images (order 920; the only way to open it until scenes-map flows exist) | test mode | [FR-ASSET-19](../specs/assets-pipeline.md#6-functional-requirements), [CON-28](#11-conflicts-log) |
