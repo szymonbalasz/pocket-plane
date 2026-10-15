@@ -287,7 +287,7 @@ describe("buttons, list, labels (FR-NOTE-16/17/20)", () => {
     expect(dismissButton(note(), dmV, true)).toBe("none");
   });
 
-  test("FR-NOTE-17 sections: Pending (DM all; player own) then History, newest first; labels", () => {
+  test("FR-NOTE-17 FR-NOTE-28 sections: Pending (DM all; player own) then History, newest first; labels", () => {
     const info = note();
     const card = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
     const ask = pendingFor("player", "p1");
@@ -303,6 +303,10 @@ describe("buttons, list, labels (FR-NOTE-16/17/20)", () => {
     expect(stateLabel(done, names)).toBe("Resolved by Player 1");
     expect(stateLabel({ ...done, closedByRole: "dm", closedByPlayerId: null }, names)).toBe(
       "Resolved by DM",
+    );
+    // FR-NOTE-28 badge: resolved with no actor (a rule closure) → "Closed".
+    expect(stateLabel({ ...done, closedByRole: null, closedByPlayerId: null }, names)).toBe(
+      "Closed",
     );
     expect(stateLabel(card, names)).toBe("Pending");
     expect(stateLabel({ ...card, state: "dismissed" }, names)).toBe("Dismissed");
@@ -325,7 +329,8 @@ describe("unread (FR-NOTE-18)", () => {
     const ask = pendingFor("player", "p1");
     const card = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
     const rows = [info, dmOnly, ask, card];
-    expect(unreadCount(store(DM, rows), 0)).toBe(3);
+    // DM: info, dmOnly, card and (FR-NOTE-27) the player-owned `ask`.
+    expect(unreadCount(store(DM, rows), 0)).toBe(4);
     expect(unreadCount(store(P1, rows), 0)).toBe(2);
     expect(unreadCount(store(P1, rows), ask.seq)).toBe(0);
     expect(unreadCount(store(P2, rows), 0)).toBe(1);
@@ -345,6 +350,19 @@ describe("unread (FR-NOTE-18)", () => {
     expect(unreadCount(store(DM, at("pending")), card.seq)).toBe(0);
     // The info row counts by audience whatever happens to action rows.
     expect(unreadCount(store(P1, at("dismissed")), 0)).toBe(1);
+  });
+
+  test("FR-NOTE-27 DM unread: a player-owned pending row counts for the DM, not toasted; leaves when resolved; player client unchanged", () => {
+    const ask = pendingFor("player", "p1");
+    expect(unreadCount(store(DM, [ask]), 0)).toBe(1);
+    expect(unreadCount(store(DM, [ask]), ask.seq)).toBe(0);
+    expect(unreadCount(store(DM, [{ ...ask, state: "resolved" }]), 0)).toBe(0);
+    expect(unreadCount(store(P1, [ask]), 0)).toBe(1);
+    expect(unreadCount(store(P2, [ask]), 0)).toBe(0);
+    // Still no DM toast (FR-NOTE-13): created in an event frame, the DM's triggers skip it.
+    const prev: SyncView = { state: "live", store: store(DM, [], 1) };
+    const next: SyncView = { state: "live", store: store(DM, [ask], 2) };
+    expect(toastTriggers(prev, next)).toEqual([]);
   });
 
   test("FR-NOTE-18 seen store: localStorage-like backend; failure → memory only, one warning", () => {
