@@ -199,14 +199,14 @@ describe("FR-CBT-53 outcome line detail", () => {
   test("FR-CBT-53 step 9a: DM ruled hit vs computed miss; player copy has physical, no dmPayload", () => {
     const { entry, players } = applied({ hit: true }); // 9 + 4 = 13 vs Mira's AC 16
     expect(dmText(entry)).toBe(
-      "Goblin attacks Mira: 9 + 4 = 13 (physical) vs AC 16 — DM ruled hit 6 slashing damage (1d6+2: 4 + 2) (physical)",
+      "Goblin attacks Mira: 9 + 4 = 13 vs AC 16 — DM ruled hit 6 slashing damage (1d6+2: 4 + 2) (physical)",
     );
     for (const data of players) {
       expect(data).toBeDefined();
       expect(data && "dmPayload" in data ? data.dmPayload : undefined).toBeUndefined();
       expect(data?.payload).toMatchObject({ manual: { toHit: true, damage: true } });
       expect(playerText(data)).toBe(
-        "Goblin attacks Mira: 9 + 4 = 13 (physical) — hit! 6 slashing damage (physical)",
+        "Goblin attacks Mira: 9 + 4 = 13 — hit! 6 slashing damage (physical)",
       );
       const raw = JSON.stringify(data);
       for (const leak of ['"rolls"', "DM ruled", "DM set", "targetAc"]) {

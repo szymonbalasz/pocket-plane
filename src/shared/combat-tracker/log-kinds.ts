@@ -12,13 +12,18 @@ export const AttackLogPayload = z.strictObject({
   targetName: z.string(),
   attackName: z.string(),
   damageType: z.string().nullable(),
-  /** `dice` = rolled dice sum, null when the DM edited the total. */
-  toHit: z.strictObject({
-    dice: z.int().nullable(),
-    constant: z.int(),
-    total: z.int(),
-    natural: z.int().nullable(),
-  }),
+  /**
+   * `dice` = rolled dice sum, null when the DM edited the total. Null = a damage-only card
+   * (FR-CBT-72/73): "Mira → Goblin: 6 piercing damage (Light crossbow)".
+   */
+  toHit: z
+    .strictObject({
+      dice: z.int().nullable(),
+      constant: z.int(),
+      total: z.int(),
+      natural: z.int().nullable(),
+    })
+    .nullable(),
   hit: z.boolean(),
   /** Damage dealt before HP clamping (`raw`). */
   damage: z.int(),
@@ -35,28 +40,33 @@ export type AttackLogPayload = z.infer<typeof AttackLogPayload>;
  */
 const CompactDice = z.array(CardDie).max(51);
 
-/** FR-CBT-53 (b): the card's roll rows, DM-only (FR-DICE-28). */
+/** FR-CBT-53 (b): the card's roll rows, DM-only (FR-DICE-28); a partial card lacks one. */
 export const AttackLogRolls = z.strictObject({
-  toHit: z.strictObject({
-    expression: z.string().max(80),
-    mode: z.enum(["normal", "advantage", "disadvantage"]),
-    dice: CompactDice,
-    constant: z.int(),
-  }),
-  damage: z.strictObject({
-    expression: z.string().max(80),
-    dice: CompactDice,
-    constant: z.int(),
-    crit: z.boolean(),
-  }),
+  toHit: z
+    .strictObject({
+      expression: z.string().max(80),
+      mode: z.enum(["normal", "advantage", "disadvantage"]),
+      dice: CompactDice,
+      constant: z.int(),
+    })
+    .optional(),
+  damage: z
+    .strictObject({
+      expression: z.string().max(80),
+      dice: CompactDice,
+      constant: z.int(),
+      crit: z.boolean(),
+    })
+    .optional(),
 });
 export type AttackLogRolls = z.infer<typeof AttackLogRolls>;
 
+/** FR-CBT-72: null = the card had no such roll (damage-only: no to-hit; to-hit-only: no damage). */
 export const AttackLogDmPayload = z.strictObject({
   targetAc: z.int(),
-  hitComputed: z.boolean(),
-  toHitRolled: z.int(),
-  damageRolled: z.int(),
+  hitComputed: z.boolean().nullable(),
+  toHitRolled: z.int().nullable(),
+  damageRolled: z.int().nullable(),
   damageTotal: z.int(),
   applied: z.int(),
   overkill: z.int(),
@@ -104,24 +114,54 @@ export function publicRuling(natural: number | null, hit: boolean): boolean {
   return (natural === 1 && hit) || (natural === 20 && !hit);
 }
 
+/** "6 slashing damage (half)", then the DM's "(DM set; rolled 4)" / dice breakdown. */
+function damageSegments(
+  p: AttackLogPayload,
+  dm: AttackLogDmPayload | null | undefined,
+  suffix: string,
+): LineSegment[] {
+  const type = p.damageType ? ` ${p.damageType}` : "";
+  const out: LineSegment[] = [
+    { text: `${p.damage}${type} damage${MULT_TEXT[p.multiplier]}${suffix}` },
+  ];
+  if (dm?.overrides.damage) {
+    const rolled = dm.damageRolled === null ? "" : `; rolled ${dm.damageRolled}`;
+    out.push({ text: ` (DM set${rolled})`, style: "muted" });
+  }
+  if (dm?.rolls?.damage) out.push(...rollBreakdownSegments(dm.rolls.damage));
+  return out;
+}
+
 /**
  * "Goblin attacks Mira: 12 + 4 = 16 — hit! 6 slashing damage" (FR-CBT-24); "physical" after a
- * manual roll (FR-CBT-53 a); " (natural 1)" / " (natural 20)" after that, and "— DM ruled hit" /
- * "— DM ruled miss" for everyone when the hit contradicts the natural roll (FR-CBT-58). DM only
- * (FR-CBT-53 b, c; FR-DICE-28: built from `dmPayload` alone): "(DM set; rolled 13)" after an
- * edited total, kept / dropped d20s and the damage dice in a muted run, "vs AC 15", and "— DM
- * ruled hit" / "— DM ruled miss" when the DM overrode the hit of any other roll.
+ * manual roll (FR-CBT-53 a), **one per line** (FR-CBT-73, item 12): both rolls manual → one at
+ * the end; " (natural 1)" / " (natural 20)" after the to-hit, and "— DM ruled hit" / "— DM ruled
+ * miss" for everyone when the hit contradicts the natural roll (FR-CBT-58). A damage-only card
+ * (FR-CBT-73): "Mira → Goblin: 6 piercing damage (Light crossbow)"; a to-hit-only card applied as
+ * a miss reads as any miss. DM only (FR-CBT-53 b, c; FR-DICE-28: built from `dmPayload` alone):
+ * "(DM set; rolled 13)" after an edited total, kept / dropped d20s and the damage dice in a muted
+ * run, "vs AC 15", and "— DM ruled hit" / "— DM ruled miss" when the DM overrode the hit of any
+ * other roll.
  */
 export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof AttackLogDmPayload>>({
   kind: LOG_KIND_ATTACK,
   payload: AttackLogPayload,
   dmPayload: AttackLogDmPayload,
   formatLine({ actorName, payload: p, dmPayload: dm }) {
-    const out: LineSegment[] = [
-      { text: actorName, style: "actor" },
-      { text: ` attacks ${p.targetName}: ` },
-    ];
+    const out: LineSegment[] = [{ text: actorName, style: "actor" }];
     const t = p.toHit;
+    // An edited total (dice null) is not the physical roll; a damage edit stays DM-only.
+    const hitBadge = !!p.manual?.toHit && t !== null && t.dice !== null;
+    const damageBadge = p.hit && !!p.manual?.damage;
+    if (t === null) {
+      out.push({ text: ` → ${p.targetName}: ` });
+      if (!p.hit) return [...out, { text: `miss (${p.attackName})` }];
+      out.push(...damageSegments(p, dm, ` (${p.attackName})`));
+      if (damageBadge) out.push(...PHYSICAL);
+      out.push(...absorbedSegments(dm));
+      return out;
+    }
+    out.push({ text: ` attacks ${p.targetName}: ` });
     if (t.dice !== null) {
       out.push({ text: String(t.dice) });
       if (t.constant !== 0)
@@ -129,8 +169,8 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
       out.push({ text: " = " });
     }
     out.push({ text: String(t.total), style: "total" });
-    // An edited total (dice null) is not the physical roll; a damage edit stays DM-only.
-    if (p.manual?.toHit && t.dice !== null) out.push(...PHYSICAL);
+    // Both manual → the damage's badge (at the end) is the line's only one.
+    if (hitBadge && !damageBadge) out.push(...PHYSICAL);
     const natural = naturalMark(t.natural);
     if (natural !== null) out.push({ text: ` (natural ${natural})` });
     if (dm) {
@@ -145,13 +185,8 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
     const ruled = dm?.overrides.hit === true || publicRuling(t.natural, p.hit);
     if (p.hit) {
       out.push({ text: ruled ? " — DM ruled hit " : p.crit ? " — critical hit! " : " — hit! " });
-      const type = p.damageType ? ` ${p.damageType}` : "";
-      out.push({ text: `${p.damage}${type} damage${MULT_TEXT[p.multiplier]}` });
-      if (dm?.overrides.damage) {
-        out.push({ text: ` (DM set; rolled ${dm.damageRolled})`, style: "muted" });
-      }
-      if (dm?.rolls) out.push(...rollBreakdownSegments(dm.rolls.damage));
-      if (p.manual?.damage) out.push(...PHYSICAL);
+      out.push(...damageSegments(p, dm, ""));
+      if (damageBadge) out.push(...PHYSICAL);
       out.push(...absorbedSegments(dm));
     } else {
       out.push({ text: ruled ? " — DM ruled miss" : " — miss" });

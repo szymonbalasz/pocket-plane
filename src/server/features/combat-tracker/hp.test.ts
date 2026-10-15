@@ -232,7 +232,7 @@ describe("FR-CBT-34 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
     expect(e).toMatchObject({ kind: "cbt.attack", category: "attack", public: true });
     expect(e?.encounterId).toBe(t.enc.id);
     expect(lineText(attackLogKind.formatLine({ actorName: "Mira", payload: e?.payload }))).toBe(
-      "Mira attacks Goblin: 15 + 4 = 19 (physical) — hit! 6 piercing damage (physical)",
+      "Mira attacks Goblin: 15 + 4 = 19 — hit! 6 piercing damage (physical)",
     );
     expect(t.card(r.cardId)).toMatchObject({
       state: "resolved",

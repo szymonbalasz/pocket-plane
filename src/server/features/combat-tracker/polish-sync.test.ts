@@ -101,22 +101,22 @@ describe("polish over WS (mid-combat)", () => {
     // Non-natural: 9 + 4 = 13 vs AC 15, ruled Hit → DM-only (G8).
     await ruledHit(9);
     expect(attackLines(dm).at(-1)).toBe(
-      "Mira attacks Goblin: 9 + 4 = 13 (physical) vs AC 15 — DM ruled hit 6 piercing damage (1d6+2: 4 + 2) (physical)",
+      "Mira attacks Goblin: 9 + 4 = 13 vs AC 15 — DM ruled hit 6 piercing damage (1d6+2: 4 + 2) (physical)",
     );
     for (const c of [p1, p2]) {
       expect(attackLines(c).at(-1)).toBe(
-        "Mira attacks Goblin: 9 + 4 = 13 (physical) — hit! 6 piercing damage (physical)",
+        "Mira attacks Goblin: 9 + 4 = 13 — hit! 6 piercing damage (physical)",
       );
     }
 
     // Natural 1 ruled Hit → public, built client-side from `payload`.
     await ruledHit(1);
     expect(attackLines(dm).at(-1)).toBe(
-      "Mira attacks Goblin: 1 + 4 = 5 (physical) (natural 1) vs AC 15 — DM ruled hit 6 piercing damage (1d6+2: 4 + 2) (physical)",
+      "Mira attacks Goblin: 1 + 4 = 5 (natural 1) vs AC 15 — DM ruled hit 6 piercing damage (1d6+2: 4 + 2) (physical)",
     );
     for (const c of [p1, p2]) {
       expect(attackLines(c).at(-1)).toBe(
-        "Mira attacks Goblin: 1 + 4 = 5 (physical) (natural 1) — DM ruled hit 6 piercing damage (physical)",
+        "Mira attacks Goblin: 1 + 4 = 5 (natural 1) — DM ruled hit 6 piercing damage (physical)",
       );
       // A player sees "DM ruled" only on the natural line; frames never carry it.
       expect(attackLines(c).filter((l) => l.includes("DM ruled"))).toHaveLength(1);
