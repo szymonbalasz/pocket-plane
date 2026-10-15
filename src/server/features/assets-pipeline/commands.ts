@@ -5,6 +5,7 @@ import { AssetIngested } from "@shared/events/assets-pipeline";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { defineCommand } from "../../commands/commands";
+import type { CommandContext } from "../../commands/context";
 import { conflict, invalid, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { asset, assetSeqNext } from "../../db/schema";
@@ -38,6 +39,7 @@ const Derivative = z.object({ data: Bytes, width: Dim, height: Dim });
 /** Output of `processImage` (async, no disk); the command itself is synchronous. */
 export const ProcessedImageSchema = z.object({
   hash: z.string().regex(/^[0-9a-f]{64}$/),
+  sourceHash: z.string().regex(/^[0-9a-f]{64}$/),
   mime: z.enum(["image/png", "image/jpeg", "image/webp"]),
   original: Bytes,
   width: Dim,
@@ -61,6 +63,22 @@ export interface IngestResult {
 /** Name rule (FR-ASSET-08): given `name`, else the filename without extension. */
 export function resolveName(filename: string, name?: string) {
   return AssetName.safeParse(name ?? nameFromFilename(filename));
+}
+
+/**
+ * Asset ID (FR-ASSET-08): the next `ctx.tokens` draw. Seeded (fixture / test) contexts also mix
+ * in the source bytes, so a fixture whose art changed gets a new ID and URL on reload: a URL
+ * served `immutable` (FR-ASSET-14) never names other bytes (N2). Same bytes → same ID on every
+ * load and machine (FR-ASSET-18). Real IDs are the token as drawn (ADR-0023).
+ */
+function nextAssetId(ctx: CommandContext, sourceHash: string): string {
+  const token = ctx.tokens.next();
+  if (ctx.fixtureKey === undefined) return token;
+  return createHash("sha256")
+    .update(`${token}:${sourceHash}`)
+    .digest()
+    .subarray(0, 16)
+    .toString("base64url");
 }
 
 /**
@@ -100,9 +118,9 @@ export function ingestCommand(store: AssetStore) {
 
       store.ensureFiles(image);
 
-      let id = ctx.tokens.next();
+      let id = nextAssetId(ctx, image.sourceHash);
       while (tx.select({ id: asset.id }).from(asset).where(eq(asset.id, id)).get()) {
-        id = ctx.tokens.next();
+        id = nextAssetId(ctx, image.sourceHash);
       }
       tx.insert(asset)
         .values({
