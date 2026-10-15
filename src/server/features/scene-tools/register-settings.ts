@@ -1,4 +1,7 @@
-// Settings: scn.setDiagonalRule (DM). Filled by build/scene-tools-settings; empty in fix/scn-core.
+// Settings: scn.setDiagonalRule (DM, FR-SCN-29).
 import type { Registrar } from "../../services";
+import { setDiagonalRule } from "./settings";
 
-export function registerSettings(_r: Registrar): void {}
+export function registerSettings(r: Registrar): void {
+  r.command(setDiagonalRule, { intent: true });
+}

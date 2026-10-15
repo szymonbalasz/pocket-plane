@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { Circle, Group, Image, Layer, Line, Rect, Shape, Text } from "react-konva";
 import { useStore } from "zustand";
 import { retryAssetImage, useAssetImage } from "../../assets-pipeline/useAssetImage";
+import { withoutDmOnly } from "../../scene-tools/layer-switches";
 import { useCanvas } from "../canvas-context";
 import { decorateToken, type MergedDecoration } from "../decorations";
 import { CROSS_OPACITY, crossGeometry } from "../label";
@@ -19,6 +20,7 @@ import { containRect, coverCrop, initialsBackdropOf, outlineOf } from "../shape"
 import { barGeometry, cueGeometry, cuePulse, iconRow } from "../token-decor";
 import type { TokenBar, TokenCross, TokenCue, TokenIcon } from "../token-overlays";
 import { tokenOverlays } from "../token-overlays";
+import { useLayerToggles } from "../tool-store";
 import { toneColor } from "./tone";
 
 const INSET = 0.92;
@@ -428,10 +430,13 @@ function TokenNode({ t }: { t: TokenView }) {
 }
 
 export function TokensLayer() {
-  const { tokens } = useCanvas();
+  const { tokens, client } = useCanvas();
+  // FR-SCN-05: the DM's "DM-only items" switch off → hidden tokens not drawn, not hit.
+  const off = useLayerToggles((s) => s.off);
+  const drawn = useMemo(() => withoutDmOnly(tokens, client, off), [tokens, client, off]);
   return (
     <Layer name="tokens-layer">
-      {tokens.map((t) => (
+      {drawn.map((t) => (
         <TokenNode key={t.id} t={t} />
       ))}
     </Layer>

@@ -1,16 +1,18 @@
 // Tool rail content (MAP §7): Select, Ruler, Ping, then the canvas tool registry's tools for this
 // client (FR-SCN-06; off while not live, FR-SCN-34) and Fit (FR-MAP-45); DM extras as children.
-// The active registry tool's panel shows beside the rail, below shell windows (`ToolPanel`).
+// The active registry tool's panel (or a base tool's, `basePanels`) shows beside the rail, below
+// shell windows (`ToolPanel`).
 import { MousePointer2Icon, RadarIcon, RulerIcon, ScanIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "../../components/ui/menus";
 import { Tooltip } from "../../components/ui/overlays";
+import { ToggleTip } from "../../components/ui/toggle-tip";
 import { canvasTools } from "./canvas-tools";
 import { useLive } from "./intents";
 import { type MapTool, useMapFit, useMapTool } from "./tool-store";
-import { activeTool, toolsFor } from "./tools";
+import { activeTool, type BaseTool, toolsFor } from "./tools";
 
 const TOOLS: { tool: MapTool; label: string; icon: typeof RulerIcon; hint?: string }[] = [
   { tool: "select", label: "Select", icon: MousePointer2Icon, hint: "Drag tokens, pan the map" },
@@ -92,6 +94,7 @@ export function ToolRail({
   selectHint,
   signalsOff = false,
   selectOnly = false,
+  basePanels,
   children,
 }: {
   pingHint?: string;
@@ -100,6 +103,8 @@ export function ToolRail({
   signalsOff?: boolean;
   /** DM targeting (FR-MAP-33): the tool is forced to Select; the others are off. */
   selectOnly?: boolean;
+  /** Panels for base tools, shown like a registry tool's (DM Ruler: Diagonals, FR-SCN-29). */
+  basePanels?: Partial<Record<BaseTool, React.ComponentType>>;
   children?: React.ReactNode;
 }) {
   const tool = useMapTool((s) => s.tool);
@@ -112,7 +117,10 @@ export function ToolRail({
   useEffect(() => {
     if (signalsOff && tool === "ping") setTool("select");
   }, [signalsOff, tool, setTool]);
-  const Panel = current?.panel as React.ComponentType | undefined;
+  const Panel =
+    (current?.panel as React.ComponentType | undefined) ??
+    (selectOnly ? undefined : basePanels?.[tool as BaseTool]);
+  const panelId = current?.id ?? tool;
   const railRef = useRef<HTMLDivElement>(null);
   return (
     <div
@@ -151,16 +159,13 @@ export function ToolRail({
             </ToggleGroupItem>
           );
           return (
-            <Tooltip key={t.tool} content={`${t.label} — ${hint}`}>
-              {/* A disabled button gets no pointer events: the wrapper carries the tooltip. */}
-              {off ? (
-                <span data-testid={`map-tool-${t.tool}-off`} className="inline-flex">
-                  {item}
-                </span>
-              ) : (
-                item
-              )}
-            </Tooltip>
+            <ToggleTip
+              key={t.tool}
+              content={`${t.label} — ${hint}`}
+              offTestId={off ? `map-tool-${t.tool}-off` : undefined}
+            >
+              {item}
+            </ToggleTip>
           );
         })}
         {registry.map((t) => {
@@ -178,15 +183,13 @@ export function ToolRail({
           );
           const hint = !live ? NOT_LIVE_HINT : selectOnly ? "Off while picking targets" : null;
           return (
-            <Tooltip key={t.id} content={hint ? `${t.label} — ${hint}` : t.label}>
-              {off ? (
-                <span data-testid={`map-tool-${t.id}-off`} className="inline-flex">
-                  {item}
-                </span>
-              ) : (
-                item
-              )}
-            </Tooltip>
+            <ToggleTip
+              key={t.id}
+              content={hint ? `${t.label} — ${hint}` : t.label}
+              offTestId={off ? `map-tool-${t.id}-off` : undefined}
+            >
+              {item}
+            </ToggleTip>
           );
         })}
       </ToggleGroup>
@@ -204,8 +207,8 @@ export function ToolRail({
         </Button>
       </Tooltip>
       {children}
-      {Panel && current && (
-        <ToolPanel rail={railRef} id={current.id}>
+      {Panel && (
+        <ToolPanel rail={railRef} id={panelId}>
           <Panel />
         </ToolPanel>
       )}

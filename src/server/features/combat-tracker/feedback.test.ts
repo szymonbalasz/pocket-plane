@@ -12,12 +12,14 @@ import {
   type RollAbilityResult,
 } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
+import { SCN_INTENTS } from "@shared/scene-tools/schemas";
 import { MAP_INTENTS } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
 import { gameLogEntry, hpChange, notification, roll } from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import type { Actor } from "../../events/types";
 import { UPDATE } from "../entities/commands";
+import { WALL_BLOCKED } from "../scene-tools/guard";
 import { rollAbility } from "./abilities";
 import { attackCommand } from "./attack";
 import { applyCard, applyHp, undoCommand } from "./hp";
@@ -315,6 +317,27 @@ describe("FR-CBT-39 FR-CBT-40 movement used", () => {
     t.run(setRemoved.name, { combatantId: t.id("Mira"), removed: true });
     t.move(t.tokens.mira, 10, 8, t.p1);
     expect(t.row("Mira")?.movedFt).toBe(40);
+  });
+
+  test("FR-CBT-39 FR-SCN-30 movedFt follows the campaign's diagonal rule (map-settings)", () => {
+    const t = started();
+    t.run(SCN_INTENTS.setDiagonalRule, { rule: "5" });
+    t.move(t.tokens.goblin, 14, 8); // (12,6) → (14,8): 2 diagonals = 10 ft under 5
+    expect(t.row("Goblin")?.movedFt).toBe(10);
+    t.run(SCN_INTENTS.setDiagonalRule, { rule: "5-10-5" });
+    t.move(t.tokens.goblin, 16, 10); // 2 diagonals = 15 ft under 5/10/5
+    expect(t.row("Goblin")?.movedFt).toBe(25);
+  });
+
+  test("FR-CBT-39 FR-SCN-11 a move refused by a wall adds nothing: no write, no event", () => {
+    const t = started();
+    t.run(SCN_INTENTS.addWalls, { sceneId: t.sceneId, segments: [[8, 0, 8, 14]] });
+    const n = t.events.length;
+    expect(() => t.move(t.tokens.mira, 10, 7, t.p1)).toThrow(WALL_BLOCKED);
+    expect(t.row("Mira")?.movedFt).toBe(0);
+    expect(t.events.length).toBe(n);
+    t.move(t.tokens.mira, 6, 7, t.p1); // same side: 20 ft
+    expect(t.row("Mira")?.movedFt).toBe(20);
   });
 
   test("FR-CBT-39 cap 9,999; inactive after End unchanged", () => {

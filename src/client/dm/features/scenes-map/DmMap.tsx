@@ -22,6 +22,8 @@ import { ToolRail } from "@ui/features/scenes-map/ToolRail";
 import { useRecords } from "@ui/sync/store";
 import { EyeOffIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DiagonalRulePanel } from "../scene-tools/diagonal-rule-panel";
+import { ScnLayersPopover } from "../scene-tools/layers-popover";
 import { ScnPropsDmHost } from "../scene-tools/props-host";
 import { GridTool, LockTool, ShowToPlayers } from "./DmTools";
 import {
@@ -215,7 +217,9 @@ export function DmMapToolRail() {
       selectHint="Click, Ctrl/Shift+click or Ctrl/Shift+drag to select; drag tokens, pan the map"
       signalsOff={viewed !== null && active?.id !== viewed.id}
       selectOnly={targeting}
+      basePanels={{ ruler: DiagonalRulePanel }}
     >
+      <ScnLayersPopover />
       {viewed && (
         <div className="flex flex-col gap-1 border-t pt-1">
           <GridTool scene={viewed} />

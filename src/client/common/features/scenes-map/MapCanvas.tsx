@@ -29,6 +29,7 @@ import { Layer, Stage } from "react-konva";
 import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
 import { useFreeArea } from "../play-shell/free-area";
 import { workArea } from "../play-shell/geometry";
+import { withoutDmOnly } from "../scene-tools/layer-switches";
 import {
   type Camera,
   type CameraEvent,
@@ -491,7 +492,9 @@ export function MapCanvas(props: MapCanvasProps) {
         trackBox(e);
         const box = pointers.getState().box;
         if (boxing.current && box && !click) {
-          onBoxSelect?.(tokensInBox(shownRef.current, gridRef.current, box));
+          // FR-SCN-05: tokens the DM-only items switch hides are not drawn, so not picked.
+          const pickable = withoutDmOnly(shownRef.current, client, useLayerToggles.getState().off);
+          onBoxSelect?.(tokensInBox(pickable, gridRef.current, box));
         } else if (click && !p.onToken) {
           onEmptyClick?.();
         }

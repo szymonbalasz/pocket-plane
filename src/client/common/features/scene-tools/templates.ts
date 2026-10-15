@@ -117,6 +117,18 @@ export function canEditTemplate(
   return client === "dm" || (myPlayerId !== null && t.placedByPlayerId === myPlayerId);
 }
 
+/**
+ * What the AoE tool may hit on the shown scene: the kept templates this client may edit, minus
+ * hidden ones while the DM's "DM-only items" switch is off (not drawn, not hit; FR-SCN-05).
+ */
+export function pickableTemplates<
+  T extends Pick<TemplateRecordView, "placedByPlayerId"> & { hidden: boolean },
+>(kept: readonly T[], client: "dm" | "player", myPlayerId: string | null, dmOnlyOff: boolean): T[] {
+  return kept.filter(
+    (t) => canEditTemplate(t, client, myPlayerId) && !(dmOnlyOff && client === "dm" && t.hidden),
+  );
+}
+
 /** A `scn.template` place frame (not `end`). */
 export type TemplatePlaceFrame = Exclude<TemplateSignalData, { end: true }>;
 
