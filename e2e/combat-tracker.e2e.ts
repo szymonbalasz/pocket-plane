@@ -64,13 +64,21 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await expect(enc.getByTestId("cbt-enc-xp-base")).toHaveText("250");
   await expect(enc.getByTestId("cbt-enc-xp-adjusted")).toHaveText("625");
   await expect(enc.getByTestId("cbt-enc-total-cr")).toHaveText("1.25");
-  // Step 2: picker "wo" → Wolf ×2 (popover closes after the pick), then −1.
+  // Step 2 (FR-CBT-63): lookup — no list before typing; "wo" → Enter: Wolf ×2, the list closes,
+  // focus stays in the input; then −1.
   const wolfDef = recordId("enemy-2", "imported-entity");
   const wolfEntry = enc.locator(`[data-testid="cbt-enc-entry"][data-record-id="${wolfDef}"]`);
-  await enc.getByTestId("cbt-enc-picker").click();
-  await enc.getByTestId("cbt-enc-picker").fill("wo");
-  await dm.locator(`[data-testid="cbt-enc-picker-option"][data-value="${wolfDef}"]`).click();
-  await expect(dm.getByTestId("cbt-enc-picker-option")).toHaveCount(0);
+  const lookup = enc.getByTestId("cbt-lookup-input");
+  await lookup.click();
+  await expect(dm.getByTestId("cbt-lookup-option")).toHaveCount(0);
+  await lookup.fill("wo");
+  await expect(dm.getByTestId("cbt-lookup-option").first()).toHaveAttribute(
+    "data-record-id",
+    wolfDef,
+  );
+  await lookup.press("Enter");
+  await expect(dm.getByTestId("cbt-lookup-option")).toHaveCount(0);
+  await expect(lookup).toBeFocused();
   await expect(wolfEntry).toHaveAttribute("data-value", "2");
   await expect(enc.getByTestId("cbt-enc-xp-adjusted")).toHaveText("750");
   await wolfEntry.getByTestId("cbt-enc-entry-dec").click();
@@ -81,10 +89,14 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
     player.locator('[data-testid="ui-launcher-button"][data-record-id="cbt.initiative"]'),
   ).toHaveCount(0);
 
-  // Step 3: Start → preview all bound → confirm.
+  // Step 2a (FR-CBT-62): both add options ticked; Elite has no HP formula.
+  await expect(enc.getByTestId("cbt-enc-create-tokens")).toHaveAttribute("data-state", "checked");
+  await expect(enc.getByTestId("cbt-enc-add-hidden")).toHaveAttribute("data-state", "checked");
+  // Step 3: Start → preview: every row "token", no "Not on this map" → confirm.
   await enc.getByTestId("cbt-enc-start").click();
   await expect(dm.getByTestId("cbt-enc-binding")).toHaveCount(6);
-  await expect(dm.locator('[data-testid="cbt-enc-binding"][data-bound="false"]')).toHaveCount(0);
+  await expect(dm.locator('[data-testid="cbt-enc-binding"][data-value="token"]')).toHaveCount(6);
+  await expect(dm.getByTestId("cbt-enc-not-on-map")).toHaveCount(0);
   await dm.getByTestId("cbt-enc-start-confirm").click();
   // FR-CBT-60: after the ack Initiative opens in front and Encounters minimises.
   await expect(launcherButton(dm, "cbt.encounters")).toHaveAttribute("data-state", "minimised");
@@ -107,14 +119,17 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   );
   expect(clippedMoved).toBe(0);
 
-  // Step 4: Roll monsters; Mira rolls from her sheet (routed to cbt.rollInitiative); DM sets
-  // Thorn; Start round 1.
-  // #149: an unset initiative leads with a labelled Roll button, not an empty box.
-  await expect(init.getByTestId("cbt-init-row-roll").first()).toHaveText("Roll");
-  await expect(init.getByTestId("cbt-init-row-init").first()).toHaveAttribute("placeholder", "–");
-  await init.getByTestId("cbt-init-roll-monsters").click();
-  await expect(init.getByTestId("cbt-init-roll-monsters")).toBeDisabled();
+  // Step 4: monsters rolled at Start (FR-CBT-64), so no "Roll monsters"; Mira rolls from her
+  // sheet (routed to cbt.rollInitiative); DM sets Thorn; Start round 1.
+  await expect(init.getByTestId("cbt-init-roll-monsters")).toHaveCount(0);
   const mira = await idByName(init, "Mira");
+  // #149: an unset initiative leads with a labelled Roll button, not an empty box.
+  await expect(
+    init.locator(`[data-testid="cbt-init-row-roll"][data-record-id="${mira}"]`),
+  ).toHaveText("Roll");
+  await expect(
+    init.locator(`[data-testid="cbt-init-row-init"][data-record-id="${mira}"]`),
+  ).toHaveAttribute("placeholder", "–");
   const sheet = await openWindow(player, "char.sheet");
   await expect(sheet.getByTestId("char-sheet-combat")).toBeVisible();
   await expect(pinit.getByTestId("cbt-init-hint")).toBeVisible();

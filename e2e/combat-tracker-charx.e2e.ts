@@ -62,9 +62,8 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
     [goblinDef, "gob"],
     [eliteDef, "eli"],
   ] as const) {
-    await enc.getByTestId("cbt-enc-picker").click();
-    await enc.getByTestId("cbt-enc-picker").fill(text);
-    await dm.locator(`[data-testid="cbt-enc-picker-option"][data-value="${def}"]`).click();
+    await enc.getByTestId("cbt-lookup-input").fill(text);
+    await dm.locator(`[data-testid="cbt-lookup-option"][data-record-id="${def}"]`).click();
     await expect(enc.locator(`[data-testid="cbt-enc-entry"][data-record-id="${def}"]`)).toHaveCount(
       1,
     );
