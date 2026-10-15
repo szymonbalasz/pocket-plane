@@ -6,7 +6,7 @@
 // selection kept, except after a successful Apply (FR-CBT-54). Placement: FR-CBT-55.
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
-import { clampHp, MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
+import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
 import {
   APPLY_TARGETS_MAX,
   type CombatantView,
@@ -40,20 +40,32 @@ import {
 import { useDefinitions } from "./data";
 import { measurePlacement, type Placement, placementTokenIds } from "./popup-placement";
 import { useCombatDialogs } from "./popup-store";
-import { addAction, eligibleTargets, naturalContradiction, presetHit, targetList } from "./targets";
+import {
+  addAction,
+  eligibleTargets,
+  type HpTemp,
+  naturalContradiction,
+  presetHit,
+  previewText,
+  targetList,
+} from "./targets";
 
 const MULTS: DamageMultiplier[] = ["normal", "half", "none", "double"];
 
-/** Current / max HP the DM sees: monsters on the combatant, PCs on the character. */
-export function hpOf(
-  c: CombatantView,
-  defs: Map<string, DefinitionRecord>,
-): { cur: number; max: number } | null {
+/**
+ * Current / max / temp HP the DM sees: monsters on the combatant, PCs on the character (temp HP:
+ * CBTX play state, FR-CBT-78).
+ */
+export function hpOf(c: CombatantView, defs: Map<string, DefinitionRecord>): HpTemp | null {
   if (c.kind === "monster") {
-    return c.hpCurrent != null && c.hpMax != null ? { cur: c.hpCurrent, max: c.hpMax } : null;
+    return c.hpCurrent != null && c.hpMax != null
+      ? { cur: c.hpCurrent, max: c.hpMax, temp: c.tempHp ?? 0 }
+      : null;
   }
   const d = c.entityId ? defs.get(c.entityId) : undefined;
-  return d?.kind === "character" ? { cur: d.hpCurrent, max: d.statBlock.hpMax } : null;
+  return d?.kind === "character"
+    ? { cur: d.hpCurrent, max: d.statBlock.hpMax, temp: d.tempHp }
+    : null;
 }
 
 export const acOf = (c: CombatantView, defs: Map<string, DefinitionRecord>) =>
@@ -407,9 +419,8 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                     data-record-id={x.c.id}
                     className="ml-auto text-xs tabular-nums"
                   >
-                    {x.hp
-                      ? `${x.c.name} ${x.hp.cur} → ${clampHp(x.hp.cur, -x.raw, x.hp.max)}`
-                      : `${x.c.name}: ${x.raw}`}
+                    {/* FR-CBT-78 (G5): temp HP absorbs first, "Thorn 10 (+5) → 10 (+2)". */}
+                    {x.hp ? previewText(x.c.name, x.hp, x.raw) : `${x.c.name}: ${x.raw}`}
                   </span>
                 </div>
               </li>

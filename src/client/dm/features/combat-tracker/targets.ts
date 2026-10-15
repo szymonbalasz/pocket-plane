@@ -2,8 +2,9 @@
 // Rows = selection rows (combatants bound to a selected token, selection order) ∪ added rows
 // (picked in "Add target", add order). Only eligible combatants: active, non-removed, of the
 // started encounter, not the attacker. Client memory only; the server re-checks on apply.
+import { absorb } from "@shared/combat-extras/rules";
 import { naturalMark, publicRuling } from "@shared/combat-tracker/log-kinds";
-import { hitHint, undoGroup } from "@shared/combat-tracker/rules";
+import { clampHp, hitHint, undoGroup } from "@shared/combat-tracker/rules";
 import { APPLY_TARGETS_MAX, type HpChangeRecord } from "@shared/combat-tracker/schemas";
 
 export interface TargetCandidate {
@@ -132,3 +133,32 @@ export function undoLabel(rows: readonly HpChangeRecord[]): {
     expectedHpChangeId: last.id,
   };
 }
+
+/** HP and temp HP the DM sees for one creature (FR-CBT-78). */
+export interface HpTemp {
+  cur: number;
+  max: number;
+  temp: number;
+}
+
+/**
+ * FR-CBT-78 (G5): HP and temp HP after `amount`, by CBTX's absorption (FR-CBTX-15, the shared
+ * `absorb`): damage drains temp HP first, then HP (clamped); heal ignores temp HP.
+ */
+export function hpAfter(hp: HpTemp, kind: "damage" | "heal", amount: number): HpTemp {
+  if (kind === "heal") return { ...hp, cur: clampHp(hp.cur, amount, hp.max) };
+  const { absorbed, rest } = absorb(hp.temp, amount);
+  return { ...hp, cur: clampHp(hp.cur, -rest, hp.max), temp: hp.temp - absorbed };
+}
+
+/** "10 (+5)" with temp HP, else "10". */
+export const hpTempText = (hp: Pick<HpTemp, "cur" | "temp">) =>
+  hp.temp > 0 ? `${hp.cur} (+${hp.temp})` : `${hp.cur}`;
+
+/** FR-CBT-78 popup target preview: "Thorn 10 (+5) → 10 (+2)", "Goblin 7 → 1". */
+export const previewText = (name: string, hp: HpTemp, raw: number) =>
+  `${name} ${hpTempText(hp)} → ${hpTempText(hpAfter(hp, "damage", raw))}`;
+
+/** FR-CBT-78 Damage / heal dialog: "HP 10 / 10 · Temp 5" (no temp → "HP 10 / 10"). */
+export const hpDialogText = (hp: HpTemp) =>
+  `HP ${hp.cur} / ${hp.max}${hp.temp > 0 ? ` · Temp ${hp.temp}` : ""}`;

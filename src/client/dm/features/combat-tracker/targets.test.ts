@@ -3,7 +3,16 @@ import { describe, expect, test } from "bun:test";
 import type { HpChangeRecord } from "@shared/combat-tracker/schemas";
 import { MonsterStatBlock } from "@shared/entities/schemas";
 import { type Fields, formStatBlock } from "./creature-form";
-import { addAction, naturalContradiction, presetHit, targetList, undoLabel } from "./targets";
+import {
+  addAction,
+  hpAfter,
+  hpDialogText,
+  naturalContradiction,
+  presetHit,
+  previewText,
+  targetList,
+  undoLabel,
+} from "./targets";
 
 const k = (id: string, tokenId: string | null, o: object = {}) => ({
   id,
@@ -130,6 +139,25 @@ describe("FR-CBT-35 Undo label", () => {
       text: "Undo: Goblin → Goblin, Goblin 2 (2 targets)",
       expectedHpChangeId: "b",
     });
+  });
+});
+
+describe("FR-CBT-78 temp HP in previews", () => {
+  const thorn = { cur: 10, max: 10, temp: 5 };
+  test("FR-CBT-78 preview: temp ≥ raw, temp < raw, no temp; heal ignores temp", () => {
+    expect(previewText("Thorn", thorn, 3)).toBe("Thorn 10 (+5) → 10 (+2)");
+    expect(previewText("Thorn", thorn, 5)).toBe("Thorn 10 (+5) → 10");
+    expect(previewText("Thorn", thorn, 8)).toBe("Thorn 10 (+5) → 7");
+    expect(previewText("Goblin", { cur: 7, max: 7, temp: 0 }, 6)).toBe("Goblin 7 → 1");
+    expect(previewText("Goblin", { cur: 7, max: 7, temp: 0 }, 99)).toBe("Goblin 7 → 0");
+    expect(hpAfter({ cur: 4, max: 10, temp: 5 }, "heal", 3)).toEqual({ cur: 7, max: 10, temp: 5 });
+    expect(hpAfter({ cur: 4, max: 10, temp: 5 }, "heal", 30).cur).toBe(10);
+  });
+
+  test("FR-CBT-78 dialog header: 'HP 10 / 10 · Temp 5', no temp → 'HP 10 / 10'", () => {
+    expect(hpDialogText(thorn)).toBe("HP 10 / 10 · Temp 5");
+    expect(hpDialogText(hpAfter(thorn, "damage", 3))).toBe("HP 10 / 10 · Temp 2");
+    expect(hpDialogText({ ...thorn, temp: 0 })).toBe("HP 10 / 10");
   });
 });
 
