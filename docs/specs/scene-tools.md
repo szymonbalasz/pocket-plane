@@ -203,14 +203,28 @@ Envelopes and rejects: [live-sync](live-sync.md). Everything is WS (canvas actio
 
 **Snapshot (hard constraint, CON-44).** Ceiling 786,432 B. Arithmetic and per-item sizes: [Appendix B](#appendix-b-snapshot-arithmetic).
 
-| Heavy DM scenario | Bytes | Left | Source |
-|---|---|---|---|
-| Today (`main`) | 781,916 B | 4,516 B | measured (review) |
-| Typical prepped SCN scene (active only) | + ≈ 7.3 KB | — | estimate |
-| > **TODO (spec phase): measured table from spec-fog-of-war** (today; + fog rows + `fogged` tokens + one typical SCN scene; then A, B, C), forwarded by the orchestrator (`con44-phase2.md`). Same table as FOG §12 | | | placeholder |
+Measured by spec-fog-of-war with the realistic-heavy harness on `main`. Fog and SCN rows are prototype records with the specs' wire shapes. Same table as FOG §12.
 
-- Options (OQ-SCN-01 = OQ-FOG-04): **(B) token window + SCN window** removes the other scenes' tokens (240 × 494 B ≈ 118.5 KB, measured) and SCN rows. (A) keeps tokens and loads all effect presets on demand (≈ 4.5 KB left, estimate). (C) raises the ceiling.
-- **Players:** + ≈ 3.6 KB per typical scene (≈ 276 of 512 KiB). Event frames: a structure upsert ≤ 44 KB to the DM; doors only to players.
+| Item | Bytes | Kind |
+|---|---|---|
+| Heavy DM today (`main`) | 781,917 | measured |
+| Heavy player P1 today | 273,606 | measured |
+| `fog` rows (30) | 5,045 | measured, prototype rows |
+| `"fogged":true` on 206 tokens | 2,884 | measured, prototype field |
+| One typical SCN scene (DM): 150 walls, 10 doors, 15 props, 3 kept templates, `map-settings` | 7,384 | measured, prototype rows |
+| `effect-preset` rows (16: 10 campaign + 6 character) | 18,445 | measured |
+| Tokens not on the active scene (240) | ≈ 121,125 | measured (B vs base) |
+| **Base: today + fog + `fogged` + one SCN scene** (SCN active-scene window assumed) | **797,382** | measured; **10,950 B over** 786,432 |
+| Player P1 with the active fog row + SCN player records | 281,267 (243,021 left of 524,288) | measured |
+
+| Option (OQ-SCN-01 = OQ-FOG-04) | Heavy DM | Left of 786,432 B | Cost |
+|---|---|---|---|
+| (A) All effect presets (campaign + character) load on demand over the window's WS load; **reopens #190 OQ-MOD-14 / -15** | 778,920 | 7,512 B | MOD server, client and tests change; separate `fix/mod-presets-on-demand` (MOD's owner). Leaves nothing for sprint 3 |
+| **(B) Token window + SCN window (pick)**: the DM snapshot carries only the active scene's tokens and SCN records; others load with `sync.loadScene` | **676,257** | **110,175 B** | Window ADR covers `token`; built first as `fix/active-scene-window` (ws / snapshot lock). Presets untouched (#190 stands) |
+| (C) Raise the DM ceiling (DM only) | 797,382 | needs ≥ 797.4 KB; at 1 MiB: 251,194 B | No code. The DM client usually runs on the host (ADR-0003): cost is build time and memory, not tunnel bandwidth |
+
+- Estimate, not offered: campaign presets only on demand ≈ 785.9 KB, ≈ 0.6 KB left.
+- **Players:** + ≈ 3.6 KB per typical scene (measured with fog: P1 281,267 B of 512 KiB). Event frames: a structure upsert ≤ 44 KB to the DM; doors only to players.
 - **Move guard:** O(segments) intersection tests, ≤ 2,000 at the cap. Target ≤ 1 ms p95 per move (unit benchmark). The structure row is read once per move, or cached by `rev`.
 - **Canvas:** walls are one Konva shape; props are cached image nodes (≤ 200); affected squares are one shape per template, memoised per template change. ≤ 8 Konva layers (FR-SCN-02). **Review check:** Chrome trace while panning Goblin Ambush with the typical scene: median frame ≤ 20 ms.
 - **Signals:** an ephemeral template is ≈ 250 B × ≤ 20/s per dragging sender, 1/s at rest; ≈ 30 KB/s fan-out to 6 players over the tunnel at worst.
@@ -307,7 +321,7 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-SCN-01 | CON-44 headroom for fog + scene tools; **= OQ-FOG-04**, one question — **DM** | (A) all effect presets (campaign + character) load on demand over the same WS load, reopening #190 OQ-MOD-14 / -15 (≈ 4.5 KB left, estimate) / **(B) token window + SCN window** (≈ 118.5 KB of other scenes' tokens off the frame, measured) / (C) raise the DM ceiling (DM only). *B frees room for sprint 3 and leaves MOD alone, but every view of a non-active scene needs a load. Measured table: §12* | yes | live-sync, MOD, FOG, scenes-map |
+| OQ-SCN-01 (= OQ-FOG-04) | CON-44: base with fog + one SCN scene = 797,382 B, 10,950 B over (§12, measured) — **DM** | (A) all effect presets on demand over the window's WS load, reopening #190 OQ-MOD-14 / -15: 7,512 B left; MOD server, client and tests change / **(B) token window + SCN window: 110,175 B left; presets untouched; built first as `fix/active-scene-window`** / (C) raise the DM ceiling (DM only; ≥ 797.4 KB; local client, cost is build time) | yes | live-sync, MOD, FOG, scenes-map |
 | OQ-SCN-02 | Templates ephemeral or persistent — **DM** | **Ephemeral (signal) by default, Keep → record** / always records (snapshot cost) / always ephemeral (Spirit Guardians lost on reload). *Two code paths, but most templates cost no snapshot bytes* | yes | live-sync |
 | OQ-SCN-03 | Who places templates (carried) — **DM** | **DM and players** / DM only. *Players show their own spells* | yes | — |
 | OQ-SCN-04 | Diagonal rule (carried) — **DM** | **Campaign setting: 5/10/5 default, 5 ft option** / fixed 5/10/5. *One row; touches the ruler, the indicator and combat* | yes | scenes-map, combat-tracker |
@@ -347,7 +361,7 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 
 ## Appendix B: snapshot arithmetic
 
-"Typical prepped scene" = 150 walls, 10 doors, 15 props, 3 kept templates. Estimates; the measured combined table goes in §12.
+"Typical prepped scene" = 150 walls, 10 doors, 15 props, 3 kept templates. Per-item estimates; the measured combined table is in §12 (one typical scene measured: 7,384 B DM).
 
 | Item | Wire size | Typical scene | Max scene |
 |---|---|---|---|
@@ -358,4 +372,4 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 | **Per scene** | | **≈ 7.3 KB DM**, ≈ 3.6 KB player | ≈ 90 KB |
 
 - Without the window, 30 prepped scenes would add ≈ 216 KB to the DM frame.
-- Measured on `main` (review): `token` 300 rows = 148,153 B (494 B/row), 240 of them on non-active scenes ≈ 118.5 KB; `effect-preset` 16 rows = 18,461 B (10 campaign ≈ 11.5 KB, 6 character ≈ 6.9 KB).
+- Measured on `main` (review): `token` 300 rows = 148,153 B (494 B/row), 240 of them on non-active scenes ≈ 121,125 B with `fogged` (phase-2 table); `effect-preset` 16 rows = 18,461 B (10 campaign ≈ 11.5 KB, 6 character ≈ 6.9 KB).

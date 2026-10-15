@@ -15,7 +15,7 @@
 
 - The heavy DM snapshot is 781,916 B (measured) of the 786,432 B ceiling (CON-44).
 - Fog adds rows and `fogged` copies; a typical prepped scene-tools scene adds ≈ 7.3 KB.
-- **Tokens:** 300 rows = 148,153 B. 240 of them sit on non-active scenes: ≈ 118.5 KB.
+- **Tokens:** 300 rows = 148,153 B. 240 of them sit on non-active scenes: ≈ 121,125 B with fog's `fogged` (measured, phase-2 CON-44 table). Base with fog + one SCN scene: 797,382 B, 10,950 B over.
 - 30 prepped scenes of SCN records would add ≈ 216 KB.
 - The DM sees one scene at a time (viewed scene, #122). Every other scene's tokens and map content are dead weight in the snapshot.
 
@@ -23,8 +23,8 @@
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. A registration flag `dmWindow: "active-scene"` (scene scope only) on `token`, `scene-structure`, `scene-prop`, `aoe-template`. The DM snapshot holds only the active scene's rows; the DM client loads another scene's rows with the WS intent `sync.loadScene {sceneId}`, answered in hub frame order** | ≈ 118.5 KB + all SCN prep off the frame; the cost stays one scene however much is prepped; no MOD change | One load per viewed scene per snapshot; convergence changes for flagged types; DM dialogs that read another scene's tokens load it first |
-| B. Every scene in the DM snapshot; effect presets on demand instead | No sync change | ≈ 4.5 KB left (estimate); reopens #190 OQ-MOD-14 / -15; SCN prep still grows the frame |
+| **A. A registration flag `dmWindow: "active-scene"` (scene scope only) on `token`, `scene-structure`, `scene-prop`, `aoe-template`. The DM snapshot holds only the active scene's rows; the DM client loads another scene's rows with the WS intent `sync.loadScene {sceneId}`, answered in hub frame order** | Heavy DM 676,257 B, 110,175 B left (measured) + all SCN prep off the frame; the cost stays one scene however much is prepped; no MOD change | One load per viewed scene per snapshot; convergence changes for flagged types; DM dialogs that read another scene's tokens load it first |
+| B. Every scene in the DM snapshot; effect presets on demand instead | No sync change | 7,512 B left (measured); reopens #190 OQ-MOD-14 / -15; SCN prep still grows the frame |
 | C. Raise the DM ceiling | No code | DM decision; the frame grows with prep; join time over a tunnel |
 
 ## Decision
