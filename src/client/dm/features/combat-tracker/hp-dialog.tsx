@@ -16,6 +16,10 @@ import { useState } from "react";
 import { hpOf } from "./attack-popup";
 import { useDefinitions } from "./data";
 import { useCombatDialogs } from "./popup-store";
+import { type HpTemp, hpAfter, hpDialogText } from "./targets";
+
+/** FR-CBT-78: "→ 10 / 10 · Temp 2". */
+const afterText = (hp: HpTemp) => `→ ${hpDialogText(hp).slice("HP ".length)}`;
 
 function HpForm({ c, close }: { c: CombatantView; close(): void }) {
   const [amount, setAmount] = useState("");
@@ -33,8 +37,8 @@ function HpForm({ c, close }: { c: CombatantView; close(): void }) {
     <>
       <DialogHeader>
         <DialogTitle>Damage / heal {c.name}</DialogTitle>
-        <DialogDescription>
-          {hp ? `HP ${hp.cur} / ${hp.max}` : "Direct HP change"}
+        <DialogDescription data-testid="cbt-hp-current">
+          {hp ? hpDialogText(hp) : "Direct HP change"}
         </DialogDescription>
       </DialogHeader>
       <form
@@ -53,6 +57,14 @@ function HpForm({ c, close }: { c: CombatantView; close(): void }) {
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
         />
+        {hp && valid && (
+          // FR-CBT-78 (G5): damage drains temp HP first; heal ignores it.
+          <p className="text-xs text-muted-foreground tabular-nums">
+            Damage <span data-testid="cbt-hp-preview">{afterText(hpAfter(hp, "damage", n))}</span>
+            {" · "}Heal{" "}
+            <span data-testid="cbt-hp-preview-heal">{afterText(hpAfter(hp, "heal", n))}</span>
+          </p>
+        )}
       </form>
       <DialogFooter>
         <Button

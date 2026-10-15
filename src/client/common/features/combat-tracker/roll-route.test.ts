@@ -134,7 +134,12 @@ describe("FR-CHARX-24 OQ-CBT-47 routes with a row ref", () => {
           mira: {
             id: "mira",
             entityId: "mira",
-            spells: [spell("bolt", { damage: "4d6", damageType: "radiant" }), spell("touch", {})],
+            spells: [
+              spell("bolt", { damage: "4d6", damageType: "radiant" }),
+              spell("touch", {}),
+              spell("flame", { roll: "save", saveAbility: "dex", damage: "1d8" }),
+              spell("cure", { roll: "none", effect: "healing", damage: "1d8+1" }),
+            ],
           },
         },
       },
@@ -185,14 +190,115 @@ describe("FR-CHARX-24 OQ-CBT-47 routes with a row ref", () => {
     expect(routeFor(rollRoutes, sheetStore(), "mira", "spellAttack")).toBeNull();
   });
 
-  test("FR-CHARX-24 damage, spellDamage, skill, check, save are never claimed", () => {
+  test("FR-CBT-74 skill, check, save and healing are never claimed", () => {
     const s = sheetStore();
-    expect(routeFor(rollRoutes, s, "mira", "damage", { attackId: "a2" })).toBeNull();
-    expect(routeFor(rollRoutes, s, "mira", "damage")).toBeNull();
-    expect(routeFor(rollRoutes, s, "mira", "spellDamage", { spellId: "bolt" })).toBeNull();
     expect(routeFor(rollRoutes, s, "mira", "skill")).toBeNull();
     expect(routeFor(rollRoutes, s, "mira", "check")).toBeNull();
     expect(routeFor(rollRoutes, s, "mira", "save")).toBeNull();
+    expect(routeFor(rollRoutes, s, "mira", "spellDamage", { spellId: "cure" })).toBeNull();
+  });
+
+  test("FR-CBT-74 in combat: toHit / damage / attack → cbt.attack {rolls: toHit}, cbt.rollDamage, cbt.attack", async () => {
+    sent.length = 0;
+    const s = sheetStore();
+    const ref = { attackId: "a2" };
+    const hit = routeFor(rollRoutes, s, "mira", "toHit", ref);
+    expect(hit?.critExpressions).toBeUndefined();
+    await hit?.send(send, { mode: "advantage", manual: [{ diceTotal: 11 }] });
+    const dmg = routeFor(rollRoutes, s, "mira", "damage", ref);
+    expect(dmg?.critExpressions).toBeUndefined();
+    await dmg?.send(send, { mode: "normal", manual: [{ diceTotal: 5 }], public: true });
+    await routeFor(rollRoutes, s, "mira", "attack", ref)?.send(send, { mode: "normal" });
+    expect(sent).toEqual([
+      [
+        "cbt.attack",
+        {
+          attackerId: "cb-mira",
+          mode: "advantage",
+          rolls: "toHit",
+          manual: [{ diceTotal: 11 }],
+          attackId: "a2",
+        },
+      ],
+      ["cbt.rollDamage", { attackerId: "cb-mira", manual: { diceTotal: 5 }, attackId: "a2" }],
+      ["cbt.attack", { attackerId: "cb-mira", mode: "normal", attackId: "a2" }],
+    ]);
+  });
+
+  test("FR-CBT-74 spells: spellToHit only with damage; spellDamage for attack and save spells", async () => {
+    sent.length = 0;
+    const s = sheetStore();
+    const hit = routeFor(rollRoutes, s, "mira", "spellToHit", { spellId: "bolt" });
+    await hit?.send(send, { mode: "normal" });
+    expect(routeFor(rollRoutes, s, "mira", "spellToHit", { spellId: "touch" })).toBeNull();
+    expect(routeFor(rollRoutes, s, "mira", "spellToHit", { spellId: "flame" })).toBeNull();
+    expect(routeFor(rollRoutes, s, "mira", "spellAttack", { spellId: "flame" })).toBeNull();
+    await routeFor(rollRoutes, s, "mira", "spellDamage", { spellId: "flame" })?.send(send, {
+      mode: "normal",
+    });
+    expect(routeFor(rollRoutes, s, "mira", "spellDamage", { spellId: "touch" })).toBeNull();
+    expect(sent).toEqual([
+      ["cbt.attack", { attackerId: "cb-mira", mode: "normal", rolls: "toHit", spellId: "bolt" }],
+      ["cbt.rollDamage", { attackerId: "cb-mira", spellId: "flame" }],
+    ]);
+  });
+
+  test("FR-CBT-74 Damage after a pending natural-20 to-hit card of that row → crit expressions", () => {
+    const card = (id: string, seq: number, natural: number, o: object = {}) => ({
+      id,
+      seq,
+      kind: "damage-card",
+      state: "pending",
+      payload: {
+        encounterId: "e1",
+        attackerId: "cb-mira",
+        attackerName: "Mira",
+        attackName: "Light crossbow",
+        damageType: "piercing",
+        mode: "normal",
+        crit: natural === 20,
+        toHit: {
+          rollId: "r",
+          dice: [[natural, true]],
+          constant: 4,
+          total: natural + 4,
+          natural,
+          manual: false,
+        },
+        damage: null,
+        attackId: "a2",
+        ...o,
+      },
+    });
+    const withCards = (...cards: ReturnType<typeof card>[]) => {
+      const s = sheetStore();
+      return {
+        ...s,
+        records: { ...s.records, notification: Object.fromEntries(cards.map((c) => [c.id, c])) },
+      };
+    };
+    const crit = (
+      s: RecordStore,
+      ref: { attackId?: string; spellId?: string } = { attackId: "a2" },
+    ) =>
+      routeFor(rollRoutes, s, "mira", ref.spellId ? "spellDamage" : "damage", ref as never)
+        ?.critExpressions;
+    expect(crit(withCards(card("n1", 1, 20)))).toEqual(["2d8+2"]);
+    expect(
+      routeFor(rollRoutes, withCards(card("n1", 1, 20)), "mira", "damage", { attackId: "a2" })
+        ?.crit,
+    ).toBe(true);
+    // The latest pending one decides; another row's or a resolved card doesn't count.
+    expect(crit(withCards(card("n1", 1, 20), card("n2", 2, 12)))).toBeUndefined();
+    expect(crit(withCards(card("n1", 1, 20)), { attackId: "a1" })).toBeUndefined();
+    expect(crit(withCards({ ...card("n1", 1, 20), state: "resolved" }))).toBeUndefined();
+    expect(
+      crit(withCards(card("n1", 1, 20, { attackId: undefined, spellId: "bolt" })), {
+        spellId: "bolt",
+      }),
+    ).toEqual(["8d6"]);
+    // No ref = the first attack (a1).
+    expect(crit(withCards(card("n1", 1, 20, { attackId: "a1" })), {})).toEqual(["2d6+2"]);
   });
 
   test("FR-CHAR-24 OQ-CBT-28 a PC hidden from its owner (no combatant in the store): rows stay char.roll", () => {

@@ -1,4 +1,5 @@
-// DM view of `damage-card` (FR-CBT-30): the card's action opens the attack popup (FR-CBT-19).
+// DM view of `damage-card` (FR-CBT-30): the card's action opens the attack popup (FR-CBT-19) over
+// the toast / Notifications row it was clicked in, and that toast closes (FR-CBT-75, FR-NOTE-26).
 import { DAMAGE_CARD_END_RULE } from "@shared/combat-tracker/end-rule";
 import { DAMAGE_CARD_KIND } from "@shared/combat-tracker/schemas";
 import { defineNotificationView } from "@ui/features/notifications/views";
@@ -11,7 +12,8 @@ export const dmDamageCardView = defineNotificationView({
   // FR-CBT-59: End dismisses pending cards (the End confirm counts them).
   endRule: DAMAGE_CARD_END_RULE,
   // The popup is hosted by `cbt.initiative`'s companion (mounted whatever the window state).
-  onAction(n) {
-    useCombatDialogs.getState().openCard(n.id);
+  onAction(n, ctx) {
+    useCombatDialogs.getState().openCard(n.id, ctx.origin.rect);
+    ctx.closeToast();
   },
 });

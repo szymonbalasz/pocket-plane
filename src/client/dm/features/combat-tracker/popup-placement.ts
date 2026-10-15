@@ -1,11 +1,21 @@
 // Attack popup placement (FR-CBT-55, G2): vertically centred in the work area, never over an open
 // Initiative window, at the candidate position that covers the least of its selection rows'
 // tokens (none: the attacker's likely targets, FR-CBT-56); ties: the side farther from their
-// centre (none: left). Fixed once per open; not draggable. `popupPlacement` and
-// `placementTokenIds` are pure; `measurePlacement` reads the live screen.
+// centre (none: left). Opened from a notification: over it (FR-CBT-75). Placed once per open;
+// then the DM may drag it (FR-CBT-76), always clamped into the work area. `popupPlacement`,
+// `placementTokenIds`, `clampIntoWorkArea` and `dragPopup` are pure; `measurePlacement` reads
+// the live screen.
 import type { CombatantKind } from "@shared/combat-tracker/schemas";
 import { INITIATIVE_KIND } from "@ui/features/combat-tracker/window";
-import { EDGE_GAP, LAUNCHER_CLEAR, TOP_BAR_H } from "@ui/features/play-shell/geometry";
+import {
+  EDGE_GAP,
+  LAUNCHER_CLEAR,
+  moveRect,
+  type Rect,
+  TOP_BAR_H,
+  type Viewport,
+  workArea,
+} from "@ui/features/play-shell/geometry";
 import { windowId } from "@ui/features/play-shell/manager";
 import { RAIL_CLEAR } from "@ui/features/play-shell/placement";
 import type { TargetCandidate } from "./targets";
@@ -161,4 +171,29 @@ export function measurePlacement(tokenIds: readonly string[]): Placement {
     initiative: r && r.width > 0 ? { x: r.left, w: r.width } : null,
     width: Math.min(POPUP_W, viewport.w - 32),
   });
+}
+
+/**
+ * FR-CBT-75/76: `r` moved (never resized) so it lies inside the work area (FR-SHELL-29: below the
+ * top bar, above the launcher); taller / wider than the area → its top-left corner stays inside.
+ */
+export function clampIntoWorkArea(r: Rect, vp: Viewport): Rect {
+  const wa = workArea(vp);
+  const x = Math.max(0, Math.min(r.x, wa.w - r.w));
+  const y = Math.max(TOP_BAR_H, Math.min(r.y, TOP_BAR_H + wa.h - r.h));
+  return { ...r, x: Math.round(x), y: Math.round(y) };
+}
+
+/** FR-CBT-75: opened from a toast / Notifications row → its top-left at the origin's, clamped. */
+export function originPlacement(
+  origin: { x: number; y: number },
+  size: { w: number; h: number },
+  vp: Viewport,
+): Rect {
+  return clampIntoWorkArea({ x: origin.x, y: origin.y, ...size }, vp);
+}
+
+/** FR-CBT-76: a header drag by (dx, dy) from `start` (play-shell's `moveRect`), in the work area. */
+export function dragPopup(start: Rect, dx: number, dy: number, vp: Viewport): Rect {
+  return clampIntoWorkArea(moveRect(start, dx, dy, vp), vp);
 }

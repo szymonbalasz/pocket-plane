@@ -277,6 +277,27 @@ describe("combat-extras over WS", () => {
     for (const c of [dm, p1, p2]) c.close();
   });
 
+  test("FR-CBTX-47 death counters never in the log: player-1 sees the public lines without (n / n)", async () => {
+    const dm = await h.live(DM);
+    const p1 = await h.live(p("Player 1"));
+    const p2 = await h.live(p("Player 2"));
+    const thorn = byName(dm, "Thorn") as CombatantRecord;
+    dm.intent("cbt.applyHp", { combatantId: thorn.id, kind: "damage", amount: 99 });
+    await nextEvent(p1, "HpApplied");
+    for (const diceTotal of [14, 4]) {
+      p2.intent("cbtx.rollDeathSave", { characterId: thorn.entityId, manual: { diceTotal } });
+      const rolled = await nextEvent(p1, "DeathSaveRolled");
+      const line = rolled.changes.find((x) => x.type === GAME_LOG_ENTRY_TYPE);
+      expect(line).toBeDefined();
+      expect(JSON.stringify(line)).toContain(diceTotal >= 10 ? "success" : "failure");
+    }
+    await barrier(p1);
+    expect(p1.raw()).not.toMatch(/\(\d \/ \d\)/);
+    dm.intent("cbt.applyHp", { combatantId: thorn.id, kind: "heal", amount: 10 });
+    await nextEvent(dm, "HpApplied");
+    for (const c of [dm, p1, p2]) c.close();
+  });
+
   test("FR-CBTX-01 crash-resume: a pending concentration card, effects, temp HP intact; restart → identical snapshots", async () => {
     const snap = async () => {
       const out: Record<string, unknown> = {};

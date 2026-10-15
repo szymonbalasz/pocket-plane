@@ -6,6 +6,7 @@ import { rollRoutes } from "./roll-routes";
 import {
   CONNECTION_LOST,
   charRollPayload,
+  claimRollOptions,
   createInFlight,
   intentErrorText,
   type RollRoute,
@@ -326,7 +327,7 @@ describe("FR-CHARX-43 three buttons through the routes", () => {
     ]);
   });
 
-  test("FR-CHARX-43 combat's route in an encounter: Attack + damage routed; Attack and Damage plain until P2a (S1)", () => {
+  test("FR-CHARX-43 FR-CBT-74 combat's route in an encounter claims all three buttons (S1)", () => {
     const store = {
       ...emptyStore(),
       records: {
@@ -346,7 +347,21 @@ describe("FR-CHARX-43 three buttons through the routes", () => {
       buttons: { kind: SheetRollKind }[],
       ref: { attackId?: string; spellId?: string },
     ) => buttons.map((b) => routeFor(rollRoutes, store, "mira", b.kind, routeRef(ref)) !== null);
-    expect(kinds(attackButtons(), { attackId: "a1" })).toEqual([false, false, true]);
+    expect(kinds(attackButtons(), { attackId: "a1" })).toEqual([true, true, true]);
     expect(sheetBadge(rollRoutes, store, "mira")).toBe("In combat");
+  });
+});
+
+describe("FR-CBT-74 FR-DICE-31 claim roll options", () => {
+  test("FR-CBT-74 a claim's crit expressions and crit flag reach the roll control; none → none", () => {
+    const send = () => Promise.resolve(null);
+    expect(claimRollOptions(null)).toEqual({});
+    expect(claimRollOptions({ badge: "In combat", send })).toEqual({});
+    expect(claimRollOptions({ badge: "In combat", critExpressions: ["2d8+2"], send })).toEqual({
+      critExpressions: ["2d8+2"],
+    });
+    expect(
+      claimRollOptions({ badge: "In combat", critExpressions: ["2d8+2"], crit: true, send }),
+    ).toEqual({ critExpressions: ["2d8+2"], crit: true });
   });
 });

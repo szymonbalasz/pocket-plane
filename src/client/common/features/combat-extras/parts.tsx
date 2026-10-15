@@ -1,5 +1,5 @@
 // Small combat-extras parts for both clients: effect chips on one line ("+N" for the rest, full
-// list on hover; FR-CBTX-33/34), death pips + state badge (FR-CBTX-33/34), roll / intent helpers.
+// list on hover; FR-CBTX-33/34; compact labels measured against the room left, FR-CBTX-46), death pips + state badge (FR-CBTX-33/34), roll / intent helpers.
 import type { DeathCounters, EffectView } from "@shared/combat-extras/schemas";
 import type { DeathState } from "@shared/entities/schemas";
 import { EyeOffIcon } from "lucide-react";
@@ -9,15 +9,13 @@ import { Tooltip } from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { EffectIcon, effectValue } from "./icons";
-import { chipOrder, chipText, DEATH_LABEL, splitNumbered } from "./logic";
-
-/** Width kept for the "+N" chip when some chips don't fit, px. */
-const MORE_W = 30;
+import { chipLabel, chipOrder, chipText, DEATH_LABEL, fitChips, splitNumbered } from "./logic";
 
 /**
- * How many of a row's chips fit its width; the rest stay in flow but invisible (clipped by the
- * row) and "+N" sits after the last one that fits. Measured after layout and on resize, so a row
- * never wraps or grows (FR-SHELL-32's 6 rows hold).
+ * How many of a row's chips fit its width (FR-CBTX-46: the width left on the name line after the
+ * full name, `fitChips`); the rest stay in flow but invisible (clipped by the row) and "+N" sits
+ * after the last one that fits. Measured after layout, on resize (ResizeObserver) and when the
+ * chips change, so a row never wraps or grows (FR-SHELL-32's 6 rows hold).
  */
 function useFit(count: number, deps: unknown) {
   const ref = useRef<HTMLDivElement>(null);
@@ -29,14 +27,16 @@ function useFit(count: number, deps: unknown) {
     const measure = () => {
       const kids = [...el.querySelectorAll<HTMLElement>("[data-chip]")];
       const width = el.clientWidth;
-      const right = (k: HTMLElement) => k.offsetLeft + k.offsetWidth;
-      if (width === 0 || kids.every((k) => right(k) <= width)) {
+      if (width === 0) {
         setFit({ n: count, left: 0 });
         return;
       }
-      let n = 0;
-      while (n < kids.length && right(kids[n] as HTMLElement) <= width - MORE_W) n++;
-      setFit({ n, left: n > 0 ? right(kids[n - 1] as HTMLElement) + 2 : 0 });
+      const n = fitChips(
+        kids.map((k) => k.offsetWidth),
+        width,
+      );
+      const last = kids[n - 1];
+      setFit({ n, left: n < kids.length && last ? last.offsetLeft + last.offsetWidth + 2 : 0 });
     };
     measure();
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
@@ -51,14 +51,17 @@ export function EffectChip({
   round,
   testId,
   className,
+  compact = false,
 }: {
   e: EffectView;
   round: number | null;
   testId: string;
   className?: string;
+  /** FR-CBTX-46 Initiative rows: compact label, ≤ 96 px, full text in a Tooltip. */
+  compact?: boolean;
 }) {
   const Icon = EffectIcon(e);
-  return (
+  const badge = (
     <Badge
       variant="outline"
       data-testid={testId}
@@ -66,16 +69,18 @@ export function EffectChip({
       data-value={effectValue(e)}
       data-secret={e.secret === true}
       className={cn(
-        "max-w-[9rem] shrink-0 gap-0.5 truncate px-1 py-0 text-[11px] font-normal",
+        "shrink-0 gap-0.5 truncate px-1 py-0 text-[11px] font-normal",
+        compact ? "max-w-[96px]" : "max-w-[9rem]",
         e.secret && "border-dashed",
         className,
       )}
     >
       <Icon className="size-3 shrink-0" aria-hidden />
-      <span className="truncate">{chipText(e, round)}</span>
+      <span className="truncate">{compact ? chipLabel(e, round) : chipText(e, round)}</span>
       {e.secret && <EyeOffIcon className="size-3 shrink-0" aria-label="Hidden from players" />}
     </Badge>
   );
+  return compact ? <Tooltip content={chipText(e, round)}>{badge}</Tooltip> : badge;
 }
 
 /**
@@ -88,15 +93,20 @@ export function EffectChips({
   testId,
   menu,
   className,
+  compact = false,
 }: {
   effects: readonly EffectView[];
   round: number | null;
   testId: string;
   menu?: (e: EffectView) => ReactNode;
   className?: string;
+  compact?: boolean;
 }) {
   const list = chipOrder(effects);
-  const { ref, fit, left } = useFit(list.length, list.map((e) => `${e.id}:${e.endsRound}`).join());
+  const { ref, fit, left } = useFit(
+    list.length,
+    list.map((e) => `${e.id}:${compact ? chipLabel(e, round) : chipText(e, round)}`).join(),
+  );
   if (list.length === 0) return null;
   const shown = list.slice(0, fit);
   const more = list.length - shown.length;
@@ -110,7 +120,7 @@ export function EffectChips({
       )}
     >
       {list.map((e, i) => {
-        const chip = <EffectChip e={e} round={round} testId={testId} />;
+        const chip = <EffectChip e={e} round={round} testId={testId} compact={compact} />;
         const hidden = i >= fit;
         return (
           <span

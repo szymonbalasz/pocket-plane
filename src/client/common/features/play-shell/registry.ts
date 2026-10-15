@@ -55,6 +55,12 @@ export interface WindowDef {
    * default column or at the left / right edge, never mid-map (`placement.ts`, #162).
    */
   fixedDefault?: boolean;
+  /**
+   * Opt-in open height, px (FR-NOTE-31 ruling): with no full-size free slot at an edge, the
+   * window opens at this height (clamped to the usable area) on top of others, covering the
+   * least, instead of shrinking to a free slot. Absent → it shrinks as usual (≥ min size).
+   */
+  minOpenH?: number;
   /** No entry = no launcher button (open via `openWindow` only). */
   launcher?: LauncherEntry;
   /** Read from the synced store; false → not rendered, not in the launcher, saved state kept. */

@@ -1,5 +1,5 @@
 // DM `cbt.initiative` (CBT §7): round + turns (skip cue, FR-CBT-50), Undo (one apply,
-// FR-CBT-35), Roll monsters (FR-CBT-46), End encounter (FR-CBT-51), pending cards, rows by
+// FR-CBT-35), Roll monsters (FR-CBT-46), End encounter (FR-CBT-51), Pending (FR-CBT-79), rows by
 // `position` (initiative roll / set, AC, HP, band or PC Down (FR-CBT-49), moved (FR-CBT-39),
 // Attack; menu Check ▸ / Save ▸ (FR-CBT-44), Damage / heal, Remove), Removed.
 import { signed } from "@shared/character-sheet/logic";
@@ -50,8 +50,11 @@ import {
 import { Input, Skeleton } from "@ui/components/ui/primitives";
 import { characterOf, deadPc, deathStateFor } from "@ui/features/combat-extras/logic";
 import { RowName } from "@ui/features/combat-extras/parts";
+import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
+import { pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
 import {
+  startedIn,
   useCbtIntent,
   useCombatants,
   useStartedEncounter,
@@ -64,11 +67,14 @@ import {
   type RollControl,
   useRollControl,
 } from "@ui/features/dice-roll-log/roll-control";
+import { actionButton } from "@ui/features/notifications/logic";
+import { useNoteActions } from "@ui/features/notifications/parts";
+import { originOf } from "@ui/features/notifications/views";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { movementIndicator } from "@ui/features/scenes-map/movement";
 import { cn } from "@ui/lib/utils";
-import { useSync } from "@ui/sync/store";
+import { useRecords, useSync } from "@ui/sync/store";
 import {
   DicesIcon,
   EllipsisIcon,
@@ -85,6 +91,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { dmNotificationViews } from "../../notification-views";
 import {
   DeathSaveAnchor,
   RowDeath,
@@ -102,16 +109,25 @@ import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpDialog } from "./hp-dialog";
+import { isDamageCard, pendingRowText } from "./pending";
 import { useCombatDialogs } from "./popup-store";
+
+/**
+ * FR-CBTX-46 (G1): the Init column is wide while some row can roll (round 0, a late joiner
+ * without initiative); else just the number input, so the name line keeps room for chips.
+ */
+const INIT_W = { wide: "w-[100px]", narrow: "w-9" } as const;
 
 function InitiativeCell({
   c,
   def,
   round,
+  wide,
 }: {
   c: CombatantView;
   def: DefinitionRecord | undefined;
   round: number;
+  wide: boolean;
 }) {
   const { send, disabled } = useCbtIntent();
   const [draft, setDraft] = useState(c.initiative == null ? "" : String(c.initiative));
@@ -144,7 +160,12 @@ function InitiativeCell({
   // #149: an empty initiative leads with a labelled Roll button; the box is a quiet secondary
   // way to type a value (reads as a value cell, not a form field).
   return (
-    <div className="flex w-[100px] items-center justify-end gap-0.5">
+    <div
+      className={cn(
+        "flex shrink-0 items-center justify-end gap-0.5",
+        INIT_W[wide ? "wide" : "narrow"],
+      )}
+    >
       <Tooltip content="Set initiative by hand">
         <Input
           data-testid="cbt-init-row-init"
@@ -188,30 +209,72 @@ function InitiativeCell({
   );
 }
 
+/** The three N7 actions (FR-CBT-74), in menu order; a click on the attack's name = `both`. */
+const ATTACK_ACTIONS = [
+  { value: "both", label: "Attack + damage" },
+  { value: "toHit", label: "Attack" },
+  { value: "damage", label: "Damage" },
+] as const;
+type AttackAction = (typeof ATTACK_ACTIONS)[number]["value"];
+
 /**
- * Attack (FR-CBT-16). OQ-CHARX-12: a definition with several attack rows gets a picker; the pick
- * rolls through the same control once it has re-rendered with that row (as Check ▸ / Save ▸).
+ * Attack ▸ (FR-CBT-16, FR-CBT-74, N7): every attack the definition can name (OQ-CHARX-12) with
+ * the same three actions as the sheet: Attack + damage (`cbt.attack`), Attack (`cbt.attack
+ * {rolls: "toHit"}`), Damage (`cbt.rollDamage`; after a natural 20 on that row's pending to-hit
+ * card the roll control opens critical). The pick rolls through one control once it has
+ * re-rendered with that attack and action (as Check ▸ / Save ▸); the result's card opens.
  */
 function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | undefined }) {
   const { send, disabled } = useCbtIntent();
   const openCard = useCombatDialogs((s) => s.openCard);
-  const choices = attackChoices(def?.statBlock.attacks ?? []);
-  const [pick, setPick] = useState<{ index: number; keys: KeyState; n: number } | null>(null);
+  const notes = useRecords<NotificationRecord>("notification");
+  const attacks = def?.statBlock.attacks ?? [];
+  const choices = attackChoices(attacks);
+  const [pick, setPick] = useState<{
+    index: number;
+    action: AttackAction;
+    keys: KeyState;
+    n: number;
+  } | null>(null);
   const chosen = choices[pick?.index ?? 0];
+  const action = pick?.action ?? "both";
   const attack = chosen?.attack;
+  // One attack: no id, the server's first attack (FR-CHARX-20 back-compat).
+  const attackId = choices.length > 1 ? chosen?.attackId : undefined;
+  // The row a card of this attack names (FR-CBT-71): its id, else the first attack's.
+  const rowId = chosen?.attackId ?? attacks[0]?.id;
+  const card = pendingToHitCard(notes, c.id, rowId === undefined ? {} : { attackId: rowId });
+  const crit = action === "damage" && card?.toHit?.natural === 20;
   const control = useRollControl({
-    expressions: attack ? [d20Expression(attack.toHit), attack.damage] : ["1d20"],
-    critExpressions: attack ? [critExpression(attack.damage)] : undefined,
-    category: "attack",
-    label: attack ? `${c.name} — ${attack.name} attack` : undefined,
+    expressions: !attack
+      ? ["1d20"]
+      : action === "toHit"
+        ? [d20Expression(attack.toHit)]
+        : action === "damage"
+          ? [attack.damage]
+          : [d20Expression(attack.toHit), attack.damage],
+    critExpressions: attack && action !== "toHit" ? [critExpression(attack.damage)] : undefined,
+    crit,
+    category: action === "damage" ? "damage" : "attack",
+    label: attack
+      ? `${c.name} — ${attack.name} ${action === "damage" ? "damage" : "attack"}`
+      : undefined,
     onRoll: async (r) => {
-      const res = await send<{ cardId: string }>("cbt.attack", {
-        attackerId: c.id,
-        mode: r.mode,
-        ...(r.manual ? { manual: r.manual } : {}),
-        // One attack: no id, the server's first attack (FR-CHARX-20 back-compat).
-        ...(choices.length > 1 && chosen?.attackId ? { attackId: chosen.attackId } : {}),
-      });
+      const ref = attackId ? { attackId } : {};
+      const res =
+        action === "damage"
+          ? await send<{ cardId: string }>("cbt.rollDamage", {
+              attackerId: c.id,
+              ...(r.manual?.[0] ? { manual: r.manual[0] } : {}),
+              ...ref,
+            })
+          : await send<{ cardId: string }>("cbt.attack", {
+              attackerId: c.id,
+              mode: r.mode,
+              ...(action === "toHit" ? { rolls: "toHit" } : {}),
+              ...(r.manual ? { manual: r.manual } : {}),
+              ...ref,
+            });
       if (res) openCard(res.cardId);
     },
   });
@@ -221,12 +284,17 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
     if (pick) control.roll(pick.keys);
   }, [n]);
   const keys = useRef<KeyState>({});
-  if (choices.length > 1) {
-    return (
-      <>
-        {/* Invisible anchor for the physical-dice popover of the picked attack. */}
-        <RollButton control={control} tabIndex={-1} aria-hidden className={ANCHOR} />
-        <DropdownMenu>
+  const choose = (index: number, a: AttackAction) => {
+    const k = keys.current;
+    keys.current = {};
+    setPick((p) => ({ index, action: a, keys: k, n: (p?.n ?? 0) + 1 }));
+  };
+  return (
+    <>
+      {/* Invisible anchor for the physical-dice popover of the picked attack. */}
+      <RollButton control={control} tabIndex={-1} aria-hidden className={ANCHOR} />
+      <DropdownMenu>
+        <Tooltip content={attack ? "Attack ▸ (Shift adv, Ctrl dis)" : "No weapon attack"}>
           <DropdownMenuTrigger asChild>
             <Button
               data-testid="cbt-init-row-attack"
@@ -235,55 +303,48 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
               variant="ghost"
               className="size-7"
               aria-label={`Attack with ${c.name}`}
-              disabled={disabled}
+              disabled={disabled || choices.length === 0}
             >
               <SwordIcon className="size-3.5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {choices.map((ch, i) => (
-              <DropdownMenuItem
-                key={ch.attackId ?? `first-${i}`}
-                data-testid="cbt-init-row-attack-option"
-                data-record-id={c.id}
-                data-value={ch.attackId ?? ""}
-                onPointerDown={(e) => {
-                  keys.current = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey };
-                }}
-                onSelect={() => {
-                  const k = keys.current;
-                  keys.current = {};
-                  setPick((p) => ({ index: i, keys: k, n: (p?.n ?? 0) + 1 }));
-                }}
-              >
-                <span className="flex-1">{ch.attack.name}</span>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {signed(ch.attack.toHit)} · {ch.attack.damage}
-                </span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </>
-    );
-  }
-  return (
-    <Tooltip content={attack ? `Attack: ${attack.name} (Shift adv, Ctrl dis)` : "No weapon attack"}>
-      <span>
-        <RollButton
-          control={control}
-          data-testid="cbt-init-row-attack"
-          data-record-id={c.id}
-          size="icon"
-          variant="ghost"
-          className="size-7"
-          aria-label={`Attack with ${c.name}`}
-          disabled={disabled || !attack}
-        >
-          <SwordIcon className="size-3.5" />
-        </RollButton>
-      </span>
-    </Tooltip>
+        </Tooltip>
+        <DropdownMenuContent align="end" className="min-w-64">
+          {choices.map((ch, i) => (
+            <div key={ch.attackId ?? `first-${i}`} className="flex items-center gap-0.5">
+              {ATTACK_ACTIONS.map((a) => (
+                <DropdownMenuItem
+                  key={a.value}
+                  data-testid="cbt-init-row-attack-option"
+                  data-record-id={c.id}
+                  data-value={a.value}
+                  data-attack-id={ch.attackId ?? ""}
+                  className={a.value === "both" ? "min-w-0 flex-1 gap-2" : "px-1.5 text-xs"}
+                  onPointerDown={(e) => {
+                    keys.current = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey };
+                  }}
+                  onSelect={() => choose(i, a.value)}
+                >
+                  {a.value === "both" ? (
+                    <>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate">{ch.attack.name}</span>
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {signed(ch.attack.toHit)} · {ch.attack.damage}
+                        </span>
+                      </span>
+                      <span className="text-xs text-muted-foreground">{a.label}</span>
+                    </>
+                  ) : (
+                    a.label
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </div>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }
 
@@ -462,12 +523,14 @@ function Row({
   turn,
   round,
   defs,
+  wideInit,
 }: {
   c: CombatantView;
   def: DefinitionRecord | undefined;
   turn: boolean;
   round: number;
   defs: Map<string, DefinitionRecord>;
+  wideInit: boolean;
 }) {
   const { send, disabled } = useCbtIntent();
   const openHp = useCombatDialogs((s) => s.openHp);
@@ -498,7 +561,7 @@ function Row({
       data-hidden={c.hidden === true}
       data-skipped={skipped}
       className={cn(
-        "flex items-center gap-1 rounded-md px-1 py-0.5",
+        "relative flex items-center gap-0.5 rounded-md px-1 py-0.5",
         turn && "bg-accent",
         c.hidden && "opacity-70",
         skipped && "opacity-50",
@@ -545,12 +608,15 @@ function Row({
           <RowDeath c={c} />
         </div>
       </div>
-      <InitiativeCell c={c} def={def} round={round} />
+      <InitiativeCell c={c} def={def} round={round} wide={wideInit} />
       <AttackButton c={c} def={def} />
-      {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸. */}
-      <RollButton control={check.control} tabIndex={-1} aria-hidden className={ANCHOR} />
-      <RollButton control={save.control} tabIndex={-1} aria-hidden className={ANCHOR} />
-      {c.kind === "pc" && <DeathSaveAnchor control={deathRoll} />}
+      {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸, out of the flow
+          (no gaps: the name line keeps the room, FR-CBTX-46). */}
+      <span className="pointer-events-none absolute top-1/2 right-16 flex size-0">
+        <RollButton control={check.control} tabIndex={-1} aria-hidden className={ANCHOR} />
+        <RollButton control={save.control} tabIndex={-1} aria-hidden className={ANCHOR} />
+        {c.kind === "pc" && <DeathSaveAnchor control={deathRoll} />}
+      </span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -592,28 +658,76 @@ function Row({
 
 const ANCHOR = "pointer-events-none size-0 overflow-hidden p-0 opacity-0";
 
-function PendingCards({ cards }: { cards: NotificationRecord[] }) {
+/**
+ * FR-CBT-79 (G9): one Pending row per linked notification. A damage card opens the popup; another
+ * kind shows its text ("Waiting for Mira: …" when a player owns it) and the DM's action (the
+ * view's `onAction`, as in Notifications).
+ */
+function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteActions }) {
   const openCard = useCombatDialogs((s) => s.openCard);
-  if (cards.length === 0) return null;
-  return (
-    <section
-      aria-label="Pending attacks"
-      className="flex max-h-28 shrink-0 flex-col gap-1 overflow-y-auto"
-    >
-      <h3 className="text-xs font-medium text-muted-foreground">Pending ({cards.length})</h3>
-      {cards.map((n) => (
+  const live = useSync((s) => s.state === "live");
+  const view = dmNotificationViews.get(n.kind);
+  if (isDamageCard(n)) {
+    return (
+      <li>
         <Button
-          key={n.id}
           variant="outline"
           size="sm"
           data-testid="cbt-init-card"
           data-record-id={n.id}
-          className="justify-start truncate"
+          className="w-full justify-start truncate"
           onClick={() => openCard(n.id)}
         >
           <SwordIcon className="size-3.5" /> {n.text}
         </Button>
-      ))}
+      </li>
+    );
+  }
+  const Icon = view?.icon ?? SwordIcon;
+  const mode = actionButton(n, { role: "dm", playerId: null }, live, view);
+  return (
+    <li
+      data-testid="cbt-init-pending"
+      data-record-id={n.id}
+      data-kind={n.kind}
+      className="flex h-8 items-center gap-1.5 rounded-md border px-2 text-sm"
+    >
+      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 flex-1 truncate" data-testid="cbt-init-pending-text">
+        {pendingRowText(n)}
+      </span>
+      {mode !== "none" && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 shrink-0 px-2 text-xs"
+          data-testid="cbt-init-pending-action"
+          data-record-id={n.id}
+          disabled={mode === "disabled" || actions.busy.has(n.id)}
+          // A list row like Notifications' (FR-NOTE-26 origin); its kind decides what it means.
+          onClick={(e) => void actions.run(n, originOf("history", e.currentTarget.closest("li")))}
+        >
+          {n.actionLabel}
+        </Button>
+      )}
+    </li>
+  );
+}
+
+type NoteActions = ReturnType<typeof useNoteActions>;
+
+function PendingCards({ cards }: { cards: NotificationRecord[] }) {
+  const actions = useNoteActions(dmNotificationViews);
+  if (cards.length === 0) return null;
+  return (
+    <section aria-label="Pending actions" data-testid="cbt-init-pending-list" className="shrink-0">
+      <h3 className="mb-1 text-xs font-medium text-muted-foreground">Pending ({cards.length})</h3>
+      {/* FR-CBT-77 (G4): at most 3 rows, then its own scroll, so cards never push the rows away. */}
+      <ul className="flex max-h-[104px] flex-col gap-1 overflow-y-auto">
+        {cards.map((n) => (
+          <PendingRow key={n.id} n={n} actions={actions} />
+        ))}
+      </ul>
     </section>
   );
 }
@@ -788,6 +902,11 @@ function DmInitiativeBody() {
   const cards = usePendingCards(enc?.id);
   const openWindow = useOpenWindow();
   const { send, disabled } = useCbtIntent();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLButtonElement>(null);
+  const activeIds = rows.filter((c) => !c.removed).map((c) => c.id);
+  // FR-CBT-77 (G4): new rows / the Pending section scroll into view; "↓ N more" below the fold.
+  const fold = useBelowFold(rootRef, footerRef, activeIds, cards.length > 0);
   if (!everLive) return <Skeleton className="h-24" />;
   if (!enc) {
     return (
@@ -803,9 +922,11 @@ function DmInitiativeBody() {
   }
   const active = rows.filter((c) => !c.removed);
   const removed = rows.filter((c) => c.removed);
+  const wideInit = active.some((c) => canRollInitiative(enc.round, c.initiative));
   return (
     // Header + pending cards stay put; the rows scroll inside the window (glitch 3).
     <div
+      ref={rootRef}
       data-testid="cbt-init"
       data-record-id={enc.id}
       className="flex h-full min-h-0 flex-col gap-2"
@@ -815,11 +936,11 @@ function DmInitiativeBody() {
       <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
         <div
           aria-hidden
-          className="sticky top-0 z-10 flex items-center gap-1 bg-card px-1 pb-0.5 text-[11px] text-muted-foreground"
+          className="sticky top-0 z-10 flex items-center gap-0.5 bg-card px-1 pb-0.5 text-[11px] text-muted-foreground"
         >
-          <span className="flex-1 pl-[52px]">Combatant</span>
-          <span className="w-[100px] text-center">Init</span>
-          <span className="w-[60px]" />
+          <span className="flex-1 pl-[48px]">Combatant</span>
+          <span className={cn("text-center", INIT_W[wideInit ? "wide" : "narrow"])}>Init</span>
+          <span className="w-[58px]" />
         </div>
         <ul className="flex flex-col gap-0.5">
           {active.map((c) => (
@@ -830,6 +951,7 @@ function DmInitiativeBody() {
               turn={enc.turnCombatantId === c.id}
               round={enc.round}
               defs={defs}
+              wideInit={wideInit}
             />
           ))}
         </ul>
@@ -861,6 +983,7 @@ function DmInitiativeBody() {
           </section>
         )}
       </div>
+      <MoreFooter footerRef={footerRef} more={fold.more} onClick={fold.scrollToMore} />
     </div>
   );
 }
@@ -885,6 +1008,13 @@ export const dmInitiativeWindow = defineWindow({
   defaultSize: { w: 400, h: 500 },
   minSize: { w: 320, h: 240 },
   defaultPosition: { anchor: "top-right" },
+  // FR-CBT-77 (G4): height follows the rows until the DM resizes it (FR-SHELL-39); "new" dot
+  // while minimised when the round or the turn changes (FR-SHELL-38, N1 = A, #190).
+  growToContent: true,
+  activity: (store) => {
+    const enc = startedIn(store);
+    return enc ? `${enc.round}:${enc.turnCombatantId ?? ""}` : null;
+  },
   companion: CombatDialogs,
   component: DmInitiativeBody,
 });

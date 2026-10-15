@@ -18,6 +18,9 @@ describe("FR-CHARX-45 FR-CHARX-46 G8 views", () => {
       openWindow: (kind: string) => {
         opened.push(kind);
       },
+      // FR-NOTE-26: filled by the runtime (required since fix/combat2-polish).
+      origin: { source: "history" as const, rect: { x: 0, y: 0, w: 0, h: 0 } },
+      closeToast: () => {},
     };
     await charxDraftView.onAction?.(note({ characterId: "brin" }), ctx);
     expect(sheetSelection.getState().selectedId).toBe("brin");

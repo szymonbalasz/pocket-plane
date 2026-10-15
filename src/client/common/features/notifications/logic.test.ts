@@ -21,10 +21,14 @@ import { createSeenStore } from "./seen";
 import {
   addNote,
   closeToast,
+  createToastMemory,
+  hideNote,
+  hideToast,
   INFO_TOAST_MS,
   initialToasts,
   nextExpiry,
   pruneToasts,
+  registerToastMemory,
   setHidden,
   setHovered,
   setSummary,
@@ -213,6 +217,33 @@ describe("reconnect and reload (FR-NOTE-14/15, NOTE §11)", () => {
   });
 });
 
+describe("hidden toasts (FR-NOTE-26)", () => {
+  test("FR-NOTE-26 toast hidden by closeToast() / hideToast(id) stays hidden while pending; row and bell unchanged", () => {
+    const card = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
+    let s = addNote(initialToasts(0), card, 0);
+    s = hideNote(s, card.id, 1);
+    expect(s.toasts).toHaveLength(0);
+    // Added again (e.g. a later created frame) → stays hidden.
+    expect(addNote(s, card, 2).toasts).toHaveLength(0);
+    // Pruning keeps nothing back; the row is still pending in the store and counts on the bell.
+    const st = store(DM, [card], 3);
+    expect(pruneToasts(s, st, 3).toasts).toHaveLength(0);
+    expect(unreadCount(st, 0)).toBe(1);
+    // `hideToast(id)` reaches every mounted runtime's memory.
+    const m = createToastMemory(0);
+    m.setState((x) => ({ toasts: addNote(x.toasts, card, 0) }));
+    const off = registerToastMemory(m);
+    hideToast(card.id);
+    expect(m.getState().toasts.toasts).toHaveLength(0);
+    expect(m.getState().toasts.hiddenIds).toEqual([card.id]);
+    off();
+    const other = note();
+    m.setState((x) => ({ toasts: addNote(x.toasts, other, 0) }));
+    hideToast(other.id); // unregistered → no effect
+    expect(m.getState().toasts.toasts).toHaveLength(1);
+  });
+});
+
 describe("toast timers and cap (FR-NOTE-14)", () => {
   test("FR-NOTE-14 info hides after 6 s; timer pauses while hovered and while the tab is hidden", () => {
     let s = initialToasts(0);
@@ -287,7 +318,7 @@ describe("buttons, list, labels (FR-NOTE-16/17/20)", () => {
     expect(dismissButton(note(), dmV, true)).toBe("none");
   });
 
-  test("FR-NOTE-17 sections: Pending (DM all; player own) then History, newest first; labels", () => {
+  test("FR-NOTE-17 FR-NOTE-28 sections: Pending (DM all; player own) then History, newest first; labels", () => {
     const info = note();
     const card = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
     const ask = pendingFor("player", "p1");
@@ -303,6 +334,10 @@ describe("buttons, list, labels (FR-NOTE-16/17/20)", () => {
     expect(stateLabel(done, names)).toBe("Resolved by Player 1");
     expect(stateLabel({ ...done, closedByRole: "dm", closedByPlayerId: null }, names)).toBe(
       "Resolved by DM",
+    );
+    // FR-NOTE-28 badge: resolved with no actor (a rule closure) → "Closed".
+    expect(stateLabel({ ...done, closedByRole: null, closedByPlayerId: null }, names)).toBe(
+      "Closed",
     );
     expect(stateLabel(card, names)).toBe("Pending");
     expect(stateLabel({ ...card, state: "dismissed" }, names)).toBe("Dismissed");
@@ -325,7 +360,8 @@ describe("unread (FR-NOTE-18)", () => {
     const ask = pendingFor("player", "p1");
     const card = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
     const rows = [info, dmOnly, ask, card];
-    expect(unreadCount(store(DM, rows), 0)).toBe(3);
+    // DM: info, dmOnly, card and (FR-NOTE-27) the player-owned `ask`.
+    expect(unreadCount(store(DM, rows), 0)).toBe(4);
     expect(unreadCount(store(P1, rows), 0)).toBe(2);
     expect(unreadCount(store(P1, rows), ask.seq)).toBe(0);
     expect(unreadCount(store(P2, rows), 0)).toBe(1);
@@ -345,6 +381,19 @@ describe("unread (FR-NOTE-18)", () => {
     expect(unreadCount(store(DM, at("pending")), card.seq)).toBe(0);
     // The info row counts by audience whatever happens to action rows.
     expect(unreadCount(store(P1, at("dismissed")), 0)).toBe(1);
+  });
+
+  test("FR-NOTE-27 DM unread: a player-owned pending row counts for the DM, not toasted; leaves when resolved; player client unchanged", () => {
+    const ask = pendingFor("player", "p1");
+    expect(unreadCount(store(DM, [ask]), 0)).toBe(1);
+    expect(unreadCount(store(DM, [ask]), ask.seq)).toBe(0);
+    expect(unreadCount(store(DM, [{ ...ask, state: "resolved" }]), 0)).toBe(0);
+    expect(unreadCount(store(P1, [ask]), 0)).toBe(1);
+    expect(unreadCount(store(P2, [ask]), 0)).toBe(0);
+    // Still no DM toast (FR-NOTE-13): created in an event frame, the DM's triggers skip it.
+    const prev: SyncView = { state: "live", store: store(DM, [], 1) };
+    const next: SyncView = { state: "live", store: store(DM, [ask], 2) };
+    expect(toastTriggers(prev, next)).toEqual([]);
   });
 
   test("FR-NOTE-18 seen store: localStorage-like backend; failure → memory only, one warning", () => {

@@ -110,6 +110,8 @@ test("#162 every DM window type opens at the left / right edge on the default la
       const at = `${viewport.w}×${viewport.h}`;
       expect(ok ? "ok" : `${d.kind} opens mid-map at ${at}: x${r.x} y${r.y}`).toBe("ok");
       if (!product.has(d.kind)) continue;
+      // `minOpenH` (FR-NOTE-31 ruling): no full-size free slot → that height, on top of others.
+      if (d.minOpenH !== undefined && r.h >= d.minOpenH) continue;
       for (const b of rects) {
         if (b.kind === d.kind) continue;
         expect(overlaps(r, b) ? `${d.kind} overlaps ${b.kind} at ${at}` : "ok").toBe("ok");
@@ -233,6 +235,8 @@ test("FR-SHELL-08 DM launcher windows open clear of the default-open ones (glitc
             ? RIGHT_COLUMN.has(b.kind)
             : defaults.has(b.kind) || kinds.includes(b.kind);
           if (b.kind === kind || !guard) continue;
+          // `minOpenH` (FR-NOTE-31 ruling): opens at that height on top when nothing is free.
+          if ((dmWindows.get(kind)?.minOpenH ?? Infinity) <= a.h) continue;
           const msg = `${kinds.join("+")}: ${kind} overlaps ${b.kind} at ${viewport.w}`;
           expect(overlaps(a, b) ? msg : "ok").toBe("ok");
         }

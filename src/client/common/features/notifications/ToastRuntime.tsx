@@ -1,17 +1,37 @@
 // Always-mounted notifications runtime (FR-NOTE-13/14/15/18): watches sync changes, keeps the
-// toast stack in the shell's toast region, sets the seen baseline. Toasts and timers are client
+// toast stack in the shell's toast region, sets the seen baseline, starts the DM's action cue
+// (FR-NOTE-30). Toasts and timers are client
 // memory only (per page, `ToastMemory`). Player: bottom-right. DM: top-centre below the top bar (#149): the DM's right
 // column (`cbt.initiative`, protocol §24) reaches the bottom-right corner, and sticky damage-card
 // toasts covered its lower rows; the map gap between the columns is free in the default layout.
+// Wherever Initiative is, the DM stack keeps clear of it (FR-NOTE-32, `keep-out.ts`).
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { XIcon } from "lucide-react";
-import { useCallback, useContext, useEffect } from "react";
+import {
+  type RefObject,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
-import { useOpenWindow } from "../play-shell/ShellContext";
-import { DM_TOAST_TOP } from "../play-shell/toast-region";
+import { INITIATIVE_KIND } from "../combat-tracker/window";
+import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
+import type { Rect } from "../play-shell/geometry";
+import { useViewport } from "../play-shell/hooks";
+import {
+  useAvailableKinds,
+  useOpenWindow,
+  useRegistry,
+  useShellState,
+} from "../play-shell/ShellContext";
+import { dmStackPlacement } from "./keep-out";
 import {
   actionButton,
   classify,
@@ -27,6 +47,7 @@ import {
   advance,
   closeToast,
   nextExpiry,
+  registerToastMemory,
   SUMMARY_KEY,
   setHidden,
   setHovered,
@@ -36,9 +57,11 @@ import {
   type ToastState,
   visibleToasts,
 } from "./toasts";
-import type { NotificationViews } from "./views";
+import { cueTriggers, startCues } from "./token-cue";
+import { type NotificationViews, originOf } from "./views";
 
 type Action = (s: ToastState, now: number) => ToastState;
+const TOAST_SELECTOR = '[data-testid="note-toast"]';
 const hiddenNow = () => typeof document !== "undefined" && document.visibilityState === "hidden";
 
 function NoteToast({
@@ -88,13 +111,51 @@ function NoteToast({
           className="self-end"
           data-testid="note-toast-action"
           disabled={mode === "disabled" || actions.busy.has(n.id)}
-          onClick={() => void actions.run(n)}
+          onClick={(e) =>
+            void actions.run(n, originOf("toast", e.currentTarget.closest(TOAST_SELECTOR)))
+          }
         >
           {n.actionLabel}
         </Button>
       )}
     </div>
   );
+}
+
+/** FR-NOTE-32: the open, non-minimised `cbt.initiative` window's rendered rect (DM), else null. */
+function useInitiativeRect(isDm: boolean): Rect | null {
+  const registry = useRegistry();
+  const windows = useShellState((s) => s.windows);
+  const available = useAvailableKinds();
+  const vp = useViewport();
+  const measured = useContentHeights();
+  return useMemo(() => {
+    if (!isDm) return null;
+    const win = windows.filter((w) => w.kind === INITIATIVE_KIND && w.state === "open");
+    return renderedWindowRects(win, registry, available, vp, measured)[0] ?? null;
+  }, [isDm, windows, registry, available, vp, measured]);
+}
+
+/**
+ * FR-NOTE-32: the stack's rendered height (DM), re-measured when it mounts (`shown` flips) and on
+ * resize while mounted.
+ */
+function useStackHeight(ref: RefObject<HTMLElement | null>, on: boolean, shown: boolean): number {
+  const [h, setH] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!on || !shown || !el) {
+      setH(0);
+      return;
+    }
+    const measure = () => setH(Math.ceil(el.getBoundingClientRect().height));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, on, shown]);
+  return h;
 }
 
 export function ToastRuntime({
@@ -127,6 +188,8 @@ export function ToastRuntime({
       if (t === null) return;
       if (t === "connect") note.baseline(next.store);
       memory.setState((m) => syncToasts(m, prev, next, t, Date.now()));
+      // FR-NOTE-30: the DM's 4 s action cue (live event frames only).
+      startCues(cueTriggers(prev, next, t), (kind) => views.get(kind));
       note.markSeen(next.store);
     };
     // A remount keeps the stack: the pointer is gone and the tab may have changed visibility.
@@ -135,7 +198,10 @@ export function ToastRuntime({
     // Mounted after the first snapshot (loading screen first): treat it as the connect.
     if (first.state === "live" && viewerOf(first.store)) onChange(first, null);
     return sync.subscribe((next, prev) => onChange(next, prev));
-  }, [sync, note, memory, dispatch]);
+  }, [sync, note, memory, dispatch, views]);
+
+  // FR-NOTE-26: `hideToast(id)` reaches this page's stack.
+  useEffect(() => registerToastMemory(memory), [memory]);
 
   // Info toast expiry.
   const wait = nextExpiry(state);
@@ -152,19 +218,29 @@ export function ToastRuntime({
     return () => document.removeEventListener("visibilitychange", on);
   }, [dispatch]);
 
+  // FR-NOTE-32: the DM's stack keeps clear of the rendered Initiative window.
+  const stackRef = useRef<HTMLElement>(null);
+  const initiative = useInitiativeRect(isDm);
+  const vp = useViewport();
+  const stackH = useStackHeight(stackRef, isDm, state.toasts.length > 0);
+  const at = dmStackPlacement(vp, initiative, stackH);
+
   const openHistory = () => openWindow(HISTORY_KIND);
   const { shown, more } = visibleToasts(state);
   if (state.toasts.length === 0) return null;
   return (
     <section
+      ref={stackRef}
       aria-label="Notifications"
       data-testid="note-toasts"
       data-placement={isDm ? "top-center" : "bottom-right"}
+      data-left={isDm ? at.left : undefined}
+      data-top={isDm ? at.top : undefined}
       className={cn(
         "pointer-events-none fixed z-40 flex w-80 flex-col gap-2",
-        isDm ? "left-1/2 -translate-x-1/2" : "right-4 bottom-4",
+        !isDm && "right-4 bottom-4",
       )}
-      style={isDm ? { top: DM_TOAST_TOP } : undefined}
+      style={isDm ? { left: at.left, top: at.top } : undefined}
       onMouseEnter={() => dispatch((s, now) => setHovered(s, true, now))}
       onMouseLeave={() => dispatch((s, now) => setHovered(s, false, now))}
     >

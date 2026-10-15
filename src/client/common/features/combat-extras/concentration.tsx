@@ -24,6 +24,7 @@ import {
   IMPORTED_ENTITY_TYPE,
 } from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
+import type { RecordStore } from "@shared/protocol/store";
 import { BrainIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 import { useEffect } from "react";
 import { create } from "zustand";
@@ -40,6 +41,7 @@ import {
 import { useSync } from "../../sync/store";
 import { useCbtIntent } from "../combat-tracker/store";
 import { RollButton, useRollControl } from "../dice-roll-log/roll-control";
+import { boundTokenIds, tokensOn } from "../notifications/token-cue";
 import { defineNotificationView, type NotificationView } from "../notifications/views";
 
 /** "DC 12: 14 — kept", "Ended", "Undone"; null while pending. */
@@ -78,11 +80,36 @@ interface RollHostState {
 
 export const useConcentrationRoll = create<RollHostState>(() => ({ hosts: 0, noteId: null }));
 
+/**
+ * FR-CBTX-49 (N11): the DM's cue for a player-owned concentration card: the token bound to the
+ * target character's active combatant, else that character's tokens, on the viewed scene.
+ */
+export function concentrationCueTokens(
+  n: Pick<NotificationRecord, "payload">,
+  store: RecordStore,
+  viewedSceneId: string | null,
+): string[] {
+  const effectId = (n.payload as { effectId?: unknown } | null)?.effectId;
+  const e = store.records[EFFECT_TYPE]?.[String(effectId)] as EffectView | undefined;
+  const characterId = e?.targetCharacterId;
+  if (!characterId) return [];
+  const mine = tokensOn(store, viewedSceneId).filter((t) => t.characterId === characterId);
+  const bound = boundTokenIds(store);
+  const inCombat = mine.filter((t) => bound.has(t.id));
+  return (inCombat.length > 0 ? inCombat : mine).map((t) => t.id);
+}
+
 export const concentrationView: NotificationView = defineNotificationView({
   kind: CONCENTRATION_CARD_KIND,
   icon: BrainIcon,
   render: CardBody,
   // No end rule (OQ-CBTX-15): pending cards stay at End.
+  // FR-CBTX-48 (G9): linked to its encounter, so the DM's Initiative "Pending" lists it.
+  encounterIdOf: (p) => {
+    const id = (p as { encounterId?: unknown } | null)?.encounterId;
+    return typeof id === "string" ? id : null;
+  },
+  cueTokens: concentrationCueTokens,
   onAction(n, ctx) {
     if (useConcentrationRoll.getState().hosts > 0) {
       useConcentrationRoll.setState({ noteId: n.id });
