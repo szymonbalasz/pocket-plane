@@ -1,6 +1,7 @@
 // Pure client helpers for the game log and the roll control (FR-DICE-05, 07, 21, 24, 27, 30).
 // Input convenience only: the server re-checks everything (FR-DICE-01, 06).
 
+import type { CombatantRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
 import {
   type DiceTerm,
   diceTerms,
@@ -81,22 +82,48 @@ export interface ActorOption {
   /** "" = the roller themselves ("me" / "DM"). */
   value: string;
   label: string;
-  group?: "Characters" | "Tokens";
-  ref?: { entityId: string } | { tokenId: string };
+  group?: "Characters" | "Tokens" | "Combatants";
+  ref?: { entityId: string } | { tokenId: string } | { combatantId: string };
+  /** FR-DICE-34: picked, but no longer in the list (shown disabled until the roll answers). */
+  stale?: boolean;
+}
+
+/**
+ * FR-DICE-34: the actor Select's state. A pick that left the list since (combatant removed,
+ * encounter ended, token or character deleted) stays picked and marked stale: the roll is sent
+ * as it, so the server answers `not_found` inline instead of the roll silently going out as the
+ * roller; the caller drops it after that answer. No pick → the roller ("DM" / "Me").
+ */
+export function actorSelection(
+  actors: readonly ActorOption[],
+  picked: ActorOption | null,
+): { options: ActorOption[]; selected: ActorOption | undefined } {
+  if (!picked || picked.value === "") return { options: [...actors], selected: actors[0] };
+  const current = actors.find((a) => a.value === picked.value);
+  if (current) return { options: [...actors], selected: current };
+  const stale = { ...picked, stale: true };
+  return { options: [...actors, stale], selected: stale };
 }
 
 type ActorToken = Pick<TokenView, "id" | "sceneId" | "name" | "seq" | "definitionId">;
+type ActorCombatant = Pick<
+  CombatantRecord,
+  "id" | "encounterId" | "name" | "tokenId" | "active" | "removed"
+>;
 
 /**
  * FR-DICE-27: player → "me" + own characters; DM → "DM" + every character + the tokens of the
  * active scene (by placement order). A character's token is left out: the character is already
- * listed, and both roll under the same name ("Mira" twice, #149).
+ * listed, and both roll under the same name ("Mira" twice, #149). FR-DICE-34: then the DM's
+ * token-less active, non-removed combatants of the started encounter, by name ("Goblin 3").
  */
 export function actorOptions(
   you: { role: "dm" | "player"; playerId: string | null } | null,
   entities: readonly Pick<EntityRecord, "id" | "kind" | "name" | "ownerPlayerId">[],
   scenes: readonly Pick<SceneView, "id" | "active">[] = [],
   tokens: readonly ActorToken[] = [],
+  encounters: readonly Pick<EncounterRecord, "id" | "status">[] = [],
+  combatants: readonly ActorCombatant[] = [],
 ): ActorOption[] {
   if (!you) return [];
   const chars = entities
@@ -118,6 +145,10 @@ export function actorOptions(
   const onScene = tokens
     .filter((t) => t.sceneId === active && !(t.definitionId && listed.has(t.definitionId)))
     .sort((a, b) => a.seq - b.seq);
+  const started = encounters.find((e) => e.status === "started")?.id;
+  const tokenless = combatants
+    .filter((c) => c.encounterId === started && c.active && !c.removed && c.tokenId === null)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   return [
     ...out,
     ...onScene.map((t) => ({
@@ -125,6 +156,12 @@ export function actorOptions(
       label: t.name,
       group: "Tokens" as const,
       ref: { tokenId: t.id },
+    })),
+    ...tokenless.map((c) => ({
+      value: c.id,
+      label: c.name,
+      group: "Combatants" as const,
+      ref: { combatantId: c.id },
     })),
   ];
 }
@@ -156,20 +193,301 @@ export function manualSlots(expressions: readonly string[], mode: RollMode): Man
 }
 
 /**
- * FR-DICE-24 crit swap: the slots after the first, given the first entry. A natural 20 on the
- * first (its single kept d20) and `critExpressions` set → the rest use those.
+ * FR-DICE-31: the "Extra critical dice" group of a crit slot — the base expression's dice terms
+ * once more, no constants — when `crit` is `base` with every dice count doubled. Anything else
+ * (keep, subtracted dice, a different crit rule) → null, and the slot falls back to showing the
+ * crit expression itself (the FR-DICE-24 swap).
  */
-export function slotsAfterFirst(
-  expressions: readonly string[],
-  critExpressions: readonly string[] | undefined,
-  first: ManualEntry | null,
-  firstExpression: string,
-): readonly string[] {
-  const rest = expressions.slice(1);
-  if (!critExpressions || !first) return rest;
-  return manualNatural(firstExpression, first) === 20
-    ? rest.map((e, i) => critExpressions[i] ?? e)
-    : rest;
+export function critExtra(base: string, crit: string): ManualSlot | null {
+  const b = prepareExpression(base, "normal");
+  const c = prepareExpression(crit, "normal");
+  if (!b.ok || !c.ok || b.value.length !== c.value.length) return null;
+  const extra: DiceTerm[] = [];
+  for (const [i, bt] of b.value.entries()) {
+    const ct = c.value[i];
+    if (!ct || ct.kind !== bt.kind || ct.sign !== bt.sign) return null;
+    if (bt.kind === "const") {
+      if (ct.kind !== "const" || ct.value !== bt.value) return null;
+      continue;
+    }
+    if (ct.kind !== "dice" || bt.sign !== 1 || bt.keep || ct.keep) return null;
+    if (ct.faces !== bt.faces || ct.count !== bt.count * 2) return null;
+    extra.push(bt);
+  }
+  if (extra.length === 0) return null;
+  return {
+    expression: toNotation(extra),
+    faces: extra.flatMap((t) => Array<number>(t.count).fill(t.faces)),
+  };
+}
+
+/** One slot of the physical-dice popover (FR-DICE-24, 31). */
+export interface FormSlot {
+  /** The expression's own inputs (kept as typed when a crit adds the extra group). */
+  base: ManualSlot;
+  /** "Extra critical dice: 4d6"; null = no crit on this slot. */
+  extra: ManualSlot | null;
+}
+
+export interface FormOptions {
+  expressions: readonly string[];
+  /** Without `crit`: pairs with `expressions[1…]`; with `crit`: with `expressions[0…]`. */
+  critExpressions?: readonly string[] | undefined;
+  /** The caller knows the hit is critical: every slot shows its extra group from the start. */
+  crit?: boolean | undefined;
+}
+
+export interface GroupInput {
+  total: string;
+  dice: string[];
+}
+
+export interface SlotInput {
+  /** The base expression these inputs were typed for (a swap fallback resets them). */
+  for: string;
+  base: GroupInput;
+  extra: GroupInput;
+}
+
+const emptyGroup = (slot: ManualSlot | null): GroupInput => ({
+  total: "",
+  dice: slot && slot.faces.length > 1 ? slot.faces.map(() => "") : [],
+});
+
+/**
+ * FR-DICE-24 / FR-DICE-31: the popover's slots for the current inputs. A natural 20 typed in the
+ * first slot (or `crit: true`) gives each crit slot its extra critical group. Returns an error
+ * message when an expression can't be laid out.
+ */
+export function formSlots(
+  o: FormOptions,
+  mode: RollMode,
+  inputs: readonly SlotInput[],
+): FormSlot[] | string {
+  const base = manualSlots(o.expressions, mode);
+  if (typeof base === "string") return base;
+  const crits = o.critExpressions ?? [];
+  let natural20 = false;
+  const first = base[0];
+  const firstInput = inputs[0];
+  if (!o.crit && first && firstInput && firstInput.for === first.expression) {
+    const r = checkGroup(first, firstInput.base, first.expression);
+    natural20 = "entry" in r && manualNatural(first.expression, r.entry) === 20;
+  }
+  const out: FormSlot[] = [];
+  for (const [i, slot] of base.entries()) {
+    const crit = o.crit ? crits[i] : natural20 && i > 0 ? crits[i - 1] : undefined;
+    if (!crit) {
+      out.push({ base: slot, extra: null });
+      continue;
+    }
+    const extra = critExtra(slot.expression, crit);
+    if (extra) {
+      out.push({ base: slot, extra });
+      continue;
+    }
+    const swapped = manualSlots([crit], "normal");
+    if (typeof swapped === "string") return swapped;
+    out.push({ base: swapped[0] as ManualSlot, extra: null });
+  }
+  return out;
+}
+
+/** Inputs aligned to `slots`: a slot whose base changed starts empty; a gone extra group is dropped. */
+export function reconcileInputs(
+  slots: readonly FormSlot[],
+  inputs: readonly SlotInput[],
+): SlotInput[] {
+  return slots.map((s, i) => {
+    const prev = inputs[i];
+    const base = prev && prev.for === s.base.expression ? prev.base : emptyGroup(s.base);
+    const extra = s.extra && prev && prev.for === s.base.expression ? prev.extra : null;
+    return {
+      for: s.base.expression,
+      base,
+      extra:
+        extra && extra.dice.length === emptyGroup(s.extra).dice.length
+          ? extra
+          : emptyGroup(s.extra),
+    };
+  });
+}
+
+/**
+ * One input changed: the new inputs, with the slots re-derived from them (FR-DICE-31: the first
+ * entry moving onto / off 20 adds / drops the extra groups; base inputs stay).
+ */
+export function updateInputs(
+  o: FormOptions,
+  mode: RollMode,
+  inputs: readonly SlotInput[],
+  at: { slot: number; group: "base" | "extra" },
+  patch: Partial<GroupInput>,
+): SlotInput[] {
+  const slots = formSlots(o, mode, inputs);
+  if (typeof slots === "string") return [...inputs];
+  const next = reconcileInputs(slots, inputs);
+  const cur = next[at.slot];
+  if (!cur) return next;
+  next[at.slot] = { ...cur, [at.group]: { ...cur[at.group], ...patch } };
+  const after = formSlots(o, mode, next);
+  return typeof after === "string" ? next : reconcileInputs(after, next);
+}
+
+/** Where the popover puts focus for an error: a slot's group total (`die` null) or one die. */
+export interface FormFocus {
+  slot: number;
+  group: "base" | "extra";
+  die: number | null;
+}
+
+export type FormResult =
+  | { ok: true; entries: ManualEntry[] }
+  | { ok: false; message: string; focus: FormFocus };
+
+/** Min–max of the kept dice of an expression (constants excluded), as FR-DICE-06 checks. */
+export function diceRange(expression: string): { min: number; max: number } | null {
+  const r = prepareExpression(expression, "normal");
+  if (!r.ok) return null;
+  let min = 0;
+  let max = 0;
+  for (const t of diceTerms(r.value)) {
+    const k = t.keep ? t.keep.n : t.count;
+    if (t.sign === 1) {
+      min += k;
+      max += k * t.faces;
+    } else {
+      min -= k * t.faces;
+      max -= k;
+    }
+  }
+  return { min, max };
+}
+
+/** Sum of the kept dice of `values` (notation order). */
+function keptSum(expression: string, values: readonly number[]): number {
+  const r = prepareExpression(expression, "normal");
+  if (!r.ok) return 0;
+  let at = 0;
+  let total = 0;
+  for (const t of diceTerms(r.value)) {
+    const vs = values.slice(at, at + t.count);
+    const flags = keptFlags(t, vs);
+    vs.forEach((v, i) => {
+      if (flags[i]) total += t.sign * v;
+    });
+    at += t.count;
+  }
+  return total;
+}
+
+type GroupCheck = { entry: ManualEntry } | { message: string; die: number | null };
+
+/**
+ * FR-DICE-32: one input group → its `ManualEntry`, or what is missing / wrong and where. A group
+ * is complete with its total filled and in range, or with every die filled (total computed).
+ * `name` goes into "Enter the total for …".
+ */
+export function checkGroup(slot: ManualSlot, input: GroupInput, name: string): GroupCheck {
+  const int = (s: string) => (/^-?\d{1,5}$/.test(s.trim()) ? Number(s.trim()) : null);
+  const boxes = slot.faces.length > 1 ? slot.faces.length : 0;
+  const texts = input.dice.slice(0, boxes);
+  const filled = texts.filter((s) => s.trim() !== "").length;
+  let dice: number[] | undefined;
+  if (filled > 0) {
+    if (filled !== boxes) {
+      const empty = texts.findIndex((s) => s.trim() === "");
+      return { message: `Enter all ${boxes} dice or none`, die: empty < 0 ? filled : empty };
+    }
+    dice = [];
+    for (const [i, s] of texts.entries()) {
+      const v = int(s);
+      const faces = slot.faces[i] ?? 0;
+      if (v === null || v < 1 || v > faces)
+        return { message: `Die ${i + 1} must be 1–${faces}`, die: i };
+      dice.push(v);
+    }
+  }
+  const text = input.total.trim();
+  if (text === "") {
+    if (!dice) return { message: `Enter the total for ${name}`, die: null };
+    return { entry: { diceTotal: keptSum(slot.expression, dice), dice } };
+  }
+  const total = int(text);
+  if (total === null) return { message: "Dice total must be a whole number", die: null };
+  const range = diceRange(slot.expression);
+  if (range && (total < range.min || total > range.max)) {
+    return { message: `Total must be ${range.min}–${range.max}`, die: null };
+  }
+  if (dice) {
+    const sum = keptSum(slot.expression, dice);
+    if (sum !== total) return { message: `The dice add up to ${sum}, not ${total}`, die: null };
+    return { entry: { diceTotal: total, dice } };
+  }
+  return { entry: { diceTotal: total } };
+}
+
+/** A group's dice values when known: entered, or a single die = its total. */
+function groupDice(slot: ManualSlot, entry: ManualEntry): number[] | null {
+  if (entry.dice) return entry.dice;
+  return slot.faces.length === 1 ? [entry.diceTotal] : null;
+}
+
+/**
+ * FR-DICE-31: a crit slot's `ManualEntry` for the crit expression = base dice total + extra
+ * total; `dice` = per dice term, its base dice then its extra dice (the crit expression's
+ * order), only when every die of both groups is known.
+ */
+export function mergeCrit(
+  base: ManualSlot,
+  baseEntry: ManualEntry,
+  extra: ManualSlot,
+  extraEntry: ManualEntry,
+): ManualEntry {
+  const diceTotal = baseEntry.diceTotal + extraEntry.diceTotal;
+  const bd = groupDice(base, baseEntry);
+  const ed = groupDice(extra, extraEntry);
+  const terms = prepareExpression(extra.expression, "normal");
+  if (!bd || !ed || !terms.ok) return { diceTotal };
+  const dice: number[] = [];
+  let at = 0;
+  for (const t of diceTerms(terms.value)) {
+    dice.push(...bd.slice(at, at + t.count), ...ed.slice(at, at + t.count));
+    at += t.count;
+  }
+  return { diceTotal, dice };
+}
+
+/**
+ * FR-DICE-32: every slot complete → one `ManualEntry` per slot (crit slots merged, FR-DICE-31);
+ * else the first problem and where to put focus. Nothing is sent on a failure.
+ */
+export function formEntries(slots: readonly FormSlot[], inputs: readonly SlotInput[]): FormResult {
+  const entries: ManualEntry[] = [];
+  for (const [i, s] of slots.entries()) {
+    const input = inputs[i];
+    const baseInput = input && input.for === s.base.expression ? input.base : emptyGroup(s.base);
+    const b = checkGroup(s.base, baseInput, s.base.expression);
+    if (!("entry" in b))
+      return { ok: false, message: b.message, focus: { slot: i, group: "base", die: b.die } };
+    if (!s.extra) {
+      entries.push(b.entry);
+      continue;
+    }
+    const extraInput = input && input.for === s.base.expression ? input.extra : emptyGroup(s.extra);
+    const e = checkGroup(s.extra, extraInput, `${s.extra.expression} (critical)`);
+    if (!("entry" in e))
+      return { ok: false, message: e.message, focus: { slot: i, group: "extra", die: e.die } };
+    entries.push(mergeCrit(s.base, b.entry, s.extra, e.entry));
+  }
+  return { ok: true, entries };
+}
+
+/** FR-DICE-32: the total shown for a group whose total is empty but whose dice are all filled. */
+export function computedTotal(slot: ManualSlot, input: GroupInput): number | null {
+  if (input.total.trim() !== "" || slot.faces.length < 2) return null;
+  const r = checkGroup(slot, input, slot.expression);
+  return "entry" in r ? r.entry.diceTotal : null;
 }
 
 /** The natural d20 of a manual entry, when it can be known; else null. */
@@ -193,48 +511,6 @@ export function manualNatural(expression: string, entry: ManualEntry): number | 
   const only = dts.length === 1 ? (dts[0] as DiceTerm) : null;
   const keptCount = only ? (only.keep ? only.keep.n : only.count) : 0;
   return only && only.faces === 20 && only.sign === 1 && keptCount === 1 ? entry.diceTotal : null;
-}
-
-/**
- * Form strings → ManualEntry. Dice optional: all filled or all empty. An empty total with every
- * die filled → total computed (sum of kept dice). Returns an error message or the entry.
- */
-export function parseManual(
-  slot: ManualSlot,
-  totalText: string,
-  dieTexts: readonly string[],
-): ManualEntry | string {
-  const int = (s: string) => (/^-?\d{1,5}$/.test(s.trim()) ? Number(s.trim()) : null);
-  const filled = dieTexts.filter((s) => s.trim() !== "");
-  let dice: number[] | undefined;
-  if (filled.length > 0) {
-    if (filled.length !== slot.faces.length) return `Enter all ${slot.faces.length} dice or none`;
-    dice = [];
-    for (const [i, s] of dieTexts.entries()) {
-      const v = int(s);
-      const faces = slot.faces[i] ?? 0;
-      if (v === null || v < 1 || v > faces) return `Die ${i + 1} must be 1–${faces}`;
-      dice.push(v);
-    }
-  }
-  let total = totalText.trim() === "" ? null : int(totalText);
-  if (totalText.trim() !== "" && total === null) return "Dice total must be a whole number";
-  if (total === null) {
-    if (!dice) return "Enter the dice total";
-    const r = prepareExpression(slot.expression, "normal");
-    if (!r.ok) return r.message;
-    let at = 0;
-    total = 0;
-    for (const t of diceTerms(r.value)) {
-      const values = dice.slice(at, at + t.count);
-      const flags = keptFlags(t, values);
-      values.forEach((v, i) => {
-        if (flags[i]) total = (total ?? 0) + t.sign * v;
-      });
-      at += t.count;
-    }
-  }
-  return dice ? { diceTotal: total, dice } : { diceTotal: total };
 }
 
 export type FlagBackend = Pick<Storage, "getItem" | "setItem">;

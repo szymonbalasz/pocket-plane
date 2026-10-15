@@ -238,3 +238,42 @@ test("FR-DICE-21 footer resize: a list at the bottom stays there when Options / 
   await player.context().close();
   await dm.context().close();
 });
+
+test("FR-DICE-32 physical popover: Roll with empty boxes says why and sends nothing", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const log = await openWindow(dm, "dice.log");
+  await openOptions(log);
+  await log.getByTestId("dice-roll-physical").click();
+  const before = await entries(dm).count();
+  await log.getByTestId("dice-roll-expression").fill("4d6+3");
+  await log.getByTestId("dice-roll-submit").click();
+
+  const submit = dm.getByTestId("dice-manual-submit");
+  const total = dm.getByTestId("dice-manual-total");
+  const error = dm.getByTestId("dice-manual-error");
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect(error).toHaveText("Enter the total for 4d6+3");
+  await expect(total).toBeFocused();
+  await total.fill("30");
+  await total.press("Enter");
+  await expect(error).toHaveText("Total must be 4–24");
+  await expect(entries(dm)).toHaveCount(before);
+
+  // Every die filled → the total is computed and shown; Roll sends one entry.
+  await total.fill("");
+  const dice = dm.getByTestId("dice-manual-die");
+  for (const [i, v] of ["3", "4", "5", "6"].entries()) await dice.nth(i).fill(v);
+  await expect(total).toHaveAttribute("placeholder", "18");
+  await submit.click();
+  await expect(entries(dm)).toHaveCount(before + 1);
+  await expect(entries(dm).nth(before)).toContainText("21");
+  await expect(entries(dm).nth(before).getByTestId("dice-log-entry-manual")).toBeVisible();
+  await log.getByTestId("dice-log-physical-off").click();
+  await dm.context().close();
+});
