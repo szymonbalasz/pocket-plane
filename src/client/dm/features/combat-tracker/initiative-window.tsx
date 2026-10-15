@@ -111,14 +111,22 @@ import { HpDialog } from "./hp-dialog";
 import { isDamageCard, pendingRowText } from "./pending";
 import { useCombatDialogs } from "./popup-store";
 
+/**
+ * FR-CBTX-46 (G1): the Init column is wide while some row can roll (round 0, a late joiner
+ * without initiative); else just the number input, so the name line keeps room for chips.
+ */
+const INIT_W = { wide: "w-[100px]", narrow: "w-9" } as const;
+
 function InitiativeCell({
   c,
   def,
   round,
+  wide,
 }: {
   c: CombatantView;
   def: DefinitionRecord | undefined;
   round: number;
+  wide: boolean;
 }) {
   const { send, disabled } = useCbtIntent();
   const [draft, setDraft] = useState(c.initiative == null ? "" : String(c.initiative));
@@ -151,7 +159,12 @@ function InitiativeCell({
   // #149: an empty initiative leads with a labelled Roll button; the box is a quiet secondary
   // way to type a value (reads as a value cell, not a form field).
   return (
-    <div className="flex w-[100px] items-center justify-end gap-0.5">
+    <div
+      className={cn(
+        "flex shrink-0 items-center justify-end gap-0.5",
+        INIT_W[wide ? "wide" : "narrow"],
+      )}
+    >
       <Tooltip content="Set initiative by hand">
         <Input
           data-testid="cbt-init-row-init"
@@ -469,12 +482,14 @@ function Row({
   turn,
   round,
   defs,
+  wideInit,
 }: {
   c: CombatantView;
   def: DefinitionRecord | undefined;
   turn: boolean;
   round: number;
   defs: Map<string, DefinitionRecord>;
+  wideInit: boolean;
 }) {
   const { send, disabled } = useCbtIntent();
   const openHp = useCombatDialogs((s) => s.openHp);
@@ -505,7 +520,7 @@ function Row({
       data-hidden={c.hidden === true}
       data-skipped={skipped}
       className={cn(
-        "flex items-center gap-1 rounded-md px-1 py-0.5",
+        "relative flex items-center gap-0.5 rounded-md px-1 py-0.5",
         turn && "bg-accent",
         c.hidden && "opacity-70",
         skipped && "opacity-50",
@@ -552,12 +567,15 @@ function Row({
           <RowDeath c={c} />
         </div>
       </div>
-      <InitiativeCell c={c} def={def} round={round} />
+      <InitiativeCell c={c} def={def} round={round} wide={wideInit} />
       <AttackButton c={c} def={def} />
-      {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸. */}
-      <RollButton control={check.control} tabIndex={-1} aria-hidden className={ANCHOR} />
-      <RollButton control={save.control} tabIndex={-1} aria-hidden className={ANCHOR} />
-      {c.kind === "pc" && <DeathSaveAnchor control={deathRoll} />}
+      {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸, out of the flow
+          (no gaps: the name line keeps the room, FR-CBTX-46). */}
+      <span className="pointer-events-none absolute top-1/2 right-16 flex size-0">
+        <RollButton control={check.control} tabIndex={-1} aria-hidden className={ANCHOR} />
+        <RollButton control={save.control} tabIndex={-1} aria-hidden className={ANCHOR} />
+        {c.kind === "pc" && <DeathSaveAnchor control={deathRoll} />}
+      </span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -863,6 +881,7 @@ function DmInitiativeBody() {
   }
   const active = rows.filter((c) => !c.removed);
   const removed = rows.filter((c) => c.removed);
+  const wideInit = active.some((c) => canRollInitiative(enc.round, c.initiative));
   return (
     // Header + pending cards stay put; the rows scroll inside the window (glitch 3).
     <div
@@ -876,11 +895,11 @@ function DmInitiativeBody() {
       <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
         <div
           aria-hidden
-          className="sticky top-0 z-10 flex items-center gap-1 bg-card px-1 pb-0.5 text-[11px] text-muted-foreground"
+          className="sticky top-0 z-10 flex items-center gap-0.5 bg-card px-1 pb-0.5 text-[11px] text-muted-foreground"
         >
-          <span className="flex-1 pl-[52px]">Combatant</span>
-          <span className="w-[100px] text-center">Init</span>
-          <span className="w-[60px]" />
+          <span className="flex-1 pl-[48px]">Combatant</span>
+          <span className={cn("text-center", INIT_W[wideInit ? "wide" : "narrow"])}>Init</span>
+          <span className="w-[58px]" />
         </div>
         <ul className="flex flex-col gap-0.5">
           {active.map((c) => (
@@ -891,6 +910,7 @@ function DmInitiativeBody() {
               turn={enc.turnCombatantId === c.id}
               round={enc.round}
               defs={defs}
+              wideInit={wideInit}
             />
           ))}
         </ul>
