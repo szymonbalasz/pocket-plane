@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
+import { useActivityDots } from "./activity";
 import { badgeText, useBadgeVersion } from "./badges";
 import { SHELL_ZONE_ATTR } from "./keys";
 import { launcherState, launcherTooltip, type WindowAction, type Windows } from "./manager";
@@ -22,6 +23,7 @@ export function Launcher({
 }) {
   const store = useSync((s) => s.store);
   useBadgeVersion(); // re-render on `refreshBadges()`
+  const dots = useActivityDots(windows);
   const entries = defs
     .filter((d) => d.launcher)
     .sort((a, b) => (a.launcher?.order ?? 0) - (b.launcher?.order ?? 0));
@@ -65,6 +67,13 @@ export function Launcher({
                 >
                   {badge}
                 </span>
+              )}
+              {/* FR-SHELL-38: "new" dot, top-left (the badge keeps top-right). */}
+              {dots.has(d.kind) && (
+                <span
+                  data-testid="ui-launcher-activity"
+                  className="absolute -top-0.5 -left-0.5 size-2 rounded-full bg-warning"
+                />
               )}
               {/* FR-SHELL-37: open = solid bar, minimised = hollow ring, closed = nothing. */}
               {state === "open" && (

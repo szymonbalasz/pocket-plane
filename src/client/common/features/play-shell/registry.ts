@@ -65,6 +65,12 @@ export interface WindowDef {
    */
   badge?: (store: RecordStore) => number;
   /**
+   * "New" dot while minimised (FR-SHELL-38, `./activity`): a pure read of the synced store. The
+   * launcher shows a dot while the value differs from the one at minimise; restore or close
+   * clears it. Independent of `badge`.
+   */
+  activity?: (store: RecordStore) => string | number | null;
+  /**
    * Always mounted while the kind is available, whatever the window state (e.g. the toast
    * runtime of `note.history`). Renders its own UI, if any; gets no props.
    */
