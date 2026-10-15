@@ -124,3 +124,52 @@ test("FR-NOTE-24 a handled action leaves the bell: 1 while pending, none after R
   await player.context().close();
   await dm.context().close();
 });
+
+test("FR-NOTE-32 sim-6 glitch 3: the DM's toast stack keeps off an open window's body, not only its title bar", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  // Narrow, Notifications at the top (as in i01): every top-row spot (centre, left edge, right
+  // edge) meets its title bar, so the stack goes lower: below the window, not onto its rows.
+  await dm.setViewportSize({ width: 720, height: 900 });
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const summary = dm.getByTestId("note-toast-pending-summary");
+  if (await summary.isVisible()) await summary.getByTestId("note-toast-close").click();
+  // Game log closed: with it open there is no spot clear of every window at this width.
+  const log = shellWindow(dm, "dice.log");
+  if (await log.isVisible()) await log.getByTestId("ui-window-close").click();
+  await expect(log).toHaveCount(0);
+  const win = await openWindow(dm, "note.history");
+  const t = await win.getByTestId("ui-window-title").boundingBox();
+  if (!t) throw new Error("no title bar");
+  await dm.mouse.move(t.x + 40, t.y + t.height / 2);
+  await dm.mouse.down();
+  await dm.mouse.move(t.x + 40, 92 + t.height / 2, { steps: 4 });
+  await dm.mouse.up();
+  await expect.poll(async () => Math.abs(((await win.boundingBox())?.y ?? 0) - 92)).toBeLessThan(4);
+  await win.getByTestId("note-test-text").fill("Window card");
+  await win.getByTestId("note-test-audience").selectOption("dm");
+  await win.getByTestId("note-test-owner").selectOption("dm");
+  await win.getByTestId("note-test-label").fill("Apply");
+  await win.getByTestId("note-test-send").click();
+  const card = dm.getByTestId("note-toast").filter({ hasText: "Window card" });
+  await expect(card).toBeVisible();
+  const w = await win.boundingBox();
+  if (!w) throw new Error("no window box");
+  const stack = dm.getByTestId("note-toasts");
+  await expect
+    .poll(async () => {
+      const s = await stack.boundingBox();
+      if (!s) return "no stack";
+      const over =
+        s.x < w.x + w.width && w.x < s.x + s.width && s.y < w.y + w.height && w.y < s.y + s.height;
+      return over ? `stack ${JSON.stringify(s)} over window ${JSON.stringify(w)}` : "clear";
+    })
+    .toBe("clear");
+  // Clean up: resolve the card.
+  await card.getByTestId("note-toast-action").click();
+  await expect(card).toHaveCount(0);
+  await dm.context().close();
+});

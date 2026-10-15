@@ -98,3 +98,58 @@ describe("FR-NOTE-32 toast keep-out", () => {
     expect(dmStackPlacement(vp, init, 700, STACK_W, goblins, [logBar]).top).toBe(top);
   });
 });
+
+describe("FR-NOTE-32 sim-6 glitch 3: toasts keep off open windows' bodies", () => {
+  const vp = { w: 1440, h: 900 };
+  const init = { x: 1028, y: 60, w: 400, h: 648 };
+  type R = { x: number; y: number; w: number; h: number };
+  const over = (a: R, b: R) =>
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const stack = (p: { left: number; top: number }, h: number) => ({
+    x: p.left,
+    y: p.top,
+    w: STACK_W,
+    h,
+  });
+
+  // i01: 2 card toasts + "1 pending action" sat on the Notifications rows at the top-left.
+  test("FR-NOTE-32 toast keep-out: a spot clear of the monsters, Initiative and every window body wins (i01)", () => {
+    const notes = { x: 68, y: 92, w: 360, h: 480 };
+    const log = { x: 68, y: 587, w: 460, h: 236 };
+    const box = (x: number, y: number) => ({ x, y, w: 50, h: 50 });
+    const monsters = [
+      box(815, 160),
+      box(497, 265),
+      box(550, 318),
+      box(708, 265),
+      box(708, 370),
+      box(866, 370),
+    ];
+    const h = 244;
+    const at = dmStackPlacement(vp, init, h, STACK_W, monsters, [notes, log]);
+    const r = stack(at, h);
+    for (const w of [notes, log]) expect(over(r, w)).toBe(false);
+    for (const t of monsters) expect(over(r, t)).toBe(false);
+    expect(at.left + STACK_W + 12).toBeLessThanOrEqual(init.x);
+    expect(at.top + h).toBeLessThanOrEqual(900 - 64);
+  });
+
+  test("FR-NOTE-32 toast keep-out: a window under the default spot → beside it, not below its title bar", () => {
+    // The Notifications window dragged to the top centre: its bar is under the default spot.
+    const notes = { x: 540, y: 60, w: 360, h: 480 };
+    const at = dmStackPlacement(vp, init, 120, STACK_W, [], [notes]);
+    expect(over(stack(at, 120), notes)).toBe(false);
+  });
+
+  test("FR-NOTE-32 toast keep-out: no spot clear of the bodies → over a body, never a title bar", () => {
+    // One window filling the work area left of Initiative; a token under the default spot.
+    const big = { x: 0, y: 48, w: 1016, h: 788 };
+    const wolf = { x: 700, y: 120, w: 50, h: 50 };
+    const at = dmStackPlacement({ w: 1440, h: 900 }, init, 120, STACK_W, [wolf], [big]);
+    const r = stack(at, 120);
+    expect(over(r, { ...big, h: 32 })).toBe(false);
+    expect(over(r, wolf)).toBe(false);
+    expect(at.top).toBeGreaterThanOrEqual(48 + 32);
+    expect(at.left + STACK_W + 12).toBeLessThanOrEqual(init.x);
+  });
+});

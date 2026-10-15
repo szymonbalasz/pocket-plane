@@ -113,10 +113,15 @@ export function clearToasts(s: ToastState, now: number): ToastState {
 
 /**
  * FR-NOTE-15 (P3 glitch 8: one toast per pending action): the pending-for-me rows without their
- * own toast on the stack; the summary counts only these (0 → no summary).
+ * own toast on the stack; the summary counts only these (0 → no summary). A row whose toast was
+ * hidden (FR-NOTE-26, e.g. its popup is or was open) counts as toasted: it doesn't come back as
+ * the summary either (sim-6 glitch 3).
  */
 export function untoastedPending(s: ToastState, store: RecordStore): number {
-  const toasted = new Set(s.toasts.flatMap((t) => (t.kind === "note" ? [t.notificationId] : [])));
+  const toasted = new Set([
+    ...s.toasts.flatMap((t) => (t.kind === "note" ? [t.notificationId] : [])),
+    ...(s.hiddenIds ?? []),
+  ]);
   return pendingForMe(store).filter((n) => !toasted.has(n.id)).length;
 }
 

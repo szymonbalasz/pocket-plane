@@ -23,7 +23,7 @@ import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
-import { EDGE_GAP, LAUNCHER_CLEAR, type Rect, TITLE_H, TOP_BAR_H } from "../play-shell/geometry";
+import { EDGE_GAP, LAUNCHER_CLEAR, type Rect, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
 import {
   useAvailableKinds,
@@ -139,8 +139,11 @@ function useInitiativeRect(isDm: boolean): Rect | null {
   }, [isDm, windows, registry, available, vp, measured]);
 }
 
-/** P3 retest: the title bars of the DM's open windows but Initiative (the stack never covers them). */
-function useTitleBars(isDm: boolean): Rect[] {
+/**
+ * The DM's open windows but Initiative, as rendered: the stack never covers their title bars (P3
+ * retest) and keeps off their bodies when it can (sim-6 glitch 3).
+ */
+function useWindowRects(isDm: boolean): Rect[] {
   const registry = useRegistry();
   const windows = useShellState((s) => s.windows);
   const available = useAvailableKinds();
@@ -149,10 +152,7 @@ function useTitleBars(isDm: boolean): Rect[] {
   return useMemo(() => {
     if (!isDm) return [];
     const win = windows.filter((w) => w.kind !== INITIATIVE_KIND && w.state === "open");
-    return renderedWindowRects(win, registry, available, vp, measured).map((r) => ({
-      ...r,
-      h: TITLE_H,
-    }));
+    return renderedWindowRects(win, registry, available, vp, measured);
   }, [isDm, windows, registry, available, vp, measured]);
 }
 
@@ -305,7 +305,7 @@ export function ToastRuntime({
   // P3 glitch 2: and of the tokens its cards' likely targets are on (`avoidTokens`), measured
   // when the stack, Initiative or the viewport change (never on hover: the stack holds still).
   const avoidKey = useAvoidTokens(isDm, state.toasts, rows, views).join(",");
-  const bars = useTitleBars(isDm);
+  const windowRects = useWindowRects(isDm);
   // P3 E1: token boxes re-read once the map settles (resize refit, pan, zoom), not while the
   // pointer is on the stack.
   const settled = useMapSettled(isDm && state.toasts.length > 0);
@@ -321,9 +321,9 @@ export function ToastRuntime({
         stackH,
         undefined,
         tokenScreenBoxes(avoidKey ? avoidKey.split(",") : []),
-        bars,
+        windowRects,
       ),
-    [vp, initiative, stackH, avoidKey, bars, tick],
+    [vp, initiative, stackH, avoidKey, windowRects, tick],
   );
 
   // P3 E3: the stack always fits the viewport: while it is taller than the room (DM: below the
