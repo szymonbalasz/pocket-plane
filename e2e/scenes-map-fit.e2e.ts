@@ -13,7 +13,8 @@ const LAPTOP = { width: 1280, height: 720 };
 /** Tokens drawn (count) and those whose centre lies inside a rendered window. */
 async function coverage(page: Page) {
   const tokens = await konvaNodes(page, "map-token");
-  const wins = await page.getByTestId("ui-window").evaluateAll((els) =>
+  const shown = page.locator('[data-testid="ui-window"]:not([data-state="minimised"])');
+  const wins = await shown.evaluateAll((els) =>
     els.map((el) => {
       const r = el.getBoundingClientRect();
       return { x: r.left, y: r.top, w: r.width, h: r.height };

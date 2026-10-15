@@ -1,9 +1,18 @@
 // One floating window: title bar (drag), minimise / close, edge + corner resize, scrolling body
 // (FR-SHELL-10/11). Drag and resize move the element by CSS only; the store is written once,
-// on pointer up (SHELL §12).
+// on pointer up (SHELL §12). A minimised window stays mounted, parked: invisible and inert
+// (FR-SHELL-36). `visibility`, not `display: none`, so its scroll positions survive.
 import type { WindowState } from "@shared/play-shell/layout";
 import { MinusIcon, XIcon } from "lucide-react";
-import { Component, type ErrorInfo, type ReactNode, useRef } from "react";
+import {
+  Component,
+  createContext,
+  type ErrorInfo,
+  type ReactNode,
+  useContext,
+  useRef,
+} from "react";
+import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
 import {
   moveRect,
@@ -52,6 +61,17 @@ class WindowErrorBoundary extends Component<{ children: ReactNode }, { error: Er
   }
 }
 
+const WindowShown = createContext(true);
+
+/**
+ * False while the window around the caller is minimised (FR-SHELL-36: mounted, not shown).
+ * For bodies whose effects mean "the user sees this" (e.g. marking things seen). Outside a
+ * window: true.
+ */
+export function useWindowShown(): boolean {
+  return useContext(WindowShown);
+}
+
 export function ShellWindow({
   win,
   def,
@@ -70,6 +90,7 @@ export function ShellWindow({
   // its end stores the result with the current work area.
   const rect = renderedRect(win, def.minSize, viewport);
   const id = { kind: win.kind, instance: win.instance };
+  const parked = win.state === "minimised";
   const Body = def.component;
 
   /** Pointer-capture gesture; `compute` maps the pointer delta to a rect. */
@@ -115,11 +136,14 @@ export function ShellWindow({
       data-state={win.state}
       data-focused={focused}
       aria-label={def.title}
+      aria-hidden={parked || undefined}
+      inert={parked}
       // Focusable, so clicks anywhere inside move keyboard focus here (FR-SHELL-13).
       tabIndex={-1}
       className={cn(
         "pointer-events-auto absolute outline-none left-0 top-0 flex flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-lg",
         focused && "border-ring",
+        parked && "invisible",
       )}
       style={{
         transform: `translate(${rect.x}px, ${rect.y}px)`,
@@ -138,28 +162,35 @@ export function ShellWindow({
         }}
       >
         <span className="flex-1 truncate">{def.title}</span>
-        <button
-          type="button"
-          data-testid="ui-window-minimise"
-          aria-label={`Minimise ${def.title}`}
-          className="rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-          onClick={() => dispatch({ type: "minimise", ...id })}
-        >
-          <MinusIcon className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          data-testid="ui-window-close"
-          aria-label={`Close ${def.title}`}
-          className="rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-          onClick={() => dispatch({ type: "close", ...id })}
-        >
-          <XIcon className="size-3.5" />
-        </button>
+        {/* FR-SHELL-37: say what each button does. */}
+        <Tooltip content="Minimise — keep it on the launcher">
+          <button
+            type="button"
+            data-testid="ui-window-minimise"
+            aria-label={`Minimise ${def.title}`}
+            className="rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            onClick={() => dispatch({ type: "minimise", ...id })}
+          >
+            <MinusIcon className="size-3.5" />
+          </button>
+        </Tooltip>
+        <Tooltip content="Close">
+          <button
+            type="button"
+            data-testid="ui-window-close"
+            aria-label={`Close ${def.title}`}
+            className="rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            onClick={() => dispatch({ type: "close", ...id })}
+          >
+            <XIcon className="size-3.5" />
+          </button>
+        </Tooltip>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-3">
         <WindowErrorBoundary>
-          <Body kind={win.kind} instance={win.instance} />
+          <WindowShown.Provider value={!parked}>
+            <Body kind={win.kind} instance={win.instance} />
+          </WindowShown.Provider>
         </WindowErrorBoundary>
       </div>
       {EDGES.map(({ edge, className, testId }) => (

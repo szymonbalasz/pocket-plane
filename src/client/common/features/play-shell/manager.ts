@@ -234,8 +234,23 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
   }
 }
 
+/**
+ * Windows mounted now (FR-SHELL-36): open ones shown, minimised ones parked (mounted, hidden,
+ * state kept). Closed windows and unavailable kinds are unmounted whatever their state.
+ */
+export function mountedWindows(ws: Windows, available: ReadonlySet<string>): WindowState[] {
+  return ws.filter((w) => w.state !== "closed" && available.has(w.kind));
+}
+
 export type LauncherState = "open" | "minimised" | "closed";
 
 export function launcherState(ws: Windows, kind: string, instance = MAIN_INSTANCE): LauncherState {
   return find(ws, kind, instance)?.state ?? "closed";
+}
+
+/** Launcher button Tooltip per state (FR-SHELL-37). */
+export function launcherTooltip(label: string, state: LauncherState): string {
+  if (state === "open") return `${label} (open)`;
+  if (state === "minimised") return `${label} (minimised — click to restore)`;
+  return label;
 }

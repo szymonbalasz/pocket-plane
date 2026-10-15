@@ -8,10 +8,8 @@ import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { badgeText, useBadgeVersion } from "./badges";
 import { SHELL_ZONE_ATTR } from "./keys";
-import { launcherState, type WindowAction, type Windows } from "./manager";
+import { launcherState, launcherTooltip, type WindowAction, type Windows } from "./manager";
 import type { WindowDef } from "./registry";
-
-const STATE_LABEL = { open: "open", minimised: "minimised", closed: "closed" } as const;
 
 export function Launcher({
   defs,
@@ -42,7 +40,7 @@ export function Launcher({
         const Icon = l.icon;
         const badge = badgeText(d.badge && (() => d.badge?.(store) ?? 0));
         return (
-          <Tooltip key={d.kind} content={`${l.label} (${STATE_LABEL[state]})`}>
+          <Tooltip key={d.kind} content={launcherTooltip(l.label, state)}>
             <Button
               variant="ghost"
               size="sm"
@@ -68,12 +66,17 @@ export function Launcher({
                   {badge}
                 </span>
               )}
-              {state !== "closed" && (
+              {/* FR-SHELL-37: open = solid bar, minimised = hollow ring, closed = nothing. */}
+              {state === "open" && (
                 <span
-                  className={cn(
-                    "absolute bottom-0.5 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full",
-                    state === "open" ? "bg-foreground" : "bg-muted-foreground/60",
-                  )}
+                  data-marker="open"
+                  className="absolute bottom-0.5 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-foreground"
+                />
+              )}
+              {state === "minimised" && (
+                <span
+                  data-marker="minimised"
+                  className="absolute bottom-0 left-1/2 size-1.5 -translate-x-1/2 rounded-full border border-muted-foreground"
                 />
               )}
             </Button>
