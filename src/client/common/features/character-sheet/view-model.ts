@@ -309,12 +309,23 @@ export function hitDicePips(
   })).filter((p) => p.max > 0);
 }
 
+/** FR-CHARX-48: what stays pinned: the whole header + tab strip, or name row + tab strip. */
+export type PinnedPart = "full" | "compact";
+
+/** Pixels the full header must shrink below half the body before compact turns full again. */
+export const PIN_HYSTERESIS_PX = 16;
+
 /**
- * FR-CHARX-48: the header + tab strip stay pinned unless they would take more than half the
- * window body (then everything scrolls together). Not measured yet (0) → pinned.
+ * FR-CHARX-48: the full header (name row, badges, buttons, picker, `header` sections) + tab
+ * strip stay pinned while they take at most half the window body; else only the name row and
+ * the tab strip ("compact"). `fullPx` is the full part's height wherever it currently sits.
+ * The hysteresis keeps a scrollbar-width reflow from flipping it back and forth. Not measured
+ * yet (body 0) → unchanged.
  */
-export function headerPinned(headerPx: number, bodyPx: number): boolean {
-  return bodyPx <= 0 || headerPx * 2 <= bodyPx;
+export function pinnedPart(fullPx: number, bodyPx: number, current: PinnedPart): PinnedPart {
+  if (bodyPx <= 0) return current;
+  const room = bodyPx - (current === "compact" ? PIN_HYSTERESIS_PX : 0);
+  return fullPx * 2 <= room ? "full" : "compact";
 }
 
 /** A pip click (CHARX §7): click = use one, Shift+click = restore one. */

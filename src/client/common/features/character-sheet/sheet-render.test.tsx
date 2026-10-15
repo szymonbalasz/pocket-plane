@@ -3,7 +3,11 @@
 // header (FR-CHARX-48). Static server render over a fake sync store (no encounter, so combat's
 // route never claims).
 import { describe, expect, test } from "bun:test";
-import { defaultSheetData, SpellRow } from "@shared/character-sheet/sheet";
+import {
+  type CreatureSheetRecord,
+  defaultSheetData,
+  SpellRow,
+} from "@shared/character-sheet/sheet";
 import { CharacterStatBlock, type DefinitionRecord } from "@shared/entities/schemas";
 import { emptyStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -19,7 +23,7 @@ import type { RollRoute } from "./routing";
 import { SheetView } from "./SheetView";
 import type { SheetCtx } from "./sheet-context";
 import { SheetContext } from "./sheet-context";
-import { headerPinned } from "./view-model";
+import { PIN_HYSTERESIS_PX, pinnedPart } from "./view-model";
 
 /** The registry, writable for a test route placed first (first claim wins). */
 const testRoutes = rollRoutes as RollRoute[];
@@ -205,44 +209,100 @@ describe("FR-CHARX-44 attacks on the Actions tab only", () => {
 });
 
 describe("FR-CHARX-48 pinned header", () => {
-  test("FR-CHARX-48 pinned while the header takes at most half the body; else it scrolls along", () => {
-    expect(headerPinned(120, 400)).toBe(true);
-    expect(headerPinned(200, 400)).toBe(true);
-    expect(headerPinned(201, 400)).toBe(false);
-    expect(headerPinned(180, 0)).toBe(true); // not measured yet
+  test("FR-CHARX-48 full header while it takes at most half the body; else compact; hysteresis back", () => {
+    expect(pinnedPart(120, 400, "full")).toBe("full");
+    expect(pinnedPart(200, 400, "full")).toBe("full");
+    expect(pinnedPart(201, 400, "full")).toBe("compact");
+    // Back to full only once it fits with PIN_HYSTERESIS_PX to spare (no scrollbar flip-flop).
+    expect(pinnedPart(200, 400, "compact")).toBe("compact");
+    expect(pinnedPart(192, 400, "compact")).toBe("full");
+    expect(pinnedPart(180, 0, "compact")).toBe("compact"); // not measured yet
+    expect(PIN_HYSTERESIS_PX).toBe(16);
   });
 
-  test("FR-CHARX-48 header part = name, badges, header actions, tab strip; tab content outside it", () => {
+  function sheetHtml(part: "full" | "compact") {
     // The shell's title marker takes `document` at render; a stub is enough for a static render.
     const g = globalThis as { document?: unknown };
     g.document = { title: "", hidden: false };
-    let html: string;
+    const row = {
+      id: "mira",
+      entityId: "mira",
+      campaignId: "c1",
+      ownerPlayerId: "p1",
+      ...defaultSheetData(),
+      status: "draft",
+    } as unknown as CreatureSheetRecord;
     try {
-      html = render(
+      return render(
         <ShellProvider registry={createWindowRegistry("player", [])}>
           <SheetView
             creature={ctxCreature()}
-            row={undefined}
+            row={row}
             client="player"
             playerId="p1"
             ownerName="Player 1"
-            picker={null}
+            picker={<select data-testid="char-sheet-picker" />}
             startEditing={false}
+            initialPinnedPart={part}
           />
         </ShellProvider>,
       );
     } finally {
       delete g.document;
     }
+  }
+  /** Where each test ID sits: in the pinned part, or in the scrolling content. */
+  function placeOf(html: string, ids: string[]) {
     const header = html.indexOf('data-testid="charx-header"');
     const content = html.indexOf('data-testid="charx-content"');
     expect(header).toBeGreaterThan(-1);
-    expect(html).toContain('data-testid="charx-header" data-pinned="true"');
-    for (const id of ["char-sheet-name", "charx-tab", "charx-edit-toggle"]) {
+    expect(content).toBeGreaterThan(header);
+    return ids.map((id) => {
       const at = html.indexOf(`data-testid="${id}"`);
       expect(at).toBeGreaterThan(header);
-      expect(at).toBeLessThan(content);
-    }
-    expect(html.indexOf('data-testid="char-sheet-roll-init"')).toBeGreaterThan(content);
+      return at < content ? "pinned" : "scrolls";
+    });
+  }
+  const IDS = [
+    "char-sheet-name",
+    "charx-tab",
+    "charx-draft",
+    "charx-edit-toggle",
+    "char-sheet-picker",
+    "char-sheet-roll-init",
+  ];
+
+  test("FR-CHARX-48 full: name row, badges, buttons, picker and tab strip pinned; tab content scrolls", () => {
+    const html = sheetHtml("full");
+    expect(html).toContain('data-testid="charx-header" data-pinned="true" data-pinned-part="full"');
+    expect(html).not.toContain('data-testid="charx-header-rest"');
+    expect(placeOf(html, IDS)).toEqual([
+      "pinned",
+      "pinned",
+      "pinned",
+      "pinned",
+      "pinned",
+      "scrolls",
+    ]);
+  });
+
+  test("FR-CHARX-48 compact fallback: only name row + tab strip pinned; badges, buttons, picker scroll", () => {
+    const html = sheetHtml("compact");
+    expect(html).toContain(
+      'data-testid="charx-header" data-pinned="true" data-pinned-part="compact"',
+    );
+    expect(placeOf(html, IDS)).toEqual([
+      "pinned",
+      "pinned",
+      "scrolls",
+      "scrolls",
+      "scrolls",
+      "scrolls",
+    ]);
+    // The header rest comes first in the content, before the tab content.
+    expect(html.indexOf('data-testid="charx-header-rest"')).toBeLessThan(
+      html.indexOf('data-testid="char-sheet-roll-init"'),
+    );
+    expect(html.match(/data-testid="char-sheet-picker"/g)).toHaveLength(1);
   });
 });

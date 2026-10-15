@@ -1,7 +1,8 @@
 // One full sheet (CHARX §7, FR-CHARX-26): header (FR-CHAR-03 + Draft / Locked badges, Edit
 // toggle, DM Approve / Lock), header sections, then the tabs Main · Actions · Features ·
-// Inventory · Notes · section tabs. Header + tab strip pinned, the tab content scrolls
-// (FR-CHARX-48). NPC sheets: CR + XP; imported definitions read-only.
+// Inventory · Notes · section tabs. Header + tab strip pinned, the tab content scrolls; in a
+// small window only the name row + tab strip (FR-CHARX-48). NPC sheets: CR + XP; imported
+// definitions read-only.
 import { initials, levelLine } from "@shared/character-sheet/logic";
 import { CHARX_INTENTS, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import type { DefinitionRecord } from "@shared/entities/schemas";
@@ -11,7 +12,6 @@ import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Card } from "../../components/ui/primitives";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { AssetImg } from "../assets-pipeline/AssetImg";
 import { useOpenWindow } from "../play-shell/ShellContext";
@@ -25,7 +25,14 @@ import { SectionView, SheetSlotView } from "./SheetSections";
 import { sectionsFor } from "./sections";
 import { SheetContext, type SheetCtx, useSheet, useSheetIntents } from "./sheet-context";
 import { sheetSections } from "./sheet-sections";
-import { canEdit, canUseCounters, crLine, headerPinned, sheetData } from "./view-model";
+import {
+  canEdit,
+  canUseCounters,
+  crLine,
+  type PinnedPart,
+  pinnedPart,
+  sheetData,
+} from "./view-model";
 
 /** Creatures window kind (entities): "Derive to customise" opens it (FR-CHARX-31). */
 const CREATURES_KIND = "ent.creatures";
@@ -135,91 +142,133 @@ function HeaderActions({
   );
 }
 
-function SheetHeader({
-  picker,
-  editing,
-  setEditing,
-}: {
-  picker: ReactNode;
-  editing: boolean;
-  setEditing(v: boolean): void;
-}) {
+/** "In combat", "Draft", "Locked" badges (FR-CHAR-16, FR-CHARX-26). */
+function HeaderBadges() {
   const ctx = useSheet();
   const store = useSync((s) => s.store);
   const c = ctx.creature;
-  const s = ctx.stats;
   const combat = c.kind === "character" ? sheetBadge(rollRoutes, store, c.id) : null;
-  const sub = "cr" in s ? crLine(s.cr) : levelLine(s.level, s.className);
-  const species = "species" in s && s.species ? s.species : null;
   const showStatus = ctx.client === "dm" || c.kind === "character";
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-start gap-3">
-        <Portrait id={c.portraitAssetId} name={c.name} />
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span
-            data-testid="char-sheet-name"
-            className="flex items-center gap-1 truncate font-semibold"
-          >
-            {ctx.readOnly && (
-              <LockIcon data-testid="charx-readonly" aria-label="Read-only" className="size-3.5" />
-            )}
-            {c.name}
-          </span>
-          <span data-testid="char-sheet-level" className="text-xs text-muted-foreground">
-            {sub}
-            {species ? ` · ${species}` : ""}
-          </span>
-          <span className="flex flex-wrap gap-1">
-            {combat && (
-              <Badge data-testid="char-sheet-combat" className="w-fit">
-                {combat}
-              </Badge>
-            )}
-            {showStatus && ctx.sheet.status === "draft" && (
-              <Badge data-testid="charx-draft" variant="outline" className="w-fit">
-                Draft
-              </Badge>
-            )}
-            {showStatus && ctx.sheet.locked && (
-              <Tooltip content="Locked by the DM">
-                <Badge data-testid="charx-locked" variant="outline" className="w-fit">
-                  Locked
-                </Badge>
-              </Tooltip>
-            )}
-          </span>
-        </div>
-        {picker}
-      </div>
-      {!ctx.readOnly && (
-        <SheetSlotView slot="header" creatureId={c.id} client={ctx.client} kind={c.kind} />
+    <span className="flex flex-wrap gap-1">
+      {combat && (
+        <Badge data-testid="char-sheet-combat" className="w-fit">
+          {combat}
+        </Badge>
       )}
-      <HeaderActions editing={editing} setEditing={setEditing} />
+      {showStatus && ctx.sheet.status === "draft" && (
+        <Badge data-testid="charx-draft" variant="outline" className="w-fit">
+          Draft
+        </Badge>
+      )}
+      {showStatus && ctx.sheet.locked && (
+        <Tooltip content="Locked by the DM">
+          <Badge data-testid="charx-locked" variant="outline" className="w-fit">
+            Locked
+          </Badge>
+        </Tooltip>
+      )}
+    </span>
+  );
+}
+
+/**
+ * The name row: portrait, name, level line. With the full header pinned (FR-CHARX-48) it also
+ * carries the badges and the picker; in the compact fallback those scroll (`HeaderRest`).
+ */
+function NameRow({ picker, full }: { picker: ReactNode; full: boolean }) {
+  const ctx = useSheet();
+  const c = ctx.creature;
+  const s = ctx.stats;
+  const sub = "cr" in s ? crLine(s.cr) : levelLine(s.level, s.className);
+  const species = "species" in s && s.species ? s.species : null;
+  return (
+    <div className="flex items-start gap-3">
+      <Portrait id={c.portraitAssetId} name={c.name} />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span
+          data-testid="char-sheet-name"
+          className="flex items-center gap-1 truncate font-semibold"
+        >
+          {ctx.readOnly && (
+            <LockIcon data-testid="charx-readonly" aria-label="Read-only" className="size-3.5" />
+          )}
+          {c.name}
+        </span>
+        <span data-testid="char-sheet-level" className="text-xs text-muted-foreground">
+          {sub}
+          {species ? ` · ${species}` : ""}
+        </span>
+        {full && <HeaderBadges />}
+      </div>
+      {full && picker}
     </div>
   );
 }
 
 /**
- * FR-CHARX-48: measures the window body (the Card) and the pinned part; pinned while the part
- * takes at most half the body. Window size and geometry are untouched (FR-CHARX-26).
+ * The header below the name row: `header` sections and Edit / Approve / Lock; in the compact
+ * fallback (FR-CHARX-48) also the badges and the picker, since all of it scrolls then.
  */
-function usePinnedHeader() {
+function HeaderRest({
+  picker,
+  compact,
+  editing,
+  setEditing,
+}: {
+  picker: ReactNode;
+  compact: boolean;
+  editing: boolean;
+  setEditing(v: boolean): void;
+}) {
+  const ctx = useSheet();
+  const c = ctx.creature;
+  return (
+    <>
+      {compact && (
+        <div className="flex items-start justify-between gap-2">
+          <HeaderBadges />
+          {picker}
+        </div>
+      )}
+      {!ctx.readOnly && (
+        <SheetSlotView slot="header" creatureId={c.id} client={ctx.client} kind={c.kind} />
+      )}
+      <HeaderActions editing={editing} setEditing={setEditing} />
+    </>
+  );
+}
+
+/** Gap between the pinned part and the scrolling header rest (`gap-2`). */
+const HEADER_GAP_PX = 8;
+
+/**
+ * FR-CHARX-48: measures the window body (the Card) and the full header (pinned part, plus the
+ * scrolling header rest in the compact fallback); full while it takes at most half the body,
+ * else compact. Window size and geometry are untouched (FR-CHARX-26).
+ */
+function usePinnedHeader(initial: PinnedPart) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
-  const [pinned, setPinned] = useState(true);
+  const restRef = useRef<HTMLDivElement>(null);
+  const [part, setPart] = useState<PinnedPart>(initial);
   useLayoutEffect(() => {
     const body = bodyRef.current;
     const header = headerRef.current;
     if (!body || !header || typeof ResizeObserver === "undefined") return;
-    const measure = () => setPinned(headerPinned(header.offsetHeight, body.clientHeight));
+    const rest = part === "compact" ? restRef.current : null;
+    const measure = () => {
+      const full = header.offsetHeight + (rest ? rest.offsetHeight + HEADER_GAP_PX : 0);
+      setPart((p) => pinnedPart(full, body.clientHeight, p));
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(body);
     ro.observe(header);
+    if (rest) ro.observe(rest);
     return () => ro.disconnect();
-  }, []);
-  return { bodyRef, headerRef, pinned };
+  }, [part]);
+  return { bodyRef, headerRef, restRef, part };
 }
 
 export function SheetView({
@@ -230,6 +279,7 @@ export function SheetView({
   ownerName,
   picker,
   startEditing,
+  initialPinnedPart = "full",
 }: {
   creature: DefinitionRecord;
   row: CreatureSheetRecord | undefined;
@@ -239,6 +289,8 @@ export function SheetView({
   picker: ReactNode;
   /** A just-created character: open in edit mode with the creation hint (FR-CHARX-30). */
   startEditing: boolean;
+  /** FR-CHARX-48 part before the first measurement (static renders); measuring decides. */
+  initialPinnedPart?: PinnedPart;
 }) {
   const store = useSync((s) => s.store);
   const [editing, setEditing] = useState(startEditing);
@@ -282,7 +334,21 @@ export function SheetView({
         });
   const tabs = [...TABS, ...sectionTabs.map((s) => [`section:${s.id}`, s.title ?? s.id] as const)];
   const current = tabs.some(([v]) => v === tab) ? tab : "main";
-  const { bodyRef, headerRef, pinned } = usePinnedHeader();
+  const { bodyRef, headerRef, restRef, part } = usePinnedHeader(initialPinnedPart);
+  const compact = part === "compact";
+  const rest = (
+    <>
+      <HeaderRest picker={picker} compact={compact} editing={ctx.editing} setEditing={setEditing} />
+      {hint && ctx.editing && (
+        <p data-testid="charx-create-hint" className="rounded-md bg-muted p-2 text-xs">
+          {CREATE_HINT}{" "}
+          <button type="button" className="underline" onClick={() => setHint(false)}>
+            OK
+          </button>
+        </p>
+      )}
+    </>
+  );
   return (
     <SheetContext.Provider value={ctx}>
       <Card
@@ -290,33 +356,23 @@ export function SheetView({
         data-testid="char-sheet"
         data-record-id={creature.id}
         data-editing={ctx.editing ? "true" : "false"}
-        className={cn(
-          "flex h-full flex-col border-0 bg-transparent p-1 shadow-none",
-          pinned ? "overflow-hidden" : "overflow-auto",
-        )}
+        className="flex h-full flex-col overflow-hidden border-0 bg-transparent p-1 shadow-none"
       >
-        {/* FR-CHARX-48: pinned = only the tab content scrolls; else the Card scrolls as a whole.
+        {/* FR-CHARX-48: the pinned part stays, only the content box scrolls. Compact: the name
+            row + tab strip are pinned; badges, buttons, picker, sections scroll with the content.
             Nothing outside the content box may shrink (an overflow-x box would collapse to 0 px). */}
-        <Tabs
-          value={current}
-          onValueChange={setTab}
-          className={cn("flex flex-col gap-2", pinned ? "min-h-0 flex-1" : "shrink-0")}
-        >
+        <Tabs value={current} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col gap-2">
           <div
             ref={headerRef}
             data-testid="charx-header"
-            data-pinned={pinned ? "true" : "false"}
+            data-pinned="true"
+            data-pinned-part={part}
             className="flex shrink-0 flex-col gap-2"
           >
-            <SheetHeader picker={picker} editing={ctx.editing} setEditing={setEditing} />
-            {hint && ctx.editing && (
-              <p data-testid="charx-create-hint" className="rounded-md bg-muted p-2 text-xs">
-                {CREATE_HINT}{" "}
-                <button type="button" className="underline" onClick={() => setHint(false)}>
-                  OK
-                </button>
-              </p>
-            )}
+            <div className="flex flex-col gap-1.5">
+              <NameRow picker={picker} full={!compact} />
+              {!compact && rest}
+            </div>
             <div className="shrink-0 overflow-x-auto pb-0.5">
               <TabsList className="w-max">
                 {tabs.map(([v, label]) => (
@@ -327,10 +383,16 @@ export function SheetView({
               </TabsList>
             </div>
           </div>
-          <div
-            data-testid="charx-content"
-            className={pinned ? "min-h-0 flex-1 overflow-y-auto" : undefined}
-          >
+          <div data-testid="charx-content" className="min-h-0 flex-1 overflow-y-auto">
+            {compact && (
+              <div
+                ref={restRef}
+                data-testid="charx-header-rest"
+                className="mb-2 flex flex-col gap-1.5"
+              >
+                {rest}
+              </div>
+            )}
             <TabsContent value="main">
               <MainTab />
             </TabsContent>
