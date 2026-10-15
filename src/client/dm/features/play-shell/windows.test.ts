@@ -6,7 +6,12 @@ import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
 import { availableKinds } from "@ui/features/play-shell/registry";
-import { contentBox, fitContent } from "@ui/features/scenes-map/camera";
+import {
+  contentBox,
+  FIT_MIN_CELL_PX,
+  fitContent,
+  footprintBox,
+} from "@ui/features/scenes-map/camera";
 
 // The players panel pulls in the DM session (localStorage, window.location at import); no DOM
 // in bun test, and the shell only needs the window definition here.
@@ -129,26 +134,36 @@ test("#162 DM map-first: battlemap uncovered by the default layout ≥ 70% at 14
 
 /** `session-sim` Goblin Ambush tokens (FIX `battlemap`, `goblin-2`, `thorn-battlemap`), all 1×1. */
 const GOBLIN_AMBUSH = [
-  { name: "Mira", col: 2, row: 7 },
-  { name: "Goblin", col: 12, row: 6 },
-  { name: "Wolf (hidden)", col: 14, row: 4 },
-  { name: "Elite (hidden)", col: 15, row: 8 },
-  { name: "Goblin 2", col: 12, row: 8 },
-  { name: "Thorn", col: 2, row: 9 },
+  { name: "Mira", col: 2, row: 7, pc: true },
+  { name: "Goblin", col: 12, row: 6, pc: false },
+  { name: "Wolf (hidden)", col: 14, row: 4, pc: false },
+  { name: "Elite (hidden)", col: 15, row: 8, pc: false },
+  { name: "Goblin 2", col: 12, row: 8, pc: false },
+  { name: "Thorn", col: 2, row: 9, pc: true },
 ].map((t) => ({ ...t, size: "medium" as const }));
 const CELL = 70;
 
-test("FR-SHELL-34 default layout leaves tokens uncovered: DM (Initiative open), all six Goblin Ambush tokens fitted per FR-MAP-44 (1280×720, 1440×900, 1600×900)", () => {
+/** The Goblin Ambush fitted per FR-MAP-44 / -46 into the DM default layout's free area. */
+function fitAmbush(viewport: { w: number; h: number }) {
   const grid = { gridCellSize: CELL, gridOffsetX: 0, gridOffsetY: 0 };
+  const all = new Set(dmWindows.defs.map((d) => d.kind));
+  const layout = defaultLayout(dmWindows, viewport);
+  expect(layout.some((w) => w.kind === "cbt.initiative" && w.state === "open")).toBe(true);
+  const rects = renderedWindowRects(layout, dmWindows, all, viewport);
+  const free = freeArea(rects, viewport);
+  const box = contentBox(GOBLIN_AMBUSH, grid, BATTLEMAP);
+  const pcs = footprintBox(
+    GOBLIN_AMBUSH.filter((t) => t.pc),
+    grid,
+  );
+  return { rects, free, cam: fitContent(box, free, BATTLEMAP, workArea(viewport), CELL, pcs) };
+}
+
+test("FR-SHELL-34 default layout leaves tokens uncovered: DM (Initiative open), all six Goblin Ambush tokens fitted per FR-MAP-44 (1280×720, 1440×900, 1600×900); at the FR-MAP-46 floor only the PCs", () => {
   for (const viewport of [LAPTOP, WIDE, DESKTOP]) {
-    const all = new Set(dmWindows.defs.map((d) => d.kind));
-    const layout = defaultLayout(dmWindows, viewport);
-    expect(layout.some((w) => w.kind === "cbt.initiative" && w.state === "open")).toBe(true);
-    const rects = renderedWindowRects(layout, dmWindows, all, viewport);
-    const free = freeArea(rects, viewport);
-    const box = contentBox(GOBLIN_AMBUSH, grid, BATTLEMAP);
-    const cam = fitContent(box, free, BATTLEMAP, workArea(viewport));
-    for (const t of GOBLIN_AMBUSH) {
+    const { rects, free, cam } = fitAmbush(viewport);
+    // FR-MAP-46 (G2): at the floor, edge monsters may sit under a window; the PCs may not.
+    for (const t of GOBLIN_AMBUSH.filter((t) => t.pc || !cam.floor)) {
       const c = {
         x: cam.x + (t.col + 0.5) * CELL * cam.scale,
         y: cam.y + (t.row + 0.5) * CELL * cam.scale,
@@ -159,7 +174,14 @@ test("FR-SHELL-34 default layout leaves tokens uncovered: DM (Initiative open), 
       const inFree = c.x > free.x && c.x < free.x + free.w && c.y > free.y && c.y < free.y + free.h;
       expect(inFree ? "ok" : `${at} outside the free area`).toBe("ok");
     }
+    expect(cam.scale * CELL).toBeGreaterThanOrEqual(FIT_MIN_CELL_PX - 1e-9);
   }
+});
+
+test("FR-MAP-46 fit floor 48 px at 1280×720: session-sim Goblin Ambush in the DM free area with Initiative open → 48 px cell, floor", () => {
+  const { cam } = fitAmbush(LAPTOP);
+  expect(cam.floor).toBe(true);
+  expect(Math.round(cam.scale * CELL)).toBe(FIT_MIN_CELL_PX);
 });
 
 /**
