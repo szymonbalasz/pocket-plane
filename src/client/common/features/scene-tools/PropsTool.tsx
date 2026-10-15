@@ -43,12 +43,12 @@ import {
   usePropTool,
   zChange,
 } from "./prop-tool";
-import { type Send, undoLast, usePropUndo } from "./prop-undo";
+import { type Send, undoLast, useUndoStacks } from "./prop-undo";
 
 /** Undo for the shown scene; a rejected inverse drops its entry and shows a Toast (FR-SCN-15). */
 function useUndo(send: Send) {
   const sceneId = usePropTool((s) => s.sceneId);
-  const depth = usePropUndo((s) => (sceneId ? (s.stacks[sceneId]?.length ?? 0) : 0));
+  const depth = useUndoStacks((s) => (sceneId ? (s.stacks[sceneId]?.length ?? 0) : 0));
   const run = () => {
     if (sceneId) undoLast(send, sceneId).catch(toastReject);
   };

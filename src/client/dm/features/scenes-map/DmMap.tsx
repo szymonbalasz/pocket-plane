@@ -22,6 +22,7 @@ import { ToolRail } from "@ui/features/scenes-map/ToolRail";
 import { useRecords } from "@ui/sync/store";
 import { EyeOffIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ScnPropsDmHost } from "../scene-tools/props-host";
 import { GridTool, LockTool, ShowToPlayers } from "./DmTools";
 import {
   dispatchSelection,
@@ -217,6 +218,7 @@ export function DmMapToolRail() {
           {active?.id !== viewed.id && <ShowToPlayers scene={viewed} />}
         </div>
       )}
+      <ScnPropsDmHost />
     </ToolRail>
   );
 }

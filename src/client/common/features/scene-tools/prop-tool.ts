@@ -14,7 +14,7 @@ import {
 import { SCN_INTENTS, type ScenePropRecord } from "@shared/scene-tools/schemas";
 import { create } from "zustand";
 import type { ToolCancelReason, ToolGrid, ToolPointer } from "../scenes-map/tools";
-import { type PropFieldsBefore, prevFields, recordUndo, type Send } from "./prop-undo";
+import { type PropFieldsBefore, prevFields, propUndo, recordUndo, type Send } from "./prop-undo";
 
 /** The Props tool's registry id (`canvas-tools.ts`); rail button `map-tool-props`. */
 export const PROPS_TOOL_ID = "props";
@@ -115,7 +115,7 @@ export async function placePropAt(
   const r = (await send(SCN_INTENTS.placeProp, { sceneId, assetId, ...cell })) as {
     propId: string;
   };
-  recordUndo(sceneId, { op: "place", propId: r.propId });
+  recordUndo(sceneId, propUndo.place(r.propId));
   return r.propId;
 }
 
@@ -130,24 +130,24 @@ export async function updatePropFields(
   const input: Record<string, unknown> = { propId: p.id };
   for (const k of Object.keys(prev)) input[k] = change[k as keyof PropFieldsBefore];
   await send(SCN_INTENTS.updateProp, input);
-  recordUndo(p.sceneId, { op: "update", propId: p.id, prev });
+  recordUndo(p.sceneId, propUndo.update(p.id, prev));
 }
 
 export async function setHidden(send: Send, p: ScenePropRecord, hidden: boolean): Promise<void> {
   if (p.hidden === hidden) return;
   await send(SCN_INTENTS.setPropHidden, { propId: p.id, hidden });
-  recordUndo(p.sceneId, { op: "hidden", propId: p.id, prev: p.hidden });
+  recordUndo(p.sceneId, propUndo.hidden(p.id, p.hidden));
 }
 
 export async function duplicate(send: Send, p: ScenePropRecord): Promise<string> {
   const r = (await send(SCN_INTENTS.duplicateProp, { propId: p.id })) as { propId: string };
-  recordUndo(p.sceneId, { op: "place", propId: r.propId });
+  recordUndo(p.sceneId, propUndo.place(r.propId));
   return r.propId;
 }
 
 export async function remove(send: Send, p: ScenePropRecord): Promise<void> {
   await send(SCN_INTENTS.deleteProp, { propId: p.id });
-  recordUndo(p.sceneId, { op: "delete", prev: p });
+  recordUndo(p.sceneId, propUndo.delete(p));
 }
 
 /** Menu entries (FR-SCN-17) as `scn.updateProp` changes. */

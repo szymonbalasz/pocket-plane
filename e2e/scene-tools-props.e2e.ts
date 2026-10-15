@@ -2,7 +2,8 @@
 // Thin props flow (SCN §13 step 6), DM + player-1 in separate contexts: the DM shows Goblin
 // Ambush; the player sees the barrel and the table, not the hidden chest. With the Props tool the
 // DM reveals the chest from its menu (the player gets it), locks it (a locked drag does nothing),
-// drags the barrel a cell (the player sees it), then Ctrl+Z puts it back. Player reload keeps it.
+// drags the barrel a cell (the player sees it), Ctrl+Z puts it back, then places a new barrel via
+// the asset picker. Player reload keeps them.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
@@ -134,8 +135,21 @@ test("FR-SCN-16–19 props: reveal, lock, locked drag, move, Ctrl+Z (DM + player
   await expect.poll(() => propCell(player, barrel)).toEqual({ col: 5, row: 3 });
   await expect.poll(() => propCell(dm, barrel)).toEqual({ col: 5, row: 3 });
 
-  // Player reload: the revealed chest is still there.
+  // Place a barrel at (6, 12): "Choose image…" → the DM picker → click the cell (FR-SCN-16).
+  const barrelImage = recordId("scn-prop-images", "asset", 0);
+  await dm.getByTestId("scn-prop-image").click();
+  await dm.locator(`[data-testid="asset-picker-item"][data-record-id="${barrelImage}"]`).click();
+  await dm.getByTestId("asset-picker-select").click();
+  await expect(dm.getByTestId("asset-picker")).toHaveCount(0);
+  await expect(dm.getByTestId("scn-prop-image-name")).toHaveText("prop-barrel");
+  const at = await cellCentre(dm, 6, 12);
+  await dm.mouse.click(at.x, at.y);
+  await expect.poll(async () => (await propIds(player)).length).toBe(4);
+  const placed = (await propIds(player)).find((id) => ![barrel, table, chest].includes(id))!;
+  expect(await propCell(player, placed)).toEqual({ col: 6, row: 12 });
+
+  // Player reload: the revealed chest and the new barrel are still there.
   await player.reload();
   await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
-  await expect.poll(() => propIds(player)).toEqual([barrel, table, chest].sort());
+  await expect.poll(() => propIds(player)).toEqual([barrel, table, chest, placed].sort());
 });
