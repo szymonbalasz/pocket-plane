@@ -52,6 +52,7 @@ import { characterOf, deadPc, deathStateFor } from "@ui/features/combat-extras/l
 import { RowName } from "@ui/features/combat-extras/parts";
 import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
+import { pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
 import {
   startedIn,
   useCbtIntent,
@@ -73,7 +74,7 @@ import { defineWindow } from "@ui/features/play-shell/registry";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { movementIndicator } from "@ui/features/scenes-map/movement";
 import { cn } from "@ui/lib/utils";
-import { useSync } from "@ui/sync/store";
+import { useRecords, useSync } from "@ui/sync/store";
 import {
   DicesIcon,
   EllipsisIcon,
@@ -208,30 +209,72 @@ function InitiativeCell({
   );
 }
 
+/** The three N7 actions (FR-CBT-74), in menu order; a click on the attack's name = `both`. */
+const ATTACK_ACTIONS = [
+  { value: "both", label: "Attack + damage" },
+  { value: "toHit", label: "Attack" },
+  { value: "damage", label: "Damage" },
+] as const;
+type AttackAction = (typeof ATTACK_ACTIONS)[number]["value"];
+
 /**
- * Attack (FR-CBT-16). OQ-CHARX-12: a definition with several attack rows gets a picker; the pick
- * rolls through the same control once it has re-rendered with that row (as Check ▸ / Save ▸).
+ * Attack ▸ (FR-CBT-16, FR-CBT-74, N7): every attack the definition can name (OQ-CHARX-12) with
+ * the same three actions as the sheet: Attack + damage (`cbt.attack`), Attack (`cbt.attack
+ * {rolls: "toHit"}`), Damage (`cbt.rollDamage`; after a natural 20 on that row's pending to-hit
+ * card the roll control opens critical). The pick rolls through one control once it has
+ * re-rendered with that attack and action (as Check ▸ / Save ▸); the result's card opens.
  */
 function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | undefined }) {
   const { send, disabled } = useCbtIntent();
   const openCard = useCombatDialogs((s) => s.openCard);
-  const choices = attackChoices(def?.statBlock.attacks ?? []);
-  const [pick, setPick] = useState<{ index: number; keys: KeyState; n: number } | null>(null);
+  const notes = useRecords<NotificationRecord>("notification");
+  const attacks = def?.statBlock.attacks ?? [];
+  const choices = attackChoices(attacks);
+  const [pick, setPick] = useState<{
+    index: number;
+    action: AttackAction;
+    keys: KeyState;
+    n: number;
+  } | null>(null);
   const chosen = choices[pick?.index ?? 0];
+  const action = pick?.action ?? "both";
   const attack = chosen?.attack;
+  // One attack: no id, the server's first attack (FR-CHARX-20 back-compat).
+  const attackId = choices.length > 1 ? chosen?.attackId : undefined;
+  // The row a card of this attack names (FR-CBT-71): its id, else the first attack's.
+  const rowId = chosen?.attackId ?? attacks[0]?.id;
+  const card = pendingToHitCard(notes, c.id, rowId === undefined ? {} : { attackId: rowId });
+  const crit = action === "damage" && card?.toHit?.natural === 20;
   const control = useRollControl({
-    expressions: attack ? [d20Expression(attack.toHit), attack.damage] : ["1d20"],
-    critExpressions: attack ? [critExpression(attack.damage)] : undefined,
-    category: "attack",
-    label: attack ? `${c.name} — ${attack.name} attack` : undefined,
+    expressions: !attack
+      ? ["1d20"]
+      : action === "toHit"
+        ? [d20Expression(attack.toHit)]
+        : action === "damage"
+          ? [attack.damage]
+          : [d20Expression(attack.toHit), attack.damage],
+    critExpressions: attack && action !== "toHit" ? [critExpression(attack.damage)] : undefined,
+    crit,
+    category: action === "damage" ? "damage" : "attack",
+    label: attack
+      ? `${c.name} — ${attack.name} ${action === "damage" ? "damage" : "attack"}`
+      : undefined,
     onRoll: async (r) => {
-      const res = await send<{ cardId: string }>("cbt.attack", {
-        attackerId: c.id,
-        mode: r.mode,
-        ...(r.manual ? { manual: r.manual } : {}),
-        // One attack: no id, the server's first attack (FR-CHARX-20 back-compat).
-        ...(choices.length > 1 && chosen?.attackId ? { attackId: chosen.attackId } : {}),
-      });
+      const ref = attackId ? { attackId } : {};
+      const res =
+        action === "damage"
+          ? await send<{ cardId: string }>("cbt.rollDamage", {
+              attackerId: c.id,
+              ...(r.manual?.[0] ? { manual: r.manual[0] } : {}),
+              ...ref,
+            })
+          : await send<{ cardId: string }>("cbt.attack", {
+              attackerId: c.id,
+              mode: r.mode,
+              ...(action === "toHit" ? { rolls: "toHit" } : {}),
+              ...(r.manual ? { manual: r.manual } : {}),
+              ...ref,
+            });
       if (res) openCard(res.cardId);
     },
   });
@@ -241,12 +284,17 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
     if (pick) control.roll(pick.keys);
   }, [n]);
   const keys = useRef<KeyState>({});
-  if (choices.length > 1) {
-    return (
-      <>
-        {/* Invisible anchor for the physical-dice popover of the picked attack. */}
-        <RollButton control={control} tabIndex={-1} aria-hidden className={ANCHOR} />
-        <DropdownMenu>
+  const choose = (index: number, a: AttackAction) => {
+    const k = keys.current;
+    keys.current = {};
+    setPick((p) => ({ index, action: a, keys: k, n: (p?.n ?? 0) + 1 }));
+  };
+  return (
+    <>
+      {/* Invisible anchor for the physical-dice popover of the picked attack. */}
+      <RollButton control={control} tabIndex={-1} aria-hidden className={ANCHOR} />
+      <DropdownMenu>
+        <Tooltip content={attack ? "Attack ▸ (Shift adv, Ctrl dis)" : "No weapon attack"}>
           <DropdownMenuTrigger asChild>
             <Button
               data-testid="cbt-init-row-attack"
@@ -255,55 +303,48 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
               variant="ghost"
               className="size-7"
               aria-label={`Attack with ${c.name}`}
-              disabled={disabled}
+              disabled={disabled || choices.length === 0}
             >
               <SwordIcon className="size-3.5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {choices.map((ch, i) => (
-              <DropdownMenuItem
-                key={ch.attackId ?? `first-${i}`}
-                data-testid="cbt-init-row-attack-option"
-                data-record-id={c.id}
-                data-value={ch.attackId ?? ""}
-                onPointerDown={(e) => {
-                  keys.current = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey };
-                }}
-                onSelect={() => {
-                  const k = keys.current;
-                  keys.current = {};
-                  setPick((p) => ({ index: i, keys: k, n: (p?.n ?? 0) + 1 }));
-                }}
-              >
-                <span className="flex-1">{ch.attack.name}</span>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {signed(ch.attack.toHit)} · {ch.attack.damage}
-                </span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </>
-    );
-  }
-  return (
-    <Tooltip content={attack ? `Attack: ${attack.name} (Shift adv, Ctrl dis)` : "No weapon attack"}>
-      <span>
-        <RollButton
-          control={control}
-          data-testid="cbt-init-row-attack"
-          data-record-id={c.id}
-          size="icon"
-          variant="ghost"
-          className="size-7"
-          aria-label={`Attack with ${c.name}`}
-          disabled={disabled || !attack}
-        >
-          <SwordIcon className="size-3.5" />
-        </RollButton>
-      </span>
-    </Tooltip>
+        </Tooltip>
+        <DropdownMenuContent align="end" className="min-w-64">
+          {choices.map((ch, i) => (
+            <div key={ch.attackId ?? `first-${i}`} className="flex items-center gap-0.5">
+              {ATTACK_ACTIONS.map((a) => (
+                <DropdownMenuItem
+                  key={a.value}
+                  data-testid="cbt-init-row-attack-option"
+                  data-record-id={c.id}
+                  data-value={a.value}
+                  data-attack-id={ch.attackId ?? ""}
+                  className={a.value === "both" ? "min-w-0 flex-1 gap-2" : "px-1.5 text-xs"}
+                  onPointerDown={(e) => {
+                    keys.current = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey };
+                  }}
+                  onSelect={() => choose(i, a.value)}
+                >
+                  {a.value === "both" ? (
+                    <>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate">{ch.attack.name}</span>
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {signed(ch.attack.toHit)} · {ch.attack.damage}
+                        </span>
+                      </span>
+                      <span className="text-xs text-muted-foreground">{a.label}</span>
+                    </>
+                  ) : (
+                    a.label
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </div>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }
 

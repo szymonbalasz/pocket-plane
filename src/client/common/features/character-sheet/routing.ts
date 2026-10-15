@@ -29,6 +29,11 @@ export interface RollRouteClaim {
   /** Damage expressions after a natural 20, for the manual popover (combat only). */
   critExpressions?: readonly string[];
   /**
+   * The roll is already known to be critical (combat's Damage after a natural-20 to-hit,
+   * FR-CBT-74): the roll control opens with `crit: true` (FR-DICE-31, X-1).
+   */
+  crit?: boolean;
+  /**
    * FR-CHAR-24: the sheet renders no button (nor public switch) for this kind; Initiative shows
    * a muted "Initiative set". The badge stays.
    */
@@ -62,6 +67,17 @@ export function routeRef(ref: SheetRollRef | undefined): RollRouteRef | undefine
   if (ref?.attackId !== undefined) return { attackId: ref.attackId };
   if (ref?.spellId !== undefined) return { spellId: ref.spellId };
   return undefined;
+}
+
+/** The roll-control options a claim sets (FR-DICE-31): crit expressions, `crit: true`. */
+export function claimRollOptions(claim: RollRouteClaim | null): {
+  critExpressions?: readonly string[];
+  crit?: boolean;
+} {
+  return {
+    ...(claim?.critExpressions ? { critExpressions: claim.critExpressions } : {}),
+    ...(claim?.crit ? { crit: true } : {}),
+  };
 }
 
 /** FR-CHAR-16: the first route that claims, else null (→ `char.roll`). A throwing route passes. */

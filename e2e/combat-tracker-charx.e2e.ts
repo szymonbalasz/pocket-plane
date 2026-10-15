@@ -105,17 +105,38 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
   await expect(popup).toHaveCount(0);
   await expect(row(init, goblin).getByTestId("cbt-init-row-hp")).toHaveText("HP 4/7");
 
-  // OQ-CHARX-12: Elite has two attack rows → the row's Attack opens a picker; Shortbow → card.
+  // OQ-CHARX-12: Elite has two attack rows → Attack ▸ lists both, each with the three actions
+  // (FR-CBT-74); Shortbow's Attack + damage → card.
   const elite = await idByName(init, "Elite Goblin Warrior");
   await row(init, elite).getByTestId("cbt-init-row-attack").click();
   const options = dm.locator(
-    `[data-testid="cbt-init-row-attack-option"][data-record-id="${elite}"]`,
+    `[data-testid="cbt-init-row-attack-option"][data-record-id="${elite}"][data-value="both"]`,
   );
   await expect(options).toHaveCount(2);
   await options.filter({ hasText: "Shortbow" }).click();
   await expect(dm.getByTestId("cbt-popup").getByRole("heading", { level: 2 })).toHaveText(
     "Elite Goblin Warrior — Shortbow",
   );
+
+  await dm.getByTestId("cbt-popup-dismiss").click();
+
+  // FR-CBT-74: Attack ▸ Shortbow "Attack" → a to-hit-only card ("Waiting for damage"); Later;
+  // "Damage" completes it (the same card, damage filled).
+  const option = async (value: string) => {
+    await row(init, elite).getByTestId("cbt-init-row-attack").click();
+    const bow = dm
+      .locator(`[data-testid="cbt-init-row-attack-option"][data-record-id="${elite}"]`)
+      .and(dm.locator(`[data-value="${value}"]`));
+    const bowId = await options.filter({ hasText: "Shortbow" }).getAttribute("data-attack-id");
+    await bow.and(dm.locator(`[data-attack-id="${bowId}"]`)).click();
+  };
+  await option("toHit");
+  await expect(popup.getByTestId("cbt-popup-waiting-damage")).toBeVisible();
+  const splitCard = await popup.getAttribute("data-record-id");
+  await dm.getByTestId("cbt-popup-later").click();
+  await option("damage");
+  await expect(popup).toHaveAttribute("data-record-id", splitCard as string);
+  await expect(popup.getByTestId("cbt-popup-waiting-damage")).toHaveCount(0);
 
   // Leave the shared server as found: dismiss the card, end the encounter.
   await dm.getByTestId("cbt-popup-dismiss").click();

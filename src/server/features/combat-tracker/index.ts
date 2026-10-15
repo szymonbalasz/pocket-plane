@@ -6,6 +6,7 @@ import type { CommandDef } from "../../commands/commands";
 import type { Feature } from "../../services";
 import { rollAbility } from "./abilities";
 import { attackCommand } from "./attack";
+import { rollDamageCommand } from "./damage";
 import { createEncounter, deleteEncounter, updateEncounter } from "./encounters";
 import { applyCard, applyHp, undoCommand } from "./hp";
 import { rollInitiative, setInitiative, setRemoved } from "./initiative";
@@ -31,6 +32,7 @@ export const combatTracker: Feature = {
       turnCommand("prev", hooks),
       setRemoved,
       attackCommand,
+      rollDamageCommand,
       applyCard,
       applyHp,
       undoCommand,

@@ -1,28 +1,41 @@
 // `cbt.attack` (FR-CBT-16–18, FR-CBT-52, #135): rolls to-hit + damage server-side, writes the roll
 // line, then creates the damage card via `notify` in the same transaction (ADR-0027). No target:
 // the DM picks it in the attack popup (#134). FR-CHARX-24 (OQ-CBT-47): `attackId?` / `spellId?`
-// name the sheet row, resolved by CHARX's `sheetAttack`; neither = the first attack.
+// name the sheet row, resolved by CHARX's `sheetAttack`; neither = the first attack. FR-CBT-70
+// (N7): `rolls: "toHit"` rolls the d20 only, a to-hit-only card that `cbt.rollDamage` completes.
 import { attackRollSpecs } from "@shared/character-sheet/logic";
-import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { critExpression } from "@shared/combat-tracker/rules";
 import {
   AttackInput,
   type AttackResult,
   CBT_INTENTS,
+  type CombatantRecord,
   DAMAGE_CARD_KIND,
   type DamageCardPayload,
 } from "@shared/combat-tracker/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import { AttackRolled } from "@shared/events/combat-tracker";
-import { defineCommand } from "../../commands/commands";
-import { invalid } from "../../commands/errors";
-import type { DomainEvent, RecordChange } from "../../events/types";
+import { type CommandEnv, defineCommand } from "../../commands/commands";
+import type { DomainEvent } from "../../events/types";
 import { characters } from "../character-sheet";
-import { dice, gameLog, type Roll } from "../dice-roll-log";
+import { dice, gameLog } from "../dice-roll-log";
 import { notify } from "../notifications";
-import { activeCombatant } from "./guards";
+import { cardRollOf, cardToHitOf, damageCardText } from "./card-kind";
+import { activeCombatant, statsOf } from "./guards";
 
-const cardDice = (r: Roll) => r.dice.map((d) => [d.value, d.kept] as [number | null, boolean]);
+/**
+ * FR-CBT-71: the sheet row a card belongs to, so `cbt.rollDamage` completes the card of the same
+ * row. No ref = the first attack, named by its id when it has one (a legacy row has none).
+ */
+export function cardRowRef(
+  env: Pick<CommandEnv, "tx">,
+  c: CombatantRecord,
+  ref: { attackId?: string; spellId?: string },
+): { attackId?: string; spellId?: string } {
+  if (ref.spellId !== undefined) return { spellId: ref.spellId };
+  const attackId = ref.attackId ?? statsOf(env, c).attacks[0]?.id;
+  return attackId === undefined ? {} : { attackId };
+}
 
 export const attackCommand = defineCommand({
   name: CBT_INTENTS.attack,
@@ -32,53 +45,46 @@ export const attackCommand = defineCommand({
     if (env.actor.role === "player") activeCombatant(env, input.attackerId, { own: true });
   },
   execute(input, env): AttackResult {
-    // FR-CBT-70: the schema accepts `rolls`; to-hit-only cards land in fix/combat2-split-attack.
-    if (input.rolls === "toHit") throw invalid("To-hit-only attacks are not available yet");
     const { c, enc } = activeCombatant(env, input.attackerId, { own: true });
     // The attacker's own definition only: a row of another creature is `not_found` here.
-    const attack = characters.sheetAttack(env, c.entityId, {
-      attackId: input.attackId,
-      spellId: input.spellId,
-    });
+    const ref = { attackId: input.attackId, spellId: input.spellId };
+    const attack = characters.sheetAttack(env, c.entityId, ref);
     const [hitSpec, dmgSpec] = attackRollSpecs(attack);
     const actor = { kind: "entity" as const, id: c.entityId, name: c.name };
-    const toHit = dice.evaluate(env, {
-      expression: hitSpec.expression,
-      mode: input.mode,
-      category: hitSpec.category,
-      label: hitSpec.label,
-      actor,
-      manual: input.manual?.[0],
-      source: "cbt",
-    });
+    const toHitOnly = input.rolls === "toHit";
+    // Every roll of the command goes through here (one place for later roll options).
+    const rollOf = (spec: typeof hitSpec, expression: string, i: number) =>
+      dice.evaluate(env, {
+        expression,
+        mode: spec.d20 ? input.mode : "normal",
+        category: spec.category,
+        label: spec.label,
+        actor,
+        manual: input.manual?.[i],
+        source: "cbt",
+      });
+    const toHit = rollOf(hitSpec, hitSpec.expression, 0);
     // FR-CBT-16 / -17: natural 20 → damage dice doubled; manual damage is checked against it.
     const crit = toHit.natural === 20;
-    const damage = dice.evaluate(env, {
-      expression: crit ? critExpression(dmgSpec.expression) : dmgSpec.expression,
-      mode: "normal",
-      category: dmgSpec.category,
-      label: dmgSpec.label,
-      actor,
-      manual: input.manual?.[1],
-      source: "cbt",
-    });
-    const rollIds = [toHit.id, damage.id];
-    const changes: RecordChange[] = [];
+    const damage = toHitOnly
+      ? null
+      : rollOf(dmgSpec, crit ? critExpression(dmgSpec.expression) : dmgSpec.expression, 1);
+    const rolls = damage ? [toHit, damage] : [toHit];
+    const rollIds = rolls.map((r) => r.id);
     const isPlayer = env.actor.role === "player";
     // FR-CBT-18: a player's attack → one public roll line now. FR-CBT-52 (#171): a DM's attack
     // (monster or PC) → the same line, always DM-only whatever the Attack tickbox; the outcome
     // line at apply carries the public rule (FR-CBT-24). Rolls are facts: Undo never strikes it.
-    changes.push(
-      gameLog.append(env, {
-        kind: ROLL_KIND,
-        category: "attack",
-        actorName: c.name,
-        payload: [dice.rollPayloadItem(toHit), dice.rollPayloadItem(damage)],
-        rollIds,
-        encounterId: enc.id,
-        ...(isPlayer ? {} : { public: false }),
-      }),
-    );
+    // FR-CBT-70: a to-hit-only attack's line holds the to-hit roll alone.
+    const entry = gameLog.append(env, {
+      kind: ROLL_KIND,
+      category: "attack",
+      actorName: c.name,
+      payload: rolls.map((r) => dice.rollPayloadItem(r)),
+      rollIds,
+      encounterId: enc.id,
+      ...(isPlayer ? {} : { public: false }),
+    });
     const payload: DamageCardPayload = {
       encounterId: enc.id,
       attackerId: c.id,
@@ -87,21 +93,9 @@ export const attackCommand = defineCommand({
       damageType: attack.damageType,
       mode: input.mode,
       crit,
-      toHit: {
-        rollId: toHit.id,
-        dice: cardDice(toHit),
-        constant: toHit.constant,
-        total: toHit.total,
-        natural: toHit.natural,
-        manual: toHit.manual,
-      },
-      damage: {
-        rollId: damage.id,
-        dice: cardDice(damage),
-        constant: damage.constant,
-        total: damage.total,
-        manual: damage.manual,
-      },
+      toHit: cardToHitOf(toHit),
+      damage: damage ? cardRollOf(damage) : null,
+      ...cardRowRef(env, c, ref),
     };
     // Owner event first, the card's `NotificationCreated` after (protocol §22). The card id is
     // known only once `notify` ran; the payload is validated at commit, so fill it in then.
@@ -109,18 +103,15 @@ export const attackCommand = defineCommand({
       type: AttackRolled.type,
       campaignId: enc.campaignId,
       payload: { cardId: "", rollIds },
-      changes,
+      changes: [entry],
     };
     env.emit(rolled);
-    const type = attack.damageType ? ` ${attack.damageType}` : "";
-    // FR-CBT-57 (R4): " (natural 1)" / " (natural 20)" after the to-hit.
-    const natural = naturalMark(toHit.natural);
-    const nat = natural === null ? "" : ` (natural ${natural})`;
     const cardId = notify(env, {
       kind: DAMAGE_CARD_KIND,
       audience: isPlayer ? "player" : "dm",
       audiencePlayerId: isPlayer ? env.actor.playerId : null,
-      text: `${c.name}: ${toHit.total} to hit${nat}, ${damage.total}${type}${crit ? " (critical)" : ""}`,
+      // FR-CBT-57 (R4): " (natural 1)" / " (natural 20)" after the to-hit.
+      text: damageCardText(payload),
       payload,
       action: { label: "Apply", role: "dm" },
     });

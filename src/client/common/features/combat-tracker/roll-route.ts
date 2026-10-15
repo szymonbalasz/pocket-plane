@@ -1,16 +1,25 @@
 // Sheet roll route (FR-CBT-30, #135): while the character is an active, non-removed combatant of
 // the started encounter in this client's store, the sheet's Initiative sends
-// `cbt.rollInitiative` and Attack sends `cbt.attack` (no `public`). FR-CHARX-24 (OQ-CBT-47):
-// every attack row's Attack and a spell's Attack (only a spell with damage) send `cbt.attack`
-// with the row's `ref`. Checks, saves, skills, Damage and spell Damage are never claimed: they
-// stay `char.roll` (FR-CBT-45). A PC hidden from its owner isn't in the player's store, so the
-// sheet falls back to `char.roll` (OQ-CBT-28).
+// `cbt.rollInitiative` and the attack buttons send combat intents (no `public`). FR-CBT-74 (N7,
+// §6.1), per attack row and per attack or save spell, with the row's `ref`: Attack (`toHit` /
+// `spellToHit`, a spell only with damage) → `cbt.attack {rolls: "toHit"}`; Damage (`damage` /
+// `spellDamage`) → `cbt.rollDamage`; Attack + damage (`attack` / `spellAttack`) → `cbt.attack`.
+// Healing, checks, saves and skills are never claimed: they stay `char.roll` (FR-CBT-45). A PC
+// hidden from its owner isn't in the player's store, so the sheet falls back to `char.roll`
+// (OQ-CBT-28).
 import { type RollSheet, resolveSheetAttack } from "@shared/character-sheet/logic";
-import { CREATURE_SHEET_TYPE } from "@shared/character-sheet/sheet";
+import type { SheetRollKind } from "@shared/character-sheet/schemas";
+import { CREATURE_SHEET_TYPE, type SpellRow } from "@shared/character-sheet/sheet";
 import { critExpression } from "@shared/combat-tracker/rules";
-import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
+import {
+  COMBATANT_TYPE,
+  type CombatantView,
+  DAMAGE_CARD_KIND,
+  DamageCardPayload,
+} from "@shared/combat-tracker/schemas";
+import type { NotificationRecord } from "@shared/notifications/schemas";
 import type { RecordStore } from "@shared/protocol/store";
-import type { RollRoute, RollRouteRef } from "../character-sheet/routing";
+import type { RollRoute, RollRouteClaim, RollRouteRef } from "../character-sheet/routing";
 import { startedIn } from "./store";
 
 function combatantOf(store: RecordStore, characterId: string): CombatantView | null {
@@ -34,27 +43,90 @@ export function initiativeLocked(store: RecordStore, c: CombatantView): boolean 
   return (startedIn(store)?.round ?? 0) >= 1 && c.initiative != null;
 }
 
+type StatBlockLike = Parameters<typeof resolveSheetAttack>[0];
+
+function statBlockOf(store: RecordStore, characterId: string): StatBlockLike | null {
+  const e = store.records.entity?.[characterId] as { statBlock?: StatBlockLike } | undefined;
+  return e?.statBlock?.attacks ? e.statBlock : null;
+}
+
+const sheetOf = (store: RecordStore, characterId: string) =>
+  (store.records[CREATURE_SHEET_TYPE]?.[characterId] ?? null) as RollSheet;
+
 /**
  * The row's damage expression from this client's store (full entity + `creature-sheet`, DM and
  * owner), or null: unknown row, no damage, or not in the store.
  */
-function damageOf(store: RecordStore, characterId: string, ref?: RollRouteRef): string | null {
-  const e = store.records.entity?.[characterId] as
-    | { statBlock?: Parameters<typeof resolveSheetAttack>[0] }
-    | undefined;
-  if (!e?.statBlock?.attacks) return null;
-  const sheet = (store.records[CREATURE_SHEET_TYPE]?.[characterId] ?? null) as RollSheet;
-  const r = resolveSheetAttack(e.statBlock, sheet, ref ?? {});
+function attackDamageOf(
+  store: RecordStore,
+  characterId: string,
+  ref?: RollRouteRef,
+): string | null {
+  const stats = statBlockOf(store, characterId);
+  if (!stats) return null;
+  const r = resolveSheetAttack(stats, sheetOf(store, characterId), ref ?? {});
   return r.ok ? r.attack.damage : null;
 }
+
+function spellOf(store: RecordStore, characterId: string, spellId: string): SpellRow | null {
+  return sheetOf(store, characterId)?.spells.find((s) => s.id === spellId) ?? null;
+}
+
+/** The ref a card names (FR-CBT-71): no ref = the first attack, by its id when it has one. */
+function cardRef(store: RecordStore, characterId: string, ref?: RollRouteRef) {
+  if (ref?.spellId !== undefined) return { spellId: ref.spellId };
+  const attackId = ref?.attackId ?? statBlockOf(store, characterId)?.attacks[0]?.id;
+  return attackId === undefined ? {} : { attackId };
+}
+
+/**
+ * FR-CBT-74: the latest pending to-hit-only card of this attacker's row among `notes` (what
+ * `cbt.rollDamage` completes), or null. Used by the sheet route and the DM's Initiative row.
+ */
+export function pendingToHitCard(
+  notes: readonly NotificationRecord[],
+  attackerId: string,
+  row: { attackId?: string; spellId?: string },
+): DamageCardPayload | null {
+  let best: { seq: number; p: DamageCardPayload } | null = null;
+  for (const n of notes) {
+    if (n.kind !== DAMAGE_CARD_KIND || n.state !== "pending") continue;
+    const parsed = DamageCardPayload.safeParse(n.payload);
+    if (!parsed.success) continue;
+    const p = parsed.data;
+    if (p.attackerId !== attackerId || p.toHit === null || p.damage !== null) continue;
+    if (p.attackId !== row.attackId || p.spellId !== row.spellId) continue;
+    if (!best || n.seq > best.seq) best = { seq: n.seq, p };
+  }
+  return best?.p ?? null;
+}
+
+const notesOf = (store: RecordStore) =>
+  Object.values(store.records.notification ?? {}) as NotificationRecord[];
+
+const refFields = (ref?: RollRouteRef) => ({
+  ...(ref?.attackId !== undefined ? { attackId: ref.attackId } : {}),
+  ...(ref?.spellId !== undefined ? { spellId: ref.spellId } : {}),
+});
+
+/** Kinds this route claims; per kind, a weapon row (`attackId` / none) or a spell row. */
+const ATTACK_KINDS: Partial<Record<SheetRollKind, "weapon" | "spell">> = {
+  toHit: "weapon",
+  damage: "weapon",
+  attack: "weapon",
+  spellToHit: "spell",
+  spellDamage: "spell",
+  spellAttack: "spell",
+};
 
 export const combatRollRoute: RollRoute = {
   name: "combat-tracker",
   claim(store, characterId, kind, ref) {
-    if (kind !== "initiative" && kind !== "attack" && kind !== "spellAttack") return null;
-    // A spell attack needs its row; one without damage rolls plainly via `char.roll`.
-    if (kind === "spellAttack" && ref?.spellId === undefined) return null;
-    if (kind === "attack" && ref?.spellId !== undefined) return null;
+    const row = ATTACK_KINDS[kind];
+    if (kind !== "initiative" && !row) return null;
+    // A spell kind needs its row; a weapon kind never names a spell.
+    if (row === "spell" && ref?.spellId === undefined) return null;
+    if (row === "weapon" && ref?.spellId !== undefined) return null;
     const c = combatantOf(store, characterId);
     if (!c) return null;
     if (kind === "initiative") {
@@ -72,18 +144,42 @@ export const combatRollRoute: RollRoute = {
           }),
       };
     }
-    const damage = damageOf(store, characterId, ref);
-    if (kind === "spellAttack" && !damage) return null;
+    const spell = ref?.spellId !== undefined ? spellOf(store, characterId, ref.spellId) : null;
+    // Spells: healing never routes; Attack / Attack + damage only for an attack spell with
+    // damage; Damage for any spell with damage (save spells get a damage-only card).
+    if (row === "spell") {
+      if (!spell?.damage || spell.effect === "healing") return null;
+      if (kind !== "spellDamage" && spell.roll !== "attack") return null;
+    }
+    const damage = spell ? (spell.damage ?? null) : attackDamageOf(store, characterId, ref);
+    if (kind === "damage" || kind === "spellDamage") {
+      // FR-CBT-74: after a natural 20 on the row's pending to-hit card the Damage is critical:
+      // the roll control shows the extra critical dice from the start.
+      const card = pendingToHitCard(notesOf(store), c.id, cardRef(store, characterId, ref));
+      const crit = card?.toHit?.natural === 20 && damage !== null;
+      const claim: RollRouteClaim = {
+        badge: "In combat",
+        ...(crit && damage ? { critExpressions: [critExpression(damage)], crit: true } : {}),
+        send: (sendIntent, input) =>
+          sendIntent("cbt.rollDamage", {
+            attackerId: c.id,
+            ...(input.manual?.[0] ? { manual: input.manual[0] } : {}),
+            ...refFields(ref),
+          }),
+      };
+      return claim;
+    }
+    const toHitOnly = kind === "toHit" || kind === "spellToHit";
     return {
       badge: "In combat",
-      ...(damage ? { critExpressions: [critExpression(damage)] } : {}),
+      ...(damage && !toHitOnly ? { critExpressions: [critExpression(damage)] } : {}),
       send: (sendIntent, input) =>
         sendIntent("cbt.attack", {
           attackerId: c.id,
           mode: input.mode,
+          ...(toHitOnly ? { rolls: "toHit" } : {}),
           ...(input.manual ? { manual: input.manual } : {}),
-          ...(ref?.attackId !== undefined ? { attackId: ref.attackId } : {}),
-          ...(ref?.spellId !== undefined ? { spellId: ref.spellId } : {}),
+          ...refFields(ref),
         }),
     };
   },

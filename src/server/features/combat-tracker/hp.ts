@@ -20,7 +20,6 @@ import {
   type HpChangeRecord,
   type HpChangeResult,
   type HpChangesResult,
-  isFullCard,
   LOG_KIND_ATTACK,
   LOG_KIND_HP,
   UndoInput,
@@ -144,40 +143,55 @@ export const applyCard = defineCommand({
     // FR-CBT-10: End also dismissed the card (FR-CBT-59); the ended encounter is the reason.
     if (enc.status !== "started") throw conflict("Encounter has ended");
     if (card.state !== "pending") throw conflict("No longer pending");
-    // FR-CBT-72: the totals are optional on the wire. Partial cards (to-hit- or damage-only)
-    // apply from fix/combat2-split-attack; until then a card has both rolls and needs both totals.
-    const { toHitTotal, damageTotal } = input;
-    if (!isFullCard(p) || damageTotal === undefined) throw invalid("Damage needed");
-    if (toHitTotal === undefined) throw invalid("To-hit total needed");
+    // FR-CBT-72: `toHitTotal` iff the card has a to-hit roll; `damageTotal` unless the card has
+    // no damage roll and every target misses. A typed total on a card without a damage roll =
+    // "DM set" (`damageRolled` null).
+    const { toHitTotal } = input;
+    if (p.toHit && toHitTotal === undefined) throw invalid("To-hit total needed");
+    if (!p.toHit && toHitTotal !== undefined) throw invalid("This card has no to-hit roll");
+    const allMiss = input.targets.every((t) => !t.hit);
+    if (input.damageTotal === undefined && (p.damage || !allMiss)) throw invalid("Damage needed");
+    const damageTotal = input.damageTotal ?? 0;
     // FR-CBT-34: every target active and non-removed, checked before anything is written.
     const targets = input.targets.map((t) => ({ ...t, c: activeCombatant(env, t.targetId).c }));
     const attacker = getCombatant(env.tx, enc.campaignId, p.attackerId);
     // Rolled values come from the card's roll rows, never the client (gems: FR-CBT-32).
-    const toHitRoll = cardRoll(env, p.toHit.rollId);
-    const damageRoll = cardRoll(env, p.damage.rollId);
+    const toHitRoll = p.toHit ? cardRoll(env, p.toHit.rollId) : null;
+    const damageRoll = p.damage ? cardRoll(env, p.damage.rollId) : null;
     // FR-CBT-53: physical flags for everyone; the dice breakdown for the DM only (FR-DICE-28).
-    const manual = { toHit: toHitRoll.manual, damage: damageRoll.manual };
+    const manual = { toHit: toHitRoll?.manual ?? false, damage: damageRoll?.manual ?? false };
     const rolls: AttackLogRolls = {
-      toHit: {
-        expression: toHitRoll.expression,
-        mode: toHitRoll.mode,
-        dice: toHitRoll.dice,
-        constant: toHitRoll.constant,
-      },
-      damage: {
-        expression: damageRoll.expression,
-        dice: damageRoll.dice,
-        constant: damageRoll.constant,
-        crit: p.crit,
-      },
+      ...(toHitRoll
+        ? {
+            toHit: {
+              expression: toHitRoll.expression,
+              mode: toHitRoll.mode,
+              dice: toHitRoll.dice,
+              constant: toHitRoll.constant,
+            },
+          }
+        : {}),
+      ...(damageRoll
+        ? {
+            damage: {
+              expression: damageRoll.expression,
+              dice: damageRoll.dice,
+              constant: damageRoll.constant,
+              crit: p.crit,
+            },
+          }
+        : {}),
     };
     const playerCard = card.audience === "player";
-    const rollIds = [p.toHit.rollId, p.damage.rollId];
+    const rollIds = [p.toHit?.rollId, p.damage?.rollId].filter((id): id is string => !!id);
     const hpChangeIds: string[] = [];
     const outcomes: DamageCardTargetOutcome[] = [];
     for (const { c: target, hit, multiplier } of targets) {
       const targetAc = statsOf(env, target).ac;
-      const hitComputed = hitHint(toHitRoll.natural, toHitTotal, targetAc);
+      // FR-CBT-72: a damage-only card has no to-hit facts (null in the row and the line).
+      const hitComputed = toHitRoll
+        ? hitHint(toHitRoll.natural, toHitTotal ?? toHitRoll.total, targetAc)
+        : null;
       const raw = rawDamage(hit, damageTotal, multiplier);
       // Allocated first: effects ended `down` point at this row (FR-CBTX-16, -22).
       const hpChangeId = env.ctx.ids.next();
@@ -190,16 +204,20 @@ export const applyCard = defineCommand({
       // `applied` = HP lost; temp HP took `absorbed` first (FR-CBTX-15).
       const applied = Math.abs(hp.hpBefore - hp.hpAfter);
       const overkill = Math.max(0, raw - hp.absorbed - hp.hpBefore);
+      const lineToHit =
+        toHitRoll && p.toHit && toHitTotal !== undefined
+          ? {
+              dice: toHitTotal === toHitRoll.total ? toHitRoll.total - p.toHit.constant : null,
+              constant: p.toHit.constant,
+              total: toHitTotal,
+              natural: toHitRoll.natural,
+            }
+          : null;
       const logPayload: AttackLogPayload = {
         targetName: target.name,
         attackName: p.attackName,
         damageType: p.damageType,
-        toHit: {
-          dice: toHitTotal === toHitRoll.total ? toHitRoll.total - p.toHit.constant : null,
-          constant: p.toHit.constant,
-          total: toHitTotal,
-          natural: toHitRoll.natural,
-        },
+        toHit: lineToHit,
         hit,
         damage: raw,
         multiplier,
@@ -209,15 +227,16 @@ export const applyCard = defineCommand({
       const dmPayload: AttackLogDmPayload = {
         targetAc,
         hitComputed,
-        toHitRolled: toHitRoll.total,
-        damageRolled: damageRoll.total,
+        toHitRolled: toHitRoll?.total ?? null,
+        damageRolled: damageRoll?.total ?? null,
         damageTotal,
         applied,
         overkill,
         overrides: {
-          toHit: toHitTotal !== toHitRoll.total,
-          hit: hit !== hitComputed,
-          damage: damageTotal !== damageRoll.total,
+          toHit: toHitRoll !== null && toHitTotal !== toHitRoll.total,
+          hit: hitComputed !== null && hit !== hitComputed,
+          // An all-miss apply without a total sets nothing.
+          damage: input.damageTotal !== undefined && damageTotal !== damageRoll?.total,
         },
         rolls,
         ...(hp.absorbed > 0 ? { absorbed: hp.absorbed } : {}),
@@ -248,12 +267,12 @@ export const applyCard = defineCommand({
         targetEntityId: target.entityId,
         targetName: target.name,
         targetAc,
-        toHitRolled: toHitRoll.total,
-        toHitTotal: toHitTotal,
-        natural: toHitRoll.natural,
+        toHitRolled: toHitRoll?.total ?? null,
+        toHitTotal: toHitRoll ? (toHitTotal ?? null) : null,
+        natural: toHitRoll?.natural ?? null,
         hitComputed,
         hit,
-        damageRolled: damageRoll.total,
+        damageRolled: damageRoll?.total ?? null,
         damageTotal,
         multiplier,
         raw,

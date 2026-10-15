@@ -99,7 +99,7 @@ describe("FR-DICE-28 kind contract", () => {
     });
   }
 
-  test("FR-DICE-28 cbt.attack: the DM line shows its DM-only detail; physical badges for everyone", () => {
+  test("FR-DICE-28 cbt.attack: the DM line shows its DM-only detail; one physical badge for everyone", () => {
     const s = SAMPLES["cbt.attack"] as (typeof SAMPLES)[string];
     const dm = formatEntry({ kind: "cbt.attack", actorName: "Goblin", ...s }).segments;
     expect(lineText(dm)).toContain(`vs AC ${N}`);
@@ -107,7 +107,8 @@ describe("FR-DICE-28 kind contract", () => {
     expect(lineText(dm)).toContain(`DM set; rolled ${N}`);
     const player = formatEntry({ kind: "cbt.attack", actorName: "Goblin", payload: s.payload });
     const badges = player.segments.filter((x) => x.style === "badge").map((x) => x.text);
-    expect(badges).toEqual(["physical", "physical"]);
+    // FR-CBT-73 (item 12): both rolls physical → one badge per line.
+    expect(badges).toEqual(["physical"]);
   });
 
   test("FR-DICE-28 / FR-MOD-20 roll: the DM line names every part; players read (DM)", () => {

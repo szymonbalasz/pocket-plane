@@ -17,6 +17,7 @@ import { useRecords, useSync } from "../../sync/store";
 import { useRollControl } from "../dice-roll-log/roll-control";
 import { useBusy } from "./fields";
 import {
+  claimRollOptions,
   type RollRouteClaim,
   type RollRouteInput,
   type SheetRollRef,
@@ -110,7 +111,8 @@ export function useSheetRollControl({
     expressions: specs.map((s) => s.expression),
     category,
     label: `${ctx.creature.name} — ${title}`,
-    critExpressions: claim?.critExpressions,
+    // FR-CBT-74: a routed Damage after a natural 20 opens with the extra critical dice.
+    ...claimRollOptions(claim),
     onRoll(r) {
       const o = overrides?.get(category);
       const input: RollRouteInput =

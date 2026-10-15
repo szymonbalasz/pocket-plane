@@ -54,7 +54,13 @@ async function viewAmbush(dm: Page, player: Page, ambush: string) {
 
 /** DM row Attack → popup; one target, Hit, damage total; returns the popup (not applied). */
 async function attack(dm: Page, init: Locator, attackerId: string, targetId: string, dmg: number) {
+  // Attack ▸ → the first attack's Attack + damage (FR-CBT-74).
   await init.locator(`[data-testid="cbt-init-row-attack"][data-record-id="${attackerId}"]`).click();
+  await dm
+    .locator(
+      `[data-testid="cbt-init-row-attack-option"][data-record-id="${attackerId}"][data-value="both"]`,
+    )
+    .click();
   const popup = dm.getByTestId("cbt-popup");
   await expect(popup).toBeVisible();
   await popup.getByTestId("cbt-popup-target-add").click();

@@ -109,7 +109,13 @@ test("FR-CBTX-17 FR-CBTX-18 FR-CBTX-28 FR-CBTX-29 bar + icons for both; concentr
   await expect(plog.getByTestId("dice-roll-physical")).toHaveAttribute("data-state", "checked");
 
   // Goblin attacks Mira: hit, damage total 3 → Mira 9 / 12, card DC 10 to player-1.
+  // Attack ▸ → the first attack's Attack + damage (FR-CBT-74).
   await init.locator(`[data-testid="cbt-init-row-attack"][data-record-id="${goblin}"]`).click();
+  await dm
+    .locator(
+      `[data-testid="cbt-init-row-attack-option"][data-record-id="${goblin}"][data-value="both"]`,
+    )
+    .click();
   const popup = dm.getByTestId("cbt-popup");
   await expect(popup).toBeVisible();
   await popup.getByTestId("cbt-popup-target-add").click();

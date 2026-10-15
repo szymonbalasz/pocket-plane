@@ -2,7 +2,8 @@
 // Thin combat flow (CBT §13 E2E): DM + player-1. Encounter card, Start on Goblin Ambush, roll
 // monsters, Mira's sheet initiative + Attack (routed to cbt.*), round 1, DM targets Goblin and
 // Goblin 2 in the non-modal popup (target rings), applies (Goblin half) → player sees the bands;
-// one Undo reverts both; Remove → Out badge for the player; End from Initiative (#171: no roll
+// one Undo reverts both; N7: sheet Attack then Damage fill one card, applied from its toast;
+// Remove → Out badge for the player; End from Initiative (#171: no roll
 // controls from round 1, Down cross; polish: Start / End move the DM's windows, End dismisses the
 // reopened card). Visibility matrix, hooks, movement,
 // crash-resume: bun test (combat-tracker sync.test.ts, feedback.test.ts).
@@ -238,6 +239,32 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   );
   await expect(init.getByTestId("cbt-init-card")).toHaveCount(1);
 
+  // N7 (FR-CBT-70/71, X-5): Mira's sheet Attack (to-hit only) → one DM toast; her Damage completes
+  // that card: the same toast's text gains the damage (no second toast). The DM opens it from the
+  // toast → popup over it, toast gone; Goblin hit; Apply.
+  const shortsword = sheet.getByTestId("charx-attack").filter({ hasText: "Shortsword" });
+  await shortsword.getByTestId("charx-roll-attack").click();
+  const splitToast = dm.getByTestId("note-toast").filter({ hasText: "to hit (Shortsword)" });
+  await expect(splitToast).toHaveCount(1);
+  const splitId = (await splitToast.getAttribute("data-record-id")) as string;
+  await shortsword.getByTestId("charx-roll-damage").click();
+  const sameToast = dm.locator(`[data-testid="note-toast"][data-record-id="${splitId}"]`);
+  await expect(sameToast).toContainText(/Mira: \d+ to hit(?: \(natural \d+\))?, \d+ piercing/);
+  await expect(dm.getByTestId("note-toast").filter({ hasText: "Mira:" })).toHaveCount(1);
+  await expect(init.getByTestId("cbt-init-card")).toHaveCount(2);
+  await sameToast.getByTestId("note-toast-action").click();
+  await expect(popup).toBeVisible();
+  await expect(popup).toHaveAttribute("data-record-id", splitId);
+  await expect(sameToast).toHaveCount(0);
+  await expect(popup.getByTestId("cbt-popup-waiting-damage")).toHaveCount(0);
+  await popup.getByTestId("cbt-popup-target-add").click();
+  await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${goblin}"]`).click();
+  const splitHit = trow(goblin).getByTestId("cbt-popup-target-hit");
+  if ((await splitHit.getAttribute("data-value")) === "miss") await splitHit.click();
+  await popup.getByTestId("cbt-popup-apply").click();
+  await expect(popup).toHaveCount(0);
+  await expect(init.getByTestId("cbt-init-card")).toHaveCount(1);
+
   // Step 11: Remove Goblin 2 → Out badge for the player; it leaves the player's Initiative.
   await row(init, goblin2).getByTestId("cbt-init-row-menu").click();
   await dm.getByTestId("cbt-init-row-remove").click();
@@ -258,9 +285,12 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   const init2 = await openWindow(dm, "cbt.initiative");
   await expect(init2.getByTestId("cbt-init-empty")).toBeVisible();
   const history = await openWindow(dm, "note.history");
+  // The reopened step-6 card is dismissed; the N7 card stays resolved.
   await expect(
-    history.getByTestId("note-history-row").filter({ hasText: "Mira:" }).first(),
-  ).toHaveAttribute("data-state", "dismissed");
+    history.locator('[data-testid="note-history-row"][data-state="dismissed"]').filter({
+      hasText: "Mira:",
+    }),
+  ).toHaveCount(1);
   const enc2 = await openWindow(dm, "cbt.encounters");
   const encRow = enc2.locator(`[data-testid="cbt-enc-row"][data-record-id="${encounterId}"]`);
   if (await encRow.isVisible()) await encRow.click();

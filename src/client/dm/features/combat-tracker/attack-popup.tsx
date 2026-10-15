@@ -5,6 +5,8 @@
 // order (FR-CBT-34); Later keeps the card pending; Dismiss closes it. Close → targeting off,
 // selection kept, except after a successful Apply (FR-CBT-54). Placement: FR-CBT-55/56, over its
 // notification (FR-CBT-75); movable by its header (FR-CBT-76); its card's toast stays hidden.
+// Partial cards (FR-CBT-72, N7): to-hit-only → "Waiting for damage" (the DM may type a total;
+// the roll fills the cell when it attaches); damage-only → no to-hit cell or "vs AC", rows Hit.
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
@@ -13,7 +15,6 @@ import {
   type CombatantView,
   DamageCardPayload,
   type DamageMultiplier,
-  isFullCard,
 } from "@shared/combat-tracker/schemas";
 import type { DefinitionRecord } from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
@@ -53,12 +54,16 @@ import {
 import { type PopupOrigin, useCombatDialogs } from "./popup-store";
 import {
   addAction,
+  applyReady,
+  cardShape,
   eligibleTargets,
   type HpTemp,
   naturalContradiction,
-  presetHit,
   previewText,
+  rowPreset,
+  shownTotal,
   targetList,
+  totalOf,
 } from "./targets";
 
 const MULTS: DamageMultiplier[] = ["normal", "half", "none", "double"];
@@ -81,11 +86,6 @@ export function hpOf(c: CombatantView, defs: Map<string, DefinitionRecord>): HpT
 
 export const acOf = (c: CombatantView, defs: Map<string, DefinitionRecord>) =>
   c.entityId ? (defs.get(c.entityId)?.statBlock.ac ?? null) : null;
-
-const intOr = (s: string, fallback: number) => {
-  const n = Number(s);
-  return s.trim() !== "" && Number.isInteger(n) ? n : fallback;
-};
 
 function Dice({ dice }: { dice: readonly (readonly [number | null, boolean])[] }) {
   return (
@@ -186,15 +186,14 @@ interface PerTarget {
 
 function PopupBody({ card, close }: { card: NotificationRecord; close(): void }) {
   const payload = useMemo(() => DamageCardPayload.safeParse(card.payload), [card.payload]);
-  // Partial cards (FR-CBT-72) get their own popup rows in fix/combat2-polish; no command makes
-  // them before that build.
-  const p = payload.success && isFullCard(payload.data) ? payload.data : null;
+  const p = payload.success ? payload.data : null;
   const defs = useDefinitions();
   const combatants = useCombatants(p?.encounterId);
   const tokens = useRecords<{ id: string; sceneId: string }>(TOKEN_TYPE);
   const selection = useMapSelection();
-  const [toHit, setToHit] = useState(String(p?.toHit.total ?? 0));
-  const [damage, setDamage] = useState(String(p?.damage.total ?? 0));
+  // Null = follow the card's rolled value (a Damage attaching while open fills the cell).
+  const [toHitDraft, setToHit] = useState<string | null>(null);
+  const [damageDraft, setDamage] = useState<string | null>(null);
   const [added, setAdded] = useState<string[]>([]);
   const [per, setPer] = useState<Record<string, PerTarget>>({});
   const { send, disabled } = useCbtIntent();
@@ -223,19 +222,29 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   const addable = eligibleTargets(combatants, p.encounterId, p.attackerId).filter(
     (c) => !inList.has(c.id),
   );
-  const toHitTotal = intOr(toHit, p.toHit.total);
-  const natural = naturalMark(p.toHit.natural);
-  const damageTotal = intOr(damage, p.damage.total);
+  const shape = cardShape(p);
+  const toHit = shownTotal(toHitDraft, p.toHit?.total);
+  const damage = shownTotal(damageDraft, p.damage?.total);
+  const toHitTotal = totalOf(toHit) ?? p.toHit?.total ?? 0;
+  const rolledNatural = p.toHit?.natural ?? null;
+  const natural = naturalMark(rolledNatural);
+  // An empty / non-number cell falls back to the roll; none yet → null (FR-CBT-72).
+  const damageTotal = totalOf(damage) ?? p.damage?.total ?? null;
   const rows = list.rows.map(({ c, source }) => {
     const ac = acOf(c, defs);
-    const preset = presetHit(p.toHit.natural, toHitTotal, ac);
+    const preset = rowPreset(shape, rolledNatural, toHitTotal, ac);
     const st = per[c.id] ?? { hit: null, mult: "normal" };
     const hit = st.hit ?? preset;
-    const raw = rawDamage(hit, damageTotal, st.mult);
+    const raw = damageTotal === null ? null : rawDamage(hit, damageTotal, st.mult);
     const hp = hpOf(c, defs);
-    const contra = naturalContradiction(p.toHit.natural, hit);
+    const contra = naturalContradiction(rolledNatural, hit);
     return { c, source, ac, preset, hit, mult: st.mult, raw, hp, contra };
   });
+  const ready = applyReady(
+    rows.map((x) => x.hit),
+    damageTotal,
+    list.tooMany,
+  );
   const setRow = (id: string, patch: Partial<PerTarget>) =>
     setPer((s) => ({ ...s, [id]: { ...(s[id] ?? { hit: null, mult: "normal" }), ...patch } }));
   const remove = (c: CombatantView) => {
@@ -252,11 +261,13 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   };
 
   const apply = async () => {
-    if (rows.length === 0 || list.tooMany) return;
+    if (!ready) return;
+    // FR-CBT-72: a to-hit total iff the card has a to-hit roll; no damage total on an all-miss
+    // to-hit-only card.
     const r = await send("cbt.applyCard", {
       cardId: card.id,
-      toHitTotal,
-      damageTotal,
+      ...(p.toHit ? { toHitTotal } : {}),
+      ...(damageTotal !== null ? { damageTotal } : {}),
       targets: rows.map((x) => ({ targetId: x.c.id, hit: x.hit, multiplier: x.mult })),
     });
     if (r === undefined) return;
@@ -283,52 +294,77 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
           {card.text}
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="grid gap-1">
-          <Label htmlFor="cbt-popup-tohit" className="flex-wrap text-xs">
-            To hit <Dice dice={p.toHit.dice} /> {p.toHit.constant >= 0 ? "+" : "−"}
-            {Math.abs(p.toHit.constant)}
-            {natural !== null && (
-              // FR-CBT-57 (R4): `hp.down` for a natural 1, `hp.full` for a natural 20.
-              <Badge
-                variant="outline"
-                data-testid="cbt-popup-natural"
-                data-value={natural}
-                className={
-                  natural === 1
-                    ? "border-hp-down/50 text-hp-down"
-                    : "border-hp-full/40 text-hp-full"
-                }
-              >
-                natural {natural}
-              </Badge>
-            )}
-            {toHitTotal !== p.toHit.total && <Badge variant="secondary">edited</Badge>}
-          </Label>
-          <Input
-            id="cbt-popup-tohit"
-            data-testid="cbt-popup-tohit"
-            inputMode="numeric"
-            className="h-8"
-            value={toHit}
-            onChange={(e) => setToHit(e.target.value)}
-          />
-        </div>
+      <div className={shape === "damage" ? "grid gap-2" : "grid grid-cols-2 gap-2"}>
+        {p.toHit && (
+          <div className="grid gap-1">
+            <Label htmlFor="cbt-popup-tohit" className="flex-wrap text-xs">
+              To hit <Dice dice={p.toHit.dice} /> {p.toHit.constant >= 0 ? "+" : "−"}
+              {Math.abs(p.toHit.constant)}
+              {natural !== null && (
+                // FR-CBT-57 (R4): `hp.down` for a natural 1, `hp.full` for a natural 20.
+                <Badge
+                  variant="outline"
+                  data-testid="cbt-popup-natural"
+                  data-value={natural}
+                  className={
+                    natural === 1
+                      ? "border-hp-down/50 text-hp-down"
+                      : "border-hp-full/40 text-hp-full"
+                  }
+                >
+                  natural {natural}
+                </Badge>
+              )}
+              {toHitTotal !== p.toHit.total && <Badge variant="secondary">edited</Badge>}
+            </Label>
+            <Input
+              id="cbt-popup-tohit"
+              data-testid="cbt-popup-tohit"
+              inputMode="numeric"
+              className="h-8"
+              value={toHit}
+              onChange={(e) => setToHit(e.target.value)}
+            />
+          </div>
+        )}
         <div className="grid gap-1">
           <Label htmlFor="cbt-popup-damage" className="flex-wrap text-xs">
-            Damage <Dice dice={p.damage.dice} /> {p.damage.constant >= 0 ? "+" : "−"}
-            {Math.abs(p.damage.constant)}
+            Damage{" "}
+            {p.damage ? (
+              <>
+                <Dice dice={p.damage.dice} /> {p.damage.constant >= 0 ? "+" : "−"}
+                {Math.abs(p.damage.constant)}
+              </>
+            ) : (
+              <span
+                data-testid="cbt-popup-waiting-damage"
+                className="font-normal text-muted-foreground"
+              >
+                Waiting for damage
+              </span>
+            )}
             {p.damageType ? ` ${p.damageType}` : ""}
-            {damageTotal !== p.damage.total && <Badge variant="secondary">edited</Badge>}
+            {p.damage && damageTotal !== p.damage.total && (
+              <>
+                <Badge variant="secondary">edited</Badge>
+                <span className="font-normal text-muted-foreground">rolled {p.damage.total}</span>
+              </>
+            )}
           </Label>
           <Input
             id="cbt-popup-damage"
             data-testid="cbt-popup-damage"
             inputMode="numeric"
             className="h-8"
+            placeholder={p.damage ? undefined : "Total"}
             value={damage}
             onChange={(e) => setDamage(e.target.value)}
           />
+          {p.saveDc && (
+            <p className="text-xs text-muted-foreground">
+              DC {p.saveDc.dc} {p.saveDc.ability.toUpperCase()} · Half on a successful save
+            </p>
+          )}
         </div>
       </div>
       <section aria-label="Targets" className="flex min-h-0 flex-col gap-1.5">
@@ -365,7 +401,12 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                     />
                   )}
                   <span className="text-xs text-muted-foreground tabular-nums">
-                    {x.ac === null ? "vs AC —" : `vs AC ${x.ac} →`}
+                    {/* FR-CBT-72: a damage-only card has no to-hit to compare: AC alone. */}
+                    {shape === "damage"
+                      ? `AC ${x.ac ?? "—"}`
+                      : x.ac === null
+                        ? "vs AC —"
+                        : `vs AC ${x.ac} →`}
                   </span>
                   <Button
                     size="sm"
@@ -432,7 +473,11 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                     className="ml-auto text-xs tabular-nums"
                   >
                     {/* FR-CBT-78 (G5): temp HP absorbs first, "Thorn 10 (+5) → 10 (+2)". */}
-                    {x.hp ? previewText(x.c.name, x.hp, x.raw) : `${x.c.name}: ${x.raw}`}
+                    {x.raw === null
+                      ? `${x.c.name}: ?`
+                      : x.hp
+                        ? previewText(x.c.name, x.hp, x.raw)
+                        : `${x.c.name}: ${x.raw}`}
                   </span>
                 </div>
               </li>
@@ -462,7 +507,7 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
         <Button
           size="sm"
           data-testid="cbt-popup-apply"
-          disabled={disabled || rows.length === 0 || list.tooMany}
+          disabled={disabled || !ready}
           onClick={apply}
         >
           Apply

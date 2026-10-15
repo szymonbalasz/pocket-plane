@@ -41,7 +41,7 @@ export const CBT_INTENTS = {
   prevTurn: "cbt.prevTurn",
   setRemoved: "cbt.setRemoved",
   attack: "cbt.attack",
-  /** FR-CBT-71 (sprint 2): schema here; the command lands in fix/combat2-split-attack. */
+  /** FR-CBT-71 (sprint 2, N7): completes a to-hit-only card or makes a damage-only one. */
   rollDamage: "cbt.rollDamage",
   applyCard: "cbt.applyCard",
   applyHp: "cbt.applyHp",

@@ -162,3 +162,54 @@ export const previewText = (name: string, hp: HpTemp, raw: number) =>
 /** FR-CBT-78 Damage / heal dialog: "HP 10 / 10 · Temp 5" (no temp → "HP 10 / 10"). */
 export const hpDialogText = (hp: HpTemp) =>
   `HP ${hp.cur} / ${hp.max}${hp.temp > 0 ? ` · Temp ${hp.temp}` : ""}`;
+
+// ---------- partial cards (FR-CBT-72, N7) ----------
+
+/** Which rolls a card holds: both, to-hit only (damage pending) or damage only. */
+export type CardShape = "full" | "toHit" | "damage";
+
+export function cardShape(p: { toHit: unknown; damage: unknown }): CardShape {
+  if (p.toHit === null) return "damage";
+  return p.damage === null ? "toHit" : "full";
+}
+
+/**
+ * Hit preset of a target row: a damage-only card has no to-hit, so every row starts Hit
+ * (FR-CBT-72); else the to-hit rule (FR-CBT-33).
+ */
+export function rowPreset(
+  shape: CardShape,
+  natural: number | null,
+  toHitTotal: number,
+  ac: number | null,
+): boolean {
+  return shape === "damage" ? true : presetHit(natural, toHitTotal, ac);
+}
+
+/**
+ * The total an editable cell shows: the DM's draft once typed, else the rolled value (so damage
+ * attaching while the popup is open fills the cell, and a typed total stays); "" = none yet.
+ */
+export function shownTotal(draft: string | null, rolled: number | null | undefined): string {
+  if (draft !== null) return draft;
+  return rolled == null ? "" : String(rolled);
+}
+
+/** An integer total typed in a cell, else null (empty or not a number). */
+export function totalOf(s: string): number | null {
+  const n = Number(s);
+  return s.trim() !== "" && Number.isInteger(n) ? n : null;
+}
+
+/**
+ * FR-CBT-72: Apply needs rows, at most 20, and a damage total unless every row is a Miss (a
+ * to-hit-only card whose damage hasn't been rolled).
+ */
+export function applyReady(
+  hits: readonly boolean[],
+  damageTotal: number | null,
+  tooMany: boolean,
+): boolean {
+  if (hits.length === 0 || tooMany) return false;
+  return damageTotal !== null || hits.every((h) => !h);
+}
