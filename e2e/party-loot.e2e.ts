@@ -4,7 +4,7 @@
 // conservation, restart: bun test (party-loot commands.test.ts, sync.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { openWindow } from "./support/shell";
+import { launcherButton, openWindow } from "./support/shell";
 
 const potCoin = (win: Locator, coin: string) =>
   win.locator(`[data-testid="loot-pot"] [data-testid="loot-pot-coin"][data-value="${coin}"]`);
@@ -30,8 +30,13 @@ test("FR-LOOT-03 FR-LOOT-13 FR-LOOT-15 FR-LOOT-18 DM adds 50 gp → player-1 row
   await player.goto(link("Player 1"));
   await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
 
+  // P3 glitch 12: one name: the launcher says what the window says.
+  for (const page of [dm, player]) {
+    await expect(launcherButton(page, "loot.log")).toHaveAttribute("aria-label", "Party loot");
+  }
   const dmWin = await openWindow(dm, "loot.log");
   const pWin = await openWindow(player, "loot.log");
+  await expect(dmWin.getByTestId("ui-window-title")).toHaveText("Party loot");
   // Bundle state: pot 5 pp, 30 gp; Mira 21 gp (own, first); 9 rows; player has no add form.
   for (const w of [dmWin, pWin]) {
     await expect(potCoin(w, "gp")).toHaveText("30 gp");

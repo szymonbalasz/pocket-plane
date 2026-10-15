@@ -9,16 +9,20 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Phase 1 | merged | — | Done (#189-#195) | DM playtest |
-| CON-44 window (ADR-0041) | `fix/active-scene-window` (w31) | build-active-scene-window | Building | Walkthrough, then fog-core |
-| P3 polish (sim-5 leftovers) | `fix/p3-polish` (w32) | build-p3-polish | Building | Walkthrough |
-| Fog core / server / client | `fix/fog-core`, `build/fog-*` | — | After window | — |
-| Scene tools core + slices | `fix/scn-core`, `build/scene-tools-*` | — | After fog-core | — |
+| Window, fog core / server, SCN core | merged | — | Done (#197) | — |
+| P3 polish | `fix/p3-polish` (w32) | build-p3-polish | Fixing E1 / E2 | Retest |
+| SCN structure | `build/scene-tools-structure` (w36) | build-scn-structure | Building | Walkthrough |
+| SCN props | `build/scene-tools-props` (w37) | build-scn-props | Building | Walkthrough |
+| SCN templates | `build/scene-tools-templates` (w38) | build-scn-templates | Building | Walkthrough |
+| Fog client | `build/fog-client` | — | When a slot frees | — |
+| Fog visibility (switch on) + fog-scn | `build/fog-visibility` | — | Last fog slice | — |
+| SCN settings | `build/scene-tools-settings` | — | After fog-visibility | — |
 
 ## Shared-file locks
 
-- ws / snapshot, live-sync client store, scenes-map client viewing: fix/active-scene-window.
-- Play-shell frame (placement), combat DM popup / Initiative, notifications client: fix/p3-polish.
-- Schema: fix/fog-core → fix/scn-core (later).
+- Registries (canvas-layers, canvas-tools, move-guards, scene-hooks, visibility-hooks, token menu): append-only for all slices.
+- LabelsLayer + token context menu: fix/p3-polish.
+- Schema: free.
 
 ## Pending DM decisions
 

@@ -5,7 +5,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, stageScale, tokenNode } from "./support/konva";
-import { openWindow, shellWindow } from "./support/shell";
+import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 /** A token's map-space cell (Town / Goblin Ambush: 70 px cells, offset 0). */
 async function cellOf(page: Page, tokenId: string) {
@@ -94,8 +94,8 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
       .locator(`[data-testid="map-scene-row"][data-record-id="${town}"]`)
       .getByTestId("map-scene-live"),
   ).toBeVisible();
-  // The Initiative window (top-right) would cover part of the map.
-  await shellWindow(dm, "cbt.initiative").getByTestId("ui-window-close").click();
+  // No encounter: the empty Initiative opened minimised (P3 glitch 3), clear of the map.
+  await expect(launcherButton(dm, "cbt.initiative")).toHaveAttribute("data-state", "minimised");
 
   const player = await rolePage(browser);
   const frames: string[] = [];

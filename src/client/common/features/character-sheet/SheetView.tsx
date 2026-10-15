@@ -207,8 +207,8 @@ function NameRow({ picker, full }: { picker: ReactNode; full: boolean }) {
 }
 
 /**
- * The header below the name row: `header` sections and Edit / Approve / Lock; in the compact
- * fallback (FR-CHARX-48) also the badges and the picker, since all of it scrolls then.
+ * The header below the name row: `header` sections and Edit / Approve / Lock on one line; in the
+ * compact fallback (FR-CHARX-48) also the badges and the picker, since all of it scrolls then.
  */
 function HeaderRest({
   picker,
@@ -231,10 +231,22 @@ function HeaderRest({
           {picker}
         </div>
       )}
-      {!ctx.readOnly && (
-        <SheetSlotView slot="header" creatureId={c.id} client={ctx.client} kind={c.kind} />
-      )}
-      <HeaderActions editing={editing} setEditing={setEditing} />
+      {/* P3 glitch 12: the `header` sections (e.g. the Effects chips + menu) share one line with
+          Edit / Approve / Lock instead of a row of their own. */}
+      <div data-testid="charx-header-line" className="flex items-center gap-1.5">
+        {!ctx.readOnly && (
+          <SheetSlotView
+            slot="header"
+            creatureId={c.id}
+            client={ctx.client}
+            kind={c.kind}
+            className="flex min-w-0 flex-1 flex-col gap-1"
+          />
+        )}
+        <div className="ml-auto shrink-0">
+          <HeaderActions editing={editing} setEditing={setEditing} />
+        </div>
+      </div>
     </>
   );
 }

@@ -3,6 +3,7 @@
 import { deathStateOf, effectName, roundsLeft } from "@shared/combat-extras/rules";
 import { EFFECT_TYPE, type EffectView } from "@shared/combat-extras/schemas";
 import type { CombatantView } from "@shared/combat-tracker/schemas";
+import { matchingMods } from "@shared/effect-modifiers/rules";
 import { type DeathState, ENTITY_TYPE } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 
@@ -127,4 +128,46 @@ export const DEATH_LABEL: Record<DeathState, string> = {
 export function splitNumbered(name: string): { base: string; suffix: string } {
   const m = / \d+$/.exec(name);
   return m ? { base: name.slice(0, m.index), suffix: m[0] } : { base: name, suffix: "" };
+}
+
+/**
+ * FR-CBTX-36 / FR-MOD-09 duration hint (P3 glitch 9): an effect ends at the start of its anchor's
+ * turn in round N; anchor = the source, else the turn combatant, else each target's own (the
+ * server's rule, FR-CBTX-05).
+ */
+export function endsHint(o: {
+  sourceName: string | null;
+  turnName: string | null;
+  targetNames: readonly string[];
+  endsRound: number;
+}): string {
+  const one = o.targetNames.length === 1 ? (o.targetNames[0] ?? null) : null;
+  const who = o.sourceName ?? o.turnName ?? one;
+  return who
+    ? `Ends at the start of ${who}'s turn, round ${o.endsRound}`
+    : `Ends at the start of each target's turn, round ${o.endsRound}`;
+}
+
+/**
+ * FR-CBTX-42 dialog line (P3 glitch 9): "d20 + 4 + 1d4 Bless vs DC 10": the save bonus, then the
+ * dice / flat parts of the creature's active effects a Constitution save picks up (FR-MOD-14,
+ * what the server's roll hook adds; display only).
+ */
+export function concentrationSaveText(
+  bonus: number,
+  effects: readonly EffectView[],
+  ref: CreatureRef,
+  dc: number | null,
+): string {
+  const sign = (n: number) => (n < 0 ? "−" : "+");
+  const parts = [`d20 ${sign(bonus)} ${Math.abs(bonus)}`];
+  for (const { effect, modifier: m } of matchingMods(effects, ref, {
+    roll: "save",
+    ability: "con",
+  })) {
+    const label = effect.label ? ` ${effect.label}` : "";
+    if (m.kind === "dice") parts.push(`${sign(m.sign)} ${m.dice}${label}`);
+    else if (m.kind === "flat") parts.push(`${sign(m.value)} ${Math.abs(m.value)}${label}`);
+  }
+  return `${parts.join(" ")} vs DC ${dc ?? "?"}`;
 }

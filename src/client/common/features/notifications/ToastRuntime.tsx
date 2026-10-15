@@ -23,7 +23,7 @@ import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
-import type { Rect } from "../play-shell/geometry";
+import { EDGE_GAP, LAUNCHER_CLEAR, type Rect, TITLE_H, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
 import {
   useAvailableKinds,
@@ -31,6 +31,8 @@ import {
   useRegistry,
   useShellState,
 } from "../play-shell/ShellContext";
+import { DM_TOAST_TOP, NOTE_EDGE } from "../play-shell/toast-region";
+import { tokenScreenBoxes } from "../play-shell/token-boxes";
 import { dmStackPlacement } from "./keep-out";
 import {
   actionButton,
@@ -46,6 +48,7 @@ import { NoteBody, useNoteActions } from "./parts";
 import {
   advance,
   closeToast,
+  MAX_VISIBLE,
   nextExpiry,
   registerToastMemory,
   SUMMARY_KEY,
@@ -136,6 +139,82 @@ function useInitiativeRect(isDm: boolean): Rect | null {
   }, [isDm, windows, registry, available, vp, measured]);
 }
 
+/** P3 retest: the title bars of the DM's open windows but Initiative (the stack never covers them). */
+function useTitleBars(isDm: boolean): Rect[] {
+  const registry = useRegistry();
+  const windows = useShellState((s) => s.windows);
+  const available = useAvailableKinds();
+  const vp = useViewport();
+  const measured = useContentHeights();
+  return useMemo(() => {
+    if (!isDm) return [];
+    const win = windows.filter((w) => w.kind !== INITIATIVE_KIND && w.state === "open");
+    return renderedWindowRects(win, registry, available, vp, measured).map((r) => ({
+      ...r,
+      h: TITLE_H,
+    }));
+  }, [isDm, windows, registry, available, vp, measured]);
+}
+
+interface KonvaLayerLike {
+  on(evt: string, fn: () => void): void;
+  off(evt: string): void;
+}
+
+/**
+ * P3 E1: bumps 300 ms after the map canvas last redrew or the viewport last resized (a resize
+ * refit, a pan, a zoom), so the stack re-reads the token boxes once the map has settled.
+ */
+function useMapSettled(on: boolean): number {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!on || typeof window === "undefined") return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const bump = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setN((x) => x + 1), 300);
+    };
+    const K = (
+      window as unknown as {
+        Konva?: { stages: { container(): HTMLElement; getLayers(): KonvaLayerLike[] }[] };
+      }
+    ).Konva;
+    const layers = K?.stages.find((st) => st.container().isConnected)?.getLayers() ?? [];
+    for (const l of layers) l.on("draw.noteStack", bump);
+    window.addEventListener("resize", bump);
+    return () => {
+      clearTimeout(timer);
+      for (const l of layers) l.off("draw.noteStack");
+      window.removeEventListener("resize", bump);
+    };
+  }, [on]);
+  return n;
+}
+
+/**
+ * P3 glitch 2: the tokens the DM's stack keeps clear of: each toasted pending row's
+ * `avoidTokens` (the summary toast: every pending row's), sorted, unique.
+ */
+function useAvoidTokens(
+  isDm: boolean,
+  toasts: readonly Toast[],
+  rows: Record<string, NotificationRecord> | undefined,
+  views: NotificationViews,
+): string[] {
+  const store = useSync((s) => s.store);
+  return useMemo(() => {
+    if (!isDm || !rows) return [];
+    const summary = toasts.some((t) => t.kind === "summary");
+    const ids = new Set(toasts.flatMap((t) => (t.kind === "note" ? [t.notificationId] : [])));
+    const out = new Set<string>();
+    for (const n of Object.values(rows)) {
+      if (n.state !== "pending" || !(summary || ids.has(n.id))) continue;
+      for (const t of views.get(n.kind)?.avoidTokens?.(n, store) ?? []) out.add(t);
+    }
+    return [...out].sort();
+  }, [isDm, toasts, rows, views, store]);
+}
+
 /**
  * FR-NOTE-32: the stack's rendered height (DM), re-measured when it mounts (`shown` flips) and on
  * resize while mounted.
@@ -223,10 +302,46 @@ export function ToastRuntime({
   const initiative = useInitiativeRect(isDm);
   const vp = useViewport();
   const stackH = useStackHeight(stackRef, isDm, state.toasts.length > 0);
-  const at = dmStackPlacement(vp, initiative, stackH);
+  // P3 glitch 2: and of the tokens its cards' likely targets are on (`avoidTokens`), measured
+  // when the stack, Initiative or the viewport change (never on hover: the stack holds still).
+  const avoidKey = useAvoidTokens(isDm, state.toasts, rows, views).join(",");
+  const bars = useTitleBars(isDm);
+  // P3 E1: token boxes re-read once the map settles (resize refit, pan, zoom), not while the
+  // pointer is on the stack.
+  const settled = useMapSettled(isDm && state.toasts.length > 0);
+  const frozen = useRef(settled);
+  if (!state.hovered) frozen.current = settled;
+  const tick = frozen.current;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` re-reads the live token boxes
+  const at = useMemo(
+    () =>
+      dmStackPlacement(
+        vp,
+        initiative,
+        stackH,
+        undefined,
+        tokenScreenBoxes(avoidKey ? avoidKey.split(",") : []),
+        bars,
+      ),
+    [vp, initiative, stackH, avoidKey, bars, tick],
+  );
+
+  // P3 E3: the stack always fits the viewport: while it is taller than the room (DM: below the
+  // top row, above the launcher; player: above its corner, below the top bar), one more toast
+  // folds into "+N more". The cap starts over when the toasts or the room change.
+  const room = isDm
+    ? vp.h - LAUNCHER_CLEAR - DM_TOAST_TOP
+    : vp.h - NOTE_EDGE - TOP_BAR_H - EDGE_GAP;
+  const [cap, setCap] = useState(MAX_VISIBLE);
+  const count = state.toasts.length;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count or room
+  useLayoutEffect(() => setCap(MAX_VISIBLE), [count, room]);
+  useLayoutEffect(() => {
+    if (stackH > room && cap > 1) setCap((c) => Math.max(1, c - 1));
+  }, [stackH, room, cap]);
 
   const openHistory = () => openWindow(HISTORY_KIND);
-  const { shown, more } = visibleToasts(state);
+  const { shown, more } = visibleToasts(state, cap);
   if (state.toasts.length === 0) return null;
   return (
     <section

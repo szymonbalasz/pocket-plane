@@ -1,7 +1,7 @@
 // Shell state: the stored windows of the current layout key, plus restore and write rules
 // (FR-SHELL-15/16). One per play page; survives waiting / reconnect screens.
 import { createStore, type StoreApi } from "zustand";
-import type { Viewport } from "./geometry";
+import type { Rect, Viewport } from "./geometry";
 import { reduce, restoreLayout, serialise, type WindowAction, type Windows } from "./manager";
 import type { WindowRegistry } from "./registry";
 import type { LayoutStorage } from "./storage";
@@ -28,6 +28,8 @@ export function createShellController(opts: {
   registry: WindowRegistry;
   storage: LayoutStorage;
   viewport: () => Viewport;
+  /** Map token boxes a newly opened window keeps clear of (P3 glitch 13). */
+  avoid?: () => readonly Rect[];
   warn?: (msg: string) => void;
 }): ShellController {
   const { registry, storage } = opts;
@@ -45,7 +47,12 @@ export function createShellController(opts: {
     dispatch(action, available) {
       const { key, windows } = store.getState();
       if (key === null) return; // nothing shown before the first snapshot
-      const next = reduce(windows, action, { registry, viewport: opts.viewport(), available });
+      const next = reduce(windows, action, {
+        registry,
+        viewport: opts.viewport(),
+        available,
+        avoid: opts.avoid,
+      });
       if (next === windows) return;
       store.setState({ windows: next });
       storage.write(key, serialise(next, registry));

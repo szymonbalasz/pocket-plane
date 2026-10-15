@@ -136,6 +136,11 @@ test("FR-CBTX-46 FR-CBT-78 FR-NOTE-27 FR-CBT-79 FR-NOTE-30 chips fit; temp HP pr
   await expect(pending.getByTestId("cbt-init-pending-text")).toHaveText(
     /^Waiting for Mira: concentration save DC 10 \(Bless\)$/,
   );
+  // P3 glitch 10: the whole text on hover when the row cuts it.
+  await expect(pending.getByTestId("cbt-init-pending-text")).toHaveAttribute(
+    "title",
+    "Waiting for Mira: concentration save DC 10 (Bless)",
+  );
   await expect(pending.getByTestId("cbt-init-pending-action")).toHaveText("Roll save");
   // FR-NOTE-27: the DM's bell counts it; no DM toast for it.
   await expect.poll(async () => Number(await bell.textContent())).toBeGreaterThan(bellBefore);
@@ -172,6 +177,18 @@ test("FR-CBT-75 FR-CBT-76 FR-NOTE-26 popup opens over its toast, the toast close
   const toast = dm.getByTestId("note-toast").filter({ has: dm.getByTestId("note-toast-action") });
   await expect(toast).toHaveCount(1);
   const cardId = (await toast.getAttribute("data-record-id")) as string;
+  // The stack may re-place once the map settles (E1: token boxes re-read after the 4 s cue).
+  await expect
+    .poll(
+      async () => {
+        const a = await toast.boundingBox();
+        await dm.waitForTimeout(500);
+        const b = await toast.boundingBox();
+        return a !== null && b !== null && a.x === b.x && a.y === b.y;
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
   const box = await toast.boundingBox();
   if (!box) throw new Error("no toast box");
   const badge = launcherButton(dm, "note.history").getByTestId("note-launcher-badge");
@@ -263,6 +280,111 @@ test("FR-CBT-77 a short window: Initiative grows to the work area, '↓ N more' 
   await expect(more).toBeVisible();
   await expect.poll(async () => (await shown(init)) - (await below(init))).toBe(0);
 
+  await player.context().close();
+  await dm.context().close();
+});
+
+test("FR-CBTX-46 P3 glitch 6: '+N' lists the hidden effects (hover and click) on both clients", async ({
+  browser,
+}) => {
+  const { dm, player, recordId } = await setup(browser);
+  await viewAmbush(dm, player, recordId("battlemap", "scene"));
+  const init = await openWindow(dm, "cbt.initiative");
+  const pinit = await openWindow(player, "cbt.initiative");
+  const mira = await idByName(init, "Mira");
+  // Three more conditions on Mira: her chips no longer fit on either client.
+  for (const condition of ["blinded", "deafened", "poisoned"]) {
+    await row(init, mira).getByTestId("cbt-init-row-menu").click();
+    await dm.getByTestId("cbtx-init-row-conditions").hover();
+    await dm
+      .locator(`[data-testid="cbtx-init-row-conditions-option"][data-value="${condition}"]`)
+      .click();
+    await dm.keyboard.press("Escape");
+    await expect(
+      row(init, mira).locator(`[data-testid="cbtx-init-row-effect"][data-value="${condition}"]`),
+    ).toHaveCount(1);
+  }
+  for (const [page, scope] of [
+    [dm, init],
+    [player, pinit],
+  ] as const) {
+    const more = row(scope, mira).getByTestId("cbtx-init-row-effect-more");
+    await expect(more).toBeVisible();
+    const n = Number(await more.getAttribute("data-value"));
+    // The hidden chips are the invisible ones, in order.
+    const hidden = await row(scope, mira)
+      .locator('[data-testid="cbtx-init-row-effect"]')
+      .evaluateAll((els) =>
+        els
+          .filter((e) => e.closest("[data-chip]")?.getAttribute("aria-hidden") === "true")
+          .map((e) => e.getAttribute("data-record-id")),
+      );
+    expect(hidden.length).toBe(n);
+    await more.click();
+    const items = page.getByTestId("cbtx-init-row-effect-more-item");
+    await expect(items).toHaveCount(n);
+    expect(
+      await items.evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id"))),
+    ).toEqual(hidden);
+    if (page === dm) {
+      // DM: each hidden effect keeps its chip menu (Edit… / End).
+      await items.first().hover();
+      await expect(dm.getByTestId("cbtx-init-row-effect-edit")).toBeVisible();
+    }
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+  }
+  // Clean up: the conditions end again.
+  for (const condition of ["blinded", "deafened", "poisoned"]) {
+    await row(init, mira).getByTestId("cbt-init-row-menu").click();
+    await dm.getByTestId("cbtx-init-row-conditions").hover();
+    await dm
+      .locator(`[data-testid="cbtx-init-row-conditions-option"][data-value="${condition}"]`)
+      .click();
+    await dm.keyboard.press("Escape");
+  }
+  await expect(row(init, mira).getByTestId("cbtx-init-row-effect-more")).toHaveCount(0);
+  await player.context().close();
+  await dm.context().close();
+});
+
+test("FR-NOTE-14 FR-NOTE-32 P3 E3: at 1280×720 a 4-card toast stack (3 + '+1 more') fits the viewport", async ({
+  browser,
+}) => {
+  const { dm, player, recordId } = await setup(browser, 1280, 720);
+  await viewAmbush(dm, player, recordId("battlemap", "scene"));
+  const init = await openWindow(dm, "cbt.initiative");
+  const sheet = await openWindow(player, "char.sheet");
+  await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
+  const cards = dm.getByTestId("note-toast").filter({ has: dm.getByTestId("note-toast-action") });
+  // Earlier tests may leave a card pending: count from here.
+  await expect(init).toBeVisible();
+  const before = await init.getByTestId("cbt-init-card").count();
+  for (let i = 1; i <= 4; i++) {
+    await sheet.getByTestId("charx-roll-attack-damage").first().click();
+    await expect(init.getByTestId("cbt-init-card")).toHaveCount(before + i);
+  }
+  await expect(dm.getByTestId("note-toast-more")).toBeVisible();
+  await expect.poll(() => cards.count()).toBeGreaterThanOrEqual(1);
+  // Every toast, its Apply and "+N more" lie inside the viewport, above the launcher bar.
+  const bottom = 720 - 64;
+  const boxes = async () =>
+    dm.locator('[data-testid="note-toasts"]').evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom };
+    });
+  await expect.poll(async () => (await boxes()).bottom).toBeLessThanOrEqual(bottom);
+  expect((await boxes()).top).toBeGreaterThanOrEqual(48);
+  for (const apply of await dm.getByTestId("note-toast-action").all()) {
+    await expect(apply).toBeInViewport();
+  }
+
+  // Clean up: dismiss the four cards from the Pending list.
+  for (let i = 4; i > 0; i--) {
+    await init.getByTestId("cbt-init-card").last().click();
+    await dm.getByTestId("cbt-popup-dismiss").click();
+    await expect(init.getByTestId("cbt-init-card")).toHaveCount(before + i - 1);
+  }
   await player.context().close();
   await dm.context().close();
 });

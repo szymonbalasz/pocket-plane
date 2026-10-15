@@ -1,7 +1,8 @@
 // Open placement for windows without stored geometry (FR-SHELL-08/14). Pure.
 // 1. The default rect, fitted to the usable area (shrunk, never below min size).
 // 2. If it overlaps an open window: edge-first, never a mid-map column (map-first, #162). A
-//    full-size free slot at either edge (its default column first, then the nearest) beats a
+//    full-size free slot at either edge (the one over fewer map tokens, P3 glitch 13; then its
+//    default column first, then the nearest) beats a
 //    shrunk one (FR-NOTE-31 ruling); with none, a window with `minOpenH` opens at that height on
 //    top, covering the least; any other takes the tallest free slot ≥ min height (default column
 //    first); all full → the spot covering least, in its default column first (a cascade), then
@@ -75,12 +76,18 @@ function freeHeight(x: number, y: number, w: number, max: number, obstacles: rea
 
 /**
  * Where a window with no stored geometry opens, given the rendered rects of the windows
- * already open. Ranking: free at full size (default column, then the left / right edge column;
- * nearest to default) < `minOpenH` set: that height, least overlap (default column first) <
+ * already open (`avoid`: on-screen map token boxes, P3 glitch 13). Ranking: free at full size
+ * (least token area covered, then default column, then the left / right edge column; nearest to
+ * default) < `minOpenH` set: that height, least overlap (default column first) <
  * free at ≥ min height (default column first, tallest) < least overlap in the default column <
  * least overlap at an edge. Mid-map columns never. Deterministic.
  */
-export function placeRect(def: Placeable, vp: Viewport, obstacles: readonly Rect[]): Rect {
+export function placeRect(
+  def: Placeable,
+  vp: Viewport,
+  obstacles: readonly Rect[],
+  avoid: readonly Rect[] = [],
+): Rect {
   const base = fittedDefaultRect(def, vp);
   if (def.fixedDefault) return base;
   const a = usableArea(vp);
@@ -103,8 +110,9 @@ export function placeRect(def: Placeable, vp: Viewport, obstacles: readonly Rect
   const openH =
     def.minOpenH === undefined ? null : Math.min(def.minOpenH, base.h, a.bottom - a.top);
   const covered = (r: Rect) => obstacles.reduce((n, o) => n + overlapArea(r, o), 0);
-  let best: { rect: Rect; rank: [number, number, number, number] } | null = null;
-  const consider = (rect: Rect, rank: [number, number, number, number]) => {
+  const onTokens = (r: Rect) => avoid.reduce((n, t) => n + overlapArea(r, t), 0);
+  let best: { rect: Rect; rank: number[] } | null = null;
+  const consider = (rect: Rect, rank: number[]) => {
     if (!best || lexLess(rank, best.rank)) best = { rect, rank };
   };
   for (const s of spots) {
@@ -115,7 +123,8 @@ export function placeRect(def: Placeable, vp: Viewport, obstacles: readonly Rect
     const free = freeHeight(x, y, w, room, obstacles);
     const dist = Math.abs(x - base.x) + Math.abs(y - base.y);
     if (free >= base.h) {
-      consider({ x, y, w, h: base.h }, [0, column, dist, 0]);
+      const rect = { x, y, w, h: base.h };
+      consider(rect, [0, onTokens(rect), column, dist]);
     } else if (openH !== null) {
       const oy = Math.max(a.top, Math.min(s.y, a.bottom - openH));
       const rect = { x, y: oy, w, h: openH };

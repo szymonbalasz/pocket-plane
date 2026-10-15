@@ -97,28 +97,32 @@ function PlayerInitiativeBody() {
             >
               <TurnMarker active={turn} />
               <Portrait name={c.name} imageAssetId={c.imageAssetId} />
-              <div className="flex min-w-0 flex-1 items-center gap-1">
-                <RowName name={c.name} testId="cbt-init-row-name" className="text-sm" />
-                <EffectChips
-                  compact
-                  effects={effectsOn(fx, creatureOf(c))}
-                  round={enc.round}
-                  testId="cbtx-init-row-effect"
-                />
+              <div className="flex min-w-0 flex-1 flex-col">
+                {/* FR-CBTX-46 (P3 glitch 6): the name line holds only the name and the chips, so
+                    chips get the width left after the full name, as on the DM's rows. */}
+                <div className="flex min-w-0 items-center gap-1">
+                  <RowName name={c.name} testId="cbt-init-row-name" className="text-sm" />
+                  <EffectChips
+                    compact
+                    effects={effectsOn(fx, creatureOf(c))}
+                    round={enc.round}
+                    testId="cbtx-init-row-effect"
+                  />
+                </div>
+                {/* FR-CBTX-34: a PC's death state (own PC with pips) replaces the plain Down; on
+                    its own line under the name. */}
+                {death && (
+                  <div className="flex items-center gap-1">
+                    {counters && <DeathPips c={counters} />}
+                    <DeathBadge state={death} testId="cbtx-init-row-death" />
+                  </div>
+                )}
               </div>
               {c.kind === "monster" && c.band && (
                 <BandBadge band={c.band} testId="cbt-init-row-band" />
               )}
-              {/* FR-CBTX-34: a PC's death state (own PC with pips) replaces the plain Down. */}
-              {death ? (
-                <>
-                  {counters && <DeathPips c={counters} />}
-                  <DeathBadge state={death} testId="cbtx-init-row-death" />
-                </>
-              ) : (
-                // FR-CBT-49 (#172): a PC at 0 HP (own HP, else the redacted `down`).
-                pcDown(store, c) && <BandBadge band="down" testId="cbt-init-row-band" />
-              )}
+              {/* FR-CBT-49 (#172): a PC at 0 HP (own HP, else the redacted `down`). */}
+              {!death && pcDown(store, c) && <BandBadge band="down" testId="cbt-init-row-band" />}
               {c.kind === "pc" && (
                 <span
                   data-testid="cbt-init-row-init"
