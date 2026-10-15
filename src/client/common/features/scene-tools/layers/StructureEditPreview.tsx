@@ -6,13 +6,14 @@ import { vertexToPx } from "@shared/scene-tools/geometry";
 import { Circle, Group, Line, Rect } from "react-konva";
 import { useStore } from "zustand";
 import { useCanvas } from "../../scenes-map/canvas-context";
-import { shownStructure, structureTool } from "../structure-store";
+import { structureTool } from "../structure-store";
 import { segmentPx } from "../structure-view";
+import { useShownStructure } from "./StructureLayer";
 
 export function StructureEditPreview() {
   const { activeTool, grid, cam, colors } = useCanvas();
   const st = useStore(structureTool);
-  const view = useStore(shownStructure, (s) => s.view);
+  const view = useShownStructure();
   if (activeTool?.id !== "structure") return null;
   const px = (v: { x: number; y: number }) => vertexToPx(grid, v);
   const path = st.mode === "erase" ? [] : [...st.points, ...(st.hover ? [st.hover] : [])];

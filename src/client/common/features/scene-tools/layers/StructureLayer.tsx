@@ -237,8 +237,13 @@ function useBlockedFlash(on: boolean) {
   return flash;
 }
 
-export function ScnStructureLayer() {
-  const { client, scene, grid, store, colors, cam, pointers, live } = useCanvas();
+/**
+ * The shown scene's structure; on the DM client also published for the Structure tool and Undo.
+ * Called by this layer and by the tool's `scn-edit` preview, so it stays current while the
+ * "Walls & doors" switch has this layer unmounted.
+ */
+export function useShownStructure() {
+  const { client, scene, store, cam } = useCanvas();
   const dm = client === "dm";
   const record = store.records[SCENE_STRUCTURE_TYPE]?.[scene.id] as
     | SceneStructureRecord
@@ -249,6 +254,13 @@ export function ScnStructureLayer() {
   useEffect(() => {
     if (dm) shownStructure.setState({ sceneId: scene.id, view, scale: cam.scale, loaded });
   }, [dm, scene.id, view, cam.scale, loaded]);
+  return view;
+}
+
+export function ScnStructureLayer() {
+  const { client, scene, grid, colors, pointers, live } = useCanvas();
+  const dm = client === "dm";
+  const view = useShownStructure();
   useDoorMenuIsland(useContext(SyncContext), dm);
   const wallsOff = useLayerToggles((s) => s.off["dm-only"] === true);
   const drag = useStore(pointers, (s) => s.drag);
