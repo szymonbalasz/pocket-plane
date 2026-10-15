@@ -79,10 +79,16 @@ export const setTempHp = defineCommand({
   },
 });
 
-/** FR-CBTX-39 line note: "success (2 / 0)", "failure (0 / 2)", "back to 1 HP". */
+/**
+ * FR-CBTX-47 (G7) line note, no counters (#178 G6: they are the owner's and the DM's): "success",
+ * "failure"; a state change adds it: "success — stable", "failure — dead", "conscious" (natural 20).
+ */
 export function deathSaveNote(s: ReturnType<typeof deathSave>): string {
-  if (s.outcome === "revive") return "back to 1 HP";
-  return `${s.outcome} (${s.after.successes} / ${s.after.failures})`;
+  if (s.outcome === "revive") return "conscious";
+  const state = deathStateOf(0, s.after.successes, s.after.failures);
+  if (s.outcome === "success" && state === "stable") return "success — stable";
+  if (s.outcome === "failure" && state === "dead") return "failure — dead";
+  return s.outcome;
 }
 
 export const rollDeathSave = defineCommand({
@@ -118,7 +124,7 @@ export const rollDeathSave = defineCommand({
       kind: ROLL_KIND,
       category: "saving-throw",
       actorName: c.name,
-      // FR-CBTX-39: "Mira — Death save: 14 — success (2 / 0)".
+      // FR-CBTX-47: "Mira — Death save: 14 — success", no counters.
       payload: [{ ...dice.rollPayloadItem(r), note: deathSaveNote(save) }],
       rollIds: [r.id],
       encounterId: pc?.encounterId ?? null,

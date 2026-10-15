@@ -199,7 +199,7 @@ describe("FR-CBTX-39 save log lines", () => {
   const line = (t: ReturnType<typeof cbtxSetup>, id: string) =>
     lineText(rollKind.formatLine(entry(t, id) as never));
 
-  test("FR-CBTX-39 death save line notes the outcome and counters: success, failure, natural 1, natural 20", () => {
+  test("FR-CBTX-47 death line: success / failure / natural 1 / natural 20 conscious / third failure dead / third success stable, no counters", () => {
     const t = cbtxSetup();
     t.hp("Thorn", "damage", 99);
     const save = (diceTotal: number) =>
@@ -208,15 +208,21 @@ describe("FR-CBTX-39 save log lines", () => {
         { characterId: t.thornId, manual: { diceTotal } },
         t.p2,
       ).entryId;
-    expect(line(t, save(15))).toBe("Thorn — Death save: 15 = 15 — success (1 / 0) (physical)");
-    expect(line(t, save(4))).toBe("Thorn — Death save: 4 = 4 — failure (1 / 1) (physical)");
+    expect(line(t, save(15))).toBe("Thorn — Death save: 15 = 15 — success (physical)");
+    expect(line(t, save(4))).toBe("Thorn — Death save: 4 = 4 — failure (physical)");
     expect(line(t, save(1))).toBe(
-      "Thorn — Death save: 1 = 1 — natural 1 — failure (1 / 3) (physical)",
+      "Thorn — Death save: 1 = 1 — natural 1 — failure — dead (physical)",
     );
     t.run(setDeathSaves.name, { characterId: t.thornId, successes: 0, failures: 0 });
     expect(line(t, save(20))).toBe(
-      "Thorn — Death save: 20 = 20 — natural 20! — back to 1 HP (physical)",
+      "Thorn — Death save: 20 = 20 — natural 20! — conscious (physical)",
     );
+    t.hp("Thorn", "damage", 99);
+    t.run(setDeathSaves.name, { characterId: t.thornId, successes: 2, failures: 0 });
+    const stable = save(12);
+    expect(line(t, stable)).toBe("Thorn — Death save: 12 = 12 — success — stable (physical)");
+    const payload = JSON.stringify(entry(t, stable));
+    expect(payload).not.toMatch(/\(\d \/ \d\)/);
   });
 
   test("FR-CBTX-39 concentration save line: kept / lost", () => {
