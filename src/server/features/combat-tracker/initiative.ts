@@ -1,5 +1,6 @@
 // Initiative (FR-CBT-11, FR-CBT-12, FR-CBT-47) and remove / restore (FR-CBT-15).
 import { characterRolls } from "@shared/character-sheet/logic";
+import type { CombatantRecord } from "@shared/combat-tracker/schemas";
 import {
   CBT_INTENTS,
   RollInitiativeInput,
@@ -7,6 +8,7 @@ import {
   SetRemovedInput,
 } from "@shared/combat-tracker/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
+import type { ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
 import {
   CombatantRemoved,
   CombatantRestored,
@@ -14,7 +16,7 @@ import {
   InitiativeSet,
 } from "@shared/events/combat-tracker";
 import { eq } from "drizzle-orm";
-import { defineCommand } from "../../commands/commands";
+import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, forbidden, invalid } from "../../commands/errors";
 import { combatant } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
@@ -52,39 +54,12 @@ export const rollInitiative = defineCommand({
       if (set.length > 0) throw alreadySet(set);
     }
     const before = combatantsOf(env.tx, encounterId);
-    const rollIds: string[] = [];
-    const entries: RecordChange[] = [];
-    for (const { c } of targets) {
-      const spec = characterRolls(statsOf(env, c), "initiative")?.[0];
-      if (!spec) throw new Error("characterRolls: no initiative roll");
-      const r = dice.evaluate(env, {
-        expression: spec.expression,
-        mode: input.mode,
-        category: spec.category,
-        label: spec.label,
-        actor: { kind: "entity", id: c.entityId, name: c.name },
-        manual: input.manual,
-        source: "cbt",
-      });
-      env.tx
-        .update(combatant)
-        .set({ initiative: r.total, initRollId: r.id })
-        .where(eq(combatant.id, c.id))
-        .run();
-      rollIds.push(r.id);
-      entries.push(
-        gameLog.append(env, {
-          kind: ROLL_KIND,
-          category: "initiative",
-          actorName: c.name,
-          payload: [dice.rollPayloadItem(r)],
-          rollIds: [r.id],
-          encounterId,
-          // FR-CBT-24: a hidden combatant's roll is never public.
-          public: c.hidden ? false : input.public,
-        }),
-      );
-    }
+    const { rollIds, entries } = rollInitiativeFor(
+      env,
+      targets.map((t) => t.c),
+      encounterId,
+      input,
+    );
     rerank(env.tx, encounterId);
     env.emit({
       type: InitiativeRolled.type,
@@ -100,6 +75,53 @@ export const rollInitiative = defineCommand({
     return { rollIds };
   },
 });
+
+/**
+ * FR-CBT-11: one d20 + init bonus roll and one `roll` entry per combatant; writes `initiative`
+ * and `initRollId` (the caller reranks). `public`: a hidden combatant → false (FR-CBT-24); a
+ * monster → false unless `public: true` (FR-CBT-69); a PC → the sent value, else the category
+ * setting. Also Start's and add's monster rolls (FR-CBT-64, FR-CBTX-44: mode normal, no public).
+ */
+export function rollInitiativeFor(
+  env: CommandEnv,
+  combatants: readonly CombatantRecord[],
+  encounterId: string,
+  opts: { mode: RollMode; manual?: ManualEntry; public?: boolean },
+): { rollIds: string[]; entries: RecordChange[] } {
+  const rollIds: string[] = [];
+  const entries: RecordChange[] = [];
+  for (const c of combatants) {
+    const spec = characterRolls(statsOf(env, c), "initiative")?.[0];
+    if (!spec) throw new Error("characterRolls: no initiative roll");
+    const r = dice.evaluate(env, {
+      expression: spec.expression,
+      mode: opts.mode,
+      category: spec.category,
+      label: spec.label,
+      actor: { kind: "entity", id: c.entityId, name: c.name },
+      manual: opts.manual,
+      source: "cbt",
+    });
+    env.tx
+      .update(combatant)
+      .set({ initiative: r.total, initRollId: r.id })
+      .where(eq(combatant.id, c.id))
+      .run();
+    rollIds.push(r.id);
+    entries.push(
+      gameLog.append(env, {
+        kind: ROLL_KIND,
+        category: "initiative",
+        actorName: c.name,
+        payload: [dice.rollPayloadItem(r)],
+        rollIds: [r.id],
+        encounterId,
+        public: c.hidden ? false : c.kind === "monster" ? opts.public === true : opts.public,
+      }),
+    );
+  }
+  return { rollIds, entries };
+}
 
 const alreadySet = (cs: { name: string }[]) =>
   conflict(`Initiative already set: ${cs.map((c) => c.name).join(", ")}`);

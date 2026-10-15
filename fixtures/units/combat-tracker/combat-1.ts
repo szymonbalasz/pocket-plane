@@ -16,7 +16,9 @@ const roll = (k: keyof typeof COMBAT_1, d20: number) =>
 
 /**
  * CBT §13 `combat-1`: Start "Ambush at the Ford" on Goblin Ambush; initiative Wolf 18, Mira 15,
- * Goblin 12, Goblin 2 12, Thorn 10, Elite 8; Next → round 1, Wolf's turn.
+ * Goblin 12, Goblin 2 12, Thorn 10, Elite 8; Next → round 1, Wolf's turn. Sprint 2 (FR-CBT-64):
+ * Start already rolls monster initiative (seeded, DM-only entries); the manual rolls below
+ * overwrite it in round 0. Every monster binds a placed token, so Start creates none.
  */
 export default defineFixture({
   key: "combat-1",

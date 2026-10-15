@@ -2,7 +2,10 @@
 // "‹name› (copy)" for a custom), Edit (customs only). Creature core fields + speed, token shape,
 // the six ability scores (all or none) and save proficiencies; entities' zod and REST (`POST` /
 // `PUT /api/entities`); server errors shown inline. PUT is a whole replace: the form always sends
-// `tokenShape` (Default = null) and the whole stat block (source fields kept).
+// `tokenShape` (Default = null) and the whole stat block (source fields kept). Sprint 2: optional
+// HP formula with an "Average N" hint and "Use as HP max" (FR-CBT-62, FR-ENT-25).
+
+import { hpAverage, parseHpFormula } from "@shared/entities/hp-formula";
 import {
   ABILITIES,
   ABILITY_NAMES,
@@ -62,6 +65,8 @@ export interface Fields {
   tokenShape: TokenShape | typeof DEFAULT_SHAPE;
   abilities: Record<Ability, string>;
   saves: Ability[];
+  /** FR-ENT-25: "" = none. Absent = not shown: the source's formula is kept. */
+  hpFormula?: string;
 }
 
 const NONE = "__none__";
@@ -101,7 +106,13 @@ function initial(mode: Mode): Fields {
       ABILITIES.map((k) => [k, sb?.abilities ? String(sb.abilities[k]) : ""]),
     ) as Record<Ability, string>,
     saves: sb?.saveProficiencies ? [...sb.saveProficiencies] : [],
+    hpFormula: sb?.hpFormula ?? "",
   };
+}
+
+/** FR-CBT-62: the form's "Average N" hint, or null while the formula is empty / invalid. */
+export function formulaAverage(formula: string): number | null {
+  return formula.trim() !== "" && parseHpFormula(formula) ? hpAverage(formula) : null;
 }
 
 /** The stat block the form sends: the source's (Edit / Derive) with the shown fields replaced. */
@@ -113,7 +124,14 @@ export function formStatBlock(
   if (filled.length !== 0 && filled.length !== ABILITIES.length) {
     return { ok: false, message: "Ability scores: fill all six or none" };
   }
-  const { speed: _speed, abilities: _abilities, saveProficiencies: _saves, ...rest } = source ?? {};
+  const {
+    speed: _speed,
+    abilities: _abilities,
+    saveProficiencies: _saves,
+    hpFormula: sourceFormula,
+    ...rest
+  } = source ?? {};
+  const formula = f.hpFormula === undefined ? sourceFormula : f.hpFormula.trim() || undefined;
   const attacks =
     f.attackName.trim() === ""
       ? []
@@ -142,6 +160,7 @@ export function formStatBlock(
       initBonus: Number(f.initBonus),
       cr: f.cr,
       attacks,
+      ...(formula !== undefined ? { hpFormula: formula } : {}),
       ...(f.speed.trim() !== "" ? { speed: Number(f.speed) } : {}),
       ...(abilities ? { abilities } : {}),
       ...(abilities && f.saves.length > 0
@@ -167,6 +186,7 @@ function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
   const [saving, setSaving] = useState(false);
   const set = (k: keyof Fields) => (e: { target: { value: string } }) =>
     setF((x) => ({ ...x, [k]: e.target.value }));
+  const average = formulaAverage(f.hpFormula ?? "");
 
   const save = async () => {
     const src = mode.kind === "derive" ? mode.base : mode.kind === "edit" ? mode.def : null;
@@ -269,6 +289,29 @@ function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
         </Field>
         <Field id="hpMax" label="HP max">
           <Input id="cbt-form-hpMax" inputMode="numeric" value={f.hpMax} onChange={set("hpMax")} />
+        </Field>
+        <Field id="hpFormula" label="HP formula">
+          <Input
+            id="cbt-form-hpFormula"
+            placeholder="2d6+2"
+            value={f.hpFormula ?? ""}
+            onChange={set("hpFormula")}
+          />
+          {average !== null && (
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              Average {average}
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-6 px-1.5 text-xs"
+                data-testid="cbt-form-hp-average"
+                onClick={() => setF((x) => ({ ...x, hpMax: String(average) }))}
+              >
+                Use as HP max
+              </Button>
+            </span>
+          )}
         </Field>
         <Field id="initBonus" label="Initiative bonus">
           <Input

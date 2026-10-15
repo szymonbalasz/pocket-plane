@@ -26,8 +26,9 @@ export const TOKEN_IN_ENCOUNTER = "Token is in a running encounter";
 /**
  * Token bound to an active combatant: a move → `movedFt` (FR-CBT-39); rename / image / hide /
  * reveal → its copies; if `hidden` changed, ranks and the player turn copy too. Delete →
- * `conflict`. Tokens bound only to inactive combatants: nothing (the FK sets `tokenId` null on
- * delete). May run as a player (their own token's move): it never rejects a move (ADR-0031).
+ * `conflict`, unless every bound active combatant is removed (FR-CBT-68): their `tokenId` → null.
+ * Tokens bound only to inactive combatants: nothing (the FK sets `tokenId` null on delete). May
+ * run as a player (their own token's move): it never rejects a move (ADR-0031).
  */
 export function combatantTokenHook(
   env: TokenHookEnv,
@@ -47,7 +48,14 @@ export function combatantTokenHook(
     .all()
     .map(toCombatantRecord);
   if (bound.length === 0) return [];
-  if (after === null) throw conflict(TOKEN_IN_ENCOUNTER);
+  if (after === null) {
+    if (bound.some((c) => !c.removed)) throw conflict(TOKEN_IN_ENCOUNTER);
+    // FR-CBT-68: a mistaken add is cleaned up with Remove + delete.
+    for (const c of bound) {
+      env.tx.update(combatant).set({ tokenId: null }).where(eq(combatant.id, c.id)).run();
+    }
+    return combatantDiff(env.tx, bound);
+  }
   const out: RecordChange[] = [];
   const ft = distanceFt(before, after);
   for (const c of bound) {
@@ -83,8 +91,9 @@ export function combatantTokenHook(
 }
 
 /**
- * FR-CBT-06: active monster combatants of the definition take the new `hpMax`; `hpCurrent` =
- * new max if it equalled the old, else clamped. Active combatants of the definition still
+ * FR-CBT-06 / -67: active monster combatants of the definition whose `hpMax` equals the old
+ * definition's (average HP) take the new `hpMax`; rolled ones keep theirs. `hpCurrent` = new max
+ * if it equalled the old, else clamped. Active combatants of the definition still
  * showing the old portrait take the new one (gate I23).
  */
 export function combatantDefinitionHook(
@@ -100,13 +109,14 @@ export function combatantDefinitionHook(
     .map(toCombatantRecord);
   if (rows.length === 0) return [];
   const portraitChanged = before.portraitAssetId !== after.portraitAssetId;
+  const oldMax = before.kind === "monster" ? before.statBlock.hpMax : null;
   const newMax = after.kind === "monster" ? after.statBlock.hpMax : null;
   for (const c of rows) {
     const set: Partial<typeof combatant.$inferInsert> = {};
     if (portraitChanged && c.imageAssetId === before.portraitAssetId) {
       set.imageAssetId = after.portraitAssetId;
     }
-    if (c.kind === "monster" && newMax !== null && c.hpMax !== null && c.hpMax !== newMax) {
+    if (c.kind === "monster" && newMax !== null && c.hpMax === oldMax && oldMax !== newMax) {
       set.hpMax = newMax;
       set.hpCurrent = c.hpCurrent === c.hpMax ? newMax : Math.min(c.hpCurrent ?? 0, newMax);
     }

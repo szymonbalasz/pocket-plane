@@ -118,8 +118,11 @@ export function unrolledMonsters<
   return rows.filter((c) => c.kind === "monster" && !c.removed && c.initiative == null);
 }
 
-/** FR-CBT-46: round 0 always shows "Roll monsters" (disabled when none); from round 1 iff any. */
-export const showRollMonsters = (round: number, unrolled: number) => round === 0 || unrolled > 0;
+/**
+ * FR-CBT-46 / -64: "Roll monsters" shows iff a non-removed monster lacks initiative. Since sprint 2
+ * monsters roll at Start and add, so round 0 hides it too when it has nothing to send.
+ */
+export const showRollMonsters = (_round: number, unrolled: number) => unrolled > 0;
 
 /** FR-CBT-50: a combatant Next / Prev skips while down (a monster at 0 HP, not removed). */
 export const skippedWhileDown = (r: TurnRow) => !r.removed && !eligible(r);

@@ -26,7 +26,7 @@ import {
 type Read = Pick<CombatRuleEnv, "tx">;
 
 /** FR-CBTX-13: writes `hidden` on the active effects of these combatants' creatures. */
-function syncHidden(
+export function syncHidden(
   env: Pick<CombatRuleEnv, "tx" | "ctx">,
   rows: readonly CombatantRecord[],
 ): RecordChange[] {

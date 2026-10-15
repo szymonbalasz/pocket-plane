@@ -114,6 +114,7 @@ describe("FR-CBT-16 FR-CBT-17 FR-CBT-18 attack", () => {
 
   test("FR-CBT-16 player: other PC forbidden, monster forbidden, hidden not_found; strict input", () => {
     const t = started();
+    const rolls = t.count("roll"); // Start's monster initiative (FR-CBT-64)
     const code = (input: unknown) => t.err(() => t.run(attackCommand.name, input, t.p1)).code;
     expect(code({ attackerId: t.id("Thorn") })).toBe("forbidden");
     expect(code({ attackerId: t.id("Goblin") })).toBe("forbidden");
@@ -123,11 +124,12 @@ describe("FR-CBT-16 FR-CBT-17 FR-CBT-18 attack", () => {
     t.run(setRemoved.name, { combatantId: t.id("Mira"), removed: true });
     expect(code({ attackerId: t.id("Mira") })).toBe("not_found");
     expect(t.count("notification")).toBe(0);
-    expect(t.count("roll")).toBe(0);
+    expect(t.count("roll")).toBe(rolls);
   });
 
   test("FR-CBT-16 no weapon attack → conflict, nothing written", () => {
     const t = started();
+    const rolls = t.count("roll");
     t.run(UPDATE, {
       id: t.eliteId,
       name: "Elite Goblin Warrior",
@@ -135,7 +137,7 @@ describe("FR-CBT-16 FR-CBT-17 FR-CBT-18 attack", () => {
     });
     const e = t.err(() => t.run(attackCommand.name, { attackerId: t.id("Elite Goblin Warrior") }));
     expect(e).toMatchObject({ code: "conflict", message: "No weapon attack" });
-    expect(t.count("roll")).toBe(0);
+    expect(t.count("roll")).toBe(rolls);
   });
 
   test("FR-CBT-16 FR-CBT-17 natural 20 → damage dice doubled; manual checked against it", () => {

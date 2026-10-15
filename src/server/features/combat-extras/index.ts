@@ -5,6 +5,7 @@ import type { CommandDef } from "../../commands/commands";
 import type { Feature } from "../../services";
 import { combatRuleHooksOf } from "../combat-tracker/rule-hooks";
 import { addCombatantsCommand } from "./add-combatants";
+import { bindToken } from "./bind-token";
 import { rollConcentration } from "./concentration";
 import { addEffect, endEffect, setConcentration, updateEffect } from "./effect-commands";
 import { rollDeathSave, setDeathSaves, setTempHp } from "./play-state";
@@ -26,6 +27,7 @@ export const combatExtras: Feature = {
       setDeathSaves,
       // combat-tracker registers first (feature order) and binds the hook list.
       addCombatantsCommand(combatRuleHooksOf(r.services)),
+      bindToken,
     ] as unknown as CommandDef[];
     for (const c of intents) r.command(c, { intent: true });
     r.recordType(effectRecordType);
