@@ -5,6 +5,7 @@ import * as characterSheet from "./character-sheet";
 import * as combatExtras from "./combat-extras";
 import * as combatTracker from "./combat-tracker";
 import * as diceRollLog from "./dice-roll-log";
+import * as effectModifiers from "./effect-modifiers";
 import * as entities from "./entities";
 import * as liveSync from "./live-sync";
 import * as notifications from "./notifications";
@@ -29,6 +30,8 @@ export const domainEvents: readonly DomainEventDef[] = [
   ...Object.values<unknown>(partyLoot).filter(isDomainEventDef),
   // combat-extras (fix/cbtx-core).
   ...Object.values<unknown>(combatExtras).filter(isDomainEventDef),
+  // effect-modifiers (fix/mod-core).
+  ...Object.values<unknown>(effectModifiers).filter(isDomainEventDef),
 ];
 
 /** `cause.name` of presence changes (not a domain event, CON-07). */

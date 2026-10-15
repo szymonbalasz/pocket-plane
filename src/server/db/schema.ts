@@ -8,6 +8,7 @@ import {
   EFFECT_KINDS,
 } from "@shared/combat-extras/schemas";
 import { HP_MODES } from "@shared/combat-tracker/schemas";
+import type { Modifier } from "@shared/effect-modifiers/schemas";
 import { TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
@@ -683,6 +684,10 @@ export const effect = sqliteTable(
     endedRound: integer("ended_round"),
     endedTurnId: text("ended_turn_id"),
     endedByHpChangeId: text("ended_by_hp_change_id"),
+    /** effect-modifiers (FR-MOD-03): JSON leaf Modifier[] 0–6, `custom` effects only (zod). */
+    modifiers: text("modifiers", { mode: "json" }).$type<Modifier[]>().notNull().default([]),
+    /** Built-in preset key or preset id it was applied from (soft, no FK; FR-MOD-09). */
+    presetKey: text("preset_key"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -710,6 +715,48 @@ export const effect = sqliteTable(
   ],
 );
 
+/**
+ * Effect preset (effect-modifiers, `effect-preset`, data model §23): a campaign preset
+ * (`characterId` null; `key` set = customises that built-in, unique per campaign) or a
+ * character preset (toggle; `ownerPlayerId` copies the character's owner, FR-MOD-07).
+ * `modifiers` is a JSON leaf (Modifier[] 1–6, zod). Caps (40 campaign, 6 per character) are
+ * checked by the commands. `usesFeatureId` is a soft id of a sheet `features` row (tier 3).
+ */
+export const effectPreset = sqliteTable(
+  "effect_preset",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    key: text("key"),
+    characterId: text("character_id").references((): AnySQLiteColumn => entity.id, {
+      onDelete: "cascade",
+    }),
+    ownerPlayerId: text("owner_player_id").references((): AnySQLiteColumn => player.id),
+    name: text("name").notNull(),
+    modifiers: text("modifiers", { mode: "json" }).$type<Modifier[]>().notNull(),
+    durationRounds: integer("duration_rounds"),
+    concentration: integer("concentration", { mode: "boolean" }).notNull().default(false),
+    /** Character presets: the effect the last toggle-on made (toggle state, FR-MOD-11). */
+    activeEffectId: text("active_effect_id").references((): AnySQLiteColumn => effect.id, {
+      onDelete: "set null",
+    }),
+    usesFeatureId: text("uses_feature_id"),
+    note: text("note").notNull().default(""),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("effect_preset_seq").on(t.seq),
+    index("effect_preset_campaign").on(t.campaignId),
+    index("effect_preset_character").on(t.characterId),
+    // MOD §8.3: one customisation per built-in key per campaign.
+    uniqueIndex("effect_preset_campaign_key").on(t.campaignId, t.key).where(sql`key is not null`),
+  ],
+);
+
 /** CON-20: `seq` values for Combat inserts, computed by the DB inside the insert's transaction. */
 export const notificationSeqNext = sql<number>`(select coalesce(max(${notification.seq}), 0) + 1 from ${notification})`;
 export const encounterSeqNext = sql<number>`(select coalesce(max(${encounter.seq}), 0) + 1 from ${encounter})`;
@@ -717,6 +764,7 @@ export const encounterEntrySeqNext = sql<number>`(select coalesce(max(${encounte
 export const combatantSeqNext = sql<number>`(select coalesce(max(${combatant.seq}), 0) + 1 from ${combatant})`;
 export const hpChangeSeqNext = sql<number>`(select coalesce(max(${hpChange.seq}), 0) + 1 from ${hpChange})`;
 export const effectSeqNext = sql<number>`(select coalesce(max(${effect.seq}), 0) + 1 from ${effect})`;
+export const effectPresetSeqNext = sql<number>`(select coalesce(max(${effectPreset.seq}), 0) + 1 from ${effectPreset})`;
 export const lootEntrySeqNext = sql<number>`(select coalesce(max(${lootEntry.seq}), 0) + 1 from ${lootEntry})`;
 
 export const schema = {
@@ -741,4 +789,5 @@ export const schema = {
   lootEntry,
   creatureSheet,
   effect,
+  effectPreset,
 };

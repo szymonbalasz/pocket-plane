@@ -111,6 +111,31 @@ export const DieResult = z.strictObject({
 });
 export type DieResult = z.infer<typeof DieResult>;
 
+/** FR-MOD-19: parts per roll (roll hooks; MOD caps a roll's parts at this). */
+export const ROLL_MODS_MAX = 20;
+
+/**
+ * FR-MOD-19: one roll-hook part on a payload (player-safe). `label` = the effect's label iff
+ * the effect is player-visible, else null ("(DM)"); `value` signed, in the item's `total`;
+ * `expression` / `rollId` for bonus dice (their own `roll` row); `auto` = rolled by the server
+ * for a physical base roll (FR-MOD-18).
+ */
+export const RollModPart = z.strictObject({
+  label: z.string().max(LABEL_MAX).nullable(),
+  value: z.int(),
+  expression: z.string().max(20).optional(),
+  auto: z.literal(true).optional(),
+  rollId: Id.optional(),
+});
+export type RollModPart = z.infer<typeof RollModPart>;
+
+/** FR-MOD-19: the DM's names for a part or mode hint (`dmPayload`), same index as the payload's. */
+export const DmModPart = z.strictObject({
+  effectId: Id,
+  label: z.string().max(LABEL_MAX),
+});
+export type DmModPart = z.infer<typeof DmModPart>;
+
 /** `roll` kind payload item (data model §15). */
 export const RollPayloadItem = z.strictObject({
   rollId: Id,
@@ -127,11 +152,28 @@ export const RollPayloadItem = z.strictObject({
    * "success (2 / 0)" (FR-CBTX-39); shown after the total. Absent on plain rolls.
    */
   note: z.string().max(80).optional(),
+  /** FR-MOD-19: roll-hook parts, after the constant; `total` includes them. Absent = none. */
+  mods: z.array(RollModPart).min(1).max(ROLL_MODS_MAX).optional(),
+  /** FR-MOD-19 (tier 2): labels of the mode hints behind `mode` (null = "(DM)"). */
+  modes: z.array(z.string().max(LABEL_MAX).nullable()).min(1).max(ROLL_MODS_MAX).optional(),
 });
 export type RollPayloadItem = z.infer<typeof RollPayloadItem>;
 
 export const RollEntryPayload = z.array(RollPayloadItem).min(1).max(20);
 export type RollEntryPayload = z.infer<typeof RollEntryPayload>;
+
+/** FR-MOD-19: per payload item (same index), the names of its `mods` / `modes` (DM only). */
+export const RollItemDmMods = z.strictObject({
+  mods: z.array(DmModPart).max(ROLL_MODS_MAX),
+  modes: z.array(DmModPart).max(ROLL_MODS_MAX).optional(),
+});
+export type RollItemDmMods = z.infer<typeof RollItemDmMods>;
+
+/** `roll` kind `dmPayload` (FR-MOD-19): present only when an item has parts or mode hints. */
+export const RollEntryDmPayload = z.strictObject({
+  items: z.array(RollItemDmMods).min(1).max(20),
+});
+export type RollEntryDmPayload = z.infer<typeof RollEntryDmPayload>;
 
 /** `game-log-entry` as the DM receives it (full row). */
 export const GameLogEntryRecord = z.strictObject({
