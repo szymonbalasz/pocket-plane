@@ -2,26 +2,21 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 2 phase 1 builds (#190 gate 1 'go with picks'; specs merged, ADR-0037 / 0038). Wave 1 merged (#192); wave 2 merged (#193); split-attack ∥ M slice 2, then M slices 3-4; then session-sim-5. Plan: phase-1 review build graph (`.verify/review-phase1/review.md` "Build order").
+**Phase:** Sprint 2 **phase 1 complete** (#194; playtest section in sprint-2). Phase 2 specs running (F fog-of-war, B scene-tools); `fix/sim5-glitches` in parallel. Next: F/B seam, one review, DM gate 2 (incl. CON-44 headroom and session-sim-5 glitches).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Waves 1-2 (P2b all, P2a core / add / polish, M core) | merged | — | Done (#192, #193) | — |
-| P2a split attack (N7 combat, item 12) | `fix/combat2-split-attack` (w2W, slot 2) | build-combat2-split-attack | Building | Walkthrough CBT 9c, 9d |
-| M tier 1 slices 2-4 | `build/effect-modifiers` (w2V, slot 0) | build-effect-modifiers | Slice 2; slices 3-4 after split-attack merges | Walkthrough MOD §13 |
-| Phase 1 close | main | — | After both | session-sim-5, "Playtest: phase 1 fixes" |
-| F: fog of war (phase 2) | `spec/fog-of-war` | — | After phase 1 | — |
-| B: props + structure (phase 2) | `spec/scene-tools` | — | After phase 1 | — |
-
-Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-14-evening)). Briefs in `briefs\`. Evidence: `verify-*\` (session-sim-3 evidence only in the main checkout: `.verify/20261014-131140-session-sim-3/`; the `%TEMP%` copy was cleared).
+| Phase 1 (Q, P2a, P2b, M tier 1) | merged | — | Done (#189-#194), session-sim-5 13/13 | DM playtest |
+| sim-5 bugs (stale popup targets, created tokens without art) | `fix/sim5-glitches` (w20, slot 0) | fix-sim5-glitches | Building | Walkthrough |
+| F: fog of war | `spec/fog-of-war` (w2Y) | spec-fog-of-war | Spec | Seam, review, gate 2 |
+| B: props + structure | `spec/scene-tools` (w2Z) | spec-scene-tools | Spec | Seam, review, gate 2 |
 
 ## Shared-file locks
 
-- Combat-tracker attack / damage / hp / card-kind / roll-route / popup / Initiative: fix/combat2-split-attack → M slice 3 (subject passing).
-- Character-sheet `commands.ts`, CBTX concentration / play-state: M slice 3 (after split-attack).
-- Schema: free (phase 2 cores next, one at a time).
+- Combat-tracker DM client (targets / popup), combat-extras add / scenes-map placeTokenIn: fix/sim5-glitches.
+- Schema: free (phase 2 cores later, one at a time).
 
 ## Pending DM decisions
 
