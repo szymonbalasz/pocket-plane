@@ -9,13 +9,14 @@ import {
   setLocked,
 } from "@server/features/scenes-map/commands";
 import { wolf } from "../../srd/monster/wolf";
+import { fog } from "../fog-of-war/commands";
 
 /**
  * MAP §13 `scenes-extras`: folder "Act 1" holding Town + Goblin Ambush; Thorn on both; custom
  * "Cave Ogre" (wolf block, large, speed 40, shape none) on Goblin Ambush (9, 10), visible; root
  * scene "Cellar"
  * (`map-large`, cell 50, offset 25/10, #ffffff 0.3, locked) with a Goblin at (40, 27).
- * Records: scene-folder 0; entity 0 = Cave Ogre; scene 0 = Cellar.
+ * Records: scene-folder 0; entity 0 = Cave Ogre; scene 0 = Cellar. Cellar revealed last (FR-FOG-25).
  */
 export default defineFixture({
   key: "scenes-extras",
@@ -73,5 +74,6 @@ export default defineFixture({
       row: 27,
     })),
     step(setLocked, (r) => ({ sceneId: r.id("scenes-extras", "scene"), locked: true })),
+    step(fog.setAll, (r) => ({ sceneId: r.id("scenes-extras", "scene"), fogged: false })),
   ],
 });

@@ -12,6 +12,7 @@ import diceLog from "./dice-log";
 import effectModifiers from "./effect-modifiers";
 import entities from "./entities";
 import fog from "./fog";
+import fogScn from "./fog-scn";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
 import partyLoot from "./party-loot";
@@ -42,4 +43,5 @@ export const bundles: readonly Bundle[] = [
   fog,
   sceneToolsProps,
   sceneTools,
+  fogScn,
 ];

@@ -27,7 +27,7 @@ export interface SceneHook {
 
 /** The registry. Append your feature's line; order = run order. */
 export const sceneHooks: readonly SceneHook[] = [
-  fogSceneHook, // fog-of-war (FR-FOG-02 duplicated, FR-FOG-23 deleting)
+  fogSceneHook, // fog-of-war (FR-FOG-02 created / duplicated, FR-FOG-23 deleting)
   scnSceneHook, // scene-tools (FR-SCN-31)
 ];
 

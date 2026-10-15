@@ -12,6 +12,7 @@ import { combatant } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import type { HookEnv } from "../entities/definition-hooks";
 import type { TokenHookEnv } from "../scenes-map/token-hooks";
+import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 import { combatantDiff, encounterDiff, rerank, syncPlayerTurn } from "./ranks";
 import {
   combatantChange,
@@ -25,7 +26,9 @@ export const TOKEN_IN_ENCOUNTER = "Token is in a running encounter";
 
 /**
  * Token bound to an active combatant: a move → `movedFt` (FR-CBT-39); rename / image / hide /
- * reveal → its copies; if `hidden` changed, ranks and the player turn copy too. Delete →
+ * reveal → its copies; if `hidden` changed, ranks and the player turn copy too. The hidden copy is
+ * `tokenHiddenForPlayers` (hidden or fog-hidden, FR-FOG-14): fog commands, moves into / out of fog
+ * and the size refresh flip it (FR-FOG-13). Delete →
  * `conflict`, unless every bound active combatant is removed (FR-CBT-68): their `tokenId` → null.
  * Tokens bound only to inactive combatants: nothing (the FK sets `tokenId` null on delete). May
  * run as a player (their own token's move): it never rejects a move (ADR-0031).
@@ -58,6 +61,7 @@ export function combatantTokenHook(
   }
   const out: RecordChange[] = [];
   const ft = distanceFt(before, after);
+  const hidden = tokenHiddenForPlayers(after);
   for (const c of bound) {
     // FR-CBT-39: before the copy check (which skips on a move); removed combatants gain nothing.
     if (ft > 0 && !c.removed) {
@@ -69,21 +73,17 @@ export function combatantTokenHook(
       const now = readCombatant(env.tx, c.id);
       if (now.movedFt !== c.movedFt) out.push(combatantChange(c, now));
     }
-    if (
-      c.name === after.name &&
-      c.imageAssetId === after.imageAssetId &&
-      c.hidden === after.hidden
-    ) {
+    if (c.name === after.name && c.imageAssetId === after.imageAssetId && c.hidden === hidden) {
       continue;
     }
     const rows = combatantsOf(env.tx, c.encounterId);
     const encBefore = readEncounter(env.tx, c.encounterId);
     env.tx
       .update(combatant)
-      .set({ name: after.name, imageAssetId: after.imageAssetId, hidden: after.hidden })
+      .set({ name: after.name, imageAssetId: after.imageAssetId, hidden })
       .where(eq(combatant.id, c.id))
       .run();
-    if (c.hidden !== after.hidden) rerank(env.tx, c.encounterId);
+    if (c.hidden !== hidden) rerank(env.tx, c.encounterId);
     const encAfter = syncPlayerTurn(env, c.encounterId);
     out.push(...combatantDiff(env.tx, rows), ...encounterDiff(encBefore, encAfter));
   }

@@ -1,6 +1,8 @@
 // FR-MAP-50: the token's `characterId` display copy: place, duplicate, scene copy, definition
 // edits and the boot backfill. Visibility (FR-MAP-26) is in visibility.test.ts / sync.test.ts.
+
 import { describe, expect, test } from "bun:test";
+import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import type { SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
 import { MAP_INTENTS as I } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
@@ -17,6 +19,7 @@ function setup() {
     name: "Goblin Ambush",
     mapAssetId: "map-battle",
   });
+  t.run(FOG_INTENTS.setAll, { sceneId: scene.id, fogged: false }); // FR-FOG-25 ripple
   const tokenRow = (id: string) =>
     t.s.db.select().from(token).where(eq(token.id, id)).get() as TokenRecord;
   const place = (definitionId: string, col: number, row: number) =>

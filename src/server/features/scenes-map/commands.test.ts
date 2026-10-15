@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { EntityRecord } from "@shared/entities/schemas";
+import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import type { SceneFolderRecord, SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
 import { MAP_INTENTS as I } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
@@ -16,8 +17,12 @@ import { tokenHooksOf } from "./token-hooks";
 
 function setup() {
   const t = scenesSetup();
-  const newScene = (name = "Goblin Ambush", mapAssetId = "map-battle") =>
-    t.run<SceneRecord>(R.createScene, { name, mapAssetId });
+  // FR-FOG-25 ripple: new scenes start fogged; the helper reveals them unless `revealed` is false.
+  const newScene = (name = "Goblin Ambush", mapAssetId = "map-battle", revealed = true) => {
+    const s = t.run<SceneRecord>(R.createScene, { name, mapAssetId });
+    if (revealed) t.run(FOG_INTENTS.setAll, { sceneId: s.id, fogged: false });
+    return s;
+  };
   const place = (sceneId: string, definitionId: string, col: number, row: number, extra = {}) => {
     const { tokenId } = t.run<{ tokenId: string }>(I.placeToken, {
       sceneId,
@@ -69,7 +74,11 @@ describe("scenes-map commands", () => {
         .slice(before)
         .map((l) => [l.type, l.payload]),
     ).toEqual([["SceneCreated", { sceneId: s.id }]]);
-    expect(t.lastEvent()?.changes).toEqual([{ type: "scene", id: s.id, before: null, after: s }]);
+    // FR-FOG-02: the new scene's fully fogged `fog` row joins SceneCreated.
+    expect(t.lastEvent()?.changes).toEqual([
+      { type: "scene", id: s.id, before: null, after: s },
+      expect.objectContaining({ type: "fog", id: s.id, before: null }),
+    ]);
     // Another campaign's asset → not_found; nothing written.
     const n = t.count("scene");
     expect(t.err(() => t.run(R.createScene, { name: "X", mapAssetId: "art-other" })).code).toBe(
@@ -337,7 +346,7 @@ describe("scenes-map commands", () => {
     expect(copies.every((c) => c.id !== a.id && c.id !== b.id && c.seq > b.seq)).toBe(true);
     const ev = t.lastEvent();
     expect(ev?.type).toBe("SceneDuplicated");
-    expect(ev?.changes.map((c) => c.type)).toEqual(["scene", "token", "token"]);
+    expect(ev?.changes.map((c) => c.type)).toEqual(["scene", "fog", "token", "token"]);
   });
 
   test("FR-MAP-05 delete: active → conflict; tokens go with it", () => {
@@ -351,6 +360,7 @@ describe("scenes-map commands", () => {
     expect(t.s.db.select().from(token).where(eq(token.sceneId, other.id)).all()).toEqual([]);
     expect(t.lastEvent()?.changes.map((c) => [c.type, c.after])).toEqual([
       ["token", null],
+      ["fog", null],
       ["scene", null],
     ]);
   });

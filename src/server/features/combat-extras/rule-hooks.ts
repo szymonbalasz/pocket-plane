@@ -14,6 +14,7 @@ import type { RecordChange } from "../../events/types";
 import { combatantsOf, toCombatantRecord } from "../combat-tracker/rows";
 import type { CombatRuleEnv, CombatRuleHookSet } from "../combat-tracker/rule-hooks";
 import type { TokenHookEnv } from "../scenes-map/token-hooks";
+import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 import { closeCardsOfEnded, endEffects, restoreEffects } from "./effects";
 import {
   activeEffectsOf,
@@ -124,13 +125,16 @@ export const cbtxRuleHooks: CombatRuleHookSet = {
 /**
  * Token-changed hook `cbtx` (FR-CBTX-13, ADR-0028): hide / reveal of a token bound to an active
  * combatant copies `hidden` onto its creature's active effects. Runs after combat's own hook.
+ * Hidden = `tokenHiddenForPlayers` (hidden or fog-hidden, FR-FOG-14).
  */
 export function cbtxTokenHook(
   env: TokenHookEnv,
   before: TokenRecord,
   after: TokenRecord | null,
 ): RecordChange[] {
-  if (!after || before.hidden === after.hidden) return [];
+  if (!after) return [];
+  const hidden = tokenHiddenForPlayers(after);
+  if (tokenHiddenForPlayers(before) === hidden) return [];
   const bound = env.tx
     .select()
     .from(combatant)
@@ -142,6 +146,6 @@ export function cbtxTokenHook(
       ),
     )
     .all()
-    .map((r) => ({ ...toCombatantRecord(r), hidden: after.hidden }));
+    .map((r) => ({ ...toCombatantRecord(r), hidden }));
   return syncHidden(env, bound);
 }

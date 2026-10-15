@@ -10,13 +10,18 @@ import type { RecordChange } from "../../events/types";
 import { MAP_REST as R } from "../scenes-map/commands";
 import { scenesSetup } from "../scenes-map/testing";
 import { readFogRecord } from "./rows";
+import { dropFogRow } from "./testing";
 
 const AT = "2026-01-01T00:00:00.000Z";
 
 function setup() {
   const t = scenesSetup();
-  const newScene = (name: string, actor = t.h.dm, mapAssetId = "map-battle") =>
-    t.run<SceneRecord>(R.createScene, { name, mapAssetId }, actor);
+  // Rows are written directly: start from scenes without one (as before this build).
+  const newScene = (name: string, actor = t.h.dm, mapAssetId = "map-battle") => {
+    const s = t.run<SceneRecord>(R.createScene, { name, mapAssetId }, actor);
+    dropFogRow(t.s.db, s.id);
+    return s;
+  };
   const town = newScene("Town");
   const ambush = newScene("Goblin Ambush");
   const writeFog = (sceneId: string, campaignId = t.h.campaignId, runs = "0,5,3") =>

@@ -1,7 +1,6 @@
-// FOG §13 integration over real sockets on the `fog` bundle (build/fog-server: commands, undo,
-// `derive`, lifecycle; nothing hidden from players yet): DM acks + frames, player frames carry the
-// redacted `fog` row of the active scene only and still every non-hidden token; undo guard;
-// players refused; convergence; restart → identical snapshots and undo still works.
+// FOG §13 integration over real sockets on the `fog` bundle: snapshots per viewer, activation,
+// `fogged` only on a player's own tokens, players refused; restart → identical snapshots and undo
+// still works. The step-by-step leak walkthrough is in leak.test.ts.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
@@ -16,7 +15,7 @@ import { closeDb, type Db, openFileDb } from "../../db/client";
 import { player, scene, token } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
-import { convergence, leakScan } from "../../ws/testing/convergence";
+import { leakScan } from "../../ws/testing/convergence";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
 
@@ -39,7 +38,7 @@ const tokenIds = (c: TestClient) => Object.keys(c.store.records[TOKEN_TYPE] ?? {
 const tokenOf = (c: TestClient, id: string) =>
   c.store.records[TOKEN_TYPE]?.[id] as TokenRecord | undefined;
 
-describe("fog bundle over WS (build/fog-server)", () => {
+describe("fog bundle over WS", () => {
   let h: TestServer;
   let db: Db;
   let dir: string;
@@ -101,10 +100,13 @@ describe("fog bundle over WS (build/fog-server)", () => {
     const dm = await h.live(DM);
     const p1 = await h.live(p("Player 1"));
     const fog = fogOf(dm, ambushId) as FogRecord;
-    expect(fog).toMatchObject({ fill: "fog", box: [0, 0, 20, 14], undo: { n: 3 } });
+    expect(fog).toMatchObject({ fill: "fog", box: [0, 0, 20, 14], undo: { n: 4 } });
     expect(fog.undo?.kind).toBe("reveal-polygon");
-    expect(fogOf(dm, townId)).toBeUndefined();
-    expect(p1.store.records[FOG_TYPE] ?? {}).toEqual({});
+    // FR-FOG-25 ripple: Town was revealed after create (one "reveal all" entry).
+    expect(fogOf(dm, townId)).toMatchObject({ fill: "clear", runs: "", undo: { n: 1 } });
+    expect(p1.store.records[FOG_TYPE] ?? {}).toEqual({
+      [townId]: { id: townId, fill: "clear", box: (fogOf(dm, townId) as FogRecord).box, runs: "" },
+    });
     // Player refused on every fog intent.
     for (const [name, payload] of [
       [F.setAll, { sceneId: ambushId, fogged: false }],
@@ -123,89 +125,43 @@ describe("fog bundle over WS (build/fog-server)", () => {
     p1.close();
   });
 
-  test("FR-FOG-05 / -07 / -08 live: reveal → ack editId, one FogEdited per connection; players get the redacted row and still every non-hidden token; undo guard", async () => {
+  test("FR-FOG-12 activation: players' resync snapshot = the scene's fog row + only records not fog-hidden; DM all", async () => {
     const dm = await h.live(DM);
-    expect((await answer(dm, dm.intent(I.activateScene, { sceneId: ambushId }))).type).toBe("ack");
-    // ADR-0041: the DM views the scene (its tokens load into the live store).
-    expect((await answer(dm, dm.loadScene(ambushId))).type).toBe("ack");
     const p1 = await h.live(p("Player 1"));
     const p2 = await h.live(p("Player 2"));
-    const visible = Object.values(tok)
-      .filter((t) => !t.hidden)
-      .map((t) => t.id)
-      .sort();
-    // Nothing is hidden by fog yet (build/fog-visibility switches `hides` on).
+    expect((await answer(dm, dm.intent(I.activateScene, { sceneId: ambushId }))).type).toBe("ack");
     for (const c of [p1, p2]) {
-      expect(tokenIds(c)).toEqual(visible);
-      expect(Object.keys(fogOf(c, ambushId) ?? {}).sort()).toEqual(["box", "fill", "id", "runs"]);
-    }
-    const goblin = tok.Goblin?.id as string;
-    const ack = await answer(
-      dm,
-      dm.intent(F.edit, {
-        sceneId: ambushId,
-        op: "reveal",
-        shape: { kind: "rect", c0: 11, r0: 5, c1: 13, r1: 7 },
-      }),
-    );
-    expect(ack.type).toBe("ack");
-    const editId = (ack as { result: { editId: string } }).result.editId;
-    expect(editId).toEqual(expect.any(String));
-    await until(() => (fogOf(dm, ambushId) as FogRecord).undo?.editId === editId);
-    expect(tokenOf(dm, goblin)).not.toHaveProperty("fogged");
-    for (const c of [p1, p2]) {
-      const fogEvents = () =>
-        c.frames.filter((f) => f.type === "event" && f.cause.name === "FogEdited");
-      await until(() => fogEvents().length > 0);
-      expect(fogEvents()).toHaveLength(1);
-      expect(tokenOf(c, goblin)).not.toHaveProperty("fogged");
+      await until(() => fogOf(c, ambushId) !== undefined);
+      expect(tokenIds(c)).toEqual(
+        ["Mira", "Thorn", "Cave Ogre"].map((n) => tok[n]?.id as string).sort(),
+      );
       expect(fogOf(c, ambushId)).toEqual({
         id: ambushId,
         fill: "fog",
         box: [0, 0, 20, 14],
         runs: (fogOf(dm, ambushId) as FogRecord).runs,
       });
-      expect(tokenIds(c)).toEqual(visible);
+      const raw = c.raw();
+      expect(raw).not.toContain("Goblin Lurker");
+      for (const n of ["Goblin", "Goblin 2", "Goblin Lurker", "Wolf", "Elite Goblin Warrior"]) {
+        expect(raw).not.toContain(tok[n]?.id as string);
+      }
+      expect(leakScan(h.s, c)).toEqual([]);
     }
-    // Undo: stale id → conflict; the latest → back; DM's undo info follows.
-    const stale = await answer(
-      dm,
-      dm.intent(F.undo, { sceneId: ambushId, expectedEditId: "nope" }),
+    // A DM snapshot holds every token of the active scene (ADR-0041), fogged copies on the wire.
+    const fresh = await h.live(DM);
+    const ids = Object.keys(fresh.store.records[TOKEN_TYPE] ?? {});
+    expect(ids.filter((id) => tokenOf(fresh, id)?.sceneId === ambushId).sort()).toEqual(
+      Object.values(tok)
+        .map((t) => t.id)
+        .sort(),
     );
-    expect(stale).toMatchObject({ type: "reject", code: "conflict" });
-    expect(
-      (await answer(dm, dm.intent(F.undo, { sceneId: ambushId, expectedEditId: editId }))).type,
-    ).toBe("ack");
-    await until(() => (fogOf(dm, ambushId) as FogRecord).undo?.n === 3);
-    await until(() => tokenOf(dm, goblin)?.fogged === true);
-    // No-op edit: ack with editId null, no event.
-    const noop = await answer(
-      dm,
-      dm.intent(F.edit, {
-        sceneId: ambushId,
-        op: "hide",
-        shape: { kind: "rect", c0: 15, r0: 0, c1: 19, r1: 2 },
-      }),
-    );
-    expect(noop).toMatchObject({ type: "ack", result: { editId: null } });
-    for (const c of [dm, p1, p2]) expect(leakScan(h.s, c)).toEqual([]);
-    for (const [live, cred] of [
-      [dm, DM],
-      [p1, p("Player 1")],
-      [p2, p("Player 2")],
-    ] as const) {
-      const fresh = await h.live(cred);
-      const c = convergence(h.s, live, fresh);
-      expect(c.live[FOG_TYPE]).toEqual(c.fresh[FOG_TYPE] ?? {});
-      expect(c.live[TOKEN_TYPE]).toEqual(c.fresh[TOKEN_TYPE] ?? {});
-      fresh.close();
-    }
-    for (const c of [dm, p1, p2]) c.close();
+    expect(tokenOf(fresh, tok["Goblin Lurker"]?.id as string)?.fogged).toBe(true);
+    for (const c of [dm, fresh, p1, p2]) c.close();
   });
 
   test("FOG §9 leak: players get `fogged` only on their own tokens (snapshot + every frame); the DM on all", async () => {
     const dm = await h.live(DM);
-    expect((await answer(dm, dm.loadScene(ambushId))).type).toBe("ack");
     const p1 = await h.live(p("Player 1"));
     const p2 = await h.live(p("Player 2"));
     const mira = tok.Mira?.id as string; // Player 1's
@@ -296,7 +252,7 @@ describe("fog bundle over WS (build/fog-server)", () => {
     expect(await snap()).toEqual(before);
     const dm = await h.live(DM);
     const fog = fogOf(dm, ambushId) as FogRecord;
-    expect(fog.undo?.n).toBe(3);
+    expect(fog.undo?.n).toBe(4);
     const ack = await answer(
       dm,
       dm.intent(F.undo, { sceneId: ambushId, expectedEditId: fog.undo?.editId }),

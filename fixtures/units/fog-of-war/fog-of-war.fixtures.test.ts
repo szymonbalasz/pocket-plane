@@ -18,13 +18,13 @@ afterAll(() => {
 });
 
 describe("fog-of-war fixtures (FOG §13)", () => {
-  test("FOG §13 bundle `fog` loads from empty: Goblin Ambush partly revealed, fogged copies, undo depth 3", async () => {
+  test("FOG §13 bundle `fog` loads from empty: Goblin Ambush partly revealed, fogged copies, undo depth 4 (FR-FOG-25 ripple)", async () => {
     const r = await loadBundle("fog");
     dirs.push(r.dir);
     const db = r.openDb();
     const scenes = db.select().from(scene).all();
     const fogs = db.select().from(sceneFog).all();
-    const edits = db.select().from(sceneFogEdit).orderBy(asc(sceneFogEdit.seq)).all();
+    const allEdits = db.select().from(sceneFogEdit).orderBy(asc(sceneFogEdit.seq)).all();
     const tokens = db.select().from(token).orderBy(asc(token.seq)).all();
     closeDb(db);
     expect(r.manifest.fixtures.slice(-4)).toEqual([
@@ -34,10 +34,25 @@ describe("fog-of-war fixtures (FOG §13)", () => {
       "fog-ambush-partial",
     ]);
     const ambush = scenes.find((s) => s.name === "Goblin Ambush");
-    // Only Goblin Ambush has fog (no `created` line yet: other scenes stay clear).
-    expect(fogs.map((f) => f.sceneId)).toEqual([ambush?.id as string]);
-    expect(fogs[0]).toMatchObject({ fill: "fog", col0: 0, row0: 0, cols: 20, rows: 14 });
-    expect(edits.map((e) => e.kind)).toEqual(["fog-all", "reveal-rect", "reveal-polygon"]);
+    // FR-FOG-25: every scene a unit creates is revealed last (one "reveal-all" entry each); only
+    // Goblin Ambush is fogged again by fog-ambush.
+    expect(fogs.map((f) => f.sceneId).sort()).toEqual(scenes.map((s) => s.id).sort());
+    for (const f of fogs.filter((x) => x.sceneId !== ambush?.id)) {
+      expect(f).toMatchObject({ fill: "clear", runs: "" });
+    }
+    const fog = fogs.find((f) => f.sceneId === ambush?.id);
+    expect(fog).toMatchObject({ fill: "fog", col0: 0, row0: 0, cols: 20, rows: 14 });
+    const edits = allEdits.filter((e) => e.sceneId === ambush?.id);
+    expect(edits.map((e) => e.kind)).toEqual([
+      "reveal-all",
+      "fog-all",
+      "reveal-rect",
+      "reveal-polygon",
+    ]);
+    expect(allEdits.filter((e) => e.sceneId !== ambush?.id).map((e) => e.kind)).toEqual([
+      "reveal-all",
+      "reveal-all",
+    ]);
     const on = tokens.filter((t) => t.sceneId === ambush?.id);
     const by = (name: string) => on.find((t) => t.name === name);
     expect(by("Goblin Lurker")).toMatchObject({ col: 17, row: 11, hidden: false, fogged: true });

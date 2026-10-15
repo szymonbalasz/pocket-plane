@@ -2,6 +2,7 @@
 // Thorn) plus "Elite Goblin Warrior" and a battlemap like CBT §13's `combat` bundle: Mira,
 // Goblin, Goblin 2 visible; Wolf, Elite hidden; Thorn.
 import type { CombatantRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
+import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import { asc, eq } from "drizzle-orm";
 import { combatant } from "../../db/schema";
 import { createEntity } from "../entities/commands";
@@ -34,6 +35,8 @@ export function combatSetup() {
     name: "Goblin Ambush",
     mapAssetId: "map-battle",
   });
+  // FR-FOG-25 ripple: new scenes start fogged; this battlemap is revealed (as the fixture).
+  run(FOG_INTENTS.setAll, { sceneId: scene.id, fogged: false });
   const place = (definitionId: string, col: number, row: number, hidden = false) =>
     run<{ tokenId: string }>(placeToken.name, {
       sceneId: scene.id,

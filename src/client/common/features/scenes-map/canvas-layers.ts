@@ -42,6 +42,6 @@ export const canvasLayers: readonly LayerDef<object>[] = orderLayers<object>([
     toggle: { key: "templates", label: "Templates", layer: "objects" },
   },
   { id: "scn-edit", order: LAYER_ORDER.scnEdit, component: ScnEditLayer, clients: ["dm"] },
-  // fog-of-war (FR-FOG-20): DM render + Fog tool draft; build/fog-visibility opens it to players.
-  { id: "fog", order: LAYER_ORDER.fog, component: FogLayer, clients: ["dm"] },
+  // fog-of-war (FR-FOG-20/21): translucent for the DM (+ Fog tool draft), opaque for players.
+  { id: "fog", order: LAYER_ORDER.fog, component: FogLayer },
 ]);

@@ -43,7 +43,7 @@ export interface SceneVisibilityHook {
 
 /** The registry. Append your feature's line; order = run order. */
 export const sceneVisibilityHooks: readonly SceneVisibilityHook[] = [
-  fogVisibilityHook, // fog-of-war (FR-FOG-10: derive)
+  fogVisibilityHook, // fog-of-war (FR-FOG-10 derive, FR-FOG-11/12 hides, FR-FOG-15 dragToDm)
 ];
 
 /** Live hook list, seeded from the registry; tests may add hooks via `register`. */

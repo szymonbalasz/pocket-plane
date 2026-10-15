@@ -1,7 +1,7 @@
 // `fog` canvas layer (order 30, FR-FOG-20/21): the shown scene's fogged cells as one shape of
 // row-run rects (`fog-mask`, `listening: false`), clipped to the map; translucent for the DM. On the
 // DM client also the Fog tool's draft (`fog-draft`, `fog-draft-vertex`) and the shown scene the fog
-// bar acts on. Registered DM only until build/fog-visibility switches the player render on.
+// bar acts on. Players: opaque, from their redacted `fog` record (FR-FOG-21); no row → no fog.
 import { FOG_TYPE } from "@shared/fog-of-war/schemas";
 import { useEffect, useMemo } from "react";
 import { Circle, Group, Layer, Line, Rect, Shape } from "react-konva";

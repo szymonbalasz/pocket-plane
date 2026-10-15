@@ -1015,14 +1015,15 @@ From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD, `comple
 
 ## 24. Sprint 2: fog of war
 
-From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG, `complete`; DM gate 2, #196; [ADR-0039](../architecture/adr/0039-fog-visibility.md)). **Built by `fix/fog-core`**: the tables and column below (drizzle push), the zod shapes and pure mask code (`@shared/fog-of-war`: `schemas`, `mask` codec / box / re-base / footprint, `raster`, `visibility` `fogHidden`). Commands that write them *(built, build/fog-server)*: `fog.edit` / `fog.setAll` / `fog.undo` and fog's `derive` / `duplicated` / `deleting` registry lines ([protocol §35](../protocol/README.md#35-sprint-2-phase-2-fog-of-war)). Protocol side: [protocol §35](../protocol/README.md#35-sprint-2-phase-2-fog-of-war).
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG, `complete`; DM gate 2, #196; [ADR-0039](../architecture/adr/0039-fog-visibility.md)). **Built by `fix/fog-core`**: the tables and column below (drizzle push), the zod shapes and pure mask code (`@shared/fog-of-war`: `schemas`, `mask` codec / box / re-base / footprint, `raster`, `visibility` `fogHidden`). Commands that write them *(built, build/fog-server)*: `fog.edit` / `fog.setAll` / `fog.undo` and fog's `derive` / `duplicated` / `deleting` registry lines; *(built, build/fog-visibility)* the `created` line (new scenes fully fogged) and the fog commands' re-derive of SCN subjects and door flags ([protocol §35](../protocol/README.md#35-sprint-2-phase-2-fog-of-war)). Protocol side: [protocol §35](../protocol/README.md#35-sprint-2-phase-2-fog-of-war).
 
 | Table / leaf | Change | Default (push-safe) | Visibility | Source |
 |---|---|---|---|---|
 | `token` | + `fogged` (bool): server copy, [§12](#12-scenes-scene-scene-folder-token) | false | wire only when true; DM + players who see the token | [FR-FOG-10](../specs/fog-of-war.md#6-functional-requirements) |
-| `scene_fog` (new, record type `fog`) | see below | no row = every cell clear (scenes before this build stay clear) | DM full; players redacted, active scene only | [FR-FOG-01](../specs/fog-of-war.md#6-functional-requirements) |
+| `scene_fog` (new, record type `fog`) | see below | no row = every cell clear (scenes before this build stay clear); *(build/fog-visibility)* `map.createScene` writes `{fill: fog, box: fogBox(scene), runs: ""}` (FR-FOG-02) | DM full; players redacted, active scene only | [FR-FOG-01](../specs/fog-of-war.md#6-functional-requirements) |
 | `scene_fog_edit` (new, server table, **not** a record type) | see below | — | DM sees depth + latest entry on the `fog` record | [FR-FOG-07](../specs/fog-of-war.md#6-functional-requirements) |
-| prop, AoE template (SCN) | + `fogged` | created with their tables by `fix/scn-core` ([§25](#25-sprint-2-scene-tools)) | — | ADR-0039 |
+| prop, AoE template (SCN) | + `fogged` | created with their tables by `fix/scn-core` ([§25](#25-sprint-2-scene-tools)) | DM wire only when true; fog-hidden rows never reach players; *(build/fog-visibility)* an exempt player-placed template reaches players without it | ADR-0039 |
+| `scene_structure.doors[i][6]` (`f`, SCN) | door fog flag 0 \| 1 | written by `scn.addDoor` and *(build/fog-visibility)* by every fog command (`rev` + 1 when a flag flips) | players never receive `f = 1` doors | [FR-SCN-36](../specs/scene-tools.md#6-functional-requirements), OQ-SCN-06 |
 
 ### Fog (`scene_fog`, record type `fog`) — owner [fog-of-war](../specs/fog-of-war.md#8-data-model)
 
@@ -1045,7 +1046,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG, `complete`; DM gate
 
 - **Constraints the DB enforces:** `scene_fog` PK = scene (one row per scene); both tables cascade with their scene (FR-FOG-23); FKs to campaign; `scene_fog_edit.seq` unique; indexes `scene_fog_campaign`, `scene_fog_edit_scene (scene_id, seq)`, `scene_fog_edit_campaign`. Runs cap, box size and undo depth are command checks.
 - **Derived** (never stored): box (`fogBox(scene)`), mask ↔ runs (`maskOf`, `rowOf`), re-base (`rebase`), `footprintFogged` (every cell fogged; off-box cells take `fill`), fog-hidden (`fogHidden(type, record)`: `fogged` and not exempt: owned token, player-placed template), undo depth and latest edit (DM wire).
-- **Persisted runtime state:** fog rows, undo stacks and `fogged` copies, committed together (survive reload and a hard kill).
+- **Persisted runtime state:** fog rows, undo stacks, `fogged` copies (tokens, props, templates) and door flags, committed together in one transaction per fog command (survive reload and a hard kill). *(build/fog-visibility)* Combat copies: `combatant.hidden` / `effect.hidden` = `hidden` or fog-hidden of the bound token (FR-FOG-14), rewritten in the same transaction when a fog edit, move or size refresh flips it.
 - **Duplicate / delete** *(build/fog-server)*: `map.duplicateScene` copies the `scene_fog` row (not `scene_fog_edit`) before the copy's tokens, which derive `fogged` against it; `map.deleteScene` lists the `fog` delete, then the FK cascade removes row and stack.
 
 ## 25. Sprint 2: scene tools

@@ -1,20 +1,25 @@
 // fog-of-war's registry lines against the real fog (FR-FOG-02, -10, -23, -24): `derive` at every
 // scenes-map write site, `duplicated` copies the row (not the stack), `deleting` lists the `fog`
-// delete; the FK cascade removes row and stack. Nothing is hidden from players yet (no `hides`).
+// delete; the FK cascade removes row and stack; `created` fogs new scenes; `hides` = fog-hidden;
+// `dragToDm` routes previews into fog to the DM (FR-FOG-11, -15).
 import { describe, expect, test } from "bun:test";
 import { FOG_INTENTS as F, type FogRecord, type FogShape } from "@shared/fog-of-war/schemas";
-import { MAP_INTENTS as I, type SceneRecord } from "@shared/scenes-map/schemas";
+import { type DragData, MAP_INTENTS as I, type SceneRecord } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { type CommandDef, defineCommand } from "../../commands/commands";
 import { sceneFog, sceneFogEdit, token } from "../../db/schema";
+import type { SignalSender } from "../../ws/signals";
 import { createEntity, UPDATE } from "../entities/commands";
 import { goblinBlock } from "../entities/testing";
 import { placeTokenIn, MAP_REST as R } from "../scenes-map/commands";
+import { dragAudience } from "../scenes-map/drag";
 import { scenesSetup } from "../scenes-map/testing";
 import { tokenVisibility } from "../scenes-map/visibility";
+import { sceneVisibilityHooks } from "../scenes-map/visibility-hooks";
 import { fogUndoStack } from "./commands";
 import { readFogRecord } from "./rows";
+import { dropFogRow } from "./testing";
 
 const placeOne = defineCommand({
   name: "test.placeOne",
@@ -34,8 +39,14 @@ const placeOne = defineCommand({
 function setup() {
   const t = scenesSetup();
   t.s.commands.register(placeOne as unknown as CommandDef);
-  const newScene = (name = "Goblin Ambush") =>
+  // Scenes as before this build (no fog row); `fresh` keeps FR-FOG-02's fully fogged row.
+  const fresh = (name: string) =>
     t.run<SceneRecord>(R.createScene, { name, mapAssetId: "map-battle" });
+  const newScene = (name = "Goblin Ambush") => {
+    const s = fresh(name);
+    dropFogRow(t.s.db, s.id);
+    return s;
+  };
   const ambush = newScene();
   const place = (col: number, row: number, definitionId = t.h.goblinId, sceneId = ambush.id) =>
     t.run<{ tokenId: string }>(I.placeToken, { sceneId, definitionId, col, row }).tokenId;
@@ -53,7 +64,7 @@ function setup() {
   const setAll = (f: boolean, sceneId = ambush.id) =>
     t.run<{ editId: string | null }>(F.setAll, { sceneId, fogged: f }).editId;
   const lastEvent = () => t.events.at(-1)?.event;
-  return { ...t, newScene, ambush, place, fogged, rect, edit, setAll, lastEvent };
+  return { ...t, fresh, newScene, ambush, place, fogged, rect, edit, setAll, lastEvent };
 }
 
 describe("FR-FOG-10 derive (fog's line)", () => {
@@ -74,11 +85,13 @@ describe("FR-FOG-10 derive (fog's line)", () => {
     expect(t.fogged(placed.id)).toBe(true);
     // Off the box: cells take `fill` (fog).
     expect(t.fogged(t.place(19, 13))).toBe(true);
-    // Players: nothing hidden yet (no `hides` line; build/fog-visibility switches it on).
+    // FR-FOG-11/12: fog-hidden for players unless owned (exempt; the registry gives the DM full).
     const row = t.s.db.select().from(token).where(eq(token.id, placed.id)).get();
-    expect(
-      tokenVisibility({ ...row, fogged: true } as never, t.h.viewer("player", t.h.p1.id)),
-    ).toBe("redacted");
+    const p1 = t.h.viewer("player", t.h.p1.id);
+    expect(tokenVisibility({ ...row, fogged: true } as never, p1)).toBe("hidden");
+    const owned = { ...row, fogged: true, ownerPlayerId: t.h.p1.id };
+    expect(tokenVisibility(owned as never, p1)).toBe("redacted");
+    expect(tokenVisibility(owned as never, t.h.viewer("player", t.h.p2.id))).toBe("redacted");
   });
 
   test("FR-FOG-10 map.moveToken: walking into fog is fogged in its own TokenMoved; out of it clear", () => {
@@ -223,10 +236,109 @@ describe("FR-FOG-02 / -23 lifecycle (fog's lines)", () => {
     expect(t.lastEvent()?.changes.map((c) => c.type)).toEqual(["scene"]);
   });
 
-  test("FR-FOG-02 no `created` line yet: a new scene has no fog row (build/fog-visibility adds it)", () => {
+  test("FR-FOG-02 created: a new scene starts fully fogged (row in SceneCreated, no undo entry); tokens placed on it are fogged", () => {
     const t = setup();
-    const s = t.newScene("Fresh");
-    expect(readFogRecord(t.s.db, s.id)).toBeNull();
-    expect(t.lastEvent()?.changes.map((c) => c.type)).toEqual(["scene"]);
+    const s = t.fresh("Fresh");
+    const rec = readFogRecord(t.s.db, s.id) as FogRecord;
+    expect(rec).toEqual({
+      id: s.id,
+      campaignId: t.h.campaignId,
+      fill: "fog",
+      box: [0, 0, 20, 14],
+      runs: "",
+      undo: null,
+    });
+    const ev = t.lastEvent();
+    expect(ev?.type).toBe("SceneCreated");
+    expect(ev?.changes.map((c) => c.type)).toEqual(["scene", "fog"]);
+    expect(ev?.changes[1]).toEqual({ type: "fog", id: s.id, before: null, after: rec });
+    expect(fogUndoStack(t.s.db, s.id)).toEqual([]);
+    expect(t.fogged(t.place(3, 3, t.h.goblinId, s.id))).toBe(true);
+    // The DM can Reveal all at once: one entry, every cell clear.
+    t.setAll(false, s.id);
+    expect(readFogRecord(t.s.db, s.id)).toMatchObject({ fill: "clear", undo: { n: 1 } });
+  });
+
+  test("FR-FOG-02 a duplicate of a new scene keeps it fogged; a create that rolls back leaves no row", () => {
+    const t = setup();
+    const s = t.fresh("Fresh");
+    const copy = t.run<SceneRecord>(R.duplicateScene, { id: s.id });
+    expect(readFogRecord(t.s.db, copy.id)).toMatchObject({ fill: "fog", runs: "", undo: null });
+    const rows = t.s.db.select().from(sceneFog).all().length;
+    expect(() => t.run(R.createScene, { name: "Bad", mapAssetId: "nope" })).toThrow();
+    expect(t.s.db.select().from(sceneFog).all()).toHaveLength(rows);
+  });
+});
+
+describe("FR-FOG-11 / -15 hides and dragToDm (fog's line)", () => {
+  const routeOf = (t: ReturnType<typeof setup>) => {
+    const read = { db: t.s.db, activeSceneOf: (c: string) => t.s.records.activeSceneOf(c) };
+    const dm: SignalSender = { role: "dm", campaignId: t.h.campaignId };
+    return (data: DragData) => dragAudience(data, dm, read);
+  };
+
+  test("FR-FOG-15 visible token: clear preview → all; wholly fogged preview → dm from the first such frame; end → all", () => {
+    const t = setup();
+    t.run(I.activateScene, { sceneId: t.ambush.id });
+    t.setAll(true);
+    t.edit("reveal", t.rect(0, 0, 3, 3));
+    const g = t.place(1, 1);
+    const route = routeOf(t);
+    const at = (col: number, row: number): DragData => ({
+      sceneId: t.ambush.id,
+      tokenId: g,
+      x: col * 70 + 20, // FR-MAP-15 rounding: + 20 px stays in the cell
+      y: row * 70,
+    });
+    expect(route(at(2, 1))).toBe("all");
+    expect(route(at(3, 3))).toBe("all");
+    expect(route(at(4, 3))).toBe("dm");
+    expect(route(at(9, 9))).toBe("dm");
+    expect(route({ sceneId: t.ambush.id, tokenId: g, end: true })).toBe("all");
+  });
+
+  test("FR-FOG-15 Large previews use the whole footprint; fog-hidden tokens and their end frames → dm; owned → all", () => {
+    const t = setup();
+    t.run(I.activateScene, { sceneId: t.ambush.id });
+    t.setAll(true);
+    t.edit("reveal", t.rect(0, 0, 3, 3));
+    const ogre = t.run<{ id: string }>(createEntity.name, {
+      kind: "monster",
+      name: "Cave Ogre",
+      statBlock: { ...goblinBlock, size: "large" },
+    });
+    const o = t.place(1, 1, ogre.id);
+    const hiddenInFog = t.place(10, 10);
+    const owned = t.run<{ tokenId: string }>(I.placeToken, {
+      sceneId: t.ambush.id,
+      definitionId: t.h.goblinId,
+      col: 2,
+      row: 2,
+      ownerPlayerId: t.h.p1.id,
+    }).tokenId;
+    const route = routeOf(t);
+    const px = (tokenId: string, col: number, row: number): DragData => ({
+      sceneId: t.ambush.id,
+      tokenId,
+      x: col * 70,
+      y: row * 70,
+    });
+    expect(route(px(o, 3, 3))).toBe("all"); // (3, 3) of its 2 × 2 is clear
+    expect(route(px(o, 4, 4))).toBe("dm");
+    expect(route(px(hiddenInFog, 1, 1))).toBe("dm"); // hidden for players: every frame
+    expect(route({ sceneId: t.ambush.id, tokenId: hiddenInFog, end: true })).toBe("dm");
+    expect(route(px(owned, 12, 12))).toBe("all"); // exempt (OQ-FOG-03)
+    expect(route({ sceneId: t.ambush.id, tokenId: owned, end: true })).toBe("all");
+  });
+
+  test("FR-FOG-11 hides = fog-hidden: fogged and not exempt; props never exempt; player templates exempt", () => {
+    const [line] = sceneVisibilityHooks;
+    const hides = (type: string, r: object) => line?.hides?.(type, r) ?? false;
+    expect(hides("token", { fogged: true, ownerPlayerId: null })).toBe(true);
+    expect(hides("token", { fogged: true, ownerPlayerId: "p" })).toBe(false);
+    expect(hides("token", { ownerPlayerId: null })).toBe(false);
+    expect(hides("scene-prop", { fogged: true })).toBe(true);
+    expect(hides("aoe-template", { fogged: true, placedByPlayerId: null })).toBe(true);
+    expect(hides("aoe-template", { fogged: true, placedByPlayerId: "p" })).toBe(false);
   });
 });
