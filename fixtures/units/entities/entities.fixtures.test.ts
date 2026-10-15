@@ -30,7 +30,7 @@ async function loaded(bundle: string) {
 }
 
 describe("entities fixtures (ENT §13)", () => {
-  test("FR-ENT-06 enemy-1 / enemy-2: SRD goblin + wolf, global, fixture provenance", async () => {
+  test("FR-ENT-06 / FR-ENT-25 enemy-1 / enemy-2: SRD goblin + wolf (HP formulas), global, fixture provenance", async () => {
     const r = await loaded("entities");
     const imported = r.rows.filter((e) => e.campaignId === null);
     expect(imported.map((e) => [e.name, e.kind, e.source, e.sourceKey, e.licence])).toEqual([
@@ -42,6 +42,7 @@ describe("entities fixtures (ENT §13)", () => {
       size: "small",
       ac: 15,
       hpMax: 7,
+      hpFormula: "2d6",
       initBonus: 2,
       speed: 30,
       abilities: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 },
@@ -52,6 +53,7 @@ describe("entities fixtures (ENT §13)", () => {
       size: "medium",
       ac: 13,
       hpMax: 11,
+      hpFormula: "2d8+2",
       initBonus: 2,
       speed: 40,
       abilities: { str: 12, dex: 15, con: 12, int: 3, wis: 12, cha: 6 },

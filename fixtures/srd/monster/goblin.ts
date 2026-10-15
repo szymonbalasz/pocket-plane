@@ -7,6 +7,7 @@ export const goblin = {
     size: "small",
     ac: 15,
     hpMax: 7,
+    hpFormula: "2d6",
     initBonus: 2,
     speed: 30,
     abilities: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 },
