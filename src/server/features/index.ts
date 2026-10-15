@@ -9,6 +9,7 @@ import { diceRollLog } from "./dice-roll-log";
 import { effectModifiers } from "./effect-modifiers";
 import { entities } from "./entities";
 import { fixturesAdapters } from "./fixtures-adapters";
+import { fogOfWar } from "./fog-of-war";
 import { liveSync } from "./live-sync";
 import { notifications } from "./notifications";
 import { partyLootFeature } from "./party-loot";
@@ -28,4 +29,5 @@ export const features: readonly Feature[] = [
   partyLootFeature,
   combatExtras,
   effectModifiers,
+  fogOfWar,
 ];
