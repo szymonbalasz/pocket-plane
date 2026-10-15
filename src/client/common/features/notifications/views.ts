@@ -40,9 +40,10 @@ export interface NotificationView {
   encounterIdOf?: (payload: unknown) => string | null;
   /**
    * FR-NOTE-30 (DM view only): tokens to cue for a new pending player action. Absent → the
-   * default rule (the action player's tokens on the viewed scene).
+   * default rule (the action player's tokens on the viewed scene, `token-cue.ts`).
+   * `viewedSceneId`: the DM's viewed scene (only its tokens are drawn).
    */
-  cueTokens?: (n: NotificationRecord, store: RecordStore) => string[];
+  cueTokens?: (n: NotificationRecord, store: RecordStore, viewedSceneId: string | null) => string[];
 }
 
 export function defineNotificationView(v: NotificationView): NotificationView {

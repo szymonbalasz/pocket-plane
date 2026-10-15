@@ -1,5 +1,6 @@
 // Always-mounted notifications runtime (FR-NOTE-13/14/15/18): watches sync changes, keeps the
-// toast stack in the shell's toast region, sets the seen baseline. Toasts and timers are client
+// toast stack in the shell's toast region, sets the seen baseline, starts the DM's action cue
+// (FR-NOTE-30). Toasts and timers are client
 // memory only (per page, `ToastMemory`). Player: bottom-right. DM: top-centre below the top bar (#149): the DM's right
 // column (`cbt.initiative`, protocol §24) reaches the bottom-right corner, and sticky damage-card
 // toasts covered its lower rows; the map gap between the columns is free in the default layout.
@@ -37,6 +38,7 @@ import {
   type ToastState,
   visibleToasts,
 } from "./toasts";
+import { cueTriggers, startCues } from "./token-cue";
 import { type NotificationViews, originOf } from "./views";
 
 type Action = (s: ToastState, now: number) => ToastState;
@@ -131,6 +133,8 @@ export function ToastRuntime({
       if (t === null) return;
       if (t === "connect") note.baseline(next.store);
       memory.setState((m) => syncToasts(m, prev, next, t, Date.now()));
+      // FR-NOTE-30: the DM's 4 s action cue (live event frames only).
+      startCues(cueTriggers(prev, next, t), (kind) => views.get(kind));
       note.markSeen(next.store);
     };
     // A remount keeps the stack: the pointer is gone and the tab may have changed visibility.
@@ -139,7 +143,7 @@ export function ToastRuntime({
     // Mounted after the first snapshot (loading screen first): treat it as the connect.
     if (first.state === "live" && viewerOf(first.store)) onChange(first, null);
     return sync.subscribe((next, prev) => onChange(next, prev));
-  }, [sync, note, memory, dispatch]);
+  }, [sync, note, memory, dispatch, views]);
 
   // FR-NOTE-26: `hideToast(id)` reaches this page's stack.
   useEffect(() => registerToastMemory(memory), [memory]);
