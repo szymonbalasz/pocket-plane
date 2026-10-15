@@ -1,7 +1,7 @@
 ---
 title: Play shell
 prefix: SHELL
-status: complete
+status: in-review
 owner: spec-play-shell
 wave: 2
 ---

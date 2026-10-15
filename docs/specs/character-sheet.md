@@ -1,7 +1,7 @@
 ---
 title: Character sheet (basics)
 prefix: CHAR
-status: complete
+status: in-review
 owner: spec-character-sheet
 wave: 2
 ---

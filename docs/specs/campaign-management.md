@@ -1,7 +1,7 @@
 ---
 title: Campaign management
 prefix: CAMP
-status: complete
+status: in-review
 owner: spec-campaign-management
 wave: 1
 ---
