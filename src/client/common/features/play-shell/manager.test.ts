@@ -355,6 +355,65 @@ describe("layout restore (FR-SHELL-17)", () => {
   });
 });
 
+describe("FR-SHELL-39 grow to content: fixedH", () => {
+  const grows = createWindowRegistry("dm", [
+    def("cbt.initiative", { growToContent: true }),
+    def("a.plain"),
+  ]);
+  const gctx: ManagerContext = {
+    ...ctx,
+    registry: grows,
+    available: new Set(["cbt.initiative", "a.plain"]),
+  };
+  const go = (ws: Windows, ...actions: WindowAction[]) =>
+    actions.reduce((acc, a) => reduce(acc, a, gctx), ws);
+  const rect = { x: 100, y: 100, w: 320, h: 400 };
+
+  test("FR-SHELL-39 resize end sets fixedH and writes h; a move doesn't", () => {
+    let ws = go([], { type: "open", kind: "cbt.initiative" });
+    ws = go(ws, { type: "setRect", kind: "cbt.initiative", rect });
+    expect(get(ws, "cbt.initiative").fixedH).toBeUndefined();
+    ws = go(ws, { type: "setRect", kind: "cbt.initiative", rect, resized: true });
+    expect(get(ws, "cbt.initiative")).toMatchObject({ ...rect, fixedH: true });
+    ws = go(ws, { type: "setRect", kind: "cbt.initiative", rect: { ...rect, x: 300 } });
+    expect(get(ws, "cbt.initiative").fixedH).toBe(true); // a later move keeps it
+  });
+
+  test("FR-SHELL-39 a fixedH-only change is written (not dropped as a no-op)", () => {
+    let ws = go([], { type: "open", kind: "cbt.initiative" });
+    ws = go(ws, { type: "setRect", kind: "cbt.initiative", rect });
+    const next = go(ws, { type: "setRect", kind: "cbt.initiative", rect, resized: true });
+    expect(next).not.toBe(ws);
+  });
+
+  test("FR-SHELL-39 only opted-in types get fixedH", () => {
+    let ws = go([], { type: "open", kind: "a.plain" });
+    ws = go(ws, { type: "setRect", kind: "a.plain", rect, resized: true });
+    expect(get(ws, "a.plain").fixedH).toBeUndefined();
+  });
+
+  test("FR-SHELL-39 reset clears it", () => {
+    let ws = go([], { type: "open", kind: "cbt.initiative" });
+    ws = go(
+      ws,
+      { type: "setRect", kind: "cbt.initiative", rect, resized: true },
+      { type: "reset" },
+    );
+    expect(ws.some((w) => w.fixedH)).toBe(false);
+  });
+
+  test("FR-SHELL-39 entries without fixedH parse; fixedH round-trips; other values are invalid", () => {
+    const w = { kind: "cbt.initiative", instance: "main", state: "open", ...rect, z: 1 };
+    const back = (x: object) => restoreLayout(grows, JSON.stringify({ windows: [x] }), vp);
+    expect(back(w).warning).toBeUndefined();
+    expect(get(back(w).windows, "cbt.initiative").fixedH).toBeUndefined();
+    const fixed = back({ ...w, fixedH: true });
+    expect(get(fixed.windows, "cbt.initiative").fixedH).toBe(true);
+    expect(serialise(fixed.windows, grows).windows[0]?.fixedH).toBe(true);
+    expect(back({ ...w, fixedH: false }).warning).toBeString();
+  });
+});
+
 describe("FR-SHELL-36/37 minimised = parked", () => {
   const keys = (ws: Windows, available = ctx.available) =>
     mountedWindows(ws, available).map((w) => `${w.kind}:${w.state}`);

@@ -1,7 +1,7 @@
 // Window geometry: default placement, render-only fit and clamp, drag and resize math
 // (FR-SHELL-10/12/29).
 import { GEOMETRY_LIMIT } from "@shared/play-shell/layout";
-import type { DefaultPosition, Size } from "./registry";
+import type { DefaultPosition, Size, WindowDef } from "./registry";
 
 /** Height of the top bar; windows never go above it (FR-SHELL-12). Matches `h-12`. */
 export const TOP_BAR_H = 48;
@@ -117,6 +117,44 @@ export function renderedRect(
   vp: Viewport,
 ): Rect {
   return clampRect(fitRect(win, win.area, min, vp), vp);
+}
+
+/**
+ * Grow to content (FR-SHELL-39), render-only: `r` (the rendered rect) made as tall as `needed`
+ * (the window height its content asks for), never shorter than `r`, capped so it stays inside the
+ * work area. Grows down from its top; `up` (bottom-anchored types) keeps its bottom, grows up.
+ */
+export function grownRect(r: Rect, needed: number | undefined, up: boolean, vp: Viewport): Rect {
+  if (needed === undefined || needed <= r.h) return r;
+  if (up) {
+    const bottom = r.y + r.h;
+    const h = Math.max(r.h, Math.min(Math.ceil(needed), bottom - TOP_BAR_H));
+    return { ...r, y: bottom - h, h };
+  }
+  const h = Math.max(r.h, Math.min(Math.ceil(needed), TOP_BAR_H + workArea(vp).h - r.y));
+  return { ...r, h };
+}
+
+type GrowDef = Pick<WindowDef, "minSize" | "defaultPosition" | "growToContent">;
+
+/** The window type grows to its content now: opted in and not resized by the user (FR-SHELL-39). */
+export const growsToContent = (win: { fixedH?: true | undefined }, def: GrowDef) =>
+  def.growToContent === true && win.fixedH !== true;
+
+/**
+ * Where a window draws (FR-SHELL-29, -12, -39): fit + clamp, then, while it grows to content,
+ * the height `needed` measured by `ShellWindow`. `ShellWindow` and `renderedWindowRects` both
+ * use it, so what is drawn is what the free area and other consumers see.
+ */
+export function windowRect(
+  win: Rect & { area?: Viewport | undefined; fixedH?: true | undefined },
+  def: GrowDef,
+  vp: Viewport,
+  needed?: number,
+): Rect {
+  const r = renderedRect(win, def.minSize, vp);
+  if (!growsToContent(win, def)) return r;
+  return grownRect(r, needed, def.defaultPosition.anchor.startsWith("bottom"), vp);
 }
 
 /** Title-bar drag from `start` (the rendered rect) by (dx, dy); result clamped. */

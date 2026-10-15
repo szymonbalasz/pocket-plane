@@ -4,6 +4,8 @@ import {
   defaultRect,
   EDGE_GAP,
   fitRect,
+  grownRect,
+  growsToContent,
   LAUNCHER_CLEAR,
   MIN_VISIBLE_W,
   moveRect,
@@ -12,6 +14,7 @@ import {
   resizeRect,
   TITLE_H,
   TOP_BAR_H,
+  windowRect,
   workArea,
 } from "./geometry";
 
@@ -153,5 +156,57 @@ describe("geometry", () => {
     expect(resizeRect(r, "w", 1000, 0, min, vp)).toEqual({ x: 300, y: 100, w: 200, h: 300 });
     expect(resizeRect(r, "w", -1000, 0, min, vp)).toEqual({ x: 0, y: 100, w: 500, h: 300 });
     expect(resizeRect(r, "sw", -10, 10, min, vp)).toEqual({ x: 90, y: 100, w: 410, h: 310 });
+  });
+});
+
+describe("FR-SHELL-39 grow to content", () => {
+  const grow = {
+    minSize: { w: 320, h: 240 },
+    defaultPosition: { anchor: "top-right" as const },
+    growToContent: true as const,
+  };
+  const win = { x: 1188, y: 60, w: 400, h: 300 };
+  /** Window height for `rows` rows of 36 px under a 34 px title bar + borders and 24 px padding. */
+  const rows = (n: number) => 34 + 24 + 36 * n;
+  const waBottom = TOP_BAR_H + workArea(vp).h; // 836 at 1600×900
+
+  test("FR-SHELL-39 content 6 → 9 rows: rendered height grows, render-only", () => {
+    expect(windowRect(win, grow, vp, rows(6))).toEqual(win); // 274 < stored 300: stored wins
+    expect(windowRect(win, grow, vp, rows(9))).toEqual({ ...win, h: rows(9) });
+    expect(win.h).toBe(300); // nothing written
+  });
+
+  test("FR-SHELL-39 capped at the work-area bottom (then the body scrolls)", () => {
+    expect(windowRect(win, grow, vp, rows(40))).toEqual({ ...win, h: waBottom - win.y });
+    // Already past the cap (a user-placed window): never shorter than its rendered rect.
+    const low = { ...win, y: 700 };
+    expect(windowRect(low, grow, vp, rows(40))).toEqual(low);
+  });
+
+  test("FR-SHELL-39 a bottom-anchored type keeps its bottom and grows up, to the top bar", () => {
+    const up = { ...grow, defaultPosition: { anchor: "bottom-right" as const } };
+    const w = { x: 1188, y: 500, w: 280, h: 300 };
+    expect(windowRect(w, up, vp, 400)).toEqual({ ...w, y: 400, h: 400 });
+    expect(windowRect(w, up, vp, 2000)).toEqual({ ...w, y: TOP_BAR_H, h: 800 - TOP_BAR_H });
+  });
+
+  test("FR-SHELL-39 no growth after a user resize (`fixedH`), without opt-in, or unmeasured", () => {
+    expect(windowRect({ ...win, fixedH: true }, grow, vp, rows(9))).toEqual(win);
+    expect(windowRect(win, { ...grow, growToContent: undefined }, vp, rows(9))).toEqual(win);
+    expect(windowRect(win, grow, vp, undefined)).toEqual(win);
+    expect(growsToContent({}, grow)).toBe(true);
+    expect(growsToContent({ fixedH: true }, grow)).toBe(false);
+  });
+
+  test("FR-SHELL-39 growth applies after the FR-SHELL-29 fit", () => {
+    const small = { w: 1280, h: 720 };
+    const stored = { ...win, x: 868, area: workArea(vp) };
+    const fitted = renderedRect(stored, grow.minSize, small);
+    expect(grownRect(fitted, rows(9), false, small)).toEqual(
+      windowRect(stored, grow, small, rows(9)),
+    );
+    expect(windowRect(stored, grow, small, rows(40)).h).toBe(
+      TOP_BAR_H + workArea(small).h - fitted.y,
+    );
   });
 });

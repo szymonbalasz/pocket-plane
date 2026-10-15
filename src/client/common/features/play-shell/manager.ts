@@ -14,7 +14,8 @@ export type WindowAction =
   | { type: "minimise"; kind: string; instance?: string }
   | { type: "focus"; kind: string; instance?: string }
   | { type: "toggle"; kind: string; instance?: string }
-  | { type: "setRect"; kind: string; instance?: string; rect: Rect }
+  /** Move / resize end. `resized`: a user resize; on a `growToContent` type it sets `fixedH`. */
+  | { type: "setRect"; kind: string; instance?: string; rect: Rect; resized?: boolean }
   /**
    * The kind just became available (e.g. player `cbt.initiative` on Start). If it is open, still
    * at its default-layout geometry (never moved) and would cover a window on screen, it goes to
@@ -153,7 +154,8 @@ function patch(
     next.h === cur.h &&
     next.z === cur.z &&
     next.area?.w === cur.area?.w &&
-    next.area?.h === cur.area?.h
+    next.area?.h === cur.area?.h &&
+    next.fixedH === cur.fixedH
   ) {
     return ws;
   }
@@ -229,6 +231,8 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
         w: bound(Math.max(def.minSize.w, r.w), 1),
         h: bound(Math.max(def.minSize.h, r.h), 1),
         area: workArea(ctx.viewport),
+        // FR-SHELL-39: after a user resize the stored height wins (cleared by reset).
+        ...(action.resized && def.growToContent && { fixedH: true as const }),
       }));
     }
   }

@@ -1,7 +1,8 @@
 // One floating window: title bar (drag), minimise / close, edge + corner resize, scrolling body
 // (FR-SHELL-10/11). Drag and resize move the element by CSS only; the store is written once,
 // on pointer up (SHELL §12). A minimised window stays mounted, parked: invisible and inert
-// (FR-SHELL-36). `visibility`, not `display: none`, so its scroll positions survive.
+// (FR-SHELL-36). `visibility`, not `display: none`, so its scroll positions survive. A
+// `growToContent` type measures its content and reports the height it needs (FR-SHELL-39).
 import type { WindowState } from "@shared/play-shell/layout";
 import { MinusIcon, XIcon } from "lucide-react";
 import {
@@ -9,18 +10,25 @@ import {
   createContext,
   type ErrorInfo,
   type ReactNode,
+  type RefObject,
   useContext,
+  useEffect,
+  useLayoutEffect,
   useRef,
+  useState,
 } from "react";
 import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
+import { reportContentHeight } from "./free-area";
 import {
+  growsToContent,
   moveRect,
   type Rect,
   type ResizeEdge,
   renderedRect,
   resizeRect,
   type Viewport,
+  windowRect,
 } from "./geometry";
 import { SHELL_ZONE_ATTR } from "./keys";
 import { type WindowAction, windowId } from "./manager";
@@ -86,15 +94,37 @@ export function ShellWindow({
   dispatch: (a: WindowAction) => void;
 }) {
   const ref = useRef<HTMLElement>(null);
-  // Render-only fit to the work area, then clamp (FR-SHELL-29, -12); a gesture starts here and
-  // its end stores the result with the current work area.
-  const rect = renderedRect(win, def.minSize, viewport);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const grows = growsToContent(win, def);
+  const needed = useNeededHeight(grows, ref, bodyRef, contentRef);
+  const wid = windowId(win.kind, win.instance);
+  useEffect(() => reportContentHeight(wid, grows ? (needed ?? null) : null), [wid, grows, needed]);
+  useEffect(() => () => reportContentHeight(wid, null), [wid]);
+  // Render-only fit to the work area, then clamp (FR-SHELL-29, -12), then grow to content
+  // (FR-SHELL-39); a gesture starts here and its end stores the result with the current work area.
+  const rect = windowRect(win, def, viewport, needed);
   const id = { kind: win.kind, instance: win.instance };
   const parked = win.state === "minimised";
   const Body = def.component;
 
+  /**
+   * What a move stores: growth is never written (FR-SHELL-39), so the stored height stays, and a
+   * window grown upwards keeps the bottom the user dropped it at.
+   */
+  function movedRect(last: Rect): Rect {
+    const base = renderedRect(win, def.minSize, viewport);
+    if (last.h === base.h) return last;
+    const up = rect.y !== base.y;
+    return { ...last, y: up ? last.y + last.h - base.h : last.y, h: base.h };
+  }
+
   /** Pointer-capture gesture; `compute` maps the pointer delta to a rect. */
-  function gesture(e: React.PointerEvent<HTMLElement>, compute: (dx: number, dy: number) => Rect) {
+  function gesture(
+    e: React.PointerEvent<HTMLElement>,
+    kind: "move" | "resize",
+    compute: (dx: number, dy: number) => Rect,
+  ) {
     if (e.button !== 0) return;
     const el = ref.current;
     if (!el) return;
@@ -117,7 +147,8 @@ export function ShellWindow({
         last &&
         (last.x !== rect.x || last.y !== rect.y || last.w !== rect.w || last.h !== rect.h)
       ) {
-        dispatch({ type: "setRect", ...id, rect: last });
+        if (kind === "resize") dispatch({ type: "setRect", ...id, rect: last, resized: true });
+        else dispatch({ type: "setRect", ...id, rect: movedRect(last) });
       } else {
         applyRect(el, rect);
       }
@@ -132,7 +163,7 @@ export function ShellWindow({
       ref={ref}
       {...{ [SHELL_ZONE_ATTR]: "window" }}
       data-testid="ui-window"
-      data-record-id={windowId(win.kind, win.instance)}
+      data-record-id={wid}
       data-state={win.state}
       data-focused={focused}
       aria-label={def.title}
@@ -158,7 +189,7 @@ export function ShellWindow({
         className="flex h-8 shrink-0 cursor-move select-none items-center gap-2 border-b bg-muted/40 pl-3 pr-1 text-sm font-medium"
         onPointerDown={(e) => {
           if ((e.target as Element).closest("button")) return;
-          gesture(e, (dx, dy) => moveRect(rect, dx, dy, viewport));
+          gesture(e, "move", (dx, dy) => moveRect(rect, dx, dy, viewport));
         }}
       >
         <span className="flex-1 truncate">{def.title}</span>
@@ -186,10 +217,22 @@ export function ShellWindow({
           </button>
         </Tooltip>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-3">
+      <div ref={bodyRef} className="min-h-0 flex-1 overflow-auto p-3">
         <WindowErrorBoundary>
           <WindowShown.Provider value={!parked}>
-            <Body kind={win.kind} instance={win.instance} />
+            {def.growToContent ? (
+              // FR-SHELL-39: measured at its natural height while growing; after a user resize
+              // (`fixedH`) it fills the body again. Same tree either way: the body never remounts.
+              <div
+                ref={contentRef}
+                data-testid="ui-window-content"
+                className={cn("flow-root", !grows && "h-full")}
+              >
+                <Body kind={win.kind} instance={win.instance} />
+              </div>
+            ) : (
+              <Body kind={win.kind} instance={win.instance} />
+            )}
           </WindowShown.Provider>
         </WindowErrorBoundary>
       </div>
@@ -200,10 +243,44 @@ export function ShellWindow({
           data-edge={edge}
           className={cn("absolute touch-none", className)}
           onPointerDown={(e) =>
-            gesture(e, (dx, dy) => resizeRect(rect, edge, dx, dy, def.minSize, viewport))
+            gesture(e, "resize", (dx, dy) => resizeRect(rect, edge, dx, dy, def.minSize, viewport))
           }
         />
       ))}
     </section>
   );
+}
+
+/**
+ * FR-SHELL-39: the window height the content asks for (title bar, borders and body padding
+ * included), re-measured on every content resize while `grows`; undefined otherwise.
+ */
+function useNeededHeight(
+  grows: boolean,
+  sectionRef: RefObject<HTMLElement | null>,
+  bodyRef: RefObject<HTMLDivElement | null>,
+  contentRef: RefObject<HTMLDivElement | null>,
+): number | undefined {
+  const [needed, setNeeded] = useState<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    const section = sectionRef.current;
+    const body = bodyRef.current;
+    const content = contentRef.current;
+    if (!grows || !section || !body || !content) {
+      setNeeded(undefined);
+      return;
+    }
+    const measure = () => {
+      const cs = getComputedStyle(body);
+      const pad = Number.parseFloat(cs.paddingTop) + Number.parseFloat(cs.paddingBottom);
+      const chrome = section.offsetHeight - body.clientHeight;
+      setNeeded(Math.ceil(chrome + pad + content.getBoundingClientRect().height));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [grows, sectionRef, bodyRef, contentRef]);
+  return needed;
 }
