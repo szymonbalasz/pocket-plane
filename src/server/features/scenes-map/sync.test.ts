@@ -94,6 +94,14 @@ async function intent(c: TestClient, name: string, payload: unknown) {
     if ((f.type === "ack" || f.type === "reject") && f.intentId === id) return f;
   }
 }
+/** `sync.loadScene` (ADR-0041); the harness merges the ack's records into the store. */
+async function load(c: TestClient, scene: string) {
+  const id = c.loadScene(scene);
+  for (;;) {
+    const f = await c.next(undefined, 2000);
+    if ((f.type === "ack" || f.type === "reject") && f.intentId === id) return f;
+  }
+}
 /** Leak strings for player frames (MAP §13), checked against raw bytes. */
 function leaks(c: TestClient, extra: string[] = []): string[] {
   const raw = c.raw();
@@ -115,7 +123,16 @@ describe("scenes-map over REST + WS (scenes bundle)", () => {
     const p1 = await h.live(p1Cred());
     expect(names(dm, "scene")).toEqual(["Cellar", "Goblin Ambush", "Town"]);
     expect(names(dm, "scene-folder")).toEqual(["Act 1"]);
+    // ADR-0041: the DM snapshot holds the active Town's tokens; the other scenes load on view.
+    const townIds = Object.entries(tokenId)
+      .filter(([k]) => k.startsWith("town:"))
+      .map(([, id]) => id);
+    expect(Object.keys(dm.store.records.token ?? {}).sort()).toEqual(townIds.sort());
+    for (const sc of ["Goblin Ambush", "Cellar"]) {
+      expect((await load(dm, sceneId[sc] as string)).type).toBe("ack");
+    }
     expect(Object.keys(dm.store.records.token ?? {})).toHaveLength(9);
+    expect(leakScan(h.s, dm)).toEqual([]);
     const scenes = Object.values(p1.store.records.scene ?? {}) as Record<string, unknown>[];
     expect(scenes).toHaveLength(1);
     expect(scenes[0]).toMatchObject({ id: sceneId.Town, active: true, gridCellSize: 70 });
@@ -141,6 +158,7 @@ describe("scenes-map over REST + WS (scenes bundle)", () => {
     const dm = await h.live(dmCred());
     const p1 = await h.live(p1Cred());
     const p2 = await h.live(p2Cred());
+    await load(dm, sceneId["Goblin Ambush"] as string);
     const ogre = (Object.values(dm.store.records.token ?? {}) as Record<string, unknown>[]).find(
       (t) => t.name === "Cave Ogre",
     );

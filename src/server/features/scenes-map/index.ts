@@ -3,7 +3,7 @@ import { DragData, LaserData, MAP_SIGNALS, PingData, PullData } from "@shared/sc
 import type { CommandDef } from "../../commands/commands";
 import type { Feature } from "../../services";
 import { defineSignal } from "../../ws/signals";
-import { ActiveSceneCache } from "./active-scene";
+import { ActiveSceneCache, sceneCampaignOf } from "./active-scene";
 import { backfillCharacterIds } from "./character-copy";
 import {
   activateScene,
@@ -84,6 +84,8 @@ export const scenesMap: Feature = {
     // FR-MAP-06: cache first (commit hook, CON-23), then resync every player of the campaign.
     const cache = new ActiveSceneCache(s.db);
     r.activeScene((cid) => cache.get(cid));
+    // ADR-0041: `sync.loadScene` loads only scenes of the DM's campaign.
+    s.records.provideSceneCampaign((sceneId) => sceneCampaignOf(s.db, sceneId));
     r.afterCommit("scenes-map.active-scene", (e) => cache.onCommit(e));
     r.listener("scenes-map.activation-resync", (e) => {
       if (e.event.type !== SceneActivated.type) return;

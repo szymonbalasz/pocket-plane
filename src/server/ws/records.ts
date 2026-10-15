@@ -1,4 +1,5 @@
 // Record-type registry with visibility (SYNC §8, FR-SYNC-09/18/19). Default deny.
+import { DM_WINDOW_ACTIVE_SCENE, type DmWindow } from "@shared/protocol/scene-window";
 import { cutWindow, type RecordWindow, type WindowIds } from "@shared/protocol/window";
 import type { z } from "zod";
 import type { Db } from "../db/client";
@@ -55,10 +56,19 @@ export interface RecordTypeDef<R> {
    * cut before the scope gate and visibility filter, so the floor is the same for every viewer.
    */
   window?: RecordWindow<R>;
+  /**
+   * Active-scene window (ADR-0041), scene scope only: the DM snapshot holds only the active
+   * scene's rows (none if no scene is active); the DM loads another scene's with
+   * `sync.loadScene`. Live events and players are unchanged.
+   */
+  dmWindow?: DmWindow;
 }
 
 /** Active scene id of a campaign, or null (CON-22). Must be a cheap in-memory read. */
 export type ActiveSceneResolver = (campaignId: string) => string | null;
+
+/** The campaign a scene belongs to, or null when no such scene exists (`sync.loadScene`). */
+export type SceneCampaignResolver = (sceneId: string) => string | null;
 
 /** Type-erased registration (the registry works on unknown records). */
 export type AnyRecordType = RecordTypeDef<unknown>;
@@ -79,6 +89,9 @@ export class RecordRegistry {
   /** No provider (before scenes-map registers one) → no active scene → players see no scene records. */
   private activeScene: ActiveSceneResolver = () => null;
   private activeSceneProvided = false;
+  /** No provider → no scene exists → every `sync.loadScene` is `not_found`. */
+  private sceneCampaign: SceneCampaignResolver = () => null;
+  private sceneCampaignProvided = false;
 
   register(def: AnyRecordType): void {
     if (this.types.has(def.type)) throw new Error(`Record type "${def.type}" registered twice`);
@@ -87,6 +100,14 @@ export class RecordRegistry {
     }
     if (def.scope === "scene" && !def.sceneOf) {
       throw new Error(`Record type "${def.type}" (scope scene) needs sceneOf (CON-22)`);
+    }
+    if (def.dmWindow !== undefined) {
+      if (def.dmWindow !== DM_WINDOW_ACTIVE_SCENE) {
+        throw new Error(`Record type "${def.type}" dmWindow must be "${DM_WINDOW_ACTIVE_SCENE}"`);
+      }
+      if (def.scope !== "scene") {
+        throw new Error(`Record type "${def.type}" dmWindow needs scope scene (ADR-0041)`);
+      }
     }
     if (def.window) {
       const { orderBy, size } = def.window;
@@ -111,6 +132,32 @@ export class RecordRegistry {
 
   activeSceneOf(campaignId: string): string | null {
     return this.activeScene(campaignId);
+  }
+
+  /** One provider per server (scenes-map's scene table). `replace`: test fixtures only. */
+  provideSceneCampaign(fn: SceneCampaignResolver, opts: { replace?: boolean } = {}): void {
+    if (this.sceneCampaignProvided && !opts.replace) {
+      throw new Error("Scene-campaign resolver provided twice");
+    }
+    this.sceneCampaignProvided = true;
+    this.sceneCampaign = fn;
+  }
+
+  sceneCampaignOf(sceneId: string): string | null {
+    return this.sceneCampaign(sceneId);
+  }
+
+  /** Types registered with `dmWindow` (ADR-0041). */
+  dmWindowed(): AnyRecordType[] {
+    return [...this.types.values()].filter((d) => d.dmWindow !== undefined);
+  }
+
+  /**
+   * Scenes whose flagged rows a fresh DM snapshot holds: the active scene, or none. Null for
+   * players (the scene gate already limits them; nothing is windowed).
+   */
+  dmWindowScene(v: Viewer): string | null {
+    return v.role === "dm" ? this.activeSceneOf(v.campaignId) : null;
   }
 
   get(type: string): AnyRecordType | undefined {
@@ -157,10 +204,37 @@ export class RecordRegistry {
     return null;
   }
 
-  /** Provider rows, cut to the window for windowed types (ADR-0029); pre-filter. */
+  /**
+   * Provider rows, cut to the window for windowed types (ADR-0029) and, for the DM, to the
+   * active scene for `dmWindow` types (ADR-0041); pre-filter.
+   */
   private snapshotRows(def: AnyRecordType, src: SnapshotSource, v: Viewer): unknown[] {
-    const rows = def.snapshot(src, v);
+    let rows = def.snapshot(src, v);
+    if (def.dmWindow && v.role === "dm") {
+      const active = this.dmWindowScene(v);
+      rows = active === null ? [] : rows.filter((r) => def.sceneOf?.(r) === active);
+    }
     return def.window ? cutWindow(rows, def.window).rows : rows;
+  }
+
+  /**
+   * `sync.loadScene` result (ADR-0041): every `dmWindow` type's rows of one scene, through the
+   * scope gate and the visibility fn as in a snapshot. The caller checks the scene belongs to
+   * the viewer's campaign.
+   */
+  loadScene(src: SnapshotSource, v: Viewer, sceneId: string): Record<string, unknown[]> {
+    const out: Record<string, unknown[]> = {};
+    for (const def of this.dmWindowed()) {
+      if (def.audience === "dm" && v.role !== "dm") continue;
+      const list: unknown[] = [];
+      for (const r of def.snapshot(src, v)) {
+        if (def.sceneOf?.(r) !== sceneId) continue;
+        const seen = this.view(def.type, r, v);
+        if (seen.vis !== "hidden") list.push(seen.data);
+      }
+      out[def.type] = list;
+    }
+    return out;
   }
 
   /**

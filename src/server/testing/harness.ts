@@ -2,6 +2,7 @@
 // the real store reducer, frame log, fake clock + timers, pauseSnapshot, restart on the same DB.
 import { CloseCode } from "@shared/protocol/codes";
 import type { Credential, ServerFrame } from "@shared/protocol/frames";
+import { LoadSceneResult, mergeRecords, SYNC_LOAD_SCENE } from "@shared/protocol/scene-window";
 import { applyEvent, applySnapshot, emptyStore, type RecordStore } from "@shared/protocol/store";
 import { manualClock } from "../commands/context";
 import type { Db } from "../db/client";
@@ -22,6 +23,13 @@ export interface TestClient {
   send(frame: unknown): void;
   sendRaw(text: string): void;
   intent(name: string, payload: unknown, intentId?: string): string;
+  /**
+   * Sends `sync.loadScene` (ADR-0041); its ack's records are merged into `store` in frame
+   * order, like the DM client does. Returns the intentId.
+   */
+  loadScene(sceneId: string, intentId?: string): string;
+  /** Scenes loaded with `loadScene` since the last snapshot (the active scene is implied). */
+  loadedScenes: string[];
   /** Next unread frame (optionally of a type), waiting up to `ms`. */
   next<T extends ServerFrame["type"]>(
     type?: T,
@@ -43,6 +51,7 @@ export async function connectClient(
   let cursor = 0;
   let wake: (() => void) | null = null;
   let isClosed = false;
+  const loads = new Map<string, string>();
   const client: TestClient = {
     frames,
     store: emptyStore(),
@@ -61,6 +70,11 @@ export async function connectClient(
       ws.send(JSON.stringify({ type: "intent", intentId, name, payload }));
       return intentId;
     },
+    loadScene(sceneId, intentId = crypto.randomUUID()) {
+      loads.set(intentId, sceneId);
+      return client.intent(SYNC_LOAD_SCENE, { sceneId }, intentId);
+    },
+    loadedScenes: [],
     async next(type, ms = 2000) {
       const deadline = Date.now() + ms;
       for (;;) {
@@ -96,6 +110,14 @@ export async function connectClient(
     if (f.type === "snapshot") {
       client.store = applySnapshot(f);
       client.gap = false;
+      client.loadedScenes = [];
+    } else if (f.type === "ack" && loads.has(f.intentId)) {
+      const sceneId = loads.get(f.intentId) as string;
+      loads.delete(f.intentId);
+      client.store = mergeRecords(client.store, LoadSceneResult.parse(f.result).records);
+      if (!client.loadedScenes.includes(sceneId)) client.loadedScenes.push(sceneId);
+    } else if (f.type === "reject" && f.intentId !== null) {
+      loads.delete(f.intentId);
     } else if (f.type === "event") {
       const r = applyEvent(client.store, f);
       if (r.ok) client.store = r.store;
