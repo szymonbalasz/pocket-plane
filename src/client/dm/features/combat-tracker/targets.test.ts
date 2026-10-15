@@ -92,22 +92,35 @@ describe("FR-CBT-35 Undo label", () => {
       attackerName: "Goblin",
       targetName: "Mira",
       kind: "damage",
+      hit: true,
+      raw: 6,
       applied: 6,
       ...o,
     }) as HpChangeRecord;
 
-  test("FR-CBT-35 one row: 'Undo: Goblin → Mira, 6'; heal +N; direct = DM", () => {
+  test("FR-CBT-80 undo label: one row 'N damage' from raw, miss, heal; direct = DM", () => {
     expect(undoLabel([])).toBeNull();
     expect(undoLabel([row("a", 1)])).toEqual({
-      text: "Undo: Goblin → Mira, 6",
+      text: "Undo: Goblin → Mira, 6 damage",
       expectedHpChangeId: "a",
     });
-    expect(undoLabel([row("a", 1, { attackerName: null, kind: "heal", applied: 4 })])?.text).toBe(
-      "Undo: DM → Mira, +4",
+    // 99 to a PC at 4 HP: the label says what was dealt, not the HP lost.
+    expect(undoLabel([row("a", 1, { raw: 99, applied: 4 })])?.text).toBe(
+      "Undo: Goblin → Mira, 99 damage",
+    );
+    expect(undoLabel([row("a", 1, { hit: false, raw: 0, applied: 0 })])?.text).toBe(
+      "Undo: Goblin → Mira, miss",
+    );
+    expect(
+      undoLabel([row("a", 1, { attackerName: null, hit: null, kind: "heal", raw: 5, applied: 4 })])
+        ?.text,
+    ).toBe("Undo: DM → Mira, heal 5");
+    expect(undoLabel([row("a", 1, { attackerName: null, hit: null, raw: 99 })])?.text).toBe(
+      "Undo: DM → Mira, 99 damage",
     );
   });
 
-  test("FR-CBT-35 multi-target apply: names in apply order, count, expected = latest", () => {
+  test("FR-CBT-80 multi-target apply unchanged: names in apply order, count, expected = latest", () => {
     const rows = [
       row("x", 1, { cardId: "c0" }),
       row("a", 2, { cardId: "c1", targetName: "Goblin" }),

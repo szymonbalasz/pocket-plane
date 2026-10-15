@@ -104,8 +104,10 @@ export function naturalContradiction(
 }
 
 /**
- * Undo Tooltip (FR-CBT-25, FR-CBT-35): "Undo: Goblin → Mira, 6" for one row; "Undo: Goblin →
- * Goblin, Goblin 2 (2 targets)" for a multi-target apply. Null = nothing to undo.
+ * Undo Tooltip (FR-CBT-25, FR-CBT-35, FR-CBT-80): one row reads "Undo: Sela → Goblin 2, 6
+ * damage", "…, miss" (hit false) or "Undo: DM → Mira, heal 5", the amount being `raw` (dealt
+ * after the multiplier), not `applied`; "Undo: Goblin → Goblin, Goblin 2 (2 targets)" for a
+ * multi-target apply. Null = nothing to undo.
  */
 export function undoLabel(rows: readonly HpChangeRecord[]): {
   text: string;
@@ -116,11 +118,13 @@ export function undoLabel(rows: readonly HpChangeRecord[]): {
   if (!last) return null;
   const who = last.attackerName ?? "DM";
   if (unit.length === 1) {
-    const sign = last.kind === "heal" ? "+" : "";
-    return {
-      text: `Undo: ${who} → ${last.targetName}, ${sign}${last.applied}`,
-      expectedHpChangeId: last.id,
-    };
+    const what =
+      last.kind === "heal"
+        ? `heal ${last.raw}`
+        : last.hit === false
+          ? "miss"
+          : `${last.raw} damage`;
+    return { text: `Undo: ${who} → ${last.targetName}, ${what}`, expectedHpChangeId: last.id };
   }
   const names = [...unit].reverse().map((r) => r.targetName);
   return {
