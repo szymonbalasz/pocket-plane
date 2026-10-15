@@ -66,3 +66,21 @@ describe("FR-CBT-75 opened from a notification", () => {
     useCombatDialogs.getState().closeCard();
   });
 });
+
+describe("FR-CBT-77 window def", () => {
+  test("FR-CBT-77 DM Initiative grows to content; activity = round:turnCombatantId of the started encounter", async () => {
+    const { dmInitiativeWindow } = await import("./initiative-window");
+    expect(dmInitiativeWindow.growToContent).toBe(true);
+    const store = (enc: object | null) =>
+      ({ you: null, seq: 0, records: { encounter: enc ? { e1: enc } : {} } }) as never;
+    expect(
+      dmInitiativeWindow.activity?.(
+        store({ id: "e1", status: "started", round: 2, turnCombatantId: "k1" }),
+      ),
+    ).toBe("2:k1");
+    expect(
+      dmInitiativeWindow.activity?.(store({ id: "e1", status: "ended", round: 2 })),
+    ).toBeNull();
+    expect(dmInitiativeWindow.activity?.(store(null))).toBeNull();
+  });
+});

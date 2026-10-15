@@ -1,5 +1,5 @@
 // DM `cbt.initiative` (CBT §7): round + turns (skip cue, FR-CBT-50), Undo (one apply,
-// FR-CBT-35), Roll monsters (FR-CBT-46), End encounter (FR-CBT-51), pending cards, rows by
+// FR-CBT-35), Roll monsters (FR-CBT-46), End encounter (FR-CBT-51), Pending (FR-CBT-79), rows by
 // `position` (initiative roll / set, AC, HP, band or PC Down (FR-CBT-49), moved (FR-CBT-39),
 // Attack; menu Check ▸ / Save ▸ (FR-CBT-44), Damage / heal, Remove), Removed.
 import { signed } from "@shared/character-sheet/logic";
@@ -50,8 +50,10 @@ import {
 import { Input, Skeleton } from "@ui/components/ui/primitives";
 import { characterOf, deadPc, deathStateFor } from "@ui/features/combat-extras/logic";
 import { RowName } from "@ui/features/combat-extras/parts";
+import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
 import {
+  startedIn,
   useCbtIntent,
   useCombatants,
   useStartedEncounter,
@@ -841,6 +843,11 @@ function DmInitiativeBody() {
   const cards = usePendingCards(enc?.id);
   const openWindow = useOpenWindow();
   const { send, disabled } = useCbtIntent();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLButtonElement>(null);
+  const activeIds = rows.filter((c) => !c.removed).map((c) => c.id);
+  // FR-CBT-77 (G4): new rows / the Pending section scroll into view; "↓ N more" below the fold.
+  const fold = useBelowFold(rootRef, footerRef, activeIds, cards.length > 0);
   if (!everLive) return <Skeleton className="h-24" />;
   if (!enc) {
     return (
@@ -859,6 +866,7 @@ function DmInitiativeBody() {
   return (
     // Header + pending cards stay put; the rows scroll inside the window (glitch 3).
     <div
+      ref={rootRef}
       data-testid="cbt-init"
       data-record-id={enc.id}
       className="flex h-full min-h-0 flex-col gap-2"
@@ -914,6 +922,7 @@ function DmInitiativeBody() {
           </section>
         )}
       </div>
+      <MoreFooter footerRef={footerRef} more={fold.more} onClick={fold.scrollToMore} />
     </div>
   );
 }
@@ -938,6 +947,13 @@ export const dmInitiativeWindow = defineWindow({
   defaultSize: { w: 400, h: 500 },
   minSize: { w: 320, h: 240 },
   defaultPosition: { anchor: "top-right" },
+  // FR-CBT-77 (G4): height follows the rows until the DM resizes it (FR-SHELL-39); "new" dot
+  // while minimised when the round or the turn changes (FR-SHELL-38, N1 = A, #190).
+  growToContent: true,
+  activity: (store) => {
+    const enc = startedIn(store);
+    return enc ? `${enc.round}:${enc.turnCombatantId ?? ""}` : null;
+  },
   companion: CombatDialogs,
   component: DmInitiativeBody,
 });
