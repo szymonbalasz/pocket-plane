@@ -34,6 +34,7 @@ import {
 import type { CombatRuleHooks } from "../combat-tracker/rule-hooks";
 import { resolveDefinition } from "../entities/commands";
 import { getScene, sceneTokens } from "../scenes-map/rows";
+import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 
 interface Slot {
   kind: CombatantKind;
@@ -83,7 +84,8 @@ export function addCombatantsCommand(hooks: CombatRuleHooks) {
         if (t) taken.add(t.id);
         return t ?? null;
       };
-      // FR-CBT-08: a token's name, image and hidden flag; token-less → numbered, visible.
+      // FR-CBT-08: a token's name, image and hidden flag (hidden or fog-hidden, FR-FOG-14);
+      // token-less → numbered, visible.
       const push = (
         kind: CombatantKind,
         def: DefinitionRecord,
@@ -98,7 +100,7 @@ export function addCombatantsCommand(hooks: CombatRuleHooks) {
               tokenId: tok.id,
               name: tok.name,
               imageAssetId: tok.imageAssetId,
-              hidden: tok.hidden,
+              hidden: tokenHiddenForPlayers(tok),
             }
           : {
               kind,

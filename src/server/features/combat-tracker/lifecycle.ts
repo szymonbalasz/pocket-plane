@@ -13,6 +13,7 @@ import type { RecordChange } from "../../events/types";
 import { resolveDefinition } from "../entities/commands";
 import { dismissForEncounter } from "../notifications";
 import { getScene, sceneTokens } from "../scenes-map/rows";
+import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 import { rollInitiativeFor } from "./initiative";
 import { monsterHp, TokenPlacer } from "./join";
 import { rerank } from "./ranks";
@@ -112,7 +113,12 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
         }
       }
       const placer = new TokenPlacer(env, scene, at);
-      const bindings = planBindings(slots, sceneTokens(tx, scene.id)).map((b, i) => {
+      // FR-FOG-14: a combatant's hidden copy = the token's `hidden` or fog-hidden.
+      const placed = sceneTokens(tx, scene.id).map((t) => ({
+        ...t,
+        hidden: tokenHiddenForPlayers(t),
+      }));
+      const bindings = planBindings(slots, placed).map((b, i) => {
         const def = slots[i]?.def;
         if (b.tokenId !== null || !def || !before.createTokens) return b;
         const t = placer.place(def, before.addHidden);
@@ -121,7 +127,7 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
           tokenId: t.id,
           name: t.name,
           imageAssetId: t.imageAssetId,
-          hidden: t.hidden,
+          hidden: tokenHiddenForPlayers(t),
         };
       });
       const hpEntries: RecordChange[] = [];

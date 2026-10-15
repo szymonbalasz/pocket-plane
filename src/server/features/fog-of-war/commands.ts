@@ -1,14 +1,14 @@
 // fog-of-war commands (FOG §6, §9; protocol §35). DM-only WS intents `fog.edit`, `fog.setAll`,
 // `fog.undo`. Each is one transaction (FR-FOG-08): the `fog` row + its undo entry (or the undone
-// entry's delete) + every token on the scene whose `fogged` flips + token-changed hook rows for a
-// fog-hidden flip (FR-FOG-13) + one event-log entry → `FogEdited` / `FogUndone`. IDs and time
+// entry's delete) + every fog subject (token, prop, kept template) whose `fogged` flips + the
+// scene's `scene-structure` row if a door flag flips + token-changed hook rows for a fog-hidden
+// flip (FR-FOG-13, `rederive.ts`) + one event-log entry → `FogEdited` / `FogUndone`. IDs and time
 // from ctx. Works on any scene of the campaign, active or not (FR-FOG-09).
 import { FogEdited, FogUndone } from "@shared/events/fog-of-war";
 import {
   type FogMask,
   type FogRow,
   fogBox,
-  footprintFogged,
   maskOf,
   rebase,
   rowOf,
@@ -29,19 +29,17 @@ import {
   type FogShape,
   FogUndoInput,
 } from "@shared/fog-of-war/schemas";
-import { footprint } from "@shared/scenes-map/geometry";
-import { type SceneRecord, TOKEN_TYPE } from "@shared/scenes-map/schemas";
+import type { SceneRecord } from "@shared/scenes-map/schemas";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, invalid } from "../../commands/errors";
 import type { Tx } from "../../db/client";
-import { sceneFog, sceneFogEdit, sceneFogEditSeqNext, token } from "../../db/schema";
+import { sceneFog, sceneFogEdit, sceneFogEditSeqNext } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import type { Logger } from "../../log";
-import { campaignOf, getScene, readToken, sceneTokens } from "../scenes-map/rows";
-import { runTokenChangedHooks } from "../scenes-map/token-hooks";
-import { hiddenByHooks } from "../scenes-map/visibility-hooks";
+import { campaignOf, getScene } from "../scenes-map/rows";
 import { readFogRow } from "./hooks";
+import { rederiveSubjects } from "./rederive";
 import { readFogRecord } from "./rows";
 
 /** FR-FOG-04: over the run cap → nothing written. */
@@ -122,30 +120,6 @@ function pushUndo(env: CommandEnv, s: SceneRecord, kind: FogEditKind, prev: FogR
   return id;
 }
 
-/**
- * FR-FOG-08 / -10 / -13: re-derives `fogged` of every token on the scene against `mask`; a token
- * whose fog-hidden value (any `hides`) flips runs the token-changed hooks. Token rows first, then
- * hook rows (as the FR-MAP-20 size refresh).
- */
-function rederiveTokens(env: CommandEnv, sceneId: string, mask: FogMask): RecordChange[] {
-  const { tx, ctx, actor } = env;
-  const changes: RecordChange[] = [];
-  const hookChanges: RecordChange[] = [];
-  const now = ctx.clock.iso();
-  for (const t of sceneTokens(tx, sceneId)) {
-    const n = footprint(t.size);
-    const fogged = footprintFogged(mask, { col: t.col, row: t.row, w: n, h: n });
-    if (fogged === (t.fogged === true)) continue;
-    tx.update(token).set({ fogged, updatedAt: now }).where(eq(token.id, t.id)).run();
-    const next = readToken(tx, t.id);
-    changes.push({ type: TOKEN_TYPE, id: t.id, before: t, after: next });
-    if (hiddenByHooks(TOKEN_TYPE, t) !== hiddenByHooks(TOKEN_TYPE, next)) {
-      hookChanges.push(...runTokenChangedHooks({ tx, ctx, actor }, t, next));
-    }
-  }
-  return [...changes, ...hookChanges];
-}
-
 /** Commits a new mask as one undoable edit and emits `FogEdited` (FR-FOG-05 / -06 / -08). */
 function commitEdit(
   env: CommandEnv,
@@ -160,12 +134,12 @@ function commitEdit(
   const before = readFogRecord(env.tx, s.id);
   writeRow(env, s, row);
   const editId = pushUndo(env, s, kind, prev);
-  const tokens = rederiveTokens(env, s.id, next);
+  const subjects = rederiveSubjects(env, s, next);
   env.emit({
     type: FogEdited.type,
     campaignId: s.campaignId,
     payload: { sceneId: s.id, editId, kind, ...(shape ? { shape } : {}) },
-    changes: [fogChange(before, readFogRecord(env.tx, s.id)), ...tokens],
+    changes: [fogChange(before, readFogRecord(env.tx, s.id)), ...subjects],
   });
   return { editId };
 }
@@ -240,12 +214,12 @@ export function fogCommands(log: Logger) {
       tx.delete(sceneFogEdit)
         .where(and(eq(sceneFogEdit.id, latest.id), eq(sceneFogEdit.sceneId, s.id)))
         .run();
-      const tokens = rederiveTokens(env, s.id, mask);
+      const subjects = rederiveSubjects(env, s, mask);
       env.emit({
         type: FogUndone.type,
         campaignId: s.campaignId,
         payload: { sceneId: s.id, editId: latest.id },
-        changes: [fogChange(before, readFogRecord(tx, s.id)), ...tokens],
+        changes: [fogChange(before, readFogRecord(tx, s.id)), ...subjects],
       });
     },
   });
