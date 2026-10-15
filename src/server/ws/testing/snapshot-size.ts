@@ -145,6 +145,73 @@ function pendingPresets(s: Services, v: Viewer): Record<string, unknown[]> {
   return rows.length ? { [EFFECT_PRESET_TYPE]: rows } : {};
 }
 
+export interface SceneLoadSize {
+  sceneId: string;
+  /** UTF-8 bytes of the whole `ack` frame (36-char intentId). */
+  bytes: number;
+  rows: Record<string, number>;
+}
+
+/** The DM's `sync.loadScene` result per scene of the active campaign (ADR-0041), largest first. */
+export function sceneLoadSizes(s: Services): SceneLoadSize[] {
+  const active = s.db.select().from(campaign).where(eq(campaign.active, true)).get();
+  if (!active) throw new Error("no active campaign");
+  const v: Viewer = { connId: "dm", campaignId: active.id, role: "dm", playerId: null };
+  const src = { db: s.db, presence: { list: () => [] } };
+  return s.db
+    .select({ id: scene.id })
+    .from(scene)
+    .where(eq(scene.campaignId, active.id))
+    .all()
+    .map(({ id }) => {
+      const records = s.records.loadScene(src, v, id);
+      const frame = { type: "ack", intentId: "0".repeat(36), result: { records } };
+      const rows: Record<string, number> = {};
+      for (const [t, list] of Object.entries(records)) rows[t] = list.length;
+      return { sceneId: id, bytes: Buffer.byteLength(JSON.stringify(frame), "utf8"), rows };
+    })
+    .sort((a, b) => b.bytes - a.bytes);
+}
+
+/** FR-MAP-14 cap: tokens per scene. */
+export const SCENE_TOKEN_CAP = 200;
+
+/**
+ * Fills a scene to the FR-MAP-14 cap with max-string tokens (commands only), for the ADR-0041
+ * "largest scene load" bound. Returns the scene's token count.
+ */
+export function fillSceneToCap(s: Services, sceneId: string): number {
+  const cid = s.db.select().from(campaign).where(eq(campaign.active, true)).get()?.id as string;
+  const DM: Actor = { role: "dm", playerId: null, campaignId: cid };
+  const img = s.db.select().from(asset).where(eq(asset.campaignId, cid)).all().at(-1)?.id;
+  const mon = s.db
+    .select()
+    .from(entity)
+    .where(and(eq(entity.campaignId, cid), eq(entity.kind, "monster")))
+    .get()?.id;
+  const count = () =>
+    s.db.$client
+      .query<{ n: number }, [string]>("SELECT count(*) AS n FROM token WHERE scene_id = ?")
+      .get(sceneId)?.n ?? 0;
+  for (let c = count(); c < SCENE_TOKEN_CAP; c++) {
+    s.commands.run(
+      "map.placeToken",
+      {
+        sceneId,
+        definitionId: mon,
+        col: c % 20,
+        row: Math.floor(c / 20) % 14,
+        name: fill(`Cap ${c} `, 40),
+        imageAssetId: img,
+        ownerPlayerId: null,
+        hidden: c % 2 === 0,
+      },
+      { actor: DM },
+    );
+  }
+  return count();
+}
+
 /** DM snapshot build time in ms: one warm-up, then the median of `runs`. */
 export function dmBuildMs(s: Services, runs = 3): number {
   const active = s.db.select().from(campaign).where(eq(campaign.active, true)).get();

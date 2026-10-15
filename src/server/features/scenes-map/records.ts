@@ -1,5 +1,6 @@
 // Record types `scene`, `scene-folder`, `token` (FR-MAP-26, protocol §12). Providers return
-// every scene's rows of the campaign; the scene gate filters for players (CON-22).
+// every scene's rows of the campaign; the scene gate filters for players (CON-22), the
+// active-scene window cuts `token` for the DM (ADR-0041).
 import {
   SCENE_FOLDER_TYPE,
   SCENE_TYPE,
@@ -66,6 +67,8 @@ export const sceneRecordTypes = [
     sceneOf: (r) => r.sceneId,
     visibility: tokenVisibility,
     redact: redactToken,
+    // ADR-0041: the DM snapshot holds the active scene's tokens; others load on view.
+    dmWindow: "active-scene",
     // ≤ 1,000 per campaign (FR-MAP-14).
     snapshot: ({ db }, v) =>
       db

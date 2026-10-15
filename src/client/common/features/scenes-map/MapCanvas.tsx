@@ -93,6 +93,11 @@ export interface MapCanvasProps {
   onTokenDoubleClick?(t: TokenView): void;
   /** DM: a Creatures row dropped on the canvas (FR-MAP-13); the pointer cell = top-left. */
   onDropDefinition?(definitionId: string, cell: { col: number; row: number }): void;
+  /**
+   * DM: the scene's tokens are still loading (ADR-0041): "Loading scene…" shows and the
+   * scene-open fit (FR-MAP-44) waits for them.
+   */
+  loading?: boolean;
 }
 
 const gridOf = (s: SceneView): EffectiveGrid => ({
@@ -185,11 +190,12 @@ export function MapCanvas(props: MapCanvasProps) {
   }, []);
   // (a) a scene opens on this page, after the layout is applied (FR-SHELL-16).
   const fittedFor = useRef<string | null>(null);
+  const loading = props.loading === true;
   useEffect(() => {
-    if (size.w === 0 || !free.ready || fittedFor.current === scene.id) return;
+    if (size.w === 0 || !free.ready || loading || fittedFor.current === scene.id) return;
     fittedFor.current = scene.id;
     onCamera("open");
-  }, [scene.id, size, free.ready, onCamera]);
+  }, [scene.id, size, free.ready, loading, onCamera]);
   // (b) an appearance refits while `fitted`; the window lands (FR-SHELL-18 `appear`) first.
   const seenAppearances = useRef(free.appearances);
   useEffect(() => {
@@ -579,6 +585,7 @@ export function MapCanvas(props: MapCanvasProps) {
       data-camera={cameraMode}
       data-cell-px={Math.round(cam.scale * grid.gridCellSize)}
       data-fit-floor={fitFloor}
+      data-loading={loading}
       className="absolute inset-0"
       style={{ cursor: tool === "select" && !targeting ? undefined : "crosshair" }}
       onContextMenu={(e) => e.preventDefault()}
@@ -637,6 +644,17 @@ export function MapCanvas(props: MapCanvasProps) {
             </CanvasContext.Provider>
           </SyncContext.Provider>
         </Stage>
+      )}
+      {loading && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <span
+            data-testid="map-scene-loading"
+            role="status"
+            className="rounded-md bg-background/90 px-3 py-1.5 text-sm text-muted-foreground shadow-sm"
+          >
+            Loading scene…
+          </span>
+        </div>
       )}
     </div>
   );

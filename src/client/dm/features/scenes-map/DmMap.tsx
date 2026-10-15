@@ -17,6 +17,7 @@ import { useBaseKeyDown } from "@ui/features/play-shell/hooks";
 import { BaseEmpty } from "@ui/features/play-shell/PlayFrame";
 import { toastReject, useLive, useMapIntent } from "@ui/features/scenes-map/intents";
 import { LazyMapCanvas as MapCanvas } from "@ui/features/scenes-map/LazyMapCanvas";
+import { useSceneLoaded } from "@ui/features/scenes-map/scene-window";
 import { ToolRail } from "@ui/features/scenes-map/ToolRail";
 import { useRecords } from "@ui/sync/store";
 import { EyeOffIcon } from "lucide-react";
@@ -50,6 +51,8 @@ type Open = { tokenId: string; at: { x: number; y: number } } | null;
 
 export function DmMapBase() {
   const { viewed, active } = useViewedScene();
+  // ADR-0041: viewing a scene other than the snapshot's active one loads its tokens first.
+  const loaded = useSceneLoaded(viewed?.id ?? null);
   const tokens = useRecords<TokenRecord>(TOKEN_TYPE);
   const selection = useMapSelection();
   const targeting = useTargeting();
@@ -119,6 +122,7 @@ export function DmMapBase() {
         client="dm"
         scene={viewed}
         tokens={onScene}
+        loading={!loaded}
         myPlayerId={null}
         signalsOn={!notShown}
         gridOverride={draft?.sceneId === viewed.id ? draft.grid : null}

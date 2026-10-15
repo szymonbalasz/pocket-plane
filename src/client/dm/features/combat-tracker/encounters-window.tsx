@@ -34,6 +34,7 @@ import { useCbtIntent } from "@ui/features/combat-tracker/store";
 import { ENCOUNTERS_KIND } from "@ui/features/combat-tracker/window";
 import { useFreeArea } from "@ui/features/play-shell/free-area";
 import { defineWindow } from "@ui/features/play-shell/registry";
+import { useSceneLoaded } from "@ui/features/scenes-map/scene-window";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
 import { ArrowLeftIcon, MinusIcon, PlusIcon, SwordsIcon, Trash2Icon } from "lucide-react";
@@ -183,6 +184,8 @@ function StartDialog({
   const tokens = useRecords<TokenRecord>("token");
   const requested = useDmMap((s) => s.viewedSceneId);
   const scene = viewedScene(scenes, folders, requested);
+  // ADR-0041: binding preview and "Not on this map" read the viewed scene's tokens.
+  const sceneLoaded = useSceneLoaded(scene?.id ?? null);
   const defs = useDefinitions();
   const characters = useCharacters();
   const drafts = useDraftIds();
@@ -199,7 +202,7 @@ function StartDialog({
     [scene, tokens],
   );
   const party = partyMembers(characters, draft.partyCharacterIds, drafts);
-  const offMap = notOnMap(party, sceneTokens);
+  const offMap = sceneLoaded ? notOnMap(party, sceneTokens) : [];
   const joiningParty = party.filter((c) => !offMap.includes(c) || joining.has(c.id));
   const slots: JoinSlot[] = [
     ...joiningParty.map((c) => ({
@@ -223,13 +226,14 @@ function StartDialog({
       }));
     }),
   ];
-  const rows = scene
-    ? previewJoin(slots, sceneTokens, {
-        createTokens: draft.createTokens,
-        hidden: draft.addHidden,
-        sceneTokenNames: sceneTokens.map((t) => t.name),
-      })
-    : [];
+  const rows =
+    scene && sceneLoaded
+      ? previewJoin(slots, sceneTokens, {
+          createTokens: draft.createTokens,
+          hidden: draft.addHidden,
+          sceneTokenNames: sceneTokens.map((t) => t.name),
+        })
+      : [];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="cbt-enc-start-dialog">
@@ -237,7 +241,9 @@ function StartDialog({
           <DialogTitle>Start “{encounter.name}”</DialogTitle>
           <DialogDescription>
             {scene
-              ? `On “${scene.name}”. Tokens are bound in placement order.`
+              ? sceneLoaded
+                ? `On “${scene.name}”. Tokens are bound in placement order.`
+                : "Loading scene…"
               : "No scene to start on"}
           </DialogDescription>
         </DialogHeader>
@@ -285,9 +291,9 @@ function StartDialog({
           </Button>
           <Button
             data-testid="cbt-enc-start-confirm"
-            disabled={disabled || startEnd.disabled || !scene}
+            disabled={disabled || startEnd.disabled || !scene || !sceneLoaded}
             onClick={async () => {
-              if (!scene) return;
+              if (!scene || !sceneLoaded) return;
               // FR-CBT-65: created tokens go around the centre of this tab's free area.
               const at = freeAreaCell(free.area, scene);
               const body = startBody(encounter.id, scene.id, offMap, joining, at);

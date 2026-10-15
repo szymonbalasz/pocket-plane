@@ -13,6 +13,7 @@ import {
   type SignalFrom,
   type SnapshotFrame,
 } from "@shared/protocol/frames";
+import { LoadScenePayload, SYNC_LOAD_SCENE } from "@shared/protocol/scene-window";
 import { CommandError, zodIssues } from "../commands/errors";
 import type { DispatchedEvent, RecordChange, Role } from "../events/types";
 import type { Services } from "../services";
@@ -311,6 +312,7 @@ export class Hub implements HubApi {
     if (c.phase !== "live" || !c.role) {
       return this.reject(c, intentId, "invalid", "Connection not live");
     }
+    if (name === SYNC_LOAD_SCENE) return this.loadScene(c, intentId, payload);
     if (!this.s.intents.has(name)) {
       return this.reject(c, intentId, "unknown_intent", `Unknown intent "${name}"`);
     }
@@ -334,6 +336,32 @@ export class Hub implements HubApi {
       c,
       result === undefined ? { type: "ack", intentId } : { type: "ack", intentId, result },
     );
+  }
+
+  /**
+   * `sync.loadScene` (ADR-0041): DM only, read-only, no bus, log or `seq`. Answered here, in
+   * this connection's frame order: every change committed before the read already went out as
+   * an event, later ones follow as events (nothing lost or duplicated, as FR-SYNC-10).
+   */
+  private loadScene(c: Connection, intentId: string, payload: unknown): undefined {
+    if (c.role !== "dm") return this.reject(c, intentId, "forbidden", "Not allowed");
+    const parsed = LoadScenePayload.safeParse(payload);
+    if (!parsed.success) {
+      return this.reject(c, intentId, "invalid", "Invalid payload", zodIssues(parsed.error));
+    }
+    const { sceneId } = parsed.data;
+    let records: Record<string, unknown[]>;
+    try {
+      if (this.s.records.sceneCampaignOf(sceneId) !== c.campaignId) {
+        return this.reject(c, intentId, "not_found", "Scene not found");
+      }
+      const src = { db: this.s.db, presence: this.presenceView() };
+      records = this.s.records.loadScene(src, this.viewer(c), sceneId);
+    } catch (err) {
+      this.s.log.error(`${SYNC_LOAD_SCENE} failed for ${c.connId}`, err);
+      return this.reject(c, intentId, "internal", "Internal error");
+    }
+    this.send(c, { type: "ack", intentId, result: { records } });
   }
 
   /**

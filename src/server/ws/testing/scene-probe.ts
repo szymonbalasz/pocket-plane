@@ -44,16 +44,26 @@ export interface SceneProbeFixture {
   activeInDb: Map<string, string>;
   /** Cache the scope gate reads; reloaded from `activeInDb` by the commit hook (CON-23). */
   activeCache: Map<string, string>;
+  /** Known scenes → campaign (the `sync.loadScene` scope check); filled by `set`. */
+  scenes: Map<string, string>;
   set: CommandDef;
   activate: CommandDef;
 }
 
-/** Registers the type, its commands + events, the active-scene resolver and the commit hook. */
-export function registerSceneProbe(s: Services): SceneProbeFixture {
+/**
+ * Registers the type, its commands + events, the active-scene resolver and the commit hook.
+ * `dmWindow`: flag the type `dmWindow: "active-scene"` and resolve scenes for `sync.loadScene`
+ * (ADR-0041).
+ */
+export function registerSceneProbe(
+  s: Services,
+  opts: { dmWindow?: boolean } = {},
+): SceneProbeFixture {
   if (!s.config.testMode) throw new Error("scene probe exists only in test mode");
   const rows = new Map<string, SceneProbeRecord>();
   const activeInDb = new Map<string, string>();
   const activeCache = new Map<string, string>();
+  const scenes = new Map<string, string>();
 
   s.records.register(
     defineRecordType<SceneProbeRecord>({
@@ -63,12 +73,16 @@ export function registerSceneProbe(s: Services): SceneProbeFixture {
       idOf: (r) => r.id,
       campaignOf: (r) => r.campaignId,
       sceneOf: (r) => r.sceneId,
+      ...(opts.dmWindow ? { dmWindow: "active-scene" as const } : {}),
       visibility: (r) => (r.hidden ? "hidden" : "full"),
       // Every scene's rows of the campaign; the scene gate filters (CON-22).
       snapshot: (_src, v) => [...rows.values()].filter((r) => r.campaignId === v.campaignId),
     }),
   );
   s.records.provideActiveScene((cid) => activeCache.get(cid) ?? null, { replace: true });
+  if (opts.dmWindow) {
+    s.records.provideSceneCampaign((id) => scenes.get(id) ?? null, { replace: true });
+  }
   s.commands.registerEvent(SceneProbeSet);
   s.commands.registerEvent(SceneProbeActivated);
 
@@ -97,6 +111,7 @@ export function registerSceneProbe(s: Services): SceneProbeFixture {
         changes: [{ type: "scene-probe", id, before, after }],
       });
       rows.set(id, after);
+      scenes.set(input.sceneId, campaignId);
       return { id };
     },
   });
@@ -140,6 +155,7 @@ export function registerSceneProbe(s: Services): SceneProbeFixture {
     rows,
     activeInDb,
     activeCache,
+    scenes,
     set: set as unknown as CommandDef,
     activate: activate as unknown as CommandDef,
   };

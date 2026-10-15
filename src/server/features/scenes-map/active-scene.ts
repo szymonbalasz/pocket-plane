@@ -32,3 +32,13 @@ export class ActiveSceneCache {
     this.byCampaign.set(e.event.campaignId, this.load(e.event.campaignId));
   }
 }
+
+/** `sync.loadScene` scope check (ADR-0041): the scene's campaign, or null if it doesn't exist. */
+export function sceneCampaignOf(db: Db, sceneId: string): string | null {
+  const r = db
+    .select({ campaignId: scene.campaignId })
+    .from(scene)
+    .where(eq(scene.id, sceneId))
+    .get();
+  return r?.campaignId ?? null;
+}

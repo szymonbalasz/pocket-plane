@@ -7,12 +7,16 @@ import { COMBATANT_TYPE } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_WINDOW } from "@shared/dice-roll-log/schemas";
 import { EFFECT_PRESET_TYPE } from "@shared/effect-modifiers/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
+import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { SNAPSHOT_CEILING } from "./hub";
 import {
   buildRealisticHeavy,
   CREATURE_SHEET_TYPE,
   dmBuildMs,
+  fillSceneToCap,
   HEAVY,
+  SCENE_TOKEN_CAP,
+  sceneLoadSizes,
   servicesFromBundle,
   snapshotFrames,
   snapshotSizes,
@@ -20,6 +24,10 @@ import {
 } from "./testing/snapshot-size";
 
 const BUILD_MS = 200;
+/** ADR-0041: a `sync.loadScene` result stays under the player ceiling (512 KiB). */
+const SCENE_LOAD_MAX = 512 * 1024;
+/** ADR-0041 re-baseline: the heavy DM keeps ≥ 100 KiB under its ceiling (fog + SCN headroom). */
+const HEAVY_DM_HEADROOM = 100 * 1024;
 const sessionSim = async () =>
   servicesFromBundle(await loadBundle("session-sim", { testMode: true }));
 
@@ -41,6 +49,14 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect(sizes.map((v) => v.label)).toEqual(["DM", "P1", "P2"]);
       expectUnderCeilings(sizes);
       expect(dmBuildMs(b.s)).toBeLessThan(BUILD_MS);
+      // ADR-0041: the DM gets the active scene's tokens; the inactive scene's load on view.
+      const [dm, ...players] = sizes;
+      const loads = sceneLoadSizes(b.s);
+      expect(loads).toHaveLength(2);
+      const loadedTokens = loads.map((l) => l.rows[TOKEN_TYPE] ?? 0);
+      expect(loadedTokens).toContain(dm?.types[TOKEN_TYPE]?.rows ?? -1);
+      expect(dm?.types[TOKEN_TYPE]?.rows).toBeLessThan(loadedTokens.reduce((a, n) => a + n, 0));
+      for (const p of players) expect(p.types[TOKEN_TYPE]?.rows).toBe(dm?.types[TOKEN_TYPE]?.rows);
     } finally {
       b.cleanup();
     }
@@ -77,6 +93,21 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect(sizes).toHaveLength(1 + HEAVY.players);
       expectUnderCeilings(sizes);
       expect(dmBuildMs(b.s)).toBeLessThan(BUILD_MS);
+    });
+
+    test("ADR-0041 DM token window: the active scene's 60 tokens only; ≥ 100 KiB DM headroom; largest scene load < 512 KiB", () => {
+      const sizes = snapshotSizes(b.s);
+      // Measured: 781,930 B with every token → 663,699 B (−118,231 B, the 240 non-active ones).
+      expect(sizes.map((v) => v.types[TOKEN_TYPE]?.rows)).toEqual(
+        Array(1 + HEAVY.players).fill(HEAVY.activeSceneTokens),
+      );
+      expect(SNAPSHOT_CEILING.dm - (sizes[0]?.bytes ?? Infinity)).toBeGreaterThanOrEqual(
+        HEAVY_DM_HEADROOM,
+      );
+      const loads = sceneLoadSizes(b.s);
+      expect(loads).toHaveLength(HEAVY.scenes);
+      expect(loads.reduce((n, l) => n + (l.rows[TOKEN_TYPE] ?? 0), 0)).toBe(HEAVY.tokens);
+      expect(loads[0]?.bytes).toBeLessThan(SCENE_LOAD_MAX);
     });
 
     test("CHARX §12 creature-sheet rows: DM all 16 + session-sim's 2, each player only their own; ceilings hold", () => {
@@ -190,6 +221,21 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       const src = { db: b.s.db, presence: { list: () => [] } };
       expect(b.s.records.get("game-log-entry")?.snapshot(src, v)).toHaveLength(GAME_LOG_WINDOW);
       expect(dmBuildMs(b.s)).toBeLessThan(Math.max(BUILD_MS, before * 2));
+    });
+
+    // Mutates the scenario (adds tokens): keep last.
+    test("ADR-0041 a non-active scene at the 200-token cap: its load < 512 KiB; the DM snapshot doesn't grow", () => {
+      const dmBefore = snapshotSizes(b.s)[0]?.bytes ?? 0;
+      const target = sceneLoadSizes(b.s).find(
+        (l) => l.rows[TOKEN_TYPE] !== HEAVY.activeSceneTokens,
+      );
+      expect(fillSceneToCap(b.s, target?.sceneId as string)).toBe(SCENE_TOKEN_CAP);
+      const largest = sceneLoadSizes(b.s)[0];
+      expect(largest?.sceneId).toBe(target?.sceneId as string);
+      expect(largest?.rows[TOKEN_TYPE]).toBe(SCENE_TOKEN_CAP);
+      // Measured 98,628 B for 200 max-string tokens; a max SCN scene adds ≈ 190 KB (ADR-0041).
+      expect(largest?.bytes).toBeLessThan(SCENE_LOAD_MAX);
+      expect(snapshotSizes(b.s)[0]?.bytes).toBe(dmBefore);
     });
   });
 });
