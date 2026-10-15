@@ -14,11 +14,13 @@ wave: 1
 
 - Several campaigns, one **active campaign** per server; the DM creates and switches ([ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md), [ADR-0020](../architecture/adr/0020-single-active-campaign.md)).
 - DM secret for the DM; one player link per player, opened with no other setup ([ADR-0019](../architecture/adr/0019-auth-credentials.md)). Built first, in the Phase 2 skeleton ([roadmap](../roadmap.md#build-order-mvp)).
+- **Sprint 2 phase 1** (P2b, N3; FR-CAMP-21, 22): the DM's players panel shows, under each player, their characters at a glance: level, AC, HP (+ temp HP), passive Perception / Investigation / Insight; a click opens that sheet. DM client only; no new data.
 
 ## 2. Scope
 
 - DM secret from env config; DM login. Campaigns: create, list, rename, switch. Players: add, rename, copy link.
 - Player page (joined, invalid-link, waiting). Links that survive server restarts and tunnel URL changes ([ADR-0003](../architecture/adr/0003-local-hosting.md)).
+- *(Sprint 2, N3)* Players panel: per-player character lines (read-only numbers from the DM's store) that open the sheet.
 
 ## 3. Goals
 
@@ -62,6 +64,9 @@ N/A — the goals in §3 are the stories; listing them again adds nothing.
 | FR-CAMP-18 | Valid token, inactive campaign (on open or after a switch) → waiting screen naming the campaign. The page joins ≤ 10 s after the DM activates that campaign, no reload. | live-sync retry, cap 5 s ± 20 % |
 | FR-CAMP-19 | Player connections never receive the DM secret, any link token, or another campaign's data. *(proposed)* They receive `{id, name}` of every player in their own campaign. | [OQ-CAMP-13](#15-open-questions) |
 | FR-CAMP-20 | Every mutation is a server command committing in one transaction with its event log entry ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). Fixtures call the same commands. | |
+| **Sprint 2 phase 1** (P2b, N3) | | |
+| FR-CAMP-21 | **Party at a glance** (DM players panel): under each player row, one line per `character` entity they own (drafts too, marked "Draft"), sorted as FR-CHAR-02: name, **Lvl**, **AC**, **HP** `current / max` (+ "+N temp" when temp HP > 0; "Down" at 0), **PP**, **Inv**, **Ins**. Sources (all already in the DM's store, DM full visibility): `statBlock.level` (written from classes, [FR-CHARX-04](character-sheet-full.md#6-functional-requirements)), `statBlock.ac`, `statBlock.hpMax` (stored, [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md)); `hpCurrent` (entity, CHAR); temp HP = combat-extras' `entity.tempHp` ([FR-CBTX-14](combat-extras.md#6-functional-requirements); read only, not modelled here); passives = `passiveScore(statBlock, perception \| investigation \| insight)` from `@shared/entities` (derived, overrides honoured, [FR-CHARX-05/06](character-sheet-full.md#6-functional-requirements)); no ability scores → "—". A committed change shows ≤ 1 s. Player without a character: "No character yet". | N3 |
+| FR-CAMP-22 | Clicking a character line opens the DM's `char.sheet` on it (CHARX's `openSheetFor` + `openWindow`, brought to front; FR-CHARX-47 stores the pick). No intent; no other action on the line. | N3 |
 
 ## 7. UI/UX notes
 
@@ -72,6 +77,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark onl
   - Campaign switcher: Select, active marked; "New campaign" Dialog. Players online → confirm Dialog "Switch to **X**? N online players will wait until you switch back." Loading while the DM connection reconnects.
   - Players panel: Table — name, online dot, copy link (Toast "Link copied"), rename; add-player input below. Shows the base URL used; warns if it is a loopback host (`localhost`, `127.0.0.1`, `::1`).
   - *(playtest pass, to build; #171 G10)* Online dots muted (no dot, "–") while the DM client is not `live`: presence is unknown then ([FR-SYNC-29](live-sync.md#6-functional-requirements)).
+  - *(Sprint 2, N3)* Under each player row, indented compact lines: "Mira · Lvl 1 · AC 16 · HP 12 / 12 +5 · PP 14 · Inv 10 · Ins 11" (labels muted, numbers tabular; Tooltip on PP / Inv / Ins with the full name and "override" when overridden). Draft Badge; HP 0 in the `hp.down` token. Whole line is a button (hover, focus ring). Window size unchanged (400×220); the body scrolls (OQ-CAMP-16). Test IDs: `camp-player-char` (+ `data-record-id` = character id), `camp-player-char-<level|ac|hp|temp|pp|inv|ins>`, `camp-player-char-draft`, `camp-player-nochar`.
   - Empty: "Create your first campaign" / "Add a player to get a link". Validation inline; server errors as Toast; disconnected banner from [live-sync](live-sync.md).
 - **Player view** (`/p/<token>`, loading first). This spec owns the wording; live-sync's player `rejected` state shows the invalid-link screen.
   - Joined (skeleton): "Playing as **Player 1** in **Fixture Campaign**". Later: the active scene.
@@ -94,7 +100,7 @@ No JSON leaf fields ([ADR-0006](../architecture/adr/0006-persistence.md)). DM se
 | | linkToken | text | Unique; plain text so the DM can re-copy. Never in a sync record, event or log entry |
 | | createdAt, updatedAt | timestamp | |
 
-- **Relations:** Campaign 1—* Player 1—* owned records ([entities](entities.md), [scenes-map](scenes-map.md)); no removal → no dangling owners. **Derived:** link URL = public base URL + path + `linkToken`; online state from presence. **Persisted runtime state:** `Campaign.active` (throttle counter: memory only).
+- **Relations:** Campaign 1—* Player 1—* owned records ([entities](entities.md), [scenes-map](scenes-map.md)); no removal → no dangling owners. **Derived:** link URL = public base URL + path + `linkToken`; online state from presence; *(N3)* party lines (FR-CAMP-21: passives derived by entities' helpers; level, AC, HP stored; temp HP read from combat-extras' column), client only. **Persisted runtime state:** `Campaign.active` (throttle counter: memory only).
 
 ## 9. API & events
 
@@ -112,6 +118,7 @@ Envelopes, errors and close codes: [live-sync](live-sync.md). CRUD over REST (OQ
 
 - **Record types** (generic record changes `{type, id, op, data}` + cause, OQ-SYNC-07): `campaign {id, name}` and `player {id, campaignId, name}` (no token field exists). Scope `campaign`; visibility = full for connections of their own campaign; snapshot = own campaign row / all its players.
 - **Close reason `campaign-inactive`** (retryable; also sent at `hello` for a valid token of an inactive campaign): player client → waiting screen, keeps retrying; DM client → reconnects at once.
+- *(N3)* No new intent, record type, event or field. The party lines read `entity` records the DM already receives in full ([FR-ENT-15](entities.md#6-functional-requirements)); `camp.players` is a DM-only window, so nothing new reaches any player (owning player or others).
 - **Provided to live-sync:** `verifyDmCredential(value) → {campaignId} | invalid | throttled | noActiveCampaign`; `resolvePlayerLink(token) → {campaignId, playerId, campaignActive} | null`. With no active campaign the DM client stays on REST and opens no WS.
 
 | Domain event | Changes | Logged | Transient | Undoable | After commit |
@@ -138,6 +145,7 @@ No player-writable actions in this spec.
 - **DM disconnect / reconnect:** players unaffected; DM client re-sends the stored secret in `hello` → active campaign's snapshot. A throttled login (429) keeps the stored secret and retries after 60 s (#163). A REST call that fails on the network (or a 502/503/504 without an error body) shows "Connection lost — check the result before trying again" (login: "Could not reach the server.") (#168).
 - **Server crash:** each command is one transaction (row + log): all or nothing. Retried create → unique-name error. Activation flips both flags at once: never zero or two active. Crash after the activation commit: connections drop anyway; old-campaign players then get `campaign-inactive`. After restart: DM still logged in, same active campaign, links work, throttle cleared. Server or tunnel down: page can't load; new tunnel host → DM re-copies links.
 - **Concurrent edits:** two DM tabs → last write wins; racing creates/renames → DB uniqueness gives one success, one error. A switch closes the other DM tabs too; in-flight intents are not resent ([FR-SYNC-05](live-sync.md#6-functional-requirements)).
+- **Party lines (N3):** client-only view of the store: disconnect → last values + banner; reconnect / server crash → the snapshot refreshes them; nothing to lose. Character reassigned → it moves under the new owner ≤ 1 s. Temp HP absent (column missing in old data) → treated as 0. A sheet edit by the owner shows ≤ 1 s.
 - **Invalid / malicious input:** zod on every route; names trimmed, control characters rejected, rendered as text. Unknown token → 404, no detail; 128-bit tokens need no join rate limit. A player on the DM route sees only the login screen. Anyone reaching the tunnel can keep the DM locked out in 60 s windows (accepted, trusted table; OQ-CAMP-12).
 
 ## 12. Performance & bandwidth
@@ -156,6 +164,8 @@ Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from wo
 | Unit | Name rules; token length/charset; secret compare; throttle window (fake clock); link building; startup refusal | none |
 | Integration | Each command commits row + log entry (injected failure → neither). At most one active. DM routes 401 without secret / with a player token. 5 failures → 429 even for the correct secret; restart clears. Unknown token → 404 + invalid-credential close, no data frame. Inactive campaign → `campaign-inactive` at `hello`. Switch closes all old-campaign connections ≤ 1 s; DM reconnect snapshot = new campaign. No `linkToken` in any WS frame, snapshot or log row. | `base`, `campaign-switch` |
 | E2E (thin) | Playwright: the walkthrough below, scripted | `campaign-switch` |
+| Unit (N3) | `FR-CAMP-21 party lines` (pure view-model from a store: Mira full-sheet with `passive.perception` override 14 → PP 14; Pip no scores → "—"; temp HP 5 → "+5 temp"; HP 0 → "Down"; draft marked; sort; player without character → "No character yet"); `FR-CAMP-22` click calls `openSheetFor` + opens `char.sheet` | In-code |
+| Integration (N3) | None: no server change. Leak property kept: player frames carry no other character's `statBlock` (entities' and CHARX's leak scans) | — |
 
 **Browser walkthrough** (DM and each player in separate browser contexts; reset + load `campaign-switch`, app on the worktree ports):
 
@@ -168,6 +178,12 @@ Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from wo
 7. Kill and restart the server → DM still logged in, Fixture Campaign active, A and B reconnect.
 8. **Throughout:** no player's WS frames or REST responses contain another player's token or the DM secret.
 
+**Party lines walkthrough (N3)** — bundle `character-sheet-full`, built client, `verify` profile; contexts A DM, B `player-1`, C `player-2`.
+
+9. **A:** open Players → under Player 1: Mira "Lvl 1 · AC 16 · HP 12 / 12 · PP 14 · Inv 10 · Ins 11" (PP from the override) and Pip "… PP — …"; under Player 2: Sela (Draft) and Thorn.
+10. **C:** Sela edit WIS 16 → 18; **A:** Sela's PP and Ins rise by 1 ≤ 1 s. **A:** Mira's sheet → Temp HP 5; Damage 3 from **B** → Mira line "HP 12 / 12 +2 temp".
+11. **A:** click Thorn's line → `char.sheet` opens (or comes to front) on Thorn. Hard-kill + restart → lines unchanged after rejoin. B, C: no Players window in their launcher.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -176,6 +192,9 @@ Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from wo
 | [fixtures-adapters](fixtures-adapters.md) | `base`, `player-2`; loader calls our commands; seeded tokens only when disposable; DM secret from env (OQ-FIX-13) | agreed |
 | [play-shell](play-shell.md), [entities](entities.md), [scenes-map](scenes-map.md) | Placement of switcher, players panel and player landing; owned records reference `Player.id` | phase 2 |
 | Build conventions (AGENTS.md) | `PP_DM_SECRET`, `PP_PUBLIC_BASE_URL`, `PP_DATA_DISPOSABLE`, `ctx.ids/tokens/clock` (AGENTS §9.2–9.3) | agreed, pending merge |
+| [character-sheet-full](character-sheet-full.md), [entities](entities.md), [combat-extras](combat-extras.md) (N3) | `passiveScore` (overrides), stored `level` / `ac` / `hpMax`, `hpCurrent`; `entity.tempHp` (CBTX, read only); `openSheetFor` (FR-CHARX-47). No change to those specs | built |
+
+**Shared changes** (sprint 2 phase 1, N3): none shared. Feature-owned: `src/client/dm/features/campaign-management/PlayersPanel.tsx` + a pure `party-lines.ts` (view model, tested). Imports `@shared/entities` helpers and `@ui/features/character-sheet/selection` (allowed, AGENTS §9.1). No DB, event, protocol, record type or window geometry change (unless OQ-CAMP-16 picks a taller default: protocol §24 `camp.players` row + layout tests).
 
 ## 15. Open questions
 
@@ -195,6 +214,7 @@ Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from wo
 | OQ-CAMP-12 | Login throttle policy (FR-CAMP-05) | **Global 5 / 60 s → 60 s lockout** (simple; lockout abusable) / per IP via tunnel header (trusts a header) / none (secret open to the internet) | no · owner: spec-campaign-management | live-sync |
 | OQ-CAMP-13 | Players see other players' names? | **Yes, `{id, name}`** (game log, party UI) / no (others resolve names) | no · owner: spec-campaign-management | dice-roll-log, play-shell |
 | OQ-CAMP-14 | ~~Glossary~~ **Decided (integrator):** added **Active campaign**, **Public base URL**, **Link token**; **Player link** reworded to "bound to one player" (rename keeps the token; [ADR-0019](../architecture/adr/0019-auth-credentials.md) refines ADR-0004). | — | — | — |
+| OQ-CAMP-16 | N3: `camp.players` is 400×220; two players with two characters each plus the add row already scroll | **Keep 400×220, the body scrolls** (no geometry or layout-test change; the DM resizes once, layout remembers) / default 400×320 (protocol §24 row + the 1280×720 edge-placement tests change) | no · owner: spec-polish-2b | play-shell, protocol §24 |
 | OQ-CAMP-15 | Routes: DM client, player page, REST prefix | **DM `/`, player `/p/<token>`, REST `/api/*` as in §9** *(proposed)* / other | no · owner: spec-campaign-management | live-sync, AGENTS §9.1 |
 
 ## 16. Out of scope
