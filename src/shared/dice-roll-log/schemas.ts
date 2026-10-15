@@ -71,13 +71,23 @@ export const RollActorRef = z.union([
 ]);
 export type RollActorRef = z.infer<typeof RollActorRef>;
 
-/** Intent `dice.roll` (FR-DICE-09). */
+/**
+ * FR-DICE-34: the DM may also roll as a combatant of the started encounter (the token-less ones
+ * are listed); the server resolves it to the combatant's entity and name. Not for players.
+ */
+export const DmRollActorRef = z.union([
+  ...RollActorRef.options,
+  z.strictObject({ combatantId: Id }),
+]);
+export type DmRollActorRef = z.infer<typeof DmRollActorRef>;
+
+/** Intent `dice.roll` (FR-DICE-09). `actor.combatantId`: DM only (player → `invalid`). */
 export const DiceRollIntent = z.strictObject({
   expression: DiceExpression,
   mode: RollMode.default("normal"),
   category: RollCategory.default("other"),
   label: RollLabel.optional(),
-  actor: RollActorRef.optional(),
+  actor: DmRollActorRef.optional(),
   manual: ManualEntry.optional(),
   public: z.boolean().optional(),
 });
