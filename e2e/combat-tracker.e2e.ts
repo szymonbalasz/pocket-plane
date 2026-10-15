@@ -244,7 +244,10 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   // toast → popup over it, toast gone; Goblin hit; Apply.
   const shortsword = sheet.getByTestId("charx-attack").filter({ hasText: "Shortsword" });
   await shortsword.getByTestId("charx-roll-attack").click();
-  const splitToast = dm.getByTestId("note-toast").filter({ hasText: "to hit (Shortsword)" });
+  // A natural 1 / 20 puts " (natural N)" between "to hit" and the attack name (FR-CBT-70).
+  const splitToast = dm.getByTestId("note-toast").filter({
+    hasText: /Mira: \d+ to hit(?: \(natural (?:1|20)\))? \(Shortsword\)/,
+  });
   await expect(splitToast).toHaveCount(1);
   const splitId = (await splitToast.getAttribute("data-record-id")) as string;
   await shortsword.getByTestId("charx-roll-damage").click();
