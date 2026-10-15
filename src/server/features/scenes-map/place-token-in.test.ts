@@ -1,6 +1,6 @@
 // FR-MAP-48: `placeTokenIn`, `map.placeToken` minus intent and event, run inside another
 // command's transaction (combat's created tokens). `freeCellsNear` is in @shared/scenes-map.
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { defineEvent } from "@shared/events/types";
 import type { SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
 import { MAP_INTENTS as I, TOKENS_PER_SCENE_MAX } from "@shared/scenes-map/schemas";
@@ -11,8 +11,9 @@ import { seededContext } from "../../commands/context";
 import { token } from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import { placeTokenIn, MAP_REST as R } from "./commands";
+import { toTokenRecord } from "./rows";
 import { scenesSetup } from "./testing";
-import { tokenHooksOf } from "./token-hooks";
+import { tokenHooks, tokenHooksOf } from "./token-hooks";
 
 const Placed = defineEvent({
   type: "TestTokensPlaced",
@@ -55,6 +56,7 @@ function setup() {
     mapAssetId: "map-battle",
   });
   const hookCalls: string[] = [];
+  // One hook list per process: each case registers its spy, `afterEach` removes it.
   tokenHooksOf(t.s).register("test-spy", (_env, before) => {
     hookCalls.push(before.id);
     return [];
@@ -71,6 +73,8 @@ function setup() {
 }
 
 describe("FR-MAP-48 placeTokenIn", () => {
+  afterEach(() => tokenHooks.unregister("test-spy"));
+
   test("same rules as map.placeToken, in the caller's transaction and event; no token-changed hooks", () => {
     const t = setup();
     const placedByIntent = t.run<{ tokenId: string }>(I.placeToken, t.spec(t.h.goblinId, 0, 0));
@@ -149,7 +153,9 @@ describe("FR-MAP-48 placeTokenIn", () => {
   test("map.placeToken keeps its behaviour (TokenPlaced with the one change)", () => {
     const t = setup();
     const { tokenId } = t.run<{ tokenId: string }>(I.placeToken, t.spec(t.h.wolfId, 5, 5));
-    const row = t.s.db.select().from(token).where(eq(token.id, tokenId)).get();
+    const row = toTokenRecord(
+      t.s.db.select().from(token).where(eq(token.id, tokenId)).get() as typeof token.$inferSelect,
+    );
     const ev = t.events.at(-1)?.event;
     expect(ev?.type).toBe("TokenPlaced");
     expect(ev?.payload).toEqual({ tokenId, sceneId: t.scene.id });

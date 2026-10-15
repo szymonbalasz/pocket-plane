@@ -26,14 +26,13 @@ import {
 } from "./commands";
 import { dragAudience } from "./drag";
 import { sceneRecordTypes } from "./records";
-import { bindTokenHooks, TokenHooks, tokenChangedHooks } from "./token-hooks";
+import { tokenHooksOf } from "./token-hooks";
 
 export const scenesMap: Feature = {
   name: "scenes-map",
   register(r) {
     const s = r.services;
-    const hooks = new TokenHooks(tokenChangedHooks);
-    bindTokenHooks(s, hooks);
+    const hooks = tokenHooksOf(s);
 
     // REST-only (MAP §9, ADR-0021 D) — also fixture steps.
     const rest: CommandDef[] = [

@@ -12,6 +12,7 @@ import type { Modifier } from "@shared/effect-modifiers/schemas";
 import { TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
+import { FOG_EDIT_KINDS, FOG_FILLS } from "@shared/fog-of-war/schemas";
 import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
@@ -304,6 +305,8 @@ export const token = sqliteTable(
     speed: integer("speed"),
     /** Display copy: `definitionId` on character tokens, else null; players see it (FR-MAP-50). */
     characterId: text("character_id"),
+    /** Server copy: every footprint cell fogged (FR-FOG-10, ADR-0039); wire only when true. */
+    fogged: integer("fogged", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -767,6 +770,64 @@ export const effectSeqNext = sql<number>`(select coalesce(max(${effect.seq}), 0)
 export const effectPresetSeqNext = sql<number>`(select coalesce(max(${effectPreset.seq}), 0) + 1 from ${effectPreset})`;
 export const lootEntrySeqNext = sql<number>`(select coalesce(max(${lootEntry.seq}), 0) + 1 from ${lootEntry})`;
 
+// ---------------------------------------------------------------------------------------------
+// Fog of war (FOG §8, data model §24; fix/fog-core). fog-of-war writes the rows. Both cascade
+// with their scene (FR-FOG-23). `token.fogged` above is the subject copy (ADR-0039).
+// ---------------------------------------------------------------------------------------------
+
+/** Fog mask of a scene (FR-FOG-01–04): no row = every cell clear. Wire `id` = `sceneId`. */
+export const sceneFog = sqliteTable(
+  "scene_fog",
+  {
+    sceneId: text("scene_id")
+      .primaryKey()
+      .references((): AnySQLiteColumn => scene.id, { onDelete: "cascade" }),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    fill: text("fill", { enum: FOG_FILLS }).notNull(),
+    col0: integer("col0").notNull(),
+    row0: integer("row0").notNull(),
+    cols: integer("cols").notNull(),
+    rows: integer("rows").notNull(),
+    /** Run-length mask over the box (FR-FOG-04), ≤ 2,000 runs. */
+    runs: text("runs").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("scene_fog_campaign").on(t.campaignId)],
+);
+
+/** Fog undo stack (FR-FOG-07): ≤ 20 per scene, LIFO by `seq`; `prev*` = the mask before. */
+export const sceneFogEdit = sqliteTable(
+  "scene_fog_edit",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    sceneId: text("scene_id")
+      .notNull()
+      .references((): AnySQLiteColumn => scene.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    kind: text("kind", { enum: FOG_EDIT_KINDS }).notNull(),
+    prevFill: text("prev_fill", { enum: FOG_FILLS }).notNull(),
+    prevCol0: integer("prev_col0").notNull(),
+    prevRow0: integer("prev_row0").notNull(),
+    prevCols: integer("prev_cols").notNull(),
+    prevRows: integer("prev_rows").notNull(),
+    prevRuns: text("prev_runs").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("scene_fog_edit_seq").on(t.seq),
+    index("scene_fog_edit_scene").on(t.sceneId, t.seq),
+    index("scene_fog_edit_campaign").on(t.campaignId),
+  ],
+);
+
+/** CON-20: `seq` for undo entries, computed by the DB inside the insert's transaction. */
+export const sceneFogEditSeqNext = sql<number>`(select coalesce(max(${sceneFogEdit.seq}), 0) + 1 from ${sceneFogEdit})`;
+
 export const schema = {
   dbMeta,
   campaign,
@@ -790,4 +851,6 @@ export const schema = {
   creatureSheet,
   effect,
   effectPreset,
+  sceneFog,
+  sceneFogEdit,
 };

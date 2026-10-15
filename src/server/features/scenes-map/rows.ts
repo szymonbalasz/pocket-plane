@@ -11,7 +11,9 @@ type TokenRow = typeof token.$inferSelect;
 type FolderRow = typeof sceneFolder.$inferSelect;
 
 export const toSceneRecord = (r: SceneRow): SceneRecord => ({ ...r });
-export const toTokenRecord = (r: TokenRow): TokenRecord => ({ ...r });
+/** `fogged` rides the wire only when true (FOG §9). */
+export const toTokenRecord = ({ fogged, ...r }: TokenRow): TokenRecord =>
+  fogged ? { ...r, fogged: true } : r;
 export const toFolderRecord = (r: FolderRow): SceneFolderRecord => ({ ...r });
 
 /** Campaign fixed at authentication (CON-21): `actor.campaignId`. */
