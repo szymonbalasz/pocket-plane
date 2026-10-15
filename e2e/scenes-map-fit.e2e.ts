@@ -76,7 +76,8 @@ test("FR-MAP-44 / -45 FR-SHELL-34 fit to the free area: open, reload, pan + Fit,
   await dm.getByTestId("map-show-to-players").click();
   await expect(dm.getByTestId("map-not-shown-badge")).toHaveCount(0);
   await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
-  await expect(shellWindow(dm, "cbt.initiative")).toBeVisible(); // default layout
+  // P3 glitch 3: no encounter running → the empty Initiative opened minimised (launcher keeps it).
+  await expect(launcherButton(dm, "cbt.initiative")).toHaveAttribute("data-state", "minimised");
   // Six tokens, the hidden Wolf and Elite included.
   await expectUncovered(dm, 6, pcs);
 

@@ -62,3 +62,15 @@ export async function endAndFollow(
   fx.dispatch({ type: "minimise", kind: INITIATIVE_KIND });
   return r;
 }
+
+/**
+ * P3 glitch 3 (amends FR-CBT-60): once per page load, at the first live store with the layout
+ * applied, an open Initiative with no started encounter minimises (empty, it only covered the
+ * map; the launcher keeps it), and one appearance is noted so a fitted map refits into the room.
+ * Opened again by the DM, it stays open.
+ */
+export function idleInitiativeOnLoad(o: { started: boolean; open: boolean }, fx: ShellEffects) {
+  if (o.started || !o.open) return;
+  fx.dispatch({ type: "minimise", kind: INITIATIVE_KIND });
+  fx.noteAppearance();
+}

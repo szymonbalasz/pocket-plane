@@ -60,7 +60,11 @@ import {
   useStartedEncounter,
 } from "@ui/features/combat-tracker/store";
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
-import { ENCOUNTERS_KIND, initiativeWindowBase } from "@ui/features/combat-tracker/window";
+import {
+  ENCOUNTERS_KIND,
+  INITIATIVE_KIND,
+  initiativeWindowBase,
+} from "@ui/features/combat-tracker/window";
 import { modeFromKeys } from "@ui/features/dice-roll-log/logic";
 import {
   RollButton,
@@ -70,8 +74,13 @@ import {
 import { actionButton } from "@ui/features/notifications/logic";
 import { useNoteActions } from "@ui/features/notifications/parts";
 import { originOf } from "@ui/features/notifications/views";
+import { noteAppearance } from "@ui/features/play-shell/free-area";
 import { defineWindow } from "@ui/features/play-shell/registry";
-import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
+import {
+  useOpenWindow,
+  useShellState,
+  useWindowDispatch,
+} from "@ui/features/play-shell/ShellContext";
 import { movementIndicator } from "@ui/features/scenes-map/movement";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
@@ -111,6 +120,7 @@ import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpDialog } from "./hp-dialog";
 import { isDamageCard, pendingRowText } from "./pending";
 import { useCombatDialogs } from "./popup-store";
+import { idleInitiativeOnLoad } from "./start-end";
 
 /**
  * FR-CBTX-46 (G1): the Init column is wide while some row can roll (round 0, a late joiner
@@ -988,8 +998,26 @@ function DmInitiativeBody() {
   );
 }
 
+/** P3 glitch 3: once per page load, an empty Initiative minimises (`idleInitiativeOnLoad`). */
+function useIdleInitiativeOnLoad() {
+  const ready = useShellState((s) => s.key !== null);
+  const live = useSync((s) => s.state === "live");
+  const started = useSync((s) => startedIn(s.store) !== null);
+  const open = useShellState((s) =>
+    s.windows.some((w) => w.kind === INITIATIVE_KIND && w.state === "open"),
+  );
+  const dispatch = useWindowDispatch();
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current || !ready || !live) return;
+    done.current = true;
+    idleInitiativeOnLoad({ started, open }, { dispatch, noteAppearance });
+  }, [ready, live, started, open, dispatch]);
+}
+
 /** Dialogs hosted while the window type is available (popup opens from cards and rows). */
 function CombatDialogs() {
+  useIdleInitiativeOnLoad();
   return (
     <>
       <AttackPopup />

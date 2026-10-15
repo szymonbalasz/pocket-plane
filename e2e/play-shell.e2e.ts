@@ -59,7 +59,7 @@ const TEST_WINDOWS = ["shell.test:main", "sync.probes:main"];
 const zOf = (page: Page, kind: string) =>
   shellWindow(page, kind).evaluate((el) => Number((el as HTMLElement).style.zIndex));
 
-test("FR-SHELL-01/02/05/06/21 DM frame: top bar, presence badge, Players window (map-first: closed; 1280×720 left edge, 1440×900 right edge below Initiative), base empty state", async ({
+test("FR-SHELL-01/02/05/06/21 DM frame: top bar, presence badge, Players window (map-first: closed; empty Initiative minimised → right edge; 1440×900 right edge below a restored Initiative), base empty state", async ({
   browser,
 }) => {
   const { secret } = e2eEnv();
@@ -77,9 +77,11 @@ test("FR-SHELL-01/02/05/06/21 DM frame: top bar, presence badge, Players window 
   await dm.getByTestId("ui-presence-badge").click();
   await expect(players).toHaveAttribute("data-state", "open");
   await expect(players.getByRole("heading", { name: "Players" })).toBeHidden(); // title bar only
-  // Protocol §24: at 1280×720 the 400×500 DM Initiative leaves < 200 px below it → left edge.
+  // P3 glitch 3: no encounter running → the empty Initiative opened minimised, so Players takes
+  // its default bottom-right spot (with Initiative open at 1280×720 it would go to the left edge).
+  await expect(launcherButton(dm, "cbt.initiative")).toHaveAttribute("data-state", "minimised");
   const b = await box(dm, "camp.players");
-  expect(b.x).toBeLessThan(80); // left edge
+  expect(b.x + b.w).toBeGreaterThan(1280 - 40); // right edge
   // Close it; the badge opens it again.
   await players.getByTestId("ui-window-close").click();
   await expect(players).toHaveCount(0);
@@ -92,6 +94,9 @@ test("FR-SHELL-01/02/05/06/21 DM frame: top bar, presence badge, Players window 
   await wide.setViewportSize({ width: 1440, height: 900 });
   await loginDm(wide, secret);
   await expect(wide.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  // Empty Initiative opened minimised (P3 glitch 3); the DM restores it from the launcher.
+  await expect(launcherButton(wide, "cbt.initiative")).toHaveAttribute("data-state", "minimised");
+  await launcherButton(wide, "cbt.initiative").click();
   await expect(shellWindow(wide, "cbt.initiative")).toBeVisible();
   await wide.getByTestId("ui-presence-badge").click();
   await expect(shellWindow(wide, "camp.players")).toHaveAttribute("data-state", "open");

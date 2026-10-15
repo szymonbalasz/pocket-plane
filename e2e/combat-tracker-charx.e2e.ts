@@ -7,7 +7,7 @@
 // hpRules: bun test (combat-tracker charx-routes.test.ts, roll-route.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { openWindow } from "./support/shell";
+import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
@@ -79,7 +79,9 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
   await expect(bindings.filter({ hasText: "Mira" })).toHaveCount(1);
   await expect(bindings.filter({ hasText: "Brin" })).toHaveCount(0);
   await dm.getByTestId("cbt-enc-start-confirm").click();
-  const init = await openWindow(dm, "cbt.initiative");
+  // FR-CBT-60: the acked Start opens Initiative (it loaded minimised: no encounter, P3 glitch 3).
+  const init = shellWindow(dm, "cbt.initiative");
+  await expect(init).toBeVisible();
   await expect(init.locator('[data-testid="cbt-init-row-name"][data-value="Mira"]')).toHaveCount(1);
   await expect(init.locator('[data-testid="cbt-init-row-name"][data-value="Brin"]')).toHaveCount(0);
 
