@@ -414,17 +414,18 @@ describe("FR-FOG-08 tokens and hooks", () => {
     expect(t.lastEvent()?.changes.map((c) => c.type)).toEqual(["fog"]);
   });
 
-  test("FR-FOG-13 no `hides` registered → token-changed hooks never run (players unaffected)", () => {
+  test("FR-FOG-13 fog's hides: only fog-hidden flips run the hooks; an owned token (exempt) never does", () => {
     const t = setup();
     const runs: string[] = [];
     tokenHooks.register("test.spy", (_e, before) => {
       runs.push(before.id);
       return [];
     });
-    t.place(12, 6);
+    const goblin = t.place(12, 6);
+    t.place(2, 7, { ownerPlayerId: t.h.p1.id });
     t.setAll(true);
     t.edit("reveal", t.rect(0, 0, 19, 13));
-    expect(runs).toEqual([]);
+    expect(runs).toEqual([goblin, goblin]);
   });
 
   test("FR-FOG-13 a fog-hidden flip runs the token-changed hooks; rows join; a reject rolls everything back", () => {

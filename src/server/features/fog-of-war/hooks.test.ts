@@ -1,18 +1,22 @@
 // fog-of-war's registry lines against the real fog (FR-FOG-02, -10, -23, -24): `derive` at every
 // scenes-map write site, `duplicated` copies the row (not the stack), `deleting` lists the `fog`
-// delete; the FK cascade removes row and stack. Nothing is hidden from players yet (no `hides`).
+// delete; the FK cascade removes row and stack; `created` fogs new scenes; `hides` = fog-hidden;
+// `dragToDm` routes previews into fog to the DM (FR-FOG-11, -15).
 import { describe, expect, test } from "bun:test";
 import { FOG_INTENTS as F, type FogRecord, type FogShape } from "@shared/fog-of-war/schemas";
-import { MAP_INTENTS as I, type SceneRecord } from "@shared/scenes-map/schemas";
+import { type DragData, MAP_INTENTS as I, type SceneRecord } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { type CommandDef, defineCommand } from "../../commands/commands";
 import { sceneFog, sceneFogEdit, token } from "../../db/schema";
+import type { SignalSender } from "../../ws/signals";
 import { createEntity, UPDATE } from "../entities/commands";
 import { goblinBlock } from "../entities/testing";
 import { placeTokenIn, MAP_REST as R } from "../scenes-map/commands";
+import { dragAudience } from "../scenes-map/drag";
 import { scenesSetup } from "../scenes-map/testing";
 import { tokenVisibility } from "../scenes-map/visibility";
+import { sceneVisibilityHooks } from "../scenes-map/visibility-hooks";
 import { fogUndoStack } from "./commands";
 import { readFogRecord } from "./rows";
 import { dropFogRow } from "./testing";
@@ -81,11 +85,13 @@ describe("FR-FOG-10 derive (fog's line)", () => {
     expect(t.fogged(placed.id)).toBe(true);
     // Off the box: cells take `fill` (fog).
     expect(t.fogged(t.place(19, 13))).toBe(true);
-    // Players: nothing hidden yet (no `hides` line; build/fog-visibility switches it on).
+    // FR-FOG-11/12: fog-hidden for players unless owned (exempt; the registry gives the DM full).
     const row = t.s.db.select().from(token).where(eq(token.id, placed.id)).get();
-    expect(
-      tokenVisibility({ ...row, fogged: true } as never, t.h.viewer("player", t.h.p1.id)),
-    ).toBe("redacted");
+    const p1 = t.h.viewer("player", t.h.p1.id);
+    expect(tokenVisibility({ ...row, fogged: true } as never, p1)).toBe("hidden");
+    const owned = { ...row, fogged: true, ownerPlayerId: t.h.p1.id };
+    expect(tokenVisibility(owned as never, p1)).toBe("redacted");
+    expect(tokenVisibility(owned as never, t.h.viewer("player", t.h.p2.id))).toBe("redacted");
   });
 
   test("FR-FOG-10 map.moveToken: walking into fog is fogged in its own TokenMoved; out of it clear", () => {
@@ -261,5 +267,78 @@ describe("FR-FOG-02 / -23 lifecycle (fog's lines)", () => {
     const rows = t.s.db.select().from(sceneFog).all().length;
     expect(() => t.run(R.createScene, { name: "Bad", mapAssetId: "nope" })).toThrow();
     expect(t.s.db.select().from(sceneFog).all()).toHaveLength(rows);
+  });
+});
+
+describe("FR-FOG-11 / -15 hides and dragToDm (fog's line)", () => {
+  const routeOf = (t: ReturnType<typeof setup>) => {
+    const read = { db: t.s.db, activeSceneOf: (c: string) => t.s.records.activeSceneOf(c) };
+    const dm: SignalSender = { role: "dm", campaignId: t.h.campaignId };
+    return (data: DragData) => dragAudience(data, dm, read);
+  };
+
+  test("FR-FOG-15 visible token: clear preview → all; wholly fogged preview → dm from the first such frame; end → all", () => {
+    const t = setup();
+    t.run(I.activateScene, { sceneId: t.ambush.id });
+    t.setAll(true);
+    t.edit("reveal", t.rect(0, 0, 3, 3));
+    const g = t.place(1, 1);
+    const route = routeOf(t);
+    const at = (col: number, row: number): DragData => ({
+      sceneId: t.ambush.id,
+      tokenId: g,
+      x: col * 70 + 20, // FR-MAP-15 rounding: + 20 px stays in the cell
+      y: row * 70,
+    });
+    expect(route(at(2, 1))).toBe("all");
+    expect(route(at(3, 3))).toBe("all");
+    expect(route(at(4, 3))).toBe("dm");
+    expect(route(at(9, 9))).toBe("dm");
+    expect(route({ sceneId: t.ambush.id, tokenId: g, end: true })).toBe("all");
+  });
+
+  test("FR-FOG-15 Large previews use the whole footprint; fog-hidden tokens and their end frames → dm; owned → all", () => {
+    const t = setup();
+    t.run(I.activateScene, { sceneId: t.ambush.id });
+    t.setAll(true);
+    t.edit("reveal", t.rect(0, 0, 3, 3));
+    const ogre = t.run<{ id: string }>(createEntity.name, {
+      kind: "monster",
+      name: "Cave Ogre",
+      statBlock: { ...goblinBlock, size: "large" },
+    });
+    const o = t.place(1, 1, ogre.id);
+    const hiddenInFog = t.place(10, 10);
+    const owned = t.run<{ tokenId: string }>(I.placeToken, {
+      sceneId: t.ambush.id,
+      definitionId: t.h.goblinId,
+      col: 2,
+      row: 2,
+      ownerPlayerId: t.h.p1.id,
+    }).tokenId;
+    const route = routeOf(t);
+    const px = (tokenId: string, col: number, row: number): DragData => ({
+      sceneId: t.ambush.id,
+      tokenId,
+      x: col * 70,
+      y: row * 70,
+    });
+    expect(route(px(o, 3, 3))).toBe("all"); // (3, 3) of its 2 × 2 is clear
+    expect(route(px(o, 4, 4))).toBe("dm");
+    expect(route(px(hiddenInFog, 1, 1))).toBe("dm"); // hidden for players: every frame
+    expect(route({ sceneId: t.ambush.id, tokenId: hiddenInFog, end: true })).toBe("dm");
+    expect(route(px(owned, 12, 12))).toBe("all"); // exempt (OQ-FOG-03)
+    expect(route({ sceneId: t.ambush.id, tokenId: owned, end: true })).toBe("all");
+  });
+
+  test("FR-FOG-11 hides = fog-hidden: fogged and not exempt; props never exempt; player templates exempt", () => {
+    const [line] = sceneVisibilityHooks;
+    const hides = (type: string, r: object) => line?.hides?.(type, r) ?? false;
+    expect(hides("token", { fogged: true, ownerPlayerId: null })).toBe(true);
+    expect(hides("token", { fogged: true, ownerPlayerId: "p" })).toBe(false);
+    expect(hides("token", { ownerPlayerId: null })).toBe(false);
+    expect(hides("scene-prop", { fogged: true })).toBe(true);
+    expect(hides("aoe-template", { fogged: true, placedByPlayerId: null })).toBe(true);
+    expect(hides("aoe-template", { fogged: true, placedByPlayerId: "p" })).toBe(false);
   });
 });

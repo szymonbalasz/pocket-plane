@@ -1,7 +1,9 @@
 // FR-MAP-48: `placeTokenIn`, `map.placeToken` minus intent and event, run inside another
 // command's transaction (combat's created tokens). `freeCellsNear` is in @shared/scenes-map.
+
 import { afterEach, describe, expect, test } from "bun:test";
 import { defineEvent } from "@shared/events/types";
+import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import type { SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
 import { MAP_INTENTS as I, TOKENS_PER_SCENE_MAX } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
@@ -55,6 +57,7 @@ function setup() {
     name: "Goblin Ambush",
     mapAssetId: "map-battle",
   });
+  t.run(FOG_INTENTS.setAll, { sceneId: scene.id, fogged: false }); // FR-FOG-25 ripple
   const hookCalls: string[] = [];
   // One hook list per process: each case registers its spy, `afterEach` removes it.
   tokenHooksOf(t.s).register("test-spy", (_env, before) => {

@@ -1,6 +1,8 @@
 // ADR-0040 / FR-SCN-11 move guards: the registry ships empty; a test guard shows `map.moveToken`
 // runs guards → derive → one write → token-changed hooks, and that a refusal writes nothing.
+
 import { afterEach, describe, expect, test } from "bun:test";
+import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import type { SceneRecord } from "@shared/scenes-map/schemas";
 import { MAP_INTENTS as I } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
@@ -26,6 +28,7 @@ afterEach(() => {
 function setup() {
   const t = scenesSetup();
   const s = t.run<SceneRecord>(R.createScene, { name: "Goblin Ambush", mapAssetId: "map-battle" });
+  t.run(FOG_INTENTS.setAll, { sceneId: s.id, fogged: false }); // FR-FOG-25 ripple
   t.run(I.activateScene, { sceneId: s.id });
   const place = (definitionId: string, col: number, row: number, ownerPlayerId?: string) =>
     t.run<{ tokenId: string }>(I.placeToken, {

@@ -146,7 +146,7 @@ describe("FR-FOG-24 registries (fog's server lines only)", () => {
     // build/fog-visibility completes fog's lines (FOG §14).
     expect(sceneVisibilityHooks.map((h) => h.name)).toEqual(["fog-of-war.fogged"]);
     const [line] = sceneVisibilityHooks;
-    expect([!!line?.derive, !!line?.hides, !!line?.dragToDm]).toEqual([true, false, false]);
+    expect([!!line?.derive, !!line?.hides, !!line?.dragToDm]).toEqual([true, true, true]);
     // scene-tools' line (FR-SCN-31) only lists SCN rows, and these scenes have none.
     expect(sceneHooks.map((h) => h.name)).toEqual(["fog-of-war.fog-row", "scene-tools.scene-rows"]);
     const [fogLine] = sceneHooks;
