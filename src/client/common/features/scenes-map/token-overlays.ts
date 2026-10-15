@@ -8,6 +8,7 @@ import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import { cbtxTokenOverlay } from "../combat-extras/token-overlay";
 import { cbtTokenOverlay } from "../combat-tracker/token-overlay";
+import { fogTokenOverlay } from "../fog-of-war/token-overlay";
 import { noteCueOverlay } from "../notifications/token-cue";
 
 export interface TokenOverlayView {
@@ -112,4 +113,5 @@ export const tokenOverlays: readonly TokenOverlay[] = [
   cbtTokenOverlay, // combat-tracker (FR-CBT-38/39)
   cbtxTokenOverlay, // combat-extras: HP bar, effect icons, death badge (FR-CBTX-28/29/30)
   noteCueOverlay, // notifications: the DM's 4 s action cue (FR-NOTE-30)
+  fogTokenOverlay, // fog-of-war: DM "Fog" badge on fog-hidden tokens (FR-FOG-20)
 ];

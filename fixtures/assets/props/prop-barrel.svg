@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>prop-barrel</title>
+  <!-- Fixture "prop-barrel" (scene-tools §13): a barrel seen from above, transparent corners.
+       Brown staves, two dark iron hoops, a round lid with a bung. -->
+  <circle cx="128" cy="128" r="116" fill="#8b5a2b" stroke="#3b2a1a" stroke-width="10"/>
+  <circle cx="128" cy="128" r="96" fill="none" stroke="#2f2f2f" stroke-width="10"/>
+  <circle cx="128" cy="128" r="70" fill="#a0703c" stroke="#5c3d1e" stroke-width="6"/>
+  <path d="M128 58 V198 M86 70 V186 M170 70 V186" stroke="#5c3d1e" stroke-width="4"/>
+  <circle cx="150" cy="110" r="10" fill="#3b2a1a"/>
+</svg>
