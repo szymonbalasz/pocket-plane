@@ -14,6 +14,7 @@ import { eq } from "drizzle-orm";
 import { seededContext } from "../../commands/context";
 import { armCrashHook } from "../../commands/crash";
 import { conflict } from "../../commands/errors";
+import { stateDigest } from "../../db/digest";
 import { sceneFog, token } from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import { createEntity } from "../entities/commands";
@@ -559,8 +560,10 @@ describe("FOG §11 crash", () => {
     const t = setup();
     const goblin = t.place(12, 6);
     const log = readEventLog(t.s.db).length;
+    const digest = stateDigest(t.s.db.$client).sha256;
     armCrashHook({ point: "before-commit", target: F.setAll }, kill);
     expect(() => t.setAll(true)).toThrow();
+    expect(stateDigest(t.s.db.$client).sha256).toBe(digest);
     expect(t.fog()).toBeNull();
     expect(t.stack()).toEqual([]);
     expect(t.tok(goblin)?.fogged).toBe(false);
@@ -575,5 +578,17 @@ describe("FOG §11 crash", () => {
         .slice(log)
         .map((l) => l.type),
     ).toEqual(["FogEdited"]);
+    // Undo and edit alike: a kill before commit leaves the digest unchanged.
+    const after = stateDigest(t.s.db.$client).sha256;
+    expect(after).not.toBe(digest);
+    const editId = t.fog()?.undo?.editId as string;
+    for (const [target, fn] of [
+      [F.undo, () => t.undo(editId)],
+      [F.edit, () => t.edit("reveal", t.rect(12, 6, 12, 6))],
+    ] as const) {
+      armCrashHook({ point: "before-commit", target }, kill);
+      expect(fn).toThrow();
+      expect(stateDigest(t.s.db.$client).sha256).toBe(after);
+    }
   });
 });
