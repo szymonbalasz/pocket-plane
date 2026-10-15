@@ -2,25 +2,23 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 2 **phase 1 complete** (#194; playtest section in sprint-2). Phase 2 specs running (F fog-of-war, B scene-tools); `fix/sim5-glitches` in parallel. Next: F/B seam, one review, DM gate 2 (incl. CON-44 headroom and session-sim-5 glitches).
+**Phase:** Sprint 2 phase 1 complete (#194, #195; DM playtest pending). Phase 2 specs F (fog-of-war) + B (scene-tools) written, seams settled, reviewed (2 blockers + 12 major, applied; CON-44 measured). **Waiting: DM gate 2** (`%TEMP%/pocket-plane/gate-sprint2-phase2.md`).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Phase 1 (Q, P2a, P2b, M tier 1) | merged | — | Done (#189-#194), session-sim-5 13/13 | DM playtest |
-| sim-5 bugs (stale popup targets, created tokens without art) | `fix/sim5-glitches` (w20, slot 0) | fix-sim5-glitches | Building | Walkthrough |
-| F: fog of war | `spec/fog-of-war` (w2Y) | spec-fog-of-war | Spec | Seam, review, gate 2 |
-| B: props + structure | `spec/scene-tools` (w2Z) | spec-scene-tools | Spec | Seam, review, gate 2 |
+| Phase 1 | merged | — | Done (#189-#195) | DM playtest |
+| F: fog of war | `spec/fog-of-war` (w2Y) | spec-fog-of-war | Reviewed, in-review | Gate 2, merge, builds |
+| B: scene tools | `spec/scene-tools` (w2Z) | spec-scene-tools | Reviewed, in-review | Gate 2, merge, builds |
 
 ## Shared-file locks
 
-- Combat-tracker DM client (targets / popup), combat-extras add / scenes-map placeTokenIn: fix/sim5-glitches.
-- Schema: free (phase 2 cores later, one at a time).
+- None (no build branch active).
 
 ## Pending DM decisions
 
-- None now. Gate 2: CON-44 headroom (heavy DM 780,950 / 786,432 B after mod-core) before fog: presets on demand / fog compaction / raise ceiling.
+- Gate 2: E1 CON-44 (pick B token + SCN active-scene window, measured 110 KB free), E2-E8 fog / scene-tools picks, E9 three ADRs, E10 session-sim-5 glitches as a P3 track.
 
 ## Resolved locally (report at gate)
 
