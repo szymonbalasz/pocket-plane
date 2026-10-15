@@ -82,7 +82,8 @@ test("FR-NOTE-14 FR-NOTE-15 DM reconnect: the sticky toast stays and the summary
   await expect(status).not.toHaveAttribute("data-state", "live");
   await expect(status).toHaveAttribute("data-state", "live");
   await expect(card).toBeVisible();
-  await expect(summary).toHaveAttribute("data-count", String(before + 1));
+  // P3 glitch 8: the toasted card is not counted again; the untoasted pending rows are.
+  await expect(summary).toHaveAttribute("data-count", String(before));
   await expect(dm.getByTestId("note-toast")).toHaveCount(1); // no per-item toasts replayed
 
   await dm.context().close();

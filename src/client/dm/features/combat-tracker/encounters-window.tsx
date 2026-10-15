@@ -45,7 +45,7 @@ import { useDmMap, viewedScene } from "../scenes-map/view-state";
 import { useDefinitions } from "./data";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpSelect, JoinPreviewRow } from "./join-parts";
-import { type JoinSlot, notOnMap, previewJoin, startBody } from "./join-preview";
+import { defaultJoiningIds, type JoinSlot, notOnMap, previewJoin, startBody } from "./join-preview";
 import { useOpenEncounter } from "./open-encounter";
 import { partyMembers, toggleParty } from "./party";
 import { freeAreaCell } from "./place-at";
@@ -101,14 +101,34 @@ function draftOf(e: EncounterRecord, entries: EncounterEntryRecord[]): Draft {
 
 // ---------- difficulty card (FR-CBT-03) ----------
 
-/** `partyIds`: the Start dialog's joining PCs only (FR-CBT-66); else the planned party. */
+/**
+ * P3 glitch 7 (FR-CBT-66): the builder rates the PCs Start will add by default: the planned party
+ * minus those with no token on the scene Start uses (the viewed one; "Not on this map", unticked
+ * by default). No scene viewed (or not loaded yet) → the planned party.
+ */
+function useStartScenePcIds(): ((partyIds: readonly string[]) => string[]) | null {
+  const scenes = useRecords<SceneRecord>("scene");
+  const folders = useRecords<SceneFolderRecord>("scene-folder");
+  const tokens = useRecords<TokenRecord>("token");
+  const requested = useDmMap((s) => s.viewedSceneId);
+  const scene = viewedScene(scenes, folders, requested);
+  // ADR-0041: as the Start dialog, only a loaded scene's tokens say who is on it.
+  const loaded = useSceneLoaded(scene?.id ?? null);
+  if (!scene || !loaded) return null;
+  const onScene = tokens.filter((t) => t.sceneId === scene.id);
+  return (ids) => defaultJoiningIds(ids, onScene);
+}
+
+/** `partyIds`: the Start dialog's joining PCs (FR-CBT-66); else those Start would add. */
 function DifficultyCard({ draft, partyIds }: { draft: Draft; partyIds?: readonly string[] }) {
   const defs = useDefinitions();
   const characters = useCharacters();
   const drafts = useDraftIds();
-  const party = partyIds
-    ? characters.filter((c) => partyIds.includes(c.id))
-    : partyMembers(characters, draft.partyCharacterIds, drafts);
+  const startPcs = useStartScenePcIds();
+  const planned = partyMembers(characters, draft.partyCharacterIds, drafts);
+  const joining = partyIds ?? startPcs?.(planned.map((c) => c.id)) ?? planned.map((c) => c.id);
+  const party = characters.filter((c) => joining.includes(c.id));
+  const notCounted = partyIds ? [] : planned.filter((c) => !joining.includes(c.id));
   const levels = party.map((c) => (c.kind === "character" ? c.statBlock.level : 1));
   const crs = draft.entries.flatMap((e) => {
     const d = defs.get(e.definitionId);
@@ -136,6 +156,11 @@ function DifficultyCard({ draft, partyIds }: { draft: Draft; partyIds?: readonly
           Total CR <b data-testid="cbt-enc-total-cr">{formatCr(totalCr(crs))}</b>
         </span>
       </div>
+      {notCounted.length > 0 && (
+        <div data-testid="cbt-enc-rating-off-map" className="text-muted-foreground">
+          Not on this map (not counted): {notCounted.map((c) => c.name).join(", ")}
+        </div>
+      )}
       {r.thresholds && (
         <div className="text-muted-foreground tabular-nums">
           Easy {r.thresholds.easy} · Medium {r.thresholds.medium} · Hard {r.thresholds.hard} ·

@@ -29,7 +29,7 @@ import { dice, gameLog } from "../dice-roll-log";
 import { withCardMods } from "../effect-modifiers/card";
 import { notify } from "../notifications";
 import { toNotificationRecord, updateNotification } from "../notifications/helpers";
-import { cardRowRef } from "./attack";
+import { cardRowRef, critLabel } from "./attack";
 import { cardRollOf, damageCardText } from "./card-kind";
 import { activeCombatant } from "./guards";
 
@@ -121,7 +121,7 @@ export const rollDamageCommand = defineCommand({
       expression: crit ? critExpression(row.spec.expression) : row.spec.expression,
       mode: "normal",
       category: row.spec.category,
-      label: row.spec.label,
+      label: crit ? critLabel(row.spec.label) : row.spec.label,
       actor: { kind: "entity", id: c.entityId, name: c.name },
       manual: input.manual,
       source: "cbt",

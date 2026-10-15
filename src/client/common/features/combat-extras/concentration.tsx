@@ -4,7 +4,6 @@
 // toggle) hosted by each client's always-mounted combat companion; no host mounted (a player
 // after End) → the server rolls at once.
 
-import { signed } from "@shared/character-sheet/logic";
 import {
   CBTX_INTENTS,
   ConcentrationCardPayload,
@@ -43,6 +42,7 @@ import { useCbtIntent } from "../combat-tracker/store";
 import { RollButton, useRollControl } from "../dice-roll-log/roll-control";
 import { boundTokenIds, tokensOn } from "../notifications/token-cue";
 import { defineNotificationView, type NotificationView } from "../notifications/views";
+import { activeEffects, type CreatureRef, concentrationSaveText } from "./logic";
 
 /** "DC 12: 14 — kept", "Ended", "Undone"; null while pending. */
 export function concentrationOutcome(n: Pick<NotificationRecord, "state" | "resolution">) {
@@ -140,9 +140,31 @@ function useBonus(effectId: string | undefined): number {
   });
 }
 
+/** P3 glitch 9: the dialog's formula with the effect dice the save will add. */
+function useFormula(effectId: string | undefined, bonus: number, dc: number | null): string {
+  return useSync((s) => {
+    const e = effectId
+      ? (s.store.records[EFFECT_TYPE]?.[effectId] as EffectView | undefined)
+      : undefined;
+    const ref: CreatureRef | null = e?.targetCharacterId
+      ? { characterId: e.targetCharacterId }
+      : e?.targetCombatantId
+        ? { combatantId: e.targetCombatantId }
+        : null;
+    return ref
+      ? concentrationSaveText(bonus, activeEffects(s.store), ref, dc)
+      : concentrationSaveText(bonus, [], { characterId: "" }, dc);
+  });
+}
+
 function RollDialog({ n, close }: { n: NotificationRecord; close: () => void }) {
   const p = ConcentrationCardPayload.safeParse(n.payload);
   const bonus = useBonus(p.success ? p.data.effectId : undefined);
+  const formula = useFormula(
+    p.success ? p.data.effectId : undefined,
+    bonus,
+    p.success ? p.data.dc : null,
+  );
   const { send, disabled } = useCbtIntent();
   const control = useRollControl({
     expressions: [d20Expression(bonus)],
@@ -164,8 +186,8 @@ function RollDialog({ n, close }: { n: NotificationRecord; close: () => void }) 
         <DialogTitle>Concentration save</DialogTitle>
         <DialogDescription>{n.text}</DialogDescription>
       </DialogHeader>
-      <p className="text-sm text-muted-foreground">
-        d20 {signed(bonus)} vs DC {p.success ? p.data.dc : "?"} · Shift advantage, Ctrl disadvantage
+      <p data-testid="cbtx-note-formula" className="text-sm text-muted-foreground">
+        {formula} · Shift advantage, Ctrl disadvantage
       </p>
       {control.isDm && (
         <div className="flex items-center gap-2 text-sm">

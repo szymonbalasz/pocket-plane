@@ -29,6 +29,8 @@ export interface ManagerContext {
   viewport: Viewport;
   /** Kinds rendered right now (registered + available). */
   available: ReadonlySet<string>;
+  /** On-screen map token boxes a new window should keep clear of (open only; P3 glitch 13). */
+  avoid?: () => readonly Rect[];
 }
 
 export const windowId = (kind: string, instance: string = MAIN_INSTANCE) => `${kind}:${instance}`;
@@ -188,7 +190,12 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
       // FR-SHELL-08: last geometry, else default (first free slot, not over an open window);
       // front; minimised → restored.
       if (find(ws, kind, instance)) return toFront(ws, kind, instance, "open");
-      const rect = placeRect(def, ctx.viewport, onScreen(ws, ctx, kind, instance));
+      const rect = placeRect(
+        def,
+        ctx.viewport,
+        onScreen(ws, ctx, kind, instance),
+        ctx.avoid?.() ?? [],
+      );
       const area = workArea(ctx.viewport);
       return normaliseZ([...ws, { kind, instance, state: "open", ...rect, z: maxZ(ws) + 1, area }]);
     }
