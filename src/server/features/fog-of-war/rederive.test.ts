@@ -7,6 +7,7 @@ import {
   AOE_TEMPLATE_TYPE,
   SCENE_PROP_TYPE,
   SCENE_STRUCTURE_TYPE,
+  SCN_INTENTS,
   type SceneStructureRecord,
 } from "@shared/scene-tools/schemas";
 import { readProp, readStructure, readTemplate } from "../scene-tools/rows";
@@ -109,5 +110,22 @@ describe("FR-FOG-08 SCN subjects re-derived", () => {
     t.run(F.setAll, { sceneId: t.cellar.id, fogged: true });
     expect(t.changes().map((c) => c.type)).toEqual(["fog"]);
     expect(readStructure(t.s.db, t.cellar.id)).toBeNull();
+  });
+
+  test("FR-SCN-36 / FR-FOG-08 scn.addDoor in fog sets f = 1; a reveal of one adjoining cell clears it in FogEdited; Undo sets it again", () => {
+    const t = setup();
+    t.setAll(true);
+    const { n } = t.run<{ n: number }>(SCN_INTENTS.addDoor, {
+      sceneId: t.ambush.id,
+      segment: [15, 13, 16, 13],
+    });
+    const flag = () => t.flags().find((d) => d[0] === n)?.[6];
+    expect(flag()).toBe(1);
+    const editId = t.edit("reveal", t.rect(15, 12, 15, 12)) as string;
+    expect(t.events.at(-1)?.event.type).toBe("FogEdited");
+    expect(t.ids(SCENE_STRUCTURE_TYPE)).toEqual([t.ambush.id]);
+    expect(flag()).toBe(0);
+    t.run(F.undo, { sceneId: t.ambush.id, expectedEditId: editId });
+    expect(flag()).toBe(1);
   });
 });

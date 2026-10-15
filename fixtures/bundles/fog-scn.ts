@@ -4,5 +4,5 @@ import { defineBundle } from "@server/features/fixtures-adapters/fixture-types";
 export default defineBundle({
   name: "fog-scn",
   includes: ["fog"],
-  fixtures: ["scn-prop-images", "scn-props", "scn-templates", "fog-scn"],
+  fixtures: ["scn-walls", "scn-prop-images", "scn-props", "scn-templates", "fog-scn"],
 });
