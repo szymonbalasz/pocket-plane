@@ -109,6 +109,18 @@ export const AttackRolled = defineEvent({
   undoable: false,
 });
 
+/**
+ * `cbt.rollDamage` (FR-CBT-71, ADR-0037): `game-log-entry`; then `NotificationUpdated`
+ * (`attached`: completed the attacker's pending to-hit-only card) or `NotificationCreated` (a new
+ * damage-only card).
+ */
+export const DamageRolled = defineEvent({
+  type: "DamageRolled",
+  payload: z.object({ cardId: Id, rollIds: z.array(Id).min(1), attached: z.boolean() }).strict(),
+  logged: true,
+  undoable: false,
+});
+
 /** `cbt.rollAbility`: one `game-log-entry` (players iff public; hidden combatant never) (FR-CBT-44). */
 export const CombatantRolled = defineEvent({
   type: "CombatantRolled",

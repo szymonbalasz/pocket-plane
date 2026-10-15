@@ -40,6 +40,7 @@ import {
 } from "./camera";
 import { CanvasContext, type CanvasContextValue, type EffectiveGrid } from "./canvas-context";
 import { canvasLayers } from "./canvas-layers";
+import { subscribeOverlays } from "./decorations";
 import {
   clearPreviews,
   createPreviewStore,
@@ -64,6 +65,7 @@ import {
 import { addPing, addTrailPoints, createPointerStore, senderKey } from "./pointers";
 import { isClick, tokensInBox } from "./selection-logic";
 import { useCanvasColors } from "./theme";
+import { tokenOverlays } from "./token-overlays";
 import { useMapFit, useMapTool } from "./tool-store";
 
 export interface MapCanvasProps {
@@ -240,6 +242,10 @@ export function MapCanvas(props: MapCanvasProps) {
     const id = setInterval(() => prunePreviews(previews, performance.now()), 250);
     return () => clearInterval(id);
   }, [previews]);
+
+  // ---- FR-MAP-49: an overlay's client-only state (e.g. a cue timer) re-runs decorations ----
+  const [, setOverlayRev] = useState(0);
+  useEffect(() => subscribeOverlays(tokenOverlays, () => setOverlayRev((n) => n + 1)), []);
 
   const shown = useMemo(
     () => tokens.map((t) => shownCell(overlay, t)).sort(tokenDrawOrder),

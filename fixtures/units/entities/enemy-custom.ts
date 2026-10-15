@@ -3,6 +3,9 @@ import { defineFixture, step } from "@server/features/fixtures-adapters/fixture-
 import type { CreateEntityBody } from "@shared/entities/schemas";
 import { goblin } from "../../srd/monster/goblin";
 
+// FIX §8: no HP formula (only Average HP), unlike its SRD source (FR-ENT-25).
+const { hpFormula: _hpFormula, ...goblinBlock } = goblin.statBlock;
+
 /** "Elite Goblin Warrior", custom in Fixture Campaign, derived from `enemy-1` (ENT §13). */
 export default defineFixture({
   key: "enemy-custom",
@@ -18,7 +21,7 @@ export default defineFixture({
         derivedFromId: r.id("enemy-1", "imported-entity"),
         tokenShape: "square",
         statBlock: {
-          ...goblin.statBlock,
+          ...goblinBlock,
           ac: 16,
           hpMax: 15,
           saveProficiencies: ["dex"],

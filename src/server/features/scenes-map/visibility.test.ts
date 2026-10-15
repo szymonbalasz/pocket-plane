@@ -34,11 +34,13 @@ const token = (
   sceneId: string,
   hidden: boolean,
   owner: string | null,
+  characterId: string | null = null,
 ): TokenRecord => ({
   id,
   campaignId: "c",
   sceneId,
-  definitionId: "def",
+  definitionId: characterId ?? "def",
+  characterId,
   seq: 1,
   name: id,
   imageAssetId: "img",
@@ -153,22 +155,53 @@ describe("FR-MAP-26 visibility matrix", () => {
 
   test("token × DM / owner / other player × hidden", () => {
     const r = registry("s1");
-    const visible = token("mira", "s1", false, "p1");
+    const visible = token("mira", "s1", false, "p1", "char-mira");
     const hidden = token("wolf", "s1", true, null);
-    const hiddenOwned = token("thorn", "s1", true, "p1");
+    const hiddenOwned = token("thorn", "s1", true, "p1", "char-thorn");
     const offScene = token("elsewhere", "s2", false, "p1");
     expect(r.view("token", visible, dm).vis).toBe("full");
     expect(r.view("token", hidden, dm).vis).toBe("full");
     expect(r.view("token", offScene, dm).vis).toBe("full");
+    expect(r.view("token", visible, dm).data).toMatchObject({
+      definitionId: "char-mira",
+      characterId: "char-mira",
+    });
     for (const p of [owner, other]) {
       const seen = r.view("token", visible, p);
       expect(seen.vis).toBe("redacted");
       expect(seen.data).not.toHaveProperty("definitionId");
-      expect(seen.data).toMatchObject({ id: "mira", name: "mira", ownerPlayerId: "p1" });
+      // FR-MAP-26 / FR-MAP-50: the character copy is for every player who sees the token.
+      expect(seen.data).toMatchObject({
+        id: "mira",
+        name: "mira",
+        ownerPlayerId: "p1",
+        characterId: "char-mira",
+      });
       expect(r.view("token", hidden, p).vis).toBe("hidden");
       expect(r.view("token", hiddenOwned, p).vis).toBe("hidden");
       expect(r.view("token", offScene, p).vis).toBe("hidden");
     }
+  });
+
+  test("FR-MAP-26 / FR-MAP-50 leak row: no definitionId on any player token; characterId only on character tokens", () => {
+    const r = registry("s1");
+    const tokens = [
+      token("mira", "s1", false, "p1", "char-mira"),
+      token("thorn", "s1", false, "p2", "char-thorn"),
+      token("goblin", "s1", false, null),
+      token("npc", "s1", false, "p1"),
+    ];
+    for (const p of [owner, other]) {
+      for (const t of tokens) {
+        const data = r.view("token", t, p).data as Record<string, unknown>;
+        expect(data).not.toHaveProperty("definitionId");
+        expect(JSON.stringify(data)).not.toContain('"definitionId"');
+        expect(data.characterId).toBe(t.characterId);
+      }
+    }
+    // Monster / NPC tokens carry null: their definition id never reaches a player.
+    const goblin = r.view("token", tokens[2] as TokenRecord, other).data;
+    expect(JSON.stringify(goblin)).not.toContain('"def"');
   });
 
   test("FR-MAP-36 token speed: DM always; a player only on own tokens", () => {

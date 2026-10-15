@@ -4,10 +4,11 @@
 // (FR-MAP-42). Konva node `name` = `map-token`, `id` = token id, attrs `shape`, `preview`
 // (FR-MAP-40); ring `map-token-ring` (attr `state`); crosses, bars and icons named by their
 // overlay id (bar attrs `tone`, `fraction`; icon attrs `value`, `icon`, `tone`, `label`); "+N"
-// `map-token-icons-more` (attr `count`).
+// `map-token-icons-more` (attr `count`); a cue (FR-MAP-49) named by its id, attr `label`.
 import { cellToPx, footprint, initials } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
-import { useEffect } from "react";
+import type Konva from "konva";
+import { useEffect, useRef } from "react";
 import { Circle, Group, Image, Layer, Line, Rect, Shape, Text } from "react-konva";
 import { useStore } from "zustand";
 import { retryAssetImage, useAssetImage } from "../../assets-pipeline/useAssetImage";
@@ -15,8 +16,8 @@ import { useCanvas } from "../canvas-context";
 import { decorateToken, type MergedDecoration } from "../decorations";
 import { CROSS_OPACITY, crossGeometry } from "../label";
 import { containRect, coverCrop, initialsBackdropOf, outlineOf } from "../shape";
-import { barGeometry, iconRow } from "../token-decor";
-import type { TokenBar, TokenCross, TokenIcon } from "../token-overlays";
+import { barGeometry, cueGeometry, cuePulse, iconRow } from "../token-decor";
+import type { TokenBar, TokenCross, TokenCue, TokenIcon } from "../token-overlays";
 import { tokenOverlays } from "../token-overlays";
 import { toneColor } from "./tone";
 
@@ -266,6 +267,78 @@ function TokenIconRow({
   );
 }
 
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** Bell glyph (dome, flared rim, clapper) in a disc of radius `r` centred on (0, 0). */
+function bellPath(ctx: Konva.Context, r: number) {
+  const w = r * 0.55;
+  ctx.moveTo(-w, r * 0.3);
+  ctx.quadraticCurveTo(-w * 0.85, -r * 0.55, 0, -r * 0.55);
+  ctx.quadraticCurveTo(w * 0.85, -r * 0.55, w, r * 0.3);
+  ctx.lineTo(w * 1.2, r * 0.42);
+  ctx.lineTo(-w * 1.2, r * 0.42);
+  ctx.closePath();
+  ctx.moveTo(r * 0.14, r * 0.55);
+  ctx.arc(0, r * 0.55, r * 0.14, 0, Math.PI * 2, false);
+}
+
+/** FR-MAP-49: pulsing accent ring + bell, above image, bar and icons; steady if reduced motion. */
+function TokenCueMark({ t, side, cue }: { t: TokenView; side: number; cue: TokenCue }) {
+  const { colors, client } = useCanvas();
+  const ringRef = useRef<Konva.Circle>(null);
+  const g = cueGeometry(side);
+  const accent = client === "dm" ? colors.dmAccent : colors.playerAccent;
+  useEffect(() => {
+    const reduced = prefersReducedMotion();
+    const ring = ringRef.current;
+    if (!ring || reduced) return;
+    let frame = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const p = cuePulse(now - start, false);
+      ring.opacity(p.opacity);
+      ring.scale({ x: p.scale, y: p.scale });
+      ring.getLayer()?.batchDraw();
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return (
+    <Group name={cue.id} id={t.id} label={cue.label} listening={false}>
+      <Circle
+        ref={ringRef}
+        x={g.ring.x}
+        y={g.ring.y}
+        radius={g.ring.radius}
+        stroke={accent}
+        strokeWidth={g.ring.strokeWidth}
+      />
+      <Circle
+        x={g.bell.x}
+        y={g.bell.y}
+        radius={g.bell.radius}
+        fill={colors.background}
+        stroke={accent}
+        strokeWidth={g.bell.radius * 0.16}
+      />
+      <Shape
+        x={g.bell.x}
+        y={g.bell.y}
+        fill={accent}
+        sceneFunc={(ctx, shape) => {
+          ctx.beginPath();
+          bellPath(ctx, g.bell.radius);
+          ctx.fillShape(shape);
+        }}
+      />
+    </Group>
+  );
+}
+
 function TokenNode({ t }: { t: TokenView }) {
   const c = useCanvas();
   const { grid, colors, cam } = c;
@@ -319,6 +392,7 @@ function TokenNode({ t }: { t: TokenView }) {
       <TokenOutline t={t} side={side} state={ring} />
       {deco.bar && <TokenBarMark t={t} side={side} bar={deco.bar} />}
       {deco.icons.length > 0 && <TokenIconRow t={t} side={side} icons={deco.icons} />}
+      {deco.cue && <TokenCueMark t={t} side={side} cue={deco.cue} />}
       {t.hidden && (
         // Eye-off mark in `visibility.hidden` (only the DM ever receives hidden tokens).
         <Group x={side - 9 / cam.scale} y={9 / cam.scale} listening={false} name="map-token-hidden">

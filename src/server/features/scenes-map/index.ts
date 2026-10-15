@@ -4,6 +4,7 @@ import type { CommandDef } from "../../commands/commands";
 import type { Feature } from "../../services";
 import { defineSignal } from "../../ws/signals";
 import { ActiveSceneCache } from "./active-scene";
+import { backfillCharacterIds } from "./character-copy";
 import {
   activateScene,
   createFolder,
@@ -61,6 +62,10 @@ export const scenesMap: Feature = {
     for (const c of intents) r.command(c, { intent: true });
 
     for (const t of sceneRecordTypes) r.recordType(t);
+    // FR-MAP-50: tokens placed before the `characterId` column get their copy.
+    r.onStart("scenes-map.character-backfill", (sv) => {
+      backfillCharacterIds(sv.db);
+    });
 
     // Signals (FR-MAP-25, ADR-0026): pull is DM only.
     r.signal(defineSignal({ name: MAP_SIGNALS.ping, schema: PingData, roles: ["dm", "player"] }));

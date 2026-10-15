@@ -7,6 +7,7 @@ export const wolf = {
     size: "medium",
     ac: 13,
     hpMax: 11,
+    hpFormula: "2d8+2",
     initBonus: 2,
     speed: 40,
     abilities: { str: 12, dex: 15, con: 12, int: 3, wis: 12, cha: 6 },

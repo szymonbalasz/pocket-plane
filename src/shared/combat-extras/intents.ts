@@ -1,5 +1,6 @@
 // combat-extras WS intents, results and the concentration card (CBTX §8, §9; protocol §32).
 // Strict zod; none optimistic. DM-only unless the spec lists the owner.
+import { GridCell, HpMode } from "@shared/combat-tracker/schemas";
 import { ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
 import { z } from "zod";
 import { Condition, ExhaustionLevel } from "./conditions";
@@ -21,6 +22,8 @@ export const CBTX_INTENTS = {
   rollDeathSave: "cbtx.rollDeathSave",
   setDeathSaves: "cbtx.setDeathSaves",
   addCombatants: "cbtx.addCombatants",
+  /** FR-CBTX-45 (sprint 2): schema here; the command lands in fix/combat2-add. */
+  bindToken: "cbtx.bindToken",
 } as const;
 
 const Id = z.string().min(1).max(64);
@@ -142,17 +145,45 @@ export type SetDeathSavesInput = z.input<typeof SetDeathSavesInput>;
 
 /** FR-CBTX-26: total combatants of an encounter after an add. */
 export const COMBATANTS_MAX = 56;
+/** FR-CBTX-44: instances per add (a definition item counts its `quantity`). */
+export const ADD_INSTANCES_MAX = 20;
 export const AddCombatantItem = z.union([
   z.strictObject({ tokenId: Id }),
   z.strictObject({ characterId: Id }),
-  z.strictObject({ definitionId: Id }),
+  /** FR-CBTX-44 (sprint 2): `quantity` 1–20 (absent = 1), `hpMode` (absent = average). */
+  z.strictObject({
+    definitionId: Id,
+    quantity: z.int().min(1).max(ADD_INSTANCES_MAX).optional(),
+    hpMode: HpMode.optional(),
+  }),
 ]);
 export type AddCombatantItem = z.infer<typeof AddCombatantItem>;
+const instancesOf = (i: AddCombatantItem) => ("definitionId" in i ? (i.quantity ?? 1) : 1);
+/**
+ * FR-CBTX-26 / -44: ≤ 20 instances per call. `createTokens` (absent = false: the token menu's
+ * Add to combat is unchanged), `hidden` (created tokens' flag), `at` (FR-CBT-65).
+ */
 export const AddCombatantsInput = z.strictObject({
   encounterId: Id,
-  items: z.array(AddCombatantItem).min(1).max(20),
+  items: z
+    .array(AddCombatantItem)
+    .min(1)
+    .max(ADD_INSTANCES_MAX)
+    .refine((items) => items.reduce((n, i) => n + instancesOf(i), 0) <= ADD_INSTANCES_MAX, {
+      message: `At most ${ADD_INSTANCES_MAX} creatures per add`,
+    }),
+  createTokens: z.boolean().optional(),
+  hidden: z.boolean().optional(),
+  at: GridCell.optional(),
 });
 export type AddCombatantsInput = z.input<typeof AddCombatantsInput>;
+
+/**
+ * FR-CBTX-45: link a token to a token-less active combatant, or `tokenId: null` to unlink a
+ * bound one (DM). Emits `CombatantBound`.
+ */
+export const BindTokenInput = z.strictObject({ combatantId: Id, tokenId: Id.nullable() });
+export type BindTokenInput = z.input<typeof BindTokenInput>;
 export const CombatantIdsResult = z.object({ combatantIds: z.array(z.string()) });
 export type CombatantIdsResult = z.infer<typeof CombatantIdsResult>;
 

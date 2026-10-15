@@ -43,7 +43,12 @@ export function addCombatantsCommand(hooks: CombatRuleHooks) {
   return defineCommand({
     name: CBTX_INTENTS.addCombatants,
     input: AddCombatantsInput,
-    execute({ encounterId, items }, env): CombatantIdsResult {
+    execute({ encounterId, items, createTokens }, env): CombatantIdsResult {
+      // FR-CBTX-44: the schema accepts the Add dialog's options; they land in fix/combat2-add.
+      const pending = items.some(
+        (i) => "definitionId" in i && ((i.quantity ?? 1) > 1 || i.hpMode === "rolled"),
+      );
+      if (createTokens || pending) throw invalid("Add options are not available yet");
       const { tx, ctx } = env;
       const cid = campaignOf(env.actor);
       const before = getEncounter(tx, cid, encounterId);

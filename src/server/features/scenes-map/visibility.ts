@@ -32,7 +32,8 @@ export const folderVisibility = (): Visibility => "hidden";
 
 /**
  * `token`: hidden while `hidden`; else every field but `definitionId`, and `speed` only on the
- * viewer's own tokens (FR-MAP-36: a monster's speed is a stat, #120).
+ * viewer's own tokens (FR-MAP-36: a monster's speed is a stat, #120). `characterId` stays: set
+ * only on character tokens, whose entity every player sees redacted (FR-MAP-26, FR-MAP-50).
  */
 export function tokenVisibility(r: TokenRecord, _v: Viewer): Visibility {
   return r.hidden ? "hidden" : "redacted";

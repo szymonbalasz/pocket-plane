@@ -15,6 +15,7 @@ import {
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import { AttackRolled } from "@shared/events/combat-tracker";
 import { defineCommand } from "../../commands/commands";
+import { invalid } from "../../commands/errors";
 import type { DomainEvent, RecordChange } from "../../events/types";
 import { characters } from "../character-sheet";
 import { dice, gameLog, type Roll } from "../dice-roll-log";
@@ -31,6 +32,8 @@ export const attackCommand = defineCommand({
     if (env.actor.role === "player") activeCombatant(env, input.attackerId, { own: true });
   },
   execute(input, env): AttackResult {
+    // FR-CBT-70: the schema accepts `rolls`; to-hit-only cards land in fix/combat2-split-attack.
+    if (input.rolls === "toHit") throw invalid("To-hit-only attacks are not available yet");
     const { c, enc } = activeCombatant(env, input.attackerId, { own: true });
     // The attacker's own definition only: a row of another creature is `not_found` here.
     const attack = characters.sheetAttack(env, c.entityId, {

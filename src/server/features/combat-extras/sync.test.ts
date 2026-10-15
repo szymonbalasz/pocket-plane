@@ -10,7 +10,7 @@ import {
   type AttackResult,
   COMBATANT_TYPE,
   type CombatantRecord,
-  DamageCardPayload,
+  parseFullCard,
 } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
@@ -165,7 +165,7 @@ describe("combat-extras over WS", () => {
     await nextEvent(dm, "AttackRolled");
     const { cardId } = (await dm.next("ack")).result as AttackResult;
     const card = dm.store.records.notification?.[cardId] as NotificationRecord;
-    const pay = DamageCardPayload.parse(card.payload);
+    const pay = parseFullCard(card.payload);
     dm.intent("cbt.applyCard", {
       cardId,
       toHitTotal: pay.toHit.total,

@@ -5,10 +5,10 @@ import { resolutionText, undoGroup } from "@shared/combat-tracker/rules";
 import {
   type AttackResult,
   COMBATANT_TYPE,
-  DamageCardPayload,
   DamageCardResolutionRead,
   type HpChangeRecord,
   type HpChangesResult,
+  parseFullCard,
   type RollAbilityResult,
 } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
@@ -47,7 +47,7 @@ function started() {
     targets: [string, boolean, string][],
     o: Record<string, unknown> = {},
   ) => {
-    const p = DamageCardPayload.parse(card(cardId)?.payload);
+    const p = parseFullCard(card(cardId)?.payload);
     return t.run<HpChangesResult>(applyCard.name, {
       cardId,
       toHitTotal: p.toHit.total,

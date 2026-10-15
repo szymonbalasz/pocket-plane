@@ -1,7 +1,7 @@
 // Max-size inputs a legal creature form allows (Phase 4 audit #1a, #1b): the derived roll label
 // and the damage card payload must fit their caps, or `cbt.attack` fails on spec-legal input.
 import { describe, expect, test } from "bun:test";
-import { type AttackResult, DamageCardPayload } from "@shared/combat-tracker/schemas";
+import { type AttackResult, parseFullCard } from "@shared/combat-tracker/schemas";
 import { LABEL_MAX } from "@shared/dice-roll-log/schemas";
 import { jsonBytes, PAYLOAD_MAX_BYTES } from "@shared/notifications/schemas";
 import { MAP_INTENTS } from "@shared/scenes-map/schemas";
@@ -81,7 +81,7 @@ describe("hardening: max-size attack inputs", () => {
       ],
     });
     const card = t.s.db.select().from(notification).where(eq(notification.id, r.cardId)).get();
-    const payload = DamageCardPayload.parse(card?.payload);
+    const payload = parseFullCard(card?.payload);
     expect(payload.crit).toBe(true);
     expect([payload.attackerName, payload.attackName]).toEqual([attackerName, attackName]);
     expect(payload.damage.dice).toHaveLength(40);

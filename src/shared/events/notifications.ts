@@ -30,6 +30,17 @@ export const NotificationResolved = defineEvent({
   undoable: false,
 });
 
+/**
+ * `updateNotification` (FR-NOTE-25, ADR-0037): a pending row's text / payload changed by its kind
+ * owner (`cbt.rollDamage`), after the owner's event. Changes = `notification` upsert. No toast.
+ */
+export const NotificationUpdated = defineEvent({
+  type: "NotificationUpdated",
+  payload: NotificationRef,
+  logged: true,
+  undoable: false,
+});
+
 /** `note.dismiss`. */
 export const NotificationDismissed = defineEvent({
   type: "NotificationDismissed",
