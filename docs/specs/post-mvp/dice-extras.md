@@ -12,9 +12,9 @@ Beyond MVP [dice-roll-log](../dice-roll-log.md). Ranking in [feature tiers](../.
 
 | Tier | Feature |
 |---|---|
-| A | Inline rolls in text (`[[1d20+5]]`) |
+| S | **3D dice roller** in a tray or over the battlemap; every roll in the app eventually goes through it; customisation later (B) (#188) |
+| A | **Dice notation in any free text is clickable** ("1d12+5", whitespace-tolerant): puts the dice in the tray to adjust before rolling; doesn't feed attack / apply. Very important (#188) |
 | A | Saved roll macros / custom roll buttons |
-| A | 3D dice animation (Dice So Nice style) |
 | B | DM requests a roll from players ("everyone roll Perception") — fits as a [notification](../notifications.md) with a roll action |
 | — | ~~Hidden DM rolls~~ → MVP as per-category public log settings ([dice-roll-log](../dice-roll-log.md)) |
 | C | Player whispers a roll to the DM |

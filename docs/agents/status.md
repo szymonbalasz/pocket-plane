@@ -2,15 +2,18 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 1 complete (#186). **Sprint 2 planned, not started** (#187): [sprint-2](sprint-2.md): P2 glitch polish, F fog of war (FOG), B props + structure (SCN), all in parallel. Next: spec phase, three spec agents.
+**Phase:** Sprint 1 complete (#186). **Sprint 2 planned, not started** (#187, #188): [sprint-2](sprint-2.md). Phase 1 = DM playtest notes + glitches (Q, P2a, P2b, M), then phase 2 = F fog of war + B props / structure. Next: phase 1 spec agents + `fix/asset-cache`.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| P2: glitch polish (session-sim-4) | `spec/polish-2` | — | Not started | Spec agent |
-| F: fog of war, `fog-of-war` (FOG) | `spec/fog-of-war` | — | Not started | Spec agent |
-| B: props + structure, `scene-tools` (SCN) | `spec/scene-tools` | — | Not started | Spec agent |
+| Q: token art cache bug (N2) | `fix/asset-cache` | — | Not started | Builder (root cause first) |
+| P2a: combat notes + glitches | `spec/polish-2a` | — | Not started | Spec agent |
+| P2b: sheet + shell notes + glitches | `spec/polish-2b` | — | Not started | Spec agent |
+| M: effect modifiers (N9) | `spec/effect-modifiers` | — | Not started | Spec agent |
+| F: fog of war (phase 2) | `spec/fog-of-war` | — | After phase 1 | — |
+| B: props + structure (phase 2) | `spec/scene-tools` | — | After phase 1 | — |
 
 Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plane\` ([continue-session §1](continue-session.md#1-where-we-are-2026-10-14-evening)). Briefs in `briefs\`. Evidence: `verify-*\` (session-sim-3 evidence only in the main checkout: `.verify/20261014-131140-session-sim-3/`; the `%TEMP%` copy was cleared).
 
@@ -20,7 +23,7 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 
 ## Pending DM decisions
 
-- None now. At the sprint-2 spec gate: F / B scope, picks, P2 G2 (map size when fitting).
+- None now. At DM gate 1: N1 (minimise), N9 / M scope and timing, G2 (map size when fitting), plus every other pick.
 
 ## Resolved locally (report at gate)
 

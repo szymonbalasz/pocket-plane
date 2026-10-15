@@ -26,7 +26,7 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 
 ## 2. Next, in order
 
-**Sprint 2, DM decision #187: [sprint-2](sprint-2.md).** Three tracks in parallel: **P2** polish of the session-sim-4 glitches, **F** fog of war (new spec `fog-of-war`, FOG), **B** props + structure (`scene-tools`, SCN). Follow sprint-2's "Orchestrator: how to run this sprint" and its hotspot table; the sprint-1 loop below is the template.
+**Sprint 2, DM decisions #187 + #188: [sprint-2](sprint-2.md).** Two phases. **Phase 1 first**: the DM's sprint-1 playtest notes N1–N11 + the session-sim-4 glitches G1–G10, as tracks Q (`fix/asset-cache`), P2a (combat), P2b (sheet + shell), M (effect modifiers design), with DM gate 1. **Phase 2** only after phase 1 is merged: F fog of war (FOG), B props + structure (SCN), DM gate 2. Follow sprint-2's "Orchestrator: how to run this sprint" and its hotspot tables; the sprint-1 loop is the template.
 
 The DM's own playtest script for sprint 1: [sprint-1 §Playtest](sprint-1.md#playtest-sprint-1-features). Write the same for sprint 2 at its sprint gate.
 

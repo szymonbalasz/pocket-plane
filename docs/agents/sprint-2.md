@@ -1,35 +1,60 @@
-# Sprint 2: battlemap polish, fog of war, props and structure
+# Sprint 2: DM playtest fixes first, then fog of war, props and structure
 
-DM decision #187 (2026-10-15), after the sprint-1 recap (#186). Three tracks **in parallel**; overlapping code is sequenced by the orchestrator. Process: [orchestrator prompt](orchestrator-prompt.md), [continue-session §3](continue-session.md#3-herdr-how-to-run-agents-learned-the-hard-way) and its sprint-1 lessons. Sprint 1 for reference: [sprint-1](sprint-1.md).
+DM decisions #187 (sprint 2 chosen) and #188 (the DM's sprint-1 playtest notes come first). Process: [orchestrator prompt](orchestrator-prompt.md), [continue-session §3](continue-session.md#3-herdr-how-to-run-agents-learned-the-hard-way) and its sprint-1 lessons. Sprint 1 for reference: [sprint-1](sprint-1.md).
+
+Two phases. **Phase 1** fixes what the DM found playtesting sprint 1 (N1–N11) plus the session-sim-4 glitches (G1–G10). **Phase 2** (tracks F and B) starts only after phase 1 is merged and verified. Inside each phase, tracks run **in parallel**; overlapping code is sequenced by the orchestrator.
 
 ```mermaid
 flowchart LR
-  P1[P2 spec: glitch polish] --> G{DM gate}
-  F1[F spec: fog-of-war] --> G
-  B1[B spec: scene-tools] --> G
-  G --> PB[P2 builds]
-  G --> BC[B core: layers + schema]
-  PB --> FB[F build]
-  BC --> FB
-  BC --> BB[B build]
-  FB --> R[walkthroughs + session-sim regression]
-  BB --> R
+  Q[fix/asset-cache N2] --> M1
+  A[P2a spec: combat] --> G1{DM gate 1}
+  B[P2b spec: sheet + shell] --> G1
+  M[M spec: effect modifiers] --> G1
+  G1 --> M1[phase 1 builds + walkthroughs]
+  M1 --> R1[session-sim check + playtest notes]
+  R1 --> F[F spec: fog-of-war]
+  R1 --> S[B spec: scene-tools]
+  F --> G2{DM gate 2}
+  S --> G2
+  G2 --> M2[phase 2 builds + walkthroughs]
+  M2 --> R2[session-sim regression + recap]
 ```
 
 ## Orchestrator: how to run this sprint
 
-1. Spec phase, all three at once: one spec agent per track (`spec/polish-2`, `spec/fog-of-war`, `spec/scene-tools`). P2 revises the owning specs; F writes a **new** spec `docs/specs/fog-of-war.md` from `_template.md` (prefix **FOG**, `phase: post-mvp-2`); B expands the stub [post-mvp/scene-tools](../specs/post-mvp/scene-tools.md) into `docs/specs/scene-tools.md` (prefix SCN, `phase: post-mvp-2`) without fog. Claim → draft → in-review per AGENTS §4.
-2. Settle the **F ↔ B seam** (layer stack, what fog hides, props / walls under fog) yourself before the review, as with sprint 1's D/S seam: read both drafts, write a short settlement file, have each author apply it to their own spec.
-3. One review agent across all three (inputs copied into the main checkout's `.verify/review-sprint2/`; agents can't read outside their working dir). Authors apply the findings.
-4. **One DM spec gate**: F and B scope, every pick, the P2 questions that need the DM. Then number ADRs, fix moved links, spec index, glossary, AGENTS §9.9 registries, decisions log; merge the spec branches.
-5. Builds per the hotspot rules below. Each feature: walkthrough PASS by a test agent; `check` + full `e2e` in the branch **and again on `main` after the merge**.
-6. Session-sim regression on final `main` (now incl. fog reveal, a wall blocking a move, an AoE template), then **pause and recap with the DM** before sprint 3.
+**Phase 1**
+1. At once: `fix/asset-cache` (N2, a bug: no spec; root cause first) and three spec agents: `spec/polish-2a` (P2a combat), `spec/polish-2b` (P2b sheet + shell), `spec/effect-modifiers` (M). P2a / P2b revise the owning specs (one agent per group so cross-spec items get one design); M writes a new spec `docs/specs/effect-modifiers.md` from `_template.md` (prefix **MOD**, `phase: post-mvp-2`) plus a proposed ADR. Copy the inputs (this file, the session-sim-4 report) into each agent's worktree.
+2. Settle the seams between P2a, P2b and M yourself (N7's sheet buttons vs combat routing; M's modifiers vs CBTX effects and the sheet), then one review agent across all three; authors apply the findings.
+3. **DM gate 1**: every pick that needs the DM (column below), M's scope and whether M builds in phase 1 or later. Then integrate (ADRs, links, index, glossary, registries, log) and merge the spec branches.
+4. Builds per the hotspot table; walkthroughs per feature; `check` + full `e2e` in the branch and on `main` after every merge. Then a session-sim run on `main` and a **"Playtest: phase 1 fixes"** section appended here (setup commands + steps, like [sprint-1](sprint-1.md#playtest-sprint-1-features)); tell the DM it's ready. Continue to phase 2 without waiting; DM feedback joins at gate 2.
+
+**Phase 2**
+5. Spec agents `spec/fog-of-war` (F, new spec FOG, `docs/specs/fog-of-war.md` from `_template.md`, `phase: post-mvp-2`) and `spec/scene-tools` (B, expand the stub [post-mvp/scene-tools](../specs/post-mvp/scene-tools.md) into `docs/specs/scene-tools.md` without fog, prefix SCN). Settle the F ↔ B seam (layer stack, what fog hides) before one review agent.
+6. **DM gate 2**: F and B scope, every pick, any phase-1 playtest feedback. Integrate and merge.
+7. Builds, walkthroughs, `check` + full `e2e` on `main` after each merge, session-sim regression on final `main` (incl. fog, a wall, an AoE template), a "Playtest: sprint 2 features" section here, then **pause and recap with the DM** before sprint 3.
 
 Work autonomously between gates; come back to the DM only for product decisions, gates, ADR acceptance, new dependencies, anything destructive.
 
-## Track P2: polish (from the session-sim-4 regression, #186)
+## Phase 1: DM playtest notes (sprint 1, 2026-10-15)
 
-Evidence: `.verify/20261014-194223-session-sim-4/report.md` in the main checkout (glitches 1–17, screenshots alongside). Copy it into the spec agent's worktree. One spec agent revises the owning specs; then small `fix/*` builds.
+| # | DM note (short) | Track | Owning spec(s) | Needs the DM? |
+|---|---|---|---|---|
+| N1 | Minimise vs close look the same; what does minimised mean for a player (the launcher line suggests "open")? | P2b | play-shell | Yes: what minimise is for (keeps state / alerts / badges?) vs dropping it |
+| N2 | Thorn's new token art loaded; Mira's (and the goblins', wolf's) only after empty cache + hard reload | Q | assets-pipeline (cache headers, seeded asset IDs across fixture reloads) | No: bug |
+| N3 | DM view, under each player: passive Perception, Investigation, Insight, current HP, AC, temp HP, level | P2b | character-sheet-full, campaign-management (players panel) | No (placement is the spec agent's pick) |
+| N4 | Why is there an Attack on both the Main and the Actions tab? | P2b | character-sheet, character-sheet-full | No |
+| N5 | Adding creatures to an encounter: roll initiative before adding; tickbox "create tokens" (checked; placed in the middle of the screen); tickbox "add hidden" (checked); per row after creature + number: HP **average** (standard) or **rolled**, in both the encounter builder and the mid-fight add dialog; creature lookup becomes an **autocomplete** instead of a dropdown | P2a | combat-tracker (builder), combat-extras (add dialog), entities (HP formula on definitions) | No: DM specified it |
+| N6 | Creatures added mid-encounter get no movement-tracker value in the Initiative window | P2a | combat-extras, combat-tracker | No: bug |
+| N6.1 | Added creatures: no red crosshair when selected as targets (stays white); the popup says the selection "is not in combat"; multi-select doesn't list them (the targets dropdown does) | P2a | combat-extras, combat-tracker (FR-CBT-33 selection rows, binding) | No: bug |
+| N7 | Attack / Damage buttons confuse: Main's Attack also rolls damage; Actions' Attack / Damage differ in and out of combat. Add a **third button: Attack + damage**, and make the three behave the same everywhere | P2b (sheet) with P2a (routing) | character-sheet-full, combat-tracker routes | No: DM specified the third button; the spec states each button in and out of combat |
+| N8 | The targets popup (opened from a player's apply notification) can't be moved: make it movable like any window, open it over the apply notification, and that notification goes away | P2a | combat-tracker (amends FR-CBT-55 "not draggable"), notifications | No: DM decided |
+| N9 | Bless adds to attack rolls: the sheet needs a place for temporary effects; and the plan for toggling effects like a barbarian's **Rage** | M | new effect-modifiers spec; combat-extras (effects), character-sheet-full (sheet section), ADR-0009 modifiers (design-for-later becomes real) | Yes: scope (modifier kinds, presets, toggles with uses) and whether it builds in phase 1 |
+| N10 | Dice notation anywhere in free text becomes clickable ("1d12+5", whitespace-tolerant) and puts the dice in a **3D dice tray** to adjust and roll; doesn't feed attack / apply. Every roll eventually goes through the 3D roller | — | backlog: [feature-tiers](../feature-tiers.md#3-character-sheet-and-dice), [dice-extras](../specs/post-mvp/dice-extras.md) | Done (#188): 3D dice tray tier **S**, dice notation shortcut tier **A** (flagged very important). Not built in sprint 2 |
+| N11 | When a player gets a notification (e.g. roll for concentration), the DM sees a few-second cue over that player's token | P2a | combat-extras, notifications, scenes-map (transient token cue) | No |
+
+## Phase 1: glitches from the session-sim-4 regression (#186)
+
+Evidence: `.verify/20261014-194223-session-sim-4/report.md` in the main checkout (glitches 1–17, screenshots alongside). G2, G3, G6, G8 → P2b; G1, G4, G5, G7, G9, G10 → P2a.
 
 | # | Glitch | Owning spec(s) | Needs the DM? |
 |---|---|---|---|
@@ -44,7 +69,18 @@ Evidence: `.verify/20261014-194223-session-sim-4/report.md` in the main checkout
 | G9 | Pending concentration card: no DM bell badge, no Initiative "Pending" row; after End "Resolved by DM" | combat-extras, notifications | No |
 | G10 | Undo tooltip copy ("Sela → Goblin 2, 0"; "DM → Mira, 4" after 99) | combat-tracker | No |
 
-Fold in if the same FR is touched anyway: 11–17 of the report (duplicate card toast, "physical" twice, sheet picker jumps after reload, dead PC no map cue after End, monster initiative rolls public, cramped sheet for creation, encounter rating counts a token-less approved PC), plus sprint-1 leftovers: pending toast over Initiative's Undo, Notifications window opens ~250 px tall vs 360×480, setting a monster's temp HP sends players an empty update.
+Fold in if the same FR is touched anyway (P2a or P2b, whichever owns it): 11–17 of the report (duplicate card toast, "physical" twice, sheet picker jumps after reload, dead PC no map cue after End, monster initiative rolls public, cramped sheet for creation, encounter rating counts a token-less approved PC), plus sprint-1 leftovers: pending toast over Initiative's Undo, Notifications window opens ~250 px tall vs 360×480, setting a monster's temp HP sends players an empty update.
+
+## Phase 1: track M, effect modifiers (N9)
+
+Design first; build if the DM says so at gate 1. Proposed scope for the spec agent to refine:
+- Effects (CBTX) gain optional **modifiers**: roll bonus dice (Bless +1d4 to attack rolls and saves), flat bonuses (+2 damage), advantage / disadvantage on a roll kind, resistance to damage types; applied server-side when a matching roll is made, shown on the roll line ("+1d4 Bless").
+- **Presets** for common effects (Bless, Bane, Rage, Hunter's Mark, Shield of Faith…) as data, hand-editable; the DM and the owning player **toggle** an effect on / off; optional uses (Rage 2 / long rest).
+- A sheet section "Active effects" (through CHARX's sheet sections) listing what currently modifies this character.
+- Reconcile with ADR-0009's design-for-later modifier list, CBTX's out-of-scope "adv / dis automation", ADR-0036 overrides (an override still wins).
+- Out: a full rules engine, spell / class data (compendium), automatic concentration from spells.
+
+## Phase 2 (after phase 1): fog of war and props + structure
 
 ## Track F: fog of war → new spec `fog-of-war` (prefix FOG)
 
@@ -70,6 +106,19 @@ Expand the stub. Proposed scope (DM confirms):
 
 ## Boundaries and hotspots (orchestrator: sequence these)
 
+**Phase 1**
+
+| Overlap | Rule |
+|---|---|
+| P2a ↔ P2b: N7 sheet buttons vs combat routing | P2b owns the sheet buttons, P2a the combat route semantics; one seam settled before the review |
+| P2a ↔ M: CBTX effects | **M owns** modifiers and their application; P2a doesn't change the effect record shape |
+| P2b ↔ M: sheet section for active effects | M registers through CHARX's `sheetSections`; P2b doesn't add an effects block |
+| P2a ↔ P2b: combat-tracker vs character-sheet files | Disjoint by default; any shared file → lock in status.md |
+| Schema (`src/server/db/`) | P2a (HP formula, add options) and M (modifier rows) core changes one at a time, never both |
+| Everything ↔ snapshot ceilings | Re-check CON-44 (heavy DM snapshot ~731 KiB of 768 KiB) |
+
+**Phase 2**
+
 | Overlap | Rule |
 |---|---|
 | F ↔ B: layer stack | **B owns** the layer model and its client registry; F registers the fog layer through it. Each spec raises an OQ naming the other; settle before the review |
@@ -83,6 +132,7 @@ Expand the stub. Proposed scope (DM confirms):
 
 ## Gates
 
-1. **Spec gate (DM):** all three specs reviewed by one review agent, then one DM pass: F and B scope, every pick, the P2 questions (at least G2).
-2. Builds in parallel per the hotspot rules. Each feature: walkthrough PASS; full `check` and full `e2e` before every merge and on `main` after it.
-3. **Sprint gate (DM):** session-sim regression on final `main` (incl. fog, a wall, an AoE template), a "Playtest: sprint 2 features" section appended here (like [sprint-1](sprint-1.md#playtest-sprint-1-features)), then recap and pick sprint 3 (candidates: party board + handouts, table flavour, compendium).
+1. **DM gate 1 (phase 1 specs):** P2a, P2b, M reviewed by one review agent; one DM pass: the "Needs the DM" picks (N1, N9, G2 at least), M's scope and timing.
+2. Phase 1 builds: walkthrough PASS per feature; full `check` + full `e2e` before each merge and on `main` after it; "Playtest: phase 1 fixes" section here.
+3. **DM gate 2 (phase 2 specs):** F and B reviewed by one review agent; one DM pass: scope, picks, any phase-1 playtest feedback.
+4. **Sprint gate (DM):** session-sim regression on final `main` (incl. fog, a wall, an AoE template, an effect modifier if built), "Playtest: sprint 2 features" section here, then recap and pick sprint 3 (candidates: party board + handouts, table flavour, compendium, 3D dice tray).
