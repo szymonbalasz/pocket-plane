@@ -475,18 +475,25 @@ for (const [width, height] of [
     const p1 = await popup.boundingBox();
     if (!p1) throw new Error("no popup box");
     const size = { w: p1.width, h: p1.height };
-    const atOrigin = { ...first.box, ...size };
+    // FR-CBT-75: the toast's top-left, clamped into the work area (below the top bar, above the
+    // launcher).
+    const origin = (b: Box) => ({
+      x: Math.max(0, Math.min(b.x, width - size.w)),
+      y: Math.max(48, Math.min(b.y, height - 64 - size.h)),
+      ...size,
+    });
+    const atOrigin = origin(first.box);
     if ((await monsters()).some((t) => overlaps(atOrigin, t))) {
       await expect(popup).not.toHaveAttribute("data-side", "origin");
     } else {
       await expect(popup).toHaveAttribute("data-side", "origin");
-      expect(Math.abs(p1.x - first.box.x)).toBeLessThan(2);
-      expect(Math.abs(p1.y - first.box.y)).toBeLessThan(2);
+      expect(Math.abs(p1.x - atOrigin.x)).toBeLessThan(2);
+      expect(Math.abs(p1.y - atOrigin.y)).toBeLessThan(2);
     }
     await popup.getByTestId("cbt-popup-dismiss").click();
     await expect(popup).toHaveCount(0);
 
-    // 2. A monster just right of the toast, inside the popup's width there but clear of the toast:
+    // 2. A monster beside the toast, inside the popup's span there but clear of the toast:
     // the stack stays put, the popup over it would cover a likely target.
     const cell = Number(await dm.getByTestId("map-canvas").getAttribute("data-cell-px"));
     let card = first;
@@ -505,11 +512,48 @@ for (const [width, height] of [
       const m = grabbable.reduce((a, b) => (b.y > a.y ? b : a));
       const cx = m.x + m.w / 2;
       const cy = m.y + m.h / 2;
-      // Cell centres lie on the token grid: the cell right of the toast, within 440 of its left
-      // edge, level with the toast's middle.
-      const wantX = card.box.x + card.box.w + 12 + cell / 2;
-      const tx = cx + Math.ceil((wantX - cx) / cell) * cell;
-      const ty = cy + Math.round((card.box.y + card.box.h / 2 - cy) / cell) * cell;
+      // Cell centres lie on the token grid: of the free map cells wholly inside the popup's span
+      // over the toast and clear of the toast, the one nearest the toast.
+      const span = origin(card.box);
+      const others = (await tokenBoxes(dm)).filter((t) => t.id !== m.id);
+      // On the map image (a token must overlap the map).
+      const [img] = await konvaNodes(dm, "map-image");
+      if (!img) throw new Error("no map image");
+      const onImage = (c: { x: number; y: number }) =>
+        Math.abs(c.x - img.x) < img.width / 2 && Math.abs(c.y - img.y) < img.height / 2;
+      const half = cell / 2 + 4;
+      const cells: { x: number; y: number }[] = [];
+      for (let i = -40; i <= 40; i++) {
+        for (let j = -40; j <= 40; j++) {
+          const c = { x: cx + i * cell, y: cy + j * cell };
+          const r = { x: c.x - half, y: c.y - half, w: 2 * half, h: 2 * half };
+          const inside =
+            r.x >= span.x &&
+            r.x + r.w <= span.x + span.w &&
+            r.y >= span.y &&
+            r.y + r.h <= span.y + span.h;
+          if (inside && onImage(c) && !overlaps(r, card.box) && !others.some((t) => overlaps(r, t)))
+            cells.push(c);
+        }
+      }
+      const mid = { x: card.box.x + card.box.w / 2, y: card.box.y + card.box.h / 2 };
+      cells.sort(
+        (a, b) => Math.hypot(a.x - mid.x, a.y - mid.y) - Math.hypot(b.x - mid.x, b.y - mid.y),
+      );
+      let target: { x: number; y: number } | undefined;
+      for (const c of cells) {
+        const onMap = await dm.evaluate(
+          ([x, y]) =>
+            document.elementFromPoint(x, y)?.closest('[data-testid="map-canvas"]') !== null,
+          [c.x, c.y] as const,
+        );
+        if (onMap) {
+          target = c;
+          break;
+        }
+      }
+      if (!target) throw new Error("no free map cell under the popup's span beside the toast");
+      const { x: tx, y: ty } = target;
       await dm.mouse.move(cx, cy);
       await dm.mouse.down();
       for (let i = 1; i <= 6; i++) {
@@ -524,7 +568,7 @@ for (const [width, height] of [
         .toBe(true);
       await sheet.getByTestId("charx-roll-attack-damage").first().click();
       card = await settledToast(dm, known);
-      const over = { ...card.box, ...size };
+      const over = origin(card.box);
       blocked = (await monsters()).some((t) => overlaps(over, t));
     }
     expect(blocked).toBe(true);
@@ -534,10 +578,11 @@ for (const [width, height] of [
     const p2 = await popup.boundingBox();
     if (!p2) throw new Error("no popup box");
     const placed = { x: p2.x, y: p2.y, w: p2.width, h: p2.height };
-    // Clear of every likely target, and near the toast (sim-6: it went to the far bottom centre).
+    // Clear of every likely target, and near the toast: within one popup height of its spot there
+    // (sim-6: it went to the far bottom centre, 500+ px away).
     for (const t of await monsters()) expect(overlaps(placed, t)).toBe(false);
-    const d = Math.hypot(placed.x - card.box.x, placed.y - card.box.y);
-    expect(d).toBeLessThanOrEqual(2 * cell + 2 * 12 + card.box.h);
+    const o = origin(card.box);
+    expect(Math.hypot(placed.x - o.x, placed.y - o.y)).toBeLessThan(size.h);
     await popup.getByTestId("cbt-popup-dismiss").click();
     await expect(popup).toHaveCount(0);
 
