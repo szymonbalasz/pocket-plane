@@ -1,10 +1,10 @@
 // e2e-bundle: character-sheet-full
 // Thin character-sheet-full flow (CHARX §13 E2E): player-1 creates "Brin", sets DEX 16 + Stealth
-// proficient, rolls Stealth → "+ 5" in the log; the DM approves; player-2 sees Brin's summary
-// card only. Permission matrix, leak scan, merge, crash, restart: bun test (character-sheet).
+// proficient, rolls Stealth → "+ 5" in the log; the DM gets the draft card, Review → Approve;
+// player-1 gets the approval toast; player-2 sees Brin's summary card only. Permission matrix, leak scan, merge, crash, restart: bun test (character-sheet).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { openWindow } from "./support/shell";
+import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
@@ -63,7 +63,7 @@ for (const vp of [
   });
 }
 
-test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-10 FR-CHARX-32 Brin: create, edit, roll Stealth, approve; player-2 summary", async ({
+test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-45 FR-CHARX-46 FR-CHARX-10 FR-CHARX-32 Brin: create, edit, roll Stealth, draft card, approve; player-2 summary", async ({
   browser,
 }) => {
   const { secret, link } = e2eEnv();
@@ -110,26 +110,41 @@ test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-10 FR-CHARX-32 Brin: create, edit, roll S
   await expect(line).toHaveCount(1);
   await expect(line).toContainText(/Stealth check: .*\+ 5 = /);
 
-  // DM approves Brin: the Draft badge goes on both sheets.
-  const dmSheet = await openWindow(dm, "char.sheet");
-  await dmSheet.getByTestId("char-sheet-picker").selectOption({ label: "Brin (Player 1) · Draft" });
+  // G8 (FR-CHARX-45): the DM's draft card → Review opens Brin's sheet → Approve; the Draft badge
+  // goes on both sheets and the card closes.
+  const card = dm.getByTestId("note-toast").filter({
+    hasText: "Player 1 made a character: Brin. Awaiting your approval",
+  });
+  await expect(card).toHaveCount(1);
+  await card.getByTestId("note-toast-action").click();
+  const dmSheet = shellWindow(dm, "char.sheet");
+  await expect(dmSheet.getByTestId("char-sheet")).toHaveAttribute("data-record-id", brinId);
   await dmSheet.getByTestId("charx-approve").click();
   await expect(dmSheet.getByTestId("charx-draft")).toHaveCount(0);
   await expect(sheet1.getByTestId("charx-draft")).toHaveCount(0);
+  await expect(card).toHaveCount(0);
+  // FR-CHARX-46: Player 1's info toast; Player 2 gets none.
+  await expect(
+    p1.getByTestId("note-toast").filter({ hasText: "Brin was approved by the DM: ready to play" }),
+  ).toHaveCount(1);
+  await expect(p2.getByTestId("note-toast")).toHaveCount(0);
 
   // Player 2: Brin in the Party group → summary card only, no sheet, no numbers.
   const sheet2 = await openWindow(p2, "char.sheet");
   await sheet2.getByTestId("char-sheet-picker").selectOption({ label: "Brin (Player 1)" });
-  const card = sheet2.getByTestId("charx-summary");
-  await expect(card).toHaveAttribute("data-record-id", brinId);
-  await expect(card.getByTestId("charx-summary-level")).toHaveText("Level 1");
-  await expect(card.getByTestId("charx-summary-owner")).toHaveText("Played by Player 1");
+  const summary = sheet2.getByTestId("charx-summary");
+  await expect(summary).toHaveAttribute("data-record-id", brinId);
+  await expect(summary.getByTestId("charx-summary-level")).toHaveText("Level 1");
+  await expect(summary.getByTestId("charx-summary-owner")).toHaveText("Played by Player 1");
   await expect(sheet2.getByTestId("char-sheet")).toHaveCount(0);
   await expect(sheet2.getByTestId("charx-roll-skill")).toHaveCount(0);
   // FR-CHARX-36: no Brin creature-sheet and no stat block ever reached player 2.
   const frames = p2Frames.join("\n");
   expect(frames).not.toMatch(new RegExp(`"type":"creature-sheet","id":"${brinId}"`));
   expect(frames).not.toMatch(new RegExp(`"id":"${brinId}"[^}]*"statBlock"`));
+  // G8: no draft card and no approval card ever reached player 2.
+  expect(frames).not.toContain('"kind":"charx-draft"');
+  expect(frames).not.toContain('"kind":"charx-approved"');
 
   for (const page of [p2, p1, dm]) await page.context().close();
 });
