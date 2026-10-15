@@ -65,15 +65,20 @@ describe("FR-FOG-20/21 render", () => {
     expect(fogOpacity("player")).toBe(1);
   });
 
-  test("FR-FOG-20 layer `fog` at 30: above props + structure, below templates and tokens; DM only for now", () => {
+  test("FR-FOG-20/21 layer `fog` at 30 on both clients: above props + structure, below templates, tokens and labels", () => {
     const fog = canvasLayers.find((l) => l.id === "fog");
     expect(fog?.order).toBe(LAYER_ORDER.fog);
     const dm = layerSlots(canvasLayers, "dm").map((s) => s.key);
     expect(dm.indexOf("fog")).toBe(dm.indexOf("scn-objects:scn-props") + 1);
     expect(dm.indexOf("fog")).toBe(dm.indexOf("scn-templates") - 1);
     expect(dm.indexOf("fog")).toBeLessThan(dm.indexOf("tokens"));
-    // Players see nothing new until build/fog-visibility (FR-FOG-21, BO1).
-    expect(layerSlots(canvasLayers, "player").map((s) => s.key)).not.toContain("fog");
+    // FR-FOG-21: the player client draws it in the same slot, so party tokens and own templates
+    // stay visible over the opaque fog.
+    const player = layerSlots(canvasLayers, "player").map((s) => s.key);
+    expect(player.indexOf("fog")).toBe(player.indexOf("scn-templates") - 1);
+    expect(player.indexOf("fog")).toBeLessThan(player.indexOf("tokens"));
+    expect(player.indexOf("fog")).toBeLessThan(player.indexOf("labels"));
+    expect(player.indexOf("fog")).toBeGreaterThan(player.indexOf("scn-objects:scn-props"));
   });
 });
 

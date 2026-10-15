@@ -18,6 +18,7 @@ import {
   readEncounter,
 } from "../combat-tracker/rows";
 import { getToken } from "../scenes-map/rows";
+import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 import { syncHidden } from "./rule-hooks";
 
 export const bindToken = defineCommand({
@@ -45,11 +46,13 @@ export const bindToken = defineCommand({
         .get();
       if (holder) throw conflict(`${t.name} is already in combat`);
       if (t.definitionId !== c.entityId) throw invalid("Token is a different creature");
+      // FR-FOG-14: the hidden copy = the token's `hidden` or fog-hidden.
+      const hidden = tokenHiddenForPlayers(t);
       tx.update(combatant)
-        .set({ tokenId: t.id, name: t.name, imageAssetId: t.imageAssetId, hidden: t.hidden })
+        .set({ tokenId: t.id, name: t.name, imageAssetId: t.imageAssetId, hidden })
         .where(eq(combatant.id, c.id))
         .run();
-      if (t.hidden !== c.hidden) rerank(tx, enc.id);
+      if (hidden !== c.hidden) rerank(tx, enc.id);
     }
     const encAfter = syncPlayerTurn(env, enc.id);
     env.emit({

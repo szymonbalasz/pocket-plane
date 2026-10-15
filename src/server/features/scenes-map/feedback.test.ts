@@ -1,6 +1,8 @@
 // Feedback pass (MAP §13 "Integration (feedback)"): token shape and speed copies (FR-MAP-35/36)
 // and token-changed hooks on moves (FR-MAP-38, ADR-0031).
+
 import { describe, expect, test } from "bun:test";
+import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import type { SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
 import { MAP_INTENTS as I } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
@@ -15,8 +17,12 @@ import { tokenHooksOf } from "./token-hooks";
 
 function setup() {
   const t = scenesSetup(captureLogger().log);
-  const newScene = (name = "Goblin Ambush") =>
-    t.run<SceneRecord>(R.createScene, { name, mapAssetId: "map-battle" });
+  // FR-FOG-25 ripple: new scenes start fogged; the helper reveals them unless `revealed` is false.
+  const newScene = (name = "Goblin Ambush", revealed = true) => {
+    const s = t.run<SceneRecord>(R.createScene, { name, mapAssetId: "map-battle" });
+    if (revealed) t.run(FOG_INTENTS.setAll, { sceneId: s.id, fogged: false });
+    return s;
+  };
   const tokenRow = (id: string) =>
     t.s.db.select().from(token).where(eq(token.id, id)).get() as TokenRecord;
   const place = (sceneId: string, definitionId: string, col: number, row: number, extra = {}) =>

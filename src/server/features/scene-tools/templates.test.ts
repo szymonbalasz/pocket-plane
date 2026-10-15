@@ -1,7 +1,8 @@
 // AoE templates (SCN FR-SCN-20–27, -35; §9, §11, §13): kept-template commands (rows + log + one
 // event, IDs from ctx, caps, who may edit, player-only refusals, rollback / crash) and the
-// `scn.template` audience (FR-SCN-24, ADR-0033), incl. the fog seam (FR-FOG-15).
-import { afterEach, describe, expect, test } from "bun:test";
+// `scn.template` audience (FR-SCN-24, ADR-0033), incl. the fog seam (FR-FOG-15). Fog's real line
+// is lifted out per case so only the test fog acts (fog's own tests cover its line).
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { fogHidden } from "@shared/fog-of-war/visibility";
 import { templateCells } from "@shared/scene-tools/geometry";
 import {
@@ -18,13 +19,19 @@ import { armCrashHook } from "../../commands/crash";
 import { stateDigest } from "../../db/digest";
 import { readEventLog } from "../../events/log";
 import type { SignalSender } from "../../ws/signals";
+import { fogVisibilityHook } from "../fog-of-war/hooks";
 import { type SceneObject, visibilityHooks } from "../scenes-map/visibility-hooks";
 import { readTemplate } from "./rows";
 import { templateAudience } from "./templates";
 import { scnSetup } from "./testing";
 
+beforeEach(() => {
+  visibilityHooks.unregister(fogVisibilityHook.name);
+});
+
 afterEach(() => {
   visibilityHooks.unregister("test.fog");
+  visibilityHooks.register(fogVisibilityHook);
   armCrashHook(null);
 });
 

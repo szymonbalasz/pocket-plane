@@ -8,6 +8,7 @@ import {
   type EncounterRecord,
 } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
+import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import { MAP_INTENTS, TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
 import { createApp } from "../../app";
@@ -273,6 +274,7 @@ describe("FR-CBT-64 FR-CBT-65 start applies the options", () => {
     const u = setup();
     addAsset(u.s, "map-tiny", u.h.campaignId, { w: 140, h: 70 });
     const tiny = u.run<{ id: string }>(createScene.name, { name: "Tiny", mapAssetId: "map-tiny" });
+    u.run(FOG_INTENTS.setAll, { sceneId: tiny.id, fogged: false }); // FR-FOG-25 ripple
     const small = u.run<EncounterRecord>(createEncounter.name, {
       name: "Tiny fight",
       partyCharacterIds: [],

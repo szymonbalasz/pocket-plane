@@ -1,5 +1,7 @@
 // Test support for dice-roll-log: in-memory services with one seeded context (FR-DICE-25),
 // seeded like the `dice-log` bundle's prerequisites.
+
+import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import { type CommandContext, manualClock, seededContext } from "../../commands/context";
 import { openTestDb } from "../../db/testing";
 import type { Actor } from "../../events/types";
@@ -69,6 +71,8 @@ export function seedDice(s: Services) {
   const tokenIn = (cid: string, actor: Actor) => {
     addAsset(s, `map-${cid}`, cid);
     const sc = run(createScene, { name: "Battle", mapAssetId: `map-${cid}` }, { actor });
+    // FR-FOG-25 ripple: new scenes start fogged; reveal it.
+    run(FOG_INTENTS.setAll, { sceneId: sc.id, fogged: false }, { actor });
     return run(
       placeToken,
       { sceneId: sc.id, definitionId: imported[0]?.id as string, col: 1, row: 1, name: "Boss" },

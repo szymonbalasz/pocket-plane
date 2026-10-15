@@ -6,7 +6,7 @@ import { fog } from "./commands";
 
 /**
  * FOG §13 `fog-ambush`: Goblin Ambush fully fogged (`fog.setAll {fogged: true}`); token "Goblin
- * Lurker" (`enemy-1`) at (17, 11), visible flag (fogged). No ripple yet (build/fog-visibility).
+ * Lurker" (`enemy-1`) at (17, 11), visible flag (fogged). `battlemap` revealed it (FR-FOG-25).
  */
 export default defineFixture({
   key: "fog-ambush",

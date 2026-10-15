@@ -27,14 +27,16 @@ describe("FR-SCN-31 scene hooks", () => {
     const copy = t.run<SceneRecord>(R.duplicateScene, { id: t.ambush.id });
     const ev = t.events.at(-1);
     expect(ev?.event.type).toBe(SceneDuplicated.type);
+    // fog-of-war's line runs first (FR-FOG-02: the copy gets the source's fog row).
     expect(kinds(ev?.event.changes ?? [])).toEqual([
       "scene:+",
+      "fog:+",
       `${SCENE_STRUCTURE_TYPE}:+`,
       `${SCENE_PROP_TYPE}:+`,
       `${SCENE_PROP_TYPE}:+`,
       `${SCENE_PROP_TYPE}:+`,
     ]);
-    const structure = ev?.event.changes[1]?.after;
+    const structure = ev?.event.changes[2]?.after;
     expect(structure).toEqual({ ...a.structure, id: copy.id });
     const props = sceneProps(t.s.db, copy.id);
     expect(props.map((p) => p.assetId)).toEqual(["prop-barrel", "prop-table", "prop-chest"]);
@@ -67,7 +69,7 @@ describe("FR-SCN-31 scene hooks", () => {
   test("FR-SCN-31 a scene without SCN rows adds no changes", () => {
     const t = scnSetup();
     t.run<SceneRecord>(R.duplicateScene, { id: t.cellar.id });
-    expect(kinds(t.events.at(-1)?.event.changes ?? [])).toEqual(["scene:+"]);
+    expect(kinds(t.events.at(-1)?.event.changes ?? [])).toEqual(["scene:+", "fog:+"]);
   });
 
   test("FR-SCN-16 duplicate past the 2,000-prop campaign cap → conflict, nothing written", () => {
@@ -95,6 +97,7 @@ describe("FR-SCN-31 scene hooks", () => {
     expect(ev?.event.type).toBe(SceneDeleted.type);
     const changes = ev?.event.changes ?? [];
     expect(kinds(changes)).toEqual([
+      "fog:-",
       `${SCENE_STRUCTURE_TYPE}:-`,
       `${SCENE_PROP_TYPE}:-`,
       `${SCENE_PROP_TYPE}:-`,
@@ -103,8 +106,8 @@ describe("FR-SCN-31 scene hooks", () => {
       `${AOE_TEMPLATE_TYPE}:-`,
       "scene:-",
     ]);
-    expect(changes[0]?.before).toEqual(c.structure);
-    expect(changes[5]?.before).toEqual(c.glyph);
+    expect(changes[1]?.before).toEqual(c.structure);
+    expect(changes[6]?.before).toEqual(c.glyph);
     const dm = t.h.viewer("dm");
     for (const ch of changes) expect(t.s.records.filterChange(ch, dm)?.op).toBe("delete");
     // Players never saw the (non-active) scene: nothing to send.

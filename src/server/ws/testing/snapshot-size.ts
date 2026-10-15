@@ -457,6 +457,9 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
   const scenes = db.select().from(scene).where(eq(scene.campaignId, cid)).all();
   const battle = scenes.at(-1)?.id as string;
   run("map.activateScene", { sceneId: battle });
+  // FR-FOG-25 ripple: new scenes start fogged (FR-FOG-02); the battle scene is revealed, the other
+  // new ones stay fogged (their tokens carry `fogged: true`, FOG §12).
+  run("fog.setAll", { sceneId: battle, fogged: false });
 
   let cell = 0;
   const place = (sceneId: string, definitionId: string, owner: string | null) => {
