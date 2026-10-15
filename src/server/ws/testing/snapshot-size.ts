@@ -9,10 +9,13 @@ import {
 } from "@shared/combat-extras/schemas";
 import { parseFullCard } from "@shared/combat-tracker/schemas";
 import { EFFECT_PRESET_TYPE, type Modifier } from "@shared/effect-modifiers/schemas";
+import { type Door, TEMPLATE_LABEL_MAX, type Wall } from "@shared/scene-tools/schemas";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { Config } from "../../config";
 import { closeDb, type Db, openMemoryDb } from "../../db/client";
 import {
+  aoeTemplate,
+  aoeTemplateSeqNext,
   asset,
   campaign,
   combatant,
@@ -22,9 +25,13 @@ import {
   effectPresetSeqNext,
   effectSeqNext,
   entity,
+  mapSettings,
   notification,
   player,
+  prop,
+  propSeqNext,
   scene,
+  sceneStructure,
 } from "../../db/schema";
 import type { Actor } from "../../events/types";
 import { silentLogger } from "../../log";
@@ -288,6 +295,16 @@ export const HEAVY = {
   /** MOD §12: max-length presets: 10 campaign (5 customise a built-in), 1 per PC. */
   campaignPresets: 10,
   characterPresets: 6,
+  /**
+   * SCN §12 "typical prepped scene" on the active battle scene: 150 walls, 10 doors, 15 props
+   * (3 hidden), 3 kept templates (1 hidden DM, 1 player's), and the campaign's `map-settings`.
+   */
+  scnWalls: 150,
+  scnDoors: 10,
+  scnProps: 15,
+  scnHiddenProps: 3,
+  scnTemplates: 3,
+  scnHiddenTemplates: 1,
 } as const;
 
 /** MOD §12: the longest tier-1 modifiers (all abilities; signed max dice; flat via weapon). */
@@ -468,6 +485,14 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
   for (let i = 0; tokenCount() < HEAVY.tokens; i++) {
     place(others[i % others.length] as string, monIds[i % monIds.length] as string, null);
   }
+
+  prepTypicalScnScene(
+    s,
+    cid,
+    battle,
+    img,
+    players.map((p) => p.id),
+  );
 
   // Encounters: session-sim's encounter-1 + 10 ended + 8 planned + the started one = 20.
   const encBody = (name: string, entries: { definitionId: string; quantity: number }[]) => ({
@@ -680,6 +705,8 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
         )
         .get(cid)?.n ?? 0,
     loot: n("loot_entry"),
+    scnProps: n("prop"),
+    scnTemplates: n("aoe_template"),
     sheets: n("creature_sheet"),
     presets: n("effect_preset"),
     modEffects:
@@ -746,4 +773,97 @@ export function typicalSheet(tag: string) {
     slotsUsed: { "1": 2, "2": 1 },
     hitDiceUsed: { d10: 3 },
   };
+}
+
+const uuid = (tag: number, n: number) =>
+  `00000000-0000-4000-8${tag.toString().padStart(3, "0")}-${n.toString().padStart(12, "0")}`;
+
+/**
+ * SCN §12 / Appendix B: one typical prepped scene, written directly (scene-tools commands come
+ * with its slices): 150 walls and 10 doors (6 closed, 2 open, 2 locked) as one structure row, 15
+ * props (3 hidden, 2 locked, up to 3 × 3, rotated), 3 kept templates with max-length labels
+ * (a player's sphere, a hidden DM cube, a DM line), `map-settings` with the 5 ft rule.
+ */
+export function prepTypicalScnScene(
+  s: Services,
+  campaignId: string,
+  sceneId: string,
+  assetId: string,
+  playerIds: readonly string[],
+): void {
+  const at = "2026-01-01T00:00:00.000Z";
+  const walls: Wall[] = Array.from({ length: HEAVY.scnWalls }, (_, i) => {
+    const x = (i * 7) % 21;
+    const y = (i * 3) % 15;
+    return [i + 1, x, y, Math.min(20, x + 1 + (i % 3)), Math.min(14, y + (i % 2) * 2)];
+  });
+  const doors: Door[] = Array.from({ length: HEAVY.scnDoors }, (_, i) => {
+    const n = HEAVY.scnWalls + i + 1;
+    const state = i < 6 ? 1 : i < 8 ? 0 : 2;
+    return [n, 2 + i * 2, 5, 2 + i * 2, 6, state, 0];
+  });
+  s.db
+    .insert(sceneStructure)
+    .values({
+      sceneId,
+      campaignId,
+      rev: HEAVY.scnWalls + HEAVY.scnDoors,
+      nextN: HEAVY.scnWalls + HEAVY.scnDoors + 1,
+      walls,
+      doors,
+      updatedAt: at,
+    })
+    .run();
+  for (let i = 0; i < HEAVY.scnProps; i++) {
+    s.db
+      .insert(prop)
+      .values({
+        id: uuid(1, i),
+        campaignId,
+        sceneId,
+        seq: propSeqNext,
+        assetId,
+        col: (i * 5) % 20,
+        row: (i * 3) % 14,
+        w: 1 + (i % 3),
+        h: 1 + ((i + 1) % 3),
+        rotation: (i % 4) * 90,
+        z: i % 3,
+        hidden: i < HEAVY.scnHiddenProps,
+        locked: i % 7 === 3,
+        createdAt: at,
+        updatedAt: at,
+      })
+      .run();
+  }
+  const label = (prefix: string) => fill(prefix, TEMPLATE_LABEL_MAX);
+  const templates = [
+    {
+      shape: "sphere",
+      x: 3,
+      y: 8,
+      size: 20,
+      width: null,
+      angle: 0,
+      placedByPlayerId: playerIds[0],
+    },
+    { shape: "cube", x: 12, y: 12, size: 15, width: null, angle: 90, hidden: true },
+    { shape: "line", x: 6, y: 2, size: 60, width: 5, angle: 315 },
+  ] as const;
+  for (const [i, t] of templates.entries()) {
+    s.db
+      .insert(aoeTemplate)
+      .values({
+        id: uuid(2, i),
+        campaignId,
+        sceneId,
+        seq: aoeTemplateSeqNext,
+        label: label(`Template ${i + 1} `),
+        createdAt: at,
+        updatedAt: at,
+        ...t,
+      })
+      .run();
+  }
+  s.db.insert(mapSettings).values({ campaignId, diagonalRule: "5", updatedAt: at }).run();
 }

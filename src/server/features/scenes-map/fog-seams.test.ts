@@ -138,7 +138,8 @@ describe("FR-FOG-24 registries (fog's server lines only)", () => {
     // with build/fog-visibility (FOG §14), so nothing is hidden and new scenes get no row.
     expect(sceneVisibilityHooks.map((h) => h.name)).toEqual(["fog-of-war.fogged"]);
     expect(sceneVisibilityHooks.some((h) => h.hides || h.dragToDm)).toBe(false);
-    expect(sceneHooks.map((h) => h.name)).toEqual(["fog-of-war.fog-row"]);
+    // scene-tools' line (FR-SCN-31) only lists SCN rows, and these scenes have none.
+    expect(sceneHooks.map((h) => h.name)).toEqual(["fog-of-war.fog-row", "scene-tools.scene-rows"]);
     expect(sceneHooks.some((h) => h.created)).toBe(false);
     const t = setup();
     const s = t.newScene();

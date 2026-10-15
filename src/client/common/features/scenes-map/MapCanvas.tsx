@@ -2,8 +2,11 @@
 // registry (FR-MAP-29), per-client camera (FR-MAP-12), drop-only moves with an optimistic overlay
 // (FR-MAP-15), ruler (FR-MAP-22), ping / pull (FR-MAP-23), laser (FR-MAP-24), definition drops
 // (FR-MAP-13, DM), DM selection + box select + targeting (FR-MAP-31–33), the not-live rules
-// (FR-MAP-28) and the live drag preview (FR-MAP-39/40). No feature logic: the server decides.
+// (FR-MAP-28), the live drag preview (FR-MAP-39/40) and the canvas tool core (FR-SCN-06: stage
+// dispatch to the active registry tool, Space + drag pans, Esc to the tool first, tokens ignore
+// left-press while drawing). No feature logic: the server decides.
 import { DEFINITION_DRAG_MIME, DefinitionDragData } from "@shared/entities/schemas";
+import { pxToVertex } from "@shared/scene-tools/geometry";
 import {
   cellToPx,
   dropCell,
@@ -22,7 +25,7 @@ import {
 } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Stage } from "react-konva";
+import { Layer, Stage } from "react-konva";
 import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
 import { useFreeArea } from "../play-shell/free-area";
 import { workArea } from "../play-shell/geometry";
@@ -40,11 +43,11 @@ import {
 } from "./camera";
 import { CanvasContext, type CanvasContextValue, type EffectiveGrid } from "./canvas-context";
 import { canvasLayers } from "./canvas-layers";
+import { canvasTools } from "./canvas-tools";
 import { subscribeOverlays } from "./decorations";
 import {
   clearPreviews,
   createPreviewStore,
-  escapeTarget,
   prunePreviews,
   receiveDrag,
   TokenDrag,
@@ -52,6 +55,7 @@ import {
 } from "./drag-preview";
 import { toastReject, useLive, useMapIntent } from "./intents";
 import { LaserSender } from "./laser";
+import { layerSlots } from "./layers";
 import {
   clearOverlay,
   emptyOverlay,
@@ -66,7 +70,17 @@ import { addPing, addTrailPoints, createPointerStore, senderKey } from "./pointe
 import { isClick, tokensInBox } from "./selection-logic";
 import { useCanvasColors } from "./theme";
 import { tokenOverlays } from "./token-overlays";
-import { useMapFit, useMapTool } from "./tool-store";
+import { useLayerToggles, useMapFit, useMapTool } from "./tool-store";
+import {
+  activeTool,
+  escapeOrder,
+  isDrawing,
+  pressGoesToTool,
+  stagePans,
+  type ToolPointer,
+  tokenTakesLeftPress,
+  typingTarget,
+} from "./tools";
 
 export interface MapCanvasProps {
   client: "dm" | "player";
@@ -136,8 +150,23 @@ export function MapCanvas(props: MapCanvasProps) {
   const live = useLive();
   const liveRef = useRef(live);
   liveRef.current = live;
+  // ---- canvas tools (FR-SCN-06): the active registry tool, if any, and Space-to-pan ----
+  const toolDef = useMemo(() => activeTool(canvasTools, tool, client), [tool, client]);
+  const toolDefRef = useRef(toolDef);
+  toolDefRef.current = toolDef;
+  const drawing = isDrawing(toolDef);
+  const drawingRef = useRef(drawing);
+  drawingRef.current = drawing;
+  /** A left press the active tool received; its release goes to the tool too. */
+  const toolPress = useRef(false);
+  const [space, setSpace] = useState(false);
+  const spaceRef = useRef(space);
+  spaceRef.current = space;
+  useEffect(() => useMapTool.setState({ client }), [client]);
   const sendIntent = useMapIntent();
   const sendSignal = useSendSignal();
+  /** A stage pointer event as the active tool receives it (FR-SCN-06). */
+  const toolPointerRef = useRef<(evt: MouseEvent) => ToolPointer | null>(() => null);
   const [pointers] = useState(createPointerStore);
   const [previews] = useState(createPreviewStore);
   const grid = props.gridOverride ?? gridOf(scene);
@@ -145,6 +174,8 @@ export function MapCanvas(props: MapCanvasProps) {
   gridRef.current = grid;
   const sceneIdRef = useRef(scene.id);
   sceneIdRef.current = scene.id;
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
   /** This client's token drag in progress (FR-MAP-39), if any. */
   const dragRef = useRef<TokenDrag | null>(null);
 
@@ -341,9 +372,11 @@ export function MapCanvas(props: MapCanvasProps) {
         resizeRefit.current?.drop();
       },
       click(t, toggle) {
+        if (!tokenTakesLeftPress(toolDefRef.current)) return;
         onTokenClick?.(t, toggle);
       },
       dblClick(t) {
+        if (!tokenTakesLeftPress(toolDefRef.current)) return;
         onTokenDoubleClick?.(t);
       },
     }),
@@ -410,7 +443,7 @@ export function MapCanvas(props: MapCanvasProps) {
   const endBox = useCallback(() => {
     boxing.current = false;
     pointers.setState({ box: null });
-    stageRef.current?.draggable(useMapTool.getState().tool === "select");
+    stageRef.current?.draggable(stagePans(useMapTool.getState().tool, spaceRef.current));
   }, [pointers]);
   /** Box corner follows the pointer anywhere on the page (windows may cover the canvas). */
   const trackBox = useCallback(
@@ -430,6 +463,11 @@ export function MapCanvas(props: MapCanvasProps) {
   }, [trackBox]);
   const endGestures = useCallback(
     (e?: PointerEvent) => {
+      if (toolPress.current) {
+        toolPress.current = false;
+        const tp = e ? toolPointerRef.current(e) : null;
+        if (tp) toolDefRef.current?.pointer?.up?.(tp);
+      }
       const p = press.current;
       press.current = null;
       if (p && e) {
@@ -464,8 +502,14 @@ export function MapCanvas(props: MapCanvasProps) {
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      const target = escapeTarget(dragRef.current !== null, boxing.current);
+      const target = escapeOrder(dragRef.current !== null, boxing.current, toolDefRef.current);
       if (!target) return;
+      if (target === "tool") {
+        // FR-SCN-06: Esc goes to the tool; it stops here only if a gesture was dropped.
+        toolPress.current = false;
+        if (toolDefRef.current?.pointer?.cancel?.("escape") === true) e.stopPropagation();
+        return;
+      }
       e.stopPropagation();
       if (target === "drag") {
         dragRef.current?.cancel();
@@ -484,6 +528,75 @@ export function MapCanvas(props: MapCanvasProps) {
 
   const mapPoint = () => stageRef.current?.getRelativePointerPosition() ?? null;
 
+  // ---- canvas tools: stage events → the active tool (FR-SCN-06, FR-FOG-17) ----
+  toolPointerRef.current = (evt) => {
+    const stage = stageRef.current;
+    if (!stage) return null;
+    stage.setPointersPositions(evt);
+    const p = stage.getRelativePointerPosition();
+    if (!p) return null;
+    const g = gridRef.current;
+    return {
+      x: p.x,
+      y: p.y,
+      cell: pxToCell(g, p.x, p.y),
+      vertex: pxToVertex(g, p.x, p.y),
+      screen: { x: evt.clientX, y: evt.clientY },
+      button: evt.button,
+      ctrl: evt.ctrlKey || evt.metaKey,
+      shift: evt.shiftKey,
+      alt: evt.altKey,
+      clicks: evt.detail,
+      client,
+      scene: sceneRef.current,
+      grid: g,
+      intent: sendIntent,
+      signal: sendSignal,
+    };
+  };
+  // Space + drag pans with any tool; typing in a field keeps Space.
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || typingTarget(e.target)) return;
+      e.preventDefault();
+      if (!spaceRef.current) setSpace(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === "Space") setSpace(false);
+    };
+    const blur = () => setSpace(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
+    };
+  }, []);
+  // A gesture in progress is dropped on a tool switch, a scene switch, leaving `live` and unmount
+  // (FR-SCN-34, FR-FOG-22).
+  useEffect(
+    () => () => {
+      toolPress.current = false;
+      toolDef?.pointer?.cancel?.("tool");
+    },
+    [toolDef],
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a scene switch drops the gesture.
+  useEffect(
+    () => () => {
+      toolPress.current = false;
+      toolDefRef.current?.pointer?.cancel?.("scene");
+    },
+    [scene.id],
+  );
+  useEffect(() => {
+    if (live) return;
+    toolPress.current = false;
+    toolDefRef.current?.pointer?.cancel?.("live");
+  }, [live]);
+
   const onMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const p = mapPoint();
     if (!p) return;
@@ -496,6 +609,18 @@ export function MapCanvas(props: MapCanvasProps) {
       return;
     }
     if (e.evt.button !== 0) return;
+    const def = toolDefRef.current;
+    if (drawingRef.current) {
+      // FR-SCN-06: a drawing tool takes the left press (Space held: the stage pans instead).
+      if (!pressGoesToTool(def, { button: 0, space: spaceRef.current, live: liveRef.current })) {
+        return;
+      }
+      toolPress.current = true;
+      const tp = toolPointerRef.current(e.evt);
+      if (tp) def?.pointer?.down?.(tp);
+      return;
+    }
+    if (spaceRef.current && tool !== "select") return;
     if (tool === "ruler") {
       const cell = pxToCell(gridRef.current, p.x, p.y);
       ruling.current = true;
@@ -517,7 +642,11 @@ export function MapCanvas(props: MapCanvasProps) {
     }
   };
 
-  const onMouseMove = () => {
+  const onMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (drawingRef.current && liveRef.current && !spaceRef.current) {
+      const tp = toolPointerRef.current(e.evt);
+      if (tp) toolDefRef.current?.pointer?.move?.(tp);
+    }
     if (!ruling.current && !laser.current) return;
     const p = mapPoint();
     if (!p) return;
@@ -559,6 +688,8 @@ export function MapCanvas(props: MapCanvasProps) {
     pointers,
     previews,
     tool,
+    activeTool: toolDef,
+    drawing,
     live,
     myPlayerId,
     selected,
@@ -567,6 +698,10 @@ export function MapCanvas(props: MapCanvasProps) {
     canMove,
     token: tokenHandlers,
   };
+
+  // FR-SCN-02/03/05: this client's layers; DM toggles that are off drop theirs.
+  const layersOff = useLayerToggles((s) => s.off);
+  const slots = useMemo(() => layerSlots(canvasLayers, client, layersOff), [client, layersOff]);
 
   const acceptsDrop = (e: React.DragEvent) =>
     props.onDropDefinition !== undefined &&
@@ -581,13 +716,23 @@ export function MapCanvas(props: MapCanvasProps) {
       aria-label="Map canvas"
       data-scene-id={scene.id}
       data-tool={tool}
+      data-drawing={drawing}
+      data-space-pan={space}
       data-targeting={targeting}
       data-camera={cameraMode}
       data-cell-px={Math.round(cam.scale * grid.gridCellSize)}
       data-fit-floor={fitFloor}
       data-loading={loading}
       className="absolute inset-0"
-      style={{ cursor: tool === "select" && !targeting ? undefined : "crosshair" }}
+      style={{
+        cursor: space
+          ? "grab"
+          : toolDef
+            ? (toolDef.cursor ?? "crosshair")
+            : tool === "select" && !targeting
+              ? undefined
+              : "crosshair",
+      }}
       onContextMenu={(e) => e.preventDefault()}
       onDragOver={(e) => {
         if (!acceptsDrop(e)) return;
@@ -623,7 +768,7 @@ export function MapCanvas(props: MapCanvasProps) {
           y={cam.y}
           scaleX={cam.scale}
           scaleY={cam.scale}
-          draggable={tool === "select"}
+          draggable={stagePans(tool, space)}
           onDragEnd={(e) => {
             const stage = stageRef.current;
             if (!stage || e.target !== stage) return;
@@ -637,9 +782,19 @@ export function MapCanvas(props: MapCanvasProps) {
         >
           <SyncContext.Provider value={syncStore}>
             <CanvasContext.Provider value={ctx}>
-              {canvasLayers.map((l) => {
-                const Layer = l.component as React.ComponentType;
-                return <Layer key={l.id} />;
+              {slots.map((slot) => {
+                const entries = slot.layers.map((l) => {
+                  const C = l.component as React.ComponentType;
+                  return <C key={l.id} />;
+                });
+                // FR-SCN-03: same-group neighbours render as Groups inside one Konva layer.
+                return slot.group === null ? (
+                  entries
+                ) : (
+                  <Layer key={slot.key} name={slot.group}>
+                    {entries}
+                  </Layer>
+                );
               })}
             </CanvasContext.Provider>
           </SyncContext.Provider>

@@ -12,6 +12,7 @@ Consolidated domain model. Entities and relationships, **not SQL**. **Living doc
 | Sprint 1 | [combat-extras](../specs/combat-extras.md) (CBTX, #178) | core built (fix/cbtx-core): [§21](#21-sprint-1-effect-and-combat-play-state), play-state columns in [§11](#11-scenes-entity) and [§17](#17-combat-encounter-combatant-combat-log-entry); commands, rules, record-type registration, fixtures built (build/combat-extras) |
 | Sprint 2 | [effect-modifiers](../specs/effect-modifiers.md) (MOD tier 1, #190) | core built (fix/mod-core): [§23](#23-sprint-2-effect-modifiers-tier-1), `effect` columns in [§21](#21-sprint-1-effect-and-combat-play-state); commands, hook, record-type registration, fixtures: build/effect-modifiers |
 | Sprint 2 phase 2 | [fog-of-war](../specs/fog-of-war.md) (FOG, #196) | core built (fix/fog-core): [§24](#24-sprint-2-fog-of-war), `token.fogged` in [§12](#12-scenes-scene-scene-folder-token); commands, undo, fixtures: build/fog-server |
+| Sprint 2 phase 2 | [scene-tools](../specs/scene-tools.md) (SCN, #196) | core built (fix/scn-core): [§25](#25-sprint-2-scene-tools), record types + visibility, scene hooks; commands, guard, fixtures: build/scene-tools-structure / -props / -templates / -settings |
 
 Every fact links its source. Protocol side (record types, intents, events): [protocol](../protocol/README.md).
 
@@ -1021,7 +1022,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG, `complete`; DM gate
 | `token` | + `fogged` (bool): server copy, [§12](#12-scenes-scene-scene-folder-token) | false | wire only when true; DM + players who see the token | [FR-FOG-10](../specs/fog-of-war.md#6-functional-requirements) |
 | `scene_fog` (new, record type `fog`) | see below | no row = every cell clear (scenes before this build stay clear) | DM full; players redacted, active scene only | [FR-FOG-01](../specs/fog-of-war.md#6-functional-requirements) |
 | `scene_fog_edit` (new, server table, **not** a record type) | see below | — | DM sees depth + latest entry on the `fog` record | [FR-FOG-07](../specs/fog-of-war.md#6-functional-requirements) |
-| prop, AoE template (SCN) | + `fogged` | created with their tables by `fix/scn-core` | — | ADR-0039 |
+| prop, AoE template (SCN) | + `fogged` | created with their tables by `fix/scn-core` ([§25](#25-sprint-2-scene-tools)) | — | ADR-0039 |
 
 ### Fog (`scene_fog`, record type `fog`) — owner [fog-of-war](../specs/fog-of-war.md#8-data-model)
 
@@ -1046,3 +1047,59 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG, `complete`; DM gate
 - **Derived** (never stored): box (`fogBox(scene)`), mask ↔ runs (`maskOf`, `rowOf`), re-base (`rebase`), `footprintFogged` (every cell fogged; off-box cells take `fill`), fog-hidden (`fogHidden(type, record)`: `fogged` and not exempt: owned token, player-placed template), undo depth and latest edit (DM wire).
 - **Persisted runtime state:** fog rows, undo stacks and `fogged` copies, committed together (survive reload and a hard kill).
 - **Duplicate / delete** *(build/fog-server)*: `map.duplicateScene` copies the `scene_fog` row (not `scene_fog_edit`) before the copy's tokens, which derive `fogged` against it; `map.deleteScene` lists the `fog` delete, then the FK cascade removes row and stack.
+
+## 25. Sprint 2: scene tools
+
+From [scene-tools](../specs/scene-tools.md#8-data-model) (SCN, `complete`; DM gate 2, #196; [ADR-0039](../architecture/adr/0039-fog-visibility.md), [ADR-0040](../architecture/adr/0040-token-move-guards.md), [ADR-0041](../architecture/adr/0041-active-scene-window.md)). **Built by `fix/scn-core`**: the tables below (drizzle push), the zod shapes and pure geometry (`@shared/scene-tools`: `schemas`, `geometry`), the four record types and their visibility, the scene-hook rows. Commands that write them: build/scene-tools-structure, -props, -templates, -settings. Protocol side: [protocol §36](../protocol/README.md#36-sprint-2-phase-2-scene-tools).
+
+| Table | Record type | Default (push-safe) | Visibility | Source |
+|---|---|---|---|---|
+| `scene_structure` (new) | `scene-structure` | no row = no walls, no doors | DM full; players redacted (doors only) | [FR-SCN-07](../specs/scene-tools.md#6-functional-requirements) |
+| `prop` (new) | `scene-prop` | — | `hidden` / fog-hidden → hidden; else redacted | [FR-SCN-16](../specs/scene-tools.md#6-functional-requirements) |
+| `aoe_template` (new) | `aoe-template` | — (ephemeral templates are signals, never rows) | `hidden` / fog-hidden (DM-placed) → hidden; else full | [FR-SCN-25](../specs/scene-tools.md#6-functional-requirements) |
+| `map_settings` (new) | `map-settings` | no row = `5-10-5` | everyone | [FR-SCN-29](../specs/scene-tools.md#6-functional-requirements) |
+
+### Structure (`scene_structure`) — owner [scene-tools](../specs/scene-tools.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| sceneId (PK), campaignId | ID → Scene (`ON DELETE CASCADE`), ID → Campaign | One row per scene, created on the first edit; wire `id` = `sceneId` | SCN §8 |
+| rev, nextN | int, int | `rev` +1 per edit; `n` taken from `nextN`, unique per scene | FR-SCN-07 |
+| walls | **JSON** `[n, x1, y1, x2, y2][]` | Vertex to vertex, length > 0, endpoints in the vertex range ± 1, deduped (either direction) | FR-SCN-07 |
+| doors | **JSON** `[n, x1, y1, x2, y2, state, f][]` | `state` 0 open / 1 closed / 2 locked; `f` server-written fog flag | FR-SCN-07, [FR-SCN-36](../specs/scene-tools.md#6-functional-requirements) |
+| updatedAt | timestamp | `ctx.clock` | SCN §8 |
+
+### Prop (`prop`) — owner scene-tools
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, sceneId, seq | ID, ID → Campaign, ID → Scene (`ON DELETE CASCADE`), int | `seq` DB-assigned (`propSeqNext`, CON-20), unique | SCN §8 |
+| assetId | ID → Asset | **Asset reference** (`assets.require`) | FR-SCN-16 |
+| col, row, w, h, rotation, z | int ×4 (w, h 1–20), 0 / 90 / 180 / 270, int | Footprint = `w × h` cells (`propCells`); rotation swaps only the drawn sides | FR-SCN-17, -18 |
+| hidden, locked, fogged | bool ×3 | `fogged` = server copy via `deriveSceneObject`, never in an intent; wire only when true | FR-SCN-19, -35 |
+| createdAt, updatedAt | timestamp | | SCN §8 |
+
+### AoE template (`aoe_template`) — owner scene-tools
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, sceneId, seq | ID, ID → Campaign, ID → Scene (`ON DELETE CASCADE`), int | `seq` DB-assigned (`aoeTemplateSeqNext`), unique; kept templates only | SCN §8 |
+| shape, x, y, size, width, angle | cone \| sphere \| cylinder \| cube \| line; int ×2 (origin vertex); int ×3 | `width` null unless line; ranges FR-SCN-20; cells = `templateCells` (uncut for `fogged`) | FR-SCN-20, -21 |
+| label | text 0–40 | default "" | FR-SCN-22 |
+| placedByPlayerId | ID → Player \| null | null = DM-placed (fog subject) | FR-SCN-25, -27 |
+| hidden, fogged | bool ×2 | as on Prop | FR-SCN-27, -35 |
+| createdAt, updatedAt | timestamp | | SCN §8 |
+
+### Map settings (`map_settings`) — owner scene-tools
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| campaignId (PK) | ID → Campaign | Wire `id` = `campaignId`; row created on the first set | FR-SCN-29 |
+| diagonalRule | `5-10-5` \| `5` | No row = `5-10-5` | FR-SCN-29, -30 |
+| updatedAt | timestamp | | SCN §8 |
+
+- **Constraints the DB enforces:** one structure row per scene, one settings row per campaign (PKs); scene tables cascade with their scene; FKs to campaign, asset (prop), player (template); `prop.seq`, `aoe_template.seq` unique; indexes `scene_structure_campaign`, `prop_scene`, `prop_campaign`, `aoe_template_scene`, `aoe_template_campaign`. Segment, prop and template caps are command checks.
+- **Wire** (compact): no `seq` (except on props: draw order, FR-SCN-18), no timestamps; `campaignId` on the DM wire only (the registry's scope gate reads it from the record).
+- **Derived** (never stored): `propCells`, `templateCells(t, scene, {cut})`, `doorCells`, blocking segments (`blockingSegments`, FR-SCN-10), `distanceFt(a, b, rule)`.
+- **Persisted runtime state:** walls, door states and `f`, props, kept templates, `fogged` copies, the diagonal rule; each command commits rows + one event-log entry together.
+- **Snapshot size** (CON-44, heavy scenario after fix/scn-core): one typical prepped active scene (150 walls, 10 doors, 15 props, 3 kept templates with 40-char labels, `map-settings`) = 7,592 B DM, 3,418 B per player; heavy DM 671,291 B (115,141 B left of 786,432 B); players 277,041–280,101 B.
