@@ -112,13 +112,26 @@ export function clearToasts(s: ToastState, now: number): ToastState {
 }
 
 /**
+ * FR-NOTE-15 (P3 glitch 8: one toast per pending action): the pending-for-me rows without their
+ * own toast on the stack; the summary counts only these (0 → no summary).
+ */
+export function untoastedPending(s: ToastState, store: RecordStore): number {
+  const toasted = new Set(s.toasts.flatMap((t) => (t.kind === "note" ? [t.notificationId] : [])));
+  return pendingForMe(store).filter((n) => !toasted.has(n.id)).length;
+}
+
+/**
  * Keeps toasts in line with the store: a pending toast whose notification left `pending` (or
- * is gone) disappears; the summary follows the current pending-for-me count.
+ * is gone) disappears; the summary follows the current count of pending-for-me rows without a
+ * toast of their own.
  */
 export function pruneToasts(s: ToastState, store: RecordStore, now: number): ToastState {
   const ran = advance(s, now);
   const rows = (store.records[NOTIFICATION_TYPE] ?? {}) as Record<string, NotificationRecord>;
-  const mine = pendingForMe(store).length;
+  const kept = ran.toasts.filter(
+    (t) => !(t.kind === "note" && t.sticky && rows[t.notificationId]?.state !== "pending"),
+  );
+  const mine = untoastedPending({ ...ran, toasts: kept }, store);
   let changed = false;
   const toasts: Toast[] = [];
   for (const t of ran.toasts) {
@@ -157,8 +170,8 @@ export function createToastMemory(now: number, hidden = false): ToastMemoryStore
 
 /**
  * One classified sync change applied to the stack (FR-NOTE-13/14/15): a `connect` to another
- * campaign clears it, every `connect` sets the summary; created rows toast; then the stack
- * follows the store.
+ * campaign clears it, every `connect` sets the summary (rows already toasted don't count, P3
+ * glitch 8); created rows toast; then the stack follows the store.
  */
 export function syncToasts(
   m: ToastMemory,
@@ -175,7 +188,8 @@ export function syncToasts(
     const cid = store.you?.campaignId ?? null;
     if (cid !== campaignId) s = clearToasts(s, now);
     campaignId = cid;
-    s = setSummary(s, summaryCount(t, store), now);
+    // Only pending rows without a toast of their own (a sticky card kept over a reconnect).
+    s = setSummary(s, Math.min(summaryCount(t, store), untoastedPending(s, store)), now);
   }
   for (const n of toastTriggers(prev, next, t)) s = addNote(s, n, now);
   s = pruneToasts(s, store, now);

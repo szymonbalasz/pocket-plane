@@ -119,6 +119,8 @@ test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-45 FR-CHARX-46 FR-CHARX-10 FR-CHARX-32 FR
   await card.getByTestId("note-toast-action").click();
   const dmSheet = shellWindow(dm, "char.sheet");
   await expect(dmSheet.getByTestId("char-sheet")).toHaveAttribute("data-record-id", brinId);
+  // P3 glitch 8: the sheet shows the draft → its toast closes; the row stays pending (bell).
+  await expect(card).toHaveCount(0);
   await dmSheet.getByTestId("charx-approve").click();
   await expect(dmSheet.getByTestId("charx-draft")).toHaveCount(0);
   await expect(sheet1.getByTestId("charx-draft")).toHaveCount(0);
