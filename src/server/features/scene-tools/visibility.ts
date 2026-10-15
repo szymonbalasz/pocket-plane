@@ -44,14 +44,15 @@ export function redactProp(r: ScenePropRecord): PlayerScenePropRecord {
 /**
  * FR-SCN-27: `hidden` or fog-hidden → hidden; else every field (incl. `placedByPlayerId`) but
  * `campaignId`, which only the DM wire keeps (SCN §8 compact wire). Fog's `hides` exempts
- * player-placed templates (FR-FOG-11).
+ * player-placed templates (FR-FOG-11); their `fogged` copy stays DM-only too (FOG §13: no player
+ * record carries `fogged: true` but the viewer's own tokens).
  */
 export function templateVisibility(r: AoeTemplateRecord): Visibility {
   return r.hidden || hiddenByHooks(AOE_TEMPLATE_TYPE, r) ? "hidden" : "redacted";
 }
 
 export function redactTemplate(r: AoeTemplateRecord): PlayerAoeTemplateRecord {
-  const { campaignId: _campaignId, ...rest } = r;
+  const { campaignId: _campaignId, fogged: _fogged, ...rest } = r;
   return rest;
 }
 

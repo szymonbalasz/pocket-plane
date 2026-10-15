@@ -214,6 +214,13 @@ describe("FOG §13 fog-scn: SCN subjects under fog (player-1, player-2)", () => 
         .all()
         .find((r) => r.id === kept)?.fogged,
     ).toBe(true);
+    // The DM wire keeps the copy; neither player (placer or other) gets it.
+    await until(() => ids(dm2, AOE_TEMPLATE_TYPE).includes(kept));
+    expect(dm2.store.records[AOE_TEMPLATE_TYPE]?.[kept]).toMatchObject({ fogged: true });
+    for (const c of [p1, p2]) {
+      expect(c.store.records[AOE_TEMPLATE_TYPE]?.[kept]).toMatchObject({ label: "Mira's fog" });
+      expect(c.store.records[AOE_TEMPLATE_TYPE]?.[kept]).not.toHaveProperty("fogged");
+    }
     dm2.close();
   });
 
@@ -254,7 +261,7 @@ describe("FOG §13 fog-scn: SCN subjects under fog (player-1, player-2)", () => 
     await expectHidden(true);
   });
 
-  test("FOG §13 property: a player prop / template row is fogged only if a player placed it (exempt); never a prop", () => {
+  test("FOG §13 property: no player prop / template row carries `fogged`, not even a player-placed template in fog", () => {
     for (const c of [p1, p2]) {
       for (const f of c.frames) {
         const rows: Record<string, unknown>[] = [];
@@ -271,11 +278,9 @@ describe("FOG §13 fog-scn: SCN subjects under fog (player-1, player-2)", () => 
             }
           }
         }
-        // SCN's redaction keeps `fogged` on player-placed templates (FR-SCN-27); fog-hidden
-        // (DM-placed) rows never arrive.
-        for (const r of rows) {
-          if (r.fogged === true) expect(r.placedByPlayerId).toEqual(expect.any(String));
-        }
+        // Fog-hidden (DM-placed) rows never arrive; exempt player-placed ones arrive without
+        // their `fogged` copy (scene-tools' redactTemplate).
+        for (const r of rows) expect(r).not.toHaveProperty("fogged");
       }
     }
   });
