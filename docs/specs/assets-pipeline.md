@@ -26,7 +26,7 @@ wave: 1
 
 ## 4. Non-goals
 
-- Preload, load progress, player-ready (ADR-0003's "preloaded" is deferred by [ADR-0014](../architecture/adr/0014-mvp-scope.md): assume immediate load). Preloading an inactive scene would reveal its IDs early; it needs a player-visible preload grant (post-MVP, [scene-tools](post-mvp/scene-tools.md)).
+- Preload, load progress, player-ready (ADR-0003's "preloaded" is deferred by [ADR-0014](../architecture/adr/0014-mvp-scope.md): assume immediate load). Preloading an inactive scene would reveal its IDs early; it needs a player-visible preload grant (post-MVP, [scene-tools](scene-tools.md)).
 - Token art library / standalone image browser (tier A). Player uploads (OQ-ASSET-02). Rename, delete, replace, revoke an asset (OQ-ASSET-05). Image editing. Audio/video ([ADR-0007](../architecture/adr/0007-product-scope.md)). Cloud storage, CDN.
 
 ## 5. User stories

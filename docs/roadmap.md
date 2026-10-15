@@ -53,7 +53,7 @@ graph LR
 |---|---|
 | [compendium](specs/post-mvp/compendium.md) | SRD import, browse, clone, homebrew |
 | [world-builder](specs/post-mvp/world-builder.md) | NPCs, locations, factions, quests, search, cross-refs, location ↔ scenes |
-| [scene-tools](specs/post-mvp/scene-tools.md) | **Fog first (right after MVP)**, then AoE props, layers, walls |
+| [scene-tools](specs/scene-tools.md) | **Fog first (right after MVP)**, then AoE props, layers, walls |
 | [character-sheet-full](specs/character-sheet-full.md) | Full 5e sheet |
 | [combat-extras](specs/combat-extras.md) | Conditions, concentration, durations, temp HP, custom actions, multi-target |
 | [party-board](specs/post-mvp/party-board.md) | Handouts, party inventory |

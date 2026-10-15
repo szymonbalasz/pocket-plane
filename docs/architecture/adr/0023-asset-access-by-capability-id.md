@@ -2,7 +2,7 @@
 
 - Status: accepted (2026-10-12; decisions-log #123)
 - Date: 2026-10-12
-- Affects: [assets-pipeline](../../specs/assets-pipeline.md), [live-sync](../../specs/live-sync.md), [campaign-management](../../specs/campaign-management.md), [scenes-map](../../specs/scenes-map.md), [entities](../../specs/entities.md); later handouts ([party-board](../../specs/post-mvp/party-board.md)), preload ([scene-tools](../../specs/post-mvp/scene-tools.md))
+- Affects: [assets-pipeline](../../specs/assets-pipeline.md), [live-sync](../../specs/live-sync.md), [campaign-management](../../specs/campaign-management.md), [scenes-map](../../specs/scenes-map.md), [entities](../../specs/entities.md); later handouts ([party-board](../../specs/post-mvp/party-board.md)), preload ([scene-tools](../../specs/scene-tools.md))
 - Extends: [ADR-0005](0005-server-authoritative-sync.md), [ADR-0019](0019-auth-credentials.md), [ADR-0021](0021-sync-protocol-conventions.md), [ADR-0022](0022-deterministic-seams.md). Raised by OQ-ASSET-01.
 
 ## Context

@@ -16,7 +16,7 @@
 
 | In MVP | Deferred |
 |---|---|
-| Town scene with map + tokens; switch to a battlemap scene | Fog (shape + polygon tools), AoE props → [scene-tools](../../specs/post-mvp/scene-tools.md) |
+| Town scene with map + tokens; switch to a battlemap scene | Fog (shape + polygon tools), AoE props → [scene-tools](../../specs/scene-tools.md) |
 | **Scene prep in the UI**: upload map, grid calibration (size, offset, settings), drag tokens on, rename, pick token art, **hide/reveal button** (Owlbear-style). Pan/zoom, ruler (5e diagonals) | Location ↔ scenes, world builder → [world-builder](../../specs/post-mvp/world-builder.md) |
 | Tokens; free Owlbear-style movement; DM moves any, player moves own tokens anytime, in or out of combat. Plus tier-S map features in [feature tiers](../../feature-tiers.md) (snap, sizes, labels, ping, laser, lock map, ownership) | Compendium + import → [compendium](../../specs/post-mvp/compendium.md) |
 | Character sheet **basics**: AC, HP, initiative, one weapon attack (e.g. shortsword 1d6, may be hardcoded). **Characters come from fixtures** | Character builder → [levelling](../../specs/post-mvp/levelling.md); character import → once-off scripts | Spells, saves, skills, features, inventory… → [character-sheet-full](../../specs/character-sheet-full.md) |
@@ -26,8 +26,8 @@
 | One-click monster initiative; monster HP as health band to players; **start / end encounter**; combatants bind to pre-placed (possibly hidden) tokens | Conditions, concentration, durations, temp HP, death saves; custom NPC actions, multi-target (tier A) |
 | **Stats data capture**: all rolls, damage dealt/taken/healed, weapon, overkill | Stats UI, summaries → [stats](../../specs/post-mvp/stats.md) |
 | **Every roll: automated or manual entry** (physical dice), for DM and players | |
-| **One play page** ([play-shell](../../specs/play-shell.md)): canvas as base, floating windows over it. Player lands on the active scene; window layout persisted per player | Props (status rings, AoE markers) → [scene-tools](../../specs/post-mvp/scene-tools.md); notes from tokens, player notes → [world-builder](../../specs/post-mvp/world-builder.md) |
-| Assume immediate asset load | Player-ready indicator / load handling → [scene-tools](../../specs/post-mvp/scene-tools.md) |
+| **One play page** ([play-shell](../../specs/play-shell.md)): canvas as base, floating windows over it. Player lands on the active scene; window layout persisted per player | Props (status rings, AoE markers) → [scene-tools](../../specs/scene-tools.md); notes from tokens, player notes → [world-builder](../../specs/post-mvp/world-builder.md) |
+| Assume immediate asset load | Player-ready indicator / load handling → [scene-tools](../../specs/scene-tools.md) |
 | Party loot log: rewards given to the party are visible to all | Full party board → [party-board](../../specs/post-mvp/party-board.md) |
 | Fixtures: one player, enemies, an encounter, two scenes; teardown/rebuild. **Minimal import pipeline core** (SRD fixture creatures load as read-only imports) | Real source adapters (Open5e first) → [compendium](../../specs/post-mvp/compendium.md) |
 | **DM undo of combat log entries** (damage/healing applied, LIFO) via the event log ([ADR-0016](0016-domain-events-pending-actions.md)) | |

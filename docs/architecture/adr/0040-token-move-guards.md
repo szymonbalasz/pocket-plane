@@ -1,4 +1,4 @@
-# NNNN — Token move guards (a move may be refused)
+# 0040 — Token move guards (a move may be refused)
 
 - Status: accepted (2026-10-15; decisions-log #196)
 - Date: 2026-10-15

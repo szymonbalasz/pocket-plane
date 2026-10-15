@@ -29,7 +29,7 @@ flowchart LR
 4. Builds per the hotspot table; walkthroughs per feature; `check` + full `e2e` in the branch and on `main` after every merge. Then a session-sim run on `main` and a **"Playtest: phase 1 fixes"** section appended here (setup commands + steps, like [sprint-1](sprint-1.md#playtest-sprint-1-features)); tell the DM it's ready. Continue to phase 2 without waiting; DM feedback joins at gate 2.
 
 **Phase 2**
-5. Spec agents `spec/fog-of-war` (F, new spec FOG, `docs/specs/fog-of-war.md` from `_template.md`, `phase: post-mvp-2`) and `spec/scene-tools` (B, expand the stub [post-mvp/scene-tools](../specs/post-mvp/scene-tools.md) into `docs/specs/scene-tools.md` without fog, prefix SCN). Settle the F ↔ B seam (layer stack, what fog hides) before one review agent.
+5. Spec agents `spec/fog-of-war` (F, new spec FOG, `docs/specs/fog-of-war.md` from `_template.md`, `phase: post-mvp-2`) and `spec/scene-tools` (B, expand the stub [post-mvp/scene-tools](../specs/scene-tools.md) into `docs/specs/scene-tools.md` without fog, prefix SCN). Settle the F ↔ B seam (layer stack, what fog hides) before one review agent.
 6. **DM gate 2**: F and B scope, every pick, any phase-1 playtest feedback. Integrate and merge.
 7. Builds, walkthroughs, `check` + full `e2e` on `main` after each merge, session-sim regression on final `main` (incl. fog, a wall, an AoE template), a "Playtest: sprint 2 features" section here, then **pause and recap with the DM** before sprint 3.
 

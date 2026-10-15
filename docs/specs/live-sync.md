@@ -214,4 +214,4 @@ The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map 
 
 ## 16. Out of scope
 
-- Multi-DM; player-ready indicator ([scene-tools](post-mvp/scene-tools.md)); DM "view as player" (tier C, [play-shell](play-shell.md)). Fixture load into a running server: CLI refuses ([fixtures-adapters](fixtures-adapters.md) OQ-FIX-10).
+- Multi-DM; player-ready indicator ([scene-tools](scene-tools.md)); DM "view as player" (tier C, [play-shell](play-shell.md)). Fixture load into a running server: CLI refuses ([fixtures-adapters](fixtures-adapters.md) OQ-FIX-10).

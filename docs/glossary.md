@@ -52,7 +52,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 
 | Term | Meaning | Not to be confused with |
 |---|---|---|
-| **Scene** | A map plus its grid and tokens (fog and props post-MVP). Players view the active scene. | Session |
+| **Scene** | A map plus its grid, tokens, fog and scene-tool records (structure, props, templates). Players view the active scene. | Session |
 | **Active scene** | The scene currently shown to players. | — |
 | **Viewed scene** | The scene the DM's canvas shows: any scene, client-only; defaults to the active scene (decisions #122). | Active scene |
 | **Scene folder** | DM-only, one-level grouping of scenes in the scene list. Never sent to players. | — |
@@ -65,14 +65,26 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Selection** | The DM's client-only set of selected tokens on the viewed scene (click, Ctrl/Shift-click, box select); never sent. Features read it, e.g. to preselect attack targets (#148). | Target |
 | **Box select** | DM Ctrl/Shift + drag on empty canvas: tokens whose footprint centre lies inside the box join the selection. | — |
 | **Movement indicator** | Local drag label showing a move's distance against the token's speed (in combat: plus movement used); amber past speed, red past twice speed. Never blocks. | Ruler |
-| **Fog** | Polygon regions hiding parts of a scene from players. | Lighting (out of scope) |
-| **AoE prop** | A shape (cone, sphere, line, cube…) placed on a scene to show an area of effect. | Freehand drawing (out of scope) |
+| **Fog** | Cells of a scene hidden from players, drawn by the DM with rectangle and polygon tools; tokens, props and DM templates wholly under it are filtered server-side ([fog-of-war](specs/fog-of-war.md), [ADR-0039](architecture/adr/0039-fog-visibility.md)). | Lighting (out of scope) |
+| **Fog-hidden** | A record wholly under fog: its server-written `fogged` copy is true and players don't receive it (owned tokens excepted). | Hidden token |
+| **Reveal all / Fog all** | DM fog actions that clear or cover a whole scene. | — |
+| **AoE template** | A shape (cone, sphere, cylinder, cube, line) placed on a scene to show an area of effect; ephemeral unless kept ([scene-tools](specs/scene-tools.md)). | Freehand drawing (out of scope) |
+| **Ephemeral template** | An AoE template sent as a live signal, gone when cleared or its placer leaves; **Keep** saves it as a record. | AoE template |
+| **Prop** | A DM-placed image object on a scene's objects layer (barrel, table). | Token |
+| **Wall** | A segment between grid vertices that blocks player token moves (no vision). | Door |
+| **Door** | A wall segment the DM sets open, closed or locked; hidden from players while fully fogged. | Wall |
+| **Structure** | A scene's walls and doors, stored as one record per scene. | — |
+| **DM-only layer** | Records with the `hidden` flag (tokens, props, templates): drawn for the DM only. | Canvas layer |
+| **Canvas layer** | A render slot in the canvas-layer registry (map, grid, props, structure, fog, templates, tokens, labels…), ordered by number. | DM-only layer |
+| **Diagonal rule** | Campaign setting for distance on diagonals: 5/10/5 (default) or 5 ft. | — |
+| **Move guard** | An append-only server check that may refuse a token move before it is written (walls, doors; [ADR-0040](architecture/adr/0040-token-move-guards.md)). | Token-changed hook |
+| **Active-scene window** | The DM snapshot carries only the active scene's tokens and scene-tool records; other scenes load on view ([ADR-0041](architecture/adr/0041-active-scene-window.md)). | Windowed record type |
 | **Ruler** | Measuring tool using 5/10/5 diagonals (every second diagonal costs 10 ft, decisions #145). | Movement indicator |
 | **Ping** | Signal: a click shows a short pulse at a point to every other client showing that scene. | Pull |
 | **Pull** | DM-only ping that also centres every player's camera on the point; players may pan away. | Ping |
 | **Laser pointer** | Signal: a right-drag draws a trail that others see fade shortly after the last point. | Ping |
 | **Drag preview** | Signal: others see a token move while it is dragged, without the movement label; never logged or persisted; a hidden token's drag reaches the DM only (decisions #171, #172). | Move (committed on drop) |
-| **Player-ready indicator** | Shows the DM which players have fully loaded a scene. Post-MVP ([scene-tools](specs/post-mvp/scene-tools.md)); MVP assumes immediate load. | — |
+| **Player-ready indicator** | Shows the DM which players have fully loaded a scene. Post-MVP ([scene-tools](specs/scene-tools.md)); MVP assumes immediate load. | — |
 | **Encounter** | A planned set of monsters with CR/difficulty math. Lifecycle: planned → started → ended. The unit of combat history. | Combat; session |
 | **Combat** | The running state of a started encounter: initiative order, rounds, turns. | Encounter |
 | **Combatant** | A participant in a combat, linked to an entity (and a token if on a scene). Holds HP and temp HP (for PCs, both live on the character); effects target the combatant (monsters) or the character (PCs). | Token; Entity |
@@ -97,7 +109,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Domain event** | Typed record of a committed change, dispatched in-process to listeners (broadcaster, rules…) ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | WS event (the filtered message sent to a client) |
 | **Notification** | Persisted, toast-like message with a history feed; has a kind, an audience and optionally an action ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | WS event |
 | **Event log** | Persisted, append-only log of every domain event; source for undo and stats ([ADR-0016](architecture/adr/0016-domain-events-pending-actions.md)). | Game log (player-facing) |
-| **Undo** | DM-only, strict LIFO, combat log entries only (damage/healing applied): appends a compensating event that reverses the latest apply (all its combat log entries: one card apply, or one direct HP change) and marks them undone. | — |
+| **Undo** | Three kinds: **combat** (DM-only, strict LIFO over combat log entries: a compensating event reverses the latest apply and marks its entries undone); **fog** (DM, server-side per-scene stack, 20 steps, survives reload); **scene drawing** (DM, walls / props, client inverse intents, 50 per scene, lost on reload). | — |
 | **Pending action** | A notification whose action (button) is not yet resolved or dismissed (e.g. apply damage, roll a save). | — |
 | **Damage card** | A notification kind (`damage-card`) with an "apply" action, holding an attack's to-hit and damage rolls (from a player or DM roll) that the DM applies to one or more targets picked in the attack popup, each with its own hit / miss and multiplier: normal, half, none, double (#53, #134, #148). | Roll |
 | **Attack + damage** | The sheet button that rolls to-hit and damage as one action; **Attack** rolls to-hit only and **Damage** damage only. In combat, Attack makes a to-hit-only damage card that Damage completes ([ADR-0037](architecture/adr/0037-split-attack-damage.md)). | Damage card |

@@ -1,4 +1,4 @@
-# NNNN — Active-scene window for tokens and scene-tool records in the DM snapshot
+# 0041 — Active-scene window for tokens and scene-tool records in the DM snapshot
 
 - Status: accepted (2026-10-15; decisions-log #196)
 - Date: 2026-10-15

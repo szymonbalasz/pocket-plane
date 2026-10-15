@@ -35,6 +35,8 @@ Sprint 1 also revised scenes-map, play-shell, combat-tracker, dice-roll-log and 
 | Spec | Prefix | Status | Owner |
 |---|---|---|---|
 | [Effect modifiers](effect-modifiers.md) | MOD | complete | spec-effect-modifiers |
+| [Fog of war](fog-of-war.md) | FOG | complete | spec-fog-of-war |
+| [Scene tools](scene-tools.md) | SCN | complete | spec-scene-tools |
 
 Sprint 2 phase 1 also revised combat-tracker, combat-extras, entities, notifications (P2a) and play-shell, scenes-map, character-sheet, character-sheet-full, campaign-management, dice-roll-log (P2b) for the DM's playtest notes N1–N11 and glitches G1–G10 (#190).
 
@@ -46,7 +48,6 @@ Stubs only. Not to be claimed during MVP spec phase.
 |---|---|---|
 | [Compendium](post-mvp/compendium.md) | CMP | First candidate after MVP |
 | [World builder](post-mvp/world-builder.md) | WORLD | Incl. location ↔ scenes |
-| [Scene tools](post-mvp/scene-tools.md) | SCN | Fog, hidden tokens, AoE props |
 | [Stats and summaries](post-mvp/stats.md) | STATS | Data capture starts in MVP |
 | [Dice extras](post-mvp/dice-extras.md) | DICEX | Inline rolls, macros, 3D dice, hidden rolls |
 | [Gems (homebrew)](post-mvp/gems.md) | GEM | DM-awarded gems; reroll, max damage dice; tier A |

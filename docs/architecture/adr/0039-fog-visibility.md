@@ -1,6 +1,6 @@
-# Fog visibility: server-written `fogged` copies, scene visibility and lifecycle hook registries
+# 0039 — Fog visibility: server-written `fogged` copies, scene visibility and lifecycle hook registries
 
-- Status: accepted (DM gate 2, decisions-log #196); integrator numbers it
+- Status: accepted (DM gate 2, decisions-log #196)
 - Date: 2026-10-15
 - Affects: [fog-of-war](../../specs/fog-of-war.md), [scenes-map](../../specs/scenes-map.md) (token fn, `map.drag` audience, scene create / duplicate / delete, size refresh), [scene-tools](../../specs/scene-tools.md) (props, AoE templates, doors, `sceneHooks`), [combat-tracker](../../specs/combat-tracker.md) / [combat-extras](../../specs/combat-extras.md) (hidden copies), [protocol](../../protocol/README.md), [AGENTS §9.9](../../../AGENTS.md#99-shared-files)
 - Extends: [ADR-0021](0021-sync-protocol-conventions.md) (visibility reads record + context), [ADR-0024](0024-definition-visibility.md) (display copies), [ADR-0028](0028-token-changed-hooks.md) / [ADR-0031](0031-token-move-hooks.md) (token-changed hooks), [ADR-0033](0033-signal-audience.md) (signal audience)

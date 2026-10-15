@@ -34,7 +34,7 @@ wave: 3
 
 ## 4. Non-goals
 
-- Fog, AoE props, layers UI, walls, HP rings, condition icons (→ [scene-tools](post-mvp/scene-tools.md)); current-turn highlight, path measurement, keyboard shortcuts other than Ctrl-D (tier B); token art library (tier A); location ↔ scene ([world-builder](post-mvp/world-builder.md)).
+- Fog, AoE props, layers UI, walls, HP rings, condition icons (→ [scene-tools](scene-tools.md)); current-turn highlight, path measurement, keyboard shortcuts other than Ctrl-D (tier B); token art library (tier A); location ↔ scene ([world-builder](post-mvp/world-builder.md)).
 - Per-token size or stat editing (#120); ~~live drag preview~~ (in scope since #171, FR-MAP-39–41); shared ruler, a movement label for others (#171), rotation, lighting, freehand, touch ([ADR-0007](../architecture/adr/0007-product-scope.md)); undo ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)); server-side signal rate limit (post-MVP).
 - Group move of a selection, dragging images / props onto the map (tier A, #148); movement blocking or server speed checks (indicators only, #145); player selection or targeting (#134).
 

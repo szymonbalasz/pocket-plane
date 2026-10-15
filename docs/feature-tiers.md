@@ -24,10 +24,10 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Lock map/background | S | [scenes-map](specs/scenes-map.md) | |
 | Token labels (name, "Goblin 2") | S | [scenes-map](specs/scenes-map.md) | |
 | DM controls any token; reassigns ownership | S | [scenes-map](specs/scenes-map.md) | |
-| HP bar/ring on token | A | [scene-tools](specs/post-mvp/scene-tools.md) | |
-| Condition icons on token | A | [scene-tools](specs/post-mvp/scene-tools.md) | Needs conditions ([combat-extras](specs/combat-extras.md)) |
-| Layers (map / objects / tokens / DM-only) | A | [scene-tools](specs/post-mvp/scene-tools.md) | DM-only layer ≈ hidden tokens |
-| Doors and walls (block movement) | A | [scene-tools](specs/post-mvp/scene-tools.md) | Movement only; no vision ([ADR-0007](architecture/adr/0007-product-scope.md)) |
+| HP bar/ring on token | A | [combat-extras](specs/combat-extras.md) | |
+| Condition icons on token | A | [combat-extras](specs/combat-extras.md) | Needs conditions ([combat-extras](specs/combat-extras.md)) |
+| Layers (map / objects / tokens / DM-only) | A | [scene-tools](specs/scene-tools.md) | DM-only layer ≈ hidden tokens |
+| Doors and walls (block movement) | A | [scene-tools](specs/scene-tools.md) | Movement only; no vision ([ADR-0007](architecture/adr/0007-product-scope.md)) |
 | Highlight current-turn token | B | [combat-tracker](specs/combat-tracker.md) | Initiative strip / portraits show whose turn in MVP; token highlight only if trivial |
 | Movement measured along drag path, waypoints | B (indicator vs speed: S, §8) | [scenes-map](specs/scenes-map.md) | |
 
@@ -86,7 +86,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | NPC directory players build as they meet people | A | [world-builder](specs/post-mvp/world-builder.md) | Player-authored notes on revealed NPCs |
 | Search / command palette (Obsidian / VS Code style) | A–B | [play-shell](specs/play-shell.md) | Search + commands in one palette |
 | Journal entries with DM-only / player-visible sections | B | [world-builder](specs/post-mvp/world-builder.md) | |
-| Map pins linked to notes/locations | B | [scene-tools](specs/post-mvp/scene-tools.md) | |
+| Map pins linked to notes/locations | B | [scene-tools](specs/scene-tools.md) | |
 | Shared party notes | B | [party-board](specs/post-mvp/party-board.md) | |
 | Session recap / journal | B | [campaign-manager](specs/post-mvp/campaign-manager.md) | See [ADR-0013](architecture/adr/0013-session-journal-scope.md) |
 | Quest log with status | C | [world-builder](specs/post-mvp/world-builder.md) | |
@@ -139,7 +139,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Hide / reveal token button (Owlbear-style) | S | [scenes-map](specs/scenes-map.md) | Hidden combatants follow |
 | Pre-place encounter tokens on battlemap (some hidden) | S | [combat-tracker](specs/combat-tracker.md) | No auto-placement |
 | Start / end encounter | S | [combat-tracker](specs/combat-tracker.md) | Unit of combat history |
-| Fog of war with shape + polygon tools | A | [scene-tools](specs/post-mvp/scene-tools.md) | Not MVP; **first thing after** |
+| Fog of war with shape + polygon tools | A | [fog-of-war](specs/fog-of-war.md) | Not MVP; **first thing after** |
 | Ctrl-D duplicate token (same definition), rename | S | [scenes-map](specs/scenes-map.md) | |
 | Per-instance modifiers (temp HP, buffs/debuffs) | A | [combat-extras](specs/combat-extras.md) | No inline stat editing on instances |
 | **Custom creature form** (Shieldmaiden-style), prefilled from a base | S | [combat-tracker](specs/combat-tracker.md) | Full editor (SRD base, custom actions) tier A |
@@ -186,5 +186,5 @@ Tiers confirmed by the DM (#148); details in [feedback-phase3](agents/feedback-p
 | Freehand drawing | F | [ADR-0007](architecture/adr/0007-product-scope.md) |
 | Audio (music, ambience, soundboard) | F | [ADR-0007](architecture/adr/0007-product-scope.md); UI notification sounds allowed by [ADR-0030](architecture/adr/0030-ui-notification-sounds.md) |
 | Other game systems | F | [ADR-0007](architecture/adr/0007-product-scope.md) |
-| Fog, AoE props, status rings | C→ post-MVP, design for it | [scene-tools](specs/post-mvp/scene-tools.md) |
+| Fog, AoE props, status rings | C→ post-MVP, design for it | [scene-tools](specs/scene-tools.md) |
 | Notes from tokens, player notes | post-MVP, design for it | [world-builder](specs/post-mvp/world-builder.md) |
