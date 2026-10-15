@@ -136,3 +136,73 @@ Expand the stub. Proposed scope (DM confirms):
 2. Phase 1 builds: walkthrough PASS per feature; full `check` + full `e2e` before each merge and on `main` after it; "Playtest: phase 1 fixes" section here.
 3. **DM gate 2 (phase 2 specs):** F and B reviewed by one review agent; one DM pass: scope, picks, any phase-1 playtest feedback.
 4. **Sprint gate (DM):** session-sim regression on final `main` (incl. fog, a wall, an AoE template, an effect modifier if built), "Playtest: sprint 2 features" section here, then recap and pick sprint 3 (candidates: party board + handouts, table flavour, compendium, 3D dice tray).
+
+## Playtest: phase 1 fixes
+
+Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~40 minutes for part 1, ~15 for part 2. **DM** (normal browser) + **Player 1** (incognito) + **Player 2** (another browser). Regression run: [session-sim-5 report](../../.verify/20261015-162659-session-sim-5/report.md) (local, gitignored): 13 / 13 PASS, leak scan clean, digest identical across a hard kill (#194). Each step names the note (N) or glitch (G) it checks.
+
+### Setup
+
+```powershell
+bun install
+bun run build
+bun run fixtures:reset-load session-sim --profile verify
+bun run start --profile verify
+```
+
+The load prints the **DM URL**, **DM secret** and the **player links** (`http://127.0.0.1:4112/…`). Player 1 plays Mira, Player 2 plays Thorn. To switch bundles: `Ctrl+C`, `bun run fixtures:reset-load <bundle> --profile verify`, `bun run start --profile verify`; reopen the new player links.
+
+**Token art (N2)** is fixed at the source: changed fixture art gets a new URL, so a normal reload shows it. No hard reload or cache clearing needed any more.
+
+### Part 1: a session with the fixes (`session-sim`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Player 2: Sheets → **New character** "Sela", a few fields | DM gets a pending card "Draft awaiting approval" (bell +1); **Review** opens the sheet (G8) |
+| 2 | DM: **Approve** | The card resolves; Player 2 gets "Sela was approved" (G8) |
+| 3 | DM: Players window | Under each player, one line per character: passive Perception / Investigation / Insight, HP, temp HP, AC, level; click opens the sheet (N3) |
+| 4 | Player 2: pick Thorn in the sheet picker, reload | Still on Thorn (13). Sheet header (name, tabs) stays put while the tab content scrolls (16) |
+| 5 | Player 1: Mira's sheet | Main has no attack row; Actions has **Attack**, **Damage**, **Attack + damage** per attack (N4, N7). Out of combat each is a plain roll |
+| 6 | Anyone: Game log → type something, **minimise** it, roll something from another window, restore it | Minimised launcher button = hollow ring; a dot appears when a new line arrives; restored window kept its input and scroll. **Close** then reopen = fresh window (N1) |
+| 7 | DM: Goblin Ambush → **Show to players**, at 1440×900 then 1280×720 | Tokens readable (cell ≥ 48 px); PCs in the open, edge monsters may sit under a window (G2). Resizing the browser refits while you haven't panned (G3) |
+| 8 | Encounters → "Ambush at the Ford": in the builder add a creature with the **autocomplete**, count 2, **Rolled** HP; leave "Create tokens" and "Add hidden" ticked | Options are saved with the encounter (N5) |
+| 9 | **Start** | A PC with no token on the map is listed "Not on this map", unticked. Monster initiative is rolled at Start, ranked at once; players see no monster initiative numbers in the log (15) |
+| 10 | Round 1 → Initiative **Add…** → Goblin ×2 | Hidden tokens appear near the centre of your view; rows ranked at once. The new goblins have a movement value, get the red crosshair when targeted, appear in multi-select (N5, N6, N6.1). Initiative grows; "↓ N more" when rows are below the fold (G4) |
+| 11 | Look at the Initiative rows with effects | Chips readable when there's room, "+N" only when there isn't (G1) |
+| 12 | Player 1, in combat: Mira's **Attack** (Shortsword) | DM toast "Mira: N to hit (Shortsword)"; popup shows "Waiting for damage" (N7) |
+| 13 | Player 1: **Damage** on the same attack | Same toast/card gains the damage (no second card). With physical dice after a natural 20, the crit dice appear as their own group (G6) |
+| 14 | DM: open the card from its toast | Popup opens over the toast, the toast goes away; drag the popup anywhere (N8). Preview counts temp HP (G5). Apply; hover Undo: "Undo: Mira → Goblin, 6 damage" (G10) |
+| 15 | Player 1: Damage on another attack with no pending to-hit | A damage-only card (rows preset Hit, no "vs AC") |
+| 16 | DM: Initiative row **Attack ▸** on a monster | Same three actions as the sheet |
+| 17 | DM: hit a concentrating PC | The player gets the concentration card; for ~4 s a cue pulses over that player's token on your map (N11); your bell counts it and Initiative shows "Waiting for Mira: …" (G9) |
+| 18 | DM: drop Thorn to 0; Player 2 rolls death saves | Public lines show the state only, no counters (G7) |
+| 19 | **End encounter** | Thorn keeps his X / Dying badge on the map for everyone (14). Notifications window opens 360×480 (may overlap at 1280×720) |
+
+### Part 2: effect modifiers (`effect-modifiers`, N9 tier 1)
+
+Starts in combat (round 1, Wolf's turn): Bless on Mira and Thorn (Mira concentrating), Bane on a Goblin, Rage available to Thorn's player.
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Players: sheet → **Active effects** tab | Every effect on the character with its parts in words ("+1d4 to attack rolls and saves") |
+| 2 | Player 1: Mira's Attack, then Damage | Line "… + N Bless"; the DM popup names the Bless part |
+| 3 | Player 1: physical dice on, a CON save | The server rolls the Bless d4 "(rolled for you)" |
+| 4 | DM: a Goblin attack on Mira | DM line "− N Bane"; players see the part values, never a hidden effect's name |
+| 5 | Player 2: Active effects → **Rage** on, Dagger Damage | Rage chip for everyone; line "+ 2 Rage" (advantage and resistance come with tier 2) |
+| 6 | DM: select tokens → token menu **Apply effect ▸ Bless** (or another preset); **Edit presets…** → change one, then **Reset** | Applied to all selected; customised mark appears / goes |
+| 7 | End encounter | Timed effects end; untimed stay; Rage reads off |
+
+### Known gaps / later
+
+- Effect modifiers tiers 2–3 (advantage / disadvantage, resistances in the popup, Shield of Faith AC, a box per bonus die, Rage uses per rest) are designed but not built.
+- Snapshot headroom: the heavy DM snapshot is 781,923 B of the 786,432 B ceiling. Fog of war needs room: options come to gate 2.
+- Being fixed now (`fix/sim5-glitches`): the attack popup can pre-fill targets left over from a dismissed popup (risk: applying to a hidden monster); tokens created by Add show initials instead of the creature's art.
+- Known glitches from session-sim-5 (for gate 2): the targets popup and card toasts often cover the monster tokens; with the 48 px floor, monsters can sit under the empty Initiative window before Start; the Players window (400×220) needs scrolling with two players; the player Initiative (280 px) still collapses chips to "+N"; the builder's encounter rating counts a token-less PC that Start then unticks; a duplicate "1 pending action" toast after rejoin; copy nits (Apply effect without a source, End confirm, concentration dialog doesn't mention the Bless die); name truncation in Initiative and map labels; new windows (Scenes, Notifications) open over others.
+
+### Teardown
+
+`Ctrl+C` the server, then:
+
+```powershell
+bun run fixtures:reset --profile verify
+```
