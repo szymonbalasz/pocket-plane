@@ -6,6 +6,7 @@ import { characterSheet } from "./character-sheet";
 import { combatExtras } from "./combat-extras";
 import { combatTracker } from "./combat-tracker";
 import { diceRollLog } from "./dice-roll-log";
+import { effectModifiers } from "./effect-modifiers";
 import { entities } from "./entities";
 import { fixturesAdapters } from "./fixtures-adapters";
 import { liveSync } from "./live-sync";
@@ -26,4 +27,5 @@ export const features: readonly Feature[] = [
   combatTracker,
   partyLootFeature,
   combatExtras,
+  effectModifiers,
 ];

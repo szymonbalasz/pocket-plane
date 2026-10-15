@@ -10,6 +10,7 @@ import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
 import { creatureSheetDefinitionHook } from "../character-sheet/definition-hook";
 import { combatantDefinitionHook } from "../combat-tracker/hooks";
+import { presetOwnerHook } from "../effect-modifiers/definition-hook";
 import { refreshTokenCopies } from "../scenes-map/definition-hook";
 
 export type HookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor">;
@@ -31,6 +32,7 @@ export const definitionChangedHooks: readonly HookRegistration[] = [
   { name: "scenes-map.token-copies", hook: refreshTokenCopies }, // scenes-map (FR-MAP-20)
   { name: "combat-tracker.combatant-copies", hook: combatantDefinitionHook }, // combat-tracker (FR-CBT-06)
   { name: "character-sheet.sheet-copies", hook: creatureSheetDefinitionHook }, // CHARX owner copy + counter clamp (FR-CHARX-13/17)
+  { name: "effect-modifiers.preset-owner", hook: presetOwnerHook }, // MOD preset owner copy (FR-MOD-07)
 ];
 
 /** Per-server hook list, seeded from the registry; tests may add hooks via `register`. */
