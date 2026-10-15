@@ -396,6 +396,64 @@ describe("FR-DICE-27 actor select", () => {
   });
 });
 
+describe("FR-DICE-34 roll as token-less combatants", () => {
+  const ents = [{ id: "g", kind: "monster" as const, name: "Goblin", ownerPlayerId: null }];
+  const scenes = [{ id: "s1", active: true }];
+  const tokens = [{ id: "t1", sceneId: "s1", name: "Goblin", seq: 1, definitionId: "g" }];
+  const c = (id: string, name: string, more: Record<string, unknown> = {}) => ({
+    id,
+    encounterId: "e1",
+    name,
+    tokenId: null as string | null,
+    active: true,
+    removed: false,
+    ...more,
+  });
+  const dm = { role: "dm" as const, playerId: null };
+
+  test("FR-DICE-34 actor list", () => {
+    const encounters = [
+      { id: "e0", status: "ended" as const },
+      { id: "e1", status: "started" as const },
+    ];
+    const combatants = [
+      c("c1", "Goblin", { tokenId: "t1" }),
+      c("c10", "Goblin 10"),
+      c("c3", "Goblin 3"),
+      c("c4", "Goblin 4", { removed: true }),
+      c("c5", "Wolf", { active: false }),
+      c("c6", "Old", { encounterId: "e0" }),
+    ];
+    const list = actorOptions(dm, ents, scenes, tokens, encounters, combatants);
+    // After the scene's tokens; tokened combatants aren't listed again; by name.
+    expect(list.map((a) => [a.group ?? "", a.label])).toEqual([
+      ["", "DM"],
+      ["Tokens", "Goblin"],
+      ["Combatants", "Goblin 3"],
+      ["Combatants", "Goblin 10"],
+    ]);
+    expect(list.at(2)).toEqual({
+      value: "c3",
+      label: "Goblin 3",
+      group: "Combatants",
+      ref: { combatantId: "c3" },
+    });
+    // Encounter ended (or none started) → gone; players never get them.
+    const ended = [{ id: "e1", status: "ended" as const }];
+    const none = actorOptions(dm, ents, scenes, tokens, ended, combatants);
+    expect(none.some((a) => a.group === "Combatants")).toBe(false);
+    const p = actorOptions(
+      { role: "player", playerId: "p1" },
+      ents,
+      scenes,
+      tokens,
+      encounters,
+      combatants,
+    );
+    expect(p.some((a) => a.group === "Combatants")).toBe(false);
+  });
+});
+
 describe("FR-DICE-21 log order", () => {
   test("FR-DICE-21 oldest at the top by n", () => {
     expect(sortEntries([{ n: 3 }, { n: 1 }, { n: 2 }]).map((e) => e.n)).toEqual([1, 2, 3]);

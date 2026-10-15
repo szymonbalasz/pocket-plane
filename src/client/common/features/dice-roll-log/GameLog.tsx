@@ -1,6 +1,13 @@
 // Window `dice.log` body, both clients (FR-DICE-21, 22, 27, 30; DICE §7). Entries from the synced
 // store; rolls go out as `dice.roll` intents. DM-only parts (public eye toggle, settings gear)
 // render from `you.role` / the `dmTools` slot.
+
+import {
+  COMBATANT_TYPE,
+  type CombatantRecord,
+  ENCOUNTER_TYPE,
+  type EncounterRecord,
+} from "@shared/combat-tracker/schemas";
 import type { LineSegment } from "@shared/dice-roll-log/kind-types";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import {
@@ -219,11 +226,14 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const uid = useId();
   const scenes = useRecords<SceneView>(SCENE_TYPE);
   const tokens = useRecords<TokenView>(TOKEN_TYPE);
+  const encounters = useRecords<EncounterRecord>(ENCOUNTER_TYPE);
+  const combatants = useRecords<CombatantRecord>(COMBATANT_TYPE);
   const actors = useMemo(
-    () => actorOptions(you, entities, scenes, tokens),
-    [you, entities, scenes, tokens],
+    () => actorOptions(you, entities, scenes, tokens, encounters, combatants),
+    [you, entities, scenes, tokens, encounters, combatants],
   );
-  // A token that left the active scene (or a removed character) falls back to the roller.
+  // A token that left the active scene, a removed character or an ended / removed combatant
+  // (FR-DICE-34) falls back to the roller.
   const selected = actors.find((a) => a.value === actor) ?? actors[0];
   const actorRef = selected?.ref;
 
@@ -405,7 +415,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
                   {a.label}
                 </option>
               ))}
-            {(["Characters", "Tokens"] as const).map((g) => {
+            {(["Characters", "Tokens", "Combatants"] as const).map((g) => {
               const list = actors.filter((a) => a.group === g);
               return list.length === 0 ? null : (
                 <optgroup key={g} label={g}>

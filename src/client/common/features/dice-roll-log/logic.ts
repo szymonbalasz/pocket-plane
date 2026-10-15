@@ -1,6 +1,7 @@
 // Pure client helpers for the game log and the roll control (FR-DICE-05, 07, 21, 24, 27, 30).
 // Input convenience only: the server re-checks everything (FR-DICE-01, 06).
 
+import type { CombatantRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
 import {
   type DiceTerm,
   diceTerms,
@@ -81,22 +82,29 @@ export interface ActorOption {
   /** "" = the roller themselves ("me" / "DM"). */
   value: string;
   label: string;
-  group?: "Characters" | "Tokens";
-  ref?: { entityId: string } | { tokenId: string };
+  group?: "Characters" | "Tokens" | "Combatants";
+  ref?: { entityId: string } | { tokenId: string } | { combatantId: string };
 }
 
 type ActorToken = Pick<TokenView, "id" | "sceneId" | "name" | "seq" | "definitionId">;
+type ActorCombatant = Pick<
+  CombatantRecord,
+  "id" | "encounterId" | "name" | "tokenId" | "active" | "removed"
+>;
 
 /**
  * FR-DICE-27: player → "me" + own characters; DM → "DM" + every character + the tokens of the
  * active scene (by placement order). A character's token is left out: the character is already
- * listed, and both roll under the same name ("Mira" twice, #149).
+ * listed, and both roll under the same name ("Mira" twice, #149). FR-DICE-34: then the DM's
+ * token-less active, non-removed combatants of the started encounter, by name ("Goblin 3").
  */
 export function actorOptions(
   you: { role: "dm" | "player"; playerId: string | null } | null,
   entities: readonly Pick<EntityRecord, "id" | "kind" | "name" | "ownerPlayerId">[],
   scenes: readonly Pick<SceneView, "id" | "active">[] = [],
   tokens: readonly ActorToken[] = [],
+  encounters: readonly Pick<EncounterRecord, "id" | "status">[] = [],
+  combatants: readonly ActorCombatant[] = [],
 ): ActorOption[] {
   if (!you) return [];
   const chars = entities
@@ -118,6 +126,10 @@ export function actorOptions(
   const onScene = tokens
     .filter((t) => t.sceneId === active && !(t.definitionId && listed.has(t.definitionId)))
     .sort((a, b) => a.seq - b.seq);
+  const started = encounters.find((e) => e.status === "started")?.id;
+  const tokenless = combatants
+    .filter((c) => c.encounterId === started && c.active && !c.removed && c.tokenId === null)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   return [
     ...out,
     ...onScene.map((t) => ({
@@ -125,6 +137,12 @@ export function actorOptions(
       label: t.name,
       group: "Tokens" as const,
       ref: { tokenId: t.id },
+    })),
+    ...tokenless.map((c) => ({
+      value: c.id,
+      label: c.name,
+      group: "Combatants" as const,
+      ref: { combatantId: c.id },
     })),
   ];
 }
