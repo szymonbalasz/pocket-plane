@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: in-review
+status: complete
 owner: spec-dice-roll-log
 wave: 2
 ---
@@ -18,7 +18,7 @@ wave: 2
 - character-sheet and combat-tracker roll and log through this spec's internal helpers, **log-entry kinds** and the shared roll control.
 - **Playtest pass** (#171; FR-DICE-28, 29): one rule for **DM-only detail** in any kind's line (facts a kind declares DM-only, e.g. AC, "DM ruled hit", an NPC's damage dice, live in `dmPayload`, shown on the DM client only) and for the "physical" tag across kinds (P5, G7, G8); no "natural 1" noise on initiative lines (G12).
 - **Polish pass** (sprint 1, R3; FR-DICE-30): the roll bar collapses to one row, so the Game log shows ≥ 6 lines of history at default size ([FR-SHELL-35](play-shell.md#6-functional-requirements)).
-- **Sprint 2 phase 1** (P2b; FR-DICE-31–34): physical dice after a natural 20 ask only for the **extra critical dice** and keep what was typed (G6); a Roll that can't go never fails silently; a minimised Game log shows a "new" dot (N1, pending [OQ-SHELL-21](play-shell.md#15-open-questions)); the DM can roll as a token-less combatant (S4).
+- **Sprint 2 phase 1** (P2b; FR-DICE-31–34): physical dice after a natural 20 ask only for the **extra critical dice** and keep what was typed (G6); a Roll that can't go never fails silently; a minimised Game log shows a "new" dot (N1, decided #190, [OQ-SHELL-21](play-shell.md#15-open-questions)); the DM can roll as a token-less combatant (S4).
 
 ## 2. Scope
 
@@ -84,7 +84,7 @@ wave: 2
 | **Sprint 2 phase 1** (P2b) | | |
 | FR-DICE-31 | **Physical crit keeps what was typed** (G6; amends FR-DICE-24's swap): when the first entry becomes a natural 20 and `critExpressions` is set, each later slot keeps its base expression's inputs **as entered** (total and per-die values) and gains a second group **"Extra critical dice: 4d6"** (the base expression's dice terms once more, no constants) with its own total input and optional per-die inputs. The slot's `ManualEntry` for the crit expression = base dice total + extra total; `dice` = base dice then extra dice when every die was entered, else omitted (FR-DICE-06). The first entry moves off 20 → the extra group goes (its values dropped), the base inputs stay. Server unchanged: it still receives one `ManualEntry` per crit expression. **`crit: true`** (option on `useRollControl`, review X-1): the caller already knows the hit is critical (e.g. a Damage roll after a natural-20 to-hit, combat-tracker FR-CBT-74), so every slot shows its extra critical group **from the start**, with no d20 entry needed; `critExpressions` then gives the expressions sent. | G6; X-1 |
 | FR-DICE-32 | **No silent Roll** (G6): a slot is complete when its total (base and, after a crit, extra) is filled and within the dice part's min–max, or when every per-die box of that group is filled (the total is then computed and shown). Roll / Enter with an incomplete or out-of-range slot sends nothing, focuses the first offending input and shows an inline message under the popover (`dice-manual-error`): "Enter the total for 4d6 (critical)" / "Total must be 4–24". The Roll button stays enabled (a disabled button is the silent case the report hit). | G6 |
-| FR-DICE-33 | **Minimised Game log dot** (N1; *pending DM gate, [OQ-SHELL-21](play-shell.md#15-open-questions)*): both clients' `dice.log` window types declare `activity(store)` = the highest entry `n` in this client's store ([FR-SHELL-38](play-shell.md#6-functional-requirements)), so a new entry this client can see lights the launcher dot while the log is minimised (players: public entries only; the DM: every entry). | N1 |
+| FR-DICE-33 | **Minimised Game log dot** (N1; decided #190, [OQ-SHELL-21](play-shell.md#15-open-questions)): both clients' `dice.log` window types declare `activity(store)` = the highest entry `n` in this client's store ([FR-SHELL-38](play-shell.md#6-functional-requirements)), so a new entry this client can see lights the launcher dot while the log is minimised (players: public entries only; the DM: every entry). | N1 |
 | FR-DICE-34 | **Roll as token-less combatants** (report item 17; settled S4, OQ-CBT-55; amends FR-DICE-27, FR-DICE-10): the DM's actor Select also lists every **active, non-removed combatant of the started encounter that has no token** (e.g. "Goblin 3" added mid-fight), after the scene's tokens, by the combatant's name. It sends actor `{combatantId}` (**DM only**; a player sending it → `invalid`, not in the player schema). The server resolves it in the campaign's started encounter (else `not_found`) to `{kind: entity, id: combatant.entityId, name: combatant's name}`, so the `roll` row and entry need no new actor kind or column. Visibility unchanged: the entry is a DM roll, public per category / override (FR-DICE-13). Encounter ended or combatant removed between pick and roll → `not_found` inline, the Select drops it. | Item 17 |
 
 ## 7. UI/UX notes
@@ -261,7 +261,7 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 | ~~OQ-DICE-03–22~~ | ~~Seeding; snapshot depth; shared changes; manual; visibility; defaults; contests; limits; log timing; glossary; storage; sheet buttons~~ | Decided: 05 no sessions (ADR-0013), 06 superseded, 08 #73, 12 #74; #137 (`ctx.dice`, newest 100, §14); #139 P6, P8, P21–P25; gate I3–I5, I13; #135 + I1 (`char.roll` out of combat, `cbt.*` in combat) | — | — |
 | ~~OQ-DICE-23~~ | ~~Natural marker on initiative lines (G12)~~ | **Decided (#172):** no natural marker on initiative lines (FR-DICE-29) | — | combat-tracker |
 | ~~OQ-DICE-25~~ | ~~R3: DM Game log history shows ~3 lines; multi-line outcome lines are cut~~ | **Decided #178:** collapse the roll bar to one row, options behind a chevron (FR-DICE-30). Rejected: taller or wider DM default (covers more map, R1) | — | play-shell |
-| OQ-DICE-26 | G6: after a natural 20, how does the physical popover ask for crit damage? | **Keep the typed base dice, add an "Extra critical dice" group** (FR-DICE-31; nothing typed is lost, the ask is explicit) / grow the per-die boxes to 8d6 and keep the first 4 (today's look, still unclear which dice to roll) / re-ask the whole 8d6 total (simple, loses what was typed) | no · owner: spec-polish-2b | combat-tracker (crit expressions) |
+| ~~OQ-DICE-26~~ | ~~G6: after a natural 20, how does the physical popover ask for crit damage?~~ | **Decided (#190):** keep the typed base dice, add an "Extra critical dice" group (FR-DICE-31) | — | combat-tracker (crit expressions) |
 | ~~OQ-DICE-24~~ | ~~G12 verdicts (dice part)~~ | **Decided (#172):** verdicts accepted: "— natural 1" per FR-DICE-20 except initiative (FR-DICE-29); no group roll (each combatant rolls, FR-CBT-11); fixture clock by design (FR-FIX-08) | — | fixtures-adapters |
 
 ## 16. Out of scope

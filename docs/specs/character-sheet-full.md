@@ -1,7 +1,7 @@
 ---
 title: Character sheet (full)
 prefix: CHARX
-status: in-review
+status: complete
 owner: spec-character-sheet-full
 phase: post-mvp-1
 ---
@@ -30,7 +30,7 @@ Scope accepted by the DM (#178), including the items beyond sprint-1's first pro
 - Roll every number (§6 table); several attacks per character and spell attacks routed into combat (roll routes gain a row reference).
 - Other players see a summary (name, portrait, owner, level + class, species, Down / `deathState`). Read-only wallet line from [party-loot](party-loot.md).
 - Sheet sections registry (seam for [combat-extras](combat-extras.md)). Fixtures + bundle `character-sheet-full`.
-- **Sprint 2 phase 1:** the three attack buttons and `char.roll` kinds `toHit` / `spellToHit`; Main without attacks; notification kinds `charx-draft`, `charx-approved`; picker memory; pinned header. Track M's "Active effects" block registers through `sheetSections` (effect-modifiers spec, MOD, in review); this spec adds no effects block.
+- **Sprint 2 phase 1:** the three attack buttons and `char.roll` kinds `toHit` / `spellToHit`; Main without attacks; notification kinds `charx-draft`, `charx-approved`; picker memory; pinned header. Track M's "Active effects" block registers through `sheetSections` (effect-modifiers spec, MOD, accepted #190); this spec adds no effects block.
 
 ## 3. Goals
 
@@ -380,8 +380,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | [dice-roll-log](dice-roll-log.md), [play-shell](play-shell.md), [party-loot](party-loot.md), [fixtures-adapters](fixtures-adapters.md) | Roll control, categories `skill-check` / `damage` / `healing`; window registry; `wallet` record; bundles. No change | complete |
 | [combat-tracker](combat-tracker.md) (N7) | Claims `toHit` → `cbt.attack {rolls: "toHit"}`, `damage` → `cbt.rollDamage`, `attack` → `cbt.attack` (settled S1). The three existing e2e files move in `fix/charx-buttons` (this spec); P2a's new CBT e2e lands in `fix/combat2-split-attack` (X-5) | settled S1; P2a builds after `fix/charx-buttons` |
 | [notifications](notifications.md) (G8) | Existing `notify` / `resolveNotification`, kind registry and client views (append-only lines). No notifications spec change | complete |
-| [campaign-management](campaign-management.md) (N3) | Consumes `openSheetFor` and the passive helpers for the players panel (FR-CAMP-21/22) | in review |
-| effect-modifiers (M, in review) | Registers "Active effects" through `sheetSections`; no CHARX change | in review |
+| [campaign-management](campaign-management.md) (N3) | Consumes `openSheetFor` and the passive helpers for the players panel (FR-CAMP-21/22) | decided #190 |
+| effect-modifiers (M, accepted #190) | Registers "Active effects" through `sheetSections`; no CHARX change | decided #190 |
 
 ### Shared changes
 
@@ -430,7 +430,7 @@ Per AGENTS §9.9; the orchestrator routes each. Shared-branch-first changes mark
 
 ## 15. Open questions
 
-Sprint-1 rows all decided. Sprint 2 phase 1 rows (OQ-CHARX-20–23) below them; none needs the DM.
+All decided (#178, S1, #190); OQ-CHARX-23 (glossary) stays for the integrator.
 
 | ID | Question | Decision | Blocking? | Affects |
 |---|---|---|---|---|
@@ -451,9 +451,9 @@ Sprint-1 rows all decided. Sprint 2 phase 1 rows (OQ-CHARX-20–23) below them; 
 | OQ-CHARX-16 | Glossary | **Decided #178:** add Draft (character), Sheet lock, Sheet section, NPC sheet (not the `npc` entity kind), Override; drop "Override (not supported)" from Modifier's avoid-column (integrator) | — | glossary |
 | OQ-CHARX-17 | Deleting characters | **Decided #178:** no delete (FR-ENT-14); rename / reassign | — | entities |
 | OQ-CHARX-19 | Entities changes | **Decided #178:** accepted; they land in `fix/charx-core` | — | entities |
-| OQ-CHARX-20 | Crit damage out of combat (N7): a player rolls Attack (natural 20), then Damage | **None, as FR-CHAR-05** (no crit rule outside combat; the DM rules it) / a "Critical" tick in Damage's physical popover and roll (doubles dice; one more control on every Damage) | no · owner: spec-polish-2b | dice-roll-log |
+| ~~OQ-CHARX-20~~ | ~~Crit damage out of combat (N7): a player rolls Attack (natural 20), then Damage~~ | **Decided (#190):** none, as FR-CHAR-05 (no crit rule outside combat; the DM rules it) | — | dice-roll-log |
 | ~~OQ-CHARX-21~~ | **Combat-tracker (N7 seam):** in a running encounter, what does each sheet button do? The sheet sends kinds `toHit` / `damage` / `attack` (spell: `spellToHit` / `spellDamage` / `spellAttack`) with `ref` through the roll routes (FR-CHARX-43); combat answers per kind: claim + intent, `critExpressions`, or `hidden`. Same answer for the DM attack picker and NPC rows so the three behave the same everywhere | **Settled S1 (orchestrator):** sheet kind names stand (`attack` / `spellAttack` keep their stored meaning); Attack → `cbt.attack {rolls: "toHit"}`, Damage → `cbt.rollDamage` (healing never routes), Attack + damage → `cbt.attack`; FR-CHARX-43 | — | combat-tracker, combat-extras |
-| OQ-CHARX-22 | Sheet window cramped for building a character (report item 16) | **Pinned header now (FR-CHARX-48); the player resizes; no auto-grow** / grow to 480×640 on entering edit mode (fit to the work area) through a new shell `resizeWindow` (frame change, writes the layout) | no · owner: spec-polish-2b | play-shell |
+| ~~OQ-CHARX-22~~ | ~~Sheet window cramped for building a character (report item 16)~~ | **Decided (#190):** pinned header (FR-CHARX-48); the player resizes; no auto-grow | — | play-shell |
 | OQ-CHARX-23 | Glossary: add "**Attack + damage**: the sheet button that rolls to-hit and damage as one action; **Attack** rolls to-hit only, **Damage** damage only" | **Add at merge** / none | no · owner: integrator | glossary |
 
 OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while drafting).

@@ -1,7 +1,7 @@
 ---
 title: Campaign management
 prefix: CAMP
-status: in-review
+status: complete
 owner: spec-campaign-management
 wave: 1
 ---
@@ -214,7 +214,7 @@ Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from wo
 | OQ-CAMP-12 | Login throttle policy (FR-CAMP-05) | **Global 5 / 60 s → 60 s lockout** (simple; lockout abusable) / per IP via tunnel header (trusts a header) / none (secret open to the internet) | no · owner: spec-campaign-management | live-sync |
 | OQ-CAMP-13 | Players see other players' names? | **Yes, `{id, name}`** (game log, party UI) / no (others resolve names) | no · owner: spec-campaign-management | dice-roll-log, play-shell |
 | OQ-CAMP-14 | ~~Glossary~~ **Decided (integrator):** added **Active campaign**, **Public base URL**, **Link token**; **Player link** reworded to "bound to one player" (rename keeps the token; [ADR-0019](../architecture/adr/0019-auth-credentials.md) refines ADR-0004). | — | — | — |
-| OQ-CAMP-16 | N3: `camp.players` is 400×220; two players with two characters each plus the add row already scroll | **Keep 400×220, the body scrolls** (no geometry or layout-test change; the DM resizes once, layout remembers) / default 400×320 (protocol §24 row + the 1280×720 edge-placement tests change) | no · owner: spec-polish-2b | play-shell, protocol §24 |
+| ~~OQ-CAMP-16~~ | ~~N3: `camp.players` is 400×220; two players with two characters each plus the add row already scroll~~ | **Decided (#190):** keep 400×220, the body scrolls (no geometry or layout-test change) | — | play-shell, protocol §24 |
 | OQ-CAMP-15 | Routes: DM client, player page, REST prefix | **DM `/`, player `/p/<token>`, REST `/api/*` as in §9** *(proposed)* / other | no · owner: spec-campaign-management | live-sync, AGENTS §9.1 |
 
 ## 16. Out of scope
