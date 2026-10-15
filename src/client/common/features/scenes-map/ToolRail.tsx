@@ -1,6 +1,7 @@
 // Tool rail content (MAP §7): Select, Ruler, Ping, then the canvas tool registry's tools for this
 // client (FR-SCN-06; off while not live, FR-SCN-34) and Fit (FR-MAP-45); DM extras as children.
-// The active registry tool's panel shows beside the rail, below shell windows (`ToolPanel`).
+// The active registry tool's panel (or a base tool's, `basePanels`) shows beside the rail, below
+// shell windows (`ToolPanel`).
 import { MousePointer2Icon, RadarIcon, RulerIcon, ScanIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -10,7 +11,7 @@ import { Tooltip } from "../../components/ui/overlays";
 import { canvasTools } from "./canvas-tools";
 import { useLive } from "./intents";
 import { type MapTool, useMapFit, useMapTool } from "./tool-store";
-import { activeTool, toolsFor } from "./tools";
+import { activeTool, type BaseTool, toolsFor } from "./tools";
 
 const TOOLS: { tool: MapTool; label: string; icon: typeof RulerIcon; hint?: string }[] = [
   { tool: "select", label: "Select", icon: MousePointer2Icon, hint: "Drag tokens, pan the map" },
@@ -92,6 +93,7 @@ export function ToolRail({
   selectHint,
   signalsOff = false,
   selectOnly = false,
+  basePanels,
   children,
 }: {
   pingHint?: string;
@@ -100,6 +102,8 @@ export function ToolRail({
   signalsOff?: boolean;
   /** DM targeting (FR-MAP-33): the tool is forced to Select; the others are off. */
   selectOnly?: boolean;
+  /** Panels for base tools, shown like a registry tool's (DM Ruler: Diagonals, FR-SCN-29). */
+  basePanels?: Partial<Record<BaseTool, React.ComponentType>>;
   children?: React.ReactNode;
 }) {
   const tool = useMapTool((s) => s.tool);
@@ -112,7 +116,10 @@ export function ToolRail({
   useEffect(() => {
     if (signalsOff && tool === "ping") setTool("select");
   }, [signalsOff, tool, setTool]);
-  const Panel = current?.panel as React.ComponentType | undefined;
+  const Panel =
+    (current?.panel as React.ComponentType | undefined) ??
+    (selectOnly ? undefined : basePanels?.[tool as BaseTool]);
+  const panelId = current?.id ?? tool;
   const railRef = useRef<HTMLDivElement>(null);
   return (
     <div
@@ -204,8 +211,8 @@ export function ToolRail({
         </Button>
       </Tooltip>
       {children}
-      {Panel && current && (
-        <ToolPanel rail={railRef} id={current.id}>
+      {Panel && (
+        <ToolPanel rail={railRef} id={panelId}>
           <Panel />
         </ToolPanel>
       )}

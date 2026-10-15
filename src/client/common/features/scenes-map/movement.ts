@@ -1,4 +1,5 @@
-// Movement indicator (FR-MAP-37): local only, never blocks. `move` = the 5/10/5 drag distance,
+// Movement indicator (FR-MAP-37): local only, never blocks. `move` = the drag distance under the
+// campaign's diagonal rule (FR-SCN-30),
 // `used` = movement already used this turn from a token overlay (combat), null outside combat.
 // DOM-free so it runs under `bun test`.
 

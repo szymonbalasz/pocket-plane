@@ -1,11 +1,14 @@
 // Pointers layer: drag target + movement indicator (FR-MAP-15/22/37), ruler (FR-MAP-22), DM box
 // select (FR-MAP-32), ping pulses (FR-MAP-23) and laser trails (FR-MAP-24). Reads the canvas'
-// pointer store, so 20 laser frames/s re-render only this layer. Konva names: `map-move-label`
-// (attr `tone`), `map-ruler-label`, `map-select-box`, `map-ping`, `map-laser`.
-import { cellToPx, distanceFt, distanceLabel } from "@shared/scenes-map/geometry";
+// pointer store, so 20 laser frames/s re-render only this layer. Ruler and movement distances
+// follow the campaign's diagonal rule (FR-SCN-30). Konva names: `map-move-label` (attr `tone`),
+// `map-ruler-label`, `map-select-box`, `map-ping`, `map-laser`.
+import { distanceFt } from "@shared/scene-tools/geometry";
+import { cellToPx } from "@shared/scenes-map/geometry";
 import { useEffect, useState } from "react";
 import { Circle, Group, Label, Layer, Line, Rect, Tag, Text } from "react-konva";
 import { useStore } from "zustand";
+import { diagonalRuleIn, rulerText } from "../../scene-tools/diagonal-rule";
 import { useCanvas } from "../canvas-context";
 import { movedFtOf } from "../decorations";
 import { LASER_FADE_MS } from "../laser";
@@ -74,12 +77,16 @@ function MoveLabel({
   const { tokens, store } = useCanvas();
   const t = tokens.find((k) => k.id === drag.tokenId);
   const used = t ? movedFtOf(tokenOverlays, t, store) : null;
-  const m = movementIndicator(distanceFt(drag.from, drag.to), used, t?.speed);
+  const m = movementIndicator(
+    distanceFt(drag.from, drag.to, diagonalRuleIn(store.records)),
+    used,
+    t?.speed,
+  );
   return <DistanceLabel name="map-move-label" x={x} y={y} text={m.text} tone={m.tone} />;
 }
 
 export function PointersLayer() {
-  const { grid, cam, colors, pointers } = useCanvas();
+  const { grid, cam, colors, pointers, store } = useCanvas();
   const st = useStore(pointers);
   const animating = st.pings.length > 0 || Object.keys(st.trails).length > 0;
   const now = useFrameClock(animating);
@@ -139,7 +146,7 @@ export function PointersLayer() {
           <DistanceLabel
             name="map-ruler-label"
             {...centre(st.ruler.to)}
-            text={distanceLabel(st.ruler.from, st.ruler.to)}
+            text={rulerText(st.ruler.from, st.ruler.to, diagonalRuleIn(store.records))}
           />
         </Group>
       )}
