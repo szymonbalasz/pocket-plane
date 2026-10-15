@@ -80,15 +80,14 @@ function cardRef(store: RecordStore, characterId: string, ref?: RollRouteRef) {
 }
 
 /**
- * FR-CBT-74: the latest pending to-hit-only card of this row in the store (what `cbt.rollDamage`
- * completes), or null.
+ * FR-CBT-74: the latest pending to-hit-only card of this attacker's row among `notes` (what
+ * `cbt.rollDamage` completes), or null. Used by the sheet route and the DM's Initiative row.
  */
 export function pendingToHitCard(
-  store: RecordStore,
+  notes: readonly NotificationRecord[],
   attackerId: string,
   row: { attackId?: string; spellId?: string },
 ): DamageCardPayload | null {
-  const notes = Object.values(store.records.notification ?? {}) as NotificationRecord[];
   let best: { seq: number; p: DamageCardPayload } | null = null;
   for (const n of notes) {
     if (n.kind !== DAMAGE_CARD_KIND || n.state !== "pending") continue;
@@ -101,6 +100,9 @@ export function pendingToHitCard(
   }
   return best?.p ?? null;
 }
+
+const notesOf = (store: RecordStore) =>
+  Object.values(store.records.notification ?? {}) as NotificationRecord[];
 
 const refFields = (ref?: RollRouteRef) => ({
   ...(ref?.attackId !== undefined ? { attackId: ref.attackId } : {}),
@@ -153,7 +155,7 @@ export const combatRollRoute: RollRoute = {
     if (kind === "damage" || kind === "spellDamage") {
       // FR-CBT-74: after a natural 20 on the row's pending to-hit card the Damage is critical:
       // the roll control shows the extra critical dice from the start.
-      const card = pendingToHitCard(store, c.id, cardRef(store, characterId, ref));
+      const card = pendingToHitCard(notesOf(store), c.id, cardRef(store, characterId, ref));
       const crit = card?.toHit?.natural === 20 && damage !== null;
       const claim: RollRouteClaim = {
         badge: "In combat",
