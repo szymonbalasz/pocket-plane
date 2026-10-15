@@ -127,3 +127,11 @@ export function presetChoices(rows: readonly EffectPresetRecord[]): PresetChoice
     if (r.key === null) out.push({ source: "campaign", key: null, preset: r });
   return out;
 }
+
+/** A list entry's stable value: the built-in key (also when customised), else the preset id. */
+export const choiceValue = (c: PresetChoice): string =>
+  c.source === "campaign" ? c.preset.id : c.key;
+
+/** The campaign row behind an entry (customised or campaign), else null (a plain built-in). */
+export const choiceRowId = (c: PresetChoice): string | null =>
+  c.source === "builtin" ? null : c.preset.id;
