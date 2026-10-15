@@ -34,6 +34,7 @@ import type { Viewport } from "@ui/features/play-shell/geometry";
 import { useRecords } from "@ui/sync/store";
 import { EyeOffIcon, XIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { LinkHintNote } from "../combat-extras/link-hint";
 import {
   getMapSelection,
   setMapSelection,
@@ -335,7 +336,7 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
           <h3 className="text-xs font-medium text-muted-foreground">Targets ({rows.length})</h3>
           {list.notInCombat > 0 && (
             <span data-testid="cbt-popup-not-in-combat" className="text-xs text-muted-foreground">
-              {list.notInCombat} selected not in combat
+              {list.notInCombat} selected not in combat <LinkHintNote />
             </span>
           )}
         </div>
