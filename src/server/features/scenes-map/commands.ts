@@ -68,6 +68,7 @@ import type { RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
 import { resolveDefinition } from "../entities/commands";
 import { characterIdOf } from "./character-copy";
+import { tokenMoveGuards } from "./move-guards";
 import {
   activeSceneOf,
   campaignOf,
@@ -621,6 +622,13 @@ export function moveTokenCommand(hooks: TokenHooks) {
       const before = getToken(tx, cid, tokenId);
       const s = findScene(tx, cid, before.sceneId) as SceneRecord;
       assertOnMap(s, col, row, before.size);
+      // ADR-0040: guards (may refuse) → derive → one write → token-changed hooks.
+      tokenMoveGuards.run(
+        { read: tx, actor },
+        before,
+        { col: before.col, row: before.row },
+        { col, row },
+      );
       const { fogged } = tokenCopies(tx, s.id, col, row, before.size);
       tx.update(token)
         .set({ col, row, fogged, updatedAt: ctx.clock.iso() })

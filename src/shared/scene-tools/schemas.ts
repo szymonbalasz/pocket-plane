@@ -126,8 +126,8 @@ export type DiagonalRule = z.infer<typeof DiagonalRule>;
 export const DEFAULT_DIAGONAL_RULE: DiagonalRule = "5-10-5";
 
 // ---------- record types (SCN §9) ----------
-// Compact wire: no timestamps. `campaignId` stays on the DM wire (the registry's scope gate reads
-// it from the record); players never get it. `fogged` rides the wire only when true.
+// Compact wire: no timestamps. `campaignId` stays (the registry's scope gate reads it from the
+// record); the player redactions of structure and props drop it. `fogged` only when true.
 
 /** `scene-structure` (scope scene, `sceneOf = id` = the scene id), DM view. No row = empty. */
 export const SceneStructureRecord = z.object({

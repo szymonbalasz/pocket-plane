@@ -12,6 +12,7 @@
 import type { SceneRecord } from "@shared/scenes-map/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
+import { scnSceneHook } from "../scene-tools/lifecycle";
 
 export type SceneHookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor">;
 
@@ -24,7 +25,9 @@ export interface SceneHook {
 }
 
 /** The registry. Append your feature's line; order = run order. */
-export const sceneHooks: readonly SceneHook[] = [];
+export const sceneHooks: readonly SceneHook[] = [
+  scnSceneHook, // scene-tools (FR-SCN-31)
+];
 
 /** Live hook list, seeded from the registry; tests may add hooks via `register`. */
 export class SceneHooks {

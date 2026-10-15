@@ -135,7 +135,8 @@ function setup() {
 describe("FR-FOG-24 registries (empty)", () => {
   test("FR-FOG-24 both registries ship empty: no derive, no hides, no lifecycle rows", () => {
     expect(sceneVisibilityHooks).toEqual([]);
-    expect(sceneHooks).toEqual([]);
+    // scene-tools' line (FR-SCN-31) only lists SCN rows, and these scenes have none.
+    expect(sceneHooks.filter((h) => !h.name.startsWith("scene-tools."))).toEqual([]);
     const t = setup();
     const s = t.newScene();
     expect(t.lastEvent()?.changes.map((c) => c.type)).toEqual(["scene"]);
