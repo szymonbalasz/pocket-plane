@@ -11,6 +11,7 @@ Consolidated domain model. Entities and relationships, **not SQL**. **Living doc
 | Sprint 1 | [character-sheet-full](../specs/character-sheet-full.md) (CHARX, #178) | core built (fix/charx-core): [§20](#20-sprint-1-creature-sheet), stat-block additions in [§11](#11-scenes-entity); record type, commands, hook, fixtures **built** (build/character-sheet-full); combat routes **built** (fix/charx-combat-routes, slice 4) |
 | Sprint 1 | [combat-extras](../specs/combat-extras.md) (CBTX, #178) | core built (fix/cbtx-core): [§21](#21-sprint-1-effect-and-combat-play-state), play-state columns in [§11](#11-scenes-entity) and [§17](#17-combat-encounter-combatant-combat-log-entry); commands, rules, record-type registration, fixtures built (build/combat-extras) |
 | Sprint 2 | [effect-modifiers](../specs/effect-modifiers.md) (MOD tier 1, #190) | core built (fix/mod-core): [§23](#23-sprint-2-effect-modifiers-tier-1), `effect` columns in [§21](#21-sprint-1-effect-and-combat-play-state); commands, hook, record-type registration, fixtures: build/effect-modifiers |
+| Sprint 2 phase 2 | [fog-of-war](../specs/fog-of-war.md) (FOG, #196) | core built (fix/fog-core): [§24](#24-sprint-2-fog-of-war), `token.fogged` in [§12](#12-scenes-scene-scene-folder-token); commands, undo, fixtures: build/fog-server |
 
 Every fact links its source. Protocol side (record types, intents, events): [protocol](../protocol/README.md).
 
@@ -416,6 +417,7 @@ An instance of a creature definition: own name, read-only display copies, play s
 | shape *(feedback pass, built)* | `round` \| `square` \| `none` | Column `shape` text not null default `round`. **Token-owned** instance state: from the definition's `tokenShape` at place, copied by duplicate, set by `map.updateToken {shape}`; never changed by a definition edit | [FR-MAP-35](../specs/scenes-map.md#6-functional-requirements), #148 |
 | speed *(feedback pass, built)* | int \| null | Column `speed` int, nullable. **Display copy** of `statBlock.speed`, written at place / duplicate and by the definition-changed hook; never per-token editable. Players: own tokens only | [FR-MAP-36](../specs/scenes-map.md#6-functional-requirements), OQ-MAP-24 |
 | characterId *(sprint 2, built, fix/combat2-core)* | ID \| null | Column `character_id` text, nullable, no FK. **Display copy**: `definitionId` when the definition is a `character`, else null; written at place / `placeTokenIn` / duplicate / scene copy, re-asserted by the definition-changed hook; idempotent boot backfill for older rows. Never in an intent. **Sent to every player who sees the token** (unlike `definitionId`) | [FR-MAP-50](../specs/scenes-map.md#6-functional-requirements), FR-MAP-26 (ruling P2b-1) |
+| fogged *(sprint 2 phase 2, built, fix/fog-core)* | bool | Column `fogged` int bool not null default false. **Server copy**: every footprint cell fogged; written in the same transaction by every write of the token's scene, cell or size (via `deriveSceneObject`) and by fog commands; never in an intent. Wire: only when true. [§24](#24-sprint-2-fog-of-war) | [FR-FOG-10](../specs/fog-of-war.md#6-functional-requirements), [ADR-0039](../architecture/adr/0039-fog-visibility.md) |
 | createdAt, updatedAt | timestamp | | MAP §8 |
 
 - Only `map.placeToken`, `map.duplicateToken`, scene duplicate and the definition-changed hook write `imageAssetId` / `size` / `speed` copies; `map.updateToken` may set `imageAssetId` (custom art), never `size` ([ADR-0024](../architecture/adr/0024-definition-visibility.md), FR-MAP-18).
@@ -1009,3 +1011,37 @@ From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD, `comple
 - **Modifier** (JSON leaf, MOD §8.1): `dice {on: RollSel, dice, sign}`, `flat {on: RollSel, value}` (tier 1); `mode`, `defense`, `flat` on AC (tier 2) are `invalid` until built (`BUILT_TIER`). `RollSel = {roll: attack | damage | save | check | initiative, abilities?, via?}`.
 - **Derived** (never stored): active modifiers of a creature, parts per roll, toggle state (`activeEffectId` names an active effect), built-ins at the built tier.
 - **Snapshot size** (CON-44, heavy scenario after fix/mod-core): + 16 effect presets at max length (10 campaign, 5 of them customising a built-in; 1 per PC; 6 longest modifiers, 200-char notes, UUID ids: ≈ 1.15 KB each, 18.5 KB) and 12 custom effects with 2 longest modifiers (6 on PCs, 4 secret + 2 Bane on monsters; effects 42 rows, 33 KB). DM 780,950 B (762.6 KiB; ceiling 768 KiB = 786,432 B, headroom ≈ 5.4 KiB); players 273,478–276,488 B (own preset ≈ 1.2 KB, PC effect modifiers). MOD §12 estimated ≈ 13 KB at ≈ 744 KiB; max-length modifiers are larger than its compact-key estimate. After slice 2 registers `effect-preset` the snapshot carries the same rows: DM 780,918 B (preset rows 18,461 B, unchanged).
+
+## 24. Sprint 2: fog of war
+
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG, `complete`; DM gate 2, #196; [ADR-0039](../architecture/adr/0039-fog-visibility.md)). **Built by `fix/fog-core`**: the tables and column below (drizzle push), the zod shapes and pure mask code (`@shared/fog-of-war`: `schemas`, `mask` codec / box / re-base / footprint, `raster`, `visibility` `fogHidden`). Commands that write them: build/fog-server. Protocol side: [protocol §35](../protocol/README.md#35-sprint-2-phase-2-fog-of-war).
+
+| Table / leaf | Change | Default (push-safe) | Visibility | Source |
+|---|---|---|---|---|
+| `token` | + `fogged` (bool): server copy, [§12](#12-scenes-scene-scene-folder-token) | false | wire only when true; DM + players who see the token | [FR-FOG-10](../specs/fog-of-war.md#6-functional-requirements) |
+| `scene_fog` (new, record type `fog`) | see below | no row = every cell clear (scenes before this build stay clear) | DM full; players redacted, active scene only | [FR-FOG-01](../specs/fog-of-war.md#6-functional-requirements) |
+| `scene_fog_edit` (new, server table, **not** a record type) | see below | — | DM sees depth + latest entry on the `fog` record | [FR-FOG-07](../specs/fog-of-war.md#6-functional-requirements) |
+| prop, AoE template (SCN) | + `fogged` | created with their tables by `fix/scn-core` | — | ADR-0039 |
+
+### Fog (`scene_fog`, record type `fog`) — owner [fog-of-war](../specs/fog-of-war.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| sceneId (PK), campaignId | ID → Scene (`ON DELETE CASCADE`), ID → Campaign | One row per scene; wire `id` = `sceneId` | FOG §8 |
+| fill | `fog` \| `clear` | Value of every cell outside the box, and of every box cell when `runs` = "" | FR-FOG-01 |
+| col0, row0, cols, rows | int ×4 | The **box** at the last edit: every cell overlapping the map rectangle at the then grid (≤ 513 × 513); wire `box [col0, row0, cols, rows]` | [FR-FOG-03](../specs/fog-of-war.md#6-functional-requirements) |
+| runs | text ≤ 10 KB | Row-major runs over the box, alternating from **fogged**, base 36, comma-separated; ≤ 2,000 runs; sum ≠ `cols × rows` on read → fully fogged + `error` log (fail closed) | [FR-FOG-04](../specs/fog-of-war.md#6-functional-requirements) |
+| updatedAt | timestamp | `ctx.clock` | FOG §8 |
+
+### Fog edit (`scene_fog_edit`, undo stack) — owner fog-of-war
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, sceneId, seq | ID, ID → Campaign, ID → Scene (`ON DELETE CASCADE`), int | `seq` DB-assigned (`sceneFogEditSeqNext`, CON-20), unique; LIFO per scene by `seq`; ≤ 20 per scene (oldest dropped in the edit's transaction) | FR-FOG-07 |
+| kind | `reveal-rect` \| `reveal-polygon` \| `hide-rect` \| `hide-polygon` \| `reveal-all` \| `fog-all` | Undo Tooltip | FR-FOG-17 |
+| prevFill, prevCol0, prevRow0, prevCols, prevRows, prevRuns | the mask before the edit | Undo restores it | FR-FOG-07 |
+| createdAt | timestamp | `ctx.clock` | FOG §8 |
+
+- **Constraints the DB enforces:** `scene_fog` PK = scene (one row per scene); both tables cascade with their scene (FR-FOG-23); FKs to campaign; `scene_fog_edit.seq` unique; indexes `scene_fog_campaign`, `scene_fog_edit_scene (scene_id, seq)`, `scene_fog_edit_campaign`. Runs cap, box size and undo depth are command checks.
+- **Derived** (never stored): box (`fogBox(scene)`), mask ↔ runs (`maskOf`, `rowOf`), re-base (`rebase`), `footprintFogged` (every cell fogged; off-box cells take `fill`), fog-hidden (`fogHidden(type, record)`: `fogged` and not exempt: owned token, player-placed template), undo depth and latest edit (DM wire).
+- **Persisted runtime state:** fog rows, undo stacks and `fogged` copies, committed together (survive reload and a hard kill).

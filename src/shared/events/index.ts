@@ -7,6 +7,7 @@ import * as combatTracker from "./combat-tracker";
 import * as diceRollLog from "./dice-roll-log";
 import * as effectModifiers from "./effect-modifiers";
 import * as entities from "./entities";
+import * as fogOfWar from "./fog-of-war";
 import * as liveSync from "./live-sync";
 import * as notifications from "./notifications";
 import * as partyLoot from "./party-loot";
@@ -32,6 +33,8 @@ export const domainEvents: readonly DomainEventDef[] = [
   ...Object.values<unknown>(combatExtras).filter(isDomainEventDef),
   // effect-modifiers (fix/mod-core).
   ...Object.values<unknown>(effectModifiers).filter(isDomainEventDef),
+  // fog-of-war (fix/fog-core).
+  ...Object.values<unknown>(fogOfWar).filter(isDomainEventDef),
 ];
 
 /** `cause.name` of presence changes (not a domain event, CON-07). */

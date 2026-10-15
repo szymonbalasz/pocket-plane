@@ -11,6 +11,7 @@ import { seededContext } from "../../commands/context";
 import { token } from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import { placeTokenIn, MAP_REST as R } from "./commands";
+import { toTokenRecord } from "./rows";
 import { scenesSetup } from "./testing";
 import { tokenHooksOf } from "./token-hooks";
 
@@ -149,7 +150,9 @@ describe("FR-MAP-48 placeTokenIn", () => {
   test("map.placeToken keeps its behaviour (TokenPlaced with the one change)", () => {
     const t = setup();
     const { tokenId } = t.run<{ tokenId: string }>(I.placeToken, t.spec(t.h.wolfId, 5, 5));
-    const row = t.s.db.select().from(token).where(eq(token.id, tokenId)).get();
+    const row = toTokenRecord(
+      t.s.db.select().from(token).where(eq(token.id, tokenId)).get() as typeof token.$inferSelect,
+    );
     const ev = t.events.at(-1)?.event;
     expect(ev?.type).toBe("TokenPlaced");
     expect(ev?.payload).toEqual({ tokenId, sceneId: t.scene.id });
