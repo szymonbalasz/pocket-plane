@@ -9,7 +9,8 @@ describe("route table", () => {
     const paths = app.routes.map((r) => `${r.method} ${r.path}`);
     expect(paths.length).toBeGreaterThan(0);
     for (const p of paths) expect(p).not.toMatch(/fixture|reset|load|import/i);
-    expect([...s.intents].filter((n) => /import|fixture|reset|load/.test(n))).toEqual([]);
+    // Name segments only: "mod.putPreset" is not a reset intent.
+    expect([...s.intents].filter((n) => /(^|\.)(import|fixture|reset|load)/i.test(n))).toEqual([]);
     expect(s.commands.has("import.batch")).toBe(true);
   });
 

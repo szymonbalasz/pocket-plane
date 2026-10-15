@@ -16,6 +16,8 @@ import {
   DamageCardPayload,
   type DamageMultiplier,
 } from "@shared/combat-tracker/schemas";
+import { lineText } from "@shared/dice-roll-log/kind-types";
+import { modSegments } from "@shared/effect-modifiers/line";
 import type { DefinitionRecord } from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
@@ -300,6 +302,8 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
             <Label htmlFor="cbt-popup-tohit" className="flex-wrap text-xs">
               To hit <Dice dice={p.toHit.dice} /> {p.toHit.constant >= 0 ? "+" : "−"}
               {Math.abs(p.toHit.constant)}
+              {/* effect-modifiers (FR-MOD-20): the card's parts, already in its total. */}
+              {p.toHit.mods && lineText(modSegments(p.toHit.mods))}
               {natural !== null && (
                 // FR-CBT-57 (R4): `hp.down` for a natural 1, `hp.full` for a natural 20.
                 <Badge
@@ -334,6 +338,7 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
               <>
                 <Dice dice={p.damage.dice} /> {p.damage.constant >= 0 ? "+" : "−"}
                 {Math.abs(p.damage.constant)}
+                {p.damage.mods && lineText(modSegments(p.damage.mods))}
               </>
             ) : (
               <span

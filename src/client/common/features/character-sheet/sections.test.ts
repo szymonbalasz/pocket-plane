@@ -25,11 +25,15 @@ const ids = (list: SheetSection[]) => list.map((x) => x.id);
 
 describe("FR-CHARX-34 sheet sections", () => {
   test("FR-CHARX-34 FR-CBTX-41 registry holds combat-extras' three lines", () => {
-    expect(sheetSections.map((x) => [x.id, x.slot])).toEqual([
+    // Append-only registry: other features add lines (e.g. `mod.effects`).
+    const lines = sheetSections.map((x) => [x.id, x.slot]);
+    for (const line of [
       ["cbtx.temp-hp", "vitals"],
       ["cbtx.death-saves", "vitals"],
       ["cbtx.effects", "header"],
-    ]);
+    ]) {
+      expect(lines).toContainEqual(line);
+    }
   });
 
   test("FR-CHARX-34 slot filter; ascending order, ties by id", () => {

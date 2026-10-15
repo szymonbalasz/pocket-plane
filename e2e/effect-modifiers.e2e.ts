@@ -68,6 +68,7 @@ test("FR-MOD-15 FR-MOD-16 FR-MOD-20 FR-MOD-28 sheet attack with Bless → line +
   await card.click();
   const popup = dm.getByTestId("cbt-popup");
   await expect(popup.getByTestId("cbt-popup-tohit")).toHaveValue(String(total));
+  await expect(popup.locator('label[for="cbt-popup-tohit"]')).toContainText(`+ ${part} Bless`);
   await dm.getByTestId("cbt-popup-dismiss").click();
 
   // DM: view Goblin Ambush; Goblin 2's token → Apply effect ▸ Bane → Apply.
