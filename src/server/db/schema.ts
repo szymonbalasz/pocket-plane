@@ -13,6 +13,7 @@ import { TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
 import { FOG_EDIT_KINDS, FOG_FILLS } from "@shared/fog-of-war/schemas";
+import { DIAGONAL_RULES, type Door, TEMPLATE_SHAPES, type Wall } from "@shared/scene-tools/schemas";
 import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
@@ -828,6 +829,119 @@ export const sceneFogEdit = sqliteTable(
 /** CON-20: `seq` for undo entries, computed by the DB inside the insert's transaction. */
 export const sceneFogEditSeqNext = sql<number>`(select coalesce(max(${sceneFogEdit.seq}), 0) + 1 from ${sceneFogEdit})`;
 
+// ---------------------------------------------------------------------------------------------
+// Scene tools (SCN §8, data model §25; fix/scn-core). scene-tools writes the rows. Every scene
+// table cascades with its scene. `fogged` on prop / template is fog's server copy (ADR-0039),
+// written through `deriveSceneObject`; never in an intent.
+// ---------------------------------------------------------------------------------------------
+
+/** Walls and doors of a scene (FR-SCN-07): one row per scene, created on the first edit. */
+export const sceneStructure = sqliteTable(
+  "scene_structure",
+  {
+    sceneId: text("scene_id")
+      .primaryKey()
+      .references((): AnySQLiteColumn => scene.id, { onDelete: "cascade" }),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    /** +1 per edit (concurrent DM tabs, SCN §11). */
+    rev: integer("rev").notNull(),
+    /** Next segment `n`; unique per scene. */
+    nextN: integer("next_n").notNull(),
+    /** JSON leaf `[n, x1, y1, x2, y2][]`. */
+    walls: text("walls", { mode: "json" }).$type<Wall[]>().notNull(),
+    /** JSON leaf `[n, x1, y1, x2, y2, state, f][]`. */
+    doors: text("doors", { mode: "json" }).$type<Door[]>().notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("scene_structure_campaign").on(t.campaignId)],
+);
+
+/** DM-placed image on the objects layer (FR-SCN-16–19); ≤ 200 per scene, 2,000 per campaign. */
+export const prop = sqliteTable(
+  "prop",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    sceneId: text("scene_id")
+      .notNull()
+      .references((): AnySQLiteColumn => scene.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    /** Asset reference (FR-ASSET-15). */
+    assetId: text("asset_id")
+      .notNull()
+      .references((): AnySQLiteColumn => asset.id),
+    col: integer("col").notNull(),
+    row: integer("row").notNull(),
+    w: integer("w").notNull(),
+    h: integer("h").notNull(),
+    rotation: integer("rotation").notNull().default(0),
+    z: integer("z").notNull().default(0),
+    hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+    locked: integer("locked", { mode: "boolean" }).notNull().default(false),
+    /** Server copy: every footprint cell fogged (FR-SCN-35); wire only when true. */
+    fogged: integer("fogged", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("prop_seq").on(t.seq),
+    index("prop_scene").on(t.sceneId),
+    index("prop_campaign").on(t.campaignId),
+  ],
+);
+
+/** Kept AoE template (FR-SCN-20–27); ≤ 20 per scene. Ephemeral ones are signals only. */
+export const aoeTemplate = sqliteTable(
+  "aoe_template",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    sceneId: text("scene_id")
+      .notNull()
+      .references((): AnySQLiteColumn => scene.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    shape: text("shape", { enum: TEMPLATE_SHAPES }).notNull(),
+    /** Origin vertex. */
+    x: integer("x").notNull(),
+    y: integer("y").notNull(),
+    size: integer("size").notNull(),
+    /** Line only, else null. */
+    width: integer("width"),
+    angle: integer("angle").notNull(),
+    label: text("label").notNull().default(""),
+    /** Null = DM-placed (fog subject); else the placing player (FR-SCN-25, -27). */
+    placedByPlayerId: text("placed_by_player_id").references((): AnySQLiteColumn => player.id),
+    hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+    fogged: integer("fogged", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("aoe_template_seq").on(t.seq),
+    index("aoe_template_scene").on(t.sceneId),
+    index("aoe_template_campaign").on(t.campaignId),
+  ],
+);
+
+/** Campaign map settings (FR-SCN-29): no row = `5-10-5`. */
+export const mapSettings = sqliteTable("map_settings", {
+  campaignId: text("campaign_id")
+    .primaryKey()
+    .references((): AnySQLiteColumn => campaign.id),
+  diagonalRule: text("diagonal_rule", { enum: DIAGONAL_RULES }).notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/** CON-20: `seq` for props and templates, computed by the DB inside the insert's transaction. */
+export const propSeqNext = sql<number>`(select coalesce(max(${prop.seq}), 0) + 1 from ${prop})`;
+export const aoeTemplateSeqNext = sql<number>`(select coalesce(max(${aoeTemplate.seq}), 0) + 1 from ${aoeTemplate})`;
+
 export const schema = {
   dbMeta,
   campaign,
@@ -853,4 +967,8 @@ export const schema = {
   effectPreset,
   sceneFog,
   sceneFogEdit,
+  sceneStructure,
+  prop,
+  aoeTemplate,
+  mapSettings,
 };

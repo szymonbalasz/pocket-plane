@@ -13,6 +13,7 @@ import { fogOfWar } from "./fog-of-war";
 import { liveSync } from "./live-sync";
 import { notifications } from "./notifications";
 import { partyLootFeature } from "./party-loot";
+import { sceneTools } from "./scene-tools";
 import { scenesMap } from "./scenes-map";
 
 export const features: readonly Feature[] = [
@@ -30,4 +31,5 @@ export const features: readonly Feature[] = [
   combatExtras,
   effectModifiers,
   fogOfWar,
+  sceneTools,
 ];
