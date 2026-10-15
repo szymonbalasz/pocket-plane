@@ -41,7 +41,9 @@ export type Eligibility = (id: string) => "option" | "npc" | null;
  */
 export function createSheetMemory(
   getBackend: () => SheetMemoryBackend = () => window.localStorage,
-  warn: (msg: string, err?: unknown) => void = (m, e) => console.warn(m, e),
+  // No error → message only (no trailing "undefined" in the console).
+  warn: (msg: string, err?: unknown) => void = (m, e) =>
+    e === undefined ? console.warn(m) : console.warn(m, e),
 ) {
   const memory = new Map<string, string>();
   let failed = false;

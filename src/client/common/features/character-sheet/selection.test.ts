@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, spyOn, test } from "bun:test";
 import {
   bindSheetMemory,
   createSheetMemory,
@@ -99,6 +99,21 @@ describe("FR-CHARX-47 picker memory", () => {
       bindSheetMemory(P1, all);
       expect(sel().selectedId).toBeNull();
       expect(warnings).toHaveLength(1);
+    }
+  });
+
+  test("FR-CHARX-47 default console warning: corrupt entry → message only, no stray argument", () => {
+    store.data.set(P1, "{");
+    const spy = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      resetSheetMemory(createSheetMemory(() => store.backend));
+      bindSheetMemory(P1, all);
+      expect(spy.mock.calls).toEqual([
+        ['character-sheet: invalid picker memory "pp.sheet.v1.c1.p1"; using the default'],
+      ]);
+      expect(spy.mock.calls[0]).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
     }
   });
 
