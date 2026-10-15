@@ -132,11 +132,15 @@ function setup() {
   return { ...t, newScene, place, raw, tokenRow: row_, lastEvent };
 }
 
-describe("FR-FOG-24 registries (empty)", () => {
-  test("FR-FOG-24 both registries ship empty: no derive, no hides, no lifecycle rows", () => {
-    expect(sceneVisibilityHooks).toEqual([]);
+describe("FR-FOG-24 registries (fog's server lines only)", () => {
+  test("FR-FOG-24 fog registers derive + duplicated / deleting only; no fog row → nothing changes", () => {
+    // build/fog-server: `derive` and the lifecycle lines; `hides`, `dragToDm`, `created` come
+    // with build/fog-visibility (FOG §14), so nothing is hidden and new scenes get no row.
+    expect(sceneVisibilityHooks.map((h) => h.name)).toEqual(["fog-of-war.fogged"]);
+    expect(sceneVisibilityHooks.some((h) => h.hides || h.dragToDm)).toBe(false);
     // scene-tools' line (FR-SCN-31) only lists SCN rows, and these scenes have none.
-    expect(sceneHooks.filter((h) => !h.name.startsWith("scene-tools."))).toEqual([]);
+    expect(sceneHooks.map((h) => h.name)).toEqual(["fog-of-war.fog-row", "scene-tools.scene-rows"]);
+    expect(sceneHooks.some((h) => h.created)).toBe(false);
     const t = setup();
     const s = t.newScene();
     expect(t.lastEvent()?.changes.map((c) => c.type)).toEqual(["scene"]);

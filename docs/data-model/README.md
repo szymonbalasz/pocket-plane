@@ -1015,7 +1015,7 @@ From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD, `comple
 
 ## 24. Sprint 2: fog of war
 
-From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG, `complete`; DM gate 2, #196; [ADR-0039](../architecture/adr/0039-fog-visibility.md)). **Built by `fix/fog-core`**: the tables and column below (drizzle push), the zod shapes and pure mask code (`@shared/fog-of-war`: `schemas`, `mask` codec / box / re-base / footprint, `raster`, `visibility` `fogHidden`). Commands that write them: build/fog-server. Protocol side: [protocol §35](../protocol/README.md#35-sprint-2-phase-2-fog-of-war).
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG, `complete`; DM gate 2, #196; [ADR-0039](../architecture/adr/0039-fog-visibility.md)). **Built by `fix/fog-core`**: the tables and column below (drizzle push), the zod shapes and pure mask code (`@shared/fog-of-war`: `schemas`, `mask` codec / box / re-base / footprint, `raster`, `visibility` `fogHidden`). Commands that write them *(built, build/fog-server)*: `fog.edit` / `fog.setAll` / `fog.undo` and fog's `derive` / `duplicated` / `deleting` registry lines ([protocol §35](../protocol/README.md#35-sprint-2-phase-2-fog-of-war)). Protocol side: [protocol §35](../protocol/README.md#35-sprint-2-phase-2-fog-of-war).
 
 | Table / leaf | Change | Default (push-safe) | Visibility | Source |
 |---|---|---|---|---|
@@ -1040,12 +1040,13 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG, `complete`; DM gate
 |---|---|---|---|
 | id, campaignId, sceneId, seq | ID, ID → Campaign, ID → Scene (`ON DELETE CASCADE`), int | `seq` DB-assigned (`sceneFogEditSeqNext`, CON-20), unique; LIFO per scene by `seq`; ≤ 20 per scene (oldest dropped in the edit's transaction) | FR-FOG-07 |
 | kind | `reveal-rect` \| `reveal-polygon` \| `hide-rect` \| `hide-polygon` \| `reveal-all` \| `fog-all` | Undo Tooltip | FR-FOG-17 |
-| prevFill, prevCol0, prevRow0, prevCols, prevRows, prevRuns | the mask before the edit | Undo restores it | FR-FOG-07 |
+| prevFill, prevCol0, prevRow0, prevCols, prevRows, prevRuns | the mask before the edit | Undo restores it. *(build/fog-server)* The row as stored; a scene without a row → `clear`, box 0 × 0, `""` (undo writes that clear row back); a corrupt row → its fail-closed fully fogged mask | FR-FOG-07 |
 | createdAt | timestamp | `ctx.clock` | FOG §8 |
 
 - **Constraints the DB enforces:** `scene_fog` PK = scene (one row per scene); both tables cascade with their scene (FR-FOG-23); FKs to campaign; `scene_fog_edit.seq` unique; indexes `scene_fog_campaign`, `scene_fog_edit_scene (scene_id, seq)`, `scene_fog_edit_campaign`. Runs cap, box size and undo depth are command checks.
 - **Derived** (never stored): box (`fogBox(scene)`), mask ↔ runs (`maskOf`, `rowOf`), re-base (`rebase`), `footprintFogged` (every cell fogged; off-box cells take `fill`), fog-hidden (`fogHidden(type, record)`: `fogged` and not exempt: owned token, player-placed template), undo depth and latest edit (DM wire).
 - **Persisted runtime state:** fog rows, undo stacks and `fogged` copies, committed together (survive reload and a hard kill).
+- **Duplicate / delete** *(build/fog-server)*: `map.duplicateScene` copies the `scene_fog` row (not `scene_fog_edit`) before the copy's tokens, which derive `fogged` against it; `map.deleteScene` lists the `fog` delete, then the FK cascade removes row and stack.
 
 ## 25. Sprint 2: scene tools
 
@@ -1100,4 +1101,5 @@ From [scene-tools](../specs/scene-tools.md#8-data-model) (SCN, `complete`; DM ga
 - **Constraints the DB enforces:** one structure row per scene, one settings row per campaign (PKs); scene tables cascade with their scene; FKs to campaign, asset (prop), player (template); `prop.seq`, `aoe_template.seq` unique; indexes `scene_structure_campaign`, `prop_scene`, `prop_campaign`, `aoe_template_scene`, `aoe_template_campaign`. Segment, prop and template caps are command checks.
 - **Wire** (compact): no `seq` (except on props: draw order, FR-SCN-18), no timestamps; `campaignId` on the DM wire only (the registry's scope gate reads it from the record).
 - **Derived** (never stored): `propCells`, `templateCells(t, scene, {cut})`, `doorCells`, blocking segments (`blockingSegments`, FR-SCN-10), `distanceFt(a, b, rule)`.
-- **Persisted runtime state:** walls, door states and `f`, props, kept templates, `fogged` copies, the diagonal rule; each command commits rows + one event-log entry together.- **Snapshot size** (CON-44, heavy scenario after fix/scn-core): one typical prepped active scene (150 walls, 10 doors, 15 props, 3 kept templates with 40-char labels, `map-settings`) = 7,592 B DM, 3,418 B per player; heavy DM 671,280 B (115,152 B left of 786,432 B); players 277,035–280,095 B.
+- **Persisted runtime state:** walls, door states and `f`, props, kept templates, `fogged` copies, the diagonal rule; each command commits rows + one event-log entry together.
+- **Snapshot size** (CON-44, heavy scenario after fix/scn-core): one typical prepped active scene (150 walls, 10 doors, 15 props, 3 kept templates with 40-char labels, `map-settings`) = 7,592 B DM, 3,418 B per player; heavy DM 671,291 B (115,141 B left of 786,432 B); players 277,041–280,101 B.
