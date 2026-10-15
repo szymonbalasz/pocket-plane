@@ -215,7 +215,7 @@ describe("FR-CBTX-39 save log lines", () => {
     );
     t.run(setDeathSaves.name, { characterId: t.thornId, successes: 0, failures: 0 });
     expect(line(t, save(20))).toBe(
-      "Thorn — Death save: 20 = 20 — natural 20! — conscious (physical)",
+      "Thorn — Death save: 20 = 20 — natural 20, conscious (physical)",
     );
     t.hp("Thorn", "damage", 99);
     t.run(setDeathSaves.name, { characterId: t.thornId, successes: 2, failures: 0 });
