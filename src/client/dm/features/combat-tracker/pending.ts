@@ -5,7 +5,11 @@ import { DAMAGE_CARD_KIND } from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { encounterIdOfView, type NotificationViews } from "@ui/features/notifications/views";
 
-/** Pending rows linked to `encounterId` by their kind's view, oldest first. */
+/**
+ * Pending rows linked to `encounterId` by their kind's view: linked actions (concentration, a
+ * player's wait) before damage cards, so FR-CBT-77's 3-row cap never scrolls them away (sim-6
+ * glitch 1); oldest first within each.
+ */
 export function pendingForEncounter(
   notes: readonly NotificationRecord[],
   encounterId: string | null | undefined,
@@ -17,7 +21,7 @@ export function pendingForEncounter(
       (n) =>
         n.state === "pending" && encounterIdOfView(views.get(n.kind), n.payload) === encounterId,
     )
-    .sort((a, b) => a.seq - b.seq);
+    .sort((a, b) => Number(isDamageCard(a)) - Number(isDamageCard(b)) || a.seq - b.seq);
 }
 
 export const isDamageCard = (n: Pick<NotificationRecord, "kind">) => n.kind === DAMAGE_CARD_KIND;
