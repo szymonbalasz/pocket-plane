@@ -11,6 +11,7 @@
 // No line registered → no behaviour change.
 import { TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
 import type { Db } from "../../db/client";
+import { fogVisibilityHook } from "../fog-of-war/hooks";
 
 /** Read-only DB access: a command's `tx` or a signal audience's `read.db`. */
 export type SceneRead = Pick<Db, "select">;
@@ -41,7 +42,9 @@ export interface SceneVisibilityHook {
 }
 
 /** The registry. Append your feature's line; order = run order. */
-export const sceneVisibilityHooks: readonly SceneVisibilityHook[] = [];
+export const sceneVisibilityHooks: readonly SceneVisibilityHook[] = [
+  fogVisibilityHook, // fog-of-war (FR-FOG-10: derive)
+];
 
 /** Live hook list, seeded from the registry; tests may add hooks via `register`. */
 export class SceneVisibilityHooks {
