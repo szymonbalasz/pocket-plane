@@ -5,12 +5,17 @@ import { MonsterStatBlock } from "@shared/entities/schemas";
 import { type Fields, formStatBlock } from "./creature-form";
 import {
   addAction,
+  applyReady,
+  cardShape,
   hpAfter,
   hpDialogText,
   naturalContradiction,
   presetHit,
   previewText,
+  rowPreset,
+  shownTotal,
   targetList,
+  totalOf,
   undoLabel,
 } from "./targets";
 
@@ -236,5 +241,37 @@ describe("FR-CBT-57 popup natural", () => {
   test("FR-CBT-57 popup natural: hit preset unchanged (nat 1 miss, nat 20 hit)", () => {
     expect(presetHit(1, 30, 15)).toBe(false);
     expect(presetHit(20, 5, 15)).toBe(true);
+  });
+});
+
+describe("FR-CBT-72 popup", () => {
+  const roll = { rollId: "r", dice: [], constant: 0, total: 5, manual: false };
+  test("FR-CBT-72 card shape: full, to-hit-only, damage-only", () => {
+    expect(cardShape({ toHit: roll, damage: roll })).toBe("full");
+    expect(cardShape({ toHit: roll, damage: null })).toBe("toHit");
+    expect(cardShape({ toHit: null, damage: roll })).toBe("damage");
+  });
+
+  test("FR-CBT-72 Apply enabled: to-hit-only + all Miss ✓, a Hit ✗ until a total; no rows / > 20 ✗", () => {
+    expect(applyReady([false, false], null, false)).toBe(true);
+    expect(applyReady([false, true], null, false)).toBe(false);
+    expect(applyReady([false, true], 7, false)).toBe(true);
+    expect(applyReady([], 7, false)).toBe(false);
+    expect(applyReady([true], 7, true)).toBe(false);
+  });
+
+  test("FR-CBT-72 damage-only rows preset Hit whatever the AC; else the to-hit rule", () => {
+    expect(rowPreset("damage", null, 0, 30)).toBe(true);
+    expect(rowPreset("toHit", 12, 14, 15)).toBe(false);
+    expect(rowPreset("full", 12, 16, 15)).toBe(true);
+  });
+
+  test("FR-CBT-72 attached damage fills the cell unless the DM typed a total", () => {
+    expect(shownTotal(null, undefined)).toBe("");
+    expect(shownTotal(null, 7)).toBe("7"); // the Damage attached while open
+    expect(shownTotal("9", 7)).toBe("9"); // a typed total stays
+    expect(totalOf("")).toBeNull();
+    expect(totalOf("x")).toBeNull();
+    expect(totalOf(" 12 ")).toBe(12);
   });
 });
