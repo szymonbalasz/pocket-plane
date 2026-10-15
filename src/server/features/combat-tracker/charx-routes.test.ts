@@ -5,9 +5,9 @@ import { describe, expect, test } from "bun:test";
 import { CHARX_INTENTS } from "@shared/character-sheet/sheet";
 import {
   type AttackResult,
-  DamageCardPayload,
   type EncounterRecord,
   type HpChangeRecord,
+  parseFullCard,
 } from "@shared/combat-tracker/schemas";
 import { asc, eq } from "drizzle-orm";
 import { gameLogEntry, hpChange, notification, roll } from "../../db/schema";
@@ -66,7 +66,7 @@ function setup() {
       actor,
     );
   const payload = (cardId: string) =>
-    DamageCardPayload.parse(
+    parseFullCard(
       t.s.db.select().from(notification).where(eq(notification.id, cardId)).get()?.payload,
     );
   const labels = (rollIds: string[]) =>

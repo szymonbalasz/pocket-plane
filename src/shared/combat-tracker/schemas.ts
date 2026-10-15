@@ -4,6 +4,7 @@ import { DeathCounters, TempHp } from "@shared/combat-extras/schemas";
 import { ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
 import { Ability } from "@shared/entities/schemas";
 import { DamageMultiplier } from "@shared/events/combat-tracker";
+import { CellIndex } from "@shared/scenes-map/schemas";
 import { z } from "zod";
 
 export { DamageMultiplier };
@@ -40,6 +41,8 @@ export const CBT_INTENTS = {
   prevTurn: "cbt.prevTurn",
   setRemoved: "cbt.setRemoved",
   attack: "cbt.attack",
+  /** FR-CBT-71 (sprint 2): schema here; the command lands in fix/combat2-split-attack. */
+  rollDamage: "cbt.rollDamage",
   applyCard: "cbt.applyCard",
   applyHp: "cbt.applyHp",
   undo: "cbt.undo",
@@ -273,18 +276,49 @@ export const CardRoll = z.strictObject({
   total: z.int(),
   manual: z.boolean(),
 });
-export const DamageCardPayload = z.strictObject({
-  encounterId: z.string(),
-  attackerId: z.string(),
-  attackerName: z.string(),
-  attackName: z.string(),
-  damageType: z.string().nullable(),
-  mode: RollMode,
-  crit: z.boolean(),
-  toHit: CardRoll.extend({ natural: z.int().nullable() }),
-  damage: CardRoll,
-});
+export const CardToHit = CardRoll.extend({ natural: z.int().nullable() });
+export type CardToHit = z.infer<typeof CardToHit>;
+export type CardRoll = z.infer<typeof CardRoll>;
+
+/** A save spell's DC on a damage-only card ("— DC 13 DEX", FR-CBT-71). */
+export const CardSaveDc = z.strictObject({ dc: z.int().min(1).max(30), ability: Ability });
+
+/**
+ * Card payload. Sprint 2 (FR-CBT-70/71, ADR-0037): `toHit` and `damage` each nullable, never both
+ * (to-hit-only card from `cbt.attack {rolls: "toHit"}`, completed or damage-only from
+ * `cbt.rollDamage`); `attackId` / `spellId` = the sheet row Damage completes; `saveDc` on save
+ * spells. Rows stored before parse unchanged.
+ */
+export const DamageCardPayload = z
+  .strictObject({
+    encounterId: z.string(),
+    attackerId: z.string(),
+    attackerName: z.string(),
+    attackName: z.string(),
+    damageType: z.string().nullable(),
+    mode: RollMode,
+    crit: z.boolean(),
+    toHit: CardToHit.nullable(),
+    damage: CardRoll.nullable(),
+    attackId: z.string().optional(),
+    spellId: z.string().optional(),
+    saveDc: CardSaveDc.optional(),
+  })
+  .refine((p) => p.toHit !== null || p.damage !== null, {
+    path: ["damage"],
+    message: "A card needs a to-hit or a damage roll",
+  });
 export type DamageCardPayload = z.infer<typeof DamageCardPayload>;
+/** A card with both rolls (`cbt.attack`'s default, or a to-hit-only card once completed). */
+export type FullDamageCardPayload = DamageCardPayload & { toHit: CardToHit; damage: CardRoll };
+export const isFullCard = (p: DamageCardPayload): p is FullDamageCardPayload =>
+  p.toHit !== null && p.damage !== null;
+/** Parses a stored payload that must have both rolls; throws on a partial card. */
+export function parseFullCard(v: unknown): FullDamageCardPayload {
+  const p = DamageCardPayload.parse(v);
+  if (!isFullCard(p)) throw new Error("Damage card has no to-hit or no damage roll");
+  return p;
+}
 
 /** One target's outcome, seen by the rolling player (#138): no DM-only ids. */
 export const DamageCardTargetOutcome = z.strictObject({
@@ -315,7 +349,21 @@ export const DamageCardResolutionRead = z.union([
 
 // ---------- intents ----------
 
-export const StartInput = z.strictObject({ encounterId: Id, sceneId: Id });
+/** A grid cell (`at`, FR-CBT-65): where created tokens go; the server clamps it into the map. */
+export const GridCell = z.strictObject({ col: CellIndex, row: CellIndex });
+export type GridCell = z.infer<typeof GridCell>;
+
+/**
+ * `cbt.start` (FR-CBT-07; sprint 2 FR-CBT-64–66): `at` = the DM's free-area centre cell when it
+ * views the encounter's scene; `excludeCharacterIds` = party PCs left out (each a party member).
+ */
+export const StartInput = z.strictObject({
+  encounterId: Id,
+  sceneId: Id,
+  at: GridCell.optional(),
+  excludeCharacterIds: z.array(Id).max(50).optional(),
+});
+export type StartInput = z.input<typeof StartInput>;
 export const EndInput = z.strictObject({ encounterId: Id });
 export const RollInitiativeInput = z.strictObject({
   combatantIds: z.array(Id).min(1).max(50),
@@ -335,24 +383,61 @@ export const TurnInput = z.strictObject({
 });
 export type TurnInput = z.input<typeof TurnInput>;
 export const SetRemovedInput = z.strictObject({ combatantId: Id, removed: z.boolean() });
+/** FR-CBT-70: what `cbt.attack` rolls. */
+export const AttackRolls = z.enum(["both", "toHit"]);
+export type AttackRolls = z.infer<typeof AttackRolls>;
 export const AttackInput = z
   .strictObject({
     attackerId: Id,
     mode: RollMode.default("normal"),
-    /** FR-CBT-17: two entries, to-hit first. */
-    manual: z.array(ManualEntry).length(2).optional(),
+    /** FR-CBT-17: two entries, to-hit first (one with `rolls: "toHit"`). */
+    manual: z.array(ManualEntry).min(1).max(2).optional(),
     /** FR-CHARX-24 (OQ-CBT-47): one attack row; absent (and no `spellId`) = the first attack. */
     attackId: Id.optional(),
     /** FR-CHARX-24: a sheet spell with `roll: attack` and damage. */
+    spellId: Id.optional(),
+    /**
+     * FR-CBT-70 (sprint 2): `toHit` rolls the d20 only (card `damage: null`; `manual` then holds
+     * one entry); absent = `both`.
+     */
+    rolls: AttackRolls.optional(),
+  })
+  .refine((v) => v.attackId === undefined || v.spellId === undefined, {
+    path: ["spellId"],
+    message: "Either an attack or a spell",
+  })
+  .refine((v) => v.manual === undefined || v.manual.length === (v.rolls === "toHit" ? 1 : 2), {
+    path: ["manual"],
+    message: "One manual entry per roll",
+  });
+export type AttackInput = z.input<typeof AttackInput>;
+export const AttackResult = z.object({ cardId: z.string(), rollIds: z.array(z.string()) });
+export type AttackResult = z.infer<typeof AttackResult>;
+
+/**
+ * `cbt.rollDamage` (FR-CBT-71, ADR-0037): completes the attacker's latest pending to-hit-only
+ * card of the same row, else makes a damage-only card. `manual`: one entry (the implied, doubled
+ * on a crit, expression).
+ */
+export const RollDamageInput = z
+  .strictObject({
+    attackerId: Id,
+    manual: ManualEntry.optional(),
+    attackId: Id.optional(),
     spellId: Id.optional(),
   })
   .refine((v) => v.attackId === undefined || v.spellId === undefined, {
     path: ["spellId"],
     message: "Either an attack or a spell",
   });
-export type AttackInput = z.input<typeof AttackInput>;
-export const AttackResult = z.object({ cardId: z.string(), rollIds: z.array(z.string()) });
-export type AttackResult = z.infer<typeof AttackResult>;
+export type RollDamageInput = z.input<typeof RollDamageInput>;
+/** `attached` = completed an existing card (`NotificationUpdated`), else a new card. */
+export const RollDamageResult = z.object({
+  cardId: z.string(),
+  rollIds: z.array(z.string()),
+  attached: z.boolean(),
+});
+export type RollDamageResult = z.infer<typeof RollDamageResult>;
 export const ApplyCardTarget = z.strictObject({
   targetId: Id,
   hit: z.boolean(),
@@ -360,11 +445,15 @@ export const ApplyCardTarget = z.strictObject({
 });
 export type ApplyCardTarget = z.infer<typeof ApplyCardTarget>;
 
-/** `cbt.applyCard` (FR-CBT-34): 1–20 unique targets, all or nothing. */
+/**
+ * `cbt.applyCard` (FR-CBT-34): 1–20 unique targets, all or nothing. Sprint 2 (FR-CBT-72): the
+ * totals are optional on the wire; the server requires `toHitTotal` iff the card has `toHit`, and
+ * `damageTotal` unless the card has no damage roll and every target misses (`invalid`).
+ */
 export const ApplyCardTargetsInput = z.strictObject({
   cardId: Id,
-  toHitTotal: z.int().min(-20).max(99),
-  damageTotal: z.int().min(0).max(999),
+  toHitTotal: z.int().min(-20).max(99).optional(),
+  damageTotal: z.int().min(0).max(999).optional(),
   targets: z
     .array(ApplyCardTarget)
     .min(1)

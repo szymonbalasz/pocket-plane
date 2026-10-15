@@ -4,9 +4,9 @@ import { critExpression, rawDamage } from "@shared/combat-tracker/rules";
 import {
   type AttackResult,
   COMBATANT_TYPE,
-  DamageCardPayload,
   type HpChangeRecord,
   type HpChangesResult,
+  parseFullCard,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
@@ -42,7 +42,7 @@ function started() {
     targets: readonly (string | [string, TargetOpts])[],
     o: Record<string, unknown> = {},
   ) => {
-    const p = DamageCardPayload.parse(card(cardId)?.payload);
+    const p = parseFullCard(card(cardId)?.payload);
     const { hit = true, multiplier = "normal", ...shared } = o;
     return t.run<HpChangesResult>(applyCard.name, {
       cardId,
@@ -92,7 +92,7 @@ describe("FR-CBT-16 FR-CBT-17 FR-CBT-18 attack", () => {
       state: "pending",
       text: "Mira: 19 to hit, 6 piercing",
     });
-    const p = DamageCardPayload.parse(card?.payload);
+    const p = parseFullCard(card?.payload);
     expect(p).toMatchObject({
       attackerName: "Mira",
       attackName: "Shortsword",
@@ -143,7 +143,7 @@ describe("FR-CBT-16 FR-CBT-17 FR-CBT-18 attack", () => {
     expect(critExpression("1d6+2")).toBe("2d6+2");
     expect(critExpression("2d4+2")).toBe("4d4+2");
     const r = t.attack("Goblin", 20, 12);
-    const p = DamageCardPayload.parse(t.card(r.cardId)?.payload);
+    const p = parseFullCard(t.card(r.cardId)?.payload);
     expect(p).toMatchObject({ crit: true, damage: { total: 14 } });
     expect(t.card(r.cardId)?.text).toContain("(critical)");
     // 12 on 1d6 without a crit → invalid, nothing written.
@@ -155,14 +155,14 @@ describe("FR-CBT-16 FR-CBT-17 FR-CBT-18 attack", () => {
       attackerId: t.id("Goblin"),
       mode: "advantage",
     });
-    const ap = DamageCardPayload.parse(t.card(adv.cardId)?.payload);
+    const ap = parseFullCard(t.card(adv.cardId)?.payload);
     expect(ap.toHit.dice).toHaveLength(2);
     expect(ap.mode).toBe("advantage");
   });
 
   test("FR-CBT-18 card payload ≤ 1 KB at 50 dice", () => {
     const die: [number, boolean] = [6, true];
-    const p = DamageCardPayload.parse({
+    const p = parseFullCard({
       encounterId: "e".repeat(36),
       attackerId: "a".repeat(36),
       attackerName: "n".repeat(40),

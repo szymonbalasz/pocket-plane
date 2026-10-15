@@ -7,7 +7,7 @@ import {
   effectVisibleToPlayers,
   redactEffect,
 } from "@shared/combat-extras/schemas";
-import { DamageCardPayload } from "@shared/combat-tracker/schemas";
+import { parseFullCard } from "@shared/combat-tracker/schemas";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { Config } from "../../config";
 import { closeDb, type Db, openMemoryDb } from "../../db/client";
@@ -405,7 +405,7 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
     );
     if (i < 10) {
       const row = db.select().from(notification).where(eq(notification.id, a.cardId)).get();
-      const p = DamageCardPayload.parse(row?.payload);
+      const p = parseFullCard(row?.payload);
       run("cbt.applyCard", {
         cardId: a.cardId,
         toHitTotal: p.toHit.total,

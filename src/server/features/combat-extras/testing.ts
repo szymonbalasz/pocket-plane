@@ -5,8 +5,8 @@ import type { AddEffectInput } from "@shared/combat-extras/intents";
 import type { EffectRecord } from "@shared/combat-extras/schemas";
 import {
   type AttackResult,
-  DamageCardPayload,
   type HpChangeRecord,
+  parseFullCard,
   type UndoResult,
 } from "@shared/combat-tracker/schemas";
 import type { CharacterRecord } from "@shared/entities/schemas";
@@ -117,7 +117,7 @@ export function cbtxSetup(opts: { round1?: boolean } = {}) {
       o.actor ?? t.h.dm,
     );
     const card = note(r.cardId) as NotificationRecord;
-    const p = DamageCardPayload.parse(card.payload);
+    const p = parseFullCard(card.payload);
     t.run(applyCard.name, {
       cardId: r.cardId,
       toHitTotal: p.toHit.total,
