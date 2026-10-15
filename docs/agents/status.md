@@ -2,16 +2,16 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 1 complete (#186). **Sprint 2 planned, not started** (#187, #188): [sprint-2](sprint-2.md). Phase 1 = DM playtest notes + glitches (Q, P2a, P2b, M), then phase 2 = F fog of war + B props / structure. Next: phase 1 spec agents + `fix/asset-cache`.
+**Phase:** Sprint 1 complete (#186). **Sprint 2 phase 1 running** (#187, #188): [sprint-2](sprint-2.md). Q builder + P2a / P2b / M spec agents started 2026-10-15. Next: settle P2a/P2b/M seams, one review, DM gate 1.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Q: token art cache bug (N2) | `fix/asset-cache` | — | Not started | Builder (root cause first) |
-| P2a: combat notes + glitches | `spec/polish-2a` | — | Not started | Spec agent |
-| P2b: sheet + shell notes + glitches | `spec/polish-2b` | — | Not started | Spec agent |
-| M: effect modifiers (N9) | `spec/effect-modifiers` | — | Not started | Spec agent |
+| Q: token art cache bug (N2) | `fix/asset-cache` (w2E, slot 0) | build-asset-cache | Root cause first | Walkthrough |
+| P2a: combat notes + glitches | `spec/polish-2a` (w2F) | spec-polish-2a | Spec | Seams, review |
+| P2b: sheet + shell notes + glitches | `spec/polish-2b` (w2G) | spec-polish-2b | Spec | Seams, review |
+| M: effect modifiers (N9) | `spec/effect-modifiers` (w2H) | spec-effect-modifiers | Spec | Seams, review |
 | F: fog of war (phase 2) | `spec/fog-of-war` | — | After phase 1 | — |
 | B: props + structure (phase 2) | `spec/scene-tools` | — | After phase 1 | — |
 
