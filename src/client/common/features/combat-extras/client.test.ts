@@ -8,7 +8,17 @@ import type { TokenView } from "@shared/scenes-map/schemas";
 import { turnAlertFor } from "../combat-tracker/turn-alert";
 import type { TokenOverlayView } from "../scenes-map/token-overlays";
 import { concentrationOutcome } from "./concentration";
-import { chipOrder, chipText, deadPc, deathStateFor, splitNumbered } from "./logic";
+import {
+  CHIP_MAX_W,
+  chipLabel,
+  chipOrder,
+  chipText,
+  deadPc,
+  deathStateFor,
+  fitChips,
+  MORE_W,
+  splitNumbered,
+} from "./logic";
 import { deathSavesAvailable } from "./sheet-sections";
 import { cbtxTokenOverlay } from "./token-overlay";
 
@@ -209,6 +219,30 @@ describe("FR-CBTX-33 FR-CBTX-34 chips, death state", () => {
       "Exhaustion 2",
       "Bless 9r",
     ]);
+  });
+
+  test("FR-CBTX-46 chip fit: compact labels incl. 'Exh 2'; given widths: all fit → no +N, one too many → +1", () => {
+    const list = [
+      fx("c", { kind: "concentration", label: "Bless", endsRound: 11 }),
+      fx("b", { condition: "exhaustion", level: 2 }),
+      fx("p", { condition: "prone" }),
+      fx("a", { kind: "custom", label: "Bless", endsRound: 11 }),
+    ] as Parameters<typeof chipOrder>[0];
+    expect(chipOrder(list).map((e) => chipLabel(e, 2))).toEqual([
+      "Bless",
+      "Exh 2",
+      "Prone",
+      "Bless 9r",
+    ]);
+    // Full text stays the Tooltip's.
+    expect(chipText(list[0] as (typeof list)[0], 2)).toBe("Concentrating: Bless 9r");
+    // Room = the name line left after the full name; gap 2 between chips.
+    expect(fitChips([40, 50], 92)).toBe(2);
+    expect(fitChips([40, 50], 200)).toBe(2);
+    expect(fitChips([40, 50, 40], 92)).toBe(1); // 40 + 2 + "+N" fits, 92 does not
+    expect(fitChips([40, 50, 40], 40 + 2 + 50 + 2 + MORE_W)).toBe(2);
+    expect(fitChips([CHIP_MAX_W], 20)).toBe(0);
+    expect(fitChips([], 0)).toBe(0);
   });
 
   test("FR-CBTX-25 dead PC (client copy) and death state from either shape", () => {

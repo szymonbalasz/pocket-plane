@@ -89,6 +89,7 @@ function PlayerInitiativeBody() {
               <div className="flex min-w-0 flex-1 items-center gap-1">
                 <RowName name={c.name} testId="cbt-init-row-name" className="text-sm" />
                 <EffectChips
+                  compact
                   effects={effectsOn(fx, creatureOf(c))}
                   round={enc.round}
                   testId="cbtx-init-row-effect"
