@@ -6,12 +6,12 @@
 import type { SignalFrom } from "@shared/protocol/frames";
 import { pxToVertex } from "@shared/scene-tools/geometry";
 import {
-  type AoeTemplateRecord,
   FT_PER_CELL,
   TEMPLATE_ANGLE,
   TEMPLATE_SIZE,
   TEMPLATE_WIDTH,
   type TemplateGeometry,
+  type TemplateRecordView,
   type TemplateShape,
   type TemplateSignalData,
 } from "@shared/scene-tools/schemas";
@@ -110,7 +110,7 @@ export function templateCaption(label: string, n: number): string {
 
 /** FR-SCN-26: the DM edits any kept template; a player only one they placed. */
 export function canEditTemplate(
-  t: Pick<AoeTemplateRecord, "placedByPlayerId">,
+  t: Pick<TemplateRecordView, "placedByPlayerId">,
   client: "dm" | "player",
   myPlayerId: string | null,
 ): boolean {

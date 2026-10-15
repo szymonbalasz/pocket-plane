@@ -96,6 +96,13 @@ describe("SCN §13 templates over sockets (scene-tools bundle)", () => {
     );
     expect(p1.raw()).not.toContain("Glyph");
     expect(leakScan(h.s, p1)).toEqual([]);
+    // SCN §8 compact wire: players get no campaignId; the DM wire keeps it (scope gate).
+    expect(Object.values(p1.store.records[AOE_TEMPLATE_TYPE] ?? {})).not.toContainEqual(
+      expect.objectContaining({ campaignId: expect.anything() }),
+    );
+    for (const r of Object.values(dm2.store.records[AOE_TEMPLATE_TYPE] ?? {})) {
+      expect(r).toHaveProperty("campaignId");
+    }
     for (const c of [dm2, p1]) c.close();
   });
 
@@ -204,6 +211,14 @@ describe("SCN §13 templates over sockets (scene-tools bundle)", () => {
     await intent(dm, S.updateTemplate, { templateId: glyph, hidden: false });
     await barrier(p2);
     expect(labels(p2)).toEqual(["Fireball", "Glyph", "Spirit Guardians"]);
+    // Event upserts (place, move, reveal) carry no campaignId to players either.
+    const upserts = p2.frames.flatMap((f) =>
+      f.type === "event"
+        ? f.changes.filter((c) => c.type === AOE_TEMPLATE_TYPE && c.op === "upsert")
+        : [],
+    );
+    expect(upserts.length).toBeGreaterThanOrEqual(3);
+    for (const c of upserts) expect(c).not.toHaveProperty("data.campaignId");
     await intent(dm, S.updateTemplate, { templateId: glyph, hidden: true });
     await barrier(p2);
     expect(labels(p2)).toEqual(["Fireball", "Spirit Guardians"]);

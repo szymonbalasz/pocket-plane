@@ -4,7 +4,7 @@
 // sees it live with its squares, Keep, reload, it is still there.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { openWindow, shellWindow } from "./support/shell";
+import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 interface TemplateNode {
   id: string;
@@ -66,7 +66,8 @@ test("FR-SCN-22 / -23 / -25 player places a sphere, the DM sees it live, Keep, r
   const dm = await rolePage(browser);
   await loginDm(dm, secret);
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
-  await shellWindow(dm, "cbt.initiative").getByTestId("ui-window-close").click();
+  // The Initiative window starts minimised (p3-polish), so it covers no map.
+  await expect(launcherButton(dm, "cbt.initiative")).toHaveAttribute("data-state", "minimised");
   const scenes = await openWindow(dm, "map.scenes");
   await scenes
     .locator(`[data-testid="map-scene-row"][data-record-id="${ambush}"] button`)

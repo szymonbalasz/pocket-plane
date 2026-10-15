@@ -10,8 +10,8 @@
 import { templateCells } from "@shared/scene-tools/geometry";
 import {
   AOE_TEMPLATE_TYPE,
-  type AoeTemplateRecord,
   SCN_SIGNALS,
+  type TemplateRecordView,
   TemplateSignalData,
 } from "@shared/scene-tools/schemas";
 import { useEffect, useMemo, useState } from "react";
@@ -133,7 +133,7 @@ function TemplateNode({ d }: { d: Drawn }) {
   );
 }
 
-const keptView = (r: AoeTemplateRecord): TemplateView => ({
+const keptView = (r: TemplateRecordView): TemplateView => ({
   shape: r.shape,
   x: r.x,
   y: r.y,
@@ -152,7 +152,7 @@ export function ScnTemplatesLayer() {
   const toolOn = activeTool?.id === "aoe";
 
   // ---- kept templates of the shown scene ----
-  const byId = store.records[AOE_TEMPLATE_TYPE] as Record<string, AoeTemplateRecord> | undefined;
+  const byId = store.records[AOE_TEMPLATE_TYPE] as Record<string, TemplateRecordView> | undefined;
   const kept = useMemo(
     () => Object.values(byId ?? {}).filter((r) => r.sceneId === scene.id),
     [byId, scene.id],

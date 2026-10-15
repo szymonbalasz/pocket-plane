@@ -4,9 +4,9 @@
 // template and the kept templates this client may edit on the shown scene (the layer keeps
 // that fresh). Client only; the server validates every intent.
 import {
-  type AoeTemplateRecord,
   SCN_INTENTS,
   SCN_SIGNALS,
+  type TemplateRecordView,
   type TemplateSignalData,
 } from "@shared/scene-tools/schemas";
 import { create } from "zustand";
@@ -37,7 +37,7 @@ export interface AoeState {
   selectedId: string | null;
   /** Written by `TemplatesLayer`: the shown scene and the kept templates this client may edit. */
   sceneId: string | null;
-  editable: readonly AoeTemplateRecord[];
+  editable: readonly TemplateRecordView[];
 }
 
 export const useAoe = create<AoeState>(() => ({

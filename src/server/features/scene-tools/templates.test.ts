@@ -7,6 +7,7 @@ import { templateCells } from "@shared/scene-tools/geometry";
 import {
   AOE_TEMPLATE_TYPE,
   type AoeTemplateRecord,
+  PlayerAoeTemplateRecord,
   SCN_INTENTS as S,
   TEMPLATES_PER_SCENE_MAX,
   type TemplateSignalData,
@@ -287,7 +288,7 @@ describe("FR-SCN-26 persistent edits", () => {
 });
 
 describe("FR-SCN-27 visibility of kept templates", () => {
-  test("FR-SCN-27 DM full; players full (incl. placedByPlayerId) unless hidden; other scenes none", () => {
+  test("FR-SCN-27 DM full; players every field but campaignId (incl. placedByPlayerId) unless hidden; other scenes none", () => {
     const t = setup();
     const mine = t.place(sphere(t.ambush.id, { label: "Fireball" }), t.p1);
     const glyph = t.place(sphere(t.ambush.id, { hidden: true, label: "Glyph" }));
@@ -295,7 +296,9 @@ describe("FR-SCN-27 visibility of kept templates", () => {
     expect(t.ids(t.h.viewer("dm"))).toEqual([mine, glyph]);
     for (const p of [t.h.p1, t.h.p2]) {
       const snap = t.h.snapshot(t.h.viewer("player", p.id));
-      expect(snap[AOE_TEMPLATE_TYPE]).toEqual([t.tpl(mine) as AoeTemplateRecord]);
+      const { campaignId: _cid, ...wire } = t.tpl(mine) as AoeTemplateRecord;
+      expect(snap[AOE_TEMPLATE_TYPE]).toEqual([wire]);
+      expect(PlayerAoeTemplateRecord.strict().safeParse(wire).success).toBe(true);
       const frame = JSON.stringify(snap);
       for (const leak of ["Glyph", glyph, cellar, "Cellar trap"]) {
         expect(frame).not.toContain(leak);
