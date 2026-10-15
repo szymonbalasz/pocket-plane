@@ -14,7 +14,8 @@ export type WindowAction =
   | { type: "minimise"; kind: string; instance?: string }
   | { type: "focus"; kind: string; instance?: string }
   | { type: "toggle"; kind: string; instance?: string }
-  | { type: "setRect"; kind: string; instance?: string; rect: Rect }
+  /** Move / resize end. `resized`: a user resize; on a `growToContent` type it sets `fixedH`. */
+  | { type: "setRect"; kind: string; instance?: string; rect: Rect; resized?: boolean }
   /**
    * The kind just became available (e.g. player `cbt.initiative` on Start). If it is open, still
    * at its default-layout geometry (never moved) and would cover a window on screen, it goes to
@@ -153,7 +154,8 @@ function patch(
     next.h === cur.h &&
     next.z === cur.z &&
     next.area?.w === cur.area?.w &&
-    next.area?.h === cur.area?.h
+    next.area?.h === cur.area?.h &&
+    next.fixedH === cur.fixedH
   ) {
     return ws;
   }
@@ -229,13 +231,30 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
         w: bound(Math.max(def.minSize.w, r.w), 1),
         h: bound(Math.max(def.minSize.h, r.h), 1),
         area: workArea(ctx.viewport),
+        // FR-SHELL-39: after a user resize the stored height wins (cleared by reset).
+        ...(action.resized && def.growToContent && { fixedH: true as const }),
       }));
     }
   }
+}
+
+/**
+ * Windows mounted now (FR-SHELL-36): open ones shown, minimised ones parked (mounted, hidden,
+ * state kept). Closed windows and unavailable kinds are unmounted whatever their state.
+ */
+export function mountedWindows(ws: Windows, available: ReadonlySet<string>): WindowState[] {
+  return ws.filter((w) => w.state !== "closed" && available.has(w.kind));
 }
 
 export type LauncherState = "open" | "minimised" | "closed";
 
 export function launcherState(ws: Windows, kind: string, instance = MAIN_INSTANCE): LauncherState {
   return find(ws, kind, instance)?.state ?? "closed";
+}
+
+/** Launcher button Tooltip per state (FR-SHELL-37). */
+export function launcherTooltip(label: string, state: LauncherState): string {
+  if (state === "open") return `${label} (open)`;
+  if (state === "minimised") return `${label} (minimised — click to restore)`;
+  return label;
 }

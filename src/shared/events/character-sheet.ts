@@ -33,7 +33,7 @@ export const CharacterHpAdjusted = defineEvent({
   undoable: false,
 });
 
-/** `char.roll` kinds: CHAR's four + CHARX's (FR-CHARX-20). */
+/** `char.roll` kinds: CHAR's four + CHARX's (FR-CHARX-20) + to-hit only (FR-CHARX-42, N7). */
 export const CHARACTER_ROLL_KINDS = [
   "initiative",
   "attack",
@@ -43,6 +43,8 @@ export const CHARACTER_ROLL_KINDS = [
   "damage",
   "spellAttack",
   "spellDamage",
+  "toHit",
+  "spellToHit",
 ] as const;
 
 /** `char.roll`: changes = `game-log-entry` upsert (#67: not undoable). */
@@ -56,9 +58,9 @@ export const CharacterRolled = defineEvent({
       ability: Ability.optional(),
       /** Kind `skill` only (FR-CHARX-20). */
       skill: SkillName.optional(),
-      /** Attack row of `attack` / `damage` (FR-CHARX-20); absent = the first attack. */
+      /** Attack row of `attack` / `damage` / `toHit` (FR-CHARX-20, -42); absent = the first. */
       attackId: Id.optional(),
-      /** Spell row of `spellAttack` / `spellDamage` (FR-CHARX-20). */
+      /** Spell row of `spellAttack` / `spellDamage` / `spellToHit` (FR-CHARX-20, -42). */
       spellId: Id.optional(),
       mode: RollMode,
       manual: z.boolean(),
@@ -72,8 +74,12 @@ export const CharacterRolled = defineEvent({
       (p) =>
         (p.ability === undefined || p.kind === "check" || p.kind === "save") &&
         (p.skill !== undefined) === (p.kind === "skill") &&
-        (p.attackId === undefined || p.kind === "attack" || p.kind === "damage") &&
-        (p.spellId !== undefined) === (p.kind === "spellAttack" || p.kind === "spellDamage"),
+        (p.attackId === undefined ||
+          p.kind === "attack" ||
+          p.kind === "damage" ||
+          p.kind === "toHit") &&
+        (p.spellId !== undefined) ===
+          (p.kind === "spellAttack" || p.kind === "spellDamage" || p.kind === "spellToHit"),
       { message: "Roll reference does not match the kind" },
     ),
   logged: true,

@@ -1,5 +1,6 @@
-// Actions tab (CHARX §7): attacks (Attack + Damage each), spellcasting header (spell attack, DC,
-// slot pips), spells grouped by level with their rolls. Edit mode: rows editable in place.
+// Actions tab (CHARX §7): attacks (Attack · Damage · Attack + damage each, §6.1), spellcasting
+// header (spell attack, DC, slot pips), spells grouped by level with their rolls. The only place
+// attacks are rolled (FR-CHARX-44). Edit mode: rows editable in place.
 import { signed } from "@shared/character-sheet/logic";
 import { CHARX_INTENTS, ROW_LIMITS, type SpellRow } from "@shared/character-sheet/sheet";
 import {
@@ -15,10 +16,18 @@ import {
 import { useSync } from "../../sync/store";
 import { SheetRoll } from "./CharacterSheet";
 import { IntField, OverrideControl, SelectField, SheetField, TextField, useBusy } from "./fields";
-import { PublicSwitch, usePublicOverrides } from "./rolls";
+import { type PublicOverrides, PublicSwitch, usePublicOverrides } from "./rolls";
 import { AddRow, RowTools, useRows } from "./rows";
 import { useSheet, useSheetIntents } from "./sheet-context";
-import { pipDelta, slotPips, spellGroups, spellLevelLabel } from "./view-model";
+import {
+  attackButtons,
+  pipDelta,
+  type RowRollButton,
+  slotPips,
+  spellButtons,
+  spellGroups,
+  spellLevelLabel,
+} from "./view-model";
 
 const damageText = (damage: string, type?: string) => (type ? `${damage} ${type}` : damage);
 
@@ -56,10 +65,56 @@ const typeOptions = [
   ...DAMAGE_TYPES.map((t) => ({ value: t, label: t })),
 ];
 
-function AttackRow({ a, index, count }: { a: Attack; index: number; count: number }) {
+/**
+ * FR-CHARX-41/43: a row's roll buttons in §6.1 order; each asks the roll routes with its own
+ * kind + the row's ref (a hidden claim drops that button only). DM public overrides are the
+ * Attacks block's switches (`charx-public-attack` / `-damage`, by the roll's category).
+ */
+function RowButtons({
+  buttons,
+  name,
+  rollRef,
+  rowId,
+  overrides,
+}: {
+  buttons: RowRollButton[];
+  name: string;
+  rollRef: { attackId?: string; spellId?: string };
+  rowId: string | undefined;
+  overrides: PublicOverrides;
+}) {
+  return (
+    <div className="flex justify-end gap-1.5">
+      {buttons.map((b) => (
+        <SheetRoll
+          key={b.kind}
+          kind={b.kind}
+          rollRef={rollRef}
+          title={`${name} ${b.label.toLowerCase()}`}
+          overrides={overrides}
+          data-testid={b.testId}
+          data-record-id={rowId}
+        >
+          {b.label}
+        </SheetRoll>
+      ))}
+    </div>
+  );
+}
+
+function AttackRow({
+  a,
+  index,
+  count,
+  overrides,
+}: {
+  a: Attack;
+  index: number;
+  count: number;
+  overrides: PublicOverrides;
+}) {
   const ctx = useSheet();
   const rows = useRows("attacks");
-  const overrides = usePublicOverrides();
   const e = ctx.editing && ctx.canEdit;
   const put = (patch: Partial<Attack>) => {
     const next: Record<string, unknown> = { ...a, ...patch };
@@ -114,35 +169,19 @@ function AttackRow({ a, index, count }: { a: Attack; index: number; count: numbe
           </span>
         </span>
       )}
-      <div className="flex justify-end gap-1.5">
-        <SheetRoll
-          kind="attack"
-          rollRef={ref}
-          title={`${a.name} attack`}
-          overrides={overrides}
-          data-testid="charx-roll-attack"
-          data-record-id={a.id}
-        >
-          Attack
-        </SheetRoll>
-        <SheetRoll
-          kind="damage"
-          rollRef={ref}
-          title={`${a.name} damage`}
-          overrides={overrides}
-          data-testid="charx-roll-damage"
-          data-record-id={a.id}
-        >
-          Damage
-        </SheetRoll>
-      </div>
+      <RowButtons
+        buttons={attackButtons()}
+        name={a.name}
+        rollRef={ref}
+        rowId={a.id}
+        overrides={overrides}
+      />
     </div>
   );
 }
 
-function AttacksBlock() {
+function AttacksBlock({ overrides }: { overrides: PublicOverrides }) {
   const ctx = useSheet();
-  const overrides = usePublicOverrides();
   const attacks = ctx.stats.attacks;
   const e = ctx.editing && ctx.canEdit;
   return (
@@ -166,7 +205,13 @@ function AttacksBlock() {
       </div>
       {attacks.length === 0 && !e && <p className="text-xs text-muted-foreground">No attacks</p>}
       {attacks.map((a, i) => (
-        <AttackRow key={a.id ?? `legacy-${i}`} a={a} index={i} count={attacks.length} />
+        <AttackRow
+          key={a.id ?? `legacy-${i}`}
+          a={a}
+          index={i}
+          count={attacks.length}
+          overrides={overrides}
+        />
       ))}
       {e && (
         <AddRow
@@ -413,11 +458,19 @@ function SpellEditor({ s, index, count }: { s: SpellRow; index: number; count: n
   );
 }
 
-function SpellRowView({ s, index, count }: { s: SpellRow; index: number; count: number }) {
+function SpellRowView({
+  s,
+  index,
+  count,
+  overrides,
+}: {
+  s: SpellRow;
+  index: number;
+  count: number;
+  overrides: PublicOverrides;
+}) {
   const ctx = useSheet();
-  const overrides = usePublicOverrides();
   const e = ctx.editing && ctx.canEdit;
-  const dmg = s.effect === "healing" ? "Healing" : "Damage";
   return (
     <div
       data-testid="charx-spell"
@@ -435,37 +488,18 @@ function SpellRowView({ s, index, count }: { s: SpellRow; index: number; count: 
       {!e && s.notes && (
         <p className="text-xs whitespace-pre-wrap text-muted-foreground">{s.notes}</p>
       )}
-      <div className="flex justify-end gap-1.5">
-        {s.roll === "attack" && (
-          <SheetRoll
-            kind="spellAttack"
-            rollRef={{ spellId: s.id }}
-            title={`${s.name} attack`}
-            overrides={overrides}
-            data-testid="charx-roll-spell-attack"
-            data-record-id={s.id}
-          >
-            Attack
-          </SheetRoll>
-        )}
-        {s.damage && (
-          <SheetRoll
-            kind="spellDamage"
-            rollRef={{ spellId: s.id }}
-            title={`${s.name} ${dmg.toLowerCase()}`}
-            overrides={overrides}
-            data-testid="charx-roll-spell-damage"
-            data-record-id={s.id}
-          >
-            {dmg}
-          </SheetRoll>
-        )}
-      </div>
+      <RowButtons
+        buttons={spellButtons(s)}
+        name={s.name}
+        rollRef={{ spellId: s.id }}
+        rowId={s.id}
+        overrides={overrides}
+      />
     </div>
   );
 }
 
-function SpellsBlock() {
+function SpellsBlock({ overrides }: { overrides: PublicOverrides }) {
   const ctx = useSheet();
   const spells = ctx.sheet.spells;
   const e = ctx.editing && ctx.canEdit;
@@ -479,7 +513,13 @@ function SpellsBlock() {
             {spellLevelLabel(g.level)}
           </span>
           {g.spells.map((s) => (
-            <SpellRowView key={s.id} s={s} index={spells.indexOf(s)} count={spells.length} />
+            <SpellRowView
+              key={s.id}
+              s={s}
+              index={spells.indexOf(s)}
+              count={spells.length}
+              overrides={overrides}
+            />
           ))}
         </div>
       ))}
@@ -496,11 +536,14 @@ function SpellsBlock() {
 }
 
 export function ActionsTab() {
+  // One set of DM public overrides for the tab: the Attacks block's switches apply to every
+  // attack / damage roll on it (FR-CHAR-22's rule; §6.1 "Public").
+  const overrides = usePublicOverrides();
   return (
     <div className="flex flex-col gap-2">
-      <AttacksBlock />
+      <AttacksBlock overrides={overrides} />
       <SpellcastingHeader />
-      <SpellsBlock />
+      <SpellsBlock overrides={overrides} />
     </div>
   );
 }

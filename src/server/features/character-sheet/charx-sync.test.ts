@@ -119,6 +119,55 @@ describe("character-sheet-full bundle over WS", () => {
     for (const c of [dm, p1, p2]) c.close();
   });
 
+  test("FR-CHARX-41 FR-CHARX-42 visibility per button: player rolls public, DM per category / override; others summary only", async () => {
+    const dm = await h.live(DM);
+    const p1 = await h.live(p("Player 1"));
+    const p2 = await h.live(p("Player 2"));
+    const mira = ids.Mira as string;
+    const sela = ids.Sela as string;
+    const block = ent(dm, mira)?.statBlock as { attacks: { id: string; name: string }[] };
+    const attacks = block.attacks;
+    const lc = attacks.find((a) => a.name === "Light crossbow")?.id as string;
+    const gb = sheetOf(dm, sela)?.spells.find((s) => s.name === "Guiding Bolt")?.id as string;
+    const entryOf = (c: TestClient, id: string) =>
+      c.store.records[GAME_LOG_ENTRY_TYPE]?.[id] as
+        | { public: boolean; category: string; rollIds: string[] }
+        | undefined;
+    const roll = async (c: TestClient, payload: object) => {
+      const f = await answer(c, c.intent("char.roll", payload));
+      expect(f.type).toBe("ack");
+      return (f as { result: { entryId: string; rollIds: string[] } }).result;
+    };
+    // Player: Attack (to-hit only), Damage, Attack + damage → public lines for everyone.
+    const btns = [
+      ["toHit", 1, "attack"],
+      ["damage", 1, "damage"],
+      ["attack", 2, "attack"],
+    ] as const;
+    for (const [kind, n, category] of btns) {
+      const r = await roll(p1, { characterId: mira, kind, attackId: lc });
+      expect(r.rollIds).toHaveLength(n);
+      await until(() => entryOf(p2, r.entryId) !== undefined);
+      expect(entryOf(p2, r.entryId)).toMatchObject({ public: true, category });
+    }
+    const st = await roll(p2, { characterId: sela, kind: "spellToHit", spellId: gb });
+    expect(st.rollIds).toHaveLength(1);
+    await until(() => entryOf(p1, st.entryId) !== undefined);
+    // DM, categories at defaults (hidden): DM-only; the per-category override shows it.
+    for (const [kind] of btns) {
+      const hidden = await roll(dm, { characterId: mira, kind, attackId: lc });
+      const shown = await roll(dm, { characterId: mira, kind, attackId: lc, public: true });
+      await until(() => entryOf(p2, shown.entryId) !== undefined);
+      expect(entryOf(dm, hidden.entryId)).toMatchObject({ public: false });
+      for (const c of [p1, p2]) expect(entryOf(c, hidden.entryId)).toBeUndefined();
+    }
+    // Rolling never leaks the stat block: other players keep the redacted whitelist.
+    expect(Object.keys(ent(p2, mira) ?? {}).sort()).toEqual([...REDACTED_CHARACTER_KEYS].sort());
+    expect(Object.keys(ent(p1, sela) ?? {}).sort()).toEqual([...REDACTED_CHARACTER_KEYS].sort());
+    expect(p2.raw()).not.toContain("MIRA-NOTE-7");
+    for (const c of [dm, p1, p2]) c.close();
+  });
+
   test("FR-CHARX-08 FR-CHARX-15 FR-CHARX-28 player creates Brin; DM + player edits merge per field ≤ 1 s", async () => {
     const dm = await h.live(DM);
     const p1 = await h.live(p("Player 1"));

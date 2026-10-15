@@ -1,19 +1,31 @@
 import { describe, expect, test } from "bun:test";
+import type { RollMode } from "@shared/dice-roll-log/schemas";
 import {
   actorOptions,
+  actorSelection,
+  checkGroup,
+  computedTotal,
   createFlagStore,
   createStickToBottom,
+  critExtra,
+  diceRange,
   type FlagBackend,
+  type FormOptions,
+  type FormSlot,
+  formEntries,
+  formSlots,
+  type GroupInput,
   manualNatural,
   manualSlots,
+  mergeCrit,
   modeFromKeys,
   optionsDirty,
   optionsKey,
-  parseManual,
   physicalKey,
   publicState,
-  slotsAfterFirst,
+  type SlotInput,
   sortEntries,
+  updateInputs,
 } from "./logic";
 
 describe("FR-DICE-05 keys → mode", () => {
@@ -135,30 +147,203 @@ describe("FR-DICE-24 roll control", () => {
     expect(manualSlots(["1000d1000"], "normal")).toBe("At most 50 dice");
   });
 
-  test("FR-DICE-24 crit swap: a natural 20 on the first shows critExpressions for the rest", () => {
-    const exprs = ["1d20+4", "1d6+2"];
-    const crit = ["2d6+2"];
-    expect(slotsAfterFirst(exprs, crit, { diceTotal: 20 }, "1d20+4")).toEqual(["2d6+2"]);
-    expect(slotsAfterFirst(exprs, crit, { diceTotal: 19 }, "1d20+4")).toEqual(["1d6+2"]);
-    expect(slotsAfterFirst(exprs, undefined, { diceTotal: 20 }, "1d20+4")).toEqual(["1d6+2"]);
-    expect(slotsAfterFirst(exprs, crit, null, "1d20+4")).toEqual(["1d6+2"]);
+  test("FR-DICE-24 crit: a natural 20 on the first (total or kept die) adds the crit group", () => {
+    const o = { expressions: ["1d20+4", "1d6+2"], critExpressions: ["2d6+2"] };
+    const first = (total: string, dice: string[] = [], expr = "1d20+4") => [
+      { for: expr, base: g(total, dice), extra: g() },
+    ];
+    const d6 = { expression: "1d6", faces: [6] };
+    expect(slotsOf(o, first("20"))[1]?.extra).toEqual(d6);
+    expect(slotsOf(o, first("19"))[1]?.extra).toBeNull();
+    expect(slotsOf(o, [])[1]?.extra).toBeNull();
+    expect(slotsOf({ expressions: o.expressions }, first("20"))[1]?.extra).toBeNull();
     // Advantage: total-only of the kept die, or per-die values.
-    expect(slotsAfterFirst(exprs, crit, { diceTotal: 20 }, "2d20kh1+4")).toEqual(["2d6+2"]);
-    expect(slotsAfterFirst(exprs, crit, { diceTotal: 20, dice: [20, 3] }, "2d20kh1+4")).toEqual([
-      "2d6+2",
-    ]);
+    expect(slotsOf(o, first("20", ["", ""], "2d20kh1+4"), "advantage")[1]?.extra).toEqual(d6);
+    expect(slotsOf(o, first("", ["3", "20"], "2d20kh1+4"), "advantage")[1]?.extra).toEqual(d6);
     expect(manualNatural("2d20kl1", { diceTotal: 3, dice: [20, 3] })).toBe(3);
     expect(manualNatural("1d20+1d4", { diceTotal: 21 })).toBeNull();
   });
 
-  test("FR-DICE-06 manual form: total, optional per-die values, kept total computed", () => {
+  test("FR-DICE-24 crit swap fallback: a crit rule that isn't doubled dice shows the crit expression", () => {
+    const o = { expressions: ["1d20+4", "2d6kh1+2"], critExpressions: ["4d6kh1+2"] };
+    const nat20 = [{ for: "1d20+4", base: g("20"), extra: g() }];
+    expect(slotsOf(o, nat20)).toEqual([
+      { base: { expression: "1d20+4", faces: [20] }, extra: null },
+      { base: { expression: "4d6kh1+2", faces: [6, 6, 6, 6] }, extra: null },
+    ]);
+  });
+
+  test("FR-DICE-06 manual group: total, optional per-die values, kept total computed", () => {
     const adv = { expression: "2d20kh1+4", faces: [20, 20] };
-    expect(parseManual(adv, "17", ["", ""])).toEqual({ diceTotal: 17 });
-    expect(parseManual(adv, "", ["5", "17"])).toEqual({ diceTotal: 17, dice: [5, 17] });
-    expect(parseManual(adv, "17", ["5", ""])).toBe("Enter all 2 dice or none");
-    expect(parseManual(adv, "", ["21", "1"])).toBe("Die 1 must be 1–20");
-    expect(parseManual(adv, "", ["", ""])).toBe("Enter the dice total");
-    expect(parseManual(adv, "x", [])).toBe("Dice total must be a whole number");
+    const name = adv.expression;
+    expect(checkGroup(adv, g("17", ["", ""]), name)).toEqual({ entry: { diceTotal: 17 } });
+    expect(checkGroup(adv, g("", ["5", "17"]), name)).toEqual({
+      entry: { diceTotal: 17, dice: [5, 17] },
+    });
+    expect(checkGroup(adv, g("17", ["5", ""]), name)).toEqual({
+      message: "Enter all 2 dice or none",
+      die: 1,
+    });
+    expect(checkGroup(adv, g("", ["21", "1"]), name)).toEqual({
+      message: "Die 1 must be 1–20",
+      die: 0,
+    });
+    expect(checkGroup(adv, g("x"), name)).toEqual({
+      message: "Dice total must be a whole number",
+      die: null,
+    });
+    expect(checkGroup(adv, g("12", ["5", "17"]), name)).toEqual({
+      message: "The dice add up to 17, not 12",
+      die: null,
+    });
+    expect(computedTotal(adv, g("", ["5", "17"]))).toBe(17);
+    expect(computedTotal(adv, g("", ["5", ""]))).toBeNull();
+    expect(diceRange("2d20kh1+4")).toEqual({ min: 1, max: 20 });
+    expect(diceRange("2d6-1d4+3")).toEqual({ min: -2, max: 11 });
+  });
+});
+
+/** A group input. */
+function g(total = "", dice: string[] = []): GroupInput {
+  return { total, dice };
+}
+
+function slotsOf(o: FormOptions, inputs: SlotInput[], mode: RollMode = "normal"): FormSlot[] {
+  const s = formSlots(o, mode, inputs);
+  if (typeof s === "string") throw new Error(s);
+  return s;
+}
+
+const typer =
+  (o: FormOptions) =>
+  (inputs: SlotInput[], slot: number, group: "base" | "extra", p: Partial<GroupInput>) =>
+    updateInputs(o, "normal", inputs, { slot, group }, p);
+
+describe("FR-DICE-31 physical crit keeps what was typed", () => {
+  const o = { expressions: ["1d20+5", "4d6+3"], critExpressions: ["8d6+3"] };
+  const type = typer(o);
+
+  test("FR-DICE-31 crit keeps entries", () => {
+    // 4d6 per-die 3, 4, 5, 6 typed first, then the d20 = 20.
+    let inputs = type([], 1, "base", { dice: ["3", "4", "5", "6"] });
+    expect(slotsOf(o, inputs)[1]?.extra).toBeNull();
+    inputs = type(inputs, 0, "base", { total: "20" });
+    expect(slotsOf(o, inputs)[1]).toEqual({
+      base: { expression: "4d6+3", faces: [6, 6, 6, 6] },
+      extra: { expression: "4d6", faces: [6, 6, 6, 6] },
+    });
+    expect(inputs[1]?.base.dice).toEqual(["3", "4", "5", "6"]);
+    expect(inputs[1]?.extra).toEqual(g("", ["", "", "", ""]));
+    // Extra total 10 → one ManualEntry for 8d6: 18 + 10, no dice (the extra dice weren't entered).
+    inputs = type(inputs, 1, "extra", { total: "10" });
+    expect(formEntries(slotsOf(o, inputs), inputs)).toEqual({
+      ok: true,
+      entries: [{ diceTotal: 20 }, { diceTotal: 28 }],
+    });
+    // Every die entered → dice = base dice then extra dice.
+    const all = type(inputs, 1, "extra", { total: "", dice: ["1", "2", "3", "4"] });
+    expect(formEntries(slotsOf(o, all), all)).toEqual({
+      ok: true,
+      entries: [{ diceTotal: 20 }, { diceTotal: 28, dice: [3, 4, 5, 6, 1, 2, 3, 4] }],
+    });
+    // d20 back to 15 → extra group gone (its values dropped), base kept.
+    inputs = type(all, 0, "base", { total: "15" });
+    expect(slotsOf(o, inputs)[1]?.extra).toBeNull();
+    expect(inputs[1]?.base.dice).toEqual(["3", "4", "5", "6"]);
+    expect(inputs[1]?.extra).toEqual(g());
+    expect(formEntries(slotsOf(o, inputs), inputs)).toEqual({
+      ok: true,
+      entries: [{ diceTotal: 15 }, { diceTotal: 18, dice: [3, 4, 5, 6] }],
+    });
+    // Back on 20: the extra group returns empty.
+    inputs = type(inputs, 0, "base", { total: "20" });
+    expect(inputs[1]?.extra).toEqual(g("", ["", "", "", ""]));
+  });
+
+  test("FR-DICE-31 single dice: the totals are the dice; multi-term dice merge per term", () => {
+    const one = { expressions: ["1d20+5", "1d8+2"], critExpressions: ["2d8+2"] };
+    const t = typer(one);
+    let inputs = t([], 1, "base", { total: "6" });
+    inputs = t(inputs, 0, "base", { total: "20" });
+    expect(slotsOf(one, inputs)[1]?.extra).toEqual({ expression: "1d8", faces: [8] });
+    expect(inputs[1]?.base.total).toBe("6");
+    inputs = t(inputs, 1, "extra", { total: "4" });
+    expect(formEntries(slotsOf(one, inputs), inputs)).toEqual({
+      ok: true,
+      entries: [{ diceTotal: 20 }, { diceTotal: 10, dice: [6, 4] }],
+    });
+    expect(critExtra("1d8+1d6+2", "2d8+2d6+2")).toEqual({ expression: "1d8+1d6", faces: [8, 6] });
+    expect(
+      mergeCrit(
+        { expression: "1d8+1d6+2", faces: [8, 6] },
+        { diceTotal: 9, dice: [7, 2] },
+        { expression: "1d8+1d6", faces: [8, 6] },
+        { diceTotal: 4, dice: [1, 3] },
+      ),
+    ).toEqual({ diceTotal: 13, dice: [7, 1, 2, 3] });
+    expect(critExtra("1d6+2", "1d6+4")).toBeNull();
+    expect(critExtra("2d6kh1", "4d6kh1")).toBeNull();
+  });
+
+  test("FR-DICE-31 crit: true on a Damage-only control: extra group at once, no d20 slot", () => {
+    const dmg = { expressions: ["1d8+2"], critExpressions: ["2d8+2"], crit: true };
+    expect(slotsOf(dmg, [])).toEqual([
+      { base: { expression: "1d8+2", faces: [8] }, extra: { expression: "1d8", faces: [8] } },
+    ]);
+    const t = typer(dmg);
+    let inputs = t([], 0, "base", { total: "6" });
+    inputs = t(inputs, 0, "extra", { total: "3" });
+    expect(formEntries(slotsOf(dmg, inputs), inputs)).toEqual({
+      ok: true,
+      entries: [{ diceTotal: 9, dice: [6, 3] }],
+    });
+  });
+});
+
+describe("FR-DICE-32 no silent roll", () => {
+  const o = { expressions: ["1d20+5", "4d6+3"], critExpressions: ["8d6+3"] };
+  const type = typer(o);
+
+  test("FR-DICE-32 no silent roll", () => {
+    let inputs = type([], 0, "base", { total: "20" });
+    inputs = type(inputs, 1, "base", { total: "14" });
+    // Empty extra total → nothing sent, focus on it, a message naming the group.
+    expect(formEntries(slotsOf(o, inputs), inputs)).toEqual({
+      ok: false,
+      message: "Enter the total for 4d6 (critical)",
+      focus: { slot: 1, group: "extra", die: null },
+    });
+    inputs = type(inputs, 1, "extra", { total: "30" });
+    expect(formEntries(slotsOf(o, inputs), inputs)).toEqual({
+      ok: false,
+      message: "Total must be 4–24",
+      focus: { slot: 1, group: "extra", die: null },
+    });
+    inputs = type(inputs, 1, "extra", { total: "12" });
+    expect(formEntries(slotsOf(o, inputs), inputs)).toEqual({
+      ok: true,
+      entries: [{ diceTotal: 20 }, { diceTotal: 26 }],
+    });
+  });
+
+  test("FR-DICE-32 empty boxes: the first incomplete group or die gets focus", () => {
+    expect(formEntries(slotsOf(o, []), [])).toEqual({
+      ok: false,
+      message: "Enter the total for 1d20+5",
+      focus: { slot: 0, group: "base", die: null },
+    });
+    let inputs = type([], 0, "base", { total: "12" });
+    inputs = type(inputs, 1, "base", { dice: ["2", "", "4", ""] });
+    expect(formEntries(slotsOf(o, inputs), inputs)).toEqual({
+      ok: false,
+      message: "Enter all 4 dice or none",
+      focus: { slot: 1, group: "base", die: 1 },
+    });
+    inputs = type(inputs, 1, "base", { total: "25", dice: ["", "", "", ""] });
+    expect(formEntries(slotsOf(o, inputs), inputs)).toMatchObject({
+      ok: false,
+      message: "Total must be 4–24",
+    });
   });
 });
 
@@ -209,6 +394,91 @@ describe("FR-DICE-27 actor select", () => {
     const dm = actorOptions({ role: "dm", playerId: null }, ents, scenes, tokens);
     expect(dm.map((a) => a.label)).toEqual(["DM", "Mira", "Thorn", "Goblin"]);
     expect(dm.find((a) => a.label === "Mira")?.ref).toEqual({ entityId: "m" });
+  });
+});
+
+describe("FR-DICE-34 roll as token-less combatants", () => {
+  const ents = [{ id: "g", kind: "monster" as const, name: "Goblin", ownerPlayerId: null }];
+  const scenes = [{ id: "s1", active: true }];
+  const tokens = [{ id: "t1", sceneId: "s1", name: "Goblin", seq: 1, definitionId: "g" }];
+  const c = (id: string, name: string, more: Record<string, unknown> = {}) => ({
+    id,
+    encounterId: "e1",
+    name,
+    tokenId: null as string | null,
+    active: true,
+    removed: false,
+    ...more,
+  });
+  const dm = { role: "dm" as const, playerId: null };
+
+  test("FR-DICE-34 actor list", () => {
+    const encounters = [
+      { id: "e0", status: "ended" as const },
+      { id: "e1", status: "started" as const },
+    ];
+    const combatants = [
+      c("c1", "Goblin", { tokenId: "t1" }),
+      c("c10", "Goblin 10"),
+      c("c3", "Goblin 3"),
+      c("c4", "Goblin 4", { removed: true }),
+      c("c5", "Wolf", { active: false }),
+      c("c6", "Old", { encounterId: "e0" }),
+    ];
+    const list = actorOptions(dm, ents, scenes, tokens, encounters, combatants);
+    // After the scene's tokens; tokened combatants aren't listed again; by name.
+    expect(list.map((a) => [a.group ?? "", a.label])).toEqual([
+      ["", "DM"],
+      ["Tokens", "Goblin"],
+      ["Combatants", "Goblin 3"],
+      ["Combatants", "Goblin 10"],
+    ]);
+    expect(list.at(2)).toEqual({
+      value: "c3",
+      label: "Goblin 3",
+      group: "Combatants",
+      ref: { combatantId: "c3" },
+    });
+    // Encounter ended (or none started) → gone; players never get them.
+    const ended = [{ id: "e1", status: "ended" as const }];
+    const none = actorOptions(dm, ents, scenes, tokens, ended, combatants);
+    expect(none.some((a) => a.group === "Combatants")).toBe(false);
+    const p = actorOptions(
+      { role: "player", playerId: "p1" },
+      ents,
+      scenes,
+      tokens,
+      encounters,
+      combatants,
+    );
+    expect(p.some((a) => a.group === "Combatants")).toBe(false);
+  });
+});
+
+describe("FR-DICE-34 a pick that left the list", () => {
+  const dm = { value: "", label: "DM" };
+  const goblin3 = {
+    value: "c3",
+    label: "Goblin 3",
+    group: "Combatants" as const,
+    ref: { combatantId: "c3" },
+  };
+
+  test("FR-DICE-34 removed between pick and roll → still sent (server not_found), never the roller", () => {
+    expect(actorSelection([dm, goblin3], null)).toEqual({
+      options: [dm, goblin3],
+      selected: dm,
+    });
+    expect(actorSelection([dm, goblin3], goblin3).selected).toEqual(goblin3);
+    // Goblin 3 removed from combat: the Select keeps it, disabled and marked stale, and the
+    // roll still carries its ref, so the answer is not_found instead of a roll as "DM".
+    const gone = actorSelection([dm], goblin3);
+    expect(gone.selected).toEqual({ ...goblin3, stale: true });
+    expect(gone.selected?.ref).toEqual({ combatantId: "c3" });
+    expect(gone.options).toEqual([dm, { ...goblin3, stale: true }]);
+    // Restored before the roll: the live entry again (fresh label).
+    const renamed = { ...goblin3, label: "Goblin 3*" };
+    expect(actorSelection([dm, renamed], goblin3).selected).toEqual(renamed);
   });
 });
 

@@ -221,24 +221,28 @@ function sheetRolls(
       return ok([spec(d20(bonus), "skill-check", `${SKILL_NAMES[ref.skill]} check`, true)]);
     }
     case "attack":
-    case "damage": {
+    case "damage":
+    case "toHit": {
       const r = resolveSheetAttack(stats, sheet, { attackId: ref.attackId });
       if (!r.ok) return r;
       const [hit, dmg] = attackRollSpecs(r.attack);
-      return ok(kind === "damage" ? [dmg] : [hit, dmg]);
+      // FR-CHARX-42: toHit = the d20 alone; attack keeps to-hit + damage (FR-CHAR-05).
+      return ok(kind === "damage" ? [dmg] : kind === "toHit" ? [hit] : [hit, dmg]);
     }
     case "spellAttack":
-    case "spellDamage": {
+    case "spellDamage":
+    case "spellToHit": {
       const s = sheet?.spells.find((x) => x.id === ref.spellId);
       if (!s) return fail("not_found", "Spell was deleted");
       const category: RollCategory = s.effect === "healing" ? "healing" : "damage";
       const effectLabel =
         s.effect === "healing" ? `${s.name} healing` : damageLabel(s.name, s.damageType);
-      if (kind === "spellAttack") {
+      if (kind === "spellAttack" || kind === "spellToHit") {
         if (s.roll !== "attack") return fail("conflict", `No attack roll for ${s.name}`);
         const bonus = spellAttackBonus(stats);
         if (bonus === null) return fail("conflict", "No spellcasting");
         const hit = spec(d20(bonus), "attack", `${s.name} attack`, true);
+        if (kind === "spellToHit") return ok([hit]);
         return ok(s.damage ? [hit, spec(s.damage, category, effectLabel, false)] : [hit]);
       }
       if (!s.damage) return fail("conflict", `No damage roll for ${s.name}`);
