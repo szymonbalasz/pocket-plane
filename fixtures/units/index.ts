@@ -34,6 +34,8 @@ import enemy1 from "./entities/enemy-1";
 import enemy2 from "./entities/enemy-2";
 import enemyCustom from "./entities/enemy-custom";
 import enemyCustomSecond from "./entities/enemy-custom-second";
+import fogAmbush from "./fog-of-war/fog-ambush";
+import fogAmbushPartial from "./fog-of-war/fog-ambush-partial";
 import syncProbes from "./live-sync/sync-probes";
 import notificationsTest from "./notifications/notifications-test";
 import loot1 from "./party-loot/loot-1";
@@ -88,4 +90,6 @@ export const units: readonly Fixture[] = [
   modBless,
   modBane,
   modRage,
+  fogAmbush,
+  fogAmbushPartial,
 ];
