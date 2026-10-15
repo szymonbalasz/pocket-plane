@@ -10,7 +10,7 @@ import {
   IMPORTED_ENTITY_TYPE,
   ImportedEntityRecord,
 } from "@shared/entities/schemas";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
@@ -24,7 +24,14 @@ import { ROLL_HINT, type SheetRollProps, useSheetRollControl } from "./rolls";
 import { rollActionView, routeFor, routeRef } from "./routing";
 import { SheetView } from "./SheetView";
 import { SummaryCard } from "./SummaryCard";
-import { clearEditRequest, selectSheet, sheetSelection } from "./selection";
+import {
+  bindSheetMemory,
+  clearEditRequest,
+  type Eligibility,
+  selectSheet,
+  sheetMemoryKey,
+  sheetSelection,
+} from "./selection";
 import { useSheet } from "./sheet-context";
 import { type CreatureLike, pickerModel, type SummaryInput } from "./view-model";
 
@@ -146,6 +153,20 @@ export function CharacterSheet() {
     picker.options.find((o) => o.id === sel.selectedId) ??
     picker.options.find((o) => o.group === "own") ??
     null;
+  // FR-CHARX-47: after the first snapshot (and per campaign), restore the remembered choice if
+  // still eligible (incl. the DM's last NPC); else FR-CHAR-04's default.
+  const memoryKey = you && live ? sheetMemoryKey(you.campaignId, you.role, you.playerId) : null;
+  const eligibleRef = useRef<Eligibility>(() => null);
+  eligibleRef.current = (id) => {
+    if (pickerModel(entities, sheets, viewer, players, null).options.some((o) => o.id === id)) {
+      return "option";
+    }
+    const monster = [...entities, ...imported].some((e) => e.id === id && e.kind === "monster");
+    return viewer.role === "dm" && monster ? "npc" : null;
+  };
+  useEffect(() => {
+    if (memoryKey) bindSheetMemory(memoryKey, (id) => eligibleRef.current(id));
+  }, [memoryKey]);
   // FR-CHARX-30: the creation request is consumed once its character is shown.
   const startEditing = sel.editId !== null && sel.editId === selected?.id;
   useEffect(() => {

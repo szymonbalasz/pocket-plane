@@ -18,6 +18,7 @@ import { defineCommand } from "../../commands/commands";
 import { conflict, invalid } from "../../commands/errors";
 import { creatureSheet } from "../../db/schema";
 import { createIn } from "../entities/commands";
+import { notifyApproved, notifyDraft } from "./draft-notes";
 import { getCharacter } from "./hp";
 import { mergeChanges, newSheet, sheetOrNew, writeSheet } from "./sheet-rows";
 
@@ -82,11 +83,15 @@ export const charCreate = defineCommand({
       payload: { characterId: record.id, ownerPlayerId, status },
       changes: mergeChanges([change, sheetChange]),
     });
+    if (isPlayer) notifyDraft(env, record.id, record.name, ownerPlayerId);
     return { characterId: record.id };
   },
 });
 
-/** FR-CHARX-10: draft → ready; already ready (or no row) → success, no event. */
+/**
+ * FR-CHARX-10: draft → ready; already ready (or no row) → success, no event. G8: a draft's
+ * pending card is resolved and the owner notified (FR-CHARX-45/46).
+ */
 export const charApprove = defineCommand({
   name: CHARX_INTENTS.approve,
   input: CharApproveIntent,
@@ -101,6 +106,7 @@ export const charApprove = defineCommand({
       payload: { characterId: c.id },
       changes: mergeChanges([change]),
     });
+    notifyApproved(env, c.id, c.name, c.ownerPlayerId);
     return {};
   },
 });
