@@ -11,7 +11,7 @@
 
 - The DM's playtest (N9): Bless must add to attack rolls; a barbarian toggles Rage. Today effects are labels: the d4 is mental arithmetic.
 - ADR-0009 planned a per-instance modifier list (field, op, value, source, duration); ADR-0035 put effects (conditions, labels, concentration) in CBTX's `effect` table and left numbers for later.
-- Rolls are made in six commands across four features (`char.roll`, `cbt.attack`, `cbt.rollAbility`, `cbt.rollInitiative`, `cbtx.rollConcentration`, `cbtx.rollDeathSave`); all go through dice-roll-log's `dice.evaluate` inside their transaction.
+- Rolls are made in seven commands across three features (`char.roll`, `cbt.attack` (whole or to-hit only), `cbt.rollDamage` (P2a's split attack, `proposed-split-attack-damage.md` on its branch), `cbt.rollAbility`, `cbt.rollInitiative`, `cbtx.rollConcentration`, `cbtx.rollDeathSave`); all go through dice-roll-log's `dice.evaluate` inside their transaction. A card's to-hit and damage parts may be rolled in separate commands, so each part takes the modifiers active at its own commit.
 - ADR-0036: sheet numbers are derived with overrides; an override replaces the derived value everywhere.
 - Attacks are rolled before targets are picked (#134, #135); only the DM applies (#136).
 
@@ -30,7 +30,7 @@
 | Option | Pros | Cons |
 |---|---|---|
 | **A. Roll side: an append-only `rollHooks` registry in dice-roll-log, run by `dice.evaluate` when the caller passes a `subject` (creature, roll kind, ability, via, crit); hooks return parts (extra dice as their own roll rows, flat values, modes). Target side: pure functions preset the DM's popup (effective AC, multiplier); the DM confirms** | One choke point already inside every roll transaction; callers add one field; later riders (gems, inspiration) register too; DM authority over damage kept | dice-roll-log gains a hook; each caller still adds parts to its own total and payload |
-| B. A MOD helper each roll command calls explicitly (as `hpRules`) | Explicit call sites | Six call sites own combine / crit / line logic; easy to miss one |
+| B. A MOD helper each roll command calls explicitly (as `hpRules`) | Explicit call sites | Seven call sites own combine / crit / line logic; easy to miss one |
 | C. A new hook point in ADR-0035's `combatRuleHooks` | Existing registry | Sheet rolls happen out of combat; it fires on lifecycle, not rolls |
 | D. Apply resistances automatically at apply | Fewer clicks | Contradicts #134 / #136 (DM confirms every multiplier) |
 
