@@ -107,6 +107,10 @@ test("FR-SCN-29 / -30 / -05 diagonal rule on everyone's ruler; DM-only layer swi
   await expect.poll(() => countWith(dm, "scn-prop", "hidden", true)).toBe(1);
   const doors = (await konvaNodes(dm, "scn-door")).length;
   expect(doors).toBe(2);
+  // Hidden Wolf + Elite: their eye-off marks and labels.
+  await expect.poll(async () => (await konvaNodes(dm, "map-token-hidden")).length).toBe(2);
+  const labels = (await konvaNodes(dm, "map-token-label")).length;
+  const tokens = (await konvaNodes(dm, "map-token")).length;
 
   // Layers: Walls & doors off, DM-only items off. Nothing is sent.
   await dm.getByTestId("map-tool-layers").click();
@@ -128,6 +132,10 @@ test("FR-SCN-29 / -30 / -05 diagonal rule on everyone's ruler; DM-only layer swi
   expect(await konvaNodes(dm, "scn-walls")).toHaveLength(0);
   await expect.poll(() => countWith(dm, "scn-prop", "hidden", true)).toBe(0);
   expect(await countWith(dm, "scn-prop", "hidden", false)).toBe(2);
+  // Hidden tokens and their labels go too (FR-SCN-01).
+  expect(await konvaNodes(dm, "map-token-hidden")).toHaveLength(0);
+  expect(await konvaNodes(dm, "map-token")).toHaveLength(tokens - 2);
+  expect(await konvaNodes(dm, "map-token-label")).toHaveLength(labels - 2);
   await expect(dm.getByTestId("map-tool-layers")).toHaveAttribute("data-some-off", "true");
   expect(intents).toBe(before);
   await dm.keyboard.press("Escape");

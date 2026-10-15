@@ -14,6 +14,20 @@ export const DM_ONLY_SWITCH: LayerToggle = {
   layer: "dm-only",
 };
 
+/**
+ * FR-SCN-01 / -05: with "DM-only items" off, the DM client drops hidden records (tokens and their
+ * labels too). Players never receive hidden ones, so they are never filtered.
+ */
+export function withoutDmOnly<T extends { hidden: boolean }>(
+  items: readonly T[],
+  client: "dm" | "player",
+  off: LayersOff,
+): readonly T[] {
+  return client === "dm" && off[DM_ONLY_SWITCH.key] === true
+    ? items.filter((t) => !t.hidden)
+    : items;
+}
+
 /** The popover's switches: the registry's toggles in layer order, then DM-only items. */
 export function layerSwitches(toggles: readonly LayerToggle[]): LayerToggle[] {
   return [...toggles.filter((t) => t.key !== DM_ONLY_SWITCH.key), DM_ONLY_SWITCH];

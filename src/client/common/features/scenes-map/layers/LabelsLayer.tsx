@@ -12,11 +12,13 @@ import type Konva from "konva";
 import { useEffect, useMemo, useRef } from "react";
 import { Group, Layer, Rect, Text } from "react-konva";
 import { useStore } from "zustand";
+import { withoutDmOnly } from "../../scene-tools/layer-switches";
 import { useCanvas } from "../canvas-context";
 import { decorateToken } from "../decorations";
 import { labelRow, type Measure } from "../label";
 import type { TokenBadge } from "../token-overlays";
 import { tokenOverlays } from "../token-overlays";
+import { useLayerToggles } from "../tool-store";
 import { toneColor } from "./tone";
 
 /** Konva's default font family; labels and badges measure with the same canvas font. */
@@ -187,7 +189,10 @@ function useFullNameOnHover(layer: React.RefObject<Konva.Layer | null>) {
 }
 
 export function LabelsLayer() {
-  const { tokens, previews } = useCanvas();
+  const { tokens: all, previews, client } = useCanvas();
+  // FR-SCN-05: the DM's "DM-only items" switch off → hidden tokens' labels go with them.
+  const off = useLayerToggles((s) => s.off);
+  const tokens = useMemo(() => withoutDmOnly(all, client, off), [all, client, off]);
   const layer = useRef<Konva.Layer>(null);
   useFullNameOnHover(layer);
   // Changes only when a drag or preview starts / stops, not per frame.

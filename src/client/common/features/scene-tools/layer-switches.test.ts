@@ -4,7 +4,13 @@
 import { describe, expect, test } from "bun:test";
 import { type LayerDef, layerSlots, layerToggles, orderLayers } from "../scenes-map/layers";
 import { useLayerToggles } from "../scenes-map/tool-store";
-import { createLayerMemory, DM_ONLY_SWITCH, layerMemoryKey, layerSwitches } from "./layer-switches";
+import {
+  createLayerMemory,
+  DM_ONLY_SWITCH,
+  layerMemoryKey,
+  layerSwitches,
+  withoutDmOnly,
+} from "./layer-switches";
 
 const C = () => null;
 /** The SCN entries of `canvas-layers.ts` (the real registry imports Konva). */
@@ -71,6 +77,22 @@ describe("FR-SCN-05 switches", () => {
     expect(ids("player")).toEqual(["map", "scn-props", "scn-structure", "scn-templates", "tokens"]);
     useLayerToggles.getState().replace({});
     expect(ids("dm")).toHaveLength(5);
+  });
+});
+
+describe("FR-SCN-01 / -05 DM-only items", () => {
+  test("FR-SCN-05 DM-only items off drops hidden tokens (and their labels) on the DM client only", () => {
+    const tokens = [
+      { id: "mira", hidden: false },
+      { id: "wolf", hidden: true },
+    ];
+    const ids = (client: "dm" | "player", off: Record<string, boolean>) =>
+      withoutDmOnly(tokens, client, off).map((t) => t.id);
+    expect(ids("dm", {})).toEqual(["mira", "wolf"]);
+    expect(ids("dm", { "dm-only": false, walls: true })).toEqual(["mira", "wolf"]);
+    expect(ids("dm", { "dm-only": true })).toEqual(["mira"]);
+    expect(ids("player", { "dm-only": true })).toEqual(["mira", "wolf"]);
+    expect(withoutDmOnly(tokens, "dm", {})).toBe(tokens);
   });
 });
 
