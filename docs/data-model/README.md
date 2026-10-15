@@ -984,6 +984,9 @@ From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD, `comple
 | `effect_preset` (new, record type `effect-preset`) | see below | — | DM full; player own rows (`ownerPlayerId`) | [FR-MOD-22](../specs/effect-modifiers.md#6-functional-requirements) |
 | `game_log_entry.payload` (`roll` items) | + optional `mods [{label \| null, value, expression?, auto?, rollId?}]`, `modes [label \| null]`; `total` includes the parts | absent; old rows parse | as the payload (labels null for effects players don't receive) | [FR-MOD-19](../specs/effect-modifiers.md#6-functional-requirements) |
 | `game_log_entry.dmPayload` (`roll`) | new: `{items: [{mods: [{effectId, label}], modes?}]}` | null (no parts) | DM only | FR-MOD-19, [FR-DICE-28](../specs/dice-roll-log.md#6-functional-requirements) |
+| damage card payload (`damage-card`) | `toHit` / `damage` + optional `mods [RollModPart]` (≤ 6 each, `CARD_MODS_MAX`); `total` includes them (slice 3) | absent; old cards parse | as the card | FR-MOD-16, -19 |
+| `game_log_entry.payload` / `dmPayload` (`cbt.attack`) | `payload.toHit.mods` (player-safe); `dmPayload.mods {toHit?, damage?}` (slice 3) | absent | DM names in `dmPayload` only | FR-MOD-20 |
+| `hp_change` | `toHitRolled` / `damageRolled` = base roll + the card part's `mods` (slice 3) | — | as today | FR-MOD-16 |
 | `roll` | no change: a bonus die is its own row (`label` = effect label, same category / source / actor as the base) | — | server table | MOD §8.2 |
 
 ### Effect preset (`effect_preset`, record type `effect-preset`) — owner [effect-modifiers](../specs/effect-modifiers.md#82-records)

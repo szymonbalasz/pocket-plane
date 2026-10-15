@@ -1020,7 +1020,21 @@ From [effect-modifiers](../specs/effect-modifiers.md) (MOD, `complete`; DM gate 
 
 **Domain events**: [§8](#8-domain-events) MOD rows (schemas built, registered).
 
-**Log payloads** (`roll` kind, **built**): a payload item gains optional `mods [{label | null, value, expression?, auto?: true, rollId?}]` (1–20) and `modes [label | null]`; `total` includes the parts. `label` is null when the effect is not player-visible. New `dmPayload` `{items: [{mods: [{effectId, label}], modes?}]}` (same index as the payload; present only when a part exists) names every part for the DM. Line: "Mira — Shortsword attack: 14 + 4 + 3 Bless = 21"; "− 2 Bane"; "(DM)" for unnamed parts; "(rolled for you)" on `auto`; "(adv: Rage)" from `modes`; a death save's note stays after the total. Rows from before parse unchanged. `cbt.attack` / card parts: build/effect-modifiers slice 3.
+**Log payloads** (`roll` kind, **built**): a payload item gains optional `mods [{label | null, value, expression?, auto?: true, rollId?}]` (1–20) and `modes [label | null]`; `total` includes the parts. `label` is null when the effect is not player-visible. New `dmPayload` `{items: [{mods: [{effectId, label}], modes?}]}` (same index as the payload; present only when a part exists) names every part for the DM. Line: "Mira — Shortsword attack: 14 + 4 + 3 Bless = 21"; "− 2 Bane"; "(DM)" for unnamed parts; "(rolled for you)" on `auto`; "(adv: Rage)" from `modes`; a death save's note stays after the total. Rows from before parse unchanged.
+
+**Callers** (**built**, slice 3; FR-MOD-15/16): every roll below passes a `subject`; part rolls follow their base roll in `rollIds` (entry, event, result); entries carry `dmPayload` when a part exists.
+
+| Caller | Subject | Outcome incl. parts |
+|---|---|---|
+| `char.roll` (characters only; NPC-sheet definitions none) | by the spec's category: `attack` / `damage` (`via` spell for `spell*` kinds), `saving-throw` → `save` + ability, `ability-check` / `skill-check` → `check` + ability (skill → its ability), `initiative`; healing none | line totals |
+| `cbt.attack` (incl. `rolls: "toHit"`) | to-hit `attack`, damage `damage` + `crit` on a natural 20; `via` spell iff `spellId`; a PC combatant → its character | card `toHit` / `damage` gain `mods` (≤ 6 each, `CARD_MODS_MAX`; more → `conflict`), `total` incl. parts; card text |
+| `cbt.rollDamage` | `damage`, `crit` from the completed card's natural 20 | completed / damage-only card part as above |
+| `cbt.rollAbility` | `save` / `check` + ability | line |
+| `cbt.rollInitiative` | `initiative` (Start's / add's rolls: none) | `initiative` value |
+| `cbtx.rollConcentration` | `save`, `con` | total vs DC (event, resolution `total`) |
+| `cbtx.rollDeathSave` | `save`, no ability | ≥ 10 on the total; natural 1 / 20 read the base d20 |
+
+**Apply** (`cbt.applyCard`): `toHitRolled` / `damageRolled` = base row + the card part's `mods` (no "DM set" on an unedited total); `rollIds` incl. part rolls. `cbt.attack` line: `payload.toHit.mods` (player-safe, shown after the constant when unedited: "12 + 4 − 2 Bane = 14"); `dmPayload.mods {toHit?: [{effectId, label}], damage?: [RollModPart]}` names the to-hit parts and lists the damage parts after the DM's damage breakdown (names from the roll line's `dmPayload`).
 
 **Internal server APIs and seams**
 

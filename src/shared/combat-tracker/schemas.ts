@@ -1,7 +1,7 @@
 // combat-tracker boundary schemas (CBT §8, §9; protocol §20–§23). zod is the source of truth for
 // the wire records, intents, REST bodies and the damage card's payload / resolution.
 import { DeathCounters, TempHp } from "@shared/combat-extras/schemas";
-import { ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
+import { ManualEntry, RollMode, RollModPart } from "@shared/dice-roll-log/schemas";
 import { Ability } from "@shared/entities/schemas";
 import { DamageMultiplier } from "@shared/events/combat-tracker";
 import { CellIndex } from "@shared/scenes-map/schemas";
@@ -267,6 +267,12 @@ export type HpChangeRecord = z.infer<typeof HpChangeRecord>;
 
 // ---------- damage card (notification kind `damage-card`, CBT §8) ----------
 
+/**
+ * effect-modifiers (MOD §12): parts per card roll, so a worst-case card (50 dice, max names,
+ * 2 × 6 parts at max label length) stays within the kind's 4 KB payload cap.
+ */
+export const CARD_MODS_MAX = 6;
+
 /** Per-die `[value, kept]`; value null for a manual total of several dice (#140). */
 export const CardDie = z.tuple([z.int().nullable(), z.boolean()]);
 export const CardRoll = z.strictObject({
@@ -275,6 +281,11 @@ export const CardRoll = z.strictObject({
   constant: z.int(),
   total: z.int(),
   manual: z.boolean(),
+  /**
+   * effect-modifiers (FR-MOD-19): roll-hook parts of this roll, player-safe labels (null =
+   * "(DM)"); `total` includes them. Absent = none (rows from before parse unchanged).
+   */
+  mods: z.array(RollModPart).min(1).max(CARD_MODS_MAX).optional(),
 });
 export const CardToHit = CardRoll.extend({ natural: z.int().nullable() });
 export type CardToHit = z.infer<typeof CardToHit>;

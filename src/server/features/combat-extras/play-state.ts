@@ -113,13 +113,21 @@ export const rollDeathSave = defineCommand({
       actor: { kind: "entity", id: c.id, name: c.name },
       manual: input.manual,
       source: "char",
+      // FR-MOD-15: a death save is a save with no ability.
+      subject: { creature: { characterId: c.id }, roll: "save" },
     });
+    const rollIds = dice.rollIdsOf(r);
     const pc = pcCombatant(env.tx, c.campaignId, c.id);
     // FR-CBTX-23: a PC hidden from players (#141) rolls DM-only, whoever rolls.
     const hidden = pc?.hidden ?? false;
     const natural = r.natural ?? r.total;
     const before = countersOf(c);
-    const save = deathSave(before, natural);
+    // FR-MOD-16: ≥ 10 on the total incl. parts; a natural 1 / 20 reads the base d20 only.
+    const total = r.total + (r.mods?.modTotal ?? 0);
+    const save = deathSave(
+      before,
+      natural === 1 || natural === 20 ? natural : Math.min(19, Math.max(2, total)),
+    );
     const entry = gameLog.append(env, {
       kind: ROLL_KIND,
       category: "saving-throw",
@@ -133,7 +141,8 @@ export const rollDeathSave = defineCommand({
           note: deathSaveNote(save),
         },
       ],
-      rollIds: [r.id],
+      dmPayload: dice.rollDmPayload([r]),
+      rollIds,
       encounterId: pc?.encounterId ?? null,
       public: input.public,
       forcePrivate: hidden,
@@ -165,7 +174,7 @@ export const rollDeathSave = defineCommand({
       campaignId: c.campaignId,
       payload: {
         characterId: c.id,
-        rollIds: [r.id],
+        rollIds,
         entryId: entry.id,
         natural,
         before,
@@ -173,7 +182,7 @@ export const rollDeathSave = defineCommand({
       },
       changes: [...changes, entry],
     });
-    return { rollIds: [r.id], entryId: entry.id };
+    return { rollIds, entryId: entry.id };
   },
 });
 

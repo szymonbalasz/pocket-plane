@@ -26,6 +26,7 @@ import { entity, notification } from "../../db/schema";
 import type { DomainEvent } from "../../events/types";
 import { getSheet } from "../character-sheet/sheet-rows";
 import { dice, gameLog } from "../dice-roll-log";
+import { withCardMods } from "../effect-modifiers/card";
 import { notify } from "../notifications";
 import { toNotificationRecord, updateNotification } from "../notifications/helpers";
 import { cardRowRef } from "./attack";
@@ -124,7 +125,16 @@ export const rollDamageCommand = defineCommand({
       actor: { kind: "entity", id: c.entityId, name: c.name },
       manual: input.manual,
       source: "cbt",
+      // FR-MOD-15/16: damage mods from the effects active now; a completed card's crit doubles.
+      subject: {
+        creature: c.kind === "pc" ? { characterId: c.entityId } : { combatantId: c.id },
+        roll: "damage",
+        via: asked.spellId !== undefined ? "spell" : "weapon",
+        crit,
+      },
     });
+    const rollIds = dice.rollIdsOf(damage);
+    const card = withCardMods(cardRollOf(damage), damage);
     const isPlayer = env.actor.role === "player";
     // Roll line: a player's is public (FR-DICE-13); the DM's is DM-only (FR-CBT-52), except when
     // it completes a player's card: the owner's rule, so the table sees the damage the player's
@@ -135,21 +145,22 @@ export const rollDamageCommand = defineCommand({
       category: row.spec.category,
       actorName: c.name,
       payload: [dice.rollPayloadItem(damage)],
-      rollIds: [damage.id],
+      dmPayload: dice.rollDmPayload([damage]),
+      rollIds,
       encounterId: enc.id,
       ...(isPlayer ? {} : { public: ownerRule && !c.hidden }),
     });
     const rolled: DomainEvent<{ cardId: string; rollIds: string[]; attached: boolean }> = {
       type: DamageRolled.type,
       campaignId: enc.campaignId,
-      payload: { cardId: pending?.card.id ?? "", rollIds: [damage.id], attached: !!pending },
+      payload: { cardId: pending?.card.id ?? "", rollIds, attached: !!pending },
       changes: [entry],
     };
     env.emit(rolled);
     if (pending) {
-      const payload: DamageCardPayload = { ...pending.p, damage: cardRollOf(damage) };
+      const payload: DamageCardPayload = { ...pending.p, damage: card };
       updateNotification(env, pending.card.id, { text: damageCardText(payload), payload });
-      return { cardId: pending.card.id, rollIds: [damage.id], attached: true };
+      return { cardId: pending.card.id, rollIds, attached: true };
     }
     const payload: DamageCardPayload = {
       encounterId: enc.id,
@@ -160,7 +171,7 @@ export const rollDamageCommand = defineCommand({
       mode: "normal",
       crit: false,
       toHit: null,
-      damage: cardRollOf(damage),
+      damage: card,
       ...ref,
       ...(row.saveDc ? { saveDc: row.saveDc } : {}),
     };
@@ -173,6 +184,6 @@ export const rollDamageCommand = defineCommand({
       action: { label: "Apply", role: "dm" },
     });
     rolled.payload.cardId = cardId;
-    return { cardId, rollIds: [damage.id], attached: false };
+    return { cardId, rollIds, attached: false };
   },
 });

@@ -58,7 +58,7 @@ export const rollInitiative = defineCommand({
       env,
       targets.map((t) => t.c),
       encounterId,
-      input,
+      { ...input, effects: true },
     );
     rerank(env.tx, encounterId);
     env.emit({
@@ -81,12 +81,14 @@ export const rollInitiative = defineCommand({
  * and `initRollId` (the caller reranks). `public`: a hidden combatant → false (FR-CBT-24); a
  * monster → false unless `public: true` (FR-CBT-69); a PC → the sent value, else the category
  * setting. Also Start's and add's monster rolls (FR-CBT-64, FR-CBTX-44: mode normal, no public).
+ * `effects`: `cbt.rollInitiative` only (FR-MOD-15): the roll hooks add the creature's parts to
+ * the value; combatant-creation rolls pass none (new combatants carry no effects).
  */
 export function rollInitiativeFor(
   env: CommandEnv,
   combatants: readonly CombatantRecord[],
   encounterId: string,
-  opts: { mode: RollMode; manual?: ManualEntry; public?: boolean },
+  opts: { mode: RollMode; manual?: ManualEntry; public?: boolean; effects?: boolean },
 ): { rollIds: string[]; entries: RecordChange[] } {
   const rollIds: string[] = [];
   const entries: RecordChange[] = [];
@@ -101,20 +103,30 @@ export function rollInitiativeFor(
       actor: { kind: "entity", id: c.entityId, name: c.name },
       manual: opts.manual,
       source: "cbt",
+      ...(opts.effects
+        ? {
+            subject: {
+              creature: c.kind === "pc" ? { characterId: c.entityId } : { combatantId: c.id },
+              roll: "initiative" as const,
+            },
+          }
+        : {}),
     });
+    // FR-MOD-16: the initiative value includes the parts.
     env.tx
       .update(combatant)
-      .set({ initiative: r.total, initRollId: r.id })
+      .set({ initiative: r.total + (r.mods?.modTotal ?? 0), initRollId: r.id })
       .where(eq(combatant.id, c.id))
       .run();
-    rollIds.push(r.id);
+    rollIds.push(...dice.rollIdsOf(r));
     entries.push(
       gameLog.append(env, {
         kind: ROLL_KIND,
         category: "initiative",
         actorName: c.name,
         payload: [dice.rollPayloadItem(r)],
-        rollIds: [r.id],
+        dmPayload: dice.rollDmPayload([r]),
+        rollIds: dice.rollIdsOf(r),
         encounterId,
         public: c.hidden ? false : c.kind === "monster" ? opts.public === true : opts.public,
       }),
