@@ -1,7 +1,7 @@
 // The wall move guard (FR-SCN-10, -11; ADR-0040) on Goblin Ambush with `scn-walls`: a player's
 // move across a wall or a non-open door is `conflict` with no write, event, log entry, derive or
 // token-changed hook (so no combat `movedFt`); open doors pass; the DM is never checked; the guard
-// reads the committed structure at drop. Benchmark: ≤ 1 ms p95 per move at 2,000 segments.
+// reads the committed structure at drop (cached by rev). Benchmark: ≤ 1 ms p95 per move at 2,000.
 import { afterEach, describe, expect, test } from "bun:test";
 import { SCN_INTENTS as S, SEGMENTS_MAX, type Wall } from "@shared/scene-tools/schemas";
 import { MAP_INTENTS as I, type TokenRecord } from "@shared/scenes-map/schemas";
