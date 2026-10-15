@@ -43,6 +43,7 @@ import lootSecond from "./party-loot/loot-second";
 import lootWallets from "./party-loot/loot-wallets";
 import scnPropImages from "./scene-tools/scn-prop-images";
 import scnProps from "./scene-tools/scn-props";
+import scnTemplates from "./scene-tools/scn-templates";
 import battlemap from "./scenes-map/battlemap";
 import scenesExtras from "./scenes-map/scenes-extras";
 import thornTown from "./scenes-map/thorn-town";
@@ -96,4 +97,5 @@ export const units: readonly Fixture[] = [
   fogAmbushPartial,
   scnPropImages,
   scnProps,
+  scnTemplates,
 ];

@@ -376,3 +376,14 @@ describe("FR-SCN-06 registration", () => {
     expect(toolsFor(canvasTools, "player").map((x) => x.id)).not.toContain("props");
   });
 });
+
+describe("FR-SCN-06 tool panel stacking (walkthrough F1)", () => {
+  test("FR-SCN-06 the tool panel sits beside the rail, above the base and below shell windows", async () => {
+    const { panelSpot, TOOL_PANEL_Z } = await import("../scenes-map/ToolRail");
+    // PlayFrame: base z-0 < windows z-10 < chrome z-20.
+    expect(TOOL_PANEL_Z).toBeGreaterThan(0);
+    expect(TOOL_PANEL_Z).toBeLessThan(10);
+    expect(panelSpot({ top: 64, right: 56 }, { top: 0, left: 0 })).toEqual({ top: 64, left: 64 });
+    expect(panelSpot({ top: 74, right: 66 }, { top: 10, left: 10 })).toEqual({ top: 64, left: 64 });
+  });
+});

@@ -194,12 +194,15 @@ describe("FR-SCN-14 / -19 / -27 player visibility", () => {
     expect(t.s.records.filterChange(hide, t.dm)).toMatchObject({ op: "upsert", data: t.a.chest });
   });
 
-  test("FR-SCN-27 templates: full for placer and others (incl. placedByPlayerId); hidden → none", () => {
+  test("FR-SCN-27 templates: every field but campaignId for placer and others (incl. placedByPlayerId); hidden → none; DM keeps campaignId", () => {
     const t = setup();
     t.run(I.activateScene, { sceneId: t.ambush.id });
+    const { campaignId: _cid, ...guardians } = t.a.guardians;
     for (const v of [t.p1, t.p2]) {
-      expect(t.h.snapshot(v)[AOE_TEMPLATE_TYPE]).toEqual([t.a.guardians]);
+      expect(t.h.snapshot(v)[AOE_TEMPLATE_TYPE]).toEqual([guardians]);
     }
+    // The DM wire keeps campaignId: the registry's scope gate reads it from the record (§8).
+    expect(t.h.snapshot(t.dm)[AOE_TEMPLATE_TYPE]).toContainEqual(t.a.guardians);
     expect(t.a.guardians.placedByPlayerId).toBe(t.h.p1.id);
     const shown = { ...t.a.glyph, hidden: false };
     const ch = (before: AoeTemplateRecord, after: AoeTemplateRecord): RecordChange => ({
@@ -208,9 +211,12 @@ describe("FR-SCN-14 / -19 / -27 player visibility", () => {
       before,
       after,
     });
-    expect(t.s.records.filterChange(ch(t.a.glyph, shown), t.p1)).toMatchObject({
+    const { campaignId: _c, ...shownWire } = shown;
+    expect(t.s.records.filterChange(ch(t.a.glyph, shown), t.p1)).toEqual({
+      type: AOE_TEMPLATE_TYPE,
+      id: shown.id,
       op: "upsert",
-      data: shown,
+      data: shownWire,
     });
     expect(t.s.records.filterChange(ch(shown, t.a.glyph), t.p1)?.op).toBe("delete");
   });
