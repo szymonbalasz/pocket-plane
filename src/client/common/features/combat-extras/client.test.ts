@@ -201,6 +201,54 @@ describe("FR-CBTX-28 FR-CBTX-29 FR-CBTX-30 token overlay cbtx", () => {
     ).toBe("Stable");
   });
 
+  test("FR-CBTX-50 death outside combat: unbound PC token dead → X + Dead; dying / stable at 0 HP → X + badge; healed → none; DM / owner full, other player redacted; bound → FR-CBTX-30 path only", () => {
+    const tok = { id: "t-mira", characterId: "mira" } as TokenView;
+    const ended = { ...miraC, active: false };
+    const at = (you: typeof dmYou, entity: object) =>
+      cbtxTokenOverlay.decorate?.(
+        tok,
+        store(you, { combatants: [ended], entities: [entity] }),
+        view(you.role === "dm" ? "dm" : "player"),
+      );
+    const dead = at(dmYou, { ...miraFull, hpCurrent: 0, deathFailures: 3 });
+    expect(dead?.cross).toEqual({ id: "cbt-token-down", tone: "down" });
+    expect(dead?.badges).toEqual([
+      { id: "cbtx-token-death", icon: "skull", tone: "down", label: "Dead" },
+    ]);
+    // Dead stays dead even after HP comes back (until the DM resets the counters).
+    expect(at(dmYou, { ...miraFull, hpCurrent: 5, deathFailures: 3 })?.badges?.[0]?.label).toBe(
+      "Dead",
+    );
+    expect(at(p1You, { ...miraFull, hpCurrent: 0 })?.badges?.[0]?.label).toBe("Dying");
+    expect(at(p1You, { ...miraFull, hpCurrent: 0, deathSuccesses: 3 })).toMatchObject({
+      cross: { id: "cbt-token-down" },
+      badges: [{ label: "Stable", tone: "neutral" }],
+    });
+    expect(at(dmYou, miraFull)).toBeNull();
+    // Another player: the redacted deathState.
+    expect(
+      at(p2You, { ...miraRedacted, down: true, deathState: "stable" })?.badges?.[0]?.label,
+    ).toBe("Stable");
+    expect(at(p2You, miraRedacted)).toBeNull();
+    // DM: `definitionId` also links (no `characterId` copy).
+    const dmTok = { id: "t-mira", characterId: null, definitionId: "mira" } as TokenView;
+    expect(
+      cbtxTokenOverlay.decorate?.(
+        dmTok,
+        store(dmYou, { combatants: [ended], entities: [{ ...miraFull, deathFailures: 3 }] }),
+        view("dm"),
+      )?.badges?.[0]?.label,
+    ).toBe("Dead");
+    // Bound: the FR-CBTX-30 badge only (the cross is combat-tracker's), no double badge.
+    const bound = cbtxTokenOverlay.decorate?.(
+      tok,
+      store(dmYou, { combatants: [miraC], entities: [{ ...miraFull, hpCurrent: 0 }] }),
+      view("dm"),
+    );
+    expect(bound?.badges).toHaveLength(1);
+    expect(bound?.cross).toBeUndefined();
+  });
+
   test("no bound combatant (after End) → nothing", () => {
     const s = store(dmYou, { combatants: [{ ...goblinDm, active: false }] });
     expect(cbtxTokenOverlay.decorate?.(t("t-gob"), s, view("dm"))).toBeNull();
