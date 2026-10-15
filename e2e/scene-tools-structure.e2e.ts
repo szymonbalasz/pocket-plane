@@ -80,7 +80,6 @@ test("FR-SCN-11 / -12 / -09 / -08 / -15 blocked move, door open, door menu, draw
   await dm.getByTestId("map-show-to-players").click();
   await expect(dm.getByTestId("map-not-shown-badge")).toHaveCount(0);
   await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
-  await shellWindow(dm, "cbt.initiative").getByTestId("ui-window-close").click();
 
   // DM: walls (one shape, 3 segments), d1 closed, d2 locked.
   await expect.poll(() => attr(dm, "scn-walls", null, "count")).toBe(3);
@@ -153,6 +152,69 @@ test("FR-SCN-11 / -12 / -09 / -08 / -15 blocked move, door open, door menu, draw
   const raw = frames.join("\n");
   expect(raw).not.toContain('"walls"');
   expect(raw).not.toMatch(/\[5,8,11,8,12,2/);
+
+  await player.context().close();
+  await dm.context().close();
+});
+
+test("FR-MAP-28 a drag in progress when the connection drops snaps back unsent; the DM's preview clears; no frames after", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const ambush = recordId("battlemap", "scene");
+  const mira = recordId("battlemap", "token", 0);
+
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+
+  // The player's socket goes through a route we can cut (a server loss, seen from the player).
+  const player = await rolePage(browser);
+  const sockets: { cut(): Promise<void> }[] = [];
+  let dragFrames = 0;
+  await player.routeWebSocket(/\/ws/, (ws) => {
+    const server = ws.connectToServer();
+    ws.onMessage((m) => {
+      if (String(m).includes('"map.drag"')) dragFrames++;
+      server.send(m);
+    });
+    server.onMessage((m) => ws.send(m));
+    sockets.push({
+      cut: async () => {
+        await ws.close({ code: 4000, reason: "cut" });
+        await server.close();
+      },
+    });
+  });
+  await player.goto(link("Player 1"));
+  const status = player.getByTestId("sync-connection-status");
+  await expect(status).toHaveAttribute("data-state", "live");
+  await expect.poll(() => tokenNode(player, mira)).not.toBeNull();
+  const start = (await cellOf(player, mira)) as { col: number; row: number };
+
+  // Press on Mira and drag a little, without releasing; the DM sees the preview.
+  const m = (await tokenNode(player, mira)) as { x: number; y: number };
+  await player.mouse.move(m.x, m.y);
+  await player.mouse.down();
+  for (let i = 1; i <= 4; i++) await player.mouse.move(m.x + 12 * i, m.y + 6 * i);
+  await expect.poll(() => attr(dm, "map-token", mira, "preview")).toBe(true);
+
+  // The connection drops mid-drag; the player reconnects while still holding, then releases.
+  await sockets.at(-1)?.cut();
+  await expect(status).not.toHaveAttribute("data-state", "live");
+  await expect(status).toHaveAttribute("data-state", "live", { timeout: 15_000 });
+  await player.mouse.move(m.x + 80, m.y + 40);
+  await player.mouse.up();
+
+  // Snapped back unsent, on the player and the DM; the DM's preview is gone and stays gone.
+  await expect.poll(() => cellOf(player, mira)).toEqual(start);
+  await expect.poll(() => attr(dm, "map-token", mira, "preview"), { timeout: 5_000 }).toBeNull();
+  await expect.poll(() => cellOf(dm, mira)).toEqual(start);
+  const after = dragFrames;
+  await player.waitForTimeout(2_500);
+  expect(dragFrames).toBe(after);
+  expect(await attr(dm, "map-token", mira, "preview")).toBeNull();
 
   await player.context().close();
   await dm.context().close();

@@ -296,9 +296,21 @@ export function MapCanvas(props: MapCanvasProps) {
     for (const n of stageRef.current?.find(".map-token") ?? []) {
       if (n.isDragging()) n.stopDrag();
     }
+    // Safety net: a drag whose `dragend` never reached `dragEnd` would repeat its preview frame
+    // forever once live again; end it here and put the token back on its cell.
+    const left = dragRef.current;
+    if (left) {
+      dragRef.current = null;
+      left.abort();
+      const node = stageRef.current?.find(".map-token").find((n) => n.id() === left.tokenId);
+      node?.position(cellToPx(gridRef.current, left.from.col, left.from.row));
+      previews.setState({ local: null });
+    }
     pointers.setState({ drag: null });
     laser.current = null;
-  }, [live, pointers]);
+  }, [live, pointers, previews]);
+  // Unmount mid-drag: no more frames from this canvas.
+  useEffect(() => () => dragRef.current?.abort(), []);
 
   const targeting = props.targeting ?? false;
   const canMove = useCallback(
