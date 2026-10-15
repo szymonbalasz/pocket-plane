@@ -3,6 +3,7 @@
 // memory only, one warning) and the DM canvas dropping a switched-off layer (players never).
 import { describe, expect, test } from "bun:test";
 import { type LayerDef, layerSlots, layerToggles, orderLayers } from "../scenes-map/layers";
+import { tokensInBox } from "../scenes-map/selection-logic";
 import { useLayerToggles } from "../scenes-map/tool-store";
 import {
   createLayerMemory,
@@ -11,6 +12,7 @@ import {
   layerSwitches,
   withoutDmOnly,
 } from "./layer-switches";
+import { pickableTemplates } from "./templates";
 
 const C = () => null;
 /** The SCN entries of `canvas-layers.ts` (the real registry imports Konva). */
@@ -93,6 +95,36 @@ describe("FR-SCN-01 / -05 DM-only items", () => {
     expect(ids("dm", { "dm-only": true })).toEqual(["mira"]);
     expect(ids("player", { "dm-only": true })).toEqual(["mira", "wolf"]);
     expect(withoutDmOnly(tokens, "dm", {})).toBe(tokens);
+  });
+});
+
+describe("FR-SCN-05 DM-only items off: not hit", () => {
+  const grid = { gridCellSize: 70, gridOffsetX: 0, gridOffsetY: 0 };
+  const box = { x0: 0, y0: 0, x1: 700, y1: 700 };
+  const tokens = [
+    { id: "mira", col: 2, row: 2, size: "medium" as const, hidden: false },
+    { id: "wolf", col: 4, row: 4, size: "medium" as const, hidden: true },
+  ];
+
+  test("FR-SCN-05 / FR-MAP-32 box select skips hidden tokens while DM-only items is off", () => {
+    const pick = (off: Record<string, boolean>) =>
+      tokensInBox(withoutDmOnly(tokens, "dm", off), grid, box);
+    expect(pick({})).toEqual(["mira", "wolf"]);
+    expect(pick({ "dm-only": true })).toEqual(["mira"]);
+    expect(pick({ walls: true })).toEqual(["mira", "wolf"]);
+  });
+
+  test("FR-SCN-05 / -26 the AoE tool hits no hidden kept template while DM-only items is off", () => {
+    const kept = [
+      { id: "sg", placedByPlayerId: "p1", hidden: false },
+      { id: "glyph", placedByPlayerId: null, hidden: true },
+    ];
+    const ids = (client: "dm" | "player", me: string | null, off: boolean) =>
+      pickableTemplates(kept, client, me, off).map((t) => t.id);
+    expect(ids("dm", null, false)).toEqual(["sg", "glyph"]);
+    expect(ids("dm", null, true)).toEqual(["sg"]);
+    expect(ids("player", "p1", true)).toEqual(["sg"]);
+    expect(ids("player", "p2", false)).toEqual([]);
   });
 });
 

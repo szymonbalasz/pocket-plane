@@ -25,6 +25,7 @@ import {
   canEditTemplate,
   createEphemeralStore,
   ephemeralsOn,
+  pickableTemplates,
   pruneEphemerals,
   receiveTemplate,
   resetEphemerals,
@@ -157,13 +158,14 @@ export function ScnTemplatesLayer() {
     () => Object.values(byId ?? {}).filter((r) => r.sceneId === scene.id),
     [byId, scene.id],
   );
-  // The AoE tool edits only what this client may (FR-SCN-26) and sees.
+  // The AoE tool edits only what this client may (FR-SCN-26) and sees: with DM-only items off,
+  // hidden ones are not drawn, so not hit (FR-SCN-05).
   useEffect(() => {
     useAoe.setState({
       sceneId: scene.id,
-      editable: kept.filter((r) => canEditTemplate(r, client, myPlayerId)),
+      editable: pickableTemplates(kept, client, myPlayerId, dmOnlyOff),
     });
-  }, [kept, scene.id, client, myPlayerId]);
+  }, [kept, scene.id, client, myPlayerId, dmOnlyOff]);
   useEffect(() => () => useAoe.setState({ editable: [], sceneId: null }), []);
 
   // ---- others' ephemerals (FR-SCN-23) ----

@@ -39,6 +39,37 @@ async function rule(page: Page, a: [number, number], b: [number, number]) {
   return text;
 }
 
+/** Shift-drags a box from cell point `a` to `b` (70 px cells). */
+async function boxSelect(page: Page, a: [number, number], b: [number, number]) {
+  const from = await mapToPage(page, a[0] * 70, a[1] * 70);
+  const to = await mapToPage(page, b[0] * 70, b[1] * 70);
+  await page.keyboard.down("Shift");
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 5; i++) {
+    await page.mouse.move(from.x + ((to.x - from.x) * i) / 5, from.y + ((to.y - from.y) * i) / 5);
+  }
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+}
+
+/** Selection rings (FR-MAP-31): token ids with a `map-token-ring` in state `selected`. */
+async function selectedIds(page: Page) {
+  return page.evaluate(() => {
+    type KNode = {
+      getAttr(a: string): unknown;
+      findAncestor(s: string): KNode | null;
+      id(): string;
+    };
+    type KStage = { find(s: string): KNode[] };
+    const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
+    return (K?.stages[0]?.find(".map-token-ring") ?? [])
+      .filter((n) => n.getAttr("state") === "selected")
+      .map((n) => n.findAncestor(".map-token")?.id() ?? "")
+      .sort();
+  });
+}
+
 /** Visible Konva nodes named `name` whose attr `a` is `v`. */
 async function countWith(page: Page, name: string, a: string, v: unknown) {
   return page.evaluate(
@@ -141,6 +172,22 @@ test("FR-SCN-29 / -30 / -05 diagonal rule on everyone's ruler; DM-only layer swi
   expect(await konvaNodes(dm, "map-token-label")).toHaveLength(labels - 2);
   await expect(dm.getByTestId("map-tool-layers")).toHaveAttribute("data-some-off", "true");
   expect(intents).toBe(before);
+  await dm.keyboard.press("Escape");
+
+  // FR-SCN-05 / FR-MAP-32: a Shift box around Wolf (14, 4) and Elite (15, 8) picks nothing while
+  // they are not drawn; with DM-only items back on, the same box picks both.
+  await boxSelect(dm, [13.5, 3.5], [16.6, 9.6]);
+  await dm.getByTestId("map-tool-layers").click();
+  await dmOnly.click();
+  await expect(dmOnly).toHaveAttribute("aria-checked", "true");
+  await dm.keyboard.press("Escape");
+  await expect.poll(async () => (await konvaNodes(dm, "map-token-hidden")).length).toBe(2);
+  expect(await selectedIds(dm)).toEqual([]);
+  await boxSelect(dm, [13.5, 3.5], [16.6, 9.6]);
+  await expect.poll(async () => (await selectedIds(dm)).length).toBe(2);
+  await dm.getByTestId("map-tool-layers").click();
+  await dmOnly.click();
+  await expect(dmOnly).toHaveAttribute("aria-checked", "false");
   await dm.keyboard.press("Escape");
 
   // Kept per campaign in this browser: a reload keeps them off.
