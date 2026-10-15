@@ -6,6 +6,8 @@ import {
   type EncounterRecord,
 } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
+import { eq } from "drizzle-orm";
+import { combatant } from "../../db/schema";
 import type { Actor } from "../../events/types";
 import { rollInitiative, setInitiative, setRemoved } from "./initiative";
 import { startCommand } from "./lifecycle";
@@ -52,7 +54,7 @@ const lastEntries = (t: ReturnType<typeof started>) =>
     .map((c) => c.after as GameLogEntryRecord);
 
 describe("FR-CBT-11 FR-CBT-12 initiative", () => {
-  test("FR-CBT-11 Roll monsters: one roll + entry each; hidden → not public; ranks", () => {
+  test("FR-CBT-11 FR-CBT-69 Roll monsters: one roll + entry each, DM-only by default; ranks", () => {
     const t = started();
     const monsters = ["Goblin", "Goblin 2", "Wolf", "Elite Goblin Warrior"].map(t.id);
     const r = t.run<{ rollIds: string[] }>(rollInitiative.name, { combatantIds: monsters });
@@ -60,9 +62,10 @@ describe("FR-CBT-11 FR-CBT-12 initiative", () => {
     const ev = t.events.at(-1)?.event;
     expect(ev?.type).toBe("InitiativeRolled");
     const entries = lastEntries(t);
+    // FR-CBT-69: monster lines DM-only even with the initiative category public.
     expect(entries.map((e) => [e.actorName, e.public, e.encounterId])).toEqual([
-      ["Goblin", true, t.enc.id],
-      ["Goblin 2", true, t.enc.id],
+      ["Goblin", false, t.enc.id],
+      ["Goblin 2", false, t.enc.id],
       ["Wolf", false, t.enc.id],
       ["Elite Goblin Warrior", false, t.enc.id],
     ]);
@@ -143,9 +146,17 @@ describe("FR-CBT-11 FR-CBT-12 initiative", () => {
 });
 
 describe("FR-CBT-46 FR-CBT-47 playtest: no re-rolls from round 1", () => {
-  /** combat-1 order without Goblin 2: removed in round 0 before any roll, then round 1. */
+  /**
+   * combat-1 order without Goblin 2: removed in round 0 without initiative, then round 1. Sprint 2:
+   * monsters roll at Start (FR-CBT-64), so the missing initiative is set up in the test DB.
+   */
   function lateJoiner() {
     const t = started();
+    t.s.db
+      .update(combatant)
+      .set({ initiative: null, initRollId: null })
+      .where(eq(combatant.id, t.id("Goblin 2")))
+      .run();
     t.run(setRemoved.name, { combatantId: t.id("Goblin 2"), removed: true });
     for (const [n, v] of [
       ["Wolf", 18],
@@ -247,7 +258,8 @@ describe("FR-CBT-14 FR-CBT-31 FR-CBT-15 turns and removal", () => {
   test("FR-CBT-14 round 0 needs every initiative; then round 1 first; wrap; prev", () => {
     const t = started();
     t.set("Wolf", 18);
-    expect(t.err(() => t.turn("next")).message).toBe("5 without initiative");
+    // Sprint 2: monsters rolled at Start (FR-CBT-64); Mira and Thorn still lack one.
+    expect(t.err(() => t.turn("next")).message).toBe("2 without initiative");
     t.standard();
     t.turn("next");
     expect(t.enc0()).toMatchObject({ round: 1, turnCombatantId: t.id("Wolf") });

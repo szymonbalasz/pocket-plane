@@ -107,14 +107,15 @@ describe("FR-CBT-07 FR-CBT-08 FR-CBT-10 start / end", () => {
     expect(by["Goblin 2"]?.tokenId).toBe(t.tokens.goblin2);
     expect(by.Wolf).toMatchObject({ hpCurrent: 11, hpMax: 11 });
     expect(by.Mira).toMatchObject({ hpCurrent: null, hpMax: null });
-    expect(pos(rows)).toEqual([
-      ["Thorn", 1],
-      ["Mira", 2],
-      ["Goblin", 3],
-      ["Goblin 2", 4],
-      ["Wolf", null],
-      ["Elite Goblin Warrior", null],
+    // Sprint 2 (FR-CBT-64): monsters rolled at Start rank first; PCs without initiative last.
+    const ranked = pos(rows);
+    expect(ranked.slice(4)).toEqual([
+      ["Thorn", 3],
+      ["Mira", 4],
     ]);
+    for (const r of rows) expect(r.initiative === null).toBe(r.kind === "pc");
+    const visible = ranked.slice(0, 4).filter(([n]) => n === "Goblin" || n === "Goblin 2");
+    expect(visible.map(([, p]) => p)).toEqual([1, 2]);
     const ev = t.events.at(-1)?.event;
     expect(ev?.type).toBe("EncounterStarted");
     expect(ev?.payload).toMatchObject({ encounterId: t.enc.id, sceneId: t.sceneId });
@@ -147,6 +148,7 @@ describe("FR-CBT-07 FR-CBT-08 FR-CBT-10 start / end", () => {
       name: "Many",
       partyCharacterIds: [t.thornId],
       entries: [{ definitionId: t.h.goblinId, quantity: 3 }],
+      createTokens: false,
     });
     t.run(startCommand.name, { encounterId: enc.id, sceneId: t.sceneId });
     expect(t.combatants(enc.id).map((r) => [r.name, r.tokenId === null, r.hidden])).toEqual([
@@ -187,7 +189,7 @@ describe("FR-CBT-07 FR-CBT-08 FR-CBT-10 start / end", () => {
       tokenId: t.tokens.goblin,
       name: "Goblin",
       imageAssetId: null,
-      playerPosition: 3,
+      playerPosition: expect.any(Number),
       band: "healthy",
       removed: false,
       movedFt: 0,
@@ -229,7 +231,8 @@ describe("FR-CBT-09 token-changed hook", () => {
     const ev = t.events.at(-1)?.event;
     expect(ev?.type).toBe("TokenRevealed");
     const by = t.byName(t.enc.id);
-    expect(by.Wolf).toMatchObject({ hidden: false, playerPosition: 5 });
+    expect(by.Wolf?.hidden).toBe(false);
+    expect(by.Wolf?.playerPosition).toBeNumber();
     const v = t.h.viewer("player", t.h.p1.id);
     const wire = (ev?.changes ?? []).map((c) => t.s.records.filterChange(c, v)).filter(Boolean);
     expect(wire.some((w) => w?.type === COMBATANT_TYPE && w.id === by.Wolf?.id)).toBe(true);

@@ -2,6 +2,7 @@
 import {
   EncounterBody,
   type EncounterRecord,
+  type HpMode,
   OPEN_ENCOUNTERS_MAX,
   QUANTITY_MAX,
 } from "@shared/combat-tracker/schemas";
@@ -65,9 +66,14 @@ function checkParty(env: CommandEnv, cid: string, ids: string[] | null): string[
   return unique;
 }
 
-/** FR-CBT-01: monsters via `resolveDefinition`; duplicates merged (order of first use). */
-function checkEntries(env: CommandEnv, entries: Body["entries"]) {
-  const merged = new Map<string, number>();
+type Entry = { definitionId: string; quantity: number; hpMode: HpMode };
+
+/**
+ * FR-CBT-01: monsters via `resolveDefinition`; duplicates merged (order and `hpMode` of first
+ * use). FR-CBT-62: `rolled` needs the definition's `hpFormula`.
+ */
+function checkEntries(env: CommandEnv, entries: Body["entries"]): Entry[] {
+  const merged = new Map<string, Entry>();
   entries.forEach((e, i) => {
     const def = resolveDefinition(env, e.definitionId);
     if (def.kind !== "monster") {
@@ -75,22 +81,29 @@ function checkEntries(env: CommandEnv, entries: Body["entries"]) {
         { path: ["entries", i, "definitionId"], message: "Not a monster" },
       ]);
     }
-    merged.set(def.id, (merged.get(def.id) ?? 0) + e.quantity);
+    const hpMode = e.hpMode ?? "average";
+    if (hpMode === "rolled" && !def.statBlock.hpFormula) {
+      const message = `${def.name} has no HP formula`;
+      throw invalid(message, [{ path: ["entries", i, "hpMode"], message }]);
+    }
+    const prev = merged.get(def.id);
+    if (prev) prev.quantity += e.quantity;
+    else merged.set(def.id, { definitionId: def.id, quantity: e.quantity, hpMode });
   });
-  for (const [definitionId, quantity] of merged) {
+  for (const { definitionId, quantity } of merged.values()) {
     if (quantity > QUANTITY_MAX) {
       throw invalid(`At most ${QUANTITY_MAX} of one creature`, [
         { path: ["entries"], message: `${definitionId}: at most ${QUANTITY_MAX}` },
       ]);
     }
   }
-  return [...merged].map(([definitionId, quantity]) => ({ definitionId, quantity }));
+  return [...merged.values()];
 }
 
 function insertEntries(
   env: CommandEnv,
   enc: { id: string; campaignId: string },
-  entries: { definitionId: string; quantity: number }[],
+  entries: Entry[],
 ): RecordChange[] {
   return entries.map((e) => {
     const id = env.ctx.ids.next();
@@ -102,6 +115,12 @@ function insertEntries(
     return entryChange(null, toEntryRecord(row, enc.campaignId));
   });
 }
+
+/** FR-CBT-62: builder options; omitted = true. */
+const optionsOf = (b: Body) => ({
+  createTokens: b.createTokens ?? true,
+  addHidden: b.addHidden ?? true,
+});
 
 function requirePlanned(e: EncounterRecord) {
   if (e.status !== "planned") throw conflict("Only a planned encounter can be changed");
@@ -133,6 +152,7 @@ export const createEncounter = defineCommand({
         name: input.name,
         status: "planned",
         partyCharacterIds: party,
+        ...optionsOf(input),
         round: 0,
         createdAt: now,
         updatedAt: now,
@@ -165,7 +185,12 @@ export const updateEncounter = defineCommand({
     env.tx.delete(encounterEntry).where(eq(encounterEntry.encounterId, before.id)).run();
     env.tx
       .update(encounter)
-      .set({ name: input.name, partyCharacterIds: party, updatedAt: env.ctx.clock.iso() })
+      .set({
+        name: input.name,
+        partyCharacterIds: party,
+        ...optionsOf(input),
+        updatedAt: env.ctx.clock.iso(),
+      })
       .where(eq(encounter.id, before.id))
       .run();
     const after = readEncounter(env.tx, before.id);
