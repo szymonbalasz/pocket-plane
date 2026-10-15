@@ -9,9 +9,11 @@ import { DM_TOAST_TOP } from "../play-shell/toast-region";
 /** The stack's width, px (`w-80`). */
 export const STACK_W = 320;
 
+/** `stackH`: the stack's measured height (0 before the first measure). */
 export function dmStackPlacement(
   vp: Viewport,
   initiative: Rect | null,
+  stackH: number,
   width = STACK_W,
 ): { left: number; top: number } {
   const left = Math.round((vp.w - width) / 2);
@@ -19,7 +21,8 @@ export function dmStackPlacement(
   if (!initiative) return { left, top };
   const overlapsX =
     left < initiative.x + initiative.w + EDGE_GAP && initiative.x - EDGE_GAP < left + width;
-  const overlapsY = initiative.y + initiative.h + EDGE_GAP > top;
+  const overlapsY =
+    initiative.y < top + stackH + EDGE_GAP && initiative.y + initiative.h + EDGE_GAP > top;
   if (!overlapsX || !overlapsY) return { left, top };
   const shifted = initiative.x - EDGE_GAP - width;
   if (shifted >= RAIL_CLEAR) return { left: Math.min(left, shifted), top };

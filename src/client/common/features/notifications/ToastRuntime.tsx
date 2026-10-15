@@ -7,7 +7,16 @@
 // Wherever Initiative is, the DM stack keeps clear of it (FR-NOTE-32, `keep-out.ts`).
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { XIcon } from "lucide-react";
-import { useCallback, useContext, useEffect, useMemo } from "react";
+import {
+  type RefObject,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
@@ -127,6 +136,28 @@ function useInitiativeRect(isDm: boolean): Rect | null {
   }, [isDm, windows, registry, available, vp, measured]);
 }
 
+/**
+ * FR-NOTE-32: the stack's rendered height (DM), re-measured when it mounts (`shown` flips) and on
+ * resize while mounted.
+ */
+function useStackHeight(ref: RefObject<HTMLElement | null>, on: boolean, shown: boolean): number {
+  const [h, setH] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!on || !shown || !el) {
+      setH(0);
+      return;
+    }
+    const measure = () => setH(Math.ceil(el.getBoundingClientRect().height));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, on, shown]);
+  return h;
+}
+
 export function ToastRuntime({
   views,
   note,
@@ -188,15 +219,18 @@ export function ToastRuntime({
   }, [dispatch]);
 
   // FR-NOTE-32: the DM's stack keeps clear of the rendered Initiative window.
+  const stackRef = useRef<HTMLElement>(null);
   const initiative = useInitiativeRect(isDm);
   const vp = useViewport();
-  const at = dmStackPlacement(vp, initiative);
+  const stackH = useStackHeight(stackRef, isDm, state.toasts.length > 0);
+  const at = dmStackPlacement(vp, initiative, stackH);
 
   const openHistory = () => openWindow(HISTORY_KIND);
   const { shown, more } = visibleToasts(state);
   if (state.toasts.length === 0) return null;
   return (
     <section
+      ref={stackRef}
       aria-label="Notifications"
       data-testid="note-toasts"
       data-placement={isDm ? "top-center" : "bottom-right"}
