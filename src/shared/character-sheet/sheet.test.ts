@@ -305,6 +305,48 @@ describe("FR-CHARX-21 characterRolls(stats, sheet, kind, ref)", () => {
     });
   });
 
+  test("FR-CHARX-42 toHit specs: d20 + to-hit only, category attack, labels; spellToHit needs roll attack", () => {
+    expect(specs("toHit", {})).toEqual([["1d20+5", "attack", "Dagger attack", true]]);
+    expect(specs("toHit", { attackId: "a2" })).toEqual([
+      ["1d20+5", "attack", "Shortbow attack", true],
+    ]);
+    expect(specs("toHit", { attackId: "gone" })).toMatchObject({ ok: false, code: "not_found" });
+    expect(specs("toHit", {}, { ...brin, attacks: [] })).toMatchObject({
+      ok: false,
+      code: "conflict",
+      message: "No weapon attack",
+    });
+    // Guiding Bolt has damage: spellToHit still rolls the d20 alone (spellAttack keeps both).
+    expect(specs("spellToHit", { spellId: "gb" })).toEqual([
+      ["1d20+5", "attack", "Guiding Bolt attack", true],
+    ]);
+    expect(specs("spellToHit", { spellId: "sf" })).toEqual({
+      ok: false,
+      code: "conflict",
+      message: "No attack roll for Sacred Flame",
+    });
+    expect(specs("spellToHit", { spellId: "nope" })).toMatchObject({
+      ok: false,
+      code: "not_found",
+    });
+    // Unchanged meaning: attack / spellAttack = to-hit + damage (FR-CHARX-42, S1).
+    expect(specs("attack", { attackId: "a1" })).toHaveLength(2);
+    expect(specs("spellAttack", { spellId: "gb" })).toHaveLength(2);
+  });
+
+  test("FR-CHARX-42 toHit intent: manual 1; attackId only on toHit, spellId required on spellToHit", () => {
+    const ok = (p: object) => SheetRollIntent.safeParse({ characterId: "c", ...p }).success;
+    const m = { diceTotal: 14 };
+    expect(ok({ kind: "toHit" })).toBe(true);
+    expect(ok({ kind: "toHit", attackId: "a1", manual: [m] })).toBe(true);
+    expect(ok({ kind: "toHit", manual: [m, m] })).toBe(false);
+    expect(ok({ kind: "toHit", spellId: "s1" })).toBe(false);
+    expect(ok({ kind: "spellToHit", spellId: "s1", manual: [m] })).toBe(true);
+    expect(ok({ kind: "spellToHit", spellId: "s1", manual: [m, m] })).toBe(false);
+    expect(ok({ kind: "spellToHit" })).toBe(false);
+    expect(ok({ kind: "spellToHit", spellId: "s1", attackId: "a1" })).toBe(false);
+  });
+
   test("FR-CHARX-07 MVP signature unchanged: characterRolls(stats, kind[, ability])", () => {
     expect(characterRolls(brin, "initiative")?.[0]?.expression).toBe("1d20+3");
     expect(characterRolls(brin, "save", "dex")?.[0]?.label).toBe("Dexterity save");
