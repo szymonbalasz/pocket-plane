@@ -129,8 +129,8 @@ export const PlayerEffectRecord = EffectRecordShape.pick({
   presetKey: z.enum(BUILTIN_PRESET_KEYS).nullable().optional(),
 });
 export type PlayerEffectRecord = z.infer<typeof PlayerEffectRecord>;
-/** An effect as either client holds it. */
-export type EffectView = PlayerEffectRecord & Partial<EffectRecord>;
+/** An effect as either client holds it (the DM's `presetKey` may be a preset id). */
+export type EffectView = Omit<PlayerEffectRecord, "presetKey"> & Partial<EffectRecord>;
 
 /** FR-CBTX-31: players never receive secret, hidden or ended effects. */
 export const effectVisibleToPlayers = (r: EffectRecord): boolean =>
