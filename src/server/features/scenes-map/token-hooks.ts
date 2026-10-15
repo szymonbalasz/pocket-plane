@@ -3,6 +3,8 @@
 //
 // A hook runs inside `map.updateToken`, `map.setTokenHidden`, `map.deleteToken`, scene delete
 // (once per token) and `map.moveToken` (FR-MAP-38, ADR-0031) with `(env, before, after | null)`;
+// also inside fog commands and the FR-MAP-20 size refresh for every token whose fog-hidden value
+// flips (FR-FOG-13, ADR-0039; via `runTokenChangedHooks`);
 // `after` is null on delete. It returns the rows it changed; every one is listed in the token
 // event's `changes`. A throw (e.g. a `conflict` for a token bound to a running encounter) rolls
 // the whole command back. Hooks write through `env.tx` only and never emit. Placement and
@@ -61,15 +63,25 @@ export class TokenHooks {
   }
 }
 
-const bound = new WeakMap<object, TokenHooks>();
+/**
+ * The process's hook list. Hooks are stateless and write through `env.tx`, so one list serves
+ * every server; tests register and unregister their own hooks around a case.
+ */
+export const tokenHooks = new TokenHooks(tokenChangedHooks);
 
-export function bindTokenHooks(s: object, hooks: TokenHooks): void {
-  bound.set(s, hooks);
+/**
+ * Runs every token-changed hook (ADR-0039 export): fog commands and the FR-MAP-20 size refresh
+ * call it for tokens whose fog-hidden value flips (FR-FOG-13).
+ */
+export function runTokenChangedHooks(
+  env: TokenHookEnv,
+  before: TokenRecord,
+  after: TokenRecord | null,
+): RecordChange[] {
+  return tokenHooks.run(env, before, after);
 }
 
-/** The hook list of a server instance (set at feature registration). */
-export function tokenHooksOf(s: object): TokenHooks {
-  const h = bound.get(s);
-  if (!h) throw new Error("scenes-map is not registered on these services");
-  return h;
+/** The hook list a server's commands run (the process's list). */
+export function tokenHooksOf(_s: object): TokenHooks {
+  return tokenHooks;
 }

@@ -197,6 +197,8 @@ const tokenFields = {
   shape: TokenShape,
   /** Display copy: `definitionId` on character tokens, else null; players get it (FR-MAP-50). */
   characterId: z.string().nullable(),
+  /** Server copy: every footprint cell fogged (FR-FOG-10); on the wire only when true. */
+  fogged: z.literal(true).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 };

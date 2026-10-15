@@ -18,7 +18,13 @@ import {
   TokenRevealed,
   TokenUpdated,
 } from "@shared/events/scenes-map";
-import { copyName, duplicateCell, numberedName, overlapsMap } from "@shared/scenes-map/geometry";
+import {
+  copyName,
+  duplicateCell,
+  footprint,
+  numberedName,
+  overlapsMap,
+} from "@shared/scenes-map/geometry";
 import {
   ActivateSceneInput,
   CreateSceneBody,
@@ -75,7 +81,9 @@ import {
   readToken,
   sceneTokens,
 } from "./rows";
+import { lifecycleHooks } from "./scene-hooks";
 import type { TokenHooks } from "./token-hooks";
+import { deriveSceneObject, tokenHiddenForPlayers } from "./visibility-hooks";
 
 /** REST-only commands (no WS intent, MAP §9 / ADR-0021 D). */
 export const MAP_REST = {
@@ -148,6 +156,15 @@ function assertUnlocked(s: SceneRecord) {
 const assetOrNull = (env: CommandEnv, id: string | null | undefined): string | null =>
   id === null || id === undefined ? null : requireAsset(env, id).id;
 
+/**
+ * FR-FOG-10 (ADR-0039): a token's server copies (`fogged`) at a scene, cell and size, derived in
+ * the writing command's transaction before its single write. No `derive` hook → not fogged.
+ */
+function tokenCopies(tx: Tx, sceneId: string, col: number, row: number, size: TokenSize) {
+  const n = footprint(size);
+  return deriveSceneObject(tx, { type: TOKEN_TYPE, sceneId, cells: { col, row, w: n, h: n } });
+}
+
 // ---------- scenes (REST) ----------
 
 /** FR-MAP-01: inactive, unlocked, grid defaults; map size = the asset's `display` size. */
@@ -184,11 +201,13 @@ export const createScene = defineCommand({
       })
       .run();
     const after = readScene(tx, id);
+    // ADR-0039: scene lifecycle hooks (fog: the new scene's fog row) join the event.
+    const hookChanges = lifecycleHooks.created({ tx, ctx, actor }, after);
     emit({
       type: SceneCreated.type,
       campaignId: cid,
       payload: { sceneId: id },
-      changes: [sceneChange(null, after)],
+      changes: [sceneChange(null, after), ...hookChanges],
     });
     return after;
   },
@@ -238,7 +257,11 @@ export const patchScene = defineCommand({
   },
 });
 
-/** FR-MAP-04: inactive copy "‹name› (copy)", same folder/map/grid/lock, every token copied. */
+/**
+ * FR-MAP-04: inactive copy "‹name› (copy)", same folder/map/grid/lock, every token copied.
+ * ADR-0039: the lifecycle hooks run after the copy's insert and before its tokens, whose
+ * `fogged` is derived against the copy (FR-FOG-10).
+ */
 export const duplicateScene = defineCommand({
   name: MAP_REST.duplicateScene,
   input: z.strictObject({ id: IdSchema }),
@@ -264,7 +287,11 @@ export const duplicateScene = defineCommand({
         updatedAt: now,
       })
       .run();
-    const changes: RecordChange[] = [sceneChange(null, readScene(tx, id))];
+    const copy = readScene(tx, id);
+    const changes: RecordChange[] = [
+      sceneChange(null, copy),
+      ...lifecycleHooks.duplicated({ tx, ctx, actor }, src, copy),
+    ];
     for (const t of tokens) {
       const tid = ctx.ids.next();
       const { seq: _s, ...fields } = t;
@@ -274,6 +301,7 @@ export const duplicateScene = defineCommand({
           id: tid,
           sceneId: id,
           seq: tokenSeqNext,
+          fogged: tokenCopies(tx, id, t.col, t.row, t.size).fogged,
           createdAt: now,
           updatedAt: now,
         })
@@ -290,7 +318,11 @@ export const duplicateScene = defineCommand({
   },
 });
 
-/** FR-MAP-05: non-active only; tokens go with it, each through the token-changed hooks first. */
+/**
+ * FR-MAP-05: non-active only; tokens go with it, each through the token-changed hooks first.
+ * ADR-0039: the lifecycle hooks' `deleting` runs before any row is deleted (fog: the `fog`
+ * delete); the FK cascade removes the dependent rows.
+ */
 export function deleteSceneCommand(hooks: TokenHooks) {
   return defineCommand({
     name: MAP_REST.deleteScene,
@@ -300,6 +332,7 @@ export function deleteSceneCommand(hooks: TokenHooks) {
       const cid = campaignOf(actor);
       const before = getScene(tx, cid, id);
       if (before.active) throw conflict("The scene shown to players can't be deleted");
+      const sceneHookChanges = lifecycleHooks.deleting({ tx, ctx, actor }, before);
       const tokens = sceneTokens(tx, id);
       const changes: RecordChange[] = [];
       for (const t of tokens) changes.push(...hooks.run({ tx, ctx, actor }, t, null));
@@ -312,6 +345,7 @@ export function deleteSceneCommand(hooks: TokenHooks) {
         changes: [
           ...tokens.map((t) => tokenChange(t, null)),
           ...changes,
+          ...sceneHookChanges,
           sceneChange(before, null),
         ],
       });
@@ -499,8 +533,8 @@ export type PlaceTokenSpec = z.output<typeof PlaceTokenInput>;
  * FR-MAP-13: name = definition name, numbered (FR-MAP-16); image = portrait or none; size =
  * `statBlock.size`; shape = definition `tokenShape`, else round (FR-MAP-35); speed =
  * `statBlock.speed`, else null (FR-MAP-36); owner = the character's owner, else none; visible;
- * `characterId` copy (FR-MAP-50). Optional overrides (fixtures) for name, image, owner, hidden,
- * shape; never size, speed or `characterId`.
+ * `characterId` copy (FR-MAP-50); `fogged` derived (FR-FOG-10). Optional overrides (fixtures) for
+ * name, image, owner, hidden, shape; never size, speed, `characterId` or `fogged`.
  */
 export function placeTokenIn(
   env: CommandEnv,
@@ -536,6 +570,7 @@ export function placeTokenIn(
     ownerPlayerId,
     hidden: input.hidden ?? false,
     characterId: characterIdOf(def),
+    fogged: tokenCopies(tx, s.id, input.col, input.row, size).fogged,
   });
   return { token: after, change: tokenChange(null, after) };
 }
@@ -561,7 +596,9 @@ export const placeToken = defineCommand({
  * A token the player can't see answers `not_found` (as unknown); visible but not theirs →
  * `forbidden`. DM moves any token on any scene. FR-MAP-38 (ADR-0031): runs the token-changed
  * hooks in the same transaction, possibly as a player actor; their rows ride on the unlogged
- * `TokenMoved`. Hooks never reject a move; a throw rolls it back (`internal`).
+ * `TokenMoved`. Hooks never reject a move; a throw rolls it back (`internal`). Order (ADR-0040,
+ * FR-FOG-10): validate → guards → `derive` (`fogged`) → one write → token-changed hooks, so a
+ * move into fog is already fogged in its own change (players get one `delete`).
  */
 export function moveTokenCommand(hooks: TokenHooks) {
   return defineCommand({
@@ -573,7 +610,7 @@ export function moveTokenCommand(hooks: TokenHooks) {
       const cid = campaignOf(actor);
       const t = getToken(tx, cid, tokenId);
       const active = activeSceneOf(tx, cid);
-      if (t.hidden || active?.id !== t.sceneId) throw notFound("Token not found");
+      if (tokenHiddenForPlayers(t) || active?.id !== t.sceneId) throw notFound("Token not found");
       if (t.ownerPlayerId === null || t.ownerPlayerId !== actor.playerId) {
         throw forbidden("Not your token");
       }
@@ -584,8 +621,9 @@ export function moveTokenCommand(hooks: TokenHooks) {
       const before = getToken(tx, cid, tokenId);
       const s = findScene(tx, cid, before.sceneId) as SceneRecord;
       assertOnMap(s, col, row, before.size);
+      const { fogged } = tokenCopies(tx, s.id, col, row, before.size);
       tx.update(token)
-        .set({ col, row, updatedAt: ctx.clock.iso() })
+        .set({ col, row, fogged, updatedAt: ctx.clock.iso() })
         .where(eq(token.id, tokenId))
         .run();
       const after = readToken(tx, tokenId);
@@ -662,7 +700,8 @@ export function setTokenHiddenCommand(hooks: TokenHooks) {
 
 /**
  * FR-MAP-17: same definition, image, size, shape, speed, owner, hidden flag; numbered name; at
- * `col + footprint` same row if valid, else `col − footprint`, else the source cell.
+ * `col + footprint` same row if valid, else `col − footprint`, else the source cell; `fogged`
+ * derived at that cell (FR-FOG-10).
  */
 export const duplicateToken = defineCommand({
   name: MAP_INTENTS.duplicateToken,
@@ -689,6 +728,7 @@ export const duplicateToken = defineCommand({
       ownerPlayerId: src.ownerPlayerId,
       hidden: src.hidden,
       characterId: src.characterId,
+      fogged: tokenCopies(tx, s.id, cell.col, cell.row, src.size).fogged,
     });
     emit({
       type: TokenDuplicated.type,

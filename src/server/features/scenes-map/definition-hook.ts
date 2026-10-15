@@ -1,8 +1,11 @@
 // FR-MAP-20: token display copies follow a definition edit, inside `entities.update`'s
 // transaction (FR-ENT-19). Size and speed (FR-MAP-36) always follow; the image follows only on
 // tokens still showing the old portrait (#127); `characterId` is re-asserted (FR-MAP-50). Names,
-// shapes (FR-MAP-35) and cells untouched (#126). Runs no token-changed hooks.
+// shapes (FR-MAP-35) and cells untouched (#126). A size change re-derives `fogged` for the new
+// footprint (FR-FOG-10); a token whose fog-hidden value flips runs the token-changed hooks, their
+// rows joining the changes (FR-FOG-13, ADR-0039). No other token-changed hooks run.
 import type { EntityRecord } from "@shared/entities/schemas";
+import { footprint } from "@shared/scenes-map/geometry";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { asc, eq } from "drizzle-orm";
 import { token } from "../../db/schema";
@@ -11,6 +14,8 @@ import { requireAsset } from "../assets-pipeline/commands";
 import type { HookEnv } from "../entities/definition-hooks";
 import { characterIdOf } from "./character-copy";
 import { readToken, toTokenRecord } from "./rows";
+import { runTokenChangedHooks } from "./token-hooks";
+import { deriveSceneObject, hiddenByHooks } from "./visibility-hooks";
 
 export function refreshTokenCopies(
   env: HookEnv,
@@ -32,10 +37,20 @@ export function refreshTokenCopies(
     .all()
     .map(toTokenRecord);
   const changes: RecordChange[] = [];
+  const hookChanges: RecordChange[] = [];
   const now = env.ctx.clock.iso();
   for (const t of rows) {
     const set: Partial<typeof token.$inferInsert> = {};
-    if (sizeChanged && t.size !== after.statBlock.size) set.size = after.statBlock.size;
+    if (sizeChanged && t.size !== after.statBlock.size) {
+      set.size = after.statBlock.size;
+      const n = footprint(after.statBlock.size);
+      const { fogged } = deriveSceneObject(env.tx, {
+        type: TOKEN_TYPE,
+        sceneId: t.sceneId,
+        cells: { col: t.col, row: t.row, w: n, h: n },
+      });
+      if (fogged !== (t.fogged === true)) set.fogged = fogged;
+    }
     if (speedChanged && t.speed !== speed) set.speed = speed;
     if (portraitChanged && t.imageAssetId === before.portraitAssetId) {
       set.imageAssetId = after.portraitAssetId;
@@ -48,7 +63,11 @@ export function refreshTokenCopies(
       .set({ ...set, updatedAt: now })
       .where(eq(token.id, t.id))
       .run();
-    changes.push({ type: TOKEN_TYPE, id: t.id, before: t, after: readToken(env.tx, t.id) });
+    const next = readToken(env.tx, t.id);
+    changes.push({ type: TOKEN_TYPE, id: t.id, before: t, after: next });
+    if (hiddenByHooks(TOKEN_TYPE, t) !== hiddenByHooks(TOKEN_TYPE, next)) {
+      hookChanges.push(...runTokenChangedHooks(env, t, next));
+    }
   }
-  return changes;
+  return [...changes, ...hookChanges];
 }
