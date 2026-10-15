@@ -20,6 +20,7 @@ import {
   type HpChangeRecord,
   type HpChangeResult,
   type HpChangesResult,
+  isFullCard,
   LOG_KIND_ATTACK,
   LOG_KIND_HP,
   UndoInput,
@@ -34,7 +35,7 @@ import {
 } from "@shared/events/combat-tracker";
 import { and, desc, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
-import { conflict, notFound } from "../../commands/errors";
+import { conflict, invalid, notFound } from "../../commands/errors";
 import { hpChange, hpChangeSeqNext, roll } from "../../db/schema";
 import type { DomainEvent, RecordChange } from "../../events/types";
 import { type Applied, hpRules, hpTargetOf } from "../combat-extras/hp-rules";
@@ -143,6 +144,11 @@ export const applyCard = defineCommand({
     // FR-CBT-10: End also dismissed the card (FR-CBT-59); the ended encounter is the reason.
     if (enc.status !== "started") throw conflict("Encounter has ended");
     if (card.state !== "pending") throw conflict("No longer pending");
+    // FR-CBT-72: the totals are optional on the wire. Partial cards (to-hit- or damage-only)
+    // apply from fix/combat2-split-attack; until then a card has both rolls and needs both totals.
+    const { toHitTotal, damageTotal } = input;
+    if (!isFullCard(p) || damageTotal === undefined) throw invalid("Damage needed");
+    if (toHitTotal === undefined) throw invalid("To-hit total needed");
     // FR-CBT-34: every target active and non-removed, checked before anything is written.
     const targets = input.targets.map((t) => ({ ...t, c: activeCombatant(env, t.targetId).c }));
     const attacker = getCombatant(env.tx, enc.campaignId, p.attackerId);
@@ -171,8 +177,8 @@ export const applyCard = defineCommand({
     const outcomes: DamageCardTargetOutcome[] = [];
     for (const { c: target, hit, multiplier } of targets) {
       const targetAc = statsOf(env, target).ac;
-      const hitComputed = hitHint(toHitRoll.natural, input.toHitTotal, targetAc);
-      const raw = rawDamage(hit, input.damageTotal, multiplier);
+      const hitComputed = hitHint(toHitRoll.natural, toHitTotal, targetAc);
+      const raw = rawDamage(hit, damageTotal, multiplier);
       // Allocated first: effects ended `down` point at this row (FR-CBTX-16, -22).
       const hpChangeId = env.ctx.ids.next();
       const hp = hpRules.apply(env, hpTargetOf(target), {
@@ -189,9 +195,9 @@ export const applyCard = defineCommand({
         attackName: p.attackName,
         damageType: p.damageType,
         toHit: {
-          dice: input.toHitTotal === toHitRoll.total ? toHitRoll.total - p.toHit.constant : null,
+          dice: toHitTotal === toHitRoll.total ? toHitRoll.total - p.toHit.constant : null,
           constant: p.toHit.constant,
-          total: input.toHitTotal,
+          total: toHitTotal,
           natural: toHitRoll.natural,
         },
         hit,
@@ -205,13 +211,13 @@ export const applyCard = defineCommand({
         hitComputed,
         toHitRolled: toHitRoll.total,
         damageRolled: damageRoll.total,
-        damageTotal: input.damageTotal,
+        damageTotal,
         applied,
         overkill,
         overrides: {
-          toHit: input.toHitTotal !== toHitRoll.total,
+          toHit: toHitTotal !== toHitRoll.total,
           hit: hit !== hitComputed,
-          damage: input.damageTotal !== damageRoll.total,
+          damage: damageTotal !== damageRoll.total,
         },
         rolls,
         ...(hp.absorbed > 0 ? { absorbed: hp.absorbed } : {}),
@@ -243,12 +249,12 @@ export const applyCard = defineCommand({
         targetName: target.name,
         targetAc,
         toHitRolled: toHitRoll.total,
-        toHitTotal: input.toHitTotal,
+        toHitTotal: toHitTotal,
         natural: toHitRoll.natural,
         hitComputed,
         hit,
         damageRolled: damageRoll.total,
-        damageTotal: input.damageTotal,
+        damageTotal,
         multiplier,
         raw,
         applied,

@@ -26,6 +26,7 @@ const CBTX_EVENTS = [
   "DeathSaveRolled",
   "DeathSavesSet",
   "CombatantsAdded",
+  "CombatantBound",
 ];
 
 const roundTrip = (s: { parse(v: unknown): unknown }, v: unknown) =>
@@ -62,7 +63,7 @@ const facts = {
 };
 
 describe("CBTX domain events (§9)", () => {
-  test("CBTX §9 all 9 events registered once, logged, none undoable", () => {
+  test("CBTX §9 all 10 events registered once, logged, none undoable", () => {
     const defs = domainEvents.filter((e) => CBTX_EVENTS.includes(e.type));
     expect(defs.map((e) => e.type).sort()).toEqual([...CBTX_EVENTS].sort());
     expect(defs.every((e) => e.logged && !e.undoable)).toBe(true);

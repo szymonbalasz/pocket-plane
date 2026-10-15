@@ -2,6 +2,9 @@
 // REST bodies, derived values. One schema for pipeline, commands, fixtures and clients.
 import { DeathSaveCount, TempHp } from "@shared/combat-extras/schemas";
 import { z } from "zod";
+import { HP_FORMULA_MESSAGE, normalizeHpFormula, parseHpFormula } from "./hp-formula";
+
+export { clampRolledHp, hpAverage, hpRollSpec, parseHpFormula } from "./hp-formula";
 
 // ---------- creature core (FR-ENT-02, ENT §8) ----------
 
@@ -204,10 +207,19 @@ export const SHEET_FULL_MESSAGE = "Sheet is full";
 
 const jsonBytes = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
 
+/** FR-ENT-25: optional HP formula, stored normalised (`2d8+2`). */
+export const HpFormula = z
+  .string()
+  .max(20)
+  .transform(normalizeHpFormula)
+  .refine((f) => parseHpFormula(f) !== null, { message: HP_FORMULA_MESSAGE });
+
 const core = {
   size: Size,
   ac: int(0, 30),
   hpMax: int(1, 999),
+  /** FR-ENT-25: absent = only Average HP (the stat block's `hpMax`) is offered. */
+  hpFormula: HpFormula.optional(),
   initBonus: int(-10, 20),
   attacks: Attacks,
   /** Absent = unknown: no movement indicator (FR-ENT-21). */

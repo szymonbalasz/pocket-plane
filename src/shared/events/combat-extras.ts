@@ -92,6 +92,17 @@ export const DeathSavesSet = defineEvent({
   undoable: false,
 });
 
+/**
+ * `cbtx.bindToken` (FR-CBTX-45): `combatant` (and on a `hidden` change ranks, `encounter`,
+ * `effect` hidden copies). `tokenId` null = unlink.
+ */
+export const CombatantBound = defineEvent({
+  type: "CombatantBound",
+  payload: z.strictObject({ combatantId: Id, tokenId: Id.nullable() }),
+  logged: true,
+  undoable: false,
+});
+
 /** `cbtx.addCombatants`: `combatant` creates + ranks, `encounter`, `effect` copies (FR-CBTX-26). */
 export const CombatantsAdded = defineEvent({
   type: "CombatantsAdded",

@@ -2,22 +2,18 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 2 phase 1 builds (#190 gate 1 'go with picks'; specs merged, ADR-0037 / 0038). Wave 1 = four P2b branches; P2a core waits for map-fit-floor; M last. Plan: phase-1 review build graph (`.verify/review-phase1/review.md` "Build order").
+**Phase:** Sprint 2 phase 1 builds (#190 gate 1 'go with picks'; specs merged, ADR-0037 / 0038). Wave 1 merged (#192); wave 2 = charx-cues, combat2-add, combat2-polish; then split-attack; M last. Plan: phase-1 review build graph (`.verify/review-phase1/review.md` "Build order").
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| G2 / G3 map fit | `fix/map-fit-floor` (w2J, slot 0) | build-map-fit-floor | Building | Walkthrough scenes-map 12, 13 |
-| G6 + FR-DICE-34 | `fix/physical-crit` (w2K, slot 2) | build-physical-crit | Building | Walkthrough dice 13, 14 |
-| N4 / N7 sheet / item 16 | `fix/charx-buttons` (w2M, slot 3) | build-charx-buttons | Building | Walkthrough CHARX |
-| N1 + growToContent | `fix/shell-minimise` (w2N, slot 4) | build-shell-minimise | Building | Walkthrough shell 17, 18 |
-| P2a core (schema, scenes-map seams, token characterId) | `fix/combat2-core` | — | After map-fit-floor | — |
-| P2a add (N5, N6, 15, 17) | `fix/combat2-add` | — | After core | — |
-| P2a polish (N8, N11, G1, G4, G5, G7, G9, G10) | `fix/combat2-polish` | — | After core + shell-minimise | — |
-| P2a split attack (N7 combat) | `fix/combat2-split-attack` | — | After polish, charx-buttons, physical-crit | — |
-| P2b cues (G8, 13, N3) | `fix/charx-cues` | — | After charx-buttons | — |
-| M tier 1 | `fix/mod-core`, `build/effect-modifiers` | — | After combat2-add + physical-crit; slices 3-4 last | — |
+| Wave 1: map-fit-floor, shell-minimise, physical-crit, charx-buttons, combat2-core | merged | — | Done (#192) | — |
+| P2b cues (G8, 13, N3) | `fix/charx-cues` (w2Q, slot 2) | build-charx-cues | Building | Walkthrough CHARX 3, 6, 12, 13a; CAMP 9-11 |
+| P2a add (N5, N6, 15, 17) | `fix/combat2-add` (w2R, slot 0) | build-combat2-add | Building | Walkthrough CBT 2-4, CBTX 11a/b |
+| P2a polish (N8, N11, G1, G4, G5, G7, G9, G10, 14, FR-NOTE-31/32) | `fix/combat2-polish` (w2S, slot 3) | build-combat2-polish | Building | Walkthrough |
+| P2a split attack (N7 combat) | `fix/combat2-split-attack` | — | After polish | — |
+| M tier 1 | `fix/mod-core`, `build/effect-modifiers` | — | mod-core after combat2-add; slices 3-4 last | — |
 | F: fog of war (phase 2) | `spec/fog-of-war` | — | After phase 1 | — |
 | B: props + structure (phase 2) | `spec/scene-tools` | — | After phase 1 | — |
 
@@ -25,11 +21,10 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 
 ## Shared-file locks
 
-- Canvas (scenes-map camera / MapCanvas): fix/map-fit-floor → fix/combat2-core → phase 2.
-- Play-shell frame: fix/shell-minimise.
-- `src/shared/events/character-sheet.ts` + character-sheet folder: fix/charx-buttons → fix/charx-cues → M.
-- Roll control / dice-roll-log: fix/physical-crit → combat2-split-attack → M.
-- Schema: fix/combat2-core → fix/mod-core.
+- Canvas: free (fix/combat2-core merged) → phase 2.
+- Character-sheet folder + notification registries (append): fix/charx-cues → M.
+- Combat: fix/combat2-add (server lifecycle / encounters / initiative / hooks, CBTX add / bind, DM encounters / creature form / dialogs / token menu) ∥ fix/combat2-polish (popup, Initiative windows, hp-dialog, CBTX row / parts / concentration / play-state, notifications feature files) → fix/combat2-split-attack.
+- Schema: free until fix/mod-core.
 
 ## Pending DM decisions
 

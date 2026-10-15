@@ -1,8 +1,8 @@
 // Token overlay registry (FR-MAP-34, protocol §26). APPEND-ONLY (AGENTS §9.9): a feature adds
 // one import and one line; nothing else changes here. scenes-map merges the results in registry
-// order and draws dim, ring, cross, bar and icons inside the token's group, badges in the label row
-// (FR-MAP-43; bar + icons: OQ-CBTX-21). combat-tracker adds `cbt` (Out, Down, target ring,
-// `movedFt`; FR-CBT-38/39).
+// order and draws dim, ring, cross, bar, icons and cue inside the token's group, badges in the
+// label row (FR-MAP-43; bar + icons: OQ-CBTX-21; cue + subscribe: FR-MAP-49). combat-tracker adds
+// `cbt` (Out, Down, target ring, `movedFt`; FR-CBT-38/39).
 
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
@@ -65,6 +65,17 @@ export interface TokenIcon {
   value?: string;
 }
 
+/**
+ * A transient cue (FR-MAP-49): pulsing accent ring + bell glyph in the token group, above the
+ * image, bar and icons; steady under `prefers-reduced-motion`. Konva `name` = `id`, `id` attr =
+ * token id, attr `label` (no tooltip: the owning feature's UI explains it).
+ */
+export interface TokenCue {
+  /** Test id; Konva `name` of the cue. */
+  id: string;
+  label: string;
+}
+
 export interface TokenDecoration {
   /** Token group opacity × 0.5 (the label row stays at full opacity). */
   dim?: boolean;
@@ -78,6 +89,8 @@ export interface TokenDecoration {
   bar?: TokenBar;
   /** Icon row below the bar; concatenated in registry order. */
   icons?: readonly TokenIcon[];
+  /** Transient cue above everything in the group; first non-null wins (FR-MAP-49). */
+  cue?: TokenCue;
 }
 
 /** Pure functions; a throw is logged once and ignored (token drawn plain). */
@@ -86,6 +99,12 @@ export interface TokenOverlay {
   decorate?(token: TokenView, store: RecordStore, view: TokenOverlayView): TokenDecoration | null;
   /** Movement used this turn, ft; first non-null wins (FR-MAP-37). */
   movedFt?(token: TokenView, store: RecordStore): number | null;
+  /**
+   * FR-MAP-49: client-only state changed (e.g. a 4 s cue timer), so `decorate` may answer
+   * differently without a record change. scenes-map subscribes once per overlay while the canvas
+   * is mounted and re-runs decorations on `onChange`. A throw is logged once and ignored.
+   */
+  subscribe?(onChange: () => void): () => void;
 }
 
 export const tokenOverlays: readonly TokenOverlay[] = [

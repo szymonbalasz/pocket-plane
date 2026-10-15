@@ -5,8 +5,8 @@ import { type AttackLogDmPayload, attackLogKind } from "@shared/combat-tracker/l
 import {
   AttackInput,
   type AttackResult,
-  DamageCardPayload,
   type HpChangesResult,
+  parseFullCard,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import {
@@ -30,7 +30,7 @@ function started() {
   const id = (name: string) => t.byName(enc.id)[name]?.id as string;
   const entries = () => t.s.db.select().from(gameLogEntry).all() as GameLogEntryRecord[];
   const cardPayload = (cardId: string) =>
-    DamageCardPayload.parse(
+    parseFullCard(
       t.s.db.select().from(notification).where(eq(notification.id, cardId)).get()?.payload,
     );
   const players = [t.h.viewer("player", t.h.p1.id), t.h.viewer("player", t.h.p2.id)];

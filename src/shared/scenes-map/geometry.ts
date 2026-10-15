@@ -131,6 +131,77 @@ export function duplicateCell(
   return { col: t.col, row: t.row };
 }
 
+/** FR-MAP-48: the whole footprint lies inside the map rectangle (stricter than `overlapsMap`). */
+export function insideMap(m: MapRect, col: number, row: number, size: TokenSize): boolean {
+  const { x, y } = cellToPx(m, col, row);
+  const side = footprint(size) * m.gridCellSize;
+  const eps = 1e-9;
+  return x >= -eps && y >= -eps && x + side <= m.mapWidth + eps && y + side <= m.mapHeight + eps;
+}
+
+type Cell = { col: number; row: number };
+type Placed = Cell & { size: TokenSize };
+
+/**
+ * FR-MAP-48: up to `n` top-left cells nearest `at` (FR-MAP-22 distance, ties by row then col)
+ * whose footprint lies inside the map and overlaps no token's footprint and no earlier result;
+ * fewer if the map is full. Search grows by square rings: after ring R every cell with distance
+ * ≤ 5R has been seen (a cell outside it is ≥ 5(R + 1) away), so those are taken in order.
+ */
+export function freeCellsNear(
+  m: MapRect,
+  tokens: readonly Placed[],
+  at: Cell,
+  size: TokenSize,
+  n: number,
+): Cell[] {
+  const side = footprint(size);
+  const taken = new Set<string>();
+  const occupy = (c: Cell, s: number) => {
+    for (let dc = 0; dc < s; dc++)
+      for (let dr = 0; dr < s; dr++) taken.add(`${c.col + dc},${c.row + dr}`);
+  };
+  for (const t of tokens) occupy(t, footprint(t.size));
+  const free = (c: Cell) => {
+    for (let dc = 0; dc < side; dc++) {
+      for (let dr = 0; dr < side; dr++) if (taken.has(`${c.col + dc},${c.row + dr}`)) return false;
+    }
+    return true;
+  };
+  // Cell index bounds of the map (± 1 for offsets); cells outside never fit.
+  const cols = Math.ceil(m.mapWidth / m.gridCellSize) + 1;
+  const rows = Math.ceil(m.mapHeight / m.gridCellSize) + 1;
+  const maxR = Math.max(Math.abs(at.col) + cols, Math.abs(at.row) + rows);
+  const out: Cell[] = [];
+  const take = (cells: (Cell & { d: number })[]) => {
+    for (const c of cells) {
+      if (out.length >= n) return;
+      if (!free(c)) continue;
+      out.push({ col: c.col, row: c.row });
+      occupy(c, side);
+    }
+  };
+  const order = (a: Cell & { d: number }, b: Cell & { d: number }) =>
+    a.d - b.d || a.row - b.row || a.col - b.col;
+  let pending: (Cell & { d: number })[] = [];
+  for (let r = 0; r <= maxR && out.length < n; r++) {
+    for (let row = at.row - r; row <= at.row + r; row++) {
+      const edge = row === at.row - r || row === at.row + r;
+      const step = edge || r === 0 ? 1 : 2 * r;
+      for (let col = at.col - r; col <= at.col + r; col += step) {
+        if (insideMap(m, col, row, size)) {
+          pending.push({ col, row, d: distanceFt(at, { col, row }) });
+        }
+      }
+    }
+    pending.sort(order);
+    take(pending.filter((c) => c.d <= 5 * r));
+    pending = pending.filter((c) => c.d > 5 * r);
+  }
+  take(pending);
+  return out;
+}
+
 // ---------- order ----------
 
 /** Case-insensitive, code-point order on the folded name; same on every machine. */

@@ -256,7 +256,9 @@ describe("FR-CBTX-43 rule closures", () => {
     expect(t.note(card?.id as string)).toMatchObject({
       state: "resolved",
       resolution: { outcome: "ended" },
-      closedByRole: "player",
+      // FR-NOTE-28 / FR-CBTX-48: a rule closure records no actor.
+      closedByRole: null,
+      closedByPlayerId: null,
     });
   });
 

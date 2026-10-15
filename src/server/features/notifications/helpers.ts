@@ -1,4 +1,4 @@
-// Internal helpers for kind owners (FR-NOTE-02/08/10, protocol §21, ADR-0027). They run in the
+// Internal helpers for kind owners (FR-NOTE-02/08/10/25, protocol §21, ADR-0027). They run in the
 // caller's transaction, take `env` first and emit their own event via `env.emit`; call them
 // **after** emitting the owner's event (protocol §22 event order). Campaign and actor come from
 // `env.actor`; IDs and time from `env.ctx`.
@@ -90,17 +90,23 @@ function isPlayerOf(tx: Tx, playerId: string, campaignId: string): boolean {
   );
 }
 
-/** Writes the state change and emits its event in the caller's transaction. */
+/** Writes the change and emits its event in the caller's transaction. */
 function transition(
   env: CommandEnv,
   before: NotificationRecord,
   patch: Partial<NotificationRecord>,
-  eventType: "NotificationResolved" | "NotificationDismissed" | "NotificationReopened",
+  eventType:
+    | "NotificationResolved"
+    | "NotificationDismissed"
+    | "NotificationReopened"
+    | "NotificationUpdated",
 ): RecordChange {
   const after: NotificationRecord = { ...before, ...patch, updatedAt: env.ctx.clock.iso() };
   env.tx
     .update(notification)
     .set({
+      text: after.text,
+      payload: after.payload,
       state: after.state,
       resolution: after.resolution,
       closedAt: after.closedAt,
@@ -229,7 +235,8 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
    * the actor's campaign), `conflict` (not pending), `forbidden` (neither action owner nor DM),
    * `invalid` (resolution fails the kind's schema); any failure rolls back the whole command.
    * `byRule` (FR-CBTX-43): a closure made by a rule of the kind owner (not the actor's own
-   * action) skips the action-owner check; state and schema checks stay.
+   * action) skips the action-owner check; state and schema checks stay. It records no actor
+   * (FR-NOTE-28): `closedByRole` / `closedByPlayerId` null, `closedAt` set.
    */
   function resolveNotification(
     env: CommandEnv,
@@ -255,12 +262,53 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
       }
       stored = parsed.data;
     }
+    const closed = opts.byRule
+      ? { closedAt: env.ctx.clock.iso(), closedByRole: null, closedByPlayerId: null }
+      : closedFields(env);
     transition(
       env,
       before,
-      { state: "resolved", resolution: stored, ...closedFields(env) },
+      { state: "resolved", resolution: stored, ...closed },
       "NotificationResolved",
     );
+  }
+
+  /**
+   * FR-NOTE-25 (ADR-0037): the kind owner changes a **pending** row's payload (and text) in its
+   * own command and transaction, after its own event. `not_found` (not in the actor's campaign),
+   * `conflict` (not pending). Payload re-checked against the kind's zod and payload cap, text per
+   * FR-NOTE-21: a broken call throws a plain error (the caller fails `internal`). Audience,
+   * action, `seq` and `createdAt` never change; `updatedAt` from the clock. Emits
+   * `NotificationUpdated` (record upsert); no toast, unread unchanged (same `seq`).
+   */
+  function updateNotification(
+    env: CommandEnv,
+    id: string,
+    patch: { text?: string; payload: unknown },
+  ): NotificationRecord {
+    const before = loadNotification(env, id);
+    if (before.state !== "pending") throw conflict("No longer pending");
+    const def = kindOf(before.kind);
+    if (!def) throw new Error(`updateNotification: unknown notification kind "${before.kind}"`);
+    const payload = def.payload.safeParse(patch.payload);
+    if (!payload.success) {
+      throw new Error(`updateNotification: invalid payload for kind "${before.kind}"`);
+    }
+    const payloadCap = payloadCapOf(def);
+    if (jsonBytes(payload.data) > payloadCap) {
+      throw new Error(
+        `updateNotification: payload of kind "${before.kind}" exceeds ${payloadCap} B`,
+      );
+    }
+    let text = before.text;
+    if (patch.text !== undefined) {
+      const parsed = NotificationText.safeParse(patch.text);
+      if (!parsed.success)
+        throw new Error("updateNotification: text must be 1–280 chars of plain text");
+      text = parsed.data;
+    }
+    const change = transition(env, before, { text, payload: payload.data }, "NotificationUpdated");
+    return change.after as NotificationRecord;
   }
 
   /** FR-NOTE-10: `resolved` → `pending` (kind owner's undo, after the owner's event). */
@@ -323,6 +371,7 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
   return {
     notify,
     resolveNotification,
+    updateNotification,
     reopenNotification,
     dismissNotification,
     dismissForEncounter,
@@ -337,6 +386,7 @@ const helpers = createNotificationHelpers(notificationKinds);
 /** Kind owners' API (protocol §21). */
 export const notify = helpers.notify;
 export const resolveNotification = helpers.resolveNotification;
+export const updateNotification = helpers.updateNotification;
 export const reopenNotification = helpers.reopenNotification;
 export const dismissNotification = helpers.dismissNotification;
 export const dismissForEncounter = helpers.dismissForEncounter;

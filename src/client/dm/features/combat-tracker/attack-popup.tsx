@@ -12,6 +12,7 @@ import {
   type CombatantView,
   DamageCardPayload,
   type DamageMultiplier,
+  isFullCard,
 } from "@shared/combat-tracker/schemas";
 import type { DefinitionRecord } from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
@@ -162,7 +163,9 @@ interface PerTarget {
 
 function PopupBody({ card, close }: { card: NotificationRecord; close(): void }) {
   const payload = useMemo(() => DamageCardPayload.safeParse(card.payload), [card.payload]);
-  const p = payload.success ? payload.data : null;
+  // Partial cards (FR-CBT-72) get their own popup rows in fix/combat2-polish; no command makes
+  // them before that build.
+  const p = payload.success && isFullCard(payload.data) ? payload.data : null;
   const defs = useDefinitions();
   const combatants = useCombatants(p?.encounterId);
   const tokens = useRecords<{ id: string; sceneId: string }>(TOKEN_TYPE);
