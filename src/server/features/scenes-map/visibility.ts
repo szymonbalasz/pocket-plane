@@ -7,6 +7,7 @@ import type {
   TokenRecord,
 } from "@shared/scenes-map/schemas";
 import type { Viewer, Visibility } from "../../ws/records";
+import { tokenHiddenForPlayers } from "./visibility-hooks";
 
 /** `scene`: redacted for players (no name, folder, lock, `seq`) *(proposed, OQ-MAP-17)*. */
 export const sceneVisibility = (): Visibility => "redacted";
@@ -31,12 +32,13 @@ export function redactScene(r: SceneRecord): PlayerSceneRecord {
 export const folderVisibility = (): Visibility => "hidden";
 
 /**
- * `token`: hidden while `hidden`; else every field but `definitionId`, and `speed` only on the
- * viewer's own tokens (FR-MAP-36: a monster's speed is a stat, #120). `characterId` stays: set
- * only on character tokens, whose entity every player sees redacted (FR-MAP-26, FR-MAP-50).
+ * `token`: hidden while `hidden` or any scene visibility hook `hides` it (FR-FOG-12, ADR-0039:
+ * reads only the record); else every field but `definitionId`, and `speed` only on the viewer's
+ * own tokens (FR-MAP-36: a monster's speed is a stat, #120). `characterId` stays: set only on
+ * character tokens, whose entity every player sees redacted (FR-MAP-26, FR-MAP-50).
  */
 export function tokenVisibility(r: TokenRecord, _v: Viewer): Visibility {
-  return r.hidden ? "hidden" : "redacted";
+  return tokenHiddenForPlayers(r) ? "hidden" : "redacted";
 }
 
 export function redactToken(r: TokenRecord, v: Viewer): PlayerTokenRecord {
