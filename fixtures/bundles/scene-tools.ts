@@ -8,5 +8,5 @@ import { defineBundle } from "@server/features/fixtures-adapters/fixture-types";
 export default defineBundle({
   name: "scene-tools",
   includes: ["scenes"],
-  fixtures: ["scn-templates"],
+  fixtures: ["scn-prop-images", "scn-props", "scn-templates"],
 });

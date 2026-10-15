@@ -16,6 +16,7 @@ import midCombat from "./mid-combat";
 import notifications from "./notifications";
 import partyLoot from "./party-loot";
 import sceneTools from "./scene-tools";
+import sceneToolsProps from "./scene-tools-props";
 import scenes from "./scenes";
 import sessionSim from "./session-sim";
 import syncProbe from "./sync-probe";
@@ -39,5 +40,6 @@ export const bundles: readonly Bundle[] = [
   combatExtras,
   effectModifiers,
   fog,
+  sceneToolsProps,
   sceneTools,
 ];
