@@ -1,10 +1,18 @@
-// Small combat-extras parts for both clients: effect chips on one line ("+N" for the rest, full
-// list on hover; FR-CBTX-33/34; compact labels measured against the room left, FR-CBTX-46), death pips + state badge (FR-CBTX-33/34), roll / intent helpers.
+// Small combat-extras parts for both clients: effect chips on one line ("+N" for the rest: the
+// hidden ones on hover and click, P3 glitch 6; FR-CBTX-33/34; compact labels measured against the room left, FR-CBTX-46), death pips + state badge (FR-CBTX-33/34), roll / intent helpers.
 import type { DeathCounters, EffectView } from "@shared/combat-extras/schemas";
 import type { DeathState } from "@shared/entities/schemas";
 import { EyeOffIcon } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "../../components/ui/menus";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "../../components/ui/menus";
 import { Tooltip } from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
@@ -84,7 +92,8 @@ export function EffectChip({
 }
 
 /**
- * One line of chips, concentration first; what doesn't fit collapses into "+N" (hover lists all).
+ * One line of chips, concentration first; what doesn't fit collapses into "+N" (hover and click
+ * list the hidden ones).
  * `menu(e)` (DM): the chip opens a menu with those items.
  */
 export function EffectChips({
@@ -113,6 +122,7 @@ export function EffectChips({
   return (
     <div
       ref={ref}
+      data-chip-row
       className={cn(
         // Never narrower than the "+N" chip; chips collapse before the name truncates.
         "relative flex min-w-7 flex-1 flex-nowrap items-center gap-0.5 overflow-hidden",
@@ -145,19 +155,76 @@ export function EffectChips({
         );
       })}
       {more > 0 && (
-        <Tooltip content={list.map((e) => chipText(e, round)).join(", ")}>
-          <Badge
-            variant="secondary"
-            data-testid={`${testId}-more`}
-            data-value={more}
-            className="absolute shrink-0 px-1 py-0 text-[11px]"
-            style={{ left }}
-          >
-            +{more}
-          </Badge>
-        </Tooltip>
+        <MoreChip hidden={list.slice(fit)} round={round} testId={testId} left={left} menu={menu} />
       )}
     </div>
+  );
+}
+
+/**
+ * The "+N" chip (P3 glitch 6): its Tooltip names the hidden effects only; a click lists them,
+ * full text (DM: each with its chip menu, Edit… / End).
+ */
+function MoreChip({
+  hidden,
+  round,
+  testId,
+  left,
+  menu,
+}: {
+  hidden: readonly EffectView[];
+  round: number | null;
+  testId: string;
+  left: number;
+  menu?: (e: EffectView) => ReactNode;
+}) {
+  const names = hidden.map((e) => chipText(e, round)).join(", ");
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="absolute flex shrink-0 rounded-md"
+          style={{ left }}
+          aria-label={`More effects: ${names}`}
+        >
+          <Tooltip content={names}>
+            <Badge
+              variant="secondary"
+              data-testid={`${testId}-more`}
+              data-value={hidden.length}
+              className="px-1 py-0 text-[11px]"
+            >
+              +{hidden.length}
+            </Badge>
+          </Tooltip>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" data-testid={`${testId}-more-list`}>
+        {hidden.map((e) => {
+          const Icon = EffectIcon(e);
+          const label = (
+            <>
+              <Icon className="size-3.5 shrink-0" aria-hidden />
+              <span className="truncate">{chipText(e, round)}</span>
+              {e.secret && <EyeOffIcon className="size-3.5" aria-label="Hidden from players" />}
+            </>
+          );
+          return menu ? (
+            <DropdownMenuSub key={e.id}>
+              <DropdownMenuSubTrigger data-testid={`${testId}-more-item`} data-record-id={e.id}>
+                {label}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>{menu(e)}</DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : (
+            <DropdownMenuItem key={e.id} data-testid={`${testId}-more-item`} data-record-id={e.id}>
+              {label}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

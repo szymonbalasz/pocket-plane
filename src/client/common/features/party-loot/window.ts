@@ -13,5 +13,6 @@ export const lootLogWindowBase = {
   defaultPosition: { anchor: "top-left", dx: 56 },
   // OQ-LOOT-07: closed by default; the launcher and the toast's "Open" open it.
   defaultOpen: false,
-  launcher: { icon: CoinsIcon, label: "Loot", order: 60 },
+  // P3 glitch 12: one name, the window's ("Loot" in the launcher read as another thing).
+  launcher: { icon: CoinsIcon, label: "Party loot", order: 60 },
 } satisfies Omit<WindowDef, "component" | "clients">;

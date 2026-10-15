@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@ui/components/ui/overlays";
 import { Input, Label } from "@ui/components/ui/primitives";
-import { activeEffects, creatureOf, effectsOn } from "@ui/features/combat-extras/logic";
+import { activeEffects, creatureOf, effectsOn, endsHint } from "@ui/features/combat-extras/logic";
 import { useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
 import { modifiersText } from "@ui/features/effect-modifiers/describe";
 import { useModIntent } from "@ui/features/effect-modifiers/store";
@@ -116,7 +116,12 @@ function ApplyForm({
             {!enc
               ? "No encounter running: no duration"
               : typeof rounds === "number" && validRounds
-                ? `Ends at the start of ${src?.name ?? "the turn combatant"}'s turn, round ${endsRoundOf(enc.round, rounds)}`
+                ? endsHint({
+                    sourceName: src?.name ?? null,
+                    turnName: rows.find((c) => c.id === enc.turnCombatantId)?.name ?? null,
+                    targetNames: targets.map((t) => t.name),
+                    endsRound: endsRoundOf(enc.round, rounds),
+                  })
                 : "Until removed"}
           </p>
         </div>

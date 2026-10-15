@@ -14,6 +14,7 @@ import {
   type DamageCardPayload,
 } from "@shared/combat-tracker/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
+import { LABEL_MAX as ROLL_LABEL_MAX } from "@shared/dice-roll-log/schemas";
 import { AttackRolled } from "@shared/events/combat-tracker";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import type { DomainEvent } from "../../events/types";
@@ -23,6 +24,24 @@ import { withCardMods } from "../effect-modifiers/card";
 import { notify } from "../notifications";
 import { cardRollOf, cardToHitOf, damageCardText } from "./card-kind";
 import { activeCombatant, statsOf } from "./guards";
+
+/**
+ * P3 glitch 9: a critical damage roll says so in its label, "Dagger damage (piercing, critical)"
+ * ("… (critical)" when the label has no parentheses), so the log line marks the doubled dice.
+ */
+export function critLabel(label: string): string {
+  const [base, tail] = label.endsWith(")")
+    ? [label.slice(0, -1), ", critical)"]
+    : [label, " (critical)"];
+  // Roll labels hold at most 60 characters: a long name gives way ("…") to the marker.
+  if (base.length + tail.length <= ROLL_LABEL_MAX) return base + tail;
+  let cut = "";
+  for (const ch of base) {
+    if (cut.length + ch.length + 1 + tail.length > ROLL_LABEL_MAX) break;
+    cut += ch;
+  }
+  return `${cut}…${tail}`;
+}
 
 /**
  * FR-CBT-71: the sheet row a card belongs to, so `cbt.rollDamage` completes the card of the same
@@ -67,7 +86,7 @@ export const attackCommand = defineCommand({
         expression,
         mode: spec.d20 ? input.mode : "normal",
         category: spec.category,
-        label: spec.label,
+        label: subject.crit ? critLabel(spec.label) : spec.label,
         actor,
         manual: input.manual?.[i],
         source: "cbt",

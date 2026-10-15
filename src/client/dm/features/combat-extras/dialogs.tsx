@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@ui/components/ui/overlays";
 import { Input, Label } from "@ui/components/ui/primitives";
-import { activeEffects, creatureOf, effectsOn } from "@ui/features/combat-extras/logic";
+import { activeEffects, creatureOf, effectsOn, endsHint } from "@ui/features/combat-extras/logic";
 import {
   useCbtIntent,
   useCombatants,
@@ -89,9 +89,14 @@ function EffectForm({ targets, editId }: { targets: Target[]; editId?: string })
       : tab === "custom"
         ? label.trim().length >= 1 && label.trim().length <= 40
         : condition !== "exhaustion" || (Number.isInteger(lvl) && lvl >= 1 && lvl <= 6));
-  const endsHint =
+  const endsText =
     typeof rounds === "number" && enc
-      ? `Ends at the start of ${src?.name ?? "the turn combatant"}'s turn, round ${endsRoundOf(enc.round, rounds)}`
+      ? endsHint({
+          sourceName: src?.name ?? null,
+          turnName: rows.find((c) => c.id === enc.turnCombatantId)?.name ?? null,
+          targetNames: targets.map((t) => t.name),
+          endsRound: endsRoundOf(enc.round, rounds),
+        })
       : "Until removed";
   const save = async () => {
     if (!valid) return;
@@ -207,7 +212,7 @@ function EffectForm({ targets, editId }: { targets: Target[]; editId?: string })
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
           />
-          {!edit && <p className="text-xs text-muted-foreground">{endsHint}</p>}
+          {!edit && <p className="text-xs text-muted-foreground">{endsText}</p>}
         </div>
         {!edit && enc && (
           <div className="grid gap-1.5">

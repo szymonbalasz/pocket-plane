@@ -28,6 +28,7 @@ import { availableKinds, type WindowRegistry } from "./registry";
 import { createShellController, type ShellController, type ShellState } from "./shell-store";
 import { browserSoundSettingsStorage, soundKey } from "./sound-settings";
 import { browserLayoutStorage } from "./storage";
+import { tokenScreenBoxes } from "./token-boxes";
 
 const ShellContext = createContext<ShellController | null>(null);
 const AlertContext = createContext<AlertController | null>(null);
@@ -46,6 +47,7 @@ export function ShellProvider({
       registry,
       storage: browserLayoutStorage(),
       viewport: browserViewport,
+      avoid: () => tokenScreenBoxes("all"),
     }),
   );
   const you = useSync((s) => s.store.you);
