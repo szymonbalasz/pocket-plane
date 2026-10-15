@@ -487,53 +487,70 @@ function insertToken(
 
 const namesOn = (tx: Tx, sceneId: string) => sceneTokens(tx, sceneId).map((t) => t.name);
 
+/** `placeTokenIn`'s input: `map.placeToken`'s fields (FR-MAP-48 callers pass the first six). */
+export type PlaceTokenSpec = z.output<typeof PlaceTokenInput>;
+
 /**
+ * FR-MAP-48: `map.placeToken` minus intent and event, for other commands (combat's Start and
+ * add, FR-CBT-65 / FR-CBTX-44). Same rules, in the **caller's** transaction: FR-MAP-14 validity
+ * (`invalid`) and caps (`conflict`) fail the caller's command. The caller lists `change` in its
+ * own event. Runs no token-changed hooks (placement never does, FR-MAP-30).
+ *
  * FR-MAP-13: name = definition name, numbered (FR-MAP-16); image = portrait or none; size =
  * `statBlock.size`; shape = definition `tokenShape`, else round (FR-MAP-35); speed =
  * `statBlock.speed`, else null (FR-MAP-36); owner = the character's owner, else none; visible;
  * `characterId` copy (FR-MAP-50). Optional overrides (fixtures) for name, image, owner, hidden,
  * shape; never size, speed or `characterId`.
  */
+export function placeTokenIn(
+  env: CommandEnv,
+  input: PlaceTokenSpec,
+): { token: TokenRecord; change: RecordChange } {
+  const { tx, actor } = env;
+  const cid = campaignOf(actor);
+  const s = getScene(tx, cid, input.sceneId);
+  const def = resolveDefinition(env, input.definitionId);
+  const size = def.statBlock.size;
+  assertOnMap(s, input.col, input.row, size);
+  assertCaps(tx, cid, s.id, 1);
+  let ownerPlayerId: string | null = def.kind === "character" ? def.ownerPlayerId : null;
+  if (input.ownerPlayerId !== undefined) {
+    if (input.ownerPlayerId !== null) assertOwner(tx, cid, input.ownerPlayerId);
+    ownerPlayerId = input.ownerPlayerId;
+  }
+  const imageAssetId =
+    input.imageAssetId !== undefined
+      ? assetOrNull(env, input.imageAssetId)
+      : assetOrNull(env, def.portraitAssetId);
+  const after = insertToken(env, {
+    campaignId: cid,
+    sceneId: s.id,
+    definitionId: def.id,
+    name: numberedName(input.name ?? def.name, namesOn(tx, s.id)),
+    imageAssetId,
+    size,
+    shape: input.shape ?? def.tokenShape ?? "round",
+    speed: def.statBlock.speed ?? null,
+    col: input.col,
+    row: input.row,
+    ownerPlayerId,
+    hidden: input.hidden ?? false,
+    characterId: characterIdOf(def),
+  });
+  return { token: after, change: tokenChange(null, after) };
+}
+
+/** FR-MAP-13: `placeTokenIn` + `TokenPlaced`. */
 export const placeToken = defineCommand({
   name: MAP_INTENTS.placeToken,
   input: PlaceTokenInput,
   execute(input, env): { tokenId: string } {
-    const { tx, actor, emit } = env;
-    const cid = campaignOf(actor);
-    const s = getScene(tx, cid, input.sceneId);
-    const def = resolveDefinition(env, input.definitionId);
-    const size = def.statBlock.size;
-    assertOnMap(s, input.col, input.row, size);
-    assertCaps(tx, cid, s.id, 1);
-    let ownerPlayerId: string | null = def.kind === "character" ? def.ownerPlayerId : null;
-    if (input.ownerPlayerId !== undefined) {
-      if (input.ownerPlayerId !== null) assertOwner(tx, cid, input.ownerPlayerId);
-      ownerPlayerId = input.ownerPlayerId;
-    }
-    const imageAssetId =
-      input.imageAssetId !== undefined
-        ? assetOrNull(env, input.imageAssetId)
-        : assetOrNull(env, def.portraitAssetId);
-    const after = insertToken(env, {
-      campaignId: cid,
-      sceneId: s.id,
-      definitionId: def.id,
-      name: numberedName(input.name ?? def.name, namesOn(tx, s.id)),
-      imageAssetId,
-      size,
-      shape: input.shape ?? def.tokenShape ?? "round",
-      speed: def.statBlock.speed ?? null,
-      col: input.col,
-      row: input.row,
-      ownerPlayerId,
-      hidden: input.hidden ?? false,
-      characterId: characterIdOf(def),
-    });
-    emit({
+    const { token: after, change } = placeTokenIn(env, input);
+    env.emit({
       type: TokenPlaced.type,
-      campaignId: cid,
-      payload: { tokenId: after.id, sceneId: s.id },
-      changes: [tokenChange(null, after)],
+      campaignId: after.campaignId,
+      payload: { tokenId: after.id, sceneId: after.sceneId },
+      changes: [change],
     });
     return { tokenId: after.id };
   },
