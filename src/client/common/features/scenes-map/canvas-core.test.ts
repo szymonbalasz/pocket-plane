@@ -120,8 +120,7 @@ const tool = (t: Partial<CanvasToolDef> & Pick<CanvasToolDef, "id" | "order">): 
 });
 
 describe("FR-SCN-06 canvas tools", () => {
-  test("FR-SCN-06 the registry validates and sorts; entries validate and sort", () => {
-    // Registry-agnostic (each slice appends a line): already ordered and valid.
+  test("FR-SCN-06 the registry is valid and sorted; entries validate and sort", () => {
     expect(orderTools(canvasTools)).toEqual([...canvasTools]);
     const tools = orderTools([
       tool({ id: "aoe", order: 30, clients: ["dm", "player"], pointer: {} }),

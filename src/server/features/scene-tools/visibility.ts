@@ -5,6 +5,7 @@ import {
   AOE_TEMPLATE_TYPE,
   type AoeTemplateRecord,
   DOOR_OPEN,
+  type PlayerAoeTemplateRecord,
   type PlayerScenePropRecord,
   type PlayerSceneStructureRecord,
   SCENE_PROP_TYPE,
@@ -41,11 +42,17 @@ export function redactProp(r: ScenePropRecord): PlayerScenePropRecord {
 }
 
 /**
- * FR-SCN-27: `hidden` or fog-hidden → hidden; else full (incl. `placedByPlayerId`). Fog's `hides`
- * exempts player-placed templates (FR-FOG-11).
+ * FR-SCN-27: `hidden` or fog-hidden → hidden; else every field (incl. `placedByPlayerId`) but
+ * `campaignId`, which only the DM wire keeps (SCN §8 compact wire). Fog's `hides` exempts
+ * player-placed templates (FR-FOG-11).
  */
 export function templateVisibility(r: AoeTemplateRecord): Visibility {
-  return r.hidden || hiddenByHooks(AOE_TEMPLATE_TYPE, r) ? "hidden" : "full";
+  return r.hidden || hiddenByHooks(AOE_TEMPLATE_TYPE, r) ? "hidden" : "redacted";
+}
+
+export function redactTemplate(r: AoeTemplateRecord): PlayerAoeTemplateRecord {
+  const { campaignId: _campaignId, ...rest } = r;
+  return rest;
 }
 
 /** `map-settings`: everyone (FR-SCN-29). */
