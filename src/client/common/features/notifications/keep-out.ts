@@ -5,7 +5,7 @@
 // covering the least of the toasts' tokens to avoid (a card's likely targets) wins; ties keep the
 // default. Window title bars are never covered. Pure; players keep bottom-right.
 
-import { EDGE_GAP, type Rect, type Viewport } from "../play-shell/geometry";
+import { EDGE_GAP, LAUNCHER_CLEAR, type Rect, type Viewport } from "../play-shell/geometry";
 import { RAIL_CLEAR } from "../play-shell/placement";
 import { DM_TOAST_TOP, STACK_GAP } from "../play-shell/toast-region";
 import { coveredArea, type TokenBox } from "../play-shell/token-boxes";
@@ -42,7 +42,8 @@ const hits = (a: Rect, b: Rect, gap: number) =>
  * never covered (P3 retest: their drag handle stays reachable). Candidate spots: FR-NOTE-32's
  * first, then the top row and below each title bar, at the centre, the left edge, left of
  * Initiative and beside each token; the first spot clear of Initiative and the bars that covers
- * the least token area wins (ties keep the earlier spot). None clear → FR-NOTE-32's spot.
+ * the least token area wins (ties keep the earlier spot); a spot must hold the whole stack above
+ * the launcher bar (P3 E3). None → the top row (the runtime collapses toasts into "+N more").
  */
 export function dmStackPlacement(
   vp: Viewport,
@@ -53,7 +54,9 @@ export function dmStackPlacement(
   bars: readonly Rect[] = [],
 ): { left: number; top: number } {
   const base = initiativeKeepOut(vp, initiative, stackH, width);
-  if ((avoid.length === 0 && bars.length === 0) || stackH === 0) return base;
+  // P3 E3: a spot must hold the whole stack above the launcher bar.
+  const fits = (p: { top: number }) => p.top + stackH <= vp.h - LAUNCHER_CLEAR;
+  if (stackH === 0 || (avoid.length === 0 && bars.length === 0 && fits(base))) return base;
   const at = (p: { left: number; top: number }) => ({ x: p.left, y: p.top, w: width, h: stackH });
   const clear = (p: { left: number; top: number }) =>
     !(initiative && hits(at(p), initiative, EDGE_GAP)) && !bars.some((b) => hits(at(p), b, 0));
@@ -69,7 +72,7 @@ export function dmStackPlacement(
   let best: { left: number; top: number } | null = null;
   let bestArea = Number.POSITIVE_INFINITY;
   for (const p of spots) {
-    if (!clear(p)) continue;
+    if (!clear(p) || !fits(p)) continue;
     const area = coveredArea(at(p), avoid);
     // Strictly less wins: ties keep the earlier spot (FR-NOTE-32's first).
     if (area < bestArea) {
@@ -77,5 +80,6 @@ export function dmStackPlacement(
       bestArea = area;
     }
   }
-  return best ?? base;
+  // Nothing holds it (the runtime then shows fewer toasts): the top row, clear if possible.
+  return best ?? spots.find((p) => p.top === DM_TOAST_TOP && clear(p)) ?? base;
 }

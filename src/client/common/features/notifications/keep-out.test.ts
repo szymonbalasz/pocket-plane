@@ -79,4 +79,22 @@ describe("FR-NOTE-32 toast keep-out", () => {
     const p = dmStackPlacement(vp, init, 80, STACK_W, [], [mid]);
     expect(over({ x: p.left, y: p.top, w: STACK_W, h: 80 }, mid)).toBe(false);
   });
+
+  // P3 E3: at 1280×720 a 4-entry stack went below the Game log title bar (y 444) and off-screen.
+  test("FR-NOTE-32 toast keep-out: the chosen spot holds the whole stack above the launcher", () => {
+    const vp = { w: 1280, h: 720 };
+    const init = { x: 868, y: 60, w: 400, h: 578 };
+    const logBar = { x: 68, y: 404, w: 460, h: 32 };
+    const goblins = [
+      { x: 460, y: 160, w: 48, h: 48 },
+      { x: 620, y: 200, w: 48, h: 48 },
+      { x: 120, y: 200, w: 48, h: 48 },
+    ];
+    const h = 330;
+    const at = dmStackPlacement(vp, init, h, STACK_W, goblins, [logBar]);
+    expect(at.top + h).toBeLessThanOrEqual(720 - 64);
+    expect(at.left + STACK_W + 12).toBeLessThanOrEqual(init.x);
+    // Taller than any slot: the top row (the runtime collapses toasts into "+N more").
+    expect(dmStackPlacement(vp, init, 700, STACK_W, goblins, [logBar]).top).toBe(top);
+  });
 });

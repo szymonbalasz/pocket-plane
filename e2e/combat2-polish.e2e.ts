@@ -177,6 +177,18 @@ test("FR-CBT-75 FR-CBT-76 FR-NOTE-26 popup opens over its toast, the toast close
   const toast = dm.getByTestId("note-toast").filter({ has: dm.getByTestId("note-toast-action") });
   await expect(toast).toHaveCount(1);
   const cardId = (await toast.getAttribute("data-record-id")) as string;
+  // The stack may re-place once the map settles (E1: token boxes re-read after the 4 s cue).
+  await expect
+    .poll(
+      async () => {
+        const a = await toast.boundingBox();
+        await dm.waitForTimeout(500);
+        const b = await toast.boundingBox();
+        return a !== null && b !== null && a.x === b.x && a.y === b.y;
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
   const box = await toast.boundingBox();
   if (!box) throw new Error("no toast box");
   const badge = launcherButton(dm, "note.history").getByTestId("note-launcher-badge");
@@ -332,6 +344,47 @@ test("FR-CBTX-46 P3 glitch 6: '+N' lists the hidden effects (hover and click) on
     await dm.keyboard.press("Escape");
   }
   await expect(row(init, mira).getByTestId("cbtx-init-row-effect-more")).toHaveCount(0);
+  await player.context().close();
+  await dm.context().close();
+});
+
+test("FR-NOTE-14 FR-NOTE-32 P3 E3: at 1280×720 a 4-card toast stack (3 + '+1 more') fits the viewport", async ({
+  browser,
+}) => {
+  const { dm, player, recordId } = await setup(browser, 1280, 720);
+  await viewAmbush(dm, player, recordId("battlemap", "scene"));
+  const init = await openWindow(dm, "cbt.initiative");
+  const sheet = await openWindow(player, "char.sheet");
+  await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
+  const cards = dm.getByTestId("note-toast").filter({ has: dm.getByTestId("note-toast-action") });
+  // Earlier tests may leave a card pending: count from here.
+  await expect(init).toBeVisible();
+  const before = await init.getByTestId("cbt-init-card").count();
+  for (let i = 1; i <= 4; i++) {
+    await sheet.getByTestId("charx-roll-attack-damage").first().click();
+    await expect(init.getByTestId("cbt-init-card")).toHaveCount(before + i);
+  }
+  await expect(dm.getByTestId("note-toast-more")).toBeVisible();
+  await expect.poll(() => cards.count()).toBeGreaterThanOrEqual(1);
+  // Every toast, its Apply and "+N more" lie inside the viewport, above the launcher bar.
+  const bottom = 720 - 64;
+  const boxes = async () =>
+    dm.locator('[data-testid="note-toasts"]').evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom };
+    });
+  await expect.poll(async () => (await boxes()).bottom).toBeLessThanOrEqual(bottom);
+  expect((await boxes()).top).toBeGreaterThanOrEqual(48);
+  for (const apply of await dm.getByTestId("note-toast-action").all()) {
+    await expect(apply).toBeInViewport();
+  }
+
+  // Clean up: dismiss the four cards from the Pending list.
+  for (let i = 4; i > 0; i--) {
+    await init.getByTestId("cbt-init-card").last().click();
+    await dm.getByTestId("cbt-popup-dismiss").click();
+    await expect(init.getByTestId("cbt-init-card")).toHaveCount(before + i - 1);
+  }
   await player.context().close();
   await dm.context().close();
 });

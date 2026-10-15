@@ -23,7 +23,7 @@ import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
-import { type Rect, TITLE_H } from "../play-shell/geometry";
+import { EDGE_GAP, LAUNCHER_CLEAR, type Rect, TITLE_H, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
 import {
   useAvailableKinds,
@@ -31,6 +31,7 @@ import {
   useRegistry,
   useShellState,
 } from "../play-shell/ShellContext";
+import { DM_TOAST_TOP, NOTE_EDGE } from "../play-shell/toast-region";
 import { tokenScreenBoxes } from "../play-shell/token-boxes";
 import { dmStackPlacement } from "./keep-out";
 import {
@@ -47,6 +48,7 @@ import { NoteBody, useNoteActions } from "./parts";
 import {
   advance,
   closeToast,
+  MAX_VISIBLE,
   nextExpiry,
   registerToastMemory,
   SUMMARY_KEY,
@@ -324,8 +326,22 @@ export function ToastRuntime({
     [vp, initiative, stackH, avoidKey, bars, tick],
   );
 
+  // P3 E3: the stack always fits the viewport: while it is taller than the room (DM: below the
+  // top row, above the launcher; player: above its corner, below the top bar), one more toast
+  // folds into "+N more". The cap starts over when the toasts or the room change.
+  const room = isDm
+    ? vp.h - LAUNCHER_CLEAR - DM_TOAST_TOP
+    : vp.h - NOTE_EDGE - TOP_BAR_H - EDGE_GAP;
+  const [cap, setCap] = useState(MAX_VISIBLE);
+  const count = state.toasts.length;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count or room
+  useLayoutEffect(() => setCap(MAX_VISIBLE), [count, room]);
+  useLayoutEffect(() => {
+    if (stackH > room && cap > 1) setCap((c) => Math.max(1, c - 1));
+  }, [stackH, room, cap]);
+
   const openHistory = () => openWindow(HISTORY_KIND);
-  const { shown, more } = visibleToasts(state);
+  const { shown, more } = visibleToasts(state, cap);
   if (state.toasts.length === 0) return null;
   return (
     <section

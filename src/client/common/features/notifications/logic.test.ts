@@ -301,6 +301,10 @@ describe("toast timers and cap (FR-NOTE-14)", () => {
     const v = visibleToasts(s);
     expect(v.more).toBe(2);
     expect(v.shown.map((t) => t.key)).toEqual(ns.slice(2).map((n) => n.id));
+    // P3 E3: a short viewport lowers the cap; the newest stay, at least one shows.
+    expect(visibleToasts(s, 2)).toMatchObject({ more: 3 });
+    expect(visibleToasts(s, 2).shown.map((t) => t.key)).toEqual(ns.slice(3).map((n) => n.id));
+    expect(visibleToasts(s, 0).shown).toHaveLength(1);
   });
 
   test("FR-NOTE-15 summary toast follows the pending-for-me count", () => {

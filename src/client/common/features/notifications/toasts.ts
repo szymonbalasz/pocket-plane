@@ -196,9 +196,15 @@ export function syncToasts(
   return s === m.toasts && campaignId === m.campaignId ? m : { toasts: s, campaignId };
 }
 
-/** The newest `MAX_VISIBLE` toasts (oldest first) and how many more are held back. */
-export function visibleToasts(s: ToastState): { shown: Toast[]; more: number } {
-  const more = Math.max(0, s.toasts.length - MAX_VISIBLE);
+/**
+ * The newest `max` (default `MAX_VISIBLE`) toasts (oldest first) and how many more are held back;
+ * the runtime lowers `max` while the stack doesn't fit the viewport (P3 E3).
+ */
+export function visibleToasts(
+  s: ToastState,
+  max: number = MAX_VISIBLE,
+): { shown: Toast[]; more: number } {
+  const more = Math.max(0, s.toasts.length - Math.max(1, max));
   return { shown: s.toasts.slice(more), more };
 }
 
