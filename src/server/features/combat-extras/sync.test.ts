@@ -218,7 +218,8 @@ describe("combat-extras over WS", () => {
       items: [{ tokenId: wolf2?.id }],
     });
     await nextEvent(dm, "CombatantsAdded");
-    expect(byName(dm, "Wolf 2")).toMatchObject({ hidden: true, initiative: null });
+    // FR-CBTX-44: initiative rolled on the way in (DM-only entry).
+    expect(byName(dm, "Wolf 2")).toMatchObject({ hidden: true, initiative: expect.any(Number) });
     dm.intent("map.setTokenHidden", { tokenId: elite.tokenId, hidden: false });
     const ev = await nextEvent(p1, "TokenRevealed");
     expect(ev.changes.find((x) => x.type === EFFECT_TYPE && x.id === poisoned.id)).toMatchObject({
