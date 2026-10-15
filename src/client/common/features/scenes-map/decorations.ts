@@ -1,6 +1,6 @@
-// Applying the token overlay registry (FR-MAP-34, -43): results merged in registry order (first
-// non-null `cross` and `bar` win; badges and icons concatenate); a throw is logged once per
-// overlay and ignored (token drawn plain).
+// Applying the token overlay registry (FR-MAP-34, -43, -49): results merged in registry order
+// (first non-null `cross`, `bar` and `cue` win; badges and icons concatenate); a throw is logged
+// once per overlay and ignored (token drawn plain). Overlay subscriptions (FR-MAP-49) likewise.
 // DOM-free so it runs under `bun test`.
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
@@ -8,6 +8,7 @@ import type {
   TokenBadge,
   TokenBar,
   TokenCross,
+  TokenCue,
   TokenIcon,
   TokenOverlay,
   TokenOverlayView,
@@ -20,6 +21,7 @@ export interface MergedDecoration {
   cross: TokenCross | null;
   bar: TokenBar | null;
   icons: TokenIcon[];
+  cue: TokenCue | null;
 }
 
 export const plainDecoration: MergedDecoration = {
@@ -29,6 +31,7 @@ export const plainDecoration: MergedDecoration = {
   cross: null,
   bar: null,
   icons: [],
+  cue: null,
 };
 
 export type OverlayErrorReporter = (overlayId: string, err: unknown) => void;
@@ -60,15 +63,46 @@ export function decorateToken(
       continue;
     }
     if (!d) continue;
-    out ??= { dim: false, badges: [], ring: null, cross: null, bar: null, icons: [] };
+    out ??= { dim: false, badges: [], ring: null, cross: null, bar: null, icons: [], cue: null };
     if (d.dim) out.dim = true;
     if (d.badges) out.badges.push(...d.badges);
     if (d.ring === "target") out.ring = "target";
     if (d.cross && !out.cross) out.cross = d.cross;
     if (d.bar && !out.bar) out.bar = d.bar;
     if (d.icons) out.icons.push(...d.icons);
+    if (d.cue && !out.cue) out.cue = d.cue;
   }
   return out ?? plainDecoration;
+}
+
+/**
+ * FR-MAP-49: subscribe once to every overlay with `subscribe`; returns one unsubscribe for all.
+ * A throwing `subscribe` (or unsubscribe) is reported once per overlay and ignored.
+ */
+export function subscribeOverlays(
+  overlays: readonly TokenOverlay[],
+  onChange: () => void,
+  report: OverlayErrorReporter = logOverlayErrorOnce,
+): () => void {
+  const offs: { id: string; off: () => void }[] = [];
+  for (const o of overlays) {
+    if (!o.subscribe) continue;
+    try {
+      const off = o.subscribe(onChange);
+      if (typeof off === "function") offs.push({ id: o.id, off });
+    } catch (err) {
+      report(o.id, err);
+    }
+  }
+  return () => {
+    for (const { id, off } of offs) {
+      try {
+        off();
+      } catch (err) {
+        report(id, err);
+      }
+    }
+  };
 }
 
 /** FR-MAP-37: movement used this turn = the first non-null `movedFt`, else null. */

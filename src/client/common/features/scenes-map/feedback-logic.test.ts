@@ -108,6 +108,7 @@ describe("FR-MAP-34 overlay merge", () => {
       cross: null,
       bar: null,
       icons: [],
+      cue: null,
     });
   });
   test("FR-MAP-37 first non-null movedFt wins; throws ignored; none → null", () => {
