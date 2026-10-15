@@ -10,34 +10,41 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 
 **Working mode (DM, #141):** run long autonomous stretches. Merge, fix and sequence on your own; settle technical questions yourself and log them. Come back to the DM only when blocked: product decisions, phase gates, ADR acceptance, new dependencies, anything destructive.
 
-## 1. Where we are (2026-10-14, night)
+## 1. Where we are (2026-10-16)
 
 | Area | State |
 |---|---|
-| MVP | Done (#176). |
-| Sprint 1 | **Done (#177–#186).** P polish R1–R5, D [combat-extras](../specs/combat-extras.md) (CBTX), S [character-sheet-full](../specs/character-sheet-full.md) (CHARX) merged. `main` green: 1139 tests, full e2e 39/39 (11 bundles). Session-sim-4 regression PASS (a–j, leak scan, digest across a hard kill). |
-| Verification | Evidence `%TEMP%\pocket-planeerify-*` (latest `verify-session-sim-4`; also in the main checkout `.verify/20261014-194223-session-sim-4/`, report lists 17 ranked glitches). |
-| Specs / ADRs | All specs `complete`. ADRs 0001–0036 accepted (0034 encounter-scoped notifications, 0035 combat rule hooks, 0036 full-sheet derivation). |
-| Decisions | Up to #186 in [decisions-log](../decisions-log.md). |
+| MVP, sprint 1 | Done (#176, #177–#186). |
+| Sprint 2 | **Builds done (#187–#199).** Phase 1: DM playtest notes N1–N11, session-sim-4 glitches G1–G10, effect modifiers tier 1 (MOD), P3 polish. Phase 2: fog of war (FOG), scene tools (SCN: walls / doors, props, AoE templates, layers, diagonal rule), DM active-scene window (ADR-0041). `main` green: 1877 tests, full e2e 58/58 (15 bundles). Session-sim-6 17/18 (one popup regression, `fix/sim6-popup`), leak scan clean. Playtest scripts: [sprint-2 §Playtest: phase 1 fixes](sprint-2.md#playtest-phase-1-fixes), [§Playtest: sprint 2 features](sprint-2.md#playtest-sprint-2-features). |
+| Verification | Evidence `%TEMP%\pocket-planeerify-*` (latest `verify-session-sim-6`; also `.verify/20261015-232530-session-sim-6/` in the main checkout, 12 ranked glitches). |
+| Specs / ADRs | All specs `complete`. ADRs 0001–0041 accepted (0037 split attack / damage, 0038 effect modifiers, 0039 fog visibility, 0040 token move guards, 0041 active-scene window). |
+| Decisions | Up to #199 in [decisions-log](../decisions-log.md). |
+| CON-44 | Heavy DM snapshot 676,059 B of 786,432 B (active-scene window freed ~110 KB). Re-measure for every new record type. |
 | Agents | Herdr kind `claude` (`-- --permission-mode auto`, `--strict-mcp-config` except test agents). |
-| Helpers | [`docs/agents/tools/`](tools/), orchestrator only, run from the main checkout by absolute path (`bash /c/Repos/pocket-plane/docs/agents/tools/<x>.sh`): `mkwt.sh <branch> <label> [build]` (prints `ws= root= dir=`), `startagent.sh <pane> <name> <brief> [test]`, `starttest.sh <ws> <name> <brief-template>` (new tab + server pane, fills `{{SRVPANE}}`, starts a test agent), `poll.sh <agent…>`. Change them on `main` only. |
-| Scratch | `%TEMP%\pocket-plane\`: `briefs/` (test brief templates `tpl-*.md`), agent reports `<name>.md`, archived evidence `verify-*/`. Storage Sense may clear it. |
-| Worktrees | `main` only (slot 1; test agents on `main` use 4113). Leftover gitignored `data/verify-*` folders in worktrees went with them; in the main checkout `data/verify-sim4` and older ones may be deleted by the DM (agents' `rm -rf` is blocked by a hook). |
+| Helpers | [`docs/agents/tools/`](tools/), orchestrator only, run from the main checkout by absolute path (`bash /c/Repos/pocket-plane/docs/agents/tools/<x>.sh`): `mkwt.sh <branch> <label> [build]` (prints `ws= root= dir=`), `startagent.sh <pane> <name> <brief> [test]`, `starttest.sh <ws> <name> <brief-template>` (new tab + server pane, fills `{{SRVPANE}}`, starts a test agent), `poll.sh <agent…>`. Change them on `main` only. Brief generators used in sprint 2 lived in the session scratchpad (mktest.py: §5 template filler; mkbuild.py: spec-slice builder brief); recreate if needed. |
+| Scratch | `%TEMP%\pocket-plane\`: `briefs/` (test brief templates `tpl-*.md`), agent reports `<name>.md`, archived evidence `verify-*/`, gate files `gate-sprint2-phase{1,2}.md`. Storage Sense may clear it. |
+| Worktrees | `main` only (slot 1; test agents on `main` use 4113). |
 
 ## 2. Next, in order
 
-**Sprint 2, DM decisions #187 + #188: [sprint-2](sprint-2.md).** Two phases. **Phase 1 first**: the DM's sprint-1 playtest notes N1–N11 + the session-sim-4 glitches G1–G10, as tracks Q (`fix/asset-cache`), P2a (combat), P2b (sheet + shell), M (effect modifiers design), with DM gate 1. **Phase 2** only after phase 1 is merged: F fog of war (FOG), B props + structure (SCN), DM gate 2. Follow sprint-2's "Orchestrator: how to run this sprint" and its hotspot tables; the sprint-1 loop is the template.
+**Paused for the DM recap** after sprint 2 (sprint-2 "Gates" 4). Bring: what shipped, session-sim-6 glitches, the DM's playtest feedback on phase 1 / sprint 2, and the sprint-3 candidates (party board + handouts, table flavour, compendium, 3D dice tray (tier S, #188), dice notation shortcut (tier A), effect modifiers tiers 2–3). Then write `sprint-3.md` like sprint-2.
 
-The DM's own playtest script for sprint 1: [sprint-1 §Playtest](sprint-1.md#playtest-sprint-1-features). Write the same for sprint 2 at its sprint gate.
+Lessons from sprint 2 (2026-10-15/16), on top of the ones below:
+- **Wait for the builder's commit before you check its worktree.** Running `check` / `e2e` while a builder's own e2e runs collides (Playwright trace ENOENT, ports) and merging main into a dirty tree mixes states. Poll `git status --short` clean + agent not working + "ready" in its output.
+- Append-only registry files (`canvas-tools.ts`, `canvas-layers.ts`, bundle / unit indexes) conflict on every parallel merge: the resolution is always "keep both lines"; let the builder do it or use `git -C`.
+- Measure snapshot costs in the heavy harness before a gate; estimates were off by 2–3× twice (presets, fogged tokens).
+- A spec-only rule a builder can't meet in the default layout (pinned header fallback, toast placement) shows up only in the walkthrough: give builders the default window sizes in the brief.
+- Builders: tools only via the repo's binaries (`bun run`, `bun x`); `npx biome` once ran an unrelated npm package.
+- Seams between parallel spec agents: write one `seams.md` ruling, copy it into each worktree, let authors push back once; then one review agent across all specs; then `rulings.md` for the review.
 
-Lessons from sprint 1 (2026-10-14), on top of the earlier ones:
+Lessons from sprint 1 (2026-10-14):
 - **Agents can't read outside their working directory** without a prompt (`blockReadsOutsideWorkingDirectories`). Copy inputs (evidence, review summaries) into the agent's worktree or the main checkout's `.verify/` and point the brief there. Writes to `%TEMP%\pocket-plane\` work.
 - A safety hook blocks `rm -rf`, for agents and the orchestrator. Use `git worktree remove --force` (it deletes untracked data); leave `data/verify-*` in the main checkout for the DM.
 - **Never `cd` into a worktree** from the orchestrator shell, not even in a compound command: the shell's cwd persists and the session's primary directory switches. Use `(cd <wt> && …)` subshells or `git -C`.
-- Run `check` **and the full e2e on `main` after every merge** that touches UI: a branch's own green e2e didn't catch a cross-branch break (CBTX row names broke combat-tracker e2e).
-- Suite time is a health signal: it grew 42 s → 165 s and timed out on `main` (fixture images rasterised per load, disk sync on temp loads; #184). The main checkout is still ~3× slower than worktrees (~100 s vs ~30 s), cause not found.
+- Run `check` **and the full e2e on `main` after every merge** that touches UI: a branch's own green e2e didn't catch a cross-branch break.
+- Suite time is a health signal (#184). Main checkout check now ~40 s.
 - Builders who need a shared file message the orchestrator (`shared change needed`); the `from` address goes stale once their session ends.
-- Start a dependent fix on top of an unmerged branch with `herdr worktree create --base <branch>` when it only needs one export (polish-combat on polish-map-fit).
+- Start a dependent fix on top of an unmerged branch with `herdr worktree create --base <branch>` when it only needs one export.
 
 ## 3. Herdr: how to run agents (learned the hard way)
 
