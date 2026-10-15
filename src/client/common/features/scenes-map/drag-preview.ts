@@ -64,6 +64,16 @@ export class TokenDrag {
     this.cancelled = true;
   }
 
+  /**
+   * FR-MAP-28 safety net: the drag is over without a Konva `dragend` (not live, canvas gone).
+   * Stops the repeat and throttle timers and sends nothing more; the caller snaps the token back.
+   */
+  abort(): void {
+    this.stopTimers();
+    this.cancelled = true;
+    this.done = true;
+  }
+
   get isCancelled(): boolean {
     return this.cancelled;
   }

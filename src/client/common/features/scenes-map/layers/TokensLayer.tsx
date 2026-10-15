@@ -8,7 +8,7 @@
 import { cellToPx, footprint, initials } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Circle, Group, Image, Layer, Line, Rect, Shape, Text } from "react-konva";
 import { useStore } from "zustand";
 import { retryAssetImage, useAssetImage } from "../../assets-pipeline/useAssetImage";
@@ -352,6 +352,22 @@ function TokenNode({ t }: { t: TokenView }) {
   const { x, y } = preview ?? cellToPx(grid, t.col, t.row);
   const movable = c.canMove(t);
   const draggable = movable && c.live && c.tool === "select";
+  // FR-MAP-28: stable drag handlers. react-konva detaches a changed handler, then sets attrs, then
+  // attaches the new one; leaving live sets `draggable: false`, whose `stopDrag()` fires `dragend`
+  // in that gap, so a per-render arrow would miss it (the drag never ends, its frames repeat).
+  const latest = useRef({ t, token: c.token });
+  latest.current = { t, token: c.token };
+  const drag = useMemo(
+    () => ({
+      onDragStart: (e: { target: Konva.Node }) =>
+        latest.current.token.dragStart(latest.current.t, e.target),
+      onDragMove: (e: { target: Konva.Node }) =>
+        latest.current.token.dragMove(latest.current.t, e.target),
+      onDragEnd: (e: { target: Konva.Node }) =>
+        latest.current.token.dragEnd(latest.current.t, e.target),
+    }),
+    [],
+  );
   const selected = c.selected.has(t.id);
   const deco: MergedDecoration = decorateToken(tokenOverlays, t, c.store, {
     client: c.client,
@@ -375,9 +391,7 @@ function TokenNode({ t }: { t: TokenView }) {
       y={y}
       draggable={draggable}
       opacity={(t.hidden ? 0.45 : 1) * (deco.dim ? 0.5 : 1)}
-      onDragStart={(e) => c.token.dragStart(t, e.target)}
-      onDragMove={(e) => c.token.dragMove(t, e.target)}
-      onDragEnd={(e) => c.token.dragEnd(t, e.target)}
+      {...drag}
       onClick={(e) => {
         if (e.evt.button === 0) c.token.click(t, e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey);
       }}

@@ -10,6 +10,7 @@
 // Placement, `placeTokenIn`, duplicate and scene copy run none. No line registered → no change.
 import type { TokenRecord } from "@shared/scenes-map/schemas";
 import type { Actor } from "../../events/types";
+import { scnWallGuard } from "../scene-tools/guard";
 import type { SceneRead } from "./visibility-hooks";
 
 export interface MoveGuardEnv {
@@ -32,7 +33,9 @@ export interface MoveGuardRegistration {
 }
 
 /** The registry. Append your feature's line; order = run order. */
-export const moveGuards: readonly MoveGuardRegistration[] = [];
+export const moveGuards: readonly MoveGuardRegistration[] = [
+  scnWallGuard, // scene-tools: walls and non-open doors refuse a player's move (FR-SCN-10/11)
+];
 
 /** Live guard list, seeded from the registry; tests may add guards via `register`. */
 export class MoveGuards {
