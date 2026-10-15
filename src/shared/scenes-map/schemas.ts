@@ -195,6 +195,8 @@ const tokenFields = {
   hidden: z.boolean(),
   /** Token-owned (FR-MAP-35). */
   shape: TokenShape,
+  /** Display copy: `definitionId` on character tokens, else null; players get it (FR-MAP-50). */
+  characterId: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 };
@@ -212,7 +214,7 @@ export type TokenRecord = z.infer<typeof TokenRecord>;
 
 /**
  * What a player receives of a visible token: every field but `definitionId` (FR-MAP-26), and
- * `speed` only on tokens the player owns (FR-MAP-36).
+ * `speed` only on tokens the player owns (FR-MAP-36). `characterId` stays (FR-MAP-50).
  */
 export const PlayerTokenRecord = z.object({ ...tokenFields, speed: TokenSpeed.optional() });
 export type PlayerTokenRecord = z.infer<typeof PlayerTokenRecord>;

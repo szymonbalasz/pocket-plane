@@ -61,6 +61,7 @@ import {
 import type { RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
 import { resolveDefinition } from "../entities/commands";
+import { characterIdOf } from "./character-copy";
 import {
   activeSceneOf,
   campaignOf,
@@ -489,8 +490,9 @@ const namesOn = (tx: Tx, sceneId: string) => sceneTokens(tx, sceneId).map((t) =>
 /**
  * FR-MAP-13: name = definition name, numbered (FR-MAP-16); image = portrait or none; size =
  * `statBlock.size`; shape = definition `tokenShape`, else round (FR-MAP-35); speed =
- * `statBlock.speed`, else null (FR-MAP-36); owner = the character's owner, else none; visible.
- * Optional overrides (fixtures) for name, image, owner, hidden, shape; never size or speed.
+ * `statBlock.speed`, else null (FR-MAP-36); owner = the character's owner, else none; visible;
+ * `characterId` copy (FR-MAP-50). Optional overrides (fixtures) for name, image, owner, hidden,
+ * shape; never size, speed or `characterId`.
  */
 export const placeToken = defineCommand({
   name: MAP_INTENTS.placeToken,
@@ -525,6 +527,7 @@ export const placeToken = defineCommand({
       row: input.row,
       ownerPlayerId,
       hidden: input.hidden ?? false,
+      characterId: characterIdOf(def),
     });
     emit({
       type: TokenPlaced.type,
@@ -668,6 +671,7 @@ export const duplicateToken = defineCommand({
       row: cell.row,
       ownerPlayerId: src.ownerPlayerId,
       hidden: src.hidden,
+      characterId: src.characterId,
     });
     emit({
       type: TokenDuplicated.type,

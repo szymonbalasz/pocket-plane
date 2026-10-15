@@ -62,9 +62,16 @@ export const EncounterName = z
     message: `Name must be at most ${ENCOUNTER_NAME_MAX} characters`,
   });
 
+/** FR-CBT-62: a monster's HP at Start / add. `average` = stat block `hpMax`; `rolled` = `hpFormula`. */
+export const HP_MODES = ["average", "rolled"] as const;
+export const HpMode = z.enum(HP_MODES);
+export type HpMode = z.infer<typeof HpMode>;
+
 export const EncounterEntryInput = z.strictObject({
   definitionId: Id,
   quantity: z.int().min(1).max(QUANTITY_MAX),
+  /** FR-CBT-62: omitted = `average`. */
+  hpMode: HpMode.optional(),
 });
 
 /** POST / PUT `/api/encounters` (whole replace). */
@@ -77,6 +84,9 @@ export const EncounterBody = z.strictObject({
     .refine((es) => es.reduce((n, e) => n + e.quantity, 0) <= MONSTERS_MAX, {
       message: `At most ${MONSTERS_MAX} creatures`,
     }),
+  /** FR-CBT-62: builder options; omitted = true. */
+  createTokens: z.boolean().optional(),
+  addHidden: z.boolean().optional(),
 });
 export type EncounterBody = z.input<typeof EncounterBody>;
 
@@ -99,6 +109,9 @@ export const EncounterRecord = z.object({
   playerTurnCombatantId: z.string().nullable(),
   startedAt: z.string().nullable(),
   endedAt: z.string().nullable(),
+  /** FR-CBT-62 (DM only, never in the player view). */
+  createTokens: z.boolean(),
+  addHidden: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -122,6 +135,7 @@ export const EncounterEntryRecord = z.object({
   seq: z.int(),
   definitionId: z.string(),
   quantity: z.int(),
+  hpMode: HpMode,
 });
 export type EncounterEntryRecord = z.infer<typeof EncounterEntryRecord>;
 

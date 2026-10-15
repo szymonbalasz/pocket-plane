@@ -7,6 +7,7 @@ import {
   EFFECT_ENDED_REASONS,
   EFFECT_KINDS,
 } from "@shared/combat-extras/schemas";
+import { HP_MODES } from "@shared/combat-tracker/schemas";
 import { TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
@@ -300,6 +301,8 @@ export const token = sqliteTable(
     shape: text("shape", { enum: TOKEN_SHAPES }).notNull().default("round"),
     /** Display copy of `statBlock.speed`; players: own tokens only (FR-MAP-36). */
     speed: integer("speed"),
+    /** Display copy: `definitionId` on character tokens, else null; players see it (FR-MAP-50). */
+    characterId: text("character_id"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -465,6 +468,9 @@ export const encounter = sqliteTable(
     playerTurnCombatantId: text("player_turn_combatant_id"),
     startedAt: text("started_at"),
     endedAt: text("ended_at"),
+    /** Builder options (FR-CBT-62): Start creates missing monster tokens, hidden. */
+    createTokens: integer("create_tokens", { mode: "boolean" }).notNull().default(true),
+    addHidden: integer("add_hidden", { mode: "boolean" }).notNull().default(true),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -489,6 +495,8 @@ export const encounterEntry = sqliteTable(
       .notNull()
       .references((): AnySQLiteColumn => entity.id),
     quantity: integer("quantity").notNull(),
+    /** FR-CBT-62: `average` = stat block `hpMax`; `rolled` = the `hpFormula` at Start. */
+    hpMode: text("hp_mode", { enum: HP_MODES }).notNull().default("average"),
   },
   (t) => [
     uniqueIndex("encounter_entry_seq").on(t.seq),

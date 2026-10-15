@@ -20,6 +20,7 @@ let links: Record<string, string>;
 const sceneId: Record<string, string> = {};
 const tokenId: Record<string, string> = {};
 let monsterDefIds: string[] = [];
+const characterIds: Record<string, string> = {};
 let eliteImage: string;
 let wolfImage: string;
 
@@ -49,6 +50,9 @@ beforeAll(async () => {
     .all()
     .filter((e) => e.kind === "monster")
     .map((e) => e.id);
+  for (const e of db.select().from(entity).all()) {
+    if (e.kind === "character") characterIds[e.name] = e.id;
+  }
   h = await startTestServer({ db, fake: false, testMode: true });
 }, 30_000); // loads the scenes bundle incl. sharp rasterising: > 5 s under parallel agent load
 
@@ -118,8 +122,15 @@ describe("scenes-map over REST + WS (scenes bundle)", () => {
     expect(scenes[0]).not.toHaveProperty("name");
     expect(p1.store.records["scene-folder"]).toBeUndefined();
     expect(names(p1, "token")).toEqual(["Mira", "Thorn"]);
-    for (const t of Object.values(p1.store.records.token ?? {})) {
+    // FR-MAP-26 / FR-MAP-50: never `definitionId`; the character copy names Mira / Thorn.
+    for (const t of Object.values(p1.store.records.token ?? {}) as Record<string, unknown>[]) {
       expect(t).not.toHaveProperty("definitionId");
+      expect(t.characterId).toBe(characterIds[t.name as string] as string);
+    }
+    const dmTokens = Object.values(dm.store.records.token ?? {}) as Record<string, unknown>[];
+    for (const t of dmTokens) {
+      const isCharacter = !monsterDefIds.includes(t.definitionId as string);
+      expect(t.characterId).toBe(isCharacter ? (t.definitionId as string) : null);
     }
     expect(leaks(p1, ["Wolf", wolfImage])).toEqual([]);
     expect(leakScan(h.s, p1)).toEqual([]);
