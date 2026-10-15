@@ -34,6 +34,7 @@ import {
   centreOn,
   contentBox,
   fitContent,
+  footprintBox,
   zoomAt,
 } from "./camera";
 import { CanvasContext, type CanvasContextValue, type EffectiveGrid } from "./canvas-context";
@@ -143,13 +144,29 @@ export function MapCanvas(props: MapCanvasProps) {
   const [cam, setCam] = useState<Camera>({ x: 0, y: 0, scale: 1 });
   const [cameraMode, setCameraMode] = useState<CameraMode>("fitted");
   const cameraModeRef = useRef(cameraMode);
+  /** FR-MAP-46: the last fit hit the 48 px cell floor (`data-fit-floor`). */
+  const [fitFloor, setFitFloor] = useState(false);
   const free = useFreeArea();
   const fitNow = useRef(() => {});
   fitNow.current = () => {
     if (size.w === 0) return;
     const map = { w: scene.mapWidth, h: scene.mapHeight };
     const box = contentBox(tokens, grid, map);
-    setCam(fitContent(box, free.area, map, workArea(size)));
+    // PC tokens = tokens with an owner, in this client's store (FR-MAP-46).
+    const pcs = footprintBox(
+      tokens.filter((t) => t.ownerPlayerId !== null),
+      grid,
+    );
+    const { floor, ...fit } = fitContent(
+      box,
+      free.area,
+      map,
+      workArea(size),
+      grid.gridCellSize,
+      pcs,
+    );
+    setCam(fit);
+    setFitFloor(floor);
   };
   /** Applies a camera event; fits now (or next frame, once the window change is laid out). */
   const onCamera = useCallback((e: CameraEvent, deferred = false) => {
@@ -538,6 +555,8 @@ export function MapCanvas(props: MapCanvasProps) {
       data-tool={tool}
       data-targeting={targeting}
       data-camera={cameraMode}
+      data-cell-px={Math.round(cam.scale * grid.gridCellSize)}
+      data-fit-floor={fitFloor}
       className="absolute inset-0"
       style={{ cursor: tool === "select" && !targeting ? undefined : "crosshair" }}
       onContextMenu={(e) => e.preventDefault()}

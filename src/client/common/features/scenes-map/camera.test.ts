@@ -1,6 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import type { TokenSize } from "@shared/scenes-map/schemas";
-import { cameraOn, contentBox, FIT_MARGIN, fitCamera, fitContent } from "./camera";
+import {
+  type Box,
+  type Camera,
+  cameraOn,
+  contentBox,
+  FIT_MARGIN,
+  FIT_MIN_CELL_PX,
+  fitCamera,
+  fitContent,
+  footprintBox,
+  ZOOM_MAX,
+} from "./camera";
 
 /** The `battlemap` fixture: 20 × 14 cells at 70 px, no offset. */
 const GRID = { gridCellSize: 70, gridOffsetX: 0, gridOffsetY: 0 };
@@ -10,6 +21,8 @@ const tok = (col: number, row: number, size: TokenSize = "medium") => ({ col, ro
 /** Goblin Ambush in `session-sim`: Mira, Goblin, Goblin 2, Thorn; hidden Wolf, Elite. */
 const VISIBLE = [tok(2, 7), tok(12, 6), tok(12, 8), tok(2, 9)];
 const HIDDEN = [tok(14, 4), tok(15, 8)];
+/** The PC tokens (owned): Mira, Thorn. */
+const PCS = [tok(2, 7), tok(2, 9)];
 
 describe("FR-MAP-44 content box", () => {
   test("FR-MAP-44 content box: footprints + 1 cell per side (DM incl. hidden)", () => {
@@ -50,7 +63,7 @@ describe("FR-MAP-44 fit", () => {
   test("FR-MAP-44 scale cap: never above the whole-map fit into the work area", () => {
     const free = { x: 68, y: 48, w: 1372, h: 788 };
     const one = contentBox([tok(10, 7)], GRID, MAP);
-    const cam = fitContent(one, free, MAP, work);
+    const cam = fitContent(one, free, MAP, work, 70, null);
     // One token: that zoom, centred in the free area.
     expect(cam.scale).toBe(cap);
     expect(cam.x + (one.x + one.w / 2) * cam.scale).toBeCloseTo(68 + 1372 / 2);
@@ -60,17 +73,119 @@ describe("FR-MAP-44 fit", () => {
   });
 
   test("FR-MAP-44 fit: the box fills the free area minus 16 px, centred", () => {
-    const free = { x: 68, y: 48, w: 600, h: 400 };
+    const free = { x: 68, y: 48, w: 840, h: 500 };
     const box = contentBox([...VISIBLE, ...HIDDEN], GRID, MAP);
-    const cam = fitContent(box, free, MAP, work);
-    expect(cam.scale).toBeCloseTo((600 - 2 * FIT_MARGIN) / box.w);
+    const cam = fitContent(box, free, MAP, work, 70, null);
+    expect(cam.scale).toBeCloseTo((840 - 2 * FIT_MARGIN) / box.w);
     const left = cam.x + box.x * cam.scale;
     const right = cam.x + (box.x + box.w) * cam.scale;
     expect(left).toBeCloseTo(68 + FIT_MARGIN);
-    expect(right).toBeCloseTo(68 + 600 - FIT_MARGIN);
+    expect(right).toBeCloseTo(68 + 840 - FIT_MARGIN);
     const top = cam.y + box.y * cam.scale;
     const bottom = cam.y + (box.y + box.h) * cam.scale;
-    expect(top - 48).toBeCloseTo(48 + 400 - bottom);
+    expect(top - 48).toBeCloseTo(48 + 500 - bottom);
+  });
+});
+
+describe("FR-MAP-46 fit floor", () => {
+  const work = { w: 1280, h: 608 };
+  /** The DM free area at 1280×720, default layout (Initiative top-right, Game log bottom-left). */
+  const free = { x: 68, y: 48, w: 800, h: 356 };
+  const inside = (cam: Camera, b: Box, f: Box) => {
+    const x0 = cam.x + b.x * cam.scale;
+    const y0 = cam.y + b.y * cam.scale;
+    return (
+      x0 >= f.x + FIT_MARGIN - 1e-6 &&
+      y0 >= f.y + FIT_MARGIN - 1e-6 &&
+      x0 + b.w * cam.scale <= f.x + f.w - FIT_MARGIN + 1e-6 &&
+      y0 + b.h * cam.scale <= f.y + f.h - FIT_MARGIN + 1e-6
+    );
+  };
+
+  test("FR-MAP-46 fit floor 48 px at 1280×720: Goblin Ambush (DM) → 48 px cell, floor, PCs in the free area", () => {
+    const box = contentBox([...VISIBLE, ...HIDDEN], GRID, MAP);
+    const pcs = footprintBox(PCS, GRID);
+    const cam = fitContent(box, free, MAP, work, 70, pcs);
+    expect(cam.floor).toBe(true);
+    expect(cam.scale * 70).toBeCloseTo(FIT_MIN_CELL_PX);
+    expect(pcs && inside(cam, pcs, free)).toBe(true);
+    // The content box doesn't fit at the floor (taller than the free area).
+    expect(box.h * cam.scale).toBeGreaterThan(free.h);
+  });
+
+  test("FR-MAP-46 PC tokens inside the free area after the least pan", () => {
+    // Monsters left, PCs at the far right: centring the box leaves the PCs outside.
+    const pcs = footprintBox([tok(19, 6), tok(19, 8)], GRID);
+    const box = contentBox([tok(0, 6), tok(1, 8), tok(19, 6), tok(19, 8)], GRID, MAP);
+    const cam = fitContent(box, free, MAP, work, 70, pcs);
+    expect(cam.floor).toBe(true);
+    expect(pcs && inside(cam, pcs, free)).toBe(true);
+    // Least: the PCs touch the right margin, not centred.
+    const right = cam.x + ((pcs?.x ?? 0) + (pcs?.w ?? 0)) * cam.scale;
+    expect(right).toBeCloseTo(free.x + free.w - FIT_MARGIN);
+  });
+
+  test("FR-MAP-46 a box that fits above the floor keeps today's scale (floor false)", () => {
+    const wide = { x: 68, y: 48, w: 1372, h: 788 };
+    const work1440 = { w: 1440, h: 788 };
+    const box = contentBox([...VISIBLE, ...HIDDEN], GRID, MAP);
+    const cam = fitContent(box, wide, MAP, work1440, 70, footprintBox(PCS, GRID));
+    expect(cam.floor).toBe(false);
+    expect(cam.scale).toBe(fitCamera(MAP, work1440).scale);
+    expect(cam.scale * 70).toBeGreaterThan(FIT_MIN_CELL_PX);
+    expect(cam.x + (box.x + box.w / 2) * cam.scale).toBeCloseTo(68 + 1372 / 2);
+  });
+
+  test("FR-MAP-46 the floor beats the whole-map cap (one token, box fits): centred at 48 px", () => {
+    const one = contentBox([tok(10, 7)], GRID, MAP);
+    expect(fitCamera(MAP, work).scale * 70).toBeLessThan(FIT_MIN_CELL_PX);
+    const cam = fitContent(one, free, MAP, work, 70, null);
+    expect(cam.floor).toBe(true);
+    expect(cam.scale * 70).toBeCloseTo(FIT_MIN_CELL_PX);
+    expect(cam.x + (one.x + one.w / 2) * cam.scale).toBeCloseTo(68 + 800 / 2);
+  });
+
+  test("FR-MAP-46 PC box wider than the free area → centred on the PCs", () => {
+    const pcs = footprintBox([tok(0, 7), tok(19, 7)], GRID);
+    const box = contentBox([tok(0, 7), tok(19, 7), ...HIDDEN], GRID, MAP);
+    const narrow = { x: 68, y: 48, w: 500, h: 356 };
+    const cam = fitContent(box, narrow, MAP, work, 70, pcs);
+    expect(cam.floor).toBe(true);
+    const mid = cam.x + ((pcs?.x ?? 0) + (pcs?.w ?? 0) / 2) * cam.scale;
+    expect(mid).toBeCloseTo(68 + 250);
+    // Vertically the PCs fit: inside the free area.
+    const top = cam.y + (pcs?.y ?? 0) * cam.scale;
+    expect(top).toBeGreaterThanOrEqual(48 + FIT_MARGIN);
+    expect(top + (pcs?.h ?? 0) * cam.scale).toBeLessThanOrEqual(48 + 356 - FIT_MARGIN);
+  });
+
+  test("FR-MAP-46 max zoom caps the floor", () => {
+    const g = { gridCellSize: 5, gridOffsetX: 0, gridOffsetY: 0 };
+    const box = contentBox([tok(0, 0), tok(199, 0)], g, MAP);
+    const cam = fitContent(box, free, MAP, work, 5, null);
+    expect(cam.floor).toBe(true);
+    expect(cam.scale).toBe(ZOOM_MAX);
+  });
+
+  test("FR-MAP-46 player store: hidden tokens never move the camera", () => {
+    // The player's fit only sees its store (no Wolf / Elite): the same as the DM's fit with
+    // the hidden tokens left out, and not the DM's.
+    const pcs = footprintBox(PCS, GRID);
+    const player = fitContent(contentBox(VISIBLE, GRID, MAP), free, MAP, work, 70, pcs);
+    const dm = fitContent(contentBox([...VISIBLE, ...HIDDEN], GRID, MAP), free, MAP, work, 70, pcs);
+    const movedHidden = [tok(18, 1), tok(17, 12)];
+    const dmElsewhere = fitContent(
+      contentBox([...VISIBLE, ...movedHidden], GRID, MAP),
+      free,
+      MAP,
+      work,
+      70,
+      pcs,
+    );
+    expect(player).not.toEqual(dm);
+    expect(dmElsewhere).not.toEqual(dm);
+    expect(fitContent(contentBox(VISIBLE, GRID, MAP), free, MAP, work, 70, pcs)).toEqual(player);
+    expect(pcs && inside(player, pcs, free)).toBe(true);
   });
 });
 
