@@ -25,7 +25,10 @@ export function endPendingCount(
 /** The End confirm's second sentence; 0 → none (first sentence only). */
 export function endPendingText(n: number): string {
   if (n === 0) return "";
-  return `${n} pending card${n === 1 ? "" : "s"} will be dismissed: apply them first if they count.`;
+  // P3 glitch 9: one card reads in the singular.
+  return n === 1
+    ? "1 pending card will be dismissed: apply it first if it counts."
+    : `${n} pending cards will be dismissed: apply them first if they count.`;
 }
 
 export const END_FIRST_SENTENCE = "Combatants leave the initiative list.";

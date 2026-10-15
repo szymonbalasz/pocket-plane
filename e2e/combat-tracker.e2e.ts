@@ -294,7 +294,7 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await init.getByTestId("cbt-init-end").click();
   await expect(dm.getByTestId("cbt-init-end-pending")).toHaveAttribute("data-value", "1");
   await expect(dm.getByTestId("cbt-init-end-pending")).toHaveText(
-    "1 pending card will be dismissed: apply them first if they count.",
+    "1 pending card will be dismissed: apply it first if it counts.",
   );
   await dm.getByTestId("cbt-init-end-confirm").click();
   await expect(dm.getByTestId("cbt-init-end-confirm")).toHaveCount(0);

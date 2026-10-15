@@ -48,7 +48,7 @@ describe("FR-CBT-59 confirm count", () => {
       "3 pending cards will be dismissed: apply them first if they count.",
     );
     expect(endPendingText(1)).toBe(
-      "1 pending card will be dismissed: apply them first if they count.",
+      "1 pending card will be dismissed: apply it first if it counts.",
     );
     expect(endPendingText(0)).toBe("");
   });
