@@ -1,4 +1,5 @@
 // Players panel: name, online dot, copy link, rename; add player (CAMP §7, FR-CAMP-12–15).
+// Under each player, their characters at a glance; a line opens the sheet (FR-CAMP-21/22, N3).
 import {
   isLoopbackUrl,
   PlayerName,
@@ -6,16 +7,37 @@ import {
   type PlayerWithLink,
   playerLinkUrl,
 } from "@shared/campaign-management/schemas";
+import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
+import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { ApiError } from "@ui/api";
 import { Button } from "@ui/components/ui/button";
-import { Alert, Input, Table, TableBody, TableCell, TableRow } from "@ui/components/ui/primitives";
+import { Tooltip } from "@ui/components/ui/overlays";
+import {
+  Alert,
+  Badge,
+  Input,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+} from "@ui/components/ui/primitives";
+import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { cn } from "@ui/lib/utils";
 import { onlineDot } from "@ui/sync/presence";
 import { usePresence, useRecords, useSync } from "@ui/sync/store";
 import { CopyIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { NameDialog } from "./NameDialog";
+import {
+  hpText,
+  openPartyLine,
+  type PartyCharacter,
+  type PartyLine,
+  partyLines,
+  passiveTitle,
+  tempText,
+} from "./party-lines";
 import { api, dmCall } from "./session";
 
 interface PlayersResponse {
@@ -42,11 +64,95 @@ function usePlayerLinks(players: PlayerRecord[]) {
   return data;
 }
 
+/** FR-CAMP-21/22: one compact line; the whole line opens the DM's sheet on it. */
+function CharacterLine({ line }: { line: PartyLine }) {
+  const openWindow = useOpenWindow();
+  const temp = tempText(line.temp);
+  const label = "text-muted-foreground";
+  return (
+    <button
+      type="button"
+      data-testid="camp-player-char"
+      data-record-id={line.id}
+      className="flex w-full flex-wrap items-center gap-x-1.5 rounded-sm px-1 py-0.5 text-left text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      onClick={() => openPartyLine(line.id, openWindow)}
+    >
+      <span className="max-w-32 truncate font-medium" title={line.name}>
+        {line.name}
+      </span>
+      {line.draft && (
+        <Badge
+          data-testid="camp-player-char-draft"
+          variant="outline"
+          className="h-4 px-1 text-[10px]"
+        >
+          Draft
+        </Badge>
+      )}
+      <span className={label}>·</span>
+      <span>
+        <span className={label}>Lvl </span>
+        <span data-testid="camp-player-char-level" className="tabular-nums">
+          {line.level ?? "—"}
+        </span>
+      </span>
+      <span className={label}>·</span>
+      <span>
+        <span className={label}>AC </span>
+        <span data-testid="camp-player-char-ac" className="tabular-nums">
+          {line.ac ?? "—"}
+        </span>
+      </span>
+      <span className={label}>·</span>
+      <span>
+        <span className={label}>HP </span>
+        <span
+          data-testid="camp-player-char-hp"
+          data-down={line.down}
+          className={cn("tabular-nums", line.down && "text-hp-down")}
+        >
+          {hpText(line)}
+        </span>
+        {line.down && <span className="text-hp-down"> Down</span>}
+        {temp && (
+          <span data-testid="camp-player-char-temp" className="tabular-nums">
+            {" "}
+            {temp}
+          </span>
+        )}
+      </span>
+      {line.passives.map((p) => (
+        <Fragment key={p.skill}>
+          <span className={label}>·</span>
+          <Tooltip content={passiveTitle(p)}>
+            <span>
+              <span className={label}>{p.short} </span>
+              <span
+                data-testid={`camp-player-char-${p.short.toLowerCase()}`}
+                data-overridden={p.overridden}
+                className="tabular-nums"
+              >
+                {p.value ?? "—"}
+              </span>
+            </span>
+          </Tooltip>
+        </Fragment>
+      ))}
+    </button>
+  );
+}
+
 export function PlayersPanel() {
   const players = useRecords<PlayerRecord>("player");
   const presence = usePresence();
   const live = useSync((s) => s.state === "live");
   const links = usePlayerLinks(players);
+  const entities = useRecords<PartyCharacter>(ENTITY_TYPE);
+  const sheets = useRecords<CreatureSheetRecord>(CREATURE_SHEET_TYPE);
+  const lines = useMemo(() => {
+    const drafts = new Set(sheets.filter((s) => s.status === "draft").map((s) => s.entityId));
+    return partyLines(entities, drafts);
+  }, [entities, sheets]);
   const [newName, setNewName] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
   const base = links?.publicBaseUrl ?? window.location.origin;
@@ -93,75 +199,95 @@ export function PlayersPanel() {
               {players.map((p) => {
                 const token = tokenOf(p.id);
                 const dot = onlineDot(presence, p.id);
+                const own = lines.get(p.id) ?? [];
                 return (
-                  <TableRow key={p.id} data-testid="camp-player-row" data-record-id={p.id}>
-                    {/* Name takes the free width, one line; long names truncate. */}
-                    <TableCell
-                      data-testid="camp-player-name"
-                      title={p.name}
-                      className="w-full max-w-0 truncate whitespace-nowrap px-1 py-1 font-medium"
-                    >
-                      {p.name}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap px-1 py-1">
-                      {/* Presence unknown while not live: no dot, muted "–" (FR-SYNC-29). */}
-                      <span
-                        data-testid="camp-player-online"
-                        data-online={dot === "unknown" ? undefined : dot === "online"}
-                        data-state={dot === "unknown" ? "unknown" : "known"}
-                        className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+                  <Fragment key={p.id}>
+                    <TableRow data-testid="camp-player-row" data-record-id={p.id}>
+                      {/* Name takes the free width, one line; long names truncate. */}
+                      <TableCell
+                        data-testid="camp-player-name"
+                        title={p.name}
+                        className="w-full max-w-0 truncate whitespace-nowrap px-1 py-1 font-medium"
                       >
-                        {dot === "unknown" ? (
-                          <>
-                            <span aria-hidden>–</span>
-                            <span className="sr-only">Unknown while reconnecting</span>
-                          </>
+                        {p.name}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap px-1 py-1">
+                        {/* Presence unknown while not live: no dot, muted "–" (FR-SYNC-29). */}
+                        <span
+                          data-testid="camp-player-online"
+                          data-online={dot === "unknown" ? undefined : dot === "online"}
+                          data-state={dot === "unknown" ? "unknown" : "known"}
+                          className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+                        >
+                          {dot === "unknown" ? (
+                            <>
+                              <span aria-hidden>–</span>
+                              <span className="sr-only">Unknown while reconnecting</span>
+                            </>
+                          ) : (
+                            <>
+                              <span
+                                className={cn(
+                                  "size-2 rounded-full",
+                                  dot === "online" ? "bg-success" : "bg-muted-foreground/40",
+                                )}
+                              />
+                              {dot}
+                            </>
+                          )}
+                        </span>
+                      </TableCell>
+                      <TableCell className="flex justify-end gap-1 whitespace-nowrap px-1 py-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7"
+                          data-testid="camp-player-copy-link"
+                          data-link={token ? playerLinkUrl(base, token) : undefined}
+                          disabled={!token}
+                          onClick={() => token && void copy(token)}
+                        >
+                          <CopyIcon className="size-3.5" /> Copy link
+                        </Button>
+                        <NameDialog
+                          title="Rename player"
+                          label="Name"
+                          schema={PlayerName}
+                          initial={p.name}
+                          testId="camp-player-rename"
+                          submitLabel="Rename"
+                          disabled={!live}
+                          trigger={
+                            <Button size="sm" variant="ghost" className="h-7">
+                              Rename
+                            </Button>
+                          }
+                          onSubmit={async (name) => {
+                            await dmCall(
+                              api.api.players[":id"].$patch({
+                                param: { id: p.id },
+                                json: { name },
+                              }),
+                            );
+                          }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell colSpan={3} className="px-1 pt-0 pb-1 pl-3">
+                        {own.length === 0 ? (
+                          <span
+                            data-testid="camp-player-nochar"
+                            className="text-xs text-muted-foreground"
+                          >
+                            No character yet
+                          </span>
                         ) : (
-                          <>
-                            <span
-                              className={cn(
-                                "size-2 rounded-full",
-                                dot === "online" ? "bg-success" : "bg-muted-foreground/40",
-                              )}
-                            />
-                            {dot}
-                          </>
+                          own.map((l) => <CharacterLine key={l.id} line={l} />)
                         )}
-                      </span>
-                    </TableCell>
-                    <TableCell className="flex justify-end gap-1 whitespace-nowrap px-1 py-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7"
-                        data-testid="camp-player-copy-link"
-                        data-link={token ? playerLinkUrl(base, token) : undefined}
-                        disabled={!token}
-                        onClick={() => token && void copy(token)}
-                      >
-                        <CopyIcon className="size-3.5" /> Copy link
-                      </Button>
-                      <NameDialog
-                        title="Rename player"
-                        label="Name"
-                        schema={PlayerName}
-                        initial={p.name}
-                        testId="camp-player-rename"
-                        submitLabel="Rename"
-                        disabled={!live}
-                        trigger={
-                          <Button size="sm" variant="ghost" className="h-7">
-                            Rename
-                          </Button>
-                        }
-                        onSubmit={async (name) => {
-                          await dmCall(
-                            api.api.players[":id"].$patch({ param: { id: p.id }, json: { name } }),
-                          );
-                        }}
-                      />
-                    </TableCell>
-                  </TableRow>
+                      </TableCell>
+                    </TableRow>
+                  </Fragment>
                 );
               })}
             </TableBody>

@@ -4,6 +4,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
+import { CHARX_APPROVED_KIND, CHARX_DRAFT_KIND } from "@shared/character-sheet/notes";
 import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, REDACTED_CHARACTER_KEYS } from "@shared/entities/schemas";
@@ -12,6 +13,7 @@ import { entity, player } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
 import { convergence, leakScan } from "../../ws/testing/convergence";
+import { NOTIFICATION_TYPE } from "../notifications/helpers";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
 
@@ -51,6 +53,28 @@ function sheetIdsInFrames(c: TestClient): string[] {
   }
   return [...ids].sort();
 }
+
+/** Kinds of every `notification` row any frame `c` received carried (snapshot or event). */
+function noteKindsInFrames(c: TestClient): string[] {
+  const kinds = new Set<string>();
+  for (const f of c.frames) {
+    if (f.type === "snapshot") {
+      for (const r of (f.records[NOTIFICATION_TYPE] ?? []) as { kind: string }[]) kinds.add(r.kind);
+    }
+    if (f.type === "event") {
+      for (const ch of f.changes) {
+        const after = (ch as { after?: { kind?: string } }).after;
+        if (ch.type === NOTIFICATION_TYPE && after?.kind) kinds.add(after.kind);
+      }
+    }
+  }
+  return [...kinds].sort();
+}
+type Note = { kind: string; state: string; text: string; audiencePlayerId: string | null };
+const notesOf = (c: TestClient, kind: string) =>
+  Object.values(c.store.records[NOTIFICATION_TYPE] ?? {}).filter(
+    (n) => (n as Note).kind === kind,
+  ) as Note[];
 
 describe("character-sheet-full bundle over WS", () => {
   let h: TestServer;
@@ -181,6 +205,12 @@ describe("character-sheet-full bundle over WS", () => {
     await until(() => ent(p2, brin) !== undefined);
     expect(sheetOf(p1, brin)).toMatchObject({ status: "draft" });
     expect(Object.keys(ent(p2, brin) ?? {}).sort()).toEqual([...REDACTED_CHARACTER_KEYS].sort());
+    // G8 (FR-CHARX-45): the DM's pending card within 1 s; no player ever receives it.
+    await until(() => notesOf(dm, CHARX_DRAFT_KIND).length === 1);
+    expect(notesOf(dm, CHARX_DRAFT_KIND)[0]).toMatchObject({
+      state: "pending",
+      text: "Player 1 made a character: Brin. Awaiting your approval",
+    });
 
     const e1 = p1.intent("char.edit", {
       creatureId: brin,
@@ -233,6 +263,13 @@ describe("character-sheet-full bundle over WS", () => {
       expect((await answer(dm, dm.intent(name, payload))).type).toBe("ack");
     }
     await until(() => sheetOf(p1, brin)?.locked === true && sheetOf(p1, brin)?.status === "ready");
+    // G8 (FR-CHARX-45/46): card resolved for the DM; the owner (only) gets the approval.
+    await until(() => notesOf(p1, CHARX_APPROVED_KIND).length === 1);
+    expect(notesOf(p1, CHARX_APPROVED_KIND)[0]).toMatchObject({
+      state: "info",
+      text: "Brin was approved by the DM: ready to play",
+    });
+    await until(() => notesOf(dm, CHARX_DRAFT_KIND)[0]?.state === "resolved");
     const ed = p1.intent("char.edit", { creatureId: brin, set: { ac: 18 } });
     expect(await answer(p1, ed)).toMatchObject({
       type: "reject",
@@ -307,6 +344,11 @@ describe("character-sheet-full bundle over WS", () => {
     expect(sheetIdsInFrames(p2)).toEqual([ids.Sela as string]);
     expect(sheetIdsInFrames(p1).sort()).toEqual([ids.Brin, ids.Kell, ids.Mira].sort() as string[]);
     for (const c of [dm, p1, p2]) expect(leakScan(h.s, c)).toEqual([]);
+    // G8 leak scan: no player frame carries a draft card; Player 2 never Brin's approval.
+    expect(noteKindsInFrames(p1)).not.toContain(CHARX_DRAFT_KIND);
+    expect(noteKindsInFrames(p2)).not.toContain(CHARX_DRAFT_KIND);
+    expect(noteKindsInFrames(p2)).not.toContain(CHARX_APPROVED_KIND);
+    expect(noteKindsInFrames(p1)).toContain(CHARX_APPROVED_KIND);
     for (const [live, cred] of [
       [dm, DM],
       [p1, p("Player 1")],
@@ -335,5 +377,24 @@ describe("character-sheet-full bundle over WS", () => {
     const before = await snap();
     await h.restart();
     expect(await snap()).toEqual(before);
+  });
+
+  test("FR-CHARX-45 a pending draft card survives a restart (DM snapshot); players never get it", async () => {
+    const p1 = await h.live(p("Player 1"));
+    const ack = await answer(p1, p1.intent("char.create", { name: "Quill" }));
+    expect(ack.type).toBe("ack");
+    p1.close();
+    await h.restart();
+    const dm = await h.live(DM);
+    const quill = notesOf(dm, CHARX_DRAFT_KIND).filter((n) => n.state === "pending");
+    expect(quill.map((n) => n.text)).toEqual([
+      "Player 1 made a character: Quill. Awaiting your approval",
+    ]);
+    for (const name of ["Player 1", "Player 2"]) {
+      const c = await h.live(p(name));
+      expect(noteKindsInFrames(c)).not.toContain(CHARX_DRAFT_KIND);
+      c.close();
+    }
+    dm.close();
   });
 });
