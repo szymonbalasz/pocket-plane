@@ -1,10 +1,6 @@
 // DM read models for combat: definitions by id (AC, HP, CR, attack), the started encounter's
 // pending damage cards and its latest undoable combat log entry. Display only; the server decides.
-import {
-  DAMAGE_CARD_KIND,
-  HP_CHANGE_TYPE,
-  type HpChangeRecord,
-} from "@shared/combat-tracker/schemas";
+import { HP_CHANGE_TYPE, type HpChangeRecord } from "@shared/combat-tracker/schemas";
 import {
   type DefinitionRecord,
   ENTITY_TYPE,
@@ -15,6 +11,8 @@ import {
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { useRecords } from "@ui/sync/store";
 import { useMemo } from "react";
+import { dmNotificationViews } from "../../notification-views";
+import { pendingForEncounter } from "./pending";
 import { undoLabel } from "./targets";
 
 export function useDefinitions(): Map<string, DefinitionRecord> {
@@ -34,19 +32,14 @@ export function useDefinitions(): Map<string, DefinitionRecord> {
   }, [entities, imported]);
 }
 
-/** Pending damage cards of an encounter, oldest first. */
+/**
+ * Pending notifications of an encounter, oldest first (FR-CBT-79): damage cards and any kind
+ * whose DM view links it to the encounter (FR-NOTE-29).
+ */
 export function usePendingCards(encounterId: string | null | undefined): NotificationRecord[] {
   const notes = useRecords<NotificationRecord>("notification");
   return useMemo(
-    () =>
-      notes
-        .filter(
-          (n) =>
-            n.kind === DAMAGE_CARD_KIND &&
-            n.state === "pending" &&
-            (n.payload as { encounterId?: string } | null)?.encounterId === encounterId,
-        )
-        .sort((a, b) => a.seq - b.seq),
+    () => pendingForEncounter(notes, encounterId, dmNotificationViews),
     [notes, encounterId],
   );
 }

@@ -83,6 +83,11 @@ export const concentrationView: NotificationView = defineNotificationView({
   icon: BrainIcon,
   render: CardBody,
   // No end rule (OQ-CBTX-15): pending cards stay at End.
+  // FR-CBTX-48 (G9): linked to its encounter, so the DM's Initiative "Pending" lists it.
+  encounterIdOf: (p) => {
+    const id = (p as { encounterId?: unknown } | null)?.encounterId;
+    return typeof id === "string" ? id : null;
+  },
   onAction(n, ctx) {
     if (useConcentrationRoll.getState().hosts > 0) {
       useConcentrationRoll.setState({ noteId: n.id });

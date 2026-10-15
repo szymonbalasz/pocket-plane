@@ -241,6 +241,23 @@ describe("FR-CBTX-09 FR-CBTX-10 FR-CBTX-11 concentration", () => {
   });
 });
 
+describe("FR-CBTX-48 rule closures record no actor", () => {
+  test("FR-CBTX-48 concentration ending at End → card resolved 'ended', closedByRole null", () => {
+    const t = cbtxSetup();
+    t.concentrate({ characterId: t.thornId }, "Hex", 10);
+    t.attackApply("Goblin", ["Thorn"], 2);
+    const [card] = t.cards().filter((n) => n.state === "pending");
+    expect(card).toMatchObject({ actionRole: "player" });
+    t.endEncounter();
+    expect(t.note(card?.id as string)).toMatchObject({
+      state: "resolved",
+      resolution: { outcome: "ended" },
+      closedByRole: null,
+      closedByPlayerId: null,
+    });
+  });
+});
+
 describe("FR-CBTX-43 rule closures", () => {
   test("FR-CBTX-43 hidden PC's card (owner DM): player ends own concentration → card closed ended, no forbidden", () => {
     const t = cbtxSetup();

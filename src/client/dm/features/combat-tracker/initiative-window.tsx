@@ -64,6 +64,8 @@ import {
   type RollControl,
   useRollControl,
 } from "@ui/features/dice-roll-log/roll-control";
+import { actionButton } from "@ui/features/notifications/logic";
+import { useNoteActions } from "@ui/features/notifications/parts";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { movementIndicator } from "@ui/features/scenes-map/movement";
@@ -85,6 +87,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { dmNotificationViews } from "../../notification-views";
 import {
   DeathSaveAnchor,
   RowDeath,
@@ -102,6 +105,7 @@ import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpDialog } from "./hp-dialog";
+import { isDamageCard, pendingRowText } from "./pending";
 import { useCombatDialogs } from "./popup-store";
 
 function InitiativeCell({
@@ -592,28 +596,75 @@ function Row({
 
 const ANCHOR = "pointer-events-none size-0 overflow-hidden p-0 opacity-0";
 
-function PendingCards({ cards }: { cards: NotificationRecord[] }) {
+/**
+ * FR-CBT-79 (G9): one Pending row per linked notification. A damage card opens the popup; another
+ * kind shows its text ("Waiting for Mira: …" when a player owns it) and the DM's action (the
+ * view's `onAction`, as in Notifications).
+ */
+function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteActions }) {
   const openCard = useCombatDialogs((s) => s.openCard);
-  if (cards.length === 0) return null;
-  return (
-    <section
-      aria-label="Pending attacks"
-      className="flex max-h-28 shrink-0 flex-col gap-1 overflow-y-auto"
-    >
-      <h3 className="text-xs font-medium text-muted-foreground">Pending ({cards.length})</h3>
-      {cards.map((n) => (
+  const live = useSync((s) => s.state === "live");
+  const view = dmNotificationViews.get(n.kind);
+  if (isDamageCard(n)) {
+    return (
+      <li>
         <Button
-          key={n.id}
           variant="outline"
           size="sm"
           data-testid="cbt-init-card"
           data-record-id={n.id}
-          className="justify-start truncate"
+          className="w-full justify-start truncate"
           onClick={() => openCard(n.id)}
         >
           <SwordIcon className="size-3.5" /> {n.text}
         </Button>
-      ))}
+      </li>
+    );
+  }
+  const Icon = view?.icon ?? SwordIcon;
+  const mode = actionButton(n, { role: "dm", playerId: null }, live, view);
+  return (
+    <li
+      data-testid="cbt-init-pending"
+      data-record-id={n.id}
+      data-kind={n.kind}
+      className="flex h-8 items-center gap-1.5 rounded-md border px-2 text-sm"
+    >
+      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 flex-1 truncate" data-testid="cbt-init-pending-text">
+        {pendingRowText(n)}
+      </span>
+      {mode !== "none" && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 shrink-0 px-2 text-xs"
+          data-testid="cbt-init-pending-action"
+          data-record-id={n.id}
+          disabled={mode === "disabled" || actions.busy.has(n.id)}
+          onClick={() => void actions.run(n)}
+        >
+          {n.actionLabel}
+        </Button>
+      )}
+    </li>
+  );
+}
+
+type NoteActions = ReturnType<typeof useNoteActions>;
+
+function PendingCards({ cards }: { cards: NotificationRecord[] }) {
+  const actions = useNoteActions(dmNotificationViews);
+  if (cards.length === 0) return null;
+  return (
+    <section aria-label="Pending actions" data-testid="cbt-init-pending-list" className="shrink-0">
+      <h3 className="mb-1 text-xs font-medium text-muted-foreground">Pending ({cards.length})</h3>
+      {/* FR-CBT-77 (G4): at most 3 rows, then its own scroll, so cards never push the rows away. */}
+      <ul className="flex max-h-[104px] flex-col gap-1 overflow-y-auto">
+        {cards.map((n) => (
+          <PendingRow key={n.id} n={n} actions={actions} />
+        ))}
+      </ul>
     </section>
   );
 }
