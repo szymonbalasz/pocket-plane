@@ -26,7 +26,7 @@
 
 ## Consequences
 
-- `map.moveToken` = validate → **guards** (may refuse) → write → FOG's `derive` (`fogged`, same transaction) → token-changed hooks → `TokenMoved` (seam S4). A guard reject: no write, no hook, no event, no `ack`; the client reverts (FR-MAP-15).
+- `map.moveToken` = validate → **guards** (may refuse) → FOG's `derive` (`fogged`) → one write → token-changed hooks → `TokenMoved` (seam S4, review X7). A guard reject: no write, no hook, no event, no `ack`; the client reverts (FR-MAP-15).
 - Guards run for every actor; each guard decides (scene-tools' wall guard returns at once for the DM).
 - Guards are read-only (review check + test). Placement, `placeTokenIn` and duplicate run none.
 - ADR-0031's "a hook must not reject a move" stays true for hooks.
