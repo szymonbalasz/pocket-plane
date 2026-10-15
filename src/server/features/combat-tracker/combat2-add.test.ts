@@ -287,6 +287,36 @@ describe("FR-CBT-64 FR-CBT-65 start applies the options", () => {
     ]);
   });
 
+  test("FR-CBT-65 created token image (sim-5 glitch 4): the portrait, else the image of the definition's latest token on the scene, else none; the combatant copies it", () => {
+    const t = setup();
+    for (const id of ["art-goblin-a", "art-goblin-b"]) addAsset(t.s, id, t.h.campaignId);
+    const setImage = (tokenId: string, imageAssetId: string) =>
+      t.run(MAP_INTENTS.updateToken, { tokenId, imageAssetId });
+    // SRD Goblin has no portrait (imports never do): its art lives on its tokens only.
+    setImage(t.tokens.goblin, "art-goblin-a");
+    setImage(t.tokens.goblin2, "art-goblin-b");
+    // Elite has a portrait: that wins over its token's own image.
+    setImage(t.tokens.elite, "art-goblin-a");
+    const enc = ambushPlus(t, {
+      entries: [
+        { definitionId: t.h.goblinId, quantity: 3 },
+        { definitionId: t.h.wolfId, quantity: 2 },
+        { definitionId: t.eliteId, quantity: 2 },
+      ],
+    });
+    const before = t.sceneTokenRows().length;
+    t.run(START, { encounterId: enc.id, sceneId: t.sceneId });
+    const created = t.sceneTokenRows().slice(before);
+    const images = Object.fromEntries(created.map((x) => [x.name, x.imageAssetId]));
+    expect(images).toEqual({
+      "Goblin 3": "art-goblin-b",
+      "Wolf 2": null,
+      "Elite Goblin Warrior 2": "art-elite",
+    });
+    const by = t.byName(enc.id);
+    expect(by["Goblin 3"]?.imageAssetId).toBe("art-goblin-b");
+  });
+
   test("FR-CBT-65 scene at its token cap → conflict 'Scene is full', nothing written", () => {
     const t = setup();
     const enc = ambushPlus(t);
