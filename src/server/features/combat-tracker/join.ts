@@ -33,7 +33,8 @@ export function anchorCell(s: SceneRecord, at?: GridCell): GridCell {
  * FR-CBT-65: created tokens go to `freeCellsNear(anchor)` (FR-MAP-48), one at a time so tokens
  * placed earlier in the command count as occupied; no free cell left → the anchor (overlap
  * allowed). Each token via scenes-map's `placeTokenIn` in the caller's transaction; `changes`
- * lists the token creates for the caller's event. Caps → `conflict` "Scene is full".
+ * lists the token creates for the caller's event. Caps → `conflict` "Scene is full". Image:
+ * `imageOf`.
  */
 export class TokenPlacer {
   readonly changes: RecordChange[] = [];
@@ -59,6 +60,7 @@ export class TokenPlacer {
         col: cell.col,
         row: cell.row,
         hidden,
+        ...this.imageOf(def),
       });
       this.tokens.push(token);
       this.changes.push(change);
@@ -67,6 +69,17 @@ export class TokenPlacer {
       if (err instanceof CommandError && err.code === "conflict") throw conflict(SCENE_FULL);
       throw err;
     }
+  }
+
+  /**
+   * FR-CBT-65 (sim-5 glitch 4): the portrait (`placeTokenIn`'s default); none (imported
+   * definitions never have one) → the image of the definition's latest token on this scene, as
+   * Ctrl-D copies it (FR-MAP-17); none there either → no image.
+   */
+  private imageOf(def: DefinitionRecord): { imageAssetId?: string } {
+    if (def.portraitAssetId) return {};
+    const art = this.tokens.findLast((t) => t.definitionId === def.id && t.imageAssetId !== null);
+    return art?.imageAssetId ? { imageAssetId: art.imageAssetId } : {};
   }
 }
 

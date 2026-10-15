@@ -2,8 +2,8 @@
 // to-hit / damage (editable), then one row per target: selection rows follow the DM's map
 // selection (targeting on: click, Ctrl/Shift-click, box), added rows come from "Add target".
 // Per row: hit vs AC (preset, toggle), multiplier, preview. Apply sends 1–20 targets in list
-// order (FR-CBT-34); Later keeps the card pending; Dismiss closes it. Close → targeting off,
-// selection kept, except after a successful Apply (FR-CBT-54). Placement: FR-CBT-55/56, over its
+// order (FR-CBT-34); Later keeps the card pending; Dismiss closes it. Close → targeting off and
+// the selection cleared (FR-CBT-54, every close: popup-store). Placement: FR-CBT-55/56, over its
 // notification (FR-CBT-75); movable by its header (FR-CBT-76); its card's toast stays hidden.
 // Partial cards (FR-CBT-72, N7): to-hit-only → "Waiting for damage" (the DM may type a total;
 // the roll fills the cell when it attaches); damage-only → no to-hit cell or "vs AC", rows Hit.
@@ -272,11 +272,8 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
       ...(damageTotal !== null ? { damageTotal } : {}),
       targets: rows.map((x) => ({ targetId: x.c.id, hit: x.hit, multiplier: x.mult })),
     });
-    if (r === undefined) return;
-    // FR-CBT-54 (G5): a successful Apply clears the map selection, so the next popup opens with
-    // no stale rows; Later, Dismiss, close and a reject keep it.
-    setMapSelection([]);
-    close();
+    // FR-CBT-54: closing clears the map selection (popup-store); a reject keeps the popup open.
+    if (r !== undefined) close();
   };
   const dismiss = async () => {
     const r = await send("note.dismiss", { id: card.id });
@@ -566,6 +563,11 @@ export function AttackPopup() {
   const close = useCombatDialogs((s) => s.closeCard);
   const notes = useRecords<NotificationRecord>("notification");
   const card = cardId ? notes.find((n) => n.id === cardId) : undefined;
+  const resolved = card !== undefined && card.state !== "pending";
+  // Resolved elsewhere (Notifications, Undo, End): that is a close too (FR-CBT-54).
+  useEffect(() => {
+    if (resolved) close();
+  }, [resolved, close]);
   if (card?.state !== "pending") return null;
   return <PopupPanel key={`${card.id}:${openSeq}`} card={card} origin={origin} close={close} />;
 }

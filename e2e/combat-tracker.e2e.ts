@@ -239,6 +239,19 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   );
   await expect(init.getByTestId("cbt-init-card")).toHaveCount(1);
 
+  // FR-CBT-54 (sim-5 glitch 1): the reopened card from Pending; the DM targets Goblin (selected,
+  // ring), then Later: the card stays pending, the selection and ring go, so the next card's
+  // popup (below) opens with no rows.
+  await init.getByTestId("cbt-init-card").click();
+  await expect(popup).toBeVisible();
+  await popup.getByTestId("cbt-popup-target-add").click();
+  await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${goblin}"]`).click();
+  await expect(trow(goblin)).toHaveAttribute("data-source", "selection");
+  await expect.poll(async () => (await targetRings(dm)).length).toBe(1);
+  await popup.getByTestId("cbt-popup-later").click();
+  await expect(popup).toHaveCount(0);
+  await expect(init.getByTestId("cbt-init-card")).toHaveCount(1);
+
   // N7 (FR-CBT-70/71, X-5): Mira's sheet Attack (to-hit only) → one DM toast; her Damage completes
   // that card: the same toast's text gains the damage (no second toast). The DM opens it from the
   // toast → popup over it, toast gone; Goblin hit; Apply.
@@ -260,6 +273,7 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await expect(popup).toHaveAttribute("data-record-id", splitId);
   await expect(sameToast).toHaveCount(0);
   await expect(popup.getByTestId("cbt-popup-waiting-damage")).toHaveCount(0);
+  await expect(popup.getByTestId("cbt-popup-target-row")).toHaveCount(0);
   await popup.getByTestId("cbt-popup-target-add").click();
   await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${goblin}"]`).click();
   const splitHit = trow(goblin).getByTestId("cbt-popup-target-hit");

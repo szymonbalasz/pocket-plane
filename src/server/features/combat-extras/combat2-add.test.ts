@@ -10,6 +10,7 @@ import { conflict } from "../../commands/errors";
 import { token } from "../../db/schema";
 import { combatRuleHooksOf } from "../combat-tracker/rule-hooks";
 import { placeToken } from "../scenes-map/commands";
+import { addAsset } from "../scenes-map/testing";
 import { cbtxSetup } from "./testing";
 
 const ADD = CBTX_INTENTS.addCombatants;
@@ -84,6 +85,29 @@ describe("FR-CBTX-44 add dialog options", () => {
       ["other", false],
       ["initiative", false],
       ["initiative", false],
+    ]);
+  });
+
+  test("FR-CBTX-44 FR-CBT-65 created tokens carry the art of the definition's latest token on the scene (sim-5 glitch 4)", () => {
+    const t = setup();
+    for (const id of ["art-goblin-a", "art-goblin-b"]) addAsset(t.s, id, t.h.campaignId);
+    t.run(MAP_INTENTS.updateToken, { tokenId: t.tokens.goblin, imageAssetId: "art-goblin-a" });
+    t.run(MAP_INTENTS.updateToken, { tokenId: t.tokens.goblin2, imageAssetId: "art-goblin-b" });
+    const before = t.sceneTokens().length;
+    const { combatantIds } = t.add({
+      items: [{ definitionId: t.h.goblinId, quantity: 2, hpMode: "rolled" }],
+      createTokens: true,
+      hidden: true,
+    });
+    const made = t.sceneTokens().slice(before);
+    expect(made.map((x) => [x.name, x.imageAssetId])).toEqual([
+      ["Goblin 3", "art-goblin-b"],
+      ["Goblin 4", "art-goblin-b"],
+    ]);
+    // Initiative's avatar reads the combatant's copy.
+    expect(combatantIds.map((id) => t.row(id).imageAssetId)).toEqual([
+      "art-goblin-b",
+      "art-goblin-b",
     ]);
   });
 
