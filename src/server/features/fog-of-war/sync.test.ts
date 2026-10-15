@@ -154,11 +154,11 @@ describe("fog bundle over WS (build/fog-server)", () => {
     await until(() => (fogOf(dm, ambushId) as FogRecord).undo?.editId === editId);
     expect(tokenOf(dm, goblin)).not.toHaveProperty("fogged");
     for (const c of [p1, p2]) {
-      await until(
-        () => tokenOf(c, goblin) !== undefined && !("fogged" in (tokenOf(c, goblin) as object)),
-      );
-      const ev = c.frames.filter((f) => f.type === "event" && f.cause.name === "FogEdited");
-      expect(ev).toHaveLength(1);
+      const fogEvents = () =>
+        c.frames.filter((f) => f.type === "event" && f.cause.name === "FogEdited");
+      await until(() => fogEvents().length > 0);
+      expect(fogEvents()).toHaveLength(1);
+      expect(tokenOf(c, goblin)).not.toHaveProperty("fogged");
       expect(fogOf(c, ambushId)).toEqual({
         id: ambushId,
         fill: "fog",
@@ -177,7 +177,7 @@ describe("fog bundle over WS (build/fog-server)", () => {
       (await answer(dm, dm.intent(F.undo, { sceneId: ambushId, expectedEditId: editId }))).type,
     ).toBe("ack");
     await until(() => (fogOf(dm, ambushId) as FogRecord).undo?.n === 3);
-    await until(() => tokenOf(p1, goblin)?.fogged === true);
+    await until(() => tokenOf(dm, goblin)?.fogged === true);
     // No-op edit: ack with editId null, no event.
     const noop = await answer(
       dm,
@@ -201,6 +201,84 @@ describe("fog bundle over WS (build/fog-server)", () => {
       fresh.close();
     }
     for (const c of [dm, p1, p2]) c.close();
+  });
+
+  test("FOG §9 leak: players get `fogged` only on their own tokens (snapshot + every frame); the DM on all", async () => {
+    const dm = await h.live(DM);
+    expect((await answer(dm, dm.loadScene(ambushId))).type).toBe("ack");
+    const p1 = await h.live(p("Player 1"));
+    const p2 = await h.live(p("Player 2"));
+    const mira = tok.Mira?.id as string; // Player 1's
+    const ownerOf = new Map(
+      db
+        .select({ id: token.id, owner: token.ownerPlayerId })
+        .from(token)
+        .all()
+        .map((t) => [t.id, t.owner]),
+    );
+    const playerId = Object.fromEntries(
+      db
+        .select({ id: player.id, name: player.name })
+        .from(player)
+        .all()
+        .map((r) => [r.name, r.id]),
+    );
+    /** Every token row id a client received carrying `fogged` (snapshot or event). */
+    const foggedIds = (c: TestClient) => {
+      const ids = new Set<string>();
+      for (const f of c.frames) {
+        if (f.type === "snapshot") {
+          for (const r of (f.records[TOKEN_TYPE] ?? []) as TokenRecord[]) {
+            if ("fogged" in r) ids.add(r.id);
+          }
+        }
+        if (f.type === "event") {
+          for (const ch of f.changes) {
+            const data = (ch as { data?: object }).data;
+            if (ch.type === TOKEN_TYPE && data && "fogged" in data) ids.add(ch.id);
+          }
+        }
+      }
+      return [...ids];
+    };
+    // Cover Mira (2, 7): her owner sees `fogged: true`; Player 2 sees her without it.
+    const ack = await answer(
+      dm,
+      dm.intent(F.edit, {
+        sceneId: ambushId,
+        op: "hide",
+        shape: { kind: "rect", c0: 2, r0: 7, c1: 2, r1: 7 },
+      }),
+    );
+    const editId = (ack as { result: { editId: string } }).result.editId;
+    await until(() => tokenOf(p1, mira)?.fogged === true);
+    await until(() => p2.frames.some((f) => f.type === "event" && f.cause.name === "FogEdited"));
+    expect(tokenOf(p2, mira)).toBeDefined();
+    expect(tokenOf(p2, mira)).not.toHaveProperty("fogged");
+    // The DM wire keeps every copy: the ownerless fogged tokens and Mira.
+    expect(tokenOf(dm, mira)?.fogged).toBe(true);
+    expect(tokenOf(dm, tok.Goblin?.id as string)?.fogged).toBe(true);
+    // Fresh snapshots too, then undo back to the bundle's state.
+    const f1 = await h.live(p("Player 1"));
+    const f2 = await h.live(p("Player 2"));
+    for (const [c, name] of [
+      [p1, "Player 1"],
+      [p2, "Player 2"],
+      [f1, "Player 1"],
+      [f2, "Player 2"],
+    ] as const) {
+      for (const id of foggedIds(c)) expect(ownerOf.get(id)).toBe(playerId[name]);
+    }
+    expect(foggedIds(p1)).toContain(mira);
+    expect(foggedIds(f1)).toContain(mira);
+    expect(foggedIds(p2)).toEqual([]);
+    expect(
+      (await answer(dm, dm.intent(F.undo, { sceneId: ambushId, expectedEditId: editId }))).type,
+    ).toBe("ack");
+    await until(
+      () => tokenOf(p1, mira) !== undefined && !("fogged" in (tokenOf(p1, mira) as object)),
+    );
+    for (const c of [dm, p1, p2, f1, f2]) c.close();
   });
 
   test("FOG §11 restart → identical snapshots; fog, undo depth survive; undo still works", async () => {
