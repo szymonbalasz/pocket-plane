@@ -16,13 +16,10 @@ export interface NotificationActionContext {
   send(name: string, payload: unknown): Promise<unknown>;
   /** Opens (or brings to front) a window of this client. */
   openWindow(kind: string, instance?: string): void;
-  /**
-   * FR-NOTE-26: the clicked toast / row. Optional until the runtime fills it
-   * (fix/combat2-polish); a view must cope with it absent.
-   */
-  origin?: NotificationActionOrigin;
+  /** FR-NOTE-26: the clicked toast / row. */
+  origin: NotificationActionOrigin;
   /** FR-NOTE-26: closes this notification's toast locally (as the user's close; no dismiss). */
-  closeToast?(): void;
+  closeToast(): void;
 }
 
 export interface NotificationView {
@@ -43,9 +40,10 @@ export interface NotificationView {
   encounterIdOf?: (payload: unknown) => string | null;
   /**
    * FR-NOTE-30 (DM view only): tokens to cue for a new pending player action. Absent → the
-   * default rule (the action player's tokens on the viewed scene).
+   * default rule (the action player's tokens on the viewed scene, `token-cue.ts`).
+   * `viewedSceneId`: the DM's viewed scene (only its tokens are drawn).
    */
-  cueTokens?: (n: NotificationRecord, store: RecordStore) => string[];
+  cueTokens?: (n: NotificationRecord, store: RecordStore, viewedSceneId: string | null) => string[];
 }
 
 export function defineNotificationView(v: NotificationView): NotificationView {
@@ -74,4 +72,16 @@ export function createNotificationViews(list: readonly NotificationView[]): Noti
     map.set(v.kind, v);
   }
   return { get: (kind) => map.get(kind) };
+}
+
+/** FR-NOTE-26: the origin of a click inside a toast / row element (its bounding box). */
+export function originOf(
+  source: NotificationActionOrigin["source"],
+  el: Element | null,
+): NotificationActionOrigin {
+  const r = el?.getBoundingClientRect();
+  return {
+    source,
+    rect: r ? { x: r.left, y: r.top, w: r.width, h: r.height } : { x: 0, y: 0, w: 0, h: 0 },
+  };
 }

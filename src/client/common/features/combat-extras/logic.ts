@@ -38,6 +38,38 @@ export function chipText(e: EffectView, round: number | null): string {
   return `${effectName(e)}${left}`;
 }
 
+/**
+ * FR-CBTX-46 (G1) compact Initiative-row label: concentration = its label ("Bless"; the icon and
+ * the Tooltip say "Concentrating"), condition = its name ("Exh 2" for exhaustion), custom = label
+ * + "3r".
+ */
+export function chipLabel(e: EffectView, round: number | null): string {
+  if (e.kind === "concentration") return e.label ?? "";
+  if (e.kind === "condition") {
+    if (e.condition === "exhaustion") return `Exh ${e.level ?? 1}`;
+    return effectName(e);
+  }
+  return chipText(e, round);
+}
+
+/** One Initiative-row chip at most this wide, px; longer labels end in an ellipsis. */
+export const CHIP_MAX_W = 96;
+/** Width kept for the "+N" chip when some chips don't fit, px. */
+export const MORE_W = 30;
+
+/**
+ * FR-CBTX-46: how many whole chips fit `room` (the name line's width left after the full name),
+ * in order; all fit → all, else as many as leave room for "+N". `gap` between chips.
+ */
+export function fitChips(widths: readonly number[], room: number, gap = 2): number {
+  const end = (n: number) =>
+    widths.slice(0, n).reduce((s, w) => s + w, 0) + Math.max(0, n - 1) * gap;
+  if (end(widths.length) <= room) return widths.length;
+  let n = 0;
+  while (n < widths.length && end(n + 1) + gap + MORE_W <= room) n++;
+  return n;
+}
+
 /** "N rounds left" (sheet chips). */
 export function roundsLeftText(e: EffectView, round: number | null): string | null {
   if (e.endsRound == null || round === null) return null;

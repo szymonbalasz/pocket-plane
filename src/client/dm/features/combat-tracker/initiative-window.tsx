@@ -1,5 +1,5 @@
 // DM `cbt.initiative` (CBT §7): round + turns (skip cue, FR-CBT-50), Undo (one apply,
-// FR-CBT-35), Roll monsters (FR-CBT-46), End encounter (FR-CBT-51), pending cards, rows by
+// FR-CBT-35), Roll monsters (FR-CBT-46), End encounter (FR-CBT-51), Pending (FR-CBT-79), rows by
 // `position` (initiative roll / set, AC, HP, band or PC Down (FR-CBT-49), moved (FR-CBT-39),
 // Attack; menu Check ▸ / Save ▸ (FR-CBT-44), Damage / heal, Remove), Removed.
 import { signed } from "@shared/character-sheet/logic";
@@ -50,8 +50,10 @@ import {
 import { Input, Skeleton } from "@ui/components/ui/primitives";
 import { characterOf, deadPc, deathStateFor } from "@ui/features/combat-extras/logic";
 import { RowName } from "@ui/features/combat-extras/parts";
+import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
 import {
+  startedIn,
   useCbtIntent,
   useCombatants,
   useStartedEncounter,
@@ -64,6 +66,9 @@ import {
   type RollControl,
   useRollControl,
 } from "@ui/features/dice-roll-log/roll-control";
+import { actionButton } from "@ui/features/notifications/logic";
+import { useNoteActions } from "@ui/features/notifications/parts";
+import { originOf } from "@ui/features/notifications/views";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { movementIndicator } from "@ui/features/scenes-map/movement";
@@ -85,6 +90,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { dmNotificationViews } from "../../notification-views";
 import {
   DeathSaveAnchor,
   RowDeath,
@@ -102,16 +108,25 @@ import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpDialog } from "./hp-dialog";
+import { isDamageCard, pendingRowText } from "./pending";
 import { useCombatDialogs } from "./popup-store";
+
+/**
+ * FR-CBTX-46 (G1): the Init column is wide while some row can roll (round 0, a late joiner
+ * without initiative); else just the number input, so the name line keeps room for chips.
+ */
+const INIT_W = { wide: "w-[100px]", narrow: "w-9" } as const;
 
 function InitiativeCell({
   c,
   def,
   round,
+  wide,
 }: {
   c: CombatantView;
   def: DefinitionRecord | undefined;
   round: number;
+  wide: boolean;
 }) {
   const { send, disabled } = useCbtIntent();
   const [draft, setDraft] = useState(c.initiative == null ? "" : String(c.initiative));
@@ -144,7 +159,12 @@ function InitiativeCell({
   // #149: an empty initiative leads with a labelled Roll button; the box is a quiet secondary
   // way to type a value (reads as a value cell, not a form field).
   return (
-    <div className="flex w-[100px] items-center justify-end gap-0.5">
+    <div
+      className={cn(
+        "flex shrink-0 items-center justify-end gap-0.5",
+        INIT_W[wide ? "wide" : "narrow"],
+      )}
+    >
       <Tooltip content="Set initiative by hand">
         <Input
           data-testid="cbt-init-row-init"
@@ -462,12 +482,14 @@ function Row({
   turn,
   round,
   defs,
+  wideInit,
 }: {
   c: CombatantView;
   def: DefinitionRecord | undefined;
   turn: boolean;
   round: number;
   defs: Map<string, DefinitionRecord>;
+  wideInit: boolean;
 }) {
   const { send, disabled } = useCbtIntent();
   const openHp = useCombatDialogs((s) => s.openHp);
@@ -498,7 +520,7 @@ function Row({
       data-hidden={c.hidden === true}
       data-skipped={skipped}
       className={cn(
-        "flex items-center gap-1 rounded-md px-1 py-0.5",
+        "relative flex items-center gap-0.5 rounded-md px-1 py-0.5",
         turn && "bg-accent",
         c.hidden && "opacity-70",
         skipped && "opacity-50",
@@ -545,12 +567,15 @@ function Row({
           <RowDeath c={c} />
         </div>
       </div>
-      <InitiativeCell c={c} def={def} round={round} />
+      <InitiativeCell c={c} def={def} round={round} wide={wideInit} />
       <AttackButton c={c} def={def} />
-      {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸. */}
-      <RollButton control={check.control} tabIndex={-1} aria-hidden className={ANCHOR} />
-      <RollButton control={save.control} tabIndex={-1} aria-hidden className={ANCHOR} />
-      {c.kind === "pc" && <DeathSaveAnchor control={deathRoll} />}
+      {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸, out of the flow
+          (no gaps: the name line keeps the room, FR-CBTX-46). */}
+      <span className="pointer-events-none absolute top-1/2 right-16 flex size-0">
+        <RollButton control={check.control} tabIndex={-1} aria-hidden className={ANCHOR} />
+        <RollButton control={save.control} tabIndex={-1} aria-hidden className={ANCHOR} />
+        {c.kind === "pc" && <DeathSaveAnchor control={deathRoll} />}
+      </span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -592,28 +617,76 @@ function Row({
 
 const ANCHOR = "pointer-events-none size-0 overflow-hidden p-0 opacity-0";
 
-function PendingCards({ cards }: { cards: NotificationRecord[] }) {
+/**
+ * FR-CBT-79 (G9): one Pending row per linked notification. A damage card opens the popup; another
+ * kind shows its text ("Waiting for Mira: …" when a player owns it) and the DM's action (the
+ * view's `onAction`, as in Notifications).
+ */
+function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteActions }) {
   const openCard = useCombatDialogs((s) => s.openCard);
-  if (cards.length === 0) return null;
-  return (
-    <section
-      aria-label="Pending attacks"
-      className="flex max-h-28 shrink-0 flex-col gap-1 overflow-y-auto"
-    >
-      <h3 className="text-xs font-medium text-muted-foreground">Pending ({cards.length})</h3>
-      {cards.map((n) => (
+  const live = useSync((s) => s.state === "live");
+  const view = dmNotificationViews.get(n.kind);
+  if (isDamageCard(n)) {
+    return (
+      <li>
         <Button
-          key={n.id}
           variant="outline"
           size="sm"
           data-testid="cbt-init-card"
           data-record-id={n.id}
-          className="justify-start truncate"
+          className="w-full justify-start truncate"
           onClick={() => openCard(n.id)}
         >
           <SwordIcon className="size-3.5" /> {n.text}
         </Button>
-      ))}
+      </li>
+    );
+  }
+  const Icon = view?.icon ?? SwordIcon;
+  const mode = actionButton(n, { role: "dm", playerId: null }, live, view);
+  return (
+    <li
+      data-testid="cbt-init-pending"
+      data-record-id={n.id}
+      data-kind={n.kind}
+      className="flex h-8 items-center gap-1.5 rounded-md border px-2 text-sm"
+    >
+      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 flex-1 truncate" data-testid="cbt-init-pending-text">
+        {pendingRowText(n)}
+      </span>
+      {mode !== "none" && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 shrink-0 px-2 text-xs"
+          data-testid="cbt-init-pending-action"
+          data-record-id={n.id}
+          disabled={mode === "disabled" || actions.busy.has(n.id)}
+          // A list row like Notifications' (FR-NOTE-26 origin); its kind decides what it means.
+          onClick={(e) => void actions.run(n, originOf("history", e.currentTarget.closest("li")))}
+        >
+          {n.actionLabel}
+        </Button>
+      )}
+    </li>
+  );
+}
+
+type NoteActions = ReturnType<typeof useNoteActions>;
+
+function PendingCards({ cards }: { cards: NotificationRecord[] }) {
+  const actions = useNoteActions(dmNotificationViews);
+  if (cards.length === 0) return null;
+  return (
+    <section aria-label="Pending actions" data-testid="cbt-init-pending-list" className="shrink-0">
+      <h3 className="mb-1 text-xs font-medium text-muted-foreground">Pending ({cards.length})</h3>
+      {/* FR-CBT-77 (G4): at most 3 rows, then its own scroll, so cards never push the rows away. */}
+      <ul className="flex max-h-[104px] flex-col gap-1 overflow-y-auto">
+        {cards.map((n) => (
+          <PendingRow key={n.id} n={n} actions={actions} />
+        ))}
+      </ul>
     </section>
   );
 }
@@ -788,6 +861,11 @@ function DmInitiativeBody() {
   const cards = usePendingCards(enc?.id);
   const openWindow = useOpenWindow();
   const { send, disabled } = useCbtIntent();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLButtonElement>(null);
+  const activeIds = rows.filter((c) => !c.removed).map((c) => c.id);
+  // FR-CBT-77 (G4): new rows / the Pending section scroll into view; "↓ N more" below the fold.
+  const fold = useBelowFold(rootRef, footerRef, activeIds, cards.length > 0);
   if (!everLive) return <Skeleton className="h-24" />;
   if (!enc) {
     return (
@@ -803,9 +881,11 @@ function DmInitiativeBody() {
   }
   const active = rows.filter((c) => !c.removed);
   const removed = rows.filter((c) => c.removed);
+  const wideInit = active.some((c) => canRollInitiative(enc.round, c.initiative));
   return (
     // Header + pending cards stay put; the rows scroll inside the window (glitch 3).
     <div
+      ref={rootRef}
       data-testid="cbt-init"
       data-record-id={enc.id}
       className="flex h-full min-h-0 flex-col gap-2"
@@ -815,11 +895,11 @@ function DmInitiativeBody() {
       <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
         <div
           aria-hidden
-          className="sticky top-0 z-10 flex items-center gap-1 bg-card px-1 pb-0.5 text-[11px] text-muted-foreground"
+          className="sticky top-0 z-10 flex items-center gap-0.5 bg-card px-1 pb-0.5 text-[11px] text-muted-foreground"
         >
-          <span className="flex-1 pl-[52px]">Combatant</span>
-          <span className="w-[100px] text-center">Init</span>
-          <span className="w-[60px]" />
+          <span className="flex-1 pl-[48px]">Combatant</span>
+          <span className={cn("text-center", INIT_W[wideInit ? "wide" : "narrow"])}>Init</span>
+          <span className="w-[58px]" />
         </div>
         <ul className="flex flex-col gap-0.5">
           {active.map((c) => (
@@ -830,6 +910,7 @@ function DmInitiativeBody() {
               turn={enc.turnCombatantId === c.id}
               round={enc.round}
               defs={defs}
+              wideInit={wideInit}
             />
           ))}
         </ul>
@@ -861,6 +942,7 @@ function DmInitiativeBody() {
           </section>
         )}
       </div>
+      <MoreFooter footerRef={footerRef} more={fold.more} onClick={fold.scrollToMore} />
     </div>
   );
 }
@@ -885,6 +967,13 @@ export const dmInitiativeWindow = defineWindow({
   defaultSize: { w: 400, h: 500 },
   minSize: { w: 320, h: 240 },
   defaultPosition: { anchor: "top-right" },
+  // FR-CBT-77 (G4): height follows the rows until the DM resizes it (FR-SHELL-39); "new" dot
+  // while minimised when the round or the turn changes (FR-SHELL-38, N1 = A, #190).
+  growToContent: true,
+  activity: (store) => {
+    const enc = startedIn(store);
+    return enc ? `${enc.round}:${enc.turnCombatantId ?? ""}` : null;
+  },
   companion: CombatDialogs,
   component: DmInitiativeBody,
 });

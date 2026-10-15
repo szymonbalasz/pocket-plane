@@ -114,10 +114,13 @@ export function summaryText(n: number): string {
 /**
  * FR-NOTE-18: addressed to this client by the FR-NOTE-13 rule (owner for actions). FR-NOTE-24
  * (#178): an action row counts only while `pending`; applied, dismissed or closed at End leaves
- * the bell, reopened counts again.
+ * the bell, reopened counts again. FR-NOTE-27 (G9): the DM also counts a player-owned pending row
+ * (the DM may act on it, FR-NOTE-08); it still doesn't toast for the DM (`toastsFor`).
  */
 export function addressedForUnread(n: NotificationRecord, v: NoteViewer): boolean {
-  return n.actionRole !== null ? n.state === "pending" && isActionOwner(n, v) : addressedTo(n, v);
+  if (n.actionRole === null) return addressedTo(n, v);
+  if (n.state !== "pending") return false;
+  return isActionOwner(n, v) || (v.role === "dm" && n.actionRole === "player");
 }
 
 /** FR-NOTE-18: addressed notifications with row `seq` > last seen. */
@@ -175,7 +178,10 @@ export function historySections(store: RecordStore): {
 
 type Names = (playerId: string | null) => string;
 
-/** FR-NOTE-17 state badge; null for info rows. */
+/**
+ * FR-NOTE-17 state badge; null for info rows. FR-NOTE-28 (G9): a resolved row with no actor was
+ * closed by a rule → "Closed" (the kind's view says why).
+ */
 export function stateLabel(n: NotificationRecord, nameOf: Names): string | null {
   switch (n.state) {
     case "pending":
@@ -183,6 +189,7 @@ export function stateLabel(n: NotificationRecord, nameOf: Names): string | null 
     case "dismissed":
       return "Dismissed";
     case "resolved":
+      if (n.closedByRole === null) return "Closed";
       return `Resolved by ${n.closedByRole === "player" ? nameOf(n.closedByPlayerId) : "DM"}`;
     default:
       return null;

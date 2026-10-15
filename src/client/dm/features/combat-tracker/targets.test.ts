@@ -3,7 +3,16 @@ import { describe, expect, test } from "bun:test";
 import type { HpChangeRecord } from "@shared/combat-tracker/schemas";
 import { MonsterStatBlock } from "@shared/entities/schemas";
 import { type Fields, formStatBlock } from "./creature-form";
-import { addAction, naturalContradiction, presetHit, targetList, undoLabel } from "./targets";
+import {
+  addAction,
+  hpAfter,
+  hpDialogText,
+  naturalContradiction,
+  presetHit,
+  previewText,
+  targetList,
+  undoLabel,
+} from "./targets";
 
 const k = (id: string, tokenId: string | null, o: object = {}) => ({
   id,
@@ -92,22 +101,35 @@ describe("FR-CBT-35 Undo label", () => {
       attackerName: "Goblin",
       targetName: "Mira",
       kind: "damage",
+      hit: true,
+      raw: 6,
       applied: 6,
       ...o,
     }) as HpChangeRecord;
 
-  test("FR-CBT-35 one row: 'Undo: Goblin → Mira, 6'; heal +N; direct = DM", () => {
+  test("FR-CBT-80 undo label: one row 'N damage' from raw, miss, heal; direct = DM", () => {
     expect(undoLabel([])).toBeNull();
     expect(undoLabel([row("a", 1)])).toEqual({
-      text: "Undo: Goblin → Mira, 6",
+      text: "Undo: Goblin → Mira, 6 damage",
       expectedHpChangeId: "a",
     });
-    expect(undoLabel([row("a", 1, { attackerName: null, kind: "heal", applied: 4 })])?.text).toBe(
-      "Undo: DM → Mira, +4",
+    // 99 to a PC at 4 HP: the label says what was dealt, not the HP lost.
+    expect(undoLabel([row("a", 1, { raw: 99, applied: 4 })])?.text).toBe(
+      "Undo: Goblin → Mira, 99 damage",
+    );
+    expect(undoLabel([row("a", 1, { hit: false, raw: 0, applied: 0 })])?.text).toBe(
+      "Undo: Goblin → Mira, miss",
+    );
+    expect(
+      undoLabel([row("a", 1, { attackerName: null, hit: null, kind: "heal", raw: 5, applied: 4 })])
+        ?.text,
+    ).toBe("Undo: DM → Mira, heal 5");
+    expect(undoLabel([row("a", 1, { attackerName: null, hit: null, raw: 99 })])?.text).toBe(
+      "Undo: DM → Mira, 99 damage",
     );
   });
 
-  test("FR-CBT-35 multi-target apply: names in apply order, count, expected = latest", () => {
+  test("FR-CBT-80 multi-target apply unchanged: names in apply order, count, expected = latest", () => {
     const rows = [
       row("x", 1, { cardId: "c0" }),
       row("a", 2, { cardId: "c1", targetName: "Goblin" }),
@@ -117,6 +139,25 @@ describe("FR-CBT-35 Undo label", () => {
       text: "Undo: Goblin → Goblin, Goblin 2 (2 targets)",
       expectedHpChangeId: "b",
     });
+  });
+});
+
+describe("FR-CBT-78 temp HP in previews", () => {
+  const thorn = { cur: 10, max: 10, temp: 5 };
+  test("FR-CBT-78 preview: temp ≥ raw, temp < raw, no temp; heal ignores temp", () => {
+    expect(previewText("Thorn", thorn, 3)).toBe("Thorn 10 (+5) → 10 (+2)");
+    expect(previewText("Thorn", thorn, 5)).toBe("Thorn 10 (+5) → 10");
+    expect(previewText("Thorn", thorn, 8)).toBe("Thorn 10 (+5) → 7");
+    expect(previewText("Goblin", { cur: 7, max: 7, temp: 0 }, 6)).toBe("Goblin 7 → 1");
+    expect(previewText("Goblin", { cur: 7, max: 7, temp: 0 }, 99)).toBe("Goblin 7 → 0");
+    expect(hpAfter({ cur: 4, max: 10, temp: 5 }, "heal", 3)).toEqual({ cur: 7, max: 10, temp: 5 });
+    expect(hpAfter({ cur: 4, max: 10, temp: 5 }, "heal", 30).cur).toBe(10);
+  });
+
+  test("FR-CBT-78 dialog header: 'HP 10 / 10 · Temp 5', no temp → 'HP 10 / 10'", () => {
+    expect(hpDialogText(thorn)).toBe("HP 10 / 10 · Temp 5");
+    expect(hpDialogText(hpAfter(thorn, "damage", 3))).toBe("HP 10 / 10 · Temp 2");
+    expect(hpDialogText({ ...thorn, temp: 0 })).toBe("HP 10 / 10");
   });
 });
 

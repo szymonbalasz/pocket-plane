@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { placementTokenIds, popupPlacement } from "./popup-placement";
+import {
+  clampIntoWorkArea,
+  dragPopup,
+  originPlacement,
+  placementTokenIds,
+  popupPlacement,
+} from "./popup-placement";
 
 const viewport = { w: 1440, h: 900 };
 const base = { viewport, initiative: null, width: 440 };
@@ -166,5 +172,31 @@ describe("FR-CBT-56 likely targets", () => {
   test("FR-CBT-56 likely targets: rows win over likely targets", () => {
     expect(ids("Goblin", ["t-gob2"])).toEqual(["t-gob2"]);
     expect(side(ids("Goblin", ["t-gob2"]))).toBe("left");
+  });
+});
+
+describe("FR-CBT-75 FR-CBT-76 popup over its notification, movable", () => {
+  const vp = { w: 1440, h: 900 };
+  const size = { w: 440, h: 300 };
+
+  test("FR-CBT-75 placement: origin rect → top-left, clamped into the work area", () => {
+    expect(originPlacement({ x: 560, y: 92 }, size, vp)).toEqual({ x: 560, y: 92, ...size });
+    // Off the right / bottom edge → moved in (bottom = above the launcher).
+    expect(originPlacement({ x: 1300, y: 800 }, size, vp)).toEqual({
+      x: 1440 - 440,
+      y: 900 - 64 - 300,
+      ...size,
+    });
+    // Above the top bar / left of the viewport → moved in.
+    expect(originPlacement({ x: -20, y: 10 }, size, vp)).toMatchObject({ x: 0, y: 48 });
+    // Taller than the work area: the top stays inside.
+    expect(clampIntoWorkArea({ x: 0, y: 500, w: 440, h: 2000 }, vp).y).toBe(48);
+  });
+
+  test("FR-CBT-76 drag: follows the pointer, stops at the work-area edge", () => {
+    const start = { x: 100, y: 200, ...size };
+    expect(dragPopup(start, 300, 50, vp)).toEqual({ x: 400, y: 250, ...size });
+    expect(dragPopup(start, 5000, 5000, vp)).toEqual({ x: 1000, y: 536, ...size });
+    expect(dragPopup(start, -5000, -5000, vp)).toEqual({ x: 0, y: 48, ...size });
   });
 });

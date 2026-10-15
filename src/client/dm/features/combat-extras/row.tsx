@@ -83,6 +83,7 @@ export function RowEffects({ c, round }: { c: CombatantView; round: number }) {
   const openEffect = useCbtxDialogs((s) => s.openEffect);
   return (
     <EffectChips
+      compact
       effects={effects}
       round={round}
       testId="cbtx-init-row-effect"

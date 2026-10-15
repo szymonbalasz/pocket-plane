@@ -30,6 +30,6 @@ describe("notification view contract (sprint 2)", () => {
       { kind: "cue", icon: BellIcon, cueTokens: () => ["t1"] },
     ]);
     expect(views.get("old")?.cueTokens).toBeUndefined();
-    expect(views.get("cue")?.cueTokens?.({} as never, {} as never)).toEqual(["t1"]);
+    expect(views.get("cue")?.cueTokens?.({} as never, {} as never, null)).toEqual(["t1"]);
   });
 });

@@ -15,6 +15,7 @@ import {
   effectsOn,
 } from "@ui/features/combat-extras/logic";
 import { DeathBadge, DeathPips, EffectChips, RowName } from "@ui/features/combat-extras/parts";
+import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
@@ -23,6 +24,7 @@ import { initiativeWindowBase } from "@ui/features/combat-tracker/window";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
+import { useRef } from "react";
 
 /** Mounted while an encounter runs: turn alert (FR-CBT-41), concentration roll host (FR-CBTX-37). */
 function PlayerCombatRuntime() {
@@ -41,6 +43,14 @@ function PlayerInitiativeBody() {
   const characters = useRecords<{ id: string; ownerPlayerId?: string | null }>("entity");
   const everLive = useSync((s) => s.everLive);
   const store = useSync((s) => s.store);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLButtonElement>(null);
+  // FR-CBT-77 (G4): new rows (Start, reveal) scroll into view; "↓ N more" below the fold.
+  const fold = useBelowFold(
+    rootRef,
+    footerRef,
+    rows.map((c) => c.id),
+  );
   if (!everLive || !enc) return <Skeleton className="h-24" />;
   const fx = activeEffects(store);
   const mine = new Set(characters.filter((c) => c.ownerPlayerId === me).map((c) => c.id));
@@ -50,6 +60,7 @@ function PlayerInitiativeBody() {
   return (
     // Round + hint stay put; the rows scroll inside the window.
     <div
+      ref={rootRef}
       data-testid="cbt-init"
       data-record-id={enc.id}
       className="flex h-full min-h-0 flex-col gap-2"
@@ -89,6 +100,7 @@ function PlayerInitiativeBody() {
               <div className="flex min-w-0 flex-1 items-center gap-1">
                 <RowName name={c.name} testId="cbt-init-row-name" className="text-sm" />
                 <EffectChips
+                  compact
                   effects={effectsOn(fx, creatureOf(c))}
                   round={enc.round}
                   testId="cbtx-init-row-effect"
@@ -120,6 +132,7 @@ function PlayerInitiativeBody() {
           );
         })}
       </ul>
+      <MoreFooter footerRef={footerRef} more={fold.more} onClick={fold.scrollToMore} />
     </div>
   );
 }
@@ -133,6 +146,13 @@ export const playerInitiativeWindow = defineWindow({
   defaultSize: { w: 280, h: 400 },
   minSize: { w: 240, h: 200 },
   defaultPosition: { anchor: "bottom-right" },
+  // FR-CBT-77 (G4): grows up to its rows until resized (FR-SHELL-39); "new" dot while minimised
+  // on a round / turn change (players never get `turnCombatantId`).
+  growToContent: true,
+  activity: (store) => {
+    const enc = startedIn(store);
+    return enc ? `${enc.round}:${enc.playerTurnCombatantId ?? ""}` : null;
+  },
   available: (store) => startedIn(store) !== null,
   component: PlayerInitiativeBody,
   companion: PlayerCombatRuntime,

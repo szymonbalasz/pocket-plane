@@ -2,13 +2,13 @@
 // an active combatant of the started encounter: HP bar, effect icons, PC death badge. Pure over
 // the store the client holds, so players see only what they receive: the DM every bar; a player
 // their own PC's bar (they hold its HP) and a monster's band as a full-width bar (no proportion);
-// no bar on other PCs. Nothing after End (no bound combatant).
+// no bar on other PCs. After End (no bound combatant) only a PC's death state stays (FR-CBTX-50).
 import { healthBand } from "@shared/combat-tracker/rules";
 import type { CombatantView } from "@shared/combat-tracker/schemas";
 import type { DeathState } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
-import { boundCombatant } from "../combat-tracker/token-overlay";
+import { boundCombatant, DOWN_CROSS } from "../combat-tracker/token-overlay";
 import type {
   TokenBadge,
   TokenBar,
@@ -91,11 +91,34 @@ export function deathBadgeFor(store: RecordStore, c: CombatantView): TokenBadge 
   };
 }
 
+/**
+ * FR-CBTX-50 (item 14): a character token not bound to an active combatant (after End, another
+ * scene) keeps its death state: "Dead" always while dead, "Dying" / "Stable" while at 0 HP, plus
+ * the Down X. The link is the token's `characterId` copy (players get it, FR-MAP-50; DM clients
+ * may also use `definitionId`); DM and owner read the full character, others the redacted one.
+ */
+export function unboundDeathFor(store: RecordStore, token: TokenView): TokenDecoration | null {
+  const id = token.characterId ?? token.definitionId;
+  const state = id ? deathStateFor(characterOf(store, id)) : null;
+  if (!state) return null;
+  return {
+    badges: [
+      {
+        id: DEATH_ID,
+        icon: state === "stable" ? "heart-pulse" : "skull",
+        tone: TONE[state],
+        label: DEATH_LABEL[state],
+      },
+    ],
+    cross: DOWN_CROSS,
+  };
+}
+
 export const cbtxTokenOverlay: TokenOverlay = {
   id: "cbtx",
   decorate(token: TokenView, store): TokenDecoration | null {
     const c = boundCombatant(store, token.id);
-    if (!c) return null;
+    if (!c) return unboundDeathFor(store, token);
     const out: TokenDecoration = {};
     const bar = barFor(store, c);
     if (bar) out.bar = bar;

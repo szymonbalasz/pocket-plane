@@ -7,7 +7,12 @@ import { toast } from "sonner";
 import { useRecords, useSync } from "../../sync/store";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import { rejectMessage } from "./logic";
-import type { NotificationActionContext, NotificationViews } from "./views";
+import { hideToast } from "./toasts";
+import type {
+  NotificationActionContext,
+  NotificationActionOrigin,
+  NotificationViews,
+} from "./views";
 
 /** Icon + text (rendered as text, never HTML: FR-NOTE-21) or the kind's renderer (FR-NOTE-19). */
 export function NoteBody({ n, views }: { n: NotificationRecord; views: NotificationViews }) {
@@ -32,7 +37,8 @@ export function usePlayerNames(): (id: string | null) => string {
 }
 
 /**
- * Runs a notification's action (FR-NOTE-16): the kind's `onAction`, else `note.resolve`.
+ * Runs a notification's action (FR-NOTE-16): the kind's `onAction`, else `note.resolve`, with the
+ * clicked toast's / row's `origin` and `closeToast()` (FR-NOTE-26).
  * One click in flight per notification; a reject toasts (FR-NOTE-20), the row keeps the
  * server's state.
  */
@@ -55,11 +61,13 @@ export function useNoteActions(views: NotificationViews) {
       );
   }, []);
   const run = useCallback(
-    (n: NotificationRecord) => {
+    (n: NotificationRecord, origin: NotificationActionOrigin) => {
       if (busy.has(n.id)) return Promise.resolve();
       const ctx: NotificationActionContext = {
         send: (name, payload) => connection.sendIntent(name, payload),
         openWindow,
+        origin,
+        closeToast: () => hideToast(n.id),
       };
       const view = views.get(n.kind);
       let p: Promise<unknown>;

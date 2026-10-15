@@ -25,6 +25,11 @@ export type Toast =
 export interface ToastState {
   /** Insertion order, oldest first. */
   toasts: Toast[];
+  /**
+   * FR-NOTE-26: notifications whose toast was hidden (`closeToast()` of an action, `hideToast`);
+   * their toast doesn't come back in this page load. Optional: absent = none.
+   */
+  hiddenIds?: readonly string[];
   hovered: boolean;
   hidden: boolean;
   /** When timers last ran up to; null while paused. */
@@ -64,7 +69,7 @@ export function setHidden(s: ToastState, hidden: boolean, now: number): ToastSta
 /** FR-NOTE-13/14: a toast per created notification; pending → sticky. */
 export function addNote(s: ToastState, n: NotificationRecord, now: number): ToastState {
   const ran = advance(s, now);
-  if (ran.toasts.some((t) => t.key === n.id)) return ran;
+  if (ran.toasts.some((t) => t.key === n.id) || ran.hiddenIds?.includes(n.id)) return ran;
   const sticky = n.state === "pending";
   return {
     ...ran,
@@ -89,6 +94,16 @@ export function setSummary(s: ToastState, count: number, now: number): ToastStat
 export function closeToast(s: ToastState, key: string, now: number): ToastState {
   const ran = advance(s, now);
   return { ...ran, toasts: ran.toasts.filter((t) => t.key !== key) };
+}
+
+/**
+ * FR-NOTE-26: closes a notification's toast as the user's close would (no dismiss) and keeps it
+ * hidden for this page load; the row stays in `note.history` and the bell.
+ */
+export function hideNote(s: ToastState, notificationId: string, now: number): ToastState {
+  const ran = closeToast(s, notificationId, now);
+  if (ran.hiddenIds?.includes(notificationId)) return ran;
+  return { ...ran, hiddenIds: [...(ran.hiddenIds ?? []), notificationId] };
 }
 
 /** Clears every toast (campaign switch). */
@@ -179,4 +194,26 @@ export function nextExpiry(s: ToastState): number | null {
   let min: number | null = null;
   for (const t of s.toasts) if (!t.sticky && (min === null || t.remaining < min)) min = t.remaining;
   return min;
+}
+
+// ---- FR-NOTE-26: `hideToast(id)` for kind owners' own UI ----
+
+const memories = new Set<ToastMemoryStore>();
+
+/** The toast runtime registers its page memory while mounted (one per client page). */
+export function registerToastMemory(m: ToastMemoryStore): () => void {
+  memories.add(m);
+  return () => {
+    memories.delete(m);
+  };
+}
+
+/**
+ * FR-NOTE-26 client export: hides a notification's toast (same effect as an action's
+ * `closeToast()`), e.g. combat's popup opened from its Pending list. Client memory only.
+ */
+export function hideToast(notificationId: string): void {
+  const now = Date.now();
+  for (const m of memories)
+    m.setState((x) => ({ toasts: hideNote(x.toasts, notificationId, now) }));
 }
