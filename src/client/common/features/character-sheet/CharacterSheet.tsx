@@ -36,8 +36,8 @@ const NEW = "__new";
 
 /**
  * One sheet roll (checks, saves, skills, attacks by row, spells): `char.roll`, unless a roll
- * route claims it with the row's ref (FR-CHARX-24: combat claims an attack row's or a damaging
- * spell's Attack). A hidden claim renders nothing (FR-CHAR-24).
+ * route claims its kind with the row's ref (FR-CHARX-24, -43: each of a row's three buttons
+ * asks on its own). A hidden claim renders nothing (FR-CHAR-24).
  */
 export function SheetRoll({
   kind,
@@ -76,8 +76,8 @@ export function SheetRoll({
 }
 
 /**
- * Initiative / the first attack, asking the roll routes first (FR-CHAR-16): a claim answering
- * `hidden` renders no button; Initiative shows "Initiative set" (FR-CHAR-24).
+ * Initiative, asking the roll routes first (FR-CHAR-16): a claim answering `hidden` renders no
+ * button and shows "Initiative set" (FR-CHAR-24). Attacks: `SheetRoll` per row (FR-CHARX-44).
  */
 export function RoutedRoll({
   kind,
@@ -85,7 +85,7 @@ export function RoutedRoll({
   overrides,
   children,
   ...button
-}: Omit<SheetRollProps, "kind" | "rollRef"> & { kind: "initiative" | "attack" }) {
+}: Omit<SheetRollProps, "kind" | "rollRef"> & { kind: "initiative" }) {
   const ctx = useSheet();
   const store = useSync((s) => s.store);
   const claim = routeFor(rollRoutes, store, ctx.creature.id, kind);

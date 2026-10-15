@@ -1,4 +1,5 @@
 import { describe, expect, spyOn, test } from "bun:test";
+import type { SheetRollKind } from "@shared/character-sheet/schemas";
 import { emptyStore } from "@shared/protocol/store";
 import { IntentRejected } from "../../sync/connection";
 import { rollRoutes } from "./roll-routes";
@@ -14,6 +15,7 @@ import {
   sendSheetRoll,
   sheetBadge,
 } from "./routing";
+import { attackButtons } from "./view-model";
 
 const sent: [string, unknown][] = [];
 const send = (name: string, payload: unknown) => {
@@ -296,5 +298,55 @@ describe("FR-CHARX-24 route ref", () => {
       ["char.roll", { characterId: "mira", kind: "attack", mode: "normal", attackId: "a2" }],
       ["char.roll", { characterId: "mira", kind: "spellAttack", mode: "normal", spellId: "t" }],
     ]);
+  });
+});
+
+describe("FR-CHARX-43 three buttons through the routes", () => {
+  test("FR-CHARX-43 a route claiming only toHit takes Attack; Damage and Attack + damage stay char.roll", async () => {
+    sent.length = 0;
+    const onlyToHit: RollRoute = {
+      name: "to-hit",
+      claim: (_s, _id, kind, ref) =>
+        kind === "toHit"
+          ? {
+              badge: "In combat",
+              send: (s, input) => s("cbt.attack", { rolls: "toHit", mode: input.mode, ...ref }),
+            }
+          : null,
+    };
+    const ref = { attackId: "a2" };
+    for (const b of attackButtons()) {
+      const claim = routeFor([onlyToHit], emptyStore(), "mira", b.kind, routeRef(ref));
+      await sendSheetRoll(send, claim, "mira", b.kind, { mode: "normal" }, ref);
+    }
+    expect(sent).toEqual([
+      ["cbt.attack", { rolls: "toHit", mode: "normal", attackId: "a2" }],
+      ["char.roll", { characterId: "mira", kind: "damage", mode: "normal", attackId: "a2" }],
+      ["char.roll", { characterId: "mira", kind: "attack", mode: "normal", attackId: "a2" }],
+    ]);
+  });
+
+  test("FR-CHARX-43 combat's route in an encounter: Attack + damage routed; Attack and Damage plain until P2a (S1)", () => {
+    const store = {
+      ...emptyStore(),
+      records: {
+        encounter: { e1: { id: "e1", status: "started", round: 1, playerTurnCombatantId: null } },
+        combatant: {
+          cb: { id: "cb", encounterId: "e1", kind: "pc", entityId: "mira", name: "Mira" },
+        },
+        entity: {
+          mira: {
+            id: "mira",
+            statBlock: { attacks: [{ id: "a1", name: "Sword", toHit: 4, damage: "1d6" }] },
+          },
+        },
+      },
+    };
+    const kinds = (
+      buttons: { kind: SheetRollKind }[],
+      ref: { attackId?: string; spellId?: string },
+    ) => buttons.map((b) => routeFor(rollRoutes, store, "mira", b.kind, routeRef(ref)) !== null);
+    expect(kinds(attackButtons(), { attackId: "a1" })).toEqual([false, false, true]);
+    expect(sheetBadge(rollRoutes, store, "mira")).toBe("In combat");
   });
 });

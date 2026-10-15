@@ -141,7 +141,13 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   // Step 6–7: Mira attacks from the sheet → card pending for the DM. In the non-modal popup the
   // DM adds Goblin and Goblin 2 (tokens on the viewed scene → selected, target rings); Goblin
   // hit, 8 damage, Half → 7 → 3; Goblin 2 hit, Normal → 7 → 0 (bands for the player).
-  await sheet.getByTestId("char-sheet-roll-attack").click();
+  // Attacks live on the Actions tab (FR-CHARX-44); Attack + damage → cbt.attack (FR-CHARX-43).
+  await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
+  await sheet
+    .getByTestId("charx-attack")
+    .filter({ hasText: "Shortsword" })
+    .getByTestId("charx-roll-attack-damage")
+    .click();
   const card = init.getByTestId("cbt-init-card");
   await expect(card).toHaveCount(1);
   // #149: the DM's sticky card toast sits top-centre, clear of the Initiative rows.
