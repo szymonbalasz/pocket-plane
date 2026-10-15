@@ -20,6 +20,7 @@ wave: 2
 - **Feedback pass** ([feature-tiers §8](../feature-tiers.md#8-dm-feedback-after-the-combat-build-145), #148): optional **speed** in the creature core (movement tracker, F3) and an optional **default token shape** on the definition (F4). Both additive.
 - **#149:** optional **ability scores** and **save proficiencies** in the creature core (both kinds), plus pure derivation helpers (modifier, proficiency bonus, check / save bonus) for the sheet's and combat's check / save buttons.
 - **#154:** redacted characters carry a derived `down` flag (combat's PC Down indicator for everyone). Character speed, scores and saves come from fixtures / `PUT /api/entities` in MVP; full PC / NPC editing and player-filled sheets are design-for-later.
+- **Sprint 2 (N5, #188; FR-ENT-25):** optional **HP formula** on the stat block, so combat can add a creature with **average** (the stat block's HP max) or **rolled** HP.
 
 ## 3. Goals
 
@@ -64,6 +65,8 @@ wave: 2
 | FR-ENT-22 | Every entity gains optional `tokenShape`: `round` \| `square` \| `none`, null = `round` (OQ-ENT-17). It is the default for **new** tokens only ([FR-MAP-35](scenes-map.md#6-functional-requirements)); a token owns its shape after placement, so an edit never changes placed tokens (as the name, #126). Set by create / update; FR-ENT-11's whole replace includes it, so a `PUT` without `tokenShape` sets null (callers send it, combat FR-CBT-43). Imported rows null. Redacted characters omit it. | F4 |
 | FR-ENT-23 | Creature core gains optional `abilities {str, dex, con, int, wis, cha}` (all six together, int 1–30) and optional `saveProficiencies` (unique subset of the six; absent = none), **both kinds** (#149, #154). `saveProficiencies` without `abilities` → `invalid`. Stored rows without them stay valid. Visibility unchanged: part of the stat block (owner + DM full; redacted characters and monsters never reach other players). | #149, additive |
 | FR-ENT-24 | Pure helpers in `@shared/entities` ([ADR-0032](../architecture/adr/0032-ability-derivation.md), amends ADR-0012), all taking the **stat block** (`level` present → character, `cr` → monster): `abilityMod(score) = floor((score − 10) / 2)`; `proficiencyBonus(stats)` = 2 + floor((level − 1) / 4) for characters, SRD CR table for monsters (CR 0–4 +2, 5–8 +3, 9–12 +4, 13–16 +5, 17–20 +6, 21–24 +7, 25–28 +8, 29–30 +9); `checkBonus(stats, ability)`, `saveBonus(stats, ability)` (+ proficiency if listed). Callers pass `effectiveStats(def, inst)` (FR-ENT-13). Never stored. Known deviation: SRD monster save bonuses that differ from mod + PB are not reproduced (accepted, ADR-0032). | Sheet FR-CHAR-20, combat FR-CBT-44 |
+| **Sprint 2** (N5, #188) | | |
+| FR-ENT-25 | **HP formula** (OQ-ENT-20): the creature core gains optional `hpFormula`, a string `NdM` optionally `+K` / `−K` (N 1–50, M ∈ 4/6/8/10/12/20, K 0–999; e.g. `2d8+2`), both kinds (combat uses it for monsters only). Pure helpers in `@shared/entities`: `hpAverage(formula) = max(1, floor(N × (M + 1) / 2) + K)` (5e "average", capped 999) and `hpRollSpec(formula)` (the expression `dice.evaluate` rolls; the caller clamps the result to 1–999). **Average HP = `statBlock.hpMax`** (the stat block's standard value), never recomputed; `hpAverage` is a form hint only. **No formula** → only Average is offered; a "rolled" request is the caller's `invalid` ("‹name› has no HP formula", [FR-CBT-62](combat-tracker.md#6-functional-requirements)). Stored rows without it stay valid; no backfill. Visibility unchanged (stat block). | N5; additive, zod only |
 
 ## 7. UI/UX notes
 
@@ -94,6 +97,7 @@ wave: 2
 |---|---|---|
 | size | both | `tiny` \| `small` \| `medium` \| `large` \| `huge` \| `gargantuan` |
 | ac, hpMax, initBonus | both | int 0–30; int 1–999; int −10…+20 |
+| hpFormula *(optional)* | both | `NdM[±K]`, N 1–50, M ∈ 4/6/8/10/12/20, K 0–999 (FR-ENT-25); `hpMax` stays the average |
 | speed *(optional)* | both | int 0–200, multiple of 5 (ft, walking; FR-ENT-21) |
 | abilities *(optional)* | both | `{str, dex, con, int, wis, cha}` int 1–30 (FR-ENT-23) |
 | saveProficiencies *(optional)* | both | `("str" \| "dex" \| "con" \| "int" \| "wis" \| "cha")[]`, unique; needs `abilities` |
@@ -102,7 +106,7 @@ wave: 2
 
 - `damage` = `NdM` optionally `+K` or `−K`: N 1–20, M ∈ 4/6/8/10/12/20/100, K 0–30 (e.g. `1d4-1`); a subset of [dice-roll-log](dice-roll-log.md)'s grammar. `damageType` = a 5e damage type.
 - **Relations:** Campaign 1—* Entity (custom, character); Player 1—* character; Entity 1—* instances (token, combatant, encounter entry; FK owned by scenes-map / combat-tracker); derived → base (informational).
-- **Derived values:** `readOnly`, `xp`, `effectiveStats`, ability helpers (FR-ENT-03, 05, 13, 24), computed in `@shared`, not sent; redacted character `down` (FR-ENT-15), computed in the visibility fn. **Persisted runtime state:** character `hpCurrent`; the rest is prep data. **Later:** non-creature kinds register their own schema; modifiers on instances; delete per ADR-0009 open row.
+- **Derived values:** `readOnly`, `xp`, `effectiveStats`, ability helpers (FR-ENT-03, 05, 13, 24), `hpAverage` (FR-ENT-25), computed in `@shared`, not sent; redacted character `down` (FR-ENT-15), computed in the visibility fn. **Persisted runtime state:** character `hpCurrent`; the rest is prep data. **Later:** non-creature kinds register their own schema; modifiers on instances; delete per ADR-0009 open row.
 
 ## 9. API & events
 
@@ -147,6 +151,7 @@ Other writers of a character's `hpCurrent` (character-sheet's `CharacterHpAdjust
 - **Invalid / malicious input:** strict zod (unknown keys, bounds, dice grammar); names rendered as text; spoofed `campaignId` / `source` → `invalid` (not in schema).
 - **No backfill (feedback, #149):** columns are additive and nullable; existing characters have no speed, scores or saves until a fixture reload or a DM `PUT /api/entities/:id` (#154: fixtures / API in MVP; character editing UI is design-for-later, [levelling](post-mvp/levelling.md)). The sheet shows "Speed —" and "No ability scores" meanwhile.
 - **Leak accepted (#154):** other players learn that a PC is at 0 HP (`down`), never the number.
+- **HP formula (sprint 2):** a formula whose average differs from `hpMax` is allowed (homebrew); Average still means `hpMax`, the form shows "Formula average 15" beside HP max. Existing customs and imported rows without a formula offer Average only until the DM adds one (imported: derive first, FR-ENT-07).
 
 ## 12. Performance & bandwidth
 
@@ -158,16 +163,16 @@ Other writers of a character's `hpCurrent` (character-sheet's `CharacterHpAdjust
 
 | Key | Kind | Requires | Contents |
 |---|---|---|---|
-| `enemy-1` | reference | — | `srd/monster/goblin.ts`: small, AC 15, HP 7, init +2, speed 30, STR 8 DEX 14 CON 10 INT 10 WIS 8 CHA 8, scimitar +4 / 1d6+2 slashing, CR 1/4. Source `fixture`, SRD 5.1 CC BY 4.0 attribution |
-| `enemy-2` | reference | — | `srd/monster/wolf.ts`: medium, AC 13, HP 11, init +2, speed 40, STR 12 DEX 15 CON 12 INT 3 WIS 12 CHA 6, bite +4 / 2d4+2 piercing, CR 1/4 |
-| `enemy-custom` | setup | `enemy-1` | Derived from `enemy-1`: "Elite Goblin Warrior", AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2, `tokenShape` square, save proficiency DEX; other fields as `enemy-1` |
+| `enemy-1` | reference | — | `srd/monster/goblin.ts`: small, AC 15, HP 7 (*sprint 2:* `hpFormula` `2d6`), init +2, speed 30, STR 8 DEX 14 CON 10 INT 10 WIS 8 CHA 8, scimitar +4 / 1d6+2 slashing, CR 1/4. Source `fixture`, SRD 5.1 CC BY 4.0 attribution |
+| `enemy-2` | reference | — | `srd/monster/wolf.ts`: medium, AC 13, HP 11 (*sprint 2:* `2d8+2`), init +2, speed 40, STR 12 DEX 15 CON 12 INT 3 WIS 12 CHA 6, bite +4 / 2d4+2 piercing, CR 1/4 |
+| `enemy-custom` | setup | `enemy-1` | Derived from `enemy-1`: "Elite Goblin Warrior", AC 16, HP 15, scimitar +5 / 1d6+3, CR 1/2, `tokenShape` square, save proficiency DEX; other fields as `enemy-1` (*sprint 2:* **no** `hpFormula`: the "no formula" case) |
 | `char-mira` | setup | `player-1` | "Mira", owner `player-1`, medium, L1 fighter, AC 16, HP 12/12, init +2, speed 30, STR 14 DEX 14 CON 14 INT 10 WIS 12 CHA 10, saves STR + CON, shortsword +4 / 1d6+2 piercing |
 | `char-thorn` | setup | `player-2` | "Thorn", owner `player-2`, medium, L1 rogue, AC 14, HP 10/10, init +3, speed 30, STR 8 DEX 16 CON 14 INT 12 WIS 10 CHA 13, saves DEX + INT, dagger +5 / 1d4+3 piercing |
 | `enemy-custom-second` | setup | `campaign-second` | Activate it; create "Marsh Troll" (large, AC 15, HP 59, init +1, speed 30, claw +7 / 2d6+4 slashing, CR 5); re-activate Fixture Campaign |
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | Schemas: bounds, strict keys, 0–1 attacks, dice grammar incl. `−K`, CR enum; `speed` optional (0, 35, 200 ok; 33, 205, −5 `invalid`), a stored block without it still parses; `tokenShape` enum or null; `abilities` all six or none, 0 / 31 `invalid`; `saveProficiencies` duplicate or without `abilities` `invalid`; helpers take a stat block: `abilityMod` table ends, proficiency by level and CR (1/4 → +2, 5 → +3, 30 → +9), save bonus with / without proficiency; XP table; `effectiveStats` identity; visibility matrix (DM / owner / other player × character / custom / imported; redacted `down` true at 0 HP, false above, no HP field); list sort. **Review check:** only `effectiveStats` reads instance stats; no listener mutates state | In-code |
+| Unit | Schemas: bounds, strict keys, 0–1 attacks, dice grammar incl. `−K`, CR enum; `speed` optional (0, 35, 200 ok; 33, 205, −5 `invalid`), a stored block without it still parses; `tokenShape` enum or null; `abilities` all six or none, 0 / 31 `invalid`; `saveProficiencies` duplicate or without `abilities` `invalid`; helpers take a stat block: `abilityMod` table ends, proficiency by level and CR (1/4 → +2, 5 → +3, 30 → +9), save bonus with / without proficiency; *(sprint 2)* `FR-ENT-25 hpFormula` (`2d6`, `2d8+2`, `33d20+330` ok; `51d6`, `2d7`, `d6`, `2d6+1000` `invalid`; a block without it parses) and `hpAverage` (`2d6` → 7, `2d8+2` → 11, `1d4-3` → 1); XP table; `effectiveStats` identity; visibility matrix (DM / owner / other player × character / custom / imported; redacted `down` true at 0 HP, false above, no HP field); list sort. **Review check:** only `effectiveStats` reads instance stats; no listener mutates state | In-code |
 | Integration | Each command: row + log + event, IDs from `ctx`; rollback → none. Read-only `forbidden`, no event. No active campaign → `conflict`. Derive cross-campaign → `not_found`; base edit leaves derived unchanged. Name `conflict` (create, rename, character); custom "Goblin" allowed. Bad owner → `invalid`. `hpCurrent` clamp. `PUT` without `tokenShape` → null. Owner change: old owner gets redacted upsert, new owner full. **Hook:** a test-registered hook's row is in the same commit and in `EntityUpdated.changes`; a throwing hook rolls back the update. Bad stored JSON row → DM snapshot omits it, log line present. **Leak scan:** `player-1` frames never contain "Elite Goblin Warrior", "Marsh Troll", "Goblin" or Thorn's `1d4+3`; restart → identical snapshots | `entities` |
 | E2E (thin) | DM list rows; dropping a row on a test drop target yields its `definitionId`; `player-1` WS frames hold Mira full, no monster records; restart | `entities` |
 
@@ -178,6 +183,7 @@ Other writers of a character's `hpCurrent` (character-sheet's `CharacterHpAdjust
 | 1 | Log in; open Creatures | — | Mira (Player 1), Thorn (Player 2), Goblin + Wolf (SRD, lock, CR 1/4, 50 XP), Elite Goblin Warrior (Custom, derived from Goblin, CR 1/2, 100 XP). No Marsh Troll |
 | 2 | — | B, C open links | From B/C frame log: B has Mira full, Thorn name only, no monsters; C the reverse |
 | 3 | PUT Goblin; PUT Elite Goblin Warrior HP 20, speed 40, `tokenShape` none, saves DEX + WIS; same with speed 33; POST derive "Goblin Boss" from Goblin | — | Goblin: 403 read-only message, unchanged. Speed 33: 400, issue path `statBlock.speed`. Others: A2 updates ≤ 1 s; B, C get no `event` frame |
+| 3a | *(sprint 2)* PUT Goblin Boss with `hpFormula` `4d6+3`, HP max 17; then `hpFormula` `2d7` | — | First: 200, A2's record has the formula; B, C no frame. Second: 400, issue path `statBlock.hpFormula`. The roll itself is walked in [combat-tracker §13](combat-tracker.md#13-test-plan) step 2a |
 | 4 | PUT Mira name "Mira Vale"; then bring Mira to HP 0 with `char.adjustHp` (the PUT body has no `hpCurrent`) | — | From frame logs: B full upsert, C redacted upsert, ≤ 1 s. HP 0: C's redacted upsert has `down: true`, no `hpCurrent` |
 | 5 | Reload all; then kill + restart server | — | All reconnect; state includes steps 3–4 |
 | 6 | Switch to Second Campaign, then back | — | List: Marsh Troll + SRD only, then step-5 list. No console errors throughout |
@@ -192,6 +198,7 @@ Other writers of a character's `hpCurrent` (character-sheet's `CharacterHpAdjust
 | [scenes-map](scenes-map.md) | Drop handler (FR-MAP-13); `resolveDefinition`; definition-changed hook refreshing token copies (#120; replaces OQ-MAP-14's copy-at-placement pick) | in-review |
 | [combat-tracker](combat-tracker.md), [character-sheet](character-sheet.md), [dice-roll-log](dice-roll-log.md) | Form via `creatureActions`, combatant hook (OQ-ENT-10); optional character fields only + `hpCurrent` commands; dice grammar ⊇ ours | Combat |
 | Feedback pass, #149, #154 | scenes-map copies `speed` onto tokens and reads `tokenShape` at placement (FR-MAP-35/36); character-sheet shows speed and the abilities block (FR-CHAR-18–22); combat-tracker's form edits the new fields (FR-CBT-43), rolls monster checks / saves (FR-CBT-44) and reads `down` (FR-CBT-38) | complete |
+| Sprint 2 (N5) | combat-tracker's builder / Start and combat-extras' Add dialog read `hpFormula` (FR-CBT-62/63, FR-CBTX-44); the creature form edits it | in-review (P2a) |
 
 **Shared changes** (feedback pass; the consolidation agent writes data-model / protocol):
 - `src/server/db/`: `entity.token_shape` text, nullable (values checked by zod). `speed` lives in the `statBlock` JSON leaf: zod only (`@shared/entities`), no column.
@@ -200,6 +207,11 @@ Other writers of a character's `hpCurrent` (character-sheet's `CharacterHpAdjust
 - FIX §8 (integrator): speeds as §13 (`enemy-custom` inherits 30); `enemy-custom` `tokenShape` square.
 - **#149:** `abilities`, `saveProficiencies` live in the `statBlock` JSON leaf: zod only (`@shared/entities`), no column, no migration. Helpers (FR-ENT-24) in `@shared/entities` (entities-owned). Data model §11 stat block rows; FIX §8 scores on `enemy-1`, `enemy-2`, `enemy-custom` (DEX save), `char-mira`, `char-thorn`. [ADR-0032](../architecture/adr/0032-ability-derivation.md) amends ADR-0012.
 - **Existing common files this build edits:** none (entities has no `src/client/common/features/entities/` files; its `@shared/entities` and server folder are feature-owned).
+
+**Shared changes — sprint 2** (N5, track P2a; builders report `shared change needed:`):
+- `@shared/entities` (entities-owned, in P2a's shared-first branch): `hpFormula` in the stat block zod, `hpAverage`, `hpRollSpec`. **No DB column** (JSON leaf), no event, record type or visibility change.
+- Combat's creature form (FR-CBT-43) shows the field: [FR-CBT-62](combat-tracker.md#6-functional-requirements).
+- FIX §8 (integrator): `enemy-1` `2d6`, `enemy-2` `2d8+2` (SRD values); `enemy-custom` none. Data model §11 stat block row; protocol §13 bodies (stat block is zod-validated, no route change).
 
 ## 15. Open questions
 
@@ -220,6 +232,8 @@ Other writers of a character's `hpCurrent` (character-sheet's `CharacterHpAdjust
 | OQ-ENT-15 | Other PCs' HP for players (party view) | **Combat-phase call: nothing in Scenes; combat-tracker picks** (combatant copy / band only / redacted character adds HP) | no (owner: combat-tracker) | combat-tracker, character-sheet |
 | OQ-ENT-16, 17 | `speed` shape (F3); where the default token shape lives (F4) | **16: one optional walking speed, int 0–200, multiple of 5** (fly / swim / climb later as more optional fields) / object `{walk, fly?, swim?}` now. **17: nullable `tokenShape` column on `entity`** (presentation, beside the portrait) / optional field in `statBlock` | no (owner: spec-feedback) | scenes-map, combat-tracker, character-sheet |
 | ~~OQ-ENT-18~~ | ~~Monsters get abilities and save proficiencies now too? (#149)~~ | **Decided (#154):** yes, same optional core fields for both kinds; the DM rolls monster checks / saves from the initiative row ([FR-CBT-44](combat-tracker.md#6-functional-requirements)) | — | combat-tracker |
+| ~~OQ-ENT-20~~ | ~~HP formula shape (N5)~~ | **Decided (#190):** optional string `hpFormula` in the stat block (`2d8+2`, entities' dice subset); `hpMax` stays the Average value. Rejected: structured `{count, die, bonus}`; deriving `hpMax` from the formula | — | combat-tracker, combat-extras, fixtures-adapters |
+| OQ-ENT-21 | Glossary: **HP formula** ("dice expression for a creature's hit points; Average = the stat block's HP max, Rolled = the formula rolled when the creature joins combat") | **Add** | no · owner: integrator | glossary |
 | ~~OQ-ENT-19~~ | ~~Character data without an edit UI (review #11)~~ | **Decided (#154):** fixtures / `PUT /api/entities` in MVP; full PC / NPC editing and player-filled sheets design-for-later | — | character-sheet |
 
 ## 16. Out of scope
