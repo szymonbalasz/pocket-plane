@@ -23,7 +23,7 @@ import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
-import type { Rect } from "../play-shell/geometry";
+import { type Rect, TITLE_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
 import {
   useAvailableKinds,
@@ -135,6 +135,58 @@ function useInitiativeRect(isDm: boolean): Rect | null {
     const win = windows.filter((w) => w.kind === INITIATIVE_KIND && w.state === "open");
     return renderedWindowRects(win, registry, available, vp, measured)[0] ?? null;
   }, [isDm, windows, registry, available, vp, measured]);
+}
+
+/** P3 retest: the title bars of the DM's open windows but Initiative (the stack never covers them). */
+function useTitleBars(isDm: boolean): Rect[] {
+  const registry = useRegistry();
+  const windows = useShellState((s) => s.windows);
+  const available = useAvailableKinds();
+  const vp = useViewport();
+  const measured = useContentHeights();
+  return useMemo(() => {
+    if (!isDm) return [];
+    const win = windows.filter((w) => w.kind !== INITIATIVE_KIND && w.state === "open");
+    return renderedWindowRects(win, registry, available, vp, measured).map((r) => ({
+      ...r,
+      h: TITLE_H,
+    }));
+  }, [isDm, windows, registry, available, vp, measured]);
+}
+
+interface KonvaLayerLike {
+  on(evt: string, fn: () => void): void;
+  off(evt: string): void;
+}
+
+/**
+ * P3 E1: bumps 300 ms after the map canvas last redrew or the viewport last resized (a resize
+ * refit, a pan, a zoom), so the stack re-reads the token boxes once the map has settled.
+ */
+function useMapSettled(on: boolean): number {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!on || typeof window === "undefined") return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const bump = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setN((x) => x + 1), 300);
+    };
+    const K = (
+      window as unknown as {
+        Konva?: { stages: { container(): HTMLElement; getLayers(): KonvaLayerLike[] }[] };
+      }
+    ).Konva;
+    const layers = K?.stages.find((st) => st.container().isConnected)?.getLayers() ?? [];
+    for (const l of layers) l.on("draw.noteStack", bump);
+    window.addEventListener("resize", bump);
+    return () => {
+      clearTimeout(timer);
+      for (const l of layers) l.off("draw.noteStack");
+      window.removeEventListener("resize", bump);
+    };
+  }, [on]);
+  return n;
 }
 
 /**
@@ -251,6 +303,14 @@ export function ToastRuntime({
   // P3 glitch 2: and of the tokens its cards' likely targets are on (`avoidTokens`), measured
   // when the stack, Initiative or the viewport change (never on hover: the stack holds still).
   const avoidKey = useAvoidTokens(isDm, state.toasts, rows, views).join(",");
+  const bars = useTitleBars(isDm);
+  // P3 E1: token boxes re-read once the map settles (resize refit, pan, zoom), not while the
+  // pointer is on the stack.
+  const settled = useMapSettled(isDm && state.toasts.length > 0);
+  const frozen = useRef(settled);
+  if (!state.hovered) frozen.current = settled;
+  const tick = frozen.current;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` re-reads the live token boxes
   const at = useMemo(
     () =>
       dmStackPlacement(
@@ -259,8 +319,9 @@ export function ToastRuntime({
         stackH,
         undefined,
         tokenScreenBoxes(avoidKey ? avoidKey.split(",") : []),
+        bars,
       ),
-    [vp, initiative, stackH, avoidKey],
+    [vp, initiative, stackH, avoidKey, bars, tick],
   );
 
   const openHistory = () => openWindow(HISTORY_KIND);
