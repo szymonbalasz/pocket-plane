@@ -162,6 +162,10 @@ export function MapCanvas(props: MapCanvasProps) {
   const [space, setSpace] = useState(false);
   const spaceRef = useRef(space);
   spaceRef.current = space;
+  /** The pointer is over the canvas (Space pans then even while a button has focus). */
+  const overMap = useRef(false);
+  /** Space taken from a focused button: its keyup must not click it either. */
+  const spaceFromButton = useRef(false);
   useEffect(() => useMapTool.setState({ client }), [client]);
   const sendIntent = useMapIntent();
   const sendSignal = useSendSignal();
@@ -566,17 +570,28 @@ export function MapCanvas(props: MapCanvasProps) {
       signal: sendSignal,
     };
   };
-  // Space + drag pans with any tool; typing in a field keeps Space.
+  // Space + drag pans with any tool; typing in a field keeps Space. A focused button (e.g. a fog
+  // bar toggle just clicked) keeps Space only while the pointer is off the map: over the map,
+  // Space pans and never presses the button (FR-FOG-17).
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.code !== "Space" || typingTarget(e.target)) return;
+      if (e.code !== "Space") return;
+      const button = (e.target as { tagName?: string } | null)?.tagName === "BUTTON";
+      if (typingTarget(e.target) && !(button && overMap.current)) return;
       e.preventDefault();
+      if (button) spaceFromButton.current = true;
       if (!spaceRef.current) setSpace(true);
     };
     const up = (e: KeyboardEvent) => {
-      if (e.code === "Space") setSpace(false);
+      if (e.code !== "Space") return;
+      if (spaceFromButton.current) e.preventDefault();
+      spaceFromButton.current = false;
+      setSpace(false);
     };
-    const blur = () => setSpace(false);
+    const blur = () => {
+      spaceFromButton.current = false;
+      setSpace(false);
+    };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     window.addEventListener("blur", blur);
@@ -731,6 +746,12 @@ export function MapCanvas(props: MapCanvasProps) {
       data-drawing={drawing}
       data-space-pan={space}
       data-targeting={targeting}
+      onPointerEnter={() => {
+        overMap.current = true;
+      }}
+      onPointerLeave={() => {
+        overMap.current = false;
+      }}
       data-camera={cameraMode}
       data-cell-px={Math.round(cam.scale * grid.gridCellSize)}
       data-fit-floor={fitFloor}

@@ -243,3 +243,54 @@ test("FR-FOG-17–20 DM fog render, rect + polygon reveal, Undo, Space pan, Reve
 
   expect(errors).toEqual([]);
 });
+
+test("FR-FOG-17 Space + drag pans with a fog bar toggle focused (Hide): no edit, the toggle keeps its state", async ({
+  browser,
+}) => {
+  const { secret, recordId } = e2eEnv();
+  const ambush = recordId("battlemap", "scene");
+  const dm = await rolePage(browser);
+  const sent: string[] = [];
+  dm.on("websocket", (ws) => ws.on("framesent", (f) => sent.push(String(f.payload))));
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const scenes = await openWindow(dm, "map.scenes");
+  await scenes
+    .locator(`[data-testid="map-scene-row"][data-record-id="${ambush}"] button`)
+    .first()
+    .click();
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
+  await scenes.getByTestId("ui-window-close").click();
+  await dm.getByTestId("map-tool-fog").click();
+  const hide = dm.getByTestId("fog-mode-hide");
+  await hide.click();
+  await expect(hide).toHaveAttribute("data-state", "on");
+  await expect(hide).toBeFocused(); // the walkthrough's state: the toggle keeps focus
+  const depth = await dm.getByTestId("fog-undo").getAttribute("data-depth");
+
+  const stageX = () =>
+    dm.evaluate(() =>
+      (window as unknown as { Konva: { stages: { x(): number }[] } }).Konva.stages[0]?.x(),
+    );
+  const x0 = await stageX();
+  const edits = () => sent.filter((f) => f.includes('"fog.edit"')).length;
+  const before = edits();
+  const p = await centre(dm, 4, 12);
+  await dm.mouse.move(p.x, p.y);
+  await dm.keyboard.down("Space");
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-space-pan", "true");
+  await dm.mouse.down();
+  for (let i = 1; i <= 5; i++) await dm.mouse.move(p.x + i * 15, p.y + i * 5);
+  await dm.mouse.up();
+  await dm.keyboard.up("Space");
+  await expect.poll(stageX).not.toBe(x0);
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-space-pan", "false");
+  await dm.waitForTimeout(300); // a stray edit would have been sent by now
+  expect(edits()).toBe(before);
+  expect(await attrOf(dm, "fog-draft", "kind")).toBeNull();
+  await expect(dm.getByTestId("fog-undo")).toHaveAttribute("data-depth", depth ?? "");
+  // Space didn't press the focused toggle: Hide is still on, Reveal still off.
+  await expect(hide).toHaveAttribute("data-state", "on");
+  await expect(dm.getByTestId("fog-mode-reveal")).toHaveAttribute("data-state", "off");
+});
