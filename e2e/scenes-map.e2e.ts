@@ -76,9 +76,16 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   const elite = recordId("battlemap", "token", 3);
 
   const dm = await rolePage(browser);
+  const dmIn: string[] = [];
+  const dmOut: string[] = [];
+  dm.on("websocket", (ws) => {
+    ws.on("framereceived", (f) => dmIn.push(String(f.payload)));
+    ws.on("framesent", (f) => dmOut.push(String(f.payload)));
+  });
   await loginDm(dm, secret);
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", town);
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
   const scenes = await openWindow(dm, "map.scenes"); // closed by default (map-first, #162)
   await expect(scenes.getByTestId("map-scene-row")).toHaveCount(3);
   await expect(scenes.getByTestId("map-folder-row")).toHaveCount(1);
@@ -131,6 +138,10 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
     .first()
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+  // ADR-0041: the DM snapshot held only Town's tokens; viewing Goblin Ambush loads them.
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
+  expect(dmIn.find((f) => f.includes('"type":"snapshot"'))).not.toContain(wolf);
+  expect(dmOut.filter((f) => f.includes('"sync.loadScene"') && f.includes(ambush))).toHaveLength(1);
   await expect(dm.getByTestId("map-not-shown-badge")).toBeVisible();
   await expect(dm.getByTestId("map-tool-ping")).toBeDisabled();
   await expect.poll(async () => (await tokenNode(dm, wolf))?.opacity).toBeLessThan(1);

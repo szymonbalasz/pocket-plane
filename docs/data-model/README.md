@@ -449,6 +449,7 @@ An instance of a creature definition: own name, read-only display copies, play s
 | Layout (windows, geometry, z-order) | browser `localStorage` key `pp.layout.v1.<campaignId>.<dm \| playerId>`, zod-parsed, ≤ 40 windows; *(playtest pass, built)* each window `area? {w, h}` (work area when its geometry was last set, FR-SHELL-29) | [FR-SHELL-15/17](../specs/play-shell.md#6-functional-requirements), [ADR-0025](../architecture/adr/0025-play-shell-windows.md) |
 | Window types, canvas layers, token menu entries, `creatureActions`, definition-changed hooks, token-changed hooks ([FR-MAP-30](../specs/scenes-map.md#6-functional-requirements), CON-37), kind registry | code registries | [FR-SHELL-07](../specs/play-shell.md#6-functional-requirements), [FR-MAP-29](../specs/scenes-map.md#6-functional-requirements), [FR-ENT-19/20](../specs/entities.md#6-functional-requirements), [FR-ENT-01](../specs/entities.md#6-functional-requirements) |
 | Viewed scene, camera, selection, ruler, move overlay | client memory | [FR-MAP-08](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-12](../specs/scenes-map.md#6-functional-requirements), MAP §8 |
+| *(built, fix/active-scene-window)* DM loaded-scene set `{loaded, loading}` (scenes whose `dmWindow` rows the store holds in full); reset to the active scene by every snapshot | client memory (`SyncConnection.snapshot.scenes`) | [ADR-0041](../architecture/adr/0041-active-scene-window.md) |
 | *(feedback pass, built)* DM selection set + targeting flag (`src/client/dm/features/scenes-map/selection.ts`); token overlay registry `tokenOverlays` (`src/client/common/features/scenes-map/token-overlays.ts`, append-only; drawn by `TokensLayer`) | client memory; code registry | [FR-MAP-31–34](../specs/scenes-map.md#6-functional-requirements) |
 | Sound settings `{muted, volume}` (**built**) | browser `localStorage` `pp.sound.v1.<campaignId>.<playerId>`, zod-parsed; never sent | [FR-SHELL-24](../specs/play-shell.md#6-functional-requirements) |
 
@@ -478,7 +479,7 @@ An instance of a creature definition: own name, read-only display copies, play s
 | Imported entity | — (players: always hidden) | — |
 | Scene | `id` vs active scene (scope gate) | Players: `name`, `folderId`, `mapLocked`, `seq` |
 | Scene folder | — (players: always hidden) | — |
-| Token | `hidden`; `sceneId` vs active scene (scope gate); `ownerPlayerId` vs `ctx.playerId` (→ `speed`) | Players: `definitionId`; `speed` unless they own the token |
+| Token | `hidden`; `sceneId` vs active scene (scope gate; *(built)* also the DM snapshot window, [ADR-0041](../architecture/adr/0041-active-scene-window.md)); `ownerPlayerId` vs `ctx.playerId` (→ `speed`) | Players: `definitionId`; `speed` unless they own the token |
 
 ## 14. Combat: ER diagram
 
