@@ -1,7 +1,7 @@
 ---
 title: Scene tools
 prefix: SCN
-status: in-review
+status: complete
 owner: spec-scene-tools
 phase: post-mvp-2
 ---
@@ -12,16 +12,15 @@ phase: post-mvp-2
 
 - Battlemap **props and structure** on the [scenes-map](scenes-map.md) canvas (sprint 2 track B, #187): a **layer model** (map / objects / tokens / DM-only), **walls and doors** that block player token moves, **AoE templates** (cone, sphere, cylinder, cube, line), image **props** from the [asset pipeline](assets-pipeline.md), and the **diagonal rule** as a campaign setting.
 - Movement only: walls never affect vision, light or fog ([ADR-0007](../architecture/adr/0007-product-scope.md)). Fog of war is its own spec ([fog-of-war](fog-of-war.md), FOG). This spec owns the layer model and the tool registry fog registers into, and exposes what fog's filter needs (FR-SCN-35).
-- Hard constraint: CON-44 (DM snapshot ≈ 4.4 KiB left). The pick is that the DM snapshot carries only the **active scene's** tokens and SCN records; other scenes load on view ([proposed ADR](../architecture/adr/proposed-active-scene-window.md), [OQ-SCN-01](#15-open-questions)).
+- Hard constraint: CON-44 (DM snapshot ≈ 4.4 KiB left). Decided (#196): the DM snapshot carries only the **active scene's** tokens and SCN records; other scenes load on view ([active-scene window ADR](../architecture/adr/proposed-active-scene-window.md), accepted #196; [OQ-SCN-01](#15-open-questions)).
 
 ## 2. Scope
 
 - **Layers:** four layers, render order, DM view toggles. DM-only = the existing `hidden` flag on each record (tokens unchanged).
-- **Structure:** walls and doors are segments between grid vertices; doors are open / closed / locked (DM). A player move across a wall or a non-open door is refused server-side; the DM always moves through. Client-side undo of DM drawing *(OQ-SCN-08)*.
-- **AoE templates:** five shapes, snapped to the grid, affected squares shown. Placed by the DM and players *(carried pick, OQ-SCN-03)*. Ephemeral by default; **Keep** makes one persistent *(OQ-SCN-02)*.
+- **Structure:** walls and doors are segments between grid vertices; doors are open / closed / locked (DM). A player move across a wall or a non-open door is refused server-side; the DM always moves through. Client-side undo of DM drawing (#196, OQ-SCN-08).
+- **AoE templates:** five shapes, snapped to the grid, affected squares shown. Placed by the DM and players (#196, OQ-SCN-03). Ephemeral by default; **Keep** makes one persistent (#196, OQ-SCN-02).
 - **Props:** DM-placed images on the objects layer, cell-snapped, 90° rotation.
-- **Diagonal rule:** campaign setting, 5/10/5 (default, #145) or 5 ft *(carried pick, OQ-SCN-04)*.
-- **DM option, default out:** "Select creatures inside" a template (FR-SCN-28, OQ-SCN-21).
+- **Diagonal rule:** campaign setting, 5/10/5 (default, #145) or 5 ft (#196, OQ-SCN-04).
 
 ## 3. Goals
 
@@ -68,13 +67,13 @@ phase: post-mvp-2
 | **Structure** | | |
 | FR-SCN-07 | **Structure** = one record per scene. `walls [n, x1, y1, x2, y2][]`. `doors [n, x1, y1, x2, y2, state, f][]`: `state` 0 open / 1 closed / 2 locked; `f` is the server-written fog flag (FR-SCN-36). `n` is unique per scene, taken from `nextN`. A segment runs vertex to vertex at any angle, length > 0, endpoints within the map's vertex range ± 1. Identical segments (either direction) dedupe. ≤ 2,000 segments per scene, else `conflict`. | Compact on purpose (§12) |
 | FR-SCN-08 | **Structure tool** (DM), modes Wall · Door · Erase. **Wall:** click vertices (the pointer snaps to the nearest one) to draw a polyline; double-click ends it, Esc cancels. Ending sends one `scn.addWalls` (≤ 200 segments). **Door:** two clicks → `scn.addDoor` (closed). **Erase:** click within 8 px of a segment, or Ctrl/Shift-drag a box (segments fully inside) → `scn.removeSegments`. | |
-| FR-SCN-09 | **Door state** (DM): `scn.setDoor {sceneId, n, state}`. Door menu (right-click): Open, Close, Lock, Unlock, Delete. Double-click a door with the Select tool to toggle open ↔ closed (a locked door stays locked). Players can't change doors *(OQ-SCN-07)*. | |
+| FR-SCN-09 | **Door state** (DM): `scn.setDoor {sceneId, n, state}`. Door menu (right-click): Open, Close, Lock, Unlock, Delete. Double-click a door with the Select tool to toggle open ↔ closed (a locked door stays locked). Players can't change doors (#196, OQ-SCN-07). | |
 | FR-SCN-10 | **Blocking rule:** a **player's** `map.moveToken` is refused iff the straight segment between the footprint centres of `from` and `to` intersects or touches any wall, or any door whose state ≠ open (collinear overlap counts). Integer math on doubled coordinates. DM moves are never checked. | OQ-SCN-05 |
-| FR-SCN-11 | The check is a **move guard** in `map.moveToken`'s transaction. Order: **guards** (may refuse) → FOG's `derive` → one write → token-changed hooks. The guard reads only the scene's structure row (an in-memory cache keyed by `(sceneId, rev)` is allowed). Refused → `reject conflict` "Blocked by a wall or door" (same text for wall, closed and locked). No write, no event, no hook, no `movedFt` change. | [proposed ADR](../architecture/adr/proposed-token-move-guards.md); X7 |
+| FR-SCN-11 | The check is a **move guard** in `map.moveToken`'s transaction. Order: **guards** (may refuse) → FOG's `derive` → one write → token-changed hooks. The guard reads only the scene's structure row (an in-memory cache keyed by `(sceneId, rev)` is allowed). Refused → `reject conflict` "Blocked by a wall or door" (same text for wall, closed and locked). No write, no event, no hook, no `movedFt` change. | [move-guards ADR](../architecture/adr/proposed-token-move-guards.md) (accepted #196); X7 |
 | FR-SCN-12 | **Player cue:** on that reject the client reverts (FR-MAP-15), shows the Toast and flashes the target cell (`accent.danger`, 1 s). | |
 | FR-SCN-13 | **DM hint:** while the DM drags a token (read from the existing `pointers.drag`, FR-MAP-40) across a blocking segment, `scn-structure` highlights the crossed segments and shows a "through wall" tag at the target cell. The drop still sends. Local only. | B10 |
-| FR-SCN-14 | **Drawing.** DM: walls as lines (`accent.primary`); doors as a door glyph per state, with a lock glyph when locked. Players: doors only, open or closed (locked is sent as closed), never walls; doors with `f = 1` are dropped *(OQ-SCN-06 pick)*. | |
-| FR-SCN-15 | **Undo** (DM, client only). Per scene, the last 50 structure and prop edits made in this tab. Undo button in the tool panel, and Ctrl+Z while a SCN tool is active *(proposed)*. Undo sends the inverse intent: add ↔ remove with the same coordinates, the previous door state, the previous prop fields, or re-placing a deleted prop. Each inverse's `ack` (`{ns}`, `{propId}`) **remaps** the old `n` / id in older entries, so undo chains keep working. A rejected inverse drops that entry and shows a Toast. Lost on reload. It amends ADR-0016's "not scene edits", together with fog's server-side undo (OQ-SCN-08, one DM question). | B2, B3 |
+| FR-SCN-14 | **Drawing.** DM: walls as lines (`accent.primary`); doors as a door glyph per state, with a lock glyph when locked. Players: doors only, open or closed (locked is sent as closed), never walls; doors with `f = 1` are dropped (#196, OQ-SCN-06). | |
+| FR-SCN-15 | **Undo** (DM, client only). Per scene, the last 50 structure and prop edits made in this tab. Undo button in the tool panel, and Ctrl+Z while a SCN tool is active. Undo sends the inverse intent: add ↔ remove with the same coordinates, the previous door state, the previous prop fields, or re-placing a deleted prop. Each inverse's `ack` (`{ns}`, `{propId}`) **remaps** the old `n` / id in older entries, so undo chains keep working. A rejected inverse drops that entry and shows a Toast. Lost on reload. It amends ADR-0016's "not scene edits", together with fog's server-side undo (decided #196, OQ-SCN-08). | B2, B3 |
 | **Props** | | |
 | FR-SCN-16 | **Place** (DM, Props tool): pick an image in the asset picker ([FR-ASSET-17](assets-pipeline.md#6-functional-requirements)), then click a cell → `scn.placeProp {sceneId, assetId, col, row, w?, h?, hidden?}`. Runs `assets.require`; default 1 × 1; the footprint must overlap the map. ≤ 200 per scene and ≤ 2,000 per campaign, else `conflict`. | |
 | FR-SCN-17 | **Edit** (DM, Props tool): click selects one prop; drag moves it (cell snap); handles resize it (1–20 cells per side). Menu: Rotate 90°, Hide / Reveal, Lock / Unlock, To front / To back, Duplicate, Image…, Delete. Intents `scn.updateProp`, `scn.setPropHidden`, `scn.duplicateProp`, `scn.deleteProp`. A locked prop can't be moved or resized (the menu still works). | OQ-SCN-10 |
@@ -89,17 +88,17 @@ phase: post-mvp-2
 | FR-SCN-25 | **Keep:** the panel's Keep button turns the ephemeral into a record with `scn.placeTemplate` (same fields; `hidden` = `dmOnly`), then sends `end`. ≤ 20 per scene and ≤ 3 per player per scene, else `conflict`. A player's `sceneId` must be the active scene. The DM may set `placedByPlayerId` (a player of the campaign; fixtures); a player sending it → `invalid`. | OQ-SCN-02; B1 |
 | FR-SCN-26 | **Persistent edits.** The placer (`placedByPlayerId = ctx.playerId`) or the DM: move (drag the origin), rotate / resize (panel), Delete → `scn.updateTemplate`, `scn.deleteTemplate`. DM only: Hide / Reveal (`hidden`), and "Clear templates" per scene → `scn.clearTemplates`. Others' templates have no menu and can't be dragged. | |
 | FR-SCN-27 | **Visibility:** `hidden` or fog-hidden (FOG's `hides`; never for a player-placed template) → hidden; else full (incl. `placedByPlayerId`). | S5 |
-| FR-SCN-28 | **Only if the DM opts in** (OQ-SCN-21, default out). **Select creatures inside** (DM, template menu, ephemeral or persistent): sets the DM selection ([FR-MAP-33](scenes-map.md#6-functional-requirements)) to the viewed scene's tokens (incl. hidden and fog-hidden) whose footprint overlaps an affected square. The attack popup then preselects them. No roll, no damage. | B6 |
+| ~~FR-SCN-28~~ | ~~Select creatures inside a template~~: **out** (#196, OQ-SCN-21). | B6 |
 | **Diagonal rule** | | |
 | FR-SCN-29 | Record `map-settings` per campaign: `{id = campaignId, diagonalRule: "5-10-5" \| "5"}`, default `5-10-5` (#145). The DM sets it in the Ruler tool's panel → `scn.setDiagonalRule`. Everyone receives it. | OQ-SCN-04 |
 | FR-SCN-30 | One distance fn, `distanceFt(a, b, rule)` (`@shared/scenes-map/geometry`), drives the ruler ([FR-MAP-22](scenes-map.md#6-functional-requirements)), the movement indicator ([FR-MAP-37](scenes-map.md#6-functional-requirements)) and combat's movement used ([FR-CBT-39](combat-tracker.md#6-functional-requirements); the server reads the row). Rule `5`: `5 × max(dx, dy)`. Template sizes don't use it. | combat seam |
 | **Scenes, sync, lifecycle** | | |
-| FR-SCN-31 | Through scenes-map's **`sceneHooks`** (`scene-hooks.ts`, created by `fix/fog-core`; signature in FOG's [proposed ADR](../architecture/adr/proposed-fog-visibility.md)). `duplicated(env, source, copy)` copies structure and props (new IDs, same `n`), not templates. `deleting(env, scene)` returns every SCN row of the scene as a delete, before the row deletes. All of them go into `SceneDuplicated` / `SceneDeleted` `changes`. | Settled S3; X4 |
-| FR-SCN-32 | **Active-scene window:** `scene-structure`, `scene-prop` and `aoe-template` register with `dmWindow: "active-scene"` (as `token` does, set by `fix/active-scene-window`). The DM snapshot holds only the active scene's rows. When the DM views another scene, its client sends `sync.loadScene {sceneId}` once per scene per snapshot. That scene's tokens and SCN rows come back in hub frame order, and the canvas shows "Loading scene…" until they land. Live events still reach the DM for every scene. Players are unchanged (scene gate). | [proposed ADR](../architecture/adr/proposed-active-scene-window.md) |
+| FR-SCN-31 | Through scenes-map's **`sceneHooks`** (`scene-hooks.ts`, created by `fix/fog-core`; signature in FOG's [fog visibility ADR](../architecture/adr/proposed-fog-visibility.md) (accepted #196)). `duplicated(env, source, copy)` copies structure and props (new IDs, same `n`), not templates. `deleting(env, scene)` returns every SCN row of the scene as a delete, before the row deletes. All of them go into `SceneDuplicated` / `SceneDeleted` `changes`. | Settled S3; X4 |
+| FR-SCN-32 | **Active-scene window:** `scene-structure`, `scene-prop` and `aoe-template` register with `dmWindow: "active-scene"` (as `token` does, set by `fix/active-scene-window`). The DM snapshot holds only the active scene's rows. When the DM views another scene, its client sends `sync.loadScene {sceneId}` once per scene per snapshot. That scene's tokens and SCN rows come back in hub frame order, and the canvas shows "Loading scene…" until they land. Live events still reach the DM for every scene. Players are unchanged (scene gate). | [active-scene window ADR](../architecture/adr/proposed-active-scene-window.md) (accepted #196) |
 | FR-SCN-33 | Every SCN command commits its rows and one event-log entry in one transaction, then emits the event; IDs and time come from `ctx` ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)). All structure ops emit one event name, `StructureEdited`, so players can't tell a lock from a wall edit. Nothing is server-undoable. | |
 | FR-SCN-34 | While not `live` ([FR-SYNC-24](live-sync.md#6-functional-requirements)): SCN tools are disabled except the Layers popover; a polyline in progress is discarded; the ephemeral template stops sending. | |
 | FR-SCN-35 | **Fog seam** (S5). Fog subjects: props, DM-placed kept templates, DM-placed ephemeral signals (FR-SCN-24). Every prop or template write that sets or moves a footprint calls `deriveSceneObject(read, {type, sceneId, cells})` (FOG's `derive`) **before** its single write, and stores `fogged` (on the wire only when true). SCN's visibility fns for `scene-prop` and `aoe-template` consult `hides`. Walls are never fog subjects. SCN exports the pure fns `propCells`, `templateCells` and `doorCells`. FOG owns what fog hides. | Settled S5; X7 |
-| FR-SCN-36 | *(OQ-SCN-06 pick)* **Door fog flag:** `f = 1` iff every cell of `doorCells(door)` is fogged. `doorCells` = the cells that share an edge with the segment on either side; for a diagonal segment, the cells it passes through. `scn.addDoor` sets `f` (via `derive`), and FOG's re-derive sets it on fog edits (its event lists the `scene-structure` change). The player redaction drops `f = 1` doors and stays pure. | X6 |
+| FR-SCN-36 | **Door fog flag** (#196, OQ-SCN-06): `f = 1` iff every cell of `doorCells(door)` is fogged. `doorCells` = the cells that share an edge with the segment on either side; for a diagonal segment, the cells it passes through. `scn.addDoor` sets `f` (via `derive`), and FOG's re-derive sets it on fog edits (its event lists the `scene-structure` change). The player redaction drops `f = 1` doors and stays pure. | X6 |
 
 ## 7. UI/UX notes
 
@@ -180,7 +179,6 @@ Envelopes and rejects: [live-sync](live-sync.md). Everything is WS (canvas actio
 | Move a token through a wall / non-open door | ✓ | ✗ | Move guard (FR-SCN-11) |
 | Place ephemeral / persistent template | ✓ (any scene; may be DM-only) | ✓ active scene, ≤ 3 kept | Signal audience; FR-SCN-25 |
 | Edit / delete persistent template | any | own | FR-SCN-26 |
-| Select creatures inside (if opted in) | ✓ | ✗ | Client only |
 
 ## 11. Edge cases & failure modes
 
@@ -220,10 +218,10 @@ Measured by spec-fog-of-war with the realistic-heavy harness on `main`. Fog and 
 | Option (OQ-SCN-01 = OQ-FOG-04) | Heavy DM | Left of 786,432 B | Cost |
 |---|---|---|---|
 | (A) All effect presets (campaign + character) load on demand over the window's WS load; **reopens #190 OQ-MOD-14 / -15** | 778,920 | 7,512 B | MOD server, client and tests change; separate `fix/mod-presets-on-demand` (MOD's owner). Leaves nothing for sprint 3 |
-| **(B) Token window + SCN window (pick)**: the DM snapshot carries only the active scene's tokens and SCN records; others load with `sync.loadScene` | **676,257** | **110,175 B** | Window ADR covers `token`; built first as `fix/active-scene-window` (ws / snapshot lock). Presets untouched (#190 stands) |
+| **(B) Token window + SCN window (decided #196)**: the DM snapshot carries only the active scene's tokens and SCN records; others load with `sync.loadScene` | **676,257** | **110,175 B** | Window ADR covers `token`; built first as `fix/active-scene-window` (ws / snapshot lock). Presets untouched (#190 stands) |
 | (C) Raise the DM ceiling (DM only) | 797,382 | needs ≥ 797.4 KB; at 1 MiB: 251,194 B | No code. The DM client usually runs on the host (ADR-0003): cost is build time and memory, not tunnel bandwidth |
 
-- Estimate, not offered: campaign presets only on demand ≈ 785.9 KB, ≈ 0.6 KB left.
+- Estimate, not offered at the gate: campaign presets only on demand ≈ 785.9 KB, ≈ 0.6 KB left.
 - **Players:** + ≈ 3.6 KB per typical scene (measured with fog: P1 281,267 B of 512 KiB). Event frames: a structure upsert ≤ 44 KB to the DM; doors only to players.
 - **Move guard:** O(segments) intersection tests, ≤ 2,000 at the cap. Target ≤ 1 ms p95 per move (unit benchmark). The structure row is read once per move, or cached by `rev`.
 - **Canvas:** walls are one Konva shape; props are cached image nodes (≤ 200); affected squares are one shape per template, memoised per template change. ≤ 8 Konva layers (FR-SCN-02). **Review check:** Chrome trace while panning Goblin Ambush with the typical scene: median frame ≤ 20 ms.
@@ -263,7 +261,7 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 | 5 | Structure: add a door, open it, erase it; Undo, Undo; draw a 3-segment wall; Undo | — | The door comes back, then closes again (remap works); the wall is gone; B, C see no walls, only `StructureEdited` upserts |
 | 6 | Props: place a barrel at (6, 12), resize to 2 × 2, rotate, hide; reveal the chest, lock it, drag it | — | B, C see the barrel change and lose it on hide; the chest appears with its image; a locked drag does nothing |
 | 7 | — | B: AoE cone 15 ft from (3, 7), drag the direction, Keep; C: sphere 20 ft, then closes the tab | A, C see B's cone live with "N squares", then kept; C cannot delete it; C's sphere vanishes for A, B within 3 s |
-| 8 | Clear templates (if OQ-SCN-21 is in: first, Select creatures inside on B's cone) | — | Every kept template is gone for B, C (opted in: tokens inside get selection rings) |
+| 8 | Clear templates | — | Every kept template is gone for B, C |
 | 9 | Ruler panel: Diagonals 5 ft | B rulers (2, 7) → (5, 9) | B reads "15 ft" (was "20 ft"); then back to 5/10/5 |
 | 10 | Layers: Walls & doors off, DM-only off | — | A hides them; B, C unaffected |
 | 11 | View Cellar; draw a wall; reload; view Cellar again | — | "Loading scene…", then Cellar's Goblin and the wall; B, C get no frame |
@@ -274,12 +272,11 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 
 | On | What we need | Status |
 |---|---|---|
-| [scenes-map](scenes-map.md) | Move-guard registry in `map.moveToken` ([proposed ADR](../architecture/adr/proposed-token-move-guards.md)); `sceneHooks`; layer entry shape (FR-SCN-03); tool registry + stage dispatch (FR-SCN-06); `distanceFt` rule param; `token` flagged `dmWindow` | complete; changed by the branches below |
+| [scenes-map](scenes-map.md) | Move-guard registry in `map.moveToken` ([move-guards ADR](../architecture/adr/proposed-token-move-guards.md) (accepted #196)); `sceneHooks`; layer entry shape (FR-SCN-03); tool registry + stage dispatch (FR-SCN-06); `distanceFt` rule param; `token` flagged `dmWindow` | complete; changed by the branches below |
 | [fog-of-war](fog-of-war.md) | `visibility-hooks.ts` (`derive`, `hides`, `dragToDm`), `scene-hooks.ts`, `deriveSceneObject(read, obj)`; door re-derive (FR-SCN-36); the fog layer (order 30) and tools via SCN's registries; fixture `fog-scn` | spec in-review |
-| [live-sync](live-sync.md) | Active-scene window + `sync.loadScene` ([proposed ADR](../architecture/adr/proposed-active-scene-window.md)); signal audience (built) | ADR proposed |
-| [combat-tracker](combat-tracker.md) | `movedFt` uses the campaign rule; blocked moves commit nothing; popup preselect from the selection (only with FR-SCN-28) | complete (OQ-SCN-17) |
+| [live-sync](live-sync.md) | Active-scene window + `sync.loadScene` ([active-scene window ADR](../architecture/adr/proposed-active-scene-window.md) (accepted #196)); signal audience (built) | ADR accepted (#196) |
+| [combat-tracker](combat-tracker.md) | `movedFt` uses the campaign rule; blocked moves commit nothing | complete (OQ-SCN-17) |
 | [assets-pipeline](assets-pipeline.md) | Picker, `assets.require`, `useAssetImage` | complete |
-| [effect-modifiers](effect-modifiers.md) | Only if the DM picks OQ-SCN-01 (A): presets on demand, `fix/mod-presets-on-demand` (MOD's owner) | complete |
 | [fixtures-adapters](fixtures-adapters.md) | Units + bundle above; FIX §8 rows at merge | complete |
 
 **Registries** (BO5; same table as FOG §14):
@@ -302,7 +299,6 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 | `src/server/features/scenes-map/` (MAP lock) | `move-guards.ts`, run in `map.moveToken` before `derive`; SCN lines in `scene-hooks.ts` | `fix/scn-core` |
 | `src/client/common/features/scenes-map/` (canvas lock, with FOG) | `tool-store.ts` (open `MapTool`); `MapCanvas.tsx` (stage dispatch to the active registry tool, Space pan, Esc, tokens ignore left-press while drawing); `layers.ts` (entry shape, `group`); `canvas-tools.ts`; `ToolRail.tsx`; `@shared/scenes-map/geometry` `distanceFt(rule)` | `fix/scn-core` |
 | Combat hook | FR-CBT-39 reads `map-settings` | `build/scene-tools-settings` (BO2) |
-| *(only if OQ-SCN-01 = A)* effect-modifiers | All presets (campaign + character) over the WS load: FR-MOD-22, `effect-preset` registration (snapshot excluded, a "loaded" flag), DM preset manager, the token menu's Apply effect ▸, the apply dialog, sheet toggles on both clients; tests: `snapshot-size`, FR-MOD-21/22 leak scan on the load result, MOD sync, `effect-modifiers.e2e.ts`. Size M, reopens #190 OQ-MOD-14 / -15 | `fix/mod-presets-on-demand` (MOD's owner) |
 | Docs | Protocol: new SCN section; data model: four tables; AGENTS §9.9 registry list (table above); AGENTS §9.3 `fixtures/assets/props/`; glossary (OQ-SCN-19); FIX §8 | integrator |
 
 **Build order:** `fix/active-scene-window` → `fix/fog-core` → `fix/scn-core` → the SCN slices ∥ the fog client slice (needs `canvas-tools.ts`). `build/scene-tools-settings` goes after fog's last server slice, which carries FR-FOG-14. P2's canvas fixes merge first.
@@ -312,32 +308,32 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 | `fix/scn-core` | Shared rows above, `derive` call sites, geometry lib (`@shared/scene-tools/geometry`), empty SCN layers registered, CON-44 heavy scene | Schema ★, canvas ★ |
 | `build/scene-tools-structure` | Structure commands, guard, door `f`, layer, tool, door menu, DM hint, undo helper, `scn-walls` | Own files + registry lines |
 | `build/scene-tools-props` | Props commands, layer, tool, menu, `scn-prop-images`, `scn-props` | Own files |
-| `build/scene-tools-templates` | Template records + signal, layer, AoE tool, (FR-SCN-28 if opted in), `scn-templates` | Own files |
+| `build/scene-tools-templates` | Template records + signal, layer, AoE tool, `scn-templates` | Own files |
 | `build/scene-tools-settings` | Layers popover, diagonal rule panel + wiring, combat `movedFt` rule | `ToolRail` panel slot, combat hook |
 
 ## 15. Open questions
 
-**Bold** = suggested pick (not decided). **DM** = needs the DM at gate 2.
+All decided at DM gate 2 (#196, "go with picks") or settled earlier. Glossary rows stay for the integrator.
 
-| ID | Question | Options (pick marked) | Blocking? | Affects |
-|---|---|---|---|---|
-| OQ-SCN-01 (= OQ-FOG-04) | CON-44: base with fog + one SCN scene = 797,382 B, 10,950 B over (§12, measured) — **DM** | (A) all effect presets on demand over the window's WS load, reopening #190 OQ-MOD-14 / -15: 7,512 B left; MOD server, client and tests change / **(B) token window + SCN window: 110,175 B left; presets untouched; built first as `fix/active-scene-window`** / (C) raise the DM ceiling (DM only; ≥ 797.4 KB; local client, cost is build time) | yes | live-sync, MOD, FOG, scenes-map |
-| OQ-SCN-02 | Templates ephemeral or persistent — **DM** | **Ephemeral (signal) by default, Keep → record** / always records (snapshot cost) / always ephemeral (Spirit Guardians lost on reload). *Two code paths, but most templates cost no snapshot bytes* | yes | live-sync |
-| OQ-SCN-03 | Who places templates (carried) — **DM** | **DM and players** / DM only. *Players show their own spells* | yes | — |
-| OQ-SCN-04 | Diagonal rule (carried) — **DM** | **Campaign setting: 5/10/5 default, 5 ft option** / fixed 5/10/5. *One row; touches the ruler, the indicator and combat* | yes | scenes-map, combat-tracker |
-| OQ-SCN-05 | Blocking rule — **DM** | **Straight line between footprint centres (as Foundry)** / reachable region (path search; round corners in one drop). *Simple and exact; corners need two drops* | yes | — |
-| OQ-SCN-06 | Doors under fog — **DM** | **A server-written per-door fog flag (every adjoining cell fogged) that the player redaction drops** (FR-SCN-36) / doors visible under fog (leaks layout and secret doors). Walls are never sent to players | yes | FOG |
-| OQ-SCN-07 | Who opens doors — **DM** | **DM only; locked is a DM marker** / players toggle unlocked doors next to their token. *Locked means little until players can open doors* | no · owner: DM | — |
-| OQ-SCN-08 | Undo for scene editing, **one question with OQ-FOG-08** — **DM** | **Both as specified:** fog = server per-scene stack, depth 20; structure / props = client inverse intents, 50 per scene, lost on reload. Both amend ADR-0016's "not scene edits" / no undo for scene editing. *Different by design: one mask vs many records (S7)* | yes | ADR-0016, FOG, glossary |
-| OQ-SCN-09 | Affected squares | **Cell centre inside the shape** / any overlap / sphere by the diagonal rule. *Common VTT default* | no · owner: DM (rules) | — |
-| OQ-SCN-10 | Prop size / angle | **Cells 1–20, 90° steps** / free size and angle. *Cheap, grid-true* | no · owner: spec-scene-tools | — |
-| ~~OQ-SCN-11, 12, 14, 15, 16~~ | ~~Layer registry home; FOG seam; scene hooks; DM drag hint; tool registry~~ | **Settled S3 / S5 / S6 + review:** `canvas-layers.ts` with SCN's entry shape; fog subjects per FR-SCN-35; `scene-hooks.ts` (FR-SCN-31); the hint reads the existing `pointers.drag` (no canvas-context change); `canvas-tools.ts` with stage dispatch | — | — |
-| OQ-SCN-13 | scenes-map: wall check | **Move-guard registry that may reject ([proposed ADR](../architecture/adr/proposed-token-move-guards.md))** / a token-changed hook that rejects (breaks ADR-0031) / a client-only check. *Keeps ADR-0031's hooks non-rejecting* | yes · ADR at gate | scenes-map |
-| OQ-SCN-17 | combat-tracker | **`movedFt` per campaign rule (in `build/scene-tools-settings`); nothing on blocked moves** / no rule in combat | no · owner: orchestrator | combat-tracker |
-| OQ-SCN-18 | live-sync: DM window | **[Proposed ADR](../architecture/adr/proposed-active-scene-window.md): tokens + SCN records windowed to the active scene, `sync.loadScene` in hub frame order** / every scene in the DM snapshot (needs OQ-SCN-01 C) | yes · ADR at gate | live-sync, scenes-map, combat-tracker |
-| OQ-SCN-19 | Glossary | **Rename "AoE prop" → "AoE template"; add Prop, Wall, Door, Structure, DM-only layer, Ephemeral template, Diagonal rule, Move guard, Canvas layer (vs Layer); one Undo row covering combat, fog and scene drawing** | no · owner: integrator | glossary |
-| ~~OQ-SCN-20~~ | ~~`session-sim` content~~ | **Ruled (B7):** unchanged; walls and templates are walked from `scene-tools` | — | — |
-| OQ-SCN-21 | Scope: "Select creatures inside" a template (FR-SCN-28) — **DM** | **Out (default)** / in: the DM fills the map selection from a template, so the attack popup preselects its targets. *Small, but touches combat targeting; not in Track B's list* | no · owner: DM | combat-tracker |
+| ID | Question | Decision | Affects |
+|---|---|---|---|
+| OQ-SCN-01 (= OQ-FOG-04) | CON-44 headroom for fog + scene tools | **Decided (#196): (B)** token window + SCN window (110,175 B left, measured, §12); presets stay in the snapshot (#190 stands); built first as `fix/active-scene-window`. Rejected: (A) presets on demand, (C) raise the ceiling | live-sync, FOG, scenes-map |
+| OQ-SCN-02 | Templates ephemeral or persistent | **Decided (#196):** ephemeral (signal) by default, Keep → record | live-sync |
+| OQ-SCN-03 | Who places templates | **Decided (#196):** DM and players | — |
+| OQ-SCN-04 | Diagonal rule | **Decided (#196):** campaign setting, 5/10/5 default, 5 ft option | scenes-map, combat-tracker |
+| OQ-SCN-05 | Blocking rule | **Decided (#196):** straight line between footprint centres | — |
+| OQ-SCN-06 | Doors under fog | **Decided (#196):** server-written per-door fog flag; the player redaction drops fully fogged doors (FR-SCN-36). Walls are never sent to players | FOG |
+| OQ-SCN-07 | Who opens doors | **Decided (#196):** DM only; locked is a DM marker | — |
+| OQ-SCN-08 (= OQ-FOG-08) | Undo for scene editing | **Decided (#196):** both as specified: fog = server per-scene stack, depth 20; structure / props = client inverse intents, 50 per scene, lost on reload; both amend ADR-0016's "not scene edits" | ADR-0016, FOG, glossary |
+| OQ-SCN-09 | Affected squares | **Decided (#196):** cell centre inside the shape | — |
+| OQ-SCN-10 | Prop size / angle | **Decided (#196):** cells 1–20, 90° steps | — |
+| OQ-SCN-11, 12, 14, 15, 16 | Layer registry home; FOG seam; scene hooks; DM drag hint; tool registry | **Settled (S3 / S5 / S6 + review):** `canvas-layers.ts` with SCN's entry shape; fog subjects per FR-SCN-35; `scene-hooks.ts` (FR-SCN-31); the hint reads the existing `pointers.drag`; `canvas-tools.ts` with stage dispatch | — |
+| OQ-SCN-13 | scenes-map: wall check | **Decided (#196):** move-guard registry that may reject; [move-guards ADR](../architecture/adr/proposed-token-move-guards.md) accepted | scenes-map |
+| OQ-SCN-17 | combat-tracker | **Decided (#196):** `movedFt` per campaign rule (in `build/scene-tools-settings`); nothing on blocked moves | combat-tracker |
+| OQ-SCN-18 | live-sync: DM window | **Decided (#196):** tokens + SCN records windowed to the active scene, `sync.loadScene` in hub frame order; [active-scene window ADR](../architecture/adr/proposed-active-scene-window.md) accepted | live-sync, scenes-map, combat-tracker |
+| OQ-SCN-19 | Glossary | Rename "AoE prop" → "AoE template"; add Prop, Wall, Door, Structure, DM-only layer, Ephemeral template, Diagonal rule, Move guard, Canvas layer (vs Layer); one Undo row covering combat, fog and scene drawing. **Owner: integrator** | glossary |
+| OQ-SCN-20 | `session-sim` content | **Ruled (B7):** unchanged; walls and templates are walked from `scene-tools` | — |
+| OQ-SCN-21 | Scope: "Select creatures inside" a template | **Decided (#196): out** | combat-tracker |
 
 ## 16. Out of scope
 
@@ -350,7 +346,7 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
   - Tools: `scn-tool-<structure|props|aoe|layers>`, `scn-structure-mode-<wall|door|erase>`, `scn-undo`.
   - Door menu: `scn-door-menu-<open|close|lock|unlock|delete>`.
   - Props: `scn-prop-menu-<rotate|hide|lock|front|back|duplicate|image|delete>`, `scn-prop-image`.
-  - AoE: `scn-aoe-shape-<cone|sphere|cylinder|cube|line>`, `scn-aoe-<size|width|label|keep|clear>`, `scn-template-menu-<select-inside|hide|delete>`.
+  - AoE: `scn-aoe-shape-<cone|sphere|cylinder|cube|line>`, `scn-aoe-<size|width|label|keep|clear>`, `scn-template-menu-<hide|delete>`.
   - Other: `scn-layer-toggle-<key>`, `scn-diagonal-rule` (`data-value`), `scn-scene-loading`.
 - **Konva** (name = test ID, id = record ID):
   - `scn-walls`: one shape; attr `count`.

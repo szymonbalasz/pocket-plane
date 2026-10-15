@@ -1,6 +1,6 @@
 # NNNN — Token move guards (a move may be refused)
 
-- Status: proposed
+- Status: accepted (2026-10-15; decisions-log #196)
 - Date: 2026-10-15
 - Amends: [ADR-0031](0031-token-move-hooks.md) ("a hook must not reject a move")
 - Affects: [scene-tools](../../specs/scene-tools.md) (FR-SCN-10/11), [scenes-map](../../specs/scenes-map.md) (FR-MAP-15, FR-MAP-38), [combat-tracker](../../specs/combat-tracker.md) (FR-CBT-39), [protocol](../../protocol/README.md) §25, [AGENTS §9.9](../../../AGENTS.md#99-shared-files)
@@ -22,7 +22,7 @@
 
 ## Decision
 
-> Undecided. Suggested: **A**.
+**A** (#196, DM gate 2).
 
 ## Consequences
 

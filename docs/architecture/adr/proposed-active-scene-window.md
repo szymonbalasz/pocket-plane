@@ -1,6 +1,6 @@
 # NNNN — Active-scene window for tokens and scene-tool records in the DM snapshot
 
-- Status: proposed
+- Status: accepted (2026-10-15; decisions-log #196)
 - Date: 2026-10-15
 - Refines: [ADR-0021](0021-sync-protocol-conventions.md) C ("DM: whole campaign"); sibling of [ADR-0029](0029-windowed-record-types.md)
 - Affects:
@@ -29,7 +29,7 @@
 
 ## Decision
 
-> Undecided. Suggested: **A** (DM gate 2, with OQ-SCN-01 = OQ-FOG-04 option B).
+**A** (#196, DM gate 2; OQ-SCN-01 = OQ-FOG-04 option B).
 
 ## Consequences
 
