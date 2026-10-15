@@ -1,15 +1,17 @@
 // One full sheet (CHARX §7, FR-CHARX-26): header (FR-CHAR-03 + Draft / Locked badges, Edit
 // toggle, DM Approve / Lock), header sections, then the tabs Main · Actions · Features ·
-// Inventory · Notes · section tabs. NPC sheets: CR + XP; imported definitions read-only.
+// Inventory · Notes · section tabs. Header + tab strip pinned, the tab content scrolls
+// (FR-CHARX-48). NPC sheets: CR + XP; imported definitions read-only.
 import { initials, levelLine } from "@shared/character-sheet/logic";
 import { CHARX_INTENTS, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import type { DefinitionRecord } from "@shared/entities/schemas";
 import { LockIcon } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Card } from "../../components/ui/primitives";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { AssetImg } from "../assets-pipeline/AssetImg";
 import { useOpenWindow } from "../play-shell/ShellContext";
@@ -23,7 +25,7 @@ import { SectionView, SheetSlotView } from "./SheetSections";
 import { sectionsFor } from "./sections";
 import { SheetContext, type SheetCtx, useSheet, useSheetIntents } from "./sheet-context";
 import { sheetSections } from "./sheet-sections";
-import { canEdit, canUseCounters, crLine, sheetData } from "./view-model";
+import { canEdit, canUseCounters, crLine, headerPinned, sheetData } from "./view-model";
 
 /** Creatures window kind (entities): "Derive to customise" opens it (FR-CHARX-31). */
 const CREATURES_KIND = "ent.creatures";
@@ -198,6 +200,28 @@ function SheetHeader({
   );
 }
 
+/**
+ * FR-CHARX-48: measures the window body (the Card) and the pinned part; pinned while the part
+ * takes at most half the body. Window size and geometry are untouched (FR-CHARX-26).
+ */
+function usePinnedHeader() {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [pinned, setPinned] = useState(true);
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    const header = headerRef.current;
+    if (!body || !header || typeof ResizeObserver === "undefined") return;
+    const measure = () => setPinned(headerPinned(header.offsetHeight, body.clientHeight));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(body);
+    ro.observe(header);
+    return () => ro.disconnect();
+  }, []);
+  return { bodyRef, headerRef, pinned };
+}
+
 export function SheetView({
   creature,
   row,
@@ -258,54 +282,76 @@ export function SheetView({
         });
   const tabs = [...TABS, ...sectionTabs.map((s) => [`section:${s.id}`, s.title ?? s.id] as const)];
   const current = tabs.some(([v]) => v === tab) ? tab : "main";
+  const { bodyRef, headerRef, pinned } = usePinnedHeader();
   return (
     <SheetContext.Provider value={ctx}>
       <Card
+        ref={bodyRef}
         data-testid="char-sheet"
         data-record-id={creature.id}
         data-editing={ctx.editing ? "true" : "false"}
-        className="flex h-full flex-col gap-2 overflow-auto border-0 bg-transparent p-1 shadow-none"
-      >
-        <SheetHeader picker={picker} editing={ctx.editing} setEditing={setEditing} />
-        {hint && ctx.editing && (
-          <p data-testid="charx-create-hint" className="rounded-md bg-muted p-2 text-xs">
-            {CREATE_HINT}{" "}
-            <button type="button" className="underline" onClick={() => setHint(false)}>
-              OK
-            </button>
-          </p>
+        className={cn(
+          "flex h-full flex-col border-0 bg-transparent p-1 shadow-none",
+          pinned ? "overflow-hidden" : "overflow-auto",
         )}
-        {/* The Card scrolls; nothing in it may shrink (an overflow-x box would collapse to 0 px). */}
-        <Tabs value={current} onValueChange={setTab} className="flex shrink-0 flex-col gap-2">
-          <div className="shrink-0 overflow-x-auto pb-0.5">
-            <TabsList className="w-max">
-              {tabs.map(([v, label]) => (
-                <TabsTrigger key={v} value={v} data-testid="charx-tab" data-value={v}>
-                  {label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+      >
+        {/* FR-CHARX-48: pinned = only the tab content scrolls; else the Card scrolls as a whole.
+            Nothing outside the content box may shrink (an overflow-x box would collapse to 0 px). */}
+        <Tabs
+          value={current}
+          onValueChange={setTab}
+          className={cn("flex flex-col gap-2", pinned ? "min-h-0 flex-1" : "shrink-0")}
+        >
+          <div
+            ref={headerRef}
+            data-testid="charx-header"
+            data-pinned={pinned ? "true" : "false"}
+            className="flex shrink-0 flex-col gap-2"
+          >
+            <SheetHeader picker={picker} editing={ctx.editing} setEditing={setEditing} />
+            {hint && ctx.editing && (
+              <p data-testid="charx-create-hint" className="rounded-md bg-muted p-2 text-xs">
+                {CREATE_HINT}{" "}
+                <button type="button" className="underline" onClick={() => setHint(false)}>
+                  OK
+                </button>
+              </p>
+            )}
+            <div className="shrink-0 overflow-x-auto pb-0.5">
+              <TabsList className="w-max">
+                {tabs.map(([v, label]) => (
+                  <TabsTrigger key={v} value={v} data-testid="charx-tab" data-value={v}>
+                    {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
           </div>
-          <TabsContent value="main">
-            <MainTab />
-          </TabsContent>
-          <TabsContent value="actions">
-            <ActionsTab />
-          </TabsContent>
-          <TabsContent value="features">
-            <FeaturesTab />
-          </TabsContent>
-          <TabsContent value="inventory">
-            <InventoryTab />
-          </TabsContent>
-          <TabsContent value="notes">
-            <NotesTab />
-          </TabsContent>
-          {sectionTabs.map((s) => (
-            <TabsContent key={s.id} value={`section:${s.id}`}>
-              <SectionView section={s} creatureId={creature.id} client={client} />
+          <div
+            data-testid="charx-content"
+            className={pinned ? "min-h-0 flex-1 overflow-y-auto" : undefined}
+          >
+            <TabsContent value="main">
+              <MainTab />
             </TabsContent>
-          ))}
+            <TabsContent value="actions">
+              <ActionsTab />
+            </TabsContent>
+            <TabsContent value="features">
+              <FeaturesTab />
+            </TabsContent>
+            <TabsContent value="inventory">
+              <InventoryTab />
+            </TabsContent>
+            <TabsContent value="notes">
+              <NotesTab />
+            </TabsContent>
+            {sectionTabs.map((s) => (
+              <TabsContent key={s.id} value={`section:${s.id}`}>
+                <SectionView section={s} creatureId={creature.id} client={client} />
+              </TabsContent>
+            ))}
+          </div>
         </Tabs>
       </Card>
     </SheetContext.Provider>

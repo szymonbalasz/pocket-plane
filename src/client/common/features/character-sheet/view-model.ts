@@ -309,6 +309,14 @@ export function hitDicePips(
   })).filter((p) => p.max > 0);
 }
 
+/**
+ * FR-CHARX-48: the header + tab strip stay pinned unless they would take more than half the
+ * window body (then everything scrolls together). Not measured yet (0) → pinned.
+ */
+export function headerPinned(headerPx: number, bodyPx: number): boolean {
+  return bodyPx <= 0 || headerPx * 2 <= bodyPx;
+}
+
 /** A pip click (CHARX §7): click = use one, Shift+click = restore one. */
 export const pipDelta = (shiftKey: boolean) => (shiftKey ? -1 : 1);
 

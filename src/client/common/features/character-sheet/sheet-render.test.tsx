@@ -1,20 +1,25 @@
 // Sheet rendering (CHARX §13 unit, sprint 2): the three attack buttons per row and spell form
-// (FR-CHARX-41), routing per button (FR-CHARX-43), Main without attacks (FR-CHARX-44). Static
-// server render over a fake sync store (no encounter, so combat's route never claims).
+// (FR-CHARX-41), routing per button (FR-CHARX-43), Main without attacks (FR-CHARX-44), pinned
+// header (FR-CHARX-48). Static server render over a fake sync store (no encounter, so combat's
+// route never claims).
 import { describe, expect, test } from "bun:test";
 import { defaultSheetData, SpellRow } from "@shared/character-sheet/sheet";
-import { CharacterStatBlock } from "@shared/entities/schemas";
+import { CharacterStatBlock, type DefinitionRecord } from "@shared/entities/schemas";
 import { emptyStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
+import { createWindowRegistry } from "../play-shell/registry";
+import { ShellProvider } from "../play-shell/ShellContext";
 import { ActionsTab } from "./ActionsTab";
 import { MainTab } from "./MainTab";
 import { rollRoutes } from "./roll-routes";
 import type { RollRoute } from "./routing";
+import { SheetView } from "./SheetView";
 import type { SheetCtx } from "./sheet-context";
 import { SheetContext } from "./sheet-context";
+import { headerPinned } from "./view-model";
 
 /** The registry, writable for a test route placed first (first claim wins). */
 const testRoutes = rollRoutes as RollRoute[];
@@ -41,26 +46,29 @@ const spells = [
   { id: "sh", name: "Shield", level: 1 },
 ].map((s) => SpellRow.parse(s));
 
+function ctxCreature(o: { npc?: boolean; legacy?: boolean } = {}): DefinitionRecord {
+  const s = o.legacy ? { ...stats, attacks: stats.attacks.map(({ id: _, ...a }) => a) } : stats;
+  return {
+    id: "mira",
+    kind: o.npc ? "monster" : "character",
+    name: "Mira",
+    campaignId: "c1",
+    ownerPlayerId: o.npc ? null : "p1",
+    portraitAssetId: null,
+    statBlock: s,
+  } as unknown as DefinitionRecord;
+}
+
 function render(
   node: React.ReactNode,
   o: { client?: "dm" | "player"; npc?: boolean; legacy?: boolean } = {},
 ) {
   const client = o.client ?? "player";
-  const s = o.legacy
-    ? { ...stats, attacks: stats.attacks.map(({ id: _, ...a }) => a) }
-    : (stats as typeof stats);
+  const creature = ctxCreature(o);
   const sheet = { ...defaultSheetData(), spells };
   const ctx = {
-    creature: {
-      id: "mira",
-      kind: o.npc ? "monster" : "character",
-      name: "Mira",
-      campaignId: "c1",
-      ownerPlayerId: o.npc ? null : "p1",
-      portraitAssetId: null,
-      statBlock: s,
-    },
-    stats: s,
+    creature,
+    stats: creature.statBlock,
     sheet,
     row: { id: "mira", entityId: "mira", campaignId: "c1", ownerPlayerId: "p1", ...sheet },
     client,
@@ -193,5 +201,48 @@ describe("FR-CHARX-44 attacks on the Actions tab only", () => {
     expect(html.match(/data-testid="charx-attack"/g)).toHaveLength(2);
     expect(html.match(/data-testid="charx-roll-attack-damage"/g)).toHaveLength(2);
     expect(html).toContain("Light crossbow");
+  });
+});
+
+describe("FR-CHARX-48 pinned header", () => {
+  test("FR-CHARX-48 pinned while the header takes at most half the body; else it scrolls along", () => {
+    expect(headerPinned(120, 400)).toBe(true);
+    expect(headerPinned(200, 400)).toBe(true);
+    expect(headerPinned(201, 400)).toBe(false);
+    expect(headerPinned(180, 0)).toBe(true); // not measured yet
+  });
+
+  test("FR-CHARX-48 header part = name, badges, header actions, tab strip; tab content outside it", () => {
+    // The shell's title marker takes `document` at render; a stub is enough for a static render.
+    const g = globalThis as { document?: unknown };
+    g.document = { title: "", hidden: false };
+    let html: string;
+    try {
+      html = render(
+        <ShellProvider registry={createWindowRegistry("player", [])}>
+          <SheetView
+            creature={ctxCreature()}
+            row={undefined}
+            client="player"
+            playerId="p1"
+            ownerName="Player 1"
+            picker={null}
+            startEditing={false}
+          />
+        </ShellProvider>,
+      );
+    } finally {
+      delete g.document;
+    }
+    const header = html.indexOf('data-testid="charx-header"');
+    const content = html.indexOf('data-testid="charx-content"');
+    expect(header).toBeGreaterThan(-1);
+    expect(html).toContain('data-testid="charx-header" data-pinned="true"');
+    for (const id of ["char-sheet-name", "charx-tab", "charx-edit-toggle"]) {
+      const at = html.indexOf(`data-testid="${id}"`);
+      expect(at).toBeGreaterThan(header);
+      expect(at).toBeLessThan(content);
+    }
+    expect(html.indexOf('data-testid="char-sheet-roll-init"')).toBeGreaterThan(content);
   });
 });
