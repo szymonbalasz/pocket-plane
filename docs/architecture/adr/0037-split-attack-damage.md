@@ -1,6 +1,6 @@
-# Proposed — Attack and damage as separate rolls on one damage card
+# 0037 — Attack and damage as separate rolls on one damage card
 
-- Status: accepted (DM gate 1, decision #190, 2026-10-15; raised by spec-polish-2a; integrator numbers it at merge)
+- Status: accepted (DM gate 1, decision #190, 2026-10-15; raised by spec-polish-2a)
 - Date: 2026-10-15
 - Refines: [ADR-0016](0016-domain-events-pending-actions.md) (a pending action's payload can change while it is pending), [ADR-0027](0027-notification-creation.md) (notifications change only in the causing command's transaction; now also an update)
 - Affects: [combat-tracker](../../specs/combat-tracker.md) (FR-CBT-70–74, §6.1), [notifications](../../specs/notifications.md) (FR-NOTE-25; drops "editing" from the non-goals for pending rows), [character-sheet-full](../../specs/character-sheet-full.md) (new kinds `toHit` / `spellToHit`, FR-CHARX-24 claim list; seam settled S1, OQ-CBT-51 / OQ-CHARX-21), [protocol §21–23](../../protocol/README.md#23-combat-notification-kinds)

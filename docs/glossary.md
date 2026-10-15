@@ -26,8 +26,8 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Entity kind** | The type of an entity (npc, monster, item, location, faction, quest, character). MVP uses only **character** and **monster** ([ADR-0014](architecture/adr/0014-mvp-scope.md)). | — |
 | **Creature definition** | What a creature *is*: stat block, actions. Imported (read-only) or custom (editable). Same shape for all sources ([ADR-0009](architecture/adr/0009-entity-content-model.md)). | Instance |
 | **Derive** | Create a new, independent custom definition via the creature form, prefilled from a base (shortcut only; no ongoing link). | Duplicate (Ctrl-D on an instance) |
-| **Instance** | A placed creature (token, combatant) pointing at one definition. Holds its own display name, read-only display copies of the definition (image, size; refreshed in the definition edit's transaction), play state and modifiers ([ADR-0024](architecture/adr/0024-definition-visibility.md), decisions #126). | Creature definition |
-| **Modifier** | Design for later ([ADR-0009](architecture/adr/0009-entity-content-model.md)): a field / op / value adjustment on an instance (e.g. +2 AC from a spell). Not built; conditions and labelled buffs are **Effects** ([ADR-0035](architecture/adr/0035-combat-rule-hooks.md)). | Effect; Override |
+| **Instance** | A placed creature (token, combatant) pointing at one definition. Holds its own display name, read-only display copies of the definition (image, size; refreshed in the definition edit's transaction), play state and effects, which may carry modifiers ([ADR-0024](architecture/adr/0024-definition-visibility.md), decisions #126). | Creature definition |
+| **Modifier** | A typed entry on an effect (bonus dice, flat bonus; later advantage / disadvantage, resistance, AC) applied by the server as a roll-time rider and named in the roll line ("+ 3 Bless"); never a derived value, so overrides still decide the base ([ADR-0038](architecture/adr/0038-effect-modifiers.md), refines ADR-0009). | Effect; Override |
 | **Override** | A stored value that replaces a derived sheet value (fixed key list, e.g. `save.con`), with an optional note ([ADR-0036](architecture/adr/0036-full-sheet-derivation.md)). | Modifier |
 | **Character** | Entity kind for a player character with a 5e character sheet (basics in MVP, full sheet later). Owned by a player. | Player |
 | **Character sheet** | The 5e sheet view/data of a character. | — |
@@ -80,7 +80,10 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Turn alert** | The player client's alert (flash, ping, Toast) when one of its own PCs' turn starts. | Notification |
 | **Initiative order** | Ordered list of combatants for the current combat. | — |
 | **Condition** | A 5e condition (e.g. prone, poisoned; exhaustion with a level), stored as an Effect on a combatant or character. Reminder only, except incapacitating ones end concentration. | Effect |
-| **Effect** | A row on a creature in play: a condition, a custom label, or a concentration; optional duration in rounds ([combat-extras](specs/combat-extras.md)). | Modifier |
+| **Effect** | A row on a creature in play: a condition, a custom label, or a concentration; optional duration in rounds ([combat-extras](specs/combat-extras.md)); custom effects may carry modifiers ([effect-modifiers](specs/effect-modifiers.md)). | Modifier |
+| **Preset** | A named effect template with modifiers (built-in, customised per campaign, or a character's own), e.g. Bless, Rage ([effect-modifiers](specs/effect-modifiers.md)). | Effect |
+| **Toggle** | A character preset the owner or DM switches on / off, creating or ending its effect. | Preset |
+| **Roll hook** | An append-only server registry entry that adds modifier parts to a roll inside the rolling command's transaction ([ADR-0038](architecture/adr/0038-effect-modifiers.md)). | Rule hook |
 | **Concentration** | An Effect marking that a creature maintains a concentration spell (one per creature); damage raises a Concentration card. | — |
 | **Concentration card** | A notification kind with a "Roll save" action (DC max(10, half the damage)) sent to the PC's owner or the DM. | Damage card |
 | **Temp HP** | Temporary hit points on a character or combatant; absorb damage first, don't stack. | — |
@@ -97,6 +100,9 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Undo** | DM-only, strict LIFO, combat log entries only (damage/healing applied): appends a compensating event that reverses the latest apply (all its combat log entries: one card apply, or one direct HP change) and marks them undone. | — |
 | **Pending action** | A notification whose action (button) is not yet resolved or dismissed (e.g. apply damage, roll a save). | — |
 | **Damage card** | A notification kind (`damage-card`) with an "apply" action, holding an attack's to-hit and damage rolls (from a player or DM roll) that the DM applies to one or more targets picked in the attack popup, each with its own hit / miss and multiplier: normal, half, none, double (#53, #134, #148). | Roll |
+| **Attack + damage** | The sheet button that rolls to-hit and damage as one action; **Attack** rolls to-hit only and **Damage** damage only. In combat, Attack makes a to-hit-only damage card that Damage completes ([ADR-0037](architecture/adr/0037-split-attack-damage.md)). | Damage card |
+| **HP formula** | Dice expression for a creature's hit points; Average = the stat block's HP max, Rolled = the formula rolled when the creature joins combat ([entities](specs/entities.md)). | — |
+| **Action cue** | A few-second mark on a player's token on the DM's map when that player gets a pending action notification ([notifications](specs/notifications.md)). | Notification |
 | **Attack popup** | The DM's non-modal panel to pick a damage card's targets (map selection or list), check hit vs AC per target, override values and apply. | Damage card |
 | **Action owner** | Who may act on a pending notification (the DM or one player); the DM may always act. | Actor (a roll's actor in the game log) |
 | **Combat log entry** | One applied HP change to one target in combat (damage or heal): the stats unit. Undo reverts one apply, which may hold several entries. | Game log entry; event log entry |
@@ -119,6 +125,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Window** | A floating, movable, resizable panel on the play page; an open instance of a window type. | Browser window (pop-outs out of scope) |
 | **Window type** | A feature's registered kind of window (`<prefix>.<name>`, clients, defaults, component) in a per-client registry. | Window |
 | **Launcher** | Bottom bar of buttons that open, bring to front or minimise windows. | — |
+| **Minimised** (window) | Parked on the launcher: keeps its state and shows a dot when something new happens in it. A closed window keeps only its geometry ([play-shell](specs/play-shell.md)). | Closed |
 | **Work area** | The part of the viewport below the top bar and above the launcher; windows and the attack popup fit into it (decisions #172). | Viewport |
 | **Free area** | The largest part of the work area, right of the tool rail, that no open window covers; the map frames its tokens there (FR-SHELL-34, FR-MAP-44). | Work area |
 | **Alert** | The shell's attention signal for one client: screen flash, short UI sound ([ADR-0030](architecture/adr/0030-ui-notification-sounds.md)) and a Toast; per-browser mute and volume. Not persisted. | Notification |

@@ -8,7 +8,7 @@ phase: post-mvp-2
 
 # Effect modifiers
 
-> Five-minute read for §1–§7; §8 onwards is reference. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Builds on [combat-extras](combat-extras.md) (CBTX, effects) and [character-sheet-full](character-sheet-full.md) (CHARX, sheet sections). Sprint plan: [sprint-2](../agents/sprint-2.md) track M, DM note N9 (#188). Cross-cutting decision: [proposed ADR](../architecture/adr/proposed-effect-modifiers.md).
+> Five-minute read for §1–§7; §8 onwards is reference. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Builds on [combat-extras](combat-extras.md) (CBTX, effects) and [character-sheet-full](character-sheet-full.md) (CHARX, sheet sections). Sprint plan: [sprint-2](../agents/sprint-2.md) track M, DM note N9 (#188). Cross-cutting decision: [proposed ADR](../architecture/adr/0038-effect-modifiers.md).
 
 ## 1. Summary
 
@@ -302,7 +302,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | On | What we need | Status |
 |---|---|---|
 | ADR-0005, 0009, 0016, 0018, 0021, 0022, 0035, 0036; #134, #136, #138, #178 | Authority, modifier list (refined), events, licence, sync, seams, in-tx rules, overrides | accepted |
-| [Effect-modifiers ADR](../architecture/adr/proposed-effect-modifiers.md) | Modifier model + where it applies | accepted #190 (integrator numbers it at merge) |
+| [Effect-modifiers ADR](../architecture/adr/0038-effect-modifiers.md) | Modifier model + where it applies | accepted #190 (integrator numbers it at merge) |
 | [combat-extras](combat-extras.md) | `effect` columns + redaction; internal effect / concentration helpers; concentration and death-save callers pass a subject; death-save line with parts (FR-CBTX-47) | complete; P2a revising (no shape change) |
 | [dice-roll-log](dice-roll-log.md) | `rollHooks`, `subject` on `dice.evaluate`, payload `mods`, `roll` line; tier 2 roll-control `subject` | complete; amendment |
 | [combat-tracker](combat-tracker.md) | Callers pass a subject (incl. P2a's `cbt.rollDamage`, partial `cbt.attack {rolls: "toHit"}`); card / line `mods` on nullable parts; rolled incl. parts (FR-CBT-23/34/53); tier 2 popup AC + defense | complete; P2a revising (split attack, S1) |
@@ -362,7 +362,7 @@ flowchart LR
 
 ## 15. Open questions
 
-All decided at DM gate 1 ("go with picks", #190), except OQ-MOD-16 (glossary), which the integrator applies at merge. The [ADR](../architecture/adr/proposed-effect-modifiers.md) is accepted (#190). Accepted leak (#190): public lines show part values of a visible monster's effects ("− 2 Bane").
+All decided at DM gate 1 ("go with picks", #190), except OQ-MOD-16 (glossary), which the integrator applies at merge. The [ADR](../architecture/adr/0038-effect-modifiers.md) is accepted (#190). Accepted leak (#190): public lines show part values of a visible monster's effects ("− 2 Bane").
 
 | ID | Question | Decision | Blocking? | Affects |
 |---|---|---|---|---|

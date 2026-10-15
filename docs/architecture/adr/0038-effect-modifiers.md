@@ -1,6 +1,6 @@
-# Proposed — Effect modifiers: typed riders on effect rows, applied by a roll hook
+# 0038 — Effect modifiers: typed riders on effect rows, applied by a roll hook
 
-- Status: accepted (DM gate 1, decision #190, 2026-10-15; raised by [effect-modifiers](../../specs/effect-modifiers.md) OQ-MOD-07, -08, -15, -17; DM note N9, #188). Integrator numbers it at merge.
+- Status: accepted (DM gate 1, decision #190, 2026-10-15; raised by [effect-modifiers](../../specs/effect-modifiers.md) OQ-MOD-07, -08, -15, -17; DM note N9, #188).
 - Date: 2026-10-15
 - Affects: [effect-modifiers](../../specs/effect-modifiers.md), [combat-extras](../../specs/combat-extras.md), [dice-roll-log](../../specs/dice-roll-log.md), [combat-tracker](../../specs/combat-tracker.md), [character-sheet-full](../../specs/character-sheet-full.md), [data model](../../data-model/README.md), [protocol](../../protocol/README.md), [AGENTS §9.9](../../../AGENTS.md#99-shared-files)
 - Refines: [ADR-0009](0009-entity-content-model.md) open row "Modifier model: design for later: instance → list of modifiers (field, op, value, source, duration)", with two differences: (1) the list is a JSON leaf on CBTX effect rows, not relational columns / rows on token or combatant; (2) modifiers apply as roll-time riders (and DM popup presets), not as "effective stats = definition + instance modifiers". [ADR-0035](0035-combat-rule-hooks.md) ("effects carry no numbers"). [ADR-0021](0021-sync-protocol-conventions.md) D for preset edits, as [ADR-0036](0036-full-sheet-derivation.md) did for sheet edits
@@ -10,7 +10,7 @@
 
 - The DM's playtest (N9): Bless must add to attack rolls; a barbarian toggles Rage. Today effects are labels: the d4 is mental arithmetic.
 - ADR-0009 planned a per-instance modifier list (field, op, value, source, duration); ADR-0035 put effects (conditions, labels, concentration) in CBTX's `effect` table and left numbers for later.
-- Rolls are made in seven commands across three features (`char.roll`, `cbt.attack` (whole or to-hit only), `cbt.rollDamage` (P2a's split attack, `proposed-split-attack-damage.md` on its branch), `cbt.rollAbility`, `cbt.rollInitiative`, `cbtx.rollConcentration`, `cbtx.rollDeathSave`); all go through dice-roll-log's `dice.evaluate` inside their transaction. A card's to-hit and damage parts may be rolled in separate commands, so each part takes the modifiers active at its own commit.
+- Rolls are made in seven commands across three features (`char.roll`, `cbt.attack` (whole or to-hit only), `cbt.rollDamage` (P2a's split attack, `0037-split-attack-damage.md` on its branch), `cbt.rollAbility`, `cbt.rollInitiative`, `cbtx.rollConcentration`, `cbtx.rollDeathSave`); all go through dice-roll-log's `dice.evaluate` inside their transaction. A card's to-hit and damage parts may be rolled in separate commands, so each part takes the modifiers active at its own commit.
 - ADR-0036: sheet numbers are derived with overrides; an override replaces the derived value everywhere.
 - Attacks are rolled before targets are picked (#134, #135); only the DM applies (#136).
 
