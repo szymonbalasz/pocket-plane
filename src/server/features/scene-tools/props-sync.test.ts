@@ -33,6 +33,34 @@ async function until(pred: () => boolean, ms = 1000) {
     await Bun.sleep(10);
   }
 }
+/** SCN §8 compact player wire: no campaignId, locked or timestamps; seq stays (draw order). */
+const PLAYER_PROP_KEYS = [
+  "assetId",
+  "col",
+  "h",
+  "hidden",
+  "id",
+  "rotation",
+  "row",
+  "sceneId",
+  "seq",
+  "w",
+  "z",
+];
+/** Every `scene-prop` row a client received (snapshot rows and event upserts). */
+function propRows(c: TestClient): object[] {
+  const out: object[] = [];
+  for (const f of c.frames) {
+    if (f.type === "snapshot") out.push(...((f.records[SCENE_PROP_TYPE] ?? []) as object[]));
+    if (f.type === "event") {
+      for (const ch of f.changes) {
+        const data = (ch as { data?: object }).data;
+        if (ch.type === SCENE_PROP_TYPE && data) out.push(data);
+      }
+    }
+  }
+  return out;
+}
 const propsOf = (c: TestClient) =>
   (c.store.records[SCENE_PROP_TYPE] ?? {}) as Record<
     string,
@@ -110,6 +138,8 @@ describe("scene-tools props over WS (build/scene-tools-props)", () => {
       const ps = propsOf(c);
       expect(Object.keys(ps).sort()).toEqual([ids.barrel, ids.table].map(String).sort());
       expect(ps[ids.table as string]).toMatchObject({ col: 4, row: 11, w: 2, h: 1, rotation: 90 });
+      // SCN §8 compact player wire: no campaignId, locked or timestamps; seq stays (draw order).
+      for (const r of Object.values(ps)) expect(Object.keys(r).sort()).toEqual(PLAYER_PROP_KEYS);
       const raw = c.raw();
       for (const leak of [img["prop-chest"] as string, '"locked"', ids.chest as string]) {
         expect(raw).not.toContain(leak);
@@ -163,8 +193,11 @@ describe("scene-tools props over WS (build/scene-tools-props)", () => {
     await until(() => (propsOf(dm)[chest] as ScenePropRecord | undefined)?.locked === true);
     const drag = await answer(dm, dm.intent(S.updateProp, { propId: chest, col: 15 }));
     expect(drag).toMatchObject({ type: "reject", code: "conflict" });
-    // Prop frames: only Prop* causes; no `locked` anywhere a player received.
+    // Prop frames: only Prop* causes; no `locked` anywhere a player received; every row compact.
     for (const c of [p1, p2]) {
+      const rows = propRows(c);
+      expect(rows.length).toBeGreaterThan(4);
+      for (const r of rows) expect(Object.keys(r).sort()).toEqual(PLAYER_PROP_KEYS);
       expect(c.raw()).not.toContain('"locked"');
       const causes = c.frames.flatMap((f) => (f.type === "event" ? [f.cause.name] : []));
       expect(new Set(causes)).toEqual(
