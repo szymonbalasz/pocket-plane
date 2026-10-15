@@ -202,7 +202,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 1 | A logs in, opens Notifications | — | Summary toast "1 pending action". Pending: `pending-dm`, `pending-p1`; History: 5 rows with audience tags. No per-item toasts. *(Sprint 2)* The window is 360×480 at 1440×900 (FR-NOTE-31) |
 | 2 | — | B, C open links, open Notifications | B: summary "1 pending action"; 4 rows, `pending-p1` with Done. C: no summary; 2 rows. No `SECRET-NOTE` in B or C |
 | 3 | A sends info to All "Torches gutter" | — | Toast in A, B, C; hides after ~6 s; History row in all three |
-| 4 | A sends pending to Player 1, owner Player 1, "Done", "Roll DEX save" | — | B: sticky toast with Done. C: nothing. A: no toast; row Pending "Player 1"; *(sprint 2)* A's bell badge +1 (FR-NOTE-27), back after step 5 |
+| 4 | A sends pending to Player 1, owner Player 1, "Done", "Roll DEX save" | — | B: sticky toast with Done. C: nothing. A: no toast; row Pending "Player 1"; *(sprint 2)* A closes (or minimises) Notifications after sending: A's bell badge +1 (FR-NOTE-27; while the window is shown, FR-NOTE-18 marks rows seen), back after step 5 |
 | 5 | — | B clicks Done on the toast | B toast gone; "Resolved by Player 1" in A and B |
 | 6 | — | B sends test "Apply 4 damage?" | A and D: sticky toast with Resolve. B: row Pending, no button, no toast |
 | 7 | A and D click Resolve at once | — | One succeeds; the other "No longer pending". One "Resolved by DM" row everywhere |
