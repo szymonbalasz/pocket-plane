@@ -1,4 +1,5 @@
-// ADR-0040 / FR-SCN-11 move guards: the registry ships empty; a test guard shows `map.moveToken`
+// ADR-0040 / FR-SCN-11 move guards: the registry holds scene-tools' wall guard (no structure
+// row → no effect; its own tests are in scene-tools/guard.test.ts); a test guard shows `map.moveToken`
 // runs guards → derive → one write → token-changed hooks, and that a refusal writes nothing.
 import { afterEach, describe, expect, test } from "bun:test";
 import type { SceneRecord } from "@shared/scenes-map/schemas";
@@ -57,8 +58,8 @@ function setup() {
 }
 
 describe("ADR-0040 move guards", () => {
-  test("ADR-0040 the registry ships empty: moves are unchanged", () => {
-    expect(moveGuards).toEqual([]);
+  test("ADR-0040 the registry holds scene-tools' wall guard; no structure → moves unchanged", () => {
+    expect(moveGuards.map((g) => g.name)).toEqual(["scene-tools.walls"]);
     const t = setup();
     const g = t.place(t.h.goblinId, 2, 2);
     t.run(I.moveToken, { tokenId: g, col: 9, row: 2 });
