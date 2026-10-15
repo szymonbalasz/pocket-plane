@@ -2,18 +2,16 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 2 phase 1 builds (#190 gate 1 'go with picks'; specs merged, ADR-0037 / 0038). Wave 1 merged (#192); wave 2 = charx-cues, combat2-add, combat2-polish; then split-attack; M last. Plan: phase-1 review build graph (`.verify/review-phase1/review.md` "Build order").
+**Phase:** Sprint 2 phase 1 builds (#190 gate 1 'go with picks'; specs merged, ADR-0037 / 0038). Wave 1 merged (#192); wave 2 merged (#193); split-attack ∥ M slice 2, then M slices 3-4; then session-sim-5. Plan: phase-1 review build graph (`.verify/review-phase1/review.md` "Build order").
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Wave 1: map-fit-floor, shell-minimise, physical-crit, charx-buttons, combat2-core | merged | — | Done (#192) | — |
-| P2b cues (G8, 13, N3) | `fix/charx-cues` (w2Q, slot 2) | build-charx-cues | Building | Walkthrough CHARX 3, 6, 12, 13a; CAMP 9-11 |
-| P2a add (N5, N6, 15, 17) | `fix/combat2-add` (w2R, slot 0) | build-combat2-add | Building | Walkthrough CBT 2-4, CBTX 11a/b |
-| P2a polish (N8, N11, G1, G4, G5, G7, G9, G10, 14, FR-NOTE-31/32) | `fix/combat2-polish` (w2S, slot 3) | build-combat2-polish | Building | Walkthrough |
-| P2a split attack (N7 combat) | `fix/combat2-split-attack` | — | After polish | — |
-| M tier 1 | `fix/mod-core`, `build/effect-modifiers` | — | mod-core after combat2-add; slices 3-4 last | — |
+| Waves 1-2 (P2b all, P2a core / add / polish, M core) | merged | — | Done (#192, #193) | — |
+| P2a split attack (N7 combat, item 12) | `fix/combat2-split-attack` (w2W, slot 2) | build-combat2-split-attack | Building | Walkthrough CBT 9c, 9d |
+| M tier 1 slices 2-4 | `build/effect-modifiers` (w2V, slot 0) | build-effect-modifiers | Slice 2; slices 3-4 after split-attack merges | Walkthrough MOD §13 |
+| Phase 1 close | main | — | After both | session-sim-5, "Playtest: phase 1 fixes" |
 | F: fog of war (phase 2) | `spec/fog-of-war` | — | After phase 1 | — |
 | B: props + structure (phase 2) | `spec/scene-tools` | — | After phase 1 | — |
 
@@ -21,14 +19,13 @@ Helpers in [`tools/`](tools/); scratch + evidence archive in `%TEMP%\pocket-plan
 
 ## Shared-file locks
 
-- Canvas: free (fix/combat2-core merged) → phase 2.
-- Character-sheet folder + notification registries (append): fix/charx-cues → M.
-- Combat: fix/combat2-add (server lifecycle / encounters / initiative / hooks, CBTX add / bind, DM encounters / creature form / dialogs / token menu) ∥ fix/combat2-polish (popup, Initiative windows, hp-dialog, CBTX row / parts / concentration / play-state, notifications feature files) → fix/combat2-split-attack.
-- Schema: free until fix/mod-core.
+- Combat-tracker attack / damage / hp / card-kind / roll-route / popup / Initiative: fix/combat2-split-attack → M slice 3 (subject passing).
+- Character-sheet `commands.ts`, CBTX concentration / play-state: M slice 3 (after split-attack).
+- Schema: free (phase 2 cores next, one at a time).
 
 ## Pending DM decisions
 
-- None. Gate 1 answered (#190).
+- None now. Gate 2: CON-44 headroom (heavy DM 780,950 / 786,432 B after mod-core) before fog: presets on demand / fog compaction / raise ceiling.
 
 ## Resolved locally (report at gate)
 
