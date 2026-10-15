@@ -7,6 +7,7 @@ import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "../../components/ui/menus";
 import { Tooltip } from "../../components/ui/overlays";
+import { ToggleTip } from "../../components/ui/toggle-tip";
 import { toastReject, useLive, useMapIntent } from "../scenes-map/intents";
 import type { CanvasToolDef } from "../scenes-map/tools";
 import { typingTarget } from "../scenes-map/tools";
@@ -69,7 +70,7 @@ export function StructurePanel() {
         aria-label="Structure mode"
       >
         {MODES.map((m) => (
-          <Tooltip key={m.mode} content={`${m.label} — ${m.hint}`}>
+          <ToggleTip key={m.mode} content={`${m.label} — ${m.hint}`}>
             <ToggleGroupItem
               value={m.mode}
               aria-label={m.label}
@@ -77,7 +78,7 @@ export function StructurePanel() {
             >
               <m.icon />
             </ToggleGroupItem>
-          </Tooltip>
+          </ToggleTip>
         ))}
       </ToggleGroup>
       <Tooltip content="Undo (Ctrl+Z)">

@@ -80,6 +80,9 @@ test("FR-SCN-29 / -30 / -05 diagonal rule on everyone's ruler; DM-only layer swi
 
   // The DM's Ruler panel: Diagonals 5 ft → player-1 reads 15 ft.
   await dm.getByTestId("map-tool-ruler").click();
+  // The active rail tool keeps its highlight under the hover hint (ToggleTip).
+  await expect(dm.getByTestId("map-tool-ruler")).toHaveAttribute("data-state", "on");
+  await expect(dm.getByTestId("map-tool-select")).toHaveAttribute("data-state", "off");
   const diagonals = dm.getByTestId("scn-diagonal-rule");
   await expect(diagonals).toHaveAttribute("data-value", "5-10-5");
   await dm.getByTestId("scn-diagonal-rule-5").click();

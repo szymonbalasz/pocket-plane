@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "../../components/ui/menus";
 import { Tooltip } from "../../components/ui/overlays";
+import { ToggleTip } from "../../components/ui/toggle-tip";
 import { canvasTools } from "./canvas-tools";
 import { useLive } from "./intents";
 import { type MapTool, useMapFit, useMapTool } from "./tool-store";
@@ -158,16 +159,13 @@ export function ToolRail({
             </ToggleGroupItem>
           );
           return (
-            <Tooltip key={t.tool} content={`${t.label} — ${hint}`}>
-              {/* A disabled button gets no pointer events: the wrapper carries the tooltip. */}
-              {off ? (
-                <span data-testid={`map-tool-${t.tool}-off`} className="inline-flex">
-                  {item}
-                </span>
-              ) : (
-                item
-              )}
-            </Tooltip>
+            <ToggleTip
+              key={t.tool}
+              content={`${t.label} — ${hint}`}
+              offTestId={off ? `map-tool-${t.tool}-off` : undefined}
+            >
+              {item}
+            </ToggleTip>
           );
         })}
         {registry.map((t) => {
@@ -185,15 +183,13 @@ export function ToolRail({
           );
           const hint = !live ? NOT_LIVE_HINT : selectOnly ? "Off while picking targets" : null;
           return (
-            <Tooltip key={t.id} content={hint ? `${t.label} — ${hint}` : t.label}>
-              {off ? (
-                <span data-testid={`map-tool-${t.id}-off`} className="inline-flex">
-                  {item}
-                </span>
-              ) : (
-                item
-              )}
-            </Tooltip>
+            <ToggleTip
+              key={t.id}
+              content={hint ? `${t.label} — ${hint}` : t.label}
+              offTestId={off ? `map-tool-${t.id}-off` : undefined}
+            >
+              {item}
+            </ToggleTip>
           );
         })}
       </ToggleGroup>

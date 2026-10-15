@@ -32,8 +32,8 @@ import {
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/menus";
-import { Tooltip } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
+import { ToggleTip } from "../../components/ui/toggle-tip";
 import { useSendSignal } from "../../sync/store";
 import { toastReject, useMapIntent } from "../scenes-map/intents";
 import { useMapTool } from "../scenes-map/tool-store";
@@ -239,11 +239,11 @@ export function AoePanel() {
         {TEMPLATE_SHAPES.map((s) => {
           const Icon = SHAPE_ICONS[s];
           return (
-            <Tooltip key={s} content={`${s[0]?.toUpperCase()}${s.slice(1)}`}>
+            <ToggleTip key={s} content={`${s[0]?.toUpperCase()}${s.slice(1)}`}>
               <ToggleGroupItem value={s} aria-label={s} data-testid={`scn-aoe-shape-${s}`}>
                 <Icon />
               </ToggleGroupItem>
-            </Tooltip>
+            </ToggleTip>
           );
         })}
       </ToggleGroup>
