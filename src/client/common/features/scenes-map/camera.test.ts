@@ -3,13 +3,17 @@ import type { TokenSize } from "@shared/scenes-map/schemas";
 import {
   type Box,
   type Camera,
+  type CameraMode,
   cameraOn,
   contentBox,
+  createResizeRefit,
   FIT_MARGIN,
   FIT_MIN_CELL_PX,
   fitCamera,
   fitContent,
   footprintBox,
+  RESIZE_REFIT_MS,
+  type Timers,
   ZOOM_MAX,
 } from "./camera";
 
@@ -207,5 +211,110 @@ describe("FR-MAP-44/45 camera triggers", () => {
   test("FR-MAP-45 fit button refits from moved (camera only: no live input, works while not live)", () => {
     expect(cameraOn("moved", "fit")).toEqual({ mode: "fitted", fit: true });
     expect(cameraOn(cameraOn("moved", "fit").mode, "appearance").fit).toBe(true);
+  });
+});
+
+/** A fake clock: `advance(ms)` runs due timers in order. */
+function fakeTimers() {
+  let now = 0;
+  let next = 0;
+  const due = new Map<number, { at: number; fn: () => void }>();
+  const timers: Timers = {
+    set(fn, ms) {
+      next += 1;
+      due.set(next, { at: now + ms, fn });
+      return next;
+    },
+    clear: (h) => void due.delete(h as number),
+  };
+  const advance = (to: number) => {
+    for (;;) {
+      const [id, t] = [...due.entries()].sort((a, b) => a[1].at - b[1].at)[0] ?? [];
+      if (id === undefined || !t || t.at > to) break;
+      due.delete(id);
+      now = t.at;
+      t.fn();
+    }
+    now = to;
+  };
+  return { timers, advance, now: () => now };
+}
+
+describe("FR-MAP-47 resize refit", () => {
+  /** A canvas stand-in: camera mode, a drag flag and the times it refitted. */
+  function rig(mode: CameraMode = "fitted") {
+    const clock = fakeTimers();
+    const state = { mode, dragging: false, fits: [] as number[] };
+    const r = createResizeRefit(
+      () => {
+        const next = cameraOn(state.mode, "resize");
+        state.mode = next.mode;
+        if (next.fit) state.fits.push(clock.now());
+      },
+      () => state.dragging,
+      clock.timers,
+    );
+    return { clock, state, r };
+  }
+
+  test("FR-MAP-47 refit on resize only while fitted: events at 0 / 100 / 250 ms → one refit at 450 ms", () => {
+    const { clock, state, r } = rig();
+    r.resize();
+    clock.advance(100);
+    r.resize();
+    clock.advance(250);
+    r.resize();
+    clock.advance(449);
+    expect(state.fits).toEqual([]);
+    clock.advance(2000);
+    expect(state.fits).toEqual([250 + RESIZE_REFIT_MS]);
+    expect(state.mode).toBe("fitted");
+  });
+
+  test("FR-MAP-47 refit on resize only while fitted: moved → no refit", () => {
+    const { clock, state, r } = rig("moved");
+    r.resize();
+    clock.advance(1000);
+    expect(state.fits).toEqual([]);
+    expect(state.mode).toBe("moved");
+    // A pan between the last resize event and the refit wins too.
+    const b = rig();
+    b.r.resize();
+    b.clock.advance(100);
+    b.state.mode = cameraOn(b.state.mode, "pan").mode;
+    b.clock.advance(1000);
+    expect(b.state.fits).toEqual([]);
+  });
+
+  test("FR-MAP-47 resize during a token drag refits after the drop", () => {
+    const { clock, state, r } = rig();
+    state.dragging = true;
+    r.resize();
+    clock.advance(1000);
+    expect(state.fits).toEqual([]);
+    state.dragging = false;
+    clock.advance(1500);
+    r.drop();
+    expect(state.fits).toEqual([1500]);
+    // Once only; a drop with nothing pending does nothing.
+    r.drop();
+    expect(state.fits).toEqual([1500]);
+  });
+
+  test("FR-MAP-47 window move → no refit (only viewport resize events refit)", () => {
+    // Window moves, opens and closes reach the canvas as a new free area, never as `resize()`;
+    // a drop with no resize pending does nothing either.
+    const { clock, state, r } = rig();
+    r.drop();
+    clock.advance(1000);
+    expect(state.fits).toEqual([]);
+  });
+
+  test("FR-MAP-47 dispose cancels a pending refit", () => {
+    const { clock, state, r } = rig();
+    r.resize();
+    r.dispose();
+    clock.advance(1000);
+    expect(state.fits).toEqual([]);
   });
 });

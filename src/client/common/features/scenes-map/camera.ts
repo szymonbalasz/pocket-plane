@@ -1,5 +1,6 @@
 // Per-client camera (FR-MAP-12): pan/zoom never sent. Map px → screen px = p × scale + (x, y).
-// A scene opens framed in the free area (FR-MAP-44, R1), never below a readable cell (FR-MAP-46).
+// A scene opens framed in the free area (FR-MAP-44, R1), never below a readable cell (FR-MAP-46);
+// a viewport resize refits while fitted (FR-MAP-47).
 import { footprint, type Grid } from "@shared/scenes-map/geometry";
 import type { TokenSize } from "@shared/scenes-map/schemas";
 
@@ -143,12 +144,15 @@ export function fitContent(
 /** `data-camera` (FR-MAP-44 (b)): where the last fit put it, or moved by the user since. */
 export type CameraMode = "fitted" | "moved";
 
-/** What can happen to the camera; window, token, snapshot and resize changes are not here. */
-export type CameraEvent = "open" | "fit" | "appearance" | "pan" | "zoom" | "pull";
+/**
+ * What can happen to the camera; window, token and snapshot changes are not here. `resize` = a
+ * browser viewport resize, settled (FR-MAP-47).
+ */
+export type CameraEvent = "open" | "fit" | "appearance" | "resize" | "pan" | "zoom" | "pull";
 
 /**
- * FR-MAP-44/45 triggers: a scene open and the Fit button always fit; an appearance refits only
- * while `fitted`; pan, wheel zoom and pull mark the camera `moved`.
+ * FR-MAP-44/45/47 triggers: a scene open and the Fit button always fit; an appearance or a
+ * viewport resize refits only while `fitted`; pan, wheel zoom and pull mark the camera `moved`.
  */
 export function cameraOn(mode: CameraMode, e: CameraEvent): { mode: CameraMode; fit: boolean } {
   switch (e) {
@@ -156,10 +160,56 @@ export function cameraOn(mode: CameraMode, e: CameraEvent): { mode: CameraMode; 
     case "fit":
       return { mode: "fitted", fit: true };
     case "appearance":
+    case "resize":
       return { mode, fit: mode === "fitted" };
     default:
       return { mode: "moved", fit: false };
   }
+}
+
+/** FR-MAP-47: a viewport resize refits this long after the last `resize` event. */
+export const RESIZE_REFIT_MS = 200;
+
+export interface Timers {
+  set(fn: () => void, ms: number): unknown;
+  clear(handle: unknown): void;
+}
+
+const realTimers: Timers = {
+  set: (fn, ms) => setTimeout(fn, ms),
+  clear: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+};
+
+/**
+ * FR-MAP-47: `resize()` on each viewport `resize` event; `refit` runs once, `RESIZE_REFIT_MS`
+ * after the last one (it applies the `resize` camera event, so `moved` never refits). Settled
+ * during a token drag (`dragging()`): it waits for `drop()`.
+ */
+export function createResizeRefit(refit: () => void, dragging: () => boolean, timers = realTimers) {
+  let handle: unknown = null;
+  let afterDrop = false;
+  const fire = () => {
+    handle = null;
+    if (dragging()) afterDrop = true;
+    else refit();
+  };
+  return {
+    resize() {
+      if (handle !== null) timers.clear(handle);
+      afterDrop = false;
+      handle = timers.set(fire, RESIZE_REFIT_MS);
+    },
+    drop() {
+      if (!afterDrop) return;
+      afterDrop = false;
+      refit();
+    },
+    dispose() {
+      if (handle !== null) timers.clear(handle);
+      handle = null;
+      afterDrop = false;
+    },
+  };
 }
 
 /** Wheel zoom about the pointer (screen px): the map point under it stays put. */

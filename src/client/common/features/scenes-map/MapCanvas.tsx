@@ -33,6 +33,7 @@ import {
   cameraOn,
   centreOn,
   contentBox,
+  createResizeRefit,
   fitContent,
   footprintBox,
   zoomAt,
@@ -194,6 +195,20 @@ export function MapCanvas(props: MapCanvasProps) {
     seenAppearances.current = free.appearances;
     onCamera("appearance", true);
   }, [free.appearances, onCamera]);
+  // FR-MAP-47: a settled viewport resize refits while `fitted` (after a token drag drops).
+  const resizeRefit = useRef<ReturnType<typeof createResizeRefit> | null>(null);
+  useEffect(() => {
+    const r = createResizeRefit(
+      () => onCamera("resize"),
+      () => dragRef.current !== null,
+    );
+    resizeRefit.current = r;
+    window.addEventListener("resize", r.resize);
+    return () => {
+      window.removeEventListener("resize", r.resize);
+      r.dispose();
+    };
+  }, [onCamera]);
   // FR-MAP-45: the rail's Fit button.
   useEffect(
     () =>
@@ -311,6 +326,7 @@ export function MapCanvas(props: MapCanvasProps) {
           ? drag.finish(drop, liveRef.current, (to) => move(t, to.col, to.row))
           : { col: t.col, row: t.row };
         node.position(cellToPx(gridRef.current, at.col, at.row));
+        resizeRefit.current?.drop();
       },
       click(t, toggle) {
         onTokenClick?.(t, toggle);

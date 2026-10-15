@@ -3,6 +3,7 @@
 // with no token centre under a window at 1440×900 and 1280×720 (DM incl. hidden Wolf / Elite);
 // a pan marks the camera moved, Fit refits; the player's Initiative appearing on Start refits.
 // G2 (FR-MAP-46): cells never below 48 px; at the floor only the PCs (Mira, Thorn) must be clear.
+// G3 (FR-MAP-47): a viewport resize refits while fitted, never once the camera moved.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
@@ -91,7 +92,25 @@ test("FR-MAP-44 / -45 FR-SHELL-34 fit to the free area: open, reload, pan + Fit,
   await player.getByTestId("map-tool-fit").click();
   await expectUncovered(player, 4, pcs);
 
-  // The same at 1280×720 after a reload (a resize alone never refits).
+  // G3 (FR-MAP-47): a resize to 1280×720 while fitted refits, no Fit click.
+  for (const [page, count] of [
+    [dm, 6],
+    [player, 4],
+  ] as const) {
+    await page.setViewportSize(LAPTOP);
+    await expectUncovered(page, count, pcs);
+  }
+  // A wheel zoom marks the camera moved: the resize back leaves it alone.
+  await dm.mouse.move(400, 200);
+  await dm.mouse.wheel(0, -100);
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-camera", "moved");
+  const zoomed = await konvaNodes(dm, "map-token");
+  await dm.setViewportSize(WIDE);
+  await dm.waitForTimeout(600); // > the 200 ms settle
+  expect(await konvaNodes(dm, "map-token")).toEqual(zoomed);
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-camera", "moved");
+
+  // The same at 1280×720 after a reload.
   for (const page of [dm, player]) {
     await page.setViewportSize(LAPTOP);
     await page.reload();
