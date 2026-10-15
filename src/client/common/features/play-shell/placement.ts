@@ -1,9 +1,11 @@
 // Open placement for windows without stored geometry (FR-SHELL-08/14). Pure.
 // 1. The default rect, fitted to the usable area (shrunk, never below min size).
-// 2. If it overlaps an open window: edge-first, never a mid-map column (map-first, #162). Its
-//    default column (free at full size, nearest; else the tallest free slot ≥ min height), then
-//    the left or right edge column (same order); all full → the spot covering least, in its
-//    default column first (a cascade), then at the other edge.
+// 2. If it overlaps an open window: edge-first, never a mid-map column (map-first, #162). A
+//    full-size free slot at either edge (its default column first, then the nearest) beats a
+//    shrunk one (FR-NOTE-31 ruling); with none, a window with `minOpenH` opens at that height on
+//    top, covering the least; any other takes the tallest free slot ≥ min height (default column
+//    first); all full → the spot covering least, in its default column first (a cascade), then
+//    at the other edge.
 import {
   defaultRect,
   EDGE_GAP,
@@ -19,7 +21,7 @@ export const RAIL_CLEAR = 68;
 
 export type Placeable = Pick<
   WindowDef,
-  "defaultPosition" | "defaultSize" | "minSize" | "fixedDefault"
+  "defaultPosition" | "defaultSize" | "minSize" | "fixedDefault" | "minOpenH"
 >;
 
 interface Area {
@@ -73,8 +75,9 @@ function freeHeight(x: number, y: number, w: number, max: number, obstacles: rea
 
 /**
  * Where a window with no stored geometry opens, given the rendered rects of the windows
- * already open. Ranking: default column < left / right edge column (each: free at full size,
- * nearest to default < free at ≥ min height, tallest) < least overlap in the default column <
+ * already open. Ranking: free at full size (default column, then the left / right edge column;
+ * nearest to default) < `minOpenH` set: that height, least overlap (default column first) <
+ * free at ≥ min height (default column first, tallest) < least overlap in the default column <
  * least overlap at an edge. Mid-map columns never. Deterministic.
  */
 export function placeRect(def: Placeable, vp: Viewport, obstacles: readonly Rect[]): Rect {
@@ -96,7 +99,14 @@ export function placeRect(def: Placeable, vp: Viewport, obstacles: readonly Rect
   }
   const spots: { x: number; y: number }[] = [];
   for (const x of xs) for (const y of ys) spots.push({ x, y });
+  // Opt-in open height (never shrunk below it), clamped to the usable area.
+  const openH =
+    def.minOpenH === undefined ? null : Math.min(def.minOpenH, base.h, a.bottom - a.top);
+  const covered = (r: Rect) => obstacles.reduce((n, o) => n + overlapArea(r, o), 0);
   let best: { rect: Rect; rank: [number, number, number, number] } | null = null;
+  const consider = (rect: Rect, rank: [number, number, number, number]) => {
+    if (!best || lexLess(rank, best.rank)) best = { rect, rank };
+  };
   for (const s of spots) {
     const x = Math.max(minX, Math.min(s.x, a.right - w));
     const column = x === base.x ? 0 : 1; // default column, else the left / right edge
@@ -104,21 +114,20 @@ export function placeRect(def: Placeable, vp: Viewport, obstacles: readonly Rect
     const room = Math.min(base.h, a.bottom - y);
     const free = freeHeight(x, y, w, room, obstacles);
     const dist = Math.abs(x - base.x) + Math.abs(y - base.y);
-    let rect: Rect;
-    let rank: [number, number, number, number];
     if (free >= base.h) {
-      rect = { x, y, w, h: base.h };
-      rank = [column, 0, 0, dist];
+      consider({ x, y, w, h: base.h }, [0, column, dist, 0]);
+    } else if (openH !== null) {
+      const oy = Math.max(a.top, Math.min(s.y, a.bottom - openH));
+      const rect = { x, y: oy, w, h: openH };
+      consider(rect, [1, covered(rect), column, Math.abs(oy - base.y) + Math.abs(x - base.x)]);
     } else if (free >= minH) {
-      rect = { x, y, w, h: free };
-      rank = [column, 1, -free, dist];
+      consider({ x, y, w, h: free }, [2, column, -free, dist]);
     } else {
-      rect = { x, y, w, h: Math.max(minH, room) };
-      rank = [2 + column, 0, obstacles.reduce((n, o) => n + overlapArea(rect, o), 0), dist];
+      const rect = { x, y, w, h: Math.max(minH, room) };
+      consider(rect, [3 + column, covered(rect), dist, 0]);
     }
-    if (!best || lexLess(rank, best.rank)) best = { rect, rank };
   }
-  return best?.rect ?? base;
+  return (best as { rect: Rect } | null)?.rect ?? base;
 }
 
 function lexLess(a: readonly number[], b: readonly number[]) {

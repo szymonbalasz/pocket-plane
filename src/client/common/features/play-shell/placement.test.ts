@@ -53,10 +53,18 @@ describe("open placement (FR-SHELL-08)", () => {
     const a = usableArea(vp);
     const tall = def({ defaultSize: { w: 300, h: 400 }, minSize: { w: 200, h: 150 } });
     // A log in the left column leaves 200 px above it and 340 below: less than the 400 asked,
-    // yet a shorter slot in the default column beats a full-size one further right.
+    // so a full-size slot at the other edge beats the shorter one in the default column
+    // (FR-NOTE-31 ruling).
     const log = { x: EDGE_GAP, y: 272, w: 300, h: 200 };
-    const kept = placeRect(tall, vp, [log]);
-    expect(kept).toEqual({ x: EDGE_GAP, y: log.y + log.h + EDGE_GAP, w: 300, h: 340 });
+    expect(placeRect(tall, vp, [log])).toEqual({ x: a.right - 300, y: a.top, w: 300, h: 400 });
+    // Both edges short of 400 → the tallest free slot in the default column.
+    const rightLog = { x: a.right - 300, y: 272, w: 300, h: 200 };
+    expect(placeRect(tall, vp, [log, rightLog])).toEqual({
+      x: EDGE_GAP,
+      y: log.y + log.h + EDGE_GAP,
+      w: 300,
+      h: 340,
+    });
     // No room ≥ min height in the default column → the right edge, full size.
     const block = { x: EDGE_GAP, y: 140, w: 300, h: 600 };
     expect(placeRect(tall, vp, [block])).toEqual({ x: a.right - 300, y: a.top, w: 300, h: 400 });
@@ -67,6 +75,29 @@ describe("open placement (FR-SHELL-08)", () => {
     expect(r.x === EDGE_GAP || r.x + r.w === a.right ? "edge" : `mid-map x${r.x}`).toBe("edge");
     // Least overlap: min height at the bottom of the left column, over the block's last 66 px.
     expect(r).toEqual({ x: EDGE_GAP, y: a.bottom - 150, w: 300, h: 150 });
+  });
+
+  test("FR-NOTE-31 ruling: no full-size free slot → a `minOpenH` window opens at that height on top, covering the least; others shrink", () => {
+    const a = usableArea(small);
+    const tall = def({
+      defaultPosition: { anchor: "bottom-right" },
+      defaultSize: { w: 360, h: 480 },
+      minSize: { w: 280, h: 240 },
+    });
+    // Right column: a window down to 560; left column: a log from 404.
+    const init = { x: a.right - 400, y: a.top, w: 400, h: 500 };
+    const log = { x: RAIL_CLEAR, y: 404, w: 460, h: 240 };
+    const shrunk = placeRect(tall, small, [init, log]);
+    expect(shrunk.h).toBeLessThan(480);
+    const r = placeRect({ ...tall, minOpenH: 480 }, small, [init, log]);
+    expect(r.h).toBe(480);
+    expect(r.y + r.h).toBeLessThanOrEqual(a.bottom);
+    expect(r.x === RAIL_CLEAR || r.x + r.w === a.right).toBe(true);
+    // A full-size free slot still wins (no overlap).
+    expect(overlaps(placeRect({ ...tall, minOpenH: 480 }, small, [log]), log)).toBe(false);
+    // Clamped to the usable area.
+    const huge = placeRect({ ...tall, minOpenH: 5000 }, small, [init, log]);
+    expect(huge.y + huge.h).toBeLessThanOrEqual(a.bottom);
   });
 
   test("fixedDefault (test-mode windows) always opens at its default rect", () => {

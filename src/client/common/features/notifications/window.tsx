@@ -23,6 +23,8 @@ export function notificationsWindow(
     defaultSize: { w: 360, h: 480 },
     minSize: { w: 280, h: 240 },
     defaultPosition: { anchor: "bottom-right", dy: 64 },
+    // FR-NOTE-31: opens at 480 (over other windows if it must) rather than a shrunk slot.
+    minOpenH: 480,
     launcher: { icon: BellIcon, label: "Notifications", order: 80 },
     badge: (store) => note.unread(store),
     companion: () => <ToastRuntime views={views} note={note} memory={memory} />,

@@ -84,7 +84,7 @@ const at = (rects: (Rect & { kind: string })[], kind: string) => {
   return r;
 };
 
-test("FR-SHELL-14 player default layout (#162): sheet top-right, Initiative at an edge (below the sheet when it fits), log bottom-left", () => {
+test("FR-SHELL-14 player default layout (#162): sheet top-right, Initiative at an edge at full size where one is free, log bottom-left", () => {
   for (const viewport of [LAPTOP, WIDE, DESKTOP]) {
     const open = openOnDefaults([], viewport);
     const sheet = at(open, "char.sheet");
@@ -97,8 +97,10 @@ test("FR-SHELL-14 player default layout (#162): sheet top-right, Initiative at a
       // No 200 px below the sheet at 720: the left edge, above the log.
       expect(init.x).toBe(12 + 56);
     } else {
-      expect(init.x + init.w).toBe(viewport.w - 12);
-      expect(init.y).toBeGreaterThan(sheet.y + sheet.h);
+      // A full-size free slot at either edge beats a shrunk one below the sheet (FR-NOTE-31
+      // ruling): the left edge, above the log, 400 high.
+      expect(touchedEdge(init, viewport)).toBe("left");
+      expect(init.h).toBe(400);
     }
   }
 });
@@ -187,6 +189,8 @@ test("#162 every player window type opens at the left / right edge (1280×720, 1
         const where = `${viewport.w}×${viewport.h}${combat ? " in combat" : ""}`;
         expect(ok ? "ok" : `${d.kind} opens mid-map at ${where}: x${r.x} y${r.y}`).toBe("ok");
         if (!product.has(d.kind) || (combat && viewport === LAPTOP)) continue;
+        // `minOpenH` (FR-NOTE-31 ruling): no full-size free slot → that height, on top of others.
+        if (d.minOpenH !== undefined && r.h >= d.minOpenH) continue;
         for (const b of rects) {
           if (b.kind === d.kind) continue;
           expect(overlaps(r, b) ? `${d.kind} overlaps ${b.kind} at ${where}` : "ok").toBe("ok");
