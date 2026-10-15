@@ -1,5 +1,7 @@
 // `dice.evaluate` (FR-DICE-19, FR-DICE-01–08): grammar + mode + manual checks, then one
 // immutable `roll` row in the caller's transaction. No event; the caller logs and emits.
+// With a `subject` (FR-MOD-13) it then runs the roll hooks: their parts come back on `mods`, the
+// caller adds `mods.modTotal` to its outcome and lists the part rolls (`rollIdsOf`).
 import {
   constantOf,
   type DiceTerm,
@@ -14,15 +16,19 @@ import {
 import {
   type DieResult,
   type ManualEntry,
+  ROLL_MODS_MAX,
   type RollCategory,
+  type RollEntryDmPayload,
   RollLabel,
   type RollMode,
   type RollPayloadItem,
 } from "@shared/dice-roll-log/schemas";
+import { RollSubject } from "@shared/effect-modifiers/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import { rollDice } from "../../commands/dice";
-import { CommandError, invalid } from "../../commands/errors";
+import { CommandError, conflict, invalid } from "../../commands/errors";
 import { roll } from "../../db/schema";
+import { type RollHook, type RollModeHint, type RollPart, rollHooks } from "./roll-hooks";
 import { campaignOf } from "./settings";
 
 export type RollSource = "dice" | "char" | "cbt";
@@ -38,10 +44,27 @@ export interface EvaluateInput {
   manual?: ManualEntry;
   source: RollSource;
   target?: { entityId?: string | null; tokenId?: string | null; name: string | null };
+  /**
+   * FR-MOD-13: who rolls what. Given → the roll hooks run after the base row and the result
+   * carries `mods`. Absent → exactly as before (no hooks, no `mods`).
+   */
+  subject?: RollSubject;
 }
 
 /** A stored roll (data model §15). */
 export type Roll = Omit<typeof roll.$inferSelect, "dice"> & { dice: DieResult[] };
+
+/** FR-MOD-14: what the roll hooks added to a subject roll. */
+export interface RollMods {
+  /** Registry order, then each hook's order. */
+  parts: RollPart[];
+  /** Σ part values: the outcome total = base `total` + `modTotal` (FR-MOD-16). */
+  modTotal: number;
+  modes: RollModeHint[];
+}
+
+/** `dice.evaluate`'s result: the base roll row, plus `mods` iff a subject was passed. */
+export type EvaluatedRoll = Roll & { mods?: RollMods };
 
 const exprIssue = (message: string) => invalid(message, [{ path: ["expression"], message }]);
 const manualIssue = (message: string, path: (string | number)[] = []) =>
@@ -134,7 +157,57 @@ function naturalOf(terms: Term[], dice: DieResult[]): number | null {
   return kept.length === 1 ? (kept[0]?.value ?? null) : null;
 }
 
-export function evaluate(env: CommandEnv, input: EvaluateInput): Roll {
+/**
+ * `hooks` defaults to the registry; tests pass their own list (stub hooks). Callers never do.
+ */
+export function evaluate(
+  env: CommandEnv,
+  input: EvaluateInput,
+  hooks: readonly RollHook[] = rollHooks,
+): EvaluatedRoll {
+  // A bad subject is a caller bug (`internal`), caught before anything is rolled.
+  const subject = input.subject === undefined ? undefined : RollSubject.parse(input.subject);
+  const row = evaluateBase(env, input);
+  if (!subject) return row;
+  return { ...row, mods: runRollHooks(env, input, row, subject, hooks) };
+}
+
+/** FR-MOD-13/14: every hook in order, after the base row, in the caller's transaction. */
+function runRollHooks(
+  env: CommandEnv,
+  input: EvaluateInput,
+  base: Roll,
+  subject: RollSubject,
+  hooks: readonly RollHook[],
+): RollMods {
+  const rollExtra = (expression: string, label: string): Roll =>
+    evaluateBase(env, {
+      expression,
+      mode: "normal",
+      category: input.category,
+      label,
+      actor: input.actor,
+      source: input.source,
+      ...(input.target ? { target: input.target } : {}),
+    });
+  const ctx = { manual: base.manual, category: base.category, source: input.source, rollExtra };
+  const parts: RollPart[] = [];
+  const modes: RollModeHint[] = [];
+  for (const h of hooks) {
+    const r = h.adjust(env, subject, ctx);
+    for (const p of r.parts) {
+      if (!Number.isInteger(p.value)) throw new Error(`Roll hook "${h.id}": part value not an int`);
+      parts.push(p);
+    }
+    modes.push(...r.modes);
+  }
+  if (parts.length > ROLL_MODS_MAX || modes.length > ROLL_MODS_MAX) {
+    throw conflict(`At most ${ROLL_MODS_MAX} effect modifiers per roll`);
+  }
+  return { parts, modTotal: parts.reduce((s, p) => s + p.value, 0), modes };
+}
+
+function evaluateBase(env: CommandEnv, input: EvaluateInput): Roll {
   const cid = campaignOf(env.actor);
   const prepared = prepareExpression(input.expression, input.mode);
   if (!prepared.ok) throw exprIssue(prepared.message);
@@ -191,9 +264,13 @@ export function evaluate(env: CommandEnv, input: EvaluateInput): Roll {
   return row;
 }
 
-/** The `roll` kind's payload item for a stored roll (callers build multi-roll entries with it). */
-export function rollPayloadItem(r: Roll): RollPayloadItem {
-  return {
+/**
+ * The `roll` kind's payload item for a stored roll (callers build multi-roll entries with it).
+ * FR-MOD-19: with parts, `total` includes them and `mods` lists them; a part's label only if
+ * its effect is player-visible (the DM's names go in `rollDmPayload`).
+ */
+export function rollPayloadItem(r: EvaluatedRoll): RollPayloadItem {
+  const item: RollPayloadItem = {
     rollId: r.id,
     expression: r.expression,
     mode: r.mode,
@@ -204,4 +281,40 @@ export function rollPayloadItem(r: Roll): RollPayloadItem {
     natural: r.natural,
     label: r.label,
   };
+  if (r.mods?.parts.length) {
+    item.total = r.total + r.mods.modTotal;
+    item.mods = r.mods.parts.map((p) => ({
+      label: p.public ? p.label : null,
+      value: p.value,
+      ...(p.expression !== undefined ? { expression: p.expression } : {}),
+      ...(p.auto ? { auto: true as const } : {}),
+      ...(p.rollId !== undefined ? { rollId: p.rollId } : {}),
+    }));
+  }
+  if (r.mods?.modes.length) item.modes = r.mods.modes.map((m) => (m.public ? m.label : null));
+  return item;
 }
+
+/**
+ * FR-MOD-19: the `roll` kind's `dmPayload` for an entry of these rolls (payload order): every
+ * part's and mode hint's effect id and label. Undefined when no roll has any (no `dmPayload`).
+ */
+export function rollDmPayload(rolls: readonly EvaluatedRoll[]): RollEntryDmPayload | undefined {
+  if (!rolls.some((r) => r.mods?.parts.length || r.mods?.modes.length)) return undefined;
+  const named = (x: { effectId: string; label: string }) => ({
+    effectId: x.effectId,
+    label: x.label,
+  });
+  return {
+    items: rolls.map((r) => ({
+      mods: (r.mods?.parts ?? []).map(named),
+      ...(r.mods?.modes.length ? { modes: r.mods.modes.map(named) } : {}),
+    })),
+  };
+}
+
+/** FR-DICE-26: the base roll and its part rolls (bonus dice), for an entry's `rollIds`. */
+export const rollIdsOf = (r: EvaluatedRoll): string[] => [
+  r.id,
+  ...(r.mods?.parts ?? []).flatMap((p) => (p.rollId ? [p.rollId] : [])),
+];
