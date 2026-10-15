@@ -3,6 +3,7 @@ import {
   clampIntoWorkArea,
   dragPopup,
   originPlacement,
+  placementTiers,
   placementTokenIds,
   popupPlacement,
 } from "./popup-placement";
@@ -198,5 +199,96 @@ describe("FR-CBT-75 FR-CBT-76 popup over its notification, movable", () => {
     expect(dragPopup(start, 300, 50, vp)).toEqual({ x: 400, y: 250, ...size });
     expect(dragPopup(start, 5000, 5000, vp)).toEqual({ x: 1000, y: 536, ...size });
     expect(dragPopup(start, -5000, -5000, vp)).toEqual({ x: 0, y: 48, ...size });
+  });
+});
+
+describe("FR-CBT-56 FR-CBT-75 P3 glitch 2: free area away from the likely targets", () => {
+  // Session-sim-5 c08: Wolf attacks Goblin 4 (row); the goblins sit mid-map, left of Initiative.
+  const initiative = { x: 1028, w: 400 };
+  const box = (x: number, y: number) => ({ x, y, w: 50, h: 50 });
+  const g4 = box(497, 265);
+  const goblins = [box(550, 318), box(708, 265), box(708, 370), box(866, 370)];
+  const pcs = [box(180, 318), box(180, 423)];
+  const covers = (p: { x: number; y?: number }, h: number, t: { x: number; y: number }) =>
+    p.x < t.x + 50 && t.x < p.x + 440 && (p.y ?? 0) < t.y + 50 && t.y < (p.y ?? 0) + h;
+
+  test("FR-CBT-56 tiers: rows, then the other likely targets, then every other combatant token", () => {
+    const k = (id: string, kind: "pc" | "monster", tokenId: string) => ({
+      id,
+      encounterId: "e1",
+      kind,
+      tokenId,
+      name: id,
+      active: true,
+      removed: false,
+    });
+    const combatants = [
+      k("Wolf", "monster", "t-wolf"),
+      k("Goblin", "monster", "t-gob"),
+      k("Goblin 4", "monster", "t-g4"),
+      k("Mira", "pc", "t-mira"),
+      k("Thorn", "pc", "t-thorn"),
+    ];
+    const tiers = (rowTokenIds: string[]) =>
+      placementTiers({
+        rowTokenIds,
+        combatants,
+        encounterId: "e1",
+        attackerId: "Wolf",
+        tokenSceneOf: () => "s1",
+        viewedSceneId: "s1",
+      });
+    expect(tiers(["t-g4"])).toEqual([["t-g4"], ["t-mira", "t-thorn"], ["t-wolf", "t-gob"]]);
+    expect(tiers([])).toEqual([["t-mira", "t-thorn"], [], ["t-wolf", "t-gob", "t-g4"]]);
+  });
+
+  test("FR-CBT-56 with a measured height: clear of the row's token first, then of the others", () => {
+    const h = 305;
+    const p = popupPlacement({
+      viewport: { w: 1440, h: 900 },
+      tokens: [g4],
+      others: [pcs, goblins],
+      initiative,
+      width: 440,
+      height: h,
+    });
+    expect(p.y).toBeDefined();
+    for (const t of [g4, ...pcs, ...goblins]) expect(covers(p, h, t)).toBe(false);
+    expect(p.x + 440).toBeLessThanOrEqual(initiative.x);
+  });
+
+  test("FR-CBT-56 no measured height: full height, no y; a lower tier only breaks ties", () => {
+    const p = popupPlacement({ ...base, tokens: at([1000, 1100]), others: [at([700])] });
+    expect(p).toMatchObject({ side: "left", x: 68 });
+    expect(p.y).toBeUndefined();
+    // The left edge would cover a lower-tier token: another spot clear of both tiers wins.
+    const q = popupPlacement({ ...base, tokens: at([1000, 1100]), others: [at([200])] });
+    expect(at([1000, 1100, 200]).some((t) => q.x < t.x + t.w && t.x < q.x + 440)).toBe(false);
+  });
+
+  test("FR-CBT-75 over its notification unless that covers a likely target", () => {
+    const vp = { w: 1440, h: 900 };
+    const clearSpot = { x: 68, y: 100 };
+    const p = popupPlacement({
+      viewport: vp,
+      tokens: goblins,
+      others: [[], pcs],
+      initiative,
+      width: 440,
+      height: 300,
+      prefer: clearSpot,
+    });
+    expect(p).toMatchObject({ side: "origin", x: 68, y: 100 });
+    // The toast sat over the goblins (d02): the popup moves off them.
+    const over = popupPlacement({
+      viewport: vp,
+      tokens: goblins,
+      initiative,
+      width: 440,
+      height: 300,
+      prefer: { x: 560, y: 100 },
+    });
+    expect(over.side).not.toBe("origin");
+    for (const t of goblins) expect(covers(over, 300, t)).toBe(false);
   });
 });

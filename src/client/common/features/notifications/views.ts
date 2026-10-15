@@ -44,6 +44,11 @@ export interface NotificationView {
    * `viewedSceneId`: the DM's viewed scene (only its tokens are drawn).
    */
   cueTokens?: (n: NotificationRecord, store: RecordStore, viewedSceneId: string | null) => string[];
+  /**
+   * FR-NOTE-32 (DM view only, P3 glitch 2): tokens this row's toast should keep clear of (a card's
+   * likely targets); only the drawn ones count. Absent → none.
+   */
+  avoidTokens?: (n: NotificationRecord, store: RecordStore) => string[];
 }
 
 export function defineNotificationView(v: NotificationView): NotificationView {

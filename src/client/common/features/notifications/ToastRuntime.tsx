@@ -21,6 +21,7 @@ import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
+import { tokenScreenBoxes } from "../combat-tracker/token-boxes";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
 import type { Rect } from "../play-shell/geometry";
@@ -137,6 +138,30 @@ function useInitiativeRect(isDm: boolean): Rect | null {
 }
 
 /**
+ * P3 glitch 2: the tokens the DM's stack keeps clear of: each toasted pending row's
+ * `avoidTokens` (the summary toast: every pending row's), sorted, unique.
+ */
+function useAvoidTokens(
+  isDm: boolean,
+  toasts: readonly Toast[],
+  rows: Record<string, NotificationRecord> | undefined,
+  views: NotificationViews,
+): string[] {
+  const store = useSync((s) => s.store);
+  return useMemo(() => {
+    if (!isDm || !rows) return [];
+    const summary = toasts.some((t) => t.kind === "summary");
+    const ids = new Set(toasts.flatMap((t) => (t.kind === "note" ? [t.notificationId] : [])));
+    const out = new Set<string>();
+    for (const n of Object.values(rows)) {
+      if (n.state !== "pending" || !(summary || ids.has(n.id))) continue;
+      for (const t of views.get(n.kind)?.avoidTokens?.(n, store) ?? []) out.add(t);
+    }
+    return [...out].sort();
+  }, [isDm, toasts, rows, views, store]);
+}
+
+/**
  * FR-NOTE-32: the stack's rendered height (DM), re-measured when it mounts (`shown` flips) and on
  * resize while mounted.
  */
@@ -223,7 +248,20 @@ export function ToastRuntime({
   const initiative = useInitiativeRect(isDm);
   const vp = useViewport();
   const stackH = useStackHeight(stackRef, isDm, state.toasts.length > 0);
-  const at = dmStackPlacement(vp, initiative, stackH);
+  // P3 glitch 2: and of the tokens its cards' likely targets are on (`avoidTokens`), measured
+  // when the stack, Initiative or the viewport change (never on hover: the stack holds still).
+  const avoidKey = useAvoidTokens(isDm, state.toasts, rows, views).join(",");
+  const at = useMemo(
+    () =>
+      dmStackPlacement(
+        vp,
+        initiative,
+        stackH,
+        undefined,
+        tokenScreenBoxes(avoidKey ? avoidKey.split(",") : []),
+      ),
+    [vp, initiative, stackH, avoidKey],
+  );
 
   const openHistory = () => openWindow(HISTORY_KIND);
   const { shown, more } = visibleToasts(state);

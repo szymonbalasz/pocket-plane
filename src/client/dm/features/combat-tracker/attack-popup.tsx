@@ -33,7 +33,12 @@ import { Badge, Input, Label } from "@ui/components/ui/primitives";
 import { useCbtIntent, useCombatants } from "@ui/features/combat-tracker/store";
 import { useTargetingAttacker } from "@ui/features/combat-tracker/token-overlay";
 import { hideToast } from "@ui/features/notifications/toasts";
-import type { Viewport } from "@ui/features/play-shell/geometry";
+import {
+  EDGE_GAP,
+  LAUNCHER_CLEAR,
+  TOP_BAR_H,
+  type Viewport,
+} from "@ui/features/play-shell/geometry";
 import { useRecords } from "@ui/sync/store";
 import { EyeOffIcon, XIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -49,9 +54,8 @@ import {
   clampIntoWorkArea,
   dragPopup,
   measurePlacement,
-  originPlacement,
   type Placement,
-  placementTokenIds,
+  placementTiers,
 } from "./popup-placement";
 import { type PopupOrigin, useCombatDialogs } from "./popup-store";
 import {
@@ -520,16 +524,16 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
 }
 
 /**
- * FR-CBT-55/56: placement fixed when the popup opens, from the selection rows' tokens at that
- * moment, else the attacker's likely targets (the panel never jumps while the DM edits the
- * selection, switches scene or moves a token).
+ * FR-CBT-55/56: the placement tiers fixed when the popup opens, from the selection rows' tokens at
+ * that moment, else the attacker's likely targets, then the rest (`placementTiers`; the panel
+ * never jumps while the DM edits the selection, switches scene or moves a token).
  */
-function useOpenPlacement(card: NotificationRecord): Placement {
+function useOpenTiers(card: NotificationRecord): string[][] {
   const p = DamageCardPayload.safeParse(card.payload);
   const combatants = useCombatants(p.data?.encounterId);
   const tokens = useRecords<{ id: string; sceneId: string }>(TOKEN_TYPE);
-  const [placement] = useState(() => {
-    if (!p.success) return measurePlacement([]);
+  const [tiers] = useState(() => {
+    if (!p.success) return [];
     const selection = getMapSelection();
     const { rows } = targetList({
       combatants,
@@ -538,18 +542,16 @@ function useOpenPlacement(card: NotificationRecord): Placement {
       selectedTokenIds: selection.tokenIds,
       added: [],
     });
-    return measurePlacement(
-      placementTokenIds({
-        rowTokenIds: rows.flatMap((r) => (r.c.tokenId ? [r.c.tokenId] : [])),
-        combatants,
-        encounterId: p.data.encounterId,
-        attackerId: p.data.attackerId,
-        tokenSceneOf: (id) => tokens.find((t) => t.id === id)?.sceneId ?? null,
-        viewedSceneId: selection.sceneId,
-      }),
-    );
+    return placementTiers({
+      rowTokenIds: rows.flatMap((r) => (r.c.tokenId ? [r.c.tokenId] : [])),
+      combatants,
+      encounterId: p.data.encounterId,
+      attackerId: p.data.attackerId,
+      tokenSceneOf: (id) => tokens.find((t) => t.id === id)?.sceneId ?? null,
+      viewedSceneId: selection.sceneId,
+    });
   });
-  return placement;
+  return tiers;
 }
 
 /**
@@ -583,18 +585,19 @@ function PopupPanel({
   origin: PopupOrigin | null;
   close(): void;
 }) {
-  const at = useOpenPlacement(card);
+  const tiers = useOpenTiers(card);
   const ref = useRef<HTMLDivElement>(null);
-  // Top-left once placed over its notification (FR-CBT-75) or dragged (FR-CBT-76); null = the
-  // FR-CBT-55/56 spot, centred. Client memory until the popup closes.
+  // Top-left once placed (FR-CBT-55/56, over its notification FR-CBT-75) or dragged (FR-CBT-76);
+  // null before the first layout. Client memory until the popup closes.
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [side, setSide] = useState<Placement["side"] | null>(null);
   const posRef = useRef(pos);
   posRef.current = pos;
 
   // Item 11: a card's toast never shows while its popup is open (FR-CBT-75, FR-NOTE-26).
   useEffect(() => hideToast(card.id), [card.id]);
 
-  // FR-CBT-75: over its origin, clamped once the panel's size is known; re-clamped when the
+  // FR-CBT-55/56/75: placed once the panel's size is known (before paint); re-clamped when the
   // panel or the viewport changes size, so it stays in the work area.
   // biome-ignore lint/correctness/useExhaustiveDependencies: placed once per open
   useLayoutEffect(() => {
@@ -604,7 +607,9 @@ function PopupPanel({
       const r = el.getBoundingClientRect();
       return { w: r.width, h: r.height };
     };
-    if (origin) setPos(originPlacement(origin, size(), viewport()));
+    const at = measurePlacement(tiers, size(), origin);
+    setSide(at.side);
+    setPos({ x: at.x, y: at.y ?? at.top });
     const reclamp = () => {
       const p = posRef.current;
       if (p) setPos(clampIntoWorkArea({ ...p, ...size() }, viewport()));
@@ -644,7 +649,8 @@ function PopupPanel({
     target.addEventListener("pointercancel", end);
   };
 
-  const maxHeight = at.bottom - at.top;
+  const vp = viewport();
+  const maxHeight = vp.h - LAUNCHER_CLEAR - TOP_BAR_H - EDGE_GAP;
   return (
     <div
       ref={ref}
@@ -653,14 +659,12 @@ function PopupPanel({
       aria-label="Attack"
       data-testid="cbt-popup"
       data-record-id={card.id}
-      data-side={origin ? "origin" : at.side}
-      // FR-CBT-55: centred in the work area at its left / right edge; FR-CBT-75/76: at `pos`.
+      data-side={side ?? undefined}
+      // At `pos` (placed / dragged); hidden for the first, measuring layout only.
       style={
         pos
           ? { left: pos.x, top: pos.y, maxHeight }
-          : origin
-            ? { left: origin.x, top: origin.y, maxHeight }
-            : { left: at.x, top: (at.top + at.bottom) / 2, maxHeight, translate: "0 -50%" }
+          : { left: 0, top: TOP_BAR_H, maxHeight, visibility: "hidden" }
       }
       className="fixed z-40 flex w-[min(440px,calc(100vw-2rem))] flex-col overflow-y-auto rounded-lg border bg-card p-3 text-card-foreground shadow-lg"
       onPointerDown={onPointerDown}
