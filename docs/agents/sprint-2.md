@@ -196,7 +196,7 @@ Starts in combat (round 1, Wolf's turn): Bless on Mira and Thorn (Mira concentra
 
 - Effect modifiers tiers 2–3 (advantage / disadvantage, resistances in the popup, Shield of Faith AC, a box per bonus die, Rage uses per rest) are designed but not built.
 - Snapshot headroom: the heavy DM snapshot is 781,923 B of the 786,432 B ceiling. Fog of war needs room: options come to gate 2.
-- Being fixed now (`fix/sim5-glitches`): the attack popup can pre-fill targets left over from a dismissed popup (risk: applying to a hidden monster); tokens created by Add show initials instead of the creature's art.
+- Fixed after session-sim-5 (`fix/sim5-glitches`, #195): the attack popup no longer carries targets over from a dismissed popup; tokens created by Start / Add take the creature's art (the image of its latest token on the scene).
 - Known glitches from session-sim-5 (for gate 2): the targets popup and card toasts often cover the monster tokens; with the 48 px floor, monsters can sit under the empty Initiative window before Start; the Players window (400×220) needs scrolling with two players; the player Initiative (280 px) still collapses chips to "+N"; the builder's encounter rating counts a token-less PC that Start then unticks; a duplicate "1 pending action" toast after rejoin; copy nits (Apply effect without a source, End confirm, concentration dialog doesn't mention the Bless die); name truncation in Initiative and map labels; new windows (Scenes, Notifications) open over others.
 
 ### Teardown
