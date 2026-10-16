@@ -13,6 +13,7 @@ import type { EncounterRecord } from "@shared/combat-tracker/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
 import { cbtxRuleHooks } from "../combat-extras/rule-hooks";
+import { modReminderHooks } from "../effect-modifiers/reminders";
 
 export type CombatRuleEnv = CommandEnv;
 
@@ -68,6 +69,7 @@ export interface CombatRuleHookRegistration {
 /** The registry. Append your feature's line; order = run order. */
 export const combatRuleHooks: readonly CombatRuleHookRegistration[] = [
   { name: "combat-extras.rules", hooks: cbtxRuleHooks }, // combat-extras (FR-CBTX-06/07/12/13)
+  { name: "effect-modifiers.reminders", hooks: modReminderHooks }, // effect-modifiers (FR-MOD-44)
 ];
 
 /** Per-server hook list, seeded from the registry; tests may add hooks via `register`. */

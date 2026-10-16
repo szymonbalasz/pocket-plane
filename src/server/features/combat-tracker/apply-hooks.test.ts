@@ -33,6 +33,8 @@ function started() {
   t.run(startCommand.name, { encounterId: enc.id, sceneId: t.sceneId });
   const id = (name: string) => t.byName(enc.id)[name]?.id as string;
   const hooks = applyHooksOf(t.s);
+  // These tests drive stub hooks alone: MOD's registry line (R4) has its own tests.
+  hooks.unregister("effect-modifiers.triggers");
   const attack = (name: string, toHit: number, damage: number) =>
     t.run<{ cardId: string }>(attackCommand.name, {
       attackerId: id(name),
@@ -104,8 +106,8 @@ function furyStub(seen: unknown[]): ApplyHook {
 }
 
 describe("FR-MOD-38 apply hooks (R0)", () => {
-  test("FR-MOD-38 the registry is created empty; the server binds its own list; ids unique", () => {
-    expect(applyHooks).toEqual([]);
+  test("FR-MOD-38 the registry holds MOD's line; the server binds its own list; ids unique", () => {
+    expect(applyHooks.map((h) => h.id)).toEqual(["effect-modifiers.triggers"]);
     const h = new ApplyHooks([]);
     h.register({ id: "x.one" });
     expect(() => h.register({ id: "x.one" })).toThrow(/registered twice/);
