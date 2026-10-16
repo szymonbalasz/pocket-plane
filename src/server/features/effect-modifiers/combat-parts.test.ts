@@ -7,6 +7,7 @@ import { lineText } from "@shared/dice-roll-log/kind-types";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import { eq } from "drizzle-orm";
 import { gameLogEntry, hpChange, ruleTrigger } from "../../db/schema";
+import { playerViewer, sourceOf } from "../../ws/testing/convergence";
 import { type RtSetup, rtSetup } from "./trigger-testing";
 
 function raging() {
@@ -112,5 +113,69 @@ describe("FR-MOD-48 outcome lines", () => {
     expect(l.dm).toContain("(Divine Fury) (DM ruled)");
     expect(l.players).toContain("(Divine Fury)");
     expect(l.players).not.toContain("DM ruled");
+  });
+});
+
+describe("MOD §13 leak scan (R7 combat parts)", () => {
+  test("FR-MOD-47 per player, snapshot (= reconnect) and live: no campaign preset id on Thorn's card; a non-public part's name never; values public", () => {
+    const t = rtSetup();
+    const mark = t.put({
+      characterId: null,
+      name: "Favored Foe",
+      modifiers: [],
+      durationRounds: 10,
+      concentration: true,
+      note: "",
+    });
+    const ff = t.trig({
+      characterId: t.thornId,
+      name: "Favored Foe",
+      rule: {
+        on: "hit",
+        when: [{ if: "targetMarked", preset: mark }],
+        every: "turn",
+        then: { do: "damage", formula: "1d4", type: null },
+      },
+    });
+    const ma = t.trig({
+      definitionId: t.eliteId,
+      name: "Martial Advantage",
+      rule: {
+        on: "hit",
+        when: [{ if: "ask", note: "an ally within 5 ft of the target" }],
+        every: "turn",
+        then: { do: "damage", formula: "2d6", type: null },
+      },
+    });
+    t.apply({
+      targets: [{ combatantId: t.id("Goblin") }],
+      preset: { presetId: mark },
+      sourceCombatantId: t.id("Thorn"),
+    });
+    t.nextTo("Thorn", 1);
+    const thorn = t.attack("Thorn", { damage: 3, actor: t.p2 }).cardId;
+    expect(t.note(thorn)?.audiencePlayerId).toBe(t.h.p2.id);
+    t.applyTo(thorn, [{ name: "Goblin", triggers: [{ triggerId: ff }] }]);
+    t.nextTo("Elite Goblin Warrior", 1);
+    const elite = t.attack("Elite Goblin Warrior", { damage: 5 }).cardId;
+    const { hpChangeIds } = t.applyTo(elite, [
+      { name: "Thorn", triggers: [{ triggerId: ma, value: 9 }] },
+    ]);
+    expect(lines(t, hpChangeIds[0] as string).players).toContain("+ 9 (DM)");
+
+    const src = sourceOf(t.s);
+    const changes = t.events.flatMap((e) => e.event.changes);
+    for (const playerId of [t.h.p1.id, t.h.p2.id]) {
+      const v = playerViewer(t.h.campaignId, playerId);
+      const snapshot = t.s.records.snapshot(src, v);
+      const live = changes.map((c) => t.s.records.filterChange(c, v)).filter(Boolean);
+      const json = JSON.stringify([snapshot, live]);
+      for (const s of [mark, "Martial Advantage", "an ally within 5 ft", "rolled", "set"]) {
+        expect(json).not.toContain(s === "set" ? '"set":true' : s);
+      }
+    }
+    // Thorn's player reads the card (its offer, the mark by name) in snapshot and live.
+    const p2 = JSON.stringify(t.s.records.snapshot(src, playerViewer(t.h.campaignId, t.h.p2.id)));
+    expect(p2).toContain('"marked":"Favored Foe"');
   });
 });
