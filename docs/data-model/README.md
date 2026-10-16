@@ -1191,3 +1191,18 @@ Indexes `trigger_use_charge` (`trigger_id`, `owner_combatant_id`, `encounter_id`
 
 - **Redaction (FR-MOD-47, fail closed):** the registry record carries server-only `presetRefs` (built with the row: per non-built-in preset ref of the rule, `{own: true}` for the trigger's own character's preset, else `{name}` of the campaign preset); `dmRedact` strips it. A player's copy keeps built-in keys and own preset ids; every other ref (incl. a deleted preset) becomes `{name}` ("Missing preset" if gone).
 - **Snapshot size** (CON-44, #208; MOD's `con44.test.ts`): heavy harness + every MOD §12 R row at max length (tier-2 modifiers on 16 presets and 12 effects, `originKey` on every preset, 1 max offer with settle facts on 20 pending cards, `offered` (20 dice) + DM name on 30 attack roll entries, a typed part on the outcome lines): DM 672,416 → 710,459 B (**+38,043**; 338,117 B left of 1 MiB; bound ≤ 40 KiB), players max 293,985 B (+13,408…+13,794; bound ≤ 20 KiB). Not in MOD §12's table: `hp_change.triggerParts` with 1 max part on every applied row, DM **+5,040** (players 0). `rule-trigger` at the campaign cap (40 rows, 1 `row` filter each): in no snapshot; DM load ack 41,615 B (1,040 B/row; bound ≤ 48 KiB), a player's own rows ≤ 10,004 B. Worst card (6 max mods on both rolls, 4 max offers, 50 dice): 4,353 B > the kind's 4 KB cap; 3 offers 3,975 B (R10 drops offers from the last).
+
+## 28. Sprint 3: freeform fog + darkness (V1)
+
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V1). **Built by `build/fog-shapes`**: no new table or column; the commands that write [§26](#26-sprint-3-vision-core-v0)'s v2 fields. Protocol side: [protocol §38](../protocol/README.md#41-sprint-3-freeform-fog--darkness-v1).
+
+| Field | Written by (V1) | Rule | Source |
+|---|---|---|---|
+| `scene_fog.shapes` | `fog.edit` (append), `fog.setAll` (`[]`), `fog.undo` (restore) | ≤ 100 (`conflict` past it); legacy `fog.edit` forms stored as their v2 shapes; the base mask is never re-rastered by an edit (box changes only with `fog.setAll`, FR-FOG-03) | FR-FOG-01, -05, -26, -27 |
+| `scene_fog.darkness` | darkness intents, `fog.undo`; `seenBy` by every scene re-derive | ≤ 20; ids from `ctx.ids`; serialized DM row ≤ 16 KiB; `seenBy` (V1, static) = every player when some cell centre inside the shape's bounding box is statically clear or explored, plus each player with an explored-memory cell there; else `[]`. Sight polygons join in V2. A scene duplicate re-derives the copy's `seenBy` (no memory there) | FR-FOG-28, -30, -44 |
+| `scene_fog.explored` | `fog.setExplored` | default false; not in the undo stack | FR-FOG-29 |
+| `scene_fog_edit` | every undoable fog command | kinds per protocol §41; `prevShapes` / `prevDarkness` = the row before (darkness with its `seenBy`, re-derived on restore) | FR-FOG-07 |
+| `fog_explored` | `fog.forgetExplored` (delete all rows of the scene) | runs decode as "1 = explored" (`@shared/fog-of-war/explored`, corrupt → nothing explored); growth lands in V2 | FR-FOG-31, -37 |
+
+- **Derived (V1):** static state with shapes (`samplePoint` on a prepared layer, once per point per re-derive), darkness containment, darkness `seenBy` (static part). Client: draft, Ctrl "free" flag, darkness selection and drag offset.
+- **CON-44:** unchanged (no new record type or field; V0's measured `fog` row at 12 typical shapes + 2 darkness shapes stands, §26).
