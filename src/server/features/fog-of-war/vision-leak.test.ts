@@ -2,9 +2,11 @@
 // vision 30 ft; `player-2` = Thorn, darkvision 60 ft + Devil's Sight), Goblin Ambush active: sight
 // through the open door, explored memory, darkness and the blind rule, walls and doors cutting
 // sight, Fog all / Reveal all, the darkness filter by sight, `map.drag` and template routing,
-// can't-see → `not_found`. Each state: snapshot + every frame + a fresh connection + a `resync`.
+// can't-see → `not_found`, View as (FR-FOG-43). Each state: snapshot + every frame + a fresh connection + a `resync`.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
+  answer,
+  DM,
   explores,
   type VisionHarness,
   visionHarness,
@@ -17,6 +19,7 @@ import {
 } from "@shared/fog-of-war/schemas";
 import { SCN_INTENTS, SCN_SIGNALS } from "@shared/scene-tools/schemas";
 import { MAP_INTENTS as I, TOKEN_TYPE } from "@shared/scenes-map/schemas";
+import { convergence } from "../../ws/testing/convergence";
 
 const THORN = { visionFt: 0, darkvisionFt: 60, seesMagicalDarkness: true };
 const PARTY = ["Mira", "Thorn"];
@@ -263,6 +266,33 @@ describe("FOG §13 V2 leak walkthrough: dynamic vision (player-1, player-2)", ()
     const enc = Object.values(t.dm.store.records.encounter ?? {}) as { id: string; name: string }[];
     return enc.find((e) => e.name === "Ambush at the Ford")?.id as string;
   }
+
+  test("FR-FOG-43 View as: the ack carries P1's `vision` / `fog-explored` only; a later move follows as an event; the loaded pair converges", async () => {
+    const dm = t.dm;
+    const a = await answer(dm, dm.loadViewAs(t.ambushId, t.pid.p1));
+    expect(a.type).toBe("ack");
+    const records = (a as { result: { records: Record<string, { id: string }[]> } }).result.records;
+    expect(records[VISION_TYPE]?.map((r) => r.id)).toEqual([`${t.ambushId}:${t.pid.p1}`]);
+    expect(records[FOG_EXPLORED_TYPE]?.map((r) => r.id)).toEqual([`${t.ambushId}:${t.pid.p1}`]);
+    expect(JSON.stringify(records)).not.toContain(t.pid.p2);
+    const bad = await answer(dm, dm.loadViewAs(t.ambushId, "00000000-0000-4000-8000-000000000000"));
+    expect(bad).toMatchObject({ type: "reject", code: "not_found" });
+    await t.move(t.c.p1, "Mira", 2, 6);
+    const pair = `${t.ambushId}:${t.pid.p1}`;
+    await until(
+      () =>
+        JSON.stringify(dm.store.records[VISION_TYPE]?.[pair]) ===
+        JSON.stringify(t.visionOf(t.c.p1, "p1")),
+    );
+    const fresh = await t.h.live(DM);
+    expect((await answer(fresh, fresh.loadScene(t.ambushId))).type).toBe("ack");
+    expect((await answer(fresh, fresh.loadViewAs(t.ambushId, t.pid.p1))).type).toBe("ack");
+    const conv = convergence(t.h.s, dm, fresh);
+    for (const type of [VISION_TYPE, FOG_EXPLORED_TYPE]) {
+      expect(conv.live[type]).toEqual(conv.fresh[type]);
+    }
+    fresh.close();
+  });
 });
 
 async function until(pred: () => boolean, ms = 2000) {

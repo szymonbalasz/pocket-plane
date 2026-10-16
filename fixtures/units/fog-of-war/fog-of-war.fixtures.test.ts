@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { closeDb } from "@server/db/client";
-import { scene, sceneFog, sceneFogEdit, token } from "@server/db/schema";
+import { entity, scene, sceneFog, sceneFogEdit, sceneStructure, token } from "@server/db/schema";
 import { asc } from "drizzle-orm";
 import { loadBundle } from "../../index";
 
@@ -65,5 +65,66 @@ describe("fog-of-war fixtures (FOG §13)", () => {
     for (const n of ["Mira", "Thorn", "Cave Ogre"]) expect(by(n)?.fogged).toBe(false);
     // Other scenes untouched.
     expect(tokens.filter((t) => t.sceneId !== ambush?.id).every((t) => !t.fogged)).toBe(true);
+  });
+
+  test("FOG §13 bundle `vision` loads from empty: vision-senses + vision-crypt on Goblin Ambush (nook revealed, Explored corridor, darkness [12.5, 9, 1.5], freeform wall, Explored on)", async () => {
+    const r = await loadBundle("vision");
+    dirs.push(r.dir);
+    const db = r.openDb();
+    const ambush = db
+      .select()
+      .from(scene)
+      .all()
+      .find((s) => s.name === "Goblin Ambush");
+    const fog = db
+      .select()
+      .from(sceneFog)
+      .all()
+      .find((f) => f.sceneId === ambush?.id);
+    const structure = db
+      .select()
+      .from(sceneStructure)
+      .all()
+      .find((x) => x.sceneId === ambush?.id);
+    const tokens = db
+      .select()
+      .from(token)
+      .all()
+      .filter((t) => t.sceneId === ambush?.id);
+    const senses = Object.fromEntries(
+      db
+        .select()
+        .from(entity)
+        .all()
+        .filter((e) => e.kind === "character")
+        .map((e) => [e.name, (e.statBlock as { senses?: unknown }).senses]),
+    );
+    closeDb(db);
+    expect(r.manifest.fixtures.slice(-6)).toEqual([
+      "goblin-2",
+      "encounter-1",
+      "fog-ambush",
+      "scn-walls",
+      "vision-senses",
+      "vision-crypt",
+    ]);
+    expect(fog).toMatchObject({ fill: "fog", runs: "", explored: true, visionStale: false });
+    expect(fog?.shapes).toEqual([
+      { op: "reveal", rect: [0, 6, 3, 11] },
+      { op: "explored", polygon: [8.5, 0, 19.75, 0, 19.75, 4.5, 8.5, 4.5] },
+    ]);
+    expect(fog?.darkness.map(({ seenBy: _s, id: _i, ...d }) => d)).toEqual([
+      { circle: [12.5, 9, 1.5] },
+    ]);
+    expect(structure?.walls.map((w) => w.slice(1))).toContainEqual([4.5, 3.25, 6.75, 5.5]);
+    expect(senses.Mira).toEqual({ visionFt: 30, darkvisionFt: 0, seesMagicalDarkness: false });
+    expect(senses.Thorn).toEqual({ visionFt: 0, darkvisionFt: 60, seesMagicalDarkness: true });
+    const at = (name: string) => tokens.find((t) => t.name === name);
+    expect(at("Mira")).toMatchObject({ col: 2, row: 7, fogged: false });
+    expect(at("Thorn")).toMatchObject({ col: 2, row: 9, fogged: false });
+    // §13 geometry: from the nook nobody sees a monster (walls at x = 8, doors closed).
+    for (const n of ["Goblin", "Goblin 2", "Goblin Lurker", "Wolf", "Elite Goblin Warrior"]) {
+      expect(at(n)).toMatchObject({ fogged: true, seenBy: [] });
+    }
   });
 });
