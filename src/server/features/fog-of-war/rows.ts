@@ -8,9 +8,11 @@ import {
   type FogRecord,
   type FogUndoInfo,
   scenePlayerId,
+  type VisionRecord,
 } from "@shared/fog-of-war/schemas";
 import type { DarknessRow } from "@shared/fog-of-war/shapes";
-import { asc, eq } from "drizzle-orm";
+import type { PlayerVision } from "@shared/fog-of-war/vision";
+import { and, asc, eq } from "drizzle-orm";
 import { fogExplored, sceneFog, sceneFogEdit } from "../../db/schema";
 import type { SceneRead } from "../scenes-map/visibility-hooks";
 
@@ -134,4 +136,39 @@ export function campaignExploredRecords(
     .orderBy(asc(fogExplored.sceneId), asc(fogExplored.playerId))
     .all()
     .map(serverExplored);
+}
+
+/** One player's `fog-explored` row on a scene, or null. */
+export function readExploredRecord(
+  read: SceneRead,
+  sceneId: string,
+  playerId: string,
+): ServerExploredRecord | null {
+  const r = read
+    .select()
+    .from(fogExplored)
+    .where(and(eq(fogExplored.sceneId, sceneId), eq(fogExplored.playerId, playerId)))
+    .get();
+  return r ? serverExplored(r) : null;
+}
+
+/** Server `vision` rows carry `campaignId` for the scope gate (FR-FOG-39). */
+export type ServerVisionRecord = VisionRecord & { campaignId: string };
+
+/** FR-FOG-39: the derived `vision` record of one player's sight (`inv` omitted when empty). */
+export function toVisionRecord(
+  scene: { sceneId: string; campaignId: string },
+  playerId: string,
+  v: PlayerVision,
+): ServerVisionRecord {
+  return {
+    id: scenePlayerId(scene.sceneId, playerId),
+    sceneId: scene.sceneId,
+    playerId,
+    campaignId: scene.campaignId,
+    blind: v.blind,
+    see: v.see,
+    dark: v.dark,
+    ...(v.inv.length > 0 ? { inv: v.inv } : {}),
+  };
 }

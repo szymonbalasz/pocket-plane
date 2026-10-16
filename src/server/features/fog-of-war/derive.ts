@@ -1,20 +1,32 @@
-// FR-FOG-10 / -34 / -40 (ADR-0042): per-player server copies of fog subjects. A subject's sample
-// points (token / prop / template: cell centres; door: FR-SCN-36's points) are tested against the
-// scene's **static state** (base mask + fog shapes, FR-FOG-01) and darkness (FR-FOG-28), once per
-// point. V0 has no vision sources yet (no senses are set before V2's bundle), so a player sees a
-// point iff it is statically clear and not in darkness, and `seenBy` is "every player or none"
-// (owned tokens: every player, FR-FOG-34; an unowned invisible token: nobody, FR-FOG-46). V2 adds
-// the sight polygons here. FR-FOG-44 (static part, V1): a darkness shape's `seenBy` = the players
-// with a cell centre inside its bounding box that is statically clear / explored or in their
-// explored memory. Pure apart from the reads.
+// FR-FOG-10 / -34 / -36 / -44 / -46 (ADR-0042): per-player server copies of fog subjects. A
+// subject's sample points (token / prop / template: cell centres; door: FR-SCN-36's points) are
+// tested against the scene's **static state** (base mask + fog shapes, FR-FOG-01) and darkness
+// (FR-FOG-28) once per point, then per player against that player's sight polygons (`sight.ts`,
+// FR-FOG-33): P sees a point iff P is not blind and the point is statically clear outside
+// darkness, or inside one of P's polygons (FR-FOG-34). Owned tokens: the owner + every non-blind
+// player (FR-FOG-34 / -36); an unowned invisible token: only through a Sees-invisible polygon
+// (FR-FOG-46). A player with no source sees the static state only (sprint 2). FR-FOG-44: a
+// darkness shape's `seenBy` = the players whose polygons meet its bounding box, or with a cell
+// centre inside the box that is statically clear / explored or in their explored memory. Pure
+// apart from the reads.
 import { exploredMask } from "@shared/fog-of-war/explored";
 import { type FogMask as Mask, maskOf } from "@shared/fog-of-war/mask";
 import type { FogLayerShape } from "@shared/fog-of-war/shapes";
-import { type DarknessRow, shapeBox } from "@shared/fog-of-war/shapes";
-import { prepareStaticLayer, type StaticLayer, samplePoint } from "@shared/fog-of-war/vision";
+import { type Box, type DarknessRow, shapeBox } from "@shared/fog-of-war/shapes";
+import {
+  invisibleSeen,
+  type PlayerVision,
+  pointInPolygon,
+  pointVisible,
+  prepareStaticLayer,
+  type SamplePoint,
+  type StaticLayer,
+  samplePoint,
+} from "@shared/fog-of-war/vision";
 import { asc, eq, sql } from "drizzle-orm";
 import { fogExplored, player, scene, sceneFog } from "../../db/schema";
 import type { SceneCells, SceneObject, SceneRead } from "../scenes-map/visibility-hooks";
+import { type SightEntry, sceneSight, sceneSources } from "./sight";
 
 /** What a re-derive reads once per scene (FR-FOG-35: static state once per point). */
 export interface SceneStatic {
@@ -27,6 +39,8 @@ export interface SceneStatic {
   layer: StaticLayer;
   /** The campaign's players, oldest first. */
   players: string[];
+  /** Each player's sight (players with ≥ 1 source only; none = static only, FR-FOG-32). */
+  sight?: ReadonlyMap<string, SightEntry>;
 }
 
 /** The campaign's player ids, oldest first (the `player` snapshot order). */
@@ -41,8 +55,9 @@ export function campaignPlayers(read: SceneRead, campaignId: string): string[] {
 }
 
 /**
- * The scene's fog state. No row → every point clear (FR-FOG-01); a corrupt row → fully fogged
- * (fail closed, FR-FOG-04). Null when the scene doesn't exist.
+ * The scene's fog state and every player's sight (FR-FOG-33, cached, FR-FOG-38). No row → every
+ * point clear (FR-FOG-01); a corrupt row → fully fogged (fail closed, FR-FOG-04). Null when the
+ * scene doesn't exist.
  */
 export function loadSceneStatic(read: SceneRead, sceneId: string): SceneStatic | null {
   const s = read
@@ -55,14 +70,47 @@ export function loadSceneStatic(read: SceneRead, sceneId: string): SceneStatic |
   const mask = maskOf(
     r ? { fill: r.fill, box: [r.col0, r.row0, r.cols, r.rows], runs: r.runs } : null,
   ).mask;
+  const players = campaignPlayers(read, s.campaignId);
+  const darkness = r?.darkness ?? [];
+  const sight = sceneSight(
+    read,
+    { sceneId: s.id, fogRev: r ? r.rev : -1, darkness },
+    sceneSources(read, s.id, players),
+  );
   return sceneStatic({
     sceneId: s.id,
     campaignId: s.campaignId,
     mask,
     shapes: r?.shapes ?? [],
-    darkness: r?.darkness ?? [],
-    players: campaignPlayers(read, s.campaignId),
+    darkness,
+    players,
+    sight,
   });
+}
+
+/** FR-FOG-39: every player's sight on a scene without its static layer (`vision` snapshot). */
+export function loadSceneSight(
+  read: SceneRead,
+  sceneId: string,
+): { campaignId: string; sight: Map<string, SightEntry> } | null {
+  const s = read
+    .select({ campaignId: scene.campaignId })
+    .from(scene)
+    .where(eq(scene.id, sceneId))
+    .get();
+  if (!s) return null;
+  const r = read
+    .select({ rev: sceneFog.rev, darkness: sceneFog.darkness })
+    .from(sceneFog)
+    .where(eq(sceneFog.sceneId, sceneId))
+    .get();
+  const players = campaignPlayers(read, s.campaignId);
+  const sight = sceneSight(
+    read,
+    { sceneId, fogRev: r ? r.rev : -1, darkness: r?.darkness ?? [] },
+    sceneSources(read, sceneId, players),
+  );
+  return { campaignId: s.campaignId, sight };
 }
 
 /** A `SceneStatic` with its prepared layer. */
@@ -100,22 +148,51 @@ export interface SubjectCopies {
   seenBy: string[];
 }
 
+/** P's vision on the scene, or null (no source: the static state only). */
+export const visionOf = (st: SceneStatic, p: string): PlayerVision | null =>
+  st.sight?.get(p)?.vision ?? null;
+
+/** FR-FOG-36: P has ≥ 1 source and all are in darkness without see-through. */
+export const isBlind = (st: SceneStatic, p: string) => visionOf(st, p)?.blind === true;
+
+/** FR-FOG-34: P sees one of the points (a player without sources: statically visible). */
+export function seesAny(st: SceneStatic, p: string, pts: readonly SamplePoint[]): boolean {
+  const v = visionOf(st, p);
+  if (!v) return pts.some((pt) => pt.state === "clear" && !pt.dark);
+  return pts.some((pt) => pointVisible(v, pt));
+}
+
+/** FR-FOG-46: P sees an unowned invisible subject through a Sees-invisible polygon. */
+export function seesInvisibleAny(st: SceneStatic, p: string, pts: readonly SamplePoint[]) {
+  const v = visionOf(st, p);
+  return v !== null && pts.some((pt) => invisibleSeen(v, pt));
+}
+
+/** A subject's sample points with their static state (once per point, FR-FOG-35). */
+export const samplePoints = (st: SceneStatic, points: readonly (readonly [number, number])[]) =>
+  points.map(([x, y]) => samplePoint(st.layer, x, y));
+
 /**
- * FR-FOG-10 / -34 / -46 for one subject on a scene. Owned token: every player sees it; `fogged`
- * = statically hidden (sprint 2's value). Unowned invisible token: nobody (no source sees
- * invisible in V0), `fogged`. Player-placed template: not a fog subject, every player sees it;
- * `fogged` = statically hidden (DM wire only). Anything else: every player iff statically
- * visible; `fogged` = seen by nobody, or statically hidden while there are no players.
+ * FR-FOG-10 / -34 / -36 / -46 for one subject on a scene. Owned token: the owner and every
+ * non-blind player; `fogged` = statically hidden (sprint 2's value). Player-placed template: not
+ * a fog subject, every player; `fogged` = statically hidden (DM wire only). Unowned invisible
+ * token: the players whose Sees-invisible polygon holds a sample point; `fogged` = seen by nobody
+ * (also with no players). Anything else: the players who see a sample point; `fogged` = seen by
+ * nobody, or statically hidden while there are no players.
  */
 export function subjectCopies(st: SceneStatic, obj: SceneObject): SubjectCopies {
-  const points = obj.points ?? cellCentres(obj.cells);
-  const visible = staticallyVisible(st, points);
-  if (obj.ownerPlayerId != null || obj.placedByPlayerId != null) {
-    return { fogged: !visible, seenBy: [...st.players] };
+  const pts = samplePoints(st, obj.points ?? cellCentres(obj.cells));
+  const visible = pts.some((pt) => pt.state === "clear" && !pt.dark);
+  if (obj.placedByPlayerId != null) return { fogged: !visible, seenBy: [...st.players] };
+  if (obj.ownerPlayerId != null) {
+    const owner = obj.ownerPlayerId;
+    return { fogged: !visible, seenBy: st.players.filter((p) => p === owner || !isBlind(st, p)) };
   }
-  if (obj.invisible === true) return { fogged: true, seenBy: [] };
-  const seenBy = visible ? [...st.players] : [];
-  // Players → seen by nobody; none → statically hidden. Static-only V0: both = `!visible`.
+  if (obj.invisible === true) {
+    const seenBy = st.players.filter((p) => seesInvisibleAny(st, p, pts));
+    return { fogged: seenBy.length === 0, seenBy };
+  }
+  const seenBy = st.players.filter((p) => seesAny(st, p, pts));
   return { fogged: st.players.length > 0 ? seenBy.length === 0 : !visible, seenBy };
 }
 
@@ -144,22 +221,85 @@ const memoryHas = (m: Mask, col: number, row: number) => {
   return c >= 0 && r >= 0 && c < cols && r < rows && m.cells[r * cols + c] === 1;
 };
 
+/** Does a flat polygon meet a box (boundary-inclusive)? A vertex in it, a corner in the polygon, or an edge across it. */
+export function polygonMeetsBox(flat: readonly number[], [x0, y0, x1, y1]: Box): boolean {
+  const n = flat.length >> 1;
+  let px0 = Number.POSITIVE_INFINITY;
+  let py0 = Number.POSITIVE_INFINITY;
+  let px1 = Number.NEGATIVE_INFINITY;
+  let py1 = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < n; i++) {
+    const x = flat[2 * i] as number;
+    const y = flat[2 * i + 1] as number;
+    if (x >= x0 && x <= x1 && y >= y0 && y <= y1) return true;
+    px0 = Math.min(px0, x);
+    py0 = Math.min(py0, y);
+    px1 = Math.max(px1, x);
+    py1 = Math.max(py1, y);
+  }
+  if (px1 < x0 || px0 > x1 || py1 < y0 || py0 > y1) return false;
+  const corners: [number, number][] = [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ];
+  if (corners.some(([x, y]) => pointInPolygon(flat, x, y))) return true;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const a: [number, number] = [flat[2 * j] as number, flat[2 * j + 1] as number];
+    const b: [number, number] = [flat[2 * i] as number, flat[2 * i + 1] as number];
+    if (segmentMeetsBox(a, b, [x0, y0, x1, y1])) return true;
+  }
+  return false;
+}
+
+/** Liang–Barsky: does the segment touch the box? */
+function segmentMeetsBox([ax, ay]: [number, number], [bx, by]: [number, number], box: Box) {
+  const [x0, y0, x1, y1] = box;
+  let t0 = 0;
+  let t1 = 1;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const sides: [number, number][] = [
+    [-dx, ax - x0],
+    [dx, x1 - ax],
+    [-dy, ay - y0],
+    [dy, y1 - ay],
+  ];
+  for (const [p, q] of sides) {
+    if (p === 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    const t = q / p;
+    if (p < 0) t0 = Math.max(t0, t);
+    else t1 = Math.min(t1, t);
+    if (t0 > t1) return false;
+  }
+  return true;
+}
+
 /**
- * FR-FOG-44 (static part): the players who get a darkness shape = those with a cell centre
- * inside its bounding box that is statically clear or explored (every player), or explored in
- * their own memory. Sight polygons join in V2. Campaign player order.
+ * FR-FOG-44: the players who get a darkness shape = those whose sight polygons meet its bounding
+ * box, or with a cell centre inside the box that is statically clear or explored (every player),
+ * or explored in their own memory. Campaign player order.
  */
 export function darknessSeenBy(
   st: SceneStatic,
   d: DarknessRow,
   memory: ReadonlyMap<string, Mask>,
 ): string[] {
-  const [x0, y0, x1, y1] = shapeBox(d);
+  const box = shapeBox(d);
+  const [x0, y0, x1, y1] = box;
   const c0 = Math.ceil(x0 - 0.5);
   const c1 = Math.floor(x1 - 0.5);
   const r0 = Math.ceil(y0 - 0.5);
   const r1 = Math.floor(y1 - 0.5);
-  const seen = new Set<string>();
+  const seen = new Set<string>(
+    st.players.filter((p) =>
+      (visionOf(st, p)?.polys ?? []).some((poly) => polygonMeetsBox(poly.poly, box)),
+    ),
+  );
   const remembered = st.players.filter((p) => memory.has(p));
   for (let r = r0; r <= r1; r++) {
     for (let c = c0; c <= c1; c++) {

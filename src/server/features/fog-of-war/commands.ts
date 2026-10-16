@@ -1,7 +1,7 @@
 // fog-of-war commands (FOG §6, §9; protocol §35, §38). DM-only WS intents: `fog.edit` (append a
 // fog shape), `fog.setAll`, `fog.undo`, the darkness intents (`fog.placeDarkness` /
 // `moveDarkness` / `removeDarkness` / `clearDarkness`), `fog.setExplored` and
-// `fog.forgetExplored`. Each is one transaction (FR-FOG-08): the `fog` row (`rev` + 1) + its undo
+// `fog.forgetExplored`, and `fog.setInvisible` (#210, FR-FOG-45). Each is one transaction (FR-FOG-08): the `fog` row (`rev` + 1) + its undo
 // entry (or the undone entry's delete) + the scene re-derive (fog subjects whose copies change,
 // door flags, darkness `seenBy`, token-changed hook rows; `rederive.ts`) + one event-log entry →
 // one event. Fog edits and darkness edits share one LIFO undo stack (FR-FOG-07, #207 G12). IDs
@@ -15,6 +15,7 @@ import {
   FogEdited,
   FogExploredSet,
   FogUndone,
+  TokenInvisibleSet,
 } from "@shared/events/fog-of-war";
 import {
   type FogRow,
@@ -41,6 +42,7 @@ import {
   FogRemoveDarknessInput,
   FogSetAllInput,
   FogSetExploredInput,
+  FogSetInvisibleInput,
   FogUndoInput,
 } from "@shared/fog-of-war/schemas";
 import {
@@ -57,15 +59,18 @@ import {
   shapeProblem,
   translateShape,
 } from "@shared/fog-of-war/shapes";
-import type { SceneRecord } from "@shared/scenes-map/schemas";
+import { footprint } from "@shared/scenes-map/geometry";
+import { type SceneRecord, TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, invalid, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
-import { fogExplored, sceneFog, sceneFogEdit, sceneFogEditSeqNext } from "../../db/schema";
+import { fogExplored, sceneFog, sceneFogEdit, sceneFogEditSeqNext, token } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import type { Logger } from "../../log";
-import { campaignOf, getScene } from "../scenes-map/rows";
+import { campaignOf, getScene, getToken, readToken } from "../scenes-map/rows";
+import { runTokenChangedHooks } from "../scenes-map/token-hooks";
+import { deriveSceneObject, tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 import { readFogRow } from "./hooks";
 import { rederiveScene } from "./rederive";
 import { dmFogRecord, readFogRecord, type ServerFogRecord, sceneExploredRecords } from "./rows";
@@ -466,6 +471,50 @@ export function fogCommands(log: Logger) {
     },
   });
 
+  /**
+   * FR-FOG-45 (#210): the DM-only Invisible token state, any scene. Same value → no-op (no
+   * event). Re-derives the token's copies (`derive`, FR-FOG-46: only Sees-invisible polygons see
+   * an unowned invisible token) and runs token-changed hooks on a party-level flip (FR-FOG-13 /
+   * -14). Not a source change: an owned token keeps its vision.
+   */
+  const setInvisible = defineCommand({
+    name: FOG_INTENTS.setInvisible,
+    input: FogSetInvisibleInput,
+    execute({ tokenId, invisible }, env): Record<string, never> {
+      const { tx } = env;
+      const cid = campaignOf(env.actor);
+      const before = getToken(tx, cid, tokenId);
+      if ((before.invisible === true) === invisible) return {};
+      const n = footprint(before.size);
+      const { fogged, seenBy } = deriveSceneObject(tx, {
+        type: TOKEN_TYPE,
+        sceneId: before.sceneId,
+        cells: { col: before.col, row: before.row, w: n, h: n },
+        ownerPlayerId: before.ownerPlayerId,
+        invisible,
+      });
+      // `invisible` is on the DM wire only: `updatedAt` moves with `fogged` alone, so a player who
+      // keeps seeing the token gets nothing (FOG §9 change table).
+      const touched = fogged !== (before.fogged === true) ? { updatedAt: env.ctx.clock.iso() } : {};
+      tx.update(token)
+        .set({ invisible, fogged, seenBy, ...touched })
+        .where(eq(token.id, tokenId))
+        .run();
+      const after = readToken(tx, tokenId);
+      const hookChanges =
+        tokenHiddenForPlayers(before) !== tokenHiddenForPlayers(after)
+          ? runTokenChangedHooks(env, before, after)
+          : [];
+      env.emit({
+        type: TokenInvisibleSet.type,
+        campaignId: cid,
+        payload: { sceneId: before.sceneId, tokenId, invisible },
+        changes: [{ type: TOKEN_TYPE, id: tokenId, before, after }, ...hookChanges],
+      });
+      return {};
+    },
+  });
+
   return {
     edit,
     setAll,
@@ -476,6 +525,7 @@ export function fogCommands(log: Logger) {
     clearDarkness,
     setExplored,
     forgetExplored,
+    setInvisible,
   };
 }
 

@@ -165,6 +165,7 @@ export const FOG_INTENTS = {
   clearDarkness: "fog.clearDarkness",
   setExplored: "fog.setExplored",
   forgetExplored: "fog.forgetExplored",
+  setInvisible: "fog.setInvisible",
 } as const;
 
 const Id = z.string().min(1).max(64);
@@ -227,3 +228,7 @@ export type FogSetExploredInput = z.input<typeof FogSetExploredInput>;
 /** FR-FOG-31: `fog.forgetExplored`. */
 export const FogForgetExploredInput = z.strictObject({ sceneId: Id });
 export type FogForgetExploredInput = z.input<typeof FogForgetExploredInput>;
+
+/** FR-FOG-45 (#210): the DM-only Invisible token state; same value → no-op. */
+export const FogSetInvisibleInput = z.strictObject({ tokenId: Id, invisible: z.boolean() });
+export type FogSetInvisibleInput = z.input<typeof FogSetInvisibleInput>;

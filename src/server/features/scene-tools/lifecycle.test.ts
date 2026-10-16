@@ -2,6 +2,7 @@
 // delete lists every SCN row before the cascade; both ride the scene event's `changes`.
 import { describe, expect, test } from "bun:test";
 import { SceneDeleted, SceneDuplicated } from "@shared/events/scenes-map";
+import { FOG_INTENTS as F } from "@shared/fog-of-war/schemas";
 import {
   AOE_TEMPLATE_TYPE,
   PROPS_PER_CAMPAIGN_MAX,
@@ -55,6 +56,8 @@ describe("FR-SCN-31 scene hooks", () => {
     const t = scnSetup();
     t.writeStructure(t.ambush.id, [], [[1, 16, 5, 16, 6, 1, 1]]);
     t.writeProp(t.ambush.id, "crate", "prop-barrel", { col: 18, row: 2, fogged: true });
+    // Since V2 the copy re-derives (#216, FR-FOG-35): the source's fog really hides them.
+    t.run(F.setAll, { sceneId: t.ambush.id, fogged: true });
     const copy = t.run<SceneRecord>(R.duplicateScene, { id: t.ambush.id });
     const [p] = sceneProps(t.s.db, copy.id);
     expect(p?.fogged).toBe(true);

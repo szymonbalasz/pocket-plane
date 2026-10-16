@@ -5,8 +5,8 @@
 //   viewer in `seenBy`, FR-FOG-44), active scene only via the scene gate (CON-22).
 // - `fog-explored` (FR-FOG-37) and `vision` (FR-FOG-39, derived): `dmWindow: "view-as"`
 //   (FR-FOG-43): the DM snapshot carries none; `sync.loadScene {sceneId, viewAs}` loads one
-//   player's. Players: their own rows only. V0 registers them empty: nothing writes memory and
-//   no vision source exists before V2.
+//   player's. Players: their own rows only. `vision` is derived (no table): the snapshot computes
+//   it from the DB through the vision cache; commands list before / after (`rederive.ts`).
 import {
   FOG_EXPLORED_TYPE,
   FOG_TYPE,
@@ -16,13 +16,19 @@ import {
   VISION_TYPE,
   VisionRecord,
 } from "@shared/fog-of-war/schemas";
+import { and, eq } from "drizzle-orm";
+import type { Db } from "../../db/client";
+import { scene } from "../../db/schema";
 import { defineRecordType, type Viewer, type Visibility } from "../../ws/records";
+import { loadSceneSight } from "./derive";
 import {
   campaignExploredRecords,
   campaignFogRecords,
   dmFogRecord,
   type ServerExploredRecord,
   type ServerFogRecord,
+  type ServerVisionRecord,
+  toVisionRecord,
   wireDarkness,
 } from "./rows";
 
@@ -82,8 +88,27 @@ export const fogExploredRecordType = defineRecordType<ServerExploredRecord>({
     ),
 });
 
-/** Server `vision` rows carry `campaignId` for the scope gate. */
-export type ServerVisionRecord = VisionRecord & { campaignId: string };
+/**
+ * FR-FOG-39: `vision` rows computed from the DB (cached sight, FR-FOG-38). A player: their own row
+ * on the active scene (or the loaded scene); the DM: only on a View-as load (`scope`, FR-FOG-43).
+ */
+function visionSnapshot(db: Db, v: Viewer, scope?: { sceneId: string }): ServerVisionRecord[] {
+  if (v.role === "dm" && !scope) return [];
+  const sceneId =
+    scope?.sceneId ??
+    db
+      .select({ id: scene.id })
+      .from(scene)
+      .where(and(eq(scene.campaignId, v.campaignId), eq(scene.active, true)))
+      .get()?.id;
+  if (!sceneId) return [];
+  const loaded = loadSceneSight(db, sceneId);
+  if (!loaded || loaded.campaignId !== v.campaignId) return [];
+  const sc = { sceneId, campaignId: loaded.campaignId };
+  return [...loaded.sight]
+    .filter(([p]) => v.role === "dm" || p === v.playerId)
+    .map(([p, e]) => toVisionRecord(sc, p, e.vision));
+}
 
 const wireVision = ({ campaignId: _c, ...r }: ServerVisionRecord): VisionRecord => r;
 
@@ -99,6 +124,5 @@ export const visionRecordType = defineRecordType<ServerVisionRecord>({
   redact: wireVision,
   dmRedact: wireVision,
   dmWindow: "view-as",
-  // V0: no vision source exists (senses are set from V2 on); V2 computes from the DB here.
-  snapshot: () => [],
+  snapshot: ({ db }, v, scope) => visionSnapshot(db, v, scope),
 });
