@@ -1,7 +1,7 @@
 ---
 title: Dice extras
 prefix: DICEX
-status: in-review
+status: complete
 owner: spec-dice-extras
 phase: post-mvp-3
 ---
@@ -13,7 +13,7 @@ phase: post-mvp-3
 ## 1. Summary
 
 - **Dice tray**: a window where a roll is composed or adjusted before it is sent. It becomes the roll control's second face: roll buttons still roll at once, Alt+click stages the roll in the tray; clicked dice notation always lands there.
-- **3D dice**: every `roll` log entry a client receives is **thrown** as 3D dice that settle on the **server's** faces ([ADR-0022](../architecture/adr/0022-deterministic-seams.md), [FR-DICE-03](dice-roll-log.md#6-functional-requirements)). Purely cosmetic and client-side: no new server command, event or signal for the animation; visibility is the game log's ([proposed-3d-dice](../architecture/adr/proposed-3d-dice.md)).
+- **3D dice**: every `roll` log entry a client receives is **thrown** as 3D dice that settle on the **server's** faces ([ADR-0022](../architecture/adr/0022-deterministic-seams.md), [FR-DICE-03](dice-roll-log.md#6-functional-requirements)). Purely cosmetic and client-side: no new server command, event or signal for the animation; visibility is the game log's ([ADR-0044](../architecture/adr/0044-3d-dice.md)).
 - **Clickable dice notation** in free text ("1d12+5", "1d12 + 5"): puts the dice in the tray to adjust, then rolls a plain `dice.roll`; never feeds attack / apply.
 - **Dice look** per owner (DM, each player): a named style, colours, material; everyone sees the roller's look.
 
@@ -25,7 +25,7 @@ phase: post-mvp-3
 - Dice look: record, intent, UI (FR-DICEX-24–27).
 - Notation parser + `DiceText` component; sheet free text as the first surface (FR-DICEX-28–31).
 - Extension point for [effect-modifiers](effect-modifiers.md) tier 2 "box per bonus die" (FR-DICEX-08).
-- *(proposed)* items: the throw zone over the free area (OQ-DICEX-02), Alt+click (OQ-DICEX-08), styles list (FR-DICEX-24).
+- Decided at sprint-3 gate 1 ([#207](../decisions-log.md)): `three` + `cannon-es` (OQ-DICEX-01), throw zone over the free area (OQ-DICEX-02), server-stored looks (OQ-DICEX-06), Alt+click (OQ-DICEX-08), styles list (FR-DICEX-24).
 
 ## 3. Goals
 
@@ -86,7 +86,7 @@ phase: post-mvp-3
 | FR-DICEX-22 | **Lazy chunk**: 3D code (library, meshes, textures, all bundled; no CDN) loads by dynamic import on the first 3D throw or look preview; `flat` / `off` never load it. Each client's initial JS grows ≤ 15 KB gz (parser, tray, flat dice); 3D chunk ≤ 170 KB gz with the pick (measured 159 KB, §14). Load failure → `flat` for the session + one console warning. | |
 | FR-DICEX-23 | **Perf**: render loop only while a throw is visible (idle = no frames). A 3D throw with median frame time > 33 ms → this device switches to `flat` + Toast "Dice set to flat: 3D was slow on this device" (switch back in settings). | |
 | **Dice look** | | |
-| FR-DICEX-24 | Look = `{style, body, pips, material}`: named **styles** Ivory, Obsidian, Crimson, Sapphire, Emerald, Amethyst, Gold, Bone *(proposed)*, each a starting body / pips / material ("preset" stays MOD's word, seams S9); `body`, `pips` `#rrggbb`; material `plastic` \| `metal` \| `glass` \| `stone`. One per owner (DM, each player) per campaign. No row → default: DM Obsidian; players in order of sorted player `id` (every client has it; snapshot order and creation time aren't sent) Crimson, Sapphire, Emerald, Amethyst, Gold, Bone, Ivory, … (derived, not stored). | OQ-DICEX-05 |
+| FR-DICEX-24 | Look = `{style, body, pips, material}`: named **styles** Ivory, Obsidian, Crimson, Sapphire, Emerald, Amethyst, Gold, Bone, each a starting body / pips / material ("preset" stays MOD's word, seams S9); `body`, `pips` `#rrggbb`; material `plastic` \| `metal` \| `glass` \| `stone`. One per owner (DM, each player) per campaign. No row → default: DM Obsidian; players in order of sorted player `id` (every client has it; snapshot order and creation time aren't sent) Crimson, Sapphire, Emerald, Amethyst, Gold, Bone, Ivory, … (derived, not stored). | OQ-DICEX-05 |
 | FR-DICEX-25 | Record `dice-look` (§8): visibility **full** to everyone in the campaign, so every client draws the roller's look. Always in the snapshot, not a lazy type (§12, seams S1). | OQ-DICEX-06 |
 | FR-DICEX-26 | `dicex.setLook {style, body, pips, material}` (DM, player): owner = sender (no owner field: nobody sets another's look). zod; same look → no-op, no event; else upsert + event-log row + `DiceLookSet` in one transaction ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). IDs and time from `ctx`. | |
 | FR-DICEX-27 | "Dice look" (tray gear → popover): style swatches, body / pip colour (12-swatch palette + hex Input), material ToggleGroup, live preview die (3D if render = 3d, else flat), Save, Reset (= the style's defaults). Pips vs body contrast < 3:1 → inline hint, still allowed. Disabled unless `live`. | |
@@ -205,14 +205,14 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 - **Wire:** no new traffic per roll (throws reuse the entry frame). `dice-look` ≈ 310 B per row; one upsert per look save (human-paced).
 - **CON-44 (re-measured 2026-10-16 at the seams pass**, `dice-look` row shape; throwaway probe on the heavy harness `snapshot-size.ts`, session-sim + 6 players, max-length values (36-char IDs, longest style / material), 7 rows: DM + 6 players; deleted before commit):
 
-| Variant | `dice-look` DM | Heavy DM frame | Left of 786,432 B | Players |
+| Variant | `dice-look` DM | Heavy DM frame | Left of 1,048,576 B (DM, #208) | Players (ceiling 524,288 B) |
 |---|---|---|---|---|
-| Baseline (`main` today) | — | 676,057 B | 110,375 B | 277,040–280,100 B |
-| **Look per owner (pick)** | **2,157 B** (308 B/row) | **678,215 B** | **108,217 B** | 279,198–282,258 B (+ 2,158 B each) |
-| Look + 9 per-category looks (OQ-DICEX-05 C; first pass, old row shape) | 7,525 B (1,075 B/row) | ≈ 683,600 B | ≈ 102,800 B | ≈ + 7,500 B each |
-| Browser-local (OQ-DICEX-06 B) | 0 | 676,057 B | 110,375 B | unchanged |
+| Baseline (`main` today) | — | 676,057 B | 372,519 B | 277,040–280,100 B |
+| **Look per owner (decided, #207)** | **2,157 B** (308 B/row) | **678,215 B** | **370,361 B** | 279,198–282,258 B (+ 2,158 B each) |
+| ~~Look + 9 per-category looks~~ (OQ-DICEX-05 C, rejected; first pass, old row shape) | 7,525 B (1,075 B/row) | ≈ 683,600 B | ≈ 365,000 B | ≈ + 7,500 B each |
+| ~~Browser-local~~ (OQ-DICEX-06 B, rejected) | 0 | 676,057 B | 372,519 B | unchanged |
 
-- **Sprint context (seams S2, updated by X1):** D's +2,158 B is the smallest track delta; the sprint total (≈ 699,400 B heavy DM, ≈ 87,000 B left) keeps the ceiling but breaks the 100 KiB DM-headroom guard by ≈ 15 KB. That is the orchestrator's gate-1 DM question; DICEX's own CON-44 test asserts its delta (§13) and the guard as decided there.
+- **Sprint context (gate G3, #208):** D's +2,158 B is the smallest track delta; the sprint total with every pick is 712,310 B heavy DM. The DM ceiling is now **1 MiB** (players stay 512 KiB) and the "≥ 100 KiB DM headroom" guard is **dropped** (#208). The constant and protocol CON-44 change in V0 (`fix/vision-core`), not here.
 - **Not a lazy type (seams S1):** every client needs every owner's look the moment any entry arrives (a throw starts in the frame it arrives, FR-DICEX-16); loading on demand would draw the first throw in a default look or delay it, to save ≈ 2 KB.
 
 - **Client bundle:** initial chunk + ≤ 15 KB gz per client; 3D chunk lazy, ≤ 170 KB gz with the pick. Both asserted by a size test on `bun run build` output. Measured library sizes: [§14](#14-dependencies).
@@ -236,7 +236,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | Level | What | Fixtures |
 |---|---|---|
 | Unit | `FR-DICEX-28 notation parser`: "1d12+5", "1d12 + 5", "1d12 +5", "1D12+5" → `1d12+5`; "d20" → `1d20`; "7 (2d6 + 3) slashing" → `2d6+3`; "2d6 − 1" / "2d6 – 1" → `2d6-1`; "4d6kh3", "2d20kl1+5"; "1d6+1d4+2" one match; "1d8 plus 1d6" two; "1d6 +" → `1d6`; "1d6+3days" → `1d6`; "1d6+3." → `1d6+3`; newline between "1d6" and "+ 2" → `1d6`; not matched: "51d6", "1d1", "0d6", "1d1001", "2d6/2", "4d6x2", "abc1d6", "2d6x", "1 d 6", "+5 to hit", "d%"; > 60 chars / > 10 terms → text; positions exact; 4,000 chars < 1 ms. `FR-DICEX-13 throwDice`: kept + dropped (adv), MOD `1d4` part with `dice` → labelled die, `-1d4` → value 3 + "−", `3d6` part with `dice` [2, 5, 6] → three labelled dice, a part without `dice`: `1d4` → one die, `2d6` → chip, null label → "DM", an `offered` `1d6` (Divine Fury) → one die tagged "on a hit", not in the total badge, manual with / without per-die values, 51 dice → 20 + "+31 more", d3 / d1000 → flat, d100 → tens + units (100 → 00 + 0). `FR-DICEX-15 upFace + relabel`: for each die type and every (landed face, target value) pair, the relabelled up-face reads the target. `FR-DICEX-15 headless settle` (D3, cannon-es, no renderer): 20 seeds × d4, d6, d8, d10, d12, d20, d100 × every target value: simulate, relabel, read `upFace` from the final body orientation → target; d4 by its top vertex; d100 tens + units incl. 100 → 00 + 0; every run rests or snaps within 150 steps. `FR-DICEX-11 high-water`: snapshot entries, resync, `markUndone` upsert → no throw; new `n` → throw; campaign switch resets; one frame with 3 `roll` entries (Roll monsters) → one throw, dice in `n` order, 30 dice → 20 + "+10 more". `FR-DICEX-09 pending`: reduced motion → static "Rolling…" label, no animation frames. `FR-DICEX-12 payload only`: an entry with a `dmPayload` sentinel → throw never contains it. `FR-DICEX-21 settings`: parse, invalid → defaults, throwing storage → memory, reduced motion → flat. `FR-DICEX-24 default looks` by sorted player `id`: the same on DM and player stores fed in different snapshot orders. Roll control (DOM tests, as `sheet-render.test.tsx`): `FR-DICEX-06` click → `onRoll` at once + pending; Alt+click → tray `adjust`, Roll → `onRoll` with the same `RollRequest`; `FR-DICEX-07` physical + tray → `ManualForm` in the tray, FR-DICE-31/32 rules hold; `FR-DICEX-08` a test `trayExtras` entry shows its chips; an unknown `options` field (a `subject`) and the `RollRequest` fields `previewMode`, `manualParts` reach `onRoll` unchanged; adv via the toggle → two d20 chips; a request whose `previewMode` is `dis` → two d20 chips tagged dis; a damage entry with an `offered` trigger part `1d6` → one labelled thrown die (`throwDice`). `FR-DICEX-06` the Roll monsters button and the concentration notification action roll at once (no Alt stage). `FR-DICEX-01` window `dicex.tray` passes the registry-driven layout tests (1280×720 fit, 1600×900 no overlap) | in-code |
-| Integration | `FR-DICEX-26`: setLook as DM and player → own row only; same look → no event; bad colour → `invalid`; event + row + log in one tx, rollback → none. `FR-DICEX-25`: every player frame has every `dice-look` row. CON-44 test: heavy + 7 rows < ceilings, `dice-look` ≤ 2.5 KB for the DM, DM headroom per the gate-1 guard decision (seams S2; §12). Restart → identical snapshots. Leak scan: hidden "DM-SECRET-ROLL" (rolls-1) absent from player frames, as DICE | `dice-extras` |
+| Integration | `FR-DICEX-26`: setLook as DM and player → own row only; same look → no event; bad colour → `invalid`; event + row + log in one tx, rollback → none. `FR-DICEX-25`: every player frame has every `dice-look` row. CON-44 test (#208): heavy + 7 rows under the ceilings (DM 1 MiB, each player 512 KiB) and DICEX's own per-type bound `dice-look` ≤ 2.5 KB in the DM frame; no headroom guard (§12). Restart → identical snapshots. Leak scan: hidden "DM-SECRET-ROLL" (rolls-1) absent from player frames, as DICE | `dice-extras` |
 | E2E (thin) | B clicks `1d12+5` in Mira's "Notation test" feature → tray `compose` → Roll; A sees the line; B's `dicex-throw-die` `data-settled` = `data-value` for each die (headless Chromium WebGL, or flat when unavailable: then `data-flat`) | `dice-extras` |
 | Bundle | `bun run build`: player and DM initial chunks grow ≤ 15 KB gz vs `main`; the 3D library sits only in a lazy chunk, and that chunk is ≤ 170 KB gz | — |
 
@@ -267,7 +267,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | [live-sync](live-sync.md) | `useEventFrame` (live frames only), `live` state | built; D never touches `src/server/ws/`, protocol or the common store (V0, then `fix/lazy-records` only) |
 | [character-sheet-full](character-sheet-full.md) | Text fields rendered through `DiceText`; `char.putRow` for the fixture | complete; sheet folder sequenced V5 → R3 → R6 → C2 → **D4** → P4 / C4 (seams S3, X2) |
 | [effect-modifiers](effect-modifiers.md) | Tier 2 builds on FR-DICEX-08; MOD parts on `roll` payloads (FR-MOD-19) and `offered` trigger parts, both with per-die `dice` (R1, D9); `subject` on `RollControlOptions`, `previewMode` and `manualParts` on `RollRequest` (R14, seams S4) | revising (R, sprint 3) |
-| New dependency | 3D rendering + physics, lazy chunk (OQ-DICEX-01) | **DM OK at gate 1** (AGENTS §3) |
+| New dependency | 3D rendering + physics, lazy chunk (OQ-DICEX-01) | **DM OK at gate 1** (#207, G1: `three` 0.186 + `cannon-es` 0.20; AGENTS §3) |
 
 **Library candidates** (OQ-DICEX-01) — measured 2026-10-16 by bundling each with `bun build --minify --target browser` in a scratch dir:
 
@@ -285,7 +285,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 - `src/client/common/features/play-shell/PlayFrame.tsx` (frame, shared) — mount the throw layer in the overlay layer (one line, D1 by sequencing, seams S3). No canvas file: the throw zone is not a Konva layer.
 - `src/client/common/features/dice-roll-log/` (dice-roll-log's client folder; roll-control hotspot, D1 → R2): `roll-control.tsx` (Alt+click stage, pending, `ManualForm` export for the tray host, two-d20 preview), `GameLog.tsx` (tray button).
 - New append-only registry `src/client/common/features/dice-extras/tray-extras.ts` → AGENTS §9.9 list (integrator at the gate, seams S11).
-- Only if OQ-DICEX-06 A: `src/server/db/` (`dice_look`), `src/shared/events/` (`DiceLookSet`), record-type registry, `src/server/features/index.ts`, `fixtures/bundles/index.ts` (`dice-extras`); schema slot last: V0 → R0 → P core → C1 → **D2** (seams S3).
+- Server-stored looks (OQ-DICEX-06 A, #207): `src/server/db/` (`dice_look`), `src/shared/events/` (`DiceLookSet`), record-type registry, `src/server/features/index.ts`, `fixtures/bundles/index.ts` (`dice-extras`); schema slot last: V0 → R0 → P core → C1 → **D2** (seams S3).
 - `package.json`, `bun.lock` — the library (after DM OK). `vite.config.ts` only if the library needs asset copying.
 - Docs at merge: protocol rows (intent, record type, event, roll-control row in §26, window row), data-model row, glossary (OQ-DICEX-17).
 
@@ -294,7 +294,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | # | Branch | Content | Shared files | After |
 |---|---|---|---|---|
 | D1 | `build/dicex-tray` | Parser, `throwDice`, `DiceText` (`dice-extras/DiceText.tsx`), tray window + states, roll-control routing (Alt+click, pending, tray `manual`, two-d20 preview, `tray-extras.ts`), roll-bar button, **flat** throws + throw zone, device settings | windows.ts ×2, `PlayFrame.tsx`, dice-roll-log client folder, new registry | Can start first (client only); **R2 (`fix/mod-roll-preview`) waits for it**; P and C import `DiceText` after it |
-| D2 | `fix/dicex-look-core` (only if OQ-DICEX-06 A) | `dice_look`, record type, `dicex.setLook`, `DiceLookSet`, fixtures + bundle, CON-44 test | db, events, registries, bundles index | Schema order: after C1 |
+| D2 | `fix/dicex-look-core` | `dice_look`, record type, `dicex.setLook`, `DiceLookSet`, fixtures + bundle, CON-44 test | db, events, registries, bundles index | Schema order: after C1 |
 | D3 | `build/dicex-3d` | Library, lazy 3D renderer, settle to result (+ headless settle test), looks + materials, Dice look UI, perf fallback, bundle-size test (initial + 3D chunk) | `package.json`, `bun.lock` | D1; look UI after D2 |
 | D4 | `fix/dicex-sheet-notation` | `DiceText` in sheet feature text, spell notes, item notes, notes | character-sheet folder | Sheet lock: after R6 and C2, before P4 / C4 (X2) |
 
@@ -302,22 +302,22 @@ Walkthrough steps per slice: D1 → 2–5, 7–12 (flat); D2 → 6 (data via fra
 
 ## 15. Open questions
 
-**Bold** option = suggested pick (not decided). Owner of every open question: the DM at sprint-3 gate 1 (via the orchestrator). Rows 13–17 were settled by the seams ruling (2026-10-16; 17 = terms the integrator adds after the gate).
+All rows decided. Rows 01–12: DM at sprint-3 gate 1 ([#207](../decisions-log.md), 2026-10-16; gate rows G1, G16–G18 + bulk-accept D); the decided option is in bold, rejected ones are kept for the record. Rows 13–17 were settled by the seams ruling (2026-10-16; 17 = terms the integrator adds after the gate).
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-DICEX-01 | 3D library (new dependency, lazy chunk; sizes measured, §14) | **C hand-rolled `three` + `cannon-es`, 159 KB gz, MIT, no assets** (three maintained; cannon-es idle since 2022-08 but only in the swappable headless precompute; testable relabel; most build work) / B `dice-box-threejs`, 144 KB gz, MIT (forced results + colour sets built in; 4 years idle, vendors three r143) / A `dice-box`, 700 KB gz + 283 KB assets (no forced results) / D R3F 8 + rapier, 1,025 KB gz (old lines only on React 18) | yes (gate 1) | ADR-0001, build 3 |
-| OQ-DICEX-02 | Where do dice land? | A tray window only (others' rolls animate only while your tray is open) / **B throw zone over the free area, tray for composing** (every roll visible, no window opened, never over a window; covers map for ~3 s) / C on the map canvas in world space (after V's canvas slices; most immersive, touches `MapCanvas`) | yes (gate 1) | play-shell, scenes-map |
-| OQ-DICEX-03 | Who sees a throw? | **A everyone who received the entry, per-device "others" toggle** (table feel; hidden rolls safe by construction) / B roller only (quiet, but remote players miss the table) / C roller 3D, others flat | no | — |
-| OQ-DICEX-04 | Does the log line wait for the dice? | **A no: line at once, dice settle ≤ 2.5 s later** (log stays the truth, no hidden-state timers) / B this client holds the line's total until its throw rests (suspense; a second, client-only delay rule) | no | dice-roll-log |
-| OQ-DICEX-05 | Customisation scope | A colours only / **B named style + colours + material** (2,157 B measured) / C B + per-category looks (≈ 7,500 B; more UI) | no | — |
-| OQ-DICEX-06 | Where looks live, who sees whose | **A server `dice-look`, everyone sees the roller's look** (+2,158 B heavy DM, 108,217 B left; schema slot D2, last) / B browser-local, only you see your look (no server work; lost per browser; others see defaults) / C server, but each viewer draws all dice in their own look | yes (gate 1: decides slice 2) | CON-44, schema order |
-| OQ-DICEX-07 | Physical dice with the tray | **A stays: same `ManualForm` in the popover (buttons) and the tray (staged), flat dice in the throw** / B moves into the tray only (one place, but every physical roll opens a window) / C drop it (3D replaces it; breaks #43) | no | dice-roll-log |
-| OQ-DICEX-08 | Roll buttons and the tray | **A roll at once; Alt+click stages** (no extra click in combat) / B every button stages (one more click per roll) / C per-device setting | no | dice-roll-log, CHARX, CBT |
-| OQ-DICEX-09 | Where notation is clickable | A sheet text only / **B sheet text now + every sprint-3 free-text surface through `DiceText` (handouts, compendium)** / C also log lines, labels, loot text (re-roll from the log confuses "what happened") | no | P, C, party-loot |
-| OQ-DICEX-10 | Motion settings | **A per device: 3D / flat / off, reduced motion → flat, auto-flat when slow** / B one campaign setting by the DM (can't fit each laptop) / C none | no | — |
-| OQ-DICEX-11 | Dice sound | **A none** (ADR-0007) / B a short clatter as a UI sound (amends ADR-0030 / ADR-0007) | no | ADR-0007 |
-| OQ-DICEX-12 | Max 3D dice per throw | A 10 / **B 20, rest as chips** (target 50 fps; the DM checks on the table laptop at the sprint gate) / C all 50 | no | — |
+| OQ-DICEX-01 | 3D library (new dependency, lazy chunk; sizes measured, §14) | **Decided (#207, G1): C hand-rolled `three` 0.186 + `cannon-es` 0.20, 159 KB gz, MIT, no assets** (three maintained; cannon-es idle since 2022-08 but only in the swappable headless precompute; testable relabel; most build work). Rejected: B `dice-box-threejs`, 144 KB gz (forced results + colour sets built in; 4 years idle, vendors three r143); A `dice-box`, 700 KB gz + 283 KB assets (no forced results); D R3F 8 + rapier, 1,025 KB gz (old lines only on React 18) | no (decided) | ADR-0001, [ADR-0044](../architecture/adr/0044-3d-dice.md), D3 |
+| OQ-DICEX-02 | Where do dice land? | **Decided (#207, G16): B throw zone over the free area, tray for composing** (every roll visible, no window opened, never over a window; covers map for ~3 s). Rejected: A tray window only (others' rolls animate only while your tray is open); C on the map canvas in world space (after V's canvas slices; touches `MapCanvas`) | no (decided) | play-shell, scenes-map |
+| OQ-DICEX-03 | Who sees a throw? | **Decided (#207, bulk D): A everyone who received the entry, per-device "others" toggle** (hidden rolls safe by construction). Rejected: B roller only; C roller 3D, others flat | no (decided) | — |
+| OQ-DICEX-04 | Does the log line wait for the dice? | **Decided (#207, bulk D): A no: line at once, dice settle ≤ 2.5 s later**. Rejected: B this client holds the line's total until its throw rests (a second, client-only delay rule) | no (decided) | dice-roll-log |
+| OQ-DICEX-05 | Customisation scope | **Decided (#207, G17): B named style + colours + material** (2,157 B measured). Rejected: A colours only; C B + per-category looks (≈ 7,500 B; more UI) | no (decided) | — |
+| OQ-DICEX-06 | Where looks live, who sees whose | **Decided (#207, G17): A server `dice-look`, everyone sees the roller's look** (+2,158 B heavy DM; schema slot D2, last). Rejected: B browser-local, only you see your look; C server, but each viewer draws all dice in their own look | no (decided) | CON-44, schema order |
+| OQ-DICEX-07 | Physical dice with the tray | **Decided (#207, bulk D): A stays: same `ManualForm` in the popover (buttons) and the tray (staged), flat dice in the throw**. Rejected: B tray only (every physical roll opens a window); C drop it (breaks #43) | no (decided) | dice-roll-log |
+| OQ-DICEX-08 | Roll buttons and the tray | **Decided (#207, G18): A roll at once; Alt+click stages** (no extra click in combat). Rejected: B every button stages; C per-device setting | no (decided) | dice-roll-log, CHARX, CBT |
+| OQ-DICEX-09 | Where notation is clickable | **Decided (#207, bulk D): B sheet text now + every sprint-3 free-text surface through `DiceText` (handouts, compendium; one parser)**. Rejected: A sheet text only; C also log lines, labels, loot text | no (decided) | P, C, party-loot |
+| OQ-DICEX-10 | Motion settings | **Decided (#207, bulk D): A per device: 3D / flat / off, reduced motion → flat, auto-flat when slow**. Rejected: B one campaign setting by the DM; C none | no (decided) | — |
+| OQ-DICEX-11 | Dice sound | **Decided (#207, bulk D): A none** (ADR-0007). Rejected: B a short clatter as a UI sound | no (decided) | ADR-0007 |
+| OQ-DICEX-12 | Max 3D dice per throw | **Decided (#207, bulk D): B 20, rest as chips**; fps judged by the DM on the table laptop at the sprint gate (headless runs only log it). Rejected: A 10; C all 50 | no (decided) | — |
 | OQ-DICEX-13 | effect-modifiers (R): tier 2 on the tray | **Settled by seams S4:** R2 (`fix/mod-roll-preview`) builds on FR-DICEX-08 after D1; extra groups via `tray-extras.ts`, physical boxes via `ManualForm` → `manualParts`, adv / dis preview = two d20s (D renders, R supplies the mode); offered trigger parts ride on the damage `roll` entry as `offered` items with per-die `dice`, outside `total` (R1, D9), and are thrown as labelled dice | no | [effect-modifiers](effect-modifiers.md) |
 | OQ-DICEX-14 | party-board (P): handout text | **Settled by seams S7:** handout bodies through `DiceText` once D1 is on `main` (plain text until then); context is P's | no | [party-board](post-mvp/party-board.md) |
 | OQ-DICEX-15 | compendium (C): descriptions | **Settled by seams S7:** C's markdown-lite component wraps text runs in `DiceText` once D1 is on `main`; context (actor) is C's | no | [compendium](post-mvp/compendium.md) |
