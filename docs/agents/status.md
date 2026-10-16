@@ -9,7 +9,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | V0 vision core | `fix/vision-core` (w3N, slot 0) | build-vision-core | Building | Review + regression walkthrough → merge; then V5, R0, `fix/lazy-records` |
-| D1 dice tray | `build/dicex-tray` (w3M, slot 2) | build-dicex-tray | Building | Walkthrough D1 → merge; then D3, R2 |
+| D1 dice tray | `build/dicex-tray` (w3M, slot 2) | test-dicex-tray (port 4123) | Walkthrough (steps 1, 4, 5, 7–12 flat) | Merge; then R2. D1 picks: steps 2–3 + Alt hint → D4; Initiative / death-save Alt staging → small fix after R7 |
+| D3 3D dice | `build/dicex-3d` (w3R, slot 3; based on D1) | build-dicex-3d | Building | Merge main after D1; walkthrough steps 4, 11, 13 (3D) |
 | R early: formula + rule zod + presets | — | — | Merged (2d6d4c8) | R0 builds on it |
 | C early: bundled SRD 5.1 + recorder + pure adapter | `fix/cmp-data` (w3Q, slot 4) | build-cmp-data | Building | Merge (no UI) → C1 wires it |
 | Queue | — | — | V5 → V1 → (V4 ∥ V2) → V3; R0 → R1 ∥ R4 → R2 / R3 / R5–R7; `fix/lazy-records` → P core → P2 ∥ P3 → P4; C1 → C2 → C3, C4; D3, D2, D4 | Per locks below |
@@ -19,6 +20,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 - `fix/vision-core`: `src/server/db/`, `src/server/ws/` + `src/shared/protocol/` + common sync store, `src/server/features/scenes-map/`, scene-tools shared parts, entities schemas.
 - `build/dicex-tray`: `src/client/{dm,player}/windows.ts` (append), `PlayFrame.tsx` (one mount line), `src/client/common/features/dice-roll-log/`.
+- `build/dicex-3d`: `package.json`, `bun.lock` (three + cannon-es, #207).
 - Order after: schema V0 → R0 → P core → C1 → D2; ws V0 → `fix/lazy-records`; canvas V1 → V4 → V3; sheet V5 → R3 → R6 → C2 → D4 → P4 / C4; combat R0 → R7 → C2; dice-roll-log client D1 → R2.
 
 ## Pending DM decisions
