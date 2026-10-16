@@ -1563,3 +1563,36 @@ From [party-board](../specs/party-board.md#64-gold-ledger-party-loot-evolved) (P
 
 - DM **Split…** Button by the pot (`loot-split-open`, disabled while not `live`) → Dialog `loot-split-dialog`: five coin Inputs pp → cp (`loot-split-coin` + `data-value`), prefilled with the pot's positive coins; a Checkbox per character by name (`loot-split-character` + `data-record-id`; approved = sheet not `draft` ticked); preview `loot-split-preview` ("Each gets 2 pp, 15 gp; 1 pp stays in the pot", or the validation message with `data-valid="false"`); Split `loot-split-submit` disabled while invalid, not `live` or in flight; reject → `loot-split-error`; ack → closes; lost intent → Toast "Connection lost — check the loot log before splitting again". Players have no Split….
 - **Item rows:** `loot-entry` `data-kind="item"`, line "‹from› → ‹to›: ‹name› ×‹qty›" ("Party", "Outside the party"), no coin Badges, no Edit.
+
+## 56. Sprint 3: party inventory (P4)
+
+From [party-board](../specs/party-board.md#63-party-inventory) (PARTY slice 4; #207 G27, #221). **Built by `build/party-inventory`**: the item intents beyond `party.addItem` ([§44](#44-sprint-3-party-board-core-p-core)), CHARX's `sheet-items.ts` helper, party-loot's item-row helper, and the Inventory tab. Events `PartyItemEdited`, `PartyItemRemoved`, `ItemMoved` are §44's, now emitted. No new record type. Data side: [data model §42](../data-model/README.md#42-sprint-3-party-inventory-p4).
+
+**Intents** (`src/server/features/party-board/item-commands.ts`; none optimistic)
+
+| Intent | Who | Payload | Validation | Result | Source |
+|---|---|---|---|---|---|
+| `party.editItem` | DM | `EditItemIntent {itemId, name, qty, notes}` (strict; bounds as `addItem`) | unknown / other campaign → `not_found` "Item is gone"; same values → `ack`, no event; another row with the new merge key → `conflict` "Same item exists — move or remove one" | — | [FR-PARTY-20](../specs/party-board.md#63-party-inventory) |
+| `party.removeItem` | DM | `RemoveItemIntent {itemId, qty}` (qty int 1–9 999) | `not_found` as edit; qty > row → `conflict` "Only ‹n› left"; row deleted at 0 | `{entryId}` | FR-PARTY-21 |
+| `party.moveItem` | DM, player | `MoveItemIntent {from, to, qty, itemId?, rowId?}` (strict; ends `{kind: party}` / `{kind: character, characterId}`; `from ≠ to`; from party ⇒ `itemId` only, from a character ⇒ `rowId` only, else `invalid`) | In order: each character end a `character` of the campaign (`not_found` "Character not found"); FR-PARTY-23 (player: own → party / other character, party → own; own = entity `ownerPlayerId` at commit; else `forbidden` "You can't move that item"; sheet lock and draft status never block); source row (`not_found` "Item is gone": party row gone, or `rowId` not on that sheet); qty > held → `conflict` "Only ‹n› left"; target caps → `conflict`: party 61st row "Party inventory is full (60)", sheet 81st row "‹name›'s inventory is full (80)", merged qty > 9 999 "‹Party / name› can't hold more than 9999 of this item" | `{entryId}` | FR-PARTY-22, -23 |
+
+- **Move semantics:** source reduced, deleted at 0 (an equipped sheet row too); target merges by key (name trimmed + case-insensitive, notes exact; the target row keeps its name, `equipped` and place) or appends (party: new row; sheet: `{equipped: false}`, id from `ctx.ids`). A sheet row's name / notes going to the party are cleaned (PARTY clean text). A character without a `creature-sheet` row gets one (CHARX defaults) on its first incoming move. Party row, sheet row(s) and loot row: one transaction; crash seams `PP_TEST_CRASH=party.moveItem:before-commit` / `:after-commit`.
+- **Log rows:** every remove / move writes `loot-entry {kind: item, text: name, qty, coins 0}` (`party → world`, or the move's ends) through `insertItemEntry` (`src/server/features/party-loot/item-entries.ts`, also used by `addItem`). No notification on edit, remove or move (`loot-received` stays `addItem`'s).
+
+**Events** (logged, not undoable; one `event` frame before the sender's `ack`)
+
+| Event | Payload | Changes (order) | Visibility |
+|---|---|---|---|
+| `PartyItemEdited` | `{itemId, before, after}` (`{name, qty, notes}`) | `party-item` | DM + every player of the campaign |
+| `PartyItemRemoved` | `{itemId, entryId, name, qty}` | `party-item` (delete at 0), `loot-entry` | same |
+| `ItemMoved` | `{entryId, from, to, name, qty}` | `party-item` (if a party end), then each changed `creature-sheet` (from, then to), then `loot-entry` | `party-item`, `loot-entry`: everyone of the campaign; `creature-sheet`: CHARX's fn (DM + owner full, others hidden). A player's give to another character reaches the other owner as their own sheet + the log row only |
+
+**CHARX helper** `src/server/features/character-sheet/sheet-items.ts` (seams S8): `readSheetItems`, `decrementSheetItem` (gone / short / ok), `addSheetItem` (merge or append; caps 80 rows, 9 999), `writeSheetItems` (only `items` changes; the whole row validated by `writeSheet`, 48 KB cap). No event, no authorization: the caller's.
+
+**Client** (`party.board` Inventory tab, `@ui/features/party-board/Inventory`; pure rules `inventory-logic.ts`)
+
+- Rows by name (`party-item-row` + `data-record-id`; `party-item-name`, `party-item-count` "×‹qty›"). Empty `party-item-empty` "Party inventory is empty"; loading `party-item-loading`.
+- **Take** (`party-item-take`; label "Move…" for the DM) opens a row form: target `party-item-target` + `data-value` (`character:<id>`; a Select with `party-item-target-option` options when > 1 character, else the one name as text), `party-item-qty` (default 1; client mirror: 1–9 999 and ≤ held → "Only ‹n› left"), `party-item-submit`, `party-item-cancel`. Targets: a player's own characters; the DM's every character.
+- **Give…** (`party-item-give`) opens `party-item-give-form`: sources `party-item-source` + `data-record-id` (sheet row id) + `data-character-id`, one per sheet item with qty ≥ 1 of the viewer's characters (DM: every character); target Party or another character (`party-item-target`); qty; submit.
+- **DM:** Add form `party-item-add` (`party-item-add-name`, `-qty`, `-notes`, `-submit`; Enter submits; ack clears; errors `party-item-add-error`), row **Edit** (`party-item-edit` → `party-item-edit-name` / `-qty` / `-notes`, Save `party-item-submit` disabled while unchanged), **Remove** (`party-item-remove` → qty, `party-item-submit`).
+- Every form: submit disabled while invalid, not `live` or in flight; reject → `party-item-error` inline; lost intent → Toast "Connection lost — check the party inventory before adding / saving / removing / moving again". A player with no character sees no Take / Give…. Esc closes a row form; a campaign switch closes it.
