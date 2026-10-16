@@ -5,6 +5,7 @@ import type { ComponentType } from "react";
 import { cbtxTokenMenu } from "../combat-extras/token-menu-entries";
 import { combatTokenMenu } from "../combat-tracker/token-menu-entries";
 import { modTokenMenu } from "../effect-modifiers/token-menu-entries";
+import { fogTokenMenu } from "../fog-of-war/token-menu-entries";
 import { scenesMapTokenMenu } from "./token-menu-entries";
 
 export interface TokenMenuItemProps {
@@ -44,6 +45,7 @@ export const tokenMenuEntries: readonly TokenMenuEntry[] = [
   ...combatTokenMenu, // combat-tracker: "Damage / heal…", "Remove from combat" (FR-CBT-30)
   ...cbtxTokenMenu, // combat-extras: Conditions ▸, Effect…, Temp HP…, Add to combat (FR-CBTX-35)
   ...modTokenMenu, // effect-modifiers: Apply effect ▸, Effect modifiers… (FR-MOD-28)
+  ...fogTokenMenu, // fog-of-war: Invisible (FR-FOG-47, #210)
 ];
 
 /** Token double-click: the first available entry by order runs. Append your feature's line. */

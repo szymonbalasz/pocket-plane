@@ -6,7 +6,8 @@
 //   nodes on top.
 // - Player: Fog opaque, Explored dims the map; darkness draws opaque only where the point is
 //   statically clear (never over Fog or Explored): painted first, erased under base fog and under
-//   each fog / explored shape, re-painted inside each reveal shape.
+//   each fog / explored shape, re-painted inside each reveal shape; explored memory turns Fog
+//   into Explored (V3). Sight, darkvision and the blind screen go on top: `vision-render.ts`.
 // DOM-free (a minimal 2D-context interface) so it runs under `bun test`.
 import { exploredMask } from "@shared/fog-of-war/explored";
 import { type FogRow, fogBox, maskOf, rebase } from "@shared/fog-of-war/mask";
@@ -203,7 +204,34 @@ function erase(ctx: PaintCtx, draw: () => void, rule?: "evenodd") {
   ctx.fill(rule);
 }
 
-/** FR-FOG-20/21: the static fog of one record, painter order (see the header). */
+/**
+ * FR-FOG-37 (V3): inside `clip`, the player's explored-memory cells turn Fog into Explored (the
+ * caller clips to where Fog was just painted).
+ */
+function fogToMemory(
+  ctx: PaintCtx,
+  paints: FogPaints,
+  memory: readonly FogRun[],
+  clip: () => void,
+  rule?: "evenodd",
+) {
+  if (memory.length === 0) return;
+  const cells = () => {
+    for (const [x, y, w, h] of memory) ctx.rect(x, y, w, h);
+  };
+  ctx.save();
+  ctx.beginPath();
+  clip();
+  ctx.clip(rule);
+  erase(ctx, cells);
+  fillWith(ctx, paints.explored, cells);
+  ctx.restore();
+}
+
+/**
+ * FR-FOG-20/21: the static fog of one record, painter order (see the header). `memory` = the
+ * player's explored-memory cells (map px runs, FR-FOG-37): Fog there draws as Explored.
+ */
 export function paintFog(
   ctx: PaintCtx,
   rec: FogRecordLike,
@@ -211,6 +239,7 @@ export function paintFog(
   client: CanvasClient,
   paints: FogPaints,
   hairline = 0,
+  memory: readonly FogRun[] = [],
 ): void {
   const base = fogRuns(rec, m).runs;
   const shapes = rec.shapes ?? [];
@@ -225,11 +254,14 @@ export function paintFog(
   darknessFill();
   if (darkness.length > 0) erase(ctx, baseRuns);
   fillWith(ctx, paints.fog, baseRuns);
+  if (base.length > 0) fogToMemory(ctx, paints, memory, baseRuns);
   for (const s of shapes as readonly (FogShapeGeom & { op: FogLayerShape["op"] })[]) {
     const path = () => shapePath(ctx, s, m);
     erase(ctx, path, "evenodd");
-    if (s.op === "fog") fillWith(ctx, paints.fog, path, "evenodd");
-    else if (s.op === "explored") fillWith(ctx, paints.explored, path, "evenodd");
+    if (s.op === "fog") {
+      fillWith(ctx, paints.fog, path, "evenodd");
+      fogToMemory(ctx, paints, memory, path, "evenodd");
+    } else if (s.op === "explored") fillWith(ctx, paints.explored, path, "evenodd");
     else if (darkness.length > 0) {
       ctx.save();
       ctx.beginPath();
