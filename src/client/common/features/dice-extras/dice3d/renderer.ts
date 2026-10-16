@@ -83,6 +83,9 @@ const MATERIAL: Record<DiceMaterial, (map: Texture) => Material> = {
   stone: (map) => new MeshStandardMaterial({ map, roughness: 0.92, metalness: 0 }),
 };
 
+/** A look's material over a face texture (also the look editor's preview, FR-DICEX-27). */
+export const materialOf = (look: DiceLook, map: Texture): Material => MATERIAL[look.material](map);
+
 /** Dropped dice at rest (FR-DICEX-13: dimmed). */
 const DROPPED_OPACITY = 0.38;
 /** FR-DICEX-23 needs this many frames to judge. */
