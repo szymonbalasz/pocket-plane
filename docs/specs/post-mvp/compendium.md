@@ -8,6 +8,8 @@ phase: post-mvp
 
 # Compendium (post-MVP stub)
 
+> **Superseded by [compendium](../compendium.md)** (sprint 3, prefix CMP). This stub is kept for history only.
+>
 > **In scope for sprint 3 (DM decision [#203](../../decisions-log.md), 2026-10-16).** Expand this stub into `docs/specs/compendium.md` (prefix CMP) in sprint 3; it also feeds rule-trigger presets (class features) and the dice / MOD work with SRD data where useful.
 
 Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). First post-MVP candidate.
