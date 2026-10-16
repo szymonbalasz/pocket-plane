@@ -26,15 +26,15 @@
 
 | Rule | Detail |
 |---|---|
-| Source | A throw = a live `game-log-entry` upsert of kind `roll` with `n` above the client's highest seen `n`. Snapshots, resyncs and undo upserts never throw |
-| Truth | Dice rest on the server's values; the client relabels faces after a headless simulation. The log line never waits for the animation |
+| Source | A throw = the live `game-log-entry` upserts of kind `roll` in one frame with `n` above the client's highest seen `n` (coalesced, ≤ 20 3D dice). Snapshots, resyncs and undo upserts never throw |
+| Truth | Dice rest on the server's values; the client relabels faces after a headless simulation (≤ 2.5 s, tested headless in `bun test`). The log line never waits for the animation |
 | Visibility | Exactly the entry's; a throw reads `payload` only, never `dmPayload` |
-| Randomness | Throw motion uses a client PRNG seeded by the entry id; cosmetic only, never `ctx.dice`, never sent |
+| Randomness | Throw motion uses a client PRNG seeded by the throw's first entry id; cosmetic only, never `ctx.dice`, never sent |
 | Cost | 3D code in a lazy chunk, loaded on the first 3D throw; per-device render setting (3D / flat / off), reduced motion → flat; no render loop when idle |
 | Roll control | The dice tray is the roll control's staging host; roll intents and server commands are unchanged |
 
 ## Consequences
 
 - No protocol change for animation; `dice-look` is the only new record type, and only if the DM picks server-stored looks (OQ-DICEX-06).
-- New client dependency must stay out of initial chunks (bundle-size test in the build).
-- A future log kind that carries fresh dice must map them for throws (only `roll` throws today). MOD bonus dice and offered trigger parts (Divine Fury) ride on the `roll` entry as MOD parts (seams S4), so they throw with no special case.
+- New client dependency must stay out of initial chunks; the 3D chunk has its own size cap (bundle-size test in the build).
+- A future log kind that carries fresh dice must map them for throws (only `roll` throws today). MOD bonus dice and offered trigger parts (Divine Fury) ride on the `roll` entry's damage item as MOD parts and `offered` items, each with per-die `dice` (effect-modifiers, sprint-3 review R1), so they throw with no special case.
