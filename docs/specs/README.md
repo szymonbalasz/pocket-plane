@@ -44,6 +44,7 @@ Sprint 2 phase 1 also revised combat-tracker, combat-extras, entities, notificat
 
 | Spec | Prefix | Status | Owner |
 |---|---|---|---|
+| [Compendium](compendium.md) | CMP | complete | spec-compendium |
 | [Dice extras](dice-extras.md) | DICEX | complete | spec-dice-extras |
 
 ## Post-MVP
@@ -52,7 +53,6 @@ Stubs only. Not to be claimed during MVP spec phase.
 
 | Spec | Prefix | Note |
 |---|---|---|
-| [Compendium](post-mvp/compendium.md) | CMP | First candidate after MVP |
 | [World builder](post-mvp/world-builder.md) | WORLD | Incl. location ↔ scenes |
 | [Stats and summaries](post-mvp/stats.md) | STATS | Data capture starts in MVP |
 | [Dice extras](post-mvp/dice-extras.md) | DICEX | Inline rolls, macros, 3D dice, hidden rolls |

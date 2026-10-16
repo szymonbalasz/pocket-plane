@@ -1,6 +1,6 @@
 # 0010 — Compendium design
 
-- Status: proposed — re-import safety decided (option i); scope open
+- Status: accepted — re-import safety option i; **scope A (global library + campaign clones), decided by [ADR-0046](0046-compendium-scope.md) (#207)**
 - Date: 2026-10-10
 - Affects: post-mvp/compendium, entities, combat-tracker, character-sheet, post-mvp/compendium-expansion
 - MVP: not blocking ([ADR-0014](0014-mvp-scope.md)). Shares the adapter pipeline and provenance with [ADR-0015](0015-source-adapters-fixtures.md).

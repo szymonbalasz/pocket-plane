@@ -35,12 +35,13 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Sheet lock** | DM switch on a character: only the DM edits its sheet data; counters and play state stay usable by the owner. | — |
 | **Sheet section** | A block another feature registers into the character sheet (slot header / vitals / main / tab) through the append-only `sheetSections` registry. | Window |
 | **NPC sheet** | The character sheet opened by the DM on a custom creature definition for full editing. | `npc` entity kind |
-| **Compendium** | Library of rules content (monsters, spells, items…) from external sources or homebrew. Design is open ([ADR-0010](architecture/adr/0010-compendium-design.md)). | Entity |
+| **Compendium** | Global library of rules content (monsters, spells, items, conditions, class features) from bundled sources or homebrew; read on demand, never in the snapshot ([compendium](specs/compendium.md), [ADR-0046](architecture/adr/0046-compendium-scope.md)). | Entity |
 | **Compendium entry** | One record in the compendium. | Entity |
 | **Source** | Origin of imported data (e.g. fixtures, Open5e, 5etools JSON, homebrew), with licence/provenance. | Asset |
 | **Adapter** | Bespoke code for one source that turns its data into normalised records for the import pipeline ([ADR-0015](architecture/adr/0015-source-adapters-fixtures.md)). | Import pipeline |
 | **Import pipeline** | Fixed core: validate normalised records → upsert by (source, sourceKey) → provenance. Fed by adapters. | Adapter |
-| **Clone** | A campaign-owned copy of a compendium entry, editable without affecting the original. | — |
+| **Clone** | A campaign-owned copy of a compendium entry, editable without affecting the original; for monsters the clone is a derived custom definition (Derive). | — |
+| **Bundled source** | A recorded copy of an external source shipped in the repo (e.g. SRD 5.1 from Open5e, `wotc-srd` only) and imported offline. | — |
 | **Homebrew** | DM-authored content not from an external source. | — |
 | **Gem** | Homebrew reward the DM awards to a character (Inspiration, Fortune, Combat, Divine Knowledge, Action); spent for an effect. Post-MVP ([gems](specs/post-mvp/gems.md)). | Homebrew |
 | **Cross-reference** | A link from one entity/entry to another. Model is open ([ADR-0011](architecture/adr/0011-cross-references.md)). | — |

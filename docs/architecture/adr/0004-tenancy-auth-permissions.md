@@ -30,3 +30,5 @@
 - A leaked player link = that player's access. Revocation/rotation **not planned** (tier F, trusted table — [feature tiers](../../feature-tiers.md#5-dm-tools)).
 - Compendium may be shared across campaigns — scope is open in [ADR-0010](0010-compendium-design.md).
 - **Refined by [ADR-0018](0018-global-imported-content.md):** imported definitions are global; custom definitions stay per campaign.
+
+> Amended by [ADR-0046](0046-compendium-scope.md) (#207): global `compendium_source` / `compendium_entry` rows are a second exception to "every record belongs to one campaign".

@@ -27,3 +27,5 @@
 - Fixture reset wipes the whole disposable DB, so global records need no separate cleanup.
 - Event-log entries of global events (imported definitions) have no campaign (`campaignId` null).
 - Visibility: imported definitions are reference content; per-field rules for players are set by [entities](../../specs/entities.md).
+
+> Amended by [ADR-0046](0046-compendium-scope.md) (#207): imported compendium entries (not only definitions) are global too.

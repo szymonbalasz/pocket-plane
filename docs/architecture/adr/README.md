@@ -9,13 +9,13 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0001](0001-tech-stack.md) | Tech stack | accepted |
 | [0002](0002-single-package.md) | Single package, path aliases | accepted |
 | [0003](0003-local-hosting.md) | Local hosting via cloudflared | accepted |
-| [0004](0004-tenancy-auth-permissions.md) | Tenancy, auth and permissions | accepted |
+| [0004](0004-tenancy-auth-permissions.md) | Tenancy, auth and permissions | accepted; amended by 0046 (global compendium rows) |
 | [0005](0005-server-authoritative-sync.md) | Server-authoritative sync | accepted |
 | [0006](0006-persistence.md) | Persistence model | accepted |
 | [0007](0007-product-scope.md) | Product scope and exclusions | accepted, partly superseded by 0014 |
 | [0008](0008-parallel-dev-isolation.md) | Parallel dev isolation | accepted |
 | [0009](0009-entity-content-model.md) | Entity content model | accepted, refined by 0035, 0038 |
-| [0010](0010-compendium-design.md) | Compendium design | proposed (re-import safety decided) |
+| [0010](0010-compendium-design.md) | Compendium design | accepted (scope A via 0046, #207; re-import safety option i) |
 | [0011](0011-cross-references.md) | Cross-reference model | proposed |
 | [0012](0012-character-derived-values.md) | Character sheet: derived vs stored, homebrew overrides | accepted for MVP basics (stored), amended by 0032; full sheet decided by 0036 (C, derived with overrides) |
 | [0013](0013-session-journal-scope.md) | Session outcomes / journal: MVP or post-MVP | accepted — no session tracking |
@@ -23,8 +23,8 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0015](0015-source-adapters-fixtures.md) | Import pipeline and source adapters | accepted |
 | [0016](0016-domain-events-pending-actions.md) | Domain events and pending actions | accepted (core), refined by 0034, 0035, 0037; undo scope amended by 0039 |
 | [0017](0017-agent-verification-fixture-library.md) | Agent-driven verification and fixture library | accepted |
-| [0018](0018-global-imported-content.md) | Imported reference content is global; custom content per campaign | accepted |
-| [0019](0019-auth-credentials.md) | DM secret and player link credentials | accepted |
+| [0018](0018-global-imported-content.md) | Imported reference content is global; custom content per campaign | accepted; amended by 0046 (compendium entries) |
+| [0019](0019-auth-credentials.md) | DM secret and player link credentials | accepted; amended by 0046 (player REST header on compendium routes) |
 | [0020](0020-single-active-campaign.md) | Several campaigns, one active per server | accepted |
 | [0021](0021-sync-protocol-conventions.md) | Sync protocol conventions | accepted, C refined by 0041, D refined by 0036, 0038 |
 | [0022](0022-deterministic-seams.md) | Deterministic IDs, tokens and clock for fixtures and tests | accepted |
@@ -48,6 +48,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0040](0040-token-move-guards.md) | Token move guards: a move may be refused | accepted (#196; amends 0031) |
 | [0041](0041-active-scene-window.md) | Active-scene window for tokens and scene-tool records in the DM snapshot | accepted (#196; refines 0021 C; sibling of 0029) |
 | [0044](0044-3d-dice.md) | 3D dice: throws derived on each client from received roll entries | accepted (#207; amends 0001 stack) |
+| [0046](0046-compendium-scope.md) | Compendium: global library, campaign clones, read on demand | accepted (#207; completes 0010; amends 0004, 0018, 0019) |
 
 ## Proposing a new ADR
 

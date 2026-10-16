@@ -37,3 +37,5 @@
 - Build conventions define env names for the DM secret and the public base URL.
 - Fixtures take the DM secret from worktree env. Seeded tokens only when the data dir is flagged disposable ([ADR-0022](0022-deterministic-seams.md)); real tokens always come from a CSPRNG.
 - No revocation or rotation (tier F): a link stays valid for the player's life; rename keeps the token.
+
+> Amended by [ADR-0046](0046-compendium-scope.md) (#207): compendium REST routes accept `Authorization: Player <link token>`.
