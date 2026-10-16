@@ -28,6 +28,7 @@ import { useCbtIntent } from "@ui/features/combat-tracker/store";
 import {
   RollButton,
   type RollControl,
+  type RollKeys,
   useRollControl,
 } from "@ui/features/dice-roll-log/roll-control";
 import { useSync } from "@ui/sync/store";
@@ -43,6 +44,7 @@ import {
   TrophyIcon,
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { rollKeys } from "../combat-tracker/roll-keys";
 import { type Target, useCbtxDialogs } from "./store";
 
 /** The row's creature as an intent target. */
@@ -302,7 +304,7 @@ export function RowMenuItems({ c, deathRoll }: { c: CombatantView; deathRoll: Ro
   const d = useCbtxDialogs();
   const ch = useSync((s) => (c.entityId ? characterOf(s.store, c.entityId) : undefined));
   const state = c.kind === "pc" ? deathStateFor(ch) : null;
-  const keys = useRef<{ shiftKey?: boolean; ctrlKey?: boolean }>({});
+  const keys = useRef<RollKeys>({});
   const t = targetOf(c);
   return (
     <>
@@ -324,7 +326,7 @@ export function RowMenuItems({ c, deathRoll }: { c: CombatantView; deathRoll: Ro
           <DropdownMenuItem
             data-testid="cbtx-init-row-death-roll"
             onPointerDown={(e) => {
-              keys.current = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey };
+              keys.current = rollKeys(e);
             }}
             onSelect={() => {
               deathRoll.roll(keys.current);
