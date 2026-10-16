@@ -5,13 +5,8 @@
 // then formats them with Biome.
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import {
-  ATTRIBUTION_FILE,
-  OPEN5E_ENDPOINTS,
-  OPEN5E_V1_URL,
-  SRD_51_ATTRIBUTION,
-  SRD_DOCUMENT_SLUG,
-} from "./source";
+import { OPEN5E_ENDPOINTS, SRD_DOCUMENT_SLUG } from "../../adapter/open5e";
+import { ATTRIBUTION_FILE, OPEN5E_V1_URL, SRD_51_ATTRIBUTION } from "./source";
 
 type Rec = { slug: string; document__slug?: string; archetypes?: Rec[] } & Record<string, unknown>;
 
