@@ -41,11 +41,14 @@ test("FR-MOD-49 FR-MOD-47 FR-MOD-28 Triggers blocks per player; DM entries for m
   await expect(sa).toHaveCount(1);
   await expect(sa).toContainText("Sneak Attack");
   await expect(sa.getByTestId("mod-trigger-value")).toHaveAttribute("data-value", "3d6");
-  for (const [page, other] of [
-    [p1, "Sneak Attack"],
-    [p2, "Divine Fury"],
+  // The other player's trigger never in this player's Triggers block (its public outcome lines
+  // may be in the log: rule-triggers-combat shares this server); monster triggers nowhere.
+  for (const [page, block, other] of [
+    [p1, brakka, "Sneak Attack"],
+    [p2, thorn, "Divine Fury"],
   ] as const) {
-    for (const s of [other, "Martial Advantage", "Regeneration"]) {
+    await expect(block.getByText(other)).toHaveCount(0);
+    for (const s of ["Martial Advantage", "Regeneration"]) {
       await expect(page.getByText(s)).toHaveCount(0);
     }
   }
