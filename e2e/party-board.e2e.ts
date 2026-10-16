@@ -96,3 +96,74 @@ test("FR-PARTY-05 FR-PARTY-06 FR-PARTY-07 FR-PARTY-09 FR-PARTY-16 DM shares Ship
 
   for (const page of [p2, p1, dm]) await page.context().close();
 });
+
+test("FR-PARTY-15 FR-PARTY-14 FR-PARTY-13 FR-PARTY-10 DM creates Wanted Poster with an image → Share with everyone → player-2 opens it; reload keeps the marks", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const poster = recordId("handout-images", "asset", 1);
+  const mayor = recordId("handouts-1", "handout", 0);
+
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await live(dm);
+  const p2 = await rolePage(browser);
+  await p2.goto(link("Player 2"));
+  await live(p2);
+
+  const dmBoard = await openWindow(dm, "party.board");
+  await dmBoard.getByTestId("party-handout-create").click();
+  const editor = shellWindow(dm, "party.handout");
+  await expect(editor.getByTestId("party-editor-save")).toBeDisabled(); // no title yet
+  await editor.getByTestId("party-editor-title").fill("Wanted Poster");
+  await editor.getByTestId("party-editor-body").fill("Reward 50 gp");
+  await editor.getByTestId("party-editor-add-image").click();
+  await dm.locator(`[data-testid="asset-picker-item"][data-record-id="${poster}"]`).click();
+  await dm.getByTestId("asset-picker-select").click();
+  await expect(editor.getByTestId("party-editor-image")).toHaveAttribute("data-record-id", poster);
+  await editor.getByTestId("party-editor-save").click();
+
+  // Saved: the viewer shows it, unshared; the board lists it first, "Not shared".
+  const view = editor.getByTestId("party-handout-view");
+  await expect(view.getByTestId("party-handout-title")).toHaveText("Wanted Poster");
+  await expect(view.getByTestId("party-handout-image")).toHaveAttribute("data-record-id", poster);
+  const id = (await view.getAttribute("data-record-id")) as string;
+  await expect(row(dmBoard, id)).toHaveAttribute("data-shared", "none");
+
+  const p2Board = await openWindow(p2, "party.board");
+  await expect(row(p2Board, mayor)).toBeVisible();
+  await expect(row(p2Board, id)).toHaveCount(0);
+
+  // One click: Share with everyone → player-2 toast + row (New).
+  await view.getByTestId("party-share-everyone").click();
+  await expect(row(dmBoard, id)).toHaveAttribute("data-shared", "all");
+  await expect(
+    p2.getByTestId("note-toast").filter({ hasText: "New handout: Wanted Poster" }),
+  ).toBeVisible();
+  await expect(row(p2Board, id)).toHaveAttribute("data-new", "true");
+  await expect(p2Board.getByTestId("party-handout-row").first()).toHaveAttribute(
+    "data-record-id",
+    id,
+  );
+  await row(p2Board, id).getByRole("button").first().click();
+  const p2View = shellWindow(p2, "party.handout").getByTestId("party-handout-view");
+  await expect(p2View.getByTestId("party-handout-body")).toHaveText("Reward 50 gp");
+  await expect(p2View.getByTestId("party-handout-image")).toHaveAttribute("data-record-id", poster);
+  await expect(p2View.getByTestId("party-handout-edit")).toHaveCount(0); // read only
+  await expect(row(p2Board, id)).toHaveAttribute("data-new", "false");
+
+  // DM edits the text → player-2's row is marked Updated, the open viewer shows the new text.
+  await view.getByTestId("party-handout-edit").click();
+  await editor.getByTestId("party-editor-body").fill("Reward 80 gp");
+  await editor.getByTestId("party-editor-save").click();
+  await expect(p2View.getByTestId("party-handout-body")).toHaveText("Reward 80 gp");
+
+  // Reload: skeleton, then the same list; seen marks survive (this browser).
+  await p2.reload();
+  await live(p2);
+  const again = await openWindow(p2, "party.board");
+  await expect(row(again, id)).toBeVisible();
+  await expect(row(again, mayor)).toHaveAttribute("data-new", "true");
+
+  for (const page of [p2, dm]) await page.context().close();
+});
