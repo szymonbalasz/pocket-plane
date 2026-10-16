@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 3 Phase A (specs) started 2026-10-16 (#201–#205): [sprint-3](sprint-3.md). all five specs drafted; seams ruling `.verify/sprint3/seams.md` (main checkout), seams applied (no pushbacks); reviews done (a: 1/11/17, b: 1/11/35 blocker/major/minor); rulings `.verify/sprint3/rulings.md`; rulings applied by all five; **waiting on DM gate 1** (`%TEMP%\pocket-plane\gate-sprint3.md`, copy `.verify/sprint3/gate.md`); backlog only during downtime, not near the sprint's end ([orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill), [backlog](backlog.md)).
+**Phase:** Sprint 3 Phase A (specs) started 2026-10-16 (#201–#205): [sprint-3](sprint-3.md). all five specs drafted; seams ruling `.verify/sprint3/seams.md` (main checkout), seams applied (no pushbacks); reviews done (a: 1/11/17, b: 1/11/35 blocker/major/minor); rulings `.verify/sprint3/rulings.md`; rulings applied by all five; **DM gate 1 passed (#207–#210)**; gate-apply passes running, then merge + integrate, then wave 1 (V0 ∥ D1) (`%TEMP%\pocket-plane\gate-sprint3.md`, copy `.verify/sprint3/gate.md`); backlog only during downtime, not near the sprint's end ([orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill), [backlog](backlog.md)).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
@@ -22,7 +22,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Pending DM decisions
 
-- Sprint-3 gate 1 (G1–G33): dependency three + cannon-es, snapshot guard re-baseline, five ADRs, picks per track, cut order. File `%TEMP%\pocket-plane\gate-sprint3.md`.
+- None.
 
 ## Resolved locally (report at gate)
 
