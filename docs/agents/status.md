@@ -2,22 +2,27 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 3 Phase A (specs) started 2026-10-16 (#201–#205): [sprint-3](sprint-3.md). all five specs drafted; seams ruling `.verify/sprint3/seams.md` (main checkout), seams applied (no pushbacks); reviews done (a: 1/11/17, b: 1/11/35 blocker/major/minor); rulings `.verify/sprint3/rulings.md`; rulings applied by all five; **DM gate 1 passed (#207–#210)**; gate-apply passes running, then merge + integrate, then wave 1 (V0 ∥ D1) (`%TEMP%\pocket-plane\gate-sprint3.md`, copy `.verify/sprint3/gate.md`); backlog only during downtime, not near the sprint's end ([orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill), [backlog](backlog.md)).
+**Phase:** Sprint 3 **Phase B (builds)** since 2026-10-16. Gate 1 passed (#207–#210); all five specs complete and merged; ADRs 0042–0046 accepted. Wave 1: V0 `fix/vision-core` ∥ D1 `build/dicex-tray`. Backlog only during downtime, not near the sprint's end ([orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill), [backlog](backlog.md)).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| V: fog v2 + vision + walls | `spec/vision` (w3D, slot 0) | — | Spec in-review, rulings applied | DM gate 1 |
-| D: dice extras | `spec/dice-extras` (w3E, slot 2) | — | Spec in-review, rulings applied | DM gate 1 |
-| R: modifiers tiers 1–3 + triggers | `spec/rule-triggers` (w3F, slot 3) | — | Spec in-review, rulings applied | DM gate 1 |
-| P: party board + handouts | `spec/party-board` (w3G, slot 4) | — | Spec in-review, rulings applied | DM gate 1 |
-| C: compendium | `spec/compendium` (w3H, slot 5) | — | Spec in-review, rulings applied | DM gate 1 |
+| V0 vision core | `fix/vision-core` (w3N, slot 0) | build-vision-core | Building | Review + regression walkthrough → merge; then V5, R0, `fix/lazy-records` |
+| D1 dice tray | — | — | Merged (892819e, #214) | R2 builds on it |
+| D1 follow-up: Alt staging on Initiative / death saves | `fix/dicex-stage-anchors` (w3T, slot 5) | build-dicex-stage-anchors | Building | Merge |
+| D3 3D dice | `build/dicex-3d` (w3R, slot 3; based on D1) | build-dicex-3d | Building | Merge main after D1; walkthrough steps 4, 11, 13 (3D) |
+| R early: formula + rule zod + presets | — | — | Merged (2d6d4c8) | R0 builds on it |
+| C early: bundled SRD 5.1 + adapter | — | — | Merged (5b5aeb5, #213) | C1 wires it |
+| P early: party-board pure `@shared` | — | — | Merged (fc24c39) | P core |
+| Queue | — | — | V5 → V1 → (V4 ∥ V2) → V3; R0 → R1 ∥ R4 → R2 / R3 / R5–R7; `fix/lazy-records` → P core → P2 ∥ P3 → P4; C1 → C2 → C3, C4; D3, D2, D4 | Per locks below |
 | Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | BL-06 (#206), BL-02 (#211) merged | Per §3a |
 
 ## Shared-file locks
 
-- None.
+- `fix/vision-core`: `src/server/db/`, `src/server/ws/` + `src/shared/protocol/` + common sync store, `src/server/features/scenes-map/`, scene-tools shared parts, entities schemas.
+- `build/dicex-3d`: `package.json`, `bun.lock` (three + cannon-es, #207).
+- Order after: schema V0 → R0 → P core → C1 → D2; ws V0 → `fix/lazy-records`; canvas V1 → V4 → V3; sheet V5 → R3 → R6 → C2 → D4 → P4 / C4; combat R0 → R7 → C2; dice-roll-log client D1 → R2.
 
 ## Pending DM decisions
 
