@@ -9,6 +9,7 @@ import {
   PRESET_DURATION_MAX,
   PRESET_NOTE_MAX,
   PresetModifiers,
+  presetModifiersIssue,
 } from "./schemas";
 
 export const MOD_INTENTS = {
@@ -30,7 +31,8 @@ const Duration = z.int().min(1).max(Math.min(PRESET_DURATION_MAX, DURATION_ROUND
  * `originKey` (FR-MOD-36): the built-in key "Start from" copied; only a built-in key; absent on
  * a replace = kept, on a create = null; never with `key`. `usesFeatureId` (FR-MOD-12, tier 3): a
  * feature row with uses on the character's sheet, spent by each toggle on; character presets only;
- * absent on a replace = kept, on a create = null.
+ * absent on a replace = kept, on a create = null. `modifiers` 1–6; 0 only on a campaign preset
+ * (a **mark**, FR-MOD-05).
  */
 export const PresetInput = z
   .strictObject({
@@ -56,6 +58,8 @@ export const PresetInput = z
     if (v.key !== null && v.characterId !== null) {
       ctx.addIssue({ code: "custom", path: ["key"], message: "Key on campaign presets only" });
     }
+    const empty = presetModifiersIssue(v);
+    if (empty) ctx.addIssue({ code: "custom", path: ["modifiers"], message: empty });
     if (v.characterId === null && v.usesFeatureId) {
       ctx.addIssue({
         code: "custom",

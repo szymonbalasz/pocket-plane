@@ -123,7 +123,22 @@ export function modSetup(opts: { round1?: boolean } = {}) {
       sourceCombatantId: t.id("Mira"),
       startConcentration: true,
     });
-  return { ...t, seeded, put, from, apply, toggle, presets, preset, roll, bless };
+  /**
+   * A campaign "Hunter's Mark" with the tier-1 +1d6 weapon damage (the built-in is a mark now,
+   * FR-MOD-05), applied to Thorn: a bonus die on damage for the roll tests.
+   */
+  const d6OnThorn = () => {
+    const presetId = put({
+      characterId: null,
+      name: "Hunter's Mark",
+      modifiers: [{ kind: "dice", on: { roll: "damage", via: "weapon" }, dice: "1d6", sign: 1 }],
+      durationRounds: null,
+      concentration: false,
+      note: "",
+    });
+    return apply({ targets: [{ characterId: t.thornId }], preset: { presetId } });
+  };
+  return { ...t, seeded, put, from, apply, toggle, presets, preset, roll, bless, d6OnThorn };
 }
 
 export type ModSetup = ReturnType<typeof modSetup>;
