@@ -10,6 +10,8 @@ import { dmTrayWindow } from "./features/dice-extras/tray-window";
 import { dmDiceLogWindow } from "./features/dice-roll-log/log-window";
 import { creaturesWindow } from "./features/entities/creatures-window";
 import { notificationsHistoryWindow } from "./features/notifications/history-window";
+import { dmPartyBoardWindow } from "./features/party-board/board-window";
+import { dmHandoutWindow } from "./features/party-board/handout-window";
 import { dmLootLogWindow } from "./features/party-loot/loot-window";
 import { playersWindow } from "./features/play-shell/players-window";
 import { scenesWindow } from "./features/scenes-map/scenes-window";
@@ -28,6 +30,8 @@ const windows: WindowDef[] = [
   encountersWindow, // cbt.encounters (combat-tracker, CBT §7)
   dmLootLogWindow, // loot.log (party-loot, FR-LOOT-15)
   dmTrayWindow, // dicex.tray (dice-extras, FR-DICEX-01)
+  dmPartyBoardWindow, // party.board (party-board, FR-PARTY-11)
+  dmHandoutWindow, // party.handout (party-board, FR-PARTY-14)
 ];
 
 export const dmWindows = createWindowRegistry("dm", windows);

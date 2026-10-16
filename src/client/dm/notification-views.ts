@@ -4,6 +4,7 @@ import { charxApprovedView, charxDraftView } from "@ui/features/character-sheet/
 import { concentrationView } from "@ui/features/combat-extras/concentration";
 import { testNotificationView } from "@ui/features/notifications/test-view";
 import { createNotificationViews, type NotificationView } from "@ui/features/notifications/views";
+import { handoutSharedView } from "@ui/features/party-board/note-view";
 import { lootReceivedView } from "@ui/features/party-loot/note-view";
 import { dmDamageCardView } from "./features/combat-tracker/card-view";
 
@@ -14,6 +15,7 @@ const views: NotificationView[] = [
   concentrationView, // cbtx-concentration (combat-extras, FR-CBTX-37)
   charxDraftView, // charx-draft (character-sheet-full, FR-CHARX-45)
   charxApprovedView, // charx-approved (character-sheet-full, FR-CHARX-46)
+  handoutSharedView, // handout-shared (party-board, FR-PARTY-06)
 ];
 
 export const dmNotificationViews = createNotificationViews(views);

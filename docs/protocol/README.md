@@ -1464,9 +1464,46 @@ One transaction: the token's `invisible` + its `derive`d `fogged` / `seenBy` (`u
 - **Cache** (FR-FOG-38, `fog-of-war/vision-cache.ts`): per SQLite connection, LRU 256, key = fog `rev`, structure `rev`, darkness geometry, sources `(tokenId, col, row, size, senses)`; entries computed in a transaction stay pending until it commits (a TEMP marker row, so a rolled-back rev leaves no entry).
 - **Tests**: per player on snapshot, every frame, View-as ack, fresh connection and `resync` (`vision-leak`, `invisible`, `vision-triggers`, `con44` tests; harness `fixtures/units/fog-of-war/vision-harness.ts`). Fixtures: unit `vision-crypt` (FOG §13), bundle `vision` = `scenes` + `goblin-2` + `encounter-1` + `fog-ambush` + `scn-walls` + `vision-senses` + `vision-crypt`.
 
-## 50. Sprint 3: vision client (V3)
+## 50. Sprint 3: party board handouts (P2)
 
-From [fog-of-war](../specs/fog-of-war.md) v2 (FOG §14 slice V3; #207, #210). **Built by `build/vision-client`** (canvas lock 3rd): the clients draw [§49](#49-sprint-3-dynamic-vision-server--invisible-v2)'s records. No new intent, event, record type, signal or wire field. Data side: [data model §37](../data-model/README.md#37-sprint-3-vision-client-v3).
+From [party-board](../specs/party-board.md) (PARTY slice 2; #207, #221, #223). **Built by `build/party-handouts`**: the `handout-shared` notification kind + both client views, and windows `party.board` (Handouts tab) + `party.handout` in both clients. No new intent, record type or event; the handout intents are [§44](#44-sprint-3-party-board-core-p-core)'s. Data side: [data model §37](../data-model/README.md#37-sprint-3-party-board-handouts-p2).
+
+**Notification kind** (registries per [§23](#23-combat-notification-kinds) / [§26](#26-combat-registries-and-seams); server line `handoutSharedKind`, `src/server/features/party-board/kind.ts`)
+
+| Kind | Owner | Audience | Action | Payload | Resolution | `genericResolve` | End rule | Source |
+|---|---|---|---|---|---|---|---|---|
+| `handout-shared` | PARTY | `all` for a `none` → `all` share; else `player`, one row per gainer (players who see it after and not before; `all` = every player of the campaign at commit). No gainer → none; unshare, update, delete → none | none (state `info`) | `{handoutId}`; text "New handout: ‹title›", cut to 280 (share-time title, kept after an unshare or delete, OQ-PARTY-15) | none | no | none | [FR-PARTY-06](../specs/party-board.md#61-handouts) |
+
+- Created by `party.shareHandout` in its transaction, after `HandoutShared` (§22 event order); a failing `notify` rolls the share back. Recipients are never told who else got it (a `player` row reaches its player only, FR-NOTE-06).
+- View (both clients, `@ui/features/party-board/note-view`): scroll icon, the text, "Open" (`party-note-open` + `data-record-id` = handout id) → selects the handout and opens `party.handout`; a body load without the id there shows "No longer shared" (FR-PARTY-09). Toasts per FR-NOTE-13/14 (the DM toasts `all` rows, as loot).
+
+**Windows** (registries per [§18](#18-scenes-client-registries) / [§24](#24-combat-windows); one line each in `src/client/{dm,player}/windows.ts`)
+
+| Kind | Owner | Clients | Default open | Default geometry | Launcher | Gate | Source |
+|---|---|---|---|---|---|---|---|
+| `party.board` | PARTY | both | no | top-left `dx` 56 (left edge, as `loot.log`), 440×560, min 340×360, `minOpenH` 400 (no full-size slot at 1280×720 → that height on top at the edge covering least). Tabs Handouts / Inventory (choice per browser), "Coin: open Party loot" → `loot.log`. `activity` = newest `seq` / `sharedAt` / `updatedAt` of the store's `handout` rows | "Party" (scroll icon, order 58) | — | [FR-PARTY-11](../specs/party-board.md#62-party-window-and-viewer) |
+| `party.handout` | PARTY | both | no | top-right, 640×560, min 360×320, `minOpenH` 400 (opens on top rather than shrinking). Shows the client-selected handout (`@ui/features/party-board/selection`, never sent); DM: also the editor (Edit / New) | none | — | [FR-PARTY-14](../specs/party-board.md#62-party-window-and-viewer) |
+
+- **Loads** ([§38](#38-sprint-3-lazy-record-types)): the Handouts tab and the viewer `useLazyRecords("handout")` (whole type); the viewer `useLazyRecords("handout-body", [id])`; the Inventory tab `useLazyRecords("party-item")` (read-only list until P4). Loaded rows only (never store presence); every snapshot reloads open windows (FR-SYNC-37). Loading → Skeleton (`party-handout-loading`), reject → "Couldn't load — Retry" (`party-handout-retry`), loaded without the header or body → "No longer shared" (`party-handout-gone`).
+- **DM intents from the UI:** `party.createHandout` (editor Save on New; result id → the viewer shows it), `party.updateHandout` (editor Save), `party.shareHandout` (Share… dialog, "Share with everyone" `{mode: all}`, Unshare `{mode: none}`), `party.deleteHandout` (row menu, inline confirm). One in flight per form; reject → inline; lost (disconnect) → Toast "Connection lost — check the handout(s) before saving / sharing / deleting again".
+- Test IDs per PARTY §7, plus `party-handout-create` (New handout), `party-editor-counter`, `party-editor-changed`, `party-editor-image-left` / `-remove` / `-right`, `party-share-dialog`, `party-item-loading`, `party-note-open`. `party-handout-new` carries `data-value` `new` / `updated`.
+
+## 51. Sprint 3: rule-trigger sheet UI (R6)
+
+From [effect-modifiers](../specs/effect-modifiers.md) sprint 3 (MOD, `complete`; FR-MOD-28, -45, -47, -49, -50). **Built by `build/mod-sheet-ui`** (R6, sheet lock 3rd after R3): client only, on [§43](#43-sprint-3-rule-trigger-engine-r4)'s intents and lazy record type. No new intent, event, record type or wire field; no data change.
+
+| Piece | Contract |
+|---|---|
+| Triggers block (`mod.effects`, `@ui/features/effect-modifiers/triggers`; FR-MOD-49) | Block "Triggers" (`mod-triggers-block`, owner and DM) after Presets. Mount = `useLazyRecords("rule-trigger")` (whole type, once per snapshot generation): `mod-trigger-loading` `data-state` `loading` "Loading triggers…" \| `error` "Couldn't load triggers" + `mod-trigger-retry`. Rows = the owner's loaded rows by `seq` (a player never lists a definition's): `mod-trigger` (`data-record-id`, `data-state` `on` \| `off`), Switch `mod-trigger-enabled` (sends `mod.putTrigger` with the row and `enabled` flipped), sentence, Badge `mod-trigger-value` (`data-value` = the formula for the owner now), `mod-trigger-warning` (`data-value` `uses-broken` "Uses link broken" \| `missing-preset` "Requires a missing preset" \| `formula`). Owner unless locked, DM: `mod-trigger-new`, `mod-trigger-from-menu` → `mod-trigger-from` (`data-value` = built-in trigger preset key; `triggerPresetsFor(owner kind)`, drafted with [§48](#48-sprint-3-trigger-presets--fixtures-r5)'s `startFromTriggerPreset`), `mod-trigger-edit`, `mod-trigger-delete` (`mod.deleteTrigger`); New / Start from disabled at the owner's cap |
+| Trigger editor (`@ui/features/effect-modifiers/trigger-editor`; FR-MOD-50) | Dialog `mod-trig-editor-dialog` (≤ 480 px, 85vh, body scrolls): `mod-trig-editor-name`, `-event`, `-requires` (none \| built-ins \| the owner's presets \| campaign presets the viewer holds), filter rows `-filter` (`data-value` = kind) with `-filter-kind` (kinds the event allows, MOD §8.4), `-filter-via`, `-filter-names`, `-filter-roll`, `-filter-roll-via`, `-filter-ability`, `-filter-mode`, `-filter-soft` (hit only), `-filter-preset`, `-filter-note`, `-filter-add`, `-filter-remove`; `-every` (`turnStart`: each only; `feature` on characters' hit triggers, #223) + `-feature` (rows with uses); a Start from's `confirm` fields each get `-confirm` (`data-value` `requires` \| `every`), Save waits for them (FR-MOD-46); `-do` (roll: part \| mode), `-formula` + `-formula-error` (parse / owner evaluation, with position) \| `-formula-value` ("Brakka now: 1d6+2", `data-value`), `-type`, `-mode`, `-text`; `-public`; `-preview` (sentence) \| `-invalid` (first zod issue); `-save` → `mod.putTrigger` (no `id` = create). The strict zod `TriggerRule` decides validity client-side; the server re-validates |
+| Player copies (FR-MOD-47) | A rule whose `requires` / `targetMarked` arrives as `{name}` (a campaign preset) shows "<name> (DM's preset)" and can't be saved back: Save, Switch disabled, "Uses the DM's preset: ask the DM" (no intent carries `{name}`) |
+| Live formula value (FR-MOD-35, -50) | `formulaOwnerOf(statBlock)` of the owner's `entity` row, or for a definition the `entity` / `imported-entity` row in the store — until compendium's C2 moves imported definitions behind `useDefinitions` (review C5) |
+| DM entries (FR-MOD-28) | Token menu line `mod.triggers` (order 82) "Rule triggers…" (`mod-token-menu-triggers`): a token with `characterId` → that character, else its monster definition (custom or imported); dialog `mod-triggers-dialog` around the Triggers block. `creatureActions` row action `mod.triggers` (`mod-creature-triggers`, `data-record-id` = definition id) on monster rows |
+| Pure helpers (`@shared/effect-modifiers/trigger-words`) | `triggerSentence(rule, cx)`, `triggerValueNow(rule, owner)`, `triggerWarnings(rule, features, cx)`, `hasRedactedRefs(rule)`, `presetRefName`, `builtinName`; DM row or player copy alike |
+
+## 52. Sprint 3: vision client (V3)
+
+From [fog-of-war](../specs/fog-of-war.md) v2 (FOG §14 slice V3; #207, #210). **Built by `build/vision-client`** (canvas lock 3rd): the clients draw [§49](#49-sprint-3-dynamic-vision-server--invisible-v2)'s records. No new intent, event, record type, signal or wire field. Data side: [data model §38](../data-model/README.md#38-sprint-3-vision-client-v3).
 
 | Client part | Where | Rule | Source |
 |---|---|---|---|

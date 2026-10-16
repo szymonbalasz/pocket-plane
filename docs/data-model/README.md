@@ -1368,9 +1368,19 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V2). *
 - **Derived** (not stored): each player's sight (`see` / `dark` polygons, `blind`, `inv`), the `vision` record; the vision cache (server memory, per connection, LRU 256, written after commit).
 - **CON-44** (#208, `con44.test.ts`, measured): with no senses, V0's heavy figures stand (DM 673,475 B; players 278,689–281,749 B). With real sight at caps on the heavy battle scene (one player at 4 sources, see r 12 / dark r 24, 300 walls): DM 681,447 B (the 300-wall structure row and 4 tokens; 367,129 B left of 1 MiB), players ≤ 283,929 B of 512 KiB, that player's `vision` 7,789 B (≤ 48 KiB), the View-as ack with memory at the run cap 14,033 B (≤ 48 KiB). A source move at those caps (server: derive, write, re-derive, memory, log): median ≈ 7–8 ms.
 
-## 37. Sprint 3: vision client (V3)
+## 37. Sprint 3: party board handouts (P2)
 
-From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V3). **Built by `build/vision-client`**: no schema change, no new record type or field. Protocol side: [protocol §50](../protocol/README.md#50-sprint-3-vision-client-v3).
+From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Built by `build/party-handouts`**: no new table, column or record type. Protocol side: [protocol §50](../protocol/README.md#50-sprint-3-party-board-handouts-p2).
+
+- **Notification rows:** kind `handout-shared` in `notification` (payload `{handoutId}`, state `info`, audience `all` or `player`; FR-PARTY-06). The row and its handout id stay after an unshare or delete (OQ-PARTY-15); the handout's records still leave the player.
+- **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab: handouts | inventory}` (FR-PARTY-11); the viewer's selected handout + mode (page memory).
+- **Derived (client, `@ui/features/party-board/logic`):** DM order newest `seq`, player order newest `sharedAt`; mark New (never opened) / Updated (`rev` > seen rev); share label (`@shared/party-board/format`); launcher activity.
+- **Fixtures:** `handouts-1` now also writes 3 `handout-shared` rows through its shares: h1 `all`, h2 `player` player-1, h4 `all` (kept after h4's unshare); `party-second` 1 (`all`, Second Campaign).
+- **CON-44:** no new snapshot bytes in the worst case: notifications stay within NOTE's 100-row window, and a `handout-shared` row (text ≤ 93 chars, payload ≈ 51 B) is smaller than the heavy harness's damage-card rows that fill it; PARTY's CON-44 test unchanged (+1,100 B, DM 673,998 B).
+
+## 38. Sprint 3: vision client (V3)
+
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V3). **Built by `build/vision-client`**: no schema change, no new record type or field. Protocol side: [protocol §52](../protocol/README.md#52-sprint-3-vision-client-v3).
 
 - **Client only** (FOG §8 "Derived"): the DM's View as pick (`fog-of-war/view-as.ts`, null = "DM") and the loaded `(sceneId, playerId)` pair it draws (mirrored from the sync connection's `viewAs`); the player's blind state (read from the own `vision` row).
 - **CON-44:** unchanged (no new record or field; View-as rows load on demand, [§26](#26-sprint-3-vision-core-v0)).

@@ -7,6 +7,7 @@
 import type { ComponentType } from "react";
 import { sheetCreatureAction } from "../character-sheet/sheet-action";
 import { combatCreatureActions } from "../combat-tracker/creature-form";
+import { modCreatureTriggersAction } from "../effect-modifiers/triggers-dialog";
 import type { CreatureRow, CreatureTab } from "./list";
 
 export interface CreatureToolbarAction {
@@ -28,6 +29,7 @@ export type CreatureAction = CreatureToolbarAction | CreatureRowAction;
 export const creatureActions: readonly CreatureAction[] = [
   ...combatCreatureActions, // combat-tracker: creature form New / Derive / Edit (FR-CBT-05)
   sheetCreatureAction, // character-sheet-full: "Sheet" opens char.sheet on the row (FR-CHARX-31)
+  modCreatureTriggersAction, // effect-modifiers: "Rule triggers…" on monster rows (FR-MOD-28)
 ];
 
 export function actionsOf(actions: readonly CreatureAction[]) {
