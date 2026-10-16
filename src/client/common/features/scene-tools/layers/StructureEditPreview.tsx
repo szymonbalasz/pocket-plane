@@ -1,13 +1,14 @@
 // Structure tool previews on `scn-edit` (FR-SCN-02, -08), while the tool is active: the snapped
 // hover vertex (`scn-edit-vertex`), the polyline / door in progress to the hover
 // (`scn-edit-polyline`, attr `count` = clicked vertices), the erase target (`scn-edit-erase`) and
-// box (`scn-edit-box`).
+// box (`scn-edit-box`). Sprint 3: the clicked points (`scn-draft-point`, id = index, attr
+// `free`); off-grid points (Ctrl, or a magnet onto a free endpoint) are small open dots.
 import { vertexToPx } from "@shared/scene-tools/geometry";
 import { Circle, Group, Line, Rect } from "react-konva";
 import { useStore } from "zustand";
 import { useCanvas } from "../../scenes-map/canvas-context";
 import { structureTool } from "../structure-store";
-import { segmentPx } from "../structure-view";
+import { isFreePoint, segmentPx } from "../structure-view";
 import { useShownStructure } from "./StructureLayer";
 
 export function StructureEditPreview() {
@@ -41,12 +42,33 @@ export function StructureEditPreview() {
           dash={[6 / cam.scale, 4 / cam.scale]}
         />
       )}
+      {st.mode !== "erase" &&
+        st.points.map((v, i) => {
+          const free = isFreePoint(v);
+          return (
+            <Circle
+              // biome-ignore lint/suspicious/noArrayIndexKey: a polyline's points by position.
+              key={i}
+              name="scn-draft-point"
+              id={String(i)}
+              free={free}
+              {...px(v)}
+              radius={(free ? 4 : 3) / cam.scale}
+              {...(free
+                ? { stroke: colors.primary, strokeWidth: sw * 0.75, fill: colors.background }
+                : { fill: colors.primary })}
+            />
+          );
+        })}
       {st.mode !== "erase" && st.hover && (
         <Circle
           name="scn-edit-vertex"
+          free={isFreePoint(st.hover)}
           {...px(st.hover)}
           radius={5 / cam.scale}
-          fill={colors.primary}
+          {...(isFreePoint(st.hover)
+            ? { stroke: colors.primary, strokeWidth: sw, fill: colors.background }
+            : { fill: colors.primary })}
         />
       )}
       {erase && (
