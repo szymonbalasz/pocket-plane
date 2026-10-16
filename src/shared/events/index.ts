@@ -4,6 +4,7 @@ import * as campaignManagement from "./campaign-management";
 import * as characterSheet from "./character-sheet";
 import * as combatExtras from "./combat-extras";
 import * as combatTracker from "./combat-tracker";
+import * as compendium from "./compendium";
 import * as diceRollLog from "./dice-roll-log";
 import * as effectModifiers from "./effect-modifiers";
 import * as entities from "./entities";
@@ -41,6 +42,8 @@ export const domainEvents: readonly DomainEventDef[] = [
   ...Object.values<unknown>(sceneTools).filter(isDomainEventDef),
   // party-board (build/party-core).
   ...Object.values<unknown>(partyBoard).filter(isDomainEventDef),
+  // compendium (fix/cmp-core).
+  ...Object.values<unknown>(compendium).filter(isDomainEventDef),
 ];
 
 /** `cause.name` of presence changes (not a domain event, CON-07). */

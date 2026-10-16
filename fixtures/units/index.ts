@@ -23,6 +23,9 @@ import combatPending from "./combat-tracker/combat-pending";
 import encounter1 from "./combat-tracker/encounter-1";
 import goblin2 from "./combat-tracker/goblin-2";
 import thornBattlemap from "./combat-tracker/thorn-battlemap";
+import cmpHomebrew from "./compendium/cmp-homebrew";
+import cmpHomebrewSecond from "./compendium/cmp-homebrew-second";
+import cmpSrdMini from "./compendium/cmp-srd-mini";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
 import diceSettings from "./dice-roll-log/dice-settings";
 import rolls1 from "./dice-roll-log/rolls-1";
@@ -123,5 +126,11 @@ export const units: readonly Fixture[] = [
   handouts1,
   partyItems1,
   partySecond,
+<<<<<<< HEAD
   visionCrypt,
+=======
+  cmpSrdMini,
+  cmpHomebrew,
+  cmpHomebrewSecond,
+>>>>>>> main
 ];

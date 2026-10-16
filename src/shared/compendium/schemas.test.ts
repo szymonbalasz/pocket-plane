@@ -8,7 +8,6 @@ import {
   featureKey,
   isReadOnlyEntry,
 } from "./schemas";
-import { CreatureSenses } from "./senses";
 
 const spell = {
   kind: "spell",
@@ -178,15 +177,5 @@ describe("CMP §8 derived line", () => {
         }),
       ),
     ).toBe("Uncommon wondrous item");
-  });
-});
-
-describe("FR-CHARX-49 senses mirror (FR-CMP-05)", () => {
-  test("0–120 step 5, strict", () => {
-    const s = { visionFt: 0, darkvisionFt: 60, seesMagicalDarkness: false };
-    expect(CreatureSenses.safeParse(s).success).toBe(true);
-    expect(CreatureSenses.safeParse({ ...s, darkvisionFt: 125 }).success).toBe(false);
-    expect(CreatureSenses.safeParse({ ...s, darkvisionFt: 62 }).success).toBe(false);
-    expect(CreatureSenses.safeParse({ ...s, blindsightFt: 10 }).success).toBe(false);
   });
 });

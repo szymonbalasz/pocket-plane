@@ -28,7 +28,9 @@ const Duration = z.int().min(1).max(Math.min(PRESET_DURATION_MAX, DURATION_ROUND
  * `characterId` and `key`). `characterId` null = campaign preset (DM); `key` customises that
  * built-in (campaign presets only). The name becomes the effect label (CBTX label rules).
  * `originKey` (FR-MOD-36): the built-in key "Start from" copied; only a built-in key; absent on
- * a replace = kept, on a create = null; never with `key`.
+ * a replace = kept, on a create = null; never with `key`. `usesFeatureId` (FR-MOD-12, tier 3): a
+ * feature row with uses on the character's sheet, spent by each toggle on; character presets only;
+ * absent on a replace = kept, on a create = null.
  */
 export const PresetInput = z
   .strictObject({
@@ -36,6 +38,7 @@ export const PresetInput = z
     characterId: Id.nullable(),
     key: BuiltinKey.nullable().default(null),
     originKey: BuiltinKey.nullable().optional(),
+    usesFeatureId: Id.nullable().optional(),
     name: EffectLabel,
     modifiers: PresetModifiers,
     durationRounds: Duration.nullable(),
@@ -52,6 +55,13 @@ export const PresetInput = z
   .superRefine((v, ctx) => {
     if (v.key !== null && v.characterId !== null) {
       ctx.addIssue({ code: "custom", path: ["key"], message: "Key on campaign presets only" });
+    }
+    if (v.characterId === null && v.usesFeatureId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["usesFeatureId"],
+        message: "Uses on character presets only",
+      });
     }
     if (v.key !== null && v.originKey) {
       ctx.addIssue({
@@ -107,7 +117,7 @@ export const ApplyResult = z.object({
 });
 export type ApplyResult = z.infer<typeof ApplyResult>;
 
-/** FR-MOD-11: `force` (DM only) is tier 3's "on without spending a use". */
+/** FR-MOD-11, -12: `force` (DM only) = tier 3's "on without spending a use". */
 export const ToggleInput = z.strictObject({
   characterId: Id,
   presetId: Id,

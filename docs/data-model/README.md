@@ -1286,9 +1286,60 @@ From [scene-tools](../specs/scene-tools.md#8-data-model) (SCN §14 slice V4). **
 - **Client only:** the polyline in progress may hold free points (0.01 cell); the player's current wall hint pieces (from the latest `map.checkMove` ack, cleared on cell change, drag end, snapshot, leaving live); the Ctrl state for the "Free" chip.
 - **CON-44:** unchanged (no new record or field; decimal coordinates per SCN §12, ≤ 3 B per freeform number).
 
-## 33. Sprint 3: dynamic vision server + Invisible (V2)
+## 33. Sprint 3: effect modifiers tier 3 (R3)
 
-From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V2). **Built by `build/vision-server`**: no new table or column; V2 writes [§26](#26-sprint-3-vision-core-v0)'s per-player fields by sight. Protocol side: [protocol §46](../protocol/README.md#46-sprint-3-dynamic-vision-server--invisible-v2).
+From [effect-modifiers](../specs/effect-modifiers.md#82-records) tier 3 (MOD, `complete`). **Built by `build/mod-tier3`** (R3): no table, column or record type change; the R0 column is now written. Protocol side: [protocol §46](../protocol/README.md#46-sprint-3-effect-modifiers-tier-3-r3).
+
+| Table / leaf | Change | Visibility | Source |
+|---|---|---|---|
+| `effect_preset.uses_feature_id` | Set by `mod.putPreset` (character presets): soft id of a `creature_sheet.features` row with `usesMax`; kept when the row is later deleted or its uses cleared (broken link, toggles without uses) | as the row (owner + DM, FR-MOD-22) | [FR-MOD-12](../specs/effect-modifiers.md#6-functional-requirements) |
+| `effect_preset.origin_key` | Written by the sheet's "Start from ▸" create (built-in key) | as the row | FR-MOD-36 |
+| `creature_sheet.features[].used` (**JSON leaf**) | +1 per `mod.toggle` on with a live link (not with `force`); −1 by `refundFeatureUse` (R4's undo); reset only by the Features tab's Reset (`char.useResource`) | as the sheet (owner + DM) | FR-MOD-12, -41 |
+
+- **Derived** (pure, `@shared/effect-modifiers/rules`): `presetUses(preset, features)` → `null` (no link) \| `{state: "broken"}` \| `{state: "ok", featureId, name, left, max}`; `hasUses(row)`.
+- **Fixtures**: none added (Brakka's "Rage" feature row + linked preset are R5's `char-brakka` / `trg-brakka`). **Snapshot size** (CON-44): no new rows or fields; `uses_feature_id` was already in every preset row (R0 measured at max).
+
+## 34. Sprint 3: compendium core (C1)
+
+From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; gate 1 #207, #208, #213; [ADR-0046](../architecture/adr/0046-compendium-scope.md)). **Built by `fix/cmp-core`** (schema lock 4th, after P core): two tables (drizzle push, push-safe). **Not record types**: nothing here is in a snapshot or on the WS; C2 reads entries over REST. Global imported rows are ADR-0004's second exception (ADR-0046). Protocol side: [protocol §47](../protocol/README.md#47-sprint-3-compendium-core-c1).
+
+### Compendium source (`compendium_source`, global) — owner [compendium](../specs/compendium.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| key | text PK | e.g. `srd-5.1` | FR-CMP-04 |
+| name, licence, attribution, url | text ×3, text \| null | Attribution stored once here; entries carry the source key | FR-CMP-04 |
+| version | text | SHA-256 of the bundled files + `ADAPTER_VERSION`; fixtures may use a label (`mini`) | FR-CMP-04 |
+| importedAt | timestamp | `ctx.clock`; the last import that wrote something | FR-CMP-04 |
+| counts | **JSON leaf** `{<kind>: int}` | Entries per kind of that import | FR-CMP-04 |
+
+### Compendium entry (`compendium_entry`) — owner compendium
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id | ID | `ctx.ids` | CMP §8 |
+| campaignId | ID → Campaign \| null | null = imported (global, read-only); else homebrew | FR-CMP-02 |
+| kind | `monster` \| `spell` \| `item` \| `condition` \| `feature` | Immutable; homebrew never `monster` | FR-CMP-01, -02 |
+| source, sourceKey | text → `compendium_source.key` \| null, text \| null | Both or neither; `sourceKey` `<kind>/<slug>[/…]` | FR-CMP-02 |
+| name, nameKey | text 1–80, text | `nameKey` = trimmed lower-case NFC | FR-CMP-02 |
+| line | text ≤ 80 | `entryLine`, derived at write | CMP §8 |
+| facets, body | **JSON leaves** | Per kind (`kindRegistry`, `@shared/compendium/schemas`); facets + body ≤ 32 KB | FR-CMP-01 |
+| searchText | text | Lower-case name + line + body strings (not `preset` / `presetKey`), `*` / `\|` dropped | FR-CMP-10 |
+| dataHash | text | SHA-256 of the sorted-key JSON of the entry draft: upsert change detection | FR-CMP-07 |
+| definitionId | ID → Entity \| null | Monster entries: the imported creature definition with the same `(source, sourceKey)` | FR-CMP-03 |
+| shared | bool, default false | Homebrew only | FR-CMP-24 |
+| derivedFromId | ID \| null | Informational, no FK | CMP §8 |
+| createdAt, updatedAt, importedAt | timestamp ×2, timestamp \| null | `importedAt` on imported rows only | CMP §8 |
+
+Indexes: unique `compendium_entry_source_key` (`source`, `source_key`); unique `compendium_entry_campaign_kind_name` (`campaign_id`, `kind`, `name_key`) where `campaign_id is not null`; `compendium_entry_kind_name`, `compendium_entry_campaign`.
+
+- **Imported definitions** (`entity`, no column change): a changed one is now **updated in place** (same id) on re-import and its instances refreshed by the definition-changed hooks (FR-CMP-08); derived customs, homebrew, clones and NPC sheets never change (FR-CMP-09). Entries missing from a newer source stay.
+- **Snapshot size** (CON-44): compendium rows are in no snapshot (asserted on the `compendium` bundle: no entry text in any DM or player frame). Until C2 makes `imported-entity` lazy, the mini set's 5 SRD definitions are in the DM snapshot: `compendium` bundle DM 15,869 B, `imported-entity` 7 rows / 7,788 B (2 fixture + 5 SRD); players 0 rows (max 2,696 B). C1 has no route, so a full import (322 definitions, +341 KB) can't reach a real DM snapshot before C2.
+- **Import timing** (FR-CMP-31, `import.test.ts`, Windows dev box): full `srd-5.1` (1,150 entries + 322 definitions) 0.7–1.1 s; unchanged re-import 0.3–0.5 s with no writes (`total_changes()` unchanged).
+
+## 35. Sprint 3: dynamic vision server + Invisible (V2)
+
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V2). **Built by `build/vision-server`**: no new table or column; V2 writes [§26](#26-sprint-3-vision-core-v0)'s per-player fields by sight. Protocol side: [protocol §48](../protocol/README.md#48-sprint-3-dynamic-vision-server--invisible-v2).
 
 | Field | Written by (V2) | Rule | Source |
 |---|---|---|---|
