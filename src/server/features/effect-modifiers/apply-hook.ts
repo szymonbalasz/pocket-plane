@@ -11,7 +11,7 @@ import type { HpTriggerPart } from "@shared/combat-tracker/schemas";
 import { windowed, windowWords } from "@shared/effect-modifiers/trigger-fire";
 import { and, eq } from "drizzle-orm";
 import type { z } from "zod";
-import { conflict, invalid } from "../../commands/errors";
+import { CommandError, invalid } from "../../commands/errors";
 import { ruleTrigger, triggerUse } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import type { ApplyHook, ApplyTargetResult } from "../combat-tracker/apply-hooks";
@@ -19,6 +19,13 @@ import { refundFeatureUse, spendFeatureUse } from "./feature-uses";
 import { chargeFree, featureUses } from "./trigger-hook";
 
 const none = (): ApplyTargetResult => ({ extraRaw: 0, parts: [], dm: {}, changes: [] });
+
+/**
+ * FR-MOD-38, -40: a used charge / no use left. The issue names the part (`["triggers",
+ * triggerId]`), so the DM's popup marks that chip "Used this turn" with a Force tick.
+ */
+const usedConflict = (triggerId: string, message: string) =>
+  new CommandError("conflict", message, [{ path: ["triggers", triggerId], message }]);
 
 export const modApplyHook: ApplyHook = {
   id: "effect-modifiers.triggers",
@@ -57,13 +64,17 @@ export const modApplyHook: ApplyHook = {
         const every = t.rule.every;
         if (windowed(every)) {
           if (!chargeFree(env, t.id, use.ownerCombatantId, use.encounterId, use.window)) {
-            if (!x.force) throw conflict(`${part.label} was already used ${windowWords(every)}`);
+            if (!x.force) {
+              throw usedConflict(t.id, `${part.label} was already used ${windowWords(every)}`);
+            }
             forced = true;
           }
         } else if (typeof every === "object" && t.characterId !== null) {
           const uses = featureUses(env, t.characterId, every.feature);
           if (!uses || uses.left <= 0) {
-            if (!x.force) throw conflict(`${part.label}: no ${uses?.name ?? "feature"} uses left`);
+            if (!x.force) {
+              throw usedConflict(t.id, `${part.label}: no ${uses?.name ?? "feature"} uses left`);
+            }
             forced = true;
           } else {
             const change = spendFeatureUse(env, t.characterId, every.feature);

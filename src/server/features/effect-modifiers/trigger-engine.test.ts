@@ -519,6 +519,10 @@ describe("FR-MOD-42 once per turn", () => {
     t.applyTo(a, [{ name: "Goblin", triggers: assignFury(t) }]);
     const e = t.err(() => t.applyTo(b, [{ name: "Goblin 2", triggers: assignFury(t) }]));
     expect([e.code, e.message]).toEqual(["conflict", "Divine Fury was already used this turn"]);
+    // R7: the issue names the part, so the popup marks its chip "Used this turn" + Force.
+    expect(e.issues).toEqual([
+      { path: ["triggers", t.furyId], message: "Divine Fury was already used this turn" },
+    ]);
     expect(t.note(b)?.state).toBe("pending");
     const { hpChangeIds } = t.applyTo(b, [
       { name: "Goblin 2", triggers: assignFury(t, { force: true }) },
