@@ -12,8 +12,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | D: dice extras | `spec/dice-extras` (w3E, slot 2) | — | Spec in-review (5b6b60d), agent ended | Seams → review |
 | R: modifiers tiers 1–3 + triggers | `spec/rule-triggers` (w3F, slot 3) | — | Spec in-review (1a1506e), agent ended | Seams → review |
 | P: party board + handouts | `spec/party-board` (w3G, slot 4) | — | Spec in-review (2c793d4), agent ended | Seams → review |
-| C: compendium | `spec/compendium` (w3H, slot 5) | spec-compendium | Working | Report → seams |
-| Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | None | Per §3a |
+| C: compendium | `spec/compendium` (w3H, slot 5) | — | Spec in-review (0f557fc), agent ended | Seams → review |
+| Backfill (BL-06): scene dialog map name | `fix/bl-06-scene-map-name` (w3J, slot 6) | build-bl-06 | Working | Walkthrough → merge |
 
 ## Shared-file locks
 
