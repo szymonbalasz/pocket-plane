@@ -287,7 +287,8 @@ describe("CON-44 with MOD sprint-3 rows (MOD §12, #208)", () => {
       `MOD CON-44 (R0): + hp_change.triggerParts (1 max part on every applied row): DM +${partsDelta} → ${withParts[0]?.bytes} B; players +${Math.max(...withParts.slice(1).map((p, i) => p.bytes - (players[i]?.bytes ?? 0)))}`,
     );
     expect(withParts[0]?.bytes ?? Infinity).toBeLessThan(SNAPSHOT_CEILING.dm);
-    for (const [i, p] of withParts.slice(1).entries()) expect(p.bytes).toBe(players[i]?.bytes ?? -1);
+    for (const [i, p] of withParts.slice(1).entries())
+      expect(p.bytes).toBe(players[i]?.bytes ?? -1);
     console.log(
       `MOD CON-44 (R0): heavy DM ${before[0]} → ${dm?.bytes} B (+${dmDelta}; ${SNAPSHOT_CEILING.dm - (dm?.bytes ?? 0)} B left of 1 MiB); players max ${Math.max(...players.map((p) => p.bytes))} B (+${Math.min(...deltas)}…+${Math.max(...deltas)})`,
     );
@@ -311,18 +312,18 @@ describe("CON-44 with MOD sprint-3 rows (MOD §12, #208)", () => {
   });
 
   test("FR-MOD-47 load ack at the campaign cap ≤ 48 KiB (DM, every row); a player's own rows", () => {
-    // The future `sync.load {type: "rule-trigger"}` ack (R4): the visibility-filtered rows.
+    // The `sync.load {type: "rule-trigger"}` ack once R4 registers the type: the filtered rows.
     const reg = new RecordRegistry();
     reg.register(ruleTriggerRecordType);
     const frames = snapshotFrames(b.s);
     const ack = (v: Viewer) => {
-      const records = reg.snapshot({ db: b.s.db, presence: { list: () => [] } }, v);
+      const records = reg.load({ db: b.s.db, presence: { list: () => [] } }, v, RULE_TRIGGER_TYPE);
       const rows = (records[RULE_TRIGGER_TYPE] ?? []) as { definitionId: string | null }[];
       return {
         rows: rows.length,
         definitions: rows.filter((r) => r.definitionId !== null).length,
         bytes: Buffer.byteLength(
-          JSON.stringify({ type: "ack", id: "i1", result: { records } }),
+          JSON.stringify({ type: "ack", intentId: uuid("intent"), result: { records } }),
           "utf8",
         ),
       };

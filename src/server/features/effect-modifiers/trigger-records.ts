@@ -1,5 +1,5 @@
-// Record type `rule-trigger` (FR-MOD-47, ADR-0043, ADR-0045; R0): defined here, **registered in
-// R4** as a lazy type (`lazy: "all"`, `fix/lazy-records`). Campaign scope. DM full; the owner
+// Record type `rule-trigger` (FR-MOD-47, ADR-0043, ADR-0045; R0): defined here as a lazy type
+// (`lazy: "all"`: never in a snapshot, `sync.load` only), **registered in R4**. Campaign scope. DM full; the owner
 // player gets their characters' rows redacted (campaign preset ids → `{name}`); definition
 // triggers and everyone else: hidden. `trigger_use` is server-only: no record type at all.
 //
@@ -77,12 +77,13 @@ export function campaignTriggers(read: Read, campaignId: string): RuleTriggerRow
 }
 
 /**
- * The `rule-trigger` registration. **Not registered in R0**: R4 adds `lazy: "all"` (ADR-0045)
- * and registers it in MOD's `index.ts`, so no row ever reaches a snapshot.
+ * The `rule-trigger` registration (`lazy: "all"`, ADR-0045). **Not registered in R0**: R4
+ * registers it in MOD's `index.ts` with its commands.
  */
 export const ruleTriggerRecordType = defineRecordType<RuleTriggerRow>({
   type: RULE_TRIGGER_TYPE,
   scope: "campaign",
+  lazy: "all",
   schema: RuleTriggerRecord as never,
   idOf: (r) => r.id,
   campaignOf: (r) => r.campaignId,

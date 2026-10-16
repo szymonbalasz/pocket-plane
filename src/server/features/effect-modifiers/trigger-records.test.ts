@@ -1,8 +1,8 @@
 // biome-ignore-all lint/suspicious/noThenProperty: `then` is the rule's effect field (MOD §8.4); rules are data, never awaited.
-// `rule-trigger` visibility (FR-MOD-47; R0): the record type is defined, not registered (R4
-// registers it lazy); here it runs in a test registry. DM full (no server-only `presetRefs`);
-// the owner player their characters' rows with campaign preset ids redacted; other players and
-// definition triggers nothing; live changes follow the same matrix.
+// `rule-trigger` visibility (FR-MOD-47; R0): the record type is defined lazy, not registered
+// (R4 registers it); here it runs in a test registry: never in a snapshot, rows via `load`. DM
+// full (no server-only `presetRefs`); the owner player their characters' rows with campaign
+// preset ids redacted; other players and definition triggers nothing; live changes alike.
 import { describe, expect, test } from "bun:test";
 import { RULE_TRIGGER_TYPE } from "@shared/effect-modifiers/trigger-records";
 import type { TriggerRule } from "@shared/effect-modifiers/triggers";
@@ -72,11 +72,15 @@ function setup() {
   const dm = viewer("dm", null);
   const p1 = viewer("player", t.h.p1.id);
   const p2 = viewer("player", t.h.p2.id);
-  const snap = (v: Viewer) =>
-    (reg.snapshot({ db: t.s.db, presence: { list: () => [] } }, v)[RULE_TRIGGER_TYPE] ?? []) as {
+  const src = { db: t.s.db, presence: { list: () => [] } };
+  /** The `sync.load {type: "rule-trigger"}` ack's rows for a viewer (lazy: never a snapshot). */
+  const snap = (v: Viewer) => {
+    expect(reg.snapshot(src, v)[RULE_TRIGGER_TYPE]).toBeUndefined();
+    return (reg.load(src, v, RULE_TRIGGER_TYPE)[RULE_TRIGGER_TYPE] ?? []) as {
       id: string;
       rule: unknown;
     }[];
+  };
   const record = (id: string) =>
     toRuleTriggerRecord(
       t.s.db,
