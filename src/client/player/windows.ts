@@ -4,6 +4,7 @@ import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/re
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
 import { playerCharSheetWindow } from "./features/character-sheet/sheet-window";
 import { playerInitiativeWindow } from "./features/combat-tracker/initiative-window";
+import { playerTrayWindow } from "./features/dice-extras/tray-window";
 import { playerDiceLogWindow } from "./features/dice-roll-log/log-window";
 import { notificationsHistoryWindow } from "./features/notifications/history-window";
 import { playerLootLogWindow } from "./features/party-loot/loot-window";
@@ -16,6 +17,7 @@ const windows: WindowDef[] = [
   playerCharSheetWindow, // char.sheet (character-sheet, FR-CHAR-15)
   playerInitiativeWindow, // cbt.initiative (combat-tracker, CBT §7)
   playerLootLogWindow, // loot.log (party-loot, FR-LOOT-15)
+  playerTrayWindow, // dicex.tray (dice-extras, FR-DICEX-01)
 ];
 
 export const playerWindows = createWindowRegistry("player", windows);
