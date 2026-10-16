@@ -1,6 +1,11 @@
 // FR-CMP-19 entry views: monster stat block (core from the definition + reference sections),
 // spell, item, condition, feature; footer "SRD 5.1 · CC BY 4.0" + About (full attribution), or
 // "Homebrew" (+ "Shared" / "DM only" for the DM). Text through `MarkdownLite` (FR-CMP-26).
+// Actions row: **Add to sheet** on spells / items / features (both clients, FR-CMP-28), the DM's
+// extras from the caller (Derive…, Clone / Edit / Delete; FR-CMP-25, -27); "Preset: ‹name›"
+// when FR-CMP-29 resolves a trigger preset.
+import { isSheetable } from "@shared/compendium/homebrew";
+import { resolvePreset } from "@shared/compendium/presets";
 import type { EntryDefinition, EntryResponse, SourceAttribution } from "@shared/compendium/rest";
 import {
   type BodyOf,
@@ -27,6 +32,7 @@ import {
   DialogTitle,
 } from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
+import { AddToSheet } from "./AddToSheet";
 import { crText, footerLabel, type Role, scoreText, signed } from "./logic";
 import { MarkdownLite, type TextContext } from "./MarkdownLite";
 
@@ -358,8 +364,30 @@ export function Attribution({
   );
 }
 
-/** One entry (FR-CMP-19): the kind's view, the DM's drag handle on monsters, the footer. */
-export function EntryView({ data, viewer }: { data: EntryResponse; viewer: Role }) {
+/** FR-CMP-29: the trigger preset Add to sheet also adds. */
+function PresetLine({ e }: { e: CompendiumEntry }) {
+  const p = resolvePreset(e);
+  if (!p) return null;
+  return (
+    <p className="text-xs text-muted-foreground" data-testid="cmp-preset">
+      <span className="font-semibold">Preset:</span> {p.name}
+    </p>
+  );
+}
+
+/**
+ * One entry (FR-CMP-19): the kind's view, the actions row (the DM's drag handle on monsters, Add
+ * to sheet, the caller's `actions`), the footer.
+ */
+export function EntryView({
+  data,
+  viewer,
+  actions,
+}: {
+  data: EntryResponse;
+  viewer: Role;
+  actions?: ReactNode;
+}) {
   const e = data.entry;
   let view: ReactNode;
   if (e.kind === "monster" && data.definition) {
@@ -374,6 +402,8 @@ export function EntryView({ data, viewer }: { data: EntryResponse; viewer: Role 
   } else if (e.kind === "spell") view = <SpellView e={e} />;
   else if (e.kind === "item") view = <ItemView e={e} />;
   else view = <TextView e={e} />;
+  const drag = viewer === "dm" && e.kind === "monster" && data.definition;
+  const sheetable = isSheetable(e.kind);
   return (
     <article
       data-testid="cmp-entry"
@@ -381,12 +411,20 @@ export function EntryView({ data, viewer }: { data: EntryResponse; viewer: Role 
       data-value={e.kind}
       className="space-y-2"
     >
-      {viewer === "dm" && e.kind === "monster" && data.definition && (
-        <div className="flex items-center justify-end gap-1" data-testid="cmp-entry-actions">
-          <DragHandle definitionId={data.definition.id} name={e.name} />
+      {(drag || sheetable || actions) && (
+        <div
+          className="flex flex-wrap items-center justify-end gap-1"
+          data-testid="cmp-entry-actions"
+        >
+          {actions}
+          {sheetable && <AddToSheet entryId={e.id} />}
+          {drag && data.definition && (
+            <DragHandle definitionId={data.definition.id} name={e.name} />
+          )}
         </div>
       )}
       {view}
+      <PresetLine e={e} />
       <Attribution source={data.source} entry={e} viewer={viewer} />
     </article>
   );

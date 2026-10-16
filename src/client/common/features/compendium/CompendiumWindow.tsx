@@ -1,10 +1,11 @@
 // `cmp.compendium` body (FR-CMP-18–23), both clients: search (debounced 200 ms), Filters popover,
 // kind Tabs per role, results with **More**, entry view with Back (list scroll kept). Reads on
 // demand: refetch on open, search and Back (FR-CMP-23). DM extras come in as props: the import
-// panel (`top`) and monster rows as drag sources (FR-CMP-21). The client supplies the `Api` with
-// its credential (DM secret / `Authorization: Player`).
+// panel (`top`), the New homebrew button (`toolbar`), entry actions (`entryActions`: Derive…,
+// Clone / Edit / Delete; C4) and monster rows as drag sources (FR-CMP-21). The client supplies
+// the `Api` with its credential (DM secret / `Authorization: Player`).
 
-import type { EntrySummary } from "@shared/compendium/rest";
+import type { EntryResponse, EntrySummary } from "@shared/compendium/rest";
 import {
   DEFINITION_DRAG_MIME,
   type DefinitionDragData,
@@ -55,6 +56,9 @@ import {
 import { Attribution, DragHandle, EntryView, StatBlock } from "./views";
 
 const ANY = "__any__";
+
+/** The DM's extra buttons on an entry view (C4); players pass none. */
+export type EntryActions = (data: EntryResponse) => ReactNode;
 
 function FiltersPopover({ tab, filters }: { tab: CmpTab; filters: Filters }) {
   const fields = tab === "all" ? [] : FILTER_FIELDS[tab];
@@ -235,7 +239,15 @@ function ResultsList({ api, viewer }: { api: Api; viewer: Role }) {
   );
 }
 
-function EntryReadView({ read, viewer }: { read: EntryRead; viewer: Role }) {
+function EntryReadView({
+  read,
+  viewer,
+  actions,
+}: {
+  read: EntryRead;
+  viewer: Role;
+  actions?: EntryActions;
+}) {
   if (read.state === "loading") {
     return (
       <div className="space-y-2" data-testid="cmp-entry-loading">
@@ -251,12 +263,22 @@ function EntryReadView({ read, viewer }: { read: EntryRead; viewer: Role }) {
       </p>
     );
   }
-  return <EntryView data={read.data} viewer={viewer} />;
+  return <EntryView data={read.data} viewer={viewer} actions={actions?.(read.data)} />;
 }
 
-function EntryById({ api, id, viewer }: { api: Api; id: string; viewer: Role }) {
+function EntryById({
+  api,
+  id,
+  viewer,
+  actions,
+}: {
+  api: Api;
+  id: string;
+  viewer: Role;
+  actions?: EntryActions;
+}) {
   const nonce = useCmpNav((s) => s.entryNonce);
-  return <EntryReadView read={useEntry(api, id, nonce)} viewer={viewer} />;
+  return <EntryReadView read={useEntry(api, id, nonce)} viewer={viewer} actions={actions} />;
 }
 
 /**
@@ -267,10 +289,12 @@ function DefinitionView({
   api,
   definitionId,
   viewer,
+  actions,
 }: {
   api: Api;
   definitionId: string;
   viewer: Role;
+  actions?: EntryActions;
 }) {
   const defs = useDefinitions(useMemo(() => [definitionId], [definitionId]));
   const raw = defs.byId.get(definitionId);
@@ -293,7 +317,9 @@ function DefinitionView({
   }
   if (!def?.success || found.state === "loading")
     return <EntryReadView read={{ state: "loading" }} viewer={viewer} />;
-  if (found.entryId !== null) return <EntryById api={api} id={found.entryId} viewer={viewer} />;
+  if (found.entryId !== null) {
+    return <EntryById api={api} id={found.entryId} viewer={viewer} actions={actions} />;
+  }
   const d = def.data;
   return (
     <article
@@ -328,10 +354,12 @@ function EntryPane({
   api,
   view,
   viewer,
+  actions,
 }: {
   api: Api;
   view: Exclude<CmpView, { mode: "list" }>;
   viewer: Role;
+  actions?: EntryActions;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -348,16 +376,33 @@ function EntryPane({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {view.mode === "entry" ? (
-          <EntryById api={api} id={view.entryId} viewer={viewer} />
+          <EntryById api={api} id={view.entryId} viewer={viewer} actions={actions} />
         ) : (
-          <DefinitionView api={api} definitionId={view.definitionId} viewer={viewer} />
+          <DefinitionView
+            api={api}
+            definitionId={view.definitionId}
+            viewer={viewer}
+            actions={actions}
+          />
         )}
       </div>
     </div>
   );
 }
 
-export function CompendiumBody({ api, viewer, top }: { api: Api; viewer: Role; top?: ReactNode }) {
+export function CompendiumBody({
+  api,
+  viewer,
+  top,
+  toolbar,
+  entryActions,
+}: {
+  api: Api;
+  viewer: Role;
+  top?: ReactNode;
+  toolbar?: ReactNode;
+  entryActions?: EntryActions;
+}) {
   const q = useCmpNav((s) => s.q);
   const tab = useCmpNav((s) => s.tab);
   const filters = useCmpNav((s) => s.filters);
@@ -389,6 +434,7 @@ export function CompendiumBody({ api, viewer, top }: { api: Api; viewer: Role; t
             onChange={(e) => setQuery(e.target.value)}
           />
           <FiltersPopover tab={shownTab} filters={filters} />
+          {toolbar}
         </div>
         <Tabs value={shownTab} onValueChange={(v) => setTab(v as CmpTab)} className="px-2 pt-1.5">
           <TabsList className="w-full justify-start overflow-x-auto">
@@ -409,7 +455,7 @@ export function CompendiumBody({ api, viewer, top }: { api: Api; viewer: Role; t
           <ResultsList api={api} viewer={viewer} />
         </div>
       </div>
-      {!listing && <EntryPane api={api} view={view} viewer={viewer} />}
+      {!listing && <EntryPane api={api} view={view} viewer={viewer} actions={entryActions} />}
     </div>
   );
 }

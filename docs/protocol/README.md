@@ -1659,3 +1659,48 @@ From [compendium](../specs/compendium.md) (CMP, `complete`; #207). **Built by `b
 | Token menu "Stat block" | DM registry entry `cmp.statblock` (order 5, [§18](#18-scenes-client-registries)) on tokens with `characterId` null: definition in the store's campaign `entity` rows → `char.sheet` on that NPC (`openSheetFor(id, "monster")`); else → `cmp.compendium` in `definition` view: the definition via `useDefinitions` (lazy load), then a DM monster search on its name picks the entry linking it; an entryless imported definition (e.g. the `fixture` Goblin) shows its stat block alone (same for entryless search rows) | FR-CMP-22 |
 
 **Test IDs:** `cmp-window` (+ `data-view`), `cmp-search`, `cmp-filters` (+ `data-value` = active count), `cmp-filters-panel`, `cmp-filter` (+ `data-value` = filter key), `cmp-filters-clear`, `cmp-tab` (+ `data-value` kind \| `all`), `cmp-results`, `cmp-result` (+ `data-record-id`, `data-value` = kind), `cmp-result-name`, `cmp-more`, `cmp-empty`, `cmp-loading`, `cmp-error`, `cmp-retry`, `cmp-entry` (+ `data-record-id`, `data-value` = kind), `cmp-entry-header`, `cmp-entry-actions`, `cmp-entry-loading`, `cmp-entry-error`, `cmp-back`, `cmp-statblock-<header|core|scores|score|facts|traits|actions|bonus-actions|reactions|legendary|section>`, `cmp-drag-handle` (+ `data-record-id` = definitionId), `cmp-attribution`, `cmp-about`, `cmp-about-dialog`, `cmp-about-text`, `cmp-import-panel` (+ `data-state` `empty` \| `current` \| `update`), `cmp-import`, `cmp-update`, `cmp-import-status`, `cmp-import-dialog`, `cmp-import-confirm`, `cmp-token-menu-statblock`.
+
+## 60. Sprint 3: compendium homebrew (C4)
+
+From [compendium](../specs/compendium.md) (CMP, `complete`; #207, #209). **Built by `build/compendium-homebrew`** on C2 / C3: homebrew REST, Clone, Derive…, **Add to sheet** with FR-CMP-29's trigger presets. Entries still never travel on the WS (CON-44). Data side: [data model §46](../data-model/README.md#46-sprint-3-compendium-homebrew-c4).
+
+**REST** (`src/server/features/compendium/homebrew-routes.ts`, mounted at `/api` after C3's routes; DM secret only: a player credential or none → `401`; no active campaign → `409`; `Cache-Control: private, no-cache` on every answer, FR-CMP-12; bodies in `@shared/compendium/homebrew`)
+
+| Method | Path | Body / result | Errors | Source |
+|---|---|---|---|---|
+| POST | `/api/compendium/entries` | `PutEntryBody {entry: EntryDraft (kind ≠ monster), shared = false, derivedFromId = null}` → `cmp.putEntry` → `201 {entryId}` | `400 invalid` (schema, monster kind, text > 8,000 chars); `404` base `derivedFromId` not visible to the DM; `409 conflict` "An entry of this kind with this name already exists" (case-insensitive, per campaign and kind) | [FR-CMP-24](../specs/compendium.md#6-functional-requirements) |
+| PUT | `/api/compendium/entries/:id` | `PutEntryBody` (whole replace; kind immutable) → `200 {entryId}` | as POST; imported id → `403 forbidden` "Imported entries are read-only. Clone to edit."; another campaign's / unknown → `404` | FR-CMP-24 |
+| DELETE | `/api/compendium/entries/:id` | → `cmp.deleteEntry` → `204` (sheet rows added from it stay) | imported → `403 forbidden` (same message); another campaign's / unknown → `404` | FR-CMP-25 |
+| POST | `/api/compendium/derive-monster` | `DeriveMonsterBody {entryId, entity: {kind: "monster", name, portraitAssetId?, tokenShape?, statBlock} (entities' create body minus derivedFromId), copyText = true}` → `cmp.deriveMonster`, one transaction: entities' `createIn` with `derivedFromId` = the entry's definition; if `copyText`, the NPC sheet's Features rows (traits, then actions and bonus actions whose name matches no attack of the new creature, reactions, legendary actions; name ≤ 60, source = the entry's source name, text clipped to 600 with "…", ≤ 30) → `201 {entity}` | `400 invalid` (schema, not a monster entry); `404` entry not visible; `409 conflict` name taken (FR-ENT-08); any failure → nothing written | FR-CMP-27 |
+
+**WS intent** (feature-local, `intent: true`; roles DM + player)
+
+| Intent | Payload | Ack result | Rejects | Source |
+|---|---|---|---|---|
+| `cmp.addToSheet` | `{entryId, characterId}` | `{list: "spells" \| "items" \| "features", rowId, triggerId?}` | `not_found` "Entry not found" (unknown, or not visible to the caller per FR-CMP-14: a player's unshared homebrew, monsters, other campaigns) or "Character not found" (an NPC, another campaign); `invalid` (a monster or condition entry; a stored preset MOD refuses); `forbidden` "Not your character" / "Locked by the DM" (`char.putRow`'s rule, FR-CHARX-12); `conflict` list full | FR-CMP-28 |
+
+- **One transaction:** visibility → sheet row via CHARX's internal row insert (`insertSheetRows`, `src/server/features/character-sheet/row-insert.ts`: `char.putRow`'s authorisation, ids from `ctx`, row limits, whole-sheet validation) → if FR-CMP-29 resolves, MOD's `addTriggerFromPreset(env, characterId, {presetKey} | {name, rule})`. Rows: spell `{name, level, concentration, ritual, roll: none, effect: damage}`; item `{name, qty: 1}`; feature `{name, source ("SRD 5.1" / "Homebrew"), text (clipped 600)}`. Crash hook `cmp.addToSheet:before-commit` → neither.
+- **Preset resolution** (`resolvePreset`, `@shared/compendium/presets`, FR-CMP-29; also the view's "Preset: ‹name›"): feature `presetKey` (a MOD built-in **trigger** key; unknown → none) > feature `preset` (`TriggerRule`; the trigger is named after the entry) > the built-in trigger whose `featureKeys` list `featureKey(entry)`; spells by built-in only. Effect presets (`rage`) never resolve.
+- **`FeatureBody.preset`** is now MOD's `TriggerRule` zod (opaque in C1): a homebrew write with an invalid rule → `400 invalid`.
+
+**Domain events**
+
+| Event | Payload | Changes | Visibility | Source |
+|---|---|---|---|---|
+| `CompendiumEntrySaved` (C1 type, now routed) | `{entryId, kind, shared}` | none | DM only (no record) | FR-CMP-24 |
+| `CompendiumEntryDeleted` (C1 type, now emitted) | `{entryId}` | none | DM only | FR-CMP-25 |
+| `EntityCreated` + `CharacterSheetEdited {op: putRow, list: features, rowId: first new row}` (derive) | as entities / CHARX | `entity` + `creature-sheet` (NPC) | DM only (custom definitions and NPC sheets, ADR-0024) | FR-CMP-27 |
+| `CharacterSheetEdited {op: putRow, list, rowId}` + `RuleTriggerSaved {triggerId}` (add to sheet) | as CHARX / MOD | `creature-sheet`; `rule-trigger` upsert | sheet: owner + DM (CHARX); trigger: MOD's fns (owner live; lazy type) | FR-CMP-28 |
+
+**Client** (`@ui/features/compendium/*`, DM `src/client/dm/features/compendium/`)
+
+| Piece | Contract | Source |
+|---|---|---|
+| `CompendiumBody` | Adds `toolbar?` (DM: **New** next to Filters) and `entryActions?(data)` (DM: Derive… / Clone / Edit / Delete in the entry's actions row) | CMP §7 |
+| Homebrew form (DM Dialog) | New: kind Select (spell, item, condition, feature); Clone (from a visible non-monster entry; imported name kept, homebrew "‹name› (copy)"; not shared; `derivedFromId` = base) and Edit (homebrew; kind fixed). Fields: name; spell level, school, casting time, range, components, duration, concentration, ritual; item category, rarity, type line, attunement; feature class, level, subclass; text (≤ 8,000) with a live markdown-lite preview; **Shared with players**. Unshown fields (spell classes / material / higher levels, item cost / weight / damage / properties / AC, feature `presetKey` / `preset`) kept from the source. Save → `POST` / `PUT`; server errors inline; New / Clone open the saved entry, Edit refetches | FR-CMP-24, -25 |
+| Delete | Confirm Dialog "Sheet rows already added from it stay." → `DELETE` → Toast, back to the list | FR-CMP-25 |
+| Derive… (DM, monster entries with a definition) | Dialog prefilled from the definition: name (= entry name), size, CR (+ XP), AC, HP max, HP formula (+ "Use as HP max"), initiative, speed; attacks, scores, saves and senses kept from the definition; **Copy text** Switch (on) → `POST derive-monster` → Toast "Derived ‹name›" with **Open sheet** (the NPC sheet) | FR-CMP-27 |
+| Add to sheet (both clients; spell / item / feature views) | Popover: character Select (DM: campaign characters; player: own; hidden with none) → `cmp.addToSheet` → Toast "Added to ‹name›'s ‹Spells \| Items \| Features›" (+ " and Triggers") or the reject message. "Preset: ‹name›" under the view when FR-CMP-29 resolves | FR-CMP-28, -29 |
+| Offline rule | Every write button disabled while the connection isn't `live` | CMP §7 |
+
+**Test IDs:** `cmp-new`, `cmp-derive`, `cmp-derive-dialog`, `cmp-derive-name`, `cmp-derive-field` (+ `data-field`), `cmp-derive-copy-text`, `cmp-derive-save`, `cmp-derive-error`, `cmp-clone`, `cmp-edit`, `cmp-delete`, `cmp-delete-dialog`, `cmp-delete-confirm`, `cmp-form`, `cmp-form-kind`, `cmp-form-name`, `cmp-form-field` (+ `data-field`), `cmp-form-text`, `cmp-form-preview`, `cmp-form-shared`, `cmp-form-save`, `cmp-form-error`, `cmp-add-to-sheet`, `cmp-add-to-sheet-panel`, `cmp-add-to-sheet-character`, `cmp-add-to-sheet-confirm`, `cmp-preset`.

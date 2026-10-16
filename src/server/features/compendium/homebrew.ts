@@ -1,13 +1,14 @@
-// `cmp.putEntry` (FR-CMP-24, server side only): homebrew create / whole replace in the active
-// campaign. C1 ships the command for the `cmp-homebrew*` fixtures; C4 adds the REST route,
-// delete and clone. Imported entries are read-only (`forbidden`).
+// Homebrew (FR-CMP-24, -25): `cmp.putEntry` (create / whole replace in the active campaign) and
+// `cmp.deleteEntry`. Imported entries are read-only (`forbidden`). Clone is the form prefilled
+// from a visible entry: a plain create, no link (`derivedFromId` is informational).
+import { PutEntryBody } from "@shared/compendium/homebrew";
 import {
-  EntryDraft,
+  type EntryDraft,
   entryNameKey,
   HOMEBREW_TEXT_MAX,
   isReadOnlyEntry,
 } from "@shared/compendium/schemas";
-import { CompendiumEntrySaved } from "@shared/events/compendium";
+import { CompendiumEntryDeleted, CompendiumEntrySaved } from "@shared/events/compendium";
 import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
@@ -18,25 +19,21 @@ import { dataHash } from "../fixtures-adapters/import-pipeline";
 import { derivedColumns, EntryId, getEntry } from "./entries";
 
 export const PUT_ENTRY = "cmp.putEntry";
+export const DELETE_ENTRY = "cmp.deleteEntry";
 export const READ_ONLY_ENTRY = "Imported entries are read-only. Clone to edit.";
 export const NAME_TAKEN = "An entry of this kind with this name already exists";
 
 /** Kind + name + facets + body as `EntryDraft` (monster excluded: customs, FR-CMP-02). */
-export const PutEntryInput = z.strictObject({
-  id: EntryId.optional(),
-  entry: EntryDraft,
-  shared: z.boolean().default(false),
-  derivedFromId: EntryId.nullable().default(null),
-});
+export const PutEntryInput = PutEntryBody.extend({ id: EntryId.optional() });
 
-function campaignOf(env: CommandEnv): string {
+export function campaignOf(env: Pick<CommandEnv, "tx" | "actor">): string {
   const cid = env.actor.campaignId ?? activeCampaign(env.tx)?.id ?? null;
   if (!cid) throw conflict("No active campaign");
   return cid;
 }
 
 /** Visible to the campaign's DM: imported, or the campaign's own homebrew (FR-CMP-14). */
-function visibleToDm(cid: string, id: string, env: CommandEnv): boolean {
+function visibleToDm(cid: string, id: string, env: Pick<CommandEnv, "tx">): boolean {
   const r = getEntry(env.tx, id);
   return !!r && (r.campaignId === null || r.campaignId === cid);
 }
@@ -119,5 +116,25 @@ export const putEntry = defineCommand({
       changes: [],
     });
     return { entryId };
+  },
+});
+
+/** FR-CMP-25: homebrew only; imported → `forbidden`; other campaign / unknown → `not_found`. */
+export const deleteEntry = defineCommand({
+  name: DELETE_ENTRY,
+  input: z.strictObject({ id: EntryId }),
+  execute({ id }, env): Record<string, never> {
+    const cid = campaignOf(env);
+    const before = getEntry(env.tx, id);
+    if (before && isReadOnlyEntry(before)) throw forbidden(READ_ONLY_ENTRY);
+    if (!before || before.campaignId !== cid) throw notFound("Entry not found");
+    env.tx.delete(compendiumEntry).where(eq(compendiumEntry.id, id)).run();
+    env.emit({
+      type: CompendiumEntryDeleted.type,
+      campaignId: cid,
+      payload: { entryId: id },
+      changes: [],
+    });
+    return {};
   },
 });
