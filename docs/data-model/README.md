@@ -1191,3 +1191,19 @@ Indexes `trigger_use_charge` (`trigger_id`, `owner_combatant_id`, `encounter_id`
 
 - **Redaction (FR-MOD-47, fail closed):** the registry record carries server-only `presetRefs` (built with the row: per non-built-in preset ref of the rule, `{own: true}` for the trigger's own character's preset, else `{name}` of the campaign preset); `dmRedact` strips it. A player's copy keeps built-in keys and own preset ids; every other ref (incl. a deleted preset) becomes `{name}` ("Missing preset" if gone).
 - **Snapshot size** (CON-44, #208; MOD's `con44.test.ts`): heavy harness + every MOD §12 R row at max length (tier-2 modifiers on 16 presets and 12 effects, `originKey` on every preset, 1 max offer with settle facts on 20 pending cards, `offered` (20 dice) + DM name on 30 attack roll entries, a typed part on the outcome lines): DM 672,416 → 710,459 B (**+38,043**; 338,117 B left of 1 MiB; bound ≤ 40 KiB), players max 293,985 B (+13,408…+13,794; bound ≤ 20 KiB). Not in MOD §12's table: `hp_change.triggerParts` with 1 max part on every applied row, DM **+5,040** (players 0). `rule-trigger` at the campaign cap (40 rows, 1 `row` filter each): in no snapshot; DM load ack 41,615 B (1,040 B/row; bound ≤ 48 KiB), a player's own rows ≤ 10,004 B. Worst card (6 max mods on both rolls, 4 max offers, 50 dice): 4,353 B > the kind's 4 KB cap; 3 offers 3,975 B (R10 drops offers from the last).
+
+## 28. Sprint 3: rule-trigger engine (R4)
+
+From [effect-modifiers](../specs/effect-modifiers.md#82-records) sprint 3. **Built by `build/rule-triggers`** (R4): no schema change; who writes §27's rows now. Protocol side: [protocol §41](../protocol/README.md#41-sprint-3-rule-trigger-engine-r4).
+
+| Row / leaf | Written by | Notes | Source |
+|---|---|---|---|
+| `rule_trigger` | `mod.putTrigger` (insert / replace), `mod.deleteTrigger`, `addTriggerFromPreset` (caller's transaction), the owner-change hook (`owner_player_id`) | Caps by command; `public` default character on / definition off; `updated_at` from `ctx.clock` | FR-MOD-32, -45–47 |
+| `trigger_use` (hit) | `cbt.attack` / `cbt.rollDamage` after the card exists: one `offered` row per card part (`card_id`, `roll_id`, `part`, `window` = the trigger's key at the roll, `owner_combatant_id` = the card's attacker); `cbt.applyCard` (MOD apply hook) → `used` + `target_id`, `hp_change_id`, `value` (after multiplier), `multiplier`, `forced`, `feature_id` (spent); `cbt.undo` → back to `offered`, those fields cleared | Two cards in one window both carry the offer; the first apply spends the charge. Unassigned offers stay `offered`. A dropped offer (card cap) has no row | FR-MOD-37, -38, -41, -42 |
+| `trigger_use` (roll) | the roll hook: `used` at once, `roll_id`, windowed frequencies in combat only | Never undone (rolls are facts) | FR-MOD-43 |
+| `creature_sheet.features[].used` | apply (`every.feature`, +1) and its undo (−1), via CHARX's counter helpers + `writeSheet` (MOD's interim `feature-uses.ts` until R3's `spendFeatureUse` / `refundFeatureUse`) | Not on `force` | FR-MOD-38, -41 |
+| `hp_change.trigger_parts` | `cbt.applyCard` (apply hooks' `triggerParts`) | `{triggerId, name, value, multiplier, type, forced}` | FR-MOD-38, -48 |
+| `notification` kind `mod-trigger` | the reminders line on Next | payload `{triggerName, creatureName, encounterId, text}`; info rows (History) | FR-MOD-44 |
+| damage card `mode` | `cbt.attack` | Now the to-hit roll's final mode (was the requested one) | FR-MOD-37 |
+
+- **CON-44:** no new record type or snapshot field (R0 measured every R row: [§27](#27-sprint-3-rule-triggers-core-r0)). `mod-trigger` reminders are small info rows (≈ 0.4 KB each) in the notifications window like any info card.
