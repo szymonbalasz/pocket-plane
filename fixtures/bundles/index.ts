@@ -8,6 +8,7 @@ import characterSheet from "./character-sheet";
 import characterSheetFull from "./character-sheet-full";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
+import diceExtras from "./dice-extras";
 import diceLog from "./dice-log";
 import effectModifiers from "./effect-modifiers";
 import entities from "./entities";
@@ -44,4 +45,5 @@ export const bundles: readonly Bundle[] = [
   sceneToolsProps,
   sceneTools,
   fogScn,
+  diceExtras,
 ];
