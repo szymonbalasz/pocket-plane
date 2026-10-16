@@ -9,11 +9,11 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | V2 vision server + Invisible | `build/vision-server` (w4B) | build-vision-server | Building | Walkthrough → V3 |
-| V4 freeform walls + red hint | `build/walls-freeform` (w4C) | build-walls-freeform | Building | Walkthrough SCN S1–S4 |
+| V4 freeform walls + red hint | `build/walls-freeform` (w4C, slot 6) | test-walls-freeform (port 4163) | Built (+ BL-12 fixed); walkthrough S1–S4 on `scene-tools` | Merge → V3 |
 | R2 tier 2 client | `fix/mod-roll-preview` (w4D) | build-mod-roll-preview | Building | Walkthrough |
-| R3 tier 3 uses | `build/mod-tier3` (w4A) | build-mod-tier3 | Building | Walkthrough → R6 |
-| P core | `build/party-core` (w30) | — | Ready (walkthrough comes with P2); merging after R4 | C1, P2 ∥ P3 |
-| Merged so far | — | — | D1 (#214), D3 (#217), V0 (#216), V5 (#219), lazy-records (#218), R0 (#220), R1 (#222), V1 + empty-event fix + R4 (#223); early slices rt-shared, cmp-data (#213), party-shared; BL-06, BL-02, BL-11 | — |
+| R3 tier 3 uses | `build/mod-tier3` (w4A, slot 4) | — | Built; walkthrough next free slot (Rage feature added on `effect-modifiers`) | Merge → R6 |
+| C1 compendium core | `fix/cmp-core` (w4E) | build-cmp-core | Building | Review → C2 (after R7), C3, D2 |
+| Merged so far | — | — | P core (c58470c), D1 (#214), D3 (#217), V0 (#216), V5 (#219), lazy-records (#218), R0 (#220), R1 (#222), V1 + empty-event fix + R4 (#223); early slices rt-shared, cmp-data (#213), party-shared; BL-06, BL-02, BL-11 | — |
 | Queue | — | — | V3 (after V2 + V4, canvas 3rd); R5 → R6 (sheet) → R7 (combat); C1 (after P core) → C2 → C3, C4; P2 ∥ P3 → P4; D2 (after C1), D4 (sheet, after C2) | Locks below |
 | Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | BL-06, BL-02, BL-11 done; open BL-01, 03–05, 07, 08, 10, 12–14 | Per §3a |
 
