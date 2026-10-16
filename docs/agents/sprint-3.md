@@ -52,3 +52,103 @@ DM decisions #201 (fog v2 + dynamic vision), #202 (walls), #203 (sprint 3 scope)
 - Rules: where triggers run; formula language; which class-feature presets ship.
 - Party board: handout reveal model vs entity visibility; inventory transfer; gold ledger vs party-loot.
 - Compendium: source (bundled SRD JSON vs Open5e download; licence per ADR-0018), what's in (monsters, spells, items, class features), homebrew editor scope.
+
+## Playtest: sprint 3 features
+
+Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira, and Brakka in part 3) + **Player 2** (another browser: Thorn). Regression run: [session-sim-7 report](../../.verify/20261017-005557-session-sim-7/report.md) (local, gitignored): 14 / 15 PASS, leak scan clean (WS + REST, both players) with vision, darkness, Invisible, triggers, handouts and compendium in play; hard kill mid-combat kept a pending Divine Fury card byte-identical. The one FAIL is the first known gap below.
+
+### Setup
+
+```powershell
+bun install
+bun run build
+bun run fixtures:reset-load vision --profile verify
+bun run start --profile verify
+```
+
+Open the printed DM URL (paste the secret) and each player link in its own browser. To switch bundles: `Ctrl+C`, `bun run fixtures:reset-load <bundle> --profile verify`, `bun run start --profile verify`; player links change on every load. 3D dice: judge the frame rate on the table laptop.
+
+### Part 1: vision, darkness, walls, Invisible (`vision`)
+
+Goblin Ambush: Mira has 30 ft vision, Thorn darkvision 60 ft and sees through magical darkness; a darkness area sits in the south room.
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | View Goblin Ambush, **Show to players** | You: translucent fog, a lighter Explored corridor, hatched darkness. Player 1 sees only Mira's sight area (cut by walls); Player 2 sees Thorn's darkvision ring dimmed and grey |
+| 2 | **Fog** tool → Fog + Polygon, hold **Ctrl** while clicking corners | Corners go off-grid ("Free", "≈ 11 ft"); players see the new shape at once |
+| 3 | **Structure** → Wall with **Ctrl** held: a three-point wall | An off-grid wall; Player 1 dragging Mira across it sees it turn red and the drop is refused; your own drag shows "through wall" and is allowed |
+| 4 | Open a door; Player 1 walks Mira to it and back | A goblin beyond appears while in sight and disappears after; the cells she saw stay dim (Explored) for her only |
+| 5 | Drag Thorn into the darkness | Player 2: darker see-through tint, sees inside. Then Thorn's sheet → **Sees through magical darkness** off: Player 2's screen goes dark (grid + Thorn only, "Magical darkness — you can't see" under the top bar); on again restores it |
+| 6 | Goblin 2's token menu → **Invisible**; Thorn's sheet → **Sees invisible** on (DM only) | You see Goblin 2 faded with an "Invisible" badge; Player 2 sees it; Player 1 never does |
+| 7 | Fog bar → **View as** Player 1, then Player 2 | Their exact view overlaid on yours |
+| 8 | Clear Mira's vision on her sheet | The fog bar warns "No vision set for: Mira"; restore it |
+| 9 | Stop the server and start it again | Shapes, darkness, memory, Invisible and every player's view unchanged |
+
+### Part 2: dice tray, 3D dice, looks, notation (`dice-extras`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Player 1 opens the dice tray, rolls 1d20 | 3D dice for everyone in Player 1's stored look (crimson metal); with reduced motion: flat chips in the same colours |
+| 2 | Player 2: tray settings → **Dice look** → Emerald, glass, Save; roll | Everyone sees emerald glass; kept after a reload |
+| 3 | Player 1: Mira's sheet → Features → "Notation test", click "1d12 + 5" | The tray opens composed (d12 + 5, label "Notation test"); Shift / Ctrl+click on "1d20+3" preselects advantage / disadvantage |
+| 4 | You: a hidden roll | Your throw only; players see nothing |
+| 5 | A roll with bonus dice in the tray's labelled groups; advantage preview | Each group shows on the roll line; the preview shows both d20s |
+
+### Part 3: rule triggers in combat (`rule-triggers`)
+
+Brakka (Player 1) is a Zealot-style barbarian: Rage (3 uses) and **Divine Fury** as trigger data (first hit each turn while raging: 1d6 + half barbarian level radiant). Thorn has Sneak Attack. The Wolf has Regeneration, the Elite Martial Advantage (both DM-only).
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Player 1: Brakka's sheet → Active effects | Triggers "Divine Fury … = 1d6+2"; Rage 3 / 3 |
+| 2 | Start the fight, Next to Brakka; Player 1: Rage on, Greataxe **Attack + damage** | Rage 2 / 3; card "… (+ 6 radiant Divine Fury on a hit)"; the roll line says the same |
+| 3 | Popup on a goblin: chip "+ N radiant Divine Fury" ticked → Apply | Damage includes the radiant part; Undo puts it back |
+| 4 | Player 1 attacks again the same turn | No Divine Fury offer (once per turn); next round it's back |
+| 5 | Elite attacks a raging Brakka; tick Martial Advantage, set 9 | Halved with the weapon damage (+ 4); players read "+ 4 (DM)", never the name |
+| 6 | Player 2: Thorn attacks with Shift (advantage) | Sneak Attack offered and applied once per turn |
+| 7 | Next to the Wolf | Only you get "Wolf: Regeneration — regain 10 HP …" |
+
+### Part 4: party board (`party-board`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Open **Party** | Handouts (newest first, with who they're shared with) and the party inventory |
+| 2 | New handout with an image → Share with Player 1, then everyone | Toast + "New" for each player as they gain it; Player 2 never sees it before |
+| 3 | Unshare while both players have it open | "No longer shared" for both |
+| 4 | Inventory: Add "Healer's kit"; Player 1 **Take** a potion to Mira; **Give…** bolts from Mira to the party | Rows update for everyone; Mira's sheet Inventory changes; log rows "Party → Mira: …" |
+| 5 | Party loot → **Split…** Mira + Thorn | Preview "Each gets 2 pp, 15 gp; 1 pp stays in the pot"; wallets updated |
+
+### Part 5: compendium (`compendium`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Launcher → **Compendium** → **Update** → confirm | "Players will pause for ~2 s"; ~1,150 entries |
+| 2 | Search "goblin", open Goblin; click "1d6 + 2" | Stat block with attribution; the click stages a "Scimitar" damage roll |
+| 3 | Goblin → **Derive…** "Goblin Sneak", HP 12, copy text on | A custom monster with Nimble Escape on its NPC sheet; add it to "Ambush at the Ford" |
+| 4 | Clone Potion of Healing → "Potion of Greater Healing (house)", Shared on | Player 1 finds it; a DM-only homebrew stays invisible to players |
+| 5 | Player 2: Features → Rogue "Sneak Attack" → **Add to sheet** (Thorn) | Thorn's Features row + Sneak Attack trigger |
+| 6 | Map: drag Hobgoblin from results; token menu → **Stat block** | Token placed; the window opens on its entry |
+
+### Part 6: a whole session (`session-sim-7`)
+
+Everything above in one world (session-sim + vision + triggers + dice looks + party board + compendium): run the [MVP playtest script](playtest-mvp.md) on it, weaving in parts 1–5.
+
+### Known gaps / later
+
+- **Add to sheet duplicates a trigger** the character already has (Thorn's fixture Sneak Attack + the compendium's): the card offers it twice and the popup ticks both (session-sim-7 h). Fix pending your call (recap).
+- Window placement on the battlemap: DM Initiative covers monsters on Goblin Ambush; Initiative opens over the Compendium at Start; the player sheet covers the east of the map at 1280×800; an empty Handout window comes back after a player reload.
+- After an SRD import the thin fixture Goblin ranks above the SRD Goblin in search and lookups; the "All" tab opens on many "Ability Score Improvement" rows.
+- Fit still cuts the top of Goblin Ambush with the Game log open (BL-01, tried and reverted this sprint); at 1280×720 the DM dock is clipped at both ends.
+- session-sim-7's Brakka has no senses, so "No vision set for: Brakka" shows from load (fixture gap).
+- Labels: "Invisi…" badge over a name, adjacent Goblin Sneak labels overlap, the 3D throw caption covers a token label; compendium / derived monsters have no token art (initials).
+- Narrow Initiative rows still show "+1" in some layouts; the tray offers "Divine Fury +1d6" after it was used this turn (the roll correctly adds nothing); the first 3D throw of a session renders flat while the 3D chunk loads.
+- Still from sprint 2: players read "9 — hit!" after a DM ruling (BL-10, needs your call on the copy); "Clear templates" has no confirm and removes players' kept templates (BL-05); Konva layer warning (BL-07).
+- Later by design: a Divine Fury class import from 5etools (compendium-expansion); homebrew form can't edit spell classes / material / item cost and weight; Alt hint missing on non-sheet roll buttons (BL-15); `useRecords` array stability (BL-16).
+
+### Teardown
+
+`Ctrl+C` the server, then:
+
+```powershell
+bun run fixtures:reset --profile verify
+```

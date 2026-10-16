@@ -8,11 +8,9 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Sprint gate bundle session-sim-7 | `fix/session-sim-7` (slot 3) | fix-session-sim-7 | Adding C4's units | Merge → session-sim-7 walkthrough on `main` (brief `%TEMP%\pocket-planeriefs	pl-test-session-7.md`) |
-| Playtest section | `main` (sprint-3.md, uncommitted draft) | — | Drafted | Fill "Known gaps" from session-sim-7, commit |
-| Merged in sprint 3 | — | — | All slices: V0–V5, D1–D4, R0–R7, P core + P2–P4, C1–C4, lazy-records, empty-event fix (#212–#239); backlog BL-02, 03, 04, 06, 08, 11, 12, 13, 14 | — |
-| Then | — | — | Recap with the DM (pause) | — |
-| Backlog (BL-nn) | — | — | Open: BL-01 (tried, reverted), 05, 07, 10, 15, 16; no picks until after the recap | — |
+| Sprint 3 recap with the DM | — | — | **Paused** after session-sim-7 (#240) | DM's call on the Add-to-sheet duplicate trigger fix, glitch list priorities |
+| Merged in sprint 3 | — | — | All slices + session-sim-7 bundle (#212–#240); backlog BL-02, 03, 04, 06, 08, 11, 12, 13, 14 | — |
+| Backlog (BL-nn) | — | — | Open: BL-01, 05, 07, 10, 15, 16 | After the recap |
 
 ## Shared-file locks
 
