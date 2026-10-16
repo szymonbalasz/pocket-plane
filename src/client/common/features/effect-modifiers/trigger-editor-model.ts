@@ -1,7 +1,8 @@
 // biome-ignore-all lint/suspicious/noThenProperty: `then` is the rule's effect field (MOD §8.4); rules are data, never awaited.
 // Trigger editor drafts (FR-MOD-50, MOD §7 "Trigger editor"): flat, form-friendly fields for one
-// rule; `ruleOfDraft` builds the §8.4 rule and the strict zod `TriggerRule` decides validity (the
-// server validates again, with the owner's refs). Pure; both clients.
+// rule; `ruleOfDraft` builds the §8.4 rule and the strict zod `PlayerTriggerRule` decides validity
+// (the server validates again, with the owner's refs; a kept `{name}` ref of a player's copy
+// resolves to the stored preset there, FR-MOD-47 #228). Pure; both clients.
 import type { RollKind, RollVia } from "@shared/effect-modifiers/schemas";
 import type { PutTriggerInput } from "@shared/effect-modifiers/trigger-intents";
 import {
@@ -13,13 +14,12 @@ import { TRIGGER_NAME_MAX } from "@shared/effect-modifiers/trigger-records";
 import {
   EVENT_EFFECTS,
   EVENT_FILTERS,
-  type PlayerTriggerRule,
+  PlayerTriggerRule,
   TO_HIT_MODES,
   TRIGGER_FILTERS_MAX,
   type TriggerEffect,
   type TriggerEvent,
   type TriggerFilterKind,
-  TriggerRule,
 } from "@shared/effect-modifiers/triggers";
 import type { Ability, DAMAGE_TYPES } from "@shared/entities/schemas";
 
@@ -252,7 +252,10 @@ function filterOf(f: FilterDraft): unknown {
         ...(f.soft ? { soft: true } : {}),
       };
     case "targetMarked":
-      return { if: "targetMarked", preset: f.preset };
+      // A player's kept `{name}` (FR-MOD-47): the server keeps the stored preset.
+      return f.presetName !== null
+        ? { if: "targetMarked", name: f.presetName }
+        : { if: "targetMarked", preset: f.preset };
     case "ask":
       return { if: "ask", note: f.note.trim() };
     default:
@@ -275,17 +278,11 @@ function effectOf(d: TriggerDraft): unknown {
 }
 
 export type RuleOfDraft =
-  | { ok: true; rule: TriggerRule }
+  | { ok: true; rule: PlayerTriggerRule }
   | { ok: false; message: string; path: (string | number)[] };
-
-/** FR-MOD-47: a player can't save a ref only the DM's copy names. */
-export const REDACTED_MESSAGE = "Only the DM can keep a campaign preset: pick another";
 
 /** The draft's rule, or the first problem (zod's message and path). */
 export function ruleOfDraft(d: TriggerDraft): RuleOfDraft {
-  if (d.requiresName !== null) return { ok: false, message: REDACTED_MESSAGE, path: ["requires"] };
-  const marked = d.when.findIndex((f) => f.kind === "targetMarked" && f.presetName !== null);
-  if (marked >= 0) return { ok: false, message: REDACTED_MESSAGE, path: ["when", marked] };
   if (d.when.length > TRIGGER_FILTERS_MAX) {
     return { ok: false, message: `At most ${TRIGGER_FILTERS_MAX} filters`, path: ["when"] };
   }
@@ -294,12 +291,16 @@ export function ruleOfDraft(d: TriggerDraft): RuleOfDraft {
   }
   const raw = {
     on: d.on,
-    ...(d.requires !== NO_REQUIRES ? { requires: { preset: d.requires } } : {}),
+    ...(d.requiresName !== null
+      ? { requires: { name: d.requiresName } }
+      : d.requires !== NO_REQUIRES
+        ? { requires: { preset: d.requires } }
+        : {}),
     when: d.when.map(filterOf),
     every: d.every === "feature" ? { feature: d.feature } : d.every,
     then: effectOf(d),
   };
-  const r = TriggerRule.safeParse(raw);
+  const r = PlayerTriggerRule.safeParse(raw);
   if (r.success) return { ok: true, rule: r.data };
   const first = r.error.issues[0];
   return {
@@ -319,7 +320,7 @@ export type TriggerOwnerRef = { characterId: string } | { definitionId: string }
 /** FR-MOD-45: the `mod.putTrigger` payload (no `id` → create; with `id` → replace). */
 export function putTriggerPayload(
   d: TriggerDraft,
-  rule: TriggerRule,
+  rule: PlayerTriggerRule,
   owner: TriggerOwnerRef,
   id?: string,
 ): PutTriggerInput {

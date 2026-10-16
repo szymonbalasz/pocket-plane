@@ -23,7 +23,6 @@ import {
   draftOfRule,
   everyOptions,
   putTriggerPayload,
-  REDACTED_MESSAGE,
   ruleOfDraft,
   withEvent,
 } from "./trigger-editor-model";
@@ -401,14 +400,18 @@ describe("FR-MOD-50 trigger editor", () => {
     expect(ruleOfDraft({ ...blankTrigger("character"), on: "roll", when: [] }).ok).toBe(false);
   });
 
-  test("FR-MOD-47 a player's redacted ref is shown but can't be saved back", () => {
+  test("FR-MOD-47 #228 a player's redacted ref is shown and saved back as {name} (the server keeps the stored preset)", () => {
     const copy = { ...divineFury.rule, requires: { name: "Frost Ward" } };
     const d = draftOfRule(divineFury, copy as never);
     expect(d.requiresName).toBe("Frost Ward");
-    expect(ruleOfDraft(d)).toEqual({ ok: false, message: REDACTED_MESSAGE, path: ["requires"] });
-    expect(ruleOfDraft({ ...d, requires: "rage", requiresName: null }).ok).toBe(true);
+    expect(ruleOfDraft(d)).toEqual({ ok: true, rule: copy });
+    expect(ruleOfDraft({ ...d, requires: "rage", requiresName: null })).toMatchObject({
+      ok: true,
+      rule: { requires: { preset: "rage" } },
+    });
     const html = renderForm({ role: "player" }, { owner, draft: d, title: "x" });
-    expect(html).toContain('data-testid="mod-trig-editor-invalid"');
-    expect(tags(html, "mod-trig-editor-save")[0]).toContain('disabled=""');
+    expect(html).toContain("while Frost Ward is on");
+    expect(html).not.toContain('data-testid="mod-trig-editor-invalid"');
+    expect(tags(html, "mod-trig-editor-save")[0]).not.toContain('disabled=""');
   });
 });

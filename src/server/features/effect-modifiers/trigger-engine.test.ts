@@ -672,7 +672,7 @@ describe("FR-MOD-43 roll triggers", () => {
     const labels = (kind: "damage" | "attack") => {
       const r = t.run<{ entryId: string }>("char.roll", { characterId: t.brakkaId, kind }, t.p1);
       const e = t.s.db.select().from(gameLogEntry).where(eq(gameLogEntry.id, r.entryId)).get();
-      return (e?.payload as RollEntryPayload).map((i) => i.mods?.map((m) => m.label) ?? []);
+      return ((e?.payload ?? []) as RollEntryPayload).map((i) => i.mods?.map((m) => m.label) ?? []);
     };
     expect(labels("damage")).toEqual([["Savage"]]);
     // Attack + damage: the to-hit has no damage part; the damage row matches by name.
