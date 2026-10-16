@@ -59,7 +59,7 @@ function TriggerRow({
   onEdit(): void;
 }) {
   const store = useSync((s) => s.store);
-  const { send, disabled } = useModIntent();
+  const { send, disabled, live } = useModIntent();
   const cx = wordsContext(store, facts.features);
   const value = triggerValueNow(t.rule, facts.values);
   const warnings = triggerWarnings(t.rule, facts.features, cx);
@@ -139,6 +139,7 @@ function TriggerRow({
             data-testid="mod-trigger-edit"
             data-record-id={t.id}
             aria-label={`Edit ${t.name}`}
+            disabled={!live}
             onClick={onEdit}
           >
             <PencilIcon className="size-3.5" />
@@ -164,6 +165,7 @@ function TriggerRow({
 /** The owner's triggers with their states and controls (no frame: callers wrap it). */
 export function TriggersBlock({ owner }: { owner: TriggerOwnerRef }) {
   const store = useSync((s) => s.store);
+  const { live } = useModIntent();
   const { rows, state, retry } = useLazyRecords<PlayerRuleTriggerRecord>(RULE_TRIGGER_TYPE);
   const [editor, setEditor] = useState<TriggerEditorStart | null>(null);
   const facts = triggerOwnerFacts(store, owner);
@@ -228,7 +230,7 @@ export function TriggersBlock({ owner }: { owner: TriggerOwnerRef }) {
                 variant="outline"
                 className="h-7"
                 data-testid="mod-trigger-new"
-                disabled={full}
+                disabled={full || !live}
                 onClick={() => open(blankTrigger(owner.kind), "New trigger")}
               >
                 <PlusIcon /> New
@@ -240,7 +242,7 @@ export function TriggersBlock({ owner }: { owner: TriggerOwnerRef }) {
                     variant="outline"
                     className="h-7"
                     data-testid="mod-trigger-from-menu"
-                    disabled={full}
+                    disabled={full || !live}
                   >
                     Start from <ChevronRightIcon />
                   </Button>

@@ -100,6 +100,7 @@ function syncState(o: {
   lazy?: Lazy;
   locked?: boolean;
   triggers?: readonly object[];
+  offline?: boolean;
 }) {
   const lazy: LazyState = { ...lazyAfterSnapshot(1) };
   if (o.lazy === "ready" || o.lazy === undefined)
@@ -142,7 +143,7 @@ function syncState(o: {
   return createStore<SyncState>()(
     () =>
       ({
-        state: "live",
+        state: o.offline ? "reconnecting" : "live",
         store: { ...emptyStore(), you, records },
         lazy,
         notLiveSince: null,
@@ -234,6 +235,22 @@ describe("FR-MOD-49 Triggers block", () => {
     expect(
       ownerTriggers(rows, { kind: "definition", id: "srd-elite" }, "dm").map((t) => t.id),
     ).toEqual(["t-elite"]);
+  });
+
+  test("FR-MOD-49 disconnected: last rows stay; New, Start from, Edit, Delete and the Switch disabled", () => {
+    const html = render({ role: "player", offline: true });
+    expect(html).toContain('data-testid="mod-trigger" data-record-id="t-df"');
+    for (const id of [
+      "mod-trigger-new",
+      "mod-trigger-from-menu",
+      "mod-trigger-edit",
+      "mod-trigger-delete",
+      "mod-trigger-enabled",
+    ]) {
+      const found = tags(html, id);
+      expect(found.length).toBeGreaterThan(0);
+      expect(found.every((t) => t.includes('disabled=""'))).toBe(true);
+    }
   });
 
   test("FR-MOD-49 empty: 'No triggers yet — New or Start from a preset'", () => {
