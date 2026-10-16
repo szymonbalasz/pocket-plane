@@ -76,7 +76,7 @@ export const TRIGGER_PRESETS: readonly TriggerPreset[] = [
       every: "turn",
       then: { do: "damage", formula: "1d8", type: null },
     },
-    featureKeys: ["srd-5.1:feature/ranger/colossus-slayer"],
+    featureKeys: ["srd-5.1:feature/ranger/hunters-prey"],
   },
   {
     key: "martial-advantage",
