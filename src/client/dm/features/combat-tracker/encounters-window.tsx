@@ -11,7 +11,6 @@ import {
   type EncounterEntryRecord,
   EncounterName,
   type EncounterRecord,
-  type HpMode,
   QUANTITY_MAX,
 } from "@shared/combat-tracker/schemas";
 import { entityNameKey } from "@shared/entities/schemas";
@@ -45,6 +44,7 @@ import { toast } from "sonner";
 import { creatureRows } from "../entities/list";
 import { useDmMap, viewedScene } from "../scenes-map/view-state";
 import { useDefinitions } from "./data";
+import { adoptServerDraft, type Draft, draftOf } from "./encounter-draft";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpSelect, JoinPreviewRow } from "./join-parts";
 import { defaultJoiningIds, type JoinSlot, notOnMap, previewJoin, startBody } from "./join-preview";
@@ -55,15 +55,6 @@ import { combatRest } from "./rest";
 
 /** The DM REST client, imported lazily (the session reads localStorage at import). */
 const api = lazyApi(() => import("../campaign-management/session").then((m) => m.api));
-
-interface Draft {
-  name: string;
-  partyCharacterIds: string[] | null;
-  entries: { definitionId: string; quantity: number; hpMode: HpMode }[];
-  /** FR-CBT-62: applied at Start. */
-  createTokens: boolean;
-  addHidden: boolean;
-}
 
 const STATUS_ORDER = { started: 0, planned: 1, ended: 2 } as const;
 
@@ -89,19 +80,6 @@ function useDraftIds(): ReadonlySet<string> {
     () => new Set(sheets.filter((s) => s.status === "draft").map((s) => s.entityId)),
     [sheets],
   );
-}
-
-function draftOf(e: EncounterRecord, entries: EncounterEntryRecord[]): Draft {
-  return {
-    name: e.name,
-    partyCharacterIds: e.partyCharacterIds,
-    entries: entries
-      .filter((x) => x.encounterId === e.id)
-      .sort((a, b) => a.seq - b.seq)
-      .map((x) => ({ definitionId: x.definitionId, quantity: x.quantity, hpMode: x.hpMode })),
-    createTokens: e.createTokens,
-    addHidden: e.addHidden,
-  };
 }
 
 // ---------- difficulty card (FR-CBT-03) ----------
@@ -346,7 +324,13 @@ function StartDialog({
 // ---------- editor ----------
 
 function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void }) {
-  const allEntries = useRecords<EncounterEntryRecord>(ENCOUNTER_ENTRY_TYPE);
+  // One array per store version (`useRecords` builds a fresh one per render), so `server` only
+  // changes when the encounter or its entries do.
+  const entriesById = useSync((s) => s.store.records[ENCOUNTER_ENTRY_TYPE]);
+  const allEntries = useMemo(
+    () => Object.values(entriesById ?? {}) as EncounterEntryRecord[],
+    [entriesById],
+  );
   const characters = useCharacters();
   const drafts = useDraftIds();
   const live = useSync((s) => s.state === "live");
@@ -365,7 +349,8 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
 
   // Adopt server state when we have no local edits pending.
   useEffect(() => {
-    if (!dirty.current) setDraft(server);
+    // Same content → same state object: no re-render, no render loop (F1).
+    if (!dirty.current) setDraft((d) => adoptServerDraft(d, server));
   }, [server]);
 
   // Debounced whole-replace save of local edits (planned only).
