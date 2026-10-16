@@ -19,12 +19,12 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Shared-file locks
 
-- `build/fog-shapes` (V1): canvas lock 1st, fog events.
-- `build/party-core`: `src/server/db/` (schema 3rd), party events, record-type registry lines.
-- `build/rule-triggers` (R4): MOD registry lines, combat `attack.ts` / `damage.ts` caller lines, notification kinds line.
+- `build/vision-server` (V2): scenes-map registry lines, entities definition hook line, player-hooks line, combat `join.ts` (Start / Add dependants), bundles index.
+- `build/walls-freeform` (V4): canvas lock 2nd (then V3).
+- `fix/mod-roll-preview` (R2): dice-roll-log client folder, dice-extras tray-extras line, DM popup files (not with R7), roll-intent `manualParts` pass-through.
 - `build/mod-tier3` (R3): character-sheet folder (sheet lock 2nd; `resources.ts`).
-- `fix/empty-event-frames`: `src/shared/protocol/`, client sync store.
-- Order after: schema P core → C1 → D2; canvas V1 → V4 → V3; sheet R3 → R6 → C2 → D4 → P4 / C4; combat R7 → C2; dice-roll-log client R2 (after R1).
+- Next: schema P core → C1 → D2; canvas V4 → V3; sheet R3 → R6 → C2 → D4 → P4 / C4; combat R7 → C2.
+- Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
 
 ## Pending DM decisions
 
