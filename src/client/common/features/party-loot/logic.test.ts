@@ -1,4 +1,5 @@
-// LOOT §13 client unit: order, wallets, form drafts, Move options per role, locks, outcomes.
+// LOOT §13 + PARTY §13 client unit: order, wallets, form drafts, Move options per role, locks,
+// outcomes, item rows (FR-PARTY-25), the Split… dialog (FR-PARTY-27).
 import { describe, expect, test } from "bun:test";
 import type { LootEntryRecord, WalletRecord } from "@shared/party-loot/schemas";
 import { IntentRejected } from "../../sync/connection";
@@ -12,11 +13,16 @@ import {
   endpointLabel,
   fromOptions,
   intentFailure,
+  itemLine,
   LOST_ADD,
+  LOST_SPLIT,
   lootPayload,
   movePayload,
   newestFirst,
   parseCoin,
+  splitCharacters,
+  splitPayload,
+  splitPrefill,
   submitEnabled,
   toOptions,
   walletRows,
@@ -210,5 +216,93 @@ describe("FR-LOOT-18 Move form options", () => {
     expect(movePayload(chars, dm, "party", "char:m", "", EMPTY_DRAFT).ok).toBe(false);
     expect(movePayload(chars, dm, "party", "char:m", "", gp("-1")).ok).toBe(false);
     expect(movePayload(chars, dm, "party", "char:m", "x".repeat(101), gp("1")).ok).toBe(false);
+  });
+});
+
+describe("item rows (FR-PARTY-25)", () => {
+  test("FR-PARTY-25 item row text: ‹from› → ‹to›: ‹name› ×‹qty›", () => {
+    const names = new Map(chars.map((c) => [c.id, c.name]));
+    const nameOf = (id: string) => names.get(id);
+    const item = (from: LootEntryRecord["from"], to: LootEntryRecord["to"]) => ({
+      ...entry({ kind: "item", text: "Healer's kit", from, to }),
+      qty: 1,
+    });
+    expect(itemLine(item({ kind: "world" }, { kind: "party" }), nameOf)).toBe(
+      "Outside the party → Party: Healer's kit ×1",
+    );
+    expect(itemLine(item({ kind: "party" }, { kind: "character", characterId: "m" }), nameOf)).toBe(
+      "Party → Mira: Healer's kit ×1",
+    );
+    expect(
+      itemLine(item({ kind: "character", characterId: "gone" }, { kind: "party" }), nameOf),
+    ).toBe("Unknown character → Party: Healer's kit ×1");
+  });
+});
+
+describe("Split… dialog (FR-PARTY-27)", () => {
+  const coins = (c: Partial<Record<"cp" | "sp" | "ep" | "gp" | "pp", number>>) => ({
+    cp: 0,
+    sp: 0,
+    ep: 0,
+    gp: 0,
+    pp: 0,
+    ...c,
+  });
+
+  test("FR-PARTY-27 coins prefilled with the pot's positive coins", () => {
+    expect(splitPrefill(coins({ pp: 5, gp: 30, sp: -4, cp: 0 }))).toEqual({
+      ...EMPTY_DRAFT,
+      pp: "5",
+      gp: "30",
+    });
+    expect(splitPrefill(coins({}))).toEqual(EMPTY_DRAFT);
+  });
+
+  test("FR-PARTY-27 a checkbox per character by name; approved (not draft, no sheet = ready) ticked", () => {
+    const status: Record<string, "draft" | "ready"> = { a: "draft", t: "ready" };
+    expect(
+      splitCharacters(chars, (id) => status[id]).map((x) => [x.character.id, x.ticked]),
+    ).toEqual([
+      ["a", false],
+      ["m", true],
+      ["t", true],
+    ]);
+  });
+
+  test("FR-PARTY-27 preview 'Each gets …; … stays in the pot'; invalid → message, Split disabled", () => {
+    const order = ["a", "m", "t"];
+    const ok = splitPayload(order, new Set(["t", "m"]), { ...EMPTY_DRAFT, pp: "5", gp: "30" });
+    expect(ok).toEqual({
+      ok: true,
+      value: { characterIds: ["m", "t"], ...coins({ pp: 5, gp: 30 }) },
+      preview: "Each gets 2 pp, 15 gp; 1 pp stays in the pot",
+    });
+    expect(splitPayload(order, new Set(["m"]), { ...EMPTY_DRAFT, gp: "30" })).toMatchObject({
+      ok: true,
+      preview: "Each gets 30 gp",
+    });
+    const bad = (ticked: string[], draft: Partial<typeof EMPTY_DRAFT>) =>
+      splitPayload(order, new Set(ticked), { ...EMPTY_DRAFT, ...draft });
+    expect(bad(["m", "t"], { gp: "1" })).toEqual({ ok: false, message: "Nothing to split" });
+    expect(bad(["m"], {})).toEqual({ ok: false, message: "Nothing to split" });
+    expect(bad([], { gp: "30" })).toEqual({ ok: false, message: "Choose at least one character" });
+    expect(bad(["m"], { gp: "-3" }).ok).toBe(false);
+    expect(bad(["m"], { gp: "1.5" }).ok).toBe(false);
+    expect(bad(["m"], { gp: "1000000" }).ok).toBe(false);
+    for (const p of [ok, bad(["m", "t"], { gp: "1" })]) {
+      expect(submitEnabled({ valid: p.ok, live: true, busy: false })).toBe(p.ok);
+    }
+    expect(submitEnabled({ valid: ok.ok, live: false, busy: false })).toBe(false);
+    expect(submitEnabled({ valid: ok.ok, live: true, busy: true })).toBe(false);
+  });
+
+  test("FR-PARTY-27 lost split → toast; reject → inline", () => {
+    expect(intentFailure(new IntentRejected("disconnected", "x"), LOST_SPLIT)).toEqual({
+      kind: "toast",
+      message: "Connection lost — check the loot log before splitting again",
+    });
+    expect(
+      intentFailure(new IntentRejected("not_found", "Character not found"), LOST_SPLIT),
+    ).toEqual({ kind: "inline", message: "Character not found" });
   });
 });
