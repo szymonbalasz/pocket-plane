@@ -13,5 +13,5 @@ export const canvasTools: readonly CanvasToolDef[] = orderTools([
   structureToolDef, // scene-tools: Structure (DM; Wall · Door · Erase, Undo; FR-SCN-08, -15)
   propsTool, // scene-tools Props (DM, FR-SCN-16–18)
   aoeTool, // scene-tools: AoE templates (FR-SCN-22), both clients
-  fogTool, // fog-of-war: Fog (DM; rectangle / polygon, reveal / hide, all, Undo; FR-FOG-17)
+  fogTool, // fog-of-war: Fog (DM; shapes × Reveal / Fog / Explored / Darkness, all, Undo; FR-FOG-17)
 ]);

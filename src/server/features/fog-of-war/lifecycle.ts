@@ -12,7 +12,8 @@ import { sceneFog } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import type { PlayerHook } from "../campaign-management/player-hooks";
 import type { SceneHook } from "../scenes-map/scene-hooks";
-import { markScenesStale, rederiveScene } from "./rederive";
+import { loadSceneStatic } from "./derive";
+import { markScenesStale, rederiveDarkness, rederiveScene } from "./rederive";
 import { readFogRecord, sceneExploredRecords } from "./rows";
 
 const boxColumns = ([col0, row0, cols, rows]: FogBox) => ({ col0, row0, cols, rows });
@@ -37,7 +38,10 @@ export const fogSceneHook: SceneHook = {
       .run();
     return [{ type: FOG_TYPE, id: scene.id, before: null, after: readFogRecord(tx, scene.id) }];
   },
-  /** FR-FOG-02: shapes, darkness, setting; not the undo stack, memory or `visionStale`. */
+  /**
+   * FR-FOG-02: shapes, darkness, setting; not the undo stack, memory or `visionStale`. Darkness
+   * `seenBy` is re-derived for the copy (it has no memory, FR-FOG-44).
+   */
   duplicated({ tx, ctx }, source, copy): RecordChange[] {
     const src = tx.select().from(sceneFog).where(eq(sceneFog.sceneId, source.id)).get();
     if (!src) return [];
@@ -51,6 +55,8 @@ export const fogSceneHook: SceneHook = {
         updatedAt: ctx.clock.iso(),
       })
       .run();
+    const st = loadSceneStatic(tx, copy.id);
+    if (st) rederiveDarkness({ tx }, st);
     return [{ type: FOG_TYPE, id: copy.id, before: null, after: readFogRecord(tx, copy.id) }];
   },
   /** FR-FOG-23: the `fog` delete and every `fog-explored` row (the FK cascade removes them). */

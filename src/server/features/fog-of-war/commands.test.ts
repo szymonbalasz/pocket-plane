@@ -2,13 +2,14 @@
 // tokens + hook rows + one log entry → one event); no-ops write nothing; undo is strict LIFO with
 // a depth cap and an `expectedEditId` guard; players are refused; a crash is all or nothing.
 import { afterEach, describe, expect, test } from "bun:test";
-import { encodeRuns } from "@shared/fog-of-war/mask";
+import { maskOf } from "@shared/fog-of-war/mask";
 import {
   FOG_INTENTS as F,
   FOG_UNDO_MAX,
   type FogRecord,
   type FogShape,
 } from "@shared/fog-of-war/schemas";
+import { staticState } from "@shared/fog-of-war/shapes";
 import { MAP_INTENTS as I, type SceneRecord, type TokenRecord } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
 import { seededContext } from "../../commands/context";
@@ -20,11 +21,11 @@ import { readEventLog } from "../../events/log";
 import { createEntity } from "../entities/commands";
 import { captureLogger, goblinBlock } from "../entities/testing";
 import { MAP_REST as R } from "../scenes-map/commands";
-import { addAsset, scenesSetup } from "../scenes-map/testing";
+import { scenesSetup } from "../scenes-map/testing";
 import { tokenHooks } from "../scenes-map/token-hooks";
 import { visibilityHooks } from "../scenes-map/visibility-hooks";
 import { FOG_CHANGED, FOG_NOTHING_TO_UNDO, FOG_TOO_DETAILED, fogUndoStack } from "./commands";
-import { readFogRecord } from "./rows";
+import { dmFogRecord, readFogRecord } from "./rows";
 import { dropFogRow } from "./testing";
 
 afterEach(() => {
@@ -93,11 +94,20 @@ function setup() {
   };
 }
 
-/** Runs of a 20 × 14 box where exactly the listed cells are clear (fill fog). */
-function clearAt(cells: [number, number][]): string {
-  const m = new Uint8Array(20 * 14).fill(1);
-  for (const [c, r] of cells) m[r * 20 + c] = 0;
-  return encodeRuns(m, "fog");
+/** FR-FOG-01: the static state of a point from a `fog` record. */
+const stateOf = (rec: FogRecord | null, x: number, y: number) =>
+  rec ? staticState(maskOf(rec).mask, rec.shapes, x, y) : "clear";
+
+const sortCells = (cells: [number, number][]) =>
+  [...cells].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+
+/** Cells of the 20 × 14 box whose centre is statically clear, row-major. */
+function clearCells(rec: FogRecord | null): [number, number][] {
+  const out: [number, number][] = [];
+  for (let r = 0; r < 14; r++) {
+    for (let c = 0; c < 20; c++) if (stateOf(rec, c + 0.5, r + 0.5) === "clear") out.push([c, r]);
+  }
+  return out;
 }
 const block = (c0: number, r0: number, c1: number, r1: number) => {
   const out: [number, number][] = [];
@@ -170,28 +180,35 @@ describe("FR-FOG-06 fog.setAll", () => {
 });
 
 describe("FR-FOG-05 fog.edit", () => {
-  test("FR-FOG-05 reveal rect (normalised, inclusive): runs over the box, shape in the payload", () => {
+  test("FR-FOG-05 legacy rect (normalised, inclusive) appends rect [c0, r0, c1 + 1, r1 + 1]: same cells, base untouched, shape in the payload", () => {
     const t = setup();
     t.setAll(true);
-    const shape = t.rect(7, 11, 0, 3);
-    const editId = t.edit("reveal", shape) as string;
+    const editId = t.edit("reveal", t.rect(7, 11, 0, 3)) as string;
     expect(t.fog()).toMatchObject({
       fill: "fog",
       box: [0, 0, 20, 14],
-      runs: clearAt(block(0, 3, 7, 11)),
+      runs: "",
+      shapes: [{ op: "reveal", rect: [0, 3, 8, 12] }],
       undo: { n: 2, editId, kind: "reveal-rect" },
     });
+    expect(clearCells(t.fog())).toEqual(block(0, 3, 7, 11));
     expect(t.lastEvent()).toMatchObject({
       type: "FogEdited",
-      payload: { sceneId: t.ambush.id, editId, kind: "reveal-rect", shape },
+      payload: {
+        sceneId: t.ambush.id,
+        editId,
+        kind: "reveal-rect",
+        shape: { rect: [0, 3, 8, 12] },
+      },
     });
-    // Hide part of it again.
+    // Hide part of it again (`hide` = `fog`).
     t.edit("hide", t.rect(0, 3, 7, 3));
-    expect(t.fog()?.runs).toBe(clearAt(block(0, 4, 7, 11)));
+    expect(t.fog()?.shapes.at(-1)).toEqual({ op: "fog", rect: [0, 3, 8, 4] });
+    expect(clearCells(t.fog())).toEqual(block(0, 4, 7, 11));
     expect(t.stack().map((e) => e.kind)).toEqual(["fog-all", "reveal-rect", "hide-rect"]);
   });
 
-  test("FR-FOG-05 polygon: centre on the diagonal is inside; crossing / zero area → invalid", () => {
+  test("FR-FOG-05 legacy polygon: centre on the diagonal is inside; crossing / zero area → invalid", () => {
     const t = setup();
     t.setAll(true);
     const tri: FogShape = {
@@ -206,7 +223,8 @@ describe("FR-FOG-05 fog.edit", () => {
     // Row 9: centres x 8.5…12.5 inside (edge x + y = 22 → x ≤ 12.5); row 13: x 8.5 only.
     const cells: [number, number][] = [];
     for (let r = 9; r < 14; r++) for (let c = 8; c + 0.5 + r + 0.5 <= 22; c++) cells.push([c, r]);
-    expect(t.fog()?.runs).toBe(clearAt(cells));
+    expect(clearCells(t.fog())).toEqual(sortCells(cells));
+    expect(t.fog()?.shapes).toEqual([{ op: "reveal", polygon: [8, 9, 13, 9, 8, 14] }]);
     expect(t.stack().at(-1)?.kind).toBe("reveal-polygon");
     const n = t.events.length;
     const bow: FogShape = {
@@ -274,68 +292,104 @@ describe("FR-FOG-05 fog.edit", () => {
     ).toBe("invalid");
   });
 
-  test("FR-FOG-05 no cell changes (already clear, outside the box) → no event, no entry, editId null", () => {
+  test("FR-FOG-05 / -26 v2 shapes: reveal | fog | explored × rect | polygon | circle append in order (painter); kinds `<op>-shape`", () => {
     const t = setup();
-    const n = t.events.length;
-    // No row = every cell clear: a reveal changes nothing.
-    expect(t.edit("reveal", t.rect(0, 0, 5, 5))).toBeNull();
-    expect(t.fog()).toBeNull();
     t.setAll(true);
-    // Wholly outside the 20 × 14 box: ignored.
-    expect(t.edit("reveal", t.rect(30, 30, 40, 40))).toBeNull();
-    expect(
-      t.edit("reveal", {
-        kind: "polygon",
-        points: [
-          [-10, -10],
-          [-5, -10],
-          [-10, -5],
-        ],
-      }),
-    ).toBeNull();
-    expect(t.edit("hide", t.rect(0, 0, 3, 3))).toBeNull();
-    expect(t.events.length).toBe(n + 1);
-    expect(t.stack()).toHaveLength(1);
-    // Partly outside: only box cells change.
-    t.edit("reveal", t.rect(18, 12, 25, 25));
-    expect(t.fog()?.runs).toBe(clearAt(block(18, 12, 19, 13)));
+    const v2 = (op: string, shape: Record<string, unknown>) =>
+      t.run<{ editId: string }>(F.edit, { sceneId: t.ambush.id, op, shape }).editId;
+    v2("reveal", { rect: [6, 6, 0.5, 0.25] });
+    v2("explored", { polygon: [1, 1, 3.5, 1, 3.5, 3.5] });
+    v2("fog", { circle: [2, 2, 0.75] });
+    const fog = t.fog() as FogRecord;
+    expect(fog.shapes).toEqual([
+      { op: "reveal", rect: [0.5, 0.25, 6, 6] },
+      { op: "explored", polygon: [1, 1, 3.5, 1, 3.5, 3.5] },
+      { op: "fog", circle: [2, 2, 0.75] },
+    ]);
+    expect(t.stack().map((e) => e.kind)).toEqual([
+      "fog-all",
+      "reveal-shape",
+      "explored-shape",
+      "fog-shape",
+    ]);
+    expect(t.lastEvent()?.payload).toMatchObject({
+      kind: "fog-shape",
+      shape: { circle: [2, 2, 0.75] },
+    });
+    // FR-FOG-01: later shapes override; boundary-inclusive.
+    expect(stateOf(fog, 5.5, 5.5)).toBe("clear");
+    expect(stateOf(fog, 3.25, 1.5)).toBe("explored");
+    expect(stateOf(fog, 2, 2.75)).toBe("fog");
+    expect(stateOf(fog, 6, 6)).toBe("clear");
+    expect(stateOf(fog, 7.5, 7.5)).toBe("fog");
+    // Zod: > 2 decimals, a circle under 0.5 cells, a 2-vertex polygon, two shape keys.
+    for (const shape of [
+      { rect: [0, 0, 1.005, 1] },
+      { circle: [1, 1, 0.4] },
+      { polygon: [0, 0, 1, 1] },
+      { rect: [0, 0, 1, 1], circle: [1, 1, 1] },
+    ]) {
+      expect(t.err(() => v2("reveal", shape)).code).toBe("invalid");
+    }
+    // FR-FOG-26: zero area → invalid.
+    expect(t.err(() => v2("reveal", { rect: [1, 1, 1, 4] }))).toMatchObject({
+      code: "invalid",
+      message: "The shape has no area",
+    });
   });
 
-  test("FR-FOG-04 > 2,000 runs → conflict, nothing written; ≤ 2,000 fine", () => {
+  test("FR-FOG-05 every edit appends (sprint-2 no-op retired): an edit that flips nothing still writes a row, an entry and one event", () => {
     const t = setup();
-    addAsset(t.s, "map-huge", t.h.campaignId, { w: 7000, h: 7000 });
-    const huge = t.newScene("Huge", "map-huge");
-    // 1,998 runs of one cell each, then clear: 100 × 100 box, fill clear.
-    const cells = new Uint8Array(100 * 100);
-    for (let i = 0; i < 1998; i += 2) cells[i] = 1;
-    t.s.db
-      .insert(sceneFog)
-      .values({
-        sceneId: huge.id,
-        campaignId: t.h.campaignId,
-        fill: "clear",
-        col0: 0,
-        row0: 0,
-        cols: 100,
-        rows: 100,
-        runs: encodeRuns(cells, "clear"),
-        updatedAt: AT,
-      })
-      .run();
-    expect(t.fog(huge.id)?.runs.split(",")).toHaveLength(1998);
-    // An isolated fogged cell adds two runs: 2,000 is within the cap.
-    expect(t.edit("hide", t.rect(50, 50, 50, 50), huge.id)).not.toBeNull();
-    expect(t.fog(huge.id)?.runs.split(",")).toHaveLength(2000);
-    const before = t.fog(huge.id);
     const n = t.events.length;
-    const e = t.err(() => t.edit("hide", t.rect(60, 60, 60, 60), huge.id));
-    expect(e).toMatchObject({ code: "conflict", message: FOG_TOO_DETAILED });
-    expect(t.fog(huge.id)).toEqual(before);
-    expect(t.stack(huge.id)).toHaveLength(1);
-    expect(t.events.length).toBe(n);
+    // No row = every cell clear: a reveal changes no cell but appends.
+    expect(t.edit("reveal", t.rect(0, 0, 5, 5))).not.toBeNull();
+    expect(t.fog()).toMatchObject({
+      fill: "clear",
+      shapes: [{ op: "reveal", rect: [0, 0, 6, 6] }],
+    });
+    // Wholly outside the box.
+    expect(t.edit("reveal", t.rect(30, 30, 40, 40))).not.toBeNull();
+    expect(t.events.length).toBe(n + 2);
+    expect(t.lastEvent()?.changes.map((c) => c.type)).toEqual(["fog"]);
+    expect(t.stack()).toHaveLength(2);
   });
 
-  test("FR-FOG-04 corrupt runs on read → fully fogged + error log; the edit applies to that", () => {
+  test("FR-FOG-27 caps: ≤ 100 fog shapes, row ≤ 16 KiB → conflict, nothing written", () => {
+    const t = setup();
+    for (let i = 0; i < 100; i++) t.edit("reveal", t.rect(i % 20, 0, i % 20, 0));
+    const before = t.fog();
+    const n = t.events.length;
+    expect(t.err(() => t.edit("reveal", t.rect(0, 0, 0, 0)))).toMatchObject({
+      code: "conflict",
+      message: FOG_TOO_DETAILED,
+    });
+    expect(t.fog()).toEqual(before);
+    expect(t.events.length).toBe(n);
+    // 64-vertex freeform polygons: the row passes 16 KiB well under 100 shapes.
+    const other = t.newScene("Town", "map-town");
+    const poly = Array.from({ length: 64 }, (_, k) => {
+      const a = (2 * Math.PI * k) / 64;
+      return [
+        Math.round((500.01 + 400 * Math.cos(a)) * 100) / 100,
+        Math.round((500.01 + 400 * Math.sin(a)) * 100) / 100,
+      ];
+    }).flat();
+    const add = () => t.run(F.edit, { sceneId: other.id, op: "fog", shape: { polygon: poly } });
+    let refused: unknown = null;
+    for (let i = 0; i < 40 && refused === null; i++) {
+      try {
+        add();
+      } catch (e) {
+        refused = e;
+      }
+    }
+    expect(refused).toMatchObject({ code: "conflict", message: FOG_TOO_DETAILED });
+    const rec = t.fog(other.id) as NonNullable<ReturnType<typeof t.fog>>;
+    expect(rec.shapes.length).toBeLessThan(40);
+    expect(Buffer.byteLength(JSON.stringify(dmFogRecord(rec)))).toBeLessThanOrEqual(16 * 1024);
+  });
+
+  test("FR-FOG-04 corrupt runs on read → fully fogged + error log; the edit applies over that", () => {
     const t = setup();
     t.s.db
       .insert(sceneFog)
@@ -355,12 +409,13 @@ describe("FR-FOG-05 fog.edit", () => {
     expect(t.cap.errors).toEqual([
       `fog: scene ${t.ambush.id} has corrupt runs; treated as fully fogged`,
     ]);
-    expect(t.fog()).toMatchObject({ fill: "fog", runs: clearAt([[0, 0]]) });
+    expect(t.fog()).toMatchObject({ fill: "fog", runs: "" });
+    expect(clearCells(t.fog())).toEqual([[0, 0]]);
     // The undo entry holds the fail-closed mask, not the corrupt runs.
     expect(t.stack()[0]).toMatchObject({ prevFill: "fog", prevRuns: "", prevCols: 20 });
   });
 
-  test("FR-FOG-03 re-base: an edit after a grid change takes the new box; dropped cells fall back to fill", () => {
+  test("FR-FOG-03 box applies to the base only: an edit keeps the stored box; Fog all takes the new box; shapes stay in grid units", () => {
     const t = setup();
     t.setAll(true);
     t.edit("reveal", t.rect(0, 0, 19, 0)); // row 0 clear
@@ -373,16 +428,12 @@ describe("FR-FOG-05 fog.edit", () => {
       color: "#000000",
       opacity: 0.5,
     });
-    // Grid change alone: fog untouched (cells keep their index).
-    expect(t.fog()?.box).toEqual([0, 0, 20, 14]);
     t.edit("reveal", t.rect(5, 5, 5, 5));
+    expect(t.fog()?.box).toEqual([0, 0, 20, 14]);
+    expect(clearCells(t.fog())).toEqual(sortCells([...block(0, 0, 19, 0), [5, 5]]));
     // New box: col0 = floor(−35 / 70) = −1, cols = ceil((1400 − 35) / 70) + 1 = 21.
-    const rec = t.fog() as FogRecord;
-    expect(rec.box).toEqual([-1, 0, 21, 14]);
-    const m = new Uint8Array(21 * 14).fill(1);
-    for (let c = 0; c <= 19; c++) m[c + 1] = 0; // row 0, cols 0…19 kept clear; col −1 takes fill
-    m[5 * 21 + 6] = 0;
-    expect(rec.runs).toBe(encodeRuns(m, "fog"));
+    t.setAll(true);
+    expect(t.fog()).toMatchObject({ box: [-1, 0, 21, 14], runs: "", shapes: [] });
   });
 });
 
@@ -470,12 +521,12 @@ describe("FR-FOG-07 fog.undo", () => {
     expect(t.tok(goblin)?.fogged).toBe(false);
     const fogged = t.fog() as FogRecord;
     const c = t.edit("hide", t.rect(0, 0, 3, 3)) as string;
-    expect(c).toBeNull(); // already fogged → nothing to undo for it
+    const hidden = t.fog() as FogRecord;
     const d = t.edit("reveal", t.rect(0, 0, 0, 0)) as string;
     const n = t.events.length;
     const log = readEventLog(t.s.db).length;
     t.undo(d);
-    expect(t.fog()).toEqual(fogged);
+    expect(t.fog()).toEqual(hidden);
     expect(t.events.length).toBe(n + 1);
     expect(t.lastEvent()).toMatchObject({
       type: "FogUndone",
@@ -486,10 +537,17 @@ describe("FR-FOG-07 fog.undo", () => {
         .slice(log)
         .map((l) => l.type),
     ).toEqual(["FogUndone"]);
+    t.undo(c);
+    expect(t.fog()).toEqual(fogged);
     t.undo(b);
     expect(t.tok(goblin)?.fogged).toBe(true);
     expect(t.lastEvent()?.changes.map((x) => x.id)).toEqual([t.ambush.id, goblin]);
-    expect(t.fog()).toMatchObject({ fill: "fog", runs: "", undo: { n: 1, editId: a } });
+    expect(t.fog()).toMatchObject({
+      fill: "fog",
+      runs: "",
+      shapes: [],
+      undo: { n: 1, editId: a },
+    });
     // Undoing the first edit restores "no fog" (a clear row): every cell clear.
     t.undo(a);
     expect(t.fog()).toMatchObject({ fill: "clear", runs: "", undo: null });
