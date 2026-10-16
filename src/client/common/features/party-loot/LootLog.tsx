@@ -1,6 +1,8 @@
-// Window `loot.log` body, both clients (FR-LOOT-15–19): pot strip, wallets, DM add form, Move
-// form, log (newest first) with DM Edit on loot rows. Reads the synced store; every change is an
-// intent (`loot.add`, `loot.edit`, `loot.move`). DM-only parts render from `you.role`.
+// Window `loot.log` body, both clients (FR-LOOT-15–19, FR-PARTY-25/27): pot strip with the DM's
+// Split… dialog, wallets, DM add form, Move form, log (newest first) with DM Edit on loot rows and
+// item rows. Reads the synced store; every change is an intent (`loot.add`, `loot.edit`,
+// `loot.move`, `loot.split`). DM-only parts render from `you.role`.
+import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { formatCoin, formatGpValue, nonZeroCoins } from "@shared/party-loot/format";
 import {
@@ -19,7 +21,14 @@ import { PencilIcon } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
+import { Checkbox } from "../../components/ui/controls";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Select,
   SelectContent,
   SelectItem,
@@ -27,7 +36,7 @@ import {
   SelectValue,
   Tooltip,
 } from "../../components/ui/overlays";
-import { Badge, Input, Skeleton } from "../../components/ui/primitives";
+import { Badge, Input, Label, Skeleton } from "../../components/ui/primitives";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { cn } from "../../lib/utils";
 import { useHasType, useRecords, useSync } from "../../sync/store";
@@ -42,14 +51,19 @@ import {
   endpointLabel,
   fromOptions,
   intentFailure,
+  itemLine,
   LOST_ADD,
   LOST_EDIT,
   LOST_MOVE,
+  LOST_SPLIT,
   lootPayload,
   type MoveViewer,
   movePayload,
   NO_MOVE_TEXT,
   newestFirst,
+  splitCharacters,
+  splitPayload,
+  splitPrefill,
   submitEnabled,
   toOptions,
   walletRows,
@@ -332,6 +346,111 @@ function MoveForm({
   );
 }
 
+/** DM Split… dialog (FR-PARTY-27): coins prefilled from the pot, approved characters ticked. */
+function SplitDialog({
+  chars,
+  pot,
+  live,
+  open,
+  onOpenChange,
+}: {
+  chars: CharacterRef[];
+  pot: Coins;
+  live: boolean;
+  open: boolean;
+  onOpenChange(open: boolean): void;
+}) {
+  const sheets = useRecords<CreatureSheetRecord>(CREATURE_SHEET_TYPE);
+  const status = useMemo(() => new Map(sheets.map((x) => [x.entityId, x.status])), [sheets]);
+  const list = splitCharacters(chars, (id) => status.get(id));
+  const [draft, setDraft] = useState<CoinDraft>(EMPTY_DRAFT);
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
+  const { busy, error, setError, send } = useSend(LOST_SPLIT);
+  // A fresh draft from the pot and the sheets each time the dialog opens.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on open only
+  useEffect(() => {
+    if (!open) return;
+    setDraft(splitPrefill(pot));
+    setTicked(new Set(list.filter((x) => x.ticked).map((x) => x.character.id)));
+    setError(null);
+  }, [open]);
+  const parsed = splitPayload(
+    list.map((x) => x.character.id),
+    ticked,
+    draft,
+  );
+  const enabled = submitEnabled({ valid: parsed.ok, live, busy });
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!enabled || !parsed.ok) return;
+    if (await send("loot.split", parsed.value)) onOpenChange(false);
+  };
+  const tick = (id: string, on: boolean) =>
+    setTicked((t) => {
+      const next = new Set(t);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent data-testid="loot-split-dialog" className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Split the pot</DialogTitle>
+          <DialogDescription>
+            Each character gets an equal share of each coin; the rest stays in the pot.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="flex flex-col gap-2">
+          <fieldset disabled={!live} className="flex flex-col gap-2">
+            <CoinInputs draft={draft} onChange={setDraft} signed={false} testId="loot-split-coin" />
+            {list.length === 0 ? (
+              <span className="text-xs text-muted-foreground">No characters</span>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {list.map(({ character: ch }) => (
+                  <li key={ch.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`loot-split-${ch.id}`}
+                      data-testid="loot-split-character"
+                      data-record-id={ch.id}
+                      checked={ticked.has(ch.id)}
+                      onCheckedChange={(v) => tick(ch.id, v === true)}
+                    />
+                    <Label htmlFor={`loot-split-${ch.id}`} className="text-sm font-normal">
+                      {ch.name}
+                    </Label>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </fieldset>
+          <p
+            data-testid="loot-split-preview"
+            data-valid={parsed.ok}
+            className={cn("text-sm", !parsed.ok && "text-muted-foreground")}
+          >
+            {parsed.ok ? parsed.preview : parsed.message}
+          </p>
+          {error && (
+            <p data-testid="loot-split-error" role="alert" className="text-xs text-destructive">
+              {error}
+            </p>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" data-testid="loot-split-submit" disabled={!enabled}>
+              Split
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function Time({ iso }: { iso: string }) {
   const t = timeOf(iso);
   return (
@@ -428,6 +547,10 @@ function EntryRow({
 }) {
   const isMove = entry.kind === "move";
   const edited = entry.editedAt !== null;
+  const line =
+    entry.kind === "item" && entry.qty !== undefined
+      ? itemLine({ ...entry, qty: entry.qty }, nameOf)
+      : null;
   return (
     <li
       data-testid="loot-entry"
@@ -438,13 +561,14 @@ function EntryRow({
     >
       <div className="flex items-start gap-1.5">
         <span className="min-w-0 flex-1 break-words">
-          {isMove ? (
-            <span data-testid="loot-entry-route">
-              {endpointLabel(entry.from, nameOf)} → {endpointLabel(entry.to, nameOf)}
-            </span>
-          ) : (
-            entry.text
-          )}
+          {line ??
+            (isMove ? (
+              <span data-testid="loot-entry-route">
+                {endpointLabel(entry.from, nameOf)} → {endpointLabel(entry.to, nameOf)}
+              </span>
+            ) : (
+              entry.text
+            ))}
         </span>
         <Time iso={entry.createdAt} />
         {onEdit && (
@@ -504,10 +628,14 @@ export function LootLog() {
   );
   const names = useMemo(() => new Map(chars.map((c) => [c.id, c.name])), [chars]);
   const [editing, setEditing] = useState<string | null>(null);
+  const [splitting, setSplitting] = useState(false);
   const campaignId = you?.campaignId ?? null;
-  // A campaign switch discards the open edit (FR-LOOT-17).
+  // A campaign switch discards the open edit (FR-LOOT-17) and closes the Split… dialog.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset on campaign change only
-  useEffect(() => setEditing(null), [campaignId]);
+  useEffect(() => {
+    setEditing(null);
+    setSplitting(false);
+  }, [campaignId]);
 
   if (!you || !loaded) {
     return (
@@ -523,19 +651,39 @@ export function LootLog() {
   const ownCount = rows.filter((r) => r.own).length;
   const sorted = newestFirst(entries);
   const editingEntry = editing ? entries.find((e) => e.id === editing) : undefined;
+  const potCoins = pot ? coinsOf(pot) : ZERO_COINS;
 
   return (
     <ScrollArea className="h-full">
       <div data-testid="loot-log" className="flex flex-col gap-3 p-3">
         <section className="flex flex-col gap-1">
-          <SectionTitle>Party pot</SectionTitle>
-          <div data-testid="loot-pot" className="flex flex-wrap gap-1">
-            <Purse
-              coins={pot ? coinsOf(pot) : ZERO_COINS}
-              testId="loot-pot-coin"
-              emptyTestId="loot-pot-empty"
-            />
+          <div className="flex items-center justify-between gap-2">
+            <SectionTitle>Party pot</SectionTitle>
+            {isDm && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                data-testid="loot-split-open"
+                disabled={!live}
+                onClick={() => setSplitting(true)}
+              >
+                Split…
+              </Button>
+            )}
           </div>
+          <div data-testid="loot-pot" className="flex flex-wrap gap-1">
+            <Purse coins={potCoins} testId="loot-pot-coin" emptyTestId="loot-pot-empty" />
+          </div>
+          {isDm && (
+            <SplitDialog
+              chars={chars}
+              pot={potCoins}
+              live={live}
+              open={splitting}
+              onOpenChange={setSplitting}
+            />
+          )}
         </section>
 
         <section className="flex flex-col gap-1">
