@@ -35,6 +35,7 @@ import { SRD_51_SOURCE } from "./sources/srd-5.1/source";
 
 const AT = "2026-01-01T00:00:00.000Z";
 let bytes: Uint8Array;
+const realFetch = globalThis.fetch;
 
 beforeAll(async () => {
   globalThis.fetch = (() => {
@@ -52,7 +53,10 @@ beforeAll(async () => {
   }
 }, 60_000);
 
-afterAll(() => armCrashHook(null));
+afterAll(() => {
+  armCrashHook(null);
+  globalThis.fetch = realFetch;
+});
 
 /** A fresh in-memory copy of the loaded bundle, with event capture. */
 function fresh() {
