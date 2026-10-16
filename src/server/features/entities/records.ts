@@ -1,4 +1,5 @@
-// Record types `entity` (campaign) and `imported-entity` (global) (ENT §9, FR-ENT-15/16).
+// Record types `entity` (campaign) and `imported-entity` (global, lazy by ids: FR-CMP-15)
+// (ENT §9, FR-ENT-15/16).
 import { deathStateOf } from "@shared/combat-extras/rules";
 import {
   type CharacterRecord,
@@ -11,7 +12,7 @@ import {
   REDACTED_CHARACTER_KEYS,
   type RedactedCharacter,
 } from "@shared/entities/schemas";
-import { asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { entity } from "../../db/schema";
 import type { Logger } from "../../log";
 import { defineRecordType, type Viewer, type Visibility } from "../../ws/records";
@@ -97,6 +98,18 @@ export function entityRecordTypes(log: Logger) {
     schema: ImportedSchema,
     idOf: (r) => r.id,
     visibility: () => "hidden",
+    // FR-CMP-15 (ADR-0045): in no snapshot; the DM loads definitions by id (`sync.load`).
+    lazy: "ids",
+    byIds: ({ db }, _v, ids) =>
+      mapValid(
+        db
+          .select()
+          .from(entity)
+          .where(and(isNull(entity.campaignId), inArray(entity.id, [...ids])))
+          .all(),
+        toImportedRecord,
+        log,
+      ),
     snapshot: ({ db }) =>
       mapValid(
         db.select().from(entity).where(isNull(entity.campaignId)).orderBy(asc(sql`rowid`)).all(),

@@ -67,6 +67,13 @@ const barrier = async (c: TestClient) => {
   c.send({ type: "ping" });
   await c.next("pong");
 };
+/** The next ack or reject (a `sync.load` reply). */
+async function loadReply(c: TestClient) {
+  for (;;) {
+    const f = await c.next();
+    if (f.type === "ack" || f.type === "reject") return f;
+  }
+}
 const entityChanges = (frames: ServerFrame[]) =>
   frames.flatMap((f) => (f.type === "event" ? f.changes.filter((c) => c.type === "entity") : []));
 
@@ -86,14 +93,21 @@ describe("entities over REST + WS (entities bundle)", () => {
     expect(thorn(p2)).toMatchObject({ hpCurrent: 10 });
     expect(Object.keys(mira(p2) ?? {})).not.toContain("statBlock");
     expect(p1.store.records["imported-entity"]).toBeUndefined();
-    // DM: characters + Elite in `entity`, Goblin + Wolf in `imported-entity`, no Marsh Troll.
+    // DM: characters + Elite in `entity`, no Marsh Troll. `imported-entity` is lazy (FR-CMP-15):
+    // in no snapshot; Goblin + Wolf come by id with `sync.load`.
     expect(
       view(dm)
         .map((r) => r.name)
         .sort(),
     ).toEqual(["Elite Goblin Warrior", "Mira", "Thorn"]);
+    expect(dm.store.records["imported-entity"]).toBeUndefined();
+    dm.load("imported-entity", [id("Goblin"), id("Wolf")]);
+    await dm.next("ack");
     const imported = Object.values(dm.store.records["imported-entity"] ?? {}) as { name: string }[];
     expect(imported.map((r) => r.name).sort()).toEqual(["Goblin", "Wolf"]);
+    p1.load("imported-entity", [id("Goblin"), id("Wolf")]);
+    expect((await p1.next("reject")).code).toBe("forbidden");
+    expect(p1.store.records["imported-entity"]).toBeUndefined();
     for (const c of [p1, p2, dm]) c.close();
   });
 
@@ -238,6 +252,9 @@ describe("entities over REST + WS (entities bundle)", () => {
       name: "Hidden Horror",
       statBlock: (byName.Goblin as EntityRecord).statBlock,
     });
+    // FR-SYNC-38: the load reply is scanned too (a player's load of the DM-only type is refused).
+    p1.load("imported-entity", [id("Goblin"), id("Wolf")]);
+    await p1.next("reject");
     await barrier(p1);
     const raw = p1.raw();
     for (const s of ["Elite Goblin Warrior", "Marsh Troll", "Goblin", "Hidden Horror", "1d4+3"]) {
@@ -251,8 +268,15 @@ describe("entities over REST + WS (entities bundle)", () => {
         const client = await h.live(c);
         const f = client.frames.find((x) => x.type === "snapshot");
         const records = f?.type === "snapshot" ? f.records : {};
+        // `imported-entity` is lazy (FR-CMP-15): compare the load reply (DM) / the refusal.
+        client.load("imported-entity", [id("Goblin"), id("Wolf")]);
+        const reply = await loadReply(client);
         // Presence depends on who is connected; entities' types must be identical.
-        out[k] = { entity: records.entity, imported: records["imported-entity"] };
+        out[k] = {
+          entity: records.entity,
+          imported: records["imported-entity"],
+          load: reply.type === "ack" ? reply.result : reply.code,
+        };
         client.close();
       }
       return out;
