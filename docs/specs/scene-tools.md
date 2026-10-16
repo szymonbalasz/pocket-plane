@@ -1,33 +1,25 @@
 ---
 title: Scene tools
 prefix: SCN
-status: claimed
+status: in-review
 owner: spec-vision
 phase: post-mvp-3
 ---
 
 # Scene tools
 
-> **Sprint 3 revision pending (DM decisions [#201](../decisions-log.md), [#202](../decisions-log.md), 2026-10-16).** Decided by the DM (not open):
->
-> | Topic | DM decision |
-> |---|---|
-> | Freeform walls | Walls are drawn **freeform while Ctrl is held**, grid-snapped otherwise (today: segments between grid vertices only) |
-> | Wall feedback | While a player drags a token over a wall, the **wall segment(s) under the drag path highlight red** before the drop, so the player sees why the move will be refused (today: only a flash and toast after the drop) |
-> | Walls and vision | Walls take part in dynamic vision (fog-of-war v2, [proposed-dynamic-vision](../architecture/adr/proposed-dynamic-vision.md)); whether they block sight is confirmed there |
->
-> TODO (spec phase, sprint 3): FRs for freeform segments (geometry, move guard on non-grid segments, door placement on freeform walls), the client drag-path check (same rule as the server guard, FR-SCN-10), test plan.
+> **Sprint 3 (track V, DM decisions [#201](../decisions-log.md), [#202](../decisions-log.md)).** Decided by the DM (not open): walls are drawn **freeform while Ctrl is held**, grid-snapped otherwise; while a token is dragged over a wall, the **wall under the drag path highlights red** before the drop; walls take part in dynamic vision ([fog-of-war](fog-of-war.md) v2, [proposed-dynamic-vision](../architecture/adr/proposed-dynamic-vision.md)). Amended here: FR-SCN-07, 08, 10, 12, 13, 36; new FR-SCN-37–40; §8, §9, §12–§15. Everything else is the built sprint-2 spec. **Bold** in §15's new rows = suggested pick.
 
 ## 1. Summary
 
 - Battlemap **props and structure** on the [scenes-map](scenes-map.md) canvas (sprint 2 track B, #187): a **layer model** (map / objects / tokens / DM-only), **walls and doors** that block player token moves, **AoE templates** (cone, sphere, cylinder, cube, line), image **props** from the [asset pipeline](assets-pipeline.md), and the **diagonal rule** as a campaign setting.
-- Movement only: walls never affect vision, light or fog ([ADR-0007](../architecture/adr/0007-product-scope.md)). Fog of war is its own spec ([fog-of-war](fog-of-war.md), FOG). This spec owns the layer model and the tool registry fog registers into, and exposes what fog's filter needs (FR-SCN-35).
+- ~~Movement only: walls never affect vision~~ *(sprint 3)*: walls and doors not open block player moves **and sight** (FR-SCN-37, picks OQ-FOG-21 / -24); never light (dynamic lighting stays out). Fog of war is its own spec ([fog-of-war](fog-of-war.md), FOG). This spec owns the layer model and the tool registry fog registers into, and exposes what fog's filter needs (FR-SCN-35, FR-SCN-37).
 - Hard constraint: CON-44 (DM snapshot ≈ 4.4 KiB left). Decided (#196): the DM snapshot carries only the **active scene's** tokens and SCN records; other scenes load on view ([active-scene window ADR](../architecture/adr/0041-active-scene-window.md), accepted #196; [OQ-SCN-01](#15-open-questions)).
 
 ## 2. Scope
 
 - **Layers:** four layers, render order, DM view toggles. DM-only = the existing `hidden` flag on each record (tokens unchanged).
-- **Structure:** walls and doors are segments between grid vertices; doors are open / closed / locked (DM). A player move across a wall or a non-open door is refused server-side; the DM always moves through. Client-side undo of DM drawing (#196, OQ-SCN-08).
+- **Structure:** walls and doors are segments between grid vertices, or **anywhere with Ctrl** (sprint 3); doors are open / closed / locked (DM). A player move across a wall or a non-open door is refused server-side; the DM always moves through. While dragging, the crossed wall highlights **red** for the player and the DM (sprint 3). Client-side undo of DM drawing (#196, OQ-SCN-08).
 - **AoE templates:** five shapes, snapped to the grid, affected squares shown. Placed by the DM and players (#196, OQ-SCN-03). Ephemeral by default; **Keep** makes one persistent (#196, OQ-SCN-02).
 - **Props:** DM-placed images on the objects layer, cell-snapped, 90° rotation.
 - **Diagonal rule:** campaign setting, 5/10/5 (default, #145) or 5 ft (#196, OQ-SCN-04).
@@ -35,13 +27,14 @@ phase: post-mvp-3
 ## 3. Goals
 
 - The DM preps Goblin Ambush (walls, two doors, barrel, table, a hidden chest) in the UI in minutes, without leaking anything hidden.
-- A player can't walk through a wall or a closed door, and is told why. The DM is never blocked.
+- A player can't walk through a wall or a closed door, and is told why, *(sprint 3)* already while dragging. The DM is never blocked.
+- *(Sprint 3)* The DM traces an irregular cave wall in a few Ctrl-clicks; walls cut the party's sight exactly where they cut movement (one geometry, FR-SCN-10 / 37).
 - Everyone sees a spell's area and the squares it covers, live, ≤ 1 s.
 - Fits CON-44 with fog included. Nothing persisted is lost on a hard kill.
 
 ## 4. Non-goals
 
-- Vision, lighting, line of sight, fog by walls ([ADR-0007](../architecture/adr/0007-product-scope.md)); freehand drawing (#21).
+- Lighting ([ADR-0007](../architecture/adr/0007-product-scope.md)); vision math itself (owned by FOG; walls only supply occluders, FR-SCN-37); one-way, terrain or window walls; freehand (brush) drawing (#21).
 - Automatic AoE damage, saves or target lists ([combat-extras](combat-extras.md) multi-target is out); speed enforcement (#145: indicators only).
 - Props that block movement; overhead props above tokens; free rotation or sizing *(OQ-SCN-10)*.
 - Map pins (tier B), player-ready indicator, scene preload, server-side (event-log) undo of scene edits.
@@ -53,15 +46,15 @@ phase: post-mvp-3
 - As the DM, I want to lock a door without players seeing it's locked, and open it with a double-click mid-fight.
 - As the DM, I want to drop barrels, tables and a hidden chest from my uploads and reveal the chest later.
 - As the DM, I want to undo my last few drawing steps.
+- *(Sprint 3)* As the DM, I want to trace a curved cave wall off the grid (Ctrl) and have doors snap into its gaps.
 
 **Player**
 - As a player, I want to place a Fireball sphere and see who's in it before I commit, then clear it.
-- As a player, I want a refused move to tell me a wall is in the way.
-
+- As a player, I want a refused move to tell me a wall is in the way, *(sprint 3)* and to see the wall turn red before I let go.
 ## 6. Functional requirements
 
 **Units.**
-- **Vertex** = grid intersection `(x, y)`, integers; map space `offset + x × cellSize`.
+- **Vertex** = grid intersection `(x, y)`, integers; map space `offset + x × cellSize`. *(Sprint 3)* **Point** = any `(x, y)` in grid units with ≤ 2 decimals (1/100 cell); a vertex is a point with integer coordinates. Segments run point to point.
 - **Cell** `(col, row)` as [FR-MAP-14](scenes-map.md#6-functional-requirements). 1 cell = 5 ft.
 - Everything is stored in grid units, so recalibration ([FR-MAP-10](scenes-map.md#6-functional-requirements)) moves SCN content with the grid.
 
@@ -75,13 +68,13 @@ phase: post-mvp-3
 | FR-SCN-05 | **Layers popover** (DM tool rail): one Switch per registered `toggle` (Walls & doors, Props, Templates, DM-only items; FOG may add Fog). Off = not drawn and not hit on this DM client. Client only, never sent; `localStorage` per campaign; all on by default. | |
 | FR-SCN-06 | **Canvas tool registry** (new, append-only): `src/client/common/features/scenes-map/canvas-tools.ts`. Entry: `{id, label, icon, clients, order, panel?, cursor?, pointer?: {down, move, up, cancel}}`. `MapCanvas` dispatches stage pointer events to the active tool's `pointer` handlers. While a drawing tool is active, the tokens layer ignores left-press (right-click menus still open) and Space + drag pans. Esc goes to the tool first. SCN adds Structure, Props (DM) and AoE (both); FOG adds its tools. | Settled S6; F11, BO3 |
 | **Structure** | | |
-| FR-SCN-07 | **Structure** = one record per scene. `walls [n, x1, y1, x2, y2][]`. `doors [n, x1, y1, x2, y2, state, f][]`: `state` 0 open / 1 closed / 2 locked; `f` is the server-written fog flag (FR-SCN-36). `n` is unique per scene, taken from `nextN`. A segment runs vertex to vertex at any angle, length > 0, endpoints within the map's vertex range ± 1. Identical segments (either direction) dedupe. ≤ 2,000 segments per scene, else `conflict`. | Compact on purpose (§12) |
-| FR-SCN-08 | **Structure tool** (DM), modes Wall · Door · Erase. **Wall:** click vertices (the pointer snaps to the nearest one) to draw a polyline; double-click ends it, Esc cancels. Ending sends one `scn.addWalls` (≤ 200 segments). **Door:** two clicks → `scn.addDoor` (closed). **Erase:** click within 8 px of a segment, or Ctrl/Shift-drag a box (segments fully inside) → `scn.removeSegments`. | |
+| FR-SCN-07 | **Structure** = one record per scene. `walls [n, x1, y1, x2, y2][]`. `doors [n, x1, y1, x2, y2, state, f][]`: `state` 0 open / 1 closed / 2 locked; `f` is the server-written fog flag (FR-SCN-36). `n` is unique per scene, taken from `nextN`. A segment runs ~~vertex to vertex~~ **point to point** *(sprint 3: coordinates are numbers with ≤ 2 decimals; more → `invalid`; existing integer segments stay valid unchanged)* at any angle, length ≥ 0.05 cell, endpoints within the map's vertex range ± 1. Identical segments (either direction) dedupe. ≤ 2,000 segments per scene, else `conflict`. | Compact on purpose (§12) |
+| FR-SCN-08 | **Structure tool** (DM), modes Wall · Door · Erase. **Wall:** click vertices (the pointer snaps to the nearest one) to draw a polyline; double-click ends it, Esc cancels. Ending sends one `scn.addWalls` (≤ 200 segments). **Door:** two clicks → `scn.addDoor` (closed). **Erase:** click within 8 px of a segment, or Ctrl/Shift-drag a box (segments fully inside) → `scn.removeSegments`. *(Sprint 3)* **Freeform:** in Wall and Door mode a click **with Ctrl held** places the point where the pointer is (rounded to 0.01 cell) instead of the nearest vertex; per click, so one polyline may mix both. In either mode a point within **8 px of an existing segment endpoint** snaps to that endpoint (magnet, *pick OQ-SCN-24*), so freeform walls join up and a door fits a gap. A "Free" chip follows the cursor while Ctrl is held. Erase unchanged (Ctrl-drag still box-selects there). | #202 |
 | FR-SCN-09 | **Door state** (DM): `scn.setDoor {sceneId, n, state}`. Door menu (right-click): Open, Close, Lock, Unlock, Delete. Double-click a door with the Select tool to toggle open ↔ closed (a locked door stays locked). Players can't change doors (#196, OQ-SCN-07). | |
-| FR-SCN-10 | **Blocking rule:** a **player's** `map.moveToken` is refused iff the straight segment between the footprint centres of `from` and `to` intersects or touches any wall, or any door whose state ≠ open (collinear overlap counts). Integer math on doubled coordinates. DM moves are never checked. | OQ-SCN-05 |
+| FR-SCN-10 | **Blocking rule:** a **player's** `map.moveToken` is refused iff the straight segment between the footprint centres of `from` and `to` intersects or touches any wall, or any door whose state ≠ open (collinear overlap counts). Integer math on ~~doubled~~ coordinates **scaled by 200** *(sprint 3: 1/100-cell points, doubled for centres; \|v\| ≤ 2 × 200 × 1,025 = 410,000, so products stay < 2^53 and exact)*. DM moves are never checked. Pure `blockingSegments(structure, from, to, size) → Segment[]` in `@shared/scene-tools/geometry` (empty = not blocked); the guard, `map.checkMove` and the DM client all call it, so the highlight and the refusal can't disagree. | OQ-SCN-05 |
 | FR-SCN-11 | The check is a **move guard** in `map.moveToken`'s transaction. Order: **guards** (may refuse) → FOG's `derive` → one write → token-changed hooks. The guard reads only the scene's structure row (an in-memory cache keyed by `(sceneId, rev)` is allowed). Refused → `reject conflict` "Blocked by a wall or door" (same text for wall, closed and locked). No write, no event, no hook, no `movedFt` change. | [move-guards ADR](../architecture/adr/0040-token-move-guards.md) (accepted #196); X7 |
-| FR-SCN-12 | **Player cue:** on that reject the client reverts (FR-MAP-15), shows the Toast and flashes the target cell (`accent.danger`, 1 s). | |
-| FR-SCN-13 | **DM hint:** while the DM drags a token (read from the existing `pointers.drag`, FR-MAP-40) across a blocking segment, `scn-structure` highlights the crossed segments and shows a "through wall" tag at the target cell. The drop still sends. Local only. | B10 |
+| FR-SCN-12 | **Player cue:** on that reject the client reverts (FR-MAP-15), shows the Toast and flashes the target cell (`accent.danger`, 1 s). *(Sprint 3)* Before the drop: FR-SCN-38. | |
+| FR-SCN-13 | **DM hint:** while the DM drags a token (read from the existing `pointers.drag`, FR-MAP-40) across a blocking segment, `scn-structure` highlights the crossed segments **red** (`accent.danger`, sprint 3, #202; was the accent colour) and shows a "through wall" tag at the target cell. The drop still sends. Local only, from `blockingSegments` on the DM's own structure row. | B10 |
 | FR-SCN-14 | **Drawing.** DM: walls as lines (`accent.primary`); doors as a door glyph per state, with a lock glyph when locked. Players: doors only, open or closed (locked is sent as closed), never walls; doors with `f = 1` are dropped (#196, OQ-SCN-06). | |
 | FR-SCN-15 | **Undo** (DM, client only). Per scene, the last 50 structure and prop edits made in this tab. Undo button in the tool panel, and Ctrl+Z while a SCN tool is active. Undo sends the inverse intent: add ↔ remove with the same coordinates, the previous door state, the previous prop fields, or re-placing a deleted prop. Each inverse's `ack` (`{ns}`, `{propId}`) **remaps** the old `n` / id in older entries, so undo chains keep working. A rejected inverse drops that entry and shows a Toast. Lost on reload. It amends ADR-0016's "not scene edits", together with fog's server-side undo (decided #196, OQ-SCN-08). | B2, B3 |
 | **Props** | | |
@@ -108,7 +101,12 @@ phase: post-mvp-3
 | FR-SCN-33 | Every SCN command commits its rows and one event-log entry in one transaction, then emits the event; IDs and time come from `ctx` ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)). All structure ops emit one event name, `StructureEdited`, so players can't tell a lock from a wall edit. Nothing is server-undoable. | |
 | FR-SCN-34 | While not `live` ([FR-SYNC-24](live-sync.md#6-functional-requirements)): SCN tools are disabled except the Layers popover; a polyline in progress is discarded; the ephemeral template stops sending. | |
 | FR-SCN-35 | **Fog seam** (S5). Fog subjects: props, DM-placed kept templates, DM-placed ephemeral signals (FR-SCN-24). Every prop or template write that sets or moves a footprint calls `deriveSceneObject(read, {type, sceneId, cells})` (FOG's `derive`) **before** its single write, and stores `fogged` (on the wire only when true). SCN's visibility fns for `scene-prop` and `aoe-template` consult `hides`. Walls are never fog subjects. SCN exports the pure fns `propCells`, `templateCells` and `doorCells`. FOG owns what fog hides. | Settled S5; X7 |
-| FR-SCN-36 | **Door fog flag** (#196, OQ-SCN-06): `f = 1` iff every cell of `doorCells(door)` is fogged. `doorCells` = the cells that share an edge with the segment on either side; for a diagonal segment, the cells it passes through. `scn.addDoor` sets `f` (via `derive`), and FOG's re-derive sets it on fog edits (its event lists the `scene-structure` change). The player redaction drops `f = 1` doors and stays pure. | X6 |
+| FR-SCN-36 | **Door fog flag** (#196, OQ-SCN-06), *amended sprint 3 (per player)*: a door's **sample points** = 2 points 0.25 cell either side of its midpoint, along its normal (works for freeform doors; replaces `doorCells` for fog). FOG writes `doorSeen[n]` = the players who see a sample point (FR-FOG-34) and `f = 1` iff nobody does. `scn.addDoor` sets both (via `derive`); FOG's re-derive updates them and lists the `scene-structure` change. The player redaction keeps a door iff the viewer ∈ `doorSeen[n]`, never sends `doorSeen` or `f`, and stays pure. | X6 |
+| **Sprint 3: freeform walls, sight, drag highlight** | | |
+| FR-SCN-37 | **Walls block sight** *(pick, OQ-FOG-21 / -24)*: walls and doors whose state ≠ open are **occluders** for FOG's sight polygons (FR-FOG-33); open doors aren't. Pure `sightOccluders(structure) → Segment[]` (`@shared/scene-tools/geometry`). Walls still never reach players (FR-SCN-14). | FOG seam |
+| FR-SCN-38 | **Red drag highlight, player** (#202, *pick OQ-SCN-22*): while a player drags their token, each time the previewed cell changes (debounced 50 ms, ≤ 10 / s, newest wins) the client sends the read-only intent **`map.checkMove {tokenId, col, row}`** (scenes-map, OQ-SCN-26). It runs the move guards in dry run and returns `{ok, hints}`; the wall guard's hint = `blockingSegments` **clipped to 0.5 cell either side of each crossing** (*pick OQ-SCN-23*). The client draws the pieces red (`scn-wall-hint`) on `scn-structure` until the cell changes, the drag ends or a snapshot arrives; a stale ack (older cell) is dropped. The drop still sends `map.moveToken` (the guard decides); FR-SCN-12's flash and Toast stay. DM drags use FR-SCN-13 (no intent). | Leak: ≤ 1 cell per crossing |
+| FR-SCN-39 | **Structure edits re-derive vision:** every structure command (`scn.addWalls`, `addDoor`, `setDoor`, `removeSegments`) runs FOG's scene re-derive (FR-FOG-35) in its transaction; `StructureEdited.changes` gains the flipped tokens, props, templates, `vision` rows and doors. One event as before. | FOG seam |
+| FR-SCN-40 | **Move guard** unchanged in contract ([ADR-0040](../architecture/adr/0040-token-move-guards.md)): read-only, before `derive`; on decimal segments via FR-SCN-10. *(Sprint 3)* A guard may also return a **hint** for `map.checkMove`; guards stay read-only and the dry run writes, logs and emits nothing. | ADR-0040 refined |
 
 ## 7. UI/UX notes
 
@@ -119,8 +117,8 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
   - **Props:** "Choose image…" + Undo.
   - **AoE:** shape ToggleGroup, size / width number inputs with ±5 nudges, label Input, Keep, Clear.
   - **Ruler** (DM): gains a "Diagonals" ToggleGroup (5/10/5 · 5 ft).
-- **DM view:** walls; doors (a glyph per state); every prop and template, with hidden ones in `visibility.hidden` styling; drawing previews on `scn-edit`; handles on the selected prop; the "through wall" tag while dragging.
-- **Player view:** doors (open / closed; none under fog); visible props; visible templates; their own and others' ephemeral templates; the blocked-cell flash.
+- **DM view:** walls; doors (a glyph per state); every prop and template, with hidden ones in `visibility.hidden` styling; drawing previews on `scn-edit`; handles on the selected prop; the "through wall" tag and **red** crossed segments while dragging; *(sprint 3)* the "Free" chip at the cursor while Ctrl is held in Wall / Door mode; off-grid points drawn as small open dots on the preview.
+- **Player view:** doors (open / closed; only those the player sees, FR-SCN-36); visible props; visible templates; their own and others' ephemeral templates; *(sprint 3)* red wall pieces under the drag line before the drop (FR-SCN-38); the blocked-cell flash.
 - **States.**
   - Empty scene: nothing extra.
   - Loading (DM, non-active scene): a "Loading scene…" chip on the canvas; tools stay disabled until the scene loads.
@@ -133,14 +131,15 @@ All rows are per campaign; `seq` comes from the DB (CON-20); timestamps from `ct
 
 | Entity | Field | Type | Notes |
 |---|---|---|---|
-| SceneStructure | id (= sceneId), campaignId, rev, nextN; walls; doors; updatedAt | ID → Scene (cascade), ID, int, int; **JSON** `[n, x1, y1, x2, y2][]`; **JSON** `[n, x1, y1, x2, y2, state, f][]`; timestamp | Created lazily on the first edit; no row = empty. ≤ 2,000 segments |
+| SceneStructure | id (= sceneId), campaignId, rev, nextN; walls; doors; updatedAt | ID → Scene (cascade), ID, int, int; **JSON** `[n, x1, y1, x2, y2][]`; **JSON** `[n, x1, y1, x2, y2, state, f][]`; timestamp | Created lazily on the first edit; no row = empty. ≤ 2,000 segments. *Sprint 3:* coordinates are numbers ≤ 2 decimals (integers stay valid, no migration) |
+| | **doorSeen** *(sprint 3)* | **JSON** `{<n>: playerId[]}` | FOG-written copy (FR-SCN-36); server only, never on any wire |
 | Prop | id, campaignId, sceneId, seq; assetId; col, row, w, h, rotation, z; hidden, locked, fogged; createdAt, updatedAt | ID, ID, ID → Scene (cascade), int; ID → Asset (**asset reference**); int ×4 (w, h 1–20), 0/90/180/270, int; bool ×3; timestamp ×2 | ≤ 200 per scene. `fogged` is a server copy from `derive`, never in an intent. Always DM-placed |
 | AoeTemplate | id, campaignId, sceneId, seq; shape; x, y; size, width, angle; label; placedByPlayerId; hidden, fogged; createdAt, updatedAt | ID, ID, ID → Scene (cascade), int; cone \| sphere \| cylinder \| cube \| line; int ×2 (vertex); int ×3 (width null unless line); text 0–40; ID → Player \| null (null = DM); bool ×2; timestamp ×2 | Persistent only; ≤ 20 per scene. `fogged` as on Prop |
 | MapSettings | id (= campaignId), diagonalRule, updatedAt | ID → Campaign; `5-10-5` \| `5`; timestamp | Row created on the first set; no row = `5-10-5` |
 
 - **Relations:** Scene 1—0..1 SceneStructure; Scene 1—* Prop, AoeTemplate; Prop → Asset; AoeTemplate → Player; Campaign 1—0..1 MapSettings.
-- **Derived:** segment geometry; a door's open / closed for players; `propCells`, `templateCells`, `doorCells`; distance per rule.
-- **Client only:** ephemeral templates `key → {from, template, lastAt}` (receivers); undo stacks with the id remap; layer toggles; the loaded-scenes set; prop selection; a polyline in progress.
+- **Derived:** segment geometry; a door's open / closed for players; `propCells`, `templateCells`, `doorCells`; distance per rule. *(Sprint 3)* `blockingSegments`, `sightOccluders`, door sample points.
+- **Client only:** ephemeral templates `key → {from, template, lastAt}` (receivers); undo stacks with the id remap; layer toggles; the loaded-scenes set; prop selection; a polyline in progress; *(sprint 3)* the player's current wall hint pieces (from the latest `map.checkMove` ack).
 - **Persisted runtime state:** door states and `f`, props, persistent templates, `fogged` copies, the diagonal rule.
 
 ## 9. API & events
@@ -151,7 +150,8 @@ Envelopes and rejects: [live-sync](live-sync.md). Everything is WS (canvas actio
 
 | Intent | Who | Validation / ownership |
 |---|---|---|
-| `scn.addWalls {sceneId, segments [x1, y1, x2, y2][] 1–200}` → `{ns}` | DM | FR-SCN-07 |
+| `scn.addWalls {sceneId, segments [x1, y1, x2, y2][] 1–200}` → `{ns}` | DM | FR-SCN-07 (*sprint 3:* numbers ≤ 2 decimals, also for `scn.addDoor`'s `segment`) |
+| `map.checkMove {tokenId, col, row}` → `{ok, hints [{guard, segments [x1, y1, x2, y2][]}]}` *(sprint 3, scenes-map's intent, OQ-SCN-26)* | player (own token, FR-MAP-21), DM | Read-only dry run of the move guards (FR-SCN-38); not logged, no event, no `seq`; FR-MAP-21 errors as `map.moveToken` (hidden / unknown → `not_found`, not theirs → `forbidden`) |
 | `scn.addDoor {sceneId, segment, state?}` → `{n}`; `scn.setDoor {sceneId, n, state}`; `scn.removeSegments {sceneId, ns 1–500}` | DM | `n` must exist, else `not_found` |
 | `scn.placeProp` → `{propId}`; `scn.updateProp {propId, col?, row?, w?, h?, rotation?, z?, locked?, assetId?}`; `scn.setPropHidden {propId, hidden}`; `scn.duplicateProp {propId}` → `{propId}`; `scn.deleteProp {propId}` | DM | `assets.require`; FR-SCN-16/17; moving or resizing a locked prop → `conflict` |
 | `scn.placeTemplate {sceneId, shape, x, y, size, width?, angle, label?, hidden?, placedByPlayerId?}` → `{templateId}` | DM, player | FR-SCN-20, 25. Player: active scene only; `hidden` and `placedByPlayerId` are not in the player schema |
@@ -163,7 +163,7 @@ Envelopes and rejects: [live-sync](live-sync.md). Everything is WS (canvas actio
 
 | Type | Scope | Player visibility (DM `full`) | Snapshot |
 |---|---|---|---|
-| `scene-structure` | scene, `sceneOf = id`; `dmWindow` | **redacted** `{id, doors [n, x1, y1, x2, y2, open 0 \| 1][]}`: no walls; locked sent as closed; `f = 1` doors dropped | DM: active scene (+ loads); player: active scene |
+| `scene-structure` | scene, `sceneOf = id`; `dmWindow` | **redacted** `{id, doors [n, x1, y1, x2, y2, open 0 \| 1][]}`: no walls; locked sent as closed; ~~`f = 1` doors dropped~~ *(sprint 3)* doors the viewer is not in `doorSeen` of dropped; never `doorSeen` | DM: active scene (+ loads); player: active scene |
 | `scene-prop` | scene, `sceneOf = sceneId`; `dmWindow` | `hidden` or fog-hidden → hidden; else redacted (no `locked`) | same |
 | `aoe-template` | scene, `sceneOf = sceneId`; `dmWindow` | `hidden` or fog-hidden (DM-placed only) → hidden; else full | same |
 | `map-settings` | campaign | full | the campaign's row (or none) |
@@ -174,7 +174,7 @@ Envelopes and rejects: [live-sync](live-sync.md). Everything is WS (canvas actio
 
 | Event | Payload | Changes |
 |---|---|---|
-| `StructureEdited` | `{sceneId, op: addWalls \| addDoor \| removeSegments \| setDoor, ns}` | `scene-structure` upsert |
+| `StructureEdited` | `{sceneId, op: addWalls \| addDoor \| removeSegments \| setDoor, ns}` | `scene-structure` upsert; *(sprint 3)* + FOG re-derive rows: flipped tokens, props, templates, `vision` (FR-SCN-39) |
 | `PropPlaced` / `PropUpdated` / `PropHidden` / `PropRevealed` / `PropDuplicated` / `PropDeleted` | `{propId}` | `scene-prop` upsert / delete |
 | `TemplatePlaced` / `TemplateUpdated` / `TemplateDeleted` / `TemplatesCleared` | `{templateId}` / `{sceneId, templateIds}` | `aoe-template` upsert / delete |
 | `DiagonalRuleSet` | `{rule}` | `map-settings` upsert |
@@ -187,6 +187,7 @@ Envelopes and rejects: [live-sync](live-sync.md). Everything is WS (canvas actio
 |---|---|---|---|
 | Walls, doors, props, Layers, diagonal rule | ✓ (any scene) | ✗ | Default-DM intents |
 | Move a token through a wall / non-open door | ✓ | ✗ | Move guard (FR-SCN-11) |
+| Check a move before the drop (`map.checkMove`, sprint 3) | ✓ (not needed: FR-SCN-13) | own token on the active scene | FR-MAP-21 checks, read-only |
 | Place ephemeral / persistent template | ✓ (any scene; may be DM-only) | ✓ active scene, ≤ 3 kept | Signal audience; FR-SCN-25 |
 | Edit / delete persistent template | any | own | FR-SCN-26 |
 
@@ -202,8 +203,13 @@ Envelopes and rejects: [live-sync](live-sync.md). Everything is WS (canvas actio
 - **Scene switch:** players' ephemerals on the old scene are dropped by the receivers' scene filter; persistent templates stay with their scene. Activating a scene puts its SCN rows into every player's resync snapshot.
 - **Recalibration / map change:** content follows the grid; entries off the new map stay drawn and editable; `fogged` uses uncut cells (FR-SCN-21).
 - **Invalid / malicious input:** strict zod; another campaign's IDs → `not_found`; a player sending `hidden`, `placedByPlayerId` or a DM intent → `invalid` / `forbidden`; labels are rendered as text; frames > 64 KB are closed (CON-13).
+- **Sprint 3:**
+  - A door closed while a player drags: the next `map.checkMove` (or the drop) sees it; a hint can lag one ack (≤ 1 RTT) behind; the guard at drop decides.
+  - Disconnect mid-drag: no ack arrives; the hint clears with the drag (FR-MAP-28). Reconnect: hints are never in a snapshot.
+  - Freeform points: an endpoint off the map ± 1 or with 3 decimals → `invalid`; a 0.04-cell segment → `invalid`; the magnet never moves an existing segment.
+  - A wall added across a player's sight removes what it hides in the same `StructureEdited` (FR-SCN-39).
 - **Accepted leaks:**
-  - A refused move tells the player something blocks that line (that is the feature).
+  - A refused move tells the player something blocks that line (that is the feature). *(Sprint 3)* Before the drop, `map.checkMove` shows ≤ 0.5 cell of the crossed wall either side of the crossing, also under fog (OQ-SCN-23); the sight polygon's edges show walls inside the player's own sight (FOG).
   - `StructureEdited` upserts tell players the DM edited the active scene's structure, but not what.
   - Positions and states of doors outside fog.
 
@@ -236,6 +242,7 @@ Measured by spec-fog-of-war with the realistic-heavy harness on `main`. Fog and 
 - **Move guard:** O(segments) intersection tests, ≤ 2,000 at the cap. Target ≤ 1 ms p95 per move (unit benchmark). The structure row is read once per move, or cached by `rev`.
 - **Canvas:** walls are one Konva shape; props are cached image nodes (≤ 200); affected squares are one shape per template, memoised per template change. ≤ 8 Konva layers (FR-SCN-02). **Review check:** Chrome trace while panning Goblin Ambush with the typical scene: median frame ≤ 20 ms.
 - **Signals:** an ephemeral template is ≈ 250 B × ≤ 20/s per dragging sender, 1/s at rest; ≈ 30 KB/s fan-out to 6 players over the tunnel at worst.
+- **Sprint 3 (measured with the FOG probe, FOG §12):** a `map.checkMove` ack with 2 clipped segments = 119 B; ≤ 10 / s while the previewed cell changes ≈ 1.2 KB/s down per dragging player, plus ≈ 70 B intents up; server cost = one guard run (≤ 1 ms p95 at 2,000 segments, as FR-SCN-11). Decimal coordinates add ≤ 3 B per freeform number to a wall tuple (arithmetic: `12.25` vs `12`; a fully freeform typical scene ≈ +1.8 KB on the DM's windowed structure row, inside FOG §12's headroom). A structure edit adds FOG's re-derive (≤ 60 ms at caps, FOG §12) to its transaction.
 
 ## 13. Test plan
 
@@ -252,13 +259,16 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 
 - **Bundle `scene-tools`** = `scenes` + the four units. `session-sim` stays unchanged: walls would refuse existing eastward moves (B7). The sprint-gate regression walks a wall and a template from `scene-tools`. The CON-44 heavy scenario gains one typical prepped active scene.
 - **Fog × SCN** (X5): FOG owns the fixture `fog-scn` (a barrel, a DM kept template "Trap" and a door, all in fog), its leak strings, the DM-ephemeral routing test and the walkthrough step (FOG §13, after both client slices). SCN builds the call sites (FR-SCN-24, 35, 36).
-- **Leak strings / properties** (player frames): "Glyph"; `prop-chest`'s asset ID (until it is revealed); no `walls` key; no door state `2`; no `scene-structure`, `scene-prop` or `aoe-template` from a non-active scene; no `scn.template` signal with `dmOnly` or from a non-active scene.
+- **Leak strings / properties** (player frames): "Glyph"; `prop-chest`'s asset ID (until it is revealed); no `walls` key; no door state `2`; no `scene-structure`, `scene-prop` or `aoe-template` from a non-active scene; no `scn.template` signal with `dmOnly` or from a non-active scene. *(Sprint 3)* no `doorSeen` key; a `map.checkMove` ack carries only pieces ≤ 1 cell long that the line from → to crosses.
+- **Sprint 3 fixture:** the freeform wall `[4.5, 3.25, 6.75, 5.5]` is part of FOG's `vision-crypt` (bundle `vision`); `scn-walls` is unchanged.
 
 | Level | What | Fixtures |
 |---|---|---|
 | Unit | `FR-SCN-10 blocking` (cross, touching an endpoint, collinear, diagonal through a jamb, open door passes, closed / locked block, Large token centre, DM skipped) + a benchmark at 2,000 segments; `FR-SCN-07` (dedupe both directions, length 0, bounds, cap); `FR-SCN-21 templateCells` (golden cells per shape, each angle step, cut vs uncut); `FR-SCN-36 doorCells` (axis-aligned, diagonal); `FR-SCN-18` prop footprint with rotation; `FR-SCN-30` distance per rule; `FR-SCN-15` undo reducer (inverse per op; id / `n` remap after a re-add, "door, open, erase, Undo, Undo"; a reject drops the entry; per scene; cap 50); `FR-SCN-23` ephemeral store (end, snapshot, 3 s, scene filter, one per sender); `FR-SCN-03` registry (`clients`, `group`, toggles, duplicate order throws); `FR-SCN-06` tool dispatch (Space pan, Esc to the tool, tokens ignore left-press); visibility matrix (3 types × DM / placer / other player × hidden / locked / `f`) | In-code |
 | Integration | **Commands:** each one writes rows + log + one event, IDs from `ctx`; rollback → nothing; caps → `conflict`; a player sending `placedByPlayerId` → `invalid`. **Guard:** `player-1` Mira (2, 7) → (10, 7) is `conflict`, with no event and no `movedFt` change in combat; via open d1 ✓; d2 locked ✗; DM Goblin through the wall ✓; guard before `derive` and hooks. **Leak test:** `player-1` / `player-2` frames per the leak list, through snapshot, lock / unlock, prop hide / reveal and template hide; `StructureEdited` cause only. **Window:** the DM snapshot holds only the active scene's tokens and SCN rows; `sync.loadScene` returns the others and the leak scan covers `ack.records`; convergence per the ADR; edits on a non-active scene reach no player. **Signal:** `scn.template` routing (player → all; DM `dmOnly` → DM tabs only; player on a non-active scene → `invalid`; `end` → all). **Scene hooks:** duplicate copies structure + props but not templates; delete lists every SCN row. **Crash** (`PP_TEST_CRASH`): `scn.addWalls`, `scn.placeProp`, `scn.placeTemplate` at `:before-commit` / `:after-commit` → `state:digest` equals the pre-command state / the committed state. **CON-44:** heavy + `session-sim` under the ceilings | `scene-tools` |
-| E2E (thin) | DM + `player-1`: a blocked move reverts with a Toast; the DM opens d1 and the move succeeds; the player places a sphere, the DM sees it, Keep, reload, it is still there | `scene-tools` |
+| Unit (sprint 3) | `FR-SCN-07 decimals` (≤ 2 decimals ok, 3 → `invalid`, integers unchanged, min length 0.05, dedupe with decimals); `FR-SCN-10 blockingSegments` on freeform segments (crossing at a decimal point, touching a free endpoint, collinear free segment, scaled integer math matches a rational reference on 10k random cases, same result as the sprint-2 rule on integer data); `FR-SCN-08 freeform gestures` (Ctrl per click, mixed polyline, magnet within / outside 8 px, door into a gap, "Free" chip, Erase Ctrl-drag unchanged); `FR-SCN-38 hint` (clip to ±0.5 cell, several crossings, stale ack dropped, cleared on drag end / snapshot / disconnect, debounce + ≤ 10 / s); `FR-SCN-37 sightOccluders` (open door excluded, closed / locked included); `FR-SCN-36 door samples` (axis, diagonal, freeform) | In-code |
+| Integration (sprint 3) | `map.checkMove`: `player-1` Mira (2, 7) → (10, 7) → `{ok: false}` with one piece of the x = 8 wall; → (7, 5) `ok`; Goblin → `forbidden`; Wolf (hidden) → `not_found`; no DB write, log row, event or `seq` change; ack frames scanned by the leak test. **Guard** on the freeform wall `[4.5, 3.25, 6.75, 5.5]`: Mira (2, 7) → (6, 3) `conflict`. `FR-SCN-39`: a wall added between Mira and a token she sees → that token's `delete` for `player-1` in the same `StructureEdited`; door opened → appears. Crash `scn.addWalls:after-commit` with decimals → digest | `vision` |
+| E2E (thin) | DM + `player-1`: a blocked move reverts with a Toast; the DM opens d1 and the move succeeds; the player places a sphere, the DM sees it, Keep, reload, it is still there. *(Sprint 3)* While dragging Mira toward (10, 7), `scn-wall-hint` appears before the drop | `scene-tools`; `vision` |
 
 **Browser walkthrough** — `PP_TEST_MODE=1`; `bun run build`, `fixtures:reset-load scene-tools --profile verify`, `start --profile verify`. **A** DM, **B** `player-1`, **C** `player-2`.
 
@@ -278,12 +288,21 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 | 12 | Duplicate Goblin Ambush, view the copy, delete it | — | The copy has walls, doors and props, no templates; after the delete, A's store holds none of its rows |
 | 13 | Hard-kill + restart | B mid-drag, reconnects | Walls, door states, props and kept templates intact; ephemerals gone; `state:digest` equal before / after; no console errors |
 
+**Sprint 3 walkthrough** (bundle `vision`; run with FOG §13, which repeats steps 3 and 6 with vision): A DM, B `player-1`, C `player-2`.
+
+| # | DM (A) | Players (B, C) | Expected |
+|---|---|---|---|
+| S1 | Structure → Wall: click (10, 2), **Ctrl**-click (12.4, 3.65), double-click; second wall: Ctrl-click (13.1, 4.8), click (15, 6), double-click | — | "Free" chip while Ctrl is held; each polyline mixes vertex and free points; one `StructureEdited` each; B, C frames: no `walls` key |
+| S2 | Door mode: click 5 px from (12.4, 3.65), then 5 px from (13.1, 4.8) | — | The door's endpoints land exactly on both wall ends (magnet) and close the gap; B, C get the door only if their characters see it (FR-SCN-36) |
+| S3 | Drag Goblin across the new wall | B drags Mira slowly toward (10, 7), back, then toward (6, 3); drops on (6, 3) | A: red crossed segments + "through wall", drop accepted. B: red pieces at x = 8 while over the line, gone when back, then on the freeform wall; drop refused: snap back, Toast, flash. C sees Mira stay at (2, 7) |
+| S4 | Undo, Undo (the door, the wall) | — | Both gone; red hints never shown to C |
+
 ## 14. Dependencies
 
 | On | What we need | Status |
 |---|---|---|
 | [scenes-map](scenes-map.md) | Move-guard registry in `map.moveToken` ([move-guards ADR](../architecture/adr/0040-token-move-guards.md) (accepted #196)); `sceneHooks`; layer entry shape (FR-SCN-03); tool registry + stage dispatch (FR-SCN-06); `distanceFt` rule param; `token` flagged `dmWindow` | complete; changed by the branches below |
-| [fog-of-war](fog-of-war.md) | `visibility-hooks.ts` (`derive`, `hides`, `dragToDm`), `scene-hooks.ts`, `deriveSceneObject(read, obj)`; door re-derive (FR-SCN-36); the fog layer (order 30) and tools via SCN's registries; fixture `fog-scn` | spec in-review |
+| [fog-of-war](fog-of-war.md) | `visibility-hooks.ts` (`derive`, `hides`, `dragToDm`), `scene-hooks.ts`, `deriveSceneObject(read, obj)`; door re-derive (FR-SCN-36); the fog layer (order 30) and tools via SCN's registries; fixture `fog-scn`. *Sprint 3:* FOG v2 consumes `sightOccluders`, door samples, `doorSeen`; owns the re-derive SCN calls (FR-SCN-39) and the `vision` bundle | complete (sprint 2); v2 revised with this spec |
 | [live-sync](live-sync.md) | Active-scene window + `sync.loadScene` ([active-scene window ADR](../architecture/adr/0041-active-scene-window.md) (accepted #196)); signal audience (built) | ADR accepted (#196) |
 | [combat-tracker](combat-tracker.md) | `movedFt` uses the campaign rule; blocked moves commit nothing | complete (OQ-SCN-17) |
 | [assets-pipeline](assets-pipeline.md) | Picker, `assets.require`, `useAssetImage` | complete |
@@ -321,9 +340,16 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 | `build/scene-tools-templates` | Template records + signal, layer, AoE tool, `scn-templates` | Own files |
 | `build/scene-tools-settings` | Layers popover, diagonal rule panel + wiring, combat `movedFt` rule | `ToolRail` panel slot, combat hook |
 
+**Sprint 3** (track V; order and the core in [FOG §14](fog-of-war.md#14-dependencies)): `fix/vision-core` (V0) lands the shared parts; this spec's slice is V4, in parallel with FOG's V1 and CHARX's V5.
+
+| Slice | Contents | Touches |
+|---|---|---|
+| V0 `fix/vision-core` (FOG-owned) | `doorSeen` column; decimal zod for segments in `@shared/scene-tools/schemas.ts`; scaled `blockingSegments` + `sightOccluders` in `@shared/scene-tools/geometry`; scenes-map `map.checkMove` + guard `hint` in `move-guards.ts` (ADR-0040 refined); structure commands call FOG's re-derive (no-op until V2) | ★ db, scenes-map (MAP lock), scene-tools shared files |
+| V4 `build/walls-freeform` | Ctrl drawing + magnet + "Free" chip, wall guard hint line, player `map.checkMove` client + red pieces, DM red hint, tests, walkthrough S1–S4 | scene-tools folders only; `scn-structure` layer (canvas lock, after or with V1 by the orchestrator) |
+
 ## 15. Open questions
 
-All decided at DM gate 2 (#196, "go with picks") or settled earlier. Glossary rows stay for the integrator.
+Sprint-2 rows: all decided at DM gate 2 (#196, "go with picks") or settled earlier; OQ-SCN-05 (blocking rule) stands on freeform segments; OQ-SCN-06 (doors under fog) is refined per player by FR-SCN-36. Glossary rows stay for the integrator. Sprint-3 rows follow the table.
 
 | ID | Question | Decision | Affects |
 |---|---|---|---|
@@ -345,6 +371,17 @@ All decided at DM gate 2 (#196, "go with picks") or settled earlier. Glossary ro
 | OQ-SCN-20 | `session-sim` content | **Ruled (B7):** unchanged; walls and templates are walked from `scene-tools` | — |
 | OQ-SCN-21 | Scope: "Select creatures inside" a template | **Decided (#196): out** | combat-tracker |
 
+**Sprint 3** (open for DM gate 1; **bold** = suggested pick; all blocking unless marked)
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-SCN-22 | How does a player's client know a wall is under the drag (players never get walls, FR-SCN-14)? | **A server dry run `map.checkMove` per previewed cell** (exact guard rule, 119 B acks, ≤ 1 RTT lag) · B send walls to players (contradicts #196 / FR-SCN-14: layout under fog leaks) · C send players the walls they have seen (complex; walls in fog never highlight) | yes | live-sync, FOG |
+| OQ-SCN-23 | How much of the wall is highlighted? | **A 0.5 cell either side of each crossing** (the "why", without leaking a long wall under fog) · B the whole crossed segment (DM's literal "that wall"; can outline a fogged room) | yes | FOG |
+| OQ-SCN-24 | Freeform snapping | **A Ctrl = free point; an endpoint magnet (8 px) in both modes** (walls join, doors fill gaps) · B Ctrl = free, no magnet (gaps and overlaps by hand) | no · DM gate 1 | — |
+| OQ-SCN-25 | Do walls block sight? | Same question as FOG's OQ-FOG-21 (walls) and OQ-FOG-24 (doors): **walls + doors not open block sight** | yes | FOG |
+| OQ-SCN-26 | **scenes-map:** host the dry run as `map.checkMove` (all move guards, read-only) and let a guard return a `hint` ([ADR-0040](../architecture/adr/0040-token-move-guards.md) refined) | **A in scenes-map** (guards are its registry; any future guard can hint) · B an SCN-only `scn.checkPath` (no scenes-map change; duplicates FR-MAP-21 checks) | yes | scenes-map, ADR-0040 |
+| OQ-SCN-27 | Glossary | Integrator: **Wall** → "A segment between two points (grid vertices, or free with Ctrl) that blocks player token moves and sight"; **Door** → "…; hidden from a player until a point beside it is in their sight"; add **Wall hint** | no · integrator | glossary |
+
 ## 16. Out of scope
 
 - Fog → [fog-of-war](fog-of-war.md). HP bar / condition icons on tokens → built by [combat-extras](combat-extras.md) (FR-CBTX-28/29). Drag previews → built by [scenes-map](scenes-map.md) (#171).
@@ -364,6 +401,7 @@ All decided at DM gate 2 (#196, "go with picks") or settled earlier. Glossary ro
   - `scn-prop`: attr `hidden`.
   - `scn-template`: id = record ID or `eph-<key>`; attrs `shape`, `cells`, `ephemeral`.
   - `scn-blocked-cell`, `scn-through-wall`.
+  - *(Sprint 3)* `scn-wall-hint` (player, one shape per piece; attr `segment`); DM crossed segments: `scn-wall-crossed`; `scn-draft-point` (id = index, attr `free`); DOM chip `scn-free-chip`.
 
 ## Appendix B: snapshot arithmetic
 

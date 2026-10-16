@@ -1,299 +1,342 @@
 ---
 title: Fog of war
 prefix: FOG
-status: claimed
+status: in-review
 owner: spec-vision
 phase: post-mvp-3
 ---
 
-# Fog of war
+# Fog of war (FOG v2: freeform fog, dynamic vision, magical darkness)
 
-> **Sprint 3 revision pending (DM decisions [#201](../decisions-log.md), 2026-10-16).** The sections below describe the built sprint-2 fog (cell mask, static). Sprint 3 re-specifies fog as FOG v2; until then this spec stays the reference for what is built. Decided by the DM (not open):
->
-> | Topic | DM decision |
-> |---|---|
-> | Shapes | Freeform fog shapes drawn with **drawing tools** (rectangle, polygon, circle; the DM wants drawing tools more than cell on / off toggles); vertices **snap to the grid unless Ctrl is held** |
-> | Dynamic vision | Each character has a **vision / darkvision radius** that pierces fog; recomputed as tokens move |
-> | Fog kinds | **Fog**: hides the map and everything on it until in a player's vision, returns when the vision leaves. **Explored**: the map is visible but nothing on it (RTS-style memory). **Magical darkness**: DM-placed ad hoc shapes that block all player vision |
-> | Explored toggle | Per map: Explored memory on / off for the whole map (on for dungeons and other non-open spaces) |
-> | Darkness vs sheet | Character-sheet setting "sees through magical darkness" (Devil's Sight). Without it, a character standing in darkness gives that player a **fully dark screen** (own tokens and the grid only, like Fog all); otherwise their vision is blocked by the darkness shape. With it, the darkness shape is a **darker, more transparent overlay than Explored** |
-> | Scope note | Vision (radius, darkvision, walls blocking sight) is in; dynamic lighting (light sources) stays out unless the DM adds it: [proposed-dynamic-vision](../architecture/adr/proposed-dynamic-vision.md) |
->
-> TODO (spec phase, sprint 3): FRs, data model (shapes, per-map settings, explored memory), per-player visibility (supersedes the same-for-every-player `fogged` copy of ADR-0039?), vision math (line of sight vs walls, performance), migration from the cell mask, CON-44 cost, test plan. Open questions with picks for sprint-3 gate 1.
+> **FOG v2** (sprint 3, track V; DM decisions [#201](../decisions-log.md), [#202](../decisions-log.md)) replaces sprint 2's static cell fog. FR IDs are kept where the behaviour survives (text amended in place), retired IDs are struck through, new ones start at FR-FOG-26. One vision design across this spec, [scene-tools](scene-tools.md) (walls, SCN) and [character-sheet-full](character-sheet-full.md) (senses, CHARX); ADR: [proposed-dynamic-vision](../architecture/adr/proposed-dynamic-vision.md). **Bold** in §15 = suggested pick, not decided.
 
 ## 1. Summary
 
-- The DM covers a scene with **fog** and reveals or hides areas with a **rectangle** or **polygon** tool, plus **Reveal all** / **Fog all** and **Undo**. Sprint 2 phase 2, track F ([sprint-2](../agents/sprint-2.md#track-f-fog-of-war--new-spec-fog-of-war-prefix-fog)); first post-MVP item since [ADR-0014](../architecture/adr/0014-mvp-scope.md).
-- Fog is a **cell mask** on the scene's grid, run-length encoded (one small `fog` record per scene). Players see it opaque, the DM translucent.
-- Whatever fog covers is **filtered server-side**: a token, prop or DM-placed AoE template wholly under fog never reaches a player socket. A server-written `fogged` copy on each record + scenes-map hook registries keep visibility fns pure ([ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md)); registry contracts in the fog-visibility ADR [fog visibility](../architecture/adr/0039-fog-visibility.md).
+- The DM draws **freeform fog** with rectangle, polygon and circle tools (grid snap unless **Ctrl** is held) in four modes: **Reveal**, **Fog**, **Explored**, **Darkness**. Sprint 2's cell mask stays as the base the shapes paint over, so existing scenes look the same.
+- **Dynamic vision:** each player-owned token is a **vision source** with its creature's vision and darkvision radius; line of sight stops at walls and closed doors. Vision pierces Fog; a per-map **Explored** memory keeps seen areas visible (map, not records). **Magical darkness** blocks vision unless the character "sees through magical darkness"; standing in it without that gives the player a dark screen.
+- Hiding stays **server-side**, now **per player**: each fog subject carries a server-written `seenBy` copy, so visibility fns stay pure (record + viewer, [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md)). The server computes each player's vision polygons and sends them to that player only; walls never reach players.
 
 ## 2. Scope
 
-- Per scene, DM only: rectangle and polygon tools in **reveal** or **hide** mode; Reveal all; Fog all; Undo (per scene, LIFO). No brush.
-- **New scenes start fully fogged** (decided #196, [OQ-FOG-02](#15-open-questions)); scenes that exist before this build stay clear.
-- Live: a reveal reaches players ≤ 1 s, one transaction, one event. Fog and its undo stack survive reload, reconnect and a hard kill.
-- Server-side hiding of **fog subjects**: tokens (scenes-map), props and DM-placed AoE templates ([scene-tools](scene-tools.md), SCN). Tokens with an owner stay visible to every player (decided #196, [OQ-FOG-03](#15-open-questions)). Doors are hidden while fully fogged (SCN's per-door flag, OQ-SCN-06, decided #196).
-- Seams: scenes-map token visibility, scene lifecycle, drag preview routing, camera fit; scene-tools layers, tools, records, doors; combat copies of "hidden" ([OQ-FOG-07](#15-open-questions)).
+- DM, per scene (any scene, prep or live): shape tools × modes; Reveal all, Fog all, Undo (shapes); Darkness add / move / delete / clear; per-map **Explored memory** on / off and **Forget explored**; **View as player** preview *(pick, OQ-FOG-31)*.
+- Vision for every token with an owner: radius from the creature's senses (CHARX FR-CHARX-49), blocked by walls and non-open doors (SCN FR-SCN-37) *(picks, OQ-FOG-21 / -24)*, by darkness for sources without "sees through". Each player sees through **their own characters only** *(pick, OQ-FOG-20)*.
+- Server-side, per player: tokens, props, DM templates and doors outside a player's sight and not in revealed area never reach that player. Fog-hidden monsters stay hidden in combat until **any** player sees them *(pick, OQ-FOG-25)*.
+- Decided by the DM (#201, #202), not open:
+
+| Topic | DM decision |
+|---|---|
+| Shapes | Freeform shapes with drawing tools (rectangle, polygon, circle); vertices snap to the grid unless Ctrl is held |
+| Vision | Each character has a vision / darkvision radius that pierces fog; recomputed as tokens move |
+| Fog kinds | **Fog**: hides map and records until in a player's vision, returns when vision leaves. **Explored**: map visible, records hidden (RTS memory). **Magical darkness**: DM-placed ad hoc shapes that block all player vision |
+| Explored toggle | Per map: Explored memory on / off for the whole map (on for dungeons, off for open spaces) |
+| Darkness vs sheet | Sheet setting "sees through magical darkness". Without it, a character standing in darkness → that player's screen is **fully dark** (own tokens and the grid only). With it, the darkness shape is a **darker, more transparent overlay than Explored** |
+| Scope | Vision (radius, darkvision, walls blocking sight) is in; dynamic lighting (light sources, colour, shadows) stays out |
 
 ## 3. Goals
 
-- **Zero leakage:** no player frame (snapshot, event, signal, load result) carries the id, name, position, image or any field of a fog-hidden record, before or after a reconnect.
-- A reveal of a large polygon over many tokens = one transaction, one `FogEdited`, one frame per connection, ≤ 1 s to players.
-- Fits the DM snapshot ceiling (CON-44) with the token + SCN active-scene window ([OQ-FOG-04](#15-open-questions), decided #196).
+- **Zero leakage per player:** no player frame (snapshot, event, signal, ack) carries the id, name, position, image or any field of a record that player can't see, before or after a reconnect; nor another player's vision, explored memory or senses.
+- A token move = one transaction, one event, one frame per connection; commit → player frame ≤ 1 s; vision work ≤ 10 ms typical, ≤ 30 ms at caps (benchmark, §12).
+- Fits CON-44 (measured, §12). Existing scenes, bundles and tests keep behaving: no senses set → exactly sprint 2.
 
 ## 4. Non-goals
 
-- Vision, dynamic lighting, line of sight ([ADR-0007](../architecture/adr/0007-product-scope.md)); fog by walls; per-player exploration memory ("seen before" grey fog).
-- Brush or freehand fog; smooth (non-grid) fog edges ([OQ-FOG-05](#15-open-questions)); redo.
-- Hiding map **pixels**: the map image still reaches players whole ([OQ-FOG-09](#15-open-questions)).
-- Player fog tools; fog on non-grid maps (every scene has a grid, [FR-MAP-10](scenes-map.md#6-functional-requirements)).
+- Dynamic lighting: light sources, bright / dim light, colour, shadows, per-token torches ([ADR-0007](../architecture/adr/0007-product-scope.md) as superseded in part by the dynamic-vision ADR). "Vision 30 ft" stands in for a carried light.
+- Vision for tokens without an owner (monsters see nothing; the DM sees everything). Darkness attached to a moving token. One-way, terrain or windowed walls.
+- Hiding map **pixels**: the map image still reaches players whole (OQ-FOG-09 stands); fog draws over it.
+- Brush; player fog tools; live vision while dragging *(pick, OQ-FOG-26)*; redo.
 
 ## 5. User stories
 
 **DM**
-- As the DM, I want a new battlemap to start black for players and to reveal the first room with one drag, so that the dungeon unfolds as they explore.
-- As the DM, I want goblins I placed in an unrevealed room to stay off players' screens without hiding each one, and to appear the moment I reveal the room or walk them out.
-- As the DM, I want to undo a reveal I drew too big, so that a slip doesn't spoil the next room.
+- As the DM, I want to trace a cave's fog with a few free polygon clicks (Ctrl) and let the party's torches and darkvision peel it back as they walk, so that I don't reveal rooms by hand.
+- As the DM, I want to drop a 15 ft sphere of magical darkness mid-fight and move it, so that only the warlock with Devil's Sight sees the goblins inside.
+- As the DM, I want to see what Player 2 sees, so that I trust the fog before the session.
 
 **Player**
-- As a player, I want to see only the revealed map and my party's tokens, and to keep seeing my own token when it walks into the dark.
+- As a player, I want my torch to show 30 ft around Mira, the corridor I walked to stay remembered (but empty), and nothing I couldn't see.
+- As a player with Devil's Sight, I want to see inside magical darkness, darker than the rest.
 
 ## 6. Functional requirements
+
+**Units.** Shape and wall coordinates are **grid units**: corner (i, j) = map point `(offsetX + i·cellSize, offsetY + j·cellSize)`; cell (col, row) has centre `(col + 0.5, row + 0.5)`. Numbers carry ≤ 2 decimals (1/100 cell); integers = grid corners. Stored in grid units, so content follows recalibration ([FR-MAP-10](scenes-map.md#6-functional-requirements)).
 
 | ID | Requirement | Notes |
 |---|---|---|
 | **Model** | | |
-| FR-FOG-01 | **Fog cells** = the scene's grid cells (col, row as token positions, [FR-MAP-14](scenes-map.md#6-functional-requirements)); each is fogged or clear. A scene's `fog` row holds `fill` (`fog` \| `clear`), a **box** `[col0, row0, cols, rows]` and `runs` (FR-FOG-04). A cell inside the box takes its run value; outside, `fill`. **No row = every cell clear** (scenes created before this build). | |
-| FR-FOG-02 | **New scene fully fogged** *(decided #196, OQ-FOG-02)*: fog's `sceneHooks` line ([fog-visibility ADR](../architecture/adr/0039-fog-visibility.md)) writes `{fill: fog, runs: ""}` in `map.createScene`'s transaction (`created`), and copies the source's row, not its undo stack, in `map.duplicateScene` (`duplicated`; no source row → none). | Registered in the last server slice (§14) |
-| FR-FOG-03 | **Box** = every cell overlapping the map rectangle at the scene's current grid: `col0 = floor(−offsetX / cellSize)`, `cols = ceil((mapWidth − offsetX) / cellSize) − col0`; rows alike (≤ 513 × 513). `map.setGrid` / `map.setSceneMap` never touch fog: cells keep their index, so fog moves with the grid like tokens. Each fog edit **re-bases** the mask to the current box (new cells take `fill`; cells leaving it fall back to `fill`, so their value may change); FR-FOG-08 re-derives every subject anyway. | |
-| FR-FOG-04 | **Encoding** `runs`: row-major over the box, alternating run lengths starting with **fogged**, base 36, comma-separated (`"1k,5,7"`); `""` = every box cell is `fill`. Sum ≠ `cols × rows` on read → fully fogged + `error` log (fail closed). ≤ **2,000 runs** per scene (≤ 10 KB) *(OQ-FOG-19)*; over → `conflict` "Fog too detailed — reveal or hide larger areas", nothing written. Pure codec in `@shared/fog-of-war/mask.ts`. | |
+| FR-FOG-01 | *(amended)* A scene's **fog layer** = a **base mask** (sprint 2's cell mask: `fill`, box, `runs`) + an ordered list of **fog shapes** painted over it. The **static state** of a point is the base mask value of the cell containing it (outside the box: `fill`), then every shape containing the point, in list order, overrides it: `reveal` → clear, `fog` → fog, `explored` → explored. Containment is boundary-inclusive; polygons even-odd. **No row = every point clear.** | Migration: OQ-FOG-27 |
+| FR-FOG-02 | New scene fully fogged *(decided #196)*: fog's `created` line writes `{fill: fog, runs: "", shapes: [], darkness: [], explored: false}`; `duplicated` copies the source's row (shapes, darkness, setting), not its undo stack or explored memory. | Unchanged otherwise |
+| FR-FOG-03 | *(amended)* **Box** applies to the base mask only (≤ 513 × 513 cells, sprint-2 formula). ~~Each edit re-bases the mask~~ *(retired: shapes no longer touch the mask)*; `fog.setAll` writes `{fill, runs: ""}` over the current box. | |
+| FR-FOG-04 | Run-length codec unchanged (`@shared/fog-of-war/mask.ts`); also encodes explored memory (FR-FOG-37). Bad sum → fully fogged + `error` log (fail closed). | |
+| FR-FOG-26 | **Shapes** (zod, `@shared/fog-of-war/shapes.ts`): `rect [x0, y0, x1, y1]` (normalised), `polygon [x, y, …]` 3–64 vertices, simple (no crossing edges), area > 0, `circle [cx, cy, r]` r 0.5–60 cells. \|coord\| ≤ 1,024. Fog shape = `{op: reveal \| fog \| explored, <shape>}`; darkness = `{id, <shape>}`. Crossing / zero area → `invalid`. | |
+| FR-FOG-27 | **Caps** *(OQ-FOG-35)*: ≤ 100 fog shapes and ≤ 20 darkness shapes per scene; the serialized `fog` row ≤ 16 KiB. Over → `conflict` "Fog too detailed — use Fog all or Reveal all to start over" / "Too many darkness areas". Nothing written. | §12 |
+| FR-FOG-28 | **Magical darkness** = the row's `darkness` list (ids from `ctx.ids`): a union, independent of fog state; Fog all, Reveal all and Undo never touch it. A point is **in darkness** iff inside any darkness shape. | |
+| FR-FOG-29 | **Explored memory setting** per scene: `explored` on the fog row, default **off** (new and existing scenes), `fog.setExplored {sceneId, on}`. Off: memory neither grows nor draws; rows are kept. | OQ-FOG-35 |
 | **Editing** (DM only; WS intents, [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md) D) | | |
-| FR-FOG-05 | `fog.edit {sceneId, op: reveal \| hide, shape}`. **Rectangle** `{kind: rect, c0, r0, c1, r1}`: cells c0…c1 × r0…r1 inclusive (normalised). **Polygon** `{kind: polygon, points [[i, j], …]}`: 3–64 vertices on **grid corners** (corner (i, j) = map point `(offsetX + i·cellSize, offsetY + j·cellSize)`); crossing edges or zero area → `invalid`. A cell is affected iff its **centre** lies inside or on the boundary (scanline, even-odd). Cells outside the box are ignored. No cell changes → no event, no undo entry, `ack {editId: null}`. | Diagonals stepped (OQ-FOG-05) |
-| FR-FOG-06 | `fog.setAll {sceneId, fogged}`: **Fog all** → `{fill: fog, runs: ""}`; **Reveal all** → `{fill: clear, runs: ""}`; writes a row for a scene that had none. Same value → no-op. | |
-| FR-FOG-07 | **Undo** `fog.undo {sceneId, expectedEditId}`: restores the mask from before the latest edit and drops that entry; strict LIFO; ≤ **20** entries per scene, oldest dropped in the edit's transaction *(OQ-FOG-08)*. Stale `expectedEditId` → `conflict` "Fog changed — check and undo again"; empty → `conflict`. No redo. Persisted (survives reload, restart). Own stack, not [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md) undo; scene-tools undoes with client inverse intents instead (one mask vs many records, S7). | Guard like FR-CBT-35 |
-| FR-FOG-08 | Every fog command (edit, setAll, undo) is one transaction: `fog` row + undo row(s) + every **fog subject** on the scene whose `fogged` changes (FR-FOG-10) + the scene's `scene-structure` row if a door's fog flag changes (OQ-SCN-06, decided #196) + rows from token-changed hooks (FR-FOG-13) + one event-log entry; then one `FogEdited` / `FogUndone` (§9). IDs and time from `ctx` ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)). | |
-| FR-FOG-09 | Fog intents work on any scene, active or not (prep); disabled in the UI while not `live` ([FR-SYNC-24](live-sync.md#6-functional-requirements)). A player sending any `fog.*` → `forbidden`. | |
-| **What fog hides** | | |
-| FR-FOG-10 | **`fogged` copy**: true iff **every** cell of the subject's footprint is fogged (OQ-FOG-14). Footprint: token = FR-MAP-14 square; prop, template = SCN's **uncut** cells (cells off the box take `fill`, so a map change never makes it stale). Server-written only (in an intent → `invalid`). Written in the same transaction by fog commands (FR-FOG-08) and, via `deriveSceneObject(read, obj)`, by every write of a subject's scene, cell or size: `map.placeToken`, `placeTokenIn` ([FR-MAP-48](scenes-map.md#6-functional-requirements)), `map.duplicateToken`, `map.moveToken`, `map.duplicateScene`, the size refresh ([FR-MAP-20](scenes-map.md#6-functional-requirements)), SCN's prop / template writes. **Order** (S4): guards (SCN `moveGuards`) → `derive` → one write → token-changed hooks. | ADR-0024 copy pattern |
-| FR-FOG-11 | **Fog-hidden** (pure, reads only the record; the same for every player): `fogged` **and** not exempt. Exempt: a token with `ownerPlayerId` *(decided #196, OQ-FOG-03)*; a template with `placedByPlayerId`. Props are DM-placed, never exempt. The `hidden` flag ([FR-MAP-19](scenes-map.md#6-functional-requirements)) is independent: hidden **or** fog-hidden → `hidden` for players. `fogHidden(type, record)` in `@shared/fog-of-war`. | |
-| FR-FOG-12 | **Visibility via the `hides` hook** (FR-FOG-24): scenes-map's token fn and SCN's prop / template fns return `hidden` when any `hides(type, record)` is true; DM always `full`. Snapshot, events and `sync.loadScene` share the fn: covering = `delete`, revealing = `upsert` ([FR-SYNC-19](live-sync.md#6-functional-requirements)); a token **walking out** of fog arrives as an upsert in `TokenMoved`, one walking in as a `delete`. Wire `fogged` only when true. | |
-| FR-FOG-13 | **Token-changed hooks on fog flips:** fog commands and the FR-MAP-20 size refresh run scenes-map's token-changed hooks ([FR-MAP-30](scenes-map.md#6-functional-requirements), [ADR-0028](../architecture/adr/0028-token-changed-hooks.md)) for every token whose fog-hidden value flips; rows join the event's `changes`; a reject rolls back. Moves already run them ([ADR-0031](../architecture/adr/0031-token-move-hooks.md)) with `after.fogged` derived. | Size refresh: new hook run |
-| FR-FOG-14 | **Combat** *(decided #196, OQ-FOG-07)*: **every write of a combatant's or effect's hidden copy uses `tokenHiddenForPlayers(token)`** (= `hidden` or fog-hidden; scenes-map export). Sites: Start binding ([FR-CBT-08](combat-tracker.md#6-functional-requirements)); created tokens at Start ([FR-CBT-64/65](combat-tracker.md#6-functional-requirements), `lifecycle.ts` via `TokenPlacer`); mid-fight Add binding and created tokens ([FR-CBTX-44](combat-extras.md#6-functional-requirements), `add-combatants.ts`); link ([FR-CBTX-45](combat-extras.md#6-functional-requirements), `bind-token.ts`); the token hook ([FR-CBT-09](combat-tracker.md#6-functional-requirements): ranks, player turn), fed by fog commands, moves and the size refresh (FR-FOG-13); CBTX's effect copy ([FR-CBTX-13](combat-extras.md#6-functional-requirements)). So a fog-hidden monster is a hidden combatant (no player Initiative row, public outcome lines DM-only, [FR-CBT-36](combat-tracker.md#6-functional-requirements)); revealing it shows token and row in one event. Targeting stays DM-only (#134). If the DM adds SCN's "Select creatures inside" (default out), it includes fog-hidden tokens. | Combat specs amend |
-| FR-FOG-15 | **Signals** ([ADR-0033](../architecture/adr/0033-signal-audience.md), read-only access FR-SYNC-28). `map.drag` ([FR-MAP-41](scenes-map.md#6-functional-requirements)): a position frame routes **`"dm"`** if the token is hidden for players **or** its previewed footprint (cell under the frame's top-left, rounded as FR-MAP-15) is wholly fogged and the token isn't exempt; an `end` frame (no position) routes `"dm"` iff the token is hidden for players, else `"all"`. Players see a monster glide to the fog edge and vanish on the drop. SCN's ephemeral `scn.template`: a **DM-placed** template whose uncut cells are wholly fogged → `"dm"`; its `end` routes as SCN; player-placed ones are never fog-hidden. | |
-| FR-FOG-16 | **Camera fit** ([FR-MAP-44/46](scenes-map.md#6-functional-requirements)): no change. A player's content box uses its store, so fog-hidden tokens never count; the DM's includes them (OQ-FOG-13). | |
+| FR-FOG-05 | *(amended)* `fog.edit {sceneId, op: reveal \| fog \| explored, shape}` appends one fog shape. **Legacy forms** stay valid, so fixtures and tests behave as before: `op: hide` = `fog`; `{kind: rect, c0, r0, c1, r1}` (cells) = `rect [c0, r0, c1 + 1, r1 + 1]`; `{kind: polygon, points}` (grid corners) = that polygon. Same cells result: a cell's state is its centre's (FR-FOG-34). ~~No cell changes → no event~~ *(retired: every edit appends; V1 rewrites the sprint-2 no-op tests)*. | Raster retired |
+| FR-FOG-06 | `fog.setAll {sceneId, fogged}`: base → `{fill: fog \| clear, runs: ""}`, `shapes: []`. Darkness, setting and explored memory untouched. Same value and no shapes → no-op. | |
+| FR-FOG-07 | Undo `fog.undo {sceneId, expectedEditId}` restores **base + shapes** from before the latest `fog.edit` / `fog.setAll`; strict LIFO, ≤ 20, persisted, `expectedEditId` guard, no redo. Darkness, setting and memory are not in the stack (remove is the inverse of place). | Unchanged contract |
+| FR-FOG-30 | **Darkness intents:** `fog.placeDarkness {sceneId, shape}` → `{darknessId}`; `fog.moveDarkness {sceneId, darknessId, dx, dy}` (translate, grid units); `fog.removeDarkness {sceneId, darknessId}`; `fog.clearDarkness {sceneId}`. Unknown id → `not_found`. | |
+| FR-FOG-31 | `fog.forgetExplored {sceneId}` (DM, confirm): deletes every `fog-explored` row of the scene. | |
+| FR-FOG-08 | *(amended)* Every fog command = one transaction: `fog` row (`rev` + 1) + undo row + the scene **re-derive** (FR-FOG-35) + one event-log entry; then one event (§9). IDs, time from `ctx` ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)). | |
+| FR-FOG-09 | Fog intents work on any scene; disabled in the UI while not `live`. A player sending any `fog.*` → `forbidden`. | Unchanged |
+| **Vision** | | |
+| FR-FOG-32 | **Vision source:** a token with `ownerPlayerId = P`, not `hidden`. Senses come from its definition's `statBlock.senses` (CHARX FR-CHARX-49; absent = vision 0, darkvision 0, no see-through). Origin = footprint centre. Reach `r = max(visionFt, darkvisionFt) / 5` cells. Sources of P = **P's own tokens** on that scene *(pick, OQ-FOG-20)*. | |
+| FR-FOG-33 | **Sight polygon** per source (pure `sightPolygon(origin, r, occluders)`, `@shared/fog-of-war/vision.ts`, exact orientation tests on integer-scaled coordinates): the visibility polygon from the origin, bounded by a 64-gon of radius `r`, cut by **occluders** = walls + doors not open (SCN FR-SCN-37) *(picks, OQ-FOG-21 / -24)* + for a source **without** see-through, the edges of every darkness shape. Two polygons per source: `see` (radius vision) and `dark` (radius darkvision); records use the larger *(pick, OQ-FOG-23)*. r = 0 → none. | Hand-rolled (OQ-FOG-29) |
+| FR-FOG-34 | **Visible to P** (pure `pointVisible(scene, P, pt)`): P not blind (FR-FOG-36) and either the point's static state is clear and it is not in darkness, or it lies in one of P's sight polygons (a see-through source's polygon includes darkness; another's stops at it). Explored counts as hidden for records. A **subject** is visible to P iff any **sample point** is: token = every footprint cell centre ([FR-MAP-14](scenes-map.md#6-functional-requirements)); prop, template = SCN's uncut cell centres; door = 2 points 0.25 cell either side of its midpoint (FR-SCN-36). An **owned** token is always visible to its owner, and to every other non-blind player (party exemption, #196). | Same cells as sprint 2 when no vision |
+| FR-FOG-35 | **Re-derive** (server, in the writing command's transaction): recompute the affected players' sources and polygons (cache, FR-FOG-38), the `seenBy` of affected subjects, P's explored row (FR-FOG-37) and `vision` record; list every flipped row in the command's event. Triggers below; token-changed hooks ([ADR-0028](../architecture/adr/0028-token-changed-hooks.md)) run for every token whose `tokenHiddenForPlayers` flips (FR-FOG-13). | Table below |
+| FR-FOG-36 | **Blind:** P is blind on a scene iff P has ≥ 1 source there, every source's origin is in darkness and none sees through. Blind P receives **no fog subject** (token, prop, DM template, door) **but their own tokens** (party tokens too are dropped; combat rows stay party-level, FR-FOG-14) and draws the dark screen (FR-FOG-21); `vision {blind: true, see: [], dark: []}`. Leaving darkness restores the view in the same event. | DM #201 |
+| FR-FOG-37 | **Explored memory** (scene setting on): every cell whose centre lies in one of P's polygons becomes explored for P; one `fog-explored` row per (scene, player) (box + runs, FR-FOG-04 codec), written in the same transaction as the move / re-derive, **never shrinks** *(per player, OQ-FOG-22)*. > 2,000 runs → memory stops growing, `warn` log (map pixels only, never records). Visible to its player and the DM. | |
+| FR-FOG-10 | *(amended)* **Copies:** each fog subject stores **`seenBy`** = ids of the campaign's players for whom FR-FOG-34 holds (server-only column, **never on the wire**) and **`fogged`** = `seenBy` empty (DM wire only, when true; players never get `fogged`). Written by `derive` before every subject write (call sites as sprint 2: place, `placeTokenIn`, duplicate, move, size refresh, SCN prop / template writes) and by re-derive. Doors: `scene-structure.doorSeen {<n>: playerId[]}`; door `f` = seen by nobody. In an intent → `invalid`. Order (S4): guards → `derive` → one write → **re-derive dependants** → token-changed hooks. | ADR-0039 pattern, per player |
+| FR-FOG-11 | *(amended)* **Fog-hidden for P** (pure, record + viewer): `fogHidden(type, record, playerId)` = P ∉ `seenBy` and not P's own token. `hidden` stays independent: hidden **or** fog-hidden → hidden for P. | `@shared/fog-of-war` |
+| FR-FOG-12 | *(amended)* Visibility via `hides(type, record, viewer)` (FR-FOG-24). Snapshot and events share the fn; per connection the transition matrix (FR-SYNC-19) turns a flip into `upsert` / `delete`; a `visible → visible` change whose wire data is identical for that connection is **dropped** (OQ-FOG-37, live-sync). | Per player |
+| FR-FOG-13 | Token-changed hooks on flips: fog commands, re-derive and the size refresh run them for every token whose **party-level** hidden (FR-FOG-14) flips; rows join the event. | Unchanged contract |
+| FR-FOG-14 | *(amended meaning)* **Combat:** every combatant / effect hidden copy keeps using `tokenHiddenForPlayers(token)`, which now = `hidden` or **seen by no player** (`fogged`). A monster seen by any player is a visible combatant for every player *(pick, OQ-FOG-25)*; no combat call site changes. Targeting stays DM-only (#134). | combat-tracker / -extras: no code change |
+| FR-FOG-15 | *(amended)* **Signals** ([ADR-0033](../architecture/adr/0033-signal-audience.md)): `map.drag` position frames route to the DM plus the players for whom the token at the previewed cell is visible (FR-FOG-34 on cached polygons); an `end` frame to the players who see the stored token. DM-placed ephemeral `scn.template`: players for whom any uncut cell centre is visible. Needs `audience` → player-id lists (OQ-FOG-37). | Per player |
+| FR-FOG-16 | Camera fit: no change (a player's content box uses its own store). | |
+| FR-FOG-38 | **Vision cache** (server memory, never authoritative): `(sceneId, playerId)` → polygons + blind, keyed by fog `rev`, structure `rev` and the sources' `(tokenId, col, row, size, senses)`; LRU 256 entries; a miss recomputes from the DB. Restart → empty cache, same results. | §12 |
+| FR-FOG-39 | **`vision` record** (derived, not stored): one per (scene, player) with ≥ 1 source: `{id = sceneId:playerId, sceneId, playerId, blind, see: number[][], dark: number[][]}`, flat coordinates, 2 decimals. Snapshot computes it from the DB; commands list before / after when a source or occluder changes. Visible to that player; the DM gets the active scene's for preview (OQ-FOG-31). | |
+| FR-FOG-40 | **Migration** *(pick, OQ-FOG-27)*: schema push adds the columns (`shapes`, `darkness` `[]`, `explored` false, `rev` 0; `seenBy` null). An idempotent **boot backfill** re-derives every scene whose subjects still have `seenBy = null` (FR-MAP-50's pattern). With no senses set, every player's view equals sprint 2's: same cells, same tokens. Fixture units and FR-FOG-25's ripple stay as they are. | Neutral |
 | **Client** | | |
-| FR-FOG-17 | **Fog tool** (DM, a line in SCN's `canvas-tools.ts`): a floating fog bar beside the rail (open while the tool is active; not a Popover, so drawing keeps it open): **Reveal \| Hide**, **Rectangle \| Polygon** (defaults Reveal, Rectangle), **Reveal all**, **Fog all…** (AlertDialog "Fog the whole scene? Players keep only the party's tokens." Confirm / Cancel), **Undo** (Tooltip "Undo: ‹reveal \| hide› ‹rectangle \| polygon \| all›"; disabled when empty). Works on the viewed scene (FR-MAP-08). Pointer input is dispatched at **stage level** to the active tool (SCN's canvas core, BO3); while the tool is active tokens take no left-press (no drag), right-click still opens the token menu. **Rectangle mode:** left-drag draws, Space + drag pans. **Polygon mode:** clicks add vertices, left-drag or Space + drag pans. | |
-| FR-FOG-18 | **Rectangle:** left-drag cell to cell; the draft (snapped cells, accent outline, translucent fill) follows; release sends `fog.edit`. < 4 px = that one cell. Esc cancels. The draft stays until the event or reject; reject → Toast. | |
-| FR-FOG-19 | **Polygon:** a click adds a vertex at the nearest grid corner (< 4 px from the last one: ignored); a vertex whose edge would cross another is refused (Tooltip "Edges can't cross"); **Enter**, double-click or a click on the first vertex closes (≥ 3) and sends; **Backspace** drops the last; **Esc** cancels; 64 max. Keys via `useBaseKeyDown` ([FR-SHELL-13](play-shell.md#6-functional-requirements)). | |
-| FR-FOG-20 | **DM render:** fogged cells as one translucent shape (`fog.dm`, ≈ 50 %) on the `fog` canvas layer (`canvas-layers.ts`, order 30, S6): map 0 < grid 10 < scn-props 20 < scn-structure 26 < **fog 30** < scn-templates 35 < tokens 40 < labels 45 < scn-edit 48 < pointers 50. Fog-hidden tokens get a DM-only overlay badge "Fog" (`fog-token-fogged`, [FR-MAP-34](scenes-map.md#6-functional-requirements)); `hidden` tokens keep their own styling. | |
-| FR-FOG-21 | **Player render:** fogged cells opaque (`fog.player`) on the same layer, under templates, tokens and labels, so party tokens and own templates in fog stay visible. Drawn from the same snapshot as the scene. No fog row → no fog. Switched on in the same slice as `hides` (§14). | |
-| FR-FOG-22 | A gesture in progress is dropped (unsent) when the client leaves `live`, the viewed scene changes or another tool is picked. | Like FR-MAP-28 |
+| FR-FOG-17 | *(amended)* **Fog tool** (DM, `canvas-tools.ts` line, floating fog bar): **Mode** Reveal \| Fog \| Explored \| Darkness; **Shape** Rectangle \| Polygon \| Circle (defaults Reveal, Rectangle); Reveal all; Fog all… (AlertDialog as sprint 2); Undo (Tooltip "Undo: ‹reveal \| fog \| explored› ‹rectangle \| polygon \| circle \| all›"); Switch **Remember explored areas** (FR-FOG-29); **Forget explored…** (AlertDialog "Players lose the explored map of this scene."); **View as** Select (DM, Players + "DM", OQ-FOG-31); in Darkness mode: **Clear darkness…**. Stage-level dispatch, Space + drag pans (sprint 2). | |
+| FR-FOG-18 | *(amended)* **Rectangle:** left-drag corner to corner; corners snap to the nearest grid corner **unless Ctrl** is held (read on every move: free, rounded to 0.01). < 4 px = the cell under the press. Esc cancels. Release sends; the draft stays until the event or reject (Toast). | |
+| FR-FOG-19 | *(amended)* **Polygon:** each click adds a vertex at the nearest grid corner, or **free with Ctrl**; < 4 px from the last ignored; crossing refused (Tooltip "Edges can't cross"); Enter / double-click / first vertex closes (≥ 3); Backspace; Esc; 64 max. | |
+| FR-FOG-41 | **Circle:** press = centre (nearest grid corner, free with Ctrl), drag = radius in whole cells (label "15 ft"), free with Ctrl (label rounded to ft). < 4 px → 1 cell. Esc cancels. Darkness + Circle is the usual Darkness spell (15 ft). | |
+| FR-FOG-42 | **Darkness editing** (Darkness mode): click a darkness shape selects it (outline handles); drag moves it (snapped by whole cells, free with Ctrl) → `fog.moveDarkness` on release; Delete / Backspace or its right-click menu **Remove** → `fog.removeDarkness`. Drawing starts only on empty space. | |
+| FR-FOG-20 | *(amended)* **DM render** (`fog` layer, order 30; one cached Konva shape, no new Konva layer: the stage already warns at 8–9, session-sim-6): Fog ≈ 50 % (`fog.dm`), Explored ≈ 25 % (`fog.dm-explored`), darkness hatched (`fog.dm-darkness`), shapes' edges hairline. **View as P:** that player's render (FR-FOG-21) at 70 % over the DM view, tokens P can't see dimmed, computed client-side from the same pure fns. Fog badge (`fog-token-fogged`) = seen by no player. | |
+| FR-FOG-21 | *(amended)* **Player render** (same layer, under templates / tokens / labels; one cached shape): unseen **Fog** opaque (`fog.player`); **Explored** (static, or the player's memory) and not in sight: map dimmed (`fog.explored`), records absent; in sight: clear; beyond `see` but inside `dark`: dimmed + desaturated (`fog.darkvision`); **darkness**: without see-through opaque (`fog.darkness`), with see-through inside sight a darker, more transparent tint (`fog.darkness-seen`). **Blind:** the whole map dark, grid lines redrawn on top, own tokens only, chip "Magical darkness — you can't see" (`fog-blind`). Drawn from the snapshot + `vision` + `fog-explored` records. | Tokens: OQ-FOG-17 |
+| FR-FOG-22 | A gesture in progress is dropped when the client leaves `live`, the viewed scene changes or another tool is picked. | Unchanged |
 | **Lifecycle** | | |
-| FR-FOG-23 | **Scene delete:** fog's `sceneHooks` `deleting` line returns `{type: fog, before, after: null}`, so `SceneDeleted` lists the `fog` delete (DM store converges); the FK cascade removes the row and undo stack. Activation: players get the new scene's `fog` in the resync snapshot (scene gate, [FR-SYNC-09](live-sync.md#6-functional-requirements)). | |
-| FR-FOG-24 | **Registries** (scenes-map's, append-only, created empty by `fix/fog-core`; contracts in the fog-visibility ADR, accepted #196): `visibility-hooks.ts` (`derive`, `hides`, `dragToDm`) and `scene-hooks.ts` (`created`, `duplicated`, `deleting`). scenes-map exports `deriveSceneObject(read, obj)`, `tokenHiddenForPlayers(token)`, `runTokenChangedHooks(env, before, after)`. No line registered → no behaviour change. | Table §14 |
-| FR-FOG-25 | **Ripple** (new scenes start fogged once fog's `created` line registers): every setup that creates scenes reveals them, so existing tests and bundles keep their player view: fixture units `town`, `battlemap`, `scenes-extras` (last step `fog.setAll {fogged: false}` per scene); test helpers `combat-tracker/testing.ts`, `dice-roll-log/testing.ts`, scenes-map's `commands.test.ts`, `feedback.test.ts`, `place-token-in.test.ts`, `character-copy.test.ts`, `combat2-add.test.ts` (a shared `revealed` default on their create helper); the CON-44 harness `ws/testing/snapshot-size.ts` (reveals its battle scene, keeps the others fogged). Accepted: each ripple reveal leaves one undo entry ("Undo: reveal all") on those scenes. Re-baselines in the same branch. | OQ-FOG-18 |
+| FR-FOG-23 | *(amended)* Scene delete: `deleting` lists the `fog` delete and every `fog-explored` / `vision` row of the scene; FK cascade removes rows and stack. Activation: players get the new scene's `fog`, their `vision` and `fog-explored` in the resync snapshot. | |
+| FR-FOG-24 | *(amended)* **Registries** (scenes-map's, append-only): `visibility-hooks.ts` members become `derive(read, obj) → {fogged, seenBy}`, `hides(type, record, viewer)`, `dragAudience(read, token, at) → playerId[]` (replaces `dragToDm`), new `rederive(env, before, after) → RecordChange[]` (dependants of a token / subject write, run after the write); `scene-hooks.ts` unchanged. Fog also appends a line to entities' definition-changed hooks (senses, FR-FOG-35) and to campaign-management's player hook (OQ-FOG-39). | Call sites in `fix/vision-core` |
+| FR-FOG-25 | Ripple unchanged: units / helpers that create scenes reveal them; nothing new to ripple (senses default to 0). | |
+
+**Re-derive triggers** (FR-FOG-35)
+
+| Write | Players | Subjects |
+|---|---|---|
+| Fog edit / setAll / undo; darkness place / move / remove / clear | all | every subject on the scene |
+| SCN structure edit, door state (FR-SCN-39) | all | every subject on the scene |
+| Vision source placed, moved, duplicated, deleted, resized, hidden / revealed, owner changed | old and new owner | every subject on the scene + the token itself |
+| Other subject written | all | that subject (`derive`) |
+| Senses edit (definition-changed hook) | owners of that definition's tokens | every scene with such a token |
+| Player created / deleted (OQ-FOG-39) | that player | every scene of the campaign |
 
 ## 7. UI/UX notes
 
-Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, the map is the hero; lucide `cloud-fog`. Fog colours are placeholder semantic tokens `fog.dm` / `fog.player` until [theme-system](post-mvp/theme-system.md) names them (OQ-FOG-17).
+Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, the map is the hero; lucide `cloud-fog`, `moon` (Darkness), `eye` (View as). Colours are placeholder semantic tokens (`fog.player`, `fog.explored`, `fog.darkvision`, `fog.darkness`, `fog.darkness-seen`, `fog.dm*`) until theme-system (OQ-FOG-17).
 
-- **Screens:** no window. Tool line + floating fog bar + canvas layer + one token overlay badge.
-- **States:** empty = no fog row or fully fogged (players: black map, party tokens). Loading = scene loading ([FR-MAP-07](scenes-map.md#6-functional-requirements)). Error = Toast on reject, draft removed. Disconnected = fog bar disabled, gestures dropped (FR-FOG-22), fog stays drawn.
-- **DM view:** all tokens; fog translucent; "Fog" badge; draft shape; Undo Tooltip names the step; works on scenes not shown to players.
-- **Player view:** opaque fog; only records not fog-hidden; party tokens and own templates over the fog. No fog controls.
-- **Test IDs:** `map-tool-fog` (rail button, built by the core ToolRail, #198), `fog-bar`, `fog-mode-reveal`, `fog-mode-hide`, `fog-shape-rect`, `fog-shape-polygon`, `fog-reveal-all`, `fog-fog-all`, `fog-fog-all-confirm`, `fog-undo` (attr `data-depth`). Konva: layer `fog-layer`; shape `fog-mask` (attrs `fill`, `fogged-cells`); `fog-draft`, `fog-draft-vertex` (`id` = index); badge `fog-token-fogged` (`id` = token id).
+- **Screens:** no window. Tool line + floating fog bar + the `fog` canvas layer + one overlay badge + the blind chip.
+- **States:** empty = no row (clear) or fully fogged with no sources (black map, party tokens). Loading = scene loading. Error = Toast, draft removed. Disconnected = fog bar disabled, gestures dropped, last fog / vision drawn.
+- **DM view:** everything; fog translucent; Explored lighter; darkness hatched with handles when selected; Ctrl shows a "Free" hint chip at the cursor while drawing; View as P overlay.
+- **Player view:** FR-FOG-21. No fog controls. Party tokens over fog (unless blind).
+- **Test IDs:** `map-tool-fog` (rail), `fog-bar`, `fog-mode-<reveal|fog|explored|darkness>`, `fog-shape-<rect|polygon|circle>`, `fog-reveal-all`, `fog-fog-all`, `fog-fog-all-confirm`, `fog-undo` (`data-depth`), `fog-explored-toggle` (`data-state`), `fog-forget-explored`, `fog-forget-explored-confirm`, `fog-clear-darkness`, `fog-clear-darkness-confirm`, `fog-view-as` (`data-value` = playerId \| `dm`), `fog-darkness-menu-remove`, `fog-blind`. Konva: layer `fog-layer`; shape `fog-mask` (attrs `shapes`, `darkness`, `fogged-cells`); `fog-darkness` (id = darkness id, attr `selected`); `fog-vision` (attr `sources`, `blind`); `fog-explored` (attr `cells`); `fog-draft`, `fog-draft-vertex` (id = index, attr `free`); badge `fog-token-fogged`.
 
 ## 8. Data model
 
-No JSON leaf fields. Rows per campaign ([ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md)); timestamps from `ctx.clock`.
+JSON leaf fields per [ADR-0006](../architecture/adr/0006-persistence.md): `shapes`, `darkness`, `prevShapes`, `seenBy`, `doorSeen`. Rows per campaign; time from `ctx.clock`.
 
 | Entity | Field | Type | Notes |
 |---|---|---|---|
-| Fog *(new, `scene_fog`)* | sceneId (PK), campaignId | ID → Scene (cascade), ID → Campaign | One row per scene; wire `id` = `sceneId` |
-| | fill; col0, row0, cols, rows; runs; updatedAt | `fog` \| `clear`; int ×4; text ≤ 10 KB; timestamp | FR-FOG-01–04 |
-| Fog edit *(new, `scene_fog_edit`, undo stack)* | id, campaignId, sceneId, seq | ID, ID, ID → Scene (cascade), int | ≤ 20 per scene |
-| | kind; prevFill, prevCol0, prevRow0, prevCols, prevRows, prevRuns; createdAt | `reveal-rect` \| `reveal-polygon` \| `hide-rect` \| `hide-polygon` \| `reveal-all` \| `fog-all`; mask before; timestamp | Undo restores `prev*` |
-| Token *(scenes-map)* | **fogged** | bool, default false | Server copy; wire only when true |
-| Prop, AoE template *(SCN)* | **fogged** | bool, default false | Created with the tables in `fix/scn-core` (S2) |
-| Door *(SCN `doors` JSON)* | fog flag | OQ-SCN-06 (decided #196) | Both adjoining cells fogged; set by fog's re-derive and `scn.addDoor`; player redaction drops flagged doors |
+| Fog (`scene_fog`) | sceneId (PK), campaignId; fill; col0, row0, cols, rows; runs; updatedAt | as sprint 2 | Base mask |
+| | **shapes**; **darkness**; **explored**; **rev** | **JSON** `{op, rect \| polygon \| circle}[]` ≤ 100; **JSON** `{id, rect \| polygon \| circle}[]` ≤ 20; bool; int | Row ≤ 16 KiB |
+| Fog edit (`scene_fog_edit`) | + **prevShapes**; kinds + `reveal-shape`, `fog-shape`, `explored-shape` | **JSON**; enum | Sprint-2 kinds stay valid |
+| Explored memory *(new, `fog_explored`)* | sceneId + playerId (PK), campaignId; col0, row0, cols, rows; runs; updatedAt | ID → Scene (cascade), ID → Player (cascade), ID; int ×4; text ≤ 10 KB; timestamp | Wire id `sceneId:playerId` |
+| Token *(scenes-map)*, Prop, AoE template *(SCN)* | **seenBy**; fogged | **JSON** playerId[] \| null (server only); bool | null = pre-v2 (backfill) |
+| Scene structure *(SCN)* | **doorSeen** | **JSON** `{<n>: playerId[]}` | Server only |
+| Creature `statBlock.senses` *(CHARX)* | visionFt, darkvisionFt, seesMagicalDarkness | int 0–300 step 5 ×2, bool | JSON leaf, zod only |
+| Vision *(derived, no table)* | id, sceneId, playerId, blind, see, dark | computed | FR-FOG-39 |
 
-- **Relations:** Scene 1—0..1 Fog; Scene 1—* Fog edit. Fog subjects → Scene.
-- **Derived:** box; mask ↔ runs; `fogged`; fog-hidden; undo depth and latest edit (DM wire). Client only: draft, fog bar state.
-- **Persisted runtime state:** fog rows, undo stacks, `fogged` copies, door flags, all committed together.
+- **Relations:** Scene 1—0..1 Fog; Scene 1—* Fog edit; Scene × Player 1—0..1 Explored memory; fog subjects → Scene; vision source = Token → Entity (senses), Player (owner).
+- **Derived:** static state, darkness, sight polygons, blind, `seenBy`, `fogged`, `vision`, undo depth. Client only: draft, selection, View as.
+- **Persisted runtime state:** fog rows, undo stacks, explored memory, `seenBy` / `fogged` / `doorSeen` copies, committed together. The vision cache is memory only.
 
 ## 9. API & events
 
-**REST:** none (canvas actions are WS, ADR-0021 D).
+**REST:** none.
 
 | WS intent (DM only) | Validation / ownership |
 |---|---|
-| `fog.edit {sceneId, op, shape}` → `{editId \| null}` | Scene in `ctx.campaignId` (`not_found`); zod: ints, \|value\| ≤ 1,024, 3–64 vertices; crossing / zero area → `invalid`; runs cap → `conflict` |
-| `fog.setAll {sceneId, fogged}` → `{editId \| null}` | Scene in campaign |
-| `fog.undo {sceneId, expectedEditId}` | Latest edit = `expectedEditId`, else `conflict` |
+| `fog.edit {sceneId, op, shape}` → `{editId}` | Scene in `ctx.campaignId` (`not_found`); FR-FOG-26 zod (legacy forms FR-FOG-05); caps → `conflict` |
+| `fog.setAll {sceneId, fogged}` → `{editId \| null}`; `fog.undo {sceneId, expectedEditId}` | As sprint 2 |
+| `fog.placeDarkness {sceneId, shape}` → `{darknessId}`; `fog.moveDarkness {sceneId, darknessId, dx, dy}`; `fog.removeDarkness {…, darknessId}`; `fog.clearDarkness {sceneId}` | Id on the scene, else `not_found`; caps; moved shape must stay within ±1,024 |
+| `fog.setExplored {sceneId, on}`; `fog.forgetExplored {sceneId}` | Same value / no rows → no-op |
 
 | Record type | Scope | DM wire | Player visibility | Snapshot |
 |---|---|---|---|---|
-| `fog` *(new)* | scene, `sceneOf = id` | `{id, campaignId, fill, box, runs, undo: {n, editId, kind} \| null}` | **redacted** `{id, fill, box, runs}` | DM: every scene's row (compact, never windowed); player: active scene's |
-| `token` (scenes-map) | unchanged | + `fogged` (when true) | `hidden` or fog-hidden → **hidden**; else FR-MAP-26 | DM: active scene's; others via `sync.loadScene` (OQ-FOG-04 B, decided #196) |
-| prop, AoE template (SCN) | SCN's | + `fogged` | fog-hidden → **hidden**; else SCN's | SCN's window |
+| `fog` | scene, `sceneOf = id`, **`dmWindow`** *(pick, OQ-FOG-30)* | `{id, campaignId, fill, box, runs, shapes, darkness, explored, undo}` | redacted: no `campaignId`, `undo` | DM: active scene (+ `sync.loadScene`); player: active scene |
+| `fog-explored` *(new)* | scene, `dmWindow` | `{id, sceneId, playerId, box, runs}` | full iff `playerId = viewer`, else hidden | own row, active scene |
+| `vision` *(new, derived)* | scene, `dmWindow` | `{id, sceneId, playerId, blind, see, dark}` | full iff `playerId = viewer`, else hidden | own row, active scene; DM all players' (OQ-FOG-31) |
+| `token`, `scene-prop`, `aoe-template`, `scene-structure` | unchanged | + `fogged` (DM only) | `hidden` or fog-hidden for that player → hidden; doors filtered by `doorSeen`; never `seenBy`, `doorSeen`, `fogged` | unchanged |
 
-| Change | Owning player | Other players |
+| Change (per player P) | P | Other players |
 |---|---|---|
-| `fog` upsert, active scene / other scene | upsert (redacted) / nothing (gate) | same |
-| Ownerless token covered / revealed | — | `delete` / `upsert` (image ID reaches them now, [FR-ASSET-12](assets-pipeline.md#6-functional-requirements)) |
-| Owned token under fog | `upsert`, `fogged: true` | `upsert` *(decided #196, OQ-FOG-03)* |
-| Prop / DM template covered / revealed | `delete` / `upsert` | same |
-| Door flag set / cleared (OQ-SCN-06, #196) | `scene-structure` upsert without / with the door | same |
-| Combatant / effect of a fog-hidden token | `delete` (hidden copy) | `delete` |
-| `map.drag` / DM `scn.template` into or under fog | none (`"dm"`) | none |
+| P's source moves; a monster enters P's sight | `token` upsert(s), `vision` upsert, `fog-explored` upsert | the moved token only (party exemption) |
+| Monster leaves P's sight | `delete` | — |
+| P becomes blind / sees again | `delete` / `upsert` of every visible fog subject but own tokens; `vision {blind}` | unchanged |
+| `fog` / darkness edit | `fog` upsert + flips | same |
+| `map.drag` of a monster | frames only while P sees the previewed cell | per their sight |
+| Combatant / effect of a token seen by nobody → by someone | `upsert` (party-level) | `upsert` |
 
 | Domain event (logged; not ADR-0016-undoable) | Payload | Changes |
 |---|---|---|
-| `FogEdited` / `FogUndone` | `{sceneId, editId, kind, shape?}` / `{sceneId, editId}` | `fog` upsert; flipped subjects; `scene-structure` (door flags); token-hook rows (`combatant`, `encounter`, `effect`) |
-| `SceneCreated` / `SceneDuplicated` / `SceneDeleted` (scenes-map) | unchanged | + `fog` upsert / upsert / delete (`sceneHooks`) |
-| Token events, `EntityUpdated` | unchanged | `token` rows carry the derived `fogged`; size refresh + token-hook rows |
+| `FogEdited` / `FogUndone` | `{sceneId, editId, kind}` | `fog`; flipped subjects; `scene-structure`; `vision`; token-hook rows |
+| `DarknessPlaced` / `DarknessMoved` / `DarknessRemoved` / `DarknessCleared` | `{sceneId, darknessId?}` | same as `FogEdited` |
+| `FogExploredSet` / `ExploredForgotten` | `{sceneId, on}` / `{sceneId}` | `fog` / `fog-explored` deletes |
+| Token events, `StructureEdited`, `EntityUpdated` (senses), player create (CAMP) | unchanged | + flipped subjects, `vision`, `fog-explored` (re-derive) |
 
 ## 10. Permissions
 
 | Action | DM | Player | Server check |
 |---|---|---|---|
-| Edit / reveal all / fog all / undo fog | ✓ any scene | ✗ | Default-DM intents; scene in `ctx.campaignId` |
-| See fog | translucent, every scene | opaque, active scene | `fog` record + scene gate |
-| See fog-hidden records | ✓ | ✗ (exempt: party tokens, own templates) | Visibility fns + `hides` |
-| Move own token into / out of fog | — | ✓ (FR-MAP-21) | Unchanged; `fogged` derived |
+| Fog shapes, darkness, Explored setting, Forget, Undo | ✓ any scene | ✗ | Default-DM intents |
+| See fog layer | translucent, every scene; View as | own render, active scene | `fog` + scene gate |
+| See records | all | in own sight or revealed (party tokens unless blind) | `seenBy` copy + `hides` |
+| See vision / explored | every player's (active scene) | own only | record visibility |
+| Edit senses | any creature | own character, unless locked | CHARX FR-CHARX-49 |
 
 ## 11. Edge cases & failure modes
 
-- **Player disconnect / reconnect:** stale view + banner; the reconnect snapshot = current fog + only visible records. Previews of fog-hidden drags never reached them.
-- **DM disconnect / reconnect:** fog bar disabled, gesture dropped; players unaffected; the undo stack is server-side. With the token window (OQ-FOG-04 B), `FogEdited` token rows for a scene the DM hasn't loaded follow the window ADR's rule (live events reach the DM for every scene).
-- **Server crash mid-action:** one transaction: before commit → nothing; after → all in the snapshot. `PP_TEST_CRASH fog.edit:before-commit` / `after-commit` ([AGENTS §9.2](../../AGENTS.md#92-env-ports-and-data)); `state:digest` identical across the kill.
-- **Concurrent edits:** serialised; each edit applies its shape to the current mask. Two DM tabs undoing → `expectedEditId` `conflict`. A move racing a reveal: the later commit derives against the committed mask. Preview routing follows the stored state per frame.
-- **Grid / map changed:** fog keeps cell indices; the box re-bases on the next edit; subjects re-derive then (template cells are uncut, so nothing goes stale before).
-- **Token partly under fog** (Large, one clear cell) → visible. **Off the map** → its cells take `fill`. **Hidden + fog:** independent.
-- **Invalid / malicious input:** player `fog.*` → `forbidden`; `fogged` in any intent → `invalid`; zod caps; frame cap 64 KB ([FR-SYNC-12](live-sync.md#6-functional-requirements)); corrupt `runs` → fully fogged.
-- **Accepted leaks:** the map image (OQ-FOG-09); token name numbering and `seq` gaps (as hidden tokens today); `cause FogEdited` on a cover; **walls** under fog (not fog subjects; the map image shows structure). Doors are **not** leaked: hidden while fully fogged (OQ-SCN-06, decided #196), dropped from the player redaction.
+- **Player disconnect / reconnect:** banner, stale view. The reconnect snapshot carries current fog, own `vision` and `fog-explored`, and only records visible now; nothing seen meanwhile leaks into the old store (snapshot replaces it).
+- **DM disconnect / reconnect:** fog bar disabled, gestures dropped; players unaffected; undo stack server-side; the window reloads the viewed scene (ADR-0041).
+- **Server crash mid-action:** one transaction per command (move + `seenBy` + explored + log): before commit nothing, after commit all. Cache lost, recomputed. `PP_TEST_CRASH map.moveToken:after-commit`, `fog.placeDarkness:before-commit` → `state:digest` equal to the expected state; per-player snapshots identical after restart.
+- **Concurrent edits:** serialised; each derive reads committed state. A door closed while a player drags: the drop re-derives against it. Two DM tabs undoing → `conflict`.
+- **Source edge cases:** two own tokens → union; one in darkness, one outside → not blind; senses all 0 → no polygon (revealed area still visible); token hidden by the DM → no vision; owner removed → that player loses its vision in the same event.
+- **Grid / map change:** shapes and memory are in grid units / cells and follow the grid; subjects re-derive on the next edit or move (static state uses uncut cells, as sprint 2).
+- **Invalid / malicious input:** player `fog.*` → `forbidden`; `seenBy` / `fogged` in any intent → `invalid`; zod caps; frame cap 64 KB; corrupt runs → fogged.
+- **Accepted leaks:** the map image (OQ-FOG-09); the active scene's fog shapes and darkness geometry (OQ-FOG-32); party tokens; a monster's Initiative row while only another player sees it (OQ-FOG-25); wall pieces inside one's own sight (polygon edges) and ≤ 1 cell of a wall a drag crosses (SCN FR-SCN-38); `cause` names (`DarknessPlaced`).
 
 ## 12. Performance & bandwidth
 
-- **Edit cost:** scanline raster over the shape's bounding box (≤ 263k cells); re-check ≤ 200 tokens + SCN subjects; one transaction, one event; commit → player frame < 50 ms locally.
-- **Frames:** `fog` row ≈ 170 B + runs (cap 10 KB). Uncovering 50 tokens: player ≈ 21 KB, DM ≈ 25 KB.
-- **Render:** runs → one Konva shape of row-run rects, `listening: false`, cached, redrawn only on `fog` change. **Review check:** Chrome trace, DM pan on Cellar with a 2,000-run mask and every SCN layer present: median frame ≤ 20 ms; if not, fog renders as a `Group` in a shared Konva layer (layer count budget with SCN, X10).
-- **Snapshot (CON-44), measured** on `main`'s realistic-heavy harness with prototype fog / SCN rows (method and raw numbers: the probe report shared with scene-tools). Base = today + 30 `fog` rows (5,045 B) + `"fogged":true` on 206 of 300 tokens (2,884 B) + one typical SCN scene under its window (7,384 B):
+**Measured** on `main`'s realistic-heavy harness (`buildRealisticHeavy`, `snapshotSizes`, `snapshotTypeBytes`) with prototype FOG v2 rows in the spec's wire shapes and a real sight sweep against the typical scene's 150 walls (throwaway probe, not committed). Typical scene: 12 fog shapes (5 rect, 5 ten-vertex polygons, 2 circles, freeform coordinates) + 2 darkness shapes; PCs vision 30 ft / darkvision 60 ft.
 
-| Option (OQ-FOG-04 = OQ-SCN-01, decided #196: B) | Heavy DM | Left of 786,432 B | Kind |
+| Item | Bytes | Kind |
+|---|---|---|
+| Heavy DM today | 676,045 (110,387 left of 786,432) | measured |
+| `fog` row: today / v2 typical / v2 at the 16 KiB cap | 150 / 1,219 / 16,542 | measured |
+| DM `fog` type, 30 scenes: today / v2 typical not windowed / **windowed** (active only) | 4,756 / 36,774 / **1,309** | measured |
+| `vision` per player (1 PC, 2 polygons, 45–85 vertices) | 1,211–1,694 | measured |
+| `fog-explored` per player after 10 steps (31–39 runs) | 204–218 | measured |
+| `senses` on all 19 DM entity rows | +1,349 | measured |
+| Sight polygon at caps: 2,000 walls, r 12 cells / 300 walls, r 24 | 217 vertices, 2,559 B / 346, 4,017 B | measured |
+
+| Option (OQ-FOG-30) | Heavy DM | Left | Kind |
 |---|---|---|---|
-| Today (`main`) | 781,917 | 4,515 | measured |
-| Base (no option) | 797,382 | **−10,950 (over)** | measured |
-| (A) all effect presets (campaign + character) on demand over the window's WS load; reopens #190 OQ-MOD-14 / -15 | 778,920 | 7,512 | measured |
-| **(B) token window + SCN window** (decided #196) | **676,257** | **110,175** | measured |
-| (C) raise the DM ceiling (DM only) | 797,382 | needs ≥ 797.4 KB; at 1 MiB 251,194 | measured |
-| Campaign presets only on demand | ≈ 785.9 KB | ≈ 0.6 KB | estimate, not offered |
+| (A) `fog` not windowed + explored + vision preview | 720,091 | 66,341 (30 rows at cap: 1,168,928, over) | measured |
+| **(B) `fog` windowed + explored + vision preview** | **684,626** | **101,806** | measured |
+| (C) `fog` windowed, no preview | 673,947 | 112,485 | measured |
 
-- Players: P1 281,267 B with the active fog row + SCN records (243,021 B left of 512 KiB), measured.
+- **Players:** 277,032–280,092 → 279,625–283,126 B (≥ 241,162 left of 512 KiB), measured.
+- **Per move** (frames, measured): mover's player 5,042 B (token + `vision` + `fog-explored` + 5 newly seen tokens + 2 deletes); other players 658 B; DM 2,355 B with the identical-upsert drop (14,238 B without it, if 20 `seenBy`-only flips were resent): the drop is required (OQ-FOG-37). Moves stay drop-only (few/s).
+- **CPU:** a naive O(n²) probe sweep took 0.6–3.9 ms per polygon on the typical scene and 105 ms at 2,000 walls. The build uses an angular sweep with radius culling: **target ≤ 2 ms per polygon typical, ≤ 10 ms at caps; a move ≤ 10 ms / ≤ 30 ms** incl. sample tests and explored cells (unit benchmark, `fix/vision-core`). Full-scene re-derive (6 players): ≤ 60 ms at caps.
+- **Render:** one cached Konva shape for fog + vision + explored + darkness, redrawn on `fog` / `vision` / `fog-explored` change only; no new Konva layer. Review check: Chrome trace, DM pan on the `vision` bundle with View as on: median frame ≤ 20 ms.
 
 ## 13. Test plan
 
-Isolated per worktree: `bun test` on `:memory:` DB, temp asset dir, port 0; walkthrough on the `verify` profile ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md), [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md), [AGENTS §9.6](../../AGENTS.md#96-browser-verification-test-agents)). Tests named after FRs. Setups run as DM.
+Isolated per worktree: `bun test` on `:memory:`, temp asset dir, port 0; walkthrough on the `verify` profile ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md), [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md), [AGENTS §9.6](../../AGENTS.md#96-browser-verification-test-agents)). Tests named after FRs; setups run as DM. Sprint-2 fixtures `fog-ambush`, `fog-ambush-partial`, `fog-scn` and bundles `fog`, `fog-scn` stay and must pass unchanged (migration proof).
 
 | Key | Contents | Requires |
 |---|---|---|
-| `fog-ambush` | Goblin Ambush: `fog.setAll {fogged: true}`; token "Goblin Lurker" (`enemy-1`) at (17, 11), visible flag | `battlemap` (+ ripple) |
-| `fog-ambush-partial` | Reveal rect (0, 3)–(7, 11) (Mira, Thorn); reveal polygon `[(8, 9), (13, 9), (8, 14)]` (Cave Ogre; its (10, 11) centre lies on the diagonal = inside). Fog-hidden: Goblin (12, 6), Goblin 2 (12, 8), Lurker; hidden + fogged: Wolf, Elite. Undo depth 4 (incl. the ripple's Reveal all) | `fog-ambush`, `scenes-extras`, `goblin-2` |
-| `fog-scn` | In fog on Goblin Ambush: a visible barrel prop at (16, 2); a DM kept template "Trap" (sphere 10 ft at vertex (18, 5)); a closed door on the segment (15, 13)–(16, 13) (both adjoining cells fogged) | `fog-ambush-partial`, `scn-props`, `scn-templates` |
+| `vision-senses` (owner CHARX) | Mira: vision 30 ft, no darkvision ("torch"). Thorn: darkvision 60 ft, sees through magical darkness (Devil's Sight) | `char-mira`, `char-thorn` |
+| `vision-crypt` | Goblin Ambush (Fog all from `fog-ambush`): reveal rect `[0, 6, 3, 11]` (snapped); Explored polygon `[8.5, 0, 19.75, 0, 19.75, 4.5, 8.5, 4.5]` (free); darkness circle `[13, 9, 3]` (Goblin 2 inside); freeform wall `[4.5, 3.25, 6.75, 5.5]`; Explored memory on | `fog-ambush`, `scn-walls`, `goblin-2` |
 
-- **Bundles:** `fog` = `scenes` + `goblin-2` + `encounter-1` + `fog-ambush` + `fog-ambush-partial`; `fog-scn` = `fog` + SCN's units + `fog-scn` (after both client slices). `session-sim` gets no fog units.
-- **Leak strings** (player frames incl. `sync.loadScene` results): "Goblin Lurker", "Trap"; the barrel's asset ID; ids and `col`/`row` pairs of fog-hidden tokens; the fogged door's segment; plus scenes-map's list. **Property:** no player record has `fogged: true` unless it is an owned token; no `signal` names a fog-hidden token id.
+- **Bundle `vision`** = `scenes` + `goblin-2` + `encounter-1` + `fog-ambush` + `scn-walls` + `vision-senses` + `vision-crypt`. Positions: Mira (2, 7), Thorn (2, 9), Goblin (12, 6), Goblin 2 (12, 8), Lurker (17, 11); walls x = 8, d1 (8, 5)–(8, 6) closed, d2 locked. `session-sim` unchanged.
+- **Leak strings / properties** (each player's frames incl. acks and signals): ids, names, `col`/`row` of tokens that player can't see; "Goblin Lurker"; `seenBy`, `doorSeen`, `fogged`, `walls` keys; another player's `vision` / `fog-explored` id; Thorn's `senses` in `player-1` frames and Mira's in `player-2`'s; while blind, any fog subject but own tokens.
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | `FR-FOG-04 codec` (round trip, `""`, base 36, bad sum, cap); `FR-FOG-03 box` (offset 0 / > 0; re-base to a smaller box changes dropped cells, subjects re-derived); `FR-FOG-05 raster` (rect; triangle incl. a centre on an edge; concave; crossing / zero area refused; outside box; no-op); `FR-FOG-10 fogged` (1×1, Large with one clear cell, off-box `fill`, uncut template cells); `FR-FOG-11` matrix (owned / ownerless / hidden; prop; DM vs player template); `FR-FOG-07 stack`. Client: `FR-FOG-17–19 gestures` per mode (rect drag draws, polygon clicks, Space pans in both, < 4 px, Enter / double-click / first vertex, Backspace, Esc, crossing refused, 64 max, dropped on leaving live, right-click menu still opens); `FR-FOG-20/21 render` (row rects; DM vs player alpha; layer order) | In-code |
-| Integration | Each command: rows + undo row + log + one event, IDs from `ctx`, rollback → nothing; no-op → no event. `FR-FOG-02/23` create → fogged row; duplicate copies row not stack, copies re-derived; **delete → DM frame has the `fog` delete, DM store converges**. `FR-FOG-10 derive` per call site. `FR-FOG-12` per type × DM / owner / other player. **Leak tests** (`player-1`, `player-2`): snapshot + every frame through reveal rect / polygon, undo, Goblin 2 out of fog, Goblin into fog, `map.drag` of each (position and `end` frames), Fog all, Reveal all; **again after `resync`** at each fogged state; convergence. **`FR-FOG-14` per copy site** (each: no player `combatant` / `effect` / log-entry frame for the fog-hidden monster): Start with Goblin 2 fog-hidden; Start with created tokens at a fogged `at`; Add (Add hidden unticked) binding a token in fog; Add with created tokens in fog; link a token in fog; size refresh Large → Medium flipping fog-hidden; reveal → token + combatant + ranks in one `FogEdited`; move back into fog → hidden. `FR-FOG-15`: fog-hidden → `"dm"`; visible token previewed into fog → `"dm"` from the first fogged frame; `end` by stored state; owned → `"all"`. Crash hooks → digest before / after. Restart → identical snapshots, undo works. **CON-44:** heavy harness gains the §12 fog rows and the revealed battle scene; asserted under the picked option | `fog` |
-| Integration (with SCN) | `fog-scn`: barrel, Trap, door absent from player frames and `sync.loadScene` results; reveal their cells → upserts (door back in `scene-structure`); a DM ephemeral `scn.template` wholly in fog → `"dm"`, partly revealed → `"all"`; a player template in fog → visible to all | `fog-scn` |
-| E2E (thin) | DM + `player-1` (`// e2e-bundle: fog`): reveal a rect over Goblin → player sees it; player reload → still there; DM Undo → gone | `fog` |
+| Unit | `FR-FOG-26 shapes` (zod, crossing, zero area, caps); `FR-FOG-01 static state` (painter order, boundary, base mask + shapes, legacy forms = sprint-2 cells for every `fog-ambush-partial` cell); `FR-FOG-33 sightPolygon` golden cases (empty room, wall shadow, ray through a wall endpoint, collinear wall, door open / closed, darkness occluder vs see-through, r = 0, freeform decimals) + **property test** vs brute-force ray sampling + **benchmark** (150 / 2,000 walls); `FR-FOG-34` samples (Large token one cell seen, door both sides); `FR-FOG-36 blind` matrix (one / two sources, see-through); `FR-FOG-37` memory union + cap; `FR-FOG-38` cache keys (each input invalidates). Client: gestures per shape × snap / Ctrl, circle radius label, darkness select / move / remove, View as; render (painter, darkvision ring, darkness both ways, blind chip) | In-code |
+| Integration | Each command: rows + undo + log + one event, IDs from `ctx`, rollback → nothing. **Per-player leak tests** (`player-1`, `player-2`, snapshot + every frame, then again after `resync` at each state): Mira → (7, 5) with d1 open (P1 gets Goblin, P2 nothing); back → P1 delete, memory kept; Thorn into darkness with see-through (P2 gets Goblin 2) and with it switched off (P2 blind: deletes all but Thorn); DM wall added across Mira's sight (P1 delete); door closed; Fog all / Reveal all; `map.drag` of Goblin per player; DM ephemeral template routing. **Convergence** per player (FR-SYNC-20) with the identical-upsert drop. `FR-FOG-14`: Goblin seen by P1 only → combatant reaches both; seen by nobody → hidden; Lurker never. `FR-FOG-40 migration`: rows with `seenBy = null` from the `fog` bundle → backfill → per-player snapshots byte-equal the pre-backfill sprint-2 filter; rerun no-op. Re-derive triggers table (one test per row). Crash hooks → digest; restart → identical per-player snapshots. **CON-44:** heavy harness + v2 rows under the picked option (§12) | `vision`, `fog` |
+| E2E (thin) | `// e2e-bundle: vision`: `player-1` moves Mira to (7, 5) after the DM opens d1 → Goblin appears for P1 only (`player-2` context: absent); reload P1 → still there; DM places darkness over Goblin → gone for P1 | `vision` |
 
-**Browser walkthrough.** `PP_TEST_MODE=1`; `bun run build`, `fixtures:reset-load fog --profile verify` (step 11: `fog-scn`), `start --profile verify`. Contexts **A** DM, **B** `player-1`, **C** `player-2`. Evidence and teardown per AGENTS §9.6.
+**Browser walkthrough.** `PP_TEST_MODE=1`; `bun run build`, `fixtures:reset-load vision --profile verify`, `start --profile verify` (Herdr pane). **A** DM, **B** `player-1` (Mira), **C** `player-2` (Thorn). Evidence and teardown per AGENTS §9.6; WS frames of B and C logged.
 
 | # | DM (A) | Players (B, C) | Expected |
 |---|---|---|---|
-| 1 | Log in; view Goblin Ambush; "Show to players" | B, C open links | A: translucent fog, all tokens, "Fog" badge on Goblin, Goblin 2, Lurker. B, C: opaque fog; Mira, Thorn, Cave Ogre only |
-| 2 | Fog tool → Reveal, Rectangle; drag (11, 5)–(13, 7) | — | Goblin appears for B, C ≤ 1 s; Goblin 2 still absent |
-| 3 | Polygon: click (15, 10), (19, 10), (19, 13), (15, 13), the first vertex | — | Goblin Lurker appears |
-| 4 | Undo (Tooltip "Undo: reveal polygon") | — | Lurker gone; `fog-undo` `data-depth` −1 |
-| 5 | Drag Goblin 2 slowly from (12, 8) to (11, 6), drop | — | B, C: nothing while in fog; it appears at (11, 6) on the drop |
-| 6 | Drag Goblin from (12, 6) to (16, 6), drop | — | B, C: glides to the fog edge, vanishes on the drop; no player frame shows it in a fogged cell |
-| 7 | Hide, Rectangle over (0, 3)–(7, 11) | B drags Mira to (5, 5) | B, C still see Mira and Thorn (owned); B's move accepted |
-| 8 | Start "Ambush at the Ford"; Reveal all; Fog all (confirm); Undo | — | After Start, B, C Initiative: Mira, Thorn, Goblin 2 (Goblin fog-hidden; Wolf, Elite hidden). Reveal all → Goblin's row and token in one event. Fog all → Goblin, Goblin 2 leave map and Initiative. Undo → back |
-| 9 | Reveal a rect while B is dropped (Probes "drop connection") | B back | B: banner, then the revealed tokens, no reload |
-| 10 | Hard-kill server; restart | All rejoin | Fog, undo depth and visibility as before; Undo works |
-| 11 | *(after both client slices; bundle `fog-scn`)* Reveal a rect over (15, 1)–(19, 13) | B places a template in fog | Barrel, Trap and the door appear for B, C on the reveal, not before; B's template visible to A, B, C throughout. No leak string in B, C frames in any step; no console errors |
+| 1 | View Goblin Ambush, Show to players | B, C open links | A: translucent fog, Explored corridor lighter, hatched darkness, freeform wall, all tokens; Fog badge on Goblin, Goblin 2, Lurker. B: 30 ft circle around Mira cut at x = 8, nook clear, corridor dim and empty. C: 60 ft dimmed darkvision area cut at x = 8 |
+| 2 | Fog tool: Fog + Polygon, Ctrl-click 4 free vertices over (15.3, 10.2)…; Darkness + Circle, Ctrl-free radius at (16.4, 3.7) | — | Draft vertices off-grid (`free`); label "≈ 11 ft"; shapes appear for B, C ≤ 1 s; Undo removes the polygon (depth −1), not the darkness |
+| 3 | Structure → Wall, hold Ctrl: polyline (9.3, 1.2) → (11.7, 3.9) → (10.2, 5.6), double-click | — | Off-grid wall for A; B, C frames: no `walls` key |
+| 4 | Open d1 | B drags Mira → (7, 5) | B: Goblin appears in Mira's sight through the doorway; C: no Goblin frame. Corridor cells east of the door turn Explored for B only |
+| 5 | — | B drags Mira back → (2, 7) | B: Goblin `delete`; the cells Mira saw stay dim (memory); C unchanged |
+| 6 | Drag Goblin across the x = 8 wall | B drags Mira slowly toward (10, 7), then toward (6, 3), drops | A: crossed segment red + "through wall", drop accepted. B: a red wall piece at x = 8 before the drop, then across the freeform wall; drop refused, Toast, cell flash (SCN) |
+| 7 | Drag Thorn into the darkness (11, 9) | — | C: darkness as a darker see-through tint, Goblin 2 visible inside; B: nothing new |
+| 8 | Thorn's sheet: switch "Sees through magical darkness" off; then on again | — | Off: C's screen dark, grid + Thorn only, chip "Magical darkness — you can't see"; C frames: one `CharacterSheetEdited` with deletes for every other token, prop and door (Mira too). On: view restored in one event. B unaffected throughout |
+| 9 | Start "Ambush at the Ford" | — | B, C Initiative: Goblin 2 (seen by C) and party; Goblin (seen by nobody now), Lurker absent; Wolf, Elite hidden |
+| 10 | View as Player 1; Remember explored off, then on; Forget explored… | — | A sees B's render overlaid; B's memory hidden then back; after Forget, B's corridor fogged again |
+| 11 | Place a darkness while B is dropped (Probes) | B back | B: banner, then current state; frames after resync carry no record B can't see |
+| 12 | Hard-kill server; restart | All rejoin | Shapes, darkness, memory, undo depth, per-player views as before; `state:digest` equal; no console errors |
 
 ## 14. Dependencies
 
 | On | What we need | Status |
 |---|---|---|
-| [scenes-map](scenes-map.md) | Registries + call sites (FR-FOG-24), size refresh runs token hooks, token fn consults `hides`, `drag.ts` consults `dragToDm`, `fog` layer slot 30, overlay line | complete; settled S3, S6 |
-| [scene-tools](scene-tools.md) | Window ADR covering `token` (`fix/active-scene-window`, before both cores); canvas core + `canvas-tools.ts` (stage dispatch, Space pan, BO3); props / templates with `fogged`, uncut cells, `placedByPlayerId` (templates), `derive` calls, `hides`; door flag (OQ-SCN-06); `scn-props`, `scn-templates` | spec in parallel |
-| [live-sync](live-sync.md) | Scene gate for `fog`; `audience` read access (FR-SYNC-28) | complete |
-| [combat-tracker](combat-tracker.md), [combat-extras](combat-extras.md) | Every hidden copy via `tokenHiddenForPlayers` (FR-FOG-14) | complete; amended per OQ-FOG-07 (decided #196) |
-| [effect-modifiers](effect-modifiers.md) | Nothing: OQ-FOG-04 decided (B) (#196); presets stay in the snapshot (#190) | complete; unchanged |
-| [fixtures-adapters](fixtures-adapters.md) | Units + bundles `fog`, `fog-scn`; ripple (FR-FOG-25) | complete |
-
-**Registries** (same table in scene-tools; AGENTS §9.9 additions by the integrator)
-
-| Registry | Path | Created by | Who appends |
-|---|---|---|---|
-| Scene visibility hooks | `src/server/features/scenes-map/visibility-hooks.ts` | `fix/fog-core` | fog (`derive`, `hides`, `dragToDm`); SCN calls `deriveSceneObject`, consults `hides` |
-| Scene lifecycle hooks | `src/server/features/scenes-map/scene-hooks.ts` | `fix/fog-core` | fog (`created`, `duplicated`, `deleting`); SCN (`duplicated`, `deleting`) |
-| Move guards | `src/server/features/scenes-map/move-guards.ts` | `fix/scn-core` | SCN (walls / doors) |
-| Canvas tools | `src/client/common/features/scenes-map/canvas-tools.ts` | `fix/scn-core` | SCN tools; fog's Fog tool |
+| [scene-tools](scene-tools.md) | Freeform segments, walls + non-open doors as occluders (FR-SCN-37), door samples, `doorSeen`, structure edits re-derive (FR-SCN-39), `map.checkMove` wall hint (FR-SCN-38) | revised here |
+| [character-sheet-full](character-sheet-full.md) | `statBlock.senses` + sheet UI (FR-CHARX-49–52) | revised here |
+| [scenes-map](scenes-map.md) | Registry members + call sites (FR-FOG-24), `rederive` after token writes, `fogged` DM-only on the wire, `seenBy` column, `map.checkMove` (OQ-FOG-36) | open question |
+| [live-sync](live-sync.md) | Identical-upsert drop (FR-SYNC-19), per-player signal audience (FR-SYNC-28), derived record type, `fog` windowed (OQ-FOG-37) | open question |
+| [combat-tracker](combat-tracker.md), [combat-extras](combat-extras.md) | Nothing in code under OQ-FOG-25 B; the meaning of `tokenHiddenForPlayers` changes (OQ-FOG-38) | open question |
+| [campaign-management](campaign-management.md) | A player create / delete hook line (OQ-FOG-39) | open question |
+| [play-shell](play-shell.md) | Nothing: the dark screen covers the canvas only (OQ-FOG-40) | open question |
+| [entities](entities.md), compendium (track C) | `senses` on both kinds; SRD darkvision on imported monsters (OQ-FOG-41) | open question |
+| [fixtures-adapters](fixtures-adapters.md) | Units `vision-senses`, `vision-crypt`, bundle `vision` | at merge |
 
 **Shared changes** (builders report `shared change needed:` per AGENTS §9.9)
 
 | Path | Change | Slice |
 |---|---|---|
-| ★ `src/server/db/` (schema lock; one core at a time) | `scene_fog`, `scene_fog_edit`, `token.fogged` | 1 |
-| `src/shared/events/fog-of-war.ts` | `FogEdited`, `FogUndone` | 1 |
-| `src/server/features/scenes-map/` (cross-feature lock) | Both registries (empty); `derive` call sites; size refresh runs token hooks; `tokenVisibility` consults `hides`; `drag.ts` consults `dragToDm` (incl. `end` rule); `sceneHooks` run in create / duplicate / delete; exports | 1 |
-| Record-type registry, feature list, `fixtures/bundles/index.ts` | `fog` type; `fogOfWar`; bundles `fog`, `fog-scn` | 2, 5 |
-| `canvas-layers.ts`, `token-overlays.ts`, SCN's `canvas-tools.ts` | `fog` layer (30), `fog` overlay line, Fog tool line | 3 |
-| `combat-tracker/` (`lifecycle.ts`, token hook), `combat-extras/` (`add-combatants.ts`, `bind-token.ts`, effect copy) — combat lock, one at a time with SCN's `build/scene-tools-settings` | FR-FOG-14 | 4 |
-| Ripple: `fixtures/units/scenes-map/{town,battlemap,scenes-extras}.ts`; the test helpers and harness in FR-FOG-25 | Reveal after create; re-baselines | 4 |
-| Docs | data model, protocol (§5 `fog`, intents, events, registries, CON-44 row), glossary (OQ-FOG-16) | consolidation |
+| ★ `src/server/db/` (schema lock) | `scene_fog` columns, `scene_fog_edit.prevShapes`, `fog_explored`, `seen_by` on `token` / `prop` / `aoe_template`, `scene_structure.door_seen` | V0 |
+| ★ `src/server/ws/`, `src/shared/protocol/` (ws lock) | identical-upsert drop; `SignalAudience` player lists; derived record types; `fog` flagged `dmWindow`; leak / convergence helpers per player; CON-44 test re-baselined | V0 |
+| `src/server/features/scenes-map/` (MAP lock) | `visibility-hooks.ts` members + `rederive` call sites in every token write, `drag.ts` per-player audience, token wire without `seenBy`, `fogged` DM-only, `map.checkMove` + guard hints ([ADR-0040](../architecture/adr/0040-token-move-guards.md)) | V0 |
+| `src/shared/entities/schemas.ts`, entities `definition-hooks.ts` | `senses` zod; fog's hook line | V0 / V2 |
+| `src/shared/events/fog-of-war.ts` | darkness / explored events | V0 |
+| Record-type registry, feature list, `fixtures/bundles/index.ts` | `fog-explored`, `vision`; bundle `vision` | V0, V2 |
+| campaign-management player commands | re-derive line (OQ-FOG-39) | V2 |
+| Docs | data model, protocol (§5 `fog`, §35 registries, CON-44 row), glossary (OQ-FOG-42) | consolidation |
 
-**Build slices** (after DM gate 2). Order: SCN `fix/active-scene-window` → `fix/fog-core` → `fix/scn-core` → fog 2 ∥ SCN slices → fog 3 → fog 4; every intermediate `main` is neutral for players (BO1).
+**Build slices** (after DM gate 1). Order: **V0 → (V1 ∥ V4 ∥ V5) → V2 → V3**; V6 only if OQ-FOG-25 ≠ B. Every intermediate `main` is neutral for players: no senses are set outside fixtures until V5.
 
-| # | Branch | Contents | Players see |
-|---|---|---|---|
-| 1 | `fix/fog-core` (M) | Schema, events, empty registries + scenes-map call sites, `fog` record type, codec + raster | nothing new |
-| 2 | `build/fog-server` (M) | Commands, undo, `derive` + `deleting` / `duplicated` lines, fixtures `fog-ambush*`, bundle `fog`, command / crash tests | nothing new (`fogged` written, nothing hidden) |
-| 3 | `build/fog-client` (L), after `fix/scn-core` | DM render, Fog tool + gestures, overlay badge | nothing new (DM-only render) |
-| 4 | `build/fog-visibility` (M), last | `hides` + `dragToDm` + `created` lines, player render, FR-FOG-14 combat sites, ripple, leak / CON-44 tests, e2e, walkthrough 1–10 | fog |
-| 5 | with SCN's last client slice (S) | `fog-scn` fixture + bundle, SCN-subject leak tests, walkthrough step 11 | — |
+| # | Branch | Contents | Shared files | Players see |
+|---|---|---|---|---|
+| V0 | `fix/vision-core` (L; schema + ws + MAP locks) | Schema + migration backfill, `@shared/fog-of-war/{shapes,vision}.ts` (sweep + benchmark), registry members + call sites (no-op lines), ws changes, `senses` zod, record types registered empty, CON-44 | ★ db, ★ ws / protocol, scenes-map, entities schemas, events | nothing new |
+| V1 | `build/fog-shapes` (M) | Shape / darkness / explored intents, undo over shapes, static derive with darkness, tools (Ctrl, circle, darkness edit), DM + player static render | own folders; `canvas-tools.ts` line exists | DM's freeform fog + darkness (static) |
+| V4 | `build/walls-freeform` (M, SCN) | Decimal segments, Ctrl drawing + magnet, scaled guard, occluder export, `map.checkMove` guard hint, red highlight (player, DM) | scene-tools folders (the wall guard's hint line; `map.checkMove` itself lands in V0) | red wall highlight |
+| V5 | `build/sheet-senses` (S, CHARX) | Senses UI, `char.edit` key, `vision-senses` | character-sheet folder lock | senses on own sheet |
+| V2 | `build/vision-server` (L) | Sight + cache + re-derive triggers + explored writes + `vision` records + per-player drag audience + definition / player hook lines + leak tests + `vision-crypt`, bundle `vision` | entities hook line, campaign-management line | records by vision |
+| V3 | `build/vision-client` (M, canvas lock) | Player vision render, darkvision ring, darkness overlay, blind screen, View as, e2e, walkthrough | own folders | vision |
+| V6 | `build/vision-combat` (only if OQ-FOG-25 A / C) | Per-player combat copies | combat lock | — |
 
 ## 15. Open questions
 
-All decided at DM gate 2 (#196, "go with picks") unless marked for the integrator.
+Sprint-2 rows OQ-FOG-01–19 were decided at gate 2 (#196) and stay in force except: **05 / 06** (cell mask, corner snap) superseded by #201 (freeform shapes, Ctrl); **14** (every footprint cell) restated as FR-FOG-34's samples (same cells); **03** (owned tokens visible to all) refined by FR-FOG-36 (blind); **04** (CON-44) continued by OQ-FOG-30; **16 / 17** carry on below.
 
-| ID | Question | Decision | Blocking? | Affects |
+| ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-FOG-01 | Scope | **Decided (#196):** as §2: rect + polygon, reveal / hide, Reveal all, Fog all, Undo; no brush | — | — |
-| OQ-FOG-02 | Default for a new scene | **Decided (#196):** fully fogged; the DM reveals | — | ripple (FR-FOG-25) |
-| OQ-FOG-03 | Who sees owned tokens under fog | **Decided (#196):** every player (`hides` the same for every player; combat copies one flag; `"all" \| "dm"` routing kept). Rejected: owner only, nobody | — | scenes-map, combat, ADR-0033 |
-| OQ-FOG-04 (= OQ-SCN-01) | CON-44 (§12, measured) | **Decided (#196): (B) token window + SCN active-scene window** (676,257 B, 110,175 B left; `fix/active-scene-window` first). Rejected: (A) presets on demand, (C) raise the ceiling | — | scene-tools, live-sync, protocol CON-44 |
-| OQ-FOG-05 | Fog geometry | **Decided (#196):** cell mask, run-length; diagonals stepped | — | — |
-| OQ-FOG-06 | Polygon snap | **Decided (#196):** grid corners | — | — |
-| OQ-FOG-07 | Fog-hidden monsters in combat | **Decided (#196):** fog-hidden counts as hidden for every combat copy (FR-FOG-14; combat-tracker, combat-extras amend) | — | combat-tracker, combat-extras |
-| OQ-FOG-08 (= OQ-SCN-08) | Undo for scene editing | **Decided (#196):** both: fog server per-scene stack (depth 20, persisted, no redo) and SCN client inverse intents; ADR-0016's "not scene edits" amended (fog-visibility ADR accepted) | — | ADR-0016, glossary |
-| OQ-FOG-09 | The map image is downloaded whole | **Decided (#196):** accepted; fog hides records, not pixels | — | assets-pipeline |
-| OQ-FOG-10, -11, -12, -15 | Registries, layers, SCN subjects, core order | **Decided (seams S2, S3, S5, S6, review rulings; confirmed #196):** §14 registry table; layer order FR-FOG-20; subjects FR-FOG-10/11; doors OQ-SCN-06; `fix/active-scene-window` → `fix/fog-core` → `fix/scn-core` | — | scene-tools |
-| OQ-FOG-13 | Camera fit | **Decided (#196):** no change | — | scenes-map |
-| OQ-FOG-14 | When a subject counts as under fog | **Decided (#196):** every footprint cell fogged | — | scene-tools |
-| OQ-FOG-16 | Glossary | Integrator: **Fog** → "Cells of a scene hidden from players, drawn by the DM; what lies wholly under it is filtered server-side"; add **Fog-hidden**, **Reveal all / Fog all**, **Canvas layer** (with SCN); **Undo** → one row covering combat (log entries), fog (server stack) and scene drawing (client inverse intents) | no · integrator | glossary |
-| OQ-FOG-17 | Fog colours | **Decided (#196):** placeholder `fog.dm` / `fog.player` until theme-system | — | visual-direction |
-| OQ-FOG-18 | Ripple | **Decided (#196):** reveal after create in units and test helpers; one undo entry per rippled scene accepted | — | fixtures, tests |
-| OQ-FOG-19 | Numbers | **Decided (#196):** ≤ 1 s, 2,000 runs, 64 vertices, undo 20, DM alpha 50 % | — | — |
+| OQ-FOG-20 | Whose vision does a player see through? | **A own characters only** (DM's wording; dark screen is per player) · B shared party vision (one `seenBy` per party, cheaper; dark screen contradicts it) · C campaign switch (both paths to build and test) | yes | — |
+| OQ-FOG-21 | Do walls block sight? | **A yes, walls + doors not open** (the natural reading of #202; vision polygon per source) · B no, radius only (cheap, but vision leaks through walls) · C walls yes, doors never | yes | scene-tools |
+| OQ-FOG-22 | Explored memory: per player or party; where; reset | **A per player, cell rows `fog-explored` in the DB, DM "Forget explored" per scene; Fog all keeps it** (follows A of -20; ~210 B per player) · B per party, one row per scene (simpler; a player "remembers" rooms they never saw) · C client memory only (lost on reload) | yes | — |
+| OQ-FOG-23 | Darkvision vs vision with no lighting model | **B two radii; records use the larger; between them the map draws dimmed + desaturated** (5e flavour at no rules cost) · A one "sight" radius (simplest; darkvision is just a number) · C per-map light level bright / dim / dark (a lighting model; ADR scope) | yes | character-sheet-full |
+| OQ-FOG-24 | Doors and sight | **A closed / locked block sight, open don't; a door is seen from either side** · B doors never block sight (players see through closed doors) | yes | scene-tools |
+| OQ-FOG-25 | Vision-hidden combatant: Initiative, targets | **B party-level: hidden only while no player sees the token; no combat change** (P2 may see a row for a goblin only P1 sees, without its position) · A per player (combat copies, outcome lines and ranks per player: big amendments in two complete specs) · C sticky: once seen in an encounter, stays | yes | combat-tracker, combat-extras |
+| OQ-FOG-26 | Vision update rate while dragging | **A on drop only** (one recompute per move) · B private live preview ≤ 10 Hz to the dragger, fog peels, records still on drop (~1.6 KB × 10/s per dragger) · C client-side (needs walls on players: leak) | no · DM gate 1 | scenes-map |
+| OQ-FOG-27 | Migration from the cell mask | **A keep the mask as the base layer, shapes paint over it; boot backfill fills `seenBy` once** (byte-identical views, no data rewrite) · B convert masks to rectangles (≤ 2,000 runs → over the shape cap) · C convert to polygons (needs a union library) | yes | fixtures |
+| OQ-FOG-28 | Where per-player visibility is computed | **A server-written per-player `seenBy` copies (ADR-0039 pattern) + server vision polygons** (fns stay pure; atomic; crash-safe) · B in-memory per-player set read by the filter (breaks ADR-0021; transition matrix needs before-state) · C client render + coarse server filter (leaks positions) | yes | live-sync |
+| OQ-FOG-29 | Geometry dependency (needs the DM's OK if a library) | **A hand-rolled** sweep + point-in-shape, ~300 lines + property tests; exact integer-scaled math shared with the move guard · B `visibility-polygon` 1.1.0 (MIT, 5.5 KB min, 0 deps, last release 2020, float) · C `martinez-polygon-clipping` 0.9.0 (MIT, ~11 KB, active, 2026-09) or `polygon-clipping` 0.15.7 (MIT, 29 KB, 2023): only if memory or shapes become polygons (not picked) | yes | — |
+| OQ-FOG-30 | CON-44 (measured §12) | **B window `fog` to the active scene + explored + vision preview: 684,626 B, 101,806 left** · A not windowed: 66,341 left, over at caps · C windowed, no preview: 112,485 left | yes | live-sync, ADR-0041 |
+| OQ-FOG-31 | DM "View as player" | **A in** (DM gets the active scene's `vision` + `fog-explored`, +10.7 KB; DM checks the fog before play) · B out (Fog badge only) | no · DM gate 1 | — |
+| OQ-FOG-32 | Fog shapes and darkness geometry to players | **A the active scene's whole `fog` row to every player; drawn only where seen** (accepted leak: a darkness blob deep in fog is in the frame, not on screen) · B per-player filtered darkness (`seenBy` per shape, more derive work) | no · DM gate 1 | — |
+| OQ-FOG-33 | "Explored" as a DM drawing mode | **A yes: a known-but-unseen area (map shown, contents hidden)** · B memory only | no · DM gate 1 | — |
+| OQ-FOG-35 | Numbers | **≤ 100 fog + 20 darkness shapes, row ≤ 16 KiB, 64 vertices, circle ≤ 60 cells, Explored default off, senses default 0, cache 256, move ≤ 30 ms at caps** | no · DM gate 1 | — |
+| OQ-FOG-36 | **scenes-map:** registry members `derive → {fogged, seenBy}`, `hides(…, viewer)`, `dragAudience`, `rederive`; `seenBy` column; `fogged` DM-only; `map.checkMove` with guard hints | **Accept as FR-FOG-24 / FR-SCN-38** (one MAP-lock change in V0) · ask scenes-map for another shape | yes | scenes-map, ADR-0039, ADR-0040 |
+| OQ-FOG-37 | **live-sync:** FR-SYNC-19 drops `visible → visible` upserts with identical wire data per connection; FR-SYNC-28 audience may be a player list; derived record types; `fog` gets `dmWindow` | **Accept** (V owns the ws lock) · per-connection last-sent cache instead of the before / after compare (memory per connection) | yes | live-sync, ADR-0033, ADR-0041 |
+| OQ-FOG-38 | **combat-tracker / combat-extras:** `tokenHiddenForPlayers` = hidden or seen by nobody (OQ-FOG-25 B) | **Accept: note in both specs, no FR change** · per OQ-FOG-25 A: per-player combat copies | yes | combat-tracker, combat-extras |
+| OQ-FOG-39 | **campaign-management:** a new player must get `seenBy` membership on every scene | **A a player-created / deleted hook line calling fog's re-derive** · B fog re-derives lazily on that player's first hello (a snapshot-time write: rejected) | no · DM gate 1 | campaign-management |
+| OQ-FOG-40 | **play-shell:** does the dark screen cover windows? | **A canvas only; sheet, Initiative, log stay usable** · B dim the whole shell | no · DM gate 1 | play-shell |
+| OQ-FOG-41 | **entities / compendium:** imported SRD monsters' darkvision | **A adapters / compendium fill `senses` from SRD "darkvision N ft"; matters only for player-owned tokens** · B DM derives a custom definition | no · DM gate 1 | entities, compendium |
+| OQ-FOG-42 | Glossary | Integrator: **Fog** → "Areas of a scene hidden from players: freeform shapes over a base mask; pierced by vision"; add **Explored**, **Magical darkness**, **Vision source**, **Sight**, **Darkvision**, **Sees through magical darkness**, **Blind (dark screen)**, **Seen by** (server copy), **View as**; **Fog-hidden** → per player | no · integrator | glossary |
+| OQ-FOG-17 | Fog colours | Placeholder tokens §7 until theme-system | no · integrator | visual-direction |
+
+OQ-FOG-34 is retired (merged into SCN's OQ-SCN-22 while drafting).
 
 ## 16. Out of scope
 
-- Vision, lighting, line of sight, fog by walls ([ADR-0007](../architecture/adr/0007-product-scope.md)); exploration memory; brush; player fog tools; fogged map images (OQ-FOG-09).
-- Layers, walls, doors, props, AoE templates, the active-scene window itself → [scene-tools](scene-tools.md).
+- Dynamic lighting, light sources, colour, shadows; vision for unowned tokens; darkness attached to tokens; one-way / terrain walls; fogged map images (OQ-FOG-09).
+- Layers, walls, doors, props, AoE templates themselves → [scene-tools](scene-tools.md); senses on the sheet → [character-sheet-full](character-sheet-full.md).
