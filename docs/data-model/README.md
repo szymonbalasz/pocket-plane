@@ -1279,13 +1279,20 @@ Indexes unique `party_item_seq`, `party_item_campaign_seq` (`campaign_id`, `seq`
 - **Item rows in the gold ledger:** `party.addItem` writes `loot_entry {kind: item, world → party, text = name, qty, coins 0}` and a `loot-received` notification; pot and wallets unaffected (coins 0). Moves (`party ↔ character`) come with P4.
 - **Snapshot size** (CON-44, #208; PARTY's `con44.test.ts`): heavy harness on `session-sim` + PARTY's units + the §12 board at max length (30 handouts, 10 with 3 images, 20 shared all / 5 player-1 / 5 unshared; 60 party items; every one of the 100 window loot rows an item row with `qty` 9 999): DM 672,902 → 674,002 B (**+1,100**, all `loot-entry.qty`; 374,574 B left of 1 MiB), every player **+1,100** (max 281,281 B of 512 KiB). `handout`, `handout-body`, `party-item` in no snapshot. Load acks (`lazyLoadSizes`): 30 headers DM 12,009 B (player max 8,658 B); worst body chunk (30 bodies at 10,000 chars) 255,340 B; 60 items 23,400 B.
 
-## 32. Sprint 3: dynamic vision server + Invisible (V2)
+## 32. Sprint 3: freeform walls + wall hint (V4)
 
-From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V2). **Built by `build/vision-server`**: no new table or column; V2 writes [§26](#26-sprint-3-vision-core-v0)'s per-player fields by sight. Protocol side: [protocol §45](../protocol/README.md#45-sprint-3-dynamic-vision-server--invisible-v2).
+From [scene-tools](../specs/scene-tools.md#8-data-model) (SCN §14 slice V4). **Built by `build/walls-freeform`**: no new table, column or record type; `scene_structure.walls` / `doors` take the ≤ 2-decimal points [§26](#26-sprint-3-vision-core-v0) allows, written by the freeform Structure tool. Protocol side: [protocol §45](../protocol/README.md#45-sprint-3-freeform-walls--wall-hint-v4).
+
+- **Client only:** the polyline in progress may hold free points (0.01 cell); the player's current wall hint pieces (from the latest `map.checkMove` ack, cleared on cell change, drag end, snapshot, leaving live); the Ctrl state for the "Free" chip.
+- **CON-44:** unchanged (no new record or field; decimal coordinates per SCN §12, ≤ 3 B per freeform number).
+
+## 33. Sprint 3: dynamic vision server + Invisible (V2)
+
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V2). **Built by `build/vision-server`**: no new table or column; V2 writes [§26](#26-sprint-3-vision-core-v0)'s per-player fields by sight. Protocol side: [protocol §46](../protocol/README.md#46-sprint-3-dynamic-vision-server--invisible-v2).
 
 | Field | Written by (V2) | Rule | Source |
 |---|---|---|---|
-| `token.seenBy`, `prop.seenBy`, `aoe_template.seenBy`, `scene_structure.doorSeen` | `derive` before every subject write; every re-derive (protocol §45 triggers) | P ∈ `seenBy` iff P is not blind and a sample point is statically clear outside darkness, or inside one of P's sight polygons (a polygon without see-through never counts in darkness). Owned token: owner + every non-blind player. Unowned **invisible** token: only players with a Sees-invisible polygon over a sample point (static clear, Explored and memory never count). Player-placed template: every player. A player without sources: the static rule (sprint 2) | FR-FOG-10, -34, -36, -46 |
+| `token.seenBy`, `prop.seenBy`, `aoe_template.seenBy`, `scene_structure.doorSeen` | `derive` before every subject write; every re-derive (protocol §46 triggers) | P ∈ `seenBy` iff P is not blind and a sample point is statically clear outside darkness, or inside one of P's sight polygons (a polygon without see-through never counts in darkness). Owned token: owner + every non-blind player. Unowned **invisible** token: only players with a Sees-invisible polygon over a sample point (static clear, Explored and memory never count). Player-placed template: every player. A player without sources: the static rule (sprint 2) | FR-FOG-10, -34, -36, -46 |
 | `fogged` (same rows), door `f` | as above | Unowned: seen by nobody (statically hidden while the campaign has no players; an unowned invisible token: true then). Owned: statically hidden | FR-FOG-10 |
 | `token.invisible` | `fog.setInvisible` (DM); `map.duplicateToken` copies it; placement false | bool; DM wire only, never a player's | FR-FOG-45 |
 | `scene_fog.darkness[].seenBy` | every re-derive | + the players whose sight polygons meet the shape's bounding box (V1's static part kept) | FR-FOG-44 |
