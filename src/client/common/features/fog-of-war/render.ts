@@ -8,8 +8,17 @@
 //   statically clear (never over Fog or Explored): painted first, erased under base fog and under
 //   each fog / explored shape, re-painted inside each reveal shape.
 // DOM-free (a minimal 2D-context interface) so it runs under `bun test`.
+import { exploredMask } from "@shared/fog-of-war/explored";
 import { type FogRow, fogBox, maskOf, rebase } from "@shared/fog-of-war/mask";
-import type { FogBox, FogFill } from "@shared/fog-of-war/schemas";
+import {
+  FOG_EXPLORED_TYPE,
+  type FogBox,
+  type FogExploredRecord,
+  type FogFill,
+  scenePlayerId,
+  VISION_TYPE,
+  type VisionRecord,
+} from "@shared/fog-of-war/schemas";
 import type {
   DarknessShape,
   FogLayerShape,
@@ -296,4 +305,35 @@ function boxPx(s: ShapeLike, g: GridPx, dx: number, dy: number): [number, number
   const xs = s.polygon.filter((_, i) => i % 2 === 0);
   const ys = s.polygon.filter((_, i) => i % 2 === 1);
   return [X(Math.min(...xs)), Y(Math.min(...ys)), X(Math.max(...xs)), Y(Math.max(...ys))];
+}
+
+/**
+ * FOG §7 marker attrs from the viewer's own rows on a scene (players: their `vision` and
+ * `fog-explored`, written from V2 on): `fog-vision` `{sources, blind, see, dark}` (the record's
+ * flat polygons; `sources` = polygons per kind, at most one each per source) and `fog-explored`
+ * `{cells}`. Null when the row is absent.
+ */
+export function ownFogRows(
+  records: Readonly<Record<string, Readonly<Record<string, unknown>>>>,
+  sceneId: string,
+  playerId: string | null,
+): {
+  vision: { sources: number; blind: boolean; see: number[][]; dark: number[][] } | null;
+  explored: { cells: number } | null;
+} {
+  if (playerId === null) return { vision: null, explored: null };
+  const id = scenePlayerId(sceneId, playerId);
+  const v = records[VISION_TYPE]?.[id] as VisionRecord | undefined;
+  const e = records[FOG_EXPLORED_TYPE]?.[id] as FogExploredRecord | undefined;
+  return {
+    vision: v
+      ? {
+          sources: Math.max(v.see.length, v.dark.length),
+          blind: v.blind,
+          see: v.see,
+          dark: v.dark,
+        }
+      : null,
+    explored: e ? { cells: exploredMask(e).cells.reduce((n, c) => n + c, 0) } : null,
+  };
 }

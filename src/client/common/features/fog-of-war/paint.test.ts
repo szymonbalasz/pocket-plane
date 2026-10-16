@@ -1,13 +1,16 @@
 // FOG §13 client unit rows: FR-FOG-20/21 painter (V1, static). A tiny software rasteriser stands in
 // for the canvas (pixel centres, source-over / destination-out, clip), so the tests read what a
 // pixel ends up showing: painter order over the base mask, DM alphas, player darkness only where
-// statically clear (never over Fog or Explored), the `fog-mask` attrs, DM darkness hatching.
+// statically clear (never over Fog or Explored), the `fog-mask` attrs, DM darkness hatching, the
+// `fog-vision` / `fog-explored` markers.
 import { describe, expect, test } from "bun:test";
+import { encodeRuns } from "@shared/fog-of-war/mask";
 import type { DarknessShape, FogLayerShape } from "@shared/fog-of-war/shapes";
 import {
   FOG_ALPHA,
   type FogPaints,
   fogStats,
+  ownFogRows,
   type PaintCtx,
   paintDarknessDm,
   paintFog,
@@ -220,5 +223,42 @@ describe("FR-FOG-20/21 painter", () => {
     // 60 cells: reveal 6 × 6 = 36 (centres x, y ≤ 6), explored 3 × 3 = 9, fog circle r 0.75 at
     // (2, 2) holds centres (1.5, 1.5), (2.5, 1.5), (1.5, 2.5), (2.5, 2.5) (d 0.707).
     expect(s).toEqual({ shapes: 3, darkness: 1, fogged: 24 + 4, explored: 9 - 4 });
+  });
+
+  test("FOG §7 fog-vision / fog-explored markers: the player's own rows only", () => {
+    const m = new Uint8Array(6).fill(0);
+    m[1] = 1;
+    m[4] = 1;
+    const records = {
+      vision: {
+        "s:p1": {
+          id: "s:p1",
+          sceneId: "s",
+          playerId: "p1",
+          blind: false,
+          see: [[0, 0, 1, 0, 1, 1]],
+          dark: [],
+        },
+        "s:p2": { id: "s:p2", sceneId: "s", playerId: "p2", blind: true, see: [], dark: [] },
+      },
+      "fog-explored": {
+        "s:p1": {
+          id: "s:p1",
+          sceneId: "s",
+          playerId: "p1",
+          box: [0, 0, 3, 2],
+          runs: encodeRuns(m, "clear"),
+        },
+      },
+    };
+    expect(ownFogRows(records, "s", "p1")).toEqual({
+      vision: { sources: 1, blind: false, see: [[0, 0, 1, 0, 1, 1]], dark: [] },
+      explored: { cells: 2 },
+    });
+    expect(ownFogRows(records, "s", "p2")).toEqual({
+      vision: { sources: 0, blind: true, see: [], dark: [] },
+      explored: null,
+    });
+    expect(ownFogRows(records, "s", null)).toEqual({ vision: null, explored: null });
   });
 });

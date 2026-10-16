@@ -1,11 +1,12 @@
 // `fog` canvas layer (order 30, FR-FOG-20/21; no new Konva layer): the shown scene's static fog
 // as one painted shape (`fog-mask`, `listening: false`, attrs `shapes`, `darkness`,
-// `fogged-cells`, `explored-cells`, `fog-alpha`), clipped to the map; translucent for the DM, opaque for
-// players. On the DM client also each darkness shape, hatched (`fog-darkness`, id = darkness id,
-// attr `selected`; a drag draws it at its offset), the Fog tool's draft (`fog-draft`,
-// `fog-draft-vertex` with attr `free`, the circle's radius label) and the shown scene the fog
-// bar acts on. Players: from their redacted `fog` record (darkness filtered, FR-FOG-44); no row →
-// no fog.
+// `fogged-cells`, `explored-cells`, `fog-alpha`), clipped to the map; translucent for the DM,
+// opaque for players. On the DM client also each darkness shape, hatched (`fog-darkness`, id =
+// darkness id, attr `selected`; a drag draws it at its offset), the Fog tool's draft
+// (`fog-draft`, `fog-draft-vertex` with attr `free`, the circle's radius label) and the shown
+// scene the fog bar acts on. Players: from their redacted `fog` record (darkness filtered,
+// FR-FOG-44; no row → no fog), plus non-drawing markers `fog-vision` / `fog-explored` from their
+// own rows (V2 writes them; V3 draws vision).
 import { FOG_TYPE } from "@shared/fog-of-war/schemas";
 import type { DarknessShape } from "@shared/fog-of-war/shapes";
 import { useEffect, useMemo, useRef } from "react";
@@ -21,6 +22,7 @@ import {
   type FogPaints,
   type FogRecordLike,
   fogStats,
+  ownFogRows,
   type PaintCtx,
   paintDarknessDm,
   paintFog,
@@ -215,8 +217,10 @@ function shapeOutline(
   ctx.closePath();
 }
 
+const noDraw = () => {};
+
 export function FogLayer() {
-  const { client, scene, grid, store, activeTool, cam } = useCanvas();
+  const { client, scene, grid, store, activeTool, cam, myPlayerId } = useCanvas();
   const hairline = 1 / cam.scale;
   const rec = (store.records[FOG_TYPE]?.[scene.id] ?? null) as FogRecordLike | null;
   const { mapWidth, mapHeight } = scene;
@@ -226,6 +230,10 @@ export function FogLayer() {
     [mapWidth, mapHeight, gridCellSize, gridOffsetX, gridOffsetY],
   );
   const stats = useMemo(() => fogStats(rec, map), [rec, map]);
+  const own = useMemo(
+    () => ownFogRows(store.records, scene.id, client === "player" ? myPlayerId : null),
+    [store.records, scene.id, client, myPlayerId],
+  );
   const paints = useMemo(() => paintsFor(client), [client]);
   // The fog bar acts on the scene this DM canvas shows (FR-FOG-17, FR-MAP-08).
   useEffect(() => {
@@ -270,6 +278,9 @@ export function FogLayer() {
         </Group>
       )}
       {drafting && gesture.draft && <Draft draft={gesture.draft} pending={gesture.pending} />}
+      {/* FOG §7 markers (draw nothing): the player's own vision and explored memory. */}
+      {own.vision && <Shape name="fog-vision" {...own.vision} sceneFunc={noDraw} />}
+      {own.explored && <Shape name="fog-explored" cells={own.explored.cells} sceneFunc={noDraw} />}
     </Layer>
   );
 }
