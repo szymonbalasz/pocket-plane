@@ -407,6 +407,11 @@ describe("PARTY §13 leak tests (player-1, player-2)", () => {
       }),
     );
     const takeEntry = (take.result as { entryId: string }).entryId;
+    // FR-SYNC-14: the sender's event frame comes before its ack.
+    const own = p1.frames.slice(marks[1]);
+    const evAt = own.findIndex((f) => f.type === "event" && f.cause.name === "ItemMoved");
+    expect(evAt).toBeGreaterThanOrEqual(0);
+    expect(evAt).toBeLessThan(own.findIndex((f) => f.type === "ack"));
     for (const [i, c] of [dm, p1, p2].entries()) await wait(c, marks[i] as number);
     const sheetUp = (id: string) => `${CREATURE_SHEET_TYPE}:upsert:${id}`;
     const party = `${PARTY_ITEM_TYPE}:upsert:${potion}`;
