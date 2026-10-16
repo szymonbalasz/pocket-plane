@@ -1400,3 +1400,12 @@ Index: unique `dice_look_campaign_owner` (`campaign_id`, `owner_key`).
 - **Derived:** no row → the default look (DM Obsidian; players by sorted player `id`: Crimson, Sapphire, Emerald, Amethyst, Gold, Bone, Ivory, …), never stored. `lookOf(owner, rows, playerIds)` in `@shared/dice-extras/looks`.
 - **Fixtures:** `dicex-looks` writes only `dice-look` rows (DM, player-1).
 - **Snapshot size** (CON-44): every snapshot carries the campaign's rows (not lazy): 7 max-length rows = 2,157 B DM, the same bytes in each player frame; heavy DM 674,580 B ([protocol §52](../protocol/README.md#52-sprint-3-dice-looks-d2)).
+
+## 39. Sprint 3: compendium read (C2)
+
+From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #207, #208). **Built by `build/compendium-read`**: no table or column change. Protocol side: [protocol §53](../protocol/README.md#53-sprint-3-compendium-read-c2).
+
+- **`imported-entity`** (entities' record type over `entity` rows with `campaign_id` null): now **lazy by ids** (FR-CMP-15, ADR-0045): in no snapshot; the DM loads rows by id. Players never.
+- **Derived at read** (never stored): `sourceLabel` (imported: `compendium_source.name`; homebrew: "Homebrew"), the search rank (name prefix / word start / substring / text, FR-CMP-10), the entry `ETag` (entry `updatedAt` + source `version` + monster definition `updatedAt`).
+- **Filters** (FR-CMP-11) read `facets` (JSON leaf) after a SQL pre-filter on campaign, kind and `instr` over `name_key` / `search_text`; no index added (≤ ~1,200 rows, OQ-CMP-09).
+

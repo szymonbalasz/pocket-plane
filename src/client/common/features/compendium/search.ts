@@ -1,0 +1,63 @@
+// FR-CMP-10 client side: `GET /api/compendium/search` over the Hono RPC client (DM: secret,
+// player: `Authorization: Player`, set by the client's `Api`), and a debounced hook for lookups
+// and the Creatures window (FR-CMP-17: 150 ms). Results are read on demand, never pushed (FR-CMP-23).
+import { type SearchQuery, SearchResponse } from "@shared/compendium/rest";
+import { useEffect, useState } from "react";
+import { type Api, call } from "../../api";
+
+/** FR-CMP-17: lookups and the Creatures window wait this long after the last keystroke. */
+export const LOOKUP_DEBOUNCE_MS = 150;
+
+/** Query values as the URL carries them (strings); undefined keys are left out. */
+export type SearchParams = { [K in keyof SearchQuery]?: string };
+
+export async function searchCompendium(api: Api, params: SearchParams): Promise<SearchResponse> {
+  const query: Record<string, string> = {};
+  for (const [k, v] of Object.entries(params)) if (v !== undefined) query[k] = v;
+  const body = await call<unknown>(api.api.compendium.search.$get({ query }));
+  return SearchResponse.parse(body);
+}
+
+export interface CompendiumSearch {
+  /** Results of the latest settled request (kept while the next one runs). */
+  page: SearchResponse | null;
+  state: "idle" | "loading" | "ready" | "error";
+}
+
+export interface SearchOptions {
+  /** Off → no request, `idle` (e.g. an empty lookup input, or a player client). */
+  enabled?: boolean;
+  debounceMs?: number;
+}
+
+/**
+ * Debounced search: one request `debounceMs` after `params` last changed; a stale answer (params
+ * changed meanwhile) is dropped. Errors leave the last page and report `error`.
+ */
+export function useCompendiumSearch(
+  api: Api,
+  params: SearchParams,
+  { enabled = true, debounceMs = LOOKUP_DEBOUNCE_MS }: SearchOptions = {},
+): CompendiumSearch {
+  const key = JSON.stringify(params);
+  const [out, setOut] = useState<CompendiumSearch>({ page: null, state: "idle" });
+  useEffect(() => {
+    if (!enabled) {
+      setOut({ page: null, state: "idle" });
+      return;
+    }
+    let live = true;
+    setOut((o) => ({ page: o.page, state: "loading" }));
+    const t = setTimeout(() => {
+      searchCompendium(api, JSON.parse(key) as SearchParams).then(
+        (page) => live && setOut({ page, state: "ready" }),
+        () => live && setOut((o) => ({ page: o.page, state: "error" })),
+      );
+    }, debounceMs);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [api, key, enabled, debounceMs]);
+  return out;
+}

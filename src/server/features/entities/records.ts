@@ -106,6 +106,7 @@ export function entityRecordTypes(log: Logger) {
           .select()
           .from(entity)
           .where(and(isNull(entity.campaignId), inArray(entity.id, [...ids])))
+          .orderBy(asc(sql`rowid`))
           .all(),
         toImportedRecord,
         log,
