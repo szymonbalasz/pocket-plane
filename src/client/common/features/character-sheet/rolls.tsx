@@ -19,7 +19,7 @@ import { type ComponentProps, type ReactNode, useId, useMemo, useState } from "r
 import type { Button } from "../../components/ui/button";
 import { Switch } from "../../components/ui/controls";
 import { useRecords, useSync } from "../../sync/store";
-import { useRollControl } from "../dice-roll-log/roll-control";
+import { STAGE_HINT, useRollControl } from "../dice-roll-log/roll-control";
 import { useBusy } from "./fields";
 import {
   claimRollOptions,
@@ -30,7 +30,8 @@ import {
 } from "./routing";
 import { useSheet } from "./sheet-context";
 
-export const ROLL_HINT = "Shift: advantage · Ctrl: disadvantage";
+/** FR-DICEX-06: sheet roll buttons also stage in the dice tray on Alt+click. */
+export const ROLL_HINT = `Shift: advantage · Ctrl: disadvantage · ${STAGE_HINT}`;
 
 /** DM per-roll public override per category; absent = the category's setting. */
 export function usePublicOverrides() {

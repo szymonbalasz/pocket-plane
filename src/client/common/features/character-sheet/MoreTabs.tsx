@@ -9,11 +9,12 @@ import {
 } from "@shared/character-sheet/sheet";
 import { WALLET_TYPE, type WalletRecord } from "@shared/party-loot/schemas";
 import { useRecords, useSync } from "../../sync/store";
+import { DiceText } from "../dice-extras/DiceText";
 import { LOOT_LOG_KIND } from "../party-loot/logic";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import { IntField, SelectField, TextField, useBusy } from "./fields";
 import { AddRow, RowTools, useRows } from "./rows";
-import { useSheet, useSheetIntents } from "./sheet-context";
+import { notationContext, useSheet, useSheetIntents } from "./sheet-context";
 import { pipDelta, walletLine } from "./view-model";
 
 const clean = (row: Record<string, unknown>) => {
@@ -142,7 +143,11 @@ function FeatureView({ f, index, count }: { f: FeatureRow; index: number; count:
             <span className="text-sm font-medium">{f.name}</span>
             {f.source && <span className="text-[10px] text-muted-foreground">{f.source}</span>}
           </div>
-          {f.text && <p className="text-xs whitespace-pre-wrap text-muted-foreground">{f.text}</p>}
+          {f.text && (
+            <p className="text-xs whitespace-pre-wrap text-muted-foreground">
+              <DiceText text={f.text} context={notationContext(ctx, f.name)} />
+            </p>
+          )}
         </>
       )}
       <FeatureUses f={f} />
@@ -232,7 +237,11 @@ function ItemView({ it, index, count }: { it: ItemRow; index: number; count: num
           {it.equipped && <span className="text-[10px] text-muted-foreground">Equipped</span>}
         </div>
       )}
-      {!e && it.notes && <p className="text-xs text-muted-foreground">{it.notes}</p>}
+      {!e && it.notes && (
+        <p className="text-xs text-muted-foreground">
+          <DiceText text={it.notes} context={notationContext(ctx, it.name)} />
+        </p>
+      )}
     </div>
   );
 }
@@ -377,7 +386,11 @@ export function NotesTab() {
         </p>
       )}
       <p data-testid="charx-notes" className="whitespace-pre-wrap">
-        {s.notes || <span className="text-muted-foreground">No notes</span>}
+        {s.notes ? (
+          <DiceText text={s.notes} context={notationContext(ctx, "Notes")} />
+        ) : (
+          <span className="text-muted-foreground">No notes</span>
+        )}
       </p>
     </div>
   );
