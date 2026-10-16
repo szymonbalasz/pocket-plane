@@ -8,13 +8,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| V3 vision client | `build/vision-client` (w4K) | build-vision-client | Building (canvas lock 3rd) | Walkthrough FOG §13 + CHARX 14 |
-| D2 dice looks | `fix/dicex-look-core` (w4J) | test-dicex-look | Built; walkthrough | Merge |
-| P3 split + item rows | `build/party-gold` (w4M) | build-party-gold | Building | Walkthrough → P4 |
-| R2 tier 2 client | `fix/mod-roll-preview` (w4D) | — | Re-test PASS; merge verification | R7 |
+| Players see vision on the map (V3) | `build/vision-client` (slot 0) | test-vision-client (port 4103) | Walkthrough | Merge |
+| Saved dice looks (D2) | `fix/dicex-look-core` (slot 3) | test-dicex-look (port 4133) | Walkthrough | Merge FIRST (tray lazy-load fixes R2's bundle budget) |
+| Tray bonus dice / adv preview / popup AC (R2) | `fix/mod-roll-preview` (slot 7) | — | Re-test PASS; bundle-size check failed on main merge | After D2: merge main, check + e2e, merge; tell R7 |
+| Party coin split + item rows (P3) | `build/party-gold` (slot 4) | build-party-gold | Building | Walkthrough → merge → P4 |
+| Trigger bonuses on combat cards + popup chips (R7) | `build/mod-combat-parts` (slot 2) | build-mod-combat-parts | Building (chips after R2) | Walkthrough → merge → C2 |
 | Merged so far | — | — | R6 (#230), P2 (#229), V2 (#228), R5 (#227), C1 (#226), R3 (#225), V4 (#224), P core, R4 + V1 + empty-event fix (#223), R1 (#222), R0 (#220), V5 (#219), lazy-records (#218), D3 (#217), V0 (#216), D1 (#214), early slices (#212, #213) | — |
-| Queue | — | — | R7 (after R2; brief ready); P3; C2 (after R6 + R7) → C3, C4; D4 (sheet, after C2); P4 (last) | Locks below |
-| Backlog (BL-nn), downtime only | — | — | Done: BL-02, 06, 11, 12, 13; BL-14 → R7 | Per §3a |
+| Queue | — | — | C2 → C3, C4; D4 (sheet, after C2); P4 (last); then session-sim-7, playtest section, recap | Handover: `%TEMP%\pocket-plane\handover-sprint3.md` |
+| Backlog (BL-nn), downtime only | — | — | Done: BL-02, 06, 11, 12, 13; BL-14 in R7 | Per §3a; none near the end |
 
 ## Shared-file locks
 
