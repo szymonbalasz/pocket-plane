@@ -5,9 +5,9 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
 import { EntryResponse, type EntrySummary, SearchResponse } from "@shared/compendium/rest";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { closeDb, type Db, openFileDb } from "../../db/client";
-import { compendiumEntry, player } from "../../db/schema";
+import { compendiumEntry, entity, player } from "../../db/schema";
 import { startTestServer, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
 import { CMP_CACHE_CONTROL } from "./auth";
@@ -101,7 +101,8 @@ describe("compendium REST (C2)", () => {
   });
 
   test("FR-CMP-10 FR-CMP-14 search: DM 'goblin' → Goblin then Hobgoblin with definitions; player gets no monsters; kind=monster empty for a player", async () => {
-    const dm = await search({ q: "goblin" }, "dm");
+    // SRD entries only here (the fixture Goblin without an entry: the FR-CMP-17 test below).
+    const dm = (await search({ q: "goblin" }, "dm")).filter((r) => r.sourceLabel === "SRD 5.1");
     expect(dm.slice(0, 2).map((r) => [r.name, r.kind, r.sourceLabel])).toEqual([
       ["Goblin", "monster", "SRD 5.1"],
       ["Hobgoblin", "monster", "SRD 5.1"],
@@ -111,13 +112,61 @@ describe("compendium REST (C2)", () => {
     const p1 = await search({ q: "goblin" }, "Player 1");
     expect(p1.every((r) => r.kind !== "monster")).toBe(true);
     expect(await search({ kind: "monster" }, "Player 1")).toEqual([]);
-    expect((await search({ kind: "monster" }, "dm")).map((r) => r.name)).toEqual([
+    const srd = (await search({ kind: "monster" }, "dm")).filter(
+      (r) => r.sourceLabel !== "fixture",
+    );
+    expect(srd.map((r) => r.name)).toEqual([
       "Adult Red Dragon",
       "Goblin",
       "Hobgoblin",
       "Ogre",
       "Wolf",
     ]);
+  });
+
+  test("FR-CMP-17 entryless imported definitions: DM monster search also lists the fixture Goblin / Wolf (id = definitionId, GET 404); players never", async () => {
+    const fixtureIds = Object.fromEntries(
+      db
+        .select({ id: entity.id, name: entity.name })
+        .from(entity)
+        .where(and(isNull(entity.campaignId), eq(entity.source, "fixture")))
+        .all()
+        .map((r) => [r.name, r.id]),
+    );
+    expect(Object.keys(fixtureIds).sort()).toEqual(["Goblin", "Wolf"]);
+    const wo = await search({ q: "wo", kind: "monster" }, "dm");
+    const fixtureWolf = wo.find((r) => r.id === fixtureIds.Wolf);
+    expect(fixtureWolf).toEqual({
+      id: fixtureIds.Wolf as string,
+      kind: "monster",
+      name: "Wolf",
+      sourceLabel: "fixture",
+      line: "CR 1/4 · Medium",
+      definitionId: fixtureIds.Wolf as string,
+    });
+    // Same tiers as entries: both Wolves are name prefixes; ties by name key, then id.
+    expect(wo.map((r) => r.name)).toEqual(["Wolf", "Wolf"]);
+    const all = await search({ q: "goblin" }, "dm");
+    expect(all.some((r) => r.id === fixtureIds.Goblin)).toBe(true);
+    expect(all.slice(0, 2).map((r) => r.name)).toEqual(["Goblin", "Goblin"]);
+    // CR filter applies; a type filter can't match (the creature core has no type).
+    expect(
+      (await search({ kind: "monster", crMin: "1" }, "dm")).some(
+        (r) => r.sourceLabel === "fixture",
+      ),
+    ).toBe(false);
+    expect((await search({ kind: "monster", type: "beast" }, "dm")).map((r) => r.id)).not.toContain(
+      fixtureIds.Wolf,
+    );
+    // Other kinds never list them; there is no entry to GET.
+    expect(
+      (await search({ q: "wolf", kind: "spell" }, "dm")).some((r) => r.kind === "monster"),
+    ).toBe(false);
+    expect((await get(`/entries/${fixtureIds.Wolf}`, "dm")).res.status).toBe(404);
+    for (const who of ["Player 1", "Player 2"] as const) {
+      const p = await search({ q: "wolf" }, who);
+      expect(p.some((r) => r.kind === "monster" || r.id === fixtureIds.Wolf)).toBe(false);
+    }
   });
 
   test("FR-CMP-14 homebrew: DM sees own shared + hidden, never another campaign's; players own shared only", async () => {
@@ -162,7 +211,12 @@ describe("compendium REST (C2)", () => {
       "Fireball (house)",
     ]);
     expect(await names({ kind: "monster", crMin: "1", crMax: "5" })).toEqual(["Ogre"]);
-    expect(await names({ kind: "monster", crMax: "1/4" })).toEqual(["Goblin", "Wolf"]);
+    expect(await names({ kind: "monster", crMax: "1/4" })).toEqual([
+      "Goblin",
+      "Goblin",
+      "Wolf",
+      "Wolf",
+    ]);
     expect(await names({ kind: "monster", crMin: "10" })).toEqual(["Adult Red Dragon"]);
     expect(await names({ kind: "monster", type: "Beast" })).toEqual(["Wolf"]);
     expect(await names({ kind: "item", category: "armor" })).toEqual(["Chain mail"]);

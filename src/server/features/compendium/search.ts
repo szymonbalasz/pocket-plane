@@ -8,12 +8,13 @@ import {
   type SearchQuery,
   TEXT_MATCH_MIN,
 } from "@shared/compendium/rest";
-import { CR_VALUES } from "@shared/entities/schemas";
+import { entryNameKey } from "@shared/compendium/schemas";
+import { CR_VALUES, MonsterStatBlock } from "@shared/entities/schemas";
 import { and, eq, isNull, or, type SQL, sql } from "drizzle-orm";
 import { z } from "zod";
 import { invalid } from "../../commands/errors";
 import type { Db } from "../../db/client";
-import { compendiumEntry, compendiumSource } from "../../db/schema";
+import { compendiumEntry, compendiumSource, entity } from "../../db/schema";
 import { type EntryViewer, entryVisibleTo } from "./visibility";
 
 /** 0 name prefix, 1 word start, 2 substring, 3 text match. */
@@ -157,19 +158,16 @@ export function searchEntries(db: Db, v: EntryViewer, query: SearchQuery): Searc
     .where(and(...where))
     .all();
 
-  const ranked: { key: CursorKey; row: (typeof rows)[number] }[] = [];
+  const labels = sourceLabels(db);
+  const ranked: { key: CursorKey; summary: EntrySummary }[] = [];
+  const add = (rank: Rank | null, nameKey: string, summary: EntrySummary) => {
+    if (rank === null) return;
+    const key: CursorKey = [rank, nameKey, summary.id];
+    if (after && compareKeys(key, after) <= 0) return;
+    ranked.push({ key, summary });
+  };
   for (const r of rows) {
     if (!entryVisibleTo(r, v) || !matchesFilters(r.facets, query)) continue;
-    const rank = rankOf(r.nameKey, q, Boolean(r.textHit));
-    if (rank === null) continue;
-    const key: CursorKey = [rank, r.nameKey, r.id];
-    if (after && compareKeys(key, after) <= 0) continue;
-    ranked.push({ key, row: r });
-  }
-  ranked.sort((a, b) => compareKeys(a.key, b.key));
-  const page = ranked.slice(0, SEARCH_PAGE);
-  const labels = sourceLabels(db);
-  const results = page.map(({ row: r }): EntrySummary => {
     const s: EntrySummary = {
       id: r.id,
       kind: r.kind,
@@ -178,11 +176,63 @@ export function searchEntries(db: Db, v: EntryViewer, query: SearchQuery): Searc
       line: r.line,
     };
     if (r.kind === "monster" && r.definitionId !== null) s.definitionId = r.definitionId;
-    return s;
-  });
+    add(rankOf(r.nameKey, q, Boolean(r.textHit)), r.nameKey, s);
+  }
+  if (v.role === "dm" && (query.kind === undefined || query.kind === "monster")) {
+    for (const d of entrylessDefinitions(db, query)) {
+      add(rankOf(d.nameKey, q, false), d.nameKey, {
+        ...d.summary,
+        sourceLabel: labels.get(d.source) ?? d.source,
+      });
+    }
+  }
+  ranked.sort((a, b) => compareKeys(a.key, b.key));
+  const page = ranked.slice(0, SEARCH_PAGE);
   const last = page.at(-1);
   return {
-    results,
+    results: page.map((x) => x.summary),
     nextCursor: ranked.length > SEARCH_PAGE && last ? encodeCursor(last.key) : null,
   };
+}
+
+/**
+ * Imported definitions without a compendium entry (e.g. the `fixture` Goblin and Wolf): DM
+ * monster results too, so lookups and the Creatures window keep finding them (FR-CMP-17,
+ * orchestrator pick A). `id` = `definitionId`; there is no entry, so GET on it is 404. Name
+ * tiers only (no `searchText`); `type` can't match (the creature core has no type).
+ */
+function entrylessDefinitions(
+  db: Db,
+  query: SearchQuery,
+): { nameKey: string; source: string; summary: Omit<EntrySummary, "sourceLabel"> }[] {
+  if (query.type !== undefined) return [];
+  const rows = db
+    .select({
+      id: entity.id,
+      name: entity.name,
+      statBlock: entity.statBlock,
+      source: entity.source,
+    })
+    .from(entity)
+    .leftJoin(compendiumEntry, eq(compendiumEntry.definitionId, entity.id))
+    .where(and(isNull(entity.campaignId), eq(entity.kind, "monster"), isNull(compendiumEntry.id)))
+    .all();
+  const out: { nameKey: string; source: string; summary: Omit<EntrySummary, "sourceLabel"> }[] = [];
+  for (const r of rows) {
+    const sb = MonsterStatBlock.safeParse(r.statBlock);
+    if (!sb.success || !matchesFilters({ cr: sb.data.cr }, query)) continue;
+    const size = sb.data.size;
+    out.push({
+      nameKey: entryNameKey(r.name),
+      source: r.source ?? "",
+      summary: {
+        id: r.id,
+        kind: "monster",
+        name: r.name,
+        line: `CR ${sb.data.cr} · ${size.charAt(0).toUpperCase()}${size.slice(1)}`,
+        definitionId: r.id,
+      },
+    });
+  }
+  return out;
 }
