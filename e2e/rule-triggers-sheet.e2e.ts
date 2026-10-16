@@ -84,10 +84,17 @@ test("FR-MOD-49 FR-MOD-47 FR-MOD-28 Triggers blocks per player; DM entries for m
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", battlemap);
   const token = recordId("char-brakka", "token");
-  await expect.poll(async () => (await tokenNode(dm, token)) !== null).toBe(true);
-  const t = (await tokenNode(dm, token))!;
-  await dm.mouse.click(t.x, t.y, { button: "right" });
-  await dm.getByTestId("mod-token-menu-triggers").click();
+  // The canvas may still be fitting the scene under load: right-click again until the menu opens.
+  const entry = dm.getByTestId("mod-token-menu-triggers");
+  await expect(async () => {
+    const t = await tokenNode(dm, token);
+    expect(t).not.toBeNull();
+    if (!t) return;
+    await dm.keyboard.press("Escape");
+    await dm.mouse.click(t.x, t.y, { button: "right" });
+    await expect(entry).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+  await entry.click();
   await expect(dialog).toBeVisible();
   await expect(dialog.getByTestId("mod-trigger")).toContainText("Divine Fury");
   await expect(dialog.getByTestId("mod-trigger-edit")).toHaveCount(1);
