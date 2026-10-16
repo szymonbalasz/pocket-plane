@@ -35,6 +35,8 @@ export interface DiceExtrasState {
   request: TrayRequest | null;
   /** Bumped per stage: the runtime opens the tray on a change (FR-DICEX-01). */
   staged: number;
+  /** The tray's roll mode (FR-DICEX-05): the staged request's, back to normal after a roll. */
+  mode: RollMode;
   /** A tray Roll is in flight (`rolling`). */
   rolling: boolean;
   /** The tray's last own roll, shown in `result` (FR-DICEX-10). */
@@ -53,6 +55,8 @@ export interface DiceExtrasTimers {
 export interface DiceExtrasStore {
   api: StoreApi<DiceExtrasState>;
   stage(request: TrayRequest): void;
+  /** The tray's mode toggle. */
+  setMode(mode: RollMode): void;
   /** Esc / Clear / the tray window closed. */
   clear(): void;
   /** A roll left this client (button or tray); `tray` = from the tray (→ `rolling`). */
@@ -75,6 +79,7 @@ const browserTimers: DiceExtrasTimers = {
 const initial = (): DiceExtrasState => ({
   request: null,
   staged: 0,
+  mode: "normal",
   rolling: false,
   result: null,
   pending: false,
@@ -92,7 +97,16 @@ export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers):
   return {
     api,
     stage(request) {
-      api.setState((s) => ({ request, staged: s.staged + 1, rolling: false, result: null }));
+      api.setState((s) => ({
+        request,
+        staged: s.staged + 1,
+        mode: request.mode,
+        rolling: false,
+        result: null,
+      }));
+    },
+    setMode(mode) {
+      api.setState({ mode });
     },
     clear() {
       api.setState({ request: null, rolling: false, result: null });
@@ -103,7 +117,12 @@ export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers):
         timer = null;
         api.setState({ pending: false, rolling: false });
       }, PENDING_MS);
-      api.setState((s) => ({ pending: true, rolling: tray || s.rolling }));
+      // FR-DICEX-05: Adv / Dis never sticks to the next tray roll (a later 50d6 would be refused).
+      api.setState((s) =>
+        tray
+          ? { pending: true, rolling: true, mode: "normal" }
+          : { pending: true, rolling: s.rolling },
+      );
     },
     failed() {
       stopTimer();

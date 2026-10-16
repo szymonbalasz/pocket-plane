@@ -375,7 +375,7 @@ export function TrayWindow() {
   const live = useSync((s) => s.state === "live");
   const connection = useSync((s) => s.connection);
   const actors = useActors();
-  const [mode, setMode] = useState<RollMode>(request?.mode ?? "normal");
+  const mode = useDiceExtras((s) => s.mode);
   const [held, trackKeys] = useHeldMode();
   const [error, setError] = useState<string | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -383,11 +383,10 @@ export function TrayWindow() {
   const [draft, setDraft] = useState(free?.expression ?? "");
   const lastValid = useRef(termsOf(draft) ?? []);
 
-  // A new stage resets the tray's mode and draft to the request's (FR-DICEX-02).
+  // A new stage resets the draft to the request's (FR-DICEX-02); the store resets the mode.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per stage (`staged`)
   useEffect(() => {
     const r = diceExtras.api.getState().request;
-    setMode(r?.mode ?? "normal");
     setError(null);
     if (r?.kind === "free") {
       setDraft(r.expression);
@@ -648,7 +647,7 @@ export function TrayWindow() {
               value={mode}
               disabled={!request || state === "rolling"}
               onValueChange={(v) => {
-                if (v) setMode(v as RollMode);
+                if (v) diceExtras.setMode(v as RollMode);
               }}
             >
               {(["disadvantage", "normal", "advantage"] as const).map((m) => (
