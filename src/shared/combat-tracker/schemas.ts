@@ -2,6 +2,7 @@
 // the wire records, intents, REST bodies and the damage card's payload / resolution.
 import { DeathCounters, TempHp } from "@shared/combat-extras/schemas";
 import { ManualEntry, RollMode, RollModPart } from "@shared/dice-roll-log/schemas";
+import { PartDamageType } from "@shared/effect-modifiers/schemas";
 import { Ability } from "@shared/entities/schemas";
 import { DamageMultiplier } from "@shared/events/combat-tracker";
 import { CellIndex } from "@shared/scenes-map/schemas";
@@ -221,6 +222,27 @@ export type PlayerCombatant =
 /** A combatant as either client holds it. */
 export type CombatantView = PlayerCombatant & Partial<CombatantRecord> & { band?: HealthBand };
 
+/** effect-modifiers (FR-MOD-19, -37): offered rule-trigger parts per damage roll / card / apply. */
+export const TRIGGER_PARTS_MAX = 4;
+/** MOD §8.2 text limits of an offered part. */
+export const TRIGGER_LABEL_MAX = 40;
+export const TRIGGER_EXPRESSION_MAX = 20;
+export const TRIGGER_ASK_MAX = 60;
+
+/**
+ * FR-MOD-38, -48: a rule-trigger part an apply landed on the target (hp_change `triggerParts`,
+ * DM only): `value` = damage after `multiplier`, `forced` = the DM forced a used charge.
+ */
+export const HpTriggerPart = z.strictObject({
+  triggerId: Id,
+  name: z.string().min(1).max(TRIGGER_LABEL_MAX),
+  value: z.int().min(0),
+  multiplier: DamageMultiplier,
+  type: PartDamageType.nullable(),
+  forced: z.boolean(),
+});
+export type HpTriggerPart = z.infer<typeof HpTriggerPart>;
+
 export const HpChangeRecord = z.object({
   id: z.string(),
   campaignId: z.string(),
@@ -259,6 +281,8 @@ export const HpChangeRecord = z.object({
   deathAfter: DeathCounters.nullable(),
   /** `cbtx-concentration` cards this change created. */
   noteIds: z.array(z.string()),
+  /** effect-modifiers (FR-MOD-38, -48): rule-trigger parts this apply landed (DM, stats). */
+  triggerParts: z.array(HpTriggerPart).max(TRIGGER_PARTS_MAX),
   entryId: z.string(),
   undone: z.boolean(),
   undoneAt: z.string().nullable(),
@@ -291,6 +315,35 @@ export const CardToHit = CardRoll.extend({ natural: z.int().nullable() });
 export type CardToHit = z.infer<typeof CardToHit>;
 export type CardRoll = z.infer<typeof CardRoll>;
 
+/**
+ * FR-MOD-19, -37: one offered rule-trigger part on the card's damage (rolled with it, **not** in
+ * `total`; lands per target at apply). The card's audience is the owner or the DM, so `label` is
+ * the trigger's name. Settle facts for the DM popup (FR-MOD-39), frozen at the roll: `marked` =
+ * the `targetMarked` preset (key or id), `hurt` = a `targetHurt` filter, `ask` = the first `ask`
+ * note, `untick` = soft filters and none of the non-`ask` ones held at the roll.
+ */
+export const CardTriggerPart = z.strictObject({
+  triggerId: Id,
+  label: z.string().min(1).max(TRIGGER_LABEL_MAX),
+  value: z.int(),
+  expression: z.string().min(1).max(TRIGGER_EXPRESSION_MAX),
+  rollId: Id,
+  /** null = the attack's type. */
+  type: PartDamageType.nullable(),
+  auto: z.literal(true).optional(),
+  ask: z.string().min(1).max(TRIGGER_ASK_MAX).optional(),
+  marked: z.string().min(1).max(TRIGGER_LABEL_MAX).optional(),
+  hurt: z.literal(true).optional(),
+  untick: z.literal(true).optional(),
+});
+export type CardTriggerPart = z.infer<typeof CardTriggerPart>;
+
+/** The card's damage roll: + offered trigger parts (absent = none; old cards parse). */
+export const CardDamage = CardRoll.extend({
+  triggers: z.array(CardTriggerPart).min(1).max(TRIGGER_PARTS_MAX).optional(),
+});
+export type CardDamage = z.infer<typeof CardDamage>;
+
 /** A save spell's DC on a damage-only card ("— DC 13 DEX", FR-CBT-71). */
 export const CardSaveDc = z.strictObject({ dc: z.int().min(1).max(30), ability: Ability });
 
@@ -310,7 +363,7 @@ export const DamageCardPayload = z
     mode: RollMode,
     crit: z.boolean(),
     toHit: CardToHit.nullable(),
-    damage: CardRoll.nullable(),
+    damage: CardDamage.nullable(),
     attackId: z.string().optional(),
     spellId: z.string().optional(),
     saveDc: CardSaveDc.optional(),
@@ -321,7 +374,7 @@ export const DamageCardPayload = z
   });
 export type DamageCardPayload = z.infer<typeof DamageCardPayload>;
 /** A card with both rolls (`cbt.attack`'s default, or a to-hit-only card once completed). */
-export type FullDamageCardPayload = DamageCardPayload & { toHit: CardToHit; damage: CardRoll };
+export type FullDamageCardPayload = DamageCardPayload & { toHit: CardToHit; damage: CardDamage };
 export const isFullCard = (p: DamageCardPayload): p is FullDamageCardPayload =>
   p.toHit !== null && p.damage !== null;
 /** Parses a stored payload that must have both rolls; throws on a partial card. */
@@ -449,12 +502,36 @@ export const RollDamageResult = z.object({
   attached: z.boolean(),
 });
 export type RollDamageResult = z.infer<typeof RollDamageResult>;
+/**
+ * effect-modifiers (FR-MOD-38, -40): the DM's assignment of one offered part to this target.
+ * `value` = the DM's edit (absent = as rolled), `multiplier` = the part's own (absent = the
+ * row's), `force` = land it although its charge is used.
+ */
+export const ApplyTargetTrigger = z.strictObject({
+  triggerId: Id,
+  value: z.int().min(0).max(999).optional(),
+  multiplier: DamageMultiplier.optional(),
+  force: z.boolean().optional(),
+});
+export type ApplyTargetTrigger = z.infer<typeof ApplyTargetTrigger>;
+
 export const ApplyCardTarget = z.strictObject({
   targetId: Id,
   hit: z.boolean(),
   multiplier: DamageMultiplier,
+  /** FR-MOD-38: offered parts this target takes; only on a Hit row. */
+  triggers: z
+    .array(ApplyTargetTrigger)
+    .min(1)
+    .max(TRIGGER_PARTS_MAX)
+    .refine((ts) => new Set(ts.map((t) => t.triggerId)).size === ts.length, {
+      message: "Each trigger part at most once",
+    })
+    .optional(),
 });
 export type ApplyCardTarget = z.infer<typeof ApplyCardTarget>;
+/** One target of the apply intent as a client writes it (popup parts merge into it). */
+export type ApplyTargetInput = z.input<typeof ApplyCardTarget>;
 
 /**
  * `cbt.applyCard` (FR-CBT-34): 1–20 unique targets, all or nothing. Sprint 2 (FR-CBT-72): the
@@ -471,7 +548,18 @@ export const ApplyCardTargetsInput = z.strictObject({
     .max(APPLY_TARGETS_MAX)
     .refine((ts) => new Set(ts.map((t) => t.targetId)).size === ts.length, {
       message: "Each target at most once",
-    }),
+    })
+    // FR-MOD-38: an offered part lands on at most one target, and only on a hit.
+    .refine((ts) => ts.every((t) => t.hit || !t.triggers), {
+      message: "Trigger parts on Hit targets only",
+    })
+    .refine(
+      (ts) => {
+        const ids = ts.flatMap((t) => (t.triggers ?? []).map((x) => x.triggerId));
+        return new Set(ids).size === ids.length;
+      },
+      { message: "Each trigger part on at most one target" },
+    ),
   public: z.boolean().optional(),
 });
 export type ApplyCardTargetsInput = z.input<typeof ApplyCardTargetsInput>;

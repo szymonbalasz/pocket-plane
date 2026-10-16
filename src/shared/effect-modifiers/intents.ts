@@ -27,12 +27,15 @@ const Duration = z.int().min(1).max(Math.min(PRESET_DURATION_MAX, DURATION_ROUND
  * A preset as the DM or owner writes it (MOD §8.2). No `id` → create; with `id` → replace (same
  * `characterId` and `key`). `characterId` null = campaign preset (DM); `key` customises that
  * built-in (campaign presets only). The name becomes the effect label (CBTX label rules).
+ * `originKey` (FR-MOD-36): the built-in key "Start from" copied; only a built-in key; absent on
+ * a replace = kept, on a create = null; never with `key`.
  */
 export const PresetInput = z
   .strictObject({
     id: Id.optional(),
     characterId: Id.nullable(),
     key: BuiltinKey.nullable().default(null),
+    originKey: BuiltinKey.nullable().optional(),
     name: EffectLabel,
     modifiers: PresetModifiers,
     durationRounds: Duration.nullable(),
@@ -49,6 +52,13 @@ export const PresetInput = z
   .superRefine((v, ctx) => {
     if (v.key !== null && v.characterId !== null) {
       ctx.addIssue({ code: "custom", path: ["key"], message: "Key on campaign presets only" });
+    }
+    if (v.key !== null && v.originKey) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["originKey"],
+        message: "A customised built-in has no origin",
+      });
     }
   });
 export type PresetInput = z.input<typeof PresetInput>;

@@ -5,10 +5,50 @@ import { defineLogKind, type LineSegment } from "@shared/dice-roll-log/kind-type
 import { rollBreakdownSegments } from "@shared/dice-roll-log/roll-kind";
 import { DmModPart, ROLL_MODS_MAX, RollModPart } from "@shared/dice-roll-log/schemas";
 import { modSegments } from "@shared/effect-modifiers/line";
+import { PartDamageType } from "@shared/effect-modifiers/schemas";
 import { z } from "zod";
-import { CardDie, LOG_KIND_ATTACK, LOG_KIND_HP } from "./schemas";
+import {
+  CardDie,
+  LOG_KIND_ATTACK,
+  LOG_KIND_HP,
+  TRIGGER_LABEL_MAX,
+  TRIGGER_PARTS_MAX,
+} from "./schemas";
 
 const Multiplier = z.enum(["normal", "half", "none", "double"]);
+
+/**
+ * effect-modifiers (FR-MOD-20, -38, -47): one rule-trigger part an apply landed on this target,
+ * player-safe: `label` iff the trigger is `public`, else null "(DM)"; `value` = its damage after
+ * its multiplier (inside `damage`); `type` null = the attack's type. "+ 6 radiant (Divine Fury)".
+ */
+export const AttackLinePart = z.strictObject({
+  label: z.string().max(TRIGGER_LABEL_MAX).nullable(),
+  value: z.int().min(0),
+  type: PartDamageType.nullable(),
+});
+export type AttackLinePart = z.infer<typeof AttackLinePart>;
+
+/** FR-MOD-40: the DM's facts of a line part (same index): name, rolled value, forced. */
+export const AttackLineDmPart = z.strictObject({
+  triggerId: z.string().min(1).max(64),
+  label: z.string().max(TRIGGER_LABEL_MAX),
+  rolled: z.int(),
+  forced: z.literal(true).optional(),
+});
+export type AttackLineDmPart = z.infer<typeof AttackLineDmPart>;
+
+/** FR-MOD-24 (tier 2): an AC part of the target's effective AC (DM only). */
+export const AcModPart = z.strictObject({
+  effectId: z.string().min(1).max(64),
+  label: z.string().max(60),
+  value: z.int(),
+});
+/** FR-MOD-25 (tier 2): the defense preset behind the row's multiplier (DM only). */
+export const DefenseFact = z.strictObject({
+  level: z.enum(["resistance", "vulnerability", "immunity", "both"]),
+  label: z.string().max(60),
+});
 
 export const AttackLogPayload = z.strictObject({
   targetName: z.string(),
@@ -35,6 +75,11 @@ export const AttackLogPayload = z.strictObject({
   crit: z.boolean(),
   /** FR-CBT-53 (a), #171: physical-dice flags, shown as "physical" to everyone. Old rows: absent. */
   manual: z.strictObject({ toHit: z.boolean(), damage: z.boolean() }).optional(),
+  /**
+   * effect-modifiers (FR-MOD-20, -38): rule-trigger parts in `damage` (`damage` = weapon raw + Σ
+   * parts). Absent = none; old rows parse. Rendered by R7 (card text, outcome lines).
+   */
+  parts: z.array(AttackLinePart).min(1).max(TRIGGER_PARTS_MAX).optional(),
 });
 export type AttackLogPayload = z.infer<typeof AttackLogPayload>;
 
@@ -89,6 +134,14 @@ export const AttackLogDmPayload = z.strictObject({
       damage: z.array(RollModPart).min(1).max(ROLL_MODS_MAX).optional(),
     })
     .optional(),
+  /**
+   * Apply hooks (`applyHooks`, R0; MOD lines R1 / R4): the DM's facts of `payload.parts` (same
+   * index); tier 2 effective-AC parts (`targetAc` is then the effective AC) and the defense
+   * preset. Absent = none.
+   */
+  parts: z.array(AttackLineDmPart).min(1).max(TRIGGER_PARTS_MAX).optional(),
+  acMods: z.array(AcModPart).min(1).max(6).optional(),
+  defense: DefenseFact.optional(),
 });
 export type AttackLogDmPayload = z.infer<typeof AttackLogDmPayload>;
 

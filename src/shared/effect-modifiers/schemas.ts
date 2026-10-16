@@ -53,6 +53,9 @@ export const MODIFIER_ABILITIES: readonly Ability[] = MOD_ABILITIES;
 export const MODIFIER_DAMAGE_TYPES: readonly (typeof DAMAGE_TYPES)[number][] = MOD_DAMAGE_TYPES;
 const AbilityKey = z.enum(MOD_ABILITIES);
 const DamageTypeKey = z.enum(MOD_DAMAGE_TYPES);
+/** A damage type on a typed part (FR-MOD-19: trigger parts, line parts). */
+export const PartDamageType = DamageTypeKey;
+export type PartDamageType = z.infer<typeof PartDamageType>;
 
 /** Roll kinds a selector or a roll subject names (FR-MOD-02). */
 export const ROLL_KINDS = ["attack", "damage", "save", "check", "initiative"] as const;
@@ -159,9 +162,18 @@ export const Modifiers = z.array(Modifier).max(MODIFIERS_MAX);
 export const PresetModifiers = z.array(Modifier).min(1).max(MODIFIERS_MAX);
 
 /**
+ * `RollSubject.row` (FR-MOD-13, #209): the attack / spell row's name. Attack rows are ≤ 40,
+ * spell rows ≤ 60 (CHARX), so the subject takes 60; a `row` filter's names are ≤ 40.
+ */
+export const ROLL_ROW_MAX = 60;
+
+/**
  * Who rolls what (FR-MOD-13): `dice.evaluate`'s optional subject. A PC combatant's subject is
  * its character. `ability` on saves / checks (a death save has none); `via` on attacks / damage;
- * `crit` on damage rolled for a natural 20.
+ * `crit` on damage rolled for a natural 20. Rule triggers (ADR-0043): `card` = this damage roll
+ * belongs to a damage card (`cbt.attack`, `cbt.rollDamage`; `hit` triggers are offered on it);
+ * `row` = the attack / spell row's name (absent for ability, save, initiative rolls), read only
+ * by the `row` filter.
  */
 export const RollSubject = z.strictObject({
   creature: z.union([
@@ -172,6 +184,8 @@ export const RollSubject = z.strictObject({
   ability: AbilityKey.optional(),
   via: RollVia.optional(),
   crit: z.boolean().optional(),
+  card: z.boolean().optional(),
+  row: z.string().min(1).max(ROLL_ROW_MAX).optional(),
 });
 export type RollSubject = z.infer<typeof RollSubject>;
 
@@ -216,6 +230,11 @@ export const EffectPresetRecordShape = z.object({
   concentration: z.boolean(),
   activeEffectId: Id.nullable(),
   usesFeatureId: Id.nullable(),
+  /**
+   * FR-MOD-36 (review R5): the built-in key "Start from" copied; null for a blank preset or a
+   * customised built-in (its `key` already is it). Origin match for rule triggers' `requires`.
+   */
+  originKey: z.string().min(1).max(PRESET_KEY_MAX).nullable(),
   note: z.string().max(PRESET_NOTE_MAX),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -230,5 +249,6 @@ export const EffectPresetRecord = EffectPresetRecordShape.superRefine((r, ctx) =
   } else if (r.key !== null) {
     issue("Key on campaign presets only");
   }
+  if (r.key !== null && r.originKey !== null) issue("A customised built-in has no origin");
 });
 export type EffectPresetRecord = z.infer<typeof EffectPresetRecordShape>;

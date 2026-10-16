@@ -137,6 +137,7 @@ describe("MOD §8.2 effect-preset record", () => {
     concentration: true,
     activeEffectId: null,
     usesFeatureId: null,
+    originKey: null,
     note: "House: Bless (test)",
     createdAt: "t",
     updatedAt: "t",
