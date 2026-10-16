@@ -20,7 +20,12 @@ import { Input } from "@ui/components/ui/primitives";
 import { useRecords } from "@ui/sync/store";
 import { useEffect, useMemo, useState } from "react";
 // Types only: `popup-parts.ts` imports this line (no runtime cycle).
-import type { PopupPart, PopupPartProps, PopupRowView } from "../combat-tracker/popup-parts";
+import type {
+  PopupPart,
+  PopupPartProps,
+  PopupRowView,
+  RejectIssue,
+} from "../combat-tracker/popup-parts";
 import { defenseMultiplier } from "./popup-defense";
 import {
   type ChipFacts,
@@ -147,7 +152,6 @@ function Chip({
               key={x.m}
               value={x.m}
               aria-label={x.label}
-              title={x.label}
               className="h-6 px-1.5 text-xs"
               data-testid="mod-popup-part-mult-option"
               data-value={x.m}
@@ -240,7 +244,7 @@ export const modTriggersPart = {
   Chips: TriggerChips,
   toInput: (value: ChipsValue | undefined, row: PopupRowView) => chipsInput(value, row),
   previewExtra: (value: ChipsValue | undefined, row: PopupRowView) => chipsExtra(value, row),
-  onReject: (value: ChipsValue | undefined, issues: readonly { path?: readonly unknown[] }[]) => {
+  onReject: (value: ChipsValue | undefined, issues: readonly RejectIssue[]) => {
     const touched = markUsed(value, issues);
     return touched && value ? { ...value, touched } : undefined;
   },

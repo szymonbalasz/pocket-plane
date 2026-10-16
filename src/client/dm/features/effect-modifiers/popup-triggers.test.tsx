@@ -70,7 +70,7 @@ const facts = (defense: Record<string, string> = {}): ChipFacts => ({
   defenseOf: (r, type) => (defense[`${r.targetId}:${type}`] as never) ?? null,
 });
 /** The line's value after the DM's changes (as the first row's sync writes it). */
-const valueOf = (c: DamageCardPayload, rows: PopupRowView[], t: ChipsValue["touched"] = {}) => ({
+const lineValue = (c: DamageCardPayload, rows: PopupRowView[], t: ChipsValue["touched"] = {}) => ({
   touched: t,
   chips: chipViews(c, rows, t, facts()),
 });
@@ -125,7 +125,7 @@ describe("FR-MOD-40 DM overrides and the apply share", () => {
   test("FR-MOD-40 untick, value edit, own multiplier, retarget; Miss rows send nothing; preview sums ticked chips", () => {
     const c = card([fury, { ...ma, untick: undefined, ask: undefined }]);
     const rows = [row("gob"), row("wolf")];
-    let v = valueOf(c, rows);
+    let v = lineValue(c, rows);
     expect(chipsInput(v, rows[0] as PopupRowView)).toEqual({
       triggers: [
         { triggerId: "df", multiplier: "normal" },
@@ -134,10 +134,10 @@ describe("FR-MOD-40 DM overrides and the apply share", () => {
     });
     const df = v.chips[0];
     if (!df) throw new Error("no chip");
-    v = valueOf(c, rows, touch(v, df, { value: 9, multiplier: "double", targetId: "wolf" }));
+    v = lineValue(c, rows, touch(v, df, { value: 9, multiplier: "double", targetId: "wolf" }));
     const ma2 = v.chips[1];
     if (!ma2) throw new Error("no chip");
-    v = valueOf(c, rows, touch(v, ma2, { on: false }));
+    v = lineValue(c, rows, touch(v, ma2, { on: false }));
     expect(chipsInput(v, rows[0] as PopupRowView)).toEqual({});
     expect(chipsInput(v, rows[1] as PopupRowView)).toEqual({
       triggers: [{ triggerId: "df", value: 9, multiplier: "double" }],
@@ -148,7 +148,7 @@ describe("FR-MOD-40 DM overrides and the apply share", () => {
     ]).toEqual([0, 18]);
     // The target row turns Miss: the touched chip has no target, nothing is sent.
     const missed = [row("gob"), row("wolf", false)];
-    const w = valueOf(c, missed, v.touched);
+    const w = lineValue(c, missed, v.touched);
     expect(w.chips[0]).toMatchObject({ on: false, targetId: null });
     expect(chipsInput(w, missed[1] as PopupRowView)).toEqual({});
   });
@@ -156,13 +156,13 @@ describe("FR-MOD-40 DM overrides and the apply share", () => {
   test("FR-MOD-40 a conflict naming the part → 'Used this turn' hint + Force; forcing sends force", () => {
     const c = card([fury]);
     const rows = [row("gob")];
-    const v = valueOf(c, rows);
+    const v = lineValue(c, rows);
     expect(markUsed(v, [{ path: ["targets", 0] }])).toBeNull();
     const touched = markUsed(v, [
       { path: ["triggers", "df"], message: "Divine Fury was already used this turn" },
     ]);
     if (!touched) throw new Error("not marked");
-    let u = valueOf(c, rows, touched);
+    let u = lineValue(c, rows, touched);
     expect(u.chips[0]).toMatchObject({
       on: true,
       force: false,
@@ -170,7 +170,7 @@ describe("FR-MOD-40 DM overrides and the apply share", () => {
     });
     const chip = u.chips[0];
     if (!chip) throw new Error("no chip");
-    u = valueOf(c, rows, touch(u, chip, { force: true }));
+    u = lineValue(c, rows, touch(u, chip, { force: true }));
     expect(chipsInput(u, rows[0] as PopupRowView)).toEqual({
       triggers: [{ triggerId: "df", multiplier: "normal", force: true }],
     });
