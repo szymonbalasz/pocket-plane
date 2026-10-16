@@ -12,13 +12,15 @@ import type { Modifier } from "@shared/effect-modifiers/schemas";
 import { TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
-import { FOG_EDIT_KINDS, FOG_FILLS } from "@shared/fog-of-war/schemas";
+import { type DoorSeen, FOG_EDIT_KINDS, FOG_FILLS } from "@shared/fog-of-war/schemas";
+import type { DarknessRow, FogLayerShape } from "@shared/fog-of-war/shapes";
 import { DIAGONAL_RULES, type Door, TEMPLATE_SHAPES, type Wall } from "@shared/scene-tools/schemas";
 import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
   index,
   integer,
+  primaryKey,
   real,
   sqliteTable,
   text,
@@ -306,8 +308,15 @@ export const token = sqliteTable(
     speed: integer("speed"),
     /** Display copy: `definitionId` on character tokens, else null; players see it (FR-MAP-50). */
     characterId: text("character_id"),
-    /** Server copy: every footprint cell fogged (FR-FOG-10, ADR-0039); wire only when true. */
+    /**
+     * Server copy (FR-FOG-10): owned = statically hidden; unowned = seen by no player (statically
+     * hidden while the campaign has no players). DM wire (and the owner) only when true.
+     */
     fogged: integer("fogged", { mode: "boolean" }).notNull().default(false),
+    /** Server copy (FR-FOG-10, ADR-0042): player ids who see it; null = pre-v2 (backfill). Never on a wire. */
+    seenBy: text("seen_by", { mode: "json" }).$type<string[]>(),
+    /** FR-FOG-45 (#210): DM-only token state; DM wire only when true, never to players. */
+    invisible: integer("invisible", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -793,6 +802,16 @@ export const sceneFog = sqliteTable(
     rows: integer("rows").notNull(),
     /** Run-length mask over the box (FR-FOG-04), ≤ 2,000 runs. */
     runs: text("runs").notNull(),
+    /** FR-FOG-26 / -27: fog shapes painted over the base mask, ≤ 100 (JSON leaf). */
+    shapes: text("shapes", { mode: "json" }).$type<FogLayerShape[]>().notNull().default([]),
+    /** FR-FOG-28 / -44: magical darkness, ≤ 20, each with its server-only `seenBy` (JSON leaf). */
+    darkness: text("darkness", { mode: "json" }).$type<DarknessRow[]>().notNull().default([]),
+    /** FR-FOG-29: explored memory on / off. */
+    explored: integer("explored", { mode: "boolean" }).notNull().default(false),
+    /** FR-FOG-38: + 1 per write (vision cache key). Server only. */
+    rev: integer("rev").notNull().default(0),
+    /** FR-FOG-35: re-derive on activation (senses edit / player added elsewhere). Server only. */
+    visionStale: integer("vision_stale", { mode: "boolean" }).notNull().default(false),
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [index("scene_fog_campaign").on(t.campaignId)],
@@ -817,6 +836,9 @@ export const sceneFogEdit = sqliteTable(
     prevCols: integer("prev_cols").notNull(),
     prevRows: integer("prev_rows").notNull(),
     prevRuns: text("prev_runs").notNull(),
+    /** FR-FOG-07: shapes / darkness before the edit; null on pre-v2 rows. */
+    prevShapes: text("prev_shapes", { mode: "json" }).$type<FogLayerShape[]>(),
+    prevDarkness: text("prev_darkness", { mode: "json" }).$type<DarknessRow[]>(),
     createdAt: text("created_at").notNull(),
   },
   (t) => [
@@ -828,6 +850,36 @@ export const sceneFogEdit = sqliteTable(
 
 /** CON-20: `seq` for undo entries, computed by the DB inside the insert's transaction. */
 export const sceneFogEditSeqNext = sql<number>`(select coalesce(max(${sceneFogEdit.seq}), 0) + 1 from ${sceneFogEdit})`;
+
+/**
+ * Explored memory (FR-FOG-37): one row per (scene, player), cells as box + runs (FR-FOG-04
+ * codec), never shrinks. Wire id `sceneId:playerId`. Cascades with its scene and its player.
+ */
+export const fogExplored = sqliteTable(
+  "fog_explored",
+  {
+    sceneId: text("scene_id")
+      .notNull()
+      .references((): AnySQLiteColumn => scene.id, { onDelete: "cascade" }),
+    playerId: text("player_id")
+      .notNull()
+      .references((): AnySQLiteColumn => player.id, { onDelete: "cascade" }),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    col0: integer("col0").notNull(),
+    row0: integer("row0").notNull(),
+    cols: integer("cols").notNull(),
+    rows: integer("rows").notNull(),
+    runs: text("runs").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sceneId, t.playerId] }),
+    index("fog_explored_campaign").on(t.campaignId),
+    index("fog_explored_player").on(t.playerId),
+  ],
+);
 
 // ---------------------------------------------------------------------------------------------
 // Scene tools (SCN §8, data model §25; fix/scn-core). scene-tools writes the rows. Every scene
@@ -853,6 +905,8 @@ export const sceneStructure = sqliteTable(
     walls: text("walls", { mode: "json" }).$type<Wall[]>().notNull(),
     /** JSON leaf `[n, x1, y1, x2, y2, state, f][]`. */
     doors: text("doors", { mode: "json" }).$type<Door[]>().notNull(),
+    /** FR-SCN-36 (sprint 3): `{<n>: playerId[]}`, FOG-written; null = pre-v2. Never on a wire. */
+    doorSeen: text("door_seen", { mode: "json" }).$type<DoorSeen>(),
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [index("scene_structure_campaign").on(t.campaignId)],
@@ -882,8 +936,10 @@ export const prop = sqliteTable(
     z: integer("z").notNull().default(0),
     hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
     locked: integer("locked", { mode: "boolean" }).notNull().default(false),
-    /** Server copy: every footprint cell fogged (FR-SCN-35); wire only when true. */
+    /** Server copy: seen by no player (FR-FOG-10, FR-SCN-35); wire only when true. */
     fogged: integer("fogged", { mode: "boolean" }).notNull().default(false),
+    /** Server copy (FR-FOG-10): player ids who see it; null = pre-v2. Never on a wire. */
+    seenBy: text("seen_by", { mode: "json" }).$type<string[]>(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -919,6 +975,8 @@ export const aoeTemplate = sqliteTable(
     placedByPlayerId: text("placed_by_player_id").references((): AnySQLiteColumn => player.id),
     hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
     fogged: integer("fogged", { mode: "boolean" }).notNull().default(false),
+    /** Server copy (FR-FOG-10): player ids who see it; null = pre-v2. Never on a wire. */
+    seenBy: text("seen_by", { mode: "json" }).$type<string[]>(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -967,6 +1025,7 @@ export const schema = {
   effectPreset,
   sceneFog,
   sceneFogEdit,
+  fogExplored,
   sceneStructure,
   prop,
   aoeTemplate,
