@@ -1,13 +1,13 @@
 // Triggers block (FR-MOD-49, MOD §7): one row per rule trigger of the owner — enabled Switch +
 // name, the rule as a muted sentence, "= 1d6+2" (the formula for this owner now), "Uses link
-// broken" / "Requires a missing preset". Owner unless locked, DM: New, Start from ▸ (the five
-// built-in trigger presets, FR-MOD-46), Edit, Delete. `rule-trigger` is lazy (FR-MOD-47,
+// broken" / "Requires a missing preset". Owner unless locked, DM: New, Start from ▸ (the built-in
+// trigger presets for the owner kind, FR-MOD-46), Edit, Delete. `rule-trigger` is lazy (FR-MOD-47,
 // ADR-0045): loaded when the block mounts (the Active effects tab opens), once per snapshot
 // generation; "Loading triggers…" until ready, "Couldn't load triggers" + Retry on error. Used by
 // the sheet section (characters) and the DM's token menu / Creatures entries (FR-MOD-28).
 
 import { TRIGGER_INTENTS } from "@shared/effect-modifiers/trigger-intents";
-import { TRIGGER_PRESETS } from "@shared/effect-modifiers/trigger-presets";
+import { triggerPresetsFor } from "@shared/effect-modifiers/trigger-presets";
 import {
   CHARACTER_TRIGGERS_MAX,
   DEFINITION_TRIGGERS_MAX,
@@ -37,7 +37,7 @@ import { Badge } from "../../components/ui/primitives";
 import { useLazyRecords, useSync } from "../../sync/store";
 import { useModIntent } from "./store";
 import { TriggerEditorDialog, type TriggerEditorStart } from "./trigger-editor";
-import { blankTrigger, draftOfPreset, draftOfRule } from "./trigger-editor-model";
+import { blankTrigger, draftFromPreset, draftOfRule } from "./trigger-editor-model";
 import {
   mayEditTriggers,
   ownerTriggers,
@@ -171,8 +171,12 @@ export function TriggersBlock({ owner }: { owner: TriggerOwnerRef }) {
   const mine = ownerTriggers(rows, owner, store.you?.role);
   const cap = owner.kind === "character" ? CHARACTER_TRIGGERS_MAX : DEFINITION_TRIGGERS_MAX;
   const full = mine.length >= cap;
-  const open = (draft: TriggerEditorStart["draft"], title: string, id?: string) =>
-    setEditor({ owner, draft, title, ...(id ? { id } : {}) });
+  const open = (
+    draft: TriggerEditorStart["draft"],
+    title: string,
+    id?: string,
+    confirm: TriggerEditorStart["confirm"] = [],
+  ) => setEditor({ owner, draft, title, confirm, ...(id ? { id } : {}) });
   return (
     <div data-testid="mod-triggers" className="grid gap-1">
       {state === "loading" ? (
@@ -244,19 +248,17 @@ export function TriggersBlock({ owner }: { owner: TriggerOwnerRef }) {
                 <DropdownMenuContent align="start">
                   <DropdownMenuLabel>Start from</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {TRIGGER_PRESETS.map((p) => (
+                  {triggerPresetsFor(owner.kind).map((p) => (
                     <DropdownMenuItem
                       key={p.key}
                       data-testid="mod-trigger-from"
                       data-value={p.key}
-                      onSelect={() => open(draftOfPreset(p), `New trigger from ${p.name}`)}
+                      onSelect={() => {
+                        const f = draftFromPreset(p.key, { ...owner, features: facts.features });
+                        if (f) open(f.draft, `New trigger from ${p.name}`, undefined, f.confirm);
+                      }}
                     >
                       {p.name}
-                      {p.owner !== owner.kind && (
-                        <span className="text-muted-foreground">
-                          {p.owner === "definition" ? " (monster)" : " (character)"}
-                        </span>
-                      )}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>

@@ -13,6 +13,7 @@ import {
   type RollKind,
 } from "@shared/effect-modifiers/schemas";
 import { TRIGGER_INTENTS } from "@shared/effect-modifiers/trigger-intents";
+import type { StartFromConfirm } from "@shared/effect-modifiers/trigger-presets";
 import { TRIGGER_NAME_MAX } from "@shared/effect-modifiers/trigger-records";
 import { builtinName, triggerSentence } from "@shared/effect-modifiers/trigger-words";
 import {
@@ -407,6 +408,36 @@ export interface TriggerEditorStart {
   /** Set = edit (replace) this trigger. */
   id?: string;
   title: string;
+  /** "Start from": owner-specific fields the user must confirm before Save (FR-MOD-46). */
+  confirm?: readonly StartFromConfirm[];
+}
+
+const CONFIRM_LABEL: Readonly<Record<StartFromConfirm, string>> = {
+  requires: "The effect it needs is right for this owner",
+  every: "The feature it spends is right for this owner",
+};
+
+function ConfirmBox({
+  what,
+  checked,
+  onChange,
+}: {
+  what: StartFromConfirm;
+  checked: boolean;
+  onChange(v: boolean): void;
+}) {
+  return (
+    <span className="flex items-center gap-1 text-xs text-amber-500">
+      <Checkbox
+        data-testid="mod-trig-editor-confirm"
+        data-value={what}
+        aria-label={CONFIRM_LABEL[what]}
+        checked={checked}
+        onCheckedChange={(v) => onChange(v === true)}
+      />
+      {CONFIRM_LABEL[what]}
+    </span>
+  );
 }
 
 /** The editor's form (exported for static-render tests; the Dialog wraps it). */
@@ -421,8 +452,18 @@ export function TriggerForm({ start, onDone }: { start: TriggerEditorStart; onDo
   const set = (patch: Partial<TriggerDraft>) => setD((x) => ({ ...x, ...patch }));
   const setFilter = (i: number, f: FilterDraft) =>
     setD((x) => ({ ...x, when: x.when.map((g, j) => (j === i ? f : g)) }));
+  const [confirmed, setConfirmed] = useState<readonly StartFromConfirm[]>([]);
+  const toConfirm = start.confirm ?? [];
+  const confirmBox = (what: StartFromConfirm) =>
+    toConfirm.includes(what) && (
+      <ConfirmBox
+        what={what}
+        checked={confirmed.includes(what)}
+        onChange={(v) => setConfirmed((c) => (v ? [...c, what] : c.filter((x) => x !== what)))}
+      />
+    );
   const built = ruleOfDraft(d);
-  const valid = built.ok && nameValid(d.name);
+  const valid = built.ok && nameValid(d.name) && toConfirm.every((c) => confirmed.includes(c));
   const cx = wordsContext(store, facts.features);
   const kinds = filterKinds(d.on);
   const save = async () => {
@@ -486,6 +527,7 @@ export function TriggerForm({ start, onDone }: { start: TriggerEditorStart; onDo
               className="w-56"
             />
           </div>
+          {confirmBox("requires")}
         </Section>
         <Section title="Only if">
           {d.when.length === 0 && <p className="text-xs text-muted-foreground">No conditions</p>}
@@ -569,6 +611,7 @@ export function TriggerForm({ start, onDone }: { start: TriggerEditorStart; onDo
               />
             )}
           </div>
+          {confirmBox("every")}
         </Section>
         <Section title="Then">
           {effectKinds(d.on).length > 1 && (

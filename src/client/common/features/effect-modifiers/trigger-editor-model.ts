@@ -4,7 +4,11 @@
 // server validates again, with the owner's refs). Pure; both clients.
 import type { RollKind, RollVia } from "@shared/effect-modifiers/schemas";
 import type { PutTriggerInput } from "@shared/effect-modifiers/trigger-intents";
-import type { TriggerPreset } from "@shared/effect-modifiers/trigger-presets";
+import {
+  type StartFromConfirm,
+  type StartFromOwner,
+  startFromTriggerPreset,
+} from "@shared/effect-modifiers/trigger-presets";
 import { TRIGGER_NAME_MAX } from "@shared/effect-modifiers/trigger-records";
 import {
   EVENT_EFFECTS,
@@ -163,20 +167,36 @@ export function draftOfRule(
   };
 }
 
-/** "Start from ▸" (FR-MOD-46): a built-in trigger preset copied into the editor. */
-export const draftOfPreset = (p: TriggerPreset): TriggerDraft =>
-  draftOfRule({ name: p.name, enabled: true, public: p.public }, p.rule);
+/**
+ * "Start from ▸" (FR-MOD-46, R5's `startFromTriggerPreset`): the built-in for this owner as a
+ * draft, plus the owner-specific fields the user must confirm (`requires`, a preselected feature).
+ * Undefined for an unknown key or a built-in of the other owner kind.
+ */
+export function draftFromPreset(
+  key: string,
+  owner: StartFromOwner,
+): { draft: TriggerDraft; confirm: StartFromConfirm[] } | undefined {
+  const s = startFromTriggerPreset(key, owner);
+  if (!s) return undefined;
+  const t = s.draft;
+  const draft = draftOfRule(
+    { name: t.name, enabled: t.enabled ?? true, public: t.public ?? owner.kind === "character" },
+    t.rule,
+  );
+  return { draft, confirm: s.confirm };
+}
 
 /** Filter kinds the event allows (MOD §8.4 table). */
 export const filterKinds = (on: TriggerEvent): readonly TriggerFilterKind[] => EVENT_FILTERS[on];
 export const effectKinds = (on: TriggerEvent): readonly EffectKind[] => EVENT_EFFECTS[on];
-/** `turnStart` fires each time (review R6); `feature` on characters only. */
+/** `turnStart` fires each time (review R6); `feature` on characters' hit triggers only (#223). */
 export function everyOptions(
   on: TriggerEvent,
   ownerKind: "character" | "definition",
 ): EveryDraft[] {
   if (on === "turnStart") return ["each"];
-  return ownerKind === "character"
+  // #223: roll triggers can't spend a feature use (ROLL_FEATURE_UNSUPPORTED).
+  return ownerKind === "character" && on === "hit"
     ? ["each", "turn", "round", "encounter", "feature"]
     : ["each", "turn", "round", "encounter"];
 }

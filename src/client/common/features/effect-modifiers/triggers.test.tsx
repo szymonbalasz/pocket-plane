@@ -19,7 +19,7 @@ import { ActiveEffectsSection } from "./section";
 import { TriggerForm } from "./trigger-editor";
 import {
   blankTrigger,
-  draftOfPreset,
+  draftFromPreset,
   draftOfRule,
   everyOptions,
   putTriggerPayload,
@@ -322,6 +322,8 @@ describe("FR-MOD-50 trigger editor", () => {
     expect(everyOptions("turnStart", "character")).toEqual(["each"]);
     expect(everyOptions("hit", "definition")).not.toContain("feature");
     expect(everyOptions("hit", "character")).toContain("feature");
+    // #223: roll triggers can't spend feature uses.
+    expect(everyOptions("roll", "character")).not.toContain("feature");
     const remind = renderForm(
       { role: "dm" },
       {
@@ -334,20 +336,40 @@ describe("FR-MOD-50 trigger editor", () => {
     expect(remind).toContain("Elite now: 10");
   });
 
-  test("FR-MOD-46 Start from: each built-in round-trips through the editor unchanged", () => {
+  test("FR-MOD-46 Start from: each built-in round-trips through the editor for its owner kind only", () => {
     for (const p of TRIGGER_PRESETS) {
-      const r = ruleOfDraft(draftOfPreset(p));
-      expect(r.ok && r.rule).toEqual(p.rule);
+      const owner = { kind: p.owner, id: "o1" };
+      const f = draftFromPreset(p.key, owner);
+      const r = f && ruleOfDraft(f.draft);
+      expect(r?.ok && r.rule).toEqual(p.rule);
+      expect(f?.draft.name).toBe(p.name);
+      expect(f?.draft.public).toBe(p.public);
+      const other = p.owner === "character" ? "definition" : "character";
+      expect(draftFromPreset(p.key, { kind: other, id: "o1" })).toBeUndefined();
     }
+    expect(draftFromPreset("divine-fury", { kind: "character", id: "o1" })).toBeUndefined();
     const df = ruleOfDraft(draftOfRule(divineFury, DF_RULE));
     expect(df.ok && df.rule).toEqual(DF_RULE);
   });
 
+  test("FR-MOD-46 owner-specific fields to confirm: a checkbox each; Save waits for them", () => {
+    const draft = draftOfRule(divineFury, DF_RULE);
+    const html = renderForm(
+      { role: "player" },
+      { owner, draft, title: "x", confirm: ["requires", "every"] },
+    );
+    expect(html).toContain('data-testid="mod-trig-editor-confirm" data-value="requires"');
+    expect(html).toContain('data-testid="mod-trig-editor-confirm" data-value="every"');
+    expect(tags(html, "mod-trig-editor-save")[0]).toContain('disabled=""');
+    const plain = renderForm({ role: "player" }, { owner, draft, title: "x" });
+    expect(plain).not.toContain("mod-trig-editor-confirm");
+    expect(tags(plain, "mod-trig-editor-save")[0]).not.toContain('disabled=""');
+  });
+
   test("FR-MOD-45 payload: create without id, replace with id; owner ref; invalid drafts don't build", () => {
-    const d = {
-      ...draftOfPreset(TRIGGER_PRESETS[0] as (typeof TRIGGER_PRESETS)[0]),
-      name: " Sneak ",
-    };
+    const start = draftFromPreset("sneak-attack", { kind: "character", id: "thorn" });
+    if (!start) throw new Error("sneak-attack missing");
+    const d = { ...start.draft, name: " Sneak " };
     const r = ruleOfDraft(d);
     if (!r.ok) throw new Error(r.message);
     expect(putTriggerPayload(d, r.rule, { characterId: "thorn" })).toEqual({
