@@ -21,6 +21,7 @@
 | DB | SQLite via Drizzle ORM | `drizzle-kit push` in dev; `drizzle-kit generate` migrations at release |
 | Validation | zod | At all boundaries: HTTP, WS, DB JSON columns, imports |
 | Dice | ~~`@dice-roller/rpg-dice-roller`~~ → own roller over the dice-roll-log grammar + `random-js` (#151) | Evaluated server-side. The library pulled in mathjs (~9 s import on Windows) |
+| 3D dice | `three` + `cannon-es` (#207, [ADR-0044](0044-3d-dice.md)) | Client only, lazy chunk; cosmetic throws that settle on the server's result |
 | Images | `sharp` | Derivatives for assets |
 | Tests | `bun test` (unit/integration); Playwright (thin E2E) | E2E only for critical flows |
 

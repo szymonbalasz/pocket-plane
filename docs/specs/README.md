@@ -40,6 +40,12 @@ Sprint 1 also revised scenes-map, play-shell, combat-tracker, dice-roll-log and 
 
 Sprint 2 phase 1 also revised combat-tracker, combat-extras, entities, notifications (P2a) and play-shell, scenes-map, character-sheet, character-sheet-full, campaign-management, dice-roll-log (P2b) for the DM's playtest notes N1–N11 and glitches G1–G10 (#190).
 
+## Sprint 3 (post-MVP)
+
+| Spec | Prefix | Status | Owner |
+|---|---|---|---|
+| [Dice extras](dice-extras.md) | DICEX | complete | spec-dice-extras |
+
 ## Post-MVP
 
 Stubs only. Not to be claimed during MVP spec phase.

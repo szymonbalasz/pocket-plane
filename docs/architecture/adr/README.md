@@ -47,6 +47,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0039](0039-fog-visibility.md) | Fog visibility: server-written `fogged` copies, scene visibility and lifecycle hook registries | accepted (#196; amends 0016 undo scope; refines 0024, 0028) |
 | [0040](0040-token-move-guards.md) | Token move guards: a move may be refused | accepted (#196; amends 0031) |
 | [0041](0041-active-scene-window.md) | Active-scene window for tokens and scene-tool records in the DM snapshot | accepted (#196; refines 0021 C; sibling of 0029) |
+| [0044](0044-3d-dice.md) | 3D dice: throws derived on each client from received roll entries | accepted (#207; amends 0001 stack) |
 
 ## Proposing a new ADR
 

@@ -123,6 +123,11 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Roll mode** | normal / advantage / disadvantage, applied to the d20. | — |
 | **Physical-dice mode** | Per-browser toggle: every roll through the roll control asks for manual entry. | Manual roll |
 | **Manual roll** | A roll entered from physical dice instead of rolled by the server. Logged and marked manual. | — |
+| **Dice tray** | Window to compose or adjust a roll before rolling it; staged rolls and clicked notation land here ([dice-extras](specs/dice-extras.md)). | Roll control |
+| **Throw** | The animation of one received `roll` entry (or all entries of one frame), settling on the server's faces; cosmetic only ([ADR-0044](architecture/adr/0044-3d-dice.md)). | Roll |
+| **Dice look** | An owner's dice appearance (style, colours, material); everyone sees the roller's look. | — |
+| **Dice style** | A named starting look (Ivory, Obsidian, …). | Preset (MOD) |
+| **Notation link** | Dice notation in free text (e.g. "1d12 + 5") rendered clickable; stages a plain roll in the tray, never attack / apply. | — |
 | **Party loot** | Shared, party-visible log of the party's coin and rewards: loot the DM gives, party spending, and coin moves between the party pot and wallets. | Party board (post-MVP superset) |
 | **Loot entry** | One row of the party loot log: loot (text + signed coins, DM) or a coin move. | Loot row |
 | **Party pot** | The party's shared coin per denomination, derived from the loot log. | Party purse, treasury |
