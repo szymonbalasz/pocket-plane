@@ -252,7 +252,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 | # | DM (A) | Players (B, C) | Expected |
 |---|---|---|---|
-| 1 | Open Party | — | Handouts h5, h4, h3, h2, h1 with shares Not shared, Not shared, Not shared, Player 1, Everyone. Inventory: Potion ×2, Rope ×1, Torch ×8. Board at the left edge, clear of Initiative and the log |
+| 1 | Open Party | — | Handouts h5, h4, h3, h2, h1 with shares Not shared, Not shared, Not shared, Player 1, Everyone. Inventory: Potion ×2, Rope ×1, Torch ×8. Board at the left edge, clear of Initiative and the log (when Initiative is minimised, a full-size free slot at the right edge wins, shared placement rule #193; #229) |
 | 2 | — | B, C open Party | B: h2, h1 (New). C: h1 only. Leak scan C: "PARTY-P1-ONLY", "PARTY-SECRET-3", "PARTY-UNSHARED-4", "PARTY-PREP-5", thieves-map and wanted-poster ids absent |
 | 3 | New handout "Wanted Poster", add image wanted-poster, text "Reward 50 gp", Save | — | Row "Not shared" in A only; nothing in B, C (frames) |
 | 4 | Share… → Chosen: Player 1 | B | B: toast "New handout: Wanted Poster", row New; open → viewer shows image + text. C: no toast, no row; leak scan C clean (title, id, asset id) |
