@@ -65,7 +65,8 @@ export const shellTestWindow = defineWindow({
   clients: ["dm", "player"],
   defaultSize: { w: 320, h: 220 },
   minSize: { w: 240, h: 160 },
-  defaultPosition: { anchor: "bottom-right" },
+  // Bottom-right, lifted clear of the player toast stack (above the launcher strip).
+  defaultPosition: { anchor: "bottom-right", dy: 150 },
   fixedDefault: true,
   launcher: { icon: TestTubeIcon, label: "Test", order: 910 },
   available: isTestMode,

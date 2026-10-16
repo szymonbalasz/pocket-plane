@@ -7,9 +7,10 @@ import { entityNameKey, xpForCr } from "@shared/entities/schemas";
 import { useMemo } from "react";
 import { type LookupRow, lookupMatches } from "../combat-tracker/lookup";
 import { useDefinitions } from "./definitions";
+import { badgeLabel } from "./logic";
 import { type ApiSource, useCompendiumSearch } from "./search";
 
-/** Badge of an imported definition (as the Creatures window's read-only rows). */
+/** Badge of an SRD definition (as the Creatures window's read-only rows); others per `badgeLabel`. */
 export const IMPORTED_BADGE = "SRD";
 
 type Merged = LookupRow & { imported: boolean };
@@ -24,7 +25,7 @@ export function importedLookupRows(results: readonly EntrySummary[]): Merged[] {
       name: r.name,
       cr: null,
       xp: null,
-      badge: IMPORTED_BADGE,
+      badge: badgeLabel(r.sourceLabel),
       imported: true,
     });
   }

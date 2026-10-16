@@ -1461,3 +1461,13 @@ From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #207, #
 - **`imported-entity`** (entities' record type over `entity` rows with `campaign_id` null): now **lazy by ids** (FR-CMP-15, ADR-0045): in no snapshot; the DM loads rows by id. Players never.
 - **Derived at read** (never stored): `sourceLabel` (imported: `compendium_source.name`; homebrew: "Homebrew"), the search rank (name prefix / word start / substring / text, FR-CMP-10), the entry `ETag` (entry `updatedAt` + source `version` + monster definition `updatedAt`).
 - **Filters** (FR-CMP-11) read `facets` (JSON leaf) after a SQL pre-filter on campaign, kind and `instr` over `name_key` / `search_text`; no index added (≤ ~1,200 rows, OQ-CMP-09).
+
+## 45. Sprint 3: compendium window (C3)
+
+From [compendium](../specs/compendium.md) (CMP). **Built by `build/compendium-window`**: no new table, column or record type. Protocol side: [protocol §59](../protocol/README.md#59-sprint-3-compendium-window-c3).
+
+- **Writes:** only through `cmp.import` (C1), now routed: `POST /api/compendium/import` writes `compendium_source`, `compendium_entry` and imported definitions as [§34](#34-sprint-3-compendium-core-c1); nothing else.
+- **Derived (server):** `bundledVersion` per bundled source (`GET /api/compendium/sources`), never stored; compared with `compendium_source.version` for **Update**.
+- **Derived (client, `@ui/features/compendium/logic`):** tabs per role, search params, source Badge, footer label, CR + XP, ability mods, a monster expression's roll category, the Stat block route (campaign definition → sheet, else the entry linking the imported definition).
+- **Persisted runtime state:** none. Window query / tab / filters / view live in the page's memory only (not `localStorage`, not the server).
+- **CON-44:** no record shape; 0 B in every snapshot (entries and sources are read over REST).

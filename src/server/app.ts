@@ -7,6 +7,7 @@ import { serveStatic } from "hono/bun";
 import { assetRoutes } from "./features/assets-pipeline/routes";
 import { campaignRoutes } from "./features/campaign-management/routes";
 import { encounterRoutes } from "./features/combat-tracker/routes";
+import { compendiumImportRoutes } from "./features/compendium/import-route";
 import { compendiumRoutes } from "./features/compendium/routes";
 import { entityRoutes } from "./features/entities/routes";
 import { sceneRoutes } from "./features/scenes-map/routes";
@@ -23,6 +24,7 @@ export function createApi(s: Services) {
       .route("/api", sceneRoutes(s))
       .route("/api", encounterRoutes(s))
       .route("/api", compendiumRoutes(s))
+      .route("/api", compendiumImportRoutes(s))
   );
 }
 

@@ -26,6 +26,7 @@ import {
   useStartedEncounter,
 } from "@ui/features/combat-tracker/store";
 import { useCreatureLookup } from "@ui/features/compendium/lookup";
+import { lazyApi } from "@ui/features/compendium/search";
 import { useFreeArea } from "@ui/features/play-shell/free-area";
 import { useSceneLoaded } from "@ui/features/scenes-map/scene-window";
 import { useRecords } from "@ui/sync/store";
@@ -40,7 +41,7 @@ import { useDmMap, viewedScene } from "../scenes-map/view-state";
 import { useCbtxDialogs } from "./store";
 
 /** The DM REST client, imported lazily (the session reads localStorage at import). */
-const api = () => import("../campaign-management/session").then((m) => m.api);
+const api = lazyApi(() => import("../campaign-management/session").then((m) => m.api));
 
 export interface AddRow {
   id: string;
