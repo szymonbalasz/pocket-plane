@@ -8,6 +8,7 @@ import {
   checkRuleForOwner,
   doublesOnCrit,
   PlayerTriggerRule,
+  ROLL_FEATURE_UNSUPPORTED,
   reminderText,
   rowMatches,
   type TriggerEvent,
@@ -153,6 +154,17 @@ describe("FR-MOD-33 rule schema", () => {
     for (const every of ["day", { feature: "" }, { feature: "x", extra: 1 }, null]) {
       expect(TriggerRule.safeParse(with_("hit", { every })).success).toBe(false);
     }
+  });
+
+  test("FR-MOD-43 roll triggers with every: feature → invalid at save (documented limitation, #223); hit ones parse", () => {
+    expect(issues(with_("roll", { every: { feature: "feat-rage" } }))).toEqual([
+      { path: "every", message: ROLL_FEATURE_UNSUPPORTED },
+    ]);
+    expect(
+      PlayerTriggerRule.safeParse(with_("roll", { every: { feature: "feat-rage" } })).success,
+    ).toBe(false);
+    for (const every of ["each", "turn", "round", "encounter"]) ok(with_("roll", { every }));
+    ok(with_("hit", { every: { feature: "feat-rage" } }));
   });
 
   test("FR-MOD-33 rule schema: caps and strictness", () => {

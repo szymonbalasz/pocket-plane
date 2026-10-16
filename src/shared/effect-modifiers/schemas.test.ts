@@ -69,11 +69,12 @@ describe("FR-MOD-01 modifier bounds", () => {
     bad(Modifier, { ...ac, value: 0 });
   });
 
-  test("FR-MOD-01 ≤ 6 per effect (0 ok), 1–6 per preset", () => {
+  test("FR-MOD-01 ≤ 6 per effect (0 ok), ≤ 6 per preset", () => {
     ok(Modifiers, []);
     ok(Modifiers, Array(6).fill(bless));
     bad(Modifiers, Array(7).fill(bless));
-    bad(PresetModifiers, []);
+    // 0 only for a campaign mark (FR-MOD-05): the preset schemas refine it per owner.
+    ok(PresetModifiers, []);
     ok(PresetModifiers, Array(6).fill(rage));
     bad(PresetModifiers, Array(7).fill(rage));
   });
@@ -180,11 +181,13 @@ describe("MOD §8.2 effect-preset record", () => {
     ok(EffectPresetRecord, { ...characterPreset, usesFeatureId: "row" });
   });
 
-  test("MOD §8.2 bounds: name 1–40, note ≤ 200, 1–6 built-tier modifiers, duration 1–100", () => {
+  test("MOD §8.2 bounds: name 1–40, note ≤ 200, 1–6 built-tier modifiers (0: campaign mark), duration 1–100", () => {
     bad(EffectPresetRecord, { ...campaignPreset, name: "" });
     bad(EffectPresetRecord, { ...campaignPreset, name: "x".repeat(41) });
     bad(EffectPresetRecord, { ...campaignPreset, note: "x".repeat(201) });
-    bad(EffectPresetRecord, { ...campaignPreset, modifiers: [] });
+    // FR-MOD-05 (#209): a campaign preset with 0 modifiers is a mark; a character preset needs 1.
+    ok(EffectPresetRecord, { ...campaignPreset, key: null, modifiers: [] });
+    bad(EffectPresetRecord, { ...characterPreset, modifiers: [] });
     ok(EffectPresetRecord, {
       ...campaignPreset,
       modifiers: [{ kind: "flat", on: { roll: "ac" }, value: 2 }],

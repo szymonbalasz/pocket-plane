@@ -156,7 +156,7 @@ describe("FR-MOD-15/16 cbt.attack and apply", () => {
 
   test("FR-MOD-14/16 natural 20: bonus damage dice double on the card; flat Rage doesn't", () => {
     const t = modSetup();
-    t.apply({ targets: [{ characterId: t.thornId }], preset: { key: "hunters-mark" } });
+    t.d6OnThorn();
     const rage = t.put(t.from("rage", { characterId: t.thornId }), t.p2);
     t.toggle(t.thornId, rage, true, t.p2);
     const r = t.run<AttackResult>(
