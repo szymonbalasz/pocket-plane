@@ -81,3 +81,43 @@ test("FR-DICEX-01 FR-DICEX-04 FR-DICEX-06 FR-DICEX-10 FR-DICEX-11 FR-DICEX-17 tr
 
   for (const page of [p1, dm]) await page.context().close();
 });
+
+// Headless Chromium has WebGL only through SwiftShader, which Chrome now gates behind a flag.
+test.use({ launchOptions: { args: ["--enable-unsafe-swiftshader", "--use-angle=swiftshader"] } });
+
+test("FR-DICEX-15 FR-DICEX-22 3D throw rests on the server's values (skipped without WebGL)", async ({
+  browser,
+}) => {
+  const { link } = e2eEnv();
+  const p1 = await rolePage(browser);
+  await p1.goto(link("Player 1"));
+  await live(p1);
+  const webgl = await p1.evaluate(() => {
+    const c = document.createElement("canvas");
+    return (c.getContext("webgl2") ?? c.getContext("webgl")) !== null;
+  });
+  test.skip(!webgl, "no WebGL in this headless browser: throws are flat (covered above)");
+
+  const log = await openWindow(p1, "dice.log");
+  const roll = async () => {
+    await log.getByTestId("dice-roll-expression").fill("2d6+1d20+1d100");
+    await log.getByTestId("dice-roll-expression").press("Enter");
+  };
+  // The first 3D throw loads the lazy chunk and draws flat (DICEX §7); a later one tumbles.
+  const thrown = p1.locator('[data-testid="dicex-throw"][data-record-id][data-render="3d"]');
+  await expect(async () => {
+    await roll();
+    await expect(thrown).toHaveCount(1, { timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
+  await expect(thrown).toHaveAttribute("data-state", "rest", { timeout: 6_000 });
+  const dice = thrown.getByTestId("dicex-throw-die");
+  await expect(dice).toHaveCount(5); // 2 d6, 1 d20, d100 = tens + units
+  for (const d of await dice.all()) {
+    const value = await d.getAttribute("data-value");
+    expect(value).toMatch(/^\d+$/);
+    await expect(d).toHaveAttribute("data-settled", value as string);
+    await expect(d).toHaveAttribute("data-flat", "false");
+  }
+  await expect(thrown.locator("canvas")).toHaveCount(1);
+  await p1.context().close();
+});
