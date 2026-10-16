@@ -2,6 +2,7 @@
 
 - Status: proposed (sprint 3, spec-compendium; accept at sprint-3 DM gate 1). Completes [ADR-0010](0010-compendium-design.md) (scope); the integrator numbers it
 - Date: 2026-10-16
+- Amends: [ADR-0004](0004-tenancy-auth-permissions.md) (a second exception to "every record belongs to one campaign": global `compendium_source` / `compendium_entry`), [ADR-0018](0018-global-imported-content.md) (scope table row: imported compendium entries, not only definitions), [ADR-0019](0019-auth-credentials.md) (player REST header `Authorization: Player <link token>` on compendium routes). The DM accepts these at gate 1 (compendium OQ-CMP-25)
 - Refines: [ADR-0010](0010-compendium-design.md) (scope A / B / C), [ADR-0018](0018-global-imported-content.md) (global imports), [ADR-0015](0015-source-adapters-fixtures.md) (pipeline: in-place update), [ADR-0021](0021-sync-protocol-conventions.md) C (snapshot scope)
 - Depends on: [proposed lazy record types](proposed-lazy-record-types.md) (party-board; the one on-demand path, global scope + id loads, per the sprint-3 seams ruling S1)
 - Affects: [compendium](../../specs/compendium.md), [entities](../../specs/entities.md), [fixtures-adapters](../../specs/fixtures-adapters.md), [live-sync](../../specs/live-sync.md), [combat-tracker](../../specs/combat-tracker.md), [combat-extras](../../specs/combat-extras.md), [character-sheet-full](../../specs/character-sheet-full.md), [protocol](../../protocol/README.md) §2, §5
@@ -41,7 +42,8 @@
 | Records | `compendium_source` and `compendium_entry` (global imported, or campaign homebrew); monster entries link an imported `entity` (the creature definition) |
 | Edits | Imported entries read-only (ADR-0010 i). Monsters: derive a custom (ADR-0009). Other kinds: clone into a campaign homebrew entry, independent, no link |
 | Snapshot | No compendium data. `imported-entity` is lazy (`sync.load {type, ids}`), DM only |
-| Reads | REST `/api/compendium/search`, `/entries/:id`; one pure `entryVisibleTo`: players never get monsters, unshared homebrew or other campaigns' homebrew. Players authenticate with their link token on these routes |
-| Import | Bundled recorded source (SRD 5.1 via Open5e), DM-triggered, one transaction, idempotent; changed upstream rows update in place (closes ADR-0015's open row / OQ-FIX-18); customs, clones and sheets never change |
+| Reads | REST `/api/compendium/search`, `/entries/:id`; one pure `entryVisibleTo`: players never get monsters, unshared homebrew or other campaigns' homebrew. Players authenticate with `Authorization: Player <link token>` on these routes only (route-local; amends ADR-0019). Visibility before `304`; `Cache-Control: private, no-cache` |
+| Import | Bundled recorded source (SRD 5.1 via Open5e, filtered to `wotc-srd` at recording time; CC BY 4.0 attribution, Open5e as provenance), DM-triggered, one transaction, idempotent, refused while an encounter is started; changed upstream rows update in place (closes ADR-0015's open row / OQ-FIX-18), instance changes logged per campaign; customs, clones and sheets never change |
+| Tenancy | Global imported rows (`compendium_source`, imported `compendium_entry`, imported definitions) are the exceptions to ADR-0004's one-campaign rule; homebrew entries are campaign-scoped (amends ADR-0004, ADR-0018) |
 | Pipeline | Per-kind stores (entities: `monster`; compendium: the other kinds); outcomes `created` / `updated` / `existing`; `cmp.import` is the one routed caller and takes a source key, never client data (amends FR-FIX-24) |
 | ADR-0010 | Status → accepted (scope A) when this is accepted; "Consequences" points here |
