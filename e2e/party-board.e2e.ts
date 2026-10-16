@@ -20,7 +20,7 @@ test("FR-PARTY-05 FR-PARTY-06 FR-PARTY-07 FR-PARTY-09 FR-PARTY-16 DM shares Ship
 }) => {
   const { secret, link, recordId } = e2eEnv();
   const h = (i: number) => recordId("handouts-1", "handout", i);
-  const [mayor, thievesMap, , , shipManifest] = [0, 1, 2, 3, 4].map(h) as string[];
+  const [mayor, thievesMap, shipManifest] = [h(0), h(1), h(4)];
   const p1Id = recordId("player-1", "player");
 
   const dm = await rolePage(browser);
