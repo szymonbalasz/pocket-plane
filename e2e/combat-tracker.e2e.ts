@@ -325,6 +325,55 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await dm.context().close();
 });
 
+// Runs after the flow above (workers: 1, file order): encounter-1 is ended, so a new encounter
+// (whole party, no monsters) starts with Mira and Thorn lacking initiative.
+test("BL-02 Start round 1 shows why it can't start", async ({ browser }) => {
+  const { secret, recordId } = e2eEnv();
+  const ambush = recordId("battlemap", "scene");
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const scenes = await openWindow(dm, "map.scenes");
+  await scenes
+    .locator(`[data-testid="map-scene-row"][data-record-id="${ambush}"] button`)
+    .first()
+    .click();
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+  const enc = await openWindow(dm, "cbt.encounters");
+  await enc.getByTestId("cbt-enc-new").click();
+  await enc.getByTestId("cbt-enc-start").click();
+  await expect(dm.getByTestId("cbt-enc-binding")).toHaveCount(2);
+  await dm.getByTestId("cbt-enc-start-confirm").click();
+  const init = await openWindow(dm, "cbt.initiative");
+  await expect(init.getByTestId("cbt-init-row")).toHaveCount(2);
+
+  // The reason names who lacks initiative; a click sends nothing and flashes it.
+  const reason = init.getByTestId("cbt-init-start-reason");
+  await expect(reason).toHaveText(/^2 without initiative: (Mira, Thorn|Thorn, Mira)$/);
+  await init.getByTestId("cbt-init-next").click();
+  await expect(reason).toHaveAttribute("data-flash", "true");
+  await expect(init.getByTestId("cbt-init-round")).toHaveAttribute("data-value", "0");
+
+  // Everyone set → the line goes and Start works.
+  for (const [name, value] of [
+    ["Mira", "15"],
+    ["Thorn", "10"],
+  ] as const) {
+    const id = await idByName(init, name);
+    const input = init.locator(`[data-testid="cbt-init-row-init"][data-record-id="${id}"]`);
+    await input.fill(value);
+    await input.press("Enter");
+  }
+  await expect(reason).toHaveCount(0);
+  await init.getByTestId("cbt-init-next").click();
+  await expect(init.getByTestId("cbt-init-round")).toHaveAttribute("data-value", "1");
+
+  await init.getByTestId("cbt-init-end").click();
+  await dm.getByTestId("cbt-init-end-confirm").click();
+  await expect(dm.getByTestId("cbt-init-end-confirm")).toHaveCount(0);
+  await dm.context().close();
+});
+
 async function idByName(scope: Locator, name: string): Promise<string> {
   // By the full name: the row splits "Goblin 2" into "Goblin" + " 2" (CBTX `RowName`).
   const r = scope.locator('[data-testid="cbt-init-row"]').filter({
