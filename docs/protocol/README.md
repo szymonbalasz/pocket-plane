@@ -1500,3 +1500,21 @@ From [effect-modifiers](../specs/effect-modifiers.md) sprint 3 (MOD, `complete`;
 | Live formula value (FR-MOD-35, -50) | `formulaOwnerOf(statBlock)` of the owner's `entity` row, or for a definition the `entity` / `imported-entity` row in the store — until compendium's C2 moves imported definitions behind `useDefinitions` (review C5) |
 | DM entries (FR-MOD-28) | Token menu line `mod.triggers` (order 82) "Rule triggers…" (`mod-token-menu-triggers`): a token with `characterId` → that character, else its monster definition (custom or imported); dialog `mod-triggers-dialog` around the Triggers block. `creatureActions` row action `mod.triggers` (`mod-creature-triggers`, `data-record-id` = definition id) on monster rows |
 | Pure helpers (`@shared/effect-modifiers/trigger-words`) | `triggerSentence(rule, cx)`, `triggerValueNow(rule, owner)`, `triggerWarnings(rule, features, cx)`, `hasRedactedRefs(rule)`, `presetRefName`, `builtinName`; DM row or player copy alike |
+
+## 52. Sprint 3: party board gold (P3)
+
+From [party-board](../specs/party-board.md#64-gold-ledger-party-loot-evolved) (PARTY slice 3; #207 G28, #221). **Built by `build/party-gold`** in party-loot's folders (seams S8): `loot.split`, the `loot.edit` item conflict, the Split… dialog and item rows in `loot.log`. No new record type; `CoinSplit` is [§44](#44-sprint-3-party-board-core-p-core)'s. Data side: [data model §38](../data-model/README.md#38-sprint-3-party-board-gold-p3).
+
+**Intents** (party-loot feature; extend the [§29](#29-reward-party-loot) table)
+
+| Intent | Who | Payload | Validation | Result | Source |
+|---|---|---|---|---|---|
+| `loot.split` | DM | `LootSplitIntent {characterIds, cp?, sp?, ep?, gp?, pp?}` (`@shared/party-board/schemas`, strict) | 1–10 unique ids; each coin int 0…999 999; every share (⌊coin / n⌋) 0 → `invalid` "Nothing to split"; each id a `character` of the actor's campaign, else `not_found`; player → `forbidden`. No balance check (#150) | `{entryIds}` (list order) | [FR-PARTY-26](../specs/party-board.md#64-gold-ledger-party-loot-evolved) |
+| `loot.edit` (amended) | DM | as §29 | + entry of kind `item` → `conflict` "Item moves can't be edited — move it back" (`ITEM_EDIT_MESSAGE`) | — | [FR-PARTY-25](../specs/party-board.md#64-gold-ledger-party-loot-evolved) |
+
+**Event** `CoinSplit {entryIds, characterIds, shares}` (logged, not undoable; no notification): changes = one `loot-entry` per character (before null; `move`, `party → character`, text "Split", coins = `shares`), then `party-pot`, then one `wallet` per character in list order (before null on that character's first coin). Visibility as LOOT-10: the DM and every player of the campaign; other campaigns never (scope gate). One `event` frame before the DM's `ack` (FR-SYNC-14). Crash seams `PP_TEST_CRASH=loot.split:before-commit` / `:after-commit`.
+
+**Client** (`loot.log`, `@ui/features/party-loot/LootLog`)
+
+- DM **Split…** Button by the pot (`loot-split-open`, disabled while not `live`) → Dialog `loot-split-dialog`: five coin Inputs pp → cp (`loot-split-coin` + `data-value`), prefilled with the pot's positive coins; a Checkbox per character by name (`loot-split-character` + `data-record-id`; approved = sheet not `draft` ticked); preview `loot-split-preview` ("Each gets 2 pp, 15 gp; 1 pp stays in the pot", or the validation message with `data-valid="false"`); Split `loot-split-submit` disabled while invalid, not `live` or in flight; reject → `loot-split-error`; ack → closes; lost intent → Toast "Connection lost — check the loot log before splitting again". Players have no Split….
+- **Item rows:** `loot-entry` `data-kind="item"`, line "‹from› → ‹to›: ‹name› ×‹qty›" ("Party", "Outside the party"), no coin Badges, no Edit.

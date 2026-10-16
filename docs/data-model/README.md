@@ -1377,3 +1377,12 @@ From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Buil
 - **Derived (client, `@ui/features/party-board/logic`):** DM order newest `seq`, player order newest `sharedAt`; mark New (never opened) / Updated (`rev` > seen rev); share label (`@shared/party-board/format`); launcher activity.
 - **Fixtures:** `handouts-1` now also writes 3 `handout-shared` rows through its shares: h1 `all`, h2 `player` player-1, h4 `all` (kept after h4's unshare); `party-second` 1 (`all`, Second Campaign).
 - **CON-44:** no new snapshot bytes in the worst case: notifications stay within NOTE's 100-row window, and a `handout-shared` row (text ≤ 93 chars, payload ≈ 51 B) is smaller than the heavy harness's damage-card rows that fill it; PARTY's CON-44 test unchanged (+1,100 B, DM 673,998 B).
+
+## 38. Sprint 3: party board gold (P3)
+
+From [party-board](../specs/party-board.md#64-gold-ledger-party-loot-evolved) (PARTY slice 3, on [party-loot](../specs/party-loot.md)). **Built by `build/party-gold`**: no new table, column or record type. Protocol side: [protocol §52](../protocol/README.md#52-sprint-3-party-board-gold-p3).
+
+- **Split rows:** `loot.split` writes one `loot_entry` per chosen character: `kind = move`, `party → character`, `text` "Split" (`SPLIT_TEXT`), coins = the share (⌊coin / n⌋ per denomination), `qty` null, `editedAt` null. The remainder is simply not moved, so it stays in the derived `party-pot` (FR-LOOT-09 sums, conservation unchanged). Split rows are ordinary moves: not editable, corrected by a reverse move.
+- **Item rows** (`kind = item`, from P core): read-only in `loot.log`; `loot.edit` refuses them (`conflict`).
+- **Derived (client, `@ui/features/party-loot/logic`):** item-row line `itemLine` ("‹from› → ‹to›: ‹name› ×‹qty›"), Split… prefill (the pot's positive coins), default ticks (characters whose `creature-sheet.status` ≠ `draft`; no sheet = ready), preview (`splitPreview`, `@shared/party-board/format`).
+- **CON-44:** no new record shape; a split adds n ordinary move rows inside LOOT's 100-row window (≤ 471 B each, protocol §29 budget unchanged).
