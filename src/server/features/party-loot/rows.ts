@@ -35,6 +35,8 @@ export function toEntryRecord(r: EntryRow): LootEntryRecord {
     ep: r.ep,
     gp: r.gp,
     pp: r.pp,
+    // FR-PARTY-25: item rows only; absent (not null) on the wire otherwise.
+    ...(r.qty === null ? {} : { qty: r.qty }),
     createdAt: r.createdAt,
     editedAt: r.editedAt,
   };

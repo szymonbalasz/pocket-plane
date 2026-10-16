@@ -10,6 +10,7 @@ import * as entities from "./entities";
 import * as fogOfWar from "./fog-of-war";
 import * as liveSync from "./live-sync";
 import * as notifications from "./notifications";
+import * as partyBoard from "./party-board";
 import * as partyLoot from "./party-loot";
 import * as sceneTools from "./scene-tools";
 import * as scenesMap from "./scenes-map";
@@ -38,6 +39,8 @@ export const domainEvents: readonly DomainEventDef[] = [
   ...Object.values<unknown>(fogOfWar).filter(isDomainEventDef),
   // scene-tools (fix/scn-core).
   ...Object.values<unknown>(sceneTools).filter(isDomainEventDef),
+  // party-board (build/party-core).
+  ...Object.values<unknown>(partyBoard).filter(isDomainEventDef),
 ];
 
 /** `cause.name` of presence changes (not a domain event, CON-07). */
