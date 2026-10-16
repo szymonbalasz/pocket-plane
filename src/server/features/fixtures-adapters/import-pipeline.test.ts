@@ -91,13 +91,11 @@ describe("import pipeline core", () => {
     ).toThrow(CommandError);
   });
 
-  test("FR-FIX-20 existing (source, sourceKey) → existing, nothing written, same ID", () => {
-    const { run, rows } = setup();
+  test("FR-FIX-20 existing (source, sourceKey), same data → existing, nothing written, same ID", () => {
+    const { s, run, rows } = setup();
     const first = run({ source, records: [goblin] });
-    const second = run({
-      source,
-      records: [{ ...goblin, data: { name: "Changed", statBlock: block(1, 1) } }, wolf],
-    });
+    const before = rows();
+    const second = run({ source, records: [goblin, wolf] });
     expect(second[0]).toEqual({
       sourceKey: "goblin",
       outcome: "existing",
@@ -105,7 +103,33 @@ describe("import pipeline core", () => {
     });
     expect(second[1]?.outcome).toBe("created");
     expect(rows()).toHaveLength(2);
-    expect(rows()[0]?.name).toBe("Goblin");
+    expect(rows()[0]).toEqual(before[0] as Record<string, string>);
+    expect(readEventLog(s.db).map((e) => e.type)).toEqual(["EntityImported", "EntityImported"]);
+  });
+
+  test("OQ-FIX-18 FR-CMP-07 changed data → updated in place: same ID, ImportedEntityUpdated logged with campaignId null", () => {
+    const { s, run, rows } = setup();
+    const first = run({ source, records: [goblin] });
+    const second = run({
+      source,
+      records: [{ ...goblin, data: { name: "Changed", statBlock: block(1, 1) } }],
+    });
+    expect(second).toEqual([
+      { sourceKey: "goblin", outcome: "updated", id: first[0]?.id as string },
+    ]);
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0]).toMatchObject({ id: first[0]?.id, name: "Changed", source: "fixture" });
+    const log = readEventLog(s.db);
+    expect(log.map((e) => [e.type, e.campaignId])).toEqual([
+      ["EntityImported", null],
+      ["ImportedEntityUpdated", null],
+    ]);
+    // Key order of the stored JSON doesn't matter: the same data again is `existing`.
+    const third = run({
+      source,
+      records: [{ ...goblin, data: { statBlock: block(1, 1), name: "Changed" } }],
+    });
+    expect(third[0]?.outcome).toBe("existing");
   });
 
   test("FR-FIX-23 each created record emits the definition event, logged with campaignId null; existing emits nothing", () => {
