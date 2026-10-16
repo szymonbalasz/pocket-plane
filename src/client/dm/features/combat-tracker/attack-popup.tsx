@@ -8,7 +8,9 @@
 // Partial cards (FR-CBT-72, N7): to-hit-only → "Waiting for damage" (the DM may type a total;
 // the roll fills the cell when it attaches); damage-only → no to-hit cell or "vs AC", rows Hit.
 // Popup parts (FR-MOD-39, ADR-0043): every `popupParts` line renders under each target row and
-// merges its share into that row's apply entry.
+// merges its share into that row's apply entry. Effect modifiers tier 2 (FR-MOD-24, -25): Hit is
+// preset vs the effective AC (AC cell with its parts) and the multiplier from the target's
+// defenses against the card's damage type.
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
@@ -32,7 +34,7 @@ import {
   ToggleGroupItem,
 } from "@ui/components/ui/controls";
 import { Badge, Input, Label } from "@ui/components/ui/primitives";
-import { useCbtIntent, useCombatants } from "@ui/features/combat-tracker/store";
+import { toastIntentError, useCbtIntent, useCombatants } from "@ui/features/combat-tracker/store";
 import { useTargetingAttacker } from "@ui/features/combat-tracker/token-overlay";
 import { hideToast } from "@ui/features/notifications/toasts";
 import {
@@ -41,10 +43,17 @@ import {
   TOP_BAR_H,
   type Viewport,
 } from "@ui/features/play-shell/geometry";
-import { useRecords } from "@ui/sync/store";
+import { IntentRejected } from "@ui/sync/connection";
+import { useRecords, useSync } from "@ui/sync/store";
 import { EyeOffIcon, XIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LinkHintNote } from "../combat-extras/link-hint";
+import {
+  AcCell,
+  presetMultiplier,
+  rowFacts,
+  useActiveEffects,
+} from "../effect-modifiers/popup-facts";
 import {
   getMapSelection,
   setMapSelection,
@@ -52,7 +61,14 @@ import {
   useMapSelection,
 } from "../scenes-map/selection";
 import { useDefinitions } from "./data";
-import { type PopupRowView, partInputs, partPreviewExtra, popupParts } from "./popup-parts";
+import {
+  type PopupRowView,
+  partInputs,
+  partPreviewExtra,
+  partRejects,
+  popupParts,
+  type RejectIssue,
+} from "./popup-parts";
 import {
   clampIntoWorkArea,
   dragPopup,
@@ -207,7 +223,12 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   const [per, setPer] = useState<Record<string, PerTarget>>({});
   // Popup parts' values, one per line (client memory; lost on close).
   const [partValues, setPartValues] = useState<Record<string, unknown>>({});
-  const { send, disabled } = useCbtIntent();
+  const effects = useActiveEffects();
+  const { send, disabled: sending } = useCbtIntent();
+  // Apply goes through the connection itself so popup parts see its reject (R7, `onReject`).
+  const connection = useSync((s) => s.connection);
+  const [applying, setApplying] = useState(false);
+  const disabled = sending || applying;
   const attackerId = p?.attackerId ?? null;
 
   // FR-CBT-33: targeting while open; the attacker never gets a target ring.
@@ -243,13 +264,15 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   const damageTotal = totalOf(damage) ?? p.damage?.total ?? null;
   const base = list.rows.map(({ c, source }) => {
     const ac = acOf(c, defs);
-    const preset = rowPreset(shape, rolledNatural, toHitTotal, ac);
-    const st = per[c.id] ?? { hit: null, mult: "normal" };
+    // FR-MOD-24, -25: Hit vs the effective AC; the multiplier preset from the target's defenses.
+    const facts = rowFacts(effects, c, ac, p.damageType);
+    const preset = rowPreset(shape, rolledNatural, toHitTotal, facts.ac?.value ?? ac);
+    const st = per[c.id] ?? { hit: null, mult: presetMultiplier(facts) };
     const hit = st.hit ?? preset;
     const raw = damageTotal === null ? null : rawDamage(hit, damageTotal, st.mult);
     const hp = hpOf(c, defs);
     const contra = naturalContradiction(rolledNatural, hit);
-    return { c, source, ac, preset, hit, mult: st.mult, raw, hp, contra };
+    return { c, source, ac, facts, preset, hit, mult: st.mult, raw, hp, contra };
   });
   const views: PopupRowView[] = base.map((x) => ({
     targetId: x.c.id,
@@ -270,8 +293,10 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
     damageTotal,
     list.tooMany,
   );
-  const setRow = (id: string, patch: Partial<PerTarget>) =>
-    setPer((s) => ({ ...s, [id]: { ...(s[id] ?? { hit: null, mult: "normal" }), ...patch } }));
+  const setRow = (id: string, patch: Partial<PerTarget>) => {
+    const mult = rows.find((x) => x.c.id === id)?.mult ?? "normal";
+    setPer((s) => ({ ...s, [id]: { ...(s[id] ?? { hit: null, mult }), ...patch } }));
+  };
   const remove = (c: CombatantView) => {
     setAdded((a) => a.filter((id) => id !== c.id));
     if (c.tokenId && selection.tokenIds.includes(c.tokenId)) {
@@ -286,22 +311,34 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   };
 
   const apply = async () => {
-    if (!ready) return;
-    // FR-CBT-72: a to-hit total iff the card has a to-hit roll; no damage total on an all-miss
-    // to-hit-only card.
-    const r = await send("cbt.applyCard", {
-      cardId: card.id,
-      ...(p.toHit ? { toHitTotal } : {}),
-      ...(damageTotal !== null ? { damageTotal } : {}),
-      targets: rows.map((x) => ({
-        ...partInputs(popupParts, partValues, x.view, views, p),
-        targetId: x.c.id,
-        hit: x.hit,
-        multiplier: x.mult,
-      })),
-    });
-    // FR-CBT-54: closing clears the map selection (popup-store); a reject keeps the popup open.
-    if (r !== undefined) close();
+    if (!ready || disabled) return;
+    setApplying(true);
+    try {
+      // FR-CBT-72: a to-hit total iff the card has a to-hit roll; no damage total on an all-miss
+      // to-hit-only card.
+      await connection.sendIntent("cbt.applyCard", {
+        cardId: card.id,
+        ...(p.toHit ? { toHitTotal } : {}),
+        ...(damageTotal !== null ? { damageTotal } : {}),
+        targets: rows.map((x) => ({
+          ...partInputs(popupParts, partValues, x.view, views, p),
+          targetId: x.c.id,
+          hit: x.hit,
+          multiplier: x.mult,
+        })),
+      });
+      // FR-CBT-54: closing clears the map selection (popup-store).
+      close();
+    } catch (err) {
+      // A reject keeps the popup open; lines may mark what it names (FR-MOD-40: Force).
+      toastIntentError(err);
+      if (err instanceof IntentRejected) {
+        const issues = (err.issues ?? []) as RejectIssue[];
+        setPartValues((s) => partRejects(popupParts, s, issues));
+      }
+    } finally {
+      setApplying(false);
+    }
   };
   const dismiss = async () => {
     const r = await send("note.dismiss", { id: card.id });
@@ -430,14 +467,8 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                       aria-label="Hidden"
                     />
                   )}
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {/* FR-CBT-72: a damage-only card has no to-hit to compare: AC alone. */}
-                    {shape === "damage"
-                      ? `AC ${x.ac ?? "—"}`
-                      : x.ac === null
-                        ? "vs AC —"
-                        : `vs AC ${x.ac} →`}
-                  </span>
+                  {/* FR-CBT-72: a damage-only card has no to-hit to compare: AC alone. */}
+                  <AcCell combatantId={x.c.id} facts={x.facts} damageOnly={shape === "damage"} />
                   <Button
                     size="sm"
                     variant={x.hit ? "default" : "outline"}

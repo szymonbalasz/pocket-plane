@@ -4,6 +4,7 @@
 import { defineLogKind, type LineSegment } from "@shared/dice-roll-log/kind-types";
 import { rollBreakdownSegments } from "@shared/dice-roll-log/roll-kind";
 import { DmModPart, ROLL_MODS_MAX, RollModPart } from "@shared/dice-roll-log/schemas";
+import { linePartSegments } from "@shared/effect-modifiers/combat-parts";
 import { modSegments } from "@shared/effect-modifiers/line";
 import { PartDamageType } from "@shared/effect-modifiers/schemas";
 import { z } from "zod";
@@ -20,20 +21,26 @@ const Multiplier = z.enum(["normal", "half", "none", "double"]);
 /**
  * effect-modifiers (FR-MOD-20, -38, -47): one rule-trigger part an apply landed on this target,
  * player-safe: `label` iff the trigger is `public`, else null "(DM)"; `value` = its damage after
- * its multiplier (inside `damage`); `type` null = the attack's type. "+ 6 radiant (Divine Fury)".
+ * its multiplier (inside `damage`); `type` null = the attack's type; `multiplier` its own when
+ * not normal (R7). "+ 6 radiant (Divine Fury)".
  */
 export const AttackLinePart = z.strictObject({
   label: z.string().max(TRIGGER_LABEL_MAX).nullable(),
   value: z.int().min(0),
   type: PartDamageType.nullable(),
+  multiplier: Multiplier.exclude(["normal"]).optional(),
 });
 export type AttackLinePart = z.infer<typeof AttackLinePart>;
 
-/** FR-MOD-40: the DM's facts of a line part (same index): name, rolled value, forced. */
+/**
+ * FR-MOD-40: the DM's facts of a line part (same index): name, rolled value, `set` = the DM
+ * edited the value (R7: "(DM set; rolled 7)"), forced.
+ */
 export const AttackLineDmPart = z.strictObject({
   triggerId: z.string().min(1).max(64),
   label: z.string().max(TRIGGER_LABEL_MAX),
   rolled: z.int(),
+  set: z.literal(true).optional(),
   forced: z.literal(true).optional(),
 });
 export type AttackLineDmPart = z.infer<typeof AttackLineDmPart>;
@@ -181,15 +188,20 @@ export function publicRuling(natural: number | null, hit: boolean): boolean {
   return (natural === 1 && hit) || (natural === 20 && !hit);
 }
 
-/** "6 slashing damage (half)", then the DM's "(DM set; rolled 4)" / dice breakdown. */
+/**
+ * "6 slashing damage (half)", then the DM's "(DM set; rolled 4)" / dice breakdown; rule-trigger
+ * parts after it (FR-MOD-48, R7): "14 slashing damage + 6 radiant (Divine Fury)" (`damage` =
+ * weapon + parts, so the weapon's share is `damage` − Σ parts).
+ */
 function damageSegments(
   p: AttackLogPayload,
   dm: AttackLogDmPayload | null | undefined,
   suffix: string,
 ): LineSegment[] {
   const type = p.damageType ? ` ${p.damageType}` : "";
+  const weapon = p.damage - (p.parts ?? []).reduce((s, x) => s + x.value, 0);
   const out: LineSegment[] = [
-    { text: `${p.damage}${type} damage${MULT_TEXT[p.multiplier]}${suffix}` },
+    { text: `${weapon}${type} damage${MULT_TEXT[p.multiplier]}${suffix}` },
   ];
   if (dm?.overrides.damage) {
     const rolled = dm.damageRolled === null ? "" : `; rolled ${dm.damageRolled}`;
@@ -197,6 +209,7 @@ function damageSegments(
   }
   if (dm?.rolls?.damage) out.push(...rollBreakdownSegments(dm.rolls.damage));
   if (dm?.mods?.damage) out.push(...modSegments(dm.mods.damage));
+  out.push(...linePartSegments(p.parts, dm?.parts, p.damageType));
   return out;
 }
 

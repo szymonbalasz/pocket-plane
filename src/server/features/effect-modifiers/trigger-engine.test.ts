@@ -233,7 +233,7 @@ describe("FR-MOD-37 offers at the damage roll", () => {
     expect(t.offers(dis)).toEqual([]);
   });
 
-  test("FR-MOD-37 settle facts: a targetMarked trigger's offer carries the campaign mark and `hurt` (target-side filters never gate the roll)", () => {
+  test("FR-MOD-37 settle facts: a targetMarked trigger's offer carries the campaign mark (by name, never its id: R7) and `hurt` (target-side filters never gate the roll)", () => {
     const t = rtSetup();
     const mark = t.put(t.from("bless", { name: "Favored Foe" }));
     const ff = t.trig({
@@ -247,11 +247,14 @@ describe("FR-MOD-37 offers at the damage roll", () => {
       },
     });
     t.nextTo("Thorn", 1);
-    expect(t.card(t.attack("Thorn", { damage: 3 }).cardId).damage?.triggers?.[0]).toMatchObject({
+    const card = t.card(t.attack("Thorn", { damage: 3 }).cardId);
+    expect(card.damage?.triggers?.[0]).toMatchObject({
       triggerId: ff,
-      marked: mark,
+      marked: "Favored Foe",
       hurt: true,
     });
+    // FR-MOD-47: the card reaches Thorn's player (a player card); no campaign preset id on it.
+    expect(JSON.stringify(card)).not.toContain(mark);
   });
 });
 
@@ -516,6 +519,10 @@ describe("FR-MOD-42 once per turn", () => {
     t.applyTo(a, [{ name: "Goblin", triggers: assignFury(t) }]);
     const e = t.err(() => t.applyTo(b, [{ name: "Goblin 2", triggers: assignFury(t) }]));
     expect([e.code, e.message]).toEqual(["conflict", "Divine Fury was already used this turn"]);
+    // R7: the issue names the part, so the popup marks its chip "Used this turn" + Force.
+    expect(e.issues).toEqual([
+      { path: ["triggers", t.furyId], message: "Divine Fury was already used this turn" },
+    ]);
     expect(t.note(b)?.state).toBe("pending");
     const { hpChangeIds } = t.applyTo(b, [
       { name: "Goblin 2", triggers: assignFury(t, { force: true }) },
@@ -663,6 +670,20 @@ describe("FR-MOD-43 roll triggers", () => {
     expect((e?.payload as RollEntryPayload | undefined)?.[0]?.mods?.map((m) => m.label)).toEqual([
       "Savage",
     ]);
+  });
+
+  test("FR-MOD-13 char.roll passes subject.row: a `row` Greataxe trigger adds to the sheet's Greataxe damage, a Handaxe one doesn't", () => {
+    const t = rtSetup({ inCombat: false });
+    t.trig({ characterId: t.brakkaId, name: "Savage", rule: part("each", ["greataxe"]) });
+    t.trig({ characterId: t.brakkaId, name: "Thrown", rule: part("each", ["Handaxe"]) });
+    const labels = (kind: "damage" | "attack") => {
+      const r = t.run<{ entryId: string }>("char.roll", { characterId: t.brakkaId, kind }, t.p1);
+      const e = t.s.db.select().from(gameLogEntry).where(eq(gameLogEntry.id, r.entryId)).get();
+      return ((e?.payload ?? []) as RollEntryPayload).map((i) => i.mods?.map((m) => m.label) ?? []);
+    };
+    expect(labels("damage")).toEqual([["Savage"]]);
+    // Attack + damage: the to-hit has no damage part; the damage row matches by name.
+    expect(labels("attack")).toEqual([[], ["Savage"]]);
   });
 });
 

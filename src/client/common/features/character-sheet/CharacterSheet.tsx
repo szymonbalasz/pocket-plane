@@ -16,7 +16,7 @@ import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
 import { Skeleton } from "../../components/ui/primitives";
 import { useRecords, useSync } from "../../sync/store";
-import { RollButton } from "../dice-roll-log/roll-control";
+import { RollButton, rollTooltip } from "../dice-roll-log/roll-control";
 import { CreateCharacterDialog } from "./CreateCharacter";
 import { SELECT } from "./fields";
 import { rollRoutes } from "./roll-routes";
@@ -67,7 +67,7 @@ export function SheetRoll({
   });
   if (rollActionView(claim, kind) !== "button") return null;
   return (
-    <Tooltip content={hint ? `${hint} · ${ROLL_HINT}` : ROLL_HINT}>
+    <Tooltip content={rollTooltip(control, hint ? `${hint} · ${ROLL_HINT}` : ROLL_HINT)}>
       <RollButton
         control={control}
         type="button"

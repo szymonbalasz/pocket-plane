@@ -18,8 +18,13 @@ import {
   CHARACTER_TRIGGERS_MAX,
   DEFINITION_TRIGGERS_MAX,
   RULE_TRIGGER_TYPE,
+  redactRuleForPlayer,
 } from "@shared/effect-modifiers/trigger-records";
-import { checkRuleForOwner, TriggerRule } from "@shared/effect-modifiers/triggers";
+import {
+  checkRuleForOwner,
+  type PlayerTriggerRule,
+  TriggerRule,
+} from "@shared/effect-modifiers/triggers";
 import type { StatBlock } from "@shared/entities/schemas";
 import { RuleTriggerDeleted, RuleTriggerSaved } from "@shared/events/effect-modifiers";
 import type { Issue } from "@shared/protocol/codes";
@@ -256,12 +261,60 @@ function writeTrigger(
   return { triggerId: id, change: triggerChange(before, readTrigger(env.tx, id)) };
 }
 
+/** The redacted-name message: a `{name}` ref only keeps what the stored rule already names. */
+export const NAMED_REF_MESSAGE = "Pick a preset: only the DM can name that preset anew";
+
+/**
+ * FR-MOD-47 (#228): a player's copy names a campaign preset as `{name}`; on a replace, each
+ * `{name}` equal to the stored ref's redacted name keeps that stored ref (`requires`; each
+ * `targetMarked` by its first unused match, rule order), so the owner can toggle or edit the
+ * trigger. A `{name}` on a create or one the stored rule doesn't name → `invalid`.
+ */
+function resolveNamedRefs(
+  env: Env,
+  id: string | undefined,
+  rule: PlayerTriggerRule,
+  at: (string | number)[],
+): TriggerRule {
+  const named =
+    (rule.requires !== undefined && "name" in rule.requires) ||
+    rule.when.some((f) => f.if === "targetMarked" && "name" in f);
+  if (!named) return rule as TriggerRule;
+  const before = id === undefined ? null : getTrigger(env, id);
+  const shown = before ? redactRuleForPlayer(before.rule, before.presetRefs) : null;
+  let requires = rule.requires;
+  if (requires && "name" in requires) {
+    const s = shown?.requires;
+    if (!before?.rule.requires || !s || !("name" in s) || s.name !== requires.name) {
+      issue([...at, "requires", "name"], NAMED_REF_MESSAGE);
+    }
+    requires = before?.rule.requires;
+  }
+  const taken = new Set<number>();
+  const when = rule.when.map((f, i) => {
+    if (f.if !== "targetMarked" || !("name" in f)) return f;
+    const j = (shown?.when ?? []).findIndex(
+      (g, k) => !taken.has(k) && g.if === "targetMarked" && "name" in g && g.name === f.name,
+    );
+    const stored = before?.rule.when[j];
+    if (j < 0 || stored?.if !== "targetMarked")
+      return issue([...at, "when", i, "name"], NAMED_REF_MESSAGE);
+    taken.add(j);
+    return stored;
+  });
+  const out = TriggerRule.safeParse({ ...rule, ...(requires ? { requires } : {}), when });
+  if (!out.success) throw invalid("Invalid trigger rule", zodIssues(out.error));
+  return out.data;
+}
+
 export const putTrigger = defineCommand({
   name: TRIGGER_INTENTS.putTrigger,
   input: PutTriggerInput,
   roles: ["dm", "player"],
-  execute({ trigger: t }, env): PutTriggerResult {
-    const owner = editableOwner(env, t.characterId, t.definitionId);
+  execute({ trigger: input }, env): PutTriggerResult {
+    const owner = editableOwner(env, input.characterId, input.definitionId);
+    const rule = resolveNamedRefs(env, input.id, input.rule, ["trigger", "rule"]);
+    const t = { ...input, rule };
     const { triggerId, change } = writeTrigger(env, owner, t, ["trigger"]);
     env.emit({
       type: RuleTriggerSaved.type,

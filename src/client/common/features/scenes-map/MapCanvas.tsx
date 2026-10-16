@@ -27,6 +27,8 @@ import type Konva from "konva";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Layer, Stage } from "react-konva";
 import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
+import { FogBlindChip } from "../fog-of-war/BlindChip";
+import { blindStore, isBlind } from "../fog-of-war/blind";
 import { useFreeArea } from "../play-shell/free-area";
 import { workArea } from "../play-shell/geometry";
 import { withoutDmOnly } from "../scene-tools/layer-switches";
@@ -275,6 +277,14 @@ export function MapCanvas(props: MapCanvasProps) {
     }
     prevStore.current = store;
   }, [store, previews]);
+  // FR-FOG-36: a blind player draws no other placer's templates, pings or laser (fog-of-war).
+  const blind = client === "player" && isBlind(store, scene.id, myPlayerId);
+  const blindRef = useRef(blind);
+  blindRef.current = blind;
+  const layerStore = useMemo(
+    () => (blind ? blindStore(store, myPlayerId) : store),
+    [blind, store, myPlayerId],
+  );
 
   // ---- drag previews (FR-MAP-40): dropped on a `token` change, a scene switch or 3 s silence ----
   useEventFrame((f) => clearPreviews(previews, tokenIdsOf(f.changes)));
@@ -407,12 +417,12 @@ export function MapCanvas(props: MapCanvasProps) {
   };
   useSignal(MAP_SIGNALS.ping, (s) => {
     const d = signalsFor(s.data, PingData);
-    if (d) addPing(pointers, d.x, d.y, s.from.role, performance.now());
+    if (d && !blindRef.current) addPing(pointers, d.x, d.y, s.from.role, performance.now());
   });
   useSignal(MAP_SIGNALS.pull, (s) => {
     const d = signalsFor(s.data, PingData);
     if (!d) return;
-    addPing(pointers, d.x, d.y, s.from.role, performance.now());
+    if (!blindRef.current) addPing(pointers, d.x, d.y, s.from.role, performance.now());
     // Forced recentre, zoom unchanged; players may pan away (OQ-MAP-08).
     if (client !== "player") return;
     setCam((c) => centreOn(c, d, size));
@@ -420,7 +430,7 @@ export function MapCanvas(props: MapCanvasProps) {
   });
   useSignal(MAP_SIGNALS.laser, (s) => {
     const d = LaserData.safeParse(s.data);
-    if (!d.success || !signalForShownScene(d.data, scene.id)) return;
+    if (!d.success || !signalForShownScene(d.data, scene.id) || blindRef.current) return;
     addTrailPoints(
       pointers,
       senderKey(s.from),
@@ -729,7 +739,7 @@ export function MapCanvas(props: MapCanvasProps) {
     myPlayerId,
     selected,
     targeting,
-    store,
+    store: layerStore,
     canMove,
     token: tokenHandlers,
   };
@@ -841,6 +851,7 @@ export function MapCanvas(props: MapCanvasProps) {
           </SyncContext.Provider>
         </Stage>
       )}
+      <FogBlindChip blind={blind} />
       {loading && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span

@@ -157,7 +157,11 @@ describe("FR-MOD-05 campaign marks (#209)", () => {
     t.nextTo("Thorn", 1);
     const { cardId } = t.attack("Thorn", { damage: 3 });
     const offer = t.card(cardId).damage?.triggers?.[0];
-    expect([offer?.triggerId, offer?.marked, offer?.expression]).toEqual([ff, mark, "1d4"]);
+    expect([offer?.triggerId, offer?.marked, offer?.expression]).toEqual([
+      ff,
+      "Favored Foe",
+      "1d4",
+    ]);
     const on = (name: string) =>
       targetMarkedBy(effects(t), { combatantId: t.id(name) }, mark, t.id("Thorn"));
     expect([on("Goblin"), on("Goblin 2")]).toEqual([true, false]);

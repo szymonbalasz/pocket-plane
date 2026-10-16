@@ -6,7 +6,8 @@
 // one value per popup (`value` / `onChange`; client memory, lost on close), so a chip can move
 // between rows. Lines read the card (settle facts ride on it, FR-MOD-37) and may read records
 // with the store hooks (`useRecords`); they never send intents themselves. `previewExtra` adds a
-// row's extra raw damage to its HP preview.
+// row's extra raw damage to its HP preview; `onReject` sees a rejected apply's issues (R7: a used
+// trigger charge marks its chip).
 import type {
   ApplyTargetInput,
   CombatantView,
@@ -14,7 +15,15 @@ import type {
   DamageMultiplier,
 } from "@shared/combat-tracker/schemas";
 import type { ComponentType } from "react";
+import { modDefensePart } from "../effect-modifiers/popup-facts";
+import { modTriggersPart } from "../effect-modifiers/popup-triggers";
 import type { HpTemp } from "./targets";
+
+/** One issue of a reject frame (`path` into the intent, or a line's own, e.g. `["triggers", id]`). */
+export interface RejectIssue {
+  path?: readonly unknown[];
+  message?: string;
+}
 
 /** One target row as the popup shows it (list order). */
 export interface PopupRowView {
@@ -49,6 +58,11 @@ export interface PopupPart<V = unknown> {
     rows: readonly PopupRowView[],
     card: DamageCardPayload,
   ): Partial<ApplyTargetInput>;
+  /**
+   * A rejected `cbt.applyCard` (the popup stays open): the line's new value from the reject's
+   * issues, or undefined to keep it.
+   */
+  onReject?(value: V | undefined, issues: readonly RejectIssue[]): V | undefined;
   /** Extra raw damage this line lands on the row (preview only; the server decides). */
   previewExtra?(
     value: V | undefined,
@@ -62,7 +76,10 @@ export interface PopupPart<V = unknown> {
 export const definePopupPart = <V>(part: PopupPart<V>): PopupPart => part as unknown as PopupPart;
 
 /** The registry. Append your feature's line (`definePopupPart`); order = render order. */
-export const popupParts: readonly PopupPart[] = [];
+export const popupParts: readonly PopupPart[] = [
+  modDefensePart, // effect-modifiers: defense hint "Half (Rage)" (FR-MOD-25)
+  modTriggersPart, // effect-modifiers: offered rule-trigger parts as chips (FR-MOD-39, -40)
+];
 
 type Values = Readonly<Record<string, unknown>>;
 
@@ -95,3 +112,17 @@ export const partPreviewExtra = (
   rows: readonly PopupRowView[],
   card: DamageCardPayload,
 ): number => lines.reduce((s, l) => s + (l.previewExtra?.(values[l.id], row, rows, card) ?? 0), 0);
+
+/** A rejected apply: every line's `onReject` in registry order; values it returns replace. */
+export function partRejects(
+  lines: readonly PopupPart[],
+  values: Values,
+  issues: readonly RejectIssue[],
+): Values {
+  let out = values;
+  for (const l of lines) {
+    const v = l.onReject?.(values[l.id], issues);
+    if (v !== undefined) out = { ...out, [l.id]: v };
+  }
+  return out;
+}

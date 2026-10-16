@@ -2,6 +2,7 @@
 // adds one import and one line in the list; nothing else changes here.
 import { charxApprovedView } from "@ui/features/character-sheet/note-views";
 import { concentrationView } from "@ui/features/combat-extras/concentration";
+import { modTriggerView } from "@ui/features/effect-modifiers/note-view";
 import { testNotificationView } from "@ui/features/notifications/test-view";
 import { createNotificationViews, type NotificationView } from "@ui/features/notifications/views";
 import { handoutSharedView } from "@ui/features/party-board/note-view";
@@ -15,6 +16,7 @@ const views: NotificationView[] = [
   concentrationView, // cbtx-concentration (combat-extras, FR-CBTX-37)
   charxApprovedView, // charx-approved (character-sheet-full, FR-CHARX-46)
   handoutSharedView, // handout-shared (party-board, FR-PARTY-06)
+  modTriggerView, // mod-trigger (effect-modifiers, FR-MOD-44)
 ];
 
 export const playerNotificationViews = createNotificationViews(views);

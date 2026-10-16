@@ -1,6 +1,14 @@
 // party-loot commands (LOOT §6, §9): `loot.add` / `loot.edit` (DM), `loot.move` (DM, player),
-// and the internal helper `partyLoot.add` (FR-LOOT-03) that runs in the caller's transaction.
-import { CoinMoved, LootAdded, LootEdited } from "@shared/events/party-loot";
+// `loot.split` (DM, FR-PARTY-26), and the internal helper `partyLoot.add` (FR-LOOT-03) that runs
+// in the caller's transaction.
+import { CoinMoved, CoinSplit, LootAdded, LootEdited } from "@shared/events/party-loot";
+import {
+  ITEM_EDIT_MESSAGE,
+  LootSplitIntent,
+  type LootSplitResult,
+  SPLIT_TEXT,
+} from "@shared/party-board/schemas";
+import { splitCoins } from "@shared/party-board/split";
 import { lootNotificationText, notifiesLoot } from "@shared/party-loot/format";
 import {
   type Coins,
@@ -29,6 +37,7 @@ import { endpointColumns, getEntry, partyPot, wallets } from "./rows";
 export const LOOT_ADD = "loot.add";
 export const LOOT_EDIT = "loot.edit";
 export const LOOT_MOVE = "loot.move";
+export const LOOT_SPLIT = "loot.split";
 
 function campaignOf(env: CommandEnv): string {
   if (!env.actor.campaignId) throw conflict("No active campaign");
@@ -135,6 +144,8 @@ export const lootEdit = defineCommand({
     const before = getEntry(env.tx, cid, entryId);
     if (!before) throw notFound("Loot entry not found");
     if (before.kind === "move") throw conflict("Moves can't be edited — move the coin back");
+    // FR-PARTY-25: item rows are moves of things, corrected by a reverse move.
+    if (before.kind === "item") throw conflict(ITEM_EDIT_MESSAGE);
     const coins = coinsOf(rest);
     // FR-LOOT-04: same values → ack, no write, no event.
     if (before.text === text && sameCoins(before, coins)) return;
@@ -221,5 +232,51 @@ export const lootMove = defineCommand({
       changes,
     });
     return { entryId: entry.id };
+  },
+});
+
+/**
+ * FR-PARTY-26: ⌊coin / n⌋ per denomination to each character, the remainder stays in the pot. One
+ * `move` row `party → character` (text "Split") per character, in list order; no balance check
+ * (#150). Changes: the entries, `party-pot`, each character's `wallet`. No notification.
+ */
+export const lootSplit = defineCommand({
+  name: LOOT_SPLIT,
+  input: LootSplitIntent,
+  execute({ characterIds, ...rest }, env): LootSplitResult {
+    const cid = campaignOf(env);
+    for (const id of characterIds) characterOwner(env, cid, id);
+    // The intent guarantees a non-empty list and some share > 0 ("Nothing to split").
+    const { share } = splitCoins(coinsOf(rest), characterIds.length) as { share: Coins };
+    const potBefore = partyPot(env.tx, cid);
+    const walletsBefore = new Map(wallets(env.tx, cid).map((w) => [w.id, w] as const));
+    const party: Endpoint = { kind: "party" };
+    const created = characterIds.map((characterId) =>
+      insertEntry(env, cid, "move", party, { kind: "character", characterId }, SPLIT_TEXT, share),
+    );
+    const changes: RecordChange[] = created.map((entry) => ({
+      type: LOOT_ENTRY_TYPE,
+      id: entry.id,
+      before: null,
+      after: entry,
+    }));
+    changes.push(potChange(potBefore, partyPot(env.tx, cid)));
+    const walletsAfter = new Map(wallets(env.tx, cid).map((w) => [w.id, w] as const));
+    for (const characterId of characterIds) {
+      changes.push({
+        type: WALLET_TYPE,
+        id: characterId,
+        before: walletsBefore.get(characterId) ?? null,
+        after: walletsAfter.get(characterId) as WalletRecord,
+      });
+    }
+    const entryIds = created.map((e) => e.id);
+    env.emit({
+      type: CoinSplit.type,
+      campaignId: cid,
+      payload: { entryIds, characterIds, shares: share },
+      changes,
+    });
+    return { entryIds };
   },
 });

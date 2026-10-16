@@ -4,7 +4,14 @@
 // notification kind `mod-trigger` and the owner copies (entities' definition-changed hooks).
 import type { CommandDef } from "../../commands/commands";
 import type { Feature } from "../../services";
-import { applyPreset, deletePreset, putPreset, setModifiers, togglePreset } from "./commands";
+import {
+  applyPreset,
+  deletePreset,
+  putPreset,
+  putPresetWithUses,
+  setModifiers,
+  togglePreset,
+} from "./commands";
 import { effectPresetRecordType } from "./records";
 import { deleteTrigger, putTrigger } from "./trigger-commands";
 import { ruleTriggerRecordType } from "./trigger-records";
@@ -25,6 +32,8 @@ export const effectModifiers: Feature = {
       deleteTrigger,
     ] as unknown as CommandDef[];
     for (const c of intents) r.command(c, { intent: true });
+    // Fixtures only (not an intent): a preset linked to a feature row by name (tier 3).
+    r.command(putPresetWithUses as unknown as CommandDef);
     r.recordType(effectPresetRecordType);
     r.recordType(ruleTriggerRecordType);
   },

@@ -1380,7 +1380,7 @@ From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Buil
 
 ## 38. Sprint 3: dice looks (D2)
 
-From [dice-extras](../specs/dice-extras.md#8-data-model) (DICEX, `complete`; #207 G17). **Built by `fix/dicex-look-core`** (schema lock 5th, after C1): one table (drizzle push, push-safe). Protocol side: [protocol §52](../protocol/README.md#52-sprint-3-dice-looks-d2).
+From [dice-extras](../specs/dice-extras.md#8-data-model) (DICEX, `complete`; #207 G17). **Built by `fix/dicex-look-core`** (schema lock 5th, after C1): one table (drizzle push, push-safe). Protocol side: [protocol §54](../protocol/README.md#52-sprint-3-dice-looks-d2).
 
 ### Dice look (`dice_look`, record type `dice-look`) — owner [dice-extras](../specs/dice-extras.md#8-data-model)
 
@@ -1399,13 +1399,65 @@ Index: unique `dice_look_campaign_owner` (`campaign_id`, `owner_key`).
 
 - **Derived:** no row → the default look (DM Obsidian; players by sorted player `id`: Crimson, Sapphire, Emerald, Amethyst, Gold, Bone, Ivory, …), never stored. `lookOf(owner, rows, playerIds)` in `@shared/dice-extras/looks`.
 - **Fixtures:** `dicex-looks` writes only `dice-look` rows (DM, player-1).
+- **Snapshot size** (CON-44): every snapshot carries the campaign's rows (not lazy): 7 max-length rows = 2,157 B DM, the same bytes in each player frame; heavy DM 674,580 B ([protocol §54](../protocol/README.md#52-sprint-3-dice-looks-d2)).
+
+## 39. Sprint 3: effect modifiers tier 2 client (R2)
+
+From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) tier 2 + T (MOD, `complete`). **Built by `fix/mod-roll-preview`** (R2): no table, column or record type change. Protocol side: [protocol §58](../protocol/README.md#53-sprint-3-effect-modifiers-tier-2-client-r2).
+
+| Table / leaf | Change | Visibility | Source |
+|---|---|---|---|
+| `roll` (part rows) | `manual: true` now written from real clients: a bonus die (`e:`) or offered trigger die (`t:`) entered as a `manualParts` group on any of the seven roll intents | as the roll | FR-MOD-18 |
+| `roll.dice` (JSON leaf) | a die may carry `auto: true`: a physical roll's second d20, rolled by the server when only effects the player can't see give adv / dis (R2 ruling); the line says "(rolled for you)", the reason "(DM)"; old rows parse | as the roll (payload `dice` copies it) | FR-MOD-17 |
+| roll intents (wire only, not stored) | `manualParts` (one list; `char.roll` / `cbt.attack`: one list per `manual` entry) | — | FR-MOD-18 |
+
+- **Derived (client, pure):** preview mode, physical groups and parts line per roll (`@shared/effect-modifiers/preview`); a sheet roll's subjects (`sheetRollSubjects`); popup effective AC with parts and defense multiplier presets (`@shared/effect-modifiers/target-facts`).
+- **Client memory:** typed group inputs (lost on cancel / reload); the loaded `rule-trigger` set, now also loaded by a physical form or the tray (FR-MOD-47).
+- **Snapshot size** (CON-44): unchanged; nothing new is stored or sent besides the intents' groups.
+
+## 40. Sprint 3: vision client (V3)
+
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V3). **Built by `build/vision-client`**: no schema change, no new record type or field. Protocol side: [protocol §54](../protocol/README.md#54-sprint-3-vision-client-v3).
+
+- **Client only** (FOG §8 "Derived"): the DM's View as pick (`fog-of-war/view-as.ts`, null = "DM") and the loaded `(sceneId, playerId)` pair it draws (mirrored from the sync connection's `viewAs`); the player's blind state (read from the own `vision` row).
+- **CON-44:** unchanged (no new record or field; View-as rows load on demand, [§26](#26-sprint-3-vision-core-v0)).
+
+## 41. Sprint 3: party board gold (P3)
+
+From [party-board](../specs/party-board.md#64-gold-ledger-party-loot-evolved) (PARTY slice 3, on [party-loot](../specs/party-loot.md)). **Built by `build/party-gold`**: no new table, column or record type. Protocol side: [protocol §55](../protocol/README.md#55-sprint-3-party-board-gold-p3).
+
+- **Split rows:** `loot.split` writes one `loot_entry` per chosen character: `kind = move`, `party → character`, `text` "Split" (`SPLIT_TEXT`), coins = the share (⌊coin / n⌋ per denomination), `qty` null, `editedAt` null. The remainder is simply not moved, so it stays in the derived `party-pot` (FR-LOOT-09 sums, conservation unchanged). Split rows are ordinary moves: not editable, corrected by a reverse move.
+- **Item rows** (`kind = item`, from P core): read-only in `loot.log`; `loot.edit` refuses them (`conflict`).
+- **Derived (client, `@ui/features/party-loot/logic`):** item-row line `itemLine` ("‹from› → ‹to›: ‹name› ×‹qty›"), Split… prefill (the pot's positive coins), default ticks (characters whose `creature-sheet.status` ≠ `draft`; no sheet = ready), preview (`splitPreview`, `@shared/party-board/format`).
+- **CON-44:** no new record shape; a split adds n ordinary move rows inside LOOT's 100-row window (≤ 471 B each, protocol §29 budget unchanged).
+
+## 42. Sprint 3: party inventory (P4)
+
+From [party-board](../specs/party-board.md#63-party-inventory) (PARTY slice 4). **Built by `build/party-inventory`**: no new table, column or record type. Protocol side: [protocol §56](../protocol/README.md#56-sprint-3-party-inventory-p4).
+
+- **Writes:** `party_item` rows are edited (full replacement), reduced and deleted at 0 by `party.removeItem` / `party.moveItem`, inserted or merged by a move into the party (merge key as `addItem`). A move's sheet side writes only `creature_sheet.items` (CHARX `sheet-items.ts`): the source row's `qty` reduced (row removed at 0, also when equipped), the target row merged (`qty`) or appended `{id, name, qty, equipped: false, notes}`; a missing sheet row is created with CHARX defaults. One transaction with the `loot_entry`.
+- **Item rows in the gold ledger:** remove → `loot_entry {kind: item, party → world}`; move → `{kind: item, from, to}` with character ends in `fromCharacterId` / `toCharacterId`. `text` = item name, `qty`, coins 0: pot and wallets unaffected.
+- **Conservation** (tested): per item key, Σ `party_item.qty` + Σ sheet `items.qty` = Σ `qty` of `world → party` rows − Σ `qty` of `party → world` rows + the sheets' starting qty.
+- **Fixtures:** `party-items-1` now ends with Torch ×2 party → Thorn (`party.moveItem`): Torch 10 → 8 in the party, one `items` row on Thorn's sheet (created if missing; no other sheet field), a fourth item log row.
+- **CON-44:** no new record shape. A max-length move party → a sheet adds one `items` row to that sheet: +272 B to the DM's and the owner's snapshot (inside CHARX's 80-row budget); heavy DM 674,818 B, players max 281,715 B, under the #208 ceilings. PARTY's lazy types stay off every snapshot.
+
+## 43. Sprint 3: rule-trigger combat parts (R7)
+
+From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD slice R7). **Built by `build/mod-combat-parts`**: no new table, column or record type. Protocol side: [protocol §57](../protocol/README.md#57-sprint-3-rule-trigger-combat-parts-r7).
+
+- **Damage card payload** (`damage-card` notification): `damage.triggers[].marked` = a built-in key or the campaign mark's **name** (≤ 40; was the preset id). Cards stored before keep an id; the popup then finds no mark (the DM ticks by hand).
+- **Damage card text**: + the offers suffix (≤ 280 chars total, count fallback).
+- **`cbt.attack` log line**: payload `parts[].multiplier?` (`half` \| `none` \| `double`; absent = normal); `dmPayload.parts[].set?: true` (the DM edited the value). Old rows parse.
+- **Fixtures:** `trg-brakka`'s "Rage" preset now has `usesFeatureId` → Brakka's "Rage" feature row (3 uses, tier 3).
+- **Derived (client):** popup defaults `settleTriggers` (default target, tick, hint).
+- **CON-44:** no new rows; a line part grows ≤ 21 B (`"multiplier":"double"`) and a DM part ≤ 11 B (`"set":true`), inside R's measured +5,730 B line bound; card `marked` ≤ 40 either way.
+
 - **Snapshot size** (CON-44): every snapshot carries the campaign's rows (not lazy): 7 max-length rows = 2,157 B DM, the same bytes in each player frame; heavy DM 674,580 B ([protocol §52](../protocol/README.md#52-sprint-3-dice-looks-d2)).
 
-## 39. Sprint 3: compendium read (C2)
+## 44. Sprint 3: compendium read (C2)
 
-From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #207, #208). **Built by `build/compendium-read`**: no table or column change. Protocol side: [protocol §53](../protocol/README.md#53-sprint-3-compendium-read-c2).
+From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #207, #208). **Built by `build/compendium-read`**: no table or column change. Protocol side: [protocol §58](../protocol/README.md#58-sprint-3-compendium-read-c2).
 
 - **`imported-entity`** (entities' record type over `entity` rows with `campaign_id` null): now **lazy by ids** (FR-CMP-15, ADR-0045): in no snapshot; the DM loads rows by id. Players never.
 - **Derived at read** (never stored): `sourceLabel` (imported: `compendium_source.name`; homebrew: "Homebrew"), the search rank (name prefix / word start / substring / text, FR-CMP-10), the entry `ETag` (entry `updatedAt` + source `version` + monster definition `updatedAt`).
 - **Filters** (FR-CMP-11) read `facets` (JSON leaf) after a SQL pre-filter on campaign, kind and `instr` over `name_key` / `search_text`; no index added (≤ ~1,200 rows, OQ-CMP-09).
-

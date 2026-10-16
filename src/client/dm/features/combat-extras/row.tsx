@@ -26,6 +26,7 @@ import {
 import { DeathBadge, DeathPips, EffectChips } from "@ui/features/combat-extras/parts";
 import { useCbtIntent } from "@ui/features/combat-tracker/store";
 import {
+  manualPartsOf,
   RollButton,
   type RollControl,
   type RollKeys,
@@ -142,11 +143,14 @@ export function useDeathSaveRoll(c: CombatantView): RollControl {
     expressions: ["1d20"],
     category: "saving-throw",
     label: `${c.name} — Death save`,
+    // FR-MOD-15, -27: a death save is a save with no ability.
+    ...(c.entityId ? { subject: { creature: { characterId: c.entityId }, roll: "save" } } : {}),
     onRoll: (r) =>
       void send(CBTX_INTENTS.rollDeathSave, {
         characterId: c.entityId,
         mode: r.mode,
         ...(r.manual ? { manual: r.manual[0] } : {}),
+        ...manualPartsOf(r),
         ...(r.public !== undefined ? { public: r.public } : {}),
       }),
   });

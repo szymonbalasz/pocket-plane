@@ -72,6 +72,7 @@ const Part = z.looseObject({
   value: z.number(),
   expression: z.string().optional(),
   dice: z.array(z.number().int()).max(20).optional(),
+  auto: z.boolean().optional(),
 });
 type Part = z.infer<typeof Part>;
 
@@ -79,7 +80,12 @@ const Item = z.looseObject({
   expression: z.string(),
   manual: z.boolean(),
   dice: z.array(
-    z.looseObject({ faces: z.number().int(), value: z.number().nullable(), kept: z.boolean() }),
+    z.looseObject({
+      faces: z.number().int(),
+      value: z.number().nullable(),
+      kept: z.boolean(),
+      auto: z.boolean().optional(),
+    }),
   ),
   constant: z.number(),
   total: z.number(),
@@ -123,13 +129,47 @@ const chipOf = (faces: number, sum: number, rest: Partial<DieInit>): DieInit => 
 
 const ONE_DIE = /^([+-]?)1d(\d+)$/i;
 const FACES = /d(\d+)/i;
+const TERMS = /([+-]?)(\d+)d(\d+)/gi;
+const TERMS_ANY = /\d+d\d+/i;
 
-/** MOD parts and offered trigger parts: per-die `dice`, else `1dM` → one die, else a chip. */
-function partDice(p: Part, offered: boolean): DieInit[] {
+/**
+ * Faces and sign of every die of an expression's dice terms, in order ("2d6+1d8" → d6, d6, d8;
+ * "1d6-1d4" → d6, −d4): MOD's per-die `dice` follow the terms in this order (FR-MOD-19, #220).
+ */
+function termDice(expr: string): { faces: number; sign: 1 | -1 }[] {
+  const out: { faces: number; sign: 1 | -1 }[] = [];
+  for (const m of expr.matchAll(TERMS)) {
+    const sign: 1 | -1 = m[1] === "-" ? -1 : 1;
+    for (let i = 0; i < Number(m[2]); i++) out.push({ faces: Number(m[3]), sign });
+  }
+  return out;
+}
+
+/**
+ * MOD parts and offered trigger parts: per-die `dice`, else `1dM` → one die, else a chip.
+ * `physical`: the part's dice were typed in (a manual item's part not rolled by the server,
+ * FR-MOD-18) → flat dice, no tumble, like the base roll's.
+ */
+function partDice(p: Part, offered: boolean, physical: boolean): DieInit[] {
   const expr = p.expression?.replace(/\s+/g, "") ?? "";
   const sign: 1 | -1 = expr.startsWith("-") || (!expr.startsWith("+") && p.value < 0) ? -1 : 1;
-  const tag: Partial<DieInit> = { label: p.label ?? "DM", sign, ...(offered && { offered: true }) };
+  const tag: Partial<DieInit> = {
+    label: p.label ?? "DM",
+    sign,
+    ...(offered && { offered: true }),
+    ...(physical && TERMS_ANY.test(expr) && { physical: true, flat: true }),
+  };
   const faces = Number(FACES.exec(expr)?.[1] ?? 0);
+  const terms = termDice(expr);
+  if (p.dice && p.dice.length > 0 && terms.length === p.dice.length && terms.length > 1) {
+    // Each die with its own type; a term's sign flips the part's ("1d6-1d4": the d4 is −).
+    const lead = terms[0]?.sign ?? 1;
+    return p.dice.flatMap((v, i) => {
+      const t = terms[i] as { faces: number; sign: 1 | -1 };
+      const s: 1 | -1 = t.sign === lead ? sign : sign === 1 ? -1 : 1;
+      return dieOf(t.faces, Math.abs(v), { ...tag, sign: s });
+    });
+  }
   if (p.dice && p.dice.length > 0 && faces >= 2) {
     return p.dice.flatMap((v) => dieOf(faces, Math.abs(v), tag));
   }
@@ -146,14 +186,21 @@ function itemDice(item: Item): DieInit[] {
       const mods = (item.mods ?? []).reduce((s, m) => s + m.value, 0);
       out.push(chipOf(item.dice[0]?.faces ?? 0, item.total - item.constant - mods, physical));
     } else {
+      // A server-rolled d20 of a physical roll (FR-MOD-17, `auto`) tumbles like any rolled die.
       for (const d of item.dice)
-        out.push(...dieOf(d.faces, d.value ?? 0, { ...physical, kept: d.kept }));
+        out.push(
+          ...dieOf(
+            d.faces,
+            d.value ?? 0,
+            d.auto ? { kept: d.kept } : { ...physical, kept: d.kept },
+          ),
+        );
     }
   } else {
     for (const d of item.dice) out.push(...dieOf(d.faces, d.value ?? 0, { kept: d.kept }));
   }
-  for (const m of item.mods ?? []) out.push(...partDice(m, false));
-  for (const o of item.offered ?? []) out.push(...partDice(o, true));
+  for (const m of item.mods ?? []) out.push(...partDice(m, false, item.manual && !m.auto));
+  for (const o of item.offered ?? []) out.push(...partDice(o, true, item.manual && !o.auto));
   return out;
 }
 

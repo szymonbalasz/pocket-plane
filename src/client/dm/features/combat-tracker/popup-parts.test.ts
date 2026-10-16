@@ -12,7 +12,9 @@ import {
   type PopupRowView,
   partInputs,
   partPreviewExtra,
+  partRejects,
   popupParts,
+  type RejectIssue,
 } from "./popup-parts";
 
 const card = DamageCardPayload.parse({
@@ -43,8 +45,11 @@ const line = (id: string, triggerId: string, extra: number): PopupPart =>
   });
 
 describe("FR-MOD-39 popup parts (R0)", () => {
-  test("FR-MOD-39 the registry is created empty: the popup sends exactly the sprint-2 intent", () => {
-    expect(popupParts).toEqual([]);
+  test("FR-MOD-39 the registry's lines (R2: MOD's defense hint; R7: trigger chips) add nothing to the sprint-2 intent", () => {
+    expect(popupParts.map((p) => p.id)).toEqual([
+      "effect-modifiers.defense",
+      "effect-modifiers.triggers",
+    ]);
     expect(partInputs(popupParts, {}, row("g1"), [row("g1")], card)).toEqual({});
     expect(partPreviewExtra(popupParts, {}, row("g1"), [row("g1")], card)).toBe(0);
   });
@@ -64,5 +69,20 @@ describe("FR-MOD-39 popup parts (R0)", () => {
         .success,
     ).toBe(true);
     expect(partPreviewExtra(lines, values, row("g1"), rows, card)).toBe(10);
+  });
+
+  test("FR-MOD-40 a rejected apply: each line's onReject may replace its value; others keep theirs", () => {
+    const marking = {
+      ...line("a.fury", "trg-fury", 6),
+      onReject: (_v: unknown, issues: readonly RejectIssue[]) =>
+        issues.some((i) => i.path?.[0] === "triggers") ? "used" : undefined,
+    } as PopupPart;
+    const values = { "a.fury": true, "b.mark": true };
+    const lines = [marking, line("b.mark", "trg-mark", 4)];
+    expect(partRejects(lines, values, [{ path: ["triggers", "trg-fury"] }])).toEqual({
+      "a.fury": "used",
+      "b.mark": true,
+    });
+    expect(partRejects(lines, values, [{ path: ["targets", 0] }])).toBe(values);
   });
 });

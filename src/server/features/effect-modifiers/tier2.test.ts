@@ -9,7 +9,13 @@ import type {
   DamageCardPayload,
   HpChangeRecord,
 } from "@shared/combat-tracker/schemas";
-import type { ManualEntry, ManualPart, RollEntryPayload } from "@shared/dice-roll-log/schemas";
+import {
+  type DieResult,
+  GAME_LOG_ENTRY_TYPE,
+  type ManualEntry,
+  type ManualPart,
+  type RollEntryPayload,
+} from "@shared/dice-roll-log/schemas";
 import { bonusDieKey } from "@shared/effect-modifiers/rules";
 import type { RollSubject } from "@shared/effect-modifiers/schemas";
 import { eq } from "drizzle-orm";
@@ -89,6 +95,107 @@ describe("FR-MOD-17 mode from effects (tier 2)", () => {
     const hit = rollRow(t, p.toHit?.rollId as string);
     expect([hit?.mode, (hit?.dice as unknown[] | undefined)?.length]).toEqual(["advantage", 2]);
     expect(rollRow(t, p.damage?.rollId as string)?.mode).toBe("normal");
+  });
+
+  test("FR-MOD-17 cbt.attack physical: one d20 previewed normal, Reckless Attack applied before the roll → conflict 'Effects changed — roll again', nothing logged", () => {
+    const t = modSetup();
+    t.bless();
+    const bless = bonusDieKey(
+      t
+        .active()
+        .find((e) => e.kind === "custom" && e.label === "Bless" && e.targetCharacterId === t.miraId)
+        ?.id as string,
+      0,
+      false,
+    );
+    // As the tier-2 form sends it: the lone d20's value as `dice` (R2 step 4).
+    const attack = () =>
+      t.run<AttackResult>(
+        "cbt.attack",
+        {
+          attackerId: t.id("Mira"),
+          manual: [{ diceTotal: 11, dice: [11] }, { diceTotal: 5 }],
+          manualParts: [[{ key: bless, entry: { diceTotal: 2 } }], []],
+        },
+        t.p1,
+      );
+    t.apply({ targets: [{ characterId: t.miraId }], preset: { key: "reckless" } });
+    const before = t.s.db.select().from(gameLogEntry).all().length;
+    const e = t.err(attack);
+    expect([e.code, e.message]).toEqual(["conflict", EFFECTS_CHANGED]);
+    expect(t.s.db.select().from(gameLogEntry).all()).toHaveLength(before);
+    // Reckless ended again: the same entry fits and commits.
+    t.end(t.active().find((x) => x.label === "Reckless Attack")?.id as string);
+    const p = t.note(attack().cardId)?.payload as DamageCardPayload;
+    expect(rollRow(t, p.toHit?.rollId as string)).toMatchObject({ mode: "normal", total: 15 });
+  });
+});
+
+describe("FR-MOD-17 a mode only from effects the player can't see (R2 ruling)", () => {
+  /** A campaign preset "Foresight" (adv on attacks) on Mira, secret. */
+  function foresight() {
+    const t = modSetup();
+    const presetId = t.put({
+      characterId: null,
+      name: "Foresight",
+      modifiers: [{ kind: "mode", on: { roll: "attack" }, mode: "advantage" }],
+      durationRounds: null,
+      concentration: false,
+    });
+    t.apply({ targets: [{ characterId: t.miraId }], preset: { presetId }, secret: true });
+    const id = t.active().find((e) => e.label === "Foresight")?.id as string;
+    const attack = (asDm = false) =>
+      t.run<AttackResult>(
+        "cbt.attack",
+        {
+          attackerId: t.id("Mira"),
+          manual: [{ diceTotal: 11, dice: [11] }, { diceTotal: 5 }],
+          manualParts: [[], []],
+        },
+        asDm ? undefined : t.p1,
+      );
+    return { t, id, attack };
+  }
+  const playerFrames = (t: ModSetup) =>
+    JSON.stringify(
+      t.s.db
+        .select()
+        .from(gameLogEntry)
+        .all()
+        .map((row) =>
+          t.s.records.view(
+            GAME_LOG_ENTRY_TYPE,
+            { ...row },
+            { connId: "p1", campaignId: t.h.campaignId, role: "player", playerId: t.h.p1.id },
+          ),
+        ),
+    );
+
+  test("FR-MOD-17 secret adv on Mira, one physical d20 → the server rolls the second (auto), adv applies, the roll commits; players never see the effect", () => {
+    const { t, id, attack } = foresight();
+    const p = t.note(attack().cardId)?.payload as DamageCardPayload;
+    const hit = rollRow(t, p.toHit?.rollId as string);
+    const dice = hit?.dice as DieResult[];
+    expect([hit?.mode, hit?.manual, hit?.expression]).toEqual(["advantage", true, "2d20kh1+4"]);
+    expect(dice.map((d) => [d.value === 11, d.auto])).toEqual([
+      [true, undefined],
+      [false, true],
+    ]);
+    const kept = Math.max(11, dice[1]?.value ?? 0);
+    expect([hit?.total, hit?.natural]).toEqual([kept + 4, kept]);
+    for (const seen of [JSON.stringify(p), playerFrames(t)]) {
+      expect(seen).not.toContain("Foresight");
+      expect(seen).not.toContain(id);
+    }
+  });
+
+  test("FR-MOD-17 a visible effect also gives the mode (Reckless Attack) → conflict; a DM roll → conflict", () => {
+    const { t, attack } = foresight();
+    const dm = t.err(() => attack(true));
+    expect([dm.code, dm.message]).toEqual(["conflict", EFFECTS_CHANGED]);
+    t.apply({ targets: [{ characterId: t.miraId }], preset: { key: "reckless" } });
+    const e = t.err(() => attack());
+    expect([e.code, e.message]).toEqual(["conflict", EFFECTS_CHANGED]);
   });
 });
 
