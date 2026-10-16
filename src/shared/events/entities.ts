@@ -31,3 +31,15 @@ export const EntityUpdated = defineEvent({
   logged: true,
   undoable: false,
 });
+
+/**
+ * Re-import of a changed imported definition (compendium FR-CMP-08, OQ-FIX-18): one per updated
+ * row, logged with campaignId null (the `imported-entity` upsert); hook-changed instances follow
+ * in one more `ImportedEntityUpdated` per affected campaign, logged with that campaign.
+ */
+export const ImportedEntityUpdated = defineEvent({
+  type: "ImportedEntityUpdated",
+  payload: z.object({ entityId: z.string() }).strict(),
+  logged: true,
+  undoable: false,
+});

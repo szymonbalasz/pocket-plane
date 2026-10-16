@@ -326,3 +326,9 @@ export function entryLine(e: EntryDraft): string {
   }
   return line.length <= LINE_MAX ? line : `${line.slice(0, LINE_MAX - 1)}…`;
 }
+
+/** `nameKey` (CMP §8): lower-case NFC; homebrew names are unique on it per campaign and kind. */
+export const entryNameKey = (name: string) => name.trim().normalize("NFC").toLowerCase();
+
+/** Homebrew body text cap (FR-CMP-24). */
+export const HOMEBREW_TEXT_MAX = 8_000;

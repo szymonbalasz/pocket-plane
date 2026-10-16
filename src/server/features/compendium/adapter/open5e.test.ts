@@ -2,8 +2,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { srdMini } from "@fixtures/srd/open5e";
 import { EntryDraft } from "@shared/compendium/schemas";
-import { CreatureSenses } from "@shared/compendium/senses";
-import { MonsterStatBlock } from "@shared/entities/schemas";
+import { MonsterStatBlock, Senses } from "@shared/entities/schemas";
 import { loadSrd51 } from "../sources/srd-5.1";
 import { ADAPTER_VERSION, type AdapterRecord, type AdapterResult, adaptOpen5e } from "./open5e";
 import { toMarkdownLite } from "./text";
@@ -54,9 +53,9 @@ describe("FR-CMP-05 adapter", () => {
     );
     expect(monsters).toHaveLength(322);
     for (const m of monsters) {
-      const { senses, ...core } = m.definition.statBlock;
-      expect(MonsterStatBlock.safeParse(core).success).toBe(true);
-      if (senses) expect(CreatureSenses.safeParse(senses).success).toBe(true);
+      expect(MonsterStatBlock.safeParse(m.definition.statBlock).success).toBe(true);
+      const { senses } = m.definition.statBlock;
+      if (senses) expect(Senses.safeParse(senses).success).toBe(true);
       expect(m.definition.name).toBe(m.data.name);
     }
   });
