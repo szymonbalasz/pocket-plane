@@ -209,6 +209,34 @@ describe("FR-FOG-35 re-derive triggers", () => {
   });
 });
 
+describe("BL-13 one change per record", () => {
+  test("BL-13 Reveal all / Fog all / Undo with an encounter running: each combatant once in the event", async () => {
+    const t = await setup();
+    const enc = t.db.$client
+      .query<{ id: string }, []>("SELECT id FROM encounter WHERE name = 'Ambush at the Ford'")
+      .get();
+    t.run("cbt.start", { encounterId: enc?.id, sceneId: t.ambushId });
+    // No darkness: Reveal all flips both goblins (each flip runs the combat hooks).
+    t.run(F.clearDarkness, { sceneId: t.ambushId });
+    const unique = () => {
+      const ids = (t.last()?.changes ?? []).map((c) => `${c.type}:${c.id}`);
+      expect(ids.filter((x) => x.startsWith("combatant:")).length).toBeGreaterThan(0);
+      expect(new Set(ids).size).toBe(ids.length);
+    };
+    t.run(F.setAll, { sceneId: t.ambushId, fogged: false });
+    unique();
+    t.run(F.setAll, { sceneId: t.ambushId, fogged: true });
+    unique();
+    const latest = t.db.$client
+      .query<{ id: string }, [string]>(
+        "SELECT id FROM scene_fog_edit WHERE scene_id = ? ORDER BY seq DESC LIMIT 1",
+      )
+      .get(t.ambushId);
+    t.run(F.undo, { sceneId: t.ambushId, expectedEditId: latest?.id });
+    unique();
+  });
+});
+
 describe("FR-FOG-37 explored memory", () => {
   test("FR-FOG-37 a move on a non-active scene with Explored on writes `seenBy` and `vision` but no memory", async () => {
     const t = await setup();
