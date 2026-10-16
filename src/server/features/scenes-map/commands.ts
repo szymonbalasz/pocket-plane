@@ -328,6 +328,12 @@ export const duplicateScene = defineCommand({
         .run();
       changes.push(tokenChange(null, readToken(tx, tid)));
     }
+    // FR-FOG-35 (#216): the copy re-derives once its tokens are copied; rows fold into creates.
+    for (const d of rederiveDependants({ tx, ctx, actor }, sceneChange(null, copy))) {
+      const c = changes.find((x) => x.type === d.type && x.id === d.id);
+      if (c) c.after = d.after;
+      else changes.push(d);
+    }
     emit({
       type: SceneDuplicated.type,
       campaignId: cid,

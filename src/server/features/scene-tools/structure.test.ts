@@ -16,6 +16,7 @@ import { MAP_INTENTS as I, type SceneRecord } from "@shared/scenes-map/schemas";
 import { armCrashHook } from "../../commands/crash";
 import { stateDigest } from "../../db/digest";
 import { readEventLog } from "../../events/log";
+import { fogVisibilityHook } from "../fog-of-war/hooks";
 import { MAP_REST as R } from "../scenes-map/commands";
 import { visibilityHooks } from "../scenes-map/visibility-hooks";
 import { readStructure } from "./rows";
@@ -24,6 +25,9 @@ import { scnSetup } from "./testing";
 
 afterEach(() => {
   visibilityHooks.unregister("test.fog");
+  // The FR-SCN-36 case below runs without fog's line (its re-derive would rewrite `f`).
+  visibilityHooks.unregister(fogVisibilityHook.name);
+  visibilityHooks.register(fogVisibilityHook);
   armCrashHook(null);
 });
 
@@ -181,7 +185,9 @@ describe("FR-SCN-08 / -36 scn.addDoor", () => {
   test("FR-SCN-36 scn.addDoor sets f via derive before the write: 1 iff every doorCells cell is fogged", () => {
     const t = setup();
     const seen: string[] = [];
-    // Test fog: every cell with col ≥ 8 is fogged.
+    // Test fog: every cell with col ≥ 8 is fogged. Fog's own line is off here: since V2 its
+    // `rederive` re-derives every door after a structure edit (FR-FOG-35) with fog's rule.
+    visibilityHooks.unregister(fogVisibilityHook.name);
     visibilityHooks.register({
       name: "test.fog",
       derive(read, obj) {
@@ -190,7 +196,7 @@ describe("FR-SCN-08 / -36 scn.addDoor", () => {
         );
         const all = "col" in obj.cells ? obj.cells.col >= 8 : obj.cells.every(([c]) => c >= 8);
         // ADR-0042: fogged = seen by nobody.
-        return { fogged: all, ...(all ? { seenBy: [] } : {}) };
+        return { fogged: all, seenBy: all ? [] : [t.h.p1.id] };
       },
     });
     t.addDoor([8, 5, 8, 6]); // cells (7, 5) and (8, 5): not all fogged

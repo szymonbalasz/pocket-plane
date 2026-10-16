@@ -5,16 +5,29 @@
 //   activation, FR-FOG-35).
 // - campaign-management `player-hooks.ts`: `added` (OQ-FOG-39: the new player joins `seenBy` on
 //   the active scene; other scenes are marked `visionStale`).
+// - entities' definition-changed hooks: `fogSensesHook` (FR-FOG-35: a senses edit re-derives the
+//   active scene for the definition's source tokens; their other scenes → `visionStale`).
+// - scenes-map `visibility-hooks.ts` `rederive` (bound into `hooks.ts`, FR-FOG-35): a vision
+//   source written (placed, moved, resized, hidden / revealed, re-owned, duplicated, deleted)
+//   re-derives its scene(s); a structure edit (FR-SCN-39) and a scene copy (#216) re-derive that
+//   scene; any other token write needs only its own `derive`.
+import type { EntityRecord } from "@shared/entities/schemas";
 import { fogBox } from "@shared/fog-of-war/mask";
 import { FOG_EXPLORED_TYPE, FOG_TYPE, type FogBox } from "@shared/fog-of-war/schemas";
-import { eq } from "drizzle-orm";
-import { sceneFog } from "../../db/schema";
+import { SCENE_STRUCTURE_TYPE } from "@shared/scene-tools/schemas";
+import { SCENE_TYPE, TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
+import { and, asc, eq, isNotNull } from "drizzle-orm";
+import { sceneFog, token } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import type { PlayerHook } from "../campaign-management/player-hooks";
+import type { HookEnv } from "../entities/definition-hooks";
 import type { SceneHook } from "../scenes-map/scene-hooks";
+import type { SceneHookEnv } from "../scenes-map/visibility-hooks";
 import { loadSceneStatic } from "./derive";
-import { markScenesStale, rederiveDarkness, rederiveScene } from "./rederive";
+import { bindFogRederive } from "./hooks";
+import { markScenesStale, mergeChanges, rederiveDarkness, rederiveScene } from "./rederive";
 import { readFogRecord, sceneExploredRecords } from "./rows";
+import { isSource } from "./sight";
 
 const boxColumns = ([col0, row0, cols, rows]: FogBox) => ({ col0, row0, cols, rows });
 
@@ -94,6 +107,80 @@ export const fogSceneHook: SceneHook = {
 export const fogPlayerHook: PlayerHook = {
   name: "fog-of-war.player-membership",
   added(env, p): RecordChange[] {
-    return markScenesStale(env, p.campaignId).flatMap((id) => rederiveScene(env, id));
+    return markScenesStale(env, p.campaignId).flatMap((id) =>
+      rederiveScene(env, id, { players: [p.id] }),
+    );
   },
 };
+
+/** Same source on the same place (FR-FOG-32): nothing a sight depends on changed. */
+const sameSource = (a: TokenRecord, b: TokenRecord) =>
+  a.sceneId === b.sceneId &&
+  a.ownerPlayerId === b.ownerPlayerId &&
+  a.col === b.col &&
+  a.row === b.row &&
+  a.size === b.size;
+
+/** FR-FOG-35: the dependants of a token, structure or scene-copy write (re-derive triggers). */
+export function fogRederive(env: SceneHookEnv, change: RecordChange): RecordChange[] {
+  if (change.type === TOKEN_TYPE) {
+    const b = change.before as TokenRecord | null;
+    const a = change.after as TokenRecord | null;
+    const was = isSource(b);
+    const is = isSource(a);
+    if (!was && !is) return [];
+    if (was && is && sameSource(b as TokenRecord, a as TokenRecord)) return [];
+    const scenes = new Set<string>();
+    if (was) scenes.add((b as TokenRecord).sceneId);
+    if (is) scenes.add((a as TokenRecord).sceneId);
+    const owners = [b?.ownerPlayerId, a?.ownerPlayerId].filter((p): p is string => !!p);
+    return mergeChanges(
+      [...scenes].flatMap((id) =>
+        rederiveScene(env, id, { sourceChange: { before: b, after: a }, players: owners }),
+      ),
+    );
+  }
+  if (change.type === SCENE_STRUCTURE_TYPE) return rederiveScene(env, change.id);
+  // #216: a scene copy re-derives once its tokens and SCN rows are copied.
+  if (change.type === SCENE_TYPE && change.before === null) return rederiveScene(env, change.id);
+  return [];
+}
+
+bindFogRederive(fogRederive);
+
+const sensesKey = (e: EntityRecord) => {
+  const s = (e.statBlock as { senses?: Record<string, unknown> } | null)?.senses;
+  return s
+    ? `${s.visionFt},${s.darkvisionFt},${s.seesMagicalDarkness === true},${s.seesInvisible === true}`
+    : "0,0,false,false";
+};
+
+/**
+ * FR-FOG-35 (definition-changed hook): a senses edit (incl. Sees invisible) re-derives the active
+ * scene if it holds a source token of the definition; the definition's other source scenes are
+ * marked `visionStale` (re-derived on activation). No source token → nothing.
+ */
+export function fogSensesHook(env: HookEnv, before: EntityRecord, after: EntityRecord) {
+  if (sensesKey(before) === sensesKey(after)) return [];
+  const rows = env.tx
+    .select({ sceneId: token.sceneId, campaignId: token.campaignId, owner: token.ownerPlayerId })
+    .from(token)
+    .where(
+      and(
+        eq(token.definitionId, after.id),
+        isNotNull(token.ownerPlayerId),
+        eq(token.hidden, false),
+      ),
+    )
+    .orderBy(asc(token.seq))
+    .all();
+  const first = rows[0];
+  if (!first) return [];
+  const scenes = [...new Set(rows.map((r) => r.sceneId))];
+  const players = [...new Set(rows.map((r) => r.owner as string))];
+  return mergeChanges(
+    markScenesStale(env, first.campaignId, scenes).flatMap((id) =>
+      rederiveScene(env, id, { players }),
+    ),
+  );
+}

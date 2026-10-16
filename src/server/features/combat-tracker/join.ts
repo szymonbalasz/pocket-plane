@@ -33,8 +33,8 @@ export function anchorCell(s: SceneRecord, at?: GridCell): GridCell {
  * FR-CBT-65: created tokens go to `freeCellsNear(anchor)` (FR-MAP-48), one at a time so tokens
  * placed earlier in the command count as occupied; no free cell left → the anchor (overlap
  * allowed). Each token via scenes-map's `placeTokenIn` in the caller's transaction; `changes`
- * lists the token creates for the caller's event. Caps → `conflict` "Scene is full". Image:
- * `imageOf`.
+ * lists the token creates (each followed by its fog re-derive rows, FR-FOG-35) for the caller's
+ * event. Caps → `conflict` "Scene is full". Image: `imageOf`.
  */
 export class TokenPlacer {
   readonly changes: RecordChange[] = [];
@@ -54,7 +54,7 @@ export class TokenPlacer {
     const size = def.statBlock.size;
     const cell = freeCellsNear(this.scene, this.tokens, this.at, size, 1)[0] ?? this.at;
     try {
-      const { token, change } = placeTokenIn(this.env, {
+      const { token, change, dependants } = placeTokenIn(this.env, {
         sceneId: this.scene.id,
         definitionId: def.id,
         col: cell.col,
@@ -63,7 +63,8 @@ export class TokenPlacer {
         ...this.imageOf(def),
       });
       this.tokens.push(token);
-      this.changes.push(change);
+      // FR-FOG-35 (#216): a placed PC token is a vision source; its re-derive rows follow it.
+      this.changes.push(change, ...dependants);
       return token;
     } catch (err) {
       if (err instanceof CommandError && err.code === "conflict") throw conflict(SCENE_FULL);
