@@ -12,6 +12,7 @@ import { fixturesAdapters } from "./fixtures-adapters";
 import { fogOfWar } from "./fog-of-war";
 import { liveSync } from "./live-sync";
 import { notifications } from "./notifications";
+import { partyBoard } from "./party-board";
 import { partyLootFeature } from "./party-loot";
 import { sceneTools } from "./scene-tools";
 import { scenesMap } from "./scenes-map";
@@ -32,4 +33,5 @@ export const features: readonly Feature[] = [
   effectModifiers,
   fogOfWar,
   sceneTools,
+  partyBoard,
 ];

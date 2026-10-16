@@ -1,10 +1,10 @@
 // party-loot boundary schemas (LOOT §6, §8, §9). zod is the source of truth; the clients mirror
 // the intent rules with these same schemas (FR-LOOT-16, FR-LOOT-18).
-import { Endpoint } from "@shared/events/party-loot";
+import { Endpoint, LootEntryKind } from "@shared/events/party-loot";
 import { cleanText } from "@shared/notifications/schemas";
 import { z } from "zod";
 
-export { Endpoint };
+export { Endpoint, LootEntryKind };
 
 export const LOOT_ENTRY_TYPE = "loot-entry";
 export const PARTY_POT_TYPE = "party-pot";
@@ -113,12 +113,15 @@ export type LootMoveIntent = z.input<typeof LootMoveIntent>;
 export const LootResult = z.strictObject({ entryId: z.string() });
 export type LootResult = z.infer<typeof LootResult>;
 
-/** Wire record `loot-entry` (FR-LOOT-01, LOOT §8); no DM-only field (FR-LOOT-10). */
+/**
+ * Wire record `loot-entry` (FR-LOOT-01, LOOT §8); no DM-only field (FR-LOOT-10). Kind `item`
+ * (FR-PARTY-25): `text` = item name, `qty` 1–9 999, coins 0; `qty` is on the wire only when set.
+ */
 export const LootEntryRecord = z.strictObject({
   id: z.string(),
   campaignId: z.string(),
   seq: z.int(),
-  kind: z.enum(["loot", "move"]),
+  kind: LootEntryKind,
   from: Endpoint,
   to: Endpoint,
   text: z.string(),
@@ -127,6 +130,7 @@ export const LootEntryRecord = z.strictObject({
   ep: z.int(),
   gp: z.int(),
   pp: z.int(),
+  qty: z.int().min(1).max(9_999).optional(),
   createdAt: z.string(),
   editedAt: z.string().nullable(),
 });
