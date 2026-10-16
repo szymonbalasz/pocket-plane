@@ -123,6 +123,20 @@ const chipOf = (faces: number, sum: number, rest: Partial<DieInit>): DieInit => 
 
 const ONE_DIE = /^([+-]?)1d(\d+)$/i;
 const FACES = /d(\d+)/i;
+const TERMS = /([+-]?)(\d+)d(\d+)/gi;
+
+/**
+ * Faces and sign of every die of an expression's dice terms, in order ("2d6+1d8" → d6, d6, d8;
+ * "1d6-1d4" → d6, −d4): MOD's per-die `dice` follow the terms in this order (FR-MOD-19, #220).
+ */
+function termDice(expr: string): { faces: number; sign: 1 | -1 }[] {
+  const out: { faces: number; sign: 1 | -1 }[] = [];
+  for (const m of expr.matchAll(TERMS)) {
+    const sign: 1 | -1 = m[1] === "-" ? -1 : 1;
+    for (let i = 0; i < Number(m[2]); i++) out.push({ faces: Number(m[3]), sign });
+  }
+  return out;
+}
 
 /** MOD parts and offered trigger parts: per-die `dice`, else `1dM` → one die, else a chip. */
 function partDice(p: Part, offered: boolean): DieInit[] {
@@ -130,6 +144,16 @@ function partDice(p: Part, offered: boolean): DieInit[] {
   const sign: 1 | -1 = expr.startsWith("-") || (!expr.startsWith("+") && p.value < 0) ? -1 : 1;
   const tag: Partial<DieInit> = { label: p.label ?? "DM", sign, ...(offered && { offered: true }) };
   const faces = Number(FACES.exec(expr)?.[1] ?? 0);
+  const terms = termDice(expr);
+  if (p.dice && p.dice.length > 0 && terms.length === p.dice.length && terms.length > 1) {
+    // Each die with its own type; a term's sign flips the part's ("1d6-1d4": the d4 is −).
+    const lead = terms[0]?.sign ?? 1;
+    return p.dice.flatMap((v, i) => {
+      const t = terms[i] as { faces: number; sign: 1 | -1 };
+      const s: 1 | -1 = t.sign === lead ? sign : sign === 1 ? -1 : 1;
+      return dieOf(t.faces, Math.abs(v), { ...tag, sign: s });
+    });
+  }
   if (p.dice && p.dice.length > 0 && faces >= 2) {
     return p.dice.flatMap((v) => dieOf(faces, Math.abs(v), tag));
   }

@@ -87,6 +87,30 @@ describe("FR-DICEX-13 throwDice", () => {
     ]);
   });
 
+  test("FR-DICEX-13 #220 mixed dice in one part: '2d6+1d8' → d6, d6, d8 (each die its own type)", () => {
+    const t = one([
+      item({
+        mods: [{ label: "Smite", value: 12, expression: "2d6+1d8", dice: [2, 4, 6] }],
+        offered: [{ label: "Fury", value: 5, expression: "1d6+1d4", dice: [3, 2] }],
+      }),
+    ]);
+    expect(t.dice.slice(1).map((d) => [d.label, d.faces, d.value, d.shape, d.offered])).toEqual([
+      ["Smite", 6, 2, "d6", undefined],
+      ["Smite", 6, 4, "d6", undefined],
+      ["Smite", 8, 6, "d8", undefined],
+      ["Fury", 6, 3, "d6", true],
+      ["Fury", 4, 2, "d4", true],
+    ]);
+    // A subtracted term's dice carry the minus.
+    const sub = one([
+      item({ mods: [{ label: "X", value: 3, expression: "1d6-1d4", dice: [5, 2] }] }),
+    ]);
+    expect(sub.dice.slice(1).map((d) => [d.faces, d.sign])).toEqual([
+      [6, 1],
+      [4, -1],
+    ]);
+  });
+
   test("a part without dice: 1d4 → one die; 2d6 → chip with the sum; null label → DM; flat bonus → chip", () => {
     const t = one([
       item({
