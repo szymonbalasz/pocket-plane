@@ -126,11 +126,8 @@ export const units: readonly Fixture[] = [
   handouts1,
   partyItems1,
   partySecond,
-<<<<<<< HEAD
-  visionCrypt,
-=======
   cmpSrdMini,
   cmpHomebrew,
   cmpHomebrewSecond,
->>>>>>> main
+  visionCrypt,
 ];

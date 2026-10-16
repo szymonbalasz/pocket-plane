@@ -50,9 +50,6 @@ export const bundles: readonly Bundle[] = [
   fogScn,
   diceExtras,
   partyBoard,
-<<<<<<< HEAD
-  vision,
-=======
   compendium,
->>>>>>> main
+  vision,
 ];
