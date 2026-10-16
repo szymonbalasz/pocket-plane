@@ -6,7 +6,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 
 | ID | Item | Size | Area (files) | Spec need | Avoid while | Status |
 |---|---|---|---|---|---|---|
-| BL-01 | Fit with the Game log open cuts the top rows of Goblin Ambush and leaves space below; Town crops on the right (session-sim-6 #4) | S | scenes-map camera (`camera.ts`) | FR-MAP-44/46 wording if behaviour changes | fog v2 / walls canvas work | open |
+| BL-01 | Fit with the Game log open cuts the top rows of Goblin Ambush and leaves space below; Town crops on the right (session-sim-6 #4) | S | scenes-map camera (`camera.ts`) | FR-MAP-44/46 wording if behaviour changes | — | open: tried in sprint 3 (commit 138c9fd, reverted in the same branch): fits both scenes at 1440×900, but 5 e2e specs (scene-tools-props, scene-tools-settings, fog-of-war, combat2-polish) click fixed map cells that then sit under the Game log → those specs must pick clear cells or close the log first; proposed FR-MAP-44 wording in #234 |
 | BL-02 | "Start round 1" does nothing silently while PCs lack initiative: tooltip / inline reason (FR-CBT-14) (sim-6 #5) | S | combat-tracker DM Initiative | none | combat polish branches | done (#211) |
 | BL-03 | Round-0 movement counts toward round 1's "Moved" (sim-6 #6) | S | combat-tracker hooks (`movedFt`) | FR-CBT-39 note | MOD trigger / combat core | open |
 | BL-04 | A Dying / Down badge covers a neighbour's name label on the map (sim-6 #7) | S | scenes-map LabelsLayer / CBTX overlay | none | canvas work | open |
