@@ -15,6 +15,7 @@ import {
   type RollRequest,
   useRollControl,
 } from "../dice-roll-log/roll-control";
+import { NO_PREVIEW } from "../effect-modifiers/roll-preview";
 import { actorFor, DiceText, notationRequest } from "./DiceText";
 import { diceExtras, type TrayRequest } from "./store";
 import { TrayWindow, trayControlOptions, trayState } from "./TrayWindow";
@@ -64,11 +65,12 @@ function captureControl(options: RollControlOptions): RollControl {
 }
 
 const stage = (request: TrayRequest) => diceExtras.stage(request);
+const registered = [...trayExtras];
 
 afterEach(() => {
   diceExtras.failed(); // stop any pending timer
   diceExtras.clear();
-  trayExtras.length = 0;
+  trayExtras.splice(0, trayExtras.length, ...registered);
   sent.length = 0;
 });
 
@@ -94,7 +96,12 @@ describe("FR-DICEX-06 roll buttons: click rolls at once, Alt+click stages", () =
       category: "skill-check" as const,
       label: "Mira — Athletics check",
       onRoll: (r: RollRequest) => rolls.push(r),
-      subject: { creature: "mira", roll: "check" }, // a later spec's option (MOD R14)
+      // MOD R14: the preview's input rides in the options.
+      subject: {
+        creature: { characterId: "mira" },
+        roll: "check" as const,
+        ability: "str" as const,
+      },
     };
     const control = captureControl(options);
     control.roll({ altKey: true, shiftKey: true });
@@ -115,7 +122,7 @@ describe("FR-DICEX-05 / -08 adjust rolls through the caller's onRoll", () => {
       expressions: ["1d20+5"],
       category: "skill-check" as const,
       onRoll: (r: RollRequest) => got.push(r),
-      subject: { creature: "mira", roll: "check", card: { ac: 15 } },
+      subject: { creature: { characterId: "mira" }, roll: "check" as const },
     };
     const tray = trayControlOptions(
       { kind: "control", options, mode: "normal" },
@@ -126,11 +133,12 @@ describe("FR-DICEX-05 / -08 adjust rolls through the caller's onRoll", () => {
     expect((tray as unknown as typeof options).subject).toBe(options.subject);
     expect(tray.mode).toBe("advantage");
     expect(tray.expressions).toBe(options.expressions);
-    const request = {
+    const request: RollRequest = {
       mode: "advantage",
       previewMode: "advantage",
-      manualParts: [[3]],
-    } as RollRequest;
+      manual: [{ diceTotal: 14 }],
+      manualParts: [[{ key: "e:fx-bless", entry: { diceTotal: 3 } }]],
+    };
     tray.onRoll(request);
     expect(got).toHaveLength(1);
     expect(got[0]).toBe(request);
@@ -292,6 +300,7 @@ describe("FR-DICEX-07 physical dice: the same ManualForm in popover and tray", (
     const control = {
       manual: { mode: "normal" },
       options: { expressions: ["2d6-1"], category: "other", onRoll() {} },
+      preview: NO_PREVIEW,
     } as unknown as RollControl;
     const html = render(<ManualForm control={control} />);
     expect(html).toContain('data-testid="dice-manual-total"');

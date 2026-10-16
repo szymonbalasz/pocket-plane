@@ -110,6 +110,11 @@ export const DieResult = z.strictObject({
   faces: z.int().min(2).max(1000),
   value: z.int().nullable(),
   kept: z.boolean(),
+  /**
+   * FR-MOD-17 (R2 ruling): a physical roll's second d20, rolled by the server because only
+   * effects the player can't see give the mode. Absent = as entered / as rolled.
+   */
+  auto: z.literal(true).optional(),
 });
 export type DieResult = z.infer<typeof DieResult>;
 
@@ -207,6 +212,30 @@ export const ManualParts = z
     message: "Each part group at most once",
   });
 export type ManualParts = z.infer<typeof ManualParts>;
+
+/**
+ * FR-MOD-18 (R2): roll intents carry `manualParts` beside `manual` only. Single-roll intents
+ * take one list; two-roll intents (`char.roll`, `cbt.attack`) one per `manual` entry (an effect
+ * may have bonus dice on both the to-hit and the damage, under the same key).
+ */
+export const MANUAL_PARTS_ALONE = "Physical part groups need a physical roll";
+export const MANUAL_PARTS_PER_ENTRY = "One part-group list per physical roll";
+export const ManualPartsPerRoll = z.array(ManualParts).min(1).max(2);
+
+/** The intent-level rule (a `superRefine`): `manualParts` only with `manual`, one list per entry. */
+export function checkManualParts(
+  v: { manual?: unknown; manualParts?: readonly unknown[] },
+  ctx: z.RefinementCtx,
+): void {
+  if (v.manualParts === undefined) return;
+  const message =
+    v.manual === undefined
+      ? MANUAL_PARTS_ALONE
+      : Array.isArray(v.manual) && v.manualParts.length !== v.manual.length
+        ? MANUAL_PARTS_PER_ENTRY
+        : null;
+  if (message) ctx.addIssue({ code: "custom", path: ["manualParts"], message });
+}
 
 /** `roll` kind payload item (data model §15). */
 export const RollPayloadItem = z.strictObject({

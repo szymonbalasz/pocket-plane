@@ -19,6 +19,8 @@ import type {
   TurnResult,
   UndoResult,
 } from "@shared/combat-tracker/schemas";
+import type { RollMode } from "@shared/dice-roll-log/schemas";
+import type { RollSubject } from "@shared/effect-modifiers/schemas";
 import {
   ABILITIES,
   ABILITY_NAMES,
@@ -68,6 +70,7 @@ import {
 } from "@ui/features/combat-tracker/window";
 import { modeFromKeys } from "@ui/features/dice-roll-log/logic";
 import {
+  manualPartsOf,
   RollButton,
   type RollControl,
   type RollKeys,
@@ -151,11 +154,14 @@ function InitiativeCell({
     expressions: [d20Expression(def?.statBlock.initBonus ?? 0)],
     category: "initiative",
     label: `${c.name} — Initiative`,
+    // FR-MOD-15, -27: the preview maps a PC combatant to its character, as the server does.
+    subject: { creature: { combatantId: c.id }, roll: "initiative" },
     onRoll: (r) =>
       void send("cbt.rollInitiative", {
         combatantIds: [c.id],
         mode: r.mode,
         ...(r.manual ? { manual: r.manual[0] } : {}),
+        ...manualPartsOf(r),
         ...(r.public !== undefined ? { public: r.public } : {}),
       }),
   });
@@ -233,6 +239,28 @@ const ATTACK_ACTIONS = [
 type AttackAction = (typeof ATTACK_ACTIONS)[number]["value"];
 
 /**
+ * FR-MOD-15, -27: the preview subjects of an attack row's action, as `cbt.attack` /
+ * `cbt.rollDamage` roll them: the to-hit, then the card's damage (`card: true`; Damage alone
+ * reads the pending to-hit card's mode).
+ */
+function attackSubjects(
+  combatantId: string,
+  row: string,
+  action: AttackAction,
+  cardMode: RollMode | undefined,
+): RollSubject[] {
+  const base = { creature: { combatantId }, via: "weapon" as const, row: row.slice(0, 60) };
+  const hit: RollSubject = { ...base, roll: "attack" };
+  const damage: RollSubject = {
+    ...base,
+    roll: "damage",
+    card: true,
+    ...(action === "damage" && cardMode ? { toHitMode: cardMode } : {}),
+  };
+  return action === "toHit" ? [hit] : action === "damage" ? [damage] : [hit, damage];
+}
+
+/**
  * Attack ▸ (FR-CBT-16, FR-CBT-74, N7): every attack the definition can name (OQ-CHARX-12) with
  * the same three actions as the sheet: Attack + damage (`cbt.attack`), Attack (`cbt.attack
  * {rolls: "toHit"}`), Damage (`cbt.rollDamage`; after a natural 20 on that row's pending to-hit
@@ -274,6 +302,7 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
     label: attack
       ? `${c.name} — ${attack.name} ${action === "damage" ? "damage" : "attack"}`
       : undefined,
+    ...(attack ? { subject: attackSubjects(c.id, attack.name, action, card?.mode) } : {}),
     onRoll: async (r) => {
       const ref = attackId ? { attackId } : {};
       const res =
@@ -281,6 +310,7 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
           ? await send<{ cardId: string }>("cbt.rollDamage", {
               attackerId: c.id,
               ...(r.manual?.[0] ? { manual: r.manual[0] } : {}),
+              ...manualPartsOf(r),
               ...ref,
             })
           : await send<{ cardId: string }>("cbt.attack", {
@@ -288,6 +318,7 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
               mode: r.mode,
               ...(action === "toHit" ? { rolls: "toHit" } : {}),
               ...(r.manual ? { manual: r.manual } : {}),
+              ...(r.manualParts ? { manualParts: r.manualParts } : {}),
               ...ref,
             });
       if (res) openCard(res.cardId);
@@ -382,6 +413,7 @@ function useAbilityRoll(c: CombatantView, kind: AbilityKind, bonus: (a: Ability)
     expressions: [d20Expression(bonus(ability) ?? 0)],
     category: kind === "check" ? "ability-check" : "saving-throw",
     label: `${c.name} — ${ABILITY_NAMES[ability]} ${kind}`,
+    subject: { creature: { combatantId: c.id }, roll: kind, ability },
     onRoll: (r) =>
       void send("cbt.rollAbility", {
         combatantId: c.id,
@@ -389,6 +421,7 @@ function useAbilityRoll(c: CombatantView, kind: AbilityKind, bonus: (a: Ability)
         ability,
         mode: r.mode,
         ...(r.manual ? { manual: r.manual[0] } : {}),
+        ...manualPartsOf(r),
         ...(r.public !== undefined ? { public: r.public } : {}),
       }),
   });

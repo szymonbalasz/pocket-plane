@@ -98,6 +98,8 @@ export const attackCommand = defineCommand({
         label: subject.crit ? critLabel(spec.label) : spec.label,
         actor,
         manual: input.manual?.[i],
+        // FR-MOD-18: the physical part groups of this roll (one list per `manual` entry).
+        ...(input.manualParts?.[i] ? { manualParts: input.manualParts[i] } : {}),
         source: "cbt",
         subject: { creature, via, row, ...subject },
       });
