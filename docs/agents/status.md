@@ -2,18 +2,18 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 3 Phase A (specs) started 2026-10-16 (#201–#205): [sprint-3](sprint-3.md). V, D, R, P spec agents working; C when a slot frees; backlog only during downtime, not near the sprint's end ([orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill), [backlog](backlog.md)).
+**Phase:** Sprint 3 Phase A (specs) started 2026-10-16 (#201–#205): [sprint-3](sprint-3.md). all five specs drafted; seams ruling `.verify/sprint3/seams.md` (main checkout), seams applied (no pushbacks), review-a (V) + review-b (D, R, P, C), rulings, DM gate 1; backlog only during downtime, not near the sprint's end ([orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill), [backlog](backlog.md)).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| V: fog v2 + vision + walls | `spec/vision` (w3D, slot 0) | spec-vision | Working | Report → seams |
-| D: dice extras | `spec/dice-extras` (w3E, slot 2) | — | Spec in-review (5b6b60d), agent ended | Seams → review |
-| R: modifiers tiers 1–3 + triggers | `spec/rule-triggers` (w3F, slot 3) | — | Spec in-review (1a1506e), agent ended | Seams → review |
-| P: party board + handouts | `spec/party-board` (w3G, slot 4) | — | Spec in-review (2c793d4), agent ended | Seams → review |
-| C: compendium | `spec/compendium` (w3H, slot 5) | spec-compendium | Working | Report → seams |
-| Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | None | Per §3a |
+| V: fog v2 + vision + walls | `spec/vision` (w3D, slot 0) | review-a | Seams applied (2da54c3); in review | Rulings → gate |
+| D: dice extras | `spec/dice-extras` (w3E, slot 2) | review-b | Seams applied (0825ed9); in review | Rulings → gate |
+| R: modifiers tiers 1–3 + triggers | `spec/rule-triggers` (w3F, slot 3) | review-b | Seams applied (4f840c6); in review | Rulings → gate |
+| P: party board + handouts | `spec/party-board` (w3G, slot 4) | review-b | Seams applied (fc3f636); in review | Rulings → gate |
+| C: compendium | `spec/compendium` (w3H, slot 5) | review-b | Seams applied (992d012); in review | Rulings → gate |
+| Backfill (BL-06): scene dialog map name | `fix/bl-06-scene-map-name` (w3J, slot 6) | build-bl-06 | Working | Walkthrough → merge |
 
 ## Shared-file locks
 
