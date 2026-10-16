@@ -108,6 +108,15 @@ describe("FR-MOD-13 roll subject", () => {
     bad(RollSubject, { creature: { combatantId: "k1" }, roll: "ac" });
     bad(RollSubject, { creature: { combatantId: "k1" }, roll: "attack", extra: 1 });
   });
+
+  test("FR-MOD-13 (T) card damage subjects: `card`, the card's `toHitMode`, the row's name ≤ 60", () => {
+    const dmg = { creature: { combatantId: "k1" }, roll: "damage", via: "weapon" } as const;
+    ok(RollSubject, { ...dmg, card: true, toHitMode: "advantage", row: "Greataxe" });
+    ok(RollSubject, { ...dmg, row: "x".repeat(60) });
+    bad(RollSubject, { ...dmg, row: "x".repeat(61) });
+    bad(RollSubject, { ...dmg, row: "" });
+    bad(RollSubject, { ...dmg, toHitMode: "elven" });
+  });
 });
 
 describe("FR-MOD-21 built-in keys", () => {

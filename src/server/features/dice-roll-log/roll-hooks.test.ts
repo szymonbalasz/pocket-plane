@@ -187,6 +187,53 @@ describe("FR-MOD-13 dice.evaluate with a subject", () => {
     expect(e?.rollIds).toEqual([r.id, bonus?.id]);
   });
 
+  test("FR-MOD-16 / -37 an offered trigger part is rolled as its own row, never in the total or mods", () => {
+    const furyHook: RollHook = {
+      id: "test.fury",
+      modes: () => [],
+      adjust(_env, subject, base) {
+        expect(subject).toMatchObject({ card: true, row: "Greataxe", toHitMode: "advantage" });
+        const r = base.rollExtra("1d6+2", "Divine Fury");
+        return {
+          parts: [],
+          modes: [],
+          offered: [
+            {
+              triggerId: "trg-fury",
+              label: "Divine Fury",
+              public: true,
+              value: r.total,
+              expression: r.expression,
+              rollId: r.id,
+              type: "radiant",
+              dice: [r.total - 2],
+            },
+          ],
+          notes: ["Sneak Attack skipped: 30 dice > 25"],
+        };
+      },
+    };
+    const { s, rollWith } = setup();
+    const r = rollWith([furyHook], {
+      expression: "1d12+4",
+      category: "damage",
+      subject: {
+        creature: MIRA,
+        roll: "damage",
+        via: "weapon",
+        card: true,
+        row: "Greataxe",
+        toHitMode: "advantage",
+      },
+    });
+    const [base, offer] = rolls(s);
+    expect(offer).toMatchObject({ label: "Divine Fury", expression: "1d6+2" });
+    const [item] = (entries(s)[0]?.payload ?? []) as RollEntryPayload;
+    expect(item?.total).toBe(base?.total as number);
+    expect(item?.mods).toBeUndefined();
+    expect(r.mods?.modTotal).toBe(0);
+  });
+
   test("FR-MOD-19 / FR-MOD-23 players get the entry without dmPayload: no secret label, no effect ids", () => {
     const { s, t, rollWith } = setup();
     rollWith([blessHook([]), cursedHook]);

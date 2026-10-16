@@ -172,6 +172,8 @@ export const ROLL_ROW_MAX = 60;
  * its character. `ability` on saves / checks (a death save has none); `via` on attacks / damage;
  * `crit` on damage rolled for a natural 20. Rule triggers (ADR-0043): `card` = this damage roll
  * belongs to a damage card (`cbt.attack`, `cbt.rollDamage`; `hit` triggers are offered on it);
+ * `toHitMode` = that card's to-hit mode (`DamageCardPayload.mode`, the final mode after
+ * `modes()`; a damage-only card: absent = `normal`), read by `mode` filters (FR-MOD-37, R4);
  * `row` = the attack / spell row's name (absent for ability, save, initiative rolls), read only
  * by the `row` filter.
  */
@@ -185,6 +187,7 @@ export const RollSubject = z.strictObject({
   via: RollVia.optional(),
   crit: z.boolean().optional(),
   card: z.boolean().optional(),
+  toHitMode: z.enum(["normal", "advantage", "disadvantage"]).optional(),
   row: z.string().min(1).max(ROLL_ROW_MAX).optional(),
 });
 export type RollSubject = z.infer<typeof RollSubject>;
