@@ -21,6 +21,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-13 | Reveal all sends each combatant twice in one event with different ordering positions (state converges; wasted bytes) (V0 regression walkthrough) | S | fog / combat copies re-derive (`hooks`) | none | V2 / combat lock | done (V2, #228) |
 | BL-14 | `combat-tracker/limits.test.ts` "40-char attack name + bludgeoning: label cut to 60" fails intermittently in full `check` runs (twice; passes alone) | S | combat-tracker test | none | combat lock | done (#235) |
 | BL-15 | The "Alt: adjust in tray" hint is missing on roll buttons outside the sheet: death saves and concentration (combat-extras), the Initiative window, the game log roll bar (D4 report, sprint 3) | S | combat-extras, combat-tracker, dice-roll-log clients | none | combat client work | open |
+| BL-16 | `useRecords` in `src/client/common/sync/store.ts` builds a fresh array every render despite its "stable array per store version" comment: any memo / effect keyed on it can loop (C3 found React #185 in the Encounters editor during an import, fixed locally there) | S | sync store (shared core) | none | live-sync / store work | open |
 
 ## How to add items
 
