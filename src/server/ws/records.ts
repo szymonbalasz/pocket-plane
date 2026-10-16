@@ -1,5 +1,10 @@
 // Record-type registry with visibility (SYNC §8, FR-SYNC-09/18/19). Default deny.
-import { DM_WINDOW_ACTIVE_SCENE, type DmWindow } from "@shared/protocol/scene-window";
+import {
+  DM_WINDOW_ACTIVE_SCENE,
+  DM_WINDOW_VIEW_AS,
+  DM_WINDOWS,
+  type DmWindow,
+} from "@shared/protocol/scene-window";
 import { cutWindow, type RecordWindow, type WindowIds } from "@shared/protocol/window";
 import type { z } from "zod";
 import type { Db } from "../db/client";
@@ -46,20 +51,33 @@ export interface RecordTypeDef<R> {
   /** Required when `visibility` can return `redacted`. */
   redact?(r: R, v: Viewer): unknown;
   /**
+   * The DM's `full` wire record: strips server-only copies (e.g. `seenBy`, FR-FOG-10, ADR-0042)
+   * that the visibility fns read but no wire carries. Absent = the record as is.
+   */
+  dmRedact?(r: R): unknown;
+  /**
+   * Derived type (ADR-0042, e.g. `vision`): no table; `snapshot` computes the rows from the DB
+   * and commands list before / after themselves. Same filter and transition matrix otherwise.
+   */
+  derived?: boolean;
+  /**
    * Bounded snapshot provider: this type's records for the viewer's campaign (pre-filter).
    * Scene scope: return every scene's rows of the campaign; the scene gate filters.
    * Windowed types return the whole log; the registry cuts it (ADR-0029).
+   * `scope.sceneId` (a scene load, ADR-0041 / FR-FOG-43): only that scene's rows are used, so a
+   * provider may return just those (derived types should).
    */
-  snapshot(src: SnapshotSource, v: Viewer): R[];
+  snapshot(src: SnapshotSource, v: Viewer, scope?: { sceneId: string }): R[];
   /**
    * Append-only logs (ADR-0029, CON-38): snapshot = pinned rows + newest `size` by `orderBy`,
    * cut before the scope gate and visibility filter, so the floor is the same for every viewer.
    */
   window?: RecordWindow<R>;
   /**
-   * Active-scene window (ADR-0041), scene scope only: the DM snapshot holds only the active
-   * scene's rows (none if no scene is active); the DM loads another scene's with
-   * `sync.loadScene`. Live events and players are unchanged.
+   * Scene scope only. `active-scene` (ADR-0041): the DM snapshot holds only the active scene's
+   * rows (none if no scene is active); the DM loads another scene's with `sync.loadScene`.
+   * `view-as` (FR-FOG-43): the DM snapshot holds none; `sync.loadScene {sceneId, viewAs}` loads
+   * one player's rows of one scene. Live events and players are unchanged either way.
    */
   dmWindow?: DmWindow;
 }
@@ -69,6 +87,9 @@ export type ActiveSceneResolver = (campaignId: string) => string | null;
 
 /** The campaign a scene belongs to, or null when no such scene exists (`sync.loadScene`). */
 export type SceneCampaignResolver = (sceneId: string) => string | null;
+
+/** The campaign a player belongs to, or null when no such player exists (FR-FOG-43). */
+export type PlayerCampaignResolver = (playerId: string) => string | null;
 
 /** Type-erased registration (the registry works on unknown records). */
 export type AnyRecordType = RecordTypeDef<unknown>;
@@ -84,6 +105,13 @@ export interface WireChange {
   data?: unknown;
 }
 
+/**
+ * One change through the transition matrix for one connection (FR-SYNC-19): a wire change,
+ * `"same"` (visible → visible with identical wire data: dropped, ADR-0042 / OQ-FOG-37) or null
+ * (hidden → hidden).
+ */
+export type FilteredChange = WireChange | "same" | null;
+
 export class RecordRegistry {
   private types = new Map<string, AnyRecordType>();
   /** No provider (before scenes-map registers one) → no active scene → players see no scene records. */
@@ -92,6 +120,9 @@ export class RecordRegistry {
   /** No provider → no scene exists → every `sync.loadScene` is `not_found`. */
   private sceneCampaign: SceneCampaignResolver = () => null;
   private sceneCampaignProvided = false;
+  /** No provider → no player exists → every `sync.loadScene {viewAs}` is `not_found`. */
+  private playerCampaign: PlayerCampaignResolver = () => null;
+  private playerCampaignProvided = false;
 
   register(def: AnyRecordType): void {
     if (this.types.has(def.type)) throw new Error(`Record type "${def.type}" registered twice`);
@@ -102,8 +133,10 @@ export class RecordRegistry {
       throw new Error(`Record type "${def.type}" (scope scene) needs sceneOf (CON-22)`);
     }
     if (def.dmWindow !== undefined) {
-      if (def.dmWindow !== DM_WINDOW_ACTIVE_SCENE) {
-        throw new Error(`Record type "${def.type}" dmWindow must be "${DM_WINDOW_ACTIVE_SCENE}"`);
+      if (!(DM_WINDOWS as readonly string[]).includes(def.dmWindow)) {
+        throw new Error(
+          `Record type "${def.type}" dmWindow must be one of ${DM_WINDOWS.join(", ")}`,
+        );
       }
       if (def.scope !== "scene") {
         throw new Error(`Record type "${def.type}" dmWindow needs scope scene (ADR-0041)`);
@@ -147,9 +180,27 @@ export class RecordRegistry {
     return this.sceneCampaign(sceneId);
   }
 
-  /** Types registered with `dmWindow` (ADR-0041). */
+  /** One provider per server (campaign-management's player table). `replace`: tests only. */
+  providePlayerCampaign(fn: PlayerCampaignResolver, opts: { replace?: boolean } = {}): void {
+    if (this.playerCampaignProvided && !opts.replace) {
+      throw new Error("Player-campaign resolver provided twice");
+    }
+    this.playerCampaignProvided = true;
+    this.playerCampaign = fn;
+  }
+
+  playerCampaignOf(playerId: string): string | null {
+    return this.playerCampaign(playerId);
+  }
+
+  /** Types registered with `dmWindow: "active-scene"` (ADR-0041). */
   dmWindowed(): AnyRecordType[] {
-    return [...this.types.values()].filter((d) => d.dmWindow !== undefined);
+    return [...this.types.values()].filter((d) => d.dmWindow === DM_WINDOW_ACTIVE_SCENE);
+  }
+
+  /** Types registered with `dmWindow: "view-as"` (FR-FOG-43). */
+  viewAsTypes(): AnyRecordType[] {
+    return [...this.types.values()].filter((d) => d.dmWindow === DM_WINDOW_VIEW_AS);
   }
 
   /**
@@ -180,7 +231,7 @@ export class RecordRegistry {
       const cid = def.campaignOf?.(record);
       if (cid !== v.campaignId) return { vis: "hidden" };
     }
-    if (v.role === "dm") return { vis: "full", data: record };
+    if (v.role === "dm") return { vis: "full", data: def.dmRedact ? def.dmRedact(record) : record };
     if (def.audience === "dm") return { vis: "hidden" };
     if (def.scope === "scene") {
       const active = this.activeSceneOf(v.campaignId);
@@ -195,13 +246,46 @@ export class RecordRegistry {
     return { vis, data: record };
   }
 
-  /** Transition matrix per connection (FR-SYNC-19). */
-  filterChange(c: RecordChange, v: Viewer): WireChange | null {
+  /**
+   * Transition matrix per connection (FR-SYNC-19, amended by ADR-0042 / OQ-FOG-37): hidden →
+   * visible = upsert; visible → hidden = delete; visible → visible = upsert, or `"same"` when
+   * the wire data is identical for this connection (stateless before / after compare, per
+   * change); hidden → hidden = null.
+   */
+  classifyChange(c: RecordChange, v: Viewer): FilteredChange {
     const before = c.before === null ? { vis: "hidden" as const } : this.view(c.type, c.before, v);
     const after = c.after === null ? { vis: "hidden" as const } : this.view(c.type, c.after, v);
-    if (after.vis !== "hidden") return { type: c.type, id: c.id, op: "upsert", data: after.data };
+    if (after.vis !== "hidden") {
+      if (before.vis !== "hidden" && Bun.deepEquals(before.data, after.data, true)) return "same";
+      return { type: c.type, id: c.id, op: "upsert", data: after.data };
+    }
     if (before.vis !== "hidden") return { type: c.type, id: c.id, op: "delete" };
     return null;
+  }
+
+  /** `classifyChange` as a wire change, or null (dropped: hidden → hidden or identical). */
+  filterChange(c: RecordChange, v: Viewer): WireChange | null {
+    const w = this.classifyChange(c, v);
+    return w === "same" ? null : w;
+  }
+
+  /**
+   * One event's changes for one connection: `touched` = some change passed the matrix (an
+   * event whose only changes were identical upserts still goes out, empty, keeping `seq`).
+   */
+  filterChanges(
+    changes: readonly RecordChange[],
+    v: Viewer,
+  ): { changes: WireChange[]; touched: boolean } {
+    const out: WireChange[] = [];
+    let touched = false;
+    for (const c of changes) {
+      const w = this.classifyChange(c, v);
+      if (w === null) continue;
+      touched = true;
+      if (w !== "same") out.push(w);
+    }
+    return { changes: out, touched };
   }
 
   /**
@@ -209,8 +293,9 @@ export class RecordRegistry {
    * active scene for `dmWindow` types (ADR-0041); pre-filter.
    */
   private snapshotRows(def: AnyRecordType, src: SnapshotSource, v: Viewer): unknown[] {
+    if (def.dmWindow === DM_WINDOW_VIEW_AS && v.role === "dm") return [];
     let rows = def.snapshot(src, v);
-    if (def.dmWindow && v.role === "dm") {
+    if (def.dmWindow === DM_WINDOW_ACTIVE_SCENE && v.role === "dm") {
       const active = this.dmWindowScene(v);
       rows = active === null ? [] : rows.filter((r) => def.sceneOf?.(r) === active);
     }
@@ -227,10 +312,41 @@ export class RecordRegistry {
     for (const def of this.dmWindowed()) {
       if (def.audience === "dm" && v.role !== "dm") continue;
       const list: unknown[] = [];
-      for (const r of def.snapshot(src, v)) {
+      for (const r of def.snapshot(src, v, { sceneId })) {
         if (def.sceneOf?.(r) !== sceneId) continue;
         const seen = this.view(def.type, r, v);
         if (seen.vis !== "hidden") list.push(seen.data);
+      }
+      out[def.type] = list;
+    }
+    return out;
+  }
+
+  /**
+   * `sync.loadScene {sceneId, viewAs}` result (FR-FOG-43): every `view-as` type's rows of one
+   * scene that player `viewAs` may see (their visibility fn as that player; no active-scene
+   * gate: the DM previews any scene), rendered as the DM's wire. DM only; the caller checks the
+   * scene and the player belong to the viewer's campaign.
+   */
+  loadViewAs(
+    src: SnapshotSource,
+    v: Viewer,
+    sceneId: string,
+    viewAs: string,
+  ): Record<string, unknown[]> {
+    const as: Viewer = {
+      connId: v.connId,
+      campaignId: v.campaignId,
+      role: "player",
+      playerId: viewAs,
+    };
+    const out: Record<string, unknown[]> = {};
+    for (const def of this.viewAsTypes()) {
+      const list: unknown[] = [];
+      for (const r of def.snapshot(src, as, { sceneId })) {
+        if (def.sceneOf?.(r) !== sceneId || def.campaignOf?.(r) !== v.campaignId) continue;
+        if (def.visibility(r, as) === "hidden") continue;
+        list.push(this.view(def.type, r, v).data);
       }
       out[def.type] = list;
     }

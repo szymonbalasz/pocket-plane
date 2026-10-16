@@ -40,7 +40,15 @@ describe("visibility filter", () => {
       id: "t",
       op: "delete",
     });
-    expect(reg.filterChange(change(rec(), rec()), player)?.op).toBe("upsert");
+    // ADR-0042 / OQ-FOG-37: visible → visible with identical wire data → dropped ("same").
+    expect(reg.filterChange(change(rec(), rec()), player)).toBeNull();
+    expect(reg.classifyChange(change(rec(), rec()), player)).toBe("same");
+    expect(reg.filterChange(change(rec(), rec({ secret: "x" })), player)?.op).toBe("upsert");
+    // Compared on the viewer's wire: a redacted field that changed is no change for them.
+    const r1 = rec({ secret: "a" });
+    const r2 = rec({ secret: "b" });
+    expect(reg.classifyChange(change(r1, r2), player)).toBe("same");
+    expect(reg.filterChange(change(r1, r2), dm)?.op).toBe("upsert");
     expect(
       reg.filterChange(change(rec({ hidden: true }), rec({ hidden: true })), player),
     ).toBeNull();
@@ -93,10 +101,11 @@ describe("visibility filter", () => {
     r.provideActiveScene(() => active);
     expect(() => r.provideActiveScene(() => null)).toThrow(/twice/);
     expect(r.filterChange(ch(on("B"), on("B")), player)).toBeNull();
-    expect(r.filterChange(ch(on("A"), on("A")), player)?.op).toBe("upsert");
+    expect(r.classifyChange(ch(on("A"), on("A")), player)).toBe("same");
     expect(r.filterChange(ch(on("A"), on("B")), player)?.op).toBe("delete");
     expect(r.filterChange(ch(on("B"), on("A")), player)?.op).toBe("upsert");
-    expect(r.filterChange(ch(on("B"), on("B")), dm)?.op).toBe("upsert");
+    expect(r.classifyChange(ch(on("B"), on("B")), dm)).toBe("same");
+    expect(r.filterChange(ch(on("B"), null), dm)?.op).toBe("delete");
     expect(r.snapshot(src, player).tok).toEqual([{ id: "a", campaignId: "c1", sceneId: "A" }]);
     expect(r.snapshot(src, dm).tok).toHaveLength(2);
     active = null;
