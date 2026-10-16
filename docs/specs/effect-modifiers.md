@@ -318,7 +318,7 @@ CLASS   := letters, spaces, hyphens, ≤ 30; case-insensitive
 |---|---|---|---|---|---|
 | `sneak-attack` | Sneak Attack | hit; via weapon; mode [normal, advantage]; soft mode [advantage]; ask "finesse or ranged; or an ally within 5 ft"; turn; damage `(ceil(level(rogue) / 2))d6` | ✓ | `srd-5.1:feature/rogue/sneak-attack` | |
 | `hunters-mark` | Hunter's Mark | hit; via weapon; targetMarked `hunters-mark`; each; damage `1d6` | ✓ | `srd-5.1:spell/hunters-mark` | Pairs with the mark preset (same key on the built-in effect preset) |
-| `colossus-slayer` | Colossus Slayer | hit; via weapon; targetHurt; turn; damage `1d8` | ✓ | `srd-5.1:feature/ranger/colossus-slayer` | Slug per C's adapter (OQ-MOD-35) |
+| `colossus-slayer` | Colossus Slayer | hit; via weapon; targetHurt; turn; damage `1d8` | ✓ | `srd-5.1:feature/ranger/hunters-prey` | Open5e has no own Colossus Slayer entry: it sits inside Hunter's Prey (#213) |
 | `martial-advantage` | Martial Advantage | hit; via weapon; ask "an ally within 5 ft of the target"; turn; damage `2d6` | — | — | Monster (definition) |
 | `regeneration` | Regeneration | turnStart; each; remind "regain {value} HP unless it took acid or fire damage", value `10` | — | — | Monster (definition) |
 
