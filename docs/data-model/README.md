@@ -1224,3 +1224,10 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V1). *
 
 - **Derived (V1):** static state with shapes (`samplePoint` on a prepared layer, once per point per re-derive), darkness containment, darkness `seenBy` (static part). Client: draft, Ctrl "free" flag, darkness selection and drag offset.
 - **CON-44:** unchanged (no new record type or field; V0's measured `fog` row at 12 typical shapes + 2 darkness shapes stands, §26).
+
+## 30. Sprint 3: freeform walls + wall hint (V4)
+
+From [scene-tools](../specs/scene-tools.md#8-data-model) (SCN §14 slice V4). **Built by `build/walls-freeform`**: no new table, column or record type; `scene_structure.walls` / `doors` take the ≤ 2-decimal points [§26](#26-sprint-3-vision-core-v0) allows, written by the freeform Structure tool. Protocol side: [protocol §43](../protocol/README.md#43-sprint-3-freeform-walls--wall-hint-v4).
+
+- **Client only:** the polyline in progress may hold free points (0.01 cell); the player's current wall hint pieces (from the latest `map.checkMove` ack, cleared on cell change, drag end, snapshot, leaving live); the Ctrl state for the "Free" chip.
+- **CON-44:** unchanged (no new record or field; decimal coordinates per SCN §12, ≤ 3 B per freeform number).
