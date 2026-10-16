@@ -14,11 +14,12 @@ import {
   spellSaveDc,
 } from "@shared/entities/schemas";
 import { useSync } from "../../sync/store";
+import { DiceText } from "../dice-extras/DiceText";
 import { SheetRoll } from "./CharacterSheet";
 import { IntField, OverrideControl, SelectField, SheetField, TextField, useBusy } from "./fields";
 import { type PublicOverrides, PublicSwitch, usePublicOverrides } from "./rolls";
 import { AddRow, RowTools, useRows } from "./rows";
-import { useSheet, useSheetIntents } from "./sheet-context";
+import { notationContext, useSheet, useSheetIntents } from "./sheet-context";
 import {
   attackButtons,
   pipDelta,
@@ -486,7 +487,9 @@ function SpellRowView({
         </div>
       )}
       {!e && s.notes && (
-        <p className="text-xs whitespace-pre-wrap text-muted-foreground">{s.notes}</p>
+        <p className="text-xs whitespace-pre-wrap text-muted-foreground">
+          <DiceText text={s.notes} context={notationContext(ctx, s.name)} />
+        </p>
       )}
       <RowButtons
         buttons={spellButtons(s)}
