@@ -8,7 +8,7 @@ wave: 1
 
 # Live sync, reconnect, visibility
 
-> **Sprint 3 revision: lazy record types (proposed; written by party-board by orchestrator assignment, review ruling L2, 2026-10-16).** Applies only if the DM accepts [proposed lazy record types](../architecture/adr/proposed-lazy-record-types.md) option A at gate 1 (OQ-PARTY-03). New FR-SYNC-30–38; nothing below this block changes. One generic on-demand path for campaign- and global-scope types (seams S1). Consumers: party-board `handout`, `handout-body`, `party-item`; compendium `imported-entity`; effect-modifiers `rule-trigger`. Built by `fix/lazy-records` (after V0, before P core and C2).
+> **Sprint 3 revision: lazy record types (decided #207, 2026-10-16; written by party-board by orchestrator assignment, review ruling L2).** Implements [ADR-0045](../architecture/adr/0045-lazy-record-types.md) option A, accepted at DM gate 1 (OQ-PARTY-03). New FR-SYNC-30–38; nothing below this block changes. One generic on-demand path for campaign- and global-scope types (seams S1). Consumers: party-board `handout`, `handout-body`, `party-item`; compendium `imported-entity`; effect-modifiers `rule-trigger`. Built by `fix/lazy-records` (after V0, before P core and C2).
 >
 > | ID | Requirement | Named test |
 > |---|---|---|

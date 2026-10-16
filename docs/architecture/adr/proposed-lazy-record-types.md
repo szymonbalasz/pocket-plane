@@ -1,13 +1,13 @@
-# Proposed — Lazy record types (load on open)
+# 0045 — Lazy record types (load on open)
 
-- Status: proposed (sprint 3, spec-party-board; accept at sprint-3 DM gate 1)
+- Status: accepted (#207, 2026-10-16)
 - Date: 2026-10-16 (seams pass: S1 global scope + id loads, consumers, build order; review rulings L1–L3: snapshot purge, live-sync FRs, R mode)
 - Affects: [live-sync](../../specs/live-sync.md) (sprint 3 revision block, FR-SYNC-30–38), [protocol](../../protocol/README.md), [party-board](../../specs/party-board.md), compendium (`imported-entity`), effect-modifiers (`rule-trigger`)
 - Extends: [ADR-0021](0021-sync-protocol-conventions.md) C (snapshot scope), [ADR-0029](0029-windowed-record-types.md) (windowed types), [ADR-0041](0041-active-scene-window.md) (load on view). Raised by OQ-PARTY-03.
 
 ## Context
 
-- CON-44: heavy DM snapshot 676,045 B of 786,432 B; the fog CON-44 test asserts ≥ 100 KiB headroom, so ~8 KB is left for all of sprint 3 (V, R, P, C, D). Sprint 3 as specced: +40.6 KB DM (seams S2).
+- CON-44: heavy DM snapshot 676,045 B of 786,432 B; the fog CON-44 test asserts ≥ 100 KiB headroom, so ~8 KB is left for all of sprint 3 (V, R, P, C, D). Sprint 3 as specced: +40.6 KB DM (seams S2). (Gate 1 later raised the DM ceiling to 1 MiB and dropped the headroom guard, #208; this path still keeps growing, rarely read data off every snapshot.)
 - Party-board data grows with the campaign and is read only when its window is open. Measured (PARTY §12, heavy harness probe): 30 handout headers +12.9 KB DM / +7.6–9.9 KB per player; 100 headers ≈ 55 KB; 60 party items +24 KB; 30 inline bodies at 10,000 chars +313 KB DM.
 - Other sprint-3 data has the same shape: compendium-imported definitions (global, needed by id when an entry or creature opens) and rule triggers (campaign, needed when a sheet's Triggers block or the Creatures entry opens; R measured the saving with the type lazy).
 - ADR-0041 already loads scene-scoped rows on view (`sync.loadScene`). Campaign- and global-scoped data has no such path.
@@ -22,9 +22,9 @@
 
 ## Decision
 
-> TODO (DM gate 1): pick. Suggested **A** (integrator pick per seams S1; DM decides at the gate).
+**A** (DM gate 1, #207, G4; integrator pick per seams S1): a registration flag `lazy: "all" | "ids"` on campaign- or global-scope types, never in a snapshot, loaded with `sync.load {type, ids?}` through the scope gate + visibility fn in hub frame order; live events unchanged. Rejected: B (feature read commands), C (rows in the snapshot with caps).
 
-## Consequences (if A)
+## Consequences
 
 Numbered, testable requirements: live-sync's sprint 3 revision block, **FR-SYNC-30–38** (review ruling L2).
 

@@ -1,21 +1,21 @@
 ---
 title: Party board
 prefix: PARTY
-status: in-review
+status: complete
 owner: spec-party-board
 phase: post-mvp-3
 ---
 
 # Party board
 
-> Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Picks marked **bold** are suggestions for DM gate 1, not decisions ([§15](#15-open-questions)). Seams pass applied (orchestrator ruling 2026-10-16, S1, S3, S7–S10). Review rulings applied (2026-10-16, P1–P4, L1–L3): cut options for inventory / split, `DiceText` context, unshare vs images already seen, loaded-set checks; lazy-type FRs live in [live-sync's sprint 3 revision block](live-sync.md) (FR-SYNC-30–38).
+> Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md). DM gate 1 decided every DM question (#207, 2026-10-16; snapshot ceilings #208) ([§15](#15-open-questions)). Seams pass applied (orchestrator ruling 2026-10-16, S1, S3, S7–S10). Review rulings applied (2026-10-16, P1–P4, L1–L3): cut options for inventory / split, `DiceText` context, unshare vs images already seen, loaded-set checks; lazy-type FRs live in [live-sync's sprint 3 revision block](live-sync.md) (FR-SYNC-30–38).
 
 ## 1. Summary
 
 - A **Party** window, both clients, replacing Miro for the table: **handouts** the DM shares with everyone or chosen players, and a **party inventory** that items move in and out of (DM [#203](../decisions-log.md): "party board + handouts"; tier A in [feature tiers §4](../feature-tiers.md#4-notes-handouts-world-and-party)).
 - A **handout** = title + plain text + 0–10 images (assets pipeline, capability IDs per [ADR-0023](../architecture/adr/0023-asset-access-by-capability-id.md)). The DM prepares it unshared, then **shares** it with everyone or chosen players, and can **unshare** it. A player it isn't shared with never receives its ID, title, text or image IDs.
 - The **gold ledger** is [party-loot](party-loot.md) evolved, not replaced: item moves join the same log, plus a DM **split** of the party pot.
-- Board data **loads when the window opens** (proposed [lazy record types](../architecture/adr/proposed-lazy-record-types.md), the one on-demand path per seams S1): measured +0 B on every snapshot for handouts and items ([§12](#12-performance--bandwidth)).
+- Board data **loads when the window opens** ([ADR-0045](../architecture/adr/0045-lazy-record-types.md) lazy record types, the one on-demand path per seams S1): measured +0 B on every snapshot for handouts and items ([§12](#12-performance--bandwidth)).
 
 ## 2. Scope
 
@@ -25,14 +25,14 @@ phase: post-mvp-3
 - Party-loot evolves: `loot-entry` kind `item` (+ `qty`), `loot.split`, item rows in `loot.log` (OQ-PARTY-05, OQ-PARTY-16).
 - Windows `party.board` "Party" (tabs Handouts, Inventory) and `party.handout` (viewer), both clients (OQ-PARTY-08).
 - Fixtures + bundle `party-board`.
-- Cuttable at gate 1: party inventory + moves (slice 4, OQ-PARTY-04) and the split (slice 3, OQ-PARTY-05) each have an "out of sprint 3" option; #203 asks only for "party board + handouts".
+- All four slices are in sprint 3 (#207, G5). If the sprint runs late, cut slice 4 (party inventory + moves) first, then slice 3 (split); handouts always ship (#203's ask).
 
 ## 3. Goals
 
 - The DM shares a prepared handout with one player in ≤ 3 clicks; the player sees a toast and can open it ≤ 1 s after commit.
 - No leak: a socket of a player the handout isn't shared with never carries its ID, title, text or image asset IDs: snapshot, events, load results, notifications; before and after reconnect.
 - Items and coin move between the party and characters in ≤ 10 s, each move logged, conserved and crash-safe (one transaction).
-- CON-44: PARTY adds +1,100 B to the heavy DM snapshot (seams S2 budget). Whether sprint 3 as a whole keeps the 100 KiB guard is the orchestrator's gate-1 question, not this spec's.
+- CON-44 (#208): PARTY adds +1,100 B to the heavy DM snapshot and to every player snapshot (seams S2 budget). Tests assert the ceilings (DM 1 MiB, player 512 KiB) plus PARTY's own bound: the lazy types add 0 B (§12).
 
 ## 4. Non-goals
 
@@ -61,7 +61,7 @@ phase: post-mvp-3
 
 | ID | Requirement | Notes |
 |---|---|---|
-| FR-PARTY-01 | Table `handout` (§8). Two record types read from it: `handout` (header: no body) and `handout-body` (`{id = handoutId, campaignId, body, rev, sharedWith}`). Both campaign scope, **lazy**: never in a snapshot, loaded with `sync.load` (proposed ADR): `handout` lazy `"all"`, `handout-body` lazy `"ids"`. ≤ 200 handouts per campaign; the 201st create → `conflict` "Handout limit reached (200)". | OQ-PARTY-03 |
+| FR-PARTY-01 | Table `handout` (§8). Two record types read from it: `handout` (header: no body) and `handout-body` (`{id = handoutId, campaignId, body, rev, sharedWith}`). Both campaign scope, **lazy**: never in a snapshot, loaded with `sync.load` ([ADR-0045](../architecture/adr/0045-lazy-record-types.md)): `handout` lazy `"all"`, `handout-body` lazy `"ids"`. ≤ 200 handouts per campaign; the 201st create → `conflict` "Handout limit reached (200)". | OQ-PARTY-03 |
 | FR-PARTY-02 | Handout input (strict zod, create and update): `title` clean, 1–80 chars; `body` clean, 0–10 000 chars; `imageAssetIds` 0–10, unique, each checked with `assets.require` (other campaign / unknown → `not_found`). | ADR-0023 |
 | FR-PARTY-03 | `party.createHandout {title, body, imageAssetIds}` (DM): row with `sharedWith {mode: none, playerIds: []}`, `rev` 1, `sharedAt` null. Emits `HandoutCreated` (changes: header, body). Result `{handoutId}`. No notification. | |
 | FR-PARTY-04 | `party.updateHandout {handoutId, title, body, imageAssetIds}` (DM): full replacement. Unknown / other campaign → `not_found`. Same values → `ack`, no write, no event. Else `rev` + 1, `updatedAt`; emits `HandoutUpdated` (changes: header; body only if `body` changed). No notification; clients mark it Updated (FR-PARTY-13). | |
@@ -70,7 +70,7 @@ phase: post-mvp-3
 | FR-PARTY-07 | Visibility `handout` and `handout-body`: DM full. Player **hidden** unless `sharedWith.mode = all` or their id ∈ `sharedWith.playerIds`. Visible header is **redacted**: `sharedWith` → `{mode: all \| players}` (no ids). Visible body drops `sharedWith`. So a share change is an upsert to gainers and a delete to losers (record-change rule). | [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md) B, OQ-PARTY-10 |
 | FR-PARTY-08 | `party.deleteHandout {handoutId}` (DM): deletes the row; emits `HandoutDeleted` (changes: header, body → null). Its notifications stay. `not_found` as FR-PARTY-04. | |
 | FR-PARTY-09 | Unshare / delete on an open view: the delete arrives, the row leaves the list, an open viewer shows "No longer shared" (`party-handout-gone`), no error toast. A notification's "Open" whose body load (FR-PARTY-10) comes back without the id opens the viewer on the same message. Unshare does **not** revoke images already seen: under ADR-0023 the image **asset IDs** stay valid capabilities (and fetched bytes stay cached); only the handout's rows leave the player. The Share dialog says so (FR-PARTY-16). | ADR-0023 |
-| FR-PARTY-10 | Client loading: opening `party.board` loads `handout` (all visible) via `useLazyRecords`; opening a handout loads its `handout-body` by id unless the id is in the type's **loaded set** (`isLoaded`, [FR-SYNC-35](live-sync.md)); presence in the store never counts (live upserts don't mark loaded; a snapshot purges lazy rows, FR-SYNC-37). A load that comes back without the id → FR-PARTY-09's message. After any snapshot (reconnect, resync) an open board / viewer reloads. While loading: skeleton rows; load reject → inline "Couldn't load — Retry". | proposed ADR; FR-SYNC-35–37 |
+| FR-PARTY-10 | Client loading: opening `party.board` loads `handout` (all visible) via `useLazyRecords`; opening a handout loads its `handout-body` by id unless the id is in the type's **loaded set** (`isLoaded`, [FR-SYNC-35](live-sync.md)); presence in the store never counts (live upserts don't mark loaded; a snapshot purges lazy rows, FR-SYNC-37). A load that comes back without the id → FR-PARTY-09's message. After any snapshot (reconnect, resync) an open board / viewer reloads. While loading: skeleton rows; load reject → inline "Couldn't load — Retry". | ADR-0045; FR-SYNC-35–37 |
 
 ### 6.2 Party window and viewer
 
@@ -167,7 +167,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Texta
 | `party.removeItem {itemId, qty}` | DM | FR-PARTY-21 | `{entryId}` |
 | `party.moveItem {from, to, qty, itemId?, rowId?}` | DM, player | FR-PARTY-22, 23 | `{entryId}` |
 | `loot.split {characterIds, cp?…pp?}` | DM | FR-PARTY-26 | `{entryIds}` |
-| `sync.load {type, ids?}` (proposed ADR) | DM, player | lazy types only; `invalid` / `forbidden` per [FR-SYNC-31](live-sync.md) | `{records}` |
+| `sync.load {type, ids?}` (ADR-0045) | DM, player | lazy types only; `invalid` / `forbidden` per [FR-SYNC-31](live-sync.md) | `{records}` |
 
 Players sending a DM-only intent → `forbidden`, no change.
 
@@ -216,13 +216,13 @@ Players sending a DM-only intent → `forbidden`, no change.
 
 | Variant | Heavy DM (base 676,050 B) | Player-1 (25 visible) | Other players (20 visible) |
 |---|---|---|---|
-| **Lazy (pick)**: handout, handout-body, party-item off the snapshot; `loot-entry.qty` | **+1,100 B** (100 item rows, worst) → 677,150 B, 109,282 B left | +1,100 B | +1,100 B |
+| **Lazy (decided, #207)**: handout, handout-body, party-item off the snapshot; `loot-entry.qty` | **+1,100 B** (100 item rows, worst) → 677,150 B, 371,426 B under the 1 MiB ceiling (#208) | +1,100 B | +1,100 B |
 | Headers in snapshot (3 images) | +12,932 | +9,912 | +7,632 |
 | Headers in snapshot (10 images) | +14,682 | +10,787 | +7,632 |
 | + bodies inline at 2,000 / 4,000 / 10,000 chars | +73,322 / +133,322 / +313,352 | +60,237 / +110,237 / +260,262 | +47,892 / +87,892 / +207,912 |
 | + 100 max party items in snapshot | +39,915 | +39,915 | +39,915 |
 
-- Seams pass: **no re-measure needed** for PARTY. The rulings change no snapshot byte of ours (lazy types stay off the snapshot; `loot-entry.qty` unchanged). Seams S2 books PARTY at +1,100 B of a sprint total ≈ 692,000 B DM after S1 (≈ 94,400 B left); the 100 KiB guard is a gate-1 question for the orchestrator. Putting `name` + `qty` in a nested object instead of reusing `text` cost +9,000 B; rejected.
+- Seams pass: **no re-measure needed** for PARTY. The rulings change no snapshot byte of ours (lazy types stay off the snapshot; `loot-entry.qty` unchanged). Seams S2 books PARTY at +1,100 B. Gate 1 (#208): ceilings DM **1 MiB** (1,048,576 B), player **512 KiB**; the "≥ 100 KiB DM headroom" guard is dropped. Sprint 3 with every pick measures 712,310 B heavy DM (336,266 B left). PARTY's CON-44 tests assert both ceilings plus PARTY's own bound: `handout`, `handout-body`, `party-item` absent from every snapshot and `loot-entry` growth ≤ 1,100 B at the 100-row window. Putting `name` + `qty` in a nested object instead of reusing `text` cost +9,000 B; rejected.
 - **Load results** (`sync.load` ack, DM view; measured before the rename, plus 4 B per row for `reveal` → `sharedWith`, computed): 30 headers 16,832 B; 100 headers 55,962 B; 200 (cap) ≈ 112 KB; 60 items (cap) 24,005 B. One body ≤ 10,111 B ASCII, ≤ 30,111 B worst UTF-8. All far below the 4 MiB frame limit.
 - Tunnel: a share sends one header (~450 B) + body (≤ 30 KB) per gainer; images are fetched by players as `display` derivatives (1–3 MB each, cached forever). 6 players × 3 images at 10 Mbit/s ≈ 5–15 s for the first view, as a map.
 - Rates: human-paced (a few shares / moves per session). Grouped `SUM` for pot / wallets unchanged.
@@ -245,7 +245,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | Level | What | Fixtures |
 |---|---|---|
 | Unit | zod: title / body clean + bounds, 10 001 chars, 11 images, duplicate ids, `sharedWith` shapes (`none` with ids, `players` empty, 21 ids) → `invalid`; item bounds, merge key (case, notes); split shares + remainder, "Nothing to split". Visibility fns: `FR-PARTY-07` DM full / gainer redacted / not shared → hidden for both types, `all` covers a later player. Gainers set G for every transition (none→all, none→players, players→all, all→players, →none). Notification text cut. Client: list order DM / player, New / Updated from seen revs (bad storage → memory), share label, item-row text, split preview, Take / Give options per role, form locks, lost-intent toasts. **Layout** (seams S8): `party.board` and `party.handout` pass the existing registry-driven tests in both `windows.test.ts` (FR-SHELL-08 fit at 1280×720 / 1600×900; #162 edge + clear of default-open windows, or `minOpenH`) | in-code |
-| Integration | Commands: each FR-PARTY-03…08, 19…23, 26 incl. no-op `ack`, `not_found` across campaigns, caps (`conflict`), events before `ack`, notification in the same tx (`notify` forced to throw → nothing written). **Leak tests** (`FR-PARTY-07 leak`): player-2's frames (snapshot, every event, `sync.load` acks for `handout`, `handout-body` by h2/h3 ids) never contain "PARTY-P1-ONLY", "PARTY-SECRET-3", "PARTY-UNSHARED-4", "PARTY-PREP-5", h2 / h3 / h5 ids or the thieves-map / wanted-poster asset ids (h4's id and title do reach them, in the pre-unshare notification) — **before and after a reconnect**, and after share-to-player-1 → share-all → unshare (player-2 got upsert then delete; a fresh reconnect + load has nothing). Second-campaign strings never in Fixture Campaign frames. Unshare: player-1 receives deletes for header and body. Moves: authorization matrix, merge both ways, row deleted at 0 incl. equipped, caps per side, sheet + party + log in one tx (crash hook `party.moveItem:before-commit` → nothing changed), conservation of item qty (Σ party + Σ sheets + Σ world ends). **Compose** (S10): PARTY units loaded on `session-sim` change only Thorn's `items` among sheet fields (every other `creature-sheet` field byte-identical). Convergence with the loaded set (FR-SYNC-38 helper). **Stale store** (`FR-PARTY-10 loaded set`): player-1 loads h2's body, disconnects; DM unshares h2; on reconnect the store holds no `handout-body` h2 (FR-SYNC-37) and a notification Open for h2 loads and shows "No longer shared". Restart on the same DB → identical loads. Two loads → identical IDs | `party-board` |
+| Integration | Commands: each FR-PARTY-03…08, 19…23, 26 incl. no-op `ack`, `not_found` across campaigns, caps (`conflict`), events before `ack`, notification in the same tx (`notify` forced to throw → nothing written). **Leak tests** (`FR-PARTY-07 leak`): player-2's frames (snapshot, every event, `sync.load` acks for `handout`, `handout-body` by h2/h3 ids) never contain "PARTY-P1-ONLY", "PARTY-SECRET-3", "PARTY-UNSHARED-4", "PARTY-PREP-5", h2 / h3 / h5 ids or the thieves-map / wanted-poster asset ids (h4's id and title do reach them, in the pre-unshare notification) — **before and after a reconnect**, and after share-to-player-1 → share-all → unshare (player-2 got upsert then delete; a fresh reconnect + load has nothing). Second-campaign strings never in Fixture Campaign frames. Unshare: player-1 receives deletes for header and body. Moves: authorization matrix, merge both ways, row deleted at 0 incl. equipped, caps per side, sheet + party + log in one tx (crash hook `party.moveItem:before-commit` → nothing changed), conservation of item qty (Σ party + Σ sheets + Σ world ends). **Compose** (S10): PARTY units loaded on `session-sim` change only Thorn's `items` among sheet fields (every other `creature-sheet` field byte-identical). Convergence with the loaded set (FR-SYNC-38 helper). **CON-44** (#208, heavy harness + `party-board` units): DM ≤ 1 MiB, every player ≤ 512 KiB; `handout`, `handout-body`, `party-item` absent from every snapshot; `loot-entry` growth ≤ 1,100 B. **Stale store** (`FR-PARTY-10 loaded set`): player-1 loads h2's body, disconnects; DM unshares h2; on reconnect the store holds no `handout-body` h2 (FR-SYNC-37) and a notification Open for h2 loads and shows "No longer shared". Restart on the same DB → identical loads. Two loads → identical IDs | `party-board` |
 | E2E (thin) | DM shares h5 "Ship Manifest" with player-1 → player-1 toast + opens it; player-2's board has no h5; player-1 takes a potion → Mira's Inventory tab shows it | `party-board` |
 
 **Browser walkthrough** — `PP_TEST_MODE=1`; `bun run build`; `fixtures:reset-load party-board --profile verify`; `start --profile verify` in the test agent's pane. Contexts **A** DM (`pw-dm`), **B** `player-1` / Mira (`pw-player-1`), **C** `player-2` / Thorn (`pw-player-2`). Every change ≤ 1 s. Leak scan = search C's WS frames and DOM for the listed strings / ids.
@@ -272,7 +272,7 @@ Teardown: stop the server, then `fixtures:reset --profile verify`.
 
 | On | What we need | Status |
 |---|---|---|
-| [proposed lazy record types](../architecture/adr/proposed-lazy-record-types.md) | `lazy` flag (`"all"` / `"ids"`), `sync.load`, `useLazyRecords` / `isLoaded`, snapshot purge, loaded-set convergence + leak scan: [live-sync FR-SYNC-30–38](live-sync.md) (revision block, ruling L2) | proposed; integrator pick (seams S1), DM gate (OQ-PARTY-03) |
+| [ADR-0045](../architecture/adr/0045-lazy-record-types.md) lazy record types | `lazy` flag (`"all"` / `"ids"`), `sync.load`, `useLazyRecords` / `isLoaded`, snapshot purge, loaded-set convergence + leak scan: [live-sync FR-SYNC-30–38](live-sync.md) (revision block, ruling L2) | accepted (#207); built by `fix/lazy-records` |
 | [party-loot](party-loot.md) | kind `item` + `qty`, `loot.split`, item rows, `loot-received` from `party.addItem` | complete; evolved here by assignment (seams S8) |
 | [character-sheet-full](character-sheet-full.md) | `sheet-items.ts` helper for `creature-sheet.items` writes from moves; CHARX visibility on the sheet change | complete; helper accepted (seams S8) |
 | dice-extras (D1) | `DiceText` for handout bodies | sprint 3; optional, plain text until on `main` (seams S7) |
@@ -281,37 +281,37 @@ Teardown: stop the server, then `fixtures:reset --profile verify`.
 
 ### 14.1 Build split (AGENTS §9.9 shared files per slice)
 
-Sprint hotspots (seams S3): ws / protocol / common store V0 → `fix/lazy-records`; schema cores V0 → R0 → **P core** → C1 → D style; character-sheet folder V5 → R3 → R6 → D4 → **P4** / C4 (P4 and C4 in arrival order).
+Sprint locks (seams S3, gate 1 build plan): ws / protocol / common store V0 → `fix/lazy-records`; schema V0 → R0 → **P core** → C1 → D2; character-sheet folder V5 → R3 → R6 → C2 → D4 → **P4** / C4 (P4 and C4 in arrival order). Order inside P: core → handouts ∥ gold → inventory.
 
 | # | Branch | Contents | Shared files touched |
 |---|---|---|---|
-| 0 | `fix/lazy-records` (only if the ADR is accepted; after V0, before P core and C2) | FR-SYNC-30–38: `lazy` flag (`"all"` / `"ids"`, campaign + global scope), `sync.load`, client loaded set + `useLazyRecords` / `isLoaded`, snapshot purge, convergence / leak-scan helpers | `src/server/ws/`, `src/shared/protocol/`, existing `src/client/common/` store files, `src/server/ws/testing/`; protocol docs |
+| 0 | `fix/lazy-records` (ADR-0045; after V0, before P core and C2) | FR-SYNC-30–38: `lazy` flag (`"all"` / `"ids"`, campaign + global scope), `sync.load`, client loaded set + `useLazyRecords` / `isLoaded`, snapshot purge, convergence / leak-scan helpers | `src/server/ws/`, `src/shared/protocol/`, existing `src/client/common/` store files, `src/server/ws/testing/`; protocol docs |
 | 1 | `build/party-core` (schema lock after R0, before C1) | Tables `handout`, `party_item`; `loot_entry.qty` + kind `item`; events; `@shared/party-board` zod + pure fns; record-type registrations; fixtures units + bundle; CON-44 re-measure in the heavy harness | `src/server/db/`, `src/shared/events/party-board.ts` + `party-loot.ts` (`CoinSplit`, kind), record-type registry lines, `src/server/features/index.ts` line, `fixtures/bundles/index.ts` line; data-model + protocol docs |
 | 2 | `build/party-handouts` (∥ 3) | Handout commands, `handout-shared` kind + views, `party.board` (Handouts tab) + `party.handout` windows; `DiceText` import if D1 is on `main` | `kinds.ts` line, both `notification-views.ts` lines, both `windows.ts` lines |
 | 3 | `build/party-gold` (∥ 2) | `loot.split`, Split… dialog, item-row rendering in `loot.log`, `loot.edit` item `conflict` | party-loot server + client folders (LOOT-owned; by assignment, seams S8) |
-| 4 | `build/party-inventory` (after 3; char-sheet folder lock after D4, arrival order with C4) | Item commands, CHARX `sheet-items.ts`, Inventory tab | new file in `src/server/features/character-sheet/` (CHARX-owned), party-loot `add` helper for item rows |
+| 4 | `build/party-inventory` (after 3; char-sheet folder lock after D4, arrival order with C4; first to cut if late, G5) | Item commands, CHARX `sheet-items.ts`, Inventory tab | new file in `src/server/features/character-sheet/` (CHARX-owned), party-loot `add` helper for item rows |
 
 ## 15. Open questions
 
-**Bold** = suggested pick. "DM gate" = blocking until the DM picks at gate 1.
+DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G29 and the P bulk-accept). Rejected options kept for the record. Seam / integrator rows stay as settled.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-PARTY-01 | Handout share model vs entity visibility | **Handout-own `sharedWith` {none / all / chosen players} + its own visibility fn; shape exported from `@shared` for later reuse (world-builder NPCs)**: fits ADR-0021 (flag on the record), no entity change / reuse entity visibility (fixed per kind; needs a share field on entities and a handout entity kind) / `hidden` boolean like tokens (no chosen players). Terms Share / Unshare per seams S9 | yes · DM gate | entities, post-mvp/world-builder |
-| OQ-PARTY-02 | Content types; where files live | **Text + 0–10 images via the assets pipeline (capability IDs, ADR-0023); PDF out (DM exports pages as images)**: no pipeline change / PDF served as an original with the browser viewer (breaks "originals never served", script risk) / PDF rasterised at ingest (new dependency, e.g. pdf.js / MuPDF) | yes · DM gate | assets-pipeline |
-| OQ-PARTY-03 | Snapshot cost (CON-44, measured §12) | **Lazy types + `sync.load` (proposed ADR; integrator pick per seams S1 as the one on-demand path, also for C `imported-entity` and R `rule-trigger`)**: +1.1 KB DM / headers + items in the snapshot, bodies on demand: +37–80 KB DM, needs a lower headroom / feature `party.load` command: no ws change, re-implements the filter (ruled out by S1) | yes · DM gate | live-sync, compendium, effect-modifiers |
-| OQ-PARTY-04 | Party inventory vs per-character inventory; transfer | **Own `party-item` rows; moves write the sheet's `items` in the same tx, merge by name + notes, logged as loot entries**: one source per side, conserved / items only as loot-log text (no stock list) / wait for item entities (compendium / world-builder) / **out of sprint 3**: cut slice 4 (FR-PARTY-17–24, Inventory tab); the board ships Handouts only, #203's literal ask, one slice and the sheet-lock slot saved | yes · DM gate | character-sheet-full, party-loot |
-| OQ-PARTY-05 | Gold ledger vs party-loot | **Evolve party-loot: same log + kind `item` + DM `loot.split`**: no second source of wallets / separate ledger table (two sources of truth) / **out of sprint 3**: cut slice 3 (`loot.split`, FR-PARTY-26–27; the DM keeps moving coin per character with FR-LOOT moves); if slice 4 stays, item-row rendering and the `loot.edit` item conflict (FR-PARTY-25) move into slice 4. Cutting both 3 and 4 also drops kind `item` + `qty` from the core | yes · DM gate | party-loot |
-| OQ-PARTY-06 | Split rules | **DM only; ⌊coin / n⌋ per denomination, remainder stays in the pot; no conversion**: simple, conserved / players may split (breaks FR-LOOT-07's "pot → own only") / convert to gp first (making change is a LOOT non-goal) | no · owner: DM | party-loot |
-| OQ-PARTY-07 | Shared party notes (tier B) | **Out of sprint 3**: keeps 3 slices / in: one player-editable plain-text doc, last write wins (+1 slice, edit conflicts) | yes · DM gate | — |
-| OQ-PARTY-08 | Where it opens | **`party.board` (Handouts, Inventory; 440×560, left edge) + viewer `party.handout` (640×560, right edge, opens on top), both clients; `loot.log` stays**: big images get their own window / board absorbs loot as a third tab (retire `loot.log`) / one window per part (more launcher buttons). Sizes fit 1280×720 (seams S8) | yes · DM gate | play-shell, party-loot |
-| OQ-PARTY-09 | What players can do | **Read only + per-browser New / Updated marks; DM order (newest shared first)**: no server state / per-player pins (server record) / annotations (→ party notes, tier B) | no · owner: DM | — |
-| OQ-PARTY-10 | Do recipients of a chosen-players handout see who else got it? | **No ("Shared with you")**: allows secret handouts / yes, names | no · owner: DM | — |
+| OQ-PARTY-01 | Handout share model vs entity visibility | **Decided (#207, G26):** handout-own `sharedWith` {none / all / chosen players} + its own visibility fn; shape exported from `@shared` for later reuse (world-builder NPCs). Terms Share / Unshare per seams S9. Rejected: reuse entity visibility (fixed per kind; needs a share field on entities and a handout entity kind), `hidden` boolean like tokens (no chosen players) | — | entities, post-mvp/world-builder |
+| OQ-PARTY-02 | Content types; where files live | **Decided (#207, G26):** text + 0–10 images via the assets pipeline (capability IDs, ADR-0023); PDF out (DM exports pages as images). Rejected: PDF served as an original with the browser viewer (breaks "originals never served", script risk), PDF rasterised at ingest (new dependency) | — | assets-pipeline |
+| OQ-PARTY-03 | Snapshot cost (CON-44, measured §12) | **Decided (#207, G4): lazy types + `sync.load`** ([ADR-0045](../architecture/adr/0045-lazy-record-types.md), the one on-demand path, also for C `imported-entity` and R `rule-trigger`); +1.1 KB DM. Ceilings per #208 (§12). Rejected: headers + items in the snapshot with bodies on demand (+37–80 KB DM), feature `party.load` command (re-implements the filter; ruled out by S1) | — | live-sync, compendium, effect-modifiers |
+| OQ-PARTY-04 | Party inventory vs per-character inventory; transfer | **Decided (#207, G27): in.** Own `party-item` rows; moves write the sheet's `items` in the same tx, merge by name + notes, logged as loot entries. Slice 4 is first in the sprint cut order if late (G5). Rejected: items only as loot-log text, wait for item entities, out of sprint 3 | — | character-sheet-full, party-loot |
+| OQ-PARTY-05 | Gold ledger vs party-loot | **Decided (#207, G28): evolve party-loot** (same log + kind `item` + DM `loot.split`). Slice 3 is second in the cut order (G5); if cut, item-row rendering and the `loot.edit` item conflict (FR-PARTY-25) move into slice 4. Rejected: separate ledger table (two sources of truth), out of sprint 3 | — | party-loot |
+| OQ-PARTY-06 | Split rules | **Decided (#207, G28):** DM only; ⌊coin / n⌋ per denomination, remainder stays in the pot; no conversion. Rejected: players may split (breaks FR-LOOT-07), convert to gp first (making change is a LOOT non-goal) | — | party-loot |
+| OQ-PARTY-07 | Shared party notes (tier B) | **Decided (#207, G29): out of sprint 3.** Rejected: one player-editable plain-text doc, last write wins (+1 slice) | — | — |
+| OQ-PARTY-08 | Where it opens | **Decided (#207, P bulk-accept):** `party.board` (Handouts, Inventory; 440×560, left edge) + viewer `party.handout` (640×560, right edge, opens on top), both clients; `loot.log` stays. Rejected: board absorbs loot as a third tab, one window per part | — | play-shell, party-loot |
+| OQ-PARTY-09 | What players can do | **Decided (#207, P bulk-accept):** read only + per-browser New / Updated marks; DM order (newest shared first). Rejected: per-player pins (server record), annotations (→ party notes, tier B) | — | — |
+| OQ-PARTY-10 | Do recipients of a chosen-players handout see who else got it? | **Decided (#207, P bulk-accept):** no ("Shared with you"). Rejected: yes, names | — | — |
 | OQ-PARTY-11 | Do sheet lock / draft block item moves? | **No: a move is a logged game action, as coin** / lock blocks player moves in and out | no · owner: spec-party-board | character-sheet-full |
 | OQ-PARTY-12 | dice-extras: clickable notation in handout bodies | Settled by seams S7: body text runs render through D1's `DiceText` once it is on `main`, plain text until then; PARTY adds no parser; context `{label: handout title, category: other}`, no actor (FR-PARTY-14, ruling P2) | no · settled | dice-extras |
 | OQ-PARTY-13 | compendium: items referencing compendium entries | **Later: nullable `party_item.itemRef` (additive)** / now (needs C's item data first) | no · owner: spec-compendium | compendium, post-mvp/world-builder |
 | OQ-PARTY-14 | Glossary | **Add Party board, Handout, Share / Unshare (handouts; "reveal" stays fog's, seams S9), Party inventory, Item move, Split; amend Party loot (item rows)** | no · owner: integrator | glossary |
-| OQ-PARTY-15 | Notification title after unshare | **Keep "New handout: ‹title›" in the recipient's history (already seen)** / generic "New handout" text | no · owner: DM | notifications |
+| OQ-PARTY-15 | Notification title after unshare | **Decided (#207, P bulk-accept):** keep "New handout: ‹title›" in the recipient's history (already seen); unshare doesn't revoke images a player already saw (the Share dialog says so). Rejected: generic "New handout" text | — | notifications |
 | OQ-PARTY-16 | party-loot owns the table, `loot.log` and FR-LOOT-07/13 | Settled by seams S8: P slices edit party-loot's folders by orchestrator assignment; integrator adds a revision note to party-loot at merge | no · settled | party-loot |
 | OQ-PARTY-17 | character-sheet-full: who writes `items` on a move | Settled by seams S8: CHARX helper `sheet-items.ts` (validate, merge, caps), built under the char-sheet lock (S3: after D4, arrival order with C4); no sheet UI change in sprint 3 | no · settled | character-sheet-full |
 
