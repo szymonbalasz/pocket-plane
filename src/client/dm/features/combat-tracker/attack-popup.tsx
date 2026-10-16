@@ -7,6 +7,8 @@
 // notification (FR-CBT-75); movable by its header (FR-CBT-76); its card's toast stays hidden.
 // Partial cards (FR-CBT-72, N7): to-hit-only → "Waiting for damage" (the DM may type a total;
 // the roll fills the cell when it attaches); damage-only → no to-hit cell or "vs AC", rows Hit.
+// Popup parts (FR-MOD-39, ADR-0043): every `popupParts` line renders under each target row and
+// merges its share into that row's apply entry.
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
@@ -50,6 +52,7 @@ import {
   useMapSelection,
 } from "../scenes-map/selection";
 import { useDefinitions } from "./data";
+import { type PopupRowView, partInputs, partPreviewExtra, popupParts } from "./popup-parts";
 import {
   clampIntoWorkArea,
   dragPopup,
@@ -202,6 +205,8 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   const [damageDraft, setDamage] = useState<string | null>(null);
   const [added, setAdded] = useState<string[]>([]);
   const [per, setPer] = useState<Record<string, PerTarget>>({});
+  // Popup parts' values, one per line (client memory; lost on close).
+  const [partValues, setPartValues] = useState<Record<string, unknown>>({});
   const { send, disabled } = useCbtIntent();
   const attackerId = p?.attackerId ?? null;
 
@@ -236,7 +241,7 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   const natural = naturalMark(rolledNatural);
   // An empty / non-number cell falls back to the roll; none yet → null (FR-CBT-72).
   const damageTotal = totalOf(damage) ?? p.damage?.total ?? null;
-  const rows = list.rows.map(({ c, source }) => {
+  const base = list.rows.map(({ c, source }) => {
     const ac = acOf(c, defs);
     const preset = rowPreset(shape, rolledNatural, toHitTotal, ac);
     const st = per[c.id] ?? { hit: null, mult: "normal" };
@@ -245,6 +250,20 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
     const hp = hpOf(c, defs);
     const contra = naturalContradiction(rolledNatural, hit);
     return { c, source, ac, preset, hit, mult: st.mult, raw, hp, contra };
+  });
+  const views: PopupRowView[] = base.map((x) => ({
+    targetId: x.c.id,
+    combatant: x.c,
+    hit: x.hit,
+    multiplier: x.mult,
+    ac: x.ac,
+    hp: x.hp,
+  }));
+  // FR-MOD-39: a line's parts on a Hit row join its preview (the server decides at apply).
+  const rows = base.map((x, i) => {
+    const view = views[i] as PopupRowView;
+    const extra = x.hit ? partPreviewExtra(popupParts, partValues, view, views, p) : 0;
+    return { ...x, view, raw: x.raw === null ? null : x.raw + extra };
   });
   const ready = applyReady(
     rows.map((x) => x.hit),
@@ -274,7 +293,12 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
       cardId: card.id,
       ...(p.toHit ? { toHitTotal } : {}),
       ...(damageTotal !== null ? { damageTotal } : {}),
-      targets: rows.map((x) => ({ targetId: x.c.id, hit: x.hit, multiplier: x.mult })),
+      targets: rows.map((x) => ({
+        ...partInputs(popupParts, partValues, x.view, views, p),
+        targetId: x.c.id,
+        hit: x.hit,
+        multiplier: x.mult,
+      })),
     });
     // FR-CBT-54: closing clears the map selection (popup-store); a reject keeps the popup open.
     if (r !== undefined) close();
@@ -486,6 +510,18 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                         : `${x.c.name}: ${x.raw}`}
                   </span>
                 </div>
+                {popupParts.map((part) => (
+                  <part.Chips
+                    key={part.id}
+                    card={p}
+                    cardId={card.id}
+                    row={x.view}
+                    rows={views}
+                    value={partValues[part.id]}
+                    onChange={(v) => setPartValues((s) => ({ ...s, [part.id]: v }))}
+                    disabled={disabled}
+                  />
+                ))}
               </li>
             ))}
           </ul>
