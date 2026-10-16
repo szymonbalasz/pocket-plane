@@ -4,7 +4,8 @@
 // concentration. Toggles: the character's presets as switches (owner, DM; also on a locked
 // sheet); tier 3: uses left "2 / 3" or "Uses link broken", DM "Force on" at 0 (FR-MOD-12).
 // Presets: New, Start from ▸ (keeps the built-in as `originKey`), Edit, Delete (owner unless
-// locked, DM). Store reads only.
+// locked, DM). Triggers (FR-MOD-49): the character's rule triggers, lazy-loaded when the tab
+// opens (owner, DM; `./triggers`). Store reads only.
 
 import type { FeatureRow } from "@shared/character-sheet/sheet";
 import { CBTX_INTENTS } from "@shared/combat-extras/intents";
@@ -59,6 +60,7 @@ import { useStartedEncounter } from "../combat-tracker/store";
 import { modifiersText } from "./describe";
 import { blankPreset, EffectModifiersDialog, PresetDialog, type PresetDraft } from "./dialogs";
 import { presetsIn, sheetIn, useModIntent } from "./store";
+import { TriggersBlock } from "./triggers";
 
 function Block({
   title,
@@ -407,6 +409,11 @@ export function ActiveEffectsSection({
           ) : (
             <p className="text-xs text-muted-foreground">Locked by the DM</p>
           )}
+        </Block>
+      )}
+      {(isDm || owner) && (
+        <Block title="Triggers" testId="mod-triggers-block">
+          <TriggersBlock owner={{ kind: "character", id: creatureId }} />
         </Block>
       )}
       <EffectModifiersDialog effect={editing} onClose={() => setEditing(null)} />

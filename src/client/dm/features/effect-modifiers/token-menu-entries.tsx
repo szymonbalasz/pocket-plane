@@ -1,7 +1,8 @@
 // effect-modifiers' token menu entries (FR-MOD-28, registry FR-MAP-29): "Apply effect ▸" (preset
 // list: customised + built-in + campaign; acts on the selection as FR-CBTX-35) and "Effect
-// modifiers…" (one token: its active custom effects, edit / end). Tokens bound to an active
-// combatant only; dialogs through the registry's Dialog mechanism.
+// modifiers…" (one token: its active custom effects, edit / end); both on tokens bound to an
+// active combatant only. "Rule triggers…" (T): a monster token → its definition's triggers, a PC
+// token → that character's (`./triggers-dialog`). Dialogs through the registry's Dialog mechanism.
 import { CBTX_INTENTS } from "@shared/combat-extras/intents";
 import { effectName } from "@shared/combat-extras/rules";
 import type { EffectView } from "@shared/combat-extras/schemas";
@@ -37,6 +38,7 @@ import type {
 } from "../scenes-map/token-menu";
 import { ApplyDialog } from "./apply-dialog";
 import { type ModTarget, useModDialogs } from "./store";
+import { TriggersMenuDialog, TriggersMenuItem } from "./triggers-dialog";
 
 const activeOn = (all: readonly CombatantView[], tokenId: string) =>
   all.find((c) => c.tokenId === tokenId && c.active !== false && !c.removed);
@@ -171,4 +173,5 @@ function ModifiersDialog({ token, close }: TokenMenuDialogProps) {
 export const modTokenMenu: readonly TokenMenuEntry[] = [
   { id: "mod.apply", order: 80, Item: ApplyItem, Dialog: ApplyDialog },
   { id: "mod.modifiers", order: 81, Item: ModifiersItem, Dialog: ModifiersDialog },
+  { id: "mod.triggers", order: 82, Item: TriggersMenuItem, Dialog: TriggersMenuDialog },
 ];

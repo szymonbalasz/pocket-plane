@@ -1,0 +1,91 @@
+// e2e-bundle: rule-triggers
+// Thin rule-trigger sheet flow (MOD §13 walkthrough step 1, R6): player-1's Brakka → Active
+// effects → Triggers "Divine Fury … = 1d6+2"; player-2's Thorn → "Sneak Attack = 3d6"; neither
+// sees the other's or a monster's. DM: Creatures → the Elite's and the Wolf's Rule triggers…;
+// Brakka's token menu → Rule triggers…. Visibility and lazy loads: bun test (effect-modifiers).
+import { expect, type Page, test } from "@playwright/test";
+import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { tokenNode } from "./support/konva";
+import { openWindow } from "./support/shell";
+
+async function triggersOn(page: Page, characterId?: string) {
+  const sheet = await openWindow(page, "char.sheet");
+  if (characterId) await sheet.getByTestId("char-sheet-picker").selectOption(characterId);
+  await sheet.locator('[data-testid="charx-tab"][data-value="section:mod.effects"]').click();
+  const block = sheet.getByTestId("mod-triggers-block");
+  await expect(block.getByTestId("mod-trigger-loading")).toHaveCount(0);
+  return block;
+}
+
+test("FR-MOD-49 FR-MOD-47 FR-MOD-28 Triggers blocks per player; DM entries for monsters and PCs", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const p1 = await rolePage(browser);
+  await p1.goto(link("Player 1"));
+  await expect(p1.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const brakka = await triggersOn(p1, recordId("char-brakka", "entity"));
+  const df = brakka.getByTestId("mod-trigger");
+  await expect(df).toHaveCount(1);
+  await expect(df).toContainText("Divine Fury");
+  await expect(df).toHaveAttribute("data-state", "on");
+  await expect(df.getByTestId("mod-trigger-value")).toHaveAttribute("data-value", "1d6+2");
+  await expect(df).toContainText("while Rage is on");
+  await expect(df.getByTestId("mod-trigger-warning")).toHaveCount(0);
+
+  const p2 = await rolePage(browser);
+  await p2.goto(link("Player 2"));
+  await expect(p2.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const thorn = await triggersOn(p2);
+  const sa = thorn.getByTestId("mod-trigger");
+  await expect(sa).toHaveCount(1);
+  await expect(sa).toContainText("Sneak Attack");
+  await expect(sa.getByTestId("mod-trigger-value")).toHaveAttribute("data-value", "3d6");
+  for (const [page, other] of [
+    [p1, "Sneak Attack"],
+    [p2, "Divine Fury"],
+  ] as const) {
+    for (const s of [other, "Martial Advantage", "Regeneration"]) {
+      await expect(page.getByText(s)).toHaveCount(0);
+    }
+  }
+
+  // DM: Creatures → the Elite (custom) and the Wolf (imported) definitions' triggers.
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const creatures = await openWindow(dm, "ent.creatures");
+  const dialog = dm.getByTestId("mod-triggers-dialog");
+  for (const [id, name, value] of [
+    [recordId("enemy-custom", "entity"), "Martial Advantage", "2d6"],
+    [recordId("enemy-2", "imported-entity"), "Regeneration", "10"],
+  ] as const) {
+    await creatures
+      .locator(`[data-testid="mod-creature-triggers"][data-record-id="${id}"]`)
+      .click();
+    await expect(dialog).toBeVisible();
+    const row = dialog.getByTestId("mod-trigger");
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText(name);
+    await expect(row.getByTestId("mod-trigger-value")).toHaveAttribute("data-value", value);
+    await dm.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+  }
+
+  // DM: Brakka's token → Rule triggers… → her Triggers block.
+  const scenes = await openWindow(dm, "map.scenes");
+  const battlemap = recordId("battlemap", "scene");
+  await scenes
+    .locator(`[data-testid="map-scene-row"][data-record-id="${battlemap}"] button`)
+    .first()
+    .click();
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", battlemap);
+  const token = recordId("char-brakka", "token");
+  await expect.poll(async () => (await tokenNode(dm, token)) !== null).toBe(true);
+  const t = (await tokenNode(dm, token))!;
+  await dm.mouse.click(t.x, t.y, { button: "right" });
+  await dm.getByTestId("mod-token-menu-triggers").click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByTestId("mod-trigger")).toContainText("Divine Fury");
+  await expect(dialog.getByTestId("mod-trigger-edit")).toHaveCount(1);
+});

@@ -7,6 +7,7 @@ import { builtinPreset } from "@shared/effect-modifiers/presets";
 import { presetUses } from "@shared/effect-modifiers/rules";
 import { EFFECT_PRESET_TYPE } from "@shared/effect-modifiers/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
+import { lazyAfterSnapshot } from "@shared/protocol/lazy";
 import { emptyStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
@@ -48,6 +49,7 @@ function render(o: { role: "dm" | "player"; used?: number; link?: string; noUses
         store: { ...emptyStore(), you, records },
         notLiveSince: null,
         everLive: true,
+        lazy: lazyAfterSnapshot(1),
         connection: { sendIntent: () => Promise.resolve({}) },
       }) as unknown as SyncState,
   );

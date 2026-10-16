@@ -1380,7 +1380,7 @@ From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Buil
 
 ## 38. Sprint 3: effect modifiers tier 2 client (R2)
 
-From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) tier 2 + T (MOD, `complete`). **Built by `fix/mod-roll-preview`** (R2): no table, column or record type change. Protocol side: [protocol §51](../protocol/README.md#51-sprint-3-effect-modifiers-tier-2-client-r2).
+From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) tier 2 + T (MOD, `complete`). **Built by `fix/mod-roll-preview`** (R2): no table, column or record type change. Protocol side: [protocol §52](../protocol/README.md#52-sprint-3-effect-modifiers-tier-2-client-r2).
 
 | Table / leaf | Change | Visibility | Source |
 |---|---|---|---|
