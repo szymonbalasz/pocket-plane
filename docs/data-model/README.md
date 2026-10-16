@@ -1440,3 +1440,13 @@ From [party-board](../specs/party-board.md#63-party-inventory) (PARTY slice 4). 
 - **Conservation** (tested): per item key, Σ `party_item.qty` + Σ sheet `items.qty` = Σ `qty` of `world → party` rows − Σ `qty` of `party → world` rows + the sheets' starting qty.
 - **Fixtures:** `party-items-1` now ends with Torch ×2 party → Thorn (`party.moveItem`): Torch 10 → 8 in the party, one `items` row on Thorn's sheet (created if missing; no other sheet field), a fourth item log row.
 - **CON-44:** no new record shape. A max-length move party → a sheet adds one `items` row to that sheet: +272 B to the DM's and the owner's snapshot (inside CHARX's 80-row budget); heavy DM 674,818 B, players max 281,715 B, under the #208 ceilings. PARTY's lazy types stay off every snapshot.
+
+## 43. Sprint 3: compendium window (C3)
+
+From [compendium](../specs/compendium.md) (CMP). **Built by `build/compendium-window`**: no new table, column or record type. Protocol side: [protocol §57](../protocol/README.md#57-sprint-3-compendium-window-c3).
+
+- **Writes:** only through `cmp.import` (C1), now routed: `POST /api/compendium/import` writes `compendium_source`, `compendium_entry` and imported definitions as [§34](#34-sprint-3-compendium-core-c1); nothing else.
+- **Derived (server):** `bundledVersion` per bundled source (`GET /api/compendium/sources`), never stored; compared with `compendium_source.version` for **Update**.
+- **Derived (client, `@ui/features/compendium/logic`):** tabs per role, search params, source Badge, footer label, CR + XP, ability mods, a monster expression's roll category, the Stat block route (campaign definition → sheet, else the entry linking the imported definition).
+- **Persisted runtime state:** none. Window query / tab / filters / view live in the page's memory only (not `localStorage`, not the server).
+- **CON-44:** no record shape; 0 B in every snapshot (entries and sources are read over REST).
