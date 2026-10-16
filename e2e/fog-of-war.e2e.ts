@@ -3,7 +3,9 @@
 // shows Goblin Ambush; the player sees opaque fog and the party only; a reveal rect over Goblin →
 // the player sees it; player reload → still there; DM Undo → gone. DM part: translucent fog with
 // "Fog" badges; Fog tool: reveal a rect over Goblin, a polygon over Goblin Lurker, Undo; Space +
-// drag pans without an edit; Reveal all, Fog all (confirm).
+// drag pans without an edit; Reveal all, Fog all (confirm). V1 (static freeform fog + darkness):
+// a free (Ctrl) darkness circle over the revealed Goblin → gone for the player; dragged off →
+// back; Undo → gone again; Delete removes it.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, tokenNode } from "./support/konva";
@@ -45,10 +47,10 @@ const corner = (page: Page, i: number, j: number) => mapToPage(page, i * 70, j *
 const centre = (page: Page, c: number, r: number) =>
   mapToPage(page, (c + 0.5) * 70, (r + 0.5) * 70);
 
-/** Drags a Fog tool rectangle from the centre of cell (c0, r0) to the centre of (c1, r1). */
+/** Drags a Fog tool rectangle over cells (c0, r0)–(c1, r1): corner to corner (snapped). */
 async function dragRect(page: Page, c0: number, r0: number, c1: number, r1: number) {
-  const a = await centre(page, c0, r0);
-  const b = await centre(page, c1, r1);
+  const a = await corner(page, c0, r0);
+  const b = await corner(page, c1 + 1, r1 + 1);
   await page.mouse.move(a.x, a.y);
   await page.mouse.down();
   for (let i = 1; i <= 5; i++) {
@@ -94,7 +96,7 @@ test("FR-FOG-12 / -21 player view: opaque fog, party only; reveal → Goblin app
   await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
   await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
   // FR-FOG-21: opaque fog; Mira (own) over it; fog-hidden Goblin, Goblin 2, Lurker absent.
-  await expect.poll(() => attrOf(player, "fog-mask", "opacity")).toBe(1);
+  await expect.poll(() => attrOf(player, "fog-mask", "fog-alpha")).toBe(1);
   await expect.poll(() => tokenNode(player, mira)).not.toBeNull();
   for (const id of [goblin, goblin2, lurker]) expect(await tokenNode(player, id)).toBeNull();
   expect(await konvaNodes(player, "fog-token-fogged")).toEqual([]);
@@ -114,7 +116,7 @@ test("FR-FOG-12 / -21 player view: opaque fog, party only; reveal → Goblin app
   await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
   await expect.poll(() => tokenNode(player, goblin)).not.toBeNull();
-  await expect.poll(() => attrOf(player, "fog-mask", "opacity")).toBe(1);
+  await expect.poll(() => attrOf(player, "fog-mask", "fog-alpha")).toBe(1);
 
   // DM Undo → Goblin leaves the player's map.
   await undo.click();
@@ -157,7 +159,7 @@ test("FR-FOG-17–20 DM fog render, rect + polygon reveal, Undo, Space pan, Reve
   await scenes.getByTestId("ui-window-close").click(); // clear of the map
 
   // FR-FOG-20: translucent fog; "Fog" on the fog-hidden tokens only (Wolf, Elite: hidden styling).
-  await expect.poll(() => attrOf(dm, "fog-mask", "opacity")).toBe(0.5);
+  await expect.poll(() => attrOf(dm, "fog-mask", "fog-alpha")).toBe(0.5);
   const cells0 = Number(await attrOf(dm, "fog-mask", "fogged-cells"));
   expect(cells0).toBeGreaterThan(0);
   await expect.poll(() => fogBadges(dm)).toEqual([goblin, goblin2, lurker].sort());
@@ -172,9 +174,10 @@ test("FR-FOG-17–20 DM fog render, rect + polygon reveal, Undo, Space pan, Reve
   const undo = dm.getByTestId("fog-undo");
   await expect(undo).toHaveAttribute("data-depth", "4");
 
-  // FR-FOG-18: drag (11, 5)–(13, 7) → Goblin (12, 6) clear; Goblin 2 (12, 8) still fogged.
-  const a = await centre(dm, 11, 5);
-  const b = await centre(dm, 13, 7);
+  // FR-FOG-18: drag corner (11, 5) → (14, 8) (cells (11, 5)–(13, 7)) → Goblin (12, 6) clear;
+  // Goblin 2 (12, 8) still fogged.
+  const a = await corner(dm, 11, 5);
+  const b = await corner(dm, 14, 8);
   await dm.mouse.move(a.x, a.y);
   await dm.mouse.down();
   for (let i = 1; i <= 5; i++) {
@@ -244,7 +247,7 @@ test("FR-FOG-17–20 DM fog render, rect + polygon reveal, Undo, Space pan, Reve
   expect(errors).toEqual([]);
 });
 
-test("FR-FOG-17 Space + drag pans with a fog bar toggle focused (Hide): no edit, the toggle keeps its state", async ({
+test("FR-FOG-17 Space + drag pans with a fog bar toggle focused (Fog): no edit, the toggle keeps its state", async ({
   browser,
 }) => {
   const { secret, recordId } = e2eEnv();
@@ -263,7 +266,7 @@ test("FR-FOG-17 Space + drag pans with a fog bar toggle focused (Hide): no edit,
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
   await scenes.getByTestId("ui-window-close").click();
   await dm.getByTestId("map-tool-fog").click();
-  const hide = dm.getByTestId("fog-mode-hide");
+  const hide = dm.getByTestId("fog-mode-fog");
   await hide.click();
   await expect(hide).toHaveAttribute("data-state", "on");
   await expect(hide).toBeFocused(); // the walkthrough's state: the toggle keeps focus
@@ -290,7 +293,89 @@ test("FR-FOG-17 Space + drag pans with a fog bar toggle focused (Hide): no edit,
   expect(edits()).toBe(before);
   expect(await attrOf(dm, "fog-draft", "kind")).toBeNull();
   await expect(dm.getByTestId("fog-undo")).toHaveAttribute("data-depth", depth ?? "");
-  // Space didn't press the focused toggle: Hide is still on, Reveal still off.
+  // Space didn't press the focused toggle: Fog is still on, Reveal still off.
   await expect(hide).toHaveAttribute("data-state", "on");
   await expect(dm.getByTestId("fog-mode-reveal")).toHaveAttribute("data-state", "off");
+});
+
+test("FR-FOG-30 / -34 / -41 / -42 darkness (static): a free circle over the revealed Goblin hides it from the player; drag off → back; Undo → gone; Delete removes it (DM + player-1)", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const ambush = recordId("battlemap", "scene");
+  const goblin = recordId("battlemap", "token", 1);
+  const dm = await rolePage(browser);
+  const errors: string[] = [];
+  dm.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const scenes = await openWindow(dm, "map.scenes");
+  await scenes
+    .locator(`[data-testid="map-scene-row"][data-record-id="${ambush}"] button`)
+    .first()
+    .click();
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
+  await scenes.getByTestId("ui-window-close").click();
+  // Shown since the first test (same server); show it when run alone.
+  const show = dm.getByTestId("map-show-to-players");
+  if ((await show.count()) > 0) await show.click();
+  const player = await rolePage(browser);
+  player.on("console", (m) => {
+    if (m.type() === "error") errors.push(`player: ${m.text()}`);
+  });
+  await player.goto(link("Player 1"));
+  await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
+
+  // Reveal everything: Goblin (12, 6) reaches the player; no darkness yet.
+  await dm.getByTestId("map-tool-fog").click();
+  await dm.getByTestId("fog-reveal-all").click();
+  await expect.poll(() => tokenNode(player, goblin)).not.toBeNull();
+  const undo = dm.getByTestId("fog-undo");
+  const depth = Number(await undo.getAttribute("data-depth"));
+
+  // FR-FOG-41: Darkness + Circle, Ctrl-press at (12.5, 6.5), drag 1.5 cells: label "≈ 8 ft".
+  await dm.getByTestId("fog-mode-darkness").click();
+  await dm.getByTestId("fog-shape-circle").click();
+  const c = await mapToPage(dm, 12.5 * 70, 6.5 * 70);
+  const edge = await mapToPage(dm, 14 * 70, 6.5 * 70);
+  await dm.keyboard.down("Control");
+  await dm.mouse.move(c.x, c.y);
+  await dm.mouse.down();
+  for (let i = 1; i <= 5; i++) await dm.mouse.move(c.x + ((edge.x - c.x) * i) / 5, c.y);
+  await expect.poll(() => attrOf(dm, "fog-draft", "label")).toBe("≈ 8 ft");
+  await expect(dm.getByTestId("fog-free")).toBeVisible();
+  await dm.mouse.up();
+  await dm.keyboard.up("Control");
+  await expect(undo).toHaveAttribute("data-depth", String(depth + 1));
+  const dark = await konvaNodes(dm, "fog-darkness");
+  expect(dark).toHaveLength(1);
+  // FR-FOG-34: the Goblin's only sample point is in darkness → gone for the player, whose fog row
+  // now lists the shape (its box meets clear cells, FR-FOG-44).
+  await expect.poll(() => tokenNode(player, goblin)).toBeNull();
+  await expect.poll(() => attrOf(player, "fog-mask", "darkness")).toBe(1);
+  await undo.hover();
+  await expect(dm.getByRole("tooltip").first()).toContainText("Undo: darkness place");
+
+  // FR-FOG-42: drag the darkness 3 cells east → the Goblin is back; Undo → gone again.
+  const from = await mapToPage(dm, 12.5 * 70, 6.5 * 70);
+  await dm.mouse.move(from.x, from.y);
+  await dm.mouse.down();
+  for (let i = 1; i <= 5; i++) await dm.mouse.move(from.x + (3 * 70 * i) / 5, from.y);
+  await dm.mouse.up();
+  await expect(undo).toHaveAttribute("data-depth", String(depth + 2));
+  await expect.poll(() => tokenNode(player, goblin)).not.toBeNull();
+  await expect.poll(() => attrOf(dm, "fog-darkness", "selected")).toBe(true);
+  await undo.click();
+  await expect.poll(() => tokenNode(player, goblin)).toBeNull();
+
+  // Delete removes the selected shape (select it first: a click on it).
+  await dm.mouse.click(from.x, from.y);
+  await expect.poll(() => attrOf(dm, "fog-darkness", "selected")).toBe(true);
+  await dm.keyboard.press("Delete");
+  await expect.poll(async () => (await konvaNodes(dm, "fog-darkness")).length).toBe(0);
+  await expect.poll(() => tokenNode(player, goblin)).not.toBeNull();
+  expect(errors).toEqual([]);
 });

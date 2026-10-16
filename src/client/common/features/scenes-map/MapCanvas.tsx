@@ -632,7 +632,12 @@ export function MapCanvas(props: MapCanvasProps) {
     if (!p) return;
     const onToken = tokenNodeOf(e.target) !== null;
     if (e.evt.button === 2) {
-      if (onToken || !signalsLive) return;
+      if (onToken) return;
+      // A drawing tool may take the right press for its own menu (FR-FOG-42).
+      const menuTool = drawingRef.current && liveRef.current ? toolDefRef.current : null;
+      const tp = menuTool?.pointer?.menu ? toolPointerRef.current(e.evt) : null;
+      if (tp && menuTool?.pointer?.menu?.(tp)) return;
+      if (!signalsLive) return;
       laser.current = new LaserSender(scene.id, (d) => sendSignal(MAP_SIGNALS.laser, d));
       laser.current.push(p.x, p.y);
       addTrailPoints(pointers, "self", client, [[p.x, p.y]], false, performance.now());
