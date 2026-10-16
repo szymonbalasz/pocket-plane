@@ -28,7 +28,13 @@ import type { CommandEnv } from "../../commands/commands";
 import { rollDice } from "../../commands/dice";
 import { CommandError, conflict, invalid } from "../../commands/errors";
 import { roll } from "../../db/schema";
-import { type RollHook, type RollModeHint, type RollPart, rollHooks } from "./roll-hooks";
+import {
+  type OfferedPart,
+  type RollHook,
+  type RollModeHint,
+  type RollPart,
+  rollHooks,
+} from "./roll-hooks";
 import { campaignOf } from "./settings";
 
 export type RollSource = "dice" | "char" | "cbt";
@@ -61,6 +67,10 @@ export interface RollMods {
   /** Σ part values: the outcome total = base `total` + `modTotal` (FR-MOD-16). */
   modTotal: number;
   modes: RollModeHint[];
+  /** FR-MOD-37: offered trigger parts (rolled, **not** in `modTotal`), registry order; absent = none. */
+  offered?: OfferedPart[];
+  /** FR-MOD-34, -37: DM-only line notes from the hooks, registry order; absent = none. */
+  notes?: string[];
 }
 
 /** `dice.evaluate`'s result: the base roll row, plus `mods` iff a subject was passed. */
@@ -193,6 +203,8 @@ function runRollHooks(
   const ctx = { manual: base.manual, category: base.category, source: input.source, rollExtra };
   const parts: RollPart[] = [];
   const modes: RollModeHint[] = [];
+  const offered: OfferedPart[] = [];
+  const notes: string[] = [];
   for (const h of hooks) {
     const r = h.adjust(env, subject, ctx);
     for (const p of r.parts) {
@@ -200,11 +212,19 @@ function runRollHooks(
       parts.push(p);
     }
     modes.push(...r.modes);
+    offered.push(...(r.offered ?? []));
+    notes.push(...(r.notes ?? []));
   }
   if (parts.length > ROLL_MODS_MAX || modes.length > ROLL_MODS_MAX) {
     throw conflict(`At most ${ROLL_MODS_MAX} effect modifiers per roll`);
   }
-  return { parts, modTotal: parts.reduce((s, p) => s + p.value, 0), modes };
+  return {
+    parts,
+    modTotal: parts.reduce((s, p) => s + p.value, 0),
+    modes,
+    ...(offered.length ? { offered } : {}),
+    ...(notes.length ? { notes } : {}),
+  };
 }
 
 function evaluateBase(env: CommandEnv, input: EvaluateInput): Roll {
@@ -313,8 +333,12 @@ export function rollDmPayload(rolls: readonly EvaluatedRoll[]): RollEntryDmPaylo
   };
 }
 
-/** FR-DICE-26: the base roll and its part rolls (bonus dice), for an entry's `rollIds`. */
+/**
+ * FR-DICE-26: the base roll, its part rolls (bonus dice) and its offered trigger rolls
+ * (FR-MOD-14), for an entry's `rollIds`.
+ */
 export const rollIdsOf = (r: EvaluatedRoll): string[] => [
   r.id,
   ...(r.mods?.parts ?? []).flatMap((p) => (p.rollId ? [p.rollId] : [])),
+  ...(r.mods?.offered ?? []).map((o) => o.rollId),
 ];
