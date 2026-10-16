@@ -1,9 +1,9 @@
 // e2e-bundle: party-board
 // Thin party-board flow (PARTY §13 E2E, handout part): the DM shares h5 "Ship Manifest" with
 // player-1 → player-1 gets the toast and opens it from there; player-2's board has no h5; the DM
-// unshares → player-1's open viewer shows "No longer shared". Visibility per player, events,
-// loads, reconnects: bun test (party-board leak.test.ts, commands.test.ts).
-// The "player-1 takes a potion" part comes with slice 4 (party inventory moves).
+// unshares → player-1's open viewer shows "No longer shared"; player-1 takes a potion → Mira's
+// sheet Inventory tab shows it. Visibility per player, events, loads, reconnects, the move matrix:
+// bun test (party-board leak.test.ts, commands.test.ts, items.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow, shellWindow } from "./support/shell";
@@ -166,4 +166,49 @@ test("FR-PARTY-15 FR-PARTY-14 FR-PARTY-13 FR-PARTY-10 DM creates Wanted Poster w
   await expect(row(again, mayor)).toHaveAttribute("data-new", "true");
 
   for (const page of [p2, dm]) await page.context().close();
+});
+
+test("FR-PARTY-22 FR-PARTY-24 player-1 takes a potion → Mira's Inventory tab shows it; Give… lists only Mira's items", async ({
+  browser,
+}) => {
+  const { link, recordId } = e2eEnv();
+  const potion = recordId("party-items-1", "party-item", 0);
+  const miraId = recordId("char-mira", "entity");
+  const p1 = await rolePage(browser);
+  await p1.goto(link("Player 1"));
+  await live(p1);
+
+  const board = await openWindow(p1, "party.board");
+  await board.locator('[data-testid="party-tab"][data-value="inventory"]').click();
+  const potionRow = board.locator(`[data-testid="party-item-row"][data-record-id="${potion}"]`);
+  await expect(potionRow.getByTestId("party-item-count")).toHaveText("×2");
+  await potionRow.getByTestId("party-item-take").click();
+  // One own character: no picker, the target is Mira.
+  await expect(potionRow.getByTestId("party-item-target")).toHaveAttribute(
+    "data-value",
+    `character:${miraId}`,
+  );
+  await potionRow.getByTestId("party-item-qty").fill("3");
+  await expect(potionRow.getByTestId("party-item-error")).toHaveText("Only 2 left");
+  await expect(potionRow.getByTestId("party-item-submit")).toBeDisabled();
+  await potionRow.getByTestId("party-item-qty").fill("1");
+  await potionRow.getByTestId("party-item-submit").click();
+  await expect(potionRow.getByTestId("party-item-count")).toHaveText("×1");
+
+  const sheet = await openWindow(p1, "char.sheet");
+  await expect(sheet.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
+  const tab = sheet.locator('[data-testid="charx-tab"][data-value="inventory"]');
+  await tab.scrollIntoViewIfNeeded();
+  await tab.click();
+  await expect(
+    sheet.getByTestId("charx-item").filter({ hasText: "Potion of healing" }),
+  ).toBeVisible();
+
+  // Give…: only Mira's sheet items are sources (never Thorn's Torch row).
+  await board.getByTestId("party-item-give").click();
+  const sources = board.getByTestId("party-item-source");
+  await expect(sources.filter({ hasText: "Potion of healing" })).toHaveCount(1);
+  for (const s of await sources.all()) await expect(s).toHaveAttribute("data-character-id", miraId);
+
+  await p1.context().close();
 });

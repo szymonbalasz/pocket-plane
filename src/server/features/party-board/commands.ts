@@ -1,7 +1,7 @@
-// party-board commands of the core (PARTY §6, §9; orchestrator ruling for P core): handouts
-// `party.createHandout` / `updateHandout` / `shareHandout` / `deleteHandout` and
-// `party.addItem` (DM), and the `handout-shared` notification (FR-PARTY-06, slice 2);
-// `editItem` / `removeItem` / `moveItem` with slice 4, `loot.split` with slice 3.
+// party-board commands (PARTY §6, §9): handouts `party.createHandout` / `updateHandout` /
+// `shareHandout` / `deleteHandout` and `party.addItem` (DM), and the `handout-shared` notification
+// (FR-PARTY-06). `editItem` / `removeItem` / `moveItem` live in `item-commands.ts`; `loot.split`
+// in party-loot.
 import {
   HandoutCreated,
   HandoutDeleted,
@@ -23,6 +23,7 @@ import {
   HANDOUT_SHARED_KIND,
   HANDOUT_TYPE,
   type HandoutInput,
+  ITEM_GONE_MESSAGE,
   NOT_SHARED,
   PARTY_ITEM_MAX,
   PARTY_ITEM_TYPE,
@@ -31,27 +32,15 @@ import {
   UpdateHandoutIntent,
 } from "@shared/party-board/schemas";
 import { sameShare, shareGainers, shareNotifications } from "@shared/party-board/visibility";
-import {
-  LOOT_ENTRY_TYPE,
-  LOOT_RECEIVED_KIND,
-  type LootEntryRecord,
-  ZERO_COINS,
-} from "@shared/party-loot/schemas";
+import { LOOT_ENTRY_TYPE, LOOT_RECEIVED_KIND } from "@shared/party-loot/schemas";
 import { and, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, notFound } from "../../commands/errors";
-import {
-  handout,
-  handoutSeqNext,
-  lootEntry,
-  lootEntrySeqNext,
-  partyItem,
-  partyItemSeqNext,
-} from "../../db/schema";
+import { handout, handoutSeqNext, partyItem, partyItemSeqNext } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
 import { notify } from "../notifications/helpers";
-import { getEntry } from "../party-loot/rows";
+import { insertItemEntry } from "../party-loot/item-entries";
 import {
   campaignPlayerIds,
   getHandoutRow,
@@ -68,11 +57,16 @@ export const PARTY_INTENTS = {
   shareHandout: "party.shareHandout",
   deleteHandout: "party.deleteHandout",
   addItem: "party.addItem",
+  editItem: "party.editItem",
+  removeItem: "party.removeItem",
+  moveItem: "party.moveItem",
 } as const;
 
 const HANDOUT_NOT_FOUND = "Handout not found";
+const WORLD = { kind: "world" } as const;
+const PARTY = { kind: "party" } as const;
 
-function campaignOf(env: CommandEnv): string {
+export function campaignOf(env: CommandEnv): string {
   if (!env.actor.campaignId) throw conflict("No active campaign");
   return env.actor.campaignId;
 }
@@ -254,44 +248,14 @@ export const deleteHandout = defineCommand({
   },
 });
 
-/** FR-PARTY-25: an item row (`text` = name, `qty`, coins 0) in the caller's transaction. */
-function insertItemEntry(
-  env: CommandEnv,
-  cid: string,
-  from: "world" | "party",
-  to: "world" | "party",
-  name: string,
-  qty: number,
-): LootEntryRecord {
-  const id = env.ctx.ids.next();
-  env.tx
-    .insert(lootEntry)
-    .values({
-      id,
-      campaignId: cid,
-      seq: lootEntrySeqNext,
-      kind: "item",
-      fromKind: from,
-      fromCharacterId: null,
-      toKind: to,
-      toCharacterId: null,
-      text: name,
-      ...ZERO_COINS,
-      qty,
-      createdAt: env.ctx.clock.iso(),
-      editedAt: null,
-    })
-    .run();
-  return getEntry(env.tx, cid, id) as LootEntryRecord;
-}
-
-function getItem(env: CommandEnv, cid: string, id: string): PartyItemRecord {
+/** The campaign's party row `id`, else `not_found` "Item is gone". */
+export function getItem(env: CommandEnv, cid: string, id: string): PartyItemRecord {
   const row = env.tx
     .select()
     .from(partyItem)
     .where(and(eq(partyItem.id, id), eq(partyItem.campaignId, cid)))
     .get();
-  if (!row) throw notFound("Item is gone");
+  if (!row) throw notFound(ITEM_GONE_MESSAGE);
   return toPartyItemRecord(row);
 }
 
@@ -337,7 +301,7 @@ export const addItem = defineCommand({
         .run();
     }
     const after = getItem(env, cid, itemId);
-    const entry = insertItemEntry(env, cid, "world", "party", after.name, input.qty);
+    const entry = insertItemEntry(env, cid, WORLD, PARTY, after.name, input.qty);
     env.emit({
       type: PartyItemAdded.type,
       campaignId: cid,
