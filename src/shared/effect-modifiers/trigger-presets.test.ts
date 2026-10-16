@@ -3,7 +3,18 @@
 // (§6.1) as plain data.
 import { describe, expect, test } from "bun:test";
 import { type FormulaOwner, formulaValue } from "./formula";
-import { getTriggerPreset, isTriggerPresetKey, TRIGGER_PRESETS } from "./trigger-presets";
+import { builtinPreset } from "./presets";
+import { PutTriggerInput } from "./trigger-intents";
+import {
+  draftFromTriggerPreset,
+  getTriggerPreset,
+  isTriggerPresetKey,
+  startFromTriggerPreset,
+  TRIGGER_PRESETS,
+  type TriggerPreset,
+  triggerPresetForFeature,
+  triggerPresetsFor,
+} from "./trigger-presets";
 import { checkRuleForOwner, reminderText, TriggerRule } from "./triggers";
 
 const thorn: FormulaOwner = { level: 5, classes: [{ name: "Rogue", level: 5 }], prof: 3 };
@@ -101,6 +112,87 @@ describe("FR-MOD-46 built-in trigger presets", () => {
       if (text.toLowerCase().includes(banned)) hits.push(f);
     }
     expect(hits).toEqual([]);
+  });
+});
+
+describe("FR-MOD-46 Start from", () => {
+  test("FR-MOD-46 Start from lists the built-ins per owner kind, §8.6 order", () => {
+    expect(triggerPresetsFor("character").map((p) => p.key)).toEqual([
+      "sneak-attack",
+      "hunters-mark",
+      "colossus-slayer",
+    ]);
+    expect(triggerPresetsFor("definition").map((p) => p.key)).toEqual([
+      "martial-advantage",
+      "regeneration",
+    ]);
+  });
+
+  test("FR-MOD-46 Start from copies a built-in into a valid putTrigger draft for the owner (a fresh rule copy)", () => {
+    for (const p of TRIGGER_PRESETS) {
+      const owner = { kind: p.owner, id: "owner-1" };
+      const s = startFromTriggerPreset(p.key, owner);
+      expect(s?.draft).toEqual({
+        characterId: p.owner === "character" ? "owner-1" : null,
+        definitionId: p.owner === "definition" ? "owner-1" : null,
+        name: p.name,
+        enabled: true,
+        public: p.public,
+        rule: p.rule,
+      });
+      expect(s?.draft.rule).not.toBe(p.rule);
+      expect(s?.confirm).toEqual([]);
+      expect(PutTriggerInput.safeParse({ trigger: s?.draft }).success).toBe(true);
+    }
+    const sa = startFromTriggerPreset("sneak-attack", { kind: "character", id: "c" });
+    sa?.draft.rule.when.pop();
+    expect(getTriggerPreset("sneak-attack")?.rule.when).toHaveLength(4);
+    expect(startFromTriggerPreset("divine-fury", { kind: "character", id: "c" })).toBeUndefined();
+    expect(startFromTriggerPreset("regeneration", { kind: "character", id: "c" })).toBeUndefined();
+    expect(startFromTriggerPreset("sneak-attack", { kind: "definition", id: "d" })).toBeUndefined();
+  });
+
+  test("FR-MOD-46 owner-specific fields: a feature preselected by name (rows with uses), requires kept as the built-in key; both to confirm", () => {
+    const p: TriggerPreset = {
+      key: "sneak-attack",
+      name: "Test",
+      owner: "character",
+      public: true,
+      rule: {
+        on: "hit",
+        requires: { preset: "rage" },
+        when: [],
+        every: "turn",
+        then: { do: "damage", formula: "1d6", type: null },
+      },
+      featureKeys: [],
+      usesFeature: "Rage",
+    };
+    const features = [
+      { id: "f-1", name: "rage", usesMax: null },
+      { id: "f-2", name: " Rage ", usesMax: 3 },
+    ];
+    const s = draftFromTriggerPreset(p, { kind: "character", id: "c", features });
+    expect(s.draft.rule.every).toEqual({ feature: "f-2" });
+    expect(s.draft.rule.requires).toEqual({ preset: "rage" });
+    expect(s.confirm).toEqual(["requires", "every"]);
+    const none = draftFromTriggerPreset(p, { kind: "character", id: "c", features: [] });
+    expect([none.draft.rule.every, none.confirm]).toEqual(["turn", ["requires", "every"]]);
+  });
+
+  test("FR-MOD-46 featureKeys (S5): the built-in implementing a compendium key; Colossus Slayer = Hunter's Prey (#213)", () => {
+    expect(triggerPresetForFeature("srd-5.1:feature/rogue/sneak-attack")?.key).toBe("sneak-attack");
+    expect(triggerPresetForFeature("srd-5.1:spell/hunters-mark")?.key).toBe("hunters-mark");
+    expect(triggerPresetForFeature("srd-5.1:feature/ranger/hunters-prey")?.key).toBe(
+      "colossus-slayer",
+    );
+    expect(triggerPresetForFeature("srd-5.1:feature/barbarian/rage")).toBeUndefined();
+  });
+
+  test("FR-MOD-05 / OQ-MOD-27 Hunter's Mark pairs the mark preset with the trigger (same key)", () => {
+    const rule = getTriggerPreset("hunters-mark")?.rule;
+    expect(rule?.when).toContainEqual({ if: "targetMarked", preset: "hunters-mark" });
+    expect(builtinPreset("hunters-mark")).toMatchObject({ mark: true, modifiers: [] });
   });
 });
 

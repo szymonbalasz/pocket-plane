@@ -11,6 +11,7 @@ import {
   presetKeysMatch,
   requiresMet,
   settleFacts,
+  targetMarkedBy,
   windowKey,
 } from "./trigger-fire";
 import { TRIGGER_PRESETS } from "./trigger-presets";
@@ -127,5 +128,43 @@ describe("FR-MOD-37 filters and settle facts", () => {
       ),
     ).toEqual({ marked: "hunters-mark", hurt: true });
     expect(settleFacts({ when: [] }, facts())).toEqual({});
+  });
+});
+
+describe("FR-MOD-05 / -39 marks: target-side `marked`", () => {
+  const fx = (o: Partial<Parameters<typeof targetMarkedBy>[0][number]>) => ({
+    targetCombatantId: null,
+    targetCharacterId: null,
+    sourceCombatantId: "k-thorn",
+    presetKey: "hunters-mark",
+    endedAt: null,
+    ...o,
+  });
+  const goblin = { combatantId: "k-gob" };
+  test("FR-MOD-05 the mark holds on the creature it is on, from the attacker, while active", () => {
+    const effects = [fx({ targetCombatantId: "k-gob" })];
+    expect(targetMarkedBy(effects, goblin, "hunters-mark", "k-thorn")).toBe(true);
+    expect(targetMarkedBy(effects, { combatantId: "k-gob2" }, "hunters-mark", "k-thorn")).toBe(
+      false,
+    );
+    // Another's mark, another key, an ended effect: no.
+    expect(targetMarkedBy(effects, goblin, "hunters-mark", "k-mira")).toBe(false);
+    expect(targetMarkedBy(effects, goblin, "pre-favored", "k-thorn")).toBe(false);
+    expect(
+      targetMarkedBy(
+        [fx({ targetCombatantId: "k-gob", endedAt: "t" })],
+        goblin,
+        "hunters-mark",
+        "k-thorn",
+      ),
+    ).toBe(false);
+  });
+  test("FR-MOD-05 a PC target's effects sit on its character; a campaign mark by its id", () => {
+    const effects = [fx({ targetCharacterId: "c-mira", presetKey: "pre-favored" })];
+    const mira = { combatantId: "k-mira", characterId: "c-mira" };
+    expect(targetMarkedBy(effects, mira, "pre-favored", "k-thorn")).toBe(true);
+    expect(targetMarkedBy(effects, { combatantId: "k-mira" }, "pre-favored", "k-thorn")).toBe(
+      false,
+    );
   });
 });
