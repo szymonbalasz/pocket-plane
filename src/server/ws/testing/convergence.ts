@@ -4,7 +4,9 @@
 // DM's `dmWindow` types (ADR-0041) only the active scene + the loaded scenes are compared; for
 // `view-as` types (FR-FOG-43) only the loaded `(sceneId, playerId)` pair (none → nothing).
 // Per-player helpers (ADR-0042): `playerViewer` and `leakScan` on each player's client.
+// Lazy types (ADR-0045, FR-SYNC-38): compared only for the client's loaded types / ids.
 import type { ServerFrame } from "@shared/protocol/frames";
+import { emptyLoaded, isLoaded, type LoadedSet } from "@shared/protocol/lazy";
 import { LoadSceneResult, type ViewAsPair } from "@shared/protocol/scene-window";
 import type { RecordMap, RecordStore } from "@shared/protocol/store";
 import { type WindowIds, windowProjection } from "@shared/protocol/window";
@@ -70,6 +72,23 @@ export function sceneWindowProjection(
   return out;
 }
 
+/**
+ * ADR-0045 projection: every lazy type keeps only rows of its loaded set (the whole type, or the
+ * loaded ids); a type with nothing loaded is `{}` (the snapshot never carries it). Rows a client
+ * holds from live events alone are real, just not compared.
+ */
+export function lazyProjection(s: Services, records: RecordMap, loaded: LoadedSet): RecordMap {
+  const out: RecordMap = { ...records };
+  for (const def of s.records.lazyTypes()) {
+    const kept: Record<string, unknown> = {};
+    for (const [id, r] of Object.entries(records[def.type] ?? {})) {
+      if (isLoaded(loaded, def.type, id)) kept[id] = r;
+    }
+    out[def.type] = kept;
+  }
+  return out;
+}
+
 /** A client as the helpers see it; the harness's `TestClient` fits. */
 export interface ClientView {
   store: RecordStore;
@@ -77,6 +96,8 @@ export interface ClientView {
   loadedScenes?: readonly string[];
   /** The `view-as` pair loaded with `sync.loadScene {viewAs}` (FR-FOG-43). */
   viewAs?: ViewAsPair | null;
+  /** Lazy types / ids loaded with `sync.load` since the last snapshot (ADR-0045). */
+  lazy?: LoadedSet;
   /** Every frame received; the leak scan also reads `ack.records`. */
   frames?: readonly ServerFrame[];
 }
@@ -85,12 +106,14 @@ export interface ClientView {
  * Both stores projected for FR-SYNC-20: `expect(c.live).toEqual(c.fresh)`.
  * `fresh` = a client that just took a snapshot, same viewer. DM `dmWindow` types compare on the
  * active scene + `loaded` (default: `live.loadedScenes`); `fresh` must load the same scenes.
+ * Lazy types compare on `lazy` (default: `live.lazy`); `fresh` must load the same (FR-SYNC-38).
  */
 export function convergence(
   s: Services,
   live: ClientView,
   fresh: ClientView,
   loaded: readonly string[] = live.loadedScenes ?? [],
+  lazy: LoadedSet = live.lazy ?? emptyLoaded(),
 ): { live: RecordMap; fresh: RecordMap } {
   const v = viewerOf(fresh.store);
   const ids = windowIdsFor(s, v);
@@ -99,7 +122,7 @@ export function convergence(
   if (active !== null) scenes.add(active);
   const pair = live.viewAs ?? null;
   const project = (r: RecordMap) =>
-    sceneWindowProjection(s, v, windowProjection(r, ids), scenes, pair);
+    lazyProjection(s, sceneWindowProjection(s, v, windowProjection(r, ids), scenes, pair), lazy);
   return { live: project(live.store.records), fresh: project(fresh.store.records) };
 }
 
@@ -108,7 +131,7 @@ export function convergence(
  * renders it. Windowed types: the provider returns the whole log, so rows below the floor are
  * checked too (live changes reach them). Rows the provider doesn't return are left to
  * `convergence`. Also scans every `ack.records` the client received (`sync.loadScene`,
- * ADR-0041). Pair with a raw-frame scan for secrets (`client.raw()`).
+ * ADR-0041; `sync.load`, ADR-0045 / FR-SYNC-38). Pair with a raw-frame scan for secrets (`client.raw()`).
  * Returns `type/id: problem` lines; `[]` = clean.
  */
 export function leakScan(s: Services, client: ClientView): string[] {
