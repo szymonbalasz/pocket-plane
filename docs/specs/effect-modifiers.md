@@ -8,7 +8,7 @@ phase: post-mvp-3
 
 # Effect modifiers
 
-> Five-minute read for §1–§7; §8 onwards is reference. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Builds on [combat-extras](combat-extras.md) (CBTX, effects), [combat-tracker](combat-tracker.md) (CBT, cards, popup, apply, undo) and [character-sheet-full](character-sheet-full.md) (CHARX, sheet sections, features). Sprint 2: tier 1 built (#190, ADR-0038). **Sprint 3 revision** (DM [#203](../decisions-log.md), track R of [sprint-3](../agents/sprint-3.md)): tiers 2 and 3 in scope, plus **rule triggers** ([proposed ADR](../architecture/adr/proposed-rule-triggers.md)). Sprint-3 FRs: FR-MOD-32–52; changed: FR-MOD-01, -05, -12, -13, -14, -17, -18, -19, -24–28, -31.
+> Five-minute read for §1–§7; §8 onwards is reference. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Builds on [combat-extras](combat-extras.md) (CBTX, effects), [combat-tracker](combat-tracker.md) (CBT, cards, popup, apply, undo) and [character-sheet-full](character-sheet-full.md) (CHARX, sheet sections, features). Sprint 2: tier 1 built (#190, ADR-0038). **Sprint 3 revision** (DM [#203](../decisions-log.md), track R of [sprint-3](../agents/sprint-3.md)): tiers 2 and 3 in scope, plus **rule triggers** ([proposed ADR](../architecture/adr/proposed-rule-triggers.md)). Sprint-3 FRs: new FR-MOD-32–52 (21); changed FR-MOD-01, -05, -12–20, -24–28, -30, -31 (18).
 
 ## 1. Summary
 
