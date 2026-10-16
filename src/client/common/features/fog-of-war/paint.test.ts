@@ -157,6 +157,14 @@ describe("FR-FOG-20/21 painter", () => {
     expect(cell(r, 3, 3)).toEqual({ label: "E", alpha: 0.25 }); // explored over the reveal
     expect(cell(r, 2, 2)).toEqual({ label: "F", alpha: 0.5 }); // fog circle over the explored
     expect(r.globalCompositeOperation).toBe("source-over");
+    expect(r.strokes).toBe(0);
+    // FR-FOG-20: shape edges as one hairline stroke for the DM; never for players.
+    const edged = new Raster(100, 60);
+    paintFog(edged, { ...fogged, shapes }, map, "dm", paints("dm"), 1);
+    expect(edged.strokes).toBe(1);
+    const player = new Raster(100, 60);
+    paintFog(player, { ...fogged, shapes }, map, "player", paints("player"), 1);
+    expect(player.strokes).toBe(0);
   });
 
   test("FR-FOG-21 player: Fog opaque, Explored dims; darkness only where statically clear, never over Fog or Explored", () => {

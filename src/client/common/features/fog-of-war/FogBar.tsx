@@ -418,7 +418,6 @@ export function FogBar() {
         <Switch
           id="fog-explored-toggle"
           data-testid="fog-explored-toggle"
-          data-state={explored ? "on" : "off"}
           checked={explored}
           disabled={off}
           onCheckedChange={(on) => {

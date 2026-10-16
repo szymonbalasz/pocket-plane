@@ -216,7 +216,8 @@ function shapeOutline(
 }
 
 export function FogLayer() {
-  const { client, scene, grid, store, activeTool } = useCanvas();
+  const { client, scene, grid, store, activeTool, cam } = useCanvas();
+  const hairline = 1 / cam.scale;
   const rec = (store.records[FOG_TYPE]?.[scene.id] ?? null) as FogRecordLike | null;
   const { mapWidth, mapHeight } = scene;
   const { gridCellSize, gridOffsetX, gridOffsetY } = grid;
@@ -256,7 +257,7 @@ export function FogLayer() {
             explored-cells={stats.explored}
             perfectDrawEnabled={false}
             sceneFunc={(kctx) =>
-              paintFog(kctx._context as unknown as PaintCtx, rec, map, client, paints)
+              paintFog(kctx._context as unknown as PaintCtx, rec, map, client, paints, hairline)
             }
           />
           {client === "dm" && (

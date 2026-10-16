@@ -2,7 +2,8 @@
 // cells keep their index, cells outside the stored box take `fill`) painted, then every fog shape
 // in list order over it (painter: each shape first erases what is under it, then paints its own
 // state), all inside one Konva shape on the fog layer.
-// - DM: Fog ≈ 50 %, Explored ≈ 25 %; darkness is drawn by its own hatched nodes on top.
+// - DM: Fog ≈ 50 %, Explored ≈ 25 %, shape edges hairline; darkness is drawn by its own hatched
+//   nodes on top.
 // - Player: Fog opaque, Explored dims the map; darkness draws opaque only where the point is
 //   statically clear (never over Fog or Explored): painted first, erased under base fog and under
 //   each fog / explored shape, re-painted inside each reveal shape.
@@ -200,6 +201,7 @@ export function paintFog(
   m: MapRect,
   client: CanvasClient,
   paints: FogPaints,
+  hairline = 0,
 ): void {
   const base = fogRuns(rec, m).runs;
   const shapes = rec.shapes ?? [];
@@ -227,6 +229,16 @@ export function paintFog(
       darknessFill();
       ctx.restore();
     }
+  }
+  // FR-FOG-20: the DM sees every shape's edge as a hairline.
+  if (client === "dm" && hairline > 0 && shapes.length > 0) {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = Math.min(1, paints.fog.alpha + 0.2);
+    ctx.strokeStyle = paints.fog.color;
+    ctx.lineWidth = hairline;
+    ctx.beginPath();
+    for (const s of shapes) shapePath(ctx, s, m);
+    ctx.stroke();
   }
   ctx.restore();
 }
