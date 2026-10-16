@@ -365,9 +365,7 @@ function sourcesBefore(st: SceneStatic, sceneId: string, o: RederiveOptions) {
     const now = (st.sight?.get(p)?.sources ?? []).filter((s) => s.tokenId !== ch?.after?.id);
     if (now.length > 0) return true;
     const b = ch?.before;
-    if (ch && isSource(b) && b.sceneId === sceneId && b.ownerPlayerId === p) return true;
-    // Over the source cap the written token may be the one left out: still a source then.
-    return !ch && st.sight?.has(p) === true;
+    return isSource(b) && b.sceneId === sceneId && b.ownerPlayerId === p;
   };
 }
 
