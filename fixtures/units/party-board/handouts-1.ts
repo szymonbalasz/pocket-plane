@@ -23,8 +23,9 @@ const h = (r: R, i: number) => ({ handoutId: r.id("handouts-1", HANDOUT_TYPE, i)
 /**
  * PARTY §13 `handouts-1` (patch: handouts only): h1 "Mayor's Letter" (3 lines) → all; h2
  * "PARTY-P1-ONLY Thieves' Map" (thieves-map + text) → [player-1]; h3 "Secret Orders" →
- * unshared; h4 "Old Bounty" → all, then unshared; h5 "Ship Manifest" → unshared. The
- * `handout-shared` notifications (h1, h2, h4) arrive with slice 2's notification kind.
+ * unshared; h4 "Old Bounty" → all, then unshared; h5 "Ship Manifest" → unshared. Side
+ * effects: 3 `handout-shared` notifications (FR-PARTY-06): h1 all, h2 player-1, h4 all (its row
+ * and id stay after the unshare, OQ-PARTY-15).
  */
 export default defineFixture({
   key: "handouts-1",

@@ -1,4 +1,5 @@
-// PARTY §13 fixtures (FR-PARTY-28): bundle `party-board` contents from empty, deterministic, and
+// PARTY §13 fixtures (FR-PARTY-28): bundle `party-board` contents from empty (incl. the
+// `handout-shared` notifications, FR-PARTY-06), deterministic, and
 // the units as patches on `session-sim` (seams S10: no `creature-sheet` field changes in P core;
 // P4 adds the Torch ×2 move to Thorn's `items`).
 import { afterAll, describe, expect, test } from "bun:test";
@@ -138,6 +139,27 @@ describe("party-board fixtures (PARTY §13, FR-PARTY-28)", () => {
     // LOOT's pot is unaffected by item rows: 5 pp, 30 gp.
     expect([r.pot.pp, r.pot.gp, r.pot.sp, r.pot.ep, r.pot.cp]).toEqual([5, 30, 0, 0, 0]);
     const notes = (cid: string) => r.notes.filter((n) => n.campaignId === cid).map((n) => n.text);
+    // FR-PARTY-06: h1 all, h2 player-1, h4 all; h4's row and id stay after the unshare.
+    const shared = r.notes.filter((n) => n.campaignId === fixture && n.kind === "handout-shared");
+    expect(
+      shared.map((n) => [
+        n.text,
+        n.audience,
+        n.audiencePlayerId && r.players[n.audiencePlayerId],
+        n.payload,
+        n.state,
+      ]),
+    ).toEqual([
+      ["New handout: Mayor's Letter", "all", null, { handoutId: mine[0]?.id }, "info"],
+      [
+        `New handout: ${HANDOUTS_1.p1Only} Thieves' Map`,
+        "player",
+        "Player 1",
+        { handoutId: mine[1]?.id },
+        "info",
+      ],
+      ["New handout: Old Bounty", "all", null, { handoutId: mine[3]?.id }, "info"],
+    ]);
     expect(notes(fixture).slice(-3)).toEqual([
       "Party loot: Potion of healing ×2",
       "Party loot: Torch ×10",
@@ -151,6 +173,7 @@ describe("party-board fixtures (PARTY §13, FR-PARTY-28)", () => {
       SECOND_ITEM_NAME,
     ]);
     expect(notes(second)).toContain(`Party loot: ${SECOND_ITEM_NAME} ×1`);
+    expect(notes(second)).toContain(`New handout: ${SECOND_HANDOUT_TITLE}`);
   });
 
   test("FR-PARTY-28 deterministic: two loads give identical IDs and rows", async () => {

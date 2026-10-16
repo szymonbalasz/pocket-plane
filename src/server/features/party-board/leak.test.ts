@@ -8,6 +8,7 @@ import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
 import { HANDOUTS_1 } from "@fixtures/units/party-board/handouts-1";
 import { SECOND_HANDOUT_TITLE, SECOND_ITEM_NAME } from "@fixtures/units/party-board/party-second";
+import type { NotificationRecord } from "@shared/notifications/schemas";
 import {
   HANDOUT_BODY_TYPE,
   HANDOUT_TYPE,
@@ -21,6 +22,7 @@ import { asset, campaign, handout, player } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
 import { convergence, leakScan } from "../../ws/testing/convergence";
+import { NOTIFICATION_TYPE } from "../notifications/helpers";
 import { PARTY_INTENTS as P } from "./commands";
 
 const DM: Credential = { role: "dm", secret: TEST_SECRET };
@@ -269,14 +271,27 @@ describe("PARTY §13 leak tests (player-1, player-2)", () => {
       `${HANDOUT_TYPE}:delete`,
       `${HANDOUT_BODY_TYPE}:delete`,
     ]);
-    // After a reconnect + load: nothing of the poster for either player.
+    // After a reconnect + load: no poster record and never its body or image for either player.
+    // Its id and title stay in each gainer's own `handout-shared` row (OQ-PARTY-15).
     for (const [name, forbidden] of [
       ["Player 1", p1Forbidden()],
       ["Player 2", p2Forbidden()],
     ] as const) {
       const fresh = await h.live(cred(name));
       await loadBoard(fresh, [...allBodies(), poster]);
-      expectClean(fresh, [...forbidden, ...posterSecrets], `${name} fresh after unshare`);
+      expectClean(
+        fresh,
+        [...forbidden, "Reward 50 gp", assets["wanted-poster"] as string],
+        `${name} fresh after unshare`,
+      );
+      expect(fresh.store.records[HANDOUT_TYPE]?.[poster]).toBeUndefined();
+      expect(fresh.store.records[HANDOUT_BODY_TYPE]?.[poster]).toBeUndefined();
+      const own = (
+        Object.values(fresh.store.records[NOTIFICATION_TYPE] ?? {}) as NotificationRecord[]
+      ).filter((n) => (n.payload as { handoutId?: string }).handoutId === poster);
+      expect(own.map((n) => [n.kind, n.audience, n.audiencePlayerId, n.text])).toEqual([
+        ["handout-shared", "player", playerIds[name] as string, "New handout: Wanted Poster"],
+      ]);
       fresh.close();
     }
     await ok(dm, dm.intent(P.deleteHandout, { handoutId: poster }));
