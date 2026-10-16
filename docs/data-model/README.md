@@ -1128,7 +1128,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG, `complete`; spri
 | `token` | + `invisible` (bool, #210) | false | DM wire only when true; players never get the key | [FR-FOG-45](../specs/fog-of-war.md#6-functional-requirements) |
 | `scene_structure` | + `door_seen` (JSON `{<n>: playerId[]}`, nullable) | null = pre-v2: no door for any player until the backfill | server only | [FR-SCN-36](../specs/scene-tools.md#6-functional-requirements) |
 | `scene_structure.walls` / `doors` (JSON leaves) | coordinates are numbers with ≤ 2 decimals (more → `invalid`); integers stay valid; length ≥ 0.05 | no migration | as before | [FR-SCN-07](../specs/scene-tools.md#6-functional-requirements) |
-| `entity.statBlock.senses` (JSON leaf, both kinds) | `{visionFt, darkvisionFt: int 0–120 step 5, seesMagicalDarkness: bool, seesInvisible?: bool}` (zod only; `char.edit` key in V5) | absent = 0, 0, false, false | not on the other-players whitelist (DM + owner only) | [FR-CHARX-49 / -53](../specs/character-sheet-full.md#6-functional-requirements) |
+| `entity.statBlock.senses` (JSON leaf, both kinds) | `{visionFt, darkvisionFt: int 0–120 step 5, seesMagicalDarkness: bool, seesInvisible?: bool}` (zod in V0; `char.edit` key **built** in V5, [protocol §39](../protocol/README.md#39-sprint-3-sheet-senses-v5); `seesInvisible` stored only when true) | absent = 0, 0, false, false | not on the other-players whitelist (DM + owner only) | [FR-CHARX-49 / -53](../specs/character-sheet-full.md#6-functional-requirements) |
 | `vision` (record type, **derived**, no table) | `{id = sceneId:playerId, sceneId, playerId, blind, see, dark, inv?}` | none in V0 (no source) | that player only; DM on demand (View as) | [FR-FOG-39](../specs/fog-of-war.md#6-functional-requirements) |
 
 ### Explored memory (`fog_explored`, record type `fog-explored`) — owner [fog-of-war](../specs/fog-of-war.md#8-data-model)
@@ -1147,7 +1147,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG, `complete`; spri
 
 ## 27. Sprint 3: rule triggers core (R0)
 
-From [effect-modifiers](../specs/effect-modifiers.md#82-records) sprint 3 (MOD, `complete`; gate 1 #207–#209; [ADR-0043](../architecture/adr/0043-rule-triggers.md)). **Built by `fix/rt-core`** (R0, schema lock 2nd after V0): the tables, columns and zod below (drizzle push, push-safe defaults). No command writes the trigger tables yet (R4), and `rule-trigger` is not registered (R4 registers it lazy), so **nothing new reaches any wire**. Protocol side: [protocol §39](../protocol/README.md#39-sprint-3-rule-triggers-core-r0).
+From [effect-modifiers](../specs/effect-modifiers.md#82-records) sprint 3 (MOD, `complete`; gate 1 #207–#209; [ADR-0043](../architecture/adr/0043-rule-triggers.md)). **Built by `fix/rt-core`** (R0, schema lock 2nd after V0): the tables, columns and zod below (drizzle push, push-safe defaults). No command writes the trigger tables yet (R4), and `rule-trigger` is not registered (R4 registers it lazy), so **nothing new reaches any wire**. Protocol side: [protocol §40](../protocol/README.md#40-sprint-3-rule-triggers-core-r0).
 
 | Table / leaf | Change | Default (push-safe) | Visibility | Source |
 |---|---|---|---|---|

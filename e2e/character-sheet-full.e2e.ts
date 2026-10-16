@@ -1,6 +1,6 @@
 // e2e-bundle: character-sheet-full
 // Thin character-sheet-full flow (CHARX §13 E2E): player-1 creates "Brin", sets DEX 16 + Stealth
-// proficient, rolls Stealth → "+ 5" in the log; the DM gets the draft card, Review → Approve;
+// proficient, darkvision 60 (Senses line), rolls Stealth → "+ 5" in the log; the DM gets the draft card, Review → Approve;
 // player-1 gets the approval toast; player-2 sees Brin's summary card only. Permission matrix, leak scan, merge, crash, restart: bun test (character-sheet).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
@@ -100,6 +100,14 @@ test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-45 FR-CHARX-46 FR-CHARX-10 FR-CHARX-32 FR
   await expect(stealth).toHaveText("+3");
   await field(sheet1, "skills.stealth").click();
   await expect(stealth).toHaveText("+5");
+  // Sprint 3 (FR-CHARX-50 / -53): Senses line; darkvision 60 (Enter commits); Sees invisible is
+  // the DM's (disabled for the owner).
+  const senses = sheet1.getByTestId("charx-senses");
+  await expect(senses).toHaveText("Senses —");
+  await field(sheet1, "senses.darkvisionFt").fill("60");
+  await field(sheet1, "senses.darkvisionFt").press("Enter");
+  await expect(senses).toHaveText("Senses Darkvision 60 ft");
+  await expect(sheet1.getByTestId("charx-senses-invisible")).toBeDisabled();
   await sheet1.getByTestId("charx-edit-toggle").click();
   await expect(sheet1.getByTestId("char-sheet")).toHaveAttribute("data-editing", "false");
 
