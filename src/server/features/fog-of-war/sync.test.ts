@@ -152,7 +152,7 @@ describe("fog bundle over WS", () => {
         fill: "fog",
         box: [0, 0, 20, 14],
         runs: (fogOf(dm, ambushId) as FogRecord).runs,
-        shapes: [],
+        shapes: (fogOf(dm, ambushId) as FogRecord).shapes,
         darkness: [],
         explored: false,
       });

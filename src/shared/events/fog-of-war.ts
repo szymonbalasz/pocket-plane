@@ -2,12 +2,16 @@
 // has its own per-scene stack, FR-FOG-07). Changes: the `fog` upsert, every subject whose
 // copies change, `scene-structure` door flags, `vision` / `fog-explored` rows and token-changed
 // hook rows (FR-FOG-08, -35). FOG v2 events (darkness, explored, Invisible) are declared in V0;
-// their commands land in V1 / V2.
+// darkness and explored commands land in V1, `TokenInvisibleSet` in V2.
 import { FogEditKind, FogShape } from "@shared/fog-of-war/schemas";
+import { FogShapeGeom } from "@shared/fog-of-war/shapes";
 import { z } from "zod";
 import { defineEvent } from "./types";
 
-/** `fog.edit` / `fog.setAll`; `shape` only on rect / polygon edits. */
+/**
+ * `fog.edit` / `fog.setAll`; `shape` only on shape edits: the appended geometry (FR-FOG-05, V1
+ * on) or a sprint-2 legacy form (event-log rows written before V1).
+ */
 export const FogEdited = defineEvent({
   type: "FogEdited",
   payload: z
@@ -15,14 +19,14 @@ export const FogEdited = defineEvent({
       sceneId: z.string(),
       editId: z.string(),
       kind: FogEditKind,
-      shape: FogShape.optional(),
+      shape: z.union([FogShapeGeom, FogShape]).optional(),
     })
     .strict(),
   logged: true,
   undoable: false,
 });
 
-/** `fog.undo`: `editId` = the undo entry that was dropped. */
+/** `fog.undo`: `editId` = the undo entry that was dropped (a fog or darkness edit, FR-FOG-07). */
 export const FogUndone = defineEvent({
   type: "FogUndone",
   payload: z.object({ sceneId: z.string(), editId: z.string() }).strict(),

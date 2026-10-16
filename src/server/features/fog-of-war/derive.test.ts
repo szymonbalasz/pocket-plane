@@ -2,19 +2,19 @@
 import { describe, expect, test } from "bun:test";
 import { uniformMask } from "@shared/fog-of-war/mask";
 import type { FogLayerShape } from "@shared/fog-of-war/shapes";
-import { cellCentres, type SceneStatic, sameSeenBy, subjectCopies } from "./derive";
+import { cellCentres, type SceneStatic, sameSeenBy, sceneStatic, subjectCopies } from "./derive";
 
 /** Fogged base; a reveal rect over cells (0..3) × (0..3); darkness over cell (1, 1). */
 function scene(players: string[]): SceneStatic {
   const shapes: FogLayerShape[] = [{ op: "reveal", rect: [0, 0, 4, 4] }];
-  return {
+  return sceneStatic({
     sceneId: "s",
     campaignId: "c",
     mask: uniformMask("fog", [0, 0, 20, 20]),
     shapes,
     darkness: [{ id: "d1", circle: [1.5, 1.5, 0.5] }],
     players,
-  };
+  });
 }
 const block = (col: number, row: number, n = 1) => ({ col, row, w: n, h: n });
 const tok = (col: number, row: number, extra = {}) => ({

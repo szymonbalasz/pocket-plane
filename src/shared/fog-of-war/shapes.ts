@@ -277,6 +277,32 @@ export function shapeBox(s: ShapeLike): Box {
   return [x0, y0, x1, y1];
 }
 
+const shift = (v: number, d: number) => Math.round((v + d) * 100) / 100;
+
+/**
+ * FR-FOG-30 / -42: the geometry moved by `(dx, dy)` grid units, rounded back to 1/100 cell. The
+ * result may leave ±1,024: callers validate it with `FogShapeGeom`.
+ */
+export function translateShape(s: ShapeLike, dx: number, dy: number): FogShapeGeom {
+  const g = normaliseShape(s);
+  if ("rect" in g) {
+    const [a, b, c, d] = g.rect;
+    return { rect: [shift(a, dx), shift(b, dy), shift(c, dx), shift(d, dy)] };
+  }
+  if ("circle" in g) {
+    const [cx, cy, r] = g.circle;
+    return { circle: [shift(cx, dx), shift(cy, dy), r] };
+  }
+  return { polygon: g.polygon.map((v, i) => shift(v, i % 2 === 0 ? dx : dy)) };
+}
+
+/** The geometry alone (drops `op` / `id` / `seenBy`). */
+export function geomOf(s: ShapeLike): FogShapeGeom {
+  if ("rect" in s) return { rect: [...s.rect] as [number, number, number, number] };
+  if ("circle" in s) return { circle: [...s.circle] as [number, number, number] };
+  return { polygon: [...s.polygon] };
+}
+
 /** Segment `[x1, y1, x2, y2]` in grid units. */
 export type ShapeEdge = [x1: number, y1: number, x2: number, y2: number];
 
