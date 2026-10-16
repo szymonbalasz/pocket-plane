@@ -664,6 +664,20 @@ describe("FR-MOD-43 roll triggers", () => {
       "Savage",
     ]);
   });
+
+  test("FR-MOD-13 char.roll passes subject.row: a `row` Greataxe trigger adds to the sheet's Greataxe damage, a Handaxe one doesn't", () => {
+    const t = rtSetup({ inCombat: false });
+    t.trig({ characterId: t.brakkaId, name: "Savage", rule: part("each", ["greataxe"]) });
+    t.trig({ characterId: t.brakkaId, name: "Thrown", rule: part("each", ["Handaxe"]) });
+    const labels = (kind: "damage" | "attack") => {
+      const r = t.run<{ entryId: string }>("char.roll", { characterId: t.brakkaId, kind }, t.p1);
+      const e = t.s.db.select().from(gameLogEntry).where(eq(gameLogEntry.id, r.entryId)).get();
+      return (e?.payload as RollEntryPayload).map((i) => i.mods?.map((m) => m.label) ?? []);
+    };
+    expect(labels("damage")).toEqual([["Savage"]]);
+    // Attack + damage: the to-hit has no damage part; the damage row matches by name.
+    expect(labels("attack")).toEqual([[], ["Savage"]]);
+  });
 });
 
 describe("FR-MOD-51 crash safety", () => {

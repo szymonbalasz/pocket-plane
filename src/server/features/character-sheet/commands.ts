@@ -14,7 +14,7 @@ import {
 } from "@shared/character-sheet/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import type { RollCategory } from "@shared/dice-roll-log/schemas";
-import type { RollSubject } from "@shared/effect-modifiers/schemas";
+import { ROLL_ROW_MAX, type RollSubject } from "@shared/effect-modifiers/schemas";
 import { type CharacterRecord, SKILL_ABILITY } from "@shared/entities/schemas";
 import { CharacterHpAdjusted, CharacterRolled } from "@shared/events/character-sheet";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
@@ -40,18 +40,22 @@ export function authorizedCharacter(env: CommandEnv, characterId: string): Chara
 
 /**
  * FR-MOD-15: a character's roll subject by the spec's category: attack / damage (`via` spell for
- * spell rows), save / check of the ability (a skill → its ability), initiative. Healing and a
- * definition's (NPC sheet) rolls have none.
+ * spell rows; `row` = the attack / spell row's name for `row` filters, FR-MOD-13), save / check
+ * of the ability (a skill → its ability), initiative. Healing and a definition's (NPC sheet)
+ * rolls have none.
  */
 function subjectOf(
   c: { id: string; kind: string },
   category: RollCategory,
   input: { kind: string; ability?: RollSubject["ability"]; skill?: keyof typeof SKILL_ABILITY },
+  row: string | undefined,
 ): RollSubject | undefined {
   if (c.kind !== "character") return undefined;
   const creature = { characterId: c.id };
   const via = input.kind.startsWith("spell") ? ("spell" as const) : ("weapon" as const);
-  if (category === "attack" || category === "damage") return { creature, roll: category, via };
+  if (category === "attack" || category === "damage") {
+    return { creature, roll: category, via, ...(row ? { row: row.slice(0, ROLL_ROW_MAX) } : {}) };
+  }
   if (category === "saving-throw") return { creature, roll: "save", ability: input.ability };
   if (category === "ability-check") return { creature, roll: "check", ability: input.ability };
   if (category === "skill-check" && input.skill) {
@@ -98,8 +102,14 @@ export const charRoll = defineCommand({
     }
     const ability = ref.ability;
     const actor = { kind: "entity" as const, id: c.id, name: c.name };
+    const attack = !isAttackRowKind(input.kind)
+      ? null
+      : input.attackId === undefined
+        ? sheetAttack(c.statBlock)
+        : (c.statBlock.attacks.find((a) => a.id === input.attackId) ?? null);
+    const row = attack?.name ?? sheet?.spells.find((x) => x.id === input.spellId)?.name;
     const rolls = specs.map((s, i) => {
-      const subject = subjectOf(c, s.category, { ...input, ability });
+      const subject = subjectOf(c, s.category, { ...input, ability }, row);
       return dice.evaluate(env, {
         expression: s.expression,
         mode: s.d20 ? input.mode : "normal",
@@ -124,11 +134,6 @@ export const charRoll = defineCommand({
       // FR-CHARX-22: a definition's name can leak a renamed or hidden creature (ADR-0024).
       public: definition ? false : input.public,
     });
-    const attack = !isAttackRowKind(input.kind)
-      ? null
-      : input.attackId === undefined
-        ? sheetAttack(c.statBlock)
-        : (c.statBlock.attacks.find((a) => a.id === input.attackId) ?? null);
     env.emit({
       type: CharacterRolled.type,
       campaignId: env.actor.campaignId,
