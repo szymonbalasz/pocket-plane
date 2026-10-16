@@ -24,6 +24,7 @@ import sceneTools from "./scene-tools";
 import sceneToolsProps from "./scene-tools-props";
 import scenes from "./scenes";
 import sessionSim from "./session-sim";
+import sessionSim7 from "./session-sim-7";
 import syncProbe from "./sync-probe";
 import vision from "./vision";
 
@@ -54,4 +55,5 @@ export const bundles: readonly Bundle[] = [
   compendium,
   ruleTriggers,
   vision,
+  sessionSim7,
 ];
