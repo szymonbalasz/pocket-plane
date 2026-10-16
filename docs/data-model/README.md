@@ -1240,3 +1240,41 @@ From [effect-modifiers](../specs/effect-modifiers.md#82-records) sprint 3. **Bui
 | damage card `mode` | `cbt.attack` | Now the to-hit roll's final mode (was the requested one) | FR-MOD-37 |
 
 - **CON-44:** no new record type or snapshot field (R0 measured every R row: [§27](#27-sprint-3-rule-triggers-core-r0)). `mod-trigger` reminders are small info rows (≈ 0.4 KB each) in the notifications window like any info card.
+
+## 31. Sprint 3: party board core (P core)
+
+From [party-board](../specs/party-board.md#8-data-model) (PARTY, `complete`; gate 1 #207, #208; seams S8, S10; build rulings #221). **Built by `build/party-core`** (schema lock 3rd, after R0): two tables, one `loot_entry` column + kind (drizzle push, push-safe). Three **lazy** record types ([ADR-0045](../architecture/adr/0045-lazy-record-types.md)): in no snapshot, loaded with `sync.load`. Protocol side: [protocol §44](../protocol/README.md#44-sprint-3-party-board-core-p-core).
+
+| Table / leaf | Change | Default (push-safe) | Visibility | Source |
+|---|---|---|---|---|
+| `handout` (new; record types `handout` + `handout-body`, both lazy) | see below | — | DM full; a player only if `sharedWith.mode = all` or they are listed: header redacted (`sharedWith → {mode}`), body without `sharedWith`; else hidden | [FR-PARTY-01, -07](../specs/party-board.md#61-handouts) |
+| `party_item` (new; record type `party-item`, lazy) | see below | — | DM + every player of the campaign, full (scope gate) | [FR-PARTY-17](../specs/party-board.md#63-party-inventory) |
+| `loot_entry` | kind + `item` (`LOOT_ENTRY_KINDS`, `@shared/events/party-loot`); + `qty` (int 1–9 999 \| null; item rows only). On the wire `qty` only when set | null; old rows parse | as the row (`loot-entry`) | [FR-PARTY-25](../specs/party-board.md#64-gold-ledger-party-loot-evolved) |
+
+### Handout (`handout`, record types `handout`, `handout-body`) — owner [party-board](../specs/party-board.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, seq | ID, ID → Campaign, int | `env.ctx.ids`; `seq` DB-assigned (`handoutSeqNext`), unique. ≤ 200 per campaign (command) | FR-PARTY-01 |
+| title | text 1–80 | Clean text | FR-PARTY-02 |
+| body | text 0–10 000 | Clean text keeping `\n` / `\t`; only in `handout-body` | FR-PARTY-02 |
+| imageAssetIds | **JSON leaf**, 0–10 unique asset IDs | Each via `assets.require` (no FK) | FR-PARTY-02 |
+| sharedWith | **JSON leaf** `{mode: none \| all \| players, playerIds ≤ 20}` (`SharedWith`) | The only visibility input; `none` = unshared; ids are players of the campaign at share time | FR-PARTY-05, -07 |
+| rev | int ≥ 1 | 1 at create; + 1 per content update (`party.updateHandout`); a share doesn't bump it | FR-PARTY-04 |
+| bodyRev | int ≥ 1 | **Build detail:** the `rev` at which the body last changed = `handout-body.rev`, so a title / image update sends no body change (FR-PARTY-04) and a fresh load still equals the store | FR-PARTY-04 |
+| createdAt, updatedAt, sharedAt | timestamp ×2, timestamp \| null | `sharedAt` = now iff some player newly gains access | FR-PARTY-05 |
+
+Indexes unique `handout_seq`, `handout_campaign_seq` (`campaign_id`, `seq`). Header record = every field but `body` / `bodyRev`; body record = `{id, campaignId, body, rev (= bodyRev), sharedWith}`.
+
+### Party item (`party_item`, record type `party-item`) — owner party-board
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, seq | ID, ID → Campaign, int | `seq` DB-assigned (`partyItemSeqNext`); ≤ 60 rows per campaign (command) | FR-PARTY-17 |
+| name, qty, notes | text 1–60, int 1–9 999, text 0–120 | Merge key (name trimmed, case-insensitive; notes exact): `party.addItem` merges into the matching row | FR-PARTY-18, -19 |
+| createdAt, updatedAt | timestamp ×2 | `ctx.clock` | PARTY §8 |
+
+Indexes unique `party_item_seq`, `party_item_campaign_seq` (`campaign_id`, `seq`).
+
+- **Item rows in the gold ledger:** `party.addItem` writes `loot_entry {kind: item, world → party, text = name, qty, coins 0}` and a `loot-received` notification; pot and wallets unaffected (coins 0). Moves (`party ↔ character`) come with P4.
+- **Snapshot size** (CON-44, #208; PARTY's `con44.test.ts`): heavy harness on `session-sim` + PARTY's units + the §12 board at max length (30 handouts, 10 with 3 images, 20 shared all / 5 player-1 / 5 unshared; 60 party items; every one of the 100 window loot rows an item row with `qty` 9 999): DM 672,902 → 674,002 B (**+1,100**, all `loot-entry.qty`; 374,574 B left of 1 MiB), every player **+1,100** (max 281,281 B of 512 KiB). `handout`, `handout-body`, `party-item` in no snapshot. Load acks (`lazyLoadSizes`): 30 headers DM 12,009 B (player max 8,658 B); worst body chunk (30 bodies at 10,000 chars) 255,340 B; 60 items 23,400 B.

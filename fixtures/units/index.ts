@@ -45,6 +45,10 @@ import fogAmbushPartial from "./fog-of-war/fog-ambush-partial";
 import fogScn from "./fog-of-war/fog-scn";
 import syncProbes from "./live-sync/sync-probes";
 import notificationsTest from "./notifications/notifications-test";
+import handoutImages from "./party-board/handout-images";
+import handouts1 from "./party-board/handouts-1";
+import partyItems1 from "./party-board/party-items-1";
+import partySecond from "./party-board/party-second";
 import loot1 from "./party-loot/loot-1";
 import lootSecond from "./party-loot/loot-second";
 import lootWallets from "./party-loot/loot-wallets";
@@ -114,4 +118,8 @@ export const units: readonly Fixture[] = [
   charBrakka,
   trgBrakka,
   trgCombat,
+  handoutImages,
+  handouts1,
+  partyItems1,
+  partySecond,
 ];
