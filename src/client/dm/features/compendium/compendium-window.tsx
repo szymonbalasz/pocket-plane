@@ -1,5 +1,6 @@
-// DM `cmp.compendium` (FR-CMP-18–21): the shared body with the DM's credential, the import
-// panel on top, Monsters tab and monster rows as drag sources. The session module is imported
+// DM `cmp.compendium` (FR-CMP-18–21, -24/25/27): the shared body with the DM's credential, the
+// import panel on top, New homebrew in the toolbar, entry actions (Derive…, Clone / Edit /
+// Delete), Monsters tab and monster rows as drag sources. The session module is imported
 // lazily (it reads localStorage at load; keeps the registry testable), as `combat-tracker/rest`.
 import type { Api } from "@ui/api";
 import { Skeleton } from "@ui/components/ui/primitives";
@@ -7,6 +8,7 @@ import { CompendiumBody } from "@ui/features/compendium/CompendiumWindow";
 import { compendiumWindowBase } from "@ui/features/compendium/window";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { useEffect, useState } from "react";
+import { EntryActions, NewHomebrew } from "./EntryActions";
 import { ImportPanel } from "./ImportPanel";
 
 function DmCompendium() {
@@ -19,7 +21,15 @@ function DmCompendium() {
     };
   }, []);
   if (!api) return <Skeleton className="m-2 h-8" />;
-  return <CompendiumBody api={api} viewer="dm" top={<ImportPanel api={api} />} />;
+  return (
+    <CompendiumBody
+      api={api}
+      viewer="dm"
+      top={<ImportPanel api={api} />}
+      toolbar={<NewHomebrew api={api} />}
+      entryActions={(data) => <EntryActions api={api} data={data} />}
+    />
+  );
 }
 
 export const dmCompendiumWindow = defineWindow({

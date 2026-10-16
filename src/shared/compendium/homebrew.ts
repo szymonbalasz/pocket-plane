@@ -15,7 +15,7 @@ export const PutEntryBody = z.strictObject({
   /** A visible entry (Clone's base); informational, no link (FR-CMP-25). */
   derivedFromId: Id.nullable().default(null),
 });
-export type PutEntryBody = z.input<typeof PutEntryBody>;
+export type PutEntryBody = z.output<typeof PutEntryBody>;
 
 export const PutEntryResponse = z.strictObject({ entryId: Id });
 export type PutEntryResponse = z.infer<typeof PutEntryResponse>;
@@ -30,7 +30,7 @@ export const DeriveMonsterBody = z.strictObject({
   /** Copy traits / actions text into the NPC sheet's Features. */
   copyText: z.boolean().default(true),
 });
-export type DeriveMonsterBody = z.input<typeof DeriveMonsterBody>;
+export type DeriveMonsterBody = z.output<typeof DeriveMonsterBody>;
 
 export const DeriveMonsterResponse = z.strictObject({ entity: EntityRecord });
 export type DeriveMonsterResponse = z.infer<typeof DeriveMonsterResponse>;
