@@ -25,6 +25,7 @@ import {
   useCombatants,
   useStartedEncounter,
 } from "@ui/features/combat-tracker/store";
+import { useCreatureLookup } from "@ui/features/compendium/lookup";
 import { useFreeArea } from "@ui/features/play-shell/free-area";
 import { useSceneLoaded } from "@ui/features/scenes-map/scene-window";
 import { useRecords } from "@ui/sync/store";
@@ -37,6 +38,9 @@ import { freeAreaCell } from "../combat-tracker/place-at";
 import { creatureRows } from "../entities/list";
 import { useDmMap, viewedScene } from "../scenes-map/view-state";
 import { useCbtxDialogs } from "./store";
+
+/** The DM REST client, imported lazily (the session reads localStorage at import). */
+const api = () => import("../campaign-management/session").then((m) => m.api);
 
 export interface AddRow {
   id: string;
@@ -75,7 +79,6 @@ export function AddForm() {
   const enc = useStartedEncounter();
   const combatants = useCombatants(enc?.id);
   const entities = useRecords<unknown>("entity");
-  const imported = useRecords<unknown>("imported-entity");
   const players = useRecords<PlayerRecord>("player");
   const tokens = useRecords<TokenRecord>("token");
   const scenes = useRecords<SceneRecord>("scene");
@@ -83,14 +86,18 @@ export function AddForm() {
   const requested = useDmMap((s) => s.viewedSceneId);
   const viewed = viewedScene(scenes, folders, requested);
   const free = useFreeArea();
-  const defs = useDefinitions();
-  const options = useMemo(() => {
+  // Store rows: customs + characters not in combat; imported monsters come from the server
+  // search (FR-CMP-17), merged by `useCreatureLookup`.
+  const storeOptions = useMemo(() => {
     const inCombat = new Set(combatants.filter((c) => c.kind === "pc").map((c) => c.entityId));
-    return creatureRows(entities, imported, players, "all").filter(
+    return creatureRows(entities, [], players, "all").filter(
       (r) => r.kind === "monster" || !inCombat.has(r.id),
     );
-  }, [entities, imported, players, combatants]);
+  }, [entities, players, combatants]);
+  const [query, setQuery] = useState("");
+  const options = useCreatureLookup(api, storeOptions, query);
   const [rows, setRows] = useState<AddRow[]>([]);
+  const defs = useDefinitions(rows.map((r) => r.id));
   const [createTokens, setCreateTokens] = useState(true);
   const [hidden, setHidden] = useState(true);
   const scene = scenes.find((s) => s.id === enc?.sceneId) ?? null;
@@ -138,10 +145,12 @@ export function AddForm() {
         rows={options}
         testId="cbtx-add-picker"
         placeholder="Add monster or character…"
+        onQueryChange={setQuery}
         onPick={(id) => {
           const o = options.find((x) => x.id === id);
           if (!o) return;
-          const kind = o.kind === "character" ? "character" : "monster";
+          const fromStore = storeOptions.find((x) => x.id === id);
+          const kind = fromStore?.kind === "character" ? "character" : "monster";
           setRows((rs) => addPick(rs, { id: o.id, name: o.name, kind }));
         }}
       />

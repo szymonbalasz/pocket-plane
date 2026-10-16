@@ -69,6 +69,7 @@ import {
   type TriggerOwnerFacts,
   type TriggerOwnerRef,
   triggerOwnerFacts,
+  useOwnerDefinitions,
   wordsContext,
 } from "./trigger-owner";
 
@@ -446,7 +447,7 @@ export function TriggerForm({ start, onDone }: { start: TriggerEditorStart; onDo
   const { send, disabled } = useModIntent();
   const [d, setD] = useState<TriggerDraft>(start.draft);
   const { owner } = start;
-  const facts = triggerOwnerFacts(store, owner);
+  const facts = triggerOwnerFacts(store, owner, useOwnerDefinitions(owner));
   const options = presetOptions(store, owner);
   const features = (facts.features ?? []).filter(hasUses);
   const set = (patch: Partial<TriggerDraft>) => setD((x) => ({ ...x, ...patch }));
@@ -712,7 +713,8 @@ export function TriggerEditorDialog({
   onClose(): void;
 }) {
   const store = useSync((s) => s.store);
-  const name = start ? triggerOwnerFacts(store, start.owner).name : "";
+  const definitions = useOwnerDefinitions(start?.owner ?? null);
+  const name = start ? triggerOwnerFacts(store, start.owner, definitions).name : "";
   return (
     <Dialog open={start !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent

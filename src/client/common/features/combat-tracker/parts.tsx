@@ -70,14 +70,21 @@ export function CreatureLookup({
   disabled = false,
   testId = "cbt-lookup-input",
   placeholder = "Add creature…",
+  onQueryChange,
 }: {
   rows: readonly LookupRow[];
   onPick(id: string): void;
+  /** The typed text (e.g. to search the server for imported monsters, FR-CMP-17). */
+  onQueryChange?(q: string): void;
   disabled?: boolean;
   testId?: string;
   placeholder?: string;
 }) {
-  const [q, setQ] = useState("");
+  const [q, setQuery] = useState("");
+  const setQ = (v: string) => {
+    setQuery(v);
+    onQueryChange?.(v);
+  };
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const shown = lookupMatches(rows, q);

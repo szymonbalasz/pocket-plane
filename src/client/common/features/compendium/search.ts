@@ -8,10 +8,20 @@ import { type Api, call } from "../../api";
 /** FR-CMP-17: lookups and the Creatures window wait this long after the last keystroke. */
 export const LOOKUP_DEBOUNCE_MS = 150;
 
+/**
+ * The client's REST client, or a loader of it (the DM session module reads localStorage at
+ * import, so DM code imports it lazily to keep registries testable).
+ */
+export type ApiSource = Api | (() => Promise<Api>);
+
 /** Query values as the URL carries them (strings); undefined keys are left out. */
 export type SearchParams = { [K in keyof SearchQuery]?: string };
 
-export async function searchCompendium(api: Api, params: SearchParams): Promise<SearchResponse> {
+export async function searchCompendium(
+  source: ApiSource,
+  params: SearchParams,
+): Promise<SearchResponse> {
+  const api = typeof source === "function" ? await source() : source;
   const query: Record<string, string> = {};
   for (const [k, v] of Object.entries(params)) if (v !== undefined) query[k] = v;
   const body = await call<unknown>(api.api.compendium.search.$get({ query }));
@@ -35,7 +45,7 @@ export interface SearchOptions {
  * changed meanwhile) is dropped. Errors leave the last page and report `error`.
  */
 export function useCompendiumSearch(
-  api: Api,
+  api: ApiSource,
   params: SearchParams,
   { enabled = true, debounceMs = LOOKUP_DEBOUNCE_MS }: SearchOptions = {},
 ): CompendiumSearch {

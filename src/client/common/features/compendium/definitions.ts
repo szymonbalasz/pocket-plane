@@ -16,7 +16,7 @@ import { useLazyRecords, useRecords, useSync } from "../../sync/store";
 
 export interface Definitions {
   /** Campaign definitions (every full `entity` row) + the loaded imported ones among `ids`. */
-  byId: ReadonlyMap<string, DefinitionRecord>;
+  byId: Map<string, DefinitionRecord>;
   /** Imported part: `ready` once every requested imported id is loaded (players: always). */
   state: LazyStatus;
   /** Loads the failed ids again (after `error`). */
