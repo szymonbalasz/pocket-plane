@@ -123,7 +123,9 @@ export const attackCommand = defineCommand({
         attackerName: c.name,
         attackName: attack.name,
         damageType: attack.damageType,
-        mode: input.mode,
+        // FR-MOD-37 (R4): the to-hit's final mode (after the roll hooks' `modes()`), not the
+        // roller's request; `cbt.rollDamage` hands it to `mode` filters as `toHitMode`.
+        mode: toHit.mode,
         crit,
         // FR-MOD-16/19: the card's totals include the parts, `mods` name them.
         toHit: withCardMods(cardToHitOf(toHit), toHit),

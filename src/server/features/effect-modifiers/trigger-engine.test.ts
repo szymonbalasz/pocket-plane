@@ -228,6 +228,25 @@ describe("FR-MOD-37 offers at the damage roll", () => {
   });
 });
 
+describe("FR-MOD-37 card mode (R4)", () => {
+  test("FR-MOD-37 the card stores the to-hit's final mode (its roll row's), which `cbt.rollDamage` passes to mode filters", () => {
+    const t = rtSetup();
+    const sa = sneak(t);
+    t.nextTo("Thorn", 1);
+    const { cardId } = t.attack("Thorn", { rolls: "toHit", mode: "advantage" });
+    const p = t.card(cardId);
+    const row = t.s.db
+      .select()
+      .from(roll)
+      .where(eq(roll.id, p.toHit?.rollId as string))
+      .get();
+    expect([p.mode, row?.mode]).toEqual(["advantage", "advantage"]);
+    t.rollDamage("Thorn", 3);
+    expect(t.card(cardId).damage?.triggers?.[0]).toMatchObject({ triggerId: sa });
+    expect(t.card(cardId).damage?.triggers?.[0]?.untick).toBeUndefined();
+  });
+});
+
 describe("FR-MOD-34 / -37 never fails the roll", () => {
   test("FR-MOD-34 a trigger over 25 dice at fire time (level raised in the DB) → skipped with a DM note, the roll commits", () => {
     const t = raging();
