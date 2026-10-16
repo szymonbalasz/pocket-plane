@@ -12,7 +12,9 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | R0 rule-trigger core | — | — | Merged (52c72da, #220) | — |
 | P core | `build/party-core` (w30) | build-party-core | Building | Review → merge → P2 ∥ P3, C1 |
 | R4 trigger engine | `build/rule-triggers` (w41) | build-rule-triggers-engine | Building | Review → R5, R6, R7 |
-| R1 tier 2 server | `build/mod-tier2` (w42) | build-mod-tier2-server | Building | Review → R2 |
+| R1 tier 2 server | — | — | Merged (c086e34, #222) | R2 |
+| R3 tier 3 uses | `build/mod-tier3` (w4A) | build-mod-tier3 | Building | Walkthrough → R6 |
+| Empty event frames (V0 bug) | `fix/empty-event-frames` (w49) | build-empty-event-frames | Building | Merge |
 | V5 sheet senses | — | — | Merged (03e108b, #219) | — |
 | Lazy record types | — | — | Merged (6591646, #218) | — |
 | D1 dice tray | — | — | Merged (892819e, #214) | R2 builds on it |
@@ -21,7 +23,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | R early: formula + rule zod + presets | — | — | Merged (2d6d4c8) | R0 builds on it |
 | C early: bundled SRD 5.1 + adapter | — | — | Merged (5b5aeb5, #213) | C1 wires it |
 | P early: party-board pure `@shared` | — | — | Merged (fc24c39) | P core |
-| V1 fog shapes + darkness (static) | `build/fog-shapes` (w3Z, slot 0) | test-fog-shapes (port 4103) | Built; walkthrough (static steps on `fog`) | Merge → V4 ∥ V2 |
+| V1 fog shapes + darkness (static) | `build/fog-shapes` (w3Z, slot 0) | — | Walkthrough 8/9 (step 7 = V0 empty-frame bug, not V1); merging | V4 ∥ V2 |
 | Queue | — | — | V5 → V1 → (V4 ∥ V2) → V3; R0 → R1 ∥ R4 → R2 / R3 / R5–R7; `fix/lazy-records` → P core → P2 ∥ P3 → P4; C1 → C2 → C3, C4; D3, D2, D4 | Per locks below |
 | Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | BL-06 (#206), BL-02 (#211) merged | Per §3a |
 
@@ -30,7 +32,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 - `build/fog-shapes` (V1): canvas lock 1st, fog events.
 - `build/party-core`: `src/server/db/` (schema 3rd), party events, record-type registry lines.
 - `build/rule-triggers` (R4): MOD registry lines, combat `attack.ts` / `damage.ts` caller lines, notification kinds line.
-- `build/mod-tier2` (R1): dice-roll-log `evaluate.ts` + `src/shared/dice-roll-log/`.
+- `build/mod-tier3` (R3): character-sheet folder (sheet lock 2nd; `resources.ts`).
+- `fix/empty-event-frames`: `src/shared/protocol/`, client sync store.
 - Order after: schema P core → C1 → D2; canvas V1 → V4 → V3; sheet R3 → R6 → C2 → D4 → P4 / C4; combat R7 → C2; dice-roll-log client R2 (after R1).
 
 ## Pending DM decisions

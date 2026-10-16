@@ -1227,7 +1227,7 @@ From [fog-of-war](../specs/fog-of-war.md) v2 (FOG, `complete`; gate 1 #207, #208
 - **Fog lines** (`fog-of-war/hooks.ts`: visibility; `lifecycle.ts`: scene + player hooks; `derive.ts`, `rederive.ts`, `backfill.ts`): static per-player copies (data model §26); fog commands re-derive with `rederiveScene` (undo entries keep `prevShapes` / `prevDarkness`, `rev` + 1); `created` writes the v2 defaults; `duplicated` copies shapes / darkness / setting (not memory, `rev` 0, not stale); `deleting` lists the `fog` delete and every `fog-explored` row. Start hook `fog-of-war.seen-by-backfill` (FR-FOG-40) before listen.
 - **Shared geometry** (pure): `@shared/fog-of-war/shapes` (zod `Dec2`, `FogShapeGeom`, `FogShapeOp`, `FogLayerShape`, `DarknessShape`, `DarknessRow`; caps 100 shapes / 20 darkness / 16 KiB row / 3–64 vertices / circle 0.5–60; `shapeProblem`, `shapeContains` (exact on 1/100-cell integers, boundary-inclusive, even-odd), `shapeBox`, `shapeEdges` (circle as a circumscribed polygon), `legacyShape` (sprint-2 forms → the same cells), `staticState`, `inDarkness`); `@shared/fog-of-war/vision` (`sightPolygon(origin, r, occluders)`: two-pass angular sweep with radius culling, 64-gon bound, rounded to 0.01; `sightPolygons`, `playerVision` (blind, `see`, `dark`, `inv`), `pointVisible`, `invisibleSeen`, `prepareStaticLayer` / `samplePoint`, `pointInPolygon`, `polygonCells`). `@shared/scene-tools`: segment coordinates ≤ 2 decimals, `SEGMENT_MIN_LENGTH` 0.05, `blockingSegments` on coordinates scaled by 200 (exact), `sightOccluders`, `doorSamplePoints`, `wallHint`.
 - **Benchmark** (`vision.bench.test.ts`, V0 exit gate, FOG §12; median ms): one polygon typical 0.14 / caps 0.55 (≤ 2 / ≤ 10); a move 0.88 / 6.80 (≤ 10 / ≤ 30); full-scene re-derive 2.91 / 21.07 (≤ 20 / ≤ 60); `vision` record at 4 sources ≤ 22,430 B (≤ 48 KiB). Caps = 2,000 segments within r 24, 100 fog + 20 darkness shapes, 200 tokens × 16 cells, 6 players × 4 sources.
-- **Events** (declared, logged, not undoable; commands in V1 / V2): `DarknessPlaced` / `DarknessMoved` / `DarknessRemoved` / `DarknessCleared` `{sceneId, editId, darknessId?}`, `FogExploredSet {sceneId, on}`, `ExploredForgotten {sceneId}`, `TokenInvisibleSet {sceneId, tokenId, invisible}`; `FogEditKind` gains the v2 kinds.
+- **Events** (declared, logged, not undoable; darkness / explored commands built in V1, [§42](#42-sprint-3-freeform-fog--darkness-v1); `TokenInvisibleSet` in V2): `DarknessPlaced` / `DarknessMoved` / `DarknessRemoved` / `DarknessCleared` `{sceneId, editId, darknessId?}`, `FogExploredSet {sceneId, on}`, `ExploredForgotten {sceneId}`, `TokenInvisibleSet {sceneId, tokenId, invisible}`; `FogEditKind` gains the v2 kinds.
 - **CON-44** ([§11](#11-conflicts-log), #208), measured: data model §26.
 
 ## 38. Sprint 3: lazy record types
@@ -1290,9 +1290,45 @@ From [effect-modifiers](../specs/effect-modifiers.md) tier 2 (MOD, `complete`; F
 | Payload (`roll` items) | `dice.evaluate` fills each part's and offer's per-die `dice` (≤ 20, notation order) from the row `rollExtra` made; `mods[]` carry `dice?`, `type?`; item `offered?` from the hooks' offers (label iff `public`, no settle facts, **not in `total`**), ids in `rollIdsOf`. `dmPayload`: a part / hint with `triggerId` is named `{triggerId, label}`, else `{effectId, label}`; `offered [{triggerId, label}]`; entry `notes` (≤ 4, each clipped to 80) — a `dmPayload` with only notes is written. Card parts (`withCardMods`) drop per-die `dice` (roll entry only) |
 | Apply hook line `effect-modifiers.target-facts` (`applyHooks`, FR-MOD-24, -25) | Per target: effective AC = stored + Σ `flat` on `ac` of its active effects (PC target: its character's) → `targetAc` (row, line, hit hint); `dmPayload.acMods` (≤ 6 `{effectId, label, value}`) when any. On a **Hit** row with a known damage type: `dmPayload.defense {level, label}` from its `defense` parts (`immunity` wins; resistance + vulnerability → `both`; label = the effects' labels). Facts only: `extraRaw` 0, no rows; the DM's multiplier is applied as sent. Players never get them (`dmPayload`, `hp-change` DM only) |
 | Not wired here (callers, other locks) | Roll intents carry no `manualParts` yet (`char.roll`, `cbt.attack`, `cbt.rollDamage`, `cbt.rollAbility`, `cbt.rollInitiative`, `cbtx.rollConcentration`, `cbtx.rollDeathSave`: R2 / owners add `manualParts?` and pass it on). `cbt.attack`'s card `mode` and `CharacterRolled.mode` still copy the intent's mode; the final mode is the to-hit row's `mode` (R7 / combat lock: card `mode` = `toHit.mode`, read by `subject.toHitMode`) |
-## 42. Sprint 3: rule-trigger engine (R4)
 
-From [effect-modifiers](../specs/effect-modifiers.md) sprint 3 (MOD, `complete`; [ADR-0043](../architecture/adr/0043-rule-triggers.md)). **Built by `build/rule-triggers`** (R4) on [§40](#40-sprint-3-rule-triggers-core-r0)'s types. Card text, popup chips and outcome-line rendering are R7; the Triggers block and editor R6; the `rule-triggers` bundle R5. Data side: [data model §29](../data-model/README.md#29-sprint-3-rule-trigger-engine-r4).
+## 42. Sprint 3: freeform fog + darkness (V1)
+
+From [fog-of-war](../specs/fog-of-war.md) v2 (FOG §14 slice V1). **Built by `build/fog-shapes`** (canvas lock 1st): the fog / darkness / explored intents below, one undo stack over shapes and darkness (#207 G12), the static re-derive with darkness (no vision source before V2) and the static part of the per-player darkness filter (FR-FOG-44, #207 G11), the DM tools and the DM + player static render. Supersedes [§35](#35-sprint-2-phase-2-fog-of-war)'s `fog.edit` row (raster retired). Data side: [data model §27](../data-model/README.md#29-sprint-3-freeform-fog--darkness-v1).
+
+**Intents** (DM only, ADR-0021 D; a player → `forbidden`; scene not in `ctx.campaignId` → `not_found`; any scene, prep or live, FR-FOG-09). Each is one transaction: `fog` row (`rev` + 1) + undo entry + scene re-derive + one log entry → one event (FR-FOG-08).
+
+| Intent | Payload (zod, `@shared/fog-of-war/schemas`) | Ack | Rejects |
+|---|---|---|---|
+| `fog.edit` | `{sceneId, op: reveal \| fog \| explored \| hide, shape}`; `shape` = `{rect \| polygon \| circle}` (`FogShapeGeom`, FR-FOG-26) or a sprint-2 legacy form (`{kind: rect, c0, r0, c1, r1}` cells → `rect [c0, r0, c1 + 1, r1 + 1]`; `{kind: polygon, points}`); `hide` = `fog` | `{editId}`: **every edit appends** one shape (no no-op) | `invalid` (zod; "Edges can't cross" / "The shape has no area"); `conflict` "Fog too detailed — use Fog all or Reveal all to start over" (> 100 shapes or DM row > 16 KiB, FR-FOG-27; nothing written) |
+| `fog.setAll` | `{sceneId, fogged}` | `{editId \| null}`: base → uniform over the current box, `shapes: []`, darkness / setting / memory kept; same base and no shapes → null | `not_found` |
+| `fog.undo` | `{sceneId, expectedEditId}` | — | `conflict` "Fog changed — check and undo again" / "Nothing to undo" |
+| `fog.placeDarkness` | `{sceneId, shape: FogShapeGeom}` | `{darknessId, editId}` (id from `ctx.ids`) | `invalid` (as `fog.edit`); `conflict` "Too many darkness areas" (> 20) / "Fog too detailed…" (row > 16 KiB) |
+| `fog.moveDarkness` | `{sceneId, darknessId, dx, dy}` (grid units, ≤ 2 decimals) | `{editId \| null}` (0, 0 → null) | `not_found` "Darkness area not found"; `invalid` (moved shape outside ±1,024) |
+| `fog.removeDarkness` | `{sceneId, darknessId}` | `{editId}` | `not_found` |
+| `fog.clearDarkness` | `{sceneId}` | `{editId \| null}` (none → null) | — |
+| `fog.setExplored` | `{sceneId, on}` | — (same value → no-op, no event); not in the undo stack | — |
+| `fog.forgetExplored` | `{sceneId}` | — (no rows → no-op); deletes every `fog-explored` row of the scene | — |
+
+**Undo** (FR-FOG-07): one LIFO stack per scene over `fog.edit` / `fog.setAll` and the four darkness intents, ≤ 20, `expectedEditId` guard; an entry restores base + shapes + darkness as before (a removed / cleared darkness comes back with the same id); pre-v2 entries (`prevShapes` / `prevDarkness` null) → shapes `[]`, darkness kept. Kinds: legacy `fog.edit` forms with `reveal` / `hide` keep the sprint-2 kinds (`reveal-rect`, `hide-polygon`, …); v2 edits write `reveal-shape` / `fog-shape` / `explored-shape`; darkness writes `darkness-place` / `-move` / `-remove` / `-clear`.
+
+**Events** (logged, not ADR-0016-undoable)
+
+| Event | Payload | Changes (in order) |
+|---|---|---|
+| `FogEdited` | `{sceneId, editId, kind, shape?}`; `shape` = the appended geometry (v2) on shape edits; event-log rows from before V1 may carry a legacy form | `fog` upsert; subjects whose copies change (`token`, `scene-prop`, `aoe-template`, `scene-structure` doors); token-hook rows |
+| `FogUndone` | `{sceneId, editId}` (may undo a darkness edit) | as `FogEdited` |
+| `DarknessPlaced` / `DarknessMoved` / `DarknessRemoved` | `{sceneId, editId, darknessId}` | as `FogEdited` |
+| `DarknessCleared` | `{sceneId, editId}` | as `FogEdited` |
+| `FogExploredSet` | `{sceneId, on}` | `fog` upsert |
+| `ExploredForgotten` | `{sceneId}` | `fog-explored` deletes; `fog` upsert when a darkness `seenBy` shrinks |
+
+- **Per player** (FR-FOG-44, static part): a darkness edit reaches a player as a `fog` upsert only if that player's filtered `darkness` changed; otherwise the identical-upsert drop leaves the event empty for them (`cause` only, the accepted timing side channel, FOG §11). The DM wire never carries `seenBy` (snapshot, events, `sync.loadScene` acks).
+- **Static derive** (FR-FOG-34 without sources): a sample point is visible iff statically clear (base, then shapes in order; Explored counts as hidden for records) and outside every darkness shape. Re-derive order: darkness `seenBy` (the `fog` row, listed first only when no fog command lists its own), then subjects, then hook rows.
+- **Client** (canvas lock): `canvas-tools.ts` keeps fog's line; `ToolPointerHandlers` gains the optional `menu(e) → boolean` (right press off tokens; true = the tool took it, else the laser starts), dispatched by MapCanvas (FR-FOG-42 darkness menu). No new Konva layer: the `fog` layer holds `fog-mask` (attrs `shapes`, `darkness`, `fogged-cells`, `explored-cells`, `fog-alpha`), the DM's `fog-darkness` nodes (id, attr `selected`), the draft (`fog-draft` with `kind`, `free`, `shape`, circle `label`; `fog-draft-vertex` with `free`); on players, non-drawing markers `fog-vision` (attrs `sources`, `blind`, `see`, `dark` from their own `vision` row) and `fog-explored` (`cells`) for V2 / V3. Test IDs per FOG §7: `fog-mode-<reveal|fog|explored|darkness>`, `fog-shape-<rect|polygon|circle>`, `fog-explored-toggle` (`data-state` checked | unchecked), `fog-forget-explored(-confirm)`, `fog-clear-darkness(-confirm)`, `fog-darkness-menu-remove`, `fog-free` (the Ctrl chip).
+
+## 43. Sprint 3: rule-trigger engine (R4)
+
+From [effect-modifiers](../specs/effect-modifiers.md) sprint 3 (MOD, `complete`; [ADR-0043](../architecture/adr/0043-rule-triggers.md)). **Built by `build/rule-triggers`** (R4) on [§40](#40-sprint-3-rule-triggers-core-r0)'s types. Card text, popup chips and outcome-line rendering are R7; the Triggers block and editor R6; the `rule-triggers` bundle R5. Data side: [data model §30](../data-model/README.md#30-sprint-3-rule-trigger-engine-r4).
 
 **Intents** (strict zod, `@shared/effect-modifiers/trigger-intents`; none optimistic; one transaction each)
 

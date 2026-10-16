@@ -1,7 +1,7 @@
 // Fog of war wire shapes (FOG §8, §9; protocol §5). The mask codec and raster live beside this
 // (`mask.ts`, `raster.ts`); visibility of fog subjects in `visibility.ts`.
 import { z } from "zod";
-import { DarknessShape, FogLayerShape } from "./shapes";
+import { DarknessShape, FogLayerShape, FogShapeGeom, isDec2, SHAPE_COORD_MAX } from "./shapes";
 
 export const FOG_TYPE = "fog";
 /** FR-FOG-37: explored memory, one per (scene, player); `dmWindow: "view-as"` (FR-FOG-43). */
@@ -79,7 +79,8 @@ export type FogPolygon = z.infer<typeof FogPolygon>;
 export const FogShape = z.discriminatedUnion("kind", [FogRect, FogPolygon]);
 export type FogShape = z.infer<typeof FogShape>;
 
-export const FogOp = z.enum(["reveal", "hide"]);
+/** FR-FOG-05: `reveal | fog | explored`; legacy `hide` = `fog`. */
+export const FogOp = z.enum(["reveal", "fog", "explored", "hide"]);
 export type FogOp = z.infer<typeof FogOp>;
 
 /** DM wire: the latest undo entry and the stack depth, or null when empty. */
@@ -158,12 +159,22 @@ export const FOG_INTENTS = {
   edit: "fog.edit",
   setAll: "fog.setAll",
   undo: "fog.undo",
+  placeDarkness: "fog.placeDarkness",
+  moveDarkness: "fog.moveDarkness",
+  removeDarkness: "fog.removeDarkness",
+  clearDarkness: "fog.clearDarkness",
+  setExplored: "fog.setExplored",
+  forgetExplored: "fog.forgetExplored",
 } as const;
 
 const Id = z.string().min(1).max(64);
 
-/** FR-FOG-05: reveal or hide the cells of a rectangle or polygon. */
-export const FogEditInput = z.strictObject({ sceneId: Id, op: FogOp, shape: FogShape });
+/** FR-FOG-05: append one fog shape (v2 geometry, or a sprint-2 legacy form). */
+export const FogEditInput = z.strictObject({
+  sceneId: Id,
+  op: FogOp,
+  shape: z.union([FogShapeGeom, FogShape]),
+});
 export type FogEditInput = z.input<typeof FogEditInput>;
 
 /** FR-FOG-06: Fog all (`fogged: true`) / Reveal all (`false`). */
@@ -174,6 +185,45 @@ export type FogSetAllInput = z.input<typeof FogSetAllInput>;
 export const FogUndoInput = z.strictObject({ sceneId: Id, expectedEditId: Id });
 export type FogUndoInput = z.input<typeof FogUndoInput>;
 
-/** `fog.edit` / `fog.setAll` ack: the new undo entry, or null when no cell changed. */
+/** `fog.edit` / `fog.setAll` / darkness ack: the new undo entry, or null on a no-op. */
 export const FogEditResult = z.object({ editId: z.string().nullable() });
 export type FogEditResult = z.infer<typeof FogEditResult>;
+
+const DarknessId = z.string().min(1).max(64);
+/** FR-FOG-30: a move in grid units (≤ 2 decimals); the moved shape must stay within ±1,024. */
+const Delta = z
+  .number()
+  .min(-2 * SHAPE_COORD_MAX)
+  .max(2 * SHAPE_COORD_MAX)
+  .refine(isDec2, "At most 2 decimals");
+
+/** FR-FOG-30: `fog.placeDarkness`. */
+export const FogPlaceDarknessInput = z.strictObject({ sceneId: Id, shape: FogShapeGeom });
+export type FogPlaceDarknessInput = z.input<typeof FogPlaceDarknessInput>;
+export const FogPlaceDarknessResult = z.object({ darknessId: z.string(), editId: z.string() });
+export type FogPlaceDarknessResult = z.infer<typeof FogPlaceDarknessResult>;
+
+/** FR-FOG-30: `fog.moveDarkness` (translate). */
+export const FogMoveDarknessInput = z.strictObject({
+  sceneId: Id,
+  darknessId: DarknessId,
+  dx: Delta,
+  dy: Delta,
+});
+export type FogMoveDarknessInput = z.input<typeof FogMoveDarknessInput>;
+
+/** FR-FOG-30: `fog.removeDarkness`. */
+export const FogRemoveDarknessInput = z.strictObject({ sceneId: Id, darknessId: DarknessId });
+export type FogRemoveDarknessInput = z.input<typeof FogRemoveDarknessInput>;
+
+/** FR-FOG-30: `fog.clearDarkness`. */
+export const FogClearDarknessInput = z.strictObject({ sceneId: Id });
+export type FogClearDarknessInput = z.input<typeof FogClearDarknessInput>;
+
+/** FR-FOG-29: `fog.setExplored` (Explored memory on / off for the scene). */
+export const FogSetExploredInput = z.strictObject({ sceneId: Id, on: z.boolean() });
+export type FogSetExploredInput = z.input<typeof FogSetExploredInput>;
+
+/** FR-FOG-31: `fog.forgetExplored`. */
+export const FogForgetExploredInput = z.strictObject({ sceneId: Id });
+export type FogForgetExploredInput = z.input<typeof FogForgetExploredInput>;

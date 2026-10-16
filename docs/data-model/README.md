@@ -1209,9 +1209,25 @@ From [effect-modifiers](../specs/effect-modifiers.md#81-modifier-json-leaf-zod-o
 - **Derived** (pure, `@shared/effect-modifiers/rules`): `modeHints`, `combineModes`, `bonusDieGroups` / `bonusDieKey`, `effectiveAc`, `defenseFor`, `DEFENSE_MULTIPLIER` (immunity → none, resistance → half, vulnerability → double, both → normal).
 - **Fixture** `mod-tier2` (requires `combat-1`, `mod-presets`, `mod-bane`): campaign preset "Frost Ward" (`defense` resistance cold, 10 rounds); built-in `shield-of-faith` applied to the hidden Elite. R5 stacks it into `rule-triggers`.
 - **Snapshot size** (CON-44): no new rows beyond the fixture's 1 preset + 1 effect; the tier-2 modifier rows were measured at max in R0 (§27, MOD `con44.test.ts`: 16 presets × 6 max tier-2 modifiers, 12 effects × 2); per-die `dice` stays off cards (worst card unchanged).
-## 29. Sprint 3: rule-trigger engine (R4)
 
-From [effect-modifiers](../specs/effect-modifiers.md#82-records) sprint 3. **Built by `build/rule-triggers`** (R4): no schema change; who writes §27's rows now. Protocol side: [protocol §42](../protocol/README.md#42-sprint-3-rule-trigger-engine-r4).
+## 29. Sprint 3: freeform fog + darkness (V1)
+
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V1). **Built by `build/fog-shapes`**: no new table or column; the commands that write [§26](#26-sprint-3-vision-core-v0)'s v2 fields. Protocol side: [protocol §38](../protocol/README.md#42-sprint-3-freeform-fog--darkness-v1).
+
+| Field | Written by (V1) | Rule | Source |
+|---|---|---|---|
+| `scene_fog.shapes` | `fog.edit` (append), `fog.setAll` (`[]`), `fog.undo` (restore) | ≤ 100 (`conflict` past it); legacy `fog.edit` forms stored as their v2 shapes; the base mask is never re-rastered by an edit (box changes only with `fog.setAll`, FR-FOG-03) | FR-FOG-01, -05, -26, -27 |
+| `scene_fog.darkness` | darkness intents, `fog.undo`; `seenBy` by every scene re-derive | ≤ 20; ids from `ctx.ids`; serialized DM row ≤ 16 KiB; `seenBy` (V1, static) = every player when some cell centre inside the shape's bounding box is statically clear or explored, plus each player with an explored-memory cell there; else `[]`. Sight polygons join in V2. A scene duplicate re-derives the copy's `seenBy` (no memory there) | FR-FOG-28, -30, -44 |
+| `scene_fog.explored` | `fog.setExplored` | default false; not in the undo stack | FR-FOG-29 |
+| `scene_fog_edit` | every undoable fog command | kinds per protocol §42; `prevShapes` / `prevDarkness` = the row before (darkness with its `seenBy`, re-derived on restore) | FR-FOG-07 |
+| `fog_explored` | `fog.forgetExplored` (delete all rows of the scene) | runs decode as "1 = explored" (`@shared/fog-of-war/explored`, corrupt → nothing explored); growth lands in V2 | FR-FOG-31, -37 |
+
+- **Derived (V1):** static state with shapes (`samplePoint` on a prepared layer, once per point per re-derive), darkness containment, darkness `seenBy` (static part). Client: draft, Ctrl "free" flag, darkness selection and drag offset.
+- **CON-44:** unchanged (no new record type or field; V0's measured `fog` row at 12 typical shapes + 2 darkness shapes stands, §26).
+
+## 30. Sprint 3: rule-trigger engine (R4)
+
+From [effect-modifiers](../specs/effect-modifiers.md#82-records) sprint 3. **Built by `build/rule-triggers`** (R4): no schema change; who writes §27's rows now. Protocol side: [protocol §43](../protocol/README.md#43-sprint-3-rule-trigger-engine-r4).
 
 | Row / leaf | Written by | Notes | Source |
 |---|---|---|---|
