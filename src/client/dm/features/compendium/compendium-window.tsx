@@ -13,7 +13,7 @@ function DmCompendium() {
   const [api, setApi] = useState<Api | null>(null);
   useEffect(() => {
     let live = true;
-    void import("../campaign-management/session").then((m) => live && setApi(m.api));
+    void import("../campaign-management/session").then((m) => live && setApi(() => m.api)); // hc clients are callable proxies: never a setState updater
     return () => {
       live = false;
     };
