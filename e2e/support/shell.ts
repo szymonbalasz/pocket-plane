@@ -7,7 +7,11 @@ export const launcherButton = (page: Page, kind: string): Locator =>
 export const shellWindow = (page: Page, kind: string, instance = "main"): Locator =>
   page.locator(`[data-testid="ui-window"][data-record-id="${kind}:${instance}"]`);
 
-/** Opens a window via its launcher button unless it is already open. */
+/**
+ * Opens a window via its launcher button unless it is already open. The launcher toggles
+ * (FR-SHELL-09), so after an action that opens the window itself (e.g. Start, FR-CBT-60) wait
+ * for that first: a click landing just after it would minimise the window again.
+ */
 export async function openWindow(page: Page, kind: string): Promise<Locator> {
   const win = shellWindow(page, kind);
   if (!(await win.isVisible())) await launcherButton(page, kind).click();
