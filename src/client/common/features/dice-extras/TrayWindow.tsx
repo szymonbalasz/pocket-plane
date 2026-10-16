@@ -31,7 +31,7 @@ import {
   SettingsIcon,
   XIcon,
 } from "lucide-react";
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import {
   Popover,
@@ -55,6 +55,7 @@ import {
 } from "../dice-roll-log/roll-control";
 import { FlatDie } from "./FlatDie";
 import { useThreeD } from "./lazy3d";
+import { useOwnLook } from "./own-look";
 import { useDiceSettings } from "./settings";
 import { diceExtras, type TrayRequest, useDiceExtras } from "./store";
 import { trayExtras } from "./tray-extras";
@@ -253,13 +254,18 @@ function Extras({ request, mode }: { request: TrayRequest; mode: RollMode }) {
 
 const signed = (n: number) => (n === 0 ? "" : n > 0 ? `+${n}` : `−${-n}`);
 
+/** FR-DICEX-27: the look editor loads on first open (FR-DICEX-22 initial budget). */
+const LookEditor = lazy(() => import("./LookEditor").then((m) => ({ default: m.LookEditor })));
+
 /** FR-DICEX-21 / DICEX §7: render 3D / Flat / Off, "Show others' rolls", "Dice look…". */
 function SettingsPopover() {
   const { settings, set } = useDiceSettings();
   const threeD = useThreeD();
+  const live = useSync((s) => s.state === "live");
+  const [pane, setPane] = useState<"settings" | "look">("settings");
   const shown = settings.render === "3d" && !threeD.available ? "flat" : settings.render;
   return (
-    <Popover>
+    <Popover onOpenChange={(o) => !o && setPane("settings")}>
       <PopoverTrigger asChild>
         <Button
           data-testid="dicex-settings-open"
@@ -271,50 +277,68 @@ function SettingsPopover() {
           <SettingsIcon className="size-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" side="bottom" className="flex w-64 flex-col gap-3">
-        <div className="flex flex-col gap-1.5">
-          <p className="text-sm font-medium">Dice on this device</p>
-          <ToggleGroup
-            type="single"
-            aria-label="Dice rendering"
-            value={shown}
-            onValueChange={(v) => {
-              if (v) set({ render: v as "3d" | "flat" | "off" });
-            }}
-          >
-            {(["3d", "flat", "off"] as const).map((r) => (
-              <ToggleGroupItem
-                key={r}
-                value={r}
-                data-testid="dicex-settings-render"
-                data-value={r}
-                disabled={r === "3d" && !threeD.available}
-                className="h-7 px-3"
+      <PopoverContent
+        align="end"
+        side="bottom"
+        className={cn("flex flex-col gap-3", pane === "look" ? "w-72" : "w-64")}
+      >
+        {pane === "look" ? (
+          <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+            <LookEditor onBack={() => setPane("settings")} />
+          </Suspense>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1.5">
+              <p className="text-sm font-medium">Dice on this device</p>
+              <ToggleGroup
+                type="single"
+                aria-label="Dice rendering"
+                value={shown}
+                onValueChange={(v) => {
+                  if (v) set({ render: v as "3d" | "flat" | "off" });
+                }}
               >
-                {r === "3d" ? "3D" : r === "flat" ? "Flat" : "Off"}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-          {threeD.reason && (
-            <p data-testid="dicex-settings-3d-hint" className="text-xs text-muted-foreground">
-              {threeD.reason === "no-webgl"
-                ? "3D unavailable on this device"
-                : "3D dice couldn't load: dice show flat this session."}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <Switch
-            id="dicex-settings-others"
-            data-testid="dicex-settings-others"
-            checked={settings.others}
-            onCheckedChange={(v) => set({ others: v })}
-          />
-          <label htmlFor="dicex-settings-others">Show others' rolls</label>
-        </div>
-        <Button data-testid="dicex-look-open" size="sm" variant="outline" disabled>
-          Dice look…
-        </Button>
+                {(["3d", "flat", "off"] as const).map((r) => (
+                  <ToggleGroupItem
+                    key={r}
+                    value={r}
+                    data-testid="dicex-settings-render"
+                    data-value={r}
+                    disabled={r === "3d" && !threeD.available}
+                    className="h-7 px-3"
+                  >
+                    {r === "3d" ? "3D" : r === "flat" ? "Flat" : "Off"}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+              {threeD.reason && (
+                <p data-testid="dicex-settings-3d-hint" className="text-xs text-muted-foreground">
+                  {threeD.reason === "no-webgl"
+                    ? "3D unavailable on this device"
+                    : "3D dice couldn't load: dice show flat this session."}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Switch
+                id="dicex-settings-others"
+                data-testid="dicex-settings-others"
+                checked={settings.others}
+                onCheckedChange={(v) => set({ others: v })}
+              />
+              <label htmlFor="dicex-settings-others">Show others' rolls</label>
+            </div>
+            <Button
+              data-testid="dicex-look-open"
+              size="sm"
+              variant="outline"
+              disabled={!live}
+              onClick={() => setPane("look")}
+            >
+              Dice look…
+            </Button>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );
@@ -323,6 +347,7 @@ function SettingsPopover() {
 /** `result`: the last own roll as flat dice, its total and the log line (FR-DICEX-10). */
 function ResultView({ entries }: { entries: GameLogEntryView[] }) {
   const t = useMemo(() => throwDice(entries), [entries]);
+  const look = useOwnLook();
   const lines = useMemo(
     () =>
       entries.map((e) =>
@@ -336,7 +361,7 @@ function ResultView({ entries }: { entries: GameLogEntryView[] }) {
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-1">
         {t?.dice.map((d) => (
-          <FlatDie key={d.key} die={d} size="sm" />
+          <FlatDie key={d.key} die={d} size="sm" look={look} />
         ))}
         {t && t.more > 0 && <span className="text-xs text-muted-foreground">+{t.more} more</span>}
         {t && t.totals.length > 0 && (
