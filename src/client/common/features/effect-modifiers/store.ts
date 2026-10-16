@@ -1,6 +1,7 @@
 // effect-modifiers reads over the synced store and the intent sender, both clients. The one
 // client seam for preset transport (#190 D5 A): every preset read goes through `presetsIn` /
 // `usePresets`, so moving campaign presets to on-demand loading changes this file only.
+import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { EFFECT_PRESET_TYPE, type EffectPresetRecord } from "@shared/effect-modifiers/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -25,6 +26,14 @@ export function usePresets(): EffectPresetRecord[] {
   const rows = useRecords<EffectPresetRecord>(EFFECT_PRESET_TYPE);
   return useMemo(() => [...rows].sort(bySeq), [rows]);
 }
+
+/** A creature's `creature-sheet` row in the store (features for tier-3 uses), if held. */
+export const sheetIn = (store: RecordStore, entityId: string | null) =>
+  entityId === null
+    ? undefined
+    : (Object.values(store.records[CREATURE_SHEET_TYPE] ?? {}) as CreatureSheetRecord[]).find(
+        (s) => s.entityId === entityId,
+      );
 
 /** A character's presets (toggles), `seq` order. */
 export function useCharacterPresets(characterId: string): EffectPresetRecord[] {

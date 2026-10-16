@@ -1,7 +1,8 @@
 // effect-modifiers intents (MOD §9): `mod.putPreset`, `mod.deletePreset` (DM; owner on their
 // own character presets while unlocked), `mod.apply`, `mod.setModifiers` (DM), `mod.toggle`
 // (DM; owner). Effects go through CBTX's internal helpers (limits, insert, soft end, cards), so
-// every CBTX rule moves them. One transaction per command (FR-MOD-30); nothing in memory.
+// every CBTX rule moves them. Tier 3: a toggle on spends a feature use through CHARX's
+// `spendFeatureUse` (FR-MOD-12). One transaction per command (FR-MOD-30); nothing in memory.
 import { endsRoundOf } from "@shared/combat-extras/rules";
 import type { CombatantRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
 import {
@@ -16,7 +17,7 @@ import {
   type ToggleResult,
 } from "@shared/effect-modifiers/intents";
 import { builtinPreset } from "@shared/effect-modifiers/presets";
-import { toggleOn } from "@shared/effect-modifiers/rules";
+import { hasUses, toggleOn } from "@shared/effect-modifiers/rules";
 import {
   CAMPAIGN_PRESETS_MAX,
   CHARACTER_PRESETS_MAX,
@@ -38,6 +39,8 @@ import { effectPreset, effectPresetSeqNext } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { editableCreature, NOT_YOURS } from "../character-sheet/access";
 import { getCharacter } from "../character-sheet/hp";
+import { spendFeatureUse } from "../character-sheet/resources";
+import { getSheet } from "../character-sheet/sheet-rows";
 import {
   checkLimits,
   closeCardsOfEnded,
@@ -96,6 +99,17 @@ export const putPreset = defineCommand({
       throw invalid("A preset keeps its character and key");
     }
     const owner = p.characterId === null ? null : editableCharacter(env, p.characterId);
+    const usesFeatureId =
+      p.usesFeatureId === undefined ? (before?.usesFeatureId ?? null) : p.usesFeatureId;
+    // FR-MOD-12: a new link must name a feature row with uses; a kept (maybe broken) one stays.
+    if (owner && usesFeatureId !== null && usesFeatureId !== before?.usesFeatureId) {
+      const f = getSheet(env.tx, owner.id)?.features.find((r) => r.id === usesFeatureId);
+      if (!f || !hasUses(f)) {
+        throw invalid("Pick a feature with uses", [
+          { path: ["preset", "usesFeatureId"], message: "Not a feature with uses" },
+        ]);
+      }
+    }
     if (!before) {
       if (p.key !== null) {
         if (!builtinPreset(p.key)) throw invalid("This built-in preset is not available yet");
@@ -122,6 +136,7 @@ export const putPreset = defineCommand({
       ownerPlayerId: owner?.ownerPlayerId ?? null,
       // FR-MOD-36: kept on a replace that doesn't name it.
       originKey: p.originKey === undefined ? (before?.originKey ?? null) : p.originKey,
+      usesFeatureId,
       updatedAt: now,
     };
     let id: string;
@@ -140,7 +155,6 @@ export const putPreset = defineCommand({
           key: p.key,
           characterId: p.characterId,
           activeEffectId: null,
-          usesFeatureId: null,
           createdAt: now,
         })
         .run();
@@ -353,7 +367,9 @@ export const togglePreset = defineCommand({
     const on = toggleOn(preset, current);
     // Already in the asked state → success, no event.
     if (on === input.on) return { effectId: on ? preset.activeEffectId : null };
-    return input.on ? toggleOnCmd(env, character, preset) : toggleOffCmd(env, character, preset);
+    return input.on
+      ? toggleOnCmd(env, character, preset, input.force === true)
+      : toggleOffCmd(env, character, preset);
   },
 });
 
@@ -366,12 +382,30 @@ function setActive(env: Env, p: EffectPresetRecord, activeEffectId: string | nul
   return presetChange(p, readPreset(env.tx, p.id));
 }
 
-function toggleOnCmd(env: Env, c: CharacterRecord, p: EffectPresetRecord): ToggleResult {
+/**
+ * FR-MOD-12: a linked feature use is spent in this transaction; none left → `conflict`; `force`
+ * (DM) → on without spending; a broken link (row deleted, `usesMax` cleared) → on without uses.
+ */
+function spendUse(env: Env, c: CharacterRecord, p: EffectPresetRecord, force: boolean) {
+  if (p.usesFeatureId === null || force) return null;
+  const spent = spendFeatureUse(env, c.id, p.usesFeatureId);
+  if (spent.ok) return spent.change;
+  if (spent.reason === "none-left") throw conflict(`No ${spent.name} uses left`);
+  return null;
+}
+
+function toggleOnCmd(
+  env: Env,
+  c: CharacterRecord,
+  p: EffectPresetRecord,
+  force: boolean,
+): ToggleResult {
   const cid = campaignOf(env);
   const enc = startedEncounter(env.tx, cid);
   const t: Target = { kind: "character", character: c, name: c.name };
   const cols = targetColumns(t);
   checkLimits(env, cols, 1);
+  const sheet = spendUse(env, c, p, force);
   const e = insertEffect(env, {
     kind: "custom",
     condition: null,
@@ -393,7 +427,7 @@ function toggleOnCmd(env: Env, c: CharacterRecord, p: EffectPresetRecord): Toggl
     type: EffectToggled.type,
     campaignId: cid,
     payload: { characterId: c.id, presetId: p.id, on: true, effectId: e.id },
-    changes: [effectChange(null, e), setActive(env, p, e.id)],
+    changes: [effectChange(null, e), setActive(env, p, e.id), ...(sheet ? [sheet] : [])],
   });
   return { effectId: e.id };
 }

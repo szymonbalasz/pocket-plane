@@ -254,7 +254,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 | # | DM (A) | Players (B, C) | Expected |
 |---|---|---|---|
-| 1 | Log in, open Compendium | — | "SRD 5.1 · ≈ 51 entries" (the mini set), **Update** shown (bundled version ≠ `mini`) |
+| 1 | Log in, open Compendium | — | "SRD 5.1 · 55 (#225) entries" (the mini set), **Update** shown (bundled version ≠ `mini`) |
 | 2 | Update → confirm | — | Confirm "Players will pause for ~2 s"; Toast with counts (≈ 1,076 created, the mini ones `existing`) ≤ 2 s; status "≈ 1,127 entries" (exact figures: the adapter's test) |
 | 3 | Search "goblin"; open Goblin; click "1d6 + 2" in the Scimitar's Hit text | — | Goblin first, Hobgoblin next; stat block AC 15, HP 7 (2d6), darkvision 60 ft, Nimble Escape, Scimitar, Shortbow; "+4 to hit" is plain text; attribution footer + About; the click stages a Goblin damage roll labelled "Scimitar" (DiceText; skip if D1 isn't on `main`) |
 | 4 | Derive… "Goblin Sneak", HP 12, copy text on | — | Creatures window: Goblin Sneak (Custom, derived from Goblin); its NPC sheet Features: Nimble Escape |
