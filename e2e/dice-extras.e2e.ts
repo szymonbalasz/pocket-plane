@@ -220,20 +220,16 @@ test("FR-DICEX-29 FR-DICEX-30 FR-DICEX-31 sheet notation: Mira's 'Notation test'
   await expect(tray.getByTestId("dicex-tray-die")).toHaveCount(1);
   await expect(tray.getByTestId("dicex-tray-die")).toHaveAttribute("data-faces", "12");
   await expect(tray.getByTestId("dicex-tray-constant")).toHaveValue("5");
+  await tray.getByTestId("dicex-tray-options").click();
   await expect(tray.getByTestId("dicex-tray-actor").locator("option:checked")).toHaveText("Mira");
   await expect(tray.getByTestId("dicex-tray-label")).toHaveValue("Notation test");
   await expect(tray.getByTestId("dicex-tray-category")).toHaveValue("other");
 
-  // FR-DICEX-31: a plain `dice.roll` line, as Mira.
+  // FR-DICEX-31: a plain `dice.roll` line as Mira ("Mira — Notation test: d12 + 5 = …").
   await tray.getByTestId("dicex-tray-roll").click();
-  await expect(
-    dmLog.getByTestId("dice-log-entry").filter({ hasText: "Notation test" }).filter({
-      hasText: "1d12+5",
-    }),
-  ).toHaveCount(1);
-  await expect(
-    dmLog.getByTestId("dice-log-entry").filter({ hasText: "Notation test" }),
-  ).toContainText("Mira");
+  const line = dmLog.getByTestId("dice-log-entry").filter({ hasText: "Notation test" });
+  await expect(line).toHaveCount(1);
+  await expect(line).toContainText(/Mira\s*— Notation test: \d+ \+ 5 = \d+/);
 
   for (const page of [p1, dm]) await page.context().close();
 });
