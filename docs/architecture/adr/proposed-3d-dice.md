@@ -35,6 +35,6 @@
 
 ## Consequences
 
-- No protocol change for animation; `dice-style` (dice look) is the only new record type, and only if the DM picks server-stored looks (OQ-DICEX-06).
+- No protocol change for animation; `dice-look` is the only new record type, and only if the DM picks server-stored looks (OQ-DICEX-06).
 - New client dependency must stay out of initial chunks (bundle-size test in the build).
-- A future log kind that carries fresh dice must map them for throws (only `roll` throws today); MOD bonus dice already ride on `roll` payloads as parts.
+- A future log kind that carries fresh dice must map them for throws (only `roll` throws today). MOD bonus dice and offered trigger parts (Divine Fury) ride on the `roll` entry as MOD parts (seams S4), so they throw with no special case.
