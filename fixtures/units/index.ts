@@ -22,6 +22,7 @@ import combatPending from "./combat-tracker/combat-pending";
 import encounter1 from "./combat-tracker/encounter-1";
 import goblin2 from "./combat-tracker/goblin-2";
 import thornBattlemap from "./combat-tracker/thorn-battlemap";
+import dicexNotationText from "./dice-extras/dicex-notation-text";
 import diceSettings from "./dice-roll-log/dice-settings";
 import rolls1 from "./dice-roll-log/rolls-1";
 import modBane from "./effect-modifiers/mod-bane";
@@ -102,4 +103,5 @@ export const units: readonly Fixture[] = [
   scnProps,
   scnTemplates,
   fogScn,
+  dicexNotationText,
 ];
