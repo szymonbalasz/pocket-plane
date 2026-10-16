@@ -110,6 +110,11 @@ export const DieResult = z.strictObject({
   faces: z.int().min(2).max(1000),
   value: z.int().nullable(),
   kept: z.boolean(),
+  /**
+   * FR-MOD-17 (R2 ruling): a physical roll's second d20, rolled by the server because only
+   * effects the player can't see give the mode. Absent = as entered / as rolled.
+   */
+  auto: z.literal(true).optional(),
 });
 export type DieResult = z.infer<typeof DieResult>;
 

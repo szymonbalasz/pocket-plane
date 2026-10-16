@@ -80,7 +80,12 @@ const Item = z.looseObject({
   expression: z.string(),
   manual: z.boolean(),
   dice: z.array(
-    z.looseObject({ faces: z.number().int(), value: z.number().nullable(), kept: z.boolean() }),
+    z.looseObject({
+      faces: z.number().int(),
+      value: z.number().nullable(),
+      kept: z.boolean(),
+      auto: z.boolean().optional(),
+    }),
   ),
   constant: z.number(),
   total: z.number(),
@@ -181,8 +186,15 @@ function itemDice(item: Item): DieInit[] {
       const mods = (item.mods ?? []).reduce((s, m) => s + m.value, 0);
       out.push(chipOf(item.dice[0]?.faces ?? 0, item.total - item.constant - mods, physical));
     } else {
+      // A server-rolled d20 of a physical roll (FR-MOD-17, `auto`) tumbles like any rolled die.
       for (const d of item.dice)
-        out.push(...dieOf(d.faces, d.value ?? 0, { ...physical, kept: d.kept }));
+        out.push(
+          ...dieOf(
+            d.faces,
+            d.value ?? 0,
+            d.auto ? { kept: d.kept } : { ...physical, kept: d.kept },
+          ),
+        );
     }
   } else {
     for (const d of item.dice) out.push(...dieOf(d.faces, d.value ?? 0, { kept: d.kept }));

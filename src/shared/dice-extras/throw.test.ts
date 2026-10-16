@@ -210,6 +210,25 @@ describe("FR-DICEX-13 throwDice", () => {
     expect(rolled.dice[1]?.physical).toBeUndefined();
   });
 
+  test("FR-DICEX-13 a physical roll's server-rolled d20 (FR-MOD-17 auto) tumbles; the entered one stays flat", () => {
+    const t = one([
+      item({
+        expression: "2d20kh1+4",
+        mode: "advantage",
+        manual: true,
+        dice: [
+          { faces: 20, value: 11, kept: true },
+          { faces: 20, value: 7, kept: false, auto: true },
+        ],
+        total: 15,
+      }),
+    ]);
+    expect(t.dice.map((d) => [d.value, d.kept, d.flat, d.physical, d.shape])).toEqual([
+      [11, true, true, true, null],
+      [7, false, false, undefined, "d20"],
+    ]);
+  });
+
   test("FR-DICEX-14 51 dice → 20 + '+31 more'", () => {
     const dice = Array.from({ length: 50 }, (_, i) => ({
       faces: 6,

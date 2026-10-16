@@ -1293,6 +1293,7 @@ From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) 
 | Table / leaf | Change | Visibility | Source |
 |---|---|---|---|
 | `roll` (part rows) | `manual: true` now written from real clients: a bonus die (`e:`) or offered trigger die (`t:`) entered as a `manualParts` group on any of the seven roll intents | as the roll | FR-MOD-18 |
+| `roll.dice` (JSON leaf) | a die may carry `auto: true`: a physical roll's second d20, rolled by the server when only effects the player can't see give adv / dis (R2 ruling); the line says "(rolled for you)", the reason "(DM)"; old rows parse | as the roll (payload `dice` copies it) | FR-MOD-17 |
 | roll intents (wire only, not stored) | `manualParts` (one list; `char.roll` / `cbt.attack`: one list per `manual` entry) | — | FR-MOD-18 |
 
 - **Derived (client, pure):** preview mode, physical groups and parts line per roll (`@shared/effect-modifiers/preview`); a sheet roll's subjects (`sheetRollSubjects`); popup effective AC with parts and defense multiplier presets (`@shared/effect-modifiers/target-facts`).
