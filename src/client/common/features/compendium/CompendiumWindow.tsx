@@ -37,6 +37,7 @@ import {
   isEntryless,
   type Role,
   searchParams,
+  sourceName,
   TAB_LABEL,
   tabsFor,
   WINDOW_DEBOUNCE_MS,
@@ -310,7 +311,7 @@ function DefinitionView({
       <Attribution
         source={{
           key: d.source,
-          name: d.source,
+          name: sourceName(d.source),
           licence: d.licence,
           attribution: d.attribution,
           url: null,

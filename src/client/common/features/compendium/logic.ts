@@ -88,9 +88,19 @@ export function searchParams(q: string, tab: CmpTab, filters: Filters): SearchPa
 export const activeFilterCount = (tab: CmpTab, filters: Filters) =>
   tab === "all" ? 0 : Object.keys(searchParams("", tab, filters)).length - 1;
 
-/** Result Badge (CMP §7): `SRD` for SRD sources, else the label (e.g. `Homebrew`). */
-export const badgeLabel = (sourceLabel: string) =>
-  /^SRD\b/.test(sourceLabel) ? "SRD" : sourceLabel;
+/** Result Badge (CMP §7): `SRD` for SRD sources, else the label (`Homebrew`, `Fixture`, …). */
+export const badgeLabel = (sourceLabel: string) => {
+  const name = sourceName(sourceLabel);
+  return /^SRD\b/.test(name) ? "SRD" : name;
+};
+
+/** Display names of source keys without a `compendium_source` row (entryless definitions). */
+const SOURCE_NAMES: Readonly<Record<string, string>> = { "srd-5.1": "SRD 5.1", fixture: "Fixture" };
+
+/** A source key or label as people read it: `fixture` → `Fixture`, `srd-5.1` → `SRD 5.1`. */
+export function sourceName(source: string): string {
+  return SOURCE_NAMES[source] ?? source;
+}
 
 /**
  * FR-CMP-19 footer: imported "SRD 5.1 · CC BY 4.0"; homebrew "Homebrew" (+ "Shared" / "DM only"

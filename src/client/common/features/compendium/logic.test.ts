@@ -18,6 +18,7 @@ import {
   isEntryless,
   scoreText,
   searchParams,
+  sourceName,
   statBlockRoute,
   tabsFor,
 } from "./logic";
@@ -92,6 +93,8 @@ describe("FR-CMP-19 labels", () => {
   test("FR-CMP-19 source Badge, CR + XP, ability scores", () => {
     expect(badgeLabel("SRD 5.1")).toBe("SRD");
     expect(badgeLabel("Homebrew")).toBe("Homebrew");
+    expect(badgeLabel("fixture")).toBe("Fixture");
+    expect(sourceName("srd-5.1")).toBe("SRD 5.1");
     expect(crText("1/4")).toBe("1/4 (50 XP)");
     expect(crText("17")).toBe("17 (18,000 XP)");
     expect(scoreText(14)).toBe("14 (+2)");

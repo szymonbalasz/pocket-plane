@@ -5,7 +5,16 @@ import { EntryResponse, type EntrySummary } from "@shared/compendium/rest";
 import { useEffect, useRef, useState } from "react";
 import { type Api, ApiError, call } from "../../api";
 import { entryForDefinition } from "./logic";
-import { type SearchParams, searchCompendium } from "./search";
+import { type ApiSource, type SearchParams, searchCompendium } from "./search";
+
+/**
+ * `searchCompendium` takes a client or a loader; a Hono client is a callable proxy (`typeof` is
+ * "function"), so a plain client always goes in as a loader.
+ */
+const source =
+  (api: Api): ApiSource =>
+  () =>
+    Promise.resolve(api);
 
 export async function fetchEntry(api: Api, id: string): Promise<EntryResponse> {
   const body = await call<unknown>(api.api.compendium.entries[":id"].$get({ param: { id } }));
@@ -62,7 +71,7 @@ export function useResults(
       let all: EntrySummary[] = [];
       let next: string | null = null;
       do {
-        const page = await searchCompendium(api, next ? { ...q, cursor: next } : q);
+        const page = await searchCompendium(source(api), next ? { ...q, cursor: next } : q);
         all = all.concat(page.results);
         next = page.nextCursor;
       } while (next && all.length < want);
@@ -96,7 +105,7 @@ export function useResults(
     const my = ++gen.current;
     setState("loading");
     const q = JSON.parse(key) as SearchParams;
-    searchCompendium(api, { ...q, cursor }).then(
+    searchCompendium(source(api), { ...q, cursor }).then(
       (page) => {
         if (gen.current !== my) return;
         setResults((r) => {
@@ -164,7 +173,7 @@ export function useDefinitionEntry(
       return;
     }
     let live = true;
-    searchCompendium(api, { q: name, kind: "monster" }).then(
+    searchCompendium(source(api), { q: name, kind: "monster" }).then(
       (page) =>
         live && setOut({ state: "ready", entryId: entryForDefinition(definitionId, page.results) }),
       (err: unknown) => live && setOut({ state: "error", error: readError(err) }),
