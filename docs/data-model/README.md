@@ -1377,3 +1377,13 @@ From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Buil
 - **Derived (client, `@ui/features/party-board/logic`):** DM order newest `seq`, player order newest `sharedAt`; mark New (never opened) / Updated (`rev` > seen rev); share label (`@shared/party-board/format`); launcher activity.
 - **Fixtures:** `handouts-1` now also writes 3 `handout-shared` rows through its shares: h1 `all`, h2 `player` player-1, h4 `all` (kept after h4's unshare); `party-second` 1 (`all`, Second Campaign).
 - **CON-44:** no new snapshot bytes in the worst case: notifications stay within NOTE's 100-row window, and a `handout-shared` row (text ≤ 93 chars, payload ≈ 51 B) is smaller than the heavy harness's damage-card rows that fill it; PARTY's CON-44 test unchanged (+1,100 B, DM 673,998 B).
+
+## 38. Sprint 3: rule-trigger combat parts (R7)
+
+From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD slice R7). **Built by `build/mod-combat-parts`**: no new table, column or record type. Protocol side: [protocol §52](../protocol/README.md#52-sprint-3-rule-trigger-combat-parts-r7).
+
+- **Damage card payload** (`damage-card` notification): `damage.triggers[].marked` = a built-in key or the campaign mark's **name** (≤ 40; was the preset id). Cards stored before keep an id; the popup then finds no mark (the DM ticks by hand).
+- **Damage card text**: + the offers suffix (≤ 280 chars total, count fallback).
+- **`cbt.attack` log line**: payload `parts[].multiplier?` (`half` \| `none` \| `double`; absent = normal); `dmPayload.parts[].set?: true` (the DM edited the value). Old rows parse.
+- **Derived (client):** popup defaults `settleTriggers` (default target, tick, hint).
+- **CON-44:** no new rows; a line part grows ≤ 21 B (`"multiplier":"double"`) and a DM part ≤ 11 B (`"set":true`), inside R's measured +5,730 B line bound; card `marked` ≤ 40 either way.

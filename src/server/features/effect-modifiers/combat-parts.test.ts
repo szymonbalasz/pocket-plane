@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/noThenProperty: `then` is the rule's effect field (MOD §8.4); rules are data, never awaited.
 // R7 combat parts (FR-MOD-40, -47, -48) end to end on the server: the card's text names its
 // offered parts; the outcome line lands them after the weapon damage, for the DM and players
 // (label iff the trigger is public, "(DM)" else), with the DM's "(DM set; rolled …)" / "(DM
