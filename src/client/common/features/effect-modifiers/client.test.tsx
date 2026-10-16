@@ -6,6 +6,7 @@ import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
 import { builtinPreset } from "@shared/effect-modifiers/presets";
 import { EFFECT_PRESET_TYPE, type Modifier } from "@shared/effect-modifiers/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
+import { lazyAfterSnapshot } from "@shared/protocol/lazy";
 import { emptyStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
@@ -150,6 +151,7 @@ describe("FR-MOD-26 sheet section", () => {
           store: { ...emptyStore(), you, records },
           notLiveSince: null,
           everLive: true,
+          lazy: lazyAfterSnapshot(1),
           connection: { sendIntent: () => Promise.resolve({}) },
         }) as unknown as SyncState,
     );

@@ -10,10 +10,9 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | V3 vision client | `build/vision-client` (w4K) | build-vision-client | Building (canvas lock 3rd) | Walkthrough FOG §13 + CHARX 14 |
 | D2 dice looks | `fix/dicex-look-core` (w4J) | build-dicex-look-core | Building (schema 5th) | Walkthrough step 6 |
-| R2 tier 2 client | `fix/mod-roll-preview` (w4D) | fix-mod-roll-preview | Fixing (hidden adv/dis ruling) | Re-test steps 4, 7 → merge → R7 |
-| P2 handouts UI | `build/party-handouts` (w4G) | fix-party-handouts | Walkthrough 10/11; fixing board placement | Merge → P3 |
-| R6 sheet Triggers UI | `build/mod-sheet-ui` (w4H) | — | Built | Walkthrough (next slot) → merge → C2 sheet slot |
-| Merged so far | — | — | V2 (#228), R5 (#227), C1 (#226), R3 (#225), V4 (#224), P core, R4 + V1 + empty-event fix (#223), R1 (#222), R0 (#220), V5 (#219), lazy-records (#218), D3 (#217), V0 (#216), D1 (#214), early slices (#212, #213) | — |
+| R2 tier 2 client | `fix/mod-roll-preview` (w4D) | test-mod-roll-preview-r (port 4173) | Re-test steps 4, 7, 7b, 3b | Merge → R7 |
+| R6 sheet Triggers UI | `build/mod-sheet-ui` (w4H, slot 2) | test-mod-sheet-ui (port 4123) | Walkthrough | Merge → C2 sheet slot |
+| Merged so far | — | — | P2 (#229), V2 (#228), R5 (#227), C1 (#226), R3 (#225), V4 (#224), P core, R4 + V1 + empty-event fix (#223), R1 (#222), R0 (#220), V5 (#219), lazy-records (#218), D3 (#217), V0 (#216), D1 (#214), early slices (#212, #213) | — |
 | Queue | — | — | R7 (after R2; brief ready); P3; C2 (after R6 + R7) → C3, C4; D4 (sheet, after C2); P4 (last) | Locks below |
 | Backlog (BL-nn), downtime only | — | — | Done: BL-02, 06, 11, 12, 13; BL-14 → R7 | Per §3a |
 

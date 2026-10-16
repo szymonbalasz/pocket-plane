@@ -1380,7 +1380,7 @@ From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Buil
 
 ## 38. Sprint 3: dice looks (D2)
 
-From [dice-extras](../specs/dice-extras.md#8-data-model) (DICEX, `complete`; #207 G17). **Built by `fix/dicex-look-core`** (schema lock 5th, after C1): one table (drizzle push, push-safe). Protocol side: [protocol §51](../protocol/README.md#51-sprint-3-dice-looks-d2).
+From [dice-extras](../specs/dice-extras.md#8-data-model) (DICEX, `complete`; #207 G17). **Built by `fix/dicex-look-core`** (schema lock 5th, after C1): one table (drizzle push, push-safe). Protocol side: [protocol §52](../protocol/README.md#52-sprint-3-dice-looks-d2).
 
 ### Dice look (`dice_look`, record type `dice-look`) — owner [dice-extras](../specs/dice-extras.md#8-data-model)
 
@@ -1399,4 +1399,4 @@ Index: unique `dice_look_campaign_owner` (`campaign_id`, `owner_key`).
 
 - **Derived:** no row → the default look (DM Obsidian; players by sorted player `id`: Crimson, Sapphire, Emerald, Amethyst, Gold, Bone, Ivory, …), never stored. `lookOf(owner, rows, playerIds)` in `@shared/dice-extras/looks`.
 - **Fixtures:** `dicex-looks` writes only `dice-look` rows (DM, player-1).
-- **Snapshot size** (CON-44): every snapshot carries the campaign's rows (not lazy): 7 max-length rows = 2,157 B DM, the same bytes in each player frame; heavy DM 674,580 B ([protocol §51](../protocol/README.md#51-sprint-3-dice-looks-d2)).
+- **Snapshot size** (CON-44): every snapshot carries the campaign's rows (not lazy): 7 max-length rows = 2,157 B DM, the same bytes in each player frame; heavy DM 674,580 B ([protocol §52](../protocol/README.md#52-sprint-3-dice-looks-d2)).
