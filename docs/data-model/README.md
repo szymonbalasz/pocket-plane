@@ -1144,3 +1144,50 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG, `complete`; spri
 - **Derived** (never stored): static state, darkness containment, sight polygons (`@shared/fog-of-war/vision`, V2 on), `blind`, `vision`. The vision cache (FR-FOG-38) is memory only (V2).
 - **Persisted runtime state:** fog rows (+ shapes, darkness, setting, `rev`, `visionStale`), undo stacks, explored memory, `seen_by` / `door_seen` / `fogged` / `invisible`, committed with their command.
 - **Snapshot size** (CON-44, #208: DM ceiling 1 MiB, players 512 KiB, no headroom guard): heavy harness + FOG v2 rows on the active scene (12 typical shapes, 2 darkness shapes, each player's explored memory): DM 672,677 B (375,899 B left), `fog` 1 row 1,355 B (windowed), no `view-as` rows; players 278,468–281,528 B (`fog-explored` 297 B each); the View-as ack with memory at the run cap 6,255 B. `vision` at 4 sources ≤ 22,430 B at caps (benchmark, [protocol §37](../protocol/README.md#37-sprint-3-vision-core-v0)).
+
+## 27. Sprint 3: rule triggers core (R0)
+
+From [effect-modifiers](../specs/effect-modifiers.md#82-records) sprint 3 (MOD, `complete`; gate 1 #207–#209; [ADR-0043](../architecture/adr/0043-rule-triggers.md)). **Built by `fix/rt-core`** (R0, schema lock 2nd after V0): the tables, columns and zod below (drizzle push, push-safe defaults). No command writes the trigger tables yet (R4), and `rule-trigger` is not registered (R4 registers it lazy), so **nothing new reaches any wire**. Protocol side: [protocol §39](../protocol/README.md#39-sprint-3-rule-triggers-core-r0).
+
+| Table / leaf | Change | Default (push-safe) | Visibility | Source |
+|---|---|---|---|---|
+| `rule_trigger` (new; record type `rule-trigger`, lazy) | see below | — | DM full; owner player their characters' rows, campaign preset ids redacted to `{name}`; definition rows DM only | [FR-MOD-32, -47](../specs/effect-modifiers.md#6-functional-requirements) |
+| `trigger_use` (new; **server-only**, no record type) | see below | — | never sent | FR-MOD-37, -38, -42 |
+| `effect_preset` | + `origin_key` (text ≤ 40 \| null, soft → built-in key). `mod.putPreset` accepts only a built-in key; absent on a replace = kept; never with `key` | null | as the row (`effect-preset`) | [FR-MOD-36](../specs/effect-modifiers.md#6-functional-requirements) |
+| `hp_change` | + `trigger_parts` (**JSON leaf** ≤ 4 `{triggerId, name ≤ 40, value ≥ 0, multiplier, type \| null, forced}`) | `[]` | DM only (`hp-change` is `audience: dm`) | FR-MOD-38, -48 |
+| damage card payload (`damage-card`) | `damage.triggers?` ≤ 4 `{triggerId, label ≤ 40, value, expression ≤ 20, rollId, type \| null, auto?, ask? ≤ 60, marked? ≤ 40, hurt?, untick?}` (`CardTriggerPart`); not in `total`; the to-hit part takes none | absent; old cards parse | as the card | FR-MOD-19, -37 |
+| `game_log_entry.payload` (`roll` items) | `mods[]` + `dice?` (≤ 20 ints, expression order), `type?`; item + `offered?` ≤ 4 `{label \| null, value, expression ≤ 20, rollId, type \| null, auto?, dice?}` (`RollOfferedPart`), not in `total` | absent | label null for a non-`public` trigger | FR-MOD-19 |
+| `game_log_entry.dmPayload` (`roll`) | items + `offered? [{triggerId, label}]`; `mods[]` names an effect **or** a trigger (`{effectId \| triggerId, label}`); entry + `notes?` ≤ 4 × 80 | absent | DM only | FR-MOD-19, -34, -37 |
+| `game_log_entry.payload` / `dmPayload` (`cbt.attack`) | `payload.parts?` ≤ 4 `{label \| null, value, type \| null}` (inside `damage`); `dmPayload.parts? [{triggerId, label, rolled, forced?}]`, `acMods? [{effectId, label, value}]`, `defense? {level, label}` | absent | DM facts in `dmPayload` only | FR-MOD-20, -24, -25, -48 |
+
+### Rule trigger (`rule_trigger`, record type `rule-trigger`) — owner [effect-modifiers](../specs/effect-modifiers.md#82-records)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, seq | ID, ID → Campaign, int | `seq` DB-assigned (`ruleTriggerSeqNext`), unique | MOD §8.2 |
+| characterId, definitionId | ID → Entity (`ON DELETE CASCADE`) \| null, ×2 | Exactly one set: zod (`RuleTriggerRecord`) + commands, **no CHECK** (a CHECK makes drizzle-kit push rebuild the table, as `effect`) | FR-MOD-32 |
+| ownerPlayerId | ID → Player \| null | Copy of the character's owner; null on definition triggers | FR-MOD-47 |
+| name | text 1–40 | Part label | FR-MOD-32 |
+| enabled, public | bool (default true), bool | `public` default: character on, definition off (commands) | FR-MOD-47 |
+| rule | **JSON leaf** `TriggerRule` (MOD §8.4) | `@shared/effect-modifiers/triggers` | FR-MOD-33 |
+| updatedAt | timestamp | `ctx.clock`; no `createdAt` | MOD §12 |
+
+Indexes `rule_trigger_character` (`campaign_id`, `character_id`), `rule_trigger_definition` (`campaign_id`, `definition_id`). Caps 6 / character, 4 / definition, 40 / campaign: commands (R4).
+
+### Trigger use (`trigger_use`, server-only) — owner effect-modifiers
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, encounterId, seq | ID, ID → Campaign, ID → Encounter, int | `seq` DB-assigned (`triggerUseSeqNext`) | MOD §8.2 |
+| triggerId, ownerCombatantId | ID → Rule trigger (`ON DELETE CASCADE`), ID → Combatant | The owner's combatant in that encounter | FR-MOD-42 |
+| window | text ≤ 48 | `t:<round>:<turnCombatantId>` \| `r:<round>` \| `e` \| `f` | FR-MOD-42 |
+| state | `offered` \| `used` (`TRIGGER_USE_STATES`) | zod / commands (text enum, no CHECK) | FR-MOD-37, -38 |
+| cardId, rollId, part | soft ID ×2, int \| null | Offer: card + index in `damage.triggers`; `roll` event: its roll | FR-MOD-37, -43 |
+| targetId, hpChangeId, value, multiplier, forced | soft ID ×2, int \| null, text \| null, bool (default false) | Set while `used` from an apply | FR-MOD-38, -40 |
+| featureId | text \| null | `every.feature` spent (refunded on undo) | FR-MOD-41 |
+| createdAt, updatedAt | timestamp | `ctx.clock` | MOD §8.2 |
+
+Indexes `trigger_use_charge` (`trigger_id`, `owner_combatant_id`, `encounter_id`, `window`, `state`), `trigger_use_card` (`card_id`), `trigger_use_hp_change` (`hp_change_id`).
+
+- **Redaction (FR-MOD-47, fail closed):** the registry record carries server-only `presetRefs` (built with the row: per non-built-in preset ref of the rule, `{own: true}` for the trigger's own character's preset, else `{name}` of the campaign preset); `dmRedact` strips it. A player's copy keeps built-in keys and own preset ids; every other ref (incl. a deleted preset) becomes `{name}` ("Missing preset" if gone).
+- **Snapshot size** (CON-44, #208; MOD's `con44.test.ts`): heavy harness + every MOD §12 R row at max length (tier-2 modifiers on 16 presets and 12 effects, `originKey` on every preset, 1 max offer with settle facts on 20 pending cards, `offered` (20 dice) + DM name on 30 attack roll entries, a typed part on the outcome lines): DM 672,416 → 710,459 B (**+38,043**; 338,117 B left of 1 MiB; bound ≤ 40 KiB), players max 293,985 B (+13,408…+13,794; bound ≤ 20 KiB). Not in MOD §12's table: `hp_change.triggerParts` with 1 max part on every applied row, DM **+5,040** (players 0). `rule-trigger` at the campaign cap (40 rows, 1 `row` filter each): in no snapshot; DM load ack 41,615 B (1,040 B/row; bound ≤ 48 KiB), a player's own rows ≤ 10,004 B. Worst card (6 max mods on both rolls, 4 max offers, 50 dice): 4,353 B > the kind's 4 KB cap; 3 offers 3,975 B (R10 drops offers from the last).
