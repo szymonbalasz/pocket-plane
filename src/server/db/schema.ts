@@ -9,6 +9,7 @@ import {
 } from "@shared/combat-extras/schemas";
 import { HP_MODES, type HpTriggerPart } from "@shared/combat-tracker/schemas";
 import { COMPENDIUM_KINDS } from "@shared/compendium/schemas";
+import { DICE_MATERIALS, DICE_STYLES } from "@shared/dice-extras/looks";
 import type { Modifier } from "@shared/effect-modifiers/schemas";
 import { TRIGGER_USE_STATES } from "@shared/effect-modifiers/trigger-records";
 import type { TriggerRule } from "@shared/effect-modifiers/triggers";
@@ -1227,6 +1228,30 @@ export const compendiumEntry = sqliteTable(
   ],
 );
 
+/**
+ * Dice look (dice-extras, `dice-look`, data model §36; FR-DICEX-24–26): one per owner (the DM,
+ * each player) per campaign. `ownerKey` = `"dm"` or the player id; no row = the derived default.
+ * Player id is a plain id (no FK, as DICE §8).
+ */
+export const diceLook = sqliteTable(
+  "dice_look",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    ownerKey: text("owner_key").notNull(),
+    /** null = the DM. */
+    ownerPlayerId: text("owner_player_id"),
+    style: text("style", { enum: DICE_STYLES }).notNull(),
+    body: text("body").notNull(),
+    pips: text("pips").notNull(),
+    material: text("material", { enum: DICE_MATERIALS }).notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [uniqueIndex("dice_look_campaign_owner").on(t.campaignId, t.ownerKey)],
+);
+
 /** CON-20: `seq` for props and templates, computed by the DB inside the insert's transaction. */
 export const propSeqNext = sql<number>`(select coalesce(max(${prop.seq}), 0) + 1 from ${prop})`;
 export const aoeTemplateSeqNext = sql<number>`(select coalesce(max(${aoeTemplate.seq}), 0) + 1 from ${aoeTemplate})`;
@@ -1267,4 +1292,5 @@ export const schema = {
   mapSettings,
   compendiumSource,
   compendiumEntry,
+  diceLook,
 };
