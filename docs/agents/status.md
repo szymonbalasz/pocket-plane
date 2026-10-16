@@ -10,7 +10,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | V0 vision core | — | — | Merged (daeacac; walkthrough 20/20 + 5/5) | — |
 | R0 rule-trigger core | `fix/rt-core` (w3W, slot 2) | build-rt-core | Building | Review → merge → R1 ∥ R4, P core |
-| V5 sheet senses | `build/sheet-senses` (w3X, slot 4) | — | Walkthrough 7/7; merging | Merge → sheet lock to R3 |
+| V5 sheet senses | — | — | Merged (03e108b, #219) | — |
 | Lazy record types | — | — | Merged (6591646, #218) | — |
 | D1 dice tray | — | — | Merged (892819e, #214) | R2 builds on it |
 | D1 follow-up: Alt staging | — | — | Merged (83fd7e8) | — |
@@ -25,7 +25,6 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 ## Shared-file locks
 
 - `fix/rt-core`: `src/server/db/` (schema 2nd), MOD events, dice-roll-log types, CBT `hp.ts` + schemas + popup shell call site, new `apply-hooks.ts` / `popup-parts.ts`.
-- `build/sheet-senses`: character-sheet folder (sheet lock 1st).
 - `build/fog-shapes`: canvas lock 1st (MapCanvas, layers registry, canvas-tools append), fog events.
 - Order after: schema R0 → P core → C1 → D2; canvas V1 → V4 → V3; sheet V5 → R3 → R6 → C2 → D4 → P4 / C4; combat R0 → R7 → C2; dice-roll-log client R2 (after R1); `evaluate.ts` R1.
 
