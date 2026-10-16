@@ -3,6 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { EFFECTS_PER_TARGET_MAX } from "@shared/combat-extras/schemas";
 import { MOD_INTENTS } from "@shared/effect-modifiers/intents";
+import { builtinPreset } from "@shared/effect-modifiers/presets";
 import { CAMPAIGN_PRESETS_MAX, CHARACTER_PRESETS_MAX } from "@shared/effect-modifiers/schemas";
 import { armCrashHook } from "../../commands/crash";
 import { modSetup } from "./testing";
@@ -40,7 +41,10 @@ describe("FR-MOD-06 campaign presets", () => {
     const house = t.put(t.from("bless", { key: "bless", note: "House" }));
     expect(t.preset(house)).toMatchObject({ key: "bless", note: "House", modifiers: BLESS });
     expect(t.err(() => t.put(t.from("bless", { key: "bless" }))).code).toBe("conflict");
-    expect(t.err(() => t.put(t.from("bless", { key: "shield-of-faith" }))).code).toBe("invalid");
+    // Tier 2 built (R1): Shield of Faith is a built-in to customise; an unknown key is not.
+    expect(t.err(() => t.put(t.from("bless", { key: "no-such-preset" as never }))).code).toBe(
+      "invalid",
+    );
     // A preset keeps its key and character.
     expect(t.err(() => t.put({ ...cursed, id, key: "bane" })).code).toBe("invalid");
     const n = t.events.length;
@@ -331,7 +335,7 @@ describe("FR-MOD-11 toggle", () => {
       kind: "custom",
       label: "Rage",
       targetCharacterId: t.thornId,
-      modifiers: [{ kind: "flat", on: { roll: "damage", via: "weapon" }, value: 2 }],
+      modifiers: builtinPreset("rage")?.modifiers,
       presetKey: rage,
       durationRounds: 10,
       endsRound: 11,
@@ -445,9 +449,10 @@ describe("FR-MOD-08 edit an effect's modifiers", () => {
     expect(
       t.err(() => t.run(MOD_INTENTS.setModifiers, { effectId: marked, modifiers: [] })).code,
     ).toBe("conflict");
-    const mode = [{ kind: "mode", on: { roll: "check" }, mode: "advantage" }];
+    // Tier 2 built (R1): a mode part is a valid modifier; an unknown kind is not.
+    const bad = [{ kind: "multiply", on: { roll: "check" }, value: 2 }];
     expect(
-      t.err(() => t.run(MOD_INTENTS.setModifiers, { effectId: mira?.id, modifiers: mode })).code,
+      t.err(() => t.run(MOD_INTENTS.setModifiers, { effectId: mira?.id, modifiers: bad })).code,
     ).toBe("invalid");
   });
 });

@@ -124,8 +124,9 @@ describe("combat-extras shared schemas", () => {
     expect(ok({ modifiers: Array(7).fill(blessDie) })).toBe(false);
     expect(ok({ presetKey: "x".repeat(41) })).toBe(false);
     expect(ok({ presetKey: "" })).toBe(false);
-    // Tier 2 kinds are not built (FR-MOD-01).
-    expect(ok({ modifiers: [{ kind: "flat", on: { roll: "ac" }, value: 2 }] as never })).toBe(
+    // Tier 2 kinds are built (FR-MOD-01, R1); an AC part is still bounded.
+    expect(ok({ modifiers: [{ kind: "flat", on: { roll: "ac" }, value: 2 }] as never })).toBe(true);
+    expect(ok({ modifiers: [{ kind: "flat", on: { roll: "ac" }, value: 11 }] as never })).toBe(
       false,
     );
     const cond = { kind: "condition" as const, label: null, condition: "prone" as const };

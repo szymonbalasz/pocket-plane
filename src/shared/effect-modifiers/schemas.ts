@@ -20,10 +20,11 @@ export const CHARACTER_PRESETS_MAX = 6;
 export const PRESET_DURATION_MAX = 100;
 
 /**
- * The highest modifier tier this build has built (MOD §14.2; tier 1, #190). Modifiers of a
- * higher tier are `invalid` everywhere; built-in presets ship only parts of built tiers.
+ * The highest modifier tier this build has built (MOD §14.2; tier 1 #190, tier 2 sprint 3 R1).
+ * Modifiers of a higher tier are `invalid` everywhere; built-in presets ship only parts of built
+ * tiers. Tier 3 adds no kind.
  */
-export const BUILT_TIER = 1;
+export const BUILT_TIER = 2;
 
 const MOD_ABILITIES = [
   "str",
