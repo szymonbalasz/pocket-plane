@@ -8,7 +8,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| V0 vision core | `fix/vision-core` (w3N, slot 0) | test-vision-core (port 4103) | Built (check green, e2e 64/64, benchmark met); regression walkthrough | Merge → R0, V5, `fix/lazy-records` (briefs ready) |
+| V0 vision core | — | — | Merged (daeacac; walkthrough 20/20 + 5/5) | — |
+| R0 rule-trigger core | `fix/rt-core` (w3W, slot 2) | build-rt-core | Building | Review → merge → R1 ∥ R4, P core |
+| V5 sheet senses | `build/sheet-senses` (w3X, slot 4) | build-sheet-senses | Building | Walkthrough CHARX step 14 → merge → V1 |
+| Lazy record types | `fix/lazy-records` (w3Y, slot 5) | build-lazy-records | Building | Review → merge → R4, P core, C2 |
 | D1 dice tray | — | — | Merged (892819e, #214) | R2 builds on it |
 | D1 follow-up: Alt staging | — | — | Merged (83fd7e8) | — |
 | D3 3D dice | `build/dicex-3d` (w3R, slot 3) | fix-dicex-3d | Walkthrough PASS except FR-DICEX-18 (interrupted throw vanishes); fixing | Re-test step → merge |
@@ -20,9 +23,11 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Shared-file locks
 
-- `fix/vision-core`: `src/server/db/`, `src/server/ws/` + `src/shared/protocol/` + common sync store, `src/server/features/scenes-map/`, scene-tools shared parts, entities schemas.
-- `build/dicex-3d`: `package.json`, `bun.lock` (three + cannon-es, #207).
-- Order after: schema V0 → R0 → P core → C1 → D2; ws V0 → `fix/lazy-records`; canvas V1 → V4 → V3; sheet V5 → R3 → R6 → C2 → D4 → P4 / C4; combat R0 → R7 → C2; dice-roll-log client D1 → R2.
+- `fix/rt-core`: `src/server/db/` (schema 2nd), MOD events, dice-roll-log types, CBT `hp.ts` + schemas + popup shell call site, new `apply-hooks.ts` / `popup-parts.ts`.
+- `build/sheet-senses`: character-sheet folder (sheet lock 1st).
+- `fix/lazy-records`: `src/server/ws/`, `src/shared/protocol/`, client sync store.
+- `build/dicex-3d`: `package.json`, `bun.lock`.
+- Order after: schema R0 → P core → C1 → D2; canvas V1 → V4 → V3; sheet V5 → R3 → R6 → C2 → D4 → P4 / C4; combat R0 → R7 → C2; dice-roll-log client R2 (after R1); `evaluate.ts` R1.
 
 ## Pending DM decisions
 
