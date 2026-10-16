@@ -117,6 +117,8 @@ export const charRoll = defineCommand({
         label: s.label,
         actor,
         manual: input.manual?.[i],
+        // FR-MOD-18: the physical part groups of this roll (one list per `manual` entry).
+        ...(input.manualParts?.[i] ? { manualParts: input.manualParts[i] } : {}),
         source: "char",
         ...(subject ? { subject } : {}),
       });

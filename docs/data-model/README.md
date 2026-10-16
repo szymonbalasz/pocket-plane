@@ -1378,9 +1378,46 @@ From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Buil
 - **Fixtures:** `handouts-1` now also writes 3 `handout-shared` rows through its shares: h1 `all`, h2 `player` player-1, h4 `all` (kept after h4's unshare); `party-second` 1 (`all`, Second Campaign).
 - **CON-44:** no new snapshot bytes in the worst case: notifications stay within NOTE's 100-row window, and a `handout-shared` row (text ≤ 93 chars, payload ≈ 51 B) is smaller than the heavy harness's damage-card rows that fill it; PARTY's CON-44 test unchanged (+1,100 B, DM 673,998 B).
 
-## 38. Sprint 3: rule-trigger combat parts (R7)
+## 38. Sprint 3: dice looks (D2)
 
-From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD slice R7). **Built by `build/mod-combat-parts`**: no new table, column or record type. Protocol side: [protocol §52](../protocol/README.md#52-sprint-3-rule-trigger-combat-parts-r7).
+From [dice-extras](../specs/dice-extras.md#8-data-model) (DICEX, `complete`; #207 G17). **Built by `fix/dicex-look-core`** (schema lock 5th, after C1): one table (drizzle push, push-safe). Protocol side: [protocol §54](../protocol/README.md#52-sprint-3-dice-looks-d2).
+
+### Dice look (`dice_look`, record type `dice-look`) — owner [dice-extras](../specs/dice-extras.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id | ID | `ctx.ids`; kept when the look changes | DICEX §8 |
+| campaignId | ID → Campaign | | DICEX §8 |
+| ownerKey | text | `"dm"` or the player id; unique with `campaignId` | FR-DICEX-24 |
+| ownerPlayerId | ID \| null | null = the DM; plain id, no FK (as DICE §8) | DICEX §8 |
+| style | `ivory` \| `obsidian` \| `crimson` \| `sapphire` \| `emerald` \| `amethyst` \| `gold` \| `bone` | Named style | FR-DICEX-24 |
+| body, pips | text `#rrggbb` | zod `HexColour` | FR-DICEX-24 |
+| material | `plastic` \| `metal` \| `glass` \| `stone` | | FR-DICEX-24 |
+| updatedAt | timestamp | `ctx.clock` | DICEX §8 |
+
+Index: unique `dice_look_campaign_owner` (`campaign_id`, `owner_key`).
+
+- **Derived:** no row → the default look (DM Obsidian; players by sorted player `id`: Crimson, Sapphire, Emerald, Amethyst, Gold, Bone, Ivory, …), never stored. `lookOf(owner, rows, playerIds)` in `@shared/dice-extras/looks`.
+- **Fixtures:** `dicex-looks` writes only `dice-look` rows (DM, player-1).
+- **Snapshot size** (CON-44): every snapshot carries the campaign's rows (not lazy): 7 max-length rows = 2,157 B DM, the same bytes in each player frame; heavy DM 674,580 B ([protocol §54](../protocol/README.md#52-sprint-3-dice-looks-d2)).
+
+## 39. Sprint 3: effect modifiers tier 2 client (R2)
+
+From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) tier 2 + T (MOD, `complete`). **Built by `fix/mod-roll-preview`** (R2): no table, column or record type change. Protocol side: [protocol §53](../protocol/README.md#53-sprint-3-effect-modifiers-tier-2-client-r2).
+
+| Table / leaf | Change | Visibility | Source |
+|---|---|---|---|
+| `roll` (part rows) | `manual: true` now written from real clients: a bonus die (`e:`) or offered trigger die (`t:`) entered as a `manualParts` group on any of the seven roll intents | as the roll | FR-MOD-18 |
+| `roll.dice` (JSON leaf) | a die may carry `auto: true`: a physical roll's second d20, rolled by the server when only effects the player can't see give adv / dis (R2 ruling); the line says "(rolled for you)", the reason "(DM)"; old rows parse | as the roll (payload `dice` copies it) | FR-MOD-17 |
+| roll intents (wire only, not stored) | `manualParts` (one list; `char.roll` / `cbt.attack`: one list per `manual` entry) | — | FR-MOD-18 |
+
+- **Derived (client, pure):** preview mode, physical groups and parts line per roll (`@shared/effect-modifiers/preview`); a sheet roll's subjects (`sheetRollSubjects`); popup effective AC with parts and defense multiplier presets (`@shared/effect-modifiers/target-facts`).
+- **Client memory:** typed group inputs (lost on cancel / reload); the loaded `rule-trigger` set, now also loaded by a physical form or the tray (FR-MOD-47).
+- **Snapshot size** (CON-44): unchanged; nothing new is stored or sent besides the intents' groups.
+
+## 40. Sprint 3: rule-trigger combat parts (R7)
+
+From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD slice R7). **Built by `build/mod-combat-parts`**: no new table, column or record type. Protocol side: [protocol §54](../protocol/README.md#54-sprint-3-rule-trigger-combat-parts-r7).
 
 - **Damage card payload** (`damage-card` notification): `damage.triggers[].marked` = a built-in key or the campaign mark's **name** (≤ 40; was the preset id). Cards stored before keep an id; the popup then finds no mark (the DM ticks by hand).
 - **Damage card text**: + the offers suffix (≤ 280 chars total, count fallback).

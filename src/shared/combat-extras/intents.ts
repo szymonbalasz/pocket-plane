@@ -1,7 +1,12 @@
 // combat-extras WS intents, results and the concentration card (CBTX §8, §9; protocol §32).
 // Strict zod; none optimistic. DM-only unless the spec lists the owner.
 import { GridCell, HpMode } from "@shared/combat-tracker/schemas";
-import { ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
+import {
+  checkManualParts,
+  ManualEntry,
+  ManualParts,
+  RollMode,
+} from "@shared/dice-roll-log/schemas";
 import { z } from "zod";
 import { Condition, ExhaustionLevel } from "./conditions";
 import {
@@ -112,12 +117,16 @@ export type EffectIdResult = z.infer<typeof EffectIdResult>;
 export const SetTempHpInput = z.strictObject({ target: TargetRef, value: TempHp });
 export type SetTempHpInput = z.input<typeof SetTempHpInput>;
 
-export const RollConcentrationInput = z.strictObject({
-  notificationId: Id,
-  mode: RollMode.default("normal"),
-  manual: ManualEntry.optional(),
-  public: z.boolean().optional(),
-});
+export const RollConcentrationInput = z
+  .strictObject({
+    notificationId: Id,
+    mode: RollMode.default("normal"),
+    manual: ManualEntry.optional(),
+    /** FR-MOD-18 (tier 2): physical bonus die groups (Bless's d4 on the save), with `manual`. */
+    manualParts: ManualParts.optional(),
+    public: z.boolean().optional(),
+  })
+  .superRefine(checkManualParts);
 export type RollConcentrationInput = z.input<typeof RollConcentrationInput>;
 export const RollConcentrationResult = z.object({
   rollIds: z.array(z.string()),
@@ -126,12 +135,16 @@ export const RollConcentrationResult = z.object({
 });
 export type RollConcentrationResult = z.infer<typeof RollConcentrationResult>;
 
-export const RollDeathSaveInput = z.strictObject({
-  characterId: Id,
-  mode: RollMode.default("normal"),
-  manual: ManualEntry.optional(),
-  public: z.boolean().optional(),
-});
+export const RollDeathSaveInput = z
+  .strictObject({
+    characterId: Id,
+    mode: RollMode.default("normal"),
+    manual: ManualEntry.optional(),
+    /** FR-MOD-18 (tier 2): physical bonus die groups, with `manual`. */
+    manualParts: ManualParts.optional(),
+    public: z.boolean().optional(),
+  })
+  .superRefine(checkManualParts);
 export type RollDeathSaveInput = z.input<typeof RollDeathSaveInput>;
 export const RollIdsEntryResult = z.object({ rollIds: z.array(z.string()), entryId: z.string() });
 export type RollIdsEntryResult = z.infer<typeof RollIdsEntryResult>;

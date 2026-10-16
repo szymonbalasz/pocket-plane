@@ -112,6 +112,7 @@ export const rollDeathSave = defineCommand({
       label: "Death save",
       actor: { kind: "entity", id: c.id, name: c.name },
       manual: input.manual,
+      ...(input.manualParts ? { manualParts: input.manualParts } : {}),
       source: "char",
       // FR-MOD-15: a death save is a save with no ability.
       subject: { creature: { characterId: c.id }, roll: "save" },

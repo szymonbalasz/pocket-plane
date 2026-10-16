@@ -3,7 +3,8 @@
 // from the roll bar's tray Button, adds a d6, sets the constant to 6 and rolls; A sees the line;
 // B's flat throw rests on the server's values. B Alt+clicks Athletics on Mira's sheet → the tray
 // adjusts the sheet roll and its Roll sends the sheet's own intent. Sheet notation links: D4.
-import { expect, type Page, test } from "@playwright/test";
+// Looks (D2): fixture looks thrown in their style; player-2 saves Emerald glass, seen by A and B.
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow, shellWindow } from "./support/shell";
 
@@ -80,6 +81,73 @@ test("FR-DICEX-01 FR-DICEX-04 FR-DICEX-06 FR-DICEX-10 FR-DICEX-11 FR-DICEX-17 tr
   );
 
   for (const page of [p1, dm]) await page.context().close();
+});
+
+test("FR-DICEX-20 FR-DICEX-26 FR-DICEX-27 looks: fixture looks thrown; player-2 saves Emerald glass, A and B see it, reload keeps it", async ({
+  browser,
+}) => {
+  const { secret, link } = e2eEnv();
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await live(dm);
+  const p1 = await rolePage(browser);
+  await p1.goto(link("Player 1"));
+  await live(p1);
+  const p2 = await rolePage(browser);
+  await p2.goto(link("Player 2"));
+  await live(p2);
+
+  /** `page`'s throw of a fresh roll: every die in `style` / `material`. */
+  const seesLook = async (page: Page, style: string, material: string) => {
+    const dice = page
+      .locator('[data-testid="dicex-throw"][data-record-id]')
+      .getByTestId("dicex-throw-die");
+    await expect(dice.first()).toHaveAttribute("data-style", style);
+    for (const d of await dice.all()) {
+      await expect(d).toHaveAttribute("data-style", style);
+      await expect(d).toHaveAttribute("data-material", material);
+    }
+  };
+  const log1 = await openWindow(p1, "dice.log");
+  const roll = async (log: Locator) => {
+    await log.getByTestId("dice-roll-expression").fill("1d20");
+    await log.getByTestId("dice-roll-expression").press("Enter");
+  };
+
+  // Fixture `dicex-looks`: player-1 Crimson metal, seen by A.
+  await roll(log1);
+  await seesLook(dm, "crimson", "metal");
+  await p1.locator('[data-testid="dicex-throw"][data-state="rest"]').waitFor();
+
+  // C: tray gear → Dice look (default Sapphire) → Emerald, glass → Save.
+  const tray = await openWindow(p2, "dicex.tray");
+  await tray.getByTestId("dicex-settings-open").click();
+  await p2.getByTestId("dicex-look-open").click();
+  const editor = p2.getByTestId("dicex-look");
+  await expect(
+    editor.locator('[data-testid="dicex-look-style"][data-value="sapphire"]'),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(editor.getByTestId("dicex-look-save")).toBeDisabled();
+  await editor.locator('[data-testid="dicex-look-style"][data-value="emerald"]').click();
+  await editor.locator('[data-testid="dicex-look-material"][data-value="glass"]').click();
+  await editor.getByTestId("dicex-look-save").click();
+  // Saved: the stored look is now the editor's base (Save disabled again).
+  await expect(editor.getByTestId("dicex-look-save")).toBeDisabled();
+  await p2.keyboard.press("Escape");
+
+  // C rolls; A and B see C's throw in Emerald glass.
+  const log2 = await openWindow(p2, "dice.log");
+  await roll(log2);
+  await seesLook(dm, "emerald", "glass");
+  await seesLook(p1, "emerald", "glass");
+
+  // Reload B: C's next throw is still Emerald glass.
+  await p1.reload();
+  await live(p1);
+  await roll(log2);
+  await seesLook(p1, "emerald", "glass");
+
+  for (const page of [p1, p2, dm]) await page.context().close();
 });
 
 // Headless Chromium has WebGL only through SwiftShader, which Chrome now gates behind a flag.

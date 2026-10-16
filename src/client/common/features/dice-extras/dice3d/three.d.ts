@@ -149,5 +149,6 @@ declare module "three" {
     setAnimationLoop(callback: ((time: number) => void) | null): void;
     render(scene: Object3D, camera: Camera): void;
     dispose(): void;
+    forceContextLoss(): void;
   }
 }

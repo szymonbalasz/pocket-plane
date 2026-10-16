@@ -140,6 +140,7 @@ export const combatRollRoute: RollRoute = {
             combatantIds: [c.id],
             mode: input.mode,
             ...(input.manual?.[0] ? { manual: input.manual[0] } : {}),
+            ...(input.manualParts?.[0] ? { manualParts: input.manualParts[0] } : {}),
             ...(input.public !== undefined ? { public: input.public } : {}),
           }),
       };
@@ -160,10 +161,13 @@ export const combatRollRoute: RollRoute = {
       const claim: RollRouteClaim = {
         badge: "In combat",
         ...(crit && damage ? { critExpressions: [critExpression(damage)], crit: true } : {}),
+        // FR-MOD-27: the damage completes this card (its to-hit mode) or makes a damage-only one.
+        card: card ? { toHitMode: card.mode } : {},
         send: (sendIntent, input) =>
           sendIntent("cbt.rollDamage", {
             attackerId: c.id,
             ...(input.manual?.[0] ? { manual: input.manual[0] } : {}),
+            ...(input.manualParts?.[0] ? { manualParts: input.manualParts[0] } : {}),
             ...refFields(ref),
           }),
       };
@@ -173,12 +177,14 @@ export const combatRollRoute: RollRoute = {
     return {
       badge: "In combat",
       ...(damage && !toHitOnly ? { critExpressions: [critExpression(damage)] } : {}),
+      card: {},
       send: (sendIntent, input) =>
         sendIntent("cbt.attack", {
           attackerId: c.id,
           mode: input.mode,
           ...(toHitOnly ? { rolls: "toHit" } : {}),
           ...(input.manual ? { manual: input.manual } : {}),
+          ...(input.manualParts ? { manualParts: input.manualParts } : {}),
           ...refFields(ref),
         }),
     };

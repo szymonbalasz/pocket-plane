@@ -8,7 +8,7 @@ import {
   SetRemovedInput,
 } from "@shared/combat-tracker/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
-import type { ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
+import type { ManualEntry, ManualPart, RollMode } from "@shared/dice-roll-log/schemas";
 import {
   CombatantRemoved,
   CombatantRestored,
@@ -88,7 +88,13 @@ export function rollInitiativeFor(
   env: CommandEnv,
   combatants: readonly CombatantRecord[],
   encounterId: string,
-  opts: { mode: RollMode; manual?: ManualEntry; public?: boolean; effects?: boolean },
+  opts: {
+    mode: RollMode;
+    manual?: ManualEntry;
+    manualParts?: ManualPart[];
+    public?: boolean;
+    effects?: boolean;
+  },
 ): { rollIds: string[]; entries: RecordChange[] } {
   const rollIds: string[] = [];
   const entries: RecordChange[] = [];
@@ -102,6 +108,7 @@ export function rollInitiativeFor(
       label: spec.label,
       actor: { kind: "entity", id: c.entityId, name: c.name },
       manual: opts.manual,
+      ...(opts.manualParts ? { manualParts: opts.manualParts } : {}),
       source: "cbt",
       ...(opts.effects
         ? {

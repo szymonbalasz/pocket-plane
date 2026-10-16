@@ -206,8 +206,14 @@ export function evaluate(
   // FR-MOD-17: hints first; the final mode rewrites the d20 before it is rolled (FR-DICE-04).
   const hints = preRollHints(env, input.expression, subject, hooks);
   const mode = combineModes(input.mode, hints);
-  if (input.manual) checkManualMode(input.expression, input.manual, mode);
-  const row = evaluateBase(env, { ...input, mode });
+  let manual = input.manual;
+  let autoDie: number | undefined;
+  if (manual) {
+    const unseen = unseenModeDie(env, input.expression, manual, input.mode, hints, mode);
+    if (unseen) ({ manual, autoDie } = unseen);
+    else checkManualMode(input.expression, manual, mode);
+  }
+  const row = evaluateBase(env, { ...input, mode, ...(manual ? { manual } : {}) }, autoDie);
   const agreeing = hints.filter((h) => h.mode === mode);
   return { ...row, mods: runRollHooks(env, input, row, subject, hooks, agreeing) };
 }
@@ -243,6 +249,51 @@ function checkManualMode(expression: string, m: ManualEntry, mode: RollMode): vo
   if (m.dice.length === count(mode)) return;
   const others = (["normal", "advantage", "disadvantage"] as const).filter((x) => x !== mode);
   if (others.some((x) => count(x) === m.dice?.length)) throw conflict(EFFECTS_CHANGED);
+}
+
+/**
+ * FR-MOD-17 (R2 ruling): only effects the player can't see (secret / hidden) give the final
+ * adv / dis, so the player's preview showed one d20 and they entered one. The server rolls the
+ * missing d20 (`auto`) instead of a `conflict`; the line names no hidden effect ("(DM)").
+ * Null = not that case (a DM roll, a visible hint, or not exactly the visible mode's dice).
+ */
+function unseenModeDie(
+  env: CommandEnv,
+  expression: string,
+  m: ManualEntry,
+  roller: RollMode,
+  hints: readonly RollModeHint[],
+  mode: RollMode,
+): { manual: ManualEntry; autoDie: number } | null {
+  if (env.actor.role !== "player" || mode === "normal" || !m.dice) return null;
+  if (
+    combineModes(
+      roller,
+      hints.filter((h) => h.public),
+    ) !== "normal"
+  )
+    return null;
+  const seen = prepareExpression(expression, "normal");
+  if (!seen.ok || m.dice.length !== diceCount(seen.value)) return null;
+  // The die `applyMode` doubles (FR-DICE-04): its index among the dice, and its sign.
+  let at = 0;
+  let d20: DiceTerm | null = null;
+  for (const t of diceTerms(seen.value)) {
+    if (t.count === 1 && t.faces === 20 && t.keep === null) {
+      d20 = t;
+      break;
+    }
+    at += t.count;
+  }
+  const entered = m.dice[at];
+  if (!d20 || entered === undefined) return null;
+  const extra = rolledDice(env, [{ ...d20, sign: 1 }]).dice[0]?.value ?? 0;
+  const kept = mode === "advantage" ? Math.max(entered, extra) : Math.min(entered, extra);
+  const dice = [...m.dice.slice(0, at + 1), extra, ...m.dice.slice(at + 1)];
+  return {
+    manual: { diceTotal: m.diceTotal + d20.sign * (kept - entered), dice },
+    autoDie: at + 1,
+  };
 }
 
 /** FR-MOD-19 (D9): a roll's die values in notation order; an unknown value or > 20 dice → none. */
@@ -359,7 +410,8 @@ function runRollHooks(
   };
 }
 
-function evaluateBase(env: CommandEnv, input: EvaluateInput): Roll {
+/** `autoDie`: index of a manual roll's server-rolled die (FR-MOD-17, `unseenModeDie`). */
+function evaluateBase(env: CommandEnv, input: EvaluateInput, autoDie?: number): Roll {
   const cid = campaignOf(env.actor);
   const prepared = prepareExpression(input.expression, input.mode);
   if (!prepared.ok) throw exprIssue(prepared.message);
@@ -372,6 +424,8 @@ function evaluateBase(env: CommandEnv, input: EvaluateInput): Roll {
   if (input.manual) {
     dice = manualDice(terms, input.manual);
     total = input.manual.diceTotal + constant;
+    const auto = autoDie === undefined ? undefined : dice[autoDie];
+    if (auto) dice[autoDie as number] = { ...auto, auto: true };
   } else {
     const r = rolledDice(env, terms);
     dice = r.dice;

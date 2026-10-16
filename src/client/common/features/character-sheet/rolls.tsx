@@ -2,15 +2,20 @@
 // over the specs the server will build (`characterRolls`, same data); the buttons themselves
 // are in `./CharacterSheet`. DM public switches: one per category in each block header
 // (FR-CHAR-22's rule); NPC sheets have none (FR-CHARX-22).
-import { characterRolls } from "@shared/character-sheet/logic";
-import type { SheetRollKind } from "@shared/character-sheet/schemas";
+import { characterRolls, resolveSheetAttack } from "@shared/character-sheet/logic";
+import {
+  isAttackRowKind,
+  isSpellRowKind,
+  type SheetRollKind,
+} from "@shared/character-sheet/schemas";
 import {
   categoryPublic,
   GAME_LOG_SETTINGS_TYPE,
   type GameLogSettingsRecord,
   type RollCategory,
 } from "@shared/dice-roll-log/schemas";
-import { type ComponentProps, type ReactNode, useId, useState } from "react";
+import { sheetRollSubjects } from "@shared/effect-modifiers/preview";
+import { type ComponentProps, type ReactNode, useId, useMemo, useState } from "react";
 import type { Button } from "../../components/ui/button";
 import { Switch } from "../../components/ui/controls";
 import { useRecords, useSync } from "../../sync/store";
@@ -107,10 +112,49 @@ export function useSheetRollControl({
   const res = characterRolls(ctx.stats, ctx.row ?? null, kind, rollRef);
   const specs = res.ok ? res.specs : [];
   const category = specs[0]?.category ?? "other";
+  // FR-MOD-15, -27: the effect-modifier preview's subjects, as the server derives them; a
+  // definition (NPC sheet) roll has none.
+  const attackRow = isAttackRowKind(kind)
+    ? resolveSheetAttack(ctx.stats, ctx.row ?? null, {})
+    : null;
+  const row = isSpellRowKind(kind)
+    ? ctx.row?.spells.find((s) => s.id === rollRef.spellId)?.name
+    : rollRef.attackId !== undefined
+      ? ctx.stats.attacks?.find((a) => a.id === rollRef.attackId)?.name
+      : attackRow?.ok
+        ? attackRow.attack.name
+        : undefined;
+  const categories = specs.map((s) => s.category).join(",");
+  const subject = useMemo(
+    () =>
+      ctx.npc || ctx.creature.kind !== "character"
+        ? undefined
+        : sheetRollSubjects({
+            characterId: ctx.creature.id,
+            kind,
+            categories: categories.split(","),
+            ...(rollRef.ability ? { ability: rollRef.ability } : {}),
+            ...(rollRef.skill ? { skill: rollRef.skill } : {}),
+            ...(row ? { row } : {}),
+            ...(claim?.card ? { card: claim.card } : {}),
+          }),
+    [
+      ctx.npc,
+      ctx.creature.kind,
+      ctx.creature.id,
+      kind,
+      categories,
+      rollRef.ability,
+      rollRef.skill,
+      row,
+      claim?.card,
+    ],
+  );
   const control = useRollControl({
     expressions: specs.map((s) => s.expression),
     category,
     label: `${ctx.creature.name} — ${title}`,
+    ...(subject ? { subject } : {}),
     // FR-CBT-74: a routed Damage after a natural 20 opens with the extra critical dice.
     ...claimRollOptions(claim),
     onRoll(r) {
