@@ -1,11 +1,17 @@
-// FOG §12 / §13 CON-44 under the picked option (OQ-FOG-04 B, decided #196: token window + SCN
-// window): the realistic-heavy harness with fog on (new scenes fogged, FR-FOG-02; the battle
-// scene revealed, FR-FOG-25). DM: every scene's compact `fog` row, never windowed; players: the
-// active scene's only; tokens on the other new scenes carry `fogged: true` in their scene loads.
+// FOG §12 / §13 CON-44 under OQ-FOG-30 B (#207) and the #208 ceilings (DM 1 MiB, players
+// 512 KiB, no headroom guard): the realistic-heavy harness with FOG v2 rows on the active battle
+// scene (12 typical fog shapes, 2 darkness shapes, each player's explored memory). DM: only the
+// active scene's `fog` row (`dmWindow`), no `view-as` rows; players: their own `fog` / memory.
+// Per-type bounds: DM `fog` ≤ 16 KiB, a player's `vision` ≤ 48 KiB and `fog-explored` ≤ 6 KiB,
+// the View-as ack at caps ≤ 48 KiB.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
-import { FOG_TYPE } from "@shared/fog-of-war/schemas";
+import { encodeRuns } from "@shared/fog-of-war/mask";
+import { FOG_EXPLORED_TYPE, FOG_RUNS_MAX, FOG_TYPE, VISION_TYPE } from "@shared/fog-of-war/schemas";
+import type { DarknessRow, FogLayerShape } from "@shared/fog-of-war/shapes";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
+import { and, eq } from "drizzle-orm";
+import { campaign, fogExplored, player, scene, sceneFog } from "../../db/schema";
 import { SNAPSHOT_CEILING } from "../../ws/hub";
 import {
   buildRealisticHeavy,
@@ -15,48 +21,140 @@ import {
   snapshotSizes,
 } from "../../ws/testing/snapshot-size";
 
-/** ADR-0041 re-baseline: the heavy DM keeps ≥ 100 KiB under its ceiling. */
-const HEAVY_DM_HEADROOM = 100 * 1024;
-/** FOG §12: a `fog` row ≈ 170 B + runs + the DM's undo info. */
-const FOG_ROW_DM_MAX = 400;
+/** FR-FOG-27: the serialized row ≤ 16 KiB. */
+const FOG_ROW_MAX = 16 * 1024;
+/** FOG §13 CON-44 row: per-player bounds. */
+const VISION_MAX = 48 * 1024;
+const EXPLORED_MAX = 6 * 1024;
+const VIEW_AS_ACK_MAX = 48 * 1024;
+const AT = "2026-01-01T00:00:00.000Z";
 
-describe("CON-44 with fog (FOG §12)", () => {
+/** FOG §12's typical scene: 5 rects, 5 ten-vertex polygons, 2 circles (freeform), 2 darkness. */
+function typicalShapes(): { shapes: FogLayerShape[]; darkness: DarknessRow[] } {
+  const shapes: FogLayerShape[] = [];
+  for (let i = 0; i < 5; i++) {
+    shapes.push({ op: i % 2 ? "fog" : "reveal", rect: [i * 3.25, 1.5, i * 3.25 + 2.75, 6.5] });
+  }
+  for (let i = 0; i < 5; i++) {
+    const poly: number[] = [];
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2;
+      poly.push(
+        Math.round((4 + i * 3 + Math.cos(a) * 2.37) * 100) / 100,
+        Math.round((9 + Math.sin(a) * 1.83) * 100) / 100,
+      );
+    }
+    shapes.push({ op: i === 4 ? "explored" : "reveal", polygon: poly });
+  }
+  shapes.push(
+    { op: "reveal", circle: [6.5, 11.25, 2.5] },
+    { op: "fog", circle: [14.75, 3.5, 1.5] },
+  );
+  return {
+    shapes,
+    darkness: [
+      { id: "00000000-0000-4000-8000-0000000000d1", circle: [12.5, 9, 1.5] },
+      { id: "00000000-0000-4000-8000-0000000000d2", rect: [16.25, 10.5, 18.75, 12.25] },
+    ],
+  };
+}
+
+/** Explored memory: a 20 × 14 box with alternating runs (≈ 35 runs) or at the run cap. */
+function memory(cells: number, runs: number) {
+  const a = new Uint8Array(cells);
+  const step = Math.max(1, Math.floor(cells / runs));
+  for (let i = 0; i < cells; i++) a[i] = Math.floor(i / step) % 2;
+  return encodeRuns(a, "fog");
+}
+
+describe("CON-44 with FOG v2 (FOG §12, #208)", () => {
   let b: Awaited<ReturnType<typeof servicesFromBundle>>;
   beforeAll(async () => {
     b = await servicesFromBundle(await loadBundle("session-sim", { testMode: true }));
     buildRealisticHeavy(b.s);
+    const db = b.s.db;
+    const cid = db.select().from(campaign).where(eq(campaign.active, true)).get()?.id as string;
+    const battle = db
+      .select()
+      .from(scene)
+      .where(and(eq(scene.campaignId, cid), eq(scene.active, true)))
+      .get()?.id as string;
+    const players = db.select().from(player).where(eq(player.campaignId, cid)).all();
+    const { shapes, darkness } = typicalShapes();
+    const ids = players.map((p) => p.id);
+    db.update(sceneFog)
+      .set({ shapes, darkness: darkness.map((d) => ({ ...d, seenBy: ids })) })
+      .where(eq(sceneFog.sceneId, battle))
+      .run();
+    for (const p of players) {
+      db.insert(fogExplored)
+        .values({
+          sceneId: battle,
+          playerId: p.id,
+          campaignId: cid,
+          col0: 0,
+          row0: 0,
+          cols: 20,
+          rows: 14,
+          runs: memory(280, 35),
+          updatedAt: AT,
+        })
+        .run();
+    }
   }, 60_000);
   afterAll(() => b.cleanup());
 
-  test("CON-44 FOG §12 heavy: DM every scene's fog row (compact, never windowed), players the active one; ceilings + DM headroom hold", () => {
+  test("CON-44 FOG §12 heavy (#208): DM < 1 MiB with the active scene's fog row only and no view-as rows; players < 512 KiB", () => {
     const sizes = snapshotSizes(b.s);
     const [dm, ...players] = sizes;
     const fog = dm?.types[FOG_TYPE];
-    expect(fog?.rows).toBe(HEAVY.scenes);
-    expect((fog?.bytes ?? Infinity) / HEAVY.scenes).toBeLessThan(FOG_ROW_DM_MAX);
-    for (const p of players) expect(p.types[FOG_TYPE]?.rows).toBe(1);
-    expect(SNAPSHOT_CEILING.dm - (dm?.bytes ?? Infinity)).toBeGreaterThanOrEqual(HEAVY_DM_HEADROOM);
-    for (const p of players) expect(p.bytes).toBeLessThanOrEqual(SNAPSHOT_CEILING.player);
+    expect(fog?.rows).toBe(1);
+    expect(fog?.bytes ?? Infinity).toBeLessThanOrEqual(FOG_ROW_MAX);
+    expect(dm?.types[VISION_TYPE]?.rows).toBe(0);
+    expect(dm?.types[FOG_EXPLORED_TYPE]?.rows).toBe(0);
+    expect(dm?.bytes ?? Infinity).toBeLessThan(SNAPSHOT_CEILING.dm);
+    for (const p of players) {
+      expect(p.types[FOG_TYPE]?.rows).toBe(1);
+      expect(p.types[FOG_EXPLORED_TYPE]?.rows).toBe(1);
+      expect(p.types[FOG_EXPLORED_TYPE]?.bytes ?? Infinity).toBeLessThanOrEqual(EXPLORED_MAX);
+      expect(p.types[VISION_TYPE]?.bytes ?? Infinity).toBeLessThanOrEqual(VISION_MAX);
+      expect(p.bytes).toBeLessThan(SNAPSHOT_CEILING.player);
+    }
+    const left = SNAPSHOT_CEILING.dm - (dm?.bytes ?? 0);
     console.log(
-      `FOG CON-44: heavy DM ${dm?.bytes} B (fog ${fog?.rows} rows, ${fog?.bytes} B; ${SNAPSHOT_CEILING.dm - (dm?.bytes ?? 0)} B left); players ${Math.min(...players.map((p) => p.bytes))}–${Math.max(...players.map((p) => p.bytes))} B`,
+      `FOG CON-44 (V0): heavy DM ${dm?.bytes} B (fog 1 row ${fog?.bytes} B; ${left} B left of 1 MiB); players ${Math.min(...players.map((p) => p.bytes))}–${Math.max(...players.map((p) => p.bytes))} B (fog-explored ${players[0]?.types[FOG_EXPLORED_TYPE]?.bytes} B)`,
     );
   });
 
-  test("FR-FOG-25 heavy: the revealed battle scene's 60 tokens reach every player; no player token row is fogged unless owned", () => {
+  test("FR-FOG-43 the View-as ack at caps (memory at the 2,000-run cap) ≤ 48 KiB", () => {
+    const db = b.s.db;
+    const p = db.select().from(fogExplored).all()[0];
+    if (!p) throw new Error("no memory row");
+    db.update(fogExplored)
+      .set({ cols: 400, rows: 400, runs: memory(160_000, FOG_RUNS_MAX) })
+      .where(and(eq(fogExplored.sceneId, p.sceneId), eq(fogExplored.playerId, p.playerId)))
+      .run();
+    const dm = snapshotFrames(b.s)[0]?.viewer;
+    if (!dm) throw new Error("no DM");
+    const ack = b.s.records.loadViewAs(
+      { db, presence: { list: () => [] } },
+      dm,
+      p.sceneId,
+      p.playerId,
+    );
+    expect(ack[FOG_EXPLORED_TYPE]).toHaveLength(1);
+    const bytes = Buffer.byteLength(JSON.stringify({ records: ack }), "utf8");
+    expect(bytes).toBeLessThanOrEqual(VIEW_AS_ACK_MAX);
+    console.log(`FOG CON-44 (V0): View-as ack with memory at the run cap ${bytes} B`);
+  });
+
+  test("FR-FOG-25 heavy: the revealed battle scene's tokens reach every player; no player token row is fogged unless owned", () => {
     const frames = snapshotFrames(b.s);
     for (const f of frames) {
-      const tokens = (f.records[TOKEN_TYPE] ?? []) as {
-        fogged?: boolean;
-        ownerPlayerId?: string;
-      }[];
+      const tokens = (f.records[TOKEN_TYPE] ?? []) as { fogged?: boolean }[];
       expect(tokens).toHaveLength(HEAVY.activeSceneTokens);
       expect(tokens.filter((t) => t.fogged === true)).toEqual([]);
     }
-    const fogs = frames.find((f) => f.viewer.role === "player")?.records[FOG_TYPE] as {
-      fill: string;
-      runs: string;
-    }[];
-    expect(fogs).toEqual([expect.objectContaining({ fill: "clear", runs: "" })]);
   });
 
   test("FR-FOG-02 heavy: tokens on the new (fogged) scenes carry `fogged: true` in the DB", () => {
@@ -64,6 +162,5 @@ describe("CON-44 with fog (FOG §12)", () => {
     const fogged = n("SELECT count(*) AS n FROM token WHERE fogged = 1");
     expect(fogged).toBeGreaterThan(HEAVY.tokens / 2);
     expect(fogged).toBeLessThan(HEAVY.tokens - HEAVY.activeSceneTokens + 1);
-    console.log(`FOG CON-44: ${fogged} of ${n("SELECT count(*) AS n FROM token")} tokens fogged`);
   });
 });

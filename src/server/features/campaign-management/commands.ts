@@ -12,6 +12,7 @@ import { defineCommand, IdSchema } from "../../commands/commands";
 import { conflict, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { campaign, player } from "../../db/schema";
+import { playerLifecycleHooks } from "./player-hooks";
 import { toCampaignRecord, toPlayerRecord } from "./records";
 
 export function activeCampaign(tx: Pick<Tx, "select">) {
@@ -123,11 +124,14 @@ export const activateCampaign = defineCommand({
   },
 });
 
-/** FR-CAMP-12/13: adds to the active campaign; token from ctx.tokens. */
+/**
+ * FR-CAMP-12/13: adds to the active campaign; token from ctx.tokens. Player hooks (`added`,
+ * ADR-0042) run after the insert; their rows join `PlayerAdded`.
+ */
 export const addPlayer = defineCommand({
   name: "player.add",
   input: AddPlayerBody,
-  execute({ name }, { tx, ctx, emit }) {
+  execute({ name }, { tx, ctx, actor, emit }) {
     const active = activeCampaign(tx);
     if (!active) throw conflict("No active campaign");
     assertPlayerNameFree(tx, active.id, name);
@@ -140,18 +144,13 @@ export const addPlayer = defineCommand({
     tx.insert(player)
       .values({ id, campaignId: active.id, name, linkToken, createdAt: now, updatedAt: now })
       .run();
+    const after = toPlayerRecord({ id, campaignId: active.id, name });
+    const hookChanges = playerLifecycleHooks.added({ tx, ctx, actor }, after);
     emit({
       type: "PlayerAdded",
       campaignId: active.id,
       payload: { playerId: id, campaignId: active.id, name },
-      changes: [
-        {
-          type: "player",
-          id,
-          before: null,
-          after: toPlayerRecord({ id, campaignId: active.id, name }),
-        },
-      ],
+      changes: [{ type: "player", id, before: null, after }, ...hookChanges],
     });
     return { id, name, linkToken };
   },

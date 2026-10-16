@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { SceneFolderRecord, SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
 import { defineRecordType, RecordRegistry, type Viewer } from "../../ws/records";
+import { dmTokenRecord } from "./rows";
 import {
   folderVisibility,
   redactScene,
@@ -53,6 +54,8 @@ const token = (
   speed: 30,
   createdAt: "t",
   updatedAt: "t",
+  // FR-FOG-10 (ADR-0042): a revealed scene, every player sees it.
+  seenBy: ["p1", "p2"],
 });
 const folder: SceneFolderRecord = {
   id: "f",
@@ -99,6 +102,7 @@ function registry(active: string | null) {
       sceneOf: (x) => x.sceneId,
       visibility: tokenVisibility,
       redact: redactToken,
+      dmRedact: dmTokenRecord,
       snapshot: () => [],
     }),
   );
@@ -238,5 +242,30 @@ describe("FR-MAP-26 visibility matrix", () => {
     expect(
       r.filterChange({ type: "token", id: "wolf", before: hid, after: hid }, other),
     ).toBeNull();
+  });
+
+  test("FR-FOG-45 / FR-FOG-10 token wire: `invisible` DM only (when true); `seenBy` on no wire; per-player seenBy", () => {
+    const r = registry("s1");
+    const t = { ...token("stalker", "s1", false, null), invisible: true as const };
+    const d = r.view("token", t, dm).data as Record<string, unknown>;
+    expect(d.invisible).toBe(true);
+    expect(d).not.toHaveProperty("seenBy");
+    for (const p of [owner, other]) {
+      const seen = r.view("token", t, p);
+      expect(seen.vis).toBe("redacted");
+      expect(seen.data).not.toHaveProperty("invisible");
+      expect(seen.data).not.toHaveProperty("seenBy");
+    }
+    // Seen by p1 only: hidden for p2 (FR-FOG-11, ADR-0042); null = pre-v2 → hidden for both.
+    const one = { ...t, seenBy: ["p1"] };
+    expect([r.view("token", one, owner).vis, r.view("token", one, other).vis]).toEqual([
+      "redacted",
+      "hidden",
+    ]);
+    const pre = { ...t, seenBy: null };
+    expect([r.view("token", pre, owner).vis, r.view("token", pre, other).vis]).toEqual([
+      "hidden",
+      "hidden",
+    ]);
   });
 });

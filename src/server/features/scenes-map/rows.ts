@@ -11,9 +11,19 @@ type TokenRow = typeof token.$inferSelect;
 type FolderRow = typeof sceneFolder.$inferSelect;
 
 export const toSceneRecord = (r: SceneRow): SceneRecord => ({ ...r });
-/** `fogged` rides the wire only when true (FOG §9). */
-export const toTokenRecord = ({ fogged, ...r }: TokenRow): TokenRecord =>
-  fogged ? { ...r, fogged: true } : r;
+/**
+ * `fogged` and `invisible` ride the DM wire only when true (FOG §9, #210); `seenBy` is a server
+ * copy that no wire carries (`dmTokenRecord` / `redactToken` strip it).
+ */
+export const toTokenRecord = ({ fogged, invisible, seenBy, ...r }: TokenRow): TokenRecord => ({
+  ...r,
+  ...(fogged ? { fogged: true as const } : {}),
+  ...(invisible ? { invisible: true as const } : {}),
+  seenBy,
+});
+
+/** The DM's wire token: no `seenBy` (ADR-0042). */
+export const dmTokenRecord = ({ seenBy: _seenBy, ...r }: TokenRecord): TokenRecord => r;
 export const toFolderRecord = (r: FolderRow): SceneFolderRecord => ({ ...r });
 
 /** Campaign fixed at authentication (CON-21): `actor.campaignId`. */

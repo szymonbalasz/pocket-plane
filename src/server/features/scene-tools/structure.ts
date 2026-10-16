@@ -26,7 +26,8 @@ import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, invalid, notFound } from "../../commands/errors";
 import { sceneStructure } from "../../db/schema";
 import { campaignOf, getScene } from "../scenes-map/rows";
-import { doorFogFlag } from "./copies";
+import { rederiveDependants } from "../scenes-map/visibility-hooks";
+import { doorCopies } from "./copies";
 import { readStructure } from "./rows";
 
 export const SEGMENT_CAP_MESSAGE = `A scene holds at most ${SEGMENTS_MAX} walls and doors`;
@@ -40,6 +41,8 @@ interface Structure {
   walls: Wall[];
   doors: Door[];
   nextN: number;
+  /** FR-SCN-36: FOG-written per-door seers (server only); pre-v2 null. */
+  doorSeen: Record<string, string[]> | null;
 }
 
 /** The scene (in the actor's campaign, else `not_found`) and its structure; no row = empty. */
@@ -52,6 +55,7 @@ function load(env: CommandEnv, sceneId: string): Structure {
     walls: before ? [...before.walls] : [],
     doors: before ? [...before.doors] : [],
     nextN: before?.nextN ?? 1,
+    doorSeen: before ? (before.doorSeen ?? null) : {},
   };
 }
 
@@ -77,14 +81,29 @@ function checkCap(st: Structure): void {
   if (st.walls.length + st.doors.length > SEGMENTS_MAX) throw conflict(SEGMENT_CAP_MESSAGE);
 }
 
-/** Writes the row (`rev` + 1) and queues `StructureEdited` with the touched `n`s. */
+/**
+ * Writes the row (`rev` + 1; `doorSeen` keeps only existing doors) and queues `StructureEdited`
+ * with the touched `n`s. FR-SCN-39 (ADR-0042): the visibility hooks' `rederive` runs after the
+ * write (FOG's scene re-derive: walls and doors are occluders; a no-op until V2) and its rows
+ * join the event.
+ */
 function commit(env: CommandEnv, st: Structure, op: Op, ns: number[]): void {
   const { scene, before } = st;
+  const doorSeen =
+    st.doorSeen === null
+      ? null
+      : Object.fromEntries(
+          st.doors.flatMap((d) => {
+            const seers = st.doorSeen?.[String(d[0])];
+            return seers ? [[String(d[0]), seers] as const] : [];
+          }),
+        );
   const values = {
     rev: (before?.rev ?? 0) + 1,
     nextN: st.nextN,
     walls: st.walls,
     doors: st.doors,
+    doorSeen,
     updatedAt: env.ctx.clock.iso(),
   };
   env.tx
@@ -92,18 +111,17 @@ function commit(env: CommandEnv, st: Structure, op: Op, ns: number[]): void {
     .values({ sceneId: scene.id, campaignId: scene.campaignId, ...values })
     .onConflictDoUpdate({ target: sceneStructure.sceneId, set: values })
     .run();
+  const change = {
+    type: SCENE_STRUCTURE_TYPE,
+    id: scene.id,
+    before,
+    after: readStructure(env.tx, scene.id),
+  };
   env.emit({
     type: StructureEdited.type,
     campaignId: scene.campaignId,
     payload: { sceneId: scene.id, op, ns },
-    changes: [
-      {
-        type: SCENE_STRUCTURE_TYPE,
-        id: scene.id,
-        before,
-        after: readStructure(env.tx, scene.id),
-      },
-    ],
+    changes: [change, ...rederiveDependants(env, change)],
   });
 }
 
@@ -137,7 +155,10 @@ export const addWalls = defineCommand({
   },
 });
 
-/** FR-SCN-08 / -36: one door (default closed); its fog flag `f` from `derive` before the write. */
+/**
+ * FR-SCN-08 / -36: one door (default closed); its fog flag `f` and `doorSeen` entry from
+ * `derive` before the write.
+ */
 export const addDoor = defineCommand({
   name: SCN_INTENTS.addDoor,
   input: AddDoorInput,
@@ -146,8 +167,9 @@ export const addDoor = defineCommand({
     checkSegment(st.scene, segment, ["segment"]);
     if (keysOf(st).has(segmentKey(segment))) throw conflict(SEGMENT_TAKEN_MESSAGE);
     const n = st.nextN++;
-    const f = doorFogFlag(env.tx, st.scene.id, segment);
+    const { f, seenBy } = doorCopies(env.tx, st.scene.id, segment);
     st.doors.push([n, ...segment, state ?? DOOR_CLOSED, f]);
+    if (st.doorSeen !== null && seenBy !== null) st.doorSeen[String(n)] = seenBy;
     checkCap(st);
     commit(env, st, "addDoor", [n]);
     return { n };

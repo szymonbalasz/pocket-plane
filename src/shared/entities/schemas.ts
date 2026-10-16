@@ -214,6 +214,23 @@ export const HpFormula = z
   .transform(normalizeHpFormula)
   .refine((f) => parseHpFormula(f) !== null, { message: HP_FORMULA_MESSAGE });
 
+/** FR-CHARX-49: 0–120 ft, step 5 (OQ-FOG-35). */
+export const SENSE_FT_MAX = 120;
+const SenseFt = int(0, SENSE_FT_MAX).refine((v) => v % 5 === 0, "Must be a multiple of 5");
+
+/**
+ * FR-CHARX-49 / -53 (ADR-0042): stored senses that drive fog's dynamic vision. Absent = vision 0,
+ * darkvision 0, no see-through, no sees-invisible (every existing creature: FOG v2 changes
+ * nothing until set). `seesInvisible` (#210) absent = false.
+ */
+export const Senses = z.strictObject({
+  visionFt: SenseFt,
+  darkvisionFt: SenseFt,
+  seesMagicalDarkness: z.boolean(),
+  seesInvisible: z.boolean().optional(),
+});
+export type Senses = z.infer<typeof Senses>;
+
 const core = {
   size: Size,
   ac: int(0, 30),
@@ -233,6 +250,8 @@ const core = {
   overrides: Overrides.optional(),
   /** FR-CHARX-01: needs `abilities`. */
   spellcasting: Spellcasting.optional(),
+  /** FR-CHARX-49 (sprint 3): absent = no vision (FOG v2). Not on the summary whitelist. */
+  senses: Senses.optional(),
 };
 
 /**

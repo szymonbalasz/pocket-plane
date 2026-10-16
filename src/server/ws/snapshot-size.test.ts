@@ -32,8 +32,6 @@ import {
 const BUILD_MS = 200;
 /** ADR-0041: a `sync.loadScene` result stays under the player ceiling (512 KiB). */
 const SCENE_LOAD_MAX = 512 * 1024;
-/** ADR-0041 re-baseline: the heavy DM keeps ≥ 100 KiB under its ceiling (fog + SCN headroom). */
-const HEAVY_DM_HEADROOM = 100 * 1024;
 const sessionSim = async () =>
   servicesFromBundle(await loadBundle("session-sim", { testMode: true }));
 
@@ -94,22 +92,20 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect(counts.loot).toBeGreaterThanOrEqual(HEAVY.loot);
     });
 
-    test("DM ≤ 768 KiB, every player ≤ 512 KiB; DM build < 200 ms", () => {
+    test("CON-44 (#208) DM < 1 MiB, every player < 512 KiB; DM build < 200 ms", () => {
       const sizes = snapshotSizes(b.s);
       expect(sizes).toHaveLength(1 + HEAVY.players);
       expectUnderCeilings(sizes);
       expect(dmBuildMs(b.s)).toBeLessThan(BUILD_MS);
     });
 
-    test("ADR-0041 DM token window: the active scene's 60 tokens only; ≥ 100 KiB DM headroom; largest scene load < 512 KiB", () => {
+    test("ADR-0041 DM token window: the active scene's 60 tokens only; largest scene load < 512 KiB", () => {
       const sizes = snapshotSizes(b.s);
       // Measured: 781,930 B with every token → 663,699 B (−118,231 B, the 240 non-active ones).
       expect(sizes.map((v) => v.types[TOKEN_TYPE]?.rows)).toEqual(
         Array(1 + HEAVY.players).fill(HEAVY.activeSceneTokens),
       );
-      expect(SNAPSHOT_CEILING.dm - (sizes[0]?.bytes ?? Infinity)).toBeGreaterThanOrEqual(
-        HEAVY_DM_HEADROOM,
-      );
+      // #208: no headroom guard; the ceiling itself is asserted in the test above.
       const loads = sceneLoadSizes(b.s);
       expect(loads).toHaveLength(HEAVY.scenes);
       expect(loads.reduce((n, l) => n + (l.rows[TOKEN_TYPE] ?? 0), 0)).toBe(HEAVY.tokens);

@@ -33,8 +33,7 @@ import { aoeTemplate, aoeTemplateSeqNext, player, scene } from "../../db/schema"
 import type { Actor, RecordChange } from "../../events/types";
 import type { SignalAudience, SignalRead, SignalSender } from "../../ws/signals";
 import { activeSceneOf, campaignOf, getScene } from "../scenes-map/rows";
-import { hiddenByHooks } from "../scenes-map/visibility-hooks";
-import { templateFogged } from "./copies";
+import { templateCopies } from "./copies";
 import { readTemplate, sceneTemplates } from "./rows";
 import { templateVisibility } from "./visibility";
 
@@ -81,7 +80,8 @@ function getEditable(tx: Tx, actor: Actor, templateId: string): AoeTemplateRecor
   const t = readTemplate(tx, templateId);
   if (!t || t.campaignId !== cid) throw notFound("Template not found");
   if (actor.role !== "player") return t;
-  const seen = templateVisibility(t) !== "hidden" && activeSceneOf(tx, cid)?.id === t.sceneId;
+  const v = { connId: "", campaignId: cid, role: "player" as const, playerId: actor.playerId };
+  const seen = templateVisibility(t, v) !== "hidden" && activeSceneOf(tx, cid)?.id === t.sceneId;
   if (!seen) throw notFound("Template not found");
   if (t.placedByPlayerId !== actor.playerId) throw forbidden("Not your template");
   return t;
@@ -142,7 +142,7 @@ export const placeTemplate = defineCommand({
       width: widthFor(input.shape, input.width),
       angle: input.angle,
     };
-    const fogged = templateFogged(tx, s, geometry);
+    const copies = templateCopies(tx, s, geometry, placedBy);
     const id = ctx.ids.next();
     const now = ctx.clock.iso();
     tx.insert(aoeTemplate)
@@ -160,7 +160,7 @@ export const placeTemplate = defineCommand({
         label: input.label ?? "",
         placedByPlayerId: placedBy,
         hidden: actor.role === "player" ? false : (input.hidden ?? false),
-        fogged,
+        ...copies,
         createdAt: now,
         updatedAt: now,
       })
@@ -207,7 +207,7 @@ export const updateTemplate = defineCommand({
       hidden === before.hidden;
     if (same) return;
     const s = getScene(tx, before.campaignId, before.sceneId);
-    const fogged = templateFogged(tx, s, geometry);
+    const copies = templateCopies(tx, s, geometry, before.placedByPlayerId);
     tx.update(aoeTemplate)
       .set({
         x: geometry.x,
@@ -217,7 +217,7 @@ export const updateTemplate = defineCommand({
         angle: geometry.angle,
         label,
         hidden,
-        fogged,
+        ...copies,
         updatedAt: ctx.clock.iso(),
       })
       .where(eq(aoeTemplate.id, before.id))
@@ -273,9 +273,9 @@ export const clearTemplates = defineCommand({
 /**
  * FR-SCN-24 (ADR-0033): `scn.template` routing, read-only. Player: the active scene only (else
  * `invalid`), never `dmOnly`, then `"all"` (player templates are never fog-hidden). DM: the
- * scene must be the campaign's (else `not_found`); `"dm"` if `dmOnly`, if the scene isn't
- * active, or if a DM template over those uncut cells would be fog-hidden (FR-FOG-15: `derive`
- * says every cell fogged and a `hides` hook hides it); else `"all"`. An `end` frame carries no
+ * scene must be the campaign's (else `not_found`); `"dm"` if `dmOnly` or if the scene isn't
+ * active; else the players who would see a DM template over those uncut cells (FR-FOG-15:
+ * `derive`'s `seenBy`; nobody → `"dm"`; no hook → `"all"`). An `end` frame carries no
  * geometry and routes `"all"`, except for a non-active scene (`"dm"`: SCN §13 leak list, no
  * `scn.template` from a non-active scene reaches a player).
  */
@@ -303,8 +303,7 @@ export function templateAudience(
   if (data.sceneId !== active) return "dm";
   if ("end" in data) return "all";
   if (data.dmOnly) return "dm";
-  // Ask the hooks first: while no hook would hide a fogged DM template, skip the fog read.
-  const probe = { ...data, campaignId: sender.campaignId, placedByPlayerId: null, fogged: true };
-  if (!hiddenByHooks(AOE_TEMPLATE_TYPE, probe)) return "all";
-  return templateFogged(read.db, s, data) ? "dm" : "all";
+  const { seenBy } = templateCopies(read.db, s, data, null);
+  if (seenBy === null) return "all";
+  return seenBy.length === 0 ? "dm" : { players: seenBy };
 }

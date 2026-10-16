@@ -32,7 +32,7 @@ import { prop, propSeqNext } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
 import { campaignOf, findScene, getScene } from "../scenes-map/rows";
-import { propFogged } from "./copies";
+import { propCopies } from "./copies";
 import { readProp } from "./rows";
 
 /** FR-SCN-17: a locked prop keeps its footprint (the menu still works). */
@@ -79,16 +79,24 @@ function assertCaps(tx: Tx, cid: string, sceneId: string) {
   }
 }
 
-type PropFields = Omit<ScenePropRecord, "id" | "campaignId" | "seq" | "fogged">;
+type PropFields = Omit<ScenePropRecord, "id" | "campaignId" | "seq" | "fogged" | "seenBy">;
 
-/** Inserts one prop with `fogged` derived first (FR-SCN-35); returns the record. */
+/** Inserts one prop with `fogged` / `seenBy` derived first (FR-SCN-35); returns the record. */
 function insertProp(env: CommandEnv, cid: string, f: PropFields): ScenePropRecord {
   const { tx, ctx } = env;
   const id = ctx.ids.next();
   const now = ctx.clock.iso();
-  const fogged = propFogged(tx, f.sceneId, f);
+  const copies = propCopies(tx, f.sceneId, f);
   tx.insert(prop)
-    .values({ id, campaignId: cid, seq: propSeqNext, ...f, fogged, createdAt: now, updatedAt: now })
+    .values({
+      id,
+      campaignId: cid,
+      seq: propSeqNext,
+      ...f,
+      ...copies,
+      createdAt: now,
+      updatedAt: now,
+    })
     .run();
   return readProp(tx, id) as ScenePropRecord;
 }
@@ -145,7 +153,7 @@ export const updateProp = defineCommand({
     const set: Partial<typeof prop.$inferInsert> = {};
     if (moved) {
       assertOnMap(findScene(tx, before.campaignId, before.sceneId) as SceneRecord, box);
-      Object.assign(set, box, { fogged: propFogged(tx, before.sceneId, box) });
+      Object.assign(set, box, propCopies(tx, before.sceneId, box));
     }
     if (input.rotation !== undefined && input.rotation !== before.rotation) {
       set.rotation = input.rotation;

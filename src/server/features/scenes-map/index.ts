@@ -7,6 +7,7 @@ import { ActiveSceneCache, sceneCampaignOf } from "./active-scene";
 import { backfillCharacterIds } from "./character-copy";
 import {
   activateScene,
+  checkMove,
   createFolder,
   createScene,
   deleteFolder,
@@ -57,6 +58,7 @@ export const scenesMap: Feature = {
       setTokenHiddenCommand(hooks),
       duplicateToken,
       deleteTokenCommand(hooks),
+      checkMove,
     ] as unknown as CommandDef[];
     for (const c of intents) r.command(c, { intent: true });
 

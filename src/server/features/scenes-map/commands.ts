@@ -27,6 +27,8 @@ import {
 } from "@shared/scenes-map/geometry";
 import {
   ActivateSceneInput,
+  CheckMoveInput,
+  type CheckMoveResult,
   CreateSceneBody,
   GRID_DEFAULTS,
   MAP_INTENTS,
@@ -64,7 +66,7 @@ import {
   token,
   tokenSeqNext,
 } from "../../db/schema";
-import type { RecordChange } from "../../events/types";
+import type { Actor, RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
 import { resolveDefinition } from "../entities/commands";
 import { characterIdOf } from "./character-copy";
@@ -84,7 +86,7 @@ import {
 } from "./rows";
 import { lifecycleHooks } from "./scene-hooks";
 import type { TokenHooks } from "./token-hooks";
-import { deriveSceneObject, tokenHiddenForPlayers } from "./visibility-hooks";
+import { deriveSceneObject, rederiveDependants, tokenHiddenFor } from "./visibility-hooks";
 
 /** REST-only commands (no WS intent, MAP §9 / ADR-0021 D). */
 export const MAP_REST = {
@@ -157,13 +159,30 @@ function assertUnlocked(s: SceneRecord) {
 const assetOrNull = (env: CommandEnv, id: string | null | undefined): string | null =>
   id === null || id === undefined ? null : requireAsset(env, id).id;
 
+/** What a token's copies depend on (FR-FOG-10 / -34 / -46). */
+interface TokenPlace {
+  sceneId: string;
+  col: number;
+  row: number;
+  size: TokenSize;
+  ownerPlayerId: string | null;
+  invisible?: boolean;
+}
+
 /**
- * FR-FOG-10 (ADR-0039): a token's server copies (`fogged`) at a scene, cell and size, derived in
- * the writing command's transaction before its single write. No `derive` hook → not fogged.
+ * FR-FOG-10 (ADR-0039 / ADR-0042): a token's server copies (`fogged`, `seenBy`) at a scene, cell
+ * and size for its owner, derived in the writing command's transaction before its single write.
+ * No `derive` hook → not fogged, `seenBy` null.
  */
-function tokenCopies(tx: Tx, sceneId: string, col: number, row: number, size: TokenSize) {
-  const n = footprint(size);
-  return deriveSceneObject(tx, { type: TOKEN_TYPE, sceneId, cells: { col, row, w: n, h: n } });
+function tokenCopies(tx: Tx, t: TokenPlace) {
+  const n = footprint(t.size);
+  return deriveSceneObject(tx, {
+    type: TOKEN_TYPE,
+    sceneId: t.sceneId,
+    cells: { col: t.col, row: t.row, w: n, h: n },
+    ownerPlayerId: t.ownerPlayerId,
+    invisible: t.invisible === true,
+  });
 }
 
 // ---------- scenes (REST) ----------
@@ -302,7 +321,7 @@ export const duplicateScene = defineCommand({
           id: tid,
           sceneId: id,
           seq: tokenSeqNext,
-          fogged: tokenCopies(tx, id, t.col, t.row, t.size).fogged,
+          ...tokenCopies(tx, { ...t, sceneId: id }),
           createdAt: now,
           updatedAt: now,
         })
@@ -434,7 +453,11 @@ export const deleteFolder = defineCommand({
 
 // ---------- scene intents (WS, DM) ----------
 
-/** FR-MAP-06: ≤ 1 active scene; one transaction flips both flags. Already active → no event. */
+/**
+ * FR-MAP-06: ≤ 1 active scene; one transaction flips both flags. Already active → no event.
+ * ADR-0042: the lifecycle hooks' `activated` runs after the flip (fog re-derives a stale scene,
+ * FR-FOG-35); its rows join `SceneActivated`.
+ */
 export const activateScene = defineCommand({
   name: MAP_INTENTS.activateScene,
   input: ActivateSceneInput,
@@ -450,7 +473,9 @@ export const activateScene = defineCommand({
       changes.push(sceneChange(prev, readScene(tx, prev.id)));
     }
     tx.update(scene).set({ active: true, updatedAt: now }).where(eq(scene.id, sceneId)).run();
-    changes.push(sceneChange(target, readScene(tx, sceneId)));
+    const after = readScene(tx, sceneId);
+    changes.push(sceneChange(target, after));
+    changes.push(...lifecycleHooks.activated({ tx, ctx, actor }, after));
     emit({
       type: SceneActivated.type,
       campaignId: cid,
@@ -534,13 +559,15 @@ export type PlaceTokenSpec = z.output<typeof PlaceTokenInput>;
  * FR-MAP-13: name = definition name, numbered (FR-MAP-16); image = portrait or none; size =
  * `statBlock.size`; shape = definition `tokenShape`, else round (FR-MAP-35); speed =
  * `statBlock.speed`, else null (FR-MAP-36); owner = the character's owner, else none; visible;
- * `characterId` copy (FR-MAP-50); `fogged` derived (FR-FOG-10). Optional overrides (fixtures) for
- * name, image, owner, hidden, shape; never size, speed, `characterId` or `fogged`.
+ * `characterId` copy (FR-MAP-50); `fogged` / `seenBy` derived (FR-FOG-10). Optional overrides
+ * (fixtures) for name, image, owner, hidden, shape; never size, speed, `characterId` or `fogged`.
+ * `dependants` = the visibility hooks' `rederive` rows (FR-FOG-35, ADR-0042); a caller lists them
+ * after `change` in its event (none until vision sources exist, V2).
  */
 export function placeTokenIn(
   env: CommandEnv,
   input: PlaceTokenSpec,
-): { token: TokenRecord; change: RecordChange } {
+): { token: TokenRecord; change: RecordChange; dependants: RecordChange[] } {
   const { tx, actor } = env;
   const cid = campaignOf(actor);
   const s = getScene(tx, cid, input.sceneId);
@@ -571,9 +598,10 @@ export function placeTokenIn(
     ownerPlayerId,
     hidden: input.hidden ?? false,
     characterId: characterIdOf(def),
-    fogged: tokenCopies(tx, s.id, input.col, input.row, size).fogged,
+    ...tokenCopies(tx, { sceneId: s.id, col: input.col, row: input.row, size, ownerPlayerId }),
   });
-  return { token: after, change: tokenChange(null, after) };
+  const dependants = rederiveDependants(env, tokenChange(null, after));
+  return { token: after, change: tokenChange(null, after), dependants };
 }
 
 /** FR-MAP-13: `placeTokenIn` + `TokenPlaced`. */
@@ -581,25 +609,43 @@ export const placeToken = defineCommand({
   name: MAP_INTENTS.placeToken,
   input: PlaceTokenInput,
   execute(input, env): { tokenId: string } {
-    const { token: after, change } = placeTokenIn(env, input);
+    const { token: after, change, dependants } = placeTokenIn(env, input);
     env.emit({
       type: TokenPlaced.type,
       campaignId: after.campaignId,
       payload: { tokenId: after.id, sceneId: after.sceneId },
-      changes: [change],
+      changes: [change, ...dependants],
     });
     return { tokenId: after.id };
   },
 });
 
 /**
- * FR-MAP-21: a player moves a token iff they own it, it is not hidden and on the active scene.
- * A token the player can't see answers `not_found` (as unknown); visible but not theirs →
- * `forbidden`. DM moves any token on any scene. FR-MAP-38 (ADR-0031): runs the token-changed
- * hooks in the same transaction, possibly as a player actor; their rows ride on the unlogged
- * `TokenMoved`. Hooks never reject a move; a throw rolls it back (`internal`). Order (ADR-0040,
- * FR-FOG-10): validate → guards → `derive` (`fogged`) → one write → token-changed hooks, so a
- * move into fog is already fogged in its own change (players get one `delete`).
+ * FR-MAP-21 / FR-FOG-11: a player may move (or check a move of) a token iff they own it, it is
+ * on the active scene and they can see it. One they can't see (hidden, fog-hidden for them, on
+ * another scene or unknown) answers `not_found`, checked first (no existence oracle); visible
+ * but not theirs → `forbidden`. The DM may move any token on any scene.
+ */
+function authorizeTokenMove(tx: Tx, actor: Actor, tokenId: string): void {
+  if (actor.role !== "player") return;
+  const cid = campaignOf(actor);
+  const t = getToken(tx, cid, tokenId);
+  const active = activeSceneOf(tx, cid);
+  if (active?.id !== t.sceneId || tokenHiddenFor(t, actor.playerId, cid)) {
+    throw notFound("Token not found");
+  }
+  if (t.ownerPlayerId === null || t.ownerPlayerId !== actor.playerId) {
+    throw forbidden("Not your token");
+  }
+}
+
+/**
+ * FR-MAP-21 (`authorizeTokenMove`). FR-MAP-38 (ADR-0031): runs the token-changed hooks in the
+ * same transaction, possibly as a player actor; their rows ride on the unlogged `TokenMoved`.
+ * Hooks never reject a move; a throw rolls it back (`internal`). Order (ADR-0040 / ADR-0042,
+ * FR-FOG-10): validate → guards → `derive` (`fogged`, `seenBy`) → one write → re-derive
+ * dependants → token-changed hooks, so a move into fog is already fogged in its own change
+ * (players get one `delete`).
  */
 export function moveTokenCommand(hooks: TokenHooks) {
   return defineCommand({
@@ -607,14 +653,7 @@ export function moveTokenCommand(hooks: TokenHooks) {
     input: MoveTokenInput,
     roles: ["dm", "player"],
     authorize({ tokenId }, { tx, actor }) {
-      if (actor.role !== "player") return;
-      const cid = campaignOf(actor);
-      const t = getToken(tx, cid, tokenId);
-      const active = activeSceneOf(tx, cid);
-      if (tokenHiddenForPlayers(t) || active?.id !== t.sceneId) throw notFound("Token not found");
-      if (t.ownerPlayerId === null || t.ownerPlayerId !== actor.playerId) {
-        throw forbidden("Not your token");
-      }
+      authorizeTokenMove(tx, actor, tokenId);
     },
     execute({ tokenId, col, row }, env): void {
       const { tx, ctx, actor, emit } = env;
@@ -629,22 +668,44 @@ export function moveTokenCommand(hooks: TokenHooks) {
         { col: before.col, row: before.row },
         { col, row },
       );
-      const { fogged } = tokenCopies(tx, s.id, col, row, before.size);
+      const copies = tokenCopies(tx, { ...before, col, row });
       tx.update(token)
-        .set({ col, row, fogged, updatedAt: ctx.clock.iso() })
+        .set({ col, row, ...copies, updatedAt: ctx.clock.iso() })
         .where(eq(token.id, tokenId))
         .run();
       const after = readToken(tx, tokenId);
+      const dependants = rederiveDependants({ tx, ctx, actor }, tokenChange(before, after));
       const hookChanges = hooks.run({ tx, ctx, actor }, before, after);
       emit({
         type: TokenMoved.type,
         campaignId: cid,
         payload: { tokenId, sceneId: before.sceneId, col, row },
-        changes: [tokenChange(before, after), ...hookChanges],
+        changes: [tokenChange(before, after), ...dependants, ...hookChanges],
       });
     },
   });
 }
+
+/**
+ * FR-SCN-38 (ADR-0042, OQ-SCN-26): `map.checkMove` = a read-only dry run of the move guards for
+ * a previewed cell → `{ok, hints}`. Same authorization and errors as `map.moveToken` (FR-FOG-11:
+ * a token the player can't see → `not_found`); not logged, no event, no `seq`, nothing written.
+ */
+export const checkMove = defineCommand({
+  name: MAP_INTENTS.checkMove,
+  input: CheckMoveInput,
+  roles: ["dm", "player"],
+  authorize({ tokenId }, { tx, actor }) {
+    authorizeTokenMove(tx, actor, tokenId);
+  },
+  execute({ tokenId, col, row }, { tx, actor }): CheckMoveResult {
+    const cid = campaignOf(actor);
+    const t = getToken(tx, cid, tokenId);
+    const s = findScene(tx, cid, t.sceneId) as SceneRecord;
+    assertOnMap(s, col, row, t.size);
+    return tokenMoveGuards.check({ read: tx, actor }, t, { col: t.col, row: t.row }, { col, row });
+  },
+});
 
 /** FR-MAP-18: rename, image (custom art), shape (FR-MAP-35), owner; never size or speed. Runs
  * token-changed hooks. */
@@ -664,17 +725,23 @@ export function updateTokenCommand(hooks: TokenHooks) {
         set.ownerPlayerId = input.ownerPlayerId;
       }
       if (input.shape !== undefined) set.shape = input.shape;
+      // FR-FOG-10 / -34: the owner decides the copies (owner + party rule).
+      const copies =
+        set.ownerPlayerId !== undefined && set.ownerPlayerId !== before.ownerPlayerId
+          ? tokenCopies(tx, { ...before, ownerPlayerId: set.ownerPlayerId })
+          : {};
       tx.update(token)
-        .set({ ...set, updatedAt: ctx.clock.iso() })
+        .set({ ...set, ...copies, updatedAt: ctx.clock.iso() })
         .where(eq(token.id, before.id))
         .run();
       const after = readToken(tx, before.id);
+      const dependants = rederiveDependants({ tx, ctx, actor }, tokenChange(before, after));
       const hookChanges = hooks.run({ tx, ctx, actor }, before, after);
       emit({
         type: TokenUpdated.type,
         campaignId: cid,
         payload: { tokenId: before.id, sceneId: before.sceneId },
-        changes: [tokenChange(before, after), ...hookChanges],
+        changes: [tokenChange(before, after), ...dependants, ...hookChanges],
       });
     },
   });
@@ -695,27 +762,28 @@ export function setTokenHiddenCommand(hooks: TokenHooks) {
         .where(eq(token.id, tokenId))
         .run();
       const after = readToken(tx, tokenId);
+      const dependants = rederiveDependants({ tx, ctx, actor }, tokenChange(before, after));
       const hookChanges = hooks.run({ tx, ctx, actor }, before, after);
       emit({
         type: hidden ? TokenHidden.type : TokenRevealed.type,
         campaignId: cid,
         payload: { tokenId, sceneId: before.sceneId },
-        changes: [tokenChange(before, after), ...hookChanges],
+        changes: [tokenChange(before, after), ...dependants, ...hookChanges],
       });
     },
   });
 }
 
 /**
- * FR-MAP-17: same definition, image, size, shape, speed, owner, hidden flag; numbered name; at
- * `col + footprint` same row if valid, else `col − footprint`, else the source cell; `fogged`
- * derived at that cell (FR-FOG-10).
+ * FR-MAP-17: same definition, image, size, shape, speed, owner, hidden flag, `invisible`
+ * (FR-FOG-45); numbered name; at `col + footprint` same row if valid, else `col − footprint`,
+ * else the source cell; `fogged` / `seenBy` derived at that cell (FR-FOG-10).
  */
 export const duplicateToken = defineCommand({
   name: MAP_INTENTS.duplicateToken,
   input: TokenIdInput,
   execute({ tokenId }, env): { tokenId: string } {
-    const { tx, actor, emit } = env;
+    const { tx, ctx, actor, emit } = env;
     const cid = campaignOf(actor);
     const src = getToken(tx, cid, tokenId);
     const s = findScene(tx, cid, src.sceneId) as SceneRecord;
@@ -736,13 +804,15 @@ export const duplicateToken = defineCommand({
       ownerPlayerId: src.ownerPlayerId,
       hidden: src.hidden,
       characterId: src.characterId,
-      fogged: tokenCopies(tx, s.id, cell.col, cell.row, src.size).fogged,
+      invisible: src.invisible === true,
+      ...tokenCopies(tx, { ...src, sceneId: s.id, col: cell.col, row: cell.row }),
     });
+    const dependants = rederiveDependants({ tx, ctx, actor }, tokenChange(null, after));
     emit({
       type: TokenDuplicated.type,
       campaignId: cid,
       payload: { tokenId: after.id, sceneId: s.id, sourceTokenId: src.id },
-      changes: [tokenChange(null, after)],
+      changes: [tokenChange(null, after), ...dependants],
     });
     return { tokenId: after.id };
   },
@@ -759,11 +829,12 @@ export function deleteTokenCommand(hooks: TokenHooks) {
       const before = getToken(tx, cid, tokenId);
       const hookChanges = hooks.run({ tx, ctx, actor }, before, null);
       tx.delete(token).where(eq(token.id, tokenId)).run();
+      const dependants = rederiveDependants({ tx, ctx, actor }, tokenChange(before, null));
       emit({
         type: TokenDeleted.type,
         campaignId: cid,
         payload: { tokenId, sceneId: before.sceneId },
-        changes: [tokenChange(before, null), ...hookChanges],
+        changes: [tokenChange(before, null), ...dependants, ...hookChanges],
       });
     },
   });

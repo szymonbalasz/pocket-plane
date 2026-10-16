@@ -63,6 +63,11 @@ const Id = z.string().min(1).max(64);
 const Int = z.number().int();
 const Coord = Int.min(-COORD_MAX).max(COORD_MAX);
 
+/** FR-SCN-07 (sprint 3): a number with at most 2 decimals (1/100 cell). */
+export const isDec2 = (v: number) => Math.abs(Math.round(v * 100) - v * 100) < 1e-6;
+/** FR-SCN-07 (sprint 3): segment coordinates are numbers with ≤ 2 decimals; integers stay valid. */
+const SegCoord = z.number().min(-COORD_MAX).max(COORD_MAX).refine(isDec2, "At most 2 decimals");
+
 /** FR-SCN-07: door state 0 open / 1 closed / 2 locked (DM marker). */
 export const DOOR_OPEN = 0;
 export const DOOR_CLOSED = 1;
@@ -71,21 +76,21 @@ export const DoorState = z.union([z.literal(0), z.literal(1), z.literal(2)]);
 export type DoorState = z.infer<typeof DoorState>;
 export const DOOR_STATE_NAMES = ["open", "closed", "locked"] as const;
 
-/** A segment vertex to vertex: `[x1, y1, x2, y2]`. */
-export const Segment = z.tuple([Coord, Coord, Coord, Coord]);
+/** A segment point to point: `[x1, y1, x2, y2]` (≤ 2 decimals, sprint 3). */
+export const Segment = z.tuple([SegCoord, SegCoord, SegCoord, SegCoord]);
 export type Segment = z.infer<typeof Segment>;
 
 const SegmentN = Int.min(1);
 /** Wall `[n, x1, y1, x2, y2]` (JSON leaf). */
-export const Wall = z.tuple([SegmentN, Coord, Coord, Coord, Coord]);
+export const Wall = z.tuple([SegmentN, SegCoord, SegCoord, SegCoord, SegCoord]);
 export type Wall = z.infer<typeof Wall>;
 /** Door `[n, x1, y1, x2, y2, state, f]`; `f` = server-written fog flag (FR-SCN-36). */
 export const Door = z.tuple([
   SegmentN,
-  Coord,
-  Coord,
-  Coord,
-  Coord,
+  SegCoord,
+  SegCoord,
+  SegCoord,
+  SegCoord,
   DoorState,
   z.union([z.literal(0), z.literal(1)]),
 ]);
@@ -93,10 +98,10 @@ export type Door = z.infer<typeof Door>;
 /** Player door `[n, x1, y1, x2, y2, open]`: 1 = open, 0 = closed (locked is sent as closed). */
 export const PlayerDoor = z.tuple([
   SegmentN,
-  Coord,
-  Coord,
-  Coord,
-  Coord,
+  SegCoord,
+  SegCoord,
+  SegCoord,
+  SegCoord,
   z.union([z.literal(0), z.literal(1)]),
 ]);
 export type PlayerDoor = z.infer<typeof PlayerDoor>;
@@ -137,6 +142,8 @@ export const SceneStructureRecord = z.object({
   nextN: Int.min(1),
   walls: z.array(Wall),
   doors: z.array(Door),
+  /** FR-SCN-36 (sprint 3): FOG-written `{<n>: playerId[]}`; server only, never on a wire. */
+  doorSeen: z.record(z.string(), z.array(z.string())).nullable().optional(),
 });
 export type SceneStructureRecord = z.infer<typeof SceneStructureRecord>;
 
@@ -169,6 +176,8 @@ export const ScenePropRecord = z.object({
   ...propFields,
   campaignId: z.string(),
   locked: z.boolean(),
+  /** FR-FOG-10 (ADR-0042): server copy, player ids; never on a wire. */
+  seenBy: z.array(z.string()).nullable().optional(),
 });
 export type ScenePropRecord = z.infer<typeof ScenePropRecord>;
 
@@ -197,11 +206,13 @@ export const AoeTemplateRecord = z.object({
   placedByPlayerId: z.string().nullable(),
   hidden: z.boolean(),
   fogged: z.literal(true).optional(),
+  /** FR-FOG-10 (ADR-0042): server copy, player ids; never on a wire. */
+  seenBy: z.array(z.string()).nullable().optional(),
 });
 export type AoeTemplateRecord = z.infer<typeof AoeTemplateRecord>;
 
 /** What a player receives of a visible template: no campaign (SCN §8 compact wire). */
-export const PlayerAoeTemplateRecord = AoeTemplateRecord.omit({ campaignId: true });
+export const PlayerAoeTemplateRecord = AoeTemplateRecord.omit({ campaignId: true, seenBy: true });
 export type PlayerAoeTemplateRecord = z.infer<typeof PlayerAoeTemplateRecord>;
 
 /** Fields both clients render a kept template from. */

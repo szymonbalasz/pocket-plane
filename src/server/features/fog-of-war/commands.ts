@@ -30,7 +30,7 @@ import {
   FogUndoInput,
 } from "@shared/fog-of-war/schemas";
 import type { SceneRecord } from "@shared/scenes-map/schemas";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, invalid } from "../../commands/errors";
 import type { Tx } from "../../db/client";
@@ -39,8 +39,8 @@ import type { RecordChange } from "../../events/types";
 import type { Logger } from "../../log";
 import { campaignOf, getScene } from "../scenes-map/rows";
 import { readFogRow } from "./hooks";
-import { rederiveSubjects } from "./rederive";
-import { readFogRecord } from "./rows";
+import { rederiveScene } from "./rederive";
+import { readFogRecord, type ServerFogRecord } from "./rows";
 
 /** FR-FOG-04: over the run cap → nothing written. */
 export const FOG_TOO_DETAILED = "Fog too detailed — reveal or hide larger areas";
@@ -51,7 +51,10 @@ export const FOG_NOTHING_TO_UNDO = "Nothing to undo";
 /** Every cell clear: what a scene without a `fog` row holds (FR-FOG-01). */
 const CLEAR_ROW: FogRow = { fill: "clear", box: [0, 0, 0, 0], runs: "" };
 
-const fogChange = (before: FogRecord | null, after: FogRecord | null): RecordChange => ({
+const fogChange = (
+  before: ServerFogRecord | FogRecord | null,
+  after: ServerFogRecord | FogRecord | null,
+): RecordChange => ({
   type: FOG_TYPE,
   id: (after ?? before)?.id as string,
   before,
@@ -69,8 +72,13 @@ function currentMask(tx: Tx, log: Logger, sceneId: string): { row: FogRow; mask:
   return { row: row ?? CLEAR_ROW, mask };
 }
 
-/** Writes the scene's `fog` row (insert or replace). */
-function writeRow(env: CommandEnv, s: SceneRecord, r: FogRow) {
+/** Writes the scene's `fog` row (insert or replace the base mask; `rev` + 1, FR-FOG-08). */
+function writeRow(
+  env: CommandEnv,
+  s: SceneRecord,
+  r: FogRow,
+  extra: Partial<Pick<typeof sceneFog.$inferInsert, "shapes" | "darkness">> = {},
+) {
   const values = {
     fill: r.fill,
     col0: r.box[0],
@@ -78,18 +86,33 @@ function writeRow(env: CommandEnv, s: SceneRecord, r: FogRow) {
     cols: r.box[2],
     rows: r.box[3],
     runs: r.runs,
+    ...extra,
     updatedAt: env.ctx.clock.iso(),
   };
   env.tx
     .insert(sceneFog)
     .values({ sceneId: s.id, campaignId: s.campaignId, ...values })
-    .onConflictDoUpdate({ target: sceneFog.sceneId, set: values })
+    .onConflictDoUpdate({
+      target: sceneFog.sceneId,
+      set: { ...values, rev: sql`${sceneFog.rev} + 1` },
+    })
     .run();
+}
+
+/** Shapes and darkness stored now (FR-FOG-07: the undo entry keeps them). */
+function layers(env: CommandEnv, sceneId: string) {
+  const r = env.tx
+    .select({ shapes: sceneFog.shapes, darkness: sceneFog.darkness })
+    .from(sceneFog)
+    .where(eq(sceneFog.sceneId, sceneId))
+    .get();
+  return { shapes: r?.shapes ?? [], darkness: r?.darkness ?? [] };
 }
 
 /** FR-FOG-07: pushes an undo entry (the mask before) and drops the oldest past the depth cap. */
 function pushUndo(env: CommandEnv, s: SceneRecord, kind: FogEditKind, prev: FogRow): string {
   const id = env.ctx.ids.next();
+  const before = layers(env, s.id);
   env.tx
     .insert(sceneFogEdit)
     .values({
@@ -104,6 +127,8 @@ function pushUndo(env: CommandEnv, s: SceneRecord, kind: FogEditKind, prev: FogR
       prevCols: prev.box[2],
       prevRows: prev.box[3],
       prevRuns: prev.runs,
+      prevShapes: before.shapes,
+      prevDarkness: before.darkness,
       createdAt: env.ctx.clock.iso(),
     })
     .run();
@@ -132,9 +157,9 @@ function commitEdit(
   const row = rowOf(next);
   if (!runsWithinCap(row.runs)) throw conflict(FOG_TOO_DETAILED);
   const before = readFogRecord(env.tx, s.id);
-  writeRow(env, s, row);
   const editId = pushUndo(env, s, kind, prev);
-  const subjects = rederiveSubjects(env, s, next);
+  writeRow(env, s, row);
+  const subjects = rederiveScene(env, s.id);
   env.emit({
     type: FogEdited.type,
     campaignId: s.campaignId,
@@ -210,11 +235,15 @@ export function fogCommands(log: Logger) {
         runs: latest.prevRuns,
       });
       if (corrupt) log.error(`fog: undo entry ${latest.id} has corrupt runs; fully fogged`);
-      writeRow(env, s, rowOf(mask));
+      // FR-FOG-07: pre-v2 entries (null) → shapes [], darkness unchanged.
+      writeRow(env, s, rowOf(mask), {
+        shapes: latest.prevShapes ?? [],
+        ...(latest.prevDarkness ? { darkness: latest.prevDarkness } : {}),
+      });
       tx.delete(sceneFogEdit)
         .where(and(eq(sceneFogEdit.id, latest.id), eq(sceneFogEdit.sceneId, s.id)))
         .run();
-      const subjects = rederiveSubjects(env, s, mask);
+      const subjects = rederiveScene(env, s.id);
       env.emit({
         type: FogUndone.type,
         campaignId: s.campaignId,

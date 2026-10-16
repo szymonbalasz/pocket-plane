@@ -39,7 +39,11 @@ describe("scene-tools prop fixtures (SCN §13)", () => {
     const img = Object.fromEntries(a.assets.map((x) => [x.name, x]));
     expect(img["prop-table"]).toMatchObject({ width: 128, height: 256 });
     const ambush = a.scenes.find((s) => s.name === "Goblin Ambush");
-    expect(a.props.map(({ id: _i, seq: _s, createdAt: _c, updatedAt: _u, ...p }) => p)).toEqual([
+    // FR-FOG-10 (ADR-0042): both players are in every prop's `seenBy` (revealed scene).
+    expect(a.props.map((p) => p.seenBy?.length)).toEqual([2, 2, 2]);
+    expect(
+      a.props.map(({ id: _i, seq: _s, createdAt: _c, updatedAt: _u, seenBy: _b, ...p }) => p),
+    ).toEqual([
       {
         campaignId: ambush?.campaignId as string,
         sceneId: ambush?.id as string,

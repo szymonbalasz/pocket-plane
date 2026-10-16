@@ -59,3 +59,32 @@ describe("FOG domain events (§9)", () => {
     expect(edit({ kind: "rect", c0: -1024, r0: 0, c1: 1024, r1: 0 })).toBe(true);
   });
 });
+
+describe("FOG v2 domain events (§9, declared in V0)", () => {
+  test("FOG §9 darkness / explored / Invisible events: registered once, logged, not undoable, strict", async () => {
+    const m = await import("./fog-of-war");
+    const names = [
+      "DarknessPlaced",
+      "DarknessMoved",
+      "DarknessRemoved",
+      "DarknessCleared",
+      "FogExploredSet",
+      "ExploredForgotten",
+      "TokenInvisibleSet",
+    ];
+    const defs = domainEvents.filter((e) => names.includes(e.type));
+    expect(defs.map((e) => e.type).sort()).toEqual([...names].sort());
+    expect(defs.every((e) => e.logged && !e.undoable)).toBe(true);
+    roundTrip(m.DarknessPlaced.payload, { sceneId: "s", editId: "e", darknessId: "d" });
+    roundTrip(m.DarknessCleared.payload, { sceneId: "s", editId: "e" });
+    roundTrip(m.FogExploredSet.payload, { sceneId: "s", on: true });
+    roundTrip(m.ExploredForgotten.payload, { sceneId: "s" });
+    roundTrip(m.TokenInvisibleSet.payload, { sceneId: "s", tokenId: "t", invisible: true });
+    expect(m.TokenInvisibleSet.payload.safeParse({ sceneId: "s", tokenId: "t" }).success).toBe(
+      false,
+    );
+    expect(m.FogExploredSet.payload.safeParse({ sceneId: "s", on: true, x: 1 }).success).toBe(
+      false,
+    );
+  });
+});

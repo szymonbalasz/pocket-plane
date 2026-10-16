@@ -9,13 +9,14 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { type CommandDef, defineCommand } from "../../commands/commands";
 import { conflict } from "../../commands/errors";
-import { scene, token } from "../../db/schema";
+import { player, scene, token } from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import type { RecordChange } from "../../events/types";
 import type { SignalSender } from "../../ws/signals";
 import { createEntity, UPDATE } from "../entities/commands";
 import { goblinBlock } from "../entities/testing";
-import { fogSceneHook, fogVisibilityHook } from "../fog-of-war/hooks";
+import { fogVisibilityHook } from "../fog-of-war/hooks";
+import { fogSceneHook } from "../fog-of-war/lifecycle";
 import { placeTokenIn, MAP_REST as R } from "./commands";
 import { dragAudience } from "./drag";
 import { lifecycleHooks, sceneHooks } from "./scene-hooks";
@@ -25,6 +26,7 @@ import { tokenVisibility } from "./visibility";
 import {
   type SceneCells,
   type SceneObject,
+  type SceneRead,
   sceneVisibilityHooks,
   tokenHiddenForPlayers,
   visibilityHooks,
@@ -49,6 +51,12 @@ const fog = (sceneId: string, ...cells: [number, number][]) => {
 };
 
 const derived: { obj: SceneObject; row: TokenRecord | undefined }[] = [];
+const playersOf = (read: SceneRead) =>
+  read
+    .select({ id: player.id })
+    .from(player)
+    .all()
+    .map((p) => p.id);
 const drags: { tokenId: string; at: { col: number; row: number } | null }[] = [];
 
 beforeEach(() => {
@@ -80,16 +88,20 @@ function registerFog() {
         .all()
         .find((x) => cellList(obj.cells).some(([c, r]) => x.col === c && x.row === r));
       derived.push({ obj, row: row as TokenRecord | undefined });
-      return { fogged: allFogged(obj.sceneId, obj.cells) };
+      const fogged = allFogged(obj.sceneId, obj.cells);
+      return { fogged, seenBy: fogged && obj.ownerPlayerId == null ? [] : playersOf(read) };
     },
     hides: (type, r) =>
       type === "token" &&
       (r as TokenRecord).fogged === true &&
       (r as TokenRecord).ownerPlayerId === null,
-    dragToDm(_read, t, at) {
+    dragAudience(read, t, at) {
       drags.push({ tokenId: t.id, at });
-      if (at === null) return t.fogged === true && t.ownerPlayerId === null;
-      return t.ownerPlayerId === null && allFogged(t.sceneId, { ...at, w: 1, h: 1 });
+      const hiddenThere =
+        at === null
+          ? t.fogged === true && t.ownerPlayerId === null
+          : t.ownerPlayerId === null && allFogged(t.sceneId, { ...at, w: 1, h: 1 });
+      return hiddenThere ? [] : playersOf(read);
     },
   });
 }
@@ -142,19 +154,25 @@ function setup() {
 }
 
 describe("FR-FOG-24 registries (fog's server lines only)", () => {
-  test("FR-FOG-24 fog registers derive, hides, dragToDm and created / duplicated / deleting; without them nothing changes", () => {
+  test("FR-FOG-24 fog registers derive, hides, dragAudience, rederive and created / duplicated / deleting / activated; without them nothing changes", () => {
     // build/fog-visibility completes fog's lines (FOG §14).
     expect(sceneVisibilityHooks.map((h) => h.name)).toEqual(["fog-of-war.fogged"]);
     const [line] = sceneVisibilityHooks;
-    expect([!!line?.derive, !!line?.hides, !!line?.dragToDm]).toEqual([true, true, true]);
-    // scene-tools' line (FR-SCN-31) only lists SCN rows, and these scenes have none.
-    expect(sceneHooks.map((h) => h.name)).toEqual(["fog-of-war.fog-row", "scene-tools.scene-rows"]);
-    const [fogLine] = sceneHooks;
-    expect([!!fogLine?.created, !!fogLine?.duplicated, !!fogLine?.deleting]).toEqual([
+    expect([!!line?.derive, !!line?.hides, !!line?.dragAudience, !!line?.rederive]).toEqual([
+      true,
       true,
       true,
       true,
     ]);
+    // scene-tools' line (FR-SCN-31) only lists SCN rows, and these scenes have none.
+    expect(sceneHooks.map((h) => h.name)).toEqual(["fog-of-war.fog-row", "scene-tools.scene-rows"]);
+    const [fogLine] = sceneHooks;
+    expect([
+      !!fogLine?.created,
+      !!fogLine?.duplicated,
+      !!fogLine?.deleting,
+      !!fogLine?.activated,
+    ]).toEqual([true, true, true, true]);
     // With fog's lines lifted out (beforeEach): no row, nothing changes.
     const t = setup();
     const s = t.newScene();
@@ -190,6 +208,8 @@ describe("FR-FOG-10 derive per call site", () => {
       type: "token",
       sceneId: s.id,
       cells: { col: 5, row: 5, w: 1, h: 1 },
+      ownerPlayerId: null,
+      invisible: false,
     });
     expect(derived.at(-1)?.row).toBeUndefined(); // derive runs before the insert
     expect(t.lastEvent()?.changes[0]?.after).toMatchObject({ id: a.id, fogged: true });
@@ -384,7 +404,7 @@ describe("FR-FOG-15 map.drag audience", () => {
     playerId: string | null = null,
   ) => ({ connId: "c", campaignId: t.h.campaignId, role, playerId }) as SignalSender;
 
-  test("FR-FOG-15 dragToDm: previewed cell (FR-MAP-15 rounding) into fog → dm; end by stored state; owned → all", () => {
+  test("FR-FOG-15 dragAudience: previewed cell (FR-MAP-15 rounding) into fog → dm; end by stored state; owned → its seers", () => {
     const t = setup();
     const s = t.newScene();
     t.run(I.activateScene, { sceneId: s.id });
@@ -396,14 +416,15 @@ describe("FR-FOG-15 map.drag audience", () => {
     expect(dragAudience(drag(g.id, 140, 70), dm, read(t))).toBe("all");
     registerFog();
     fog(s.id, [2, 1], [3, 1]);
-    expect(dragAudience(drag(g.id, 100, 70), dm, read(t))).toBe("all"); // 100/70 → col 1
+    const all = { players: playersOf(t.s.db) };
+    expect(dragAudience(drag(g.id, 100, 70), dm, read(t))).toEqual(all); // 100/70 → col 1
     expect(dragAudience(drag(g.id, 110, 70), dm, read(t))).toBe("dm"); // 110/70 → col 2
     expect(drags.at(-1)).toEqual({ tokenId: g.id, at: { col: 2, row: 1 } });
-    expect(dragAudience({ sceneId: s.id, tokenId: g.id, end: true }, dm, read(t))).toBe("all");
+    expect(dragAudience({ sceneId: s.id, tokenId: g.id, end: true }, dm, read(t))).toEqual(all);
     expect(drags.at(-1)).toEqual({ tokenId: g.id, at: null });
     // Owned: never routed by the fog rule.
-    expect(dragAudience(drag(mira.id, 140, 70), sender(t, "player", t.h.p1.id), read(t))).toBe(
-      "all",
+    expect(dragAudience(drag(mira.id, 140, 70), sender(t, "player", t.h.p1.id), read(t))).toEqual(
+      all,
     );
     // Stored fog-hidden: every frame (position and end) → dm; a player sender sees it as unknown.
     t.run(I.moveToken, { tokenId: g.id, col: 3, row: 1 });
@@ -489,6 +510,49 @@ describe("FR-FOG-23 / FR-FOG-02 scene lifecycle hooks", () => {
     );
     expect(rows.filter((r) => r.type === "probe-row")).toEqual([
       { type: "probe-row", id: g.id, before: null, after: { gone: true } },
+    ]);
+  });
+});
+
+describe("FR-FOG-35 rederive call sites (ADR-0042)", () => {
+  test("FR-FOG-35 every token write runs rederive after its write; rows join the event before hook rows", () => {
+    const t = setup();
+    const s = t.newScene();
+    t.run(I.activateScene, { sceneId: s.id });
+    const calls: string[] = [];
+    visibilityHooks.register({
+      name: "test.fog",
+      rederive(env, change) {
+        // Runs after the single write: the token row already holds `after`.
+        const row = env.tx.select().from(token).where(eq(token.id, change.id)).get();
+        const after = change.after as TokenRecord | null;
+        calls.push(
+          `${change.type}:${change.before ? "b" : "-"}${after ? "a" : "-"}:${row?.col ?? "gone"}`,
+        );
+        return [{ type: "probe-row", id: change.id, before: null, after: { id: change.id } }];
+      },
+    });
+    tokenHooks.register("test.spy", (_env, before) => [
+      { type: "hook-row", id: before.id, before: null, after: { id: before.id } },
+    ]);
+    const types = () => t.lastEvent()?.changes.map((c) => c.type);
+    const g = t.place(s.id, t.h.goblinId, 1, 1);
+    expect(types()).toEqual(["token", "probe-row"]);
+    t.run(I.moveToken, { tokenId: g.id, col: 2, row: 1 });
+    expect(types()).toEqual(["token", "probe-row", "hook-row"]);
+    t.run(I.updateToken, { tokenId: g.id, ownerPlayerId: t.h.p1.id });
+    t.run(I.setTokenHidden, { tokenId: g.id, hidden: true });
+    const { tokenId: d } = t.run<{ tokenId: string }>(I.duplicateToken, { tokenId: g.id });
+    expect(types()).toEqual(["token", "probe-row"]);
+    t.run(I.deleteToken, { tokenId: d });
+    expect(types()).toEqual(["token", "probe-row", "hook-row"]);
+    expect(calls).toEqual([
+      "token:-a:1",
+      "token:ba:2",
+      "token:ba:2",
+      "token:ba:2",
+      "token:-a:3",
+      "token:b-:gone",
     ]);
   });
 });

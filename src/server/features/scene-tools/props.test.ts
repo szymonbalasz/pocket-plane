@@ -3,7 +3,7 @@
 // players refused; `fogged` derived before the write; player frames per FR-SCN-19 through the
 // commands' own changes; a crash is all or nothing.
 import { afterEach, describe, expect, test } from "bun:test";
-import { fogHidden } from "@shared/fog-of-war/visibility";
+import { seenByNobody } from "@shared/fog-of-war/visibility";
 import {
   PROPS_PER_CAMPAIGN_MAX,
   PROPS_PER_SCENE_MAX,
@@ -76,6 +76,7 @@ describe("FR-SCN-16 scn.placeProp", () => {
       z: 0,
       hidden: false,
       locked: false,
+      seenBy: [t.h.p1.id, t.h.p2.id], // FR-FOG-10: every player (revealed scene)
     });
     const row = t.s.db.$client
       .query<{ created_at: string }, []>("SELECT created_at FROM prop")
@@ -275,7 +276,7 @@ describe("FR-SCN-35 fogged copies", () => {
         const c = obj.cells as { col: number };
         return { fogged: c.col >= 15 };
       },
-      hides: (type, r) => fogHidden(type, r),
+      hides: (type, r) => seenByNobody(type, r),
     });
   }
 

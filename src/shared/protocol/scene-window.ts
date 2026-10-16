@@ -4,14 +4,27 @@
 import { z } from "zod";
 import type { RecordMap, RecordStore } from "./store";
 
-/** Registration flag value (scene scope only). */
+/** Registration flag values (scene scope only). */
 export const DM_WINDOW_ACTIVE_SCENE = "active-scene";
-export type DmWindow = typeof DM_WINDOW_ACTIVE_SCENE;
+/**
+ * FR-FOG-43 (ADR-0042, seams S1): one player's rows, never in the DM snapshot; the DM loads
+ * them with `sync.loadScene {sceneId, viewAs}`. Players get their own rows as usual.
+ */
+export const DM_WINDOW_VIEW_AS = "view-as";
+export const DM_WINDOWS = [DM_WINDOW_ACTIVE_SCENE, DM_WINDOW_VIEW_AS] as const;
+export type DmWindow = (typeof DM_WINDOWS)[number];
 
 /** WS intent, DM only, read-only; answered by the hub in frame order (not a command). */
 export const SYNC_LOAD_SCENE = "sync.loadScene";
 
-export const LoadScenePayload = z.object({ sceneId: z.string().min(1).max(64) });
+/**
+ * `viewAs` absent: the scene's `active-scene` rows. `viewAs` = a player of the campaign: that
+ * player's `view-as` rows of the scene only (FR-FOG-43); another campaign's → `not_found`.
+ */
+export const LoadScenePayload = z.object({
+  sceneId: z.string().min(1).max(64),
+  viewAs: z.string().min(1).max(64).optional(),
+});
 export type LoadScenePayload = z.infer<typeof LoadScenePayload>;
 
 /** `ack.result`: every flagged type's rows of that scene, filtered as in a snapshot. */
@@ -58,3 +71,33 @@ export const sceneWindowAfterSnapshot = (store: RecordStore): SceneWindowState =
   const active = activeSceneIn(store);
   return { loaded: active === null ? [] : [active], loading: [] };
 };
+
+/** One `(sceneId, playerId)` pair (FR-FOG-43). */
+export interface ViewAsPair {
+  sceneId: string;
+  playerId: string;
+}
+
+/**
+ * The DM client's View-as state (FR-FOG-43): at most one loaded pair and one load in flight;
+ * `types` = the `view-as` types of the last load ack (the rows a new pair replaces). Reset by
+ * every snapshot (the client reloads if View as is still on).
+ */
+export interface ViewAsState {
+  loaded: ViewAsPair | null;
+  loading: ViewAsPair | null;
+  types: readonly string[];
+}
+
+export const viewAsAfterSnapshot = (): ViewAsState => ({ loaded: null, loading: null, types: [] });
+
+export const samePair = (a: ViewAsPair | null, b: ViewAsPair | null): boolean =>
+  a !== null && b !== null && a.sceneId === b.sceneId && a.playerId === b.playerId;
+
+/** Drops every row of `types` (the previous pair's view-as rows). */
+export function dropTypes(s: RecordStore, types: readonly string[]): RecordStore {
+  if (types.length === 0) return s;
+  const records: RecordMap = { ...s.records };
+  for (const t of types) records[t] = {};
+  return { ...s, records };
+}

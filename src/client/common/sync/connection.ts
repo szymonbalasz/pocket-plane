@@ -12,11 +12,16 @@ import {
   WS_PROBE_PARAM,
 } from "@shared/protocol/frames";
 import {
+  dropTypes,
   LoadSceneResult,
   mergeRecords,
   type SceneWindowState,
   SYNC_LOAD_SCENE,
+  samePair,
   sceneWindowAfterSnapshot,
+  type ViewAsPair,
+  type ViewAsState,
+  viewAsAfterSnapshot,
 } from "@shared/protocol/scene-window";
 import { applyEvent, applySnapshot, emptyStore, type RecordStore } from "@shared/protocol/store";
 import { backoffDelay } from "./backoff";
@@ -70,6 +75,11 @@ export interface SyncSnapshot {
    * snapshot's active scene + loaded ones) and loads in flight. Reset by every snapshot.
    */
   scenes: SceneWindowState;
+  /**
+   * DM View as (FR-FOG-43): the one loaded `(sceneId, playerId)` pair of `view-as` rows and the
+   * load in flight. Reset by every snapshot (the caller reloads if View as is still on).
+   */
+  viewAs: ViewAsState;
 }
 
 export interface ConnectionOptions {
@@ -155,6 +165,7 @@ export class SyncConnection {
     notLiveSince: null,
     everLive: false,
     scenes: { loaded: [], loading: [] },
+    viewAs: viewAsAfterSnapshot(),
   };
   private readonly clock: Clock;
   private wakeOff: (() => void) | null = null;
@@ -263,6 +274,63 @@ export class SyncConnection {
   }
 
   /**
+   * DM View as (FR-FOG-43): load player `playerId`'s `view-as` rows of `sceneId` with
+   * `sync.loadScene {sceneId, viewAs}`. The ack replaces the previous pair's rows (every row of
+   * the `view-as` types it lists) in frame order. One load in flight: a new pair supersedes it
+   * (the older ack is dropped). Returns null when nothing is sent: not live, not the DM, or the
+   * pair is already loaded or loading. A reject leaves no pair loaded; the caller toasts.
+   */
+  loadViewAs(sceneId: string, playerId: string): Promise<void> | null {
+    const { viewAs, state, store } = this.snap;
+    if (state !== "live" || !this.ws || store.you?.role !== "dm") return null;
+    const pair: ViewAsPair = { sceneId, playerId };
+    if (samePair(viewAs.loaded, pair) || samePair(viewAs.loading, pair)) return null;
+    const epoch = this.epoch;
+    const intentId = crypto.randomUUID();
+    this.set({ viewAs: { ...viewAs, loading: pair } });
+    const current = () => epoch === this.epoch && samePair(this.snap.viewAs.loading, pair);
+    return new Promise((resolve, reject) => {
+      this.pending.set(intentId, {
+        resolve: (result) => {
+          if (!current()) return resolve();
+          const parsed = LoadSceneResult.safeParse(result);
+          if (!parsed.success) {
+            this.set({ viewAs: { ...this.snap.viewAs, loading: null } });
+            reject(new IntentRejected("invalid", "Bad view-as load result"));
+            return;
+          }
+          const types = Object.keys(parsed.data.records);
+          const dropped = dropTypes(this.snap.store, [...this.snap.viewAs.types, ...types]);
+          this.set({
+            store: mergeRecords(dropped, parsed.data.records),
+            viewAs: { loaded: pair, loading: null, types },
+          });
+          resolve();
+        },
+        reject: (err) => {
+          if (current()) this.clearViewAs();
+          reject(err);
+        },
+      });
+      this.ws?.send(
+        JSON.stringify({
+          type: "intent",
+          intentId,
+          name: SYNC_LOAD_SCENE,
+          payload: { sceneId, viewAs: playerId },
+        }),
+      );
+    });
+  }
+
+  /** FR-FOG-43: View as off: drops the loaded pair's rows (and any load in flight). */
+  clearViewAs(): void {
+    const { viewAs, store } = this.snap;
+    if (viewAs.loaded === null && viewAs.loading === null && viewAs.types.length === 0) return;
+    this.set({ store: dropTypes(store, viewAs.types), viewAs: viewAsAfterSnapshot() });
+  }
+
+  /**
    * Send a transient signal (FR-SYNC-22). Fire-and-forget: no ack, never queued or resent.
    * Returns false when not live (dropped).
    */
@@ -343,6 +411,7 @@ export class SyncConnection {
           notLiveSince: null,
           everLive: true,
           scenes: sceneWindowAfterSnapshot(store),
+          viewAs: viewAsAfterSnapshot(),
         });
         return;
       }
