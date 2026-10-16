@@ -185,6 +185,7 @@ const preset = (o: Partial<EffectPresetRecord> = {}): EffectPresetRecord => ({
   concentration: false,
   activeEffectId: null,
   usesFeatureId: null,
+  originKey: null,
   note: "",
   createdAt: "t",
   updatedAt: "t",

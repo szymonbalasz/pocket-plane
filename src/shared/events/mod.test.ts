@@ -6,6 +6,8 @@ import {
   EffectPresetSaved,
   EffectToggled,
   PresetApplied,
+  RuleTriggerDeleted,
+  RuleTriggerSaved,
 } from "./effect-modifiers";
 import { domainEvents } from "./index";
 
@@ -15,13 +17,15 @@ const MOD_EVENTS = [
   "PresetApplied",
   "EffectToggled",
   "EffectModifiersSet",
+  "RuleTriggerSaved",
+  "RuleTriggerDeleted",
 ];
 
 const roundTrip = (s: { parse(v: unknown): unknown }, v: unknown) =>
   expect(s.parse(JSON.parse(JSON.stringify(v)))).toEqual(v);
 
 describe("MOD domain events (§9)", () => {
-  test("MOD §9 all 5 events registered once, logged, none undoable", () => {
+  test("MOD §9 all 7 events registered once, logged, none undoable", () => {
     const defs = domainEvents.filter((e) => MOD_EVENTS.includes(e.type));
     expect(defs.map((e) => e.type).sort()).toEqual([...MOD_EVENTS].sort());
     expect(defs.every((e) => e.logged && !e.undoable)).toBe(true);
@@ -54,5 +58,14 @@ describe("MOD domain events (§9)", () => {
     roundTrip(EffectToggled.payload, toggle);
     roundTrip(EffectToggled.payload, { ...toggle, on: false });
     expect(EffectToggled.payload.safeParse({ ...toggle, effectId: null }).success).toBe(false);
+  });
+
+  test("FR-MOD-45 RuleTriggerSaved / RuleTriggerDeleted carry the trigger id only; strict", () => {
+    roundTrip(RuleTriggerSaved.payload, { triggerId: "trg-1" });
+    roundTrip(RuleTriggerDeleted.payload, { triggerId: "trg-1" });
+    expect(RuleTriggerSaved.payload.safeParse({ triggerId: "t", name: "Fury" }).success).toBe(
+      false,
+    );
+    expect(RuleTriggerDeleted.payload.safeParse({ triggerId: "" }).success).toBe(false);
   });
 });

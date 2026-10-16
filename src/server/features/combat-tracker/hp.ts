@@ -42,6 +42,7 @@ import { gameLog } from "../dice-roll-log";
 import { cardRollIds, dmModNames, rolledOf } from "../effect-modifiers/card";
 import { reopenNotification, resolveNotification } from "../notifications";
 import { loadNotification } from "../notifications/helpers";
+import { ApplyHooks } from "./apply-hooks";
 import { activeCombatant, statsOf } from "./guards";
 import {
   campaignOf,
@@ -66,7 +67,13 @@ const playFacts = (a: Applied) => ({
   deathAfter: a.deathAfter,
 });
 
-function insertHpChange(env: Env, id: string, facts: FactsInput, entryId: string): HpChangeRecord {
+function insertHpChange(
+  env: Env,
+  id: string,
+  facts: FactsInput,
+  entryId: string,
+  triggerParts: HpChangeRecord["triggerParts"] = [],
+): HpChangeRecord {
   const row = env.tx
     .insert(hpChange)
     .values({
@@ -76,6 +83,7 @@ function insertHpChange(env: Env, id: string, facts: FactsInput, entryId: string
       at: env.ctx.clock.iso(),
       ...facts,
       noteIds: [],
+      triggerParts,
       entryId,
       undone: false,
       undoneAt: null,
@@ -133,193 +141,217 @@ function cardRoll(env: Env, id: string) {
   return { ...r, dice };
 }
 
-export const applyCard = defineCommand({
-  name: CBT_INTENTS.applyCard,
-  input: ApplyCardTargetsInput,
-  execute(input, env): HpChangesResult {
-    const card = loadNotification(env, input.cardId);
-    if (card.kind !== DAMAGE_CARD_KIND) throw notFound("Damage card not found");
-    const p = DamageCardPayload.parse(card.payload);
-    const enc = readEncounter(env.tx, p.encounterId);
-    // FR-CBT-10: End also dismissed the card (FR-CBT-59); the ended encounter is the reason.
-    if (enc.status !== "started") throw conflict("Encounter has ended");
-    if (card.state !== "pending") throw conflict("No longer pending");
-    // FR-CBT-72: `toHitTotal` iff the card has a to-hit roll; `damageTotal` unless the card has
-    // no damage roll and every target misses. A typed total on a card without a damage roll =
-    // "DM set" (`damageRolled` null).
-    const { toHitTotal } = input;
-    if (p.toHit && toHitTotal === undefined) throw invalid("To-hit total needed");
-    if (!p.toHit && toHitTotal !== undefined) throw invalid("This card has no to-hit roll");
-    const allMiss = input.targets.every((t) => !t.hit);
-    if (input.damageTotal === undefined && (p.damage || !allMiss)) throw invalid("Damage needed");
-    const damageTotal = input.damageTotal ?? 0;
-    // FR-CBT-34: every target active and non-removed, checked before anything is written.
-    const targets = input.targets.map((t) => ({ ...t, c: activeCombatant(env, t.targetId).c }));
-    const attacker = getCombatant(env.tx, enc.campaignId, p.attackerId);
-    // Rolled values come from the card's roll rows, never the client (gems: FR-CBT-32).
-    const toHitRoll = p.toHit ? cardRoll(env, p.toHit.rollId) : null;
-    const damageRoll = p.damage ? cardRoll(env, p.damage.rollId) : null;
-    // FR-MOD-16: rolled = base row + the card part's mods (bonus dice are part rows, never
-    // summed into the base), so an unedited effect-modified total never reads as "DM set".
-    const toHitRolled = toHitRoll ? rolledOf(toHitRoll.total, p.toHit) : null;
-    const damageRolled = damageRoll ? rolledOf(damageRoll.total, p.damage) : null;
-    // FR-MOD-20: the DM line names every part (from the roll line's `dmPayload`).
-    const toHitNames = p.toHit?.mods ? dmModNames(env, p.toHit.rollId) : null;
-    const damageNames = p.damage?.mods ? dmModNames(env, p.damage.rollId) : null;
-    const dmMods: AttackLogDmPayload["mods"] = {
-      ...(toHitNames ? { toHit: toHitNames } : {}),
-      ...(p.damage?.mods
-        ? {
-            damage: p.damage.mods.map((m, i) => ({
-              ...m,
-              label: damageNames?.[i]?.label ?? m.label,
-            })),
-          }
-        : {}),
-    };
-    // FR-CBT-53: physical flags for everyone; the dice breakdown for the DM only (FR-DICE-28).
-    const manual = { toHit: toHitRoll?.manual ?? false, damage: damageRoll?.manual ?? false };
-    const rolls: AttackLogRolls = {
-      ...(toHitRoll
-        ? {
-            toHit: {
-              expression: toHitRoll.expression,
-              mode: toHitRoll.mode,
-              dice: toHitRoll.dice,
-              constant: toHitRoll.constant,
-            },
-          }
-        : {}),
-      ...(damageRoll
-        ? {
-            damage: {
-              expression: damageRoll.expression,
-              dice: damageRoll.dice,
-              constant: damageRoll.constant,
-              crit: p.crit,
-            },
-          }
-        : {}),
-    };
-    const playerCard = card.audience === "player";
-    const rollIds = [...cardRollIds(p.toHit), ...cardRollIds(p.damage)];
-    const hpChangeIds: string[] = [];
-    const outcomes: DamageCardTargetOutcome[] = [];
-    for (const { c: target, hit, multiplier } of targets) {
-      const targetAc = statsOf(env, target).ac;
-      // FR-CBT-72: a damage-only card has no to-hit facts (null in the row and the line).
-      const hitComputed = toHitRoll
-        ? hitHint(toHitRoll.natural, toHitTotal ?? (toHitRolled as number), targetAc)
-        : null;
-      const raw = rawDamage(hit, damageTotal, multiplier);
-      // Allocated first: effects ended `down` point at this row (FR-CBTX-16, -22).
-      const hpChangeId = env.ctx.ids.next();
-      const hp = hpRules.apply(env, hpTargetOf(target), {
-        kind: "damage",
-        raw,
-        crit: p.crit,
-        hpChangeId,
-      });
-      // `applied` = HP lost; temp HP took `absorbed` first (FR-CBTX-15).
-      const applied = Math.abs(hp.hpBefore - hp.hpAfter);
-      const overkill = Math.max(0, raw - hp.absorbed - hp.hpBefore);
-      const lineToHit =
-        toHitRoll && p.toHit && toHitTotal !== undefined
+/**
+ * `cbt.applyCard` with a server's apply hooks (FR-MOD-38): per target, after the weapon raw and
+ * before `hpRules.apply`; their extra raw joins the one `hpRules.apply`, their parts the line.
+ */
+export const applyCardWith = (hooks: ApplyHooks) =>
+  defineCommand({
+    name: CBT_INTENTS.applyCard,
+    input: ApplyCardTargetsInput,
+    execute(input, env): HpChangesResult {
+      const card = loadNotification(env, input.cardId);
+      if (card.kind !== DAMAGE_CARD_KIND) throw notFound("Damage card not found");
+      const p = DamageCardPayload.parse(card.payload);
+      const enc = readEncounter(env.tx, p.encounterId);
+      // FR-CBT-10: End also dismissed the card (FR-CBT-59); the ended encounter is the reason.
+      if (enc.status !== "started") throw conflict("Encounter has ended");
+      if (card.state !== "pending") throw conflict("No longer pending");
+      // FR-CBT-72: `toHitTotal` iff the card has a to-hit roll; `damageTotal` unless the card has
+      // no damage roll and every target misses. A typed total on a card without a damage roll =
+      // "DM set" (`damageRolled` null).
+      const { toHitTotal } = input;
+      if (p.toHit && toHitTotal === undefined) throw invalid("To-hit total needed");
+      if (!p.toHit && toHitTotal !== undefined) throw invalid("This card has no to-hit roll");
+      const allMiss = input.targets.every((t) => !t.hit);
+      if (input.damageTotal === undefined && (p.damage || !allMiss)) throw invalid("Damage needed");
+      const damageTotal = input.damageTotal ?? 0;
+      // FR-CBT-34: every target active and non-removed, checked before anything is written.
+      const targets = input.targets.map((t) => ({ ...t, c: activeCombatant(env, t.targetId).c }));
+      const attacker = getCombatant(env.tx, enc.campaignId, p.attackerId);
+      // Rolled values come from the card's roll rows, never the client (gems: FR-CBT-32).
+      const toHitRoll = p.toHit ? cardRoll(env, p.toHit.rollId) : null;
+      const damageRoll = p.damage ? cardRoll(env, p.damage.rollId) : null;
+      // FR-MOD-16: rolled = base row + the card part's mods (bonus dice are part rows, never
+      // summed into the base), so an unedited effect-modified total never reads as "DM set".
+      const toHitRolled = toHitRoll ? rolledOf(toHitRoll.total, p.toHit) : null;
+      const damageRolled = damageRoll ? rolledOf(damageRoll.total, p.damage) : null;
+      // FR-MOD-20: the DM line names every part (from the roll line's `dmPayload`).
+      const toHitNames = p.toHit?.mods ? dmModNames(env, p.toHit.rollId) : null;
+      const damageNames = p.damage?.mods ? dmModNames(env, p.damage.rollId) : null;
+      const dmMods: AttackLogDmPayload["mods"] = {
+        ...(toHitNames ? { toHit: toHitNames } : {}),
+        ...(p.damage?.mods
           ? {
-              dice: toHitTotal === toHitRolled ? toHitRoll.total - p.toHit.constant : null,
-              constant: p.toHit.constant,
-              ...(p.toHit.mods && toHitTotal === toHitRolled ? { mods: p.toHit.mods } : {}),
-              total: toHitTotal,
-              natural: toHitRoll.natural,
+              damage: p.damage.mods.map((m, i) => ({
+                ...m,
+                label: damageNames?.[i]?.label ?? m.label,
+              })),
             }
+          : {}),
+      };
+      // FR-CBT-53: physical flags for everyone; the dice breakdown for the DM only (FR-DICE-28).
+      const manual = { toHit: toHitRoll?.manual ?? false, damage: damageRoll?.manual ?? false };
+      const rolls: AttackLogRolls = {
+        ...(toHitRoll
+          ? {
+              toHit: {
+                expression: toHitRoll.expression,
+                mode: toHitRoll.mode,
+                dice: toHitRoll.dice,
+                constant: toHitRoll.constant,
+              },
+            }
+          : {}),
+        ...(damageRoll
+          ? {
+              damage: {
+                expression: damageRoll.expression,
+                dice: damageRoll.dice,
+                constant: damageRoll.constant,
+                crit: p.crit,
+              },
+            }
+          : {}),
+      };
+      const playerCard = card.audience === "player";
+      const rollIds = [...cardRollIds(p.toHit), ...cardRollIds(p.damage)];
+      const hpChangeIds: string[] = [];
+      const outcomes: DamageCardTargetOutcome[] = [];
+      for (const { c: target, ...targetInput } of targets) {
+        const { hit, multiplier } = targetInput;
+        const weaponRaw = rawDamage(hit, damageTotal, multiplier);
+        // Allocated first: effects ended `down` point at this row (FR-CBTX-16, -22), and the apply
+        // hooks name it (FR-MOD-38).
+        const hpChangeId = env.ctx.ids.next();
+        const hooked = hooks.beforeTarget(env, {
+          card: p,
+          cardId: card.id,
+          target,
+          input: targetInput,
+          hpChangeId,
+          targetAc: statsOf(env, target).ac,
+          weaponRaw,
+        });
+        // FR-MOD-24 (tier 2): a hook may give the effective AC.
+        const targetAc = hooked.targetAc;
+        // FR-CBT-72: a damage-only card has no to-hit facts (null in the row and the line).
+        const hitComputed = toHitRoll
+          ? hitHint(toHitRoll.natural, toHitTotal ?? (toHitRolled as number), targetAc)
           : null;
-      const logPayload: AttackLogPayload = {
-        targetName: target.name,
-        attackName: p.attackName,
-        damageType: p.damageType,
-        toHit: lineToHit,
-        hit,
-        damage: raw,
-        multiplier,
-        crit: p.crit,
-        manual,
-      };
-      const dmPayload: AttackLogDmPayload = {
-        targetAc,
-        hitComputed,
-        toHitRolled,
-        damageRolled,
-        damageTotal,
-        applied,
-        overkill,
-        overrides: {
-          toHit: toHitRoll !== null && toHitTotal !== toHitRolled,
-          hit: hitComputed !== null && hit !== hitComputed,
-          // An all-miss apply without a total sets nothing.
-          damage: input.damageTotal !== undefined && damageTotal !== damageRolled,
-        },
-        rolls,
-        ...(dmMods.toHit || dmMods.damage ? { mods: dmMods } : {}),
-        ...(hp.absorbed > 0 ? { absorbed: hp.absorbed } : {}),
-      };
-      // FR-CBT-36: one line per target; never public if the attacker or this target is hidden,
-      // else a player's card is public, else the DM's choice / category setting (FR-CBT-24).
-      const entry = gameLog.append(env, {
-        kind: LOG_KIND_ATTACK,
-        category: "attack",
-        actorName: p.attackerName,
-        payload: logPayload,
-        dmPayload,
-        rollIds,
-        encounterId: enc.id,
-        public: attacker.hidden || target.hidden ? false : playerCard ? true : input.public,
-      });
-      const facts: FactsInput = {
-        encounterId: enc.id,
-        kind: "damage",
-        source: "card",
-        cardId: card.id,
-        rollIds,
-        attackerId: p.attackerId,
-        attackerName: p.attackerName,
-        attackName: p.attackName,
-        damageType: p.damageType,
-        targetId: target.id,
-        targetEntityId: target.entityId,
-        targetName: target.name,
-        targetAc,
-        toHitRolled,
-        toHitTotal: toHitRoll ? (toHitTotal ?? null) : null,
-        natural: toHitRoll?.natural ?? null,
-        hitComputed,
-        hit,
-        damageRolled,
-        damageTotal,
-        multiplier,
-        raw,
-        applied,
-        overkill,
-        hpBefore: hp.hpBefore,
-        hpAfter: hp.hpAfter,
-        ...playFacts(hp),
-      };
-      const row = insertHpChange(env, hpChangeId, facts, entry.id);
-      emitWithCards(env, AttackApplied.type, hp, row, facts, [entry]);
-      hpChangeIds.push(row.id);
-      // #138: the rolling player sees each outcome; a hidden target's name never. FR-CBTX-15:
-      // `applied` = damage dealt (HP lost + absorbed), so a target's temp HP never shows.
-      outcomes.push({
-        targetName: target.hidden ? null : target.name,
-        hit,
-        multiplier,
-        applied: applied + hp.absorbed,
-      });
-    }
-    const resolution: DamageCardTargetsResolution = { targets: outcomes };
-    resolveNotification(env, card.id, resolution);
-    return { hpChangeIds };
-  },
-});
+        // FR-MOD-38: the target's raw = weapon raw + its trigger parts, one `hpRules.apply`.
+        const raw = weaponRaw + hooked.extraRaw;
+        const hp = hpRules.apply(env, hpTargetOf(target), {
+          kind: "damage",
+          raw,
+          crit: p.crit,
+          hpChangeId,
+        });
+        // `applied` = HP lost; temp HP took `absorbed` first (FR-CBTX-15).
+        const applied = Math.abs(hp.hpBefore - hp.hpAfter);
+        const overkill = Math.max(0, raw - hp.absorbed - hp.hpBefore);
+        const lineToHit =
+          toHitRoll && p.toHit && toHitTotal !== undefined
+            ? {
+                dice: toHitTotal === toHitRolled ? toHitRoll.total - p.toHit.constant : null,
+                constant: p.toHit.constant,
+                ...(p.toHit.mods && toHitTotal === toHitRolled ? { mods: p.toHit.mods } : {}),
+                total: toHitTotal,
+                natural: toHitRoll.natural,
+              }
+            : null;
+        const logPayload: AttackLogPayload = {
+          targetName: target.name,
+          attackName: p.attackName,
+          damageType: p.damageType,
+          toHit: lineToHit,
+          hit,
+          damage: raw,
+          multiplier,
+          crit: p.crit,
+          manual,
+          ...(hooked.parts.length ? { parts: hooked.parts } : {}),
+        };
+        const dmPayload: AttackLogDmPayload = {
+          targetAc,
+          hitComputed,
+          toHitRolled,
+          damageRolled,
+          damageTotal,
+          applied,
+          overkill,
+          overrides: {
+            toHit: toHitRoll !== null && toHitTotal !== toHitRolled,
+            hit: hitComputed !== null && hit !== hitComputed,
+            // An all-miss apply without a total sets nothing.
+            damage: input.damageTotal !== undefined && damageTotal !== damageRolled,
+          },
+          rolls,
+          ...(dmMods.toHit || dmMods.damage ? { mods: dmMods } : {}),
+          ...(hp.absorbed > 0 ? { absorbed: hp.absorbed } : {}),
+          ...hooked.dm,
+        };
+        // FR-CBT-36: one line per target; never public if the attacker or this target is hidden,
+        // else a player's card is public, else the DM's choice / category setting (FR-CBT-24).
+        const entry = gameLog.append(env, {
+          kind: LOG_KIND_ATTACK,
+          category: "attack",
+          actorName: p.attackerName,
+          payload: logPayload,
+          dmPayload,
+          rollIds,
+          encounterId: enc.id,
+          public: attacker.hidden || target.hidden ? false : playerCard ? true : input.public,
+        });
+        const facts: FactsInput = {
+          encounterId: enc.id,
+          kind: "damage",
+          source: "card",
+          cardId: card.id,
+          rollIds,
+          attackerId: p.attackerId,
+          attackerName: p.attackerName,
+          attackName: p.attackName,
+          damageType: p.damageType,
+          targetId: target.id,
+          targetEntityId: target.entityId,
+          targetName: target.name,
+          targetAc,
+          toHitRolled,
+          toHitTotal: toHitRoll ? (toHitTotal ?? null) : null,
+          natural: toHitRoll?.natural ?? null,
+          hitComputed,
+          hit,
+          damageRolled,
+          damageTotal,
+          multiplier,
+          raw,
+          applied,
+          overkill,
+          hpBefore: hp.hpBefore,
+          hpAfter: hp.hpAfter,
+          ...playFacts(hp),
+        };
+        const row = insertHpChange(env, hpChangeId, facts, entry.id, hooked.triggerParts);
+        emitWithCards(env, AttackApplied.type, hp, row, facts, [entry, ...hooked.changes]);
+        hpChangeIds.push(row.id);
+        // #138: the rolling player sees each outcome; a hidden target's name never. FR-CBTX-15:
+        // `applied` = damage dealt (HP lost + absorbed), so a target's temp HP never shows.
+        outcomes.push({
+          targetName: target.hidden ? null : target.name,
+          hit,
+          multiplier,
+          applied: applied + hp.absorbed,
+        });
+      }
+      const resolution: DamageCardTargetsResolution = { targets: outcomes };
+      resolveNotification(env, card.id, resolution);
+      return { hpChangeIds };
+    },
+  });
+
+/** `cbt.applyCard` with the registry's hooks (fixtures; the server registers its own list). */
+export const applyCard = applyCardWith(new ApplyHooks());
 
 export const applyHp = defineCommand({
   name: CBT_INTENTS.applyHp,
@@ -398,39 +430,54 @@ export function undoUnit(env: Pick<CommandEnv, "tx">, encounterId: string): HpCh
   return undoGroup(rows);
 }
 
-export const undoCommand = defineCommand({
-  name: CBT_INTENTS.undo,
-  input: UndoInput,
-  execute({ expectedHpChangeId }, env): UndoResult {
-    const enc = startedEncounter(env.tx, campaignOf(env.actor));
-    const unit = enc ? undoUnit(env, enc.id) : [];
-    const last = unit[0];
-    if (!enc || !last) throw conflict("Nothing to undo");
-    if (last.id !== expectedHpChangeId) throw conflict("Something else changed — check Undo");
-    const notRestored: string[] = [];
-    for (const row of unit) {
-      const target = readCombatant(env.tx, row.targetId);
-      // I2: the inverse delta, clamped; it restores only this entry's own change. FR-CBTX-22:
-      // temp HP, death counters by delta, effects it ended (free slots only).
-      const hp = hpRules.revert(env, row, target);
-      notRestored.push(...hp.notRestored);
-      env.tx
-        .update(hpChange)
-        .set({ undone: true, undoneAt: env.ctx.clock.iso() })
-        .where(eq(hpChange.id, row.id))
-        .run();
-      const entry = gameLog.markUndone(env, row.entryId);
-      env.emit({
-        type: CombatEntryUndone.type,
-        campaignId: enc.campaignId,
-        payload: { hpChangeId: row.id },
-        changes: [...hp.changes, hpChangeChange(row, readHpChange(env.tx, row.id)), entry],
-      });
-      // FR-CBTX-22: this row's pending concentration cards close `undone` after its event.
-      hpRules.afterRevert(env, hp);
-    }
-    // I28: the owner's events first, then the card back to pending (once per apply).
-    if (last.cardId) reopenNotification(env, last.cardId);
-    return { hpChangeIds: unit.map((r) => r.id), notRestored };
-  },
-});
+/**
+ * `cbt.undo` with a server's apply hooks: `revert` per undone row, in its transaction, before the
+ * card is reopened (FR-MOD-41).
+ */
+export const undoCommandWith = (hooks: ApplyHooks) =>
+  defineCommand({
+    name: CBT_INTENTS.undo,
+    input: UndoInput,
+    execute({ expectedHpChangeId }, env): UndoResult {
+      const enc = startedEncounter(env.tx, campaignOf(env.actor));
+      const unit = enc ? undoUnit(env, enc.id) : [];
+      const last = unit[0];
+      if (!enc || !last) throw conflict("Nothing to undo");
+      if (last.id !== expectedHpChangeId) throw conflict("Something else changed — check Undo");
+      const notRestored: string[] = [];
+      for (const row of unit) {
+        const target = readCombatant(env.tx, row.targetId);
+        // I2: the inverse delta, clamped; it restores only this entry's own change. FR-CBTX-22:
+        // temp HP, death counters by delta, effects it ended (free slots only).
+        const hp = hpRules.revert(env, row, target);
+        notRestored.push(...hp.notRestored);
+        env.tx
+          .update(hpChange)
+          .set({ undone: true, undoneAt: env.ctx.clock.iso() })
+          .where(eq(hpChange.id, row.id))
+          .run();
+        const entry = gameLog.markUndone(env, row.entryId);
+        // FR-MOD-41: the hooks undo their own rows (trigger uses back to offered, refunds).
+        const hookChanges = hooks.revert(env, row);
+        env.emit({
+          type: CombatEntryUndone.type,
+          campaignId: enc.campaignId,
+          payload: { hpChangeId: row.id },
+          changes: [
+            ...hp.changes,
+            hpChangeChange(row, readHpChange(env.tx, row.id)),
+            entry,
+            ...hookChanges,
+          ],
+        });
+        // FR-CBTX-22: this row's pending concentration cards close `undone` after its event.
+        hpRules.afterRevert(env, hp);
+      }
+      // I28: the owner's events first, then the card back to pending (once per apply).
+      if (last.cardId) reopenNotification(env, last.cardId);
+      return { hpChangeIds: unit.map((r) => r.id), notRestored };
+    },
+  });
+
+/** `cbt.undo` with the registry's hooks (fixtures; the server registers its own list). */
+export const undoCommand = undoCommandWith(new ApplyHooks());

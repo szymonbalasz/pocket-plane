@@ -1,4 +1,6 @@
 // dice-roll-log boundary schemas (DICE §8, §9; data model §15). zod is the source of truth.
+
+import { PartDamageType } from "@shared/effect-modifiers/schemas";
 import { ROLL_CATEGORIES, ROLL_MODES, RollCategory, RollMode } from "@shared/events/dice-roll-log";
 import { z } from "zod";
 import { parseExpression } from "./grammar";
@@ -113,12 +115,26 @@ export type DieResult = z.infer<typeof DieResult>;
 
 /** FR-MOD-19: parts per roll (roll hooks; MOD caps a roll's parts at this). */
 export const ROLL_MODS_MAX = 20;
+/** FR-MOD-19 (review D9): a part carries per-die values only up to this many dice. */
+export const PART_DICE_MAX = 20;
+/** FR-MOD-19 (review R1): offered rule-trigger parts per damage roll. */
+export const ROLL_OFFERED_MAX = 4;
+/** FR-MOD-34, -37: DM-only line notes per entry ("Divine Fury skipped: 30 dice > 25"). */
+export const ROLL_NOTES_MAX = 4;
+export const ROLL_NOTE_MAX = 80;
+
+/**
+ * FR-MOD-19 (D9): a part's per-die values in the order of its expression's dice terms, so
+ * dice-extras throws them as labelled dice (FR-DICEX-13). A part with more dice carries none.
+ */
+const PartDice = z.array(z.int().min(1).max(1000)).min(1).max(PART_DICE_MAX);
 
 /**
  * FR-MOD-19: one roll-hook part on a payload (player-safe). `label` = the effect's label iff
  * the effect is player-visible, else null ("(DM)"); `value` signed, in the item's `total`;
  * `expression` / `rollId` for bonus dice (their own `roll` row); `auto` = rolled by the server
- * for a physical base roll (FR-MOD-18).
+ * for a physical base roll (FR-MOD-18). Rule triggers (T): `dice` per die (D9), `type` = a
+ * typed part's damage type ("+ 6 radiant (Divine Fury)").
  */
 export const RollModPart = z.strictObject({
   label: z.string().max(LABEL_MAX).nullable(),
@@ -126,15 +142,69 @@ export const RollModPart = z.strictObject({
   expression: z.string().max(20).optional(),
   auto: z.literal(true).optional(),
   rollId: Id.optional(),
+  dice: PartDice.optional(),
+  type: PartDamageType.optional(),
 });
 export type RollModPart = z.infer<typeof RollModPart>;
 
-/** FR-MOD-19: the DM's names for a part or mode hint (`dmPayload`), same index as the payload's. */
-export const DmModPart = z.strictObject({
-  effectId: Id,
+/**
+ * FR-MOD-19 (review R1): an offered rule-trigger part on a damage `roll` item: rolled with the
+ * damage, **not** in `total` (it lands per target at apply). `label` iff the trigger is `public`
+ * (FR-MOD-47), else null "(DM)"; `type` null = the attack's type; no settle facts (those ride on
+ * the card). dice-extras (FR-DICEX-13) throws `dice` as labelled offered dice.
+ */
+export const RollOfferedPart = z.strictObject({
+  label: z.string().max(LABEL_MAX).nullable(),
+  value: z.int(),
+  expression: z.string().min(1).max(20),
+  rollId: Id,
+  type: PartDamageType.nullable(),
+  auto: z.literal(true).optional(),
+  dice: PartDice.optional(),
+});
+export type RollOfferedPart = z.infer<typeof RollOfferedPart>;
+
+/**
+ * FR-MOD-19: the DM's names for a part or mode hint (`dmPayload`), same index as the payload's:
+ * an effect's (`effectId`) or, for a `roll` trigger's part (FR-MOD-43), a trigger's (`triggerId`).
+ */
+export const DmModPart = z
+  .strictObject({
+    effectId: Id.optional(),
+    triggerId: Id.optional(),
+    label: z.string().max(LABEL_MAX),
+  })
+  .refine((p) => (p.effectId === undefined) !== (p.triggerId === undefined), {
+    message: "An effect or a trigger",
+  });
+export type DmModPart = z.infer<typeof DmModPart>;
+
+/** FR-MOD-19: the DM's name of an offered part (`dmPayload`), same index as the item's `offered`. */
+export const DmOfferedPart = z.strictObject({
+  triggerId: Id,
   label: z.string().max(LABEL_MAX),
 });
-export type DmModPart = z.infer<typeof DmModPart>;
+export type DmOfferedPart = z.infer<typeof DmOfferedPart>;
+
+/**
+ * FR-MOD-18 (tier 2 / T): one physical dice group for a bonus die or an offered trigger die, sent
+ * on a roll intent beside the base `manual` entry. `key` = `e:<effectId>` | `t:<triggerId>`.
+ * `e:` groups must match the committed bonus dice (else `conflict`); `t:` groups never conflict
+ * (a surplus one is ignored; an offered trigger without one is server-rolled, `auto`).
+ */
+export const ManualPartKey = z
+  .string()
+  .max(66)
+  .regex(/^[et]:[^\s]{1,64}$/, "Key: e:<effectId> or t:<triggerId>");
+export const ManualPart = z.strictObject({ key: ManualPartKey, entry: ManualEntry });
+export type ManualPart = z.infer<typeof ManualPart>;
+export const ManualParts = z
+  .array(ManualPart)
+  .max(ROLL_MODS_MAX + ROLL_OFFERED_MAX)
+  .refine((ps) => new Set(ps.map((p) => p.key)).size === ps.length, {
+    message: "Each part group at most once",
+  });
+export type ManualParts = z.infer<typeof ManualParts>;
 
 /** `roll` kind payload item (data model §15). */
 export const RollPayloadItem = z.strictObject({
@@ -156,22 +226,29 @@ export const RollPayloadItem = z.strictObject({
   mods: z.array(RollModPart).min(1).max(ROLL_MODS_MAX).optional(),
   /** FR-MOD-19 (tier 2): labels of the mode hints behind `mode` (null = "(DM)"). */
   modes: z.array(z.string().max(LABEL_MAX).nullable()).min(1).max(ROLL_MODS_MAX).optional(),
+  /** FR-MOD-19 (R1): offered trigger parts of a card's damage roll, **not** in `total`. */
+  offered: z.array(RollOfferedPart).min(1).max(ROLL_OFFERED_MAX).optional(),
 });
 export type RollPayloadItem = z.infer<typeof RollPayloadItem>;
 
 export const RollEntryPayload = z.array(RollPayloadItem).min(1).max(20);
 export type RollEntryPayload = z.infer<typeof RollEntryPayload>;
 
-/** FR-MOD-19: per payload item (same index), the names of its `mods` / `modes` (DM only). */
+/** FR-MOD-19: per payload item (same index), the names of its `mods` / `modes` / `offered` (DM). */
 export const RollItemDmMods = z.strictObject({
   mods: z.array(DmModPart).max(ROLL_MODS_MAX),
   modes: z.array(DmModPart).max(ROLL_MODS_MAX).optional(),
+  offered: z.array(DmOfferedPart).min(1).max(ROLL_OFFERED_MAX).optional(),
 });
 export type RollItemDmMods = z.infer<typeof RollItemDmMods>;
 
-/** `roll` kind `dmPayload` (FR-MOD-19): present only when an item has parts or mode hints. */
+/**
+ * `roll` kind `dmPayload` (FR-MOD-19): present only when an item has parts, mode hints or offers,
+ * or the entry has `notes` (FR-MOD-34, -37: skipped triggers, DM only).
+ */
 export const RollEntryDmPayload = z.strictObject({
   items: z.array(RollItemDmMods).min(1).max(20),
+  notes: z.array(z.string().min(1).max(ROLL_NOTE_MAX)).min(1).max(ROLL_NOTES_MAX).optional(),
 });
 export type RollEntryDmPayload = z.infer<typeof RollEntryDmPayload>;
 

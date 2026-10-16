@@ -7,8 +7,10 @@ import {
   EFFECT_ENDED_REASONS,
   EFFECT_KINDS,
 } from "@shared/combat-extras/schemas";
-import { HP_MODES } from "@shared/combat-tracker/schemas";
+import { HP_MODES, type HpTriggerPart } from "@shared/combat-tracker/schemas";
 import type { Modifier } from "@shared/effect-modifiers/schemas";
+import { TRIGGER_USE_STATES } from "@shared/effect-modifiers/trigger-records";
+import type { TriggerRule } from "@shared/effect-modifiers/triggers";
 import { TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
@@ -609,6 +611,14 @@ export const hpChange = sqliteTable(
     deathAfter: text("death_after", { mode: "json" }).$type<DeathCounters | null>(),
     /** JSON leaf ID[]: the concentration cards this change created (undo closes pending ones). */
     noteIds: text("note_ids", { mode: "json" }).$type<string[]>().notNull().default([]),
+    /**
+     * effect-modifiers (FR-MOD-38, -48): JSON leaf ≤ 4 rule-trigger parts this apply landed on
+     * the target (`[]` = none); DM only, like the row.
+     */
+    triggerParts: text("trigger_parts", { mode: "json" })
+      .$type<HpTriggerPart[]>()
+      .notNull()
+      .default([]),
     entryId: text("entry_id")
       .notNull()
       .references((): AnySQLiteColumn => gameLogEntry.id),
@@ -757,6 +767,8 @@ export const effectPreset = sqliteTable(
       onDelete: "set null",
     }),
     usesFeatureId: text("uses_feature_id"),
+    /** FR-MOD-36 (R5): the built-in key "Start from" copied (soft), else null. */
+    originKey: text("origin_key"),
     note: text("note").notNull().default(""),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -770,6 +782,95 @@ export const effectPreset = sqliteTable(
   ],
 );
 
+/**
+ * Rule trigger (effect-modifiers, `rule-trigger`, lazy record type; data model §27, ADR-0043):
+ * owned by a character (`characterId`) or a monster definition (`definitionId`); exactly one is
+ * set, checked by zod and the commands (a CHECK constraint makes drizzle-kit push rebuild the
+ * table, as `effect`). `rule` is a JSON leaf (`TriggerRule`, MOD §8.4). Caps (6 per character,
+ * 4 per definition, 40 per campaign) are command checks. `ownerPlayerId` copies the
+ * character's owner (FR-MOD-47). No `createdAt` (MOD §12).
+ */
+export const ruleTrigger = sqliteTable(
+  "rule_trigger",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    characterId: text("character_id").references((): AnySQLiteColumn => entity.id, {
+      onDelete: "cascade",
+    }),
+    definitionId: text("definition_id").references((): AnySQLiteColumn => entity.id, {
+      onDelete: "cascade",
+    }),
+    ownerPlayerId: text("owner_player_id").references((): AnySQLiteColumn => player.id),
+    name: text("name").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    public: integer("public", { mode: "boolean" }).notNull(),
+    rule: text("rule", { mode: "json" }).$type<TriggerRule>().notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("rule_trigger_seq").on(t.seq),
+    index("rule_trigger_character").on(t.campaignId, t.characterId),
+    index("rule_trigger_definition").on(t.campaignId, t.definitionId),
+  ],
+);
+
+/**
+ * Trigger use (effect-modifiers, `trigger_use`; **server-only**, never a record type, never sent;
+ * FR-MOD-42, ADR-0043 D3): one offered or used part of a rule trigger in an encounter. A charge
+ * is free iff no `used` row has the same (trigger, owner combatant, encounter, window). `cardId`,
+ * `rollId`, `targetId`, `hpChangeId`, `featureId` are soft ids.
+ */
+export const triggerUse = sqliteTable(
+  "trigger_use",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    encounterId: text("encounter_id")
+      .notNull()
+      .references((): AnySQLiteColumn => encounter.id),
+    seq: integer("seq").notNull(),
+    triggerId: text("trigger_id")
+      .notNull()
+      .references((): AnySQLiteColumn => ruleTrigger.id, { onDelete: "cascade" }),
+    ownerCombatantId: text("owner_combatant_id")
+      .notNull()
+      .references((): AnySQLiteColumn => combatant.id),
+    /** `t:<round>:<turnCombatantId>` | `r:<round>` | `e` | `f` (feature), ≤ 48. */
+    window: text("window").notNull(),
+    state: text("state", { enum: TRIGGER_USE_STATES }).notNull(),
+    cardId: text("card_id"),
+    rollId: text("roll_id"),
+    /** Offer: index in the card's `damage.triggers`. */
+    part: integer("part"),
+    targetId: text("target_id"),
+    hpChangeId: text("hp_change_id"),
+    value: integer("value"),
+    multiplier: text("multiplier"),
+    forced: integer("forced", { mode: "boolean" }).notNull().default(false),
+    featureId: text("feature_id"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("trigger_use_seq").on(t.seq),
+    index("trigger_use_charge").on(
+      t.triggerId,
+      t.ownerCombatantId,
+      t.encounterId,
+      t.window,
+      t.state,
+    ),
+    index("trigger_use_card").on(t.cardId),
+    index("trigger_use_hp_change").on(t.hpChangeId),
+  ],
+);
+
 /** CON-20: `seq` values for Combat inserts, computed by the DB inside the insert's transaction. */
 export const notificationSeqNext = sql<number>`(select coalesce(max(${notification.seq}), 0) + 1 from ${notification})`;
 export const encounterSeqNext = sql<number>`(select coalesce(max(${encounter.seq}), 0) + 1 from ${encounter})`;
@@ -779,6 +880,8 @@ export const hpChangeSeqNext = sql<number>`(select coalesce(max(${hpChange.seq})
 export const effectSeqNext = sql<number>`(select coalesce(max(${effect.seq}), 0) + 1 from ${effect})`;
 export const effectPresetSeqNext = sql<number>`(select coalesce(max(${effectPreset.seq}), 0) + 1 from ${effectPreset})`;
 export const lootEntrySeqNext = sql<number>`(select coalesce(max(${lootEntry.seq}), 0) + 1 from ${lootEntry})`;
+export const ruleTriggerSeqNext = sql<number>`(select coalesce(max(${ruleTrigger.seq}), 0) + 1 from ${ruleTrigger})`;
+export const triggerUseSeqNext = sql<number>`(select coalesce(max(${triggerUse.seq}), 0) + 1 from ${triggerUse})`;
 
 // ---------------------------------------------------------------------------------------------
 // Fog of war (FOG §8, data model §24; fix/fog-core). fog-of-war writes the rows. Both cascade
@@ -1023,6 +1126,8 @@ export const schema = {
   creatureSheet,
   effect,
   effectPreset,
+  ruleTrigger,
+  triggerUse,
   sceneFog,
   sceneFogEdit,
   fogExplored,

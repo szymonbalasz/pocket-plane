@@ -60,7 +60,7 @@ describe("FR-MOD-46 built-in trigger presets", () => {
     expect(keys).toEqual({
       "sneak-attack": ["srd-5.1:feature/rogue/sneak-attack"],
       "hunters-mark": ["srd-5.1:spell/hunters-mark"],
-      "colossus-slayer": ["srd-5.1:feature/ranger/colossus-slayer"],
+      "colossus-slayer": ["srd-5.1:feature/ranger/hunters-prey"],
       "martial-advantage": [],
       regeneration: [],
     });

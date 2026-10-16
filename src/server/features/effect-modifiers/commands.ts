@@ -120,6 +120,8 @@ export const putPreset = defineCommand({
       concentration: p.concentration,
       note: p.note,
       ownerPlayerId: owner?.ownerPlayerId ?? null,
+      // FR-MOD-36: kept on a replace that doesn't name it.
+      originKey: p.originKey === undefined ? (before?.originKey ?? null) : p.originKey,
       updatedAt: now,
     };
     let id: string;

@@ -57,3 +57,23 @@ export const EffectModifiersSet = defineEvent({
   logged: true,
   undoable: false,
 });
+
+/**
+ * `mod.putTrigger` (create or replace) / `addTriggerFromPreset` callers' own events list the
+ * row: the `rule-trigger` (FR-MOD-45, ADR-0043). Owner player: upsert; others nothing (lazy type,
+ * live events unchanged, ADR-0045).
+ */
+export const RuleTriggerSaved = defineEvent({
+  type: "RuleTriggerSaved",
+  payload: z.strictObject({ triggerId: Id }),
+  logged: true,
+  undoable: false,
+});
+
+/** `mod.deleteTrigger`: the `rule-trigger` delete; its `trigger_use` rows cascade (server-only). */
+export const RuleTriggerDeleted = defineEvent({
+  type: "RuleTriggerDeleted",
+  payload: z.strictObject({ triggerId: Id }),
+  logged: true,
+  undoable: false,
+});
