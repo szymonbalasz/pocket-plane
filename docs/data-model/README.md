@@ -1192,9 +1192,58 @@ Indexes `trigger_use_charge` (`trigger_id`, `owner_combatant_id`, `encounter_id`
 - **Redaction (FR-MOD-47, fail closed):** the registry record carries server-only `presetRefs` (built with the row: per non-built-in preset ref of the rule, `{own: true}` for the trigger's own character's preset, else `{name}` of the campaign preset); `dmRedact` strips it. A player's copy keeps built-in keys and own preset ids; every other ref (incl. a deleted preset) becomes `{name}` ("Missing preset" if gone).
 - **Snapshot size** (CON-44, #208; MOD's `con44.test.ts`): heavy harness + every MOD §12 R row at max length (tier-2 modifiers on 16 presets and 12 effects, `originKey` on every preset, 1 max offer with settle facts on 20 pending cards, `offered` (20 dice) + DM name on 30 attack roll entries, a typed part on the outcome lines): DM 672,416 → 710,459 B (**+38,043**; 338,117 B left of 1 MiB; bound ≤ 40 KiB), players max 293,985 B (+13,408…+13,794; bound ≤ 20 KiB). Not in MOD §12's table: `hp_change.triggerParts` with 1 max part on every applied row, DM **+5,040** (players 0). `rule-trigger` at the campaign cap (40 rows, 1 `row` filter each): in no snapshot; DM load ack 41,615 B (1,040 B/row; bound ≤ 48 KiB), a player's own rows ≤ 10,004 B. Worst card (6 max mods on both rolls, 4 max offers, 50 dice): 4,353 B > the kind's 4 KB cap; 3 offers 3,975 B (R10 drops offers from the last).
 
-## 28. Sprint 3: party board core (P core)
+## 28. Sprint 3: effect modifiers tier 2 (R1)
 
-From [party-board](../specs/party-board.md#8-data-model) (PARTY, `complete`; gate 1 #207, #208; seams S8, S10; build rulings #221). **Built by `build/party-core`** (schema lock 3rd, after R0): two tables, one `loot_entry` column + kind (drizzle push, push-safe). Three **lazy** record types ([ADR-0045](../architecture/adr/0045-lazy-record-types.md)): in no snapshot, loaded with `sync.load`. Protocol side: [protocol §41](../protocol/README.md#41-sprint-3-party-board-core-p-core).
+From [effect-modifiers](../specs/effect-modifiers.md#81-modifier-json-leaf-zod-only) tier 2 (MOD, `complete`). **Built by `build/mod-tier2`** (R1): no table, column or record type change; existing JSON leaves accept and carry more. Protocol side: [protocol §41](../protocol/README.md#41-sprint-3-effect-modifiers-tier-2-r1).
+
+| Table / leaf | Change | Visibility | Source |
+|---|---|---|---|
+| `effect.modifiers`, `effect_preset.modifiers` (**JSON leaf** `Modifier[]`) | Tier-2 kinds valid (`BUILT_TIER = 2`): `mode {on: RollSel, mode}`, `defense {types 1–13, level}`, `flat {on: {roll: "ac"}, value}`. Built-ins' copies carry their tier-2 parts | as the row (FR-MOD-21, -22) | [FR-MOD-01, -05](../specs/effect-modifiers.md#6-functional-requirements) |
+| `roll.mode` | The **final** mode of a subject roll (roller's mode combined with effects' hints, FR-MOD-17); `roll.expression` the rewritten one (`2d20kh1+…`) | as the roll | FR-MOD-17 |
+| `roll.manual` (part rows) | `true` for a bonus / offered die entered as a `manualParts` group | as the roll | FR-MOD-18 |
+| `game_log_entry.payload` (`roll` items) | `modes` = labels of the agreeing hints; `mods[].dice` / `offered[].dice` filled (≤ 20); `mods[].type`; `offered` written when a hook offers | label null for non-visible effects / non-public triggers | FR-MOD-19 |
+| `game_log_entry.dmPayload` (`roll`) | `items[].modes` names hints; `{triggerId, label}` for trigger parts / hints; `offered` names; `notes` | DM only | FR-MOD-19 |
+| `hp_change.target_ac`, attack line `dmPayload.targetAc` | The **effective** AC (stored + AC parts) | DM only | FR-MOD-24 |
+| attack line `dmPayload.acMods`, `defense` | Written by MOD's apply-hook line: AC parts (≤ 6); defense preset on Hit rows (`resistance` \| `vulnerability` \| `immunity` \| `both`, label) | DM only | FR-MOD-24, -25 |
+
+- **Derived** (pure, `@shared/effect-modifiers/rules`): `modeHints`, `combineModes`, `bonusDieGroups` / `bonusDieKey`, `effectiveAc`, `defenseFor`, `DEFENSE_MULTIPLIER` (immunity → none, resistance → half, vulnerability → double, both → normal).
+- **Fixture** `mod-tier2` (requires `combat-1`, `mod-presets`, `mod-bane`): campaign preset "Frost Ward" (`defense` resistance cold, 10 rounds); built-in `shield-of-faith` applied to the hidden Elite. R5 stacks it into `rule-triggers`.
+- **Snapshot size** (CON-44): no new rows beyond the fixture's 1 preset + 1 effect; the tier-2 modifier rows were measured at max in R0 (§27, MOD `con44.test.ts`: 16 presets × 6 max tier-2 modifiers, 12 effects × 2); per-die `dice` stays off cards (worst card unchanged).
+
+## 29. Sprint 3: freeform fog + darkness (V1)
+
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V1). **Built by `build/fog-shapes`**: no new table or column; the commands that write [§26](#26-sprint-3-vision-core-v0)'s v2 fields. Protocol side: [protocol §38](../protocol/README.md#42-sprint-3-freeform-fog--darkness-v1).
+
+| Field | Written by (V1) | Rule | Source |
+|---|---|---|---|
+| `scene_fog.shapes` | `fog.edit` (append), `fog.setAll` (`[]`), `fog.undo` (restore) | ≤ 100 (`conflict` past it); legacy `fog.edit` forms stored as their v2 shapes; the base mask is never re-rastered by an edit (box changes only with `fog.setAll`, FR-FOG-03) | FR-FOG-01, -05, -26, -27 |
+| `scene_fog.darkness` | darkness intents, `fog.undo`; `seenBy` by every scene re-derive | ≤ 20; ids from `ctx.ids`; serialized DM row ≤ 16 KiB; `seenBy` (V1, static) = every player when some cell centre inside the shape's bounding box is statically clear or explored, plus each player with an explored-memory cell there; else `[]`. Sight polygons join in V2. A scene duplicate re-derives the copy's `seenBy` (no memory there) | FR-FOG-28, -30, -44 |
+| `scene_fog.explored` | `fog.setExplored` | default false; not in the undo stack | FR-FOG-29 |
+| `scene_fog_edit` | every undoable fog command | kinds per protocol §42; `prevShapes` / `prevDarkness` = the row before (darkness with its `seenBy`, re-derived on restore) | FR-FOG-07 |
+| `fog_explored` | `fog.forgetExplored` (delete all rows of the scene) | runs decode as "1 = explored" (`@shared/fog-of-war/explored`, corrupt → nothing explored); growth lands in V2 | FR-FOG-31, -37 |
+
+- **Derived (V1):** static state with shapes (`samplePoint` on a prepared layer, once per point per re-derive), darkness containment, darkness `seenBy` (static part). Client: draft, Ctrl "free" flag, darkness selection and drag offset.
+- **CON-44:** unchanged (no new record type or field; V0's measured `fog` row at 12 typical shapes + 2 darkness shapes stands, §26).
+
+## 30. Sprint 3: rule-trigger engine (R4)
+
+From [effect-modifiers](../specs/effect-modifiers.md#82-records) sprint 3. **Built by `build/rule-triggers`** (R4): no schema change; who writes §27's rows now. Protocol side: [protocol §43](../protocol/README.md#43-sprint-3-rule-trigger-engine-r4).
+
+| Row / leaf | Written by | Notes | Source |
+|---|---|---|---|
+| `rule_trigger` | `mod.putTrigger` (insert / replace), `mod.deleteTrigger`, `addTriggerFromPreset` (caller's transaction), the owner-change hook (`owner_player_id`) | Caps by command; `public` default character on / definition off; `updated_at` from `ctx.clock` | FR-MOD-32, -45–47 |
+| `trigger_use` (hit) | `cbt.attack` / `cbt.rollDamage` after the card exists: one `offered` row per card part (`card_id`, `roll_id`, `part`, `window` = the trigger's key at the roll, `owner_combatant_id` = the card's attacker); `cbt.applyCard` (MOD apply hook) → `used` + `target_id`, `hp_change_id`, `value` (after multiplier), `multiplier`, `forced`, `feature_id` (spent); `cbt.undo` → back to `offered`, those fields cleared | Two cards in one window both carry the offer; the first apply spends the charge. Unassigned offers stay `offered`. A dropped offer (card cap) has no row | FR-MOD-37, -38, -41, -42 |
+| `trigger_use` (roll) | the roll hook: `used` at once, `roll_id`, windowed frequencies in combat only | Never undone (rolls are facts) | FR-MOD-43 |
+| `creature_sheet.features[].used` | apply (`every.feature`, +1) and its undo (−1), via CHARX's counter helpers + `writeSheet` (MOD's interim `feature-uses.ts` until R3's `spendFeatureUse` / `refundFeatureUse`) | Not on `force` | FR-MOD-38, -41 |
+| `hp_change.trigger_parts` | `cbt.applyCard` (apply hooks' `triggerParts`) | `{triggerId, name, value, multiplier, type, forced}` | FR-MOD-38, -48 |
+| `notification` kind `mod-trigger` | the reminders line on Next | payload `{triggerName, creatureName, encounterId, text}`; info rows (History) | FR-MOD-44 |
+| damage card `mode` | `cbt.attack` | Now the to-hit roll's final mode (was the requested one) | FR-MOD-37 |
+
+- **CON-44:** no new record type or snapshot field (R0 measured every R row: [§27](#27-sprint-3-rule-triggers-core-r0)). `mod-trigger` reminders are small info rows (≈ 0.4 KB each) in the notifications window like any info card.
+
+## 31. Sprint 3: party board core (P core)
+
+From [party-board](../specs/party-board.md#8-data-model) (PARTY, `complete`; gate 1 #207, #208; seams S8, S10; build rulings #221). **Built by `build/party-core`** (schema lock 3rd, after R0): two tables, one `loot_entry` column + kind (drizzle push, push-safe). Three **lazy** record types ([ADR-0045](../architecture/adr/0045-lazy-record-types.md)): in no snapshot, loaded with `sync.load`. Protocol side: [protocol §44](../protocol/README.md#44-sprint-3-party-board-core-p-core).
 
 | Table / leaf | Change | Default (push-safe) | Visibility | Source |
 |---|---|---|---|---|

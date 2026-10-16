@@ -50,20 +50,23 @@ describe("FR-MOD-01 modifier bounds", () => {
     bad(Modifier, { ...bless, on: { roll: "hp" } });
   });
 
-  test("FR-MOD-01 tier 1 built: mode, defense and flat AC parse as any-tier but are invalid", () => {
-    expect(BUILT_TIER).toBe(1);
+  test("FR-MOD-01 tier 2 built: mode, defense and flat AC are tier 2 and valid", () => {
+    expect(BUILT_TIER).toBe(2);
     const mode = { kind: "mode", on: { roll: "check", abilities: ["str"] }, mode: "advantage" };
     const defense = { kind: "defense", types: ["slashing"], level: "resistance" };
     const ac = { kind: "flat", on: { roll: "ac" }, value: 2 };
     for (const m of [mode, defense, ac]) {
       ok(AnyModifier, m);
-      bad(Modifier, m);
+      ok(Modifier, m);
       expect(modifierTier(AnyModifier.parse(m))).toBe(2);
     }
     expect(modifierTier(AnyModifier.parse(bless))).toBe(1);
     expect(modifierTier(AnyModifier.parse(rage))).toBe(1);
     bad(AnyModifier, { ...defense, types: [] });
     bad(AnyModifier, { ...defense, types: ["slashing", "psychic", "laser"] });
+    bad(Modifier, { ...mode, mode: "double" });
+    bad(Modifier, { ...defense, level: "half" });
+    bad(Modifier, { ...ac, value: 0 });
   });
 
   test("FR-MOD-01 ≤ 6 per effect (0 ok), 1–6 per preset", () => {
@@ -182,9 +185,13 @@ describe("MOD §8.2 effect-preset record", () => {
     bad(EffectPresetRecord, { ...campaignPreset, name: "x".repeat(41) });
     bad(EffectPresetRecord, { ...campaignPreset, note: "x".repeat(201) });
     bad(EffectPresetRecord, { ...campaignPreset, modifiers: [] });
-    bad(EffectPresetRecord, {
+    ok(EffectPresetRecord, {
       ...campaignPreset,
       modifiers: [{ kind: "flat", on: { roll: "ac" }, value: 2 }],
+    });
+    bad(EffectPresetRecord, {
+      ...campaignPreset,
+      modifiers: [{ kind: "flat", on: { roll: "ac" }, value: 11 }],
     });
     bad(EffectPresetRecord, { ...campaignPreset, durationRounds: 0 });
     bad(EffectPresetRecord, { ...campaignPreset, durationRounds: 101 });

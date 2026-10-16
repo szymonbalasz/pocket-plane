@@ -168,7 +168,14 @@ describe("FR-MOD-13 dice.evaluate with a subject", () => {
     const [item] = (e?.payload ?? []) as RollEntryPayload;
     expect(item?.total).toBe((base?.total as number) + blessValue - 2);
     expect(item?.mods).toEqual([
-      { label: "Bless", value: blessValue, expression: "1d4", rollId: bonus?.id as string },
+      // FR-MOD-19 (D9): the bonus die's value rides along for dice-extras.
+      {
+        label: "Bless",
+        value: blessValue,
+        expression: "1d4",
+        rollId: bonus?.id as string,
+        dice: [blessValue],
+      },
       { label: null, value: -2 },
     ]);
     expect(item?.modes).toEqual([null]);

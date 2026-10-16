@@ -32,6 +32,8 @@ export type ApplyResult = { ok: true; store: RecordStore } | { ok: false; reason
 /** Applies one event atomically; a seq gap means the client must `resync` (FR-SYNC-21). */
 export function applyEvent(s: RecordStore, f: EventFrame): ApplyResult {
   if (f.seq !== s.seq + 1) return { ok: false, reason: "gap" };
+  // FR-SYNC-19: an empty event only advances seq; the records stay the same objects.
+  if (f.changes.length === 0) return { ok: true, store: { ...s, seq: f.seq } };
   const records: RecordMap = { ...s.records };
   for (const ch of f.changes) {
     const byId = { ...(records[ch.type] ?? {}) };
