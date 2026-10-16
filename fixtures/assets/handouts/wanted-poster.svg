@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="560" viewBox="0 0 400 560">
+  <title>wanted-poster</title>
+  <!-- Fixture "wanted-poster" (party-board §13, walkthrough step 3): a pinned wanted poster with
+       a hooded silhouette and coin marks; used by no scene, token or handout at load. -->
+  <rect width="400" height="560" fill="#3b2a1a"/>
+  <rect x="30" y="30" width="340" height="500" fill="#f1e2bb" stroke="#8c6a3c" stroke-width="6"/>
+  <rect x="70" y="60" width="260" height="56" fill="#5a3b1f"/>
+  <rect x="100" y="140" width="200" height="220" fill="#d9c391" stroke="#5a3b1f" stroke-width="5"/>
+  <path d="M200 170 C150 170 140 230 150 260 L130 350 H270 L250 260 C260 230 250 170 200 170 Z" fill="#2b2b2b"/>
+  <circle cx="200" cy="232" r="26" fill="#6b6b6b"/>
+  <rect x="90" y="385" width="220" height="16" fill="#5a3b1f"/>
+  <rect x="120" y="415" width="160" height="12" fill="#8c6a3c"/>
+  <circle cx="150" cy="475" r="22" fill="#d4a62a" stroke="#7a5a10" stroke-width="4"/>
+  <circle cx="200" cy="475" r="22" fill="#d4a62a" stroke="#7a5a10" stroke-width="4"/>
+  <circle cx="250" cy="475" r="22" fill="#d4a62a" stroke="#7a5a10" stroke-width="4"/>
+  <circle cx="200" cy="48" r="8" fill="#9a9a9a"/>
+</svg>

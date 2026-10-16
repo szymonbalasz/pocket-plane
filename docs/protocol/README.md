@@ -1357,9 +1357,26 @@ From [effect-modifiers](../specs/effect-modifiers.md) sprint 3 (MOD, `complete`;
 
 **Reminders** (`combatRuleHooks` line `effect-modifiers.reminders`): `turnChanged`, `direction: next` only, the new turn combatant's enabled `turnStart` triggers whose `requires` holds → `notify` kind **`mod-trigger`** (registered in `notifications/kinds.ts`; info, no action, no end rule, not `genericResolve`): text "<creature>: <trigger> — <reminder with {value}>" ≤ 280; payload `ModTriggerPayload {triggerName ≤ 40, creatureName ≤ 80, encounterId, text ≤ 160}` (player-safe); audience a monster → `dm`, a PC → its owner player, `dm` while the combatant is hidden. A `value` formula error skips it. No client view yet (rows show the generic text; R6 / R7 may add one).
 
-## 44. Sprint 3: freeform walls + wall hint (V4)
+## 44. Sprint 3: party board core (P core)
 
-From [scene-tools](../specs/scene-tools.md) (SCN §14 slice V4). **Built by `build/walls-freeform`** (canvas lock 2nd): client only on the wire side. No new intent, event, record type or field; it uses [§37](#37-sprint-3-vision-core-v0)'s decimal segments and `map.checkMove`. Data side: [data model §31](../data-model/README.md#31-sprint-3-freeform-walls--wall-hint-v4).
+From [party-board](../specs/party-board.md) (PARTY, `complete`; gate 1 #207, #208; seams S8, S10; build rulings #221). **Built by `build/party-core`**: three lazy record types, the handout intents and `party.addItem` (server only; no UI and no `handout-shared` notification yet: P2), events, and LOOT's item rows. Data side: [data model §31](../data-model/README.md#31-sprint-3-party-board-core-p-core).
+
+| Piece | Contract |
+|---|---|
+| Record types (`src/server/features/party-board/records.ts`) | Campaign scope, **lazy** ([§38](#38-sprint-3-lazy-record-types)): `handout` `"all"`, `handout-body` `"ids"` (`byIds` provider), `party-item` `"all"`. Never in a snapshot (DM included); `sync.load` only |
+| Visibility (`@shared/party-board/visibility`) | `handout` / `handout-body`: DM `full`; a player `redacted` iff `sharedWith.mode = all` or their id is listed (header: `sharedWith → {mode}`, no ids; body: no `sharedWith`), else `hidden`. A share change is therefore an upsert to gainers, a delete to losers, nothing to others (FR-SYNC-19; a body whose wire stays the same is dropped). `party-item`: `full` (scope gate) |
+| `party.createHandout {title, body, imageAssetIds}` (DM) | Strict zod (FR-PARTY-02: title clean 1–80, body clean 0–10 000, 0–10 unique asset ids, each `assets.require` → `not_found`). 201st in the campaign → `conflict` "Handout limit reached (200)". Row unshared, `rev` 1. Result `{handoutId}`. Event `HandoutCreated {handoutId}`; changes `handout`, `handout-body` (before null) |
+| `party.updateHandout {handoutId, title, body, imageAssetIds}` (DM) | Full replacement; unknown / other campaign → `not_found`; same values → `ack`, no event. `rev` + 1. `HandoutUpdated {handoutId, rev}`; changes `handout`, plus `handout-body` only when `body` changed (`handout-body.rev` = the body's own rev) |
+| `party.shareHandout {handoutId, sharedWith}` (DM; share and unshare) | `sharedWith` strict (`players`: 1–20 unique ids, each a player of the campaign, else `not_found`; `none` / `all`: `[]`, else `invalid`). Same share (player order ignored) → `ack`, no event. `sharedAt` = now iff someone gains access. `HandoutShared {handoutId, before, after}`; changes `handout`, `handout-body`. FR-PARTY-06 notifications: P2 |
+| `party.deleteHandout {handoutId}` (DM) | Deletes the row; `HandoutDeleted {handoutId}`; changes `handout`, `handout-body` → null (deletes to who saw it). `not_found` as update |
+| `party.addItem {name, qty, notes}` (DM) | Strict (name clean 1–60, qty int 1–9 999, notes clean 0–120). Merge into the row with the same key (name trimmed + ci, notes exact; sum > 9 999 → `conflict`) or insert (61st → `conflict` "Party inventory is full (60)"). Writes `loot-entry {kind: item, world → party, text: name, qty, coins 0}`, then `loot-received` "Party loot: ‹name› ×‹qty›" (all), same tx. `PartyItemAdded {itemId, entryId, name, qty, notes}`; changes `party-item`, `loot-entry`. Result `{itemId}` |
+| Other events (`src/shared/events/party-board.ts`, `party-loot.ts`) | Defined, emitted by later slices: `PartyItemEdited {itemId, before, after}`, `PartyItemRemoved {itemId, entryId, name, qty}`, `ItemMoved {entryId, from, to, name, qty}` (P4); `CoinSplit {entryIds, characterIds, shares}` (P3). All logged, none undoable |
+| `loot-entry` (LOOT) | `kind` + `item`; `qty?` (1–9 999) on item rows only, absent otherwise. `LOOT_ENTRY_KINDS` / `LootEntryKind` in `@shared/events/party-loot` |
+| Fixtures | Units `handout-images` (2 SVGs), `handouts-1` (h1–h5, shares per PARTY §13), `party-items-1` (3 adds; P4 appends the Torch ×2 move to Thorn), `party-second`; bundle `party-board`. Patches only: no sheet field changes |
+
+## 45. Sprint 3: freeform walls + wall hint (V4)
+
+From [scene-tools](../specs/scene-tools.md) (SCN §14 slice V4). **Built by `build/walls-freeform`** (canvas lock 2nd): client only on the wire side. No new intent, event, record type or field; it uses [§37](#37-sprint-3-vision-core-v0)'s decimal segments and `map.checkMove`. Data side: [data model §32](../data-model/README.md#32-sprint-3-freeform-walls--wall-hint-v4).
 
 | Use | Who | Wire | Rule |
 |---|---|---|---|

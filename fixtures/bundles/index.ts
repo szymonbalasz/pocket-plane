@@ -16,6 +16,7 @@ import fog from "./fog";
 import fogScn from "./fog-scn";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
+import partyBoard from "./party-board";
 import partyLoot from "./party-loot";
 import sceneTools from "./scene-tools";
 import sceneToolsProps from "./scene-tools-props";
@@ -46,4 +47,5 @@ export const bundles: readonly Bundle[] = [
   sceneTools,
   fogScn,
   diceExtras,
+  partyBoard,
 ];
