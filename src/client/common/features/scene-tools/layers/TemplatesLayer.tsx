@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Circle, Group, Label, Layer, Line, Shape, Tag, Text } from "react-konva";
 import { useStore } from "zustand";
 import { useSignal, useSync } from "../../../sync/store";
+import { canvasBlind } from "../../fog-of-war/blind";
 import { useCanvas } from "../../scenes-map/canvas-context";
 import { useLayerToggles } from "../../scenes-map/tool-store";
 import { useAoe } from "../aoe-store";
@@ -188,7 +189,12 @@ export function ScnTemplatesLayer() {
     const h = setInterval(() => pruneEphemerals(eph, performance.now()), 500);
     return () => clearInterval(h);
   }, [eph, anyEph]);
-  const others = useMemo(() => ephemeralsOn({ byId: ephById }, scene.id), [ephById, scene.id]);
+  // FR-FOG-36: a blind player draws none of the others' previews (they still arrive).
+  const blind = canvasBlind(client, store, scene.id, myPlayerId);
+  const others = useMemo(
+    () => (blind ? [] : ephemeralsOn({ byId: ephById }, scene.id)),
+    [blind, ephById, scene.id],
+  );
 
   const accent = (role: "dm" | "player") => (role === "dm" ? colors.dmAccent : colors.playerAccent);
   const drawn: Drawn[] = [];

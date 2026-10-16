@@ -126,6 +126,7 @@ export const rollDamageCommand = defineCommand({
       label: crit ? critLabel(row.spec.label) : row.spec.label,
       actor: { kind: "entity", id: c.entityId, name: c.name },
       manual: input.manual,
+      ...(input.manualParts ? { manualParts: input.manualParts } : {}),
       source: "cbt",
       // FR-MOD-15/16: damage mods from the effects active now; a completed card's crit doubles.
       subject: {

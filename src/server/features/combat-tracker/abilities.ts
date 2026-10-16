@@ -29,6 +29,7 @@ export const rollAbility = defineCommand({
       label: spec.label,
       actor: { kind: "entity", id: c.entityId, name: c.name },
       manual: input.manual,
+      ...(input.manualParts ? { manualParts: input.manualParts } : {}),
       source: "cbt",
       // FR-MOD-15: a PC combatant's subject is its character.
       subject: {

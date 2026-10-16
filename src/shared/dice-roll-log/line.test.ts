@@ -116,6 +116,26 @@ describe("FR-DICE-20 roll line", () => {
     ).toBe("Goblin — 2d6+2: 7 + 2 = 9 (physical)");
   });
 
+  test("FR-MOD-17 physical adv from an effect the player can't see: the server's d20 says '(rolled for you)', the reason '(DM)'", () => {
+    const line = text([
+      item({
+        expression: "2d20kh1+4",
+        mode: "advantage",
+        manual: true,
+        dice: [
+          { faces: 20, value: 11, kept: true },
+          { faces: 20, value: 7, kept: false, auto: true },
+        ],
+        total: 15,
+        natural: 11,
+        modes: [null],
+      }),
+    ]);
+    expect(line).toBe(
+      "Goblin — 2d20kh1+4 (adv: (DM)): 11 ~7~ (rolled for you) + 4 = 15 (physical)",
+    );
+  });
+
   test("FR-DICE-26 multi-roll entry: one line, one part per roll", () => {
     expect(
       text(

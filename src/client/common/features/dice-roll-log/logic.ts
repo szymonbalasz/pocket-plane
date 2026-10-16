@@ -227,6 +227,11 @@ export interface FormSlot {
   base: ManualSlot;
   /** "Extra critical dice: 4d6"; null = no crit on this slot. */
   extra: ManualSlot | null;
+  /**
+   * The slot is rolled as a crit (FR-DICE-31: a natural 20 typed first, or `crit: true`), also
+   * when it fell back to the crit expression itself. MOD's bonus dice double on it (FR-MOD-18).
+   */
+  crit: boolean;
 }
 
 export interface FormOptions {
@@ -278,17 +283,17 @@ export function formSlots(
   for (const [i, slot] of base.entries()) {
     const crit = o.crit ? crits[i] : natural20 && i > 0 ? crits[i - 1] : undefined;
     if (!crit) {
-      out.push({ base: slot, extra: null });
+      out.push({ base: slot, extra: null, crit: o.crit === true || (natural20 && i > 0) });
       continue;
     }
     const extra = critExtra(slot.expression, crit);
     if (extra) {
-      out.push({ base: slot, extra });
+      out.push({ base: slot, extra, crit: true });
       continue;
     }
     const swapped = manualSlots([crit], "normal");
     if (typeof swapped === "string") return swapped;
-    out.push({ base: swapped[0] as ManualSlot, extra: null });
+    out.push({ base: swapped[0] as ManualSlot, extra: null, crit: true });
   }
   return out;
 }
@@ -481,6 +486,22 @@ export function formEntries(slots: readonly FormSlot[], inputs: readonly SlotInp
     entries.push(mergeCrit(s.base, b.entry, s.extra, e.entry));
   }
   return { ok: true, entries };
+}
+
+/**
+ * FR-MOD-17 (tier 2): a lone d20 slot (no crit group) sends its value as `dice` too, so the
+ * server can tell one d20 from a `2d20kh1` total when an effect changed the mode after the
+ * preview (`conflict` "Effects changed — roll again").
+ */
+export function countedEntries(
+  slots: readonly FormSlot[],
+  entries: readonly ManualEntry[],
+): ManualEntry[] {
+  return entries.map((e, i) => {
+    const s = slots[i];
+    const lone = s && !s.extra && s.base.faces.length === 1 && s.base.faces[0] === 20;
+    return lone && !e.dice ? { ...e, dice: [e.diceTotal] } : e;
+  });
 }
 
 /** FR-DICE-32: the total shown for a group whose total is empty but whose dice are all filled. */

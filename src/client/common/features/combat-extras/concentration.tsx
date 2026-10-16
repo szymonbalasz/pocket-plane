@@ -16,6 +16,7 @@ import {
 } from "@shared/combat-extras/schemas";
 import { d20Expression } from "@shared/combat-tracker/rules";
 import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
+import type { RollSubject } from "@shared/effect-modifiers/schemas";
 import {
   concentrationSaveBonus,
   type DefinitionRecord,
@@ -25,7 +26,7 @@ import {
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { BrainIcon, EyeIcon, EyeOffIcon } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { create } from "zustand";
 import { Button } from "../../components/ui/button";
 import { Switch } from "../../components/ui/controls";
@@ -39,7 +40,7 @@ import {
 } from "../../components/ui/overlays";
 import { useSync } from "../../sync/store";
 import { useCbtIntent } from "../combat-tracker/store";
-import { RollButton, useRollControl } from "../dice-roll-log/roll-control";
+import { manualPartsOf, RollButton, useRollControl } from "../dice-roll-log/roll-control";
 import { boundTokenIds, tokensOn } from "../notifications/token-cue";
 import { defineNotificationView, type NotificationView } from "../notifications/views";
 import { activeEffects, type CreatureRef, concentrationSaveText } from "./logic";
@@ -140,6 +141,21 @@ function useBonus(effectId: string | undefined): number {
   });
 }
 
+/** FR-MOD-15, -27: the preview subject of a concentration save: a CON save of its creature. */
+function useSaveSubject(effectId: string | undefined): RollSubject | null {
+  const e = useSync((s) =>
+    effectId ? (s.store.records[EFFECT_TYPE]?.[effectId] as EffectView | undefined) : undefined,
+  );
+  return useMemo(() => {
+    const creature = e?.targetCharacterId
+      ? { characterId: e.targetCharacterId }
+      : e?.targetCombatantId
+        ? { combatantId: e.targetCombatantId }
+        : null;
+    return creature ? { creature, roll: "save", ability: "con" } : null;
+  }, [e?.targetCharacterId, e?.targetCombatantId]);
+}
+
 /** P3 glitch 9: the dialog's formula with the effect dice the save will add. */
 function useFormula(effectId: string | undefined, bonus: number, dc: number | null): string {
   return useSync((s) => {
@@ -166,15 +182,18 @@ function RollDialog({ n, close }: { n: NotificationRecord; close: () => void }) 
     p.success ? p.data.dc : null,
   );
   const { send, disabled } = useCbtIntent();
+  const subject = useSaveSubject(p.success ? p.data.effectId : undefined);
   const control = useRollControl({
     expressions: [d20Expression(bonus)],
     category: "saving-throw",
     label: p.success ? `${p.data.targetName} — Concentration save (DC ${p.data.dc})` : undefined,
+    ...(subject ? { subject } : {}),
     onRoll: async (r) => {
       const res = await send(CBTX_INTENTS.rollConcentration, {
         notificationId: n.id,
         mode: r.mode,
         ...(r.manual ? { manual: r.manual[0] } : {}),
+        ...manualPartsOf(r),
         ...(r.public !== undefined ? { public: r.public } : {}),
       });
       if (res !== undefined) close();
