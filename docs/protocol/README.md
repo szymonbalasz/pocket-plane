@@ -1374,9 +1374,23 @@ From [party-board](../specs/party-board.md) (PARTY, `complete`; gate 1 #207, #20
 | `loot-entry` (LOOT) | `kind` + `item`; `qty?` (1–9 999) on item rows only, absent otherwise. `LOOT_ENTRY_KINDS` / `LootEntryKind` in `@shared/events/party-loot` |
 | Fixtures | Units `handout-images` (2 SVGs), `handouts-1` (h1–h5, shares per PARTY §13), `party-items-1` (3 adds; P4 appends the Torch ×2 move to Thorn), `party-second`; bundle `party-board`. Patches only: no sheet field changes |
 
-## 45. Sprint 3: effect modifiers tier 3 (R3)
+## 45. Sprint 3: freeform walls + wall hint (V4)
 
-From [effect-modifiers](../specs/effect-modifiers.md) tier 3 (MOD, `complete`; FR-MOD-12, -26, -36, -41 seam). **Built by `build/mod-tier3`** (R3, sheet lock 2nd after V5). No new intent, event or record type. Data side: [data model §32](../data-model/README.md#32-sprint-3-effect-modifiers-tier-3-r3).
+From [scene-tools](../specs/scene-tools.md) (SCN §14 slice V4). **Built by `build/walls-freeform`** (canvas lock 2nd): client only on the wire side. No new intent, event, record type or field; it uses [§37](#37-sprint-3-vision-core-v0)'s decimal segments and `map.checkMove`. Data side: [data model §32](../data-model/README.md#32-sprint-3-freeform-walls--wall-hint-v4).
+
+| Use | Who | Wire | Rule |
+|---|---|---|---|
+| Freeform walls / doors | DM | `scn.addWalls` / `scn.addDoor` (§37 decimal segments) | A click with Ctrl held sends the pointer's point rounded to 0.01 cell; without Ctrl the nearest vertex. Either way a point within 8 screen px of an existing wall / door endpoint (or a point of the polyline in progress) is that endpoint, exactly (FR-SCN-08, OQ-SCN-24). Points < 0.05 cell from the previous one are dropped client-side (FR-SCN-07) |
+| Player wall hint | player | `map.checkMove {tokenId, col, row}` → `CheckMoveResult` | Sent while the player drags their token, once the previewed cell has held 50 ms, ≥ 100 ms apart (≤ 10 / s), newest cell wins; unmoved → none. Only `hints` with `guard = WALL_GUARD` (`"scene-tools.walls"`, `@shared/scene-tools/schemas`) are drawn. An ack for an older cell, an ended drag or from before a snapshot is dropped; a reject draws nothing (FR-SCN-38) |
+| DM drag hint | DM | none | Local `blockingSegments` on the DM's own structure row (FR-SCN-13); unchanged, drawn red |
+
+- **Leak:** the hint ack goes to its sender only; players still never receive walls (FR-SCN-14).
+- **Client** (canvas lock, no new Konva layer): `scn-structure` draws the player's pieces (`scn-wall-hint`, one Line per piece, attr `segment` = `"x1,y1,x2,y2"`) and the DM's crossed segments (`scn-wall-crossed`, attr `ns`; was `scn-through-wall-segments`); `scn-edit` draws the polyline's points (`scn-draft-point`, id = index, attr `free`; off-grid points are open dots) and `scn-edit-vertex` gains `free`. DOM: `scn-free-chip` (follows the cursor over the canvas while Ctrl is held in Wall / Door mode).
+- **Erase (BL-12):** a click on a door drawn over a wall erases the door first (doors win ties in the 8 px hit test).
+
+## 46. Sprint 3: effect modifiers tier 3 (R3)
+
+From [effect-modifiers](../specs/effect-modifiers.md) tier 3 (MOD, `complete`; FR-MOD-12, -26, -36, -41 seam). **Built by `build/mod-tier3`** (R3, sheet lock 2nd after V5). No new intent, event or record type. Data side: [data model §33](../data-model/README.md#33-sprint-3-effect-modifiers-tier-3-r3).
 
 | Piece | Contract |
 |---|---|

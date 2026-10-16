@@ -3,6 +3,9 @@
 // shows Goblin Ambush; player-1's move through the wall reverts with the Toast and the cell
 // flash; the DM double-clicks d1 open and the move through it succeeds; the door menu unlocks d2
 // (players see it closed throughout); the Structure tool draws a wall and Undo removes it.
+// Sprint 3 (SCN S1-S4): Ctrl free points + the "Free" chip, the endpoint magnet closing a gap with
+// a door, the player's red wall hint while dragging (map.checkMove), the DM's red crossed
+// segments; players never get walls.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, tokenNode } from "./support/konva";
@@ -229,6 +232,168 @@ test("FR-MAP-28 a drag in progress when the connection drops snaps back unsent; 
     "data-scene-id",
     recordId("town", "scene"),
   );
+
+  await player.context().close();
+  await dm.context().close();
+});
+
+/** The newest DM `scene-structure` record seen in `frames` (walls and doors). */
+function latestStructure(frames: string[]): { walls: number[][]; doors: number[][] } | null {
+  let found: { walls: number[][]; doors: number[][] } | null = null;
+  const visit = (v: unknown) => {
+    if (Array.isArray(v)) {
+      for (const x of v) visit(x);
+      return;
+    }
+    if (!v || typeof v !== "object") return;
+    const o = v as Record<string, unknown>;
+    if (Array.isArray(o.walls) && Array.isArray(o.doors)) {
+      found = o as unknown as { walls: number[][]; doors: number[][] };
+    }
+    for (const x of Object.values(o)) visit(x);
+  };
+  for (const f of frames) {
+    try {
+      visit(JSON.parse(f));
+    } catch {
+      // not JSON: skip
+    }
+  }
+  return found;
+}
+
+test("FR-SCN-08 / -38 / -13 freeform walls + magnet door, player wall hint before the drop, DM red crossing (S1–S4)", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const ambush = recordId("battlemap", "scene");
+  const town = recordId("town", "scene");
+  const mira = recordId("battlemap", "token", 0);
+  const goblin = recordId("battlemap", "token", 1);
+
+  const dm = await rolePage(browser);
+  const dmFrames: string[] = [];
+  dm.on("websocket", (ws) => ws.on("framereceived", (f) => dmFrames.push(String(f.payload))));
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const scenes = await openWindow(dm, "map.scenes");
+  await scenes
+    .locator(`[data-testid="map-scene-row"][data-record-id="${ambush}"] button`)
+    .first()
+    .click();
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
+  await dm.getByTestId("map-show-to-players").click();
+  await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
+  await expect.poll(() => attr(dm, "scn-walls", null, "count")).toBe(3);
+
+  const player = await rolePage(browser);
+  const frames: string[] = [];
+  player.on("websocket", (ws) => ws.on("framereceived", (f) => frames.push(String(f.payload))));
+  await player.goto(link("Player 1"));
+  await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+  await expect.poll(() => tokenNode(player, mira)).not.toBeNull();
+
+  const at = (x: number, y: number) => mapToPage(dm, x * 70, y * 70);
+  const ctrlClick = async (x: number, y: number) => {
+    const p = await at(x, y);
+    await dm.mouse.move(p.x, p.y);
+    await dm.keyboard.down("Control");
+    await dm.mouse.move(p.x + 1, p.y);
+    await dm.mouse.move(p.x, p.y);
+    await expect(dm.getByTestId("scn-free-chip")).toBeVisible();
+    await dm.mouse.click(p.x, p.y);
+    await dm.keyboard.up("Control");
+    await dm.mouse.move(p.x + 1, p.y);
+  };
+
+  // S1, 6 rows lower (on screen): (10, 8) → Ctrl (12.4, 9.65), double-click ends; Ctrl
+  // (13.1, 10.8) → (15, 12), double-click.
+  await dm.getByTestId("map-tool-structure").click();
+  await dm.getByTestId("scn-structure-mode-wall").click();
+  const v = await at(10, 8);
+  await dm.mouse.click(v.x, v.y);
+  await expect(dm.getByTestId("scn-free-chip")).toHaveCount(0);
+  await ctrlClick(12.4, 9.65);
+  await expect.poll(() => attr(dm, "scn-draft-point", "1", "free")).toBe(true);
+  expect(await attr(dm, "scn-draft-point", "0", "free")).toBe(false);
+  const e1 = await at(12.4, 9.65); // the magnet takes the double-click onto the free point
+  await dm.mouse.dblclick(e1.x, e1.y);
+  await expect.poll(() => attr(dm, "scn-walls", null, "count")).toBe(4);
+  await ctrlClick(13.1, 10.8);
+  const e2 = await at(15, 12);
+  await dm.mouse.click(e2.x, e2.y);
+  await dm.mouse.dblclick(e2.x, e2.y);
+  await expect.poll(() => attr(dm, "scn-walls", null, "count")).toBe(5);
+  const walls = latestStructure(dmFrames)?.walls ?? [];
+  const w1 = walls.find((w) => w[1] === 10 && w[2] === 8) as number[];
+  const w2 = walls.find((w) => w[3] === 15 && w[4] === 12) as number[];
+  expect(w1).toBeDefined();
+  expect(w2).toBeDefined();
+  expect(Number.isInteger(w1[3]) && Number.isInteger(w1[4])).toBe(false);
+
+  // S2: Door mode, each click 5 px (screen) from a free wall end → exactly on both ends.
+  await dm.getByTestId("scn-structure-mode-door").click();
+  const g1 = await at(w1[3] as number, w1[4] as number);
+  const g2 = await at(w2[1] as number, w2[2] as number);
+  await dm.mouse.click(g1.x + 5, g1.y);
+  await dm.mouse.click(g2.x, g2.y - 5);
+  await expect.poll(() => latestStructure(dmFrames)?.doors.length).toBe(3);
+  const door = latestStructure(dmFrames)?.doors.at(-1) as number[];
+  expect(door.slice(1, 5)).toEqual([w1[3], w1[4], w2[1], w2[2]]);
+
+  // S3 (DM): Goblin dragged across x = 8: red crossed segment + "through wall"; released unmoved.
+  await dm.getByTestId("map-tool-select").click();
+  const gob = (await tokenNode(dm, goblin)) as { x: number; y: number };
+  const west = await mapToPage(dm, 4 * 70 + 35, 6 * 70 + 35);
+  await dm.mouse.move(gob.x, gob.y);
+  await dm.mouse.down();
+  for (let i = 1; i <= 6; i++) {
+    await dm.mouse.move(gob.x + ((west.x - gob.x) * i) / 6, gob.y + ((west.y - gob.y) * i) / 6);
+  }
+  await expect.poll(async () => (await konvaNodes(dm, "scn-wall-crossed")).length).toBe(1);
+  await expect.poll(async () => (await konvaNodes(dm, "scn-through-wall")).length).toBe(1);
+  await dm.mouse.move(gob.x, gob.y, { steps: 6 });
+  await dm.mouse.up();
+  await expect.poll(async () => (await konvaNodes(dm, "scn-wall-crossed")).length).toBe(0);
+  await expect.poll(() => cellOf(dm, goblin)).toEqual({ col: 12, row: 6 });
+
+  // S3 (player): Mira held over (10, 7) → one red piece [8, 7, 8, 8]; back → gone; release unmoved.
+  const m = (await tokenNode(player, mira)) as { x: number; y: number };
+  const to = await mapToPage(player, 10 * 70 + 35, 7 * 70 + 35);
+  await player.mouse.move(m.x, m.y);
+  await player.mouse.down();
+  for (let i = 1; i <= 8; i++) {
+    await player.mouse.move(m.x + ((to.x - m.x) * i) / 8, m.y + ((to.y - m.y) * i) / 8);
+  }
+  await expect.poll(() => attr(player, "scn-wall-hint", null, "segment")).toBe("8,7,8,8");
+  expect(await konvaNodes(player, "scn-wall-hint")).toHaveLength(1);
+  await player.mouse.move(m.x + 80, m.y, { steps: 4 });
+  await expect.poll(async () => (await konvaNodes(player, "scn-wall-hint")).length).toBe(0);
+  await player.mouse.move(m.x, m.y, { steps: 4 });
+  await player.mouse.up();
+  await expect.poll(() => cellOf(dm, mira)).toEqual({ col: 2, row: 7 });
+
+  // S4: Undo ×3 (door, wall, wall) → Goblin Ambush's structure as loaded.
+  await dm.getByTestId("map-tool-structure").click();
+  for (let i = 0; i < 3; i++) await dm.getByTestId("scn-undo").click();
+  await expect.poll(() => attr(dm, "scn-walls", null, "count")).toBe(3);
+  await expect.poll(() => latestStructure(dmFrames)?.doors.length).toBe(2);
+
+  // Leak strings: players never get walls.
+  const raw = frames.join("\n");
+  expect(raw).not.toContain('"walls"');
+
+  // Leave the bundle as loaded: Town shown.
+  await dm.getByTestId("map-tool-select").click();
+  const again = await openWindow(dm, "map.scenes");
+  await again
+    .locator(`[data-testid="map-scene-row"][data-record-id="${town}"] button`)
+    .first()
+    .click();
+  await dm.getByTestId("map-show-to-players").click();
+  await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", town);
 
   await player.context().close();
   await dm.context().close();
