@@ -1,33 +1,72 @@
 # Proposed — Rule triggers: conditional, event-driven modifiers (class features like Divine Fury)
 
-- Status: proposed. **Need decided by the DM (decision #203, 2026-10-16)**; the sprint-3 effect-modifiers spec agent writes Options / Decision; the integrator numbers it when the DM accepts it at sprint-3 gate 1
+- Status: **proposed**. Need decided by the DM (decision #203, 2026-10-16). Options and **picks** below are the sprint-3 effect-modifiers spec's suggestions for gate 1, **not decided**; the integrator numbers this ADR when the DM accepts it
 - Date: 2026-10-16
-- Refines: [ADR-0038](0038-effect-modifiers.md) (effect modifiers: static roll-time riders via `rollHooks`), [ADR-0035](0035-combat-rule-hooks.md) (combat rule hooks in the causing command's transaction), [ADR-0016](0016-domain-events-pending-actions.md) (domain events)
+- Refines: [ADR-0038](0038-effect-modifiers.md) (effect modifiers: static roll-time riders via `rollHooks`), [ADR-0035](0035-combat-rule-hooks.md) (combat rule hooks in the causing command's transaction), [ADR-0016](0016-domain-events-pending-actions.md) (domain events), [ADR-0037](0037-split-attack-damage.md) (a card's damage may be rolled after its to-hit)
 - Not a plugin system ([ADR-0007](0007-product-scope.md) Out "extension / plugin system"): triggers are data interpreted by built-in code, not user code
-- Affects: [effect-modifiers](../../specs/effect-modifiers.md), [combat-tracker](../../specs/combat-tracker.md), [combat-extras](../../specs/combat-extras.md), [character-sheet-full](../../specs/character-sheet-full.md), [dice-roll-log](../../specs/dice-roll-log.md)
+- Affects: [effect-modifiers](../../specs/effect-modifiers.md) (FR-MOD-32–52), [combat-tracker](../../specs/combat-tracker.md), [combat-extras](../../specs/combat-extras.md), [character-sheet-full](../../specs/character-sheet-full.md), [dice-roll-log](../../specs/dice-roll-log.md), dice-extras, compendium, [notifications](../../specs/notifications.md), [AGENTS §9.9](../../../AGENTS.md#99-shared-files)
 
 ## Context
 
 - MOD tier 1 applies static parts (bonus dice, flat bonuses) to every matching roll while an effect is active.
 - The DM's table needs conditional riders. Reference case (#203), **Zealot barbarian, Divine Fury**: while raging, the first creature hit on each of the barbarian's turns with a weapon attack takes **+1d6 + half the barbarian level** radiant (or necrotic) damage. "There are going to be a lot of customisations like this", so the model must be general.
+- A hit is only known when the DM applies a card (#134, #136); the damage is rolled earlier, at the card (ADR-0037). Cards are notifications: player-safe payload, no DM-only part.
+- CON-44: the heavy DM snapshot has 8 KB above the 100 KiB headroom guard (measured, MOD §12).
 
 ## What a trigger needs (from the reference case)
 
-| Part | Divine Fury |
-|---|---|
-| Owner / source | A character feature or preset on the character (toggled with Rage) |
-| Requires | An active effect (Rage) |
-| Event | An attack that **hits** (the hit is decided at apply by the DM, #134 / #136; or at the card) |
-| Filter | Weapon attack; the attacker is the owner |
-| Frequency | **Once per turn** (first hit on each of the owner's turns); resets on the owner's turn start |
-| Effect | Add a damage part `1d6 + floor(classLevel(barbarian) / 2)` of type radiant / necrotic |
-| Formula vars | Class level, total level, ability modifiers, proficiency bonus |
-| Visibility / undo | Like other modifier parts (#190 rules); undo restores the once-per-turn charge |
+| Part | Divine Fury | Model (MOD §8.4) |
+|---|---|---|
+| Owner / source | A feature of the character | `rule-trigger` row on a character or a monster definition |
+| Requires | An active effect (Rage) | `requires.preset` = the effect's `presetKey` |
+| Event | An attack that **hits** | `on: hit` (also `roll`, `turnStart`) |
+| Filter | Weapon attack, on the owner's turn | `when: [via weapon, ownTurn]` (+ crit, mode, target marked / hurt, `ask`) |
+| Frequency | Once per turn | `every: turn` (each / round / encounter / a feature's uses) |
+| Effect | Damage part `1d6 + floor(level(barbarian) / 2)` radiant | `then: {do: damage, formula, type}` (+ roll part, mode, reminder) |
+| Visibility / undo | As modifier parts; undo restores the charge | per-trigger `public`; window keys + use rows |
 
-## Open for the spec agent (options + pick for gate 1)
+## Decision 1 — Where triggers run
 
-- Where triggers run: on domain events after commit (listener) vs inside the causing command's transaction (rule-hook style, ADR-0035; crash-safe, undoable) vs at roll time (rollHooks) with "on hit" decided later at apply.
-- Trigger record shape (event, filters, requires, frequency, effect, formula) and a small expression language for formulas (no arbitrary code).
-- Per-turn / per-round / per-rest counters and their reset points; interaction with undo and Prev.
-- Presets for common class features (Divine Fury, Sneak Attack once per turn, Hunter's Mark on the marked target, Colossus Slayer…), hand-editable.
-- How the DM sees and overrides an applied trigger part on the card / popup.
+| Option | Pros | Cons |
+|---|---|---|
+| A. Everything at apply: `cbt.applyCard` rolls the extra dice for each hit target | Hit known exactly; one place | The player never rolls those dice (physical dice, 3D tray); the popup can't show the number before apply; crit handled twice |
+| **B. Offered at the damage roll, settled at apply (pick)**: MOD's roll hook rolls a passing `hit` trigger with the card's damage and records it as an **offered** part (card + server-only use row); `cbt.applyCard` runs a new append-only **`applyHooks`** registry per target that lands each ticked part on one hit target and spends the charge; `cbt.undo` runs the hook's `revert` | Both steps in the causing command's transaction (ADR-0035): crash-safe, undoable; the player rolls with their damage; the DM sees the number and overrides it; crit doubling comes free | A card can show a part that never lands (miss, charge used by another card first → `conflict`, DM unticks or forces); two hook points |
+| C. Post-commit listener on `AttackApplied` issues a follow-up command | Decoupled | Contradicts ADR-0035 (no post-commit writes; crash gap); the hit's damage and the extra land in two steps; undo can't see it |
+
+**Pick B.** `roll` triggers (parts on the owner's own roll) run in the same roll hook and land at once; `turnStart` reminders run in a `combatRuleHooks` `turnChanged` line on Next and only `notify` (rules still never change HP by themselves, ADR-0016).
+
+## Decision 2 — Trigger data and formula
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. A `rule-trigger` table (owner = character or monster definition; `rule` JSON leaf: event, requires, filters, frequency, effect) + a hand-rolled formula grammar in `@shared` (pick)** | Passive features (Sneak Attack) and monster traits have a home; one strict zod; formula whitelist by construction, no dependency (mathjs removed, #151) | New table, record type, editor; we own ~150 lines of parser + tests |
+| B. Triggers as a new modifier kind inside presets / effects | No new table | Passive triggers need always-on effects cluttering Active effects; per-combatant monster counters have no home |
+| C. A dependency for formulas: `jsep` (MIT, ~10 KB min, parser only) or `expr-eval` (MIT, ~25 KB, evaluator) | Less parser code | A dependency needs the DM; still our whitelist / sandbox review (expr-eval had prototype-access issues) |
+
+**Pick A.** Grammar: integers, `+ − * /`, parentheses, dice terms (`NdM`, `(expr)dM`, M ∈ 4–12, only as top-level addends), variables `level`, `prof`, `cr`, `str`…`cha`, functions `floor`, `ceil`, `min`, `max`, `steps`, `level(<class>)`; rounds down; evaluates to a FR-DICE-01 expression. Unsupported shapes (positions, weapon properties, creature types) are **`ask`** filters: the DM confirms in the popup.
+
+## Decision 3 — Counters, resets, undo, Prev
+
+| Option | Pros | Cons |
+|---|---|---|
+| **A. Window keys + server-only `trigger_use` rows (pick)**: a charge is free iff no `used` row for (trigger, owner combatant, encounter, key); key = turn `t:<round>:<turnCombatantId>` / round / encounter; `feature` frequency spends a CHARX use | Next / new round "reset" with no write; Prev returns to the old turn's uses as they were; Undo flips one row (and refunds a feature use); 0 B in the snapshot | Rows grow per encounter (DB only, ~0.6 KB each); a stale popup meets a `conflict` instead of a live "used" marker |
+| B. Counter columns reset by the `turnChanged` hook | Simple reads | Prev must restore pre-reset values; per-combatant monster counters; more writes on every Next |
+| C. Charges on the effect row (e.g. Rage) | No table | No home for passive or monster triggers |
+
+**Pick A.**
+
+## Decision 4 — Authoring, override, visibility
+
+- **Authoring (pick):** DM; the owner for their own character unless the sheet is locked (as character presets, FR-MOD-07). Monster (definition) triggers: DM only. Rejected: DM only; owner proposes + DM approves.
+- **Presets (pick):** six built-ins as code (Divine Fury, Sneak Attack, Hunter's Mark, Colossus Slayer, Martial Advantage, Regeneration), own words; compendium entries may later carry a `TriggerRule` (MOD's zod).
+- **Override (pick):** chips per target in the DM's popup: tick, value edit, own multiplier (typed parts get their own defense preset), target Select; Force after a "used" conflict. Rejected: fold into the total; a second card.
+- **Visibility (pick):** trigger rows to the DM and the owner; use rows never sent; part labels in public lines iff the trigger is `public` (default on for character triggers, off for monster triggers → "(DM)"); values public like any roll part (#190).
+
+## Consequences
+
+- AGENTS §9.9 append-only list gains `src/server/features/combat-tracker/apply-hooks.ts` (`applyHooks`) and `src/client/dm/features/combat-tracker/popup-parts.ts` (`popupParts`), both created empty by `fix/rt-core`; MOD adds lines to the existing `rollHooks`, `combatRuleHooks`, notification kinds / views, token menu, `creatureActions` and definition-changed hook registries.
+- dice-roll-log: `RollSubject.card`, hook result `offered`, pre-roll `modes()` (tier 2), part `type`, `manualParts`. combat-tracker: card `damage.triggers`, `applyCard.targets[].triggers`, `hp_change.triggerParts`, typed outcome parts. CHARX: `refundFeatureUse` beside `spendFeatureUse`.
+- ADR-0016's "rules → pending actions" gains: rule triggers add **offered parts** the DM settles, and reminders; never post-commit writes.
+- Glossary: Rule trigger, Offered part, Formula, Trigger window, Apply hook (MOD OQ-MOD-37).
+- CON-44: R costs ≈ 30.5 KB in the realistic-heavy DM snapshot (measured); the 100 KiB guard needs the DM's call (MOD OQ-MOD-28).
+- Not covered (later): damage-taken / end-of-turn events, conditions or saves on hit, rerolls, position-aware filters, triggers created automatically from class or spell data.
