@@ -5,7 +5,8 @@
 // loaded pair.
 import { afterEach, describe, expect, test } from "bun:test";
 import { defineEvent } from "@shared/events";
-import type { ServerFrame } from "@shared/protocol/frames";
+import { type EventFrame, ServerFrame } from "@shared/protocol/frames";
+import { SyncConnection } from "@ui/sync/connection";
 import { z } from "zod";
 import { defineCommand } from "../commands/commands";
 import { startTestServer, TEST_SECRET, type TestClient, type TestServer } from "../testing/harness";
@@ -287,6 +288,69 @@ describe("ADR-0042 over real sockets", () => {
       expect.objectContaining({ op: "upsert", data: expect.objectContaining({ text: "changed" }) }),
     ]);
     expect(pc1.gap).toBe(false);
+  });
+
+  test("FR-SYNC-19 / FR-SYNC-21 the sync client applies an empty event: seq advances, no store change, no resync", async () => {
+    const { seed } = await setup();
+    const dmc = await h.live({ role: "dm", secret: TEST_SECRET });
+    // The real client over a real socket: frames go through the `ServerFrame` schema.
+    const sent: string[] = [];
+    const received: ServerFrame[] = [];
+    const conn = new SyncConnection({
+      credential: { role: "player", token: seed.p1.linkToken },
+      url: h.url,
+      probe: () => true,
+      onWake: () => () => {},
+      onChange() {},
+      createSocket: (url) => {
+        const ws = new WebSocket(url);
+        const send = ws.send.bind(ws);
+        ws.send = (d) => {
+          sent.push(String(d));
+          send(d);
+        };
+        ws.addEventListener("message", (e) => received.push(JSON.parse(String(e.data))));
+        return ws;
+      },
+    });
+    const waitFor = async (ok: () => boolean) => {
+      const end = performance.now() + 2000;
+      while (!ok()) {
+        if (performance.now() > end) throw new Error("timed out");
+        await Bun.sleep(5);
+      }
+    };
+    const probeEvent = async (n: number): Promise<EventFrame> => {
+      const of = () =>
+        received.filter(
+          (f): f is EventFrame => f.type === "event" && f.cause.name === "ProbeTouched",
+        );
+      await waitFor(() => of().length >= n);
+      const f = of()[n - 1] as EventFrame;
+      await waitFor(() => conn.snapshot.store.seq >= f.seq);
+      return f;
+    };
+    try {
+      conn.start();
+      await waitFor(() => conn.snapshot.state === "live");
+      dmc.intent("viewprobe.touch", { id: "A:p1" });
+      const before = conn.snapshot.store.records;
+      const e1 = await probeEvent(1);
+      expect(ServerFrame.parse(e1)).toMatchObject({ changes: [] });
+      expect(conn.snapshot.store.seq).toBe(e1.seq);
+      expect(conn.snapshot.store.records).toBe(before);
+      dmc.intent("viewprobe.touch", { id: "A:p1", text: "changed" });
+      const e2 = await probeEvent(2);
+      expect(e2.seq).toBe(e1.seq + 1);
+      expect(conn.snapshot.store.seq).toBe(e2.seq);
+      expect(conn.snapshot.store.records["view-probe"]?.["A:p1"]).toMatchObject({
+        text: "changed",
+      });
+      expect(sent.some((d) => JSON.parse(d).type === "resync")).toBe(false);
+      expect(received.filter((f) => f.type === "snapshot")).toHaveLength(1);
+    } finally {
+      conn.stop();
+    }
   });
 
   test("FR-FOG-43 DM snapshot has no view-as rows; loadViewAs returns that player's rows only; not_found across campaigns", async () => {

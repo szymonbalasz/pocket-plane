@@ -97,7 +97,7 @@ Every frame is a JSON object; field **`type`** names the frame (CON-14).
 | Frame | Payload | Visibility | Source |
 |---|---|---|---|
 | `snapshot` | `seq: 0`, `you {campaignId, role, playerId}`, `records {<type>: Record[]}` | Each type's fn; scopes per §4 | FR-SYNC-08/09, SYNC §9 |
-| `event` | `seq`, `cause {name, intentId?}`, `changes[]` of `{type, id, op: upsert \| delete, data?}` | Each type's fn + transition matrix (§3.4). `intentId` on the sender connection's copy only | FR-SYNC-17/19/21, SYNC §9 |
+| `event` | `seq`, `cause {name, intentId?}`, `changes[]` of `{type, id, op: upsert \| delete, data?}`; `changes` may be **empty** (all identical upserts, §37): the client only advances `seq` | Each type's fn + transition matrix (§3.4). `intentId` on the sender connection's copy only | FR-SYNC-17/19/21, SYNC §9 |
 | `signal` | `name`, `data`, `from {role, playerId?}` (server-stamped from the sender's connection context, never the payload) | Every **other** live connection of the sender's campaign; never the sender (§7) | FR-SYNC-22, [ADR-0026](../architecture/adr/0026-signal-routing.md) |
 | `ack` | `intentId`, `result?` | Sender only | FR-SYNC-14 |
 | `reject` | `intentId \| null`, `code`, `message`, `issues?` | Sender only | FR-SYNC-14, SYNC §9 |
@@ -1190,7 +1190,7 @@ From [fog-of-war](../specs/fog-of-war.md) v2 (FOG, `complete`; gate 1 #207, #208
 
 | Piece | Contract |
 |---|---|
-| Identical-upsert drop (FR-SYNC-19 amended, OQ-FOG-37) | `RecordRegistry.classifyChange(change, viewer)` → wire change \| `"same"` \| null: `visible → visible` whose wire data (after `redact` / `dmRedact`) is deep-equal for that connection = `"same"` (dropped). Stateless before / after compare, **per change**. The hub sends nothing when no change passes the matrix (FR-SYNC-17); an event whose surviving changes were all dropped still goes out **empty** (keeps `seq`). `filterChange` = the wire change or null; `filterChanges(changes, v) → {changes, touched}` |
+| Identical-upsert drop (FR-SYNC-19 amended, OQ-FOG-37) | `RecordRegistry.classifyChange(change, viewer)` → wire change \| `"same"` \| null: `visible → visible` whose wire data (after `redact` / `dmRedact`) is deep-equal for that connection = `"same"` (dropped). Stateless before / after compare, **per change**. The hub sends nothing when no change passes the matrix (FR-SYNC-17); an event whose surviving changes were all dropped still goes out **empty** (keeps `seq`); the frame schema allows `changes: []` and the client advances `seq` with no store change and no `resync`. `filterChange` = the wire change or null; `filterChanges(changes, v) → {changes, touched}` |
 | `dmRedact?(record)` on registration | The DM's `full` wire: strips server-only copies. `token` (`seenBy`), `scene-prop` / `aoe-template` (`seenBy`), `scene-structure` (`doorSeen`), `fog` (darkness `seenBy`), `fog-explored` / `vision` (`campaignId`) |
 | `derived?: true` | No table; `snapshot` computes rows (`vision`); commands list before / after |
 | `snapshot(src, v, scope?: {sceneId})` | A scene load passes the scene; providers may return only its rows |
