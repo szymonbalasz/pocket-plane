@@ -1,6 +1,7 @@
 // Roll-control routing and the tray (DICEX §13 unit, DOM tests as `sheet-render.test.tsx`): static
 // server render over a fake sync store; handlers called directly on the captured control.
 import { afterEach, describe, expect, test } from "bun:test";
+import { prepareExpression } from "@shared/dice-roll-log/grammar";
 import type { RollMode } from "@shared/dice-roll-log/schemas";
 import { emptyStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -354,5 +355,39 @@ describe("FR-DICEX-29 DiceText", () => {
     expect(actorFor({ entityId: "gob" }, p1, entities)).toBeUndefined();
     expect(actorFor({ entityId: "gob" }, dm, entities)).toEqual({ entityId: "gob" });
     expect(actorFor(null, dm, entities)).toBeUndefined();
+  });
+});
+
+describe("FR-DICEX-05 tray mode", () => {
+  test("FR-DICEX-05 mode resets after a roll", () => {
+    const req: TrayRequest = {
+      kind: "free",
+      expression: "1d20",
+      mode: "normal",
+      category: "other",
+    };
+    diceExtras.stage(req);
+    diceExtras.setMode("advantage");
+    const rolls: RollMode[] = [];
+    trayControlOptions(req, "1d20", diceExtras.api.getState().mode, (r) => {
+      rolls.push(r.mode);
+    }).onRoll({ mode: "advantage" });
+    expect(rolls).toEqual(["advantage"]);
+    // Adv doesn't stick: the next tray roll (a 50d6) is a normal roll the server accepts.
+    const { mode } = diceExtras.api.getState();
+    expect(mode).toBe("normal");
+    expect(prepareExpression("50d6", mode).ok).toBe(true);
+    expect(trayControlOptions(req, "50d6", mode, () => {}).mode).toBe("normal");
+    diceExtras.failed();
+  });
+
+  test("FR-DICEX-05 a new stage resets the mode to the request's (normal unless preselected)", () => {
+    diceExtras.stage({ kind: "free", expression: "1d20", mode: "normal", category: "other" });
+    diceExtras.setMode("disadvantage");
+    diceExtras.stage({ kind: "free", expression: "2d6", mode: "normal", category: "other" });
+    expect(diceExtras.api.getState().mode).toBe("normal");
+    diceExtras.stage({ kind: "free", expression: "1d20+3", mode: "advantage", category: "other" });
+    expect(diceExtras.api.getState().mode).toBe("advantage");
+    diceExtras.clear();
   });
 });

@@ -12,6 +12,19 @@ import {
   WS_PROBE_PARAM,
 } from "@shared/protocol/frames";
 import {
+  applyLoad,
+  idChunks,
+  idsToRequest,
+  isLoaded,
+  type LazyState,
+  LoadResult,
+  lazyAfterSnapshot,
+  markLoaded,
+  SYNC_LOAD,
+  unmark,
+  wholeToRequest,
+} from "@shared/protocol/lazy";
+import {
   dropTypes,
   LoadSceneResult,
   mergeRecords,
@@ -80,6 +93,12 @@ export interface SyncSnapshot {
    * load in flight. Reset by every snapshot (the caller reloads if View as is still on).
    */
   viewAs: ViewAsState;
+  /**
+   * Lazy types (ADR-0045, FR-SYNC-35): loaded / in-flight / failed `sync.load`s of this snapshot
+   * generation. Reset by every snapshot, which also drops every lazy row (FR-SYNC-37). Consumers
+   * decide "is it there" with `isLoaded`, never by presence in the store.
+   */
+  lazy: LazyState;
 }
 
 export interface ConnectionOptions {
@@ -166,6 +185,7 @@ export class SyncConnection {
     everLive: false,
     scenes: { loaded: [], loading: [] },
     viewAs: viewAsAfterSnapshot(),
+    lazy: lazyAfterSnapshot(0),
   };
   private readonly clock: Clock;
   private wakeOff: (() => void) | null = null;
@@ -323,6 +343,83 @@ export class SyncConnection {
     });
   }
 
+  /**
+   * Lazy types (ADR-0045, FR-SYNC-35): `sync.load` a whole type (`ids` undefined) or ids. An id
+   * load requests only ids not yet loaded, in flight or failed (a whole-type load covers every
+   * id), in chunks of ≤ 50, one load in flight per chunk. Each ack replaces the type's rows /
+   * those ids in frame order and marks them loaded; a reject marks them failed (not retried
+   * until `retryLoad` or the next snapshot). An answer for an older snapshot generation is
+   * dropped. Returns null when nothing is sent (not live, or nothing left to request).
+   */
+  load(type: string, ids?: readonly string[]): Promise<void> | null {
+    const { state, lazy } = this.snap;
+    if (state !== "live" || !this.ws) return null;
+    if (ids === undefined) return wholeToRequest(lazy, type) ? this.sendLoad(type) : null;
+    const want = idsToRequest(lazy, type, ids);
+    if (want.length === 0) return null;
+    return Promise.all(idChunks(want).map((chunk) => this.sendLoad(type, chunk))).then(() => {});
+  }
+
+  /** Clears the failed mark of `type` / `ids` and loads them again (FR-SYNC-35 retry). */
+  retryLoad(type: string, ids?: readonly string[]): Promise<void> | null {
+    const { lazy } = this.snap;
+    const failed = ids === undefined ? unmark(lazy.failed, type) : unmark(lazy.failed, type, ids);
+    // A failed whole-type load also covers the ids; retrying ids clears it too.
+    const cleared = ids === undefined ? failed : unmark(failed, type);
+    if (cleared !== lazy.failed) this.set({ lazy: { ...lazy, failed: cleared } });
+    return this.load(type, ids);
+  }
+
+  /** Whether `type` (or one id of it) is loaded in this snapshot generation. */
+  isLoaded(type: string, id?: string): boolean {
+    return isLoaded(this.snap.lazy.loaded, type, id);
+  }
+
+  private sendLoad(type: string, ids?: string[]): Promise<void> {
+    const generation = this.snap.lazy.generation;
+    const intentId = crypto.randomUUID();
+    const current = () => generation === this.snap.lazy.generation;
+    const lazy = this.snap.lazy;
+    this.set({ lazy: { ...lazy, loading: markLoaded(lazy.loading, type, ids) } });
+    return new Promise((resolve, reject) => {
+      const fail = (err: Error) => {
+        if (current()) {
+          // A disconnect is no reject: left unloaded, the next snapshot's generation reloads.
+          const rejected = !(err instanceof IntentRejected && err.code === "disconnected");
+          const l = this.snap.lazy;
+          this.set({
+            lazy: {
+              ...l,
+              loading: unmark(l.loading, type, ids),
+              failed: rejected ? markLoaded(l.failed, type, ids) : l.failed,
+            },
+          });
+        }
+        reject(err);
+      };
+      this.pending.set(intentId, {
+        resolve: (result) => {
+          if (!current()) return resolve();
+          const parsed = LoadResult.safeParse(result);
+          if (!parsed.success) return fail(new IntentRejected("invalid", "Bad load result"));
+          const l = this.snap.lazy;
+          this.set({
+            store: applyLoad(this.snap.store, type, ids, parsed.data.records),
+            lazy: {
+              ...l,
+              loaded: markLoaded(l.loaded, type, ids),
+              loading: unmark(l.loading, type, ids),
+            },
+          });
+          resolve();
+        },
+        reject: fail,
+      });
+      const payload = ids === undefined ? { type } : { type, ids };
+      this.ws?.send(JSON.stringify({ type: "intent", intentId, name: SYNC_LOAD, payload }));
+    });
+  }
+
   /** FR-FOG-43: View as off: drops the loaded pair's rows (and any load in flight). */
   clearViewAs(): void {
     const { viewAs, store } = this.snap;
@@ -404,6 +501,7 @@ export class SyncConnection {
       case "snapshot": {
         this.attempt = 0;
         this.epoch += 1;
+        // Lazy types are in no snapshot, so replacing the store drops every lazy row (FR-SYNC-37).
         const store = applySnapshot(frame);
         this.set({
           state: "live",
@@ -412,6 +510,7 @@ export class SyncConnection {
           everLive: true,
           scenes: sceneWindowAfterSnapshot(store),
           viewAs: viewAsAfterSnapshot(),
+          lazy: lazyAfterSnapshot(this.snap.lazy.generation + 1),
         });
         return;
       }

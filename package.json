@@ -19,6 +19,7 @@
     "state:digest": "bun scripts/state-digest.ts"
   },
   "dependencies": {
+    "cannon-es": "~0.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.4",
@@ -33,6 +34,7 @@
     "sharp": "^0.35.5",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0",
+    "three": "~0.186.0",
     "zod": "^4.6.6",
     "zustand": "^5.0.15"
   },

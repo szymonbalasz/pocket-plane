@@ -1,4 +1,4 @@
-// Throw zone rendering (FR-DICEX-09, -12, -17, -21 flat): static render of the runtime companion
+// Throw zone rendering (FR-DICEX-09, -12, -17, -18, -21 flat): static render of the runtime companion
 // inside a shell with no windows (1280×720), over a fake sync store.
 import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
 import { throwDice } from "@shared/dice-extras/throw";
@@ -29,6 +29,7 @@ afterAll(() => {
 });
 afterEach(() => {
   diceExtras.failed();
+  diceExtras.done(diceExtras.api.getState().leaving?.seq ?? -1);
   diceExtras.done(diceExtras.api.getState().current?.seq ?? -1);
 });
 
@@ -132,4 +133,54 @@ test("FR-DICEX-14 more than 20 dice → '+N more'", () => {
   const html = render();
   expect(html.match(/data-testid="dicex-throw-die"/g)).toHaveLength(20);
   expect(html).toContain("+5 more");
+});
+
+test("FR-DICEX-18 an interrupted throw snaps to rest and fades", () => {
+  const a = throwDice([entry()]);
+  const b = throwDice([
+    entry({
+      id: "e2",
+      n: 2,
+      payload: [
+        {
+          ...entry().payload[0],
+          rollId: "r2",
+          expression: "2d8",
+          dice: [
+            { faces: 8, value: 7, kept: true },
+            { faces: 8, value: 1, kept: true },
+          ],
+          constant: 0,
+          total: 8,
+        },
+      ],
+    }),
+  ]);
+  if (!a || !b) throw new Error("no throw");
+  diceExtras.play(a);
+  const first = diceExtras.api.getState().current?.seq ?? -1;
+  // A moving throw: no settled faces, no total yet.
+  expect(render()).toMatch(/data-record-id="e1"[^>]*data-state="moving" data-interrupted="false"/);
+  diceExtras.play(b);
+  const html = render();
+  // The old throw stays, snapped to rest: settled faces = values, total shown, fading out.
+  const old = html.match(/<div data-testid="dicex-throw" data-record-id="e1"[^>]*>/)?.[0] ?? "";
+  expect(old).toContain('data-state="rest" data-interrupted="true"');
+  expect(old).toContain("opacity-0");
+  const settled = [
+    ...html.matchAll(/data-entry-id="e1"[^>]*data-value="(\d+)"[^>]*data-settled="(\d+)"/g),
+  ];
+  expect(settled.map((m) => [m[1], m[2]])).toEqual([
+    ["9", "9"],
+    ["2", "2"],
+  ]);
+  expect(html).toContain("17");
+  // The new one starts moving.
+  expect(html).toMatch(/data-record-id="e2"[^>]*data-state="moving" data-interrupted="false"/);
+  expect(html).not.toMatch(/data-entry-id="e2"[^>]*data-settled/);
+  // The fade ends: only the new throw is left.
+  diceExtras.done(first);
+  const after = render();
+  expect(after).not.toContain('data-record-id="e1"');
+  expect(after).toContain('data-record-id="e2"');
 });

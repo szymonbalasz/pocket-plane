@@ -3,6 +3,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { z } from "zod";
 import { useSync } from "../../sync/store";
+import { useThreeD } from "./lazy3d";
 
 export const RenderSetting = z.enum(["3d", "flat", "off"]);
 export type RenderSetting = z.infer<typeof RenderSetting>;
@@ -11,12 +12,6 @@ export const DiceSettings = z.object({ render: RenderSetting, others: z.boolean(
 export type DiceSettings = z.infer<typeof DiceSettings>;
 
 export const DEFAULT_SETTINGS: DiceSettings = { render: "3d", others: true };
-
-/**
- * 3D dice are slice D3 (lazy `three` chunk, ADR-0044). Until then a `3d` setting draws flat, as a
- * throw does while the chunk loads (DICEX §7 "States").
- */
-export const THREE_D_AVAILABLE = false;
 
 export function settingsKey(campaignId: string, role: "dm" | "player", playerId: string | null) {
   return `pp.dicex.v1.${campaignId}.${role === "dm" ? "dm" : playerId}`;
@@ -124,9 +119,11 @@ export function useDiceSettings(): {
     },
     [key],
   );
+  // FR-DICEX-21 / -22: 3D needs WebGL and a chunk that hasn't failed this session.
+  const threeD = useThreeD().available;
   const render = effectiveRender(settings.render, {
     reducedMotion: prefersReducedMotion(),
-    threeD: THREE_D_AVAILABLE,
+    threeD,
   });
   return { settings, render, set };
 }
