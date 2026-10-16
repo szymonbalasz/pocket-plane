@@ -73,7 +73,7 @@ describe("FR-MOD-12 uses left", () => {
     });
     expect(presetUses({ usesFeatureId: "gone" }, f)).toEqual({ state: "broken" });
     expect(
-      presetUses({ usesFeatureId: "f-rage" }, [{ ...f[0], usesMax: undefined, used: 0 }]),
+      presetUses({ usesFeatureId: "f-rage" }, [{ ...RAGE_ROW, usesMax: undefined, used: 0 }]),
     ).toEqual({ state: "broken" });
     expect(presetUses({ usesFeatureId: "f-rage" }, undefined)).toEqual({ state: "broken" });
   });

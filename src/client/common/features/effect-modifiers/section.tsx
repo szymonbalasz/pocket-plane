@@ -214,7 +214,6 @@ function ToggleRow({
               data-state="ok"
               data-value={`${uses.left}/${uses.max}`}
               className="text-muted-foreground"
-              title={`${uses.name} uses left`}
             >
               {" "}
               {uses.left} / {uses.max}
