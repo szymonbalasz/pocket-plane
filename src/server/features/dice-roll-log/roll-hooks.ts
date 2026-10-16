@@ -9,9 +9,10 @@
 // subject roll: keep them to indexed reads of the creature's rows.
 //
 // Rule triggers (ADR-0043, R0 types; R1 wires `modes()` / `manualParts`, R4 MOD's offers): a hook
-// may also export `modes()` (asked before the base d20 is rolled), return `offered` parts (rolled
-// via `rollExtra`, **not** in the total; the caller puts them on the damage `roll` item and the
-// card) and DM-only `notes`. Until `dice.evaluate` reads them, they are ignored.
+// may also export `modes()` (asked before the base d20 is rolled; FR-MOD-17), return `offered`
+// parts (rolled via `rollExtra`, **not** in the total; the caller puts them on the damage `roll`
+// item and the card) and DM-only `notes`. `dice.evaluate` fills each part's and offer's per-die
+// `dice` from the row `rollExtra` made (FR-MOD-19, D9).
 import type { ManualPart, RollCategory } from "@shared/dice-roll-log/schemas";
 import type { PartDamageType, RollSubject } from "@shared/effect-modifiers/schemas";
 import type { CommandEnv } from "../../commands/commands";
@@ -87,10 +88,14 @@ export interface RollHookBase {
   category: RollCategory;
   source: RollSource;
   /**
-   * Rolls `expression` (e.g. "1d4") with `ctx.dice` as its own `roll` row: same actor, target,
-   * category and source as the base, `label` as given, mode normal, never manual.
+   * Rolls `expression` (e.g. "1d4") as its own `roll` row: same actor, target, category and
+   * source as the base, `label` as given, mode normal. FR-MOD-18: `key` names the part's physical
+   * group (`e:<effectId>` | `t:<triggerId>`); with a matching `manualParts` group the row is that
+   * manual entry (`manual: true`), else `ctx.dice`. `e:` is strict on a physical roll that sent
+   * groups (`conflict` "Effects changed — roll again"); `t:` never fails (unfit → rolled). A
+   * part is `auto` iff the base is manual and its row is not.
    */
-  rollExtra(expression: string, label: string): Roll;
+  rollExtra(expression: string, label: string, key?: string): Roll;
   /**
    * FR-MOD-18 (tier 2 / T): the intent's physical groups for bonus and offered trigger dice
    * (`e:<effectId>` / `t:<triggerId>`); absent = none sent.

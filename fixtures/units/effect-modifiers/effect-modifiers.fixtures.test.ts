@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { closeDb } from "@server/db/client";
 import { combatant, effect, effectPreset, encounter, entity } from "@server/db/schema";
+import { builtinPreset } from "@shared/effect-modifiers/presets";
 import { asc } from "drizzle-orm";
 import { loadBundle } from "../../index";
 
@@ -109,9 +110,9 @@ describe("effect-modifiers fixtures (MOD §13)", () => {
         null,
       ],
     ]);
-    expect(presets[2]?.modifiers).toEqual([
-      { kind: "flat", on: { roll: "damage", via: "weapon" }, value: 2 },
-    ]);
+    // Built tiers decide fixture contents (FR-MOD-05): tier 2 adds Rage's adv STR and resistances.
+    expect(presets[2]?.modifiers).toEqual(builtinPreset("rage")?.modifiers);
+    expect(presets[2]?.modifiers).toHaveLength(4);
     const enc = db.select().from(encounter).get();
     expect({ round: enc?.round, turn: anchor(enc?.turnCombatantId ?? null) }).toEqual({
       round: 1,

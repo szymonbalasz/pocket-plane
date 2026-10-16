@@ -17,9 +17,10 @@ import { dice, type EvaluatedRoll } from "../dice-roll-log";
 /**
  * A card roll with the roll's parts: `total` includes them, `mods` lists them (player-safe).
  * More than `CARD_MODS_MAX` parts → `conflict` (the card would outgrow its payload cap).
+ * Per-die `dice` stay on the roll entry only (FR-MOD-19, D9: no card bytes).
  */
 export function withCardMods<T extends CardRoll>(card: T, r: EvaluatedRoll): T {
-  const mods = dice.rollPayloadItem(r).mods;
+  const mods = dice.rollPayloadItem(r).mods?.map(({ dice: _dice, ...m }) => m);
   if (!mods || !r.mods) return card;
   if (mods.length > CARD_MODS_MAX) {
     throw conflict(`At most ${CARD_MODS_MAX} effect modifiers on an attack or damage roll`);

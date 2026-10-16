@@ -188,14 +188,16 @@ export type DmOfferedPart = z.infer<typeof DmOfferedPart>;
 
 /**
  * FR-MOD-18 (tier 2 / T): one physical dice group for a bonus die or an offered trigger die, sent
- * on a roll intent beside the base `manual` entry. `key` = `e:<effectId>` | `t:<triggerId>`.
- * `e:` groups must match the committed bonus dice (else `conflict`); `t:` groups never conflict
- * (a surplus one is ignored; an offered trigger without one is server-rolled, `auto`).
+ * on a roll intent beside the base `manual` entry. `key` = `e:<effectId>` | `t:<triggerId>`;
+ * an effect with several dice parts on one roll keys each `e:<effectId>.<index>` (`bonusDieKey`,
+ * `@shared/effect-modifiers/rules`). `e:` groups must match the committed bonus dice (else
+ * `conflict`); `t:` groups never conflict (a surplus one is ignored; an offered trigger without
+ * one is server-rolled, `auto`).
  */
 export const ManualPartKey = z
   .string()
-  .max(66)
-  .regex(/^[et]:[^\s]{1,64}$/, "Key: e:<effectId> or t:<triggerId>");
+  .max(70)
+  .regex(/^[et]:[^\s]{1,68}$/, "Key: e:<effectId> or t:<triggerId>");
 export const ManualPart = z.strictObject({ key: ManualPartKey, entry: ManualEntry });
 export type ManualPart = z.infer<typeof ManualPart>;
 export const ManualParts = z
