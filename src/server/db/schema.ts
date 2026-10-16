@@ -8,6 +8,7 @@ import {
   EFFECT_KINDS,
 } from "@shared/combat-extras/schemas";
 import { HP_MODES, type HpTriggerPart } from "@shared/combat-tracker/schemas";
+import { COMPENDIUM_KINDS } from "@shared/compendium/schemas";
 import type { Modifier } from "@shared/effect-modifiers/schemas";
 import { TRIGGER_USE_STATES } from "@shared/effect-modifiers/trigger-records";
 import type { TriggerRule } from "@shared/effect-modifiers/triggers";
@@ -1165,6 +1166,67 @@ export const mapSettings = sqliteTable("map_settings", {
   updatedAt: text("updated_at").notNull(),
 });
 
+/**
+ * Compendium source (compendium §8, FR-CMP-04; global, ADR-0046): one row per imported source.
+ * Attribution is stored once here; entries carry the source key. `counts` = the last import's
+ * entries per kind.
+ */
+export const compendiumSource = sqliteTable("compendium_source", {
+  key: text("key").primaryKey(),
+  name: text("name").notNull(),
+  licence: text("licence").notNull(),
+  attribution: text("attribution").notNull(),
+  url: text("url"),
+  /** SHA-256 of the bundled files + `ADAPTER_VERSION` (fixtures may use a label, e.g. `mini`). */
+  version: text("version").notNull(),
+  importedAt: text("imported_at").notNull(),
+  counts: text("counts", { mode: "json" }).$type<Record<string, number>>().notNull(),
+});
+
+/**
+ * Compendium entry (compendium §8, FR-CMP-01–03): imported (global: `campaign_id` null, source +
+ * source key set, read-only) or homebrew (campaign, no source, never `monster`). `facets` /
+ * `body` are JSON leaves validated by `@shared/compendium` per kind; not a record type (no WS).
+ */
+export const compendiumEntry = sqliteTable(
+  "compendium_entry",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id").references((): AnySQLiteColumn => campaign.id),
+    kind: text("kind", { enum: COMPENDIUM_KINDS }).notNull(),
+    source: text("source").references((): AnySQLiteColumn => compendiumSource.key),
+    sourceKey: text("source_key"),
+    name: text("name").notNull(),
+    /** Lower-case NFC name: homebrew uniqueness (FR-CMP-02) and search ranking. */
+    nameKey: text("name_key").notNull(),
+    line: text("line").notNull(),
+    facets: text("facets", { mode: "json" }).notNull(),
+    body: text("body", { mode: "json" }).notNull(),
+    /** Lower-case plain text for search's text match (FR-CMP-10). */
+    searchText: text("search_text").notNull(),
+    /** Upsert change detection (FR-CMP-07). */
+    dataHash: text("data_hash").notNull(),
+    /** Monster entries: the imported creature definition (FR-CMP-03). */
+    definitionId: text("definition_id").references((): AnySQLiteColumn => entity.id),
+    shared: integer("shared", { mode: "boolean" }).notNull().default(false),
+    /** Plain id, no FK (informational). */
+    derivedFromId: text("derived_from_id"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    importedAt: text("imported_at"),
+  },
+  (t) => [
+    // FR-CMP-02: imported provenance unique (nulls for homebrew).
+    uniqueIndex("compendium_entry_source_key").on(t.source, t.sourceKey),
+    // FR-CMP-02: homebrew names unique ci per (campaign, kind); imported names don't count.
+    uniqueIndex("compendium_entry_campaign_kind_name")
+      .on(t.campaignId, t.kind, t.nameKey)
+      .where(sql`campaign_id is not null`),
+    index("compendium_entry_kind_name").on(t.kind, t.nameKey),
+    index("compendium_entry_campaign").on(t.campaignId),
+  ],
+);
+
 /** CON-20: `seq` for props and templates, computed by the DB inside the insert's transaction. */
 export const propSeqNext = sql<number>`(select coalesce(max(${prop.seq}), 0) + 1 from ${prop})`;
 export const aoeTemplateSeqNext = sql<number>`(select coalesce(max(${aoeTemplate.seq}), 0) + 1 from ${aoeTemplate})`;
@@ -1203,4 +1265,6 @@ export const schema = {
   prop,
   aoeTemplate,
   mapSettings,
+  compendiumSource,
+  compendiumEntry,
 };
