@@ -14,10 +14,11 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Lazy record types | `fix/lazy-records` (w3Y, slot 5) | build-lazy-records | Building | Review → merge → R4, P core, C2 |
 | D1 dice tray | — | — | Merged (892819e, #214) | R2 builds on it |
 | D1 follow-up: Alt staging | — | — | Merged (83fd7e8) | — |
-| D3 3D dice | `build/dicex-3d` (w3R, slot 3) | fix-dicex-3d | Walkthrough PASS except FR-DICEX-18 (interrupted throw vanishes); fixing | Re-test step → merge |
+| D3 3D dice | — | — | Merged (af44317, #217) | D2 looks core after C1 |
 | R early: formula + rule zod + presets | — | — | Merged (2d6d4c8) | R0 builds on it |
 | C early: bundled SRD 5.1 + adapter | — | — | Merged (5b5aeb5, #213) | C1 wires it |
 | P early: party-board pure `@shared` | — | — | Merged (fc24c39) | P core |
+| V1 fog shapes + darkness (static) | `build/fog-shapes` (w3Z, slot 0) | build-fog-shapes | Building | Walkthrough → merge → V4 ∥ V2 |
 | Queue | — | — | V5 → V1 → (V4 ∥ V2) → V3; R0 → R1 ∥ R4 → R2 / R3 / R5–R7; `fix/lazy-records` → P core → P2 ∥ P3 → P4; C1 → C2 → C3, C4; D3, D2, D4 | Per locks below |
 | Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | BL-06 (#206), BL-02 (#211) merged | Per §3a |
 
@@ -26,7 +27,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 - `fix/rt-core`: `src/server/db/` (schema 2nd), MOD events, dice-roll-log types, CBT `hp.ts` + schemas + popup shell call site, new `apply-hooks.ts` / `popup-parts.ts`.
 - `build/sheet-senses`: character-sheet folder (sheet lock 1st).
 - `fix/lazy-records`: `src/server/ws/`, `src/shared/protocol/`, client sync store.
-- `build/dicex-3d`: `package.json`, `bun.lock`.
+- `build/fog-shapes`: canvas lock 1st (MapCanvas, layers registry, canvas-tools append), fog events.
 - Order after: schema R0 → P core → C1 → D2; canvas V1 → V4 → V3; sheet V5 → R3 → R6 → C2 → D4 → P4 / C4; combat R0 → R7 → C2; dice-roll-log client R2 (after R1); `evaluate.ts` R1.
 
 ## Pending DM decisions

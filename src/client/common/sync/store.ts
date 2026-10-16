@@ -1,5 +1,12 @@
 // Zustand binding for the sync connection. One per client app.
 import type { Credential } from "@shared/protocol/frames";
+import {
+  idsToRequest,
+  isLoaded,
+  type LazyStatus,
+  lazyStatus,
+  wholeToRequest,
+} from "@shared/protocol/lazy";
 import { emptyStore, recordsOf } from "@shared/protocol/store";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import { createStore, type StoreApi, useStore } from "zustand";
@@ -42,6 +49,53 @@ export function useRecords<T>(type: string): T[] {
 
 export function useHasType(type: string): boolean {
   return useSync((s) => s.store.records[type] !== undefined);
+}
+
+export interface LazyRecords<T> {
+  /** Loaded rows only (the type's, or those of `ids`); never rows merely present in the store. */
+  rows: T[];
+  state: LazyStatus;
+  /** Loads the failed part again (after `error`). */
+  retry(): void;
+}
+
+/** Sorted, deduplicated id key: a stable dependency for an id list. */
+const idKey = (ids: readonly string[] | undefined) =>
+  ids === undefined ? null : JSON.stringify([...new Set(ids)].sort());
+
+/**
+ * A lazy record type (ADR-0045, FR-SYNC-35): `useLazyRecords(type)` loads the whole type,
+ * `useLazyRecords(type, ids)` those ids (only ids not yet loaded, chunks of ≤ 50). Loads once per
+ * snapshot generation while live; `loading` until loaded, `error` after a reject (`retry`).
+ */
+export function useLazyRecords<T>(type: string, ids?: readonly string[]): LazyRecords<T> {
+  const connection = useSync((s) => s.connection);
+  const live = useSync((s) => s.state === "live");
+  const lazy = useSync((s) => s.lazy);
+  const byId = useSync((s) => s.store.records[type]);
+  const key = idKey(ids);
+  const want = useMemo(() => (key === null ? undefined : (JSON.parse(key) as string[])), [key]);
+  const needs =
+    want === undefined ? wholeToRequest(lazy, type) : idsToRequest(lazy, type, want).length > 0;
+  useEffect(() => {
+    if (live && needs) connection.load(type, want)?.catch(() => {});
+  }, [connection, live, needs, type, want]);
+  const rows = useMemo(() => {
+    if (!byId) return [];
+    const keep = want === undefined ? null : new Set(want);
+    return Object.entries(byId)
+      .filter(([id]) => (keep === null || keep.has(id)) && isLoaded(lazy.loaded, type, id))
+      .map(([, r]) => r as T);
+  }, [byId, lazy.loaded, type, want]);
+  const retry = useCallback(() => {
+    connection.retryLoad(type, want)?.catch(() => {});
+  }, [connection, type, want]);
+  return { rows, state: lazyStatus(lazy, type, want), retry };
+}
+
+/** Whether `type` (or one id of it) is loaded in this snapshot generation (FR-SYNC-35). */
+export function useIsLoaded(type: string, id?: string): boolean {
+  return useSync((s) => isLoaded(s.lazy.loaded, type, id));
 }
 
 /**
