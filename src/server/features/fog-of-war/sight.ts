@@ -22,7 +22,7 @@ import {
 import { sightOccluders } from "@shared/scene-tools/geometry";
 import { footprint } from "@shared/scenes-map/geometry";
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
-import { entity, sceneFog, sceneStructure, token } from "../../db/schema";
+import { entity, sceneStructure, token } from "../../db/schema";
 import { type Logger, silentLogger } from "../../log";
 import type { SceneRead } from "../scenes-map/visibility-hooks";
 import { visionCache } from "./vision-cache";
@@ -34,6 +34,11 @@ export function setFogLogger(l: Logger) {
   log = l;
 }
 export const fogLog = () => log;
+
+let computed = 0;
+
+/** Test support: how many sights were computed (cache misses, FR-FOG-38). */
+export const sightsComputed = () => computed;
 
 /** One vision source (FR-FOG-32). */
 export interface SourceToken extends VisionSource {
@@ -166,6 +171,7 @@ export function sceneSight(
     if (!vision) {
       occ ??= sceneOccluders(read, inputs.sceneId, inputs.darkness);
       vision = playerVision(occ, list);
+      computed++;
       cache.set(inputs.sceneId, p, { key, vision });
     }
     out.set(p, { key, sources: list, vision });
@@ -186,12 +192,4 @@ function sceneOccluders(
     .get();
   const segs = s ? sightOccluders(s) : [];
   return prepareScene(segs, darkness);
-}
-
-/** The scene's fog `rev` (no row: −1, so a later row at rev 0 never shares a key). */
-export function fogRevOf(read: SceneRead, sceneId: string): number {
-  return (
-    read.select({ rev: sceneFog.rev }).from(sceneFog).where(eq(sceneFog.sceneId, sceneId)).get()
-      ?.rev ?? -1
-  );
 }

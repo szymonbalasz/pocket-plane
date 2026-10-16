@@ -493,8 +493,11 @@ export function fogCommands(log: Logger) {
         ownerPlayerId: before.ownerPlayerId,
         invisible,
       });
+      // `invisible` is on the DM wire only: `updatedAt` moves with `fogged` alone, so a player who
+      // keeps seeing the token gets nothing (FOG §9 change table).
+      const touched = fogged !== (before.fogged === true) ? { updatedAt: env.ctx.clock.iso() } : {};
       tx.update(token)
-        .set({ invisible, fogged, seenBy, updatedAt: env.ctx.clock.iso() })
+        .set({ invisible, fogged, seenBy, ...touched })
         .where(eq(token.id, tokenId))
         .run();
       const after = readToken(tx, tokenId);

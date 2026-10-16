@@ -5,9 +5,11 @@ import { expect } from "bun:test";
 import { rmSync } from "node:fs";
 import { closeDb, type Db, openFileDb } from "@server/db/client";
 import { entity, player, scene, token } from "@server/db/schema";
+import type { Actor, DispatchedEvent } from "@server/events/types";
 import { toTokenRecord } from "@server/features/scenes-map/rows";
 import { startTestServer, type TestClient, type TestServer } from "@server/testing/harness";
-import { TEST_SECRET } from "@server/testing/services";
+import { createTestServices, TEST_SECRET } from "@server/testing/services";
+import type { Viewer } from "@server/ws/records";
 import { convergence, leakScan } from "@server/ws/testing/convergence";
 import {
   FOG_INTENTS as F,
@@ -23,6 +25,7 @@ import type { ServerFrame } from "@shared/protocol/frames";
 import { SCN_INTENTS } from "@shared/scene-tools/schemas";
 import {
   MAP_INTENTS as I,
+  MAP_INTENTS,
   MAP_SIGNALS,
   TOKEN_TYPE,
   type TokenRecord,
@@ -207,7 +210,12 @@ export async function visionHarness() {
       for (const type of [TOKEN_TYPE, FOG_TYPE, VISION_TYPE, FOG_EXPLORED_TYPE]) {
         expect(conv.live[type] ?? {}).toEqual(conv.fresh[type] ?? {});
       }
-      const fr = fresh.raw();
+      // A combatant row may name a token the player can't see (accepted leak, FOG §11, OQ-FOG-25 B).
+      const fr = JSON.stringify(
+        fresh.frames.map((f) =>
+          f.type === "snapshot" ? { ...f, records: { ...f.records, combatant: [] } } : f,
+        ),
+      );
       for (const t of hiddenNow) expect(fr).not.toContain(t.id);
       if (hiddenNow.some((t) => t.name === "Goblin Lurker"))
         expect(fr).not.toContain("Goblin Lurker");
@@ -282,3 +290,87 @@ export function explores(r: FogExploredRecord | undefined, col: number, row: num
   }
   return false;
 }
+
+/**
+ * The `vision` bundle on in-process services (no sockets): Goblin Ambush active, commands run as
+ * the DM (or a player), every dispatched event captured, snapshots per viewer.
+ */
+export async function visionServices() {
+  const loaded = await loadBundle("vision", { dmSecret: TEST_SECRET, testMode: true });
+  const db: Db = openFileDb(loaded.config.dbPath);
+  const s = createTestServices({ db });
+  const events: DispatchedEvent[] = [];
+  s.bus.subscribe("test-capture", (e) => events.push(e));
+  const players = db.select().from(player).all();
+  const pid: Record<Who, string> = {
+    p1: players.find((r) => r.name === "Player 1")?.id as string,
+    p2: players.find((r) => r.name === "Player 2")?.id as string,
+  };
+  const scenes = db.select().from(scene).all();
+  const sceneId = (name: string) => scenes.find((x) => x.name === name)?.id as string;
+  const ambushId = sceneId("Goblin Ambush");
+  const campaignId = scenes[0]?.campaignId as string;
+  const dmActor: Actor = { role: "dm", playerId: null, campaignId };
+  const actor = (w: Who): Actor => ({ role: "player", playerId: pid[w], campaignId });
+  const run = <R = unknown>(name: string, input: unknown, a: Actor = dmActor) =>
+    s.commands.run(name, input, { actor: a }) as R;
+  const viewer = (w: Who | "dm"): Viewer =>
+    w === "dm"
+      ? { connId: "dm", campaignId, role: "dm", playerId: null }
+      : { connId: w, campaignId, role: "player", playerId: pid[w] };
+  const snapshot = (w: Who | "dm") =>
+    s.records.snapshot({ db: s.db, presence: { list: () => [] } }, viewer(w));
+  const tokenRow = (name: string, on = ambushId) =>
+    db
+      .select()
+      .from(token)
+      .all()
+      .find((x) => x.name === name && x.sceneId === on) as typeof token.$inferSelect;
+  const charId = (name: string) =>
+    db
+      .select()
+      .from(entity)
+      .all()
+      .find((e) => e.name === name && e.kind === "character")?.id as string;
+  const last = () => events.at(-1)?.event;
+  /** `[type, id-or-name]` of the last event's changes (token ids → names). */
+  const changesOf = (e = last()) =>
+    (e?.changes ?? []).map((c) => {
+      const t = db
+        .select()
+        .from(token)
+        .all()
+        .find((x) => x.id === c.id);
+      return `${c.type}:${t ? t.name : c.id === `${ambushId}:${pid.p1}` ? "p1" : c.id === `${ambushId}:${pid.p2}` ? "p2" : c.id}`;
+    });
+  run(MAP_INTENTS.activateScene, { sceneId: ambushId });
+  const stop = () => {
+    closeDb(db);
+    try {
+      rmSync(loaded.dir, { recursive: true, force: true });
+    } catch {
+      // Windows may hold the WAL briefly; a leftover temp dir is harmless.
+    }
+  };
+  return {
+    s,
+    db,
+    events,
+    pid,
+    sceneId,
+    ambushId,
+    campaignId,
+    dmActor,
+    actor,
+    run,
+    viewer,
+    snapshot,
+    tokenRow,
+    charId,
+    last,
+    changesOf,
+    stop,
+  };
+}
+
+export type VisionServices = Awaited<ReturnType<typeof visionServices>>;

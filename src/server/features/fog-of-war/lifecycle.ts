@@ -107,7 +107,9 @@ export const fogSceneHook: SceneHook = {
 export const fogPlayerHook: PlayerHook = {
   name: "fog-of-war.player-membership",
   added(env, p): RecordChange[] {
-    return markScenesStale(env, p.campaignId).flatMap((id) => rederiveScene(env, id));
+    return markScenesStale(env, p.campaignId).flatMap((id) =>
+      rederiveScene(env, id, { players: [p.id] }),
+    );
   },
 };
 
@@ -134,7 +136,7 @@ export function fogRederive(env: SceneHookEnv, change: RecordChange): RecordChan
     const owners = [b?.ownerPlayerId, a?.ownerPlayerId].filter((p): p is string => !!p);
     return mergeChanges(
       [...scenes].flatMap((id) =>
-        rederiveScene(env, id, { sourceChange: { before: b, after: a }, memoryOf: owners }),
+        rederiveScene(env, id, { sourceChange: { before: b, after: a }, players: owners }),
       ),
     );
   }
@@ -161,7 +163,7 @@ const sensesKey = (e: EntityRecord) => {
 export function fogSensesHook(env: HookEnv, before: EntityRecord, after: EntityRecord) {
   if (sensesKey(before) === sensesKey(after)) return [];
   const rows = env.tx
-    .select({ sceneId: token.sceneId, campaignId: token.campaignId })
+    .select({ sceneId: token.sceneId, campaignId: token.campaignId, owner: token.ownerPlayerId })
     .from(token)
     .where(
       and(
@@ -175,7 +177,10 @@ export function fogSensesHook(env: HookEnv, before: EntityRecord, after: EntityR
   const first = rows[0];
   if (!first) return [];
   const scenes = [...new Set(rows.map((r) => r.sceneId))];
+  const players = [...new Set(rows.map((r) => r.owner as string))];
   return mergeChanges(
-    markScenesStale(env, first.campaignId, scenes).flatMap((id) => rederiveScene(env, id)),
+    markScenesStale(env, first.campaignId, scenes).flatMap((id) =>
+      rederiveScene(env, id, { players }),
+    ),
   );
 }

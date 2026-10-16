@@ -124,3 +124,9 @@ export function visionCache(read: object): VisionCacheView {
 
 /** Test support: the number of committed entries (LRU). */
 export const visionCacheSize = () => lru.size;
+
+/** Test support: a restart (memory only, FR-FOG-38). */
+export function clearVisionCache() {
+  lru.clear();
+  pending.clear();
+}
