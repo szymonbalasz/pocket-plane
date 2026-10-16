@@ -1,11 +1,312 @@
 ---
 title: Compendium
 prefix: CMP
-status: claimed
+status: in-review
 owner: spec-compendium
 phase: post-mvp-3
 ---
 
 # Compendium
 
-> TODO (spec phase): expand from [_template.md](_template.md) (sprint 3, track C).
+> **Guideline:** five-minute read. Picks marked **bold** in §15 are suggestions for DM gate 1, not decisions. Measured figures come from a throwaway probe on the realistic-heavy harness and real SRD 5.1 data (Open5e v1, document `wotc-srd`), deleted before commit.
+
+## 1. Summary
+
+- A searchable library of SRD 5.1 rules content (**monsters, spells, items, conditions, class features**), imported offline from data bundled in the repo, plus per-campaign **homebrew**. DM decision [#203](../decisions-log.md); system = 5e 2014 SRD ([#23](../decisions-log.md)).
+- Imported entries are **global and read-only**; the DM edits by **cloning** (other kinds) or **deriving** (monsters) into the campaign ([ADR-0018](../architecture/adr/0018-global-imported-content.md), [ADR-0010](../architecture/adr/0010-compendium-design.md) option i). Completes ADR-0010's scope as option A: [proposed-compendium-scope](../architecture/adr/proposed-compendium-scope.md).
+- **Nothing from the compendium is in a snapshot.** Entries are read on demand over REST; imported creature definitions become a lazy record type (CON-44: all 322 SRD monsters would add 341 KB to the heavy DM snapshot).
+
+## 2. Scope
+
+- **C1 core:** tables, kind schemas, Open5e adapter over recorded responses, bundled source `srd-5.1`, import command (atomic, idempotent, in-place update), fixtures.
+- **C2 read:** REST search / get for DM and players with per-role visibility; `imported-entity` loads on demand; creature lookups search the server.
+- **C3 window:** Compendium window (both clients), entry views, DM import button, DM token menu **Stat block** *(proposed, OQ-CMP-10)*.
+- **C4 homebrew:** homebrew entries (spells, items, conditions, features), clone, derive a monster from an entry (traits copied to the NPC sheet), **Add to sheet**, class-feature seam for rule-trigger presets.
+
+## 3. Goals
+
+- The DM finds any SRD monster or spell in ≤ 2 keystrokes' worth of typing and drops it into play without cloning.
+- One click imports the whole SRD offline in ≤ 2 s; re-import never touches DM work.
+- Players can read rules (spells, items, conditions, features) and never learn monsters or unshared homebrew.
+- Zero bytes added to any snapshot.
+
+## 4. Non-goals
+
+- Open5e download at runtime, SRD 5.2 (2024), 5etools (→ [compendium-expansion](post-mvp/compendium-expansion.md)), homebrew **files**, Griffon's Saddlebag, AI paste ([ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md)): each is a later adapter or form helper.
+- Races, backgrounds, feats, rules chapters (rules quick reference, tier B); structured editors per kind (homebrew is one text form).
+- A rules engine: entries never change rolls or effects by themselves; presets are [effect-modifiers](effect-modifiers.md)' (OQ-CMP-14).
+- Overlays / patches on imported entries (ADR-0010 option C); per-campaign imports (option B). Deleting imported entries.
+
+## 5. User stories
+
+**DM**
+- As the DM, I want to search "goblin", see the full SRD stat block and drag it onto the map or into an encounter as is.
+- As the DM, I want to derive "Goblin Sneak" from the SRD goblin with its traits copied, so my NPC keeps Nimble Escape.
+- As the DM, I want my homebrew items hidden from players until I tick "Shared".
+- As the DM, I want "Stat block" on a monster token's menu.
+
+**Player**
+- As a player, I want to look up Fireball or Poisoned mid-session without leaving the app.
+- As a player, I want to add Sneak Attack from the compendium to my sheet's Features.
+
+## 6. Functional requirements
+
+All writes: one transaction (rows + event-log entry), then the domain event ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)); IDs and time from `ctx` ([AGENTS §9.3](../../AGENTS.md#93-fixtures)). REST errors `{code, message, issues?}` (protocol CON-09).
+
+| ID | Requirement | Notes |
+|---|---|---|
+| **C1 core** | | |
+| FR-CMP-01 | Kind registry in `@shared/compendium`: `monster`, `spell`, `item`, `condition`, `feature`, each a strict zod body + facets schema (§8.1). Entry JSON ≤ 32 KB. Text fields are **markdown-lite** strings (FR-CMP-26). | |
+| FR-CMP-02 | **Imported** entry: `campaignId` null, `source` + `sourceKey` set, read-only; unique `(source, sourceKey)`. **Homebrew** entry: `campaignId` = `ctx.campaignId`, `source` null, kind ≠ `monster`; name unique case-insensitive per campaign and kind (`conflict`). | ADR-0018 |
+| FR-CMP-03 | A `monster` entry holds only reference text (traits, actions text, legendary, senses…). Its playable stat block is an imported **creature definition** (`entity`, same `(source, sourceKey)`) written in the same transaction; the entry links it as `definitionId`. | One creature contract ([ADR-0009](../architecture/adr/0009-entity-content-model.md)) |
+| FR-CMP-04 | Source row per imported source: key, name, licence, attribution, url, `version` (SHA-256 of its bundled files), `importedAt`, counts. Attribution is stored once here; entries carry the source key. | CC BY 4.0 |
+| FR-CMP-05 | **Open5e adapter** (pure, server): recorded Open5e v1 responses → import batch. Keeps only `document__slug = wotc-srd` (also for class archetypes: Open5e mixes in non-SRD subclasses). Monster → creature core: size, AC (≤ 30), HP, `hpFormula` when it fits FR-ENT-25, init = DEX mod, walking speed, six scores, save proficiencies, attacks = actions with an attack bonus and damage dice (≤ 20; damage type from text), CR; everything else → reference text. Class `desc` / SRD subclass split at headings into one `feature` per heading; `level` parsed from "At / Beginning at Nth level", else absent. A field that doesn't fit is dropped and counted as a warning; the record stays. | Measured: 322 / 322 SRD monsters map |
+| FR-CMP-06 | **Bundled source** `srd-5.1`: the recorded responses (monsters, spells, magic items, weapons, armor, conditions, classes; 2.2 MB) + attribution file under `src/server/features/compendium/sources/srd-5.1/`. No network at runtime or in tests. | OQ-CMP-01 |
+| FR-CMP-07 | `cmp.import {source}` (DM): adapter → pipeline core, **one transaction**: validate all → upsert by `(source, sourceKey)` → per record `created` \| `updated` (stored data hash differs) \| `existing`. Any error → nothing written, every issue returned. Result: counts per kind × outcome, warnings. Internal twin `cmp.importRecorded {source descriptor, responses}` (fixtures, tests). | OQ-CMP-11, OQ-FIX-18 |
+| FR-CMP-08 | Events: created monster definition → `EntityImported` (FR-FIX-23); updated imported definition → `ImportedEntityUpdated`, running entities' definition-changed hooks ([FR-ENT-19](entities.md#6-functional-requirements)) so token / combatant display copies follow; then one `CompendiumImported {source, version, counts}` (log `campaignId` null). Nothing created or updated → no event, no log entry. | |
+| FR-CMP-09 | Re-import never touches homebrew, clones, derived customs or NPC sheets (independent copies, ADR-0010 i). Entries missing from a newer source stay unchanged. | OQ-CMP-16 |
+| **C2 read** | | |
+| FR-CMP-10 | `GET /api/compendium/search` `{q ≤ 100, kind?, filters?, cursor?}` → ≤ 50 summaries `{id, kind, name, sourceLabel, line, definitionId?}` + `nextCursor`. Order: name prefix, word start, substring, then (q ≥ 3 chars) text match; ties by name, id. Empty `q` lists by name. | OQ-CMP-09 |
+| FR-CMP-11 | Filters: monster `crMin`/`crMax`, `type`; spell `level`, `school`, `className`; item `category`, `rarity`; feature `className`, `subclass`. Unknown key or value → `invalid`. | |
+| FR-CMP-12 | `GET /api/compendium/entries/:id` → the entry + its source attribution; a monster also carries its definition's stat block. `ETag` = entry `updatedAt` + source `version`. | |
+| FR-CMP-13 | Auth: DM secret, or the player's link token as `Authorization: Player <token>` (CAMP's `resolvePlayerLink`); player of an inactive campaign → `409`. Campaign = the credential's (DM: active campaign). | OQ-CMP-20 |
+| FR-CMP-14 | **Visibility** `entryVisibleTo(entry, viewer)`, one pure fn for both routes: DM: imported + own campaign's homebrew. Player: imported non-monster + own campaign's homebrew with `shared`. Other campaigns: never. Not visible = absent from search; GET → `404 not_found`, same as an unknown id. A player's `kind=monster` → empty page. | OQ-CMP-07; [ADR-0024](../architecture/adr/0024-definition-visibility.md) |
+| FR-CMP-15 | `imported-entity` registers as a **lazy** record type ([proposed lazy record types](../architecture/adr/proposed-lazy-record-types.md), party-board): in no snapshot; DM loads by ids with `sync.load`; players never (audience `dm` unchanged). Live upserts still reach DM connections. | OQ-CMP-04 |
+| FR-CMP-16 | DM client hook `useDefinitions(ids)` returns campaign `entity` rows from the store and imported ones loaded on demand (missing ids in one `sync.load`, ≤ 50 per call, reloaded after each snapshot; `loading` / `ready` / `error`). It replaces every `useRecords("imported-entity")` call (§14). | |
+| FR-CMP-17 | Creature lookups ([FR-CBT-63](combat-tracker.md#6-functional-requirements): builder, Add dialog) and the Creatures window ([FR-ENT-18](entities.md#6-functional-requirements)) take customs from the store and imported monsters from FR-CMP-10 (`kind=monster`, debounced 150 ms); merged with FR-CBT-63's ranking, ≤ 8 suggestions, row and drag data (`{definitionId}`) unchanged. | |
+| **C3 window** | | |
+| FR-CMP-18 | Window `cmp.compendium` in both clients' registries: default closed, launcher "Compendium", 440×560, min 320×360. Search input (debounced 200 ms), kind Tabs (DM: All, Monsters, Spells, Items, Conditions, Features; player: no Monsters), Filters popover, results with **More**, entry view with Back. | [play-shell](play-shell.md) |
+| FR-CMP-19 | Entry views: monster stat block (core from the definition + reference sections), spell, item, condition, feature. Footer: "SRD 5.1 · CC BY 4.0" + **About** dialog with the full attribution; homebrew shows "Homebrew" (+ "Shared" / "DM only" for the DM). | CC BY 4.0 |
+| FR-CMP-20 | DM import panel: no source imported → empty state with **Import SRD 5.1**; imported → "SRD 5.1 · N entries · imported ‹date›" and **Update** when the bundled `version` differs. Click → `POST /api/compendium/import` → Toast with counts, or the error. Button disabled while running. | |
+| FR-CMP-21 | DM: monster result rows are HTML5 drag sources with entities' MIME `{definitionId}` (map drop FR-MAP-13, unchanged). | |
+| FR-CMP-22 | DM token menu entry **Stat block** (registry, [FR-MAP-29](scenes-map.md#6-functional-requirements)) on monster tokens: imported definition → opens `cmp.compendium` on its entry; custom → the NPC sheet ([character-sheet-full](character-sheet-full.md)). Players: no entry. | OQ-CMP-10 |
+| FR-CMP-23 | Results and views read on demand; no live push. A window refetches on open, search and Back; the DM's own writes refetch at once. | OQ-CMP-15 |
+| **C4 homebrew** | | |
+| FR-CMP-24 | `POST` / `PUT /api/compendium/entries[/:id]` (DM) `cmp.putEntry`: homebrew create / whole replace: kind (≠ monster, immutable), name (as [FR-ENT-08](entities.md#6-functional-requirements)), facets, body text ≤ 8,000 chars, `shared` (default false), `derivedFromId?` (a visible entry; informational). Imported id → `forbidden` "Imported entries are read-only. Clone to edit.". `CompendiumEntrySaved`. | |
+| FR-CMP-25 | **Clone** = the homebrew form prefilled from a visible non-monster entry; saving creates an independent entry (no link). `DELETE /api/compendium/entries/:id` (DM): homebrew only (`forbidden` on imported). `CompendiumEntryDeleted`. Sheet rows added from it stay (copies). | ADR-0010 i |
+| FR-CMP-26 | **Markdown-lite**: paragraphs, `**bold**`, `*italic*`, `- ` lists, pipe tables. One client renderer outputs text nodes only, never HTML; the adapter normalises Open5e text to it. | OQ-CMP-13 |
+| FR-CMP-27 | **Derive from a monster entry** (DM): "Derive…" opens the creature form ([FR-CBT-43](combat-tracker.md#6-functional-requirements)) prefilled from the definition; `POST /api/compendium/derive-monster {entryId, entity, copyText}` runs, in one transaction, entities' `createIn` (derive, [FR-ENT-09](entities.md#6-functional-requirements)) and, if `copyText`, the NPC sheet's `features` rows: traits, then actions without a mapped attack, reactions, legendary actions (name ≤ 60, source "SRD 5.1", text clipped to 600 with "…", ≤ 30 rows). `EntityCreated` + the sheet change. "Duplicate NPC" = derive from a custom (exists). | OQ-CMP-08 |
+| FR-CMP-28 | **Add to sheet** (spell, item, feature views): DM picks a campaign character; a player only their own, unless locked ([FR-CHARX-12](character-sheet-full.md#6-functional-requirements)). Sends `char.putRow`: spell → `{name, level, concentration, ritual, roll: none, effect: damage}`; item → `{name, qty 1}`; feature → `{name, source (≤ 40), text (clipped 600)}`. No new server command. | CHARX §8.2 |
+| FR-CMP-29 | **Feature key**: every feature entry exposes `featureKey` = `<source>:<sourceKey>` (homebrew `campaign:<entryId>`) and `className` from the SRD's twelve names, so [effect-modifiers](effect-modifiers.md) can link presets to it. When MOD declares a preset for that key (or the homebrew entry carries one), the view shows "Preset: ‹name›" and Add to sheet also adds it as a character preset. Shape per OQ-CMP-14. | Seam with R |
+| **Cross-cutting** | | |
+| FR-CMP-30 | No compendium row in any snapshot; the CON-44 test imports the full bundled source on the heavy harness and asserts the DM snapshot does not grow (§12). | CON-44 |
+| FR-CMP-31 | Full import of `srd-5.1` ≤ 2 s on the test machine (warn above, fail above 4 s); re-import of an unchanged source ≤ 0.5 s, no writes. | FIX budget style |
+
+## 7. UI/UX notes
+
+Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
+
+- **Window `cmp.compendium`** (FR-CMP-18): top: search Input + Filters Popover (Selects / number inputs per kind) ; Tabs; results as a compact list (name, muted line "CR 1/4 · Small humanoid", "Level 3 evocation", "Rare wondrous item", source Badge `SRD` / `Homebrew`); **More** at the bottom. Entry view replaces the list; Back returns with scroll kept.
+- **Stat block**: header (name, size / type / alignment), AC / HP (formula) / speed row, six scores with mods, saves / skills / senses / languages / CR + XP, then Traits, Actions, Reactions, Legendary sections. DM actions row: **Derive…**, drag handle.
+- **Homebrew form** (Dialog): kind (create only), name, facets per kind, text Textarea with a live markdown-lite preview, **Shared with players** Switch. Clone / Edit / Delete on homebrew views (DM).
+- **Add to sheet**: Popover with a character Select (player: own characters only) → Toast "Added to Mira's Features".
+- **States**: empty "No matches for ‘…’"; nothing imported: DM empty state with Import, player "The DM hasn't set up the compendium yet"; loading skeleton rows; error Toast + retry; disconnected: REST still works, but writes follow the shell's offline rule (buttons disabled while not `live`).
+- **DM view**: everything above + import panel + token menu **Stat block**. **Player view**: no Monsters tab, no Derive / Clone / Edit / import; Add to sheet for own characters.
+- **Test IDs**: `cmp-window`, `cmp-search`, `cmp-filters`, `cmp-tab` (+ `data-value` kind \| `all`), `cmp-result` (+ `data-record-id`, `data-value` = kind), `cmp-more`, `cmp-empty`, `cmp-entry` (+ `data-record-id`), `cmp-back`, `cmp-statblock-<header|scores|traits|actions|reactions|legendary>`, `cmp-attribution`, `cmp-about`, `cmp-import`, `cmp-import-status`, `cmp-update`, `cmp-derive`, `cmp-derive-copy-text`, `cmp-clone`, `cmp-edit`, `cmp-delete`, `cmp-form-<kind|name|text|preview|shared|save>`, `cmp-add-to-sheet`, `cmp-add-to-sheet-character`, `cmp-preset`, `cmp-token-menu-statblock`.
+
+## 8. Data model
+
+| Entity | Field | Type | Notes |
+|---|---|---|---|
+| **Compendium source** (`compendium_source`, global) | key | text PK | `srd-5.1` |
+| | name, licence, attribution, url | text | Attribution once per source (FR-CMP-04) |
+| | version | text | SHA-256 of bundled files |
+| | importedAt | timestamp | `ctx.clock` |
+| | counts | **JSON leaf** `{<kind>: int}` | Last import |
+| **Compendium entry** (`compendium_entry`) | id | ID | `ctx.ids` |
+| | campaignId | ID → Campaign \| null | null = imported (global) |
+| | kind | `monster` \| `spell` \| `item` \| `condition` \| `feature` | Immutable |
+| | source, sourceKey | text → source.key, text \| null | Unique `(source, sourceKey)`; sourceKey `<kind>/<slug>`, e.g. `feature/rogue/sneak-attack` |
+| | name, nameKey | text 1–80, lower NFC | Unique `(campaignId, kind, nameKey)` where homebrew |
+| | line | text ≤ 80 | Summary line, derived at write |
+| | facets | **JSON leaf** (§8.1) | Filters via `json_extract` |
+| | body | **JSON leaf** (§8.1) | ≤ 32 KB |
+| | searchText | text | Lower-case plain text for FR-CMP-10's text match |
+| | dataHash | text | Upsert change detection (FR-CMP-07) |
+| | definitionId | ID → Entity \| null | Monsters only (FR-CMP-03) |
+| | shared | bool | Homebrew only; imported = n/a |
+| | derivedFromId | ID \| null | Informational, no FK |
+| | createdAt, updatedAt, importedAt | timestamp | |
+
+### 8.1 Kinds (facets / body)
+
+| Kind | Facets | Body |
+|---|---|---|
+| monster | `cr`, `type`, `size` | `meta {subtype?, alignment?, armorNote?, speedText?, savesText?, skillsText?, vulnerabilities?, resistances?, immunities?, conditionImmunities?, senses?, languages?}` (text ≤ 200 each); `traits`, `actions`, `bonusActions`, `reactions` 0–40 × `{name ≤ 80, text ≤ 4,000}`; `legendary? {intro, actions[]}` |
+| spell | `level` 0–9, `school`, `classes[]`, `concentration`, `ritual` | `castingTime`, `range`, `components`, `material?`, `duration`, `text`, `higherLevel?` |
+| item | `category` weapon \| armor \| gear \| magic, `rarity?`, `attunement` | `typeLine`, `cost?`, `weight?`, `damage?`, `properties?`, `ac?`, `text` |
+| condition | — | `text` |
+| feature | `className` (SRD class), `subclass?`, `level?` 1–20 | `text`; `preset?` (shape owned by effect-modifiers, opaque here; OQ-CMP-14) |
+
+- **Relations:** source 1—* imported entry; campaign 1—* homebrew entry; monster entry 1—1 imported definition (`entity`); homebrew → base (informational). Sheet rows and derived customs are copies, never linked.
+- **Derived:** `readOnly = source != null`, `line`, `featureKey`, XP (from CR, FR-ENT-03), `sourceLabel`.
+- **Persisted runtime state:** none; the compendium is prep / reference data.
+- **Not a record type:** entries and sources never travel on the WS; only `imported-entity` (entities) does, lazily.
+
+## 9. API & events
+
+**REST (Hono RPC)** — prefix per [OQ-CAMP-15](campaign-management.md#15-open-questions)
+
+| Method | Path | Who | Purpose |
+|---|---|---|---|
+| GET | `/api/compendium/search` | DM, player | FR-CMP-10/11/14 |
+| GET | `/api/compendium/entries/:id` | DM, player | FR-CMP-12/14 |
+| GET | `/api/compendium/sources` | DM | Sources + bundled versions (import panel) |
+| POST | `/api/compendium/import` | DM | `cmp.import {source}` (FR-CMP-07) → `200 {counts, warnings}` |
+| POST / PUT / DELETE | `/api/compendium/entries[/:id]` | DM | Homebrew (FR-CMP-24/25) |
+| POST | `/api/compendium/derive-monster` | DM | FR-CMP-27 → `201 {entity}` |
+
+**WS intents:** none of its own. Uses `sync.load {type: "imported-entity", ids}` (P's lazy ADR) and `char.putRow` (CHARX).
+
+**Domain events** (all logged; none transient or undoable)
+
+| Event | Changes | Visibility rule |
+|---|---|---|
+| `EntityImported` (existing, per created monster) | `imported-entity` upsert | DM only (audience `dm`) |
+| `ImportedEntityUpdated {entityId}` | `imported-entity` upsert + hook-changed instances (FR-ENT-19) | DM; instances per their own fns (players see token copy changes, e.g. size) |
+| `CompendiumImported {source, version, counts}` | none (entries aren't a record type) | DM only; log `campaignId` null |
+| `CompendiumEntrySaved {entryId, kind, shared}` / `CompendiumEntryDeleted {entryId}` | none | DM only |
+| `EntityCreated` + `CharacterSheetEdited` (derive, FR-CMP-27) | as entities / CHARX | as entities / CHARX |
+
+## 10. Permissions
+
+| Action | DM | Player | Server check |
+|---|---|---|---|
+| Search / read imported spells, items, conditions, features | ✓ | ✓ | FR-CMP-13/14 |
+| Read imported monsters, monster definitions | ✓ | ✗ (404 / empty) | FR-CMP-14, ADR-0024 |
+| Read homebrew | ✓ own campaign | own campaign, `shared` only | FR-CMP-14 |
+| Import, homebrew CRUD, clone, derive | ✓ | ✗ (401) | DM secret |
+| Edit / delete imported | ✗ (`forbidden`) | ✗ | FR-CMP-24/25 |
+| Add to sheet | any campaign character | own, unless locked | `char.putRow` (CHARX) |
+
+## 11. Edge cases & failure modes
+
+- **Player disconnect / reconnect:** REST is independent of the WS; open views stay. Campaign deactivated → next request `409`, window shows the shell's waiting state.
+- **DM disconnect / reconnect:** REST unaffected. New snapshot → `useDefinitions` reloads its ids (FR-CMP-16); stale imported rows never linger.
+- **Server crash mid-import:** one transaction → nothing written; restart, click Import again. Crash after commit → complete; re-import is a no-op (FR-CMP-31). Test seam `PP_TEST_CRASH=cmp.import:before-commit` / `:after-commit`.
+- **Concurrent edits:** two imports (two DM tabs) serialise; the second is all `existing`. Homebrew: last whole replace wins. Delete while a player views it → their next fetch is 404 ("No longer available").
+- **Campaign switch:** homebrew of the old campaign leaves DM results; imported entries stay.
+- **Duplicate names:** fixture goblin (source `fixture`) and SRD goblin (`srd-5.1`) both exist after an import; source Badges tell them apart (OQ-CMP-22).
+- **Invalid / malicious input:** strict zod; `q` ≤ 100; cursor opaque and validated; text rendered as text nodes only (FR-CMP-26); recorded sources are repo files, never client input (`cmp.import` takes a source key, not data).
+- **Leaks:** a player never receives a monster entry, a monster definition, unshared homebrew or another campaign's homebrew, in REST bodies, errors or WS frames.
+
+## 12. Performance & bandwidth
+
+Measured with real SRD 5.1 data (Open5e v1 `wotc-srd`) on the realistic-heavy harness (probe deleted):
+
+| Figure | Value |
+|---|---|
+| SRD 5.1 content | 322 monsters, 319 spells, 237 magic items, 37 weapons, 18 armor, 15 conditions, 179 class features (12 classes + 1 SRD subclass each) = **1,127 entries**; raw 1.73 MB (avg monster 2.4 KB, spell 1.7 KB, item 1.1 KB; max 14 KB) |
+| Recorded responses (bundled) | 2.2 MB JSON |
+| Heavy DM snapshot today | 676,044 B (110,388 B under 786,432 B; the fog test keeps ≥ 100 KiB headroom → ~8 KB slack for sprint 3) |
+| **All imported monsters in the snapshot** (today's provider) | +341,079 B → 1,017,123 B: over the ceiling |
+| Per imported definition row | avg 1,058 B, p95 1,237 B, max 1,329 B; 691 B without per-row attribution |
+| Referenced-only alternative (OQ-CMP-04 B) | 20 monsters ≈ 21 KB, 40 ≈ 42 KB (≈ 14 / 28 KB without attribution) |
+| **With picks** (lazy `imported-entity`, REST entries) | DM **−2,002 B** (the two fixture imports leave the snapshot); players 277,032–280,092 B unchanged |
+| Import through the real pipeline | 322 monsters 105 ms; same again (all `existing`) 13 ms |
+| Raw insert of all 1,127 entries (+ FTS index) | 40 ms; full import estimated ≤ 0.5 s incl. parsing |
+| DB size | 3.57 MB measured with raw bodies + an FTS5 index (upper bound); normalised, no FTS: ≈ 2 MB (estimate) |
+| Search | name `LIKE` over 1,127 rows 1.1 ms; FTS5 prefix 0.04 ms (bun:sqlite ships FTS5) |
+| Live import frames | ≈ 341 KB of `imported-entity` upserts to DM connections, once per full import |
+
+- REST: search page ≤ 50 × ~130 B ≈ 7 KB; an entry ≤ 32 KB; `ETag` makes repeat opens free over the tunnel ([ADR-0003](../architecture/adr/0003-local-hosting.md)).
+- `sync.load` of imported definitions: ≤ 50 rows × ≤ 1.3 KB ≈ 66 KB worst case.
+
+## 13. Test plan
+
+Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)); loop per [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md). **No network in any test:** recorded Open5e responses only.
+
+**Fixtures** (owner compendium; [fixtures-adapters §8](fixtures-adapters.md#8-data-model) adds the rows)
+
+| Key | Kind | Requires | Contents |
+|---|---|---|---|
+| `cmp-srd-mini` | setup | — | `cmp.importRecorded` with recorded responses in `fixtures/srd/open5e/` (source `srd-5.1`, version `mini`): monsters Goblin, Hobgoblin, Wolf, Ogre, Adult Red Dragon (legendary); spells Fireball, Cure Wounds, Hunter's Mark, Bless; items Potion of Healing, Bag of Holding, Longsword, Chain Mail; conditions Poisoned, Prone, Grappled; classes Rogue (Sneak Attack), Barbarian (Rage, Path of the Berserker) |
+| `cmp-homebrew` | setup | `cmp-srd-mini` | Fixture Campaign homebrew: item "Moonblade Shard" (shared); item "CMP-SECRET-ITEM" (DM only); spell "Fireball (house)" cloned from Fireball (DM only); feature "Divine Fury (Zealot)", Barbarian, Zealot, level 3, own words (shared) |
+| `cmp-homebrew-second` | setup | `campaign-second` | Activate Second Campaign; item "CMP-SECOND-HOMEBREW" (shared); re-activate Fixture Campaign |
+
+**Bundle `compendium`** = `base` + `player-2` + `campaign-second` + `char-mira` + `char-thorn` + `enemy-1` + `enemy-2` + `enemy-custom` + `images` + `battlemap` + `encounter-1` + `cmp-srd-mini` + `cmp-homebrew` + `cmp-homebrew-second`.
+
+| Level | What | Fixtures |
+|---|---|---|
+| Unit | `FR-CMP-05 adapter`: recorded files → batch; every monster of the **bundled** source maps to the creature core (322 / 322, no network); non-SRD archetypes dropped; features split, `level` parsed (Sneak Attack 1, Rage 1); warnings counted. Kind schemas and limits (FR-CMP-01). `FR-CMP-10 ranking` (prefix > word > substring > text; ties; cursor). `FR-CMP-14 entryVisibleTo` matrix: DM / player × 5 kinds × imported / own shared / own hidden / other campaign. `FR-CMP-26` renderer: no HTML ever (`<script>` stays text) | In-code, `fixtures/srd/open5e/` |
+| Integration | `FR-CMP-07 import idempotency`: mini twice → second all `existing`, no event, no log; edited recorded goblin → `updated`, `ImportedEntityUpdated` with a token's size copy in `changes`; Elite Goblin Warrior (derived) unchanged (FR-CMP-09). Bad record → nothing written, all issues. Crash `cmp.import:before-commit` → zero rows; `:after-commit` → complete; rerun no-op | `compendium` |
+| Integration | `FR-CMP-10/12/13/14 search`: DM "goblin" → Goblin first; player "goblin" → no monsters, `kind=monster` empty, GET Goblin entry 404, GET "CMP-SECRET-ITEM" 404, "CMP-SECOND-HOMEBREW" never; inactive campaign → 409; no credential → 401 | `compendium` |
+| Integration | `FR-CMP-24/25/27 homebrew`: put / replace / delete, `forbidden` on imported, name `conflict`; clone independent; derive-monster: entity + sheet features (Nimble Escape) in one tx, rollback on a bad body | `compendium` |
+| Integration | `FR-CMP-15/30 lazy + CON-44`: DM snapshot holds no `imported-entity`; `sync.load` returns ids; player load hidden; heavy harness + full bundled import → DM snapshot ≤ today's figure, ≥ 100 KiB headroom kept. `FR-CMP-31` timing. **Leak scan** over player REST bodies and WS frames: never "CMP-SECRET-ITEM", "CMP-SECOND-HOMEBREW", "Nimble Escape", "Fireball (house)" | `compendium`, heavy |
+| E2E (thin) | DM opens Compendium, searches "goblin", opens Goblin; `player-1` searches "fire", opens Fireball, has no Monsters tab | `compendium` |
+
+**Browser walkthrough** — `bun run build`, `fixtures:reset-load compendium --profile verify`, `start --profile verify`. Contexts: A DM, B `player-1`, C `player-2`. Player evidence: REST + WS logs from `page.on('response')` / `page.on('websocket')`. Teardown: stop, `fixtures:reset --profile verify`.
+
+| # | DM (A) | Players (B, C) | Expected |
+|---|---|---|---|
+| 1 | Log in, open Compendium | — | "SRD 5.1 · ≈ 51 entries" (the mini set), **Update** shown (bundled version ≠ `mini`) |
+| 2 | Update | — | Toast with counts (≈ 1,076 created, the mini ones `existing`) ≤ 2 s; status "≈ 1,127 entries" (exact figures: the adapter's test) |
+| 3 | Search "goblin"; open Goblin | — | Goblin first, Hobgoblin next; stat block AC 15, HP 7 (2d6), Nimble Escape, Scimitar, Shortbow; attribution footer + About |
+| 4 | Derive… "Goblin Sneak", HP 12, copy text on | — | Creatures window: Goblin Sneak (Custom, derived from Goblin); its NPC sheet Features: Nimble Escape |
+| 5 | Encounters → "Ambush at the Ford": lookup "og" → Ogre (SRD) ×1, "gob" → Goblin Sneak ×2; save | — | Entries listed with CR / XP; Ogre resolves after reload (lazy load) |
+| 6 | Battlemap: drag Hobgoblin from results onto the map; token menu → Stat block | — | Token placed; Compendium opens on Hobgoblin |
+| 7 | — | B: open Compendium; search "fire"; open Fireball; search "moon", "CMP-SECRET" | No Monsters tab; Fireball (Level 3 evocation) but not "Fireball (house)"; Moonblade Shard found; no secret result. B's logs: none of the leak strings, no monster entry |
+| 8 | — | C: Features tab → Rogue "Sneak Attack" → Add to sheet (Thorn) | Thorn's Features: Sneak Attack, source "SRD 5.1" |
+| 9 | Clone Potion of Healing → "Potion of Greater Healing (house)", Shared on | B: search "greater" | B finds it after the search |
+| 10 | Reload all; kill + restart server | All rejoin | Compendium intact; encounter shows Ogre + Goblin Sneak; Stat block works; no console errors |
+
+## 14. Dependencies
+
+| On | What we need | Status |
+|---|---|---|
+| ADR-0009, 0010, 0015, 0018, 0024 | Definitions, re-import safety, pipeline, global imports, definitions DM-only | accepted / [proposed-compendium-scope](../architecture/adr/proposed-compendium-scope.md) |
+| [party-board](party-board.md) / [proposed lazy record types](../architecture/adr/proposed-lazy-record-types.md) | `lazy` global type + `sync.load {type, ids}` (branch `fix/lazy-records`) before C2 | proposed (OQ-CMP-19) |
+| [fixtures-adapters](fixtures-adapters.md) | Pipeline: per-kind stores, `updated` outcome, `cmp.import` as a routed caller of a **bundled** source (amends FR-FIX-20, -24) | OQ-CMP-17 |
+| [entities](entities.md) | `imported-entity` lazy; in-place update of imported rows with hooks; `createIn` for derive; Creatures window search | OQ-CMP-18 |
+| [combat-tracker](combat-tracker.md), [combat-extras](combat-extras.md), [character-sheet-full](character-sheet-full.md) | Call sites move to `useDefinitions`: `CharacterSheet.tsx`, `concentration.tsx`, `add-dialog.tsx`, `combat-tracker/data.ts`, `encounters-window.tsx`, `creatures-window.tsx`; lookup (FR-CBT-63) searches the server; CHARX internal row insert for FR-CMP-27; `char.putRow` | OQ-CMP-18 |
+| [campaign-management](campaign-management.md) | `resolvePlayerLink` usable for REST (`Authorization: Player`) | OQ-CMP-20 |
+| [effect-modifiers](effect-modifiers.md) | Preset ↔ feature key link; preset shape for homebrew features | OQ-CMP-14 |
+| [scenes-map](scenes-map.md), [play-shell](play-shell.md) | Token menu registry; window registries | built |
+| Packages | **None.** Data is bundled JSON (CC BY 4.0 SRD 5.1); no markdown or search library | — |
+
+**Build split** (hotspots per [sprint-3](../agents/sprint-3.md#boundaries-and-hotspots-sequence-these); schema cores V → R → P → **C** → D)
+
+| Slice | Branch | Delivers | Shared files (AGENTS §9.9) |
+|---|---|---|---|
+| C1 core | `fix/cmp-core` | Tables, `@shared/compendium`, adapter, bundled `srd-5.1`, `cmp.import` / `cmp.importRecorded` (**no route yet**), events, fixtures + bundle, FR-CMP-01–09, 31 | `src/server/db/` (2 tables); `src/shared/events/`; pipeline `fixtures-adapters/import-pipeline.ts` (per-kind store, `updated`); entities `import-store.ts` (update in place + hooks); `src/server/features/index.ts`, `fixtures/bundles/index.ts` (append); data-model, protocol |
+| C2 read | `build/compendium-read` | REST search / get + auth, lazy `imported-entity`, `useDefinitions`, server lookups, FR-CMP-10–17, 30 | After `fix/lazy-records`. `src/server/app.ts` (append mount); entities `records.ts`; the six call sites above (character-sheet folder and combat files: **after** R's combat / sheet slices, one at a time) |
+| C3 window | `build/compendium-window` | Window, views, import route + panel, Stat block, FR-CMP-18–23, 26 | `src/client/{dm,player}/windows.ts`, token menu registry (append) |
+| C4 homebrew | `build/compendium-homebrew` | Homebrew, clone, derive-monster, Add to sheet, feature key, FR-CMP-24, 25, 27–29 | CHARX internal row insert (character-sheet folder lock); MOD preset hook per OQ-CMP-14 |
+
+- C1 has no route on purpose: the import UI must not ship before C2 makes `imported-entity` lazy (else one click puts 341 KB in the DM snapshot).
+
+## 15. Open questions
+
+**Bold** = suggested pick (not decided). "gate 1" = needs the DM at sprint-3 gate 1.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-CMP-01 | Source | **Bundled SRD 5.1: recorded Open5e v1 `wotc-srd` responses (2.2 MB) in the repo, imported offline** (works at the table without internet; data frozen until re-recorded) / Open5e download at runtime (always current; needs internet, API v1 → v2 churn, untestable offline) / both now (twice the adapter work) | yes (gate 1) | — |
+| OQ-CMP-02 | Content this sprint | **Monsters, spells, items (magic + weapons + armor), conditions, class features (12 classes + their 1 SRD subclass)** = 1,127 entries / monsters + spells only (smaller C1, no R seam) / + races, backgrounds, feats (SRD has 1 feat; more editor work) | yes (gate 1) | effect-modifiers |
+| OQ-CMP-03 | ADR-0010 scope | **A: global library + campaign clones** (= ADR-0018; one import serves all campaigns) / B: per-campaign import (×N data, re-import per campaign) / C: overlay patches (merge complexity) → [proposed-compendium-scope](../architecture/adr/proposed-compendium-scope.md) | yes (gate 1) | ADR-0004, ADR-0010 |
+| OQ-CMP-04 | Imported creature definitions vs CON-44 | **A: lazy `imported-entity` (P's ADR), loaded by ids: 0 B, scale-proof; costs 6 client call sites** / B: snapshot holds only referenced ones: ≈ 1.06 KB each measured (20 ≈ 21 KB > sprint-3 slack) / C: all imported (today): +341 KB, over the ceiling | yes (gate 1) | entities, live-sync, combat-tracker, combat-extras, character-sheet-full |
+| OQ-CMP-05 | Read path for entries | **REST search / get** (query + paging, `ETag`, no ws hotspot) / WS read request (ws change during V's lock) / P's `sync.load` (returns a whole type: ≈ 1.7 MB, no search) | no (owner: spec-compendium) | live-sync |
+| OQ-CMP-06 | Use entries directly? | **Yes; clone / derive only to edit** (as the fixture goblin today) / must clone first (extra step per monster) | yes (gate 1) | combat-tracker |
+| OQ-CMP-07 | Who browses | **Players read spells, items, conditions, features + shared homebrew; monsters DM-only** (ADR-0024) / DM only (no player REST auth) / everything (leaks monsters) | yes (gate 1) | campaign-management |
+| OQ-CMP-08 | Homebrew editor scope | **Monsters: existing creature form + NPC sheet; derive copies traits / actions text into sheet Features. Other kinds: one text form (name, facets, markdown-lite text, Shared)** / monsters only / structured editors per kind (≫ 4 slices) | yes (gate 1) | combat-tracker, character-sheet-full |
+| OQ-CMP-09 | Search | **SQL name ranking + `LIKE` on text (1.1 ms measured)** / FTS5 (0.04 ms; virtual table outside drizzle-kit push) / client filter (ships the index) | no (owner: spec-compendium) | — |
+| OQ-CMP-10 | Stat block on token click (tier B) | **In: DM token menu "Stat block"** (registry entry, opens the window) / out (later) | yes (gate 1) | scenes-map |
+| OQ-CMP-11 | Import run, crash | **DM button; one transaction (≤ 0.5 s est.); atomic; no resume; result Toast** / chunked with progress events + resume (unneeded at this size) / automatic at first start (no click; surprises a real DB) | no (owner: spec-compendium) | — |
+| OQ-CMP-12 | Changed upstream entry on re-import (OQ-FIX-18) | **Update in place; customs, clones, sheets untouched; instances follow via hooks** / version and pin / skip changes | no (owner: spec-compendium) | fixtures-adapters, entities |
+| OQ-CMP-13 | Text format | **Markdown-lite string + own text-node renderer** / a markdown package (dependency, DM OK) / plain text (loses tables) | no (owner: spec-compendium) | — |
+| OQ-CMP-14 | **effect-modifiers**: how class features feed rule-trigger presets | **MOD's built-in presets list the compendium `featureKey`s they implement (Sneak Attack, Rage…); a homebrew feature may carry an optional `preset` in MOD's schema (Divine Fury: Zealot is not in SRD 5.1)** / presets live only in MOD, compendium is text only (no "Preset" link) / compendium owns trigger data (wrong owner) | yes (seams) | effect-modifiers, character-sheet-full |
+| OQ-CMP-15 | Live refresh for players | **Refetch on open / search / Back; no push** / push a signal on homebrew save | no (owner: spec-compendium) | — |
+| OQ-CMP-16 | Entry gone upstream | **Keep unchanged** (may be referenced) / delete when unreferenced | no (owner: spec-compendium) | entities |
+| OQ-CMP-17 | **fixtures-adapters**: pipeline changes | **Per-kind stores, `updated` outcome, `cmp.import` the one routed caller (bundled source key only, never client data); amend FR-FIX-20 / -24** / compendium writes entries outside the pipeline | no (owner: integrator) | fixtures-adapters |
+| OQ-CMP-18 | **entities / combat-tracker / combat-extras / character-sheet-full**: lazy imported definitions | **`imported-entity` lazy; `useDefinitions` replaces six call sites; lookups and the Creatures window search the server for imported monsters (FR-ENT-18, FR-CBT-63 amended)** | yes (with OQ-CMP-04) | listed specs |
+| OQ-CMP-19 | **party-board / live-sync**: lazy record types ADR | **Accept P's option A incl. `ids` loads and global scope** (compendium reuses it for `imported-entity` only; entries stay REST: global, 1,127 rows, need search) | yes (gate 1) | party-board, live-sync |
+| OQ-CMP-20 | **campaign-management**: player credential on REST | **`Authorization: Player <link token>` on compendium routes via `resolvePlayerLink`** / WS-only reads for players | no (owner: integrator) | campaign-management, protocol §2 |
+| OQ-CMP-21 | Glossary | **Update "Compendium" (design settled, link here); "Clone" (monsters: derive); add "Bundled source"** (recorded copy of an external source shipped in the repo, imported offline) | no (owner: integrator) | glossary |
+| OQ-CMP-22 | Fixture goblin / wolf (`fixture`) duplicate SRD ones after an import | **Keep both; source Badge** / move fixtures to `srd-5.1` (touches every bundle's IDs) | no (owner: spec-compendium) | fixtures-adapters |
+| OQ-CMP-23 | SRD 5.2 (2024) | **Later, as a second source** (table plays 2014, #23) / now | no (owner: spec-compendium) | — |
+
+## 16. Out of scope
+
+- Runtime Open5e, SRD 5.2, 5etools, homebrew files, Griffon's Saddlebag, AI paste (§4). Rules quick reference / DM screen; races, backgrounds, feats.
+- Custom monster actions auto-rolled vs targets beyond today's attacks ([combat-extras §16](combat-extras.md#16-out-of-scope)); legendary / lair action tracking.
+- Linking condition chips to compendium text (CBTX), clickable notation in entry text ([dice-extras](post-mvp/dice-extras.md)): later, small.
