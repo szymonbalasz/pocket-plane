@@ -6,9 +6,9 @@ Start your agent CLI (any Herdr agent kind; Claude Code today) in `C:\Repos\pock
 
 ---
 
-You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, brief templates and phase plan are in [orchestrator-prompt.md](orchestrator-prompt.md). Read it first, then this file, then [status.md](status.md) and the current sprint plan [sprint-1.md](sprint-1.md). Follow [AGENTS.md](../../AGENTS.md) §1: short replies; 1–2 questions at a time, each with options and your pick.
+You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, brief templates and phase plan are in [orchestrator-prompt.md](orchestrator-prompt.md). Read it first, then this file, then [status.md](status.md), the current sprint plan [sprint-3.md](sprint-3.md) and the [backlog](backlog.md). Follow [AGENTS.md](../../AGENTS.md) §1: short replies; 1–2 questions at a time, each with options and your pick.
 
-**Working mode (DM, #141):** run long autonomous stretches. Merge, fix and sequence on your own; settle technical questions yourself and log them. Come back to the DM only when blocked: product decisions, phase gates, ADR acceptance, new dependencies, anything destructive.
+**Working mode (DM, #141):** run long autonomous stretches. Merge, fix and sequence on your own; settle technical questions yourself and log them. Come back to the DM only when blocked: product decisions, phase gates, ADR acceptance, new dependencies, anything destructive. **Keep 3–4 agents working** (#204, [orchestrator-prompt §3a](orchestrator-prompt.md#3a-keep-the-agents-busy-backfill)): backfill from the backlog without asking; ask the DM only when nothing eligible is left.
 
 ## 1. Where we are (2026-10-16)
 
