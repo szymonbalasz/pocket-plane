@@ -159,64 +159,67 @@ function PresetForm({ start, onDone }: { start: PresetDraft; onDone(): void }) {
   };
   return (
     <form
-      className="grid gap-3"
+      className="flex min-h-0 flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
         void save();
       }}
     >
-      <div className="grid gap-1.5">
-        <Label htmlFor="mod-preset-name">Name</Label>
-        <Input
-          id="mod-preset-name"
-          data-testid="mod-preset-name"
-          maxLength={40}
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
-      <ModifierEditor drafts={drafts} onChange={setDrafts} disabled={disabled} />
-      <div className="flex flex-wrap items-end gap-3">
+      {/* The body scrolls; the footer (Save) stays in the dialog's 85vh (FR-MOD-12, tier-3 Uses). */}
+      <div data-testid="mod-preset-body" className="-mx-1 grid min-h-0 gap-3 overflow-y-auto px-1">
         <div className="grid gap-1.5">
-          <Label htmlFor="mod-preset-duration">Duration (rounds)</Label>
+          <Label htmlFor="mod-preset-name">Name</Label>
           <Input
-            id="mod-preset-duration"
-            data-testid="mod-preset-duration"
-            inputMode="numeric"
-            className="h-8 w-28"
-            placeholder="Until removed"
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
+            id="mod-preset-name"
+            data-testid="mod-preset-name"
+            maxLength={40}
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2 pb-2 text-sm">
-          <Checkbox
-            id="mod-preset-conc"
-            data-testid="mod-preset-concentration"
-            checked={conc}
-            onCheckedChange={(v) => setConc(v === true)}
-          />
-          <Label htmlFor="mod-preset-conc">Concentration</Label>
+        <ModifierEditor drafts={drafts} onChange={setDrafts} disabled={disabled} />
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="mod-preset-duration">Duration (rounds)</Label>
+            <Input
+              id="mod-preset-duration"
+              data-testid="mod-preset-duration"
+              inputMode="numeric"
+              className="h-8 w-28"
+              placeholder="Until removed"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2 pb-2 text-sm">
+            <Checkbox
+              id="mod-preset-conc"
+              data-testid="mod-preset-concentration"
+              checked={conc}
+              onCheckedChange={(v) => setConc(v === true)}
+            />
+            <Label htmlFor="mod-preset-conc">Concentration</Label>
+          </div>
         </div>
-      </div>
-      {start.characterId && (
-        <UsesSelect
-          characterId={start.characterId}
-          value={uses}
-          onChange={setUses}
-          disabled={disabled}
-        />
-      )}
-      <div className="grid gap-1.5">
-        <Label htmlFor="mod-preset-note">Note</Label>
-        <Input
-          id="mod-preset-note"
-          data-testid="mod-preset-note"
-          maxLength={200}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
+        {start.characterId && (
+          <UsesSelect
+            characterId={start.characterId}
+            value={uses}
+            onChange={setUses}
+            disabled={disabled}
+          />
+        )}
+        <div className="grid gap-1.5">
+          <Label htmlFor="mod-preset-note">Note</Label>
+          <Input
+            id="mod-preset-note"
+            data-testid="mod-preset-note"
+            maxLength={200}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </div>
       </div>
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onDone}>
@@ -242,7 +245,10 @@ export function PresetDialog({
 }) {
   return (
     <Dialog open={start !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent data-testid="mod-preset-dialog" className="sm:max-w-md">
+      <DialogContent
+        data-testid="mod-preset-dialog"
+        className="flex max-h-[85vh] flex-col sm:max-w-md"
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
