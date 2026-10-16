@@ -22,7 +22,14 @@ import {
 } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
 import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
-import { ChevronDownIcon, ChevronUpIcon, EyeIcon, EyeOffIcon, HandIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  DicesIcon,
+  EyeIcon,
+  EyeOffIcon,
+  HandIcon,
+} from "lucide-react";
 import { type ReactNode, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
@@ -31,6 +38,7 @@ import { Badge, Input, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
+import { stageTray } from "../dice-extras/store";
 import {
   type ActorOption,
   actorOptions,
@@ -273,6 +281,16 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   });
   const disabled = !live || busy;
   const shownError = error ?? control.error;
+  // FR-DICEX-06: the tray Button (and Alt+click on Roll) stages the current expression, `free`.
+  const stage = (m: RollMode = mode) =>
+    stageTray({
+      kind: "free",
+      expression: expression.trim(),
+      mode: m,
+      category,
+      ...(label.trim() ? { label: label.trim() } : {}),
+      ...(actorRef ? { actor: actorRef } : {}),
+    });
   const [optionsOpen, setOptionsOpen] = useRollOptionsOpen();
   const [physical, setPhysical] = usePhysicalDice();
   const dirty = optionsDirty({
@@ -306,7 +324,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
           onKeyDown={(e) => {
             if (e.key !== "Enter" || disabled || e.nativeEvent.isComposing) return;
             e.preventDefault();
-            control.roll(e);
+            control.roll({ shiftKey: e.shiftKey, ctrlKey: e.ctrlKey }); // Enter rolls at once
           }}
         />
         <ToggleGroup
@@ -363,9 +381,27 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
           size="sm"
           className="h-7"
           disabled={disabled || expression.trim() === ""}
+          onClick={(e) => {
+            if (!e.altKey) return;
+            e.preventDefault();
+            stage();
+          }}
         >
           Roll
         </RollButton>
+        <Tooltip content="Adjust in dice tray">
+          <Button
+            type="button"
+            data-testid="dicex-tray-open"
+            aria-label="Adjust in dice tray"
+            size="icon"
+            variant="ghost"
+            className="size-7 shrink-0"
+            onClick={() => stage()}
+          >
+            <DicesIcon className="size-4" />
+          </Button>
+        </Tooltip>
         <Tooltip content={optionsOpen ? "Hide roll options" : "Roll options"}>
           <Button
             type="button"

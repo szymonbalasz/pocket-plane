@@ -2,7 +2,9 @@
 // (FR-DICE-05) and physical-dice mode (FR-DICE-07); DM gets a public toggle preset from the
 // category's setting (FR-DICE-13). The caller sends its own intent from `onRoll`. Physical mode
 // is never a surprise (#149): every `RollButton` carries a marker, and the popover offers
-// "Roll for me" (one server roll; the mode stays on).
+// "Roll for me" (one server roll; the mode stays on). Dice tray (DICEX): Alt+click stages the
+// control in the tray instead (FR-DICEX-06), every roll starts a pending throw (FR-DICEX-09), and
+// the tray hosts the same `ManualForm` (FR-DICEX-07).
 import {
   CATEGORY_LABEL,
   categoryPublic,
@@ -19,6 +21,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/cont
 import { Input } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
+import { diceExtras, stageTray } from "../dice-extras/store";
 import {
   computedTotal,
   formEntries,
@@ -73,9 +76,23 @@ export interface RollControlOptions {
   onRoll(r: RollRequest): void;
 }
 
+/** Modifier keys of the click / key event that rolls. */
+export interface RollKeys {
+  shiftKey?: boolean;
+  ctrlKey?: boolean;
+  /** FR-DICEX-06: Alt (Option on macOS) stages the roll in the dice tray instead. */
+  altKey?: boolean;
+}
+
+/** FR-DICEX-06: tooltip line for stageable roll buttons. */
+export const STAGE_HINT = "Alt: adjust in tray";
+
 export interface RollControl {
-  /** Roll now (or open the manual popover); pass the click / key event for Shift / Ctrl. */
-  roll(keys?: { shiftKey?: boolean; ctrlKey?: boolean }): void;
+  /**
+   * Roll now (or open the manual popover); pass the click / key event for Shift / Ctrl. Alt →
+   * staged in the dice tray (`adjust`), options verbatim (FR-DICEX-06, -08 a).
+   */
+  roll(keys?: RollKeys): void;
   isDm: boolean;
   /** DM public switch value: the override, else the category's setting. */
   publicValue: boolean;
@@ -110,6 +127,7 @@ export function useRollControl(options: RollControlOptions): RollControl {
     if (isDm && pub.overridden) req.public = pub.value;
     setOverride(null);
     setManual(null);
+    diceExtras.sent(false); // FR-DICEX-09: pending throw until the own entry arrives
     options.onRoll(req);
   };
 
@@ -117,6 +135,10 @@ export function useRollControl(options: RollControlOptions): RollControl {
     roll(keys) {
       setError(null);
       const mode = modeFromKeys(keys, options.mode ?? "normal");
+      if (keys?.altKey) {
+        stageTray({ kind: "control", options, mode });
+        return;
+      }
       if (!physical) return finish(mode);
       const slots = formSlots(options, mode, []);
       if (typeof slots === "string") {
@@ -223,7 +245,7 @@ function GroupInputs({
  * what was typed (FR-DICE-31). Roll never fails silently (FR-DICE-32): an incomplete slot sends
  * nothing, focuses the offending input and says why.
  */
-function ManualForm({ control }: { control: RollControl }) {
+export function ManualForm({ control }: { control: RollControl }) {
   const open = control.manual;
   const live = useSync((s) => s.state === "live");
   const [inputs, setInputs] = useState<SlotInput[]>([]);
