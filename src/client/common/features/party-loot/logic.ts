@@ -1,6 +1,10 @@
-// Pure client rules of `loot.log` (FR-LOOT-14–19): display order, wallet rows, form drafts →
-// intent payloads (FR-LOOT-02/06/07 mirrored with the shared zod schemas), Move form options.
-// No React.
+// Pure client rules of `loot.log` (FR-LOOT-14–19, FR-PARTY-25/27): display order, wallet rows,
+// form drafts → intent payloads (FR-LOOT-02/06/07, FR-PARTY-26 mirrored with the shared zod
+// schemas), Move form options, item-row text, the Split… dialog. No React.
+import type { CreatureSheetRecord } from "@shared/character-sheet/sheet";
+import { itemRowText, splitPreview } from "@shared/party-board/format";
+import { LootSplitIntent } from "@shared/party-board/schemas";
+import { splitCoins } from "@shared/party-board/split";
 import {
   COINS,
   type CoinKey,
@@ -249,3 +253,51 @@ export function editedSuffix(
   const e = entries?.[id] as LootEntryRecord | undefined;
   return e?.editedAt ? " (edited)" : "";
 }
+
+// ---- Item rows (FR-PARTY-25) ----
+
+/** An item row's line: "‹from› → ‹to›: ‹name› ×‹qty›" ("Party", "Outside the party"). */
+export function itemLine(
+  entry: LootEntryRecord & { qty: number },
+  nameOf: (id: string) => string | undefined,
+): string {
+  return itemRowText(entry, (id) => nameOf(id) ?? "Unknown character");
+}
+
+// ---- Split… dialog (FR-PARTY-27) ----
+
+/** Coin Inputs prefilled with the pot's positive coins. */
+export function splitPrefill(pot: Coins): CoinDraft {
+  const out = { ...EMPTY_DRAFT };
+  for (const k of COINS) out[k] = pot[k] > 0 ? String(pot[k]) : "";
+  return out;
+}
+
+/** Characters by name with their default tick: approved (sheet not `draft`; no sheet = ready). */
+export function splitCharacters(
+  chars: readonly CharacterRef[],
+  sheetStatus: (id: string) => CreatureSheetRecord["status"] | undefined,
+): { character: CharacterRef; ticked: boolean }[] {
+  return sortCharacters(chars, null).map((c) => ({
+    character: c,
+    ticked: sheetStatus(c.id) !== "draft",
+  }));
+}
+
+/** The split's payload (ticked ids in list order) and its preview, or why not. */
+export function splitPayload(
+  order: readonly string[],
+  ticked: ReadonlySet<string>,
+  draft: CoinDraft,
+): { ok: true; value: LootSplitIntent; preview: string } | { ok: false; message: string } {
+  const coins = coinsOf(draft, false);
+  if (!coins) return { ok: false, message: "Coins must be whole numbers ≥ 0" };
+  const characterIds = order.filter((id) => ticked.has(id));
+  const r = LootSplitIntent.safeParse({ characterIds, ...coins });
+  if (!r.success) return { ok: false, message: firstIssue(r.error) };
+  const split = splitCoins(coins, characterIds.length);
+  if (!split) return { ok: false, message: "Choose at least one character" };
+  return { ok: true, value: { characterIds, ...coins }, preview: splitPreview(split) };
+}
+
+export const LOST_SPLIT = "Connection lost — check the loot log before splitting again";

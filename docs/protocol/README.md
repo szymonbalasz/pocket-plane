@@ -1530,9 +1530,43 @@ From [effect-modifiers](../specs/effect-modifiers.md) tier 2 + T (MOD, `complete
 | DM attack popup | Hit preset vs the **effective AC** (`@shared/effect-modifiers/target-facts`: stored + `flat` on `ac`); AC cell `mod-popup-ac` (`data-value` = effective AC, "+2" marker, Tooltip "AC 17 (15 + 2 Shield of Faith)"); row multiplier preset from the target's defenses vs the card's `damageType` (immunity None, resistance Half, vulnerability Double, both Normal); `popupParts` line `effect-modifiers.defense`: hint `mod-popup-defense` (`data-value` = level) "Half (Rage)", "· DM set" when the DM changed it; adds nothing to the intent. `defensePreset(effects, target, type)` is the per-part preset for R7's typed trigger chips |
 | `throwDice` (`@shared/dice-extras/throw`) | A part / offer whose expression has several dice terms ("2d6+1d8") throws each die with its own type, in term order; a subtracted term's dice carry "−" (#220) |
 
-## 54. Sprint 3: rule-trigger combat parts (R7)
+## 54. Sprint 3: vision client (V3)
 
-From [effect-modifiers](../specs/effect-modifiers.md) sprint 3 (MOD, `complete`; FR-MOD-13, -38–40, -44, -47, -48). **Built by `build/mod-combat-parts`** (R7, combat lock after R0) on [§43](#43-sprint-3-rule-trigger-engine-r4)'s engine. No new intent, event or record type. Data side: [data model §40](../data-model/README.md#40-sprint-3-rule-trigger-combat-parts-r7).
+From [fog-of-war](../specs/fog-of-war.md) v2 (FOG §14 slice V3; #207, #210). **Built by `build/vision-client`** (canvas lock 3rd): the clients draw [§49](#49-sprint-3-dynamic-vision-server--invisible-v2)'s records. No new intent, event, record type, signal or wire field. Data side: [data model §40](../data-model/README.md#40-sprint-3-vision-client-v3).
+
+| Client part | Where | Rule | Source |
+|---|---|---|---|
+| Player render | `fog` layer (order 30), one `fog-mask` shape, `fog-of-war/vision-render.ts` | Static fog (explored memory draws Fog as Explored while the scene's `explored` is on), then from the player's own `vision` row: `dark` ring dimmed + grey where not statically clear, `see` clear, darkness inside any polygon as a darker transparent tint (only see-through polygons reach inside darkness, FR-FOG-33); blind → map dark, grid redrawn, chip `fog-blind` | FR-FOG-21, -36 |
+| Blind (player) | `MapCanvas`: `isBlind` / `blindStore`; `TemplatesLayer`: `canvasBlind` (`fog-of-war/blind.ts`) | Others' pings, pull marks and laser are not drawn; others' kept AoE templates are dropped from the store the layers read, their live previews skipped; own placement draws | FR-FOG-36 |
+| View as (DM) | fog bar `fog-view-as` (Players + "DM"); fog layer keeps the pair | Pick → `sync.loadScene {sceneId, viewAs}` (one in flight, spinner `data-loading`); another pick / viewed scene → that pair; "DM" → `clearViewAs`; snapshot → reload; reject → Toast, back to "DM". Draws only the loaded pair matching the pick and the shown scene: P's render at 70 % (`fog-view-as`, attr `player`), markers `fog-vision` / `fog-explored` (attr `player`) | FR-FOG-20, -43 |
+| Token menu line | `src/client/dm/features/scenes-map/token-menu.ts` ← `fogTokenMenu` (`fog.invisible`, order 45) | `fog-token-menu-invisible` (`data-state` checked / unchecked) → `fog.setInvisible {tokenId, invisible: !current}` | FR-FOG-47 |
+| Token overlay line | `tokenOverlays` ← `fogTokenOverlay` (DM only) | Fog badge (seen by nobody); `fog-token-invisible` badge + `dim` on invisible tokens; with View as P: `dim` = P can't see it (FR-FOG-34 / -46 on P's loaded polygons; `vision.inv` for invisible ones), replacing the Invisible fade; `subscribe` re-runs on a new pair | FR-FOG-20, -47 |
+| No-vision hint | fog bar `fog-no-vision` | "No vision set for: ‹names›": owned tokens on the viewed scene whose definition's senses are 0 / 0 (absent = 0) | FR-FOG-17 |
+
+- Colours are placeholder tokens until theme-system (OQ-FOG-17): `--fog-darkvision` (fallback `#52525b`, 50 %), `--fog-darkness-seen` (`#1e1033`, 45 %).
+- Others' *ephemeral* `scn.template` previews: scene-tools' `TemplatesLayer` draws none while `canvasBlind` (`fog-of-war/blind.ts`) holds (granted shared change).
+
+## 55. Sprint 3: party board gold (P3)
+
+From [party-board](../specs/party-board.md#64-gold-ledger-party-loot-evolved) (PARTY slice 3; #207 G28, #221). **Built by `build/party-gold`** in party-loot's folders (seams S8): `loot.split`, the `loot.edit` item conflict, the Split… dialog and item rows in `loot.log`. No new record type; `CoinSplit` is [§44](#44-sprint-3-party-board-core-p-core)'s. Data side: [data model §41](../data-model/README.md#41-sprint-3-party-board-gold-p3).
+
+**Intents** (party-loot feature; extend the [§29](#29-reward-party-loot) table)
+
+| Intent | Who | Payload | Validation | Result | Source |
+|---|---|---|---|---|---|
+| `loot.split` | DM | `LootSplitIntent {characterIds, cp?, sp?, ep?, gp?, pp?}` (`@shared/party-board/schemas`, strict) | 1–10 unique ids; each coin int 0…999 999; every share (⌊coin / n⌋) 0 → `invalid` "Nothing to split"; each id a `character` of the actor's campaign, else `not_found`; player → `forbidden`. No balance check (#150) | `{entryIds}` (list order) | [FR-PARTY-26](../specs/party-board.md#64-gold-ledger-party-loot-evolved) |
+| `loot.edit` (amended) | DM | as §29 | + entry of kind `item` → `conflict` "Item moves can't be edited — move it back" (`ITEM_EDIT_MESSAGE`) | — | [FR-PARTY-25](../specs/party-board.md#64-gold-ledger-party-loot-evolved) |
+
+**Event** `CoinSplit {entryIds, characterIds, shares}` (logged, not undoable; no notification): changes = one `loot-entry` per character (before null; `move`, `party → character`, text "Split", coins = `shares`), then `party-pot`, then one `wallet` per character in list order (before null on that character's first coin). Visibility as LOOT-10: the DM and every player of the campaign; other campaigns never (scope gate). One `event` frame before the DM's `ack` (FR-SYNC-14). Crash seams `PP_TEST_CRASH=loot.split:before-commit` / `:after-commit`.
+
+**Client** (`loot.log`, `@ui/features/party-loot/LootLog`)
+
+- DM **Split…** Button by the pot (`loot-split-open`, disabled while not `live`) → Dialog `loot-split-dialog`: five coin Inputs pp → cp (`loot-split-coin` + `data-value`), prefilled with the pot's positive coins; a Checkbox per character by name (`loot-split-character` + `data-record-id`; approved = sheet not `draft` ticked); preview `loot-split-preview` ("Each gets 2 pp, 15 gp; 1 pp stays in the pot", or the validation message with `data-valid="false"`); Split `loot-split-submit` disabled while invalid, not `live` or in flight; reject → `loot-split-error`; ack → closes; lost intent → Toast "Connection lost — check the loot log before splitting again". Players have no Split….
+- **Item rows:** `loot-entry` `data-kind="item"`, line "‹from› → ‹to›: ‹name› ×‹qty›" ("Party", "Outside the party"), no coin Badges, no Edit.
+
+## 56. Sprint 3: rule-trigger combat parts (R7)
+
+From [effect-modifiers](../specs/effect-modifiers.md) sprint 3 (MOD, `complete`; FR-MOD-13, -38–40, -44, -47, -48). **Built by `build/mod-combat-parts`** (R7, combat lock after R0) on [§43](#43-sprint-3-rule-trigger-engine-r4)'s engine. No new intent, event or record type. Data side: [data model §42](../data-model/README.md#42-sprint-3-rule-trigger-combat-parts-r7).
 
 | Piece | Contract |
 |---|---|

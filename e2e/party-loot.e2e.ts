@@ -80,6 +80,60 @@ test("FR-LOOT-03 FR-LOOT-13 FR-LOOT-15 FR-LOOT-18 DM adds 50 gp → player-1 row
   await dm.context().close();
 });
 
+// After the first test: pot 5 pp, 70 gp; Mira 31 gp; Thorn 8 gp 30 sp.
+test("FR-PARTY-26 FR-PARTY-27 DM Split… Mira + Thorn, prefilled from the pot → preview, pot keeps the remainder, player sees the wallets", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const miraId = recordId("char-mira", "entity");
+  const thornId = recordId("char-thorn", "entity");
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const player = await rolePage(browser);
+  await player.goto(link("Player 2"));
+  await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const dmWin = await openWindow(dm, "loot.log");
+  const pWin = await openWindow(player, "loot.log");
+  await expect(pWin.getByTestId("loot-split-open")).toHaveCount(0);
+
+  await dmWin.getByTestId("loot-split-open").click();
+  const dialog = dm.getByTestId("loot-split-dialog");
+  const coin = (k: string) => dialog.locator(`[data-testid="loot-split-coin"][data-value="${k}"]`);
+  await expect(coin("pp")).toHaveValue("5");
+  await expect(coin("gp")).toHaveValue("70");
+  await expect(coin("sp")).toHaveValue("");
+  for (const id of [miraId, thornId]) {
+    await expect(
+      dialog.locator(`[data-testid="loot-split-character"][data-record-id="${id}"]`),
+    ).toHaveAttribute("data-state", "checked");
+  }
+  const preview = dialog.getByTestId("loot-split-preview");
+  await expect(preview).toHaveText("Each gets 2 pp, 35 gp; 1 pp stays in the pot");
+  // Too little for two → Nothing to split, Split disabled.
+  await coin("pp").fill("1");
+  await coin("gp").fill("1");
+  await expect(preview).toHaveText("Nothing to split");
+  await expect(dialog.getByTestId("loot-split-submit")).toBeDisabled();
+  await coin("pp").fill("5");
+  await coin("gp").fill("70");
+  await dialog.getByTestId("loot-split-submit").click();
+  await expect(dialog).toHaveCount(0);
+
+  await expect(potCoin(pWin, "pp")).toHaveText("1 pp");
+  await expect(potCoin(pWin, "gp")).toHaveCount(0);
+  await expect(walletCoin(pWin, miraId, "gp")).toHaveText("66 gp");
+  await expect(walletCoin(pWin, miraId, "pp")).toHaveText("2 pp");
+  await expect(walletCoin(pWin, thornId, "gp")).toHaveText("43 gp");
+  const top = pWin.getByTestId("loot-entry").first();
+  await expect(top).toHaveAttribute("data-kind", "move");
+  await expect(top).toContainText("Party pot → Thorn");
+  await expect(top).toContainText("Split");
+
+  await player.context().close();
+  await dm.context().close();
+});
+
 // Runs last: switches the active campaign and back.
 test("FR-LOOT-18 DM Move form in a campaign without characters: empty state, Move disabled", async ({
   browser,

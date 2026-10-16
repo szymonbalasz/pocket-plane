@@ -4,7 +4,11 @@
 // Remember explored areas (Switch), Forget explored… (confirm), and in Darkness mode Clear
 // darkness… (confirm). Works on the viewed scene; disabled while not live (FR-FOG-09). Also the
 // keys (polygon, Delete for the selected darkness), the refusal hint, the "Free" chip while Ctrl
-// is held during a gesture, and the darkness right-click menu (FR-FOG-42).
+// is held during a gesture, and the darkness right-click menu (FR-FOG-42). V3: the View as Select
+// (Players + "DM", FR-FOG-43; spinner while the load is in flight) and the DM-only hint "No vision
+// set for: ‹names›".
+
+import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
   FOG_INTENTS,
   FOG_TYPE,
@@ -22,6 +26,7 @@ import {
   CloudFogIcon,
   EraserIcon,
   EyeIcon,
+  Loader2Icon,
   MapIcon,
   MoonIcon,
   PentagonIcon,
@@ -30,7 +35,7 @@ import {
   Trash2Icon,
   Undo2Icon,
 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/button";
 import {
@@ -48,12 +53,18 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTitle,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Tooltip,
 } from "../../components/ui/overlays";
-import { useSync } from "../../sync/store";
+import { useRecords, useSync } from "../../sync/store";
 import { useBaseKeyDown } from "../play-shell/hooks";
 import { toastReject, useLive, useMapIntent } from "../scenes-map/intents";
 import { type FogShapeMode, gestureKey } from "./gesture";
+import { NO_VISION_PREFIX, noVisionNames } from "./no-vision";
 import {
   applyFogStep,
   type FogMode,
@@ -62,6 +73,7 @@ import {
   setFogRejectHandler,
   useFogTool,
 } from "./store";
+import { setViewAs, useViewAs, VIEW_AS_DM } from "./view-as";
 
 const SHAPE_NAMES = { rect: "rectangle", polygon: "polygon", circle: "circle" } as const;
 
@@ -269,6 +281,76 @@ function Confirm({
   );
 }
 
+/**
+ * FR-FOG-17 / -43: View as Select (Players + "DM"). Picking a player loads that player's rows on
+ * the viewed scene (the fog layer keeps the pair); a spinner shows until the ack.
+ */
+function ViewAsSelect({ disabled }: { disabled: boolean }) {
+  const players = useRecords<PlayerRecord>("player");
+  const sorted = useMemo(
+    () => [...players].sort((a, b) => a.name.localeCompare(b.name)),
+    [players],
+  );
+  const playerId = useViewAs((s) => s.playerId);
+  const loading = useSync((s) => s.viewAs.loading !== null);
+  const value = playerId ?? VIEW_AS_DM;
+  return (
+    <Select value={value} onValueChange={(v) => setViewAs(v === VIEW_AS_DM ? null : v)}>
+      {/* The Tooltip sits on a wrapper: its `data-state` would overwrite the Select's. */}
+      <Tooltip content="View as — the scene as that player sees it">
+        <span className="inline-flex">
+          <SelectTrigger
+            aria-label="View as"
+            data-testid="fog-view-as"
+            data-value={value}
+            data-loading={loading || undefined}
+            disabled={disabled}
+            className="h-8 min-w-28"
+          >
+            {loading ? (
+              <Loader2Icon className="size-4 animate-spin" />
+            ) : (
+              <EyeIcon className="size-4" />
+            )}
+            <SelectValue />
+          </SelectTrigger>
+        </span>
+      </Tooltip>
+      <SelectContent>
+        <SelectItem value={VIEW_AS_DM} data-testid="fog-view-as-option" data-value={VIEW_AS_DM}>
+          DM
+        </SelectItem>
+        {sorted.map((p) => (
+          <SelectItem key={p.id} value={p.id} data-testid="fog-view-as-option" data-value={p.id}>
+            {p.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/** FR-FOG-17: "No vision set for: ‹names›" (DM only; hidden when every owned token has senses). */
+function NoVisionHint({ sceneId }: { sceneId: string | null }) {
+  const records = useSync((s) => s.store.records);
+  const names = useMemo(
+    () => (sceneId === null ? [] : noVisionNames(records, sceneId)),
+    [records, sceneId],
+  );
+  if (names.length === 0) return null;
+  return (
+    // Under the bar, not in it (the bar keeps one row); text only, so the map takes the pointer.
+    <div
+      data-testid="fog-no-vision"
+      className="pointer-events-none absolute top-full left-0 mt-1 max-w-full rounded-md bg-background/85 px-2 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur"
+      role="note"
+    >
+      {NO_VISION_PREFIX}
+      {names.join(", ")}
+    </div>
+  );
+}
+
 type Confirming = "fog-all" | "forget" | "clear-darkness" | null;
 
 export function FogBar() {
@@ -330,7 +412,7 @@ export function FogBar() {
     <div
       data-testid="fog-bar"
       data-disabled={off}
-      className="flex max-w-[min(54rem,calc(100vw-7rem))] flex-wrap items-center gap-1 rounded-md border bg-background/85 p-1 shadow-sm backdrop-blur"
+      className="relative flex max-w-[min(62rem,calc(100vw-7rem))] flex-wrap items-center gap-1 rounded-md border bg-background/85 p-1 shadow-sm backdrop-blur"
     >
       {/* Each item sits in a span: the Tooltip trigger's `data-state` would hide the item's "on". */}
       <ToggleGroup
@@ -439,6 +521,9 @@ export function FogBar() {
           <EraserIcon className="size-4" />
         </Button>
       </Tooltip>
+      {sep}
+      <ViewAsSelect disabled={off} />
+      <NoVisionHint sceneId={sceneId} />
       <Confirm
         open={confirming === "fog-all"}
         onOpenChange={(o) => setConfirming(o ? "fog-all" : null)}
