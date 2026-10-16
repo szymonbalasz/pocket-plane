@@ -33,6 +33,10 @@ export const PARTY_FULL_MESSAGE = `Party inventory is full (${PARTY_ITEM_MAX})`;
 export const ITEM_CLASH_MESSAGE = "Same item exists — move or remove one";
 export const ITEM_GONE_MESSAGE = "Item is gone";
 export const NOTHING_TO_SPLIT = "Nothing to split";
+/** FR-PARTY-26: the text of each split row. */
+export const SPLIT_TEXT = "Split";
+/** FR-PARTY-25: `loot.edit` on an item row. */
+export const ITEM_EDIT_MESSAGE = "Item moves can't be edited — move it back";
 export const onlyLeftMessage = (n: number) => `Only ${n} left`;
 
 const Id = z.string().min(1).max(64);
