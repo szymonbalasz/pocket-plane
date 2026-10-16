@@ -18,6 +18,9 @@ import { FOG_ALPHA, type PaintCtx } from "./render";
 import { FOG_BADGE, fogTokenOverlay, INVISIBLE_BADGE } from "./token-overlay";
 import { pairRows, shownPair, useViewAs, viewAsSees, visionOf } from "./view-as";
 import {
+  BLIND_GRID_MIN_CONTRAST,
+  blindGridColor,
+  luminance,
   memoryRuns,
   paintPlayerView,
   polygonPath,
@@ -176,6 +179,48 @@ describe("FR-FOG-21 player render (V3)", () => {
     });
     expect(noGrid.strokes).toBe(0);
     expect(BLIND_TEXT).toBe("Magical darkness — you can't see");
+  });
+
+  test("FR-FOG-36 blind (FOG §13 step 9): grid lines stroke after the dark fill, light on black", () => {
+    class Ordered extends Raster {
+      ops: string[] = [];
+      override fill(...a: Parameters<Raster["fill"]>) {
+        this.ops.push("fill");
+        super.fill(...a);
+      }
+      override stroke() {
+        this.ops.push("stroke");
+        super.stroke();
+      }
+    }
+    const r = new Ordered(100, 60);
+    const fog = { fill: "clear" as const, box: fogAll.box, runs: "" };
+    const black = { ...paints, darkness: { color: "#000000", alpha: 1 } };
+    // The scenes-map default grid: black at 50 %.
+    paintPlayerView(r, { fog, memory: [], vision: vision({ blind: true }) }, map, black, {
+      visible: true,
+      color: "#000000",
+      opacity: 0.5,
+      width: 1,
+    });
+    expect(r.ops).toEqual(["fill", "stroke"]);
+    expect(r.strokeLog).toEqual([{ style: "#ffffff", alpha: 0.5 }]);
+    expect(px(r, 4, 3)).toEqual({ label: "#000000", alpha: 1 });
+  });
+
+  test("FR-FOG-36 blind grid colour: kept when it shows on the fill, else flipped", () => {
+    expect(luminance("#000")).toBe(0);
+    expect(luminance("#ffffffcc")).toBeCloseTo(1);
+    expect(luminance("oklch(0 0 0)")).toBeNull();
+    expect(blindGridColor("#000000", "#000000")).toBe("#ffffff");
+    expect(blindGridColor("#333333", "#000000")).toBe("#ffffff");
+    expect(blindGridColor("#ffffff", "#000000")).toBe("#ffffff");
+    expect(blindGridColor("#ffd700", "#000000")).toBe("#ffd700");
+    expect(blindGridColor("#eeeeee", "#ffffff")).toBe("#000000");
+    // Unparsed fill counts as black; an unparsed grid colour is left alone.
+    expect(blindGridColor("#000000", "var(--x)")).toBe("#ffffff");
+    expect(blindGridColor("rebeccapurple", "#000000")).toBe("rebeccapurple");
+    expect(BLIND_GRID_MIN_CONTRAST).toBe(3);
   });
 
   test("FR-FOG-21 sight polygons are wound one way, so overlapping polygons clip as a union", () => {

@@ -30,6 +30,8 @@ export class Raster implements PaintCtx {
   lineWidth = 1;
   px: Px[];
   strokes = 0;
+  /** Style and alpha of each `stroke()` call. */
+  strokeLog: { style: unknown; alpha: number }[] = [];
   private path: Sub[] = [];
   private clips: Clip[][] = [[]];
   private stack: { gco: string; alpha: number; clips: number }[] = [];
@@ -73,6 +75,7 @@ export class Raster implements PaintCtx {
   closePath() {}
   stroke() {
     this.strokes++;
+    this.strokeLog.push({ style: this.strokeStyle, alpha: this.globalAlpha });
   }
   clip(rule: Rule = "nonzero") {
     (this.clips.at(-1) as Clip[]).push({

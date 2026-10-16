@@ -6,7 +6,8 @@
 // 3. darkness inside any polygon: a darker, more transparent tint (`fog.darkness-seen`). Only a
 //    source that sees through magical darkness has darkness inside its polygon (the others' are
 //    cut at its edges, FR-FOG-33), so "in a polygon and in darkness" = seen through.
-// Blind (FR-FOG-36): the whole map dark (`fog.darkness`) with the grid lines redrawn on top.
+// Blind (FR-FOG-36): the whole map dark (`fog.darkness`) with the grid lines redrawn on top, in a
+// light colour when the scene's grid colour would vanish into the dark (the default is black).
 // Polygons are wound one way before they are clipped as a union (nonzero). DOM-free.
 import { exploredMask } from "@shared/fog-of-war/explored";
 import type { FogBox } from "@shared/fog-of-war/schemas";
@@ -128,7 +129,36 @@ function eraseAll(ctx: PaintCtx, m: MapRect) {
   ctx.fill();
 }
 
-/** FR-FOG-36: the dark screen, grid lines on top (same lines as the grid layer). */
+/** WCAG relative luminance of a `#rgb` / `#rrggbb` / `#rrggbbaa` colour; null for any other form. */
+export function luminance(color: string): number | null {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(color.trim());
+  if (!m) return null;
+  const h = m[1] as string;
+  const hex = h.length === 3 ? [...h].map((c) => c + c).join("") : h.slice(0, 6);
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const v = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Below this contrast the blind grid lines would not show against the fill. */
+export const BLIND_GRID_MIN_CONTRAST = 3;
+
+/**
+ * FR-FOG-36: the blind screen's grid line colour: the scene's grid colour, unless it is too close
+ * to the dark fill; then white (black on a light fill). An unparsed fill counts as black.
+ */
+export function blindGridColor(gridColor: string, fillColor: string): string {
+  const g = luminance(gridColor);
+  if (g === null) return gridColor;
+  const f = luminance(fillColor) ?? 0;
+  const contrast = (Math.max(g, f) + 0.05) / (Math.min(g, f) + 0.05);
+  if (contrast >= BLIND_GRID_MIN_CONTRAST) return gridColor;
+  return f < 0.18 ? "#ffffff" : "#000000";
+}
+
+/** FR-FOG-36: the dark screen, grid lines on top (the grid layer's lines, kept visible). */
 export function paintBlind(ctx: PaintCtx, m: MapRect, paint: Paint, grid?: GridLines): void {
   ctx.save();
   ctx.globalCompositeOperation = "source-over";
@@ -140,7 +170,7 @@ export function paintBlind(ctx: PaintCtx, m: MapRect, paint: Paint, grid?: GridL
   if (grid?.visible) {
     const cell = m.gridCellSize;
     ctx.globalAlpha = grid.opacity;
-    ctx.strokeStyle = grid.color;
+    ctx.strokeStyle = blindGridColor(grid.color, paint.color);
     ctx.lineWidth = grid.width;
     ctx.beginPath();
     for (let x = m.gridOffsetX; x <= m.mapWidth; x += cell) {
