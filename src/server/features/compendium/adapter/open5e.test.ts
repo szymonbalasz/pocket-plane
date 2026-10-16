@@ -1,5 +1,6 @@
 // FR-CMP-04 version, FR-CMP-05 adapter over the bundled source (no network).
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { srdMini } from "@fixtures/srd/open5e";
 import { EntryDraft } from "@shared/compendium/schemas";
 import { CreatureSenses } from "@shared/compendium/senses";
 import { MonsterStatBlock } from "@shared/entities/schemas";
@@ -249,5 +250,17 @@ describe("FR-CMP-04 version", () => {
     const b = loadSrd51();
     expect(b.version).toBe(sourceVersion(b.files));
     expect(b.files.map((f) => f.name)).toContain("ATTRIBUTION.md");
+  });
+});
+
+describe("FR-CMP-05 adapter: mini fixture set", () => {
+  test("fixtures/srd/open5e maps; only the dragon's Bite fire rider warns", () => {
+    const r = adaptOpen5e(srdMini);
+    expect(r.warnings.map((w) => `${w.sourceKey} ${w.field}`)).toEqual([
+      "monster/adult-red-dragon attacks[1]",
+    ]);
+    expect(r.counts).toMatchObject({ monster: 5, spell: 4, item: 4, condition: 3 });
+    expect(r.records.map((x) => x.sourceKey)).toContain("feature/rogue/sneak-attack");
+    expect(r.records.map((x) => x.sourceKey)).toContain("spell/hunters-mark");
   });
 });
