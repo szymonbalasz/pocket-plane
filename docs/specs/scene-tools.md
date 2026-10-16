@@ -8,6 +8,16 @@ phase: post-mvp-2
 
 # Scene tools
 
+> **Sprint 3 revision pending (DM decisions [#201](../decisions-log.md), [#202](../decisions-log.md), 2026-10-16).** Decided by the DM (not open):
+>
+> | Topic | DM decision |
+> |---|---|
+> | Freeform walls | Walls are drawn **freeform while Ctrl is held**, grid-snapped otherwise (today: segments between grid vertices only) |
+> | Wall feedback | While a player drags a token over a wall, the **wall segment(s) under the drag path highlight red** before the drop, so the player sees why the move will be refused (today: only a flash and toast after the drop) |
+> | Walls and vision | Walls take part in dynamic vision (fog-of-war v2, [proposed-dynamic-vision](../architecture/adr/proposed-dynamic-vision.md)); whether they block sight is confirmed there |
+>
+> TODO (spec phase, sprint 3): FRs for freeform segments (geometry, move guard on non-grid segments, door placement on freeform walls), the client drag-path check (same rule as the server guard, FR-SCN-10), test plan.
+
 ## 1. Summary
 
 - Battlemap **props and structure** on the [scenes-map](scenes-map.md) canvas (sprint 2 track B, #187): a **layer model** (map / objects / tokens / DM-only), **walls and doors** that block player token moves, **AoE templates** (cone, sphere, cylinder, cube, line), image **props** from the [asset pipeline](assets-pipeline.md), and the **diagonal rule** as a campaign setting.

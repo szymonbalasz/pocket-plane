@@ -8,6 +8,8 @@ phase: post-mvp-1
 
 # Character sheet (full)
 
+> **Sprint 3 revision pending (DM decision [#201](../decisions-log.md), 2026-10-16).** New sheet fields for dynamic vision: **vision / darkvision radius** (ft) and **"sees through magical darkness"** (e.g. Devil's Sight; a per-character switch). Owner and DM edit them; they drive fog-of-war v2. TODO (spec phase, sprint 3): field placement, derivation vs stored (ADR-0036), visibility to other players, NPC / monster equivalents.
+
 > Five-minute read for §1–§7; §8 onwards is reference. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Extends [character-sheet](character-sheet.md) (CHAR, basics); every FR-CHAR stays in force unless amended here.
 
 ## 1. Summary

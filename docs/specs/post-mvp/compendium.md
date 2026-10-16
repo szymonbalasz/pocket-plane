@@ -8,6 +8,8 @@ phase: post-mvp
 
 # Compendium (post-MVP stub)
 
+> **In scope for sprint 3 (DM decision [#203](../../decisions-log.md), 2026-10-16).** Expand this stub into `docs/specs/compendium.md` (prefix CMP) in sprint 3; it also feeds rule-trigger presets (class features) and the dice / MOD work with SRD data where useful.
+
 Moved out of MVP by [ADR-0014](../../architecture/adr/0014-mvp-scope.md). First post-MVP candidate.
 
 - **What:** Library of 5e rules content (monsters, spells, items, conditions). SRD import from Open5e, browse/search, clone-to-campaign, homebrew, provenance/licence, re-import without clobbering edits.

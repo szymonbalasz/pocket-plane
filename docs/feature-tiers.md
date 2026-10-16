@@ -27,7 +27,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | HP bar/ring on token | A | [combat-extras](specs/combat-extras.md) | |
 | Condition icons on token | A | [combat-extras](specs/combat-extras.md) | Needs conditions ([combat-extras](specs/combat-extras.md)) |
 | Layers (map / objects / tokens / DM-only) | A | [scene-tools](specs/scene-tools.md) | DM-only layer ≈ hidden tokens |
-| Doors and walls (block movement) | A | [scene-tools](specs/scene-tools.md) | Movement only; no vision ([ADR-0007](architecture/adr/0007-product-scope.md)) |
+| Doors and walls (block movement) | A | [scene-tools](specs/scene-tools.md) | Built (sprint 2). Sprint 3: freeform with Ctrl, red highlight on drag, take part in vision (#202) |
 | Highlight current-turn token | B | [combat-tracker](specs/combat-tracker.md) | Initiative strip / portraits show whose turn in MVP; token highlight only if trivial |
 | Movement measured along drag path, waypoints | B (indicator vs speed: S, §8) | [scenes-map](specs/scenes-map.md) | |
 
@@ -139,7 +139,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Hide / reveal token button (Owlbear-style) | S | [scenes-map](specs/scenes-map.md) | Hidden combatants follow |
 | Pre-place encounter tokens on battlemap (some hidden) | S | [combat-tracker](specs/combat-tracker.md) | No auto-placement |
 | Start / end encounter | S | [combat-tracker](specs/combat-tracker.md) | Unit of combat history |
-| Fog of war with shape + polygon tools | A | [fog-of-war](specs/fog-of-war.md) | Not MVP; **first thing after** |
+| Fog of war with shape + polygon tools | A | [fog-of-war](specs/fog-of-war.md) | Built as cell fog (sprint 2). Sprint 3: freeform shapes, Fog / Explored / Magical darkness, dynamic vision (#201) |
 | Ctrl-D duplicate token (same definition), rename | S | [scenes-map](specs/scenes-map.md) | |
 | Per-instance modifiers (temp HP, buffs/debuffs) | A | [combat-extras](specs/combat-extras.md) | No inline stat editing on instances |
 | **Custom creature form** (Shieldmaiden-style), prefilled from a base | S | [combat-tracker](specs/combat-tracker.md) | Full editor (SRD base, custom actions) tier A |
@@ -182,7 +182,8 @@ Tiers confirmed by the DM (#148); details in [feedback-phase3](agents/feedback-p
 
 | Feature | Tier | Ref |
 |---|---|---|
-| Dynamic lighting / vision | F | [ADR-0007](architecture/adr/0007-product-scope.md) |
+| Dynamic vision (radius, darkvision, magical darkness) | S (sprint 3, #201) | [fog-of-war](specs/fog-of-war.md), [proposed-dynamic-vision](architecture/adr/proposed-dynamic-vision.md) |
+| Dynamic lighting (light sources) | F | [ADR-0007](architecture/adr/0007-product-scope.md) |
 | Freehand drawing | F | [ADR-0007](architecture/adr/0007-product-scope.md) |
 | Audio (music, ambience, soundboard) | F | [ADR-0007](architecture/adr/0007-product-scope.md); UI notification sounds allowed by [ADR-0030](architecture/adr/0030-ui-notification-sounds.md) |
 | Other game systems | F | [ADR-0007](architecture/adr/0007-product-scope.md) |

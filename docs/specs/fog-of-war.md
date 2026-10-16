@@ -8,6 +8,19 @@ phase: post-mvp-2
 
 # Fog of war
 
+> **Sprint 3 revision pending (DM decisions [#201](../decisions-log.md), 2026-10-16).** The sections below describe the built sprint-2 fog (cell mask, static). Sprint 3 re-specifies fog as FOG v2; until then this spec stays the reference for what is built. Decided by the DM (not open):
+>
+> | Topic | DM decision |
+> |---|---|
+> | Shapes | Freeform fog shapes drawn with **drawing tools** (rectangle, polygon, circle; the DM wants drawing tools more than cell on / off toggles); vertices **snap to the grid unless Ctrl is held** |
+> | Dynamic vision | Each character has a **vision / darkvision radius** that pierces fog; recomputed as tokens move |
+> | Fog kinds | **Fog**: hides the map and everything on it until in a player's vision, returns when the vision leaves. **Explored**: the map is visible but nothing on it (RTS-style memory). **Magical darkness**: DM-placed ad hoc shapes that block all player vision |
+> | Explored toggle | Per map: Explored memory on / off for the whole map (on for dungeons and other non-open spaces) |
+> | Darkness vs sheet | Character-sheet setting "sees through magical darkness" (Devil's Sight). Without it, a character standing in darkness gives that player a **fully dark screen** (own tokens and the grid only, like Fog all); otherwise their vision is blocked by the darkness shape. With it, the darkness shape is a **darker, more transparent overlay than Explored** |
+> | Scope note | Vision (radius, darkvision, walls blocking sight) is in; dynamic lighting (light sources) stays out unless the DM adds it: [proposed-dynamic-vision](../architecture/adr/proposed-dynamic-vision.md) |
+>
+> TODO (spec phase, sprint 3): FRs, data model (shapes, per-map settings, explored memory), per-player visibility (supersedes the same-for-every-player `fogged` copy of ADR-0039?), vision math (line of sight vs walls, performance), migration from the cell mask, CON-44 cost, test plan. Open questions with picks for sprint-3 gate 1.
+
 ## 1. Summary
 
 - The DM covers a scene with **fog** and reveals or hides areas with a **rectangle** or **polygon** tool, plus **Reveal all** / **Fog all** and **Undo**. Sprint 2 phase 2, track F ([sprint-2](../agents/sprint-2.md#track-f-fog-of-war--new-spec-fog-of-war-prefix-fog)); first post-MVP item since [ADR-0014](../architecture/adr/0014-mvp-scope.md).

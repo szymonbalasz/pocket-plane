@@ -8,6 +8,8 @@ phase: post-mvp-2
 
 # Effect modifiers
 
+> **Sprint 3 revision pending (DM decision [#203](../decisions-log.md), 2026-10-16).** Tiers 2 and 3 (§14.2) are **in scope for sprint 3**. Plus a **flexible conditional trigger system** on the event stream ([proposed-rule-triggers](../architecture/adr/proposed-rule-triggers.md)). Reference case: **Zealot barbarian, Divine Fury**: while raging, the first creature hit on each of the barbarian's turns with a weapon attack takes **+1d6 + half the barbarian level** radiant damage. The DM expects many customisations like this (Sneak Attack once per turn, Hunter's Mark on the marked target, …), so the model must express event, filters, requirements (an active effect), frequency (once per turn / round / rest), formula (class level, ability mods, proficiency) and the added part, without user code (ADR-0007: no plugin system). TODO (spec phase, sprint 3): FRs, trigger data model, where triggers run (transaction vs listener vs roll time), counters + undo, presets, test plan.
+
 > Five-minute read for §1–§7; §8 onwards is reference. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Builds on [combat-extras](combat-extras.md) (CBTX, effects) and [character-sheet-full](character-sheet-full.md) (CHARX, sheet sections). Sprint plan: [sprint-2](../agents/sprint-2.md) track M, DM note N9 (#188). Cross-cutting decision: [proposed ADR](../architecture/adr/0038-effect-modifiers.md).
 
 ## 1. Summary

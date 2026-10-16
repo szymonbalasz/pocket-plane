@@ -2,13 +2,18 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 2 complete (#200).** Paused for the DM recap and the sprint-3 pick ([continue-session §2](continue-session.md#2-next-in-order)). Main green: 1884 tests, full e2e 61/61.
+**Phase:** Sprint 2 complete (#200). **Sprint 3 planned, not started** (#201–#204): [sprint-3](sprint-3.md). Next: four spec agents (V, D, R, P), C when a slot frees; backfill rule active ([orchestrator-prompt §3a](orchestrator-prompt.md#3a-keep-the-agents-busy-backfill), [backlog](backlog.md)).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Sprint 2 | merged | — | Done (#187-#200) | DM playtest + recap |
+| V: fog v2 + vision + walls | `spec/vision` | — | Not started | Spec agent |
+| D: dice extras | `spec/dice-extras` | — | Not started | Spec agent |
+| R: modifiers tiers 1–3 + triggers | `spec/rule-triggers` | — | Not started | Spec agent |
+| P: party board + handouts | `spec/party-board` | — | Not started | Spec agent |
+| C: compendium | `spec/compendium` | — | Not started | Spec agent when a slot frees |
+| Backfill (BL-nn) | `fix/bl-<nn>-<slug>` | — | None | Per §3a |
 
 ## Shared-file locks
 
@@ -16,7 +21,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Pending DM decisions
 
-- Sprint-2 recap: playtest feedback (phase 1 + sprint 2 scripts in sprint-2), session-sim-6 glitches, sprint-3 pick.
+- None now. Sprint-3 gate 1: picks per track, dependencies (3D dice / physics, geometry), ADRs (dynamic vision, rule triggers), build order.
 
 ## Resolved locally (report at gate)
 

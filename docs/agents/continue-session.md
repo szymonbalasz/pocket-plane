@@ -18,7 +18,7 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 | Sprint 2 | **Builds done (#187–#199).** Phase 1: DM playtest notes N1–N11, session-sim-4 glitches G1–G10, effect modifiers tier 1 (MOD), P3 polish. Phase 2: fog of war (FOG), scene tools (SCN: walls / doors, props, AoE templates, layers, diagonal rule), DM active-scene window (ADR-0041).  Session-sim-6 17/18, its FAIL fixed by `fix/sim6-popup` (#200); final `main` 1884 tests, e2e 61/61; leak scan clean. Playtest scripts: [sprint-2 §Playtest: phase 1 fixes](sprint-2.md#playtest-phase-1-fixes), [§Playtest: sprint 2 features](sprint-2.md#playtest-sprint-2-features). |
 | Verification | Evidence `%TEMP%\pocket-planeerify-*` (latest `verify-session-sim-6`; also `.verify/20261015-232530-session-sim-6/` in the main checkout, 12 ranked glitches). |
 | Specs / ADRs | All specs `complete`. ADRs 0001–0041 accepted (0037 split attack / damage, 0038 effect modifiers, 0039 fog visibility, 0040 token move guards, 0041 active-scene window). |
-| Decisions | Up to #199 in [decisions-log](../decisions-log.md). |
+| Decisions | Up to #204 in [decisions-log](../decisions-log.md). Proposed ADRs waiting for sprint-3 gate 1: [dynamic vision](../architecture/adr/proposed-dynamic-vision.md), [rule triggers](../architecture/adr/proposed-rule-triggers.md). |
 | CON-44 | Heavy DM snapshot 676,059 B of 786,432 B (active-scene window freed ~110 KB). Re-measure for every new record type. |
 | Agents | Herdr kind `claude` (`-- --permission-mode auto`, `--strict-mcp-config` except test agents). |
 | Helpers | [`docs/agents/tools/`](tools/), orchestrator only, run from the main checkout by absolute path (`bash /c/Repos/pocket-plane/docs/agents/tools/<x>.sh`): `mkwt.sh <branch> <label> [build]` (prints `ws= root= dir=`), `startagent.sh <pane> <name> <brief> [test]`, `starttest.sh <ws> <name> <brief-template>` (new tab + server pane, fills `{{SRVPANE}}`, starts a test agent), `poll.sh <agent…>`. Change them on `main` only. Brief generators used in sprint 2 lived in the session scratchpad (mktest.py: §5 template filler; mkbuild.py: spec-slice builder brief); recreate if needed. |
@@ -27,7 +27,11 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 
 ## 2. Next, in order
 
-**Paused for the DM recap** after sprint 2 (sprint-2 "Gates" 4). Bring: what shipped, session-sim-6 glitches, the DM's playtest feedback on phase 1 / sprint 2, and the sprint-3 candidates (party board + handouts, table flavour, compendium, 3D dice tray (tier S, #188), dice notation shortcut (tier A), effect modifiers tiers 2–3). Then write `sprint-3.md` like sprint-2.
+**Sprint 3, DM decisions #201–#204: [sprint-3](sprint-3.md).** Tracks V (fog v2 + dynamic vision + walls), D (3D dice, tray, clickable notation, customisation), R (effect modifiers tiers 1–3 + rule triggers, Zealot Divine Fury), P (party board + handouts), C (compendium). Phase A specs → seams → two reviews → **one DM gate** → Phase B builds per the hotspot table → session-sim-7 → "Playtest: sprint 3 features" → pause and recap.
+
+**Keep the agents busy (#204, [orchestrator-prompt §3a](orchestrator-prompt.md#3a-keep-the-agents-busy-backfill)):** aim for 3–4 working agents. When only one is working and nothing in the sprint queue is unblocked, pick an eligible item from [backlog](backlog.md) without asking; if none fits, ask the DM. Track backfill rows in status.md.
+
+The DM's sprint-2 playtest feedback became #201–#203; their playtest scripts are in [sprint-2](sprint-2.md#playtest-sprint-2-features).
 
 Lessons from sprint 2 (2026-10-15/16), on top of the ones below:
 - **Wait for the builder's commit before you check its worktree.** Running `check` / `e2e` while a builder's own e2e runs collides (Playwright trace ENOENT, ports) and merging main into a dirty tree mixes states. Poll `git status --short` clean + agent not working + "ready" in its output.

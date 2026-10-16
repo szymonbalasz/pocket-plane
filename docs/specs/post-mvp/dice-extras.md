@@ -8,6 +8,8 @@ phase: post-mvp
 
 # Dice extras (post-MVP stub)
 
+> **In scope for sprint 3 (DM decision [#203](../../decisions-log.md), 2026-10-16):** 3D dice, a dice tray, clickable dice notation in free text, and **dice customisation** (per-player dice look). Expand this stub into `docs/specs/dice-extras.md` (prefix DICEX) in sprint 3. A 3D / physics library is a new dependency (AGENTS §3: needs the DM's OK at gate 1).
+
 Beyond MVP [dice-roll-log](../dice-roll-log.md). Ranking in [feature tiers](../../feature-tiers.md#3-character-sheet-and-dice).
 
 | Tier | Feature |

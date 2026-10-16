@@ -52,8 +52,23 @@ Don't paste these into sub-agents wholesale. Give each agent only the files its 
 - **Start an agent:** split a pane in the target worktree workspace (`--no-focus`), then run `herdr agent start <name> --kind <kind> --pane <id>`.
 - **Prompt an agent:** `herdr agent prompt <name> "<brief>" --wait --timeout <ms>`. Read results with `herdr agent read <name> --source recent-unwrapped`. If the output is too long, have the agent write its report to a file in the worktree and reply with the path only.
 - **Blocked agents:** if an agent sits at an approval or question prompt, read it and bring it to me. Never approve on my behalf.
-- **Concurrency:** at most **4 working agents** at once. Test agents count toward the limit.
+- **Concurrency:** at most **4 working agents** at once, and aim for 3–4 (§3a). Test agents count toward the limit.
 - **Cleanup:** when a task is merged, end its agents and remove its worktree. Only touch panes, workspaces and worktrees you created.
+
+## 3a. Keep the agents busy (backfill)
+
+DM decision [#204](../decisions-log.md): parallel agents are the point; a single working agent means we're running in series.
+
+- **Target:** 3–4 working agents whenever there is work. Check the count every time you poll (`herdr agent list`: count `working`).
+- **Queue first:** the sprint plan's next unblocked task (a spec, a builder slice, a walkthrough, a review). Start it before anything else.
+- **Backfill rule:** if only **one** agent is working and nothing in the sprint queue is unblocked, pick an item from [backlog](backlog.md) **without asking the DM**, if it is:
+  - independently buildable and testable (own branch `fix/bl-<nn>-<slug>`, thin walkthrough or e2e);
+  - free of locked files ([status](status.md) "Shared-file locks") and of shared core files another branch holds;
+  - free of product decisions (an integrator ruling is fine; log it).
+  - Prefer S items; at most **two** backfill branches at once, so sprint work always has a free slot.
+- **Nothing eligible:** ask the DM for the next thing (one line, 2–3 options and your pick). Don't idle silently.
+- **Tracking:** backfill branches get their own rows in status.md, tagged `backfill (BL-nn)`; mark the backlog row `picked (<branch>, <date>)`, then `done (#nnn)` at merge; log each merged backfill in the decisions log (one row may cover several). Sprint work always wins a contested slot or lock: pause or finish a backfill branch rather than delaying the sprint.
+- **New backlog items:** walkthrough / session-sim glitches not fixed in their branch go into backlog.md with the evidence path.
 
 ## 4. Context management
 
