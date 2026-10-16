@@ -35,6 +35,8 @@ export interface DiceExtrasState {
   request: TrayRequest | null;
   /** Bumped per stage: the runtime opens the tray on a change (FR-DICEX-01). */
   staged: number;
+  /** The tray's roll mode (FR-DICEX-05): the staged request's, back to normal after a roll. */
+  mode: RollMode;
   /** A tray Roll is in flight (`rolling`). */
   rolling: boolean;
   /** The tray's last own roll, shown in `result` (FR-DICEX-10). */
@@ -43,6 +45,8 @@ export interface DiceExtrasState {
   pending: boolean;
   /** The running throw; `seq` tells a new throw from a re-render. */
   current: { t: DiceThrow; seq: number } | null;
+  /** The throw a new one interrupted: it snaps to rest and fades (FR-DICEX-18). */
+  leaving: { t: DiceThrow; seq: number } | null;
 }
 
 export interface DiceExtrasTimers {
@@ -53,6 +57,8 @@ export interface DiceExtrasTimers {
 export interface DiceExtrasStore {
   api: StoreApi<DiceExtrasState>;
   stage(request: TrayRequest): void;
+  /** The tray's mode toggle. */
+  setMode(mode: RollMode): void;
   /** Esc / Clear / the tray window closed. */
   clear(): void;
   /** A roll left this client (button or tray); `tray` = from the tray (→ `rolling`). */
@@ -61,7 +67,7 @@ export interface DiceExtrasStore {
   failed(): void;
   /** This client's first new own `roll` entries arrived in one frame. */
   ownRolled(entries: GameLogEntryView[]): void;
-  /** A new throw (FR-DICEX-18: it replaces the running one). */
+  /** A new throw (FR-DICEX-18: the running one becomes `leaving`, snaps to rest and fades). */
   play(t: DiceThrow): void;
   /** The throw `seq` faded out. */
   done(seq: number): void;
@@ -75,10 +81,12 @@ const browserTimers: DiceExtrasTimers = {
 const initial = (): DiceExtrasState => ({
   request: null,
   staged: 0,
+  mode: "normal",
   rolling: false,
   result: null,
   pending: false,
   current: null,
+  leaving: null,
 });
 
 export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers): DiceExtrasStore {
@@ -92,7 +100,16 @@ export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers):
   return {
     api,
     stage(request) {
-      api.setState((s) => ({ request, staged: s.staged + 1, rolling: false, result: null }));
+      api.setState((s) => ({
+        request,
+        staged: s.staged + 1,
+        mode: request.mode,
+        rolling: false,
+        result: null,
+      }));
+    },
+    setMode(mode) {
+      api.setState({ mode });
     },
     clear() {
       api.setState({ request: null, rolling: false, result: null });
@@ -103,7 +120,12 @@ export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers):
         timer = null;
         api.setState({ pending: false, rolling: false });
       }, PENDING_MS);
-      api.setState((s) => ({ pending: true, rolling: tray || s.rolling }));
+      // FR-DICEX-05: Adv / Dis never sticks to the next tray roll (a later 50d6 would be refused).
+      api.setState((s) =>
+        tray
+          ? { pending: true, rolling: true, mode: "normal" }
+          : { pending: true, rolling: s.rolling },
+      );
     },
     failed() {
       stopTimer();
@@ -118,10 +140,12 @@ export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers):
     },
     play(t) {
       seq += 1;
-      api.setState({ current: { t, seq } });
+      api.setState((s) => ({ current: { t, seq }, leaving: s.current }));
     },
     done(n) {
-      if (api.getState().current?.seq === n) api.setState({ current: null });
+      const s = api.getState();
+      if (s.current?.seq === n) api.setState({ current: null });
+      if (s.leaving?.seq === n) api.setState({ leaving: null });
     },
   };
 }

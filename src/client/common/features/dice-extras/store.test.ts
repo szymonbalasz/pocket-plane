@@ -85,7 +85,9 @@ test("FR-DICEX-18 one throw at a time: a new throw replaces the running one", ()
   const first = s.api.getState().current?.seq ?? -1;
   s.play(aThrow("b"));
   expect(s.api.getState().current?.t.id).toBe("b");
+  expect(s.api.getState().leaving?.t.id).toBe("a"); // snaps to rest and fades
   s.done(first); // the old throw's fade ends: no effect on the new one
+  expect(s.api.getState().leaving).toBeNull();
   expect(s.api.getState().current?.t.id).toBe("b");
   s.done(s.api.getState().current?.seq ?? -1);
   expect(s.api.getState().current).toBeNull();

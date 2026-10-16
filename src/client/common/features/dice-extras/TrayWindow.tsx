@@ -54,7 +54,8 @@ import {
   useRollControl,
 } from "../dice-roll-log/roll-control";
 import { FlatDie } from "./FlatDie";
-import { THREE_D_AVAILABLE, useDiceSettings } from "./settings";
+import { useThreeD } from "./lazy3d";
+import { useDiceSettings } from "./settings";
 import { diceExtras, type TrayRequest, useDiceExtras } from "./store";
 import { trayExtras } from "./tray-extras";
 import {
@@ -255,7 +256,8 @@ const signed = (n: number) => (n === 0 ? "" : n > 0 ? `+${n}` : `−${-n}`);
 /** FR-DICEX-21 / DICEX §7: render 3D / Flat / Off, "Show others' rolls", "Dice look…". */
 function SettingsPopover() {
   const { settings, set } = useDiceSettings();
-  const shown = settings.render === "3d" && !THREE_D_AVAILABLE ? "flat" : settings.render;
+  const threeD = useThreeD();
+  const shown = settings.render === "3d" && !threeD.available ? "flat" : settings.render;
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -286,16 +288,18 @@ function SettingsPopover() {
                 value={r}
                 data-testid="dicex-settings-render"
                 data-value={r}
-                disabled={r === "3d" && !THREE_D_AVAILABLE}
+                disabled={r === "3d" && !threeD.available}
                 className="h-7 px-3"
               >
                 {r === "3d" ? "3D" : r === "flat" ? "Flat" : "Off"}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
-          {!THREE_D_AVAILABLE && (
-            <p className="text-xs text-muted-foreground">
-              3D dice aren't available yet: dice show flat.
+          {threeD.reason && (
+            <p data-testid="dicex-settings-3d-hint" className="text-xs text-muted-foreground">
+              {threeD.reason === "no-webgl"
+                ? "3D unavailable on this device"
+                : "3D dice couldn't load: dice show flat this session."}
             </p>
           )}
         </div>
@@ -375,7 +379,7 @@ export function TrayWindow() {
   const live = useSync((s) => s.state === "live");
   const connection = useSync((s) => s.connection);
   const actors = useActors();
-  const [mode, setMode] = useState<RollMode>(request?.mode ?? "normal");
+  const mode = useDiceExtras((s) => s.mode);
   const [held, trackKeys] = useHeldMode();
   const [error, setError] = useState<string | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -383,11 +387,10 @@ export function TrayWindow() {
   const [draft, setDraft] = useState(free?.expression ?? "");
   const lastValid = useRef(termsOf(draft) ?? []);
 
-  // A new stage resets the tray's mode and draft to the request's (FR-DICEX-02).
+  // A new stage resets the draft to the request's (FR-DICEX-02); the store resets the mode.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per stage (`staged`)
   useEffect(() => {
     const r = diceExtras.api.getState().request;
-    setMode(r?.mode ?? "normal");
     setError(null);
     if (r?.kind === "free") {
       setDraft(r.expression);
@@ -648,7 +651,7 @@ export function TrayWindow() {
               value={mode}
               disabled={!request || state === "rolling"}
               onValueChange={(v) => {
-                if (v) setMode(v as RollMode);
+                if (v) diceExtras.setMode(v as RollMode);
               }}
             >
               {(["disadvantage", "normal", "advantage"] as const).map((m) => (
