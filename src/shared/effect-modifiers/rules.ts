@@ -124,7 +124,7 @@ export function presetUses(
   preset: Pick<EffectPresetRecord, "usesFeatureId">,
   features: readonly Pick<FeatureRow, "id" | "name" | "usesMax" | "used">[] | undefined,
 ): PresetUses | null {
-  const id = preset.usesFeatureId;
+  const id = preset.usesFeatureId ?? null;
   if (id === null) return null;
   const f = features?.find((r) => r.id === id);
   if (!f || !hasUses(f)) return { state: "broken" };
