@@ -55,6 +55,7 @@ import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/par
 import { pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
 import {
   startedIn,
+  toastIntentError,
   useCbtIntent,
   useCombatants,
   useStartedEncounter,
@@ -83,6 +84,7 @@ import {
 } from "@ui/features/play-shell/ShellContext";
 import { movementIndicator } from "@ui/features/scenes-map/movement";
 import { cn } from "@ui/lib/utils";
+import { IntentRejected } from "@ui/sync/connection";
 import { useRecords, useSync } from "@ui/sync/store";
 import {
   DicesIcon,
@@ -121,6 +123,7 @@ import { HpDialog } from "./hp-dialog";
 import { isDamageCard, pendingRowText } from "./pending";
 import { useCombatDialogs } from "./popup-store";
 import { idleInitiativeOnLoad } from "./start-end";
+import { startReason } from "./start-reason";
 
 /**
  * FR-CBTX-46 (G1): the Init column is wide while some row can roll (round 0, a late joiner
@@ -821,11 +824,12 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
   const startEnd = useStartEnd();
   const store = useSync((s) => s.store);
   const openAdd = useCbtxDialogs((s) => s.openAdd);
+  const start = useStartRound(enc.round, rows);
   /**
    * FR-CBT-50: skipped names from the order at send time, toasted once the step is acked. A dead
    * PC skips like a monster at 0 (FR-CBTX-25): "Skipped Thorn (dead)".
    */
-  const step = async (direction: "next" | "prev") => {
+  const step = async (direction: "next" | "prev", sender: typeof send = send) => {
     const dead = new Set(rows.filter((c) => deadPc(store, c)).map((c) => c.name));
     const turnRows = rows.map((c) => ({
       id: c.id,
@@ -837,7 +841,7 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
       initiative: c.initiative ?? null,
     }));
     const skipped = skippedOnStep(turnRows, enc.round, enc.turnCombatantId ?? null, direction);
-    const r = await send<TurnResult>(
+    const r = await sender<TurnResult>(
       direction === "next" ? "cbt.nextTurn" : "cbt.prevTurn",
       turnArgs,
     );
@@ -917,14 +921,22 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
         >
           Prev
         </Button>
-        <Button
-          size="sm"
-          data-testid="cbt-init-next"
-          disabled={disabled}
-          onClick={() => void step("next")}
-        >
-          {enc.round === 0 ? "Start round 1" : "Next"}
-        </Button>
+        {enc.round === 0 ? (
+          <StartButton
+            reason={start.reason}
+            disabled={disabled || start.busy}
+            onClick={() => (start.blocked ? start.pulse() : void step("next", start.send))}
+          />
+        ) : (
+          <Button
+            size="sm"
+            data-testid="cbt-init-next"
+            disabled={disabled}
+            onClick={() => void step("next")}
+          >
+            Next
+          </Button>
+        )}
         <Tooltip content={undoText}>
           <span>
             <Button
@@ -967,8 +979,89 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
           <UserPlusIcon className="size-3.5" /> Add…
         </Button>
       </div>
+      {start.reason && (
+        <p
+          id={START_REASON_ID}
+          data-testid="cbt-init-start-reason"
+          data-flash={start.flash || undefined}
+          className={cn(
+            "text-xs transition-colors",
+            start.flash ? "font-medium text-foreground" : "text-muted-foreground",
+          )}
+        >
+          {start.reason}
+        </p>
+      )}
     </div>
   );
+}
+
+const START_REASON_ID = "cbt-init-start-reason";
+const FLASH_MS = 700;
+
+/**
+ * BL-02 (FR-CBT-14): while a non-removed combatant lacks initiative, Start stays clickable but
+ * says why and sends nothing (a click flashes the reason). A `conflict` the server still answers
+ * (a race) shows its message in the same line instead of a Toast.
+ */
+function useStartRound(round: number, rows: CombatantView[]) {
+  const connection = useSync((s) => s.connection);
+  const missing = round === 0 ? startReason(rows) : null;
+  const [rejected, setRejected] = useState<string | null>(null);
+  const [flash, setFlash] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // A stale rejection goes once the rows or round change.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a reset keyed on these inputs
+  useEffect(() => setRejected(null), [round, rows]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const pulse = () => {
+    clearTimeout(timer.current);
+    setFlash(true);
+    timer.current = setTimeout(() => setFlash(false), FLASH_MS);
+  };
+  const send = async <R,>(name: string, payload: unknown): Promise<R | undefined> => {
+    if (inFlight.current) return undefined;
+    inFlight.current = true;
+    setBusy(true);
+    try {
+      return ((await connection.sendIntent(name, payload)) ?? null) as R;
+    } catch (err) {
+      if (err instanceof IntentRejected && err.code === "conflict") {
+        setRejected(err.message);
+        pulse();
+      } else toastIntentError(err);
+      return undefined;
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  };
+  return { reason: missing ?? rejected, blocked: missing !== null, flash, busy, pulse, send };
+}
+
+function StartButton({
+  reason,
+  disabled,
+  onClick,
+}: {
+  reason: string | null;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const button = (
+    <Button
+      size="sm"
+      data-testid="cbt-init-next"
+      aria-describedby={reason ? START_REASON_ID : undefined}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      Start round 1
+    </Button>
+  );
+  return reason ? <Tooltip content={reason}>{button}</Tooltip> : button;
 }
 
 function DmInitiativeBody() {
