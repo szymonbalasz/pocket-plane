@@ -177,10 +177,8 @@ describe("FR-MOD-17 a mode only from effects the player can't see (R2 ruling)", 
     const hit = rollRow(t, p.toHit?.rollId as string);
     const dice = hit?.dice as DieResult[];
     expect([hit?.mode, hit?.manual, hit?.expression]).toEqual(["advantage", true, "2d20kh1+4"]);
-    expect(dice.map((d) => [d.value === 11, d.auto])).toEqual([
-      [true, undefined],
-      [false, true],
-    ]);
+    // The auto die is unseeded and may also show 11: check only the entered die's value.
+    expect([dice[0]?.value, ...dice.map((d) => d.auto)]).toEqual([11, undefined, true]);
     const kept = Math.max(11, dice[1]?.value ?? 0);
     expect([hit?.total, hit?.natural]).toEqual([kept + 4, kept]);
     for (const seen of [JSON.stringify(p), playerFrames(t)]) {
