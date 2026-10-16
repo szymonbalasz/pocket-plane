@@ -4,7 +4,12 @@
 // (FR-SCN-36; `rev` + 1 only when an `f` flips). A token whose party-level hidden flips runs the
 // token-changed hooks (combat copies, FR-FOG-13 / -14). Subject rows first, then hook rows.
 // `updatedAt` moves only with a wire-visible field (`fogged`, `f`): a `seenBy`-only change is
-// invisible on every wire and dropped from frames (FR-SYNC-19 as amended). V0: static only.
+// invisible on every wire and dropped from frames (FR-SYNC-19 as amended). Static only (V0 / V1):
+// darkness shapes' `seenBy` (FR-FOG-44) is rewritten too; a change lists the `fog` row first (its
+// player wire differs only for players whose filtered `darkness` changed).
+
+import { FOG_TYPE } from "@shared/fog-of-war/schemas";
+import type { DarknessRow } from "@shared/fog-of-war/shapes";
 import {
   doorCells,
   doorSamplePoints,
@@ -32,7 +37,15 @@ import {
 import { readScene, readToken, sceneTokens } from "../scenes-map/rows";
 import { runTokenChangedHooks } from "../scenes-map/token-hooks";
 import { type SceneHookEnv, tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
-import { loadSceneStatic, type SceneStatic, sameSeenBy, subjectCopies } from "./derive";
+import {
+  darknessSeenBy,
+  loadMemory,
+  loadSceneStatic,
+  type SceneStatic,
+  sameSeenBy,
+  subjectCopies,
+} from "./derive";
+import { readFogRecord } from "./rows";
 
 export interface RederiveOptions {
   /** Run token-changed hooks on party-level flips (default true). */
@@ -161,8 +174,27 @@ function rederiveDoors(env: SceneHookEnv, st: SceneStatic, now: string, o: Reder
 }
 
 /**
- * FR-FOG-35: every fog subject on the scene whose copies change, then token-hook rows. Callers:
- * fog commands, activation of a stale scene, a new player (active scene), the boot backfill.
+ * FR-FOG-44: each darkness shape's `seenBy` against the scene's static state and memory. Writes
+ * the row (no `rev` bump: vision doesn't depend on it) and returns its `fog` change, or null.
+ */
+export function rederiveDarkness(env: Pick<SceneHookEnv, "tx">, st: SceneStatic) {
+  if (st.darkness.length === 0) return null;
+  const memory = loadMemory(env.tx, st.sceneId);
+  const next: DarknessRow[] = st.darkness.map((d) => ({
+    ...d,
+    seenBy: darknessSeenBy(st, d, memory),
+  }));
+  if (next.every((d, i) => sameSeenBy(st.darkness[i]?.seenBy, d.seenBy ?? []))) return null;
+  const before = readFogRecord(env.tx, st.sceneId);
+  env.tx.update(sceneFog).set({ darkness: next }).where(eq(sceneFog.sceneId, st.sceneId)).run();
+  const after = readFogRecord(env.tx, st.sceneId);
+  return { type: FOG_TYPE, id: st.sceneId, before, after } satisfies RecordChange;
+}
+
+/**
+ * FR-FOG-35: the `fog` row if a darkness `seenBy` changes, every fog subject on the scene whose
+ * copies change, then token-hook rows. Callers: fog commands (they list their own `fog` change
+ * and drop this one), activation of a stale scene, a new player (active scene), the boot backfill.
  */
 export function rederiveScene(
   env: SceneHookEnv,
@@ -172,8 +204,10 @@ export function rederiveScene(
   const st = loadSceneStatic(env.tx, sceneId);
   if (!st) return [];
   const now = env.ctx.clock.iso();
+  const darkness = rederiveDarkness(env, st);
   const tokens = rederiveTokens(env, st, now, o);
   return [
+    ...(darkness ? [darkness] : []),
     ...tokens.changes,
     ...rederiveProps(env, st, now, o),
     ...rederiveTemplates(env, st, now, o),

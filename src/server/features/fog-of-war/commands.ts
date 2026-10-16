@@ -1,59 +1,91 @@
-// fog-of-war commands (FOG §6, §9; protocol §35). DM-only WS intents `fog.edit`, `fog.setAll`,
-// `fog.undo`. Each is one transaction (FR-FOG-08): the `fog` row + its undo entry (or the undone
-// entry's delete) + every fog subject (token, prop, kept template) whose `fogged` flips + the
-// scene's `scene-structure` row if a door flag flips + token-changed hook rows for a fog-hidden
-// flip (FR-FOG-13, `rederive.ts`) + one event-log entry → `FogEdited` / `FogUndone`. IDs and time
-// from ctx. Works on any scene of the campaign, active or not (FR-FOG-09).
-import { FogEdited, FogUndone } from "@shared/events/fog-of-war";
+// fog-of-war commands (FOG §6, §9; protocol §35, §38). DM-only WS intents: `fog.edit` (append a
+// fog shape), `fog.setAll`, `fog.undo`, the darkness intents (`fog.placeDarkness` /
+// `moveDarkness` / `removeDarkness` / `clearDarkness`), `fog.setExplored` and
+// `fog.forgetExplored`. Each is one transaction (FR-FOG-08): the `fog` row (`rev` + 1) + its undo
+// entry (or the undone entry's delete) + the scene re-derive (fog subjects whose copies change,
+// door flags, darkness `seenBy`, token-changed hook rows; `rederive.ts`) + one event-log entry →
+// one event. Fog edits and darkness edits share one LIFO undo stack (FR-FOG-07, #207 G12). IDs
+// and time from ctx. Works on any scene of the campaign, active or not (FR-FOG-09).
 import {
-  type FogMask,
+  DarknessCleared,
+  DarknessMoved,
+  DarknessPlaced,
+  DarknessRemoved,
+  ExploredForgotten,
+  FogEdited,
+  FogExploredSet,
+  FogUndone,
+} from "@shared/events/fog-of-war";
+import {
   type FogRow,
   fogBox,
   maskOf,
   rebase,
   rowOf,
-  runsWithinCap,
   sameMask,
   uniformMask,
 } from "@shared/fog-of-war/mask";
-import { applyShape, polygonProblem } from "@shared/fog-of-war/raster";
 import {
+  FOG_EXPLORED_TYPE,
   FOG_INTENTS,
   FOG_TYPE,
   FOG_UNDO_MAX,
+  FogClearDarknessInput,
   FogEditInput,
   type FogEditKind,
   type FogEditResult,
-  type FogRecord,
+  FogForgetExploredInput,
+  FogMoveDarknessInput,
+  FogPlaceDarknessInput,
+  type FogPlaceDarknessResult,
+  FogRemoveDarknessInput,
   FogSetAllInput,
-  type FogShape,
+  FogSetExploredInput,
   FogUndoInput,
 } from "@shared/fog-of-war/schemas";
+import {
+  DARKNESS_MAX,
+  type DarknessRow,
+  FOG_ROW_BYTES_MAX,
+  FOG_SHAPES_MAX,
+  type FogLayerShape,
+  FogShapeGeom,
+  type FogShapeOp,
+  legacyShape,
+  normaliseShape,
+  type ShapeLike,
+  shapeProblem,
+  translateShape,
+} from "@shared/fog-of-war/shapes";
 import type { SceneRecord } from "@shared/scenes-map/schemas";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
-import { conflict, invalid } from "../../commands/errors";
+import { conflict, invalid, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
-import { sceneFog, sceneFogEdit, sceneFogEditSeqNext } from "../../db/schema";
+import { fogExplored, sceneFog, sceneFogEdit, sceneFogEditSeqNext } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import type { Logger } from "../../log";
 import { campaignOf, getScene } from "../scenes-map/rows";
 import { readFogRow } from "./hooks";
 import { rederiveScene } from "./rederive";
-import { readFogRecord, type ServerFogRecord } from "./rows";
+import { dmFogRecord, readFogRecord, type ServerFogRecord, sceneExploredRecords } from "./rows";
 
-/** FR-FOG-04: over the run cap → nothing written. */
-export const FOG_TOO_DETAILED = "Fog too detailed — reveal or hide larger areas";
+/** FR-FOG-27: over the shape cap or the 16 KiB row → nothing written. */
+export const FOG_TOO_DETAILED = "Fog too detailed — use Fog all or Reveal all to start over";
+/** FR-FOG-27: over the darkness cap. */
+export const FOG_TOO_MANY_DARKNESS = "Too many darkness areas";
 /** FR-FOG-07: stale `expectedEditId`. */
 export const FOG_CHANGED = "Fog changed — check and undo again";
 export const FOG_NOTHING_TO_UNDO = "Nothing to undo";
+/** FR-FOG-30: unknown darkness id on the scene. */
+export const DARKNESS_NOT_FOUND = "Darkness area not found";
 
 /** Every cell clear: what a scene without a `fog` row holds (FR-FOG-01). */
 const CLEAR_ROW: FogRow = { fill: "clear", box: [0, 0, 0, 0], runs: "" };
 
 const fogChange = (
-  before: ServerFogRecord | FogRecord | null,
-  after: ServerFogRecord | FogRecord | null,
+  before: ServerFogRecord | null,
+  after: ServerFogRecord | null,
 ): RecordChange => ({
   type: FOG_TYPE,
   id: (after ?? before)?.id as string,
@@ -61,24 +93,31 @@ const fogChange = (
   after,
 });
 
-/** The scene's stored mask; a corrupt row is fully fogged and logged (FR-FOG-04, fail closed). */
-function currentMask(tx: Tx, log: Logger, sceneId: string): { row: FogRow; mask: FogMask } {
+/** The scene's stored mask row; a corrupt row is fully fogged and logged (FR-FOG-04, fail closed). */
+function currentRow(tx: Tx, log: Logger, sceneId: string): FogRow {
   const row = readFogRow(tx, sceneId);
   const { mask, corrupt } = maskOf(row);
   if (corrupt) {
     log.error(`fog: scene ${sceneId} has corrupt runs; treated as fully fogged`);
-    return { row: rowOf(mask), mask };
+    return rowOf(mask);
   }
-  return { row: row ?? CLEAR_ROW, mask };
+  return row ?? CLEAR_ROW;
 }
 
-/** Writes the scene's `fog` row (insert or replace the base mask; `rev` + 1, FR-FOG-08). */
-function writeRow(
-  env: CommandEnv,
-  s: SceneRecord,
-  r: FogRow,
-  extra: Partial<Pick<typeof sceneFog.$inferInsert, "shapes" | "darkness">> = {},
-) {
+/** Shapes, darkness and the Explored setting stored now (no row: none, off). */
+function layers(env: Pick<CommandEnv, "tx">, sceneId: string) {
+  const r = env.tx
+    .select({ shapes: sceneFog.shapes, darkness: sceneFog.darkness, explored: sceneFog.explored })
+    .from(sceneFog)
+    .where(eq(sceneFog.sceneId, sceneId))
+    .get();
+  return { shapes: r?.shapes ?? [], darkness: r?.darkness ?? [], explored: r?.explored ?? false };
+}
+
+type RowExtra = Partial<Pick<typeof sceneFog.$inferInsert, "shapes" | "darkness" | "explored">>;
+
+/** Writes the scene's `fog` row (insert or replace; `rev` + 1, FR-FOG-08). */
+function writeRow(env: CommandEnv, s: SceneRecord, r: FogRow, extra: RowExtra = {}) {
   const values = {
     fill: r.fill,
     col0: r.box[0],
@@ -99,17 +138,15 @@ function writeRow(
     .run();
 }
 
-/** Shapes and darkness stored now (FR-FOG-07: the undo entry keeps them). */
-function layers(env: CommandEnv, sceneId: string) {
-  const r = env.tx
-    .select({ shapes: sceneFog.shapes, darkness: sceneFog.darkness })
-    .from(sceneFog)
-    .where(eq(sceneFog.sceneId, sceneId))
-    .get();
-  return { shapes: r?.shapes ?? [], darkness: r?.darkness ?? [] };
+/** FR-FOG-27: the serialized DM row stays ≤ 16 KiB (checked after the write, rolled back if over). */
+function checkRowBytes(env: CommandEnv, sceneId: string) {
+  const r = readFogRecord(env.tx, sceneId);
+  if (r && Buffer.byteLength(JSON.stringify(dmFogRecord(r))) > FOG_ROW_BYTES_MAX) {
+    throw conflict(FOG_TOO_DETAILED);
+  }
 }
 
-/** FR-FOG-07: pushes an undo entry (the mask before) and drops the oldest past the depth cap. */
+/** FR-FOG-07: pushes an undo entry (base + shapes + darkness before) and drops the oldest past 20. */
 function pushUndo(env: CommandEnv, s: SceneRecord, kind: FogEditKind, prev: FogRow): string {
   const id = env.ctx.ids.next();
   const before = layers(env, s.id);
@@ -145,75 +182,117 @@ function pushUndo(env: CommandEnv, s: SceneRecord, kind: FogEditKind, prev: FogR
   return id;
 }
 
-/** Commits a new mask as one undoable edit and emits `FogEdited` (FR-FOG-05 / -06 / -08). */
+/** The scene's re-derive rows, without its own `fog` change (the command lists that one). */
+const subjectsOf = (env: CommandEnv, sceneId: string) =>
+  rederiveScene(env, sceneId).filter((c) => c.type !== FOG_TYPE);
+
+/**
+ * One undoable fog / darkness edit (FR-FOG-07 / -08): undo entry (the state before), the new row,
+ * caps, the re-derive and one event whose changes start with the `fog` upsert.
+ */
 function commitEdit(
   env: CommandEnv,
   s: SceneRecord,
   prev: FogRow,
-  next: FogMask,
-  kind: FogEditKind,
-  shape?: FogShape,
-): FogEditResult {
-  const row = rowOf(next);
-  if (!runsWithinCap(row.runs)) throw conflict(FOG_TOO_DETAILED);
+  next: { row: FogRow; extra: RowExtra; kind: FogEditKind },
+  event: (editId: string) => { type: string; payload: Record<string, unknown> },
+): string {
   const before = readFogRecord(env.tx, s.id);
-  const editId = pushUndo(env, s, kind, prev);
-  writeRow(env, s, row);
-  const subjects = rederiveScene(env, s.id);
+  const editId = pushUndo(env, s, next.kind, prev);
+  writeRow(env, s, next.row, next.extra);
+  checkRowBytes(env, s.id);
+  const subjects = subjectsOf(env, s.id);
+  const e = event(editId);
   env.emit({
-    type: FogEdited.type,
+    type: e.type,
     campaignId: s.campaignId,
-    payload: { sceneId: s.id, editId, kind, ...(shape ? { shape } : {}) },
+    payload: e.payload,
     changes: [fogChange(before, readFogRecord(env.tx, s.id)), ...subjects],
   });
-  return { editId };
+  return editId;
 }
 
-/** The masks a fog command works from: the stored row and its mask re-based to the box. */
-function editBase(env: CommandEnv, log: Logger, sceneId: string) {
-  const s = getScene(env.tx, campaignOf(env.actor), sceneId);
-  const { row, mask } = currentMask(env.tx, log, s.id);
-  return { s, prev: row, base: rebase(mask, fogBox(s)) };
+/** FR-FOG-26: a refused shape → `invalid` with the gesture's copy. */
+function checkShape(s: ShapeLike, path: string[]) {
+  const problem = shapeProblem(s);
+  if (problem === "crossing") {
+    throw invalid("Edges can't cross", [{ path, message: "Crossing" }]);
+  }
+  if (problem === "zero-area") {
+    throw invalid("The shape has no area", [{ path, message: "Zero area" }]);
+  }
+}
+
+function findDarkness(darkness: readonly DarknessRow[], id: string): DarknessRow {
+  const d = darkness.find((x) => x.id === id);
+  if (!d) throw notFound(DARKNESS_NOT_FOUND);
+  return d;
 }
 
 export function fogCommands(log: Logger) {
-  /** FR-FOG-05: reveal / hide a rectangle or polygon; no cell changes → no event, `editId: null`. */
+  const target = (env: CommandEnv, sceneId: string) => {
+    const s = getScene(env.tx, campaignOf(env.actor), sceneId);
+    return { s, prev: currentRow(env.tx, log, s.id), now: layers(env, s.id) };
+  };
+
+  /**
+   * FR-FOG-05 / -26 / -27: append one fog shape (`hide` = `fog`; legacy cell rects / corner
+   * polygons as their v2 shapes, undo kind `reveal | hide-rect | polygon` as in sprint 2). Every
+   * edit appends and writes an undo entry.
+   */
   const edit = defineCommand({
     name: FOG_INTENTS.edit,
     input: FogEditInput,
     execute({ sceneId, op, shape }, env): FogEditResult {
-      const { s, prev, base } = editBase(env, log, sceneId);
-      if (shape.kind === "polygon") {
-        const problem = polygonProblem(shape.points);
-        if (problem === "crossing") {
-          throw invalid("Edges can't cross", [{ path: ["shape", "points"], message: "Crossing" }]);
-        }
-        if (problem === "zero-area") {
-          throw invalid("The polygon has no area", [
-            { path: ["shape", "points"], message: "Zero area" },
-          ]);
-        }
-      }
-      const { mask, changed } = applyShape(base, op, shape);
-      if (!changed) return { editId: null };
-      const kind = `${op}-${shape.kind === "rect" ? "rect" : "polygon"}` as FogEditKind;
-      return commitEdit(env, s, prev, mask, kind, shape);
+      const { s, prev, now } = target(env, sceneId);
+      const geom = "kind" in shape ? legacyShape(shape) : normaliseShape(shape);
+      checkShape(geom, ["shape"]);
+      if (now.shapes.length >= FOG_SHAPES_MAX) throw conflict(FOG_TOO_DETAILED);
+      const fogOp: FogShapeOp = op === "hide" ? "fog" : op;
+      const added = { op: fogOp, ...geom } as FogLayerShape;
+      // Sprint-2 inputs keep their sprint-2 kinds (FR-FOG-05: they behave as before).
+      const legacy = "kind" in shape && (op === "reveal" || op === "hide");
+      const kind = (legacy ? `${op}-${shape.kind}` : `${fogOp}-shape`) as FogEditKind;
+      const editId = commitEdit(
+        env,
+        s,
+        prev,
+        { row: prev, extra: { shapes: [...now.shapes, added] }, kind },
+        (id) => ({
+          type: FogEdited.type,
+          payload: { sceneId: s.id, editId: id, kind, shape: geom },
+        }),
+      );
+      return { editId };
     },
   });
 
-  /** FR-FOG-06: Fog all / Reveal all over the current box; same value → no-op. */
+  /** FR-FOG-06: base → uniform over the current box, shapes cleared; same value, no shapes → no-op. */
   const setAll = defineCommand({
     name: FOG_INTENTS.setAll,
     input: FogSetAllInput,
     execute({ sceneId, fogged }, env): FogEditResult {
-      const { s, prev, base } = editBase(env, log, sceneId);
-      const next = uniformMask(fogged ? "fog" : "clear", base.box);
-      if (sameMask(base, next)) return { editId: null };
-      return commitEdit(env, s, prev, next, fogged ? "fog-all" : "reveal-all");
+      const { s, prev, now } = target(env, sceneId);
+      const box = fogBox(s);
+      const next = uniformMask(fogged ? "fog" : "clear", box);
+      const same = sameMask(rebase(maskOf(prev).mask, box), next);
+      if (same && now.shapes.length === 0) return { editId: null };
+      const kind: FogEditKind = fogged ? "fog-all" : "reveal-all";
+      const editId = commitEdit(
+        env,
+        s,
+        prev,
+        { row: rowOf(next), extra: { shapes: [] }, kind },
+        (id) => ({ type: FogEdited.type, payload: { sceneId: s.id, editId: id, kind } }),
+      );
+      return { editId };
     },
   });
 
-  /** FR-FOG-07: strict LIFO; stale `expectedEditId` or an empty stack → `conflict`. */
+  /**
+   * FR-FOG-07: strict LIFO over fog and darkness edits; restores base + shapes + darkness (pre-v2
+   * entries: shapes [], darkness kept). Stale `expectedEditId` or an empty stack → `conflict`.
+   */
   const undo = defineCommand({
     name: FOG_INTENTS.undo,
     input: FogUndoInput,
@@ -235,7 +314,6 @@ export function fogCommands(log: Logger) {
         runs: latest.prevRuns,
       });
       if (corrupt) log.error(`fog: undo entry ${latest.id} has corrupt runs; fully fogged`);
-      // FR-FOG-07: pre-v2 entries (null) → shapes [], darkness unchanged.
       writeRow(env, s, rowOf(mask), {
         shapes: latest.prevShapes ?? [],
         ...(latest.prevDarkness ? { darkness: latest.prevDarkness } : {}),
@@ -243,7 +321,7 @@ export function fogCommands(log: Logger) {
       tx.delete(sceneFogEdit)
         .where(and(eq(sceneFogEdit.id, latest.id), eq(sceneFogEdit.sceneId, s.id)))
         .run();
-      const subjects = rederiveScene(env, s.id);
+      const subjects = subjectsOf(env, s.id);
       env.emit({
         type: FogUndone.type,
         campaignId: s.campaignId,
@@ -253,7 +331,152 @@ export function fogCommands(log: Logger) {
     },
   });
 
-  return { edit, setAll, undo };
+  /** FR-FOG-28 / -30: a new darkness shape (id from ctx); ≤ 20 per scene. */
+  const placeDarkness = defineCommand({
+    name: FOG_INTENTS.placeDarkness,
+    input: FogPlaceDarknessInput,
+    execute({ sceneId, shape }, env): FogPlaceDarknessResult {
+      const { s, prev, now } = target(env, sceneId);
+      const geom = normaliseShape(shape);
+      checkShape(geom, ["shape"]);
+      if (now.darkness.length >= DARKNESS_MAX) throw conflict(FOG_TOO_MANY_DARKNESS);
+      const darknessId = env.ctx.ids.next();
+      const added = { id: darknessId, ...geom } as DarknessRow;
+      const editId = commitEdit(
+        env,
+        s,
+        prev,
+        { row: prev, extra: { darkness: [...now.darkness, added] }, kind: "darkness-place" },
+        (id) => ({ type: DarknessPlaced.type, payload: { sceneId: s.id, editId: id, darknessId } }),
+      );
+      return { darknessId, editId };
+    },
+  });
+
+  /** FR-FOG-30: translate a darkness shape; it must stay within ±1,024; (0, 0) → no-op. */
+  const moveDarkness = defineCommand({
+    name: FOG_INTENTS.moveDarkness,
+    input: FogMoveDarknessInput,
+    execute({ sceneId, darknessId, dx, dy }, env): FogEditResult {
+      const { s, prev, now } = target(env, sceneId);
+      const d = findDarkness(now.darkness, darknessId);
+      if (dx === 0 && dy === 0) return { editId: null };
+      const moved = FogShapeGeom.safeParse(translateShape(d, dx, dy));
+      if (!moved.success) {
+        throw invalid("The darkness area must stay within ±1,024 cells", [
+          { path: ["dx"], message: "Out of range" },
+        ]);
+      }
+      const darkness = now.darkness.map((x) =>
+        x.id === darknessId ? ({ id: x.id, ...moved.data } as DarknessRow) : x,
+      );
+      const editId = commitEdit(
+        env,
+        s,
+        prev,
+        { row: prev, extra: { darkness }, kind: "darkness-move" },
+        (id) => ({ type: DarknessMoved.type, payload: { sceneId: s.id, editId: id, darknessId } }),
+      );
+      return { editId };
+    },
+  });
+
+  /** FR-FOG-30: remove one darkness shape (Undo restores the same id). */
+  const removeDarkness = defineCommand({
+    name: FOG_INTENTS.removeDarkness,
+    input: FogRemoveDarknessInput,
+    execute({ sceneId, darknessId }, env): FogEditResult {
+      const { s, prev, now } = target(env, sceneId);
+      findDarkness(now.darkness, darknessId);
+      const darkness = now.darkness.filter((x) => x.id !== darknessId);
+      const editId = commitEdit(
+        env,
+        s,
+        prev,
+        { row: prev, extra: { darkness }, kind: "darkness-remove" },
+        (id) => ({
+          type: DarknessRemoved.type,
+          payload: { sceneId: s.id, editId: id, darknessId },
+        }),
+      );
+      return { editId };
+    },
+  });
+
+  /** FR-FOG-30: remove every darkness shape; none → no-op. */
+  const clearDarkness = defineCommand({
+    name: FOG_INTENTS.clearDarkness,
+    input: FogClearDarknessInput,
+    execute({ sceneId }, env): FogEditResult {
+      const { s, prev, now } = target(env, sceneId);
+      if (now.darkness.length === 0) return { editId: null };
+      const editId = commitEdit(
+        env,
+        s,
+        prev,
+        { row: prev, extra: { darkness: [] }, kind: "darkness-clear" },
+        (id) => ({ type: DarknessCleared.type, payload: { sceneId: s.id, editId: id } }),
+      );
+      return { editId };
+    },
+  });
+
+  /** FR-FOG-29: Explored memory on / off for the scene (not in the undo stack); same → no-op. */
+  const setExplored = defineCommand({
+    name: FOG_INTENTS.setExplored,
+    input: FogSetExploredInput,
+    execute({ sceneId, on }, env): void {
+      const { s, prev, now } = target(env, sceneId);
+      if (now.explored === on) return;
+      const before = readFogRecord(env.tx, s.id);
+      writeRow(env, s, prev, { explored: on });
+      env.emit({
+        type: FogExploredSet.type,
+        campaignId: s.campaignId,
+        payload: { sceneId: s.id, on },
+        changes: [fogChange(before, readFogRecord(env.tx, s.id))],
+      });
+    },
+  });
+
+  /**
+   * FR-FOG-31: deletes every `fog-explored` row of the scene; none → no-op. Darkness `seenBy`
+   * may shrink with the memory (FR-FOG-44): the re-derive lists the `fog` row then.
+   */
+  const forgetExplored = defineCommand({
+    name: FOG_INTENTS.forgetExplored,
+    input: FogForgetExploredInput,
+    execute({ sceneId }, env): void {
+      const s = getScene(env.tx, campaignOf(env.actor), sceneId);
+      const rows = sceneExploredRecords(env.tx, s.id);
+      if (rows.length === 0) return;
+      env.tx.delete(fogExplored).where(eq(fogExplored.sceneId, s.id)).run();
+      const deletes: RecordChange[] = rows.map((r) => ({
+        type: FOG_EXPLORED_TYPE,
+        id: r.id,
+        before: r,
+        after: null,
+      }));
+      env.emit({
+        type: ExploredForgotten.type,
+        campaignId: s.campaignId,
+        payload: { sceneId: s.id },
+        changes: [...deletes, ...rederiveScene(env, s.id)],
+      });
+    },
+  });
+
+  return {
+    edit,
+    setAll,
+    undo,
+    placeDarkness,
+    moveDarkness,
+    removeDarkness,
+    clearDarkness,
+    setExplored,
+    forgetExplored,
+  };
 }
 
 /** Entries of a scene's undo stack, oldest first (tests, fixtures). */

@@ -55,6 +55,11 @@ export interface ToolPointerHandlers {
   up?(e: ToolPointer): void;
   /** Drop any gesture in progress. Return true if one was dropped (Esc then stops there). */
   cancel?(reason: ToolCancelReason): boolean | undefined;
+  /**
+   * Right press on the stage, off tokens (FR-FOG-42: a darkness shape's menu). Return true to take
+   * it (the tool opens its own menu); otherwise the laser starts as usual.
+   */
+  menu?(e: ToolPointer): boolean;
 }
 
 /** A canvas tool (FR-SCN-06): a rail button; with `pointer`, a drawing tool. */
