@@ -135,6 +135,9 @@ test("FR-FOG-21 / -34 / -37 / -43 / -44 / -45 / -47 vision: d1 open, Mira → (7
 
   // Darkness circle [12.5, 6.5, 1.5] over the Goblin (Mira can't see into it) → gone; Undo → back.
   await dm.getByTestId("map-tool-fog").click();
+  // FR-FOG-17: Mira and Thorn have senses → no "No vision set" hint.
+  await expect(dm.getByTestId("fog-bar")).toBeVisible();
+  await expect(dm.getByTestId("fog-no-vision")).toHaveCount(0);
   const undo = dm.getByTestId("fog-undo");
   const depth = Number(await undo.getAttribute("data-depth"));
   await dm.getByTestId("fog-mode-darkness").click();

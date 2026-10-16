@@ -296,18 +296,26 @@ function ViewAsSelect({ disabled }: { disabled: boolean }) {
   const value = playerId ?? VIEW_AS_DM;
   return (
     <Select value={value} onValueChange={(v) => setViewAs(v === VIEW_AS_DM ? null : v)}>
-      <span className="px-1 text-xs">View as</span>
-      <SelectTrigger
-        aria-label="View as"
-        data-testid="fog-view-as"
-        data-value={value}
-        data-loading={loading || undefined}
-        disabled={disabled}
-        className="h-8 min-w-32"
-      >
-        {loading ? <Loader2Icon className="size-4 animate-spin" /> : <EyeIcon className="size-4" />}
-        <SelectValue />
-      </SelectTrigger>
+      {/* The Tooltip sits on a wrapper: its `data-state` would overwrite the Select's. */}
+      <Tooltip content="View as — the scene as that player sees it">
+        <span className="inline-flex">
+          <SelectTrigger
+            aria-label="View as"
+            data-testid="fog-view-as"
+            data-value={value}
+            data-loading={loading || undefined}
+            disabled={disabled}
+            className="h-8 min-w-28"
+          >
+            {loading ? (
+              <Loader2Icon className="size-4 animate-spin" />
+            ) : (
+              <EyeIcon className="size-4" />
+            )}
+            <SelectValue />
+          </SelectTrigger>
+        </span>
+      </Tooltip>
       <SelectContent>
         <SelectItem value={VIEW_AS_DM} data-testid="fog-view-as-option" data-value={VIEW_AS_DM}>
           DM
@@ -331,9 +339,10 @@ function NoVisionHint({ sceneId }: { sceneId: string | null }) {
   );
   if (names.length === 0) return null;
   return (
+    // Under the bar, not in it (the bar keeps one row); text only, so the map takes the pointer.
     <div
       data-testid="fog-no-vision"
-      className="basis-full px-1 text-xs text-muted-foreground"
+      className="pointer-events-none absolute top-full left-0 mt-1 max-w-full rounded-md bg-background/85 px-2 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur"
       role="note"
     >
       {NO_VISION_PREFIX}
@@ -403,7 +412,7 @@ export function FogBar() {
     <div
       data-testid="fog-bar"
       data-disabled={off}
-      className="flex max-w-[min(54rem,calc(100vw-7rem))] flex-wrap items-center gap-1 rounded-md border bg-background/85 p-1 shadow-sm backdrop-blur"
+      className="relative flex max-w-[min(62rem,calc(100vw-7rem))] flex-wrap items-center gap-1 rounded-md border bg-background/85 p-1 shadow-sm backdrop-blur"
     >
       {/* Each item sits in a span: the Tooltip trigger's `data-state` would hide the item's "on". */}
       <ToggleGroup
