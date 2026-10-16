@@ -3,7 +3,7 @@
 import type { DeathCounters, EffectView } from "@shared/combat-extras/schemas";
 import type { DeathState } from "@shared/entities/schemas";
 import { EyeOffIcon } from "lucide-react";
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { type ComponentProps, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -88,7 +88,8 @@ function useFit(count: number, compact: boolean, deps: unknown) {
 /**
  * A chip's badge. Compact (FR-CBTX-46): label and rounds left in their own spans, so a tight tier
  * cuts the label and keeps "3r" (tier 2: "3"), width capped per tier (BL-08). `natural`: the
- * measuring copy (tier text, tier-0 cap, no test ID).
+ * measuring copy (tier text, tier-0 cap, no test ID). Other span props (ref included, React 19)
+ * come from the Tooltip's trigger.
  */
 function ChipBadge({
   e,
@@ -98,11 +99,12 @@ function ChipBadge({
   compact,
   tier = 0,
   natural = false,
-}: {
+  style,
+  ...trigger
+}: Omit<ComponentProps<"span">, "children"> & {
   e: EffectView;
   round: number | null;
   testId?: string;
-  className?: string;
   compact: boolean;
   tier?: number;
   natural?: boolean;
@@ -112,6 +114,8 @@ function ChipBadge({
   const { label, rounds } = chipParts(e, round);
   return (
     <Badge
+      // The Tooltip's trigger (Radix Slot): its ref, handlers and data-state land on the badge.
+      {...trigger}
       variant="outline"
       data-testid={testId}
       data-record-id={testId && e.id}
@@ -124,7 +128,7 @@ function ChipBadge({
         e.secret && "border-dashed",
         className,
       )}
-      style={compact ? { maxWidth: natural ? CHIP_MAX_W : t.cap } : undefined}
+      style={compact ? { ...style, maxWidth: natural ? CHIP_MAX_W : t.cap } : style}
     >
       <Icon className="size-3 shrink-0" aria-hidden />
       {compact ? (
