@@ -8,10 +8,11 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| V0 vision core | `fix/vision-core` (w3N, slot 0) | build-vision-core | Building | Review + regression walkthrough → merge; then V5, R0, `fix/lazy-records` |
+| V0 vision core | `fix/vision-core` (w3N, slot 0) | test-vision-core (port 4103) | Built (check green, e2e 64/64, benchmark met); regression walkthrough | Merge → R0, V5, `fix/lazy-records` (briefs ready) |
 | D1 dice tray | — | — | Merged (892819e, #214) | R2 builds on it |
-| D1 follow-up: Alt staging on Initiative / death saves | `fix/dicex-stage-anchors` (w3T, slot 5) | build-dicex-stage-anchors | Building | Merge |
-| D3 3D dice | `build/dicex-3d` (w3R, slot 3; based on D1) | build-dicex-3d | Building | Merge main after D1; walkthrough steps 4, 11, 13 (3D) |
+| D1 follow-up: Alt staging | — | — | Merged (83fd7e8) | — |
+| BL-11 e2e flake (BL-02 test, Initiative minimised) | `fix/bl-11-initiative-flake` (w3V, slot 2) | build-bl-11 | Root-causing | Merge (gate hygiene) |
+| D3 3D dice | `build/dicex-3d` (w3R, slot 3) | test-dicex-3d (port 4133) | Built (3D chunk 160.8 KB gz); walkthrough | Merge |
 | R early: formula + rule zod + presets | — | — | Merged (2d6d4c8) | R0 builds on it |
 | C early: bundled SRD 5.1 + adapter | — | — | Merged (5b5aeb5, #213) | C1 wires it |
 | P early: party-board pure `@shared` | — | — | Merged (fc24c39) | P core |
