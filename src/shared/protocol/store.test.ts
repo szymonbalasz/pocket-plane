@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { ClientFrame, ServerFrame } from "./frames";
+import { ClientFrame, EventFrame, ServerFrame } from "./frames";
 import { applyEvent, applySnapshot } from "./store";
 
 const snap = applySnapshot({
@@ -22,6 +22,15 @@ test("FR-SYNC-08 snapshot replaces the store; FR-SYNC-17 events apply atomically
   });
   expect(r.ok && r.store.records.probe).toEqual({ b: { id: "b", text: "y" } });
   expect(snap.records.probe).toEqual({ a: { id: "a", text: "x" } });
+});
+
+test("FR-SYNC-19 an event frame may carry no changes; applying it only advances seq", () => {
+  const empty = { type: "event", seq: 1, cause: { name: "X" }, changes: [] };
+  expect(ServerFrame.safeParse(empty).success).toBe(true);
+  expect(ServerFrame.safeParse({ ...empty, changes: undefined }).success).toBe(false);
+  const r = applyEvent(snap, EventFrame.parse(empty));
+  expect(r.ok && r.store.seq).toBe(1);
+  expect(r.ok && r.store.records).toBe(snap.records);
 });
 
 test("FR-SYNC-21 seq gap → resync needed", () => {

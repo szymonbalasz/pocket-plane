@@ -19,6 +19,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-11 | BL-02 e2e flaked once under parallel load: Initiative window stayed minimised after its launcher click (`e2e/support/shell.ts` `openWindow`; D1 merge run, `%TEMP%\pocket-plane\e2e-d1.log`) | S | e2e support / play-shell minimise | none | play-shell work | done (#215) |
 | BL-12 | Structure eraser on a door that sits on a wall removes the wall segment, not the door (V0 regression walkthrough, `%TEMP%\pocket-planeerify-vision-core`) | S | scene-tools structure eraser (client hit test) | none | walls track (V4) | open |
 | BL-13 | Reveal all sends each combatant twice in one event with different ordering positions (state converges; wasted bytes) (V0 regression walkthrough) | S | fog / combat copies re-derive (`hooks`) | none | V2 / combat lock | open |
+| BL-14 | `combat-tracker/limits.test.ts` "40-char attack name + bludgeoning: label cut to 60" fails intermittently in full `check` runs (twice; passes alone) | S | combat-tracker test | none | combat lock | open |
 
 ## How to add items
 

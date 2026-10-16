@@ -26,11 +26,14 @@ import thornBattlemap from "./combat-tracker/thorn-battlemap";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
 import diceSettings from "./dice-roll-log/dice-settings";
 import rolls1 from "./dice-roll-log/rolls-1";
+import charBrakka from "./effect-modifiers/char-brakka";
 import modBane from "./effect-modifiers/mod-bane";
 import modBless from "./effect-modifiers/mod-bless";
 import modPresets from "./effect-modifiers/mod-presets";
 import modRage from "./effect-modifiers/mod-rage";
 import modTier2 from "./effect-modifiers/mod-tier2";
+import trgBrakka from "./effect-modifiers/trg-brakka";
+import trgCombat from "./effect-modifiers/trg-combat";
 import charMira from "./entities/char-mira";
 import charThorn from "./entities/char-thorn";
 import enemy1 from "./entities/enemy-1";
@@ -108,4 +111,7 @@ export const units: readonly Fixture[] = [
   fogScn,
   dicexNotationText,
   visionSenses,
+  charBrakka,
+  trgBrakka,
+  trgCombat,
 ];

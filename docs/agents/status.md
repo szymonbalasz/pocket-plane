@@ -8,33 +8,23 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| V0 vision core | — | — | Merged (daeacac; walkthrough 20/20 + 5/5) | — |
-| R0 rule-trigger core | — | — | Merged (52c72da, #220) | — |
-| P core | `build/party-core` (w30) | build-party-core | Building | Review → merge → P2 ∥ P3, C1 |
-| R4 trigger engine | `build/rule-triggers` (w41) | build-rule-triggers-engine | Building | Review → R5, R6, R7 |
-| R1 tier 2 server | — | — | Merged (c086e34, #222) | R2 |
+| V2 vision server + Invisible | `build/vision-server` (w4B) | build-vision-server | Building | Walkthrough → V3 |
+| V4 freeform walls + red hint | `build/walls-freeform` (w4C) | build-walls-freeform | Building | Walkthrough SCN S1–S4 |
+| R2 tier 2 client | `fix/mod-roll-preview` (w4D) | build-mod-roll-preview | Building | Walkthrough |
 | R3 tier 3 uses | `build/mod-tier3` (w4A) | build-mod-tier3 | Building | Walkthrough → R6 |
-| Empty event frames (V0 bug) | `fix/empty-event-frames` (w49) | build-empty-event-frames | Building | Merge |
-| V5 sheet senses | — | — | Merged (03e108b, #219) | — |
-| Lazy record types | — | — | Merged (6591646, #218) | — |
-| D1 dice tray | — | — | Merged (892819e, #214) | R2 builds on it |
-| D1 follow-up: Alt staging | — | — | Merged (83fd7e8) | — |
-| D3 3D dice | — | — | Merged (af44317, #217) | D2 looks core after C1 |
-| R early: formula + rule zod + presets | — | — | Merged (2d6d4c8) | R0 builds on it |
-| C early: bundled SRD 5.1 + adapter | — | — | Merged (5b5aeb5, #213) | C1 wires it |
-| P early: party-board pure `@shared` | — | — | Merged (fc24c39) | P core |
-| V1 fog shapes + darkness (static) | `build/fog-shapes` (w3Z, slot 0) | — | Walkthrough 8/9 (step 7 = V0 empty-frame bug, not V1); merging | V4 ∥ V2 |
-| Queue | — | — | V5 → V1 → (V4 ∥ V2) → V3; R0 → R1 ∥ R4 → R2 / R3 / R5–R7; `fix/lazy-records` → P core → P2 ∥ P3 → P4; C1 → C2 → C3, C4; D3, D2, D4 | Per locks below |
-| Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | BL-06 (#206), BL-02 (#211) merged | Per §3a |
+| P core | `build/party-core` (w30) | — | Ready (walkthrough comes with P2); merging after R4 | C1, P2 ∥ P3 |
+| Merged so far | — | — | D1 (#214), D3 (#217), V0 (#216), V5 (#219), lazy-records (#218), R0 (#220), R1 (#222), V1 + empty-event fix + R4 (#223); early slices rt-shared, cmp-data (#213), party-shared; BL-06, BL-02, BL-11 | — |
+| Queue | — | — | V3 (after V2 + V4, canvas 3rd); R5 → R6 (sheet) → R7 (combat); C1 (after P core) → C2 → C3, C4; P2 ∥ P3 → P4; D2 (after C1), D4 (sheet, after C2) | Locks below |
+| Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | BL-06, BL-02, BL-11 done; open BL-01, 03–05, 07, 08, 10, 12–14 | Per §3a |
 
 ## Shared-file locks
 
-- `build/fog-shapes` (V1): canvas lock 1st, fog events.
-- `build/party-core`: `src/server/db/` (schema 3rd), party events, record-type registry lines.
-- `build/rule-triggers` (R4): MOD registry lines, combat `attack.ts` / `damage.ts` caller lines, notification kinds line.
+- `build/vision-server` (V2): scenes-map registry lines, entities definition hook line, player-hooks line, combat `join.ts` (Start / Add dependants), bundles index.
+- `build/walls-freeform` (V4): canvas lock 2nd (then V3).
+- `fix/mod-roll-preview` (R2): dice-roll-log client folder, dice-extras tray-extras line, DM popup files (not with R7), roll-intent `manualParts` pass-through.
 - `build/mod-tier3` (R3): character-sheet folder (sheet lock 2nd; `resources.ts`).
-- `fix/empty-event-frames`: `src/shared/protocol/`, client sync store.
-- Order after: schema P core → C1 → D2; canvas V1 → V4 → V3; sheet R3 → R6 → C2 → D4 → P4 / C4; combat R7 → C2; dice-roll-log client R2 (after R1).
+- Next: schema P core → C1 → D2; canvas V4 → V3; sheet R3 → R6 → C2 → D4 → P4 / C4; combat R7 → C2.
+- Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
 
 ## Pending DM decisions
 
