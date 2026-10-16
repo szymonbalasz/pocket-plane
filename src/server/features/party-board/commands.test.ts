@@ -18,7 +18,8 @@ import { CommandError } from "../../commands/errors";
 import { handout, lootEntry, notification, partyItem } from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import type { Actor, RecordChange } from "../../events/types";
-import { addPlayer } from "../campaign-management/commands";
+import { DM_ACTOR } from "../../testing/services";
+import { addPlayer, createCampaign } from "../campaign-management/commands";
 import {
   addItem,
   createHandout,
@@ -69,6 +70,8 @@ const row = (t: PartySeed, id: string) =>
   t.s.db.select().from(handout).where(eq(handout.id, id)).get();
 const items = (t: PartySeed) => t.s.db.select().from(partyItem).orderBy(asc(partyItem.seq)).all();
 const notes = (t: PartySeed) => t.s.db.select().from(notification).all();
+/** The `HandoutShared` events so far (FR-PARTY-06 notifications follow each). */
+const shared = (t: PartySeed) => t.events.filter((e) => e.event.type === "HandoutShared");
 const types = (e: { event: { changes: RecordChange[] } } | undefined) =>
   e?.event.changes.map((c) => [c.type, c.after === null ? "delete" : "upsert"]);
 
@@ -216,9 +219,9 @@ describe("handouts (FR-PARTY-01–05, 07, 08)", () => {
     t.events.length = 0;
     expect(codeOf(() => share(t, id, NONE))).toBe("ok");
     share(t, id, only(t.p1.id, t.p2.id));
-    expect(t.events).toHaveLength(1);
+    expect(shared(t)).toHaveLength(1);
     share(t, id, only(t.p2.id, t.p1.id)); // order ignored
-    expect(t.events).toHaveLength(1);
+    expect(shared(t)).toHaveLength(1);
   });
 
   test("FR-PARTY-05 HandoutShared payload + header/body changes; sharedAt iff someone gains access", () => {
@@ -246,7 +249,96 @@ describe("handouts (FR-PARTY-01–05, 07, 08)", () => {
     share(t, id, NONE);
     expect(row(t, id)?.sharedAt).toBe(second as string);
     expect(row(t, id)?.rev).toBe(1); // sharing is not a content update
-    expect(notes(t)).toHaveLength(0); // FR-PARTY-06 notifications come with slice 2
+  });
+
+  test("FR-PARTY-06 handout-shared: none → all one to all; → players one per gainer; after the event, same tx", () => {
+    const t = seedParty();
+    const id = create(t, { title: "Mayor's Letter" });
+    const h2 = create(t, { title: "Map" });
+    t.events.length = 0;
+    share(t, id, ALL);
+    expect(t.events.map((e) => e.event.type)).toEqual(["HandoutShared", "NotificationCreated"]);
+    expect(
+      notes(t).map((n) => [n.kind, n.audience, n.audiencePlayerId, n.text, n.payload]),
+    ).toEqual([["handout-shared", "all", null, "New handout: Mayor's Letter", { handoutId: id }]]);
+    expect(notes(t)[0]?.state).toBe("info");
+    expect(notes(t)[0]?.actionLabel).toBeNull();
+    t.events.length = 0;
+    share(t, h2, only(t.p2.id, t.p1.id));
+    expect(t.events.map((e) => e.event.type)).toEqual([
+      "HandoutShared",
+      "NotificationCreated",
+      "NotificationCreated",
+    ]);
+    const forH2 = notes(t).filter((n) => (n.payload as { handoutId: string }).handoutId === h2);
+    // One per gainer, audience `player`.
+    expect(forH2.map((n) => [n.audience, n.audiencePlayerId]).sort()).toEqual(
+      [
+        ["player", t.p1.id],
+        ["player", t.p2.id],
+      ].sort(),
+    );
+    // Each recipient's row reaches only them (recipients aren't told who else got it).
+    const created = t.events.slice(1).map((e) => e.event.changes[0] as RecordChange);
+    for (const p of [t.p1.id, t.p2.id]) {
+      const to = created.flatMap((c) => {
+        const w = t.s.records.filterChange(c, t.viewer("player", p));
+        return w ? [(w.data as { audiencePlayerId: string }).audiencePlayerId] : [];
+      });
+      expect(to).toEqual([p]);
+    }
+  });
+
+  test("FR-PARTY-06 only gainers: players → all notifies newcomers; unshare, update, delete, same share → none", () => {
+    const t = seedParty();
+    const id = create(t, { title: "Map" });
+    share(t, id, only(t.p1.id));
+    expect(notes(t).map((n) => n.audiencePlayerId)).toEqual([t.p1.id]);
+    share(t, id, ALL); // players → all: player-2 gains, audience player (not all)
+    expect(notes(t).map((n) => [n.audience, n.audiencePlayerId])).toEqual([
+      ["player", t.p1.id],
+      ["player", t.p2.id],
+    ]);
+    share(t, id, ALL); // same → ack
+    share(t, id, only(t.p1.id)); // all → players: nobody gains
+    update(t, id, { title: "Map v2", body: "new", imageAssetIds: [] });
+    share(t, id, NONE); // unshare
+    expect(notes(t)).toHaveLength(2);
+    // Re-share after unshare: everyone gains again; none → all = one to all, the new title.
+    share(t, id, ALL);
+    expect(notes(t).at(-1)).toMatchObject({ audience: "all", text: "New handout: Map v2" });
+    t.run(deleteHandout, { handoutId: id }, { actor: t.dm });
+    // FR-PARTY-08 / OQ-PARTY-15: the history rows stay, title kept.
+    expect(notes(t).map((n) => n.text)).toEqual([
+      "New handout: Map",
+      "New handout: Map",
+      "New handout: Map v2",
+    ]);
+  });
+
+  test("FR-PARTY-06 G empty (a campaign with no players): none → all writes no notification", () => {
+    const t = seedParty();
+    const empty = t.run(createCampaign, { name: "Empty" }, { actor: DM_ACTOR });
+    const dmEmpty: Actor = { ...DM_ACTOR, campaignId: empty.id };
+    const id = create(t, {}, dmEmpty);
+    t.events.length = 0;
+    share(t, id, ALL, dmEmpty);
+    expect(t.events.map((e) => e.event.type)).toEqual(["HandoutShared"]);
+    expect(notes(t)).toHaveLength(0);
+  });
+
+  test("FR-PARTY-06 notify forced to throw → the share is not written", () => {
+    const t = seedParty();
+    const id = create(t);
+    const logBefore = readEventLog(t.s.db).length;
+    t.s.db.$client.run(
+      "CREATE TRIGGER fail_note BEFORE INSERT ON notification BEGIN SELECT RAISE(ABORT, 'boom'); END",
+    );
+    t.events.length = 0;
+    expect(codeOf(() => share(t, id, ALL))).toBe("internal");
+    expect(row(t, id)?.sharedWith).toEqual(NONE);
+    expect(readEventLog(t.s.db)).toHaveLength(logBefore);
+    expect(t.events).toHaveLength(0);
   });
 
   test("FR-PARTY-07 loads: DM full; listed player redacted header (no ids) + body without sharedWith; others nothing", () => {
@@ -282,7 +374,7 @@ describe("handouts (FR-PARTY-01–05, 07, 08)", () => {
     const p1 = t.viewer("player", t.p1.id);
     const p2 = t.viewer("player", t.p2.id);
     const wire = (v: ReturnType<typeof t.viewer>) =>
-      (t.events.at(-1)?.event.changes ?? []).map((c) => {
+      (shared(t).at(-1)?.event.changes ?? []).map((c) => {
         const w = t.s.records.filterChange(c, v);
         return w ? `${w.type}:${w.op}` : null;
       });
@@ -290,7 +382,7 @@ describe("handouts (FR-PARTY-01–05, 07, 08)", () => {
     expect(wire(p1)).toEqual(["handout:upsert", "handout-body:upsert"]);
     expect(wire(p2)).toEqual([null, null]);
     const p1Header = t.s.records.filterChange(
-      t.events.at(-1)?.event.changes[0] as RecordChange,
+      shared(t).at(-1)?.event.changes[0] as RecordChange,
       p1,
     );
     expect(p1Header?.data).toMatchObject({ sharedWith: { mode: "players" } });

@@ -4,6 +4,7 @@ import { charxApprovedKind, charxDraftKind } from "../character-sheet/draft-kind
 import { concentrationCardKind } from "../combat-extras/card-kind";
 import { damageCardKind } from "../combat-tracker/card-kind";
 import { modTriggerKind } from "../effect-modifiers/reminders";
+import { handoutSharedKind } from "../party-board/kind";
 import { lootReceivedKind } from "../party-loot/kind";
 import type { NotificationKindDef } from "./kind";
 import { testKind } from "./test-kind";
@@ -16,4 +17,5 @@ export const notificationKinds: readonly NotificationKindDef[] = [
   charxDraftKind, // charx-draft (character-sheet-full, FR-CHARX-45)
   charxApprovedKind, // charx-approved (character-sheet-full, FR-CHARX-46)
   modTriggerKind, // mod-trigger (effect-modifiers, FR-MOD-44)
+  handoutSharedKind, // handout-shared (party-board, FR-PARTY-06)
 ];

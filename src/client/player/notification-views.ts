@@ -4,6 +4,7 @@ import { charxApprovedView } from "@ui/features/character-sheet/note-views";
 import { concentrationView } from "@ui/features/combat-extras/concentration";
 import { testNotificationView } from "@ui/features/notifications/test-view";
 import { createNotificationViews, type NotificationView } from "@ui/features/notifications/views";
+import { handoutSharedView } from "@ui/features/party-board/note-view";
 import { lootReceivedView } from "@ui/features/party-loot/note-view";
 import { playerDamageCardView } from "./features/combat-tracker/card-view";
 
@@ -13,6 +14,7 @@ const views: NotificationView[] = [
   lootReceivedView, // loot-received (party-loot, FR-LOOT-14)
   concentrationView, // cbtx-concentration (combat-extras, FR-CBTX-37)
   charxApprovedView, // charx-approved (character-sheet-full, FR-CHARX-46)
+  handoutSharedView, // handout-shared (party-board, FR-PARTY-06)
 ];
 
 export const playerNotificationViews = createNotificationViews(views);
