@@ -1,6 +1,8 @@
 // Pure effect-modifier rules shared by server and clients (FR-MOD-02, -04, -06, -11, -17, -18,
 // -24, -25): which modifiers a roll picks up, a creature's active modifiers, toggle state, preset
-// lists; tier 2: mode hints and the final mode, bonus-die groups, effective AC, defense presets.
+// lists; tier 2: mode hints and the final mode, bonus-die groups, effective AC, defense presets;
+// tier 3: a toggle's feature uses.
+import type { FeatureRow } from "@shared/character-sheet/sheet";
 import { type BuiltinPreset, builtinPresets } from "./presets";
 import type {
   BuiltinPresetKey,
@@ -105,6 +107,29 @@ export function toggleOn(
   const id = preset.activeEffectId;
   if (id === null) return false;
   return effects.some((e) => e.id === id && (e.endedAt ?? null) === null);
+}
+
+/** A feature row a preset can spend (FR-MOD-12, CHARX §8.2): one with `usesMax`. */
+export const hasUses = (f: Pick<FeatureRow, "usesMax">): boolean => (f.usesMax ?? 0) > 0;
+
+/**
+ * FR-MOD-12 (tier 3): a toggle's linked uses. `null` = no link; `broken` = the row was deleted or
+ * its `usesMax` cleared (toggles without uses, "Uses link broken"); else uses left of max.
+ */
+export type PresetUses =
+  | { state: "broken" }
+  | { state: "ok"; featureId: string; name: string; left: number; max: number };
+
+export function presetUses(
+  preset: Pick<EffectPresetRecord, "usesFeatureId">,
+  features: readonly Pick<FeatureRow, "id" | "name" | "usesMax" | "used">[] | undefined,
+): PresetUses | null {
+  const id = preset.usesFeatureId;
+  if (id === null) return null;
+  const f = features?.find((r) => r.id === id);
+  if (!f || !hasUses(f)) return { state: "broken" };
+  const max = f.usesMax ?? 0;
+  return { state: "ok", featureId: f.id, name: f.name, left: Math.max(0, max - f.used), max };
 }
 
 /** One entry of the DM's preset list (FR-MOD-06, -28). */
