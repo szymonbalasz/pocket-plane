@@ -106,3 +106,27 @@ test("FR-MOD-15 FR-MOD-16 FR-MOD-20 FR-MOD-28 sheet attack with Bless → line +
   await expect(chips).toHaveCount(1);
   await expect(chips).toContainText("Bane");
 });
+
+test("FR-MOD-12 preset dialog fits the viewport", async ({ browser }) => {
+  const { link } = e2eEnv();
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const player = await ctx.newPage();
+  await player.goto(link("Player 1"));
+  await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+
+  // Sheet → Active effects → Start from ▸ Rage: the tallest form (4 parts + Uses + note).
+  const sheet = await openWindow(player, "char.sheet");
+  await sheet.locator('[data-testid="charx-tab"][data-value="section:mod.effects"]').click();
+  await sheet.getByTestId("mod-preset-from-menu").click();
+  await player.locator('[data-testid="mod-preset-from"][data-value="rage"]').click();
+  const dialog = player.getByTestId("mod-preset-dialog");
+  await expect(dialog).toBeVisible();
+  const box = await dialog.boundingBox();
+  expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
+  expect((box?.y ?? 0) + (box?.height ?? Infinity)).toBeLessThanOrEqual(720);
+  const save = dialog.getByTestId("mod-editor-save");
+  await expect(save).toBeInViewport({ ratio: 1 });
+  await save.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(sheet.getByTestId("mod-preset").filter({ hasText: "Rage" })).toHaveCount(1);
+});
