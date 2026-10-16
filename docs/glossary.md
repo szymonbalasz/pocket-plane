@@ -94,14 +94,21 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Initiative order** | Ordered list of combatants for the current combat. | — |
 | **Condition** | A 5e condition (e.g. prone, poisoned; exhaustion with a level), stored as an Effect on a combatant or character. Reminder only, except incapacitating ones end concentration. | Effect |
 | **Effect** | A row on a creature in play: a condition, a custom label, or a concentration; optional duration in rounds ([combat-extras](specs/combat-extras.md)); custom effects may carry modifiers ([effect-modifiers](specs/effect-modifiers.md)). | Modifier |
-| **Preset** | A named effect template with modifiers (built-in, customised per campaign, or a character's own), e.g. Bless, Rage ([effect-modifiers](specs/effect-modifiers.md)). | Effect |
+| **Preset** | A named effect template with modifiers (built-in, customised per campaign, or a character's own), e.g. Bless, Rage; trigger presets (Sneak Attack …) create rule triggers ([effect-modifiers](specs/effect-modifiers.md)). | Effect; Dice style |
+| **Rule trigger** | A data rule on a character or monster definition: event, requires, filters, frequency, effect (e.g. Sneak Attack once per turn); interpreted by built-in code, never user code ([ADR-0043](architecture/adr/0043-rule-triggers.md)). | Rule hook |
+| **Offered part** | A rule-trigger damage part rolled with the damage and settled at apply; not in the card's total until it lands. | Modifier part |
+| **Formula** | A rule trigger's value expression in MOD's small grammar (dice, numbers, `level(class)`, ability mods, proficiency); no code. | — |
+| **Trigger window** | The turn / round / encounter key a charge belongs to. | — |
+| **Charge** | One use of a rule trigger in its window; Undo restores it. | Feature use |
+| **Apply hook** | An append-only server registry entry that settles offered parts inside `cbt.applyCard`'s transaction. | Roll hook |
+| **Mark** | A preset a `targetMarked` filter names (e.g. Hunter's Mark on the hunted creature). | — |
 | **Toggle** | A character preset the owner or DM switches on / off, creating or ending its effect. | Preset |
 | **Roll hook** | An append-only server registry entry that adds modifier parts to a roll inside the rolling command's transaction ([ADR-0038](architecture/adr/0038-effect-modifiers.md)). | Rule hook |
 | **Concentration** | An Effect marking that a creature maintains a concentration spell (one per creature); damage raises a Concentration card. | — |
 | **Concentration card** | A notification kind with a "Roll save" action (DC max(10, half the damage)) sent to the PC's owner or the DM. | Damage card |
 | **Temp HP** | Temporary hit points on a character or combatant; absorb damage first, don't stack. | — |
 | **Death save** | A PC's d20 roll at 0 HP; three successes = stable, three failures = dead (nat 1 = two failures, nat 20 = 1 HP). | — |
-| **Rule hook** | A combat rule (expiry, concentration, death failures) run inside the causing command's transaction through `hpRules` / the `combatRuleHooks` registry ([ADR-0035](architecture/adr/0035-combat-rule-hooks.md)). | Listener |
+| **Rule hook** | A combat rule (expiry, concentration, death failures) run inside the causing command's transaction through `hpRules` / the `combatRuleHooks` registry ([ADR-0035](architecture/adr/0035-combat-rule-hooks.md)). Not a rule trigger. | Listener; Rule trigger |
 | **Roll** | A dice expression evaluated server-side, with result. | — |
 | **Game log** | Player-facing, BG2-style log window of rolls and combat outcomes (later also text). Each entry public or DM-only. Formerly "roll log". | Event log (internal) |
 | **Roll category** | Kind of roll: attack, damage, saving throw, ability check, skill check, contested, initiative, healing, other. | — |

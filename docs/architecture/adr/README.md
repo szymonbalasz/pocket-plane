@@ -40,13 +40,14 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0032](0032-ability-derivation.md) | Ability modifiers, proficiency bonus and save bonuses derived in MVP | accepted (amends 0012) |
 | [0033](0033-signal-audience.md) | Signal audience hook: a signal type routes to everyone or DM only, or refuses the sender | accepted (amends 0026) |
 | [0034](0034-encounter-scoped-notifications.md) | Pending combat notifications end with their encounter, per kind | accepted (refines 0016, 0027) |
-| [0035](0035-combat-rule-hooks.md) | Combat rules run in the causing command's transaction | accepted (refines 0009, 0016, 0027), refined by 0038 |
+| [0035](0035-combat-rule-hooks.md) | Combat rules run in the causing command's transaction | accepted (refines 0009, 0016, 0027), refined by 0038, 0043 |
 | [0036](0036-full-sheet-derivation.md) | Full character sheet: derived with overrides; rules data vs sheet record | accepted (decides 0012 full sheet; refines 0021 D, 0024) |
 | [0037](0037-split-attack-damage.md) | Attack and damage as separate rolls on one damage card | accepted (#190; refines 0016, 0027) |
-| [0038](0038-effect-modifiers.md) | Effect modifiers: typed riders on effect rows, applied by a roll hook | accepted (#190; refines 0009, 0021 D, 0035) |
+| [0038](0038-effect-modifiers.md) | Effect modifiers: typed riders on effect rows, applied by a roll hook | accepted (#190; refines 0009, 0021 D, 0035), refined by 0043 |
 | [0039](0039-fog-visibility.md) | Fog visibility: server-written `fogged` copies, scene visibility and lifecycle hook registries | accepted (#196; amends 0016 undo scope; refines 0024, 0028) |
 | [0040](0040-token-move-guards.md) | Token move guards: a move may be refused | accepted (#196; amends 0031) |
 | [0041](0041-active-scene-window.md) | Active-scene window for tokens and scene-tool records in the DM snapshot | accepted (#196; refines 0021 C; sibling of 0029) |
+| [0043](0043-rule-triggers.md) | Rule triggers: conditional class-feature riders as data, offered at the damage roll and settled at apply | accepted (#207, #209; refines 0016, 0035, 0038) |
 | [0044](0044-3d-dice.md) | 3D dice: throws derived on each client from received roll entries | accepted (#207; amends 0001 stack) |
 | [0045](0045-lazy-record-types.md) | Lazy record types: never in a snapshot, loaded on open with `sync.load` | accepted (#207; extends 0021 C, sibling of 0029 / 0041) |
 | [0046](0046-compendium-scope.md) | Compendium: global library, campaign clones, read on demand | accepted (#207; completes 0010; amends 0004, 0018, 0019) |

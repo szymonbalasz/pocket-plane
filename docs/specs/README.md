@@ -46,6 +46,7 @@ Sprint 2 phase 1 also revised combat-tracker, combat-extras, entities, notificat
 |---|---|---|---|
 | [Compendium](compendium.md) | CMP | complete | spec-compendium |
 | [Dice extras](dice-extras.md) | DICEX | complete | spec-dice-extras |
+| [Effect modifiers](effect-modifiers.md) (revision: tiers 2–3, rule triggers) | MOD | complete | spec-rule-triggers |
 | [Party board](party-board.md) | PARTY | complete | spec-party-board |
 
 Sprint 3 also revised live-sync (lazy record types, FR-SYNC-30–38) and party-loot (item rows, split).
