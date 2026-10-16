@@ -10,7 +10,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | V0 vision core | `fix/vision-core` (w3N, slot 0) | build-vision-core | Building | Review + regression walkthrough → merge; then V5, R0, `fix/lazy-records` |
 | D1 dice tray | `build/dicex-tray` (w3M, slot 2) | build-dicex-tray | Building | Walkthrough D1 → merge; then D3, R2 |
-| R early: formula + rule zod + presets (pure `@shared`) | `fix/rt-shared` (w3P, slot 3) | build-rt-shared | Building | Merge (no UI) → R0 uses it |
+| R early: formula + rule zod + presets | — | — | Merged (2d6d4c8) | R0 builds on it |
 | C early: bundled SRD 5.1 + recorder + pure adapter | `fix/cmp-data` (w3Q, slot 4) | build-cmp-data | Building | Merge (no UI) → C1 wires it |
 | Queue | — | — | V5 → V1 → (V4 ∥ V2) → V3; R0 → R1 ∥ R4 → R2 / R3 / R5–R7; `fix/lazy-records` → P core → P2 ∥ P3 → P4; C1 → C2 → C3, C4; D3, D2, D4 | Per locks below |
 | Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | BL-06 (#206), BL-02 (#211) merged | Per §3a |
