@@ -7,7 +7,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | ID | Item | Size | Area (files) | Spec need | Avoid while | Status |
 |---|---|---|---|---|---|---|
 | BL-01 | Fit with the Game log open cuts the top rows of Goblin Ambush and leaves space below; Town crops on the right (session-sim-6 #4) | S | scenes-map camera (`camera.ts`) | FR-MAP-44/46 wording if behaviour changes | fog v2 / walls canvas work | open |
-| BL-02 | "Start round 1" does nothing silently while PCs lack initiative: tooltip / inline reason (FR-CBT-14) (sim-6 #5) | S | combat-tracker DM Initiative | none | combat polish branches | picked (`fix/bl-02-start-round-reason`, 2026-10-16) |
+| BL-02 | "Start round 1" does nothing silently while PCs lack initiative: tooltip / inline reason (FR-CBT-14) (sim-6 #5) | S | combat-tracker DM Initiative | none | combat polish branches | done (#211) |
 | BL-03 | Round-0 movement counts toward round 1's "Moved" (sim-6 #6) | S | combat-tracker hooks (`movedFt`) | FR-CBT-39 note | MOD trigger / combat core | open |
 | BL-04 | A Dying / Down badge covers a neighbour's name label on the map (sim-6 #7) | S | scenes-map LabelsLayer / CBTX overlay | none | canvas work | open |
 | BL-05 | "Clear templates" has no confirm and removes players' kept templates too (sim-6 #9) | S | scene-tools templates client + command | FR-SCN-25 ruling (confirm; scope) | walls track | open |
