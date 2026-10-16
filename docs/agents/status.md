@@ -13,6 +13,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | R: modifiers tiers 1–3 + triggers | `spec/rule-triggers` (w3F, slot 3) | spec-rule-triggers-rev | Rulings pass | DM gate 1 |
 | P: party board + handouts | `spec/party-board` (w3G, slot 4) | spec-party-board-rev | Rulings pass (+ live-sync lazy FRs, L2) | DM gate 1 |
 | C: compendium | `spec/compendium` (w3H, slot 5) | spec-compendium-rev | Rulings pass | DM gate 1 |
+| Backfill (BL-02): Start round 1 reason | `fix/bl-02-start-round-reason` (w3K, slot 6) | build-bl-02 | Working | Merge (thin e2e) |
 | Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | BL-06 merged (#206) | Per §3a |
 
 ## Shared-file locks
