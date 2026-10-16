@@ -2,9 +2,11 @@
 // shared `scn-objects` layer, above props. DM: walls as one shape (`scn-walls`, attr `count`;
 // hidden while the "DM-only items" switch is off), doors with a glyph per state (`scn-door`, id
 // `door-<n>`, attr `state`), double-click (Select tool) toggles open ↔ closed, right-click opens
-// the door menu; while dragging a token, the crossed segments and a "through wall" tag
-// (`scn-through-wall`). Players: doors only (open / closed), and a 1 s flash on the target cell of
-// a refused move (`scn-blocked-cell`). Publishes the shown structure for the Structure tool.
+// the door menu; while dragging a token, the crossed segments in red (`scn-wall-crossed`, attr
+// `ns`) and a "through wall" tag (`scn-through-wall`). Players: doors only (open / closed), a 1 s
+// flash on the target cell of a refused move (`scn-blocked-cell`) and, while dragging their token,
+// the red wall hint pieces from `map.checkMove` (`scn-wall-hint`, one per piece, attr `segment`,
+// FR-SCN-38). Publishes the shown structure for the Structure tool.
 
 import {
   DOOR_LOCKED,
@@ -15,14 +17,14 @@ import {
   type Segment,
 } from "@shared/scene-tools/schemas";
 import { cellToPx } from "@shared/scenes-map/geometry";
-import { TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
+import { MAP_INTENTS, TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Group, Label, Line, Rect, Shape, Tag, Text } from "react-konva";
 import { useStore } from "zustand";
 import { SyncContext, useSync } from "../../../sync/store";
 import { useCanvas } from "../../scenes-map/canvas-context";
-import { toastReject, useMapIntent } from "../../scenes-map/intents";
+import { toastReject, useLive, useMapIntent } from "../../scenes-map/intents";
 import { useLayerToggles } from "../../scenes-map/tool-store";
 import { useDoorMenuIsland } from "../DoorMenu";
 import { setDoorEdit } from "../structure-edits";
@@ -38,6 +40,7 @@ import {
   toggledDoor,
   watchDrop,
 } from "../structure-view";
+import { WallHintProbe } from "../wall-hint";
 
 /** Segments as one shape (FR-SCN-12 perf: walls are one Konva shape). */
 function Segments({
@@ -238,6 +241,48 @@ function useBlockedFlash(on: boolean) {
 }
 
 /**
+ * FR-SCN-38: the player's wall hint pieces while dragging their token (`map.checkMove` per
+ * previewed cell); cleared on drag end, a snapshot, leaving live and a scene switch.
+ */
+function useWallHint(on: boolean): Segment[] {
+  const { pointers, scene } = useCanvas();
+  const send = useMapIntent();
+  const live = useLive();
+  const generation = useSync((s) => s.lazy.generation);
+  const [pieces, setPieces] = useState<Segment[]>([]);
+  const probe = useMemo(
+    () =>
+      on
+        ? new WallHintProbe({
+            check: (tokenId, to) =>
+              send(MAP_INTENTS.checkMove, { tokenId, col: to.col, row: to.row }),
+            now: () => performance.now(),
+            setTimer: (fn, ms) => setTimeout(fn, ms),
+            clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+            onChange: setPieces,
+          })
+        : null,
+    [on, send],
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a scene switch restarts the probe.
+  useEffect(() => {
+    if (!probe) return;
+    probe.update(pointers.getState().drag);
+    const off = pointers.subscribe((s) => probe.update(s.drag));
+    return () => {
+      off();
+      probe.clear();
+    };
+  }, [probe, pointers, scene.id]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each snapshot generation clears.
+  useEffect(() => probe?.snapshot(), [probe, generation]);
+  useEffect(() => {
+    if (!live) probe?.clear();
+  }, [probe, live]);
+  return on ? pieces : [];
+}
+
+/**
  * The shown scene's structure; on the DM client also published for the Structure tool and Undo.
  * Called by this layer and by the tool's `scn-edit` preview, so it stays current while the
  * "Walls & doors" switch has this layer unmounted.
@@ -266,6 +311,7 @@ export function ScnStructureLayer() {
   const drag = useStore(pointers, (s) => s.drag);
   const hint = dm && live ? dragHint(view, drag) : null;
   const flash = useBlockedFlash(!dm);
+  const hintPieces = useWallHint(!dm);
 
   const width = Math.max(2, grid.gridCellSize * 0.07);
   const walls = useMemo(
@@ -299,7 +345,7 @@ export function ScnStructureLayer() {
         <>
           <Segments
             segs={crossed}
-            name="scn-through-wall-segments"
+            name="scn-wall-crossed"
             stroke={colors.destructive}
             width={width * 1.6}
             attrs={{ ns: hint.ns.join(",") }}
@@ -307,6 +353,18 @@ export function ScnStructureLayer() {
           <ThroughWallTag col={hint.to.col} row={hint.to.row} size={hint.size} />
         </>
       )}
+      {hintPieces.map((p) => (
+        <Line
+          key={p.join(",")}
+          name="scn-wall-hint"
+          segment={p.join(",")}
+          points={segmentPx(grid, p)}
+          stroke={colors.destructive}
+          strokeWidth={width * 1.6}
+          lineCap="round"
+          listening={false}
+        />
+      ))}
       {flash && (
         <Rect
           name="scn-blocked-cell"
