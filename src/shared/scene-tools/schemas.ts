@@ -28,6 +28,9 @@ export const SCN_INTENTS = {
 
 export const SCN_SIGNALS = { template: "scn.template" } as const;
 
+/** FR-SCN-38: the wall move guard's name, the `guard` of its `map.checkMove` hint. */
+export const WALL_GUARD = "scene-tools.walls";
+
 // ---------- limits (FR-SCN-07, -08, -16, -17, -20, -25) ----------
 
 /** FR-SCN-07: walls + doors per scene. */
