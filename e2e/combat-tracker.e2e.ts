@@ -344,6 +344,9 @@ test("BL-02 Start round 1 shows why it can't start", async ({ browser }) => {
   await enc.getByTestId("cbt-enc-start").click();
   await expect(dm.getByTestId("cbt-enc-binding")).toHaveCount(2);
   await dm.getByTestId("cbt-enc-start-confirm").click();
+  // FR-CBT-60: the acked Start opens Initiative (it loaded minimised: no encounter, P3 glitch 3).
+  // Wait for that before openWindow: its launcher click would minimise a just-opened window.
+  await expect(launcherButton(dm, "cbt.initiative")).toHaveAttribute("data-state", "open");
   const init = await openWindow(dm, "cbt.initiative");
   await expect(init.getByTestId("cbt-init-row")).toHaveCount(2);
 
