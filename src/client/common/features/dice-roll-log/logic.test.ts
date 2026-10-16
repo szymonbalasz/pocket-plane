@@ -168,8 +168,8 @@ describe("FR-DICE-24 roll control", () => {
     const o = { expressions: ["1d20+4", "2d6kh1+2"], critExpressions: ["4d6kh1+2"] };
     const nat20 = [{ for: "1d20+4", base: g("20"), extra: g() }];
     expect(slotsOf(o, nat20)).toEqual([
-      { base: { expression: "1d20+4", faces: [20] }, extra: null },
-      { base: { expression: "4d6kh1+2", faces: [6, 6, 6, 6] }, extra: null },
+      { base: { expression: "1d20+4", faces: [20] }, extra: null, crit: false },
+      { base: { expression: "4d6kh1+2", faces: [6, 6, 6, 6] }, extra: null, crit: true },
     ]);
   });
 
@@ -231,6 +231,7 @@ describe("FR-DICE-31 physical crit keeps what was typed", () => {
     expect(slotsOf(o, inputs)[1]).toEqual({
       base: { expression: "4d6+3", faces: [6, 6, 6, 6] },
       extra: { expression: "4d6", faces: [6, 6, 6, 6] },
+      crit: true,
     });
     expect(inputs[1]?.base.dice).toEqual(["3", "4", "5", "6"]);
     expect(inputs[1]?.extra).toEqual(g("", ["", "", "", ""]));
@@ -288,7 +289,11 @@ describe("FR-DICE-31 physical crit keeps what was typed", () => {
   test("FR-DICE-31 crit: true on a Damage-only control: extra group at once, no d20 slot", () => {
     const dmg = { expressions: ["1d8+2"], critExpressions: ["2d8+2"], crit: true };
     expect(slotsOf(dmg, [])).toEqual([
-      { base: { expression: "1d8+2", faces: [8] }, extra: { expression: "1d8", faces: [8] } },
+      {
+        base: { expression: "1d8+2", faces: [8] },
+        extra: { expression: "1d8", faces: [8] },
+        crit: true,
+      },
     ]);
     const t = typer(dmg);
     let inputs = t([], 0, "base", { total: "6" });

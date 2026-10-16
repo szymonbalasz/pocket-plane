@@ -227,6 +227,11 @@ export interface FormSlot {
   base: ManualSlot;
   /** "Extra critical dice: 4d6"; null = no crit on this slot. */
   extra: ManualSlot | null;
+  /**
+   * The slot is rolled as a crit (FR-DICE-31: a natural 20 typed first, or `crit: true`), also
+   * when it fell back to the crit expression itself. MOD's bonus dice double on it (FR-MOD-18).
+   */
+  crit: boolean;
 }
 
 export interface FormOptions {
@@ -278,17 +283,17 @@ export function formSlots(
   for (const [i, slot] of base.entries()) {
     const crit = o.crit ? crits[i] : natural20 && i > 0 ? crits[i - 1] : undefined;
     if (!crit) {
-      out.push({ base: slot, extra: null });
+      out.push({ base: slot, extra: null, crit: o.crit === true || (natural20 && i > 0) });
       continue;
     }
     const extra = critExtra(slot.expression, crit);
     if (extra) {
-      out.push({ base: slot, extra });
+      out.push({ base: slot, extra, crit: true });
       continue;
     }
     const swapped = manualSlots([crit], "normal");
     if (typeof swapped === "string") return swapped;
-    out.push({ base: swapped[0] as ManualSlot, extra: null });
+    out.push({ base: swapped[0] as ManualSlot, extra: null, crit: true });
   }
   return out;
 }

@@ -230,6 +230,9 @@ function ExtraChips({
         <span
           // biome-ignore lint/suspicious/noArrayIndexKey: positional per render
           key={i}
+          data-testid="dicex-tray-extra-die"
+          data-faces={d.faces}
+          {...(d.key ? { "data-key": d.key } : {})}
           className="flex h-8 items-center rounded-md border border-dashed px-1.5 font-mono text-xs text-muted-foreground"
         >
           {d.label} {d.sign === -1 ? "−" : "+"}
@@ -434,12 +437,13 @@ export function TrayWindow() {
     });
   };
   const options = trayControlOptions(request, draft, mode, sendFree);
-  const control = useRollControl(options);
+  const control = useRollControl(options, { tray: request?.kind === "control" });
   const state = trayState({ request, rolling, result, manual: control.manual !== null });
-  const shownMode = previewMode(
-    held ?? mode,
-    request?.kind === "control" ? request.previewMode : undefined,
-  );
+  // FR-DICEX-08 e: MOD's preview (FR-MOD-27) combines the tray's mode with the effects (5e);
+  // without a subject, the tray's own mode first, else the request's `previewMode`.
+  const shownMode = control.preview.active
+    ? control.preview.modeFor(held ?? mode)
+    : previewMode(held ?? mode, request?.kind === "control" ? request.previewMode : undefined);
 
   const roll = (keys: { shiftKey?: boolean; ctrlKey?: boolean } = {}) => {
     if (!live || !request) return;
