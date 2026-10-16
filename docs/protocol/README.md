@@ -1463,3 +1463,19 @@ One transaction: the token's `invisible` + its `derive`d `fogged` / `seenBy` (`u
 - **Signals** (FR-FOG-15): `map.drag` position frames → the DM + the players in the stored token's `seenBy` (owner included) who also see the token at the previewed cell on the cached polygons (an unowned invisible token: Sees-invisible polygons only); `end` frames → the stored token's seers. DM `scn.template` → the players who see an uncut cell (via `derive`).
 - **Cache** (FR-FOG-38, `fog-of-war/vision-cache.ts`): per SQLite connection, LRU 256, key = fog `rev`, structure `rev`, darkness geometry, sources `(tokenId, col, row, size, senses)`; entries computed in a transaction stay pending until it commits (a TEMP marker row, so a rolled-back rev leaves no entry).
 - **Tests**: per player on snapshot, every frame, View-as ack, fresh connection and `resync` (`vision-leak`, `invisible`, `vision-triggers`, `con44` tests; harness `fixtures/units/fog-of-war/vision-harness.ts`). Fixtures: unit `vision-crypt` (FOG §13), bundle `vision` = `scenes` + `goblin-2` + `encounter-1` + `fog-ambush` + `scn-walls` + `vision-senses` + `vision-crypt`.
+
+## 50. Sprint 3: vision client (V3)
+
+From [fog-of-war](../specs/fog-of-war.md) v2 (FOG §14 slice V3; #207, #210). **Built by `build/vision-client`** (canvas lock 3rd): the clients draw [§49](#49-sprint-3-dynamic-vision-server--invisible-v2)'s records. No new intent, event, record type, signal or wire field. Data side: [data model §37](../data-model/README.md#37-sprint-3-vision-client-v3).
+
+| Client part | Where | Rule | Source |
+|---|---|---|---|
+| Player render | `fog` layer (order 30), one `fog-mask` shape, `fog-of-war/vision-render.ts` | Static fog (explored memory draws Fog as Explored while the scene's `explored` is on), then from the player's own `vision` row: `dark` ring dimmed + grey where not statically clear, `see` clear, darkness inside any polygon as a darker transparent tint (only see-through polygons reach inside darkness, FR-FOG-33); blind → map dark, grid redrawn, chip `fog-blind` | FR-FOG-21, -36 |
+| Blind (player) | `MapCanvas`: `isBlind` / `blindStore` (`fog-of-war/blind.ts`) | Others' pings, pull marks and laser are not drawn; others' kept AoE templates are dropped from the store the layers read; own placement draws | FR-FOG-36 |
+| View as (DM) | fog bar `fog-view-as` (Players + "DM"); fog layer keeps the pair | Pick → `sync.loadScene {sceneId, viewAs}` (one in flight, spinner `data-loading`); another pick / viewed scene → that pair; "DM" → `clearViewAs`; snapshot → reload; reject → Toast, back to "DM". Draws only the loaded pair matching the pick and the shown scene: P's render at 70 % (`fog-view-as`, attr `player`), markers `fog-vision` / `fog-explored` (attr `player`) | FR-FOG-20, -43 |
+| Token menu line | `src/client/dm/features/scenes-map/token-menu.ts` ← `fogTokenMenu` (`fog.invisible`, order 45) | `fog-token-menu-invisible` (`data-state` checked / unchecked) → `fog.setInvisible {tokenId, invisible: !current}` | FR-FOG-47 |
+| Token overlay line | `tokenOverlays` ← `fogTokenOverlay` (DM only) | Fog badge (seen by nobody); `fog-token-invisible` badge + `dim` on invisible tokens; with View as P: `dim` = P can't see it (FR-FOG-34 / -46 on P's loaded polygons; `vision.inv` for invisible ones), replacing the Invisible fade; `subscribe` re-runs on a new pair | FR-FOG-20, -47 |
+| No-vision hint | fog bar `fog-no-vision` | "No vision set for: ‹names›": owned tokens on the viewed scene whose definition's senses are 0 / 0 (absent = 0) | FR-FOG-17 |
+
+- Colours are placeholder tokens until theme-system (OQ-FOG-17): `--fog-darkvision` (fallback `#52525b`, 50 %), `--fog-darkness-seen` (`#1e1033`, 45 %).
+- **Open:** while blind, other players' *ephemeral* `scn.template` frames still draw (scene-tools' `TemplatesLayer` subscribes to them itself; a one-line `isBlind` filter there is a scene-tools change).

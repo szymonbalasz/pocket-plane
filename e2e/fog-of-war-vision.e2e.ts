@@ -1,9 +1,11 @@
 // e2e-bundle: vision
-// Thin dynamic-vision flow (FOG §13 E2E, V2: server-visible assertions; V3 draws the vision). DM,
-// player-1 (Mira, torch 30 ft) and player-2 (Thorn) in separate contexts: the DM shows Goblin
-// Ambush and opens d1; player-1 drags Mira to (7, 5) → the Goblin reaches player-1 only; a reload
-// keeps it; a darkness circle over the Goblin hides it, Undo brings it back; the DM sets the
-// Goblin Invisible (an intent over the DM's own socket: the menu line is V3) → gone again.
+// Thin dynamic-vision flow (FOG §13 E2E; V2 server, V3 client). DM, player-1 (Mira, torch 30 ft)
+// and player-2 (Thorn) in separate contexts: the DM shows Goblin Ambush and opens d1; player-1
+// drags Mira to (7, 5) → the Goblin reaches player-1 only and player-1 draws one `see` polygon
+// cut at x = 8 (V3); a reload keeps it; a darkness circle over the Goblin hides it, Undo brings it
+// back; View as Player 1 loads player-1's rows (the Goblin not dimmed, Goblin 2 in darkness
+// dimmed); the DM sets the Goblin Invisible from its token menu (V3) → faded with the Invisible
+// badge for the DM, gone for player-1.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, tokenNode } from "./support/konva";
@@ -47,37 +49,28 @@ async function dragTo(page: Page, tokenId: string, col: number, row: number) {
   await page.mouse.up();
 }
 
-/** One DM intent over a second DM socket in the DM's page (no UI for it before V3). */
-async function dmIntent(page: Page, secret: string, name: string, payload: object) {
+/** Konva attr of the first node named `name` (null when absent). */
+async function attrOf(page: Page, name: string, attr: string) {
   return page.evaluate(
-    ([secret, name, payload]) =>
-      new Promise<string>((resolve, reject) => {
-        const ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}/ws`);
-        ws.onopen = () =>
-          ws.send(JSON.stringify({ type: "hello", credential: { role: "dm", secret } }));
-        ws.onmessage = (m) => {
-          const f = JSON.parse(String(m.data)) as { type: string; intentId?: string };
-          if (f.type === "snapshot") {
-            ws.send(JSON.stringify({ type: "intent", intentId: "e2e-vision-1", name, payload }));
-          }
-          if ((f.type === "ack" || f.type === "reject") && f.intentId === "e2e-vision-1") {
-            ws.close();
-            resolve(f.type);
-          }
-        };
-        ws.onerror = () => reject(new Error("socket error"));
-      }),
-    [secret, name, payload] as const,
+    ([name, attr]) => {
+      type KNode = { getAttr(a: string): unknown };
+      type KStage = { findOne(s: string): KNode | undefined };
+      const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
+      return (K?.stages[0]?.findOne(`.${name}`)?.getAttr(attr) as unknown) ?? null;
+    },
+    [name, attr] as const,
   );
 }
 
-test("FR-FOG-34 / -37 / -44 / -45 vision: d1 open, Mira → (7, 5) → Goblin for player-1 only; reload keeps it; darkness hides it, Undo → back; Invisible → gone (DM + player-1 + player-2)", async ({
+test("FR-FOG-21 / -34 / -37 / -43 / -44 / -45 / -47 vision: d1 open, Mira → (7, 5) → Goblin for player-1 only; reload keeps it; darkness hides it, Undo → back; Invisible → gone (DM + player-1 + player-2)", async ({
   browser,
 }) => {
   const { secret, link, recordId } = e2eEnv();
   const ambush = recordId("battlemap", "scene");
   const mira = recordId("battlemap", "token", 0);
   const goblin = recordId("battlemap", "token", 1);
+  const goblin2 = recordId("goblin-2", "token");
+  const player1 = recordId("player-1", "player");
 
   const dm = await rolePage(browser);
   const errors: string[] = [];
@@ -124,6 +117,15 @@ test("FR-FOG-34 / -37 / -44 / -45 vision: d1 open, Mira → (7, 5) → Goblin fo
   await expect.poll(() => tokenNode(p1, goblin)).not.toBeNull();
   await expect.poll(() => cellOf(p2, mira)).toEqual({ col: 7, row: 5 });
   expect(await tokenNode(p2, goblin)).toBeNull();
+  // V3 (FR-FOG-21): player-1 draws its `vision`: one `see` polygon, cut at the x = 8 wall except
+  // through the open door; no darkvision. Player-2 (Thorn, darkvision 60) one `dark` polygon.
+  await expect
+    .poll(async () => ((await attrOf(p1, "fog-vision", "see")) as number[][] | null)?.length)
+    .toBe(1);
+  expect(await attrOf(p1, "fog-vision", "dark")).toEqual([]);
+  expect(await attrOf(p1, "fog-vision", "blind")).toBe(false);
+  expect(((await attrOf(p2, "fog-vision", "dark")) as number[][]).length).toBe(1);
+  expect(await attrOf(p2, "fog-vision", "see")).toEqual([]);
 
   // Reload: the snapshot computes player-1's sight again.
   await p1.reload();
@@ -151,11 +153,33 @@ test("FR-FOG-34 / -37 / -44 / -45 vision: d1 open, Mira → (7, 5) → Goblin fo
   await expect(undo).toHaveAttribute("data-depth", String(depth));
   await expect.poll(() => tokenNode(p1, goblin)).not.toBeNull();
 
-  // #210: the DM sets the Goblin Invisible → gone for player-1 (no Sees invisible source).
-  expect(await dmIntent(dm, secret, "fog.setInvisible", { tokenId: goblin, invisible: true })).toBe(
-    "ack",
-  );
+  // FR-FOG-43 / -20: View as Player 1 → one load; P1's rows drawn over the DM view; the Goblin
+  // (seen by P1) at full opacity, Goblin 2 (in darkness, unseen) dimmed; back to "DM".
+  expect(await attrOf(dm, "fog-view-as", "player")).toBeNull();
+  await dm.getByTestId("fog-view-as").click();
+  await dm.locator(`[data-testid="fog-view-as-option"][data-value="${player1}"]`).click();
+  await expect(dm.getByTestId("fog-view-as")).toHaveAttribute("data-value", player1);
+  await expect.poll(() => attrOf(dm, "fog-view-as", "player")).toBe(player1);
+  await expect(dm.getByTestId("fog-view-as")).not.toHaveAttribute("data-loading", /.*/);
+  expect(((await attrOf(dm, "fog-vision", "see")) as number[][]).length).toBe(1);
+  await expect.poll(async () => (await tokenNode(dm, goblin))?.opacity).toBe(1);
+  await expect.poll(async () => (await tokenNode(dm, goblin2))?.opacity).toBe(0.5);
+  await dm.getByTestId("fog-view-as").click();
+  await dm.locator('[data-testid="fog-view-as-option"][data-value="dm"]').click();
+  await expect.poll(() => attrOf(dm, "fog-view-as", "player")).toBeNull();
+  await expect.poll(async () => (await tokenNode(dm, goblin2))?.opacity).toBe(1);
+
+  // #210 (FR-FOG-47): the Goblin's token menu → Invisible → faded + "Invisible" badge for the DM;
+  // gone for player-1 (no Sees invisible source).
+  await dm.getByTestId("map-tool-select").click();
+  const g = (await tokenNode(dm, goblin)) as { x: number; y: number };
+  await dm.mouse.click(g.x, g.y, { button: "right" });
+  const item = dm.getByTestId("fog-token-menu-invisible");
+  await expect(item).toHaveAttribute("data-state", "unchecked");
+  await item.click();
   await expect.poll(() => tokenNode(p1, goblin)).toBeNull();
+  await expect.poll(async () => (await tokenNode(dm, goblin))?.opacity).toBe(0.5);
+  expect(await konvaNodes(dm, "fog-token-invisible", goblin)).toHaveLength(1);
 
   // No player-2 frame ever named the Goblin; no `invisible` key reached a player.
   for (const f of p2Frames) {
