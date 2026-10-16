@@ -70,6 +70,7 @@ import { modeFromKeys } from "@ui/features/dice-roll-log/logic";
 import {
   RollButton,
   type RollControl,
+  type RollKeys,
   useRollControl,
 } from "@ui/features/dice-roll-log/roll-control";
 import { actionButton } from "@ui/features/notifications/logic";
@@ -122,6 +123,7 @@ import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpDialog } from "./hp-dialog";
 import { isDamageCard, pendingRowText } from "./pending";
 import { useCombatDialogs } from "./popup-store";
+import { rollKeys } from "./roll-keys";
 import { idleInitiativeOnLoad } from "./start-end";
 import { startReason } from "./start-reason";
 
@@ -246,7 +248,7 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
   const [pick, setPick] = useState<{
     index: number;
     action: AttackAction;
-    keys: KeyState;
+    keys: RollKeys;
     n: number;
   } | null>(null);
   const chosen = choices[pick?.index ?? 0];
@@ -296,7 +298,7 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
   useEffect(() => {
     if (pick) control.roll(pick.keys);
   }, [n]);
-  const keys = useRef<KeyState>({});
+  const keys = useRef<RollKeys>({});
   const choose = (index: number, a: AttackAction) => {
     const k = keys.current;
     keys.current = {};
@@ -334,7 +336,7 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
                   data-attack-id={ch.attackId ?? ""}
                   className={a.value === "both" ? "min-w-0 flex-1 gap-2" : "px-1.5 text-xs"}
                   onPointerDown={(e) => {
-                    keys.current = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey };
+                    keys.current = rollKeys(e);
                   }}
                   onSelect={() => choose(i, a.value)}
                 >
@@ -374,7 +376,7 @@ const KIND_LABEL: Record<AbilityKind, string> = { check: "Check", save: "Save" }
  */
 function useAbilityRoll(c: CombatantView, kind: AbilityKind, bonus: (a: Ability) => number | null) {
   const { send } = useCbtIntent();
-  const [pick, setPick] = useState<{ ability: Ability; keys: KeyState; n: number } | null>(null);
+  const [pick, setPick] = useState<{ ability: Ability; keys: RollKeys; n: number } | null>(null);
   const ability = pick?.ability ?? "str";
   const control = useRollControl({
     expressions: [d20Expression(bonus(ability) ?? 0)],
@@ -397,14 +399,9 @@ function useAbilityRoll(c: CombatantView, kind: AbilityKind, bonus: (a: Ability)
   }, [n]);
   return {
     control,
-    roll: (a: Ability, keys: KeyState) =>
+    roll: (a: Ability, keys: RollKeys) =>
       setPick((p) => ({ ability: a, keys, n: (p?.n ?? 0) + 1 })),
   };
-}
-
-interface KeyState {
-  shiftKey?: boolean;
-  ctrlKey?: boolean;
 }
 
 /** Close delay of a row-menu submenu, ms: long enough to cross from the trigger to an item. */
@@ -441,10 +438,10 @@ function AbilityMenu({
   c: CombatantView;
   kind: AbilityKind;
   bonus: (a: Ability) => number | null;
-  roll: (a: Ability, keys: KeyState) => void;
+  roll: (a: Ability, keys: RollKeys) => void;
   control: RollControl;
 }) {
-  const keys = useRef<KeyState>({});
+  const keys = useRef<RollKeys>({});
   const sub = useHoverSafeSub();
   return (
     <DropdownMenuSub open={sub.open} onOpenChange={sub.onOpenChange}>
@@ -459,7 +456,7 @@ function AbilityMenu({
             data-record-id={c.id}
             data-value={a}
             onPointerDown={(e) => {
-              keys.current = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey };
+              keys.current = rollKeys(e);
             }}
             onSelect={() => {
               roll(a, keys.current);
