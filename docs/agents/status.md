@@ -9,7 +9,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | V: fog v2 + vision + walls | `spec/vision` (w3D, slot 0) | spec-vision | Working | Report → seams |
-| D: dice extras | `spec/dice-extras` (w3E, slot 2) | spec-dice-extras | Working | Report → seams |
+| D: dice extras | `spec/dice-extras` (w3E, slot 2) | — | Spec in-review (5b6b60d), agent ended | Seams → review |
 | R: modifiers tiers 1–3 + triggers | `spec/rule-triggers` (w3F, slot 3) | spec-rule-triggers | Working | Report → seams |
 | P: party board + handouts | `spec/party-board` (w3G, slot 4) | — | Spec in-review (2c793d4), agent ended | Seams → review |
 | C: compendium | `spec/compendium` (w3H, slot 5) | spec-compendium | Working | Report → seams |
