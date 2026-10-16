@@ -6,6 +6,7 @@ import { characterSheet } from "./character-sheet";
 import { combatExtras } from "./combat-extras";
 import { combatTracker } from "./combat-tracker";
 import { compendium } from "./compendium";
+import { diceExtras } from "./dice-extras";
 import { diceRollLog } from "./dice-roll-log";
 import { effectModifiers } from "./effect-modifiers";
 import { entities } from "./entities";
@@ -36,4 +37,5 @@ export const features: readonly Feature[] = [
   sceneTools,
   partyBoard,
   compendium,
+  diceExtras,
 ];
