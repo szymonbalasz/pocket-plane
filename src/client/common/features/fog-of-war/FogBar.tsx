@@ -45,6 +45,14 @@ export const UNDO_LABELS: Record<FogEditKind, string> = {
   "hide-polygon": "hide polygon",
   "reveal-all": "reveal all",
   "fog-all": "hide all",
+  // FOG v2 kinds (FR-FOG-17); written from V1 on.
+  "reveal-shape": "reveal shape",
+  "fog-shape": "fog shape",
+  "explored-shape": "explored shape",
+  "darkness-place": "darkness place",
+  "darkness-move": "darkness move",
+  "darkness-remove": "darkness remove",
+  "darkness-clear": "darkness clear",
 };
 
 export function undoHint(undo: FogRecord["undo"]): string {

@@ -12,7 +12,7 @@ import {
 import { asc, eq } from "drizzle-orm";
 import { scene, sceneFolder, token } from "../../db/schema";
 import { defineRecordType } from "../../ws/records";
-import { toFolderRecord, toSceneRecord, toTokenRecord } from "./rows";
+import { dmTokenRecord, toFolderRecord, toSceneRecord, toTokenRecord } from "./rows";
 import {
   folderVisibility,
   redactScene,
@@ -67,6 +67,7 @@ export const sceneRecordTypes = [
     sceneOf: (r) => r.sceneId,
     visibility: tokenVisibility,
     redact: redactToken,
+    dmRedact: dmTokenRecord,
     // ADR-0041: the DM snapshot holds the active scene's tokens; others load on view.
     dmWindow: "active-scene",
     // ≤ 1,000 per campaign (FR-MAP-14).

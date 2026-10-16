@@ -12,7 +12,14 @@ import {
   SceneStructureRecord,
 } from "@shared/scene-tools/schemas";
 import { defineRecordType } from "../../ws/records";
-import { campaignProps, campaignStructures, campaignTemplates, readSettings } from "./rows";
+import {
+  campaignProps,
+  campaignStructures,
+  campaignTemplates,
+  dmStructureRecord,
+  readSettings,
+  withoutSeenBy,
+} from "./rows";
 import {
   propVisibility,
   redactProp,
@@ -33,6 +40,7 @@ export const scnRecordTypes = [
     sceneOf: (r) => r.id,
     visibility: structureVisibility,
     redact: redactStructure,
+    dmRedact: dmStructureRecord,
     dmWindow: "active-scene",
     snapshot: ({ db }, v) => campaignStructures(db, v.campaignId),
   }),
@@ -45,6 +53,7 @@ export const scnRecordTypes = [
     sceneOf: (r) => r.sceneId,
     visibility: propVisibility,
     redact: redactProp,
+    dmRedact: withoutSeenBy,
     dmWindow: "active-scene",
     // ≤ 2,000 per campaign (FR-SCN-16).
     snapshot: ({ db }, v) => campaignProps(db, v.campaignId),
@@ -58,6 +67,7 @@ export const scnRecordTypes = [
     sceneOf: (r) => r.sceneId,
     visibility: templateVisibility,
     redact: redactTemplate,
+    dmRedact: withoutSeenBy,
     dmWindow: "active-scene",
     snapshot: ({ db }, v) => campaignTemplates(db, v.campaignId),
   }),

@@ -1,7 +1,8 @@
 // Test support for scene-tools: scenes-map's seed plus Goblin Ambush (20 × 14 cells) and Cellar,
 // with SCN rows written directly (fix/scn-core has no commands yet) in the shape of the SCN §13
 // fixtures: `scn-walls`, `scn-props` (barrel, table, hidden chest), `scn-templates` (Spirit
-// Guardians kept by player-1, hidden DM "Glyph").
+// Guardians kept by player-1, hidden DM "Glyph"). Direct writes carry FOG's per-player copies as
+// `derive` would on a revealed scene (ADR-0042): every player, or nobody when fogged / `f = 1`.
 
 import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import type {
@@ -46,6 +47,7 @@ export function scnSetup() {
     if (revealed) t.run(FOG_INTENTS.setAll, { sceneId: s.id, fogged: false });
     return s;
   };
+  const players = [t.h.p1.id, t.h.p2.id];
   const ambush = newScene("Goblin Ambush");
   const cellar = newScene("Cellar");
 
@@ -63,6 +65,7 @@ export function scnSetup() {
         nextN: Math.max(0, ...walls.map((w) => w[0]), ...doors.map((d) => d[0])) + 1,
         walls,
         doors,
+        doorSeen: Object.fromEntries(doors.map((d) => [String(d[0]), d[6] ? [] : players])),
         updatedAt: AT,
       })
       .run();
@@ -88,6 +91,7 @@ export function scnSetup() {
         h: 1,
         createdAt: AT,
         updatedAt: AT,
+        seenBy: f.fogged ? [] : players,
         ...f,
       })
       .run();
@@ -112,6 +116,7 @@ export function scnSetup() {
         angle: 0,
         createdAt: AT,
         updatedAt: AT,
+        seenBy: f.fogged && !f.placedByPlayerId ? [] : players,
         ...f,
       })
       .run();

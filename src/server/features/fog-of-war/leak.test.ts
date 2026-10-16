@@ -83,7 +83,9 @@ describe("FOG §13 leak walkthrough (player-1, player-2)", () => {
         .map((t) => [t.name, toTokenRecord(t)]),
     ) as Record<string, TokenRecord>;
   const id = (name: string) => tokens()[name]?.id as string;
-  const hiddenForPlayers = (t: TokenRecord) => t.hidden || fogHidden(TOKEN_TYPE, t);
+  /** ADR-0042: hidden for one player (`hidden`, or not in `seenBy` and not their own). */
+  const hiddenFor = (playerId: string) => (t: TokenRecord) =>
+    t.hidden || fogHidden(TOKEN_TYPE, t, playerId);
   const names = (c: TestClient) =>
     Object.values((c.store.records[TOKEN_TYPE] ?? {}) as Record<string, TokenRecord>)
       .filter((t) => t.sceneId === ambushId)
@@ -134,7 +136,6 @@ describe("FOG §13 leak walkthrough (player-1, player-2)", () => {
   async function expectPlayersSee(want: string[], marks: [number, number]) {
     for (const c of [p1, p2]) await until(() => names(c).join() === [...want].sort().join());
     const all = tokens();
-    const hiddenNow = Object.values(all).filter(hiddenForPlayers);
     for (const [i, [c, name]] of (
       [
         [p1, "Player 1"],
@@ -142,7 +143,8 @@ describe("FOG §13 leak walkthrough (player-1, player-2)", () => {
       ] as const
     ).entries()) {
       expect(leakScan(h.s, c)).toEqual([]);
-      const me = playerIds[name];
+      const me = playerIds[name] as string;
+      const hiddenNow = Object.values(all).filter(hiddenFor(me));
       for (const r of tokenRecordsIn(c.frames)) {
         if (r.fogged === true) expect(r.ownerPlayerId).toBe(me);
       }
@@ -167,7 +169,8 @@ describe("FOG §13 leak walkthrough (player-1, player-2)", () => {
     await until(() => p2.frames.slice(before).some((f) => f.type === "snapshot"));
     const snap = p2.frames.slice(before).find((f) => f.type === "snapshot");
     const ids = tokenRecordsIn(snap ? [snap] : []).map((r) => r.id);
-    for (const t of hiddenNow) expect(ids).not.toContain(t.id);
+    const hiddenP2 = Object.values(all).filter(hiddenFor(playerIds["Player 2"] as string));
+    for (const t of hiddenP2) expect(ids).not.toContain(t.id);
     await until(() => names(p2).join() === [...want].sort().join());
   }
   const mark = (): [number, number] => [p1.frames.length, p2.frames.length];

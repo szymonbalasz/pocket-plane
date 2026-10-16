@@ -3,7 +3,7 @@
 // `scn.template` audience (FR-SCN-24, ADR-0033), incl. the fog seam (FR-FOG-15). Fog's real line
 // is lifted out per case so only the test fog acts (fog's own tests cover its line).
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { fogHidden } from "@shared/fog-of-war/visibility";
+import { seenByNobody } from "@shared/fog-of-war/visibility";
 import { templateCells } from "@shared/scene-tools/geometry";
 import {
   AOE_TEMPLATE_TYPE,
@@ -60,6 +60,7 @@ function setup() {
 
 /** Test fog: every cell with col ≥ 15 is fogged; `hides` = FOG's pure rule (opt-in). */
 const derived: SceneObject[] = [];
+const players: string[] = [];
 function registerFog(withHides: boolean) {
   derived.length = 0;
   visibilityHooks.register({
@@ -67,9 +68,11 @@ function registerFog(withHides: boolean) {
     derive(_read, obj) {
       derived.push(obj);
       const cells = obj.cells as readonly (readonly [number, number])[];
-      return { fogged: cells.length > 0 && cells.every(([c]) => c >= 15) };
+      const fogged = cells.length > 0 && cells.every(([c]) => c >= 15);
+      // ADR-0042: with `hides`, the test fog also writes per-player `seenBy` (nobody when fogged).
+      return withHides ? { fogged, seenBy: fogged ? [] : [...players] } : { fogged };
     },
-    ...(withHides ? { hides: (type: string, r: object) => fogHidden(type, r) } : {}),
+    ...(withHides ? { hides: (type: string, r: object) => seenByNobody(type, r) } : {}),
   });
 }
 
@@ -98,6 +101,7 @@ describe("FR-SCN-25 Keep: scn.placeTemplate", () => {
       label: "Fireball",
       placedByPlayerId: null,
       hidden: true,
+      seenBy: null, // fog's line is lifted here (no per-player copies)
     });
     expect(t.logTypes().slice(log)).toEqual(["TemplatePlaced"]);
     const e = t.events.slice(events);
@@ -180,6 +184,7 @@ describe("FR-SCN-25 Keep: scn.placeTemplate", () => {
       type: AOE_TEMPLATE_TYPE,
       sceneId: t.ambush.id,
       cells: templateCells(geo, t.ambush, { cut: false }),
+      placedByPlayerId: null,
     });
     expect(t.tpl(t.place(sphere(t.ambush.id)))?.fogged).toBeUndefined();
     // Moving it out of fog re-derives.
@@ -303,7 +308,7 @@ describe("FR-SCN-27 visibility of kept templates", () => {
     expect(t.ids(t.h.viewer("dm"))).toEqual([mine, glyph]);
     for (const p of [t.h.p1, t.h.p2]) {
       const snap = t.h.snapshot(t.h.viewer("player", p.id));
-      const { campaignId: _cid, ...wire } = t.tpl(mine) as AoeTemplateRecord;
+      const { campaignId: _cid, seenBy: _s, ...wire } = t.tpl(mine) as AoeTemplateRecord;
       expect(snap[AOE_TEMPLATE_TYPE]).toEqual([wire]);
       expect(PlayerAoeTemplateRecord.strict().safeParse(wire).success).toBe(true);
       const frame = JSON.stringify(snap);
@@ -386,11 +391,11 @@ describe("FR-SCN-24 scn.template audience", () => {
     const t = audience();
     const inFog = t.place(t.ambush.id, { x: 18, y: 5, size: 10 });
     const partly = t.place(t.ambush.id, { x: 15, y: 5, size: 10 });
-    // derive alone (fog not hiding anything yet, build/fog-server): neutral for players.
+    // derive without `seenBy` (no per-player copies): neutral for players.
     registerFog(false);
     expect(t.route(inFog, t.dm)).toBe("all");
-    expect(derived).toEqual([]);
     visibilityHooks.unregister("test.fog");
+    players.splice(0, players.length, t.h.p1.id, t.h.p2.id);
     registerFog(true);
     expect(t.route(inFog, t.dm)).toBe("dm");
     expect(derived.at(-1)).toEqual({
@@ -399,8 +404,10 @@ describe("FR-SCN-24 scn.template audience", () => {
       cells: templateCells({ shape: "sphere", x: 18, y: 5, size: 10, angle: 0 }, t.ambush, {
         cut: false,
       }),
+      placedByPlayerId: null,
     });
-    expect(t.route(partly, t.dm)).toBe("all");
+    // ADR-0042 (FR-FOG-15): the players who would see it.
+    expect(t.route(partly, t.dm)).toEqual({ players: [t.h.p1.id, t.h.p2.id] });
     expect(t.route(inFog, t.p1)).toBe("all");
     expect(t.route(t.end(t.ambush.id), t.dm)).toBe("all");
   });

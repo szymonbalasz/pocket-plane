@@ -8,11 +8,13 @@
 //   tokens are copied (so their `derive` reads the copy's state) → `SceneDuplicated`.
 // - `deleting(env, scene)`: `map.deleteScene`, **before** any row is deleted (token hooks and
 //   the FK cascade come after) → `SceneDeleted`.
+// - `activated(env, scene)`: `map.activateScene`, after both `active` flags flip → `SceneActivated`
+//   (ADR-0042: fog re-derives a `visionStale` scene, FR-FOG-35).
 // Hooks write through `env.tx` only and never emit. No line registered → no behaviour change.
 import type { SceneRecord } from "@shared/scenes-map/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
-import { fogSceneHook } from "../fog-of-war/hooks";
+import { fogSceneHook } from "../fog-of-war/lifecycle";
 import { scnSceneHook } from "../scene-tools/lifecycle";
 
 export type SceneHookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor">;
@@ -23,11 +25,12 @@ export interface SceneHook {
   created?(env: SceneHookEnv, scene: SceneRecord): RecordChange[];
   duplicated?(env: SceneHookEnv, source: SceneRecord, copy: SceneRecord): RecordChange[];
   deleting?(env: SceneHookEnv, scene: SceneRecord): RecordChange[];
+  activated?(env: SceneHookEnv, scene: SceneRecord): RecordChange[];
 }
 
 /** The registry. Append your feature's line; order = run order. */
 export const sceneHooks: readonly SceneHook[] = [
-  fogSceneHook, // fog-of-war (FR-FOG-02 created / duplicated, FR-FOG-23 deleting)
+  fogSceneHook, // fog-of-war (FR-FOG-02 created / duplicated, FR-FOG-23 deleting, -35 activated)
   scnSceneHook, // scene-tools (FR-SCN-31)
 ];
 
@@ -61,6 +64,10 @@ export class SceneHooks {
 
   deleting(env: SceneHookEnv, scene: SceneRecord): RecordChange[] {
     return this.list.flatMap((h) => h.deleting?.(env, scene) ?? []);
+  }
+
+  activated(env: SceneHookEnv, scene: SceneRecord): RecordChange[] {
+    return this.list.flatMap((h) => h.activated?.(env, scene) ?? []);
   }
 }
 

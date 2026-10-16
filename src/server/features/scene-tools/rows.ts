@@ -1,5 +1,7 @@
 // Row ↔ record mapping and reads for scene-tools (SCN §8, §9). Wire records are compact: no
-// timestamps; `fogged` only when true; `campaignId` stays for the registry's scope gate.
+// timestamps; `fogged` only when true; `campaignId` stays for the registry's scope gate. Server
+// records also carry FOG's per-player copies (`seenBy`, `doorSeen`, ADR-0042), which no wire
+// carries (`dmRedact` / `redact` strip them).
 import {
   type AoeTemplateRecord,
   DEFAULT_DIAGONAL_RULE,
@@ -25,7 +27,18 @@ export const toStructureRecord = (r: StructureRow): SceneStructureRecord => ({
   nextN: r.nextN,
   walls: r.walls,
   doors: r.doors,
+  doorSeen: r.doorSeen,
 });
+
+/** DM wire: no `doorSeen`. */
+export const dmStructureRecord = ({
+  doorSeen: _doorSeen,
+  ...r
+}: SceneStructureRecord): SceneStructureRecord => r;
+
+/** DM wire for props and templates: no `seenBy`. */
+export const withoutSeenBy = <R extends { seenBy?: unknown }>({ seenBy: _seenBy, ...r }: R) =>
+  r as Omit<R, "seenBy">;
 
 export function toPropRecord(r: PropRow): ScenePropRecord {
   const rec: ScenePropRecord = {
@@ -43,7 +56,7 @@ export function toPropRecord(r: PropRow): ScenePropRecord {
     hidden: r.hidden,
     locked: r.locked,
   };
-  return r.fogged ? { ...rec, fogged: true } : rec;
+  return { ...rec, ...(r.fogged ? { fogged: true as const } : {}), seenBy: r.seenBy };
 }
 
 export function toTemplateRecord(r: TemplateRow): AoeTemplateRecord {
@@ -61,7 +74,7 @@ export function toTemplateRecord(r: TemplateRow): AoeTemplateRecord {
     placedByPlayerId: r.placedByPlayerId,
     hidden: r.hidden,
   };
-  return r.fogged ? { ...rec, fogged: true } : rec;
+  return { ...rec, ...(r.fogged ? { fogged: true as const } : {}), seenBy: r.seenBy };
 }
 
 export const toSettingsRecord = (r: SettingsRow): MapSettingsRecord => ({

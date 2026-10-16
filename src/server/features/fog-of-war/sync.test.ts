@@ -96,16 +96,26 @@ describe("fog bundle over WS", () => {
     expect(tok["Cave Ogre"]?.fogged).toBe(false);
   });
 
-  test("FR-FOG-09 / -12 snapshot: DM every scene's fog with undo; players the active scene's only, redacted", async () => {
+  test("FR-FOG-09 / -12 snapshot: DM the active scene's fog with undo (others by sync.loadScene, OQ-FOG-30 B); players the active scene's only, redacted", async () => {
     const dm = await h.live(DM);
     const p1 = await h.live(p("Player 1"));
+    expect(fogOf(dm, ambushId)).toBeUndefined();
+    expect((await answer(dm, dm.loadScene(ambushId))).type).toBe("ack");
     const fog = fogOf(dm, ambushId) as FogRecord;
     expect(fog).toMatchObject({ fill: "fog", box: [0, 0, 20, 14], undo: { n: 4 } });
     expect(fog.undo?.kind).toBe("reveal-polygon");
     // FR-FOG-25 ripple: Town was revealed after create (one "reveal all" entry).
     expect(fogOf(dm, townId)).toMatchObject({ fill: "clear", runs: "", undo: { n: 1 } });
     expect(p1.store.records[FOG_TYPE] ?? {}).toEqual({
-      [townId]: { id: townId, fill: "clear", box: (fogOf(dm, townId) as FogRecord).box, runs: "" },
+      [townId]: {
+        id: townId,
+        fill: "clear",
+        box: (fogOf(dm, townId) as FogRecord).box,
+        runs: "",
+        shapes: [],
+        darkness: [],
+        explored: false,
+      },
     });
     // Player refused on every fog intent.
     for (const [name, payload] of [
@@ -130,6 +140,8 @@ describe("fog bundle over WS", () => {
     const p1 = await h.live(p("Player 1"));
     const p2 = await h.live(p("Player 2"));
     expect((await answer(dm, dm.intent(I.activateScene, { sceneId: ambushId }))).type).toBe("ack");
+    // OQ-FOG-30 B: the DM's window loads the newly shown scene's rows (ADR-0041).
+    expect((await answer(dm, dm.loadScene(ambushId))).type).toBe("ack");
     for (const c of [p1, p2]) {
       await until(() => fogOf(c, ambushId) !== undefined);
       expect(tokenIds(c)).toEqual(
@@ -140,6 +152,9 @@ describe("fog bundle over WS", () => {
         fill: "fog",
         box: [0, 0, 20, 14],
         runs: (fogOf(dm, ambushId) as FogRecord).runs,
+        shapes: [],
+        darkness: [],
+        explored: false,
       });
       const raw = c.raw();
       expect(raw).not.toContain("Goblin Lurker");

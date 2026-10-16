@@ -1,17 +1,26 @@
-// fog-of-war (FOG): record type `fog` and the DM-only intents `fog.edit` / `fog.setAll` /
-// `fog.undo` (FOG §9). Its lines in scenes-map's `visibility-hooks.ts` / `scene-hooks.ts` live in
-// `hooks.ts` (derive, hides, dragToDm; created, duplicated, deleting).
+// fog-of-war (FOG): record types `fog`, `fog-explored`, `vision` and the DM-only intents
+// `fog.edit` / `fog.setAll` / `fog.undo` (FOG §9). Its lines in scenes-map's
+// `visibility-hooks.ts` / `scene-hooks.ts` and campaign-management's `player-hooks.ts` live in
+// `hooks.ts`. FR-FOG-40: the per-player copies are backfilled before the server listens.
+import { realContext } from "../../commands/context";
 import type { Feature } from "../../services";
+import { backfillSeenBy } from "./backfill";
 import { fogCommands } from "./commands";
-import { fogRecordType } from "./records";
+import { fogExploredRecordType, fogRecordType, visionRecordType } from "./records";
 
 export const fogOfWar: Feature = {
   name: "fog-of-war",
   register(r) {
     r.recordType(fogRecordType);
+    r.recordType(fogExploredRecordType);
+    r.recordType(visionRecordType);
     const c = fogCommands(r.services.log);
     r.command(c.edit, { intent: true });
     r.command(c.setAll, { intent: true });
     r.command(c.undo, { intent: true });
+    r.onStart("fog-of-war.seen-by-backfill", (s) => {
+      const n = backfillSeenBy(s.db, realContext(s.clock));
+      if (n > 0) s.log.info(`fog: backfilled per-player copies on ${n} scene(s) (FR-FOG-40)`);
+    });
   },
 };

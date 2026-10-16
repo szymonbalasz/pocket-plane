@@ -125,6 +125,9 @@ describe("FR-FOG-06 fog.setAll", () => {
       fill: "fog",
       box: [0, 0, 20, 14],
       runs: "",
+      shapes: [],
+      darkness: [],
+      explored: false,
       undo: { n: 1, editId, kind: "fog-all" },
     });
     expect(t.stack()).toEqual([
