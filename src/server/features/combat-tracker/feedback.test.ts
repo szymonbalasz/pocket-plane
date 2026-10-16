@@ -374,6 +374,32 @@ describe("FR-CBT-39 FR-CBT-40 movement used", () => {
     t.turn("next");
     expect(t.events.at(-1)?.event.changes.map((c) => c.type)).toEqual(["encounter"]);
   });
+
+  test("FR-CBT-39 BL-03 round-0 movement doesn't count: Start round 1 resets everyone (in TurnChanged)", () => {
+    const t = started();
+    t.standard();
+    t.move(t.tokens.mira, 4, 7, t.p1); // round 0: Mira 10 (not first in round 1)
+    t.move(t.tokens.goblin, 13, 6); // Goblin 5
+    t.run(setRemoved.name, { combatantId: t.id("Goblin 2"), removed: true });
+    t.s.db.$client.run("update combatant set moved_ft = 15 where id = ?", [t.id("Goblin 2")]);
+    expect(t.row("Mira")?.movedFt).toBe(10);
+    t.turn("next"); // Start round 1: Wolf
+    for (const n of ["Mira", "Goblin", "Goblin 2", "Wolf"]) expect(t.row(n)?.movedFt).toBe(0);
+    const ev = t.events.at(-1)?.event;
+    expect(ev?.type).toBe("TurnChanged");
+    const reset = ev?.changes.filter((c) => c.type === COMBATANT_TYPE).map((c) => c.after);
+    expect(reset).toHaveLength(3);
+    // Mira's owner gets her reset; moves from round 1 count again.
+    const w = t.wire(ev?.changes ?? [], t.h.viewer("player", t.h.p1.id));
+    expect(w.find((x) => x?.id === t.id("Mira"))).toMatchObject({ data: { movedFt: 0 } });
+    t.move(t.tokens.mira, 5, 7, t.p1);
+    expect(t.row("Mira")?.movedFt).toBe(5);
+    // A later round's Next resets only the new turn combatant.
+    t.turn("next"); // Mira: reset
+    t.move(t.tokens.mira, 6, 7, t.p1);
+    t.turn("next"); // Goblin: Mira keeps hers
+    expect(t.row("Mira")?.movedFt).toBe(5);
+  });
 });
 
 describe("FR-CBT-38 PC Down for other players (FR-ENT-15)", () => {

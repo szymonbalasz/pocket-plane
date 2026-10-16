@@ -1,5 +1,6 @@
 // Turns and rounds (FR-CBT-14, FR-CBT-31): `expected*` guards against double clicks / two tabs.
-// Next resets the new turn combatant's `movedFt`; Prev keeps it (FR-CBT-40). Dead PCs skip
+// Next resets the new turn combatant's `movedFt`; Prev keeps it (FR-CBT-40). Start round 1 resets
+// everyone's: round-0 positioning never counts (FR-CBT-39, BL-03). Dead PCs skip
 // (FR-CBTX-25); `turnChanged` rule hooks run after the event (FR-CBTX-01, ADR-0035).
 import { DEATH_SAVES_MAX } from "@shared/combat-extras/schemas";
 import { stepTurn } from "@shared/combat-tracker/rules";
@@ -75,10 +76,17 @@ export function turnCommand(direction: "next" | "prev", hooks: CombatRuleHooks) 
         .run();
       const after = readEncounter(env.tx, encounterId);
       const changes: RecordChange[] = [encounterChange(before, after)];
-      const turn = rows.find((r) => r.id === step.turnCombatantId);
-      if (direction === "next" && turn && turn.movedFt !== 0) {
-        env.tx.update(combatant).set({ movedFt: 0 }).where(eq(combatant.id, turn.id)).run();
-        changes.push(combatantChange(turn, readCombatant(env.tx, turn.id)));
+      // FR-CBT-40: the new turn combatant; on Start round 1 everyone (BL-03).
+      const reset =
+        direction !== "next"
+          ? []
+          : before.round === 0
+            ? rows
+            : rows.filter((r) => r.id === step.turnCombatantId);
+      for (const r of reset) {
+        if (r.movedFt === 0) continue;
+        env.tx.update(combatant).set({ movedFt: 0 }).where(eq(combatant.id, r.id)).run();
+        changes.push(combatantChange(r, readCombatant(env.tx, r.id)));
       }
       env.emit({
         type: TurnChanged.type,
