@@ -1,35 +1,37 @@
 // DM read models for combat: definitions by id (AC, HP, CR, attack), the started encounter's
 // pending damage cards and its latest undoable combat log entry. Display only; the server decides.
-import { HP_CHANGE_TYPE, type HpChangeRecord } from "@shared/combat-tracker/schemas";
 import {
-  type DefinitionRecord,
-  ENTITY_TYPE,
-  EntityRecord,
-  IMPORTED_ENTITY_TYPE,
-  ImportedEntityRecord,
-} from "@shared/entities/schemas";
+  COMBATANT_TYPE,
+  ENCOUNTER_ENTRY_TYPE,
+  HP_CHANGE_TYPE,
+  type HpChangeRecord,
+} from "@shared/combat-tracker/schemas";
+import type { DefinitionRecord } from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
+import { useDefinitions as useDefinitionRecords } from "@ui/features/compendium/definitions";
 import { useRecords } from "@ui/sync/store";
 import { useMemo } from "react";
 import { dmNotificationViews } from "../../notification-views";
 import { pendingForEncounter } from "./pending";
 import { undoLabel } from "./targets";
 
-export function useDefinitions(): Map<string, DefinitionRecord> {
-  const entities = useRecords<unknown>(ENTITY_TYPE);
-  const imported = useRecords<unknown>(IMPORTED_ENTITY_TYPE);
-  return useMemo(() => {
-    const out = new Map<string, DefinitionRecord>();
-    for (const r of entities) {
-      const p = EntityRecord.safeParse(r);
-      if (p.success) out.set(p.data.id, p.data);
-    }
-    for (const r of imported) {
-      const p = ImportedEntityRecord.safeParse(r);
-      if (p.success) out.set(p.data.id, p.data);
-    }
-    return out;
-  }, [entities, imported]);
+const NONE: readonly string[] = [];
+
+/**
+ * Definitions combat shows: every campaign row, plus the imported ones combat references (the
+ * combatants' and encounter entries' definitions) and `extra` (e.g. a draft's or a dialog's
+ * picks), loaded on demand (FR-CMP-16; until loaded they're absent).
+ */
+export function useDefinitions(extra: readonly string[] = NONE): Map<string, DefinitionRecord> {
+  const combatants = useRecords<{ entityId?: string | null }>(COMBATANT_TYPE);
+  const entries = useRecords<{ definitionId: string }>(ENCOUNTER_ENTRY_TYPE);
+  const ids = useMemo(() => {
+    const out = new Set<string>(extra);
+    for (const c of combatants) if (c.entityId) out.add(c.entityId);
+    for (const e of entries) out.add(e.definitionId);
+    return [...out];
+  }, [combatants, entries, extra]);
+  return useDefinitionRecords(ids).byId;
 }
 
 /**

@@ -172,31 +172,46 @@ describe("entities record types", () => {
     ]);
   });
 
-  test("FR-ENT-16 imported-entity: DM full in every campaign; players never get the type", () => {
+  test("FR-ENT-16 FR-CMP-15 imported-entity: in no snapshot; sync.load by ids returns both to the DM in every campaign; players never", () => {
     const s = entityServices();
     const h = seedEntities(s);
-    const dmSnap = h.snapshot(h.viewer("dm"));
-    const imported = dmSnap["imported-entity"] as { name: string; source: string }[];
-    expect(imported.map((r) => [r.name, r.source])).toEqual([
-      ["Goblin", "fixture"],
-      ["Wolf", "fixture"],
-    ]);
-    const second = h.snapshot(h.viewer("dm", null, h.secondCampaignId));
-    expect(second["imported-entity"]).toHaveLength(2);
-    const player = h.snapshot(h.viewer("player", h.p1.id));
+    const src = { db: s.db, presence: { list: () => [] } };
+    const ids = [h.goblinId, h.wolfId];
+    expect(s.records.get("imported-entity")?.lazy).toBe("ids");
+    for (const cid of [undefined, h.secondCampaignId]) {
+      const dm = h.viewer("dm", null, cid);
+      expect(h.snapshot(dm)["imported-entity"]).toBeUndefined();
+      const loaded = s.records.load(src, dm, "imported-entity", ids)["imported-entity"] as {
+        name: string;
+        source: string;
+      }[];
+      expect(loaded.map((r) => [r.name, r.source])).toEqual([
+        ["Goblin", "fixture"],
+        ["Wolf", "fixture"],
+      ]);
+    }
+    const p1 = h.viewer("player", h.p1.id);
+    const player = h.snapshot(p1);
     expect(player["imported-entity"]).toBeUndefined();
     expect(player.entity).toEqual([]);
+    // The hub refuses a player's load (audience dm); the registry's filter hides every row too.
+    expect(s.records.load(src, p1, "imported-entity", ids)["imported-entity"]).toEqual([]);
   });
 
-  test("FR-ENT-01 invalid stored row: snapshot omits it and logs its id", () => {
+  test("FR-ENT-01 invalid stored row: an id load omits it and logs its id", () => {
     const cap = captureLogger();
     const s = entityServices(cap.log);
     const h = seedEntities(s);
     s.db.$client.run(
       `UPDATE entity SET stat_block = '{"size":"small","ac":99}' WHERE id = '${h.wolfId}'`,
     );
-    const snap = h.snapshot(h.viewer("dm"));
-    expect((snap["imported-entity"] as { id: string }[]).map((r) => r.id)).toEqual([h.goblinId]);
+    const got = s.records.load(
+      { db: s.db, presence: { list: () => [] } },
+      h.viewer("dm"),
+      "imported-entity",
+      [h.goblinId, h.wolfId],
+    );
+    expect((got["imported-entity"] as { id: string }[]).map((r) => r.id)).toEqual([h.goblinId]);
     expect(cap.errors.some((e) => e.includes(h.wolfId))).toBe(true);
   });
 });

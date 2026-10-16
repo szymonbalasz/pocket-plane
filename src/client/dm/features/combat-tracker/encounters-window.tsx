@@ -32,6 +32,7 @@ import type { LookupRow } from "@ui/features/combat-tracker/lookup";
 import { CreatureLookup } from "@ui/features/combat-tracker/parts";
 import { useCbtIntent } from "@ui/features/combat-tracker/store";
 import { ENCOUNTERS_KIND } from "@ui/features/combat-tracker/window";
+import { useCreatureLookup } from "@ui/features/compendium/lookup";
 import { useFreeArea } from "@ui/features/play-shell/free-area";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { useSceneLoaded } from "@ui/features/scenes-map/scene-window";
@@ -50,6 +51,9 @@ import { useOpenEncounter } from "./open-encounter";
 import { partyMembers, toggleParty } from "./party";
 import { freeAreaCell } from "./place-at";
 import { combatRest } from "./rest";
+
+/** The DM REST client, imported lazily (the session reads localStorage at import). */
+const api = () => import("../campaign-management/session").then((m) => m.api);
 
 interface Draft {
   name: string;
@@ -121,7 +125,7 @@ function useStartScenePcIds(): ((partyIds: readonly string[]) => string[]) | nul
 
 /** `partyIds`: the Start dialog's joining PCs (FR-CBT-66); else those Start would add. */
 function DifficultyCard({ draft, partyIds }: { draft: Draft; partyIds?: readonly string[] }) {
-  const defs = useDefinitions();
+  const defs = useDefinitions(draft.entries.map((e) => e.definitionId));
   const characters = useCharacters();
   const drafts = useDraftIds();
   const startPcs = useStartScenePcIds();
@@ -173,22 +177,25 @@ function DifficultyCard({ draft, partyIds }: { draft: Draft; partyIds?: readonly
 
 // ---------- creature lookup (FR-CBT-63) ----------
 
-/** Every monster the campaign can use, FR-ENT-18 order, as lookup rows. */
-function useMonsterLookupRows(): LookupRow[] {
+/**
+ * The builder's suggestions (FR-CBT-63): the campaign's custom monsters from the store, imported
+ * ones from the server (FR-CMP-17), merged in FR-ENT-18 order. `q` = the lookup's text.
+ */
+function useMonsterLookupRows(q: string): LookupRow[] {
   const entities = useRecords<unknown>("entity");
-  const imported = useRecords<unknown>("imported-entity");
   const players = useRecords<PlayerRecord>("player");
-  return useMemo(
+  const customs = useMemo(
     () =>
-      creatureRows(entities, imported, players, "monster").map((r) => ({
+      creatureRows(entities, [], players, "monster").map((r) => ({
         id: r.id,
         name: r.name,
         cr: r.cr,
         xp: r.xp,
         badge: r.badge,
       })),
-    [entities, imported, players],
+    [entities, players],
   );
+  return useCreatureLookup(api, customs, q);
 }
 
 // ---------- start dialog (FR-CBT-07, FR-CBT-08) ----------
@@ -211,7 +218,7 @@ function StartDialog({
   const scene = viewedScene(scenes, folders, requested);
   // ADR-0041: binding preview and "Not on this map" read the viewed scene's tokens.
   const sceneLoaded = useSceneLoaded(scene?.id ?? null);
-  const defs = useDefinitions();
+  const defs = useDefinitions(draft.entries.map((e) => e.definitionId));
   const characters = useCharacters();
   const drafts = useDraftIds();
   const { disabled } = useCbtIntent();
@@ -339,13 +346,14 @@ function StartDialog({
 
 function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void }) {
   const allEntries = useRecords<EncounterEntryRecord>(ENCOUNTER_ENTRY_TYPE);
-  const defs = useDefinitions();
   const characters = useCharacters();
   const drafts = useDraftIds();
   const live = useSync((s) => s.state === "live");
   const { disabled } = useCbtIntent();
   const server = useMemo(() => draftOf(encounter, allEntries), [encounter, allEntries]);
   const [draft, setDraft] = useState<Draft>(server);
+  // The draft's picks (not saved yet) load too (FR-CMP-16).
+  const defs = useDefinitions(draft.entries.map((e) => e.definitionId));
   const [nameError, setNameError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [ending, setEnding] = useState(false);
@@ -387,7 +395,8 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
         .filter((e) => e.quantity > 0),
     }));
   const partyIds = partyMembers(characters, draft.partyCharacterIds, drafts).map((c) => c.id);
-  const lookupRows = useMonsterLookupRows();
+  const [lookupQuery, setLookupQuery] = useState("");
+  const lookupRows = useMonsterLookupRows(lookupQuery);
 
   return (
     <div
@@ -416,6 +425,7 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
         <CreatureLookup
           rows={lookupRows}
           disabled={readOnly}
+          onQueryChange={setLookupQuery}
           onPick={(id) =>
             edit((d) =>
               d.entries.some((e) => e.definitionId === id)

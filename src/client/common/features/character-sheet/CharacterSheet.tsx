@@ -7,7 +7,6 @@ import {
   type DefinitionRecord,
   ENTITY_TYPE,
   EntityRecord,
-  IMPORTED_ENTITY_TYPE,
   ImportedEntityRecord,
 } from "@shared/entities/schemas";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -16,6 +15,7 @@ import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
 import { Skeleton } from "../../components/ui/primitives";
 import { useRecords, useSync } from "../../sync/store";
+import { useDefinitions } from "../compendium/definitions";
 import { RollButton, rollTooltip } from "../dice-roll-log/roll-control";
 import { CreateCharacterDialog } from "./CreateCharacter";
 import { SELECT } from "./fields";
@@ -134,7 +134,6 @@ export function CharacterSheet() {
   const you = useSync((s) => s.store.you);
   const live = useSync((s) => s.state === "live");
   const entities = useRecords<CreatureLike>(ENTITY_TYPE);
-  const imported = useRecords<CreatureLike>(IMPORTED_ENTITY_TYPE);
   const sheetRecords = useRecords<CreatureSheetRecord>(CREATURE_SHEET_TYPE);
   const players = useRecords<PlayerRecord>("player");
   const sel = useStore(sheetSelection);
@@ -144,6 +143,10 @@ export function CharacterSheet() {
     [sheetRecords],
   );
   const viewer = { role: you?.role ?? "player", playerId: you?.playerId ?? null } as const;
+  // FR-CMP-16: an imported NPC sheet (DM) reads its definition through `useDefinitions` (lazy).
+  const npcDefs = useDefinitions(viewer.role === "dm" && sel.npcId ? [sel.npcId] : []);
+  const npcImported = sel.npcId ? npcDefs.byId.get(sel.npcId) : undefined;
+  const imported: CreatureLike[] = npcImported?.campaignId === null ? [npcImported] : [];
   const npc =
     viewer.role === "dm" && sel.npcId
       ? ([...entities, ...imported].find((e) => e.id === sel.npcId && e.kind === "monster") ?? null)
@@ -161,7 +164,10 @@ export function CharacterSheet() {
     if (pickerModel(entities, sheets, viewer, players, null).options.some((o) => o.id === id)) {
       return "option";
     }
-    const monster = [...entities, ...imported].some((e) => e.id === id && e.kind === "monster");
+    // Not a campaign row → maybe an imported definition (lazy, not loaded yet): the DM keeps it
+    // as the NPC; `useDefinitions` resolves it, an id that doesn't load leaves no NPC option.
+    const row = entities.find((e) => e.id === id);
+    const monster = row ? row.kind === "monster" : true;
     return viewer.role === "dm" && monster ? "npc" : null;
   };
   useEffect(() => {

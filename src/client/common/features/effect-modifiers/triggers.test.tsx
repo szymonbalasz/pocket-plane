@@ -104,6 +104,10 @@ function syncState(o: {
   const lazy: LazyState = { ...lazyAfterSnapshot(1) };
   if (o.lazy === "ready" || o.lazy === undefined)
     lazy.loaded = { ...emptyLoaded(), types: [RULE_TRIGGER_TYPE] };
+  // FR-CMP-16: the imported definition reaches the block through `useDefinitions` (loaded).
+  if (o.role === "dm") {
+    lazy.loaded = { ...lazy.loaded, ids: { [IMPORTED_ENTITY_TYPE]: ["srd-elite"] } };
+  }
   if (o.lazy === "error") lazy.failed = { ...emptyLoaded(), types: [RULE_TRIGGER_TYPE] };
   if (o.lazy === "loading") lazy.loading = { ...emptyLoaded(), types: [RULE_TRIGGER_TYPE] };
   const records = {
@@ -117,7 +121,25 @@ function syncState(o: {
       },
     },
     [IMPORTED_ENTITY_TYPE]: {
-      "srd-elite": { id: "srd-elite", kind: "monster", name: "Elite", statBlock: ELITE_STATS },
+      "srd-elite": {
+        id: "srd-elite",
+        kind: "monster",
+        name: "Elite",
+        statBlock: ELITE_STATS,
+        campaignId: null,
+        portraitAssetId: null,
+        tokenShape: null,
+        ownerPlayerId: null,
+        hpCurrent: null,
+        derivedFromId: null,
+        createdAt: "t",
+        updatedAt: "t",
+        source: "srd-5.1",
+        sourceKey: "monster/elite",
+        licence: "CC BY 4.0",
+        attribution: "SRD 5.1",
+        importedAt: "t",
+      },
     },
     [EFFECT_PRESET_TYPE]: {
       "p-rage": { id: "p-rage", seq: 1, characterId: "brakka", name: "Rage", modifiers: [] },
