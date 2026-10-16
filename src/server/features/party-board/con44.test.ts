@@ -7,6 +7,7 @@
 // growth ≤ 1,100 B. Load acks measured with `lazyLoadSizes` (FR-SYNC-38) for §12.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { library } from "@fixtures/index";
+import { CREATURE_SHEET_TYPE } from "@shared/character-sheet/sheet";
 import {
   HANDOUT_BODY_MAX,
   HANDOUT_BODY_TYPE,
@@ -24,6 +25,7 @@ import { asc, eq } from "drizzle-orm";
 import {
   asset,
   campaign,
+  entity,
   handout,
   handoutSeqNext,
   lootEntry,
@@ -31,6 +33,7 @@ import {
   partyItemSeqNext,
   player,
 } from "../../db/schema";
+import { DM_ACTOR } from "../../testing/services";
 import { SNAPSHOT_CEILING } from "../../ws/hub";
 import { lazyLoadSizes } from "../../ws/testing/lazy-probe";
 import {
@@ -41,6 +44,7 @@ import {
   type ViewerSize,
 } from "../../ws/testing/snapshot-size";
 import { loadInProcess } from "../fixtures-adapters/loader";
+import { moveItem } from "./item-commands";
 
 /** PARTY §3 / §12: what PARTY adds to every snapshot (seams S2 budget). */
 const PARTY_SNAPSHOT_MAX = 1_100;
@@ -190,5 +194,46 @@ describe("CON-44 with PARTY sprint-3 rows (PARTY §12, #208)", () => {
     for (const r of [headers, bodies, items])
       for (const s of [r.dm, ...r.players])
         expect(s?.bytes ?? Infinity).toBeLessThan(4 * 1024 * 1024);
+  });
+
+  test("CON-44 FR-PARTY-22 a move adds no record type: only the sheet's new items row grows the snapshot (owner + DM)", () => {
+    const db = b.s.db;
+    const mira = db
+      .select()
+      .from(entity)
+      .where(eq(entity.campaignId, cid))
+      .all()
+      .find((e) => e.name === "Mira" && e.kind === "character");
+    const item = db.select().from(partyItem).where(eq(partyItem.campaignId, cid)).all().at(-1);
+    if (!mira || !item) throw new Error("harness: no Mira or party item");
+    const pre = snapshotSizes(b.s);
+    b.s.commands.run(
+      moveItem,
+      {
+        from: { kind: "party" },
+        to: { kind: "character", characterId: mira.id },
+        qty: 1,
+        itemId: item.id,
+      },
+      { actor: { ...DM_ACTOR, campaignId: cid } },
+    );
+    const post = snapshotSizes(b.s);
+    const sheetDelta = post.map(
+      (v, i) =>
+        (v.types[CREATURE_SHEET_TYPE]?.bytes ?? 0) -
+        (pre[i]?.types[CREATURE_SHEET_TYPE]?.bytes ?? 0),
+    );
+    console.log(
+      `PARTY CON-44 (P4): a max-length move party → Mira: creature-sheet +${sheetDelta[0]} B (DM); heavy DM ${post[0]?.bytes} B; players max ${Math.max(...post.slice(1).map((p) => p.bytes))} B`,
+    );
+    for (const [i, v] of post.entries()) {
+      expect(Object.keys(v.types).sort()).toEqual(Object.keys(pre[i]?.types ?? {}).sort());
+      expect(v.types[PARTY_ITEM_TYPE]).toBeUndefined();
+    }
+    // One items row at max length (60-char name, 120-char notes, 36-char id): CHARX's budget.
+    expect(sheetDelta[0]).toBeGreaterThan(0);
+    expect(sheetDelta[0]).toBeLessThanOrEqual(300);
+    expect(post[0]?.bytes ?? Infinity).toBeLessThan(SNAPSHOT_CEILING.dm);
+    for (const p of post.slice(1)) expect(p.bytes).toBeLessThan(SNAPSHOT_CEILING.player);
   });
 });

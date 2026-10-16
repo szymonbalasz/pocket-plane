@@ -8,6 +8,7 @@ import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
 import { HANDOUTS_1 } from "@fixtures/units/party-board/handouts-1";
 import { SECOND_HANDOUT_TITLE, SECOND_ITEM_NAME } from "@fixtures/units/party-board/party-second";
+import { CREATURE_SHEET_TYPE, type ItemRow } from "@shared/character-sheet/sheet";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import {
   HANDOUT_BODY_TYPE,
@@ -18,7 +19,7 @@ import {
 import { LOOT_ENTRY_TYPE } from "@shared/party-loot/schemas";
 import type { Credential } from "@shared/protocol/frames";
 import { closeDb, type Db, openFileDb } from "../../db/client";
-import { asset, campaign, handout, player } from "../../db/schema";
+import { asset, campaign, entity, handout, player } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
 import { convergence, leakScan } from "../../ws/testing/convergence";
@@ -28,6 +29,8 @@ import { PARTY_INTENTS as P } from "./commands";
 const DM: Credential = { role: "dm", secret: TEST_SECRET };
 const NONE: SharedWith = { mode: "none", playerIds: [] };
 const ALL: SharedWith = { mode: "all", playerIds: [] };
+/** char-mira-full's sheet notes: only Mira's owner and the DM may receive them. */
+const MIRA_NOTE = "MIRA-NOTE-7";
 
 async function answer(c: TestClient, intentId: string) {
   for (;;) {
@@ -57,6 +60,8 @@ describe("PARTY §13 leak tests (player-1, player-2)", () => {
   let playerIds: Record<string, string>;
   let hid: Record<keyof typeof HANDOUTS_1.h, string>;
   let assets: Record<string, string>;
+  let mira: string;
+  let thorn: string;
   let dm: TestClient;
   let p1: TestClient;
   let p2: TestClient;
@@ -147,6 +152,13 @@ describe("PARTY §13 leak tests (player-1, player-2)", () => {
         .all()
         .map((a) => [a.name, a.id]),
     );
+    const chars = db
+      .select()
+      .from(entity)
+      .all()
+      .filter((e) => e.campaignId === fixture);
+    mira = chars.find((e) => e.name === "Mira")?.id as string;
+    thorn = chars.find((e) => e.name === "Thorn")?.id as string;
     expect(assets["thieves-map"]).toBeString();
     expect(assets["wanted-poster"]).toBeString();
     h = await startTestServer({ db, fake: false });
@@ -195,7 +207,7 @@ describe("PARTY §13 leak tests (player-1, player-2)", () => {
         .map((i) => `${(i as { name: string }).name} ×${(i as { qty: number }).qty}`)
         .sort();
     for (const c of [dm, p1, p2])
-      expect(items(c)).toEqual(["Potion of healing ×2", "Rope (50 ft) ×1", "Torch ×10"]);
+      expect(items(c)).toEqual(["Potion of healing ×2", "Rope (50 ft) ×1", "Torch ×8"]);
     expectClean(p2, p2Forbidden(), "p2 initial");
     expectClean(p1, p1Forbidden(), "p1 initial");
     expect(leakScan(h.s, dm)).toEqual([]);
@@ -362,6 +374,92 @@ describe("PARTY §13 leak tests (player-1, player-2)", () => {
       expect(changes[1]?.data).toMatchObject({ kind: "item", text: "Healer's kit", qty: 1 });
       expect(leakScan(h.s, c)).toEqual([]);
     }
+    await expectConverged(p2, cred("Player 2"));
+  });
+
+  test("FR-PARTY-22 FR-PARTY-23 leak: moves reach everyone as party-item + loot-entry; a sheet only its owner (before and after a reconnect)", async () => {
+    for (const c of [dm, p1, p2]) await ok(c, c.load(PARTY_ITEM_TYPE));
+    const items = Object.values(p1.store.records[PARTY_ITEM_TYPE] ?? {}) as {
+      id: string;
+      name: string;
+    }[];
+    const potion = items.find((i) => i.name === "Potion of healing")?.id as string;
+    const miraSheet = p1.store.records[CREATURE_SHEET_TYPE]?.[mira] as { items: ItemRow[] };
+    const bolts = miraSheet.items.find((i) => i.name === "Bolts")?.id as string;
+    expect([potion, bolts].every(Boolean)).toBe(true);
+    const changesOf = (c: TestClient, mark: number) => {
+      const ev = c.frames
+        .slice(mark)
+        .find((f) => f.type === "event" && f.cause.name === "ItemMoved");
+      return ev?.type === "event" ? ev.changes.map((x) => `${x.type}:${x.op}:${x.id}`) : null;
+    };
+    const wait = (c: TestClient, mark: number) => until(() => changesOf(c, mark) !== null);
+
+    // Step 8: player-1 takes a potion to Mira.
+    let marks = [dm.frames.length, p1.frames.length, p2.frames.length];
+    const take = await ok(
+      p1,
+      p1.intent(P.moveItem, {
+        from: { kind: "party" },
+        to: { kind: "character", characterId: mira },
+        qty: 1,
+        itemId: potion,
+      }),
+    );
+    const takeEntry = (take.result as { entryId: string }).entryId;
+    // FR-SYNC-14: the sender's event frame comes before its ack.
+    const own = p1.frames.slice(marks[1]);
+    const evAt = own.findIndex((f) => f.type === "event" && f.cause.name === "ItemMoved");
+    expect(evAt).toBeGreaterThanOrEqual(0);
+    expect(evAt).toBeLessThan(own.findIndex((f) => f.type === "ack"));
+    for (const [i, c] of [dm, p1, p2].entries()) await wait(c, marks[i] as number);
+    const sheetUp = (id: string) => `${CREATURE_SHEET_TYPE}:upsert:${id}`;
+    const party = `${PARTY_ITEM_TYPE}:upsert:${potion}`;
+    const log = `${LOOT_ENTRY_TYPE}:upsert:${takeEntry}`;
+    expect(changesOf(dm, marks[0] as number)).toEqual([party, sheetUp(mira), log]);
+    expect(changesOf(p1, marks[1] as number)).toEqual([party, sheetUp(mira), log]);
+    expect(changesOf(p2, marks[2] as number)).toEqual([party, log]);
+
+    // Step 9: player-1 gives Bolts ×5 to Thorn: player-1 never gets Thorn's sheet, player-2 never Mira's.
+    marks = [dm.frames.length, p1.frames.length, p2.frames.length];
+    const give = await ok(
+      p1,
+      p1.intent(P.moveItem, {
+        from: { kind: "character", characterId: mira },
+        to: { kind: "character", characterId: thorn },
+        qty: 5,
+        rowId: bolts,
+      }),
+    );
+    const giveEntry = `${LOOT_ENTRY_TYPE}:upsert:${(give.result as { entryId: string }).entryId}`;
+    for (const [i, c] of [dm, p1, p2].entries()) await wait(c, marks[i] as number);
+    expect(changesOf(dm, marks[0] as number)).toEqual([sheetUp(mira), sheetUp(thorn), giveEntry]);
+    expect(changesOf(p1, marks[1] as number)).toEqual([sheetUp(mira), giveEntry]);
+    expect(changesOf(p2, marks[2] as number)).toEqual([sheetUp(thorn), giveEntry]);
+    expect(p1.store.records[CREATURE_SHEET_TYPE]?.[thorn]).toBeUndefined();
+    expect(p2.store.records[CREATURE_SHEET_TYPE]?.[mira]).toBeUndefined();
+    expect(p2.raw()).not.toContain(MIRA_NOTE);
+
+    // player-2 may not take from Mira or give the party's potion to her.
+    const refused = await answer(
+      p2,
+      p2.intent(P.moveItem, {
+        from: { kind: "character", characterId: mira },
+        to: { kind: "party" },
+        qty: 1,
+        rowId: bolts,
+      }),
+    );
+    expect(refused.type === "reject" && refused.code).toBe("forbidden");
+
+    expectClean(p1, p1Forbidden(), "p1 after moves");
+    expectClean(p2, [...p2Forbidden(), MIRA_NOTE], "p2 after moves");
+    p2.close();
+    await p2.closed;
+    p2 = await h.live(cred("Player 2"));
+    await loadBoard(p2, allBodies());
+    expectClean(p2, [...p2Forbidden(), MIRA_NOTE], "p2 reconnected after moves");
+    await expectConverged(p1, cred("Player 1"));
     await expectConverged(p2, cred("Player 2"));
   });
 

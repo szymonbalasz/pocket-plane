@@ -1431,9 +1431,19 @@ From [party-board](../specs/party-board.md#64-gold-ledger-party-loot-evolved) (P
 - **Derived (client, `@ui/features/party-loot/logic`):** item-row line `itemLine` ("‹from› → ‹to›: ‹name› ×‹qty›"), Split… prefill (the pot's positive coins), default ticks (characters whose `creature-sheet.status` ≠ `draft`; no sheet = ready), preview (`splitPreview`, `@shared/party-board/format`).
 - **CON-44:** no new record shape; a split adds n ordinary move rows inside LOOT's 100-row window (≤ 471 B each, protocol §29 budget unchanged).
 
-## 42. Sprint 3: rule-trigger combat parts (R7)
+## 42. Sprint 3: party inventory (P4)
 
-From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD slice R7). **Built by `build/mod-combat-parts`**: no new table, column or record type. Protocol side: [protocol §56](../protocol/README.md#56-sprint-3-rule-trigger-combat-parts-r7).
+From [party-board](../specs/party-board.md#63-party-inventory) (PARTY slice 4). **Built by `build/party-inventory`**: no new table, column or record type. Protocol side: [protocol §56](../protocol/README.md#56-sprint-3-party-inventory-p4).
+
+- **Writes:** `party_item` rows are edited (full replacement), reduced and deleted at 0 by `party.removeItem` / `party.moveItem`, inserted or merged by a move into the party (merge key as `addItem`). A move's sheet side writes only `creature_sheet.items` (CHARX `sheet-items.ts`): the source row's `qty` reduced (row removed at 0, also when equipped), the target row merged (`qty`) or appended `{id, name, qty, equipped: false, notes}`; a missing sheet row is created with CHARX defaults. One transaction with the `loot_entry`.
+- **Item rows in the gold ledger:** remove → `loot_entry {kind: item, party → world}`; move → `{kind: item, from, to}` with character ends in `fromCharacterId` / `toCharacterId`. `text` = item name, `qty`, coins 0: pot and wallets unaffected.
+- **Conservation** (tested): per item key, Σ `party_item.qty` + Σ sheet `items.qty` = Σ `qty` of `world → party` rows − Σ `qty` of `party → world` rows + the sheets' starting qty.
+- **Fixtures:** `party-items-1` now ends with Torch ×2 party → Thorn (`party.moveItem`): Torch 10 → 8 in the party, one `items` row on Thorn's sheet (created if missing; no other sheet field), a fourth item log row.
+- **CON-44:** no new record shape. A max-length move party → a sheet adds one `items` row to that sheet: +272 B to the DM's and the owner's snapshot (inside CHARX's 80-row budget); heavy DM 674,818 B, players max 281,715 B, under the #208 ceilings. PARTY's lazy types stay off every snapshot.
+
+## 43. Sprint 3: rule-trigger combat parts (R7)
+
+From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD slice R7). **Built by `build/mod-combat-parts`**: no new table, column or record type. Protocol side: [protocol §57](../protocol/README.md#57-sprint-3-rule-trigger-combat-parts-r7).
 
 - **Damage card payload** (`damage-card` notification): `damage.triggers[].marked` = a built-in key or the campaign mark's **name** (≤ 40; was the preset id). Cards stored before keep an id; the popup then finds no mark (the DM ticks by hand).
 - **Damage card text**: + the offers suffix (≤ 280 chars total, count fallback).
