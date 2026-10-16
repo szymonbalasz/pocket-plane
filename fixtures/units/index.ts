@@ -40,6 +40,7 @@ import enemyCustomSecond from "./entities/enemy-custom-second";
 import fogAmbush from "./fog-of-war/fog-ambush";
 import fogAmbushPartial from "./fog-of-war/fog-ambush-partial";
 import fogScn from "./fog-of-war/fog-scn";
+import visionCrypt from "./fog-of-war/vision-crypt";
 import syncProbes from "./live-sync/sync-probes";
 import notificationsTest from "./notifications/notifications-test";
 import loot1 from "./party-loot/loot-1";
@@ -108,4 +109,5 @@ export const units: readonly Fixture[] = [
   fogScn,
   dicexNotationText,
   visionSenses,
+  visionCrypt,
 ];

@@ -22,6 +22,7 @@ import sceneToolsProps from "./scene-tools-props";
 import scenes from "./scenes";
 import sessionSim from "./session-sim";
 import syncProbe from "./sync-probe";
+import vision from "./vision";
 
 export const bundles: readonly Bundle[] = [
   base,
@@ -46,4 +47,5 @@ export const bundles: readonly Bundle[] = [
   sceneTools,
   fogScn,
   diceExtras,
+  vision,
 ];
