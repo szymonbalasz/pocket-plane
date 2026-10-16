@@ -1,9 +1,9 @@
 // Small combat-extras parts for both clients: effect chips on one line ("+N" for the rest: the
-// hidden ones on hover and click, P3 glitch 6; FR-CBTX-33/34; compact labels measured against the room left, FR-CBTX-46), death pips + state badge (FR-CBTX-33/34), roll / intent helpers.
+// hidden ones on hover and click, P3 glitch 6; FR-CBTX-33/34; compact labels measured against the room left, FR-CBTX-46; tighter tiers before "+N", BL-08), death pips + state badge (FR-CBTX-33/34), roll / intent helpers.
 import type { DeathCounters, EffectView } from "@shared/combat-extras/schemas";
 import type { DeathState } from "@shared/entities/schemas";
 import { EyeOffIcon } from "lucide-react";
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { type ComponentProps, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,41 +17,139 @@ import { Tooltip } from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { EffectIcon, effectValue } from "./icons";
-import { chipLabel, chipOrder, chipText, DEATH_LABEL, fitChips, splitNumbered } from "./logic";
+import {
+  CHIP_MAX_W,
+  CHIP_TIERS,
+  type ChipWidths,
+  chipLabel,
+  chipOrder,
+  chipParts,
+  chipText,
+  DEATH_LABEL,
+  fitChips,
+  fitChipTiers,
+  splitNumbered,
+  tierWidths,
+} from "./logic";
+
+const GAP = 2;
 
 /**
  * How many of a row's chips fit its width (FR-CBTX-46: the width left on the name line after the
  * full name, `fitChips`); the rest stay in flow but invisible (clipped by the row) and "+N" sits
- * after the last one that fits. Measured after layout, on resize (ResizeObserver) and when the
- * chips change, so a row never wraps or grows (FR-SHELL-32's 6 rows hold).
+ * after the last one that fits. Compact rows first try tighter tiers (BL-08, `fitChipTiers`),
+ * measured on an invisible copy of the chips at natural width (`data-chip-measure`). Measured
+ * after layout, on resize (ResizeObserver) and when the chips change, so a row never wraps or
+ * grows (FR-SHELL-32's 6 rows hold).
  */
-function useFit(count: number, deps: unknown) {
+function useFit(count: number, compact: boolean, deps: unknown) {
   const ref = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState({ n: count, left: 0 });
+  const [fit, setFit] = useState({ n: count, tier: 0, left: 0 });
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the chips change
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const measure = () => {
-      const kids = [...el.querySelectorAll<HTMLElement>("[data-chip]")];
-      const width = el.clientWidth;
-      if (width === 0) {
-        setFit({ n: count, left: 0 });
+      const room = el.clientWidth;
+      if (room === 0) {
+        setFit({ n: count, tier: 0, left: 0 });
         return;
       }
-      const n = fitChips(
-        kids.map((k) => k.offsetWidth),
-        width,
-      );
-      const last = kids[n - 1];
-      setFit({ n, left: n < kids.length && last ? last.offsetLeft + last.offsetWidth + 2 : 0 });
+      let widths: number[];
+      let n: number;
+      let tier = 0;
+      if (compact) {
+        const chips: ChipWidths[] = [
+          ...el.querySelectorAll<HTMLElement>("[data-chip-measure]"),
+        ].map((m) => {
+          const [full = 0, short = full] = [...m.children].map(
+            (c) => (c as HTMLElement).offsetWidth,
+          );
+          return { full, short };
+        });
+        ({ n, tier } = fitChipTiers(chips, room, GAP));
+        widths = tierWidths(chips, tier);
+      } else {
+        widths = [...el.querySelectorAll<HTMLElement>("[data-chip]")].map((k) => k.offsetWidth);
+        n = fitChips(widths, room, GAP);
+      }
+      // "+N" right after the last chip shown, at the chosen tier's widths.
+      const left = n < widths.length ? widths.slice(0, n).reduce((a, w) => a + w + GAP, 0) : 0;
+      setFit({ n, tier, left });
     };
     measure();
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
     ro?.observe(el);
     return () => ro?.disconnect();
-  }, [count, deps]);
-  return { ref, fit: Math.min(fit.n, count), left: fit.left };
+  }, [count, compact, deps]);
+  return { ref, fit: Math.min(fit.n, count), tier: fit.tier, left: fit.left };
+}
+
+/**
+ * A chip's badge. Compact (FR-CBTX-46): label and rounds left in their own spans, so a tight tier
+ * cuts the label and keeps "3r" (tier 2: "3"), width capped per tier (BL-08). `natural`: the
+ * measuring copy (tier text, tier-0 cap, no test ID). Other span props (ref included, React 19)
+ * come from the Tooltip's trigger.
+ */
+function ChipBadge({
+  e,
+  round,
+  testId,
+  className,
+  compact,
+  tier = 0,
+  natural = false,
+  style,
+  ...trigger
+}: Omit<ComponentProps<"span">, "children"> & {
+  e: EffectView;
+  round: number | null;
+  testId?: string;
+  compact: boolean;
+  tier?: number;
+  natural?: boolean;
+}) {
+  const Icon = EffectIcon(e);
+  const t = CHIP_TIERS[tier] ?? CHIP_TIERS[0];
+  const { label, rounds } = chipParts(e, round);
+  return (
+    <Badge
+      // The Tooltip's trigger (Radix Slot): its ref, handlers and data-state land on the badge.
+      {...trigger}
+      variant="outline"
+      data-testid={testId}
+      data-record-id={testId && e.id}
+      data-value={testId && effectValue(e)}
+      data-secret={testId && e.secret === true}
+      data-tier={testId && compact ? tier : undefined}
+      className={cn(
+        "shrink-0 gap-0.5 truncate px-1 py-0 text-[11px] font-normal",
+        !compact && "max-w-[9rem]",
+        e.secret && "border-dashed",
+        className,
+      )}
+      style={compact ? { ...style, maxWidth: natural ? CHIP_MAX_W : t.cap } : style}
+    >
+      <Icon className="size-3 shrink-0" aria-hidden />
+      {compact ? (
+        <>
+          <span className="min-w-0 truncate">{label}</span>
+          {rounds !== null && (
+            <>
+              {" "}
+              <span className="ml-0.5 shrink-0">
+                {rounds}
+                {t.unit ? "r" : ""}
+              </span>
+            </>
+          )}
+        </>
+      ) : (
+        <span className="truncate">{chipText(e, round)}</span>
+      )}
+      {e.secret && <EyeOffIcon className="size-3 shrink-0" aria-label="Hidden from players" />}
+    </Badge>
+  );
 }
 
 export function EffectChip({
@@ -60,6 +158,7 @@ export function EffectChip({
   testId,
   className,
   compact = false,
+  tier = 0,
 }: {
   e: EffectView;
   round: number | null;
@@ -67,26 +166,18 @@ export function EffectChip({
   className?: string;
   /** FR-CBTX-46 Initiative rows: compact label, ≤ 96 px, full text in a Tooltip. */
   compact?: boolean;
+  /** BL-08: `CHIP_TIERS` index (compact only). */
+  tier?: number;
 }) {
-  const Icon = EffectIcon(e);
   const badge = (
-    <Badge
-      variant="outline"
-      data-testid={testId}
-      data-record-id={e.id}
-      data-value={effectValue(e)}
-      data-secret={e.secret === true}
-      className={cn(
-        "shrink-0 gap-0.5 truncate px-1 py-0 text-[11px] font-normal",
-        compact ? "max-w-[96px]" : "max-w-[9rem]",
-        e.secret && "border-dashed",
-        className,
-      )}
-    >
-      <Icon className="size-3 shrink-0" aria-hidden />
-      <span className="truncate">{compact ? chipLabel(e, round) : chipText(e, round)}</span>
-      {e.secret && <EyeOffIcon className="size-3 shrink-0" aria-label="Hidden from players" />}
-    </Badge>
+    <ChipBadge
+      e={e}
+      round={round}
+      testId={testId}
+      className={className}
+      compact={compact}
+      tier={tier}
+    />
   );
   return compact ? <Tooltip content={chipText(e, round)}>{badge}</Tooltip> : badge;
 }
@@ -112,8 +203,9 @@ export function EffectChips({
   compact?: boolean;
 }) {
   const list = chipOrder(effects);
-  const { ref, fit, left } = useFit(
+  const { ref, fit, tier, left } = useFit(
     list.length,
+    compact,
     list.map((e) => `${e.id}:${compact ? chipLabel(e, round) : chipText(e, round)}`).join(),
   );
   if (list.length === 0) return null;
@@ -129,8 +221,24 @@ export function EffectChips({
         className,
       )}
     >
+      {compact && (
+        // BL-08: each chip's natural width with "3r" and with "3"; never shown.
+        <div
+          aria-hidden
+          className="pointer-events-none invisible absolute top-0 left-0 flex w-max gap-0.5"
+        >
+          {list.map((e) => (
+            <span key={e.id} data-chip-measure className="flex gap-0.5">
+              <ChipBadge e={e} round={round} compact natural />
+              <ChipBadge e={e} round={round} compact natural tier={CHIP_TIERS.length - 1} />
+            </span>
+          ))}
+        </div>
+      )}
       {list.map((e, i) => {
-        const chip = <EffectChip e={e} round={round} testId={testId} compact={compact} />;
+        const chip = (
+          <EffectChip e={e} round={round} testId={testId} compact={compact} tier={tier} />
+        );
         const hidden = i >= fit;
         return (
           <span

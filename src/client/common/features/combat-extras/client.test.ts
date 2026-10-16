@@ -10,14 +10,17 @@ import type { TokenOverlayView } from "../scenes-map/token-overlays";
 import { concentrationOutcome } from "./concentration";
 import {
   CHIP_MAX_W,
+  CHIP_TIERS,
   chipLabel,
   chipOrder,
+  chipParts,
   chipText,
   concentrationSaveText,
   deadPc,
   deathStateFor,
   endsHint,
   fitChips,
+  fitChipTiers,
   MORE_W,
   splitNumbered,
 } from "./logic";
@@ -293,6 +296,68 @@ describe("FR-CBTX-33 FR-CBTX-34 chips, death state", () => {
     expect(fitChips([40, 50, 40], 40 + 2 + 50 + 2 + MORE_W)).toBe(2);
     expect(fitChips([CHIP_MAX_W], 20)).toBe(0);
     expect(fitChips([], 0)).toBe(0);
+  });
+
+  test("FR-CBTX-46 BL-08 narrow rows abbreviate before '+N': labels cut at 72 px keep '3r', then '3' at 60 px", () => {
+    const bless = fx("a", { kind: "custom", label: "Bless", endsRound: 12 });
+    expect(chipParts(bless as Parameters<typeof chipParts>[0], 2)).toEqual({
+      label: "Bless",
+      rounds: 10,
+    });
+    expect(
+      chipParts(fx("p", { condition: "prone" }) as Parameters<typeof chipParts>[0], 2),
+    ).toEqual({
+      label: "Prone",
+      rounds: null,
+    });
+    expect(CHIP_TIERS.map((t) => [t.cap, t.unit])).toEqual([
+      [CHIP_MAX_W, true],
+      [72, true],
+      [60, false],
+    ]);
+    // Wide enough: tier 0, nothing cut.
+    expect(
+      fitChipTiers(
+        [
+          { full: 64, short: 56 },
+          { full: 62, short: 54 },
+        ],
+        200,
+      ),
+    ).toEqual({ n: 2, tier: 0 });
+    // Long labels cut at 72 px (rounds kept) → both fit: 72 + 2 + 72 = 146.
+    expect(
+      fitChipTiers(
+        [
+          { full: 90, short: 82 },
+          { full: 80, short: 72 },
+        ],
+        146,
+      ),
+    ).toEqual({ n: 2, tier: 1 });
+    // Session-sim-6 #8, Thorn at a narrow width: "Bless 10r" + "Rage 10r" (128) don't fit 118;
+    // without the unit (56 + 2 + 54 = 112) both show instead of "Bless 10r +1".
+    const thorn = [
+      { full: 64, short: 56 },
+      { full: 62, short: 54 },
+    ];
+    expect(fitChips([64, 62], 118)).toBe(1);
+    expect(fitChipTiers(thorn, 118)).toEqual({ n: 2, tier: 2 });
+    // Untimed chips: tier 2 only caps them at 60.
+    expect(
+      fitChipTiers(
+        [
+          { full: 70, short: 70 },
+          { full: 70, short: 70 },
+        ],
+        122,
+      ),
+    ).toEqual({ n: 2, tier: 2 });
+    // Still too narrow: the first tier with the most whole chips, then "+N".
+    expect(fitChipTiers(thorn, 60 + 2 + MORE_W)).toEqual({ n: 1, tier: 2 });
+    expect(fitChipTiers(thorn, 64 + 2 + MORE_W)).toEqual({ n: 1, tier: 0 });
+    expect(fitChipTiers(thorn, 20)).toEqual({ n: 0, tier: 0 });
+    expect(fitChipTiers([], 0)).toEqual({ n: 0, tier: 0 });
   });
 
   test("FR-CBTX-25 dead PC (client copy) and death state from either shape", () => {

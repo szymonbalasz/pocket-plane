@@ -45,12 +45,24 @@ export function chipText(e: EffectView, round: number | null): string {
  * + "3r".
  */
 export function chipLabel(e: EffectView, round: number | null): string {
-  if (e.kind === "concentration") return e.label ?? "";
+  const { label, rounds } = chipParts(e, round);
+  return rounds === null ? label : `${label} ${rounds}r`;
+}
+
+/** `chipLabel` in two parts, so a tight chip cuts the label and keeps the rounds (BL-08). */
+export function chipParts(
+  e: EffectView,
+  round: number | null,
+): { label: string; rounds: number | null } {
+  if (e.kind === "concentration") return { label: e.label ?? "", rounds: null };
   if (e.kind === "condition") {
-    if (e.condition === "exhaustion") return `Exh ${e.level ?? 1}`;
-    return effectName(e);
+    return {
+      label: e.condition === "exhaustion" ? `Exh ${e.level ?? 1}` : effectName(e),
+      rounds: null,
+    };
   }
-  return chipText(e, round);
+  const rounds = e.endsRound != null && round !== null ? roundsLeft(e.endsRound, round) : null;
+  return { label: effectName(e), rounds };
 }
 
 /** One Initiative-row chip at most this wide, px; longer labels end in an ellipsis. */
@@ -69,6 +81,46 @@ export function fitChips(widths: readonly number[], room: number, gap = 2): numb
   let n = 0;
   while (n < widths.length && end(n + 1) + gap + MORE_W <= room) n++;
   return n;
+}
+
+/**
+ * BL-08: tighter Initiative-row chips before "+N". Tier 0 = FR-CBTX-46's compact chip (≤ 96 px);
+ * tier 1 cuts long labels (ellipsis) at 72 px and keeps "3r"; tier 2 also drops the unit ("3")
+ * at 60 px. One tier per row.
+ */
+export const CHIP_TIERS = [
+  { cap: CHIP_MAX_W, unit: true },
+  { cap: 72, unit: true },
+  { cap: 60, unit: false },
+] as const;
+
+/** A chip's natural widths, px: `full` with "3r", `short` with "3" (equal when untimed). */
+export interface ChipWidths {
+  full: number;
+  short: number;
+}
+
+export const tierWidths = (chips: readonly ChipWidths[], tier: number): number[] => {
+  const t = CHIP_TIERS[tier] ?? CHIP_TIERS[0];
+  return chips.map((c) => Math.min(t.unit ? c.full : c.short, t.cap));
+};
+
+/**
+ * BL-08 fit rule: the first tier at which every chip fits `room`; when none does, the first tier
+ * showing the most whole chips (then "+N", `fitChips`).
+ */
+export function fitChipTiers(
+  chips: readonly ChipWidths[],
+  room: number,
+  gap = 2,
+): { n: number; tier: number } {
+  let best = { n: -1, tier: 0 };
+  for (let tier = 0; tier < CHIP_TIERS.length; tier++) {
+    const n = fitChips(tierWidths(chips, tier), room, gap);
+    if (n === chips.length) return { n, tier };
+    if (n > best.n) best = { n, tier };
+  }
+  return best;
 }
 
 /** "N rounds left" (sheet chips). */
