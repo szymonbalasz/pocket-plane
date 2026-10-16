@@ -46,6 +46,9 @@ Sprint 2 phase 1 also revised combat-tracker, combat-extras, entities, notificat
 |---|---|---|---|
 | [Compendium](compendium.md) | CMP | complete | spec-compendium |
 | [Dice extras](dice-extras.md) | DICEX | complete | spec-dice-extras |
+| [Party board](party-board.md) | PARTY | complete | spec-party-board |
+
+Sprint 3 also revised live-sync (lazy record types, FR-SYNC-30–38) and party-loot (item rows, split).
 
 ## Post-MVP
 
@@ -57,7 +60,6 @@ Stubs only. Not to be claimed during MVP spec phase.
 | [Stats and summaries](post-mvp/stats.md) | STATS | Data capture starts in MVP |
 | [Dice extras](post-mvp/dice-extras.md) | DICEX | Inline rolls, macros, 3D dice, hidden rolls |
 | [Gems (homebrew)](post-mvp/gems.md) | GEM | DM-awarded gems; reroll, max damage dice; tier A |
-| [Party board](post-mvp/party-board.md) | PARTY | |
 | [Campaign manager](post-mvp/campaign-manager.md) | CMGR | |
 | [Compendium expansion](post-mvp/compendium-expansion.md) | CMPX | |
 | [Levelling workflows](post-mvp/levelling.md) | LVL | |

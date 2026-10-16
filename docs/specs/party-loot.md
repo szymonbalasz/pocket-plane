@@ -8,6 +8,8 @@ wave: 3
 
 # Party loot
 
+> **Sprint 3 revision (DM gate 1, #207; owned by [party-board](party-board.md), seams S8):** loot entries gain kind `item` and a `qty` column (party inventory moves are logged here), a DM `loot.split` (⌊coin / n⌋ per denomination, remainder stays in the pot), item rows in `loot.log`, and `loot-received` also from `party.addItem` (amends FR-LOOT-13). Party-board builders edit this feature's folders by orchestrator assignment. The rest of this spec is unchanged.
+
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
 ## 1. Summary

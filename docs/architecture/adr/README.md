@@ -26,7 +26,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0018](0018-global-imported-content.md) | Imported reference content is global; custom content per campaign | accepted; amended by 0046 (compendium entries) |
 | [0019](0019-auth-credentials.md) | DM secret and player link credentials | accepted; amended by 0046 (player REST header on compendium routes) |
 | [0020](0020-single-active-campaign.md) | Several campaigns, one active per server | accepted |
-| [0021](0021-sync-protocol-conventions.md) | Sync protocol conventions | accepted, C refined by 0041, D refined by 0036, 0038 |
+| [0021](0021-sync-protocol-conventions.md) | Sync protocol conventions | accepted, C refined by 0041, 0045, D refined by 0036, 0038 |
 | [0022](0022-deterministic-seams.md) | Deterministic IDs, tokens and clock for fixtures and tests | accepted |
 | [0023](0023-asset-access-by-capability-id.md) | Asset access by capability ID | accepted |
 | [0024](0024-definition-visibility.md) | Creature definitions DM-only for players; instances carry read-only display copies | accepted (refines 0009), redaction whitelist refined by 0036 |
@@ -48,6 +48,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0040](0040-token-move-guards.md) | Token move guards: a move may be refused | accepted (#196; amends 0031) |
 | [0041](0041-active-scene-window.md) | Active-scene window for tokens and scene-tool records in the DM snapshot | accepted (#196; refines 0021 C; sibling of 0029) |
 | [0044](0044-3d-dice.md) | 3D dice: throws derived on each client from received roll entries | accepted (#207; amends 0001 stack) |
+| [0045](0045-lazy-record-types.md) | Lazy record types: never in a snapshot, loaded on open with `sync.load` | accepted (#207; extends 0021 C, sibling of 0029 / 0041) |
 | [0046](0046-compendium-scope.md) | Compendium: global library, campaign clones, read on demand | accepted (#207; completes 0010; amends 0004, 0018, 0019) |
 
 ## Proposing a new ADR

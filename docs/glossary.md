@@ -129,7 +129,14 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Dice look** | An owner's dice appearance (style, colours, material); everyone sees the roller's look. | — |
 | **Dice style** | A named starting look (Ivory, Obsidian, …). | Preset (MOD) |
 | **Notation link** | Dice notation in free text (e.g. "1d12 + 5") rendered clickable; stages a plain roll in the tray, never attack / apply. | — |
-| **Party loot** | Shared, party-visible log of the party's coin and rewards: loot the DM gives, party spending, and coin moves between the party pot and wallets. | Party board (post-MVP superset) |
+| **Party loot** | Shared, party-visible log of the party's coin and rewards: loot the DM gives, party spending, coin moves between the party pot and wallets, and (sprint 3) party item moves and the DM's split. | Party board |
+| **Party board** | Shared party window: handouts and the party inventory ([party-board](specs/party-board.md)). | Party loot |
+| **Handout** | DM-authored title + text + up to 10 images, shared with everyone or chosen players. | Note |
+| **Share / Unshare** | Making a handout visible to players or withdrawing it; "reveal" stays fog's word. Images a player already saw stay valid capabilities ([ADR-0023](architecture/adr/0023-asset-access-by-capability-id.md)). | Reveal (fog) |
+| **Party inventory** | Items the party holds in common (`party-item` rows), outside any sheet. | Inventory (sheet) |
+| **Item move** | Moving an item between the party inventory and a character's sheet items (or PC → PC) in one step, logged in party loot. | — |
+| **Split** | The DM dividing the party pot's coin among the PCs: ⌊coin / n⌋ per denomination, remainder stays in the pot. | — |
+| **Lazy record type** | A record type never sent in a snapshot; a client loads it on open with `sync.load` ([ADR-0045](architecture/adr/0045-lazy-record-types.md)). | Windowed record type |
 | **Loot entry** | One row of the party loot log: loot (text + signed coins, DM) or a coin move. | Loot row |
 | **Party pot** | The party's shared coin per denomination, derived from the loot log. | Party purse, treasury |
 | **Wallet** | One character's coin per denomination, derived from coin moves. | Purse |
