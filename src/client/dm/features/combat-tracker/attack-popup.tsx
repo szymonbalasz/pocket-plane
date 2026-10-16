@@ -8,7 +8,9 @@
 // Partial cards (FR-CBT-72, N7): to-hit-only → "Waiting for damage" (the DM may type a total;
 // the roll fills the cell when it attaches); damage-only → no to-hit cell or "vs AC", rows Hit.
 // Popup parts (FR-MOD-39, ADR-0043): every `popupParts` line renders under each target row and
-// merges its share into that row's apply entry.
+// merges its share into that row's apply entry. Effect modifiers tier 2 (FR-MOD-24, -25): Hit is
+// preset vs the effective AC (AC cell with its parts) and the multiplier from the target's
+// defenses against the card's damage type.
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
@@ -45,6 +47,12 @@ import { useRecords } from "@ui/sync/store";
 import { EyeOffIcon, XIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LinkHintNote } from "../combat-extras/link-hint";
+import {
+  AcCell,
+  presetMultiplier,
+  rowFacts,
+  useActiveEffects,
+} from "../effect-modifiers/popup-facts";
 import {
   getMapSelection,
   setMapSelection,
@@ -207,6 +215,7 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   const [per, setPer] = useState<Record<string, PerTarget>>({});
   // Popup parts' values, one per line (client memory; lost on close).
   const [partValues, setPartValues] = useState<Record<string, unknown>>({});
+  const effects = useActiveEffects();
   const { send, disabled } = useCbtIntent();
   const attackerId = p?.attackerId ?? null;
 
@@ -243,13 +252,15 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   const damageTotal = totalOf(damage) ?? p.damage?.total ?? null;
   const base = list.rows.map(({ c, source }) => {
     const ac = acOf(c, defs);
-    const preset = rowPreset(shape, rolledNatural, toHitTotal, ac);
-    const st = per[c.id] ?? { hit: null, mult: "normal" };
+    // FR-MOD-24, -25: Hit vs the effective AC; the multiplier preset from the target's defenses.
+    const facts = rowFacts(effects, c, ac, p.damageType);
+    const preset = rowPreset(shape, rolledNatural, toHitTotal, facts.ac?.value ?? ac);
+    const st = per[c.id] ?? { hit: null, mult: presetMultiplier(facts) };
     const hit = st.hit ?? preset;
     const raw = damageTotal === null ? null : rawDamage(hit, damageTotal, st.mult);
     const hp = hpOf(c, defs);
     const contra = naturalContradiction(rolledNatural, hit);
-    return { c, source, ac, preset, hit, mult: st.mult, raw, hp, contra };
+    return { c, source, ac, facts, preset, hit, mult: st.mult, raw, hp, contra };
   });
   const views: PopupRowView[] = base.map((x) => ({
     targetId: x.c.id,
@@ -270,8 +281,10 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
     damageTotal,
     list.tooMany,
   );
-  const setRow = (id: string, patch: Partial<PerTarget>) =>
-    setPer((s) => ({ ...s, [id]: { ...(s[id] ?? { hit: null, mult: "normal" }), ...patch } }));
+  const setRow = (id: string, patch: Partial<PerTarget>) => {
+    const mult = rows.find((x) => x.c.id === id)?.mult ?? "normal";
+    setPer((s) => ({ ...s, [id]: { ...(s[id] ?? { hit: null, mult }), ...patch } }));
+  };
   const remove = (c: CombatantView) => {
     setAdded((a) => a.filter((id) => id !== c.id));
     if (c.tokenId && selection.tokenIds.includes(c.tokenId)) {
@@ -430,14 +443,8 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                       aria-label="Hidden"
                     />
                   )}
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {/* FR-CBT-72: a damage-only card has no to-hit to compare: AC alone. */}
-                    {shape === "damage"
-                      ? `AC ${x.ac ?? "—"}`
-                      : x.ac === null
-                        ? "vs AC —"
-                        : `vs AC ${x.ac} →`}
-                  </span>
+                  {/* FR-CBT-72: a damage-only card has no to-hit to compare: AC alone. */}
+                  <AcCell combatantId={x.c.id} facts={x.facts} damageOnly={shape === "damage"} />
                   <Button
                     size="sm"
                     variant={x.hit ? "default" : "outline"}

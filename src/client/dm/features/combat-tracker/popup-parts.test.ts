@@ -43,8 +43,8 @@ const line = (id: string, triggerId: string, extra: number): PopupPart =>
   });
 
 describe("FR-MOD-39 popup parts (R0)", () => {
-  test("FR-MOD-39 the registry is created empty: the popup sends exactly the sprint-2 intent", () => {
-    expect(popupParts).toEqual([]);
+  test("FR-MOD-39 the registry's lines (R2: MOD's defense hint) add nothing to the sprint-2 intent", () => {
+    expect(popupParts.map((p) => p.id)).toEqual(["effect-modifiers.defense"]);
     expect(partInputs(popupParts, {}, row("g1"), [row("g1")], card)).toEqual({});
     expect(partPreviewExtra(popupParts, {}, row("g1"), [row("g1")], card)).toBe(0);
   });
