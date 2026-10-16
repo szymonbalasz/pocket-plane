@@ -43,7 +43,7 @@ export const tokenMenuEntries: readonly TokenMenuEntry[] = [
   ...scenesMapTokenMenu, // scenes-map (FR-MAP-18)
   ...combatTokenMenu, // combat-tracker: "Damage / heal…", "Remove from combat" (FR-CBT-30)
   ...cbtxTokenMenu, // combat-extras: Conditions ▸, Effect…, Temp HP…, Add to combat (FR-CBTX-35)
-  ...modTokenMenu, // effect-modifiers: Apply effect ▸, Effect modifiers… (FR-MOD-28)
+  ...modTokenMenu, // effect-modifiers: Apply effect ▸, Effect modifiers…, Rule triggers… (FR-MOD-28)
 ];
 
 /** Token double-click: the first available entry by order runs. Append your feature's line. */
