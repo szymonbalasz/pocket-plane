@@ -11,6 +11,7 @@ import { parseFullCard } from "@shared/combat-tracker/schemas";
 import { EFFECT_PRESET_TYPE, type Modifier } from "@shared/effect-modifiers/schemas";
 import { type Door, TEMPLATE_LABEL_MAX, type Wall } from "@shared/scene-tools/schemas";
 import { and, eq, inArray, isNull } from "drizzle-orm";
+import { fixedClock, realContext } from "../../commands/context";
 import type { Config } from "../../config";
 import { closeDb, type Db, openMemoryDb } from "../../db/client";
 import {
@@ -34,6 +35,7 @@ import {
   sceneStructure,
 } from "../../db/schema";
 import type { Actor } from "../../events/types";
+import { backfillSeenBy } from "../../features/fog-of-war/backfill";
 import { silentLogger } from "../../log";
 import { createServices, type Services } from "../../services";
 import { snapshotTypeBytes } from "../hub";
@@ -869,4 +871,7 @@ export function prepTypicalScnScene(
       .run();
   }
   s.db.insert(mapSettings).values({ campaignId, diagonalRule: "5", updatedAt: at }).run();
+  // FR-FOG-10 (ADR-0042): rows written directly carry no per-player copies yet; derive them as
+  // the commands would (the boot backfill's re-derive, FR-FOG-40).
+  backfillSeenBy(s.db, realContext(fixedClock(at)));
 }

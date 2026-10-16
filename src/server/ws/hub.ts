@@ -18,7 +18,13 @@ import { CommandError, zodIssues } from "../commands/errors";
 import type { DispatchedEvent, RecordChange, Role } from "../events/types";
 import type { Services } from "../services";
 import type { PresenceView, Viewer, WireChange } from "./records";
-import type { SignalAudience, SignalRead, SignalSender } from "./signals";
+import {
+  reaches,
+  type SignalAudience,
+  type SignalRead,
+  type SignalSender,
+  validAudience,
+} from "./signals";
 import { realTimers, type TimerHandle, type Timers } from "./timers";
 
 export interface SocketLike {
@@ -29,10 +35,10 @@ export interface SocketLike {
 }
 
 /**
- * CON-44 snapshot ceilings (#142): DM 768 KiB, players 512 KiB. Not enforced (a bigger snapshot
- * is still sent); over → `warn` with per-type bytes (#163).
+ * CON-44 snapshot ceilings (#142, raised for the DM by #208): DM 1 MiB, players 512 KiB. Not
+ * enforced (a bigger snapshot is still sent); over → `warn` with per-type bytes (#163).
  */
-export const SNAPSHOT_CEILING = { dm: 768 * 1024, player: 512 * 1024 } as const;
+export const SNAPSHOT_CEILING = { dm: 1024 * 1024, player: 512 * 1024 } as const;
 /**
  * Send-buffer limit before closing 4000 (FR-SYNC-21) and Bun's `backpressureLimit` /
  * `maxPayloadLength` (#163): well above the largest allowed snapshot, so a slow tunnel never
@@ -349,14 +355,22 @@ export class Hub implements HubApi {
     if (!parsed.success) {
       return this.reject(c, intentId, "invalid", "Invalid payload", zodIssues(parsed.error));
     }
-    const { sceneId } = parsed.data;
+    const { sceneId, viewAs } = parsed.data;
     let records: Record<string, unknown[]>;
     try {
       if (this.s.records.sceneCampaignOf(sceneId) !== c.campaignId) {
         return this.reject(c, intentId, "not_found", "Scene not found");
       }
       const src = { db: this.s.db, presence: this.presenceView() };
-      records = this.s.records.loadScene(src, this.viewer(c), sceneId);
+      if (viewAs === undefined) {
+        records = this.s.records.loadScene(src, this.viewer(c), sceneId);
+      } else {
+        // FR-FOG-43: a player of the DM's campaign only (another campaign's looks unknown).
+        if (this.s.records.playerCampaignOf(viewAs) !== c.campaignId) {
+          return this.reject(c, intentId, "not_found", "Player not found");
+        }
+        records = this.s.records.loadViewAs(src, this.viewer(c), sceneId, viewAs);
+      }
     } catch (err) {
       this.s.log.error(`${SYNC_LOAD_SCENE} failed for ${c.connId}`, err);
       return this.reject(c, intentId, "internal", "Internal error");
@@ -386,7 +400,7 @@ export class Hub implements HubApi {
       if (c.playerId) sender.playerId = c.playerId;
       try {
         audience = def.audience(parsed.data, sender, this.signalRead);
-        if (audience !== "all" && audience !== "dm") {
+        if (!validAudience(audience)) {
           throw new Error(`audience returned ${JSON.stringify(audience)}`);
         }
       } catch (err) {
@@ -402,7 +416,7 @@ export class Hub implements HubApi {
     const frame: ServerSignalFrame = { type: "signal", name, data: parsed.data, from };
     for (const o of [...this.conns.values()]) {
       if (o === c || o.phase !== "live" || o.campaignId !== c.campaignId) continue;
-      if (audience === "dm" && o.role !== "dm") continue;
+      if (!reaches(audience, o)) continue;
       this.send(o, frame);
     }
   }
@@ -436,20 +450,21 @@ export class Hub implements HubApi {
     }
   }
 
+  /**
+   * FR-SYNC-17 / -19 (ADR-0042): nothing when no change passes the transition matrix; an event
+   * whose surviving changes were all identical upserts (dropped per change) still goes out,
+   * empty, so `seq` stays aligned with the events that touched this connection.
+   */
   private deliver(c: Connection, changes: RecordChange[], cause: EventFrame["cause"]): undefined {
     let out: WireChange[];
     try {
-      const v = this.viewer(c);
-      out = [];
-      for (const ch of changes) {
-        const w = this.s.records.filterChange(ch, v);
-        if (w) out.push(w);
-      }
+      const r = this.s.records.filterChanges(changes, this.viewer(c));
+      if (!r.touched) return;
+      out = r.changes;
     } catch (err) {
       this.s.log.error(`broadcaster failed for ${c.connId}`, err);
       return this.close(c, CloseCode.resyncRequired);
     }
-    if (out.length === 0) return;
     c.seq += 1;
     const frame: EventFrame = { type: "event", seq: c.seq, cause, changes: out };
     if (cause.intentId === undefined) delete frame.cause.intentId;

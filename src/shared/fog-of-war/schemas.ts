@@ -1,8 +1,13 @@
 // Fog of war wire shapes (FOG §8, §9; protocol §5). The mask codec and raster live beside this
 // (`mask.ts`, `raster.ts`); visibility of fog subjects in `visibility.ts`.
 import { z } from "zod";
+import { DarknessShape, FogLayerShape } from "./shapes";
 
 export const FOG_TYPE = "fog";
+/** FR-FOG-37: explored memory, one per (scene, player); `dmWindow: "view-as"` (FR-FOG-43). */
+export const FOG_EXPLORED_TYPE = "fog-explored";
+/** FR-FOG-39: derived per (scene, player), no table; `dmWindow: "view-as"` (FR-FOG-43). */
+export const VISION_TYPE = "vision";
 
 /** FR-FOG-01: value of every cell outside the box (and of every box cell when `runs` is ""). */
 export const FOG_FILLS = ["fog", "clear"] as const;
@@ -37,6 +42,14 @@ export const FOG_EDIT_KINDS = [
   "hide-polygon",
   "reveal-all",
   "fog-all",
+  // FOG v2 (FR-FOG-05 / -30, FOG §8): shape and darkness edits.
+  "reveal-shape",
+  "fog-shape",
+  "explored-shape",
+  "darkness-place",
+  "darkness-move",
+  "darkness-remove",
+  "darkness-clear",
 ] as const;
 export const FogEditKind = z.enum(FOG_EDIT_KINDS);
 export type FogEditKind = z.infer<typeof FogEditKind>;
@@ -77,25 +90,68 @@ export const FogUndoInfo = z.object({
 });
 export type FogUndoInfo = z.infer<typeof FogUndoInfo>;
 
-/** `fog` (scope scene, `sceneOf = id` = the scene id), DM view. Never windowed (ADR-0041). */
+/** FR-SCN-36 (sprint 3): `scene-structure.doorSeen`, door `n` → player ids. Server only. */
+export type DoorSeen = Record<string, string[]>;
+
+/**
+ * `fog` (scope scene, `sceneOf = id` = the scene id), DM view (FOG §9): base mask + shapes +
+ * darkness (never `seenBy`) + the Explored setting + undo info. `dmWindow` (OQ-FOG-30 B).
+ */
 export const FogRecord = z.object({
   id: z.string(),
   campaignId: z.string(),
   fill: FogFill,
   box: FogBox,
   runs: z.string(),
+  shapes: z.array(FogLayerShape),
+  darkness: z.array(DarknessShape),
+  explored: z.boolean(),
   undo: FogUndoInfo.nullable(),
 });
 export type FogRecord = z.infer<typeof FogRecord>;
 
-/** What a player receives (redacted: no campaign, no undo). */
+/**
+ * What a player receives (redacted: no campaign, no undo; `darkness` = only the shapes the
+ * viewer is in `seenBy` of, FR-FOG-44).
+ */
 export const PlayerFogRecord = z.object({
   id: z.string(),
   fill: FogFill,
   box: FogBox,
   runs: z.string(),
+  shapes: z.array(FogLayerShape),
+  darkness: z.array(DarknessShape),
+  explored: z.boolean(),
 });
 export type PlayerFogRecord = z.infer<typeof PlayerFogRecord>;
+
+/** Wire id of a per-(scene, player) row: `sceneId:playerId` (FR-FOG-37 / -39). */
+export const scenePlayerId = (sceneId: string, playerId: string) => `${sceneId}:${playerId}`;
+
+/** `fog-explored` (FR-FOG-37): the player's explored cells; full to that player only. */
+export const FogExploredRecord = z.object({
+  id: z.string(),
+  sceneId: z.string(),
+  playerId: z.string(),
+  box: FogBox,
+  runs: z.string(),
+});
+export type FogExploredRecord = z.infer<typeof FogExploredRecord>;
+
+/**
+ * `vision` (FR-FOG-39, derived): the player's rounded sight polygons, flat `[x, y, …]`; `inv` =
+ * indices into `see ++ dark` of the polygons whose source sees invisible (omitted when empty).
+ */
+export const VisionRecord = z.object({
+  id: z.string(),
+  sceneId: z.string(),
+  playerId: z.string(),
+  blind: z.boolean(),
+  see: z.array(z.array(z.number())),
+  dark: z.array(z.array(z.number())),
+  inv: z.array(z.number().int().min(0)).optional(),
+});
+export type VisionRecord = z.infer<typeof VisionRecord>;
 
 /** WS intents (FOG §9; DM only, ADR-0021 D). */
 export const FOG_INTENTS = {

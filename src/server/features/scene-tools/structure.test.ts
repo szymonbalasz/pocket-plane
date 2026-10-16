@@ -68,6 +68,7 @@ describe("FR-SCN-07 / -08 scn.addWalls", () => {
         [3, 8, 12, 8, 14],
       ],
       doors: [],
+      doorSeen: {},
     });
     expect(
       readEventLog(t.s.db)
@@ -188,7 +189,8 @@ describe("FR-SCN-08 / -36 scn.addDoor", () => {
           `${obj.type} ${JSON.stringify(obj.cells)} row=${readStructure(read, t.sid) ? 1 : 0}`,
         );
         const all = "col" in obj.cells ? obj.cells.col >= 8 : obj.cells.every(([c]) => c >= 8);
-        return { fogged: all };
+        // ADR-0042: fogged = seen by nobody.
+        return { fogged: all, ...(all ? { seenBy: [] } : {}) };
       },
     });
     t.addDoor([8, 5, 8, 6]); // cells (7, 5) and (8, 5): not all fogged
@@ -292,21 +294,18 @@ describe("FR-SCN-33 permissions and scope", () => {
       step();
       const ch = t.lastEvent()?.changes[0];
       if (!ch) throw new Error("no change");
-      const w = t.s.records.filterChange(ch, p1);
-      expect(w).toEqual({
-        type: SCENE_STRUCTURE_TYPE,
+      // The player's wire is unchanged (locked = closed, walls never sent): the identical
+      // upsert is dropped for them (ADR-0042, FR-SYNC-19); the event still reaches them.
+      expect(t.s.records.classifyChange(ch, p1)).toBe("same");
+      expect(t.s.records.view(SCENE_STRUCTURE_TYPE, ch.after, p1).data).toEqual({
         id: t.sid,
-        op: "upsert",
-        data: {
-          id: t.sid,
-          doors: [
-            [4, 8, 5, 8, 6, 0],
-            [5, 8, 11, 8, 12, 0],
-          ],
-        },
+        doors: [
+          [4, 8, 5, 8, 6, 0],
+          [5, 8, 11, 8, 12, 0],
+        ],
       });
-      expect(JSON.stringify(w)).not.toContain("walls");
-      expect(t.s.records.filterChange(ch, dm)?.data).toEqual(ch.after as SceneStructureRecord);
+      const { doorSeen: _d, ...dmWire } = ch.after as SceneStructureRecord;
+      expect(t.s.records.filterChange(ch, dm)?.data).toEqual(dmWire);
     }
     // A non-active scene's edit reaches no player.
     t.writeStructure(t.cellar.id);

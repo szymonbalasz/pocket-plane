@@ -89,7 +89,13 @@ describe("FR-FOG-10 derive (fog's line)", () => {
     const row = t.s.db.select().from(token).where(eq(token.id, placed.id)).get();
     const p1 = t.h.viewer("player", t.h.p1.id);
     expect(tokenVisibility({ ...row, fogged: true } as never, p1)).toBe("hidden");
-    const owned = { ...row, fogged: true, ownerPlayerId: t.h.p1.id };
+    // ADR-0042: an owned token's `seenBy` is every player (owner + party, FR-FOG-34).
+    const owned = {
+      ...row,
+      fogged: true,
+      ownerPlayerId: t.h.p1.id,
+      seenBy: [t.h.p1.id, t.h.p2.id],
+    };
     expect(tokenVisibility(owned as never, p1)).toBe("redacted");
     expect(tokenVisibility(owned as never, t.h.viewer("player", t.h.p2.id))).toBe("redacted");
   });
@@ -246,6 +252,9 @@ describe("FR-FOG-02 / -23 lifecycle (fog's lines)", () => {
       fill: "fog",
       box: [0, 0, 20, 14],
       runs: "",
+      shapes: [],
+      darkness: [],
+      explored: false,
       undo: null,
     });
     const ev = t.lastEvent();
@@ -277,27 +286,28 @@ describe("FR-FOG-11 / -15 hides and dragToDm (fog's line)", () => {
     return (data: DragData) => dragAudience(data, dm, read);
   };
 
-  test("FR-FOG-15 visible token: clear preview → all; wholly fogged preview → dm from the first such frame; end → all", () => {
+  test("FR-FOG-15 visible token: clear preview → all; wholly fogged preview → dm from the first such frame; end → its seers (every player)", () => {
     const t = setup();
     t.run(I.activateScene, { sceneId: t.ambush.id });
     t.setAll(true);
     t.edit("reveal", t.rect(0, 0, 3, 3));
     const g = t.place(1, 1);
     const route = routeOf(t);
+    const all = { players: [t.h.p1.id, t.h.p2.id] };
     const at = (col: number, row: number): DragData => ({
       sceneId: t.ambush.id,
       tokenId: g,
       x: col * 70 + 20, // FR-MAP-15 rounding: + 20 px stays in the cell
       y: row * 70,
     });
-    expect(route(at(2, 1))).toBe("all");
-    expect(route(at(3, 3))).toBe("all");
+    expect(route(at(2, 1))).toEqual(all);
+    expect(route(at(3, 3))).toEqual(all);
     expect(route(at(4, 3))).toBe("dm");
     expect(route(at(9, 9))).toBe("dm");
-    expect(route({ sceneId: t.ambush.id, tokenId: g, end: true })).toBe("all");
+    expect(route({ sceneId: t.ambush.id, tokenId: g, end: true })).toEqual(all);
   });
 
-  test("FR-FOG-15 Large previews use the whole footprint; fog-hidden tokens and their end frames → dm; owned → all", () => {
+  test("FR-FOG-15 Large previews use the whole footprint; fog-hidden tokens and their end frames → dm; owned → every player", () => {
     const t = setup();
     t.run(I.activateScene, { sceneId: t.ambush.id });
     t.setAll(true);
@@ -317,28 +327,32 @@ describe("FR-FOG-11 / -15 hides and dragToDm (fog's line)", () => {
       ownerPlayerId: t.h.p1.id,
     }).tokenId;
     const route = routeOf(t);
+    const all = { players: [t.h.p1.id, t.h.p2.id] };
     const px = (tokenId: string, col: number, row: number): DragData => ({
       sceneId: t.ambush.id,
       tokenId,
       x: col * 70,
       y: row * 70,
     });
-    expect(route(px(o, 3, 3))).toBe("all"); // (3, 3) of its 2 × 2 is clear
+    expect(route(px(o, 3, 3))).toEqual(all); // (3, 3) of its 2 × 2 is clear
     expect(route(px(o, 4, 4))).toBe("dm");
     expect(route(px(hiddenInFog, 1, 1))).toBe("dm"); // hidden for players: every frame
     expect(route({ sceneId: t.ambush.id, tokenId: hiddenInFog, end: true })).toBe("dm");
-    expect(route(px(owned, 12, 12))).toBe("all"); // exempt (OQ-FOG-03)
-    expect(route({ sceneId: t.ambush.id, tokenId: owned, end: true })).toBe("all");
+    expect(route(px(owned, 12, 12))).toEqual(all); // exempt (OQ-FOG-03)
+    expect(route({ sceneId: t.ambush.id, tokenId: owned, end: true })).toEqual(all);
   });
 
-  test("FR-FOG-11 hides = fog-hidden: fogged and not exempt; props never exempt; player templates exempt", () => {
+  test("FR-FOG-11 hides = fog-hidden for the viewer: not in seenBy and not their own; player templates exempt", () => {
     const [line] = sceneVisibilityHooks;
-    const hides = (type: string, r: object) => line?.hides?.(type, r) ?? false;
-    expect(hides("token", { fogged: true, ownerPlayerId: null })).toBe(true);
-    expect(hides("token", { fogged: true, ownerPlayerId: "p" })).toBe(false);
-    expect(hides("token", { ownerPlayerId: null })).toBe(false);
-    expect(hides("scene-prop", { fogged: true })).toBe(true);
-    expect(hides("aoe-template", { fogged: true, placedByPlayerId: null })).toBe(true);
-    expect(hides("aoe-template", { fogged: true, placedByPlayerId: "p" })).toBe(false);
+    const p1 = { connId: "c", campaignId: "c1", role: "player" as const, playerId: "p1" };
+    const hides = (type: string, r: object) => line?.hides?.(type, r, p1) ?? false;
+    expect(hides("token", { seenBy: [], ownerPlayerId: null })).toBe(true);
+    expect(hides("token", { seenBy: ["p1"], ownerPlayerId: null })).toBe(false);
+    expect(hides("token", { seenBy: [], ownerPlayerId: "p1" })).toBe(false);
+    expect(hides("token", { seenBy: [], ownerPlayerId: "p2" })).toBe(true);
+    expect(hides("token", { seenBy: null, ownerPlayerId: null })).toBe(true);
+    expect(hides("scene-prop", { seenBy: ["p2"] })).toBe(true);
+    expect(hides("aoe-template", { seenBy: [], placedByPlayerId: null })).toBe(true);
+    expect(hides("aoe-template", { seenBy: [], placedByPlayerId: "p2" })).toBe(false);
   });
 });

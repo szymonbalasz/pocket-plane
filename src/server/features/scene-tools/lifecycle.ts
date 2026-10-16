@@ -1,8 +1,8 @@
 // Scene-tools' scene lifecycle hook (FR-SCN-31, ADR-0039), a line in scenes-map's `sceneHooks`.
 // `duplicated`: copies the structure row (same `n`s, `rev`, door fog flags) and every prop (new
-// IDs from `ctx`, same fields); kept templates are not copied. `fogged` / `f` are copied, not
-// re-derived: fog's own `duplicated` line copies the fog row unchanged (FR-FOG-24), so the copies
-// stay exact whatever the hook order. `deleting`: every SCN row of the scene as a delete, before
+// IDs from `ctx`, same fields); kept templates are not copied. `fogged` / `f` and the per-player
+// `seenBy` / `doorSeen` are copied, not re-derived: fog's own `duplicated` line copies the fog row
+// unchanged (FR-FOG-24), so the copies stay exact whatever the hook order. `deleting`: every SCN row of the scene as a delete, before
 // the FK cascade removes them. Writes through `env.tx` only; never emits.
 import {
   AOE_TEMPLATE_TYPE,
@@ -32,6 +32,7 @@ function duplicated(env: SceneHookEnv, source: SceneRecord, copy: SceneRecord): 
         nextN: structure.nextN,
         walls: structure.walls,
         doors: structure.doors,
+        doorSeen: structure.doorSeen ?? null,
         updatedAt: now,
       })
       .run();
@@ -67,6 +68,7 @@ function duplicated(env: SceneHookEnv, source: SceneRecord, copy: SceneRecord): 
         hidden: p.hidden,
         locked: p.locked,
         fogged: p.fogged === true,
+        seenBy: p.seenBy ?? null,
         createdAt: now,
         updatedAt: now,
       })

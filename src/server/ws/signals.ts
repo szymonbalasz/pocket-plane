@@ -19,8 +19,25 @@ export interface SignalRead {
   activeSceneOf(campaignId: string): string | null;
 }
 
-/** `all` = every other live connection of the campaign; `dm` = other live DM connections only. */
-export type SignalAudience = "all" | "dm";
+/**
+ * `all` = every other live connection of the campaign; `dm` = other live DM connections only;
+ * `{players}` (FR-SYNC-28 amended, ADR-0042) = other live DM connections plus those players'.
+ */
+export type SignalAudience = "all" | "dm" | { players: readonly string[] };
+
+/** A well-formed `audience` result. */
+export function validAudience(a: unknown): a is SignalAudience {
+  if (a === "all" || a === "dm") return true;
+  const p = (a as { players?: unknown } | null)?.players;
+  return Array.isArray(p) && p.every((x) => typeof x === "string");
+}
+
+/** Whether a receiving connection is in the audience (the sender is skipped by the caller). */
+export function reaches(a: SignalAudience, o: { role: Role | null; playerId: string | null }) {
+  if (a === "all" || o.role === "dm") return true;
+  if (a === "dm") return false;
+  return o.playerId !== null && a.players.includes(o.playerId);
+}
 
 export interface SignalDef<S extends z.ZodType = z.ZodType> {
   /** `<short feature name>.<verb>`, e.g. `map.ping`. */

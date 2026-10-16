@@ -24,6 +24,8 @@ export const MAP_INTENTS = {
   setTokenHidden: "map.setTokenHidden",
   duplicateToken: "map.duplicateToken",
   deleteToken: "map.deleteToken",
+  /** FR-SCN-38 (ADR-0042): read-only dry run of the move guards. */
+  checkMove: "map.checkMove",
 } as const;
 
 export const MAP_SIGNALS = {
@@ -206,11 +208,19 @@ const tokenFields = {
 /** Display copy of `statBlock.speed` in ft; null = unknown (FR-MAP-36). */
 const TokenSpeed = z.number().int().nullable();
 
-/** `token` (scope scene, `sceneOf = sceneId`), DM full view. */
+/**
+ * `token` (scope scene, `sceneOf = sceneId`), DM full view. Server records also carry `seenBy`
+ * (FR-FOG-10, ADR-0042: player ids, null = pre-v2), which no wire ever carries (the record
+ * type's `dmRedact` and player `redact` strip it).
+ */
 export const TokenRecord = z.object({
   ...tokenFields,
   definitionId: z.string(),
   speed: TokenSpeed,
+  /** FR-FOG-45 (#210): DM wire only, only when true; players never get the key. */
+  invisible: z.literal(true).optional(),
+  /** Server only (never on a wire). */
+  seenBy: z.array(z.string()).nullable().optional(),
 });
 export type TokenRecord = z.infer<typeof TokenRecord>;
 
@@ -253,6 +263,22 @@ export type PlaceTokenInput = z.input<typeof PlaceTokenInput>;
 
 export const MoveTokenInput = z.strictObject({ tokenId: Id, col: CellIndex, row: CellIndex });
 export type MoveTokenInput = z.input<typeof MoveTokenInput>;
+
+/** FR-SCN-38: `map.checkMove` (same fields as `map.moveToken`). */
+export const CheckMoveInput = MoveTokenInput;
+export type CheckMoveInput = z.input<typeof CheckMoveInput>;
+
+/** `map.checkMove` ack: `ok` = the move would pass; `hints` per guard (wall: ≤ 1 piece). */
+export const CheckMoveResult = z.object({
+  ok: z.boolean(),
+  hints: z.array(
+    z.object({
+      guard: z.string(),
+      segments: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])),
+    }),
+  ),
+});
+export type CheckMoveResult = z.infer<typeof CheckMoveResult>;
 
 export const UpdateTokenInput = z.strictObject({
   tokenId: Id,

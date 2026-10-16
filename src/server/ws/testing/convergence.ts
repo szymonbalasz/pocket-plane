@@ -1,9 +1,11 @@
 // Convergence and leak-scan helpers (FR-SYNC-20) that honour windowed record types
 // (ADR-0029, CON-39): for a windowed type only pinned rows and rows at or above the window
 // floor are compared; older rows a client still holds are real, just not resent. For the
-// DM's `dmWindow` types (ADR-0041) only the active scene + the loaded scenes are compared.
+// DM's `dmWindow` types (ADR-0041) only the active scene + the loaded scenes are compared; for
+// `view-as` types (FR-FOG-43) only the loaded `(sceneId, playerId)` pair (none → nothing).
+// Per-player helpers (ADR-0042): `playerViewer` and `leakScan` on each player's client.
 import type { ServerFrame } from "@shared/protocol/frames";
-import { LoadSceneResult } from "@shared/protocol/scene-window";
+import { LoadSceneResult, type ViewAsPair } from "@shared/protocol/scene-window";
 import type { RecordMap, RecordStore } from "@shared/protocol/store";
 import { type WindowIds, windowProjection } from "@shared/protocol/window";
 import type { Services } from "../../services";
@@ -14,6 +16,11 @@ import type { SnapshotSource, Viewer } from "../records";
 export function viewerOf(store: RecordStore): Viewer {
   if (!store.you) throw new Error("Client has no snapshot yet");
   return { connId: "test", ...store.you };
+}
+
+/** A player viewer of a campaign (per-player leak / visibility checks, ADR-0042). */
+export function playerViewer(campaignId: string, playerId: string): Viewer {
+  return { connId: `test-${playerId}`, campaignId, role: "player", playerId };
 }
 
 /** The hub's snapshot source (live presence); no hub → nobody online. */
@@ -36,9 +43,20 @@ export function sceneWindowProjection(
   v: Viewer,
   records: RecordMap,
   scenes: ReadonlySet<string>,
+  viewAs: ViewAsPair | null = null,
 ): RecordMap {
   if (v.role !== "dm") return records;
   const out: RecordMap = { ...records };
+  for (const def of s.records.viewAsTypes()) {
+    const byId = records[def.type];
+    if (!byId) continue;
+    const kept: Record<string, unknown> = {};
+    for (const [id, r] of Object.entries(byId)) {
+      const pid = (r as { playerId?: unknown }).playerId;
+      if (viewAs && def.sceneOf?.(r) === viewAs.sceneId && pid === viewAs.playerId) kept[id] = r;
+    }
+    out[def.type] = kept;
+  }
   for (const def of s.records.dmWindowed()) {
     const byId = records[def.type];
     if (!byId) continue;
@@ -57,6 +75,8 @@ export interface ClientView {
   store: RecordStore;
   /** Scenes loaded with `sync.loadScene` since the last snapshot (ADR-0041). */
   loadedScenes?: readonly string[];
+  /** The `view-as` pair loaded with `sync.loadScene {viewAs}` (FR-FOG-43). */
+  viewAs?: ViewAsPair | null;
   /** Every frame received; the leak scan also reads `ack.records`. */
   frames?: readonly ServerFrame[];
 }
@@ -77,7 +97,9 @@ export function convergence(
   const scenes = new Set(loaded);
   const active = s.records.activeSceneOf(v.campaignId);
   if (active !== null) scenes.add(active);
-  const project = (r: RecordMap) => sceneWindowProjection(s, v, windowProjection(r, ids), scenes);
+  const pair = live.viewAs ?? null;
+  const project = (r: RecordMap) =>
+    sceneWindowProjection(s, v, windowProjection(r, ids), scenes, pair);
   return { live: project(live.store.records), fresh: project(fresh.store.records) };
 }
 

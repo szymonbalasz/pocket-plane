@@ -1,5 +1,7 @@
 import { CampaignActivated } from "@shared/events/campaign-management";
 import { CloseCode } from "@shared/protocol/codes";
+import { eq } from "drizzle-orm";
+import { player } from "../../db/schema";
 import type { Feature } from "../../services";
 import { createResolvers, DmSecretChecker } from "./auth";
 import {
@@ -24,6 +26,15 @@ export const campaignManagement: Feature = {
     r.recordType(campaignRecordType);
     r.recordType(playerRecordType);
     r.provideAuth(createResolvers(s.db, new DmSecretChecker(s.config.dmSecret, s.clock)));
+    // FR-FOG-43: `sync.loadScene {viewAs}` accepts only a player of the DM's campaign.
+    s.records.providePlayerCampaign(
+      (playerId) =>
+        s.db
+          .select({ campaignId: player.campaignId })
+          .from(player)
+          .where(eq(player.id, playerId))
+          .get()?.campaignId ?? null,
+    );
     // FR-CAMP-09 / FR-SYNC-07: after an activation commits, close every connection of another
     // campaign with 4409 campaign-inactive (DM reconnects, players wait).
     r.listener("campaign-switch", ({ event }) => {

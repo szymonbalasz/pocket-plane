@@ -1,7 +1,10 @@
 // Pure scene-tools math shared by server and clients (SCN §8 derived values): vertices, segment
 // validity and dedupe (FR-SCN-07), the blocking rule (FR-SCN-10), prop / template / door cells
 // (FR-SCN-18, -21, -36; the footprints fog reads, FR-SCN-35) and distance per diagonal rule
-// (FR-SCN-30). Grid units throughout: vertices `(x, y)`, cells `(col, row)`.
+// (FR-SCN-30). Grid units throughout: vertices `(x, y)`, cells `(col, row)`. Sprint 3: segment
+// points carry ≤ 2 decimals; the blocking rule runs on integers scaled by 200 (FR-SCN-10); walls
+// and non-open doors are FOG's sight occluders (FR-SCN-37); door sample points (FR-SCN-36); the
+// first-crossing wall hint for `map.checkMove` (FR-SCN-38).
 import { distanceFt as distance5105, type Grid, type MapRect } from "@shared/scenes-map/geometry";
 import {
   type DiagonalRule,
@@ -60,10 +63,18 @@ export function segmentKey([x1, y1, x2, y2]: Segment): string {
   return x1 < x2 || (x1 === x2 && y1 <= y2) ? `${x1},${y1},${x2},${y2}` : `${x2},${y2},${x1},${y1}`;
 }
 
-/** Why a segment is refused, or null: length 0, or an endpoint outside the vertex range ± 1. */
+/** FR-SCN-07 (sprint 3): a segment is at least 0.05 cell long. */
+export const SEGMENT_MIN_LENGTH = 0.05;
+
+/**
+ * Why a segment is refused, or null: shorter than 0.05 cell, or an endpoint outside the vertex
+ * range ± 1. Exact on ≤ 2-decimal points (1/100-cell integers).
+ */
 export function segmentProblem(seg: Segment, m: MapRect): "length" | "bounds" | null {
   const [x1, y1, x2, y2] = seg;
-  if (x1 === x2 && y1 === y2) return "length";
+  const dx = Math.round((x2 - x1) * 100);
+  const dy = Math.round((y2 - y1) * 100);
+  if (dx * dx + dy * dy < (SEGMENT_MIN_LENGTH * 100) ** 2) return "length";
   const r = vertexRange(m);
   const inX = (x: number) => x >= r.x0 - 1 && x <= r.x1 + 1;
   const inY = (y: number) => y >= r.y0 - 1 && y <= r.y1 + 1;
@@ -98,14 +109,27 @@ export function segmentsTouch(p: P, q: P, r: P, s: P): boolean {
   );
 }
 
-/** Footprint centre on doubled coordinates: `(2 col + n, 2 row + n)`. */
-const centre2 = (c: CellPoint, n: number): P => [2 * c.col + n, 2 * c.row + n];
+/** FR-SCN-10: 1/100-cell points, doubled for footprint centres → integers (×200). */
+const SCALE = 200;
+const scaled = (v: number) => Math.round(v * SCALE);
+
+/** Footprint centre ×200: `(200 col + 100 n, 200 row + 100 n)`. */
+const centreScaled = (c: CellPoint, n: number): P => [
+  SCALE * c.col + (SCALE / 2) * n,
+  SCALE * c.row + (SCALE / 2) * n,
+];
+
+/** The segments that block moves and sight: every wall, every door whose state ≠ open. */
+function blockers(walls: readonly Wall[], doors: readonly Door[]): (Wall | Door)[] {
+  return [...walls, ...doors.filter((d) => d[5] !== DOOR_OPEN)];
+}
 
 /**
  * FR-SCN-10 blocking rule: the `n`s of every wall, and every door whose state ≠ open, that the
  * straight segment between the footprint centres of `from` and `to` (footprint `n` cells per
- * side) intersects or touches. Integer math on doubled coordinates. An unmoved token crosses
- * nothing. The caller decides who is checked (DM moves never are).
+ * side) intersects or touches. Integer math on coordinates scaled by 200 (1/100-cell points,
+ * doubled for centres; |v| ≤ 410,000, so products stay exact). An unmoved token crosses nothing.
+ * The caller decides who is checked (DM moves never are).
  */
 export function blockingSegments(
   from: CellPoint,
@@ -115,13 +139,89 @@ export function blockingSegments(
   doors: readonly Door[],
 ): number[] {
   if (from.col === to.col && from.row === to.row) return [];
-  const a = centre2(from, n);
-  const b = centre2(to, n);
-  const hit = (s: Wall | Door) => segmentsTouch(a, b, [2 * s[1], 2 * s[2]], [2 * s[3], 2 * s[4]]);
+  const a = centreScaled(from, n);
+  const b = centreScaled(to, n);
+  const hit = (s: Wall | Door) =>
+    segmentsTouch(a, b, [scaled(s[1]), scaled(s[2])], [scaled(s[3]), scaled(s[4])]);
   const out: number[] = [];
   for (const w of walls) if (hit(w)) out.push(w[0]);
   for (const d of doors) if (d[5] !== DOOR_OPEN && hit(d)) out.push(d[0]);
   return out;
+}
+
+/** FR-SCN-37: walls and doors whose state ≠ open, as FOG's sight occluders (grid units). */
+export function sightOccluders(structure: {
+  walls: readonly Wall[];
+  doors: readonly Door[];
+}): Segment[] {
+  return blockers(structure.walls, structure.doors).map(segmentOf);
+}
+
+/** FR-SCN-38: half the hint piece's length, in cells, either side of the crossing. */
+export const WALL_HINT_HALF = 0.5;
+
+const round2 = (v: number) => Math.round(v * 100) / 100 + 0;
+
+/**
+ * FR-SCN-38 (#207, OQ-SCN-23): the wall guard's hint. Of the blocking segments the from → to
+ * centre line crosses or touches (FR-SCN-10), the one whose crossing is nearest `from`; returns
+ * that segment clipped to 0.5 cell either side of the crossing (along the segment, inside its
+ * ends), rounded to 2 decimals, or null when nothing blocks. A collinear overlap crosses at the
+ * overlap point nearest `from`. One piece only, so a scripted client can't map walls behind walls.
+ */
+export function wallHint(
+  from: CellPoint,
+  to: CellPoint,
+  n: number,
+  walls: readonly Wall[],
+  doors: readonly Door[],
+): Segment | null {
+  if (from.col === to.col && from.row === to.row) return null;
+  const a = centreScaled(from, n);
+  const b = centreScaled(to, n);
+  let best: { t: number; seg: Wall | Door } | null = null;
+  for (const s of blockers(walls, doors)) {
+    const p: P = [scaled(s[1]), scaled(s[2])];
+    const q: P = [scaled(s[3]), scaled(s[4])];
+    if (!segmentsTouch(a, b, p, q)) continue;
+    const t = crossingParam(a, b, p, q);
+    if (best === null || t < best.t) best = { t, seg: s };
+  }
+  if (best === null) return null;
+  const cx = (a[0] + best.t * (b[0] - a[0])) / SCALE;
+  const cy = (a[1] + best.t * (b[1] - a[1])) / SCALE;
+  const [, x1, y1, x2, y2] = best.seg;
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  // The crossing's parameter along the segment, then ± 0.5 cell, clipped to its ends.
+  const s = ((cx - x1) * (x2 - x1) + (cy - y1) * (y2 - y1)) / (len * len);
+  const s0 = Math.max(0, s - WALL_HINT_HALF / len);
+  const s1 = Math.min(1, s + WALL_HINT_HALF / len);
+  return [
+    round2(x1 + s0 * (x2 - x1)),
+    round2(y1 + s0 * (y2 - y1)),
+    round2(x1 + s1 * (x2 - x1)),
+    round2(y1 + s1 * (y2 - y1)),
+  ];
+}
+
+/**
+ * The smallest parameter `t ∈ [0, 1]` along `ab` where it meets the closed segment `pq` (the
+ * caller checked they touch). Collinear → the nearest overlap point.
+ */
+function crossingParam(a: P, b: P, p: P, q: P): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const ex = q[0] - p[0];
+  const ey = q[1] - p[1];
+  const den = dx * ey - dy * ex;
+  if (den !== 0) {
+    const t = ((p[0] - a[0]) * ey - (p[1] - a[1]) * ex) / den;
+    return Math.min(1, Math.max(0, t));
+  }
+  const dd = dx * dx + dy * dy;
+  const tp = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / dd;
+  const tq = ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / dd;
+  return Math.min(1, Math.max(0, Math.min(tp, tq)));
 }
 
 /** FR-SCN-10: any blocking segment on the path. */
@@ -241,6 +341,29 @@ export function doorCells([x1, y1, x2, y2]: Segment): Cell[] {
 }
 
 const rowMajor = (a: Cell, b: Cell) => a[1] - b[1] || a[0] - b[0];
+
+/**
+ * FR-SCN-36 (sprint 3, review A8): a door's fog sample points. Integer endpoints: the centres of
+ * its `doorCells` (exactly sprint 2's cells, so the migration is byte-equal). Freeform: per each
+ * of its ⌈length⌉ equal pieces, 2 points 0.5 cell either side of the piece's midpoint along the
+ * normal.
+ */
+export function doorSamplePoints(seg: Segment): [x: number, y: number][] {
+  if (seg.every(Number.isInteger)) return doorCells(seg).map(([c, r]) => [c + 0.5, r + 0.5]);
+  const [x1, y1, x2, y2] = seg;
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  const k = Math.max(1, Math.ceil(len - 1e-9));
+  const nx = (-(y2 - y1) / len) * 0.5;
+  const ny = ((x2 - x1) / len) * 0.5;
+  const out: [number, number][] = [];
+  for (let i = 0; i < k; i++) {
+    const t = (i + 0.5) / k;
+    const mx = x1 + t * (x2 - x1);
+    const my = y1 + t * (y2 - y1);
+    out.push([mx + nx, my + ny], [mx - nx, my - ny]);
+  }
+  return out;
+}
 
 /** Liang–Barsky: the parameter length of the segment inside the closed cell `(c, r)`. */
 function clipLength([x1, y1, x2, y2]: Segment, c: number, r: number): number {

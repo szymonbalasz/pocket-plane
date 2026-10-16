@@ -2,7 +2,13 @@
 // the real store reducer, frame log, fake clock + timers, pauseSnapshot, restart on the same DB.
 import { CloseCode } from "@shared/protocol/codes";
 import type { Credential, ServerFrame } from "@shared/protocol/frames";
-import { LoadSceneResult, mergeRecords, SYNC_LOAD_SCENE } from "@shared/protocol/scene-window";
+import {
+  dropTypes,
+  LoadSceneResult,
+  mergeRecords,
+  SYNC_LOAD_SCENE,
+  type ViewAsPair,
+} from "@shared/protocol/scene-window";
 import { applyEvent, applySnapshot, emptyStore, type RecordStore } from "@shared/protocol/store";
 import { manualClock } from "../commands/context";
 import type { Db } from "../db/client";
@@ -30,6 +36,13 @@ export interface TestClient {
   loadScene(sceneId: string, intentId?: string): string;
   /** Scenes loaded with `loadScene` since the last snapshot (the active scene is implied). */
   loadedScenes: string[];
+  /**
+   * Sends `sync.loadScene {sceneId, viewAs}` (FR-FOG-43); its ack replaces the previous pair's
+   * `view-as` rows in `store`, like the DM client. Returns the intentId.
+   */
+  loadViewAs(sceneId: string, playerId: string, intentId?: string): string;
+  /** The loaded View-as pair (reset by a snapshot). */
+  viewAs: ViewAsPair | null;
   /** Next unread frame (optionally of a type), waiting up to `ms`. */
   next<T extends ServerFrame["type"]>(
     type?: T,
@@ -52,6 +65,8 @@ export async function connectClient(
   let wake: (() => void) | null = null;
   let isClosed = false;
   const loads = new Map<string, string>();
+  const viewAsLoads = new Map<string, ViewAsPair>();
+  let viewAsTypes: string[] = [];
   const client: TestClient = {
     frames,
     store: emptyStore(),
@@ -75,6 +90,11 @@ export async function connectClient(
       return client.intent(SYNC_LOAD_SCENE, { sceneId }, intentId);
     },
     loadedScenes: [],
+    loadViewAs(sceneId, playerId, intentId = crypto.randomUUID()) {
+      viewAsLoads.set(intentId, { sceneId, playerId });
+      return client.intent(SYNC_LOAD_SCENE, { sceneId, viewAs: playerId }, intentId);
+    },
+    viewAs: null,
     async next(type, ms = 2000) {
       const deadline = Date.now() + ms;
       for (;;) {
@@ -111,6 +131,16 @@ export async function connectClient(
       client.store = applySnapshot(f);
       client.gap = false;
       client.loadedScenes = [];
+      client.viewAs = null;
+      viewAsTypes = [];
+    } else if (f.type === "ack" && viewAsLoads.has(f.intentId)) {
+      const pair = viewAsLoads.get(f.intentId) as ViewAsPair;
+      viewAsLoads.delete(f.intentId);
+      const records = LoadSceneResult.parse(f.result).records;
+      const types = Object.keys(records);
+      client.store = mergeRecords(dropTypes(client.store, [...viewAsTypes, ...types]), records);
+      viewAsTypes = types;
+      client.viewAs = pair;
     } else if (f.type === "ack" && loads.has(f.intentId)) {
       const sceneId = loads.get(f.intentId) as string;
       loads.delete(f.intentId);
@@ -118,6 +148,7 @@ export async function connectClient(
       if (!client.loadedScenes.includes(sceneId)) client.loadedScenes.push(sceneId);
     } else if (f.type === "reject" && f.intentId !== null) {
       loads.delete(f.intentId);
+      viewAsLoads.delete(f.intentId);
     } else if (f.type === "event") {
       const r = applyEvent(client.store, f);
       if (r.ok) client.store = r.store;

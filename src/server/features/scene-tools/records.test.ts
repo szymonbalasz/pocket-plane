@@ -2,7 +2,7 @@
 // with `sync.loadScene`; players redacted / gated; the `hides` seam; live transitions; leak
 // strings per SCN §13. Rows are written directly (commands come with the SCN slices).
 import { afterEach, describe, expect, test } from "bun:test";
-import { fogHidden } from "@shared/fog-of-war/visibility";
+import { seenByNobody } from "@shared/fog-of-war/visibility";
 import {
   AOE_TEMPLATE_TYPE,
   type AoeTemplateRecord,
@@ -19,12 +19,22 @@ import { mapSettings } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import type { Viewer } from "../../ws/records";
 import { type SceneObject, visibilityHooks } from "../scenes-map/visibility-hooks";
-import { doorFogFlag, propFogged, templateFogged } from "./copies";
+import { doorCopies, propCopies, templateFogged } from "./copies";
+
+const propFogged = (...a: Parameters<typeof propCopies>) => propCopies(...a).fogged;
+const doorFogFlag = (...a: Parameters<typeof doorCopies>) => doorCopies(...a).f;
+
 import { diagonalRuleOf } from "./rows";
 import { scnSetup } from "./testing";
 
 const SCN_TYPES = [SCENE_STRUCTURE_TYPE, SCENE_PROP_TYPE, AOE_TEMPLATE_TYPE];
 const AT = "2026-01-01T00:00:00.000Z";
+
+/** A server record as the DM wire carries it: no FOG copies (`seenBy`, `doorSeen`, ADR-0042). */
+const wire = <R extends object>(r: R) => {
+  const { seenBy: _s, doorSeen: _d, ...rest } = r as R & { seenBy?: unknown; doorSeen?: unknown };
+  return rest;
+};
 
 afterEach(() => visibilityHooks.unregister("test.fog"));
 
@@ -54,8 +64,8 @@ describe("FR-SCN-32 DM window (ADR-0041)", () => {
     expect(t.ids(t.dm, SCENE_PROP_TYPE)).toEqual(["barrel", "table", "chest"]);
     expect(t.ids(t.dm, AOE_TEMPLATE_TYPE)).toEqual(["guardians", "glyph"]);
     const snap = t.h.snapshot(t.dm);
-    expect(snap[SCENE_STRUCTURE_TYPE]).toEqual([t.a.structure]);
-    expect(t.a.structure).toEqual({
+    expect(snap[SCENE_STRUCTURE_TYPE]).toEqual([wire(t.a.structure)]);
+    expect(wire(t.a.structure)).toEqual({
       id: t.ambush.id,
       campaignId: t.h.campaignId,
       rev: 1,
@@ -93,12 +103,12 @@ describe("FR-SCN-32 DM window (ADR-0041)", () => {
     });
   });
 
-  test("FR-SCN-32 sync.loadScene returns another scene's SCN rows (and tokens), never fog or settings", () => {
+  test("FR-SCN-32 sync.loadScene returns another scene's SCN rows (and tokens, fog: OQ-FOG-30 B), never settings", () => {
     const t = setup();
     t.run(I.activateScene, { sceneId: t.ambush.id });
     const load = t.s.records.loadScene(t.src, t.dm, t.cellar.id);
-    expect(Object.keys(load).sort()).toEqual([...SCN_TYPES, "token"].sort());
-    expect(load[SCENE_STRUCTURE_TYPE]).toEqual([t.c.structure]);
+    expect(Object.keys(load).sort()).toEqual([...SCN_TYPES, "fog", "token"].sort());
+    expect(load[SCENE_STRUCTURE_TYPE]).toEqual([wire(t.c.structure)]);
     expect((load[SCENE_PROP_TYPE] as { id: string }[]).map((p) => p.id)).toEqual([
       "c-barrel",
       "c-table",
@@ -133,6 +143,8 @@ describe("FR-SCN-14 / -19 / -27 player visibility", () => {
         [5, 8, 11, 8, 12, 2, 1],
         [6, 2, 2, 2, 3, 1, 1],
       ],
+      // FR-SCN-36 per player (ADR-0042): seen by nobody ↔ `f = 1`.
+      doorSeen: { "4": [t.h.p1.id, t.h.p2.id], "5": [], "6": [] },
     };
     const ch = t.s.records.filterChange(
       { type: SCENE_STRUCTURE_TYPE, id: t.ambush.id, before: t.a.structure, after: open },
@@ -191,18 +203,21 @@ describe("FR-SCN-14 / -19 / -27 player visibility", () => {
       after: t.a.chest,
     };
     expect(t.s.records.filterChange(hide, t.p2)?.op).toBe("delete");
-    expect(t.s.records.filterChange(hide, t.dm)).toMatchObject({ op: "upsert", data: t.a.chest });
+    expect(t.s.records.filterChange(hide, t.dm)).toMatchObject({
+      op: "upsert",
+      data: wire(t.a.chest),
+    });
   });
 
   test("FR-SCN-27 templates: every field but campaignId for placer and others (incl. placedByPlayerId); hidden → none; DM keeps campaignId", () => {
     const t = setup();
     t.run(I.activateScene, { sceneId: t.ambush.id });
-    const { campaignId: _cid, ...guardians } = t.a.guardians;
+    const { campaignId: _cid, ...guardians } = wire(t.a.guardians);
     for (const v of [t.p1, t.p2]) {
       expect(t.h.snapshot(v)[AOE_TEMPLATE_TYPE]).toEqual([guardians]);
     }
     // The DM wire keeps campaignId: the registry's scope gate reads it from the record (§8).
-    expect(t.h.snapshot(t.dm)[AOE_TEMPLATE_TYPE]).toContainEqual(t.a.guardians);
+    expect(t.h.snapshot(t.dm)[AOE_TEMPLATE_TYPE]).toContainEqual(wire(t.a.guardians));
     expect(t.a.guardians.placedByPlayerId).toBe(t.h.p1.id);
     const shown = { ...t.a.glyph, hidden: false };
     const ch = (before: AoeTemplateRecord, after: AoeTemplateRecord): RecordChange => ({
@@ -211,7 +226,7 @@ describe("FR-SCN-14 / -19 / -27 player visibility", () => {
       before,
       after,
     });
-    const { campaignId: _c, ...shownWire } = shown;
+    const { campaignId: _c, ...shownWire } = wire(shown);
     expect(t.s.records.filterChange(ch(t.a.glyph, shown), t.p1)).toEqual({
       type: AOE_TEMPLATE_TYPE,
       id: shown.id,
@@ -273,7 +288,7 @@ describe("FR-SCN-35 fog seam", () => {
           : [[(obj.cells as { col: number }).col, 0] as const];
         return { fogged: cells.length > 0 && cells.every(([c]) => c >= 15) };
       },
-      hides: (type, r) => fogHidden(type, r),
+      hides: (type, r) => seenByNobody(type, r),
     });
   }
 
@@ -301,7 +316,8 @@ describe("FR-SCN-35 fog seam", () => {
     expect(trap.fogged).toBe(true);
     expect(mine).toMatchObject({ fogged: true, placedByPlayerId: t.h.p2.id });
     // A prop walking out of fog arrives as an upsert.
-    const out = { ...crate, col: 3 } as ScenePropRecord;
+    // ADR-0042: `derive` would also write every player into `seenBy` there.
+    const out = { ...crate, col: 3, seenBy: [t.h.p1.id, t.h.p2.id] } as ScenePropRecord;
     delete out.fogged;
     expect(
       t.s.records.filterChange(
@@ -336,6 +352,11 @@ describe("FR-SCN-35 fog seam", () => {
       cells: [
         [15, 5],
         [16, 5],
+      ],
+      // FR-SCN-36 sample points: the doorCells centres on an integer door.
+      points: [
+        [15.5, 5.5],
+        [16.5, 5.5],
       ],
     });
     expect(doorFogFlag(t.s.db, t.ambush.id, [15, 5, 15, 6])).toBe(0);

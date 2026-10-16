@@ -17,6 +17,8 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-09 | Live-sync hub skips record changes whose player redaction is unchanged (OQ-CBTX-25; empty updates on monster temp HP) | M | `src/server/ws/` hub | live-sync FR note | any ws / snapshot work | superseded by V0 `fix/vision-core` (identical-upsert drop, sprint-3 seams S11) |
 | BL-10 | Player outcome line "12 — hit!" vs AC 14 after a DM-only ruling reads odd (sim-6 #10): copy only ("DM ruled") within #178 G8 | S | combat-tracker player card view | DM product call? (ask if copy changes visibility) | — | open (ask) |
 | BL-11 | BL-02 e2e flaked once under parallel load: Initiative window stayed minimised after its launcher click (`e2e/support/shell.ts` `openWindow`; D1 merge run, `%TEMP%\pocket-plane\e2e-d1.log`) | S | e2e support / play-shell minimise | none | play-shell work | done (#215) |
+| BL-12 | Structure eraser on a door that sits on a wall removes the wall segment, not the door (V0 regression walkthrough, `%TEMP%\pocket-planeerify-vision-core`) | S | scene-tools structure eraser (client hit test) | none | walls track (V4) | open |
+| BL-13 | Reveal all sends each combatant twice in one event with different ordering positions (state converges; wasted bytes) (V0 regression walkthrough) | S | fog / combat copies re-derive (`hooks`) | none | V2 / combat lock | open |
 
 ## How to add items
 

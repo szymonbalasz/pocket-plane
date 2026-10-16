@@ -35,7 +35,11 @@ describe("scene-tools fixtures (SCN §13)", () => {
     const templates = db.select().from(aoeTemplate).orderBy(asc(aoeTemplate.seq)).all();
     closeDb(db);
     expect(r.manifest.fixtures).toContain("scn-templates");
-    expect(templates.map(({ id, seq, createdAt, updatedAt, campaignId, ...t }) => t)).toEqual([
+    // FR-FOG-10 (ADR-0042): both players see both templates on the revealed scene.
+    expect(templates.map((x) => x.seenBy?.length)).toEqual([2, 2]);
+    expect(
+      templates.map(({ id, seq, createdAt, updatedAt, campaignId, seenBy, ...t }) => t),
+    ).toEqual([
       {
         sceneId: ambush?.id as string,
         shape: "sphere",

@@ -8,7 +8,11 @@
 // runs, no event is emitted. Guards run for every actor; each decides whom it checks (scene-tools'
 // wall guard returns at once for the DM). Guards are read-only: `env.read` can only select.
 // Placement, `placeTokenIn`, duplicate and scene copy run none. No line registered → no change.
+// ADR-0042 (FR-SCN-38 / -40): a guard may also **return** `{refuse?, hint?}`: `refuse` = the
+// `conflict` message (same as throwing it), `hint` = segments the client may draw. `map.checkMove`
+// runs every guard as a dry run (`check`): read-only, nothing written, logged or emitted.
 import type { TokenRecord } from "@shared/scenes-map/schemas";
+import { CommandError, conflict } from "../../commands/errors";
 import type { Actor } from "../../events/types";
 import { scnWallGuard } from "../scene-tools/guard";
 import type { SceneRead } from "./visibility-hooks";
@@ -19,12 +23,30 @@ export interface MoveGuardEnv {
   actor: Actor;
 }
 
+/** A guard's hint for `map.checkMove` (FR-SCN-38): segments `[x1, y1, x2, y2]` in grid units. */
+export interface MoveGuardHint {
+  segments: [number, number, number, number][];
+}
+
+/** What a guard may return instead of throwing. */
+export interface MoveGuardVerdict {
+  /** Refuse with `conflict(refuse)`. */
+  refuse?: string;
+  hint?: MoveGuardHint;
+}
+
 export type MoveGuard = (
   env: MoveGuardEnv,
   token: TokenRecord,
   from: { col: number; row: number },
   to: { col: number; row: number },
-) => void;
+) => MoveGuardVerdict | undefined;
+
+/** `map.checkMove`'s answer (FR-SCN-38). */
+export interface MoveCheck {
+  ok: boolean;
+  hints: { guard: string; segments: [number, number, number, number][] }[];
+}
 
 export interface MoveGuardRegistration {
   /** `<feature>.<what>`, unique. */
@@ -57,14 +79,45 @@ export class MoveGuards {
     this.list = this.list.filter((g) => g.name !== name);
   }
 
-  /** Runs every guard in list order; the first throw refuses the move. */
+  /** Runs every guard in list order; the first throw or `refuse` refuses the move. */
   run(
     env: MoveGuardEnv,
     token: TokenRecord,
     from: { col: number; row: number },
     to: { col: number; row: number },
   ): void {
-    for (const g of this.list) g.guard(env, token, from, to);
+    for (const g of this.list) {
+      const v = g.guard(env, token, from, to);
+      if (v?.refuse !== undefined) throw conflict(v.refuse);
+    }
+  }
+
+  /**
+   * Dry run for `map.checkMove` (FR-SCN-38): every guard runs; a `refuse` or a thrown `conflict`
+   * makes `ok` false; hints are collected in list order. Other errors propagate.
+   */
+  check(
+    env: MoveGuardEnv,
+    token: TokenRecord,
+    from: { col: number; row: number },
+    to: { col: number; row: number },
+  ): MoveCheck {
+    const out: MoveCheck = { ok: true, hints: [] };
+    for (const g of this.list) {
+      let v: MoveGuardVerdict | undefined;
+      try {
+        v = g.guard(env, token, from, to);
+      } catch (err) {
+        if (!(err instanceof CommandError) || err.code !== "conflict") throw err;
+        out.ok = false;
+        continue;
+      }
+      if (v?.refuse !== undefined) out.ok = false;
+      if (v?.hint && v.hint.segments.length > 0) {
+        out.hints.push({ guard: g.name, segments: v.hint.segments });
+      }
+    }
+    return out;
   }
 }
 

@@ -117,7 +117,10 @@ describe("ADR-0040 move guards", () => {
       trace.push("first");
       throw conflict("no");
     });
-    tokenMoveGuards.register("test.second", () => trace.push("second"));
+    tokenMoveGuards.register("test.second", () => {
+      trace.push("second");
+      return undefined;
+    });
     expect(t.err(() => t.run(I.moveToken, { tokenId: g, col: 3, row: 2 })).code).toBe("conflict");
     expect(trace).toEqual(["first"]);
     expect(() => tokenMoveGuards.register("test.guard", () => {})).toThrow(/twice/);
