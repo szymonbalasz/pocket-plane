@@ -66,14 +66,26 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Selection** | The DM's client-only set of selected tokens on the viewed scene (click, Ctrl/Shift-click, box select); never sent. Features read it, e.g. to preselect attack targets (#148). | Target |
 | **Box select** | DM Ctrl/Shift + drag on empty canvas: tokens whose footprint centre lies inside the box join the selection. | — |
 | **Movement indicator** | Local drag label showing a move's distance against the token's speed (in combat: plus movement used); amber past speed, red past twice speed. Never blocks. | Ruler |
-| **Fog** | Cells of a scene hidden from players, drawn by the DM with rectangle and polygon tools; tokens, props and DM templates wholly under it are filtered server-side ([fog-of-war](specs/fog-of-war.md), [ADR-0039](architecture/adr/0039-fog-visibility.md)). | Lighting (out of scope) |
-| **Fog-hidden** | A record wholly under fog: its server-written `fogged` copy is true and players don't receive it (owned tokens excepted). | Hidden token |
+| **Fog** | Areas of a scene hidden from players: freeform shapes (rectangle, polygon, circle; grid snap unless Ctrl) over a base cell mask; pierced by vision; records a player can't see are filtered server-side ([fog-of-war](specs/fog-of-war.md), [ADR-0042](architecture/adr/0042-dynamic-vision.md)). | Lighting (out of scope) |
+| **Explored** | Map visible, records on it hidden: a player's remembered area (per player, per-map toggle) or a DM drawing mode. | Fog |
+| **Magical darkness** | DM-placed shapes that block all player sight unless the source sees through magical darkness. | Fog |
+| **Vision source** | A player-owned token whose sight reveals fog for that player (≤ 4 per player). | — |
+| **Sight** | A vision source's visibility polygon, cut by walls, closed doors and darkness, within its vision / darkvision radius. | — |
+| **Darkvision** | A second, larger sight radius; the darkvision-only ring is drawn dimmed and grey (no lighting model). | — |
+| **Sees through magical darkness** | Sheet sense (e.g. Devil's Sight): darkness doesn't block this source's sight; drawn as a darker transparent overlay. | — |
+| **Blind (dark screen)** | A player whose every source stands in darkness without see-through sees only own tokens and the grid. | — |
+| **Seen by** | Server-written per-player copy on a record (`seenBy`): which players see it; never on the wire. | Fogged |
+| **View as** | DM preview of one player's view, loaded on demand. | — |
+| **Invisible** | DM-only token state, distinct from Hidden and from the Invisible condition: only players whose source has Sees invisible (and sight on the token) receive it; the party still sees invisible PCs (#210). | Hidden token; condition |
+| **Sees invisible** | DM-only sheet sense (truesight, See Invisibility). | — |
+| **Fog-hidden** | A record a given player can't see (not in their sight or clear area): not in that player's `seenBy`, so they don't receive it (owned / party tokens excepted). `fogged` = seen by no player. | Hidden token |
 | **Reveal all / Fog all** | DM fog actions that clear or cover a whole scene. | — |
 | **AoE template** | A shape (cone, sphere, cylinder, cube, line) placed on a scene to show an area of effect; ephemeral unless kept ([scene-tools](specs/scene-tools.md)). | Freehand drawing (out of scope) |
 | **Ephemeral template** | An AoE template sent as a live signal, gone when cleared or its placer leaves; **Keep** saves it as a record. | AoE template |
 | **Prop** | A DM-placed image object on a scene's objects layer (barrel, table). | Token |
-| **Wall** | A segment between grid vertices that blocks player token moves (no vision). | Door |
-| **Door** | A wall segment the DM sets open, closed or locked; hidden from players while fully fogged. | Wall |
+| **Wall** | A segment between two points (grid vertices, or free with Ctrl) that blocks player token moves and sight. | Door |
+| **Wall hint** | The red piece of the first wall crossed, shown while a player drags a token (from a server dry-run check). | — |
+| **Door** | A wall segment the DM sets open, closed or locked; closed / locked doors block sight; hidden from a player until a point beside it is in their sight. | Wall |
 | **Structure** | A scene's walls and doors, stored as one record per scene. | — |
 | **DM-only layer** | Records with the `hidden` flag (tokens, props, templates): drawn for the DM only. | Canvas layer |
 | **Canvas layer** | A render slot in the canvas-layer registry (map, grid, props, structure, fog, templates, tokens, labels…), ordered by number. | DM-only layer |

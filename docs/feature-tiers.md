@@ -182,7 +182,7 @@ Tiers confirmed by the DM (#148); details in [feedback-phase3](agents/feedback-p
 
 | Feature | Tier | Ref |
 |---|---|---|
-| Dynamic vision (radius, darkvision, magical darkness) | S (sprint 3, #201) | [fog-of-war](specs/fog-of-war.md), [proposed-dynamic-vision](architecture/adr/proposed-dynamic-vision.md) |
+| Dynamic vision (radius, darkvision, magical darkness) | S (sprint 3, #201) | [fog-of-war](specs/fog-of-war.md), [ADR-0042](architecture/adr/0042-dynamic-vision.md) |
 | Dynamic lighting (light sources) | F | [ADR-0007](architecture/adr/0007-product-scope.md) |
 | Freehand drawing | F | [ADR-0007](architecture/adr/0007-product-scope.md) |
 | Audio (music, ambience, soundboard) | F | [ADR-0007](architecture/adr/0007-product-scope.md); UI notification sounds allowed by [ADR-0030](architecture/adr/0030-ui-notification-sounds.md) |
