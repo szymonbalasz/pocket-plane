@@ -243,8 +243,9 @@ function chargeOpen(env: Env, t: Trigger, o: TriggerOwner): boolean | "no-combat
 
 /**
  * FR-MOD-43: the owner's enabled `roll` triggers that fire on this roll now: requires, hard
- * filters, charge open (`each` anywhere; windowed in combat only). `{feature}` ones are skipped
- * with a note (a sheet spend needs a `creature-sheet` change the roll's event can't list yet).
+ * filters, charge open (`each` anywhere; windowed in combat only). `{feature}` ones are rejected
+ * at save (#223: a sheet spend needs a `creature-sheet` change the roll's event can't list); a row
+ * written before that is skipped with a note.
  */
 function firingRollTriggers(
   env: Env,
@@ -313,7 +314,8 @@ function rollParts(
       continue;
     }
     if (v.expression === null) continue;
-    const r = v.dice.length > 0 ? base.rollExtra(v.expression, t.name) : null;
+    // FR-MOD-18: a physical `t:` group (lenient, as offers; R2 ruling #224) else server-rolled.
+    const r = v.dice.length > 0 ? base.rollExtra(v.expression, t.name, `t:${t.id}`) : null;
     parts.push({
       effectId: t.id,
       triggerId: t.id,

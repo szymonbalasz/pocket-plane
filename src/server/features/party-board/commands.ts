@@ -1,6 +1,6 @@
 // party-board commands of the core (PARTY §6, §9; orchestrator ruling for P core): handouts
 // `party.createHandout` / `updateHandout` / `shareHandout` / `deleteHandout` and
-// `party.addItem` (DM). The `handout-shared` notification (FR-PARTY-06) comes with slice 2;
+// `party.addItem` (DM), and the `handout-shared` notification (FR-PARTY-06, slice 2);
 // `editItem` / `removeItem` / `moveItem` with slice 4, `loot.split` with slice 3.
 import {
   HandoutCreated,
@@ -9,7 +9,7 @@ import {
   HandoutUpdated,
   PartyItemAdded,
 } from "@shared/events/party-board";
-import { itemAddedText } from "@shared/party-board/format";
+import { handoutSharedText, itemAddedText } from "@shared/party-board/format";
 import { mergeConflictMessage, planMerge } from "@shared/party-board/items";
 import {
   AddItemIntent,
@@ -20,6 +20,7 @@ import {
   HANDOUT_BODY_TYPE,
   HANDOUT_LIMIT_MESSAGE,
   HANDOUT_MAX,
+  HANDOUT_SHARED_KIND,
   HANDOUT_TYPE,
   type HandoutInput,
   NOT_SHARED,
@@ -29,7 +30,7 @@ import {
   ShareHandoutIntent,
   UpdateHandoutIntent,
 } from "@shared/party-board/schemas";
-import { sameShare, shareGainers } from "@shared/party-board/visibility";
+import { sameShare, shareGainers, shareNotifications } from "@shared/party-board/visibility";
 import {
   LOOT_ENTRY_TYPE,
   LOOT_RECEIVED_KIND,
@@ -190,7 +191,8 @@ export const updateHandout = defineCommand({
 /**
  * FR-PARTY-05 (share and unshare): `players` ids each a player of the campaign (`not_found`);
  * same share → `ack`, no event. `sharedAt` = now iff some player newly gains access. Changes:
- * header + body, so gainers get upserts and losers deletes (FR-PARTY-07).
+ * header + body, so gainers get upserts and losers deletes (FR-PARTY-07). Then FR-PARTY-06:
+ * `handout-shared` to the gainers (one to `all` for `none` → `all`), after the event.
  */
 export const shareHandout = defineCommand({
   name: PARTY_INTENTS.shareHandout,
@@ -219,6 +221,16 @@ export const shareHandout = defineCommand({
         { type: HANDOUT_BODY_TYPE, id: handoutId, before: body(before), after: body(after) },
       ],
     });
+    const text = handoutSharedText(after.title);
+    for (const n of shareNotifications(before.sharedWith, sharedWith, players)) {
+      notify(env, {
+        kind: HANDOUT_SHARED_KIND,
+        audience: n.audience,
+        audiencePlayerId: n.audience === "player" ? n.playerId : null,
+        text,
+        payload: { handoutId },
+      });
+    }
   },
 });
 

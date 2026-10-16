@@ -16,7 +16,6 @@ import {
   type StatBlockSection,
   StatBlockSection as StatBlockSectionSchema,
 } from "@shared/compendium/schemas";
-import { CreatureSenses } from "@shared/compendium/senses";
 import { hpAverage, normalizeHpFormula, parseHpFormula } from "@shared/entities/hp-formula";
 import {
   ABILITIES,
@@ -26,6 +25,7 @@ import {
   abilityMod,
   DAMAGE_TYPES,
   MonsterStatBlock,
+  Senses,
   SIZES,
 } from "@shared/entities/schemas";
 import { z } from "zod";
@@ -50,8 +50,8 @@ export type Open5eResponses = Partial<Record<Open5eEndpoint, readonly unknown[]>
 /** Creature definition written next to a monster entry (FR-CMP-03): entities' `{name, statBlock}`. */
 export interface MonsterDefinition {
   name: string;
-  /** Entities' creature core + `senses` (V0, seams S6). */
-  statBlock: MonsterStatBlock & { senses?: CreatureSenses };
+  /** Entities' creature core, `senses` included (V0, seams S6). */
+  statBlock: MonsterStatBlock;
 }
 
 export type AdapterRecord =
@@ -301,7 +301,7 @@ function darkvision(c: Run, key: string, senses: string | undefined) {
   const m = /darkvision\s+(\d+)\s*ft/i.exec(senses ?? "");
   if (!m) return undefined;
   const s = { visionFt: 0, darkvisionFt: Number(m[1]), seesMagicalDarkness: false };
-  if (CreatureSenses.safeParse(s).success) return s;
+  if (Senses.safeParse(s).success) return s;
   c.warn(key, "statBlock.senses", `Darkvision ${m[1]} ft doesn't fit; dropped`);
   return undefined;
 }

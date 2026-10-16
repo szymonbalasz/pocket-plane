@@ -5,6 +5,7 @@ import { campaignManagement } from "./campaign-management";
 import { characterSheet } from "./character-sheet";
 import { combatExtras } from "./combat-extras";
 import { combatTracker } from "./combat-tracker";
+import { compendium } from "./compendium";
 import { diceRollLog } from "./dice-roll-log";
 import { effectModifiers } from "./effect-modifiers";
 import { entities } from "./entities";
@@ -34,4 +35,5 @@ export const features: readonly Feature[] = [
   fogOfWar,
   sceneTools,
   partyBoard,
+  compendium,
 ];

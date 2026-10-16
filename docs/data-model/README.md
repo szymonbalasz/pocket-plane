@@ -1286,9 +1286,101 @@ From [scene-tools](../specs/scene-tools.md#8-data-model) (SCN §14 slice V4). **
 - **Client only:** the polyline in progress may hold free points (0.01 cell); the player's current wall hint pieces (from the latest `map.checkMove` ack, cleared on cell change, drag end, snapshot, leaving live); the Ctrl state for the "Free" chip.
 - **CON-44:** unchanged (no new record or field; decimal coordinates per SCN §12, ≤ 3 B per freeform number).
 
-## 33. Sprint 3: effect modifiers tier 2 client (R2)
+## 33. Sprint 3: effect modifiers tier 3 (R3)
 
-From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) tier 2 + T (MOD, `complete`). **Built by `fix/mod-roll-preview`** (R2): no table, column or record type change. Protocol side: [protocol §46](../protocol/README.md#46-sprint-3-effect-modifiers-tier-2-client-r2).
+From [effect-modifiers](../specs/effect-modifiers.md#82-records) tier 3 (MOD, `complete`). **Built by `build/mod-tier3`** (R3): no table, column or record type change; the R0 column is now written. Protocol side: [protocol §46](../protocol/README.md#46-sprint-3-effect-modifiers-tier-3-r3).
+
+| Table / leaf | Change | Visibility | Source |
+|---|---|---|---|
+| `effect_preset.uses_feature_id` | Set by `mod.putPreset` (character presets): soft id of a `creature_sheet.features` row with `usesMax`; kept when the row is later deleted or its uses cleared (broken link, toggles without uses) | as the row (owner + DM, FR-MOD-22) | [FR-MOD-12](../specs/effect-modifiers.md#6-functional-requirements) |
+| `effect_preset.origin_key` | Written by the sheet's "Start from ▸" create (built-in key) | as the row | FR-MOD-36 |
+| `creature_sheet.features[].used` (**JSON leaf**) | +1 per `mod.toggle` on with a live link (not with `force`); −1 by `refundFeatureUse` (R4's undo); reset only by the Features tab's Reset (`char.useResource`) | as the sheet (owner + DM) | FR-MOD-12, -41 |
+
+- **Derived** (pure, `@shared/effect-modifiers/rules`): `presetUses(preset, features)` → `null` (no link) \| `{state: "broken"}` \| `{state: "ok", featureId, name, left, max}`; `hasUses(row)`.
+- **Fixtures**: none added (Brakka's "Rage" feature row + linked preset are R5's `char-brakka` / `trg-brakka`). **Snapshot size** (CON-44): no new rows or fields; `uses_feature_id` was already in every preset row (R0 measured at max).
+
+## 34. Sprint 3: compendium core (C1)
+
+From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; gate 1 #207, #208, #213; [ADR-0046](../architecture/adr/0046-compendium-scope.md)). **Built by `fix/cmp-core`** (schema lock 4th, after P core): two tables (drizzle push, push-safe). **Not record types**: nothing here is in a snapshot or on the WS; C2 reads entries over REST. Global imported rows are ADR-0004's second exception (ADR-0046). Protocol side: [protocol §47](../protocol/README.md#47-sprint-3-compendium-core-c1).
+
+### Compendium source (`compendium_source`, global) — owner [compendium](../specs/compendium.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| key | text PK | e.g. `srd-5.1` | FR-CMP-04 |
+| name, licence, attribution, url | text ×3, text \| null | Attribution stored once here; entries carry the source key | FR-CMP-04 |
+| version | text | SHA-256 of the bundled files + `ADAPTER_VERSION`; fixtures may use a label (`mini`) | FR-CMP-04 |
+| importedAt | timestamp | `ctx.clock`; the last import that wrote something | FR-CMP-04 |
+| counts | **JSON leaf** `{<kind>: int}` | Entries per kind of that import | FR-CMP-04 |
+
+### Compendium entry (`compendium_entry`) — owner compendium
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id | ID | `ctx.ids` | CMP §8 |
+| campaignId | ID → Campaign \| null | null = imported (global, read-only); else homebrew | FR-CMP-02 |
+| kind | `monster` \| `spell` \| `item` \| `condition` \| `feature` | Immutable; homebrew never `monster` | FR-CMP-01, -02 |
+| source, sourceKey | text → `compendium_source.key` \| null, text \| null | Both or neither; `sourceKey` `<kind>/<slug>[/…]` | FR-CMP-02 |
+| name, nameKey | text 1–80, text | `nameKey` = trimmed lower-case NFC | FR-CMP-02 |
+| line | text ≤ 80 | `entryLine`, derived at write | CMP §8 |
+| facets, body | **JSON leaves** | Per kind (`kindRegistry`, `@shared/compendium/schemas`); facets + body ≤ 32 KB | FR-CMP-01 |
+| searchText | text | Lower-case name + line + body strings (not `preset` / `presetKey`), `*` / `\|` dropped | FR-CMP-10 |
+| dataHash | text | SHA-256 of the sorted-key JSON of the entry draft: upsert change detection | FR-CMP-07 |
+| definitionId | ID → Entity \| null | Monster entries: the imported creature definition with the same `(source, sourceKey)` | FR-CMP-03 |
+| shared | bool, default false | Homebrew only | FR-CMP-24 |
+| derivedFromId | ID \| null | Informational, no FK | CMP §8 |
+| createdAt, updatedAt, importedAt | timestamp ×2, timestamp \| null | `importedAt` on imported rows only | CMP §8 |
+
+Indexes: unique `compendium_entry_source_key` (`source`, `source_key`); unique `compendium_entry_campaign_kind_name` (`campaign_id`, `kind`, `name_key`) where `campaign_id is not null`; `compendium_entry_kind_name`, `compendium_entry_campaign`.
+
+- **Imported definitions** (`entity`, no column change): a changed one is now **updated in place** (same id) on re-import and its instances refreshed by the definition-changed hooks (FR-CMP-08); derived customs, homebrew, clones and NPC sheets never change (FR-CMP-09). Entries missing from a newer source stay.
+- **Snapshot size** (CON-44): compendium rows are in no snapshot (asserted on the `compendium` bundle: no entry text in any DM or player frame). Until C2 makes `imported-entity` lazy, the mini set's 5 SRD definitions are in the DM snapshot: `compendium` bundle DM 15,869 B, `imported-entity` 7 rows / 7,788 B (2 fixture + 5 SRD); players 0 rows (max 2,696 B). C1 has no route, so a full import (322 definitions, +341 KB) can't reach a real DM snapshot before C2.
+- **Import timing** (FR-CMP-31, `import.test.ts`, Windows dev box): full `srd-5.1` (1,150 entries + 322 definitions) 0.7–1.1 s; unchanged re-import 0.3–0.5 s with no writes (`total_changes()` unchanged).
+
+## 35. Sprint 3: trigger presets + fixtures (R5)
+
+From [effect-modifiers](../specs/effect-modifiers.md#82-records) sprint 3. **Built by `build/trigger-presets`** (R5): no schema change, no new record type. Protocol side: [protocol §48](../protocol/README.md#48-sprint-3-trigger-presets--fixtures-r5).
+
+| Row / leaf | Change | Source |
+|---|---|---|
+| `effect_preset.modifiers` | 1–6 for character presets; **0–6 for campaign presets** (0 = a mark, named by a `targetMarked` filter); zod `EffectPresetRecord` refines it | FR-MOD-05 (#209) |
+| `effect.modifiers` of a `hunters-mark` effect | `[]` for new applies (the built-in is a mark); rows applied before keep their +1d6 | FR-MOD-05, OQ-MOD-27 |
+| `rule_trigger.rule` | `on: roll` with `every: {feature}` no longer parses (`TriggerRule`); hit triggers unchanged | #223 |
+| `trigger_use` (roll) | unchanged; the part's `roll_id` is a manual row when a `t:` group was sent | FR-MOD-18, #224 |
+
+- **Fixtures:** `trg-thorn` writes Thorn's `classes` (derived `level` 5, `className` Rogue) and one `rule_trigger`; `trg-monsters` two definition `rule_trigger` rows (the Wolf's on an imported definition, keyed per campaign).
+- **CON-44:** unchanged (no new record or field; `rule-trigger` is lazy, [§30](#30-sprint-3-rule-trigger-engine-r4)).
+
+## 36. Sprint 3: dynamic vision server + Invisible (V2)
+
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V2). **Built by `build/vision-server`**: no new table or column; V2 writes [§26](#26-sprint-3-vision-core-v0)'s per-player fields by sight. Protocol side: [protocol §49](../protocol/README.md#49-sprint-3-dynamic-vision-server--invisible-v2).
+
+| Field | Written by (V2) | Rule | Source |
+|---|---|---|---|
+| `token.seenBy`, `prop.seenBy`, `aoe_template.seenBy`, `scene_structure.doorSeen` | `derive` before every subject write; every re-derive (protocol §46 triggers) | P ∈ `seenBy` iff P is not blind and a sample point is statically clear outside darkness, or inside one of P's sight polygons (a polygon without see-through never counts in darkness). Owned token: owner + every non-blind player. Unowned **invisible** token: only players with a Sees-invisible polygon over a sample point (static clear, Explored and memory never count). Player-placed template: every player. A player without sources: the static rule (sprint 2) | FR-FOG-10, -34, -36, -46 |
+| `fogged` (same rows), door `f` | as above | Unowned: seen by nobody (statically hidden while the campaign has no players; an unowned invisible token: true then). Owned: statically hidden | FR-FOG-10 |
+| `token.invisible` | `fog.setInvisible` (DM); `map.duplicateToken` copies it; placement false | bool; DM wire only, never a player's | FR-FOG-45 |
+| `scene_fog.darkness[].seenBy` | every re-derive | + the players whose sight polygons meet the shape's bounding box (V1's static part kept) | FR-FOG-44 |
+| `scene_fog.visionStale` | senses edit / player add → true on non-active scenes with a fog row; the activation re-derive and any full scene re-derive → false | — | FR-FOG-35 |
+| `fog_explored` (one row per scene × player) | every re-derive on the **active** scene with `explored` on, for the players it lists | the stored cells OR the cells whose centre lies in one of P's polygons (`see` or `dark`); box = the scene's fog box (rebased); never shrinks; > 2,000 runs → not written (`warn`) | FR-FOG-37 |
+
+- **Sources** (FR-FOG-32): tokens with `ownerPlayerId` of a campaign player, not `hidden`; per player oldest `seq` first, ≤ 4 (more → `warn`, ignored); senses = the definition's `statBlock.senses` (absent = 0); origin = footprint centre.
+- **Derived** (not stored): each player's sight (`see` / `dark` polygons, `blind`, `inv`), the `vision` record; the vision cache (server memory, per connection, LRU 256, written after commit).
+- **CON-44** (#208, `con44.test.ts`, measured): with no senses, V0's heavy figures stand (DM 673,475 B; players 278,689–281,749 B). With real sight at caps on the heavy battle scene (one player at 4 sources, see r 12 / dark r 24, 300 walls): DM 681,447 B (the 300-wall structure row and 4 tokens; 367,129 B left of 1 MiB), players ≤ 283,929 B of 512 KiB, that player's `vision` 7,789 B (≤ 48 KiB), the View-as ack with memory at the run cap 14,033 B (≤ 48 KiB). A source move at those caps (server: derive, write, re-derive, memory, log): median ≈ 7–8 ms.
+
+## 37. Sprint 3: party board handouts (P2)
+
+From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Built by `build/party-handouts`**: no new table, column or record type. Protocol side: [protocol §50](../protocol/README.md#50-sprint-3-party-board-handouts-p2).
+
+- **Notification rows:** kind `handout-shared` in `notification` (payload `{handoutId}`, state `info`, audience `all` or `player`; FR-PARTY-06). The row and its handout id stay after an unshare or delete (OQ-PARTY-15); the handout's records still leave the player.
+- **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab: handouts | inventory}` (FR-PARTY-11); the viewer's selected handout + mode (page memory).
+- **Derived (client, `@ui/features/party-board/logic`):** DM order newest `seq`, player order newest `sharedAt`; mark New (never opened) / Updated (`rev` > seen rev); share label (`@shared/party-board/format`); launcher activity.
+- **Fixtures:** `handouts-1` now also writes 3 `handout-shared` rows through its shares: h1 `all`, h2 `player` player-1, h4 `all` (kept after h4's unshare); `party-second` 1 (`all`, Second Campaign).
+- **CON-44:** no new snapshot bytes in the worst case: notifications stay within NOTE's 100-row window, and a `handout-shared` row (text ≤ 93 chars, payload ≈ 51 B) is smaller than the heavy harness's damage-card rows that fill it; PARTY's CON-44 test unchanged (+1,100 B, DM 673,998 B).
+
+## 38. Sprint 3: effect modifiers tier 2 client (R2)
+
+From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) tier 2 + T (MOD, `complete`). **Built by `fix/mod-roll-preview`** (R2): no table, column or record type change. Protocol side: [protocol §51](../protocol/README.md#51-sprint-3-effect-modifiers-tier-2-client-r2).
 
 | Table / leaf | Change | Visibility | Source |
 |---|---|---|---|

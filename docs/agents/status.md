@@ -8,21 +8,21 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| V2 vision server + Invisible | `build/vision-server` (w4B) | build-vision-server | Building | Walkthrough → V3 |
-| V4 freeform walls + red hint | `build/walls-freeform` (w4C, slot 6) | test-walls-freeform (port 4163) | Built (+ BL-12 fixed); walkthrough S1–S4 on `scene-tools` | Merge → V3 |
-| R2 tier 2 client | `fix/mod-roll-preview` (w4D) | build-mod-roll-preview | Building | Walkthrough |
-| R3 tier 3 uses | `build/mod-tier3` (w4A, slot 4) | — | Built; walkthrough next free slot (Rage feature added on `effect-modifiers`) | Merge → R6 |
-| C1 compendium core | `fix/cmp-core` (w4E) | build-cmp-core | Building | Review → C2 (after R7), C3, D2 |
-| Merged so far | — | — | P core (c58470c), D1 (#214), D3 (#217), V0 (#216), V5 (#219), lazy-records (#218), R0 (#220), R1 (#222), V1 + empty-event fix + R4 (#223); early slices rt-shared, cmp-data (#213), party-shared; BL-06, BL-02, BL-11 | — |
-| Queue | — | — | V3 (after V2 + V4, canvas 3rd); R5 → R6 (sheet) → R7 (combat); C1 (after P core) → C2 → C3, C4; P2 ∥ P3 → P4; D2 (after C1), D4 (sheet, after C2) | Locks below |
-| Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | BL-06, BL-02, BL-11 done; open BL-01, 03–05, 07, 08, 10, 12–14 | Per §3a |
+| V3 vision client | `build/vision-client` (w4K) | build-vision-client | Building (canvas lock 3rd) | Walkthrough FOG §13 + CHARX 14 |
+| D2 dice looks | `fix/dicex-look-core` (w4J) | build-dicex-look-core | Building (schema 5th) | Walkthrough step 6 |
+| R2 tier 2 client | `fix/mod-roll-preview` (w4D) | fix-mod-roll-preview | Fixing (hidden adv/dis ruling) | Re-test steps 4, 7 → merge → R7 |
+| P2 handouts UI | `build/party-handouts` (w4G) | fix-party-handouts | Walkthrough 10/11; fixing board placement | Merge → P3 |
+| R6 sheet Triggers UI | `build/mod-sheet-ui` (w4H) | — | Built | Walkthrough (next slot) → merge → C2 sheet slot |
+| Merged so far | — | — | V2 (#228), R5 (#227), C1 (#226), R3 (#225), V4 (#224), P core, R4 + V1 + empty-event fix (#223), R1 (#222), R0 (#220), V5 (#219), lazy-records (#218), D3 (#217), V0 (#216), D1 (#214), early slices (#212, #213) | — |
+| Queue | — | — | R7 (after R2; brief ready); P3; C2 (after R6 + R7) → C3, C4; D4 (sheet, after C2); P4 (last) | Locks below |
+| Backlog (BL-nn), downtime only | — | — | Done: BL-02, 06, 11, 12, 13; BL-14 → R7 | Per §3a |
 
 ## Shared-file locks
 
 - `build/vision-server` (V2): scenes-map registry lines, entities definition hook line, player-hooks line, combat `join.ts` (Start / Add dependants), bundles index.
-- `build/walls-freeform` (V4): canvas lock 2nd (then V3).
 - `fix/mod-roll-preview` (R2): dice-roll-log client folder, dice-extras tray-extras line, DM popup files (not with R7), roll-intent `manualParts` pass-through.
-- `build/mod-tier3` (R3): character-sheet folder (sheet lock 2nd; `resources.ts`).
+- `build/party-handouts` (P2): kinds.ts line, notification-views lines, windows.ts lines.
+- `build/trigger-presets` (R5): fixtures index lines.
 - Next: schema P core → C1 → D2; canvas V4 → V3; sheet R3 → R6 → C2 → D4 → P4 / C4; combat R7 → C2.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
 

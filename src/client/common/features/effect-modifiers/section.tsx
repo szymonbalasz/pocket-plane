@@ -2,16 +2,28 @@
 // characters. Active: every effect on the character (conditions, custom, concentration) with
 // rounds left and its modifier parts in words; DM: Modifiers… (custom), End; owner: End own
 // concentration. Toggles: the character's presets as switches (owner, DM; also on a locked
-// sheet). Presets: New, Start from ▸, Edit, Delete (owner unless locked, DM). Store reads only.
+// sheet); tier 3: uses left "2 / 3" or "Uses link broken", DM "Force on" at 0 (FR-MOD-12).
+// Presets: New, Start from ▸ (keeps the built-in as `originKey`), Edit, Delete (owner unless
+// locked, DM). Store reads only.
 
-import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
+import type { FeatureRow } from "@shared/character-sheet/sheet";
 import { CBTX_INTENTS } from "@shared/combat-extras/intents";
 import { effectName } from "@shared/combat-extras/rules";
 import type { EffectView } from "@shared/combat-extras/schemas";
 import { MOD_INTENTS } from "@shared/effect-modifiers/intents";
 import { builtinPresets } from "@shared/effect-modifiers/presets";
-import { choiceValue, presetChoices, toggleOn } from "@shared/effect-modifiers/rules";
-import type { EffectPresetRecord } from "@shared/effect-modifiers/schemas";
+import {
+  choiceValue,
+  type PresetChoice,
+  presetChoices,
+  presetUses,
+  toggleOn,
+} from "@shared/effect-modifiers/rules";
+import {
+  type BuiltinPresetKey,
+  type EffectPresetRecord,
+  isBuiltinPresetKey,
+} from "@shared/effect-modifiers/schemas";
 import {
   ChevronRightIcon,
   PencilIcon,
@@ -46,7 +58,7 @@ import {
 import { useStartedEncounter } from "../combat-tracker/store";
 import { modifiersText } from "./describe";
 import { blankPreset, EffectModifiersDialog, PresetDialog, type PresetDraft } from "./dialogs";
-import { presetsIn, useModIntent } from "./store";
+import { presetsIn, sheetIn, useModIntent } from "./store";
 
 function Block({
   title,
@@ -77,7 +89,16 @@ const draftFromRow = (p: EffectPresetRecord): PresetDraft => ({
   durationRounds: p.durationRounds,
   concentration: p.concentration,
   note: p.note,
+  usesFeatureId: p.usesFeatureId,
 });
+
+/** FR-MOD-36: the built-in a "Start from" entry stands for (a campaign preset: its own origin). */
+const originOf = (c: PresetChoice): BuiltinPresetKey | null =>
+  c.source !== "campaign"
+    ? c.key
+    : isBuiltinPresetKey(c.preset.originKey)
+      ? c.preset.originKey
+      : null;
 
 function ActiveRow({
   e,
@@ -145,8 +166,28 @@ function ActiveRow({
   );
 }
 
-function ToggleRow({ p, on, may }: { p: EffectPresetRecord; on: boolean; may: boolean }) {
+function ToggleRow({
+  p,
+  on,
+  may,
+  isDm,
+  features,
+}: {
+  p: EffectPresetRecord;
+  on: boolean;
+  may: boolean;
+  isDm: boolean;
+  features: readonly FeatureRow[] | undefined;
+}) {
   const { send, disabled } = useModIntent();
+  const uses = presetUses(p, features);
+  const toggle = (v: boolean, force?: true) =>
+    void send(MOD_INTENTS.toggle, {
+      characterId: p.characterId,
+      presetId: p.id,
+      on: v,
+      ...(force ? { force } : {}),
+    });
   return (
     <div className="flex items-center gap-2 text-sm">
       {/* Radix owns the Switch's own `data-state` (checked / unchecked): the wrapper carries ours. */}
@@ -160,15 +201,50 @@ function ToggleRow({ p, on, may }: { p: EffectPresetRecord; on: boolean; may: bo
           aria-label={`${p.name} ${on ? "on" : "off"}`}
           checked={on}
           disabled={!may || disabled}
-          onCheckedChange={(v) =>
-            void send(MOD_INTENTS.toggle, { characterId: p.characterId, presetId: p.id, on: v })
-          }
+          onCheckedChange={(v) => toggle(v)}
         />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate">{p.name}</div>
+        <div className="truncate">
+          {p.name}
+          {uses?.state === "ok" && (
+            <span
+              data-testid="mod-toggle-uses"
+              data-record-id={p.id}
+              data-state="ok"
+              data-value={`${uses.left}/${uses.max}`}
+              className="text-muted-foreground"
+            >
+              {" "}
+              {uses.left} / {uses.max}
+            </span>
+          )}
+        </div>
+        {uses?.state === "broken" && (
+          <div
+            data-testid="mod-toggle-uses"
+            data-record-id={p.id}
+            data-state="broken"
+            className="text-xs text-destructive"
+          >
+            Uses link broken
+          </div>
+        )}
         <div className="text-xs text-muted-foreground">{modifiersText(p.modifiers)}</div>
       </div>
+      {isDm && !on && uses?.state === "ok" && uses.left === 0 && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 px-2 text-xs"
+          data-testid="mod-toggle-force"
+          data-record-id={p.id}
+          disabled={disabled}
+          onClick={() => toggle(true, true)}
+        >
+          Force on
+        </Button>
+      )}
     </div>
   );
 }
@@ -187,9 +263,7 @@ export function ActiveEffectsSection({
   const you = store.you;
   const isDm = you?.role === "dm";
   const owner = characterOf(store, creatureId)?.ownerPlayerId === you?.playerId && !isDm;
-  const sheet = (
-    Object.values(store.records[CREATURE_SHEET_TYPE] ?? {}) as CreatureSheetRecord[]
-  ).find((s) => s.entityId === creatureId);
+  const sheet = sheetIn(store, creatureId);
   const mayToggle = isDm || owner;
   const mayEditPresets = isDm || (owner && !sheet?.locked);
   const round = enc?.round ?? null;
@@ -199,9 +273,11 @@ export function ActiveEffectsSection({
   // "Start from ▸": the DM's preset list (customised + built-in + campaign); players the built-ins.
   const from = (
     p: Pick<PresetDraft, "name" | "modifiers" | "durationRounds" | "concentration" | "note">,
+    originKey: BuiltinPresetKey | null,
   ): PresetDraft => ({
     characterId: creatureId,
     key: null,
+    originKey,
     name: p.name,
     modifiers: p.modifiers,
     durationRounds: p.durationRounds,
@@ -211,10 +287,10 @@ export function ActiveEffectsSection({
   const choices = isDm
     ? presetChoices(all).map((c) => ({
         value: choiceValue(c),
-        draft: from(c.preset),
+        draft: from(c.preset, originOf(c)),
         label: c.source === "customised" ? `${c.preset.name} (Customised)` : c.preset.name,
       }))
-    : builtinPresets().map((b) => ({ value: b.key, draft: from(b), label: b.name }));
+    : builtinPresets().map((b) => ({ value: b.key, draft: from(b, b.key), label: b.name }));
   return (
     <div data-testid="mod-section" className="grid gap-3 p-2">
       <Block title="Active" testId="mod-active-block">
@@ -240,7 +316,14 @@ export function ActiveEffectsSection({
           </p>
         ) : (
           toggles.map((p) => (
-            <ToggleRow key={p.id} p={p} on={toggleOn(p, effects)} may={mayToggle} />
+            <ToggleRow
+              key={p.id}
+              p={p}
+              on={toggleOn(p, effects)}
+              may={mayToggle}
+              isDm={isDm}
+              features={sheet?.features}
+            />
           ))
         )}
       </Block>

@@ -159,8 +159,18 @@ export type Modifier = z.infer<typeof Modifier>;
 
 /** An effect's list (FR-MOD-03): 0–6, default `[]`. */
 export const Modifiers = z.array(Modifier).max(MODIFIERS_MAX);
-/** A preset's list (MOD §8.2): 1–6. */
-export const PresetModifiers = z.array(Modifier).min(1).max(MODIFIERS_MAX);
+/**
+ * A preset's list (MOD §8.2): 1–6; 0 only for a campaign **mark** (FR-MOD-05, #209), so the
+ * preset schemas refine it with `presetModifiersIssue`.
+ */
+export const PresetModifiers = Modifiers;
+export const CHARACTER_PRESET_EMPTY = "A character preset needs at least one modifier";
+/** FR-MOD-05: character presets need ≥ 1 modifier; a campaign preset with 0 is a mark. */
+export const presetModifiersIssue = (p: {
+  characterId: string | null;
+  modifiers: readonly unknown[];
+}): string | null =>
+  p.characterId !== null && p.modifiers.length === 0 ? CHARACTER_PRESET_EMPTY : null;
 
 /**
  * `RollSubject.row` (FR-MOD-13, #209): the attack / spell row's name. Attack rows are ≤ 40,
@@ -253,6 +263,8 @@ export const EffectPresetRecord = EffectPresetRecordShape.superRefine((r, ctx) =
   } else if (r.key !== null) {
     issue("Key on campaign presets only");
   }
+  const empty = presetModifiersIssue(r);
+  if (empty) issue(empty);
   if (r.key !== null && r.originKey !== null) issue("A customised built-in has no origin");
 });
 export type EffectPresetRecord = z.infer<typeof EffectPresetRecordShape>;

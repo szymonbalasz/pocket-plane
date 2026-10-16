@@ -85,13 +85,13 @@ describe("FR-MOD-14 parts from active effects", () => {
       { effectId: expect.any(String), label: "Rage", public: true, value: 2 },
     ]);
     expect(dmg("spell")).toEqual([]);
-    t.apply({ targets: [{ characterId: t.thornId }], preset: { key: "hunters-mark" } });
+    t.d6OnThorn();
     expect(dmg("weapon")?.map((p) => p.label)).toEqual(["Rage", "Hunter's Mark"]);
   });
 
   test("FR-MOD-14 crit: bonus damage dice double, flat bonuses don't", () => {
     const t = modSetup();
-    t.apply({ targets: [{ characterId: t.thornId }], preset: { key: "hunters-mark" } });
+    t.d6OnThorn();
     const rage = t.put(t.from("rage", { characterId: t.thornId }), t.p2);
     t.toggle(t.thornId, rage, true, t.p2);
     const r = t.roll(

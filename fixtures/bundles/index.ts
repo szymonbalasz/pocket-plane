@@ -8,6 +8,7 @@ import characterSheet from "./character-sheet";
 import characterSheetFull from "./character-sheet-full";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
+import compendium from "./compendium";
 import diceExtras from "./dice-extras";
 import diceLog from "./dice-log";
 import effectModifiers from "./effect-modifiers";
@@ -18,11 +19,13 @@ import midCombat from "./mid-combat";
 import notifications from "./notifications";
 import partyBoard from "./party-board";
 import partyLoot from "./party-loot";
+import ruleTriggers from "./rule-triggers";
 import sceneTools from "./scene-tools";
 import sceneToolsProps from "./scene-tools-props";
 import scenes from "./scenes";
 import sessionSim from "./session-sim";
 import syncProbe from "./sync-probe";
+import vision from "./vision";
 
 export const bundles: readonly Bundle[] = [
   base,
@@ -48,4 +51,7 @@ export const bundles: readonly Bundle[] = [
   fogScn,
   diceExtras,
   partyBoard,
+  compendium,
+  ruleTriggers,
+  vision,
 ];

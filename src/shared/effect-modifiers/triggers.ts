@@ -143,7 +143,15 @@ function checkCombination(r: RuleShape, ctx: z.RefinementCtx): void {
   if (r.on === "turnStart" && r.every !== "each") {
     issue(["every"], "Turn start reminders fire every time (each)");
   }
+  // Documented limitation (#223): a roll's event can't list the sheet spend a use needs.
+  if (r.on === "roll" && typeof r.every === "object") {
+    issue(["every"], ROLL_FEATURE_UNSUPPORTED);
+  }
 }
+
+/** #223: `roll` triggers can't spend a feature use (yet); hit triggers can. */
+export const ROLL_FEATURE_UNSUPPORTED =
+  "Roll triggers can't spend feature uses: pick each, turn, round or encounter";
 
 const ruleFields = { on: TriggerEvent, every: TriggerEvery, then: TriggerEffect };
 

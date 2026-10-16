@@ -23,6 +23,9 @@ import combatPending from "./combat-tracker/combat-pending";
 import encounter1 from "./combat-tracker/encounter-1";
 import goblin2 from "./combat-tracker/goblin-2";
 import thornBattlemap from "./combat-tracker/thorn-battlemap";
+import cmpHomebrew from "./compendium/cmp-homebrew";
+import cmpHomebrewSecond from "./compendium/cmp-homebrew-second";
+import cmpSrdMini from "./compendium/cmp-srd-mini";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
 import diceSettings from "./dice-roll-log/dice-settings";
 import rolls1 from "./dice-roll-log/rolls-1";
@@ -34,6 +37,8 @@ import modRage from "./effect-modifiers/mod-rage";
 import modTier2 from "./effect-modifiers/mod-tier2";
 import trgBrakka from "./effect-modifiers/trg-brakka";
 import trgCombat from "./effect-modifiers/trg-combat";
+import trgMonsters from "./effect-modifiers/trg-monsters";
+import trgThorn from "./effect-modifiers/trg-thorn";
 import charMira from "./entities/char-mira";
 import charThorn from "./entities/char-thorn";
 import enemy1 from "./entities/enemy-1";
@@ -43,6 +48,7 @@ import enemyCustomSecond from "./entities/enemy-custom-second";
 import fogAmbush from "./fog-of-war/fog-ambush";
 import fogAmbushPartial from "./fog-of-war/fog-ambush-partial";
 import fogScn from "./fog-of-war/fog-scn";
+import visionCrypt from "./fog-of-war/vision-crypt";
 import syncProbes from "./live-sync/sync-probes";
 import notificationsTest from "./notifications/notifications-test";
 import handoutImages from "./party-board/handout-images";
@@ -118,8 +124,14 @@ export const units: readonly Fixture[] = [
   charBrakka,
   trgBrakka,
   trgCombat,
+  trgThorn,
+  trgMonsters,
   handoutImages,
   handouts1,
   partyItems1,
   partySecond,
+  cmpSrdMini,
+  cmpHomebrew,
+  cmpHomebrewSecond,
+  visionCrypt,
 ];
