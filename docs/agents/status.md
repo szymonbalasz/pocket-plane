@@ -8,13 +8,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| V2 vision server + Invisible | `build/vision-server` (w4B, slot 0) | test-vision-server (port 4103) | Built (+ BL-13); walkthrough on `vision` | Merge → V3 |
-| R2 tier 2 client | `fix/mod-roll-preview` (w4D) | fix-mod-roll-preview | Walkthrough 7/9; fixing steps 4, 7 + flat entered dice | Re-test → merge → R7 popup |
-| R6 sheet Triggers UI | `build/mod-sheet-ui` (w4H) | build-mod-sheet-ui | Building (sheet lock 3rd) | Walkthrough → C2 sheet slot |
-| P2 handouts UI | `build/party-handouts` (w4G, slot 5) | test-party-handouts (port 4153) | Built; walkthrough (steps 1–6, 11–13) | Merge → P3 |
-| Merged so far | — | — | R5 (#227), C1 (#226), R3 (#225), V4 (#224), P core, R4 + V1 + empty-event fix (#223), R1 (#222), R0 (#220), V5 (#219), lazy-records (#218), D3 (#217), V0 (#216), D1 (#214), early slices (#212, #213) | — |
-| Queue | — | — | V3 (after V2); R7 (after R5 + R2); D2 (schema 5th, now free); P3; C2 (after R6 + R7) → C3, C4; D4 (sheet, after C2); P4 (last) | Locks below |
-| Backlog (BL-nn), downtime only | — | — | Done: BL-02, 06, 11, 12; BL-13 in V2; BL-14 cause found | Per §3a |
+| V3 vision client | `build/vision-client` (w4K) | build-vision-client | Building (canvas lock 3rd) | Walkthrough FOG §13 + CHARX 14 |
+| D2 dice looks | `fix/dicex-look-core` (w4J) | build-dicex-look-core | Building (schema 5th) | Walkthrough step 6 |
+| R2 tier 2 client | `fix/mod-roll-preview` (w4D) | fix-mod-roll-preview | Fixing (hidden adv/dis ruling) | Re-test steps 4, 7 → merge → R7 |
+| P2 handouts UI | `build/party-handouts` (w4G) | fix-party-handouts | Walkthrough 10/11; fixing board placement | Merge → P3 |
+| R6 sheet Triggers UI | `build/mod-sheet-ui` (w4H) | — | Built | Walkthrough (next slot) → merge → C2 sheet slot |
+| Merged so far | — | — | V2 (#228), R5 (#227), C1 (#226), R3 (#225), V4 (#224), P core, R4 + V1 + empty-event fix (#223), R1 (#222), R0 (#220), V5 (#219), lazy-records (#218), D3 (#217), V0 (#216), D1 (#214), early slices (#212, #213) | — |
+| Queue | — | — | R7 (after R2; brief ready); P3; C2 (after R6 + R7) → C3, C4; D4 (sheet, after C2); P4 (last) | Locks below |
+| Backlog (BL-nn), downtime only | — | — | Done: BL-02, 06, 11, 12, 13; BL-14 → R7 | Per §3a |
 
 ## Shared-file locks
 
