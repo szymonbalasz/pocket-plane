@@ -13,6 +13,7 @@ import {
   type SignalFrom,
   type SnapshotFrame,
 } from "@shared/protocol/frames";
+import { LoadPayload, SYNC_LOAD } from "@shared/protocol/lazy";
 import { LoadScenePayload, SYNC_LOAD_SCENE } from "@shared/protocol/scene-window";
 import { CommandError, zodIssues } from "../commands/errors";
 import type { DispatchedEvent, RecordChange, Role } from "../events/types";
@@ -315,6 +316,7 @@ export class Hub implements HubApi {
   }
 
   private intent(c: Connection, intentId: string, name: string, payload: unknown): undefined {
+    if (name === SYNC_LOAD && c.role) return this.load(c, intentId, payload);
     if (c.phase !== "live" || !c.role) {
       return this.reject(c, intentId, "invalid", "Connection not live");
     }
@@ -376,6 +378,48 @@ export class Hub implements HubApi {
       return this.reject(c, intentId, "internal", "Internal error");
     }
     this.send(c, { type: "ack", intentId, result: { records } });
+  }
+
+  /**
+   * `sync.load {type, ids?}` (ADR-0045, FR-SYNC-31–33): DM and player, read-only, no bus, DB
+   * write, log or `seq`. Read at once and answered in this connection's frame order: changes
+   * committed before the read already went out as events, later ones follow as events. While a
+   * snapshot is between read and send (`resync`, FR-SYNC-26's pause), the answer queues behind
+   * the events already pending, so nothing is lost or duplicated (as FR-SYNC-10).
+   */
+  private load(c: Connection, intentId: string, payload: unknown): undefined {
+    const answer = (frame: ServerFrame): undefined => {
+      if (c.phase === "snapshotting") c.pending.push(() => this.send(c, frame));
+      else this.send(c, frame);
+    };
+    const reject = (
+      code: RejectFrame["code"],
+      message: string,
+      issues?: RejectFrame["issues"],
+    ): undefined => {
+      const f: RejectFrame = { type: "reject", intentId, code, message };
+      if (issues) f.issues = issues;
+      return answer(f);
+    };
+    const parsed = LoadPayload.safeParse(payload);
+    if (!parsed.success) return reject("invalid", "Invalid payload", zodIssues(parsed.error));
+    const { type, ids } = parsed.data;
+    const def = this.s.records.get(type);
+    if (!def) return reject("invalid", `Unknown record type "${type}"`);
+    if (def.lazy === undefined) return reject("invalid", `Record type "${type}" is not lazy`);
+    if (def.lazy === "ids" && ids === undefined) {
+      return reject("invalid", `Record type "${type}" loads by ids only`);
+    }
+    if (def.audience === "dm" && c.role !== "dm") return reject("forbidden", "Not allowed");
+    let records: Record<string, unknown[]>;
+    try {
+      const src = { db: this.s.db, presence: this.presenceView() };
+      records = this.s.records.load(src, this.viewer(c), type, ids);
+    } catch (err) {
+      this.s.log.error(`${SYNC_LOAD} ${type} failed for ${c.connId}`, err);
+      return reject("internal", "Internal error");
+    }
+    return answer({ type: "ack", intentId, result: { records } });
   }
 
   /**

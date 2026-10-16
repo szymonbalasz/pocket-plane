@@ -3,6 +3,14 @@
 import { CloseCode } from "@shared/protocol/codes";
 import type { Credential, ServerFrame } from "@shared/protocol/frames";
 import {
+  applyLoad,
+  emptyLoaded,
+  type LoadedSet,
+  LoadResult,
+  markLoaded,
+  SYNC_LOAD,
+} from "@shared/protocol/lazy";
+import {
   dropTypes,
   LoadSceneResult,
   mergeRecords,
@@ -43,6 +51,13 @@ export interface TestClient {
   loadViewAs(sceneId: string, playerId: string, intentId?: string): string;
   /** The loaded View-as pair (reset by a snapshot). */
   viewAs: ViewAsPair | null;
+  /**
+   * Sends `sync.load {type, ids?}` (ADR-0045); its ack replaces the type's rows / those ids in
+   * `store` and marks them in `lazy`, like the client does. No chunking. Returns the intentId.
+   */
+  load(type: string, ids?: string[], intentId?: string): string;
+  /** Lazy types / ids loaded since the last snapshot (a snapshot resets it, FR-SYNC-37). */
+  lazy: LoadedSet;
   /** Next unread frame (optionally of a type), waiting up to `ms`. */
   next<T extends ServerFrame["type"]>(
     type?: T,
@@ -67,6 +82,7 @@ export async function connectClient(
   const loads = new Map<string, string>();
   const viewAsLoads = new Map<string, ViewAsPair>();
   let viewAsTypes: string[] = [];
+  const lazyLoads = new Map<string, { type: string; ids?: string[] }>();
   const client: TestClient = {
     frames,
     store: emptyStore(),
@@ -95,6 +111,11 @@ export async function connectClient(
       return client.intent(SYNC_LOAD_SCENE, { sceneId, viewAs: playerId }, intentId);
     },
     viewAs: null,
+    load(type, ids, intentId = crypto.randomUUID()) {
+      lazyLoads.set(intentId, ids === undefined ? { type } : { type, ids });
+      return client.intent(SYNC_LOAD, ids === undefined ? { type } : { type, ids }, intentId);
+    },
+    lazy: emptyLoaded(),
     async next(type, ms = 2000) {
       const deadline = Date.now() + ms;
       for (;;) {
@@ -133,6 +154,15 @@ export async function connectClient(
       client.loadedScenes = [];
       client.viewAs = null;
       viewAsTypes = [];
+      client.lazy = emptyLoaded();
+    } else if (f.type === "ack" && lazyLoads.has(f.intentId)) {
+      // Applied even when answered after a newer snapshot: the hub read it after that
+      // snapshot's read, in frame order (the client drops it instead and reloads).
+      const req = lazyLoads.get(f.intentId) as { type: string; ids?: string[] };
+      lazyLoads.delete(f.intentId);
+      const records = LoadResult.parse(f.result).records;
+      client.store = applyLoad(client.store, req.type, req.ids, records);
+      client.lazy = markLoaded(client.lazy, req.type, req.ids);
     } else if (f.type === "ack" && viewAsLoads.has(f.intentId)) {
       const pair = viewAsLoads.get(f.intentId) as ViewAsPair;
       viewAsLoads.delete(f.intentId);
@@ -149,6 +179,7 @@ export async function connectClient(
     } else if (f.type === "reject" && f.intentId !== null) {
       loads.delete(f.intentId);
       viewAsLoads.delete(f.intentId);
+      lazyLoads.delete(f.intentId);
     } else if (f.type === "event") {
       const r = applyEvent(client.store, f);
       if (r.ok) client.store = r.store;

@@ -1,4 +1,6 @@
 // Record-type registry with visibility (SYNC §8, FR-SYNC-09/18/19). Default deny.
+
+import { LAZY_MODES, type LazyMode } from "@shared/protocol/lazy";
 import {
   DM_WINDOW_ACTIVE_SCENE,
   DM_WINDOW_VIEW_AS,
@@ -80,6 +82,17 @@ export interface RecordTypeDef<R> {
    * one player's rows of one scene. Live events and players are unchanged either way.
    */
   dmWindow?: DmWindow;
+  /**
+   * Lazy type (ADR-0045, FR-SYNC-30): campaign or global scope only, never with `window` /
+   * `dmWindow`. Omitted from every snapshot (DM included); loaded with `sync.load {type, ids?}`.
+   * `all`: whole-type and id loads; `ids`: id loads only. Live events unchanged.
+   */
+  lazy?: LazyMode;
+  /**
+   * Optional id-load provider (`sync.load {ids}`): rows among `ids` (pre-filter; may include
+   * other campaigns' rows, the scope gate filters). Absent → `snapshot` rows filtered by id.
+   */
+  byIds?(src: SnapshotSource, v: Viewer, ids: readonly string[]): R[];
 }
 
 /** Active scene id of a campaign, or null (CON-22). Must be a cheap in-memory read. */
@@ -140,6 +153,19 @@ export class RecordRegistry {
       }
       if (def.scope !== "scene") {
         throw new Error(`Record type "${def.type}" dmWindow needs scope scene (ADR-0041)`);
+      }
+    }
+    if (def.lazy !== undefined) {
+      if (!(LAZY_MODES as readonly string[]).includes(def.lazy)) {
+        throw new Error(`Record type "${def.type}" lazy must be one of ${LAZY_MODES.join(", ")}`);
+      }
+      if (def.scope === "scene") {
+        throw new Error(
+          `Record type "${def.type}" lazy needs scope campaign or global (scene types use dmWindow, ADR-0045)`,
+        );
+      }
+      if (def.window || def.dmWindow !== undefined) {
+        throw new Error(`Record type "${def.type}" lazy excludes window / dmWindow (ADR-0045)`);
       }
     }
     if (def.window) {
@@ -209,6 +235,11 @@ export class RecordRegistry {
    */
   dmWindowScene(v: Viewer): string | null {
     return v.role === "dm" ? this.activeSceneOf(v.campaignId) : null;
+  }
+
+  /** Types registered `lazy` (ADR-0045). */
+  lazyTypes(): AnyRecordType[] {
+    return [...this.types.values()].filter((d) => d.lazy !== undefined);
   }
 
   get(type: string): AnyRecordType | undefined {
@@ -354,6 +385,35 @@ export class RecordRegistry {
   }
 
   /**
+   * `sync.load` result (ADR-0045, FR-SYNC-32): every row of a lazy type (`ids` undefined) or
+   * the rows among `ids`, through the scope gate and the visibility fn exactly as a snapshot
+   * would send them. Ids not visible or not existing are simply absent. The caller validates
+   * the type, mode and audience (FR-SYNC-31).
+   */
+  load(
+    src: SnapshotSource,
+    v: Viewer,
+    type: string,
+    ids?: readonly string[],
+  ): Record<string, unknown[]> {
+    const def = this.types.get(type);
+    if (!def || def.lazy === undefined) throw new Error(`Record type "${type}" is not lazy`);
+    let rows: unknown[];
+    if (ids === undefined) rows = def.snapshot(src, v);
+    else {
+      const want = new Set(ids);
+      const found = def.byIds ? def.byIds(src, v, ids) : def.snapshot(src, v);
+      rows = found.filter((r) => want.has(def.idOf(r)));
+    }
+    const list: unknown[] = [];
+    for (const r of rows) {
+      const seen = this.view(type, r, v);
+      if (seen.vis !== "hidden") list.push(seen.data);
+    }
+    return { [type]: list };
+  }
+
+  /**
    * Per windowed type the viewer receives: the record IDs the snapshot is cut to (pinned +
    * newest `size`, pre-filter) and the floor. Convergence and leak-scan helpers use it.
    */
@@ -378,10 +438,11 @@ export class RecordRegistry {
     return out;
   }
 
-  /** Snapshot records per type through the same filter (FR-SYNC-20). */
+  /** Snapshot records per type through the same filter (FR-SYNC-20). Lazy types: never. */
   snapshot(src: SnapshotSource, v: Viewer): Record<string, unknown[]> {
     const out: Record<string, unknown[]> = {};
     for (const def of this.types.values()) {
+      if (def.lazy !== undefined) continue;
       if (def.audience === "dm" && v.role !== "dm") continue;
       const list: unknown[] = [];
       for (const r of this.snapshotRows(def, src, v)) {
