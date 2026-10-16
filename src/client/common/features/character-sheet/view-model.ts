@@ -21,6 +21,7 @@ import {
   PASSIVE_SKILLS,
   type PassiveSkill,
   passiveScore,
+  type Senses,
   SKILL_ABILITY,
   SKILL_NAMES,
   SKILLS,
@@ -334,4 +335,36 @@ export const pipDelta = (shiftKey: boolean) => (shiftKey ? -1 : 1);
 /** FR-CHARX-33: the read-only wallet line; missing record = all zero. */
 export function walletLine(w: Coins | undefined): string {
   return (w && formatCoins(w)) || "0 gp";
+}
+
+/** FR-CHARX-49: absent senses = vision 0, darkvision 0, both switches off. */
+export const NO_SENSES: Senses = { visionFt: 0, darkvisionFt: 0, seesMagicalDarkness: false };
+
+/** FR-CHARX-50 / -53: the Senses line's parts; zero / false parts omitted. */
+export function sensesParts(senses: Senses | undefined): string[] {
+  const s = senses ?? NO_SENSES;
+  return [
+    s.visionFt > 0 ? `Vision ${s.visionFt} ft` : null,
+    s.darkvisionFt > 0 ? `Darkvision ${s.darkvisionFt} ft` : null,
+    s.seesMagicalDarkness ? "Sees through magical darkness" : null,
+    s.seesInvisible ? "Sees invisible" : null,
+  ].filter((p): p is string => p !== null);
+}
+
+/** The line after "Senses": parts joined by " · ", or "—" when all default. */
+export const sensesText = (senses: Senses | undefined): string =>
+  sensesParts(senses).join(" · ") || "—";
+
+/**
+ * The whole `senses` object for `char.edit` (FR-CHARX-49): the shown value with `patch` applied.
+ * A player never sends `seesInvisible` (absent = the stored value; changing it is DM only,
+ * FR-CHARX-53).
+ */
+export function sensesEdit(
+  senses: Senses | undefined,
+  patch: Partial<Senses>,
+  client: "dm" | "player",
+): Senses {
+  const { seesInvisible, ...rest } = { ...NO_SENSES, ...senses, ...patch };
+  return client === "dm" ? { ...rest, seesInvisible: seesInvisible ?? false } : rest;
 }
