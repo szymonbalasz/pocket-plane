@@ -11,7 +11,8 @@ import {
   ImportedEntityRecord,
 } from "@shared/entities/schemas";
 import { ArrowLeftIcon, FilterIcon } from "lucide-react";
-import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import type { Api } from "../../api";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/controls";
@@ -172,6 +173,10 @@ function ResultsList({ api, viewer }: { api: Api; viewer: Role }) {
   const nonce = useCmpNav((s) => s.listNonce);
   const params = useMemo(() => searchParams(q, tab, filters), [q, tab, filters]);
   const res = useResults(api, params, nonce, WINDOW_DEBOUNCE_MS);
+  // CMP §7 states: a failed read → error Toast (once per failure) + Retry in the list.
+  useEffect(() => {
+    if (res.state === "error" && res.error) toast.error(res.error);
+  }, [res.state, res.error]);
   const first = res.state === "loading" && res.results.length === 0;
   const unfiltered = Object.keys(params).length === 0;
   if (first) {
