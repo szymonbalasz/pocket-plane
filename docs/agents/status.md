@@ -13,6 +13,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | D3 3D dice | `build/dicex-3d` (w3R, slot 3; based on D1) | build-dicex-3d | Building | Merge main after D1; walkthrough steps 4, 11, 13 (3D) |
 | R early: formula + rule zod + presets | — | — | Merged (2d6d4c8) | R0 builds on it |
 | C early: bundled SRD 5.1 + adapter | — | — | Merged (5b5aeb5, #213) | C1 wires it |
+| P early: party-board zod, visibility fns, split / merge math (pure `@shared`) | `fix/party-shared` | build-party-shared | Building | Merge (no UI) → P core |
 | Queue | — | — | V5 → V1 → (V4 ∥ V2) → V3; R0 → R1 ∥ R4 → R2 / R3 / R5–R7; `fix/lazy-records` → P core → P2 ∥ P3 → P4; C1 → C2 → C3, C4; D3, D2, D4 | Per locks below |
 | Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | BL-06 (#206), BL-02 (#211) merged | Per §3a |
 
