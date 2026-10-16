@@ -31,7 +31,7 @@ import {
   SettingsIcon,
   XIcon,
 } from "lucide-react";
-import { type KeyboardEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import {
   Popover,
@@ -54,6 +54,7 @@ import {
   useRollControl,
 } from "../dice-roll-log/roll-control";
 import { FlatDie } from "./FlatDie";
+import { LookEditor } from "./LookEditor";
 import { useThreeD } from "./lazy3d";
 import { useOwnLook } from "./own-look";
 import { useDiceSettings } from "./settings";
@@ -254,9 +255,6 @@ function Extras({ request, mode }: { request: TrayRequest; mode: RollMode }) {
 
 const signed = (n: number) => (n === 0 ? "" : n > 0 ? `+${n}` : `−${-n}`);
 
-/** FR-DICEX-27: the look editor loads on first open (FR-DICEX-22 initial budget). */
-const LookEditor = lazy(() => import("./LookEditor").then((m) => ({ default: m.LookEditor })));
-
 /** FR-DICEX-21 / DICEX §7: render 3D / Flat / Off, "Show others' rolls", "Dice look…". */
 function SettingsPopover() {
   const { settings, set } = useDiceSettings();
@@ -283,9 +281,7 @@ function SettingsPopover() {
         className={cn("flex flex-col gap-3", pane === "look" ? "w-72" : "w-64")}
       >
         {pane === "look" ? (
-          <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
-            <LookEditor onBack={() => setPane("settings")} />
-          </Suspense>
+          <LookEditor onBack={() => setPane("settings")} />
         ) : (
           <>
             <div className="flex flex-col gap-1.5">

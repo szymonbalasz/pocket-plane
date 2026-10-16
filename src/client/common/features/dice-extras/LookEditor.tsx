@@ -1,8 +1,7 @@
 // "Dice look" (FR-DICEX-27): the tray gear popover's second pane. Style swatches, body / pip
 // colour (12-swatch palette + hex Input), material ToggleGroup, live preview die (3D when this
 // device renders 3D, else flat), Save (`dicex.setLook`, owner = sender), Reset (= the style's
-// defaults). Low pips / body contrast → inline hint, still allowed. Save needs `live`. Loaded
-// lazily from the tray settings (FR-DICEX-22 initial budget).
+// defaults). Low pips / body contrast → inline hint, still allowed. Save needs `live`.
 import {
   DICE_MATERIALS,
   DICE_STYLES,
