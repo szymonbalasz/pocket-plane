@@ -130,3 +130,75 @@ test("FR-MOD-12 preset dialog fits the viewport", async ({ browser }) => {
   await expect(dialog).toHaveCount(0);
   await expect(sheet.getByTestId("mod-preset").filter({ hasText: "Rage" })).toHaveCount(1);
 });
+
+test("FR-MOD-49 FR-MOD-50 FR-MOD-28 triggers: player writes one on the sheet; DM writes a monster's (never sent to the player)", async ({
+  browser,
+}) => {
+  const { secret, link } = e2eEnv();
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const player = await ctx.newPage();
+  await player.goto(link("Player 1"));
+  await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+
+  // Sheet → Active effects: the lazy load settles on the empty block.
+  const sheet = await openWindow(player, "char.sheet");
+  await sheet.locator('[data-testid="charx-tab"][data-value="section:mod.effects"]').click();
+  const block = sheet.getByTestId("mod-triggers-block");
+  await expect(block.getByTestId("mod-trigger-loading")).toHaveCount(0);
+  await expect(block).toContainText("No triggers yet");
+
+  // New: the editor fits 1280×720; a bad name errors inline; the live value is Mira's.
+  await block.getByTestId("mod-trigger-new").click();
+  const editor = player.getByTestId("mod-trig-editor-dialog");
+  await expect(editor).toBeVisible();
+  const box = await editor.boundingBox();
+  expect((box?.y ?? 0) + (box?.height ?? Infinity)).toBeLessThanOrEqual(720);
+  await editor.getByTestId("mod-trig-editor-name").fill("Bonus");
+  const formula = editor.getByTestId("mod-trig-editor-formula");
+  await formula.fill("1d4 + foo");
+  await expect(editor.getByTestId("mod-trig-editor-formula-error")).toContainText(
+    "Unknown name ‘foo’ at 7",
+  );
+  await expect(editor.getByTestId("mod-trig-editor-save")).toBeDisabled();
+  await formula.fill("1d4 + prof");
+  await expect(editor.getByTestId("mod-trig-editor-formula-value")).toHaveAttribute(
+    "data-value",
+    /^1d4\+\d$/,
+  );
+  await expect(editor.getByTestId("mod-trig-editor-preview")).toContainText("Once per turn");
+  await expect(editor.getByTestId("mod-trig-editor-save")).toBeInViewport({ ratio: 1 });
+  await editor.getByTestId("mod-trig-editor-save").click();
+  await expect(editor).toHaveCount(0);
+  const row = block.getByTestId("mod-trigger");
+  await expect(row).toHaveCount(1);
+  await expect(row).toHaveAttribute("data-state", "on");
+  await expect(row.getByTestId("mod-trigger-value")).toHaveAttribute("data-value", /^1d4\+\d$/);
+  await row.getByTestId("mod-trigger-enabled").click();
+  await expect(row).toHaveAttribute("data-state", "off");
+
+  // DM: Creatures → a monster's Rule triggers… → Start from ▸ Martial Advantage → Save.
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const creatures = await openWindow(dm, "ent.creatures");
+  await creatures.getByTestId("mod-creature-triggers").first().click();
+  const dialog = dm.getByTestId("mod-triggers-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByTestId("mod-trigger-loading")).toHaveCount(0);
+  await dialog.getByTestId("mod-trigger-from-menu").click();
+  await dm.locator('[data-testid="mod-trigger-from"][data-value="martial-advantage"]').click();
+  const dmEditor = dm.getByTestId("mod-trig-editor-dialog");
+  await expect(dmEditor.getByTestId("mod-trig-editor-formula-value")).toHaveAttribute(
+    "data-value",
+    "2d6",
+  );
+  await dmEditor.getByTestId("mod-trig-editor-save").click();
+  await expect(dmEditor).toHaveCount(0);
+  await expect(
+    dialog.getByTestId("mod-trigger").filter({ hasText: "Martial Advantage" }),
+  ).toHaveCount(1);
+
+  // The player's block keeps its one row; the monster trigger never reaches the player.
+  await expect(row).toHaveCount(1);
+  await expect(player.getByText("Martial Advantage")).toHaveCount(0);
+});
