@@ -14,7 +14,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-06 | New scene dialog shows "Map:" with no name after choosing a map (sim-6 #11) | S | scenes-map DM scenes window | none | — | picked (`fix/bl-06-scene-map-name`, 2026-10-16) |
 | BL-07 | Konva "stage has 9 layers" warning on every load: merge static layers (sim-6 #12) | M | scenes-map canvas layers registry | FR-SCN-02 / FR-FOG-20 note | fog v2 canvas work | open |
 | BL-08 | Narrow Initiative rows still collapse chips to "+N" (sim-6 #8): abbreviate durations when tight | S | combat-extras chips | FR-CBTX-46 note | MOD tier 2 chips | open |
-| BL-09 | Live-sync hub skips record changes whose player redaction is unchanged (OQ-CBTX-25; empty updates on monster temp HP) | M | `src/server/ws/` hub | live-sync FR note | any ws / snapshot work | open |
+| BL-09 | Live-sync hub skips record changes whose player redaction is unchanged (OQ-CBTX-25; empty updates on monster temp HP) | M | `src/server/ws/` hub | live-sync FR note | any ws / snapshot work | superseded by V0 `fix/vision-core` (identical-upsert drop, sprint-3 seams S11) |
 | BL-10 | Player outcome line "12 — hit!" vs AC 14 after a DM-only ruling reads odd (sim-6 #10): copy only ("DM ruled") within #178 G8 | S | combat-tracker player card view | DM product call? (ask if copy changes visibility) | — | open (ask) |
 
 ## How to add items
