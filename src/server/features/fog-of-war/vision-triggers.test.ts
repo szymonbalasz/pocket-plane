@@ -13,12 +13,13 @@ import { armCrashHook } from "../../commands/crash";
 import { stateDigest } from "../../db/digest";
 import { fogExplored, sceneFog, token } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
+import { silentLogger } from "../../log";
 import { TokenPlacer } from "../combat-tracker/join";
 import { resolveDefinition } from "../entities/commands";
 import { MAP_REST as R } from "../scenes-map/commands";
 import { readScene } from "../scenes-map/rows";
 import { growMemory } from "./rederive";
-import { sightsComputed } from "./sight";
+import { setFogLogger, sightsComputed } from "./sight";
 import { clearVisionCache } from "./vision-cache";
 
 const opened: VisionServices[] = [];
@@ -206,6 +207,23 @@ describe("FR-FOG-35 re-derive triggers", () => {
     const thorn = t.tokenRow("Thorn");
     expect(changes[0]).toMatchObject({ type: "token", id: thorn.id, before: null });
     expect(changes.findIndex((c) => c.type === VISION_TYPE && c.id === pair(t, "p2"))).toBe(1);
+  });
+});
+
+describe("FR-FOG-32 sources", () => {
+  test("FR-FOG-32 more than 4 own tokens: the oldest 4 give vision, the rest a `warn`", async () => {
+    const t = await setup();
+    const warned: string[] = [];
+    setFogLogger({ ...silentLogger, warn: (m: string) => warned.push(m) });
+    try {
+      const mira = t.tokenRow("Mira");
+      for (let i = 0; i < 4; i++) t.run(I.duplicateToken, { tokenId: mira.id });
+      const v = t.snapshot("p1")[VISION_TYPE]?.[0] as { see: unknown[] };
+      expect(v.see).toHaveLength(4);
+      expect(warned.some((m) => m.includes("more than 4"))).toBe(true);
+    } finally {
+      setFogLogger(silentLogger);
+    }
   });
 });
 
