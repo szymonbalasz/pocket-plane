@@ -333,7 +333,7 @@ describe("FR-MOD-27 trigger groups (T)", () => {
     );
   });
 
-  test("FR-MOD-43 roll triggers: a part group and a mode hint; windows only in combat", () => {
+  test("FR-MOD-43 roll triggers: a part (server-rolled: no group) and a mode hint; windows only in combat", () => {
     const part: PreviewTrigger = {
       ...divineFury(),
       id: "trg-p",
@@ -353,13 +353,14 @@ describe("FR-MOD-27 trigger groups (T)", () => {
     };
     const s = store({});
     const p = rollPreview(s, attack, [part, mode]);
-    expect(p.groups.map((g) => [g.key, g.expression, g.onHit])).toEqual([
-      ["t:trg-p", "1d4+1", undefined],
-    ]);
+    expect(p.groups).toEqual([]);
+    expect(previewText(p.parts)).toBe("Sacred Weapon +1d4+1");
     expect(previewMode(s, attack, "normal", [part, mode])).toBe("advantage");
     const perTurn = { ...part, rule: { ...part.rule, every: "turn" as const } };
-    expect(rollPreview(store({ combat: false }), attack, [perTurn]).groups).toEqual([]);
-    expect(rollPreview(store({ combat: false }), attack, [part]).groups).toHaveLength(1);
+    expect(rollPreview(store({ combat: false }), attack, [perTurn]).parts).toEqual([]);
+    expect(rollPreview(store({ combat: false }), attack, [part]).parts).toHaveLength(1);
+    const feature = { ...part, rule: { ...part.rule, every: { feature: "f1" } } };
+    expect(rollPreview(s, attack, [feature]).parts).toEqual([]);
   });
 
   test("FR-MOD-27 a part with mixed dice lists every term", () => {

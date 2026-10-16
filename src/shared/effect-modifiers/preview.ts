@@ -2,8 +2,9 @@
 // pure over the synced store. From a roll subject it gives the **preview mode** (the roller's
 // mode combined with the creature's `mode` effects and enabled `roll` mode triggers), one
 // physical **group** per bonus die (`e:` keys from `bonusDieGroups`, the server's function) and
-// per trigger that **may** fire (`t:<triggerId>`: requires and owner-side filters pass; charges
-// are server-only, so a group may go unused), and the Tooltip's parts line. The server's final
+// per `hit` trigger that **may** be offered (`t:<triggerId>`: requires and owner-side filters
+// pass, R4's `trigger-fire` rules; charges are server-only, so a group may go unused), and the
+// Tooltip's parts line. `roll` trigger parts are server-rolled (no group; R4 passes no key). The server's final
 // mode and parts always decide (FR-MOD-17, -18).
 import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
 import {
@@ -13,12 +14,11 @@ import {
   type EncounterView,
 } from "@shared/combat-tracker/schemas";
 import {
-  ABILITIES,
-  abilityMod,
+  type ABILITIES,
   ENTITY_TYPE,
   IMPORTED_ENTITY_TYPE,
-  proficiencyBonus,
   SKILL_ABILITY,
+  type StatBlock,
 } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { type FormulaOwner, formulaValue } from "./formula";
@@ -28,7 +28,6 @@ import {
   combineModes,
   type FinalMode,
   type ModEffect,
-  matches,
   matchingMods,
   modeHints,
 } from "./rules";
@@ -38,8 +37,9 @@ import {
   ROLL_ROW_MAX,
   type RollSubject,
 } from "./schemas";
+import { type FireFacts, formulaOwnerOf, ownerFiltersPass, requiresMet } from "./trigger-fire";
 import { RULE_TRIGGER_TYPE } from "./trigger-records";
-import { type PlayerTriggerRule, rowMatches, type TriggerRule } from "./triggers";
+import { doublesOnCrit, type PlayerTriggerRule, type TriggerRule } from "./triggers";
 
 /** A `rule-trigger` as either client holds it (the player copy may name presets by `{name}`). */
 export interface PreviewTrigger {
@@ -130,74 +130,45 @@ const ownsTrigger = (t: PreviewTrigger, o: Owner): boolean =>
   o !== null &&
   ("characterId" in o ? t.characterId === o.characterId : t.definitionId === o.definitionId);
 
-interface StatsLike {
-  abilities?: Record<string, number>;
-  level?: number;
-  className?: string;
-  classes?: { name: string; level: number }[];
-  cr?: string;
-}
-
-/** FR-MOD-35: the formula owner from the stat block this client holds (missing → 0). */
-export function formulaOwnerOf(store: RecordStore, o: Owner): FormulaOwner {
+/** FR-MOD-35: the owner's formula values from the stat block this client holds (none → 0s). */
+function ownerValues(store: RecordStore, o: Owner): FormulaOwner {
   if (o === null) return {};
   const id = "characterId" in o ? o.characterId : o.definitionId;
   const rec = (store.records[ENTITY_TYPE]?.[id] ?? store.records[IMPORTED_ENTITY_TYPE]?.[id]) as
-    | { statBlock?: StatsLike }
+    | { statBlock?: StatBlock }
     | undefined;
-  const s = rec?.statBlock;
-  if (!s) return {};
-  const abilities: Partial<Record<(typeof ABILITIES)[number], number>> = {};
-  if (s.abilities) {
-    for (const a of ABILITIES) abilities[a] = abilityMod(s.abilities[a] ?? 10);
-  }
-  const prof = proficiencyBonus(s as Parameters<typeof proficiencyBonus>[0]);
-  if (s.cr !== undefined) {
-    const cr = s.cr.includes("/") ? 0 : Number(s.cr);
-    return { level: 0, cr, prof, abilities };
-  }
-  const level = s.level ?? 0;
-  const classes = s.classes ?? (s.className ? [{ name: s.className, level }] : []);
-  return { level, classes, prof, abilities };
+  return rec?.statBlock ? formulaOwnerOf(rec.statBlock) : {};
 }
 
 /**
- * FR-MOD-36 (origin match), client side: `requires.preset` holds iff one of the owner's active
- * effects carries a matching key. An effect's keys = its `presetKey` (players: built-in keys
- * only) and the ids of presets toggled on through it (`activeEffectId`). Keys match if equal or
- * if one is a preset whose `originKey` is the other. A `{name}` ref (a campaign preset in a
- * player's copy) can't be checked here: it **may** hold.
+ * FR-MOD-36 (origin match, `requiresMet` as the server's hook): the owner's active effects'
+ * keys = their `presetKey` (players: built-in keys only, ids redacted) plus, client side, the
+ * ids of presets toggled on through them (`activeEffectId`; the player holds their own). A
+ * `{name}` ref (a campaign preset in a player's copy) can't be checked here: it **may** hold.
  */
-function requiresMet(
+function requiresHold(
   store: RecordStore,
   rule: PreviewTrigger["rule"],
   creature: CreatureRef,
   effects: readonly StoreEffect[],
 ): boolean {
   const req = rule.requires;
-  if (!req) return true;
-  if (!("preset" in req)) return true;
+  if (req && !("preset" in req)) return true;
   const presets = values<EffectPresetRecord>(store, EFFECT_PRESET_TYPE);
-  const byId = new Map(presets.map((p) => [p.id, p]));
+  const origin = new Map(presets.map((p) => [p.id, p.originKey]));
   const mine = effects.filter((e) =>
     "characterId" in creature
       ? e.targetCharacterId === creature.characterId
       : e.targetCombatantId === creature.combatantId,
   );
-  const keys = new Set<string>();
-  for (const e of mine) {
-    if (e.presetKey) keys.add(e.presetKey);
-    for (const p of presets) if (p.activeEffectId === e.id) keys.add(p.id);
-  }
-  const want = req.preset;
-  for (const k of keys) {
-    if (k === want) return true;
-    if (byId.get(want)?.originKey === k) return true;
-    if (byId.get(k)?.originKey === want) return true;
-  }
-  return false;
+  const keys = mine.flatMap((e) => [
+    e.presetKey ?? null,
+    ...presets.filter((p) => p.activeEffectId === e.id).map((p) => p.id),
+  ]);
+  return requiresMet(req ? { requires: req } : {}, keys, (k) => origin.get(k) ?? null);
 }
 
+/** The started encounter's turn as this client sees it (players: `playerTurnCombatantId`). */
 function isOwnTurn(store: RecordStore, own: CombatantView | null): boolean {
   if (!own) return false;
   const enc = startedEncounter(store);
@@ -206,29 +177,11 @@ function isOwnTurn(store: RecordStore, own: CombatantView | null): boolean {
 }
 
 /**
- * Owner-side filters (FR-MOD-37, -43): `via`, `row`, `ownTurn`, `crit`, hard `mode` (a `hit`
- * trigger reads the card's to-hit mode, absent = normal), `roll` (a `roll` trigger's selector).
- * Target-side and soft filters (`targetMarked`, `targetHurt`, `ask`, soft `mode`) may hold.
+ * The enabled triggers of this roll's owner that may fire on it, in `seq` order, as MOD's
+ * server hook picks them minus the charges (server-only): `hit` → `damage` on a card's damage
+ * roll in combat; `roll` → `each` anywhere, windowed ones in combat only, no `feature` ones
+ * (FR-MOD-43). Requires and hard owner-side filters (`ownerFiltersPass`) must hold.
  */
-function ownerFiltersPass(
-  rule: PreviewTrigger["rule"],
-  subject: RollSubject,
-  ownTurn: boolean,
-): boolean {
-  for (const f of rule.when) {
-    if (f.if === "via" && subject.via !== f.via) return false;
-    if (f.if === "row" && !rowMatches(f.names, subject.row)) return false;
-    if (f.if === "ownTurn" && !ownTurn) return false;
-    if (f.if === "crit" && !subject.crit) return false;
-    if (f.if === "roll" && !matches(f.on, subject)) return false;
-    if (f.if === "mode" && !f.soft && rule.on === "hit") {
-      if (!f.modes.includes(subject.toHitMode ?? "normal")) return false;
-    }
-  }
-  return true;
-}
-
-/** The enabled triggers of this roll's owner that may fire on it, in `seq` order. */
 function firingTriggers(
   store: RecordStore,
   subject: RollSubject,
@@ -238,23 +191,29 @@ function firingTriggers(
   const owner = ownerOf(store, creature);
   const effects = effectsOf(store);
   const own = ownCombatant(store, subject);
-  const ownTurn = isOwnTurn(store, own);
+  const facts: FireFacts = {
+    subject,
+    ownTurn: isOwnTurn(store, own),
+    mode: subject.toHitMode ?? "normal",
+  };
   return [...triggers]
     .filter((t) => t.enabled && ownsTrigger(t, owner))
     .sort((a, b) => a.seq - b.seq)
     .filter((t) => {
       const { rule } = t;
       if (rule.on === "hit") {
-        if (!(subject.roll === "damage" && subject.card)) return false;
+        if (!(subject.roll === "damage" && subject.card && own) || rule.then.do !== "damage") {
+          return false;
+        }
       } else if (rule.on === "roll") {
-        // FR-MOD-43: turn / round / encounter windows only for an active combatant.
-        if (rule.every !== "each" && typeof rule.every !== "object" && !own) return false;
+        if (typeof rule.every === "object") return false;
+        if (rule.every !== "each" && !own) return false;
       } else {
         return false;
       }
-      return (
-        requiresMet(store, rule, creature, effects) && ownerFiltersPass(rule, subject, ownTurn)
-      );
+      // Target-side filters of a player copy (`targetMarked {name}`) hold here, as all do.
+      const when = rule.when as TriggerRule["when"];
+      return requiresHold(store, rule, creature, effects) && ownerFiltersPass({ when }, facts);
     });
 }
 
@@ -278,8 +237,10 @@ function triggerExpression(
   const then = t.rule.then;
   if (then.do !== "damage" && then.do !== "part") return null;
   const crit =
-    subject.roll === "damage" && subject.crit === true && !t.rule.when.some((f) => f.if === "crit");
-  const owner = formulaOwnerOf(store, ownerOf(store, previewCreature(store, subject)));
+    subject.roll === "damage" &&
+    subject.crit === true &&
+    doublesOnCrit({ when: t.rule.when as TriggerRule["when"] });
+  const owner = ownerValues(store, ownerOf(store, previewCreature(store, subject)));
   const v = formulaValue(then.formula, owner, { crit });
   return v.ok ? v.value.expression : null;
 }
@@ -329,7 +290,8 @@ export function rollPreview(
     if (expression === null) continue;
     const onHit = t.rule.on === "hit";
     const dice = diceOfExpression(expression);
-    if (dice.length > 0) {
+    // FR-MOD-18: offered (`hit`) dice take a physical `t:` group; `roll` parts are server-rolled.
+    if (onHit && dice.length > 0) {
       groups.push({
         key: `t:${t.id}`,
         label: t.name,
