@@ -7,7 +7,12 @@
 // running one (FR-DICEX-18): it snaps to its settled faces and fades while the new one starts.
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
-import { type DiceLook, defaultLook } from "@shared/dice-extras/looks";
+import {
+  DICE_LOOK_TYPE,
+  type DiceLook,
+  type DiceLookRecord,
+  lookOf,
+} from "@shared/dice-extras/looks";
 import type { DiceThrow } from "@shared/dice-extras/throw";
 import { recordsOf } from "@shared/protocol/store";
 import { DicesIcon, EyeOffIcon } from "lucide-react";
@@ -40,18 +45,19 @@ export const FLAT_FADE_MS = 300;
 export const REST_MS = 1500;
 
 /**
- * Each entry's roller look (FR-DICEX-20). The seam for D2's stored looks: the roller's
- * `dice-look` row goes first here once that record type exists; until then the derived default.
+ * Each entry's roller look (FR-DICEX-20): the roller's stored `dice-look` row (D2), else the
+ * derived default. Read when the throw starts, so a look changed mid-throw shows from the next.
  */
-function looksOf(
+export function looksOf(
   t: DiceThrow,
   entries: readonly { id: string; rollerRole: string; rollerPlayerId: string | null }[],
   playerIds: readonly string[],
+  rows: readonly DiceLookRecord[],
 ): Record<string, DiceLook> {
   const out: Record<string, DiceLook> = {};
   for (const e of entries) {
     if (!t.entryIds.includes(e.id)) continue;
-    out[e.id] = defaultLook(e.rollerRole === "dm" ? null : e.rollerPlayerId, playerIds);
+    out[e.id] = lookOf(e.rollerRole === "dm" ? null : e.rollerPlayerId, rows, playerIds);
   }
   return out;
 }
@@ -261,7 +267,7 @@ export function DiceExtrasRuntime() {
         const keep = diceExtras.api.getState().current?.t.entryIds ?? [];
         setLooks((prev) => ({
           ...Object.fromEntries(keep.flatMap((id) => (prev[id] ? [[id, prev[id]]] : []))),
-          ...looksOf(t, entries, playerIds),
+          ...looksOf(t, entries, playerIds, recordsOf<DiceLookRecord>(store, DICE_LOOK_TYPE)),
         }));
         draw.current = throwDraw(cfg.current.render, dice3d.state());
         diceExtras.play(t);

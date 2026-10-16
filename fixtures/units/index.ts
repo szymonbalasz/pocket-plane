@@ -26,6 +26,7 @@ import thornBattlemap from "./combat-tracker/thorn-battlemap";
 import cmpHomebrew from "./compendium/cmp-homebrew";
 import cmpHomebrewSecond from "./compendium/cmp-homebrew-second";
 import cmpSrdMini from "./compendium/cmp-srd-mini";
+import dicexLooks from "./dice-extras/dicex-looks";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
 import diceSettings from "./dice-roll-log/dice-settings";
 import rolls1 from "./dice-roll-log/rolls-1";
@@ -134,4 +135,5 @@ export const units: readonly Fixture[] = [
   cmpHomebrew,
   cmpHomebrewSecond,
   visionCrypt,
+  dicexLooks,
 ];

@@ -1,5 +1,6 @@
 // A flat die (FR-DICEX-21 `flat`, FR-DICEX-13 chips): the face at its server value in the
-// roller's look. Dropped dice dimmed, MOD / offered dice labelled, physical dice badged.
+// roller's look (`data-style` / `data-material`, FR-DICEX-20). Dropped dice dimmed, MOD /
+// offered dice labelled, physical dice badged.
 import type { DiceLook } from "@shared/dice-extras/looks";
 import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import type { ThrowDie } from "@shared/dice-extras/throw";
@@ -39,6 +40,8 @@ export function FlatDie({
       data-kept={die.kept}
       data-flat={die.flat || flat}
       data-offered={die.offered === true}
+      data-style={look.style}
+      data-material={look.material}
       {...(settled && { "data-settled": die.value ?? "" })}
       className="flex flex-col items-center gap-0.5"
     >
