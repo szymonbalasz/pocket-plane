@@ -26,7 +26,7 @@ import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import type { SheetSection } from "../character-sheet/sections";
 import { useCbtIntent, useStartedEncounter } from "../combat-tracker/store";
-import { RollButton, useRollControl } from "../dice-roll-log/roll-control";
+import { manualPartsOf, RollButton, useRollControl } from "../dice-roll-log/roll-control";
 import {
   activeEffects,
   characterOf,
@@ -145,11 +145,14 @@ export function DeathSavesSection({ creatureId }: SectionProps) {
     expressions: ["1d20"],
     category: "saving-throw",
     label: `${ch?.name ?? ""} — Death save`,
+    // FR-MOD-15, -27: a death save is a save with no ability.
+    subject: { creature: { characterId: creatureId }, roll: "save" },
     onRoll: (r) =>
       void send(CBTX_INTENTS.rollDeathSave, {
         characterId: creatureId,
         mode: r.mode,
         ...(r.manual ? { manual: r.manual[0] } : {}),
+        ...manualPartsOf(r),
         ...(r.public !== undefined ? { public: r.public } : {}),
       }),
   });

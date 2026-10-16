@@ -86,6 +86,7 @@ export const rollConcentration = defineCommand({
       label,
       actor: { kind: "entity", id: actorId, name },
       manual: input.manual,
+      ...(input.manualParts ? { manualParts: input.manualParts } : {}),
       source: "cbt",
       // FR-MOD-15: a concentration save is a CON save of the concentrating creature.
       subject: {

@@ -232,6 +232,15 @@ export function useRollControl(
   };
 }
 
+/**
+ * FR-MOD-18: a single-roll intent's `manualParts` field from the request (the list of entry
+ * `i`), or nothing. Two-roll intents (`char.roll`, `cbt.attack`) send `r.manualParts` as is.
+ */
+export const manualPartsOf = (r: RollRequest, i = 0): { manualParts?: ManualPart[] } => {
+  const parts = r.manualParts?.[i];
+  return parts ? { manualParts: parts } : {};
+};
+
 /** A roll button's Tooltip: the caller's hint, then the parts the roll picks up (FR-MOD-27). */
 export const rollTooltip = (control: Pick<RollControl, "preview">, hint: string): string =>
   control.preview.text ? `${control.preview.text} · ${hint}` : hint;

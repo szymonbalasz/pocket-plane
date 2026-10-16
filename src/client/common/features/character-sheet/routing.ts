@@ -6,7 +6,7 @@ import {
   type SheetRollIntent,
   type SheetRollKind,
 } from "@shared/character-sheet/schemas";
-import type { ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
+import type { ManualEntry, ManualPart, RollMode } from "@shared/dice-roll-log/schemas";
 import type { Ability, Skill } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { IntentRejected } from "../../sync/connection";
@@ -16,6 +16,8 @@ export interface RollRouteInput {
   mode: RollMode;
   /** One per expression: attack (Attack + damage) 2 (to-hit, damage); toHit, damage, … 1. */
   manual?: ManualEntry[];
+  /** FR-MOD-18: physical part groups, one list per `manual` entry (roll control's request). */
+  manualParts?: ManualPart[][];
   /** DM override only. */
   public?: boolean;
 }
@@ -33,6 +35,11 @@ export interface RollRouteClaim {
    * FR-CBT-74): the roll control opens with `crit: true` (FR-DICE-31, X-1).
    */
   crit?: boolean;
+  /**
+   * FR-MOD-27: the roll lands on a combat card (`cbt.attack` / `cbt.rollDamage`): the preview's
+   * damage subject gets `card: true` (rule triggers offered on it) and the card's to-hit mode.
+   */
+  card?: { toHitMode?: RollMode };
   /**
    * FR-CHAR-24: the sheet renders no button (nor public switch) for this kind; Initiative shows
    * a muted "Initiative set". The badge stays.
@@ -149,6 +156,7 @@ export function charRollPayload(
   if (r.attackId) p.attackId = r.attackId;
   if (r.spellId) p.spellId = r.spellId;
   if (input.manual) p.manual = input.manual;
+  if (input.manualParts) p.manualParts = input.manualParts;
   if (input.public !== undefined) p.public = input.public;
   return p;
 }

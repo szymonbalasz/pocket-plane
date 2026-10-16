@@ -9,6 +9,7 @@ import {
   previewMode,
   previewText,
   rollPreview,
+  sheetRollSubjects,
 } from "./preview";
 import type { Modifier, RollSubject } from "./schemas";
 
@@ -129,6 +130,39 @@ const divineFury = (o: Partial<PreviewTrigger> = {}): PreviewTrigger => ({
 });
 const ragePreset = { id: "pre-rage", activeEffectId: "fx-rage", originKey: "rage" };
 const rageFx: Fx = { id: "fx-rage", label: "Rage", modifiers: [rageDmg] };
+
+describe("FR-MOD-15 sheet roll subjects (as char.roll derives them)", () => {
+  test("FR-MOD-15 attack → [attack, damage] via weapon with the row; card adds card + to-hit mode", () => {
+    const base = { characterId: "brakka", kind: "attack", categories: ["attack", "damage"] };
+    expect(sheetRollSubjects({ ...base, row: "Greataxe" })).toEqual([
+      { creature: brakka, roll: "attack", via: "weapon", row: "Greataxe" },
+      { creature: brakka, roll: "damage", via: "weapon", row: "Greataxe" },
+    ]);
+    expect(sheetRollSubjects({ ...base, card: { toHitMode: "advantage" } })[1]).toEqual({
+      creature: brakka,
+      roll: "damage",
+      via: "weapon",
+      card: true,
+      toHitMode: "advantage",
+    });
+    expect(
+      sheetRollSubjects({ characterId: "brakka", kind: "spellDamage", categories: ["damage"] }),
+    ).toEqual([{ creature: brakka, roll: "damage", via: "spell" }]);
+  });
+
+  test("FR-MOD-15 save / check / skill / initiative; healing none", () => {
+    const s = (categories: string[], o: object = {}) =>
+      sheetRollSubjects({ characterId: "brakka", kind: "x", categories, ...o });
+    expect(s(["saving-throw"], { ability: "con" })).toEqual([
+      { creature: brakka, roll: "save", ability: "con" },
+    ]);
+    expect(s(["skill-check"], { skill: "athletics" })).toEqual([
+      { creature: brakka, roll: "check", ability: "str" },
+    ]);
+    expect(s(["initiative"])).toEqual([{ creature: brakka, roll: "initiative" }]);
+    expect(s(["healing"])).toEqual([null]);
+  });
+});
 
 describe("FR-MOD-27 preview mode", () => {
   test("FR-MOD-27 preview mode: Rage adv on Athletics; adv + dis → normal; roller combines", () => {

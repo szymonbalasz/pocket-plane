@@ -18,6 +18,7 @@ import {
   ENTITY_TYPE,
   IMPORTED_ENTITY_TYPE,
   proficiencyBonus,
+  SKILL_ABILITY,
 } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { type FormulaOwner, formulaValue } from "./formula";
@@ -31,7 +32,12 @@ import {
   matchingMods,
   modeHints,
 } from "./rules";
-import { EFFECT_PRESET_TYPE, type EffectPresetRecord, type RollSubject } from "./schemas";
+import {
+  EFFECT_PRESET_TYPE,
+  type EffectPresetRecord,
+  ROLL_ROW_MAX,
+  type RollSubject,
+} from "./schemas";
 import { RULE_TRIGGER_TYPE } from "./trigger-records";
 import { type PlayerTriggerRule, rowMatches, type TriggerRule } from "./triggers";
 
@@ -359,6 +365,46 @@ export function previewMode(
 export function previewText(parts: readonly PreviewPart[]): string | null {
   if (parts.length === 0) return null;
   return parts.map((p) => (p.label ? `${p.label} ${p.text}` : p.text)).join(" · ");
+}
+
+/** A sheet roll's spec category (`characterRolls`), as `char.roll` maps it to a subject. */
+type SheetCategory = string;
+
+/**
+ * FR-MOD-15, -27: the subjects of a sheet roll's specs, as `char.roll` derives them (attack /
+ * damage via weapon or spell, save / check with the ability, a skill's ability, initiative;
+ * anything else, e.g. healing, none). `row` = the attack / spell row's name (#209). `card` = the
+ * roll is routed to a combat card (`cbt.attack` / `cbt.rollDamage`): its damage subject gets
+ * `card: true` and the card's to-hit mode. Definition (NPC) rolls have no subject.
+ */
+export function sheetRollSubjects(o: {
+  characterId: string;
+  kind: string;
+  categories: readonly SheetCategory[];
+  ability?: (typeof ABILITIES)[number];
+  skill?: keyof typeof SKILL_ABILITY;
+  row?: string;
+  card?: { toHitMode?: FinalMode };
+}): (RollSubject | null)[] {
+  const creature = { characterId: o.characterId };
+  const via = o.kind.startsWith("spell") ? ("spell" as const) : ("weapon" as const);
+  const row = o.row ? { row: o.row.slice(0, ROLL_ROW_MAX) } : {};
+  return o.categories.map((c): RollSubject | null => {
+    if (c === "attack") return { creature, roll: "attack", via, ...row };
+    if (c === "damage") {
+      const card = o.card
+        ? { card: true, ...(o.card.toHitMode ? { toHitMode: o.card.toHitMode } : {}) }
+        : {};
+      return { creature, roll: "damage", via, ...row, ...card };
+    }
+    if (c === "saving-throw" && o.ability) return { creature, roll: "save", ability: o.ability };
+    if (c === "ability-check" && o.ability) return { creature, roll: "check", ability: o.ability };
+    if (c === "skill-check" && o.skill) {
+      return { creature, roll: "check", ability: SKILL_ABILITY[o.skill] };
+    }
+    if (c === "initiative") return { creature, roll: "initiative" };
+    return null;
+  });
 }
 
 /** Record types the preview reads (a hook subscribes to just these). */

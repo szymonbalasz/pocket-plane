@@ -1,6 +1,11 @@
 // character-sheet boundary schemas (CHAR §9): intents `char.roll`, `char.adjustHp` and results.
 // Strict: no expression, bonus or HP field (FR-CHAR-05, FR-CHAR-10, CHAR §11).
-import { ManualEntry, RollMode } from "@shared/dice-roll-log/schemas";
+import {
+  checkManualParts,
+  ManualEntry,
+  ManualPartsPerRoll,
+  RollMode,
+} from "@shared/dice-roll-log/schemas";
 import { Ability, SkillName } from "@shared/entities/schemas";
 import { z } from "zod";
 
@@ -77,9 +82,12 @@ export const SheetRollIntent = z
     spellId: Id.optional(),
     mode: RollMode.default("normal"),
     manual: z.array(ManualEntry).min(1).max(2).optional(),
+    /** FR-MOD-18 (tier 2): physical bonus / trigger die groups, one list per `manual` entry. */
+    manualParts: ManualPartsPerRoll.optional(),
     public: z.boolean().optional(),
   })
   .superRefine((v, ctx) => {
+    checkManualParts(v, ctx);
     const n = v.kind === "spellAttack" ? null : MANUAL_COUNT[v.kind];
     if (v.manual && n !== null && v.manual.length !== n) {
       ctx.addIssue({
