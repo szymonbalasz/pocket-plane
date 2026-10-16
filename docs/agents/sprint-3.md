@@ -1,6 +1,6 @@
 # Sprint 3: vision, dice, rules, party board, compendium
 
-DM decisions #201 (fog v2 + dynamic vision), #202 (walls), #203 (sprint 3 scope), #204 (keep agents busy: backfill). Process: [orchestrator prompt](orchestrator-prompt.md) (incl. **§3a backfill**), [continue-session §3](continue-session.md#3-herdr-how-to-run-agents-learned-the-hard-way) and its lessons. Sprint 2 for reference: [sprint-2](sprint-2.md) (same loop: specs in parallel → seams → review → one DM gate → builds per hotspot rules → walkthroughs → session-sim → playtest section → recap).
+DM decisions #201 (fog v2 + dynamic vision), #202 (walls), #203 (sprint 3 scope), #204 / #205 (backlog only fills idle slots; sprint milestones first). Process: [orchestrator prompt](orchestrator-prompt.md) (incl. **§3a backfill**), [continue-session §3](continue-session.md#3-herdr-how-to-run-agents-learned-the-hard-way) and its lessons. Sprint 2 for reference: [sprint-2](sprint-2.md) (same loop: specs in parallel → seams → review → one DM gate → builds per hotspot rules → walkthroughs → session-sim → playtest section → recap).
 
 ## Tracks
 
@@ -15,14 +15,14 @@ DM decisions #201 (fog v2 + dynamic vision), #202 (walls), #203 (sprint 3 scope)
 ## Orchestrator: how to run this sprint
 
 **Phase A: specs (one DM gate)**
-1. Start four spec agents at once: **V** (one agent across fog-of-war, scene-tools walls, character-sheet-full vision fields: one design for vision), **D**, **R**, **P**. Start **C** the moment any of them finishes (backfill: never leave a slot empty). Copy inputs into each worktree (this file, the relevant session-sim-6 evidence `.verify/20261015-232530-session-sim-6/` for V, the proposed ADRs are on `main`).
+1. Start four spec agents at once: **V** (one agent across fog-of-war, scene-tools walls, character-sheet-full vision fields: one design for vision), **D**, **R**, **P**. Start **C** the moment any of them finishes. Copy inputs into each worktree (this file, the relevant session-sim-6 evidence `.verify/20261015-232530-session-sim-6/` for V, the proposed ADRs are on `main`).
 2. Each spec agent: options + bold pick per open question, a **measured** CON-44 figure for new record types (heavy harness probe, not estimates; sprint-2 lesson), named tests, a §13 walkthrough, a build split with the shared files each slice touches, and the **dependency** it needs, if any, with alternatives.
 3. Settle seams yourself (one `seams.md`, copied into each worktree; authors push back once). Expected seams: V ↔ scene-tools (walls block sight; freeform segments in the move guard), V ↔ combat (vision-hidden monsters; per-player visibility of combatants), V ↔ live-sync (per-player visibility filter, ADR-0039 → per-player), R ↔ dice (tier-2 boxes per bonus die vs the new tray), R ↔ combat (trigger parts on cards / apply / undo), R ↔ C (class-feature presets from compendium data), P ↔ party-loot / character-sheet inventory, D ↔ character-sheet / notes (clickable notation in sheet text).
 4. Reviews: **two** review agents in parallel (review-a: V; review-b: D, R, P, C), then `rulings.md`, authors apply.
 5. **DM gate 1**: every pick that needs the DM, scope cuts per track, **new dependencies** (3D dice / physics library; geometry / visibility-polygon / polygon-clipping library), ADR acceptance (dynamic vision, rule triggers, any new ones), and build order. Integrate (number ADRs, index, glossary, registries in AGENTS §9.9, log) and merge the spec branches.
 
 **Phase B: builds**
-6. Cores first, **one schema branch at a time** (see Hotspots), then feature slices in parallel. Keep 3–4 agents working (§3a): while a core holds a lock, run other tracks' non-locked slices, walkthroughs, or backlog backfill.
+6. Cores first, **one schema branch at a time** (see Hotspots), then feature slices in parallel wherever the hotspot table allows. If only one agent is working and no sprint task can start, §3a lets you fill a slot with a small backlog item; stop doing that once the last build slices are in flight.
 7. Every slice: builder → "ready for walkthrough" → test agent → fixes → `check` + full `e2e` in the branch after merging main → merge → `check` + full `e2e` on `main`. **Wait for the builder's commit before you check its worktree** (sprint-2 lesson).
 8. Sprint gate: session-sim-7 on final `main` (incl. a freeform fog shape, Explored memory, magical darkness with and without Devil's Sight, darkvision piercing fog, a freeform wall with the red drag highlight, the 3D tray rolling a clicked notation, a Zealot Divine Fury trigger once per turn, a handout, a compendium monster cloned into an encounter), leak scan per player, a "Playtest: sprint 3 features" section here, then **pause and recap with the DM**.
 
@@ -42,7 +42,7 @@ DM decisions #201 (fog v2 + dynamic vision), #202 (walls), #203 (sprint 3 scope)
 ## Gates
 
 1. **DM gate 1 (specs):** all five tracks reviewed; picks, scope, dependencies, ADRs, build order.
-2. **Builds:** walkthrough PASS per slice; `check` + full `e2e` in the branch and on `main` after every merge; backlog backfill whenever only one agent works (§3a).
+2. **Builds:** walkthrough PASS per slice; `check` + full `e2e` in the branch and on `main` after every merge; backlog items only during downtime and not near the end (§3a).
 3. **Sprint gate:** session-sim-7, "Playtest: sprint 3 features", recap.
 
 ## Expected DM questions (for the spec agents to frame, not to decide)

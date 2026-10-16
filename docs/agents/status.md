@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 2 complete (#200). **Sprint 3 planned, not started** (#201–#204): [sprint-3](sprint-3.md). Next: four spec agents (V, D, R, P), C when a slot frees; backfill rule active ([orchestrator-prompt §3a](orchestrator-prompt.md#3a-keep-the-agents-busy-backfill), [backlog](backlog.md)).
+**Phase:** Sprint 2 complete (#200). **Sprint 3 planned, not started** (#201–#204): [sprint-3](sprint-3.md). Next: four spec agents (V, D, R, P), C when a slot frees; backlog only during downtime, not near the sprint's end ([orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill), [backlog](backlog.md)).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
@@ -13,7 +13,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | R: modifiers tiers 1–3 + triggers | `spec/rule-triggers` | — | Not started | Spec agent |
 | P: party board + handouts | `spec/party-board` | — | Not started | Spec agent |
 | C: compendium | `spec/compendium` | — | Not started | Spec agent when a slot frees |
-| Backfill (BL-nn) | `fix/bl-<nn>-<slug>` | — | None | Per §3a |
+| Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | None | Per §3a |
 
 ## Shared-file locks
 

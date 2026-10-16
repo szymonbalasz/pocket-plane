@@ -1,6 +1,6 @@
 # Backlog: self-selectable work (orchestrator)
 
-DM decision [#204](../decisions-log.md): when only **one agent is working and nothing is queued**, the orchestrator picks an item from this list **without asking the DM**, as long as it is independently buildable and testable and doesn't touch a locked file ([status](status.md) "Shared-file locks"). If nothing here fits, ask the DM for the next thing. The rules for picking and tracking are in [orchestrator-prompt §3a](orchestrator-prompt.md#3a-keep-the-agents-busy-backfill).
+DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprint's milestones come first. Only during **downtime** (one agent working, nothing in the sprint queue can start) does the orchestrator pick an item from this list **without asking the DM**, and not near the sprint's end. Rules for picking and tracking: [orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill).
 
 **Eligible** = size S or M, no DM product decision needed (an integrator ruling is fine), no shared core file (schema, `src/server/ws`, protocol envelope, play-shell frame) unless no other branch holds it, and testable with a thin walkthrough or e2e.
 
