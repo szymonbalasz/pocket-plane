@@ -12,7 +12,7 @@ import type { TokenView } from "@shared/scenes-map/schemas";
 import { decorateToken } from "../scenes-map/decorations";
 import { tokenOverlays } from "../scenes-map/token-overlays";
 import { BLIND_TEXT, blindStore, canvasBlind, isBlind } from "./blind";
-import { NO_VISION_PREFIX, noVisionNames } from "./no-vision";
+import { NO_VISION_PREFIX, noVisionDefinitionIds, noVisionNames } from "./no-vision";
 import { Raster } from "./paint-raster";
 import { FOG_ALPHA, type PaintCtx } from "./render";
 import { FOG_BADGE, fogTokenOverlay, INVISIBLE_BADGE } from "./token-overlay";
@@ -329,12 +329,12 @@ describe("FR-FOG-17 No vision set hint", () => {
     expect(NO_VISION_PREFIX).toBe("No vision set for: ");
   });
 
-  test("FR-FOG-17 imported definitions are read too; none left → hidden (empty)", () => {
-    const r = {
-      token: { a: tok("a", "Wolf", "imp", "p1") },
-      "imported-entity": { imp: senses(0, 60) },
-    };
-    expect(noVisionNames(r, "s")).toEqual([]);
+  test("FR-FOG-17 imported definitions are read too (from useDefinitions, FR-CMP-16); none left → hidden (empty)", () => {
+    const r = { token: { a: tok("a", "Wolf", "imp", "p1") } };
+    expect(noVisionDefinitionIds(r, "s")).toEqual(["imp"]);
+    expect(noVisionNames(r, "s", new Map([["imp", senses(0, 60)]]))).toEqual([]);
+    // Not loaded yet: unknown counts as 0 (FR-FOG-32).
+    expect(noVisionNames(r, "s")).toEqual(["Wolf"]);
   });
 });
 

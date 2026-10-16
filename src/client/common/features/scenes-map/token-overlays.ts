@@ -81,7 +81,7 @@ export interface TokenCue {
 export interface TokenDecoration {
   /** Token group opacity × 0.5 (the label row stays at full opacity). */
   dim?: boolean;
-  /** In the label row, after the name, on the labels layer (FR-MAP-43). */
+  /** In rows above the name, inside the footprint, overflow as "+N", on the labels layer (FR-MAP-43, BL-04). */
   badges?: readonly TokenBadge[];
   /** Replaces the selection ring. */
   ring?: "target";

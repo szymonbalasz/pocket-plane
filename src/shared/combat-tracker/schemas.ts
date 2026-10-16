@@ -326,7 +326,8 @@ export type CardRoll = z.infer<typeof CardRoll>;
  * FR-MOD-19, -37: one offered rule-trigger part on the card's damage (rolled with it, **not** in
  * `total`; lands per target at apply). The card's audience is the owner or the DM, so `label` is
  * the trigger's name. Settle facts for the DM popup (FR-MOD-39), frozen at the roll: `marked` =
- * the `targetMarked` preset (key or id), `hurt` = a `targetHurt` filter, `ask` = the first `ask`
+ * the `targetMarked` preset (a built-in key, or a campaign mark's **name**: a player's card never
+ * carries a preset id, R7), `hurt` = a `targetHurt` filter, `ask` = the first `ask`
  * note, `untick` = soft filters and none of the non-`ask` ones held at the roll.
  */
 export const CardTriggerPart = z.strictObject({

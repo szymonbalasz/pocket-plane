@@ -15,7 +15,6 @@ import {
   RULE_TRIGGER_TYPE,
 } from "@shared/effect-modifiers/trigger-records";
 import {
-  hasRedactedRefs,
   TRIGGER_WARNING_TEXT,
   triggerSentence,
   triggerValueNow,
@@ -44,6 +43,7 @@ import {
   type TriggerOwnerFacts,
   type TriggerOwnerRef,
   triggerOwnerFacts,
+  useOwnerDefinitions,
   wordsContext,
 } from "./trigger-owner";
 
@@ -63,13 +63,11 @@ function TriggerRow({
   const cx = wordsContext(store, facts.features);
   const value = triggerValueNow(t.rule, facts.values);
   const warnings = triggerWarnings(t.rule, facts.features, cx);
-  // A player's copy naming a DM's preset can't be saved back (FR-MOD-47): the DM edits it.
-  const redacted = store.you?.role !== "dm" && hasRedactedRefs(t.rule);
+  // A player's copy may name a DM's preset as `{name}`; the server keeps it (FR-MOD-47, #228).
   const owner = t.characterId
     ? { characterId: t.characterId }
     : { definitionId: t.definitionId as string };
   const setEnabled = (enabled: boolean) => {
-    if (redacted) return;
     void send(TRIGGER_INTENTS.putTrigger, {
       trigger: { id: t.id, ...owner, name: t.name, enabled, public: t.public, rule: t.rule },
     });
@@ -87,7 +85,7 @@ function TriggerRow({
         className="mt-0.5"
         aria-label={`${t.name} ${t.enabled ? "on" : "off"}`}
         checked={t.enabled}
-        disabled={!may || redacted || disabled}
+        disabled={!may || disabled}
         onCheckedChange={setEnabled}
       />
       <div className="min-w-0 flex-1">
@@ -126,9 +124,6 @@ function TriggerRow({
             {TRIGGER_WARNING_TEXT[w]}
           </div>
         ))}
-        {may && redacted && (
-          <div className="text-xs text-muted-foreground">Uses the DM's preset: ask the DM</div>
-        )}
       </div>
       {may && (
         <>
@@ -168,7 +163,7 @@ export function TriggersBlock({ owner }: { owner: TriggerOwnerRef }) {
   const { live } = useModIntent();
   const { rows, state, retry } = useLazyRecords<PlayerRuleTriggerRecord>(RULE_TRIGGER_TYPE);
   const [editor, setEditor] = useState<TriggerEditorStart | null>(null);
-  const facts = triggerOwnerFacts(store, owner);
+  const facts = triggerOwnerFacts(store, owner, useOwnerDefinitions(owner));
   const may = mayEditTriggers(store, owner);
   const mine = ownerTriggers(rows, owner, store.you?.role);
   const cap = owner.kind === "character" ? CHARACTER_TRIGGERS_MAX : DEFINITION_TRIGGERS_MAX;

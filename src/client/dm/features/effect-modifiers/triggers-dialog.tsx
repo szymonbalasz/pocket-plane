@@ -3,8 +3,7 @@
 // window's row action (any monster definition, custom or imported). Both open one Dialog around
 // the common Triggers block, which loads `rule-trigger` on open (FR-MOD-47). No new window.
 
-import { ENTITY_TYPE, IMPORTED_ENTITY_TYPE } from "@shared/entities/schemas";
-import type { RecordStore } from "@shared/protocol/store";
+import type { DefinitionRecord } from "@shared/entities/schemas";
 import type { TokenRecord } from "@shared/scenes-map/schemas";
 import { Button } from "@ui/components/ui/button";
 import { DropdownMenuItem } from "@ui/components/ui/menus";
@@ -15,8 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@ui/components/ui/overlays";
+import { useDefinitions } from "@ui/features/compendium/definitions";
 import type { TriggerOwnerRef } from "@ui/features/effect-modifiers/trigger-owner";
-import { triggerOwnerFacts } from "@ui/features/effect-modifiers/trigger-owner";
+import {
+  triggerOwnerFacts,
+  useOwnerDefinitions,
+} from "@ui/features/effect-modifiers/trigger-owner";
 import { TriggersBlock } from "@ui/features/effect-modifiers/triggers";
 import { useSync } from "@ui/sync/store";
 import { ZapIcon } from "lucide-react";
@@ -25,13 +28,23 @@ import type { CreatureAction } from "../entities/creature-actions";
 import type { CreatureRow } from "../entities/list";
 import type { TokenMenuDialogProps, TokenMenuItemProps } from "../scenes-map/token-menu";
 
-/** The trigger owner a token stands for: its character, else its monster definition if held. */
-export function tokenTriggerOwner(store: RecordStore, t: TokenRecord): TriggerOwnerRef | null {
+/**
+ * The trigger owner a token stands for: its character, else its monster definition if held.
+ * `definitions`: `useDefinitions([token.definitionId]).byId` (an imported one loads, FR-CMP-16).
+ */
+export function tokenTriggerOwner(
+  t: TokenRecord,
+  definitions: ReadonlyMap<string, DefinitionRecord>,
+): TriggerOwnerRef | null {
   if (t.characterId) return { kind: "character", id: t.characterId };
-  const def =
-    (store.records[ENTITY_TYPE]?.[t.definitionId] as { kind?: string } | undefined) ??
-    (store.records[IMPORTED_ENTITY_TYPE]?.[t.definitionId] as { kind?: string } | undefined);
+  const def = definitions.get(t.definitionId);
   return def?.kind === "monster" ? { kind: "definition", id: t.definitionId } : null;
+}
+
+/** The token's trigger owner, loading an imported definition on demand. */
+function useTokenTriggerOwner(t: TokenRecord): TriggerOwnerRef | null {
+  const defs = useDefinitions(t.characterId ? [] : [t.definitionId]).byId;
+  return tokenTriggerOwner(t, defs);
 }
 
 export function RuleTriggersDialog({
@@ -42,7 +55,8 @@ export function RuleTriggersDialog({
   onClose(): void;
 }) {
   const store = useSync((s) => s.store);
-  const name = owner ? triggerOwnerFacts(store, owner).name : "";
+  const definitions = useOwnerDefinitions(owner);
+  const name = owner ? triggerOwnerFacts(store, owner, definitions).name : "";
   return (
     <Dialog open={owner !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent data-testid="mod-triggers-dialog" className="sm:max-w-md">
@@ -59,8 +73,7 @@ export function RuleTriggersDialog({
 }
 
 export function TriggersMenuItem({ token, openDialog }: TokenMenuItemProps) {
-  const store = useSync((s) => s.store);
-  const owner = tokenTriggerOwner(store, token);
+  const owner = useTokenTriggerOwner(token);
   if (!owner) return null;
   return (
     <DropdownMenuItem data-testid="mod-token-menu-triggers" onSelect={openDialog}>
@@ -70,8 +83,7 @@ export function TriggersMenuItem({ token, openDialog }: TokenMenuItemProps) {
 }
 
 export function TriggersMenuDialog({ token, close }: TokenMenuDialogProps) {
-  const store = useSync((s) => s.store);
-  return <RuleTriggersDialog owner={tokenTriggerOwner(store, token)} onClose={close} />;
+  return <RuleTriggersDialog owner={useTokenTriggerOwner(token)} onClose={close} />;
 }
 
 function TriggersRowAction({ row }: { row: CreatureRow }) {

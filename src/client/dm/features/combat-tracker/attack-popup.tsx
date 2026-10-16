@@ -34,7 +34,7 @@ import {
   ToggleGroupItem,
 } from "@ui/components/ui/controls";
 import { Badge, Input, Label } from "@ui/components/ui/primitives";
-import { useCbtIntent, useCombatants } from "@ui/features/combat-tracker/store";
+import { toastIntentError, useCbtIntent, useCombatants } from "@ui/features/combat-tracker/store";
 import { useTargetingAttacker } from "@ui/features/combat-tracker/token-overlay";
 import { hideToast } from "@ui/features/notifications/toasts";
 import {
@@ -43,7 +43,8 @@ import {
   TOP_BAR_H,
   type Viewport,
 } from "@ui/features/play-shell/geometry";
-import { useRecords } from "@ui/sync/store";
+import { IntentRejected } from "@ui/sync/connection";
+import { useRecords, useSync } from "@ui/sync/store";
 import { EyeOffIcon, XIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LinkHintNote } from "../combat-extras/link-hint";
@@ -60,7 +61,14 @@ import {
   useMapSelection,
 } from "../scenes-map/selection";
 import { useDefinitions } from "./data";
-import { type PopupRowView, partInputs, partPreviewExtra, popupParts } from "./popup-parts";
+import {
+  type PopupRowView,
+  partInputs,
+  partPreviewExtra,
+  partRejects,
+  popupParts,
+  type RejectIssue,
+} from "./popup-parts";
 import {
   clampIntoWorkArea,
   dragPopup,
@@ -216,7 +224,11 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   // Popup parts' values, one per line (client memory; lost on close).
   const [partValues, setPartValues] = useState<Record<string, unknown>>({});
   const effects = useActiveEffects();
-  const { send, disabled } = useCbtIntent();
+  const { send, disabled: sending } = useCbtIntent();
+  // Apply goes through the connection itself so popup parts see its reject (R7, `onReject`).
+  const connection = useSync((s) => s.connection);
+  const [applying, setApplying] = useState(false);
+  const disabled = sending || applying;
   const attackerId = p?.attackerId ?? null;
 
   // FR-CBT-33: targeting while open; the attacker never gets a target ring.
@@ -299,22 +311,34 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   };
 
   const apply = async () => {
-    if (!ready) return;
-    // FR-CBT-72: a to-hit total iff the card has a to-hit roll; no damage total on an all-miss
-    // to-hit-only card.
-    const r = await send("cbt.applyCard", {
-      cardId: card.id,
-      ...(p.toHit ? { toHitTotal } : {}),
-      ...(damageTotal !== null ? { damageTotal } : {}),
-      targets: rows.map((x) => ({
-        ...partInputs(popupParts, partValues, x.view, views, p),
-        targetId: x.c.id,
-        hit: x.hit,
-        multiplier: x.mult,
-      })),
-    });
-    // FR-CBT-54: closing clears the map selection (popup-store); a reject keeps the popup open.
-    if (r !== undefined) close();
+    if (!ready || disabled) return;
+    setApplying(true);
+    try {
+      // FR-CBT-72: a to-hit total iff the card has a to-hit roll; no damage total on an all-miss
+      // to-hit-only card.
+      await connection.sendIntent("cbt.applyCard", {
+        cardId: card.id,
+        ...(p.toHit ? { toHitTotal } : {}),
+        ...(damageTotal !== null ? { damageTotal } : {}),
+        targets: rows.map((x) => ({
+          ...partInputs(popupParts, partValues, x.view, views, p),
+          targetId: x.c.id,
+          hit: x.hit,
+          multiplier: x.mult,
+        })),
+      });
+      // FR-CBT-54: closing clears the map selection (popup-store).
+      close();
+    } catch (err) {
+      // A reject keeps the popup open; lines may mark what it names (FR-MOD-40: Force).
+      toastIntentError(err);
+      if (err instanceof IntentRejected) {
+        const issues = (err.issues ?? []) as RejectIssue[];
+        setPartValues((s) => partRejects(popupParts, s, issues));
+      }
+    } finally {
+      setApplying(false);
+    }
   };
   const dismiss = async () => {
     const r = await send("note.dismiss", { id: card.id });

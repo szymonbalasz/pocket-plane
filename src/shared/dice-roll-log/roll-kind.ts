@@ -4,6 +4,7 @@
 // `rollSegments` / `rollBreakdownSegments` for their roll parts (FR-DICE-28). Roll-hook parts
 // (FR-MOD-19/20) follow the constant ("14 + 4 + 3 Bless = 21"); the DM's line names every part
 // from `dmPayload`, players see "(DM)" for parts of effects they don't receive.
+import { rollOfferSegments } from "@shared/effect-modifiers/combat-parts";
 import { AUTO_PART_TEXT, modeLabels, modSegments, modsTotal } from "@shared/effect-modifiers/line";
 import { parseExpression } from "./grammar";
 import { defineLogKind, type LineSegment } from "./kind-types";
@@ -85,6 +86,8 @@ export function rollSegments(
   out.push(...termSegments(item));
   out.push(...modSegments(item.mods, opts.dm?.mods));
   out.push({ text: " = " }, { text: String(item.total), style: "total" });
+  // FR-MOD-20 (R7): offered trigger parts, not in the total.
+  out.push(...rollOfferSegments(item.offered, opts.dm?.offered));
   if (opts.category !== "initiative") {
     if (item.natural === 20) out.push({ text: " — natural 20!" });
     if (item.natural === 1) out.push({ text: " — natural 1" });

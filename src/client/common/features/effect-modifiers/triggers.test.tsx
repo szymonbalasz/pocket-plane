@@ -23,7 +23,6 @@ import {
   draftOfRule,
   everyOptions,
   putTriggerPayload,
-  REDACTED_MESSAGE,
   ruleOfDraft,
   withEvent,
 } from "./trigger-editor-model";
@@ -105,6 +104,10 @@ function syncState(o: {
   const lazy: LazyState = { ...lazyAfterSnapshot(1) };
   if (o.lazy === "ready" || o.lazy === undefined)
     lazy.loaded = { ...emptyLoaded(), types: [RULE_TRIGGER_TYPE] };
+  // FR-CMP-16: the imported definition reaches the block through `useDefinitions` (loaded).
+  if (o.role === "dm") {
+    lazy.loaded = { ...lazy.loaded, ids: { [IMPORTED_ENTITY_TYPE]: ["srd-elite"] } };
+  }
   if (o.lazy === "error") lazy.failed = { ...emptyLoaded(), types: [RULE_TRIGGER_TYPE] };
   if (o.lazy === "loading") lazy.loading = { ...emptyLoaded(), types: [RULE_TRIGGER_TYPE] };
   const records = {
@@ -118,7 +121,25 @@ function syncState(o: {
       },
     },
     [IMPORTED_ENTITY_TYPE]: {
-      "srd-elite": { id: "srd-elite", kind: "monster", name: "Elite", statBlock: ELITE_STATS },
+      "srd-elite": {
+        id: "srd-elite",
+        kind: "monster",
+        name: "Elite",
+        statBlock: ELITE_STATS,
+        campaignId: null,
+        portraitAssetId: null,
+        tokenShape: null,
+        ownerPlayerId: null,
+        hpCurrent: null,
+        derivedFromId: null,
+        createdAt: "t",
+        updatedAt: "t",
+        source: "srd-5.1",
+        sourceKey: "monster/elite",
+        licence: "CC BY 4.0",
+        attribution: "SRD 5.1",
+        importedAt: "t",
+      },
     },
     [EFFECT_PRESET_TYPE]: {
       "p-rage": { id: "p-rage", seq: 1, characterId: "brakka", name: "Rage", modifiers: [] },
@@ -401,14 +422,18 @@ describe("FR-MOD-50 trigger editor", () => {
     expect(ruleOfDraft({ ...blankTrigger("character"), on: "roll", when: [] }).ok).toBe(false);
   });
 
-  test("FR-MOD-47 a player's redacted ref is shown but can't be saved back", () => {
+  test("FR-MOD-47 #228 a player's redacted ref is shown and saved back as {name} (the server keeps the stored preset)", () => {
     const copy = { ...divineFury.rule, requires: { name: "Frost Ward" } };
     const d = draftOfRule(divineFury, copy as never);
     expect(d.requiresName).toBe("Frost Ward");
-    expect(ruleOfDraft(d)).toEqual({ ok: false, message: REDACTED_MESSAGE, path: ["requires"] });
-    expect(ruleOfDraft({ ...d, requires: "rage", requiresName: null }).ok).toBe(true);
+    expect(ruleOfDraft(d)).toEqual({ ok: true, rule: copy });
+    expect(ruleOfDraft({ ...d, requires: "rage", requiresName: null })).toMatchObject({
+      ok: true,
+      rule: { requires: { preset: "rage" } },
+    });
     const html = renderForm({ role: "player" }, { owner, draft: d, title: "x" });
-    expect(html).toContain('data-testid="mod-trig-editor-invalid"');
-    expect(tags(html, "mod-trig-editor-save")[0]).toContain('disabled=""');
+    expect(html).toContain("while Frost Ward is on");
+    expect(html).not.toContain('data-testid="mod-trig-editor-invalid"');
+    expect(tags(html, "mod-trig-editor-save")[0]).not.toContain('disabled=""');
   });
 });

@@ -1,14 +1,15 @@
 // A rule trigger's owner as the client sees it (FR-MOD-35, -45, -49, -50): a character (name,
 // stats, sheet features, lock, owner player) or a monster definition (custom or imported). The
-// formula's live value reads the stats from the synced store: imported definitions come from the
-// `imported-entity` records until compendium's C2 moves them behind `useDefinitions` (review C5).
+// formula's live value reads the stats from the synced store (characters, customs) or, for an
+// imported definition, from `useDefinitions` (lazy, FR-CMP-16; review C5): `useOwnerDefinitions`.
 import type { FeatureRow } from "@shared/character-sheet/sheet";
 import type { FormulaOwner } from "@shared/effect-modifiers/formula";
 import { formulaOwnerOf } from "@shared/effect-modifiers/trigger-fire";
 import type { PlayerRuleTriggerRecord } from "@shared/effect-modifiers/trigger-records";
 import type { TriggerWordsContext } from "@shared/effect-modifiers/trigger-words";
-import { ENTITY_TYPE, IMPORTED_ENTITY_TYPE, type StatBlock } from "@shared/entities/schemas";
+import { type DefinitionRecord, ENTITY_TYPE, type StatBlock } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
+import { useDefinitions } from "../compendium/definitions";
 import { presetsIn, sheetIn } from "./store";
 
 export type TriggerOwnerKind = "character" | "definition";
@@ -37,10 +38,27 @@ interface DefinitionLike {
 const recordOf = (store: RecordStore, type: string, id: string) =>
   store.records[type]?.[id] as DefinitionLike | undefined;
 
-export function triggerOwnerFacts(store: RecordStore, owner: TriggerOwnerRef): TriggerOwnerFacts {
+/** Definitions `useDefinitions` holds for a definition owner (an imported one loads, DM only). */
+export function useOwnerDefinitions(
+  owner: TriggerOwnerRef | null,
+): ReadonlyMap<string, DefinitionRecord> {
+  return useDefinitions(owner?.kind === "definition" ? [owner.id] : []).byId;
+}
+
+/**
+ * `definitions`: `useOwnerDefinitions(owner)`; without it an imported definition's stats and
+ * name aren't known (campaign rows still come from the store).
+ */
+export function triggerOwnerFacts(
+  store: RecordStore,
+  owner: TriggerOwnerRef,
+  definitions?: ReadonlyMap<string, DefinitionRecord>,
+): TriggerOwnerFacts {
   const def =
     recordOf(store, ENTITY_TYPE, owner.id) ??
-    (owner.kind === "definition" ? recordOf(store, IMPORTED_ENTITY_TYPE, owner.id) : undefined);
+    (owner.kind === "definition"
+      ? (definitions?.get(owner.id) as DefinitionLike | undefined)
+      : undefined);
   let values: FormulaOwner | null = null;
   try {
     values = def?.statBlock ? formulaOwnerOf(def.statBlock) : null;

@@ -8,20 +8,6 @@ import path from "node:path";
 const ROOT = path.resolve(import.meta.dir, "../../../../..");
 const CLIENT = "src/client";
 const OWNER = "src/client/common/features/compendium/definitions.ts";
-/**
- * Call sites not switched yet (compendium §14: after R7 merges; the sheet under the sheet lock).
- * Must shrink to empty in C2; a listed file that no longer reads the type fails the test too.
- */
-const PENDING: readonly string[] = [
-  "src/client/common/features/character-sheet/CharacterSheet.tsx",
-  "src/client/common/features/combat-extras/concentration.tsx",
-  "src/client/common/features/effect-modifiers/trigger-owner.ts",
-  "src/client/dm/features/combat-extras/add-dialog.tsx",
-  "src/client/dm/features/combat-tracker/data.ts",
-  "src/client/dm/features/combat-tracker/encounters-window.tsx",
-  "src/client/dm/features/effect-modifiers/triggers-dialog.tsx",
-  "src/client/dm/features/entities/creatures-window.tsx",
-];
 
 function files(dir: string): string[] {
   const out: string[] = [];
@@ -44,9 +30,7 @@ describe("FR-CMP-16 boundary", () => {
     const offenders = files(CLIENT).filter(
       (f) => f !== OWNER && readsImportedEntity(readFileSync(path.join(ROOT, f), "utf8")),
     );
-    expect(offenders.filter((f) => !PENDING.includes(f))).toEqual([]);
-    // A pending entry that was switched must leave the list (it only ever shrinks).
-    expect(PENDING.filter((f) => !offenders.includes(f))).toEqual([]);
+    expect(offenders).toEqual([]);
     expect(readsImportedEntity(readFileSync(path.join(ROOT, OWNER), "utf8"))).toBe(true);
   });
 

@@ -61,10 +61,11 @@ import {
   Tooltip,
 } from "../../components/ui/overlays";
 import { useRecords, useSync } from "../../sync/store";
+import { useDefinitions } from "../compendium/definitions";
 import { useBaseKeyDown } from "../play-shell/hooks";
 import { toastReject, useLive, useMapIntent } from "../scenes-map/intents";
 import { type FogShapeMode, gestureKey } from "./gesture";
-import { NO_VISION_PREFIX, noVisionNames } from "./no-vision";
+import { NO_VISION_PREFIX, noVisionDefinitionIds, noVisionNames } from "./no-vision";
 import {
   applyFogStep,
   type FogMode,
@@ -333,9 +334,15 @@ function ViewAsSelect({ disabled }: { disabled: boolean }) {
 /** FR-FOG-17: "No vision set for: ‹names›" (DM only; hidden when every owned token has senses). */
 function NoVisionHint({ sceneId }: { sceneId: string | null }) {
   const records = useSync((s) => s.store.records);
-  const names = useMemo(
-    () => (sceneId === null ? [] : noVisionNames(records, sceneId)),
+  // FR-CMP-16: an owned token of an imported definition reads it through `useDefinitions`.
+  const defIds = useMemo(
+    () => (sceneId === null ? [] : noVisionDefinitionIds(records, sceneId)),
     [records, sceneId],
+  );
+  const definitions = useDefinitions(defIds).byId;
+  const names = useMemo(
+    () => (sceneId === null ? [] : noVisionNames(records, sceneId, definitions)),
+    [records, sceneId, definitions],
   );
   if (names.length === 0) return null;
   return (
