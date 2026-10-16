@@ -1,15 +1,26 @@
-// FR-FOG-08 / -10 / -13 / -35 (ADR-0042): the scene re-derive, in the writing command's
-// transaction: every fog subject's copies (`fogged`, `seenBy`) against the scene's current fog
-// (static state once per sample point), the doors' `f` / `doorSeen` in its `scene-structure` row
-// (FR-SCN-36; `rev` + 1 only when an `f` flips). A token whose party-level hidden flips runs the
-// token-changed hooks (combat copies, FR-FOG-13 / -14). Subject rows first, then hook rows.
+// FR-FOG-08 / -10 / -13 / -35 / -37 / -39 / -44 (ADR-0042): the scene re-derive, in the writing
+// command's transaction. Every player's sight (FR-FOG-33, cached, FR-FOG-38), then: each
+// player's explored memory (active scene with the setting on only, FR-FOG-37), each darkness
+// shape's `seenBy` (FR-FOG-44), every fog subject's copies (`fogged`, `seenBy`; static state once
+// per sample point), the doors' `f` / `doorSeen` in the `scene-structure` row (FR-SCN-36; `rev`
+// + 1 only when an `f` flips), and each player's derived `vision` record (FR-FOG-39: listed when
+// the sight's inputs changed). A token whose party-level hidden flips runs the token-changed hooks
+// (combat copies, FR-FOG-13 / -14). Order: `fog`, `vision`, `fog-explored`, subjects, hook rows;
+// one change per record (BL-13: a combatant touched by several flips is listed once).
 // `updatedAt` moves only with a wire-visible field (`fogged`, `f`): a `seenBy`-only change is
-// invisible on every wire and dropped from frames (FR-SYNC-19 as amended). Static only (V0 / V1):
-// darkness shapes' `seenBy` (FR-FOG-44) is rewritten too; a change lists the `fog` row first (its
-// player wire differs only for players whose filtered `darkness` changed).
+// identical on every wire and dropped from frames (FR-SYNC-19 as amended).
 
-import { FOG_TYPE } from "@shared/fog-of-war/schemas";
+import { exploredMask } from "@shared/fog-of-war/explored";
+import { encodeRuns, fogBox, rebase, runCount, uniformMask } from "@shared/fog-of-war/mask";
+import {
+  FOG_EXPLORED_TYPE,
+  FOG_RUNS_MAX,
+  FOG_TYPE,
+  scenePlayerId,
+  VISION_TYPE,
+} from "@shared/fog-of-war/schemas";
 import type { DarknessRow } from "@shared/fog-of-war/shapes";
+import { type PlayerVision, polygonCells } from "@shared/fog-of-war/vision";
 import {
   doorCells,
   doorSamplePoints,
@@ -24,8 +35,16 @@ import {
 } from "@shared/scene-tools/schemas";
 import { footprint } from "@shared/scenes-map/geometry";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
-import { and, eq, ne } from "drizzle-orm";
-import { aoeTemplate, prop, scene, sceneFog, sceneStructure, token } from "../../db/schema";
+import { and, eq, inArray } from "drizzle-orm";
+import {
+  aoeTemplate,
+  fogExplored,
+  prop,
+  scene,
+  sceneFog,
+  sceneStructure,
+  token,
+} from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import {
   readProp,
@@ -38,6 +57,7 @@ import { readScene, readToken, sceneTokens } from "../scenes-map/rows";
 import { runTokenChangedHooks } from "../scenes-map/token-hooks";
 import { type SceneHookEnv, tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 import {
+  campaignPlayers,
   darknessSeenBy,
   loadMemory,
   loadSceneStatic,
@@ -45,13 +65,28 @@ import {
   sameSeenBy,
   subjectCopies,
 } from "./derive";
-import { readFogRecord } from "./rows";
+import { readExploredRecord, readFogRecord, type ServerVisionRecord, toVisionRecord } from "./rows";
+import { fogLog, isSource, type SourceLike } from "./sight";
+import { type VisionEntry, visionCache } from "./vision-cache";
+
+/** A token as a possible vision source (FR-FOG-32). */
+export type SourceToken = SourceLike & { id: string };
 
 export interface RederiveOptions {
   /** Run token-changed hooks on party-level flips (default true). */
   hooks?: boolean;
   /** Boot backfill (FR-FOG-40): never touch `updatedAt` (the wire stays byte-equal). */
   migration?: boolean;
+  /**
+   * The write was a source token's (FR-FOG-35): its before / after, so a player whose last
+   * source left (or whose first arrived) gets the `vision` delete (or create).
+   */
+  sourceChange?: { before: SourceToken | null; after: SourceToken | null };
+  /**
+   * Whose explored memory may grow (default: every player). A source write grows only its old
+   * and new owner's (FOG §9: the other players get the moved token only).
+   */
+  memoryOf?: readonly string[];
 }
 
 function rederiveTokens(env: SceneHookEnv, st: SceneStatic, now: string, o: RederiveOptions) {
@@ -191,52 +226,189 @@ export function rederiveDarkness(env: Pick<SceneHookEnv, "tx">, st: SceneStatic)
   return { type: FOG_TYPE, id: st.sceneId, before, after } satisfies RecordChange;
 }
 
+/** BL-13: one change per record, at its last position: the first `before`, the last `after`. */
+export function mergeChanges(list: readonly RecordChange[]): RecordChange[] {
+  const key = (c: RecordChange) => `${c.type}\u0000${c.id}`;
+  const last = new Map<string, number>();
+  const first = new Map<string, RecordChange>();
+  list.forEach((c, i) => {
+    last.set(key(c), i);
+    if (!first.has(key(c))) first.set(key(c), c);
+  });
+  if (last.size === list.length) return [...list];
+  return list.flatMap((c, i) => {
+    const k = key(c);
+    if (last.get(k) !== i) return [];
+    const f = first.get(k) as RecordChange;
+    return [f === c ? c : { ...c, before: f.before }];
+  });
+}
+
 /**
- * FR-FOG-35: the `fog` row if a darkness `seenBy` changes, every fog subject on the scene whose
- * copies change, then token-hook rows. Callers: fog commands (they list their own `fog` change
- * and drop this one), activation of a stale scene, a new player (active scene), the boot backfill.
+ * FR-FOG-37: on the active scene with Explored on, every cell whose centre lies in one of P's
+ * polygons becomes explored for P (one row per player, never shrinks; box = the scene's fog box,
+ * FR-FOG-03). Over 2,000 runs the memory stops growing (`warn`).
+ */
+function rederiveMemory(
+  env: SceneHookEnv,
+  st: SceneStatic,
+  box: [number, number, number, number],
+  only?: readonly string[],
+) {
+  const changes: RecordChange[] = [];
+  const [col0, row0, cols, rows] = box;
+  for (const [p, sight] of st.sight ?? []) {
+    if (sight.vision.polys.length === 0 || (only && !only.includes(p))) continue;
+    const before = readExploredRecord(env.tx, st.sceneId, p);
+    const mask = before ? rebase(exploredMask(before), box) : uniformMask("clear", box);
+    let grew = !!before && before.box.some((v, i) => v !== box[i]);
+    for (const poly of sight.vision.polys) {
+      polygonCells(poly.poly, (c, r) => {
+        const cc = c - col0;
+        const rr = r - row0;
+        if (cc < 0 || rr < 0 || cc >= cols || rr >= rows) return;
+        if (mask.cells[rr * cols + cc] === 0) {
+          mask.cells[rr * cols + cc] = 1;
+          grew = true;
+        }
+      });
+    }
+    if (!grew) continue;
+    const runs = encodeRuns(mask.cells, "clear");
+    if (runCount(runs) > FOG_RUNS_MAX) {
+      fogLog().warn(`fog: explored memory of ${p} on scene ${st.sceneId} is full; not growing`);
+      continue;
+    }
+    const values = { col0, row0, cols, rows, runs, updatedAt: env.ctx.clock.iso() };
+    env.tx
+      .insert(fogExplored)
+      .values({ sceneId: st.sceneId, playerId: p, campaignId: st.campaignId, ...values })
+      .onConflictDoUpdate({ target: [fogExplored.sceneId, fogExplored.playerId], set: values })
+      .run();
+    const after = readExploredRecord(env.tx, st.sceneId, p);
+    changes.push({ type: FOG_EXPLORED_TYPE, id: scenePlayerId(st.sceneId, p), before, after });
+  }
+  return changes;
+}
+
+/** A `vision` before whose data is unknown (cache miss): never equal to a real record. */
+const unknownVision = (
+  sc: { sceneId: string; campaignId: string },
+  p: string,
+): ServerVisionRecord =>
+  toVisionRecord(sc, p, { blind: false, see: [[]], dark: [], inv: [], polys: [] });
+
+/** Same wire content (FR-FOG-39): a sight whose inputs moved but whose polygons didn't. */
+const sameVision = (a: PlayerVision, b: PlayerVision) =>
+  a.blind === b.blind &&
+  JSON.stringify([a.see, a.dark, a.inv]) === JSON.stringify([b.see, b.dark, b.inv]);
+
+/**
+ * FR-FOG-39: each player's `vision` change: created (first source), deleted (last source gone)
+ * or updated when the sight's inputs and polygons changed; `before` = the cached sight clients
+ * last got (unknown → a `before` that never equals a record, so the update always goes out).
+ */
+function visionChanges(
+  st: SceneStatic,
+  prior: ReadonlyMap<string, VisionEntry | null>,
+  hadBefore: (p: string) => boolean,
+): RecordChange[] {
+  const sc = { sceneId: st.sceneId, campaignId: st.campaignId };
+  const out: RecordChange[] = [];
+  for (const p of st.players) {
+    const now = st.sight?.get(p) ?? null;
+    const had = hadBefore(p);
+    const pr = prior.get(p) ?? null;
+    if (!now && !had) continue;
+    if (now && had && pr && (pr.key === now.key || sameVision(pr.vision, now.vision))) continue;
+    const before = had ? (pr ? toVisionRecord(sc, p, pr.vision) : unknownVision(sc, p)) : null;
+    const after = now ? toVisionRecord(sc, p, now.vision) : null;
+    out.push({ type: VISION_TYPE, id: scenePlayerId(st.sceneId, p), before, after });
+  }
+  return out;
+}
+
+/** Did P have a source on the scene before the write? (Now, adjusted by the written token.) */
+function sourcesBefore(st: SceneStatic, sceneId: string, o: RederiveOptions) {
+  const ch = o.sourceChange;
+  return (p: string) => {
+    const now = (st.sight?.get(p)?.sources ?? []).filter((s) => s.tokenId !== ch?.after?.id);
+    if (now.length > 0) return true;
+    const b = ch?.before;
+    if (ch && isSource(b) && b.sceneId === sceneId && b.ownerPlayerId === p) return true;
+    // Over the source cap the written token may be the one left out: still a source then.
+    return !ch && st.sight?.has(p) === true;
+  };
+}
+
+/**
+ * FR-FOG-35: the `fog` row if a darkness `seenBy` changes, `vision` and `fog-explored` rows,
+ * every fog subject on the scene whose copies change, then token-hook rows. Callers: fog
+ * commands (they list their own `fog` change and drop this one), the visibility line's
+ * `rederive` (source tokens, structure edits, a scene copy), activation of a stale scene, a new
+ * player and a senses edit (active scene), the boot backfill.
  */
 export function rederiveScene(
   env: SceneHookEnv,
   sceneId: string,
   o: RederiveOptions = {},
 ): RecordChange[] {
+  const sc = env.tx.select().from(scene).where(eq(scene.id, sceneId)).get();
+  if (!sc) return [];
+  const cache = visionCache(env.tx);
+  const prior = new Map(
+    campaignPlayers(env.tx, sc.campaignId).map((p) => [p, cache.latest(sceneId, p)] as const),
+  );
   const st = loadSceneStatic(env.tx, sceneId);
   if (!st) return [];
   const now = env.ctx.clock.iso();
+  const vision = o.migration ? [] : visionChanges(st, prior, sourcesBefore(st, sceneId, o));
+  const row = env.tx
+    .select({ on: sceneFog.explored, stale: sceneFog.visionStale })
+    .from(sceneFog)
+    .where(eq(sceneFog.sceneId, sceneId))
+    .get();
+  // A full re-derive brings a stale scene up to date (FR-FOG-35).
+  if (row?.stale) {
+    env.tx.update(sceneFog).set({ visionStale: false }).where(eq(sceneFog.sceneId, sceneId)).run();
+  }
+  const explored = !o.migration && sc.active && row?.on === true;
+  const memory = explored ? rederiveMemory(env, st, fogBox(sc), o.memoryOf) : [];
   const darkness = rederiveDarkness(env, st);
   const tokens = rederiveTokens(env, st, now, o);
-  return [
+  return mergeChanges([
     ...(darkness ? [darkness] : []),
+    ...vision,
+    ...memory,
     ...tokens.changes,
     ...rederiveProps(env, st, now, o),
     ...rederiveTemplates(env, st, now, o),
     ...rederiveDoors(env, st, now, o),
     ...tokens.hookChanges,
-  ];
+  ]);
 }
 
 /**
- * FR-FOG-35 (campaign-wide trigger): marks every non-active scene with a fog row `visionStale`
- * (re-derived on activation) and returns the scenes to re-derive now: the active one and those
- * without a fog row (no row to carry the flag; every point clear, so the re-derive is cheap).
+ * FR-FOG-35 (campaign-wide trigger): marks the campaign's non-active scenes with a fog row
+ * `visionStale` (re-derived on activation; `only` = just those scenes) and returns the scenes to
+ * re-derive now: the active one and those without a fog row (no row to carry the flag; every
+ * point clear, so the re-derive is cheap).
  */
-export function markScenesStale(env: SceneHookEnv, campaignId: string): string[] {
+export function markScenesStale(
+  env: SceneHookEnv,
+  campaignId: string,
+  only?: readonly string[],
+): string[] {
   const { tx } = env;
   const scenes = tx
     .select({ id: scene.id, active: scene.active, fog: sceneFog.sceneId })
     .from(scene)
     .leftJoin(sceneFog, eq(sceneFog.sceneId, scene.id))
-    .where(eq(scene.campaignId, campaignId))
+    .where(and(eq(scene.campaignId, campaignId), ...(only ? [inArray(scene.id, [...only])] : [])))
     .all();
-  tx.update(sceneFog)
-    .set({ visionStale: true })
-    .where(
-      and(
-        eq(sceneFog.campaignId, campaignId),
-        ...scenes.filter((s) => s.active).map((s) => ne(sceneFog.sceneId, s.id)),
-      ),
-    )
-    .run();
+  const stale = scenes.filter((s) => !s.active && s.fog !== null).map((s) => s.id);
+  if (stale.length > 0) {
+    tx.update(sceneFog).set({ visionStale: true }).where(inArray(sceneFog.sceneId, stale)).run();
+  }
   return scenes.filter((s) => s.active || s.fog === null).map((s) => s.id);
 }
