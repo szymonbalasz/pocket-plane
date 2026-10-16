@@ -6,7 +6,7 @@ import type { DiceLook } from "@shared/dice-extras/looks";
 import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import type { ThrowDie } from "@shared/dice-extras/throw";
 import { useEffect, useRef } from "react";
-import type { RestInfo } from "./dice3d/index";
+import type { PlayHandle, RestInfo } from "./dice3d/index";
 import { dice3d } from "./lazy3d";
 
 /** A die the 3D renderer draws (a mesh die with a server value); the rest stay flat chips. */
@@ -22,6 +22,7 @@ export function Throw3DStage({
   width,
   height,
   rest,
+  interrupted,
   onRest,
   onLost,
 }: {
@@ -31,10 +32,13 @@ export function Throw3DStage({
   width: number;
   height: number;
   rest: RestInfo | null;
+  /** FR-DICEX-18: a newer throw started; snap to the final pose and hold that frame. */
+  interrupted: boolean;
   onRest(info: RestInfo): void;
   onLost(): void;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const handle = useRef<PlayHandle | null>(null);
   const cb = useRef({ onRest, onLost });
   cb.current = { onRest, onLost };
   const input = useRef({ dice, looks, width, height });
@@ -49,9 +53,8 @@ export function Throw3DStage({
       return;
     }
     const { dice: ds, looks: ls, width: w, height: h } = input.current;
-    let handle: { stop(): void } | null = null;
     try {
-      handle = mod.playThrow({
+      handle.current = mod.playThrow({
         host: el,
         width: w,
         height: h,
@@ -71,8 +74,14 @@ export function Throw3DStage({
       console.warn("Dice: WebGL could not start; showing flat dice.", err);
       cb.current.onLost();
     }
-    return () => handle?.stop();
+    return () => {
+      handle.current?.stop();
+      handle.current = null;
+    };
   }, [throwId]);
+  useEffect(() => {
+    if (interrupted) handle.current?.freeze();
+  }, [interrupted]);
 
   return (
     <div className="relative" style={{ width, height }}>

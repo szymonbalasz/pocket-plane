@@ -58,6 +58,11 @@ export interface PlayOptions {
 }
 
 export interface PlayHandle {
+  /**
+   * FR-DICEX-18: jump to the final pose (reports rest if not yet), keep that frame as a still
+   * image in the host and hand the shared canvas back for the next throw.
+   */
+  freeze(): void;
   stop(): void;
 }
 
@@ -92,7 +97,7 @@ interface Stage {
 }
 
 let stage: Stage | null = null;
-let active: { onLost(): void } | null = null;
+let active: { onLost(): void; freeze(): void } | null = null;
 const textures = new Map<string, CanvasTexture>();
 const materials = new Map<string, Material>();
 
@@ -198,6 +203,8 @@ function median(xs: number[]): number | null {
  * FR-DICEX-15: simulate, relabel, play. Throws when WebGL can't start (the caller draws flat).
  */
 export function playThrow(o: PlayOptions): PlayHandle {
+  // FR-DICEX-18: one throw at a time; the running one snaps to rest before the canvas moves on.
+  active?.freeze();
   if (stage?.lost) stage.renderer.dispose();
   if (!stage || stage.lost) stage = createStage();
   const s = stage;
@@ -261,10 +268,13 @@ export function playThrow(o: PlayOptions): PlayHandle {
   let start: number | null = null;
   let prev: number | null = null;
   const deltas: number[] = [];
-  let stopped = false;
+  let released = false;
+  let rested = false;
+  let still: HTMLCanvasElement | null = null;
   const last = sim.frameCount - 1;
 
   const rest = () => {
+    rested = true;
     renderer.setAnimationLoop(null);
     pose(last);
     meshes.forEach((m, i) => {
@@ -289,11 +299,34 @@ export function playThrow(o: PlayOptions): PlayHandle {
     o.onRest({ settled, at, medianFrameMs: median(deltas) });
   };
 
-  const me = { onLost: () => !stopped && o.onLost() };
+  const release = () => {
+    if (released) return;
+    released = true;
+    if (active === me) active = null;
+    renderer.setAnimationLoop(null);
+    scene.remove(group);
+    for (const x of own) x.dispose();
+    if (renderer.domElement.parentElement === o.host) o.host.removeChild(renderer.domElement);
+  };
+  const freeze = () => {
+    if (released) return;
+    if (rested) renderer.render(scene, camera);
+    else rest();
+    // Copied in the same task as the render, so the drawing buffer still holds the frame.
+    const src = renderer.domElement;
+    still = o.host.ownerDocument.createElement("canvas");
+    still.width = src.width;
+    still.height = src.height;
+    still.style.cssText = `display:block;width:${o.width}px;height:${o.height}px`;
+    still.getContext("2d")?.drawImage(src, 0, 0);
+    release();
+    o.host.appendChild(still);
+  };
+  const me = { onLost: () => !released && o.onLost(), freeze };
   active = me;
   pose(0);
   renderer.setAnimationLoop((time) => {
-    if (stopped) return;
+    if (released) return;
     if (start === null) start = time;
     if (prev !== null) deltas.push(time - prev);
     prev = time;
@@ -307,14 +340,11 @@ export function playThrow(o: PlayOptions): PlayHandle {
   });
 
   return {
+    freeze,
     stop() {
-      if (stopped) return;
-      stopped = true;
-      if (active === me) active = null;
-      renderer.setAnimationLoop(null);
-      scene.remove(group);
-      for (const x of own) x.dispose();
-      if (renderer.domElement.parentElement === o.host) o.host.removeChild(renderer.domElement);
+      release();
+      still?.remove();
+      still = null;
     },
   };
 }

@@ -45,6 +45,8 @@ export interface DiceExtrasState {
   pending: boolean;
   /** The running throw; `seq` tells a new throw from a re-render. */
   current: { t: DiceThrow; seq: number } | null;
+  /** The throw a new one interrupted: it snaps to rest and fades (FR-DICEX-18). */
+  leaving: { t: DiceThrow; seq: number } | null;
 }
 
 export interface DiceExtrasTimers {
@@ -65,7 +67,7 @@ export interface DiceExtrasStore {
   failed(): void;
   /** This client's first new own `roll` entries arrived in one frame. */
   ownRolled(entries: GameLogEntryView[]): void;
-  /** A new throw (FR-DICEX-18: it replaces the running one). */
+  /** A new throw (FR-DICEX-18: the running one becomes `leaving`, snaps to rest and fades). */
   play(t: DiceThrow): void;
   /** The throw `seq` faded out. */
   done(seq: number): void;
@@ -84,6 +86,7 @@ const initial = (): DiceExtrasState => ({
   result: null,
   pending: false,
   current: null,
+  leaving: null,
 });
 
 export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers): DiceExtrasStore {
@@ -137,10 +140,12 @@ export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers):
     },
     play(t) {
       seq += 1;
-      api.setState({ current: { t, seq } });
+      api.setState((s) => ({ current: { t, seq }, leaving: s.current }));
     },
     done(n) {
-      if (api.getState().current?.seq === n) api.setState({ current: null });
+      const s = api.getState();
+      if (s.current?.seq === n) api.setState({ current: null });
+      if (s.leaving?.seq === n) api.setState({ leaving: null });
     },
   };
 }

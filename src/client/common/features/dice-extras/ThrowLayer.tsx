@@ -3,7 +3,8 @@
 // entries into throws (FR-DICEX-11, -12, -19) and draws them in the throw zone (FR-DICEX-17):
 // over the free area, bottom centre, never over a window, nothing interactive. `flat`: faces fade
 // in at their values, no motion, no render loop; `3d`: the lazy chunk tumbles the dice onto the
-// server's faces (FR-DICEX-15), then they rest and fade like flat dice.
+// server's faces (FR-DICEX-15), then they rest and fade like flat dice. A new throw interrupts the
+// running one (FR-DICEX-18): it snaps to its settled faces and fades while the new one starts.
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import { type DiceLook, defaultLook } from "@shared/dice-extras/looks";
@@ -103,10 +104,13 @@ function ThrowView({
   isDm,
   draw,
   zone,
+  interrupted,
   onSlow,
 }: {
   t: DiceThrow;
   seq: number;
+  /** FR-DICEX-18: a newer throw started; snap to rest and fade now. */
+  interrupted: boolean;
   looks: Record<string, DiceLook>;
   isDm: boolean;
   /** Decided when the throw starts: a chunk that arrives mid-throw waits for the next one. */
@@ -135,14 +139,22 @@ function ThrowView({
     return () => clearTimeout(id);
   }, [mode]);
   useEffect(() => {
-    if (phase !== "rest") return;
+    if (phase !== "rest" || interrupted) return;
     const fade = setTimeout(() => setPhase("fading"), REST_MS);
     const done = setTimeout(() => diceExtras.done(seq), REST_MS + FLAT_FADE_MS);
     return () => {
       clearTimeout(fade);
       clearTimeout(done);
     };
-  }, [phase, seq]);
+  }, [phase, seq, interrupted]);
+  useEffect(() => {
+    if (!interrupted) return;
+    const done = setTimeout(() => diceExtras.done(seq), FLAT_FADE_MS);
+    return () => clearTimeout(done);
+  }, [interrupted, seq]);
+  // Interrupted: at rest (settled faces, total) and fading, whatever the phase was.
+  const atRest = interrupted || phase !== "moving";
+  const fading = interrupted || phase === "fading";
 
   const header = t.count > 1 ? `${t.roller.name} · ${t.count} rolls` : t.roller.name;
   const flatDice = mode === "3d" ? t.dice.filter((d) => !isMeshDie(d)) : t.dice;
@@ -155,11 +167,14 @@ function ThrowView({
       data-record-id={t.id}
       data-count={t.count}
       data-render={mode}
-      data-state={phase === "fading" ? "rest" : phase}
+      data-state={atRest ? "rest" : "moving"}
+      data-interrupted={interrupted}
       className={cn(
         "flex max-w-full flex-col items-center gap-1.5 rounded-lg px-3 py-2 transition-opacity duration-300 motion-reduce:transition-none",
         mode === "flat" && "bg-background/70 shadow-lg backdrop-blur-sm",
-        (shown || mode === "3d") && phase !== "fading" ? "opacity-100" : "opacity-0",
+        // Under the new throw, same spot (the zone is bottom centred).
+        interrupted && "absolute bottom-0 left-1/2 -translate-x-1/2",
+        (shown || mode === "3d") && !fading ? "opacity-100" : "opacity-0",
       )}
     >
       <p className={cn("flex items-center gap-1.5 text-sm", pill)}>
@@ -181,6 +196,7 @@ function ThrowView({
           width={size.width}
           height={size.height}
           rest={rest}
+          interrupted={interrupted}
           onRest={(info) => {
             setRest(info);
             setPhase("rest");
@@ -196,7 +212,7 @@ function ThrowView({
               key={d.key}
               die={d}
               look={looks[d.entryId]}
-              settled={mode === "3d" || phase !== "moving"}
+              settled={mode === "3d" || atRest}
               flat
             />
           ))}
@@ -210,7 +226,7 @@ function ThrowView({
           )}
         </div>
       )}
-      {phase !== "moving" && t.totals.length > 0 && (
+      {atRest && t.totals.length > 0 && (
         <span
           data-testid="dicex-throw-total"
           className={cn("text-lg font-bold tabular-nums", pill)}
@@ -227,6 +243,7 @@ export function DiceExtrasRuntime() {
   const { settings, render, set } = useDiceSettings();
   const isDm = useSync((s) => s.store.you?.role === "dm");
   const current = useDiceExtras((s) => s.current);
+  const leaving = useDiceExtras((s) => s.leaving);
   const pending = useDiceExtras((s) => s.pending);
   const zone = useZone();
   const [looks, setLooks] = useState<Record<string, DiceLook>>({});
@@ -240,7 +257,12 @@ export function DiceExtrasRuntime() {
       load3d: () => dice3d.load(),
       play: (t) => {
         const playerIds = recordsOf<PlayerRecord>(store, "player").map((p) => p.id);
-        setLooks(looksOf(t, entries, playerIds));
+        // The interrupted throw keeps its entries' looks while it fades (FR-DICEX-18).
+        const keep = diceExtras.api.getState().current?.t.entryIds ?? [];
+        setLooks((prev) => ({
+          ...Object.fromEntries(keep.flatMap((id) => (prev[id] ? [[id, prev[id]]] : []))),
+          ...looksOf(t, entries, playerIds),
+        }));
         draw.current = throwDraw(cfg.current.render, dice3d.state());
         diceExtras.play(t);
       },
@@ -255,7 +277,20 @@ export function DiceExtrasRuntime() {
 
   if (render === "off" || !zone) return null;
   const showPending = pending && !current;
-  if (!current && !showPending) return null;
+  if (!current && !leaving && !showPending) return null;
+  const view = (x: { t: DiceThrow; seq: number }, interrupted: boolean) => (
+    <ThrowView
+      key={x.seq}
+      t={x.t}
+      seq={x.seq}
+      looks={looks}
+      isDm={isDm}
+      draw={draw.current}
+      zone={zone}
+      interrupted={interrupted}
+      onSlow={onSlow}
+    />
+  );
   return (
     <div
       data-testid="dicex-throw-zone"
@@ -263,18 +298,9 @@ export function DiceExtrasRuntime() {
       className="pointer-events-none absolute z-[15] flex flex-col items-center justify-end"
       style={{ left: zone.x, top: zone.y, width: zone.w, height: zone.h }}
     >
-      {current ? (
-        <ThrowView
-          key={current.seq}
-          t={current.t}
-          seq={current.seq}
-          looks={looks}
-          isDm={isDm}
-          draw={draw.current}
-          zone={zone}
-          onSlow={onSlow}
-        />
-      ) : (
+      {/* One parent and keyed by seq: the interrupted view keeps its instance (and its canvas). */}
+      {[leaving && view(leaving, true), current && view(current, false)]}
+      {!current && showPending && (
         <div
           data-testid="dicex-throw"
           data-render={render === "3d" ? "3d" : "flat"}
