@@ -15,6 +15,7 @@ import {
   type RollDamageResult,
 } from "@shared/combat-tracker/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
+import { ROLL_ROW_MAX } from "@shared/effect-modifiers/schemas";
 import { type StatBlock, spellSaveDc } from "@shared/entities/schemas";
 import { DamageRolled } from "@shared/events/combat-tracker";
 import type { NotificationRecord } from "@shared/notifications/schemas";
@@ -27,6 +28,7 @@ import type { DomainEvent } from "../../events/types";
 import { getSheet } from "../character-sheet/sheet-rows";
 import { dice, gameLog } from "../dice-roll-log";
 import { withCardMods } from "../effect-modifiers/card";
+import { recordOffers, rollLine, withCardOffers } from "../effect-modifiers/offers";
 import { notify } from "../notifications";
 import { toNotificationRecord, updateNotification } from "../notifications/helpers";
 import { cardRowRef, critLabel } from "./attack";
@@ -132,21 +134,47 @@ export const rollDamageCommand = defineCommand({
         roll: "damage",
         via: asked.spellId !== undefined ? "spell" : "weapon",
         crit,
+        // FR-MOD-13, -37: hit triggers offered on the card's damage; `mode` filters read the
+        // completed card's to-hit mode (a damage-only card: normal); `row` filters the row name.
+        card: true,
+        ...(pending ? { toHitMode: pending.p.mode } : {}),
+        row: row.name.slice(0, ROLL_ROW_MAX),
       },
     });
-    const rollIds = dice.rollIdsOf(damage);
     const card = withCardMods(cardRollOf(damage), damage);
     const isPlayer = env.actor.role === "player";
     // Roll line: a player's is public (FR-DICE-13); the DM's is DM-only (FR-CBT-52), except when
     // it completes a player's card: the owner's rule, so the table sees the damage the player's
     // card now shows. A hidden attacker's line is never public (FR-CBT-24).
     const ownerRule = pending?.card.audience === "player";
+    const payload: DamageCardPayload = withCardOffers(
+      env,
+      pending
+        ? { ...pending.p, damage: card }
+        : {
+            encounterId: enc.id,
+            attackerId: c.id,
+            attackerName: c.name,
+            attackName: row.name,
+            damageType: row.damageType,
+            mode: "normal",
+            crit: false,
+            toHit: null,
+            damage: card,
+            ...ref,
+            ...(row.saveDc ? { saveDc: row.saveDc } : {}),
+          },
+      damage,
+    );
+    // FR-MOD-14: offered-die rows (after any dropped by the card cap) follow the base roll.
+    const rollIds = dice.rollIdsOf(damage);
+    const line = rollLine([damage]);
     const entry = gameLog.append(env, {
       kind: ROLL_KIND,
       category: row.spec.category,
       actorName: c.name,
-      payload: [dice.rollPayloadItem(damage)],
-      dmPayload: dice.rollDmPayload([damage]),
+      payload: line.payload,
+      dmPayload: line.dmPayload,
       rollIds,
       encounterId: enc.id,
       ...(isPlayer ? {} : { public: ownerRule && !c.hidden }),
@@ -159,23 +187,10 @@ export const rollDamageCommand = defineCommand({
     };
     env.emit(rolled);
     if (pending) {
-      const payload: DamageCardPayload = { ...pending.p, damage: card };
       updateNotification(env, pending.card.id, { text: damageCardText(payload), payload });
+      recordOffers(env, pending.card.id, payload);
       return { cardId: pending.card.id, rollIds, attached: true };
     }
-    const payload: DamageCardPayload = {
-      encounterId: enc.id,
-      attackerId: c.id,
-      attackerName: c.name,
-      attackName: row.name,
-      damageType: row.damageType,
-      mode: "normal",
-      crit: false,
-      toHit: null,
-      damage: card,
-      ...ref,
-      ...(row.saveDc ? { saveDc: row.saveDc } : {}),
-    };
     const cardId = notify(env, {
       kind: DAMAGE_CARD_KIND,
       audience: isPlayer ? "player" : "dm",
@@ -185,6 +200,7 @@ export const rollDamageCommand = defineCommand({
       action: { label: "Apply", role: "dm" },
     });
     rolled.payload.cardId = cardId;
+    recordOffers(env, cardId, payload);
     return { cardId, rollIds, attached: false };
   },
 });

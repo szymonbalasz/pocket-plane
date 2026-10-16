@@ -33,6 +33,8 @@ function started() {
   t.run(startCommand.name, { encounterId: enc.id, sceneId: t.sceneId });
   const id = (name: string) => t.byName(enc.id)[name]?.id as string;
   const hooks = applyHooksOf(t.s);
+  // These tests drive stub hooks alone: MOD's registry line (R4) has its own tests.
+  hooks.unregister("effect-modifiers.triggers");
   const attack = (name: string, toHit: number, damage: number) =>
     t.run<{ cardId: string }>(attackCommand.name, {
       attackerId: id(name),
