@@ -72,6 +72,7 @@ const Part = z.looseObject({
   value: z.number(),
   expression: z.string().optional(),
   dice: z.array(z.number().int()).max(20).optional(),
+  auto: z.boolean().optional(),
 });
 type Part = z.infer<typeof Part>;
 
@@ -124,6 +125,7 @@ const chipOf = (faces: number, sum: number, rest: Partial<DieInit>): DieInit => 
 const ONE_DIE = /^([+-]?)1d(\d+)$/i;
 const FACES = /d(\d+)/i;
 const TERMS = /([+-]?)(\d+)d(\d+)/gi;
+const TERMS_ANY = /\d+d\d+/i;
 
 /**
  * Faces and sign of every die of an expression's dice terms, in order ("2d6+1d8" → d6, d6, d8;
@@ -138,11 +140,20 @@ function termDice(expr: string): { faces: number; sign: 1 | -1 }[] {
   return out;
 }
 
-/** MOD parts and offered trigger parts: per-die `dice`, else `1dM` → one die, else a chip. */
-function partDice(p: Part, offered: boolean): DieInit[] {
+/**
+ * MOD parts and offered trigger parts: per-die `dice`, else `1dM` → one die, else a chip.
+ * `physical`: the part's dice were typed in (a manual item's part not rolled by the server,
+ * FR-MOD-18) → flat dice, no tumble, like the base roll's.
+ */
+function partDice(p: Part, offered: boolean, physical: boolean): DieInit[] {
   const expr = p.expression?.replace(/\s+/g, "") ?? "";
   const sign: 1 | -1 = expr.startsWith("-") || (!expr.startsWith("+") && p.value < 0) ? -1 : 1;
-  const tag: Partial<DieInit> = { label: p.label ?? "DM", sign, ...(offered && { offered: true }) };
+  const tag: Partial<DieInit> = {
+    label: p.label ?? "DM",
+    sign,
+    ...(offered && { offered: true }),
+    ...(physical && TERMS_ANY.test(expr) && { physical: true, flat: true }),
+  };
   const faces = Number(FACES.exec(expr)?.[1] ?? 0);
   const terms = termDice(expr);
   if (p.dice && p.dice.length > 0 && terms.length === p.dice.length && terms.length > 1) {
@@ -176,8 +187,8 @@ function itemDice(item: Item): DieInit[] {
   } else {
     for (const d of item.dice) out.push(...dieOf(d.faces, d.value ?? 0, { kept: d.kept }));
   }
-  for (const m of item.mods ?? []) out.push(...partDice(m, false));
-  for (const o of item.offered ?? []) out.push(...partDice(o, true));
+  for (const m of item.mods ?? []) out.push(...partDice(m, false, item.manual && !m.auto));
+  for (const o of item.offered ?? []) out.push(...partDice(o, true, item.manual && !o.auto));
   return out;
 }
 

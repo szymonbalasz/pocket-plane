@@ -1,8 +1,8 @@
 // MOD's roll hook (FR-MOD-14, registered in dice-roll-log's `rollHooks`): the creature's active
 // effects whose modifiers match the subject → parts. `dice` → its own roll row through
 // `base.rollExtra` (doubled on a crit's damage), signed, keyed by its physical group (FR-MOD-18);
-// `flat` → its value. Tier 2: `mode` → `modes()`, asked before the d20 is rolled (FR-MOD-17);
-// `defense` and AC are target-side (MOD's apply hook, `target-facts.ts`).
+// `flat` → its value. A player's roll server-rolls the groups of effects they can't see (R2).
+// Tier 2: `mode` → `modes()`, asked before the d20 is rolled (FR-MOD-17); `defense` and AC are target-side (MOD's apply hook, `target-facts.ts`).
 //
 // Imports stay to the schema and `@shared`: `roll-hooks.ts` (imported by `dice.evaluate`)
 // imports this module, so feature helpers here would close an import cycle.
@@ -70,7 +70,11 @@ export const modRollHook: RollHook = {
         const g = groups.get(`${e.id}:${index}`);
         if (!g) throw new Error("bonus-die group missing");
         const expression = g.dice;
-        const r = base.rollExtra(expression, label, g.key);
+        // R2 ruling: a player's client can't see a secret / hidden effect, so it never sends
+        // that group; the server rolls it (tagged `auto`) instead of a `conflict`.
+        const unseen =
+          env.actor.role === "player" && !pub && !base.manualParts?.some((p) => p.key === g.key);
+        const r = base.rollExtra(expression, label, unseen ? undefined : g.key);
         parts.push({
           effectId: e.id,
           label,

@@ -34,6 +34,7 @@ import {
 import {
   checkGroup,
   computedTotal,
+  countedEntries,
   formEntries,
   formSlots,
   type GroupInput,
@@ -457,7 +458,8 @@ export function ManualForm({ control }: { control: RollControl }) {
           return;
         }
         reset();
-        control.submitManual(r.entries, preview.active ? p.parts : undefined);
+        if (preview.active) control.submitManual(countedEntries(slots, r.entries), p.parts);
+        else control.submitManual(r.entries);
       }}
     >
       <div className="flex flex-col gap-0.5">

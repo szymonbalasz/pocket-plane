@@ -5,6 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import type { AttackResult, DamageCardPayload } from "@shared/combat-tracker/schemas";
 import {
+  GAME_LOG_ENTRY_TYPE,
   MANUAL_PARTS_ALONE,
   MANUAL_PARTS_PER_ENTRY,
   type ManualPart,
@@ -221,5 +222,82 @@ describe("FR-MOD-18 manualParts on single-roll intents", () => {
       t.p2,
     );
     expect(items(t, r.entryId)[0]?.total).toBe(9);
+  });
+});
+
+describe("FR-MOD-18 effects the player can't see (R2 ruling)", () => {
+  const playerView = (t: ModSetup) =>
+    JSON.stringify(
+      t.s.db
+        .select()
+        .from(gameLogEntry)
+        .all()
+        .map((row) =>
+          t.s.records.view(
+            GAME_LOG_ENTRY_TYPE,
+            { ...row },
+            {
+              connId: "p1",
+              campaignId: t.h.campaignId,
+              role: "player",
+              playerId: t.h.p1.id,
+            },
+          ),
+        ),
+    );
+
+  test("FR-MOD-18 cbt.attack: a secret Bane on Mira has no group → server-rolled, auto, the roll commits; players never see it", () => {
+    const t = modSetup();
+    t.bless();
+    t.apply({ targets: [{ characterId: t.miraId }], preset: { key: "bane" }, secret: true });
+    const bless = bonusDieKey(effectId(t, "Bless", { characterId: t.miraId }), 0, false);
+    const bane = effectId(t, "Bane", { characterId: t.miraId });
+    const r = t.run<AttackResult>(
+      "cbt.attack",
+      {
+        attackerId: t.id("Mira"),
+        manual: [{ diceTotal: 12 }, { diceTotal: 5 }],
+        manualParts: [[part(bless, 4)], []],
+      },
+      t.p1,
+    );
+    const card = t.note(r.cardId)?.payload as DamageCardPayload;
+    const mods = card.toHit?.mods ?? [];
+    expect(mods.map((m) => [m.value > 0, m.auto])).toEqual([
+      [true, undefined],
+      [false, true],
+    ]);
+    expect(mods[0]?.value).toBe(4);
+    const baneRoll = rollRow(t, mods[1]?.rollId as string);
+    expect([baneRoll?.manual, mods[1]?.value]).toEqual([false, -(baneRoll?.total ?? 0)]);
+    const seen = playerView(t);
+    expect(seen).not.toContain("Bane");
+    expect(seen).not.toContain(bane);
+    // The DM's client sees the effect, so its group stays strict for a DM roll.
+    const dm = t.err(() =>
+      t.run("cbt.attack", {
+        attackerId: t.id("Mira"),
+        manual: [{ diceTotal: 12 }, { diceTotal: 5 }],
+        manualParts: [[part(bless, 4)], []],
+      }),
+    );
+    expect([dm.code, dm.message]).toEqual(["conflict", EFFECTS_CHANGED]);
+  });
+
+  test("FR-MOD-18 a public effect's missing group still conflicts for the player", () => {
+    const t = modSetup();
+    t.bless();
+    const e = t.err(() =>
+      t.run(
+        "cbt.attack",
+        {
+          attackerId: t.id("Mira"),
+          manual: [{ diceTotal: 12 }, { diceTotal: 5 }],
+          manualParts: [[], []],
+        },
+        t.p1,
+      ),
+    );
+    expect([e.code, e.message]).toEqual(["conflict", EFFECTS_CHANGED]);
   });
 });

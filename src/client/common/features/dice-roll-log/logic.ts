@@ -488,6 +488,22 @@ export function formEntries(slots: readonly FormSlot[], inputs: readonly SlotInp
   return { ok: true, entries };
 }
 
+/**
+ * FR-MOD-17 (tier 2): a lone d20 slot (no crit group) sends its value as `dice` too, so the
+ * server can tell one d20 from a `2d20kh1` total when an effect changed the mode after the
+ * preview (`conflict` "Effects changed — roll again").
+ */
+export function countedEntries(
+  slots: readonly FormSlot[],
+  entries: readonly ManualEntry[],
+): ManualEntry[] {
+  return entries.map((e, i) => {
+    const s = slots[i];
+    const lone = s && !s.extra && s.base.faces.length === 1 && s.base.faces[0] === 20;
+    return lone && !e.dice ? { ...e, dice: [e.diceTotal] } : e;
+  });
+}
+
 /** FR-DICE-32: the total shown for a group whose total is empty but whose dice are all filled. */
 export function computedTotal(slot: ManualSlot, input: GroupInput): number | null {
   if (input.total.trim() !== "" || slot.faces.length < 2) return null;

@@ -90,6 +90,39 @@ describe("FR-MOD-17 mode from effects (tier 2)", () => {
     expect([hit?.mode, (hit?.dice as unknown[] | undefined)?.length]).toEqual(["advantage", 2]);
     expect(rollRow(t, p.damage?.rollId as string)?.mode).toBe("normal");
   });
+
+  test("FR-MOD-17 cbt.attack physical: one d20 previewed normal, Reckless Attack applied before the roll → conflict 'Effects changed — roll again', nothing logged", () => {
+    const t = modSetup();
+    t.bless();
+    const bless = bonusDieKey(
+      t
+        .active()
+        .find((e) => e.kind === "custom" && e.label === "Bless" && e.targetCharacterId === t.miraId)
+        ?.id as string,
+      0,
+      false,
+    );
+    // As the tier-2 form sends it: the lone d20's value as `dice` (R2 step 4).
+    const attack = () =>
+      t.run<AttackResult>(
+        "cbt.attack",
+        {
+          attackerId: t.id("Mira"),
+          manual: [{ diceTotal: 11, dice: [11] }, { diceTotal: 5 }],
+          manualParts: [[{ key: bless, entry: { diceTotal: 2 } }], []],
+        },
+        t.p1,
+      );
+    t.apply({ targets: [{ characterId: t.miraId }], preset: { key: "reckless" } });
+    const before = t.s.db.select().from(gameLogEntry).all().length;
+    const e = t.err(attack);
+    expect([e.code, e.message]).toEqual(["conflict", EFFECTS_CHANGED]);
+    expect(t.s.db.select().from(gameLogEntry).all()).toHaveLength(before);
+    // Reckless ended again: the same entry fits and commits.
+    t.end(t.active().find((x) => x.label === "Reckless Attack")?.id as string);
+    const p = t.note(attack().cardId)?.payload as DamageCardPayload;
+    expect(rollRow(t, p.toHit?.rollId as string)).toMatchObject({ mode: "normal", total: 15 });
+  });
 });
 
 /** A stand-in roll intent carrying `manualParts` (as R2's tray will send on the real intents). */

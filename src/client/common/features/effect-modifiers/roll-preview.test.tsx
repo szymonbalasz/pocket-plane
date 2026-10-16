@@ -9,6 +9,7 @@ import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
 import { diceExtras } from "../dice-extras/store";
 import { TrayWindow } from "../dice-extras/TrayWindow";
+import { countedEntries, formSlots } from "../dice-roll-log/logic";
 import {
   ManualForm,
   partEntries,
@@ -194,6 +195,25 @@ describe("FR-MOD-18 physical groups → manualParts", () => {
     const html = render(<ManualForm control={{ ...c, manual: { mode: "normal" } }} />, {});
     expect(html).toContain("2d20kh1+4");
     expect(html.match(/data-testid="dice-manual-die"/g)).toHaveLength(2);
+  });
+
+  test("FR-MOD-17 a lone d20 sends its value as dice (one d20 vs adv countable); 2d20, crit and damage slots unchanged", () => {
+    const slots = (mode: "normal" | "advantage") => {
+      const s = formSlots({ expressions: ["1d20+5", "1d8+3"] }, mode, []);
+      if (typeof s === "string") throw new Error(s);
+      return s;
+    };
+    expect(countedEntries(slots("normal"), [{ diceTotal: 11 }, { diceTotal: 5 }])).toEqual([
+      { diceTotal: 11, dice: [11] },
+      { diceTotal: 5 },
+    ]);
+    expect(countedEntries(slots("advantage"), [{ diceTotal: 11 }, { diceTotal: 5 }])).toEqual([
+      { diceTotal: 11 },
+      { diceTotal: 5 },
+    ]);
+    expect(
+      countedEntries(slots("advantage"), [{ diceTotal: 11, dice: [11, 4] }, { diceTotal: 5 }]),
+    ).toEqual([{ diceTotal: 11, dice: [11, 4] }, { diceTotal: 5 }]);
   });
 
   test("FR-MOD-18 submit: manualParts per entry, keys from bonusDieGroups; e: required, empty t: left out", () => {

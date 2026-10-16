@@ -177,6 +177,39 @@ describe("FR-DICEX-13 throwDice", () => {
     ]);
   });
 
+  test("FR-DICEX-13 a manual roll's entered bonus die (Bless) → flat physical die; a server-rolled (auto) part still tumbles", () => {
+    const t = one([
+      item({
+        manual: true,
+        total: 21,
+        mods: [
+          { label: "Bless", value: 3, expression: "1d4", dice: [3] },
+          { label: "Bane", value: -2, expression: "-1d4", dice: [2], auto: true },
+          { label: null, value: 2 },
+        ],
+      }),
+    ]);
+    expect(t.dice.map((d) => [d.label, d.faces, d.value, d.flat, d.physical, d.shape])).toEqual([
+      [undefined, 20, 12, true, true, null],
+      ["Bless", 4, 3, true, true, null],
+      ["Bane", 4, 2, false, undefined, "d4"],
+      ["DM", 0, 2, true, undefined, null],
+    ]);
+    // An entered offered trigger die too (FR-MOD-18 `t:` group); a server roll's parts tumble.
+    const off = one([
+      item({
+        manual: true,
+        offered: [{ label: "Divine Fury", value: 4, expression: "1d6", dice: [4] }],
+      }),
+    ]);
+    expect(off.dice[1]).toMatchObject({ offered: true, flat: true, physical: true, shape: null });
+    const rolled = one([
+      item({ mods: [{ label: "Bless", value: 3, expression: "1d4", dice: [3] }] }),
+    ]);
+    expect(rolled.dice[1]).toMatchObject({ flat: false, shape: "d4" });
+    expect(rolled.dice[1]?.physical).toBeUndefined();
+  });
+
   test("FR-DICEX-14 51 dice → 20 + '+31 more'", () => {
     const dice = Array.from({ length: 50 }, (_, i) => ({
       faces: 6,
