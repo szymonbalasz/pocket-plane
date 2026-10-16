@@ -96,6 +96,8 @@ export function Throw3DStage({
           data-kept={d.kept}
           data-flat={false}
           data-offered={d.offered === true}
+          data-style={(looks[d.entryId] ?? STYLE_LOOK.ivory).style}
+          data-material={(looks[d.entryId] ?? STYLE_LOOK.ivory).material}
           {...(rest && { "data-settled": rest.settled[d.key] ?? "" })}
           className="sr-only"
         />

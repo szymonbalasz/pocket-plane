@@ -1,5 +1,8 @@
-// Dice looks (FR-DICEX-24): named styles and the derived default per owner. D1 draws default
-// looks only; the `dice-look` record and its editor come with D2 / D3.
+// Dice looks (FR-DICEX-24–27): named styles, the derived default per owner, the stored
+// `dice-look` record (D2) and `dicex.setLook`. Every client draws the roller's look: the stored
+// row first, else the derived default (FR-DICEX-20).
+import { z } from "zod";
+
 export const DICE_STYLES = [
   "ivory",
   "obsidian",
@@ -10,17 +13,51 @@ export const DICE_STYLES = [
   "gold",
   "bone",
 ] as const;
-export type DiceStyle = (typeof DICE_STYLES)[number];
+export const DiceStyle = z.enum(DICE_STYLES);
+export type DiceStyle = z.infer<typeof DiceStyle>;
 
-export type DiceMaterial = "plastic" | "metal" | "glass" | "stone";
+export const DICE_MATERIALS = ["plastic", "metal", "glass", "stone"] as const;
+export const DiceMaterial = z.enum(DICE_MATERIALS);
+export type DiceMaterial = z.infer<typeof DiceMaterial>;
 
-export interface DiceLook {
-  style: DiceStyle;
-  /** `#rrggbb` */
-  body: string;
-  pips: string;
-  material: DiceMaterial;
-}
+/** `#rrggbb`, lower or upper case. */
+export const HexColour = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Use #rrggbb");
+
+/** FR-DICEX-24: a look = named style + body / pips colours + material. */
+export const DiceLook = z.strictObject({
+  style: DiceStyle,
+  body: HexColour,
+  pips: HexColour,
+  material: DiceMaterial,
+});
+export type DiceLook = z.infer<typeof DiceLook>;
+
+export const DICEX_INTENTS = { setLook: "dicex.setLook" } as const;
+
+/** `dicex.setLook {style, body, pips, material}` (FR-DICEX-26): no owner field, owner = sender. */
+export const SetLookInput = DiceLook;
+export type SetLookInput = z.infer<typeof SetLookInput>;
+export const SetLookResult = z.object({ lookId: z.string() });
+export type SetLookResult = z.infer<typeof SetLookResult>;
+
+export const DICE_LOOK_TYPE = "dice-look";
+/** The DM's `ownerKey`; a player's is their id. */
+export const DM_LOOK_KEY = "dm";
+
+/** `dice-look` (scope campaign, FR-DICEX-25): full to the DM and every player of the campaign. */
+export const DiceLookRecord = z.object({
+  id: z.string(),
+  campaignId: z.string(),
+  ownerKey: z.string(),
+  /** null = the DM. */
+  ownerPlayerId: z.string().nullable(),
+  style: DiceStyle,
+  body: HexColour,
+  pips: HexColour,
+  material: DiceMaterial,
+  updatedAt: z.string(),
+});
+export type DiceLookRecord = z.infer<typeof DiceLookRecord>;
 
 /** Each style's starting body / pips / material. */
 export const STYLE_LOOK: Record<DiceStyle, DiceLook> = {
@@ -55,3 +92,35 @@ export function defaultLook(playerId: string | null, playerIds: readonly string[
   const i = Math.max(0, sorted.indexOf(playerId));
   return STYLE_LOOK[PLAYER_ORDER[i % PLAYER_ORDER.length] as DiceStyle];
 }
+
+/** The `ownerKey` of an owner (`null` = the DM). */
+export const lookKeyOf = (playerId: string | null): string => playerId ?? DM_LOOK_KEY;
+
+/** The look part of a stored row. */
+export const lookOfRecord = (r: DiceLook): DiceLook => ({
+  style: r.style,
+  body: r.body,
+  pips: r.pips,
+  material: r.material,
+});
+
+/**
+ * FR-DICEX-20 / -24: an owner's look (`null` = the DM): their stored `dice-look` row, else the
+ * derived default.
+ */
+export function lookOf(
+  playerId: string | null,
+  rows: readonly DiceLookRecord[],
+  playerIds: readonly string[],
+): DiceLook {
+  const key = lookKeyOf(playerId);
+  const row = rows.find((r) => r.ownerKey === key);
+  return row ? lookOfRecord(row) : defaultLook(playerId, playerIds);
+}
+
+/** Same look (colours compared case-insensitively): `dicex.setLook` writes nothing. */
+export const sameLook = (a: DiceLook, b: DiceLook): boolean =>
+  a.style === b.style &&
+  a.material === b.material &&
+  a.body.toLowerCase() === b.body.toLowerCase() &&
+  a.pips.toLowerCase() === b.pips.toLowerCase();
