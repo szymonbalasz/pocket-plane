@@ -96,6 +96,7 @@ describe("loot.split + item rows over WS (PARTY §13, party-board bundle)", () =
         ["Potion of healing", 2, "world", "party"],
         ["Torch", 10, "world", "party"],
         ["Rope (50 ft)", 1, "world", "party"],
+        ["Torch", 2, "party", "character"],
       ]);
       expect(items.every((e) => coinsOnly(e).gp === 0)).toBe(true);
       // Non-item rows carry no `qty` on the wire.

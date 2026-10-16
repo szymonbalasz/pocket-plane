@@ -1,7 +1,6 @@
 // PARTY §13 fixtures (FR-PARTY-28): bundle `party-board` contents from empty (incl. the
-// `handout-shared` notifications, FR-PARTY-06), deterministic, and
-// the units as patches on `session-sim` (seams S10: no `creature-sheet` field changes in P core;
-// P4 adds the Torch ×2 move to Thorn's `items`).
+// `handout-shared` notifications, FR-PARTY-06), deterministic, and the units as patches on
+// `session-sim` (seams S10: the Torch ×2 move changes only Thorn's `items` among sheet fields).
 import { afterAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { closeDb } from "@server/db/client";
@@ -9,6 +8,7 @@ import {
   asset,
   campaign,
   creatureSheet,
+  entity,
   handout,
   lootEntry,
   notification,
@@ -17,6 +17,7 @@ import {
 } from "@server/db/schema";
 import { loadInProcess } from "@server/features/fixtures-adapters/loader";
 import { partyPot } from "@server/features/party-loot/rows";
+import type { ItemRow } from "@shared/character-sheet/sheet";
 import { asc } from "drizzle-orm";
 import { bundles } from "../../bundles";
 import { library, loadBundle } from "../../index";
@@ -68,7 +69,12 @@ function read(r: Loaded) {
     items: db.select().from(partyItem).orderBy(asc(partyItem.seq)).all(),
     entries: db.select().from(lootEntry).orderBy(asc(lootEntry.seq)).all(),
     notes: db.select().from(notification).orderBy(asc(notification.seq)).all(),
-    sheets: db.select().from(creatureSheet).all(),
+    sheets: db
+      .select()
+      .from(creatureSheet)
+      .all()
+      .map((x) => ({ ...x, items: x.items as ItemRow[] })),
+    entities: db.select().from(entity).all(),
     pot: partyPot(db, camps["Fixture Campaign"] as string),
   };
   closeDb(db);
@@ -127,14 +133,24 @@ describe("party-board fixtures (PARTY §13, FR-PARTY-28)", () => {
       r.items.filter((i) => i.campaignId === fixture).map((i) => [i.name, i.qty, i.notes]),
     ).toEqual([
       ["Potion of healing", 2, ""],
-      ["Torch", 10, ""],
+      ["Torch", 8, ""],
       ["Rope (50 ft)", 1, ""],
     ]);
+    const thorn =
+      r.entities.find((e) => e.name === "Thorn" && e.campaignId === fixture)?.id ?? null;
     const itemRows = r.entries.filter((e) => e.campaignId === fixture && e.kind === "item");
-    expect(itemRows.map((e) => [e.fromKind, e.toKind, e.text, e.qty, e.gp])).toEqual([
-      ["world", "party", "Potion of healing", 2, 0],
-      ["world", "party", "Torch", 10, 0],
-      ["world", "party", "Rope (50 ft)", 1, 0],
+    expect(
+      itemRows.map((e) => [e.fromKind, e.toKind, e.toCharacterId, e.text, e.qty, e.gp]),
+    ).toEqual([
+      ["world", "party", null, "Potion of healing", 2, 0],
+      ["world", "party", null, "Torch", 10, 0],
+      ["world", "party", null, "Rope (50 ft)", 1, 0],
+      ["party", "character", thorn, "Torch", 2, 0],
+    ]);
+    // FR-PARTY-22: the move appends one unequipped row to Thorn's items.
+    const thornSheet = r.sheets.find((x) => x.entityId === thorn);
+    expect(thornSheet?.items.map((i) => [i.name, i.qty, i.equipped, i.notes])).toEqual([
+      ["Torch", 2, false, ""],
     ]);
     // LOOT's pot is unaffected by item rows: 5 pp, 30 gp.
     expect([r.pot.pp, r.pot.gp, r.pot.sp, r.pot.ep, r.pot.cp]).toEqual([5, 30, 0, 0, 0]);
@@ -185,7 +201,7 @@ describe("party-board fixtures (PARTY §13, FR-PARTY-28)", () => {
     expect(b.notes).toEqual(a.notes);
   });
 
-  test("FR-PARTY-28 compose (seams S10): PARTY units on session-sim leave every creature-sheet byte-identical", async () => {
+  test("FR-PARTY-28 compose (seams S10): PARTY units on session-sim change only Thorn's items among creature-sheet fields", async () => {
     const party = ["handout-images", "handouts-1", "party-items-1", "party-second"];
     const lib = {
       fixtures: units,
@@ -197,9 +213,27 @@ describe("party-board fixtures (PARTY §13, FR-PARTY-28)", () => {
     const base = read(await loadBundle("session-sim"));
     const composed = read(await loadInProcess(lib, "session-sim-party", {}));
     expect(composed.manifest.fixtures).toEqual(expect.arrayContaining(party));
+    const fixture = composed.camps["Fixture Campaign"] as string;
+    const thorn = composed.entities.find((e) => e.name === "Thorn" && e.campaignId === fixture)
+      ?.id as string;
     const byId = (rows: typeof base.sheets) =>
-      Object.fromEntries(rows.map((s) => [s.entityId, JSON.stringify(s)]));
-    expect(byId(composed.sheets)).toEqual(byId(base.sheets));
+      Object.fromEntries(rows.filter((s) => s.entityId !== thorn).map((s) => [s.entityId, s]));
+    // Every other sheet byte-identical.
+    expect(JSON.stringify(byId(composed.sheets))).toBe(JSON.stringify(byId(base.sheets)));
+    // Thorn: only `items` (+ `updatedAt`) differ; a missing row is created with defaults.
+    const strip = (s: (typeof base.sheets)[number] | undefined) => {
+      if (!s) return undefined;
+      const { items: _i, updatedAt: _u, createdAt: _c, ...rest } = s;
+      return rest;
+    };
+    const before = base.sheets.find((s) => s.entityId === thorn);
+    const after = composed.sheets.find((s) => s.entityId === thorn);
+    if (before) expect(strip(after)).toEqual(strip(before));
+    else expect(after).toMatchObject({ status: "ready", locked: false, notes: "" });
+    expect(after?.items.slice(-1).map((i) => [i.name, i.qty, i.equipped])).toEqual([
+      ["Torch", 2, false],
+    ]);
+    expect(after?.items.length).toBe((before?.items.length ?? 0) + 1);
     expect(composed.handouts.length).toBeGreaterThan(0);
     expect(library.bundles.some((b) => b.name === "party-board")).toBe(true);
   });
