@@ -1,8 +1,9 @@
 // Labels layer (FR-MAP-42/43, P2), above every token: per token a name pill centred on the
-// footprint's bottom grid line, then the overlay badges in the same row; full opacity whatever the
-// token's `dim`; DM: hidden tokens' labels styled `visibility.hidden`. A label follows its token's
-// own drag and others' drag previews; only that label re-renders per frame. The moving tokens'
-// labels draw last, so a dragged token's label is on top. Konva names: layer `map-labels`, name
+// footprint's bottom grid line, the overlay badges in rows just above it inside the footprint's
+// width (BL-04: never over a neighbour's name); full opacity whatever the token's `dim`; DM:
+// hidden tokens' labels styled `visibility.hidden`. A label follows its token's own drag and
+// others' drag previews; only that label re-renders per frame. The moving tokens' labels draw
+// last, so a dragged token's label is on top. Konva names: layer `map-labels`, name
 // `map-token-label` (id = token id), badges by their test id (id = token id). P3 glitch 10: a cut
 // name shows in full on hover (the canvas' native title); the layer keeps not listening, so
 // clicks and drags still reach the token below.

@@ -67,7 +67,7 @@ describe("FR-MAP-42 label", () => {
     expect(cutToWidth("🐺🐺🐺🐺", 3 * 5, 10, measure)).toBe(`🐺🐺${ELLIPSIS}`);
   });
 
-  test("FR-MAP-43 badges in the label row, after the name, same height", () => {
+  test("FR-MAP-43 BL-04 badges in a row above the name, same height, inside the footprint", () => {
     const r = labelRow(
       "Goblin",
       [
@@ -81,12 +81,94 @@ describe("FR-MAP-42 label", () => {
     );
     const [out, other] = r.badges;
     expect(out?.id).toBe("cbt-token-out");
-    expect(out?.y).toBe(r.name.y);
     expect(out?.height).toBe(r.name.height);
-    expect(out?.x).toBeGreaterThan(r.name.x + r.name.width);
+    // One row (both fit 70 px), right above the name, in registry order, centred.
+    const gap = r.font * 0.3;
+    expect(out?.y).toBeCloseTo(r.name.y - r.name.height - gap);
+    expect(other?.y).toBe(out?.y as number);
     expect(other?.x).toBeGreaterThan((out?.x ?? 0) + (out?.width ?? 0));
+    expect(((out?.x ?? 0) + (other?.x ?? 0) + (other?.width ?? 0)) / 2).toBeCloseTo(35);
+    for (const b of r.badges) {
+      expect(b.x).toBeGreaterThanOrEqual(0);
+      expect(b.x + b.width).toBeLessThanOrEqual(70);
+    }
     // The name stays centred on the footprint with badges present.
     expect(r.name.x + r.name.width / 2).toBeCloseTo(35);
+  });
+
+  /** Two pills (map px, relative to their own token) overlap once `dx` / `dy` apart. */
+  const overlaps = (
+    a: { x: number; y: number; width: number; height: number },
+    b: { x: number; y: number; width: number; height: number },
+    dx: number,
+    dy: number,
+  ) =>
+    a.x < b.x + dx + b.width &&
+    b.x + dx < a.x + a.width &&
+    a.y < b.y + dy + b.height &&
+    b.y + dy < a.y + a.height;
+
+  test("FR-MAP-43 BL-04 a Dying badge never covers an adjacent token's name (sim-6 Town: Thorn dying next to Mira)", () => {
+    // Town at the 48 px fit floor: 70 px cells at scale 48 / 70.
+    const scale = 48 / 70;
+    const thorn = labelRow(
+      "Thorn",
+      [{ id: "cbtx-token-death", label: "Dying" }],
+      70,
+      70,
+      scale,
+      measure,
+    );
+    const mira = labelRow("Mira", [], 70, 70, scale, measure);
+    const dying = thorn.badges[0];
+    if (!dying) throw new Error("no badge");
+    // Inside Thorn's own footprint.
+    expect(dying.x).toBeGreaterThanOrEqual(0);
+    expect(dying.x + dying.width).toBeLessThanOrEqual(70);
+    expect(dying.y).toBeGreaterThanOrEqual(0);
+    expect(dying.y + dying.height).toBeLessThanOrEqual(70);
+    // Neighbours right, left, above, below and diagonal: their names stay uncovered.
+    for (const [dx, dy] of [
+      [70, 0],
+      [-70, 0],
+      [0, -70],
+      [0, 70],
+      [70, -70],
+      [-70, -70],
+    ] as const) {
+      expect(overlaps(dying, mira.name, dx, dy) ? `covers the name at ${dx},${dy}` : "ok").toBe(
+        "ok",
+      );
+    }
+    // Nor Thorn's own name.
+    expect(overlaps(dying, thorn.name, 0, 0)).toBe(false);
+  });
+
+  test("FR-MAP-43 BL-04 many badges wrap into rows upwards; a badge wider than the footprint is cut", () => {
+    const r = labelRow(
+      "Elite Goblin Warrior",
+      [
+        { id: "cbtx-token-death", label: "Dying" },
+        { id: "fog-token-fogged", label: "Fog" },
+        { id: "x-long", label: "Invisible and very long" },
+      ],
+      70,
+      70,
+      1,
+      measure,
+    );
+    const ys = [...new Set(r.badges.map((b) => b.y))];
+    expect(ys.length).toBeGreaterThan(1);
+    // Rows stack upwards from just above the name.
+    expect(Math.max(...ys)).toBeLessThan(r.name.y);
+    for (const b of r.badges) {
+      expect(b.x).toBeGreaterThanOrEqual(0);
+      expect(b.x + b.width).toBeLessThanOrEqual(70 + 1e-9);
+    }
+    const long = r.badges.find((b) => b.id === "x-long");
+    expect(long?.text.endsWith(ELLIPSIS)).toBe(true);
+    // Registry order kept.
+    expect(r.badges.map((b) => b.id)).toEqual(["cbtx-token-death", "fog-token-fogged", "x-long"]);
   });
 
   test("FR-MAP-42 label: layer order map < grid < tokens < labels < pointers", () => {

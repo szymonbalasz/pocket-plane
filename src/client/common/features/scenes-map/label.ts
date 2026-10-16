@@ -1,8 +1,9 @@
-// Token label + overlay geometry (FR-MAP-42/43, P2). A label row (name pill, then overlay badges)
-// is centred on the footprint's bottom grid line, the name centred horizontally; the pill is
-// ≤ 20 % of a cell high unless that would make the font < 11 screen px; a name wider than 2 × the
-// footprint is cut with "…". The cross is a translucent X over the footprint. All lengths in map
-// px, relative to the token's top-left. DOM-free so it runs under `bun test`.
+// Token label + overlay geometry (FR-MAP-42/43, P2). The name pill is centred on the footprint's
+// bottom grid line and horizontally; the pill is ≤ 20 % of a cell high unless that would make the
+// font < 11 screen px; a name wider than 2 × the footprint is cut with "…". BL-04: overlay badges
+// sit in rows just above the name, inside the footprint's width, so they never cover a
+// neighbour's name. The cross is a translucent X over the footprint. All lengths in map px,
+// relative to the token's top-left. DOM-free so it runs under `bun test`.
 
 /** Text width in map px for a font size (map px); the canvas measures, tests fake it. */
 export type Measure = (text: string, fontSize: number, bold: boolean) => number;
@@ -17,7 +18,7 @@ export const LABEL_PILL_SHARE = 0.2;
 const PILL_PER_FONT = 1.2;
 /** Horizontal pill padding = font × this, each side. */
 const PAD_PER_FONT = 0.4;
-/** Gap between the name pill and each badge = font × this. */
+/** Gap between badges, and between badge rows and the name pill = font × this. */
 const GAP_PER_FONT = 0.3;
 
 export const ELLIPSIS = "…";
@@ -80,8 +81,10 @@ export interface LabelRow {
 }
 
 /**
- * The label row of a token whose footprint is `side` map px (= footprint × cell): the name pill
- * centred on the footprint and vertically on its bottom edge (`y = side`), badges after it.
+ * The label of a token whose footprint is `side` map px (= footprint × cell): the name pill
+ * centred on the footprint and vertically on its bottom edge (`y = side`). BL-04: badges in rows
+ * above it, each row centred on the footprint and never wider than it (a badge wider than the
+ * footprint is cut with "…"), the first row right above the name, more rows stacking upwards.
  */
 export function labelRow(
   name: string,
@@ -95,18 +98,35 @@ export function labelRow(
   const text = cutToWidth(name, 2 * side - 2 * m.padX, m.font, measure);
   const nameW = measure(text, m.font, false) + 2 * m.padX;
   const y = side - m.pillH / 2;
-  const nameX = (side - nameW) / 2;
-  let x = nameX + nameW;
-  const out: LabelRow["badges"] = [];
+  // Pack badges left to right into rows no wider than the footprint.
+  const rows: { id: string; text: string; width: number }[][] = [];
+  let row: (typeof rows)[number] = [];
+  let rowW = 0;
   for (const b of badges) {
-    x += m.gap;
-    const width = measure(b.label, m.font, true) + 2 * m.padX;
-    out.push({ id: b.id, text: b.label, x, y, width, height: m.pillH });
-    x += width;
+    const label = cutToWidth(b.label, Math.max(0, side - 2 * m.padX), m.font, measure, true);
+    const width = Math.min(side, measure(label, m.font, true) + 2 * m.padX);
+    if (row.length > 0 && rowW + m.gap + width > side) {
+      rows.push(row);
+      row = [];
+      rowW = 0;
+    }
+    rowW += (row.length > 0 ? m.gap : 0) + width;
+    row.push({ id: b.id, text: label, width });
   }
+  if (row.length > 0) rows.push(row);
+  const out: LabelRow["badges"] = [];
+  rows.forEach((r, k) => {
+    const w = r.reduce((n, b) => n + b.width, 0) + m.gap * (r.length - 1);
+    const by = y - (k + 1) * (m.pillH + m.gap);
+    let x = (side - w) / 2;
+    for (const b of r) {
+      out.push({ id: b.id, text: b.text, x, y: by, width: b.width, height: m.pillH });
+      x += b.width + m.gap;
+    }
+  });
   return {
     font: m.font,
-    name: { text, x: nameX, y, width: nameW, height: m.pillH },
+    name: { text, x: (side - nameW) / 2, y, width: nameW, height: m.pillH },
     badges: out,
   };
 }
