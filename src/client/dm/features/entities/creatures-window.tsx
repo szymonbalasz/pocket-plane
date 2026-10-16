@@ -24,7 +24,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@ui/components/ui/tabs";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
 import { useDefinitions } from "@ui/features/compendium/definitions";
-import { searchCompendium, useCompendiumSearch } from "@ui/features/compendium/search";
+import { lazyApi, searchCompendium, useCompendiumSearch } from "@ui/features/compendium/search";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { useRecords, useSync } from "@ui/sync/store";
 import { LockIcon, PawPrintIcon, UserIcon } from "lucide-react";
@@ -33,7 +33,7 @@ import { actionsOf, type CreatureAction, creatureActions } from "./creature-acti
 import { CREATURE_TABS, type CreatureRow, type CreatureTab, creatureRows } from "./list";
 
 /** The DM REST client, imported lazily (the session reads localStorage at import). */
-const api = () => import("../campaign-management/session").then((m) => m.api);
+const api = lazyApi(() => import("../campaign-management/session").then((m) => m.api));
 
 export const CREATURES_KIND = "ent.creatures";
 

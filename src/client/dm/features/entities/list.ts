@@ -1,5 +1,6 @@
 // Creatures list model (FR-ENT-18, ENT §7): pure, from synced records. Rows that fail their
 // schema are omitted (FR-ENT-01); the server already drops them, this guards the client too.
+
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
   type DefinitionRecord,
@@ -9,6 +10,7 @@ import {
   ImportedEntityRecord,
   xpForCr,
 } from "@shared/entities/schemas";
+import { badgeLabel } from "@ui/features/compendium/logic";
 
 export type CreatureTab = "all" | EntityKind;
 export const CREATURE_TABS: readonly CreatureTab[] = ["all", "character", "monster"];
@@ -59,7 +61,7 @@ export function creatureRows(
         portraitAssetId: d.portraitAssetId,
         readOnly,
         badge: readOnly
-          ? "SRD"
+          ? badgeLabel(d.source ?? "")
           : d.kind === "character"
             ? (playerName.get(d.ownerPlayerId) ?? "Unknown player")
             : "Custom",

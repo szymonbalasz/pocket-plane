@@ -9,6 +9,14 @@ import {
   isReadOnlyEntry,
 } from "./schemas";
 
+const RULE = {
+  on: "hit",
+  when: [{ if: "ownTurn" }],
+  every: "turn",
+  // biome-ignore lint/suspicious/noThenProperty: `then` is the rule's effect field (MOD §8.4)
+  then: { do: "damage", formula: "1d6", type: "radiant" },
+};
+
 const spell = {
   kind: "spell",
   name: "Fireball",
@@ -106,10 +114,11 @@ describe("FR-CMP-01 kind schemas", () => {
     expect(EntryDraft.safeParse(over).success).toBe(false);
   });
 
-  test("feature: presetKey or preset (opaque), at most one", () => {
+  test("feature: presetKey or preset (MOD's TriggerRule), at most one", () => {
     const f = (body: object) => ({ ...feature, body: { text: "t", ...body } });
     expect(EntryDraft.safeParse(f({ presetKey: "sneak-attack" })).success).toBe(true);
-    expect(EntryDraft.safeParse(f({ preset: { any: "rule" } })).success).toBe(true);
+    expect(EntryDraft.safeParse(f({ preset: RULE })).success).toBe(true);
+    expect(EntryDraft.safeParse(f({ preset: { any: "rule" } })).success).toBe(false);
     expect(EntryDraft.safeParse(f({ presetKey: "sneak-attack", preset: {} })).success).toBe(false);
     expect(EntryDraft.safeParse(f({ presetKey: "Not A Key" })).success).toBe(false);
   });

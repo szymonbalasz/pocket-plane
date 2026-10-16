@@ -10,9 +10,20 @@ export const LOOKUP_DEBOUNCE_MS = 150;
 
 /**
  * The client's REST client, or a loader of it (the DM session module reads localStorage at
- * import, so DM code imports it lazily to keep registries testable).
+ * import, so DM code imports it lazily to keep registries testable). Tagged, never told apart by
+ * `typeof`: a Hono client is a callable proxy (`typeof` is "function"). Build one with `eagerApi`
+ * / `lazyApi` once per module (hooks depend on its identity).
  */
-export type ApiSource = Api | (() => Promise<Api>);
+export type ApiSource =
+  | { readonly kind: "api"; readonly api: Api }
+  | { readonly kind: "lazy"; readonly load: () => Promise<Api> };
+
+export const eagerApi = (api: Api): ApiSource => ({ kind: "api", api });
+export const lazyApi = (load: () => Promise<Api>): ApiSource => ({ kind: "lazy", load });
+
+export async function resolveApi(source: ApiSource): Promise<Api> {
+  return source.kind === "api" ? source.api : source.load();
+}
 
 /** Query values as the URL carries them (strings); undefined keys are left out. */
 export type SearchParams = { [K in keyof SearchQuery]?: string };
@@ -21,7 +32,7 @@ export async function searchCompendium(
   source: ApiSource,
   params: SearchParams,
 ): Promise<SearchResponse> {
-  const api = typeof source === "function" ? await source() : source;
+  const api = await resolveApi(source);
   const query: Record<string, string> = {};
   for (const [k, v] of Object.entries(params)) if (v !== undefined) query[k] = v;
   const body = await call<unknown>(api.api.compendium.search.$get({ query }));

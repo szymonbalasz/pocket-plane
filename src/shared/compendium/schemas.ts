@@ -1,5 +1,6 @@
 // compendium boundary schemas (CMP §8, FR-CMP-01 / -04 / -29): kind registry (strict facets +
 // body per kind), entry and source rows, derived values. zod is the source of truth.
+import { TriggerRule } from "@shared/effect-modifiers/triggers";
 import { Cr, Size } from "@shared/entities/schemas";
 import { z } from "zod";
 
@@ -155,17 +156,11 @@ export const PresetKey = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
   .max(64);
 
-/**
- * MOD's `TriggerRule`, opaque here (FR-CMP-29).
- * TODO (C4): switch to the real zod from `@shared/effect-modifiers/triggers.ts` (fix/rt-shared).
- */
-export const OpaqueTriggerRule = z.unknown();
-
 export const FeatureBody = z
   .strictObject({
     text: text(ENTRY_TEXT_MAX),
     presetKey: PresetKey.optional(),
-    preset: OpaqueTriggerRule.optional(),
+    preset: TriggerRule.optional(),
   })
   .refine((b) => b.presetKey === undefined || b.preset === undefined, {
     message: "Use presetKey or preset, not both",

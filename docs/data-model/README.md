@@ -1461,3 +1461,24 @@ From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #207, #
 - **`imported-entity`** (entities' record type over `entity` rows with `campaign_id` null): now **lazy by ids** (FR-CMP-15, ADR-0045): in no snapshot; the DM loads rows by id. Players never.
 - **Derived at read** (never stored): `sourceLabel` (imported: `compendium_source.name`; homebrew: "Homebrew"), the search rank (name prefix / word start / substring / text, FR-CMP-10), the entry `ETag` (entry `updatedAt` + source `version` + monster definition `updatedAt`).
 - **Filters** (FR-CMP-11) read `facets` (JSON leaf) after a SQL pre-filter on campaign, kind and `instr` over `name_key` / `search_text`; no index added (≤ ~1,200 rows, OQ-CMP-09).
+
+## 45. Sprint 3: compendium window (C3)
+
+From [compendium](../specs/compendium.md) (CMP). **Built by `build/compendium-window`**: no new table, column or record type. Protocol side: [protocol §59](../protocol/README.md#59-sprint-3-compendium-window-c3).
+
+- **Writes:** only through `cmp.import` (C1), now routed: `POST /api/compendium/import` writes `compendium_source`, `compendium_entry` and imported definitions as [§34](#34-sprint-3-compendium-core-c1); nothing else.
+- **Derived (server):** `bundledVersion` per bundled source (`GET /api/compendium/sources`), never stored; compared with `compendium_source.version` for **Update**.
+- **Derived (client, `@ui/features/compendium/logic`):** tabs per role, search params, source Badge, footer label, CR + XP, ability mods, a monster expression's roll category, the Stat block route (campaign definition → sheet, else the entry linking the imported definition).
+- **Persisted runtime state:** none. Window query / tab / filters / view live in the page's memory only (not `localStorage`, not the server).
+- **CON-44:** no record shape; 0 B in every snapshot (entries and sources are read over REST).
+
+## 46. Sprint 3: compendium homebrew (C4)
+
+From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #209). **Built by `build/compendium-homebrew`**: no table, column or record type change. Protocol side: [protocol §60](../protocol/README.md#60-sprint-3-compendium-homebrew-c4).
+
+- **`compendium_entry` writes (homebrew):** `cmp.putEntry` (create / whole replace; `campaign_id` = the DM's active campaign, `source` / `source_key` / `definition_id` null; `name_key` unique per campaign and kind) and `cmp.deleteEntry` (homebrew rows only; imported rows are never deleted). `derived_from_id` = Clone's base (informational, no FK; a player reads it as null).
+- **`body.preset`** of a feature: MOD's `TriggerRule` (validated on write since C4); `presetKey` a MOD built-in trigger key; at most one.
+- **Derive** (`cmp.deriveMonster`): a campaign `entity` (monster, `derived_from_id` = the entry's imported definition) and, with copy text, its `creature_sheet` row with `features` copied from the entry body (≤ 30 rows). Copies: re-import and later entry edits never touch them (FR-CMP-09).
+- **Add to sheet** (`cmp.addToSheet`): one `creature_sheet` row-list append (`spells` / `items` / `features`) and, when FR-CMP-29 resolves, one `rule_trigger` row (character owner) in the same transaction. Copies, never linked to the entry.
+- **Derived (never stored):** `featureKey` (`<source>:<sourceKey>`, homebrew `campaign:<id>`), the resolved preset name ("Preset: ‹name›"), the row source label (source name / "Homebrew").
+- **CON-44:** no new record shape; snapshots change only by the sheet rows / triggers a DM or player adds (as CHARX / MOD rows).

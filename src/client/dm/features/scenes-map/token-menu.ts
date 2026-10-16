@@ -4,6 +4,7 @@ import type { TokenRecord } from "@shared/scenes-map/schemas";
 import type { ComponentType } from "react";
 import { cbtxTokenMenu } from "../combat-extras/token-menu-entries";
 import { combatTokenMenu } from "../combat-tracker/token-menu-entries";
+import { cmpTokenMenu } from "../compendium/token-menu-entries";
 import { modTokenMenu } from "../effect-modifiers/token-menu-entries";
 import { fogTokenMenu } from "../fog-of-war/token-menu-entries";
 import { scenesMapTokenMenu } from "./token-menu-entries";
@@ -46,6 +47,7 @@ export const tokenMenuEntries: readonly TokenMenuEntry[] = [
   ...cbtxTokenMenu, // combat-extras: Conditions ▸, Effect…, Temp HP…, Add to combat (FR-CBTX-35)
   ...modTokenMenu, // effect-modifiers: Apply effect ▸, Effect modifiers…, Rule triggers… (FR-MOD-28)
   ...fogTokenMenu, // fog-of-war: Invisible (FR-FOG-47, #210)
+  ...cmpTokenMenu, // compendium: Stat block (FR-CMP-22)
 ];
 
 /** Token double-click: the first available entry by order runs. Append your feature's line. */

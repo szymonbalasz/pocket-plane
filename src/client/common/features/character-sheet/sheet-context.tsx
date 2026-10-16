@@ -10,6 +10,7 @@ import type { SheetEditField } from "@shared/events/character-sheet";
 import { createContext, useContext } from "react";
 import { toast } from "sonner";
 import { useSync } from "../../sync/store";
+import type { DiceTextContext } from "../dice-extras/DiceText";
 import { LOST_TOAST } from "./edit-model";
 import { intentErrorText } from "./routing";
 
@@ -38,6 +39,18 @@ export function useSheet(): SheetCtx {
   if (!c) throw new Error("useSheet outside a sheet");
   return c;
 }
+
+/**
+ * FR-DICEX-30: notation in sheet text stages as this creature (when the viewer may roll as it),
+ * labelled with the row's name; category stays the tray default `other` (FR-DICEX-29, -31).
+ */
+export const notationContext = (
+  ctx: Pick<SheetCtx, "creature">,
+  label: string,
+): DiceTextContext => ({
+  label,
+  creature: { entityId: ctx.creature.id },
+});
 
 /** FR-CHARX-38: a failed intent as a Toast; a lost one asks to check the sheet first. */
 export function toastIntentError(err: unknown): void {
