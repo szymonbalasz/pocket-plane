@@ -1,10 +1,12 @@
 // Player view of `damage-card` (FR-CBT-30, FR-CBT-42): pending "Waiting for DM"; resolved one
-// part per target, "Hit Goblin: 6 · Hit Goblin 2: 3 (half) · Miss". The player has no action.
+// part per target, "Hit Goblin: 6 · Hit Goblin 2: 3 (half) · Miss" (applied incl. rule-trigger
+// parts, FR-MOD-48). The card's offered parts muted after the damage (R7). No action.
 
 import { DAMAGE_CARD_END_RULE } from "@shared/combat-tracker/end-rule";
 import { resolutionText } from "@shared/combat-tracker/rules";
 import { DAMAGE_CARD_KIND, DamageCardResolutionRead } from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
+import { CardOffersText } from "@ui/features/effect-modifiers/card-offers";
 import { defineNotificationView } from "@ui/features/notifications/views";
 import { SwordIcon } from "lucide-react";
 
@@ -19,7 +21,7 @@ export function outcomeText(n: NotificationRecord): string {
 function PlayerCard({ notification: n }: { notification: NotificationRecord }) {
   return (
     <span className="flex flex-col">
-      <span>{n.text}</span>
+      <CardOffersText notification={n} />
       <span
         data-testid="cbt-card-outcome"
         data-value={n.state}
