@@ -7,6 +7,8 @@ import { playerInitiativeWindow } from "./features/combat-tracker/initiative-win
 import { playerTrayWindow } from "./features/dice-extras/tray-window";
 import { playerDiceLogWindow } from "./features/dice-roll-log/log-window";
 import { notificationsHistoryWindow } from "./features/notifications/history-window";
+import { playerPartyBoardWindow } from "./features/party-board/board-window";
+import { playerHandoutWindow } from "./features/party-board/handout-window";
 import { playerLootLogWindow } from "./features/party-loot/loot-window";
 
 const windows: WindowDef[] = [
@@ -18,6 +20,8 @@ const windows: WindowDef[] = [
   playerInitiativeWindow, // cbt.initiative (combat-tracker, CBT §7)
   playerLootLogWindow, // loot.log (party-loot, FR-LOOT-15)
   playerTrayWindow, // dicex.tray (dice-extras, FR-DICEX-01)
+  playerPartyBoardWindow, // party.board (party-board, FR-PARTY-11)
+  playerHandoutWindow, // party.handout (party-board, FR-PARTY-14)
 ];
 
 export const playerWindows = createWindowRegistry("player", windows);
