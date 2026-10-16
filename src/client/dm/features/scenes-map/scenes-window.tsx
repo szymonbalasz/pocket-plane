@@ -1,6 +1,7 @@
 // `map.scenes` (MAP §7): folders + scenes in list order (FR-MAP-02), "Live" on the active scene,
 // click views a scene (FR-MAP-08), row menus (rename, duplicate, move, delete), new scene / folder.
 // REST for list CRUD (ADR-0021 D). Actions disabled while not live; viewing always works.
+import type { AssetRecord } from "@shared/assets-pipeline/schemas";
 import { sceneList } from "@shared/scenes-map/geometry";
 import {
   FolderName,
@@ -185,6 +186,9 @@ function NewSceneDialog({ open, onOpenChange }: { open: boolean; onOpenChange(o:
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const view = useDmMap((s) => s.view);
+  // BL-06: the chosen map's name from the asset records the picker already shows.
+  const assets = useRecords<AssetRecord>("asset");
+  const mapName = assets.find((a) => a.id === mapAssetId)?.name;
   const reset = () => {
     setName("");
     setMap(null);
@@ -236,7 +240,21 @@ function NewSceneDialog({ open, onOpenChange }: { open: boolean; onOpenChange(o:
           <div className="flex items-center gap-2 text-sm">
             <span>Map:</span>
             {mapAssetId ? (
-              <AssetImg id={mapAssetId} file="thumb" alt="" className="h-10 w-16 rounded-sm" />
+              <>
+                <AssetImg
+                  id={mapAssetId}
+                  file="thumb"
+                  alt=""
+                  className="h-10 w-16 shrink-0 rounded-sm"
+                />
+                <span
+                  className="min-w-0 truncate"
+                  title={mapName}
+                  data-testid="map-scene-new-map-name"
+                >
+                  {mapName}
+                </span>
+              </>
             ) : (
               <span className="text-muted-foreground">none chosen</span>
             )}

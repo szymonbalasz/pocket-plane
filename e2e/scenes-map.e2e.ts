@@ -236,3 +236,25 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await player.context().close();
   await dm.context().close();
 });
+
+test("BL-06 new scene dialog shows the chosen map's name", async ({ browser }) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const scenes = await openWindow(dm, "map.scenes");
+  await scenes.getByTestId("map-scene-new").click();
+  const dialog = dm.getByRole("dialog", { name: "New scene" });
+  await expect(dialog.getByText("none chosen")).toBeVisible();
+  await expect(dialog.getByTestId("map-scene-new-map-name")).toHaveCount(0);
+  const picker = dialog.getByTestId("asset-picker");
+  await picker.getByTestId("asset-picker-item").filter({ hasText: "battlemap" }).click();
+  await picker.getByTestId("asset-picker-select").click();
+  const name = dialog.getByTestId("map-scene-new-map-name");
+  await expect(name).toHaveText("battlemap");
+  await expect(name).toHaveAttribute("title", "battlemap");
+  await expect(dialog.getByText("none chosen")).toHaveCount(0);
+  await dm.keyboard.press("Escape"); // cancel: no scene created
+  await expect(dialog).toHaveCount(0);
+  await dm.context().close();
+});
