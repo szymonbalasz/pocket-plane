@@ -1337,9 +1337,23 @@ Indexes: unique `compendium_entry_source_key` (`source`, `source_key`); unique `
 - **Snapshot size** (CON-44): compendium rows are in no snapshot (asserted on the `compendium` bundle: no entry text in any DM or player frame). Until C2 makes `imported-entity` lazy, the mini set's 5 SRD definitions are in the DM snapshot: `compendium` bundle DM 15,869 B, `imported-entity` 7 rows / 7,788 B (2 fixture + 5 SRD); players 0 rows (max 2,696 B). C1 has no route, so a full import (322 definitions, +341 KB) can't reach a real DM snapshot before C2.
 - **Import timing** (FR-CMP-31, `import.test.ts`, Windows dev box): full `srd-5.1` (1,150 entries + 322 definitions) 0.7–1.1 s; unchanged re-import 0.3–0.5 s with no writes (`total_changes()` unchanged).
 
-## 35. Sprint 3: party board handouts (P2)
+## 35. Sprint 3: trigger presets + fixtures (R5)
 
-From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Built by `build/party-handouts`**: no new table, column or record type. Protocol side: [protocol §48](../protocol/README.md#48-sprint-3-party-board-handouts-p2).
+From [effect-modifiers](../specs/effect-modifiers.md#82-records) sprint 3. **Built by `build/trigger-presets`** (R5): no schema change, no new record type. Protocol side: [protocol §48](../protocol/README.md#48-sprint-3-trigger-presets--fixtures-r5).
+
+| Row / leaf | Change | Source |
+|---|---|---|
+| `effect_preset.modifiers` | 1–6 for character presets; **0–6 for campaign presets** (0 = a mark, named by a `targetMarked` filter); zod `EffectPresetRecord` refines it | FR-MOD-05 (#209) |
+| `effect.modifiers` of a `hunters-mark` effect | `[]` for new applies (the built-in is a mark); rows applied before keep their +1d6 | FR-MOD-05, OQ-MOD-27 |
+| `rule_trigger.rule` | `on: roll` with `every: {feature}` no longer parses (`TriggerRule`); hit triggers unchanged | #223 |
+| `trigger_use` (roll) | unchanged; the part's `roll_id` is a manual row when a `t:` group was sent | FR-MOD-18, #224 |
+
+- **Fixtures:** `trg-thorn` writes Thorn's `classes` (derived `level` 5, `className` Rogue) and one `rule_trigger`; `trg-monsters` two definition `rule_trigger` rows (the Wolf's on an imported definition, keyed per campaign).
+- **CON-44:** unchanged (no new record or field; `rule-trigger` is lazy, [§30](#30-sprint-3-rule-trigger-engine-r4)).
+
+## 36. Sprint 3: party board handouts (P2)
+
+From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Built by `build/party-handouts`**: no new table, column or record type. Protocol side: [protocol §49](../protocol/README.md#49-sprint-3-party-board-handouts-p2).
 
 - **Notification rows:** kind `handout-shared` in `notification` (payload `{handoutId}`, state `info`, audience `all` or `player`; FR-PARTY-06). The row and its handout id stay after an unshare or delete (OQ-PARTY-15); the handout's records still leave the player.
 - **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab: handouts | inventory}` (FR-PARTY-11); the viewer's selected handout + mode (page memory).

@@ -37,6 +37,8 @@ import modRage from "./effect-modifiers/mod-rage";
 import modTier2 from "./effect-modifiers/mod-tier2";
 import trgBrakka from "./effect-modifiers/trg-brakka";
 import trgCombat from "./effect-modifiers/trg-combat";
+import trgMonsters from "./effect-modifiers/trg-monsters";
+import trgThorn from "./effect-modifiers/trg-thorn";
 import charMira from "./entities/char-mira";
 import charThorn from "./entities/char-thorn";
 import enemy1 from "./entities/enemy-1";
@@ -121,6 +123,8 @@ export const units: readonly Fixture[] = [
   charBrakka,
   trgBrakka,
   trgCombat,
+  trgThorn,
+  trgMonsters,
   handoutImages,
   handouts1,
   partyItems1,

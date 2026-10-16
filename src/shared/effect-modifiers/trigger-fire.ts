@@ -157,3 +157,33 @@ export function settleFacts(rule: Pick<TriggerRule, "when">, x: FireFacts): Sett
   if (soft.length > 0 && !soft.some((f) => f.if !== "ask" && holds(f, x))) out.untick = true;
   return out;
 }
+
+/** The effect fields a mark check reads (CBTX effect row, DM view). */
+export interface MarkEffect {
+  targetCombatantId: string | null;
+  targetCharacterId: string | null;
+  sourceCombatantId: string | null;
+  presetKey: string | null;
+  endedAt: string | null;
+}
+
+/**
+ * FR-MOD-05, -39 (OQ-MOD-27, #209 campaign marks): the target-side `marked` fact holds iff the
+ * target (a combatant; a PC's effects sit on its character) has an active effect with that
+ * `presetKey` whose source is the attacker. Hunter's Mark: built-in key; a campaign mark: its id.
+ */
+export function targetMarkedBy(
+  effects: readonly MarkEffect[],
+  target: { combatantId: string; characterId?: string | null },
+  marked: string,
+  attackerCombatantId: string,
+): boolean {
+  return effects.some(
+    (e) =>
+      e.endedAt === null &&
+      e.presetKey === marked &&
+      e.sourceCombatantId === attackerCombatantId &&
+      (e.targetCombatantId === target.combatantId ||
+        (!!target.characterId && e.targetCharacterId === target.characterId)),
+  );
+}

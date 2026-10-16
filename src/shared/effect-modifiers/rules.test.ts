@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ApplyInput, PresetInput, PutPresetInput, ToggleInput } from "./intents";
-import { BUILTIN_PRESET_DEFS, builtinPreset, builtinPresets } from "./presets";
+import { BUILTIN_PRESET_DEFS, builtinPreset, builtinPresets, TRIGGERS_BUILT } from "./presets";
 import {
   activeMods,
   type ModEffect,
@@ -14,6 +14,7 @@ import {
 import {
   AnyModifier,
   BUILTIN_PRESET_KEYS,
+  CHARACTER_PRESET_EMPTY,
   type EffectPresetRecord,
   Modifier,
   type Modifier as ModifierT,
@@ -29,6 +30,35 @@ describe("FR-MOD-05 built-in presets", () => {
         expect(p.tier).toBe(modifierTier(p.modifier));
       }
     }
+  });
+
+  test("FR-MOD-05 built-ins at tiers 1 / 2 / T: Hunter's Mark +1d6 before triggers, a mark (0 modifiers) with them", () => {
+    const hm = (tier: number, triggers: boolean) =>
+      builtinPresets(tier, triggers).find((p) => p.key === "hunters-mark");
+    const d6: ModifierT = {
+      kind: "dice",
+      on: { roll: "damage", via: "weapon" },
+      dice: "1d6",
+      sign: 1,
+    };
+    expect([hm(1, false)?.modifiers, hm(1, false)?.mark]).toEqual([[d6], false]);
+    expect([hm(2, false)?.modifiers, hm(2, false)?.mark]).toEqual([[d6], false]);
+    expect([hm(1, true)?.modifiers, hm(2, true)?.mark]).toEqual([[], true]);
+    expect(hm(2, true)).toMatchObject({ name: "Hunter's Mark", concentration: true });
+    expect(hm(2, true)?.note).toContain("hunted creature");
+    // This build has rule triggers: the mark is the only built-in with no modifiers.
+    expect(TRIGGERS_BUILT).toBe(true);
+    expect(builtinPreset("hunters-mark")?.mark).toBe(true);
+    expect(
+      builtinPresets()
+        .filter((p) => p.modifiers.length === 0)
+        .map((p) => p.key),
+    ).toEqual(["hunters-mark"]);
+    expect(
+      builtinPresets()
+        .filter((p) => p.mark)
+        .map((p) => p.key),
+    ).toEqual(["hunters-mark"]);
   });
 
   test("FR-MOD-05 tier 1: Rage = +2 weapon damage only; Shield of Faith, Reckless, Dodge hidden", () => {
@@ -256,7 +286,12 @@ describe("FR-MOD-01 intent bounds", () => {
   };
   test("FR-MOD-01 presets: 1–6 built-tier modifiers; key on campaign presets only; name per label rules", () => {
     expect(PresetInput.safeParse(base).success).toBe(true);
-    expect(PresetInput.safeParse({ ...base, modifiers: [] }).success).toBe(false);
+    // FR-MOD-05 (#209): 0 modifiers only for a campaign mark; a character preset needs one.
+    expect(PresetInput.safeParse({ ...base, characterId: null, modifiers: [] }).success).toBe(true);
+    const empty = PresetInput.safeParse({ ...base, characterId: "thorn", modifiers: [] });
+    expect(empty.error?.issues.map((i) => [i.path.join("."), i.message])).toEqual([
+      ["modifiers", CHARACTER_PRESET_EMPTY],
+    ]);
     expect(PresetInput.safeParse({ ...base, modifiers: Array(7).fill(bless) }).success).toBe(false);
     const mode = { kind: "mode", on: { roll: "check" }, mode: "advantage" };
     // Tier 2 built (R1): mode and AC parts are preset modifiers.
