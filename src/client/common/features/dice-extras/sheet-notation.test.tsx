@@ -110,6 +110,7 @@ const links = (html: string) =>
   );
 
 afterEach(() => {
+  diceExtras.failed(); // stop the pending throw a tray roll starts
   diceExtras.clear();
 });
 
@@ -157,7 +158,7 @@ describe("FR-DICEX-30 sheet text through DiceText (view mode)", () => {
     expect(actorFor(ctx.creature, { role: "player", playerId: "p2" }, [creature])).toBeUndefined();
     // Label ≤ 60 (a 60-char row name passes as is; longer would be cut).
     const long = notationContext({ creature }, "x".repeat(70));
-    expect(notationRequest("1d6", long, {}, undefined).label).toBe("x".repeat(60));
+    expect(notationRequest("1d6", long, {}, undefined)).toMatchObject({ label: "x".repeat(60) });
   });
 
   test("FR-DICEX-29 Shift / Ctrl+click preselect adv / dis for 1d20 expressions only", () => {

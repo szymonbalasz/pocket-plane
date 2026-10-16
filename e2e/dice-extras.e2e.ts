@@ -2,7 +2,8 @@
 // Thin dice-extras flows (DICEX §13 E2E, D1 flat): DM (A) + player-1 (B, Mira). B stages "1d12+5"
 // from the roll bar's tray Button, adds a d6, sets the constant to 6 and rolls; A sees the line;
 // B's flat throw rests on the server's values. B Alt+clicks Athletics on Mira's sheet → the tray
-// adjusts the sheet roll and its Roll sends the sheet's own intent. Sheet notation links: D4.
+// adjusts the sheet roll and its Roll sends the sheet's own intent. Sheet notation (D4): B clicks
+// "1d12 + 5" in Mira's "Notation test" feature → `compose` as Mira → Roll; A sees the line.
 // Looks (D2): fixture looks thrown in their style; player-2 saves Emerald glass, seen by A and B.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
@@ -188,4 +189,51 @@ test("FR-DICEX-15 FR-DICEX-22 3D throw rests on the server's values (skipped wit
   }
   await expect(thrown.locator("canvas")).toHaveCount(1);
   await p1.context().close();
+});
+
+test("FR-DICEX-29 FR-DICEX-30 FR-DICEX-31 sheet notation: Mira's 'Notation test' links; a click composes in the tray as Mira; Roll → A sees the line", async ({
+  browser,
+}) => {
+  const { secret, link } = e2eEnv();
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await live(dm);
+  const p1 = await rolePage(browser);
+  await p1.goto(link("Player 1"));
+  await live(p1);
+  const dmLog = await openWindow(dm, "dice.log");
+
+  // Step 2: B → Mira's sheet → Features → "Notation test": links and plain text.
+  const sheet = await openWindow(p1, "char.sheet");
+  await sheet.locator('[data-testid="charx-tab"][data-value="features"]').click();
+  const row = sheet.getByTestId("charx-feature").filter({ hasText: "Notation test" });
+  const links = row.getByTestId("dicex-notation");
+  await expect(links).toHaveCount(4);
+  const values = await links.evaluateAll((els) => els.map((e) => e.getAttribute("data-value")));
+  expect(values).toEqual(["1d12+5", "1d10+1", "2d6-1", "1d20+3"]);
+  await expect(row).toContainText("Not dice: 51d6, 1d1, 2d6/2, 4d6x2, abc1d6.");
+
+  // Step 3: click "1d12 + 5" → `compose`: one d12, constant 5, actor Mira, label, category other.
+  await links.first().click();
+  const tray = shellWindow(p1, "dicex.tray");
+  await expect(tray.getByTestId("dicex-tray-state")).toHaveAttribute("data-value", "compose");
+  await expect(tray.getByTestId("dicex-tray-die")).toHaveCount(1);
+  await expect(tray.getByTestId("dicex-tray-die")).toHaveAttribute("data-faces", "12");
+  await expect(tray.getByTestId("dicex-tray-constant")).toHaveValue("5");
+  await expect(tray.getByTestId("dicex-tray-actor").locator("option:checked")).toHaveText("Mira");
+  await expect(tray.getByTestId("dicex-tray-label")).toHaveValue("Notation test");
+  await expect(tray.getByTestId("dicex-tray-category")).toHaveValue("other");
+
+  // FR-DICEX-31: a plain `dice.roll` line, as Mira.
+  await tray.getByTestId("dicex-tray-roll").click();
+  await expect(
+    dmLog.getByTestId("dice-log-entry").filter({ hasText: "Notation test" }).filter({
+      hasText: "1d12+5",
+    }),
+  ).toHaveCount(1);
+  await expect(
+    dmLog.getByTestId("dice-log-entry").filter({ hasText: "Notation test" }),
+  ).toContainText("Mira");
+
+  for (const page of [p1, dm]) await page.context().close();
 });
