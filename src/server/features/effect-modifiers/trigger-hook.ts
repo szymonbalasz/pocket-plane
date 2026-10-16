@@ -16,7 +16,7 @@ import {
 } from "@shared/combat-tracker/schemas";
 import { PART_DICE_MAX, ROLL_NOTE_MAX, ROLL_OFFERED_MAX } from "@shared/dice-roll-log/schemas";
 import { evaluateFormula, type FormulaValue, parseFormula } from "@shared/effect-modifiers/formula";
-import type { RollSubject } from "@shared/effect-modifiers/schemas";
+import { isBuiltinPresetKey, type RollSubject } from "@shared/effect-modifiers/schemas";
 import {
   type FireFacts,
   formulaOwnerOf,
@@ -26,6 +26,7 @@ import {
   windowed,
   windowKey,
 } from "@shared/effect-modifiers/trigger-fire";
+import { MISSING_PRESET_NAME } from "@shared/effect-modifiers/trigger-records";
 import { doublesOnCrit, type TriggerRule } from "@shared/effect-modifiers/triggers";
 import type { StatBlock } from "@shared/entities/schemas";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
@@ -332,6 +333,22 @@ function rollParts(
 }
 
 /**
+ * FR-MOD-37, -47 (R7): the card's `marked` fact. A player's own card is theirs to read, and
+ * players never get a campaign preset's id (FR-MOD-21, -47): a built-in key stays, a campaign
+ * mark becomes its name (the owner's trigger copy shows it too); the DM's popup matches the name
+ * against its campaign presets (`settleTriggers`).
+ */
+function markedFact(env: Env, preset: string): string {
+  if (isBuiltinPresetKey(preset)) return preset;
+  const row = env.tx
+    .select({ name: effectPreset.name })
+    .from(effectPreset)
+    .where(eq(effectPreset.id, preset))
+    .get();
+  return (row?.name ?? MISSING_PRESET_NAME).slice(0, TRIGGER_LABEL_MAX);
+}
+
+/**
  * FR-MOD-37: on a card's damage roll, the attacker's `hit` triggers whose requires, hard
  * owner-side filters and charge pass → rolled offered parts (dice doubled on a crit unless the
  * rule has a `crit` filter) with settle facts. > 4 → the rest skipped with a note.
@@ -379,7 +396,7 @@ function hitOffers(
       ...(base.manual && !r.manual ? { auto: true } : {}),
       ...(dice ? { dice } : {}),
       ...(s.ask ? { ask: s.ask.slice(0, TRIGGER_ASK_MAX) } : {}),
-      ...(s.marked ? { marked: s.marked } : {}),
+      ...(s.marked ? { marked: markedFact(env, s.marked) } : {}),
       ...(s.hurt ? { hurt: true } : {}),
       ...(s.untick ? { untick: true } : {}),
     });

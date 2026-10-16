@@ -233,7 +233,7 @@ describe("FR-MOD-37 offers at the damage roll", () => {
     expect(t.offers(dis)).toEqual([]);
   });
 
-  test("FR-MOD-37 settle facts: a targetMarked trigger's offer carries the campaign mark and `hurt` (target-side filters never gate the roll)", () => {
+  test("FR-MOD-37 settle facts: a targetMarked trigger's offer carries the campaign mark (by name, never its id: R7) and `hurt` (target-side filters never gate the roll)", () => {
     const t = rtSetup();
     const mark = t.put(t.from("bless", { name: "Favored Foe" }));
     const ff = t.trig({
@@ -247,11 +247,14 @@ describe("FR-MOD-37 offers at the damage roll", () => {
       },
     });
     t.nextTo("Thorn", 1);
-    expect(t.card(t.attack("Thorn", { damage: 3 }).cardId).damage?.triggers?.[0]).toMatchObject({
+    const card = t.card(t.attack("Thorn", { damage: 3 }).cardId);
+    expect(card.damage?.triggers?.[0]).toMatchObject({
       triggerId: ff,
-      marked: mark,
+      marked: "Favored Foe",
       hurt: true,
     });
+    // FR-MOD-47: the card reaches Thorn's player (a player card); no campaign preset id on it.
+    expect(JSON.stringify(card)).not.toContain(mark);
   });
 });
 

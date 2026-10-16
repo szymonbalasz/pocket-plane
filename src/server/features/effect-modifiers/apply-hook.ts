@@ -95,11 +95,18 @@ export const modApplyHook: ApplyHook = {
       }
       out.extraRaw += value;
       // FR-MOD-47: the label in public lines iff the trigger is public; values always.
-      parts.push({ label: t?.public ? part.label : null, value, type: part.type });
+      parts.push({
+        label: t?.public ? part.label : null,
+        value,
+        type: part.type,
+        ...(multiplier !== "normal" ? { multiplier } : {}),
+      });
       dmParts.push({
         triggerId: part.triggerId,
         label: part.label,
         rolled: part.value,
+        // FR-MOD-40: "(DM set; rolled 7)" after an edited value.
+        ...(x.value !== undefined && x.value !== part.value ? { set: true as const } : {}),
         ...(forced ? { forced: true as const } : {}),
       });
       triggerParts.push({
