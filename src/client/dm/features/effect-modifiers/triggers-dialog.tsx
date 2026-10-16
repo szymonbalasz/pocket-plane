@@ -86,7 +86,6 @@ function TriggersRowAction({ row }: { row: CreatureRow }) {
         data-testid="mod-creature-triggers"
         data-record-id={row.id}
         aria-label={`Rule triggers of ${row.name}`}
-        title="Rule triggers…"
         onClick={() => setOpen(true)}
       >
         <ZapIcon className="size-3.5" />
