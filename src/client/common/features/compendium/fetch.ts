@@ -5,16 +5,9 @@ import { EntryResponse, type EntrySummary } from "@shared/compendium/rest";
 import { useEffect, useRef, useState } from "react";
 import { type Api, ApiError, call } from "../../api";
 import { entryForDefinition } from "./logic";
-import { type ApiSource, type SearchParams, searchCompendium } from "./search";
+import { type ApiSource, eagerApi, type SearchParams, searchCompendium } from "./search";
 
-/**
- * `searchCompendium` takes a client or a loader; a Hono client is a callable proxy (`typeof` is
- * "function"), so a plain client always goes in as a loader.
- */
-const source =
-  (api: Api): ApiSource =>
-  () =>
-    Promise.resolve(api);
+const source = (api: Api): ApiSource => eagerApi(api);
 
 export async function fetchEntry(api: Api, id: string): Promise<EntryResponse> {
   const body = await call<unknown>(api.api.compendium.entries[":id"].$get({ param: { id } }));

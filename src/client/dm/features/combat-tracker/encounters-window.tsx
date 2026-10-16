@@ -33,6 +33,7 @@ import { CreatureLookup } from "@ui/features/combat-tracker/parts";
 import { useCbtIntent } from "@ui/features/combat-tracker/store";
 import { ENCOUNTERS_KIND } from "@ui/features/combat-tracker/window";
 import { useCreatureLookup } from "@ui/features/compendium/lookup";
+import { lazyApi } from "@ui/features/compendium/search";
 import { useFreeArea } from "@ui/features/play-shell/free-area";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { useSceneLoaded } from "@ui/features/scenes-map/scene-window";
@@ -53,7 +54,7 @@ import { freeAreaCell } from "./place-at";
 import { combatRest } from "./rest";
 
 /** The DM REST client, imported lazily (the session reads localStorage at import). */
-const api = () => import("../campaign-management/session").then((m) => m.api);
+const api = lazyApi(() => import("../campaign-management/session").then((m) => m.api));
 
 interface Draft {
   name: string;
