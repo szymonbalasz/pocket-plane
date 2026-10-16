@@ -1,7 +1,14 @@
 // combat-tracker boundary schemas (CBT §8, §9; protocol §20–§23). zod is the source of truth for
 // the wire records, intents, REST bodies and the damage card's payload / resolution.
 import { DeathCounters, TempHp } from "@shared/combat-extras/schemas";
-import { ManualEntry, RollMode, RollModPart } from "@shared/dice-roll-log/schemas";
+import {
+  checkManualParts,
+  ManualEntry,
+  ManualParts,
+  ManualPartsPerRoll,
+  RollMode,
+  RollModPart,
+} from "@shared/dice-roll-log/schemas";
 import { PartDamageType } from "@shared/effect-modifiers/schemas";
 import { Ability } from "@shared/entities/schemas";
 import { DamageMultiplier } from "@shared/events/combat-tracker";
@@ -429,12 +436,16 @@ export const StartInput = z.strictObject({
 });
 export type StartInput = z.input<typeof StartInput>;
 export const EndInput = z.strictObject({ encounterId: Id });
-export const RollInitiativeInput = z.strictObject({
-  combatantIds: z.array(Id).min(1).max(50),
-  mode: RollMode.default("normal"),
-  manual: ManualEntry.optional(),
-  public: z.boolean().optional(),
-});
+export const RollInitiativeInput = z
+  .strictObject({
+    combatantIds: z.array(Id).min(1).max(50),
+    mode: RollMode.default("normal"),
+    manual: ManualEntry.optional(),
+    /** FR-MOD-18 (tier 2): physical bonus / trigger die groups (one combatant, with `manual`). */
+    manualParts: ManualParts.optional(),
+    public: z.boolean().optional(),
+  })
+  .superRefine(checkManualParts);
 export type RollInitiativeInput = z.input<typeof RollInitiativeInput>;
 export const SetInitiativeInput = z.strictObject({
   combatantId: Id,
@@ -456,6 +467,8 @@ export const AttackInput = z
     mode: RollMode.default("normal"),
     /** FR-CBT-17: two entries, to-hit first (one with `rolls: "toHit"`). */
     manual: z.array(ManualEntry).min(1).max(2).optional(),
+    /** FR-MOD-18 (tier 2): physical bonus / trigger die groups, one list per `manual` entry. */
+    manualParts: ManualPartsPerRoll.optional(),
     /** FR-CHARX-24 (OQ-CBT-47): one attack row; absent (and no `spellId`) = the first attack. */
     attackId: Id.optional(),
     /** FR-CHARX-24: a sheet spell with `roll: attack` and damage. */
@@ -473,7 +486,8 @@ export const AttackInput = z
   .refine((v) => v.manual === undefined || v.manual.length === (v.rolls === "toHit" ? 1 : 2), {
     path: ["manual"],
     message: "One manual entry per roll",
-  });
+  })
+  .superRefine(checkManualParts);
 export type AttackInput = z.input<typeof AttackInput>;
 export const AttackResult = z.object({ cardId: z.string(), rollIds: z.array(z.string()) });
 export type AttackResult = z.infer<typeof AttackResult>;
@@ -487,13 +501,16 @@ export const RollDamageInput = z
   .strictObject({
     attackerId: Id,
     manual: ManualEntry.optional(),
+    /** FR-MOD-18 (tier 2): physical bonus / trigger die groups (Divine Fury's d6), with `manual`. */
+    manualParts: ManualParts.optional(),
     attackId: Id.optional(),
     spellId: Id.optional(),
   })
   .refine((v) => v.attackId === undefined || v.spellId === undefined, {
     path: ["spellId"],
     message: "Either an attack or a spell",
-  });
+  })
+  .superRefine(checkManualParts);
 export type RollDamageInput = z.input<typeof RollDamageInput>;
 /** `attached` = completed an existing card (`NotificationUpdated`), else a new card. */
 export const RollDamageResult = z.object({
@@ -591,14 +608,18 @@ export type TurnResult = z.input<typeof TurnResult>;
 export const RollIdsResult = z.object({ rollIds: z.array(z.string()) });
 
 /** `cbt.rollAbility` (FR-CBT-44): a combatant's check or save, DM only. */
-export const RollAbilityInput = z.strictObject({
-  combatantId: Id,
-  kind: z.enum(["check", "save"]),
-  ability: Ability,
-  mode: RollMode.default("normal"),
-  manual: ManualEntry.optional(),
-  public: z.boolean().optional(),
-});
+export const RollAbilityInput = z
+  .strictObject({
+    combatantId: Id,
+    kind: z.enum(["check", "save"]),
+    ability: Ability,
+    mode: RollMode.default("normal"),
+    manual: ManualEntry.optional(),
+    /** FR-MOD-18 (tier 2): physical bonus / trigger die groups, with `manual`. */
+    manualParts: ManualParts.optional(),
+    public: z.boolean().optional(),
+  })
+  .superRefine(checkManualParts);
 export type RollAbilityInput = z.input<typeof RollAbilityInput>;
 export const RollAbilityResult = z.object({ rollIds: z.array(z.string()), entryId: z.string() });
 export type RollAbilityResult = z.infer<typeof RollAbilityResult>;

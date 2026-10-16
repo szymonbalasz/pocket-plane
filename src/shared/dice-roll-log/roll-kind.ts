@@ -4,7 +4,7 @@
 // `rollSegments` / `rollBreakdownSegments` for their roll parts (FR-DICE-28). Roll-hook parts
 // (FR-MOD-19/20) follow the constant ("14 + 4 + 3 Bless = 21"); the DM's line names every part
 // from `dmPayload`, players see "(DM)" for parts of effects they don't receive.
-import { modeLabels, modSegments, modsTotal } from "@shared/effect-modifiers/line";
+import { AUTO_PART_TEXT, modeLabels, modSegments, modsTotal } from "@shared/effect-modifiers/line";
 import { parseExpression } from "./grammar";
 import { defineLogKind, type LineSegment } from "./kind-types";
 import {
@@ -49,6 +49,7 @@ function diceSegments(item: RollPayloadItem): LineSegment[] {
       const prev = dice[i - 1];
       if (prev) out.push({ text: prev.kept && d.kept ? " + " : " " });
       out.push(d.kept ? { text: String(d.value) } : { text: String(d.value), style: "dropped" });
+      if (d.auto) out.push({ text: ` ${AUTO_PART_TEXT}`, style: "muted" });
     });
     if (group) out.push({ text: ")" });
   }

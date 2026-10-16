@@ -87,6 +87,30 @@ describe("FR-DICEX-13 throwDice", () => {
     ]);
   });
 
+  test("FR-DICEX-13 #220 mixed dice in one part: '2d6+1d8' → d6, d6, d8 (each die its own type)", () => {
+    const t = one([
+      item({
+        mods: [{ label: "Smite", value: 12, expression: "2d6+1d8", dice: [2, 4, 6] }],
+        offered: [{ label: "Fury", value: 5, expression: "1d6+1d4", dice: [3, 2] }],
+      }),
+    ]);
+    expect(t.dice.slice(1).map((d) => [d.label, d.faces, d.value, d.shape, d.offered])).toEqual([
+      ["Smite", 6, 2, "d6", undefined],
+      ["Smite", 6, 4, "d6", undefined],
+      ["Smite", 8, 6, "d8", undefined],
+      ["Fury", 6, 3, "d6", true],
+      ["Fury", 4, 2, "d4", true],
+    ]);
+    // A subtracted term's dice carry the minus.
+    const sub = one([
+      item({ mods: [{ label: "X", value: 3, expression: "1d6-1d4", dice: [5, 2] }] }),
+    ]);
+    expect(sub.dice.slice(1).map((d) => [d.faces, d.sign])).toEqual([
+      [6, 1],
+      [4, -1],
+    ]);
+  });
+
   test("a part without dice: 1d4 → one die; 2d6 → chip with the sum; null label → DM; flat bonus → chip", () => {
     const t = one([
       item({
@@ -150,6 +174,58 @@ describe("FR-DICEX-13 throwDice", () => {
     ]);
     expect(total.dice.map((d) => [d.faces, d.value, d.flat, d.physical])).toEqual([
       [6, 9, true, true],
+    ]);
+  });
+
+  test("FR-DICEX-13 a manual roll's entered bonus die (Bless) → flat physical die; a server-rolled (auto) part still tumbles", () => {
+    const t = one([
+      item({
+        manual: true,
+        total: 21,
+        mods: [
+          { label: "Bless", value: 3, expression: "1d4", dice: [3] },
+          { label: "Bane", value: -2, expression: "-1d4", dice: [2], auto: true },
+          { label: null, value: 2 },
+        ],
+      }),
+    ]);
+    expect(t.dice.map((d) => [d.label, d.faces, d.value, d.flat, d.physical, d.shape])).toEqual([
+      [undefined, 20, 12, true, true, null],
+      ["Bless", 4, 3, true, true, null],
+      ["Bane", 4, 2, false, undefined, "d4"],
+      ["DM", 0, 2, true, undefined, null],
+    ]);
+    // An entered offered trigger die too (FR-MOD-18 `t:` group); a server roll's parts tumble.
+    const off = one([
+      item({
+        manual: true,
+        offered: [{ label: "Divine Fury", value: 4, expression: "1d6", dice: [4] }],
+      }),
+    ]);
+    expect(off.dice[1]).toMatchObject({ offered: true, flat: true, physical: true, shape: null });
+    const rolled = one([
+      item({ mods: [{ label: "Bless", value: 3, expression: "1d4", dice: [3] }] }),
+    ]);
+    expect(rolled.dice[1]).toMatchObject({ flat: false, shape: "d4" });
+    expect(rolled.dice[1]?.physical).toBeUndefined();
+  });
+
+  test("FR-DICEX-13 a physical roll's server-rolled d20 (FR-MOD-17 auto) tumbles; the entered one stays flat", () => {
+    const t = one([
+      item({
+        expression: "2d20kh1+4",
+        mode: "advantage",
+        manual: true,
+        dice: [
+          { faces: 20, value: 11, kept: true },
+          { faces: 20, value: 7, kept: false, auto: true },
+        ],
+        total: 15,
+      }),
+    ]);
+    expect(t.dice.map((d) => [d.value, d.kept, d.flat, d.physical, d.shape])).toEqual([
+      [11, true, true, true, null],
+      [7, false, false, undefined, "d20"],
     ]);
   });
 

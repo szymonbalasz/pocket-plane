@@ -14,6 +14,7 @@ import type {
   DamageMultiplier,
 } from "@shared/combat-tracker/schemas";
 import type { ComponentType } from "react";
+import { modDefensePart } from "../effect-modifiers/popup-facts";
 import type { HpTemp } from "./targets";
 
 /** One target row as the popup shows it (list order). */
@@ -62,7 +63,9 @@ export interface PopupPart<V = unknown> {
 export const definePopupPart = <V>(part: PopupPart<V>): PopupPart => part as unknown as PopupPart;
 
 /** The registry. Append your feature's line (`definePopupPart`); order = render order. */
-export const popupParts: readonly PopupPart[] = [];
+export const popupParts: readonly PopupPart[] = [
+  modDefensePart, // effect-modifiers: defense hint "Half (Rage)" (FR-MOD-25)
+];
 
 type Values = Readonly<Record<string, unknown>>;
 
