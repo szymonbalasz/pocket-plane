@@ -8,7 +8,12 @@ describe("route table", () => {
     const app = createApp(s);
     const paths = app.routes.map((r) => `${r.method} ${r.path}`);
     expect(paths.length).toBeGreaterThan(0);
-    for (const p of paths) expect(p).not.toMatch(/fixture|reset|load|import/i);
+    // FR-FIX-24 as amended by OQ-CMP-17: `cmp.import` (a bundled source key, never data) is the
+    // one routed import (FR-CMP-20).
+    const routed = new Set(["POST /api/compendium/import"]);
+    for (const p of paths.filter((x) => !routed.has(x))) {
+      expect(p).not.toMatch(/fixture|reset|load|import/i);
+    }
     // Name segments only: "mod.putPreset" is not a reset intent.
     expect([...s.intents].filter((n) => /(^|\.)(import|fixture|reset|load)/i.test(n))).toEqual([]);
     expect(s.commands.has("import.batch")).toBe(true);
