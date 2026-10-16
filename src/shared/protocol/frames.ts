@@ -69,7 +69,8 @@ export const EventFrame = z.object({
   seq: z.number().int().positive(),
   /** `name` = domain event type (CON-12), or `presence` (CON-07). */
   cause: z.object({ name: z.string(), intentId: IntentId.optional() }),
-  changes: z.array(WireChange).min(1),
+  /** May be empty: every change was an identical upsert for this connection (FR-SYNC-19). */
+  changes: z.array(WireChange),
 });
 /** Signal sender, stamped by the server from the connection context, never the payload (ADR-0026). */
 export const SignalFrom = z.discriminatedUnion("role", [

@@ -24,8 +24,11 @@ const turn = {
 };
 
 describe("combat rule hooks (ADR-0035)", () => {
-  test("FR-CBTX-01 the registry holds combat-extras' line; four hook points", () => {
-    expect(combatRuleHooks.map((h) => h.name)).toEqual(["combat-extras.rules"]);
+  test("FR-CBTX-01 the registry holds combat-extras' and MOD's lines; four hook points", () => {
+    expect(combatRuleHooks.map((h) => h.name)).toEqual([
+      "combat-extras.rules",
+      "effect-modifiers.reminders",
+    ]);
     expect(COMBAT_RULE_POINTS).toEqual(["started", "added", "turnChanged", "ended"]);
     expect(new CombatRuleHooks([]).run("turnChanged", env, enc, turn)).toEqual([]);
   });

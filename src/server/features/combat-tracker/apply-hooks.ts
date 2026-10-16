@@ -23,6 +23,7 @@ import type {
 } from "@shared/combat-tracker/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
+import { modApplyHook } from "../effect-modifiers/apply-hook";
 import { modTargetFactsHook } from "../effect-modifiers/target-facts";
 
 /** What a hook sees of one target of an apply. */
@@ -67,6 +68,7 @@ export interface ApplyHook {
 /** The registry. Append your feature's line; order = run order = part order. */
 export const applyHooks: readonly ApplyHook[] = [
   modTargetFactsHook, // effect-modifiers: effective AC + defense facts (FR-MOD-24, -25)
+  modApplyHook, // effect-modifiers: rule-trigger parts settled, undone (FR-MOD-38, -41)
 ];
 
 /** All hooks' results for one target, merged in registry order. */

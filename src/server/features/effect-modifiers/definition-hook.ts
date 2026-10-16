@@ -1,12 +1,14 @@
-// MOD's definition-changed hook line (FR-MOD-07, FR-ENT-19): keeps each character preset's
-// `ownerPlayerId` copy equal to the character's owner, in the owner change's transaction. The
-// changes are listed in the entity event, so the old owner gets deletes and the new one upserts.
+// MOD's definition-changed hook line (FR-MOD-07, -47, FR-ENT-19): keeps each character preset's
+// and rule trigger's `ownerPlayerId` copy equal to the character's owner, in the owner change's
+// transaction. The changes are listed in the entity event, so the old owner gets deletes and the
+// new one upserts (`rule-trigger` is lazy: live changes as any type, ADR-0045).
 import type { EntityRecord } from "@shared/entities/schemas";
 import { eq } from "drizzle-orm";
-import { effectPreset } from "../../db/schema";
+import { effectPreset, ruleTrigger } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import type { HookEnv } from "../entities/definition-hooks";
 import { presetChange, presetsOfCharacter, readPreset } from "./rows";
+import { readTrigger, triggerChange, triggersOfCharacter } from "./trigger-commands";
 
 export function presetOwnerHook(
   env: HookEnv,
@@ -15,7 +17,17 @@ export function presetOwnerHook(
 ): RecordChange[] {
   if (after.kind !== "character") return [];
   const owner = after.ownerPlayerId;
-  return presetsOfCharacter(env.tx, after.id)
+  const triggers = triggersOfCharacter(env.tx, after.id)
+    .filter((t) => t.ownerPlayerId !== owner)
+    .map((t) => {
+      env.tx
+        .update(ruleTrigger)
+        .set({ ownerPlayerId: owner, updatedAt: env.ctx.clock.iso() })
+        .where(eq(ruleTrigger.id, t.id))
+        .run();
+      return triggerChange(t, readTrigger(env.tx, t.id));
+    });
+  const presets = presetsOfCharacter(env.tx, after.id)
     .filter((p) => p.ownerPlayerId !== owner)
     .map((p) => {
       env.tx
@@ -25,4 +37,5 @@ export function presetOwnerHook(
         .run();
       return presetChange(p, readPreset(env.tx, p.id));
     });
+  return [...presets, ...triggers];
 }

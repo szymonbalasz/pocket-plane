@@ -14,8 +14,10 @@ import type { TriggerRule } from "@shared/effect-modifiers/triggers";
 import { TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
+import { LOOT_ENTRY_KINDS } from "@shared/events/party-loot";
 import { type DoorSeen, FOG_EDIT_KINDS, FOG_FILLS } from "@shared/fog-of-war/schemas";
 import type { DarknessRow, FogLayerShape } from "@shared/fog-of-war/shapes";
+import type { SharedWith } from "@shared/party-board/schemas";
 import { DIAGONAL_RULES, type Door, TEMPLATE_SHAPES, type Wall } from "@shared/scene-tools/schemas";
 import { sql } from "drizzle-orm";
 import {
@@ -634,7 +636,8 @@ export const hpChange = sqliteTable(
 );
 
 /**
- * Loot entry (party-loot, `loot-entry`): DM loot / spend (`world → party`) or a coin move. Window
+ * Loot entry (party-loot, `loot-entry`): DM loot / spend (`world → party`), a coin move, or an
+ * item move (`item`, party-board FR-PARTY-25: `text` = item name, `qty` set, coins 0). Window
  * orderBy `seq` (CON-20). Pot and wallets are derived sums, never stored (FR-LOOT-09).
  */
 export const lootEntry = sqliteTable(
@@ -645,7 +648,7 @@ export const lootEntry = sqliteTable(
       .notNull()
       .references((): AnySQLiteColumn => campaign.id),
     seq: integer("seq").notNull(),
-    kind: text("kind", { enum: ["loot", "move"] }).notNull(),
+    kind: text("kind", { enum: LOOT_ENTRY_KINDS }).notNull(),
     fromKind: text("from_kind", { enum: ["party", "world", "character"] }).notNull(),
     /** Plain id, no FK (entities has no delete, FR-ENT-14). */
     fromCharacterId: text("from_character_id"),
@@ -658,12 +661,73 @@ export const lootEntry = sqliteTable(
     ep: integer("ep").notNull(),
     gp: integer("gp").notNull(),
     pp: integer("pp").notNull(),
+    /** Item rows only (1–9 999, FR-PARTY-25); null on `loot` / `move`. */
+    qty: integer("qty"),
     createdAt: text("created_at").notNull(),
     editedAt: text("edited_at"),
   },
   (t) => [
     uniqueIndex("loot_entry_seq").on(t.seq),
     index("loot_entry_campaign_seq").on(t.campaignId, t.seq),
+  ],
+);
+
+/**
+ * Handout (party-board, data model §28): DM-authored title + plain-text body + 0–10 image asset
+ * IDs (no FK; assets have no delete). Two lazy record types read it (FR-PARTY-01): `handout`
+ * (header, no body) and `handout-body`. `sharedWith` is the only visibility input (FR-PARTY-07).
+ * `seq` = DB order (CON-20); ≤ 200 per campaign (command check).
+ */
+export const handout = sqliteTable(
+  "handout",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    imageAssetIds: text("image_asset_ids", { mode: "json" }).$type<string[]>().notNull(),
+    sharedWith: text("shared_with", { mode: "json" }).$type<SharedWith>().notNull(),
+    /** +1 per content update (FR-PARTY-04). */
+    rev: integer("rev").notNull(),
+    /**
+     * `handout-body.rev`: the `rev` at which the body last changed, so an update that keeps the
+     * body sends no body change (FR-PARTY-04) and a fresh load still equals the store.
+     */
+    bodyRev: integer("body_rev").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    sharedAt: text("shared_at"),
+  },
+  (t) => [
+    uniqueIndex("handout_seq").on(t.seq),
+    index("handout_campaign_seq").on(t.campaignId, t.seq),
+  ],
+);
+
+/**
+ * Party item (party-board, `party-item`, data model §28): the party inventory, ≤ 60 rows per
+ * campaign; merge key (name ci, notes) checked by the commands (FR-PARTY-18).
+ */
+export const partyItem = sqliteTable(
+  "party_item",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    name: text("name").notNull(),
+    qty: integer("qty").notNull(),
+    notes: text("notes").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("party_item_seq").on(t.seq),
+    index("party_item_campaign_seq").on(t.campaignId, t.seq),
   ],
 );
 
@@ -880,6 +944,8 @@ export const hpChangeSeqNext = sql<number>`(select coalesce(max(${hpChange.seq})
 export const effectSeqNext = sql<number>`(select coalesce(max(${effect.seq}), 0) + 1 from ${effect})`;
 export const effectPresetSeqNext = sql<number>`(select coalesce(max(${effectPreset.seq}), 0) + 1 from ${effectPreset})`;
 export const lootEntrySeqNext = sql<number>`(select coalesce(max(${lootEntry.seq}), 0) + 1 from ${lootEntry})`;
+export const handoutSeqNext = sql<number>`(select coalesce(max(${handout.seq}), 0) + 1 from ${handout})`;
+export const partyItemSeqNext = sql<number>`(select coalesce(max(${partyItem.seq}), 0) + 1 from ${partyItem})`;
 export const ruleTriggerSeqNext = sql<number>`(select coalesce(max(${ruleTrigger.seq}), 0) + 1 from ${ruleTrigger})`;
 export const triggerUseSeqNext = sql<number>`(select coalesce(max(${triggerUse.seq}), 0) + 1 from ${triggerUse})`;
 
@@ -1123,6 +1189,8 @@ export const schema = {
   combatant,
   hpChange,
   lootEntry,
+  handout,
+  partyItem,
   creatureSheet,
   effect,
   effectPreset,

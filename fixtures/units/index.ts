@@ -26,11 +26,14 @@ import thornBattlemap from "./combat-tracker/thorn-battlemap";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
 import diceSettings from "./dice-roll-log/dice-settings";
 import rolls1 from "./dice-roll-log/rolls-1";
+import charBrakka from "./effect-modifiers/char-brakka";
 import modBane from "./effect-modifiers/mod-bane";
 import modBless from "./effect-modifiers/mod-bless";
 import modPresets from "./effect-modifiers/mod-presets";
 import modRage from "./effect-modifiers/mod-rage";
 import modTier2 from "./effect-modifiers/mod-tier2";
+import trgBrakka from "./effect-modifiers/trg-brakka";
+import trgCombat from "./effect-modifiers/trg-combat";
 import charMira from "./entities/char-mira";
 import charThorn from "./entities/char-thorn";
 import enemy1 from "./entities/enemy-1";
@@ -43,6 +46,10 @@ import fogScn from "./fog-of-war/fog-scn";
 import visionCrypt from "./fog-of-war/vision-crypt";
 import syncProbes from "./live-sync/sync-probes";
 import notificationsTest from "./notifications/notifications-test";
+import handoutImages from "./party-board/handout-images";
+import handouts1 from "./party-board/handouts-1";
+import partyItems1 from "./party-board/party-items-1";
+import partySecond from "./party-board/party-second";
 import loot1 from "./party-loot/loot-1";
 import lootSecond from "./party-loot/loot-second";
 import lootWallets from "./party-loot/loot-wallets";
@@ -109,5 +116,12 @@ export const units: readonly Fixture[] = [
   fogScn,
   dicexNotationText,
   visionSenses,
+  charBrakka,
+  trgBrakka,
+  trgCombat,
+  handoutImages,
+  handouts1,
+  partyItems1,
+  partySecond,
   visionCrypt,
 ];
