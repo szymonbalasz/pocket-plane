@@ -5,7 +5,7 @@
 // an untyped one like a roll part "+ 9 Martial Advantage"; a non-public trigger's label reads
 // "(DM)" for players, the DM's line names it, with "(DM set; rolled 7)" / "(DM ruled)". Pure.
 import type { LineSegment } from "@shared/dice-roll-log/kind-types";
-import { DM_PART_LABEL } from "./line";
+import { AUTO_PART_TEXT, DM_PART_LABEL } from "./line";
 
 /** What the card text reads of an offered part (`CardTriggerPart`). */
 export interface OfferTextPart {
@@ -44,6 +44,33 @@ export function withOffersText(
   if (full.length <= max || !offers?.length) return full;
   const n = offers.length;
   return `${base} (+ ${n} trigger part${n === 1 ? "" : "s"} on a hit)`;
+}
+
+/** An offered part on a damage `roll` item (`RollOfferedPart`): label null = not public. */
+export interface RollOfferView {
+  label: string | null;
+  value: number;
+  type: string | null;
+  auto?: true;
+}
+
+/**
+ * FR-MOD-20, §7 "Roll lines": a damage roll's offered parts after its total, muted, as on the
+ * card: " (+ 6 radiant Divine Fury on a hit)"; players read a non-public trigger as "(DM)" ("+ 9
+ * (DM)"), the DM's line names it (`dm` = `dmPayload` names, same index); "(rolled for you)" after
+ * a server-rolled part of a physical roll.
+ */
+export function rollOfferSegments(
+  offered: readonly RollOfferView[] | undefined,
+  dm?: readonly { label: string }[] | null,
+): LineSegment[] {
+  if (!offered?.length) return [];
+  const parts = offered.map((o, i) => {
+    const label = dm?.[i]?.label ?? o.label ?? DM_PART_LABEL;
+    const auto = o.auto ? ` ${AUTO_PART_TEXT}` : "";
+    return `+ ${o.value}${o.type ? ` ${o.type}` : ""} ${label}${auto}`;
+  });
+  return [{ text: ` (${parts.join(", ")} on a hit)`, style: "muted" }];
 }
 
 const MULT_TEXT = { normal: "", half: " (half)", none: " (none)", double: " (double)" } as const;

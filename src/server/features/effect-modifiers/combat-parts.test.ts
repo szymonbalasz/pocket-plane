@@ -68,6 +68,51 @@ describe("FR-MOD-48 card text", () => {
   });
 });
 
+describe("FR-MOD-20 roll line offers (R7)", () => {
+  test("FR-MOD-20 the damage roll line shows the offer after the total for the DM and players; a non-public trigger reads (DM) for players", () => {
+    const t = raging();
+    const { cardId } = t.attack("Brakka", { toHit: 15, damage: 8 });
+    const part = t.card(cardId).damage?.triggers?.[0];
+    const e = t.s.db
+      .select()
+      .from(gameLogEntry)
+      .all()
+      .find((x) => (x.rollIds as string[]).includes(part?.rollId as string));
+    if (!e) throw new Error("no roll line");
+    const of = (dm: boolean) =>
+      lineText(
+        formatEntry({
+          kind: e.kind,
+          actorName: e.actorName,
+          payload: e.payload,
+          dmPayload: dm ? e.dmPayload : null,
+        }).segments,
+      );
+    // A physical roll without the "Divine Fury" group: the server rolled the d6.
+    const offer = `(+ ${part?.value} radiant Divine Fury (rolled for you) on a hit)`;
+    expect(of(false)).toContain(`= 14 ${offer}`);
+    expect(of(true)).toContain(`= 14 ${offer}`);
+    // Not public: players "(DM)", the DM's line names it.
+    t.s.db.update(ruleTrigger).set({ public: false }).where(eq(ruleTrigger.id, t.furyId)).run();
+    t.applyTo(cardId, [{ name: "Goblin", triggers: [{ triggerId: t.furyId }] }]);
+    t.step("next");
+    t.nextTo("Brakka", 2);
+    const next = t.attack("Brakka", { toHit: 15, damage: 8 }).cardId;
+    const p2 = t.card(next).damage?.triggers?.[0];
+    const e2 = t.s.db
+      .select()
+      .from(gameLogEntry)
+      .all()
+      .find((x) => (x.rollIds as string[]).includes(p2?.rollId as string));
+    const players = lineText(
+      formatEntry({ kind: "roll", actorName: "Brakka", payload: e2?.payload, dmPayload: null })
+        .segments,
+    );
+    expect(players).toContain(`(+ ${p2?.value} radiant (DM) (rolled for you) on a hit)`);
+    expect(players).not.toContain("Divine Fury");
+  });
+});
+
 describe("FR-MOD-48 outcome lines", () => {
   test("FR-MOD-48 DM and players: '… 14 slashing damage + N radiant (Divine Fury)'; the part's own multiplier", () => {
     const t = raging();

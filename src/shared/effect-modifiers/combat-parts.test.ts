@@ -3,7 +3,8 @@
 import { describe, expect, test } from "bun:test";
 import { attackLogKind } from "@shared/combat-tracker/log-kinds";
 import { lineText } from "@shared/dice-roll-log/kind-types";
-import { linePartSegments, offersSuffix, withOffersText } from "./combat-parts";
+import { formatEntry } from "@shared/dice-roll-log/line";
+import { linePartSegments, offersSuffix, rollOfferSegments, withOffersText } from "./combat-parts";
 import { type SettleRow, type SettleStore, settleTriggers } from "./settle";
 import type { MarkEffect } from "./trigger-fire";
 
@@ -25,6 +26,45 @@ describe("FR-MOD-48 card text", () => {
     const long = Array.from({ length: 4 }, (_, i) => ({ ...fury, label: `${"F".repeat(39)}${i}` }));
     const text = withOffersText(`${"B".repeat(40)}: 17 to hit, 12 slashing`, long, "slashing", 200);
     expect(text).toBe(`${"B".repeat(40)}: 17 to hit, 12 slashing (+ 4 trigger parts on a hit)`);
+  });
+});
+
+describe("FR-MOD-20 roll line offers (R7)", () => {
+  test("FR-MOD-20 a damage roll's offers after the total, muted; players '(DM)' for a non-public trigger, the DM names it; auto", () => {
+    const offered = [
+      { label: "Divine Fury", value: 6, type: "radiant", expression: "1d6+2", rollId: "r3" },
+      { label: null, value: 9, type: null, expression: "2d6", rollId: "r4", auto: true as const },
+    ];
+    expect(lineText(rollOfferSegments(offered))).toBe(
+      " (+ 6 radiant Divine Fury, + 9 (DM) (rolled for you) on a hit)",
+    );
+    expect(rollOfferSegments(offered).every((s) => s.style === "muted")).toBe(true);
+    const dm = [
+      { triggerId: "df", label: "Divine Fury" },
+      { triggerId: "ma", label: "Martial Advantage" },
+    ];
+    expect(lineText(rollOfferSegments(offered, dm))).toContain("+ 9 Martial Advantage");
+    expect(rollOfferSegments(undefined)).toEqual([]);
+    const item = {
+      rollId: "r2",
+      expression: "1d12+4",
+      mode: "normal" as const,
+      manual: true,
+      dice: [{ faces: 12, value: 8, kept: true }],
+      constant: 4,
+      total: 14,
+      natural: null,
+      label: "Greataxe damage (slashing)",
+      mods: [{ label: "Rage", value: 2 }],
+      offered: [offered[0] as (typeof offered)[number]],
+    };
+    const line = (dmPayload?: unknown) =>
+      lineText(
+        formatEntry({ kind: "roll", actorName: "Brakka", payload: [item], dmPayload }).segments,
+      );
+    expect(line()).toBe(
+      "Brakka — Greataxe damage (slashing): 8 + 4 + 2 Rage = 14 (+ 6 radiant Divine Fury on a hit) (physical)",
+    );
   });
 });
 
