@@ -1,17 +1,23 @@
-// `fog` canvas layer (order 30, FR-FOG-20/21; no new Konva layer): the shown scene's static fog
-// as one painted shape (`fog-mask`, `listening: false`, attrs `shapes`, `darkness`,
-// `fogged-cells`, `explored-cells`, `fog-alpha`), clipped to the map; translucent for the DM,
-// opaque for players. On the DM client also each darkness shape, hatched (`fog-darkness`, id =
-// darkness id, attr `selected`; a drag draws it at its offset), the Fog tool's draft
-// (`fog-draft`, `fog-draft-vertex` with attr `free`, the circle's radius label) and the shown
-// scene the fog bar acts on. Players: from their redacted `fog` record (darkness filtered,
-// FR-FOG-44; no row → no fog), plus non-drawing markers `fog-vision` / `fog-explored` from their
-// own rows (V2 writes them; V3 draws vision).
+// `fog` canvas layer (order 30, FR-FOG-20/21; no new Konva layer): the shown scene's fog as one
+// painted shape (`fog-mask`, `listening: false`, attrs `shapes`, `darkness`, `fogged-cells`,
+// `explored-cells`, `fog-alpha`), clipped to the map; translucent for the DM. Players: their view
+// (`vision-render.ts`: static fog with their explored memory, then sight, darkvision, seen-through
+// darkness, or the blind screen) from their redacted `fog` record (darkness filtered, FR-FOG-44;
+// no row → no fog) and their own `vision` / `fog-explored` rows. On the DM client also the View
+// as P render (`fog-view-as`, attr `player`, at 70 %, FR-FOG-20 / -43), each darkness shape
+// hatched (`fog-darkness`, id = darkness id, attr `selected`; a drag draws it at its offset), the
+// Fog tool's draft (`fog-draft`, `fog-draft-vertex` with attr `free`, the circle's radius label)
+// and the shown scene the fog bar acts on. Non-drawing markers `fog-vision` / `fog-explored`
+// (attr `player`) carry the drawn rows: the player's own, the DM's View-as pair.
 import { FOG_TYPE } from "@shared/fog-of-war/schemas";
 import type { DarknessShape } from "@shared/fog-of-war/shapes";
+import { samePair, type ViewAsPair } from "@shared/protocol/scene-window";
 import { useEffect, useMemo, useRef } from "react";
 import { Circle, Group, Layer, Line, Rect, Shape, Text } from "react-konva";
+import { IntentRejected } from "../../sync/connection";
+import { useSync } from "../../sync/store";
 import { useCanvas } from "../scenes-map/canvas-context";
+import { toastReject } from "../scenes-map/intents";
 import type { CanvasClient } from "../scenes-map/layers";
 import { type FogDraft, type GestureState, radiusLabel } from "./gesture";
 import {
@@ -19,7 +25,6 @@ import {
   FOG_ALPHA,
   FOG_COLOR_FALLBACK,
   FOG_COLOR_VARS,
-  type FogPaints,
   type FogRecordLike,
   fogStats,
   ownFogRows,
@@ -28,13 +33,25 @@ import {
   paintFog,
 } from "./render";
 import { FOG_TOOL_ID, fogRecordOf, setFogReader, useFogTool } from "./store";
+import { pairRows, setViewAs, shownPair, useViewAs } from "./view-as";
+import {
+  DARKNESS_SEEN_FALLBACK,
+  DARKVISION_FALLBACK,
+  type GridLines,
+  memoryRuns,
+  paintPlayerView,
+  VIEW_AS_OPACITY,
+  VISION_ALPHA,
+  VISION_COLOR_VARS,
+  type ViewPaints,
+} from "./vision-render";
 
 function cssVar(name: string): string {
   if (typeof document === "undefined") return "";
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-function paintsFor(client: CanvasClient): FogPaints {
+function paintsFor(client: CanvasClient): ViewPaints {
   const v = FOG_COLOR_VARS[client];
   const a = FOG_ALPHA[client];
   const dark = client === "dm" ? DM_DARKNESS_FALLBACK : FOG_COLOR_FALLBACK;
@@ -42,6 +59,14 @@ function paintsFor(client: CanvasClient): FogPaints {
     fog: { color: cssVar(v.fog) || FOG_COLOR_FALLBACK, alpha: a.fog },
     explored: { color: cssVar(v.explored) || FOG_COLOR_FALLBACK, alpha: a.explored },
     darkness: { color: cssVar(v.darkness) || dark, alpha: a.darkness },
+    darkvision: {
+      color: cssVar(VISION_COLOR_VARS.darkvision) || DARKVISION_FALLBACK,
+      alpha: VISION_ALPHA.darkvision,
+    },
+    darknessSeen: {
+      color: cssVar(VISION_COLOR_VARS.darknessSeen) || DARKNESS_SEEN_FALLBACK,
+      alpha: VISION_ALPHA.darknessSeen,
+    },
   };
 }
 
@@ -152,7 +177,7 @@ function DmDarkness({
 }: {
   darkness: readonly DarknessShape[];
   gesture: GestureState;
-  paints: FogPaints;
+  paints: ViewPaints;
 }) {
   const { grid, cam, colors } = useCanvas();
   const hairline = 1 / cam.scale;
@@ -219,6 +244,73 @@ function shapeOutline(
 
 const noDraw = () => {};
 
+/** Browser canvas used to draw the View-as render isolated (its erases must not cut the DM's). */
+let scratch: HTMLCanvasElement | null = null;
+
+/**
+ * FR-FOG-20: paints into a scratch canvas with the same transform, then draws it over `ctx` at
+ * `alpha` (the active clip applies), so the player's painter erases only its own pixels.
+ */
+function drawIsolated(ctx: CanvasRenderingContext2D, alpha: number, paint: (c: PaintCtx) => void) {
+  const { width, height } = ctx.canvas;
+  if (width === 0 || height === 0) return;
+  scratch ??= document.createElement("canvas");
+  if (scratch.width !== width) scratch.width = width;
+  if (scratch.height !== height) scratch.height = height;
+  const o = scratch.getContext("2d");
+  if (!o) return;
+  o.setTransform(1, 0, 0, 1, 0, 0);
+  o.globalCompositeOperation = "source-over";
+  o.globalAlpha = 1;
+  o.clearRect(0, 0, width, height);
+  o.setTransform(ctx.getTransform());
+  paint(o as unknown as PaintCtx);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(scratch, 0, 0);
+  ctx.restore();
+}
+
+/**
+ * FR-FOG-43, DM: keeps the connection's one loaded `(sceneId, playerId)` pair in step with the
+ * View as pick and the shown scene (a new pick or scene loads the new pair; "DM" drops it; a
+ * snapshot resets it and this loads it again). A reject → Toast and View as back to "DM".
+ * Returns the pair to draw (loaded and matching), else null.
+ */
+function useViewAsSync(client: CanvasClient, sceneId: string): ViewAsPair | null {
+  const connection = useSync((s) => s.connection);
+  const live = useSync((s) => s.state === "live");
+  const loaded = useSync((s) => s.viewAs.loaded);
+  const loading = useSync((s) => s.viewAs.loading);
+  const playerId = useViewAs((s) => s.playerId);
+  const dm = client === "dm";
+  const pair = dm ? shownPair(loaded, playerId, sceneId) : null;
+  useEffect(() => {
+    if (!dm) return;
+    if (!samePair(useViewAs.getState().loaded, pair)) useViewAs.setState({ loaded: pair });
+  }, [dm, pair]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a snapshot reset (`loaded` / `loading` back to null) loads again.
+  useEffect(() => {
+    if (!dm) return;
+    if (playerId === null) {
+      connection.clearViewAs();
+      return;
+    }
+    if (!live) return;
+    connection.loadViewAs(sceneId, playerId)?.catch((err: unknown) => {
+      // Dropped connection: the next snapshot resets the pair and this loads it again.
+      if (err instanceof IntentRejected && (err.code === "disconnected" || err.code === "offline"))
+        return;
+      toastReject(err);
+      if (useViewAs.getState().playerId === playerId) setViewAs(null);
+    });
+  }, [dm, connection, live, sceneId, playerId, loaded, loading]);
+  // Leaving the DM canvas keeps the pick; the pair follows the next shown scene.
+  return pair;
+}
+
 export function FogLayer() {
   const { client, scene, grid, store, activeTool, cam, myPlayerId } = useCanvas();
   const hairline = 1 / cam.scale;
@@ -230,11 +322,27 @@ export function FogLayer() {
     [mapWidth, mapHeight, gridCellSize, gridOffsetX, gridOffsetY],
   );
   const stats = useMemo(() => fogStats(rec, map), [rec, map]);
+  const pair = useViewAsSync(client, scene.id);
+  // Whose `vision` / `fog-explored` rows draw: the player's own; the DM's View-as pair.
+  const viewer = client === "player" ? myPlayerId : (pair?.playerId ?? null);
   const own = useMemo(
-    () => ownFogRows(store.records, scene.id, client === "player" ? myPlayerId : null),
-    [store.records, scene.id, client, myPlayerId],
+    () => ownFogRows(store.records, scene.id, viewer),
+    [store.records, scene.id, viewer],
   );
+  const rows = useMemo(
+    () =>
+      viewer === null ? null : pairRows(store.records, { sceneId: scene.id, playerId: viewer }),
+    [store.records, scene.id, viewer],
+  );
+  const memory = useMemo(() => memoryRuns(rows?.explored ?? null, map), [rows, map]);
   const paints = useMemo(() => paintsFor(client), [client]);
+  const playerPaints = useMemo(() => paintsFor("player"), []);
+  const gridLines: GridLines = {
+    visible: grid.gridVisible,
+    color: grid.gridColor,
+    opacity: grid.gridOpacity,
+    width: hairline,
+  };
   // The fog bar acts on the scene this DM canvas shows (FR-FOG-17, FR-MAP-08).
   useEffect(() => {
     if (client !== "dm") return;
@@ -252,6 +360,7 @@ export function FogLayer() {
   const gesture = useFogTool((s) => s.gesture);
   const toolOn = client === "dm" && activeTool?.id === FOG_TOOL_ID;
   const drafting = toolOn && gesture.draft !== null;
+  const view = (r: FogRecordLike) => ({ fog: r, memory, vision: rows?.vision ?? null });
   return (
     <Layer name="fog-layer" listening={false}>
       {rec && (
@@ -264,10 +373,25 @@ export function FogLayer() {
             fogged-cells={stats.fogged}
             explored-cells={stats.explored}
             perfectDrawEnabled={false}
-            sceneFunc={(kctx) =>
-              paintFog(kctx._context as unknown as PaintCtx, rec, map, client, paints, hairline)
-            }
+            sceneFunc={(kctx) => {
+              const ctx = kctx._context as unknown as PaintCtx;
+              if (client === "player") paintPlayerView(ctx, view(rec), map, paints, gridLines);
+              else paintFog(ctx, rec, map, client, paints, hairline);
+            }}
           />
+          {client === "dm" && pair && (
+            // FR-FOG-20: View as P, P's render (FR-FOG-21) at 70 % over the DM view.
+            <Shape
+              name="fog-view-as"
+              player={pair.playerId}
+              perfectDrawEnabled={false}
+              sceneFunc={(kctx) =>
+                drawIsolated(kctx._context, VIEW_AS_OPACITY, (ctx) =>
+                  paintPlayerView(ctx, view(rec), map, playerPaints, gridLines),
+                )
+              }
+            />
+          )}
           {client === "dm" && (
             <DmDarkness
               darkness={rec.darkness ?? []}
@@ -278,9 +402,11 @@ export function FogLayer() {
         </Group>
       )}
       {drafting && gesture.draft && <Draft draft={gesture.draft} pending={gesture.pending} />}
-      {/* FOG §7 markers (draw nothing): the player's own vision and explored memory. */}
-      {own.vision && <Shape name="fog-vision" {...own.vision} sceneFunc={noDraw} />}
-      {own.explored && <Shape name="fog-explored" cells={own.explored.cells} sceneFunc={noDraw} />}
+      {/* FOG §7 markers (draw nothing): the viewer's vision and explored memory. */}
+      {own.vision && <Shape name="fog-vision" player={viewer} {...own.vision} sceneFunc={noDraw} />}
+      {own.explored && (
+        <Shape name="fog-explored" player={viewer} cells={own.explored.cells} sceneFunc={noDraw} />
+      )}
     </Layer>
   );
 }
