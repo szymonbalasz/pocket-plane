@@ -3,7 +3,7 @@
 - Status: **proposed**. Direction decided by the DM (decisions #201, #202, 2026-10-16); Options / Decision filled by the sprint-3 vision spec agent (spec-vision); every "pick" below is a **suggested pick for sprint-3 gate 1, not decided**. The integrator numbers it when the DM accepts it
 - Date: 2026-10-16
 - Supersedes (part): [ADR-0007](0007-product-scope.md) Out "Dynamic lighting / vision" → **vision (sight radius, darkvision, walls blocking sight) is in; dynamic lighting (light sources, colour, shadows) stays out** unless the DM adds it
-- Refines: [ADR-0039](0039-fog-visibility.md) (fog copies become per player), [ADR-0040](0040-token-move-guards.md) (guards may return a hint for a dry run; walls also block sight), [ADR-0033](0033-signal-audience.md) (audience may be a player list), [ADR-0041](0041-active-scene-window.md) (`fog` joins the window), [ADR-0021](0021-sync-protocol-conventions.md) / FR-SYNC-19 (identical upserts dropped per connection)
+- Refines: [ADR-0039](0039-fog-visibility.md) (fog copies become per player), [ADR-0040](0040-token-move-guards.md) (guards may return a hint for a dry run; walls also block sight), [ADR-0033](0033-signal-audience.md) (audience may be a player list), [ADR-0041](0041-active-scene-window.md) (`fog` joins the window; a `view-as` window kind and `sync.loadScene {viewAs}`, seams S1), [ADR-0021](0021-sync-protocol-conventions.md) / FR-SYNC-19 (identical upserts dropped per connection)
 - Affects: [fog-of-war](../../specs/fog-of-war.md) (FOG v2), [scene-tools](../../specs/scene-tools.md), [character-sheet-full](../../specs/character-sheet-full.md), [scenes-map](../../specs/scenes-map.md), [live-sync](../../specs/live-sync.md) (CON-44, per-player visibility), [combat-tracker](../../specs/combat-tracker.md), [combat-extras](../../specs/combat-extras.md), [campaign-management](../../specs/campaign-management.md), [protocol](../../protocol/README.md), [AGENTS §9.9](../../../AGENTS.md#99-shared-files)
 
 ## Context
@@ -57,13 +57,15 @@
 | A. Per player | Exact | Combatant, effect, outcome-line and rank copies per player: large amendments to two complete specs |
 | C. Sticky once seen in the encounter | Matches table talk | New state; still party-level |
 
-**5. CON-44** (measured, FOG §12)
+**5. CON-44** (measured, FOG §12; re-cut by the sprint-3 seams ruling S1: View-as data on demand)
 
 | Option | Heavy DM | Left |
 |---|---|---|
-| A. `fog` not windowed (+ explored + vision preview) | 720,091 | 66,341 (30 rows at the 16 KiB cap: 1,168,928, over) |
-| **B. `fog` flagged `dmWindow: "active-scene"` (+ explored + vision preview)** | **684,626** | **101,806** |
-| C. Windowed, no DM preview | 673,947 | 112,485 |
+| A. `fog` not windowed, View-as data (`vision` + `fog-explored` of every player) in the snapshot | 720,091 | 66,341 (30 rows at the 16 KiB cap: 1,168,928, over) |
+| **B. `fog` flagged `dmWindow: "active-scene"`; `vision` / `fog-explored` flagged `dmWindow: "view-as"`, loaded by `sync.loadScene {sceneId, viewAs}` one player at a time** | **674,186** (today 676,038) | **112,246** |
+| C. `fog` windowed, View-as data in the snapshot (pre-seams pick) | 684,626; 708,019 with explored memory at its cap | 101,806; 78,413 |
+
+B's load ack: 1,315–1,810 B per pick, 12,676 B at caps. Lazy record types (party-board's proposed-lazy-record-types ADR) are campaign / global only, so the scene-scope load extends ADR-0041's `sync.loadScene`.
 
 **6. Wall highlight for players** (players have no walls): **A. dry run `map.checkMove` (scenes-map) returning the wall guard's crossed pieces, clipped to 0.5 cell** · B. send walls to players (contradicts FR-SCN-14) · C. send walls a player has seen.
 
@@ -76,14 +78,15 @@
 | Copies | `seenBy` (server only) on token, prop, AoE template; `doorSeen` on structure; `fogged` = seen by nobody, DM wire only |
 | Order in `map.moveToken` | guards → `derive` → one write → **re-derive dependants** (other subjects' `seenBy`, the owner's explored memory and `vision`) → token-changed hooks for every token whose party-level hidden flips → one `TokenMoved` |
 | Registries (scenes-map) | `visibility-hooks.ts`: `derive → {fogged, seenBy}`, `hides(type, record, viewer)`, `dragAudience → playerId[]` (replaces `dragToDm`), new `rederive`; `move-guards.ts`: a guard may return a `hint` for `map.checkMove` (still read-only) |
-| Sync | FR-SYNC-19: `visible → visible` with identical wire data for that connection → nothing (stateless before / after compare); FR-SYNC-28: audience `"all" \| "dm" \| {players}`; derived record types (snapshot computes, commands list before / after); `fog` windowed |
+| Sync | FR-SYNC-19: `visible → visible` with identical wire data for that connection → nothing (stateless before / after compare; supersedes backlog BL-09); FR-SYNC-28: audience `"all" \| "dm" \| {players}`; derived record types (snapshot computes, commands list before / after); `fog` windowed; second window kind `dmWindow: "view-as"` (never in the DM snapshot; `sync.loadScene {sceneId, viewAs}` returns that player's rows; live events as ADR-0041; convergence on the loaded pair) |
 | Cache | `(sceneId, playerId)` → polygons, keyed by fog `rev`, structure `rev`, sources; LRU 256; never authoritative |
 
 ## Consequences
 
 - fog-of-war is re-specified (FOG v2) with the cell mask kept as the base; scene-tools gains decimal segments, sight occluders and the wall hint; character-sheet-full gains `statBlock.senses`.
 - Visibility becomes per player for fog subjects; leak tests run per player and after `resync`; convergence per player.
-- Build: one core branch `fix/vision-core` (schema + ws + MAP locks: columns, backfill, registry members and call sites, ws changes, `senses` zod, shared geometry with a benchmark), then FOG / SCN / CHARX slices (FOG §14).
+- Build: one core branch `fix/vision-core` (schema + ws + MAP locks: columns, backfill, registry members and call sites, ws changes incl. the `view-as` window, `senses` zod, shared geometry with a benchmark), then FOG / SCN / CHARX slices (FOG §14). Sprint order (seams S3): first schema core and first ws holder (then `fix/lazy-records`); canvas V1 → V4 → V3; V5 first on the sheet folder.
+- Senses (seams S6): in the creature core zod; compendium's adapter fills `darkvisionFt` from SRD text; see-through defaults false.
 - Combat specs: no FR change under pick 4B; the meaning of `tokenHiddenForPlayers` is restated. Campaign-management: a player create / delete line re-derives that player's membership.
 - Protocol: `fog` record shape + `dmWindow`; new `fog-explored`, `vision` record types; darkness / explored events and intents; `map.checkMove`; audience lists; CON-44 row. Glossary per OQ-FOG-42.
 - Accepted leaks: the map image; the active scene's fog / darkness geometry; party tokens; party-level combat rows (4B); wall pieces inside one's own sight and ≤ 1 cell per drag crossing.

@@ -260,7 +260,7 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 - **Bundle `scene-tools`** = `scenes` + the four units. `session-sim` stays unchanged: walls would refuse existing eastward moves (B7). The sprint-gate regression walks a wall and a template from `scene-tools`. The CON-44 heavy scenario gains one typical prepped active scene.
 - **Fog × SCN** (X5): FOG owns the fixture `fog-scn` (a barrel, a DM kept template "Trap" and a door, all in fog), its leak strings, the DM-ephemeral routing test and the walkthrough step (FOG §13, after both client slices). SCN builds the call sites (FR-SCN-24, 35, 36).
 - **Leak strings / properties** (player frames): "Glyph"; `prop-chest`'s asset ID (until it is revealed); no `walls` key; no door state `2`; no `scene-structure`, `scene-prop` or `aoe-template` from a non-active scene; no `scn.template` signal with `dmOnly` or from a non-active scene. *(Sprint 3)* no `doorSeen` key; a `map.checkMove` ack carries only pieces ≤ 1 cell long that the line from → to crosses.
-- **Sprint 3 fixture:** the freeform wall `[4.5, 3.25, 6.75, 5.5]` is part of FOG's `vision-crypt` (bundle `vision`); `scn-walls` is unchanged.
+- **Sprint 3 fixture:** the freeform wall `[4.5, 3.25, 6.75, 5.5]` is part of FOG's `vision-crypt` (bundle `vision`, a patch that adds one wall, seams S10); `scn-walls` and bundle `scene-tools` are unchanged and must pass as in sprint 2.
 
 | Level | What | Fixtures |
 |---|---|---|
@@ -340,12 +340,12 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 | `build/scene-tools-templates` | Template records + signal, layer, AoE tool, `scn-templates` | Own files |
 | `build/scene-tools-settings` | Layers popover, diagonal rule panel + wiring, combat `movedFt` rule | `ToolRail` panel slot, combat hook |
 
-**Sprint 3** (track V; order and the core in [FOG §14](fog-of-war.md#14-dependencies)): `fix/vision-core` (V0) lands the shared parts; this spec's slice is V4, in parallel with FOG's V1 and CHARX's V5.
+**Sprint 3** (track V; order and the core in [FOG §14](fog-of-war.md#14-dependencies)): `fix/vision-core` (V0) lands the shared parts; this spec's slice is V4. Canvas lock one branch at a time (seams S3): **V1 → V4 → V3**; V4 may run in parallel with FOG's server slice V2 and CHARX's V5.
 
 | Slice | Contents | Touches |
 |---|---|---|
 | V0 `fix/vision-core` (FOG-owned) | `doorSeen` column; decimal zod for segments in `@shared/scene-tools/schemas.ts`; scaled `blockingSegments` + `sightOccluders` in `@shared/scene-tools/geometry`; scenes-map `map.checkMove` + guard `hint` in `move-guards.ts` (ADR-0040 refined); structure commands call FOG's re-derive (no-op until V2) | ★ db, scenes-map (MAP lock), scene-tools shared files |
-| V4 `build/walls-freeform` | Ctrl drawing + magnet + "Free" chip, wall guard hint line, player `map.checkMove` client + red pieces, DM red hint, tests, walkthrough S1–S4 | scene-tools folders only; `scn-structure` layer (canvas lock, after or with V1 by the orchestrator) |
+| V4 `build/walls-freeform` | Ctrl drawing + magnet + "Free" chip, wall guard hint line, player `map.checkMove` client + red pieces, DM red hint, tests, walkthrough S1–S4 | scene-tools folders only; `scn-structure` layer (canvas lock, after V1, before V3); no new Konva layer |
 
 ## 15. Open questions
 
@@ -380,7 +380,7 @@ Sprint-2 rows: all decided at DM gate 2 (#196, "go with picks") or settled earli
 | OQ-SCN-24 | Freeform snapping | **A Ctrl = free point; an endpoint magnet (8 px) in both modes** (walls join, doors fill gaps) · B Ctrl = free, no magnet (gaps and overlaps by hand) | no · DM gate 1 | — |
 | OQ-SCN-25 | Do walls block sight? | Same question as FOG's OQ-FOG-21 (walls) and OQ-FOG-24 (doors): **walls + doors not open block sight** | yes | FOG |
 | OQ-SCN-26 | **scenes-map:** host the dry run as `map.checkMove` (all move guards, read-only) and let a guard return a `hint` ([ADR-0040](../architecture/adr/0040-token-move-guards.md) refined) | **A in scenes-map** (guards are its registry; any future guard can hint) · B an SCN-only `scn.checkPath` (no scenes-map change; duplicates FR-MAP-21 checks) | yes | scenes-map, ADR-0040 |
-| OQ-SCN-27 | Glossary | Integrator: **Wall** → "A segment between two points (grid vertices, or free with Ctrl) that blocks player token moves and sight"; **Door** → "…; hidden from a player until a point beside it is in their sight"; add **Wall hint** | no · integrator | glossary |
+| OQ-SCN-27 | Glossary | **Settled by seams S9:** integrator adds after the gate. **Wall** → "A segment between two points (grid vertices, or free with Ctrl) that blocks player token moves and sight"; **Door** → "…; hidden from a player until a point beside it is in their sight"; add **Wall hint** | no · integrator | glossary |
 
 ## 16. Out of scope
 
