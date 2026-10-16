@@ -31,7 +31,7 @@ import {
   useRegistry,
   useShellState,
 } from "../play-shell/ShellContext";
-import { DM_TOAST_TOP, NOTE_EDGE } from "../play-shell/toast-region";
+import { DM_TOAST_TOP, NOTE_EDGE, PLAYER_TOAST_BOTTOM } from "../play-shell/toast-region";
 import { tokenScreenBoxes } from "../play-shell/token-boxes";
 import { dmStackPlacement } from "./keep-out";
 import {
@@ -331,7 +331,7 @@ export function ToastRuntime({
   // folds into "+N more". The cap starts over when the toasts or the room change.
   const room = isDm
     ? vp.h - LAUNCHER_CLEAR - DM_TOAST_TOP
-    : vp.h - NOTE_EDGE - TOP_BAR_H - EDGE_GAP;
+    : vp.h - PLAYER_TOAST_BOTTOM - TOP_BAR_H - EDGE_GAP;
   const [cap, setCap] = useState(MAX_VISIBLE);
   const count = state.toasts.length;
   // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count or room
@@ -351,11 +351,11 @@ export function ToastRuntime({
       data-placement={isDm ? "top-center" : "bottom-right"}
       data-left={isDm ? at.left : undefined}
       data-top={isDm ? at.top : undefined}
-      className={cn(
-        "pointer-events-none fixed z-40 flex w-80 flex-col gap-2",
-        !isDm && "right-4 bottom-4",
-      )}
-      style={isDm ? { left: at.left, top: at.top } : undefined}
+      className={cn("pointer-events-none fixed z-40 flex w-80 flex-col gap-2")}
+      // Player: bottom-right, above the launcher bar (never over its buttons).
+      style={
+        isDm ? { left: at.left, top: at.top } : { right: NOTE_EDGE, bottom: PLAYER_TOAST_BOTTOM }
+      }
       onMouseEnter={() => dispatch((s, now) => setHovered(s, true, now))}
       onMouseLeave={() => dispatch((s, now) => setHovered(s, false, now))}
     >
