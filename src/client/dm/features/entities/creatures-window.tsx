@@ -1,15 +1,20 @@
 // `ent.creatures` (FR-ENT-18, FR-ENT-20, ENT §7): every definition the campaign can use,
-// read-only, live from sync. Rows are HTML5 drag sources for the canvas (FR-MAP-13).
+// read-only. Characters and customs live from sync; imported monsters from the compendium search
+// (FR-CMP-17: debounced 150 ms, pages of 50 + More), their definitions loaded on demand
+// (`useDefinitions`). Rows are HTML5 drag sources for the canvas (FR-MAP-13), data unchanged.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
+import type { SearchResponse } from "@shared/compendium/rest";
 import {
   DEFINITION_DRAG_MIME,
   type DefinitionDragData,
   ENTITY_TYPE,
-  IMPORTED_ENTITY_TYPE,
+  entityNameKey,
 } from "@shared/entities/schemas";
+import { Button } from "@ui/components/ui/button";
 import { Tooltip } from "@ui/components/ui/overlays";
 import {
   Badge,
+  Input,
   Skeleton,
   Table,
   TableBody,
@@ -18,12 +23,17 @@ import {
 } from "@ui/components/ui/primitives";
 import { Tabs, TabsList, TabsTrigger } from "@ui/components/ui/tabs";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
+import { useDefinitions } from "@ui/features/compendium/definitions";
+import { searchCompendium, useCompendiumSearch } from "@ui/features/compendium/search";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { useRecords, useSync } from "@ui/sync/store";
 import { LockIcon, PawPrintIcon, UserIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { actionsOf, type CreatureAction, creatureActions } from "./creature-actions";
 import { CREATURE_TABS, type CreatureRow, type CreatureTab, creatureRows } from "./list";
+
+/** The DM REST client, imported lazily (the session reads localStorage at import). */
+const api = () => import("../campaign-management/session").then((m) => m.api);
 
 export const CREATURES_KIND = "ent.creatures";
 
@@ -108,20 +118,64 @@ function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof ac
   );
 }
 
+/**
+ * Imported monsters matching `q` (FR-CMP-17): the first page from the debounced search, further
+ * pages on `loadMore` (kept per query).
+ */
+function useImportedMonsters(q: string, enabled: boolean) {
+  const text = q.trim();
+  const first = useCompendiumSearch(api, { q: text, kind: "monster" }, { enabled });
+  const [more, setMore] = useState<{ q: string; pages: SearchResponse[] }>({ q: "", pages: [] });
+  const extra = more.q === text ? more.pages : [];
+  const last = extra.at(-1) ?? first.page;
+  const loadMore = () => {
+    const cursor = last?.nextCursor;
+    if (!cursor) return;
+    searchCompendium(api, { q: text, kind: "monster", cursor }).then(
+      (p) => setMore((m) => ({ q: text, pages: [...(m.q === text ? m.pages : []), p] })),
+      () => {},
+    );
+  };
+  const results = enabled
+    ? [...(first.page?.results ?? []), ...extra.flatMap((p) => p.results)]
+    : [];
+  return { results, hasMore: enabled && Boolean(last?.nextCursor), loadMore };
+}
+
 export function CreaturesList({
   actions = creatureActions,
 }: {
   actions?: readonly CreatureAction[];
 }) {
   const entities = useRecords<unknown>(ENTITY_TYPE);
-  const imported = useRecords<unknown>(IMPORTED_ENTITY_TYPE);
   const players = useRecords<PlayerRecord>("player");
   const everLive = useSync((s) => s.everLive);
   const [tab, setTab] = useState<CreatureTab>("all");
-  const rows = useMemo(
-    () => creatureRows(entities, imported, players, tab),
-    [entities, imported, players, tab],
-  );
+  const [q, setQ] = useState("");
+  const imported = useImportedMonsters(q, tab !== "character");
+  // Imported rows need their definitions (CR, portrait, actions); derived customs their base's name.
+  const ids = useMemo(() => {
+    const out = new Set(imported.results.flatMap((r) => (r.definitionId ? [r.definitionId] : [])));
+    for (const e of entities) {
+      const base = (e as { derivedFromId?: string | null }).derivedFromId;
+      if (base) out.add(base);
+    }
+    return [...out];
+  }, [imported.results, entities]);
+  const defs = useDefinitions(ids).byId;
+  const rows = useMemo(() => {
+    const shown = new Set(imported.results.map((r) => r.definitionId));
+    const importedDefs = [...defs.values()].filter((d) => d.campaignId === null && shown.has(d.id));
+    const key = entityNameKey(q.trim());
+    return creatureRows(entities, importedDefs, players, tab)
+      .filter((r) => key === "" || entityNameKey(r.name).includes(key))
+      .map((r) => {
+        const base = r.definition.derivedFromId;
+        return base && r.derivedFrom === "(unknown)" && defs.has(base)
+          ? { ...r, derivedFrom: defs.get(base)?.name ?? r.derivedFrom }
+          : r;
+      });
+  }, [entities, defs, imported.results, players, tab, q]);
   const { toolbar, row: rowActions } = useMemo(() => actionsOf(actions), [actions]);
 
   return (
@@ -142,6 +196,13 @@ export function CreaturesList({
           ))}
         </div>
       </div>
+      <Input
+        data-testid="ent-list-search"
+        aria-label="Search creatures"
+        placeholder="Search creatures…"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
       {!everLive ? (
         <div className="flex flex-col gap-2" data-testid="ent-list-loading">
           {[0, 1, 2].map((i) => (
@@ -150,7 +211,7 @@ export function CreaturesList({
         </div>
       ) : rows.length === 0 ? (
         <p data-testid="ent-list-empty" className="py-6 text-center text-sm text-muted-foreground">
-          No creatures yet
+          {q.trim() === "" ? "No creatures yet" : `No creature matches ‘${q.trim()}’`}
         </p>
       ) : (
         <Table>
@@ -160,6 +221,11 @@ export function CreaturesList({
             ))}
           </TableBody>
         </Table>
+      )}
+      {imported.hasMore && (
+        <Button variant="ghost" size="sm" data-testid="ent-list-more" onClick={imported.loadMore}>
+          More
+        </Button>
       )}
     </section>
   );

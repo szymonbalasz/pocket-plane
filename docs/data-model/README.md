@@ -1403,7 +1403,7 @@ Index: unique `dice_look_campaign_owner` (`campaign_id`, `owner_key`).
 
 ## 39. Sprint 3: effect modifiers tier 2 client (R2)
 
-From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) tier 2 + T (MOD, `complete`). **Built by `fix/mod-roll-preview`** (R2): no table, column or record type change. Protocol side: [protocol §53](../protocol/README.md#53-sprint-3-effect-modifiers-tier-2-client-r2).
+From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) tier 2 + T (MOD, `complete`). **Built by `fix/mod-roll-preview`** (R2): no table, column or record type change. Protocol side: [protocol §58](../protocol/README.md#53-sprint-3-effect-modifiers-tier-2-client-r2).
 
 | Table / leaf | Change | Visibility | Source |
 |---|---|---|---|
@@ -1451,3 +1451,13 @@ From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD slice R7
 - **Fixtures:** `trg-brakka`'s "Rage" preset now has `usesFeatureId` → Brakka's "Rage" feature row (3 uses, tier 3).
 - **Derived (client):** popup defaults `settleTriggers` (default target, tick, hint).
 - **CON-44:** no new rows; a line part grows ≤ 21 B (`"multiplier":"double"`) and a DM part ≤ 11 B (`"set":true`), inside R's measured +5,730 B line bound; card `marked` ≤ 40 either way.
+
+- **Snapshot size** (CON-44): every snapshot carries the campaign's rows (not lazy): 7 max-length rows = 2,157 B DM, the same bytes in each player frame; heavy DM 674,580 B ([protocol §52](../protocol/README.md#52-sprint-3-dice-looks-d2)).
+
+## 44. Sprint 3: compendium read (C2)
+
+From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #207, #208). **Built by `build/compendium-read`**: no table or column change. Protocol side: [protocol §58](../protocol/README.md#58-sprint-3-compendium-read-c2).
+
+- **`imported-entity`** (entities' record type over `entity` rows with `campaign_id` null): now **lazy by ids** (FR-CMP-15, ADR-0045): in no snapshot; the DM loads rows by id. Players never.
+- **Derived at read** (never stored): `sourceLabel` (imported: `compendium_source.name`; homebrew: "Homebrew"), the search rank (name prefix / word start / substring / text, FR-CMP-10), the entry `ETag` (entry `updatedAt` + source `version` + monster definition `updatedAt`).
+- **Filters** (FR-CMP-11) read `facets` (JSON leaf) after a SQL pre-filter on campaign, kind and `instr` over `name_key` / `search_text`; no index added (≤ ~1,200 rows, OQ-CMP-09).

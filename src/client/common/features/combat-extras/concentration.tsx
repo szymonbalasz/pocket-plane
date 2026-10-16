@@ -21,7 +21,6 @@ import {
   concentrationSaveBonus,
   type DefinitionRecord,
   ENTITY_TYPE,
-  IMPORTED_ENTITY_TYPE,
 } from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import type { RecordStore } from "@shared/protocol/store";
@@ -40,6 +39,7 @@ import {
 } from "../../components/ui/overlays";
 import { useSync } from "../../sync/store";
 import { useCbtIntent } from "../combat-tracker/store";
+import { useDefinitions } from "../compendium/definitions";
 import { manualPartsOf, RollButton, useRollControl } from "../dice-roll-log/roll-control";
 import { boundTokenIds, tokensOn } from "../notifications/token-cue";
 import { defineNotificationView, type NotificationView } from "../notifications/views";
@@ -122,23 +122,20 @@ export const concentrationView: NotificationView = defineNotificationView({
 
 /** FR-CBTX-42 display only: the bonus the server will add (it decides). */
 function useBonus(effectId: string | undefined): number {
-  return useSync((s) => {
-    if (!effectId) return 0;
+  // The save's creature: the target character, or the target combatant's definition.
+  const defId = useSync((s) => {
+    if (!effectId) return null;
     const e = s.store.records[EFFECT_TYPE]?.[effectId] as EffectView | undefined;
-    if (!e) return 0;
-    if (e.targetCharacterId) {
-      const ch = s.store.records[ENTITY_TYPE]?.[e.targetCharacterId] as
-        | DefinitionRecord
-        | undefined;
-      return (ch?.statBlock && concentrationSaveBonus(ch.statBlock)) ?? 0;
-    }
+    if (!e) return null;
+    if (e.targetCharacterId) return e.targetCharacterId;
     const c = s.store.records[COMBATANT_TYPE]?.[e.targetCombatantId ?? ""] as
       | CombatantView
       | undefined;
-    const def = (s.store.records[ENTITY_TYPE]?.[c?.entityId ?? ""] ??
-      s.store.records[IMPORTED_ENTITY_TYPE]?.[c?.entityId ?? ""]) as DefinitionRecord | undefined;
-    return (def?.statBlock && concentrationSaveBonus(def.statBlock)) ?? 0;
+    return c?.entityId ?? null;
   });
+  // FR-CMP-16: an imported definition loads on demand (DM); players have campaign rows only.
+  const def = useDefinitions(defId ? [defId] : []).byId.get(defId ?? "");
+  return (def?.statBlock && concentrationSaveBonus(def.statBlock)) ?? 0;
 }
 
 /** FR-MOD-15, -27: the preview subject of a concentration save: a CON save of its creature. */

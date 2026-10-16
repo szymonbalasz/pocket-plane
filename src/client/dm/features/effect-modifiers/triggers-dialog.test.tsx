@@ -1,8 +1,7 @@
 // FR-MOD-28 DM entry points for rule triggers: token menu "Rule triggers…" (monster token → its
 // definition, PC token → its character) and the Creatures window row action (monster rows).
 import { describe, expect, test } from "bun:test";
-import { ENTITY_TYPE, IMPORTED_ENTITY_TYPE } from "@shared/entities/schemas";
-import { emptyStore, type RecordStore } from "@shared/protocol/store";
+import type { DefinitionRecord } from "@shared/entities/schemas";
 import type { TokenRecord } from "@shared/scenes-map/schemas";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -11,30 +10,28 @@ import type { CreatureRow } from "../entities/list";
 import { tokenMenuEntries } from "../scenes-map/token-menu";
 import { modCreatureTriggersAction, tokenTriggerOwner } from "./triggers-dialog";
 
-const store: RecordStore = {
-  ...emptyStore(),
-  records: {
-    [ENTITY_TYPE]: {
-      brakka: { id: "brakka", kind: "character", name: "Brakka" },
-      boss: { id: "boss", kind: "monster", name: "Boss" },
-    },
-    [IMPORTED_ENTITY_TYPE]: { "srd-wolf": { id: "srd-wolf", kind: "monster", name: "Wolf" } },
-  },
-};
+/** What `useDefinitions` holds: campaign rows + a loaded imported one (FR-CMP-16). */
+const defs = new Map(
+  [
+    { id: "brakka", kind: "character", name: "Brakka" },
+    { id: "boss", kind: "monster", name: "Boss" },
+    { id: "srd-wolf", kind: "monster", name: "Wolf", campaignId: null },
+  ].map((d) => [d.id, d as unknown as DefinitionRecord]),
+);
 const token = (o: Partial<TokenRecord>) =>
   ({ id: "t", characterId: null, definitionId: "boss", ...o }) as TokenRecord;
 
 describe("FR-MOD-28 rule trigger entries", () => {
   test("FR-MOD-28 token → owner: PC → its character; monster (custom / imported) → its definition", () => {
     expect(
-      tokenTriggerOwner(store, token({ characterId: "brakka", definitionId: "brakka" })),
+      tokenTriggerOwner(token({ characterId: "brakka", definitionId: "brakka" }), defs),
     ).toEqual({ kind: "character", id: "brakka" });
-    expect(tokenTriggerOwner(store, token({}))).toEqual({ kind: "definition", id: "boss" });
-    expect(tokenTriggerOwner(store, token({ definitionId: "srd-wolf" }))).toEqual({
+    expect(tokenTriggerOwner(token({}), defs)).toEqual({ kind: "definition", id: "boss" });
+    expect(tokenTriggerOwner(token({ definitionId: "srd-wolf" }), defs)).toEqual({
       kind: "definition",
       id: "srd-wolf",
     });
-    expect(tokenTriggerOwner(store, token({ definitionId: "unknown" }))).toBeNull();
+    expect(tokenTriggerOwner(token({ definitionId: "unknown" }), defs)).toBeNull();
   });
 
   test("FR-MOD-28 registered: token menu 'mod.triggers' (with a Dialog), Creatures row action 'mod.triggers'", () => {

@@ -1,4 +1,4 @@
-// CMP §13 over real sockets on the `compendium` bundle (C1): FR-CMP-08 broadcast (definition
+// CMP §13 over real sockets on the `compendium` bundle (C1, C2's lazy `imported-entity`): FR-CMP-08 broadcast (definition
 // upserts to the DM, instance changes only to the active campaign; an inactive campaign picks
 // them up at its next snapshot), CON-44 (no compendium data in any snapshot or frame) and the
 // per-player leak scan over snapshots, event frames and load replies, before and after reconnect.
@@ -8,9 +8,17 @@ import { loadBundle } from "@fixtures/index";
 import { srdMini } from "@fixtures/srd/open5e";
 import { IMPORTED_ENTITY_TYPE } from "@shared/entities/schemas";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { closeDb, type Db, openFileDb } from "../../db/client";
-import { asset, assetSeqNext, campaign, compendiumEntry, player, token } from "../../db/schema";
+import {
+  asset,
+  assetSeqNext,
+  campaign,
+  compendiumEntry,
+  entity,
+  player,
+  token,
+} from "../../db/schema";
 import type { Actor } from "../../events/types";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
@@ -71,6 +79,9 @@ describe("compendium over WS (C1)", () => {
   let camps: Record<string, string>;
   const p = (name: string) => ({ role: "player" as const, token: players[name]?.token as string });
   const dmActor = (campaignId: string): Actor => ({ role: "dm", playerId: null, campaignId });
+  const goblinDefinitionId = () =>
+    db.select().from(compendiumEntry).where(eq(compendiumEntry.sourceKey, "monster/goblin")).get()
+      ?.definitionId as string;
 
   beforeAll(async () => {
     const loaded = await loadBundle("compendium", { dmSecret: TEST_SECRET, testMode: true });
@@ -103,15 +114,24 @@ describe("compendium over WS (C1)", () => {
     }
   });
 
-  test("CON-44 FR-CMP-30 (C1): no compendium data in any snapshot; players get no imported definition; DM holds the mini set's 5 until C2 makes them lazy", async () => {
+  test("CON-44 FR-CMP-15 FR-CMP-30: no compendium data and no imported definition in any snapshot; the DM loads them by id, players are refused", async () => {
     const dm = await h.live(DM);
     const p1 = await h.live(p("Player 1"));
     const p2 = await h.live(p("Player 2"));
     for (const c of [dm, p1, p2]) {
       await barrier(c);
       expect(scan(c, ENTRY_ONLY)).toEqual([]);
+      expect(c.store.records[IMPORTED_ENTITY_TYPE]).toBeUndefined();
     }
-    for (const c of [p1, p2]) expect(records(c, IMPORTED_ENTITY_TYPE)).toEqual([]);
+    const ids = db
+      .select({ id: entity.id })
+      .from(entity)
+      .where(isNull(entity.campaignId))
+      .all()
+      .map((r) => r.id);
+    expect(ids).toHaveLength(7);
+    dm.load(IMPORTED_ENTITY_TYPE, ids);
+    await dm.next("ack");
     const srd = records<{ source: string; name: string }>(dm, IMPORTED_ENTITY_TYPE).filter(
       (r) => r.source === "srd-5.1",
     );
@@ -122,15 +142,18 @@ describe("compendium over WS (C1)", () => {
       "Ogre",
       "Wolf",
     ]);
-    // Figures for the report (imported-entity is lazy from C2 on: these leave the snapshot).
+    for (const c of [p1, p2]) {
+      c.load(IMPORTED_ENTITY_TYPE, ids);
+      expect((await c.next("reject")).code).toBe("forbidden");
+      expect(c.store.records[IMPORTED_ENTITY_TYPE]).toBeUndefined();
+    }
+    // Figures for the report: C1 had imported-entity 7 rows / 7,788 B in the DM snapshot.
     const sizes = snapshotSizes(h.s);
     const [dmSize, ...playerSizes] = sizes;
-    const imp = dmSize?.types[IMPORTED_ENTITY_TYPE];
     console.log(
-      `CON-44 compendium bundle: DM ${dmSize?.bytes} B (imported-entity ${imp?.rows} rows, ${imp?.bytes} B); players max ${Math.max(...playerSizes.map((v) => v.bytes))} B`,
+      `CON-44 compendium bundle (C2): DM ${dmSize?.bytes} B (imported-entity lazy); players max ${Math.max(...playerSizes.map((v) => v.bytes))} B`,
     );
-    expect(imp?.rows).toBe(7);
-    for (const v of playerSizes) expect(v.types[IMPORTED_ENTITY_TYPE]).toBeUndefined();
+    for (const v of sizes) expect(v.types[IMPORTED_ENTITY_TYPE]).toBeUndefined();
     for (const c of [dm, p1, p2]) c.close();
   });
 
@@ -241,10 +264,11 @@ describe("compendium over WS (C1)", () => {
       const out: TestClient[] = [];
       for (const name of ["Player 1", "Player 2"]) {
         const c = await h.live(p(name));
-        // `imported-entity` is not lazy in C1 (C2): a player's load is refused, nothing leaks.
-        const id = c.load(IMPORTED_ENTITY_TYPE, ["x"]);
+        // `imported-entity` is DM-only (audience dm): a player's load is refused, nothing leaks.
+        const id = c.load(IMPORTED_ENTITY_TYPE, [goblinDefinitionId()]);
         const reply = await c.next("reject");
         expect(reply.intentId).toBe(id);
+        expect(reply.code).toBe("forbidden");
         out.push(c);
       }
       return out;

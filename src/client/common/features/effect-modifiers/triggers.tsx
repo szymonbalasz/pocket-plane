@@ -43,6 +43,7 @@ import {
   type TriggerOwnerFacts,
   type TriggerOwnerRef,
   triggerOwnerFacts,
+  useOwnerDefinitions,
   wordsContext,
 } from "./trigger-owner";
 
@@ -162,7 +163,7 @@ export function TriggersBlock({ owner }: { owner: TriggerOwnerRef }) {
   const { live } = useModIntent();
   const { rows, state, retry } = useLazyRecords<PlayerRuleTriggerRecord>(RULE_TRIGGER_TYPE);
   const [editor, setEditor] = useState<TriggerEditorStart | null>(null);
-  const facts = triggerOwnerFacts(store, owner);
+  const facts = triggerOwnerFacts(store, owner, useOwnerDefinitions(owner));
   const may = mayEditTriggers(store, owner);
   const mine = ownerTriggers(rows, owner, store.you?.role);
   const cap = owner.kind === "character" ? CHARACTER_TRIGGERS_MAX : DEFINITION_TRIGGERS_MAX;
