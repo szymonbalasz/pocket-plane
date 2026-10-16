@@ -9,6 +9,7 @@ import player1 from "./campaign-management/player-1";
 import player2 from "./campaign-management/player-2";
 import charPip from "./character-sheet/char-pip";
 import charWounds from "./character-sheet/char-wounds";
+import visionSenses from "./character-sheet/vision-senses";
 import charMiraFull from "./character-sheet-full/char-mira-full";
 import charMiraLocked from "./character-sheet-full/char-mira-locked";
 import charSela from "./character-sheet-full/char-sela";
@@ -104,4 +105,5 @@ export const units: readonly Fixture[] = [
   scnTemplates,
   fogScn,
   dicexNotationText,
+  visionSenses,
 ];

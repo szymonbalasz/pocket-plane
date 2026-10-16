@@ -1241,3 +1241,16 @@ From [live-sync](../specs/live-sync.md) sprint 3 revision block (FR-SYNC-30–38
 | Live events | Unchanged: lazy rows reach every connection that may see them, loaded or not; FR-SYNC-19 transitions |
 | Client (`src/client/common/sync/`) | `SyncSnapshot.lazy {generation, loaded, loading, failed}` (each `LoadedSet {types, ids}`); `connection.load(type, ids?)` requests only what is neither loaded, in flight nor failed (a whole-type load covers ids), ids in chunks of ≤ 50; `retryLoad(type, ids?)` clears the failed mark and loads; `isLoaded(type, id?)`. An ack replaces the type's rows (whole) or those ids (a requested id absent from the result leaves the store) and marks them loaded; a reject marks them failed (no auto retry); a disconnect leaves them unloaded; an ack for an older generation is dropped. Every snapshot drops every lazy row (they are in no snapshot) and resets `lazy` with `generation + 1`. Hooks (`store.ts`): `useLazyRecords(type, ids?) → {rows, state: loading \| ready \| error, retry}` (rows = **loaded** rows only; loads once per generation while live), `useIsLoaded(type, id?)`. Pure helpers in `@shared/protocol/lazy` |
 | Test helpers | Harness `load(type, ids?)` + `lazy` (reset by a snapshot); `convergence(s, live, fresh, loaded?, lazy?)` compares lazy types only for the loaded set (`lazyProjection`; default `live.lazy`); `leakScan` scans `sync.load` acks (same `ack.records` shape); `lazyLoadSizes(s, type, viewers)` = worst load per viewer (`"all"`: the whole type; `"ids"`: the 50 largest visible rows), bytes of the whole `ack` frame |
+
+## 39. Sprint 3: sheet senses (V5)
+
+From [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) (CHARX sprint 3, FR-CHARX-49–53; #207, #210). **Built by `build/sheet-senses`** (V5, sheet lock): the `char.edit` key only; no record type, table or event. FOG's re-derive on a senses edit (FR-CHARX-52) is V2's definition-changed hook line. Data side: [data model §26](../data-model/README.md#26-sprint-3-vision-core-v0) (`entity.statBlock.senses`).
+
+| Piece | Contract |
+|---|---|
+| `char.edit {creatureId, set: {senses}}` | `senses` = the whole `Senses` object (strict; `@shared/entities/schemas`); not nullable. Added to `CharEditSet` and `SHEET_EDIT_FIELDS` (`src/shared/events/character-sheet.ts`). Who: as every `set` key (DM any character / custom NPC; owner unless locked; imported → `forbidden`; FR-CHARX-18) |
+| `seesInvisible` (FR-CHARX-53) | Absent = the stored value. A player whose value differs from the stored one → `forbidden` "Only the DM can change Sees invisible" (nothing written; the other keys alone pass). Stored only when true (false → key omitted) |
+| Event | One `CharacterSheetEdited {op: "set", fields: ["senses"]}`; same value → success, no event (FR-CHARX-15). Changes: the `entity` row (+ hook rows) |
+| Visibility | Unchanged (FR-CHARX-51): `senses` rides on the stat block, so DM + owner only; not on `RedactedCharacter`; tokens carry no copy (token hooks copy image + size only) |
+| Fixture | Unit `vision-senses` (`fixtures/units/character-sheet/`): one `char.edit {senses}` per character (Mira 30 / 0 / false; Thorn 0 / 60 / true). In no bundle until FOG's `vision` (V2) |
+

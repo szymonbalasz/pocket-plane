@@ -1,4 +1,4 @@
-// Main tab (CHARX §7): stat row + HP, Initiative (FR-CHAR-03; no attack row, FR-CHARX-44), hit
+// Main tab (CHARX §7): stat row + HP, Senses line (FR-CHARX-50), Initiative (FR-CHAR-03; no attack row, FR-CHARX-44), hit
 // dice, vitals sections, Abilities block (FR-CHAR-22), Skills block + passives, main sections.
 // Edit mode: identity, scores, proficiencies, stats and overrides in place (FR-CHARX-27).
 
@@ -38,6 +38,7 @@ import {
 import { rollRoutes } from "./roll-routes";
 import { PublicSwitch, usePublicOverrides } from "./rolls";
 import { rollActionView, routeFor } from "./routing";
+import { SensesLine } from "./Senses";
 import { SheetSlotView } from "./SheetSections";
 import { useSheet, useSheetIntents } from "./sheet-context";
 import {
@@ -745,6 +746,7 @@ export function MainTab() {
     <div className="flex flex-col gap-3">
       {ctx.editing && ctx.canEdit && <IdentityEditor />}
       <StatRow />
+      <SensesLine />
       <HpControl />
       {!ctx.readOnly && (
         <SheetSlotView slot="vitals" creatureId={ctx.creature.id} client={ctx.client} kind={kind} />

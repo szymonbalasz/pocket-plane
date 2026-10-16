@@ -34,6 +34,8 @@ export interface FieldProps<T> {
   className?: string;
   inputClassName?: string;
   placeholder?: string;
+  /** A number input whose arrows nudge by `step` (FR-CHARX-50 senses: ±5). */
+  step?: number;
 }
 
 const isLost = (err: unknown) => err instanceof IntentRejected && err.code === "disconnected";
@@ -83,6 +85,7 @@ export function SheetField<T>(p: FieldProps<T>) {
     "aria-invalid": s.error !== null,
     value: shown,
     placeholder: p.placeholder,
+    ...(p.step ? { type: "number", step: p.step } : {}),
     disabled: !live || s.inFlight,
     onFocus: () => dispatch({ type: "focus", text: p.format(p.value), committed: p.value }),
     onChange: (e: { target: { value: string } }) =>
@@ -150,6 +153,7 @@ export function IntField(
         if (n === null) return p.optional ? { value: null } : { error: "Required" };
         if (Number.isNaN(n)) return { error: "Whole number" };
         if (n < p.min || n > p.max) return { error: `${p.min}–${p.max}` };
+        if (p.step && n % p.step !== 0) return { error: `Multiple of ${p.step}` };
         return { value: n };
       }}
     />
