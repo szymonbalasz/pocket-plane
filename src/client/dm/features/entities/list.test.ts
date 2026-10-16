@@ -67,10 +67,13 @@ describe("Creatures list model", () => {
     expect(rows.map((r) => [r.name, r.badge, r.readOnly])).toEqual([
       ["Elite Goblin Warrior", "Custom", false],
       ["goblin", "Custom", false],
-      ["Goblin", "SRD", true],
+      ["Goblin", "Fixture", true],
       ["Mira", "Player 1", false],
-      ["Wolf", "SRD", true],
+      ["Wolf", "Fixture", true],
     ]);
+    // Imported rows are badged by source (FR-CMP-19's label): SRD 5.1 → "SRD", fixture → "Fixture".
+    const srd = { ...goblin, id: "srd-gob", source: "srd-5.1" };
+    expect(creatureRows([], [srd], players)[0]?.badge).toBe("SRD");
     expect(rows.map((r) => r.xp)).toEqual([100, 100, 50, null, 50]);
     expect(rows[0]?.derivedFrom).toBe("Goblin");
   });

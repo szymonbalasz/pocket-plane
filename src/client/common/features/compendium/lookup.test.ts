@@ -38,6 +38,10 @@ describe("FR-CMP-17 creature lookup", () => {
       ["def-hob", IMPORTED_BADGE, null],
       ["def-boss", IMPORTED_BADGE, null],
     ]);
+    // An entryless fixture definition (sourceLabel = its source key) reads "Fixture", not "SRD".
+    expect(
+      importedLookupRows([{ ...summary("fx", "Wolf"), sourceLabel: "fixture" }])[0]?.badge,
+    ).toBe("Fixture");
     const store = [custom("c-gob", "goblin"), custom("c-elite", "Elite Goblin")];
     expect(mergeLookup(store, imported, "gob").map((r) => r.id)).toEqual([
       "c-gob", // prefix, custom first on the same name
