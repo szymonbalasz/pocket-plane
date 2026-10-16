@@ -2,7 +2,7 @@
 // DM; the owner player for their own character's triggers while the sheet is unlocked.
 import { z } from "zod";
 import { TRIGGER_NAME_MAX } from "./trigger-records";
-import { TriggerRule } from "./triggers";
+import { PlayerTriggerRule } from "./triggers";
 
 export const TRIGGER_INTENTS = {
   putTrigger: "mod.putTrigger",
@@ -28,7 +28,9 @@ export const TriggerName = z
 /**
  * A trigger as the DM or owner writes it (FR-MOD-32, -45). No `id` → create; with `id` →
  * replace (same owner). Exactly one of `characterId` / `definitionId`. `enabled` absent = on;
- * `public` absent = on for a character, off for a definition (OQ-MOD-26).
+ * `public` absent = on for a character, off for a definition (OQ-MOD-26). `rule` may carry a
+ * player copy's `{name}` refs (FR-MOD-47, #228): on a replace, a `{name}` equal to the stored
+ * ref's redacted name keeps that stored ref; anything else → `invalid`.
  */
 export const TriggerInput = z
   .strictObject({
@@ -38,7 +40,7 @@ export const TriggerInput = z
     name: TriggerName,
     enabled: z.boolean().default(true),
     public: z.boolean().optional(),
-    rule: TriggerRule,
+    rule: PlayerTriggerRule,
   })
   .superRefine((v, ctx) => {
     if ((v.characterId === null) === (v.definitionId === null)) {

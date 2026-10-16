@@ -295,4 +295,49 @@ describe("FR-MOD-47 lazy visibility", () => {
     t.del(id);
     expect(t.s.db.select().from(triggerUse).where(eq(triggerUse.triggerId, id)).all()).toEqual([]);
   });
+
+  test("FR-MOD-47 #228 a player's copy naming a campaign preset as {name} saves back: unchanged {name} keeps the stored ref; a new or unknown {name} → invalid", () => {
+    const t = setup();
+    const camp = t.put(t.from("bless", { name: "Frenzy" }));
+    const mark = t.put(t.from("bless", { name: "Hex" }));
+    const rule: TriggerRule = {
+      ...fury(camp),
+      when: [
+        { if: "via", via: "weapon" },
+        { if: "targetMarked", preset: mark },
+      ],
+    };
+    const id = t.trig({ characterId: t.miraId, name: "Divine Fury", rule });
+    const copy = t.load(t.p1v)[0] as unknown as { id: string; rule: TriggerInput["rule"] };
+    expect(copy.rule.requires).toEqual({ name: "Frenzy" });
+    expect(copy.rule.when[1]).toEqual({ if: "targetMarked", name: "Hex" });
+    const put = (r: TriggerInput["rule"], extra: Partial<TriggerInput> = {}) =>
+      t.trig({ id, characterId: t.miraId, name: "Divine Fury", rule: r, ...extra }, t.p1);
+    // The owner's switch: the copy as received, enabled off → the stored refs stay.
+    put(copy.rule, { enabled: false });
+    expect(t.row(id)).toMatchObject({ enabled: false, rule });
+    // An edit with the names unchanged keeps them too.
+    const then = { do: "damage" as const, formula: "1d8", type: "radiant" as const };
+    put({ ...copy.rule, then });
+    expect(t.row(id)?.rule).toEqual({ ...rule, then });
+    expect(JSON.stringify(t.load(t.p1v))).not.toContain(camp);
+    // A name the stored rule doesn't carry, or {name} on a create → invalid, nothing written.
+    const bad = t.err(() => put({ ...copy.rule, requires: { name: "Rage" } }));
+    expect([bad.code, bad.issues?.[0]?.path]).toEqual([
+      "invalid",
+      ["trigger", "rule", "requires", "name"],
+    ]);
+    const swapped = { ...copy.rule, when: [copy.rule.when[1], copy.rule.when[1]] };
+    expect(t.err(() => put(swapped as TriggerInput["rule"])).issues?.[0]?.path).toEqual([
+      "trigger",
+      "rule",
+      "when",
+      1,
+      "name",
+    ]);
+    expect(
+      t.err(() => t.trig({ characterId: t.miraId, name: "New", rule: copy.rule }, t.p1)).code,
+    ).toBe("invalid");
+    expect(t.row(id)?.rule).toEqual({ ...rule, then });
+  });
 });

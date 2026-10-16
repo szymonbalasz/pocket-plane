@@ -10,6 +10,7 @@ import {
   type ApplyResult,
   DeletePresetInput,
   MOD_INTENTS,
+  PresetInput,
   PutPresetInput,
   type PutPresetResult,
   SetModifiersInput,
@@ -33,6 +34,7 @@ import {
   PresetApplied,
 } from "@shared/events/effect-modifiers";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, forbidden, invalid } from "../../commands/errors";
 import { effectPreset, effectPresetSeqNext } from "../../db/schema";
@@ -166,6 +168,30 @@ export const putPreset = defineCommand({
       changes: [presetChange(before, readPreset(env.tx, id))],
     });
     return { presetId: id };
+  },
+});
+
+export const PUT_PRESET_WITH_USES = "mod.putPresetWithUses";
+
+/**
+ * Internal (fixtures; not an intent): `mod.putPreset` with `usesFeatureId` = the character's
+ * feature row named `usesFeature` (case-insensitive), since a fixture step can't read a row id
+ * (`trg-brakka`: Rage → the "Rage" row, tier 3). No such row with uses → `invalid`.
+ */
+export const putPresetWithUses = defineCommand({
+  name: PUT_PRESET_WITH_USES,
+  input: z.strictObject({ preset: PresetInput, usesFeature: z.string().min(1).max(60) }),
+  roles: ["dm"],
+  execute({ preset, usesFeature }, env): PutPresetResult {
+    const name = usesFeature.trim().toLowerCase();
+    const row =
+      preset.characterId === null
+        ? undefined
+        : getSheet(env.tx, preset.characterId)?.features.find(
+            (f) => f.name.trim().toLowerCase() === name && hasUses(f),
+          );
+    if (!row) throw invalid(`No feature with uses named ${usesFeature}`);
+    return putPreset.execute({ preset: { ...preset, usesFeatureId: row.id } }, env);
   },
 });
 

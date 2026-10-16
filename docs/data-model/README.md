@@ -1380,7 +1380,7 @@ From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Buil
 
 ## 38. Sprint 3: dice looks (D2)
 
-From [dice-extras](../specs/dice-extras.md#8-data-model) (DICEX, `complete`; #207 G17). **Built by `fix/dicex-look-core`** (schema lock 5th, after C1): one table (drizzle push, push-safe). Protocol side: [protocol §52](../protocol/README.md#52-sprint-3-dice-looks-d2).
+From [dice-extras](../specs/dice-extras.md#8-data-model) (DICEX, `complete`; #207 G17). **Built by `fix/dicex-look-core`** (schema lock 5th, after C1): one table (drizzle push, push-safe). Protocol side: [protocol §54](../protocol/README.md#52-sprint-3-dice-looks-d2).
 
 ### Dice look (`dice_look`, record type `dice-look`) — owner [dice-extras](../specs/dice-extras.md#8-data-model)
 
@@ -1399,7 +1399,7 @@ Index: unique `dice_look_campaign_owner` (`campaign_id`, `owner_key`).
 
 - **Derived:** no row → the default look (DM Obsidian; players by sorted player `id`: Crimson, Sapphire, Emerald, Amethyst, Gold, Bone, Ivory, …), never stored. `lookOf(owner, rows, playerIds)` in `@shared/dice-extras/looks`.
 - **Fixtures:** `dicex-looks` writes only `dice-look` rows (DM, player-1).
-- **Snapshot size** (CON-44): every snapshot carries the campaign's rows (not lazy): 7 max-length rows = 2,157 B DM, the same bytes in each player frame; heavy DM 674,580 B ([protocol §52](../protocol/README.md#52-sprint-3-dice-looks-d2)).
+- **Snapshot size** (CON-44): every snapshot carries the campaign's rows (not lazy): 7 max-length rows = 2,157 B DM, the same bytes in each player frame; heavy DM 674,580 B ([protocol §54](../protocol/README.md#52-sprint-3-dice-looks-d2)).
 
 ## 39. Sprint 3: effect modifiers tier 2 client (R2)
 
@@ -1440,3 +1440,14 @@ From [party-board](../specs/party-board.md#63-party-inventory) (PARTY slice 4). 
 - **Conservation** (tested): per item key, Σ `party_item.qty` + Σ sheet `items.qty` = Σ `qty` of `world → party` rows − Σ `qty` of `party → world` rows + the sheets' starting qty.
 - **Fixtures:** `party-items-1` now ends with Torch ×2 party → Thorn (`party.moveItem`): Torch 10 → 8 in the party, one `items` row on Thorn's sheet (created if missing; no other sheet field), a fourth item log row.
 - **CON-44:** no new record shape. A max-length move party → a sheet adds one `items` row to that sheet: +272 B to the DM's and the owner's snapshot (inside CHARX's 80-row budget); heavy DM 674,818 B, players max 281,715 B, under the #208 ceilings. PARTY's lazy types stay off every snapshot.
+
+## 43. Sprint 3: rule-trigger combat parts (R7)
+
+From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD slice R7). **Built by `build/mod-combat-parts`**: no new table, column or record type. Protocol side: [protocol §57](../protocol/README.md#57-sprint-3-rule-trigger-combat-parts-r7).
+
+- **Damage card payload** (`damage-card` notification): `damage.triggers[].marked` = a built-in key or the campaign mark's **name** (≤ 40; was the preset id). Cards stored before keep an id; the popup then finds no mark (the DM ticks by hand).
+- **Damage card text**: + the offers suffix (≤ 280 chars total, count fallback).
+- **`cbt.attack` log line**: payload `parts[].multiplier?` (`half` \| `none` \| `double`; absent = normal); `dmPayload.parts[].set?: true` (the DM edited the value). Old rows parse.
+- **Fixtures:** `trg-brakka`'s "Rage" preset now has `usesFeatureId` → Brakka's "Rage" feature row (3 uses, tier 3).
+- **Derived (client):** popup defaults `settleTriggers` (default target, tick, hint).
+- **CON-44:** no new rows; a line part grows ≤ 21 B (`"multiplier":"double"`) and a DM part ≤ 11 B (`"set":true`), inside R's measured +5,730 B line bound; card `marked` ≤ 40 either way.

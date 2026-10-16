@@ -13,6 +13,8 @@ import {
   DamageCardPayload,
   DamageCardTargetsResolution,
 } from "@shared/combat-tracker/schemas";
+import { withOffersText } from "@shared/effect-modifiers/combat-parts";
+import { TEXT_MAX } from "@shared/notifications/schemas";
 import type { Roll } from "../dice-roll-log";
 import { defineNotificationKind } from "../notifications/kind";
 
@@ -35,8 +37,13 @@ export const damageCardKind = defineNotificationKind({
  * The card's text from its payload (FR-CBT-18, -57, -70, -71): full "Mira: 15 to hit, 6
  * piercing" (+ " (natural 20)" after the to-hit, " (critical)"); to-hit-only "Mira: 15 to hit
  * (Light crossbow)"; damage-only "Mira: 6 piercing (Light crossbow)" (+ " — DC 13 DEX").
+ * Offered rule-trigger parts last (FR-MOD-48): "… 12 slashing (+ 6 radiant Divine Fury on a hit)".
  */
 export function damageCardText(p: DamageCardPayload): string {
+  return withOffersText(baseCardText(p), p.damage?.triggers, p.damageType, TEXT_MAX);
+}
+
+function baseCardText(p: DamageCardPayload): string {
   const type = p.damageType ? ` ${p.damageType}` : "";
   const natural = p.toHit ? naturalMark(p.toHit.natural) : null;
   const toHit = p.toHit

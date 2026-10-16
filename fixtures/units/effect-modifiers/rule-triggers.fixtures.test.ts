@@ -6,6 +6,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { closeDb } from "@server/db/client";
 import {
   combatant,
+  creatureSheet,
   effectPreset,
   encounter,
   entity,
@@ -43,7 +44,7 @@ async function loaded() {
 }
 
 describe("rule-trigger fixtures (MOD §13, R4 units)", () => {
-  test("FR-MOD-31 char-brakka + trg-brakka + trg-combat load from empty: Brakka, Rage preset (originKey rage), Divine Fury data, initiative 17", async () => {
+  test("FR-MOD-31 char-brakka + trg-brakka + trg-combat load from empty: Brakka, Rage preset (originKey rage, uses → her Rage row), Divine Fury data, initiative 17", async () => {
     const { r, db } = await loaded();
     expect(r.manifest.fixtures.slice(-3)).toEqual(["char-brakka", "trg-brakka", "trg-combat"]);
     const brakka = db.select().from(entity).where(eq(entity.name, "Brakka")).get();
@@ -54,6 +55,15 @@ describe("rule-trigger fixtures (MOD §13, R4 units)", () => {
       .where(eq(effectPreset.characterId, brakka?.id as string))
       .all();
     expect(rage).toMatchObject({ name: "Rage", originKey: "rage", key: null });
+    // Tier 3 (R3, walkthrough steps 1-2 "Rage 3 / 3"): linked to her "Rage" feature row.
+    const sheet = db
+      .select()
+      .from(creatureSheet)
+      .where(eq(creatureSheet.entityId, brakka?.id as string))
+      .get();
+    const features = (sheet?.features ?? []) as { id: string; name: string; usesMax?: number }[];
+    const rageRow = features.find((f) => f.name === "Rage");
+    expect([rageRow?.usesMax, rage?.usesFeatureId]).toEqual([3, rageRow?.id]);
     const [fury] = db.select().from(ruleTrigger).all();
     expect(fury).toMatchObject({
       characterId: brakka?.id,

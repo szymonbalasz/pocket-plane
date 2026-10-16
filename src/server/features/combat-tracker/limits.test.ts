@@ -38,7 +38,14 @@ describe("hardening: max-size attack inputs", () => {
       damage: "1d6+3",
       damageType: "bludgeoning",
     });
-    const r = t.run<AttackResult>(attackCommand.name, { attackerId: t.elite.id });
+    // BL-14: seeded dice, so a natural 20 (crit label "… (critical)") never flakes the check.
+    const r = t.run<AttackResult>(attackCommand.name, { attackerId: t.elite.id }, t.h.dm, "bl-14");
+    const natural = t.s.db
+      .select()
+      .from(roll)
+      .where(eq(roll.id, r.rollIds[0] as string))
+      .get();
+    expect(natural?.natural).not.toBe(20);
     const labels = r.rollIds.map(
       (id) => t.s.db.select().from(roll).where(eq(roll.id, id)).get()?.label,
     );
@@ -60,6 +67,7 @@ describe("hardening: max-size attack inputs", () => {
       "char.roll",
       { characterId: t.miraId, kind: "attack" },
       t.p1,
+      "bl-14-char",
     );
     expect(c.rollIds).toHaveLength(2);
   });

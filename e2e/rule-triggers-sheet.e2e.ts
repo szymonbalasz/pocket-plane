@@ -41,11 +41,14 @@ test("FR-MOD-49 FR-MOD-47 FR-MOD-28 Triggers blocks per player; DM entries for m
   await expect(sa).toHaveCount(1);
   await expect(sa).toContainText("Sneak Attack");
   await expect(sa.getByTestId("mod-trigger-value")).toHaveAttribute("data-value", "3d6");
-  for (const [page, other] of [
-    [p1, "Sneak Attack"],
-    [p2, "Divine Fury"],
+  // The other player's trigger never in this player's Triggers block (its public outcome lines
+  // may be in the log: rule-triggers-combat shares this server); monster triggers nowhere.
+  for (const [page, block, other] of [
+    [p1, brakka, "Sneak Attack"],
+    [p2, thorn, "Divine Fury"],
   ] as const) {
-    for (const s of [other, "Martial Advantage", "Regeneration"]) {
+    await expect(block.getByText(other)).toHaveCount(0);
+    for (const s of ["Martial Advantage", "Regeneration"]) {
       await expect(page.getByText(s)).toHaveCount(0);
     }
   }
@@ -81,10 +84,17 @@ test("FR-MOD-49 FR-MOD-47 FR-MOD-28 Triggers blocks per player; DM entries for m
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", battlemap);
   const token = recordId("char-brakka", "token");
-  await expect.poll(async () => (await tokenNode(dm, token)) !== null).toBe(true);
-  const t = (await tokenNode(dm, token))!;
-  await dm.mouse.click(t.x, t.y, { button: "right" });
-  await dm.getByTestId("mod-token-menu-triggers").click();
+  // The canvas may still be fitting the scene under load: right-click again until the menu opens.
+  const entry = dm.getByTestId("mod-token-menu-triggers");
+  await expect(async () => {
+    const t = await tokenNode(dm, token);
+    expect(t).not.toBeNull();
+    if (!t) return;
+    await dm.keyboard.press("Escape");
+    await dm.mouse.click(t.x, t.y, { button: "right" });
+    await expect(entry).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+  await entry.click();
   await expect(dialog).toBeVisible();
   await expect(dialog.getByTestId("mod-trigger")).toContainText("Divine Fury");
   await expect(dialog.getByTestId("mod-trigger-edit")).toHaveCount(1);
