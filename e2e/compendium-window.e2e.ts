@@ -1,8 +1,8 @@
 // e2e-bundle: compendium
 // Thin compendium window flow (CMP §13 E2E): the DM opens Compendium (import panel: SRD 5.1 · 55
 // entries, Update), searches "goblin", opens Goblin's stat block; player-1 searches "fire", opens
-// Fireball and has no Monsters tab; the DM updates to the bundled source (confirm → Toast with
-// counts). Visibility per player, ranking, import counts, leak scans: bun test (compendium
+// Fireball and has no Monsters tab; the DM's Update opens the confirm (cancelled: the bundle's
+// server is shared). Visibility per player, ranking, import counts, leak scans: bun test (compendium
 // rest.test.ts, import-route.test.ts).
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
@@ -12,7 +12,7 @@ async function live(page: Page) {
   await expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
 }
 
-test("FR-CMP-18 FR-CMP-19 FR-CMP-20 DM opens Goblin's stat block; player-1 opens Fireball with no Monsters tab; DM updates the SRD", async ({
+test("FR-CMP-18 FR-CMP-19 FR-CMP-20 DM opens Goblin's stat block; player-1 opens Fireball with no Monsters tab; DM's Update asks first", async ({
   browser,
 }) => {
   const { secret, link } = e2eEnv();
@@ -73,11 +73,14 @@ test("FR-CMP-18 FR-CMP-19 FR-CMP-20 DM opens Goblin's stat block; player-1 opens
   await expect(spell.locator('[data-testid="dicex-notation"]').first()).toBeVisible();
   await expect(spell.getByTestId("cmp-attribution")).toHaveText("SRD 5.1 · CC BY 4.0");
 
-  // DM: Update → confirm → Toast with counts; the panel then shows the bundled source.
+  // DM: Update asks first ("Players will pause for ~2 s"); Cancel imports nothing. The import
+  // itself runs in bun test (import-route.test.ts): this bundle's server is shared with the other
+  // compendium specs, which expect the mini set.
   await win.getByTestId("cmp-update").click();
-  await expect(dm.getByTestId("cmp-import-dialog")).toContainText("Players will pause for ~2 s");
-  await dm.getByTestId("cmp-import-confirm").click();
-  await expect(dm.getByText(/SRD 5\.1 imported: [\d,]+ new/)).toBeVisible({ timeout: 15_000 });
-  await expect(win.getByTestId("cmp-update")).toHaveCount(0);
-  await expect(win.getByTestId("cmp-import-status")).not.toHaveText(/55 entries/);
+  const dialog = dm.getByTestId("cmp-import-dialog");
+  await expect(dialog).toContainText("Players will pause for ~2 s");
+  await expect(dm.getByTestId("cmp-import-confirm")).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(win.getByTestId("cmp-import-status")).toHaveText(/55 entries/);
 });
