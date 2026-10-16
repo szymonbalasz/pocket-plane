@@ -16,7 +16,7 @@ import { useStore } from "zustand";
 import { withoutDmOnly } from "../../scene-tools/layer-switches";
 import { useCanvas } from "../canvas-context";
 import { decorateToken } from "../decorations";
-import { labelRow, type Measure } from "../label";
+import { labelRow, type Measure, MORE_BADGE_ID } from "../label";
 import type { TokenBadge } from "../token-overlays";
 import { tokenOverlays } from "../token-overlays";
 import { useLayerToggles } from "../tool-store";
@@ -129,6 +129,22 @@ function TokenLabel({ t }: { t: TokenView }) {
         full={row.name.text !== t.name ? t.name : undefined}
       />
       {row.badges.map((p) => {
+        // BL-04: the "+N" for badges that don't fit above the name; hover lists them.
+        if (p.id === MORE_BADGE_ID) {
+          return (
+            <Pill
+              key={p.id}
+              {...p}
+              name={p.id}
+              id={t.id}
+              font={row.font}
+              fill={colors.muted}
+              fillOpacity={1}
+              color={colors.foreground}
+              bold
+            />
+          );
+        }
         const b = byId.get(p.id);
         if (!b) return null;
         return (
@@ -151,7 +167,8 @@ function TokenLabel({ t }: { t: TokenView }) {
 }
 
 /**
- * P3 glitch 10: while the pointer is over a cut name pill, the canvas' title is the full name.
+ * P3 glitch 10: while the pointer is over a cut name pill, the canvas' title is the full name
+ * (BL-04: over a "+N" badge, the hidden badges).
  * Hit-tested from the stage's own pointer moves, so the layer stays non-listening.
  */
 function useFullNameOnHover(layer: React.RefObject<Konva.Layer | null>) {
@@ -168,7 +185,8 @@ function useFullNameOnHover(layer: React.RefObject<Konva.Layer | null>) {
     };
     const move = () => {
       const p = stage.getPointerPosition();
-      const pills = layer.current?.find(".map-token-label") ?? [];
+      // Cut names and "+N" badges (BL-04) carry `full`.
+      const pills = layer.current?.find((n: Konva.Node) => Boolean(n.getAttr("full"))) ?? [];
       const hit = p
         ? pills.find((n) => {
             if (!n.getAttr("full")) return false;

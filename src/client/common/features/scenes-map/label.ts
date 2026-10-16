@@ -77,14 +77,20 @@ export interface Pill {
 export interface LabelRow {
   font: number;
   name: Pill;
-  badges: (Pill & { id: string })[];
+  /** `full` (the "+N" badge only): the hidden badges' labels, for its tooltip. */
+  badges: (Pill & { id: string; full?: string })[];
 }
+
+/** Konva name of the "+N" badge standing for the badges that don't fit (BL-04). */
+export const MORE_BADGE_ID = "map-token-badge-more";
 
 /**
  * The label of a token whose footprint is `side` map px (= footprint × cell): the name pill
  * centred on the footprint and vertically on its bottom edge (`y = side`). BL-04: badges in rows
  * above it, each row centred on the footprint and never wider than it (a badge wider than the
  * footprint is cut with "…"), the first row right above the name, more rows stacking upwards.
+ * Rows never rise into the band where the upper neighbour's name sits (half a pill below the
+ * footprint's top edge); what doesn't fit collapses into a last "+N" badge.
  */
 export function labelRow(
   name: string,
@@ -99,7 +105,7 @@ export function labelRow(
   const nameW = measure(text, m.font, false) + 2 * m.padX;
   const y = side - m.pillH / 2;
   // Pack badges left to right into rows no wider than the footprint.
-  const rows: { id: string; text: string; width: number }[][] = [];
+  const rows: { id: string; text: string; width: number; label: string }[][] = [];
   let row: (typeof rows)[number] = [];
   let rowW = 0;
   for (const b of badges) {
@@ -111,16 +117,38 @@ export function labelRow(
       rowW = 0;
     }
     rowW += (row.length > 0 ? m.gap : 0) + width;
-    row.push({ id: b.id, text: label, width });
+    row.push({ id: b.id, text: label, width, label: b.label });
   }
   if (row.length > 0) rows.push(row);
+  // Rows whose top stays at or below the upper neighbour's name band (pillH / 2).
+  const fit = Math.max(0, Math.floor((y - m.pillH / 2) / (m.pillH + m.gap) + 1e-9));
+  let hidden: (typeof rows)[number] = [];
+  if (rows.length > fit) {
+    hidden = rows.slice(fit).flat();
+    rows.length = fit;
+    const last = rows[fit - 1];
+    if (last) {
+      const width = (r: typeof last) => r.reduce((n, b) => n + b.width, 0) + m.gap * r.length;
+      const more = () => {
+        const label = `+${hidden.length}`;
+        return { label, width: Math.min(side, measure(label, m.font, true) + 2 * m.padX) };
+      };
+      while (last.length > 0 && width(last) + more().width > side) {
+        hidden.unshift(last.pop() as (typeof last)[number]);
+      }
+      const { label, width: w } = more();
+      last.push({ id: MORE_BADGE_ID, text: label, width: w, label });
+    }
+  }
+  const full = hidden.map((b) => b.label).join(", ");
   const out: LabelRow["badges"] = [];
   rows.forEach((r, k) => {
     const w = r.reduce((n, b) => n + b.width, 0) + m.gap * (r.length - 1);
     const by = y - (k + 1) * (m.pillH + m.gap);
     let x = (side - w) / 2;
     for (const b of r) {
-      out.push({ id: b.id, text: b.text, x, y: by, width: b.width, height: m.pillH });
+      const pill = { id: b.id, text: b.text, x, y: by, width: b.width, height: m.pillH };
+      out.push(b.id === MORE_BADGE_ID ? { ...pill, full } : pill);
       x += b.width + m.gap;
     }
   });

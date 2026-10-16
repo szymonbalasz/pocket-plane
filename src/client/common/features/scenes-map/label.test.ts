@@ -12,6 +12,7 @@ import {
   labelMetrics,
   labelRow,
   type Measure,
+  MORE_BADGE_ID,
 } from "./label";
 import { LAYER_ORDER, orderLayers } from "./layers";
 import type { TokenOverlay, TokenOverlayView } from "./token-overlays";
@@ -169,6 +170,35 @@ describe("FR-MAP-42 label", () => {
     expect(long?.text.endsWith(ELLIPSIS)).toBe(true);
     // Registry order kept.
     expect(r.badges.map((b) => b.id)).toEqual(["cbtx-token-death", "fog-token-fogged", "x-long"]);
+  });
+
+  test("FR-MAP-43 BL-04 at 48 px cells three badges never rise above the footprint: the rest collapses into '+N' (walkthrough F1)", () => {
+    const scale = 48 / 70;
+    const three = [
+      { id: "cbt-token-out", label: "Out" },
+      { id: "fog-token-fogged", label: "Fog" },
+      { id: "vis-token-invisible", label: "Invisible" },
+    ];
+    const r = labelRow("Goblin 3", three, 70, 70, scale, measure);
+    const above = labelRow("Goblin 5", [], 70, 70, scale, measure);
+    for (const b of r.badges) {
+      // Inside the footprint, and clear of the upper neighbour's name (one cell up).
+      expect(b.y).toBeGreaterThanOrEqual(0);
+      expect(b.x).toBeGreaterThanOrEqual(0);
+      expect(b.x + b.width).toBeLessThanOrEqual(70 + 1e-9);
+      expect(overlaps(b, above.name, 0, -70) ? `${b.id} covers the name above` : "ok").toBe("ok");
+      expect(overlaps(b, r.name, 0, 0)).toBe(false);
+    }
+    // Two rows fit: Out, then "+2" (Fog + "+1" is wider than the footprint), registry order.
+    expect(r.badges.map((b) => b.id)).toEqual(["cbt-token-out", MORE_BADGE_ID]);
+    const more = r.badges[1];
+    expect(more?.text).toBe("+2");
+    expect(more?.full).toBe("Fog, Invisible");
+    expect(r.badges[0]?.full).toBeUndefined();
+    // At 70 px cells (scale 1) the font is smaller: all three fit, no "+N".
+    const big = labelRow("Goblin 3", three, 70, 70, 1, measure);
+    expect(big.badges.some((b) => b.id === MORE_BADGE_ID)).toBe(false);
+    for (const b of big.badges) expect(b.y).toBeGreaterThanOrEqual(big.font * 0.6);
   });
 
   test("FR-MAP-42 label: layer order map < grid < tokens < labels < pointers", () => {
