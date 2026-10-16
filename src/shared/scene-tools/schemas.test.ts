@@ -1,6 +1,7 @@
 // Scene-tools wire shapes (SCN §9): ranges and steps, the player template schema, signal frames.
 import { describe, expect, test } from "bun:test";
 import {
+  AddDoorInput,
   AddWallsInput,
   AoeTemplateRecord,
   Door,
@@ -51,6 +52,23 @@ describe("SCN §9 shapes", () => {
     expect(Door.safeParse([1, 0, 0, 1, 0, 2, 1]).success).toBe(true);
     expect(Door.safeParse([1, 0, 0, 1, 0, 3, 0]).success).toBe(false);
     expect(Door.safeParse([0, 0, 0, 1, 0, 1, 0]).success).toBe(false);
+  });
+
+  test("FR-SCN-07 decimals (sprint 3): ≤ 2 decimals ok, 3 → invalid, integers unchanged", () => {
+    const one = (segment: number[]) =>
+      AddWallsInput.safeParse({ sceneId: "s", segments: [segment] });
+    expect(one([4.5, 3.25, 6.75, 5.5]).success).toBe(true);
+    expect(one([0, 0, 1, 0]).success).toBe(true);
+    expect(one([4.5, 3.255, 6.75, 5.5]).success).toBe(false);
+    expect(one([0.07, 0.29, 1.13, 2.01]).success).toBe(true);
+    expect(Door.safeParse([1, 12.4, 3.65, 13.1, 4.8, 1, 0]).success).toBe(true);
+    expect(Door.safeParse([1, 12.401, 3.65, 13.1, 4.8, 1, 0]).success).toBe(false);
+    expect(AddDoorInput.safeParse({ sceneId: "s", segment: [12.4, 3.65, 13.1, 4.8] }).success).toBe(
+      true,
+    );
+    expect(
+      PlayerSceneStructureRecord.safeParse({ id: "s", doors: [[1, 1.5, 1, 2, 1, 0]] }).success,
+    ).toBe(true);
   });
 
   test("FR-SCN-17 prop sides 1–20, rotation in 90° steps; strict", () => {
