@@ -16,6 +16,19 @@ export function isBlind(store: RecordStore, sceneId: string, playerId: string | 
   return v?.blind === true;
 }
 
+/**
+ * FR-FOG-36: the shown canvas is a blind player's (the DM is never blind). Read by scene-tools'
+ * templates layer, which then draws none of the others' live (ephemeral) template previews.
+ */
+export function canvasBlind(
+  client: "dm" | "player",
+  store: RecordStore,
+  sceneId: string,
+  playerId: string | null,
+): boolean {
+  return client === "player" && isBlind(store, sceneId, playerId);
+}
+
 /** The store the canvas layers read while blind: only the player's own kept templates. */
 export function blindStore(store: RecordStore, playerId: string | null): RecordStore {
   const byId = store.records[AOE_TEMPLATE_TYPE];

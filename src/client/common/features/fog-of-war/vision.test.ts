@@ -11,7 +11,7 @@ import { emptyStore, type RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import { decorateToken } from "../scenes-map/decorations";
 import { tokenOverlays } from "../scenes-map/token-overlays";
-import { BLIND_TEXT, blindStore, isBlind } from "./blind";
+import { BLIND_TEXT, blindStore, canvasBlind, isBlind } from "./blind";
 import { NO_VISION_PREFIX, noVisionNames } from "./no-vision";
 import { Raster } from "./paint-raster";
 import { FOG_ALPHA, type PaintCtx } from "./render";
@@ -221,6 +221,14 @@ describe("FR-FOG-36 blind client", () => {
     expect(isBlind(store(false), "s", "p1")).toBe(false);
     expect(isBlind(store(true), "other-scene", "p1")).toBe(false);
     expect(isBlind(store(true), "s", null)).toBe(false);
+  });
+
+  test("FR-FOG-36 others' live template previews: the templates layer drops them on a blind player's canvas only", () => {
+    expect(canvasBlind("player", store(true), "s", "p1")).toBe(true);
+    expect(canvasBlind("player", store(false), "s", "p1")).toBe(false);
+    expect(canvasBlind("dm", store(true), "s", "p1")).toBe(false);
+    // The layer reads the blind store: the vision row survives the template filter.
+    expect(canvasBlind("player", blindStore(store(true), "p1"), "s", "p1")).toBe(true);
   });
 
   test("FR-FOG-36 while blind no other placer's templates draw; own placement still does", () => {
