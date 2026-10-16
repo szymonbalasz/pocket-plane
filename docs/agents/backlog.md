@@ -16,6 +16,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-08 | Narrow Initiative rows still collapse chips to "+N" (sim-6 #8): abbreviate durations when tight | S | combat-extras chips | FR-CBTX-46 note | MOD tier 2 chips | open |
 | BL-09 | Live-sync hub skips record changes whose player redaction is unchanged (OQ-CBTX-25; empty updates on monster temp HP) | M | `src/server/ws/` hub | live-sync FR note | any ws / snapshot work | superseded by V0 `fix/vision-core` (identical-upsert drop, sprint-3 seams S11) |
 | BL-10 | Player outcome line "12 — hit!" vs AC 14 after a DM-only ruling reads odd (sim-6 #10): copy only ("DM ruled") within #178 G8 | S | combat-tracker player card view | DM product call? (ask if copy changes visibility) | — | open (ask) |
+| BL-11 | BL-02 e2e flaked once under parallel load: Initiative window stayed minimised after its launcher click (`e2e/support/shell.ts` `openWindow`; D1 merge run, `%TEMP%\pocket-plane\e2e-d1.log`) | S | e2e support / play-shell minimise | none | play-shell work | open |
 
 ## How to add items
 
