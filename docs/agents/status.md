@@ -10,9 +10,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | V2 vision server + Invisible | `build/vision-server` (w4B) | build-vision-server | Building | Walkthrough → V3 |
 | R2 tier 2 client | `fix/mod-roll-preview` (w4D) | test-mod-roll-preview (port 4173) | Walkthrough | Merge |
-| R3 tier 3 uses | `build/mod-tier3` (w4A) | fix-mod-tier3 | Walkthrough PASS; fixing preset dialog overflow | Merge → R6 |
-| C1 compendium core | `fix/cmp-core` (w4E) | build-cmp-core | Building | Review → C2 (after R7), C3, D2 |
-| Merged so far | — | — | V4 (#224), P core (c58470c), D1 (#214), D3 (#217), V0 (#216), V5 (#219), lazy-records (#218), R0 (#220), R1 (#222), V1 + empty-event fix + R4 (#223); early slices rt-shared, cmp-data (#213), party-shared; BL-06, BL-02, BL-11 | — |
+| C1 compendium core | `fix/cmp-core` (w4E) | — | Built; merge verification | C2 (after R7), C3 after C2, D2 |
+| R5 trigger presets + bundle | `build/trigger-presets` (w4F) | build-trigger-presets | Building | Merge → R6, R7 |
+| P2 handouts UI | `build/party-handouts` (w4G) | build-party-handouts | Building | Walkthrough |
+| Merged so far | — | — | R3 (#225), V4 (#224), P core (c58470c), D1 (#214), D3 (#217), V0 (#216), V5 (#219), lazy-records (#218), R0 (#220), R1 (#222), V1 + empty-event fix + R4 (#223); early slices rt-shared, cmp-data (#213), party-shared; BL-06, BL-02, BL-11 | — |
 | Queue | — | — | V3 (after V2 + V4, canvas 3rd); R5 → R6 (sheet) → R7 (combat); C1 (after P core) → C2 → C3, C4; P2 ∥ P3 → P4; D2 (after C1), D4 (sheet, after C2) | Locks below |
 | Backlog (BL-nn), downtime only | `fix/bl-<nn>-<slug>` | — | BL-06, BL-02, BL-11 done; open BL-01, 03–05, 07, 08, 10, 12–14 | Per §3a |
 
@@ -20,7 +21,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 - `build/vision-server` (V2): scenes-map registry lines, entities definition hook line, player-hooks line, combat `join.ts` (Start / Add dependants), bundles index.
 - `fix/mod-roll-preview` (R2): dice-roll-log client folder, dice-extras tray-extras line, DM popup files (not with R7), roll-intent `manualParts` pass-through.
-- `build/mod-tier3` (R3): character-sheet folder (sheet lock 2nd; `resources.ts`).
+- `build/party-handouts` (P2): kinds.ts line, notification-views lines, windows.ts lines.
+- `build/trigger-presets` (R5): fixtures index lines.
 - Next: schema P core → C1 → D2; canvas V4 → V3; sheet R3 → R6 → C2 → D4 → P4 / C4; combat R7 → C2.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
 
