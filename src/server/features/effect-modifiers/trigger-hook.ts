@@ -46,6 +46,7 @@ import type {
   RollHook,
   RollHookBase,
   RollHookResult,
+  RollModeHint,
   RollPart,
 } from "../dice-roll-log/roll-hooks";
 
@@ -240,7 +241,57 @@ function chargeOpen(env: Env, t: Trigger, o: TriggerOwner): boolean | "no-combat
   return chargeFree(env, t.id, o.combatant.id, o.enc.id, windowKey(every, o.enc));
 }
 
-/** FR-MOD-43: the owner's `roll` triggers → parts on this roll; windowed uses `used` at once. */
+/**
+ * FR-MOD-43: the owner's enabled `roll` triggers that fire on this roll now: requires, hard
+ * filters, charge open (`each` anywhere; windowed in combat only). `{feature}` ones are skipped
+ * with a note (a sheet spend needs a `creature-sheet` change the roll's event can't list yet).
+ */
+function firingRollTriggers(
+  env: Env,
+  o: TriggerOwner,
+  subject: RollSubject,
+  notes: string[] | null,
+): Trigger[] {
+  const triggers = triggersOf(env, o, "roll");
+  if (triggers.length === 0) return [];
+  const requires = requiresOf(env, o);
+  const facts = factsOf(o, subject);
+  return triggers.filter((t) => {
+    if (!requires(t.rule) || !ownerFiltersPass(t.rule, facts)) return false;
+    if (typeof t.rule.every === "object") {
+      notes?.push(note(`${t.name} skipped: feature uses on roll triggers not built`));
+      return false;
+    }
+    return chargeOpen(env, t, o) === true;
+  });
+}
+
+/** FR-MOD-42: a windowed `roll` trigger's charge is `used` at once (in combat). */
+function spendAtOnce(env: Env, t: Trigger, o: TriggerOwner, rollId: string | null): void {
+  if (!windowed(t.rule.every) || !o.combatant || !o.enc) return;
+  const now = env.ctx.clock.iso();
+  env.tx
+    .insert(triggerUse)
+    .values({
+      id: env.ctx.ids.next(),
+      campaignId: campaignOf(env),
+      encounterId: o.enc.id,
+      seq: triggerUseSeqNext,
+      triggerId: t.id,
+      ownerCombatantId: o.combatant.id,
+      window: windowKey(t.rule.every, o.enc),
+      state: "used",
+      rollId,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .run();
+}
+
+/**
+ * FR-MOD-43: firing `part` triggers → parts on this roll; a `mode` trigger's hint came from
+ * `modes()` before the roll, its windowed charge is spent here.
+ */
 function rollParts(
   env: Env,
   o: TriggerOwner,
@@ -248,20 +299,13 @@ function rollParts(
   base: RollHookBase,
   notes: string[],
 ): RollPart[] {
-  const triggers = triggersOf(env, o, "roll");
-  if (triggers.length === 0) return [];
-  const requires = requiresOf(env, o);
-  const facts = factsOf(o, subject);
   const parts: RollPart[] = [];
-  for (const t of triggers) {
-    if (t.rule.then.do !== "part") continue; // `mode`: tier 2 (`triggerModeHints`)
-    if (!requires(t.rule) || !ownerFiltersPass(t.rule, facts)) continue;
-    if (typeof t.rule.every === "object") {
-      // A sheet spend needs a `creature-sheet` change the roll's event can't list yet.
-      notes.push(note(`${t.name} skipped: feature uses on roll triggers not built`));
+  for (const t of firingRollTriggers(env, o, subject, notes)) {
+    if (t.rule.then.do === "mode") {
+      spendAtOnce(env, t, o, null);
       continue;
     }
-    if (chargeOpen(env, t, o) !== true) continue;
+    if (t.rule.then.do !== "part") continue;
     const crit = !!subject.crit && subject.roll === "damage" && doublesOnCrit(t.rule);
     const v = fireValue(t, o, crit);
     if (typeof v === "string") {
@@ -277,28 +321,10 @@ function rollParts(
       public: t.public,
       value: r ? r.total : v.constant,
       ...(r ? { expression: r.expression, rollId: r.id } : {}),
-      ...(r && base.manual ? { auto: true } : {}),
+      ...(r && base.manual && !r.manual ? { auto: true } : {}),
       ...(r && dieValues(r) ? { dice: dieValues(r) } : {}),
     });
-    if (windowed(t.rule.every) && o.combatant && o.enc) {
-      const now = env.ctx.clock.iso();
-      env.tx
-        .insert(triggerUse)
-        .values({
-          id: env.ctx.ids.next(),
-          campaignId: campaignOf(env),
-          encounterId: o.enc.id,
-          seq: triggerUseSeqNext,
-          triggerId: t.id,
-          ownerCombatantId: o.combatant.id,
-          window: windowKey(t.rule.every, o.enc),
-          state: "used",
-          rollId: r?.id ?? null,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .run();
-    }
+    spendAtOnce(env, t, o, r?.id ?? null);
   }
   return parts;
 }
@@ -336,7 +362,8 @@ function hitOffers(
       skipped++;
       continue;
     }
-    const r = base.rollExtra(v.expression, t.name);
+    // FR-MOD-18: a physical `t:` group (lenient; R2 ruling) else server-rolled.
+    const r = base.rollExtra(v.expression, t.name, `t:${t.id}`);
     const s = settleFacts(t.rule, facts);
     const dice = dieValues(r);
     offers.push({
@@ -347,7 +374,7 @@ function hitOffers(
       expression: r.expression,
       rollId: r.id,
       type: t.rule.then.type,
-      ...(base.manual ? { auto: true } : {}),
+      ...(base.manual && !r.manual ? { auto: true } : {}),
       ...(dice ? { dice } : {}),
       ...(s.ask ? { ask: s.ask.slice(0, TRIGGER_ASK_MAX) } : {}),
       ...(s.marked ? { marked: s.marked } : {}),
@@ -361,6 +388,24 @@ function hitOffers(
 
 export const modTriggerHook: RollHook = {
   id: "effect-modifiers.triggers",
+  /** FR-MOD-43 (tier 2): firing `roll` triggers with `then.mode` → mode hints, before the d20. */
+  modes(env, subject): RollModeHint[] {
+    const o = ownerOf(env, subject.creature);
+    if (!o) return [];
+    return firingRollTriggers(env, o, subject, null).flatMap((t) =>
+      t.rule.then.do === "mode"
+        ? [
+            {
+              effectId: t.id,
+              triggerId: t.id,
+              mode: t.rule.then.mode,
+              label: t.name,
+              public: t.public,
+            },
+          ]
+        : [],
+    );
+  },
   adjust(env, subject, base): RollHookResult {
     const o = ownerOf(env, subject.creature);
     if (!o) return { parts: [], modes: [] };

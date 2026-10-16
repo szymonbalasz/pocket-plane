@@ -1,28 +1,39 @@
 // `dice.evaluate` (FR-DICE-19, FR-DICE-01–08): grammar + mode + manual checks, then one
 // immutable `roll` row in the caller's transaction. No event; the caller logs and emits.
-// With a `subject` (FR-MOD-13) it then runs the roll hooks: their parts come back on `mods`, the
-// caller adds `mods.modTotal` to its outcome and lists the part rolls (`rollIdsOf`).
+// With a `subject` (FR-MOD-13) it first asks the hooks' `modes()` (FR-MOD-17: the final mode is
+// known before the d20 is rolled), then runs their `adjust`: parts come back on `mods`, the
+// caller adds `mods.modTotal` to its outcome and lists the part rolls (`rollIdsOf`). Physical
+// part dice arrive as `manualParts` groups (FR-MOD-18): `e:` strict, `t:` lenient.
 import {
+  applyMode,
   constantOf,
   type DiceTerm,
   diceCount,
   diceRange,
   diceTerms,
   keptFlags,
+  parseExpression,
   prepareExpression,
   type Term,
   toNotation,
 } from "@shared/dice-roll-log/grammar";
 import {
   type DieResult,
+  type DmModPart,
   type ManualEntry,
+  type ManualPart,
+  PART_DICE_MAX,
   ROLL_MODS_MAX,
+  ROLL_NOTE_MAX,
+  ROLL_NOTES_MAX,
+  ROLL_OFFERED_MAX,
   type RollCategory,
   type RollEntryDmPayload,
   RollLabel,
   type RollMode,
   type RollPayloadItem,
 } from "@shared/dice-roll-log/schemas";
+import { combineModes } from "@shared/effect-modifiers/rules";
 import { RollSubject } from "@shared/effect-modifiers/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import { rollDice } from "../../commands/dice";
@@ -55,6 +66,14 @@ export interface EvaluateInput {
    * carries `mods`. Absent → exactly as before (no hooks, no `mods`).
    */
   subject?: RollSubject;
+  /**
+   * FR-MOD-18 (tier 2 / T): physical groups for bonus dice (`e:<effectId>`) and offered trigger
+   * dice (`t:<triggerId>`), beside the base `manual`. Absent = none sent (tier 1: a physical
+   * roll's part dice are server-rolled, `auto`). Sent with a physical base roll → `e:` groups
+   * must match the committed bonus dice exactly (else `conflict` "Effects changed — roll
+   * again"); `t:` groups never conflict (surplus ignored; missing or unfit → server-rolled).
+   */
+  manualParts?: readonly ManualPart[];
 }
 
 /** A stored roll (data model §15). */
@@ -66,6 +85,10 @@ export interface RollMods {
   parts: RollPart[];
   /** Σ part values: the outcome total = base `total` + `modTotal` (FR-MOD-16). */
   modTotal: number;
+  /**
+   * FR-MOD-17, -19: the `modes()` hints behind the row's final `mode` (those agreeing with it;
+   * none when hints cancel out), then any hints `adjust` returned (labels only).
+   */
   modes: RollModeHint[];
   /** FR-MOD-37: offered trigger parts (rolled, **not** in `modTotal`), registry order; absent = none. */
   offered?: OfferedPart[];
@@ -77,6 +100,8 @@ export interface RollMods {
 export type EvaluatedRoll = Roll & { mods?: RollMods };
 
 const exprIssue = (message: string) => invalid(message, [{ path: ["expression"], message }]);
+/** FR-MOD-17, -18: the client's physical dice no longer fit the committed effects. */
+export const EFFECTS_CHANGED = "Effects changed — roll again";
 const manualIssue = (message: string, path: (string | number)[] = []) =>
   invalid(message, [{ path: ["manual", ...path], message }]);
 
@@ -177,9 +202,58 @@ export function evaluate(
 ): EvaluatedRoll {
   // A bad subject is a caller bug (`internal`), caught before anything is rolled.
   const subject = input.subject === undefined ? undefined : RollSubject.parse(input.subject);
-  const row = evaluateBase(env, input);
-  if (!subject) return row;
-  return { ...row, mods: runRollHooks(env, input, row, subject, hooks) };
+  if (!subject) return evaluateBase(env, input);
+  // FR-MOD-17: hints first; the final mode rewrites the d20 before it is rolled (FR-DICE-04).
+  const hints = preRollHints(env, input.expression, subject, hooks);
+  const mode = combineModes(input.mode, hints);
+  if (input.manual) checkManualMode(input.expression, input.manual, mode);
+  const row = evaluateBase(env, { ...input, mode });
+  const agreeing = hints.filter((h) => h.mode === mode);
+  return { ...row, mods: runRollHooks(env, input, row, subject, hooks, agreeing) };
+}
+
+/** A plain `1d20` term the mode can rewrite (FR-DICE-04); none → modes don't apply. */
+function modeable(expression: string): boolean {
+  const parsed = parseExpression(expression);
+  return parsed.ok && applyMode(parsed.value, "advantage").ok;
+}
+
+/** FR-MOD-17: every hook's `modes()`, registry order; none for a roll without a d20. */
+function preRollHints(
+  env: CommandEnv,
+  expression: string,
+  subject: RollSubject,
+  hooks: readonly RollHook[],
+): RollModeHint[] {
+  if (!modeable(expression)) return [];
+  return hooks.flatMap((h) => h.modes?.(env, subject) ?? []);
+}
+
+/**
+ * FR-MOD-17: a physical entry whose die values fit another mode's d20 count but not the final
+ * mode's (the effects changed since the client's preview) → `conflict`. Other count errors stay
+ * `invalid` (FR-DICE-06, `manualDice`).
+ */
+function checkManualMode(expression: string, m: ManualEntry, mode: RollMode): void {
+  if (!m.dice || !modeable(expression)) return;
+  const count = (md: RollMode) => {
+    const r = prepareExpression(expression, md);
+    return r.ok ? diceCount(r.value) : -1;
+  };
+  if (m.dice.length === count(mode)) return;
+  const others = (["normal", "advantage", "disadvantage"] as const).filter((x) => x !== mode);
+  if (others.some((x) => count(x) === m.dice?.length)) throw conflict(EFFECTS_CHANGED);
+}
+
+/** FR-MOD-19 (D9): a roll's die values in notation order; an unknown value or > 20 dice → none. */
+function dieValues(r: Roll): number[] | undefined {
+  if (r.dice.length === 0 || r.dice.length > PART_DICE_MAX) return undefined;
+  const out: number[] = [];
+  for (const d of r.dice) {
+    if (d.value === null) return undefined;
+    out.push(Math.abs(d.value));
+  }
+  return out;
 }
 
 /** FR-MOD-13/14: every hook in order, after the base row, in the caller's transaction. */
@@ -189,9 +263,15 @@ function runRollHooks(
   base: Roll,
   subject: RollSubject,
   hooks: readonly RollHook[],
+  preHints: readonly RollModeHint[],
 ): RollMods {
-  const rollExtra = (expression: string, label: string): Roll =>
-    evaluateBase(env, {
+  const groups = new Map((input.manualParts ?? []).map((p) => [p.key, p.entry]));
+  // FR-MOD-18: `e:` groups are strict for a physical base roll from a client that sends groups.
+  const strict = base.manual && input.manualParts !== undefined;
+  const usedKeys = new Set<string>();
+  const extras = new Map<string, Roll>();
+  const extra = (expression: string, label: string, manual?: ManualEntry): Roll => {
+    const r = evaluateBase(env, {
       expression,
       mode: "normal",
       category: input.category,
@@ -199,10 +279,45 @@ function runRollHooks(
       actor: input.actor,
       source: input.source,
       ...(input.target ? { target: input.target } : {}),
+      ...(manual ? { manual } : {}),
     });
-  const ctx = { manual: base.manual, category: base.category, source: input.source, rollExtra };
+    extras.set(r.id, r);
+    return r;
+  };
+  const rollExtra = (expression: string, label: string, key?: string): Roll => {
+    if (key === undefined) return extra(expression, label);
+    usedKeys.add(key);
+    const entry = groups.get(key);
+    if (key.startsWith("e:")) {
+      if (entry === undefined) {
+        if (strict) throw conflict(EFFECTS_CHANGED);
+        return extra(expression, label);
+      }
+      const prepared = prepareExpression(expression, "normal");
+      if (entry.dice && prepared.ok && entry.dice.length !== diceCount(prepared.value)) {
+        throw conflict(EFFECTS_CHANGED);
+      }
+      return extra(expression, label, entry);
+    }
+    // `t:` (R2 ruling): never a conflict. An unfit group is ignored and the dice server-rolled.
+    if (entry !== undefined) {
+      try {
+        return extra(expression, label, entry);
+      } catch (err) {
+        if (!(err instanceof CommandError)) throw err;
+      }
+    }
+    return extra(expression, label);
+  };
+  const ctx = {
+    manual: base.manual,
+    category: base.category,
+    source: input.source,
+    rollExtra,
+    ...(input.manualParts ? { manualParts: input.manualParts } : {}),
+  };
   const parts: RollPart[] = [];
-  const modes: RollModeHint[] = [];
+  const modes: RollModeHint[] = [...preHints];
   const offered: OfferedPart[] = [];
   const notes: string[] = [];
   for (const h of hooks) {
@@ -218,11 +333,28 @@ function runRollHooks(
   if (parts.length > ROLL_MODS_MAX || modes.length > ROLL_MODS_MAX) {
     throw conflict(`At most ${ROLL_MODS_MAX} effect modifiers per roll`);
   }
+  if (offered.length > ROLL_OFFERED_MAX) {
+    throw new Error(`Roll hooks offered ${offered.length} parts (max ${ROLL_OFFERED_MAX})`);
+  }
+  // FR-MOD-18: a strict `e:` group no committed bonus die asked for → that effect ended meanwhile.
+  if (strict) {
+    for (const k of groups.keys()) {
+      if (k.startsWith("e:") && !usedKeys.has(k)) throw conflict(EFFECTS_CHANGED);
+    }
+  }
+  // FR-MOD-19 (D9): per-die values of the dice each part / offer rolled through `rollExtra`.
+  const withDice = <P extends { rollId?: string; dice?: number[] }>(p: P): P => {
+    if (p.dice !== undefined || p.rollId === undefined) return p;
+    const r = extras.get(p.rollId);
+    const values = r ? dieValues(r) : undefined;
+    return values ? { ...p, dice: values } : p;
+  };
+  const offers = offered.map(withDice);
   return {
-    parts,
+    parts: parts.map(withDice),
     modTotal: parts.reduce((s, p) => s + p.value, 0),
     modes,
-    ...(offered.length ? { offered } : {}),
+    ...(offers.length ? { offered: offers } : {}),
     ...(notes.length ? { notes } : {}),
   };
 }
@@ -309,26 +441,55 @@ export function rollPayloadItem(r: EvaluatedRoll): RollPayloadItem {
       ...(p.expression !== undefined ? { expression: p.expression } : {}),
       ...(p.auto ? { auto: true as const } : {}),
       ...(p.rollId !== undefined ? { rollId: p.rollId } : {}),
+      ...(p.dice !== undefined ? { dice: p.dice } : {}),
+      ...(p.type !== undefined ? { type: p.type } : {}),
     }));
   }
   if (r.mods?.modes.length) item.modes = r.mods.modes.map((m) => (m.public ? m.label : null));
+  // FR-MOD-19 (R1): offered trigger parts, **not** in `total`; settle facts ride on the card only.
+  if (r.mods?.offered?.length) {
+    item.offered = r.mods.offered.map((o) => ({
+      label: o.public ? o.label : null,
+      value: o.value,
+      expression: o.expression,
+      rollId: o.rollId,
+      type: o.type,
+      ...(o.auto ? { auto: true as const } : {}),
+      ...(o.dice !== undefined ? { dice: o.dice } : {}),
+    }));
+  }
   return item;
 }
 
+/** FR-MOD-19: the DM's name of a part or hint: its trigger's (`roll` trigger) or its effect's. */
+const dmName = (x: { effectId: string; triggerId?: string; label: string }): DmModPart =>
+  x.triggerId !== undefined
+    ? { triggerId: x.triggerId, label: x.label }
+    : { effectId: x.effectId, label: x.label };
+
 /**
  * FR-MOD-19: the `roll` kind's `dmPayload` for an entry of these rolls (payload order): every
- * part's and mode hint's effect id and label. Undefined when no roll has any (no `dmPayload`).
+ * part's, mode hint's and offer's name, plus the hooks' DM-only notes (FR-MOD-34, -37; ≤ 4,
+ * each ≤ 80 chars). Undefined when there is none of them (no `dmPayload`).
  */
 export function rollDmPayload(rolls: readonly EvaluatedRoll[]): RollEntryDmPayload | undefined {
-  if (!rolls.some((r) => r.mods?.parts.length || r.mods?.modes.length)) return undefined;
-  const named = (x: { effectId: string; label: string }) => ({
-    effectId: x.effectId,
-    label: x.label,
-  });
+  const notes = rolls
+    .flatMap((r) => r.mods?.notes ?? [])
+    .filter((n) => n.length > 0)
+    .slice(0, ROLL_NOTES_MAX)
+    .map((n) => (n.length > ROLL_NOTE_MAX ? `${n.slice(0, ROLL_NOTE_MAX - 1)}…` : n));
+  const named = rolls.some(
+    (r) => r.mods?.parts.length || r.mods?.modes.length || r.mods?.offered?.length,
+  );
+  if (!named && notes.length === 0) return undefined;
   return {
+    ...(notes.length ? { notes } : {}),
     items: rolls.map((r) => ({
-      mods: (r.mods?.parts ?? []).map(named),
-      ...(r.mods?.modes.length ? { modes: r.mods.modes.map(named) } : {}),
+      mods: (r.mods?.parts ?? []).map(dmName),
+      ...(r.mods?.modes.length ? { modes: r.mods.modes.map(dmName) } : {}),
+      ...(r.mods?.offered?.length
+        ? { offered: r.mods.offered.map((o) => ({ triggerId: o.triggerId, label: o.label })) }
+        : {}),
     })),
   };
 }

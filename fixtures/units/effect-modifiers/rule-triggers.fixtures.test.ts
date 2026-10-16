@@ -69,8 +69,8 @@ describe("rule-trigger fixtures (MOD §13, R4 units)", () => {
       every: "turn",
       then: { do: "damage", formula: "1d6 + floor(level(barbarian) / 2)", type: "radiant" },
     });
-    // No built-in key and no subclass name anywhere (#209).
-    expect(JSON.stringify(db.select().from(ruleTrigger).all())).not.toMatch(/divine-fury|Zealot/);
+    // No built-in key in the data (#209; the subclass-name guard is trigger-presets.test.ts).
+    expect(JSON.stringify(db.select().from(ruleTrigger).all())).not.toContain("divine-fury");
     const ks = db.select().from(combatant).orderBy(asc(combatant.position)).all();
     expect(ks.map((c) => [c.name, c.initiative])).toEqual([
       ["Wolf", 18],

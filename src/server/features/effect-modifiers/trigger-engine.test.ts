@@ -5,18 +5,45 @@
 import { describe, expect, test } from "bun:test";
 import { AttackLogDmPayload, AttackLogPayload } from "@shared/combat-tracker/log-kinds";
 import type { DamageCardPayload, HpChangeRecord } from "@shared/combat-tracker/schemas";
-import type { RollEntryDmPayload, RollEntryPayload } from "@shared/dice-roll-log/schemas";
+import type {
+  ManualPart,
+  RollEntryDmPayload,
+  RollEntryPayload,
+} from "@shared/dice-roll-log/schemas";
+import type { RollSubject } from "@shared/effect-modifiers/schemas";
 import type { TriggerRule } from "@shared/effect-modifiers/triggers";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
+import { defineCommand } from "../../commands/commands";
 import { armCrashHook } from "../../commands/crash";
 import { gameLogEntry, hpChange, notification, roll, ruleTrigger } from "../../db/schema";
 import { getSheet } from "../character-sheet/sheet-rows";
 import { attackCommand } from "../combat-tracker/attack";
 import { applyCard } from "../combat-tracker/hp";
-import type { EvaluatedRoll } from "../dice-roll-log";
+import { dice, type EvaluatedRoll } from "../dice-roll-log";
 import type { OfferedPart } from "../dice-roll-log/roll-hooks";
 import { withCardOffers } from "./offers";
 import { type RtSetup, rtSetup } from "./trigger-testing";
+
+/** A stand-in damage roll with `manualParts` (R2's tray sends them on the real intents). */
+const physicalDamage = defineCommand({
+  name: "test.rtPhysicalDamage",
+  input: z.object({ subject: z.unknown(), manualParts: z.unknown().optional() }),
+  roles: ["dm", "player"],
+  execute(input, env) {
+    return dice.evaluate(env, {
+      expression: "1d12+4",
+      mode: "normal",
+      category: "damage",
+      label: "Greataxe damage",
+      actor: { kind: "entity", id: "x", name: "Brakka" },
+      source: "cbt",
+      subject: input.subject as RollSubject,
+      manual: { diceTotal: 8, dice: [8] },
+      ...(input.manualParts ? { manualParts: input.manualParts as ManualPart[] } : {}),
+    });
+  },
+});
 
 const entryOf = (t: RtSetup, rollId: string) =>
   t.s.db
@@ -244,6 +271,76 @@ describe("FR-MOD-37 card mode (R4)", () => {
     t.rollDamage("Thorn", 3);
     expect(t.card(cardId).damage?.triggers?.[0]).toMatchObject({ triggerId: sa });
     expect(t.card(cardId).damage?.triggers?.[0]?.untick).toBeUndefined();
+  });
+});
+
+describe("FR-MOD-37 tier 2 (after R1)", () => {
+  test("FR-MOD-37 Reckless (modes() pre-roll): a normal request rolls adv; the card stores advantage; Sneak Attack offered ticked", () => {
+    const t = rtSetup();
+    const sa = sneak(t);
+    t.nextTo("Thorn", 1);
+    t.apply({ targets: [{ characterId: t.thornId }], preset: { key: "reckless" } });
+    const { cardId } = t.s.commands.run(
+      attackCommand.name,
+      { attackerId: t.id("Thorn"), rolls: "toHit" },
+      { actor: t.p2 },
+    ) as { cardId: string };
+    expect(t.card(cardId).mode).toBe("advantage");
+    t.rollDamage("Thorn", 3, t.p2);
+    const part = t.card(cardId).damage?.triggers?.[0];
+    expect(part).toMatchObject({ triggerId: sa });
+    expect(part?.untick).toBeUndefined();
+  });
+
+  test("FR-MOD-43 a `roll` trigger's mode: its hint comes before the d20 (two d20s), named; a `turn` one spends its charge", () => {
+    const t = rtSetup();
+    t.nextTo("Brakka", 1);
+    const id = t.trig({
+      characterId: t.brakkaId,
+      name: "Feral Instinct",
+      rule: {
+        on: "roll",
+        when: [{ if: "roll", on: { roll: "attack", via: "weapon" } }],
+        every: "turn",
+        then: { do: "mode", mode: "advantage" },
+      },
+    });
+    const atk = () =>
+      t.roll(
+        { creature: { characterId: t.brakkaId }, roll: "attack", via: "weapon" },
+        { actorName: "Brakka" },
+      ).roll;
+    const first = atk();
+    expect([first.mode, first.dice.length]).toEqual(["advantage", 2]);
+    expect(first.mods?.modes.map((m) => [m.triggerId, m.label])).toEqual([[id, "Feral Instinct"]]);
+    expect(t.usesOf(id).map((u) => u.state)).toEqual(["used"]);
+    expect(atk().mode).toBe("normal");
+  });
+
+  test("FR-MOD-18 offered dice from a physical `t:` group (not auto); a surplus or bad group never conflicts", () => {
+    const t = raging();
+    const roll = (manualParts?: unknown) =>
+      t.s.commands.run(
+        physicalDamage.name,
+        {
+          subject: {
+            creature: { characterId: t.brakkaId },
+            roll: "damage",
+            via: "weapon",
+            card: true,
+          },
+          manualParts,
+        },
+        { actor: t.p1 },
+      ) as EvaluatedRoll;
+    t.s.commands.register(physicalDamage);
+    const r = roll([{ key: `t:${t.furyId}`, entry: { diceTotal: 4, dice: [4] } }]);
+    expect(r.mods?.offered?.[0]).toMatchObject({ value: 6, expression: "1d6+2", dice: [4] });
+    expect(r.mods?.offered?.[0]?.auto).toBeUndefined();
+    const bad = roll([{ key: `t:${t.furyId}`, entry: { diceTotal: 9, dice: [9] } }]);
+    expect(bad.mods?.offered?.[0]?.auto).toBe(true);
+    const none = roll();
+    expect(none.mods?.offered?.[0]?.auto).toBe(true);
   });
 });
 

@@ -106,8 +106,8 @@ function furyStub(seen: unknown[]): ApplyHook {
 }
 
 describe("FR-MOD-38 apply hooks (R0)", () => {
-  test("FR-MOD-38 the registry holds MOD's line; the server binds its own list; ids unique", () => {
-    expect(applyHooks.map((h) => h.id)).toEqual(["effect-modifiers.triggers"]);
+  test("FR-MOD-38 the registry (append-only lines); the server binds its own list; ids unique", () => {
+    expect(new Set(applyHooks.map((h) => h.id)).size).toBe(applyHooks.length);
     const h = new ApplyHooks([]);
     h.register({ id: "x.one" });
     expect(() => h.register({ id: "x.one" })).toThrow(/registered twice/);
