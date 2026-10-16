@@ -24,6 +24,7 @@ import {
   type Attack,
   type EntityRecord,
   kindRegistry,
+  type Senses,
   type StatBlock,
   withAttackIds,
 } from "@shared/entities/schemas";
@@ -142,6 +143,22 @@ function checkKeys(env: CommandEnv, c: EntityRecord, keys: SheetEditField[]) {
   }
 }
 
+export const SEES_INVISIBLE_DM_ONLY = "Only the DM can change Sees invisible";
+
+/**
+ * FR-CHARX-49 / -53: absent `seesInvisible` keeps the stored value; a player who changes it →
+ * `forbidden`. Stored only when true (absent = false).
+ */
+function mergeSenses(env: CommandEnv, c: EntityRecord, next: Senses): Senses {
+  const stored = c.statBlock.senses?.seesInvisible ?? false;
+  const seesInvisible = next.seesInvisible ?? stored;
+  if (env.actor.role === "player" && seesInvisible !== stored) {
+    throw forbidden(SEES_INVISIBLE_DM_ONLY);
+  }
+  const { seesInvisible: _given, ...rest } = next;
+  return seesInvisible ? { ...rest, seesInvisible } : rest;
+}
+
 export function charEditCommand(hooks: DefinitionHooks) {
   return defineCommand({
     name: CHARX_INTENTS.edit,
@@ -149,9 +166,10 @@ export function charEditCommand(hooks: DefinitionHooks) {
     roles: ["dm", "player"],
     execute(input, env): Record<string, never> {
       const { creature: c, sheet: sheetBefore } = editableCreature(env, input.creatureId);
-      const set = input.set as Required<{ [K in keyof CharEditSet]: unknown }>;
+      const set = { ...input.set } as Required<{ [K in keyof CharEditSet]: unknown }>;
       const keys = Object.keys(set) as SheetEditField[];
       checkKeys(env, c, keys);
+      if (input.set.senses) set.senses = mergeSenses(env, c, input.set.senses);
 
       // Merge into the committed stat block: present keys replace, null clears (FR-CHARX-15).
       const block: Record<string, unknown> = { ...c.statBlock };

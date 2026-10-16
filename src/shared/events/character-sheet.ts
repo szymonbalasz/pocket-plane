@@ -116,6 +116,7 @@ export const SHEET_EDIT_FIELDS = [
   "ownerPlayerId",
   "size",
   "portraitAssetId",
+  "senses",
 ] as const;
 export const SheetEditField = z.enum(SHEET_EDIT_FIELDS);
 export type SheetEditField = z.infer<typeof SheetEditField>;

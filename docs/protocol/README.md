@@ -1224,3 +1224,16 @@ From [fog-of-war](../specs/fog-of-war.md) v2 (FOG, `complete`; gate 1 #207, #208
 - **Benchmark** (`vision.bench.test.ts`, V0 exit gate, FOG §12; median ms): one polygon typical 0.14 / caps 0.55 (≤ 2 / ≤ 10); a move 0.88 / 6.80 (≤ 10 / ≤ 30); full-scene re-derive 2.91 / 21.07 (≤ 20 / ≤ 60); `vision` record at 4 sources ≤ 22,430 B (≤ 48 KiB). Caps = 2,000 segments within r 24, 100 fog + 20 darkness shapes, 200 tokens × 16 cells, 6 players × 4 sources.
 - **Events** (declared, logged, not undoable; commands in V1 / V2): `DarknessPlaced` / `DarknessMoved` / `DarknessRemoved` / `DarknessCleared` `{sceneId, editId, darknessId?}`, `FogExploredSet {sceneId, on}`, `ExploredForgotten {sceneId}`, `TokenInvisibleSet {sceneId, tokenId, invisible}`; `FogEditKind` gains the v2 kinds.
 - **CON-44** ([§11](#11-conflicts-log), #208), measured: data model §26.
+
+## 38. Sprint 3: sheet senses (V5)
+
+From [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) (CHARX sprint 3, FR-CHARX-49–53; #207, #210). **Built by `build/sheet-senses`** (V5, sheet lock): the `char.edit` key only; no record type, table or event. FOG's re-derive on a senses edit (FR-CHARX-52) is V2's definition-changed hook line. Data side: [data model §26](../data-model/README.md#26-sprint-3-vision-core-v0) (`entity.statBlock.senses`).
+
+| Piece | Contract |
+|---|---|
+| `char.edit {creatureId, set: {senses}}` | `senses` = the whole `Senses` object (strict; `@shared/entities/schemas`); not nullable. Added to `CharEditSet` and `SHEET_EDIT_FIELDS` (`src/shared/events/character-sheet.ts`). Who: as every `set` key (DM any character / custom NPC; owner unless locked; imported → `forbidden`; FR-CHARX-18) |
+| `seesInvisible` (FR-CHARX-53) | Absent = the stored value. A player whose value differs from the stored one → `forbidden` "Only the DM can change Sees invisible" (nothing written; the other keys alone pass). Stored only when true (false → key omitted) |
+| Event | One `CharacterSheetEdited {op: "set", fields: ["senses"]}`; same value → success, no event (FR-CHARX-15). Changes: the `entity` row (+ hook rows) |
+| Visibility | Unchanged (FR-CHARX-51): `senses` rides on the stat block, so DM + owner only; not on `RedactedCharacter`; tokens carry no copy (token hooks copy image + size only) |
+| Fixture | Unit `vision-senses` (`fixtures/units/character-sheet/`): one `char.edit {senses}` per character (Mira 30 / 0 / false; Thorn 0 / 60 / true). In no bundle until FOG's `vision` (V2) |
+

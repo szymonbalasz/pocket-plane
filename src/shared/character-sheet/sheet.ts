@@ -12,6 +12,7 @@ import {
   HitDie,
   Overrides,
   SaveProficiencies,
+  Senses,
   SHEET_FULL_MESSAGE,
   Size,
   Skills,
@@ -253,6 +254,8 @@ export const CharEditSet = z.strictObject({
   ownerPlayerId: Id.optional(),
   size: Size.optional(),
   portraitAssetId: Id.nullable().optional(),
+  /** FR-CHARX-49: whole object; absent `seesInvisible` = the stored value (FR-CHARX-53). */
+  senses: Senses.optional(),
 });
 export type CharEditSet = z.input<typeof CharEditSet>;
 
