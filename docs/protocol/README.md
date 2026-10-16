@@ -1374,9 +1374,35 @@ From [party-board](../specs/party-board.md) (PARTY, `complete`; gate 1 #207, #20
 | `loot-entry` (LOOT) | `kind` + `item`; `qty?` (1–9 999) on item rows only, absent otherwise. `LOOT_ENTRY_KINDS` / `LootEntryKind` in `@shared/events/party-loot` |
 | Fixtures | Units `handout-images` (2 SVGs), `handouts-1` (h1–h5, shares per PARTY §13), `party-items-1` (3 adds; P4 appends the Torch ×2 move to Thorn), `party-second`; bundle `party-board`. Patches only: no sheet field changes |
 
-## 45. Sprint 3: compendium core (C1)
+## 45. Sprint 3: freeform walls + wall hint (V4)
 
-From [compendium](../specs/compendium.md) (CMP, `complete`; gate 1 #207, #208, #209, #213; [ADR-0046](../architecture/adr/0046-compendium-scope.md)). **Built by `fix/cmp-core`**: the pipeline's per-kind stores and `updated` outcome, imported definitions updated in place with hooks, `cmp.import` / `cmp.importRecorded`, server-side homebrew `cmp.putEntry`, events. **No route and no WS intent yet** (C2–C4): compendium entries and sources are **not record types**, never on the WS (CON-44). Data side: [data model §32](../data-model/README.md#32-sprint-3-compendium-core-c1).
+From [scene-tools](../specs/scene-tools.md) (SCN §14 slice V4). **Built by `build/walls-freeform`** (canvas lock 2nd): client only on the wire side. No new intent, event, record type or field; it uses [§37](#37-sprint-3-vision-core-v0)'s decimal segments and `map.checkMove`. Data side: [data model §32](../data-model/README.md#32-sprint-3-freeform-walls--wall-hint-v4).
+
+| Use | Who | Wire | Rule |
+|---|---|---|---|
+| Freeform walls / doors | DM | `scn.addWalls` / `scn.addDoor` (§37 decimal segments) | A click with Ctrl held sends the pointer's point rounded to 0.01 cell; without Ctrl the nearest vertex. Either way a point within 8 screen px of an existing wall / door endpoint (or a point of the polyline in progress) is that endpoint, exactly (FR-SCN-08, OQ-SCN-24). Points < 0.05 cell from the previous one are dropped client-side (FR-SCN-07) |
+| Player wall hint | player | `map.checkMove {tokenId, col, row}` → `CheckMoveResult` | Sent while the player drags their token, once the previewed cell has held 50 ms, ≥ 100 ms apart (≤ 10 / s), newest cell wins; unmoved → none. Only `hints` with `guard = WALL_GUARD` (`"scene-tools.walls"`, `@shared/scene-tools/schemas`) are drawn. An ack for an older cell, an ended drag or from before a snapshot is dropped; a reject draws nothing (FR-SCN-38) |
+| DM drag hint | DM | none | Local `blockingSegments` on the DM's own structure row (FR-SCN-13); unchanged, drawn red |
+
+- **Leak:** the hint ack goes to its sender only; players still never receive walls (FR-SCN-14).
+- **Client** (canvas lock, no new Konva layer): `scn-structure` draws the player's pieces (`scn-wall-hint`, one Line per piece, attr `segment` = `"x1,y1,x2,y2"`) and the DM's crossed segments (`scn-wall-crossed`, attr `ns`; was `scn-through-wall-segments`); `scn-edit` draws the polyline's points (`scn-draft-point`, id = index, attr `free`; off-grid points are open dots) and `scn-edit-vertex` gains `free`. DOM: `scn-free-chip` (follows the cursor over the canvas while Ctrl is held in Wall / Door mode).
+- **Erase (BL-12):** a click on a door drawn over a wall erases the door first (doors win ties in the 8 px hit test).
+
+## 46. Sprint 3: effect modifiers tier 3 (R3)
+
+From [effect-modifiers](../specs/effect-modifiers.md) tier 3 (MOD, `complete`; FR-MOD-12, -26, -36, -41 seam). **Built by `build/mod-tier3`** (R3, sheet lock 2nd after V5). No new intent, event or record type. Data side: [data model §33](../data-model/README.md#33-sprint-3-effect-modifiers-tier-3-r3).
+
+| Piece | Contract |
+|---|---|
+| `mod.putPreset` `preset.usesFeatureId?` (FR-MOD-12) | ID \| null; character presets only (zod `invalid` "Uses on character presets only"). Absent on a replace = kept, on a create = null; null clears. A **new** value (≠ stored) must name a row of that character's `creature-sheet.features` with `usesMax`, else `invalid` "Pick a feature with uses" (issue path `preset.usesFeatureId`). A kept link is never re-checked (may be broken) |
+| `mod.putPreset` `preset.originKey?` (FR-MOD-36, as R0) | The sheet's "Start from ▸" sends the entry's built-in key on a create (a campaign preset entry: its own `originKey`); an edit omits it (kept) |
+| `mod.toggle` on (FR-MOD-12) | Linked row with uses → one use spent in the same transaction via CHARX `spendFeatureUse`; `EffectToggled.changes` = `effect`, `effect-preset`, **`creature-sheet`** (owner + DM per its visibility). `used = usesMax` → **`conflict` "No <feature name> uses left"**, nothing written. DM `force: true` → on, no spend (player `force` → `forbidden`, as built). Broken link (row deleted, `usesMax` cleared) → on without uses, no sheet change. Off never refunds; the owner toggles on a locked sheet too |
+| CHARX seam (`src/server/features/character-sheet/resources.ts`, OQ-MOD-32) | `spendFeatureUse(env, characterId, rowId)` → `{ok: true, name, before, after, change}` \| `{ok: false, reason: "missing"}` \| `{ok: false, reason: "none-left", name, max}`; `refundFeatureUse(env, characterId, rowId)` → `RecordChange \| null` (`used − 1`, clamped at 0; missing / no uses / 0 used → null). Both write through `env.tx` (`writeSheet`), open no transaction, emit no event (the caller's event lists the change) and don't authorise. R4 calls them from the apply / undo hook lines (FR-MOD-38, -41) |
+| Client (`mod.effects` Toggles, FR-MOD-26) | After the name "2 / 3" (`mod-toggle-uses`, `data-record-id` = preset id, `data-state` `ok`, `data-value` `left/max`); broken link "Uses link broken" (`data-state` `broken`); DM at 0 left and off: "Force on" (`mod-toggle-force`) sends `force: true`. Preset form (character presets): "Uses" Select `mod-preset-uses` (options `mod-preset-uses-option`, `data-value` = row id \| `none`) of the sheet's feature rows with uses. Pure `presetUses(preset, features)` / `hasUses` in `@shared/effect-modifiers/rules` |
+
+## 47. Sprint 3: compendium core (C1)
+
+From [compendium](../specs/compendium.md) (CMP, `complete`; gate 1 #207, #208, #209, #213; [ADR-0046](../architecture/adr/0046-compendium-scope.md)). **Built by `fix/cmp-core`**: the pipeline's per-kind stores and `updated` outcome, imported definitions updated in place with hooks, `cmp.import` / `cmp.importRecorded`, server-side homebrew `cmp.putEntry`, events. **No route and no WS intent yet** (C2–C4): compendium entries and sources are **not record types**, never on the WS (CON-44). Data side: [data model §34](../data-model/README.md#34-sprint-3-compendium-core-c1).
 
 | Piece | Contract |
 |---|---|

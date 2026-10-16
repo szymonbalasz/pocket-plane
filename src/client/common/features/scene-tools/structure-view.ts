@@ -5,6 +5,8 @@
 
 import {
   blockingSegments,
+  pxToVertex,
+  SEGMENT_MIN_LENGTH,
   segmentKey,
   type Vertex,
   vertexToPx,
@@ -88,7 +90,10 @@ export function distToSegment(
   return Math.hypot(p.x - (ax + t * dx), p.y - (ay + t * dy));
 }
 
-/** FR-SCN-08 Erase: the nearest wall or door within `tol` map px of `p`, or null. */
+/**
+ * FR-SCN-08 Erase: the nearest wall or door within `tol` map px of `p`, or null. On a tie the
+ * door wins, so a door drawn over a wall is erased before the wall under it (BL-12).
+ */
 export function hitSegment(
   s: StructureView,
   g: Grid,
@@ -97,8 +102,8 @@ export function hitSegment(
 ): number | null {
   let best: { n: number; d: number } | null = null;
   const all: [number, Segment][] = [
-    ...s.walls.map((w): [number, Segment] => [w[0], [w[1], w[2], w[3], w[4]]]),
     ...s.doors.map((d): [number, Segment] => [d.n, d.seg]),
+    ...s.walls.map((w): [number, Segment] => [w[0], [w[1], w[2], w[3], w[4]]]),
   ];
   for (const [n, seg] of all) {
     const d = distToSegment(p, segmentPx(g, seg));
@@ -131,12 +136,20 @@ export function segmentsInBox(s: StructureView, g: Grid, b: PxBox): number[] {
 
 // ---------- drawing (FR-SCN-08) ----------
 
-const sameVertex = (a: Vertex, b: Vertex) => a.x === b.x && a.y === b.y;
+/** FR-SCN-07: two points closer than 0.05 cell make no segment (exact on 1/100-cell points). */
+export function tooClose(a: Vertex, b: Vertex): boolean {
+  const dx = Math.round((b.x - a.x) * 100);
+  const dy = Math.round((b.y - a.y) * 100);
+  return dx * dx + dy * dy < (SEGMENT_MIN_LENGTH * 100) ** 2;
+}
 
-/** Adds a clicked vertex to a polyline: a repeat of the last one is ignored; ≤ 200 segments. */
+/**
+ * Adds a clicked point to a polyline: a repeat of the last one (or one < 0.05 cell from it) is
+ * ignored; ≤ 200 segments.
+ */
 export function addPoint(points: readonly Vertex[], v: Vertex): Vertex[] {
   const last = points.at(-1);
-  if (last && sameVertex(last, v)) return [...points];
+  if (last && tooClose(last, v)) return [...points];
   if (points.length > ADD_WALLS_MAX) return [...points];
   return [...points, v];
 }
@@ -148,7 +161,7 @@ export function polylineSegments(points: readonly Vertex[]): Segment[] {
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1] as Vertex;
     const b = points[i] as Vertex;
-    if (sameVertex(a, b)) continue;
+    if (tooClose(a, b)) continue;
     const seg: Segment = [a.x, a.y, b.x, b.y];
     const key = segmentKey(seg);
     if (seen.has(key)) continue;
@@ -156,6 +169,70 @@ export function polylineSegments(points: readonly Vertex[]): Segment[] {
     out.push(seg);
   }
   return out.slice(0, ADD_WALLS_MAX);
+}
+
+// ---------- freeform points and the endpoint magnet (FR-SCN-08, sprint 3) ----------
+
+/** FR-SCN-08 (#207, OQ-SCN-24): magnet radius around existing endpoints, screen px. */
+export const MAGNET_PX = 8;
+
+const round2 = (v: number) => Math.round(v * 100) / 100 + 0;
+
+/** FR-SCN-08 freeform: the map point in grid units, rounded to 0.01 cell. */
+export function freePoint(g: Grid, x: number, y: number): Vertex {
+  return {
+    x: round2((x - g.gridOffsetX) / g.gridCellSize),
+    y: round2((y - g.gridOffsetY) / g.gridCellSize),
+  };
+}
+
+/** A point off the grid's vertices (drawn as an open dot; `scn-draft-point` attr `free`). */
+export const isFreePoint = (v: Vertex): boolean => !Number.isInteger(v.x) || !Number.isInteger(v.y);
+
+/**
+ * FR-SCN-08 magnet: the existing wall or door endpoint (or a point of the polyline in progress)
+ * nearest the map point `p`, within `tol` map px; null if none. Never moves a segment.
+ */
+export function magnetPoint(
+  s: StructureView,
+  draft: readonly Vertex[],
+  g: Grid,
+  p: { x: number; y: number },
+  tol: number,
+): Vertex | null {
+  let best: { v: Vertex; d: number } | null = null;
+  const consider = (v: Vertex) => {
+    const q = vertexToPx(g, v);
+    const d = Math.hypot(q.x - p.x, q.y - p.y);
+    if (d <= tol && (!best || d < best.d)) best = { v, d };
+  };
+  for (const w of s.walls) {
+    consider({ x: w[1], y: w[2] });
+    consider({ x: w[3], y: w[4] });
+  }
+  for (const d of s.doors) {
+    consider({ x: d.seg[0], y: d.seg[1] });
+    consider({ x: d.seg[2], y: d.seg[3] });
+  }
+  for (const v of draft) consider(v);
+  const hit = best as { v: Vertex; d: number } | null;
+  return hit ? { x: hit.v.x, y: hit.v.y } : null;
+}
+
+/**
+ * FR-SCN-08: the point a Wall / Door click places. An endpoint within the magnet radius wins;
+ * else with Ctrl held the free point under the pointer (0.01 cell), else the nearest vertex.
+ */
+export function pickPoint(
+  s: StructureView,
+  draft: readonly Vertex[],
+  g: Grid,
+  p: { x: number; y: number; ctrl: boolean },
+  tol: number,
+): Vertex {
+  return (
+    magnetPoint(s, draft, g, p, tol) ?? (p.ctrl ? freePoint(g, p.x, p.y) : pxToVertex(g, p.x, p.y))
+  );
 }
 
 // ---------- doors (FR-SCN-09) ----------

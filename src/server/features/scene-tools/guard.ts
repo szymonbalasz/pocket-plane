@@ -5,7 +5,7 @@
 // parsed segments are cached by `(sceneId, rev)` (SCN §12), checked against the row's head.
 
 import { moveBlocked, wallHint } from "@shared/scene-tools/geometry";
-import type { Door, Wall } from "@shared/scene-tools/schemas";
+import { type Door, WALL_GUARD, type Wall } from "@shared/scene-tools/schemas";
 import { footprint } from "@shared/scenes-map/geometry";
 import { eq, sql } from "drizzle-orm";
 import { sceneStructure } from "../../db/schema";
@@ -56,7 +56,7 @@ export function guardSegments(
  * piece of the **first** crossed segment, ≤ 0.5 cell either side of the crossing (review A3).
  */
 export const scnWallGuard: MoveGuardRegistration = {
-  name: "scene-tools.walls",
+  name: WALL_GUARD,
   guard(env, token, from, to) {
     if (env.actor.role !== "player") return undefined;
     const s = guardSegments(env.read, token.sceneId);
