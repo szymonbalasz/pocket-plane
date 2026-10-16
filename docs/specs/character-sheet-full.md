@@ -1,9 +1,9 @@
 ---
 title: Character sheet (full)
 prefix: CHARX
-status: complete
-owner: spec-character-sheet-full
-phase: post-mvp-1
+status: claimed
+owner: spec-vision
+phase: post-mvp-3
 ---
 
 # Character sheet (full)

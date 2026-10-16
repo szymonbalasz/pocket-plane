@@ -1,9 +1,9 @@
 ---
 title: Fog of war
 prefix: FOG
-status: complete
-owner: spec-fog-of-war
-phase: post-mvp-2
+status: claimed
+owner: spec-vision
+phase: post-mvp-3
 ---
 
 # Fog of war
