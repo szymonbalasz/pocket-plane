@@ -41,10 +41,10 @@ describe("FR-MOD-05 built-in presets", () => {
       "guidance",
       "resistance",
     ]);
-    expect(builtinPreset("rage")?.modifiers).toEqual([
+    expect(t1.find((p) => p.key === "rage")?.modifiers).toEqual([
       { kind: "flat", on: { roll: "damage", via: "weapon" }, value: 2 },
     ]);
-    expect(builtinPreset("shield-of-faith")).toBeUndefined();
+    expect(t1.find((p) => p.key === "shield-of-faith")).toBeUndefined();
     // Every shipped part is a valid stored modifier at the built tier.
     for (const p of t1)
       for (const m of p.modifiers) expect(Modifier.safeParse(m).success).toBe(true);
@@ -54,6 +54,27 @@ describe("FR-MOD-05 built-in presets", () => {
     const t2 = builtinPresets(2);
     expect(t2).toHaveLength(BUILTIN_PRESET_KEYS.length);
     expect(t2.find((p) => p.key === "rage")?.modifiers).toHaveLength(4);
+  });
+
+  test("FR-MOD-05 this build ships tier 2: Rage adv STR + resistances, Shield of Faith +2 AC, Reckless, Dodge", () => {
+    expect(builtinPresets()).toEqual(builtinPresets(2));
+    expect(builtinPreset("rage")?.modifiers).toEqual([
+      { kind: "flat", on: { roll: "damage", via: "weapon" }, value: 2 },
+      { kind: "mode", on: { roll: "check", abilities: ["str"] }, mode: "advantage" },
+      { kind: "mode", on: { roll: "save", abilities: ["str"] }, mode: "advantage" },
+      { kind: "defense", types: ["bludgeoning", "piercing", "slashing"], level: "resistance" },
+    ]);
+    expect(builtinPreset("shield-of-faith")?.modifiers).toEqual([
+      { kind: "flat", on: { roll: "ac" }, value: 2 },
+    ]);
+    expect(builtinPreset("reckless")?.modifiers).toEqual([
+      { kind: "mode", on: { roll: "attack", via: "weapon" }, mode: "advantage" },
+    ]);
+    expect(builtinPreset("dodge")?.modifiers).toEqual([
+      { kind: "mode", on: { roll: "save", abilities: ["dex"] }, mode: "advantage" },
+    ]);
+    for (const p of builtinPresets())
+      for (const m of p.modifiers) expect(Modifier.safeParse(m).success).toBe(true);
   });
 });
 
@@ -217,6 +238,9 @@ describe("FR-MOD-06 preset list", () => {
       ["builtin", "hunters-mark", null],
       ["builtin", "guidance", null],
       ["builtin", "resistance", null],
+      ["builtin", "shield-of-faith", null],
+      ["builtin", "reckless", null],
+      ["builtin", "dodge", null],
       ["campaign", null, "cursed"],
     ]);
   });
@@ -235,9 +259,10 @@ describe("FR-MOD-01 intent bounds", () => {
     expect(PresetInput.safeParse({ ...base, modifiers: [] }).success).toBe(false);
     expect(PresetInput.safeParse({ ...base, modifiers: Array(7).fill(bless) }).success).toBe(false);
     const mode = { kind: "mode", on: { roll: "check" }, mode: "advantage" };
-    expect(PresetInput.safeParse({ ...base, modifiers: [mode] }).success).toBe(false);
+    // Tier 2 built (R1): mode and AC parts are preset modifiers.
+    expect(PresetInput.safeParse({ ...base, modifiers: [mode] }).success).toBe(true);
     const ac = { kind: "flat", on: { roll: "ac" }, value: 2 };
-    expect(PresetInput.safeParse({ ...base, modifiers: [ac] }).success).toBe(false);
+    expect(PresetInput.safeParse({ ...base, modifiers: [ac] }).success).toBe(true);
     expect(PresetInput.safeParse({ ...base, key: "bless" }).success).toBe(true);
     expect(PresetInput.safeParse({ ...base, key: "bless", characterId: "x" }).success).toBe(false);
     expect(PresetInput.safeParse({ ...base, key: "fireball" }).success).toBe(false);

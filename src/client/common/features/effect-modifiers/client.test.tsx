@@ -26,7 +26,10 @@ describe("FR-MOD-26 modifiers in words", () => {
     expect(modifiersText(builtinPreset("bane")?.modifiers)).toBe(
       "−1d4 attack rolls, saving throws",
     );
-    expect(modifiersText(rage)).toBe("+2 weapon damage");
+    expect(modifiersText(rage)).toBe(
+      "+2 weapon damage; adv STR checks, STR saving throws; resistance bludgeoning, piercing, slashing",
+    );
+    expect(modifiersText(builtinPreset("shield-of-faith")?.modifiers)).toBe("+2 AC");
     expect(
       modifierText({
         kind: "dice",
@@ -61,6 +64,25 @@ describe("MOD §7 editor drafts", () => {
       on: { roll: "initiative" },
       dice: "1d4",
       sign: 1,
+    });
+    // Tier 2 (R1): mode, defense, AC round-trip; defense needs a type, types in canonical order.
+    for (const k of ["shield-of-faith", "reckless", "dodge"]) {
+      for (const m of builtinPreset(k)?.modifiers ?? []) expect(modifierOf(draftOf(m))).toEqual(m);
+    }
+    expect(modifierOf({ ...d, kind: "defense", types: [] })).toBeNull();
+    expect(
+      modifierOf({ ...d, kind: "defense", level: "immunity", types: ["fire", "acid"] }),
+    ).toEqual({ kind: "defense", types: ["acid", "fire"], level: "immunity" });
+    expect(modifierOf({ ...d, kind: "ac", value: "+3", roll: "check" })).toEqual({
+      kind: "flat",
+      on: { roll: "ac" },
+      value: 3,
+    });
+    expect(modifierOf({ ...d, kind: "ac", value: "0" })).toBeNull();
+    expect(modifierOf({ ...d, kind: "mode", mode: "disadvantage", roll: "save" })).toEqual({
+      kind: "mode",
+      on: { roll: "save" },
+      mode: "disadvantage",
     });
     expect(modifiersOf([], 1)).toBeNull();
     expect(modifiersOf([], 0)).toEqual([]);
