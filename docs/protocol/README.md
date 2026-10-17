@@ -1840,7 +1840,8 @@ From [effect-modifiers](../specs/effect-modifiers.md) sprint 4 (MOD §6.5, §14.
 | Schema | Change | Source |
 |---|---|---|
 | `Attack` (`@shared/entities/schemas`, both kinds, `char.putRow` attacks, `PUT /api/entities`) | + `bonus?` int 0–3; + `extraDamage?` ≤ 2 × `{damage: NdM[+K] (N 1–6, M 4/6/8/10/12, K 0–10), type: DamageType}` (type required) | FR-CHARX-54 |
-| `FeatureRow.used` (`@shared/character-sheet/sheet`, also `char.putRow` features) | 0 … `usesMax + 9` (`FEATURE_OVERSPEND_MAX`; uses left down to −9); no `usesMax` → 0. Commands still clamp at the max until S4-2 | FR-CHARX-58 |
+| `FeatureRow.used` (`@shared/character-sheet/sheet`, also `char.putRow` features) | 0 … `usesMax + 9` (`FEATURE_OVERSPEND_MAX`; uses left down to −9); no `usesMax` → 0 | FR-CHARX-58 |
+| `char.useResource {feature}` *(built, S4-2)* | `used = clamp(used + delta, 0, usesMax + 9)` (`counterOf(…).cap`, `featureUsedCap`); at the floor no change, no event; Reset → 0; `char.putRow` lowering `usesMax` clamps `used` to the new `usesMax + 9`. `{slot}` / `{hitDie}` unchanged (0 … max). No new field: the sheet's pips ask before spending past zero (client only) | FR-CHARX-58 |
 | `CardDamage` (damage card) | + `extra?` ≤ 2 `CardExtraPart {type, rollId, dice ≤ 12 [value, kept], constant, total, manual}`, attack-row order, not in the base part's `total` | FR-CBT-81 |
 | `cbt.applyCard` | + `extraTotals?` ≤ 2 int 0–999 (absent = rolled); `targets[].extraMultipliers?` ≤ 2 (absent = the row's `multiplier`); more than the card's extra parts → `invalid` (S4-1b) | FR-CBT-82 |
 | `AttackLogPayload` (`cbt.attack`) | + `damageParts?` ≤ 2 `{type, value, multiplier? (not normal)}` (inside `damage`) | FR-CBT-84 |
@@ -1849,7 +1850,9 @@ From [effect-modifiers](../specs/effect-modifiers.md) sprint 4 (MOD §6.5, §14.
 
 - **Line dice (S4-5, seams S8 / rulings B5, B9):** `formatLine` emits one `die {faces, value, kept: true, offered?, label}` segment per part die, built only from `payload` (players) / `dmPayload` (DM): a landed trigger part's dice after its name, `label` = its name (" + 6 radiant (Divine Fury) (1d6+2: 4 + 2)"); a weapon extra part's on the DM's line only, `label` "‹attack› ‹type›"; the damage roll line's offered parts `offered: true`, `label` "‹name› (on a hit)"; roll-hook parts with per-die values after their name. A part of one die with no constant whose value is that die (Bless `1d4`) draws its chip in place of its number (text unchanged). A part players read as "(DM)" never shows dice. Helpers: `modSegments`, `partDiceView` (`@shared/effect-modifiers/line.ts`), `rollOfferSegments`, `linePartSegments` (`combat-parts.ts`). No wire change beyond the rows above; old lines render as before.
 | `HpChangeRecord` (`hp-change`, DM only) | + `damageParts` ≤ 2 `{type, rolled, total 0–999, multiplier, raw}` \| null | FR-CBT-84 |
-| `mod.toggle` | + `overspend?: true` (read from S4-2) | FR-MOD-59 |
+| `mod.toggle` | + `overspend?: true` *(built, S4-2)*: linked row at 0 left → one use spent below zero (owner or DM); without it `conflict` "No ‹feature› uses left"; at the floor `conflict` "‹feature› is at −9 / ‹max› — reset it first" (with or without it). `force` (DM) still spends nothing | FR-MOD-59 |
+| `cbt.applyCard` `targets[].triggers[].force` on a `feature` trigger *(built, S4-2)* | at 0 left: Force **spends** the use below zero (`trigger_use.forced` true, `featureId` set, so undo refunds exactly it, −1 → 0); at the floor `conflict` "‹part›: ‹feature› is at −9 / ‹max› — reset it first" (issue path `["triggers", triggerId]`) even with Force. Window charges unchanged (forced spends nothing) | FR-MOD-59 |
+| CHARX internal `spendFeatureUse(env, characterId, rowId, {overspend?})` *(built, S4-2)* | → `ok` \| `missing` \| `none-left` (0 left, no `overspend`) \| `floor` (−9), refusals carry `{name, max, left}`; `refundFeatureUse` gives one back from below zero too | FR-CHARX-58, FR-MOD-61 |
 
 **Registries** (append-only, [AGENTS §9.9](../../AGENTS.md#99-shared-files); created **empty** by `fix/rules4-core`)
 

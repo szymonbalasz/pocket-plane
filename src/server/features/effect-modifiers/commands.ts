@@ -2,7 +2,9 @@
 // own character presets while unlocked), `mod.apply`, `mod.setModifiers` (DM), `mod.toggle`
 // (DM; owner). Effects go through CBTX's internal helpers (limits, insert, soft end, cards), so
 // every CBTX rule moves them and the effect hooks run (FR-CBTX-51). Tier 3: a toggle on spends a feature use through CHARX's
-// `spendFeatureUse` (FR-MOD-12). One transaction per command (FR-MOD-30); nothing in memory.
+// `spendFeatureUse` (FR-MOD-12); with `overspend` below zero, to the floor (FR-MOD-59). One
+// transaction per command (FR-MOD-30); nothing in memory.
+import { leftText } from "@shared/character-sheet/counters";
 import { endsRoundOf } from "@shared/combat-extras/rules";
 import type { CombatantRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
 import {
@@ -404,7 +406,10 @@ export const togglePreset = defineCommand({
     // Already in the asked state → success, no event.
     if (on === input.on) return { effectId: on ? preset.activeEffectId : null };
     return input.on
-      ? toggleOnCmd(env, character, preset, input.force === true)
+      ? toggleOnCmd(env, character, preset, {
+          force: input.force === true,
+          overspend: input.overspend === true,
+        })
       : toggleOffCmd(env, character, preset);
   },
 });
@@ -419,14 +424,24 @@ function setActive(env: Env, p: EffectPresetRecord, activeEffectId: string | nul
 }
 
 /**
- * FR-MOD-12: a linked feature use is spent in this transaction; none left → `conflict`; `force`
- * (DM) → on without spending; a broken link (row deleted, `usesMax` cleared) → on without uses.
+ * FR-MOD-12: a linked feature use is spent in this transaction; none left → `conflict` unless the
+ * sender confirmed an `overspend` (FR-MOD-59: below zero, to the floor; at the floor `conflict`);
+ * `force` (DM) → on without spending; a broken link (row deleted, `usesMax` cleared) → on without
+ * uses.
  */
-function spendUse(env: Env, c: CharacterRecord, p: EffectPresetRecord, force: boolean) {
-  if (p.usesFeatureId === null || force) return null;
-  const spent = spendFeatureUse(env, c.id, p.usesFeatureId);
+function spendUse(
+  env: Env,
+  c: CharacterRecord,
+  p: EffectPresetRecord,
+  opts: { force: boolean; overspend: boolean },
+) {
+  if (p.usesFeatureId === null || opts.force) return null;
+  const spent = spendFeatureUse(env, c.id, p.usesFeatureId, { overspend: opts.overspend });
   if (spent.ok) return spent.change;
   if (spent.reason === "none-left") throw conflict(`No ${spent.name} uses left`);
+  if (spent.reason === "floor") {
+    throw conflict(`${spent.name} is at ${leftText(spent.left)} / ${spent.max} — reset it first`);
+  }
   return null;
 }
 
@@ -434,14 +449,14 @@ function toggleOnCmd(
   env: Env,
   c: CharacterRecord,
   p: EffectPresetRecord,
-  force: boolean,
+  opts: { force: boolean; overspend: boolean },
 ): ToggleResult {
   const cid = campaignOf(env);
   const enc = startedEncounter(env.tx, cid);
   const t: Target = { kind: "character", character: c, name: c.name };
   const cols = targetColumns(t);
   checkLimits(env, cols, 1);
-  const sheet = spendUse(env, c, p, force);
+  const sheet = spendUse(env, c, p, opts);
   const e = insertEffect(env, {
     kind: "custom",
     condition: null,

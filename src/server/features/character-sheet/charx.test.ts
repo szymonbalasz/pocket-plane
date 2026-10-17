@@ -394,7 +394,7 @@ describe("FR-CHARX-16 rows", () => {
     expect(t.events).toHaveLength(1);
   });
 
-  test("FR-CHARX-16 feature used is a counter: kept on replace, clamped to new uses", () => {
+  test("FR-CHARX-16 feature used is a counter: kept on replace, clamped to new uses + 9 (FR-CHARX-58)", () => {
     const t = setup();
     const f = t.run<{ rowId: string }>(I.putRow, {
       creatureId: t.t.miraId,
@@ -408,7 +408,8 @@ describe("FR-CHARX-16 rows", () => {
       list: "features",
       row: { id: f, name: "Rage", usesMax: 2, used: 0 },
     });
-    expect(t.sheet(t.t.miraId)?.features[0]).toMatchObject({ usesMax: 2, used: 2 });
+    // FR-CHARX-58: lowering the uses keeps the count (−1 / 2 left), within `usesMax + 9`.
+    expect(t.sheet(t.t.miraId)?.features[0]).toMatchObject({ usesMax: 2, used: 3 });
   });
 
   test("FR-CHARX-16 deleteRow / moveRow: clamped index; unknown → not_found", () => {

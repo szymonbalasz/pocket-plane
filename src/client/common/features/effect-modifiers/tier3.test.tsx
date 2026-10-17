@@ -110,3 +110,25 @@ describe("FR-MOD-12 uses left", () => {
     }
   });
 });
+
+describe("FR-MOD-59 Toggles below zero", () => {
+  test("FR-MOD-59 Toggles: 'Rage −1 / 3' in hp.down with the '−1' Badge for owner and DM; DM Force on below zero too; presetUses keeps the negative", () => {
+    expect(presetUses({ usesFeatureId: "f-rage" }, [{ ...RAGE_ROW, used: 4 }])).toMatchObject({
+      left: -1,
+      max: 3,
+    });
+    for (const role of ["player", "dm"] as const) {
+      const html = render({ role, used: 4 });
+      expect(html).toMatch(
+        /data-testid="mod-toggle-uses" data-record-id="rage" data-state="ok" data-value="-1\/3" class="text-hp-down"/,
+      );
+      expect(html).toContain("−1 / 3");
+      expect(html).toMatch(/data-testid="mod-toggle-overspent"[^>]*>−1</);
+    }
+    expect(render({ role: "dm", used: 4 })).toContain('data-testid="mod-toggle-force"');
+    // At 0 and above: no Badge, muted count.
+    const zero = render({ role: "player", used: 3 });
+    expect(zero).not.toContain('data-testid="mod-toggle-overspent"');
+    expect(zero).toContain('data-value="0/3" class="text-muted-foreground"');
+  });
+});
