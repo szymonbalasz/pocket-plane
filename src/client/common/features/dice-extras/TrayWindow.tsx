@@ -66,6 +66,7 @@ import {
   constantOfTerms,
   notationOf,
   PALETTE,
+  paletteRequest,
   previewMode,
   removeDie,
   setConstant,
@@ -453,12 +454,15 @@ export function TrayWindow() {
     };
     diceExtras.api.setState({ request: { ...base, ...patch }, result: null });
   };
-  const setTerms = (terms: ReturnType<typeof addDie>) => {
+  const setTerms = (terms: ReturnType<typeof addDie>, fresh = false) => {
     const expression = notationOf(terms);
     lastValid.current = terms;
     setDraft(expression);
     setError(null);
-    update({ expression });
+    if (!fresh) return update({ expression });
+    // BL-18: a new roll after a result carries nothing of the old request.
+    const next = paletteRequest(free, expression, mode, true);
+    diceExtras.api.setState({ request: { kind: "free", ...next }, result: null });
   };
 
   // One RollControl for the staged request: `control` options verbatim (FR-DICEX-08 a) with the
@@ -625,9 +629,9 @@ export function TrayWindow() {
               className="h-7 px-2 font-mono text-xs"
               onClick={() => {
                 // After a result the palette starts a new roll; else it adds to the request.
-                const from = free && state !== "result" ? terms : [];
+                const fresh = state === "result" || !free;
                 diceExtras.api.setState({ result: null });
-                setTerms(addDie(from, f));
+                setTerms(addDie(fresh ? [] : terms, f), fresh);
               }}
             >
               d{f}

@@ -3,6 +3,7 @@ import { toNotation } from "@shared/dice-roll-log/grammar";
 import {
   addDie,
   chipsOf,
+  paletteRequest,
   previewMode,
   removeDie,
   setConstant,
@@ -89,5 +90,35 @@ describe("FR-DICEX-17 throw zone", () => {
     const win = { x: 100, y: 100, w: 300, h: 300 };
     expect(throwZone({ x: 0, y: 0, w: 1000, h: 800 }, [win])).toBeNull();
     expect(throwZone({ x: 400, y: 0, w: 600, h: 800 }, [win])).not.toBeNull();
+  });
+});
+
+describe("BL-18 palette after a result", () => {
+  const notation = {
+    expression: "1d12+5",
+    mode: "normal" as const,
+    category: "skill" as const,
+    label: "Notation test",
+    actor: { combatantId: "c1" },
+  };
+
+  test("FR-DICEX-04 BL-18 a fresh palette roll after a result keeps no label, actor or category", () => {
+    expect(paletteRequest(notation, "1d6", "normal", true)).toEqual({
+      expression: "1d6",
+      mode: "normal",
+      category: "other",
+    });
+  });
+
+  test("FR-DICEX-04 adding to a staged request keeps its label", () => {
+    expect(paletteRequest(notation, "1d12+1d6+5", "normal", false)).toEqual({
+      ...notation,
+      expression: "1d12+1d6+5",
+    });
+    expect(paletteRequest(null, "1d4", "advantage", false)).toEqual({
+      expression: "1d4",
+      mode: "advantage",
+      category: "other",
+    });
   });
 });
