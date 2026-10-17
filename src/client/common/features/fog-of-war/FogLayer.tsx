@@ -13,6 +13,7 @@
 // `visible`, `plain-map.ts`); the View-as pick and its rows stay loaded meanwhile. Sight preview
 // while dragging (FR-FOG-54, `sight-preview.ts`): the drawn `vision` takes the dragged source's
 // previewed polygons; the `fog-vision` marker then carries them and attr `preview` (token ids).
+// The brush's stroke drafts and cursor: `BrushNodes.tsx` (FR-FOG-55).
 // Party vision (FR-FOG-21 / -50 / -51, V10, `party-view.ts`): a player draws the union of every
 // `vision` record of the scene it holds, each with its owner's previews; the DM's View as P does
 // the same while party vision is on, View as Party always (with every player's memory). The
@@ -29,10 +30,12 @@ import { useStore } from "zustand";
 import { IntentRejected } from "../../sync/connection";
 import { useSignal, useSync } from "../../sync/store";
 import { useAssetImage } from "../assets-pipeline/useAssetImage";
+import { diagonalRuleIn } from "../scene-tools/diagonal-rule";
 import { useCanvas } from "../scenes-map/canvas-context";
 import { toastReject } from "../scenes-map/intents";
 import type { CanvasClient } from "../scenes-map/layers";
 import { useLayerToggles } from "../scenes-map/tool-store";
+import { BrushNodes } from "./BrushNodes";
 import { type FogDraft, type GestureState, radiusLabel } from "./gesture";
 import { greyCopy } from "./grey-map";
 import { partyView, unionMemoryRuns } from "./party-view";
@@ -94,7 +97,13 @@ function paintsFor(client: CanvasClient): ViewPaints {
   };
 }
 
-function Draft({ draft, pending }: { draft: FogDraft; pending: boolean }) {
+function Draft({
+  draft,
+  pending,
+}: {
+  draft: Exclude<FogDraft, { kind: "brush" }>;
+  pending: boolean;
+}) {
   const { grid, cam, colors } = useCanvas();
   const cs = grid.gridCellSize;
   const X = (i: number) => grid.gridOffsetX + i * cs;
@@ -423,7 +432,11 @@ export function FogLayer() {
   const records = useRef(store.records);
   records.current = store.records;
   useEffect(() => {
-    if (client === "dm") setFogReader((id) => fogRecordOf(records.current, id));
+    if (client === "dm")
+      setFogReader(
+        (id) => fogRecordOf(records.current, id),
+        () => diagonalRuleIn(records.current),
+      );
   }, [client]);
   const gesture = useFogTool((s) => s.gesture);
   const toolOn = client === "dm" && activeTool?.id === FOG_TOOL_ID;
@@ -487,7 +500,10 @@ export function FogLayer() {
           )}
         </Group>
       )}
-      {drafting && gesture.draft && <Draft draft={gesture.draft} pending={gesture.pending} />}
+      {drafting && gesture.draft && gesture.draft.kind !== "brush" && (
+        <Draft draft={gesture.draft} pending={gesture.pending} />
+      )}
+      {toolOn && <BrushNodes gesture={gesture} />}
       {/* FOG §7 markers (draw nothing): the viewer's vision and explored memory. */}
       {marker && <Shape name="fog-vision" player={viewer} {...marker} sceneFunc={noDraw} />}
       {viewer !== null && <GreyMarker player={viewer} on={greyOn} />}

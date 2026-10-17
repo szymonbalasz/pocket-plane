@@ -31,6 +31,7 @@ import sceneToolsProps from "./scene-tools-props";
 import scenes from "./scenes";
 import sessionSim from "./session-sim";
 import sessionSim7 from "./session-sim-7";
+import sessionSim8 from "./session-sim-8";
 import syncProbe from "./sync-probe";
 import tokenArtUpdate from "./token-art-update";
 import usesNegative from "./uses-negative";
@@ -74,4 +75,5 @@ export const bundles: readonly Bundle[] = [
   physicalDiceCombat,
   tokenArtUpdate,
   usesNegative,
+  sessionSim8,
 ];

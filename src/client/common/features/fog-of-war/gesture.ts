@@ -9,21 +9,27 @@
 // - Darkness mode: a press on a darkness shape selects it and drags it (whole cells, free with
 //   Ctrl) → move on release; Delete / Backspace removes the selected one; drawing starts only on
 //   empty space.
+// - Brush (sprint 4, FR-FOG-55; `brush.ts`): the press starts a stroke (free iff Ctrl is held at
+//   the press), moves paint it, release sends it; strokes completed mid-drag are sent at once.
+//   Sent strokes stay drawn (`strokes`) until their event or reject; a new one may start meanwhile.
 // A sent shape / move stays drawn (`pending`) until its event or reject. DOM-free (`bun test`).
 import { FOG_VERTICES_MAX, FOG_VERTICES_MIN } from "@shared/fog-of-war/schemas";
 import {
   CIRCLE_R_MAX,
   CIRCLE_R_MIN,
   type DarknessShape,
+  type FogBrushGeom,
   type FogShapeGeom,
   type ShapeLike,
   shapeContains,
   shapeProblem,
 } from "@shared/fog-of-war/shapes";
+import type { DiagonalRule } from "@shared/scene-tools/schemas";
 import { isClick } from "../scenes-map/selection-logic";
 import type { ToolCancelReason } from "../scenes-map/tools";
+import { BRUSH_FT, type BrushDraft, brushShape, extendBrush, startBrush } from "./brush";
 
-export type FogShapeMode = "rect" | "polygon" | "circle";
+export type FogShapeMode = "rect" | "polygon" | "circle" | "brush";
 /** A point in grid units. */
 export type Pt = readonly [number, number];
 export interface Cell {
@@ -59,7 +65,7 @@ export interface PolygonDraft {
   /** The point under the pointer: the rubber-band edge from the last vertex. */
   hover: Pt | null;
 }
-export type FogDraft = RectDraft | CircleDraft | PolygonDraft;
+export type FogDraft = RectDraft | CircleDraft | PolygonDraft | BrushDraft;
 
 /** FR-FOG-42: a darkness shape being dragged (offset in grid units). */
 export interface DarknessMove {
@@ -83,6 +89,8 @@ export interface GestureState {
   move: DarknessMove | null;
   /** Ctrl held on the latest event (the "Free" chip, FOG §7). */
   free: boolean;
+  /** FR-FOG-55: brush strokes sent and awaiting their event or reject (drawn meanwhile). */
+  strokes: readonly BrushDraft[];
 }
 
 export const idleGesture: GestureState = {
@@ -93,6 +101,7 @@ export const idleGesture: GestureState = {
   selected: null,
   move: null,
   free: false,
+  strokes: [],
 };
 
 /** What a stage pointer event gives the gesture (from a `ToolPointer`). */
@@ -110,6 +119,8 @@ export interface GesturePoint {
 export interface GestureMode {
   shape: FogShapeMode;
   darkness: readonly DarknessShape[] | null;
+  /** FR-FOG-55: the brush radius (ft) and the campaign's diagonal rule (default 10 ft, 5/10/5). */
+  brush?: { ft: number; rule: DiagonalRule };
 }
 
 export type GestureHint = "crossing" | "zero-area" | "max";
@@ -125,7 +136,9 @@ export const GESTURE_HINTS: Record<GestureHint, string> = {
 export type GestureSend =
   | { kind: "shape"; shape: FogShapeGeom }
   | { kind: "move"; id: string; dx: number; dy: number }
-  | { kind: "remove"; id: string };
+  | { kind: "remove"; id: string }
+  /** FR-FOG-55: brush strokes, each one `fog.edit`, settled by its draft. */
+  | { kind: "brush"; strokes: { draft: BrushDraft; shape: FogBrushGeom }[] };
 
 export interface GestureStep {
   state: GestureState;
@@ -154,8 +167,8 @@ export function radiusLabel(r: number, free: boolean): string {
   return free ? `≈ ${ft} ft` : `${ft} ft`;
 }
 
-/** The shape a draft sends. */
-export function draftShape(d: FogDraft): FogShapeGeom {
+/** The shape a draft sends (not a brush stroke: `brushShape`). */
+export function draftShape(d: RectDraft | CircleDraft | PolygonDraft): FogShapeGeom {
   if (d.kind === "rect") return { rect: [d.a[0], d.a[1], d.b[0], d.b[1]] };
   if (d.kind === "circle") return { circle: [d.c[0], d.c[1], d.r] };
   return { polygon: d.points.flatMap((v) => [v.p[0], v.p[1]]) };
@@ -296,6 +309,11 @@ export function gestureDown(s: GestureState, m: GestureMode, p: GesturePoint): G
     }
   }
   const next = { ...base, selected: null };
+  if (m.shape === "brush") {
+    const { ft, rule } = m.brush ?? { ft: BRUSH_FT.default, rule: "5-10-5" };
+    const draft = startBrush(p.at, ft, p.ctrl, rule);
+    return { state: { ...next, draft, pending: false } };
+  }
   if (m.shape === "rect") {
     const a = snap(p.at, p.ctrl);
     return { state: { ...next, draft: { kind: "rect", a, b: a, free: p.ctrl }, pending: false } };
@@ -321,6 +339,11 @@ export function gestureMove(s: GestureState, m: GestureMode, p: GesturePoint): G
   }
   const d = s.draft;
   if (!d || s.pending) return { state: st };
+  if (d.kind === "brush" && s.press) {
+    const { draft, sent } = extendBrush(d, p.at);
+    if (draft === d) return { state: st };
+    return sendStrokes({ ...st, draft }, sent);
+  }
   if (d.kind === "rect" && s.press && m.shape === "rect") {
     const b = snap(p.at, free);
     if (same(b, d.b) && d.free === free) return { state: st };
@@ -339,6 +362,19 @@ export function gestureMove(s: GestureState, m: GestureMode, p: GesturePoint): G
   return { state: st };
 }
 
+/** Moves completed brush strokes to `strokes` and sends them (empty ones are dropped). */
+function sendStrokes(s: GestureState, done: readonly BrushDraft[]): GestureStep {
+  const strokes = done.flatMap((draft) => {
+    const shape = brushShape(draft);
+    return shape ? [{ draft, shape }] : [];
+  });
+  if (strokes.length === 0) return { state: s };
+  return {
+    state: { ...s, strokes: [...s.strokes, ...strokes.map((x) => x.draft)] },
+    send: { kind: "brush", strokes },
+  };
+}
+
 /** Release of a press this tool received. */
 export function gestureUp(s: GestureState, m: GestureMode, p: GesturePoint): GestureStep {
   const press = s.press;
@@ -354,6 +390,7 @@ export function gestureUp(s: GestureState, m: GestureMode, p: GesturePoint): Ges
     };
   }
   const d = s.draft;
+  if (d?.kind === "brush") return sendStrokes({ ...released, draft: null }, [d]);
   if (m.shape === "rect" && d?.kind === "rect" && !s.pending) {
     let draft: RectDraft = click
       ? cellRect(press.cell)
@@ -419,6 +456,7 @@ export function gestureCancel(
   if (!dropped) return { state: s, dropped };
   const kept = {
     ...idleGesture,
+    strokes: s.strokes,
     ...(s.pending ? { draft: s.draft, pending: true } : {}),
     ...(s.move?.pending ? { move: s.move } : {}),
   };
@@ -435,6 +473,9 @@ export function gestureSettled(
 ): GestureState {
   if (sent !== null && "id" in sent) {
     return s.move === sent ? { ...s, move: null } : s;
+  }
+  if (sent?.kind === "brush") {
+    return s.strokes.includes(sent) ? { ...s, strokes: s.strokes.filter((x) => x !== sent) } : s;
   }
   return s.pending && s.draft === sent ? { ...s, draft: null, pending: false } : s;
 }

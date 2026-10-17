@@ -1653,7 +1653,7 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) (FR-DICEX-09, -38–41;
 
 ## 59. Sprint 4: token creature type (C-art core)
 
-From [entities](../specs/entities.md#8-data-model) FR-ENT-26, -27, -30 and [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-39, OQ-CMP-33; [ADR-0050](../architecture/adr/0050-token-creature-type.md) (refines ADR-0024). **Built by `fix/cmp-art-core`** (schema lock, last core this sprint; drizzle push). Protocol side: [protocol §77](../protocol/README.md#76-sprint-4-token-creature-type-c-art-core).
+From [entities](../specs/entities.md#8-data-model) FR-ENT-26, -27, -30 and [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-39, OQ-CMP-33; [ADR-0050](../architecture/adr/0050-token-creature-type.md) (refines ADR-0024). **Built by `fix/cmp-art-core`** (schema lock, last core this sprint; drizzle push). Protocol side: [protocol §78](../protocol/README.md#76-sprint-4-token-creature-type-c-art-core).
 
 | Table / leaf | Change | Default (push-safe) | Visibility | Source |
 |---|---|---|---|---|
@@ -1667,9 +1667,22 @@ From [entities](../specs/entities.md#8-data-model) FR-ENT-26, -27, -30 and [comp
 - **Fixtures:** `enemy-1` humanoid, `enemy-2` beast, `enemy-custom` humanoid, `enemy-custom-second` giant; units `ent-art-tokens` (joins `compendium-full`), `cmp-srd-mini-s3`, `art-update-tokens`; bundle `token-art-update`.
 - **CON-44** (realistic heavy, `src/server/ws/snapshot-size.test.ts`, measured): `"creatureType":null` = +20 B per token received (+1,200 B for the 60 active-scene tokens per viewer); worst case `monstrosity` on every token, +9 B more each: DM 637,357 → 637,897 B (410,679 B left of 1 MiB); players ≤ 258,017 B (512 KiB); largest scene load 39,529 B. FOG / CMP `con44` heavy DM 672,310–681,445 B, players ≤ 283,518 B. Monster `type` lives in `imported-entity` / `entity` rows (DM only; `imported-entity` lazy).
 
-## 60. Sprint 4: party vision client, View as Party, Blinded (V10)
+## 60. Sprint 4: fog brush and Ctrl+Z / redo (V9)
 
-From [fog-of-war](../specs/fog-of-war.md) FR-FOG-48, -20, -21, -43, -49–51. **Built by `build/party-vision`**: no table or column. Protocol side: [protocol §77](../protocol/README.md#77-sprint-4-party-vision-client-view-as-party-blinded-v10).
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FR-FOG-26, -55–57). **Built by `build/fog-brush`**: no table, column, record type or event change. Protocol side: [protocol §78](../protocol/README.md#77-sprint-4-fog-brush-and-ctrlz--redo-v9).
+
+| Piece | Kind | Contents | Source |
+|---|---|---|---|
+| `scene_fog.shapes` (merge) | JSON, existing | a same-op `cells` stroke after a `cells` last shape is stored as their union in that one entry (≤ 128 × 128, ≤ 500 runs), else appended; `prevShapes` of the stroke's undo entry = the list before it | FR-FOG-57 |
+| Brush radius | browser storage | `localStorage` `pp.fog.brush-ft` = ft (0–50, step 5; default 10) | FR-FOG-55 |
+| Brush draft | client memory | `BrushDraft {free, ft, rule, cells \| points, last}`; sent strokes until their event / reject; the pointer's grid point (cursor) | FR-FOG-55 |
+
+- **Derived (never stored):** the snapped stamp (`area.ts` `distance` mode with the campaign's diagonal rule), the free stroke's simplified points, the redo depth (`fog.redo.n`).
+- **CON-44:** no record or field added. A merged stroke grows the DM `fog` row by its runs only (≤ 16 KiB row cap, FR-FOG-27, unchanged); players get the same `shapes` as before.
+
+## 61. Sprint 4: party vision client, View as Party, Blinded (V10)
+
+From [fog-of-war](../specs/fog-of-war.md) FR-FOG-48, -20, -21, -43, -49–51. **Built by `build/party-vision`**: no table or column. Protocol side: [protocol §78](../protocol/README.md#78-sprint-4-party-vision-client-view-as-party-blinded-v10).
 
 | Piece | Kind | Contents | Visibility | Source |
 |---|---|---|---|---|
