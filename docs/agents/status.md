@@ -22,7 +22,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | R S4-5 Divine Fury log line | merged | — | Done (walkthrough 9/9; own e2e bundle `fury-log-line`) | — |
 | R S4-3 trigger state + tray | merged e3e203b | — | Done (walkthrough 8/8; check 3185, e2e 96) | — |
 | R S4-4 trigger badges | `build/trigger-badges` (w5Y, slot 5) | build-trigger-badges | Building | Walkthrough |
-| R S4-2 negative uses | — | — | Queued (brief ready) | Next free slot |
+| R S4-2 negative uses | `fix/uses-negative` (w5Z, slot 2) | build-uses-negative | Building | Walkthrough |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
@@ -34,6 +34,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 ## Shared-file locks
 
 - `build/roll-popup` (D7): toast-region lock (`toast-region.ts` constants, `ShellToaster.tsx`).
+- `fix/uses-negative` (S4-2): sheet folder lock.
 - `build/vision-drag` (V8): canvas lock (`MapCanvas.tsx`, `TokensLayer.tsx`, `drag-preview.ts`), `move-guards.ts` (non-append), scene-tools `wall-hint.ts`.
 - Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
