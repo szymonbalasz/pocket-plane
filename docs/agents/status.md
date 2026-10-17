@@ -10,7 +10,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
 | Docs pass | merged bd07224 | — | Done | — |
-| V7 pan / plain map / Fit | `build/map-pan-plain` (w5D, slot 3) | test-map-pan-plain | Walkthrough (check 3043, e2e 90) | Merge → V8 |
+| V7 pan / plain map / Fit | `build/map-pan-plain` (w5D, slot 3) | fix-map-pan-plain | Walkthrough 3/4: Fit at 1440×900 with the Game log cuts the top row → fixing | Re-walk 26, merge → V8 |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
@@ -21,7 +21,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
-| M4 window placement | `fix/window-placement` (w57, slot 4) | fix-window-placement-3 | Re-test 2: Initiative closed before Start still overlaps → re-place after first layout | Re-walk, merge → D7 |
+| M4 window placement | `fix/window-placement` (w57, slot 4) | test-window-placement-r3 | Re-test 3 (re-place after first layout, 110a473) | Merge → D7 |
 
 ## Shared-file locks
 
