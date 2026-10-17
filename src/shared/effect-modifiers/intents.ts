@@ -127,6 +127,11 @@ export const ToggleInput = z.strictObject({
   presetId: Id,
   on: z.boolean(),
   force: z.boolean().optional(),
+  /**
+   * FR-MOD-59 (sprint 4): the sender confirmed spending a use the linked row doesn't have (uses
+   * may go below zero, to the floor). Read from S4-2 on.
+   */
+  overspend: z.literal(true).optional(),
 });
 export type ToggleInput = z.input<typeof ToggleInput>;
 export const ToggleResult = z.object({ effectId: z.string().nullable() });
