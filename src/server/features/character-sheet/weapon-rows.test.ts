@@ -60,7 +60,7 @@ describe("FR-CHARX-54 weapon rows through char.putRow", () => {
   test("FR-CHARX-54 weapon row schema: owner stores bonus + typed parts; bad parts → invalid, nothing written", () => {
     const t = setup();
     const id = t.putAttack(FLAME, t.p2);
-    expect(t.attacks().find((a) => a.id === id)).toEqual({ id, ...FLAME });
+    expect(t.attacks().find((a) => a.id === id) as unknown).toEqual({ id, ...FLAME });
     const before = JSON.stringify(t.attacks());
     const bad = [
       { ...FLAME, bonus: 4 },
