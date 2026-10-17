@@ -1,10 +1,11 @@
-// e2e-bundle: session-sim-7
+// e2e-bundle: fury-log-line
 // Thin Divine Fury dice flow (S4-5; MOD §13.1 step 4, FR-MOD-57): DM Next → Brakka's turn;
 // player-1 turns Rage on and rolls Greataxe Attack + damage → the damage roll line shows the
 // offered d6 dashed ("Divine Fury (on a hit)"); the DM applies to Mira (visible) with the chip → the
 // outcome line "+ N radiant (Divine Fury)" then its d6 chip for the player and the DM. Sources,
-// monster triggers, DM edits, leaks: bun test (effect-modifiers). Own bundle (Brakka + Divine
-// Fury, Wolf's turn): `rule-triggers` specs share one server and expect Brakka's turn untouched.
+// monster triggers, DM edits, leaks: bun test (effect-modifiers). Own bundle (`session-sim-7` as
+// `fury-log-line`): it leaves Brakka's turn, Rage on and Divine Fury used, which
+// `trigger-state.e2e.ts` expects untouched.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
