@@ -254,6 +254,56 @@ describe("scene-tools schema (SCN §8)", () => {
     ).toThrow(/FOREIGN KEY/);
   });
 
+  test("FR-SCN-46 push turns aoe_template x / y / angle into real: sprint-3 integer rows kept as they were, decimals stored", async () => {
+    const db = seed();
+    const sqlite = db.$client;
+    const ddl = sqlite
+      .query<{ sql: string }, []>("SELECT sql FROM sqlite_master WHERE name = 'aoe_template'")
+      .get()?.sql as string;
+    // The sprint-3 table: integer origin and angle.
+    const old = ddl.replace(/`(x|y|angle)` real/g, "`$1` integer");
+    expect(old).not.toBe(ddl);
+    const indexes = sqlite
+      .query<{ sql: string }, []>(
+        "SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'aoe_template' AND sql IS NOT NULL",
+      )
+      .all();
+    const rows = sqlite.query("SELECT * FROM aoe_template ORDER BY id").all();
+    sqlite.run("DROP TABLE aoe_template");
+    sqlite.run(old);
+    for (const i of indexes) sqlite.run(i.sql);
+    const cols = Object.keys(rows[0] as object);
+    for (const r of rows) {
+      sqlite
+        .query(
+          `INSERT INTO aoe_template (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`,
+        )
+        .run(...(Object.values(r as object) as never[]));
+    }
+    sqlite.run("UPDATE aoe_template SET angle = 315 WHERE id = 's2-sphere'");
+    const before = sqlite.query("SELECT * FROM aoe_template ORDER BY id").all();
+    const { applied } = await pushSchema(sqlite);
+    expect(applied).toBeGreaterThan(0);
+    expect(sqlite.query("SELECT * FROM aoe_template ORDER BY id").all()).toEqual(before);
+    expect(
+      db
+        .select()
+        .from(aoeTemplate)
+        .all()
+        .map((t) => [t.x, t.y, t.angle]),
+    ).toEqual([
+      [3, 8, 0],
+      [3, 8, 315],
+    ]);
+    db.update(aoeTemplate)
+      .set({ x: 3.37, y: 7.64, angle: 37.5 })
+      .where(eq(aoeTemplate.id, "s1-sphere"))
+      .run();
+    const t = db.select().from(aoeTemplate).where(eq(aoeTemplate.id, "s1-sphere")).get();
+    expect([t?.x, t?.y, t?.angle]).toEqual([3.37, 7.64, 37.5]);
+    expect((await pushSchema(sqlite)).applied).toBe(0);
+  });
+
   test("FR-SCN-29 map_settings: one row per campaign", () => {
     const db = seed();
     db.insert(mapSettings).values({ campaignId: "c1", diagonalRule: "5", updatedAt: AT }).run();

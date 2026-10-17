@@ -32,7 +32,7 @@ const windows: WindowDef[] = [
   dmLootLogWindow, // loot.log (party-loot, FR-LOOT-15)
   dmTrayWindow, // dicex.tray (dice-extras, FR-DICEX-01)
   dmPartyBoardWindow, // party.board (party-board, FR-PARTY-11)
-  dmHandoutWindow, // party.handout (party-board, FR-PARTY-14)
+  { ...dmHandoutWindow, restoreOpen: false }, // party.handout (party-board, FR-PARTY-14; FR-SHELL-42)
   dmCompendiumWindow, // cmp.compendium (compendium, FR-CMP-18)
 ];
 

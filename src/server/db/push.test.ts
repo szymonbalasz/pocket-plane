@@ -5,7 +5,7 @@ import { afterAll, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { applyStatements, createSchema, pushSchema } from "./push";
+import { applyStatements, createSchema, dropDuplicateIndexCreates, pushSchema } from "./push";
 
 const AT = "2026-01-01T00:00:00.000Z";
 
@@ -175,4 +175,19 @@ test("#163 push refuses to start on leftover __new_* tables from an interrupted 
   await expect(pushSchema(db)).rejects.toThrow(/__new_token left by an interrupted schema change/);
   expect(columns(db, "token")).not.toContain("shape");
   db.close();
+});
+
+test("FR-SCN-46 push drops drizzle-kit's repeated CREATE INDEX after a table rebuild; drop → create kept", () => {
+  const stmts = [
+    "DROP INDEX `campaign_one_active`;",
+    "CREATE UNIQUE INDEX `campaign_one_active` ON `campaign` (`active`) WHERE active = 1;",
+    "CREATE TABLE `__new_t` (`id` text);",
+    "DROP TABLE `t`;",
+    "ALTER TABLE `__new_t` RENAME TO `t`;",
+    "CREATE UNIQUE INDEX `t_seq` ON `t` (`seq`);",
+    "CREATE INDEX `t_scene` ON `t` (`scene_id`);",
+    "CREATE UNIQUE INDEX `t_seq` ON `t` (`seq`);",
+    "CREATE INDEX `t_scene` ON `t` (`scene_id`);",
+  ];
+  expect(dropDuplicateIndexCreates(stmts)).toEqual(stmts.slice(0, 7));
 });

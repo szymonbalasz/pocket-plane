@@ -4,6 +4,7 @@ import {
   AddDoorInput,
   AddWallsInput,
   AoeTemplateRecord,
+  ClearTemplatesInput,
   Door,
   PlaceTemplateInput,
   PlayerPlaceTemplateInput,
@@ -11,22 +12,66 @@ import {
   SceneStructureRecord,
   TemplateSignalData,
   UpdatePropInput,
+  UpdateTemplateInput,
 } from "./schemas";
 
-const sphere = { sceneId: "s", shape: "sphere", x: 3, y: 8, size: 15, angle: 0 };
+const sphere = { sceneId: "s", shape: "sphere" as const, x: 3, y: 8, size: 15, angle: 0 };
 
 describe("SCN §9 shapes", () => {
-  test("FR-SCN-20 size 5–300 / width 5–60 step 5; angle 0–345 step 15", () => {
+  test("FR-SCN-20 size 5–300 / width 5–60 step 5; angle 0 ≤ a < 360", () => {
     const ok = (v: object) => PlaceTemplateInput.safeParse({ ...sphere, ...v }).success;
     expect(ok({})).toBe(true);
     expect(ok({ size: 300, width: 60, angle: 345 })).toBe(true);
     expect(ok({ size: 0 })).toBe(false);
     expect(ok({ size: 12 })).toBe(false);
     expect(ok({ size: 305 })).toBe(false);
+    expect(ok({ size: 12.5 })).toBe(false);
     expect(ok({ width: 65 })).toBe(false);
-    expect(ok({ angle: 10 })).toBe(false);
     expect(ok({ angle: 360 })).toBe(false);
+    expect(ok({ angle: -0.1 })).toBe(false);
     expect(ok({ label: "x".repeat(41) })).toBe(false);
+  });
+
+  test("FR-SCN-20 zod: 2-decimal origin, 1-decimal angle; 3 decimals / 360 / 12.25 → invalid; integer rows unchanged", () => {
+    const place = (v: object) => PlaceTemplateInput.safeParse({ ...sphere, ...v }).success;
+    const update = (v: object) => UpdateTemplateInput.safeParse({ templateId: "t", ...v }).success;
+    const signal = (v: object) =>
+      TemplateSignalData.safeParse({ ...sphere, key: "k", ...v }).success;
+    for (const check of [place, update, signal]) {
+      expect(check({ x: 3.37, y: 7.64, angle: 37.5 })).toBe(true);
+      expect(check({ x: -0.5, y: 10000, angle: 359.9 })).toBe(true);
+      expect(check({ x: 3.375 })).toBe(false);
+      expect(check({ y: 0.001 })).toBe(false);
+      expect(check({ x: 10_000.01 })).toBe(false);
+      expect(check({ angle: 360 })).toBe(false);
+      expect(check({ angle: 12.25 })).toBe(false);
+      expect(check({ angle: 10 })).toBe(true);
+    }
+    expect(PlayerPlaceTemplateInput.safeParse({ ...sphere, x: 3.37, angle: 0.1 }).success).toBe(
+      true,
+    );
+    // Sprint-2 rows: integer origin, 15° steps.
+    const old = {
+      ...sphere,
+      id: "t",
+      campaignId: "c",
+      width: null,
+      label: "",
+      placedByPlayerId: null,
+      hidden: false,
+    };
+    for (let angle = 0; angle < 360; angle += 15) {
+      expect(AoeTemplateRecord.parse({ ...old, angle })).toEqual({ ...old, angle });
+    }
+    expect(AoeTemplateRecord.safeParse({ ...old, x: 1.5, y: 10.5, angle: 300 }).success).toBe(true);
+    expect(AoeTemplateRecord.safeParse({ ...old, x: 1.555 }).success).toBe(false);
+  });
+
+  test("FR-SCN-44 clearTemplates {sceneId, players?}", () => {
+    expect(ClearTemplatesInput.safeParse({ sceneId: "s" }).success).toBe(true);
+    expect(ClearTemplatesInput.safeParse({ sceneId: "s", players: true }).success).toBe(true);
+    expect(ClearTemplatesInput.safeParse({ sceneId: "s", players: "yes" }).success).toBe(false);
+    expect(ClearTemplatesInput.safeParse({ sceneId: "s", all: true }).success).toBe(false);
   });
 
   test("FR-SCN-25 a player's schema has neither hidden nor placedByPlayerId", () => {

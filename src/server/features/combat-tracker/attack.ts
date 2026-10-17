@@ -24,8 +24,9 @@ import { dice, gameLog } from "../dice-roll-log";
 import { withCardMods } from "../effect-modifiers/card";
 import { recordOffers, rollLine, withCardOffers } from "../effect-modifiers/offers";
 import { notify } from "../notifications";
-import { cardRollOf, cardToHitOf, damageCardText } from "./card-kind";
+import { cardRollOf, cardToHitOf, damageCardText, fitCardPayload } from "./card-kind";
 import { activeCombatant, statsOf } from "./guards";
+import { cardExtraOf, checkManualExtra, rollExtraParts } from "./parts";
 
 /**
  * P3 glitch 9: a critical damage roll says so in its label, "Dagger damage (piercing, critical)"
@@ -71,9 +72,11 @@ export const attackCommand = defineCommand({
     // The attacker's own definition only: a row of another creature is `not_found` here.
     const ref = { attackId: input.attackId, spellId: input.spellId };
     const attack = characters.sheetAttack(env, c.entityId, ref);
-    const [hitSpec, dmgSpec] = attackRollSpecs(attack);
+    // FR-CHARX-55: to-hit and the base part carry `bonus`; FR-CBT-81: the extra parts follow.
+    const [hitSpec, dmgSpec, ...extraSpecs] = attackRollSpecs(attack);
     const actor = { kind: "entity" as const, id: c.entityId, name: c.name };
     const toHitOnly = input.rolls === "toHit";
+    if (!toHitOnly) checkManualExtra(extraSpecs, input.manual, input.manualExtra);
     // FR-MOD-15: who rolls (a PC combatant = its character), weapon or spell row.
     const creature = c.kind === "pc" ? { characterId: c.entityId } : { combatantId: c.id };
     const via = input.spellId !== undefined ? ("spell" as const) : ("weapon" as const);
@@ -116,7 +119,11 @@ export const attackCommand = defineCommand({
           card: true,
           toHitMode: toHit.mode,
         });
-    const rolls = damage ? [toHit, damage] : [toHit];
+    // FR-CBT-81, -83: every extra part, its own roll row of the entry, doubled on a crit.
+    const extra = damage
+      ? rollExtraParts(env, extraSpecs, { crit, actor, manual: input.manualExtra })
+      : [];
+    const rolls = damage ? [toHit, damage, ...extra] : [toHit];
     const payload: DamageCardPayload = withCardOffers(
       env,
       {
@@ -131,7 +138,9 @@ export const attackCommand = defineCommand({
         crit,
         // FR-MOD-16/19: the card's totals include the parts, `mods` name them.
         toHit: withCardMods(cardToHitOf(toHit), toHit),
-        damage: damage ? withCardMods(cardRollOf(damage), damage) : null,
+        damage: damage
+          ? { ...withCardMods(cardRollOf(damage), damage), ...cardExtraOf(extraSpecs, extra) }
+          : null,
         ...cardRowRef(env, c, ref),
       },
       damage,
@@ -169,7 +178,7 @@ export const attackCommand = defineCommand({
       audiencePlayerId: isPlayer ? env.actor.playerId : null,
       // FR-CBT-57 (R4): " (natural 1)" / " (natural 20)" after the to-hit.
       text: damageCardText(payload),
-      payload,
+      payload: fitCardPayload(payload),
       action: { label: "Apply", role: "dm" },
     });
     rolled.payload.cardId = cardId;

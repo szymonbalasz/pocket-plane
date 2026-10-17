@@ -83,6 +83,11 @@ export interface WindowDef {
    */
   growToContent?: true;
   /**
+   * `false`: loads closed when the layout entry is applied, geometry kept (FR-SHELL-42), for a
+   * window whose content needs a target only a feature can give (e.g. the handout viewer).
+   */
+  restoreOpen?: false;
+  /**
    * Always mounted while the kind is available, whatever the window state (e.g. the toast
    * runtime of `note.history`). Renders its own UI, if any; gets no props.
    */

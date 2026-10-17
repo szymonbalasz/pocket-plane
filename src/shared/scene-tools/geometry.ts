@@ -4,7 +4,9 @@
 // (FR-SCN-30). Grid units throughout: vertices `(x, y)`, cells `(col, row)`. Sprint 3: segment
 // points carry ≤ 2 decimals; the blocking rule runs on integers scaled by 200 (FR-SCN-10); walls
 // and non-open doors are FOG's sight occluders (FR-SCN-37); door sample points (FR-SCN-36); the
-// first-crossing wall hint for `map.checkMove` (FR-SCN-38).
+// first-crossing wall hint for `map.checkMove` (FR-SCN-38). Sprint 4: template cells come from
+// the shared coverage helper `@shared/scenes-map/area` (FR-SCN-41, -42).
+import { cells, templateArea } from "@shared/scenes-map/area";
 import { distanceFt as distance5105, type Grid, type MapRect } from "@shared/scenes-map/geometry";
 import {
   type DiagonalRule,
@@ -12,7 +14,6 @@ import {
   type Door,
   FT_PER_CELL,
   type Segment,
-  TEMPLATE_WIDTH,
   type TemplateGeometry,
   type Wall,
 } from "./schemas";
@@ -264,60 +265,23 @@ function cellOnMap(m: MapRect, col: number, row: number): boolean {
 }
 
 const EPS = 1e-9;
-const norm360 = (a: number) => ((a % 360) + 360) % 360;
 
 /**
- * FR-SCN-21: cells whose centre lies inside or on the template (FR-SCN-20). Directions are
+ * FR-SCN-21 (sprint 4, FR-SCN-41): the cells **more than 50 % covered** by the template (exact
+ * area, a tie counts on one side only), via FR-SCN-42's `cells(…, "half")`. Directions are
  * screen angles: 0 = east (+x), 90 = south (+y). `cut: true` keeps cells overlapping the map
- * (drawing, the count); `cut: false` keeps all (fog's `derive`, so `fogged` survives a map
- * change). Row-major order.
+ * (drawing, the count; may be empty: "0 squares"); `cut: false` keeps all (fog's `derive` and the
+ * DM ephemeral audience, so `fogged` survives a map change) and, for a template that covers no
+ * cell, the cell holding its origin (FR-SCN-46). Row-major order.
  */
 export function templateCells(
   t: TemplateGeometry,
   scene: MapRect,
   { cut }: { cut: boolean },
 ): Cell[] {
-  const L = t.size / FT_PER_CELL;
-  const out: Cell[] = [];
-  const push = (c: number, r: number) => {
-    if (!cut || cellOnMap(scene, c, r)) out.push([c, r]);
-  };
-  if (t.shape === "sphere" || t.shape === "cylinder") {
-    // Doubled coordinates: centre (2c + 1, 2r + 1), origin (2x, 2y); exact.
-    const r2 = (2 * L) ** 2;
-    for (let r = t.y - L; r < t.y + L; r++)
-      for (let c = t.x - L; c < t.x + L; c++) {
-        const dx = 2 * c + 1 - 2 * t.x;
-        const dy = 2 * r + 1 - 2 * t.y;
-        if (dx * dx + dy * dy <= r2) push(c, r);
-      }
-    return out;
-  }
-  if (t.shape === "cube") {
-    // The origin is a corner; `angle` picks the quadrant (0 SE, 90 SW, 180 NW, 270 NE).
-    const q = Math.floor(norm360(t.angle) / 90);
-    const c0 = q === 0 || q === 3 ? t.x : t.x - L;
-    const r0 = q === 0 || q === 1 ? t.y : t.y - L;
-    for (let r = r0; r < r0 + L; r++) for (let c = c0; c < c0 + L; c++) push(c, r);
-    return out;
-  }
-  // Cone (width at distance d = d) and line (width `width`), along `angle` from the origin.
-  const rad = (norm360(t.angle) * Math.PI) / 180;
-  const ux = Math.cos(rad);
-  const uy = Math.sin(rad);
-  const half = t.shape === "line" ? (t.width ?? TEMPLATE_WIDTH.default) / FT_PER_CELL / 2 : 0;
-  const reach = Math.ceil(L + half) + 1;
-  for (let r = t.y - reach; r < t.y + reach; r++)
-    for (let c = t.x - reach; c < t.x + reach; c++) {
-      const dx = c + 0.5 - t.x;
-      const dy = r + 0.5 - t.y;
-      const along = dx * ux + dy * uy;
-      const across = Math.abs(dx * uy - dy * ux);
-      if (along < -EPS || along > L + EPS) continue;
-      const limit = t.shape === "cone" ? along / 2 : half;
-      if (across <= limit + EPS) push(c, r);
-    }
-  return out;
+  const all = cells(templateArea(t), "half");
+  if (cut) return all.filter(([c, r]) => cellOnMap(scene, c, r));
+  return all.length > 0 ? all : [[Math.floor(t.x), Math.floor(t.y)]];
 }
 
 /**
