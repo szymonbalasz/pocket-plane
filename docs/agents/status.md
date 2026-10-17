@@ -12,9 +12,9 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Docs pass | merged bd07224 | — | Done | — |
 | C-search | `build/cmp-search` (w59, slot 3) | build-cmp-search | Building | Walkthrough |
 | V6 vision core | `fix/vision-s4-core` (w54, slot 0) | build-vision-core | Building | Walkthrough |
-| D5 die shapes + log dice | `build/dice-shapes` (w55, slot 2) | test-dice-shapes | Walkthrough (check 2917, e2e 83 green) | Merge; D6 adds the throw-dice sum flag (D5 open issue) |
+| D5 die shapes + log dice | `build/dice-shapes` (w55, slot 2) | fix-dice-shapes | Walkthrough 6/7: physical per-die dice round in tray / zone → fixing | Re-walk step 5c, merge |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
-| M4 window placement | `fix/window-placement` (w57, slot 4) | build-window-placement | Building | Walkthrough |
+| M4 window placement | `fix/window-placement` (w57, slot 4) | test-window-placement | Walkthrough (check 2915, e2e 83) | Merge |
 
 ## Shared-file locks
 
