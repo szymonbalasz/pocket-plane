@@ -11,12 +11,13 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
 | Docs pass | merged bd07224 | — | Done | — |
 | V7 pan / plain map / Fit | merged 13c15f6 | — | Done (BL-01, BL-07; check 3158, e2e 94) | V8, M1 next |
-| V8 vision while dragging, M1 freeform AoE | — | — | Queued (next free slots) | — |
+| V8 vision while dragging | `build/vision-drag` (w5N, slot 0) | build-vision-drag | Building | Walkthrough → M2 |
+| M1 freeform AoE | — | — | Queued (brief ready) | — |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
-| R S4-1a weapon rows | `build/weapon-rows` (w5F, slot 0) | fix-weapon-rows | Walkthrough 6/6; post-merge test (seeded nat 20) → fixing | Merge → S4-2 |
+| R S4-1a weapon rows | merged 9859252 | — | Done (walkthrough 6/6; check 3154, e2e 94) | S4-2 next |
 | R S4-1b weapon combat + BL-10 | merged | — | Done (walkthrough 8/8; check 3138, e2e 92) | — |
 | R S4-5 Divine Fury log line | `fix/fury-log-line` (w5M, slot 2) | build-fury-log-line | Building | Walkthrough |
 | R S4-3 trigger state + tray | `build/trigger-state` (w5K, slot 5) | build-trigger-state | Building | Walkthrough → S4-4 |
@@ -31,7 +32,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 ## Shared-file locks
 
 - `build/roll-popup` (D7): toast-region lock (`toast-region.ts` constants, `ShellToaster.tsx`).
-- `build/weapon-rows` (S4-1a): sheet folder, `creature-form.tsx`, `src/shared/dice-roll-log/{schemas.ts,roll-kind.ts}` (additive `part` on roll items; D7 rebases on it).
+- `build/vision-drag` (V8): canvas lock (`MapCanvas.tsx`, `TokensLayer.tsx`, `drag-preview.ts`), `move-guards.ts` (non-append), scene-tools `wall-hint.ts`.
 - Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
 
