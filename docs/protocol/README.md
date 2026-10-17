@@ -377,7 +377,7 @@ Combat consolidation (CON-38+, integrator; CON-34–37: [data model §8](../data
 
 ## 12. Scenes: record types
 
-Consolidated 2026-10-12 from the `complete` specs. Shorthand: ASSET = [assets-pipeline](../specs/assets-pipeline.md), ENT = [entities](../specs/entities.md), SHELL = [play-shell](../specs/play-shell.md), MAP = [scenes-map](../specs/scenes-map.md). Foundation sections above amended per [CON-22–32](#11-conflicts-log) (fix/scenes-core). Data side: [data model §9–§13](../data-model/README.md#9-scenes-er-diagram).
+Consolidated 2026-10-12 from the `complete` specs. Shorthand: ASSET = [assets-pipeline](../specs/assets-pipeline.md), ENT = [entities](../specs/entities.md), SHELL = [play-shell](../specs/play-shell.md), MAP = [scenes-map](../specs/scenes-map.md). Foundation sections above amended per [CON-22–32](#11-conflicts-log) (fix/scenes-core). Data side: [data model §9–§9](../data-model/README.md#9-scenes-er-diagram).
 
 DM always `full`. Generic record changes only ([ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md) A).
 
@@ -564,7 +564,7 @@ Core seams added by `build/assets-pipeline` (sequenced shared changes):
 
 ## 20. Combat: record types
 
-Consolidated 2026-10-12 from the Combat specs [character-sheet](../specs/character-sheet.md) (CHAR), [dice-roll-log](../specs/dice-roll-log.md) (DICE), [notifications](../specs/notifications.md) (NOTE), [combat-tracker](../specs/combat-tracker.md) (CBT), after review-combat-3 and decisions #134–#140; specs `complete` (#142). Earlier sections amended per [CON-38–44](#11-conflicts-log) (fix/combat-core). Data side: [data model §14–§18](../data-model/README.md#14-combat-er-diagram).
+Consolidated 2026-10-12 from the Combat specs [character-sheet](../specs/character-sheet.md) (CHAR), [dice-roll-log](../specs/dice-roll-log.md) (DICE), [notifications](../specs/notifications.md) (NOTE), [combat-tracker](../specs/combat-tracker.md) (CBT), after review-combat-3 and decisions #134–#140; specs `complete` (#142). Earlier sections amended per [CON-38–44](#11-conflicts-log) (fix/combat-core). Data side: [data model §14–§14](../data-model/README.md#14-combat-er-diagram).
 
 All scope `campaign` (no scene gate: combat runs whatever the active scene). DM always `full`. Generic record changes only ([ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md) A). Visibility fns read only the record and the connection context ([FR-CBT-27](../specs/combat-tracker.md#6-functional-requirements)). CHAR adds **no** record type: sheet data travels as `entity` ([§12](#12-scenes-record-types), [FR-CHAR-14](../specs/character-sheet.md#6-functional-requirements)).
 
@@ -782,7 +782,7 @@ Server registry owned by scenes-map, **append-only**, created by `build/scenes-m
 | `ctx.dice` | `src/server/commands/context.ts` (+ loader reseed in `src/server/features/fixtures-adapters/`) | Engine `{next(): int32}` beside `ids` / `tokens` / `clock`. Real = CSPRNG (`realDice`); seeded = deterministic per fixture key `(fixed seed, key)` / per test (`seededDice`, and `seededContext` includes it; own stream, so dice never shift IDs or tokens), only with `PP_DATA_DISPOSABLE=1` (same guard as ADR-0022). The loader's per-fixture `seededContext` reseeds it. `rollDice(ctx.dice, notation)` (`src/server/commands/dice.ts`) sets the library's process-global generator for one synchronous evaluation, then restores it, and returns `{roll, total, dice: {value, kept}[][]}`; between evaluations the generator throws, so nothing falls back to `Math.random`. Biome plugin `biome-plugins/no-math-random.grit` forbids `Math.random` in `src/server/**`, `src/shared/**`, `fixtures/**` (the client backoff keeps it). **Built** (fix/combat-core) | [FR-DICE-03](../specs/dice-roll-log.md#6-functional-requirements), #137, [ADR-0022](../architecture/adr/0022-deterministic-seams.md), [AGENTS §9.3](../../AGENTS.md#93-fixtures) |
 | Dice library | `package.json`, `bun.lock` | `@dice-roller/rpg-dice-roller` 5.5 (**built**) | [ADR-0001](../architecture/adr/0001-tech-stack.md) |
 | `window` on registration | `src/server/ws/`, `src/shared/protocol/` | §20 window rule; convergence + leak-scan helpers honour it (**built**) | [ADR-0029](../architecture/adr/0029-windowed-record-types.md), CON-38 |
-| Combat tables + events | `src/server/db/schema.ts`, `src/shared/events/` | [data model §14–§18](../data-model/README.md#14-combat-er-diagram), §22 (**built**; no commands) | #142 |
+| Combat tables + events | `src/server/db/schema.ts`, `src/shared/events/` | [data model §14–§14](../data-model/README.md#14-combat-er-diagram), §22 (**built**; no commands) | #142 |
 | E2E bundle per spec | `scripts/e2e.ts`, `e2e/support/env.ts` | A spec's header line `// e2e-bundle: <name>` (default `sync-probe`); `bun run e2e` loads each bundle into its own temp data dir + server; `e2eEnv().recordId(fixtureKey, type)` reads the manifest | orchestrator (fix/combat-core) |
 | `badge?(store)` on window types | `src/client/common/` shell (existing files) | Launcher unread badge | [OQ-NOTE-13](../specs/notifications.md#15-open-questions) *(proposed)* |
 | Roll control ↔ dice tray *(sprint 3, built, build/dicex-tray)* | `src/client/common/features/dice-roll-log/roll-control.tsx`, `GameLog.tsx` (D1 → R2 hotspot) | `control.roll(keys)`: `keys.altKey` → `stageTray({kind: "control", options, mode})` with the caller's `RollControlOptions` **verbatim** (unknown fields such as MOD's `subject` pass through) and nothing rolled; else as before, and every finished roll starts a pending throw (`diceExtras.sent`, ends on the first own `roll` entry or 3 s). The tray runs `useRollControl` on the staged options with its own mode and calls the caller's `onRoll` with the same `RollRequest` object (`previewMode`, `manualParts` untouched); physical mode → the exported `ManualForm` inside the tray. `STAGE_HINT` = "Alt: adjust in tray". Roll bar: tray Button (`dicex-tray-open`) and Alt+click on Roll stage `free`; Enter still rolls at once. Hosts that pass their own key state (Initiative anchors, death-save menu item) stage only if they forward `altKey` | [FR-DICEX-05](../specs/dice-extras.md#6-functional-requirements), -06, -07, -08, -09 |
@@ -790,7 +790,7 @@ Server registry owned by scenes-map, **append-only**, created by `build/scenes-m
 
 ## 27. Combat: build notes
 
-Dependency order the specs imply; the orchestrator decides. Every builder: the facts above and in [data model §14–§18](../data-model/README.md#14-combat-er-diagram) are the contract; a deviation is a shared change.
+Dependency order the specs imply; the orchestrator decides. Every builder: the facts above and in [data model §14–§14](../data-model/README.md#14-combat-er-diagram) are the contract; a deviation is a shared change.
 
 | Step | Branch | Needs | Shared files touched |
 |---|---|---|---|
@@ -802,7 +802,7 @@ Dependency order the specs imply; the orchestrator decides. Every builder: the f
 
 ## 28. Feedback pass (to build)
 
-Consolidated 2026-10-13 from the feedback revisions of [entities](../specs/entities.md), [character-sheet](../specs/character-sheet.md), [scenes-map](../specs/scenes-map.md), [combat-tracker](../specs/combat-tracker.md), [play-shell](../specs/play-shell.md) (F1, F3, F4, F6, F7, F7.1, F8, #149; DM gate #154; [ADR-0031](../architecture/adr/0031-token-move-hooks.md), [ADR-0032](../architecture/adr/0032-ability-derivation.md)). Rows marked *(feedback pass, to build)* in §12–§26 and [data model §11–§18](../data-model/README.md#11-scenes-entity) are not in the code yet. Party-loot rows are added by its own branch.
+Consolidated 2026-10-13 from the feedback revisions of [entities](../specs/entities.md), [character-sheet](../specs/character-sheet.md), [scenes-map](../specs/scenes-map.md), [combat-tracker](../specs/combat-tracker.md), [play-shell](../specs/play-shell.md) (F1, F3, F4, F6, F7, F7.1, F8, #149; DM gate #154; [ADR-0031](../architecture/adr/0031-token-move-hooks.md), [ADR-0032](../architecture/adr/0032-ability-derivation.md)). Rows marked *(feedback pass, to build)* in §12–§26 and [data model §11–§11](../data-model/README.md#11-scenes-entity) are not in the code yet. Party-loot rows are added by its own branch.
 
 **Step 1 built** (`fix/feedback-core`): the 4 columns (push-safe on old dev DBs); `CombatantRolled`, `CharacterRolled` kinds; stat block `speed` / `abilities` / `saveProficiencies`, `TokenShape`, ability helpers; `characterRolls` check / save; per-kind `resolutionMaxBytes`; empty `tokenOverlays`; zod for the new intents. Today's servers still parse the old shapes, so new zod sits **beside** them until the feature build switches:
 
@@ -818,7 +818,7 @@ Consolidated 2026-10-13 from the feedback revisions of [entities](../specs/entit
 
 | Area | Change | Source |
 |---|---|---|
-| Columns | `token.shape` text not null default `round`; `token.speed` int null; `entity.token_shape` text null; `combatant.moved_ft` int not null default 0. Additive; push at boot, no backfill | [data model §11, §12, §17](../data-model/README.md#11-scenes-entity) |
+| Columns | `token.shape` text not null default `round`; `token.speed` int null; `entity.token_shape` text null; `combatant.moved_ft` int not null default 0. Additive; push at boot, no backfill | [data model §11, §12, §11](../data-model/README.md#11-scenes-entity) |
 | JSON leaf | `statBlock` optional `speed`, `abilities`, `saveProficiencies` (zod only, both kinds) | [FR-ENT-21/23](../specs/entities.md#6-functional-requirements) |
 | Visibility | `token.speed` owner-only; `combatant` removed → redacted `removed: true`; both combatant redactions + `removed`, `movedFt`; redacted character + derived `down` | [§12](#12-scenes-record-types), [§20](#20-combat-record-types) |
 | Intents | `map.placeToken` / `map.updateToken` `shape?`; `char.roll` `check \| save` + `ability`; `cbt.applyCard` `targets[]` → `{hpChangeIds}`; `cbt.undo` → `{hpChangeIds}`; new `cbt.rollAbility` → `{rollIds, entryId}` | [§13](#13-scenes-intents-rest-and-internal-apis), [§21](#21-combat-intents-rest-and-internal-apis) |
@@ -1295,7 +1295,7 @@ From [effect-modifiers](../specs/effect-modifiers.md) tier 2 (MOD, `complete`; F
 
 ## 42. Sprint 3: freeform fog + darkness (V1)
 
-From [fog-of-war](../specs/fog-of-war.md) v2 (FOG §14 slice V1). **Built by `build/fog-shapes`** (canvas lock 1st): the fog / darkness / explored intents below, one undo stack over shapes and darkness (#207 G12), the static re-derive with darkness (no vision source before V2) and the static part of the per-player darkness filter (FR-FOG-44, #207 G11), the DM tools and the DM + player static render. Supersedes [§35](#35-sprint-2-phase-2-fog-of-war)'s `fog.edit` row (raster retired). Data side: [data model §27](../data-model/README.md#29-sprint-3-freeform-fog--darkness-v1).
+From [fog-of-war](../specs/fog-of-war.md) v2 (FOG §14 slice V1). **Built by `build/fog-shapes`** (canvas lock 1st): the fog / darkness / explored intents below, one undo stack over shapes and darkness (#207 G12), the static re-derive with darkness (no vision source before V2) and the static part of the per-player darkness filter (FR-FOG-44, #207 G11), the DM tools and the DM + player static render. Supersedes [§35](#35-sprint-2-phase-2-fog-of-war)'s `fog.edit` row (raster retired). Data side: [data model §29](../data-model/README.md#29-sprint-3-freeform-fog--darkness-v1).
 
 **Intents** (DM only, ADR-0021 D; a player → `forbidden`; scene not in `ctx.campaignId` → `not_found`; any scene, prep or live, FR-FOG-09). Each is one transaction: `fog` row (`rev` + 1) + undo entry + scene re-derive + one log entry → one event (FR-FOG-08).
 
@@ -1506,7 +1506,7 @@ From [effect-modifiers](../specs/effect-modifiers.md) sprint 3 (MOD, `complete`;
 
 ## 52. Sprint 3: dice looks (D2)
 
-From [dice-extras](../specs/dice-extras.md) (DICEX, `complete`; gate 1 #207 G17: server-stored looks, everyone sees the roller's look). **Built by `fix/dicex-look-core`** (D2; schema lock 5th, after C1) with the look editor D3 deferred. Data side: [data model §40](../data-model/README.md#38-sprint-3-dice-looks-d2).
+From [dice-extras](../specs/dice-extras.md) (DICEX, `complete`; gate 1 #207 G17: server-stored looks, everyone sees the roller's look). **Built by `fix/dicex-look-core`** (D2; schema lock 5th, after C1) with the look editor D3 deferred. Data side: [data model §38](../data-model/README.md#38-sprint-3-dice-looks-d2).
 
 | Piece | Contract |
 |---|---|
@@ -1520,7 +1520,7 @@ From [dice-extras](../specs/dice-extras.md) (DICEX, `complete`; gate 1 #207 G17:
 
 ## 53. Sprint 3: effect modifiers tier 2 client (R2)
 
-From [effect-modifiers](../specs/effect-modifiers.md) tier 2 + T (MOD, `complete`; FR-MOD-17, -18, -24, -25, -27) on dice-extras' tray (FR-DICEX-08, seams S4). **Built by `fix/mod-roll-preview`** (R2). No new intent, event or record type: the seven roll intents gain `manualParts`, the rest is client. Data side: [data model §44](../data-model/README.md#39-sprint-3-effect-modifiers-tier-2-client-r2).
+From [effect-modifiers](../specs/effect-modifiers.md) tier 2 + T (MOD, `complete`; FR-MOD-17, -18, -24, -25, -27) on dice-extras' tray (FR-DICEX-08, seams S4). **Built by `fix/mod-roll-preview`** (R2). No new intent, event or record type: the seven roll intents gain `manualParts`, the rest is client. Data side: [data model §39](../data-model/README.md#39-sprint-3-effect-modifiers-tier-2-client-r2).
 
 | Piece | Contract |
 |---|---|
@@ -2040,7 +2040,7 @@ From [dice-extras](../specs/dice-extras.md) (FR-DICEX-09, -38–41; [ADR-0048](.
 
 ## 76. Sprint 4: token creature type (C-art core)
 
-Built by `fix/cmp-art-core` ([FR-ENT-26, -27, -30](../specs/entities.md#6-functional-requirements), [FR-CMP-39](../specs/compendium.md#6-functional-requirements), OQ-CMP-33; [ADR-0050](../architecture/adr/0050-token-creature-type.md)). No new record type, intent, signal or event name. The draw and the Art menu are C-art (`build/cmp-token-art`); until then tokens carry `creatureType` and still draw initials. Data side: [data model §61](../data-model/README.md#59-sprint-4-token-creature-type-c-art-core).
+Built by `fix/cmp-art-core` ([FR-ENT-26, -27, -30](../specs/entities.md#6-functional-requirements), [FR-CMP-39](../specs/compendium.md#6-functional-requirements), OQ-CMP-33; [ADR-0050](../architecture/adr/0050-token-creature-type.md)). No new record type, intent, signal or event name. The draw and the Art menu are C-art (`build/cmp-token-art`); until then tokens carry `creatureType` and still draw initials. Data side: [data model §59](../data-model/README.md#59-sprint-4-token-creature-type-c-art-core).
 
 | Change | Contract | Source |
 |---|---|---|
@@ -2054,7 +2054,7 @@ Built by `fix/cmp-art-core` ([FR-ENT-26, -27, -30](../specs/entities.md#6-functi
 
 ## 77. Sprint 4: fog brush and Ctrl+Z / redo (V9)
 
-From [fog-of-war](../specs/fog-of-war.md) (FR-FOG-17, -26, -55–57; OQ-FOG-52 / -53, #245 G16 / G17; review A13). **Built by `build/fog-brush`**: no new intent, event, record type, field or signal; the brush sends `fog.edit` with the `stroke` / `cells` shapes of [§63](#63-sprint-4-vision-core-v6) and the history keys send `fog.undo` / `fog.redo`. Data side: [data model §61](../data-model/README.md#60-sprint-4-fog-brush-and-ctrlz--redo-v9).
+From [fog-of-war](../specs/fog-of-war.md) (FR-FOG-17, -26, -55–57; OQ-FOG-52 / -53, #245 G16 / G17; review A13). **Built by `build/fog-brush`**: no new intent, event, record type, field or signal; the brush sends `fog.edit` with the `stroke` / `cells` shapes of [§63](#63-sprint-4-vision-core-v6) and the history keys send `fog.undo` / `fog.redo`. Data side: [data model §60](../data-model/README.md#60-sprint-4-fog-brush-and-ctrlz--redo-v9).
 
 | Piece | Contract |
 |---|---|
