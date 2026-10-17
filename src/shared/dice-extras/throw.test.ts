@@ -307,4 +307,16 @@ describe("FR-DICEX-13 throwDice", () => {
     const t = one([{ junk: 1 }, item()]);
     expect(t.dice).toHaveLength(1);
   });
+
+  test("FR-DICEX-15 seed from first public entry: a DM frame [DM-only, public] seeds from the public id, as the players' frame", () => {
+    const hidden = entry(1, [item()], { public: false, rollerRole: "dm", rollerPlayerId: null });
+    const shown = entry(2, [item()], { rollerRole: "dm", rollerPlayerId: null });
+    const dm = throwDice([hidden, shown]);
+    const players = throwDice([shown]);
+    expect(dm?.id).toBe("e1");
+    expect(dm?.seedId).toBe("e2");
+    expect(players?.seedId).toBe("e2");
+    // No public entry: the first entry seeds.
+    expect(throwDice([hidden])?.seedId).toBe("e1");
+  });
 });
