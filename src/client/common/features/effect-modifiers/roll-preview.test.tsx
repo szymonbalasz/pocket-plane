@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/noThenProperty: `then` is the rule's effect field (MOD §8.4); rules are data, never awaited.
 // FR-MOD-27 / -18 roll-control preview on dice-extras' tray (DOM tests as `routing.test.tsx`:
 // static render over a fake sync store, handlers called on the captured control).
 import { afterEach, describe, expect, test } from "bun:test";
@@ -41,7 +42,7 @@ const RAGE = effect("fx-rage", "Rage", [
   { kind: "flat", on: { roll: "damage", via: "weapon" }, value: 2 },
 ]);
 
-function sync(records: RecordMap) {
+function sync(records: RecordMap, loaded: string[] = []) {
   const you = { campaignId: "c1", role: "player" as const, playerId: "p1" };
   return createStore<SyncState>()(
     () =>
@@ -50,7 +51,7 @@ function sync(records: RecordMap) {
         store: { ...emptyStore(), you, records },
         lazy: {
           generation: 1,
-          loaded: { types: [], ids: {} },
+          loaded: { types: loaded, ids: {} },
           loading: { types: [], ids: {} },
           failed: { types: [], ids: {} },
         },
@@ -61,9 +62,9 @@ function sync(records: RecordMap) {
   );
 }
 
-function render(node: React.ReactNode, records: RecordMap) {
+function render(node: React.ReactNode, records: RecordMap, loaded: string[] = []) {
   return renderToStaticMarkup(
-    <SyncContext.Provider value={sync(records)}>
+    <SyncContext.Provider value={sync(records, loaded)}>
       <TooltipProvider delayDuration={0} skipDelayDuration={0}>
         {node}
       </TooltipProvider>
@@ -316,5 +317,92 @@ describe("FR-MOD-27 tray (FR-DICEX-08)", () => {
     const html = render(<TrayWindow />, withEffects(RAGE));
     expect(html).not.toContain("data-tag=");
     expect(html.match(/data-testid="dicex-tray-die"/g)).toHaveLength(1);
+  });
+});
+
+describe("FR-MOD-56 tray reads trigger state", () => {
+  /** Brakka raging on her turn with Divine Fury loaded; her trigger-state row's charge varies. */
+  const brakkaRecords = (charge: string): RecordMap => ({
+    effect: {
+      "fx-rage": {
+        ...RAGE,
+        id: "fx-rage",
+        targetCharacterId: "brakka",
+        presetKey: "pre-rage",
+      },
+    },
+    "effect-preset": {
+      "pre-rage": { id: "pre-rage", activeEffectId: "fx-rage", originKey: "rage" },
+    },
+    encounter: {
+      enc: { id: "enc", status: "started", round: 1, turnCombatantId: "c-brakka" },
+    },
+    combatant: {
+      "c-brakka": {
+        id: "c-brakka",
+        encounterId: "enc",
+        kind: "pc",
+        entityId: "brakka",
+        active: true,
+        removed: false,
+      },
+    },
+    entity: {
+      brakka: {
+        id: "brakka",
+        kind: "character",
+        statBlock: { level: 5, className: "Barbarian", classes: [{ name: "Barbarian", level: 5 }] },
+      },
+    },
+    "rule-trigger": {
+      "trg-df": {
+        id: "trg-df",
+        seq: 1,
+        characterId: "brakka",
+        definitionId: null,
+        name: "Divine Fury",
+        enabled: true,
+        rule: {
+          on: "hit",
+          requires: { preset: "pre-rage" },
+          when: [{ if: "via", via: "weapon" }, { if: "ownTurn" }],
+          every: "turn",
+          then: { do: "damage", formula: "1d6 + floor(level(barbarian) / 2)", type: "radiant" },
+        },
+      },
+    },
+    "trigger-state": {
+      "ts-df": { id: "ts-df", combatantId: "c-brakka", triggerId: "trg-df", armed: true, charge },
+    },
+  });
+  const stageDamage = () =>
+    diceExtras.stage({
+      kind: "control",
+      options: {
+        expressions: ["1d12+4"],
+        category: "damage",
+        subject: {
+          creature: { combatantId: "c-brakka" },
+          roll: "damage",
+          via: "weapon",
+          card: true,
+        },
+        onRoll() {},
+      },
+      mode: "normal",
+    });
+
+  test("FR-MOD-56 tray stops offering a used trigger: 'Divine Fury (on a hit)' before her first hit, gone once used, back when ready", () => {
+    stageDamage();
+    const ready = render(<TrayWindow />, brakkaRecords("ready"), ["rule-trigger"]);
+    expect(ready).toContain("Divine Fury (on a hit)");
+    expect(ready).toMatch(/data-testid="dicex-tray-extra-die" data-faces="6" data-key="t:trg-df"/);
+    stageDamage();
+    const used = render(<TrayWindow />, brakkaRecords("used"), ["rule-trigger"]);
+    expect(used).not.toContain("Divine Fury");
+    stageDamage();
+    expect(render(<TrayWindow />, brakkaRecords("waiting"), ["rule-trigger"])).not.toContain(
+      "Divine Fury",
+    );
   });
 });
