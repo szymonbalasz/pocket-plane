@@ -2,27 +2,28 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 4 Phase A (specs)** per [sprint-4](sprint-4.md) (#243, #244). Seams + two reviews done, every finding applied (`.verify/sprint4/{seams,rulings,review-a,review-b}.md`). **Waiting on DM gate 1** (`.verify/sprint4/gate.md`).
+**Phase:** **Sprint 4 Phase B (builds)**. DM gate 1 "go" (#245, #246). Spec branches merging; ADRs 0047–0050 numbered after the last spec merge.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| V vision + fog spec | `spec/s4-vision` (w4Z) | spec-vision | Reviewed, in-review | DM gate 1 → integrate + merge |
-| D animated dice spec | `spec/s4-dice` (w40) | spec-dice | Reviewed, in-review | DM gate 1 → integrate + merge |
-| M map tools spec | `spec/s4-maptools` (w51) | spec-maptools | Reviewed, in-review | DM gate 1 → integrate + merge |
-| R rules + effects spec | `spec/s4-rules` (w52) | spec-rules | Reviewed, in-review | DM gate 1 → integrate + merge |
-| Reviews | — | review-a, review-b | Done (V 1/8/10, M 0/2/6, D 0/4/9, R 1/4/11, C 0/5/12) | — |
-| C compendium spec | `spec/s4-compendium` (w53) | spec-compendium | Reviewed, in-review | DM gate 1 → integrate + merge |
+| Specs V, D, M | merged (#245) | — | Done | — |
+| Specs R, C | `spec/s4-rules` (w52), `spec/s4-compendium` (w53) | spec-rules, spec-compendium | Applying gate 1 | Merge; ADR numbering; C's cross-spec text |
+| V6 vision core | `fix/vision-s4-core` (w54, slot 0) | build-vision-core | Building | Walkthrough |
+| D5 die shapes + log dice | `build/dice-shapes` (w55, slot 2) | build-dice-shapes | Building | Walkthrough |
+| M0 area helper, M4 window placement | — | — | Queued (briefs ready) | Start when R / C spec agents finish |
 
 ## Shared-file locks
 
-- None yet (spec phase). Build order per [sprint-4 hotspots](sprint-4.md#boundaries-and-hotspots-sequence-these).
+- `fix/vision-s4-core` (V6): schema, `src/server/ws/` + protocol, entities `senses`, sheet folder (Senses), scene-hooks `mapChanged`, Open5e adapter line, bundles index + `fog.ts`.
+- `build/dice-shapes` (D5): bundles index (append).
+- Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
 
 ## Pending DM decisions
 
-- DM gate 1 (sprint 4 specs): G1–G44 + build plan, `.verify/sprint4/gate.md`.
+- None.
 
 ## Resolved locally (report at gate)
 
