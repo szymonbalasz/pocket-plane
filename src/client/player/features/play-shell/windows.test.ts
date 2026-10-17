@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { emptyStore } from "@shared/protocol/store";
-import { freeArea, renderedWindowRects } from "@ui/features/play-shell/free-area";
+import { freeArea, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
 import { clampRect, type Rect, TOP_BAR_H, workArea } from "@ui/features/play-shell/geometry";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
@@ -330,4 +330,26 @@ test("FR-SHELL-40 toast keep-out: player Initiative and Notifications stay off t
 test("FR-SHELL-42 player handout viewer registers restoreOpen: false; nothing else does", () => {
   const off = playerWindows.defs.filter((d) => d.restoreOpen === false).map((d) => d.kind);
   expect(off).toEqual(["party.handout"]);
+});
+
+test("FR-SHELL-44 freeAreas: the player 1280×800 default layout yields both the strip above the Game log and the one right of it", () => {
+  const viewport = { w: 1280, h: 800 };
+  const before = new Set(playerWindows.defs.map((d) => d.kind));
+  before.delete("cbt.initiative");
+  const layout = defaultLayout(playerWindows, viewport);
+  const rects = renderedWindowRects(layout, playerWindows, before, viewport);
+  const log = at(layout, "dice.log");
+  const sheet = at(layout, "char.sheet");
+  const areas = freeAreas(rects, viewport);
+  // Above the log: from the rail to the sheet, down to the log's top.
+  expect(areas).toContainEqual({ x: 68, y: TOP_BAR_H, w: sheet.x - 68, h: log.y - TOP_BAR_H });
+  // Right of the log: from the log's right edge to the sheet, the whole work area high.
+  const right = areas.find((a) => a.x === log.x + log.w);
+  expect(right).toEqual({
+    x: log.x + log.w,
+    y: TOP_BAR_H,
+    w: sheet.x - (log.x + log.w),
+    h: workArea(viewport).h,
+  });
+  expect(freeArea(rects, viewport)).toEqual(areas[0] as Rect);
 });

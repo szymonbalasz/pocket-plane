@@ -130,6 +130,62 @@ export function freeArea(rects: readonly Rect[], vp: Viewport): Rect {
   return tooSmall || !best ? bounds : best;
 }
 
+/** At most this many candidate rectangles (FR-SHELL-44). */
+export const FREE_AREAS_MAX = 16;
+
+/**
+ * Candidate free rectangles (FR-SHELL-44): every maximal axis-aligned rectangle of the work area
+ * right of the rail that none of `rects` overlaps, each ≥ 320×240; largest first (ties → the
+ * higher, then the more left), at most 16. The camera picks the one its tokens fit (FR-MAP-58).
+ */
+export function freeAreas(rects: readonly Rect[], vp: Viewport): Rect[] {
+  const bounds = railArea(vp);
+  const bx1 = bounds.x + bounds.w;
+  const by1 = bounds.y + bounds.h;
+  const obstacles: Rect[] = [];
+  for (const r of rects) {
+    const x0 = Math.max(bounds.x, r.x);
+    const y0 = Math.max(bounds.y, r.y);
+    const x1 = Math.min(bx1, r.x + r.w);
+    const y1 = Math.min(by1, r.y + r.h);
+    if (x1 > x0 && y1 > y0) obstacles.push({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+  }
+  const xs = [...new Set([bounds.x, bx1, ...obstacles.flatMap((o) => [o.x, o.x + o.w])])].sort(
+    (a, b) => a - b,
+  );
+  const ys = [...new Set([bounds.y, by1, ...obstacles.flatMap((o) => [o.y, o.y + o.h])])].sort(
+    (a, b) => a - b,
+  );
+  const empty = (x0: number, y0: number, x1: number, y1: number) =>
+    !obstacles.some((o) => o.x < x1 && x0 < o.x + o.w && o.y < y1 && y0 < o.y + o.h);
+  // A maximal empty rectangle has every side on the bounds or an obstacle edge, and can't grow
+  // to the next grid line on any side.
+  const out: Rect[] = [];
+  for (let i = 0; i < ys.length; i++) {
+    for (let j = i + 1; j < ys.length; j++) {
+      const y0 = ys[i] as number;
+      const y1 = ys[j] as number;
+      if (y1 - y0 < FREE_MIN_H) continue;
+      for (let k = 0; k < xs.length; k++) {
+        for (let l = k + 1; l < xs.length; l++) {
+          const x0 = xs[k] as number;
+          const x1 = xs[l] as number;
+          if (!empty(x0, y0, x1, y1)) break; // wider ones from this left edge only hit more
+          if (x1 - x0 < FREE_MIN_W) continue;
+          const maximal =
+            (k === 0 || !empty(xs[k - 1] as number, y0, x1, y1)) &&
+            (l === xs.length - 1 || !empty(x0, y0, xs[l + 1] as number, y1)) &&
+            (i === 0 || !empty(x0, ys[i - 1] as number, x1, y1)) &&
+            (j === ys.length - 1 || !empty(x0, y0, x1, ys[j + 1] as number));
+          if (maximal) out.push({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+        }
+      }
+    }
+  }
+  out.sort((a, b) => b.w * b.h - a.w * a.h || a.y - b.y || a.x - b.x);
+  return out.slice(0, FREE_AREAS_MAX);
+}
+
 // ---- appearances ----
 
 /** What the appearance tracker compares between renders. */
@@ -185,6 +241,8 @@ const subscribeNoted = (fn: () => void) => {
 export interface FreeAreaState {
   /** Free area in viewport px (the canvas fills the viewport). */
   area: Rect;
+  /** Every candidate free rectangle, largest first (FR-SHELL-44); may be empty. */
+  areas: readonly Rect[];
   /** Grows by one per appearance; compare with a previous value, never read as a total. */
   appearances: number;
   /** The layout is applied (FR-SHELL-16): a fit before that would use no windows. */
@@ -199,10 +257,10 @@ export function useFreeArea(): FreeAreaState {
   const available = useAvailableKinds();
   const vp = useViewport();
   const measured = useContentHeights();
-  const area = useMemo(
-    () => freeArea(renderedWindowRects(windows, registry, available, vp, measured), vp),
-    [windows, registry, available, vp, measured],
-  );
+  const { area, areas } = useMemo(() => {
+    const rects = renderedWindowRects(windows, registry, available, vp, measured);
+    return { area: freeArea(rects, vp), areas: freeAreas(rects, vp) };
+  }, [windows, registry, available, vp, measured]);
   const notedNow = useSyncExternalStore(subscribeNoted, notedAppearances);
   const [flips, setFlips] = useState(0);
   const windowsRef = useRef(windows);
@@ -213,5 +271,5 @@ export function useFreeArea(): FreeAreaState {
     if (isAppearance(seen.current, next, windowsRef.current)) setFlips((n) => n + 1);
     seen.current = next;
   }, [key, available]);
-  return { area, appearances: flips + notedNow, ready: key !== null };
+  return { area, areas, appearances: flips + notedNow, ready: key !== null };
 }
