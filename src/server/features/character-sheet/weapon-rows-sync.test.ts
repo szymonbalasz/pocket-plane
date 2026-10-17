@@ -23,8 +23,7 @@ const barrier = async (c: TestClient) => {
   await c.next("pong");
 };
 type Ent = { id: string; name: string; statBlock?: { attacks?: Record<string, unknown>[] } };
-const entOf = (c: TestClient, id: string) =>
-  (c.store.records[ENTITY_TYPE] ?? {})[id] as Ent | undefined;
+const entOf = (c: TestClient, id: string) => c.store.records[ENTITY_TYPE]?.[id] as Ent | undefined;
 const flameOf = (c: TestClient, id: string) =>
   entOf(c, id)?.statBlock?.attacks?.find((a) => a.name === "Flame Tongue greatsword");
 
@@ -126,7 +125,7 @@ describe("FR-CHARX-57 weapon fields leak", () => {
     await dm.next("ack");
     for (const c of [dm, p1, p2]) await barrier(c);
     expect(flameOf(p1, brakka)).toMatchObject({ bonus: 2 });
-    expect((flameOf(p1, brakka)?.extraDamage as unknown[]).length).toBe(2);
+    expect(flameOf(p1, brakka)?.extraDamage).toHaveLength(2);
     await scan(p1, { owner: true });
     await scan(p2, { owner: false });
 
