@@ -1,6 +1,8 @@
 // Features, Inventory and Notes tabs (CHARX §7). Feature uses are counters (owner + DM, also
-// locked); everything else edits in place in edit mode. The wallet line is party-loot's
-// read-only `wallet` record (FR-CHARX-33).
+// locked; below zero after an ask, FR-CHARX-58); everything else edits in place in edit mode.
+// The wallet line is party-loot's read-only `wallet` record (FR-CHARX-33).
+
+import { featureLeft } from "@shared/character-sheet/counters";
 import {
   CHARX_INTENTS,
   type FeatureRow,
@@ -8,14 +10,16 @@ import {
   ROW_LIMITS,
 } from "@shared/character-sheet/sheet";
 import { WALLET_TYPE, type WalletRecord } from "@shared/party-loot/schemas";
+import { useState } from "react";
 import { useRecords, useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
 import { LOOT_LOG_KIND } from "../party-loot/logic";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import { IntField, SelectField, TextField, useBusy } from "./fields";
+import { OverspendPopover, OverspentBadge } from "./overspend";
 import { AddRow, RowTools, useRows } from "./rows";
 import { notationContext, useSheet, useSheetIntents } from "./sheet-context";
-import { pipDelta, walletLine } from "./view-model";
+import { pipDelta, usesLeftText, walletLine } from "./view-model";
 
 const clean = (row: Record<string, unknown>) => {
   for (const k of Object.keys(row)) if (row[k] === undefined) delete row[k];
@@ -27,8 +31,11 @@ function FeatureUses({ f }: { f: FeatureRow }) {
   const live = useSync((s) => s.state === "live");
   const intents = useSheetIntents();
   const busy = useBusy();
+  const [ask, setAsk] = useState(false);
   if (!f.usesMax) return null;
   const counters = ctx.creature.kind === "character" && ctx.canCount;
+  // FR-CHARX-58: uses left may go below zero (to −9); spending past zero asks first.
+  const left = featureLeft(f);
   const use = (op: object) =>
     busy.run(() =>
       intents.send(CHARX_INTENTS.useResource, {
@@ -39,24 +46,49 @@ function FeatureUses({ f }: { f: FeatureRow }) {
     );
   return (
     <span className="flex items-center gap-1">
-      {Array.from({ length: f.usesMax }, (_, i) => (
-        <button
-          // biome-ignore lint/suspicious/noArrayIndexKey: pips are positional.
-          key={i}
-          type="button"
-          data-testid="charx-feature-use"
-          data-record-id={f.id}
-          data-used={f.used}
-          aria-label={`${f.name}: ${f.used} of ${f.usesMax} used`}
-          disabled={!live || busy.busy || !counters}
-          className={`size-3 rounded-full border border-foreground/60 ${i < f.used ? "bg-foreground" : ""}`}
-          onClick={(e) => use({ delta: pipDelta(e.shiftKey) })}
-        />
-      ))}
-      <span className="text-[10px] tabular-nums text-muted-foreground">
-        {f.used}/{f.usesMax}
+      <OverspendPopover
+        open={ask}
+        onOpenChange={setAsk}
+        name={f.name}
+        left={left}
+        max={f.usesMax}
+        verb="Use"
+        testId="charx-feature-overspend"
+        disabled={!live || busy.busy}
+        onConfirm={() => use({ delta: 1 })}
+      >
+        <span className="flex items-center gap-1">
+          {Array.from({ length: f.usesMax }, (_, i) => (
+            <button
+              // biome-ignore lint/suspicious/noArrayIndexKey: pips are positional.
+              key={i}
+              type="button"
+              data-testid="charx-feature-use"
+              data-record-id={f.id}
+              data-used={f.used}
+              data-left={left}
+              aria-label={`${f.name}: ${f.used} of ${f.usesMax} used`}
+              disabled={!live || busy.busy || !counters}
+              className={`size-3 rounded-full border border-foreground/60 ${i < f.used ? (left < 0 ? "bg-hp-down" : "bg-foreground") : ""}`}
+              onClick={(e) => {
+                const delta = pipDelta(e.shiftKey);
+                if (delta > 0 && left <= 0) setAsk(true);
+                else use({ delta });
+              }}
+            />
+          ))}
+        </span>
+      </OverspendPopover>
+      <span
+        data-testid="charx-feature-left"
+        data-record-id={f.id}
+        data-value={left}
+        className={`text-[10px] tabular-nums ${left < 0 ? "text-hp-down" : "text-muted-foreground"}`}
+      >
+        {usesLeftText(left, f.usesMax)}
         {f.reset ? ` · ${f.reset} rest` : ""}
       </span>
+      <OverspentBadge left={left} testId="charx-feature-overspent" />
       {counters && f.used > 0 && (
         <button
           type="button"

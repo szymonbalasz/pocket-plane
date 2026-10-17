@@ -98,7 +98,10 @@ export interface DiceExtrasStore {
   play(t: DiceThrow, plan: ThrowPlan, looks?: Record<string, DiceLook>): void;
   /** The throw `seq` is at rest (the renderer's report; flat throws rest on their own). */
   rested(seq: number): void;
-  /** 3D failed for the throw `seq` (context lost): it shows flat in the zone at its values. */
+  /**
+   * 3D failed for the throw `seq` (context lost, unmounted): it shows flat in the zone at its
+   * values; with popups on it ends and its popup takes the dice.
+   */
   flat(seq: number): void;
   /** The throw `seq` is gone (its hand-off / fade ended). */
   done(seq: number): void;
@@ -236,6 +239,8 @@ export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers):
     flat(n) {
       const run = runOf(n);
       if (!run || run.plan.draw === "flat") return;
+      // Popups on: the run ends and its popup takes the dice (miniature or chips, FR-DICEX-41).
+      if (run.plan.handoff) return done(n);
       patch(n, (r) => ({ ...r, plan: { ...r.plan, arena: "zone", draw: "flat" } }));
       if (run.phase === "moving") after(n, FLAT_IN_MS, () => rested(n));
     },

@@ -18,3 +18,12 @@ export const PENDING_MS = 3000;
 export const CHUNK_WAIT_MS = 1500;
 /** FR-DICEX-37: no `requestIdleCallback` → preload this long after the first snapshot. */
 export const IDLE_FALLBACK_MS = 2000;
+/** FR-DICEX-39: a roll popup stays this long after its dice rest (hover / focus pauses it). */
+export const POPUP_MS = 6000;
+/** A closing popup fades out over this, then it is gone. */
+export const POPUP_CLOSE_MS = 150;
+/**
+ * A popup's dice rest by this at the latest (a chunk wait, then the 2.5 s budget, plus slack):
+ * a part nothing reported on (its view never mounted) rests then, so no popup stays "Rolling…".
+ */
+export const POPUP_ROLLING_MAX_MS = CHUNK_WAIT_MS + SETTLE_MAX_MS + 2000;

@@ -25,12 +25,15 @@ import partyBoard from "./party-board";
 import partyLoot from "./party-loot";
 import physicalDiceCombat from "./physical-dice-combat";
 import ruleTriggers from "./rule-triggers";
+import rulesEffects from "./rules-effects";
 import sceneTools from "./scene-tools";
 import sceneToolsProps from "./scene-tools-props";
 import scenes from "./scenes";
 import sessionSim from "./session-sim";
 import sessionSim7 from "./session-sim-7";
 import syncProbe from "./sync-probe";
+import tokenArtUpdate from "./token-art-update";
+import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
 
@@ -65,7 +68,10 @@ export const bundles: readonly Bundle[] = [
   compendiumFull,
   visionParty,
   diceDisplay,
+  rulesEffects,
   mapTools,
   furyLogLine,
   physicalDiceCombat,
+  tokenArtUpdate,
+  usesNegative,
 ];

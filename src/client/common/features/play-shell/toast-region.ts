@@ -35,9 +35,27 @@ export function toastRegion(client: ShellClient, noteStackH: number): ToastRegio
       };
 }
 
+/**
+ * Where the roll-popup stack starts (FR-DICEX-39, seams S7): the region's third stack, beyond
+ * the notifications and alert stacks so neither moves. Players: above both, bottom-right; the
+ * DM: below both, top-centre (the stack keeps clear of Initiative itself, FR-NOTE-32's rule).
+ */
+export function popupRegion(
+  client: ShellClient,
+  noteStackH: number,
+  alertStackH: number,
+): { top: number } | { right: number; bottom: number } {
+  const after = (h: number) => (h > 0 ? h + STACK_GAP : 0);
+  const beyond = after(noteStackH) + after(alertStackH);
+  return client === "dm"
+    ? { top: DM_TOAST_TOP + beyond }
+    : { right: NOTE_EDGE, bottom: PLAYER_TOAST_BOTTOM + beyond };
+}
+
 // ---- keep-out box (FR-SHELL-40, seams S7, review A11) ----
-// Sizes for the region's three stacks at their fullest: 3 toasts and one roll popup (DICEX §7).
-// Auto placement reads only `toastKeepOut`; D7 (roll popup) owns these constants and grows them.
+// Sizes for the region's three stacks: 3 toasts and the roll popups (DICEX §7). Auto placement
+// reads only `toastKeepOut`; D7 (roll popup) owns these constants. The popup UI sizes itself from
+// `ROLL_POPUP_W` / `ROLL_POPUP_H` / `ROLL_POPUPS_MAX`, so the box and the cards never drift.
 
 /** Toasts the box holds. */
 export const KEEP_OUT_TOASTS = 3;
@@ -46,11 +64,18 @@ export const KEEP_OUT_TOASTS = 3;
  * the DM's `dice.log` at 1280×720 and the player's sheet at 900 px high, moving them.
  */
 export const KEEP_OUT_TOAST_H = 40;
-/** Widest stack in the region: sonner's toasts (356 px; notifications `w-80`, popup 280). */
-export const KEEP_OUT_W = 356;
-/** One roll popup at its max height (DICEX §7: 280 × 160). */
+/** One roll popup (DICEX §7): 280 px wide, at most 160 px tall (rows beyond 2 scroll inside). */
+export const ROLL_POPUP_W = 280;
 export const ROLL_POPUP_H = 160;
-/** Roll popups the box holds. */
+/** FR-DICEX-39: at most this many roll popups at once (the oldest closes). */
+export const ROLL_POPUPS_MAX = 3;
+/** Widest stack in the region: sonner's toasts (356 px; notifications `w-80`, popup 280). */
+export const KEEP_OUT_W = Math.max(356, ROLL_POPUP_W);
+/**
+ * Roll popups the box holds: one. The full stack (3 × 160 + gaps, 640 px with the toasts) moves
+ * the default layouts (the DM's `dice.log` at 1280×720, the player's sheet at 900 px high), so
+ * the 2nd and 3rd popup, transient (6 s), may overlap a window (D7 report, open issue).
+ */
 export const KEEP_OUT_POPUPS = 1;
 
 /** Height of the box: the toasts, then the popups, `STACK_GAP` between any two cards. */

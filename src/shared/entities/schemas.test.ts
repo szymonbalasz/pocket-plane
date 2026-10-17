@@ -3,8 +3,10 @@ import {
   abilityMod,
   CharacterStatBlock,
   CR_VALUES,
+  CREATURE_TYPES,
   CreateEntityBody,
   checkBonus,
+  creatureTypeOf,
   DAMAGE_RE,
   definitionOrder,
   EntityName,
@@ -192,6 +194,27 @@ describe("entities schemas", () => {
     const put = { name: "G", statBlock: goblin };
     expect(UpdateEntityBody.safeParse({ ...put, tokenShape: "none" }).success).toBe(true);
     expect(UpdateEntityBody.safeParse({ ...put, tokenShape: "hex" }).success).toBe(false);
+  });
+
+  test("FR-ENT-26 type: the 14 SRD types on monsters only; absent parses", () => {
+    expect(CREATURE_TYPES).toHaveLength(14);
+    for (const type of CREATURE_TYPES) {
+      expect(MonsterStatBlock.safeParse({ ...goblin, type }).success).toBe(true);
+    }
+    expect(MonsterStatBlock.safeParse(goblin).success).toBe(true);
+    for (const type of ["swarm", "Humanoid", ""]) {
+      expect(paths(MonsterStatBlock.safeParse({ ...goblin, type }))).toEqual(["type"]);
+    }
+    // Characters have none (strict block): `invalid`.
+    expect(CharacterStatBlock.safeParse({ ...mira, type: "humanoid" }).success).toBe(false);
+    const body = { kind: "monster", name: "G", statBlock: { ...goblin, type: "Humanoid" } };
+    expect(paths(CreateEntityBody.safeParse(body))).toEqual(["statBlock.type"]);
+    const typed = MonsterStatBlock.parse({ ...goblin, type: "humanoid" });
+    expect(creatureTypeOf({ kind: "monster", statBlock: typed })).toBe("humanoid");
+    expect(creatureTypeOf({ kind: "monster", statBlock: MonsterStatBlock.parse(goblin) })).toBe(
+      null,
+    );
+    expect(creatureTypeOf({ kind: "character" })).toBe(null);
   });
 
   test("FR-ENT-23 abilities all six (1–30), save proficiencies unique and need abilities", () => {

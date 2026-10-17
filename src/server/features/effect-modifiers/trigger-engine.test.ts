@@ -560,7 +560,7 @@ describe("FR-MOD-42 once per turn", () => {
     });
   });
 
-  test("FR-MOD-41 feature frequency: apply spends a Rage use; no use left → conflict; undo refunds", () => {
+  test("FR-MOD-41 feature frequency: apply spends a Rage use; no use left → conflict; Force spends below zero (FR-MOD-59); undo refunds", () => {
     const t = raging();
     setRule(t, t.furyId, { every: { feature: t.rageRowId } });
     const used = () =>
@@ -580,7 +580,8 @@ describe("FR-MOD-42 once per turn", () => {
     const e = t.err(() => t.applyTo(cardId, [{ name: "Goblin", triggers: assignFury(t) }]));
     expect([e.code, e.message]).toEqual(["conflict", "Divine Fury: no Rage uses left"]);
     t.applyTo(cardId, [{ name: "Goblin", triggers: assignFury(t, { force: true }) }]);
-    expect(used()).toBe(3);
+    // FR-MOD-59 (b): Force spends the use (−1 / 3 left); undo refunds exactly it.
+    expect(used()).toBe(4);
     t.undo();
     expect(used()).toBe(3);
   });

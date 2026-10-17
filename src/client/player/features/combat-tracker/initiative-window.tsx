@@ -1,6 +1,7 @@
 // Player `cbt.initiative` (CBT §7), read-only: Round N; rows by `playerPosition` with the turn
 // marker (`playerTurnCombatantId`), portrait, name, band (monsters) or Down (PCs, FR-CBT-49),
-// initiative (PCs); effect chips the player receives (one line + "+N") and PCs' death state
+// initiative (PCs); effect chips the player receives (one line + "+N"; then own PCs' trigger
+// chips, FR-CBTX-52) and PCs' death state
 // (own PC with pips, FR-CBTX-34). Removed combatants reach players (FR-CBT-37, map badge) but
 // leave this list. Companion: the turn alert + the concentration roll host (FR-CBTX-37).
 import type { CombatantView } from "@shared/combat-tracker/schemas";
@@ -21,6 +22,7 @@ import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/comb
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
 import { TurnAlertRuntime } from "@ui/features/combat-tracker/turn-alert-runtime";
 import { initiativeWindowBase } from "@ui/features/combat-tracker/window";
+import { triggerChipsFor, useTriggerWords } from "@ui/features/effect-modifiers/trigger-badges";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
@@ -43,6 +45,7 @@ function PlayerInitiativeBody() {
   const characters = useRecords<{ id: string; ownerPlayerId?: string | null }>("entity");
   const everLive = useSync((s) => s.everLive);
   const store = useSync((s) => s.store);
+  useTriggerWords();
   const rootRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLButtonElement>(null);
   // FR-CBT-77 (G4): new rows (Start, reveal) scroll into view; "↓ N more" below the fold.
@@ -105,6 +108,7 @@ function PlayerInitiativeBody() {
                   <EffectChips
                     compact
                     effects={effectsOn(fx, creatureOf(c))}
+                    triggers={triggerChipsFor(store, c)}
                     round={enc.round}
                     testId="cbtx-init-row-effect"
                   />

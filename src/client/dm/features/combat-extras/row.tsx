@@ -32,6 +32,7 @@ import {
   type RollKeys,
   useRollControl,
 } from "@ui/features/dice-roll-log/roll-control";
+import { useTriggerChips } from "@ui/features/effect-modifiers/trigger-badges";
 import { useSync } from "@ui/sync/store";
 import {
   BrainIcon,
@@ -79,15 +80,17 @@ export function RowTemp({ c }: { c: CombatantView }) {
   );
 }
 
-/** Effect chips on the name line; a chip opens Edit… / End. */
+/** Effect chips on the name line (a chip opens Edit… / End), then trigger chips (FR-CBTX-52). */
 export function RowEffects({ c, round }: { c: CombatantView; round: number }) {
   const effects = useCreatureEffects(c);
+  const triggers = useTriggerChips(c);
   const { send, disabled } = useCbtIntent();
   const openEffect = useCbtxDialogs((s) => s.openEffect);
   return (
     <EffectChips
       compact
       effects={effects}
+      triggers={triggers}
       round={round}
       testId="cbtx-init-row-effect"
       menu={(e: EffectView) => (
