@@ -2,17 +2,18 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 4 Phase A (specs)** per [sprint-4](sprint-4.md) (#243, #244). Next: seams → two reviews → DM gate 1.
+**Phase:** **Sprint 4 Phase A (specs)** per [sprint-4](sprint-4.md) (#243, #244). Seams settled (`.verify/sprint4/seams.md`, one pushback accepted: M0 builds no brush-stroke `half` mode). Reviews running → rulings → DM gate 1.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| V vision + fog spec | `spec/s4-vision` (w4Z) | spec-vision | Draft in-review (687f934) + proposed party-vision ADR | Seams |
-| D animated dice spec | `spec/s4-dice` (w40) | spec-dice | Draft in-review (04a569d) | Seams |
-| M map tools spec | `spec/s4-maptools` (w51) | spec-maptools | Draft in-review (a222d30) | Seams |
-| R rules + effects spec | `spec/s4-rules` (w52) | spec-rules | Draft in-review (40c113e); review: keep model, 2 extensions | Seams |
-| C compendium spec | `spec/s4-compendium` (w53) | spec-compendium | Writing | Seams |
+| V vision + fog spec | `spec/s4-vision` (w4Z) | spec-vision | Seams applied; in review | Review findings → authors |
+| D animated dice spec | `spec/s4-dice` (w40) | spec-dice | Seams applied; in review | Review findings → authors |
+| M map tools spec | `spec/s4-maptools` (w51) | spec-maptools | Seams applied; in review | Review findings → authors |
+| R rules + effects spec | `spec/s4-rules` (w52) | spec-rules | Seams applied; in review | Review findings → authors |
+| Reviews | main checkout tab `reviews` | review-a (V+M), review-b (D+R+C) | Running | `rulings.md` |
+| C compendium spec | `spec/s4-compendium` (w53) | spec-compendium | Seams applied; in review | Review findings → authors |
 
 ## Shared-file locks
 
