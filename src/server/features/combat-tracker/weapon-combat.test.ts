@@ -14,7 +14,7 @@ import { lineText } from "@shared/dice-roll-log/kind-types";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import type { ManualEntry } from "@shared/dice-roll-log/schemas";
 import { eq } from "drizzle-orm";
-import { gameLogEntry, hpChange, roll } from "../../db/schema";
+import { combatant, entity, gameLogEntry, hpChange, roll } from "../../db/schema";
 import type { Actor } from "../../events/types";
 import { rtSetup } from "../effect-modifiers/trigger-testing";
 import { attackCommand } from "./attack";
@@ -187,6 +187,47 @@ describe("FR-CBT-81 card parts", () => {
     ).toThrow("Enter 1 physical damage part");
     expect(() => t.attack(undefined, [{ diceTotal: 8 }])).toThrow();
     expect(t.s.db.select().from(roll).all().length).toBe(before);
+  });
+});
+
+describe("FR-CBT-81 monster rows", () => {
+  test("FR-CBT-81 a monster attack row with an extra part rolls the same way from the DM's Attack; its roll line stays DM-only", () => {
+    const t = flameTongue({ rage: false, ward: false });
+    const goblin = t.s.db
+      .select()
+      .from(combatant)
+      .where(eq(combatant.id, t.id("Goblin")))
+      .get();
+    const def = t.s.db
+      .select()
+      .from(entity)
+      .where(eq(entity.id, goblin?.entityId as string))
+      .get();
+    const stats = def?.statBlock as { attacks: Record<string, unknown>[] };
+    t.s.db
+      .update(entity)
+      .set({
+        statBlock: {
+          ...stats,
+          attacks: [
+            { ...stats.attacks[0], bonus: 2, extraDamage: [{ damage: "1d4", type: "poison" }] },
+          ],
+        },
+      })
+      .where(eq(entity.id, def?.id as string))
+      .run();
+    const { cardId, rollIds } = t.seeded<AttackResult>(attackCommand.name, {
+      attackerId: t.id("Goblin"),
+    });
+    const p = t.card(cardId);
+    expect(p.damage?.extra?.map((x) => x.type)).toEqual(["poison"]);
+    const line = t.s.db
+      .select()
+      .from(gameLogEntry)
+      .all()
+      .find((e) => (e.rollIds as string[]).includes(rollIds.at(-1) as string));
+    expect(line?.public).toBe(false);
+    expect(t.note(cardId)?.text).toContain(` + ${p.damage?.extra?.[0]?.total} poison`);
   });
 });
 
