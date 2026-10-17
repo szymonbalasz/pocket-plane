@@ -43,8 +43,12 @@ describe("FR-SCN-38 map.checkMove", () => {
       ok: false,
       hints: [{ guard: "scene-tools.walls", segments: [[8, 7, 8, 8]] }],
     });
-    expect(t.check(t.mira, 7, 5)).toEqual({ ok: true, hints: [] });
-    // The DM is never checked (FR-SCN-13 draws its own hint).
+    // Sprint 4: a legal cell also carries fog's sight preview (hint phase, FR-FOG-53), no wall piece.
+    const legal = t.check(t.mira, 7, 5);
+    expect(legal.ok).toBe(true);
+    expect(legal.hints.map((h) => h.guard)).toEqual(["fog-sight"]);
+    // The DM is never checked (FR-SCN-13 draws its own hint); its sight hint runs Mira's owner's
+    // guards, which refuse (10, 7): no hint at all (FR-FOG-53, review A2).
     expect(t.check(t.mira, 10, 7, t.h.dm)).toEqual({ ok: true, hints: [] });
   });
 

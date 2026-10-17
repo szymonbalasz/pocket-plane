@@ -721,7 +721,18 @@ export const checkMove = defineCommand({
     const t = getToken(tx, cid, tokenId);
     const s = findScene(tx, cid, t.sceneId) as SceneRecord;
     assertOnMap(s, col, row, t.size);
-    return tokenMoveGuards.check({ read: tx, actor }, t, { col: t.col, row: t.row }, { col, row });
+    // FR-FOG-53 (review A2): a DM drag of an owned token gates the hint phase on the owner's guards.
+    const as =
+      actor.role === "dm" && t.ownerPlayerId !== null
+        ? { role: "player" as const, playerId: t.ownerPlayerId }
+        : undefined;
+    return tokenMoveGuards.check(
+      { read: tx, actor },
+      t,
+      { col: t.col, row: t.row },
+      { col, row },
+      as ? { as } : {},
+    );
   },
 });
 

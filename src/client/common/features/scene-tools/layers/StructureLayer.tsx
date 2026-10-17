@@ -17,14 +17,14 @@ import {
   type Segment,
 } from "@shared/scene-tools/schemas";
 import { cellToPx } from "@shared/scenes-map/geometry";
-import { MAP_INTENTS, TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
+import { TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Group, Label, Line, Rect, Shape, Tag, Text } from "react-konva";
 import { useStore } from "zustand";
 import { SyncContext, useSync } from "../../../sync/store";
 import { useCanvas } from "../../scenes-map/canvas-context";
-import { toastReject, useLive, useMapIntent } from "../../scenes-map/intents";
+import { toastReject, useMapIntent } from "../../scenes-map/intents";
 import { useLayerToggles } from "../../scenes-map/tool-store";
 import { useDoorMenuIsland } from "../DoorMenu";
 import { setDoorEdit } from "../structure-edits";
@@ -40,7 +40,7 @@ import {
   toggledDoor,
   watchDrop,
 } from "../structure-view";
-import { WallHintProbe } from "../wall-hint";
+import { subscribeWallHint } from "../wall-hint";
 
 /** Segments as one shape (FR-SCN-12 perf: walls are one Konva shape). */
 function Segments({
@@ -241,44 +241,21 @@ function useBlockedFlash(on: boolean) {
 }
 
 /**
- * FR-SCN-38: the player's wall hint pieces while dragging their token (`map.checkMove` per
- * previewed cell); cleared on drag end, a snapshot, leaving live and a scene switch.
+ * FR-SCN-38: the player's wall hint pieces while dragging their token, from the canvas drag
+ * probe's `map.checkMove` acks (scenes-map, seams S1); cleared on cell change, drag end, a
+ * snapshot, leaving live and a scene switch (the probe resets its subscribers).
  */
 function useWallHint(on: boolean): Segment[] {
-  const { pointers, scene } = useCanvas();
-  const send = useMapIntent();
-  const live = useLive();
-  const generation = useSync((s) => s.lazy.generation);
+  const { probe } = useCanvas();
   const [pieces, setPieces] = useState<Segment[]>([]);
-  const probe = useMemo(
-    () =>
-      on
-        ? new WallHintProbe({
-            check: (tokenId, to) =>
-              send(MAP_INTENTS.checkMove, { tokenId, col: to.col, row: to.row }),
-            now: () => performance.now(),
-            setTimer: (fn, ms) => setTimeout(fn, ms),
-            clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
-            onChange: setPieces,
-          })
-        : null,
-    [on, send],
-  );
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a scene switch restarts the probe.
   useEffect(() => {
-    if (!probe) return;
-    probe.update(pointers.getState().drag);
-    const off = pointers.subscribe((s) => probe.update(s.drag));
+    if (!on) return;
+    const off = subscribeWallHint(probe, setPieces);
     return () => {
       off();
-      probe.clear();
+      setPieces([]);
     };
-  }, [probe, pointers, scene.id]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: each snapshot generation clears.
-  useEffect(() => probe?.snapshot(), [probe, generation]);
-  useEffect(() => {
-    if (!live) probe?.clear();
-  }, [probe, live]);
+  }, [on, probe]);
   return on ? pieces : [];
 }
 
