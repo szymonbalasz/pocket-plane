@@ -90,13 +90,14 @@ describe("map-tools fixtures (SCN / MAP §13, sprint 4)", () => {
       [3, 11],
     ]);
     // MAP §13 `mt-crowd`: visible, numbered, inside both players' sight.
+    const sid = ambush?.id as string;
     const crowd = tokens.filter((t) =>
       ["Goblin Sneak", "Goblin Sneak 2", "Crypt Ogre"].includes(t.name),
     );
     expect(crowd.map((t) => [t.name, t.col, t.row, t.size, t.hidden, t.sceneId])).toEqual([
-      ["Goblin Sneak", 4, 9, "small", false, ambush?.id],
-      ["Goblin Sneak 2", 5, 9, "small", false, ambush?.id],
-      ["Crypt Ogre", 4, 10, "large", false, ambush?.id],
+      ["Goblin Sneak", 4, 9, "small", false, sid],
+      ["Goblin Sneak 2", 5, 9, "small", false, sid],
+      ["Crypt Ogre", 4, 10, "large", false, sid],
     ]);
     expect(crowd.map((t) => t.seenBy?.length)).toEqual([2, 2, 2]);
   });

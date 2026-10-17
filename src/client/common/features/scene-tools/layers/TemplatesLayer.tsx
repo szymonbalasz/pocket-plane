@@ -1,12 +1,15 @@
 // `scn-templates` canvas layer (order 35, FR-SCN-02, -21, -23): above fog, below tokens. Kept
 // templates of the shown scene (`aoe-template` records), others' ephemeral templates
 // (`scn.template` signals, dropped on `end`, a snapshot, leaving live or 3 s of silence; only
-// the shown scene's), this connection's own ephemeral and a kept template being moved. Each:
-// the affected squares (cut to the map) tinted in the placer's role accent, the shape's outline
-// and "‹label› · N squares" at the origin. DM: hidden / DM-only ones in `visibility.hidden`
-// styling; the "DM-only items" switch (`dm-only`) drops hidden ones. No pointer events: the AoE
-// tool works on the stage. Konva: name `scn-template`, id = record ID or `eph-<key>`, attrs
-// `shape`, `cells`, `ephemeral`.
+// the shown scene's), this connection's own ephemeral and a kept template being moved or re-aimed
+// (FR-SCN-45, local preview until the commit). Each: the affected squares (> 50 % covered,
+// FR-SCN-41; cut to the map) tinted in the placer's role accent, the shape's true outline
+// (off-grid allowed) and "‹label› · N squares" at the origin. With the AoE tool: an origin handle
+// on every template this client may edit, and an end handle on the selected one. DM: hidden /
+// DM-only ones in `visibility.hidden` styling; the "DM-only items" switch (`dm-only`) drops
+// hidden ones. No pointer events: the AoE tool works on the stage. Konva: name `scn-template`,
+// id = record ID or `eph-<key>`, attrs `shape`, `cells` ("c,r c,r …"), `origin` ("x,y"),
+// `angle`, `ephemeral`; handles `scn-template-handle-origin` / `-end` (id = template id).
 import { templateCells } from "@shared/scene-tools/geometry";
 import {
   AOE_TEMPLATE_TYPE,
@@ -21,17 +24,22 @@ import { useSignal, useSync } from "../../../sync/store";
 import { canvasBlind } from "../../fog-of-war/blind";
 import { useCanvas } from "../../scenes-map/canvas-context";
 import { useLayerToggles } from "../../scenes-map/tool-store";
-import { useAoe } from "../aoe-store";
+import { type AoeGesture, useAoe } from "../aoe-store";
 import {
   canEditTemplate,
+  cellsAttr,
   createEphemeralStore,
   ephemeralsOn,
+  type GridPoint,
+  keptView,
+  mapPx,
   pickableTemplates,
   pruneEphemerals,
   receiveTemplate,
   resetEphemerals,
   type TemplateView,
   templateCaption,
+  templateHandles,
   templateOutline,
 } from "../templates";
 
@@ -45,6 +53,36 @@ interface Drawn {
   selected?: boolean;
   /** Draw the origin handle (this client may drag it with the AoE tool). */
   handle?: boolean;
+  /** Draw the end handle too (the selected kept template, FR-SCN-45). */
+  endHandle?: boolean;
+  /** Record id of a kept template (handle node ids). */
+  recordId?: string;
+}
+
+function Handle({
+  name,
+  id,
+  at,
+  stroke,
+}: {
+  name: string;
+  id: string;
+  at: GridPoint;
+  stroke: string;
+}) {
+  const { cam, colors } = useCanvas();
+  return (
+    <Circle
+      name={name}
+      id={id}
+      x={at.x}
+      y={at.y}
+      radius={6 / cam.scale}
+      fill={colors.background}
+      stroke={stroke}
+      strokeWidth={2 / cam.scale}
+    />
+  );
 }
 
 function TemplateNode({ d }: { d: Drawn }) {
@@ -71,6 +109,11 @@ function TemplateNode({ d }: { d: Drawn }) {
       ),
     [shape, x, y, size, width, angle, cs, gx, gy],
   );
+  const handles = useMemo(() => {
+    const h = templateHandles({ shape, x, y, size, width, angle });
+    const g = { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy };
+    return { origin: mapPx(g, h.origin), end: mapPx(g, h.end) };
+  }, [shape, x, y, size, width, angle, cs, gx, gy]);
   const stroke = d.hidden ? colors.hidden : d.accent;
   const ox = gx + x * cs;
   const oy = gy + y * cs;
@@ -81,7 +124,9 @@ function TemplateNode({ d }: { d: Drawn }) {
       name="scn-template"
       id={d.id}
       shape={t.shape}
-      cells={cells.length}
+      cells={cellsAttr(cells)}
+      origin={`${x},${y}`}
+      angle={angle}
       ephemeral={d.ephemeral}
       hidden={d.hidden}
       listening={false}
@@ -111,14 +156,19 @@ function TemplateNode({ d }: { d: Drawn }) {
         <Line points={outline.points} closed stroke={stroke} strokeWidth={sw} dash={dash} />
       )}
       {d.handle && (
-        <Circle
-          name="scn-template-origin"
-          x={ox}
-          y={oy}
-          radius={6 / cam.scale}
-          fill={colors.background}
+        <Handle
+          name="scn-template-handle-origin"
+          id={d.recordId ?? d.id}
+          at={handles.origin}
           stroke={stroke}
-          strokeWidth={2 / cam.scale}
+        />
+      )}
+      {d.endHandle && (
+        <Handle
+          name="scn-template-handle-end"
+          id={d.recordId ?? d.id}
+          at={handles.end}
+          stroke={stroke}
         />
       )}
       <Label x={ox + 8 / cam.scale} y={oy + 8 / cam.scale} name="scn-template-label">
@@ -135,15 +185,12 @@ function TemplateNode({ d }: { d: Drawn }) {
   );
 }
 
-const keptView = (r: TemplateRecordView): TemplateView => ({
-  shape: r.shape,
-  x: r.x,
-  y: r.y,
-  size: r.size,
-  width: r.width,
-  angle: r.angle,
-  label: r.label,
-});
+/** FR-SCN-45: a kept template as drawn, with its origin / end handle drag previewed locally. */
+function previewOf(r: TemplateRecordView, g: AoeGesture | null): TemplateView {
+  if (g?.kind === "move" && g.id === r.id && g.at) return { ...keptView(r), ...g.at };
+  if (g?.kind === "end" && g.id === r.id) return { ...g.template, label: r.label };
+  return keptView(r);
+}
 
 export function ScnTemplatesLayer() {
   const { client, scene, store, colors, myPlayerId, live, activeTool } = useCanvas();
@@ -200,15 +247,17 @@ export function ScnTemplatesLayer() {
   const drawn: Drawn[] = [];
   for (const r of kept) {
     if (r.hidden && dmOnlyOff) continue;
-    const moving = gesture?.kind === "move" && gesture.id === r.id ? gesture.at : null;
+    const editable = toolOn && canEditTemplate(r, client, myPlayerId);
     drawn.push({
       id: r.id,
-      template: moving ? { ...keptView(r), x: moving.x, y: moving.y } : keptView(r),
+      recordId: r.id,
+      template: previewOf(r, gesture),
       accent: accent(r.placedByPlayerId === null ? "dm" : "player"),
       hidden: r.hidden,
       ephemeral: false,
       selected: r.id === selectedId,
-      handle: toolOn && canEditTemplate(r, client, myPlayerId),
+      handle: editable,
+      endHandle: editable && r.id === selectedId,
     });
   }
   for (const e of others) {
