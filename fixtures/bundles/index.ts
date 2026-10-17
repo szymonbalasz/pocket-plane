@@ -17,6 +17,8 @@ import effectModifiers from "./effect-modifiers";
 import entities from "./entities";
 import fog from "./fog";
 import fogScn from "./fog-scn";
+import furyLogLine from "./fury-log-line";
+import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
 import partyBoard from "./party-board";
@@ -64,4 +66,6 @@ export const bundles: readonly Bundle[] = [
   visionParty,
   diceDisplay,
   rulesEffects,
+  mapTools,
+  furyLogLine,
 ];

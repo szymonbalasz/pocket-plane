@@ -352,7 +352,8 @@ export const applyCardWith = (hooks: ApplyHooks) =>
           actorName: p.attackerName,
           payload: logPayload,
           dmPayload,
-          rollIds,
+          // FR-MOD-57: + public character-trigger rolls (the others ride in `dmPayload.rollIds`).
+          rollIds: [...rollIds, ...hooked.rollIds],
           encounterId: enc.id,
           public: attacker.hidden || target.hidden ? false : playerCard ? true : input.public,
         });

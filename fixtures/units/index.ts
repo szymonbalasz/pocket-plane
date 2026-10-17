@@ -68,11 +68,13 @@ import partySecond from "./party-board/party-second";
 import loot1 from "./party-loot/loot-1";
 import lootSecond from "./party-loot/loot-second";
 import lootWallets from "./party-loot/loot-wallets";
+import mtTemplates from "./scene-tools/mt-templates";
 import scnPropImages from "./scene-tools/scn-prop-images";
 import scnProps from "./scene-tools/scn-props";
 import scnTemplates from "./scene-tools/scn-templates";
 import scnWalls from "./scene-tools/scn-walls";
 import battlemap from "./scenes-map/battlemap";
+import mtCrowd from "./scenes-map/mt-crowd";
 import scenesExtras from "./scenes-map/scenes-extras";
 import thornTown from "./scenes-map/thorn-town";
 import town from "./scenes-map/town";
@@ -154,4 +156,6 @@ export const units: readonly Fixture[] = [
   modFireWard,
   usesRageSpent,
   trgMiraUses,
+  mtTemplates,
+  mtCrowd,
 ];

@@ -125,8 +125,52 @@ export function visionCache(read: object): VisionCacheView {
 /** Test support: the number of committed entries (LRU). */
 export const visionCacheSize = () => lru.size;
 
+/** FR-FOG-53: the drag preview's own LRU, so drags never evict players' sight (FR-FOG-38). */
+export const PREVIEW_CACHE_MAX = 64;
+
+/** A preview: one source's polygons at the previewed cell. */
+export interface PreviewSight {
+  see: number[][];
+  dark: number[][];
+}
+
+const previews = new Map<string, PreviewSight>();
+
+/**
+ * FR-FOG-53: the preview cache bound to one read. `map.checkMove` writes nothing, so its entries
+ * (keyed by every input, FR-FOG-53) go straight to the LRU; per connection like `visionCache`.
+ */
+export function previewCache(read: object): {
+  get(key: string): PreviewSight | null;
+  set(key: string, v: PreviewSight): void;
+} {
+  if (!isRaw(read)) return { get: () => null, set: () => {} };
+  const conn = connOf(read);
+  return {
+    get(key) {
+      const k = `${conn}|${key}`;
+      const v = previews.get(k);
+      if (!v) return null;
+      previews.delete(k);
+      previews.set(k, v);
+      return v;
+    },
+    set(key, v) {
+      const k = `${conn}|${key}`;
+      previews.delete(k);
+      previews.set(k, v);
+      while (previews.size > PREVIEW_CACHE_MAX)
+        previews.delete(previews.keys().next().value as string);
+    },
+  };
+}
+
+/** Test support: the number of preview entries. */
+export const previewCacheSize = () => previews.size;
+
 /** Test support: a restart (memory only, FR-FOG-38). */
 export function clearVisionCache() {
   lru.clear();
   pending.clear();
+  previews.clear();
 }

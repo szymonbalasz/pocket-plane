@@ -10,14 +10,17 @@
 // and the shown scene the fog bar acts on. Non-drawing markers `fog-vision` / `fog-explored`
 // (attr `player`) carry the drawn rows: the player's own, the DM's View-as pair. Sprint 4: the
 // DM's layer draws only with the Fog tool or the Layers "Fog" switch on (`fog-layer` attr
-// `visible`, `plain-map.ts`); the View-as pick and its rows stay loaded meanwhile.
-import { FOG_TYPE } from "@shared/fog-of-war/schemas";
+// `visible`, `plain-map.ts`); the View-as pick and its rows stay loaded meanwhile. Sight preview
+// while dragging (FR-FOG-54, `sight-preview.ts`): the drawn `vision` takes the dragged source's
+// previewed polygons; the `fog-vision` marker then carries them and attr `preview` (token ids).
+import { FOG_SIGNALS, FOG_TYPE, FogSightPayload } from "@shared/fog-of-war/schemas";
 import type { DarknessShape } from "@shared/fog-of-war/shapes";
 import { samePair, type ViewAsPair } from "@shared/protocol/scene-window";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Group, Line, Rect, Shape, Text } from "react-konva";
+import { useStore } from "zustand";
 import { IntentRejected } from "../../sync/connection";
-import { useSync } from "../../sync/store";
+import { useSignal, useSync } from "../../sync/store";
 import { useCanvas } from "../scenes-map/canvas-context";
 import { toastReject } from "../scenes-map/intents";
 import type { CanvasClient } from "../scenes-map/layers";
@@ -36,6 +39,15 @@ import {
   paintDarknessDm,
   paintFog,
 } from "./render";
+import {
+  clearRemote,
+  createSightPreviewStore,
+  followDrags,
+  followProbe,
+  previewList,
+  previewVision,
+  receiveSight,
+} from "./sight-preview";
 import { FOG_TOOL_ID, fogRecordOf, setFogReader, useFogTool } from "./store";
 import { pairRows, setViewAs, shownPair, useViewAs } from "./view-as";
 import {
@@ -315,6 +327,41 @@ function useViewAsSync(client: CanvasClient, sceneId: string): ViewAsPair | null
   return pair;
 }
 
+/**
+ * FR-FOG-54: the sight previews of this canvas (own drag from the probe, others' `fog.sight`
+ * beside their drag preview) applied to the drawn `vision`; a `vision` change mid-drag re-probes.
+ */
+function useSightPreview<V extends Parameters<typeof previewVision>[0]>(vision: V) {
+  const { scene, probe, previews, tokens, live } = useCanvas();
+  const [sight] = useState(createSightPreviewStore);
+  useEffect(() => followProbe(sight, probe), [sight, probe]);
+  useEffect(() => followDrags(sight, previews), [sight, previews]);
+  useEffect(() => {
+    if (!live) clearRemote(sight);
+  }, [sight, live]);
+  useSignal(FOG_SIGNALS.sight, (s) => {
+    const d = FogSightPayload.safeParse(s.data);
+    if (!d.success) return;
+    receiveSight(sight, d.data, {
+      sceneId: scene.id,
+      previewing: (id) => id in previews.getState().previews,
+    });
+  });
+  // FR-FOG-54: a `vision` change for the drawn player mid-drag re-sends the current cell.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs on each new `vision` record.
+  useEffect(() => {
+    if (probe.current()) probe.recheck();
+  }, [probe, vision]);
+  const st = useStore(sight);
+  return useMemo(() => {
+    const owners = new Map(tokens.map((t) => [t.id, t.ownerPlayerId]));
+    return previewVision(
+      vision,
+      previewList(st, (id) => owners.get(id)),
+    );
+  }, [vision, st, tokens]);
+}
+
 export function FogLayer() {
   const { client, scene, grid, store, activeTool, cam, myPlayerId } = useCanvas();
   const hairline = 1 / cam.scale;
@@ -339,6 +386,7 @@ export function FogLayer() {
     [store.records, scene.id, viewer],
   );
   const memory = useMemo(() => memoryRuns(rows?.explored ?? null, map), [rows, map]);
+  const preview = useSightPreview(rows?.vision ?? null);
   const paints = useMemo(() => paintsFor(client), [client]);
   const playerPaints = useMemo(() => paintsFor("player"), []);
   const gridLines: GridLines = {
@@ -367,7 +415,13 @@ export function FogLayer() {
   // FR-FOG-20 (sprint 4): the plain battlemap for the DM outside the Fog tool.
   const off = useLayerToggles((s) => s.off);
   const shown = fogLayerShown(client, toolOn, off);
-  const view = (r: FogRecordLike) => ({ fog: r, memory, vision: rows?.vision ?? null });
+  const view = (r: FogRecordLike) => ({ fog: r, memory, vision: preview.vision });
+  const marker = own.vision && {
+    ...own.vision,
+    ...(preview.applied.length > 0
+      ? { see: preview.vision?.see, dark: preview.vision?.dark, preview: preview.applied.join(",") }
+      : {}),
+  };
   return (
     <Group name="fog-layer" listening={false} visible={shown}>
       {rec && (
@@ -410,7 +464,7 @@ export function FogLayer() {
       )}
       {drafting && gesture.draft && <Draft draft={gesture.draft} pending={gesture.pending} />}
       {/* FOG §7 markers (draw nothing): the viewer's vision and explored memory. */}
-      {own.vision && <Shape name="fog-vision" player={viewer} {...own.vision} sceneFunc={noDraw} />}
+      {marker && <Shape name="fog-vision" player={viewer} {...marker} sceneFunc={noDraw} />}
       {own.explored && (
         <Shape name="fog-explored" player={viewer} cells={own.explored.cells} sceneFunc={noDraw} />
       )}

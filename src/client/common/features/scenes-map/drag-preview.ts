@@ -3,6 +3,11 @@
 // `end` after the drop's `map.moveToken` and on cancel (Esc, FR-MAP-15; not live, FR-MAP-28).
 // Receiver: a per-canvas store of previews (like the laser's pointer store), so a frame re-renders
 // only the previewed token's group and label. DOM-free so it runs under `bun test`.
+// Sprint 4 (seams S1, one drag pipeline): this client's drag state = `DragState` (token id, start
+// cell, current cell; kept in `pointers.drag`, changed only when the cell changes) + the pointer's
+// x / y (`PreviewState.local`, every move, so a pointer move re-renders only the dragged token's
+// label). It feeds `map.drag` (`TokenDrag`), the drag probe (`drag-probe.ts`: `map.checkMove`
+// per cell) and anything derived on the client (M's drag path).
 import {
   DRAG_INTERVAL_MS,
   DRAG_REPEAT_MS,
@@ -23,6 +28,14 @@ const browserTimers: DragTimers = {
 interface Cell {
   col: number;
   row: number;
+}
+
+/** This client's drag (FR-MAP-39, seams S1): token, footprint, start cell, current cell. */
+export interface DragState {
+  tokenId: string;
+  size: number;
+  from: Cell;
+  to: Cell;
 }
 
 /** One token drag of this client: throttled preview frames + the drop / cancel decision. */

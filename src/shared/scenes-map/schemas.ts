@@ -268,15 +268,36 @@ export type MoveTokenInput = z.input<typeof MoveTokenInput>;
 export const CheckMoveInput = MoveTokenInput;
 export type CheckMoveInput = z.input<typeof CheckMoveInput>;
 
-/** `map.checkMove` ack: `ok` = the move would pass; `hints` per guard (wall: ≤ 1 piece). */
+/** FR-FOG-53: the `guard` of fog's sight hint (the hint phase, ADR-0047). */
+export const FOG_SIGHT_HINT = "fog-sight";
+
+/** A guard's hint (FR-SCN-38): segments `[x1, y1, x2, y2]` in grid units (wall: ≤ 1 piece). */
+export const SegmentsHint = z.object({
+  guard: z.string().refine((g) => g !== FOG_SIGHT_HINT),
+  segments: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])),
+});
+export type SegmentsHint = z.infer<typeof SegmentsHint>;
+
+/**
+ * FR-FOG-53 (sprint 4): the hint phase's sight preview = the source's polygons (flat grid-unit
+ * coordinates, rounded + simplified as FR-FOG-33) with the token at the checked cell.
+ */
+export const FogSightHint = z.object({
+  guard: z.literal(FOG_SIGHT_HINT),
+  tokenId: z.string(),
+  see: z.array(z.array(z.number())),
+  dark: z.array(z.array(z.number())),
+});
+export type FogSightHint = z.infer<typeof FogSightHint>;
+
+/** A `map.checkMove` hint, tagged by `guard` (ADR-0047). */
+export const MoveHint = z.union([FogSightHint, SegmentsHint]);
+export type MoveHint = z.infer<typeof MoveHint>;
+
+/** `map.checkMove` ack: `ok` = the move would pass; `hints` per guard, then the hint phase. */
 export const CheckMoveResult = z.object({
   ok: z.boolean(),
-  hints: z.array(
-    z.object({
-      guard: z.string(),
-      segments: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])),
-    }),
-  ),
+  hints: z.array(MoveHint),
 });
 export type CheckMoveResult = z.infer<typeof CheckMoveResult>;
 

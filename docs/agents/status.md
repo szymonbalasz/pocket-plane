@@ -11,30 +11,34 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
 | Docs pass | merged bd07224 | — | Done | — |
 | V7 pan / plain map / Fit | merged 13c15f6 | — | Done (BL-01, BL-07; check 3158, e2e 94) | V8, M1 next |
-| V8 vision while dragging | `build/vision-drag` (w5N, slot 0) | test-vision-drag | Walkthrough | Merge → M2 |
-| M1 freeform AoE | `build/aoe-freeform` (w5X, slot 3) | test-aoe-freeform | Walkthrough | Merge → M2 (after V8) |
+| V8 vision while dragging | merged ec3fd3a | — | Done (walkthrough 8/8) | M2 next |
+| M1 freeform AoE | merged | — | Done (walkthrough 7/7; BL-05 done) | — |
+| M2 drag path | `build/drag-path` (w61, slot 0) | build-drag-path | Building | Walkthrough → M5 |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
+| C-art core (token creature type) | `fix/cmp-art-core` (w50, slot 6) | build-cmp-art-core | Building | Review → C-art (after M5) |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
 | R S4-1a weapon rows | merged 9859252 | — | Done (walkthrough 6/6; main check 3174, e2e 95 green) | S4-2 next |
 | R S4-1b weapon combat + BL-10 | merged | — | Done (walkthrough 8/8; check 3138, e2e 92) | — |
-| R S4-5 Divine Fury log line | `fix/fury-log-line` (w5M, slot 2) | fix-fury-e2e | Walkthrough 9/9; check 3200 green; e2e order clash with trigger-state spec (same bundle) → fixing | Merge |
+| R S4-5 Divine Fury log line | merged | — | Done (walkthrough 9/9; own e2e bundle `fury-log-line`) | — |
 | R S4-3 trigger state + tray | merged e3e203b | — | Done (walkthrough 8/8; check 3185, e2e 96) | — |
-| R S4-4 trigger badges | `build/trigger-badges` (w5Y, slot 5) | build-trigger-badges | Building | Walkthrough |
-| R S4-2 negative uses | — | — | Queued (brief ready) | Next free slot |
+| R S4-4 trigger badges | `build/trigger-badges` (w5Y, slot 5) | test-trigger-badges | Walkthrough (check 3191, e2e 97; muted icon + tooltip folded into M5) | Merge |
+| R S4-2 negative uses | `fix/uses-negative` (w5Z, slot 2) | build-uses-negative | Building | Walkthrough |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
 | M4 window placement | merged c308458 | — | Done (re-test 3 5/5; check 3097, e2e 91) | — |
-| D7 roll popup | `build/roll-popup` (w5J, slot 4) | — | Walkthrough 13/14 + fix (be064b4, real-browser e2e); merged main, branch gates running | Merge |
+| D7 roll popup | `build/roll-popup` (w5J, slot 4) | — | Fixed (stack clears the combat popup); merge after main gates | Merge |
 | Mc map-tools core | merged | — | Done (check 3109, e2e 91; drizzle duplicate-index fix) | M1 after V7 |
 
 ## Shared-file locks
 
 - `build/roll-popup` (D7): toast-region lock (`toast-region.ts` constants, `ShellToaster.tsx`).
-- `build/vision-drag` (V8): canvas lock (`MapCanvas.tsx`, `TokensLayer.tsx`, `drag-preview.ts`), `move-guards.ts` (non-append), scene-tools `wall-hint.ts`.
+- `build/drag-path` (M2): canvas lock.
+- `fix/uses-negative` (S4-2): sheet folder lock.
+- `fix/cmp-art-core` (C-art core): schema lock, scenes-map token commands, Open5e adapter.
 - Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
 
@@ -49,6 +53,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 - Sprint 1: CON-44 headroom is tight (heavy DM snapshot 746 KB vs 768 KiB after cbtx-core). D build: snapshot only active effects; never raise a ceiling without a look.
 - Sprint 1 nit (not a FAIL): Notifications window opens ~250 px tall vs spec §7 360×480 (test-polish-notes).
 
+- Known flake: `e2e/weapon-combat.e2e.ts` (Flame Tongue line count) under a loaded full run; passes alone.
 - Known flake: `vision-s4.bench.test.ts` party move ≤ 30 ms fails only under parallel load (32 ms with 4 suites running; 11 ms alone). Re-run alone before treating it as real.
 - Known flake: `snapshot-size.test.ts` (CON-44) fails with SQLITE_BUSY when several worktrees run the suite at once; passes alone and on re-run. Builders re-run before treating it as real.
 

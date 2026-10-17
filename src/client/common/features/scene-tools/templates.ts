@@ -1,13 +1,13 @@
-// AoE template client logic (SCN FR-SCN-20–27), DOM-free so it runs under `bun test`:
-// the gesture → template math (FR-SCN-22), the ephemeral sender (≤ 20 sends/s while dragging,
-// repeated every 1 s at rest, `end` on Clear / Esc / Keep; FR-SCN-23), the receivers' store
-// (dropped on `end`, on a snapshot or after 3 s of silence; one per sender connection; drawn
-// only for the shown scene) and who may edit a kept template (FR-SCN-26).
+// AoE template client logic (SCN FR-SCN-20–27, -41–45), DOM-free so it runs under `bun test`:
+// the gesture → template math (FR-SCN-22; snapped unless Ctrl, FR-SCN-43), the kept template's
+// origin / end handles (FR-SCN-45), the Clear templates scope (FR-SCN-44), the ephemeral sender
+// (≤ 20 sends/s while dragging, repeated every 1 s at rest, `end` on Clear / Esc / Keep;
+// FR-SCN-23), the receivers' store (dropped on `end`, on a snapshot or after 3 s of silence; one
+// per sender connection; drawn only for the shown scene) and who may edit a kept template
+// (FR-SCN-26).
 import type { SignalFrom } from "@shared/protocol/frames";
-import { pxToVertex } from "@shared/scene-tools/geometry";
 import {
   FT_PER_CELL,
-  TEMPLATE_ANGLE,
   TEMPLATE_SIZE,
   TEMPLATE_WIDTH,
   type TemplateGeometry,
@@ -15,6 +15,7 @@ import {
   type TemplateShape,
   type TemplateSignalData,
 } from "@shared/scene-tools/schemas";
+import { snapAngle, snapPoint } from "@shared/scenes-map/area";
 import type { Grid } from "@shared/scenes-map/geometry";
 import { DRAG_INTERVAL_MS, DRAG_REPEAT_MS, DRAG_TIMEOUT_MS } from "@shared/scenes-map/schemas";
 import { createStore, type StoreApi } from "zustand";
@@ -48,10 +49,30 @@ export const DEFAULT_AOE: AoeSettings = {
 const norm360 = (a: number) => ((a % 360) + 360) % 360;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-/** FR-SCN-20: a direction snapped to 15° steps, 0 = east, 90 = south, in 0–345. */
-export function snapAngle(dx: number, dy: number): number {
-  const deg = norm360((Math.atan2(dy, dx) * 180) / Math.PI);
-  return norm360(Math.round(deg / TEMPLATE_ANGLE.step) * TEMPLATE_ANGLE.step);
+/** A point in grid units (vertex = integers; FR-SCN-20 origins have ≤ 2 decimals). */
+export interface GridPoint {
+  x: number;
+  y: number;
+}
+
+/** Map px → grid units. */
+export function gridPoint(g: Grid, x: number, y: number): GridPoint {
+  return { x: (x - g.gridOffsetX) / g.gridCellSize, y: (y - g.gridOffsetY) / g.gridCellSize };
+}
+
+/** Grid units → map px. */
+export function mapPx(g: Grid, p: GridPoint): GridPoint {
+  return { x: g.gridOffsetX + p.x * g.gridCellSize, y: g.gridOffsetY + p.y * g.gridCellSize };
+}
+
+/**
+ * FR-SCN-20 / -43: the template angle a drag direction `(dx, dy)` aims (0 = east, 90 = south):
+ * the direction itself for cones and lines; for a cube, its diagonal (the far corner follows the
+ * pointer, so sides run along `angle` and `angle + 90°`). 15° steps, or 0.1° with Ctrl.
+ */
+export function aimAngle(dx: number, dy: number, shape: TemplateShape, free: boolean): number {
+  const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
+  return snapAngle(shape === "cube" ? deg - 45 : deg, free);
 }
 
 /** FR-SCN-20: a size in ft snapped to 5, within 5–300. */
@@ -66,20 +87,23 @@ export function snapWidth(ft: number): number {
 }
 
 /**
- * FR-SCN-22: the template a press at vertex `origin` dragged to map px `(x, y)` makes. Cone and
- * line: direction from the drag; cube: the quadrant dragged into (0 SE, 90 SW, 180 NW, 270 NE);
- * sphere and cylinder: the radius from the drag. Under half a cell of drag keeps the panel's
- * size and the previous direction (`angle`).
+ * FR-SCN-22 / -43: the template a press at `origin` (grid units, already snapped) dragged to map
+ * px `at` makes. Cone and line: direction from the drag; cube: its diagonal toward the drag;
+ * sphere and cylinder: the radius from the drag (5-ft steps). Snapped to 15° unless `free`
+ * (Ctrl, 0.1°). Under half a cell of drag keeps the panel's size and the previous direction
+ * (`angle`).
  */
 export function gestureTemplate(
   s: AoeSettings,
-  origin: { x: number; y: number },
-  at: { x: number; y: number },
+  origin: GridPoint,
+  at: GridPoint,
   g: Grid,
   angle = 0,
+  free = false,
 ): TemplateView {
-  const dx = (at.x - (g.gridOffsetX + origin.x * g.gridCellSize)) / g.gridCellSize;
-  const dy = (at.y - (g.gridOffsetY + origin.y * g.gridCellSize)) / g.gridCellSize;
+  const p = gridPoint(g, at.x, at.y);
+  const dx = p.x - origin.x;
+  const dy = p.y - origin.y;
   const dragged = Math.hypot(dx, dy) >= 0.5;
   const base: TemplateView = {
     shape: s.shape,
@@ -94,19 +118,172 @@ export function gestureTemplate(
   if (s.shape === "sphere" || s.shape === "cylinder") {
     return { ...base, size: snapSize(Math.hypot(dx, dy) * FT_PER_CELL), angle: 0 };
   }
-  const raw = norm360((Math.atan2(dy, dx) * 180) / Math.PI);
-  if (s.shape === "cube") return { ...base, angle: Math.floor(raw / 90) * 90 };
-  return { ...base, angle: snapAngle(dx, dy) };
+  return { ...base, angle: aimAngle(dx, dy, s.shape, free) };
 }
 
-/** The vertex nearest a map point (the origin snaps to it, FR-SCN-20). */
-export const originAt = (g: Grid, x: number, y: number) => pxToVertex(g, x, y);
+/** FR-SCN-43: the origin of a press at map px: the nearest vertex, or (Ctrl) 0.01 cell. */
+export const originAt = (g: Grid, x: number, y: number, free = false): GridPoint =>
+  snapPoint(gridPoint(g, x, y), free);
+
+// ---------- handles (FR-SCN-45) ----------
+
+/** Hit radius of a handle, in cells (≈ 21 px at a 70 px cell). */
+export const HANDLE_HIT = 0.3;
+/** A move shorter than this (cells) keeps the origin: a click on the handle only selects. */
+export const MOVE_MIN = 0.1;
+
+export type HandleKind = "origin" | "end";
+
+/** Unit vector of a screen angle; exact at multiples of 90° (as the area helper). */
+function unit(deg: number): [number, number] {
+  const a = norm360(deg);
+  if (a === 0) return [1, 0];
+  if (a === 90) return [0, 1];
+  if (a === 180) return [-1, 0];
+  if (a === 270) return [0, -1];
+  const r = (a * Math.PI) / 180;
+  return [Math.cos(r), Math.sin(r)];
+}
+
+/**
+ * FR-SCN-45: a template's handles in grid units: the origin, and the end: the far end of a cone
+ * or line, a cube's far corner (its diagonal), the east point of a sphere / cylinder's rim.
+ */
+export function templateHandles(t: TemplateGeometry): Record<HandleKind, GridPoint> {
+  const L = t.size / FT_PER_CELL;
+  const origin = { x: t.x, y: t.y };
+  if (t.shape === "sphere" || t.shape === "cylinder")
+    return { origin, end: { x: t.x + L, y: t.y } };
+  const [ux, uy] = unit(t.angle);
+  if (t.shape === "cube") {
+    const [nx, ny] = unit(t.angle + 90);
+    return { origin, end: { x: t.x + (ux + nx) * L, y: t.y + (uy + ny) * L } };
+  }
+  return { origin, end: { x: t.x + ux * L, y: t.y + uy * L } };
+}
+
+/** The handle of `t` under `p` (grid units): its end handle only when `withEnd` (selected). */
+export function handleAt(t: TemplateGeometry, p: GridPoint, withEnd: boolean): HandleKind | null {
+  const h = templateHandles(t);
+  const near = (q: GridPoint) => Math.hypot(q.x - p.x, q.y - p.y) <= HANDLE_HIT;
+  if (withEnd && near(h.end)) return "end";
+  return near(h.origin) ? "origin" : null;
+}
+
+/** The kept template whose origin handle is nearest `p` within the hit radius, if any. */
+export function originHit<T extends TemplateGeometry>(kept: readonly T[], p: GridPoint): T | null {
+  let best: T | null = null;
+  let bestD = HANDLE_HIT;
+  for (const t of kept) {
+    const d = Math.hypot(t.x - p.x, t.y - p.y);
+    if (d <= bestD) {
+      best = t;
+      bestD = d;
+    }
+  }
+  return best;
+}
+
+/**
+ * FR-SCN-45: the end handle dragged to `p` (grid units): cone / line aim at it, a cube's diagonal
+ * aims at it, a sphere / cylinder takes its distance as the radius (5-ft steps). 15° steps unless
+ * `free` (Ctrl). Under half a cell from the origin → unchanged.
+ */
+export function endEdit<T extends TemplateGeometry>(t: T, p: GridPoint, free: boolean): T {
+  const dx = p.x - t.x;
+  const dy = p.y - t.y;
+  if (Math.hypot(dx, dy) < 0.5) return t;
+  if (t.shape === "sphere" || t.shape === "cylinder") {
+    return { ...t, size: snapSize(Math.hypot(dx, dy) * FT_PER_CELL) };
+  }
+  return { ...t, angle: aimAngle(dx, dy, t.shape, free) };
+}
+
+/**
+ * FR-SCN-43 / -45: the origin handle dragged to `p` (grid units): the nearest vertex, or (Ctrl)
+ * 0.01 cell; `null` while within `MOVE_MIN` of the press (a click keeps the origin).
+ */
+export function movedOrigin(press: GridPoint, p: GridPoint, free: boolean): GridPoint | null {
+  if (Math.hypot(p.x - press.x, p.y - press.y) < MOVE_MIN) return null;
+  return snapPoint(p, free);
+}
+
+export interface TemplateUpdate {
+  templateId: string;
+  x?: number;
+  y?: number;
+  angle?: number;
+  size?: number;
+}
+
+/** FR-SCN-45: release sends one `scn.updateTemplate` with the changed fields, or nothing. */
+export function templateUpdate(
+  id: string,
+  before: TemplateGeometry,
+  after: TemplateGeometry,
+): TemplateUpdate | null {
+  const patch: TemplateUpdate = { templateId: id };
+  for (const k of ["x", "y", "angle", "size"] as const) {
+    if (after[k] !== before[k]) patch[k] = after[k];
+  }
+  return Object.keys(patch).length > 1 ? patch : null;
+}
+
+// ---------- Clear templates (FR-SCN-44) ----------
+
+/** FR-SCN-44: the kept templates of a scene the Clear dialog counts: DM-placed and players'. */
+export function clearCounts(
+  kept: readonly Pick<TemplateRecordView, "sceneId" | "placedByPlayerId">[],
+  sceneId: string,
+): { dm: number; players: number } {
+  let dm = 0;
+  let players = 0;
+  for (const t of kept) {
+    if (t.sceneId !== sceneId) continue;
+    if (t.placedByPlayerId === null) dm++;
+    else players++;
+  }
+  return { dm, players };
+}
+
+/** FR-SCN-44: how many the chosen scope deletes (Confirm is disabled at 0). */
+export const clearScopeCount = (c: { dm: number; players: number }, players: boolean): number =>
+  players ? c.dm + c.players : c.dm;
+
+/** FR-SCN-44 / -34: Confirm needs something in scope and a live connection. */
+export const clearConfirmEnabled = (n: number, live: boolean): boolean => n > 0 && live;
+
+/** FR-SCN-44: the intent input (`players` absent = false). */
+export const clearInput = (
+  sceneId: string,
+  players: boolean,
+): { sceneId: string; players?: true } => (players ? { sceneId, players: true } : { sceneId });
+
+/** FR-SCN-44: "Clear N DM templates on this scene?" */
+export function clearTitle(dm: number): string {
+  return `Clear ${dm} DM ${dm === 1 ? "template" : "templates"} on this scene?`;
+}
+
+/** Appendix A: `cells` attr = the squares as "c,r c,r …" (row-major). */
+export const cellsAttr = (cells: readonly (readonly [number, number])[]): string =>
+  cells.map(([c, r]) => `${c},${r}`).join(" ");
 
 /** FR-SCN-21: "‹label› · N squares" (no label: "N squares"). */
 export function templateCaption(label: string, n: number): string {
   const squares = `${n} ${n === 1 ? "square" : "squares"}`;
   return label ? `${label} · ${squares}` : squares;
 }
+
+/** A kept record as drawn. */
+export const keptView = (r: TemplateRecordView): TemplateView => ({
+  shape: r.shape,
+  x: r.x,
+  y: r.y,
+  size: r.size,
+  width: r.width,
+  angle: r.angle,
+  label: r.label,
+});
 
 /** FR-SCN-26: the DM edits any kept template; a player only one they placed. */
 export function canEditTemplate(
@@ -328,12 +505,22 @@ export function templateOutline(t: TemplateGeometry, g: Grid): TemplateOutline {
   const L = (t.size / FT_PER_CELL) * cs;
   if (t.shape === "sphere" || t.shape === "cylinder") return { kind: "circle", x: ox, y: oy, r: L };
   if (t.shape === "cube") {
-    const q = Math.floor(norm360(t.angle) / 90);
-    const sx = q === 0 || q === 3 ? 1 : -1;
-    const sy = q === 0 || q === 1 ? 1 : -1;
+    // FR-SCN-20 (sprint 4): sides along `angle` and `angle + 90°` (0 / 90 / 180 / 270 = SE / SW /
+    // NW / NE, as sprint 2's quadrants).
+    const [ux, uy] = unit(t.angle);
+    const [nx, ny] = unit(t.angle + 90);
     return {
       kind: "poly",
-      points: [ox, oy, ox + sx * L, oy, ox + sx * L, oy + sy * L, ox, oy + sy * L],
+      points: [
+        ox,
+        oy,
+        ox + ux * L,
+        oy + uy * L,
+        ox + (ux + nx) * L,
+        oy + (uy + ny) * L,
+        ox + nx * L,
+        oy + ny * L,
+      ],
     };
   }
   const rad = (norm360(t.angle) * Math.PI) / 180;
