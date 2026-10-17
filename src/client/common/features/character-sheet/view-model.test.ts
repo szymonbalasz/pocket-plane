@@ -8,10 +8,16 @@ import {
 } from "@shared/character-sheet/sheet";
 import { CharacterStatBlock } from "@shared/entities/schemas";
 import {
+  attackRowView,
+  canAddExtraPart,
   canEdit,
   canUseCounters,
   crLine,
+  EXTRA_DICE_HINT,
+  EXTRA_TYPE_HINT,
+  extraPart,
   hitDicePips,
+  MAGIC_OPTIONS,
   nextProficiency,
   overrideTooltip,
   passives,
@@ -214,5 +220,47 @@ describe("FR-CHARX-17 pips, spells, wallet", () => {
     expect(walletLine(undefined)).toBe("0 gp");
     expect(walletLine({ cp: 0, sp: 0, ep: 0, gp: 21, pp: 0 })).toBe("21 gp");
     expect(crLine("1/2")).toBe("CR 1/2 · 100 XP");
+  });
+});
+
+describe("FR-CHARX-56 weapon row view model", () => {
+  test("FR-CHARX-56 weapon row UI: numbers fold the bonus, parts chunked; Badge only with a bonus", () => {
+    const flame = {
+      name: "Flame Tongue greatsword",
+      toHit: 7,
+      damage: "2d6+4",
+      damageType: "slashing" as const,
+      bonus: 1,
+      extraDamage: [{ damage: "2d6", type: "fire" as const }],
+    };
+    expect(attackRowView(flame)).toEqual({
+      name: "Flame Tongue greatsword",
+      badge: "+1",
+      parts: ["+8 · 2d6+5 slashing", "+ 2d6 fire"],
+    });
+    expect(attackRowView({ name: "Club", toHit: 2, damage: "1d4" })).toEqual({
+      name: "Club",
+      badge: null,
+      parts: ["+2 · 1d4"],
+    });
+    expect(MAGIC_OPTIONS.map((o) => o.value)).toEqual([0, 1, 2, 3]);
+    expect(canAddExtraPart(flame)).toBe(true);
+    expect(canAddExtraPart({ extraDamage: [...flame.extraDamage, ...flame.extraDamage] })).toBe(
+      false,
+    );
+  });
+
+  test("FR-CHARX-56 weapon row UI: the FR-CHARX-54 mirror blocks 7d6 / no type inline", () => {
+    expect(extraPart({ damage: " 2d6 ", type: "fire" })).toEqual({
+      part: { damage: "2d6", type: "fire" },
+    });
+    expect(extraPart({ damage: "6d12+10", type: "cold" })).toEqual({
+      part: { damage: "6d12+10", type: "cold" },
+    });
+    for (const damage of ["7d6", "2d20", "1d6+11", "1d6-1", "fire", ""]) {
+      expect(extraPart({ damage, type: "fire" })).toEqual({ error: EXTRA_DICE_HINT });
+    }
+    expect(extraPart({ damage: "2d6", type: null })).toEqual({ error: EXTRA_TYPE_HINT });
+    expect(extraPart({ damage: "2d6", type: "holy" })).toEqual({ error: EXTRA_TYPE_HINT });
   });
 });

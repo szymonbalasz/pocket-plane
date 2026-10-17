@@ -1166,7 +1166,7 @@ From [scene-tools](../specs/scene-tools.md) (SCN, `complete`; DM gate 2, #196; [
 
 - **One distance fn** (FR-SCN-30): `distanceFt(a, b, rule)` (`@shared/scene-tools/geometry`). The client reads the rule from the store's `map-settings` row (`diagonalRuleIn(records)`, no row or a bad value = `5-10-5`) for the ruler label (`map-ruler-label`) and the drag's movement indicator (`map-move-label`), on both clients. Combat's `movedFt` (FR-CBT-39): server-side in combat's token-changed hook via `diagonalRuleOf(tx, campaignId)` + `distanceFt` *(built)*; a move refused by a move guard never reaches the hooks, so it adds nothing.
 - **Ruler panel** (DM): `ToolRail` `basePanels` (a base tool's panel beside the rail, like a registry tool's; none while targeting); `DmMapToolRail` passes `{ruler: DiagonalRulePanel}`. `scn-ruler-panel` with ToggleGroup `scn-diagonal-rule` (`data-value` = the server's rule; items `scn-diagonal-rule-5-10-5` / `-5`); shows the store's value, no optimistic state; disabled while not live. Players have no panel.
-- **Layers popover** (DM, FR-SCN-05): rail button `map-tool-layers` (`data-some-off`) → popover `scn-layers`, one Switch `scn-layer-toggle-<key>` per registered layer toggle (`props`, `walls`, `templates`, in layer order; the registry loads with the lazy canvas chunk) plus `dm-only` "DM-only items". Off = not mounted / not drawn on this DM client (walls, hidden props and templates, hidden tokens and their labels via `withoutDmOnly`) and not hit (MapCanvas box select skips hidden tokens; the Props and AoE tools hit only what is drawn, `pickableTemplates`); players are never filtered. Never sent. Works while not live. Kept per campaign in browser storage `pp.layers.v1.<campaignId>` = `{off: string[]}` (zod-parsed; invalid → all on + one warning; storage failure → memory only, one warning).
+- **Layers popover** (DM, FR-SCN-05): rail button `map-tool-layers` (`data-some-off`) → popover `scn-layers`, one Switch `scn-layer-toggle-<key>` per registered layer toggle (`props`, `walls`, `templates`, in layer order; the registry loads with the lazy canvas chunk) plus `dm-only` "DM-only items". Off = not mounted / not drawn on this DM client (walls, hidden props and templates, hidden tokens and their labels via `withoutDmOnly`) and not hit (MapCanvas box select skips hidden tokens; the Props and AoE tools hit only what is drawn, `pickableTemplates`); players are never filtered. Never sent. Works while not live. Kept per campaign in browser storage `pp.layers.v1.<campaignId>` = `{off: string[]}` (zod-parsed; invalid → all on + one warning; storage failure → memory only, one warning). *(Sprint 4, V7, [§66](#66-sprint-4-middle-pan-plain-map-konva-layers-fit-v7))* + optional `on: string[]` (switched-on keys) for FOG's `fog` switch, a `show` switch: off by default.
 - **Toggle hints:** `ToggleTip` (`@ui/components/ui/toggle-tip`) puts the shared Tooltip on a wrapper span, so the Tooltip's own `data-state` no longer overwrites a ToggleGroupItem's `on` / `off` (rail tools, Structure modes, AoE shapes keep their highlight). The disabled wrapper keeps `map-tool-<id>-off`.
 - **Tests:** `settings.test.ts` (row + log + one event, no-op, forbidden / invalid, campaigns apart, DM / player / other-campaign visibility in events and snapshot, crash before / after commit), `settings-sync.test.ts` (WS reach, convergence, reconnect, restart); e2e `scene-tools-settings` (SCN §13 steps 9–10). CON-44 re-run on the tree with build/fog-visibility merged: heavy DM 676,059 B; players 277,041–280,101 B (settings add nothing: the row was already in the harness).
 
@@ -1174,7 +1174,7 @@ From [scene-tools](../specs/scene-tools.md) (SCN, `complete`; DM gate 2, #196; [
 
 | Piece | Path | Rule |
 |---|---|---|
-| Layer entry | `layers.ts` | `LayerDef {id, order, component, clients? (default both), group?, toggle? {key, label, layer: objects \| tokens \| dm-only \| fog}}`; duplicate id, order or toggle key throws at load. `layerSlots(layers, client, off)`: same-group neighbours mount as Konva `Group`s inside one `<Layer name=group>`; DM entries whose toggle is off are dropped. `LAYER_ORDER`: map 0, grid 10, scnProps 20, scnStructure 26, fog 30, scnTemplates 35, tokens 40, labels 45, scnEdit 48, pointers 50. Budget ≤ 8 Konva layers with fog, 9 while drawing |
+| Layer entry | `layers.ts` | `LayerDef {id, order, component, clients? (default both), group?, toggle? {key, label, layer: objects \| tokens \| dm-only \| fog}}`; duplicate id, order or toggle key throws at load. `layerSlots(layers, client, off)`: same-group neighbours mount as Konva `Group`s inside one `<Layer name=group>`; DM entries whose toggle is off are dropped. `LAYER_ORDER`: map 0, grid 10, scnProps 20, scnStructure 26, fog 30, scnTemplates 35, tokens 40, labels 45, scnEdit 48, pointers 50. Budget ≤ 8 Konva layers with fog, 9 while drawing *(superseded sprint 4, V7: ≤ 4 Konva layers, every entry a Group, [§66](#66-sprint-4-middle-pan-plain-map-konva-layers-fit-v7))* |
 | Layer toggles | `tool-store.ts` `useLayerToggles` | `{off: {[toggleKey]: true}}`, client only; registered toggles: `props`, `walls`, `templates` (`layerToggles()` lists them). The Layers popover and `localStorage` persistence *(built, build/scene-tools-settings; above)*; `dm-only` is a popover switch, not a layer entry |
 | Tool entry | `tools.ts` | `CanvasToolDef {id, label, icon, clients, order, panel?, cursor?, pointer? {down, move, up, cancel(reason) → dropped?}}`; ids differ from `select` / `ruler` / `ping`; duplicate id or order throws. `ToolPointer` = map px, `cell`, nearest `vertex`, screen px, button / modifiers, `clicks`, client, scene, grid, `intent(name, input)`, `signal(name, data)` |
 | Tool store | `tool-store.ts` | `MapTool` = base tool or registry id; `useMapTool().client` set by MapCanvas (the rail filters registry tools by it) |
@@ -1915,3 +1915,72 @@ From [combat-tracker](../specs/combat-tracker.md) FR-CBT-81–85 and [effect-mod
 
 - `ApplyHookDm` (apply hooks, [§26](#26-combat-registries-and-seams)) gains `extraDefense`.
 - OQ-MOD-44: the tray / throw layer throws each payload item of a new `roll` entry, so extra parts throw as labelled dice of the same entry; no dice-extras change.
+
+## 70. Sprint 4: middle pan, plain map, Konva layers, Fit (V7)
+
+From [scenes-map](../specs/scenes-map.md) FR-MAP-12, -29, -44 and [fog-of-war](../specs/fog-of-war.md) FR-FOG-20, -22 (seams S3, S4, S11). **Built by `build/map-pan-plain`**: client only; no record type, intent, event, signal or wire field (CON-44: 0 B).
+
+| Piece | Contract |
+|---|---|
+| Middle pan (`scenes-map/middle-pan.ts`, `MapCanvas.tsx`) | Capture-phase `pointerdown` / `mousedown` on `map-canvas`, before Konva and every tool: `pointerIntent(tool, {button, buttons, space, live, panning})` (`tools.ts`) → `pan` (button 1), `ignore` (button 1 while the left button is down, OQ-MAP-45; any press while a middle pan runs), `tool` / `canvas` (as before; `pressGoesToTool` stays left-only). Taken presses stop propagating; the `mousedown` is cancelled (no autoscroll), `auxclick` button 1 too. The stage follows window `mousemove`; the release commits the camera and marks it `moved` (none if it never moved). A window `mouseup` guard registered before any Stage keeps a middle release from ending a left drag (Konva ends drags on any mouse release). `map-canvas` `data-panning="middle"` + grabbing cursor while it runs. A tool's gesture in progress (polygon draft) is untouched (FR-FOG-22) |
+| Konva layers (`layers.ts`, `canvas-layers.ts`) | `LayerDef.layer: base \| fog \| objects \| top` (required); `orderLayers` throws when an order would interleave two Konva layers. `stageLayers(layerSlots(…))` → ≤ 4 `<Layer name="map-layer-<key>">` (`fog` not listening): base = map, grid, `scn-objects` (props, structure); fog = fog; objects = scn-templates, tokens, labels; top = scn-edit, pointers. Each entry renders inside `<Group name={id}>`; layer components render a `Group` (old names kept: `map-layer`, `grid-layer`, `fog-layer`, `tokens-layer`, `map-labels`, `pointers-layer`, `scn-templates`, `scn-edit`) |
+| Layer toggles (`layers.ts`) | `LayerToggle.kind?: hide \| show`; `toggleOn(t, off)` (unset `show` = off). A `show` toggle never unmounts its entry |
+| DM plain map (`fog-of-war/plain-map.ts`, `FogLayer.tsx`) | `FOG_LAYER_SWITCH` `{key: fog, label: Fog, layer: fog, kind: show}` on the fog entry → popover `scn-layer-toggle-fog`. `fogLayerShown(client, fogToolOn, off)`: players always; DM only with the Fog tool or the switch on. `fog-layer` attr `visible`. View-as pick and rows stay loaded; Fog / Invisible badges are token overlays (unchanged) |
+| Fit (`camera.ts` `fitContent`, BL-01, 138c9fd) | After the fit and FR-MAP-46's PC pan, per axis: the map centred in the work area right of the rail (x ≥ 68, y ≥ 48) when it fits, else covering it — x panned the least, **y with its top row under the top bar** (the crop falls at the dock; FOG §13 step 26) — as far as the tokens' footprints (+ their labels' lower half) and, at the floor, the PCs (16 px margin) that were in the free area stay there |
+| E2E helper (`e2e/support/map.ts`) | `gridPoint(page, gx, gy, grid?)` (page px of a grid point, no pan); `mapPoint(page, col, row, {margin?, grid?})` (cell centre; while it or `margin` cells around it are covered (`elementFromPoint` not the map canvas), middle-drags the map onto the nearest clear spot); `panMap(page, dx, dy)` |
+
+## 71. Sprint 4: magic weapon rows on the sheet (S4-1a)
+
+From [character-sheet-full](../specs/character-sheet-full.md) (FR-CHARX-54–57) and [combat-tracker](../specs/combat-tracker.md) (FR-CBT-86); MOD §13.1. **Built by `build/weapon-rows`** (sheet folder lock after V6; `creature-form.tsx` before C-art; `src/shared/dice-roll-log/{schemas,roll-kind}.ts` under a sequence lock, orchestrator-approved). Data side: [data model §54](../data-model/README.md#54-sprint-4-magic-weapon-rows-s4-1a). The `Attack` zod (`bonus`, `extraDamage`) is S4-0's ([§66](#66-sprint-4-rules-core-s4-0)).
+
+**Intents** (no new intent)
+
+| Intent | Change | Source |
+|---|---|---|
+| `char.putRow` (attacks) | carries `bonus?` / `extraDamage?` (S4-0 zod); owner (unlocked) and DM, both kinds; bad parts (`7d6`, untyped, 3 parts, `bonus` 4) → `invalid`, nothing written | FR-CHARX-54 |
+| `char.roll` `attack` / `damage` | rolls `1d20 + toHit + bonus`; the base part = `damage` with `bonus` on its constant (`2d6+4` → `2d6+5`), typed `damageType`, mods (Rage) attach here; then **one roll per extra part**, row order, typed, **no roll subject**. All rolls in the one entry (FR-DICE-26); `rollIds` / `CharacterRolled.rollIds` list them all (event schema unchanged). `manual` / `manualParts` up to 4 (`SHEET_MANUAL_MAX`): `attack` 2 + n, `damage` 1 + n (n ≤ 2), exact count checked against the row's specs ("Enter 3 physical rolls for attack"); each manual entry checked against its own part's expression | FR-CHARX-55 |
+| `entities.update` / `PUT /api/entities` | the creature form's whole replace keeps the first attack's `id`, `bonus`, `extraDamage` and the attack rows after it (it edits neither) | FR-CBT-86 |
+
+**Schemas** (zod; optional, old rows parse and render unchanged)
+
+| Schema | Change | Source |
+|---|---|---|
+| `RollPayloadItem` (`@shared/dice-roll-log/schemas`, `roll` kind) | + `part? {type: DamageType \| null, extra: boolean}` (`RollPart`): set by `char.roll` on every damage item of a row with extra parts (base `extra: false`, `type` null = untyped base). Public like the item | FR-CHARX-55 |
+| `SheetRollIntent` (`char.roll`) | `manual` ≤ 4, `manualParts` ≤ 4 lists (was 2); count range per kind as above | FR-CHARX-55 |
+| `CharacterRollSpec` (`@shared/character-sheet/logic`) | + `part?` (as above); `SheetAttack` + `bonus` (0 = none), `extraDamage` ([] = none; spells 0 / []); `attackRollSpecs` → `[hit, base, ...extras]` with the bonus folded in. Combat consumes these (S4-1b): no second bonus | FR-CHARX-55, FR-CBT-81 |
+
+**Log line** (`roll` kind, `formatLine`): a base item followed by its `extra` items is **one run**: "Brakka — Flame Tongue greatsword damage: 2d6+5 (3 + 5) + 2 Rage slashing + 2d6 (2 + 6) fire = 23"; name = the base label without " (type)"; one `die` segment per die of every part (seams S8); one total; "physical" once. Items without `part` render byte-for-byte as before; a lone base or an orphan extra renders as a plain roll. FR-DICE-28 kind contract unchanged.
+
+**Visibility** (FR-CHARX-57): no new record type; weapon fields live in `entity.statBlock` (DM + owner; definitions DM only; not on the other-players whitelist). Leak test `weapon-rows-sync.test.ts`: `player-2` frames / snapshot / reconnect never carry "Flame Tongue", `extraDamage` or `"bonus"`; a custom monster's weapon row reaches no player; players' `sync.load` of definitions → `forbidden`.
+
+**Client** (FR-CHARX-56): Actions tab row line 1 name + Badge `charx-attack-bonus` (`data-value` = bonus) when bonus > 0; line 2 `charx-attack-numbers` "+8 · 2d6+5 slashing + 2d6 fire" (wraps between parts). Edit: Magic Select `charx-attack-bonus` (`data-value` 0–3), extra part rows `charx-attack-extra` (`data-value` = index: dice `charx-field` `attacks.<id>.extraDamage.<i>.damage`, `charx-attack-extra-type`, `charx-attack-extra-delete`), `charx-attack-extra-add` (disabled at 2), inline `charx-attack-extra-error` ("Use NdM+K: up to 6d12+10" / "Pick a damage type"; nothing sent). Extra parts have no preview subject (mods on the base part). NPC sheet the same (DM).
+
+| Item | Figure |
+|---|---|
+| CON-44 | `part` markers on 30 heavy roll entries × 3 items: DM +3,780 B, each player +3,780 B; with S4-0's extra rolls DM 714,404 B, players max 324,224 B (`weapon-rows-con44.test.ts`) |
+
+## 72. Sprint 4: trigger state (S4-3)
+
+Built by `build/trigger-state` ([FR-MOD-53–56, -60](../specs/effect-modifiers.md#6-functional-requirements); [ADR-0049](../architecture/adr/0049-trigger-state.md); #245). MOD writes the `trigger-state` rows of [§66](#66-sprint-4-rules-core-s4-0); no new record type, intent, signal or event name. Data side: [data model §55](../data-model/README.md#55-sprint-4-trigger-state-s4-3).
+
+**Writes** — one function, `triggerStates(env, encounter, combatantIds?)` (`src/server/features/effect-modifiers/trigger-state-writes.ts`): derives the rows from committed rows (FR-MOD-53) and inserts / updates / deletes only what differs, in the causing command's transaction; the rows join that command's event `changes` (no event of their own, no post-commit write). An encounter that isn't started has no rows.
+
+| Path | Event whose `changes` carry `trigger-state` | Rows |
+|---|---|---|
+| `cbt.start` / `cbtx.addCombatants` (MOD's `combatRuleHooks` line `effect-modifiers.reminders`, `started` / `added`) | `EncounterStarted` / `CombatantsAdded` | created for the new combatants |
+| `cbt.nextTurn` / `cbt.prevTurn` (same line, `turnChanged`, after CBTX's expiries / restores) | `TurnChanged` | charge (window, `waiting`) and `armed`, changed rows only |
+| `cbt.end` (same line, `ended`) | `EncounterEnded` | all deleted |
+| `cbt.applyCard` (MOD's `applyHooks` line, after the use row flips) | `AttackApplied` | the offered parts' owners: `used` |
+| `cbt.undo` (`applyHooks.revert`) | `CombatEntryUndone` | back to `ready` |
+| A `roll` trigger spent at once (MOD's roll hook) | the roll's own event (`DiceRolled`, `CharacterRolled`, `AttackRolled`, …): the hook's result has no rows, so they join the command's next emitted event | `used` |
+| Effect insert / update / end / restore, in or out of combat (MOD's `effectHooks` line `effect-modifiers.trigger-state`): `cbtx.*` effect commands, concentration, 0 HP ends, undo restores, `mod.toggle` / `mod.apply` / `mod.setModifiers` | `EffectsAdded`, `EffectsEnded`, `EffectUpdated`, `ConcentrationSet`, `ConcentrationRolled`, `HpApplied` / `AttackApplied`, `CombatEntryUndone`, `EffectToggled`, `PresetApplied`, `EffectModifiersSet`; out of combat none | `armed` of the changed creatures' rows (creatures without a combatant in the started encounter: none) |
+| `mod.putTrigger`, `cmp.addToSheet` (`addTriggerFromPreset`) | `RuleTriggerSaved` | added / renamed / re-ruled / disabled (deleted) |
+| `mod.deleteTrigger` | `RuleTriggerDeleted` | deleted (listed before the FK cascade) |
+| `mod.putPreset` / `mod.deletePreset` (an origin key decides `requires`, FR-MOD-36) | `EffectPresetSaved` / `EffectPresetDeleted` | `armed` |
+| Owner reassignment (MOD's definition-changed hook line `effect-modifiers.preset-owner`) | `EntityUpdated` / `CharacterSheetEdited` | `ownerPlayerId` rewritten: the old owner gets the delete, the new owner the upsert |
+
+- Combatant remove / restore (`cbt.setRemoved`) rewrites nothing. A Next that doesn't change a row lists none (event traffic ≤ the rows whose charge flips).
+- **Clients** read the rows; no rule reads them on the server. Tray / roll-control preview (`rollPreview`, `@shared/effect-modifiers/preview`): a `hit` trigger group, and a windowed `roll` trigger part, only while the roller's combatant row is `armed` and `ready` (and a `feature` trigger's sheet row has a use left); no row → no group (FR-MOD-56). `PREVIEW_TYPES` gains `trigger-state` and `creature-sheet`. The server stays lenient (FR-MOD-18).
+- **Badge words** (`triggerBadge(row, facts)` / `armedBadge(armed, needs)`, `@shared/effect-modifiers/trigger-state`; FR-MOD-60, reused by FR-CBTX-52, -53): Ready; Used this turn / round / fight; On ‹owner›'s turn (`waiting`); Not in effect — needs ‹preset›; a `feature` trigger "2 / 3 left" ("−1 / 3 left" down); out of combat In effect / Not in effect.
+- **`charge`** (`triggerCharge`): `waiting` whenever the rule has an `ownTurn` filter and the turn isn't the owner's (round 0 included: never a false Ready), before `used`.
+- **Test IDs:** `mod-trigger-state` + `data-record-id` (trigger id) + `data-state` = `ready` \| `used` \| `waiting` \| `off` \| `in-effect`, in the Triggers block row.

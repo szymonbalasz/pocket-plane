@@ -2,10 +2,11 @@
 // pure over the synced store. From a roll subject it gives the **preview mode** (the roller's
 // mode combined with the creature's `mode` effects and enabled `roll` mode triggers), one
 // physical **group** per bonus die (`e:` keys from `bonusDieGroups`, the server's function) and
-// per `hit` trigger that **may** be offered (`t:<triggerId>`: requires and owner-side filters
-// pass, R4's `trigger-fire` rules; charges are server-only, so a group may go unused), and the
-// Tooltip's parts line. `roll` trigger parts are server-rolled (no group; R4 passes no key). The server's final
+// per `hit` trigger that can be offered (`t:<triggerId>`: requires and owner-side filters pass,
+// R4's `trigger-fire` rules, and its `trigger-state` row says armed and ready, FR-MOD-56), and
+// the Tooltip's parts line. `roll` trigger parts are server-rolled (no group; R4 passes no key). The server's final
 // mode and parts always decide (FR-MOD-17, -18).
+import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
 import {
   COMBATANT_TYPE,
@@ -39,6 +40,7 @@ import {
 } from "./schemas";
 import { type FireFacts, formulaOwnerOf, ownerFiltersPass, requiresMet } from "./trigger-fire";
 import { RULE_TRIGGER_TYPE } from "./trigger-records";
+import { TRIGGER_STATE_TYPE, type TriggerStateRecord } from "./trigger-state";
 import { doublesOnCrit, type PlayerTriggerRule, type TriggerRule } from "./triggers";
 
 /** A `rule-trigger` as either client holds it (the player copy may name presets by `{name}`). */
@@ -168,6 +170,18 @@ function requiresHold(
   return requiresMet(req ? { requires: req } : {}, keys, (k) => origin.get(k) ?? null);
 }
 
+/**
+ * FR-MOD-60 out of combat: a trigger's `requires` against the creature's active effects in the
+ * store, as the preview checks it (a `{name}` ref may hold).
+ */
+export function triggerArmedNow(
+  store: RecordStore,
+  rule: PreviewTrigger["rule"],
+  creature: CreatureRef,
+): boolean {
+  return requiresHold(store, rule, creature, effectsOf(store));
+}
+
 /** The started encounter's turn as this client sees it (players: `playerTurnCombatantId`). */
 function isOwnTurn(store: RecordStore, own: CombatantView | null): boolean {
   if (!own) return false;
@@ -176,11 +190,41 @@ function isOwnTurn(store: RecordStore, own: CombatantView | null): boolean {
   return turn !== null && turn === own.id;
 }
 
+/** `every: {feature}`: uses left on the character's sheet row (null: sheet or row not held). */
+function featureUsesLeft(
+  store: RecordStore,
+  characterId: string | null,
+  featureId: string,
+): number | null {
+  const sheet = values<CreatureSheetRecord>(store, CREATURE_SHEET_TYPE).find(
+    (s) => s.entityId === characterId,
+  );
+  const f = sheet?.features.find((r) => r.id === featureId);
+  return f?.usesMax ? f.usesMax - f.used : null;
+}
+
 /**
- * The enabled triggers of this roll's owner that may fire on it, in `seq` order, as MOD's
- * server hook picks them minus the charges (server-only): `hit` → `damage` on a card's damage
- * roll in combat; `roll` → `each` anywhere, windowed ones in combat only, no `feature` ones
- * (FR-MOD-43). Requires and hard owner-side filters (`ownerFiltersPass`) must hold.
+ * FR-MOD-56 (sim-7): the tray never promises a spent trigger. The trigger's `trigger-state` row
+ * for the roller's combatant is armed and `ready`, and a `feature` trigger has a use left on the
+ * sheet. No row received → false. The server still decides (FR-MOD-18).
+ */
+function chargeReady(store: RecordStore, t: PreviewTrigger, own: CombatantView): boolean {
+  const row = values<TriggerStateRecord>(store, TRIGGER_STATE_TYPE).find(
+    (r) => r.triggerId === t.id && r.combatantId === own.id,
+  );
+  if (!row?.armed || row.charge !== "ready") return false;
+  const every = t.rule.every;
+  return (
+    typeof every !== "object" || (featureUsesLeft(store, t.characterId, every.feature) ?? 0) > 0
+  );
+}
+
+/**
+ * The enabled triggers of this roll's owner that can fire on it, in `seq` order, as MOD's
+ * server hook picks them: `hit` → `damage` on a card's damage roll in combat; `roll` → `each`
+ * anywhere, windowed ones in combat only, no `feature` ones (FR-MOD-43). Requires and hard
+ * owner-side filters (`ownerFiltersPass`) must hold; `hit` and windowed `roll` triggers also
+ * need their trigger state armed and ready (FR-MOD-56).
  */
 function firingTriggers(
   store: RecordStore,
@@ -205,9 +249,10 @@ function firingTriggers(
         if (!(subject.roll === "damage" && subject.card && own) || rule.then.do !== "damage") {
           return false;
         }
+        if (!chargeReady(store, t, own)) return false;
       } else if (rule.on === "roll") {
         if (typeof rule.every === "object") return false;
-        if (rule.every !== "each" && !own) return false;
+        if (rule.every !== "each" && !(own && chargeReady(store, t, own))) return false;
       } else {
         return false;
       }
@@ -377,6 +422,8 @@ export const PREVIEW_TYPES = [
   ENCOUNTER_TYPE,
   ENTITY_TYPE,
   IMPORTED_ENTITY_TYPE,
+  TRIGGER_STATE_TYPE,
+  CREATURE_SHEET_TYPE,
 ] as const;
 
 export { RULE_TRIGGER_TYPE };

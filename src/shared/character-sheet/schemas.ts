@@ -3,10 +3,10 @@
 import {
   checkManualParts,
   ManualEntry,
-  ManualPartsPerRoll,
+  ManualParts,
   RollMode,
 } from "@shared/dice-roll-log/schemas";
-import { Ability, SkillName } from "@shared/entities/schemas";
+import { Ability, EXTRA_DAMAGE_MAX, SkillName } from "@shared/entities/schemas";
 import { z } from "zod";
 
 export const CHAR_ROLL = "char.roll";
@@ -64,6 +64,16 @@ export const MANUAL_COUNT: Record<Exclude<SheetRollKind, "spellAttack">, number>
   spellToHit: 1,
 };
 
+/**
+ * FR-CHARX-55 (sprint 4): attack / damage of a row with extra damage parts take one more manual
+ * entry per part (attack 2 + n, damage 1 + n, n ≤ 2); the exact count is checked against the
+ * row's roll specs.
+ */
+const extraManual = (k: SheetRollKind): number =>
+  k === "attack" || k === "damage" ? EXTRA_DAMAGE_MAX : 0;
+/** Most manual entries a `char.roll` takes (attack + damage with two extra parts). */
+export const SHEET_MANUAL_MAX = MANUAL_COUNT.attack + EXTRA_DAMAGE_MAX;
+
 const Id = z.string().min(1).max(64);
 
 /**
@@ -81,15 +91,16 @@ export const SheetRollIntent = z
     attackId: Id.optional(),
     spellId: Id.optional(),
     mode: RollMode.default("normal"),
-    manual: z.array(ManualEntry).min(1).max(2).optional(),
+    manual: z.array(ManualEntry).min(1).max(SHEET_MANUAL_MAX).optional(),
     /** FR-MOD-18 (tier 2): physical bonus / trigger die groups, one list per `manual` entry. */
-    manualParts: ManualPartsPerRoll.optional(),
+    manualParts: z.array(ManualParts).min(1).max(SHEET_MANUAL_MAX).optional(),
     public: z.boolean().optional(),
   })
   .superRefine((v, ctx) => {
     checkManualParts(v, ctx);
     const n = v.kind === "spellAttack" ? null : MANUAL_COUNT[v.kind];
-    if (v.manual && n !== null && v.manual.length !== n) {
+    const len = v.manual?.length ?? 0;
+    if (v.manual && n !== null && (len < n || len > n + extraManual(v.kind))) {
       ctx.addIssue({
         code: "custom",
         path: ["manual"],

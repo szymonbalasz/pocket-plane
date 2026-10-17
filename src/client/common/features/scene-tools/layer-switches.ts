@@ -1,8 +1,8 @@
 // DM Layers popover (FR-SCN-05): one switch per registered layer `toggle`, plus "DM-only items"
 // (`dm-only`: not a layer of its own; hidden props / templates and every wall read it). Client
-// only, never sent; all on by default; kept per campaign in browser storage
-// (`pp.layers.v1.<campaignId>`, zod-parsed on read; storage failure → memory only, one warning).
-// DOM-free.
+// only, never sent; on by default (a `show` switch, e.g. FOG's "Fog", off); kept per campaign in
+// browser storage (`pp.layers.v1.<campaignId>`, zod-parsed on read; storage failure → memory
+// only, one warning). DOM-free.
 import { z } from "zod";
 import type { StorageBackend } from "../play-shell/storage";
 import type { LayerToggle } from "../scenes-map/layers";
@@ -35,14 +35,15 @@ export function layerSwitches(toggles: readonly LayerToggle[]): LayerToggle[] {
 
 export const layerMemoryKey = (campaignId: string) => `pp.layers.v1.${campaignId}`;
 
-/** Stored: the keys switched off. */
-const Stored = z.strictObject({ off: z.array(z.string().min(1).max(64)).max(64) });
+/** Stored: the keys switched off; `on`: the keys switched on (kept so a `show` switch survives). */
+const Keys = z.array(z.string().min(1).max(64)).max(64);
+const Stored = z.strictObject({ off: Keys, on: Keys.optional() });
 
 export type LayersOff = Readonly<Record<string, boolean>>;
 
-/** `off` for the store from what was stored (only `true` keys). */
-const toOff = (keys: readonly string[]): Record<string, boolean> =>
-  Object.fromEntries(keys.map((k) => [k, true]));
+/** `off` for the store from what was stored (`true` = off, `false` = switched on). */
+const toOff = (off: readonly string[], on: readonly string[] = []): Record<string, boolean> =>
+  Object.fromEntries([...on.map((k) => [k, false]), ...off.map((k) => [k, true])]);
 
 export interface LayerMemory {
   /** The campaign's switched-off keys; missing → all on; invalid → all on + warning. Never throws. */
@@ -72,7 +73,7 @@ export function createLayerMemory(
       json = undefined;
     }
     const r = Stored.safeParse(json);
-    if (r.success) return toOff(r.data.off);
+    if (r.success) return toOff(r.data.off, r.data.on);
     warn(`scene-tools: invalid layer switches "${key}"; all layers on`);
     return {};
   };
@@ -91,10 +92,11 @@ export function createLayerMemory(
     write(campaignId, off) {
       const key = layerMemoryKey(campaignId);
       const keys = Object.keys(off).filter((k) => off[k] === true);
-      memory.set(key, toOff(keys));
+      const on = Object.keys(off).filter((k) => off[k] === false);
+      memory.set(key, toOff(keys, on));
       if (failed) return;
       try {
-        getBackend().setItem(key, JSON.stringify({ off: keys }));
+        getBackend().setItem(key, JSON.stringify({ off: keys, on }));
       } catch (err) {
         fail("write", err);
       }

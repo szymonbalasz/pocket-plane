@@ -9,6 +9,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, tokenNode } from "./support/konva";
+import { mapPoint } from "./support/map";
 import { showToPlayers } from "./support/scenes";
 import { openWindow } from "./support/shell";
 
@@ -43,10 +44,8 @@ async function attrOf(page: Page, name: string, attr: string) {
 const fogBadges = async (page: Page) =>
   (await konvaNodes(page, "fog-token-fogged")).map((n) => n.id).sort();
 
-/** Goblin Ambush: 70 px cells, offset 0. Corner (i, j) / centre of cell (c, r) in page px. */
+/** Goblin Ambush: 70 px cells, offset 0. Corner (i, j) in page px. */
 const corner = (page: Page, i: number, j: number) => mapToPage(page, i * 70, j * 70);
-const centre = (page: Page, c: number, r: number) =>
-  mapToPage(page, (c + 0.5) * 70, (r + 0.5) * 70);
 
 /** Drags a Fog tool rectangle over cells (c0, r0)–(c1, r1): corner to corner (snapped). */
 async function dragRect(page: Page, c0: number, r0: number, c1: number, r1: number) {
@@ -176,7 +175,8 @@ test("FR-FOG-17–20 DM fog render, rect + polygon reveal, Undo, Space pan, Reve
   await expect(undo).toHaveAttribute("data-depth", "4");
 
   // FR-FOG-18: drag corner (11, 5) → (14, 8) (cells (11, 5)–(13, 7)) → Goblin (12, 6) clear;
-  // Goblin 2 (12, 8) still fogged.
+  // Goblin 2 (12, 8) still fogged. (BL-01: the cells pan clear of the Game log first.)
+  await mapPoint(dm, 12, 6, { margin: 2 });
   const a = await corner(dm, 11, 5);
   const b = await corner(dm, 14, 8);
   await dm.mouse.move(a.x, a.y);
@@ -197,8 +197,8 @@ test("FR-FOG-17–20 DM fog render, rect + polygon reveal, Undo, Space pan, Reve
     dm.evaluate(() =>
       (window as unknown as { Konva: { stages: { x(): number }[] } }).Konva.stages[0]?.x(),
     );
+  const p = await mapPoint(dm, 4, 12);
   const x0 = await stageX();
-  const p = await centre(dm, 4, 12);
   await dm.keyboard.down("Space");
   await dm.mouse.move(p.x, p.y);
   await dm.mouse.down();
@@ -210,6 +210,7 @@ test("FR-FOG-17–20 DM fog render, rect + polygon reveal, Undo, Space pan, Reve
 
   // FR-FOG-19: polygon (15, 10), (19, 10), (19, 13), (15, 13), first corner → Lurker (17, 11) clear.
   await dm.getByTestId("fog-shape-polygon").click();
+  await mapPoint(dm, 17, 11, { margin: 3 });
   for (const [i, j] of [
     [15, 10],
     [19, 10],
@@ -277,10 +278,10 @@ test("FR-FOG-17 Space + drag pans with a fog bar toggle focused (Fog): no edit, 
     dm.evaluate(() =>
       (window as unknown as { Konva: { stages: { x(): number }[] } }).Konva.stages[0]?.x(),
     );
+  const p = await mapPoint(dm, 4, 12);
   const x0 = await stageX();
   const edits = () => sent.filter((f) => f.includes('"fog.edit"')).length;
   const before = edits();
-  const p = await centre(dm, 4, 12);
   await dm.mouse.move(p.x, p.y);
   await dm.keyboard.down("Space");
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-space-pan", "true");

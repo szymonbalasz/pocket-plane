@@ -237,6 +237,10 @@ export function checkManualParts(
   if (message) ctx.addIssue({ code: "custom", path: ["manualParts"], message });
 }
 
+/** FR-CHARX-55: a weapon damage part's type and role on a `roll` payload item. */
+export const RollPart = z.strictObject({ type: PartDamageType.nullable(), extra: z.boolean() });
+export type RollPart = z.infer<typeof RollPart>;
+
 /** `roll` kind payload item (data model §15). */
 export const RollPayloadItem = z.strictObject({
   rollId: Id,
@@ -259,6 +263,12 @@ export const RollPayloadItem = z.strictObject({
   modes: z.array(z.string().max(LABEL_MAX).nullable()).min(1).max(ROLL_MODS_MAX).optional(),
   /** FR-MOD-19 (R1): offered trigger parts of a card's damage roll, **not** in `total`. */
   offered: z.array(RollOfferedPart).min(1).max(ROLL_OFFERED_MAX).optional(),
+  /**
+   * FR-CHARX-55 (sprint 4): one damage part of an attack row with extra parts (`char.roll`):
+   * `extra: false` = the base part (`type` null = untyped), `extra: true` = an extra part. The
+   * line merges a base item and the extra items after it into one run. Absent = a plain roll.
+   */
+  part: RollPart.optional(),
 });
 export type RollPayloadItem = z.infer<typeof RollPayloadItem>;
 

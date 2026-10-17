@@ -2,9 +2,10 @@
 // registry (FR-MAP-29), per-client camera (FR-MAP-12), drop-only moves with an optimistic overlay
 // (FR-MAP-15), ruler (FR-MAP-22), ping / pull (FR-MAP-23), laser (FR-MAP-24), definition drops
 // (FR-MAP-13, DM), DM selection + box select + targeting (FR-MAP-31–33), the not-live rules
-// (FR-MAP-28), the live drag preview (FR-MAP-39/40) and the canvas tool core (FR-SCN-06: stage
+// (FR-MAP-28), the live drag preview (FR-MAP-39/40), the canvas tool core (FR-SCN-06: stage
 // dispatch to the active registry tool, Space + drag pans, Esc to the tool first, tokens ignore
-// left-press while drawing). No feature logic: the server decides.
+// left-press while drawing) and the middle-mouse pan before all of it (FR-MAP-12, sprint 4). No
+// feature logic: the server decides.
 import { DEFINITION_DRAG_MIME, DefinitionDragData } from "@shared/entities/schemas";
 import { pxToVertex } from "@shared/scene-tools/geometry";
 import {
@@ -25,7 +26,7 @@ import {
 } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Layer, Stage } from "react-konva";
+import { Group, Layer, Stage } from "react-konva";
 import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
 import { FogBlindChip } from "../fog-of-war/BlindChip";
 import { blindStore, isBlind } from "../fog-of-war/blind";
@@ -58,7 +59,8 @@ import {
 } from "./drag-preview";
 import { toastReject, useLive, useMapIntent } from "./intents";
 import { LaserSender } from "./laser";
-import { layerSlots } from "./layers";
+import { layerSlots, stageLayers } from "./layers";
+import { createMiddlePan, type MiddlePan } from "./middle-pan";
 import {
   clearOverlay,
   emptyOverlay,
@@ -141,6 +143,25 @@ function useSize(ref: React.RefObject<HTMLDivElement | null>) {
 }
 
 const tokenNodeOf = (n: Konva.Node | null) => n?.findAncestor(".map-token", true) ?? null;
+
+/**
+ * FR-MAP-12 / OQ-MAP-45: the mounted canvases' middle pans. Konva ends any drag on a window
+ * `mouseup` (capture); this guard is registered when the module loads, before any Stage exists,
+ * so it runs first and keeps a middle release from ending a left drag (or reaching anyone while
+ * a middle pan runs).
+ */
+const middlePans = new Set<MiddlePan>();
+if (typeof window !== "undefined") {
+  window.addEventListener(
+    "mouseup",
+    (e) => {
+      let take = false;
+      for (const p of middlePans) take = p.release(e) || take;
+      if (take) e.stopImmediatePropagation();
+    },
+    true,
+  );
+}
 
 export function MapCanvas(props: MapCanvasProps) {
   const { client, scene, tokens, myPlayerId, signalsOn } = props;
@@ -226,6 +247,59 @@ export function MapCanvas(props: MapCanvasProps) {
         if (cameraModeRef.current === "fitted") fitNow.current();
       });
   }, []);
+  // ---- FR-MAP-12 (sprint 4): the middle mouse pans with any tool, before Konva and the tools ----
+  const [panning, setPanning] = useState(false);
+  const camRef = useRef(cam);
+  camRef.current = cam;
+  const [pan] = useState(() =>
+    createMiddlePan({
+      position: () => {
+        const s = stageRef.current;
+        return s ? { x: s.x(), y: s.y() } : camRef.current;
+      },
+      // Konva moves the stage directly (as its own drag pan does); the camera commits on release.
+      move: (x, y) => stageRef.current?.position({ x, y }),
+      end: (at) => {
+        if (!at) return;
+        setCam((c) => ({ ...c, ...at }));
+        onCamera("pan");
+      },
+      panning: (on) => {
+        setPanning(on);
+        const c = stageRef.current?.container();
+        if (c) c.style.cursor = on ? "grabbing" : "";
+      },
+    }),
+  );
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    // Capture phase on the canvas box: before Konva's stage listeners (and so every tool).
+    const down = (e: MouseEvent) =>
+      void pan.press(e, {
+        tool: toolDefRef.current,
+        space: spaceRef.current,
+        live: liveRef.current,
+      });
+    const move = (e: MouseEvent) => pan.move(e);
+    const aux = (e: MouseEvent) => pan.auxclick(e);
+    const blur = () => pan.cancel();
+    el.addEventListener("pointerdown", down, true);
+    el.addEventListener("mousedown", down, true);
+    el.addEventListener("auxclick", aux);
+    window.addEventListener("mousemove", move, true);
+    window.addEventListener("blur", blur);
+    middlePans.add(pan);
+    return () => {
+      el.removeEventListener("pointerdown", down, true);
+      el.removeEventListener("mousedown", down, true);
+      el.removeEventListener("auxclick", aux);
+      window.removeEventListener("mousemove", move, true);
+      window.removeEventListener("blur", blur);
+      middlePans.delete(pan);
+      pan.cancel();
+    };
+  }, [pan]);
   // (a) a scene opens on this page, after the layout is applied (FR-SHELL-16).
   const fittedFor = useRef<string | null>(null);
   const loading = props.loading === true;
@@ -688,6 +762,8 @@ export function MapCanvas(props: MapCanvasProps) {
   };
 
   const onMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    // A middle pan keeps the map point under the pointer: nothing for the tools (FR-MAP-12).
+    if (pan.active) return;
     if (drawingRef.current && liveRef.current && !spaceRef.current) {
       const tp = toolPointerRef.current(e.evt);
       if (tp) toolDefRef.current?.pointer?.move?.(tp);
@@ -744,9 +820,13 @@ export function MapCanvas(props: MapCanvasProps) {
     token: tokenHandlers,
   };
 
-  // FR-SCN-02/03/05: this client's layers; DM toggles that are off drop theirs.
+  // FR-SCN-02/03/05: this client's layers; DM toggles that are off drop theirs. FR-MAP-29: in at
+  // most four Konva layers (BL-07).
   const layersOff = useLayerToggles((s) => s.off);
-  const slots = useMemo(() => layerSlots(canvasLayers, client, layersOff), [client, layersOff]);
+  const layers = useMemo(
+    () => stageLayers(layerSlots(canvasLayers, client, layersOff)),
+    [client, layersOff],
+  );
 
   const acceptsDrop = (e: React.DragEvent) =>
     props.onDropDefinition !== undefined &&
@@ -763,6 +843,7 @@ export function MapCanvas(props: MapCanvasProps) {
       data-tool={tool}
       data-drawing={drawing}
       data-space-pan={space}
+      data-panning={panning ? "middle" : undefined}
       data-targeting={targeting}
       onPointerEnter={() => {
         overMap.current = true;
@@ -776,13 +857,15 @@ export function MapCanvas(props: MapCanvasProps) {
       data-loading={loading}
       className="absolute inset-0"
       style={{
-        cursor: space
-          ? "grab"
-          : toolDef
-            ? (toolDef.cursor ?? "crosshair")
-            : tool === "select" && !targeting
-              ? undefined
-              : "crosshair",
+        cursor: panning
+          ? "grabbing"
+          : space
+            ? "grab"
+            : toolDef
+              ? (toolDef.cursor ?? "crosshair")
+              : tool === "select" && !targeting
+                ? undefined
+                : "crosshair",
       }}
       onContextMenu={(e) => e.preventDefault()}
       onDragOver={(e) => {
@@ -833,20 +916,30 @@ export function MapCanvas(props: MapCanvasProps) {
         >
           <SyncContext.Provider value={syncStore}>
             <CanvasContext.Provider value={ctx}>
-              {slots.map((slot) => {
-                const entries = slot.layers.map((l) => {
-                  const C = l.component as React.ComponentType;
-                  return <C key={l.id} />;
-                });
-                // FR-SCN-03: same-group neighbours render as Groups inside one Konva layer.
-                return slot.group === null ? (
-                  entries
-                ) : (
-                  <Layer key={slot.key} name={slot.group}>
-                    {entries}
-                  </Layer>
-                );
-              })}
+              {layers.map((layer) => (
+                // The fog layer never takes pointer events: no hit canvas for it.
+                <Layer key={layer.key} name={layer.name} listening={layer.key !== "fog"}>
+                  {layer.slots.map((slot) => {
+                    // FR-MAP-29: each registry entry is a Group named by its id.
+                    const entries = slot.layers.map((l) => {
+                      const C = l.component as React.ComponentType;
+                      return (
+                        <Group key={l.id} name={l.id}>
+                          <C />
+                        </Group>
+                      );
+                    });
+                    // FR-SCN-03: same-group neighbours share one more Group (`scn-objects`).
+                    return slot.group === null ? (
+                      entries
+                    ) : (
+                      <Group key={slot.key} name={slot.group}>
+                        {entries}
+                      </Group>
+                    );
+                  })}
+                </Layer>
+              ))}
             </CanvasContext.Provider>
           </SyncContext.Provider>
         </Stage>

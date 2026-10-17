@@ -76,6 +76,7 @@ import {
   presetCount,
   readPreset,
 } from "./rows";
+import { triggerStates } from "./trigger-state-writes";
 
 type Env = CommandEnv;
 
@@ -166,7 +167,11 @@ export const putPreset = defineCommand({
       type: EffectPresetSaved.type,
       campaignId: cid,
       payload: { presetId: id },
-      changes: [presetChange(before, readPreset(env.tx, id))],
+      // FR-MOD-54: an origin key decides `requires` matches (FR-MOD-36), so `armed` may move.
+      changes: [
+        presetChange(before, readPreset(env.tx, id)),
+        ...triggerStates(env, startedEncounter(env.tx, cid)),
+      ],
     });
     return { presetId: id };
   },
@@ -208,7 +213,11 @@ export const deletePreset = defineCommand({
       type: EffectPresetDeleted.type,
       campaignId: before.campaignId,
       payload: { presetId: before.id },
-      changes: [presetChange(before, null)],
+      // FR-MOD-54: a deleted preset no longer lends its origin key to `requires` (FR-MOD-36).
+      changes: [
+        presetChange(before, null),
+        ...triggerStates(env, startedEncounter(env.tx, before.campaignId)),
+      ],
     });
   },
 });
