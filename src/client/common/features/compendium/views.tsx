@@ -1,5 +1,6 @@
 // FR-CMP-19 entry views: monster stat block (core from the definition + reference sections),
-// spell, item, condition, feature; footer "SRD 5.1 · CC BY 4.0" + About (full attribution), or
+// spell, item, condition, feature; footer "SRD 5.1 · CC BY 4.0" + About (full attribution and
+// the token art credits, `credits.tsx`), or
 // "Homebrew" (+ "Shared" / "DM only" for the DM). Text through `MarkdownLite` (FR-CMP-26).
 // Actions row: **Add to sheet** on spells / items / features (both clients, FR-CMP-28), the DM's
 // extras from the caller (Derive…, Clone / Edit / Delete; FR-CMP-25, -27); "Preset: ‹name›"
@@ -24,15 +25,9 @@ import {
 import { GripVerticalIcon, InfoIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "../../components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
 import { AddToSheet } from "./AddToSheet";
+import { AboutDialog } from "./credits";
 import { crText, footerLabel, type Role, scoreText, signed } from "./logic";
 import { MarkdownLite, type TextContext } from "./MarkdownLite";
 
@@ -312,6 +307,7 @@ function TextView({ e }: { e: CompendiumEntry }) {
 
 // ---------- footer ----------
 
+/** FR-CMP-19: About opens the full attribution, with the token art credits (FR-ENT-29). */
 function About({ source }: { source: SourceAttribution }) {
   const [open, setOpen] = useState(false);
   return (
@@ -325,18 +321,7 @@ function About({ source }: { source: SourceAttribution }) {
       >
         <InfoIcon className="size-3.5" /> About
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md" data-testid="cmp-about-dialog">
-          <DialogHeader>
-            <DialogTitle>{source.name}</DialogTitle>
-            <DialogDescription>{source.licence}</DialogDescription>
-          </DialogHeader>
-          <p className="whitespace-pre-wrap text-sm" data-testid="cmp-about-text">
-            {source.attribution}
-          </p>
-          {source.url && <p className="break-all text-xs text-muted-foreground">{source.url}</p>}
-        </DialogContent>
-      </Dialog>
+      <AboutDialog open={open} onOpenChange={setOpen} sources={[source]} />
     </>
   );
 }

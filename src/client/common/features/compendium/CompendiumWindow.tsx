@@ -4,7 +4,8 @@
 // that expands its members in place (fetched with `sameAs` and the same q); Back keeps it open. DM extras come in as props: the import
 // panel (`top`), the New homebrew button (`toolbar`), entry actions (`entryActions`: Derive…,
 // Clone / Edit / Delete; C4) and monster rows as drag sources (FR-CMP-21). The client supplies
-// the `Api` with its credential (DM secret / `Authorization: Player`).
+// the `Api` with its credential (DM secret / `Authorization: Player`). The list view's footer
+// has the **Credits** link (FR-CMP-19 S4, FR-ENT-29).
 
 import type { EntryResponse, EntrySummary } from "@shared/compendium/rest";
 import {
@@ -28,6 +29,7 @@ import {
 import { Badge, Input, Label, Skeleton } from "../../components/ui/primitives";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { cn } from "../../lib/utils";
+import { CreditsLink } from "./credits";
 import { useDefinitions } from "./definitions";
 import {
   type EntryRead,
@@ -63,6 +65,7 @@ import {
   toggleGroup,
   useCmpNav,
 } from "./nav";
+import { eagerApi } from "./search";
 import { Attribution, DragHandle, EntryView, StatBlock } from "./views";
 
 const ANY = "__any__";
@@ -551,6 +554,7 @@ export function CompendiumBody({
   const filters = useCmpNav((s) => s.filters);
   const view = useCmpNav((s) => s.view);
   const tabs = tabsFor(viewer);
+  const credits = useMemo(() => eagerApi(api), [api]);
   const shownTab = tabs.includes(tab) ? tab : "all";
   const listing = view.mode === "list";
   // Back returns with the list's scroll kept (CMP §7): saved on leaving, restored on return.
@@ -598,6 +602,10 @@ export function CompendiumBody({
         >
           <ResultsList api={api} viewer={viewer} />
         </div>
+        {/* FR-CMP-19 (S4): always shown, also with nothing imported (FR-ENT-29). */}
+        <footer className="flex justify-end border-t px-2 py-0.5">
+          <CreditsLink api={credits} testId="cmp-credits" />
+        </footer>
       </div>
       {!listing && <EntryPane api={api} view={view} viewer={viewer} actions={entryActions} />}
     </div>
