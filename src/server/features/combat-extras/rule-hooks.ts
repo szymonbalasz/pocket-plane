@@ -4,6 +4,8 @@
 //   started / added — hidden copies of the new PC combatants' effects (FR-CBTX-13);
 //   turnChanged     — Next: expiry (FR-CBTX-06); Prev: restore what that Next expired (-07);
 //   ended           — monster and timed effects end; PC effects stay, visible (FR-CBTX-12).
+// `cbtxEffectHookLine`, the last combat rule-hook line, runs the effect hooks (FR-CBTX-51) for
+// whatever the lines before it changed, once per hook point.
 import { expiresAt } from "@shared/combat-extras/rules";
 import type { EffectRecord } from "@shared/combat-extras/schemas";
 import type { CombatantRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
@@ -15,7 +17,7 @@ import { combatantsOf, toCombatantRecord } from "../combat-tracker/rows";
 import type { CombatRuleEnv, CombatRuleHookSet } from "../combat-tracker/rule-hooks";
 import type { TokenHookEnv } from "../scenes-map/token-hooks";
 import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
-import { closeCardsOfEnded, endEffects, restoreEffects } from "./effects";
+import { closeCardsOfEnded, endEffects, restoreEffects, runEffectHooks } from "./effects";
 import {
   activeEffectsOf,
   combatantTargetColumns,
@@ -120,6 +122,18 @@ export const cbtxRuleHooks: CombatRuleHookSet = {
     closeCardsOfEnded(env, ended);
     return [...ended.changes, ...shown];
   },
+};
+
+/**
+ * FR-CBTX-51: effect hooks after the combat rule lines (expiry on Next, restore on Prev, End),
+ * with the encounter as the command left it. Registered last in `combatRuleHooks`.
+ */
+const effectsChangedLine = (env: CombatRuleEnv, enc: EncounterRecord) => runEffectHooks(env, enc);
+export const cbtxEffectHookLine: CombatRuleHookSet = {
+  started: effectsChangedLine,
+  added: effectsChangedLine,
+  turnChanged: effectsChangedLine,
+  ended: effectsChangedLine,
 };
 
 /**

@@ -2,7 +2,9 @@
 // limits, soft end with the concentration cascade (FR-CBTX-10), restore into free slots
 // (FR-CBTX-07, -22), card closures by rule (FR-CBTX-43). All run in the caller's transaction and
 // return the rows for the caller's event; card closures emit, so callers run them after their
-// own event.
+// own event. Every write records its creature for the effect-changed hooks (FR-CBTX-51):
+// `runEffectHooks` runs `effectHooks` once at the end of each effect path.
+import type { TargetRef } from "@shared/combat-extras/intents";
 import {
   ConcentrationCardPayload,
   type ConcentrationCardResolution,
@@ -15,12 +17,14 @@ import {
   type EffectEndedReason,
   type EffectRecord,
 } from "@shared/combat-extras/schemas";
+import type { EncounterRecord } from "@shared/combat-tracker/schemas";
 import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
 import { conflict } from "../../commands/errors";
 import { effect, effectSeqNext, notification } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
-import { campaignOf } from "../combat-tracker/rows";
+import { campaignOf, startedEncounter } from "../combat-tracker/rows";
 import { resolveNotification } from "../notifications";
+import { type EffectHookEnv, effectsChangedHooks } from "./effect-hooks";
 import {
   activeEffectsOf,
   type Env,
@@ -55,6 +59,40 @@ export function checkLimits(
   }
 }
 
+/** FR-CBTX-51: creatures whose effects changed in a transaction, not yet passed to the hooks. */
+const touched = new WeakMap<object, { campaignId: string; creatures: Map<string, TargetRef> }>();
+
+function touch(env: Pick<Env, "tx">, e: EffectRecord): void {
+  let t = touched.get(env.tx);
+  if (!t) {
+    t = { campaignId: e.campaignId, creatures: new Map() };
+    touched.set(env.tx, t);
+  }
+  if (e.targetCombatantId !== null) {
+    t.creatures.set(`k:${e.targetCombatantId}`, { combatantId: e.targetCombatantId });
+  } else if (e.targetCharacterId !== null) {
+    t.creatures.set(`c:${e.targetCharacterId}`, { characterId: e.targetCharacterId });
+  }
+}
+
+/**
+ * FR-CBTX-51: runs `effectHooks` for the creatures whose effects changed since the last run in
+ * this transaction (none → nothing runs); the rows for the caller's event. `encounter`: a combat
+ * command's encounter as it left it; absent → the campaign's started encounter, else null.
+ */
+export function runEffectHooks(
+  env: EffectHookEnv,
+  encounter?: EncounterRecord | null,
+): RecordChange[] {
+  const t = touched.get(env.tx);
+  touched.delete(env.tx);
+  if (!t || t.creatures.size === 0 || effectsChangedHooks.empty) return [];
+  return effectsChangedHooks.run(env, {
+    creatures: [...t.creatures.values()],
+    encounter: encounter === undefined ? startedEncounter(env.tx, t.campaignId) : encounter,
+  });
+}
+
 /** One effect row; `modifiers` (default []) and `presetKey` for `custom` effects (FR-MOD-03, -09). */
 export function insertEffect(env: Env, v: NewEffect): EffectRecord {
   const now = env.ctx.clock.iso();
@@ -70,7 +108,9 @@ export function insertEffect(env: Env, v: NewEffect): EffectRecord {
     })
     .returning()
     .get();
-  return toEffectRecord(row);
+  const e = toEffectRecord(row);
+  touch(env, e);
+  return e;
 }
 
 export function updateEffectRow(
@@ -83,6 +123,7 @@ export function updateEffectRow(
     .set({ ...set, updatedAt: env.ctx.clock.iso() })
     .where(eq(effect.id, before.id))
     .run();
+  touch(env, before);
   return effectChange(before, readEffect(env.tx, before.id));
 }
 
