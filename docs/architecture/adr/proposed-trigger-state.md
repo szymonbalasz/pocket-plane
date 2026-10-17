@@ -1,6 +1,6 @@
-# Proposed — Trigger state for clients and effect-changed hooks
+# Trigger state for clients and effect-changed hooks
 
-- Status: **proposed** (sprint 4, track R; review-b B1, rulings B1). The DM accepts it at sprint-4 gate 1; the integrator numbers it at merge
+- Status: **accepted** (DM, sprint-4 gate 1, decision #245, G4; raised by review-b B1). The integrator numbers it at merge (file name stays `proposed-trigger-state.md` until then)
 - Date: 2026-10-17
 - Supersedes: [ADR-0043](0043-rule-triggers.md) D3 / D4 **visibility consequence only** ("use rows never sent", "0 B in the snapshot", trigger rows to the DM and the owner only via the lazy load). ADR-0043's model (rule, offers, window keys, `trigger_use` as the truth) stays
 - Refines: [ADR-0035](0035-combat-rule-hooks.md) (rules in the causing transaction) with a new append-only `effectHooks` registry that also runs out of combat
@@ -21,7 +21,7 @@
 | B. Send `trigger_use` rows (or a window summary) and let clients compute | No copy | Leaks window keys (turn combatant ids, incl. hidden ones); clients reimplement FR-MOD-42; contradicts D3's reason for server-only rows |
 | C. Load state on demand with the lazy `rule-trigger` rows | Nothing in the snapshot | Badges on Initiative rows and tokens need it at once for every viewer; stale between loads |
 
-**A (proposed).** Visibility per MOD OQ-MOD-41 (DM gate): suggested **DM all, owner own rows only**. The alternative (other PCs' public triggers to other players) would also amend #178's other-players whitelist / [ADR-0036](0036-full-sheet-derivation.md) and FR-MOD-47, and redefine `public` from "label shown in lines" to "visible to the party"; this ADR then records that too.
+**Decided: A (#245).** Visibility (MOD OQ-MOD-41, decided #245, G40): **the DM sees every row; a player sees only their own characters' rows (with uses); monster rows stay DM-only.** #178's other-players whitelist / [ADR-0036](0036-full-sheet-derivation.md), FR-MOD-47 and the meaning of `public` (a trigger's name in log lines) are unchanged. Rejected: other PCs' public triggers to other players (would amend that whitelist); public monster triggers too. Badge content per MOD OQ-MOD-40 (decided #245, G39).
 
 ## Decision 2 — Where "effects changed" runs
 
@@ -31,12 +31,12 @@
 | B. A new point in `combatRuleHooks` | Existing registry | Combat-only by contract; fog's Blinded must work out of combat |
 | C. Each consumer recomputes from its own call sites | No registry | Misses CBTX paths (expiry, 0 HP, undo restore); duplicated in V and R |
 
-**A (proposed).** Created empty by `fix/rules4-core` (S4-0); AGENTS §9.9 gains it. A line error rolls the command back.
+**Decided: A (#245).** Created empty by `fix/rules4-core` (S4-0); AGENTS §9.9 gains it at merge. A line error rolls the command back. Lines: MOD's trigger state (S4-3), fog-of-war's Blinded (V10).
 
 ## Consequences
 
 - ADR-0043: the consequence "a stale popup meets a `conflict` instead of a live used marker" and MOD's non-goal "no live charge indicator for players" end. Offers, settling, window keys, Undo and Prev are unchanged; a command never reads `trigger-state`.
 - ADR-0035: rules may also run out of combat through `effectHooks`; still never post-commit.
-- CON-44 (measured, MOD §12): DM +22,326 B realistic / +84,102 B worst; a player with pick A ≤ 2,592 B.
-- Snapshot convergence and leak tests cover `trigger-state` (no monster row, no other player's row under pick A).
+- CON-44 (measured, MOD §12): DM +22,326 B realistic / +84,102 B worst; a player ≤ 2,592 B.
+- Snapshot convergence and leak tests cover `trigger-state` (no monster row, no other player's row).
 - Glossary: Trigger state (MOD OQ-MOD-45).
