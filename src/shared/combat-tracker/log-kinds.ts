@@ -197,6 +197,12 @@ export const AttackLogDmPayload = z.strictObject({
    * preset. Absent = none.
    */
   parts: z.array(AttackLineDmPart).min(1).max(TRIGGER_PARTS_MAX).optional(),
+  /**
+   * FR-MOD-57 (sprint 4, rulings B4): the rolls of the landed trigger parts whose dice players
+   * don't get (non-public character triggers, every monster trigger); the public ones join the
+   * entry's `rollIds`. Absent = none.
+   */
+  rollIds: z.array(z.string().min(1).max(64)).min(1).max(TRIGGER_PARTS_MAX).optional(),
   acMods: z.array(AcModPart).min(1).max(6).optional(),
   defense: DefenseFact.optional(),
   /**
@@ -247,6 +253,10 @@ export function publicRuling(natural: number | null, hit: boolean): boolean {
   return (natural === 1 && hit) || (natural === 20 && !hit);
 }
 
+/** A die segment with the part's name as its `label` (seams S8 / rulings B5). */
+const withDieLabel = (s: LineSegment, label: string): LineSegment =>
+  s.die ? { ...s, die: { ...s.die, label } } : s;
+
 /**
  * "6 slashing damage (half)", then the DM's "(DM set; rolled 4)" / dice breakdown; rule-trigger
  * parts after it (FR-MOD-48, R7): "14 slashing damage + 6 radiant (Divine Fury)" (`damage` =
@@ -280,7 +290,9 @@ function damageSegments(
       out.push({ text: ` + ${x.value} ${x.type}${MULT_TEXT[x.multiplier ?? "normal"]}` });
       const r = dm?.rolls?.extra?.[i];
       if (r?.set) out.push({ text: ` (DM set; rolled ${r.rolled})`, style: "muted" });
-      if (r) out.push(...rollBreakdownSegments(r));
+      // FR-CBT-84 / FR-MOD-57: the part's dice labelled with its name ("Flame Tongue fire").
+      const label = `${p.attackName} ${x.type}`;
+      if (r) out.push(...rollBreakdownSegments(r).map((s) => withDieLabel(s, label)));
     });
     out.push({ text: ` damage${suffix}` });
   }

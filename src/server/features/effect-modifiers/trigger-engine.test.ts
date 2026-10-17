@@ -441,8 +441,12 @@ describe("FR-MOD-38 settled at apply", () => {
       },
     ]);
     const line = lineOf(t, r.id);
-    expect(line.p.parts).toEqual([{ label: "Divine Fury", value: v, type: "radiant" }]);
-    expect(line.dm.parts).toEqual([{ triggerId: t.furyId, label: "Divine Fury", rolled: v }]);
+    // FR-MOD-57: a public character trigger's roll on both copies.
+    const roll = { expression: "1d6+2", dice: [v - 2] };
+    expect(line.p.parts).toEqual([{ label: "Divine Fury", value: v, type: "radiant", ...roll }]);
+    expect(line.dm.parts).toEqual([
+      { triggerId: t.furyId, label: "Divine Fury", rolled: v, ...roll },
+    ]);
     const [use] = t.usesOf(t.furyId);
     expect(use).toMatchObject({
       state: "used",

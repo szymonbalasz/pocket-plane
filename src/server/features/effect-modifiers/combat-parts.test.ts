@@ -89,7 +89,8 @@ describe("FR-MOD-20 roll line offers (R7)", () => {
         }).segments,
       );
     // A physical roll without the "Divine Fury" group: the server rolled the d6.
-    const offer = `(+ ${part?.value} radiant Divine Fury (rolled for you) on a hit)`;
+    const dice = `(1d6+2: ${(part?.value as number) - 2} + 2)`;
+    const offer = `(+ ${part?.value} radiant Divine Fury (rolled for you) ${dice} on a hit)`;
     expect(of(false)).toContain(`= 14 ${offer}`);
     expect(of(true)).toContain(`= 14 ${offer}`);
     // Not public: players "(DM)", the DM's line names it.
@@ -125,7 +126,7 @@ describe("FR-MOD-48 outcome lines", () => {
     const l = lines(t, hpChangeIds[0] as string);
     // Physical weapon dice: the line's one "physical" badge stays at the end (FR-CBT-73).
     expect(l.players).toBe(
-      `Brakka attacks Goblin: 15 + 7 = 22 — DM: hit. 7 slashing damage (half) + ${half} radiant (Divine Fury) (half) (physical)`,
+      `Brakka attacks Goblin: 15 + 7 = 22 — DM: hit. 7 slashing damage (half) + ${half} radiant (Divine Fury) (half) (1d6+2: ${v - 2} + 2) (physical)`,
     );
     expect(l.dm).toContain(`+ ${half} radiant (Divine Fury) (half)`);
     expect(l.dm).not.toContain("DM set");

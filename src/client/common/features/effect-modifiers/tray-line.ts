@@ -1,6 +1,7 @@
 // MOD's line in dice-extras' `trayExtras` (FR-MOD-27, FR-DICEX-08 b; seams S4): a staged roll
 // control with a `subject` shows its bonus-die groups ("Bless +1d4") and the trigger dice that
-// may be offered ("Divine Fury (on a hit) +1d6") as labelled chips beside the base dice. The
+// can still be offered ("Divine Fury (on a hit) +1d6": its trigger state armed and ready,
+// FR-MOD-56) as labelled chips beside the base dice. The
 // tray's two-d20 preview reads the control's preview mode (TrayWindow). Physical boxes are the
 // same groups in `ManualForm` (FR-MOD-18).
 import type { RollMode } from "@shared/dice-roll-log/schemas";

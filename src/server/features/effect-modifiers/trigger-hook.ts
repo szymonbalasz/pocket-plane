@@ -5,8 +5,9 @@
 // settle facts. Owner = a PC's character or a monster combatant's definition; triggers in `seq`
 // order. A formula error or a cap skips the trigger with a DM-only note; it never fails the roll.
 //
-// Writes only `trigger_use` rows of `roll` triggers (server-only); a hit offer's row needs the card
-// id, so the caller records it (`recordOffers`). Imports stay to the schema, `@shared` and
+// Writes only `trigger_use` rows of `roll` triggers (server-only) and, when one spends at once, the
+// owner's trigger state (FR-MOD-54); a hit offer's row needs the card id, so the caller records it
+// (`recordOffers`). Imports stay to the schema, `@shared` and
 // row readers: `roll-hooks.ts` (imported by `dice.evaluate`) imports this module.
 import {
   type CombatantRecord,
@@ -40,6 +41,7 @@ import {
   triggerUse,
   triggerUseSeqNext,
 } from "../../db/schema";
+import type { RecordChange } from "../../events/types";
 import { getSheet } from "../character-sheet/sheet-rows";
 import { startedEncounter, toCombatantRecord } from "../combat-tracker/rows";
 import type {
@@ -50,6 +52,7 @@ import type {
   RollModeHint,
   RollPart,
 } from "../dice-roll-log/roll-hooks";
+import { triggerStates } from "./trigger-state-writes";
 
 type Trigger = typeof ruleTrigger.$inferSelect;
 type Env = CommandEnv;
@@ -216,7 +219,7 @@ function fireValue(t: Trigger, o: TriggerOwner, crit: boolean): FormulaValue | s
 }
 
 /** Per-die values of a server roll in expression order (FR-MOD-19, D9): ≤ 20 dice, else none. */
-function dieValues(r: { dice: { value: number | null }[] }): number[] | undefined {
+export function dieValues(r: { dice: { value: number | null }[] }): number[] | undefined {
   const vs = r.dice.map((d) => d.value);
   if (vs.length === 0 || vs.length > PART_DICE_MAX || vs.some((v) => v === null)) return undefined;
   return vs as number[];
@@ -268,9 +271,25 @@ function firingRollTriggers(
   });
 }
 
+/**
+ * FR-MOD-54: a roll hook's result carries no rows, so the trigger state of a `roll` trigger spent
+ * at once is listed in the roll command's next event (the roll's own entry event, emitted right
+ * after `dice.evaluate`), inside the same transaction. The caller's `changes` array is extended in
+ * place, so rows it pushes after emitting still land.
+ */
+function listOnNextEvent(env: Env, changes: RecordChange[]): void {
+  if (changes.length === 0) return;
+  const emit = env.emit;
+  env.emit = (e) => {
+    env.emit = emit;
+    e.changes.push(...changes);
+    emit(e);
+  };
+}
+
 /** FR-MOD-42: a windowed `roll` trigger's charge is `used` at once (in combat). */
-function spendAtOnce(env: Env, t: Trigger, o: TriggerOwner, rollId: string | null): void {
-  if (!windowed(t.rule.every) || !o.combatant || !o.enc) return;
+function spendAtOnce(env: Env, t: Trigger, o: TriggerOwner, rollId: string | null): boolean {
+  if (!windowed(t.rule.every) || !o.combatant || !o.enc) return false;
   const now = env.ctx.clock.iso();
   env.tx
     .insert(triggerUse)
@@ -288,6 +307,7 @@ function spendAtOnce(env: Env, t: Trigger, o: TriggerOwner, rollId: string | nul
       updatedAt: now,
     })
     .run();
+  return true;
 }
 
 /**
@@ -302,9 +322,10 @@ function rollParts(
   notes: string[],
 ): RollPart[] {
   const parts: RollPart[] = [];
+  let spent = false;
   for (const t of firingRollTriggers(env, o, subject, notes)) {
     if (t.rule.then.do === "mode") {
-      spendAtOnce(env, t, o, null);
+      spent = spendAtOnce(env, t, o, null) || spent;
       continue;
     }
     if (t.rule.then.do !== "part") continue;
@@ -327,8 +348,9 @@ function rollParts(
       ...(r && base.manual && !r.manual ? { auto: true } : {}),
       ...(r && dieValues(r) ? { dice: dieValues(r) } : {}),
     });
-    spendAtOnce(env, t, o, r?.id ?? null);
+    spent = spendAtOnce(env, t, o, r?.id ?? null) || spent;
   }
+  if (spent && o.combatant) listOnNextEvent(env, triggerStates(env, o.enc, [o.combatant.id]));
   return parts;
 }
 

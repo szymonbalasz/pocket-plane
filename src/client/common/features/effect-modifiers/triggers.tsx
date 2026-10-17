@@ -5,7 +5,11 @@
 // ADR-0045): loaded when the block mounts (the Active effects tab opens), once per snapshot
 // generation; "Loading triggers…" until ready, "Couldn't load triggers" + Retry on error. Used by
 // the sheet section (characters) and the DM's token menu / Creatures entries (FR-MOD-28).
+// Sprint 4 (FR-MOD-60): a character's enabled trigger shows a state Badge after its name, from
+// its `trigger-state` row in a started encounter, else armed from the store (same words as the
+// Initiative and token badges).
 
+import { triggerArmedNow } from "@shared/effect-modifiers/preview";
 import { TRIGGER_INTENTS } from "@shared/effect-modifiers/trigger-intents";
 import { triggerPresetsFor } from "@shared/effect-modifiers/trigger-presets";
 import {
@@ -15,11 +19,21 @@ import {
   RULE_TRIGGER_TYPE,
 } from "@shared/effect-modifiers/trigger-records";
 import {
+  armedBadge,
+  TRIGGER_STATE_TYPE,
+  type TriggerBadge,
+  type TriggerStateRecord,
+  triggerBadge,
+} from "@shared/effect-modifiers/trigger-state";
+import type { TriggerWordsContext } from "@shared/effect-modifiers/trigger-words";
+import {
+  presetRefName,
   TRIGGER_WARNING_TEXT,
   triggerSentence,
   triggerValueNow,
   triggerWarnings,
 } from "@shared/effect-modifiers/trigger-words";
+import type { RecordStore } from "@shared/protocol/store";
 import { ChevronRightIcon, PencilIcon, PlusIcon, RotateCwIcon, TrashIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/ui/button";
@@ -32,7 +46,9 @@ import {
   DropdownMenuTrigger,
   Switch,
 } from "../../components/ui/menus";
+import { Tooltip } from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
+import { cn } from "../../lib/utils";
 import { useLazyRecords, useSync } from "../../sync/store";
 import { useModIntent } from "./store";
 import { TriggerEditorDialog, type TriggerEditorStart } from "./trigger-editor";
@@ -46,6 +62,42 @@ import {
   useOwnerDefinitions,
   wordsContext,
 } from "./trigger-owner";
+
+const BADGE_CLASS: Record<TriggerBadge["state"], string> = {
+  ready: "border-success/50 text-success",
+  "in-effect": "border-success/50 text-success",
+  used: "text-muted-foreground",
+  waiting: "",
+  off: "border-dashed text-muted-foreground",
+};
+
+/**
+ * FR-MOD-60: a character trigger's state. In a started encounter its `trigger-state` row (the
+ * viewer holds it: DM, owner); otherwise (or no row) armed from the store, no charge.
+ */
+export function triggerBadgeOf(
+  store: RecordStore,
+  t: PlayerRuleTriggerRecord,
+  facts: TriggerOwnerFacts,
+  cx: TriggerWordsContext,
+): TriggerBadge | null {
+  if (!t.enabled || t.characterId === null) return null;
+  const needs = t.rule.requires ? presetRefName(t.rule.requires, cx) : null;
+  const row = Object.values(store.records[TRIGGER_STATE_TYPE] ?? {}).find(
+    (r) => (r as TriggerStateRecord).triggerId === t.id,
+  ) as TriggerStateRecord | undefined;
+  if (!row)
+    return armedBadge(triggerArmedNow(store, t.rule, { characterId: t.characterId }), needs);
+  const every = t.rule.every;
+  const f =
+    typeof every === "object" ? facts.features?.find((x) => x.id === every.feature) : undefined;
+  return triggerBadge(row, {
+    every,
+    ownerName: facts.name,
+    needs,
+    uses: f?.usesMax ? { left: f.usesMax - f.used, max: f.usesMax } : null,
+  });
+}
 
 function TriggerRow({
   t,
@@ -63,6 +115,7 @@ function TriggerRow({
   const cx = wordsContext(store, facts.features);
   const value = triggerValueNow(t.rule, facts.values);
   const warnings = triggerWarnings(t.rule, facts.features, cx);
+  const badge = triggerBadgeOf(store, t, facts, cx);
   // A player's copy may name a DM's preset as `{name}`; the server keeps it (FR-MOD-47, #228).
   const owner = t.characterId
     ? { characterId: t.characterId }
@@ -91,6 +144,22 @@ function TriggerRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1">
           <span className="min-w-0 truncate">{t.name}</span>
+          {badge && (
+            <Tooltip content={triggerSentence(t.rule, cx)}>
+              <Badge
+                variant="outline"
+                data-testid="mod-trigger-state"
+                data-record-id={t.id}
+                data-state={badge.state}
+                className={cn(
+                  "shrink-0",
+                  badge.down ? "border-hp-down/50 text-hp-down" : BADGE_CLASS[badge.state],
+                )}
+              >
+                {badge.text}
+              </Badge>
+            </Tooltip>
+          )}
           {value?.ok && (
             <Badge
               variant="outline"
