@@ -376,10 +376,11 @@ describe("FR-CHARX-17 counters", () => {
   };
 
   test("FR-CHARX-17 counterOf + nextUsed: clamp 0…max, reset → 0, unknown feature → null", () => {
-    expect(counterOf(s, stats, { slot: 1 })).toEqual({ used: 2, max: 2 });
-    expect(counterOf(s, stats, { slot: 3 })).toEqual({ used: 0, max: 0 });
-    expect(counterOf(s, stats, { hitDie: "d10" })).toEqual({ used: 3, max: 3 });
-    expect(counterOf(s, stats, { feature: "f" })).toEqual({ used: 1, max: 2 });
+    expect(counterOf(s, stats, { slot: 1 })).toEqual({ used: 2, max: 2, cap: 2 });
+    expect(counterOf(s, stats, { slot: 3 })).toEqual({ used: 0, max: 0, cap: 0 });
+    expect(counterOf(s, stats, { hitDie: "d10" })).toEqual({ used: 3, max: 3, cap: 3 });
+    // FR-CHARX-58: a feature row may pass its maximum by 9 (uses left down to −9).
+    expect(counterOf(s, stats, { feature: "f" })).toEqual({ used: 1, max: 2, cap: 11 });
     expect(counterOf(s, stats, { feature: "x" })).toBeNull();
     expect(nextUsed(1, 2, { delta: 5 })).toBe(2);
     expect(nextUsed(1, 2, { delta: -5 })).toBe(0);

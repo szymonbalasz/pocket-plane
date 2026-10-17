@@ -204,7 +204,13 @@ describe("FR-MOD-41 CHARX feature-use seam", () => {
     expect(call<{ ok: boolean; after: number }>("spend")).toMatchObject({ ok: true, after: 1 });
     call("spend");
     call("spend");
-    expect(call("spend")).toEqual({ ok: false, reason: "none-left", name: "Rage", max: 3 });
+    expect(call("spend")).toEqual({
+      ok: false,
+      reason: "none-left",
+      name: "Rage",
+      max: 3,
+      left: 0,
+    });
     expect(call("spend", "nope")).toEqual({ ok: false, reason: "missing" });
     expect(t.used(t.rageFeature)).toBe(3);
     const back = call<{ type: string } | null>("refund");
