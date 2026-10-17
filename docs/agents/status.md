@@ -33,7 +33,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
 | M4 window placement | merged c308458 | — | Done (re-test 3 5/5; check 3097, e2e 91) | — |
-| D7 roll popup | merged 91b610d | — | Done (13/14 + fixes; #247 in) | — |
+| D7 roll popup | merged 91b610d | — | Done (13/14 + fixes; #247 in; main check 3280, e2e 102 green) | — |
 | Mc map-tools core | merged | — | Done (check 3109, e2e 91; drizzle duplicate-index fix) | M1 after V7 |
 
 ## Shared-file locks
