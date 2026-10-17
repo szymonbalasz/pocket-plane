@@ -14,7 +14,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | V8 vision while dragging | merged ec3fd3a | — | Done (walkthrough 8/8; main check 3231, e2e 99 green) | — |
 | M1 freeform AoE | merged | — | Done (walkthrough 7/7; BL-05 done) | — |
 | M2 drag path | `build/drag-path` (w61, slot 0) | — | Walkthrough 9/9; e2e crit gap fixed (test); merged main, branch gates running | Merge → M5 |
-| M5 labels + best-rectangle Fit | `fix/map-labels-fit` (w65, slot 2; on build/drag-path) | test-map-labels-fit | Walkthrough | Merge after M2 → C-art |
+| M5 labels + best-rectangle Fit | `fix/map-labels-fit` (w65, slot 2; on build/drag-path) | fix-map-labels-fit | Walkthrough 11/11; rectangle choice must keep the top row (ruling) → fixing | Merge after M2 → C-art |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | Physical dice in combat (BL-19, BL-25) | merged | — | Done (walkthrough 5/5; check 3314, e2e 105) | — |
 | C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
