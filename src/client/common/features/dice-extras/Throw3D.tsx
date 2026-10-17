@@ -20,6 +20,10 @@ export const isMeshDie = (d: ThrowDie) => d.shape !== null && !d.flat && d.value
 /** FR-DICEX-23: a median frame time above this switches the device to flat. */
 export const SLOW_FRAME_MS = 33;
 
+/** FR-DICEX-23 / -44: the throw was slow (null = too few frames to judge). */
+export const isSlow = (medianFrameMs: number | null) =>
+  medianFrameMs !== null && medianFrameMs > SLOW_FRAME_MS;
+
 const viewport = () => ({ w: globalThis.innerWidth || 1, h: globalThis.innerHeight || 1 });
 
 /** FR-DICEX-33: the screen arena's rect = the viewport. */
@@ -77,7 +81,7 @@ export function useRun3D(
         onRest: (info) => {
           setRest(info);
           diceExtras.rested(seq);
-          slow = info.medianFrameMs !== null && info.medianFrameMs > SLOW_FRAME_MS;
+          slow = isSlow(info.medianFrameMs);
         },
         onLost: () => diceExtras.flat(seq),
       });

@@ -6,6 +6,7 @@ import { emptyStore } from "@shared/protocol/store";
 import { pendingInZone, planThrow, ROLL_POPUPS } from "./display";
 import { onRollFrame } from "./frame-handler";
 import { DEFAULT_SETTINGS, type DiceSettings, type DisplaySetting } from "./settings";
+import { isSlow } from "./Throw3D";
 
 const entry = (o: Partial<GameLogEntryView> = {}) =>
   ({
@@ -153,5 +154,14 @@ describe("FR-DICEX-09 pending (amended)", () => {
       },
     );
     expect(calls).toEqual(["own:e1", "play:e1:screen"]);
+  });
+});
+
+describe("FR-DICEX-44 slow devices", () => {
+  test("FR-DICEX-44 slow devices: a screen / zone throw with median frame 40 ms is slow (→ flat + Toast)", () => {
+    expect(isSlow(40)).toBe(true);
+    expect(isSlow(33)).toBe(false);
+    expect(isSlow(16.7)).toBe(false);
+    expect(isSlow(null)).toBe(false); // too few frames to judge
   });
 });
