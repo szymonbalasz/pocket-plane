@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { distanceFt, templateCells } from "@shared/scene-tools/geometry";
+import { distanceFt } from "@shared/scene-tools/geometry";
 import type { TemplateGeometry } from "@shared/scene-tools/schemas";
+import { sprint2TemplateCells } from "@shared/scene-tools/testing";
 import {
   AREA_TOL,
   type AreaShape,
@@ -275,19 +276,12 @@ describe("FR-SCN-42 helper", () => {
   });
 
   test("FR-SCN-42 centre mode = sprint 2's templateCells on every snapped template", () => {
-    const scene = {
-      mapWidth: 1400,
-      mapHeight: 980,
-      gridCellSize: 70,
-      gridOffsetX: 0,
-      gridOffsetY: 0,
-    };
     for (const shape of ["cone", "sphere", "cylinder", "line", "cube"] as const)
       for (let size = 5; size <= 60; size += 5)
         for (let angle = 0; angle < 360; angle += shape === "cube" ? 90 : 15)
           for (const width of shape === "line" ? [5, 10, 15] : [5]) {
             const t = tpl({ shape, x: 7, y: 9, size, angle, width });
-            const old = key(templateCells(t, scene, { cut: false }));
+            const old = key(sprint2TemplateCells(t));
             expect(key(cells(templateArea(t), "centre"))).toEqual(old);
           }
   });

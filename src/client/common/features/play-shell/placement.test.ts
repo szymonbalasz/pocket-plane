@@ -166,3 +166,106 @@ describe("P3 glitch 13: new windows keep clear of map tokens", () => {
     expect(overlaps(r, init) || overlaps(r, log)).toBe(false);
   });
 });
+
+describe("auto placement (FR-SHELL-40)", () => {
+  const init = def({
+    defaultPosition: { anchor: "top-right" },
+    defaultSize: { w: 300, h: 400 },
+    minSize: { w: 200, h: 150 },
+  });
+  const a = usableArea(vp);
+  // Left column: 360 px free above it (shrunk); the right column is free at full size.
+  const leftLog = { x: RAIL_CLEAR, y: 432, w: 300, h: 392 };
+  const coveredBy = (r: Rect, boxes: readonly Rect[]) =>
+    boxes.reduce((n, t) => n + (overlaps(r, t) ? 1 : 0), 0);
+
+  test("FR-SHELL-40 placement: of the window-free candidates the one covering the least token area wins, a shrunk one included; no tokens → default rect", () => {
+    const base = fittedDefaultRect(init, vp);
+    expect(placeRect(init, vp, [leftLog], [])).toEqual(base);
+    // Tokens down the whole right column: the shrunk slot at the left edge covers none.
+    const monsters = [
+      { x: 1400, y: 100, w: 70, h: 70 },
+      { x: 1400, y: 500, w: 70, h: 70 },
+      { x: 1400, y: 740, w: 70, h: 70 },
+    ];
+    const r = placeRect(init, vp, [leftLog], monsters);
+    expect(r).toEqual({ x: RAIL_CLEAR, y: a.top, w: 300, h: leftLog.y - EDGE_GAP - a.top });
+    expect(coveredBy(r, monsters)).toBe(0);
+    // Tokens only under the default rect: the full-size slot lower in the default column.
+    const top = [{ x: 1400, y: 100, w: 70, h: 70 }];
+    const low = placeRect(init, vp, [leftLog], top);
+    expect({ x: low.x, h: low.h, tokens: coveredBy(low, top) }).toEqual({
+      x: base.x,
+      h: 400,
+      tokens: 0,
+    });
+  });
+
+  test("FR-SHELL-40 placement ties → today's order: default column, nearest", () => {
+    // Tokens no candidate covers (mid-map): every candidate scores 0.
+    const midMap = [{ x: 700, y: 300, w: 70, h: 70 }];
+    expect(placeRect(init, vp, [leftLog], midMap)).toEqual(fittedDefaultRect(init, vp));
+    // Free at full size at both edges: the default column wins.
+    expect(placeRect(init, vp, [], midMap).x).toBe(fittedDefaultRect(init, vp).x);
+  });
+
+  test("FR-SHELL-40 toast keep-out: a candidate over the box drops out while a clear one exists; none clear → least overlap", () => {
+    const corner = def({
+      defaultPosition: { anchor: "bottom-right" },
+      defaultSize: { w: 300, h: 300 },
+    });
+    const box = { x: vp.w - 16 - 356, y: vp.h - 72 - 304, w: 356, h: 304 };
+    const base = fittedDefaultRect(corner, vp);
+    expect(overlaps(base, box)).toBe(true);
+    const r = placeRect(corner, vp, [], [], box);
+    expect(overlaps(r, box)).toBe(false);
+    expect(r.x).toBe(base.x); // still its default column, above the box
+    // Token cover comes first: tokens everywhere but the box → the default rect, over it.
+    const elsewhere = [
+      { x: 0, y: 0, w: box.x, h: vp.h },
+      { x: box.x, y: 0, w: vp.w - box.x, h: box.y },
+    ];
+    expect(placeRect(corner, vp, [], elsewhere, box)).toEqual(base);
+    // The box over the whole screen: every candidate overlaps it → least overlap, then today's
+    // order (the default rect).
+    expect(placeRect(corner, vp, [], [], { x: 0, y: 0, w: vp.w, h: vp.h })).toEqual(base);
+    // No window-free candidate: covering less of other windows beats staying off the box
+    // (toasts are transient; a feature never opens a window over another, G35).
+    const tall = def({
+      defaultPosition: { anchor: "bottom-right" },
+      defaultSize: { w: 300, h: 700 },
+      minSize: { w: 200, h: 700 },
+    });
+    const a2 = usableArea(vp);
+    const leftWin = { x: 0, y: 0, w: 400, h: vp.h };
+    const rightWin = { x: a2.right - 300, y: a2.top, w: 300, h: 100 };
+    const onRight = { x: a2.right - 356, y: a2.top + 200, w: 356, h: 200 };
+    const r2 = placeRect(tall, vp, [leftWin, rightWin], [], onRight);
+    expect(r2.x).toBe(a2.right - 300); // the right edge: least window overlap, over the box
+    expect(overlaps(r2, onRight)).toBe(true);
+    // Over the right half only: the left edge, which overlaps it least (not at all).
+    const right = { x: 800, y: 0, w: 800, h: vp.h };
+    expect(placeRect(corner, vp, [], [], right).x).toBe(RAIL_CLEAR);
+  });
+
+  test("FR-SHELL-40 a slot shorter than the height the window renders at (`need`) is not free: M8, Initiative's rows need 302 px", () => {
+    // M8 at 1280×720: Initiative (400×500, min 240, grows to content) with the Compendium on the
+    // right edge and the Game log at 68,404; the toast keep-out box top-centre.
+    const init = def({
+      defaultPosition: { anchor: "top-right" },
+      defaultSize: { w: 400, h: 500 },
+      minSize: { w: 320, h: 240 },
+    });
+    const log = { x: 68, y: 404, w: 460, h: 240 };
+    const comp = { x: 828, y: 60, w: 440, h: 560 };
+    const box = { x: 462, y: 100, w: 356, h: 304 };
+    const before = placeRect(init, small, [log, comp], [], box);
+    expect(before.h).toBe(240); // the walkthrough's 68,152 400×240: drawn 302 tall, over the log
+    const r = placeRect(init, small, [log, comp], [], box, 302);
+    expect(r.h).toBeGreaterThanOrEqual(302);
+    for (const o of [log, comp]) expect(overlaps(r, o)).toBe(false);
+    // Content taller than the default: the full-size slot holds it too (capped to the area).
+    const a = usableArea(small);
+    expect(placeRect(init, small, [], [], null, 2000).h).toBe(a.bottom - a.top);
+  });
+});

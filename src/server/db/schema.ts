@@ -1204,13 +1204,14 @@ export const aoeTemplate = sqliteTable(
       .references((): AnySQLiteColumn => scene.id, { onDelete: "cascade" }),
     seq: integer("seq").notNull(),
     shape: text("shape", { enum: TEMPLATE_SHAPES }).notNull(),
-    /** Origin vertex. */
-    x: integer("x").notNull(),
-    y: integer("y").notNull(),
+    /** Origin point, ≤ 2 decimals (sprint 4, FR-SCN-20); old integer rows stay valid. */
+    x: real("x").notNull(),
+    y: real("y").notNull(),
     size: integer("size").notNull(),
     /** Line only, else null. */
     width: integer("width"),
-    angle: integer("angle").notNull(),
+    /** 0 ≤ angle < 360, ≤ 1 decimal (sprint 4, FR-SCN-20). */
+    angle: real("angle").notNull(),
     label: text("label").notNull().default(""),
     /** Null = DM-placed (fog subject); else the placing player (FR-SCN-25, -27). */
     placedByPlayerId: text("placed_by_player_id").references((): AnySQLiteColumn => player.id),

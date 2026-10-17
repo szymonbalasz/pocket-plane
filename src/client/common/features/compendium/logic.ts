@@ -84,6 +84,27 @@ export function searchParams(q: string, tab: CmpTab, filters: Filters): SearchPa
   return out;
 }
 
+/**
+ * FR-CMP-35: a group's members, with the list's own `q` so the expanded rows are exactly the
+ * `group.count` that matched (`sameAs` takes `q` only: never kind or filters).
+ */
+export function groupParams(id: string, q: string): SearchParams {
+  const text = q.trim();
+  return text === "" ? { sameAs: id } : { sameAs: id, q: text };
+}
+
+/**
+ * Copy of an empty result list (CMP §7): a search with no match says every word must match
+ * (FR-CMP-33); nothing at all without a query or filters: nothing imported / set up yet.
+ */
+export function emptyText(q: string, unfiltered: boolean, role: Role): string {
+  if (unfiltered) {
+    return role === "dm" ? "Nothing imported yet" : "The DM hasn't set up the compendium yet";
+  }
+  const text = q.trim();
+  return text === "" ? "No matches" : `No matches for ‘${text}’. Every word must match.`;
+}
+
 /** Active filters of a tab (badge count on the Filters button). */
 export const activeFilterCount = (tab: CmpTab, filters: Filters) =>
   tab === "all" ? 0 : Object.keys(searchParams("", tab, filters)).length - 1;
