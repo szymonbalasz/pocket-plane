@@ -16,8 +16,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | `fix/rules4-core` (w5C, slot 0) | test-rules4-core | Regression walkthrough (check 3015, e2e green; DM worst 863 KB) | Merge → R slices, Mc |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
-| M3 Show to players | `fix/show-to-players` (w5B, slot 5) | — | Walkthrough 6/7 (banner over badge offline: accepted); branch gates running | Merge |
-| D6 full-screen dice | `build/dice-screen` (w5A, slot 2) | — | Walkthrough 9/9; branch gates running | Merge → D7 |
+| M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
+| D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
 | M4 window placement | `fix/window-placement` (w57, slot 4) | test-window-placement-r2 | Re-test 2 (measured heights, ae6fd6f) | Merge → D7 |
 
@@ -26,7 +26,6 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 - `fix/rules4-core` (R0): schema, entities `Attack`, combat schemas, sheet `FeatureRow`, record-type registry, new `effect-hooks.ts`.
 - `fix/window-placement` (M4): play-shell frame + `toast-region.ts`, windows.ts handout line, combat Start line, `e2e/rule-triggers-combat.e2e.ts`.
 - `build/map-pan-plain` (V7): canvas lock (`MapCanvas.tsx`, `canvas-layers.ts`, `camera.ts`), scene-tools Layers popover, BL-01 e2e specs + `e2e/support` `mapPoint`.
-- `fix/show-to-players` (M3): DM scenes-map files, `e2e/support` helper + specs using the Show button.
 - Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
 
