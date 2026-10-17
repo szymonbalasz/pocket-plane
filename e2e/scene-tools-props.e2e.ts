@@ -7,6 +7,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
+import { showToPlayers } from "./support/scenes";
 import { openWindow, shellWindow } from "./support/shell";
 
 /** Map px → page px on the first stage. */
@@ -73,7 +74,7 @@ test("FR-SCN-16–19 props: reveal, lock, locked drag, move, Ctrl+Z (DM + player
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
-  await dm.getByTestId("map-show-to-players").click();
+  await showToPlayers(dm, "Goblin Ambush");
   await expect(dm.getByTestId("map-not-shown-badge")).toHaveCount(0);
   await scenes.getByTestId("ui-window-close").click();
   const initiative = shellWindow(dm, "cbt.initiative");

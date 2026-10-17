@@ -1,6 +1,6 @@
 // DM base layer (viewed scene, FR-MAP-08), selection + box select + targeting (FR-MAP-31–33),
-// token menu host (FR-MAP-18/29), definition drops (FR-MAP-13), Ctrl-D (FR-MAP-17) and the DM
-// tool rail extras (grid, lock, show to players).
+// token menu host (FR-MAP-18/29), definition drops (FR-MAP-13), Ctrl-D (FR-MAP-17), the DM
+// tool rail extras (grid, lock) and the "Not shown to players" button (FR-MAP-51).
 import {
   MAP_INTENTS,
   SCENE_FOLDER_TYPE,
@@ -10,11 +10,12 @@ import {
   TOKEN_TYPE,
   type TokenRecord,
 } from "@shared/scenes-map/schemas";
+import { Button } from "@ui/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@ui/components/ui/menus";
-import { Badge } from "@ui/components/ui/primitives";
 import { TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { useBaseKeyDown } from "@ui/features/play-shell/hooks";
 import { BaseEmpty } from "@ui/features/play-shell/PlayFrame";
+import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { toastReject, useLive, useMapIntent } from "@ui/features/scenes-map/intents";
 import { LazyMapCanvas as MapCanvas } from "@ui/features/scenes-map/LazyMapCanvas";
 import { useSceneLoaded } from "@ui/features/scenes-map/scene-window";
@@ -25,7 +26,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DiagonalRulePanel } from "../scene-tools/diagonal-rule-panel";
 import { ScnLayersPopover } from "../scene-tools/layers-popover";
 import { ScnPropsDmHost } from "../scene-tools/props-host";
-import { GridTool, LockTool, ShowToPlayers } from "./DmTools";
+import { GridTool, LockTool } from "./DmTools";
+import { SCENES_KIND } from "./scenes-window";
 import {
   dispatchSelection,
   getMapSelection,
@@ -51,6 +53,29 @@ export function useViewedScene(): { viewed: SceneRecord | null; active: SceneRec
 }
 
 type Open = { tokenId: string; at: { x: number; y: number } } | null;
+
+/**
+ * FR-MAP-51: opens / fronts the Scenes window with the viewed scene's row scrolled into view and
+ * focused. Works while not live: viewing is local (FR-MAP-28); Show itself is disabled there.
+ */
+function NotShownButton({ sceneId }: { sceneId: string }) {
+  const openWindow = useOpenWindow();
+  const focusRow = useDmMap((s) => s.focusRow);
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      data-testid="map-not-shown-badge"
+      className="h-6 gap-1 rounded-full px-2.5 text-xs"
+      onClick={() => {
+        focusRow(sceneId);
+        openWindow(SCENES_KIND);
+      }}
+    >
+      <EyeOffIcon className="size-3.5" /> Not shown to players · Scenes…
+    </Button>
+  );
+}
 
 export function DmMapBase() {
   const { viewed, active } = useViewedScene();
@@ -157,13 +182,8 @@ export function DmMapBase() {
         }
       />
       {notShown && (
-        <div
-          className="pointer-events-none absolute left-1/2 -translate-x-1/2"
-          style={{ top: TOP_BAR_H + 8 }}
-        >
-          <Badge variant="secondary" data-testid="map-not-shown-badge" className="gap-1">
-            <EyeOffIcon className="size-3.5" /> Not shown to players
-          </Badge>
+        <div className="absolute left-1/2 -translate-x-1/2" style={{ top: TOP_BAR_H + 8 }}>
+          <NotShownButton sceneId={viewed.id} />
         </div>
       )}
       <DropdownMenu
@@ -224,7 +244,6 @@ export function DmMapToolRail() {
         <div className="flex flex-col gap-1 border-t pt-1">
           <GridTool scene={viewed} />
           <LockTool scene={viewed} />
-          {active?.id !== viewed.id && <ShowToPlayers scene={viewed} />}
         </div>
       )}
       <ScnPropsDmHost />

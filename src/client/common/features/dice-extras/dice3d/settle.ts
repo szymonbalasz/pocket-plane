@@ -1,7 +1,9 @@
-// FR-DICEX-15 settle to result: simulate the throw headless (cannon-es, no renderer; fixed 60 Hz,
-// ≤ 150 steps), snap dice still moving (or cocked) at the end to their nearest resting pose, read
-// each up-face and relabel so it carries the server value. The motion is cosmetic: seeded by the
-// throw (hash of its first entry id), never `ctx.dice`, so every client shows the same tumble.
+// FR-DICEX-15 / -34 settle to result: simulate the whole throw headless in its arena first
+// (cannon-es, no renderer; fixed 60 Hz, ≤ 150 steps), snap dice still moving (or cocked) at the
+// end to their nearest resting pose, read each up-face and relabel so it carries the server
+// value; the renderer then plays the recorded motion (no visible snap afterwards). The motion is
+// cosmetic: seeded by the throw (hash of its first public entry id), never `ctx.dice`, so equal
+// arenas show the same tumble. Dice enter from the arena's bottom edge and bounce off its walls.
 import type { DieShape } from "@shared/dice-extras/throw";
 import {
   Body,
@@ -15,6 +17,7 @@ import {
   Vec3,
   World,
 } from "cannon-es";
+import type { Arena } from "../arena";
 import {
   type DieGeometry,
   defaultLabels,
@@ -30,12 +33,16 @@ import {
 /** FR-DICEX-15: fixed step and the step budget (2.5 s). */
 export const STEP_HZ = 60;
 export const MAX_STEPS = 150;
-/** Arena half extents (world units): fixed, so every client's tumble matches its viewport. */
-export const ARENA = { x: 6, z: 3.5 } as const;
+/** The sprint-3 zone's arena (world units), for callers without a rect. */
+export const DEFAULT_ARENA: Arena = { x: 6, z: 3.5 };
 /** Frames blended into the snapped pose when a die is still moving at the budget's end. */
 const SNAP_FRAMES = 12;
 /** Dice resting further than this off flat (on another die, against a wall) snap too. */
 const MAX_TILT = (12 * Math.PI) / 180;
+
+/** Effective slow-down of a thrown die (world units / s²): sets the launch speed per arena. */
+const DECEL = 20;
+const MAX_SPEED = 50;
 
 /** Per frame and die: position xyz + quaternion xyzw. */
 export const POSE = 7;
@@ -111,8 +118,12 @@ function nlerp(a: Quat, b: Quat, t: number): Quat {
   return q.map((x) => x / n) as unknown as Quat;
 }
 
-/** Run the throw's physics; deterministic for a seed and dice list. */
-export function simulate(dice: readonly SimDie[], seed: number): Simulation {
+/** Run the throw's physics; deterministic for a seed, dice list and arena. */
+export function simulate(
+  dice: readonly SimDie[],
+  seed: number,
+  arena: Arena = DEFAULT_ARENA,
+): Simulation {
   const r = prng(seed);
   const world = new World({ gravity: new Vec3(0, -60, 0), allowSleep: true });
   world.broadphase = new SAPBroadphase(world);
@@ -131,10 +142,10 @@ export function simulate(dice: readonly SimDie[], seed: number): Simulation {
 
   const statics: [V3, V3, Material][] = [
     [[0, 0, 0], [0, 1, 0], floorMat],
-    [[-ARENA.x, 0, 0], [1, 0, 0], wallMat],
-    [[ARENA.x, 0, 0], [-1, 0, 0], wallMat],
-    [[0, 0, -ARENA.z], [0, 0, 1], wallMat],
-    [[0, 0, ARENA.z], [0, 0, -1], wallMat],
+    [[-arena.x, 0, 0], [1, 0, 0], wallMat],
+    [[arena.x, 0, 0], [-1, 0, 0], wallMat],
+    [[0, 0, -arena.z], [0, 0, 1], wallMat],
+    [[0, 0, arena.z], [0, 0, -1], wallMat],
   ];
   for (const [p, n, material] of statics) {
     const body = new Body({ mass: 0, material, collisionFilterGroup: G_STATIC });
@@ -147,9 +158,12 @@ export function simulate(dice: readonly SimDie[], seed: number): Simulation {
     world.addBody(body);
   }
 
-  // Thrown in from one side, in a loose grid so no two start overlapping.
-  const side = r() < 0.5 ? -1 : 1;
+  // Dice enter from the bottom edge (+z is screen-down) in a loose grid, so no two start
+  // overlapping, and fly up the screen fast enough to cross it and bounce off the far wall.
   const geos = dice.map((d) => geometryOf(d.shape));
+  const gap = Math.min(1.6, (2 * arena.x - 1.6) / 4);
+  const cx = (r() - 0.5) * Math.max(0, 2 * arena.x - 4 * gap - 2);
+  const reach = Math.sqrt(2 * DECEL * 2 * arena.z);
   const bodies = geos.map((g, i) => {
     const body = new Body({
       mass: 1,
@@ -174,13 +188,14 @@ export function simulate(dice: readonly SimDie[], seed: number): Simulation {
     const row = Math.floor(i / 4) % 2;
     const layer = Math.floor(i / 8);
     body.position.set(
-      side * (ARENA.x - 1 - row * 1.5 - r() * 0.3),
+      cx + (col - 1.5) * gap + (r() - 0.5) * 0.3,
       1.4 + layer * 1.5 + r() * 0.5,
-      -2.4 + col * 1.6 + (r() - 0.5) * 0.3,
+      Math.max(-arena.z + 1, arena.z - 1 - row * 1.5 - r() * 0.3),
     );
     const q = randomQuat(r);
     body.quaternion.set(q[0], q[1], q[2], q[3]);
-    body.velocity.set(-side * (10 + r() * 7), 1 + r() * 3, (r() - 0.5) * 6);
+    const speed = Math.min(MAX_SPEED, reach * (0.85 + r() * 0.35));
+    body.velocity.set((r() - 0.5) * Math.min(arena.x, 8), 1 + r() * 3, -speed);
     body.angularVelocity.set((r() - 0.5) * 30, (r() - 0.5) * 30, (r() - 0.5) * 30);
     world.addBody(body);
     return body;
@@ -228,9 +243,9 @@ export function simulate(dice: readonly SimDie[], seed: number): Simulation {
     const from = Math.max(0, frameCount - 1 - SNAP_FRAMES);
     const start = Array.from(frames.subarray(at(from), at(from) + POSE));
     const end = [
-      Math.min(ARENA.x - g.radius, Math.max(-ARENA.x + g.radius, frames[last] as number)),
+      Math.min(arena.x - g.radius, Math.max(-arena.x + g.radius, frames[last] as number)),
       pose.y,
-      Math.min(ARENA.z - g.radius, Math.max(-ARENA.z + g.radius, frames[last + 2] as number)),
+      Math.min(arena.z - g.radius, Math.max(-arena.z + g.radius, frames[last + 2] as number)),
     ];
     const q0 = start.slice(3) as unknown as Quat;
     for (let f = from + 1; f < frameCount; f++) {

@@ -1,5 +1,5 @@
-// DM tool rail extras (MAP §7): grid calibration popover (FR-MAP-10), map lock (FR-MAP-11),
-// "Show to players" (FR-MAP-06). All disabled while not live (FR-MAP-28).
+// DM tool rail extras (MAP §7): grid calibration popover (FR-MAP-10), map lock (FR-MAP-11).
+// Disabled while not live (FR-MAP-28). "Show to players" lives in the Scenes window (FR-MAP-51).
 import { GridFields, MAP_INTENTS, type SceneRecord } from "@shared/scenes-map/schemas";
 import { Button } from "@ui/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger, Slider, Switch } from "@ui/components/ui/menus";
@@ -8,7 +8,7 @@ import { Input, Label } from "@ui/components/ui/primitives";
 import type { EffectiveGrid } from "@ui/features/scenes-map/canvas-context";
 import { toastReject, useLive, useMapIntent } from "@ui/features/scenes-map/intents";
 import { cn } from "@ui/lib/utils";
-import { Grid3x3Icon, LockIcon, MinusIcon, PlusIcon, TvIcon, UnlockIcon } from "lucide-react";
+import { Grid3x3Icon, LockIcon, MinusIcon, PlusIcon, UnlockIcon } from "lucide-react";
 import { useState } from "react";
 import { useDmMap } from "./view-state";
 
@@ -242,27 +242,6 @@ export function LockTool({ scene }: { scene: SceneRecord }) {
         }
       >
         <Icon className="size-4" />
-      </Button>
-    </Tooltip>
-  );
-}
-
-/** FR-MAP-06: shown while the viewed scene isn't the active one. */
-export function ShowToPlayers({ scene }: { scene: SceneRecord }) {
-  const live = useLive();
-  const send = useMapIntent();
-  return (
-    <Tooltip content="Show to players">
-      <Button
-        size="icon"
-        variant="ghost"
-        aria-label="Show to players"
-        data-testid="map-show-to-players"
-        className="size-9"
-        disabled={!live}
-        onClick={() => send(MAP_INTENTS.activateScene, { sceneId: scene.id }).catch(toastReject)}
-      >
-        <TvIcon className="size-4" />
       </Button>
     </Tooltip>
   );

@@ -1,7 +1,7 @@
 // e2e-bundle: dice-extras
 // Thin dice-extras flows (DICEX §13 E2E, D1 flat): DM (A) + player-1 (B, Mira). B stages "1d12+5"
 // from the roll bar's tray Button, adds a d6, sets the constant to 6 and rolls; A sees the line;
-// B's flat throw rests on the server's values. B Alt+clicks Athletics on Mira's sheet → the tray
+// B's flat throw (reduced motion → flat in the zone, FR-DICEX-45) rests on the server's values. B Alt+clicks Athletics on Mira's sheet → the tray
 // adjusts the sheet roll and its Roll sends the sheet's own intent. Sheet notation (D4): B clicks
 // "1d12 + 5" in Mira's "Notation test" feature → `compose` as Mira → Roll; A sees the line.
 // Looks (D2): fixture looks thrown in their style; player-2 saves Emerald glass, seen by A and B.
@@ -20,6 +20,8 @@ test("FR-DICEX-01 FR-DICEX-04 FR-DICEX-06 FR-DICEX-10 FR-DICEX-11 FR-DICEX-17 tr
   await loginDm(dm, secret);
   await live(dm);
   const p1 = await rolePage(browser);
+  // Reduced motion: the default Full screen display shows flat in the zone (FR-DICEX-32, -45).
+  await p1.emulateMedia({ reducedMotion: "reduce" });
   await p1.goto(link("Player 1"));
   await live(p1);
 
@@ -172,8 +174,10 @@ test("FR-DICEX-15 FR-DICEX-22 3D throw rests on the server's values (skipped wit
     await log.getByTestId("dice-roll-expression").fill("2d6+1d20+1d100");
     await log.getByTestId("dice-roll-expression").press("Enter");
   };
-  // The first 3D throw loads the lazy chunk and draws flat (DICEX §7); a later one tumbles.
-  const thrown = p1.locator('[data-testid="dicex-throw"][data-record-id][data-render="3d"]');
+  // The chunk preloads at idle (FR-DICEX-37); a throw before it is ready draws flat.
+  const thrown = p1.locator(
+    '[data-testid="dicex-throw"][data-record-id][data-render="3d"][data-arena="screen"]',
+  );
   await expect(async () => {
     await roll();
     await expect(thrown).toHaveCount(1, { timeout: 2_000 });
@@ -187,7 +191,8 @@ test("FR-DICEX-15 FR-DICEX-22 3D throw rests on the server's values (skipped wit
     await expect(d).toHaveAttribute("data-settled", value as string);
     await expect(d).toHaveAttribute("data-flat", "false");
   }
-  await expect(thrown.locator("canvas")).toHaveCount(1);
+  // The page's one dice canvas lives in the dice layer (FR-DICEX-33).
+  await expect(p1.getByTestId("dicex-screen").locator("canvas")).toHaveCount(1);
   await p1.context().close();
 });
 
