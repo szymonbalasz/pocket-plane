@@ -11,7 +11,7 @@ import { useSyncExternalStore } from "react";
 import { createStore, type StoreApi } from "zustand";
 import { ROLL_POPUPS_MAX } from "../play-shell/toast-region";
 import { type DiceExtrasStore, diceExtras, type ThrowRun } from "./store";
-import { FLAT_IN_MS, POPUP_CLOSE_MS, POPUP_MS } from "./timing";
+import { FLAT_IN_MS, POPUP_CLOSE_MS, POPUP_MS, POPUP_ROLLING_MAX_MS } from "./timing";
 
 /**
  * FR-DICEX-41 PiP modes: `handoff` (the big throw's dice fly in), `play` (a miniature on the one
@@ -271,6 +271,10 @@ export function createRollPopups(
       if (plan.mode === "chips") {
         timers.setTimeout(() => rested(t.id, "play"), FLAT_IN_MS);
       }
+      timers.setTimeout(() => {
+        rested(t.id, "handoff");
+        rested(t.id, "play");
+      }, POPUP_ROLLING_MAX_MS);
       settle(t.id);
       return t.id;
     },

@@ -143,15 +143,26 @@ export function DiceExtrasRuntime() {
           waiting.current?.();
           waiting.current = null;
           if (plan.draw === "flat") return start(plan);
+          // Set before the wait: a chunk already in calls back at once and clears it.
+          waiting.current = () => {};
           // FR-DICEX-37: a throw during the load waits ≤ 1.5 s, then 3D, else flat: in the zone,
-          // or with popups on as chips in its popup (FR-DICEX-41 c).
-          waiting.current = whenChunk(dice3d, (ready) => {
+          // or with popups on as chips in its popup (FR-DICEX-41 c), as when a newer frame
+          // replaces it while it waits.
+          const toChips = () => {
+            const p = popups ? rollPopups.ofBig(t.id) : null;
+            if (p) rollPopups.fallback(p.id, "handoff", "chips");
+            return p !== null;
+          };
+          const cancel = whenChunk(dice3d, (ready) => {
             waiting.current = null;
             if (ready) return start(plan);
-            const p = popups ? rollPopups.ofBig(t.id) : null;
-            if (p) return rollPopups.fallback(p.id, "handoff", "chips");
-            start({ ...plan, arena: "zone", draw: "flat" });
+            if (!toChips()) start({ ...plan, arena: "zone", draw: "flat" });
           });
+          if (waiting.current === null) return; // ready at once: started
+          waiting.current = () => {
+            cancel();
+            toChips();
+          };
         },
       },
     );

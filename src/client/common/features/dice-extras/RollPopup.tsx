@@ -381,7 +381,7 @@ function Card({ p, display }: { p: RollPopup; display: DisplaySetting }) {
     >
       <header className="flex items-start gap-1">
         {/* Rows beyond 2 scroll inside (DICEX §7). */}
-        <div className="flex max-h-12 min-w-0 flex-1 flex-col overflow-y-auto">
+        <div className="flex max-h-10 min-w-0 flex-1 flex-col overflow-y-auto">
           {rows.map((r) => (
             <Row key={r.entryId} row={r} rolling={rolling} totals={!single} />
           ))}

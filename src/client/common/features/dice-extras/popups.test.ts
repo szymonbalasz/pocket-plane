@@ -6,7 +6,7 @@ import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import { dmStackAt, pipClip, pipDiePx, popupRows } from "./popup-logic";
 import { createRollPopups, pipModeOf, pipPlan, type RollPopup } from "./popups";
 import { createDiceExtrasStore } from "./store";
-import { FLAT_IN_MS, POPUP_CLOSE_MS, POPUP_MS } from "./timing";
+import { FLAT_IN_MS, POPUP_CLOSE_MS, POPUP_MS, POPUP_ROLLING_MAX_MS } from "./timing";
 
 function fakeTimers() {
   const timers = new Map<number, { at: number; fn: () => void }>();
@@ -122,6 +122,17 @@ describe("FR-DICEX-39 roll popup", () => {
     t.advance(1999);
     expect(one().state).toBe("rest");
     t.advance(1);
+    expect(one().state).toBe("closing");
+  });
+
+  test("FR-DICEX-39 a popup whose dice nothing reports on (its view never mounted) rests by the rolling cap, then closes", () => {
+    const { t, popups, one } = setup();
+    popups.add({ entries: [entry()], looks: {}, big: null, threeD: true });
+    t.advance(POPUP_ROLLING_MAX_MS - 1);
+    expect(one().state).toBe("rolling");
+    t.advance(1);
+    expect(one().state).toBe("rest");
+    t.advance(POPUP_MS);
     expect(one().state).toBe("closing");
   });
 
