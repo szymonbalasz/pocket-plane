@@ -88,6 +88,12 @@ test("FR-MOD-15 FR-MOD-16 FR-MOD-20 FR-MOD-28 sheet attack with Bless → line +
   // P3 E2: the token menu (taller than the room below or above Goblin 2) stays inside the
   // viewport, flipped / clamped and scrolling.
   const size = dm.viewportSize() ?? { width: 1280, height: 800 };
+  // Close Scenes and Initiative first: Fit keeps the top row (V7 priority), so Goblin 2 may sit
+  // under them (closing never refits, FR-MAP-44).
+  for (const win of [scenes, init]) {
+    await win.getByTestId("ui-window-close").click();
+    await expect(win).toBeHidden();
+  }
   const g = (await tokenNode(dm, goblin2Token))!;
   await dm.mouse.click(g.x, g.y, { button: "right" });
   const menu = dm.getByTestId("map-token-menu");
@@ -98,7 +104,8 @@ test("FR-MOD-15 FR-MOD-16 FR-MOD-20 FR-MOD-28 sheet attack with Bless → line +
   await menu.getByTestId("mod-token-menu-apply").scrollIntoViewIfNeeded();
   await expect(menu.getByTestId("mod-token-menu-apply")).toBeInViewport();
   await dm.getByTestId("mod-token-menu-apply").click();
-  await dm.locator('[data-testid="mod-apply-preset"][data-value="bane"]').click();
+  // By keyboard: Goblin 2 may sit near the right edge, where the submenu flips over its parent.
+  await dm.locator('[data-testid="mod-apply-preset"][data-value="bane"]').press("Enter");
   const apply = dm.getByTestId("mod-apply");
   await expect(apply).toBeVisible();
   await apply.getByTestId("mod-apply-submit").click();
