@@ -1738,7 +1738,7 @@ From [dice-extras](../specs/dice-extras.md) (FR-DICEX-42) and [dice-roll-log](..
 
 ## 63. Sprint 4: vision core (V6)
 
-From [fog-of-war](../specs/fog-of-war.md) (FOG sprint 4, `complete`; gate 1 #245; ADR [proposed-party-vision](../architecture/adr/proposed-party-vision.md), refines [ADR-0042](../architecture/adr/0042-dynamic-vision.md)), [character-sheet-full](../specs/character-sheet-full.md) (FR-CHARX-49 / -50 amended), [live-sync](../specs/live-sync.md) (OQ-FOG-58). **Built by `fix/vision-s4-core`** (V6; schema + ws + sheet locks): the 999 ft default, map edges and inward simplification, party vision on the server, the redo stack, the brush shape schemas, server-originated signals and View as → Party. No party-vision or brush UI yet (V9 / V10); `fog.sight` is sent by V8's `map.checkMove` hint. Data side: [data model §47](../data-model/README.md#47-sprint-4-vision-core-v6).
+From [fog-of-war](../specs/fog-of-war.md) (FOG sprint 4, `complete`; gate 1 #245; [ADR-0047](../architecture/adr/0047-party-vision.md), refines [ADR-0042](../architecture/adr/0042-dynamic-vision.md)), [character-sheet-full](../specs/character-sheet-full.md) (FR-CHARX-49 / -50 amended), [live-sync](../specs/live-sync.md) (OQ-FOG-58). **Built by `fix/vision-s4-core`** (V6; schema + ws + sheet locks): the 999 ft default, map edges and inward simplification, party vision on the server, the redo stack, the brush shape schemas, server-originated signals and View as → Party. No party-vision or brush UI yet (V9 / V10); `fog.sight` is sent by V8's `map.checkMove` hint. Data side: [data model §48](../data-model/README.md#48-sprint-4-vision-core-v6).
 
 **Intents** (DM only, ADR-0021 D; a player → `forbidden`)
 
