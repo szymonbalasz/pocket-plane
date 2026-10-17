@@ -103,7 +103,7 @@ function render(entries: GameLogEntryView[], role: "dm" | "player" = "player") {
 const chips = (html: string) =>
   [
     ...html.matchAll(
-      /<span data-testid="dice-log-die" data-faces="(\d*)" data-value="(\d+)" data-kept="(\w+)" data-offered="(\w+)"[^>]*><span data-testid="dicex-die" data-shape="(\w+)"/g,
+      /<(?:span|s) data-testid="dice-log-die" data-faces="(\d*)" data-value="(\d+)" data-kept="(\w+)" data-offered="(\w+)"[^>]*><span data-testid="dicex-die" data-shape="(\w+)"/g,
     ),
   ].map((m) => ({ faces: m[1], value: m[2], kept: m[3], offered: m[4], shape: m[5] }));
 
@@ -146,6 +146,8 @@ describe("FR-DICE-35 log die chips (GameLog)", () => {
       { faces: "6", value: "1", kept: "true", offered: "false", shape: "d6" },
       { faces: "6", value: "6", kept: "true", offered: "false", shape: "d6" },
     ]);
+    // The dropped die stays struck markup (`<s>`), as its text was in sprint 3.
+    expect(html).toMatch(/<s data-testid="dice-log-die"[^>]*data-value="4" data-kept="false"/);
     // No element carries two test IDs (review B31): the wrapper and the shape are separate.
     expect(html).not.toMatch(/data-testid="[^"]*"[^>]*data-testid=/);
     // The line text is still there for copy / screen readers.

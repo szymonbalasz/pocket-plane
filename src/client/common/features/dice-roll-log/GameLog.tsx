@@ -65,10 +65,12 @@ const SELECT =
 
 function Segment({ s, look }: { s: LineSegment; look: DiceLook }) {
   if (s.die) {
-    // FR-DICE-35: a wrapper per chip (review B31); the shape inside keeps `dicex-die`.
+    // FR-DICE-35: a wrapper per chip (review B31); the shape inside keeps `dicex-die`. A dropped
+    // die's wrapper is `<s>`, as its text was (struck for assistive tech too).
     const d = s.die;
+    const Wrap = d.kept ? "span" : "s";
     return (
-      <span
+      <Wrap
         data-testid="dice-log-die"
         data-faces={d.faces ?? ""}
         data-value={d.value}
@@ -85,7 +87,7 @@ function Segment({ s, look }: { s: LineSegment; look: DiceLook }) {
           size="sm"
           label={`${d.label ? `${d.label} ` : ""}${d.faces ? `d${d.faces}` : "dice"}: ${s.text}`}
         />
-      </span>
+      </Wrap>
     );
   }
   switch (s.style) {
