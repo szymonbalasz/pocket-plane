@@ -307,7 +307,8 @@ function outcomeText(hit: boolean, crit: boolean, ruled: boolean, dmView: boolea
  * a miss reads as any miss. DM only (FR-CBT-53 b, c; FR-DICE-28: built from `dmPayload` alone):
  * "(DM set; rolled 13)" after an edited total, kept / dropped d20s and the damage dice in a muted
  * run, "vs AC 15", and "— DM ruled hit" / "— DM ruled miss" when the DM overrode the hit of any
- * other roll.
+ * other roll. Players (FR-CBT-85, BL-10) read "— DM: hit." / "— DM: miss" / "— DM: critical hit!"
+ * in place of the DM's "— hit!" / "— miss" / "— critical hit!".
  */
 export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof AttackLogDmPayload>>({
   kind: LOG_KIND_ATTACK,

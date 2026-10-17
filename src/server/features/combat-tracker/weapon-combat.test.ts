@@ -19,7 +19,7 @@ import type { Actor } from "../../events/types";
 import { rtSetup } from "../effect-modifiers/trigger-testing";
 import { attackCommand } from "./attack";
 import { rollDamageCommand } from "./damage";
-import { applyCard } from "./hp";
+import { applyCard, undoCommand } from "./hp";
 
 function flameTongue(o: { rage?: boolean; ward?: boolean } = {}) {
   const t = rtSetup();
@@ -388,5 +388,24 @@ describe("FR-CBT-84 outcome line parts", () => {
     expect(t.lines(hpChangeIds[0] as string).players).toBe(
       "Brakka attacks Goblin: 14 + 8 = 22 (physical) — DM: miss",
     );
+  });
+});
+
+describe("FR-CBT-82 undo and re-apply", () => {
+  test("FR-CBT-82 undo reopens the card with its parts; re-applied to Goblin 2 (no ward) the fire part lands Normal", () => {
+    const t = flameTongue({ rage: false });
+    const { cardId } = t.step3();
+    const first = t.apply(cardId, [
+      { targetId: t.id("Goblin"), hit: true, multiplier: "normal", extraMultipliers: ["half"] },
+    ]).hpChangeIds[0] as string;
+    t.run(undoCommand.name, { expectedHpChangeId: first });
+    expect(t.row(first)?.undone).toBe(true);
+    expect(t.note(cardId)?.state).toBe("pending");
+    expect(t.card(cardId).damage?.extra?.[0]?.total).toBe(8);
+    const again = t.apply(cardId, [
+      { targetId: t.id("Goblin 2"), hit: true, multiplier: "normal", extraMultipliers: ["normal"] },
+    ]).hpChangeIds[0] as string;
+    expect(t.row(again)?.raw).toBe(13 + 8);
+    expect(t.lines(again).players).toContain("13 slashing + 8 fire damage");
   });
 });
