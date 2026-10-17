@@ -24,14 +24,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | R S4-1b weapon combat + BL-10 | merged | — | Done (walkthrough 8/8; check 3138, e2e 92) | — |
 | R S4-5 Divine Fury log line | merged | — | Done (walkthrough 9/9; own e2e bundle `fury-log-line`) | — |
 | R S4-3 trigger state + tray | merged e3e203b | — | Done (walkthrough 8/8; check 3185, e2e 96) | — |
-| R S4-4 trigger badges | `build/trigger-badges` (w5Y, slot 5) | — | Walkthrough: badges all PASS (DF dice = S4-5, now merged in; physical DF field → BL-25); merged main, gates queued | Merge |
+| R S4-4 trigger badges | merged 5a84b98 | — | Done (badges PASS) | — |
 | R S4-2 negative uses | `fix/uses-negative` (w5Z, slot 2) | test-uses-negative | Walkthrough | Merge |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
 | M4 window placement | merged c308458 | — | Done (re-test 3 5/5; check 3097, e2e 91) | — |
-| D7 roll popup | `build/roll-popup` (w5J, slot 4) | — | Fixed (stack clears the combat popup); merge after main gates | Merge |
+| D7 roll popup | merged 91b610d | — | Done (13/14 + fixes; #247 in) | — |
 | Mc map-tools core | merged | — | Done (check 3109, e2e 91; drizzle duplicate-index fix) | M1 after V7 |
 
 ## Shared-file locks
