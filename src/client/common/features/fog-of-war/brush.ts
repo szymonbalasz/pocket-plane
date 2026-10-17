@@ -64,7 +64,8 @@ export function startBrush(at: Pt, ft: number, free: boolean, rule: DiagonalRule
 
 /**
  * Pointer move with the button down: walks the path from the last position to `at`. Returns the
- * draft and the strokes completed on the way (sent while the button stays down).
+ * draft and the strokes completed on the way (sent while the button stays down). Nothing new
+ * painted → the same draft (no redraw; the next walk starts from the same cell).
  */
 export function extendBrush(d: BrushDraft, at: Pt): { draft: BrushDraft; sent: BrushDraft[] } {
   const sent: BrushDraft[] = [];
@@ -79,7 +80,7 @@ export function extendBrush(d: BrushDraft, at: Pt): { draft: BrushDraft; sent: B
         cur = { ...cur, points: [p] };
       }
     }
-    return { draft: { ...cur, last: at }, sent };
+    return { draft: cur === d ? d : { ...cur, last: at }, sent };
   }
   const [x0, y0] = d.last;
   const steps = Math.max(1, Math.ceil(Math.hypot(at[0] - x0, at[1] - y0) / BRUSH_POINT_GAP));
@@ -99,7 +100,7 @@ export function extendBrush(d: BrushDraft, at: Pt): { draft: BrushDraft; sent: B
     const fresh: BrushDraft = { ...cur, cells: [] };
     cur = addStamp(fresh, c) ?? fresh;
   }
-  return { draft: { ...cur, last: at }, sent };
+  return { draft: cur === d ? d : { ...cur, last: at }, sent };
 }
 
 /** Squared distance from p to the segment a–b. */
