@@ -50,8 +50,18 @@ const spells = [
   { id: "sh", name: "Shield", level: 1 },
 ].map((s) => SpellRow.parse(s));
 
-function ctxCreature(o: { npc?: boolean; legacy?: boolean } = {}): DefinitionRecord {
-  const s = o.legacy ? { ...stats, attacks: stats.attacks.map(({ id: _, ...a }) => a) } : stats;
+type RenderOpts = {
+  client?: "dm" | "player";
+  npc?: boolean;
+  legacy?: boolean;
+  /** Replaces the attack rows (FR-CHARX-56). */
+  attacks?: unknown[];
+  editing?: boolean;
+};
+
+function ctxCreature(o: RenderOpts = {}): DefinitionRecord {
+  const base = o.attacks ? CharacterStatBlock.parse({ ...stats, attacks: o.attacks }) : stats;
+  const s = o.legacy ? { ...base, attacks: base.attacks.map(({ id: _, ...a }) => a) } : base;
   return {
     id: "mira",
     kind: o.npc ? "monster" : "character",
@@ -63,10 +73,7 @@ function ctxCreature(o: { npc?: boolean; legacy?: boolean } = {}): DefinitionRec
   } as unknown as DefinitionRecord;
 }
 
-function render(
-  node: React.ReactNode,
-  o: { client?: "dm" | "player"; npc?: boolean; legacy?: boolean } = {},
-) {
+function render(node: React.ReactNode, o: RenderOpts = {}) {
   const client = o.client ?? "player";
   const creature = ctxCreature(o);
   const sheet = { ...defaultSheetData(), spells };
@@ -78,8 +85,8 @@ function render(
     client,
     npc: o.npc ?? false,
     readOnly: false,
-    canEdit: false,
-    editing: false,
+    canEdit: o.editing ?? false,
+    editing: o.editing ?? false,
     canCount: true,
     ownerName: "Player 1",
   } as unknown as SheetCtx;
@@ -304,5 +311,78 @@ describe("FR-CHARX-48 pinned header", () => {
       html.indexOf('data-testid="char-sheet-roll-init"'),
     );
     expect(html.match(/data-testid="char-sheet-picker"/g)).toHaveLength(1);
+  });
+});
+
+describe("FR-CHARX-56 weapon row UI", () => {
+  const flame = {
+    id: "ft",
+    name: "Flame Tongue greatsword",
+    toHit: 7,
+    damage: "2d6+4",
+    damageType: "slashing",
+    bonus: 1,
+    extraDamage: [{ damage: "2d6", type: "fire" }],
+  };
+  const two = {
+    id: "two",
+    name: "Frost Brand",
+    toHit: 5,
+    damage: "1d8+3",
+    extraDamage: [
+      { damage: "1d6", type: "cold" },
+      { damage: "1d4", type: "necrotic" },
+    ],
+  };
+  const plain = { id: "a1", name: "Shortsword", toHit: 4, damage: "1d6+2", damageType: "piercing" };
+  const text = (html: string) => html.replace(/<[^>]+>/g, "");
+  const addButton = (row: string) =>
+    row.match(/<button[^>]*data-testid="charx-attack-extra-add"[^>]*>/)?.[0] ?? "missing";
+  const rowHtml = (html: string, id: string) => {
+    const start = html.indexOf(`data-testid="charx-attack" data-record-id="${id}"`);
+    expect(start).toBeGreaterThan(-1);
+    const next = html.indexOf('data-testid="charx-attack" ', start + 1);
+    return html.slice(start, next === -1 ? undefined : next);
+  };
+
+  test('FR-CHARX-56 weapon row UI: view "+8 · 2d6+5 slashing + 2d6 fire" with a "+1" Badge; plain rows unchanged', () => {
+    for (const o of [{ client: "player" as const }, { client: "dm" as const, npc: true }]) {
+      const html = render(<ActionsTab />, { ...o, attacks: [plain, flame] });
+      const row = rowHtml(html, "ft");
+      expect(row).toContain('data-testid="charx-attack-bonus" data-value="1"');
+      expect(text(row)).toContain("Flame Tongue greatsword +1+8 · 2d6+5 slashing + 2d6 fire");
+      // The second line wraps between parts only.
+      expect(row.match(/class="whitespace-nowrap"/g)).toHaveLength(2);
+      expect(buttonsOf(html, "charx-attack", "ft")).toEqual(ATTACK_ROW);
+      const sword = rowHtml(html, "a1");
+      expect(sword).not.toContain("charx-attack-bonus");
+      expect(text(sword)).toContain("Shortsword +4 · 1d6+2 piercing");
+    }
+  });
+
+  test("FR-CHARX-56 weapon row UI: edit Magic Select, extra part rows, Add damage type disabled at two", () => {
+    for (const npc of [false, true]) {
+      const html = render(<ActionsTab />, {
+        client: "dm",
+        npc,
+        editing: true,
+        attacks: [flame, two, plain],
+      });
+      const ft = rowHtml(html, "ft");
+      expect(ft).toMatch(/<select data-testid="charx-attack-bonus" data-value="1"/);
+      expect(ft).toContain("Magic +3");
+      expect(ft.match(/data-testid="charx-attack-extra" data-value="\d"/g)).toEqual([
+        'data-testid="charx-attack-extra" data-value="0"',
+      ]);
+      expect(ft).toContain('data-value="attacks.ft.extraDamage.0.damage"');
+      expect(ft).toMatch(/data-testid="charx-attack-extra-type" data-value="0"/);
+      expect(ft).toContain('data-testid="charx-attack-extra-delete" data-value="0"');
+      expect(addButton(ft)).not.toContain('disabled=""');
+      const full = rowHtml(html, "two");
+      expect(full.match(/data-testid="charx-attack-extra" /g)).toHaveLength(2);
+      expect(full).toMatch(/data-testid="charx-attack-bonus" data-value="0"/);
+      expect(addButton(full)).toContain('disabled=""');
+      expect(rowHtml(html, "a1")).not.toContain('data-testid="charx-attack-extra" ');
+    }
   });
 });

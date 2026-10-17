@@ -109,7 +109,10 @@ export const charRoll = defineCommand({
         : (c.statBlock.attacks.find((a) => a.id === input.attackId) ?? null);
     const row = attack?.name ?? sheet?.spells.find((x) => x.id === input.spellId)?.name;
     const rolls = specs.map((s, i) => {
-      const subject = subjectOf(c, s.category, { ...input, ability }, row);
+      // FR-CHARX-55: mods (Rage +2) attach to the base part; an extra part has no subject.
+      const subject = s.part?.extra
+        ? undefined
+        : subjectOf(c, s.category, { ...input, ability }, row);
       return dice.evaluate(env, {
         expression: s.expression,
         mode: s.d20 ? input.mode : "normal",
@@ -130,7 +133,11 @@ export const charRoll = defineCommand({
       // attack: the to-hit's category (FR-DICE-26); check / save: ability-check / saving-throw.
       category: (specs[0] as (typeof specs)[number]).category,
       actorName: c.name,
-      payload: rolls.map((r) => dice.rollPayloadItem(r)),
+      // FR-CHARX-55: each damage part of a magic weapon row is its own item, typed (`part`).
+      payload: rolls.map((r, i) => {
+        const part = specs[i]?.part;
+        return { ...dice.rollPayloadItem(r), ...(part ? { part } : {}) };
+      }),
       dmPayload: dice.rollDmPayload(rolls),
       rollIds,
       // FR-CHARX-22: a definition's name can leak a renamed or hidden creature (ADR-0024).

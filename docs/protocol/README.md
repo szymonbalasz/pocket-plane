@@ -1925,3 +1925,33 @@ From [scenes-map](../specs/scenes-map.md) FR-MAP-12, -29, -44 and [fog-of-war](.
 | DM plain map (`fog-of-war/plain-map.ts`, `FogLayer.tsx`) | `FOG_LAYER_SWITCH` `{key: fog, label: Fog, layer: fog, kind: show}` on the fog entry → popover `scn-layer-toggle-fog`. `fogLayerShown(client, fogToolOn, off)`: players always; DM only with the Fog tool or the switch on. `fog-layer` attr `visible`. View-as pick and rows stay loaded; Fog / Invisible badges are token overlays (unchanged) |
 | Fit (`camera.ts` `fitContent`, BL-01, 138c9fd) | After the fit and FR-MAP-46's PC pan, per axis: the map centred in the work area right of the rail (x ≥ 68, y ≥ 48) when it fits, else covering it — x panned the least, **y with its top row under the top bar** (the crop falls at the dock; FOG §13 step 26) — as far as the tokens' footprints (+ their labels' lower half) and, at the floor, the PCs (16 px margin) that were in the free area stay there |
 | E2E helper (`e2e/support/map.ts`) | `gridPoint(page, gx, gy, grid?)` (page px of a grid point, no pan); `mapPoint(page, col, row, {margin?, grid?})` (cell centre; while it or `margin` cells around it are covered (`elementFromPoint` not the map canvas), middle-drags the map onto the nearest clear spot); `panMap(page, dx, dy)` |
+
+## 71. Sprint 4: magic weapon rows on the sheet (S4-1a)
+
+From [character-sheet-full](../specs/character-sheet-full.md) (FR-CHARX-54–57) and [combat-tracker](../specs/combat-tracker.md) (FR-CBT-86); MOD §13.1. **Built by `build/weapon-rows`** (sheet folder lock after V6; `creature-form.tsx` before C-art; `src/shared/dice-roll-log/{schemas,roll-kind}.ts` under a sequence lock, orchestrator-approved). Data side: [data model §54](../data-model/README.md#54-sprint-4-magic-weapon-rows-s4-1a). The `Attack` zod (`bonus`, `extraDamage`) is S4-0's ([§66](#66-sprint-4-rules-core-s4-0)).
+
+**Intents** (no new intent)
+
+| Intent | Change | Source |
+|---|---|---|
+| `char.putRow` (attacks) | carries `bonus?` / `extraDamage?` (S4-0 zod); owner (unlocked) and DM, both kinds; bad parts (`7d6`, untyped, 3 parts, `bonus` 4) → `invalid`, nothing written | FR-CHARX-54 |
+| `char.roll` `attack` / `damage` | rolls `1d20 + toHit + bonus`; the base part = `damage` with `bonus` on its constant (`2d6+4` → `2d6+5`), typed `damageType`, mods (Rage) attach here; then **one roll per extra part**, row order, typed, **no roll subject**. All rolls in the one entry (FR-DICE-26); `rollIds` / `CharacterRolled.rollIds` list them all (event schema unchanged). `manual` / `manualParts` up to 4 (`SHEET_MANUAL_MAX`): `attack` 2 + n, `damage` 1 + n (n ≤ 2), exact count checked against the row's specs ("Enter 3 physical rolls for attack"); each manual entry checked against its own part's expression | FR-CHARX-55 |
+| `entities.update` / `PUT /api/entities` | the creature form's whole replace keeps the first attack's `id`, `bonus`, `extraDamage` and the attack rows after it (it edits neither) | FR-CBT-86 |
+
+**Schemas** (zod; optional, old rows parse and render unchanged)
+
+| Schema | Change | Source |
+|---|---|---|
+| `RollPayloadItem` (`@shared/dice-roll-log/schemas`, `roll` kind) | + `part? {type: DamageType \| null, extra: boolean}` (`RollPart`): set by `char.roll` on every damage item of a row with extra parts (base `extra: false`, `type` null = untyped base). Public like the item | FR-CHARX-55 |
+| `SheetRollIntent` (`char.roll`) | `manual` ≤ 4, `manualParts` ≤ 4 lists (was 2); count range per kind as above | FR-CHARX-55 |
+| `CharacterRollSpec` (`@shared/character-sheet/logic`) | + `part?` (as above); `SheetAttack` + `bonus` (0 = none), `extraDamage` ([] = none; spells 0 / []); `attackRollSpecs` → `[hit, base, ...extras]` with the bonus folded in. Combat consumes these (S4-1b): no second bonus | FR-CHARX-55, FR-CBT-81 |
+
+**Log line** (`roll` kind, `formatLine`): a base item followed by its `extra` items is **one run**: "Brakka — Flame Tongue greatsword damage: 2d6+5 (3 + 5) + 2 Rage slashing + 2d6 (2 + 6) fire = 23"; name = the base label without " (type)"; one `die` segment per die of every part (seams S8); one total; "physical" once. Items without `part` render byte-for-byte as before; a lone base or an orphan extra renders as a plain roll. FR-DICE-28 kind contract unchanged.
+
+**Visibility** (FR-CHARX-57): no new record type; weapon fields live in `entity.statBlock` (DM + owner; definitions DM only; not on the other-players whitelist). Leak test `weapon-rows-sync.test.ts`: `player-2` frames / snapshot / reconnect never carry "Flame Tongue", `extraDamage` or `"bonus"`; a custom monster's weapon row reaches no player; players' `sync.load` of definitions → `forbidden`.
+
+**Client** (FR-CHARX-56): Actions tab row line 1 name + Badge `charx-attack-bonus` (`data-value` = bonus) when bonus > 0; line 2 `charx-attack-numbers` "+8 · 2d6+5 slashing + 2d6 fire" (wraps between parts). Edit: Magic Select `charx-attack-bonus` (`data-value` 0–3), extra part rows `charx-attack-extra` (`data-value` = index: dice `charx-field` `attacks.<id>.extraDamage.<i>.damage`, `charx-attack-extra-type`, `charx-attack-extra-delete`), `charx-attack-extra-add` (disabled at 2), inline `charx-attack-extra-error` ("Use NdM+K: up to 6d12+10" / "Pick a damage type"; nothing sent). Extra parts have no preview subject (mods on the base part). NPC sheet the same (DM).
+
+| Item | Figure |
+|---|---|
+| CON-44 | `part` markers on 30 heavy roll entries × 3 items: DM +3,780 B, each player +3,780 B; with S4-0's extra rolls DM 714,404 B, players max 324,224 B (`weapon-rows-con44.test.ts`) |

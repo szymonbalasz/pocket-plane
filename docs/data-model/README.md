@@ -1597,3 +1597,15 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-81–84 an
 | `hp_change.damage_parts` | written per target of a card with parts (`raw` 0 on a miss); null otherwise | DM only | FR-CBT-84 |
 
 - **Derived:** each extra part's popup preset (`extraPartPresets`: the target's defenses for the part's type). **CON-44:** no new record type; the worst card with 2 extra parts is measured in MOD's `con44.test.ts` (§51) and fitted by `fitCardPayload` (`card-fit.test.ts`).
+
+## 54. Sprint 4: magic weapon rows (S4-1a)
+
+From [character-sheet-full](../specs/character-sheet-full.md) FR-CHARX-54–57, [combat-tracker](../specs/combat-tracker.md) FR-CBT-86. **Built by `build/weapon-rows`**. No table or column; the `Attack` fields are S4-0's ([§51](#51-sprint-4-rules-core-s4-0)). Protocol side: [protocol §71](../protocol/README.md#71-sprint-4-magic-weapon-rows-on-the-sheet-s4-1a).
+
+| Table / leaf | Change | Default | Visibility | Source |
+|---|---|---|---|---|
+| `game_log_entry.payload` (`roll` kind, JSON leaf) | item + `part? {type \| null, extra}` on each damage item of an attack row with extra parts (`char.roll`) | absent; old rows parse | as the entry | FR-CHARX-55 |
+| `roll` rows | one row per extra part (category `damage`, label "‹name› damage (‹type›)") in the same entry | — | as today | FR-CHARX-55 |
+
+- **Derived (never stored):** rolled numbers = stored `toHit` / `damage` + `bonus` (`attackRollSpecs`, `attackNumbers`); the line's merged run.
+- **Fixtures:** `weapon-flame-tongue` (S4-0) reused; no new unit or bundle. **CON-44:** `part` markers +3,780 B per viewer on 30 heavy entries.
