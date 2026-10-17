@@ -24,6 +24,8 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-16 | `useRecords` in `src/client/common/sync/store.ts` builds a fresh array every render despite its "stable array per store version" comment: any memo / effect keyed on it can loop (C3 found React #185 in the Encounters editor during an import, fixed locally there) | S | sync store (shared core) | none | live-sync / store work | open |
 | BL-17 | **A-tier (DM, sprint-3 feedback #4):** players and the DM pick a colour; it carries through to their laser pointer, drawing tools, pings, templates, and appears in log lines and notifications | M | campaign-management (player record), scenes-map pointers, scene-tools templates, dice-roll-log / notifications views | new field + spec note (player-colour); needs a small spec | — | open (A-tier) |
 | BL-18 | After a clicked notation's roll (e.g. "Notation test"), a fresh roll composed from the tray palette keeps the old label (D5 re-test, `.verify/20261017-dice-shapes-d5-retest/` in `build/dice-shapes`) | S | dice-extras tray (label reset on compose) | none | D6 / D7 dice slices | open |
+| BL-19 | With physical dice on, the DM's Initiative-row Attack ▸ "Attack + damage" plain click sends nothing (Alt-click into the tray works); check whether `main` has it too (S4-1b walkthrough, `.verify/20261017-weapon-combat/05-wolf-click-A.png` in `build/weapon-combat`) | S | combat-tracker DM Initiative attack menu | none | combat lock | open (verify on main) |
+| BL-20 | Physical dice entry groups show only "2d6+5" / "2d6" without the damage type of each part ("slashing", "fire") (S4-1b walkthrough) | S | dice-roll-log manual form / tray groups | none | dice client work | open |
 
 ## How to add items
 
