@@ -10,7 +10,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
 | Docs pass | merged bd07224 | — | Done | — |
-| C-search | `build/cmp-search` (w59, slot 3) | — | Walkthrough 12/13 PASS; merged main, branch gates running | Merge → C-all |
+| C-search | merged | — | Done (walkthrough 12/13; check 2984, e2e 84) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | `fix/rules4-core` (w5C, slot 0) | build-rules4-core | Building | Review (no UI) |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
@@ -38,6 +38,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 - Sprint 1: CON-44 headroom is tight (heavy DM snapshot 746 KB vs 768 KiB after cbtx-core). D build: snapshot only active effects; never raise a ceiling without a look.
 - Sprint 1 nit (not a FAIL): Notifications window opens ~250 px tall vs spec §7 360×480 (test-polish-notes).
 
+- Known flake: `vision-s4.bench.test.ts` party move ≤ 30 ms fails only under parallel load (32 ms with 4 suites running; 11 ms alone). Re-run alone before treating it as real.
 - Known flake: `snapshot-size.test.ts` (CON-44) fails with SQLITE_BUSY when several worktrees run the suite at once; passes alone and on re-run. Builders re-run before treating it as real.
 
 - Integrator picks #142–#144 (badge, snapshot ceilings, registry-driven shell tests, reconnect probe 204, lazy Konva, window layout).
