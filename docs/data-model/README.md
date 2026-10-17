@@ -1666,3 +1666,16 @@ From [entities](../specs/entities.md#8-data-model) FR-ENT-26, -27, -30 and [comp
 - **Derived (client, C-art):** the art drawn = image > type > initials (`initials` and null both draw initials). Glyphs and colours are never stored.
 - **Fixtures:** `enemy-1` humanoid, `enemy-2` beast, `enemy-custom` humanoid, `enemy-custom-second` giant; units `ent-art-tokens` (joins `compendium-full`), `cmp-srd-mini-s3`, `art-update-tokens`; bundle `token-art-update`.
 - **CON-44** (realistic heavy, `src/server/ws/snapshot-size.test.ts`, measured): `"creatureType":null` = +20 B per token received (+1,200 B for the 60 active-scene tokens per viewer); worst case `monstrosity` on every token, +9 B more each: DM 637,357 → 637,897 B (410,679 B left of 1 MiB); players ≤ 258,017 B (512 KiB); largest scene load 39,529 B. FOG / CMP `con44` heavy DM 672,310–681,445 B, players ≤ 283,518 B. Monster `type` lives in `imported-entity` / `entity` rows (DM only; `imported-entity` lazy).
+
+## 60. Sprint 4: fog brush and Ctrl+Z / redo (V9)
+
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FR-FOG-26, -55–57). **Built by `build/fog-brush`**: no table, column, record type or event change. Protocol side: [protocol §77](../protocol/README.md#77-sprint-4-fog-brush-and-ctrlz--redo-v9).
+
+| Piece | Kind | Contents | Source |
+|---|---|---|---|
+| `scene_fog.shapes` (merge) | JSON, existing | a same-op `cells` stroke after a `cells` last shape is stored as their union in that one entry (≤ 128 × 128, ≤ 500 runs), else appended; `prevShapes` of the stroke's undo entry = the list before it | FR-FOG-57 |
+| Brush radius | browser storage | `localStorage` `pp.fog.brush-ft` = ft (0–50, step 5; default 10) | FR-FOG-55 |
+| Brush draft | client memory | `BrushDraft {free, ft, rule, cells \| points, last}`; sent strokes until their event / reject; the pointer's grid point (cursor) | FR-FOG-55 |
+
+- **Derived (never stored):** the snapped stamp (`area.ts` `distance` mode with the campaign's diagonal rule), the free stroke's simplified points, the redo depth (`fog.redo.n`).
+- **CON-44:** no record or field added. A merged stroke grows the DM `fog` row by its runs only (≤ 16 KiB row cap, FR-FOG-27, unchanged); players get the same `shapes` as before.

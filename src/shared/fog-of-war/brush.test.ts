@@ -2,7 +2,16 @@
 // boundary, a single point = a circle, cells box / run caps) and their place in the static state
 // (FR-FOG-01 painter order).
 import { describe, expect, test } from "bun:test";
-import { CELLS_BOX_MAX, CELLS_RUNS_MAX, decodeCells, STROKE_POINTS_MAX } from "./brush";
+import { contains } from "@shared/scenes-map/area";
+import {
+  CELLS_BOX_MAX,
+  CELLS_RUNS_MAX,
+  cellsOf,
+  decodeCells,
+  mergeCells,
+  paintedCells,
+  STROKE_POINTS_MAX,
+} from "./brush";
 import { encodeRuns, uniformMask } from "./mask";
 import { FogEditInput, FogPlaceDarknessInput } from "./schemas";
 import { FogBrushGeom, FogLayerShape, shapeBox, shapeContains, staticState } from "./shapes";
@@ -98,5 +107,56 @@ describe("FR-FOG-26 stroke / cells", () => {
     expect(staticState(base, shapes, 2.5, 1.5)).toBe("clear");
     expect(staticState(base, shapes, 4.5, 1.5)).toBe("fog");
     expect(staticState(base, shapes, 2.5, 5.5)).toBe("fog");
+  });
+});
+
+describe("FR-FOG-26 brush containment via area.ts (review A13)", () => {
+  test("FR-FOG-26 stroke containment is area.ts's: same verdict on a 0.01 lattice around a stroke", () => {
+    const stroke = [1.5, 2.25, 3.5, 6.75, 4, 7, 8.5];
+    for (let x = 0; x <= 1000; x += 7) {
+      for (let y = 100; y <= 1050; y += 7) {
+        expect(shapeContains({ stroke }, x / 100, y / 100)).toBe(
+          contains({ stroke }, x / 100, y / 100),
+        );
+      }
+    }
+  });
+
+  test("FR-FOG-57 cellsOf / mergeCells: tight box, union, caps → null", () => {
+    expect(cellsOf([])).toBeNull();
+    const a = cellsOf([
+      [3, 4],
+      [4, 4],
+    ]);
+    expect(a).toEqual({ box: [3, 4, 2, 1], runs: "2" });
+    const b = cellsOf([[5, 6]]);
+    expect(b).toEqual({ box: [5, 6, 1, 1], runs: "1" });
+    const m = mergeCells(a as NonNullable<typeof a>, b as NonNullable<typeof b>);
+    expect(m?.box).toEqual([3, 4, 3, 3]);
+    expect(paintedCells(m as NonNullable<typeof m>)).toEqual([
+      [3, 4],
+      [4, 4],
+      [5, 6],
+    ]);
+    // Box over 128 → null (the server appends instead).
+    expect(
+      cellsOf([
+        [0, 0],
+        [CELLS_BOX_MAX, 0],
+      ]),
+    ).toBeNull();
+    expect(
+      cellsOf([
+        [0, 0],
+        [CELLS_BOX_MAX - 1, 0],
+      ])?.box,
+    ).toEqual([0, 0, CELLS_BOX_MAX, 1]);
+    // Runs over 500 → null: a checkerboard row.
+    const sparse = Array.from({ length: 64 }, (_, r) =>
+      Array.from({ length: 8 }, (_, k) => [2 * k + (r % 2), r] as [number, number]),
+    ).flat();
+    expect(cellsOf(sparse)).toBeNull();
+    expect(cellsOf(sparse.slice(0, 200))).not.toBeNull();
+    expect(CELLS_RUNS_MAX).toBe(500);
   });
 });
