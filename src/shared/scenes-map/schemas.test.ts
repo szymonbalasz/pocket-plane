@@ -8,6 +8,7 @@ import {
   PlaceTokenInput,
   SetGridInput,
   TokenName,
+  TokenRecord,
   UpdateTokenInput,
 } from "./schemas";
 
@@ -59,12 +60,46 @@ describe("scenes-map schemas", () => {
     expect(SetGridInput.parse({ ...grid, color: "#ABCDEF" }).color).toBe("#abcdef");
   });
 
-  test("FR-MAP-13 place: never size; integers", () => {
+  test("FR-MAP-13 place: never size or creatureType; integers", () => {
     const base = { sceneId: "s", definitionId: "d", col: 1, row: 2 };
     expect(PlaceTokenInput.safeParse(base).success).toBe(true);
     expect(PlaceTokenInput.safeParse({ ...base, size: "huge" }).success).toBe(false);
+    expect(PlaceTokenInput.safeParse({ ...base, creatureType: "beast" }).success).toBe(false);
     expect(PlaceTokenInput.safeParse({ ...base, col: 1.5 }).success).toBe(false);
     expect(UpdateTokenInput.safeParse({ tokenId: "t", size: "huge" }).success).toBe(false);
+  });
+
+  test("FR-ENT-27 token creatureType: 14 types | initials | null on the record; update never null", () => {
+    const t = {
+      id: "t",
+      campaignId: "c",
+      sceneId: "s",
+      definitionId: "d",
+      seq: 1,
+      name: "Goblin",
+      imageAssetId: null,
+      size: "small",
+      col: 0,
+      row: 0,
+      ownerPlayerId: null,
+      hidden: false,
+      shape: "round",
+      characterId: null,
+      speed: 30,
+      createdAt: "t",
+      updatedAt: "t",
+    };
+    for (const creatureType of ["humanoid", "monstrosity", "initials", null]) {
+      expect(TokenRecord.safeParse({ ...t, creatureType }).success).toBe(true);
+    }
+    expect(TokenRecord.safeParse(t).success).toBe(false);
+    expect(TokenRecord.safeParse({ ...t, creatureType: "swarm" }).success).toBe(false);
+    const up = (creatureType: unknown) =>
+      UpdateTokenInput.safeParse({ tokenId: "t", creatureType }).success;
+    expect(up("giant")).toBe(true);
+    expect(up("initials")).toBe(true);
+    expect(up(null)).toBe(false);
+    expect(up("Humanoid")).toBe(false);
   });
 
   test("FR-MAP-25 signal schemas: finite, |x| ≤ 16384, ≤ 32 laser points", () => {
