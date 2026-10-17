@@ -31,7 +31,10 @@ async function templates(page: Page): Promise<TemplateNode[]> {
       ephemeral: n.getAttr("ephemeral") === true,
       hidden: n.getAttr("hidden") === true,
       shape: String(n.getAttr("shape")),
-      cells: Number(n.getAttr("cells")),
+      // Sprint 4 (SCN Appendix A): `cells` lists the squares as "c,r c,r …".
+      cells: String(n.getAttr("cells") ?? "")
+        .split(" ")
+        .filter(Boolean).length,
       text: n.findOne(".scn-template-label-text")?.text() ?? null,
     }));
   });

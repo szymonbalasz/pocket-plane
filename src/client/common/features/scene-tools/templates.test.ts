@@ -6,6 +6,7 @@ import type { LaserTimers } from "../scenes-map/laser";
 import { activeTool, isDrawing, toolsFor } from "../scenes-map/tools";
 import { cancelAoe, useAoe } from "./aoe-store";
 import {
+  aimAngle,
   canEditTemplate,
   createEphemeralStore,
   DEFAULT_AOE,
@@ -16,7 +17,6 @@ import {
   pruneEphemerals,
   receiveTemplate,
   resetEphemerals,
-  snapAngle,
   snapSize,
   type TemplateView,
   templateCaption,
@@ -60,18 +60,21 @@ const px = (x: number, y: number) => ({ x: x * 70, y: y * 70 });
 
 describe("FR-SCN-22 AoE gesture", () => {
   test("FR-SCN-20 angles snap to 15° (0 = east, 90 = south); sizes to 5 ft in 5–300", () => {
-    expect(snapAngle(1, 0)).toBe(0);
-    expect(snapAngle(0, 1)).toBe(90);
-    expect(snapAngle(-1, 0)).toBe(180);
-    expect(snapAngle(0, -1)).toBe(270);
-    expect(snapAngle(1, 0.27)).toBe(15);
-    expect(snapAngle(1, -0.01)).toBe(0);
+    expect(aimAngle(1, 0, "cone", false)).toBe(0);
+    expect(aimAngle(0, 1, "cone", false)).toBe(90);
+    expect(aimAngle(-1, 0, "line", false)).toBe(180);
+    expect(aimAngle(0, -1, "line", false)).toBe(270);
+    expect(aimAngle(1, 0.27, "cone", false)).toBe(15);
+    expect(aimAngle(1, -0.01, "cone", false)).toBe(0);
+    // A cube aims its diagonal: dragging south-east = 0 (sides east and south).
+    expect(aimAngle(1, 1, "cube", false)).toBe(0);
+    expect(aimAngle(1, 0.27, "cone", true)).toBe(15.1);
     expect(snapSize(2)).toBe(5);
     expect(snapSize(17)).toBe(15);
     expect(snapSize(999)).toBe(300);
   });
 
-  test("FR-SCN-22 drag sets the direction (cone, line), the quadrant (cube) or the radius (sphere, cylinder)", () => {
+  test("FR-SCN-22 drag sets the direction (cone, line), the diagonal (cube) or the radius (sphere, cylinder)", () => {
     const o = { x: 3, y: 7 };
     const s = { ...DEFAULT_AOE, size: 15, label: "Burning Hands" };
     expect(gestureTemplate({ ...s, shape: "cone" }, o, px(3, 10), G)).toEqual({
@@ -253,7 +256,7 @@ describe("FR-SCN-06 / -22 AoE tool registration and Esc", () => {
 
   test("FR-SCN-22 Esc drops a gesture, then the ephemeral, then the selection; else falls through", () => {
     useAoe.setState({
-      gesture: { kind: "move", id: "t1", from: { x: 1, y: 1 }, at: { x: 2, y: 2 } },
+      gesture: { kind: "move", id: "t1", press: { x: 1, y: 1 }, at: { x: 2, y: 2 } },
       own: { sceneId: "s1", template: T },
       selectedId: "t1",
     });

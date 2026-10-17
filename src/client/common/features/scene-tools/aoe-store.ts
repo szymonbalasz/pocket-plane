@@ -1,8 +1,8 @@
 // AoE tool state (FR-SCN-22–26), shared by the tool's pointer handlers, its panel (beside the
 // rail) and `TemplatesLayer`: the panel settings, this connection's ephemeral template and its
-// sender, a press in progress (a new placement or moving a kept template), the selected kept
-// template and the kept templates this client may edit on the shown scene (the layer keeps
-// that fresh). Client only; the server validates every intent.
+// sender, a press in progress (a new placement, or a kept template's origin / end handle drag,
+// FR-SCN-45), the selected kept template and the kept templates this client may edit on the
+// shown scene (the layer keeps that fresh). Client only; the server validates every intent.
 import {
   SCN_INTENTS,
   SCN_SIGNALS,
@@ -16,6 +16,7 @@ import {
   type AoeSettings,
   DEFAULT_AOE,
   EphemeralSender,
+  type GridPoint,
   placeFrame,
   type TemplateView,
 } from "./templates";
@@ -23,9 +24,15 @@ import {
 type Send = (name: string, data: unknown) => unknown;
 type Intent = (name: string, input: unknown) => Promise<unknown>;
 
+/**
+ * A press in progress. `place`: a new ephemeral from the raw press point (snapped per move,
+ * FR-SCN-43). `move`: a kept template's origin handle (`at` = the snapped new origin, null until
+ * the pointer leaves the press). `end`: its end handle (`template` = the local preview).
+ */
 export type AoeGesture =
-  | { kind: "place"; origin: { x: number; y: number }; angle: number }
-  | { kind: "move"; id: string; from: { x: number; y: number }; at: { x: number; y: number } };
+  | { kind: "place"; press: GridPoint; angle: number }
+  | { kind: "move"; id: string; press: GridPoint; at: GridPoint | null }
+  | { kind: "end"; id: string; template: TemplateView };
 
 export interface AoeState {
   settings: AoeSettings;

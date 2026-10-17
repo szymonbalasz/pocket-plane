@@ -1985,9 +1985,23 @@ Built by `build/trigger-state` ([FR-MOD-53–56, -60](../specs/effect-modifiers.
 - **`charge`** (`triggerCharge`): `waiting` whenever the rule has an `ownTurn` filter and the turn isn't the owner's (round 0 included: never a false Ready), before `used`.
 - **Test IDs:** `mod-trigger-state` + `data-record-id` (trigger id) + `data-state` = `ready` \| `used` \| `waiting` \| `off` \| `in-effect`, in the Triggers block row.
 
-## 73. Sprint 4: sight while dragging (V8)
+## 73. Sprint 4: freeform AoE tool (M1)
 
-From [fog-of-war](../specs/fog-of-war.md) FR-FOG-53 / -54, [scenes-map](../specs/scenes-map.md) FR-MAP-39, [scene-tools](../specs/scene-tools.md) FR-SCN-38 (seams S1, S12; review A1–A3, A6, A7; [ADR-0047](../architecture/adr/0047-party-vision.md) option 3A, refines [ADR-0040](../architecture/adr/0040-token-move-guards.md)). **Built by `build/vision-drag`** (canvas lock 2nd; `move-guards.ts` non-append edit). No new intent, signal, record type, event or `map.drag` field; `fog.sight` is [§63](#63-sprint-4-vision-core-v6)'s, now sent. Data side: [data model §56](../data-model/README.md#56-sprint-4-sight-while-dragging-v8).
+Built by `build/aoe-freeform` ([FR-SCN-21, -22, -43, -44, -45](../specs/scene-tools.md#6-functional-requirements); #243 [8], #245). **No wire change**: the client sends the intents and signal of [§68](#68-sprint-4-map-tools-core-mc) with decimal fields. Data side: [data model §56](../data-model/README.md#56-sprint-4-freeform-aoe-tool-m1).
+
+| Client action | Sends | Source |
+|---|---|---|
+| AoE press + drag (both clients) | `scn.template` frames (≤ 20 / s, 1 s repeat): origin = the press point snapped to the nearest vertex, or with Ctrl rounded to 0.01 cell; `angle` = the drag direction (cone, line) or a cube's diagonal − 45°, 15° steps, or 0.1° with Ctrl (Ctrl read on every move and on a Ctrl key press); sphere / cylinder radius from the drag in 5-ft steps | FR-SCN-22, -43 |
+| Kept template's origin handle drag (placer, DM) | one `scn.updateTemplate {templateId, x, y}` on release (snapped / Ctrl); a click without a move only selects | FR-SCN-26, -45 |
+| Selected kept template's end handle drag | one `scn.updateTemplate {templateId, angle}` (cone, line; cube: diagonal − 45°) or `{templateId, size}` (sphere, cylinder, 5-ft steps) on release; the drag previews locally only | FR-SCN-45 |
+| DM "Clear templates on this scene" → AlertDialog Confirm | `scn.clearTemplates {sceneId}`, or `{sceneId, players: true}` with "Also players' kept templates" ticked; Cancel / Esc send nothing; Confirm disabled while the scope holds 0 or not live | FR-SCN-44 |
+
+- **Squares:** every client computes them from the record / signal with `templateCells(…, {cut: true})` (FR-SCN-41); no cell list on any wire.
+- **Konva** (`scn-template`): attrs `cells` = "c,r c,r …" (row-major; was the count), `origin` = "x,y", `angle`, `shape`, `ephemeral`; handles `scn-template-handle-origin` (every template this client may edit, AoE tool active) and `scn-template-handle-end` (the selected one), id = template id. **DOM:** `scn-free-chip` (AoE tool, Ctrl held over the map), `scn-aoe-hint`, `scn-aoe-clear-dialog`, `scn-aoe-clear-players` (`data-count` = players' kept templates), `scn-aoe-clear-confirm` (`data-count` = the chosen scope), `scn-aoe-clear-cancel`.
+
+## 74. Sprint 4: sight while dragging (V8)
+
+From [fog-of-war](../specs/fog-of-war.md) FR-FOG-53 / -54, [scenes-map](../specs/scenes-map.md) FR-MAP-39, [scene-tools](../specs/scene-tools.md) FR-SCN-38 (seams S1, S12; review A1–A3, A6, A7; [ADR-0047](../architecture/adr/0047-party-vision.md) option 3A, refines [ADR-0040](../architecture/adr/0040-token-move-guards.md)). **Built by `build/vision-drag`** (canvas lock 2nd; `move-guards.ts` non-append edit). No new intent, signal, record type, event or `map.drag` field; `fog.sight` is [§63](#63-sprint-4-vision-core-v6)'s, now sent. Data side: [data model §57](../data-model/README.md#57-sprint-4-sight-while-dragging-v8).
 
 | Piece | Contract |
 |---|---|
