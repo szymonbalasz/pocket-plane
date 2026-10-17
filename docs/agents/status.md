@@ -2,18 +2,19 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 4 Phase B (builds)**. DM gate 1 "go" (#245, #246). All five spec branches merged; ADRs 0047–0050 numbered; C's cross-spec text applied; spec index updated. Docs pass (glossary, AGENTS registries, colours) queued as `fix/s4-docs`.
+**Phase:** **Sprint 4 Phase B (builds)**. DM gate 1 "go" (#245, #246). All five spec branches merged; ADRs 0047–0050 numbered; C's cross-spec text applied; spec index updated. Docs pass merged.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
-| Docs pass | `fix/s4-docs` (w58) | docs-s4 | Writing | Merge |
-| V6 vision core | `fix/vision-s4-core` (w54, slot 0) | build-vision-core | Building | Walkthrough |
-| D5 die shapes + log dice | `build/dice-shapes` (w55, slot 2) | build-dice-shapes | Building | Walkthrough |
+| Docs pass | merged bd07224 | — | Done | — |
+| C-search | `build/cmp-search` (w59, slot 3) | test-cmp-search | Walkthrough (check 2907, e2e green; DM search 0.5 s → 2 ms) | Merge → C-all |
+| V6 vision core | `fix/vision-s4-core` (w54, slot 0) | test-vision-core | Walkthrough (check, build, e2e green) | Merge → R0, V7 |
+| D5 die shapes + log dice | `build/dice-shapes` (w55, slot 2) | test-dice-shapes-r | Re-test of the physical-dice fix (d3a8ae7) | Merge → D6 |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
-| M4 window placement | `fix/window-placement` (w57, slot 4) | build-window-placement | Building | Walkthrough |
+| M4 window placement | `fix/window-placement` (w57, slot 4) | test-window-placement | Walkthrough (check 2915, e2e 83) | Merge |
 
 ## Shared-file locks
 
