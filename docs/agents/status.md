@@ -11,7 +11,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
 | Docs pass | merged bd07224 | — | Done | — |
 | V7 pan / plain map / Fit | merged 13c15f6 | — | Done (BL-01, BL-07; check 3158, e2e 94) | V8, M1 next |
-| V8 vision while dragging | merged ec3fd3a | — | Done (walkthrough 8/8) | M2 next |
+| V8 vision while dragging | merged ec3fd3a | — | Done (walkthrough 8/8; main check 3231, e2e 99 green) | — |
 | M1 freeform AoE | merged | — | Done (walkthrough 7/7; BL-05 done) | — |
 | M2 drag path | `build/drag-path` (w61, slot 0) | build-drag-path | Building | Walkthrough → M5 |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
