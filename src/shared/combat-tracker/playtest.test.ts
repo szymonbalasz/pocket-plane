@@ -62,7 +62,7 @@ describe("FR-CBT-53 formatLine DM vs player", () => {
 
   test("FR-CBT-53 legacy rows (no manual, no rolls) parse and read as before, plus 'vs AC' for the DM", () => {
     expect(line({ payload })).toBe(
-      "Mira attacks Goblin: 15 + 4 = 19 — hit! 3 piercing damage (half)",
+      "Mira attacks Goblin: 15 + 4 = 19 — DM: hit. 3 piercing damage (half)",
     );
     expect(line({ payload, dmPayload })).toBe(
       "Mira attacks Goblin: 15 + 4 = 19 vs AC 15 — hit! 3 piercing damage (half)",
@@ -92,7 +92,7 @@ describe("FR-CBT-53 formatLine DM vs player", () => {
       "Mira attacks Goblin: 15 + 4 = 19 (2d20kh1+4 adv: 15 ~7~ + 4) vs AC 15 — hit! 3 piercing damage (half) (1d6+2: 4 + 2) (physical)",
     );
     expect(line({ payload: { ...payload, manual } })).toBe(
-      "Mira attacks Goblin: 15 + 4 = 19 — hit! 3 piercing damage (half) (physical)",
+      "Mira attacks Goblin: 15 + 4 = 19 — DM: hit. 3 piercing damage (half) (physical)",
     );
     // A physical total of several dice has no per-die values: no breakdown.
     const blind = {
@@ -115,7 +115,7 @@ describe("FR-CBT-53 formatLine DM vs player", () => {
     expect(line({ payload: miss, dmPayload: ruled })).toBe(
       "Mira attacks Goblin: 15 + 4 = 19 vs AC 15 — DM ruled miss",
     );
-    expect(line({ payload: miss })).toBe("Mira attacks Goblin: 15 + 4 = 19 — miss");
+    expect(line({ payload: miss })).toBe("Mira attacks Goblin: 15 + 4 = 19 — DM: miss");
   });
 });
 

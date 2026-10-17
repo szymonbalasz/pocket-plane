@@ -112,7 +112,7 @@ describe("FR-MOD-15/16 cbt.attack and apply", () => {
     const out = lines(t, row?.entryId as string);
     const sign = `− ${Math.abs(bane?.value ?? 0)} Bane`;
     expect(out.player).toBe(
-      `Goblin attacks Mira: 15 + 4 ${sign} (rolled for you) = ${p.toHit?.total} — hit! 5 slashing damage (physical)`,
+      `Goblin attacks Mira: 15 + 4 ${sign} (rolled for you) = ${p.toHit?.total} — DM: hit. 5 slashing damage (physical)`,
     );
     expect(out.dm).toContain(sign);
     expect(out.dm).not.toContain("DM set");

@@ -37,7 +37,7 @@ const badges = (payload: AttackLogPayload) =>
 describe("FR-CBT-73 formatLine", () => {
   test("FR-CBT-73 to-hit-only applied as a miss: no damage part", () => {
     expect(line({ ...base, hit: false, damage: 0 })).toBe(
-      "Mira attacks Goblin: 12 + 4 = 16 — miss",
+      "Mira attacks Goblin: 12 + 4 = 16 — DM: miss",
     );
   });
 
@@ -60,23 +60,25 @@ describe("FR-CBT-73 formatLine", () => {
   test("FR-CBT-73 item 12: both rolls manual → one badge at the end; one manual → after that roll", () => {
     const both = { ...base, manual: { toHit: true, damage: true } };
     expect(badges(both)).toEqual(["physical"]);
-    expect(line(both)).toBe("Mira attacks Goblin: 12 + 4 = 16 — hit! 6 piercing damage (physical)");
+    expect(line(both)).toBe(
+      "Mira attacks Goblin: 12 + 4 = 16 — DM: hit. 6 piercing damage (physical)",
+    );
     expect(line({ ...base, manual: { toHit: true, damage: false } })).toBe(
-      "Mira attacks Goblin: 12 + 4 = 16 (physical) — hit! 6 piercing damage",
+      "Mira attacks Goblin: 12 + 4 = 16 (physical) — DM: hit. 6 piercing damage",
     );
     expect(line({ ...base, manual: { toHit: false, damage: true } })).toBe(
-      "Mira attacks Goblin: 12 + 4 = 16 — hit! 6 piercing damage (physical)",
+      "Mira attacks Goblin: 12 + 4 = 16 — DM: hit. 6 piercing damage (physical)",
     );
     // Both manual but a miss: the damage isn't shown, so the to-hit keeps its badge.
     expect(line({ ...both, hit: false })).toBe(
-      "Mira attacks Goblin: 12 + 4 = 16 (physical) — miss",
+      "Mira attacks Goblin: 12 + 4 = 16 (physical) — DM: miss",
     );
   });
 
   test("FR-CBT-73 old rows (no manual, both rolls) render as before", () => {
     const { manual: _, ...old } = base;
     expect(line(old as AttackLogPayload)).toBe(
-      "Mira attacks Goblin: 12 + 4 = 16 — hit! 6 piercing damage",
+      "Mira attacks Goblin: 12 + 4 = 16 — DM: hit. 6 piercing damage",
     );
   });
 });
