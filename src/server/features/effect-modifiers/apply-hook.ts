@@ -49,6 +49,8 @@ export const modApplyHook: ApplyHook = {
     const dmParts: z.infer<typeof AttackLineDmPart>[] = [];
     const triggerParts: HpTriggerPart[] = [];
     const parts: AttackLinePart[] = [];
+    const rollIds: string[] = [];
+    const dmRollIds: string[] = [];
     const changes: RecordChange[] = [];
     for (const x of assigned) {
       const part = offers.find((o) => o.triggerId === x.triggerId);
@@ -121,6 +123,8 @@ export const modApplyHook: ApplyHook = {
       const rolled = { expression: part.expression, ...partRoll(env, part.rollId) };
       // FR-MOD-57 (B3, B4): monster triggers' dice stay DM-only whatever `public` says.
       const publicDice = !!t?.public && t.characterId !== null && !set;
+      // The part's roll id goes where its dice go (rulings B4).
+      (publicDice ? rollIds : dmRollIds).push(part.rollId);
       // FR-MOD-47: the label in public lines iff the trigger is public; values always.
       parts.push({
         label: t?.public ? part.label : null,
@@ -147,7 +151,14 @@ export const modApplyHook: ApplyHook = {
         forced,
       });
     }
-    return { ...out, parts, dm: { parts: dmParts }, triggerParts, changes };
+    return {
+      ...out,
+      parts,
+      rollIds,
+      dm: { parts: dmParts, ...(dmRollIds.length ? { rollIds: dmRollIds } : {}) },
+      triggerParts,
+      changes,
+    };
   },
   revert(env, row) {
     const uses = env.tx.select().from(triggerUse).where(eq(triggerUse.hpChangeId, row.id)).all();

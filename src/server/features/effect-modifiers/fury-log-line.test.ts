@@ -52,7 +52,7 @@ function line(t: RtSetup, hpChangeId: string) {
 }
 
 describe("FR-MOD-57 Divine Fury line in the combat log", () => {
-  test("FR-MOD-57 outcome line part carries expression 1d6+2 + dice; text '+ N radiant (Divine Fury)'; one d6 die segment from payload (players) and dmPayload (DM)", () => {
+  test("FR-MOD-57 outcome line part carries expression 1d6+2 + dice; entry rollIds include its roll; text '+ N radiant (Divine Fury)'; one d6 die segment from payload (players) and dmPayload (DM)", () => {
     const t = raging();
     const { cardId } = t.attack("Brakka", { toHit: 15, damage: 8 });
     const offer = furyOf(t, cardId);
@@ -63,6 +63,9 @@ describe("FR-MOD-57 Divine Fury line in the combat log", () => {
     const l = line(t, hpChangeIds[0] as string);
     const roll = { expression: "1d6+2", dice: [v - 2] };
     expect(l.payload.parts).toEqual([{ label: "Divine Fury", value: v, type: "radiant", ...roll }]);
+    // Entry rollIds include its roll (public character trigger); nothing DM-only.
+    expect(l.entry.rollIds as string[]).toContain(offer?.rollId as string);
+    expect(l.dmPayload.rollIds).toBeUndefined();
     expect(l.dmPayload.parts?.[0]).toMatchObject(roll);
     const die = { faces: 6, value: v - 2, kept: true, label: "Divine Fury" };
     expect(lineText(l.players)).toContain(
@@ -115,6 +118,7 @@ describe("FR-MOD-57 Divine Fury line in the combat log", () => {
     ]);
     const l = line(t, hpChangeIds[0] as string);
     expect(l.payload.parts).toEqual([{ label: "Divine Fury", value: edit, type: "radiant" }]);
+    expect(l.dmPayload.rollIds).toEqual([furyOf(t, cardId)?.rollId as string]);
     expect(dice(l.players)).toEqual([]);
     expect(lineText(l.dm)).toContain(
       `+ ${edit} radiant (Divine Fury) (DM set; rolled ${v}) (1d6+2: ${v - 2} + 2)`,
@@ -131,6 +135,9 @@ describe("FR-MOD-57 Divine Fury line in the combat log", () => {
     ]);
     const l = line(t, hpChangeIds[0] as string);
     expect(l.payload.parts).toEqual([{ label: null, value: v, type: "radiant" }]);
+    const rid = furyOf(t, cardId)?.rollId as string;
+    expect(l.dmPayload.rollIds).toEqual([rid]);
+    expect(l.entry.rollIds as string[]).not.toContain(rid);
     expect(dice(l.players)).toEqual([]);
     expect(lineText(l.players)).toContain(`+ ${v} radiant (DM)`);
     expect(dice(l.dm).filter((d) => d.label === "Divine Fury")).toEqual([
@@ -170,6 +177,8 @@ describe("FR-MOD-57 Divine Fury line in the combat log", () => {
     const l = line(t, hpChangeIds[0] as string);
     expect(l.entry.public).toBe(true);
     expect(l.payload.parts).toEqual([{ label: "Martial Advantage", value: v, type: null }]);
+    expect(l.dmPayload.rollIds).toEqual([offer?.rollId as string]);
+    expect(l.entry.rollIds as string[]).not.toContain(offer?.rollId as string);
     expect(lineText(l.players)).toContain(`+ ${v} Martial Advantage`);
     expect(dice(l.players)).toEqual([]);
     expect(l.dmPayload.parts?.[0]?.expression).toBe("2d6");
