@@ -15,7 +15,7 @@ import { FLAT_IN_MS, POPUP_CLOSE_MS, POPUP_MS, POPUP_ROLLING_MAX_MS } from "./ti
 
 /**
  * FR-DICEX-41 PiP modes: `handoff` (the big throw's dice fly in), `play` (a miniature on the one
- * canvas: DM-only, FR-DICEX-38; others off, FR-DICEX-43), `chips` (flat, off, reduced motion,
+ * canvas: DM-only, FR-DICEX-38; others off, FR-DICEX-43), `chips` (flat, off,
  * no WebGL, tab hidden).
  */
 export type PipMode = "handoff" | "play" | "chips";

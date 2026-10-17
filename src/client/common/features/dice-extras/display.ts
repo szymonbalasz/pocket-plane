@@ -25,7 +25,7 @@ export interface ThrowPlan {
 
 export interface PlanInput {
   settings: DiceSettings;
-  /** The effective display (FR-DICEX-32: reduced motion / no WebGL already → `flat`). */
+  /** The effective display (FR-DICEX-32: no WebGL already → `flat`). */
   display: DisplaySetting;
   /** `document.hidden`: no animation while the tab is hidden (DICEX §11). */
   tabHidden: boolean;

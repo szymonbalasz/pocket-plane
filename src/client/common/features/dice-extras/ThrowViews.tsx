@@ -102,7 +102,7 @@ function ZoneView({
       data-state={atRest ? "rest" : "moving"}
       data-interrupted={interrupted}
       className={cn(
-        "flex max-w-full flex-col items-center gap-1.5 rounded-lg px-3 py-2 transition-opacity duration-300 motion-reduce:transition-none",
+        "flex max-w-full flex-col items-center gap-1.5 rounded-lg px-3 py-2 transition-opacity duration-300",
         !three && "bg-background/70 shadow-lg backdrop-blur-sm",
         // Under the new throw, same spot (the zone is bottom centred).
         interrupted && "absolute bottom-0 left-1/2 -translate-x-1/2",
@@ -204,10 +204,8 @@ export function ThrowViews({
               data-state="pending"
               className="flex items-center gap-1.5 rounded-lg bg-background/70 px-3 py-2 text-sm text-muted-foreground shadow-lg"
             >
-              {/* FR-DICEX-09: 3D shakes the dice; flat / reduced motion is a static label. */}
-              {display === "zone" && (
-                <DicesIcon className="size-4 animate-bounce motion-reduce:animate-none" />
-              )}
+              {/* FR-DICEX-09: 3D shakes the dice; flat is a static label. */}
+              {display === "zone" && <DicesIcon className="size-4 animate-bounce" />}
               Rolling…
             </div>
           )}

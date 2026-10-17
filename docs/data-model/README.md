@@ -1604,5 +1604,5 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) (FR-DICEX-09, -38–41;
 
 - **Client memory only** (`dice-extras/popups.ts`): roll popups `{id (first entry id), seq, entries (the frame's received roll entries), t (throwDice of them), looks, hidden, bigId, parts {handoff?, play? : {ids, state: moving | rest, chips}}, stills {handoff?, play? : 2D canvas}, state: rolling | rest | closing, hovered}`, ≤ 3; timers (6 s after rest, hover pauses). Never stored or sent; gone on reload (a reload, reconnect or snapshot pops nothing).
 - **Derived (never stored):** rows (`popupRows`: one per entry, `payload` only), PiP mode (`handoff` / `play` / `chips`), the miniature's arena and clip, the stack's place in the toast region.
-- **Browser storage:** unchanged (`pp.dicex.v2.*`, `popup` switch).
+- **Browser storage:** unchanged (`pp.dicex.v2.*`, `popup` switch). *(#247)* The effective display no longer turns `flat` under the OS reduced-motion preference (ignored); only no WebGL / a failed chunk does.
 - **CON-44:** 0 B.

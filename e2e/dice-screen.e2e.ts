@@ -4,8 +4,8 @@
 // first throw of the session flies 3D on the dice layer: portalled to `body`, topmost, no input
 // (a point on a window still hits the window), resting on the server's faces. "Tray throw" puts
 // the dice in the zone on the same canvas, no caption; the DM's hidden roll never flies big;
-// reduced motion shows no dice layer (popup chips, D7) and never fetches the 3D chunk. Skipped
-// without WebGL.
+// the OS reduced-motion preference changes nothing (#247): the full-screen throw as usual.
+// Skipped without WebGL.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
@@ -154,7 +154,7 @@ test("FR-DICEX-32 FR-DICEX-36 Tray throw: zone dice on the one canvas, no captio
   for (const page of [p1, p2]) await page.context().close();
 });
 
-test("FR-DICEX-38 FR-DICEX-45 the DM's hidden roll never flies big; reduced motion: no dice layer, no 3D chunk", async ({
+test("FR-DICEX-38 FR-DICEX-45 the DM's hidden roll never flies big; reduced motion is ignored (#247): full-screen throw, 3D chunk, nothing greyed out", async ({
   browser,
 }) => {
   const { secret, link } = e2eEnv();
@@ -201,14 +201,26 @@ test("FR-DICEX-38 FR-DICEX-45 the DM's hidden roll never flies big; reduced moti
   expect(wire).not.toContain("DM-SECRET-DICE");
   expect(wire).not.toContain(hiddenId as string);
 
-  // C (reduced motion): B's roll shows flat, as chips in C's popup (D7); no dice layer at all.
+  // C (reduced motion emulated): the same as without it (#247): chunk preloaded, B's roll flies
+  // full screen and rests on the server's face, its popup takes the hand-off.
+  await expect(p2.getByTestId("dicex-screen")).toHaveAttribute("data-chunk", "ready", {
+    timeout: 10_000,
+  });
   await roll(p1, "1d8");
+  expect(await restsOnServerFaces(p2, "screen")).toBe(1);
   const popup = p2.locator('[data-testid="dicex-popup"][data-record-id]');
-  await expect(popup.getByTestId("dicex-popup-pip")).toHaveAttribute("data-mode", "chips");
-  await expect(popup).toHaveAttribute("data-state", "rest");
-  await expect(p2.locator('[data-testid="dicex-throw"][data-record-id]')).toHaveCount(0);
-  await expect(p2.getByTestId("dicex-screen")).toHaveCount(0);
-  // The lazy 3D chunk (`dice3d-*.js`): A fetched it, C never did.
+  await expect(popup.getByTestId("dicex-popup-pip")).toHaveAttribute("data-mode", "handoff");
+  // No reduced-motion hint; Full screen / Tray throw stay pickable.
+  const tray = await openWindow(p2, "dicex.tray");
+  await tray.getByTestId("dicex-settings-open").click();
+  await expect(p2.getByTestId("dicex-settings-3d-hint")).toHaveCount(0);
+  for (const d of ["screen", "zone"]) {
+    await expect(
+      p2.locator(`[data-testid="dicex-settings-display"][data-value="${d}"]`),
+    ).toBeEnabled();
+  }
+  await p2.keyboard.press("Escape");
+  // The lazy 3D chunk (`dice3d-*.js`): fetched by A and C alike.
   const chunk3d = (page: Page) =>
     page.evaluate(() =>
       performance
@@ -217,7 +229,7 @@ test("FR-DICEX-38 FR-DICEX-45 the DM's hidden roll never flies big; reduced moti
         .filter((p) => /\/dice3d-[\w-]+\.js$/.test(p)),
     );
   expect(await chunk3d(dm)).toHaveLength(1);
-  expect(await chunk3d(p2)).toEqual([]);
+  expect(await chunk3d(p2)).toHaveLength(1);
 
   for (const page of [p1, p2, dm]) await page.context().close();
 });

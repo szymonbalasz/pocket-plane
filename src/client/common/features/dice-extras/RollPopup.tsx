@@ -48,7 +48,7 @@ const SettingsPanel = lazy(() =>
   import("./SettingsPanel").then((m) => ({ default: m.SettingsPanel })),
 );
 
-/** True one frame after mount: flat chips fade in (≤ 300 ms, none under reduced motion). */
+/** True one frame after mount: flat chips fade in (≤ 300 ms). */
 function useShown() {
   const [shown, setShown] = useState(false);
   useEffect(() => {
@@ -251,7 +251,7 @@ function Pip({
       {(chips.length > 0 || p.t.more > 0) && (
         <div
           className={cn(
-            "flex max-h-full flex-wrap content-center items-center justify-center gap-1 overflow-hidden transition-opacity duration-300 motion-reduce:transition-none",
+            "flex max-h-full flex-wrap content-center items-center justify-center gap-1 overflow-hidden transition-opacity duration-300",
             slots.length > 0 ? "shrink-0 basis-1/3" : "flex-1",
             shown ? "opacity-100" : "opacity-0",
           )}
@@ -367,7 +367,7 @@ function Card({ p, display }: { p: RollPopup; display: DisplaySetting }) {
       data-state={p.state}
       aria-label="Roll"
       className={cn(
-        "pointer-events-auto flex flex-col gap-1 overflow-hidden rounded-lg border p-2 text-popover-foreground shadow-lg transition-opacity duration-150 motion-reduce:transition-none",
+        "pointer-events-auto flex flex-col gap-1 overflow-hidden rounded-lg border p-2 text-popover-foreground shadow-lg transition-opacity duration-150",
         p.hidden ? "bg-muted" : "bg-popover",
         p.state === "closing" ? "opacity-0" : "opacity-100",
       )}

@@ -173,10 +173,10 @@ describe("FR-DICEX-39 roll popup rendering", () => {
     expect(html).toContain("Rolling…");
   });
 
-  test("FR-DICEX-45 reduced motion (effective flat): chips without motion, no 3D slot", () => {
+  test("FR-DICEX-41 flat display: chips fading in, no 3D slot", () => {
     rollPopups.add({ entries: [entry()], looks: {}, big: null, threeD: false });
     const html = render("player", "flat");
-    expect(html).toContain("motion-reduce:transition-none");
+    expect(html).toContain("transition-opacity duration-300");
     expect(html).not.toContain("<canvas");
   });
 

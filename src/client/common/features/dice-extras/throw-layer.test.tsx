@@ -108,7 +108,7 @@ test("idle: no throw zone, nothing rendered (the views chunk isn't even mounted)
   expect(render()).toBe("");
 });
 
-test("FR-DICEX-09 pending (flat / reduced motion): popups on → nothing in the zone (the own popup's row); off → a static 'Rolling…' label, no motion", () => {
+test("FR-DICEX-09 pending (flat): popups on → nothing in the zone (the own popup's row); off → a static 'Rolling…' label, no motion", () => {
   diceExtras.sent(false);
   expect(render()).not.toContain("Rolling…");
   const html = render("player", true, false);

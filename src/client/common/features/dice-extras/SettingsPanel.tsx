@@ -1,7 +1,8 @@
 // The dice settings (FR-DICEX-36, DICEX §7 "Settings popover"), the content of the tray's gear
 // popover and of the roll popup's gear: Display Full screen / Tray throw / Flat / Off, "Show
-// others' rolls", "Roll popups", "Dice look…". Reduced motion / no WebGL: the 3D modes are
-// disabled with the reason (the stored setting is kept, FR-DICEX-32).
+// others' rolls", "Roll popups", "Dice look…". No WebGL / a failed 3D chunk: the 3D modes are
+// disabled with the reason (the stored setting is kept, FR-DICEX-32); reduced motion is ignored
+// (#247).
 import { Button } from "../../components/ui/button";
 import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
 import { useSync } from "../../sync/store";
@@ -25,10 +26,10 @@ export function SettingsPanel({
   pane: SettingsPane;
   onPane(pane: SettingsPane): void;
 }) {
-  const { settings, display, reducedMotion, set } = useDiceSettings();
+  const { settings, display, set } = useDiceSettings();
   const threeD = useThreeD();
   const live = useSync((s) => s.state === "live");
-  const no3d = reducedMotion || !threeD.available;
+  const no3d = !threeD.available;
   return pane === "look" ? (
     <LookEditor onBack={() => onPane("settings")} />
   ) : (
@@ -56,13 +57,11 @@ export function SettingsPanel({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        {(reducedMotion || threeD.reason) && (
+        {threeD.reason && (
           <p data-testid="dicex-settings-3d-hint" className="text-xs text-muted-foreground">
-            {reducedMotion
-              ? "Reduced motion is on: dice show flat."
-              : threeD.reason === "no-webgl"
-                ? "3D unavailable on this device"
-                : "3D dice couldn't load: dice show flat this session."}
+            {threeD.reason === "no-webgl"
+              ? "3D unavailable on this device"
+              : "3D dice couldn't load: dice show flat this session."}
           </p>
         )}
       </div>

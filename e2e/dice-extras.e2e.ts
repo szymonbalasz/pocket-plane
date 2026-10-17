@@ -1,7 +1,7 @@
 // e2e-bundle: dice-extras
 // Thin dice-extras flows (DICEX §13 E2E, D1 flat): DM (A) + player-1 (B, Mira). B stages "1d12+5"
 // from the roll bar's tray Button, adds a d6, sets the constant to 6 and rolls; A sees the line;
-// B's flat dice (reduced motion → flat, FR-DICEX-45: chips in B's own roll popup, D7) rest on the server's values. B Alt+clicks Athletics on Mira's sheet → the tray
+// B's flat dice (Display → Flat in the tray gear: chips in B's own roll popup, D7) rest on the server's values. B Alt+clicks Athletics on Mira's sheet → the tray
 // adjusts the sheet roll and its Roll sends the sheet's own intent. Sheet notation (D4): B clicks
 // "1d12 + 5" in Mira's "Notation test" feature → `compose` as Mira → Roll; A sees the line.
 // Looks (D2): fixture looks thrown in their style; player-2 saves Emerald glass, seen by A and B.
@@ -20,13 +20,16 @@ test("FR-DICEX-01 FR-DICEX-04 FR-DICEX-06 FR-DICEX-10 FR-DICEX-11 FR-DICEX-17 tr
   await loginDm(dm, secret);
   await live(dm);
   const p1 = await rolePage(browser);
-  // Reduced motion: the default Full screen display shows flat (FR-DICEX-32, -45).
-  await p1.emulateMedia({ reducedMotion: "reduce" });
   await p1.goto(link("Player 1"));
   await live(p1);
 
   // Map-first: no tray open by default (FR-DICEX-01).
   await expect(shellWindow(p1, "dicex.tray")).toHaveCount(0);
+  // B: tray gear → Display "Flat" (a per-device choice, FR-DICEX-32).
+  const gear = await openWindow(p1, "dicex.tray");
+  await gear.getByTestId("dicex-settings-open").click();
+  await p1.locator('[data-testid="dicex-settings-display"][data-value="flat"]').click();
+  await p1.keyboard.press("Escape");
   const dmLog = await openWindow(dm, "dice.log");
   const log = await openWindow(p1, "dice.log");
 
