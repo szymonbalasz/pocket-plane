@@ -17,10 +17,11 @@ import { pickableTemplates } from "./templates";
 const C = () => null;
 /** The SCN entries of `canvas-layers.ts` (the real registry imports Konva). */
 const registry: LayerDef<object>[] = orderLayers<object>([
-  { id: "map", order: 0, component: C },
+  { id: "map", order: 0, layer: "base", component: C },
   {
     id: "scn-props",
     order: 20,
+    layer: "base",
     component: C,
     group: "scn-objects",
     toggle: { key: "props", label: "Props", layer: "objects" },
@@ -28,6 +29,7 @@ const registry: LayerDef<object>[] = orderLayers<object>([
   {
     id: "scn-structure",
     order: 26,
+    layer: "base",
     component: C,
     group: "scn-objects",
     toggle: { key: "walls", label: "Walls & doors", layer: "objects" },
@@ -35,10 +37,11 @@ const registry: LayerDef<object>[] = orderLayers<object>([
   {
     id: "scn-templates",
     order: 35,
+    layer: "objects",
     component: C,
     toggle: { key: "templates", label: "Templates", layer: "objects" },
   },
-  { id: "tokens", order: 40, component: C },
+  { id: "tokens", order: 40, layer: "objects", component: C },
 ]);
 
 function storage() {
@@ -129,17 +132,22 @@ describe("FR-SCN-05 DM-only items off: not hit", () => {
 });
 
 describe("FR-SCN-05 per-campaign memory", () => {
-  test("FR-SCN-05 all on by default; kept per campaign; only off keys stored", () => {
+  test("FR-SCN-05 all on by default; kept per campaign; off keys (and switched-on keys) stored", () => {
     const s = storage();
     const m = createLayerMemory(() => s.backend);
     expect(m.read("c1")).toEqual({});
     m.write("c1", { walls: true, props: false, "dm-only": true });
-    expect(s.items.get(layerMemoryKey("c1"))).toBe(JSON.stringify({ off: ["walls", "dm-only"] }));
+    expect(s.items.get(layerMemoryKey("c1"))).toBe(
+      JSON.stringify({ off: ["walls", "dm-only"], on: ["props"] }),
+    );
     expect(layerMemoryKey("c1")).toBe("pp.layers.v1.c1");
-    expect(m.read("c1")).toEqual({ walls: true, "dm-only": true });
+    const kept = { walls: true, props: false, "dm-only": true };
+    expect(m.read("c1")).toEqual(kept);
     expect(m.read("c2")).toEqual({});
-    // A fresh page reads what the last one wrote.
-    expect(createLayerMemory(() => s.backend).read("c1")).toEqual({ walls: true, "dm-only": true });
+    // A fresh page reads what the last one wrote; entries from before `on` existed still parse.
+    expect(createLayerMemory(() => s.backend).read("c1")).toEqual(kept);
+    s.items.set(layerMemoryKey("c3"), JSON.stringify({ off: ["walls"] }));
+    expect(m.read("c3")).toEqual({ walls: true });
   });
 
   test("FR-SCN-05 an invalid entry → all on + one warning; storage failure → memory only, one warning", () => {

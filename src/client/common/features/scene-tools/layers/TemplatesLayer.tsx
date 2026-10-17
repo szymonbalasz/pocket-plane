@@ -15,7 +15,7 @@ import {
   TemplateSignalData,
 } from "@shared/scene-tools/schemas";
 import { useEffect, useMemo, useState } from "react";
-import { Circle, Group, Label, Layer, Line, Shape, Tag, Text } from "react-konva";
+import { Circle, Group, Label, Line, Shape, Tag, Text } from "react-konva";
 import { useStore } from "zustand";
 import { useSignal, useSync } from "../../../sync/store";
 import { canvasBlind } from "../../fog-of-war/blind";
@@ -233,10 +233,10 @@ export function ScnTemplatesLayer() {
     });
   }
   return (
-    <Layer name="scn-templates" listening={false}>
+    <Group name="scn-templates" listening={false}>
       {drawn.map((d) => (
         <TemplateNode key={d.id} d={d} />
       ))}
-    </Layer>
+    </Group>
   );
 }

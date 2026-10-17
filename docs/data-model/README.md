@@ -1107,7 +1107,7 @@ From [scene-tools](../specs/scene-tools.md#8-data-model) (SCN, `complete`; DM ga
 | updatedAt | timestamp | | SCN §8 |
 
 - **Written by** `scn.setDiagonalRule` (DM; upsert on `campaignId`; the rule already in effect writes nothing) *(built, build/scene-tools-settings; protocol §36)*. Read by the client's ruler and movement indicator (the store row) and server-side by `diagonalRuleOf` (combat `movedFt`, FR-CBT-39).
-- **Client only, never stored server-side:** the DM's Layers popover switches (FR-SCN-05), per campaign in browser storage `pp.layers.v1.<campaignId>` = `{off: string[]}`; all on by default.
+- **Client only, never stored server-side:** the DM's Layers popover switches (FR-SCN-05), per campaign in browser storage `pp.layers.v1.<campaignId>` = `{off: string[], on?: string[]}`; on by default, except FOG's `show` switch "Fog" (sprint 4, V7: off by default; `on` lists it once switched on).
 
 - **Constraints the DB enforces:** one structure row per scene, one settings row per campaign (PKs); scene tables cascade with their scene; FKs to campaign, asset (prop), player (template); `prop.seq`, `aoe_template.seq` unique; indexes `scene_structure_campaign`, `prop_scene`, `prop_campaign`, `aoe_template_scene`, `aoe_template_campaign`. Segment, prop and template caps are command checks.
 - **Wire** (compact): no `seq` (except on props: draw order, FR-SCN-18), no timestamps; `campaignId` on the DM wire only (the registry's scope gate reads it from the record).
@@ -1600,7 +1600,7 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-81–84 an
 
 ## 54. Sprint 4: magic weapon rows (S4-1a)
 
-From [character-sheet-full](../specs/character-sheet-full.md) FR-CHARX-54–57, [combat-tracker](../specs/combat-tracker.md) FR-CBT-86. **Built by `build/weapon-rows`**. No table or column; the `Attack` fields are S4-0's ([§51](#51-sprint-4-rules-core-s4-0)). Protocol side: [protocol §70](../protocol/README.md#70-sprint-4-magic-weapon-rows-on-the-sheet-s4-1a).
+From [character-sheet-full](../specs/character-sheet-full.md) FR-CHARX-54–57, [combat-tracker](../specs/combat-tracker.md) FR-CBT-86. **Built by `build/weapon-rows`**. No table or column; the `Attack` fields are S4-0's ([§51](#51-sprint-4-rules-core-s4-0)). Protocol side: [protocol §71](../protocol/README.md#71-sprint-4-magic-weapon-rows-on-the-sheet-s4-1a).
 
 | Table / leaf | Change | Default | Visibility | Source |
 |---|---|---|---|---|

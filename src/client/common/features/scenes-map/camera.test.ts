@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TokenSize } from "@shared/scenes-map/schemas";
+import { freeArea } from "../play-shell/free-area";
+import { defaultRect, type Rect, workArea } from "../play-shell/geometry";
 import {
   type Box,
   type Camera,
@@ -16,6 +18,7 @@ import {
   type Timers,
   ZOOM_MAX,
 } from "./camera";
+import { labelMetrics } from "./label";
 
 /** The `battlemap` fixture: 20 × 14 cells at 70 px, no offset. */
 const GRID = { gridCellSize: 70, gridOffsetX: 0, gridOffsetY: 0 };
@@ -27,6 +30,18 @@ const VISIBLE = [tok(2, 7), tok(12, 6), tok(12, 8), tok(2, 9)];
 const HIDDEN = [tok(14, 4), tok(15, 8)];
 /** The PC tokens (owned): Mira, Thorn. */
 const PCS = [tok(2, 7), tok(2, 9)];
+
+/** `b` (map px) lies in `f` (screen px) minus the fit margin. */
+const inside = (cam: Camera, b: Box, f: Box) => {
+  const x0 = cam.x + b.x * cam.scale;
+  const y0 = cam.y + b.y * cam.scale;
+  return (
+    x0 >= f.x + FIT_MARGIN - 1e-6 &&
+    y0 >= f.y + FIT_MARGIN - 1e-6 &&
+    x0 + b.w * cam.scale <= f.x + f.w - FIT_MARGIN + 1e-6 &&
+    y0 + b.h * cam.scale <= f.y + f.h - FIT_MARGIN + 1e-6
+  );
+};
 
 describe("FR-MAP-44 content box", () => {
   test("FR-MAP-44 content box: footprints + 1 cell per side (DM incl. hidden)", () => {
@@ -68,26 +83,33 @@ describe("FR-MAP-44 fit", () => {
     const free = { x: 68, y: 48, w: 1372, h: 788 };
     const one = contentBox([tok(10, 7)], GRID, MAP);
     const cam = fitContent(one, free, MAP, work, 70, null);
-    // One token: that zoom, centred in the free area.
+    // One token: that zoom. BL-01: the whole map fits the work area at it, so it is centred
+    // there (the token stays in the free area).
     expect(cam.scale).toBe(cap);
-    expect(cam.x + (one.x + one.w / 2) * cam.scale).toBeCloseTo(68 + 1372 / 2);
-    expect(cam.y + (one.y + one.h / 2) * cam.scale).toBeCloseTo(48 + 788 / 2);
+    expect(cam.x).toBeCloseTo(68 + (1372 - MAP.w * cap) / 2);
+    expect(cam.y).toBeCloseTo(48 + (788 - MAP.h * cap) / 2);
     // Pre-R1 the scene opened at the viewport fit: never zoom in beyond that either.
     expect(cam.scale).toBeLessThanOrEqual(fitCamera(MAP, { w: 1440, h: 900 }).scale);
   });
 
-  test("FR-MAP-44 fit: the box fills the free area minus 16 px, centred", () => {
+  test("FR-MAP-44 fit: the box sets the scale (free area minus 16 px); BL-01 keeps the tokens in the free area across, the top row vertically", () => {
     const free = { x: 68, y: 48, w: 840, h: 500 };
     const box = contentBox([...VISIBLE, ...HIDDEN], GRID, MAP);
     const cam = fitContent(box, free, MAP, work, 70, null);
     expect(cam.scale).toBeCloseTo((840 - 2 * FIT_MARGIN) / box.w);
-    const left = cam.x + box.x * cam.scale;
-    const right = cam.x + (box.x + box.w) * cam.scale;
-    expect(left).toBeCloseTo(68 + FIT_MARGIN);
-    expect(right).toBeCloseTo(68 + 840 - FIT_MARGIN);
-    const top = cam.y + box.y * cam.scale;
-    const bottom = cam.y + (box.y + box.h) * cam.scale;
-    expect(top - 48).toBeCloseTo(48 + 500 - bottom);
+    // BL-01: the map (1010 × 707 px) fits the work area; panning it to the centre stops where the
+    // tokens' footprints reach the free area's edge.
+    const tokens = footprintBox([...VISIBLE, ...HIDDEN], GRID);
+    if (!tokens) throw new Error("no tokens");
+    expect(cam.x + (tokens.x + tokens.w) * cam.scale).toBeCloseTo(68 + 840);
+    expect(cam.x + tokens.x * cam.scale).toBeGreaterThan(68);
+    // Vertically the map is taller than the free area (707 > 500): the tokens in it would put
+    // the top row under the top bar (FOG §13 step 26), so the top row shows and the tokens, with
+    // their labels' lower half (6.6 px here), stay in the work area.
+    expect(cam.y).toBe(48);
+    const bottom = cam.y + (tokens.y + tokens.h) * cam.scale + 6.6;
+    expect(bottom).toBeGreaterThan(48 + 500);
+    expect(bottom).toBeLessThanOrEqual(48 + 788);
   });
 });
 
@@ -95,16 +117,6 @@ describe("FR-MAP-46 fit floor", () => {
   const work = { w: 1280, h: 608 };
   /** The DM free area at 1280×720, default layout (Initiative top-right, Game log bottom-left). */
   const free = { x: 68, y: 48, w: 800, h: 356 };
-  const inside = (cam: Camera, b: Box, f: Box) => {
-    const x0 = cam.x + b.x * cam.scale;
-    const y0 = cam.y + b.y * cam.scale;
-    return (
-      x0 >= f.x + FIT_MARGIN - 1e-6 &&
-      y0 >= f.y + FIT_MARGIN - 1e-6 &&
-      x0 + b.w * cam.scale <= f.x + f.w - FIT_MARGIN + 1e-6 &&
-      y0 + b.h * cam.scale <= f.y + f.h - FIT_MARGIN + 1e-6
-    );
-  };
 
   test("FR-MAP-46 fit floor 48 px at 1280×720: Goblin Ambush (DM) → 48 px cell, floor, PCs in the free area", () => {
     const box = contentBox([...VISIBLE, ...HIDDEN], GRID, MAP);
@@ -137,16 +149,28 @@ describe("FR-MAP-46 fit floor", () => {
     expect(cam.floor).toBe(false);
     expect(cam.scale).toBe(fitCamera(MAP, work1440).scale);
     expect(cam.scale * 70).toBeGreaterThan(FIT_MIN_CELL_PX);
-    expect(cam.x + (box.x + box.w / 2) * cam.scale).toBeCloseTo(68 + 1372 / 2);
+    // BL-01: the whole map fits the work area: centred in it.
+    expect(cam.x).toBeCloseTo(68 + (1372 - MAP.w * cam.scale) / 2);
   });
 
-  test("FR-MAP-46 the floor beats the whole-map cap (one token, box fits): centred at 48 px", () => {
+  test("FR-MAP-46 the floor beats the whole-map cap (one token, box fits): at 48 px, in the free area", () => {
     const one = contentBox([tok(10, 7)], GRID, MAP);
     expect(fitCamera(MAP, work).scale * 70).toBeLessThan(FIT_MIN_CELL_PX);
     const cam = fitContent(one, free, MAP, work, 70, null);
     expect(cam.floor).toBe(true);
     expect(cam.scale * 70).toBeCloseTo(FIT_MIN_CELL_PX);
-    expect(cam.x + (one.x + one.w / 2) * cam.scale).toBeCloseTo(68 + 800 / 2);
+    // Centred on the token the map's left edge would sit under the rail (x = -36); BL-01: the
+    // map (960 px) fits the work area's width, so it is centred there.
+    expect(cam.x).toBeCloseTo(68 + (1212 - 960) / 2);
+    // The token stays in the free area across; vertically the map (672 px) is taller than the
+    // work area, so its top row sits under the top bar (FOG §13 step 26) and the token (row 7,
+    // y 384–432) in the work area, just below the 356 px free area.
+    const own = footprintBox([tok(10, 7)], GRID);
+    if (!own) throw new Error("no token");
+    expect(cam.x + own.x * cam.scale).toBeGreaterThanOrEqual(free.x);
+    expect(cam.x + (own.x + own.w) * cam.scale).toBeLessThanOrEqual(free.x + free.w);
+    expect(cam.y).toBe(48);
+    expect(cam.y + (own.y + own.h) * cam.scale).toBeLessThanOrEqual(48 + 608);
   });
 
   test("FR-MAP-46 PC box wider than the free area → centred on the PCs", () => {
@@ -190,6 +214,257 @@ describe("FR-MAP-46 fit floor", () => {
     expect(dmElsewhere).not.toEqual(dm);
     expect(fitContent(contentBox(VISIBLE, GRID, MAP), free, MAP, work, 70, pcs)).toEqual(player);
     expect(pcs && inside(player, pcs, free)).toBe(true);
+  });
+});
+
+describe("FR-MAP-44 BL-01 fit fills the canvas (session-sim, DM)", () => {
+  /** DM defaults (protocol §24): Game log 460 × 240 bottom-left, Initiative 400 × 500 top-right. */
+  const gameLog = (vp: { w: number; h: number }) =>
+    defaultRect({ anchor: "bottom-left", dx: 56 }, { w: 460, h: 240 }, vp);
+  const initiative = (vp: { w: number; h: number }) =>
+    defaultRect({ anchor: "top-right" }, { w: 400, h: 500 }, vp);
+  /** Town: Mira (5, 5), Thorn (4, 5); both PCs. Same 1400 × 980 map, 70 px grid. */
+  const TOWN = [tok(5, 5), tok(4, 5)];
+  const SCENES = [
+    { name: "Goblin Ambush", tokens: [...VISIBLE, ...HIDDEN], pcs: PCS },
+    { name: "Town", tokens: TOWN, pcs: TOWN },
+  ];
+  function fit(scene: (typeof SCENES)[number], vp: { w: number; h: number }, windows: Rect[]) {
+    const free = freeArea(windows, vp);
+    const work = workArea(vp);
+    const cam = fitContent(
+      contentBox(scene.tokens, GRID, MAP),
+      free,
+      MAP,
+      work,
+      70,
+      footprintBox(scene.pcs, GRID),
+    );
+    const map = { x: cam.x, y: cam.y, w: MAP.w * cam.scale, h: MAP.h * cam.scale };
+    /** The work area right of the rail, in viewport px. */
+    const view = { x: 68, y: 48, w: vp.w - 68, h: work.h };
+    const under = scene.tokens.filter((t) => {
+      const c = {
+        x: cam.x + (t.col + 0.5) * 70 * cam.scale,
+        y: cam.y + (t.row + 0.5) * 70 * cam.scale,
+      };
+      return windows.some((r) => c.x > r.x && c.x < r.x + r.w && c.y > r.y && c.y < r.y + r.h);
+    });
+    return { cam, free, map, view, under };
+  }
+  const sim6 = { w: 1440, h: 900 };
+  const laptop = { w: 1280, h: 720 };
+
+  test("FR-MAP-44 BL-01 at 1440×900, with and without the Game log: the whole map on screen, centred, no token under a window", () => {
+    for (const scene of SCENES) {
+      for (const windows of [[], [gameLog(sim6)]]) {
+        const { cam, map, view, under } = fit(scene, sim6, windows);
+        const at = `${scene.name}, ${windows.length ? "Game log" : "no windows"}`;
+        expect(cam.floor).toBe(false);
+        // No top rows cut, nothing cropped on the right.
+        expect({ at, top: map.y >= view.y, right: map.x + map.w <= view.x + view.w }).toEqual({
+          at,
+          top: true,
+          right: true,
+        });
+        expect(map.x).toBeGreaterThanOrEqual(view.x);
+        expect(map.y + map.h).toBeLessThanOrEqual(view.y + view.h);
+        // No windows: centred (the slack is the same on both sides). With the Game log the
+        // tokens above it hold the map up, so the slack sits below (< 48 px).
+        if (windows.length === 0) {
+          expect(map.y - view.y).toBeCloseTo(view.y + view.h - (map.y + map.h));
+          expect(map.x - view.x).toBeCloseTo(view.x + view.w - (map.x + map.w));
+        }
+        expect(under.length).toBe(0);
+      }
+    }
+  });
+
+  test("FR-MAP-44 BL-01 at 1440×900 with the Game log: Goblin Ambush no longer cut at the top, Town no longer cropped on the right", () => {
+    // Before BL-01 (sim-6 l01 / a01): Ambush map top at y −92 under the top bar, ~250 px empty
+    // below; Town map from x 490 to 1547 in a 1440 px viewport.
+    const ambush = fit(SCENES[0] as (typeof SCENES)[number], sim6, [gameLog(sim6)]);
+    expect(ambush.map.y).toBeGreaterThanOrEqual(48);
+    const town = fit(SCENES[1] as (typeof SCENES)[number], sim6, [gameLog(sim6)]);
+    expect(town.map.x + town.map.w).toBeLessThanOrEqual(1440);
+  });
+
+  test("FR-MAP-44 BL-01 at 1280×720 (FR-MAP-46 floor, map taller than the work area): covers it, full width where the tokens allow, PCs in the free area", () => {
+    for (const scene of SCENES) {
+      for (const windows of [[], [gameLog(laptop)]]) {
+        const { cam, map, view, free } = fit(scene, laptop, windows);
+        expect(cam.floor).toBe(true);
+        // Taller than the work area (672 > 608): no empty band above or below.
+        expect(map.y).toBeLessThanOrEqual(view.y + 1e-6);
+        expect(map.y + map.h).toBeGreaterThanOrEqual(view.y + view.h - 1e-6);
+        // Narrower (960 < 1212): all of it, not cropped on the right…
+        const tokens = footprintBox(scene.tokens, GRID);
+        if (!tokens) throw new Error("no tokens");
+        const pcs = footprintBox(scene.pcs, GRID);
+        if (!pcs) throw new Error("no PCs");
+        if (windows.length === 0) {
+          expect(map.x).toBeGreaterThanOrEqual(view.x);
+          expect(map.x + map.w).toBeLessThanOrEqual(view.x + view.w);
+        } else {
+          // … but the free area is right of the Game log, and the PCs keep the FR-MAP-46 margin
+          // in it: Town's PCs (cols 4–5) stop at that margin (a 32 px crop on the right; was the
+          // whole map 336 px right of the rail); Goblin Ambush's Thorn (col 2, row 9) sits beside
+          // the log, so its cols 17–19 (no tokens) stay cut.
+          expect(cam.x + pcs.x * cam.scale).toBeCloseTo(free.x + FIT_MARGIN);
+          expect(map.x + map.w).toBeGreaterThan(view.x + view.w);
+        }
+        // Every token in the work area; the PCs in the free area.
+        expect(cam.x + (tokens.x + tokens.w) * cam.scale).toBeLessThanOrEqual(view.x + view.w);
+        expect(inside(cam, pcs, free)).toBe(true);
+      }
+    }
+  });
+
+  test("FR-MAP-44 BL-01 at 1280×720 (map taller than the work area): the top row shows under the top bar, the crop falls at the dock", () => {
+    for (const scene of SCENES) {
+      for (const windows of [[], [gameLog(laptop)]]) {
+        const { map, view, free } = fit(scene, laptop, windows);
+        expect({ scene: scene.name, top: map.y }).toEqual({ scene: scene.name, top: view.y });
+        expect(map.y + map.h).toBeGreaterThan(view.y + view.h);
+        expect(free.y).toBe(view.y);
+      }
+    }
+  });
+
+  test("FR-MAP-44 BL-01 at 1280×720 with Game log and Initiative: the PCs stay in the free area, the map pans no further", () => {
+    for (const scene of SCENES) {
+      const windows = [gameLog(laptop), initiative(laptop)];
+      const { cam, map, view, free } = fit(scene, laptop, windows);
+      const pcs = footprintBox(scene.pcs, GRID);
+      expect(pcs && inside(cam, pcs, free)).toBe(true);
+      expect(map.x).toBeGreaterThanOrEqual(view.x);
+      expect(map.x + map.w).toBeLessThanOrEqual(view.x + view.w);
+    }
+  });
+
+  /**
+   * FOG §13 step 26 (V7 walkthrough, `vision-party` after step 15): Goblin Ambush with Mira (2, 7),
+   * Thorn (2, 9), Wolf (14, 4), Goblin (14, 7), Goblin 2 (12, 8), Elite (15, 8), Cave Ogre
+   * (Large, 9, 10), Goblin Lurker (17, 11). The content box (rows 3–12) fits the strip above the
+   * Game log at 0.72, but the map's top rows don't.
+   */
+  const V7_AMBUSH = {
+    name: "Goblin Ambush (V7)",
+    tokens: [
+      tok(2, 7),
+      tok(2, 9),
+      tok(14, 4),
+      tok(14, 7),
+      tok(12, 8),
+      tok(15, 8),
+      tok(9, 10, "large"),
+      tok(17, 11),
+    ],
+    pcs: [tok(2, 7), tok(2, 9)],
+  };
+
+  test("FR-MAP-44 BL-01 FOG step 26 at 1440×900 with the Game log: Goblin Ambush's top row under the top bar, PCs in the free area", () => {
+    const { cam, map, view, free, under } = fit(V7_AMBUSH, sim6, [gameLog(sim6)]);
+    // The strip above the log sets the scale (was row 0 at y −27.4 … 22.6, under the top bar).
+    expect(free).toEqual({ x: 68, y: 48, w: 1372, h: 536 });
+    expect(cam.floor).toBe(false);
+    expect(cam.scale).toBeCloseTo(0.72);
+    expect(map.h).toBeGreaterThan(free.h);
+    expect(map.y).toBe(view.y);
+    // Horizontally the map fits: centred in the work area right of the rail, as before.
+    expect(map.x).toBeCloseTo(view.x + (view.w - map.w) / 2);
+    // PCs in the free area; every token on the canvas above the dock, none under the log.
+    const pcs = footprintBox(V7_AMBUSH.pcs, GRID);
+    expect(pcs && inside(cam, pcs, free)).toBe(true);
+    const tokens = footprintBox(V7_AMBUSH.tokens, GRID);
+    if (!tokens) throw new Error("no tokens");
+    expect(cam.y + (tokens.y + tokens.h) * cam.scale).toBeLessThanOrEqual(view.y + view.h);
+    expect(under.length).toBe(0);
+    // Log closed: unchanged, the whole map centred (row 0 at y 72).
+    const open = fit(V7_AMBUSH, sim6, []);
+    expect(open.map.y).toBeCloseTo(72);
+  });
+
+  test("FR-MAP-44 BL-01 FOG step 26 at 1280×720 and Town at both sizes: the top row under the top bar, PCs in the free area", () => {
+    for (const scene of [V7_AMBUSH, SCENES[1] as (typeof SCENES)[number]]) {
+      for (const vp of [sim6, laptop]) {
+        for (const windows of [[], [gameLog(vp)]]) {
+          const { cam, map, view, free } = fit(scene, vp, windows);
+          const at = `${scene.name} ${vp.w}×${vp.h}${windows.length ? " Game log" : ""}`;
+          expect({ at, topRowShows: map.y >= view.y }).toEqual({ at, topRowShows: true });
+          // Taller than the work area (1280×720, the floor): the top row at the top bar.
+          if (vp === laptop) expect({ at, top: map.y }).toEqual({ at, top: view.y });
+          const pcs = footprintBox(scene.pcs, GRID);
+          expect({ at, pcs: pcs && inside(cam, pcs, free) }).toEqual({ at, pcs: true });
+        }
+      }
+    }
+  });
+
+  /**
+   * FOG §13 step 26 re-test (V7, `vision-party`, DM): the client's own fitContent inputs.
+   * Goblin Ambush tokens at their fixture cells, Thorn dragged to (4, 10); the floor case also
+   * has Mira dragged to (2, 3). Before: row 0 at y −27.4 (0.72, Thorn would end under the Game
+   * log with the top row pinned) and at y 1.4 (the floor).
+   */
+  const v7Retest = (mira: ReturnType<typeof tok>) => {
+    const pcs = [mira, tok(4, 10)];
+    const others = [
+      tok(14, 4),
+      tok(14, 6),
+      tok(12, 8),
+      tok(15, 8),
+      tok(9, 10, "large"),
+      tok(17, 11),
+    ];
+    return { name: "Goblin Ambush (V7 re-test)", tokens: [...pcs, ...others], pcs };
+  };
+  /** The PCs' footprints with their labels' lower half, screen px. */
+  const pcsOnScreen = (cam: Camera, pcs: Box) => {
+    const label = (labelMetrics(70, cam.scale).pillH * cam.scale) / 2;
+    return {
+      x0: cam.x + pcs.x * cam.scale,
+      y0: cam.y + pcs.y * cam.scale,
+      x1: cam.x + (pcs.x + pcs.w) * cam.scale,
+      y1: cam.y + (pcs.y + pcs.h) * cam.scale + label,
+    };
+  };
+
+  test("FR-MAP-44 BL-01 FOG step 26 re-test at 1440×900 with the Game log: Thorn at (4, 10) → zoomed out to keep the top row and the PCs in the free area", () => {
+    for (const [mira, floor] of [
+      [tok(2, 7), false],
+      [tok(2, 3), true],
+    ] as const) {
+      const scene = v7Retest(mira);
+      const { cam, map, view, free } = fit(scene, sim6, [gameLog(sim6)]);
+      const at = `Mira (${mira.col}, ${mira.row})`;
+      expect(free).toEqual({ x: 68, y: 48, w: 1372, h: 536 });
+      expect({ at, top: map.y, floor: cam.floor }).toEqual({ at, top: view.y, floor });
+      expect(70 * cam.scale).toBeGreaterThanOrEqual(FIT_MIN_CELL_PX - 1e-9);
+      if (!floor) expect(cam.scale).toBeLessThan(0.72);
+      const pcs = footprintBox(scene.pcs, GRID);
+      if (!pcs) throw new Error("no PCs");
+      const p = pcsOnScreen(cam, pcs);
+      expect(p.y0).toBeGreaterThanOrEqual(free.y);
+      expect(p.y1).toBeLessThanOrEqual(free.y + free.h + 1e-6);
+      expect(p.x0).toBeGreaterThanOrEqual(free.x);
+      expect(p.x1).toBeLessThanOrEqual(free.x + free.w);
+    }
+    // Same layout at 1280×720: the top row at the top bar (unchanged).
+    const laptopFit = fit(v7Retest(tok(2, 7)), laptop, [gameLog(laptop)]);
+    expect(laptopFit.map.y).toBe(laptopFit.view.y);
+  });
+
+  test("FR-MAP-46 the PC rule wins only where the PCs can't fit the free area with the top row pinned", () => {
+    // PCs at rows 1 and 12: 12 rows at the 48 px floor never fit the 536 px strip below row 0.
+    const scene = {
+      name: "spread PCs",
+      tokens: [tok(2, 1), tok(4, 12)],
+      pcs: [tok(2, 1), tok(4, 12)],
+    };
+    const { cam, map, view } = fit(scene, sim6, [gameLog(sim6)]);
+    expect(cam.floor).toBe(true);
+    expect(map.y).toBeLessThan(view.y);
   });
 });
 

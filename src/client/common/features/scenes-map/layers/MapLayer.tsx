@@ -2,7 +2,7 @@
 // error, grid and tokens still render (MAP §7). A later record carrying the map re-arms a
 // failed load (FR-ASSET-16).
 import { useEffect } from "react";
-import { Image, Layer, Rect, Text } from "react-konva";
+import { Group, Image, Rect, Text } from "react-konva";
 import { retryAssetImage, useAssetImage } from "../../assets-pipeline/useAssetImage";
 import { useCanvas } from "../canvas-context";
 
@@ -15,7 +15,7 @@ export function MapLayer() {
   const w = scene.mapWidth;
   const h = scene.mapHeight;
   return (
-    <Layer listening={false} name="map-layer">
+    <Group listening={false} name="map-layer">
       {img.image ? (
         <Image image={img.image} x={0} y={0} width={w} height={h} name="map-image" />
       ) : (
@@ -35,6 +35,6 @@ export function MapLayer() {
           )}
         </>
       )}
-    </Layer>
+    </Group>
   );
 }

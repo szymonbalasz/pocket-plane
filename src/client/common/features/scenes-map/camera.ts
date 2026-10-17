@@ -1,8 +1,11 @@
 // Per-client camera (FR-MAP-12): pan/zoom never sent. Map px → screen px = p × scale + (x, y).
 // A scene opens framed in the free area (FR-MAP-44, R1), never below a readable cell (FR-MAP-46);
-// a viewport resize refits while fitted (FR-MAP-47).
+// a viewport resize refits while fitted (FR-MAP-47); BL-01: the map then pans to fill the canvas.
 import { footprint, type Grid } from "@shared/scenes-map/geometry";
 import type { TokenSize } from "@shared/scenes-map/schemas";
+import { TOP_BAR_H } from "../play-shell/geometry";
+import { RAIL_CLEAR } from "../play-shell/placement";
+import { labelMetrics } from "./label";
 
 export interface Camera {
   x: number;
@@ -101,13 +104,84 @@ export interface Fit extends Camera {
 const panInto = (at: number, len: number, lo: number, hi: number) =>
   len > hi - lo ? (lo + hi - len) / 2 : Math.min(Math.max(at, lo), hi - len);
 
+/** One axis of a box (map px) and the inset from the free area's edges it keeps (screen px). */
+interface Keep {
+  at: number;
+  len: number;
+  inset: number;
+}
+
+/**
+ * The camera positions (one axis, screen px) at which each of `keeps` that lies in [f0, f1]
+ * (minus its inset) at `pos` still does; none does → null.
+ */
+function keepRange(
+  pos: number,
+  scale: number,
+  [f0, f1]: readonly [number, number],
+  keeps: readonly (Keep | null)[],
+): [number, number] | null {
+  const eps = 1e-6;
+  let lo = Number.NEGATIVE_INFINITY;
+  let hi = Number.POSITIVE_INFINITY;
+  for (const k of keeps) {
+    if (!k) continue;
+    const kLo = f0 + k.inset - k.at * scale;
+    const kHi = f1 - k.inset - (k.at + k.len) * scale;
+    if (pos < kLo - eps || pos > kHi + eps) continue;
+    lo = Math.max(lo, Math.min(kLo, pos));
+    hi = Math.min(hi, Math.max(kHi, pos));
+  }
+  return lo === Number.NEGATIVE_INFINITY ? null : [lo, hi];
+}
+
+/**
+ * BL-01, one axis, after the fit: the map (`map` long, map px) centred in the view [v0, v1]
+ * (screen px) when it fits, else panned the least to cover it (`startFirst`: its start edge at
+ * v0, so the top row shows and the crop falls at the dock, FOG §13 step 26), so no empty band
+ * sits beside a cropped edge; but only as far as each of `keeps` that lies in the free area
+ * [f0, f1] (minus its inset) now stays there. None does → `pos` unchanged.
+ */
+function fillAxis(
+  pos: number,
+  scale: number,
+  map: number,
+  [v0, v1]: readonly [number, number],
+  [f0, f1]: readonly [number, number],
+  keeps: readonly (Keep | null)[],
+  startFirst = false,
+): number {
+  const range = keepRange(pos, scale, [f0, f1], keeps);
+  if (!range) return pos;
+  const [lo, hi] = range;
+  const len = map * scale;
+  const want =
+    len <= v1 - v0 ? (v0 + v1 - len) / 2 : startFirst ? v0 : Math.min(Math.max(pos, v1 - len), v0);
+  return Math.min(Math.max(want, lo), hi);
+}
+
+/** The tokens' own footprint box inside a content box (its 1-cell pad off, unless cut at the map). */
+function tokensIn(box: Box, map: Size, cell: number): Box {
+  const x0 = box.x > 0 ? box.x + cell : box.x;
+  const y0 = box.y > 0 ? box.y + cell : box.y;
+  const x1 = box.x + box.w < map.w ? box.x + box.w - cell : box.x + box.w;
+  const y1 = box.y + box.h < map.h ? box.y + box.h - cell : box.y + box.h;
+  return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : box;
+}
+
 /**
  * FR-MAP-44 fit: `box` (map px) centred in `free` (screen px), as large as fits with a 16 px
  * margin, but never above the whole-map fit into the work area (`work`), so it only zooms out
  * from the FR-MAP-12 zoom. FR-MAP-46: never below a `FIT_MIN_CELL_PX` cell (`cell` = grid cell,
  * map px; capped by the max zoom), which beats the cap; then the camera pans the least so `pcs`
  * (the PC tokens' footprint box, map px) lies in the free area minus the margin, centred on it
- * per axis where it can't.
+ * per axis where it can't. BL-01: last, per axis, the map is centred in the work area right of
+ * the tool rail (if larger: panned the least to cover it; vertically its top row under the top
+ * bar), as far as the tokens' footprints and the lower half of their labels (and at the floor the
+ * PCs, with the margin) stay in the free area. FOG §13 step 26 (V7 ruling) when that still puts
+ * the top row under the top bar: (1) the PCs in the free area, (2) the top row at the top bar,
+ * zooming out for it down to the floor, (3) the other tokens anywhere (cut at the dock or under
+ * a window); only where (1) and (2) can't both hold does the PC rule keep the pan.
  */
 export function fitContent(
   box: Box,
@@ -127,10 +201,43 @@ export function fitContent(
   );
   const floor = fits < min;
   const scale = floor ? min : fits;
+  const view = { x: RAIL_CLEAR, y: TOP_BAR_H, w: Math.max(1, work.w - RAIL_CLEAR), h: work.h };
+  const at = panAt(box, free, map, view, cell, pcs, scale, floor);
+  if (at.y >= view.y) return { ...at, scale, floor };
+  if (!pcs) return { x: at.x, y: view.y, scale, floor };
+  // The PCs with their labels' lower half in the free area with the top row at the top bar: the
+  // largest scale (≤ the fit's, ≥ the floor) for that. The label only shrinks as the scale does.
+  const label = (labelMetrics(cell, scale).pillH * scale) / 2;
+  const s = Math.min(scale, (free.y + free.h - view.y - label) / (pcs.y + pcs.h));
+  // A free area starting below the top bar: the PCs' top edge must clear it too.
+  const clear = free.y - view.y;
+  const low =
+    clear <= 0 ? min : pcs.y > 0 ? Math.max(min, clear / pcs.y) : Number.POSITIVE_INFINITY;
+  if (s < low - 1e-9) return { ...at, scale, floor };
+  const pinned = s < scale ? panAt(box, free, map, view, cell, pcs, s, floor) : at;
+  const x0 = pinned.x + pcs.x * s;
+  if (x0 < free.x - 1e-6 || x0 + pcs.w * s > free.x + free.w + 1e-6) return { ...at, scale, floor };
+  return { x: pinned.x, y: view.y, scale: s, floor };
+}
+
+/**
+ * The fit's pan at `scale`: `box` centred in `free`, at the floor the PCs panned into it, then
+ * BL-01 per axis (see `fitContent`).
+ */
+function panAt(
+  box: Box,
+  free: Box,
+  map: Size,
+  view: Box,
+  cell: number,
+  pcs: Box | null,
+  scale: number,
+  floor: boolean,
+): { x: number; y: number } {
   let x = free.x + free.w / 2 - (box.x + box.w / 2) * scale;
   let y = free.y + free.h / 2 - (box.y + box.h / 2) * scale;
+  const m = Math.min(FIT_MARGIN, free.w / 2, free.h / 2);
   if (floor && pcs) {
-    const m = Math.min(FIT_MARGIN, free.w / 2, free.h / 2);
     x +=
       panInto(x + pcs.x * scale, pcs.w * scale, free.x + m, free.x + free.w - m) -
       (x + pcs.x * scale);
@@ -138,7 +245,34 @@ export function fitContent(
       panInto(y + pcs.y * scale, pcs.h * scale, free.y + m, free.y + free.h - m) -
       (y + pcs.y * scale);
   }
-  return { x, y, scale, floor };
+  // BL-01: fill the work area right of the rail with the map, as far as the tokens with their
+  // name labels' lower half (FR-MAP-42) and, at the floor, the PCs with the margin stay in the
+  // free area.
+  const t = tokensIn(box, map, cell);
+  /** The name label's lower half below the footprint (map px). */
+  const label = labelMetrics(cell, scale).pillH / 2;
+  const keepPcs = floor ? pcs : null;
+  x = fillAxis(
+    x,
+    scale,
+    map.w,
+    [view.x, view.x + view.w],
+    [free.x, free.x + free.w],
+    [{ at: t.x, len: t.w, inset: 0 }, keepPcs && { at: keepPcs.x, len: keepPcs.w, inset: m }],
+  );
+  y = fillAxis(
+    y,
+    scale,
+    map.h,
+    [view.y, view.y + view.h],
+    [free.y, free.y + free.h],
+    [
+      { at: t.y, len: t.h + label, inset: 0 },
+      keepPcs && { at: keepPcs.y, len: keepPcs.h, inset: m },
+    ],
+    true,
+  );
+  return { x, y };
 }
 
 /** `data-camera` (FR-MAP-44 (b)): where the last fit put it, or moved by the user since. */

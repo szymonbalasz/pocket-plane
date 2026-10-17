@@ -204,11 +204,11 @@ describe("FR-MAP-42 label", () => {
   test("FR-MAP-42 label: layer order map < grid < tokens < labels < pointers", () => {
     const C = () => null;
     const layers = orderLayers([
-      { id: "pointers", order: LAYER_ORDER.pointers, component: C },
-      { id: "labels", order: LAYER_ORDER.labels, component: C },
-      { id: "tokens", order: LAYER_ORDER.tokens, component: C },
-      { id: "grid", order: LAYER_ORDER.grid, component: C },
-      { id: "map", order: LAYER_ORDER.map, component: C },
+      { id: "pointers", order: LAYER_ORDER.pointers, layer: "top", component: C },
+      { id: "labels", order: LAYER_ORDER.labels, layer: "objects", component: C },
+      { id: "tokens", order: LAYER_ORDER.tokens, layer: "objects", component: C },
+      { id: "grid", order: LAYER_ORDER.grid, layer: "base", component: C },
+      { id: "map", order: LAYER_ORDER.map, layer: "base", component: C },
     ]);
     expect(layers.map((l) => l.id)).toEqual(["map", "grid", "tokens", "labels", "pointers"]);
     expect(LAYER_ORDER.labels).toBeGreaterThan(LAYER_ORDER.fog);

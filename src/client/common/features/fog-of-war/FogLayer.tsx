@@ -8,18 +8,22 @@
 // hatched (`fog-darkness`, id = darkness id, attr `selected`; a drag draws it at its offset), the
 // Fog tool's draft (`fog-draft`, `fog-draft-vertex` with attr `free`, the circle's radius label)
 // and the shown scene the fog bar acts on. Non-drawing markers `fog-vision` / `fog-explored`
-// (attr `player`) carry the drawn rows: the player's own, the DM's View-as pair.
+// (attr `player`) carry the drawn rows: the player's own, the DM's View-as pair. Sprint 4: the
+// DM's layer draws only with the Fog tool or the Layers "Fog" switch on (`fog-layer` attr
+// `visible`, `plain-map.ts`); the View-as pick and its rows stay loaded meanwhile.
 import { FOG_TYPE } from "@shared/fog-of-war/schemas";
 import type { DarknessShape } from "@shared/fog-of-war/shapes";
 import { samePair, type ViewAsPair } from "@shared/protocol/scene-window";
 import { useEffect, useMemo, useRef } from "react";
-import { Circle, Group, Layer, Line, Rect, Shape, Text } from "react-konva";
+import { Circle, Group, Line, Rect, Shape, Text } from "react-konva";
 import { IntentRejected } from "../../sync/connection";
 import { useSync } from "../../sync/store";
 import { useCanvas } from "../scenes-map/canvas-context";
 import { toastReject } from "../scenes-map/intents";
 import type { CanvasClient } from "../scenes-map/layers";
+import { useLayerToggles } from "../scenes-map/tool-store";
 import { type FogDraft, type GestureState, radiusLabel } from "./gesture";
+import { fogLayerShown } from "./plain-map";
 import {
   DM_DARKNESS_FALLBACK,
   FOG_ALPHA,
@@ -360,9 +364,12 @@ export function FogLayer() {
   const gesture = useFogTool((s) => s.gesture);
   const toolOn = client === "dm" && activeTool?.id === FOG_TOOL_ID;
   const drafting = toolOn && gesture.draft !== null;
+  // FR-FOG-20 (sprint 4): the plain battlemap for the DM outside the Fog tool.
+  const off = useLayerToggles((s) => s.off);
+  const shown = fogLayerShown(client, toolOn, off);
   const view = (r: FogRecordLike) => ({ fog: r, memory, vision: rows?.vision ?? null });
   return (
-    <Layer name="fog-layer" listening={false}>
+    <Group name="fog-layer" listening={false} visible={shown}>
       {rec && (
         <Group clipX={0} clipY={0} clipWidth={mapWidth} clipHeight={mapHeight}>
           <Shape
@@ -407,6 +414,6 @@ export function FogLayer() {
       {own.explored && (
         <Shape name="fog-explored" player={viewer} cells={own.explored.cells} sceneFunc={noDraw} />
       )}
-    </Layer>
+    </Group>
   );
 }
