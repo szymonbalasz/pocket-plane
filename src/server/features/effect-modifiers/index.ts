@@ -12,6 +12,7 @@ import {
   setModifiers,
   togglePreset,
 } from "./commands";
+import { putTriggerWithFeature, useFeatureByName } from "./fixture-commands";
 import { effectPresetRecordType } from "./records";
 import { deleteTrigger, putTrigger } from "./trigger-commands";
 import { ruleTriggerRecordType } from "./trigger-records";
@@ -35,6 +36,9 @@ export const effectModifiers: Feature = {
     for (const c of intents) r.command(c, { intent: true });
     // Fixtures only (not an intent): a preset linked to a feature row by name (tier 3).
     r.command(putPresetWithUses as unknown as CommandDef);
+    // Fixtures only: a feature row by name (sprint 4 units `uses-rage-spent`, `trg-mira-uses`).
+    r.command(useFeatureByName as unknown as CommandDef);
+    r.command(putTriggerWithFeature as unknown as CommandDef);
     r.recordType(effectPresetRecordType);
     r.recordType(ruleTriggerRecordType);
     r.recordType(triggerStateRecordType);
