@@ -2,18 +2,18 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 4 Phase A (specs)** per [sprint-4](sprint-4.md) (#243, #244). Seams settled (`.verify/sprint4/seams.md`, one pushback accepted: M0 builds no brush-stroke `half` mode). Reviews running → rulings → DM gate 1.
+**Phase:** **Sprint 4 Phase A (specs)** per [sprint-4](sprint-4.md) (#243, #244). Seams + two reviews done, every finding applied (`.verify/sprint4/{seams,rulings,review-a,review-b}.md`). **Waiting on DM gate 1** (`.verify/sprint4/gate.md`).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| V vision + fog spec | `spec/s4-vision` (w4Z) | spec-vision | Seams applied; in review | Review findings → authors |
-| D animated dice spec | `spec/s4-dice` (w40) | spec-dice | Seams applied; in review | Review findings → authors |
-| M map tools spec | `spec/s4-maptools` (w51) | spec-maptools | Seams applied; in review | Review findings → authors |
-| R rules + effects spec | `spec/s4-rules` (w52) | spec-rules | Seams applied; in review | Review findings → authors |
-| Reviews | main checkout tab `reviews` | review-a (V+M), review-b (D+R+C) | Running | `rulings.md` |
-| C compendium spec | `spec/s4-compendium` (w53) | spec-compendium | Seams applied; in review | Review findings → authors |
+| V vision + fog spec | `spec/s4-vision` (w4Z) | spec-vision | Reviewed, in-review | DM gate 1 → integrate + merge |
+| D animated dice spec | `spec/s4-dice` (w40) | spec-dice | Reviewed, in-review | DM gate 1 → integrate + merge |
+| M map tools spec | `spec/s4-maptools` (w51) | spec-maptools | Reviewed, in-review | DM gate 1 → integrate + merge |
+| R rules + effects spec | `spec/s4-rules` (w52) | spec-rules | Reviewed, in-review | DM gate 1 → integrate + merge |
+| Reviews | — | review-a, review-b | Done (V 1/8/10, M 0/2/6, D 0/4/9, R 1/4/11, C 0/5/12) | — |
+| C compendium spec | `spec/s4-compendium` (w53) | spec-compendium | Reviewed, in-review | DM gate 1 → integrate + merge |
 
 ## Shared-file locks
 
@@ -22,7 +22,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Pending DM decisions
 
-- None.
+- DM gate 1 (sprint 4 specs): G1–G44 + build plan, `.verify/sprint4/gate.md`.
 
 ## Resolved locally (report at gate)
 
