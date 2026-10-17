@@ -3,11 +3,29 @@
 import type { RollCategory } from "@shared/events/dice-roll-log";
 import type { z } from "zod";
 
+/**
+ * One die of a line (FR-DICE-35, -36; seams S8 / ruling B5): drawn as a die-shape chip
+ * (FR-DICEX-42) in place of the segment's text. `faces` null = no single die type (a physical
+ * total of several dice, an unparsable expression) → a round chip. `kept: false` = dropped (adv /
+ * dis) only; `offered: true` = an offered trigger die (dashed, never struck). `label` = the part's
+ * name for trigger / weapon extra parts ("Divine Fury").
+ */
+export interface LineDie {
+  faces: number | null;
+  value: number;
+  kept: boolean;
+  offered?: true;
+  label?: string;
+}
+
 /** One styled run of a log line; clients map styles to markup, tests read `lineText`. */
 export interface LineSegment {
+  /** Always set, also on a `die` segment ("13"): `lineText`, copy and screen readers read it. */
   text: string;
   /** actor / total: bold; dropped: struck through; badge: small Badge; muted: muted text. */
   style?: "actor" | "total" | "dropped" | "badge" | "muted";
+  /** One die per segment (seams S8); DM-only exactly when its text is (FR-DICE-28). */
+  die?: LineDie;
 }
 
 export interface LineInput<P, D> {

@@ -27,6 +27,8 @@ export interface ThrowDie {
   flat: boolean;
   /** Typed in from physical dice (FR-DICE-06). */
   physical?: true;
+  /** A sum without per-die values (a part's sum, a manual total): a round chip (FR-DICEX-42). */
+  sum?: true;
   /** MOD / offered part label ("DM" when the part's label is null). */
   label?: string;
   sign: 1 | -1;
@@ -125,6 +127,7 @@ const chipOf = (faces: number, sum: number, rest: Partial<DieInit>): DieInit => 
   flat: true,
   sign: 1,
   ...rest,
+  sum: true,
 });
 
 const ONE_DIE = /^([+-]?)1d(\d+)$/i;

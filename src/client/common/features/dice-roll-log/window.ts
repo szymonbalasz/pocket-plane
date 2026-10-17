@@ -3,6 +3,7 @@ import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import { recordsOf } from "@shared/protocol/store";
 import { ScrollTextIcon } from "lucide-react";
 import type { WindowDef } from "../play-shell/registry";
+import { makeLogFocusRuntime } from "./focus";
 
 export const DICE_LOG_KIND = "dice.log";
 
@@ -19,4 +20,6 @@ export const diceLogWindowBase = {
   // FR-DICE-33: minimised "new" dot (FR-SHELL-38) = the highest entry `n` this client sees.
   activity: (store) =>
     recordsOf<{ n: number }>(store, GAME_LOG_ENTRY_TYPE).reduce((m, e) => Math.max(m, e.n), 0),
+  // FR-DICE-37: `focusLogEntry` opens / fronts the log whatever its state.
+  companion: makeLogFocusRuntime(DICE_LOG_KIND),
 } satisfies Omit<WindowDef, "component" | "clients">;
