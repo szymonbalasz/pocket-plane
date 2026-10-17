@@ -1482,3 +1482,12 @@ From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #209). 
 - **Add to sheet** (`cmp.addToSheet`): one `creature_sheet` row-list append (`spells` / `items` / `features`) and, when FR-CMP-29 resolves, one `rule_trigger` row (character owner) in the same transaction, unless the character already has that trigger (same preset name or rule; inline: same name, case-insensitive; #241). Copies, never linked to the entry.
 - **Derived (never stored):** `featureKey` (`<source>:<sourceKey>`, homebrew `campaign:<id>`), the resolved preset name ("Preset: ‹name›"), the row source label (source name / "Homebrew").
 - **CON-44:** no new record shape; snapshots change only by the sheet rows / triggers a DM or player adds (as CHARX / MOD rows).
+
+## 47. Sprint 4: compendium search (C-search)
+
+From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #245). **Built by `build/cmp-search`**: no table, column or record type change. Protocol side: [protocol §62](../protocol/README.md#62-sprint-4-compendium-search-c-search).
+
+- **Search index (derived, server-only, never persisted or sent):** one row per `compendium_entry` and per imported monster `entity` without an entry (FR-CMP-17): id, kind, campaign, shared, source + `sourceRank`, facets (entry-less: `{cr}`), line, folded name + its words, sorted unique folded words of `search_text` (entry-less: none), group key (kind + folded name + source, homebrew: `campaign:<id>`). Built from `compendium_entry` and `entity` at the first search after start, dropped on the five compendium / imported-definition events (FR-CMP-34). Replaces the `instr` scan and the entry-less `LEFT JOIN`.
+- **Derived at read:** tier (FR-CMP-33), source rank (FR-CMP-38), group `{count}` and group line (FR-CMP-35); `name_key` and `search_text` stay as stored (folding happens in the index).
+- **Fixtures:** `cmp-srd-full` (the bundled `srd-5.1` at its bundled version via `cmp.importRecorded`: 1,150 entries, 322 definitions), `cmp-search-homebrew` (Fixture Campaign items "Potion of Healing", DM only, text marker `CMP-HB-POTION`; "Healing Draught", shared); bundle `compendium-full` = `compendium` + both.
+- **CON-44:** no record added to any snapshot (entries are REST only; the full import's definitions stay lazy, §44).
