@@ -1,10 +1,12 @@
 // `map.scenes` (MAP §7): folders + scenes in list order (FR-MAP-02), "Live" on the active scene,
-// click views a scene (FR-MAP-08), row menus (rename, duplicate, move, delete), new scene / folder.
-// REST for list CRUD (ADR-0021 D). Actions disabled while not live; viewing always works.
+// click views a scene (FR-MAP-08), row menus (rename, duplicate, move, delete), new scene / folder,
+// "Show to players" on non-active rows (FR-MAP-51, `map.activateScene`). REST for list CRUD
+// (ADR-0021 D). Actions disabled while not live; viewing always works.
 import type { AssetRecord } from "@shared/assets-pipeline/schemas";
 import { sceneList } from "@shared/scenes-map/geometry";
 import {
   FolderName,
+  MAP_INTENTS,
   SCENE_FOLDER_TYPE,
   SCENE_TYPE,
   type SceneFolderRecord,
@@ -32,14 +34,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Tooltip,
 } from "@ui/components/ui/overlays";
 import { Badge, Input, Label, Skeleton } from "@ui/components/ui/primitives";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
 import { defineWindow } from "@ui/features/play-shell/registry";
-import { useLive } from "@ui/features/scenes-map/intents";
+import { toastReject, useLive, useMapIntent } from "@ui/features/scenes-map/intents";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
 import {
+  CastIcon,
   ChevronRightIcon,
   CopyIcon,
   FolderIcon,
@@ -51,7 +55,7 @@ import {
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AssetPicker } from "../assets-pipeline/AssetPicker";
 import { NameFormDialog } from "./NameFormDialog";
@@ -80,6 +84,17 @@ function SceneRow({
   onRename(r: Rename): void;
 }) {
   const view = useDmMap((s) => s.view);
+  const send = useMapIntent();
+  const show = () => send(MAP_INTENTS.activateScene, { sceneId: scene.id }).catch(toastReject);
+  // FR-MAP-51: the canvas badge asked for this row (window just opened or fronted).
+  const focus = useDmMap((s) => s.rowFocus === scene.id);
+  const rowButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!focus) return;
+    useDmMap.getState().focusRow(null);
+    rowButton.current?.scrollIntoView({ block: "nearest" });
+    rowButton.current?.focus({ preventScroll: true });
+  }, [focus]);
   return (
     <li
       data-testid="map-scene-row"
@@ -91,6 +106,7 @@ function SceneRow({
       )}
     >
       <button
+        ref={rowButton}
         type="button"
         className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm"
         onClick={() => view(scene.id)}
@@ -106,6 +122,25 @@ function SceneRow({
           </Badge>
         )}
       </button>
+      {/* FR-MAP-51: shown on row hover / keyboard focus; the active row has "Live" instead. */}
+      {!scene.active && (
+        <span className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
+          <Tooltip content="Show to players">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7"
+              aria-label={`Show ${scene.name} to players`}
+              data-testid="map-scene-show"
+              data-record-id={scene.id}
+              disabled={!live}
+              onClick={show}
+            >
+              <CastIcon className="size-4" />
+            </Button>
+          </Tooltip>
+        </span>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild disabled={!live}>
           <Button
@@ -120,6 +155,14 @@ function SceneRow({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {!scene.active && (
+            <>
+              <DropdownMenuItem data-testid="map-scene-menu-show" onSelect={show}>
+                <CastIcon /> Show to players
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem
             data-testid="map-scene-menu-rename"
             onSelect={() => onRename({ kind: "scene", id: scene.id, name: scene.name })}
@@ -284,7 +327,7 @@ function NewSceneDialog({ open, onOpenChange }: { open: boolean; onOpenChange(o:
   );
 }
 
-function ScenesBody() {
+export function ScenesBody() {
   const scenes = useRecords<SceneRecord>(SCENE_TYPE);
   const folders = useRecords<SceneFolderRecord>(SCENE_FOLDER_TYPE);
   const everLive = useSync((s) => s.everLive);
@@ -297,6 +340,18 @@ function ScenesBody() {
   const [newFolder, setNewFolder] = useState(false);
   const [rename, setRename] = useState<Rename>(null);
   const [closed, setClosed] = useState<Set<string>>(new Set());
+  // FR-MAP-51: a row asked for focus inside a collapsed folder → expand it so the row renders.
+  const rowFocus = useDmMap((s) => s.rowFocus);
+  const focusFolder = scenes.find((s) => s.id === rowFocus)?.folderId ?? null;
+  useEffect(() => {
+    if (focusFolder === null) return;
+    setClosed((c) => {
+      if (!c.has(focusFolder)) return c;
+      const n = new Set(c);
+      n.delete(focusFolder);
+      return n;
+    });
+  }, [focusFolder]);
 
   return (
     <section aria-label="Scenes" data-testid="map-scenes" className="flex min-h-0 flex-col gap-2">
