@@ -20,7 +20,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | C-art token art (last slice) | `build/cmp-token-art` (w67, slot 0) | build-cmp-token-art | Building | Walkthrough |
 | C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
 | V9 fog brush + Ctrl+Z | merged | — | Done (walkthrough 13/13) | — |
-| V10 party vision + Blinded | `build/party-vision` (w64, slot 5) | — | Walkthrough PASS; green on its branch (3375, e2e 109); re-gating after merging M5 | Merge |
+| V10 party vision + Blinded | merged | — | Done (check 3386, e2e 110). **Track V complete** | — |
 | session-sim-8 bundle | merged | — | Done (49 fixtures, ~1 s; skipped mt-crowd, art-update-tokens, vision-legacy, vision-invisible, rolls-1; V10 / M5 / C-art may add units) | Sprint gate after the last slices |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
