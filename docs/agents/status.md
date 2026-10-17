@@ -11,10 +11,12 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
 | Docs pass | merged bd07224 | — | Done | — |
 | V7 pan / plain map / Fit | `build/map-pan-plain` (w5D, slot 3) | build-map-pan-plain | Final gates in branch | Walkthrough → V8 |
-| C-all All tab | `build/cmp-all-tab` (w5E, slot 6) | test-cmp-all-tab | Walkthrough (check 2992, e2e 85) | Merge |
+| C-all All tab | `build/cmp-all-tab` (w5E, slot 6) | — | Walkthrough 16/16; branch gates running | Merge |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
-| R0 rules core | `fix/rules4-core` (w5C, slot 0) | — | Regression walkthrough 9/9; merged main, branch gates running | Merge → R slices, Mc |
+| R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
+| R S4-1a weapon rows | `build/weapon-rows` (w5F, slot 0) | build-weapon-rows | Building | Walkthrough → S4-2 |
+| R S4-1b weapon combat + BL-10 | `build/weapon-combat` (w5G, slot 2) | build-weapon-combat | Building | Walkthrough → S4-5 |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
@@ -23,7 +25,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Shared-file locks
 
-- `fix/rules4-core` (R0): schema, entities `Attack`, combat schemas, sheet `FeatureRow`, record-type registry, new `effect-hooks.ts`.
+- `build/weapon-rows` (S4-1a): sheet folder, `creature-form.tsx`.
+- `build/weapon-combat` (S4-1b): combat lock (attack / damage / apply, card, popup, `log-kinds.ts`).
 - `fix/window-placement` (M4): play-shell frame + `toast-region.ts`, windows.ts handout line, combat Start line, `e2e/rule-triggers-combat.e2e.ts`.
 - `build/map-pan-plain` (V7): canvas lock (`MapCanvas.tsx`, `canvas-layers.ts`, `camera.ts`), scene-tools Layers popover, BL-01 e2e specs + `e2e/support` `mapPoint`.
 - Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
