@@ -135,7 +135,7 @@ Everything above in one world (session-sim + vision + triggers + dice looks + pa
 
 ### Known gaps / later
 
-- **Add to sheet duplicates a trigger** the character already has (Thorn's fixture Sneak Attack + the compendium's): the card offers it twice and the popup ticks both (session-sim-7 h). Fix pending your call (recap).
+- ~~Add to sheet duplicates a trigger~~ fixed after the recap (#241): a trigger the character already has is skipped with "Trigger already on the sheet — delete it first to use the compendium's".
 - Window placement on the battlemap: DM Initiative covers monsters on Goblin Ambush; Initiative opens over the Compendium at Start; the player sheet covers the east of the map at 1280×800; an empty Handout window comes back after a player reload.
 - After an SRD import the thin fixture Goblin ranks above the SRD Goblin in search and lookups; the "All" tab opens on many "Ability Score Improvement" rows.
 - Fit still cuts the top of Goblin Ambush with the Game log open (BL-01, tried and reverted this sprint); at 1280×720 the DM dock is clipped at both ends.
