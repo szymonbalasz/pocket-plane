@@ -170,6 +170,18 @@ function requiresHold(
   return requiresMet(req ? { requires: req } : {}, keys, (k) => origin.get(k) ?? null);
 }
 
+/**
+ * FR-MOD-60 out of combat: a trigger's `requires` against the creature's active effects in the
+ * store, as the preview checks it (a `{name}` ref may hold).
+ */
+export function triggerArmedNow(
+  store: RecordStore,
+  rule: PreviewTrigger["rule"],
+  creature: CreatureRef,
+): boolean {
+  return requiresHold(store, rule, creature, effectsOf(store));
+}
+
 /** The started encounter's turn as this client sees it (players: `playerTurnCombatantId`). */
 function isOwnTurn(store: RecordStore, own: CombatantView | null): boolean {
   if (!own) return false;
