@@ -15,8 +15,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
-| R S4-1a weapon rows | `build/weapon-rows` (w5F, slot 0) | build-weapon-rows | Building | Walkthrough → S4-2 |
-| R S4-1b weapon combat + BL-10 | `build/weapon-combat` (w5G, slot 2) | — | Ready for walkthrough (next free slot) | Walkthrough → S4-5 |
+| R S4-1a weapon rows | `build/weapon-rows` (w5F, slot 0) | — | Ready for walkthrough (next free slot; brief written) | Walkthrough → S4-2 |
+| R S4-1b weapon combat + BL-10 | `build/weapon-combat` (w5G, slot 2) | test-weapon-combat | Walkthrough | Merge → S4-5 |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
