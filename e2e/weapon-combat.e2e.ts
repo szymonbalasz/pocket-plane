@@ -1,8 +1,7 @@
-// e2e-bundle: rule-triggers
+// e2e-bundle: rules-effects
 // Thin weapon-parts flow in combat (S4-1b; MOD §13.1 steps 3–4, FR-CBT-81, -82, -84, -85): the
-// DM sets up Brakka's Flame Tongue greatsword +1 (`2d6+4` slashing + `2d6` fire) and Fire Ward
-// on Goblin over the DM's own socket (the `rules-effects` bundle is S4-4's, the row editor
-// S4-1a's); player-1 rolls Flame Tongue Attack + damage → the card lists both parts; the DM's
+// bundle gives Brakka a Flame Tongue greatsword +1 (`2d6+4` slashing + `2d6` fire) and Fire Ward
+// on Goblin; player-1 rolls Flame Tongue Attack + damage → the card lists both parts; the DM's
 // popup shows the fire chip preset "Half (Fire Ward)" on Goblin → Apply → the players' line reads
 // "— DM: hit. … slashing + … fire (half) damage". Rules, leaks, crits: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
@@ -19,33 +18,6 @@ async function idByName(scope: Locator, name: string): Promise<string> {
   return (await r.first().getAttribute("data-record-id")) as string;
 }
 
-/** Setup: one DM intent over a socket of its own (hello → snapshot → intent → ack result). */
-function dmIntent(page: Page, secret: string, name: string, payload: unknown) {
-  return page.evaluate(
-    ([secret, name, payload]) =>
-      new Promise<unknown>((resolve, reject) => {
-        const ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}/ws`);
-        ws.onopen = () =>
-          ws.send(JSON.stringify({ type: "hello", credential: { role: "dm", secret } }));
-        ws.onmessage = (m) => {
-          const f = JSON.parse(String(m.data)) as { type: string; result?: unknown };
-          if (f.type === "snapshot") {
-            ws.send(
-              JSON.stringify({ type: "intent", intentId: crypto.randomUUID(), name, payload }),
-            );
-          } else if (f.type === "ack") {
-            ws.close();
-            resolve(f.result);
-          } else if (f.type === "reject" || f.type === "error") {
-            ws.close();
-            reject(new Error(String(m.data)));
-          }
-        };
-      }),
-    [secret, name, payload] as const,
-  );
-}
-
 test("FR-CBT-81 FR-CBT-82 FR-CBT-84 FR-CBT-85 Flame Tongue: parts on the card, fire chip Half (Fire Ward), players' line credits the DM", async ({
   browser,
 }) => {
@@ -60,32 +32,6 @@ test("FR-CBT-81 FR-CBT-82 FR-CBT-84 FR-CBT-85 Flame Tongue: parts on the card, f
   const init = await openWindow(dm, "cbt.initiative");
   const goblin = await idByName(init, "Goblin");
   const brakka = recordId("char-brakka", "entity");
-  await dmIntent(dm, secret, "char.putRow", {
-    creatureId: brakka,
-    list: "attacks",
-    row: {
-      name: "Flame Tongue greatsword",
-      toHit: 7,
-      damage: "2d6+4",
-      damageType: "slashing",
-      bonus: 1,
-      extraDamage: [{ damage: "2d6", type: "fire" }],
-    },
-  });
-  const { presetId } = (await dmIntent(dm, secret, "mod.putPreset", {
-    preset: {
-      characterId: null,
-      name: "Fire Ward",
-      modifiers: [{ kind: "defense", types: ["fire"], level: "resistance" }],
-      durationRounds: null,
-      concentration: false,
-      note: "",
-    },
-  })) as { presetId: string };
-  await dmIntent(dm, secret, "mod.apply", {
-    targets: [{ combatantId: goblin }],
-    preset: { presetId },
-  });
 
   // Player 1: Brakka's sheet → Actions → Flame Tongue Attack + damage.
   const sheet = await openWindow(p1, "char.sheet");

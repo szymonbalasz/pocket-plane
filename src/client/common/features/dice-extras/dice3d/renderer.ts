@@ -1,9 +1,10 @@
-// The 3D throw renderer (FR-DICEX-14, -15, -20, -23, -33, -34, -44; ADR-0044, ADR-0048), in the
-// lazy chunk only. Settles each throw headless in its arena first (settle.ts), then plays the
+// The 3D throw renderer (FR-DICEX-14, -15, -20, -23, -33, -34, -41, -44; ADR-0044, ADR-0048), in
+// the lazy chunk only. Settles each throw headless in its arena first (settle.ts), then plays the
 // recorded motion with three.js. **One WebGL canvas per page**, in the dice layer (fixed,
 // full-viewport, topmost): every running throw is an arena of it with its own scene, camera,
-// viewport and scissor rect (the screen arena = the viewport; the zone = its free-area rect),
-// drawn in one render loop that runs only while a throw moves. Pixel ratio ≤ 1.5.
+// viewport and scissor rect (the screen arena = the viewport; the zone = its free-area rect; a
+// popup's PiP = its slot, scissored to the popup's visible rect each frame; the look editor's
+// preview die), drawn in one render loop that runs only while a throw moves. Pixel ratio ≤ 1.5.
 import type { DiceLook, DiceMaterial } from "@shared/dice-extras/looks";
 import type { DieShape } from "@shared/dice-extras/throw";
 import {
@@ -64,6 +65,11 @@ export interface PlayOptions {
   layer: HTMLElement;
   /** The arena's rect in viewport CSS px, read every frame (a resize scales the running arena). */
   rect(): Rect;
+  /**
+   * FR-DICEX-41 (B26): the scissor, read every frame (a PiP: its popup's visible rect, minus a
+   * dialog over it); null = draw nothing this frame. Default: the rect.
+   */
+  clip?(): Rect | null;
   /** The simulation's arena (world units), fixed for the throw (FR-DICEX-34). */
   arena: Arena;
   /** FR-DICEX-44: no shadows above 2.5 MP. */
@@ -73,6 +79,12 @@ export interface PlayOptions {
   onRest(info: RestInfo): void;
   /** The WebGL context was lost mid-throw: the caller draws flat (DICEX §11). */
   onLost(): void;
+  /**
+   * FR-DICEX-41 (B26) miniature: at rest, the arena's visible pixels are copied in the same task
+   * as the frame that rendered them (no `preserveDrawingBuffer`) and handed here; the dice then
+   * leave the shared canvas.
+   */
+  onStill?(still: Still): void;
 }
 
 /** Rested dice copied off the shared canvas, at their rect (viewport CSS px). */
@@ -125,12 +137,15 @@ interface Play {
   scene: Scene;
   camera: OrthographicCamera;
   rect(): Rect;
+  clip?(): Rect | null;
   arena: Arena;
   /** Last fitted rect size (a resize refits the camera, FR-DICEX-34). */
   fitted: { w: number; h: number };
   moving(): boolean;
   /** Advance the motion to `time`; false once at rest. */
   tick(time: number): boolean;
+  /** Runs right after each draw, in the same task (the still capture). */
+  drawn?(): void;
   lost(): void;
 }
 
@@ -261,13 +276,16 @@ function draw(s: Stage) {
       fit(p.camera, p.arena, r.w, r.h);
       p.fitted = { w: r.w, h: r.h };
     }
-    const y = vp.h - r.y - r.h; // WebGL viewports count from the bottom
-    renderer.setViewport(r.x, y, r.w, r.h);
-    renderer.setScissor(r.x, y, r.w, r.h);
+    const c = p.clip ? p.clip() : r;
+    if (!c || c.w < 1 || c.h < 1) continue;
+    // WebGL viewports count from the bottom.
+    renderer.setViewport(r.x, vp.h - r.y - r.h, r.w, r.h);
+    renderer.setScissor(c.x, vp.h - c.y - c.h, c.w, c.h);
     renderer.setScissorTest(true);
     renderer.render(p.scene, p.camera);
   }
   renderer.setScissorTest(false);
+  for (const p of [...s.plays]) p.drawn?.();
 }
 
 /** One loop for every arena; it stops once nothing moves (FR-DICEX-23: idle = no frames). */
@@ -427,6 +445,7 @@ export function playThrow(o: PlayOptions): PlayHandle {
     scene,
     camera,
     rect: o.rect,
+    ...(o.clip && { clip: o.clip }),
     arena: o.arena,
     fitted: { w: 0, h: 0 },
     moving: () => !rested && !released,
@@ -455,6 +474,19 @@ export function playThrow(o: PlayOptions): PlayHandle {
     for (const x of own) x.dispose();
   };
 
+  // FR-DICEX-41: a miniature's still, copied right after the draw that rendered it at rest.
+  const onStill = o.onStill;
+  if (onStill) {
+    play.drawn = () => {
+      if (!rested || released || s.lost) return;
+      const box = o.clip ? o.clip() : o.rect();
+      const still = box ? copy(s, box) : null;
+      release();
+      draw(s); // take the dice off the shared canvas
+      if (still) onStill(still);
+    };
+  }
+
   s.plays.add(play);
   pose(0);
   draw(s);
@@ -481,6 +513,39 @@ export function playThrow(o: PlayOptions): PlayHandle {
     stop() {
       release();
       if (!s.lost) draw(s);
+    },
+  };
+}
+
+/**
+ * A still arena on the page's one canvas (FR-DICEX-27: the look editor's preview die), drawn on
+ * demand, never looping: `redraw` after its rect moved or its scene changed.
+ */
+export function addStillArena(
+  layer: HTMLElement,
+  a: { scene: Scene; camera: OrthographicCamera; arena: Arena; rect(): Rect },
+): { redraw(): void; remove(): void } {
+  const s = stageIn(layer);
+  const play: Play = {
+    scene: a.scene,
+    camera: a.camera,
+    rect: a.rect,
+    arena: a.arena,
+    fitted: { w: 0, h: 0 },
+    moving: () => false,
+    tick: () => false,
+    lost: () => {},
+  };
+  s.plays.add(play);
+  const redraw = () => {
+    if (stage === s && !s.lost && !s.looping) draw(s);
+  };
+  redraw();
+  return {
+    redraw,
+    remove() {
+      s.plays.delete(play);
+      redraw();
     },
   };
 }

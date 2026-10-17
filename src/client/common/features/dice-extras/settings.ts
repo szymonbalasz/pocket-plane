@@ -55,18 +55,18 @@ export function migrateV1(raw: string | null | undefined): DiceSettings | null {
 }
 
 export interface DisplayEnv {
-  reducedMotion: boolean;
   /** WebGL and the 3D code are usable here. */
   threeD: boolean;
 }
 
 /**
- * FR-DICEX-32 / -45: what this device shows. Reduced motion or no 3D turns `screen` / `zone` into
- * `flat`; the stored setting is kept.
+ * FR-DICEX-32: what this device shows. No 3D (no WebGL, a failed chunk) turns `screen` / `zone`
+ * into `flat`; the stored setting is kept. The OS reduced-motion preference is ignored, like
+ * Owlbear (#247, supersedes FR-DICEX-45): Flat and Off are the user's own choices.
  */
 export function effectiveDisplay(setting: DisplaySetting, env: DisplayEnv): DisplaySetting {
   if (setting !== "screen" && setting !== "zone") return setting;
-  return env.reducedMotion || !env.threeD ? "flat" : setting;
+  return env.threeD ? setting : "flat";
 }
 
 /** Display modes that draw 3D dice (and so preload the chunk, FR-DICEX-37). */
@@ -140,20 +140,11 @@ export function createSettingsStore(getBackend: () => SettingsBackend | undefine
 
 const store = createSettingsStore(() => globalThis.localStorage);
 
-export function prefersReducedMotion(): boolean {
-  try {
-    return globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-  } catch {
-    return false;
-  }
-}
-
 /** This client's settings (defaults before the first snapshot) and a setter. */
 export function useDiceSettings(): {
   settings: DiceSettings;
-  /** What this device shows (FR-DICEX-32): reduced motion / no 3D → `flat`. */
+  /** What this device shows (FR-DICEX-32): no 3D → `flat`. */
   display: DisplaySetting;
-  reducedMotion: boolean;
   set(patch: Partial<DiceSettings>): void;
 } {
   const you = useSync((s) => s.store.you);
@@ -171,7 +162,6 @@ export function useDiceSettings(): {
   );
   // 3D needs WebGL and a chunk that hasn't failed this session (FR-DICEX-22).
   const threeD = useThreeD().available;
-  const reducedMotion = prefersReducedMotion();
-  const display = effectiveDisplay(settings.display, { reducedMotion, threeD });
-  return { settings, display, reducedMotion, set };
+  const display = effectiveDisplay(settings.display, { threeD });
+  return { settings, display, set };
 }

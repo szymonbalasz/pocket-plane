@@ -46,8 +46,8 @@ const plan = (
   });
 
 describe("FR-DICEX-32 display modes", () => {
-  test("FR-DICEX-32 display modes: the §7 table row by row (public roll; popups not built yet)", () => {
-    expect(ROLL_POPUPS).toBe(false); // D7 turns the popup on
+  test("FR-DICEX-32 display modes: the §7 table row by row (public roll)", () => {
+    expect(ROLL_POPUPS).toBe(true); // D7: the popup hosts the dice
     // screen (default): 3D over the whole screen, no caption, hand-off timing.
     expect(plan("screen")?.plan).toEqual({
       arena: "screen",
@@ -68,8 +68,8 @@ describe("FR-DICEX-32 display modes", () => {
       caption: true,
       handoff: false,
     });
-    // flat: no 3D; chips in the zone (no popup hosts them before D7).
-    expect(plan("flat")?.plan).toMatchObject({ arena: "zone", draw: "flat" });
+    // flat: no 3D; die-shape chips in the popup, and in the zone only while popups are off.
+    expect(plan("flat")).toBeNull();
     expect(plan("flat", { popup: false })?.plan).toMatchObject({
       arena: "zone",
       draw: "flat",
@@ -82,11 +82,11 @@ describe("FR-DICEX-32 display modes", () => {
   });
 
   test("FR-DICEX-32 every mode throws the same dice on the same faces", () => {
-    const dice = (d: DisplaySetting) =>
-      plan(d)?.t.dice.map((x) => [x.key, x.faces, x.value, x.kept]) ?? null;
+    const dice = (d: DisplaySetting, popup = true) =>
+      plan(d, { popup })?.t.dice.map((x) => [x.key, x.faces, x.value, x.kept]) ?? null;
     expect(dice("screen")).toEqual([["e1:0", 20, 14, true]]);
     expect(dice("zone")).toEqual(dice("screen"));
-    expect(dice("flat")).toEqual(dice("screen"));
+    expect(dice("flat", false)).toEqual(dice("screen"));
   });
 
   test("FR-DICEX-32 a hidden tab animates nothing (DICEX §11)", () => {
@@ -125,7 +125,9 @@ describe("FR-DICEX-43 others off", () => {
   test("FR-DICEX-43 others off: another's roll → no screen / zone throw; own roll unaffected", () => {
     for (const d of ["screen", "zone", "flat"] as const) {
       expect(plan(d, { others: false }, [entry()], p2)).toBeNull();
-      expect(plan(d, { others: false }, [entry()], p1)?.t.entryIds).toEqual(["e1"]);
+      // flat with popups on: the own popup's chips, nothing in the zone.
+      const own = plan(d, { others: false }, [entry()], p1);
+      expect(own?.t.entryIds ?? null).toEqual(d === "flat" ? null : ["e1"]);
     }
     // A frame with own + another's entries throws the own dice only.
     const mixed = [entry(), entry({ id: "e9", n: 9, rollerPlayerId: "p2" })];
@@ -134,11 +136,15 @@ describe("FR-DICEX-43 others off", () => {
 });
 
 describe("FR-DICEX-09 pending (amended)", () => {
-  test("FR-DICEX-09 pending: in the zone for zone / flat; never on the screen layer; off → none", () => {
-    expect(pendingInZone(DEFAULT_SETTINGS, "zone")).toBe(true);
-    expect(pendingInZone(DEFAULT_SETTINGS, "flat")).toBe(true);
-    expect(pendingInZone(DEFAULT_SETTINGS, "screen")).toBe(false);
-    expect(pendingInZone(DEFAULT_SETTINGS, "off")).toBe(false);
+  test("FR-DICEX-09 pending + popups on: never in the zone (the own popup's row); popups off → the zone for zone / flat", () => {
+    for (const d of ["screen", "zone", "flat", "off"] as const) {
+      expect(pendingInZone(DEFAULT_SETTINGS, d)).toBe(false);
+    }
+    const off = { ...DEFAULT_SETTINGS, popup: false };
+    expect(pendingInZone(off, "zone")).toBe(true);
+    expect(pendingInZone(off, "flat")).toBe(true);
+    expect(pendingInZone(off, "screen")).toBe(false);
+    expect(pendingInZone(off, "off")).toBe(false);
   });
 
   test("FR-DICEX-09 an own entry ends the pending; the frame plays its plan", () => {

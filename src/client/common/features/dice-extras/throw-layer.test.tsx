@@ -41,8 +41,11 @@ afterEach(() => {
   diceExtras.done(diceExtras.api.getState().current?.seq ?? -1);
 });
 
-/** The runtime (`views` false) or the lazy throw views it mounts, with the effective display flat. */
-function render(role: "dm" | "player" = "player", views = true) {
+/**
+ * The runtime (`views` false) or the lazy throw views it mounts, with the effective display flat;
+ * `popup` = the device's "Roll popups" setting.
+ */
+function render(role: "dm" | "player" = "player", views = true, popup = true) {
   const you = { campaignId: "c1", role, playerId: role === "dm" ? null : "p1" };
   const sync = createStore<SyncState>()(
     () =>
@@ -59,7 +62,11 @@ function render(role: "dm" | "player" = "player", views = true) {
       <TooltipProvider delayDuration={0} skipDelayDuration={0}>
         <ShellProvider registry={createWindowRegistry(role, [])}>
           {views ? (
-            <ThrowViews settings={DEFAULT_SETTINGS} display="flat" onSlow={() => {}} />
+            <ThrowViews
+              settings={{ ...DEFAULT_SETTINGS, popup }}
+              display="flat"
+              onSlow={() => {}}
+            />
           ) : (
             <DiceExtrasRuntime />
           )}
@@ -101,9 +108,10 @@ test("idle: no throw zone, nothing rendered (the views chunk isn't even mounted)
   expect(render()).toBe("");
 });
 
-test("FR-DICEX-09 pending (flat / reduced motion): a static 'Rolling…' label, no motion", () => {
+test("FR-DICEX-09 pending (flat): popups on → nothing in the zone (the own popup's row); off → a static 'Rolling…' label, no motion", () => {
   diceExtras.sent(false);
-  const html = render();
+  expect(render()).not.toContain("Rolling…");
+  const html = render("player", true, false);
   expect(html).toContain('data-testid="dicex-throw" data-render="flat" data-state="pending"');
   expect(html).toContain("Rolling…");
   expect(html).not.toContain("transition");
