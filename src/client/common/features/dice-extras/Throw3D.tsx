@@ -1,13 +1,18 @@
-// A 3D throw (FR-DICEX-14, -15, -20, -23), drawn by the lazy chunk's renderer into a host div.
-// Dice data stays in the DOM for walkthroughs: one hidden `dicex-throw-die` per 3D die with
-// `data-settled` = the up-face read from the rendered mesh at rest. MOD / offered dice get a
-// label under the die at rest.
+// A 3D throw run (FR-DICEX-14, -15, -20, -23, -34, -35), drawn by the lazy chunk's renderer on the
+// dice layer's one canvas at its arena rect (the viewport, or the zone's dice area). At its
+// hand-off / fade the rested dice are copied into a still on the layer that fades out (D7 flies
+// it into the popup). Dice data stays in the DOM for walkthroughs: one hidden `dicex-throw-die`
+// per 3D die with `data-settled` = the up-face read from the rendered mesh at rest. MOD / offered
+// dice get a label under the die at rest.
 import type { DiceLook } from "@shared/dice-extras/looks";
 import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import type { ThrowDie } from "@shared/dice-extras/throw";
-import { useEffect, useRef } from "react";
-import type { PlayHandle, RestInfo } from "./dice3d/index";
+import { type RefObject, useEffect, useRef, useState } from "react";
+import { type Arena, arenaOf, dieSizePx, screenArena, shadowsFor } from "./arena";
+import type { PlayHandle, Rect, RestInfo } from "./dice3d/index";
 import { dice3d } from "./lazy3d";
+import { diceExtras, type ThrowRun } from "./store";
+import { FADE_MS, HANDOFF_MS } from "./timing";
 
 /** A die the 3D renderer draws (a mesh die with a server value); the rest stay flat chips. */
 export const isMeshDie = (d: ThrowDie) => d.shape !== null && !d.flat && d.value !== null;
@@ -15,77 +20,120 @@ export const isMeshDie = (d: ThrowDie) => d.shape !== null && !d.flat && d.value
 /** FR-DICEX-23: a median frame time above this switches the device to flat. */
 export const SLOW_FRAME_MS = 33;
 
-export function Throw3DStage({
-  throwId,
-  dice,
-  looks,
-  width,
-  height,
-  rest,
-  interrupted,
-  onRest,
-  onLost,
-}: {
-  throwId: string;
-  dice: readonly ThrowDie[];
-  looks: Record<string, DiceLook>;
-  width: number;
-  height: number;
-  rest: RestInfo | null;
-  /** FR-DICEX-18: a newer throw started; snap to the final pose and hold that frame. */
-  interrupted: boolean;
-  onRest(info: RestInfo): void;
-  onLost(): void;
-}) {
-  const host = useRef<HTMLDivElement>(null);
-  const handle = useRef<PlayHandle | null>(null);
-  const cb = useRef({ onRest, onLost });
-  cb.current = { onRest, onLost };
-  const input = useRef({ dice, looks, width, height });
-  input.current = { dice, looks, width, height };
+const viewport = () => ({ w: globalThis.innerWidth || 1, h: globalThis.innerHeight || 1 });
 
-  // Once per throw: settle headless, then play (FR-DICEX-15).
+/** FR-DICEX-33: the screen arena's rect = the viewport. */
+export const viewportRect = (): Rect => ({ x: 0, y: 0, ...viewport() });
+
+/** The arena of a run: the viewport's, or the zone's dice area with the screen's die size. */
+function arenaFor(arena: ThrowRun["plan"]["arena"], r: Rect): Arena {
+  return arena === "screen" ? screenArena(r) : arenaOf(r, dieSizePx(viewport()));
+}
+
+/**
+ * Plays `run` on the layer canvas in `host` at `rect()` (read every frame), reports rest to the
+ * store, and hands off at the run's `handoff` / `fading` phase. Returns the rest info.
+ */
+export function useRun3D(
+  run: ThrowRun,
+  dice: readonly ThrowDie[],
+  host: RefObject<HTMLDivElement | null>,
+  rect: () => Rect | null,
+  onSlow: () => void,
+): RestInfo | null {
+  const [rest, setRest] = useState<RestInfo | null>(null);
+  const handle = useRef<PlayHandle | null>(null);
+  const still = useRef<HTMLCanvasElement | null>(null);
+  const input = useRef({ run, dice, rect, onSlow });
+  input.current = { run, dice, rect, onSlow };
+  const { seq } = run;
+
+  // Once per run: settle headless in the arena, then play (FR-DICEX-34).
   useEffect(() => {
     const mod = dice3d.module();
-    const el = host.current;
-    if (!mod || !el) {
-      cb.current.onLost();
+    const layer = host.current;
+    const { run: r, dice: ds, rect: rectOf } = input.current;
+    const start = rectOf();
+    if (!mod || !layer || !start) {
+      diceExtras.flat(seq);
       return;
     }
-    const { dice: ds, looks: ls, width: w, height: h } = input.current;
     try {
       handle.current = mod.playThrow({
-        host: el,
-        width: w,
-        height: h,
-        seed: mod.seedOf(throwId),
+        layer,
+        rect: () => input.current.rect() ?? start,
+        arena: arenaFor(r.plan.arena, start),
+        shadows: shadowsFor(viewport()),
+        seed: mod.seedOf(r.t.seedId),
         dice: ds.map((d) => ({
           key: d.key,
           shape: d.shape as NonNullable<ThrowDie["shape"]>,
           ...(d.d100 && { d100: d.d100 }),
           value: d.value as number,
           kept: d.kept,
-          look: ls[d.entryId] ?? STYLE_LOOK.ivory,
+          look: r.looks[d.entryId] ?? STYLE_LOOK.ivory,
         })),
-        onRest: (info) => cb.current.onRest(info),
-        onLost: () => cb.current.onLost(),
+        onRest: (info) => {
+          setRest(info);
+          diceExtras.rested(seq);
+          if (info.medianFrameMs !== null && info.medianFrameMs > SLOW_FRAME_MS) {
+            input.current.onSlow();
+          }
+        },
+        onLost: () => diceExtras.flat(seq),
       });
     } catch (err) {
       console.warn("Dice: WebGL could not start; showing flat dice.", err);
-      cb.current.onLost();
+      diceExtras.flat(seq);
     }
     return () => {
       handle.current?.stop();
       handle.current = null;
+      still.current?.remove();
+      still.current = null;
     };
-  }, [throwId]);
-  useEffect(() => {
-    if (interrupted) handle.current?.freeze();
-  }, [interrupted]);
+  }, [seq, host]);
 
+  // FR-DICEX-18: a newer throw (or the rest timer) ended the motion: snap, then hand off.
+  const leaving = run.phase === "handoff" || run.phase === "fading";
+  useEffect(() => {
+    if (run.phase === "rest") handle.current?.snap();
+    if (!leaving || !handle.current) return;
+    const s = handle.current.handoff();
+    handle.current = null;
+    const layer = host.current;
+    if (!s || !layer) return;
+    still.current = s.canvas;
+    layer.appendChild(s.canvas);
+    const ms = run.phase === "handoff" ? HANDOFF_MS : FADE_MS;
+    const el = s.canvas;
+    el.style.transition = `opacity ${ms}ms ease-in, transform ${ms}ms ease-in`;
+    el.style.transformOrigin = "100% 100%";
+    // Next frame: from the copied pixels to gone (D7 swaps this for the flight into its PiP).
+    requestAnimationFrame(() => {
+      el.style.opacity = "0";
+      if (run.phase === "handoff") el.style.transform = "scale(0.6)";
+    });
+  }, [run.phase, leaving, host]);
+
+  return rest;
+}
+
+/**
+ * The DOM mirror of a 3D run: hidden dice with `data-settled` at rest, and MOD / offered labels
+ * under their dice (positions from the arena rect's top-left).
+ */
+export function Mirror3D({
+  dice,
+  looks,
+  rest,
+}: {
+  dice: readonly ThrowDie[];
+  looks: Record<string, DiceLook>;
+  rest: RestInfo | null;
+}) {
   return (
-    <div className="relative" style={{ width, height }}>
-      <div ref={host} className="absolute inset-0" />
+    <>
       {dice.map((d) => (
         <span
           key={d.key}
@@ -119,6 +167,6 @@ export function Throw3DStage({
               </span>
             );
           })}
-    </div>
+    </>
   );
 }

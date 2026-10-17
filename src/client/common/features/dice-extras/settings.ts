@@ -1,44 +1,76 @@
-// FR-DICEX-21: per-device render settings, per browser `pp.dicex.v1.<campaignId>.<dm | playerId>`
-// = {render, others}, zod-parsed. Invalid / unavailable storage → defaults, kept in memory.
+// FR-DICEX-36: per-device dice settings v2, per browser `pp.dicex.v2.<campaignId>.<dm | playerId>`
+// = {display, others, popup}, zod-parsed. Invalid / unavailable storage → defaults, kept in memory.
+// A sprint-3 v1 entry (`{render, others}`, FR-DICEX-21) migrates once on read: `3d` → `screen`,
+// `flat` / `off` kept, `others` kept; the v2 entry is written so later reads skip v1. Never sent.
 import { useCallback, useSyncExternalStore } from "react";
 import { z } from "zod";
 import { useSync } from "../../sync/store";
 import { useThreeD } from "./lazy3d";
 
-export const RenderSetting = z.enum(["3d", "flat", "off"]);
-export type RenderSetting = z.infer<typeof RenderSetting>;
+/** FR-DICEX-32: `screen` full-screen 3D (default), `zone` "Tray throw", `flat` chips, `off`. */
+export const DisplaySetting = z.enum(["screen", "zone", "flat", "off"]);
+export type DisplaySetting = z.infer<typeof DisplaySetting>;
 
-export const DiceSettings = z.object({ render: RenderSetting, others: z.boolean() });
+export const DiceSettings = z.object({
+  display: DisplaySetting,
+  others: z.boolean(),
+  popup: z.boolean(),
+});
 export type DiceSettings = z.infer<typeof DiceSettings>;
 
-export const DEFAULT_SETTINGS: DiceSettings = { render: "3d", others: true };
+export const DEFAULT_SETTINGS: DiceSettings = { display: "screen", others: true, popup: true };
+
+/** The retired sprint-3 shape (FR-DICEX-21), read only to migrate. */
+const SettingsV1 = z.object({ render: z.enum(["3d", "flat", "off"]), others: z.boolean() });
+
+const V2 = "pp.dicex.v2.";
+const V1 = "pp.dicex.v1.";
 
 export function settingsKey(campaignId: string, role: "dm" | "player", playerId: string | null) {
-  return `pp.dicex.v1.${campaignId}.${role === "dm" ? "dm" : playerId}`;
+  return `${V2}${campaignId}.${role === "dm" ? "dm" : playerId}`;
 }
 
-/** Stored JSON → settings; anything invalid → the defaults. */
+const json = (raw: string): unknown => {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+/** Stored v2 JSON → settings; anything invalid → the defaults. */
 export function parseSettings(raw: string | null | undefined): DiceSettings {
   if (!raw) return DEFAULT_SETTINGS;
-  try {
-    const r = DiceSettings.safeParse(JSON.parse(raw));
-    return r.success ? r.data : DEFAULT_SETTINGS;
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
+  const r = DiceSettings.safeParse(json(raw));
+  return r.success ? r.data : DEFAULT_SETTINGS;
 }
 
-export interface RenderEnv {
+/** A v1 entry → v2 (`3d` → `screen`); null when it doesn't parse. */
+export function migrateV1(raw: string | null | undefined): DiceSettings | null {
+  if (!raw) return null;
+  const r = SettingsV1.safeParse(json(raw));
+  if (!r.success) return null;
+  const display = r.data.render === "3d" ? "screen" : r.data.render;
+  return { ...DEFAULT_SETTINGS, display, others: r.data.others };
+}
+
+export interface DisplayEnv {
   reducedMotion: boolean;
   /** WebGL and the 3D code are usable here. */
   threeD: boolean;
 }
 
-/** What a throw draws: `3d` only with WebGL and no reduced-motion preference, else `flat`. */
-export function effectiveRender(setting: RenderSetting, env: RenderEnv): RenderSetting {
-  if (setting !== "3d") return setting;
-  return env.reducedMotion || !env.threeD ? "flat" : "3d";
+/**
+ * FR-DICEX-32 / -45: what this device shows. Reduced motion or no 3D turns `screen` / `zone` into
+ * `flat`; the stored setting is kept.
+ */
+export function effectiveDisplay(setting: DisplaySetting, env: DisplayEnv): DisplaySetting {
+  if (setting !== "screen" && setting !== "zone") return setting;
+  return env.reducedMotion || !env.threeD ? "flat" : setting;
 }
+
+/** Display modes that draw 3D dice (and so preload the chunk, FR-DICEX-37). */
+export const is3dDisplay = (d: DisplaySetting) => d === "screen" || d === "zone";
 
 export type SettingsBackend = Pick<Storage, "getItem" | "setItem">;
 
@@ -54,31 +86,47 @@ export function createSettingsStore(getBackend: () => SettingsBackend | undefine
   // useSyncExternalStore needs a stable snapshot per key: cache by the raw value.
   const cache = new Map<string, { raw: string | null; value: DiceSettings }>();
   const listeners = new Set<() => void>();
+  const get = (key: string): string | null => {
+    try {
+      return getBackend()?.getItem(key) ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const put = (key: string, s: DiceSettings): boolean => {
+    try {
+      const backend = getBackend();
+      if (!backend) return false;
+      backend.setItem(key, JSON.stringify(s));
+      return true;
+    } catch {
+      return false;
+    }
+  };
   return {
     read(key) {
       const kept = memory.get(key);
       if (kept) return kept;
-      let raw: string | null = null;
-      try {
-        raw = getBackend()?.getItem(key) ?? null;
-      } catch {
-        raw = null;
-      }
+      const raw = get(key);
       const hit = cache.get(key);
       if (hit && hit.raw === raw) return hit.value;
+      if (raw === null && key.startsWith(V2)) {
+        // FR-DICEX-36: a v1 entry migrates once; the v2 write makes later reads skip it.
+        const migrated = migrateV1(get(V1 + key.slice(V2.length)));
+        if (migrated) {
+          if (put(key, migrated)) {
+            cache.set(key, { raw: JSON.stringify(migrated), value: migrated });
+          } else memory.set(key, migrated);
+          return migrated;
+        }
+      }
       const value = parseSettings(raw);
       cache.set(key, { raw, value });
       return value;
     },
     write(key, s) {
-      try {
-        const backend = getBackend();
-        if (!backend) throw new Error("no storage");
-        backend.setItem(key, JSON.stringify(s));
-        memory.delete(key);
-      } catch {
-        memory.set(key, s);
-      }
+      if (put(key, s)) memory.delete(key);
+      else memory.set(key, s);
       for (const fn of [...listeners]) fn();
     },
     subscribe(fn) {
@@ -92,7 +140,7 @@ export function createSettingsStore(getBackend: () => SettingsBackend | undefine
 
 const store = createSettingsStore(() => globalThis.localStorage);
 
-function prefersReducedMotion(): boolean {
+export function prefersReducedMotion(): boolean {
   try {
     return globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
   } catch {
@@ -103,7 +151,9 @@ function prefersReducedMotion(): boolean {
 /** This client's settings (defaults before the first snapshot) and a setter. */
 export function useDiceSettings(): {
   settings: DiceSettings;
-  render: RenderSetting;
+  /** What this device shows (FR-DICEX-32): reduced motion / no 3D → `flat`. */
+  display: DisplaySetting;
+  reducedMotion: boolean;
   set(patch: Partial<DiceSettings>): void;
 } {
   const you = useSync((s) => s.store.you);
@@ -119,11 +169,9 @@ export function useDiceSettings(): {
     },
     [key],
   );
-  // FR-DICEX-21 / -22: 3D needs WebGL and a chunk that hasn't failed this session.
+  // 3D needs WebGL and a chunk that hasn't failed this session (FR-DICEX-22).
   const threeD = useThreeD().available;
-  const render = effectiveRender(settings.render, {
-    reducedMotion: prefersReducedMotion(),
-    threeD,
-  });
-  return { settings, render, set };
+  const reducedMotion = prefersReducedMotion();
+  const display = effectiveDisplay(settings.display, { reducedMotion, threeD });
+  return { settings, display, reducedMotion, set };
 }
