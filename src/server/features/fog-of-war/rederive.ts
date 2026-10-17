@@ -315,7 +315,8 @@ export function growMemory(
  * polygons becomes explored for P (one row per player, never shrinks; box = the scene's fog box,
  * FR-FOG-03). Full → a `warn`, the row stays. Party vision on (OQ-FOG-47): every player's row
  * grows from the polygons of the players whose sight changed (`only`; the others' cells are
- * already in every row), rasterised once.
+ * already in every row), rasterised once; a listed player without a row yet (a new player)
+ * grows from the whole party's sight.
  */
 function rederiveMemory(
   env: SceneHookEnv,
@@ -329,11 +330,16 @@ function rederiveMemory(
   const grows: [string, ReadonlySet<number>][] = [];
   if (st.party === true) {
     if (st.partySight?.blind === true) return changes;
-    const cells = polygonsCells(
-      changed.flatMap(([, s]) => s.vision.polys.map((x) => x.poly)),
-      box,
-    );
-    if (cells.size > 0) for (const p of st.players) grows.push([p, cells]);
+    const polysOf = (list: typeof changed) =>
+      list.flatMap(([, s]) => s.vision.polys.map((x) => x.poly));
+    const cells = polygonsCells(polysOf(changed), box);
+    let all: Set<number> | null = null;
+    for (const p of st.players) {
+      if (only?.includes(p) && !readExploredRecord(env.tx, st.sceneId, p)) {
+        all ??= polygonsCells(polysOf([...(st.sight ?? [])]), box);
+        grows.push([p, all]);
+      } else if (cells.size > 0) grows.push([p, cells]);
+    }
   } else {
     for (const [p, sight] of changed) {
       if (sight.vision.polys.length === 0) continue;

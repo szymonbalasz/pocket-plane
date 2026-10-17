@@ -12,6 +12,7 @@ import {
   playerVision,
   pointInPolygon,
   pointVisible,
+  polygonCells,
   prepareScene,
   prepareStaticLayer,
   REACH_MAX_CELLS,
@@ -259,5 +260,31 @@ describe("FR-FOG-39 src and FR-FOG-50 party sight", () => {
     const mira = playerVision(scene, [{ x: 2.5, y: 7.5, senses: torch }]);
     const party = partyVision([mira, thornSi]) as NonNullable<ReturnType<typeof partyVision>>;
     expect(party.polys.some((p) => p.seesInvisible && p.contains(12.5, 8.5))).toBe(true);
+  });
+});
+
+describe("FR-FOG-37 polygonCells at 999 ft", () => {
+  test("FR-FOG-37 polygonCells = cells whose centre is in the polygon, at 999 ft with edges through cell centres", () => {
+    const rand = rng(91);
+    for (let k = 0; k < 12; k++) {
+      // Walls on half-cell lines, so polygon edges pass exactly through cell centres.
+      const walls: Seg[] = [];
+      for (let i = 0; i < 30; i++) {
+        const x = Math.floor(rand() * 40) + 0.5;
+        const y = Math.floor(rand() * 40) + 0.5;
+        walls.push(rand() < 0.5 ? [x, y, x + 3, y] : [x, y, x, y + 3]);
+      }
+      const o = { x: 15 + Math.floor(rand() * 10), y: 15 + Math.floor(rand() * 10) };
+      const scene = prepareScene(walls, [], [0, 0, 40, 40]);
+      const [p] = sourcePolygons(scene, { ...o, senses: NORMAL_SENSES });
+      const poly = p as number[];
+      const got: string[] = [];
+      polygonCells(poly, (c, r) => got.push(`${c},${r}`));
+      const want: string[] = [];
+      for (let r = -2; r < 42; r++)
+        for (let c = -2; c < 42; c++)
+          if (pointInPolygon(poly, c + 0.5, r + 0.5)) want.push(`${c},${r}`);
+      expect(got.sort()).toEqual(want.sort());
+    }
   });
 });

@@ -778,22 +778,31 @@ export function polygonCells(flat: readonly number[], visit: (col: number, row: 
     y1 = Math.max(y1, y);
   }
   const xs: number[] = [];
+  const near: number[] = [];
   for (let row = Math.floor(y0 - 0.5); row <= Math.ceil(y1); row++) {
     const yc = row + 0.5;
     if (yc < y0 - 1e-9 || yc > y1 + 1e-9) continue;
     xs.length = 0;
-    let lo = Number.POSITIVE_INFINITY;
-    let hi = Number.NEGATIVE_INFINITY;
+    near.length = 0;
     for (let i = 0, j = n - 1; i < n; j = i++) {
       const ax = flat[2 * i] as number;
       const ay = flat[2 * i + 1] as number;
       const bx = flat[2 * j] as number;
       const by = flat[2 * j + 1] as number;
       if (ay > yc !== by > yc) xs.push(ax + ((yc - ay) * (bx - ax)) / (by - ay));
-      // Edges reaching this scanline: their centres may sit on the boundary.
+      // Edges reaching this scanline: a centre may sit on them (the boundary counts). Only the
+      // columns whose centre is that near are candidates: the edge's crossing x, or a
+      // horizontal edge's whole span.
       if (Math.min(ay, by) <= yc + 1e-9 && yc - 1e-9 <= Math.max(ay, by)) {
-        lo = Math.min(lo, ax, bx);
-        hi = Math.max(hi, ax, bx);
+        if (Math.abs(by - ay) < 1e-9) {
+          const c0 = Math.ceil(Math.min(ax, bx) - 0.5 - 1e-6);
+          const c1 = Math.floor(Math.max(ax, bx) - 0.5 + 1e-6);
+          for (let c = c0; c <= c1; c++) near.push(c);
+        } else {
+          const x = ax + ((yc - ay) * (bx - ax)) / (by - ay);
+          const c = Math.round(x - 0.5);
+          if (Math.abs(c + 0.5 - x) <= 1e-6) near.push(c);
+        }
       }
     }
     xs.sort((a, b) => a - b);
@@ -803,10 +812,8 @@ export function polygonCells(flat: readonly number[], visit: (col: number, row: 
       const c1 = Math.floor((xs[k + 1] as number) - 0.5 + 1e-9);
       for (let c = c0; c <= c1; c++) cols.add(c);
     }
-    if (lo <= hi) {
-      for (let c = Math.ceil(lo - 0.5 - 1e-9); c <= Math.floor(hi - 0.5 + 1e-9); c++) {
-        if (!cols.has(c) && pointInPolygon(flat, c + 0.5, yc)) cols.add(c);
-      }
+    for (const c of near) {
+      if (!cols.has(c) && pointInPolygon(flat, c + 0.5, yc)) cols.add(c);
     }
     for (const c of [...cols].sort((a, b) => a - b)) visit(c, row);
   }

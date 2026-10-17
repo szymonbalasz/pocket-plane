@@ -103,10 +103,11 @@ test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-45 FR-CHARX-46 FR-CHARX-10 FR-CHARX-32 FR
   // Sprint 3 (FR-CHARX-50 / -53): Senses line; darkvision 60 (Enter commits); Sees invisible is
   // the DM's (disabled for the owner).
   const senses = sheet1.getByTestId("charx-senses");
-  await expect(senses).toHaveText("Senses —");
+  // Sprint 4 (FR-CHARX-50): no stored vision reads "Vision normal" (999 ft).
+  await expect(senses).toHaveText("Senses Vision normal");
   await field(sheet1, "senses.darkvisionFt").fill("60");
   await field(sheet1, "senses.darkvisionFt").press("Enter");
-  await expect(senses).toHaveText("Senses Darkvision 60 ft");
+  await expect(senses).toHaveText("Senses Vision normal · Darkvision 60 ft");
   await expect(sheet1.getByTestId("charx-senses-invisible")).toBeDisabled();
   await sheet1.getByTestId("charx-edit-toggle").click();
   await expect(sheet1.getByTestId("char-sheet")).toHaveAttribute("data-editing", "false");

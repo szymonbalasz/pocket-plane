@@ -3,7 +3,11 @@
 // rectangle, party flag), FR-FOG-52 party source cap, recalibration re-derive (review A8) and
 // the one-time vision-model upgrade (FR-FOG-40, review A4).
 import { afterEach, describe, expect, test } from "bun:test";
-import { type VisionServices, visionServices } from "@fixtures/units/fog-of-war/vision-harness";
+import {
+  explores,
+  type VisionServices,
+  visionServices,
+} from "@fixtures/units/fog-of-war/vision-harness";
 import {
   FOG_INTENTS as F,
   FOG_SETTINGS_TYPE,
@@ -16,7 +20,7 @@ import { realContext } from "../../commands/context";
 import { armCrashHook } from "../../commands/crash";
 import { stateDigest } from "../../db/digest";
 import { VISION_MODEL, VISION_MODEL_KEY } from "../../db/meta";
-import { asset, dbMeta, fogSettings, scene, sceneFog, token } from "../../db/schema";
+import { asset, dbMeta, fogExplored, fogSettings, scene, sceneFog, token } from "../../db/schema";
 import { type Logger, silentLogger } from "../../log";
 import { addAsset } from "../scenes-map/testing";
 import { campaignPlayers, loadSceneSight } from "./derive";
@@ -325,5 +329,31 @@ describe("FR-FOG-49 party vision switch (in-process)", () => {
       (v) => v.playerId === t.pid.p1,
     );
     expect(own?.blind).toBe(true);
+  });
+});
+
+describe("FR-FOG-37 party memory (OQ-FOG-47)", () => {
+  test("FR-FOG-37 party vision on: every row grows from the party's sight; a player added later starts from it; switching off keeps the rows", async () => {
+    const t = await setup("vision-party");
+    t.run(F.setPartyVision, { on: true });
+    const row = (p: string) =>
+      t.db
+        .select()
+        .from(fogExplored)
+        .all()
+        .find((r) => r.sceneId === t.ambushId && r.playerId === p);
+    // Thorn's darkvision (r 12 from (2.5, 9.5)) holds cell (5, 12); the nook (1, 10) is in both.
+    const cell = (p: string, col: number, r: number) => {
+      const m = row(p);
+      if (!m) return false;
+      return explores({ box: [m.col0, m.row0, m.cols, m.rows], runs: m.runs } as never, col, r);
+    };
+    expect(cell(t.pid.p1, 5, 12)).toBe(true);
+    expect(cell(t.pid.p2, 5, 12)).toBe(true);
+    const added = t.run<{ id: string }>("player.add", { name: "Player 3" });
+    expect(cell(added.id, 5, 12)).toBe(true);
+    expect(cell(added.id, 1, 10)).toBe(true);
+    t.run(F.setPartyVision, { on: false });
+    expect(cell(added.id, 5, 12)).toBe(true);
   });
 });
