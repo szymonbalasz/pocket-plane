@@ -16,24 +16,28 @@
 | Option | Pros | Cons |
 |---|---|---|
 | **A. One topmost dice canvas (portal, no input) + a roll popup stack in the toast region; both derived from received `roll` entries (ADR-0044 A)** | No new event, signal or field (measured: 0 B); hidden rolls can't reach players by construction; one WebGL context serves screen, zone and popup; no `PlayFrame.tsx` change | Covers dialogs for ≤ 4 s (no input taken); the toast region gets a third stack (shared file, sequenced with track M) |
-| B. Dice drawn inside each window's stacking context / below dialogs | Dialogs never covered | Needs a `PlayFrame.tsx` slot; toasts already sit above dialogs, so the order gets inconsistent |
+| B. Dice layer between toasts and dialogs (FR-SHELL-01 order: toasts < dialogs, overlays) | A modal dialog is never covered | Needs a new slot in `PlayFrame.tsx` (shared frame, M4's lock); dice that duck under a dialog break the DM's "over everything" ([12]) |
 | C. Roller's client broadcasts the throw (ADR-0044 B) | Identical motion everywhere | New signal with its own visibility; rejected in ADR-0044 for the same leak risk |
 
 ## Decision (proposed)
 
-**A.**
+**A.** Rows tagged *pick, DM gate* follow the bold pick of the named open question until the DM rules ([dice-extras §15](../../specs/dice-extras.md#15-open-questions)); the others are DM decisions (#243) or settled seams (S7).
 
-| Rule | Detail |
-|---|---|
-| Where | `screen` (default): one fixed full-viewport canvas portalled to `body`, topmost, `pointer-events: none`; arena = the viewport, walls on its edges. `zone` (option, "Tray throw"): ADR-0044's zone. `flat` / `off`: chips only |
-| Popup | Every live `roll` entry a client receives → a popup in that client's toast region (players bottom-right, DM top-centre), same dice in picture-in-picture: hand-off from the big throw, or a miniature playback when the big one didn't run (DM-only rolls, others off) |
-| DM-only | `public: false` entries never animate big; the DM sees them in the popup only |
-| Truth | Unchanged: pre-computed headless simulation, then relabel, then play; no client changes a value; faces checked against `data-value` |
-| Cost | 3D chunk preloaded at idle when display is `screen` / `zone`; pixel ratio ≤ 1.5; loop only while dice move |
-| Settings | Per device, browser only (`pp.dicex.v2.*`; v1 migrated) |
+| Rule | Detail | Status |
+|---|---|---|
+| Where | `screen` (default): one fixed full-viewport canvas portalled to `body`, topmost, `pointer-events: none`; arena = the viewport, walls on its edges. `zone` (option, "Tray throw"): ADR-0044's zone, now an arena of the same canvas. `flat` / `off`: chips only | DM #243 [10, 12]; seams S7 |
+| Popup: who | Every live `roll` entry a client receives, the roller included | *pick, DM gate* (OQ-DICEX-23) |
+| Popup: where | That client's toast region (players bottom-right, DM top-centre), a third stack, ≤ 3, 6 s after rest | *pick, DM gate* (OQ-DICEX-24); stack order seams S7 |
+| Popup: dice | Same dice in picture-in-picture: hand-off from the big throw, or a miniature when the big one didn't run | *pick, DM gate* (OQ-DICEX-26) |
+| DM-only | `public: false` entries never animate big; the DM sees them in the popup only | *pick, DM gate* (OQ-DICEX-20) |
+| Timing | Settle ≤ 2.5 s, rest 1 s, hand-off 0.4 s | *pick, DM gate* (OQ-DICEX-18) |
+| Truth | Unchanged: pre-computed headless simulation, then relabel, then play; no client changes a value; faces checked against `data-value` | ADR-0044, kept |
+| Cost | 3D chunk preloaded at idle when display is `screen` / `zone`; pixel ratio ≤ 1.5; loop only while dice move | *pick, DM gate* (OQ-DICEX-27) |
+| Settings | Per device, browser only (`pp.dicex.v2.*`; v1 migrated) | *pick, DM gate* (OQ-DICEX-22) |
 
 ## Consequences
 
 - No protocol, schema or event change; CON-44 deltas 0 B (snapshot and per roll, measured 2026-10-17).
 - play-shell's layer order gains "dice layer" on top; `toast-region.ts` sizes a third stack (shared; sequenced with M's placement fixes).
-- The log gains a `die` line segment (dice-roll-log owned); kinds that reuse the roll helpers get chips with no change.
+- The log gains a `die {faces, value, kept, offered?, label?}` line segment (dice-roll-log owned; seams S8 as amended by ruling B5); kinds that reuse the roll helpers get chips with no change of their own.
+- One WebGL context per page (screen, zone and PiP arenas); the sprint-3 zone canvas is retired.
