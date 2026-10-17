@@ -19,7 +19,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
 | R S4-1a weapon rows | merged 9859252 | — | Done (walkthrough 6/6; main check 3174, e2e 95 green) | S4-2 next |
 | R S4-1b weapon combat + BL-10 | merged | — | Done (walkthrough 8/8; check 3138, e2e 92) | — |
-| R S4-5 Divine Fury log line | `fix/fury-log-line` (w5M, slot 2) | fix-fury-e2e | Walkthrough 9/9; check 3200 green; e2e order clash with trigger-state spec (same bundle) → fixing | Merge |
+| R S4-5 Divine Fury log line | merged | — | Done (walkthrough 9/9; own e2e bundle `fury-log-line`) | — |
 | R S4-3 trigger state + tray | merged e3e203b | — | Done (walkthrough 8/8; check 3185, e2e 96) | — |
 | R S4-4 trigger badges | `build/trigger-badges` (w5Y, slot 5) | build-trigger-badges | Building | Walkthrough |
 | R S4-2 negative uses | — | — | Queued (brief ready) | Next free slot |
