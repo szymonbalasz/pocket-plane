@@ -4,7 +4,9 @@
 // `PUT /api/entities`); server errors shown inline. PUT is a whole replace: the form always sends
 // `tokenShape` (Default = null) and the whole stat block (source fields kept). Sprint 2: optional
 // HP formula with an "Average N" hint and "Use as HP max" (FR-CBT-62, FR-ENT-25). Sprint 4: the
-// first attack's `bonus` / `extraDamage` (and the rows after it) ride through (FR-CBT-86).
+// first attack's `bonus` / `extraDamage` (and the rows after it) ride through (FR-CBT-86); the
+// monster **Type** (14 SRD types + None, FR-CBT-43 S4 / FR-ENT-26): Derive and Edit prefill it,
+// None omits `type`.
 
 import { hpAverage, parseHpFormula } from "@shared/entities/hp-formula";
 import {
@@ -12,6 +14,7 @@ import {
   ABILITY_NAMES,
   type Ability,
   CR_VALUES,
+  CREATURE_TYPES,
   DAMAGE_TYPES,
   type DefinitionRecord,
   MonsterStatBlock,
@@ -38,6 +41,7 @@ import {
   Tooltip,
 } from "@ui/components/ui/overlays";
 import { Input, Label } from "@ui/components/ui/primitives";
+import { creatureTypeLabel } from "@ui/features/entities/art";
 import { CopyPlusIcon, PencilIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { AssetPickerDialog } from "../assets-pipeline/AssetPicker";
@@ -45,7 +49,7 @@ import type { CreatureAction } from "../entities/creature-actions";
 import type { CreatureRow } from "../entities/list";
 import { combatRest } from "./rest";
 
-type Mode =
+export type Mode =
   | { kind: "new" }
   | { kind: "derive"; base: DefinitionRecord }
   | { kind: "edit"; def: DefinitionRecord };
@@ -68,6 +72,8 @@ export interface Fields {
   saves: Ability[];
   /** FR-ENT-25: "" = none. Absent = not shown: the source's formula is kept. */
   hpFormula?: string;
+  /** FR-ENT-26: a creature type or `NONE`. Absent = not shown: the source's type is kept. */
+  type?: string;
 }
 
 const NONE = "__none__";
@@ -79,7 +85,7 @@ const SHAPE_LABEL: Record<TokenShape | typeof DEFAULT_SHAPE, string> = {
   none: "None",
 };
 
-function initial(mode: Mode): Fields {
+export function initial(mode: Mode): Fields {
   const src = mode.kind === "derive" ? mode.base : mode.kind === "edit" ? mode.def : null;
   const sb = src?.kind === "monster" ? src.statBlock : null;
   const a = sb?.attacks[0];
@@ -108,6 +114,7 @@ function initial(mode: Mode): Fields {
     ) as Record<Ability, string>,
     saves: sb?.saveProficiencies ? [...sb.saveProficiencies] : [],
     hpFormula: sb?.hpFormula ?? "",
+    type: sb?.type ?? NONE,
   };
 }
 
@@ -133,9 +140,11 @@ export function formStatBlock(
     abilities: _abilities,
     saveProficiencies: _saves,
     hpFormula: sourceFormula,
+    type: sourceType,
     ...rest
   } = source ?? {};
   const formula = f.hpFormula === undefined ? sourceFormula : f.hpFormula.trim() || undefined;
+  const type = f.type === undefined ? sourceType : f.type === NONE ? undefined : f.type;
   // FR-CBT-86: the loaded attack keeps what the form doesn't edit (row id, `bonus`,
   // `extraDamage`; the NPC sheet edits them) and the rows after it ride along, so Edit never
   // drops them.
@@ -176,6 +185,7 @@ export function formStatBlock(
       cr: f.cr,
       attacks,
       ...(formula !== undefined ? { hpFormula: formula } : {}),
+      ...(type !== undefined ? { type } : {}),
       ...(f.speed.trim() !== "" ? { speed: Number(f.speed) } : {}),
       ...(abilities ? { abilities } : {}),
       ...(abilities && f.saves.length > 0
@@ -294,6 +304,23 @@ function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
               {CR_VALUES.map((c) => (
                 <SelectItem key={c} value={c}>
                   {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field id="type" label="Type">
+          <Select value={f.type ?? NONE} onValueChange={(v) => setF((x) => ({ ...x, type: v }))}>
+            <SelectTrigger id="cbt-form-type" data-testid="cbt-form-type" className="min-w-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE} data-value="none">
+                None
+              </SelectItem>
+              {CREATURE_TYPES.map((t) => (
+                <SelectItem key={t} value={t} data-value={t}>
+                  {creatureTypeLabel(t)}
                 </SelectItem>
               ))}
             </SelectContent>
