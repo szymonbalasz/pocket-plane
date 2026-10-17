@@ -17,7 +17,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
-| R S4-1a weapon rows | merged 9859252 | — | Done (walkthrough 6/6; check 3154, e2e 94) | S4-2 next |
+| R S4-1a weapon rows | merged 9859252 | — | Done (walkthrough 6/6; main check 3174, e2e 95 green) | S4-2 next |
 | R S4-1b weapon combat + BL-10 | merged | — | Done (walkthrough 8/8; check 3138, e2e 92) | — |
 | R S4-5 Divine Fury log line | `fix/fury-log-line` (w5M, slot 2) | build-fury-log-line | Finishing full e2e | Walkthrough |
 | R S4-3 trigger state + tray | `build/trigger-state` (w5K, slot 5) | build-trigger-state | Building | Walkthrough → S4-4 |
