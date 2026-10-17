@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { WindowState } from "@shared/play-shell/layout";
-import { clampRect, renderedRect, TOP_BAR_H, workArea } from "./geometry";
+import { clampRect, type Rect, renderedRect, TOP_BAR_H, workArea } from "./geometry";
 import {
   defaultLayout,
   launcherState,
@@ -166,7 +166,7 @@ describe("window manager", () => {
     expect(get(ws, "a.three")).toMatchObject({ x: 12, y: 60 });
   });
 
-  test("FR-SHELL-18 appear: a never-moved default window avoids open ones; a moved one stays", () => {
+  test("FR-SHELL-18, -41 appear: a default window avoids open ones; a moved one stays unless it covers one", () => {
     const reg = createWindowRegistry("dm", [
       def("a.one"),
       def("a.late", { defaultOpen: true, available: () => false }),
@@ -182,10 +182,15 @@ describe("window manager", () => {
     const fixed = get(reduce(ws, { type: "appear", kind: "a.late" }, here), "a.late");
     expect(covered(fixed, one)).toBe(false);
     expect(reduce(ws, { type: "appear", kind: "a.late" }, gone)).toBe(ws); // still unavailable
-    // Moved by the user → kept, even if it covers a.one.
+    // Moved by the user clear of a.one → kept; over a.one → auto-placed (FR-SHELL-41).
+    const clear = { x: 900, y: 500, w: 300, h: 200 };
+    const away = reduce(ws, { type: "setRect", kind: "a.late", rect: clear }, here);
+    expect(reduce(away, { type: "appear", kind: "a.late" }, here)).toBe(away);
     const rect = { x: one.x + 50, y: one.y + 50, w: 300, h: 200 };
     const moved = reduce(ws, { type: "setRect", kind: "a.late", rect }, here);
-    expect(reduce(moved, { type: "appear", kind: "a.late" }, here)).toBe(moved);
+    const placed = get(reduce(moved, { type: "appear", kind: "a.late" }, here), "a.late");
+    expect(covered(placed, one)).toBe(false);
+    expect(placed.area).toEqual(workArea(vp));
   });
 
   test("FR-SHELL-08 reopen uses last geometry", () => {
@@ -463,5 +468,108 @@ describe("FR-SHELL-36/37 minimised = parked", () => {
     expect(launcherState(ws, "a.two")).toBe("closed");
     expect(launcherState(ws, "a.three")).toBe("closed");
     expect(launcherTooltip("Log", "closed")).toBe("Log");
+  });
+});
+
+describe("sprint 4: feature vs user opens, restoreOpen (FR-SHELL-08, -41, -42)", () => {
+  // `a.one` = Initiative (default-open, top-right); `a.two` = a window the user drags over it.
+  const onInit = (ws: Windows) => {
+    const one = get(ws, "a.one");
+    return { x: one.x + 20, y: one.y + 20, w: 300, h: 200 };
+  };
+  const overlap = (a: Rect, b: Rect) =>
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  /** Initiative minimised (End), then `a.two` opened and dragged onto its spot. */
+  const setUp = () =>
+    run(
+      defaultLayout(registry, vp),
+      { type: "minimise", kind: "a.one" },
+      { type: "open", kind: "a.two" },
+    );
+  const covered = () => {
+    const ws = setUp();
+    return run(ws, { type: "setRect", kind: "a.two", rect: onInit(ws) });
+  };
+
+  test("FR-SHELL-41 a feature open whose stored rect overlaps an open window is auto-placed and written with its area", () => {
+    const ws = covered();
+    const stored = get(ws, "a.one");
+    expect(overlap(stored, get(ws, "a.two"))).toBe(true);
+    const next = run(ws, { type: "open", kind: "a.one", by: "feature" });
+    const one = get(next, "a.one");
+    expect(one.state).toBe("open");
+    expect(overlap(one, get(next, "a.two"))).toBe(false);
+    expect(one.area).toEqual(workArea(vp));
+    expect(serialise(next, registry).windows.find((w) => w.kind === "a.one")).toEqual(one);
+    // In front, like any open.
+    expect(order(next).at(-1)).toBe("a.one");
+  });
+
+  test('FR-SHELL-08 user opens keep the stored rect (no `by`, or `by: "user"`), even over a window', () => {
+    const ws = covered();
+    const stored = get(ws, "a.one");
+    for (const by of [undefined, "user"] as const) {
+      const one = get(run(ws, { type: "open", kind: "a.one", by }), "a.one");
+      expect(one).toMatchObject({
+        state: "open",
+        x: stored.x,
+        y: stored.y,
+        w: stored.w,
+        h: stored.h,
+      });
+    }
+    // The launcher toggle is a user open too.
+    expect(get(run(ws, { type: "toggle", kind: "a.one" }), "a.one")).toMatchObject({
+      x: stored.x,
+      y: stored.y,
+    });
+  });
+
+  test("FR-SHELL-41 a feature open of a spot the user chose, clear of other windows, keeps it", () => {
+    const ws = run(
+      setUp(),
+      { type: "setRect", kind: "a.one", rect: { x: 700, y: 500, w: 300, h: 200 } },
+      { type: "minimise", kind: "a.one" },
+    );
+    const one = get(run(ws, { type: "open", kind: "a.one", by: "feature" }), "a.one");
+    expect(one).toMatchObject({ state: "open", x: 700, y: 500, w: 300, h: 200 });
+    // Already open: a feature open only brings it to front.
+    const open = run(ws, { type: "open", kind: "a.one" });
+    expect(run(open, { type: "open", kind: "a.one", by: "feature" })).toBe(open);
+  });
+
+  test("FR-SHELL-40 a feature open at an untouched default rect is auto-placed against the tokens", () => {
+    const ws = setUp();
+    const stored = get(ws, "a.one");
+    const tokens = [{ x: stored.x + 10, y: stored.y + 10, w: 60, h: 60 }];
+    const withTokens = { ...ctx, avoid: () => tokens };
+    const one = get(
+      reduce(ws, { type: "open", kind: "a.one", by: "feature" }, withTokens),
+      "a.one",
+    );
+    expect(tokens.some((t) => overlap(one, t))).toBe(false);
+    // No tokens: it stays where it is.
+    const same = get(run(ws, { type: "open", kind: "a.one", by: "feature" }), "a.one");
+    expect(same).toMatchObject({ x: stored.x, y: stored.y, w: stored.w, h: stored.h });
+  });
+
+  test("FR-SHELL-42 restoreOpen: false loads closed after a reload, geometry kept; the next open is at it; other kinds unchanged", () => {
+    const reg = createWindowRegistry("dm", [
+      def("a.one", { defaultOpen: true }),
+      def("a.viewer", { restoreOpen: false }),
+    ]);
+    const stored = [
+      { kind: "a.one", instance: "main", state: "open", x: 12, y: 60, w: 300, h: 200, z: 1 },
+      { kind: "a.viewer", instance: "main", state: "open", x: 700, y: 300, w: 320, h: 240, z: 2 },
+    ];
+    for (const state of ["open", "minimised"] as const) {
+      const raw = JSON.stringify({ windows: [stored[0], { ...stored[1], state }] });
+      const { windows } = restoreLayout(reg, raw, vp);
+      expect(get(windows, "a.one").state).toBe("open");
+      expect(get(windows, "a.viewer")).toMatchObject({ state: "closed", x: 700, y: 300, w: 320 });
+      const all = { registry: reg, viewport: vp, available: new Set(["a.one", "a.viewer"]) };
+      const opened = get(reduce(windows, { type: "open", kind: "a.viewer" }, all), "a.viewer");
+      expect(opened).toMatchObject({ state: "open", x: 700, y: 300, w: 320, h: 240 });
+    }
   });
 });

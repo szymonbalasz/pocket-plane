@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import type { WindowState } from "@shared/play-shell/layout";
 import {
   contentHeights,
+  FREE_AREAS_MAX,
   freeArea,
+  freeAreas,
   isAppearance,
   noteAppearance,
   notedAppearances,
@@ -10,6 +12,7 @@ import {
   renderedWindowRects,
   reportContentHeight,
 } from "./free-area";
+import type { Rect } from "./geometry";
 import { createWindowRegistry, defineWindow } from "./registry";
 
 const VP = { w: 1440, h: 900 };
@@ -69,6 +72,78 @@ describe("FR-SHELL-34 free area", () => {
       { x: 668, y: 0, w: 800, h: 900 },
     ];
     expect(freeArea(frame, VP)).toEqual(RAIL);
+  });
+});
+
+describe("FR-SHELL-44 freeAreas", () => {
+  const init = { x: 1028, y: 60, w: 400, h: 500 };
+  const log = { x: 68, y: 584, w: 460, h: 240 };
+  const contains = (a: Rect, b: Rect) =>
+    a.x <= b.x && a.y <= b.y && a.x + a.w >= b.x + b.w && a.y + a.h >= b.y + b.h;
+  const overlaps = (a: Rect, b: Rect) =>
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+  test("FR-SHELL-44 freeAreas: every maximal free rectangle ≥ 320×240, largest first", () => {
+    expect(freeAreas([], VP)).toEqual([RAIL]);
+    // Left of Initiative (full height) and below it (full width); the 12 px above it is too low.
+    expect(freeAreas([init], VP)).toEqual([
+      { x: 68, y: 48, w: 960, h: 788 },
+      { x: 68, y: 560, w: 1372, h: 276 },
+    ]);
+    const areas = freeAreas([init, log], VP);
+    expect(areas[0]).toEqual({ x: 68, y: 48, w: 960, h: 536 });
+    expect(areas).toContainEqual({ x: 528, y: 48, w: 500, h: 788 }); // between log and Initiative
+    expect(areas).toContainEqual({ x: 528, y: 560, w: 912, h: 276 }); // right of the log
+    for (const [i, a] of areas.entries()) {
+      expect(a.w >= 320 && a.h >= 240).toBe(true);
+      expect(overlaps(a, init) || overlaps(a, log)).toBe(false);
+      expect(contains(RAIL, a)).toBe(true);
+      // Maximal: no other candidate contains it; sorted by area.
+      for (const b of areas) if (b !== a) expect(contains(b, a)).toBe(false);
+      const prev = areas[i - 1];
+      if (prev) expect(prev.w * prev.h).toBeGreaterThanOrEqual(a.w * a.h);
+    }
+  });
+
+  test("FR-SHELL-44 freeAreas: at most 16, ties → the higher, then the more left one", () => {
+    // A staggered grid of small windows leaves more than 16 maximal rectangles: the 16 largest.
+    const dots: Rect[] = [];
+    for (let i = 0; i < 5; i++)
+      for (let j = 0; j < 4; j++)
+        dots.push({ x: 68 + 330 * i + (j % 2) * 165, y: 48 + 250 * j, w: 10, h: 10 });
+    const many = freeAreas(dots, VP);
+    expect(many.length).toBe(FREE_AREAS_MAX);
+    const sizes = many.map((r) => r.w * r.h);
+    expect(sizes).toEqual([...sizes].sort((a, b) => b - a));
+    const band = { x: 0, y: 418, w: 1440, h: 48 };
+    expect(freeAreas([band], VP)).toEqual([
+      { x: 68, y: 48, w: 1372, h: 370 },
+      { x: 68, y: 466, w: 1372, h: 370 },
+    ]);
+  });
+
+  test("FR-SHELL-44 freeArea (FR-SHELL-34) is the first of them, or its fallback", () => {
+    const cases: Rect[][] = [
+      [],
+      [init],
+      [init, log],
+      [{ x: 0, y: 48, w: 200, h: 788 }],
+      [{ x: 0, y: 418, w: 1440, h: 48 }],
+      [{ x: -100, y: 300, w: 2000, h: 300 }],
+      [{ x: 0, y: 248, w: 1440, h: 700 }],
+    ];
+    let fellBack = 0;
+    for (const rects of cases) {
+      const area = freeArea(rects, VP);
+      const first = freeAreas(rects, VP)[0];
+      // The fallback (too small a free area → the whole area right of the rail) is freeArea's own.
+      if (rects.length > 0 && JSON.stringify(area) === JSON.stringify(RAIL)) {
+        fellBack += 1;
+        continue;
+      }
+      expect(first).toEqual(area);
+    }
+    expect(fellBack).toBe(1);
   });
 });
 

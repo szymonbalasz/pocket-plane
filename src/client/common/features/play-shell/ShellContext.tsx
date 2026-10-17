@@ -23,7 +23,8 @@ import {
   type ShellAlert,
 } from "./alerts";
 import { browserAudioContext, createAudioEngine } from "./audio";
-import type { WindowAction } from "./manager";
+import { contentHeights } from "./content-heights";
+import type { OpenBy, WindowAction } from "./manager";
 import { availableKinds, type WindowRegistry } from "./registry";
 import { createShellController, type ShellController, type ShellState } from "./shell-store";
 import { browserSoundSettingsStorage, soundKey } from "./sound-settings";
@@ -48,6 +49,7 @@ export function ShellProvider({
       storage: browserLayoutStorage(),
       viewport: browserViewport,
       avoid: () => tokenScreenBoxes("all"),
+      heights: (id) => contentHeights().get(id),
     }),
   );
   const you = useSync((s) => s.store.you);
@@ -172,12 +174,15 @@ export function useWindowDispatch(): (action: WindowAction) => void {
 
 /**
  * Feature API (SHELL §9): open a window by kind (and instance, `main` in MVP), or bring it to
- * front / restore it. Passes no data; the window reads the synced store itself.
+ * front / restore it. Passes no data; the window reads the synced store itself. `by` (FR-SHELL-08)
+ * defaults to `"user"` (click-driven: the stored spot); a feature opening a window on its own
+ * passes `"feature"` (never over another window, FR-SHELL-41).
  */
-export function useOpenWindow(): (kind: string, instance?: string) => void {
+export function useOpenWindow(): (kind: string, instance?: string, opts?: { by?: OpenBy }) => void {
   const dispatch = useWindowDispatch();
   return useCallback(
-    (kind: string, instance?: string) => dispatch({ type: "open", kind, instance }),
+    (kind: string, instance?: string, opts?: { by?: OpenBy }) =>
+      dispatch({ type: "open", kind, instance, by: opts?.by ?? "user" }),
     [dispatch],
   );
 }
