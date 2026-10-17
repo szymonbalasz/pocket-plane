@@ -8,6 +8,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
+import { showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 async function idByName(scope: Locator, name: string): Promise<string> {
@@ -45,9 +46,8 @@ async function viewAmbush(dm: Page, player: Page, ambush: string) {
     .first()
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
-  // Already shown (an earlier test on this server) → no button.
-  const show = dm.getByTestId("map-show-to-players");
-  if (await show.isVisible()) await show.click();
+  // Already shown (an earlier test on this server) → no click.
+  await showToPlayers(dm, "Goblin Ambush");
   await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
   await scenes.getByTestId("ui-window-close").click();
 }

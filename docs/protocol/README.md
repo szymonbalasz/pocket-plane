@@ -400,7 +400,7 @@ DM always `full`. Generic record changes only ([ADR-0021](../architecture/adr/00
 
 | Intent | Roles | Payload | Ownership / authorize | Result | Source |
 |---|---|---|---|---|---|
-| `map.activateScene` | DM | `{sceneId}` | Scene in `ctx.campaignId` | | [FR-MAP-06](../specs/scenes-map.md#6-functional-requirements) |
+| `map.activateScene` | DM | `{sceneId}` | Scene in `ctx.campaignId` | | [FR-MAP-06](../specs/scenes-map.md#6-functional-requirements); *(sprint 4)* sent from the Scenes window row / menu, no wire change ([FR-MAP-51](../specs/scenes-map.md#6-functional-requirements)) |
 | `map.setSceneMap` | DM | `{sceneId, mapAssetId}` | `assets.require`; locked → `conflict` | | [FR-MAP-09](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-11](../specs/scenes-map.md#6-functional-requirements) |
 | `map.setGrid` | DM | `{sceneId, cellSize, offsetX, offsetY, visible, color, opacity}` | Bounds FR-MAP-10; locked → `conflict` | | [FR-MAP-10](../specs/scenes-map.md#6-functional-requirements) |
 | `map.setLocked` | DM | `{sceneId, locked}` | Scene in campaign | | FR-MAP-11 |

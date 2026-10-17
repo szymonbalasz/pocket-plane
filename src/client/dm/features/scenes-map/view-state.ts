@@ -1,4 +1,5 @@
-// DM client-only map state (FR-MAP-08, -10): viewed scene, grid preview. Selection: `./selection`.
+// DM client-only map state (FR-MAP-08, -10, -51): viewed scene, grid preview, Scenes row focus.
+// Selection: `./selection`.
 import { sceneOrder } from "@shared/scenes-map/geometry";
 import type { SceneFolderRecord, SceneRecord } from "@shared/scenes-map/schemas";
 import type { EffectiveGrid } from "@ui/features/scenes-map/canvas-context";
@@ -9,15 +10,20 @@ interface DmMapState {
   viewedSceneId: string | null;
   /** Local grid preview (FR-MAP-10): never sent until Save. */
   gridDraft: { sceneId: string; grid: EffectiveGrid } | null;
+  /** FR-MAP-51: a Scenes row to scroll into view and focus once it renders; taken once. */
+  rowFocus: string | null;
   view(sceneId: string | null): void;
   setGridDraft(d: { sceneId: string; grid: EffectiveGrid } | null): void;
+  focusRow(sceneId: string | null): void;
 }
 
 export const useDmMap = create<DmMapState>((set) => ({
   viewedSceneId: null,
   gridDraft: null,
+  rowFocus: null,
   view: (viewedSceneId) => set({ viewedSceneId }),
   setGridDraft: (gridDraft) => set({ gridDraft }),
+  focusRow: (rowFocus) => set({ rowFocus }),
 }));
 
 /**
