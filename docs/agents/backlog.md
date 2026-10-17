@@ -22,6 +22,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-14 | `combat-tracker/limits.test.ts` "40-char attack name + bludgeoning: label cut to 60" fails intermittently in full `check` runs (twice; passes alone) | S | combat-tracker test | none | combat lock | done (#235) |
 | BL-15 | The "Alt: adjust in tray" hint is missing on roll buttons outside the sheet: death saves and concentration (combat-extras), the Initiative window, the game log roll bar (D4 report, sprint 3) | S | combat-extras, combat-tracker, dice-roll-log clients | none | combat client work | open |
 | BL-16 | `useRecords` in `src/client/common/sync/store.ts` builds a fresh array every render despite its "stable array per store version" comment: any memo / effect keyed on it can loop (C3 found React #185 in the Encounters editor during an import, fixed locally there) | S | sync store (shared core) | none | live-sync / store work | open |
+| BL-17 | **A-tier (DM, sprint-3 feedback #4):** players and the DM pick a colour; it carries through to their laser pointer, drawing tools, pings, templates, and appears in log lines and notifications | M | campaign-management (player record), scenes-map pointers, scene-tools templates, dice-roll-log / notifications views | new field + spec note (player-colour); needs a small spec | — | open (A-tier) |
 
 ## How to add items
 
