@@ -1,6 +1,7 @@
 // Per-client camera (FR-MAP-12): pan/zoom never sent. Map px → screen px = p × scale + (x, y).
 // A scene opens framed in the free area (FR-MAP-44, R1), never below a readable cell (FR-MAP-46);
 // a viewport resize refits while fitted (FR-MAP-47); BL-01: the map then pans to fill the canvas.
+// FR-MAP-58: "the free area" is the candidate free rectangle the tokens fit best (`bestFreeRect`).
 import { footprint, type Grid } from "@shared/scenes-map/geometry";
 import type { TokenSize } from "@shared/scenes-map/schemas";
 import { TOP_BAR_H } from "../play-shell/geometry";
@@ -95,6 +96,79 @@ export const FIT_MIN_CELL_PX = 48;
 /** A fit camera; `floor` = the FR-MAP-46 floor set the scale (`data-fit-floor`). */
 export interface Fit extends Camera {
   floor: boolean;
+}
+
+/** FR-MAP-44 (3): the scale fitting `box` into `free` minus the margin, capped at `cap`. */
+const fitScale = (box: Box, free: Box, cap: number) =>
+  clampScale(Math.min(cap, (free.w - 2 * FIT_MARGIN) / box.w, (free.h - 2 * FIT_MARGIN) / box.h));
+
+/** What the fit priority (V7 ruling) looks at per candidate: `fitContent`'s inputs, map px. */
+export interface FitPriority {
+  cell: number;
+  pcs: Box | null;
+  /** Every token's footprint this client has on the scene. */
+  tokens: readonly Box[];
+}
+
+const within = (p: { x: number; y: number }, r: Box) =>
+  p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h;
+
+/**
+ * FR-MAP-58: of the candidate free rectangles (FR-SHELL-44), the best for `box`. With `priority`
+ * each candidate is first fitted (`fitContent`) and ranked by the V7 fit priority: the PCs in it
+ * > the map's top row at or below the top bar > the most token centres on screen clear of every
+ * window (in some candidate); then the largest scale (FR-MAP-44's, capped by the whole-map fit
+ * into `work`, before the floor); ties → the larger area, then the higher, then the more left
+ * one. `area` = FR-SHELL-34's free area: when it isn't a candidate (its small-area fallback) or
+ * there are none, it is the only one.
+ */
+export function bestFreeRect(
+  box: Box,
+  areas: readonly Box[],
+  area: Box,
+  map: Size,
+  work: Size,
+  priority?: FitPriority,
+): Box {
+  const same = (a: Box) => a.x === area.x && a.y === area.y && a.w === area.w && a.h === area.h;
+  if (box.w <= 0 || box.h <= 0 || !areas.some(same)) return area;
+  const cap = fitCamera(map, work).scale;
+  const rank = (a: Box): number[] => {
+    const s = fitScale(box, a, cap);
+    if (!priority) return [s];
+    const { cell, pcs, tokens } = priority;
+    const cam = fitContent(box, a, map, work, cell, pcs);
+    const pcsIn =
+      !pcs ||
+      (cam.x + pcs.x * cam.scale >= a.x - 1e-6 &&
+        cam.y + pcs.y * cam.scale >= a.y - 1e-6 &&
+        cam.x + (pcs.x + pcs.w) * cam.scale <= a.x + a.w + 1e-6 &&
+        cam.y + (pcs.y + pcs.h) * cam.scale <= a.y + a.h + 1e-6);
+    const shown = tokens.filter((t) => {
+      const c = {
+        x: cam.x + (t.x + t.w / 2) * cam.scale,
+        y: cam.y + (t.y + t.h / 2) * cam.scale,
+      };
+      return areas.some((r) => within(c, r));
+    }).length;
+    return [pcsIn ? 1 : 0, cam.y >= TOP_BAR_H - 1e-6 ? 1 : 0, shown, s];
+  };
+  let best = area;
+  let bestRank = rank(area);
+  for (const a of areas) {
+    const r = rank(a);
+    const i = r.findIndex((v, k) => Math.abs(v - (bestRank[k] ?? 0)) > 1e-9);
+    const better =
+      i >= 0
+        ? (r[i] ?? 0) > (bestRank[i] ?? 0)
+        : a.w * a.h > best.w * best.h ||
+          (a.w * a.h === best.w * best.h && (a.y < best.y || (a.y === best.y && a.x < best.x)));
+    if (better) {
+      best = a;
+      bestRank = r;
+    }
+  }
+  return best;
 }
 
 /**
@@ -196,9 +270,7 @@ export function fitContent(
   if (box.w <= 0 || box.h <= 0 || free.w <= 0 || free.h <= 0) {
     return { x: free.x, y: free.y, scale: Math.max(cap, min), floor: min > cap };
   }
-  const fits = clampScale(
-    Math.min(cap, (free.w - 2 * FIT_MARGIN) / box.w, (free.h - 2 * FIT_MARGIN) / box.h),
-  );
+  const fits = fitScale(box, free, cap);
   const floor = fits < min;
   const scale = floor ? min : fits;
   const view = { x: RAIL_CLEAR, y: TOP_BAR_H, w: Math.max(1, work.w - RAIL_CLEAR), h: work.h };

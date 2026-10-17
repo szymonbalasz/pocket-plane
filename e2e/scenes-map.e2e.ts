@@ -148,7 +148,10 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await expect.poll(async () => (await tokenNode(dm, wolf))?.opacity).toBeLessThan(1);
   await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", town);
 
-  // Reveal Wolf via the token menu.
+  // Reveal Wolf via the token menu. Close Scenes first: Fit keeps the top row (V7 priority), so
+  // Wolf may sit under it (closing never refits, FR-MAP-44).
+  await scenes.getByTestId("ui-window-close").click();
+  await expect(scenes).toBeHidden();
   const w = (await tokenNode(dm, wolf))!;
   await dm.mouse.click(w.x, w.y, { button: "right" });
   await expect(dm.getByTestId("map-token-menu")).toBeVisible();

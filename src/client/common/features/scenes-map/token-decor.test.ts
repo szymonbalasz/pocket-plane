@@ -2,6 +2,12 @@
 import { describe, expect, test } from "bun:test";
 import { emptyStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
+import {
+  TOKEN_TRIGGER_ID,
+  type TriggerChip,
+  tokenTriggerIcon,
+} from "../effect-modifiers/trigger-badges";
+import { chipGlyph } from "./canvas-icons";
 import { decorateToken } from "./decorations";
 import { BAR_INSET, barGeometry, ICONS_MAX, iconRow, iconText } from "./token-decor";
 import type { TokenIcon, TokenOverlay, TokenOverlayView } from "./token-overlays";
@@ -112,5 +118,81 @@ describe("OQ-CBTX-21 token overlay bar + icons", () => {
     expect(iconText("bless")).toBe("Bl");
     expect(iconText("X")).toBe("X");
     expect(iconText("  ")).toBe("?");
+  });
+
+  test('FR-CBTX-29 hover tooltip per icon (its label); "+N" lists the hidden ones; muted flag carried', () => {
+    const row = iconRow(100, [
+      ...["a", "b", "c", "d"].map((v) => icon(v)),
+      icon("e", "Poisoned"),
+      { ...icon("f", "Bless"), muted: true },
+    ]);
+    expect(row.items.map((c) => c.tip)).toEqual(["a", "b", "c", "d"]);
+    expect(row.items.every((c) => c.muted === false)).toBe(true);
+    expect(row.more?.tip).toBe("Poisoned\nBless");
+    expect(iconRow(100, [{ ...icon("x"), muted: true }]).items[0]?.muted).toBe(true);
+  });
+});
+
+describe("FR-MAP-57 generic icon restyle (seams S9)", () => {
+  const chip = (name: string, state: TriggerChip["state"]): TriggerChip => ({
+    id: `ts-${name}`,
+    triggerId: `trg-${name}`,
+    name,
+    uses: null,
+    state,
+    muted: state === "used",
+    down: false,
+    tooltip: state === "used" ? "Used this turn" : "Ready",
+  });
+  const overlays = (chips: TriggerChip[]): TokenOverlay[] => [
+    {
+      id: "cbtx",
+      decorate: () => ({ icons: [icon("prone", "Prone"), icon("poisoned", "Poisoned")] }),
+    },
+    {
+      id: "mod-triggers",
+      decorate: () => {
+        const i = tokenTriggerIcon(chips);
+        return i ? { icons: [i] } : null;
+      },
+    },
+  ];
+
+  test("FR-MAP-57 keeps R's trigger icon: its id, icon, place (last in the row), glyph and hover tooltip; muted when every trigger is used", () => {
+    const ready = decorateToken(
+      overlays([chip("Divine Fury", "ready"), chip("Sneak Attack", "used")]),
+      t,
+      emptyStore(),
+      view,
+    );
+    const row = iconRow(70, ready.icons);
+    const r = row.items.at(-1);
+    expect(r?.icon).toMatchObject({ id: TOKEN_TRIGGER_ID, icon: "zap", value: "ready" });
+    // Third in the row, after the effect icons, at the same step as before the restyle.
+    expect(row.items.map((c) => c.icon.id)).toEqual([
+      "test-token-effect",
+      "test-token-effect",
+      TOKEN_TRIGGER_ID,
+    ]);
+    expect(r?.x).toBeCloseTo(
+      (row.items[1]?.x ?? 0) + (row.items[1]?.x ?? 0) - (row.items[0]?.x ?? 0),
+    );
+    expect(r?.text).toBe("↯");
+    expect(r?.tip.split("\n")).toEqual([
+      "↯ Triggers",
+      "Divine Fury — ready",
+      "Sneak Attack — used this turn",
+    ]);
+    expect(r?.muted).toBe(false);
+    // Every trigger used: the same icon in the muted tone.
+    const used = decorateToken(overlays([chip("Divine Fury", "used")]), t, emptyStore(), view);
+    const u = iconRow(70, used.icons).items.at(-1);
+    expect(u?.icon).toMatchObject({ id: TOKEN_TRIGGER_ID, value: "used" });
+    expect(u?.muted).toBe(true);
+    // As a badge chip its icon draws as lightning (canvas path), not a letter.
+    expect("path" in chipGlyph("zap", "Triggers")).toBe(true);
+    // Counts toward the 4 icons + "+N": placed last, so it is the one that overflows.
+    const crowded = iconRow(70, [...["a", "b", "c", "d"].map((v) => icon(v)), ...ready.icons]);
+    expect(crowded.more?.tip.split("\n").at(-3)).toBe("↯ Triggers");
   });
 });
