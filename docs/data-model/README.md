@@ -1640,3 +1640,16 @@ From [fog-of-war](../specs/fog-of-war.md) FR-FOG-53 / -54, [scenes-map](../specs
 | Sight preview store | client memory, per canvas | `local {tokenId, see, dark} \| null`, `remote: tokenId → {see, dark}` | — | FR-FOG-54 |
 
 - **Derived (never stored):** the drawn sight = the owner's `vision` with the previewed token's polygons swapped (`previewVision`).
+
+## 58. Sprint 4: drag path and combat trail (M2)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-52–55. **Built by `build/drag-path`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent. Protocol side: [protocol §75](../protocol/README.md#75-sprint-4-drag-path-and-combat-trail-m2).
+
+| Piece | Kind | Contents | Visibility | Source |
+|---|---|---|---|---|
+| Drag path | derived per render | `dragPath(from, to)` from the drag state (dragger) or the preview (receivers) | `pathShown`: DM every token's; players player tokens they hold | FR-MAP-52, -53 |
+| Trails | client memory, per canvas (`previews.trails`) | `TrailState {key: "encounter:round:turn" \| null, byToken: tokenId → Cell[][]}` | as the path | FR-MAP-54 |
+| Known cells | client memory, per canvas | tokenId → the stored cell before the next frame (the move's start) | — | FR-MAP-54 |
+
+- **Lost on reload or reconnect** (snapshot) mid-turn: accepted (FR-MAP-54).
+- **Fixtures:** none new; `map-tools` (§56) has every token the walkthrough drags (Mira, Thorn, Goblin Sneak, the fog-hidden Goblin).
