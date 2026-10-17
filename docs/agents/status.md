@@ -19,9 +19,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
 | R S4-1a weapon rows | merged 9859252 | — | Done (walkthrough 6/6; main check 3174, e2e 95 green) | S4-2 next |
 | R S4-1b weapon combat + BL-10 | merged | — | Done (walkthrough 8/8; check 3138, e2e 92) | — |
-| R S4-5 Divine Fury log line | `fix/fury-log-line` (w5M, slot 2) | test-fury-log-line | Walkthrough (check 3153, e2e 93) | Merge |
+| R S4-5 Divine Fury log line | `fix/fury-log-line` (w5M, slot 2) | — | Walkthrough 9/9; merged main (apply-hook conflict kept both), branch gates running | Merge |
 | R S4-3 trigger state + tray | merged e3e203b | — | Done (walkthrough 8/8; check 3185, e2e 96) | — |
-| R S4-4 badges, S4-2 negative uses | — | — | Queued (briefs ready) | Next free slots |
+| R S4-4 trigger badges | `build/trigger-badges` (w5Y, slot 5) | build-trigger-badges | Building | Walkthrough |
+| R S4-2 negative uses | — | — | Queued (brief ready) | Next free slot |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
