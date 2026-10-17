@@ -54,7 +54,8 @@ export interface TokenBar {
 
 /**
  * A small icon in a row below the bar, top-left (FR-CBTX-29). At most 4 are drawn, then "+N".
- * Konva `name` = `id`, `id` attr = token id, attrs `value`, `icon`, `tone`, `label`.
+ * Konva `name` = `id`, `id` attr = token id, attrs `value`, `icon`, `tone`, `label`, `muted`;
+ * hovering it shows `label` as a tooltip (FR-MAP-57, S9).
  */
 export interface TokenIcon {
   /** Test id; Konva `name` of the icon. */
@@ -62,10 +63,12 @@ export interface TokenIcon {
   /** Icon name (lucide); kept as an attribute, drawn as the label's initials. */
   icon: string;
   tone: TokenBadge["tone"];
-  /** Full text (hover / tests); also the source of the drawn initials, e.g. "Exhaustion 2" → "E2". */
+  /** Full text (hover tooltip / tests); also the source of the drawn initials, e.g. "Exhaustion 2" → "E2". */
   label: string;
   /** Konva attr `value`, e.g. a condition key (`data-value` for tests). */
   value?: string;
+  /** Drawn in the muted tone whatever `tone` says, e.g. a trigger with every use spent (FR-CBTX-53). */
+  muted?: boolean;
 }
 
 /**
@@ -82,7 +85,10 @@ export interface TokenCue {
 export interface TokenDecoration {
   /** Token group opacity × 0.5 (the label row stays at full opacity). */
   dim?: boolean;
-  /** In rows above the name, inside the footprint, overflow as "+N", on the labels layer (FR-MAP-43, BL-04). */
+  /**
+   * In rows above the name, inside the footprint, overflow as "+N", on the labels layer (FR-MAP-43,
+   * BL-04); one whose label doesn't fit is an icon chip (`icon`) with the label on hover (FR-MAP-57).
+   */
   badges?: readonly TokenBadge[];
   /** Replaces the selection ring. */
   ring?: "target";

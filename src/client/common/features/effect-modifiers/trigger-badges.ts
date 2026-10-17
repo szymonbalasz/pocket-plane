@@ -122,17 +122,19 @@ const ready = (t: TriggerChip) => t.state === "ready" || (t.state === "uses" && 
 
 /**
  * FR-CBTX-53: one lightning icon for the token's triggers, or null. `value` = `ready` while any
- * is ready, else `used` (muted). Its label is the hover list; the icon row draws a label's first
- * glyph, so it leads with "↯" (the lightning) until M5's icon chips draw `icon` itself.
+ * is ready, else `used` (drawn muted, FR-MAP-57). Its label is the hover tooltip; the icon row
+ * draws a label's first glyph, so it leads with "↯" (the lightning).
  */
 export function tokenTriggerIcon(chips: readonly TriggerChip[]): TokenIcon | null {
   if (chips.length === 0) return null;
+  const anyReady = chips.some(ready);
   return {
     id: TOKEN_TRIGGER_ID,
     icon: "zap",
     tone: "neutral",
     label: ["↯ Triggers", ...chips.map(triggerLine)].join("\n"),
-    value: chips.some(ready) ? "ready" : "used",
+    value: anyReady ? "ready" : "used",
+    muted: !anyReady,
   };
 }
 

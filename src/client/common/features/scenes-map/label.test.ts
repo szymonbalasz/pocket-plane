@@ -7,12 +7,18 @@ import {
   crossGeometry,
   cutToWidth,
   ELLIPSIS,
+  hoverTarget,
+  LABEL_GAP_PX,
   LABEL_MIN_SCREEN_FONT,
   LABEL_PILL_SHARE,
+  type LabelBox,
   labelMetrics,
   labelRow,
+  layoutLabels,
   type Measure,
   MORE_BADGE_ID,
+  namePill,
+  pillRect,
 } from "./label";
 import { LAYER_ORDER, orderLayers } from "./layers";
 import type { TokenOverlay, TokenOverlayView } from "./token-overlays";
@@ -145,7 +151,7 @@ describe("FR-MAP-42 label", () => {
     expect(overlaps(dying, thorn.name, 0, 0)).toBe(false);
   });
 
-  test("FR-MAP-43 BL-04 many badges wrap into rows upwards; a badge wider than the footprint is cut", () => {
+  test("FR-MAP-57 many badges wrap into rows upwards; a badge whose text doesn't fit is an icon chip, never cut text", () => {
     const r = labelRow(
       "Elite Goblin Warrior",
       [
@@ -167,19 +173,34 @@ describe("FR-MAP-42 label", () => {
       expect(b.x + b.width).toBeLessThanOrEqual(70 + 1e-9);
     }
     const long = r.badges.find((b) => b.id === "x-long");
-    expect(long?.text.endsWith(ELLIPSIS)).toBe(true);
+    // An icon chip: 16 screen px square, no text, centred on its row; nothing is ever cut.
+    expect(long).toMatchObject({ compact: true, text: "", width: 16, height: 16 });
+    expect(r.badges.some((b) => b.text.endsWith(ELLIPSIS))).toBe(false);
+    // Centred on a badge row: k rows (pill + gap each) above the name.
+    const rowTop = (long?.y ?? 0) + (long?.height ?? 0) / 2 - r.name.height / 2;
+    const k = (r.name.y - rowTop) / (r.name.height + r.font * 0.3);
+    expect(k).toBeCloseTo(Math.round(k));
+    expect(Math.round(k)).toBeGreaterThanOrEqual(1);
     // Registry order kept.
     expect(r.badges.map((b) => b.id)).toEqual(["cbtx-token-death", "fog-token-fogged", "x-long"]);
   });
 
-  test("FR-MAP-43 BL-04 at 48 px cells three badges never rise above the footprint: the rest collapses into '+N' (walkthrough F1)", () => {
+  test("FR-MAP-43 BL-04 at 48 px cells badges never rise above the footprint: the rest collapses into '+N' (walkthrough F1; FR-MAP-57 chips)", () => {
     const scale = 48 / 70;
     const three = [
       { id: "cbt-token-out", label: "Out" },
       { id: "fog-token-fogged", label: "Fog" },
       { id: "vis-token-invisible", label: "Invisible" },
     ];
-    const r = labelRow("Goblin 3", three, 70, 70, scale, measure);
+    // FR-MAP-57: Invisible is an icon chip now, so all three fit in two rows.
+    const chips = labelRow("Goblin 3", three, 70, 70, scale, measure);
+    expect(chips.badges.map((b) => [b.id, b.compact === true])).toEqual([
+      ["cbt-token-out", false],
+      ["fog-token-fogged", false],
+      ["vis-token-invisible", true],
+    ]);
+    const four = [...three, { id: "x-hex", label: "Hex" }];
+    const r = labelRow("Goblin 3", four, 70, 70, scale, measure);
     const above = labelRow("Goblin 5", [], 70, 70, scale, measure);
     for (const b of r.badges) {
       // Inside the footprint, and clear of the upper neighbour's name (one cell up).
@@ -189,14 +210,14 @@ describe("FR-MAP-42 label", () => {
       expect(overlaps(b, above.name, 0, -70) ? `${b.id} covers the name above` : "ok").toBe("ok");
       expect(overlaps(b, r.name, 0, 0)).toBe(false);
     }
-    // Two rows fit: Out, then "+2" (Fog + "+1" is wider than the footprint), registry order.
+    // Two rows fit: Out, then "+3" (Fog + "+1" is wider than the footprint), registry order.
     expect(r.badges.map((b) => b.id)).toEqual(["cbt-token-out", MORE_BADGE_ID]);
     const more = r.badges[1];
-    expect(more?.text).toBe("+2");
-    expect(more?.full).toBe("Fog, Invisible");
+    expect(more?.text).toBe("+3");
+    expect(more?.full).toBe("Fog, Invisible, Hex");
     expect(r.badges[0]?.full).toBeUndefined();
-    // At 70 px cells (scale 1) the font is smaller: all three fit, no "+N".
-    const big = labelRow("Goblin 3", three, 70, 70, 1, measure);
+    // At 70 px cells (scale 1) the font is smaller: all four fit, no "+N".
+    const big = labelRow("Goblin 3", four, 70, 70, 1, measure);
     expect(big.badges.some((b) => b.id === MORE_BADGE_ID)).toBe(false);
     for (const b of big.badges) expect(b.y).toBeGreaterThanOrEqual(big.font * 0.6);
   });
@@ -249,5 +270,95 @@ describe("FR-MAP-43 cross", () => {
     expect(d.dim).toBe(true);
     expect(errors).toEqual(["boom"]);
     expect(decorateToken([], t, emptyStore(), view).cross).toBeNull();
+  });
+});
+
+describe("FR-MAP-56 label collisions", () => {
+  // `mt-crowd` on the 70 px battlemap at the DM's 1440×900 fit (scale 0.72): Goblin Sneak (4, 9),
+  // Goblin Sneak 2 (5, 9) side by side, Crypt Ogre (Large) at (4, 10) below them.
+  const scale = 0.72;
+  const cell = 70;
+  const m = labelMetrics(cell, scale);
+  const gap = LABEL_GAP_PX / scale;
+  const box = (id: string, name: string, col: number, row: number, n = 1): LabelBox => ({
+    id,
+    x: col * cell,
+    bottom: (row + n) * cell,
+    side: n * cell,
+    width: namePill(name, 2 * n * cell, m, measure).width,
+  });
+  const sneak = box("sneak", "Goblin Sneak", 4, 9);
+  const sneak2 = box("sneak-2", "Goblin Sneak 2", 5, 9);
+  const ogre = box("ogre", "Crypt Ogre", 4, 10, 2);
+  const lurker = box("lurker", "Goblin Lurker the Long", 17, 11);
+  const disjoint = (a: ReturnType<typeof pillRect>, b: ReturnType<typeof pillRect>) =>
+    a.x + a.w + gap <= b.x + 1e-9 || b.x + b.w + gap <= a.x + 1e-9;
+
+  test("FR-MAP-56 label layout: colliding neighbours are both cut to their footprint with …; the rest keep up to 2 × theirs", () => {
+    // Both wider than a cell: at full width the pills overlap.
+    expect(sneak.width).toBeGreaterThan(cell);
+    expect(
+      disjoint(pillRect(sneak, sneak.width, m.pillH), pillRect(sneak2, sneak2.width, m.pillH)),
+    ).toBe(false);
+    const fits = layoutLabels([lurker, ogre, sneak2, sneak], m.pillH, gap);
+    expect(fits.get("sneak")).toEqual({ width: cell - gap, cut: true });
+    expect(fits.get("sneak-2")).toEqual({ width: cell - gap, cut: true });
+    // A row below (Crypt Ogre) and a lone label (wider than its cell) are not cut.
+    expect(fits.get("ogre")).toEqual({ width: ogre.width, cut: false });
+    expect(fits.get("lurker")).toEqual({ width: lurker.width, cut: false });
+    expect(lurker.width).toBeGreaterThan(cell);
+    // After the cut: the 4 px gap between them.
+    const a = pillRect(sneak, fits.get("sneak")?.width ?? 0, m.pillH);
+    const b = pillRect(sneak2, fits.get("sneak-2")?.width ?? 0, m.pillH);
+    expect(disjoint(a, b)).toBe(true);
+    expect(b.x - (a.x + a.w)).toBeCloseTo(gap);
+    // Drawn at that width: the text ends with "…" and fits it.
+    const row = labelRow("Goblin Sneak", [], cell, cell, scale, measure, cell - gap);
+    expect(row.name.text.endsWith(ELLIPSIS)).toBe(true);
+    expect(row.name.width).toBeLessThanOrEqual(cell - gap + 1e-9);
+    // Input order doesn't matter (laid out by row, then column).
+    expect([...layoutLabels([sneak, sneak2, ogre, lurker], m.pillH, gap)].sort()).toEqual(
+      [...fits].sort(),
+    );
+  });
+
+  test("FR-MAP-56 label layout: short neighbours (inside their footprints) and labels a row apart are never cut", () => {
+    const mira = box("mira", "Mira", 2, 7);
+    const thorn = box("thorn", "Thorn", 3, 7);
+    const below = box("below", "Goblin Sneak 2", 2, 8);
+    const fits = layoutLabels([mira, thorn, below], m.pillH, gap);
+    for (const id of ["mira", "thorn", "below"]) expect(fits.get(id)?.cut).toBe(false);
+    // One long label next to a short one: only a real overlap cuts.
+    const long = box("long", "Goblin Sneak", 4, 7);
+    const far = box("far", "Mira", 6, 7);
+    expect(layoutLabels([long, far], m.pillH, gap).get("long")?.cut).toBe(false);
+  });
+
+  test("FR-MAP-56 hover: the label under the pointer (topmost first), else the token's footprint; drawn in full", () => {
+    const fits = layoutLabels([sneak, sneak2, ogre], m.pillH, gap);
+    const drawn = [sneak, sneak2, ogre].map((b) => ({ ...b, drawn: fits.get(b.id)?.width ?? 0 }));
+    // On Goblin Sneak's (cut) pill, on the grid line between rows 9 and 10.
+    expect(hoverTarget({ x: 4.5 * cell, y: 10 * cell }, drawn, m.pillH)).toBe("sneak");
+    // Inside Goblin Sneak 2's footprint, above the pills.
+    expect(hoverTarget({ x: 5.5 * cell, y: 9.4 * cell }, drawn, m.pillH)).toBe("sneak-2");
+    // Inside Crypt Ogre's footprint (the Sneaks' pills reach into its top edge).
+    expect(hoverTarget({ x: 5 * cell, y: 11 * cell }, drawn, m.pillH)).toBe("ogre");
+    expect(hoverTarget({ x: 10, y: 10 }, drawn, m.pillH)).toBeNull();
+    // Two full-width pills overlapping: the one drawn last (on top) wins.
+    const full = [sneak, sneak2].map((b) => ({ ...b, drawn: b.width }));
+    const overlap = { x: 5 * cell + 2, y: 10 * cell };
+    expect(hoverTarget(overlap, full, m.pillH)).toBe("sneak-2");
+    expect(hoverTarget(overlap, [...full].reverse(), m.pillH)).toBe("sneak");
+    // Hovered: the whole name, never cut (not even at 2 × the footprint).
+    const long = "Goblin Sneak the Unreasonably Long";
+    expect(labelRow(long, [], cell, cell, scale, measure).name.text.endsWith(ELLIPSIS)).toBe(true);
+    expect(labelRow(long, [], cell, cell, scale, measure, Number.POSITIVE_INFINITY).name.text).toBe(
+      long,
+    );
+  });
+
+  test("FR-MAP-56 labels (names and badge rows) draw above every token decoration: the labels Group follows the tokens in the objects layer", () => {
+    expect(LAYER_ORDER.labels).toBeGreaterThan(LAYER_ORDER.tokens);
+    expect(LAYER_ORDER.scnEdit).toBeGreaterThan(LAYER_ORDER.labels);
   });
 });
