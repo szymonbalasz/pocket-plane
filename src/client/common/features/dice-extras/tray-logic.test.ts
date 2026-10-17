@@ -3,6 +3,7 @@ import { toNotation } from "@shared/dice-roll-log/grammar";
 import {
   addDie,
   chipsOf,
+  type FreeFields,
   paletteRequest,
   previewMode,
   removeDie,
@@ -94,10 +95,10 @@ describe("FR-DICEX-17 throw zone", () => {
 });
 
 describe("BL-18 palette after a result", () => {
-  const notation = {
+  const notation: FreeFields = {
     expression: "1d12+5",
     mode: "normal" as const,
-    category: "skill" as const,
+    category: "damage" as const,
     label: "Notation test",
     actor: { combatantId: "c1" },
   };
