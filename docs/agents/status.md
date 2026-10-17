@@ -19,14 +19,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
 | R S4-1a weapon rows | merged 9859252 | — | Done (walkthrough 6/6; check 3154, e2e 94) | S4-2 next |
 | R S4-1b weapon combat + BL-10 | merged | — | Done (walkthrough 8/8; check 3138, e2e 92) | — |
-| R S4-5 Divine Fury log line | `fix/fury-log-line` (w5M, slot 2) | build-fury-log-line | Building | Walkthrough |
+| R S4-5 Divine Fury log line | `fix/fury-log-line` (w5M, slot 2) | build-fury-log-line | Finishing full e2e | Walkthrough |
 | R S4-3 trigger state + tray | `build/trigger-state` (w5K, slot 5) | build-trigger-state | Building | Walkthrough → S4-4 |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
 | M4 window placement | merged c308458 | — | Done (re-test 3 5/5; check 3097, e2e 91) | — |
-| D7 roll popup | `build/roll-popup` (w5J, slot 4) | build-roll-popup | Building (+ #247: ignore OS reduced motion) | Walkthrough |
+| D7 roll popup | `build/roll-popup` (w5J, slot 4) | test-roll-popup | Walkthrough (check, e2e green; popup chunk 4.5 KB; #247 in) | Merge |
 | Mc map-tools core | merged | — | Done (check 3109, e2e 91; drizzle duplicate-index fix) | M1 after V7 |
 
 ## Shared-file locks
