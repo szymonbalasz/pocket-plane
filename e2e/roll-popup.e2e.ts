@@ -4,7 +4,8 @@
 // = 1) in their toast region (players bottom-right, the DM top-centre), the roller too; C's big
 // throw rests on the server's face first (or shows flat chips without WebGL). At 1280×800 the
 // popup covers no window (toast keep-out, A11). Hover keeps it; a click fronts the Game log at the
-// entry. The DM's hidden roll pops only on the DM's side, eye-off, never big; players get nothing.
+// entry, highlighted for 2 s with no page error. The DM's hidden roll pops only on the DM's side,
+// eye-off, never big; players get nothing.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
@@ -111,12 +112,16 @@ test("FR-DICEX-39 FR-DICEX-40 FR-DICEX-41 a sheet roll pops on every client in i
   await popup2.hover();
   await p2.waitForTimeout(6_500);
   await expect(popup2).toHaveAttribute("data-state", "rest");
+  // Real timers: the highlight's native setTimeout must run unbound (FR-DICE-37, 2 s).
+  const errors: string[] = [];
+  p2.on("pageerror", (e) => errors.push(e.message));
   await popup2.getByTestId("dicex-popup-row").click();
   const log2 = p2.locator('[data-testid="ui-window"][data-record-id="dice.log:main"]');
   await expect(log2).toBeVisible();
-  await expect(
-    log2.locator(`[data-testid="dice-log-entry"][data-record-id="${entryId}"]`),
-  ).toHaveAttribute("data-focused", "true");
+  const focused = log2.locator(`[data-testid="dice-log-entry"][data-record-id="${entryId}"]`);
+  await expect(focused).toHaveAttribute("data-focused", "true");
+  await expect(focused).toHaveAttribute("data-focused", "false", { timeout: 4_000 });
+  expect(errors).toEqual([]);
 
   for (const page of [p1, p2, dm]) await page.context().close();
 });

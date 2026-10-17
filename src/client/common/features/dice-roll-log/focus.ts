@@ -32,7 +32,14 @@ export interface LogFocus {
   clear(seq: number): void;
 }
 
-export function createLogFocus(timers: LogFocusTimers = { setTimeout, clearTimeout }): LogFocus {
+// The browser's timers throw "Illegal invocation" when called with `this` = another object, so
+// the defaults call them unbound.
+const globalTimers: LogFocusTimers = {
+  setTimeout: (fn, ms) => setTimeout(fn, ms),
+  clearTimeout: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+};
+
+export function createLogFocus(timers: LogFocusTimers = globalTimers): LogFocus {
   const api = createStore<LogFocusState>()(() => ({ entryId: null, seq: 0 }));
   let timer: unknown = null;
   const clear = (seq: number) => {
