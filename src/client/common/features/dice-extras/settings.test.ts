@@ -1,7 +1,10 @@
 import { expect, test } from "bun:test";
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import {
   createSettingsStore,
   DEFAULT_SETTINGS,
+  DisplaySetting,
   effectiveDisplay,
   migrateV1,
   parseSettings,
@@ -62,14 +65,37 @@ test("FR-DICEX-36 settings v2: a v1 entry migrates once (3d → screen, flat / o
   expect(s.read(settingsKey("c1", "dm", null))).toEqual(DEFAULT_SETTINGS);
 });
 
-test("FR-DICEX-32 FR-DICEX-45 reduced motion or no WebGL → effective flat; flat / off unchanged", () => {
+test("FR-DICEX-32 no WebGL / failed chunk → effective flat; flat / off unchanged", () => {
   for (const d of ["screen", "zone"] as const) {
-    expect(effectiveDisplay(d, { reducedMotion: false, threeD: true })).toBe(d);
-    expect(effectiveDisplay(d, { reducedMotion: true, threeD: true })).toBe("flat");
-    expect(effectiveDisplay(d, { reducedMotion: false, threeD: false })).toBe("flat");
+    expect(effectiveDisplay(d, { threeD: true })).toBe(d);
+    expect(effectiveDisplay(d, { threeD: false })).toBe("flat");
   }
-  expect(effectiveDisplay("off", { reducedMotion: true, threeD: true })).toBe("off");
-  expect(effectiveDisplay("flat", { reducedMotion: false, threeD: true })).toBe("flat");
+  expect(effectiveDisplay("off", { threeD: true })).toBe("off");
+  expect(effectiveDisplay("flat", { threeD: true })).toBe("flat");
+});
+
+test("FR-DICEX-45 (#247) the OS reduced-motion preference is ignored: display modes as without it, no dice code reads it", () => {
+  const g = globalThis as { matchMedia?: unknown };
+  const before = g.matchMedia;
+  g.matchMedia = () => ({ matches: true });
+  try {
+    for (const d of DisplaySetting.options) {
+      expect(effectiveDisplay(d, { threeD: true })).toBe(d);
+    }
+  } finally {
+    g.matchMedia = before;
+  }
+  // No dice-extras module consults the preference or styles for it.
+  const dir = import.meta.dir;
+  const sources = readdirSync(dir, { recursive: true, encoding: "utf8" }).filter(
+    (f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f),
+  );
+  const hits = sources.filter((f) =>
+    /prefers-reduced-motion|motion-reduce:|reducedMotion/.test(
+      readFileSync(path.join(dir, f), "utf8"),
+    ),
+  );
+  expect(hits).toEqual([]);
 });
 
 test("FR-DICEX-36 storage round-trip; throwing / missing storage → memory", () => {

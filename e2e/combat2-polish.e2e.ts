@@ -445,6 +445,15 @@ async function settledToast(dm: Page, known: Set<string>) {
   return { toast, id, box: { x: box.x, y: box.y, w: box.width, h: box.height } };
 }
 
+/** Closes the page's roll popups (FR-DICEX-39) with their ✕. */
+async function closeRollPopups(page: Page) {
+  const close = page.locator(
+    '[data-testid="dicex-popup"]:not([data-state="closing"]) [data-testid="dicex-popup-close"]',
+  );
+  while ((await close.count()) > 0) await close.first().click();
+  await expect(page.getByTestId("dicex-popup")).toHaveCount(0);
+}
+
 for (const [width, height] of [
   [1440, 900],
   [1280, 720],
@@ -503,6 +512,9 @@ for (const [width, height] of [
     let card = first;
     let blocked = false;
     for (let attempt = 0; attempt < 3 && !blocked; attempt++) {
+      // The roll popups (FR-DICEX-39) sit over the map's top rows below the toasts: closed, so
+      // the cells under the toast's popup span stay grabbable.
+      await closeRollPopups(dm);
       // A monster the DM can grab (not under a window), the lowest one.
       const grabbable: Awaited<ReturnType<typeof monsters>> = [];
       for (const t of await monsters()) {

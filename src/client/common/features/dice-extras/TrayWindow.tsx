@@ -37,7 +37,6 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Switch,
   ToggleGroup,
   ToggleGroupItem,
 } from "../../components/ui/controls";
@@ -54,10 +53,8 @@ import {
   useRollControl,
 } from "../dice-roll-log/roll-control";
 import { FlatDie } from "./FlatDie";
-import { LookEditor } from "./LookEditor";
-import { useThreeD } from "./lazy3d";
 import { useOwnLook } from "./own-look";
-import { DisplaySetting, is3dDisplay, useDiceSettings } from "./settings";
+import { SettingsPanel } from "./SettingsPanel";
 import { diceExtras, type TrayRequest, useDiceExtras } from "./store";
 import { trayExtras } from "./tray-extras";
 import {
@@ -66,6 +63,7 @@ import {
   constantOfTerms,
   notationOf,
   PALETTE,
+  paletteRequest,
   previewMode,
   removeDie,
   setConstant,
@@ -258,24 +256,9 @@ function Extras({ request, mode }: { request: TrayRequest; mode: RollMode }) {
 
 const signed = (n: number) => (n === 0 ? "" : n > 0 ? `+${n}` : `−${-n}`);
 
-const DISPLAY_LABEL: Record<DisplaySetting, string> = {
-  screen: "Full screen",
-  zone: "Tray throw",
-  flat: "Flat",
-  off: "Off",
-};
-
-/**
- * FR-DICEX-36 / DICEX §7 settings popover: Display Full screen / Tray throw / Flat / Off,
- * "Show others' rolls", "Roll popups", "Dice look…". Reduced motion / no WebGL: the 3D modes are disabled
- * with the reason (the stored setting is kept, FR-DICEX-32).
- */
+/** FR-DICEX-36 / DICEX §7: the tray's gear → the settings popover. */
 function SettingsPopover() {
-  const { settings, display, reducedMotion, set } = useDiceSettings();
-  const threeD = useThreeD();
-  const live = useSync((s) => s.state === "live");
   const [pane, setPane] = useState<"settings" | "look">("settings");
-  const no3d = reducedMotion || !threeD.available;
   return (
     <Popover onOpenChange={(o) => !o && setPane("settings")}>
       <PopoverTrigger asChild>
@@ -294,72 +277,7 @@ function SettingsPopover() {
         side="bottom"
         className={cn("flex flex-col gap-3", pane === "look" ? "w-72" : "w-80")}
       >
-        {pane === "look" ? (
-          <LookEditor onBack={() => setPane("settings")} />
-        ) : (
-          <>
-            <div className="flex flex-col gap-1.5">
-              <p className="text-sm font-medium">Dice on this device</p>
-              <ToggleGroup
-                type="single"
-                aria-label="Dice display"
-                value={display}
-                onValueChange={(v) => {
-                  if (v) set({ display: v as DisplaySetting });
-                }}
-              >
-                {DisplaySetting.options.map((d) => (
-                  <ToggleGroupItem
-                    key={d}
-                    value={d}
-                    data-testid="dicex-settings-display"
-                    data-value={d}
-                    disabled={no3d && is3dDisplay(d)}
-                    className="h-7 px-2 text-xs"
-                  >
-                    {DISPLAY_LABEL[d]}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-              {(reducedMotion || threeD.reason) && (
-                <p data-testid="dicex-settings-3d-hint" className="text-xs text-muted-foreground">
-                  {reducedMotion
-                    ? "Reduced motion is on: dice show flat."
-                    : threeD.reason === "no-webgl"
-                      ? "3D unavailable on this device"
-                      : "3D dice couldn't load: dice show flat this session."}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Switch
-                id="dicex-settings-others"
-                data-testid="dicex-settings-others"
-                checked={settings.others}
-                onCheckedChange={(v) => set({ others: v })}
-              />
-              <label htmlFor="dicex-settings-others">Show others' rolls</label>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Switch
-                id="dicex-settings-popup"
-                data-testid="dicex-settings-popup"
-                checked={settings.popup}
-                onCheckedChange={(v) => set({ popup: v })}
-              />
-              <label htmlFor="dicex-settings-popup">Roll popups</label>
-            </div>
-            <Button
-              data-testid="dicex-look-open"
-              size="sm"
-              variant="outline"
-              disabled={!live}
-              onClick={() => setPane("look")}
-            >
-              Dice look…
-            </Button>
-          </>
-        )}
+        <SettingsPanel pane={pane} onPane={setPane} />
       </PopoverContent>
     </Popover>
   );
@@ -453,12 +371,15 @@ export function TrayWindow() {
     };
     diceExtras.api.setState({ request: { ...base, ...patch }, result: null });
   };
-  const setTerms = (terms: ReturnType<typeof addDie>) => {
+  const setTerms = (terms: ReturnType<typeof addDie>, fresh = false) => {
     const expression = notationOf(terms);
     lastValid.current = terms;
     setDraft(expression);
     setError(null);
-    update({ expression });
+    if (!fresh) return update({ expression });
+    // BL-18: a new roll after a result carries nothing of the old request.
+    const next = paletteRequest(free, expression, mode, true);
+    diceExtras.api.setState({ request: { kind: "free", ...next }, result: null });
   };
 
   // One RollControl for the staged request: `control` options verbatim (FR-DICEX-08 a) with the
@@ -625,9 +546,9 @@ export function TrayWindow() {
               className="h-7 px-2 font-mono text-xs"
               onClick={() => {
                 // After a result the palette starts a new roll; else it adds to the request.
-                const from = free && state !== "result" ? terms : [];
+                const fresh = state === "result" || !free;
                 diceExtras.api.setState({ result: null });
-                setTerms(addDie(from, f));
+                setTerms(addDie(fresh ? [] : terms, f), fresh);
               }}
             >
               d{f}

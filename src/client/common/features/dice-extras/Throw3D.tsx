@@ -1,21 +1,23 @@
-// A 3D throw run (FR-DICEX-14, -15, -20, -23, -34, -35), drawn by the lazy chunk's renderer on the
-// dice layer's one canvas at its arena rect (the viewport, or the zone's dice area). At its
-// hand-off / fade the rested dice are copied into a still on the layer that fades out (D7 flies
-// it into the popup). Dice data stays in the DOM for walkthroughs: one hidden `dicex-throw-die`
-// per 3D die with `data-settled` = the up-face read from the rendered mesh at rest. MOD / offered
-// dice get a label under the die at rest.
+// A 3D throw run (FR-DICEX-14, -15, -20, -23, -34, -35, -41), drawn by the lazy chunk's renderer
+// on the dice layer's one canvas at its arena rect (the viewport, or the zone's dice area). At its
+// hand-off the rested dice are copied into a still on the layer that shrinks and flies into its
+// popup's PiP (0.4 s), which keeps the pixels; with no popup on screen (or popups off) the still
+// fades out. Dice data stays in the DOM for walkthroughs: one hidden `dicex-throw-die` per 3D die
+// with `data-settled` = the up-face read from the rendered mesh at rest. MOD / offered dice get a
+// label under the die at rest.
 import type { DiceLook } from "@shared/dice-extras/looks";
 import { STYLE_LOOK } from "@shared/dice-extras/looks";
-import type { ThrowDie } from "@shared/dice-extras/throw";
+import { isMeshDie, type ThrowDie } from "@shared/dice-extras/throw";
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { type Arena, arenaOf, dieSizePx, screenArena, shadowsFor } from "./arena";
 import type { PlayHandle, Rect, RestInfo } from "./dice3d/index";
+import { rectOf } from "./layer-host";
 import { dice3d } from "./lazy3d";
+import { handoffSlot, rollPopups } from "./popups";
 import { diceExtras, type ThrowRun } from "./store";
 import { FADE_MS, HANDOFF_MS } from "./timing";
 
-/** A die the 3D renderer draws (a mesh die with a server value); the rest stay flat chips. */
-export const isMeshDie = (d: ThrowDie) => d.shape !== null && !d.flat && d.value !== null;
+export { isMeshDie };
 
 /** FR-DICEX-23: a median frame time above this switches the device to flat. */
 export const SLOW_FRAME_MS = 33;
@@ -115,6 +117,21 @@ export function useRun3D(
     layer.appendChild(s.canvas);
     const ms = run.phase === "handoff" ? HANDOFF_MS : FADE_MS;
     const el = s.canvas;
+    // FR-DICEX-35 / -41 a: shrink and fly into the popup's PiP, which keeps the pixels.
+    const target = run.phase === "handoff" ? handoffSlot(run.t.id) : null;
+    const to = target && rectOf(target.el);
+    if (target && to && to.w > 0 && to.h > 0) {
+      const k = Math.min(1, to.w / s.rect.w, to.h / s.rect.h);
+      const dx = to.x + (to.w - s.rect.w * k) / 2 - s.rect.x;
+      const dy = to.y + (to.h - s.rect.h * k) / 2 - s.rect.y;
+      el.style.transformOrigin = "0 0";
+      el.style.transition = `transform ${ms}ms ease-in-out`;
+      requestAnimationFrame(() => {
+        el.style.transform = `translate(${dx}px, ${dy}px) scale(${k})`;
+      });
+      setTimeout(() => rollPopups.still(target.id, "handoff", el), ms);
+      return;
+    }
     el.style.transition = `opacity ${ms}ms ease-in, transform ${ms}ms ease-in`;
     el.style.transformOrigin = "100% 100%";
     // Next frame: from the copied pixels to gone (D7 swaps this for the flight into its PiP).
@@ -122,7 +139,7 @@ export function useRun3D(
       el.style.opacity = "0";
       if (run.phase === "handoff") el.style.transform = "scale(0.6)";
     });
-  }, [run.phase, leaving, host]);
+  }, [run.phase, leaving, host, run.t.id]);
 
   return rest;
 }

@@ -1567,7 +1567,7 @@ Indexes `trigger_state_owner` (unique, above), `trigger_state_campaign` (`campai
 | `game_log_entry.roll_ids` (`cbt.attack`) | + the rolls of public character-trigger parts (S4-5) | — | as the entry | FR-MOD-57 |
 
 - **Relations:** Trigger state → encounter, combatant, rule trigger (cascade). **Derived:** `armed`, `charge` (S4-3 writes them in the causing transaction). **Persisted runtime state:** `trigger_state` rows.
-- **Fixtures** (`fixtures/units/effect-modifiers/`, MOD §13.1): `weapon-flame-tongue` (Brakka's Flame Tongue greatsword row: `2d6+4` slashing, `bonus` 1, `extraDamage` [`2d6` fire]), `mod-fire-ward` (campaign preset "Fire Ward", resistance fire, on Goblin), `uses-rage-spent` (Rage 0 / 3 left via `char.useResource`), `trg-mira-uses` (Mira's "Searing Strike" feature 1 / 2 left + its `every: {feature}` trigger, 1d8 fire, public). Bundle `rules-effects` (= `rule-triggers` + those four + `char-mira-full`) is test-local (`rules-effects.ts`) until S4-4 registers it.
+- **Fixtures** (`fixtures/units/effect-modifiers/`, MOD §13.1): `weapon-flame-tongue` (Brakka's Flame Tongue greatsword row: `2d6+4` slashing, `bonus` 1, `extraDamage` [`2d6` fire]), `mod-fire-ward` (campaign preset "Fire Ward", resistance fire, on Goblin), `uses-rage-spent` (Rage 0 / 3 left via `char.useResource`), `trg-mira-uses` (Mira's "Searing Strike" feature 1 / 2 left + its `every: {feature}` trigger, 1d8 fire, public). Bundle `rules-effects` (= `rule-triggers` + those four + `char-mira-full`) is registered in `fixtures/bundles/index.ts` *(built, build/trigger-badges)*; `loadRulesEffects` in the unit folder loads it for tests.
 - **CON-44** (#208; MOD's `con44.test.ts` + `con44-rules-effects.test.ts`, measured, max-length ASCII unless noted; realistic-heavy harness base DM 671,112 B, players max 280,928 B): attack rows (71, `bonus` 3 + 2 max parts), 20 cards with 2 extra parts at 12 dice, 30 damage roll entries with 2 extra part rolls (12 dice), 30 outcome lines with 2 `damageParts` + 1 trigger part with 20 dice (public and DM), 30 `hp_change.damageParts`: DM **+79,224 B** (game-log-entry +57,540, notification +9,720, entity +7,314, hp-change +4,650), players +51,712…+52,410 (game-log-entry +49,830). `trigger-state` realistic (52 rows, PC 2 + monster 1): DM 26,053 B, a player's own 2 rows 1,123 B; worst (196 rows, PC 6 + monster 4): DM 97,525 B, own 6 rows 3,335 B; worst with 40-char CJK names: DM 113,205 B, own 3,815 B. **Track R sprint 4:** realistic DM +105,259 → 776,371 B; worst +176,731 → 847,843 B; worst CJK +192,411 → **863,523 B** (185,053 B left of 1 MiB); players max **337,135 B** (+56,207; 187,153 B left of 512 KiB). MOD §12's proposed bounds (136 KiB / 32 KiB, from estimates) don't hold: the extra part roll items carry per-die objects (≈ 600 B per 12-dice part); the test bounds are the measurement (192 KiB DM / 60 KiB per player) pending a ruling. Worst card + 2 extra parts (12 dice): ASCII 3 offers 4,466 B, 2 offers 4,088 B (fits), 0 offers 3,319 B; CJK 0 offers 4,439 B (> 4 KB), + mod labels cut to 12 chars 3,467 B (fits). `rules-effects` vs `rule-triggers` end to end with CJK names (5 `trigger-state` rows): DM +4,280 B, player-1 +1,904 B, player-2 +749 B. **S4-5:** + the trigger part's roll id on each of the 30 outcome lines (entry `rollIds`): DM and players +1,170 B → worst CJK DM **864,673 B**, players max **338,287 B**.
 
 ## 52. Sprint 4: map-tools core (Mc)
@@ -1641,9 +1641,18 @@ From [fog-of-war](../specs/fog-of-war.md) FR-FOG-53 / -54, [scenes-map](../specs
 
 - **Derived (never stored):** the drawn sight = the owner's `vision` with the previewed token's polygons swapped (`previewVision`).
 
-## 58. Sprint 4: drag path and combat trail (M2)
+## 58. Sprint 4: roll popup (D7)
 
-From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-52–55. **Built by `build/drag-path`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent. Protocol side: [protocol §75](../protocol/README.md#75-sprint-4-drag-path-and-combat-trail-m2).
+From [dice-extras](../specs/dice-extras.md#8-data-model) (FR-DICEX-09, -38–41; [ADR-0048](../architecture/adr/0048-dice-display.md)). **Built by `build/roll-popup`**: no table, column, record type, event, intent or payload change. Protocol side: [protocol §75](../protocol/README.md#75-sprint-4-roll-popup-d7).
+
+- **Client memory only** (`dice-extras/popups.ts`): roll popups `{id (first entry id), seq, entries (the frame's received roll entries), t (throwDice of them), looks, hidden, bigId, parts {handoff?, play? : {ids, state: moving | rest, chips}}, stills {handoff?, play? : 2D canvas}, state: rolling | rest | closing, hovered}`, ≤ 3; timers (6 s after rest, hover pauses). Never stored or sent; gone on reload (a reload, reconnect or snapshot pops nothing).
+- **Derived (never stored):** rows (`popupRows`: one per entry, `payload` only), PiP mode (`handoff` / `play` / `chips`), the miniature's arena and clip, the stack's place in the toast region.
+- **Browser storage:** unchanged (`pp.dicex.v2.*`, `popup` switch). *(#247)* The effective display no longer turns `flat` under the OS reduced-motion preference (ignored); only no WebGL / a failed chunk does.
+- **CON-44:** 0 B.
+
+## 59. Sprint 4: drag path and combat trail (M2)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-52–55. **Built by `build/drag-path`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent. Protocol side: [protocol §76](../protocol/README.md#76-sprint-4-drag-path-and-combat-trail-m2).
 
 | Piece | Kind | Contents | Visibility | Source |
 |---|---|---|---|---|
