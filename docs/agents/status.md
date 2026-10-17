@@ -16,7 +16,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | M2 drag path | `build/drag-path` (w61, slot 0) | build-drag-path | Building | Walkthrough → M5 |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | Physical dice in combat (BL-19, BL-25) | `fix/physical-dice-combat` (w62, slot 3) | build-physical-dice | Building (sprint fix, found by 3 walkthroughs) | Walkthrough |
-| C-art core (token creature type) | `fix/cmp-art-core` (w50, slot 6) | — | Done (no UI); merged main; gates queued | Merge → C-art (after M5) |
+| C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
 | V9 fog brush + Ctrl+Z | `build/fog-brush` (w63, slot 4) | build-fog-brush | Building | Walkthrough |
 | V10 party vision + Blinded | `build/party-vision` (w64, slot 5) | build-party-vision | Building (∥ V9; FogBar merge after V9) | Walkthrough |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
@@ -41,7 +41,6 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 - `build/roll-popup` (D7): toast-region lock (`toast-region.ts` constants, `ShellToaster.tsx`).
 - `build/drag-path` (M2): canvas lock.
 - `fix/uses-negative` (S4-2): sheet folder lock.
-- `fix/cmp-art-core` (C-art core): schema lock, scenes-map token commands, Open5e adapter.
 - Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
 
