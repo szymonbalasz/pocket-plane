@@ -35,6 +35,7 @@ import { useFreeArea } from "../play-shell/free-area";
 import { workArea } from "../play-shell/geometry";
 import { withoutDmOnly } from "../scene-tools/layer-switches";
 import {
+  bestFreeRect,
   type Camera,
   type CameraEvent,
   type CameraMode,
@@ -230,6 +231,8 @@ export function MapCanvas(props: MapCanvasProps) {
   const cameraModeRef = useRef(cameraMode);
   /** FR-MAP-46: the last fit hit the 48 px cell floor (`data-fit-floor`). */
   const [fitFloor, setFitFloor] = useState(false);
+  /** FR-MAP-58: the free rectangle the last fit used, "x,y,w,h" (`data-fit-rect`). */
+  const [fitRect, setFitRect] = useState("");
   const free = useFreeArea();
   const fitNow = useRef(() => {});
   fitNow.current = () => {
@@ -241,16 +244,13 @@ export function MapCanvas(props: MapCanvasProps) {
       tokens.filter((t) => t.ownerPlayerId !== null),
       grid,
     );
-    const { floor, ...fit } = fitContent(
-      box,
-      free.area,
-      map,
-      workArea(size),
-      grid.gridCellSize,
-      pcs,
-    );
+    const work = workArea(size);
+    // FR-MAP-58: the candidate free rectangle the content box fits at the largest scale.
+    const rect = bestFreeRect(box, free.areas, free.area, map, work);
+    const { floor, ...fit } = fitContent(box, rect, map, work, grid.gridCellSize, pcs);
     setCam(fit);
     setFitFloor(floor);
+    setFitRect(`${rect.x},${rect.y},${rect.w},${rect.h}`);
   };
   /** Applies a camera event; fits now (or next frame, once the window change is laid out). */
   const onCamera = useCallback((e: CameraEvent, deferred = false) => {
@@ -905,6 +905,7 @@ export function MapCanvas(props: MapCanvasProps) {
       data-camera={cameraMode}
       data-cell-px={Math.round(cam.scale * grid.gridCellSize)}
       data-fit-floor={fitFloor}
+      data-fit-rect={fitRect}
       data-loading={loading}
       className="absolute inset-0"
       style={{

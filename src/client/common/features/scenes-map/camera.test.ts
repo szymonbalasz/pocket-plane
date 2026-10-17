@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { TokenSize } from "@shared/scenes-map/schemas";
-import { freeArea } from "../play-shell/free-area";
+import { freeArea, freeAreas } from "../play-shell/free-area";
 import { defaultRect, type Rect, workArea } from "../play-shell/geometry";
 import {
   type Box,
+  bestFreeRect,
   type Camera,
   type CameraMode,
   cameraOn,
@@ -591,5 +592,95 @@ describe("FR-MAP-47 resize refit", () => {
     r.dispose();
     clock.advance(1000);
     expect(state.fits).toEqual([]);
+  });
+});
+
+describe("FR-MAP-58 best free rectangle", () => {
+  /** Player defaults (protocol §24) at 1280×800: Game log bottom-left, sheet top-right. */
+  const vp = { w: 1280, h: 800 };
+  const work = workArea(vp);
+  const log = { x: 68, y: 444, w: 340, h: 280 };
+  const sheet = { x: 948, y: 60, w: 320, h: 440 };
+  /** Player Initiative where the default layout puts it (top-left, above the log). */
+  const initiative = { x: 68, y: 60, w: 280, h: 372 };
+  /** The sim-7 #3 player view of Goblin Ambush (session-sim): Mira, Goblin, Goblin 2, Thorn. */
+  const ambush = VISIBLE;
+  /** M9 (`map-tools`, after M4–M7): what Mira's player sees west of the fog line. */
+  const crowd = [tok(6, 7), tok(3, 10), tok(4, 9), tok(5, 9), tok(4, 10, "large")];
+  const pick = (tokens: ReturnType<typeof tok>[], pcTokens: typeof tokens, rects: Rect[]) => {
+    const box = contentBox(tokens, GRID, MAP);
+    const area = freeArea(rects, vp);
+    const rect = bestFreeRect(box, freeAreas(rects, vp), area, MAP, work);
+    const pcs = footprintBox(pcTokens, GRID);
+    const underAt = (cam: Camera) =>
+      tokens.filter((t) => {
+        const n = t.size === "large" ? 2 : 1;
+        const c = {
+          x: cam.x + (t.col + n / 2) * 70 * cam.scale,
+          y: cam.y + (t.row + n / 2) * 70 * cam.scale,
+        };
+        return rects.some((r) => c.x > r.x && c.x < r.x + r.w && c.y > r.y && c.y < r.y + r.h);
+      });
+    const cam = fitContent(box, rect, MAP, work, 70, pcs);
+    const old = fitContent(box, area, MAP, work, 70, pcs);
+    return { area, rect, cam, under: underAt(cam), old };
+  };
+
+  test("FR-MAP-58 best rectangle: the player at 1280×800 with sheet + Game log fits the strip above the log, not the larger narrow one beside it (sim-7 #3)", () => {
+    const { area, rect, cam, under, old } = pick(ambush, PCS, [log, sheet]);
+    const tokens = footprintBox(ambush, GRID);
+    if (!tokens) throw new Error("no tokens");
+    // FR-SHELL-34's largest-area rectangle is the 540-px strip right of the log: at the 48 px
+    // floor the tokens don't fit it (the PC rule keeps Mira and Thorn there).
+    expect(area).toEqual({ x: 408, y: 48, w: 540, h: 688 });
+    expect(old.floor).toBe(true);
+    expect(inside(old, tokens, area)).toBe(false);
+    // The strip above the log fits the content box at a larger scale (here the whole-map cap,
+    // below the floor at this size): every token in it, none under a window.
+    expect(rect).toEqual({ x: 68, y: 48, w: 880, h: 396 });
+    expect(70 * cam.scale).toBeCloseTo(FIT_MIN_CELL_PX);
+    expect(inside(cam, tokens, rect)).toBe(true);
+    expect(under).toEqual([]);
+  });
+
+  test("FR-MAP-58 best rectangle: M9 (sheet + Initiative + Game log) → a candidate rectangle with no token centre under a window", () => {
+    const rects = [log, sheet, initiative];
+    const { rect, under } = pick(crowd, [tok(6, 7), tok(3, 10)], rects);
+    expect(freeAreas(rects, vp)).toContainEqual(rect);
+    expect(under).toEqual([]);
+  });
+
+  test("FR-MAP-58 best rectangle: ties on scale → the larger area, then the higher, then the more left one; none → the free area", () => {
+    const box = contentBox([tok(10, 7)], GRID, MAP);
+    const small = { x: 68, y: 48, w: 600, h: 500 };
+    const big = { x: 700, y: 48, w: 700, h: 600 };
+    // One token: the whole-map cap sets the scale in both → the larger one.
+    expect(bestFreeRect(box, [small, big], small, MAP, work)).toEqual(big);
+    const low = { x: 68, y: 300, w: 600, h: 500 };
+    const right = { x: 700, y: 48, w: 600, h: 500 };
+    expect(bestFreeRect(box, [low, right, small], small, MAP, work)).toEqual(small);
+    expect(bestFreeRect(box, [right, low], right, MAP, work)).toEqual(right);
+    // No candidates, or FR-SHELL-34's small-area fallback (not a candidate): the free area.
+    expect(bestFreeRect(box, [], small, MAP, work)).toEqual(small);
+    const rail = { x: 68, y: 48, w: 1212, h: 688 };
+    expect(bestFreeRect(box, [small], rail, MAP, work)).toEqual(rail);
+  });
+
+  test("FR-MAP-58 then FR-MAP-46 inside the picked rectangle: at the floor the PCs stay in it", () => {
+    // PCs far apart: no candidate fits above the floor; the PC rule applies in the pick.
+    const spread = [tok(2, 2), tok(17, 2), tok(9, 11)];
+    const box = contentBox(spread, GRID, MAP);
+    const rect = bestFreeRect(
+      box,
+      freeAreas([log, sheet], vp),
+      freeArea([log, sheet], vp),
+      MAP,
+      work,
+    );
+    const pcs = footprintBox([tok(2, 2)], GRID);
+    const cam = fitContent(box, rect, MAP, work, 70, pcs);
+    expect(cam.floor).toBe(true);
+    if (!pcs) throw new Error("no PCs");
+    expect(inside(cam, pcs, rect)).toBe(true);
   });
 });
