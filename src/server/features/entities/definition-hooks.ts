@@ -13,6 +13,7 @@ import { combatantDefinitionHook } from "../combat-tracker/hooks";
 import { presetOwnerHook } from "../effect-modifiers/definition-hook";
 import { fogSensesHook } from "../fog-of-war/lifecycle";
 import { refreshTokenCopies } from "../scenes-map/definition-hook";
+import { fillTokenCreatureType } from "./creature-type-fill";
 
 export type HookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor">;
 
@@ -35,6 +36,7 @@ export const definitionChangedHooks: readonly HookRegistration[] = [
   { name: "character-sheet.sheet-copies", hook: creatureSheetDefinitionHook }, // CHARX owner copy + counter clamp (FR-CHARX-13/17)
   { name: "effect-modifiers.preset-owner", hook: presetOwnerHook }, // MOD preset owner copy (FR-MOD-07)
   { name: "fog-of-war.senses", hook: fogSensesHook }, // FOG senses edit re-derives (FR-FOG-35)
+  { name: "scenes-map.creature-type-fill", hook: fillTokenCreatureType }, // token art fill (FR-ENT-27)
 ];
 
 /** Per-server hook list, seeded from the registry; tests may add hooks via `register`. */

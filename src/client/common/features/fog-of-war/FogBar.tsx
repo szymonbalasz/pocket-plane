@@ -6,7 +6,8 @@
 // keys (polygon, Delete for the selected darkness), the refusal hint, the "Free" chip while Ctrl
 // is held during a gesture, and the darkness right-click menu (FR-FOG-42). V3: the View as Select
 // (Players + "DM", FR-FOG-43; spinner while the load is in flight) and the DM-only hint "No vision
-// set for: ‹names›".
+// set for: ‹names›". Sprint 4 (V9): Shape Brush + its radius Slider, Redo, and the history keys
+// Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y (`BrushControls.tsx`, `history.ts`).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
@@ -22,6 +23,7 @@ import {
 } from "@shared/fog-of-war/schemas";
 import type { FogLayerShape } from "@shared/fog-of-war/shapes";
 import {
+  BrushIcon,
   CircleIcon,
   CloudFogIcon,
   EraserIcon,
@@ -35,7 +37,7 @@ import {
   Trash2Icon,
   Undo2Icon,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/button";
 import {
@@ -60,11 +62,13 @@ import {
   SelectValue,
   Tooltip,
 } from "../../components/ui/overlays";
-import { useRecords, useSync } from "../../sync/store";
+import { SyncContext, useRecords, useSync } from "../../sync/store";
 import { useDefinitions } from "../compendium/definitions";
 import { useBaseKeyDown } from "../play-shell/hooks";
 import { toastReject, useLive, useMapIntent } from "../scenes-map/intents";
+import { BrushRadius, RedoButton } from "./BrushControls";
 import { type FogShapeMode, gestureKey } from "./gesture";
+import { type HistoryStep, historyKey, stepHistory } from "./history";
 import { NO_VISION_PREFIX, noVisionDefinitionIds, noVisionNames } from "./no-vision";
 import {
   applyFogStep,
@@ -82,6 +86,13 @@ const SHAPE_NAMES = {
   circle: "circle",
   brush: "brush stroke",
 } as const;
+
+/** FR-FOG-56: "Redo: ‹reveal | fog | explored› shape", "Redo: fog all", "Redo: darkness ‹…›". */
+export function redoHint(fog: Pick<FogRecord, "redo"> | undefined): string {
+  const redo = fog?.redo;
+  if (!redo) return "Nothing to redo";
+  return `Redo: ${KIND_LABELS[redo.kind] ?? redo.kind.replace(/-shape$/, " shape")}`;
+}
 
 /** Sprint-2 kinds (legacy `fog.edit` forms) and Fog all / Reveal all. */
 const KIND_LABELS: Partial<Record<FogEditKind, string>> = {
@@ -164,6 +175,12 @@ const SHAPES: { value: FogShapeMode; label: string; tip: string; icon: ReactNode
     label: "Circle",
     tip: "Circle — press the centre, drag the radius (Ctrl: free)",
     icon: <CircleIcon />,
+  },
+  {
+    value: "brush",
+    label: "Brush",
+    tip: "Brush — paint whole cells (Ctrl: a free round stroke); not in Darkness mode",
+    icon: <BrushIcon />,
   },
 ];
 
@@ -387,9 +404,29 @@ export function FogBar() {
   const [confirming, setConfirming] = useState<Confirming>(null);
 
   useEffect(() => setFogRejectHandler(toastReject), []);
+  const sync = useContext(SyncContext);
+  const history = (which: HistoryStep) => {
+    if (sceneId === null) return;
+    stepHistory(which, {
+      sceneId,
+      read: () => sync?.getState().store.records[FOG_TYPE]?.[sceneId] as FogRecord | undefined,
+      intent,
+      onReject: toastReject,
+    });
+  };
   useBaseKeyDown((e) => {
     if (!live || e.repeat) return;
-    const step = gestureKey(useFogTool.getState().gesture, e.key);
+    const g = useFogTool.getState().gesture;
+    const action = historyKey(e, g.draft?.kind === "polygon" && !g.pending);
+    if (action) {
+      e.preventDefault();
+      if (action === "vertex") {
+        const step = gestureKey(g, "Backspace");
+        if (step) applyFogStep(step, null);
+      } else history(action);
+      return;
+    }
+    const step = gestureKey(g, e.key);
     if (!step) return;
     e.preventDefault();
     applyFogStep(step, null);
@@ -417,10 +454,7 @@ export function FogBar() {
       data-testid="fog-undo"
       data-depth={undo?.n ?? 0}
       disabled={undoOff}
-      onClick={() => {
-        if (sceneId !== null && undo)
-          run(FOG_INTENTS.undo, { sceneId, expectedEditId: undo.editId });
-      }}
+      onClick={() => history("undo")}
     >
       <Undo2Icon className="size-4" />
     </Button>
@@ -471,6 +505,7 @@ export function FogBar() {
                 value={s.value}
                 aria-label={s.label}
                 data-testid={`fog-shape-${s.value}`}
+                disabled={s.value === "brush" && mode === "darkness"}
               >
                 {s.icon}
               </ToggleGroupItem>
@@ -478,6 +513,7 @@ export function FogBar() {
           </Tooltip>
         ))}
       </ToggleGroup>
+      {shape === "brush" && <BrushRadius disabled={off} />}
       {sep}
       <Button
         size="sm"
@@ -503,6 +539,7 @@ export function FogBar() {
         {/* A disabled button gets no pointer events: the wrapper carries the tooltip. */}
         {undoOff ? <span className="inline-flex">{undoButton}</span> : undoButton}
       </Tooltip>
+      <RedoButton fog={fog} disabled={off} hint={redoHint(fog)} onRedo={() => history("redo")} />
       {mode === "darkness" && (
         <Button
           size="sm"

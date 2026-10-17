@@ -2,11 +2,13 @@
 // characters. Active: every effect on the character (conditions, custom, concentration) with
 // rounds left and its modifier parts in words; DM: Modifiers… (custom), End; owner: End own
 // concentration. Toggles: the character's presets as switches (owner, DM; also on a locked
-// sheet); tier 3: uses left "2 / 3" or "Uses link broken", DM "Force on" at 0 (FR-MOD-12).
+// sheet); tier 3: uses left "2 / 3" or "Uses link broken", DM "Force on" at 0 (FR-MOD-12); at 0
+// left the Switch asks "Rage anyway?" and sends `overspend` ("−1 / 3" in red, FR-MOD-59).
 // Presets: New, Start from ▸ (keeps the built-in as `originKey`), Edit, Delete (owner unless
 // locked, DM). Triggers (FR-MOD-49): the character's rule triggers, lazy-loaded when the tab
 // opens (owner, DM; `./triggers`). Store reads only.
 
+import { leftText } from "@shared/character-sheet/counters";
 import type { FeatureRow } from "@shared/character-sheet/sheet";
 import { CBTX_INTENTS } from "@shared/combat-extras/intents";
 import { effectName } from "@shared/combat-extras/rules";
@@ -47,6 +49,7 @@ import {
   Switch,
 } from "../../components/ui/menus";
 import { useSync } from "../../sync/store";
+import { OverspendPopover, OverspentBadge } from "../character-sheet/overspend";
 import type { SheetSection } from "../character-sheet/sections";
 import { EffectIcon, effectValue } from "../combat-extras/icons";
 import {
@@ -182,32 +185,54 @@ function ToggleRow({
   features: readonly FeatureRow[] | undefined;
 }) {
   const { send, disabled } = useModIntent();
+  const [ask, setAsk] = useState(false);
   const uses = presetUses(p, features);
-  const toggle = (v: boolean, force?: true) =>
+  const toggle = (v: boolean, o: { force?: true; overspend?: true } = {}) =>
     void send(MOD_INTENTS.toggle, {
       characterId: p.characterId,
       presetId: p.id,
       on: v,
-      ...(force ? { force } : {}),
+      ...o,
     });
+  // FR-MOD-59: no use left → ask "Rage anyway?" first, then send `overspend`.
+  const noneLeft = uses?.state === "ok" && uses.left <= 0;
+  const switchEl = (
+    // Radix owns the Switch's own `data-state` (checked / unchecked): the wrapper carries ours.
+    <span
+      data-testid="mod-toggle"
+      data-record-id={p.id}
+      data-state={on ? "on" : "off"}
+      className="inline-flex"
+    >
+      <Switch
+        data-testid="mod-toggle-switch"
+        data-record-id={p.id}
+        aria-label={`${p.name} ${on ? "on" : "off"}`}
+        checked={on}
+        disabled={!may || disabled}
+        onCheckedChange={(v) => (v && noneLeft ? setAsk(true) : toggle(v))}
+      />
+    </span>
+  );
   return (
     <div className="flex items-center gap-2 text-sm">
-      {/* Radix owns the Switch's own `data-state` (checked / unchecked): the wrapper carries ours. */}
-      <span
-        data-testid="mod-toggle"
-        data-record-id={p.id}
-        data-state={on ? "on" : "off"}
-        className="inline-flex"
-      >
-        <Switch
-          data-testid="mod-toggle-switch"
-          data-record-id={p.id}
-          aria-label={`${p.name} ${on ? "on" : "off"}`}
-          checked={on}
+      {uses?.state === "ok" ? (
+        <OverspendPopover
+          open={ask}
+          onOpenChange={setAsk}
+          name={uses.name}
+          left={uses.left}
+          max={uses.max}
+          verb={p.name}
+          testId="mod-toggle-overspend"
           disabled={!may || disabled}
-          onCheckedChange={(v) => toggle(v)}
-        />
-      </span>
+          onConfirm={() => toggle(true, { overspend: true })}
+        >
+          {switchEl}
+        </OverspendPopover>
+      ) : (
+        switchEl
+      )}
       <div className="min-w-0 flex-1">
         <div className="truncate">
           {p.name}
@@ -217,11 +242,17 @@ function ToggleRow({
               data-record-id={p.id}
               data-state="ok"
               data-value={`${uses.left}/${uses.max}`}
-              className="text-muted-foreground"
+              className={uses.left < 0 ? "text-hp-down" : "text-muted-foreground"}
             >
               {" "}
-              {uses.left} / {uses.max}
+              {leftText(uses.left)} / {uses.max}
             </span>
+          )}
+          {uses?.state === "ok" && (
+            <>
+              {" "}
+              <OverspentBadge left={uses.left} testId="mod-toggle-overspent" />
+            </>
           )}
         </div>
         {uses?.state === "broken" && (
@@ -236,7 +267,7 @@ function ToggleRow({
         )}
         <div className="text-xs text-muted-foreground">{modifiersText(p.modifiers)}</div>
       </div>
-      {isDm && !on && uses?.state === "ok" && uses.left === 0 && (
+      {isDm && !on && noneLeft && (
         <Button
           size="sm"
           variant="ghost"
@@ -244,7 +275,7 @@ function ToggleRow({
           data-testid="mod-toggle-force"
           data-record-id={p.id}
           disabled={disabled}
-          onClick={() => toggle(true, true)}
+          onClick={() => toggle(true, { force: true })}
         >
           Force on
         </Button>

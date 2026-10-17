@@ -13,10 +13,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | V7 pan / plain map / Fit | merged 13c15f6 | — | Done (BL-01, BL-07; check 3158, e2e 94) | V8, M1 next |
 | V8 vision while dragging | merged ec3fd3a | — | Done (walkthrough 8/8; main check 3231, e2e 99 green) | — |
 | M1 freeform AoE | merged | — | Done (walkthrough 7/7; BL-05 done) | — |
-| M2 drag path | `build/drag-path` (w61, slot 0) | build-drag-path | Building | Walkthrough → M5 |
+| M2 drag path | merged | — | Done (walkthrough 9/9; check 3356, e2e 107) | — |
+| M5 labels + best-rectangle Fit | `fix/map-labels-fit` (w65, slot 2; on build/drag-path) | fix-map-labels-fit | Walkthrough 11/11; rectangle choice must keep the top row (ruling) → fixing | Merge after M2 → C-art |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
-| Physical dice in combat (BL-19, BL-25) | `fix/physical-dice-combat` (w62, slot 3) | build-physical-dice | Building (sprint fix, found by 3 walkthroughs) | Walkthrough |
-| C-art core (token creature type) | `fix/cmp-art-core` (w50, slot 6) | build-cmp-art-core | Building | Review → C-art (after M5) |
+| Physical dice in combat (BL-19, BL-25) | merged | — | Done (walkthrough 5/5; check 3314, e2e 105) | — |
+| C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
+| V9 fog brush + Ctrl+Z | merged | — | Done (walkthrough 13/13) | — |
+| V10 party vision + Blinded | `build/party-vision` (w64, slot 5) | test-party-vision | Walkthrough (with V9 merged in; check 3363, e2e 108) | Merge |
+| session-sim-8 bundle | merged | — | Done (49 fixtures, ~1 s; skipped mt-crowd, art-update-tokens, vision-legacy, vision-invisible, rolls-1; V10 / M5 / C-art may add units) | Sprint gate after the last slices |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
@@ -25,21 +29,19 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | R S4-5 Divine Fury log line | merged | — | Done (walkthrough 9/9; own e2e bundle `fury-log-line`) | — |
 | R S4-3 trigger state + tray | merged e3e203b | — | Done (walkthrough 8/8; check 3185, e2e 96) | — |
 | R S4-4 trigger badges | merged 5a84b98 | — | Done (badges PASS) | — |
-| R S4-2 negative uses | `fix/uses-negative` (w5Z, slot 2) | test-uses-negative | Walkthrough | Merge |
+| R S4-2 negative uses | merged 9f10c6b | — | Done (walkthrough 7/7; main check 3309, e2e 103 green). **Track R complete** | — |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
 | M4 window placement | merged c308458 | — | Done (re-test 3 5/5; check 3097, e2e 91) | — |
-| D7 roll popup | merged 91b610d | — | Done (13/14 + fixes; #247 in) | — |
+| D7 roll popup | merged 91b610d | — | Done (13/14 + fixes; #247 in; main check 3280, e2e 102 green) | — |
 | Mc map-tools core | merged | — | Done (check 3109, e2e 91; drizzle duplicate-index fix) | M1 after V7 |
 
 ## Shared-file locks
 
 - `build/roll-popup` (D7): toast-region lock (`toast-region.ts` constants, `ShellToaster.tsx`).
-- `build/drag-path` (M2): canvas lock.
-- `fix/uses-negative` (S4-2): sheet folder lock.
-- `fix/cmp-art-core` (C-art core): schema lock, scenes-map token commands, Open5e adapter.
+- `build/drag-path` (M2) → `fix/map-labels-fit` (M5, stacked on M2): canvas lock.
 - Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
 

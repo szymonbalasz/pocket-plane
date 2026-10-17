@@ -19,7 +19,14 @@ import {
 } from "@shared/dice-roll-log/schemas";
 import type { PreviewGroup } from "@shared/effect-modifiers/preview";
 import { HandIcon } from "lucide-react";
-import { type ComponentProps, useMemo, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  type Dispatch,
+  type SetStateAction,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/controls";
 import { Input } from "../../components/ui/primitives";
@@ -35,11 +42,14 @@ import {
   checkGroup,
   computedTotal,
   countedEntries,
+  critExtra,
+  type FormSlot,
   formEntries,
   formSlots,
   type GroupInput,
   type ManualSlot,
   manualSlots,
+  mergeCrit,
   modeFromKeys,
   publicState,
   reconcileInputs,
@@ -272,33 +282,34 @@ function GroupInputs({
   part?: PartIds;
   onChange(patch: Partial<GroupInput>): void;
 }) {
-  const prefix = part ? "mod-tray-group" : extra ? "dice-manual-crit" : "dice-manual";
+  const prefix = `${part ? "mod-tray-group" : "dice-manual"}${extra ? "-crit" : ""}`;
   const value = part ? part.key : index;
   const slotAttr = part ? { "data-slot": part.slot } : {};
   const computed = computedTotal(slot, input);
   const name = part
-    ? `${part.label} (${slot.expression})`
+    ? `${part.label} (${slot.expression}${extra ? ", critical" : ""})`
     : extra
       ? `${slot.expression} (critical)`
       : slot.expression;
   return (
     <>
       <div className="flex items-center gap-2">
-        {part ? (
+        {extra ? (
+          <span
+            data-testid={`${prefix}-label`}
+            data-value={value}
+            {...slotAttr}
+            className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
+          >
+            Extra critical dice: {slot.expression}
+          </span>
+        ) : part ? (
           <span
             data-testid="mod-tray-group-label"
             data-value={part.key}
             className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
           >
             {part.label}: <code>{slot.expression}</code>
-          </span>
-        ) : extra ? (
-          <span
-            data-testid="dice-manual-crit-label"
-            data-value={index}
-            className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
-          >
-            Extra critical dice: {slot.expression}
           </span>
         ) : (
           <code className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
@@ -328,7 +339,7 @@ function GroupInputs({
               data-value={value}
               {...slotAttr}
               data-index={d}
-              aria-label={`${part ? `${part.label} die` : extra ? "Extra die" : "Die"} ${d + 1} (d${faces})`}
+              aria-label={`${part ? `${part.label} ${extra ? "extra die" : "die"}` : extra ? "Extra die" : "Die"} ${d + 1} (d${faces})`}
               inputMode="numeric"
               placeholder={`d${faces}`}
               className="h-7 w-12 px-1.5 text-xs"
@@ -346,62 +357,178 @@ function GroupInputs({
   );
 }
 
-/** FR-MOD-18: a part group's manual slot ("1d6+2" → one d6 box) and its input key. */
+/** FR-MOD-18: a part group's manual slot ("1d6+2" → one d6 box). */
 const partSlot = (g: PreviewGroup): ManualSlot | null => {
   const s = manualSlots([g.expression], "normal");
   return typeof s === "string" ? null : (s[0] ?? null);
 };
-const partKey = (slot: number, g: PreviewGroup) => `${slot}|${g.key}|${g.expression}`;
 const emptyInput = (s: ManualSlot): GroupInput => ({
   total: "",
   dice: s.faces.length > 1 ? s.faces.map(() => "") : [],
 });
-const isEmpty = (g: GroupInput) => g.total.trim() === "" && g.dice.every((d) => d.trim() === "");
+
+/**
+ * FR-MOD-18 (BL-25): one part group of the form — a bonus die (`e:`) or an offered trigger die
+ * (`t:`) of slot `slot`. On a crit slot whose group doubles (FR-DICE-31, FR-CBT-83), `base` keeps
+ * the uncritted dice and `extra` adds the "Extra critical dice"; else `base` is the group as
+ * rolled and `extra` null.
+ */
+export interface PartForm {
+  slot: number;
+  /** The group as the server rolls it (crit-doubled on a crit slot). */
+  group: PreviewGroup;
+  base: ManualSlot;
+  extra: ManualSlot | null;
+  /** Input keys: the base group's, and its extra group's. */
+  key: string;
+  extraKey: string;
+}
+
+/**
+ * FR-MOD-18 (BL-25, OQ-MOD-34 (4)): the form's part groups in part order — each slot's bonus
+ * dice (they sit under their roll), then every offered trigger die (after the weapon parts, as
+ * the card lists them). `groupsAt(i, crit)` = the preview's groups of slot `i`.
+ */
+export function partForms(
+  slots: readonly Pick<FormSlot, "crit">[],
+  groupsAt: (i: number, crit: boolean) => readonly PreviewGroup[],
+): PartForm[] {
+  const out: PartForm[] = [];
+  for (const [i, s] of slots.entries()) {
+    const plain = s.crit ? groupsAt(i, false) : [];
+    for (const g of groupsAt(i, s.crit)) {
+      const rolled = partSlot(g);
+      if (!rolled) continue;
+      const before = plain.find((p) => p.key === g.key);
+      const extra = before ? critExtra(before.expression, g.expression) : null;
+      const base = extra && before ? partSlot(before) : null;
+      const key = `${i}|${g.key}|${(base ?? rolled).expression}`;
+      out.push({
+        slot: i,
+        group: g,
+        base: base ?? rolled,
+        extra: base ? extra : null,
+        key,
+        extraKey: `${key}|crit`,
+      });
+    }
+  }
+  return [...out.filter((p) => !p.group.onHit), ...out.filter((p) => p.group.onHit)];
+}
 
 interface PartFocus {
   slot: number;
   key: string;
+  group: "base" | "extra";
   die: number | null;
 }
 
 /**
- * FR-MOD-18: every slot's part groups → `manualParts` per slot, or the first problem. `e:`
- * groups are required (the server matches them exactly); an empty `t:` group is left out (the
- * server rolls an offered trigger without a group).
+ * FR-MOD-18: every part group → `manualParts` per slot (`slots` lists), or the first problem.
+ * Every group is required, offered trigger dice too (BL-25, OQ-MOD-34 (4): entered like any
+ * other die; "Roll for me" is the way to let the server roll). A crit group sends its base and
+ * extra dice merged (FR-DICE-31).
  */
 export function partEntries(
-  groups: readonly (readonly PreviewGroup[])[],
+  forms: readonly PartForm[],
   inputs: Readonly<Record<string, GroupInput>>,
+  slots: number,
 ): { ok: true; parts: ManualPart[][] } | { ok: false; message: string; focus: PartFocus } {
-  const parts: ManualPart[][] = [];
-  for (const [i, gs] of groups.entries()) {
-    const out: ManualPart[] = [];
-    for (const g of gs) {
-      const slot = partSlot(g);
-      if (!slot) continue;
-      const input = inputs[partKey(i, g)] ?? emptyInput(slot);
-      if (g.key.startsWith("t:") && isEmpty(input)) continue;
-      const r = checkGroup(slot, input, `${g.label} (${g.expression})`);
-      if (!("entry" in r)) {
-        return { ok: false, message: r.message, focus: { slot: i, key: g.key, die: r.die } };
-      }
-      out.push({ key: g.key, entry: r.entry });
+  const parts: ManualPart[][] = Array.from({ length: slots }, () => []);
+  for (const f of forms) {
+    const { slot, group: g } = f;
+    const b = checkGroup(
+      f.base,
+      inputs[f.key] ?? emptyInput(f.base),
+      `${g.label} (${f.base.expression})`,
+    );
+    if (!("entry" in b)) {
+      return {
+        ok: false,
+        message: b.message,
+        focus: { slot, key: g.key, group: "base", die: b.die },
+      };
     }
-    parts.push(out);
+    let entry = b.entry;
+    if (f.extra) {
+      const name = `${g.label} (${f.extra.expression}, critical)`;
+      const e = checkGroup(f.extra, inputs[f.extraKey] ?? emptyInput(f.extra), name);
+      if (!("entry" in e)) {
+        return {
+          ok: false,
+          message: e.message,
+          focus: { slot, key: g.key, group: "extra", die: e.die },
+        };
+      }
+      entry = mergeCrit(f.base, b.entry, f.extra, e.entry);
+    }
+    parts[slot]?.push({ key: g.key, entry });
   }
   return { ok: true, parts };
 }
 
-/** The group's line: "Bane (−)", "Divine Fury (on a hit) · optional". */
+/** The group's line: "Bane (−)", "Divine Fury (on a hit)". */
 const groupLabel = (g: PreviewGroup) =>
-  `${g.label || "(DM)"}${g.sign === -1 ? " (−)" : ""}${g.onHit ? " (on a hit)" : ""}${g.key.startsWith("t:") ? " · optional" : ""}`;
+  `${g.label || "(DM)"}${g.sign === -1 ? " (−)" : ""}${g.onHit ? " (on a hit)" : ""}`;
+
+/** FR-MOD-18: one part group's inputs; on a crit its "Extra critical dice" sub-row (BL-25). */
+function PartGroup({
+  form: f,
+  inputs,
+  onChange,
+}: {
+  form: PartForm;
+  inputs: Readonly<Record<string, GroupInput>>;
+  onChange: Dispatch<SetStateAction<Record<string, GroupInput>>>;
+}) {
+  const ids = { key: f.group.key, slot: f.slot, label: groupLabel(f.group) };
+  const set = (k: string, s: ManualSlot) => (patch: Partial<GroupInput>) =>
+    onChange((all) => ({ ...all, [k]: { ...(all[k] ?? emptyInput(s)), ...patch } }));
+  return (
+    <div
+      data-testid="mod-tray-group"
+      data-value={f.group.key}
+      data-slot={f.slot}
+      className="flex flex-col gap-1.5 border-l-2 border-primary/40 pl-2"
+    >
+      <GroupInputs
+        slot={f.base}
+        input={inputs[f.key] ?? emptyInput(f.base)}
+        index={f.slot}
+        extra={false}
+        autoFocus={false}
+        part={ids}
+        onChange={set(f.key, f.base)}
+      />
+      {f.extra && (
+        <div
+          data-testid="mod-tray-group-crit"
+          data-value={f.group.key}
+          data-slot={f.slot}
+          className="flex flex-col gap-1.5 border-l-2 border-muted pl-2"
+        >
+          <GroupInputs
+            slot={f.extra}
+            input={inputs[f.extraKey] ?? emptyInput(f.extra)}
+            index={f.slot}
+            extra
+            autoFocus={false}
+            part={ids}
+            onChange={set(f.extraKey, f.extra)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Manual popover body: one dice-total input (+ optional per-die inputs) per expression; after a
  * natural 20 (or with `crit: true`) a crit slot adds its "Extra critical dice" group and keeps
  * what was typed (FR-DICE-31). Roll never fails silently (FR-DICE-32): an incomplete slot sends
  * nothing, focuses the offending input and says why. With a subject (FR-MOD-27, -18): the d20
- * slots follow the preview's mode, and each slot adds one labelled group per bonus / trigger die.
+ * slots follow the preview's mode, each slot adds one labelled group per bonus die, and the
+ * offered trigger dice follow the last slot (BL-25), each with its extra critical dice on a crit.
  */
 export function ManualForm({ control }: { control: RollControl }) {
   const open = control.manual;
@@ -417,8 +544,8 @@ export function ManualForm({ control }: { control: RollControl }) {
     return typeof s === "string" ? [] : s;
   }, [options, mode, inputs]);
   const shown = useMemo(() => reconcileInputs(slots, inputs), [slots, inputs]);
-  const groups = useMemo(
-    () => slots.map((s, i) => preview.groups(i, { crit: s.crit, toHitMode: mode })),
+  const parts = useMemo(
+    () => partForms(slots, (i, crit) => preview.groups(i, { crit, toHitMode: mode })),
     [slots, preview, mode],
   );
   if (!open) return null;
@@ -448,11 +575,11 @@ export function ManualForm({ control }: { control: RollControl }) {
           focus(id, `[data-value="${slot}"]${die === null ? "" : `[data-index="${die}"]`}`);
           return;
         }
-        const p = partEntries(groups, partInputs);
+        const p = partEntries(parts, partInputs, slots.length);
         if (!p.ok) {
           setError(p.message);
-          const { slot, key, die } = p.focus;
-          const id = `mod-tray-group-${die === null ? "total" : "die"}`;
+          const { slot, key, group, die } = p.focus;
+          const id = `mod-tray-group${group === "extra" ? "-crit" : ""}-${die === null ? "total" : "die"}`;
           const at = die === null ? "" : `[data-index="${die}"]`;
           focus(id, `[data-value="${key}"][data-slot="${slot}"]${at}`);
           return;
@@ -500,34 +627,19 @@ export function ManualForm({ control }: { control: RollControl }) {
               />
             </div>
           )}
-          {(groups[i] ?? []).map((g) => {
-            const gs = partSlot(g);
-            if (!gs) return null;
-            const k = partKey(i, g);
-            return (
-              <div
-                key={k}
-                data-testid="mod-tray-group"
-                data-value={g.key}
-                data-slot={i}
-                className="flex flex-col gap-1.5 border-l-2 border-primary/40 pl-2"
-              >
-                <GroupInputs
-                  slot={gs}
-                  input={partInputs[k] ?? emptyInput(gs)}
-                  index={i}
-                  extra={false}
-                  autoFocus={false}
-                  part={{ key: g.key, slot: i, label: groupLabel(g) }}
-                  onChange={(patch) =>
-                    setPartInputs((s) => ({ ...s, [k]: { ...(s[k] ?? emptyInput(gs)), ...patch } }))
-                  }
-                />
-              </div>
-            );
-          })}
+          {parts
+            .filter((f) => f.slot === i && !f.group.onHit)
+            .map((f) => (
+              <PartGroup key={f.key} form={f} inputs={partInputs} onChange={setPartInputs} />
+            ))}
         </div>
       ))}
+      {/* BL-25: offered trigger dice after every weapon part, as the card lists them. */}
+      {parts
+        .filter((f) => f.group.onHit)
+        .map((f) => (
+          <PartGroup key={f.key} form={f} inputs={partInputs} onChange={setPartInputs} />
+        ))}
       {error && (
         <p data-testid="dice-manual-error" role="alert" className="text-xs text-destructive">
           {error}
@@ -606,7 +718,16 @@ export function RollButton({
           {control.physical && <PhysicalMarker />}
         </Button>
       </PopoverAnchor>
-      <PopoverContent align="end" side="top" className="w-80">
+      {/* BL-19: focus moving out never closes the form. A menu item that rolls through an
+          invisible anchor (DM Initiative Attack ▸, Check ▸, Save ▸) closes its menu, which then
+          refocuses its trigger: that dismissed the form before anything was entered. A click
+          outside, Escape and Cancel still close it. */}
+      <PopoverContent
+        align="end"
+        side="top"
+        className="w-80"
+        onFocusOutside={(e) => e.preventDefault()}
+      >
         <ManualForm control={control} />
       </PopoverContent>
     </Popover>

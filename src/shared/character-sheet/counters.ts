@@ -1,5 +1,6 @@
 // Sheet counters (FR-CHARX-17): spell slots used, hit dice used, feature uses. Pure; the server
-// clamps with them and the sheet draws its pips from them.
+// clamps with them and the sheet draws its pips from them. FR-CHARX-58 (sprint 4): feature uses
+// may go below zero, down to −9 (`used` up to `usesMax + 9`); slots and hit dice keep `0 … max`.
 import {
   type ClassRow,
   HIT_DICE,
@@ -10,7 +11,13 @@ import {
   type SpellLevelKey,
 } from "@shared/entities/schemas";
 import type { SheetResource } from "@shared/events/character-sheet";
-import type { FeatureRow, HitDiceUsed, SheetData, SlotsUsed } from "./sheet";
+import {
+  FEATURE_OVERSPEND_MAX,
+  type FeatureRow,
+  type HitDiceUsed,
+  type SheetData,
+  type SlotsUsed,
+} from "./sheet";
 
 type CounterStats = { spellcasting?: Spellcasting; classes?: readonly ClassRow[] };
 
@@ -46,29 +53,42 @@ export function clampCounters(
   };
 }
 
-/** A counter's `{used, max}`; `null` = unknown feature row. */
+/** FR-CHARX-58: a feature row's highest `used` = `usesMax + 9` (uses left −9); no uses → 0. */
+export const featureUsedCap = (f: Pick<FeatureRow, "usesMax">): number =>
+  f.usesMax ? f.usesMax + FEATURE_OVERSPEND_MAX : 0;
+
+/** FR-CHARX-58: uses left of a feature row with uses (below zero once overspent). */
+export const featureLeft = (f: Pick<FeatureRow, "usesMax" | "used">): number =>
+  (f.usesMax ?? 0) - f.used;
+
+/** Uses left as shown: a typographic minus below zero ("−1"), FR-CHARX-58. */
+export const leftText = (left: number): string => (left < 0 ? `−${-left}` : String(left));
+
+/**
+ * A counter's `{used, max, cap}`; `cap` = the highest `used` (slots, hit dice: `max`; feature
+ * rows: `usesMax + 9`, FR-CHARX-58); `null` = unknown feature row.
+ */
 export function counterOf(
   sheet: Pick<SheetData, "slotsUsed" | "hitDiceUsed" | "features">,
   stats: CounterStats,
   resource: SheetResource,
-): { used: number; max: number } | null {
+): { used: number; max: number; cap: number } | null {
   if ("slot" in resource) {
     const l = String(resource.slot) as SpellLevelKey;
-    return { used: sheet.slotsUsed[l] ?? 0, max: slotMax(stats, l) };
+    const max = slotMax(stats, l);
+    return { used: sheet.slotsUsed[l] ?? 0, max, cap: max };
   }
   if ("hitDie" in resource) {
-    return {
-      used: sheet.hitDiceUsed[resource.hitDie] ?? 0,
-      max: hitDieMax(stats, resource.hitDie),
-    };
+    const max = hitDieMax(stats, resource.hitDie);
+    return { used: sheet.hitDiceUsed[resource.hitDie] ?? 0, max, cap: max };
   }
   const f = sheet.features.find((r) => r.id === resource.feature);
-  return f ? { used: f.used, max: f.usesMax ?? 0 } : null;
+  return f ? { used: f.used, max: f.usesMax ?? 0, cap: featureUsedCap(f) } : null;
 }
 
-/** `used = clamp(used + delta, 0, max)`; `reset` → 0 (FR-CHARX-17). */
-export const nextUsed = (used: number, max: number, op: { delta?: number; reset?: true }) =>
-  op.reset ? 0 : Math.max(0, Math.min(max, used + (op.delta ?? 0)));
+/** `used = clamp(used + delta, 0, cap)`; `reset` → 0 (FR-CHARX-17, -58). */
+export const nextUsed = (used: number, cap: number, op: { delta?: number; reset?: true }) =>
+  op.reset ? 0 : Math.max(0, Math.min(cap, used + (op.delta ?? 0)));
 
 /** The counter written back into the sheet's leaves / feature row. */
 export function withUsed(

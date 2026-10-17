@@ -27,6 +27,8 @@ export default defineFixture({
           saveProficiencies: ["dex"],
           attacks: [{ name: "Scimitar", toHit: 5, damage: "1d6+3", damageType: "slashing" }],
           cr: "1/2",
+          // ENT §13 (S4): from its base (FR-ENT-26).
+          type: "humanoid",
         },
       }),
     ),

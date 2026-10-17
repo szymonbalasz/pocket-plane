@@ -341,7 +341,34 @@ export const CR_VALUES = [
 ] as const;
 export const Cr = z.enum(CR_VALUES as unknown as [string, ...string[]]);
 
-export const MonsterStatBlock = z.strictObject({ ...core, cr: Cr }).superRefine(coreRules);
+/** FR-ENT-26 (sprint 4): the 14 SRD creature types, lower-case. Monsters only. */
+export const CREATURE_TYPES = [
+  "aberration",
+  "beast",
+  "celestial",
+  "construct",
+  "dragon",
+  "elemental",
+  "fey",
+  "fiend",
+  "giant",
+  "humanoid",
+  "monstrosity",
+  "ooze",
+  "plant",
+  "undead",
+] as const;
+export const CreatureType = z.enum(CREATURE_TYPES);
+export type CreatureType = z.infer<typeof CreatureType>;
+
+export const MonsterStatBlock = z
+  .strictObject({
+    ...core,
+    cr: Cr,
+    /** FR-ENT-26: absent = not known (stored rows without it stay valid). DM only. */
+    type: CreatureType.optional(),
+  })
+  .superRefine(coreRules);
 export type MonsterStatBlock = z.infer<typeof MonsterStatBlock>;
 
 export const CharacterStatBlock = z
@@ -375,6 +402,20 @@ export function withAttackIds<S extends { attacks: Attack[] }>(s: S, nextId: () 
 export const TOKEN_SHAPES = ["round", "square", "none"] as const;
 export const TokenShape = z.enum(TOKEN_SHAPES);
 export type TokenShape = z.infer<typeof TokenShape>;
+
+// ---------- token creature type (FR-ENT-27, ADR-0050) ----------
+
+/** A token's `creatureType`: a type, or `"initials"` (the DM chose initials); null = not known. */
+export const TOKEN_CREATURE_TYPES = [...CREATURE_TYPES, "initials"] as const;
+export const TokenCreatureType = z.enum(TOKEN_CREATURE_TYPES);
+export type TokenCreatureType = z.infer<typeof TokenCreatureType>;
+
+/** FR-ENT-27: the type a definition gives its new tokens (characters: none). */
+export function creatureTypeOf(
+  def: { kind: "monster"; statBlock: MonsterStatBlock } | { kind: "character" },
+): CreatureType | null {
+  return def.kind === "monster" ? (def.statBlock.type ?? null) : null;
+}
 
 // ---------- kind registry (FR-ENT-01) ----------
 
