@@ -53,14 +53,19 @@ test("FR-SHELL-43 DM at 1280×720: no launcher button outside the viewport; narr
   await live(dm);
 
   const launcher = dm.getByTestId("ui-launcher");
-  const inside = async (width: number) => {
-    const bar = await launcher.boundingBox();
-    expect(bar && bar.x >= 8 && bar.x + bar.width <= width - 8).toBe(true);
-    for (const b of await dm.getByTestId("ui-launcher-button").all()) {
-      const r = await b.boundingBox();
-      expect(r && r.x >= 0 && r.x + r.width <= width).toBe(true);
-    }
-  };
+  // Polled: after a resize the bar re-fits over a frame or two (compact first, then overflow).
+  const inside = (width: number) =>
+    expect
+      .poll(async () => {
+        const bar = await launcher.boundingBox();
+        if (!(bar && bar.x >= 8 && bar.x + bar.width <= width - 8)) return "bar outside";
+        for (const b of await dm.getByTestId("ui-launcher-button").all()) {
+          const r = await b.boundingBox();
+          if (!(r && r.x >= 0 && r.x + r.width <= width)) return "button outside";
+        }
+        return "ok";
+      })
+      .toBe("ok");
   await inside(1280);
   await expect(dm.getByTestId("ui-launcher-overflow")).toHaveAttribute("data-count", "0");
 

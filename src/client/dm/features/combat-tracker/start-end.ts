@@ -36,14 +36,20 @@ export const END_FIRST_SENTENCE = "Combatants leave the initiative list.";
 export interface ShellEffects {
   dispatch(action: WindowAction): void;
   noteAppearance(): void;
+  /**
+   * Resolves once the page has laid out the acked Start (a frame), so Initiative's content height
+   * is measured with the new rows before it is placed (FR-SHELL-39, -40). Absent: no wait.
+   */
+  settle?(): Promise<void>;
 }
 
 /**
  * FR-CBT-60: send `cbt.start`; once **this tab's** intent is acked, Encounters minimises, then
  * Initiative opens and comes to front, then one appearance is noted (the map refits if still
  * fitted). Encounters goes first so Initiative's placement sees the layout after Start
- * (FR-SHELL-41: it may take Encounters' spot, never another window's). A reject or a dropped
- * connection (`undefined`) changes nothing; nothing here runs on snapshots.
+ * (FR-SHELL-41: it may take Encounters' spot, never another window's), after one layout frame
+ * (`settle`) so it is placed at the height its rows take. A reject or a dropped connection
+ * (`undefined`) changes nothing; nothing here runs on snapshots.
  */
 export async function startAndFollow(
   send: () => Promise<unknown>,
@@ -51,6 +57,7 @@ export async function startAndFollow(
 ): Promise<unknown> {
   const r = await send();
   if (r === undefined) return r;
+  await fx.settle?.();
   fx.dispatch({ type: "minimise", kind: ENCOUNTERS_KIND });
   fx.dispatch({ type: "open", kind: INITIATIVE_KIND, by: "feature" }); // FR-SHELL-41
   fx.noteAppearance();

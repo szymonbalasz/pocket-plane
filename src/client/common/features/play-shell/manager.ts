@@ -2,7 +2,14 @@
 // Holds every window's *stored* state; rendering fits and clamps (geometry.ts) without writing
 // back. Every geometry it sets is stamped with the work area it was set in (`area`).
 import { GEOMETRY_LIMIT, Layout, MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
-import { clampRect, type Rect, renderedRect, type Viewport, workArea } from "./geometry";
+import {
+  clampRect,
+  growsToContent,
+  type Rect,
+  type Viewport,
+  windowRect,
+  workArea,
+} from "./geometry";
 import { fittedDefaultRect, placeRect } from "./placement";
 import type { WindowRegistry } from "./registry";
 import { toastKeepOut } from "./toast-region";
@@ -40,6 +47,8 @@ export interface ManagerContext {
   avoid?: () => readonly Rect[];
   /** How a window's current rect was chosen, if known on this page (`data-placed`). */
   placed?: (id: string) => Placed | undefined;
+  /** Measured content height of a `growToContent` window (FR-SHELL-39), by window id. */
+  heights?: (id: string) => number | undefined;
 }
 
 /**
@@ -112,10 +121,11 @@ export function defaultLayout(
 const overlaps = (a: Rect, b: Rect) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-/** Where a stored window renders now (fit + clamp); unknown kinds clamp only. */
+/** Where a stored window renders now (fit + clamp + grown to content); unknown kinds clamp only. */
 function shownRect(w: WindowState, ctx: ManagerContext): Rect {
   const def = ctx.registry.get(w.kind);
-  return def ? renderedRect(w, def.minSize, ctx.viewport) : clampRect(w, ctx.viewport);
+  if (!def) return clampRect(w, ctx.viewport);
+  return windowRect(w, def, ctx.viewport, ctx.heights?.(windowId(w.kind, w.instance)));
 }
 
 /** Rendered rects of the windows on screen now, except (kind, instance). */
@@ -130,13 +140,19 @@ function onScreen(ws: Windows, ctx: ManagerContext, kind: string, instance: stri
     .map((w) => shownRect(w, ctx));
 }
 
-/** Auto placement of (kind, instance) against what is on screen now (FR-SHELL-40). */
+/**
+ * Auto placement of (kind, instance) against what is on screen now (FR-SHELL-40), never shorter
+ * than the height it renders at: a growing window's measured content height (FR-SHELL-39).
+ */
 function autoRect(ws: Windows, ctx: ManagerContext, kind: string, instance: string): Rect | null {
   const def = ctx.registry.get(kind);
   if (!def) return null;
   const vp = ctx.viewport;
   const others = onScreen(ws, ctx, kind, instance);
-  return placeRect(def, vp, others, ctx.avoid?.() ?? [], toastKeepOut(ctx.registry.client, vp));
+  const cur = find(ws, kind, instance);
+  const need = growsToContent(cur ?? {}, def) ? ctx.heights?.(windowId(kind, instance)) : undefined;
+  const keepOut = toastKeepOut(ctx.registry.client, vp);
+  return placeRect(def, vp, others, ctx.avoid?.() ?? [], keepOut, need);
 }
 
 /**

@@ -134,6 +134,71 @@ describe("FR-CBT-60 windows follow the DM's own Start / End", () => {
     expect(Math.max(...ws.map((w) => w.z))).toBe(init.z);
   });
 
+  test("FR-CBT-60 own Start ack → settle (one layout frame) before any window changes", async () => {
+    const f = fx();
+    let settled = false;
+    await startAndFollow(async () => null, {
+      ...f,
+      settle: async () => {
+        expect(f.actions).toEqual([]);
+        settled = true;
+      },
+    });
+    expect(settled).toBe(true);
+    expect(f.actions.length).toBe(2);
+  });
+
+  test("FR-SHELL-40 / FR-SHELL-41 M8 at 1280×720: Initiative's rows need 302 px; placed at Start, its rendered (grown) rect overlaps no open window", async () => {
+    const viewport = { w: 1280, h: 720 };
+    const available = new Set(dmWindows.defs.map((d) => d.kind));
+    // The walkthrough's measured content heights: Initiative with Crypt's three rows.
+    const heights = new Map<string, number>();
+    const ctx = {
+      registry: dmWindows,
+      viewport,
+      available,
+      heights: (id: string) => heights.get(id),
+    };
+    const overlaps = (a: Rect, b: Rect) =>
+      a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    // Reset layout (Game log 68,404; Initiative 868,60), idle Initiative minimised; Compendium
+    // from the launcher, then Encounters from the launcher.
+    let ws: Windows = reduce(defaultLayout(dmWindows, viewport), { type: "reset" }, ctx);
+    ws = reduce(ws, { type: "minimise", kind: "cbt.initiative" }, ctx);
+    ws = reduce(ws, { type: "open", kind: "cmp.compendium" }, ctx);
+    ws = reduce(ws, { type: "open", kind: "cbt.encounters" }, ctx);
+    const of = (kind: string) => {
+      const w = ws.find((x) => x.kind === kind);
+      if (!w) throw new Error(`${kind} not in the layout`);
+      return w;
+    };
+    expect(of("dice.log")).toMatchObject({ x: 68, y: 404, h: 240 });
+    const comp = renderedWindowRects([of("cmp.compendium")], dmWindows, available, viewport)[0];
+    const initStored = of("cbt.initiative");
+    expect(comp && overlaps(comp, initStored)).toBe(true); // over Initiative's stored spot
+    heights.set("cbt.initiative:main", 302);
+    await startAndFollow(async () => null, {
+      dispatch: (a) => {
+        ws = reduce(ws, a, ctx);
+      },
+      noteAppearance: () => {},
+    });
+    const init = of("cbt.initiative");
+    expect(init.state).toBe("open");
+    const measured = new Map(heights);
+    const [shown] = renderedWindowRects([init], dmWindows, available, viewport, measured);
+    if (!shown) throw new Error("Initiative not rendered");
+    // Placed at least as tall as it renders: the stored rect is the rendered one.
+    expect(shown.h).toBeGreaterThanOrEqual(302);
+    expect(init.h).toBe(shown.h);
+    const others = ws.filter((w) => w.kind !== "cbt.initiative");
+    const rects = renderedWindowRects(others, dmWindows, available, viewport, measured);
+    expect(rects.length).toBe(2); // Game log, Compendium
+    for (const o of rects) {
+      expect(overlaps(shown, o) ? `Initiative over ${JSON.stringify(o)}` : "ok").toBe("ok");
+    }
+  });
+
   test("FR-CBT-60 own End ack → minimise Initiative", async () => {
     const f = fx();
     await endAndFollow(async () => null, f);

@@ -247,4 +247,25 @@ describe("auto placement (FR-SHELL-40)", () => {
     const right = { x: 800, y: 0, w: 800, h: vp.h };
     expect(placeRect(corner, vp, [], [], right).x).toBe(RAIL_CLEAR);
   });
+
+  test("FR-SHELL-40 a slot shorter than the height the window renders at (`need`) is not free: M8, Initiative's rows need 302 px", () => {
+    // M8 at 1280×720: Initiative (400×500, min 240, grows to content) with the Compendium on the
+    // right edge and the Game log at 68,404; the toast keep-out box top-centre.
+    const init = def({
+      defaultPosition: { anchor: "top-right" },
+      defaultSize: { w: 400, h: 500 },
+      minSize: { w: 320, h: 240 },
+    });
+    const log = { x: 68, y: 404, w: 460, h: 240 };
+    const comp = { x: 828, y: 60, w: 440, h: 560 };
+    const box = { x: 462, y: 100, w: 356, h: 304 };
+    const before = placeRect(init, small, [log, comp], [], box);
+    expect(before.h).toBe(240); // the walkthrough's 68,152 400×240: drawn 302 tall, over the log
+    const r = placeRect(init, small, [log, comp], [], box, 302);
+    expect(r.h).toBeGreaterThanOrEqual(302);
+    for (const o of [log, comp]) expect(overlaps(r, o)).toBe(false);
+    // Content taller than the default: the full-size slot holds it too (capped to the area).
+    const a = usableArea(small);
+    expect(placeRect(init, small, [], [], null, 2000).h).toBe(a.bottom - a.top);
+  });
 });

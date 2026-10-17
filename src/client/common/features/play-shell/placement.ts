@@ -12,6 +12,9 @@
 //    covering wins; ties → the order above. Then, among equals, one clear of this client's toast
 //    keep-out box (`toastKeepOut`), else the least over it. No free candidate → the cascade,
 //    still least token cover first, then least window overlap before the keep-out box.
+// 4. A window that renders taller than its min size (`need`: a `growToContent` window's measured
+//    content height, FR-SHELL-39) never gets a slot shorter than that: a slot that can't hold
+//    what it renders at is not free (M4 walkthrough, M8).
 import {
   defaultRect,
   EDGE_GAP,
@@ -88,6 +91,8 @@ function freeHeight(x: number, y: number, w: number, max: number, obstacles: rea
  * toasts are transient, another window isn't).
  * Among equals: clear of `keepOut` (else least over it), default column, nearest to default
  * (tallest first for shrunk slots). Mid-map columns never. Deterministic.
+ * `need`: the height the window renders at (measured content), if known: no rect is shorter than
+ * it (capped to the usable area), and a full-size slot holds the taller of it and the default.
  */
 export function placeRect(
   def: Placeable,
@@ -95,12 +100,15 @@ export function placeRect(
   obstacles: readonly Rect[],
   avoid: readonly Rect[] = [],
   keepOut: Rect | null = null,
+  need?: number,
 ): Rect {
   const base = fittedDefaultRect(def, vp);
   if (def.fixedDefault) return base;
   const a = usableArea(vp);
   const { w } = base;
-  const minH = Math.min(def.minSize.h, base.h);
+  // Full size and min height: never below what the window renders at (step 4).
+  const fullH = Math.min(Math.max(base.h, Math.ceil(need ?? 0)), a.bottom - a.top);
+  const minH = Math.min(Math.max(def.minSize.h, Math.ceil(need ?? 0)), fullH);
   const g = EDGE_GAP;
   // Moved windows stay right of the tool rail (unless their default is already left of it).
   const minX = Math.max(a.left, Math.min(base.x, RAIL_CLEAR));
@@ -108,15 +116,14 @@ export function placeRect(
   // in a column touches the area's or an open window's top or bottom (+ gap): those lines
   // cover them all.
   const xs = new Set([base.x, minX, a.right - w]);
-  const ys = new Set([base.y, a.top, a.bottom - base.h, a.bottom - minH]);
+  const ys = new Set([base.y, a.top, a.bottom - fullH, a.bottom - minH]);
   for (const o of obstacles) {
-    for (const y of [o.y, o.y + o.h + g, o.y - g - base.h, o.y - g - minH]) ys.add(y);
+    for (const y of [o.y, o.y + o.h + g, o.y - g - fullH, o.y - g - minH]) ys.add(y);
   }
   const spots: { x: number; y: number }[] = [];
   for (const x of xs) for (const y of ys) spots.push({ x, y });
   // Opt-in open height (never shrunk below it), clamped to the usable area.
-  const openH =
-    def.minOpenH === undefined ? null : Math.min(def.minOpenH, base.h, a.bottom - a.top);
+  const openH = def.minOpenH === undefined ? null : Math.max(minH, Math.min(def.minOpenH, fullH));
   const covered = (r: Rect) => obstacles.reduce((n, o) => n + overlapArea(r, o), 0);
   const onTokens = (r: Rect) => avoid.reduce((n, t) => n + overlapArea(r, t), 0);
   // Toast keep-out: [over it at all, how much].
@@ -132,12 +139,12 @@ export function placeRect(
     const x = Math.max(minX, Math.min(s.x, a.right - w));
     const column = x === base.x ? 0 : 1; // default column, else the left / right edge
     const y = Math.max(a.top, Math.min(s.y, a.bottom - minH));
-    const room = Math.min(base.h, a.bottom - y);
+    const room = Math.min(fullH, a.bottom - y);
     const free = freeHeight(x, y, w, room, obstacles);
     const dist = Math.abs(x - base.x) + Math.abs(y - base.y);
     // Rank: [over a window, token area, step, keep-out flag, …today's order].
-    if (free >= base.h) {
-      const rect = { x, y, w, h: base.h };
+    if (free >= fullH) {
+      const rect = { x, y, w, h: fullH };
       const [over, ko] = toasts(rect);
       consider(rect, [0, onTokens(rect), 0, over, ko, column, dist]);
     } else if (openH !== null) {

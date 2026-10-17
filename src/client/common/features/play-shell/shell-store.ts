@@ -70,6 +70,8 @@ export function createShellController(opts: {
   viewport: () => Viewport;
   /** On-screen map token boxes auto placement covers the least of (FR-SHELL-40). */
   avoid?: () => readonly Rect[];
+  /** Measured content heights of growing windows (FR-SHELL-39): placement never goes below them. */
+  heights?: (id: string) => number | undefined;
   warn?: (msg: string) => void;
 }): ShellController {
   const { registry, storage } = opts;
@@ -101,6 +103,7 @@ export function createShellController(opts: {
         viewport,
         available,
         avoid: opts.avoid,
+        heights: opts.heights,
         placed: (id) => state.placed.get(id),
       });
       if (next === windows) return;

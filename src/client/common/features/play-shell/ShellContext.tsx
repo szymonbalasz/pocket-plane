@@ -23,6 +23,7 @@ import {
   type ShellAlert,
 } from "./alerts";
 import { browserAudioContext, createAudioEngine } from "./audio";
+import { contentHeights } from "./content-heights";
 import type { OpenBy, WindowAction } from "./manager";
 import { availableKinds, type WindowRegistry } from "./registry";
 import { createShellController, type ShellController, type ShellState } from "./shell-store";
@@ -48,6 +49,7 @@ export function ShellProvider({
       storage: browserLayoutStorage(),
       viewport: browserViewport,
       avoid: () => tokenScreenBoxes("all"),
+      heights: (id) => contentHeights().get(id),
     }),
   );
   const you = useSync((s) => s.store.you);
