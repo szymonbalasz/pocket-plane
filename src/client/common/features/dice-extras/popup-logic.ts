@@ -1,6 +1,7 @@
 // The roll popup's content and geometry (FR-DICEX-38–41), pure, in the lazy popup chunk. One
 // named row per entry (sim-7: no "· N rolls"), read from `payload` only (never `dmPayload`); the
-// miniature's clip to its popup's visible rect; the DM stack's keep-clear of Initiative.
+// miniature's clip to its popup's visible rect; the DM stack's keep-clear of Initiative and the
+// open combat popup.
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import { z } from "zod";
 import type { Rect } from "../play-shell/geometry";
@@ -126,23 +127,31 @@ export function pipDiePx(rect: { w: number; h: number }, count: number): number 
 }
 
 /**
- * FR-DICEX-39 / FR-NOTE-32 rule for the DM's popup stack: centred at `top`; over Initiative →
+ * FR-DICEX-39 / FR-NOTE-32 rule for the DM's popup stack: centred at `top`; over a rect it keeps
+ * clear of (Initiative; the open combat popup, FR-CBT-75, which may sit where its toast was) →
  * left of it with a 12 px gap; no room there → below it. Returns the stack's left / top.
  */
 export function dmStackAt(
   vp: { w: number },
   top: number,
   size: { w: number; h: number },
-  initiative: Rect | null,
+  clear: readonly Rect[],
 ): { left: number; top: number } {
-  const left = Math.round((vp.w - size.w) / 2);
-  if (!initiative) return { left, top };
-  const overlapsX =
-    left < initiative.x + initiative.w + EDGE_GAP && initiative.x - EDGE_GAP < left + size.w;
-  const overlapsY =
-    initiative.y < top + size.h + EDGE_GAP && initiative.y + initiative.h + EDGE_GAP > top;
-  if (!overlapsX || !overlapsY) return { left, top };
-  const shifted = initiative.x - EDGE_GAP - size.w;
-  if (shifted >= RAIL_CLEAR) return { left: Math.min(left, shifted), top };
-  return { left, top: Math.round(initiative.y + initiative.h + EDGE_GAP) };
+  let at = { left: Math.round((vp.w - size.w) / 2), top };
+  const over = (r: Rect) =>
+    at.left < r.x + r.w + EDGE_GAP &&
+    r.x - EDGE_GAP < at.left + size.w &&
+    r.y < at.top + size.h + EDGE_GAP &&
+    r.y + r.h + EDGE_GAP > at.top;
+  // One move per rect at most: a move can land on another rect, never back on a cleared one.
+  for (let pass = 0; pass < clear.length; pass++) {
+    const r = clear.find(over);
+    if (!r) break;
+    const shifted = r.x - EDGE_GAP - size.w;
+    at =
+      shifted >= RAIL_CLEAR
+        ? { left: Math.min(at.left, shifted), top: at.top }
+        : { left: at.left, top: Math.round(r.y + r.h + EDGE_GAP) };
+  }
+  return at;
 }

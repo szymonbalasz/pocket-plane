@@ -338,21 +338,35 @@ describe("FR-DICEX-39 placement", () => {
   test("FR-DICEX-39 FR-NOTE-32 DM stack: top-centre; over Initiative → left of it; no room → below it", () => {
     const vp = { w: 1280 };
     const size = { w: 280, h: 160 };
-    expect(dmStackAt(vp, 100, size, null)).toEqual({ left: 500, top: 100 });
+    expect(dmStackAt(vp, 100, size, [])).toEqual({ left: 500, top: 100 });
     // Initiative top-right, clear of the centre → stays centred.
-    expect(dmStackAt(vp, 100, size, { x: 900, y: 60, w: 368, h: 400 })).toEqual({
+    expect(dmStackAt(vp, 100, size, [{ x: 900, y: 60, w: 368, h: 400 }])).toEqual({
       left: 500,
       top: 100,
     });
     // Initiative over the centre → shifted left with the 12 px gap.
-    expect(dmStackAt(vp, 100, size, { x: 600, y: 60, w: 400, h: 300 })).toEqual({
+    expect(dmStackAt(vp, 100, size, [{ x: 600, y: 60, w: 400, h: 300 }])).toEqual({
       left: 308,
       top: 100,
     });
     // No room left of it → below it.
-    expect(dmStackAt(vp, 100, size, { x: 200, y: 60, w: 900, h: 300 })).toEqual({
+    expect(dmStackAt(vp, 100, size, [{ x: 200, y: 60, w: 900, h: 300 }])).toEqual({
       left: 500,
       top: 372,
     });
+  });
+
+  test("FR-DICEX-39 FR-CBT-75 DM stack keeps clear of the open combat popup over its toast too", () => {
+    const vp = { w: 1440 };
+    const size = { w: 280, h: 142 };
+    // sim: the combat popup opened where its toast was (top-centre) → the stack goes left of it.
+    const popup = { x: 560, y: 100, w: 440, h: 264 };
+    expect(dmStackAt(vp, 100, size, [popup])).toEqual({ left: 268, top: 100 });
+    // Initiative top-right as well: the first move clears both.
+    const initiative = { x: 1060, y: 60, w: 368, h: 500 };
+    expect(dmStackAt(vp, 100, size, [initiative, popup])).toEqual({ left: 268, top: 100 });
+    // The left move lands on another rect → below that one.
+    const left = { x: 40, y: 60, w: 400, h: 200 };
+    expect(dmStackAt(vp, 100, size, [popup, left])).toEqual({ left: 268, top: 272 });
   });
 });

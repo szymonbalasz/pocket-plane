@@ -453,6 +453,56 @@ function useInitiativeRect(dm: boolean): Rect | null {
   }, [dm, windows, registry, available, vp, measured]);
 }
 
+/** Rect lists equal to the pixel (the observer re-measures on every style change). */
+const sameRects = (a: readonly Rect[], b: readonly Rect[]) =>
+  a.length === b.length &&
+  a.every((r, i) => {
+    const o = b[i];
+    return o !== undefined && r.x === o.x && r.y === o.y && r.w === o.w && r.h === o.h;
+  });
+
+/**
+ * FR-CBT-75 for the DM's stack: the open non-modal dialogs' rects (the combat popup, which opens
+ * where its toast was and may then be dragged, FR-CBT-76), followed while the stack shows.
+ */
+function useNonModalRects(dm: boolean, active: boolean): readonly Rect[] {
+  const [rects, setRects] = useState<readonly Rect[]>([]);
+  useEffect(() => {
+    if (!dm || !active) {
+      setRects((r) => (r.length === 0 ? r : []));
+      return;
+    }
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
+      const next: Rect[] = [];
+      for (const el of document.querySelectorAll('[role="dialog"][aria-modal="false"]')) {
+        const r = rectOf(el);
+        if (r && r.w > 0 && r.h > 0) next.push(r);
+      }
+      setRects((r) => (sameRects(r, next) ? r : next));
+    };
+    const schedule = () => {
+      if (raf === 0) raf = requestAnimationFrame(measure);
+    };
+    const mo = new MutationObserver(schedule);
+    mo.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style"],
+    });
+    window.addEventListener("resize", schedule);
+    measure();
+    return () => {
+      mo.disconnect();
+      window.removeEventListener("resize", schedule);
+      if (raf !== 0) cancelAnimationFrame(raf);
+    };
+  }, [dm, active]);
+  return rects;
+}
+
 export function RollPopupStack({
   client,
   display,
@@ -466,6 +516,7 @@ export function RollPopupStack({
   const dm = client === "dm";
   const vp = useViewport();
   const initiative = useInitiativeRect(dm);
+  const dialogs = useNonModalRects(dm, popups.length > 0 || pending);
   const stack = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ top: 0, h: 0 });
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the cards change
@@ -480,7 +531,8 @@ export function RollPopupStack({
   const cards = popups.map((p) => <Card key={p.id} p={p} display={display} />);
   if (pending) cards.push(<PendingCard key="pending" />);
   if (!dm) return <div className="flex flex-col gap-2">{cards}</div>;
-  const at = dmStackAt(vp, box.top, { w: ROLL_POPUP_W, h: box.h }, initiative);
+  const clear = initiative ? [initiative, ...dialogs] : dialogs;
+  const at = dmStackAt(vp, box.top, { w: ROLL_POPUP_W, h: box.h }, clear);
   return (
     <div
       ref={stack}
