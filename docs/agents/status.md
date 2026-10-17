@@ -19,7 +19,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Physical dice in combat (BL-19, BL-25) | merged | — | Done (walkthrough 5/5; check 3314, e2e 105) | — |
 | C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
 | V9 fog brush + Ctrl+Z | `build/fog-brush` (w63, slot 4) | — | Walkthrough 13/13; merged main, branch gates running | Merge → V10 rebases |
-| V10 party vision + Blinded | `build/party-vision` (w64, slot 5) | build-party-vision | Building (∥ V9; FogBar merge after V9) | Walkthrough |
+| V10 party vision + Blinded | `build/party-vision` (w64, slot 5) | build-party-vision (idle) | Built; merges main after V9 lands, then walkthrough | Walkthrough → merge |
 | session-sim-8 bundle | merged | — | Done (49 fixtures, ~1 s; skipped mt-crowd, art-update-tokens, vision-legacy, vision-invisible, rolls-1; V10 / M5 / C-art may add units) | Sprint gate after the last slices |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
