@@ -11,7 +11,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
 | Docs pass | merged bd07224 | — | Done | — |
 | V7 pan / plain map / Fit | `build/map-pan-plain` (w5D, slot 3) | test-map-pan-plain | Walkthrough (check 3043, e2e 90) | Merge → V8 |
-| C-all All tab | `build/cmp-all-tab` (w5E, slot 6) | — | Walkthrough 16/16; branch gates running | Merge |
+| C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
