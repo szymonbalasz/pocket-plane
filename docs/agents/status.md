@@ -8,7 +8,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Sprint 3 recap with the DM | — | — | **Paused** after session-sim-7 (#240) | DM's call on the Add-to-sheet duplicate trigger fix, glitch list priorities |
+| Sprint 3 recap with the DM | — | — | Duplicate-trigger fix merged (#241, #242) | DM: glitch list priorities, 3D dice on the table laptop, "hit!" copy (BL-10) |
 | Merged in sprint 3 | — | — | All slices + session-sim-7 bundle (#212–#240); backlog BL-02, 03, 04, 06, 08, 11, 12, 13, 14 | — |
 | Backlog (BL-nn) | — | — | Open: BL-01, 05, 07, 10, 15, 16 | After the recap |
 
