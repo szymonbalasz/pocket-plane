@@ -114,7 +114,8 @@ export const hasUses = (f: Pick<FeatureRow, "usesMax">): boolean => (f.usesMax ?
 
 /**
  * FR-MOD-12 (tier 3): a toggle's linked uses. `null` = no link; `broken` = the row was deleted or
- * its `usesMax` cleared (toggles without uses, "Uses link broken"); else uses left of max.
+ * its `usesMax` cleared (toggles without uses, "Uses link broken"); else uses left of max (may be
+ * negative, down to −9: FR-MOD-59).
  */
 export type PresetUses =
   | { state: "broken" }
@@ -129,7 +130,8 @@ export function presetUses(
   const f = features?.find((r) => r.id === id);
   if (!f || !hasUses(f)) return { state: "broken" };
   const max = f.usesMax ?? 0;
-  return { state: "ok", featureId: f.id, name: f.name, left: Math.max(0, max - f.used), max };
+  // FR-CHARX-58: below zero once overspent (FR-MOD-59).
+  return { state: "ok", featureId: f.id, name: f.name, left: max - f.used, max };
 }
 
 /** One entry of the DM's preset list (FR-MOD-06, -28). */

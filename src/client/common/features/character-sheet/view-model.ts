@@ -2,12 +2,13 @@
 // spell / counter rows, override markers, wallet line. Pure; derived values from
 // `@shared/entities` (overrides honoured), never computed twice.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
-import { hitDieMax, slotMax } from "@shared/character-sheet/counters";
+import { hitDieMax, leftText, slotMax } from "@shared/character-sheet/counters";
 import { levelLine, signed, withDamageBonus } from "@shared/character-sheet/logic";
 import type { SheetRollKind } from "@shared/character-sheet/schemas";
 import {
   type CreatureSheetRecord,
   defaultSheetData,
+  FEATURE_OVERSPEND_MAX,
   type SheetData,
   type SpellRow,
 } from "@shared/character-sheet/sheet";
@@ -393,6 +394,33 @@ export function pinnedPart(fullPx: number, bodyPx: number, current: PinnedPart):
 
 /** A pip click (CHARX §7): click = use one, Shift+click = restore one. */
 export const pipDelta = (shiftKey: boolean) => (shiftKey ? -1 : 1);
+
+/** FR-CHARX-58: a feature's uses left of max, "2 / 3 left", "−1 / 3 left" below zero. */
+export const usesLeftText = (left: number, max: number) => `${leftText(left)} / ${max} left`;
+
+/** FR-CHARX-58: the overspent Badge's Tooltip ("1 use more than the maximum — …"). */
+export const overspentTip = (left: number) =>
+  `${-left} ${left === -1 ? "use" : "uses"} more than the maximum — check with your DM`;
+
+/**
+ * FR-CHARX-58, MOD FR-MOD-59: the question before spending a use the row doesn't have (`left` ≤
+ * 0): "No Rage uses left (0 / 3). Rage anyway? → −1 / 3" + the confirm label `‹verb› anyway`; at
+ * the floor (−9) only "Rage is at −9 / 3 — reset it first", no confirm.
+ */
+export function overspendAsk(
+  name: string,
+  left: number,
+  max: number,
+  verb: string,
+): { text: string; confirm: string | null } {
+  if (left <= -FEATURE_OVERSPEND_MAX) {
+    return { text: `${name} is at ${leftText(left)} / ${max} — reset it first`, confirm: null };
+  }
+  return {
+    text: `No ${name} uses left (${leftText(left)} / ${max}). ${verb} anyway? → ${leftText(left - 1)} / ${max}`,
+    confirm: `${verb} anyway`,
+  };
+}
 
 /** FR-CHARX-33: the read-only wallet line; missing record = all zero. */
 export function walletLine(w: Coins | undefined): string {
