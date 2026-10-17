@@ -15,6 +15,7 @@ import { createEncounter } from "../combat-tracker/encounters";
 import { combatSetup } from "../combat-tracker/testing";
 import { createEntity, UPDATE } from "../entities/commands";
 import { goblinBlock } from "../entities/testing";
+import { legacySenses } from "./testing";
 
 const START = "cbt.start";
 const rect = (c0: number, r0: number, c1: number, r1: number): FogShape => ({
@@ -28,6 +29,7 @@ const rect = (c0: number, r0: number, c1: number, r1: number): FogShape => ({
 /** combatSetup (Goblin Ambush revealed, active) + a fog pocket over (15, 0)–(19, 2). */
 function setup() {
   const t = combatSetup();
+  legacySenses(t.s.db);
   t.run(I.activateScene, { sceneId: t.sceneId });
   const fog = (op: "reveal" | "hide", shape: FogShape) =>
     t.run<{ editId: string | null }>(F.edit, { sceneId: t.sceneId, op, shape }).editId;

@@ -1,11 +1,13 @@
 // fog-of-war commands (FOG §6, §9; protocol §35, §38). DM-only WS intents: `fog.edit` (append a
-// fog shape), `fog.setAll`, `fog.undo`, the darkness intents (`fog.placeDarkness` /
-// `moveDarkness` / `removeDarkness` / `clearDarkness`), `fog.setExplored` and
-// `fog.forgetExplored`, and `fog.setInvisible` (#210, FR-FOG-45). Each is one transaction (FR-FOG-08): the `fog` row (`rev` + 1) + its undo
-// entry (or the undone entry's delete) + the scene re-derive (fog subjects whose copies change,
-// door flags, darkness `seenBy`, token-changed hook rows; `rederive.ts`) + one event-log entry →
-// one event. Fog edits and darkness edits share one LIFO undo stack (FR-FOG-07, #207 G12). IDs
-// and time from ctx. Works on any scene of the campaign, active or not (FR-FOG-09).
+// fog shape), `fog.setAll`, `fog.undo` / `fog.redo` (sprint 4, FR-FOG-56), the darkness intents
+// (`fog.placeDarkness` / `moveDarkness` / `removeDarkness` / `clearDarkness`), `fog.setExplored`
+// and `fog.forgetExplored`, `fog.setInvisible` (#210, FR-FOG-45) and `fog.setPartyVision`
+// (sprint 4, FR-FOG-49). Each is one transaction (FR-FOG-08): the `fog` row (`rev` + 1) + its
+// undo entry (or the entry marked undone / redone) + the scene re-derive (fog subjects whose
+// copies change, door flags, darkness `seenBy`, token-changed hook rows; `rederive.ts`) + one
+// event-log entry → one event. Fog edits and darkness edits share one LIFO undo stack (FR-FOG-07,
+// #207 G12), ≤ 50 deep; undone entries stay as the redo list until a new edit clears it
+// (FR-FOG-56). IDs and time from ctx. Works on any scene of the campaign, active or not (FR-FOG-09).
 import {
   DarknessCleared,
   DarknessMoved,
@@ -14,7 +16,9 @@ import {
   ExploredForgotten,
   FogEdited,
   FogExploredSet,
+  FogRedone,
   FogUndone,
+  PartyVisionSet,
   TokenInvisibleSet,
 } from "@shared/events/fog-of-war";
 import {
@@ -29,6 +33,7 @@ import {
 import {
   FOG_EXPLORED_TYPE,
   FOG_INTENTS,
+  FOG_SETTINGS_TYPE,
   FOG_TYPE,
   FOG_UNDO_MAX,
   FogClearDarknessInput,
@@ -39,10 +44,13 @@ import {
   FogMoveDarknessInput,
   FogPlaceDarknessInput,
   type FogPlaceDarknessResult,
+  FogRedoInput,
+  type FogRedoResult,
   FogRemoveDarknessInput,
   FogSetAllInput,
   FogSetExploredInput,
   FogSetInvisibleInput,
+  FogSetPartyVisionInput,
   FogUndoInput,
 } from "@shared/fog-of-war/schemas";
 import {
@@ -61,19 +69,27 @@ import {
 } from "@shared/fog-of-war/shapes";
 import { footprint } from "@shared/scenes-map/geometry";
 import { type SceneRecord, TOKEN_TYPE } from "@shared/scenes-map/schemas";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, invalid, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
-import { fogExplored, sceneFog, sceneFogEdit, sceneFogEditSeqNext, token } from "../../db/schema";
+import {
+  fogExplored,
+  fogSettings,
+  sceneFog,
+  sceneFogEdit,
+  sceneFogEditSeqNext,
+  token,
+} from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import type { Logger } from "../../log";
 import { campaignOf, getScene, getToken, readToken } from "../scenes-map/rows";
 import { runTokenChangedHooks } from "../scenes-map/token-hooks";
 import { deriveSceneObject, tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 import { readFogRow } from "./hooks";
-import { rederiveScene } from "./rederive";
+import { markScenesStale, mergeChanges, rederiveScene } from "./rederive";
 import { dmFogRecord, readFogRecord, type ServerFogRecord, sceneExploredRecords } from "./rows";
+import { readFogSettings } from "./settings";
 
 /** FR-FOG-27: over the shape cap or the 16 KiB row → nothing written. */
 export const FOG_TOO_DETAILED = "Fog too detailed — use Fog all or Reveal all to start over";
@@ -82,6 +98,9 @@ export const FOG_TOO_MANY_DARKNESS = "Too many darkness areas";
 /** FR-FOG-07: stale `expectedEditId`. */
 export const FOG_CHANGED = "Fog changed — check and undo again";
 export const FOG_NOTHING_TO_UNDO = "Nothing to undo";
+/** FR-FOG-56: stale `expectedEditId` / nothing undone. */
+export const FOG_REDO_CHANGED = "Fog changed — check and redo again";
+export const FOG_NOTHING_TO_REDO = "Nothing to redo";
 /** FR-FOG-30: unknown darkness id on the scene. */
 export const DARKNESS_NOT_FOUND = "Darkness area not found";
 
@@ -151,10 +170,17 @@ function checkRowBytes(env: CommandEnv, sceneId: string) {
   }
 }
 
-/** FR-FOG-07: pushes an undo entry (base + shapes + darkness before) and drops the oldest past 20. */
+/**
+ * FR-FOG-07 / -56: pushes an undo entry (base + shapes + darkness before), clears the redo list
+ * (the undone entries) and drops the oldest past 50.
+ */
 function pushUndo(env: CommandEnv, s: SceneRecord, kind: FogEditKind, prev: FogRow): string {
   const id = env.ctx.ids.next();
   const before = layers(env, s.id);
+  env.tx
+    .delete(sceneFogEdit)
+    .where(and(eq(sceneFogEdit.sceneId, s.id), isNotNull(sceneFogEdit.undoneAt)))
+    .run();
   env.tx
     .insert(sceneFogEdit)
     .values({
@@ -297,6 +323,8 @@ export function fogCommands(log: Logger) {
   /**
    * FR-FOG-07: strict LIFO over fog and darkness edits; restores base + shapes + darkness (pre-v2
    * entries: shapes [], darkness kept). Stale `expectedEditId` or an empty stack → `conflict`.
+   * FR-FOG-56: the entry is marked undone with the state it replaced (`next*`), joining the redo
+   * list, instead of being deleted.
    */
   const undo = defineCommand({
     name: FOG_INTENTS.undo,
@@ -307,12 +335,14 @@ export function fogCommands(log: Logger) {
       const latest = tx
         .select()
         .from(sceneFogEdit)
-        .where(eq(sceneFogEdit.sceneId, s.id))
+        .where(and(eq(sceneFogEdit.sceneId, s.id), isNull(sceneFogEdit.undoneAt)))
         .orderBy(desc(sceneFogEdit.seq))
         .get();
       if (!latest) throw conflict(FOG_NOTHING_TO_UNDO);
       if (latest.id !== expectedEditId) throw conflict(FOG_CHANGED);
       const before = readFogRecord(tx, s.id);
+      const cur = currentRow(tx, log, s.id);
+      const now = layers(env, s.id);
       const { mask, corrupt } = maskOf({
         fill: latest.prevFill,
         box: [latest.prevCol0, latest.prevRow0, latest.prevCols, latest.prevRows],
@@ -323,7 +353,13 @@ export function fogCommands(log: Logger) {
         shapes: latest.prevShapes ?? [],
         ...(latest.prevDarkness ? { darkness: latest.prevDarkness } : {}),
       });
-      tx.delete(sceneFogEdit)
+      tx.update(sceneFogEdit)
+        .set({
+          undoneAt: env.ctx.clock.iso(),
+          nextBase: { fill: cur.fill, box: cur.box, runs: cur.runs },
+          nextShapes: now.shapes,
+          nextDarkness: now.darkness,
+        })
         .where(and(eq(sceneFogEdit.id, latest.id), eq(sceneFogEdit.sceneId, s.id)))
         .run();
       const subjects = subjectsOf(env, s.id);
@@ -333,6 +369,48 @@ export function fogCommands(log: Logger) {
         payload: { sceneId: s.id, editId: latest.id },
         changes: [fogChange(before, readFogRecord(tx, s.id)), ...subjects],
       });
+    },
+  });
+
+  /**
+   * FR-FOG-56: re-applies the most recently undone edit (the undone entry with the lowest `seq`):
+   * restores its `next*` state and clears its undone mark (it is back on the undo stack). Stale
+   * `expectedEditId` or nothing undone → `conflict`.
+   */
+  const redo = defineCommand({
+    name: FOG_INTENTS.redo,
+    input: FogRedoInput,
+    execute({ sceneId, expectedEditId }, env): FogRedoResult {
+      const { tx } = env;
+      const s = getScene(tx, campaignOf(env.actor), sceneId);
+      const target = tx
+        .select()
+        .from(sceneFogEdit)
+        .where(and(eq(sceneFogEdit.sceneId, s.id), isNotNull(sceneFogEdit.undoneAt)))
+        .orderBy(asc(sceneFogEdit.seq))
+        .get();
+      if (!target) throw conflict(FOG_NOTHING_TO_REDO);
+      if (target.id !== expectedEditId) throw conflict(FOG_REDO_CHANGED);
+      const before = readFogRecord(tx, s.id);
+      const base = target.nextBase;
+      const { mask, corrupt } = maskOf(base ?? currentRow(tx, log, s.id));
+      if (corrupt) log.error(`fog: redo entry ${target.id} has corrupt runs; fully fogged`);
+      writeRow(env, s, rowOf(mask), {
+        ...(target.nextShapes ? { shapes: target.nextShapes } : {}),
+        ...(target.nextDarkness ? { darkness: target.nextDarkness } : {}),
+      });
+      tx.update(sceneFogEdit)
+        .set({ undoneAt: null, nextBase: null, nextShapes: null, nextDarkness: null })
+        .where(eq(sceneFogEdit.id, target.id))
+        .run();
+      const subjects = subjectsOf(env, s.id);
+      env.emit({
+        type: FogRedone.type,
+        campaignId: s.campaignId,
+        payload: { sceneId: s.id, editId: target.id, kind: target.kind },
+        changes: [fogChange(before, readFogRecord(tx, s.id)), ...subjects],
+      });
+      return { editId: target.id };
     },
   });
 
@@ -515,10 +593,48 @@ export function fogCommands(log: Logger) {
     },
   });
 
+  /**
+   * FR-FOG-49 (sprint 4, ADR party vision): the campaign's party vision switch. Same value →
+   * no-op (no event). One transaction: the `fog_settings` row + the active scene re-derived for
+   * every player (subjects, darkness `seenBy`, memory, every `vision` with its new `shared` flag,
+   * FR-FOG-51) + `visionStale` on the campaign's other scenes (re-derived at activation) + one
+   * event-log entry → `PartyVisionSet`. Logged, not undoable; prep or live.
+   */
+  const setPartyVision = defineCommand({
+    name: FOG_INTENTS.setPartyVision,
+    input: FogSetPartyVisionInput,
+    execute({ on }, env): Record<string, never> {
+      const cid = campaignOf(env.actor);
+      const before = readFogSettings(env.tx, cid);
+      if (before.partyVision === on) return {};
+      const values = { partyVision: on, updatedAt: env.ctx.clock.iso() };
+      env.tx
+        .insert(fogSettings)
+        .values({ campaignId: cid, ...values })
+        .onConflictDoUpdate({ target: fogSettings.campaignId, set: values })
+        .run();
+      const rows = markScenesStale(env, cid).flatMap((id) =>
+        rederiveScene(env, id, { partyBefore: before.partyVision }),
+      );
+      env.emit({
+        type: PartyVisionSet.type,
+        campaignId: cid,
+        payload: { on },
+        changes: [
+          { type: FOG_SETTINGS_TYPE, id: cid, before, after: readFogSettings(env.tx, cid) },
+          ...mergeChanges(rows),
+        ],
+      });
+      return {};
+    },
+  });
+
   return {
     edit,
     setAll,
     undo,
+    redo,
+    setPartyVision,
     placeDarkness,
     moveDarkness,
     removeDarkness,
@@ -529,7 +645,7 @@ export function fogCommands(log: Logger) {
   };
 }
 
-/** Entries of a scene's undo stack, oldest first (tests, fixtures). */
+/** Entries of a scene's undo stack (undone ones included: the redo list), oldest first. */
 export function fogUndoStack(tx: Pick<Tx, "select">, sceneId: string) {
   return tx
     .select()

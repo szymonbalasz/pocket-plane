@@ -11,12 +11,18 @@
 //   radii from one sweep (a source's `see` and `dark`, FR-FOG-33).
 // - `prepareOccluders(segs)`: scaled segments + their pairwise crossings, computed once per scene
 //   and shared by every source (the angular sweep needs crossings as events).
-// - `prepareScene(walls, darkness) → SceneOccluders`: walls + non-open doors (scene-tools
-//   `sightOccluders`), and the same plus darkness edges for sources without see-through.
+// - `prepareScene(walls, darkness, bounds?) → SceneOccluders`: walls + non-open doors (scene-tools
+//   `sightOccluders`) + the map rectangle's four edges (sprint 4: sight never leaves the map), and
+//   the same plus darkness edges for sources without see-through.
 // - `playerVision(scene, sources) → PlayerVision`: one player's sources (≤ `SOURCES_MAX`, the
-//   caller picks the oldest 4, FR-FOG-32) → blind flag, `see` / `dark` polygons, `inv` indices
-//   into `see ++ dark` of Sees-invisible sources (FR-FOG-39), and `polys` with flags + a fast
-//   containment test.
+//   caller picks the oldest 4, FR-FOG-32) → blind flag, `see` / `dark` polygons (rounded, then
+//   simplified inward-only, `simplifyInward`), `inv` indices into `see ++ dark` of Sees-invisible
+//   sources and `src` = each polygon's source id (FR-FOG-39), and `polys` with flags + a fast
+//   containment test. `sourcePolygons(scene, source)`: one source's polygons the same way.
+// - `senseRadii(senses)` (FR-FOG-32 / -33, sprint 4): `[see, dark]` in cells; `visionFt` absent =
+//   Normal = 999 ft; `dark` is 0 (omitted) when darkvision ≤ vision.
+// - `partyVision(list)` (FR-FOG-50): every player's polygons as one sight; party-blind = some
+//   player has sources and every player with sources is blind.
 // - `prepareStaticLayer(mask, shapes, darkness)` + `samplePoint(layer, x, y)`: a point's static
 //   state + darkness (FR-FOG-01, -28), computed once per re-derive, not per player (FR-FOG-35).
 // - `pointVisible(vision, pt)` (FR-FOG-34) and `invisibleSeen(vision, pt)` (FR-FOG-46).
@@ -37,21 +43,32 @@ import {
 /** A segment `[x1, y1, x2, y2]` in grid units. */
 export type Seg = readonly [x1: number, y1: number, x2: number, y2: number];
 
-/** CHARX FR-CHARX-49 / -53: a creature's senses (absent = all 0 / false). */
+/**
+ * CHARX FR-CHARX-49 / -53: a creature's senses. Sprint 4 (#243 [1], OQ-FOG-51): `visionFt`
+ * absent (or no senses at all) = Normal = 999 ft; darkvision absent = 0; bools absent = false.
+ */
 export interface Senses {
-  visionFt: number;
+  visionFt?: number;
   darkvisionFt: number;
   seesMagicalDarkness: boolean;
   seesInvisible?: boolean;
 }
 
+/** Senses absent: Normal vision (999 ft), no darkvision, no see-through (FR-FOG-32). */
+export const NORMAL_SENSES: Senses = { darkvisionFt: 0, seesMagicalDarkness: false };
+/** Stored 0 / 0 (sprint 3's default; the `vision-legacy` patch): no sight at all. */
 export const NO_SENSES: Senses = { visionFt: 0, darkvisionFt: 0, seesMagicalDarkness: false };
 
 /** FR-FOG-33: the sight bound is a regular polygon with this many sides. */
 export const SIGHT_SIDES = 64;
-/** FR-FOG-32: senses ≤ 120 ft → reach ≤ 24 cells. */
+/** FR-FOG-32 (sprint 4): Normal vision, never stored (the sentinel for an absent `visionFt`). */
+export const VISION_NORMAL_FT = 999;
+/** FR-FOG-32: darkvision ≤ 120 ft → ≤ 24 cells. */
 export const SENSE_FT_MAX = 120;
-export const REACH_MAX_CELLS = 24;
+/** FR-FOG-32: reach ≤ 999 ft = 199.8 cells. */
+export const REACH_MAX_CELLS = VISION_NORMAL_FT / 5;
+/** FR-FOG-33 (sprint 4): inward-only simplification tolerance, cells. */
+export const SIMPLIFY_CELLS = 0.05;
 /** FR-FOG-32 (OQ-FOG-35): ≤ 4 sources per player (oldest `seq` first; the caller cuts). */
 export const SOURCES_MAX = 4;
 const FT_PER_CELL = 5;
@@ -849,6 +866,8 @@ export interface VisionSource {
   x: number;
   y: number;
   senses: Senses;
+  /** The source token's id (`vision.src`, FR-FOG-39); absent = "". */
+  id?: string;
 }
 
 /** A scene's occluders, prepared once per re-derive. */
@@ -860,15 +879,53 @@ export interface SceneOccluders {
   darkness: readonly ShapeLike[];
 }
 
+/** The map rectangle in grid units `[x0, y0, x1, y1]` (FR-FOG-33: its edges occlude). */
+export type MapBounds = readonly [x0: number, y0: number, x1: number, y1: number];
+
+/**
+ * FR-FOG-33 (sprint 4): a map's rectangle in grid units, rounded **inward** to 1/100 cell (fail
+ * closed: sight never reaches past the image). The image's corner (0, 0) = `-offset / cellSize`.
+ */
+export function mapBounds(m: {
+  mapWidth: number;
+  mapHeight: number;
+  gridCellSize: number;
+  gridOffsetX: number;
+  gridOffsetY: number;
+}): MapBounds {
+  const cs = m.gridCellSize;
+  // Snap float noise (1e-6 cell) before rounding inward to 1/100.
+  const up = (v: number) => Math.ceil(Math.round(v * 1e6) / 1e4) / 100;
+  const down = (v: number) => Math.floor(Math.round(v * 1e6) / 1e4) / 100;
+  return [
+    up(-m.gridOffsetX / cs) + 0,
+    up(-m.gridOffsetY / cs) + 0,
+    down((m.mapWidth - m.gridOffsetX) / cs) + 0,
+    down((m.mapHeight - m.gridOffsetY) / cs) + 0,
+  ];
+}
+
+/** The rectangle's four edges as occluders. */
+export function boundsEdges([x0, y0, x1, y1]: MapBounds): Seg[] {
+  return [
+    [x0, y0, x1, y0],
+    [x1, y0, x1, y1],
+    [x1, y1, x0, y1],
+    [x0, y1, x0, y0],
+  ];
+}
+
 export function prepareScene(
   walls: readonly Seg[],
   darkness: readonly ShapeLike[],
+  bounds?: MapBounds,
 ): SceneOccluders {
   const edges = darkness.flatMap((d) => shapeEdges(d));
-  const w = prepareOccluders(walls);
+  const base = bounds ? [...walls, ...boundsEdges(bounds)] : walls;
+  const w = prepareOccluders(base);
   return {
     walls: w,
-    wallsAndDarkness: edges.length === 0 ? w : prepareOccluders([...walls, ...edges]),
+    wallsAndDarkness: edges.length === 0 ? w : prepareOccluders([...base, ...edges]),
     darkness,
   };
 }
@@ -891,12 +948,106 @@ export interface PlayerVision {
   dark: number[][];
   /** Indices into `see ++ dark` of polygons whose source sees invisible (FR-FOG-46). */
   inv: number[];
+  /** `see ++ dark`: each polygon's source token id (FR-FOG-39, sprint 4). */
+  src: string[];
   /** `see ++ dark` with flags (same order as `inv` indexes). */
   polys: SightPoly[];
 }
 
-/** Sense radius in cells: ft / 5, clamped to 0–24. */
-export const reachCells = (ft: number) => Math.max(0, Math.min(ft, SENSE_FT_MAX)) / FT_PER_CELL;
+/** Sense radius in cells: ft / 5, clamped to 0–`maxFt` (vision: 999). */
+export const reachCells = (ft: number, maxFt = VISION_NORMAL_FT) =>
+  Math.max(0, Math.min(ft, maxFt)) / FT_PER_CELL;
+
+/**
+ * FR-FOG-32 / -33 (sprint 4): a source's `[see, dark]` radii in cells. `visionFt` absent = Normal
+ * (999 ft = 199.8 cells); a stored value (0 included) is kept; darkvision ≤ 120 ft. `dark` = 0
+ * (no polygon) when it would lie inside `see` (darkvision ≤ vision).
+ */
+export function senseRadii(s: Senses): [see: number, dark: number] {
+  const see = reachCells(s.visionFt ?? VISION_NORMAL_FT);
+  const dark = reachCells(s.darkvisionFt, SENSE_FT_MAX);
+  return [see, dark > see ? dark : 0];
+}
+
+/**
+ * FR-FOG-33 (sprint 4): inward-only simplification of a rounded sight polygon (flat, grid units)
+ * seen from `origin`. A vertex is dropped only where the polygon shrinks: every input vertex
+ * between its kept neighbours (itself and any already dropped there) lies on the outer side of
+ * the chord prev → next (or on it) within `SIMPLIFY_CELLS`, and the origin lies strictly on the
+ * inner side; repeated until none qualifies. Sight polygons are star-shaped from the origin, so
+ * the result lies inside the input (fail closed: a point within 0.05 cell of an edge may go
+ * unseen, never one past a wall). Exact on 1/100-cell integers.
+ */
+export function simplifyInward(
+  flat: readonly number[],
+  origin: { x: number; y: number },
+): number[] {
+  const n = flat.length >> 1;
+  if (n <= 3) return [...flat];
+  const X = new Float64Array(n);
+  const Y = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    X[i] = Math.round((flat[2 * i] as number) * K);
+    Y[i] = Math.round((flat[2 * i + 1] as number) * K);
+  }
+  let area2 = 0;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    area2 += (X[j] as number) * (Y[i] as number) - (X[i] as number) * (Y[j] as number);
+  }
+  if (area2 === 0) return [...flat];
+  const sgn = area2 > 0 ? 1 : -1;
+  const ox = Math.round(origin.x * K);
+  const oy = Math.round(origin.y * K);
+  const T2 = (SIMPLIFY_CELLS * K) ** 2;
+  const prev = new Int32Array(n);
+  const next = new Int32Array(n);
+  const alive = new Uint8Array(n).fill(1);
+  for (let i = 0; i < n; i++) {
+    prev[i] = (i + n - 1) % n;
+    next[i] = (i + 1) % n;
+  }
+  let left = n;
+  const removable = (v: number): boolean => {
+    const p = prev[v] as number;
+    const q = next[v] as number;
+    const px = X[p] as number;
+    const py = Y[p] as number;
+    const ex = (X[q] as number) - px;
+    const ey = (Y[q] as number) - py;
+    const len2 = ex * ex + ey * ey;
+    if (len2 === 0) return false;
+    if (sgn * (ex * (oy - py) - ey * (ox - px)) <= 0) return false;
+    for (let w = (p + 1) % n; w !== q; w = (w + 1) % n) {
+      const wx = (X[w] as number) - px;
+      const wy = (Y[w] as number) - py;
+      const c = ex * wy - ey * wx;
+      if (sgn * c > 0 || c * c > T2 * len2) return false;
+      // Within 0.05 of the chord **segment**: a thin spike beyond p or q is a line of sight.
+      const t = ex * wx + ey * wy;
+      if (t < 0 || t > len2) return false;
+    }
+    return true;
+  };
+  const queue: number[] = [];
+  for (let i = n - 1; i >= 0; i--) queue.push(i);
+  while (queue.length > 0 && left > 3) {
+    const v = queue.pop() as number;
+    if (!alive[v] || !removable(v)) continue;
+    alive[v] = 0;
+    left--;
+    const p = prev[v] as number;
+    const q = next[v] as number;
+    next[p] = q;
+    prev[q] = p;
+    queue.push(q, p);
+  }
+  if (left === n) return [...flat];
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (alive[i]) out.push(flat[2 * i] as number, flat[2 * i + 1] as number);
+  }
+  return out;
+}
 
 function sightPoly(
   poly: number[],
@@ -933,29 +1084,68 @@ export function playerVision(
     sources.length > 0 &&
     inDark.every(Boolean) &&
     !sources.some((s) => s.senses.seesMagicalDarkness);
-  const see: SightPoly[] = [];
-  const dark: SightPoly[] = [];
+  const see: { p: SightPoly; id: string }[] = [];
+  const dark: { p: SightPoly; id: string }[] = [];
   if (!blind) {
     sources.forEach((s, i) => {
       const through = s.senses.seesMagicalDarkness;
       if (!through && inDark[i]) return;
-      const occ = through ? scene.walls : scene.wallsAndDarkness;
       const flags = { seesThrough: through, seesInvisible: s.senses.seesInvisible === true };
-      const [p1, p2] = sightPolygons(
-        s,
-        [reachCells(s.senses.visionFt), reachCells(s.senses.darkvisionFt)],
-        occ,
-      );
-      if (p1) see.push(sightPoly(p1, "see", flags));
-      if (p2) dark.push(sightPoly(p2, "dark", flags));
+      const [p1, p2] = sourcePolygons(scene, s);
+      const id = s.id ?? "";
+      if (p1) see.push({ p: sightPoly(p1, "see", flags), id });
+      if (p2) dark.push({ p: sightPoly(p2, "dark", flags), id });
     });
   }
-  const polys = [...see, ...dark];
+  const all = [...see, ...dark];
+  const polys = all.map((x) => x.p);
   const inv: number[] = [];
   polys.forEach((p, i) => {
     if (p.seesInvisible) inv.push(i);
   });
-  return { blind, see: see.map((p) => p.poly), dark: dark.map((p) => p.poly), inv, polys };
+  return {
+    blind,
+    see: see.map((x) => x.p.poly),
+    dark: dark.map((x) => x.p.poly),
+    inv,
+    src: all.map((x) => x.id),
+    polys,
+  };
+}
+
+/**
+ * FR-FOG-33: one source's `[see, dark]` polygons (rounded, simplified inward-only), whatever
+ * darkness its origin is in (the caller decides blindness). Null where the radius is 0 / omitted.
+ */
+export function sourcePolygons(
+  scene: SceneOccluders,
+  s: VisionSource,
+): [see: number[] | null, dark: number[] | null] {
+  const occ = s.senses.seesMagicalDarkness ? scene.walls : scene.wallsAndDarkness;
+  const [p1, p2] = sightPolygons(s, senseRadii(s.senses), occ);
+  return [p1 ? simplifyInward(p1, s) : null, p2 ? simplifyInward(p2, s) : null];
+}
+
+/** No sources: no polygons, not blind. */
+export const EMPTY_VISION: PlayerVision = {
+  blind: false,
+  see: [],
+  dark: [],
+  inv: [],
+  src: [],
+  polys: [],
+};
+
+/**
+ * FR-FOG-50: party sight = every player's polygons, each under its own see-through rule (no
+ * geometric union). Party-blind = some player has sources and every player with sources is blind
+ * (FR-FOG-36: no polygon because of darkness); a sightless (stored 0 / 0) player is not blind.
+ * Null = nobody has a source (the static state only).
+ */
+export function partyVision(list: readonly PlayerVision[]): PlayerVision | null {
+  if (list.length === 0) return null;
+  if (list.every((v) => v.blind)) return { ...EMPTY_VISION, blind: true };
+  return { ...EMPTY_VISION, polys: list.flatMap((v) => v.polys) };
 }
 
 // ---------- static layer (FR-FOG-01, -28) ----------
