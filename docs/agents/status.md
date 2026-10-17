@@ -15,19 +15,20 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
-| R S4-1a weapon rows | `build/weapon-rows` (w5F, slot 0) | build-weapon-rows | Building | Walkthrough → S4-2 |
-| R S4-1b weapon combat + BL-10 | `build/weapon-combat` (w5G, slot 2) | build-weapon-combat | Building | Walkthrough → S4-5 |
+| R S4-1a weapon rows | `build/weapon-rows` (w5F, slot 0) | — | Ready for walkthrough (next free slot; brief written) | Walkthrough → S4-2 |
+| R S4-1b weapon combat + BL-10 | `build/weapon-combat` (w5G, slot 2) | test-weapon-combat | Walkthrough | Merge → S4-5 |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
 | M4 window placement | merged c308458 | — | Done (re-test 3 5/5; check 3097, e2e 91) | — |
-| D7 roll popup | — | — | Queued: next free slot (brief next) | — |
+| D7 roll popup | `build/roll-popup` (w5J, slot 4) | build-roll-popup | Building | Walkthrough |
 | Mc map-tools core | `fix/maptools-core` (w5H, slot 5) | build-maptools-core | Building | Review → M1, C-art core |
 
 ## Shared-file locks
 
 - `fix/maptools-core` (Mc): schema, `src/shared/events/scene-tools.ts`.
+- `build/roll-popup` (D7): toast-region lock (`toast-region.ts` constants, `ShellToaster.tsx`).
 - `build/weapon-rows` (S4-1a): sheet folder, `creature-form.tsx`, `src/shared/dice-roll-log/{schemas.ts,roll-kind.ts}` (additive `part` on roll items; D7 rebases on it).
 - `build/weapon-combat` (S4-1b): combat lock (attack / damage / apply, card, popup, `log-kinds.ts`).
 - `build/map-pan-plain` (V7): canvas lock (`MapCanvas.tsx`, `canvas-layers.ts`, `camera.ts`), scene-tools Layers popover, BL-01 e2e specs + `e2e/support` `mapPoint`.
