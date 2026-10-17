@@ -245,8 +245,14 @@ export function MapCanvas(props: MapCanvasProps) {
       grid,
     );
     const work = workArea(size);
-    // FR-MAP-58: the candidate free rectangle the content box fits at the largest scale.
-    const rect = bestFreeRect(box, free.areas, free.area, map, work);
+    // FR-MAP-58: the candidate free rectangle that best keeps the V7 fit priority (PCs, top
+    // row, tokens on screen), then fits the content box at the largest scale.
+    const footprints = tokens.flatMap((t) => footprintBox([t], grid) ?? []);
+    const rect = bestFreeRect(box, free.areas, free.area, map, work, {
+      cell: grid.gridCellSize,
+      pcs,
+      tokens: footprints,
+    });
     const { floor, ...fit } = fitContent(box, rect, map, work, grid.gridCellSize, pcs);
     setCam(fit);
     setFitFloor(floor);

@@ -607,11 +607,22 @@ describe("FR-MAP-58 best free rectangle", () => {
   const ambush = VISIBLE;
   /** M9 (`map-tools`, after M4–M7): what Mira's player sees west of the fog line. */
   const crowd = [tok(6, 7), tok(3, 10), tok(4, 9), tok(5, 9), tok(4, 10, "large")];
-  const pick = (tokens: ReturnType<typeof tok>[], pcTokens: typeof tokens, rects: Rect[]) => {
+  const pick = (
+    tokens: ReturnType<typeof tok>[],
+    pcTokens: typeof tokens,
+    rects: Rect[],
+    at: { w: number; h: number } = vp,
+  ) => {
+    const work = workArea(at);
     const box = contentBox(tokens, GRID, MAP);
-    const area = freeArea(rects, vp);
-    const rect = bestFreeRect(box, freeAreas(rects, vp), area, MAP, work);
+    const area = freeArea(rects, at);
     const pcs = footprintBox(pcTokens, GRID);
+    const footprints = tokens.flatMap((t) => footprintBox([t], GRID) ?? []);
+    const rect = bestFreeRect(box, freeAreas(rects, at), area, MAP, work, {
+      cell: 70,
+      pcs,
+      tokens: footprints,
+    });
     const underAt = (cam: Camera) =>
       tokens.filter((t) => {
         const n = t.size === "large" ? 2 : 1;
@@ -623,23 +634,31 @@ describe("FR-MAP-58 best free rectangle", () => {
       });
     const cam = fitContent(box, rect, MAP, work, 70, pcs);
     const old = fitContent(box, area, MAP, work, 70, pcs);
-    return { area, rect, cam, under: underAt(cam), old };
+    /** FR-MAP-58 before the fit priority: scale, then area, higher, left. */
+    const byScale = bestFreeRect(box, freeAreas(rects, at), area, MAP, work);
+    return { area, rect, cam, under: underAt(cam), old, byScale };
   };
 
-  test("FR-MAP-58 best rectangle: the player at 1280×800 with sheet + Game log fits the strip above the log, not the larger narrow one beside it (sim-7 #3)", () => {
-    const { area, rect, cam, under, old } = pick(ambush, PCS, [log, sheet]);
-    const tokens = footprintBox(ambush, GRID);
-    if (!tokens) throw new Error("no tokens");
-    // FR-SHELL-34's largest-area rectangle is the 540-px strip right of the log: at the 48 px
-    // floor the tokens don't fit it (the PC rule keeps Mira and Thorn there).
-    expect(area).toEqual({ x: 408, y: 48, w: 540, h: 688 });
-    expect(old.floor).toBe(true);
-    expect(inside(old, tokens, area)).toBe(false);
-    // The strip above the log fits the content box at a larger scale (here the whole-map cap,
-    // below the floor at this size): every token in it, none under a window.
-    expect(rect).toEqual({ x: 68, y: 48, w: 880, h: 396 });
+  test("FR-MAP-58 best rectangle: the player at 1280×800 with sheet + Game log (sim-7 #3): the strip above the log fits at the larger scale but cuts the top rows, so the strip beside it wins (V7 fit priority)", () => {
+    const { area, rect, cam, under, old, byScale } = pick(ambush, PCS, [log, sheet]);
+    // By scale alone the strip above the log wins (the whole-map cap, below the floor here)…
+    expect(byScale).toEqual({ x: 68, y: 48, w: 880, h: 396 });
+    const above = fitContent(
+      contentBox(ambush, GRID, MAP),
+      byScale,
+      MAP,
+      work,
+      70,
+      footprintBox(PCS, GRID),
+    );
+    expect(above.y).toBeLessThan(48);
+    // … but at the same 48 px cell the 540-px strip right of the log keeps the top row, the PCs
+    // in it and no token centre under a window.
+    expect(rect).toEqual(area);
+    expect(rect).toEqual({ x: 408, y: 48, w: 540, h: 688 });
+    expect(cam).toEqual(old);
     expect(70 * cam.scale).toBeCloseTo(FIT_MIN_CELL_PX);
-    expect(inside(cam, tokens, rect)).toBe(true);
+    expect(cam.y).toBeGreaterThanOrEqual(48);
     expect(under).toEqual([]);
   });
 
@@ -648,6 +667,43 @@ describe("FR-MAP-58 best free rectangle", () => {
     const { rect, under } = pick(crowd, [tok(6, 7), tok(3, 10)], rects);
     expect(freeAreas(rects, vp)).toContainEqual(rect);
     expect(under).toEqual([]);
+  });
+
+  test("FR-MAP-58 best rectangle: the DM at 1280×720 with Game log + Initiative keeps the top row and the ogres clear of the log (V7 fit priority before scale)", () => {
+    // M5 walkthrough, `map-tools` Goblin Ambush (DM: hidden Wolf and Elite too); PCs Mira, Thorn.
+    const laptop = { w: 1280, h: 720 };
+    const pcs = [tok(2, 7), tok(2, 9)];
+    const ambush = [
+      ...pcs,
+      tok(12, 6),
+      tok(14, 4),
+      tok(15, 8),
+      tok(9, 10, "large"),
+      tok(12, 8),
+      tok(17, 11),
+      tok(4, 9),
+      tok(5, 9),
+      tok(4, 10, "large"),
+    ];
+    const rects = [
+      defaultRect({ anchor: "bottom-left", dx: 56 }, { w: 460, h: 240 }, laptop),
+      defaultRect({ anchor: "top-right" }, { w: 400, h: 500 }, laptop),
+    ];
+    const { rect, cam, under, byScale } = pick(ambush, pcs, rects, laptop);
+    // Before: the wide strip above the log won the tie at the floor on area, so the map's top
+    // edge sat at y −92 and the Cave Ogre and Crypt Ogre under the Game log.
+    expect(byScale).toEqual({ x: 68, y: 48, w: 800, h: 356 });
+    // Now: the narrower strip between the log and Initiative, same 48 px cell.
+    expect(rect).toEqual({ x: 528, y: 48, w: 340, h: 608 });
+    expect(70 * cam.scale).toBeCloseTo(FIT_MIN_CELL_PX);
+    expect(cam.y).toBeGreaterThanOrEqual(48);
+    const p = footprintBox(pcs, GRID);
+    if (!p) throw new Error("no PCs");
+    expect(cam.x + p.x * cam.scale).toBeGreaterThanOrEqual(rect.x);
+    expect(cam.x + (p.x + p.w) * cam.scale).toBeLessThanOrEqual(rect.x + rect.w);
+    // Last in the priority: the four tokens east of col 11 sit under Initiative; the ogres
+    // (Cave (9, 10), Crypt (4, 10)) stay clear of the Game log.
+    expect(under).toEqual([tok(12, 6), tok(14, 4), tok(15, 8), tok(12, 8)]);
   });
 
   test("FR-MAP-58 best rectangle: ties on scale → the larger area, then the higher, then the more left one; none → the free area", () => {
