@@ -1704,3 +1704,18 @@ From [compendium](../specs/compendium.md) (CMP, `complete`; #207, #209). **Built
 | Offline rule | Every write button disabled while the connection isn't `live` | CMP §7 |
 
 **Test IDs:** `cmp-new`, `cmp-derive`, `cmp-derive-dialog`, `cmp-derive-name`, `cmp-derive-field` (+ `data-field`), `cmp-derive-copy-text`, `cmp-derive-save`, `cmp-derive-error`, `cmp-clone`, `cmp-edit`, `cmp-delete`, `cmp-delete-dialog`, `cmp-delete-confirm`, `cmp-form`, `cmp-form-kind`, `cmp-form-name`, `cmp-form-field` (+ `data-field`), `cmp-form-text`, `cmp-form-preview`, `cmp-form-shared`, `cmp-form-save`, `cmp-form-error`, `cmp-add-to-sheet`, `cmp-add-to-sheet-panel`, `cmp-add-to-sheet-character`, `cmp-add-to-sheet-confirm`, `cmp-preset`.
+
+## 61. Sprint 4: area / coverage helper (M0)
+
+Built by `fix/area-geom` ([FR-SCN-41/42](../specs/scene-tools.md#6-functional-requirements), seams S2). Pure, no dependency, no wire change: no caller switched yet (Mc switches `templateCells`, V9's brush imports it).
+
+| Export (`@shared/scenes-map/area`) | Contract | Source |
+|---|---|---|
+| `AreaShape` | Template kinds in grid units `{kind: circle, x, y, r}` \| `{kind: cone, x, y, length, angle}` \| `{kind: line, …, width}` \| `{kind: square, x, y, side, angle}` (origin = a corner, sides along `angle` / `angle + 90°`), plus FOG geometry as is: `{rect}` \| `{polygon}` (simple, even-odd) \| `{circle}` \| `{stroke [r, x0, y0, …]}` | FR-SCN-42, FR-FOG-26 |
+| `templateArea(t)` | `TemplateGeometry` → shape (ft / 5; line width default 5 ft) | FR-SCN-42 |
+| `cellCoverage(shape)` | `{col, row, share}[]`, row-major, share in (0, 1], exact (closed-form circle ∩ cell; cell clipped against convex templates, four corners inside = 1; polygons clipped on edge cells, scanline inside). Strokes throw | FR-SCN-41 |
+| `cells(shape, mode, {axis?, rule?})` | `half`: share > 0.5 + `AREA_TOL` (1e-9); a tie counts iff the cell centre is strictly right of the axis (line, cone), of either centre line (square), of `axis` (FOG geometry; absent → never), never for circles; strokes throw. `centre`: `contains(centre)`. `distance` (circles, strokes): cells within `r × 5` ft of the cell holding each centre / stroke point by `rule` (default `5-10-5`), deduped, row-major; other shapes throw | FR-SCN-41/42, FR-FOG-55 |
+| `contains(shape, x, y)` | Boundary-inclusive; template kinds within `AREA_TOL`; FOG rect / polygon / circle exact on 1/100-cell integers (as FR-FOG-26); stroke = distance to the polyline ≤ r | FR-SCN-21, FR-FOG-26 |
+| `areaBox`, `snapPoint(p, free)`, `snapAngle(deg, free)` | Bounding box; nearest vertex or 0.01 cell; 15° or 0.1° in [0, 360) | FR-SCN-43 |
+
+- Measured: 300-ft sphere at a free origin (11,553 cells) `cells(…, "half")` ≈ 0.3 ms median, p95 ≤ 1.2 ms (bound 3 ms).
