@@ -33,6 +33,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-25 | Physical dice: the manual damage form has no field for an offered trigger die (Divine Fury), so it's "rolled for you" — against OQ-MOD-34 (4) (offered parts are rolled inside the damage entry like any die) (S4-4 walkthrough steps 3 / 8, `.verify/20261017-trigger-badges/` in `build/trigger-badges`) | S | dice-roll-log manual form / MOD tray line | none | dice / combat client | done (`fix/physical-dice-combat`, sprint 4) |
 | BL-26 | At 1440×900 the DM Initiative window is narrow enough that trigger chips always fold into "+N" (allowed by spec; hover lists them) (S4-4 walkthrough) | S | combat-extras chips | none | — | open |
 | BL-27 | The DM's applied outcome line reads "14 slashing + 2 Rage + 6 fire" although the 14 already includes Rage (looks like 16); players' line is right ("14 slashing + 6 fire") (physical-dice fix walkthrough, `.verify/20261017-physical-dice/` in `fix/physical-dice-combat`) | S | combat-tracker / MOD DM line segments (modSegments placement on damage parts) | none | combat lock | open — check in session-sim-8 |
+| BL-28 | `vision-s4.bench.test.ts` "party move at 12 sources ≤ 30 ms" fails in most full `check` runs while other suites run (31–32 ms; 11 ms alone): make the gate load-tolerant (median of N runs, or a relative bound against a baseline) | S | fog-of-war bench test | none | — | open |
 
 ## How to add items
 
