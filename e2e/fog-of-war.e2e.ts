@@ -9,6 +9,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, tokenNode } from "./support/konva";
+import { showToPlayers } from "./support/scenes";
 import { openWindow } from "./support/shell";
 
 /** Map px → page px on the first stage. */
@@ -82,8 +83,8 @@ test("FR-FOG-12 / -21 player view: opaque fog, party only; reveal → Goblin app
     .first()
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+  await showToPlayers(dm, "Goblin Ambush");
   await scenes.getByTestId("ui-window-close").click();
-  await dm.getByTestId("map-show-to-players").click();
 
   const player = await rolePage(browser);
   player.on("console", (m) => {
@@ -318,10 +319,9 @@ test("FR-FOG-30 / -34 / -41 / -42 darkness (static): a free circle over the reve
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
+  // Shown since the first test (same server); shown here when run alone.
+  await showToPlayers(dm, "Goblin Ambush");
   await scenes.getByTestId("ui-window-close").click();
-  // Shown since the first test (same server); show it when run alone.
-  const show = dm.getByTestId("map-show-to-players");
-  if ((await show.count()) > 0) await show.click();
   const player = await rolePage(browser);
   player.on("console", (m) => {
     if (m.type() === "error") errors.push(`player: ${m.text()}`);

@@ -1,4 +1,4 @@
-// DICEX §13 "Bundle" (FR-DICEX-22): a real Vite build (in memory, no `dist/` write). Each
+// DICEX §13 "Bundle" (FR-DICEX-22, §12): a real Vite build (in memory, no `dist/` write). Each
 // client's initial JS carries ≤ 15 KB gz of dice-extras code (parser, tray, flat dice, the 3D
 // loader), measured as the gzip of exactly the dice-extras modules in the initial chunks (an
 // upper bound on the growth vs `main`, which doesn't drift as other features land). `three` and
@@ -102,6 +102,19 @@ describe("DICEX bundle size", () => {
     const size3d = lazy.reduce((s, c) => s + gz(c.code), 0);
     report.push(`3D chunk: ${(size3d / KB).toFixed(1)} KB gz (${lazy.length} chunk)`);
     expect(size3d).toBeLessThanOrEqual(CHUNK_3D_MAX);
+
+    // The throw views (dice layer, zone, 3D runs, D6): a lazy chunk preloaded at idle, outside
+    // the initial budget, without the 3D library.
+    const views = chunks.find(
+      (c) =>
+        c.isDynamicEntry &&
+        Object.keys(c.modules).some((id) => slash(id).endsWith("/dice-extras/ThrowViews.tsx")),
+    );
+    if (!views) throw new Error("no lazy throw-views chunk");
+    for (const c of initial) expect(c.imports).not.toContain(views.fileName);
+    const viewsOwn = [...closure(views, byFile)].filter((c) => !initial.has(c));
+    expect(viewsOwn.flatMap((c) => Object.keys(c.modules)).filter(is3dLib)).toEqual([]);
+    report.push(`throw views: ${(gz(views.code) / KB).toFixed(1)} KB gz`);
     console.log(`[bundle] ${report.join("; ")}`);
   }, 60_000);
 });

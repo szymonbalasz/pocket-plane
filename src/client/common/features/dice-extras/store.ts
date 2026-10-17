@@ -1,5 +1,7 @@
-// Dice-extras client memory (FR-DICEX-02, -09, -10, -18): the staged tray request, the pending
-// throw, the tray's last own result and the running throw. Never stored or sent.
+// Dice-extras client memory (FR-DICEX-02, -09, -10, -18, -35): the staged tray request, the
+// pending throw, the tray's last own result and the running throw with its timeline. Never
+// stored or sent.
+import type { DiceLook } from "@shared/dice-extras/looks";
 import type { DiceThrow } from "@shared/dice-extras/throw";
 import type {
   DmRollActorRef,
@@ -10,9 +12,18 @@ import type {
 import { useSyncExternalStore } from "react";
 import { createStore, type StoreApi } from "zustand";
 import type { RollControlOptions } from "../dice-roll-log/roll-control";
+import type { ThrowPlan } from "./display";
+import {
+  FADE_MS,
+  FLAT_IN_MS,
+  HANDOFF_MS,
+  PENDING_MS,
+  REST_MS,
+  REST_NO_POPUP_MS,
+  SETTLE_MAX_MS,
+} from "./timing";
 
-/** FR-DICEX-09: a pending throw ends after this long without an own `roll` entry. */
-export const PENDING_MS = 3000;
+export { PENDING_MS };
 
 /**
  * FR-DICEX-02: one staged request at a time (a new one replaces it). `free` = notation, palette,
@@ -43,10 +54,26 @@ export interface DiceExtrasState {
   result: GameLogEntryView[] | null;
   /** A roll was sent and its entry hasn't arrived yet (FR-DICEX-09). */
   pending: boolean;
-  /** The running throw; `seq` tells a new throw from a re-render. */
-  current: { t: DiceThrow; seq: number } | null;
-  /** The throw a new one interrupted: it snaps to rest and fades (FR-DICEX-18). */
-  leaving: { t: DiceThrow; seq: number } | null;
+  /** The running throw. */
+  current: ThrowRun | null;
+  /** The throw a new one interrupted: snapped to rest, handing off / fading (FR-DICEX-18). */
+  leaving: ThrowRun | null;
+}
+
+/**
+ * FR-DICEX-35 timeline: `moving` (≤ 2.5 s) → `rest` (1 s; popups off 1.5 s) → `handoff` (0.4 s;
+ * popups off: `fading`, 0.3 s) → gone. A new throw sends the running one to its hand-off at once.
+ */
+export type RunPhase = "moving" | "rest" | "handoff" | "fading";
+
+export interface ThrowRun {
+  t: DiceThrow;
+  /** Tells a new throw from a re-render. */
+  seq: number;
+  plan: ThrowPlan;
+  phase: RunPhase;
+  /** Each entry's roller look, read when the throw starts (FR-DICEX-20). */
+  looks: Record<string, DiceLook>;
 }
 
 export interface DiceExtrasTimers {
@@ -67,9 +94,13 @@ export interface DiceExtrasStore {
   failed(): void;
   /** This client's first new own `roll` entries arrived in one frame. */
   ownRolled(entries: GameLogEntryView[]): void;
-  /** A new throw (FR-DICEX-18: the running one becomes `leaving`, snaps to rest and fades). */
-  play(t: DiceThrow): void;
-  /** The throw `seq` faded out. */
+  /** A new throw (FR-DICEX-18: the running one becomes `leaving` and hands off at once). */
+  play(t: DiceThrow, plan: ThrowPlan, looks?: Record<string, DiceLook>): void;
+  /** The throw `seq` is at rest (the renderer's report; flat throws rest on their own). */
+  rested(seq: number): void;
+  /** 3D failed for the throw `seq` (context lost): it shows flat in the zone at its values. */
+  flat(seq: number): void;
+  /** The throw `seq` is gone (its hand-off / fade ended). */
   done(seq: number): void;
 }
 
@@ -93,9 +124,57 @@ export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers):
   const api = createStore<DiceExtrasState>()(initial);
   let timer: unknown = null;
   let seq = 0;
+  /** Each run's pending timeline step. */
+  const steps = new Map<number, unknown>();
   const stopTimer = () => {
     if (timer !== null) timers.clearTimeout(timer);
     timer = null;
+  };
+  const after = (n: number, ms: number, fn: () => void) => {
+    const h = steps.get(n);
+    if (h !== undefined) timers.clearTimeout(h);
+    steps.set(
+      n,
+      timers.setTimeout(() => {
+        steps.delete(n);
+        fn();
+      }, ms),
+    );
+  };
+  const patch = (n: number, fn: (r: ThrowRun) => ThrowRun) =>
+    api.setState((s) => ({
+      current: s.current?.seq === n ? fn(s.current) : s.current,
+      leaving: s.leaving?.seq === n ? fn(s.leaving) : s.leaving,
+    }));
+  const runOf = (n: number) => {
+    const s = api.getState();
+    return s.current?.seq === n ? s.current : s.leaving?.seq === n ? s.leaving : null;
+  };
+  const done = (n: number) => {
+    const h = steps.get(n);
+    if (h !== undefined) timers.clearTimeout(h);
+    steps.delete(n);
+    const s = api.getState();
+    if (s.current?.seq === n) api.setState({ current: null });
+    if (s.leaving?.seq === n) api.setState({ leaving: null });
+  };
+  /** Rest → hand-off / fade → gone; `restMs` 0 = at once (an interrupted throw). */
+  const leave = (n: number, restMs: number) => {
+    const run = runOf(n);
+    if (!run) return;
+    const handoff = run.plan.handoff;
+    const out = () => {
+      patch(n, (r) => ({ ...r, phase: handoff ? "handoff" : "fading" }));
+      after(n, handoff ? HANDOFF_MS : FADE_MS, () => done(n));
+    };
+    if (restMs === 0) out();
+    else after(n, restMs, out);
+  };
+  const rested = (n: number) => {
+    const run = runOf(n);
+    if (run?.phase !== "moving") return;
+    patch(n, (r) => ({ ...r, phase: "rest" }));
+    leave(n, run.plan.handoff ? REST_MS : REST_NO_POPUP_MS);
   };
   return {
     api,
@@ -138,15 +217,29 @@ export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers):
         s.rolling ? { pending: false, rolling: false, result: entries } : { pending: false },
       );
     },
-    play(t) {
+    play(t, plan, looks = {}) {
       seq += 1;
-      api.setState((s) => ({ current: { t, seq }, leaving: s.current }));
+      const n = seq;
+      const prev = api.getState();
+      // FR-DICEX-18: one throw at a time; an older leaving throw goes at once.
+      if (prev.leaving) done(prev.leaving.seq);
+      const old = prev.current;
+      api.setState({
+        current: { t, seq: n, plan, phase: "moving", looks },
+        leaving: old ? { ...old, phase: "rest" } : null,
+      });
+      if (old) leave(old.seq, 0);
+      // Flat faces fade in, then rest; a 3D throw rests by the budget's end at the latest.
+      after(n, plan.draw === "flat" ? FLAT_IN_MS : SETTLE_MAX_MS, () => rested(n));
     },
-    done(n) {
-      const s = api.getState();
-      if (s.current?.seq === n) api.setState({ current: null });
-      if (s.leaving?.seq === n) api.setState({ leaving: null });
+    rested,
+    flat(n) {
+      const run = runOf(n);
+      if (!run || run.plan.draw === "flat") return;
+      patch(n, (r) => ({ ...r, plan: { ...r.plan, arena: "zone", draw: "flat" } }));
+      if (run.phase === "moving") after(n, FLAT_IN_MS, () => rested(n));
     },
+    done,
   };
 }
 

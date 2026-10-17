@@ -1,26 +1,28 @@
-// FR-DICEX-21 / -22: whether this device can draw 3D, and the lazy 3D chunk. The chunk (three,
-// cannon-es, meshes, the renderer) loads by dynamic import on the first 3D throw; `flat` / `off`
-// never load it. A load failure → `flat` for the session + one console warning.
+// FR-DICEX-22 / -37: whether this device can draw 3D, and the lazy 3D chunk. The chunk (three,
+// cannon-es, meshes, the renderer) loads by dynamic import at idle after the first snapshot when
+// the display draws 3D (`screen` / `zone`); `flat` / `off` never load it. A throw arriving while
+// it loads waits ≤ 1.5 s. A load failure → `flat` for the session + one console warning.
 import { useSyncExternalStore } from "react";
-import type { RenderSetting } from "./settings";
+import { type DisplaySetting, is3dDisplay } from "./settings";
+import { CHUNK_WAIT_MS, IDLE_FALLBACK_MS } from "./timing";
 
 export type Dice3DModule = typeof import("./dice3d/index");
 export type ChunkState = "idle" | "loading" | "ready" | "failed";
 
-export interface ChunkLoader {
+export interface ChunkLoader<M = Dice3DModule> {
   state(): ChunkState;
-  module(): Dice3DModule | null;
+  module(): M | null;
   /** Start loading (no-op unless idle). */
   load(): void;
   subscribe(fn: () => void): () => void;
 }
 
-export function createChunkLoader(
-  importer: () => Promise<Dice3DModule>,
+export function createChunkLoader<M = Dice3DModule>(
+  importer: () => Promise<M>,
   warn: (msg: string, err: unknown) => void = (m, e) => console.warn(m, e),
-): ChunkLoader {
+): ChunkLoader<M> {
   let state: ChunkState = "idle";
-  let mod: Dice3DModule | null = null;
+  let mod: M | null = null;
   const listeners = new Set<() => void>();
   const set = (s: ChunkState) => {
     state = s;
@@ -89,9 +91,85 @@ export function useThreeD(): { available: boolean; reason: "no-webgl" | "failed"
 }
 
 /**
- * How one throw draws, given the effective render and the chunk: 3D only once the chunk is
- * ready; while it loads that throw is flat (DICEX §7 "States").
+ * How one throw draws, given the effective display and the chunk: 3D only once the chunk is
+ * ready; else flat (DICEX §7 "States").
  */
-export function throwDraw(render: RenderSetting, chunk: ChunkState): "3d" | "flat" {
-  return render === "3d" && chunk === "ready" ? "3d" : "flat";
+export function throwDraw(display: DisplaySetting, chunk: ChunkState): "3d" | "flat" {
+  return is3dDisplay(display) && chunk === "ready" ? "3d" : "flat";
+}
+
+export interface IdleEnv {
+  requestIdleCallback?: (fn: () => void) => number;
+  cancelIdleCallback?: (h: number) => void;
+  setTimeout(fn: () => void, ms: number): unknown;
+  clearTimeout(h: unknown): void;
+}
+
+const browserIdle = (): IdleEnv => ({
+  requestIdleCallback: globalThis.requestIdleCallback?.bind(globalThis),
+  cancelIdleCallback: globalThis.cancelIdleCallback?.bind(globalThis),
+  setTimeout: (fn, ms) => setTimeout(fn, ms),
+  clearTimeout: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+});
+
+/**
+ * FR-DICEX-37: once there is a snapshot and the display draws 3D, load the chunk at idle
+ * (`requestIdleCallback`, else after 2 s). Returns a cancel.
+ */
+export function preloadAtIdle(
+  loader: Pick<ChunkLoader<unknown>, "state" | "load">,
+  display: DisplaySetting,
+  env: IdleEnv = browserIdle(),
+): () => void {
+  return is3dDisplay(display) ? loadAtIdle(loader, env) : () => {};
+}
+
+/** Load `loader` at idle (`requestIdleCallback`, else after 2 s). Returns a cancel. */
+export function loadAtIdle(
+  loader: Pick<ChunkLoader<unknown>, "state" | "load">,
+  env: IdleEnv = browserIdle(),
+): () => void {
+  if (loader.state() !== "idle") return () => {};
+  if (env.requestIdleCallback) {
+    const h = env.requestIdleCallback(() => loader.load());
+    return () => env.cancelIdleCallback?.(h);
+  }
+  const h = env.setTimeout(() => loader.load(), IDLE_FALLBACK_MS);
+  return () => env.clearTimeout(h);
+}
+
+/**
+ * FR-DICEX-37: call `done(ready)` once the chunk is ready (at once when it is) or after
+ * `CHUNK_WAIT_MS` (false, or as soon as it fails). Starts the load if it hasn't. Returns a cancel.
+ */
+export function whenChunk(
+  loader: ChunkLoader,
+  done: (ready: boolean) => void,
+  timers: Pick<IdleEnv, "setTimeout" | "clearTimeout"> = browserIdle(),
+): () => void {
+  if (loader.state() === "ready") {
+    done(true);
+    return () => {};
+  }
+  loader.load();
+  let settled = false;
+  const finish = (ready: boolean) => {
+    if (settled) return;
+    settled = true;
+    unsub();
+    timers.clearTimeout(timer);
+    done(ready);
+  };
+  const unsub = loader.subscribe(() => {
+    const s = loader.state();
+    if (s === "ready") finish(true);
+    else if (s === "failed") finish(false);
+  });
+  const timer = timers.setTimeout(() => finish(loader.state() === "ready"), CHUNK_WAIT_MS);
+  if (loader.state() === "failed") finish(false);
+  return () => {
+    settled = true;
+    unsub();
+    timers.clearTimeout(timer);
+  };
 }

@@ -9,6 +9,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, tokenNode } from "./support/konva";
+import { showToPlayers } from "./support/scenes";
 import { openWindow, shellWindow } from "./support/shell";
 
 /** Map px → page px on the first stage. */
@@ -80,7 +81,7 @@ test("FR-SCN-11 / -12 / -09 / -08 / -15 blocked move, door open, door menu, draw
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
-  await dm.getByTestId("map-show-to-players").click();
+  await showToPlayers(dm, "Goblin Ambush");
   await expect(dm.getByTestId("map-not-shown-badge")).toHaveCount(0);
   await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
 
@@ -227,7 +228,7 @@ test("FR-MAP-28 a drag in progress when the connection drops snaps back unsent; 
     .locator(`[data-testid="map-scene-row"][data-record-id="${recordId("town", "scene")}"] button`)
     .first()
     .click();
-  await dm.getByTestId("map-show-to-players").click();
+  await showToPlayers(dm, "Town");
   await expect(player.getByTestId("map-canvas")).toHaveAttribute(
     "data-scene-id",
     recordId("town", "scene"),
@@ -283,7 +284,7 @@ test("FR-SCN-08 / -38 / -13 freeform walls + magnet door, player wall hint befor
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
-  await dm.getByTestId("map-show-to-players").click();
+  await showToPlayers(dm, "Goblin Ambush");
   await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
   await expect.poll(() => attr(dm, "scn-walls", null, "count")).toBe(3);
 
@@ -392,7 +393,7 @@ test("FR-SCN-08 / -38 / -13 freeform walls + magnet door, player wall hint befor
     .locator(`[data-testid="map-scene-row"][data-record-id="${town}"] button`)
     .first()
     .click();
-  await dm.getByTestId("map-show-to-players").click();
+  await showToPlayers(dm, "Town");
   await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", town);
 
   await player.context().close();

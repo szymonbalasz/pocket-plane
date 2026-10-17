@@ -5,6 +5,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, stageScale, tokenNode } from "./support/konva";
+import { sceneRow, showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 /** A token's map-space cell (Town / Goblin Ambush: 70 px cells, offset 0). */
@@ -202,8 +203,9 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await dm.mouse.click(empty.x, empty.y);
   await expect.poll(() => selectedIds(dm)).toEqual([]);
 
-  // Show to players: the player switches; Wolf visible, Elite and the scene name never sent.
-  await dm.getByTestId("map-show-to-players").click();
+  // Show to players from the Scenes window (FR-MAP-51): the player switches; Wolf visible,
+  // Elite and the scene name never sent.
+  await showToPlayers(dm, "Goblin Ambush");
   await expect(dm.getByTestId("map-not-shown-badge")).toHaveCount(0);
   await expect(dm.getByTestId("map-tool-ping")).toBeEnabled();
   await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
@@ -232,6 +234,73 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   await expect
     .poll(() => cellOf(dm, recordId("battlemap", "token", 0)))
     .toEqual({ col: 2, row: 7 });
+
+  await player.context().close();
+  await dm.context().close();
+});
+
+test("FR-MAP-51 Show to players from the Scenes window; the badge opens Scenes at the row", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const town = recordId("town", "scene");
+  const ambush = recordId("battlemap", "scene");
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  // Goblin Ambush shown by the test above; shown here when run alone.
+  const scenes = await showToPlayers(dm, "Goblin Ambush");
+  const player = await rolePage(browser);
+  await player.goto(link("Player 1"));
+  await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+
+  // No Show button on the rail; the Live row has none either.
+  await expect(dm.getByTestId("map-show-to-players")).toHaveCount(0);
+  await expect(sceneRow(dm, "Goblin Ambush").getByTestId("map-scene-show")).toHaveCount(0);
+
+  // DM views Town, collapses its folder; the badge expands it and focuses Town's row.
+  await sceneRow(dm, "Town").locator("button").first().click();
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", town);
+  const badge = dm.getByTestId("map-not-shown-badge");
+  await expect(badge).toHaveText(/Not shown to players/);
+  await scenes.getByTestId("map-folder-row").getByText("Act 1", { exact: true }).click();
+  await expect(sceneRow(dm, "Town")).toHaveCount(0);
+  await badge.click();
+  const townButton = sceneRow(dm, "Town").locator("button").first();
+  await expect(townButton).toBeFocused();
+  // Closed window: the badge opens it, Town's row focused; focus reveals its Show button.
+  await scenes.getByTestId("ui-window-close").click();
+  await expect(scenes).toBeHidden();
+  await badge.click();
+  await expect(scenes).toBeVisible();
+  await expect(townButton).toBeFocused();
+  const opacity = (name: string) =>
+    sceneRow(dm, name)
+      .getByTestId("map-scene-show")
+      .evaluate((el) => getComputedStyle(el.parentElement as HTMLElement).opacity);
+  await expect.poll(() => opacity("Town")).toBe("1");
+  expect(await opacity("Cellar")).toBe("0");
+
+  // The row menu's first item is Show to players: Town goes live, the badge goes.
+  await sceneRow(dm, "Town").getByTestId("map-scene-menu").click();
+  const menu = dm.getByRole("menu");
+  await expect(menu.getByRole("menuitem").first()).toHaveAttribute(
+    "data-testid",
+    "map-scene-menu-show",
+  );
+  await menu.getByTestId("map-scene-menu-show").click();
+  await expect(sceneRow(dm, "Town").getByTestId("map-scene-live")).toBeVisible();
+  await expect(sceneRow(dm, "Goblin Ambush").getByTestId("map-scene-live")).toHaveCount(0);
+  await expect(badge).toHaveCount(0);
+  await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", town);
+
+  // Hover Goblin Ambush → its Show button: players switch back; the DM keeps viewing Town.
+  await sceneRow(dm, "Goblin Ambush").hover();
+  await expect.poll(() => opacity("Goblin Ambush")).toBe("1");
+  await sceneRow(dm, "Goblin Ambush").getByTestId("map-scene-show").click();
+  await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", town);
+  await expect(badge).toBeVisible();
 
   await player.context().close();
   await dm.context().close();

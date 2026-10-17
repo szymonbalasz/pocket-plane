@@ -2,55 +2,87 @@ import { expect, test } from "bun:test";
 import {
   createSettingsStore,
   DEFAULT_SETTINGS,
-  effectiveRender,
+  effectiveDisplay,
+  migrateV1,
   parseSettings,
+  type SettingsBackend,
   settingsKey,
 } from "./settings";
 
-test("FR-DICEX-21 key per campaign and owner", () => {
-  expect(settingsKey("c1", "dm", null)).toBe("pp.dicex.v1.c1.dm");
-  expect(settingsKey("c1", "player", "p1")).toBe("pp.dicex.v1.c1.p1");
+const memoryBackend = (data: Map<string, string>): SettingsBackend => ({
+  getItem: (k) => data.get(k) ?? null,
+  setItem: (k, v) => void data.set(k, v),
 });
 
-test("FR-DICEX-21 parse: valid JSON kept, anything invalid → defaults (3d, others on)", () => {
-  expect(parseSettings('{"render":"off","others":false}')).toEqual({
-    render: "off",
+test("FR-DICEX-36 settings v2: key per campaign and owner", () => {
+  expect(settingsKey("c1", "dm", null)).toBe("pp.dicex.v2.c1.dm");
+  expect(settingsKey("c1", "player", "p1")).toBe("pp.dicex.v2.c1.p1");
+});
+
+test("FR-DICEX-36 settings v2: defaults (screen, others on, popups on); invalid → defaults", () => {
+  expect(DEFAULT_SETTINGS).toEqual({ display: "screen", others: true, popup: true });
+  expect(parseSettings('{"display":"zone","others":false,"popup":false}')).toEqual({
+    display: "zone",
     others: false,
+    popup: false,
   });
-  expect(DEFAULT_SETTINGS).toEqual({ render: "3d", others: true });
   for (const bad of [
     null,
     "",
     "not json",
-    '{"render":"4d","others":true}',
-    '{"render":"flat"}',
+    '{"display":"3d","others":true,"popup":true}',
+    '{"display":"flat","others":true}',
+    '{"render":"flat","others":true}',
     "[]",
   ]) {
     expect(parseSettings(bad)).toEqual(DEFAULT_SETTINGS);
   }
 });
 
-test("FR-DICEX-21 reduced motion or no WebGL → flat; flat / off unchanged", () => {
-  expect(effectiveRender("3d", { reducedMotion: false, threeD: true })).toBe("3d");
-  expect(effectiveRender("3d", { reducedMotion: true, threeD: true })).toBe("flat");
-  expect(effectiveRender("3d", { reducedMotion: false, threeD: false })).toBe("flat");
-  expect(effectiveRender("off", { reducedMotion: true, threeD: true })).toBe("off");
-  expect(effectiveRender("flat", { reducedMotion: false, threeD: true })).toBe("flat");
+test("FR-DICEX-36 settings v2: a v1 entry migrates once (3d → screen, flat / off kept, others kept)", () => {
+  expect(migrateV1('{"render":"3d","others":false}')).toEqual({
+    display: "screen",
+    others: false,
+    popup: true,
+  });
+  expect(migrateV1('{"render":"flat","others":true}')?.display).toBe("flat");
+  expect(migrateV1('{"render":"off","others":true}')?.display).toBe("off");
+  expect(migrateV1('{"render":"4d","others":true}')).toBeNull();
+  expect(migrateV1(null)).toBeNull();
+
+  const data = new Map([["pp.dicex.v1.c1.p1", '{"render":"off","others":false}']]);
+  const s = createSettingsStore(() => memoryBackend(data));
+  const key = settingsKey("c1", "player", "p1");
+  expect(s.read(key)).toEqual({ display: "off", others: false, popup: true });
+  // Written once as v2: later reads come from v2, a v1 change no longer matters.
+  expect(JSON.parse(data.get(key) ?? "")).toEqual({ display: "off", others: false, popup: true });
+  data.set("pp.dicex.v1.c1.p1", '{"render":"3d","others":true}');
+  expect(s.read(key).display).toBe("off");
+  // Another owner's v1 entry stays theirs; no v1 → defaults.
+  expect(s.read(settingsKey("c1", "dm", null))).toEqual(DEFAULT_SETTINGS);
 });
 
-test("FR-DICEX-21 storage round-trip; throwing / missing storage → memory", () => {
+test("FR-DICEX-32 FR-DICEX-45 reduced motion or no WebGL → effective flat; flat / off unchanged", () => {
+  for (const d of ["screen", "zone"] as const) {
+    expect(effectiveDisplay(d, { reducedMotion: false, threeD: true })).toBe(d);
+    expect(effectiveDisplay(d, { reducedMotion: true, threeD: true })).toBe("flat");
+    expect(effectiveDisplay(d, { reducedMotion: false, threeD: false })).toBe("flat");
+  }
+  expect(effectiveDisplay("off", { reducedMotion: true, threeD: true })).toBe("off");
+  expect(effectiveDisplay("flat", { reducedMotion: false, threeD: true })).toBe("flat");
+});
+
+test("FR-DICEX-36 storage round-trip; throwing / missing storage → memory", () => {
   const data = new Map<string, string>();
-  const ok = createSettingsStore(() => ({
-    getItem: (k) => data.get(k) ?? null,
-    setItem: (k, v) => void data.set(k, v),
-  }));
+  const ok = createSettingsStore(() => memoryBackend(data));
   let calls = 0;
   ok.subscribe(() => {
     calls += 1;
   });
-  ok.write("k", { render: "off", others: false });
-  expect(JSON.parse(data.get("k") ?? "")).toEqual({ render: "off", others: false });
-  expect(ok.read("k")).toEqual({ render: "off", others: false });
+  const v = { display: "off", others: false, popup: true } as const;
+  ok.write("k", v);
+  expect(JSON.parse(data.get("k") ?? "")).toEqual(v);
+  expect(ok.read("k")).toEqual(v);
   expect(ok.read("k")).toBe(ok.read("k")); // stable snapshot
   expect(calls).toBe(1);
 
@@ -63,9 +95,17 @@ test("FR-DICEX-21 storage round-trip; throwing / missing storage → memory", ()
     },
   }));
   expect(broken.read("k")).toEqual(DEFAULT_SETTINGS);
-  broken.write("k", { render: "flat", others: true });
-  expect(broken.read("k")).toEqual({ render: "flat", others: true });
+  broken.write("k", { ...DEFAULT_SETTINGS, display: "flat" });
+  expect(broken.read("k").display).toBe("flat");
   const none = createSettingsStore(() => undefined);
-  none.write("k", { render: "off", others: true });
-  expect(none.read("k").render).toBe("off");
+  none.write("k", { ...DEFAULT_SETTINGS, display: "off" });
+  expect(none.read("k").display).toBe("off");
+  // A v1 entry with storage that refuses writes migrates into memory.
+  const ro = createSettingsStore(() => ({
+    getItem: (k) => (k === "pp.dicex.v1.c1.dm" ? '{"render":"flat","others":true}' : null),
+    setItem: () => {
+      throw new Error("quota");
+    },
+  }));
+  expect(ro.read(settingsKey("c1", "dm", null)).display).toBe("flat");
 });
