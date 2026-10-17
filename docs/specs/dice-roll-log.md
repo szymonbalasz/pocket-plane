@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: in-review
+status: complete
 owner: spec-dice
 wave: 2
 phase: post-mvp-4
@@ -281,13 +281,15 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 ## 15. Open questions
 
-| ID | Question | Options (pick marked) | Blocking? | Affects |
+All rows decided or settled; sprint-4 rows by the DM at sprint-4 gate 1 ([#245](../decisions-log.md)) and the seams ruling (S8, rulings B5 / B9).
+
+| ID | Question | Answer (decided option in bold where options were offered) | Blocking? | Affects |
 |---|---|---|---|---|
 | ~~OQ-DICE-03–22~~ | ~~Seeding; snapshot depth; shared changes; manual; visibility; defaults; contests; limits; log timing; glossary; storage; sheet buttons~~ | Decided: 05 no sessions (ADR-0013), 06 superseded, 08 #73, 12 #74; #137 (`ctx.dice`, newest 100, §14); #139 P6, P8, P21–P25; gate I3–I5, I13; #135 + I1 (`char.roll` out of combat, `cbt.*` in combat) | — | — |
 | ~~OQ-DICE-23~~ | ~~Natural marker on initiative lines (G12)~~ | **Decided (#172):** no natural marker on initiative lines (FR-DICE-29) | — | combat-tracker |
 | ~~OQ-DICE-25~~ | ~~R3: DM Game log history shows ~3 lines; multi-line outcome lines are cut~~ | **Decided #178:** collapse the roll bar to one row, options behind a chevron (FR-DICE-30). Rejected: taller or wider DM default (covers more map, R1) | — | play-shell |
 | ~~OQ-DICE-26~~ | ~~G6: after a natural 20, how does the physical popover ask for crit damage?~~ | **Decided (#190):** keep the typed base dice, add an "Extra critical dice" group (FR-DICE-31) | — | combat-tracker (crit expressions) |
-| OQ-DICE-27 | Sprint 4 [17]: how do log lines show the dice? (owner `spec-dice`, for the DM gate) | **A inline die-shape chips in place of the dice numbers: ≥ 6 lines still fit**. B a chip row under each line: bigger dice, about half the lines visible at default size (breaks FR-SHELL-35). C chips only in the Tooltip: no layout change, but not "the same dice" at a glance | no | FR-DICE-35, play-shell (FR-SHELL-35) |
+| OQ-DICE-27 | Sprint 4 [17]: how do log lines show the dice? | **Decided** (DM, sprint-4 gate 1, #245, bulk D): inline die-shape chips in place of the dice numbers; ≥ 6 lines still fit. Rejected: a chip row under each line; chips only in the Tooltip | no (decided) | FR-DICE-35, play-shell (FR-SHELL-35) |
 | ~~OQ-DICE-28~~ | ~~Sprint 4 seam with R ([15] Divine Fury in the combat log): who builds the trigger part's dice in the line?~~ | **Settled by seams S8:** A: R, in R S4-5 `fix/fury-log-line` after D5 (and after R S4-1b), through D5's per-die `die` segments (`label` = part name; offered dice `offered: true`, `kept: false` only for dropped dice: ruling B5); MOD / offered chips are R's (B9); `die` segments DM-only exactly when their text is. Rejected: B D edits combat's `log-kinds.ts` | — | [effect-modifiers](effect-modifiers.md), [combat-tracker](combat-tracker.md) |
 | ~~OQ-DICE-24~~ | ~~G12 verdicts (dice part)~~ | **Decided (#172):** verdicts accepted: "— natural 1" per FR-DICE-20 except initiative (FR-DICE-29); no group roll (each combatant rolls, FR-CBT-11); fixture clock by design (FR-FIX-08) | — | fixtures-adapters |
 
