@@ -10,14 +10,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
 | Docs pass | merged bd07224 | — | Done | — |
-| C-search | merged | — | Done (walkthrough 12/13; check 2984, e2e 84) | C-all next |
+| C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | `fix/rules4-core` (w5C, slot 0) | build-rules4-core | Building | Review (no UI) |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
-| M3 Show to players | `fix/show-to-players` (w5B, slot 5) | build-show-to-players | Building | Walkthrough |
-| D6 full-screen dice | `build/dice-screen` (w5A, slot 2) | build-dice-screen | Building | Walkthrough |
+| M3 Show to players | `fix/show-to-players` (w5B, slot 5) | test-show-to-players | Walkthrough (check 2988, e2e 85) | Merge |
+| D6 full-screen dice | `build/dice-screen` (w5A, slot 2) | test-dice-screen | Walkthrough (check 2957, e2e green; 3D chunk 157 KB) | Merge → D7 (after M4) |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
-| M4 window placement | `fix/window-placement` (w57, slot 4) | fix-window-placement | Walkthrough FAIL M8 (Initiative over the Game log at Start) → fixing | Re-walk M8, merge |
+| M4 window placement | `fix/window-placement` (w57, slot 4) | fix-window-placement-2 | Re-test: Start order fixed; Initiative placed shorter than its min height → fixing | Re-walk M8, merge |
 
 ## Shared-file locks
 
