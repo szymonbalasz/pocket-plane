@@ -12,14 +12,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Docs pass | merged bd07224 | — | Done | — |
 | V7 pan / plain map / Fit | merged 13c15f6 | — | Done (BL-01, BL-07; check 3158, e2e 94) | V8, M1 next |
 | V8 vision while dragging | `build/vision-drag` (w5N, slot 0) | build-vision-drag | Building | Walkthrough → M2 |
-| M1 freeform AoE | `build/aoe-freeform` (w5X, slot 3) | build-aoe-freeform | Building | Walkthrough → M2 (after V8) |
+| M1 freeform AoE | `build/aoe-freeform` (w5X, slot 3) | test-aoe-freeform | Walkthrough | Merge → M2 (after V8) |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
 | R S4-1a weapon rows | merged 9859252 | — | Done (walkthrough 6/6; main check 3174, e2e 95 green) | S4-2 next |
 | R S4-1b weapon combat + BL-10 | merged | — | Done (walkthrough 8/8; check 3138, e2e 92) | — |
-| R S4-5 Divine Fury log line | `fix/fury-log-line` (w5M, slot 2) | — | Walkthrough 9/9; merged main (apply-hook conflict kept both), branch gates running | Merge |
+| R S4-5 Divine Fury log line | `fix/fury-log-line` (w5M, slot 2) | fix-fury-e2e | Walkthrough 9/9; check 3200 green; e2e order clash with trigger-state spec (same bundle) → fixing | Merge |
 | R S4-3 trigger state + tray | merged e3e203b | — | Done (walkthrough 8/8; check 3185, e2e 96) | — |
 | R S4-4 trigger badges | `build/trigger-badges` (w5Y, slot 5) | build-trigger-badges | Building | Walkthrough |
 | R S4-2 negative uses | — | — | Queued (brief ready) | Next free slot |
