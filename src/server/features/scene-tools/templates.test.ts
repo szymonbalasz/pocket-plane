@@ -377,6 +377,31 @@ describe("SCN §11 crash: one transaction per command", () => {
         .map((l) => l.type),
     ).toEqual(["TemplatePlaced"]);
   });
+
+  test("FR-SCN-44 crash scn.clearTemplates: kill before commit → digest unchanged; after commit → the committed state", () => {
+    class Killed extends Error {}
+    const kill = () => {
+      throw new Killed();
+    };
+    const t = setup();
+    const mine = t.place(sphere(t.ambush.id, { x: 3.37, y: 7.64 }), t.p1);
+    t.place(sphere(t.ambush.id, { x: 12.5, y: 0.25, angle: 37.5, hidden: true }));
+    const digest = stateDigest(t.s.db.$client).sha256;
+    const log = readEventLog(t.s.db).length;
+    armCrashHook({ point: "before-commit", target: S.clearTemplates }, kill);
+    expect(() => t.run(S.clearTemplates, { sceneId: t.ambush.id })).toThrow();
+    expect(stateDigest(t.s.db.$client).sha256).toBe(digest);
+    armCrashHook({ point: "after-commit", target: S.clearTemplates }, kill);
+    expect(() => t.run(S.clearTemplates, { sceneId: t.ambush.id })).toThrow(Killed);
+    armCrashHook(null);
+    expect(t.tpl(mine)).toMatchObject({ x: 3.37, y: 7.64 });
+    expect(t.count("aoe_template")).toBe(1);
+    expect(
+      readEventLog(t.s.db)
+        .slice(log)
+        .map((l) => l.type),
+    ).toEqual(["TemplatesCleared"]);
+  });
 });
 
 describe("FR-SCN-24 scn.template audience", () => {
@@ -446,6 +471,24 @@ describe("FR-SCN-24 scn.template audience", () => {
     expect(t.route(partly, t.dm)).toEqual({ players: [t.h.p1.id, t.h.p2.id] });
     expect(t.route(inFog, t.p1)).toBe("all");
     expect(t.route(t.end(t.ambush.id), t.dm)).toBe("all");
+  });
+
+  test("FR-SCN-46 DM audience over the new uncut cells: a freeform cube reaching out of fog → its seers; a 5-ft cone covering no cell samples its origin's cell", () => {
+    const t = audience();
+    players.splice(0, players.length, t.h.p1.id, t.h.p2.id);
+    registerFog(true);
+    // Sprint 2's centre cells of this cube were all at col ≥ 15 (fogged); > 50 % reaches col 14.
+    const cube = { shape: "cube", x: 15, y: 5, size: 10, angle: 45 };
+    expect(t.route(t.place(t.ambush.id, cube), t.dm)).toEqual({ players: [t.h.p1.id, t.h.p2.id] });
+    expect(t.route(t.place(t.ambush.id, { ...cube, x: 16.25, y: 5.5, angle: 0.5 }), t.dm)).toBe(
+      "dm",
+    );
+    const cone = { shape: "cone", size: 5, angle: 37.5 };
+    expect(t.route(t.place(t.ambush.id, { ...cone, x: 15.37, y: 3.64 }), t.dm)).toBe("dm");
+    expect(derived.at(-1)?.cells).toEqual([[15, 3]]);
+    expect(t.route(t.place(t.ambush.id, { ...cone, x: 14.37, y: 3.64 }), t.dm)).toEqual({
+      players: [t.h.p1.id, t.h.p2.id],
+    });
   });
 
   test("FR-SCN-23 signals are never persisted: no row, log or event", () => {
