@@ -46,7 +46,11 @@ describe("SCN domain events (§9)", () => {
     expect(scn.PropHidden.payload.safeParse({ propId: "p" }).success).toBe(true);
     expect(scn.PropHidden.payload.safeParse({ propId: "p", assetId: "a" }).success).toBe(false);
     expect(
-      scn.TemplatesCleared.payload.safeParse({ sceneId: "s", templateIds: ["a", "b"] }).success,
+      scn.TemplatesCleared.payload.safeParse({
+        sceneId: "s",
+        templateIds: ["a", "b"],
+        players: false,
+      }).success,
     ).toBe(true);
     expect(scn.DiagonalRuleSet.payload.safeParse({ rule: "5" }).success).toBe(true);
     expect(scn.DiagonalRuleSet.payload.safeParse({ rule: "10" }).success).toBe(false);

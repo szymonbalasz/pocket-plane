@@ -1,7 +1,8 @@
-// AoE templates (SCN FR-SCN-20–27, -35): the kept-template commands and the `scn.template`
+// AoE templates (SCN FR-SCN-20–27, -35, -44): the kept-template commands and the `scn.template`
 // signal's audience. Kept: `scn.placeTemplate` (DM, player on the active scene; ≤ 20 per scene,
 // ≤ 3 per player per scene), `scn.updateTemplate` / `scn.deleteTemplate` (DM or the placer),
-// `scn.clearTemplates` (DM). Each write that sets or moves a footprint derives `fogged` over the
+// `scn.clearTemplates` (DM; DM-placed only unless `players`). Origins and angles are decimals
+// (sprint 4, FR-SCN-20). Each write that sets or moves a footprint derives `fogged` over the
 // uncut cells **before** its single write (FR-SCN-35). A player sees a template only on the
 // active scene and not hidden for players; others' are `forbidden`, unseen ones `not_found`.
 import {
@@ -25,7 +26,7 @@ import {
   type TemplateSignalData,
   UpdateTemplateInput,
 } from "@shared/scene-tools/schemas";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
@@ -251,21 +252,30 @@ export const deleteTemplate = defineCommand({
   },
 });
 
-/** FR-SCN-26: the DM's "Clear templates" (every kept template of the scene). None → no event. */
+/**
+ * FR-SCN-44: the DM's "Clear templates": the scene's DM-placed kept templates, or every kept one
+ * with `players: true`. Ephemeral templates are signals, never touched. None → no write, no event.
+ */
 export const clearTemplates = defineCommand({
   name: SCN_INTENTS.clearTemplates,
   input: ClearTemplatesInput,
-  execute({ sceneId }, { tx, actor, emit }): void {
+  execute({ sceneId, players = false }, { tx, actor, emit }): void {
     const cid = campaignOf(actor);
     const s = getScene(tx, cid, sceneId);
-    const all = sceneTemplates(tx, s.id);
-    if (all.length === 0) return;
-    tx.delete(aoeTemplate).where(eq(aoeTemplate.sceneId, s.id)).run();
+    const gone = sceneTemplates(tx, s.id).filter((t) => players || t.placedByPlayerId === null);
+    if (gone.length === 0) return;
+    tx.delete(aoeTemplate)
+      .where(
+        players
+          ? eq(aoeTemplate.sceneId, s.id)
+          : and(eq(aoeTemplate.sceneId, s.id), isNull(aoeTemplate.placedByPlayerId)),
+      )
+      .run();
     emit({
       type: TemplatesCleared.type,
       campaignId: cid,
-      payload: { sceneId: s.id, templateIds: all.map((t) => t.id) },
-      changes: all.map((t) => change(t, null)),
+      payload: { sceneId: s.id, templateIds: gone.map((t) => t.id), players },
+      changes: gone.map((t) => change(t, null)),
     });
   },
 });
