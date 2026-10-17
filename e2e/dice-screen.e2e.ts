@@ -4,7 +4,8 @@
 // first throw of the session flies 3D on the dice layer: portalled to `body`, topmost, no input
 // (a point on a window still hits the window), resting on the server's faces. "Tray throw" puts
 // the dice in the zone on the same canvas, no caption; the DM's hidden roll never flies big;
-// reduced motion shows no dice layer and never fetches the 3D chunk. Skipped without WebGL.
+// reduced motion shows no dice layer (popup chips, D7) and never fetches the 3D chunk. Skipped
+// without WebGL.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
@@ -200,11 +201,12 @@ test("FR-DICEX-38 FR-DICEX-45 the DM's hidden roll never flies big; reduced moti
   expect(wire).not.toContain("DM-SECRET-DICE");
   expect(wire).not.toContain(hiddenId as string);
 
-  // C (reduced motion): B's roll shows flat in the zone; no dice layer at all.
+  // C (reduced motion): B's roll shows flat, as chips in C's popup (D7); no dice layer at all.
   await roll(p1, "1d8");
-  const flat = p2.locator('[data-testid="dicex-throw"][data-record-id][data-arena="zone"]');
-  await expect(flat).toHaveAttribute("data-render", "flat");
-  await expect(flat).toHaveAttribute("data-state", "rest");
+  const popup = p2.locator('[data-testid="dicex-popup"][data-record-id]');
+  await expect(popup.getByTestId("dicex-popup-pip")).toHaveAttribute("data-mode", "chips");
+  await expect(popup).toHaveAttribute("data-state", "rest");
+  await expect(p2.locator('[data-testid="dicex-throw"][data-record-id]')).toHaveCount(0);
   await expect(p2.getByTestId("dicex-screen")).toHaveCount(0);
   // The lazy 3D chunk (`dice3d-*.js`): A fetched it, C never did.
   const chunk3d = (page: Page) =>

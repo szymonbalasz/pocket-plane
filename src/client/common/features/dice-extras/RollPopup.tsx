@@ -192,6 +192,8 @@ function PlaySlot({
           data-value={d.value ?? ""}
           data-kept={d.kept}
           data-flat={false}
+          data-style={(p.looks[d.entryId] ?? STYLE_LOOK.ivory).style}
+          data-material={(p.looks[d.entryId] ?? STYLE_LOOK.ivory).material}
           {...(settled && { "data-settled": settled[d.key] ?? "" })}
           className="sr-only"
         />
