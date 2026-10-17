@@ -1662,3 +1662,16 @@ From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-52–55. **Built b
 
 - **Lost on reload or reconnect** (snapshot) mid-turn: accepted (FR-MAP-54).
 - **Fixtures:** none new; `map-tools` (§56) has every token the walkthrough drags (Mira, Thorn, Goblin Sneak, the fog-hidden Goblin).
+
+## 60. Sprint 4: label collisions, icon chips, best-rectangle Fit (M5)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-56–58. **Built by `fix/map-labels-fit`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent. Protocol side: [protocol §77](../protocol/README.md#77-sprint-4-label-collisions-icon-chips-best-rectangle-fit-m5).
+
+| Piece | Kind | Contents | Visibility | Source |
+|---|---|---|---|---|
+| Label layout | derived per render | `layoutLabels` widths + cut flags from the drawn tokens' shown positions | each client its own tokens (players never lay out tokens they don't hold) | FR-MAP-56 |
+| Hovered label | client memory, per canvas | the token id under the pointer (label pill, else footprint) | — | FR-MAP-56 |
+| Fit rectangle | derived per fit | `bestFreeRect` over `useFreeArea().areas` | — | FR-MAP-58 |
+| `TokenIcon.muted` | overlay result field (client) | optional boolean | as the overlay line (MOD: DM + owner) | FR-MAP-57 |
+
+- **Fixtures:** none new; `map-tools` (`mt-crowd`: Goblin Sneak + Goblin Sneak 2 adjacent, Crypt Ogre Large) covers the collision, hover and icon-chip steps; `session-sim` / registry layouts cover the fit (unit tests).
