@@ -13,7 +13,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | V7 pan / plain map / Fit | merged 13c15f6 | — | Done (BL-01, BL-07; check 3158, e2e 94) | V8, M1 next |
 | V8 vision while dragging | merged ec3fd3a | — | Done (walkthrough 8/8; main check 3231, e2e 99 green) | — |
 | M1 freeform AoE | merged | — | Done (walkthrough 7/7; BL-05 done) | — |
-| M2 drag path | `build/drag-path` (w61, slot 0) | build-drag-path | Building | Walkthrough → M5 |
+| M2 drag path | `build/drag-path` (w61, slot 0) | test-drag-path | Walkthrough (check, e2e 103 green) | Merge → M5 |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | Physical dice in combat (BL-19, BL-25) | `fix/physical-dice-combat` (w62, slot 3) | test-physical-dice | Walkthrough (check, e2e 101 green) | Merge |
 | C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
