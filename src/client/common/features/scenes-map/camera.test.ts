@@ -319,6 +319,17 @@ describe("FR-MAP-44 BL-01 fit fills the canvas (session-sim, DM)", () => {
     }
   });
 
+  test("FR-MAP-44 BL-01 at 1280×720 (map taller than the work area): the top row shows under the top bar, the crop falls at the dock", () => {
+    for (const scene of SCENES) {
+      for (const windows of [[], [gameLog(laptop)]]) {
+        const { map, view, free } = fit(scene, laptop, windows);
+        expect({ scene: scene.name, top: map.y }).toEqual({ scene: scene.name, top: view.y });
+        expect(map.y + map.h).toBeGreaterThan(view.y + view.h);
+        expect(free.y).toBe(view.y);
+      }
+    }
+  });
+
   test("FR-MAP-44 BL-01 at 1280×720 with Game log and Initiative: the PCs stay in the free area, the map pans no further", () => {
     for (const scene of SCENES) {
       const windows = [gameLog(laptop), initiative(laptop)];

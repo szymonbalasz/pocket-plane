@@ -7,6 +7,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
+import { mapPoint } from "./support/map";
 import { openWindow, shellWindow } from "./support/shell";
 
 /** Map px → page px on the first stage. */
@@ -24,6 +25,11 @@ async function mapToPage(page: Page, x: number, y: number) {
 
 /** Ruler from cell `a` to cell `b` (70 px cells, offset 0); the label text while held. */
 async function rule(page: Page, a: [number, number], b: [number, number]) {
+  // BL-01: both ends clear of the Game log (the ruler follows stage moves only).
+  const span = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]));
+  await mapPoint(page, Math.floor((a[0] + b[0]) / 2), Math.floor((a[1] + b[1]) / 2), {
+    margin: Math.ceil(span / 2) + 1,
+  });
   const from = await mapToPage(page, a[0] * 70 + 35, a[1] * 70 + 35);
   const to = await mapToPage(page, b[0] * 70 + 35, b[1] * 70 + 35);
   await page.mouse.move(from.x, from.y);
@@ -41,6 +47,7 @@ async function rule(page: Page, a: [number, number], b: [number, number]) {
 
 /** Shift-drags a box from cell point `a` to `b` (70 px cells). */
 async function boxSelect(page: Page, a: [number, number], b: [number, number]) {
+  await mapPoint(page, Math.floor(a[0]), Math.floor(a[1])); // the press lands on the map
   const from = await mapToPage(page, a[0] * 70, a[1] * 70);
   const to = await mapToPage(page, b[0] * 70, b[1] * 70);
   await page.keyboard.down("Shift");

@@ -113,9 +113,10 @@ interface Keep {
 
 /**
  * BL-01, one axis, after the fit: the map (`map` long, map px) centred in the view [v0, v1]
- * (screen px) when it fits, else panned the least to cover it, so no empty band sits beside a
- * cropped edge; but only as far as each of `keeps` that lies in the free area [f0, f1] (minus its
- * inset) now stays there. None does → `pos` unchanged.
+ * (screen px) when it fits, else panned the least to cover it (`startFirst`: its start edge at
+ * v0, so the top row shows and the crop falls at the dock, FOG §13 step 26), so no empty band
+ * sits beside a cropped edge; but only as far as each of `keeps` that lies in the free area
+ * [f0, f1] (minus its inset) now stays there. None does → `pos` unchanged.
  */
 function fillAxis(
   pos: number,
@@ -124,6 +125,7 @@ function fillAxis(
   [v0, v1]: readonly [number, number],
   [f0, f1]: readonly [number, number],
   keeps: readonly (Keep | null)[],
+  startFirst = false,
 ): number {
   const eps = 1e-6;
   let lo = Number.NEGATIVE_INFINITY;
@@ -138,7 +140,8 @@ function fillAxis(
   }
   if (lo === Number.NEGATIVE_INFINITY) return pos;
   const len = map * scale;
-  const want = len <= v1 - v0 ? (v0 + v1 - len) / 2 : Math.min(Math.max(pos, v1 - len), v0);
+  const want =
+    len <= v1 - v0 ? (v0 + v1 - len) / 2 : startFirst ? v0 : Math.min(Math.max(pos, v1 - len), v0);
   return Math.min(Math.max(want, lo), hi);
 }
 
@@ -158,8 +161,9 @@ function tokensIn(box: Box, map: Size, cell: number): Box {
  * map px; capped by the max zoom), which beats the cap; then the camera pans the least so `pcs`
  * (the PC tokens' footprint box, map px) lies in the free area minus the margin, centred on it
  * per axis where it can't. BL-01: last, per axis, the map is centred in the work area right of
- * the tool rail (if larger: panned the least to cover it), as far as the tokens' footprints and
- * the lower half of their labels (and at the floor the PCs, with the margin) stay in the free area.
+ * the tool rail (if larger: panned the least to cover it; vertically its top row under the top
+ * bar), as far as the tokens' footprints and the lower half of their labels (and at the floor the
+ * PCs, with the margin) stay in the free area.
  */
 export function fitContent(
   box: Box,
@@ -216,6 +220,7 @@ export function fitContent(
       { at: t.y, len: t.h + label, inset: 0 },
       keepPcs && { at: keepPcs.y, len: keepPcs.h, inset: m },
     ],
+    true,
   );
   return { x, y, scale, floor };
 }
