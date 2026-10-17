@@ -229,6 +229,20 @@ describe("auto placement (FR-SHELL-40)", () => {
     // The box over the whole screen: every candidate overlaps it → least overlap, then today's
     // order (the default rect).
     expect(placeRect(corner, vp, [], [], { x: 0, y: 0, w: vp.w, h: vp.h })).toEqual(base);
+    // No window-free candidate: covering less of other windows beats staying off the box
+    // (toasts are transient; a feature never opens a window over another, G35).
+    const tall = def({
+      defaultPosition: { anchor: "bottom-right" },
+      defaultSize: { w: 300, h: 700 },
+      minSize: { w: 200, h: 700 },
+    });
+    const a2 = usableArea(vp);
+    const leftWin = { x: 0, y: 0, w: 400, h: vp.h };
+    const rightWin = { x: a2.right - 300, y: a2.top, w: 300, h: 100 };
+    const onRight = { x: a2.right - 356, y: a2.top + 200, w: 356, h: 200 };
+    const r2 = placeRect(tall, vp, [leftWin, rightWin], [], onRight);
+    expect(r2.x).toBe(a2.right - 300); // the right edge: least window overlap, over the box
+    expect(overlaps(r2, onRight)).toBe(true);
     // Over the right half only: the left edge, which overlaps it least (not at all).
     const right = { x: 800, y: 0, w: 800, h: vp.h };
     expect(placeRect(corner, vp, [], [], right).x).toBe(RAIL_CLEAR);

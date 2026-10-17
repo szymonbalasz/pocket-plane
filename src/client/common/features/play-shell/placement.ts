@@ -11,7 +11,7 @@
 //    area it covers: of the candidates free of other windows (full size or shrunk), the least
 //    covering wins; ties → the order above. Then, among equals, one clear of this client's toast
 //    keep-out box (`toastKeepOut`), else the least over it. No free candidate → the cascade,
-//    still least token cover first.
+//    still least token cover first, then least window overlap before the keep-out box.
 import {
   defaultRect,
   EDGE_GAP,
@@ -84,7 +84,8 @@ function freeHeight(x: number, y: number, w: number, max: number, obstacles: rea
  * windows already open (`avoid`: on-screen map token boxes; `keepOut`: the client's toast
  * keep-out box). Free of every open window first (least token area, then full size before
  * shrunk to ≥ min height); else `minOpenH` set: that height on top; else the default column,
- * then an edge (least token area first, then clear of `keepOut`, then least window overlap).
+ * then an edge (least token area first, then least window overlap, then clear of `keepOut`:
+ * toasts are transient, another window isn't).
  * Among equals: clear of `keepOut` (else least over it), default column, nearest to default
  * (tallest first for shrunk slots). Mid-map columns never. Deterministic.
  */
@@ -144,7 +145,7 @@ export function placeRect(
       const rect = { x, y: oy, w, h: openH };
       const [over, ko] = toasts(rect);
       const d = Math.abs(oy - base.y) + Math.abs(x - base.x);
-      consider(rect, [1, onTokens(rect), 0, over, covered(rect), ko, column, d]);
+      consider(rect, [1, onTokens(rect), 0, covered(rect), over, ko, column, d]);
     } else if (free >= minH) {
       const rect = { x, y, w, h: free };
       const [over, ko] = toasts(rect);
@@ -152,7 +153,7 @@ export function placeRect(
     } else {
       const rect = { x, y, w, h: Math.max(minH, room) };
       const [over, ko] = toasts(rect);
-      consider(rect, [1, onTokens(rect), 1 + column, over, covered(rect), ko, dist]);
+      consider(rect, [1, onTokens(rect), 1 + column, covered(rect), over, ko, dist]);
     }
   }
   return (best as { rect: Rect } | null)?.rect ?? base;

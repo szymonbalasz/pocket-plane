@@ -373,15 +373,23 @@ test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: DM Initiative 
   }
 });
 
-test("FR-SHELL-40 toast keep-out: DM windows opened at 1280×720 / 1280×800 / 1600×900 stay off the top-centre box while a clear candidate exists; default layout clear of it", () => {
+test("FR-SHELL-40 toast keep-out: DM default layout clear of the top-centre box; with no window-free slot, avoiding windows beats the box (Compendium never over Initiative)", () => {
   for (const viewport of SPRINT4) {
+    const at = `${viewport.w}×${viewport.h}`;
     const box = toastKeepOut("dm", viewport);
     for (const w of defaultLayout(dmWindows, viewport)) {
-      expect(overlaps(w, box) ? `${w.kind} over the toast box at ${viewport.w}` : "ok").toBe("ok");
+      expect(overlaps(w, box) ? `${w.kind} over the toast box at ${at}` : "ok").toBe("ok");
     }
-    // The Compendium (440 wide) at the left edge would reach the box at 1280 wide.
-    const cmp = win(openOnDefaults(["cmp.compendium"], viewport), "cmp.compendium");
-    expect(overlaps(cmp, box) ? `compendium over the toast box at ${viewport.w}` : "ok").toBe("ok");
+    // 1280 wide: no full-size slot; the left edge reaches into the box, the right one would sit
+    // on Initiative → the left edge (toasts are transient, Initiative isn't; G35).
+    const rects = openOnDefaults(["cmp.compendium"], viewport);
+    const cmp = win(rects, "cmp.compendium");
+    const init = win(rects, "cbt.initiative");
+    expect(overlaps(cmp, init) ? `compendium over Initiative at ${at}` : "ok").toBe("ok");
+    // 1600 wide: the left edge is clear of the box too.
+    if (viewport === DESKTOP) {
+      expect(overlaps(cmp, box) ? `compendium over the box at ${at}` : "ok").toBe("ok");
+    }
   }
 });
 

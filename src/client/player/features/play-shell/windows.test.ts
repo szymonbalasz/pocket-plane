@@ -315,21 +315,26 @@ test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: player Initiat
   }
 });
 
-test("FR-SHELL-40 toast keep-out: player Initiative and Notifications stay off the bottom-right box (1280×720, 1280×800, 1600×900)", () => {
+test("FR-SHELL-40 toast keep-out: player Initiative stays off the bottom-right box; Notifications never cover Initiative, the box only as the fallback (1280×720, 1280×800, 1600×900)", () => {
   for (const viewport of SPRINT4) {
+    const where = `${viewport.w}×${viewport.h}`;
     const box = toastKeepOut("player", viewport);
-    const rects = openOnDefaults(["note.history"], viewport);
-    for (const kind of ["cbt.initiative", "note.history"]) {
-      const r = at(rects, kind);
-      expect(
-        overlaps(r, box) ? `${kind} over the toast box at ${viewport.w}×${viewport.h}` : "ok",
-      ).toBe("ok");
+    for (const combat of [true, false]) {
+      const rects = openOnDefaults(["note.history"], viewport, combat);
+      const notes = at(rects, "note.history");
+      const others = rects.filter((r) => r.kind !== notes.kind);
+      if (combat) {
+        const init = at(rects, "cbt.initiative");
+        expect(overlaps(init, box) ? `Initiative over the box at ${where}` : "ok").toBe("ok");
+        expect(overlaps(notes, init) ? `Notifications over Initiative at ${where}` : "ok").toBe(
+          "ok",
+        );
+      }
+      // Free of every window → also clear of the box.
+      if (!others.some((r) => overlaps(notes, r))) {
+        expect(overlaps(notes, box) ? `Notifications over the box at ${where}` : "ok").toBe("ok");
+      }
     }
-    // Out of combat too (Notifications opened before Initiative exists).
-    const calm = at(openOnDefaults(["note.history"], viewport, false), "note.history");
-    expect(overlaps(calm, box) ? `note.history over the toast box at ${viewport.w}` : "ok").toBe(
-      "ok",
-    );
   }
 });
 
