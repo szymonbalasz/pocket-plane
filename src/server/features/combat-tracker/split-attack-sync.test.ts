@@ -125,7 +125,7 @@ describe("split attack over WS (mid-combat)", () => {
     );
     for (const [i, c] of [p1, p2].entries()) {
       expect(attackLines(c).at(-1)).toBe(
-        "Mira attacks Goblin: 11 + 4 = 15 — hit! 6 piercing damage (physical)",
+        "Mira attacks Goblin: 11 + 4 = 15 — DM: hit. 6 piercing damage (physical)",
       );
       const frames = JSON.stringify(c.frames.slice(before[i]));
       for (const leak of ["dmPayload", "targetAc", "hitComputed", "vs AC", "DM ruled", "DM set"]) {

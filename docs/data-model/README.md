@@ -1584,3 +1584,16 @@ From [scene-tools](../specs/scene-tools.md#8-data-model) sprint 4 (FR-SCN-20, -2
 - **FR-SCN-46 boot re-derive** (start hook `scene-tools.template-rederive`, after fog's boot steps, before listen): one transaction re-derives `fogged` / `seenBy` of every DM-placed kept template over the new cells and writes only rows that change; no event, no log row, no `updatedAt`; rerun = no-op. Player-placed templates are never fog subjects.
 - **Persisted runtime state:** unchanged (kept templates, their copies).
 - **CON-44** (#208; `src/server/features/scene-tools/con44.test.ts`, measured): realistic-heavy DM 671,095 B; the active battle scene filled to the cap (20 kept templates, 40-char labels) 676,425 B with integer fields → **676,555 B freeform** (+130 B over 17 freeform rows, 7.6 B per row; **372,021 B left of 1 MiB**). Players 282,260–285,490 B (19 visible templates; **238,798 B left of 512 KiB**). Battle scene load ack 43,249 B.
+
+## 53. Sprint 4: weapon damage parts in combat (S4-1b)
+
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-81–84 and [effect-modifiers](../specs/effect-modifiers.md) FR-MOD-58. **Built by `build/weapon-combat`**; no table or column change (all fields from [§51](#51-sprint-4-rules-core-s4-0) are now written).
+
+| Leaf | Change | Visibility | Source |
+|---|---|---|---|
+| damage card payload | `damage.extra` written by `cbt.attack` / `cbt.rollDamage` (one per extra weapon part, row order); fit order to the 4 KB cap: offers, mod labels (12 chars), names (20 chars); parts never drop | as the card | FR-CBT-81 |
+| `game_log_entry.dmPayload` (`cbt.attack`) | + `rolls.extra?` ≤ 2 `{type, expression, dice ≤ 51 [value, kept], constant, rolled, set?}`; + `extraDefense?` ≤ 2 `{type, level, label ≤ 60}` | DM only | FR-CBT-84, FR-MOD-58 |
+| `game_log_entry.payload` (`cbt.attack`) | `damageParts` written on Hit lines with parts | public | FR-CBT-84 |
+| `hp_change.damage_parts` | written per target of a card with parts (`raw` 0 on a miss); null otherwise | DM only | FR-CBT-84 |
+
+- **Derived:** each extra part's popup preset (`extraPartPresets`: the target's defenses for the part's type). **CON-44:** no new record type; the worst card with 2 extra parts is measured in MOD's `con44.test.ts` (§51) and fitted by `fitCardPayload` (`card-fit.test.ts`).

@@ -500,6 +500,14 @@ export const SetRemovedInput = z.strictObject({ combatantId: Id, removed: z.bool
 /** FR-CBT-70: what `cbt.attack` rolls. */
 export const AttackRolls = z.enum(["both", "toHit"]);
 export type AttackRolls = z.infer<typeof AttackRolls>;
+/** FR-CBT-81 (sprint 4): one physical entry per extra damage part; needs `manual`. */
+const ManualExtra = z.array(ManualEntry).min(1).max(EXTRA_DAMAGE_MAX);
+const checkManualExtra = (v: { manual?: unknown; manualExtra?: unknown }, ctx: z.RefinementCtx) => {
+  if (v.manualExtra !== undefined && v.manual === undefined) {
+    ctx.addIssue({ code: "custom", path: ["manualExtra"], message: "Physical parts need manual" });
+  }
+};
+
 export const AttackInput = z
   .strictObject({
     attackerId: Id,
@@ -508,6 +516,11 @@ export const AttackInput = z
     manual: z.array(ManualEntry).min(1).max(2).optional(),
     /** FR-MOD-18 (tier 2): physical bonus / trigger die groups, one list per `manual` entry. */
     manualParts: ManualPartsPerRoll.optional(),
+    /**
+     * FR-CBT-81, -83 (sprint 4): physical entries of the row's extra damage parts, row order,
+     * with `manual` only; one per extra part (checked in the command; doubled on a crit).
+     */
+    manualExtra: ManualExtra.optional(),
     /** FR-CHARX-24 (OQ-CBT-47): one attack row; absent (and no `spellId`) = the first attack. */
     attackId: Id.optional(),
     /** FR-CHARX-24: a sheet spell with `roll: attack` and damage. */
@@ -526,7 +539,12 @@ export const AttackInput = z
     path: ["manual"],
     message: "One manual entry per roll",
   })
-  .superRefine(checkManualParts);
+  .refine((v) => v.rolls !== "toHit" || v.manualExtra === undefined, {
+    path: ["manualExtra"],
+    message: "No damage roll",
+  })
+  .superRefine(checkManualParts)
+  .superRefine(checkManualExtra);
 export type AttackInput = z.input<typeof AttackInput>;
 export const AttackResult = z.object({ cardId: z.string(), rollIds: z.array(z.string()) });
 export type AttackResult = z.infer<typeof AttackResult>;
@@ -542,6 +560,11 @@ export const RollDamageInput = z
     manual: ManualEntry.optional(),
     /** FR-MOD-18 (tier 2): physical bonus / trigger die groups (Divine Fury's d6), with `manual`. */
     manualParts: ManualParts.optional(),
+    /**
+     * FR-CBT-81, -83 (sprint 4): physical entries of the row's extra damage parts, row order,
+     * with `manual` only; one per extra part (checked in the command; doubled on a crit).
+     */
+    manualExtra: ManualExtra.optional(),
     attackId: Id.optional(),
     spellId: Id.optional(),
   })
@@ -549,7 +572,8 @@ export const RollDamageInput = z
     path: ["spellId"],
     message: "Either an attack or a spell",
   })
-  .superRefine(checkManualParts);
+  .superRefine(checkManualParts)
+  .superRefine(checkManualExtra);
 export type RollDamageInput = z.input<typeof RollDamageInput>;
 /** `attached` = completed an existing card (`NotificationUpdated`), else a new card. */
 export const RollDamageResult = z.object({

@@ -14,7 +14,7 @@ import {
   DamageCardTargetsResolution,
 } from "@shared/combat-tracker/schemas";
 import { withOffersText } from "@shared/effect-modifiers/combat-parts";
-import { TEXT_MAX } from "@shared/notifications/schemas";
+import { jsonBytes, TEXT_MAX } from "@shared/notifications/schemas";
 import type { Roll } from "../dice-roll-log";
 import { defineNotificationKind } from "../notifications/kind";
 
@@ -38,23 +38,67 @@ export const damageCardKind = defineNotificationKind({
  * piercing" (+ " (natural 20)" after the to-hit, " (critical)"); to-hit-only "Mira: 15 to hit
  * (Light crossbow)"; damage-only "Mira: 6 piercing (Light crossbow)" (+ " — DC 13 DEX").
  * Offered rule-trigger parts last (FR-MOD-48): "… 12 slashing (+ 6 radiant Divine Fury on a hit)".
+ * FR-CBT-81 (sprint 4): extra weapon parts after the base part, "15 slashing + 8 fire"; within
+ * FR-NOTE-21's cap: the offers collapse first, then the text is cut to 279 chars + "…".
  */
 export function damageCardText(p: DamageCardPayload): string {
-  return withOffersText(baseCardText(p), p.damage?.triggers, p.damageType, TEXT_MAX);
+  const text = withOffersText(baseCardText(p), p.damage?.triggers, p.damageType, TEXT_MAX);
+  return text.length <= TEXT_MAX ? text : `${text.slice(0, TEXT_MAX - 1)}…`;
+}
+
+/** "15 slashing + 8 fire": the base part's total, then each extra part's (FR-CBT-81). */
+function damageText(p: DamageCardPayload): string {
+  const type = p.damageType ? ` ${p.damageType}` : "";
+  const extra = (p.damage?.extra ?? []).map((x) => ` + ${x.total} ${x.type}`).join("");
+  return `${p.damage?.total ?? 0}${type}${extra}`;
 }
 
 function baseCardText(p: DamageCardPayload): string {
-  const type = p.damageType ? ` ${p.damageType}` : "";
   const natural = p.toHit ? naturalMark(p.toHit.natural) : null;
   const toHit = p.toHit
     ? `${p.toHit.total} to hit${natural === null ? "" : ` (natural ${natural})`}`
     : "";
   if (p.toHit && p.damage) {
-    return `${p.attackerName}: ${toHit}, ${p.damage.total}${type}${p.crit ? " (critical)" : ""}`;
+    return `${p.attackerName}: ${toHit}, ${damageText(p)}${p.crit ? " (critical)" : ""}`;
   }
   if (p.toHit) return `${p.attackerName}: ${toHit} (${p.attackName})`;
   const dc = p.saveDc ? ` — DC ${p.saveDc.dc} ${p.saveDc.ability.toUpperCase()}` : "";
-  return `${p.attackerName}: ${p.damage?.total ?? 0}${type} (${p.attackName})${dc}`;
+  return `${p.attackerName}: ${damageText(p)} (${p.attackName})${dc}`;
+}
+
+/** FR-MOD-37 fit order: mod labels cut to this many chars + "…", then names to `NAME_CUT`. */
+const MOD_LABEL_CUT = 12;
+const NAME_CUT = 20;
+
+const cut = (s: string, n: number) => {
+  const chars = [...s];
+  return chars.length <= n ? s : `${chars.slice(0, n).join("")}…`;
+};
+
+/**
+ * FR-CBT-81, FR-MOD-37 (sprint 4): weapon parts never drop. A card still over the kind's 4 KB
+ * after `withCardOffers` dropped offers gets its `mods[].label`s cut to 12 chars + "…", then
+ * `attackerName` / `attackName` to 20 chars + "…" (multi-byte names, MOD §12).
+ */
+export function fitCardPayload(p: DamageCardPayload): DamageCardPayload {
+  const fits = (x: DamageCardPayload) => jsonBytes(x) <= DAMAGE_CARD_PAYLOAD_MAX_BYTES;
+  if (fits(p)) return p;
+  const labels = <T extends { mods?: CardRoll["mods"] } | null>(r: T): T =>
+    r?.mods
+      ? {
+          ...r,
+          mods: r.mods.map((m) =>
+            m.label === null ? m : { ...m, label: cut(m.label, MOD_LABEL_CUT) },
+          ),
+        }
+      : r;
+  const short: DamageCardPayload = { ...p, toHit: labels(p.toHit), damage: labels(p.damage) };
+  if (fits(short)) return short;
+  return {
+    ...short,
+    attackerName: cut(short.attackerName, NAME_CUT),
+    attackName: cut(short.attackName, NAME_CUT),
+  };
 }
 
 /** A roll as the card stores it: per-die `[value, kept]` (#140). */

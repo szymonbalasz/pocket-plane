@@ -32,8 +32,9 @@ import { recordOffers, rollLine, withCardOffers } from "../effect-modifiers/offe
 import { notify } from "../notifications";
 import { toNotificationRecord, updateNotification } from "../notifications/helpers";
 import { cardRowRef, critLabel } from "./attack";
-import { cardRollOf, damageCardText } from "./card-kind";
+import { cardRollOf, damageCardText, fitCardPayload } from "./card-kind";
 import { activeCombatant } from "./guards";
+import { cardExtraOf, checkManualExtra, rollExtraParts, splitParts } from "./parts";
 
 type RowRef = { attackId?: string; spellId?: string };
 
@@ -50,7 +51,8 @@ function damageRow(env: CommandEnv, c: CombatantRecord, ref: RowRef) {
   const kind = ref.spellId !== undefined ? "spellDamage" : "damage";
   const res = characterRolls(stats, sheet, kind, ref);
   if (!res.ok) throw res.code === "not_found" ? notFound(res.message) : conflict(res.message);
-  const spec = res.specs[0];
+  // FR-CBT-81: the base part, then a weapon row's extra parts (CHARX FR-CHARX-55).
+  const { base: spec, extra } = splitParts(res.specs);
   if (ref.spellId !== undefined) {
     const s = sheet?.spells.find((x) => x.id === ref.spellId);
     if (!s || !spec || spec.category !== "damage") {
@@ -61,14 +63,14 @@ function damageRow(env: CommandEnv, c: CombatantRecord, ref: RowRef) {
       dc !== null && s.saveAbility && dc >= 1 && dc <= 30
         ? { dc, ability: s.saveAbility }
         : undefined;
-    return { spec, name: s.name, damageType: s.damageType ?? null, saveDc };
+    return { spec, extra: [], name: s.name, damageType: s.damageType ?? null, saveDc };
   }
   const a =
     ref.attackId === undefined
       ? stats.attacks[0]
       : stats.attacks.find((x) => x.id === ref.attackId);
   if (!spec || !a) throw conflict(`No damage roll for ${c.name}`);
-  return { spec, name: a.name, damageType: a.damageType ?? null, saveDc: undefined };
+  return { spec, extra, name: a.name, damageType: a.damageType ?? null, saveDc: undefined };
 }
 
 const sameRef = (p: DamageCardPayload, ref: RowRef) =>
@@ -116,6 +118,7 @@ export const rollDamageCommand = defineCommand({
     const asked = { attackId: input.attackId, spellId: input.spellId };
     const row = damageRow(env, c, asked);
     const ref = cardRowRef(env, c, asked);
+    checkManualExtra(row.extra, input.manual, input.manualExtra);
     const pending = pendingToHitCard(env, enc, c.id, ref);
     // A completed card doubles the dice after its natural 20; manual is checked against that.
     const crit = pending?.p.toHit?.natural === 20;
@@ -141,7 +144,10 @@ export const rollDamageCommand = defineCommand({
         row: row.name.slice(0, ROLL_ROW_MAX),
       },
     });
-    const card = withCardMods(cardRollOf(damage), damage);
+    const actor = { kind: "entity" as const, id: c.entityId, name: c.name };
+    // FR-CBT-81, -83: every extra part, its own roll row of the entry, doubled on a crit.
+    const extra = rollExtraParts(env, row.extra, { crit, actor, manual: input.manualExtra });
+    const card = { ...withCardMods(cardRollOf(damage), damage), ...cardExtraOf(row.extra, extra) };
     const isPlayer = env.actor.role === "player";
     // Roll line: a player's is public (FR-DICE-13); the DM's is DM-only (FR-CBT-52), except when
     // it completes a player's card: the owner's rule, so the table sees the damage the player's
@@ -167,8 +173,8 @@ export const rollDamageCommand = defineCommand({
       damage,
     );
     // FR-MOD-14: offered-die rows (after any dropped by the card cap) follow the base roll.
-    const rollIds = dice.rollIdsOf(damage);
-    const line = rollLine([damage]);
+    const rollIds = [damage, ...extra].flatMap((r) => dice.rollIdsOf(r));
+    const line = rollLine([damage, ...extra]);
     const entry = gameLog.append(env, {
       kind: ROLL_KIND,
       category: row.spec.category,
@@ -187,7 +193,10 @@ export const rollDamageCommand = defineCommand({
     };
     env.emit(rolled);
     if (pending) {
-      updateNotification(env, pending.card.id, { text: damageCardText(payload), payload });
+      updateNotification(env, pending.card.id, {
+        text: damageCardText(payload),
+        payload: fitCardPayload(payload),
+      });
       recordOffers(env, pending.card.id, payload);
       return { cardId: pending.card.id, rollIds, attached: true };
     }
@@ -196,7 +205,7 @@ export const rollDamageCommand = defineCommand({
       audience: isPlayer ? "player" : "dm",
       audiencePlayerId: isPlayer ? env.actor.playerId : null,
       text: damageCardText(payload),
-      payload,
+      payload: fitCardPayload(payload),
       action: { label: "Apply", role: "dm" },
     });
     rolled.payload.cardId = cardId;
