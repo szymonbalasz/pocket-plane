@@ -14,6 +14,7 @@ import { lineText } from "@shared/dice-roll-log/kind-types";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import type { ManualEntry } from "@shared/dice-roll-log/schemas";
 import { eq } from "drizzle-orm";
+import { armCrashHook } from "../../commands/crash";
 import { combatant, entity, gameLogEntry, hpChange, roll } from "../../db/schema";
 import type { Actor } from "../../events/types";
 import { rtSetup } from "../effect-modifiers/trigger-testing";
@@ -407,5 +408,39 @@ describe("FR-CBT-82 undo and re-apply", () => {
     ]).hpChangeIds[0] as string;
     expect(t.row(again)?.raw).toBe(13 + 8);
     expect(t.lines(again).players).toContain("13 slashing + 8 fire damage");
+  });
+});
+
+describe("FR-CBT-82 crash", () => {
+  test("FR-CBT-82 crash: hard kill before commit → no HP, use row or damageParts; after commit → all of them", () => {
+    class Killed extends Error {}
+    const kill = () => {
+      throw new Killed();
+    };
+    const t = flameTongue();
+    const { cardId } = t.step3();
+    const target = {
+      targetId: t.id("Goblin"),
+      hit: true,
+      multiplier: "normal",
+      extraMultipliers: ["half"],
+      triggers: [{ triggerId: t.furyId }],
+    };
+    const state = () => ({
+      rows: t.s.db.select().from(hpChange).all().length,
+      used: t.usesOf(t.furyId).filter((u) => u.state === "used").length,
+      card: t.note(cardId)?.state,
+    });
+    try {
+      armCrashHook({ point: "before-commit", target: applyCard.name }, kill);
+      expect(() => t.apply(cardId, [target])).toThrow();
+      expect(state()).toEqual({ rows: 0, used: 0, card: "pending" });
+      armCrashHook({ point: "after-commit", target: applyCard.name }, kill);
+      expect(() => t.apply(cardId, [target])).toThrow(Killed);
+    } finally {
+      armCrashHook(null);
+    }
+    expect(state()).toEqual({ rows: 1, used: 1, card: "resolved" });
+    expect(t.s.db.select().from(hpChange).get()?.damageParts?.[0]?.raw).toBe(4);
   });
 });
