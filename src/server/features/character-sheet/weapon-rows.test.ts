@@ -125,8 +125,10 @@ describe("FR-CHARX-55 char.roll with weapon parts", () => {
     const ev = t.events.filter((x) => x.event.type === "CharacterRolled").at(-1)?.event.payload;
     expect(ev).toMatchObject({ kind: "attack", attackId, rollIds: r.rollIds });
     const [hit, base, fire] = items;
+    // The suffix follows the seeded draw; out of combat a natural 20 doubles nothing (FR-CHAR-05).
+    const nat = hit?.natural === 20 ? " — natural 20!" : hit?.natural === 1 ? " — natural 1" : "";
     expect(lines(t, r.entryId).player).toBe(
-      `Thorn — Flame Tongue greatsword attack: ${hit?.dice[0]?.value} + 8 = ${hit?.total}; ` +
+      `Thorn — Flame Tongue greatsword attack: ${hit?.dice[0]?.value} + 8 = ${hit?.total}${nat}; ` +
         `Flame Tongue greatsword damage: 2d6+5 (${base?.dice.map((d) => d.value).join(" + ")}) ` +
         `slashing + 2d6 (${fire?.dice.map((d) => d.value).join(" + ")}) fire = ` +
         `${(base?.total ?? 0) + (fire?.total ?? 0)}`,
