@@ -21,6 +21,11 @@ export interface ShellState {
   windows: Windows;
   /** How each window's current rect was chosen (`data-placed`); client memory only. */
   placed: ReadonlyMap<string, Placed>;
+  /**
+   * Windows a feature open, appearance or auto placement just placed, waiting for their first
+   * layout to `settle` (FR-SHELL-40, -41); client memory only.
+   */
+  settling: ReadonlySet<string>;
 }
 
 export interface ShellController {
@@ -64,6 +69,33 @@ function nextPlaced(
   return out;
 }
 
+/**
+ * `settling` after a change: an `open` / `appear` that placed a window (new, or moved) adds it;
+ * its `settle`, or a move / resize end, removes it.
+ */
+function nextSettling(
+  prev: ReadonlySet<string>,
+  before: Windows,
+  next: Windows,
+  action: WindowAction,
+): ReadonlySet<string> {
+  if (action.type === "reset") return prev;
+  const id = windowId(action.kind, action.instance);
+  const without = () => {
+    if (!prev.has(id)) return prev;
+    const out = new Set(prev);
+    out.delete(id);
+    return out;
+  };
+  if (action.type === "settle" || action.type === "setRect") return without();
+  if (action.type !== "open" && action.type !== "appear") return prev;
+  const at = (ws: Windows) => ws.find((w) => windowId(w.kind, w.instance) === id);
+  const w = at(next);
+  const b = at(before);
+  if (!w || (b && sameRect(b, w)) || prev.has(id)) return prev;
+  return new Set(prev).add(id);
+}
+
 export function createShellController(opts: {
   registry: WindowRegistry;
   storage: LayoutStorage;
@@ -76,7 +108,12 @@ export function createShellController(opts: {
 }): ShellController {
   const { registry, storage } = opts;
   const warn = opts.warn ?? ((m: string) => console.warn(m));
-  const store = createStore<ShellState>()(() => ({ key: null, windows: [], placed: new Map() }));
+  const store = createStore<ShellState>()(() => ({
+    key: null,
+    windows: [],
+    placed: new Map(),
+    settling: new Set(),
+  }));
   return {
     store,
     registry,
@@ -91,12 +128,16 @@ export function createShellController(opts: {
         const how = r.stored || !def ? "stored" : placedAs(def, w, vp);
         placed.set(windowId(w.kind, w.instance), how);
       }
-      store.setState({ key, windows: r.windows, placed });
+      store.setState({ key, windows: r.windows, placed, settling: new Set() });
     },
     dispatch(action, available) {
       const state = store.getState();
       const { key, windows } = state;
       if (key === null) return; // nothing shown before the first snapshot
+      // One settle per placement (FR-SHELL-40): later layouts never move it again.
+      if (action.type === "settle" && !state.settling.has(windowId(action.kind, action.instance))) {
+        return;
+      }
       const viewport = opts.viewport();
       const next = reduce(windows, action, {
         registry,
@@ -106,10 +147,15 @@ export function createShellController(opts: {
         heights: opts.heights,
         placed: (id) => state.placed.get(id),
       });
-      if (next === windows) return;
+      const settling = nextSettling(state.settling, windows, next, action);
+      if (next === windows) {
+        if (settling !== state.settling) store.setState({ settling });
+        return;
+      }
       store.setState({
         windows: next,
         placed: nextPlaced(state, next, action, registry, viewport),
+        settling,
       });
       storage.write(key, serialise(next, registry));
     },

@@ -84,6 +84,7 @@ export function ShellWindow({
   win,
   def,
   placed,
+  settling,
   viewport,
   focused,
   dispatch,
@@ -92,6 +93,8 @@ export function ShellWindow({
   def: WindowDef;
   /** How its current rect was chosen (FR-SHELL-40; walkthroughs read `data-placed`). */
   placed?: Placed | undefined;
+  /** Just placed by a feature open / appearance / auto placement: settle after first layout. */
+  settling?: boolean;
   viewport: Viewport;
   focused: boolean;
   dispatch: (a: WindowAction) => void;
@@ -107,6 +110,13 @@ export function ShellWindow({
     if (!grows) reportContentHeight(wid, null);
   }, [wid, grows]);
   useEffect(() => () => reportContentHeight(wid, null), [wid]);
+  // FR-SHELL-40, -41: once the real height is laid out (before paint), place it again if needed.
+  const open = win.state === "open";
+  useLayoutEffect(() => {
+    if (settling && open && (!grows || needed !== undefined)) {
+      dispatch({ type: "settle", kind: win.kind, instance: win.instance });
+    }
+  }, [settling, open, grows, needed, dispatch, win.kind, win.instance]);
   // Render-only fit to the work area, then clamp (FR-SHELL-29, -12), then grow to content
   // (FR-SHELL-39); a gesture starts here and its end stores the result with the current work area.
   const rect = windowRect(win, def, viewport, needed);

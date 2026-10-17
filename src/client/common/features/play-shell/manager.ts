@@ -36,6 +36,12 @@ export type WindowAction =
    * auto-placed (FR-SHELL-40, -41); a user's spot clear of other windows is kept.
    */
   | { type: "appear"; kind: string; instance?: string }
+  /**
+   * First layout of a window placed by a feature open, an appearance or auto placement: once its
+   * real height is known (FR-SHELL-39), it is placed again if it covers another open window or
+   * grew taller than the slot it got (FR-SHELL-40, -41). Once; a user's stored rect never moves.
+   */
+  | { type: "settle"; kind: string; instance?: string }
   | { type: "reset" };
 
 export interface ManagerContext {
@@ -304,6 +310,17 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
       const cur = find(ws, kind, instance);
       if (cur?.state !== "open" || !ctx.available.has(kind)) return ws;
       if (!needsAutoPlace(ws, cur, ctx)) return ws;
+      const rect = autoRect(ws, ctx, kind, instance);
+      if (!rect) return ws;
+      return patch(ws, kind, instance, (w) => ({ ...w, ...rect, area: workArea(ctx.viewport) }));
+    }
+    case "settle": {
+      const cur = find(ws, kind, instance);
+      if (cur?.state !== "open" || !ctx.available.has(kind)) return ws;
+      if (ctx.placed?.(windowId(kind, instance)) === "stored") return ws;
+      const shown = shownRect(cur, ctx);
+      const covers = onScreen(ws, ctx, kind, instance).some((o) => overlaps(shown, o));
+      if (!covers && shown.h <= cur.h) return ws;
       const rect = autoRect(ws, ctx, kind, instance);
       if (!rect) return ws;
       return patch(ws, kind, instance, (w) => ({ ...w, ...rect, area: workArea(ctx.viewport) }));

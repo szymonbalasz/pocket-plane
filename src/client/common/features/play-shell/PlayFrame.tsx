@@ -56,6 +56,7 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
   const registry = useRegistry();
   const windows = useShellState((s) => s.windows);
   const placed = useShellState((s) => s.placed);
+  const settling = useShellState((s) => s.settling);
   const available = useAvailableKinds();
   const dispatch = useWindowDispatch();
   const viewport = useViewport();
@@ -91,6 +92,7 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
               win={w}
               def={def}
               placed={placed.get(`${w.kind}:${w.instance}`)}
+              settling={settling.has(`${w.kind}:${w.instance}`)}
               viewport={viewport}
               focused={top === w}
               dispatch={dispatch}
