@@ -15,7 +15,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | M1 freeform AoE | merged | — | Done (walkthrough 7/7; BL-05 done) | — |
 | M2 drag path | `build/drag-path` (w61, slot 0) | build-drag-path | Building | Walkthrough → M5 |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
-| Physical dice in combat (BL-19, BL-25) | `fix/physical-dice-combat` (w62, slot 3) | build-physical-dice | Building (sprint fix, found by 3 walkthroughs) | Walkthrough |
+| Physical dice in combat (BL-19, BL-25) | `fix/physical-dice-combat` (w62, slot 3) | test-physical-dice | Walkthrough (check, e2e 101 green) | Merge |
 | C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
 | V9 fog brush + Ctrl+Z | `build/fog-brush` (w63, slot 4) | build-fog-brush | Building | Walkthrough |
 | V10 party vision + Blinded | `build/party-vision` (w64, slot 5) | build-party-vision | Building (∥ V9; FogBar merge after V9) | Walkthrough |
