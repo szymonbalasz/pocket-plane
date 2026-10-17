@@ -1,19 +1,26 @@
-// AoE tool (FR-SCN-22–26; SCN §7), both clients: a drawing tool in the canvas tool registry.
-// Press at a vertex and drag: the direction (cone, line, cube quadrant) or the radius (sphere,
-// cylinder); release → this connection's ephemeral template (a new one replaces it; Clear or
-// Esc removes it). Pressing an editable kept template's origin selects it and drags it (one
-// `scn.updateTemplate` on release). The panel: shape, size / width with ±5 nudges, label, Keep,
-// Clear; for a selected kept template: resize, rotate, Delete and (DM) Hide / Reveal; DM: DM-only
-// and "Clear templates".
+// AoE tool (FR-SCN-22–26, -43–45; SCN §7), both clients: a drawing tool in the canvas tool
+// registry. Press and drag: the direction (cone, line, cube diagonal) or the radius (sphere,
+// cylinder); release → this connection's ephemeral template (a new one replaces it; Clear or Esc
+// removes it). Snapped (vertex, 15°) unless Ctrl: origin to 0.01 cell, angle to 0.1°, read on
+// every move, with the "Free" chip at the cursor (FR-SCN-43). Pressing an editable kept
+// template's origin selects it and drags it; the selected one's end handle re-aims it (cone,
+// line, cube) or resizes it (sphere, cylinder); release sends one `scn.updateTemplate`
+// (FR-SCN-45). The panel: shape, size / width with ±5 nudges, label, Keep, Clear; for a selected
+// kept template: resize, rotate, Delete and (DM) Hide / Reveal; DM: DM-only and "Clear templates
+// on this scene" (confirm + scope, FR-SCN-44).
+
 import {
+  AOE_TEMPLATE_TYPE,
   SCN_INTENTS as S,
   TEMPLATE_ANGLE,
   TEMPLATE_LABEL_MAX,
   TEMPLATE_SHAPES,
   TEMPLATE_SIZE,
   TEMPLATE_WIDTH,
+  type TemplateRecordView,
   type TemplateShape,
 } from "@shared/scene-tools/schemas";
+import { snapPoint } from "@shared/scenes-map/area";
 import {
   CircleIcon,
   CylinderIcon,
@@ -29,22 +36,43 @@ import {
   Trash2Icon,
   TriangleIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../components/ui/button";
+import { Checkbox } from "../../components/ui/controls";
 import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/menus";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
 import { ToggleTip } from "../../components/ui/toggle-tip";
-import { useSendSignal } from "../../sync/store";
-import { toastReject, useMapIntent } from "../scenes-map/intents";
+import { useSendSignal, useSync } from "../../sync/store";
+import { toastReject, useLive, useMapIntent } from "../scenes-map/intents";
 import { useMapTool } from "../scenes-map/tool-store";
 import type { CanvasToolDef, ToolPointer } from "../scenes-map/tools";
 import { bindAoe, cancelAoe, editTemplate, endOwn, keepOwn, showOwn, useAoe } from "./aoe-store";
+import { FreeChip } from "./free-chip";
 import {
   type AoeSettings,
+  clearConfirmEnabled,
+  clearCounts,
+  clearInput,
+  clearScopeCount,
+  clearTitle,
+  endEdit,
   gestureTemplate,
+  gridPoint,
+  handleAt,
+  keptView,
+  movedOrigin,
+  originHit,
   snapSize,
   snapWidth,
   type TemplateView,
+  templateUpdate,
 } from "./templates";
 
 const SHAPE_ICONS: Record<TemplateShape, typeof CircleIcon> = {
@@ -55,40 +83,78 @@ const SHAPE_ICONS: Record<TemplateShape, typeof CircleIcon> = {
   line: SlashIcon,
 };
 
-const sameVertex = (a: { x: number; y: number }, b: { x: number; y: number }) =>
-  a.x === b.x && a.y === b.y;
+/** The latest pointer event (a Ctrl press re-applies it without a move, FR-SCN-43). */
+let last: ToolPointer | null = null;
+
+const keptById = (id: string) => useAoe.getState().editable.find((t) => t.id === id) ?? null;
 
 function down(e: ToolPointer): void {
   bindAoe(e.signal, e.intent);
+  last = e;
   const st = useAoe.getState();
-  const kept = st.editable.find((t) => t.sceneId === e.scene.id && sameVertex(t, e.vertex));
+  const p = gridPoint(e.grid, e.x, e.y);
+  const onScene = st.editable.filter((t) => t.sceneId === e.scene.id);
+  // FR-SCN-45: the selected template's end handle first, then any editable origin.
+  const selected = onScene.find((t) => t.id === st.selectedId);
+  if (selected && handleAt(selected, p, true) === "end") {
+    useAoe.setState({ gesture: { kind: "end", id: selected.id, template: keptView(selected) } });
+    return;
+  }
+  const kept = originHit(onScene, p);
   if (kept) {
     useAoe.setState({
       selectedId: kept.id,
-      gesture: { kind: "move", id: kept.id, from: e.vertex, at: e.vertex },
+      gesture: { kind: "move", id: kept.id, press: p, at: null },
     });
     return;
   }
   const angle = st.own?.template.angle ?? 0;
-  useAoe.setState({ selectedId: null, gesture: { kind: "place", origin: e.vertex, angle } });
-  showOwn(e.scene.id, gestureTemplate(st.settings, e.vertex, e, e.grid, angle));
+  useAoe.setState({ selectedId: null, gesture: { kind: "place", press: p, angle } });
+  showOwn(e.scene.id, gestureTemplate(st.settings, snapPoint(p, e.ctrl), e, e.grid, angle, e.ctrl));
 }
 
 function move(e: ToolPointer): void {
+  last = e;
   const g = useAoe.getState().gesture;
   if (!g) return;
+  const p = gridPoint(e.grid, e.x, e.y);
   if (g.kind === "move") {
-    if (!sameVertex(g.at, e.vertex)) useAoe.setState({ gesture: { ...g, at: e.vertex } });
+    const at = movedOrigin(g.press, p, e.ctrl);
+    if (at?.x !== g.at?.x || at?.y !== g.at?.y) useAoe.setState({ gesture: { ...g, at } });
     return;
   }
-  showOwn(e.scene.id, gestureTemplate(useAoe.getState().settings, g.origin, e, e.grid, g.angle));
+  if (g.kind === "end") {
+    const kept = keptById(g.id);
+    if (!kept) return;
+    const template = endEdit(keptView(kept), p, e.ctrl);
+    if (template.angle !== g.template.angle || template.size !== g.template.size) {
+      useAoe.setState({ gesture: { ...g, template } });
+    }
+    return;
+  }
+  const { settings } = useAoe.getState();
+  showOwn(
+    e.scene.id,
+    gestureTemplate(settings, snapPoint(g.press, e.ctrl), e, e.grid, g.angle, e.ctrl),
+  );
 }
 
 function up(e: ToolPointer): void {
+  move(e);
   const g = useAoe.getState().gesture;
   useAoe.setState({ gesture: null });
-  if (g?.kind !== "move" || sameVertex(g.from, g.at)) return;
-  e.intent(S.updateTemplate, { templateId: g.id, x: g.at.x, y: g.at.y }).catch(toastReject);
+  if (!g || g.kind === "place") return;
+  const kept = keptById(g.id);
+  if (!kept) return;
+  const after: TemplateView =
+    g.kind === "end" ? g.template : { ...keptView(kept), ...(g.at ?? {}) };
+  const patch = templateUpdate(kept.id, kept, after);
+  if (patch) e.intent(S.updateTemplate, patch).catch(toastReject);
+}
+
+/** FR-SCN-43: Ctrl pressed / released without a move re-applies the gesture. */
+export function aoeCtrl(ctrl: boolean): void {
+  if (last && last.ctrl !== ctrl && useAoe.getState().gesture) move({ ...last, ctrl });
 }
 
 export const aoeTool: CanvasToolDef = {
@@ -101,7 +167,7 @@ export const aoeTool: CanvasToolDef = {
   pointer: { down, move, up, cancel: cancelAoe },
 };
 
-/** A panel change reshapes the ephemeral in place (same origin; a cube keeps its quadrant). */
+/** A panel change reshapes the ephemeral in place (same origin and angle). */
 function applySettings(patch: Partial<AoeSettings>): void {
   const settings = { ...useAoe.getState().settings, ...patch };
   useAoe.setState({ settings });
@@ -113,7 +179,6 @@ function applySettings(patch: Partial<AoeSettings>): void {
     shape: settings.shape,
     size: settings.size,
     width: settings.shape === "line" ? settings.width : null,
-    angle: settings.shape === "cube" ? Math.floor(t.angle / 90) * 90 : t.angle,
     label: settings.label,
   };
   showOwn(own.sceneId, next);
@@ -221,7 +286,7 @@ export function AoePanel() {
   const update = (input: Record<string, unknown>) =>
     selected && editTemplate(S.updateTemplate, { templateId: selected.id, ...input });
   const shape = selected?.shape ?? settings.shape;
-  const step = shape === "cube" ? 90 : TEMPLATE_ANGLE.step;
+  const step = TEMPLATE_ANGLE.step;
   const rotate = (by: number) =>
     selected && update({ angle: (((selected.angle + by) % 360) + 360) % 360 });
   return (
@@ -371,25 +436,89 @@ export function AoePanel() {
           </div>
         </>
       )}
-      {isDm && sceneId && (
-        <Button
-          size="sm"
-          variant="ghost"
-          className="justify-start text-xs"
-          data-testid="scn-aoe-clear-all"
-          onClick={() => {
-            editTemplate(S.clearTemplates, { sceneId });
-            useAoe.setState({ selectedId: null });
-          }}
-        >
-          Clear templates on this scene
-        </Button>
-      )}
+      {isDm && sceneId && <ClearTemplates sceneId={sceneId} />}
       <p className="text-muted-foreground text-xs">
         {selected
-          ? "Drag the origin to move it."
+          ? "Drag the origin to move it, the end handle to aim or resize."
           : `Drag from a grid point to aim. ${TEMPLATE_SIZE.min}–${TEMPLATE_SIZE.max} ft${shape === "line" ? `, width ${TEMPLATE_WIDTH.min}–${TEMPLATE_WIDTH.max} ft` : ""}.`}
       </p>
+      <p data-testid="scn-aoe-hint" className="text-muted-foreground text-xs">
+        Ctrl: free placement
+      </p>
+      <FreeChip enabled onCtrl={aoeCtrl} />
     </div>
+  );
+}
+
+/**
+ * FR-SCN-44: "Clear templates on this scene" (DM): an AlertDialog "Clear N DM templates on this
+ * scene?" with "Also players' kept templates (M)" unticked; Confirm (disabled while the chosen
+ * scope holds 0 or while not live) sends `scn.clearTemplates`; Cancel / Esc send nothing.
+ */
+function ClearTemplates({ sceneId }: { sceneId: string }) {
+  const [open, setOpen] = useState(false);
+  const [players, setPlayers] = useState(false);
+  const live = useLive();
+  const byId = useSync((s) => s.store.records[AOE_TEMPLATE_TYPE]) as
+    | Record<string, TemplateRecordView>
+    | undefined;
+  const counts = useMemo(() => clearCounts(Object.values(byId ?? {}), sceneId), [byId, sceneId]);
+  const n = clearScopeCount(counts, players);
+  const openDialog = (o: boolean) => {
+    setOpen(o);
+    if (o) setPlayers(false);
+  };
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="justify-start text-xs"
+        data-testid="scn-aoe-clear-all"
+        onClick={() => openDialog(true)}
+      >
+        Clear templates on this scene
+      </Button>
+      <Dialog open={open} onOpenChange={openDialog}>
+        <DialogContent role="alertdialog" className="max-w-sm" data-testid="scn-aoe-clear-dialog">
+          <DialogTitle>{clearTitle(counts.dm)}</DialogTitle>
+          <DialogDescription>Kept templates only; templates being placed stay.</DialogDescription>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="scn-aoe-clear-players"
+              data-testid="scn-aoe-clear-players"
+              data-count={counts.players}
+              checked={players}
+              onCheckedChange={(v) => setPlayers(v === true)}
+            />
+            <Label htmlFor="scn-aoe-clear-players" className="text-sm">
+              Also players' kept templates ({counts.players})
+            </Label>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              data-testid="scn-aoe-clear-cancel"
+              onClick={() => openDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              data-testid="scn-aoe-clear-confirm"
+              data-count={n}
+              disabled={!clearConfirmEnabled(n, live)}
+              onClick={() => {
+                openDialog(false);
+                editTemplate(S.clearTemplates, clearInput(sceneId, players));
+                useAoe.setState({ selectedId: null });
+              }}
+            >
+              Clear {n}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

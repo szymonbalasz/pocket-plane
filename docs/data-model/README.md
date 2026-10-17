@@ -1619,3 +1619,11 @@ From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) 
 - **Derived:** `armed` = `requires` met by the owner's active effects (origin match, FR-MOD-36); `charge` = `waiting` while an `ownTurn` filter fails, else `used` iff a `used` `trigger_use` row holds the current window key of a `turn` / `round` / `encounter` trigger, else `ready`; `featureId` = `every.feature`.
 - **Written** only by `triggerStates` in the causing transaction (paths: protocol §70); `updatedAt` from `ctx.clock`, ids from `ctx.ids`. Deleted at End, with their trigger (listed before the FK cascade), never on combatant remove. Crash: rows commit with the use row / effect / turn they follow, or not at all.
 - **CON-44:** no new bytes beyond §51's measured rows (≤ 428 B/row). `rules-effects` vs `rule-triggers` with CJK names, every state row counted: DM +4,290 B (trigger-state 2,555), player-1 +1,920 B (1,234), player-2 +765 B (499); within MOD's bounds (192 KiB DM / 60 KiB per player).
+
+## 56. Sprint 4: freeform AoE tool (M1)
+
+From [scene-tools](../specs/scene-tools.md#8-data-model) sprint 4 (FR-SCN-43–45). **Built by `build/aoe-freeform`**; no table, column or record type. Protocol side: [protocol §73](../protocol/README.md#73-sprint-4-freeform-aoe-tool-m1).
+
+- **Client only (never stored or sent):** each drawn template's covered cells (memoised per geometry), the Free chip state, the gesture in progress (`place` from the raw press point, `move` of a kept origin, `end` handle preview).
+- **Fixtures:** `mt-templates` (`fixtures/units/scene-tools/`): **Thunderwave** kept cube 15 ft at (1.5, 10.5), angle 300, `placedByPlayerId` player-2 (8 golden squares); **Web** kept DM cube 20 ft at (0, 6), angle 0 (seen by both players). `mt-crowd` (`fixtures/units/scenes-map/`): Goblin Sneak (4, 9), Goblin Sneak 2 (5, 9) (`enemy-1`), Crypt Ogre (4, 10) (`scenes-extras`' Cave Ogre, large); all visible, seen by both players. Bundle **`map-tools`** = `vision` + `scn-templates` + `mt-templates` + `mt-crowd` (Goblin Ambush inactive at load).
+- **CON-44:** no new record type and no new field; the heavy harness is unchanged (template cap with decimals measured in §52).

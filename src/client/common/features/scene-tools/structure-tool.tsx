@@ -4,8 +4,7 @@
 // "Free" chip (`scn-free-chip`) follows the cursor over the canvas while Ctrl is held in Wall /
 // Door mode (FR-SCN-08).
 import { BrickWallIcon, DoorClosedIcon, EraserIcon, PenLineIcon, Undo2Icon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect } from "react";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "../../components/ui/menus";
@@ -14,6 +13,7 @@ import { ToggleTip } from "../../components/ui/toggle-tip";
 import { toastReject, useLive, useMapIntent } from "../scenes-map/intents";
 import type { CanvasToolDef } from "../scenes-map/tools";
 import { typingTarget } from "../scenes-map/tools";
+import { FreeChip } from "./free-chip";
 import { structureCtrl, structurePointer } from "./structure-pointer";
 import {
   type StructureMode,
@@ -28,51 +28,10 @@ export function freeChipShown(mode: StructureMode, ctrl: boolean, overCanvas: bo
   return ctrl && overCanvas && (mode === "wall" || mode === "door");
 }
 
-const overCanvas = (t: EventTarget | null) =>
-  (t as Element | null)?.closest?.('[data-testid="map-canvas"]') != null;
-
 /** FR-SCN-08: the "Free" chip at the cursor; Ctrl presses also re-pick the hover point. */
-function FreeChip() {
+function StructureFreeChip() {
   const mode = useStore(structureTool, (s) => s.mode);
-  const [ctrl, setCtrl] = useState(false);
-  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
-  useEffect(() => {
-    const move = (e: PointerEvent) => {
-      setCtrl(e.ctrlKey || e.metaKey);
-      setAt(overCanvas(e.target) ? { x: e.clientX, y: e.clientY } : null);
-    };
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== "Control" && e.key !== "Meta") return;
-      const c = e.type === "keydown";
-      setCtrl(c);
-      structureCtrl(c);
-    };
-    const blur = () => {
-      setCtrl(false);
-      structureCtrl(false);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("keydown", key);
-    window.addEventListener("keyup", key);
-    window.addEventListener("blur", blur);
-    return () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("keydown", key);
-      window.removeEventListener("keyup", key);
-      window.removeEventListener("blur", blur);
-    };
-  }, []);
-  if (!at || !freeChipShown(mode, ctrl, true)) return null;
-  return createPortal(
-    <div
-      data-testid="scn-free-chip"
-      className="pointer-events-none fixed z-50 rounded-full border bg-background/90 px-2 py-0.5 text-xs font-medium shadow-sm"
-      style={{ left: at.x + 14, top: at.y + 14 }}
-    >
-      Free
-    </div>,
-    document.body,
-  );
+  return <FreeChip enabled={freeChipShown(mode, true, true)} onCtrl={structureCtrl} />;
 }
 
 const MODES: { mode: StructureMode; label: string; hint: string; icon: typeof PenLineIcon }[] = [
@@ -161,7 +120,7 @@ export function StructurePanel() {
           </Button>
         </span>
       </Tooltip>
-      <FreeChip />
+      <StructureFreeChip />
     </div>
   );
 }
