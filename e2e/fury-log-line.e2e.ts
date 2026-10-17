@@ -1,9 +1,10 @@
-// e2e-bundle: rule-triggers
+// e2e-bundle: session-sim-7
 // Thin Divine Fury dice flow (S4-5; MOD §13.1 step 4, FR-MOD-57): DM Next → Brakka's turn;
 // player-1 turns Rage on and rolls Greataxe Attack + damage → the damage roll line shows the
-// offered d6 dashed ("Divine Fury (on a hit)"); the DM applies to Goblin with the chip → the
+// offered d6 dashed ("Divine Fury (on a hit)"); the DM applies to Mira (visible) with the chip → the
 // outcome line "+ N radiant (Divine Fury)" then its d6 chip for the player and the DM. Sources,
-// monster triggers, DM edits, leaks: bun test (effect-modifiers).
+// monster triggers, DM edits, leaks: bun test (effect-modifiers). Own bundle (Brakka + Divine
+// Fury, Wolf's turn): `rule-triggers` specs share one server and expect Brakka's turn untouched.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
@@ -74,10 +75,12 @@ test("FR-MOD-57 Divine Fury's d6: offered (dashed) on the roll line, a chip afte
   await card.click();
   const popup = dm.getByTestId("cbt-popup");
   await expect(popup).toBeVisible();
-  const goblin = await idByName(init, "Goblin");
+  // session-sim-7 hides the ambushers (lines naming them are DM-only): the target is Mira, a
+  // creature everyone sees, so the line is public.
+  const target = await idByName(init, "Mira");
   await popup.getByTestId("cbt-popup-target-add").click();
-  await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${goblin}"]`).click();
-  const trow = popup.locator(`[data-testid="cbt-popup-target-row"][data-record-id="${goblin}"]`);
+  await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${target}"]`).click();
+  const trow = popup.locator(`[data-testid="cbt-popup-target-row"][data-record-id="${target}"]`);
   const hit = trow.getByTestId("cbt-popup-target-hit");
   if ((await hit.getAttribute("data-value")) === "miss") await hit.click();
   await expect(trow.getByTestId("mod-popup-part")).toHaveAttribute("data-state", "on");
