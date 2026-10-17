@@ -55,7 +55,8 @@ async function live(page: Page) {
   await expect(page.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
 }
 
-const shared = async (page: Page) => ((await attrOf(page, "fog-vision", "shared")) ?? []) as string[];
+const shared = async (page: Page) =>
+  ((await attrOf(page, "fog-vision", "shared")) ?? []) as string[];
 
 async function setup(browser: Parameters<typeof rolePage>[0]) {
   const env = e2eEnv();
@@ -179,7 +180,9 @@ test("FR-FOG-48 / -21 Blinded chip: Blinded → 'Blinded — you can't see'; sec
   // Start "Ambush at the Ford": the Initiative rows carry the condition menus.
   const enc = await openWindow(dm, "cbt.encounters");
   await enc
-    .locator(`[data-testid="cbt-enc-row"][data-record-id="${recordId("encounter-1", "encounter")}"]`)
+    .locator(
+      `[data-testid="cbt-enc-row"][data-record-id="${recordId("encounter-1", "encounter")}"]`,
+    )
     .click();
   await enc.getByTestId("cbt-enc-start").click();
   await dm.getByTestId("cbt-enc-start-confirm").click();

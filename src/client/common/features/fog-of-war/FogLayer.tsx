@@ -21,8 +21,8 @@
 // attr `on` = the copy is drawn in a ring).
 import { FOG_SIGNALS, FOG_TYPE, FogSightPayload, VISION_TYPE } from "@shared/fog-of-war/schemas";
 import type { DarknessShape } from "@shared/fog-of-war/shapes";
-import type Konva from "konva";
 import { samePair, VIEW_AS_PARTY, type ViewAsPair } from "@shared/protocol/scene-window";
+import type Konva from "konva";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Group, Line, Rect, Shape, Text } from "react-konva";
 import { useStore } from "zustand";
