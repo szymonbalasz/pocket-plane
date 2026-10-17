@@ -14,6 +14,7 @@ import { countedEntries, formSlots } from "../dice-roll-log/logic";
 import {
   ManualForm,
   partEntries,
+  partForms,
   type RollControl,
   type RollControlOptions,
   type RollRequest,
@@ -93,6 +94,30 @@ const attackSubjects: RollSubject[] = [
   { creature: mira, roll: "attack", via: "weapon" },
   { creature: mira, roll: "damage", via: "weapon" },
 ];
+
+/** An offered `hit` trigger group (FR-MOD-18 `t:`), as the preview gives it. */
+const fury = (expression: string) => ({
+  key: "t:trg",
+  label: "Divine Fury",
+  expression,
+  dice: [],
+  sign: 1 as const,
+  onHit: true as const,
+});
+
+/** BL-25: the form of a Flame Tongue Attack + damage with Divine Fury offered on the damage. */
+function renderOffered(): string {
+  const c = captureControl(
+    { expressions: ["1d20+8", "2d6+5", "2d6"], category: "attack", onRoll() {} },
+    {},
+  );
+  const preview = {
+    ...c.preview,
+    active: true,
+    groups: (i: number) => (i === 1 ? [fury("1d6+2")] : []),
+  };
+  return render(<ManualForm control={{ ...c, preview, manual: { mode: "normal" } }} />, {});
+}
 
 afterEach(() => {
   diceExtras.failed();
@@ -217,29 +242,89 @@ describe("FR-MOD-18 physical groups → manualParts", () => {
     ).toEqual([{ diceTotal: 11, dice: [11, 4] }, { diceTotal: 5 }]);
   });
 
-  test("FR-MOD-18 submit: manualParts per entry, keys from bonusDieGroups; e: required, empty t: left out", () => {
+  test("FR-MOD-18 submit: manualParts per entry, keys from bonusDieGroups; every group required", () => {
     const rolls: RollRequest[] = [];
     const c = captureControl({ ...options, onRoll: (r) => rolls.push(r) }, withEffects(BLESS));
-    const groups = [c.preview.groups(0), c.preview.groups(1)];
-    expect(groups[0]?.map((g) => g.key)).toEqual(["e:fx-bless"]);
-    expect(partEntries(groups, {})).toEqual({
+    const forms = partForms([{ crit: false }, { crit: false }], (i) => c.preview.groups(i));
+    expect(forms.map((f) => f.group.key)).toEqual(["e:fx-bless"]);
+    expect(partEntries(forms, {}, 2)).toEqual({
       ok: false,
       message: "Enter the total for Bless (1d4)",
-      focus: { slot: 0, key: "e:fx-bless", die: null },
+      focus: { slot: 0, key: "e:fx-bless", group: "base", die: null },
     });
-    const ok = partEntries(groups, { "0|e:fx-bless|1d4": { total: "3", dice: [] } });
+    const ok = partEntries(forms, { "0|e:fx-bless|1d4": { total: "3", dice: [] } }, 2);
     expect(ok).toEqual({
       ok: true,
       parts: [[{ key: "e:fx-bless", entry: { diceTotal: 3 } }], []],
     });
-    const trigger = [
-      [{ key: "t:trg", label: "Fury", expression: "1d6+2", dice: [], sign: 1 as const }],
-    ];
-    expect(partEntries(trigger, {})).toEqual({ ok: true, parts: [[]] });
-    expect(partEntries(trigger, { "0|t:trg|1d6+2": { total: "9", dice: [] } })).toMatchObject({
+    const trigger = partForms([{ crit: false }], () => [fury("1d6+2")]);
+    expect(partEntries(trigger, { "0|t:trg|1d6+2": { total: "9", dice: [] } }, 1)).toMatchObject({
       ok: false,
       message: "Total must be 1–6",
     });
+  });
+
+  test("BL-25 FR-MOD-18 an offered trigger die is entered like any die: required, sent as its t: group (no 'rolled for you')", () => {
+    const forms = partForms([{ crit: false }], () => [fury("1d6+2")]);
+    expect(partEntries(forms, {}, 1)).toEqual({
+      ok: false,
+      message: "Enter the total for Divine Fury (1d6+2)",
+      focus: { slot: 0, key: "t:trg", group: "base", die: null },
+    });
+    expect(partEntries(forms, { "0|t:trg|1d6+2": { total: "4", dice: [] } }, 1)).toEqual({
+      ok: true,
+      parts: [[{ key: "t:trg", entry: { diceTotal: 4 } }]],
+    });
+  });
+
+  test("BL-25 offered dice follow every weapon part (part order); bonus dice stay under their roll", () => {
+    // [to-hit, base damage, fire part]: Bless on the to-hit, Divine Fury offered on the damage.
+    const bless = {
+      key: "e:fx-bless",
+      label: "Bless",
+      expression: "1d4",
+      dice: [],
+      sign: 1 as const,
+    };
+    const at = (i: number) => (i === 0 ? [bless] : i === 1 ? [fury("1d6+2")] : []);
+    const forms = partForms([{ crit: false }, { crit: false }, { crit: false }], at);
+    expect(forms.map((f) => [f.slot, f.group.key])).toEqual([
+      [0, "e:fx-bless"],
+      [1, "t:trg"],
+    ]);
+    const html = renderOffered();
+    const fire = html.indexOf('data-testid="dice-manual-total" data-value="2"');
+    const offered = html.indexOf('data-testid="mod-tray-group" data-value="t:trg"');
+    expect(fire).toBeGreaterThan(-1);
+    expect(offered).toBeGreaterThan(fire);
+    expect(html).toContain("Divine Fury (on a hit): <code>1d6+2</code>");
+    expect(html).not.toContain("optional");
+  });
+
+  test("BL-25 FR-DICE-31 FR-CBT-83 on a crit an offered part keeps its dice and adds an Extra critical dice row; sent merged", () => {
+    const forms = partForms([{ crit: true }], (_, crit) => [fury(crit ? "2d6+2" : "1d6+2")]);
+    expect(forms).toHaveLength(1);
+    const f = forms[0];
+    expect(f?.base.expression).toBe("1d6+2");
+    expect(f?.extra?.expression).toBe("1d6");
+    expect(partEntries(forms, { "0|t:trg|1d6+2": { total: "4", dice: [] } }, 1)).toEqual({
+      ok: false,
+      message: "Enter the total for Divine Fury (1d6, critical)",
+      focus: { slot: 0, key: "t:trg", group: "extra", die: null },
+    });
+    expect(
+      partEntries(
+        forms,
+        {
+          "0|t:trg|1d6+2": { total: "4", dice: [] },
+          "0|t:trg|1d6+2|crit": { total: "6", dice: [] },
+        },
+        1,
+      ),
+    ).toEqual({ ok: true, parts: [[{ key: "t:trg", entry: { diceTotal: 10, dice: [4, 6] } }]] });
+    // A crit-filtered trigger (same dice on a crit) stays one group.
+    const same = partForms([{ crit: true }], () => [fury("1d6+2")]);
+    expect(same[0]?.extra).toBeNull();
   });
 
   test("FR-MOD-18 the request carries manualParts beside manual (an empty list per entry when none)", () => {
@@ -262,7 +347,7 @@ describe("FR-MOD-18 physical groups → manualParts", () => {
     });
   });
 
-  test("FR-MOD-18 crit damage slot: the bonus die doubles", () => {
+  test("FR-MOD-18 BL-25 crit damage slot: the bonus die doubles, asked as its dice + Extra critical dice", () => {
     const dmg: RollControlOptions = {
       expressions: ["1d8+3"],
       critExpressions: ["2d8+3"],
@@ -277,7 +362,10 @@ describe("FR-MOD-18 physical groups → manualParts", () => {
     const c = captureControl(dmg, withEffects(hm));
     expect(c.preview.groups(0, { crit: true }).map((g) => g.expression)).toEqual(["2d6"]);
     const html = render(<ManualForm control={{ ...c, manual: { mode: "normal" } }} />, {});
-    expect(html).toContain("Mark: <code>2d6</code>");
+    expect(html).toContain("Mark: <code>1d6</code>");
+    expect(html).toContain(
+      'data-testid="mod-tray-group-crit-label" data-value="e:fx-hm" data-slot="0" class="min-w-0 flex-1 truncate text-xs text-muted-foreground">Extra critical dice: 1d6',
+    );
   });
 });
 
