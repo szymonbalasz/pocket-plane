@@ -9,6 +9,7 @@ import characterSheetFull from "./character-sheet-full";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
 import compendium from "./compendium";
+import compendiumFull from "./compendium-full";
 import diceExtras from "./dice-extras";
 import diceLog from "./dice-log";
 import effectModifiers from "./effect-modifiers";
@@ -56,4 +57,5 @@ export const bundles: readonly Bundle[] = [
   ruleTriggers,
   vision,
   sessionSim7,
+  compendiumFull,
 ];

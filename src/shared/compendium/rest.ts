@@ -17,8 +17,6 @@ import {
 /** FR-CMP-10: query text cap and page size. */
 export const SEARCH_Q_MAX = 100;
 export const SEARCH_PAGE = 50;
-/** FR-CMP-10: below this length the body text is not searched (names only). */
-export const TEXT_MATCH_MIN = 3;
 export const CURSOR_MAX = 512;
 /** `sourceLabel` of a homebrew entry (FR-CMP-19). */
 export const HOMEBREW_LABEL = "Homebrew";
@@ -44,12 +42,16 @@ export const ALL_FILTER_KEYS = [
 ] as const;
 export type FilterKey = (typeof ALL_FILTER_KEYS)[number];
 
-/** `GET /api/compendium/search` query (FR-CMP-10 / -11). Strict: an unknown key → `invalid`. */
+/**
+ * `GET /api/compendium/search` query (FR-CMP-10 / -11 / -35). Strict: an unknown key → `invalid`.
+ * `sameAs` lists one duplicate group's members and takes `q` only (anything else → `invalid`).
+ */
 export const SearchQuery = z
   .strictObject({
     q: z.string().max(SEARCH_Q_MAX).optional(),
     kind: CompendiumKind.optional(),
     cursor: z.string().min(1).max(CURSOR_MAX).optional(),
+    sameAs: z.string().min(1).max(64).optional(),
     crMin: Cr.optional(),
     crMax: Cr.optional(),
     type: z.string().min(1).max(40).optional(),
@@ -65,6 +67,13 @@ export const SearchQuery = z
     subclass: z.string().min(1).max(NAME_MAX).optional(),
   })
   .superRefine((q, c) => {
+    if (q.sameAs !== undefined) {
+      for (const k of Object.keys(q)) {
+        if (k === "sameAs" || k === "q" || q[k as keyof typeof q] === undefined) continue;
+        c.addIssue({ code: "custom", path: [k], message: "sameAs takes only q" });
+      }
+      return;
+    }
     const allowed: readonly string[] = q.kind === undefined ? [] : FILTER_KEYS[q.kind];
     for (const k of ALL_FILTER_KEYS) {
       if (q[k] === undefined || allowed.includes(k)) continue;
@@ -77,7 +86,13 @@ export const SearchQuery = z
   });
 export type SearchQuery = z.infer<typeof SearchQuery>;
 
-/** One search result (FR-CMP-10). `definitionId`: monsters only (the imported definition). */
+/** FR-CMP-35: a duplicate group row's member count (≥ 2; `sameAs` lists exactly that many). */
+export const SummaryGroup = z.strictObject({ count: z.number().int().min(2) });
+
+/**
+ * One search result (FR-CMP-10). `definitionId`: monsters only (the imported definition).
+ * `group`: a collapsed duplicate group (FR-CMP-35); `id` is its best member.
+ */
 export const EntrySummary = z.strictObject({
   id: z.string().min(1).max(64),
   kind: CompendiumKind,
@@ -86,6 +101,7 @@ export const EntrySummary = z.strictObject({
   sourceLabel: z.string().min(1).max(NAME_MAX),
   line: z.string().max(LINE_MAX),
   definitionId: z.string().min(1).max(64).optional(),
+  group: SummaryGroup.optional(),
 });
 export type EntrySummary = z.infer<typeof EntrySummary>;
 

@@ -87,7 +87,11 @@ export function textWordsOf(text: string): string[] {
   return f === "" ? [] : [...new Set(f.split(" "))].sort();
 }
 
-function tierOfName(n: FoldedName, words: readonly string[], hits: readonly WordHit[]): NameTier | null {
+function tierOfName(
+  n: FoldedName,
+  words: readonly string[],
+  hits: readonly WordHit[],
+): NameTier | null {
   const phrase = words.join(" ");
   if (n.folded === phrase) return 0;
   if (n.folded.startsWith(phrase)) return 1;
@@ -102,7 +106,11 @@ function tierOfName(n: FoldedName, words: readonly string[], hits: readonly Word
 export function nameTier(name: string | FoldedName, words: readonly string[]): NameTier | null {
   if (words.length === 0) return null;
   const n = typeof name === "string" ? foldName(name) : name;
-  return tierOfName(n, words, words.map((w) => nameHit(n, w)));
+  return tierOfName(
+    n,
+    words,
+    words.map((w) => nameHit(n, w)),
+  );
 }
 
 /**
