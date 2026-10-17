@@ -4,9 +4,11 @@
 // and the live value, preview, payload) and its draft model. Static render over a fake store.
 import { describe, expect, test } from "bun:test";
 import { CREATURE_SHEET_TYPE, defaultSheetData } from "@shared/character-sheet/sheet";
+import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
 import { EFFECT_PRESET_TYPE } from "@shared/effect-modifiers/schemas";
 import { TRIGGER_PRESETS } from "@shared/effect-modifiers/trigger-presets";
 import { RULE_TRIGGER_TYPE } from "@shared/effect-modifiers/trigger-records";
+import { TRIGGER_STATE_TYPE } from "@shared/effect-modifiers/trigger-state";
 import type { TriggerRule } from "@shared/effect-modifiers/triggers";
 import { ENTITY_TYPE, IMPORTED_ENTITY_TYPE } from "@shared/entities/schemas";
 import { emptyLoaded, type LazyState, lazyAfterSnapshot } from "@shared/protocol/lazy";
@@ -100,6 +102,9 @@ function syncState(o: {
   locked?: boolean;
   triggers?: readonly object[];
   offline?: boolean;
+  /** Extra record maps (effects, `trigger-state` rows, FR-MOD-60). */
+  records?: Record<string, Record<string, object>>;
+  features?: readonly object[];
 }) {
   const lazy: LazyState = { ...lazyAfterSnapshot(1) };
   if (o.lazy === "ready" || o.lazy === undefined)
@@ -152,13 +157,14 @@ function syncState(o: {
         id: "s1",
         entityId: "brakka",
         ...defaultSheetData(),
-        features: [RAGE_ROW],
+        features: o.features ?? [RAGE_ROW],
         locked: o.locked === true,
       },
     },
     [RULE_TRIGGER_TYPE]: Object.fromEntries(
       (o.triggers ?? [divineFury, broken]).map((t) => [(t as { id: string }).id, t]),
     ),
+    ...o.records,
   };
   const you = { campaignId: "c1", role: o.role, playerId: o.role === "dm" ? null : "p1" };
   return createStore<SyncState>()(
@@ -435,5 +441,91 @@ describe("FR-MOD-50 trigger editor", () => {
     expect(html).toContain("while Frost Ward is on");
     expect(html).not.toContain('data-testid="mod-trig-editor-invalid"');
     expect(tags(html, "mod-trig-editor-save")[0]).not.toContain('disabled=""');
+  });
+});
+
+describe("FR-MOD-60 Triggers block state", () => {
+  const state = (charge: string, armed = true, triggerId = "t-df") => ({
+    [TRIGGER_STATE_TYPE]: {
+      ts: { id: "ts", combatantId: "c-brakka", triggerId, armed, charge },
+    },
+  });
+  const badge = (html: string) => {
+    const tag = tags(html, "mod-trigger-state")[0] ?? "";
+    const text = html
+      .slice(html.indexOf(tag) + tag.length)
+      .split("<")[0]
+      ?.replaceAll("&#x27;", "'");
+    return [tag.match(/data-state="([^"]+)"/)?.[1], text];
+  };
+  const searing = {
+    ...divineFury,
+    id: "t-ss",
+    name: "Searing Strike",
+    rule: { ...DF_RULE, requires: undefined, every: { feature: "f-ss" } },
+  };
+  const ss = (used: number) => ({ id: "f-ss", name: "Searing Strike", used, usesMax: 2 });
+
+  test("FR-MOD-60 Triggers block state: Ready, Used this turn / round / fight, On ‹name›'s turn, Not in effect — needs Rage, '1 / 2 left', '−1 / 2 left' in hp.down; out of combat In effect / Not in effect", () => {
+    const one = { triggers: [divineFury] };
+    expect(badge(render({ role: "player", ...one, records: state("ready") }))).toEqual([
+      "ready",
+      "Ready",
+    ]);
+    expect(badge(render({ role: "player", ...one, records: state("used") }))).toEqual([
+      "used",
+      "Used this turn",
+    ]);
+    for (const [every, words] of [
+      ["round", "Used this round"],
+      ["encounter", "Used this fight"],
+    ] as const) {
+      const t = { ...divineFury, rule: { ...DF_RULE, every } };
+      expect(badge(render({ role: "dm", triggers: [t], records: state("used") }))[1]).toBe(words);
+    }
+    expect(badge(render({ role: "player", ...one, records: state("waiting") }))).toEqual([
+      "waiting",
+      "On Brakka's turn",
+    ]);
+    expect(badge(render({ role: "player", ...one, records: state("ready", false) }))).toEqual([
+      "off",
+      "Not in effect — needs Rage",
+    ]);
+    // A feature trigger: uses from the sheet; below zero in hp.down (FR-MOD-59).
+    const feat = (used: number) =>
+      render({
+        role: "player",
+        triggers: [searing],
+        features: [RAGE_ROW, ss(used)],
+        records: state("ready", true, "t-ss"),
+      });
+    expect(badge(feat(1))).toEqual(["ready", "1 / 2 left"]);
+    expect(badge(feat(3))).toEqual(["used", "−1 / 2 left"]);
+    expect(tags(feat(3), "mod-trigger-state")[0]).toContain("text-hp-down");
+    // Out of combat (no row): armed from the store, no charge.
+    expect(badge(render({ role: "player", ...one }))).toEqual([
+      "off",
+      "Not in effect — needs Rage",
+    ]);
+    const raging = {
+      [EFFECT_TYPE]: {
+        "fx-rage": {
+          id: "fx-rage",
+          kind: "custom",
+          label: "Rage",
+          modifiers: [],
+          presetKey: "p-rage",
+          targetCharacterId: "brakka",
+          targetCombatantId: null,
+          endedAt: null,
+        },
+      },
+    };
+    expect(badge(render({ role: "player", ...one, records: raging }))).toEqual([
+      "in-effect",
+      "In effect",
+    ]);
+    // A disabled trigger shows no state.
+    expect(tags(render({ role: "dm", triggers: [broken] }), "mod-trigger-state")).toEqual([]);
   });
 });

@@ -1609,3 +1609,12 @@ From [character-sheet-full](../specs/character-sheet-full.md) FR-CHARX-54–57, 
 
 - **Derived (never stored):** rolled numbers = stored `toHit` / `damage` + `bonus` (`attackRollSpecs`, `attackNumbers`); the line's merged run.
 - **Fixtures:** `weapon-flame-tongue` (S4-0) reused; no new unit or bundle. **CON-44:** `part` markers +3,780 B per viewer on 30 heavy entries.
+
+## 55. Sprint 4: trigger state (S4-3)
+
+From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) (FR-MOD-53, -54); [ADR-0049](../architecture/adr/0049-trigger-state.md). **Built by `build/trigger-state`**: MOD now writes the `trigger_state` rows of [§51](#51-sprint-4-rules-core-s4-0); no schema change. Protocol side: [protocol §72](../protocol/README.md#72-sprint-4-trigger-state-s4-3).
+
+- **Rows:** one per (enabled trigger, owner combatant) of the started encounter: every active combatant (a removed one keeps its rows), a PC → its character's triggers, a monster → its definition's triggers, one row per combatant. `characterId` / `ownerPlayerId` copy the trigger's (null / null for monsters), `name` / `on` the trigger's.
+- **Derived:** `armed` = `requires` met by the owner's active effects (origin match, FR-MOD-36); `charge` = `waiting` while an `ownTurn` filter fails, else `used` iff a `used` `trigger_use` row holds the current window key of a `turn` / `round` / `encounter` trigger, else `ready`; `featureId` = `every.feature`.
+- **Written** only by `triggerStates` in the causing transaction (paths: protocol §70); `updatedAt` from `ctx.clock`, ids from `ctx.ids`. Deleted at End, with their trigger (listed before the FK cascade), never on combatant remove. Crash: rows commit with the use row / effect / turn they follow, or not at all.
+- **CON-44:** no new bytes beyond §51's measured rows (≤ 428 B/row). `rules-effects` vs `rule-triggers` with CJK names, every state row counted: DM +4,290 B (trigger-state 2,555), player-1 +1,920 B (1,234), player-2 +765 B (499); within MOD's bounds (192 KiB DM / 60 KiB per player).

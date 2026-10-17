@@ -33,12 +33,17 @@ interface Fx {
   endedAt?: string | null;
 }
 
+type StateRow = { triggerId: string; armed?: boolean; charge?: string };
+
 function store(o: {
   effects?: Fx[];
   presets?: Record<string, unknown>[];
   triggers?: PreviewTrigger[];
   turn?: string | null;
   combat?: boolean;
+  /** Brakka's `trigger-state` rows (FR-MOD-56); default: every test trigger armed and ready. */
+  states?: StateRow[];
+  sheet?: { id: string; usesMax: number; used: number }[];
 }): RecordStore {
   const byId = <T extends { id: string }>(xs: T[]) => Object.fromEntries(xs.map((x) => [x.id, x]));
   const effects = (o.effects ?? []).map((e) => ({
@@ -51,10 +56,21 @@ function store(o: {
     targetCharacterId: e.on && "characterId" in e.on ? e.on.characterId : "brakka",
     targetCombatantId: e.on && "combatantId" in e.on ? e.on.combatantId : null,
   }));
+  const states = (o.states ?? READY.map((triggerId): StateRow => ({ triggerId }))).map((r) => ({
+    id: `ts-${r.triggerId}`,
+    combatantId: "c-brakka",
+    triggerId: r.triggerId,
+    armed: r.armed ?? true,
+    charge: r.charge ?? "ready",
+  }));
   return {
     you: null,
     seq: 0,
     records: {
+      "trigger-state": o.combat === false ? {} : byId(states),
+      "creature-sheet": {
+        "sheet-brakka": { id: "sheet-brakka", entityId: "brakka", features: o.sheet ?? [] },
+      },
       effect: byId(effects),
       "effect-preset": byId((o.presets ?? []) as { id: string }[]),
       encounter:
@@ -103,6 +119,7 @@ function store(o: {
   };
 }
 
+const READY = ["trg-df", "trg-bc", "trg-sa", "trg-p", "trg-m"];
 const brakka = { characterId: "brakka" };
 const attack: RollSubject = { creature: brakka, roll: "attack", via: "weapon" };
 const cardDamage: RollSubject = {
@@ -369,5 +386,63 @@ describe("FR-MOD-27 trigger groups (T)", () => {
       { count: 1, faces: 8, sign: 1 },
     ]);
     expect(diceOfExpression("2-1d4")).toEqual([{ count: 1, faces: 4, sign: -1 }]);
+  });
+});
+
+describe("FR-MOD-56 tray stops offering a used trigger", () => {
+  const raging = (o: Parameters<typeof store>[0] = {}) =>
+    store({ effects: [rageFx], presets: [ragePreset], ...o });
+  const keys = (st: RecordStore, t: PreviewTrigger = divineFury()) =>
+    rollPreview(st, cardDamage, [t]).groups.map((g) => g.key);
+  const text = (st: RecordStore, t: PreviewTrigger = divineFury()) =>
+    previewText(rollPreview(st, cardDamage, [t]).parts);
+
+  test("FR-MOD-56 tray stops offering a used trigger: group before the first hit; none after `used`; none waiting, not armed, without a row or out of combat; back on the next turn", () => {
+    expect(keys(raging({ states: [{ triggerId: "trg-df" }] }))).toEqual(["t:trg-df"]);
+    const used = raging({ states: [{ triggerId: "trg-df", charge: "used" }] });
+    expect(keys(used)).toEqual([]);
+    expect(text(used)).toBe("Rage +2");
+    expect(keys(raging({ states: [{ triggerId: "trg-df", charge: "waiting" }] }))).toEqual([]);
+    expect(keys(raging({ states: [{ triggerId: "trg-df", armed: false }] }))).toEqual([]);
+    expect(keys(raging({ states: [] }))).toEqual([]);
+    expect(keys(raging({ combat: false }))).toEqual([]);
+    // Her next turn: the server rewrote the row to `ready`.
+    expect(keys(raging({ states: [{ triggerId: "trg-df", charge: "ready" }] }))).toEqual([
+      "t:trg-df",
+    ]);
+  });
+
+  test("FR-MOD-56 a feature trigger needs a use left on the sheet; a windowed roll trigger needs its ready row", () => {
+    const searing: PreviewTrigger = {
+      ...divineFury(),
+      id: "trg-ss",
+      name: "Searing Strike",
+      rule: { ...divineFury().rule, every: { feature: "f-ss" } },
+    };
+    const st = (used: number) =>
+      raging({
+        states: [{ triggerId: "trg-ss" }],
+        sheet: [{ id: "f-ss", usesMax: 2, used }],
+      });
+    expect(keys(st(1), searing)).toEqual(["t:trg-ss"]);
+    expect(keys(st(2), searing)).toEqual([]);
+    expect(keys(st(3), searing)).toEqual([]);
+    expect(keys(raging({ states: [{ triggerId: "trg-ss" }] }), searing)).toEqual([]);
+
+    const perTurn: PreviewTrigger = {
+      ...divineFury(),
+      id: "trg-p",
+      name: "Steady Hand",
+      rule: {
+        on: "roll",
+        when: [{ if: "roll", on: { roll: "attack", via: "weapon" } }],
+        every: "turn",
+        then: { do: "part", formula: "2" },
+      },
+    };
+    const parts = (charge: string) =>
+      rollPreview(store({ states: [{ triggerId: "trg-p", charge }] }), attack, [perTurn]).parts;
+    expect(parts("ready")).toHaveLength(1);
+    expect(parts("used")).toEqual([]);
   });
 });

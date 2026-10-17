@@ -1955,3 +1955,29 @@ From [character-sheet-full](../specs/character-sheet-full.md) (FR-CHARX-54–57)
 | Item | Figure |
 |---|---|
 | CON-44 | `part` markers on 30 heavy roll entries × 3 items: DM +3,780 B, each player +3,780 B; with S4-0's extra rolls DM 714,404 B, players max 324,224 B (`weapon-rows-con44.test.ts`) |
+
+## 72. Sprint 4: trigger state (S4-3)
+
+Built by `build/trigger-state` ([FR-MOD-53–56, -60](../specs/effect-modifiers.md#6-functional-requirements); [ADR-0049](../architecture/adr/0049-trigger-state.md); #245). MOD writes the `trigger-state` rows of [§66](#66-sprint-4-rules-core-s4-0); no new record type, intent, signal or event name. Data side: [data model §55](../data-model/README.md#55-sprint-4-trigger-state-s4-3).
+
+**Writes** — one function, `triggerStates(env, encounter, combatantIds?)` (`src/server/features/effect-modifiers/trigger-state-writes.ts`): derives the rows from committed rows (FR-MOD-53) and inserts / updates / deletes only what differs, in the causing command's transaction; the rows join that command's event `changes` (no event of their own, no post-commit write). An encounter that isn't started has no rows.
+
+| Path | Event whose `changes` carry `trigger-state` | Rows |
+|---|---|---|
+| `cbt.start` / `cbtx.addCombatants` (MOD's `combatRuleHooks` line `effect-modifiers.reminders`, `started` / `added`) | `EncounterStarted` / `CombatantsAdded` | created for the new combatants |
+| `cbt.nextTurn` / `cbt.prevTurn` (same line, `turnChanged`, after CBTX's expiries / restores) | `TurnChanged` | charge (window, `waiting`) and `armed`, changed rows only |
+| `cbt.end` (same line, `ended`) | `EncounterEnded` | all deleted |
+| `cbt.applyCard` (MOD's `applyHooks` line, after the use row flips) | `AttackApplied` | the offered parts' owners: `used` |
+| `cbt.undo` (`applyHooks.revert`) | `CombatEntryUndone` | back to `ready` |
+| A `roll` trigger spent at once (MOD's roll hook) | the roll's own event (`DiceRolled`, `CharacterRolled`, `AttackRolled`, …): the hook's result has no rows, so they join the command's next emitted event | `used` |
+| Effect insert / update / end / restore, in or out of combat (MOD's `effectHooks` line `effect-modifiers.trigger-state`): `cbtx.*` effect commands, concentration, 0 HP ends, undo restores, `mod.toggle` / `mod.apply` / `mod.setModifiers` | `EffectsAdded`, `EffectsEnded`, `EffectUpdated`, `ConcentrationSet`, `ConcentrationRolled`, `HpApplied` / `AttackApplied`, `CombatEntryUndone`, `EffectToggled`, `PresetApplied`, `EffectModifiersSet`; out of combat none | `armed` of the changed creatures' rows (creatures without a combatant in the started encounter: none) |
+| `mod.putTrigger`, `cmp.addToSheet` (`addTriggerFromPreset`) | `RuleTriggerSaved` | added / renamed / re-ruled / disabled (deleted) |
+| `mod.deleteTrigger` | `RuleTriggerDeleted` | deleted (listed before the FK cascade) |
+| `mod.putPreset` / `mod.deletePreset` (an origin key decides `requires`, FR-MOD-36) | `EffectPresetSaved` / `EffectPresetDeleted` | `armed` |
+| Owner reassignment (MOD's definition-changed hook line `effect-modifiers.preset-owner`) | `EntityUpdated` / `CharacterSheetEdited` | `ownerPlayerId` rewritten: the old owner gets the delete, the new owner the upsert |
+
+- Combatant remove / restore (`cbt.setRemoved`) rewrites nothing. A Next that doesn't change a row lists none (event traffic ≤ the rows whose charge flips).
+- **Clients** read the rows; no rule reads them on the server. Tray / roll-control preview (`rollPreview`, `@shared/effect-modifiers/preview`): a `hit` trigger group, and a windowed `roll` trigger part, only while the roller's combatant row is `armed` and `ready` (and a `feature` trigger's sheet row has a use left); no row → no group (FR-MOD-56). `PREVIEW_TYPES` gains `trigger-state` and `creature-sheet`. The server stays lenient (FR-MOD-18).
+- **Badge words** (`triggerBadge(row, facts)` / `armedBadge(armed, needs)`, `@shared/effect-modifiers/trigger-state`; FR-MOD-60, reused by FR-CBTX-52, -53): Ready; Used this turn / round / fight; On ‹owner›'s turn (`waiting`); Not in effect — needs ‹preset›; a `feature` trigger "2 / 3 left" ("−1 / 3 left" down); out of combat In effect / Not in effect.
+- **`charge`** (`triggerCharge`): `waiting` whenever the rule has an `ownTurn` filter and the turn isn't the owner's (round 0 included: never a false Ready), before `used`.
+- **Test IDs:** `mod-trigger-state` + `data-record-id` (trigger id) + `data-state` = `ready` \| `used` \| `waiting` \| `off` \| `in-effect`, in the Triggers block row.

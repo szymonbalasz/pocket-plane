@@ -5,6 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { TRIGGER_INTENTS, type TriggerInput } from "@shared/effect-modifiers/trigger-intents";
 import { RULE_TRIGGER_TYPE } from "@shared/effect-modifiers/trigger-records";
+import { TRIGGER_STATE_TYPE } from "@shared/effect-modifiers/trigger-state";
 import type { TriggerRule } from "@shared/effect-modifiers/triggers";
 import { asc, eq } from "drizzle-orm";
 import { seededContext } from "../../commands/context";
@@ -224,8 +225,10 @@ describe("FR-MOD-45 authoring", () => {
       ownerPlayerId: t.h.p2.id,
       public: true,
     });
+    // Thorn fights in the started encounter: the new trigger's state row rides along (FR-MOD-54).
     expect(r.changes.map((c) => [c.type, c.id, c.before])).toEqual([
       [RULE_TRIGGER_TYPE, r.triggerId, null],
+      [TRIGGER_STATE_TYPE, expect.any(String), null],
     ]);
     expect(t.events.length).toBe(before);
     const ruled = t.s.db.transaction((tx) =>
@@ -271,7 +274,8 @@ describe("FR-MOD-47 lazy visibility", () => {
     // Live: the save's change reaches its owner (loaded or not) and nobody else.
     const changes = t.events
       .filter((e) => e.event.type === "RuleTriggerSaved")
-      .flatMap((e) => e.event.changes);
+      .flatMap((e) => e.event.changes)
+      .filter((c) => c.type === RULE_TRIGGER_TYPE);
     const seen = (v: Viewer) =>
       changes.map((c) => t.s.records.filterChange(c, v)).filter((w) => w !== null);
     expect(seen(t.p1v).map((w) => w?.id)).toEqual([mira]);

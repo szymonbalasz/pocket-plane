@@ -28,8 +28,10 @@ function usePreviewStore(triggers: RecordMap[string] | undefined): RecordStore {
   const encounter = useSync((s) => s.store.records[PREVIEW_TYPES[3]]);
   const entity = useSync((s) => s.store.records[PREVIEW_TYPES[4]]);
   const imported = useSync((s) => s.store.records[PREVIEW_TYPES[5]]);
+  const state = useSync((s) => s.store.records[PREVIEW_TYPES[6]]);
+  const sheet = useSync((s) => s.store.records[PREVIEW_TYPES[7]]);
   return useMemo(() => {
-    const maps = [effect, preset, combatant, encounter, entity, imported];
+    const maps = [effect, preset, combatant, encounter, entity, imported, state, sheet];
     const records: RecordMap = {};
     PREVIEW_TYPES.forEach((t, i) => {
       const m = maps[i];
@@ -37,7 +39,7 @@ function usePreviewStore(triggers: RecordMap[string] | undefined): RecordStore {
     });
     if (triggers) records[RULE_TRIGGER_TYPE] = triggers;
     return { you: null, seq: 0, records };
-  }, [effect, preset, combatant, encounter, entity, imported, triggers]);
+  }, [effect, preset, combatant, encounter, entity, imported, state, sheet, triggers]);
 }
 
 /**
