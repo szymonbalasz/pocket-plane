@@ -39,13 +39,34 @@ const int = (min: number, max: number) => z.number().int().min(min).max(max);
 
 const Id = z.string().min(1).max(64);
 
+/** FR-CHARX-54: a magic weapon's +N (to hit and to the base part's damage). */
+export const ATTACK_BONUS_MAX = 3;
+/** FR-CHARX-54: typed extra damage parts per attack row. */
+export const EXTRA_DAMAGE_MAX = 2;
+/**
+ * An extra part's dice `NdM[+K]`: N 1–6, M ∈ 4/6/8/10/12, K 0–10, so a crit card with two
+ * parts fits the damage card's 4 KB (MOD §12).
+ */
+export const EXTRA_DAMAGE_RE = /^[1-6]d(4|6|8|10|12)(\+([0-9]|10))?$/;
+export const ExtraDamage = z.strictObject({
+  damage: z.string().regex(EXTRA_DAMAGE_RE, { message: "Use NdM+K: up to 6d12+10" }),
+  /** Required: an extra part exists to carry a second type. */
+  type: DamageType,
+});
+export type ExtraDamage = z.infer<typeof ExtraDamage>;
+
 export const Attack = z.strictObject({
   /** Row id from `ctx.ids` (FR-CHARX-16); legacy rows have none until their first sheet write. */
   id: Id.optional(),
   name: z.string().trim().min(1).max(40),
+  /** The weapon's own numbers, without `bonus` (FR-CHARX-54). */
   toHit: int(-10, 30),
+  /** The base part (+ `bonus` on its constant when rolled, FR-CHARX-55). */
   damage: Damage,
   damageType: DamageType.optional(),
+  /** FR-CHARX-54 (sprint 4): absent = 0 / none, so old rows parse and behave as before. */
+  bonus: int(0, ATTACK_BONUS_MAX).optional(),
+  extraDamage: z.array(ExtraDamage).max(EXTRA_DAMAGE_MAX).optional(),
 });
 export type Attack = z.infer<typeof Attack>;
 

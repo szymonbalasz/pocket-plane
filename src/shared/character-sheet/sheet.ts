@@ -86,6 +86,12 @@ export type SpellRow = z.infer<typeof SpellRow>;
 export type SpellRowInput = z.input<typeof SpellRow>;
 
 const FEATURE_USES_MAX = 20;
+/**
+ * FR-CHARX-58 (sprint 4, OQ-CHARX-27): a feature row's `used` may pass `usesMax` by up to 9
+ * (uses left down to −9, the floor). Slots and hit dice keep `0 … max`.
+ */
+export const FEATURE_OVERSPEND_MAX = 9;
+const FEATURE_USED_MAX = FEATURE_USES_MAX + FEATURE_OVERSPEND_MAX;
 const featureFields = {
   name: rowName(60),
   source: text(40).default(""),
@@ -96,10 +102,10 @@ const featureFields = {
 };
 
 export const FeatureRow = z
-  .strictObject({ id: Id, ...featureFields, used: int(0, FEATURE_USES_MAX).default(0) })
-  .refine((f) => f.used <= (f.usesMax ?? 0), {
+  .strictObject({ id: Id, ...featureFields, used: int(0, FEATURE_USED_MAX).default(0) })
+  .refine((f) => f.used <= (f.usesMax === undefined ? 0 : f.usesMax + FEATURE_OVERSPEND_MAX), {
     path: ["used"],
-    message: "Used must not exceed the uses",
+    message: `Used must not exceed the uses + ${FEATURE_OVERSPEND_MAX}`,
   });
 export type FeatureRow = z.infer<typeof FeatureRow>;
 
@@ -302,7 +308,7 @@ export const CharPutRowIntent = z.discriminatedUnion("list", [
     row: z.strictObject({
       id: Id.optional(),
       ...featureFields,
-      used: int(0, FEATURE_USES_MAX).optional(),
+      used: int(0, FEATURE_USED_MAX).optional(),
     }),
   }),
   z.strictObject({

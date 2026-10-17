@@ -1536,3 +1536,35 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) (FR-DICEX-15, -17, -32�
 - **Client memory only:** the running / leaving throw `{t, seq, plan {arena: screen | zone, draw: 3d | flat, caption, handoff}, phase: moving | rest | handoff | fading, looks}`; timeline constants in `dice-extras/timing.ts` (settle ≤ 2.5 s, rest 1 s / 1.5 s with popups off, hand-off 0.4 s, fade 0.3 s). Gone on reload.
 - **Derived (never stored):** the big throw = the frame's `public` entries (and only own ones with "Show others' rolls" off); `seedId` = first public entry id (else the first); arena from the rect rounded to 50 px (`dice-extras/arena.ts`: die size 7 % of the viewport's short side, 40–96 px); effective display (reduced motion / no WebGL → `flat`).
 - **CON-44:** 0 B; no new record shape, no wire field (throws read the `roll` entries already sent).
+
+## 51. Sprint 4: rules core (S4-0)
+
+From [effect-modifiers](../specs/effect-modifiers.md#82-records) sprint 4 (MOD §8.2, FR-MOD-53, -55), [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-81, -84) and [character-sheet-full](../specs/character-sheet-full.md) (FR-CHARX-54, -58); [ADR-0049](../architecture/adr/0049-trigger-state.md). **Built by `fix/rules4-core`** (schema lock 2nd this sprint, after V6; drizzle push, push-safe: one new table, one nullable column). No command writes the new table or fields yet (S4-1a / S4-1b / S4-2 / S4-3). Protocol side: [protocol §66](../protocol/README.md#66-sprint-4-rules-core-s4-0).
+
+### Trigger state (`trigger_state`, record type `trigger-state`) — owner [effect-modifiers](../specs/effect-modifiers.md#82-records)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, encounterId | ID, ID → Campaign, ID → Encounter | rows only while the encounter is `started`; deleted at End (S4-3) | FR-MOD-53 |
+| combatantId, triggerId | ID → Combatant, ID → Rule trigger (`ON DELETE CASCADE`) | unique (`encounter_id`, `combatant_id`, `trigger_id`): one row per (enabled trigger, owner combatant) | FR-MOD-53 |
+| characterId, ownerPlayerId | text \| null ×2 (copies, no FK) | visibility copies: null / null for a monster (definition) trigger; owner rewritten on reassignment | FR-MOD-54, -55 |
+| name, on | text 1–40, `hit` \| `roll` \| `turnStart` | copies of the trigger | FR-MOD-53 |
+| armed, charge, featureId | bool, `ready` \| `used` \| `waiting` (`TRIGGER_CHARGES`, text enum), soft ID \| null | derived display copy; `trigger_use` stays the truth; no server rule reads it | FR-MOD-53 |
+| updatedAt | timestamp | `ctx.clock` | — |
+
+Indexes `trigger_state_owner` (unique, above), `trigger_state_campaign` (`campaign_id`; the snapshot read).
+
+### Changed
+
+| Table / leaf | Change | Default (push-safe) | Visibility | Source |
+|---|---|---|---|---|
+| `hp_change` | + `damage_parts` (**JSON leaf** ≤ 2 `{type, rolled, total 0–999, multiplier, raw}` \| null; extra weapon parts only, the base part keeps `damage_type` / `damage_rolled` / `damage_total` / `multiplier`; `raw` stays the whole amount) | null | DM only | FR-CBT-84 |
+| `entity.statBlock.attacks[]` (JSON leaf, zod) | + `bonus?` 0–3; + `extraDamage?` ≤ 2 `{damage: NdM[+K] N 1–6 M 4–12 K 0–10, type}` (type required); stored `toHit` / `damage` stay the weapon's own numbers | absent | as the stat block (DM + owner; definitions DM only) | FR-CHARX-54, -57 |
+| `creature_sheet.features[].used` (JSON leaf, zod) | range 0 … `usesMax + 9` (was 0 … `usesMax`) | unchanged | as the sheet | FR-CHARX-58 |
+| damage card payload (`damage-card`) | `damage.extra?` ≤ 2 `{type, rollId, dice ≤ 12, constant, total, manual}` | absent; old cards parse | as the card | FR-CBT-81 |
+| `game_log_entry.payload` (`cbt.attack`) | + `damageParts?` ≤ 2 `{type, value, multiplier?}`; `parts[]` + `expression?` ≤ 20, `dice?` ≤ 20 ints | absent | public (public character-trigger dice only) | FR-CBT-84, FR-MOD-57 |
+| `game_log_entry.dmPayload` (`cbt.attack`) | `parts[]` + `expression?`, `dice?` | absent | DM only | FR-MOD-57 |
+
+- **Relations:** Trigger state → encounter, combatant, rule trigger (cascade). **Derived:** `armed`, `charge` (S4-3 writes them in the causing transaction). **Persisted runtime state:** `trigger_state` rows.
+- **Fixtures** (`fixtures/units/effect-modifiers/`, MOD §13.1): `weapon-flame-tongue` (Brakka's Flame Tongue greatsword row: `2d6+4` slashing, `bonus` 1, `extraDamage` [`2d6` fire]), `mod-fire-ward` (campaign preset "Fire Ward", resistance fire, on Goblin), `uses-rage-spent` (Rage 0 / 3 left via `char.useResource`), `trg-mira-uses` (Mira's "Searing Strike" feature 1 / 2 left + its `every: {feature}` trigger, 1d8 fire, public). Bundle `rules-effects` (= `rule-triggers` + those four + `char-mira-full`) is test-local (`rules-effects.ts`) until S4-4 registers it.
+- **CON-44** (#208; MOD's `con44.test.ts` + `con44-rules-effects.test.ts`, measured, max-length ASCII unless noted; realistic-heavy harness base DM 671,112 B, players max 280,928 B): attack rows (71, `bonus` 3 + 2 max parts), 20 cards with 2 extra parts at 12 dice, 30 damage roll entries with 2 extra part rolls (12 dice), 30 outcome lines with 2 `damageParts` + 1 trigger part with 20 dice (public and DM), 30 `hp_change.damageParts`: DM **+79,224 B** (game-log-entry +57,540, notification +9,720, entity +7,314, hp-change +4,650), players +51,712…+52,410 (game-log-entry +49,830). `trigger-state` realistic (52 rows, PC 2 + monster 1): DM 26,053 B, a player's own 2 rows 1,123 B; worst (196 rows, PC 6 + monster 4): DM 97,525 B, own 6 rows 3,335 B; worst with 40-char CJK names: DM 113,205 B, own 3,815 B. **Track R sprint 4:** realistic DM +105,259 → 776,371 B; worst +176,731 → 847,843 B; worst CJK +192,411 → **863,523 B** (185,053 B left of 1 MiB); players max **337,135 B** (+56,207; 187,153 B left of 512 KiB). MOD §12's proposed bounds (136 KiB / 32 KiB, from estimates) don't hold: the extra part roll items carry per-die objects (≈ 600 B per 12-dice part); the test bounds are the measurement (192 KiB DM / 60 KiB per player) pending a ruling. Worst card + 2 extra parts (12 dice): ASCII 3 offers 4,466 B, 2 offers 4,088 B (fits), 0 offers 3,319 B; CJK 0 offers 4,439 B (> 4 KB), + mod labels cut to 12 chars 3,467 B (fits). `rules-effects` vs `rule-triggers` end to end with CJK names (5 `trigger-state` rows): DM +4,280 B, player-1 +1,904 B, player-2 +749 B.

@@ -35,13 +35,17 @@ import rolls1 from "./dice-roll-log/rolls-1";
 import charBrakka from "./effect-modifiers/char-brakka";
 import modBane from "./effect-modifiers/mod-bane";
 import modBless from "./effect-modifiers/mod-bless";
+import modFireWard from "./effect-modifiers/mod-fire-ward";
 import modPresets from "./effect-modifiers/mod-presets";
 import modRage from "./effect-modifiers/mod-rage";
 import modTier2 from "./effect-modifiers/mod-tier2";
 import trgBrakka from "./effect-modifiers/trg-brakka";
 import trgCombat from "./effect-modifiers/trg-combat";
+import trgMiraUses from "./effect-modifiers/trg-mira-uses";
 import trgMonsters from "./effect-modifiers/trg-monsters";
 import trgThorn from "./effect-modifiers/trg-thorn";
+import usesRageSpent from "./effect-modifiers/uses-rage-spent";
+import weaponFlameTongue from "./effect-modifiers/weapon-flame-tongue";
 import charMira from "./entities/char-mira";
 import charThorn from "./entities/char-thorn";
 import enemy1 from "./entities/enemy-1";
@@ -146,4 +150,8 @@ export const units: readonly Fixture[] = [
   visionLegacy,
   visionInvisible,
   visionBrakka,
+  weaponFlameTongue,
+  modFireWard,
+  usesRageSpent,
+  trgMiraUses,
 ];

@@ -10,7 +10,7 @@ import {
   RollModPart,
 } from "@shared/dice-roll-log/schemas";
 import { PartDamageType } from "@shared/effect-modifiers/schemas";
-import { Ability } from "@shared/entities/schemas";
+import { Ability, EXTRA_DAMAGE_MAX } from "@shared/entities/schemas";
 import { DamageMultiplier } from "@shared/events/combat-tracker";
 import { CellIndex } from "@shared/scenes-map/schemas";
 import { z } from "zod";
@@ -250,6 +250,20 @@ export const HpTriggerPart = z.strictObject({
 });
 export type HpTriggerPart = z.infer<typeof HpTriggerPart>;
 
+/**
+ * FR-CBT-84 (sprint 4): one extra weapon damage part an apply landed (hp_change `damageParts`,
+ * DM only, stats): `rolled` = its dice + constant, `total` = the DM's value (= rolled unless
+ * set), `raw` = floor(total × multiplier). The base part keeps the row's own damage columns.
+ */
+export const HpDamagePart = z.strictObject({
+  type: PartDamageType,
+  rolled: z.int().min(0),
+  total: z.int().min(0).max(999),
+  multiplier: DamageMultiplier,
+  raw: z.int().min(0),
+});
+export type HpDamagePart = z.infer<typeof HpDamagePart>;
+
 export const HpChangeRecord = z.object({
   id: z.string(),
   campaignId: z.string(),
@@ -290,6 +304,8 @@ export const HpChangeRecord = z.object({
   noteIds: z.array(z.string()),
   /** effect-modifiers (FR-MOD-38, -48): rule-trigger parts this apply landed (DM, stats). */
   triggerParts: z.array(HpTriggerPart).max(TRIGGER_PARTS_MAX),
+  /** FR-CBT-84 (sprint 4): extra weapon damage parts; null = none (every older row). */
+  damageParts: z.array(HpDamagePart).min(1).max(EXTRA_DAMAGE_MAX).nullable(),
   entryId: z.string(),
   undone: z.boolean(),
   undoneAt: z.string().nullable(),
@@ -346,9 +362,31 @@ export const CardTriggerPart = z.strictObject({
 });
 export type CardTriggerPart = z.infer<typeof CardTriggerPart>;
 
-/** The card's damage roll: + offered trigger parts (absent = none; old cards parse). */
+/** FR-CBT-83: an extra part's dice per roll: 6 (FR-CHARX-54), doubled on a crit. */
+export const CARD_EXTRA_DICE_MAX = 12;
+
+/**
+ * FR-CBT-81 (sprint 4): one extra weapon damage part of the card's damage, its own roll row in
+ * the same entry, typed, in attack-row order. Not in the base part's `total` (summed per target
+ * at apply with its own multiplier, FR-CBT-82).
+ */
+export const CardExtraPart = z.strictObject({
+  type: PartDamageType,
+  rollId: Id,
+  dice: z.array(CardDie).max(CARD_EXTRA_DICE_MAX),
+  constant: z.int(),
+  total: z.int(),
+  manual: z.boolean(),
+});
+export type CardExtraPart = z.infer<typeof CardExtraPart>;
+
+/**
+ * The card's damage roll (the base part: `damage` + `bonus`, typed `damageType`, effect mods
+ * attached): + offered trigger parts and the extra weapon parts (absent = none; old cards parse).
+ */
 export const CardDamage = CardRoll.extend({
   triggers: z.array(CardTriggerPart).min(1).max(TRIGGER_PARTS_MAX).optional(),
+  extra: z.array(CardExtraPart).min(1).max(EXTRA_DAMAGE_MAX).optional(),
 });
 export type CardDamage = z.infer<typeof CardDamage>;
 
@@ -536,7 +574,13 @@ export type ApplyTargetTrigger = z.infer<typeof ApplyTargetTrigger>;
 export const ApplyCardTarget = z.strictObject({
   targetId: Id,
   hit: z.boolean(),
+  /** The base part's multiplier. */
   multiplier: DamageMultiplier,
+  /**
+   * FR-CBT-82 (sprint 4): each extra part's own multiplier, card order (absent = `multiplier`);
+   * ≤ the card's extra count (`invalid` in the command).
+   */
+  extraMultipliers: z.array(DamageMultiplier).min(1).max(EXTRA_DAMAGE_MAX).optional(),
   /** FR-MOD-38: offered parts this target takes; only on a Hit row. */
   triggers: z
     .array(ApplyTargetTrigger)
@@ -560,6 +604,11 @@ export const ApplyCardTargetsInput = z.strictObject({
   cardId: Id,
   toHitTotal: z.int().min(-20).max(99).optional(),
   damageTotal: z.int().min(0).max(999).optional(),
+  /**
+   * FR-CBT-82 (sprint 4): the DM's values of the extra parts, card order (absent = rolled);
+   * ≤ the card's extra count (`invalid` in the command).
+   */
+  extraTotals: z.array(z.int().min(0).max(999)).min(1).max(EXTRA_DAMAGE_MAX).optional(),
   targets: z
     .array(ApplyCardTarget)
     .min(1)
