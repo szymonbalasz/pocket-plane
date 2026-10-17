@@ -128,6 +128,7 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
       <Launcher
         defs={registry.defs.filter((d) => available.has(d.kind))}
         windows={windows}
+        viewport={viewport}
         dispatch={dispatch}
       />
 

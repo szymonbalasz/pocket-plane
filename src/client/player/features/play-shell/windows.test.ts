@@ -2,6 +2,12 @@ import { expect, test } from "bun:test";
 import { emptyStore } from "@shared/protocol/store";
 import { freeArea, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
 import { clampRect, type Rect, TOP_BAR_H, workArea } from "@ui/features/play-shell/geometry";
+import {
+  fitLauncher,
+  fittedBarWidth,
+  LAUNCHER_GUTTER,
+  launcherMetrics,
+} from "@ui/features/play-shell/launcher-fit";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
@@ -352,4 +358,31 @@ test("FR-SHELL-44 freeAreas: the player 1280×800 default layout yields both the
     h: workArea(viewport).h,
   });
   expect(freeArea(rects, viewport)).toEqual(areas[0] as Rect);
+});
+
+test("FR-SHELL-43 player launcher, test-mode kinds included, at 1280 / 1440 / 1600 wide: every button inside the viewport with 8 px gutters or in the overflow menu; icon-only before any overflow; open windows stay in the bar", () => {
+  const kinds = availableKinds(playerWindows, testMode);
+  const entries = playerWindows.defs
+    .filter((d) => d.launcher && kinds.has(d.kind))
+    .sort((a, b) => (a.launcher?.order ?? 0) - (b.launcher?.order ?? 0));
+  const labels = new Map(entries.map((d) => [d.kind, d.launcher?.label ?? ""]));
+  // Label widths as the Launcher's fallback measure (7 px a character, wider than text-xs).
+  const m = launcherMetrics(labels, (label) => label.length * 7 + 1);
+  for (const w of [1280, 1440, 1600, 900, 600]) {
+    for (const open of [[], entries.slice(-2).map((d) => d.kind)]) {
+      const items = entries.map((d) => ({
+        kind: d.kind,
+        order: d.launcher?.order ?? 0,
+        state: open.includes(d.kind) ? ("open" as const) : ("closed" as const),
+      }));
+      const fit = fitLauncher(items, w, m);
+      const gutter = (w - fittedBarWidth(fit, m)) / 2;
+      expect(gutter >= LAUNCHER_GUTTER ? "ok" : `bar clipped at ${w}`).toBe("ok");
+      expect([...fit.bar, ...fit.overflow].sort()).toEqual(items.map((i) => i.kind).sort());
+      if (fit.overflow.length > 0) expect(fit.compact).toBe(true);
+      for (const k of open)
+        expect(fit.overflow.includes(k) && fit.bar.length > open.length).toBe(false);
+      if (w >= 1280) expect(fit.overflow).toEqual([]);
+    }
+  }
 });
