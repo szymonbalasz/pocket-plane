@@ -16,6 +16,7 @@ import type { EncounterRecord } from "@shared/combat-tracker/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
 import { modTriggerStateEffectHook } from "../effect-modifiers/trigger-state-hooks";
+import { fogBlindedEffectHook } from "../fog-of-war/blinded";
 
 export type EffectHookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor">;
 
@@ -38,6 +39,7 @@ export interface EffectHook {
 /** The registry. Append your feature's line; order = run order. */
 export const effectHooks: readonly EffectHook[] = [
   modTriggerStateEffectHook, // effect-modifiers: trigger state `armed` (FR-MOD-54)
+  fogBlindedEffectHook, // fog-of-war: Blinded re-derives sight (FR-FOG-48)
 ];
 
 /** Live hook list, seeded from the registry; tests may add hooks via `register`. */

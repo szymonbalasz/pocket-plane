@@ -1705,3 +1705,20 @@ From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-56–58. **Built b
 | `TokenIcon.muted` | overlay result field (client) | optional boolean | as the overlay line (MOD: DM + owner) | FR-MAP-57 |
 
 - **Fixtures:** none new; `map-tools` (`mt-crowd`: Goblin Sneak + Goblin Sneak 2 adjacent, Crypt Ogre Large) covers the collision, hover and icon-chip steps; `session-sim` / registry layouts cover the fit (unit tests).
+
+## 63. Sprint 4: party vision client, View as Party, Blinded (V10)
+
+From [fog-of-war](../specs/fog-of-war.md) FR-FOG-48, -20, -21, -43, -49–51. **Built by `build/party-vision`**: no table or column. Protocol side: [protocol §80](../protocol/README.md#80-sprint-4-party-vision-client-view-as-party-blinded-v10).
+
+| Piece | Kind | Contents | Visibility | Source |
+|---|---|---|---|---|
+| `vision.reason` | derived wire field | `blinded` \| `unknown` (optional) | own row and the DM's View-as load; never another player's copy | FR-FOG-48, OQ-FOG-61 |
+| `vision.secret` | derived, server only | `true` while blind with a secret Blinded among the causes | never on a wire; makes other players' copies a non-source | FR-FOG-48 |
+| Source Blinded bit | server memory (sight cache key) | `-` / `open` / `secret` per source | never on a wire | FR-FOG-38, -48 |
+
+| View-as Party set | client memory (DM) | the loaded pair `(sceneId, "party")` | — | FR-FOG-43 |
+| Greyscale map copy | client memory | one offscreen canvas per map image (`WeakMap`) | — | FR-FOG-21 |
+
+- **Derived (client, never stored):** the drawn union (`party-view.ts`): every drawn record's polygons (each through its owner's sight previews), party-blind, the chip reason, the union of drawn memory rows.
+- **Read, not stored:** a source's Blinded state = an active `blinded` condition `effect` row on the token's definition (the character); one per character (CBTX §8 partial unique index).
+- **CON-44:** `reason` adds ≤ 20 B to a blind player's own `vision` row; nothing else.

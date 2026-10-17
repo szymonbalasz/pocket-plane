@@ -11,10 +11,10 @@ import {
   type VisionRecord,
 } from "@shared/fog-of-war/schemas";
 import type { DarknessRow } from "@shared/fog-of-war/shapes";
-import type { PlayerVision } from "@shared/fog-of-war/vision";
 import { and, asc, eq } from "drizzle-orm";
 import { fogExplored, sceneFog, sceneFogEdit } from "../../db/schema";
 import type { SceneRead } from "../scenes-map/visibility-hooks";
+import type { FogVision } from "./sight";
 
 type FogRow = typeof sceneFog.$inferSelect;
 type EditRow = Pick<typeof sceneFogEdit.$inferSelect, "id" | "sceneId" | "kind" | "undoneAt">;
@@ -173,16 +173,25 @@ export function readExploredRecord(
 }
 
 /**
- * Server `vision` rows carry `campaignId` for the scope gate (FR-FOG-39) and the server-only
- * `shared` flag (party vision on at compute time: other players get it redacted, FR-FOG-51).
+ * Server `vision` rows carry `campaignId` for the scope gate (FR-FOG-39), the server-only
+ * `shared` flag (party vision on at compute time: other players get it redacted, FR-FOG-51) and
+ * the server-only `secret` flag (blind with a secret Blinded among the causes: other players'
+ * copies are a non-source, FR-FOG-48).
  */
-export type ServerVisionRecord = VisionRecord & { campaignId: string; shared: boolean };
+export type ServerVisionRecord = VisionRecord & {
+  campaignId: string;
+  shared: boolean;
+  secret?: true;
+};
 
-/** FR-FOG-39: the derived `vision` record of one player's sight (`inv` omitted when empty). */
+/**
+ * FR-FOG-39: the derived `vision` record of one player's sight (`inv` omitted when empty;
+ * `reason` / `secret` only while blind for a Blinded source, FR-FOG-48).
+ */
 export function toVisionRecord(
   scene: { sceneId: string; campaignId: string },
   playerId: string,
-  v: PlayerVision,
+  v: FogVision,
   shared: boolean,
 ): ServerVisionRecord {
   return {
@@ -196,5 +205,7 @@ export function toVisionRecord(
     dark: v.dark,
     ...(v.inv.length > 0 ? { inv: v.inv } : {}),
     src: v.src,
+    ...(v.reason ? { reason: v.reason } : {}),
+    ...(v.secret ? { secret: true as const } : {}),
   };
 }

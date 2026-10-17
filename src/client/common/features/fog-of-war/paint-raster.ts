@@ -1,7 +1,9 @@
 // Test-only software rasteriser standing in for the canvas (`PaintCtx`): pixel centres,
-// source-over / destination-out, nested clips, nonzero (≈ "inside any subpath", for subpaths wound
-// one way) and even-odd fill rules. A pixel keeps the label and alpha of the last paint on it (no
-// blending), so tests read what a pixel ends up showing. Used by `paint.test.ts`, `vision.test.ts`.
+// source-over / destination-out / source-in / source-atop, nested clips, nonzero (≈ "inside any
+// subpath", for subpaths wound one way) and even-odd fill rules. A pixel keeps the label and alpha
+// of the last paint on it (no blending), so tests read what a pixel ends up showing; `drawImage`
+// paints the label `img:<image>` and a later `source-atop` paint keeps it as `img` (what lies
+// under the tint). Used by `paint.test.ts`, `vision.test.ts`.
 import type { PaintCtx } from "./render";
 
 type Rule = "nonzero" | "evenodd";
@@ -19,6 +21,8 @@ type Sub =
 export interface Px {
   label: string | null;
   alpha: number;
+  /** The image under a `source-atop` paint (set only then). */
+  img?: string;
 }
 
 /** A W × H raster that runs `PaintCtx` calls; pixel (x, y) is covered iff the point (x, y) is. */
@@ -85,18 +89,41 @@ export class Raster implements PaintCtx {
   }
   fill(rule: Rule = "nonzero") {
     const subs = this.path.filter((s) => s.k !== "poly" || s.pts.length > 2);
+    this.paint((x, y) => inside(subs, x, y, rule), String(this.fillStyle));
+  }
+  drawImage(image: unknown, x: number, y: number, w: number, h: number) {
+    const r: Sub[] = [{ k: "rect", x, y, w, h }];
+    this.paint((px, py) => inside(r, px, py, "nonzero"), `img:${String(image)}`);
+  }
+  private paint(covers: (x: number, y: number) => boolean, label: string) {
+    const gco = this.globalCompositeOperation;
     for (let y = 0; y < this.h; y++) {
       for (let x = 0; x < this.w; x++) {
-        const cx = x;
-        const cy = y;
-        if (!inside(subs, cx, cy, rule)) continue;
-        if (!(this.clips.at(-1) ?? []).every((c) => inside(c.subs, cx, cy, c.rule))) continue;
+        if (!(this.clips.at(-1) ?? []).every((c) => inside(c.subs, x, y, c.rule))) continue;
         const p = this.px[y * this.w + x] as Px;
-        if (this.globalCompositeOperation === "destination-out") {
+        const hit = covers(x, y);
+        // source-in clears the destination outside the source too (within the clip).
+        if (gco === "source-in") {
+          if (hit && p.label !== null) {
+            p.label = label;
+            p.alpha = this.globalAlpha;
+          } else {
+            p.label = null;
+            p.alpha = 0;
+          }
+          continue;
+        }
+        if (!hit) continue;
+        if (gco === "destination-out") {
           p.label = null;
           p.alpha = 0;
+        } else if (gco === "source-atop") {
+          if (p.label === null) continue;
+          if (p.label.startsWith("img:")) p.img = p.label.slice(4);
+          p.label = label;
+          p.alpha = this.globalAlpha;
         } else {
-          p.label = String(this.fillStyle);
+          p.label = label;
           p.alpha = this.globalAlpha;
         }
       }

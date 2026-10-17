@@ -2,6 +2,9 @@
 // memory) and then, from the server's `vision` record (never a client recompute), sight on top:
 // 1. darkvision ring (inside a `dark` polygon): what is not statically clear draws dimmed +
 //    desaturated (`fog.darkvision`), so the static painter runs again there with that paint;
+//    sprint 4 (session-sim-7: the red map art stayed red): with the map's greyscale copy
+//    (`grey-map.ts`) the painter's cover becomes a mask: the copy is drawn into it (`source-in`),
+//    then `fog.darkvision` on top (`source-atop`), so no hue survives in the ring;
 // 2. inside a `see` polygon: clear;
 // 3. darkness inside any polygon: a darker, more transparent tint (`fog.darkness-seen`). Only a
 //    source that sees through magical darkness has darkness inside its polygon (the others' are
@@ -193,6 +196,45 @@ export interface ViewInput {
   memory: readonly FogRun[];
   /** The viewer's `vision` record; null = no source on the scene (static fog only). */
   vision: VisionLike | null;
+  /** FR-FOG-21 (sprint 4): the map image's greyscale copy (map px), once ready; else the tint only. */
+  grey?: CanvasImageSource | null;
+}
+
+/**
+ * FR-FOG-21: inside the ring clip (already erased): the static painter's cover in `tint`, then
+ * (with the greyscale copy) the copy drawn into that cover and the darkvision paint over it.
+ */
+function paintRing(
+  ctx: PaintCtx,
+  input: ViewInput,
+  m: MapRect,
+  paints: ViewPaints,
+  memory: readonly FogRun[],
+) {
+  const fog = { ...input.fog, darkness: [] };
+  const grey = input.grey;
+  if (!grey || !ctx.drawImage) {
+    const tint = {
+      fog: paints.darkvision,
+      explored: paints.darkvision,
+      darkness: paints.darkvision,
+    };
+    paintFog(ctx, fog, m, "player", tint, 0, memory);
+    return;
+  }
+  const solid = { ...paints.darkvision, alpha: 1 };
+  paintFog(ctx, fog, m, "player", { fog: solid, explored: solid, darkness: solid }, 0, memory);
+  ctx.save();
+  ctx.globalCompositeOperation = "source-in";
+  ctx.globalAlpha = 1;
+  ctx.drawImage(grey, 0, 0, m.mapWidth, m.mapHeight);
+  ctx.globalCompositeOperation = "source-atop";
+  ctx.globalAlpha = paints.darkvision.alpha;
+  ctx.fillStyle = paints.darkvision.color;
+  ctx.beginPath();
+  ctx.rect(0, 0, m.mapWidth, m.mapHeight);
+  ctx.fill();
+  ctx.restore();
 }
 
 /** FR-FOG-21: one player's view of a scene, painter order (see the header). */
@@ -211,11 +253,6 @@ export function paintPlayerView(
   const memory = fog.explored === true ? input.memory : [];
   paintFog(ctx, fog, m, "player", paints, 0, memory);
   if (!vision || (vision.see.length === 0 && vision.dark.length === 0)) return;
-  const tint: FogPaints = {
-    fog: paints.darkvision,
-    explored: paints.darkvision,
-    darkness: paints.darkvision,
-  };
   if (vision.dark.length > 0) {
     withClip(
       ctx,
@@ -224,7 +261,7 @@ export function paintPlayerView(
       },
       () => {
         eraseAll(ctx, m);
-        paintFog(ctx, { ...fog, darkness: [] }, m, "player", tint, 0, memory);
+        paintRing(ctx, input, m, paints, memory);
       },
     );
   }

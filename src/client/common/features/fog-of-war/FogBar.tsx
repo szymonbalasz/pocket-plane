@@ -7,7 +7,8 @@
 // is held during a gesture, and the darkness right-click menu (FR-FOG-42). V3: the View as Select
 // (Players + "DM", FR-FOG-43; spinner while the load is in flight) and the DM-only hint "No vision
 // set for: ‹names›". Sprint 4 (V9): Shape Brush + its radius Slider, Redo, and the history keys
-// Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y (`BrushControls.tsx`, `history.ts`).
+// Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y (`BrushControls.tsx`, `history.ts`). V10: the Party vision Switch
+// (FR-FOG-49) and View as "Party vision".
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
@@ -22,6 +23,7 @@ import {
   type FogUndoInput,
 } from "@shared/fog-of-war/schemas";
 import type { FogLayerShape } from "@shared/fog-of-war/shapes";
+import { VIEW_AS_PARTY } from "@shared/protocol/scene-window";
 import {
   BrushIcon,
   CircleIcon,
@@ -70,6 +72,7 @@ import { BrushRadius, RedoButton } from "./BrushControls";
 import { type FogShapeMode, gestureKey } from "./gesture";
 import { type HistoryStep, historyKey, stepHistory } from "./history";
 import { NO_VISION_PREFIX, noVisionDefinitionIds, noVisionNames } from "./no-vision";
+import { PartyVisionSwitch } from "./PartyVisionSwitch";
 import {
   applyFogStep,
   type FogMode,
@@ -78,7 +81,7 @@ import {
   setFogRejectHandler,
   useFogTool,
 } from "./store";
-import { setViewAs, useViewAs, VIEW_AS_DM } from "./view-as";
+import { setViewAs, useViewAs, VIEW_AS_DM, VIEW_AS_PARTY_LABEL } from "./view-as";
 
 const SHAPE_NAMES = {
   rect: "rectangle",
@@ -313,8 +316,9 @@ function Confirm({
 }
 
 /**
- * FR-FOG-17 / -43: View as Select (Players + "DM"). Picking a player loads that player's rows on
- * the viewed scene (the fog layer keeps the pair); a spinner shows until the ack.
+ * FR-FOG-17 / -43: View as Select (Players + "DM"; sprint 4 + "Party vision", also while party
+ * vision is off, OQ-FOG-55). Picking one loads its rows on the viewed scene (the fog layer keeps
+ * the pair); a spinner shows until the ack.
  */
 function ViewAsSelect({ disabled }: { disabled: boolean }) {
   const players = useRecords<PlayerRecord>("player");
@@ -356,6 +360,13 @@ function ViewAsSelect({ disabled }: { disabled: boolean }) {
             {p.name}
           </SelectItem>
         ))}
+        <SelectItem
+          value={VIEW_AS_PARTY}
+          data-testid="fog-view-as-option"
+          data-value={VIEW_AS_PARTY}
+        >
+          {VIEW_AS_PARTY_LABEL}
+        </SelectItem>
       </SelectContent>
     </Select>
   );
@@ -579,6 +590,7 @@ export function FogBar() {
         </Button>
       </Tooltip>
       {sep}
+      <PartyVisionSwitch disabled={off} />
       <ViewAsSelect disabled={off} />
       <NoVisionHint sceneId={sceneId} />
       <Confirm

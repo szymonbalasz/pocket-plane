@@ -19,7 +19,6 @@ import { type Box, type DarknessRow, shapeBox } from "@shared/fog-of-war/shapes"
 import {
   invisibleSeen,
   type PlayerVision,
-  partyVision,
   pointInPolygon,
   pointVisible,
   prepareStaticLayer,
@@ -31,7 +30,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { fogExplored, player, scene, sceneFog } from "../../db/schema";
 import type { SceneCells, SceneObject, SceneRead } from "../scenes-map/visibility-hooks";
 import { partyVisionOn } from "./settings";
-import { type SightEntry, sceneSight, sceneSources } from "./sight";
+import { partyOf, type SightEntry, sceneSight, sceneSources } from "./sight";
 
 /** What a re-derive reads once per scene (FR-FOG-35: static state once per point). */
 export interface SceneStatic {
@@ -131,7 +130,7 @@ export function loadSceneSight(
 /** A `SceneStatic` with its prepared layer (and the party's sight while party vision is on). */
 export function sceneStatic(st: Omit<SceneStatic, "layer" | "partySight">): SceneStatic {
   const partySight =
-    st.party === true ? partyVision([...(st.sight?.values() ?? [])].map((e) => e.vision)) : null;
+    st.party === true ? partyOf([...(st.sight?.values() ?? [])].map((e) => e.vision)) : null;
   return { ...st, partySight, layer: prepareStaticLayer(st.mask, st.shapes, st.darkness) };
 }
 

@@ -118,14 +118,23 @@ function visionSnapshot(db: Db, v: Viewer, scope?: { sceneId: string }): ServerV
   return [...loaded.sight].map(([p, e]) => toVisionRecord(sc, p, e.vision, loaded.party));
 }
 
-const wireVision = ({ campaignId: _c, shared: _s, ...r }: ServerVisionRecord): VisionRecord => r;
+const wireVision = ({
+  campaignId: _c,
+  shared: _s,
+  secret: _x,
+  ...r
+}: ServerVisionRecord): VisionRecord => r;
 
-/** FR-FOG-51: own row in full; another player's shared copy without `inv`. */
+/**
+ * FR-FOG-51: own row in full; another player's shared copy without `inv` or `reason`. FR-FOG-48
+ * (OQ-FOG-61): a player blind with a secret Blinded among the causes is a non-source in the
+ * others' copies (not blind, no polygons), so nobody learns why.
+ */
 export function redactVision(r: ServerVisionRecord, v: Viewer): VisionRecord {
   const w = wireVision(r);
   if (r.playerId === v.playerId) return w;
-  const { inv: _inv, ...rest } = w;
-  return rest;
+  const { inv: _inv, reason: _reason, ...rest } = w;
+  return r.secret ? { ...rest, blind: false, see: [], dark: [], src: [] } : rest;
 }
 
 export const visionRecordType = defineRecordType<ServerVisionRecord>({

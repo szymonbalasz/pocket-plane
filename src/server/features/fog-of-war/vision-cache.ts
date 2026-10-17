@@ -9,16 +9,16 @@
 // only, until it commits: a TEMP marker row written in the same transaction survives only a
 // commit, and the connection's next access promotes the pending entries (marker present) or drops
 // them (rolled back), so a rev that never committed leaves no entry.
-import type { PlayerVision } from "@shared/fog-of-war/vision";
 import { sql } from "drizzle-orm";
 import type { Db } from "../../db/client";
+import type { FogVision } from "./sight";
 
 export const VISION_CACHE_MAX = 256;
 
 export interface VisionEntry {
   /** The inputs' key (revs, darkness, sources). */
   key: string;
-  vision: PlayerVision;
+  vision: FogVision;
 }
 
 type Raw = Pick<Db, "run" | "all">;
@@ -75,7 +75,7 @@ const pairKey = (conn: number, sceneId: string, playerId: string) =>
 /** A cache handle bound to one read (a `Db` or a command's `tx`). */
 export interface VisionCacheView {
   /** The entry for the pair if its key matches. */
-  get(sceneId: string, playerId: string, key: string): PlayerVision | null;
+  get(sceneId: string, playerId: string, key: string): FogVision | null;
   /** The pair's latest entry whatever its key (what clients last got: a re-derive's "before"). */
   latest(sceneId: string, playerId: string): VisionEntry | null;
   set(sceneId: string, playerId: string, e: VisionEntry): void;
