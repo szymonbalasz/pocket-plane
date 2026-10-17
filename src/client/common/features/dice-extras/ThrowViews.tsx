@@ -10,12 +10,12 @@ import { freeArea, renderedWindowRects, useContentHeights } from "../play-shell/
 import { useViewport } from "../play-shell/hooks";
 import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
 import { DiceLayer } from "./DiceLayer";
-import type { Rect } from "./dice3d/index";
 import { pendingInZone } from "./display";
 import { FlatDie } from "./FlatDie";
+import { diceLayerHost, rectOf } from "./layer-host";
 import { useChunk3d } from "./lazy3d";
 import { type DiceSettings, type DisplaySetting, is3dDisplay } from "./settings";
-import { type ThrowRun, useDiceExtras } from "./store";
+import { diceExtras, type ThrowRun, useDiceExtras } from "./store";
 import { isMeshDie, Mirror3D, useRun3D } from "./Throw3D";
 import { throwZone } from "./tray-logic";
 
@@ -37,11 +37,6 @@ const canvasSize = (zone: { w: number; h: number }, caption: boolean, chips: boo
   width: Math.max(160, Math.floor(zone.w - 24)),
   height: Math.max(120, Math.floor(zone.h - (caption ? 64 : 16) - (chips ? 48 : 0))),
 });
-
-const rectOf = (el: HTMLElement | null): Rect | null => {
-  const r = el?.getBoundingClientRect();
-  return r ? { x: Math.round(r.left), y: Math.round(r.top), w: r.width, h: r.height } : null;
-};
 
 /** The zone's 3D dice: drawn on the dice layer's canvas at this placeholder's rect. */
 function Zone3D({
@@ -107,7 +102,7 @@ function ZoneView({
       data-state={atRest ? "rest" : "moving"}
       data-interrupted={interrupted}
       className={cn(
-        "flex max-w-full flex-col items-center gap-1.5 rounded-lg px-3 py-2 transition-opacity duration-300 motion-reduce:transition-none",
+        "flex max-w-full flex-col items-center gap-1.5 rounded-lg px-3 py-2 transition-opacity duration-300",
         !three && "bg-background/70 shadow-lg backdrop-blur-sm",
         // Under the new throw, same spot (the zone is bottom centred).
         interrupted && "absolute bottom-0 left-1/2 -translate-x-1/2",
@@ -166,9 +161,15 @@ export function ThrowViews({
   const pending = useDiceExtras((s) => s.pending);
   const chunk = useChunk3d();
   const zone = useZone();
-  const host = useRef<HTMLDivElement>(null);
+  const host = diceLayerHost;
   const inZone = (r: ThrowRun | null) => (r?.plan.arena === "zone" ? r : null);
   const zoneRuns = [inZone(leaving), inZone(current)];
+  // DICEX §11: no free area for the zone (windows everywhere) → with popups on, the throw plays
+  // in its popup's PiP instead (FR-DICEX-41 b): the run ends while moving.
+  const homeless = !zone && current?.plan.arena === "zone" && current.plan.handoff ? current : null;
+  useEffect(() => {
+    if (homeless?.phase === "moving") diceExtras.flat(homeless.seq);
+  }, [homeless]);
   const showPending = pending && !current && pendingInZone(settings, display);
   const zoneShown = display !== "off" && zone && (zoneRuns.some(Boolean) || showPending);
   const view = (r: ThrowRun, interrupted: boolean) =>
@@ -203,10 +204,8 @@ export function ThrowViews({
               data-state="pending"
               className="flex items-center gap-1.5 rounded-lg bg-background/70 px-3 py-2 text-sm text-muted-foreground shadow-lg"
             >
-              {/* FR-DICEX-09: 3D shakes the dice; flat / reduced motion is a static label. */}
-              {display === "zone" && (
-                <DicesIcon className="size-4 animate-bounce motion-reduce:animate-none" />
-              )}
+              {/* FR-DICEX-09: 3D shakes the dice; flat is a static label. */}
+              {display === "zone" && <DicesIcon className="size-4 animate-bounce" />}
               Rolling…
             </div>
           )}

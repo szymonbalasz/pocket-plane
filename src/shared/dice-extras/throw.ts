@@ -61,6 +61,9 @@ export interface DiceThrow {
   more: number;
 }
 
+/** A die the 3D renderer draws (a mesh die with a server value); the rest stay flat chips. */
+export const isMeshDie = (d: ThrowDie) => d.shape !== null && !d.flat && d.value !== null;
+
 /** What a throw reads of an entry: never `dmPayload`. */
 export interface ThrowEntry {
   id: string;

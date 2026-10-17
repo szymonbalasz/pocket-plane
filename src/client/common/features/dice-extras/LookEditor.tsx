@@ -20,6 +20,7 @@ import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useSync } from "../../sync/store";
 import type { PreviewHandle } from "./dice3d/index";
+import { diceLayerHost, rectOf } from "./layer-host";
 import { dice3d, useChunk3d, useThreeD } from "./lazy3d";
 import {
   draftReducer,
@@ -32,8 +33,6 @@ import {
 import { useOwnLook } from "./own-look";
 import { is3dDisplay, useDiceSettings } from "./settings";
 
-const PREVIEW_PX = 72;
-
 function FlatPreview({ look }: { look: DiceLook }) {
   return (
     <span
@@ -45,7 +44,13 @@ function FlatPreview({ look }: { look: DiceLook }) {
   );
 }
 
-/** 3D preview (lazy chunk, own small renderer); flat while loading or when WebGL fails. */
+/** Frames a moved placeholder is watched for (the popover's open animation, ≈ 200 ms). */
+const SETTLE_FRAMES = 20;
+
+/**
+ * 3D preview (lazy chunk): a still arena on the dice layer's one canvas at this placeholder's
+ * rect; flat while loading, without the layer, or when WebGL fails.
+ */
 function Preview3D({ look, onFail }: { look: DiceLook; onFail(): void }) {
   const host = useRef<HTMLDivElement>(null);
   const handle = useRef<PreviewHandle | null>(null);
@@ -61,14 +66,42 @@ function Preview3D({ look, onFail }: { look: DiceLook; onFail(): void }) {
     if (chunk === "failed") fail.current();
     const mod = dice3d.module();
     const el = host.current;
+    const layer = diceLayerHost.current;
     if (chunk !== "ready" || !mod || !el) return;
+    if (!layer) return fail.current();
+    const start = rectOf(el);
+    if (!start) return;
     try {
-      handle.current = mod.previewDie(el, PREVIEW_PX, latest.current);
+      handle.current = mod.previewDie(layer, () => rectOf(host.current) ?? start, latest.current);
     } catch {
       fail.current();
       return;
     }
+    // Redraw while the placeholder moves (the popover opening), then on resize / scroll only.
+    let frames = 0;
+    let raf = 0;
+    let last = JSON.stringify(start);
+    const watch = () => {
+      const now = JSON.stringify(rectOf(host.current));
+      if (now !== last) {
+        last = now;
+        frames = 0;
+        handle.current?.redraw();
+      }
+      if (++frames < SETTLE_FRAMES) raf = requestAnimationFrame(watch);
+    };
+    raf = requestAnimationFrame(watch);
+    const again = () => {
+      frames = 0;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(watch);
+    };
+    addEventListener("resize", again);
+    addEventListener("scroll", again, true);
     return () => {
+      cancelAnimationFrame(raf);
+      removeEventListener("resize", again);
+      removeEventListener("scroll", again, true);
       handle.current?.stop();
       handle.current = null;
     };

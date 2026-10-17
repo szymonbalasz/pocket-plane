@@ -205,6 +205,8 @@ function ToggleRow({
       className="inline-flex"
     >
       <Switch
+        data-testid="mod-toggle-switch"
+        data-record-id={p.id}
         aria-label={`${p.name} ${on ? "on" : "off"}`}
         checked={on}
         disabled={!may || disabled}
