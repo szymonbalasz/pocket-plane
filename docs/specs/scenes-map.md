@@ -1,9 +1,9 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: complete
-owner: spec-scenes-map
-wave: 3
+status: claimed
+owner: spec-maptools
+phase: post-mvp-4
 ---
 
 # Scenes and map
