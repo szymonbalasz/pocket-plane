@@ -1,6 +1,6 @@
-# Dice display: full-screen dice layer and roll popup
+# 0048 — Dice display: full-screen dice layer and roll popup
 
-- Status: accepted (DM, sprint-4 gate 1, [#245](../../decisions-log.md) G4; the integrator numbers it at merge)
+- Status: accepted (DM, sprint-4 gate 1, [#245](../../decisions-log.md) G4)
 - Date: 2026-10-17
 - Amends: [ADR-0044](0044-3d-dice.md) rows **Where**, **Source** (adds the popup), **Cost** (preload). Library row unchanged (decided #245 G1, [dice-extras OQ-DICEX-28](../../specs/dice-extras.md#15-open-questions))
 - Keeps: [ADR-0001](0001-tech-stack.md) server-authoritative dice, [ADR-0022](0022-deterministic-seams.md) `ctx.dice`, ADR-0044 "Truth", "Visibility", "Randomness", "Looks"

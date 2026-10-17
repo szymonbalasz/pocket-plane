@@ -1,6 +1,7 @@
 # 0035 — Combat rules run in the causing command's transaction
 
 - Status: accepted (2026-10-14, decision #178; raised as [OQ-CBTX-01](../../specs/combat-extras.md#15-open-questions))
+- Refined by [ADR-0049](0049-trigger-state.md) (`effectHooks`, in and out of combat; sprint 4)
 - Date: 2026-10-14
 - Affects: [combat-extras](../../specs/combat-extras.md), [combat-tracker](../../specs/combat-tracker.md), [character-sheet](../../specs/character-sheet.md), [notifications](../../specs/notifications.md), [AGENTS §9.9](../../../AGENTS.md#99-shared-files)
 - Refines: [ADR-0009](0009-entity-content-model.md) (where instance play state and modifiers live; see "Refines ADR-0009" below), [ADR-0016](0016-domain-events-pending-actions.md) ("Rules → pending actions" as listeners; open row "May rules mutate state directly?"), [ADR-0027](0027-notification-creation.md) C ("post-commit rule listeners … decided when combat-extras is written, including how to close the crash gap")

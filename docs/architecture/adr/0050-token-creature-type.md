@@ -1,6 +1,6 @@
-# Proposed — Token creature type as a player-visible display copy
+# 0050 — Token creature type as a player-visible display copy
 
-- Status: accepted (DM, sprint-4 gate 1, #245; G4, G44). Raised by review-b B6. The integrator numbers it at merge.
+- Status: accepted (DM, sprint-4 gate 1, #245; G4, G44). Raised by review-b B6.
 - Date: 2026-10-17
 - Refines: [ADR-0024](0024-definition-visibility.md) (token display copies)
 - Affects: [entities](../../specs/entities.md) (FR-ENT-26–30), [scenes-map](../../specs/scenes-map.md) (token record, placement, definition-changed hook), [compendium](../../specs/compendium.md) (FR-CMP-39)

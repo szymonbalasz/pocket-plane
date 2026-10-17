@@ -1,6 +1,6 @@
-# Party vision, sight while dragging, 999 ft default vision
+# 0047 — Party vision, sight while dragging, 999 ft default vision
 
-- Status: **accepted** (DM, sprint-4 gate 1, #245, G4; every pick below decided). File keeps its proposed name; the integrator numbers it at merge
+- Status: accepted (DM, sprint-4 gate 1, #245, G4; 2026-10-17). Every pick below decided
 - Date: 2026-10-17
 - Refines: [ADR-0042](0042-dynamic-vision.md) (dynamic vision). Supersedes in part its picks OQ-FOG-20 A (own characters only → still the default, plus a party switch), OQ-FOG-26 A (vision on drop only) and OQ-FOG-35's senses numbers (0–120 ft, default 0)
 - Extends: [ADR-0021](0021-sync-protocol-conventions.md) (fns read record + viewer: kept), [ADR-0033](0033-signal-audience.md) (a server-originated signal from an intent result), [ADR-0040](0040-token-move-guards.md) (a dry-run hint phase run only when every guard passed; a DM drag's hint runs the owner's guards), [ADR-0041](0041-active-scene-window.md) (`sync.loadScene {viewAs: "party"}`)
