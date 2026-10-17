@@ -3,10 +3,11 @@
 //   `hidden` tokens keep their own styling instead (no badge; FOG §13 step 1).
 // - FR-FOG-47 (#210): an invisible token draws at ≈ 50 % with an "Invisible" badge.
 // - FR-FOG-20 / -47 View as P: tokens P can't see are dimmed (FR-FOG-34 / -46 on P's loaded
-//   `vision`); an invisible token P sees through a Sees-invisible polygon is not.
-import { scenePlayerId, VISION_TYPE, type VisionRecord } from "@shared/fog-of-war/schemas";
+//   `vision`; sprint 4: the drawn union while party vision is on, and for View as Party,
+//   `party-view.ts`); an invisible token P sees through a Sees-invisible polygon is not.
 import { seenByNobody, TOKEN_SUBJECT } from "@shared/fog-of-war/visibility";
 import type { TokenBadge, TokenOverlay } from "../scenes-map/token-overlays";
+import { partyView } from "./party-view";
 import { dmFogOf, useViewAs, viewAsFor, viewAsSees, visionOf } from "./view-as";
 
 export const FOG_BADGE: TokenBadge = {
@@ -34,13 +35,11 @@ export const fogTokenOverlay: TokenOverlay = {
     const pair = viewAsFor(token.sceneId);
     let dim = invisible;
     if (pair) {
-      const v = store.records[VISION_TYPE]?.[scenePlayerId(pair.sceneId, pair.playerId)] as
-        | VisionRecord
-        | undefined;
+      const v = partyView(store.records, pair.sceneId, pair.playerId).vision;
       dim = !viewAsSees(
         { ...token, invisible },
         pair.playerId,
-        visionOf(v ?? null),
+        visionOf(v),
         dmFogOf(store.records, token.sceneId),
       );
     }

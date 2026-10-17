@@ -13,19 +13,29 @@
 // `visible`, `plain-map.ts`); the View-as pick and its rows stay loaded meanwhile. Sight preview
 // while dragging (FR-FOG-54, `sight-preview.ts`): the drawn `vision` takes the dragged source's
 // previewed polygons; the `fog-vision` marker then carries them and attr `preview` (token ids).
-import { FOG_SIGNALS, FOG_TYPE, FogSightPayload } from "@shared/fog-of-war/schemas";
+// Party vision (FR-FOG-21 / -50 / -51, V10, `party-view.ts`): a player draws the union of every
+// `vision` record of the scene it holds, each with its owner's previews; the DM's View as P does
+// the same while party vision is on, View as Party always (with every player's memory). The
+// marker then carries the union and attrs `src` (token ids) and `shared` (the other players).
+// The darkvision ring draws the map's greyscale copy (`grey-map.ts`; marker `fog-darkvision-grey`,
+// attr `on` = the copy is drawn in a ring).
+import { FOG_SIGNALS, FOG_TYPE, FogSightPayload, VISION_TYPE } from "@shared/fog-of-war/schemas";
 import type { DarknessShape } from "@shared/fog-of-war/shapes";
-import { samePair, type ViewAsPair } from "@shared/protocol/scene-window";
+import type Konva from "konva";
+import { samePair, VIEW_AS_PARTY, type ViewAsPair } from "@shared/protocol/scene-window";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Group, Line, Rect, Shape, Text } from "react-konva";
 import { useStore } from "zustand";
 import { IntentRejected } from "../../sync/connection";
 import { useSignal, useSync } from "../../sync/store";
+import { useAssetImage } from "../assets-pipeline/useAssetImage";
 import { useCanvas } from "../scenes-map/canvas-context";
 import { toastReject } from "../scenes-map/intents";
 import type { CanvasClient } from "../scenes-map/layers";
 import { useLayerToggles } from "../scenes-map/tool-store";
 import { type FogDraft, type GestureState, radiusLabel } from "./gesture";
+import { greyCopy } from "./grey-map";
+import { partyView, unionMemoryRuns } from "./party-view";
 import { fogLayerShown } from "./plain-map";
 import {
   DM_DARKNESS_FALLBACK,
@@ -34,7 +44,6 @@ import {
   FOG_COLOR_VARS,
   type FogRecordLike,
   fogStats,
-  ownFogRows,
   type PaintCtx,
   paintDarknessDm,
   paintFog,
@@ -44,17 +53,16 @@ import {
   createSightPreviewStore,
   followDrags,
   followProbe,
+  type OwnedPreview,
   previewList,
-  previewVision,
   receiveSight,
 } from "./sight-preview";
 import { FOG_TOOL_ID, fogRecordOf, setFogReader, useFogTool } from "./store";
-import { pairRows, setViewAs, shownPair, useViewAs } from "./view-as";
+import { setViewAs, shownPair, useViewAs } from "./view-as";
 import {
   DARKNESS_SEEN_FALLBACK,
   DARKVISION_FALLBACK,
   type GridLines,
-  memoryRuns,
   paintPlayerView,
   VIEW_AS_OPACITY,
   VISION_ALPHA,
@@ -260,6 +268,18 @@ function shapeOutline(
 
 const noDraw = () => {};
 
+/**
+ * FOG §7 marker `fog-darkvision-grey` (attr `on`, `player`). Set through the node: react-konva
+ * reads any `on…` prop as an event handler.
+ */
+function GreyMarker({ player, on }: { player: string; on: boolean }) {
+  const ref = useRef<Konva.Shape>(null);
+  useEffect(() => {
+    ref.current?.setAttr("on", on);
+  }, [on]);
+  return <Shape ref={ref} name="fog-darkvision-grey" player={player} sceneFunc={noDraw} />;
+}
+
 /** Browser canvas used to draw the View-as render isolated (its erases must not cut the DM's). */
 let scratch: HTMLCanvasElement | null = null;
 
@@ -329,9 +349,10 @@ function useViewAsSync(client: CanvasClient, sceneId: string): ViewAsPair | null
 
 /**
  * FR-FOG-54: the sight previews of this canvas (own drag from the probe, others' `fog.sight`
- * beside their drag preview) applied to the drawn `vision`; a `vision` change mid-drag re-probes.
+ * beside their drag preview), each with its token's owner, for the drawn records; a change of the
+ * drawn `vision` (`vision`: the viewer's own record, or the scene's records) mid-drag re-probes.
  */
-function useSightPreview<V extends Parameters<typeof previewVision>[0]>(vision: V) {
+function useSightPreview(vision: unknown): OwnedPreview[] {
   const { scene, probe, previews, tokens, live } = useCanvas();
   const [sight] = useState(createSightPreviewStore);
   useEffect(() => followProbe(sight, probe), [sight, probe]);
@@ -355,11 +376,8 @@ function useSightPreview<V extends Parameters<typeof previewVision>[0]>(vision: 
   const st = useStore(sight);
   return useMemo(() => {
     const owners = new Map(tokens.map((t) => [t.id, t.ownerPlayerId]));
-    return previewVision(
-      vision,
-      previewList(st, (id) => owners.get(id)),
-    );
-  }, [vision, st, tokens]);
+    return previewList(st, (id) => owners.get(id));
+  }, [st, tokens]);
 }
 
 export function FogLayer() {
@@ -374,19 +392,17 @@ export function FogLayer() {
   );
   const stats = useMemo(() => fogStats(rec, map), [rec, map]);
   const pair = useViewAsSync(client, scene.id);
-  // Whose `vision` / `fog-explored` rows draw: the player's own; the DM's View-as pair.
+  // Whose `vision` / `fog-explored` rows draw: the player's own (+ the party's while party
+  // vision is on); the DM's View-as pair (a player, or Party).
   const viewer = client === "player" ? myPlayerId : (pair?.playerId ?? null);
-  const own = useMemo(
-    () => ownFogRows(store.records, scene.id, viewer),
-    [store.records, scene.id, viewer],
+  const visions = store.records[VISION_TYPE];
+  const ownVision = viewer === null ? null : (visions?.[`${scene.id}:${viewer}`] ?? null);
+  const previews = useSightPreview(viewer === VIEW_AS_PARTY ? visions : ownVision);
+  const drawn = useMemo(
+    () => (viewer === null ? null : partyView(store.records, scene.id, viewer, previews)),
+    [store.records, scene.id, viewer, previews],
   );
-  const rows = useMemo(
-    () =>
-      viewer === null ? null : pairRows(store.records, { sceneId: scene.id, playerId: viewer }),
-    [store.records, scene.id, viewer],
-  );
-  const memory = useMemo(() => memoryRuns(rows?.explored ?? null, map), [rows, map]);
-  const preview = useSightPreview(rows?.vision ?? null);
+  const memory = useMemo(() => unionMemoryRuns(drawn?.explored ?? [], map), [drawn, map]);
   const paints = useMemo(() => paintsFor(client), [client]);
   const playerPaints = useMemo(() => paintsFor("player"), []);
   const gridLines: GridLines = {
@@ -415,13 +431,22 @@ export function FogLayer() {
   // FR-FOG-20 (sprint 4): the plain battlemap for the DM outside the Fog tool.
   const off = useLayerToggles((s) => s.off);
   const shown = fogLayerShown(client, toolOn, off);
-  const view = (r: FogRecordLike) => ({ fog: r, memory, vision: preview.vision });
-  const marker = own.vision && {
-    ...own.vision,
-    ...(preview.applied.length > 0
-      ? { see: preview.vision?.see, dark: preview.vision?.dark, preview: preview.applied.join(",") }
-      : {}),
+  const vision = drawn?.vision ?? null;
+  // FR-FOG-21 (sprint 4): the darkvision ring's greyscale map copy (players and View as only).
+  const mapImage = useAssetImage(viewer === null ? null : scene.mapAssetId, "display").image;
+  const grey = useMemo(() => (mapImage ? greyCopy(mapImage) : null), [mapImage]);
+  const greyOn = grey !== null && (vision?.dark.length ?? 0) > 0 && vision?.blind !== true;
+  const view = (r: FogRecordLike) => ({ fog: r, memory, vision, grey });
+  const marker = vision && {
+    sources: Math.max(vision.see.length, vision.dark.length),
+    blind: vision.blind,
+    see: vision.see,
+    dark: vision.dark,
+    src: vision.src,
+    shared: drawn?.shared ?? [],
+    ...(drawn && drawn.preview.length > 0 ? { preview: drawn.preview.join(",") } : {}),
   };
+  const exploredCells = memory.reduce((n, r) => n + r[2] / gridCellSize, 0);
   return (
     <Group name="fog-layer" listening={false} visible={shown}>
       {rec && (
@@ -465,8 +490,9 @@ export function FogLayer() {
       {drafting && gesture.draft && <Draft draft={gesture.draft} pending={gesture.pending} />}
       {/* FOG §7 markers (draw nothing): the viewer's vision and explored memory. */}
       {marker && <Shape name="fog-vision" player={viewer} {...marker} sceneFunc={noDraw} />}
-      {own.explored && (
-        <Shape name="fog-explored" player={viewer} cells={own.explored.cells} sceneFunc={noDraw} />
+      {viewer !== null && <GreyMarker player={viewer} on={greyOn} />}
+      {drawn && drawn.explored.length > 0 && (
+        <Shape name="fog-explored" player={viewer} cells={exploredCells} sceneFunc={noDraw} />
       )}
     </Group>
   );

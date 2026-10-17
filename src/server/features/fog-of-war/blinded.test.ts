@@ -36,7 +36,11 @@ describe("FOG §13 V10 Blinded walkthrough (player-1, player-2)", () => {
   };
   const unblind = (effectId: string) => t.ok(t.dm, CBTX_INTENTS.endEffect, { effectId });
   const townStale = () => {
-    const town = t.db.select().from(scene).all().find((s) => s.name === "Town")?.id as string;
+    const town = t.db
+      .select()
+      .from(scene)
+      .all()
+      .find((s) => s.name === "Town")?.id as string;
     return t.db.select().from(sceneFog).where(eq(sceneFog.sceneId, town)).get()?.visionStale;
   };
   /** P's own `vision` as P holds it; another player's copy as `w` holds it. */

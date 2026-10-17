@@ -1677,5 +1677,9 @@ From [fog-of-war](../specs/fog-of-war.md) FR-FOG-48, -20, -21, -43, -49–51. **
 | `vision.secret` | derived, server only | `true` while blind with a secret Blinded among the causes | never on a wire; makes other players' copies a non-source | FR-FOG-48 |
 | Source Blinded bit | server memory (sight cache key) | `-` / `open` / `secret` per source | never on a wire | FR-FOG-38, -48 |
 
+| View-as Party set | client memory (DM) | the loaded pair `(sceneId, "party")` | — | FR-FOG-43 |
+| Greyscale map copy | client memory | one offscreen canvas per map image (`WeakMap`) | — | FR-FOG-21 |
+
+- **Derived (client, never stored):** the drawn union (`party-view.ts`): every drawn record's polygons (each through its owner's sight previews), party-blind, the chip reason, the union of drawn memory rows.
 - **Read, not stored:** a source's Blinded state = an active `blinded` condition `effect` row on the token's definition (the character); one per character (CBTX §8 partial unique index).
 - **CON-44:** `reason` adds ≤ 20 B to a blind player's own `vision` row; nothing else.

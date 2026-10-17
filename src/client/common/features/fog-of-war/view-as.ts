@@ -41,6 +41,8 @@ export const useViewAs = create<ViewAsState>(() => ({ playerId: null, loaded: nu
 
 /** The Select's value for "DM" (`fog-view-as` `data-value`). */
 export const VIEW_AS_DM = "dm";
+/** FR-FOG-43 (sprint 4): the Select's "Party vision" entry (value `VIEW_AS_PARTY`). */
+export const VIEW_AS_PARTY_LABEL = "Party vision";
 
 export function setViewAs(playerId: string | null): void {
   useViewAs.setState({ playerId });
@@ -70,8 +72,10 @@ export function pairRows(
   };
 }
 
-/** A `vision` record as the shared fns' `PlayerVision` (no record = no polygons, not blind). */
-export function visionOf(v: VisionRecord | null): PlayerVision {
+/** A `vision` record (or a drawn union) as the shared fns' `PlayerVision` (none = no polygons). */
+export function visionOf(
+  v: Pick<VisionRecord, "blind" | "see" | "dark" | "inv" | "src"> | null,
+): PlayerVision {
   if (!v) return { blind: false, see: [], dark: [], inv: [], src: [], polys: [] };
   const inv = v.inv ?? [];
   const polys: SightPoly[] = [...v.see, ...v.dark].map((poly, i) => ({

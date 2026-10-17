@@ -132,6 +132,8 @@ export interface PaintCtx {
   fill(rule?: "nonzero" | "evenodd"): void;
   stroke(): void;
   clip(rule?: "nonzero" | "evenodd"): void;
+  /** FR-FOG-21 (sprint 4): the darkvision ring's greyscale map copy. */
+  drawImage?(image: CanvasImageSource, x: number, y: number, w: number, h: number): void;
 }
 
 /** Grid placement in map px. */
