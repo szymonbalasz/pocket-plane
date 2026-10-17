@@ -1,6 +1,7 @@
 // Bar + icon row geometry for token overlays (OQ-CBTX-21: `bar`, `icons`), in token-group
 // coordinates (origin = footprint top-left, `side` = footprint px). Bar on the top edge; icons in
-// a row below it, top-left; at most `ICONS_MAX`, then a "+N" chip. Cue ring + bell (FR-MAP-49).
+// a row below it, top-left; at most `ICONS_MAX`, then a "+N" chip; each one's hover tooltip and
+// muted tone (FR-MAP-57, S9: generic, so R's trigger icon keeps its own). Cue ring + bell (FR-MAP-49).
 // DOM-free (tested under bun).
 import type { TokenBar, TokenIcon } from "./token-overlays";
 
@@ -51,6 +52,10 @@ export interface IconCell {
   icon: TokenIcon;
   /** Initials drawn in the disc. */
   text: string;
+  /** Hover tooltip (the icon's label). */
+  tip: string;
+  /** Drawn in the muted tone (`TokenIcon.muted`). */
+  muted: boolean;
   x: number;
   y: number;
   size: number;
@@ -59,7 +64,7 @@ export interface IconCell {
 export interface IconRow {
   items: IconCell[];
   /** "+N" for the icons past `ICONS_MAX`; null when all fit. */
-  more: { text: string; count: number; x: number; y: number; size: number } | null;
+  more: { text: string; count: number; tip: string; x: number; y: number; size: number } | null;
 }
 
 /** "Prone" → "Pr", "Exhaustion 2" → "E2", "" → "?". */
@@ -106,12 +111,23 @@ export function iconRow(side: number, icons: readonly TokenIcon[]): IconRow {
   const items = shown.map((icon, i) => ({
     icon,
     text: iconText(icon.label),
+    tip: icon.label,
+    muted: icon.muted === true,
     x: x0 + i * step,
     y,
     size,
   }));
-  const rest = icons.length - shown.length;
+  const hidden = icons.slice(ICONS_MAX);
   const more =
-    rest > 0 ? { text: `+${rest}`, count: rest, x: x0 + shown.length * step, y, size } : null;
+    hidden.length > 0
+      ? {
+          text: `+${hidden.length}`,
+          count: hidden.length,
+          tip: hidden.map((i) => i.label).join("\n"),
+          x: x0 + shown.length * step,
+          y,
+          size,
+        }
+      : null;
   return { items, more };
 }

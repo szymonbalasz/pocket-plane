@@ -3,8 +3,9 @@
 // move with a drag and show in drag previews). Names and badges are on the labels layer
 // (FR-MAP-42). Konva node `name` = `map-token`, `id` = token id, attrs `shape`, `preview`
 // (FR-MAP-40); ring `map-token-ring` (attr `state`); crosses, bars and icons named by their
-// overlay id (bar attrs `tone`, `fraction`; icon attrs `value`, `icon`, `tone`, `label`); "+N"
-// `map-token-icons-more` (attr `count`); a cue (FR-MAP-49) named by its id, attr `label`. Drag
+// overlay id (bar attrs `tone`, `fraction`; icon attrs `value`, `icon`, `tone`, `label`, `muted`, and
+// `tip` = the hover tooltip the labels layer shows, FR-MAP-57 / S9); "+N" `map-token-icons-more`
+// (attrs `count`, `tip`); a cue (FR-MAP-49) named by its id, attr `label`. Drag
 // paths and combat trails (FR-MAP-52–55) are drawn first, below every token (`DragPaths`).
 import { cellToPx, footprint, initials } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
@@ -222,7 +223,10 @@ function IconDisc(p: { x: number; y: number; size: number; text: string; color: 
   );
 }
 
-/** OQ-CBTX-21: up to 4 icon discs (initials in the tone colour) below the bar, then "+N". */
+/**
+ * OQ-CBTX-21: up to 4 icon discs (initials in the tone colour, a muted icon in the muted one)
+ * below the bar, then "+N"; each with its label as the hover tooltip (FR-MAP-57, S9).
+ */
 function TokenIconRow({
   t,
   side,
@@ -245,6 +249,8 @@ function TokenIconRow({
           icon={c.icon.icon}
           tone={c.icon.tone}
           label={c.icon.label}
+          muted={c.muted}
+          tip={c.tip}
           listening={false}
         >
           <IconDisc
@@ -252,12 +258,18 @@ function TokenIconRow({
             y={c.y}
             size={c.size}
             text={c.text}
-            color={toneColor(colors, c.icon.tone)}
+            color={c.muted ? colors.mutedForeground : toneColor(colors, c.icon.tone)}
           />
         </Group>
       ))}
       {row.more && (
-        <Group name="map-token-icons-more" id={t.id} count={row.more.count} listening={false}>
+        <Group
+          name="map-token-icons-more"
+          id={t.id}
+          count={row.more.count}
+          tip={row.more.tip}
+          listening={false}
+        >
           <IconDisc
             x={row.more.x}
             y={row.more.y}
