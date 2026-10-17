@@ -8,6 +8,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
+import { panMap } from "./support/map";
 import { showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
@@ -170,6 +171,9 @@ test("FR-CBT-75 FR-CBT-76 FR-NOTE-26 popup opens over its toast, the toast close
   const { dm, player, recordId } = await setup(browser);
   await viewAmbush(dm, player, recordId("battlemap", "scene"));
   await openWindow(dm, "cbt.initiative");
+  // BL-01: Fit puts the map's top rows under the top-centre toasts; pan the monsters out of the
+  // popup's way (the covered case is the sim-6 N8 test below).
+  await panMap(dm, 0, 420);
   // Player-1: sheet Attack + damage → a damage card to the DM (sticky toast).
   const sheet = await openWindow(player, "char.sheet");
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();

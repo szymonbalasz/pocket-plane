@@ -9,7 +9,7 @@ import { cellToPx, footprint, initials } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { useEffect, useMemo, useRef } from "react";
-import { Circle, Group, Image, Layer, Line, Rect, Shape, Text } from "react-konva";
+import { Circle, Group, Image, Line, Rect, Shape, Text } from "react-konva";
 import { useStore } from "zustand";
 import { retryAssetImage, useAssetImage } from "../../assets-pipeline/useAssetImage";
 import { withoutDmOnly } from "../../scene-tools/layer-switches";
@@ -435,10 +435,10 @@ export function TokensLayer() {
   const off = useLayerToggles((s) => s.off);
   const drawn = useMemo(() => withoutDmOnly(tokens, client, off), [tokens, client, off]);
   return (
-    <Layer name="tokens-layer">
+    <Group name="tokens-layer">
       {drawn.map((t) => (
         <TokenNode key={t.id} t={t} />
       ))}
-    </Layer>
+    </Group>
   );
 }

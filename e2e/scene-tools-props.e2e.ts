@@ -7,6 +7,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
+import { mapPoint } from "./support/map";
 import { showToPlayers } from "./support/scenes";
 import { openWindow, shellWindow } from "./support/shell";
 
@@ -101,7 +102,8 @@ test("FR-SCN-16–19 props: reveal, lock, locked drag, move, Ctrl+Z (DM + player
   await expect(dm.getByTestId("scn-undo")).toBeDisabled();
 
   // Reveal the chest from its menu → the player gets it with its image.
-  const c = await cellCentre(dm, 17, 12);
+  // BL-01: the row pans clear of the Game log first (the chest drag below goes two cells left).
+  const c = await mapPoint(dm, 17, 12, { margin: 2 });
   await dm.mouse.click(c.x, c.y, { button: "right" });
   await expect(dm.getByTestId("scn-prop-menu")).toHaveAttribute("data-record-id", chest);
   await expect(dm.getByTestId("scn-prop-menu-hide")).toHaveText(/Reveal/);
@@ -124,7 +126,7 @@ test("FR-SCN-16–19 props: reveal, lock, locked drag, move, Ctrl+Z (DM + player
   expect(frames.join("\n")).not.toContain('"locked"');
 
   // Drag the barrel (5, 3) → (6, 3): the player sees it; Ctrl+Z puts it back.
-  const b = await cellCentre(dm, 5, 3);
+  const b = await mapPoint(dm, 5, 3);
   const b2 = await cellCentre(dm, 6, 3);
   await dm.mouse.move(b.x, b.y);
   await dm.mouse.down();
@@ -143,7 +145,7 @@ test("FR-SCN-16–19 props: reveal, lock, locked drag, move, Ctrl+Z (DM + player
   await dm.getByTestId("asset-picker-select").click();
   await expect(dm.getByTestId("asset-picker")).toHaveCount(0);
   await expect(dm.getByTestId("scn-prop-image-name")).toHaveText("prop-barrel");
-  const at = await cellCentre(dm, 6, 12);
+  const at = await mapPoint(dm, 6, 12);
   await dm.mouse.click(at.x, at.y);
   await expect.poll(async () => (await propIds(player)).length).toBe(4);
   const placed = (await propIds(player)).find((id) => ![barrel, table, chest].includes(id))!;

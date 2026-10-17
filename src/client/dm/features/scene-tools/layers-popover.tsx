@@ -1,13 +1,14 @@
 // DM Layers popover (FR-SCN-05, SCN §7): a rail button (`map-tool-layers`) opening one Switch per
 // registered layer toggle plus "DM-only items" (`scn-layer-toggle-<key>`). Off = not drawn and
-// not hit on this DM client; client only, never sent; kept per campaign in browser storage, all on
-// by default. Works while not live too (FR-SCN-34).
+// not hit on this DM client; client only, never sent; kept per campaign in browser storage, on by
+// default. FOG's "Fog" switch (FR-FOG-20, sprint 4) is the other way round: off by default, on =
+// the fog drawn without the Fog tool. Works while not live too (FR-SCN-34).
 import { Button } from "@ui/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger, Switch } from "@ui/components/ui/menus";
 import { Tooltip } from "@ui/components/ui/overlays";
 import { Label } from "@ui/components/ui/primitives";
 import { browserLayerMemory, layerSwitches } from "@ui/features/scene-tools/layer-switches";
-import { type LayerToggle, layerToggles } from "@ui/features/scenes-map/layers";
+import { type LayerToggle, layerToggles, toggleOn } from "@ui/features/scenes-map/layers";
 import { useLayerToggles } from "@ui/features/scenes-map/tool-store";
 import { cn } from "@ui/lib/utils";
 import { useSync } from "@ui/sync/store";
@@ -55,7 +56,8 @@ export function ScnLayersPopover() {
   const setOn = useLayerToggles((s) => s.setOn);
   const [open, setOpen] = useState(false);
   const switches = useSwitches();
-  const anyOff = switches.some((t) => off[t.key]);
+  // "Some hidden": a hiding switch turned off (the Fog switch off hides nothing).
+  const anyOff = switches.some((t) => t.kind !== "show" && !toggleOn(t, off));
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <Tooltip content={anyOff ? "Layers — some hidden" : "Layers"}>
@@ -95,7 +97,7 @@ export function ScnLayersPopover() {
               <Switch
                 id={id}
                 data-testid={id}
-                checked={!off[t.key]}
+                checked={toggleOn(t, off)}
                 onCheckedChange={(on) => setOn(t.key, on)}
               />
             </div>
