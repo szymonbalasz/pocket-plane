@@ -110,6 +110,12 @@ describe("FR-CMP-28 Add to sheet (client)", () => {
     expect(addedMessage("Mira", { list: "spells" })).toBe("Added to Mira's Spells");
   });
 
+  test("FR-CMP-28 Toast when the trigger was skipped as a duplicate (#241)", () => {
+    expect(addedMessage("Thorn", { list: "features", triggerSkipped: true })).toBe(
+      "Added to Thorn's Features. Trigger already on the sheet — delete it first to use the compendium's.",
+    );
+  });
+
   test("FR-CMP-28 the button on spell / item / feature views (both roles); none on conditions, nor for a player without a character", () => {
     expect(render("player", SNEAK)).toContain('data-testid="cmp-add-to-sheet"');
     expect(render("dm", POTION)).toContain('data-testid="cmp-add-to-sheet"');
