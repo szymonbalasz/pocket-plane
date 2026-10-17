@@ -107,7 +107,7 @@ describe("FR-MOD-48 outcome line parts", () => {
     const line = (dmPayload?: unknown) =>
       lineText(attackLogKind.formatLine({ actorName: "Brakka", payload, dmPayload }));
     expect(line()).toBe(
-      "Brakka attacks Goblin: 15 + 7 = 22 — hit! 14 slashing damage + 6 radiant (Divine Fury)",
+      "Brakka attacks Goblin: 15 + 7 = 22 — DM: hit. 14 slashing damage + 6 radiant (Divine Fury)",
     );
     const players = line();
     const nonPublic = lineText(

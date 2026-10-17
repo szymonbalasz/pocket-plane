@@ -297,7 +297,7 @@ Each lists `changes` (before/after per record; create: before null, delete: afte
 | `StructureEdited` *(sprint 2 phase 2, SCN; schema built, fix/scn-core; emitted, build/scene-tools-structure)* | SCN | `{sceneId, op: addWalls \| addDoor \| removeSegments \| setDoor, ns}` (one name for every op, FR-SCN-33; `ns` = the `n`s added, removed or set; an edit that changes nothing emits nothing) | `scene-structure` upsert | yes | no | no | — |
 | `PropPlaced` / `PropUpdated` / `PropHidden` / `PropRevealed` / `PropDuplicated` / `PropDeleted` *(SCN; schema built)* | SCN | `{propId}` | `scene-prop` upsert / delete | yes | no | no | — |
 | `TemplatePlaced` / `TemplateUpdated` / `TemplateDeleted` *(SCN; schema built)* | SCN | `{templateId}` | `aoe-template` upsert / delete | yes | no | no | — |
-| `TemplatesCleared` *(SCN; schema built)* | SCN | `{sceneId, templateIds}` | `aoe-template` deletes | yes | no | no | — |
+| `TemplatesCleared` *(SCN; schema built; sprint 4: `players`, [§68](#68-sprint-4-map-tools-core-mc))* | SCN | `{sceneId, templateIds, players: bool}` (`players: false` = DM-placed kept templates only, FR-SCN-44) | `aoe-template` deletes of the cleared rows | yes | no | no | — |
 | `DiagonalRuleSet` *(SCN; schema built; emitted, build/scene-tools-settings)* | SCN | `{rule: "5-10-5" \| "5"}` | `map-settings` upsert | yes | no | no | — |
 
 Sources: [CAMP §9](../specs/campaign-management.md#9-api--events), [FR-CAMP-09](../specs/campaign-management.md#6-functional-requirements), [FR-SYNC-07](../specs/live-sync.md#6-functional-requirements), [FR-FIX-23](../specs/fixtures-adapters.md#6-functional-requirements), [ADR-0018](../architecture/adr/0018-global-imported-content.md).
@@ -766,6 +766,7 @@ Server registry owned by scenes-map, **append-only**, created by `build/scenes-m
 | Roll hooks (server) *(sprint 2)* | `src/server/features/dice-roll-log/roll-hooks.ts` (`rollHooks`) | `fix/mod-core` (empty, built) | MOD's hook (build/effect-modifiers). Run by `dice.evaluate` only when the caller passes a `subject`; [§34](#34-sprint-2-phase-1-effect-modifiers-tier-1). *(sprint 3, types built, fix/rt-core)* `modes()`, `offered`, `notes`, `manualParts`, subject `card` / `toHitMode` / `row`; [§40](#40-sprint-3-rule-triggers-core-r0) | [FR-MOD-13](../specs/effect-modifiers.md#6-functional-requirements), [ADR-0038](../architecture/adr/0038-effect-modifiers.md) |
 | Apply hooks (server) *(sprint 3)* | `src/server/features/combat-tracker/apply-hooks.ts` (`applyHooks`) | `fix/rt-core` (empty, built) | — (MOD R1: effective AC + defense facts; R4: trigger parts settle + undo). Run by `cbt.applyCard` per target before `hpRules.apply` and by `cbt.undo` per undone row; [§40](#40-sprint-3-rule-triggers-core-r0) | [FR-MOD-38, -41](../specs/effect-modifiers.md#6-functional-requirements), [ADR-0043](../architecture/adr/0043-rule-triggers.md) |
 | Popup parts (DM client) *(sprint 3)* | `src/client/dm/features/combat-tracker/popup-parts.ts` (`popupParts`) | `fix/rt-core` (empty, built) | — (MOD R7: trigger chips; R2: AC / defense). Rendered under every target row of the attack popup, merged into the apply intent; [§40](#40-sprint-3-rule-triggers-core-r0) | [FR-MOD-39, -40](../specs/effect-modifiers.md#6-functional-requirements), ADR-0043 |
+| Effect hooks (server) *(sprint 4)* | `src/server/features/combat-extras/effect-hooks.ts` (`effectHooks`) | `fix/rules4-core` (empty) | — (MOD S4-3: trigger state `armed`; fog-of-war V10: Blinded). `effectsChanged(env, {creatures, encounter \| null})` once per command after every effect insert / update / end / restore, in or out of combat; [§65](#65-sprint-4-rules-core-s4-0) | [FR-CBTX-51](../specs/combat-extras.md#6-functional-requirements), [ADR-0049](../architecture/adr/0049-trigger-state.md) |
 | Tray extras (client) *(sprint 3)* | `src/client/common/features/dice-extras/tray-extras.ts` (`trayExtras`) | `build/dicex-tray` (empty, built) | — (MOD tier 2 / R2: "box per bonus die" groups). Entry `{key, order, useDice(request, mode) → {label, faces, count, sign}[]}`; `useDice` is a hook, called every render in `order`; chips labelled, read-only, beside the base dice in `compose` / `adjust` (`dicex-tray-extra` + `data-value` = key) | [FR-DICEX-08](../specs/dice-extras.md#6-functional-requirements) b |
 | Definition-changed hooks | entities' folder | `build/entities` | CBT FR-CBT-06 | [FR-ENT-19](../specs/entities.md#6-functional-requirements) |
 | `creatureActions` (DM) | entities' folder | `build/entities` | CBT New / Derive / Edit | [FR-ENT-20](../specs/entities.md#6-functional-requirements), FR-CBT-05 |
@@ -1125,7 +1126,7 @@ From [fog-of-war](../specs/fog-of-war.md) (FOG, `complete`; DM gate 2, #196; [AD
 
 From [scene-tools](../specs/scene-tools.md) (SCN, `complete`; DM gate 2, #196; [ADR-0039](../architecture/adr/0039-fog-visibility.md), [ADR-0040](../architecture/adr/0040-token-move-guards.md), [ADR-0041](../architecture/adr/0041-active-scene-window.md)). **Core built by `fix/scn-core`**: schema, shapes, geometry, events, the four record types with their visibility, the scene-hook line, the `moveGuards` registry and its `map.moveToken` call site, the fog seam helpers. No SCN command or guard exists yet, so nothing changes for anyone. Commands, guard line, signal, fixtures: build/scene-tools-structure, -props, -templates, -settings (SCN §14), each registering in its own `src/server/features/scene-tools/register-<slice>.ts` (empty in core). Data side: [data model §25](../data-model/README.md#25-sprint-2-scene-tools).
 
-**Shapes** (`@shared/scene-tools`) **built**: `schemas` (type names; `SCN_INTENTS`, `SCN_SIGNALS`; caps `SEGMENTS_MAX` 2,000, `ADD_WALLS_MAX` 200, `REMOVE_SEGMENTS_MAX` 500, `PROPS_PER_SCENE_MAX` 200, `PROPS_PER_CAMPAIGN_MAX` 2,000, `PROP_SIDE_MIN/MAX` 1–20, `TEMPLATES_PER_SCENE_MAX` 20, `TEMPLATES_PER_PLAYER_MAX` 3, label ≤ 40; `TEMPLATE_SIZE` 5–300 / `TEMPLATE_WIDTH` 5–60 step 5, `TEMPLATE_ANGLE` 0–345 step 15; `Wall`, `Door`, `PlayerDoor` tuples; record shapes; every §9 intent payload incl. `PlayerPlaceTemplateInput` (no `hidden` / `placedByPlayerId`); `TemplateSignalData` place \| end); `geometry` (`vertexToPx`, `pxToVertex`, `vertexRange`, `segmentKey` (dedupe both directions), `segmentProblem` → `length` \| `bounds` \| null, `segmentsTouch`, `blockingSegments` / `moveBlocked` (FR-SCN-10, doubled integers, unmoved = clear), `propCells`, `propDrawnSides`, `templateCells(t, scene, {cut})` (angles: 0 = east, 90 = south; cube quadrant = ⌊angle / 90⌋), `doorCells`, `distanceFt(a, b, rule)`).
+**Shapes** (`@shared/scene-tools`) **built**: `schemas` (type names; `SCN_INTENTS`, `SCN_SIGNALS`; caps `SEGMENTS_MAX` 2,000, `ADD_WALLS_MAX` 200, `REMOVE_SEGMENTS_MAX` 500, `PROPS_PER_SCENE_MAX` 200, `PROPS_PER_CAMPAIGN_MAX` 2,000, `PROP_SIDE_MIN/MAX` 1–20, `TEMPLATES_PER_SCENE_MAX` 20, `TEMPLATES_PER_PLAYER_MAX` 3, label ≤ 40; `TEMPLATE_SIZE` 5–300 / `TEMPLATE_WIDTH` 5–60 step 5, `TEMPLATE_ANGLE` 0–345 step 15 (*sprint 4:* 0 ≤ a < 360, ≤ 1 decimal; `step` 15 = the snap, [§68](#68-sprint-4-map-tools-core-mc)); `Wall`, `Door`, `PlayerDoor` tuples; record shapes; every §9 intent payload incl. `PlayerPlaceTemplateInput` (no `hidden` / `placedByPlayerId`); `TemplateSignalData` place \| end); `geometry` (`vertexToPx`, `pxToVertex`, `vertexRange`, `segmentKey` (dedupe both directions), `segmentProblem` → `length` \| `bounds` \| null, `segmentsTouch`, `blockingSegments` / `moveBlocked` (FR-SCN-10, doubled integers, unmoved = clear), `propCells`, `propDrawnSides`, `templateCells(t, scene, {cut})` (angles: 0 = east, 90 = south; ~~cube quadrant = ⌊angle / 90⌋~~ *sprint 4:* > 50 % covered via `@shared/scenes-map/area`, [§68](#68-sprint-4-map-tools-core-mc)), `doorCells`, `distanceFt(a, b, rule)`).
 
 **Record types** (feature `sceneTools`, `src/server/features/scene-tools/records.ts`)
 
@@ -1821,7 +1822,98 @@ From [dice-extras](../specs/dice-extras.md) (FR-DICEX-15, -17, -18, -32–38, -4
 | Bundle | dice-extras code in each client's initial chunks **10.0 KB gz** (cap 15; was 11.1); 3D chunk **157.0 KB gz** (cap 170); throw views 3.0 KB gz, lazy |
 | CON-44 | 0 B: no record, field or frame added |
 
-## 66. Sprint 4: middle pan, plain map, Konva layers, Fit (V7)
+## 66. Sprint 4: rules core (S4-0)
+
+From [effect-modifiers](../specs/effect-modifiers.md) sprint 4 (MOD §6.5, §14.3 S4-0), [combat-tracker](../specs/combat-tracker.md) (FR-CBT-81–84 schemas), [combat-extras](../specs/combat-extras.md) (FR-CBTX-51), [character-sheet-full](../specs/character-sheet-full.md) (FR-CHARX-54, -58 zod); [ADR-0049](../architecture/adr/0049-trigger-state.md) (supersedes ADR-0043's visibility consequence, refines ADR-0035). **Built by `fix/rules4-core`** (schema lock 2nd this sprint, after V6): the `trigger-state` record type, the `effectHooks` registry and the sprint-4 zod. **No behaviour change**: no command writes `trigger-state` yet (S4-3), nothing reads the new fields yet (S4-1a / S4-1b / S4-2 / S4-5). Data side: [data model §51](../data-model/README.md#51-sprint-4-rules-core-s4-0).
+
+**Record types**
+
+| Type | Scope | DM wire | Player visibility | Snapshot | Source |
+|---|---|---|---|---|---|
+| `trigger-state` *(new)* | campaign | the row `{id, campaignId, encounterId, combatantId, triggerId, characterId \| null, ownerPlayerId \| null, name, on, armed, charge: ready \| used \| waiting, featureId \| null, updatedAt}` (`TriggerStateRecord`, `@shared/effect-modifiers/trigger-state`) | **full** to the owning player (`characterId` set and `ownerPlayerId` = theirs); every other player and every monster (definition) row: hidden (OQ-MOD-41 pick A, #245) | everyone (players: their own rows); not lazy, not windowed; rows exist only while an encounter is started | FR-MOD-53, -55 |
+
+- Registered in MOD's `index.ts` (`triggerStateRecordType`, `src/server/features/effect-modifiers/trigger-state.ts`). Rows ride in the causing event's `changes` (no event of their own, FR-MOD-54, S4-3); an owner change lists the row, so the old owner gets its delete and the new owner the upsert (transition matrix). A trigger's `public` never shows a row to other players.
+
+**Schemas** (zod; optional fields, old rows / cards / lines parse unchanged)
+
+| Schema | Change | Source |
+|---|---|---|
+| `Attack` (`@shared/entities/schemas`, both kinds, `char.putRow` attacks, `PUT /api/entities`) | + `bonus?` int 0–3; + `extraDamage?` ≤ 2 × `{damage: NdM[+K] (N 1–6, M 4/6/8/10/12, K 0–10), type: DamageType}` (type required) | FR-CHARX-54 |
+| `FeatureRow.used` (`@shared/character-sheet/sheet`, also `char.putRow` features) | 0 … `usesMax + 9` (`FEATURE_OVERSPEND_MAX`; uses left down to −9); no `usesMax` → 0. Commands still clamp at the max until S4-2 | FR-CHARX-58 |
+| `CardDamage` (damage card) | + `extra?` ≤ 2 `CardExtraPart {type, rollId, dice ≤ 12 [value, kept], constant, total, manual}`, attack-row order, not in the base part's `total` | FR-CBT-81 |
+| `cbt.applyCard` | + `extraTotals?` ≤ 2 int 0–999 (absent = rolled); `targets[].extraMultipliers?` ≤ 2 (absent = the row's `multiplier`); more than the card's extra parts → `invalid` (S4-1b) | FR-CBT-82 |
+| `AttackLogPayload` (`cbt.attack`) | + `damageParts?` ≤ 2 `{type, value, multiplier? (not normal)}` (inside `damage`) | FR-CBT-84 |
+| `AttackLinePart` / `AttackLineDmPart` | + `expression?` ≤ 20, `dice?` 1–20 ints ≥ 1 (public line: public character triggers only; DM facts: every part) | FR-MOD-57 |
+| `HpChangeRecord` (`hp-change`, DM only) | + `damageParts` ≤ 2 `{type, rolled, total 0–999, multiplier, raw}` \| null | FR-CBT-84 |
+| `mod.toggle` | + `overspend?: true` (read from S4-2) | FR-MOD-59 |
+
+**Registries** (append-only, [AGENTS §9.9](../../AGENTS.md#99-shared-files); created **empty** by `fix/rules4-core`)
+
+| Registry | Contract |
+|---|---|
+| Effect hooks (server) `src/server/features/combat-extras/effect-hooks.ts` (`effectHooks`) | `EffectHook {id, effectsChanged(env, {creatures: TargetRef[], encounter: EncounterRecord \| null}) → RecordChange[]}`. Runs **once per command** (once per target event of a multi-target apply), after the effect rows are written and after the command's own rule-hook lines, in its transaction, **in or out of combat**, whenever an effect row was inserted, updated, ended or restored. CBTX's helpers (`effects.ts`: `insertEffect`, `updateEffectRow`, hence `endEffects`, `restoreEffects`) collect the creatures (once each, first-touch order: a monster `{combatantId}`, a PC `{characterId}`); `runEffectHooks(env, encounter?)` runs the registry at each path's end: `cbtx.addEffect`, `updateEffect`, `endEffect`, `setConcentration` (replaced + linked ends), `rollConcentration` (lost), `hpRules.apply` (0 HP ends) / `revert` (undo restores), MOD's `mod.apply` / `mod.toggle` / `mod.setModifiers`, and CBTX's last `combatRuleHooks` line `combat-extras.effect-hooks` (Next expiry, Prev restore, End; `encounter` = as the command left it). Elsewhere `encounter` = the campaign's started encounter, else null. Its rows join the causing event's `changes`; a throw rolls the command back; no creature or no line → nothing runs. Hooks write through `env.tx`, never emit, never write effect rows. Live list `effectsChangedHooks` (seeded from the registry; tests `register` / `unregister`). Lines to come: MOD trigger state (S4-3), fog-of-war Blinded (V10) |
+
+- `combatRuleHooks` gains CBTX's line `combat-extras.effect-hooks` (last): it only runs the effect hooks.
+- **Internal commands** (fixtures only, not intents): `mod.useFeatureByName {characterId, feature, delta}` (`char.useResource {feature}` by the row's name), `mod.putTriggerWithFeature {trigger, feature}` (`mod.putTrigger` with `every: {feature}` = that row).
+- FR-MOD-61: MOD's apply hook spends / refunds feature uses through CHARX's `spendFeatureUse` / `refundFeatureUse` (`resources.ts`); the interim `feature-uses.ts` is gone. No behaviour change.
+
+## 67. Sprint 4: window placement (M4)
+
+From [play-shell](../specs/play-shell.md) (SHELL, `complete`; #245, seams S7, review A11 / A19). **Built by `fix/window-placement`**. Browser-only: no table, record type, intent, event or stored field (0 bytes; the layout entry is unchanged). Amends [§18](#18-scenes-client-registries) "Open placement".
+
+**Client** (`@ui/features/play-shell/*`)
+
+| Piece | Contract | Source |
+|---|---|---|
+| Auto placement (`placement.ts` `placeRect(def, vp, windows, tokens, keepOut)`) | For every window that opens without the user choosing a spot: default layout (first load, Reset layout), feature opens, appearances, launcher opens with no stored rect. Candidates as §18 (fitted default rect, edge columns, never mid-map). Rank: free of every open window first, least on-screen token area (`tokenScreenBoxes("all")`: the tokens this client draws, current camera), then full size before shrunk (≥ min height), then clear of the toast keep-out box (else least over it), default column, nearest. No free candidate: `minOpenH` at that height / the cascade, still least token area first, then least window overlap, then clear of the box (ruling: toasts are transient, a feature never opens a window over another, G35; e.g. DM Compendium at 1280×720 reaches into the box, never over Initiative). First load scores 0 (no tokens drawn) → the default layout as before | [FR-SHELL-40](../specs/play-shell.md#6-functional-requirements) |
+| Toast keep-out (`toast-region.ts` `toastKeepOut(client, vp) → Rect`) | Players bottom-right above the launcher (right 16, bottom 72); DM top-centre at the toast top (100). 356 × 304 = 3 toasts (40) + one roll popup (160, DICEX §7) + 8 px gaps. Constants `KEEP_OUT_*`, `ROLL_POPUP_H` exported beside it; **D7 owns them** from `build/roll-popup` on, placement reads only `toastKeepOut`. Taller than 304 reaches the DM `dice.log` at 1280×720 and the player sheet at 900 px high (they'd move) | FR-SHELL-40, S7, A11 |
+| `openWindow(kind, instance?, {by?})` (`useOpenWindow`) / action `{type: "open", by?: "user" \| "feature"}` | Default `"user"` (every click-driven caller unchanged): an existing window reopens at its stored rect. `"feature"` on a window not open: auto-placed if its rect overlaps a rendered open window or it still sits where auto placement put it (this page) / at its default-layout or fitted default rect; written with `area`. Already open → front only. Callers with `"feature"`: combat's Start (`start-end.ts` `startAndFollow`); `idleInitiativeOnLoad` only minimises | FR-SHELL-08, -41 |
+| `appear` (availability flip, e.g. player Initiative at Start) | Same rule as a feature open (re-placed over a window even if the user moved it there; a user spot clear of windows kept) | FR-SHELL-40, -41 |
+| `defineWindow({… restoreOpen?: false})` | Applying the layout entry loads it `closed`, geometry kept; the next open uses it. Opt-in: `party.handout` (both registries, its line in `windows.ts`) | FR-SHELL-42 |
+| Launcher fit (`launcher-fit.ts` `fitLauncher(items, vpW, metrics)`, `Launcher.tsx`) | Bar ≤ viewport − 8 px each side: labels → icon only (`data-compact="true"`, label in the Tooltip) → overflow into the "⋯" menu: closed before open / minimised, highest `order` first; menu items keep launcher order, then "Reset layout" last. Recomputed on viewport width, availability and layout restore (not on open / close: a window opened from the menu stays there until then). Label widths measured once (canvas `measureText`) | FR-SHELL-43 |
+| `freeAreas(rects, vp) → Rect[]` (`free-area.ts`), `useFreeArea().areas` | Every maximal free rectangle of the work area right of the rail (x ≥ 68), each ≥ 320×240, largest first (ties → higher, then left), ≤ 16. `freeArea` unchanged (= the first, or its fallback). Consumer: FR-MAP-58 (M5) | FR-SHELL-44 |
+
+**Test IDs:** `ui-launcher` `data-compact`; `ui-launcher-overflow` (wrapper of the "⋯" trigger `ui-launcher-menu`, `data-count` = buttons in the menu); `ui-launcher-overflow-item` + `data-record-id=<kind>` + `data-state`; `ui-window` `data-placed` = `default` (auto placement kept the fitted default rect) \| `auto` (it chose another) \| `stored` (read from the layout entry, or a move / resize end); client memory only, so every window reads `stored` after a reload.
+
+## 68. Sprint 4: map-tools core (Mc)
+
+Built by `fix/maptools-core` ([FR-SCN-20, -21, -41, -44, -46](../specs/scene-tools.md#6-functional-requirements); #243 [8], #245). No new record type, intent, signal or event name; the only new wire field is `TemplatesCleared.players`. Client UI (freeform AoE tool, Clear dialog, drawing) is M1. Data side: [data model §52](../data-model/README.md#52-sprint-4-map-tools-core-mc).
+
+| Change | Contract | Source |
+|---|---|---|
+| `scn.placeTemplate`, `scn.updateTemplate`, signal `scn.template` | `x`, `y`: numbers ≤ 2 decimals within ±`COORD_MAX` (3 decimals → `invalid`); `angle`: 0 ≤ a < 360, ≤ 1 decimal (360, 12.25 → `invalid`); `size`, `width` unchanged (5-ft steps). Zod: `TemplateCoord`, `TemplateAngle`, `isDec1` (`@shared/scene-tools/schemas`); the player schema too | FR-SCN-20, -23 |
+| `aoe-template` record | `x`, `y`, `angle` as stored (decimals); everything else unchanged; old integer rows parse | FR-SCN-20, -46 |
+| `scn.clearTemplates {sceneId, players?}` | DM only (default-DM intent; a player → `forbidden`). Deletes the scene's kept templates with `placedByPlayerId = null`, or every kept one with `players: true` (absent = false). Nothing to delete → no write, no event. Ephemeral templates (signals) untouched | FR-SCN-44 |
+| `TemplatesCleared` | `{sceneId, templateIds, players}`; changes = deletes of the cleared rows only. Players get deletes only for rows they had: a DM-only clear sends no player a delete for a player's template (and no frame at all when nothing they see changed) | FR-SCN-44 |
+| `templateCells(t, scene, {cut})` (`@shared/scene-tools/geometry`) | `cells(templateArea(t), "half")`; `cut: true` keeps cells on the map (drawing, the count; may be empty: "0 squares"); `cut: false` keeps all, or `[[⌊x⌋, ⌊y⌋]]` when none is covered. Callers unchanged: SCN `derive` call sites and `templateAudience`, FOG's `rederiveTemplates`, both clients' `TemplatesLayer` | FR-SCN-21, -41, -46 |
+| Start hook `scene-tools.template-rederive` | Runs after `fog-of-war.vision-model-upgrade`; [data model §52](../data-model/README.md#52-sprint-4-map-tools-core-mc) | FR-SCN-46 |
+
+- Sprint-2 cubes stored at a non-right angle (any 15° step was accepted, the client only placed 0 / 90 / 180 / 270) now draw rotated along `angle` (FR-SCN-20 sprint 4).
+- CON-44: freeform rows add 7.6 B each; the heavy DM at the template cap is 676,555 B, players ≤ 285,490 B ([data model §52](../data-model/README.md#52-sprint-4-map-tools-core-mc)).
+
+## 69. Sprint 4: weapon damage parts in combat (S4-1b)
+
+From [combat-tracker](../specs/combat-tracker.md) FR-CBT-81–85 and [effect-modifiers](../specs/effect-modifiers.md) FR-MOD-58 (MOD §14.3 S4-1b). **Built by `build/weapon-combat`** (combat lock). Schemas from [§66](#66-sprint-4-rules-core-s4-0) plus the rows below; optional fields, old intents / lines parse unchanged.
+
+| Intent / payload | Change | Source |
+|---|---|---|
+| `cbt.attack` | rolls the row's parts (CHARX `attackRollSpecs`: to-hit `1d20 + toHit + bonus`, base `damage` + `bonus`, then each extra part); + `manualExtra?` ≤ 2 `ManualEntry` (one per extra part, row order, only with `manual`; not with `rolls: "toHit"`); a count other than the row's extra parts → `invalid` "Enter N physical damage part(s)". `manual` / `manualParts` stay to-hit + base | FR-CBT-81 |
+| `cbt.rollDamage` | same parts; + `manualExtra?` as above (with `manual`) | FR-CBT-81 |
+| Roll line (`roll` entry of `cbt.attack` / `cbt.rollDamage`) | one payload item per extra part after the base roll (label "‹attack› damage (fire)", "…, critical)"); no roll subject, so no effect mods on it; `rollIds` gain them. Visibility unchanged (player's own public, DM's DM-only) | FR-CBT-81, FR-DICE-26 |
+| Crit | natural 20: every part's dice count doubled, constants not; physical entries checked per part against the doubled expression; the route's `critExpressions` = one per damage slot | FR-CBT-83 |
+| Damage card text | "Brakka: 22 to hit, 15 slashing + 8 fire" (damage-only "… (Flame Tongue greatsword)"); over 280 chars: offers collapse to "(+ N trigger parts on a hit)", then the text is cut to 279 + "…" | FR-CBT-81 |
+| Damage card payload fit | over 4 KB after offers dropped (FR-MOD-37): `mods[].label`s cut to 12 chars + "…", then `attackerName` / `attackName` to 20 + "…"; `damage.extra` never drops | FR-CBT-81 |
+| `cbt.applyCard` | per Hit target `raw = floor(damageTotal × m) + Σ floor(extraTotal_i × m_i)` + trigger parts; `extraTotals` / `extraMultipliers` longer than the card's `damage.extra` → `invalid` | FR-CBT-82 |
+| `AttackLogPayload.damageParts` | written on Hit lines with extra parts (value after its multiplier); text "… — DM: hit. 15 slashing + 4 fire (half) damage + 6 radiant (Divine Fury)" (base multiplier after the base part when parts exist; no parts → as before) | FR-CBT-84 |
+| `AttackLogDmPayload.rolls.extra` *(new)* | ≤ 2 `{type, expression, dice [value, kept], constant, rolled, set?: true}` (card order): the DM's per-part breakdown and "(DM set; rolled N)"; **DM only** (rulings B4: players' lines carry no extra-part dice) | FR-CBT-84 |
+| `AttackLogDmPayload.extraDefense` *(new)* | ≤ 2 `{type, level, label}`: MOD's target-facts apply hook, the defense behind each extra part's preset on a Hit; DM only | FR-MOD-58 |
+| `hp-change.damageParts` | written per target when the card has extra parts (miss: `raw` 0) | FR-CBT-84 |
+| Players' `cbt.attack` wording | "— DM: hit." / "— DM: miss" / "— DM: critical hit!" for every players' line (ruled or not); natural rulings "— DM ruled hit / miss" unchanged; DM line unchanged. Client-side from `payload`; no schema or event change | FR-CBT-85 (BL-10) |
+
+- `ApplyHookDm` (apply hooks, [§26](#26-combat-registries-and-seams)) gains `extraDefense`.
+- OQ-MOD-44: the tray / throw layer throws each payload item of a new `roll` entry, so extra parts throw as labelled dice of the same entry; no dice-extras change.
+
+## 70. Sprint 4: middle pan, plain map, Konva layers, Fit (V7)
 
 From [scenes-map](../specs/scenes-map.md) FR-MAP-12, -29, -44 and [fog-of-war](../specs/fog-of-war.md) FR-FOG-20, -22 (seams S3, S4, S11). **Built by `build/map-pan-plain`**: client only; no record type, intent, event, signal or wire field (CON-44: 0 B).
 

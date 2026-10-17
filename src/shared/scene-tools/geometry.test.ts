@@ -215,19 +215,15 @@ describe("FR-SCN-21 templateCells", () => {
     expect(all(tpl({ shape: "cone", size: 30 })).length).toBeGreaterThan(4);
   });
 
-  test("FR-SCN-21 line: length × width, centres on the edge count", () => {
+  test("FR-SCN-21 line: length × width; a row at exactly 50 % counts right of the direction only", () => {
     const line = all(tpl({ shape: "line", size: 30 }));
-    expect(line).toHaveLength(12);
-    expect(key(line)).toEqual(
-      key(
-        [0, 1, 2, 3, 4, 5].flatMap((c): Cell[] => [
-          [c, -1],
-          [c, 0],
-        ]),
-      ),
-    );
-    expect(all(tpl({ shape: "line", size: 30, width: 15 }))).toHaveLength(24);
-    expect(all(tpl({ shape: "line", size: 30, width: null }))).toHaveLength(12);
+    // East along the grid line y = 0: rows -1 and 0 are each 50 % covered; south (right) wins.
+    expect(key(line)).toEqual(key([0, 1, 2, 3, 4, 5].map((c): Cell => [c, 0])));
+    const west = all(tpl({ shape: "line", size: 30, angle: 180 }));
+    expect(key(west)).toEqual(key([-1, -2, -3, -4, -5, -6].map((c): Cell => [c, -1])));
+    // 15 ft wide: rows -1, 0 full; -2 and 1 at 50 % → only row 1 (right of east).
+    expect(all(tpl({ shape: "line", size: 30, width: 15 }))).toHaveLength(18);
+    expect(all(tpl({ shape: "line", size: 30, width: null }))).toHaveLength(6);
   });
 
   test("FR-SCN-21 every angle step: +90° rotates the cells about the origin vertex", () => {
@@ -240,6 +236,56 @@ describe("FR-SCN-21 templateCells", () => {
         expect(key(all({ ...t, angle: (angle + 90) % 360 }))).toEqual(key(rotated));
       }
     }
+  });
+
+  test("FR-SCN-41 goldens through templateCells (exact area, one-side ties)", () => {
+    const cut = (t: TemplateGeometry) => key(templateCells(t, AMBUSH, { cut: true }));
+    const thunderwave = tpl({ shape: "cube", x: 1.5, y: 10.5, size: 15, angle: 300 });
+    expect(cut(thunderwave)).toEqual(
+      key([
+        [3, 8],
+        [2, 9],
+        [3, 9],
+        [4, 9],
+        [2, 10],
+        [3, 10],
+        [4, 10],
+        [3, 11],
+      ]),
+    );
+    expect(cut(tpl({ shape: "cone", x: 3.37, y: 7.64, size: 15, angle: 37.5 }))).toEqual(
+      key([
+        [4, 8],
+        [5, 8],
+        [4, 9],
+        [5, 9],
+      ]),
+    );
+    expect(cut(tpl({ shape: "line", x: 10, y: 7, size: 30 }))).toEqual(
+      key([10, 11, 12, 13, 14, 15].map((c): Cell => [c, 7])),
+    );
+    expect(cut(tpl({ shape: "sphere", x: 6.5, y: 9.25, size: 20 }))).toHaveLength(48);
+    expect(cut(tpl({ shape: "cube", x: 0.5, y: 0.5, size: 10 }))).toEqual(
+      key([
+        [1, 1],
+        [0, 1],
+        [1, 2],
+      ]),
+    );
+    // Row-major order (the client's `cells` attr).
+    expect(templateCells(thunderwave, AMBUSH, { cut: true })[0]).toEqual([3, 8]);
+  });
+
+  test("FR-SCN-46 a template covering no cell: 0 squares drawn; uncut (derive) samples its origin's cell", () => {
+    const cone5 = tpl({ shape: "cone", x: 3.37, y: 7.64, size: 5, angle: 37.5 });
+    expect(templateCells(cone5, AMBUSH, { cut: true })).toEqual([]);
+    expect(templateCells(cone5, AMBUSH, { cut: false })).toEqual([[3, 7]]);
+    const snapped = tpl({ shape: "cone", x: 4, y: 7, size: 5 });
+    expect(templateCells(snapped, AMBUSH, { cut: false })).toEqual([[4, 7]]);
+    // Off the map: still the origin's cell (fog keeps a copy after a map change).
+    expect(templateCells({ ...cone5, x: -3.5, y: -0.25 }, AMBUSH, { cut: false })).toEqual([
+      [-4, -1],
+    ]);
   });
 
   test("FR-SCN-21 cut keeps cells on the map; uncut keeps all", () => {

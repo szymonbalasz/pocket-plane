@@ -56,6 +56,8 @@ test("FR-MOD-48 FR-MOD-39 FR-MOD-38 Divine Fury: offered on the card, chip on Go
   const text = (await offer.textContent()) ?? "";
   const n = Number(/^\+ (\d+) radiant Divine Fury$/.exec(text)?.[1]);
   expect(n).toBeGreaterThan(0);
+  // FR-SHELL-40 ruling: at 1280×800 Notifications auto-places over the sheet; park it.
+  await history.getByTestId("ui-window-minimise").click();
 
   const card = init.getByTestId("cbt-init-card");
   await expect(card).toHaveCount(1);

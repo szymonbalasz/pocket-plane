@@ -323,3 +323,66 @@ describe("FR-CHARX-24 OQ-CBT-47 routes with a row ref", () => {
     expect(routeFor(rollRoutes, set, "mira", "initiative")?.hidden).toBe(true);
   });
 });
+
+describe("FR-CBT-83 weapon parts on the route", () => {
+  const flame = (): RecordStore => {
+    const s = store(mira);
+    s.records.entity = {
+      mira: {
+        id: "mira",
+        kind: "character",
+        statBlock: {
+          attacks: [
+            {
+              id: "ft",
+              name: "Flame Tongue",
+              toHit: 7,
+              damage: "2d6+4",
+              damageType: "slashing",
+              bonus: 1,
+              extraDamage: [{ damage: "2d6", type: "fire" }],
+            },
+          ],
+        },
+      },
+    };
+    return s;
+  };
+
+  test("FR-CBT-83 critExpressions double every part (base with +1, then each extra); physical entries split into manual / manualExtra", async () => {
+    const sent: [string, unknown][] = [];
+    const send = (n: string, p: unknown) => {
+      sent.push([n, p]);
+      return Promise.resolve(null);
+    };
+    const attack = routeFor(rollRoutes, flame(), "mira", "attack", { attackId: "ft" });
+    expect(attack?.critExpressions).toEqual(["4d6+5", "4d6"]);
+    await attack?.send(send, {
+      mode: "normal",
+      manual: [{ diceTotal: 14 }, { diceTotal: 8 }, { diceTotal: 9 }],
+    });
+    const damage = routeFor(rollRoutes, flame(), "mira", "damage", { attackId: "ft" });
+    await damage?.send(send, { mode: "normal", manual: [{ diceTotal: 8 }, { diceTotal: 9 }] });
+    expect(sent).toEqual([
+      [
+        "cbt.attack",
+        {
+          attackerId: "cb-mira",
+          mode: "normal",
+          manual: [{ diceTotal: 14 }, { diceTotal: 8 }],
+          manualExtra: [{ diceTotal: 9 }],
+          attackId: "ft",
+        },
+      ],
+      [
+        "cbt.rollDamage",
+        {
+          attackerId: "cb-mira",
+          manual: { diceTotal: 8 },
+          manualExtra: [{ diceTotal: 9 }],
+          attackId: "ft",
+        },
+      ],
+    ]);
+  });
+});

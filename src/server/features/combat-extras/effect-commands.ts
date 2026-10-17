@@ -1,6 +1,7 @@
 // Effect intents (FR-CBTX-04, -08, -09, -10, -11): `cbtx.addEffect`, `cbtx.updateEffect`,
 // `cbtx.endEffect`, `cbtx.setConcentration`. Rows + event in one transaction; cards of an ended
-// concentration close after the event (FR-CBTX-10, -43).
+// concentration close after the event (FR-CBTX-10, -43). The effect hooks' rows join each
+// event (FR-CBTX-51).
 
 import { INCAPACITATING_CONDITIONS } from "@shared/combat-extras/conditions";
 import {
@@ -32,6 +33,7 @@ import {
   type Ended,
   endEffects,
   insertEffect,
+  runEffectHooks,
   updateEffectRow,
 } from "./effects";
 import {
@@ -152,7 +154,7 @@ export const addEffect = defineCommand({
       type: EffectsAdded.type,
       campaignId: cid,
       payload: { effectIds: ids },
-      changes: [...changes, ...ended.changes],
+      changes: [...changes, ...ended.changes, ...runEffectHooks(env, enc)],
     });
     closeCardsOfEnded(env, ended);
     return { effectIds: ids };
@@ -195,7 +197,7 @@ export const updateEffect = defineCommand({
       type: EffectUpdated.type,
       campaignId: e.campaignId,
       payload: { effectId: e.id },
-      changes: [updateEffectRow(env, e, set)],
+      changes: [updateEffectRow(env, e, set), ...runEffectHooks(env)],
     });
   },
 });
@@ -222,7 +224,7 @@ export const endEffect = defineCommand({
       type: EffectsEnded.type,
       campaignId: e.campaignId,
       payload: { effectIds: ended.ended.map((x) => x.id), reason: "removed" },
-      changes: ended.changes,
+      changes: [...ended.changes, ...runEffectHooks(env)],
     });
     closeCardsOfEnded(env, ended);
   },
@@ -270,7 +272,7 @@ export const setConcentration = defineCommand({
       type: ConcentrationSet.type,
       campaignId: cid,
       payload: { effectId: e.id, ...(old ? { replacedId: old.id } : {}) },
-      changes: [...ended.changes, effectChange(null, e)],
+      changes: [...ended.changes, effectChange(null, e), ...runEffectHooks(env, enc)],
     });
     closeCardsOfEnded(env, ended);
     return { effectId: e.id };

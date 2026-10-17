@@ -1,5 +1,5 @@
-// effect-modifiers (MOD): `mod.*` intents, record types `effect-preset` and `rule-trigger`
-// (lazy, ADR-0045). Registry lines elsewhere: the roll hooks (`rollHooks`, dice-roll-log), the
+// effect-modifiers (MOD): `mod.*` intents, record types `effect-preset`, `rule-trigger`
+// (lazy, ADR-0045) and `trigger-state` (in the snapshot, ADR-0049). Registry lines elsewhere: the roll hooks (`rollHooks`, dice-roll-log), the
 // apply hook (`applyHooks`, combat-tracker), the turn-start reminders (`combatRuleHooks`), the
 // notification kind `mod-trigger` and the owner copies (entities' definition-changed hooks).
 import type { CommandDef } from "../../commands/commands";
@@ -12,9 +12,11 @@ import {
   setModifiers,
   togglePreset,
 } from "./commands";
+import { putTriggerWithFeature, useFeatureByName } from "./fixture-commands";
 import { effectPresetRecordType } from "./records";
 import { deleteTrigger, putTrigger } from "./trigger-commands";
 import { ruleTriggerRecordType } from "./trigger-records";
+import { triggerStateRecordType } from "./trigger-state";
 
 /** FR-MOD-46: the compendium's `cmp.addToSheet` calls it in its own transaction. */
 export { addTriggerFromPreset } from "./trigger-commands";
@@ -34,7 +36,11 @@ export const effectModifiers: Feature = {
     for (const c of intents) r.command(c, { intent: true });
     // Fixtures only (not an intent): a preset linked to a feature row by name (tier 3).
     r.command(putPresetWithUses as unknown as CommandDef);
+    // Fixtures only: a feature row by name (sprint 4 units `uses-rage-spent`, `trg-mira-uses`).
+    r.command(useFeatureByName as unknown as CommandDef);
+    r.command(putTriggerWithFeature as unknown as CommandDef);
     r.recordType(effectPresetRecordType);
     r.recordType(ruleTriggerRecordType);
+    r.recordType(triggerStateRecordType);
   },
 };

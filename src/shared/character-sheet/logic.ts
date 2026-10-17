@@ -10,6 +10,7 @@ import {
   abilityMod,
   type CharacterStatBlock,
   checkBonus,
+  type ExtraDamage,
   proficiencyBonus,
   SKILL_NAMES,
   type Skill,
@@ -28,6 +29,12 @@ export interface CharacterRollSpec {
   label: string;
   /** Roll mode applies to this roll (the d20 only, FR-CHAR-06). */
   d20: boolean;
+  /**
+   * FR-CHARX-55: a damage part of an attack row with extra parts (`extra: false` = the base
+   * part, which carries the row's mods; `extra: true` = an extra part, no roll subject). Absent
+   * on every other roll, so rows without extra parts build the same specs as before.
+   */
+  part?: { type: ExtraDamage["type"] | null; extra: boolean };
 }
 
 type RollStats = Pick<CharacterStatBlock, "initBonus" | "attacks">;
@@ -71,9 +78,14 @@ const damageLabel = (name: string, damageType: string | null | undefined) =>
  */
 export interface SheetAttack {
   name: string;
+  /** The stored numbers, without `bonus` (FR-CHARX-54). */
   toHit: number;
   damage: string;
   damageType: string | null;
+  /** FR-CHARX-55: magic +N (0 = none; spells 0), on to-hit and the base part's constant. */
+  bonus: number;
+  /** FR-CHARX-55: typed extra parts in row order ([] = none; spells []). */
+  extraDamage: ExtraDamage[];
 }
 
 /** The row `cbt.attack` names: an attack row, a spell row, or neither (= the first attack). */
@@ -109,7 +121,7 @@ export function resolveSheetAttack(
     if (!s.damage) return fail("conflict", `No damage roll for ${s.name}`);
     const bonus = spellAttackBonus(stats);
     if (bonus === null) return fail("conflict", "No spellcasting");
-    const attack = { name: s.name, toHit: bonus, damage: s.damage };
+    const attack = { name: s.name, toHit: bonus, damage: s.damage, bonus: 0, extraDamage: [] };
     return { ok: true, attack: { ...attack, damageType: s.damageType ?? null } };
   }
   const a =
@@ -122,24 +134,62 @@ export function resolveSheetAttack(
       : fail("not_found", "Attack was deleted");
   }
   const attack = { name: a.name, toHit: a.toHit, damage: a.damage };
-  return { ok: true, attack: { ...attack, damageType: a.damageType ?? null } };
+  return {
+    ok: true,
+    attack: {
+      ...attack,
+      damageType: a.damageType ?? null,
+      bonus: a.bonus ?? 0,
+      extraDamage: a.extraDamage ?? [],
+    },
+  };
 }
 
-/** To-hit (d20, category `attack`) then damage (category `damage`) of one attack (FR-CHAR-05). */
-export function attackRollSpecs(a: SheetAttack): [CharacterRollSpec, CharacterRollSpec] {
+/** FR-CHARX-55: `NdM[±K]` with `bonus` added to its constant (`2d6+4` + 1 → `2d6+5`). */
+export function withDamageBonus(damage: string, bonus: number): string {
+  const m = /^(\d+d\d+)([+-]\d+)?$/.exec(damage);
+  if (!m || bonus === 0) return damage;
+  const k = Number(m[2] ?? 0) + bonus;
+  return k === 0 ? (m[1] as string) : `${m[1]}${k > 0 ? "+" : ""}${k}`;
+}
+
+/** FR-CHARX-55: the base part as rolled: the row's damage + `bonus`. */
+export const baseDamage = (a: Pick<SheetAttack, "damage" | "bonus">): string =>
+  withDamageBonus(a.damage, a.bonus);
+
+/**
+ * To-hit (d20, category `attack`) then damage (category `damage`) of one attack (FR-CHAR-05).
+ * FR-CHARX-55: to-hit `1d20 + toHit + bonus`; the base part's constant + `bonus`; then one
+ * damage spec per extra part, in row order, each typed (`part`).
+ */
+export function attackRollSpecs(
+  a: SheetAttack,
+): [CharacterRollSpec, CharacterRollSpec, ...CharacterRollSpec[]] {
+  const parted = a.extraDamage.length > 0;
+  const type = (a.damageType ?? null) as ExtraDamage["type"] | null;
   return [
     {
-      expression: d20(a.toHit),
+      expression: d20(a.toHit + a.bonus),
       category: "attack",
       label: fitLabel(`${a.name} attack`),
       d20: true,
     },
     {
-      expression: a.damage,
+      expression: baseDamage(a),
       category: "damage",
       label: fitLabel(damageLabel(a.name, a.damageType)),
       d20: false,
+      ...(parted ? { part: { type, extra: false } } : {}),
     },
+    ...a.extraDamage.map(
+      (x): CharacterRollSpec => ({
+        expression: x.damage,
+        category: "damage",
+        label: fitLabel(damageLabel(a.name, x.type)),
+        d20: false,
+        part: { type: x.type, extra: true },
+      }),
+    ),
   ];
 }
 
@@ -225,9 +275,10 @@ function sheetRolls(
     case "toHit": {
       const r = resolveSheetAttack(stats, sheet, { attackId: ref.attackId });
       if (!r.ok) return r;
-      const [hit, dmg] = attackRollSpecs(r.attack);
-      // FR-CHARX-42: toHit = the d20 alone; attack keeps to-hit + damage (FR-CHAR-05).
-      return ok(kind === "damage" ? [dmg] : kind === "toHit" ? [hit] : [hit, dmg]);
+      const [hit, ...dmg] = attackRollSpecs(r.attack);
+      // FR-CHARX-42: toHit = the d20 alone; attack keeps to-hit + damage (FR-CHAR-05);
+      // FR-CHARX-55: damage = every part.
+      return ok(kind === "damage" ? dmg : kind === "toHit" ? [hit] : [hit, ...dmg]);
     }
     case "spellAttack":
     case "spellDamage":
@@ -277,10 +328,23 @@ export function levelLine(level: number, className: string): string {
   return c ? `Level ${level} ${c}` : `Level ${level}`;
 }
 
-/** "Shortsword +4 · 1d6+2 piercing" (FR-CHAR-03). */
+/**
+ * FR-CHARX-56: "+8 · 2d6+5 slashing + 2d6 fire": `bonus` folded into the shown numbers,
+ * extra parts joined " + ".
+ */
+export function attackNumbers(a: Attack): string {
+  const bonus = a.bonus ?? 0;
+  const base = withDamageBonus(a.damage, bonus);
+  const parts = [
+    a.damageType ? `${base} ${a.damageType}` : base,
+    ...(a.extraDamage ?? []).map((x) => `${x.damage} ${x.type}`),
+  ];
+  return `${signed(a.toHit + bonus)} · ${parts.join(" + ")}`;
+}
+
+/** "Shortsword +4 · 1d6+2 piercing" (FR-CHAR-03; FR-CHARX-56: bonus and parts included). */
 export function attackLine(a: Attack): string {
-  const dmg = a.damageType ? `${a.damage} ${a.damageType}` : a.damage;
-  return `${a.name} ${signed(a.toHit)} \u00b7 ${dmg}`;
+  return `${a.name} ${attackNumbers(a)}`;
 }
 
 /** FR-CHAR-18: "30 ft"; absent → "—". */

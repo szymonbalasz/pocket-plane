@@ -1,11 +1,19 @@
 import { expect, test } from "bun:test";
 import { emptyStore } from "@shared/protocol/store";
-import { freeArea, renderedWindowRects } from "@ui/features/play-shell/free-area";
+import { freeArea, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
 import { clampRect, type Rect, TOP_BAR_H, workArea } from "@ui/features/play-shell/geometry";
+import {
+  fitLauncher,
+  fittedBarWidth,
+  LAUNCHER_GUTTER,
+  launcherMetrics,
+} from "@ui/features/play-shell/launcher-fit";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
 import { availableKinds } from "@ui/features/play-shell/registry";
+import { toastKeepOut } from "@ui/features/play-shell/toast-region";
+import { coveredArea } from "@ui/features/play-shell/token-boxes";
 import {
   contentBox,
   FIT_MIN_CELL_PX,
@@ -78,7 +86,7 @@ function openOnDefaults(kinds: string[], viewport: { w: number; h: number }, com
     .map((w) => ({ kind: w.kind, ...clampRect(w, viewport) }));
 }
 
-const at = (rects: (Rect & { kind: string })[], kind: string) => {
+const at = (rects: readonly (Rect & { kind: string })[], kind: string) => {
   const r = rects.find((x) => x.kind === kind);
   if (!r) throw new Error(`${kind} not open`);
   return r;
@@ -268,6 +276,118 @@ test("FR-SHELL-08 player default-open product windows don't overlap (1280×720, 
           const overlap = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
           expect(overlap ? `${a.kind} overlaps ${b.kind} at ${viewport.w}` : "ok").toBe("ok");
         }
+    }
+  }
+});
+
+// ---- sprint 4: auto placement (FR-SHELL-40, -42) ----
+
+const SPRINT4 = [LAPTOP, { w: 1280, h: 800 }, DESKTOP];
+const same = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+
+test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: player Initiative appearing over the goblins goes where it covers less, at an edge, over no window; no tokens → where the default layout put it", () => {
+  for (const viewport of SPRINT4) {
+    const where = `${viewport.w}×${viewport.h}`;
+    const all = new Set(playerWindows.defs.map((d) => d.kind));
+    const layout = defaultLayout(playerWindows, viewport);
+    const home = at(layout, "cbt.initiative");
+    const ctx = { registry: playerWindows, viewport, available: all };
+    const appear = { type: "appear", kind: "cbt.initiative" } as const;
+    expect(same(at(reduce(layout, appear, ctx), "cbt.initiative"), home)).toBe(true);
+    // Zoomed in (120 px cells) on the two goblins, under Initiative; the PCs off-screen left.
+    const cell = 120;
+    const ox = home.x + 20 - 12 * cell;
+    const oy = home.y + 20 - 6 * cell;
+    const boxes = VISIBLE_TOKENS.map((t) => ({
+      x: ox + t.col * cell,
+      y: oy + t.row * cell,
+      w: cell,
+      h: cell,
+    }));
+    const ws = reduce(layout, appear, { ...ctx, avoid: () => boxes });
+    const init = at(ws, "cbt.initiative");
+    expect(coveredArea(init, boxes)).toBeLessThan(coveredArea(home, boxes));
+    expect(["left", "right"]).toContain(touchedEdge(init, viewport) ?? `mid-map at ${where}`);
+    const others = ws.filter((w) => w.kind !== "cbt.initiative");
+    for (const o of renderedWindowRects(others, playerWindows, all, viewport)) {
+      expect(overlaps(init, o) ? `Initiative over a window at ${where}` : "ok").toBe("ok");
+    }
+  }
+});
+
+test("FR-SHELL-40 toast keep-out: player Initiative stays off the bottom-right box; Notifications never cover Initiative, the box only as the fallback (1280×720, 1280×800, 1600×900)", () => {
+  for (const viewport of SPRINT4) {
+    const where = `${viewport.w}×${viewport.h}`;
+    const box = toastKeepOut("player", viewport);
+    for (const combat of [true, false]) {
+      const rects = openOnDefaults(["note.history"], viewport, combat);
+      const notes = at(rects, "note.history");
+      const others = rects.filter((r) => r.kind !== notes.kind);
+      if (combat) {
+        const init = at(rects, "cbt.initiative");
+        expect(overlaps(init, box) ? `Initiative over the box at ${where}` : "ok").toBe("ok");
+        expect(overlaps(notes, init) ? `Notifications over Initiative at ${where}` : "ok").toBe(
+          "ok",
+        );
+      }
+      // Free of every window → also clear of the box.
+      if (!others.some((r) => overlaps(notes, r))) {
+        expect(overlaps(notes, box) ? `Notifications over the box at ${where}` : "ok").toBe("ok");
+      }
+    }
+  }
+});
+
+test("FR-SHELL-42 player handout viewer registers restoreOpen: false; nothing else does", () => {
+  const off = playerWindows.defs.filter((d) => d.restoreOpen === false).map((d) => d.kind);
+  expect(off).toEqual(["party.handout"]);
+});
+
+test("FR-SHELL-44 freeAreas: the player 1280×800 default layout yields both the strip above the Game log and the one right of it", () => {
+  const viewport = { w: 1280, h: 800 };
+  const before = new Set(playerWindows.defs.map((d) => d.kind));
+  before.delete("cbt.initiative");
+  const layout = defaultLayout(playerWindows, viewport);
+  const rects = renderedWindowRects(layout, playerWindows, before, viewport);
+  const log = at(layout, "dice.log");
+  const sheet = at(layout, "char.sheet");
+  const areas = freeAreas(rects, viewport);
+  // Above the log: from the rail to the sheet, down to the log's top.
+  expect(areas).toContainEqual({ x: 68, y: TOP_BAR_H, w: sheet.x - 68, h: log.y - TOP_BAR_H });
+  // Right of the log: from the log's right edge to the sheet, the whole work area high.
+  const right = areas.find((a) => a.x === log.x + log.w);
+  expect(right).toEqual({
+    x: log.x + log.w,
+    y: TOP_BAR_H,
+    w: sheet.x - (log.x + log.w),
+    h: workArea(viewport).h,
+  });
+  expect(freeArea(rects, viewport)).toEqual(areas[0] as Rect);
+});
+
+test("FR-SHELL-43 player launcher, test-mode kinds included, at 1280 / 1440 / 1600 wide: every button inside the viewport with 8 px gutters or in the overflow menu; icon-only before any overflow; open windows stay in the bar", () => {
+  const kinds = availableKinds(playerWindows, testMode);
+  const entries = playerWindows.defs
+    .filter((d) => d.launcher && kinds.has(d.kind))
+    .sort((a, b) => (a.launcher?.order ?? 0) - (b.launcher?.order ?? 0));
+  const labels = new Map(entries.map((d) => [d.kind, d.launcher?.label ?? ""]));
+  // Label widths as the Launcher's fallback measure (7 px a character, wider than text-xs).
+  const m = launcherMetrics(labels, (label) => label.length * 7 + 1);
+  for (const w of [1280, 1440, 1600, 900, 600]) {
+    for (const open of [[], entries.slice(-2).map((d) => d.kind)]) {
+      const items = entries.map((d) => ({
+        kind: d.kind,
+        order: d.launcher?.order ?? 0,
+        state: open.includes(d.kind) ? ("open" as const) : ("closed" as const),
+      }));
+      const fit = fitLauncher(items, w, m);
+      const gutter = (w - fittedBarWidth(fit, m)) / 2;
+      expect(gutter >= LAUNCHER_GUTTER ? "ok" : `bar clipped at ${w}`).toBe("ok");
+      expect([...fit.bar, ...fit.overflow].sort()).toEqual(items.map((i) => i.kind).sort());
+      if (fit.overflow.length > 0) expect(fit.compact).toBe(true);
+      for (const k of open)
+        expect(fit.overflow.includes(k) && fit.bar.length > open.length).toBe(false);
+      if (w >= 1280) expect(fit.overflow).toEqual([]);
     }
   }
 });

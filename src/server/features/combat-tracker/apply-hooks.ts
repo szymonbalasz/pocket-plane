@@ -41,7 +41,9 @@ export interface ApplyTargetContext {
 }
 
 /** The DM's line facts a hook may set (`AttackLogDmPayload` fields; `parts` same index as the line's). */
-export type ApplyHookDm = Partial<Pick<AttackLogDmPayload, "acMods" | "defense">> & {
+export type ApplyHookDm = Partial<
+  Pick<AttackLogDmPayload, "acMods" | "defense" | "extraDefense">
+> & {
   parts?: AttackLineDmPart[];
 };
 

@@ -1,6 +1,7 @@
 // `cmp.compendium` body (FR-CMP-18–23), both clients: search (debounced 200 ms), Filters popover,
 // kind Tabs per role, results with **More**, entry view with Back (list scroll kept). Reads on
-// demand: refetch on open, search and Back (FR-CMP-23). DM extras come in as props: the import
+// demand: refetch on open, search and Back (FR-CMP-23). Duplicate groups (FR-CMP-35) are one row
+// that expands its members in place (fetched with `sameAs` and the same q); Back keeps it open. DM extras come in as props: the import
 // panel (`top`), the New homebrew button (`toolbar`), entry actions (`entryActions`: Derive…,
 // Clone / Edit / Delete; C4) and monster rows as drag sources (FR-CMP-21). The client supplies
 // the `Api` with its credential (DM secret / `Authorization: Player`).
@@ -11,8 +12,8 @@ import {
   type DefinitionDragData,
   ImportedEntityRecord,
 } from "@shared/entities/schemas";
-import { ArrowLeftIcon, FilterIcon } from "lucide-react";
-import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, FilterIcon } from "lucide-react";
+import { type DragEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import type { Api } from "../../api";
 import { Button } from "../../components/ui/button";
@@ -28,11 +29,19 @@ import { Badge, Input, Label, Skeleton } from "../../components/ui/primitives";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { cn } from "../../lib/utils";
 import { useDefinitions } from "./definitions";
-import { type EntryRead, useDefinitionEntry, useEntry, useResults } from "./fetch";
+import {
+  type EntryRead,
+  type MembersRead,
+  useDefinitionEntry,
+  useEntry,
+  useGroupMembers,
+  useResults,
+} from "./fetch";
 import {
   activeFilterCount,
   badgeLabel,
   type CmpTab,
+  emptyText,
   FILTER_FIELDS,
   type Filters,
   isEntryless,
@@ -51,6 +60,7 @@ import {
   setFilters,
   setQuery,
   setTab,
+  toggleGroup,
   useCmpNav,
 } from "./nav";
 import { Attribution, DragHandle, EntryView, StatBlock } from "./views";
@@ -130,8 +140,33 @@ function FiltersPopover({ tab, filters }: { tab: CmpTab; filters: Filters }) {
   );
 }
 
-function ResultRow({ r, viewer }: { r: EntrySummary; viewer: Role }) {
+/** Monster rows (DM) drag onto the map (FR-CMP-21); a click opens the entry or definition. */
+function rowProps(r: EntrySummary, viewer: Role) {
   const drag = viewer === "dm" && r.kind === "monster" && r.definitionId !== undefined;
+  return {
+    draggable: drag,
+    onDragStart: drag
+      ? (e: DragEvent) => {
+          const data: DefinitionDragData = { definitionId: r.definitionId as string };
+          e.dataTransfer.setData(DEFINITION_DRAG_MIME, JSON.stringify(data));
+          e.dataTransfer.effectAllowed = "copy";
+        }
+      : undefined,
+    onClick: () => (isEntryless(r) ? openDefinition(r.definitionId as string) : openEntry(r.id)),
+    className: cn(
+      "flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      drag && "cursor-grab active:cursor-grabbing",
+    ),
+  };
+}
+
+const SourceBadge = ({ label }: { label: string }) => (
+  <Badge variant="outline" className="shrink-0 px-1.5 text-[10px]">
+    {badgeLabel(label)}
+  </Badge>
+);
+
+function ResultRow({ r, viewer }: { r: EntrySummary; viewer: Role }) {
   return (
     <li>
       <button
@@ -139,23 +174,7 @@ function ResultRow({ r, viewer }: { r: EntrySummary; viewer: Role }) {
         data-testid="cmp-result"
         data-record-id={r.id}
         data-value={r.kind}
-        draggable={drag}
-        onDragStart={
-          drag
-            ? (e) => {
-                const data: DefinitionDragData = { definitionId: r.definitionId as string };
-                e.dataTransfer.setData(DEFINITION_DRAG_MIME, JSON.stringify(data));
-                e.dataTransfer.effectAllowed = "copy";
-              }
-            : undefined
-        }
-        onClick={() =>
-          isEntryless(r) ? openDefinition(r.definitionId as string) : openEntry(r.id)
-        }
-        className={cn(
-          "flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          drag && "cursor-grab active:cursor-grabbing",
-        )}
+        {...rowProps(r, viewer)}
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium" data-testid="cmp-result-name">
@@ -163,11 +182,134 @@ function ResultRow({ r, viewer }: { r: EntrySummary; viewer: Role }) {
           </span>
           <span className="block truncate text-xs text-muted-foreground">{r.line}</span>
         </span>
-        <Badge variant="outline" className="shrink-0 px-1.5 text-[10px]">
-          {badgeLabel(r.sourceLabel)}
-        </Badge>
+        <SourceBadge label={r.sourceLabel} />
       </button>
     </li>
+  );
+}
+
+/**
+ * FR-CMP-35 group row: name, the muted group line ("12 entries · Barbarian, Bard, …") and a
+ * chevron; a click toggles its members in place below it, each with its own line.
+ */
+export function GroupRow({
+  r,
+  expanded,
+  children,
+}: {
+  r: EntrySummary;
+  expanded: boolean;
+  /** The members while expanded. */
+  children?: ReactNode;
+}) {
+  const Chevron = expanded ? ChevronDownIcon : ChevronRightIcon;
+  return (
+    <li>
+      <div
+        data-testid="cmp-result"
+        data-record-id={r.id}
+        data-value={r.kind}
+        data-group-count={r.group?.count}
+      >
+        <button
+          type="button"
+          data-testid="cmp-group-toggle"
+          data-record-id={r.id}
+          aria-expanded={expanded}
+          onClick={() => toggleGroup(r.id)}
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Chevron className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium" data-testid="cmp-result-name">
+              {r.name}
+            </span>
+            <span className="block truncate text-xs text-muted-foreground">{r.line}</span>
+          </span>
+          <SourceBadge label={r.sourceLabel} />
+        </button>
+      </div>
+      {expanded && children}
+    </li>
+  );
+}
+
+export function GroupMembers({
+  group,
+  members,
+  viewer,
+}: {
+  group: EntrySummary;
+  members: MembersRead;
+  viewer: Role;
+}) {
+  if (members.state === "loading") {
+    return (
+      <div className="space-y-1 py-0.5 pl-6" data-testid="cmp-group-loading">
+        <Skeleton className="h-6 w-full" />
+        <Skeleton className="h-6 w-full" />
+      </div>
+    );
+  }
+  if (members.state === "error") {
+    return (
+      <p className="py-1 pl-8 text-xs text-destructive" data-testid="cmp-group-error">
+        {members.error}
+      </p>
+    );
+  }
+  return (
+    <ul className="space-y-0.5 pl-6" data-testid="cmp-group-members" data-record-id={group.id}>
+      {members.members.map((m) => (
+        <li key={m.id}>
+          <button
+            type="button"
+            data-testid="cmp-group-member"
+            data-record-id={m.id}
+            data-value={m.kind}
+            {...rowProps(m, viewer)}
+          >
+            <span className="min-w-0 flex-1 truncate text-sm">{m.line || m.name}</span>
+            <SourceBadge label={m.sourceLabel} />
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function LiveMembers({
+  api,
+  group,
+  q,
+  viewer,
+}: {
+  api: Api;
+  group: EntrySummary;
+  q: string;
+  viewer: Role;
+}) {
+  const nonce = useCmpNav((s) => s.listNonce);
+  const members = useGroupMembers(api, group.id, q, nonce);
+  return <GroupMembers group={group} members={members} viewer={viewer} />;
+}
+
+function LiveGroupRow({
+  api,
+  r,
+  q,
+  viewer,
+}: {
+  api: Api;
+  r: EntrySummary;
+  q: string;
+  viewer: Role;
+}) {
+  const expanded = useCmpNav((s) => s.expanded.includes(r.id));
+  return (
+    <GroupRow r={r} expanded={expanded}>
+      <LiveMembers api={api} group={r} q={q} viewer={viewer} />
+    </GroupRow>
   );
 }
 
@@ -183,7 +325,8 @@ function ResultsList({ api, viewer }: { api: Api; viewer: Role }) {
     if (res.state === "error" && res.error) toast.error(res.error);
   }, [res.state, res.error]);
   const first = res.state === "loading" && res.results.length === 0;
-  const unfiltered = Object.keys(params).length === 0;
+  const unfiltered = Object.keys(res.params).length === 0;
+  const shownQ = res.params.q ?? "";
   if (first) {
     return (
       <div className="space-y-1.5 p-2" data-testid="cmp-loading">
@@ -204,22 +347,22 @@ function ResultsList({ api, viewer }: { api: Api; viewer: Role }) {
     );
   }
   if (res.results.length === 0) {
-    let text = `No matches for ‘${q.trim()}’`;
-    if (unfiltered) {
-      text = viewer === "dm" ? "Nothing imported yet" : "The DM hasn't set up the compendium yet";
-    } else if (q.trim() === "") text = "No matches";
     return (
       <p className="p-3 text-sm text-muted-foreground" data-testid="cmp-empty">
-        {text}
+        {emptyText(shownQ, unfiltered, viewer)}
       </p>
     );
   }
   return (
     <div data-testid="cmp-results" data-state={res.state}>
       <ul className="space-y-0.5 p-1">
-        {res.results.map((r) => (
-          <ResultRow key={r.id} r={r} viewer={viewer} />
-        ))}
+        {res.results.map((r) =>
+          r.group ? (
+            <LiveGroupRow key={r.id} api={api} r={r} q={shownQ} viewer={viewer} />
+          ) : (
+            <ResultRow key={r.id} r={r} viewer={viewer} />
+          ),
+        )}
       </ul>
       {res.hasMore && (
         <div className="p-1 pb-2">
@@ -426,7 +569,7 @@ export function CompendiumBody({
         <div className="flex items-center gap-1.5 px-2 pt-2">
           <Input
             className="h-8"
-            placeholder="Search"
+            placeholder="Search: words in any order"
             aria-label="Search the compendium"
             data-testid="cmp-search"
             maxLength={100}
@@ -449,7 +592,8 @@ export function CompendiumBody({
           ref={scroller}
           className="mt-1 min-h-0 flex-1 overflow-y-auto"
           onClickCapture={(e) => {
-            if ((e.target as HTMLElement).closest('[data-testid="cmp-result"]')) leave();
+            const t = e.target as HTMLElement;
+            if (t.closest('[data-testid="cmp-result"], [data-testid="cmp-group-member"]')) leave();
           }}
         >
           <ResultsList api={api} viewer={viewer} />

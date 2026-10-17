@@ -126,7 +126,15 @@ describe("FR-SCN-25 Keep: scn.placeTemplate", () => {
     expect(t.tpl(wide)?.width).toBe(10);
     expect(t.tpl(cone)?.width).toBeNull();
     // FR-SCN-20 ranges come from the schema.
-    for (const bad of [{ size: 0 }, { size: 7 }, { size: 305 }, { angle: 10 }, { width: 65 }]) {
+    for (const bad of [
+      { size: 0 },
+      { size: 7 },
+      { size: 305 },
+      { angle: 12.25 },
+      { angle: 360 },
+      { x: 3.375 },
+      { width: 65 },
+    ]) {
       expect(t.err(() => t.place({ ...sphere(t.ambush.id), ...bad })).code).toBe("invalid");
     }
   });
@@ -272,27 +280,55 @@ describe("FR-SCN-26 persistent edits", () => {
     expect(t.tpl(mine)).toBeNull();
   });
 
-  test("FR-SCN-26 Clear templates: DM only; every kept template of the scene; none → no event", () => {
+  test("FR-SCN-44 Clear templates scope: DM-placed only unless players; none → no event", () => {
     const t = setup();
-    const a = t.place(sphere(t.ambush.id), t.p1);
-    const b = t.place(sphere(t.ambush.id, { hidden: true }));
-    const c = t.place(sphere(t.cellar.id));
-    expect(t.err(() => t.run(S.clearTemplates, { sceneId: t.ambush.id }, t.p1)).code).toBe(
-      "forbidden",
-    );
+    const mine = t.place(sphere(t.ambush.id), t.p1);
+    const glyph = t.place(sphere(t.ambush.id, { hidden: true }));
+    const web = t.place(sphere(t.ambush.id, { x: 0.5, y: 6.25, angle: 37.5 }));
+    const cellar = t.place(sphere(t.cellar.id));
+    for (const input of [{ sceneId: t.ambush.id }, { sceneId: t.ambush.id, players: true }]) {
+      expect(t.err(() => t.run(S.clearTemplates, input, t.p1)).code).toBe("forbidden");
+    }
     const events = t.events.length;
+    const log = t.logTypes().length;
     t.run(S.clearTemplates, { sceneId: t.ambush.id });
-    expect([t.tpl(a), t.tpl(b), t.tpl(c)?.id]).toEqual([null, null, c]);
-    const e = t.events.slice(events);
+    expect([t.tpl(mine)?.id, t.tpl(glyph), t.tpl(web), t.tpl(cellar)?.id]).toEqual([
+      mine,
+      null,
+      null,
+      cellar,
+    ]);
+    let e = t.events.slice(events);
     expect(e.map((x) => x.event.type)).toEqual(["TemplatesCleared"]);
-    expect(e[0]?.event.payload).toEqual({ sceneId: t.ambush.id, templateIds: [a, b] });
-    // Players get a delete for the visible one only; the hidden one was never theirs.
-    const p2 = t.h.viewer("player", t.h.p2.id);
-    expect(
-      (e[0]?.event.changes ?? []).map((ch) => t.s.records.filterChange(ch, p2)?.op ?? null),
-    ).toEqual(["delete", null]);
-    t.run(S.clearTemplates, { sceneId: t.ambush.id });
+    expect(t.logTypes().slice(log)).toEqual(["TemplatesCleared"]);
+    expect(e[0]?.event.payload).toEqual({
+      sceneId: t.ambush.id,
+      templateIds: [glyph, web],
+      players: false,
+    });
+    // Players get a delete for the visible one only (Glyph was never theirs), and none for
+    // their own template, which stays.
+    for (const pid of [t.h.p1.id, t.h.p2.id]) {
+      const v = t.h.viewer("player", pid);
+      expect(
+        (e[0]?.event.changes ?? []).map((ch) => t.s.records.filterChange(ch, v)?.op ?? null),
+      ).toEqual([null, "delete"]);
+      expect(t.ids(v)).toEqual([mine]);
+    }
+    // Nothing DM-placed left → no write, no event.
+    t.run(S.clearTemplates, { sceneId: t.ambush.id, players: false });
     expect(t.events.length).toBe(events + 1);
+    t.run(S.clearTemplates, { sceneId: t.ambush.id, players: true });
+    e = t.events.slice(events + 1);
+    expect(e[0]?.event.payload).toEqual({
+      sceneId: t.ambush.id,
+      templateIds: [mine],
+      players: true,
+    });
+    expect(t.tpl(mine)).toBeNull();
+    expect(t.tpl(cellar)?.id).toBe(cellar);
+    t.run(S.clearTemplates, { sceneId: t.ambush.id, players: true });
+    expect(t.events.length).toBe(events + 2);
     expect(t.err(() => t.run(S.clearTemplates, { sceneId: "no-such-scene" })).code).toBe(
       "not_found",
     );
@@ -340,6 +376,31 @@ describe("SCN §11 crash: one transaction per command", () => {
         .slice(log)
         .map((l) => l.type),
     ).toEqual(["TemplatePlaced"]);
+  });
+
+  test("FR-SCN-44 crash scn.clearTemplates: kill before commit → digest unchanged; after commit → the committed state", () => {
+    class Killed extends Error {}
+    const kill = () => {
+      throw new Killed();
+    };
+    const t = setup();
+    const mine = t.place(sphere(t.ambush.id, { x: 3.37, y: 7.64 }), t.p1);
+    t.place(sphere(t.ambush.id, { x: 12.5, y: 0.25, angle: 37.5, hidden: true }));
+    const digest = stateDigest(t.s.db.$client).sha256;
+    const log = readEventLog(t.s.db).length;
+    armCrashHook({ point: "before-commit", target: S.clearTemplates }, kill);
+    expect(() => t.run(S.clearTemplates, { sceneId: t.ambush.id })).toThrow();
+    expect(stateDigest(t.s.db.$client).sha256).toBe(digest);
+    armCrashHook({ point: "after-commit", target: S.clearTemplates }, kill);
+    expect(() => t.run(S.clearTemplates, { sceneId: t.ambush.id })).toThrow(Killed);
+    armCrashHook(null);
+    expect(t.tpl(mine)).toMatchObject({ x: 3.37, y: 7.64 });
+    expect(t.count("aoe_template")).toBe(1);
+    expect(
+      readEventLog(t.s.db)
+        .slice(log)
+        .map((l) => l.type),
+    ).toEqual(["TemplatesCleared"]);
   });
 });
 
@@ -410,6 +471,24 @@ describe("FR-SCN-24 scn.template audience", () => {
     expect(t.route(partly, t.dm)).toEqual({ players: [t.h.p1.id, t.h.p2.id] });
     expect(t.route(inFog, t.p1)).toBe("all");
     expect(t.route(t.end(t.ambush.id), t.dm)).toBe("all");
+  });
+
+  test("FR-SCN-46 DM audience over the new uncut cells: a freeform cube reaching out of fog → its seers; a 5-ft cone covering no cell samples its origin's cell", () => {
+    const t = audience();
+    players.splice(0, players.length, t.h.p1.id, t.h.p2.id);
+    registerFog(true);
+    // Sprint 2's centre cells of this cube were all at col ≥ 15 (fogged); > 50 % reaches col 14.
+    const cube = { shape: "cube", x: 15, y: 5, size: 10, angle: 45 };
+    expect(t.route(t.place(t.ambush.id, cube), t.dm)).toEqual({ players: [t.h.p1.id, t.h.p2.id] });
+    expect(t.route(t.place(t.ambush.id, { ...cube, x: 16.25, y: 5.5, angle: 0.5 }), t.dm)).toBe(
+      "dm",
+    );
+    const cone = { shape: "cone", size: 5, angle: 37.5 };
+    expect(t.route(t.place(t.ambush.id, { ...cone, x: 15.37, y: 3.64 }), t.dm)).toBe("dm");
+    expect(derived.at(-1)?.cells).toEqual([[15, 3]]);
+    expect(t.route(t.place(t.ambush.id, { ...cone, x: 14.37, y: 3.64 }), t.dm)).toEqual({
+      players: [t.h.p1.id, t.h.p2.id],
+    });
   });
 
   test("FR-SCN-23 signals are never persisted: no row, log or event", () => {

@@ -7,12 +7,13 @@ import {
   EFFECT_ENDED_REASONS,
   EFFECT_KINDS,
 } from "@shared/combat-extras/schemas";
-import { HP_MODES, type HpTriggerPart } from "@shared/combat-tracker/schemas";
+import { HP_MODES, type HpDamagePart, type HpTriggerPart } from "@shared/combat-tracker/schemas";
 import { COMPENDIUM_KINDS } from "@shared/compendium/schemas";
 import { DICE_MATERIALS, DICE_STYLES } from "@shared/dice-extras/looks";
 import type { Modifier } from "@shared/effect-modifiers/schemas";
 import { TRIGGER_USE_STATES } from "@shared/effect-modifiers/trigger-records";
-import type { TriggerRule } from "@shared/effect-modifiers/triggers";
+import { TRIGGER_CHARGES } from "@shared/effect-modifiers/trigger-state";
+import { TRIGGER_EVENTS, type TriggerRule } from "@shared/effect-modifiers/triggers";
 import { TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
@@ -628,6 +629,12 @@ export const hpChange = sqliteTable(
       .$type<HpTriggerPart[]>()
       .notNull()
       .default([]),
+    /**
+     * combat-tracker (FR-CBT-84, sprint 4): JSON leaf ≤ 2 extra weapon damage parts
+     * `{type, rolled, total, multiplier, raw}` (the base part keeps `damageType`, `damageRolled`,
+     * `damageTotal`, `multiplier`; `raw` above stays the whole amount); null = none. DM only.
+     */
+    damageParts: text("damage_parts", { mode: "json" }).$type<HpDamagePart[] | null>(),
     entryId: text("entry_id")
       .notNull()
       .references((): AnySQLiteColumn => gameLogEntry.id),
@@ -942,6 +949,44 @@ export const triggerUse = sqliteTable(
   ],
 );
 
+/**
+ * Trigger state (effect-modifiers, `trigger-state`, in the snapshot; FR-MOD-53–55, ADR-0049,
+ * data model §27): a derived display copy, one row per (enabled trigger, owner combatant) while
+ * the encounter is `started` (deleted at End), rewritten in the causing transaction.
+ * `characterId` / `ownerPlayerId` are visibility copies (null / null for monsters); `featureId`
+ * is soft. `trigger_use` stays the truth for charges.
+ */
+export const triggerState = sqliteTable(
+  "trigger_state",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    encounterId: text("encounter_id")
+      .notNull()
+      .references((): AnySQLiteColumn => encounter.id),
+    combatantId: text("combatant_id")
+      .notNull()
+      .references((): AnySQLiteColumn => combatant.id),
+    triggerId: text("trigger_id")
+      .notNull()
+      .references((): AnySQLiteColumn => ruleTrigger.id, { onDelete: "cascade" }),
+    characterId: text("character_id"),
+    ownerPlayerId: text("owner_player_id"),
+    name: text("name").notNull(),
+    on: text("on", { enum: TRIGGER_EVENTS }).notNull(),
+    armed: integer("armed", { mode: "boolean" }).notNull(),
+    charge: text("charge", { enum: TRIGGER_CHARGES }).notNull(),
+    featureId: text("feature_id"),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("trigger_state_owner").on(t.encounterId, t.combatantId, t.triggerId),
+    index("trigger_state_campaign").on(t.campaignId),
+  ],
+);
+
 /** CON-20: `seq` values for Combat inserts, computed by the DB inside the insert's transaction. */
 export const notificationSeqNext = sql<number>`(select coalesce(max(${notification.seq}), 0) + 1 from ${notification})`;
 export const encounterSeqNext = sql<number>`(select coalesce(max(${encounter.seq}), 0) + 1 from ${encounter})`;
@@ -1159,13 +1204,14 @@ export const aoeTemplate = sqliteTable(
       .references((): AnySQLiteColumn => scene.id, { onDelete: "cascade" }),
     seq: integer("seq").notNull(),
     shape: text("shape", { enum: TEMPLATE_SHAPES }).notNull(),
-    /** Origin vertex. */
-    x: integer("x").notNull(),
-    y: integer("y").notNull(),
+    /** Origin point, ≤ 2 decimals (sprint 4, FR-SCN-20); old integer rows stay valid. */
+    x: real("x").notNull(),
+    y: real("y").notNull(),
     size: integer("size").notNull(),
     /** Line only, else null. */
     width: integer("width"),
-    angle: integer("angle").notNull(),
+    /** 0 ≤ angle < 360, ≤ 1 decimal (sprint 4, FR-SCN-20). */
+    angle: real("angle").notNull(),
     label: text("label").notNull().default(""),
     /** Null = DM-placed (fog subject); else the placing player (FR-SCN-25, -27). */
     placedByPlayerId: text("placed_by_player_id").references((): AnySQLiteColumn => player.id),
@@ -1308,6 +1354,7 @@ export const schema = {
   effectPreset,
   ruleTrigger,
   triggerUse,
+  triggerState,
   sceneFog,
   sceneFogEdit,
   fogExplored,

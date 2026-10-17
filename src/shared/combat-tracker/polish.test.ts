@@ -64,10 +64,10 @@ describe("FR-CBT-58 formatLine", () => {
       manual: undefined,
     };
     expect(line({ payload: crit })).toBe(
-      "Mira attacks Goblin: 20 + 4 = 24 (natural 20) — critical hit! 12 piercing damage",
+      "Mira attacks Goblin: 20 + 4 = 24 (natural 20) — DM: critical hit! 12 piercing damage",
     );
     const fumble = { ...nat1, hit: false, damage: 0, manual: undefined };
-    expect(line({ payload: fumble })).toBe("Mira attacks Goblin: 1 + 4 = 5 (natural 1) — miss");
+    expect(line({ payload: fumble })).toBe("Mira attacks Goblin: 1 + 4 = 5 (natural 1) — DM: miss");
   });
 
   test("FR-CBT-58 a non-natural override stays DM-only: player 'hit!', DM 'DM ruled hit'", () => {
@@ -76,7 +76,9 @@ describe("FR-CBT-58 formatLine", () => {
       toHit: { dice: 9, constant: 4, total: 13, natural: 9 },
       manual: undefined,
     };
-    expect(line({ payload: p })).toBe("Mira attacks Goblin: 9 + 4 = 13 — hit! 6 piercing damage");
+    expect(line({ payload: p })).toBe(
+      "Mira attacks Goblin: 9 + 4 = 13 — DM: hit. 6 piercing damage",
+    );
     expect(line({ payload: p })).not.toContain("DM ruled");
     expect(line({ payload: p, dmPayload: { ...dm(false, true), toHitRolled: 13 } })).toBe(
       "Mira attacks Goblin: 9 + 4 = 13 vs AC 15 — DM ruled hit 6 piercing damage",
@@ -89,7 +91,7 @@ describe("FR-CBT-58 formatLine", () => {
       toHit: { dice: null, constant: 4, total: 16, natural: null },
       manual: undefined,
     };
-    expect(line({ payload: old })).toBe("Mira attacks Goblin: 16 — hit! 6 piercing damage");
+    expect(line({ payload: old })).toBe("Mira attacks Goblin: 16 — DM: hit. 6 piercing damage");
   });
 
   test("FR-CBT-58 helpers: marks only 1 / 20; ruling only on a contradiction", () => {

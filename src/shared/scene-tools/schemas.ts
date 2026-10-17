@@ -50,10 +50,13 @@ export const TEMPLATES_PER_SCENE_MAX = 20;
 export const TEMPLATES_PER_PLAYER_MAX = 3;
 /** FR-SCN-22: label 0–40 chars. */
 export const TEMPLATE_LABEL_MAX = 40;
-/** FR-SCN-20: `size` 5–300 ft, `width` 5–60 ft, both step 5; `angle` 0–345 step 15. */
+/**
+ * FR-SCN-20: `size` 5–300 ft, `width` 5–60 ft, both step 5. `angle` (sprint 4): 0 ≤ a < 360
+ * (`max` exclusive), ≤ 1 decimal; `step` = the snapped steps (FR-SCN-43).
+ */
 export const TEMPLATE_SIZE = { min: 5, max: 300, step: 5 } as const;
 export const TEMPLATE_WIDTH = { min: 5, max: 60, step: 5, default: 5 } as const;
-export const TEMPLATE_ANGLE = { min: 0, max: 345, step: 15 } as const;
+export const TEMPLATE_ANGLE = { min: 0, max: 360, step: 15 } as const;
 /** Grid coordinates on the wire; commands check the map's range (FR-SCN-07, -16). */
 export const COORD_MAX = 10_000;
 
@@ -68,7 +71,12 @@ const Coord = Int.min(-COORD_MAX).max(COORD_MAX);
 
 /** FR-SCN-07 (sprint 3): a number with at most 2 decimals (1/100 cell). */
 export const isDec2 = (v: number) => Math.abs(Math.round(v * 100) - v * 100) < 1e-6;
-/** FR-SCN-07 (sprint 3): segment coordinates are numbers with ≤ 2 decimals; integers stay valid. */
+/** FR-SCN-20 (sprint 4): a number with at most 1 decimal (a template angle). */
+export const isDec1 = (v: number) => Math.abs(Math.round(v * 10) - v * 10) < 1e-6;
+/**
+ * FR-SCN-07 (sprint 3): segment coordinates are numbers with ≤ 2 decimals; integers stay valid.
+ * Sprint 4 (FR-SCN-20): also a template origin.
+ */
 const SegCoord = z.number().min(-COORD_MAX).max(COORD_MAX).refine(isDec2, "At most 2 decimals");
 
 /** FR-SCN-07: door state 0 open / 1 closed / 2 locked (DM marker). */
@@ -124,7 +132,14 @@ const stepped = (r: { min: number; max: number; step: number }) =>
     .refine((v) => v % r.step === 0, `Must be a multiple of ${r.step}`);
 export const TemplateSize = stepped(TEMPLATE_SIZE);
 export const TemplateWidth = stepped(TEMPLATE_WIDTH);
-export const TemplateAngle = stepped(TEMPLATE_ANGLE);
+/** FR-SCN-20 (sprint 4): 0 ≤ angle < 360, ≤ 1 decimal (old 15° rows stay valid). */
+export const TemplateAngle = z
+  .number()
+  .min(TEMPLATE_ANGLE.min)
+  .lt(TEMPLATE_ANGLE.max)
+  .refine(isDec1, "At most 1 decimal");
+/** FR-SCN-20 (sprint 4): a template origin, any point with ≤ 2 decimals. */
+export const TemplateCoord = SegCoord;
 export const TemplateLabel = z.string().max(TEMPLATE_LABEL_MAX);
 
 /** FR-SCN-29 (#145, OQ-SCN-04): 5/10/5 (default) or 5 ft per diagonal step. */
@@ -197,13 +212,14 @@ export const AoeTemplateRecord = z.object({
   campaignId: z.string(),
   sceneId: z.string(),
   shape: TemplateShape,
-  /** Origin vertex. */
-  x: Int,
-  y: Int,
+  /** Origin point, ≤ 2 decimals (sprint 4; a vertex when snapped). */
+  x: TemplateCoord,
+  y: TemplateCoord,
   size: Int,
   /** Line only, else null. */
   width: Int.nullable(),
-  angle: Int,
+  /** 0 ≤ angle < 360, ≤ 1 decimal (sprint 4). */
+  angle: TemplateAngle,
   label: z.string(),
   /** Null = DM-placed (a fog subject); a player's are never fog-hidden (FR-SCN-27). */
   placedByPlayerId: z.string().nullable(),
@@ -297,8 +313,8 @@ export const PropIdInput = z.strictObject({ propId: Id });
 const templateFields = {
   sceneId: Id,
   shape: TemplateShape,
-  x: Coord,
-  y: Coord,
+  x: TemplateCoord,
+  y: TemplateCoord,
   size: TemplateSize,
   width: TemplateWidth.optional(),
   angle: TemplateAngle,
@@ -315,8 +331,8 @@ export type PlaceTemplateInput = z.input<typeof PlaceTemplateInput>;
 export const PlayerPlaceTemplateInput = z.strictObject(templateFields);
 export const UpdateTemplateInput = z.strictObject({
   templateId: Id,
-  x: Coord.optional(),
-  y: Coord.optional(),
+  x: TemplateCoord.optional(),
+  y: TemplateCoord.optional(),
   size: TemplateSize.optional(),
   width: TemplateWidth.optional(),
   angle: TemplateAngle.optional(),
@@ -326,7 +342,8 @@ export const UpdateTemplateInput = z.strictObject({
 });
 export type UpdateTemplateInput = z.input<typeof UpdateTemplateInput>;
 export const TemplateIdInput = z.strictObject({ templateId: Id });
-export const ClearTemplatesInput = z.strictObject({ sceneId: Id });
+/** FR-SCN-44: DM-placed kept templates only, unless `players: true` (absent = false). */
+export const ClearTemplatesInput = z.strictObject({ sceneId: Id, players: z.boolean().optional() });
 export const SetDiagonalRuleInput = z.strictObject({ rule: DiagonalRule });
 
 // ---------- signal `scn.template` (FR-SCN-23) ----------
@@ -336,8 +353,8 @@ export const TemplateSignalPlace = z.strictObject({
   sceneId: Id,
   key: z.string().min(1).max(64),
   shape: TemplateShape,
-  x: Coord,
-  y: Coord,
+  x: TemplateCoord,
+  y: TemplateCoord,
   size: TemplateSize,
   width: TemplateWidth.optional(),
   angle: TemplateAngle,

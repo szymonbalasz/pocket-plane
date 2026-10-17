@@ -5,6 +5,7 @@ import type { StartInput } from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { DialogDescription } from "@ui/components/ui/overlays";
 import { useCbtIntent } from "@ui/features/combat-tracker/store";
+import { afterLayoutFrame } from "@ui/features/play-shell/content-heights";
 import { noteAppearance } from "@ui/features/play-shell/free-area";
 import { useWindowDispatch } from "@ui/features/play-shell/ShellContext";
 import { useRecords } from "@ui/sync/store";
@@ -44,7 +45,11 @@ export function useStartEnd() {
   const dispatch = useWindowDispatch();
   const start = useCallback(
     (body: StartInput) =>
-      startAndFollow(() => send("cbt.start", body), { dispatch, noteAppearance }),
+      startAndFollow(() => send("cbt.start", body), {
+        dispatch,
+        noteAppearance,
+        settle: afterLayoutFrame,
+      }),
     [send, dispatch],
   );
   const end = useCallback(

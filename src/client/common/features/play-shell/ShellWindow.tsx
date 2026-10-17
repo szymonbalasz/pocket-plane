@@ -19,7 +19,7 @@ import {
 } from "react";
 import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
-import { reportContentHeight } from "./free-area";
+import { reportContentHeight } from "./content-heights";
 import {
   growsToContent,
   moveRect,
@@ -31,7 +31,7 @@ import {
   windowRect,
 } from "./geometry";
 import { SHELL_ZONE_ATTR } from "./keys";
-import { type WindowAction, windowId } from "./manager";
+import { type Placed, type WindowAction, windowId } from "./manager";
 import type { WindowDef } from "./registry";
 
 function applyRect(el: HTMLElement, r: Rect) {
@@ -83,12 +83,18 @@ export function useWindowShown(): boolean {
 export function ShellWindow({
   win,
   def,
+  placed,
+  settling,
   viewport,
   focused,
   dispatch,
 }: {
   win: WindowState;
   def: WindowDef;
+  /** How its current rect was chosen (FR-SHELL-40; walkthroughs read `data-placed`). */
+  placed?: Placed | undefined;
+  /** Just placed by a feature open / appearance / auto placement: settle after first layout. */
+  settling?: boolean;
   viewport: Viewport;
   focused: boolean;
   dispatch: (a: WindowAction) => void;
@@ -97,10 +103,20 @@ export function ShellWindow({
   const bodyRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const grows = growsToContent(win, def);
-  const needed = useNeededHeight(grows, ref, bodyRef, contentRef);
   const wid = windowId(win.kind, win.instance);
-  useEffect(() => reportContentHeight(wid, grows ? (needed ?? null) : null), [wid, grows, needed]);
+  const needed = useNeededHeight(wid, grows, ref, bodyRef, contentRef);
+  // Measured heights are reported as they are taken; a window that stops growing reports none.
+  useEffect(() => {
+    if (!grows) reportContentHeight(wid, null);
+  }, [wid, grows]);
   useEffect(() => () => reportContentHeight(wid, null), [wid]);
+  // FR-SHELL-40, -41: once the real height is laid out (before paint), place it again if needed.
+  const open = win.state === "open";
+  useLayoutEffect(() => {
+    if (settling && open && (!grows || needed !== undefined)) {
+      dispatch({ type: "settle", kind: win.kind, instance: win.instance });
+    }
+  }, [settling, open, grows, needed, dispatch, win.kind, win.instance]);
   // Render-only fit to the work area, then clamp (FR-SHELL-29, -12), then grow to content
   // (FR-SHELL-39); a gesture starts here and its end stores the result with the current work area.
   const rect = windowRect(win, def, viewport, needed);
@@ -165,6 +181,7 @@ export function ShellWindow({
       data-testid="ui-window"
       data-record-id={wid}
       data-state={win.state}
+      data-placed={placed}
       data-focused={focused}
       aria-label={def.title}
       aria-hidden={parked || undefined}
@@ -253,9 +270,12 @@ export function ShellWindow({
 
 /**
  * FR-SHELL-39: the window height the content asks for (title bar, borders and body padding
- * included), re-measured on every content resize while `grows`; undefined otherwise.
+ * included), re-measured on every content resize while `grows`; undefined otherwise. Reported
+ * at once too, not only after React re-renders, so a feature open placing this window right after
+ * a layout frame (FR-SHELL-40) sees it.
  */
 function useNeededHeight(
+  wid: string,
   grows: boolean,
   sectionRef: RefObject<HTMLElement | null>,
   bodyRef: RefObject<HTMLDivElement | null>,
@@ -274,13 +294,15 @@ function useNeededHeight(
       const cs = getComputedStyle(body);
       const pad = Number.parseFloat(cs.paddingTop) + Number.parseFloat(cs.paddingBottom);
       const chrome = section.offsetHeight - body.clientHeight;
-      setNeeded(Math.ceil(chrome + pad + content.getBoundingClientRect().height));
+      const h = Math.ceil(chrome + pad + content.getBoundingClientRect().height);
+      reportContentHeight(wid, h);
+      setNeeded(h);
     };
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(measure);
     ro.observe(content);
     return () => ro.disconnect();
-  }, [grows, sectionRef, bodyRef, contentRef]);
+  }, [wid, grows, sectionRef, bodyRef, contentRef]);
   return needed;
 }

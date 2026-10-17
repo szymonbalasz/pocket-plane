@@ -125,7 +125,7 @@ describe("FR-MOD-48 outcome lines", () => {
     const l = lines(t, hpChangeIds[0] as string);
     // Physical weapon dice: the line's one "physical" badge stays at the end (FR-CBT-73).
     expect(l.players).toBe(
-      `Brakka attacks Goblin: 15 + 7 = 22 — hit! 7 slashing damage (half) + ${half} radiant (Divine Fury) (half) (physical)`,
+      `Brakka attacks Goblin: 15 + 7 = 22 — DM: hit. 7 slashing damage (half) + ${half} radiant (Divine Fury) (half) (physical)`,
     );
     expect(l.dm).toContain(`+ ${half} radiant (Divine Fury) (half)`);
     expect(l.dm).not.toContain("DM set");
