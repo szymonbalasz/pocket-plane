@@ -25,6 +25,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Entity** | A world record: NPC, monster, item, location, faction, quest, character. Campaign-owned, except imported definitions (global, [ADR-0018](architecture/adr/0018-global-imported-content.md)). Content model: [ADR-0009](architecture/adr/0009-entity-content-model.md). | Compendium entry |
 | **Entity kind** | The type of an entity (npc, monster, item, location, faction, quest, character). MVP uses only **character** and **monster** ([ADR-0014](architecture/adr/0014-mvp-scope.md)). | — |
 | **Creature definition** | What a creature *is*: stat block, actions. Imported (read-only) or custom (editable). Same shape for all sources ([ADR-0009](architecture/adr/0009-entity-content-model.md)). | Instance |
+| **Creature type** | A monster's SRD type (one of 14, e.g. humanoid) in its stat block; picks its token art. Tokens carry a display copy ([ADR-0050](architecture/adr/0050-token-creature-type.md), [entities](specs/entities.md)). | Entity kind |
 | **Derive** | Create a new, independent custom definition via the creature form, prefilled from a base (shortcut only; no ongoing link). | Duplicate (Ctrl-D on an instance) |
 | **Instance** | A placed creature (token, combatant) pointing at one definition. Holds its own display name, read-only display copies of the definition (image, size; refreshed in the definition edit's transaction), play state and effects, which may carry modifiers ([ADR-0024](architecture/adr/0024-definition-visibility.md), decisions #126). | Creature definition |
 | **Modifier** | A typed entry on an effect (bonus dice, flat bonus; later advantage / disadvantage, resistance, AC) applied by the server as a roll-time rider and named in the roll line ("+ 3 Bless"); never a derived value, so overrides still decide the base ([ADR-0038](architecture/adr/0038-effect-modifiers.md), refines ADR-0009). | Effect; Override |
@@ -37,7 +38,9 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **NPC sheet** | The character sheet opened by the DM on a custom creature definition for full editing. | `npc` entity kind |
 | **Compendium** | Global library of rules content (monsters, spells, items, conditions, class features) from bundled sources or homebrew; read on demand, never in the snapshot ([compendium](specs/compendium.md), [ADR-0046](architecture/adr/0046-compendium-scope.md)). | Entity |
 | **Compendium entry** | One record in the compendium. | Entity |
+| **Search group** | Compendium entries with the same kind, name and source, shown as one expandable search row ([compendium](specs/compendium.md)). | — |
 | **Source** | Origin of imported data (e.g. fixtures, Open5e, 5etools JSON, homebrew), with licence/provenance. | Asset |
+| **Source rank** | Order of sources on equal search tiers: own, bundled, other imported, fixture ([compendium](specs/compendium.md)). | — |
 | **Adapter** | Bespoke code for one source that turns its data into normalised records for the import pipeline ([ADR-0015](architecture/adr/0015-source-adapters-fixtures.md)). | Import pipeline |
 | **Import pipeline** | Fixed core: validate normalised records → upsert by (source, sourceKey) → provenance. Fed by adapters. | Adapter |
 | **Clone** | A campaign-owned copy of a compendium entry, editable without affecting the original; for monsters the clone is a derived custom definition (Derive). | — |
@@ -62,6 +65,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Token owner** | The one player (or none) who may move a token. Defaults from the character's owner; the DM reassigns it (decisions #124). | Character's owner |
 | **Hidden token** | Token visible only to the DM (shown translucent to DM) until revealed with the hide/reveal button. MVP. | — |
 | **Token shape** | How a token is drawn: round (circular crop), square, or none (image as is). Owned by the token; new tokens take the definition's default (decisions #148). | — |
+| **Token art** | The glyph on its creature type's colour, drawn for a token without an image; the DM can switch a token to initials ([entities](specs/entities.md), [ADR-0050](architecture/adr/0050-token-creature-type.md)). | Token shape |
 | **Token label** | A token's name drawn on the grid line below it, on a layer above every token; overlay badges (e.g. Out) sit in the same row (decisions #172). | Movement indicator |
 | **Selection** | The DM's client-only set of selected tokens on the viewed scene (click, Ctrl/Shift-click, box select); never sent. Features read it, e.g. to preselect attack targets (#148). | Target |
 | **Box select** | DM Ctrl/Shift + drag on empty canvas: tokens whose footprint centre lies inside the box join the selection. | — |
@@ -69,18 +73,23 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Fog** | Areas of a scene hidden from players: freeform shapes (rectangle, polygon, circle; grid snap unless Ctrl) over a base cell mask; pierced by vision; records a player can't see are filtered server-side ([fog-of-war](specs/fog-of-war.md), [ADR-0042](architecture/adr/0042-dynamic-vision.md)). | Lighting (out of scope) |
 | **Explored** | Map visible, records on it hidden: a player's remembered area (per player, per-map toggle) or a DM drawing mode. | Fog |
 | **Magical darkness** | DM-placed shapes that block all player sight unless the source sees through magical darkness. | Fog |
-| **Vision source** | A player-owned token whose sight reveals fog for that player (≤ 4 per player). | — |
-| **Sight** | A vision source's visibility polygon, cut by walls, closed doors and darkness, within its vision / darkvision radius. | — |
+| **Vision source** | A player-owned token whose sight reveals fog for that player (≤ 4 per player; ≤ 12 for the party while party vision is on). | — |
+| **Sight** | A vision source's visibility polygon, cut by walls, closed doors, darkness and the map's edges, within its vision / darkvision radius. | — |
+| **Normal vision** | Vision radius 999 ft, used when a creature's senses don't set one; only blinding effects reduce it ([ADR-0047](architecture/adr/0047-party-vision.md)). | Darkvision |
+| **Party vision** | A campaign switch (off by default): every player sees what any player sees ([ADR-0047](architecture/adr/0047-party-vision.md)). | View as |
+| **Sight preview** | While a source token is dragged, its sight at each previewed cell, computed by the server; map only, records follow on the drop; never logged ([fog-of-war](specs/fog-of-war.md)). | Drag preview |
+| **Fog brush** | DM fog shape: a radius painted along the pointer, grid-snapped unless Ctrl ([fog-of-war](specs/fog-of-war.md)). | — |
 | **Darkvision** | A second, larger sight radius; the darkvision-only ring is drawn dimmed and grey (no lighting model). | — |
 | **Sees through magical darkness** | Sheet sense (e.g. Devil's Sight): darkness doesn't block this source's sight; drawn as a darker transparent overlay. | — |
-| **Blind (dark screen)** | A player whose every source stands in darkness without see-through sees only own tokens and the grid. | — |
+| **Blind (dark screen)** | A player whose every source stands in darkness without see-through, or is Blinded, sees only own tokens and the grid. | — |
 | **Seen by** | Server-written per-player copy on a record (`seenBy`): which players see it; never on the wire. | Fogged |
 | **View as** | DM preview of one player's view, loaded on demand. | — |
 | **Invisible** | DM-only token state, distinct from Hidden and from the Invisible condition: only players whose source has Sees invisible (and sight on the token) receive it; the party still sees invisible PCs (#210). | Hidden token; condition |
 | **Sees invisible** | DM-only sheet sense (truesight, See Invisibility). | — |
 | **Fog-hidden** | A record a given player can't see (not in their sight or clear area): not in that player's `seenBy`, so they don't receive it (owned / party tokens excepted). `fogged` = seen by no player. | Hidden token |
 | **Reveal all / Fog all** | DM fog actions that clear or cover a whole scene. | — |
-| **AoE template** | A shape (cone, sphere, cylinder, cube, line) placed on a scene to show an area of effect; ephemeral unless kept ([scene-tools](specs/scene-tools.md)). | Freehand drawing (out of scope) |
+| **AoE template** | A shape (cone, sphere, cylinder, cube, line) placed on a scene to show an area of effect, placed freely (Ctrl) or snapped; its affected squares are the cells more than half inside it; ephemeral unless kept ([scene-tools](specs/scene-tools.md)). | Freehand drawing (out of scope) |
+| **Affected squares** | The grid cells more than half inside an AoE template ([scene-tools](specs/scene-tools.md)). | — |
 | **Ephemeral template** | An AoE template sent as a live signal, gone when cleared or its placer leaves; **Keep** saves it as a record. | AoE template |
 | **Prop** | A DM-placed image object on a scene's objects layer (barrel, table). | Token |
 | **Wall** | A segment between two points (grid vertices, or free with Ctrl) that blocks player token moves and sight. | Door |
@@ -88,7 +97,8 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Door** | A wall segment the DM sets open, closed or locked; closed / locked doors block sight; hidden from a player until a point beside it is in their sight. | Wall |
 | **Structure** | A scene's walls and doors, stored as one record per scene. | — |
 | **DM-only layer** | Records with the `hidden` flag (tokens, props, templates): drawn for the DM only. | Canvas layer |
-| **Canvas layer** | A render slot in the canvas-layer registry (map, grid, props, structure, fog, templates, tokens, labels…), ordered by number. | DM-only layer |
+| **Canvas layer** | A render slot in the canvas-layer registry (map, grid, props, structure, fog, templates, tokens, labels…), ordered by number. | DM-only layer; Konva layer group |
+| **Konva layer group** | One of the canvas's four drawing surfaces (`base` / `fog` / `objects` / `top`); canvas layers render as groups inside them ([fog-of-war](specs/fog-of-war.md)). | Canvas layer |
 | **Diagonal rule** | Campaign setting for distance on diagonals: 5/10/5 (default) or 5 ft. | — |
 | **Move guard** | An append-only server check that may refuse a token move before it is written (walls, doors; [ADR-0040](architecture/adr/0040-token-move-guards.md)). | Token-changed hook |
 | **Active-scene window** | The DM snapshot carries only the active scene's tokens and scene-tool records; other scenes load on view ([ADR-0041](architecture/adr/0041-active-scene-window.md)). | Windowed record type |
@@ -97,6 +107,8 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Pull** | DM-only ping that also centres every player's camera on the point; players may pan away. | Ping |
 | **Laser pointer** | Signal: a right-drag draws a trail that others see fade shortly after the last point. | Ping |
 | **Drag preview** | Signal: others see a token move while it is dragged, without the movement label; never logged or persisted; a hidden token's drag reaches the DM only (decisions #171, #172). | Move (committed on drop) |
+| **Drag path** | The cells a dragged token steps through on the straight line its distance counts; players' tokens' paths go to everyone who sees them, others' to the DM only ([scenes-map](specs/scenes-map.md)). | Ruler |
+| **Trail** | In combat, the faint path of a token's moves this turn ([scenes-map](specs/scenes-map.md)). | Laser pointer |
 | **Player-ready indicator** | Shows the DM which players have fully loaded a scene. Post-MVP ([scene-tools](specs/scene-tools.md)); MVP assumes immediate load. | — |
 | **Encounter** | A planned set of monsters with CR/difficulty math. Lifecycle: planned → started → ended. The unit of combat history. | Combat; session |
 | **Combat** | The running state of a started encounter: initiative order, rounds, turns. | Encounter |
@@ -108,10 +120,13 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Effect** | A row on a creature in play: a condition, a custom label, or a concentration; optional duration in rounds ([combat-extras](specs/combat-extras.md)); custom effects may carry modifiers ([effect-modifiers](specs/effect-modifiers.md)). | Modifier |
 | **Preset** | A named effect template with modifiers (built-in, customised per campaign, or a character's own), e.g. Bless, Rage; trigger presets (Sneak Attack …) create rule triggers ([effect-modifiers](specs/effect-modifiers.md)). | Effect; Dice style |
 | **Rule trigger** | A data rule on a character or monster definition: event, requires, filters, frequency, effect (e.g. Sneak Attack once per turn); interpreted by built-in code, never user code ([ADR-0043](architecture/adr/0043-rule-triggers.md)). | Rule hook |
+| **Damage part** | One typed term of an attack's damage: the base part or an extra part ([effect-modifiers](specs/effect-modifiers.md)). | Modifier part |
 | **Offered part** | A rule-trigger damage part rolled with the damage and settled at apply; not in the card's total until it lands. | Modifier part |
 | **Formula** | A rule trigger's value expression in MOD's small grammar (dice, numbers, `level(class)`, ability mods, proficiency); no code. | — |
 | **Trigger window** | The turn / round / encounter key a charge belongs to. | — |
-| **Charge** | One use of a rule trigger in its window; Undo restores it. | Feature use |
+| **Charge** | One use of a rule trigger in its window, shown as Ready / Used this turn; Undo restores it. | Feature use |
+| **Trigger state** | A derived display copy of a rule trigger's charge and in-effect state, per combatant; not the truth ([ADR-0049](architecture/adr/0049-trigger-state.md)). | Charge |
+| **Overspend** | A feature use spent below zero, after the sender confirms ([effect-modifiers](specs/effect-modifiers.md)). | — |
 | **Apply hook** | An append-only server registry entry that settles offered parts inside `cbt.applyCard`'s transaction. | Roll hook |
 | **Mark** | A preset a `targetMarked` filter names (e.g. Hunter's Mark on the hunted creature). | — |
 | **Toggle** | A character preset the owner or DM switches on / off, creating or ending its effect. | Preset |
@@ -144,7 +159,10 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Physical-dice mode** | Per-browser toggle: every roll through the roll control asks for manual entry. | Manual roll |
 | **Manual roll** | A roll entered from physical dice instead of rolled by the server. Logged and marked manual. | — |
 | **Dice tray** | Window to compose or adjust a roll before rolling it; staged rolls and clicked notation land here ([dice-extras](specs/dice-extras.md)). | Roll control |
-| **Throw** | The animation of one received `roll` entry (or all entries of one frame), settling on the server's faces; cosmetic only ([ADR-0044](architecture/adr/0044-3d-dice.md)). | Roll |
+| **Throw** | The animation of one received `roll` entry (or all entries of one frame), on the dice layer, in the zone or in a popup, settling on the server's faces; cosmetic only ([ADR-0044](architecture/adr/0044-3d-dice.md), [ADR-0048](architecture/adr/0048-dice-display.md)). | Roll |
+| **Dice layer** | The full-screen, topmost canvas the dice fly on; takes no input ([ADR-0048](architecture/adr/0048-dice-display.md)). | Canvas layer |
+| **Roll popup** | The card in the toast region that shows a received roll with its dice ([ADR-0048](architecture/adr/0048-dice-display.md)). | Toast |
+| **Die shape** | A die drawn flat as its outline with the value ([dice-extras](specs/dice-extras.md)). | — |
 | **Dice look** | An owner's dice appearance (style, colours, material); everyone sees the roller's look. | — |
 | **Dice style** | A named starting look (Ivory, Obsidian, …). | Preset (MOD) |
 | **Notation link** | Dice notation in free text (e.g. "1d12 + 5") rendered clickable; stages a plain roll in the tray, never attack / apply. | — |
@@ -172,6 +190,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Minimised** (window) | Parked on the launcher: keeps its state and shows a dot when something new happens in it. A closed window keeps only its geometry ([play-shell](specs/play-shell.md)). | Closed |
 | **Work area** | The part of the viewport below the top bar and above the launcher; windows and the attack popup fit into it (decisions #172). | Viewport |
 | **Free area** | The largest part of the work area, right of the tool rail, that no open window covers; the map frames its tokens there (FR-SHELL-34, FR-MAP-44). | Work area |
+| **Auto placement** | Where a window opens when the user didn't choose: the free edge slot covering the fewest tokens ([play-shell](specs/play-shell.md)). | Layout |
 | **Alert** | The shell's attention signal for one client: screen flash, short UI sound ([ADR-0030](architecture/adr/0030-ui-notification-sounds.md)) and a Toast; per-browser mute and volume. Not persisted. | Notification |
 | **Layout** | Every window's state, geometry and z-order for one (campaign, owner); stored only in browser `localStorage` (decisions #121). | — |
 
