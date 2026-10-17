@@ -16,7 +16,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | M2 drag path | `build/drag-path` (w61, slot 0) | — | Walkthrough 9/9; merged main; gates queued after the physical-dice fix | Merge |
 | M5 labels + best-rectangle Fit | `fix/map-labels-fit` (w65, slot 2; based on build/drag-path) | build-map-labels-fit | Building (incl. S4-4's muted icon + tooltip) | Walkthrough → C-art |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
-| Physical dice in combat (BL-19, BL-25) | `fix/physical-dice-combat` (w62, slot 3) | — | Walkthrough 5/5; merged main, branch gates running | Merge |
+| Physical dice in combat (BL-19, BL-25) | merged | — | Done (walkthrough 5/5; check 3314, e2e 105) | — |
 | C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
 | V9 fog brush + Ctrl+Z | `build/fog-brush` (w63, slot 4) | build-fog-brush | Building | Walkthrough |
 | V10 party vision + Blinded | `build/party-vision` (w64, slot 5) | build-party-vision | Building (∥ V9; FogBar merge after V9) | Walkthrough |
