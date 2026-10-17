@@ -30,10 +30,11 @@ async function cellOf(page: Page, tokenId: string) {
   return page.evaluate((id) => {
     const K = (
       window as unknown as {
-        Konva?: { stages: { findOne(s: string): { x(): number; y(): number } | undefined }[] };
+        Konva?: { stages: { find(s: string): { id(): string; x(): number; y(): number }[] }[] };
       }
     ).Konva;
-    const n = K?.stages[0]?.findOne(`#${id}`);
+    // The token group itself (a drag path / trail shares its id, FR-MAP-52).
+    const n = K?.stages[0]?.find(".map-token").find((t) => t.id() === id);
     return n ? { col: Math.round(n.x() / 70), row: Math.round(n.y() / 70) } : null;
   }, tokenId);
 }

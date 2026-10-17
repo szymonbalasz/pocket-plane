@@ -61,15 +61,21 @@ test("FR-MOD-57 Divine Fury's d6: offered (dashed) on the roll line, a chip afte
   const p1Log = await openWindow(p1, "dice.log");
   const rollLine = p1Log.getByTestId("dice-log-entry").filter({ hasText: "on a hit" });
   await expect(rollLine).toHaveCount(1);
+  // The dice are real: a natural 20 (5%) doubles the trigger's dice too (FR-CBT-16), 2d6.
+  const crit = (await rollLine.textContent())?.includes("natural 20") ?? false;
   const offered = chips(rollLine, "Divine Fury (on a hit)");
-  await expect(offered).toHaveCount(1);
-  await expect(offered).toHaveAttribute("data-offered", "true");
-  await expect(offered).toHaveAttribute("data-kept", "true");
-  const die = Number(await offered.getAttribute("data-value"));
-  expect(die).toBeGreaterThanOrEqual(1);
-  expect(die).toBeLessThanOrEqual(6);
-  // Brakka is Barbarian 5: 1d6 + 2.
-  const n = die + 2;
+  await expect(offered).toHaveCount(crit ? 2 : 1);
+  const dice: number[] = [];
+  for (const d of await offered.all()) {
+    await expect(d).toHaveAttribute("data-offered", "true");
+    await expect(d).toHaveAttribute("data-kept", "true");
+    const v = Number(await d.getAttribute("data-value"));
+    expect(v).toBeGreaterThanOrEqual(1);
+    expect(v).toBeLessThanOrEqual(6);
+    dice.push(v);
+  }
+  // Brakka is Barbarian 5: 1d6 + 2 (2d6 + 2 on a crit).
+  const n = dice.reduce((a, b) => a + b, 0) + 2;
 
   const card = init.getByTestId("cbt-init-card");
   await expect(card).toHaveCount(1);
@@ -96,8 +102,10 @@ test("FR-MOD-57 Divine Fury's d6: offered (dashed) on the roll line, a chip afte
       .filter({ hasText: `+ ${n} radiant (Divine Fury)` });
     await expect(outcome).toHaveCount(1);
     const chip = chips(outcome, "Divine Fury");
-    await expect(chip).toHaveCount(1);
-    await expect(chip).toHaveAttribute("data-value", String(die));
-    await expect(chip).toHaveAttribute("data-offered", "false");
+    await expect(chip).toHaveCount(dice.length);
+    for (const [i, die] of dice.entries()) {
+      await expect(chip.nth(i)).toHaveAttribute("data-value", String(die));
+      await expect(chip.nth(i)).toHaveAttribute("data-offered", "false");
+    }
   }
 });

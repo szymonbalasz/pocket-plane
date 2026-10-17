@@ -13,10 +13,11 @@ async function cellOf(page: Page, tokenId: string) {
   return page.evaluate((id) => {
     const K = (
       window as unknown as {
-        Konva?: { stages: { findOne(s: string): { x(): number; y(): number } | undefined }[] };
+        Konva?: { stages: { find(s: string): { id(): string; x(): number; y(): number }[] }[] };
       }
     ).Konva; // undefined until the lazy MapCanvas chunk loads
-    const n = K?.stages[0]?.findOne(`#${id}`);
+    // The token group itself (a drag path / trail shares its id, FR-MAP-52).
+    const n = K?.stages[0]?.find(".map-token").find((t) => t.id() === id);
     return n ? { col: Math.round(n.x() / 70), row: Math.round(n.y() / 70) } : null;
   }, tokenId);
 }
@@ -38,12 +39,11 @@ async function mapToPage(page: Page, x: number, y: number) {
 async function tokenAttr(page: Page, tokenId: string, attr: string) {
   return page.evaluate(
     ([id, attr]) => {
-      type KNode = { getAttr(a: string): unknown };
-      type KStage = { findOne(s: string): KNode | undefined };
+      type KNode = { id(): string; getAttr(a: string): unknown };
+      type KStage = { find(s: string): KNode[] };
       const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
-      return (
-        (K?.stages[0]?.findOne(`#${id}`)?.getAttr(attr) as string | boolean | undefined) ?? null
-      );
+      const n = K?.stages[0]?.find(".map-token").find((t) => t.id() === id);
+      return (n?.getAttr(attr) as string | boolean | undefined) ?? null;
     },
     [tokenId, attr] as const,
   );
