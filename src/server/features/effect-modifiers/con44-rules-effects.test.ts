@@ -1,9 +1,10 @@
 // MOD §12 / §13.1 CON-44 (S4-0, review B16 / B29): the `rules-effects` fixtures measured end to
 // end against `rule-triggers`, every name track R adds or copies made 40 3-byte (CJK) chars
 // through the commands (the Flame Tongue row, the Divine Fury and Searing Strike triggers, the
-// Fire Ward preset), plus the `trigger-state` rows S4-3 will write for the started encounter
-// (one per enabled trigger and owner combatant, names copied; written straight to the table
-// here). Ceilings (#208) and MOD's sprint-4 bounds; per-role rows (FR-MOD-55).
+// Fire Ward preset), plus the `trigger-state` rows MOD writes for the started encounter (one per
+// enabled trigger and owner combatant, names copied). The baseline's own `trigger-state` bytes
+// are left out, so every state row counts in the delta. Ceilings (#208) and MOD's sprint-4
+// bounds; per-role rows (FR-MOD-55).
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
 import { loadRulesEffects } from "@fixtures/units/effect-modifiers/rules-effects";
@@ -15,16 +16,8 @@ import {
   type TriggerStateRecord,
 } from "@shared/effect-modifiers/trigger-state";
 import type { Attack } from "@shared/entities/schemas";
-import { and, eq } from "drizzle-orm";
-import {
-  campaign,
-  combatant,
-  effectPreset,
-  encounter,
-  entity,
-  ruleTrigger,
-  triggerState,
-} from "../../db/schema";
+import { eq } from "drizzle-orm";
+import { campaign, effectPreset, entity, ruleTrigger, triggerState } from "../../db/schema";
 import type { Actor } from "../../events/types";
 import { SNAPSHOT_CEILING } from "../../ws/hub";
 import {
@@ -37,7 +30,6 @@ import {
 /** MOD §12 sprint-4 bounds as measured in `con44.test.ts` (`R4_DM_MAX`, `R4_PLAYER_MAX`). */
 const R4_DM_MAX = 192 * 1024;
 const R4_PLAYER_MAX = 60 * 1024;
-const AT = "2026-01-01T00:00:00.000Z";
 const cjk = (n: number) => "火".repeat(n);
 
 describe("CON-44 rules-effects end to end, multi-byte names (MOD §12 sprint 4)", () => {
@@ -96,61 +88,31 @@ describe("CON-44 rules-effects end to end, multi-byte names (MOD §12 sprint 4)"
       },
     });
 
-    // `trigger-state` as S4-3 will write it: one row per (enabled trigger, owner combatant).
-    const enc = db
-      .select()
-      .from(encounter)
-      .where(and(eq(encounter.campaignId, cid), eq(encounter.status, "started")))
-      .get();
-    if (!enc) throw new Error("no started encounter");
-    const fighters = db
-      .select()
-      .from(combatant)
-      .where(and(eq(combatant.encounterId, enc.id), eq(combatant.active, true)))
-      .all();
-    for (const k of fighters) {
-      for (const t of db.select().from(ruleTrigger).all()) {
-        const own = k.kind === "pc" ? t.characterId === k.entityId : t.definitionId === k.entityId;
-        if (!own || !t.enabled) continue;
-        const every = t.rule.every;
-        db.insert(triggerState)
-          .values({
-            // A 36-char id, like a real one.
-            id: `ts-${stateRows}-${"x".repeat(36)}`.slice(0, 36),
-            campaignId: cid,
-            encounterId: enc.id,
-            combatantId: k.id,
-            triggerId: t.id,
-            characterId: t.characterId,
-            ownerPlayerId: t.ownerPlayerId,
-            name: t.name,
-            on: t.rule.on,
-            armed: t.rule.requires === undefined,
-            charge: "waiting",
-            featureId: typeof every === "object" ? every.feature : null,
-            updatedAt: AT,
-          })
-          .run();
-        stateRows++;
-      }
-    }
+    // `trigger-state` as MOD writes it (S4-3): one row per (enabled trigger, owner combatant) of
+    // the started encounter, names copied from the renamed triggers.
+    stateRows = db.select().from(triggerState).all().length;
     after = snapshotSizes(b.s);
   }, 120_000);
   afterAll(() => b.cleanup());
 
   test("CON-44 rules-effects end to end with CJK names: ceilings; track R rows within MOD's sprint-4 bounds", () => {
-    const deltas = after.map((s, i) => s.bytes - (before[i]?.bytes ?? 0));
+    const base = (i: number) =>
+      (before[i]?.bytes ?? 0) - (before[i]?.types[TRIGGER_STATE_TYPE]?.bytes ?? 0);
+    const deltas = after.map((s, i) => s.bytes - base(i));
     const typeDelta = (i: number) =>
       Object.entries(after[i]?.types ?? {})
-        .map(([k, v]) => [k, v.bytes - (before[i]?.types[k]?.bytes ?? 0)] as const)
+        .map(([k, v]) => {
+          const was = k === TRIGGER_STATE_TYPE ? 0 : (before[i]?.types[k]?.bytes ?? 0);
+          return [k, v.bytes - was] as const;
+        })
         .filter(([, d]) => d !== 0)
         .map(([k, d]) => `${k} ${d > 0 ? "+" : ""}${d}`)
         .join(", ");
     console.log(
-      `MOD CON-44 (S4-0) rules-effects vs rule-triggers, CJK names: ${stateRows} trigger-state rows; ${after.map((s, i) => `${s.label} ${s.bytes} B (${(deltas[i] ?? 0) >= 0 ? "+" : ""}${deltas[i]})`).join("; ")}`,
+      `MOD CON-44 (S4-3) rules-effects vs rule-triggers, CJK names: ${stateRows} trigger-state rows; ${after.map((s, i) => `${s.label} ${s.bytes} B (${(deltas[i] ?? 0) >= 0 ? "+" : ""}${deltas[i]})`).join("; ")}`,
     );
     for (const i of after.keys())
-      console.log(`MOD CON-44 (S4-0)   ${after[i]?.label}: ${typeDelta(i)}`);
+      console.log(`MOD CON-44 (S4-3)   ${after[i]?.label}: ${typeDelta(i)}`);
     expect(stateRows).toBeGreaterThan(0);
     const [dm, ...players] = after;
     expect(dm?.bytes ?? Infinity).toBeLessThan(SNAPSHOT_CEILING.dm);

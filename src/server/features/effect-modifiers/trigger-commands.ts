@@ -2,7 +2,8 @@
 // Rule-trigger authoring (FR-MOD-32–35, -45, -46): `mod.putTrigger` / `mod.deleteTrigger` and
 // the compendium's `addTriggerFromPreset`. Character triggers: DM, or the owner while the sheet
 // is unlocked; definition triggers: DM. One transaction per command; the `rule-trigger` change
-// rides on `RuleTriggerSaved` / `RuleTriggerDeleted` (lazy type: live events as any type).
+// rides on `RuleTriggerSaved` / `RuleTriggerDeleted` (lazy type: live events as any type), with
+// the trigger's `trigger-state` rows in a started encounter (FR-MOD-54).
 
 import { BUILTIN_PRESET_KEYS } from "@shared/effect-modifiers/schemas";
 import { formulaOwnerOf } from "@shared/effect-modifiers/trigger-fire";
@@ -35,9 +36,11 @@ import { effectPreset, entity, ruleTrigger, ruleTriggerSeqNext } from "../../db/
 import type { RecordChange } from "../../events/types";
 import { editableCreature } from "../character-sheet/access";
 import { getSheet } from "../character-sheet/sheet-rows";
+import { startedEncounter } from "../combat-tracker/rows";
 import { resolveDefinition } from "../entities/commands";
 import { campaignOf } from "./rows";
 import { type RuleTriggerRow, toRuleTriggerRecord } from "./trigger-records";
+import { dropTriggerStates, triggerStates } from "./trigger-state-writes";
 
 type Env = CommandEnv;
 type Read = Pick<Env["tx"], "select">;
@@ -219,13 +222,16 @@ interface WriteTrigger {
   rule: TriggerRule;
 }
 
-/** Validates, then inserts / replaces; the row's change. No event (callers emit or list it). */
+/**
+ * Validates, then inserts / replaces; the row's change, then its trigger-state rows' (added,
+ * renamed, disabled, re-ruled: FR-MOD-54). No event (callers emit or list them).
+ */
 function writeTrigger(
   env: Env,
   owner: Owner,
   t: WriteTrigger,
   at: (string | number)[],
-): { triggerId: string; change: RecordChange } {
+): { triggerId: string; changes: RecordChange[] } {
   const before = t.id === undefined ? null : getTrigger(env, t.id);
   if (before && (before.characterId ?? before.definitionId) !== owner.id) {
     throw invalid("A trigger keeps its owner");
@@ -258,7 +264,11 @@ function writeTrigger(
       })
       .run();
   }
-  return { triggerId: id, change: triggerChange(before, readTrigger(env.tx, id)) };
+  const change = triggerChange(before, readTrigger(env.tx, id));
+  return {
+    triggerId: id,
+    changes: [change, ...triggerStates(env, startedEncounter(env.tx, campaignOf(env)))],
+  };
 }
 
 /** The redacted-name message: a `{name}` ref only keeps what the stored rule already names. */
@@ -315,12 +325,12 @@ export const putTrigger = defineCommand({
     const owner = editableOwner(env, input.characterId, input.definitionId);
     const rule = resolveNamedRefs(env, input.id, input.rule, ["trigger", "rule"]);
     const t = { ...input, rule };
-    const { triggerId, change } = writeTrigger(env, owner, t, ["trigger"]);
+    const { triggerId, changes } = writeTrigger(env, owner, t, ["trigger"]);
     env.emit({
       type: RuleTriggerSaved.type,
       campaignId: campaignOf(env),
       payload: { triggerId },
-      changes: [change],
+      changes,
     });
     return { triggerId };
   },
@@ -333,13 +343,14 @@ export const deleteTrigger = defineCommand({
   execute({ triggerId }, env): void {
     const before = getTrigger(env, triggerId);
     editableOwner(env, before.characterId, before.definitionId);
-    // Its `trigger_use` rows cascade (server-only, nothing to send).
+    // Its `trigger_use` rows cascade (server-only, nothing to send); its state rows are listed.
+    const states = dropTriggerStates(env, before.id);
     env.tx.delete(ruleTrigger).where(eq(ruleTrigger.id, before.id)).run();
     env.emit({
       type: RuleTriggerDeleted.type,
       campaignId: before.campaignId,
       payload: { triggerId: before.id },
-      changes: [triggerChange(before, null)],
+      changes: [triggerChange(before, null), ...states],
     });
   },
 });
@@ -371,8 +382,7 @@ export function addTriggerFromPreset(
     if (!name) issue(["name"], "Name is required");
     t = { name, enabled: true, rule: rule.data };
   }
-  const { triggerId, change } = writeTrigger(env, owner, t, []);
-  return { triggerId, changes: [change] };
+  return writeTrigger(env, owner, t, []);
 }
 
 /** A character's triggers (owner-copy hook, FR-MOD-47). */
