@@ -7,6 +7,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
+import { showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 const WIDE = { width: 1440, height: 900 };
@@ -73,7 +74,7 @@ test("FR-MAP-44 / -45 FR-SHELL-34 fit to the free area: open, reload, pan + Fit,
     .first()
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
-  await dm.getByTestId("map-show-to-players").click();
+  await showToPlayers(dm, "Goblin Ambush");
   await expect(dm.getByTestId("map-not-shown-badge")).toHaveCount(0);
   await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
   // P3 glitch 3: no encounter running → the empty Initiative opened minimised (launcher keeps it).

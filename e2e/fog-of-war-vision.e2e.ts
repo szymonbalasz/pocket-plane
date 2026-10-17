@@ -9,6 +9,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, tokenNode } from "./support/konva";
+import { showToPlayers } from "./support/scenes";
 import { openWindow } from "./support/shell";
 
 /** Map px → page px on the first stage. */
@@ -86,8 +87,8 @@ test("FR-FOG-21 / -34 / -37 / -43 / -44 / -45 / -47 vision: d1 open, Mira → (7
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
+  await showToPlayers(dm, "Goblin Ambush");
   await scenes.getByTestId("ui-window-close").click();
-  await dm.getByTestId("map-show-to-players").click();
 
   const p1 = await rolePage(browser);
   const p2 = await rolePage(browser);
