@@ -88,6 +88,8 @@ test("FR-CMP-24 FR-CMP-25 FR-CMP-27 FR-CMP-28 FR-CMP-29 DM clones a shared potio
   await win.getByTestId("cmp-delete").click();
   await dm.getByTestId("cmp-delete-confirm").click();
   await expect(win.getByTestId("cmp-window")).toHaveAttribute("data-view", "list");
-  await pw1.getByTestId("cmp-search").fill("(house)");
+  // (S4: "(house)" folds to the word `house`, which SRD text also matches; search the clone's
+  // own words instead, FR-CMP-32.)
+  await pw1.getByTestId("cmp-search").fill("greater healing house");
   await expect(pw1.getByTestId("cmp-empty")).toBeVisible();
 });

@@ -11,6 +11,7 @@ import {
   creatureSheet,
   entity,
 } from "@server/db/schema";
+import { loadSrd51 } from "@server/features/compendium/sources/srd-5.1";
 import { loadInProcess } from "@server/features/fixtures-adapters/loader";
 import { FeatureBody } from "@shared/compendium/schemas";
 import { TriggerRule } from "@shared/effect-modifiers/triggers";
@@ -20,6 +21,7 @@ import { library, loadBundle } from "../../index";
 import { units } from "../index";
 import { DIVINE_FURY_RULE, HOUSE_FIREBALL_NAME, SECRET_ITEM_NAME } from "./cmp-homebrew";
 import { SECOND_HOMEBREW_NAME } from "./cmp-homebrew-second";
+import { HB_POTION_MARKER } from "./cmp-search-homebrew";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -147,6 +149,32 @@ describe("compendium fixtures (CMP §13)", () => {
     expect(TriggerRule.parse(body.preset)).toEqual(DIVINE_FURY_RULE);
     expect(fury?.searchText).not.toContain("ownturn");
   });
+
+  test("CMP §13 compendium-full from empty (S4): the bundled source at its version, 1,150 entries; search homebrew per cmp-search-homebrew", async () => {
+    const r = read(await loadBundle("compendium-full"));
+    expect(r.manifest.fixtures).toEqual(
+      expect.arrayContaining([...CMP_UNITS, "cmp-srd-full", "cmp-search-homebrew"]),
+    );
+    const bundled = loadSrd51();
+    expect(r.sources.map((s) => [s.key, s.version])).toEqual([["srd-5.1", bundled.version]]);
+    expect(r.entries.filter((e) => e.source === "srd-5.1")).toHaveLength(1150);
+    expect(r.entities.filter((e) => e.source === "srd-5.1")).toHaveLength(322);
+    const fixture = r.camps["Fixture Campaign"] as string;
+    const brew = r.entries
+      .filter(
+        (e) =>
+          e.campaignId === fixture && ["Potion of Healing", "Healing Draught"].includes(e.name),
+      )
+      .map((e) => [e.name, e.shared]);
+    expect(brew).toEqual([
+      ["Healing Draught", true],
+      ["Potion of Healing", false],
+    ]);
+    const hidden = r.entries.find(
+      (e) => e.campaignId === fixture && e.name === "Potion of Healing",
+    );
+    expect(hidden?.searchText).toContain(HB_POTION_MARKER.toLowerCase());
+  }, 60_000);
 
   test("CMP §13 deterministic: two loads give identical IDs and rows", async () => {
     const a = read(await loadBundle("compendium"));

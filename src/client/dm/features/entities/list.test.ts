@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { actionsOf } from "./creature-actions";
-import { creatureRows } from "./list";
+import { creatureRows, matchCreatureRows } from "./list";
 
 const t = { createdAt: "t", updatedAt: "t", portraitAssetId: null, tokenShape: null };
 const monster = (cr: string) => ({
@@ -62,7 +62,7 @@ const customGoblin = { ...elite, id: "cg", name: "goblin", derivedFromId: null }
 const players = [{ id: "p1", campaignId: "c", name: "Player 1" }];
 
 describe("Creatures list model", () => {
-  test("FR-ENT-18 sorted by name ci, custom before imported, then id; badges, CR + XP", () => {
+  test("FR-ENT-18 sorted by name ci, custom before imported, then source rank, then id; badges, CR + XP", () => {
     const rows = creatureRows([elite, mira, customGoblin], [wolf, goblin], players);
     expect(rows.map((r) => [r.name, r.badge, r.readOnly])).toEqual([
       ["Elite Goblin Warrior", "Custom", false],
@@ -76,6 +76,44 @@ describe("Creatures list model", () => {
     expect(creatureRows([], [srd], players)[0]?.badge).toBe("SRD");
     expect(rows.map((r) => r.xp)).toEqual([100, 100, 50, null, 50]);
     expect(rows[0]?.derivedFrom).toBe("Goblin");
+  });
+
+  test("FR-ENT-18 order: equal names → custom, then srd-5.1, then fixture, then id (FR-CMP-38)", () => {
+    // "a-fx" sorts before "z-srd" by id; source rank decides first.
+    const fx = { ...goblin, id: "a-fx" };
+    const srd = { ...goblin, id: "z-srd", source: "srd-5.1", sourceKey: "monster/goblin" };
+    const rows = creatureRows([customGoblin], [fx, srd], players);
+    expect(rows.map((r) => [r.id, r.badge])).toEqual([
+      ["cg", "Custom"],
+      ["z-srd", "SRD"],
+      ["a-fx", "Fixture"],
+    ]);
+  });
+
+  test("FR-ENT-18 FR-CMP-37 search: every word matches the name by the shared tier, by tier, then FR-ENT-18 order", () => {
+    const srd = { ...goblin, id: "z-srd", source: "srd-5.1", sourceKey: "monster/goblin" };
+    const hob = { ...goblin, id: "h", name: "Hobgoblin", sourceKey: "hob", source: "srd-5.1" };
+    const rows = creatureRows([elite, mira, customGoblin], [goblin, srd, hob, wolf], players);
+    const names = (q: string) => matchCreatureRows(rows, q).map((r) => `${r.name}/${r.badge}`);
+    // SRD Goblin above the fixture Goblin (FR-CMP-38); tier 1 before 2 before 3.
+    expect(names("gob")).toEqual([
+      "goblin/Custom",
+      "Goblin/SRD",
+      "Goblin/Fixture",
+      "Elite Goblin Warrior/Custom",
+      "Hobgoblin/SRD",
+    ]);
+    expect(names("goblin")).toEqual([
+      "goblin/Custom",
+      "Goblin/SRD",
+      "Goblin/Fixture",
+      "Elite Goblin Warrior/Custom",
+      "Hobgoblin/SRD",
+    ]);
+    expect(names("warrior gob")).toEqual(["Elite Goblin Warrior/Custom"]);
+    expect(names("MIRA")).toEqual(["Mira/Player 1"]);
+    expect(names("gob zzz")).toEqual([]);
+    expect(matchCreatureRows(rows, "  ")).toEqual(rows);
   });
 
   test("FR-ENT-18 tabs filter by kind", () => {

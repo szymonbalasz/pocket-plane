@@ -8,7 +8,6 @@ import {
   DEFINITION_DRAG_MIME,
   type DefinitionDragData,
   ENTITY_TYPE,
-  entityNameKey,
 } from "@shared/entities/schemas";
 import { Button } from "@ui/components/ui/button";
 import { Tooltip } from "@ui/components/ui/overlays";
@@ -30,7 +29,13 @@ import { useRecords, useSync } from "@ui/sync/store";
 import { LockIcon, PawPrintIcon, UserIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { actionsOf, type CreatureAction, creatureActions } from "./creature-actions";
-import { CREATURE_TABS, type CreatureRow, type CreatureTab, creatureRows } from "./list";
+import {
+  CREATURE_TABS,
+  type CreatureRow,
+  type CreatureTab,
+  creatureRows,
+  matchCreatureRows,
+} from "./list";
 
 /** The DM REST client, imported lazily (the session reads localStorage at import). */
 const api = lazyApi(() => import("../campaign-management/session").then((m) => m.api));
@@ -166,15 +171,13 @@ export function CreaturesList({
   const rows = useMemo(() => {
     const shown = new Set(imported.results.map((r) => r.definitionId));
     const importedDefs = [...defs.values()].filter((d) => d.campaignId === null && shown.has(d.id));
-    const key = entityNameKey(q.trim());
-    return creatureRows(entities, importedDefs, players, tab)
-      .filter((r) => key === "" || entityNameKey(r.name).includes(key))
-      .map((r) => {
-        const base = r.definition.derivedFromId;
-        return base && r.derivedFrom === "(unknown)" && defs.has(base)
-          ? { ...r, derivedFrom: defs.get(base)?.name ?? r.derivedFrom }
-          : r;
-      });
+    // FR-ENT-18: store and loaded imported rows alike match by the shared name tier (FR-CMP-37).
+    return matchCreatureRows(creatureRows(entities, importedDefs, players, tab), q).map((r) => {
+      const base = r.definition.derivedFromId;
+      return base && r.derivedFrom === "(unknown)" && defs.has(base)
+        ? { ...r, derivedFrom: defs.get(base)?.name ?? r.derivedFrom }
+        : r;
+    });
   }, [entities, defs, imported.results, players, tab, q]);
   const { toolbar, row: rowActions } = useMemo(() => actionsOf(actions), [actions]);
 

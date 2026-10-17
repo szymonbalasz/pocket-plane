@@ -1,6 +1,7 @@
 // entities boundary schemas (ENT §6, §8, §9): kind registry, creature core, wire records,
 // REST bodies, derived values. One schema for pipeline, commands, fixtures and clients.
 import { DeathSaveCount, TempHp } from "@shared/combat-extras/schemas";
+import { sourceRank } from "@shared/compendium/match";
 import { z } from "zod";
 import { HP_FORMULA_MESSAGE, normalizeHpFormula, parseHpFormula } from "./hp-formula";
 
@@ -733,19 +734,21 @@ export function hitDice(stats: { classes?: readonly ClassRow[] }): Partial<Recor
 }
 
 /**
- * Creatures window order (FR-ENT-18): name case-insensitive, then custom before imported,
- * then id. Code-point order on the folded name, so it is the same on every machine.
+ * Creatures window order (FR-ENT-18): name case-insensitive, then custom before imported, then
+ * imported by source rank (FR-CMP-38: `srd-5.1` before `fixture`), then id. Code-point order on
+ * the folded name, so it is the same on every machine.
  */
 export function definitionOrder(
-  a: { id: string; name: string; campaignId: string | null },
-  b: { id: string; name: string; campaignId: string | null },
+  a: { id: string; name: string; campaignId: string | null; source?: string | null },
+  b: { id: string; name: string; campaignId: string | null; source?: string | null },
 ): number {
   const ka = entityNameKey(a.name);
   const kb = entityNameKey(b.name);
   if (ka !== kb) return ka < kb ? -1 : 1;
-  const ia = a.campaignId === null ? 1 : 0;
-  const ib = b.campaignId === null ? 1 : 0;
-  if (ia !== ib) return ia - ib;
+  // Customs rank 0 (the campaign's own); imported 1–3 by source.
+  const ra = a.campaignId === null ? sourceRank(a.source ?? "") : 0;
+  const rb = b.campaignId === null ? sourceRank(b.source ?? "") : 0;
+  if (ra !== rb) return ra - rb;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 

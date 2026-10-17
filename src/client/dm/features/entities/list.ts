@@ -2,6 +2,7 @@
 // schema are omitted (FR-ENT-01); the server already drops them, this guards the client too.
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
+import { nameTier, queryWords } from "@shared/compendium/match";
 import {
   type DefinitionRecord,
   definitionOrder,
@@ -71,4 +72,20 @@ export function creatureRows(
         definition: d,
       };
     });
+}
+
+/**
+ * FR-ENT-18 search (S4, FR-CMP-37): the rows whose name matches every typed word per the shared
+ * `nameTier` (0–3), by tier, then in `rows`' FR-ENT-18 order. Empty query → all rows.
+ */
+export function matchCreatureRows(rows: readonly CreatureRow[], q: string): CreatureRow[] {
+  const words = queryWords(q);
+  if (words.length === 0) return [...rows];
+  return rows
+    .map((r, i) => ({ r, i, tier: nameTier(r.name, words) }))
+    .filter(
+      (x): x is { r: CreatureRow; i: number; tier: NonNullable<typeof x.tier> } => x.tier !== null,
+    )
+    .sort((a, b) => a.tier - b.tier || a.i - b.i)
+    .map((x) => x.r);
 }
