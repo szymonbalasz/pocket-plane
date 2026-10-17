@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: claimed
+status: in-review
 owner: spec-dice
 wave: 2
 phase: post-mvp-4
@@ -20,6 +20,7 @@ phase: post-mvp-4
 - **Playtest pass** (#171; FR-DICE-28, 29): one rule for **DM-only detail** in any kind's line (facts a kind declares DM-only, e.g. AC, "DM ruled hit", an NPC's damage dice, live in `dmPayload`, shown on the DM client only) and for the "physical" tag across kinds (P5, G7, G8); no "natural 1" noise on initiative lines (G12).
 - **Polish pass** (sprint 1, R3; FR-DICE-30): the roll bar collapses to one row, so the Game log shows ≥ 6 lines of history at default size ([FR-SHELL-35](play-shell.md#6-functional-requirements)).
 - **Sprint 2 phase 1** (P2b; FR-DICE-31–34): physical dice after a natural 20 ask only for the **extra critical dice** and keep what was typed (G6); a Roll that can't go never fails silently; a minimised Game log shows a "new" dot (N1, decided #190, [OQ-SHELL-21](play-shell.md#15-open-questions)); the DM can roll as a token-less combatant (S4).
+- **Sprint 4** (DM [#243](../decisions-log.md) [17]; FR-DICE-35–37): log lines show **the same dice as the tray**: each die as an inline die-shape chip in the roller's look ([FR-DICEX-42](dice-extras.md#6-functional-requirements)); the roll popup opens the log at its entry. No payload, kind, event or schema change.
 
 ## 2. Scope
 
@@ -28,6 +29,7 @@ phase: post-mvp-4
 - Categories: attack, damage, saving throw, ability check, skill check, contested, initiative, healing, other. Public log settings per campaign, live; DM per-roll override at roll time.
 - Window `dice.log` (both clients); typed entries so text can join later (chat tier C–D, #61).
 - Every roll persisted with roller, actor, every die, automated vs manual ([stats](post-mvp/stats.md), #54).
+- *(Sprint 4)* Dice chips in log lines; a `die` line segment for kinds; `focusLogEntry` for the roll popup (FR-DICE-35–37).
 
 ## 3. Goals
 
@@ -87,18 +89,23 @@ phase: post-mvp-4
 | FR-DICE-32 | **No silent Roll** (G6): a slot is complete when its total (base and, after a crit, extra) is filled and within the dice part's min–max, or when every per-die box of that group is filled (the total is then computed and shown). Roll / Enter with an incomplete or out-of-range slot sends nothing, focuses the first offending input and shows an inline message under the popover (`dice-manual-error`): "Enter the total for 4d6 (critical)" / "Total must be 4–24". The Roll button stays enabled (a disabled button is the silent case the report hit). | G6 |
 | FR-DICE-33 | **Minimised Game log dot** (N1; decided #190, [OQ-SHELL-21](play-shell.md#15-open-questions)): both clients' `dice.log` window types declare `activity(store)` = the highest entry `n` in this client's store ([FR-SHELL-38](play-shell.md#6-functional-requirements)), so a new entry this client can see lights the launcher dot while the log is minimised (players: public entries only; the DM: every entry). | N1 |
 | FR-DICE-34 | **Roll as token-less combatants** (report item 17; settled S4, OQ-CBT-55; amends FR-DICE-27, FR-DICE-10): the DM's actor Select also lists every **active, non-removed combatant of the started encounter that has no token** (e.g. "Goblin 3" added mid-fight), after the scene's tokens, by the combatant's name. It sends actor `{combatantId}` (**DM only**; a player sending it → `invalid`, not in the player schema). The server resolves it in the campaign's started encounter (else `not_found`) to `{kind: entity, id: combatant.entityId, name: combatant's name}`, so the `roll` row and entry need no new actor kind or column. Visibility unchanged: the entry is a DM roll, public per category / override (FR-DICE-13). Encounter ended or combatant removed between pick and roll → `not_found` inline, the Select drops it. | Item 17 |
+| **Sprint 4** (#243 [17]) | | |
+| FR-DICE-35 | **Dice in log lines** (OQ-DICE-27): a `roll` line (FR-DICE-20) shows each die as an inline **die-shape chip** ([FR-DICEX-42](dice-extras.md#6-functional-requirements), size `sm` 18 px, the roller's look) in place of its number: "Mira — Athletics: ⬡13 + 5 = 18". Dropped dice struck and dimmed (adv / dis), MOD / offered dice with their label, manual dice with per-die values as chips plus the "physical" badge, a manual total without per-die values as one round chip. Built from a new optional `die {faces, value, kept, label?}` on `LineSegment` (`@shared/dice-roll-log/kind-types.ts`), emitted by `rollSegments` / `rollBreakdownSegments`; `text` stays on every segment, so `lineText`, copy, the Tooltip and screen readers read "d20: 13". A chip fits the line height: FR-SHELL-35's ≥ 6 single-line entries hold. | [17] |
+| FR-DICE-36 | **Other kinds** get chips through the shared helpers, with no change of their own, for exactly the dice their line already shows: the DM's `cbt.attack` dice breakdown ([FR-CBT-53](combat-tracker.md#6-functional-requirements)) shows chips on the DM client; players' `cbt.attack` to-hit ("12 + 4", a sum in `payload`) stays text. No new payload field, so nothing new reaches players; the FR-DICE-28 kind contract still holds (a `die` segment is DM-only exactly when its text is). R's Divine Fury line ([15], effect-modifiers) builds on the same segment after this slice. | Seam R |
+| FR-DICE-37 | **Focus an entry**: `focusLogEntry(entryId)` (`@ui`, dice-roll-log client) opens or restores and fronts `dice.log` ([FR-SHELL-08](play-shell.md#6-functional-requirements)), scrolls the entry into view and highlights it for 2 s (`dice-log-entry` `data-focused`); an entry not in the store (below the window, FR-DICE-17) → the log opens only. Caller: the roll popup ([FR-DICEX-39](dice-extras.md#6-functional-requirements)). | [11] |
 
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, semantic tokens (`visibility.hidden` for the hidden marker).
 
 - **Window `dice.log`** "Game log": both clients, default open, bottom-left above the launcher, 420×320, min 300×200, launcher "Log" (OQ-SHELL-06, I12).
-- **Line:** actor bold, body text, total bold; category as a small muted Badge; Tooltip = time + expression + all dice. "physical" Badge for manual.
+- **Line:** actor bold, body text, total bold; category as a small muted Badge; Tooltip = time + expression + all dice. "physical" Badge for manual. *(Sprint 4)* Dice as inline die-shape chips (FR-DICE-35), vertically centred on the text; a focused entry (FR-DICE-37) gets the accent ring for 2 s.
 - **Roll bar:** Input (expression), Select (category), Input (label), Select (actor), ToggleGroup (Dis / Normal / Adv), Switch "Physical dice"; DM: Switch "Public", gear Button. *(R3, FR-DICE-30)* Row 1: expression, mode, DM eye toggle, Roll, Options chevron (lucide `chevron-up` / `-down`); row 2 (Options): the rest. Manual popover: per expression a read-only expression + dice total Input (+ optional per-die Inputs). *(G6)* After a natural 20 a crit slot adds a muted sub-row "Extra critical dice: 4d6" with its own total (+ per-die) Inputs; the inline error sits under the inputs.
 - **States:** empty "No rolls yet"; loading skeleton; disconnected: log stays, banner, roll bar disabled; reject: inline error under the bar.
 - **DM view:** all entries, hidden ones muted + eye-off; public switch; gear. **Player view:** public entries only; no markers, switch or gear.
 - **Keyboard:** Enter / Shift+Enter / Ctrl+Enter in the expression input. macOS Ctrl+click opens a context menu: Mac users use the toggle (laptops per ADR-0007; accepted).
-- **Test IDs:** `dice-log`, `dice-log-empty`, `dice-log-new`, `dice-log-entry` + `data-record-id` + `data-public` + `data-undone`, `dice-log-entry-manual`; `dice-roll-expression`, `-category`, `-label`, `-actor`, `-mode` (+ `data-value=normal|advantage|disadvantage`), `-physical`, `-public`, `-submit`, `-error`; `dice-manual-total`, `dice-manual-die` (+ `data-value` = expression position), `dice-manual-submit`; `dice-settings-open`, `dice-settings-category` + `data-value=<category>`. *(R3)* `dice-roll-options` (+ `data-state=open|closed`, `data-dirty`); `dice-roll-public` is the eye toggle (+ `data-state=public|hidden`). *(G6)* `dice-manual-crit-total`, `dice-manual-crit-die` (+ `data-value` = expression position), `dice-manual-error`.
+- **Test IDs:** `dice-log`, `dice-log-empty`, `dice-log-new`, `dice-log-entry` + `data-record-id` + `data-public` + `data-undone`, `dice-log-entry-manual`; `dice-roll-expression`, `-category`, `-label`, `-actor`, `-mode` (+ `data-value=normal|advantage|disadvantage`), `-physical`, `-public`, `-submit`, `-error`; `dice-manual-total`, `dice-manual-die` (+ `data-value` = expression position), `dice-manual-submit`; `dice-settings-open`, `dice-settings-category` + `data-value=<category>`. *(R3)* `dice-roll-options` (+ `data-state=open|closed`, `data-dirty`); `dice-roll-public` is the eye toggle (+ `data-state=public|hidden`). *(G6)* `dice-manual-crit-total`, `dice-manual-crit-die` (+ `data-value` = expression position), `dice-manual-error`. *(Sprint 4)* `dice-log-die` (a chip in a line; + `data-shape`, `data-faces`, `data-value`, `data-kept`), `dice-log-entry` gains `data-focused`.
+- *(Sprint 4)* **DM view:** chips on every line incl. hidden ones and the DM-only dice breakdowns. **Player view:** chips only for dice in public payloads.
 
 ## 8. Data model
 
@@ -124,7 +131,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 | | attack … other | bool × 9 | No row = all false |
 
 - **Relations:** Campaign 1—* Roll, Entry; Entry → Rolls via `rollIds` (no entry references a roll = never logged → hidden for stats; I24, no `Roll.entryId`); Roll → Player, Entity, Token by id (no FK; names copied).
-- **Derived:** line text (`formatLine`), natural 20/1, effective settings. **Persisted:** rolls, entries, settings. Physical-dice mode: browser only.
+- **Derived:** line text (`formatLine`), natural 20/1, effective settings; *(sprint 4)* `die` segments and their chips from the same payload (FR-DICE-35). **Persisted:** rolls, entries, settings. Physical-dice mode: browser only.
 - **Gems later (#140):** a reroll = new roll + new entry, old entry's `supersededBy` set (shown struck through); a modified damage die = new roll row with `replacesRollId`, written by the owning command. No MVP command sets either field. Manual rolls stored without per-die values (FR-DICE-06) need them entered before a Combat gem applies.
 
 ## 9. API & events
@@ -175,11 +182,13 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - **Compact bar (R3):** a DM rolling with Options closed still gets the category preset for Public (the eye shows it), so a hidden roll can't go public by surprise; the dot warns when a hidden option is set. Storage unavailable → Options closed, in memory. Disconnect: bar disabled as before; Options toggle still works (client only).
 - **Physical crit (G6):** the popover is client state; a disconnect while it is open disables Roll (not `live`) and keeps the typed values; reconnect → Roll works again. Server crash: nothing was sent. A manual crit entry still validates server-side against the crit expression (FR-DICE-06), so a client bug can't log an impossible total.
 - **Log growth:** rows kept forever (~1 KB/roll; 10 k rolls ≈ 10 MB); snapshots stay bounded (FR-DICE-17).
+- *(Sprint 4)* **Chips:** rows written before sprint 4 render chips too (same payload); a manual roll without per-die values → one round chip with the dice total; > 20 dice in a line → all chips, wrapping (the Tooltip still lists them). Disconnect / reconnect / crash: chips are derived on render, nothing to recover. Reload: same lines, same chips. `focusLogEntry` on an entry below the window → the log opens, no scroll.
 
 ## 12. Performance & bandwidth
 
 - Entry 300–600 B typical on the wire; schema max (20 rolls × 50 dice) ≈ 8 KB. `DiceRolled` ≈ 0.6 KB × 7 connections per roll; human-paced.
-- Snapshot budget `game-log-entry`: 100 entries ≈ 60 KB typical, ≤ 100 KB (protocol per-type budget table, I17). Evaluation of ≤ 50 dice sub-millisecond; commit → frame < 50 ms locally ([live-sync §12](live-sync.md#12-performance--bandwidth)).
+- Snapshot budget `game-log-entry`: 100 entries ≈ 60 KB typical, ≤ 100 KB (protocol per-type budget table, I17).
+- *(Sprint 4, measured 2026-10-17 on real sockets, `dice-log`)* `DiceRolled` frame: player `1d20+5` 782 B to the DM / 765 B to another player; `10d6` 1,084 / 1,067 B; `50d6` 2,439 / 2,422 B; a DM hidden roll sends players **no frame**. FR-DICE-35–37 add **0 B** (chips are drawn from the payload already sent). Evaluation of ≤ 50 dice sub-millisecond; commit → frame < 50 ms locally ([live-sync §12](live-sync.md#12-performance--bandwidth)).
 
 ## 13. Test plan
 
@@ -200,6 +209,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | Integration (S4) | `FR-DICE-34`: DM `dice.roll {actor: {combatantId}}` for a token-less combatant → entry `actorName` "Goblin 3", roll `actorKind` entity; unknown / ended → `not_found`; player sending it → `invalid` | `combat` (combat-tracker's bundle) |
 | Integration | `dice.roll`: roll + entry + log row in one tx, event before `ack`, rollback → none. Ownership: `player-1` as Mira ✓, as Thorn `forbidden`, with `public` `forbidden`. Category change not retroactive; same value → no event. Settings never in player frames. Window: 105 entries → newest 100; floor cut before the filter; `markUndone` below the floor; convergence per ADR-0029. Test-registered kind via `gameLog.append` + `markUndone` commits / rolls back with its caller; multi-roll entry. **Leak scan:** player frames never contain "DM-SECRET-ROLL" or `dmPayload`. Restart → identical snapshots | `dice-log` |
 | E2E (thin) | DM + `player-1`: player Shift+Enter roll appears for DM; DM hidden roll absent from player frames; DM public roll appears for player | `dice-log` |
+| Unit (sprint 4) | `FR-DICE-35 log die chips`: `rollSegments` gives one `die` segment per die (kept / dropped, MOD / offered labels, manual with and without per-die values → chips / one round chip), `lineText` unchanged byte for byte vs sprint 3 for every `line.test.ts` case; `GameLog` renders `dice-log-die` with the right `data-shape` per faces and the roller's look; `FR-SHELL-35` layout test still ≥ 6 lines. `FR-DICE-36`: the DM's `cbt.attack` breakdown yields chips; the player view of the same entry has no `die` segment beyond the text it showed; FR-DICE-28 kind contract with `die` segments (sentinel never in a player line). `FR-DICE-37 focusLogEntry`: closed / minimised log opens and fronts, scrolls, `data-focused` 2 s; unknown id → opens only | in-code |
 
 **Browser walkthrough** — `PP_TEST_MODE=1` (for "drop connection"); `bun run build`, `fixtures:reset-load dice-log --profile verify`, `start --profile verify`; evidence per AGENTS §9.6. Contexts **A** DM, **B** `player-1`, **C** `player-2`. Automated totals are random: check *total = kept dice + constants*. Teardown: stop server, `fixtures:reset --profile verify`.
 
@@ -227,6 +237,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outcome lines) is walked in [combat-tracker §13](combat-tracker.md#13-test-plan) step 9a.
 
+**Sprint 4 walkthrough:** log chips and `focusLogEntry` are walked with the dice display in [dice-extras §13](dice-extras.md#13-test-plan) steps 14, 22 and 26 (bundle `dice-display`). Also here, on `dice-log`: step 1 again → e1–e4 show die chips (e4's manual 15 as a d20 chip + "physical"); step 3 → B's adv line shows two d20 chips, one struck.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -253,6 +265,8 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 **Shared changes — sprint 2 phase 1** (P2b): none shared. Feature-owned: `src/client/common/features/dice-roll-log/{roll-control.tsx (extra crit group, inline error), logic.ts (slot completeness, `ManualEntry` merge)}` (G6); the `dice.log` window defs (`window.ts` / the DM and player `log-window` files) gain `activity` (N1, after play-shell's `activity?` field lands). No DB, event, protocol, record type or server change; `ManualEntry` unchanged. Docs at consolidation: protocol §26 roll-control row (crit as extra dice). *(S4)* FR-DICE-34: `@shared/dice-roll-log/schemas.ts` (DM actor `{combatantId}`), `src/server/features/dice-roll-log/commands.ts` (resolve via a combat-tracker read, as it already reads `token`), `GameLog.tsx` (list); protocol §5 `dice.roll` row at consolidation. Order (review plan): `fix/physical-crit` (G6, `crit: true`, FR-DICE-34) first; roll-control lock → P2a `fix/combat2-split-attack` (consumer of `crit: true`) → M `fix/mod-roll-preview`; dice-roll-log shared + server lock → M `fix/mod-core` (X-3).
 
+**Shared changes — sprint 4** (#243 [17]): none in AGENTS §9.9. Feature-owned (D owns the dice display hotspot): `src/shared/dice-roll-log/{kind-types.ts (optional `die` on `LineSegment`), roll-kind.ts (segments)}`, `src/client/common/features/dice-roll-log/{GameLog.tsx (chips, focus), focus.ts (new)}`; `DieShape` from dice-extras. `kinds.ts`, schema, events, protocol unchanged. Order: D5 `build/dice-shapes` before R's Divine Fury log line [15] (sprint-4 hotspot rule). Docs at consolidation: protocol §26 log-kinds row (`die` segment).
+
 **Combat lines (R4, sprint 1):** [combat-tracker](combat-tracker.md) FR-CBT-57/58 add natural markers to `cbt.attack` lines from public `payload` fields only, so FR-DICE-28 holds unchanged.
 
 ## 15. Open questions
@@ -263,6 +277,8 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 | ~~OQ-DICE-23~~ | ~~Natural marker on initiative lines (G12)~~ | **Decided (#172):** no natural marker on initiative lines (FR-DICE-29) | — | combat-tracker |
 | ~~OQ-DICE-25~~ | ~~R3: DM Game log history shows ~3 lines; multi-line outcome lines are cut~~ | **Decided #178:** collapse the roll bar to one row, options behind a chevron (FR-DICE-30). Rejected: taller or wider DM default (covers more map, R1) | — | play-shell |
 | ~~OQ-DICE-26~~ | ~~G6: after a natural 20, how does the physical popover ask for crit damage?~~ | **Decided (#190):** keep the typed base dice, add an "Extra critical dice" group (FR-DICE-31) | — | combat-tracker (crit expressions) |
+| OQ-DICE-27 | Sprint 4 [17]: how do log lines show the dice? (owner `spec-dice`, for the DM gate) | **A inline die-shape chips in place of the dice numbers: ≥ 6 lines still fit**. B a chip row under each line: bigger dice, about half the lines visible at default size (breaks FR-SHELL-35). C chips only in the Tooltip: no layout change, but not "the same dice" at a glance | no | FR-DICE-35, play-shell (FR-SHELL-35) |
+| OQ-DICE-28 | Sprint 4 seam with R ([15] Divine Fury in the combat log): who builds the trigger part's dice in the line? (owner `spec-dice`) | **A R, on the `die` segment from D5, after D5 merges** (sprint-4 hotspot rule). B D adds it in D5 (D would edit combat's `log-kinds.ts`, R's area) | no | [effect-modifiers](effect-modifiers.md), [combat-tracker](combat-tracker.md) |
 | ~~OQ-DICE-24~~ | ~~G12 verdicts (dice part)~~ | **Decided (#172):** verdicts accepted: "— natural 1" per FR-DICE-20 except initiative (FR-DICE-29); no group roll (each combatant rolls, FR-CBT-11); fixture clock by design (FR-FIX-08) | — | fixtures-adapters |
 
 ## 16. Out of scope

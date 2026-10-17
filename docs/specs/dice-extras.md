@@ -1,7 +1,7 @@
 ---
 title: Dice extras
 prefix: DICEX
-status: claimed
+status: in-review
 owner: spec-dice
 phase: post-mvp-4
 ---
@@ -16,6 +16,7 @@ phase: post-mvp-4
 - **3D dice**: every `roll` log entry a client receives is **thrown** as 3D dice that settle on the **server's** faces ([ADR-0022](../architecture/adr/0022-deterministic-seams.md), [FR-DICE-03](dice-roll-log.md#6-functional-requirements)). Purely cosmetic and client-side: no new server command, event or signal for the animation; visibility is the game log's ([ADR-0044](../architecture/adr/0044-3d-dice.md)).
 - **Clickable dice notation** in free text ("1d12+5", "1d12 + 5"): puts the dice in the tray to adjust, then rolls a plain `dice.roll`; never feeds attack / apply.
 - **Dice look** per owner (DM, each player): a named style, colours, material; everyone sees the roller's look.
+- **Sprint 4** (DM [#243](../decisions-log.md) [10, 11, 12], [#244](../decisions-log.md); FR-DICEX-32–45): animated dice are the **default**: a full-screen set bounces off the screen edges **over everything**; the sprint-3 throw zone stays as the "Tray throw" option. Every received roll opens an Owlbear-style **roll popup** in the toast region with the same dice in picture-in-picture. Result chips become **die shapes** (flat d20 with the number, d6 square, …). The result stays the server's: the animation only presents it. Fixes sim-7's flat first throw and the caption over a token label.
 
 ## 2. Scope
 
@@ -26,13 +27,15 @@ phase: post-mvp-4
 - Notation parser + `DiceText` component; sheet free text as the first surface (FR-DICEX-28–31).
 - Extension point for [effect-modifiers](effect-modifiers.md) tier 2 "box per bonus die" (FR-DICEX-08).
 - Decided at sprint-3 gate 1 ([#207](../decisions-log.md)): `three` + `cannon-es` (OQ-DICEX-01), throw zone over the free area (OQ-DICEX-02), server-stored looks (OQ-DICEX-06), Alt+click (OQ-DICEX-08), styles list (FR-DICEX-24).
+- **Sprint 4:** display modes with full-screen as default (FR-DICEX-32–35), device settings v2 (FR-DICEX-36), 3D ready for the first throw (FR-DICEX-37), DM-only throws (FR-DICEX-38), roll popup + picture-in-picture (FR-DICEX-39–41), die-shape chips (FR-DICEX-42), others / slow / reduced motion (FR-DICEX-43–45). Game-log dice: [FR-DICE-35–37](dice-roll-log.md#6-functional-requirements). Library compared again (§14, #244). No server, schema, event or protocol change.
 
 ## 3. Goals
 
 - A roll feels like a roll: dice tumble for the roller and the table, and the faces always match the logged result.
 - Text with dice in it is one click from a roll ("very important", #188).
 - No new way to cheat or leak: results stay server-side; a client never shows dice it couldn't already read in its log.
-- Map-first stays (#162): nothing new is open by default; dice land only where no window is.
+- Map-first stays (#162): nothing new is open by default. ~~Dice land only where no window is.~~ *(Sprint 4, [10, 12]: dice fly over everything for ≤ 4 s, never take a click, then leave; the popup is the lasting trace.)*
+- *(Sprint 4)* Everyone sees the same dice for a roll, in the same count, on the same faces, wherever they look (screen, zone, popup, log).
 
 ## 4. Non-goals
 
@@ -42,6 +45,7 @@ phase: post-mvp-4
 - Dice in map world space / on the Konva canvas (OQ-DICEX-02 C; would follow V's canvas work).
 - Tapping 3D faces to enter physical results; per-category looks (OQ-DICEX-05 C).
 - "+5 to hit" turning into a d20 roll (only dice terms are notation, FR-DICEX-28).
+- *(Sprint 4)* Private player rolls / whispers to the DM (OQ-DICEX-21 pick A: player rolls stay public, #73). A popup or throw for entries a client never received. Dice for `cbt.attack` outcome lines beyond what their line already shows (OQ-DICEX-31). A new log kind, event, record or field.
 
 ## 5. User stories
 
@@ -54,6 +58,10 @@ phase: post-mvp-4
 - As a player, I want to click "1d12 + 5" in my sheet, add a d6 for a rider and roll, so that odd damage is quick.
 - As a player, I want to see the 3D dice of my and my friends' rolls land on the real result, so that remote play feels like a table.
 - As a player, I want to turn 3D off on a weak laptop, so that the map stays smooth.
+- *(Sprint 4)* As a player, I want a friend's roll to tumble across my whole screen and then sit in a small popup with their name and total, so that I notice it and can read it a moment later.
+
+**DM (sprint 4)**
+- As the DM, I want my secret rolls to stay small in my own popup, so that big dice always mean "the table saw this".
 
 ## 6. Functional requirements
 
@@ -68,23 +76,23 @@ phase: post-mvp-4
 | FR-DICEX-06 | **Roll buttons** (`RollButton` on a `useRollControl`, every caller; surfaces listed in §7 "Roll surfaces"): click / Shift / Ctrl+click roll at once as today; **Alt+click** (Option on macOS) stages the control in the tray (`adjust`). Tooltip adds "Alt: adjust in tray". The roll bar ([FR-DICE-30](dice-roll-log.md#6-functional-requirements)) gains a tray Button that stages its current expression (`free`); Enter still rolls at once. Surfaces that aren't a `RollButton` (Roll monsters, the concentration notification's "Roll save" action) roll at once and are not stageable; their entries still throw. A new roll surface is stageable only through `useRollControl`. | OQ-DICEX-08 |
 | FR-DICEX-07 | **Physical dice** ([FR-DICE-07](dice-roll-log.md#6-functional-requirements)) stay. Roll in the tray while the mode is on → `manual` step in the tray with the same `ManualForm` as the popover (FR-DICE-06, -31, -32, "Roll for me"); buttons rolled at once keep the popover. One component, one `RollControl`, two hosts. | OQ-DICEX-07 |
 | FR-DICEX-08 | **Extension point** (MOD tier 2, [FR-MOD-27](effect-modifiers.md#6-functional-requirements); seams S4): (a) `control.options` reaches the tray verbatim, so options a later spec adds to `RollControlOptions` work there; MOD's `subject` (incl. `subject.card`, the preview input) lives **only** in options (R14); (b) new append-only registry `src/client/common/features/dice-extras/tray-extras.ts`: `{key, order, useDice(request, mode) → {label, faces, count, sign}[]}`, rendered as labelled read-only chips beside the base dice in `compose` / `adjust` (DICEX ships it empty); (c) the `manual` step **is** `ManualForm`, so boxes MOD adds per bonus die show in popover and tray alike; (d) the fields MOD adds to `RollRequest`, `previewMode` and `manualParts` only (R14), pass through `onRoll` untouched; (e) **adv / dis preview**: when the tray's mode (toggle, Shift / Ctrl) or the request's `previewMode` (MOD's pre-roll `modes()` result) is adv / dis, the `1d20` term shows as two d20 chips tagged adv / dis. MOD owns how its preview mode combines with the toggle; DICEX only renders the result; (f) trigger parts MOD offers (Divine Fury) arrive on the damage item of the `roll` entry as `offered` items with per-die `dice`, outside `total` (R1), so FR-DICEX-13 throws them as labelled dice. No "rolled for you" special case. | Seam for R |
-| FR-DICEX-09 | **Pending**: after Roll (tray or button) the client shows a pending throw (3D: dice shaking in the throw zone; flat or reduced motion: a static "Rolling…" label, no motion) until its first new own `roll` entry arrives (`rollerRole` / `rollerPlayerId` = this client) or 3 s pass; then FR-DICEX-11 takes over. Rejects show where they do today (caller inline, tray inline); the shake just stops. Nothing is resent ([FR-SYNC-05](live-sync.md#6-functional-requirements)). | Latency |
-| FR-DICEX-10 | **Result**: the tray shows the last own roll (flat dice, total, the log line text) until the next stage; `free` requests offer "Roll again" (same request). | |
+| FR-DICEX-09 | **Pending**: after Roll (tray or button) the client shows a pending throw (3D: dice shaking in the throw zone; flat or reduced motion: a static "Rolling…" label, no motion) until its first new own `roll` entry arrives (`rollerRole` / `rollerPlayerId` = this client) or 3 s pass; then FR-DICEX-11 takes over. Rejects show where they do today (caller inline, tray inline); the shake just stops. Nothing is resent ([FR-SYNC-05](live-sync.md#6-functional-requirements)). *(Sprint 4)* The pending shows as the own popup's "Rolling…" row (FR-DICEX-39); with popups off, in the zone (`zone` display) or not at all. | Latency |
+| FR-DICEX-10 | **Result**: the tray shows the last own roll (flat dice, total, the log line text) until the next stage; `free` requests offer "Roll again" (same request). *(Sprint 4)* Dice as die shapes (FR-DICEX-42). | |
 | **Throws (3D dice)** | | |
 | FR-DICEX-11 | **Source**: live event frames only (`useEventFrame`, never snapshot or resync). Every `game-log-entry` upsert of kind `roll` with `n` above this client's highest seen `n` (set from each snapshot, raised per frame) is thrown; **all such entries in one frame coalesce into one throw** (dice in `n` order, cap per FR-DICEX-14), e.g. `cbt.start` HP and initiative or Roll monsters. Undo upserts (old `n`), snapshots and reconnects never throw. No new event, signal or record. | |
-| FR-DICEX-12 | **Visibility = the entry's** ([FR-DICE-15](dice-roll-log.md#6-functional-requirements)): a client throws only entries it received. Hidden DM rolls never reach players, so never throw for them; the DM's own hidden throws carry the eye-off marker. A throw reads `payload` only, never `dmPayload`. | |
+| FR-DICEX-12 | **Visibility = the entry's** ([FR-DICE-15](dice-roll-log.md#6-functional-requirements)): a client throws only entries it received. Hidden DM rolls never reach players, so never throw for them; the DM's own hidden throws carry the eye-off marker. A throw reads `payload` only, never `dmPayload`. *(Sprint 4)* DM-only entries play in the DM's popup only, never big (FR-DICEX-38). | |
 | FR-DICEX-13 | `throwDice(entries)` (pure, `@shared/dice-extras/throw.ts`), per entry in `n` order, per payload item in order: every die of `dice` with its server value (dropped dice thrown, dimmed at rest); MOD parts ([FR-MOD-19](effect-modifiers.md#6-functional-requirements)) and offered trigger parts (`offered`, R1) → every die of the part's per-die `dice` (≤ 20, added by R) with its value, labelled (label, or "DM" when null), signed as the part; offered dice also tagged "on a hit" and left out of the total badge (as the line, R1). A part without `dice`: `1dM` → one die of \|value\|, else a flat chip with the sum; manual items → flat dice of the typed values (value null → one chip with the dice total), "physical", no tumble. Kinds other than `roll` never throw (they carry no fresh dice). | |
 | FR-DICEX-14 | 3D meshes: d4, d6, d8, d10, d12, d20; d100 = two d10 (tens 00–90, units 0–9; 100 = "00" + "0"). Other faces (d2, d3, d7, d1000…) → flat chips. **≤ 20 3D dice per throw** (first 20 in order); the rest → a flat chip row "+N more". | OQ-DICEX-12 |
-| FR-DICEX-15 | **Settle to result**: the client simulates the throw headless (physics only, no renderer; fixed 60 Hz step, ≤ 2.5 s = 150 steps; a die still moving at 2.5 s snaps to its nearest resting pose), reads each die's up-face (d4: the value at the top vertex; others: the face whose normal is nearest +Y; d100: tens die + units die), relabels the faces so the up-face carries the server value, then plays the recorded motion. At rest, `upFace(die)` read from the final orientation equals the server value for every 3D die. Throw seed = hash(first entry id of the throw), client-side and cosmetic (never `ctx.dice`), so every client shows the same tumble. | |
+| FR-DICEX-15 | **Settle to result**: the client simulates the throw headless (physics only, no renderer; fixed 60 Hz step, ≤ 2.5 s = 150 steps; a die still moving at 2.5 s snaps to its nearest resting pose), reads each die's up-face (d4: the value at the top vertex; others: the face whose normal is nearest +Y; d100: tens die + units die), relabels the faces so the up-face carries the server value, then plays the recorded motion. At rest, `upFace(die)` read from the final orientation equals the server value for every 3D die. Throw seed = hash(first entry id of the throw), client-side and cosmetic (never `ctx.dice`), so every client shows the same tumble. *(Sprint 4)* Arenas other than the zone (screen, PiP): FR-DICEX-34. | |
 | FR-DICEX-16 | **The log never waits**: the line renders on arrival ([FR-DICE-21](dice-roll-log.md#6-functional-requirements)); the throw starts in the same frame; dice rest ≤ 2.5 s later. | OQ-DICEX-04 |
-| FR-DICEX-17 | **Throw zone**: a transient layer in the shell's overlay layer ([FR-SHELL-01](play-shell.md#6-functional-requirements)), `pointer-events: none`, inside the free area ([FR-SHELL-34](play-shell.md#6-functional-requirements)): bottom centre, ≤ 720×420. Shows roller name + label (coalesced throw: first roller + "N rolls"), then the dice; fades 1.5 s after rest. Never over an open window; nothing in it is interactive. A DOM / WebGL overlay, **not** a Konva layer: no canvas change (seams S3). | OQ-DICEX-02 |
-| FR-DICEX-18 | One throw at a time: a new throw while one runs → the running one snaps to rest and fades, the new one starts. | |
-| FR-DICEX-19 | Others' rolls throw too, per device toggle "Show others' rolls" (default on); off → own throws only. | OQ-DICEX-03 |
+| FR-DICEX-17 | **Throw zone**: a transient layer in the shell's overlay layer ([FR-SHELL-01](play-shell.md#6-functional-requirements)), `pointer-events: none`, inside the free area ([FR-SHELL-34](play-shell.md#6-functional-requirements)): bottom centre, ≤ 720×420. Shows roller name + label (coalesced throw: first roller + "N rolls"), then the dice; fades 1.5 s after rest. Never over an open window; nothing in it is interactive. A DOM / WebGL overlay, **not** a Konva layer: no canvas change (seams S3). *(Sprint 4)* Now the `zone` display option, "Tray throw" (FR-DICEX-32). Its caption moves to the popup (FR-DICEX-40); it shows in the zone only while popups are off (sim-7: caption over a token label). | OQ-DICEX-02; amended sprint 4 |
+| FR-DICEX-18 | One throw at a time: a new throw while one runs → the running one snaps to rest and fades, the new one starts. *(Sprint 4)* The interrupted throw hands its dice to its popup at once (FR-DICEX-35). | |
+| FR-DICEX-19 | Others' rolls throw too, per device toggle "Show others' rolls" (default on); off → own throws only. *(Sprint 4)* Off → others' rolls play in their popup only (FR-DICEX-43). | OQ-DICEX-03 |
 | FR-DICEX-20 | Each die uses its entry's **roller's look** (DM look for DM rolls, the player's for player rolls; FR-DICEX-24); flat dice use its colours. | |
 | **Device settings** | | |
-| FR-DICEX-21 | Per browser `pp.dicex.v1.<campaignId>.<dm \| playerId>` = `{render: "3d" \| "flat" \| "off", others: boolean}`, zod-parsed; invalid / unavailable → defaults, in memory. Default render `3d`; `prefers-reduced-motion: reduce` or no WebGL → `flat`. `flat` = dice faces fade in at their values (≤ 300 ms, no motion); `off` = no throw zone (the tray still works). In the tray gear popover. | OQ-DICEX-10 |
-| FR-DICEX-22 | **Lazy chunk**: 3D code (library, meshes, textures, all bundled; no CDN) loads by dynamic import on the first 3D throw or look preview; `flat` / `off` never load it. Each client's initial JS grows ≤ 15 KB gz (parser, tray, flat dice); 3D chunk ≤ 170 KB gz with the pick (measured 159 KB, §14). Load failure → `flat` for the session + one console warning. | |
-| FR-DICEX-23 | **Perf**: render loop only while a throw is visible (idle = no frames). A 3D throw with median frame time > 33 ms → this device switches to `flat` + Toast "Dice set to flat: 3D was slow on this device" (switch back in settings). | |
+| ~~FR-DICEX-21~~ | **Retired (sprint 4): superseded by FR-DICEX-36** (v2 key, display modes, migration). Was: per browser `pp.dicex.v1.<campaignId>.<dm \| playerId>` = `{render: "3d" \| "flat" \| "off", others: boolean}`; default `3d`; reduced motion / no WebGL → `flat`; `flat` = faces fade in ≤ 300 ms; `off` = no throw zone; in the tray gear popover. | OQ-DICEX-10 |
+| FR-DICEX-22 | **Lazy chunk**: 3D code (library, meshes, textures, all bundled; no CDN) loads by dynamic import on the first 3D throw or look preview; `flat` / `off` never load it. Each client's initial JS grows ≤ 15 KB gz (parser, tray, flat dice); 3D chunk ≤ 170 KB gz with the pick (measured 159 KB, §14). Load failure → `flat` for the session + one console warning. *(Sprint 4)* Loads at idle, not on the first throw (FR-DICEX-37). Caps unchanged; 3D chunk measured **161.3 KB gz** on `main` 2026-10-17 (§14). | |
+| FR-DICEX-23 | **Perf**: render loop only while a throw is visible (idle = no frames). A 3D throw with median frame time > 33 ms → this device switches to `flat` + Toast "Dice set to flat: 3D was slow on this device" (switch back in settings). *(Sprint 4)* Also for screen-layer and PiP throws (FR-DICEX-44). | |
 | **Dice look** | | |
 | FR-DICEX-24 | Look = `{style, body, pips, material}`: named **styles** Ivory, Obsidian, Crimson, Sapphire, Emerald, Amethyst, Gold, Bone, each a starting body / pips / material ("preset" stays MOD's word, seams S9); `body`, `pips` `#rrggbb`; material `plastic` \| `metal` \| `glass` \| `stone`. One per owner (DM, each player) per campaign. No row → default: DM Obsidian; players in order of sorted player `id` (every client has it; snapshot order and creation time aren't sent) Crimson, Sapphire, Emerald, Amethyst, Gold, Bone, Ivory, … (derived, not stored). | OQ-DICEX-05 |
 | FR-DICEX-25 | Record `dice-look` (§8): visibility **full** to everyone in the campaign, so every client draws the roller's look. Always in the snapshot, not a lazy type (§12, seams S1). | OQ-DICEX-06 |
@@ -95,6 +103,21 @@ phase: post-mvp-4
 | FR-DICEX-29 | `DiceText {text, context}` at `src/client/common/features/dice-extras/DiceText.tsx` (`@ui`, ships in D1; the only notation parser, seams S7): text rendered as text (never HTML), each match an inline link Button (`dicex-notation`). Click stages `free`: expression; label = `context.label` (≤ 60); category = `context.category` else `other`; actor = `context.creature` if the viewer may roll as it ([FR-DICE-10](dice-roll-log.md#6-functional-requirements)), else default. Shift / Ctrl+click preselect adv / dis when the expression has a `1d20`. Staging works offline; Roll needs `live`. | |
 | FR-DICEX-30 | Surfaces built by this spec: character sheet ([CHARX](character-sheet-full.md)) feature text, spell notes, item notes, notes, in view mode (edit mode = plain inputs); context = the creature + the row's name; built as D4 under the sheet lock (V5 → R3 → R6 → C2 → D4 → P4 / C4, X2). Other specs' free text imports `DiceText` once D1 is on `main` (plain text until then): party-board handout bodies, compendium entry text (its markdown-lite component wraps text runs). No second parser (OQ-DICEX-14, -15, settled by seams S7). | OQ-DICEX-09 |
 | FR-DICEX-31 | Notation never feeds attack / apply: a staged notation always rolls `dice.roll` with the tray's category, in combat too. | #188 |
+| **Sprint 4: animated dice everywhere** (#243 [10, 11, 12]) | | |
+| FR-DICEX-32 | **Display modes** (per device, FR-DICEX-36): **`screen` (default)**: full-screen 3D dice over everything (FR-DICEX-33); `zone`: the sprint-3 throw zone (FR-DICEX-17), labelled "Tray throw"; `flat`: no 3D; dice are die-shape chips (FR-DICEX-42) in the popup, and in the zone while popups are off; `off`: no animation, popup chips only. Every mode shows the same dice on the same faces; only the presentation differs. Reduced motion or no WebGL → effective `flat` (the stored setting is kept). | [10] |
+| FR-DICEX-33 | **Screen layer**: one `<canvas>` per page, `position: fixed; inset: 0`, portalled to `document.body`, `pointer-events: none`, `aria-hidden`, the **topmost** layer (above windows, chrome, toasts, popups and dialogs; never takes input or focus). Arena = the viewport: floor + four walls on the viewport edges (world size from the viewport's CSS size, rounded to 50 px); dice enter from the bottom edge, bounce off the edges and rest anywhere on screen. Die size 7 % of the viewport's short side, clamped 40–96 px. The layer draws **dice only**, no caption (sim-7: caption over a token label); name, label and total live in the popup (FR-DICEX-40). At rest: dropped dice dimmed, MOD / offered dice with their small label beside the die. Idle = cleared canvas, no loop. | [10, 12]; sim-7 |
+| FR-DICEX-34 | **Lands on the server's faces** (extends FR-DICEX-15 to every arena; [ADR-0044](../architecture/adr/0044-3d-dice.md) "Truth"): the entry carries every die's server value before the first frame; the client simulates the whole throw headless in the arena first (fixed 60 Hz, ≤ 150 steps, ≤ 50 ms for 20 dice), reads each up-face, relabels the faces so the up-face carries the server value, then plays the recorded motion. **Pre-computed, not settle-then-reorient**: no visible snap. No client changes, re-rolls or rounds a value; `data-settled` (read from the rendered mesh at rest) equals `data-value`. Seed = hash(first entry id): equal viewports show the same tumble; other viewport shapes take a different path to the same faces. A resize mid-throw scales the running arena (no re-simulation); the next throw uses the new size. | Brief 3 |
+| FR-DICEX-35 | **Timing** (OQ-DICEX-18): settle ≤ 2.5 s (FR-DICEX-15 budget), rest 1 s, then the dice shrink and fly into their popup's PiP (0.4 s, FR-DICEX-41) and the layer clears: ≤ 3.9 s on screen. A new throw snaps the running one to rest and hands it off at once (FR-DICEX-18). Popups off → rest 1.5 s and fade (FR-DICEX-17 rule). Durations are constants in one module. | OQ-DICEX-18 |
+| FR-DICEX-36 | **Device settings v2** (retires FR-DICEX-21; OQ-DICEX-22): browser key `pp.dicex.v2.<campaignId>.<dm \| playerId>` = `{display: "screen" \| "zone" \| "flat" \| "off", others: boolean, popup: boolean}`, zod-parsed; defaults `screen`, `true`, `true`; invalid / unavailable → defaults in memory. A v1 entry migrates once on read: `3d` → `screen`, `flat` / `off` kept, `others` kept. Edited in the tray gear popover and the popup's gear (FR-DICEX-39). Never sent. | OQ-DICEX-22 |
+| FR-DICEX-37 | **3D ready for the first throw** (amends FR-DICEX-22; sim-7: the first throw of a session was flat): with an effective display of `screen` or `zone`, the 3D chunk loads at idle after the first snapshot (`requestIdleCallback`, else after 2 s), not on the first throw. A throw arriving while it loads waits ≤ 1.5 s (its popup shows "Rolling…"), then plays in 3D, or flat if the chunk still isn't there. `flat` / `off` never load it. | sim-7 |
+| FR-DICEX-38 | **DM-only throws** (OQ-DICEX-20; amends FR-DICEX-12): an entry with `public: false` (DM hidden roll or category off, DM attack roll [FR-CBT-52](combat-tracker.md#6-functional-requirements), monster initiative [FR-CBT-69](combat-tracker.md#6-functional-requirements), HP roll, NPC-sheet roll, hidden PC's death save) reaches only the DM ([FR-DICE-15](dice-roll-log.md#6-functional-requirements)) and **never animates on the screen layer or in the zone**: it plays in the DM's popup PiP (FR-DICEX-41 b) with the eye-off marker. A frame mixing public and DM-only entries → one popup; public dice big, DM-only dice in the PiP only. | OQ-DICEX-20 |
+| FR-DICEX-39 | **Roll popup** ([11]; OQ-DICEX-23, -24): every live `roll` entry a client receives (FR-DICEX-11 source and high-water: never snapshots, resyncs, undo upserts or reconnects) opens a popup on that client, **roller included**, from any source: tray, roll bar, notation, sheet checks / saves / skills / attacks (`char.roll`), `cbt.attack` / `cbt.rollDamage` / `cbt.rollInitiative` roll entries, `cbtx` saves, Start / add initiative. Off while `popup` is off. Entries of one frame → one popup, one row each (≤ 5 rows, then "+N more"). Placed in the client's **toast region** ([FR-SHELL-01](play-shell.md#6-functional-requirements): players bottom-right; the DM top-centre, clear of Initiative per [FR-NOTE-32](notifications.md#6-functional-requirements)) as its own stack beyond the notifications and alert stacks, so action toasts never move; newest nearest the region's anchor; **≤ 3 roll popups** (the oldest closes). Shows from arrival ("Rolling…" while the dice move), stays **6 s after rest**; hover / focus pauses; ✕ closes; a click on the body calls `focusLogEntry` ([FR-DICE-37](dice-roll-log.md#6-functional-requirements)); gear → display settings. Client memory only. | [11] |
+| FR-DICEX-40 | **Popup content** (OQ-DICEX-25; `payload` only, never `dmPayload`): per row: actor name bold (the entry's `actorName`: "Mira", "Goblin", "DM", the player's name), label (else the expression), **total** bold with "(adv)" / "(dis)" and "natural 20!" / "natural 1" exactly as the line ([FR-DICE-20](dice-roll-log.md#6-functional-requirements), -29), "physical" badge, offered dice tagged "on a hit" and outside the total (FR-DICEX-13); the DM's DM-only rows carry the eye-off marker. A coalesced frame lists **one named row per entry** (sim-7: "Ogre · 3 rolls" named three monsters "Ogre"). Labels render as text. | OQ-DICEX-25; sim-7 |
+| FR-DICEX-41 | **Picture-in-picture** (OQ-DICEX-26): the popup's dice area shows **the same dice** as the throw: the same `throwDice` list and count (≤ 20 3D dice + chips + "+N more"), the same faces, the roller's look. (a) The throw played big on this device (screen / zone) → at rest + 1 s its dice fly into the PiP (FR-DICEX-35); the PiP then holds a still of those rested dice (copied pixels, so it moves with the popup). (b) It didn't play big (DM-only FR-DICEX-38, `others` off FR-DICEX-43) and 3D is available → the same canvas plays the throw in miniature at the PiP's rect (same simulation and seed), then the still. (c) `flat`, `off`, reduced motion or no WebGL → die-shape chips (FR-DICEX-42), faces fading in ≤ 300 ms. **One WebGL context per page** serves screen, zone and PiP. | OQ-DICEX-26 |
+| FR-DICEX-42 | **Die-shape chips** ([10]): `DieShape {faces, value, kept, look, size}` (`@ui`, inline SVG): d4 triangle, d6 square, d8 diamond, d10 kite, d12 pentagon, **d20 flat icosahedron** (hexagon outline + centre triangle) with the value centred; d100 = a tens kite ("40", "00") + a units kite; other faces (d2, d3, d1000) and dice-less sums → a round chip. Fill = look `body`; number and outline = look `pips`. Dropped: 40 % opacity + struck; offered: dashed outline; manual: "physical" tag. Sizes `sm` (18 px; game log) and `md` (36 px; popup, tray, flat zone). Replaces the rounded squares of `FlatDie` everywhere: tray result, flat throws, zone chips, popup, log ([FR-DICE-35](dice-roll-log.md#6-functional-requirements)). | [10] |
+| FR-DICEX-43 | **Others' rolls** (amends FR-DICEX-19): `others` off → other people's rolls skip the screen layer and zone and play in their popup's PiP only (FR-DICEX-41 b). Own rolls unaffected. | |
+| FR-DICEX-44 | **Slow devices and links** (OQ-DICEX-27): the screen layer renders at pixel ratio ≤ 1.5, without shadows above 2.5 MP; auto-flat (FR-DICEX-23) measures screen, zone and PiP throws. A late frame (slow tunnel) throws on arrival with the server's faces; nothing waits for other clients. The popup never needs 3D. | OQ-DICEX-27 |
+| FR-DICEX-45 | **Reduced motion** (`prefers-reduced-motion: reduce`): effective `flat`: no screen layer, no flight, popup chips appear without motion, "Rolling…" static, no 3D chunk load. | |
 
 ## 7. UI/UX notes
 
@@ -124,12 +147,26 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 | Concentration notification "Roll save" with no roll host open | notification action → `cbtx.rollConcentration` | no; throw only |
 | Notation links, tray palette | tray `free` | always staged |
 
-- **Throw zone:** dice tumble in the roller's look, roller name + label above them, total badge at rest; dropped dice dimmed; MOD dice with a small label; "physical" badge on flat manual dice; DM's hidden throws with the eye-off marker (`visibility.hidden` token).
+- **Throw zone:** dice tumble in the roller's look, roller name + label above them, total badge at rest; dropped dice dimmed; MOD dice with a small label; "physical" badge on flat manual dice; DM's hidden throws with the eye-off marker (`visibility.hidden` token). *(Sprint 4: the `zone` option; caption only while popups are off, FR-DICEX-17.)*
+
+**Sprint 4: what each display mode shows** (FR-DICEX-32, -41)
+
+| Display (device) | Public roll: big dice | Its popup's dice | DM-only roll (DM) / others off |
+|---|---|---|---|
+| **`screen`** (default) | 3D over the whole screen, topmost | the same dice fly in at rest, then a still | 3D plays in the PiP only |
+| `zone` ("Tray throw") | 3D in the bottom-centre zone (sprint 3) | the same dice fly in, then a still | 3D plays in the PiP only |
+| `flat` | — (zone chips while popups are off) | die-shape chips fade in | chips |
+| `off` | — | die-shape chips | chips |
+
+- **Roll popup** (FR-DICEX-39–41): a card ≈ 280 px wide in the toast region. Header: actor name + label (one row per entry when coalesced), ✕, gear. Body: PiP dice area (≈ 260×96 px; ≤ 20 dice shrink to fit, then "+N more"), **total** large on the right with its markers. Muted "Rolling…" until rest. DM-only rows: eye-off marker + muted background. Click body → Game log at the entry.
+- **Die shapes** (FR-DICEX-42): d4 ▲, d6 ■, d8 ◆, d10 kite, d12 pentagon, d20 hexagon with centre triangle, d100 two kites, others ●; number centred; look colours.
+- **Settings popover** (tray gear and popup gear): Display: Full screen / Tray throw / Flat / Off (ToggleGroup); Switches "Show others' rolls", "Roll popups"; "Dice look…". Reduced motion / no WebGL: Full screen and Tray throw disabled with the reason.
+- **Layers** (proposed amendment to [FR-SHELL-01](play-shell.md#6-functional-requirements), OQ-DICEX-29): base < windows < chrome < banner, toasts, roll popups < dialogs, overlays < **dice layer** (topmost, no input).
 - **States:** disconnected → tray Roll disabled (banner from live-sync), staged request kept; throws already running finish. Loading 3D chunk → flat for that throw. No WebGL → flat, settings show "3D unavailable on this device".
-- **DM view:** tray with DM eye; own hidden throws; every player's throw in their look; look editor for the DM look.
-- **Player view:** tray (no eye); own and others' public throws; own look editor; DM throws only for public DM rolls.
+- **DM view:** tray with DM eye; own hidden throws; every player's throw in their look; look editor for the DM look. *(Sprint 4)* Every public roll big + popup (top-centre region); own DM-only rolls (hidden, monster attacks and initiative, HP) only in the popup PiP with eye-off.
+- **Player view:** tray (no eye); own and others' public throws; own look editor; DM throws only for public DM rolls. *(Sprint 4)* Every public roll big + popup (bottom-right); never a DM-only roll, its popup or a placeholder.
 - **Keyboard:** tray expression Input: Enter / Shift+Enter / Ctrl+Enter roll ([FR-DICE-05](dice-roll-log.md#6-functional-requirements)); Esc clears a staged request. Notation links are focusable Buttons (Enter = click).
-- **Test IDs:** `dicex-tray`, `dicex-tray-state` (+ `data-value` = state), `dicex-tray-die` (+ `data-faces`, `data-term`), `dicex-tray-palette` (+ `data-value` = faces), `dicex-tray-expression`, `dicex-tray-constant`, `dicex-tray-mode`, `dicex-tray-public`, `dicex-tray-roll`, `dicex-tray-clear`, `dicex-tray-again`, `dicex-tray-error`, `dicex-tray-extra` (+ `data-value` = registry key), `dicex-tray-open` (roll-bar button), `dicex-settings-open`, `dicex-settings-render` (+ `data-value`), `dicex-settings-others`, `dicex-look-open`, `dicex-look-style` (+ `data-value`), `dicex-look-body`, `dicex-look-pips`, `dicex-look-material` (+ `data-value`), `dicex-look-save`, `dicex-look-reset`, `dicex-look-contrast`; `dicex-throw` (+ `data-record-id` = first entry id, `data-count` = entries coalesced, `data-render` = 3d \| flat, `data-state` = pending \| moving \| rest), `dicex-throw-die` (+ `data-entry-id`, `data-faces`, `data-value` = server value, `data-settled` = `upFace` at rest, `data-kept`, `data-flat`, `data-offered`), `dicex-throw-more`; `dicex-notation` (+ `data-value` = canonical expression). Manual step reuses `dice-manual-*`.
+- **Test IDs:** `dicex-tray`, `dicex-tray-state` (+ `data-value` = state), `dicex-tray-die` (+ `data-faces`, `data-term`), `dicex-tray-palette` (+ `data-value` = faces), `dicex-tray-expression`, `dicex-tray-constant`, `dicex-tray-mode`, `dicex-tray-public`, `dicex-tray-roll`, `dicex-tray-clear`, `dicex-tray-again`, `dicex-tray-error`, `dicex-tray-extra` (+ `data-value` = registry key), `dicex-tray-open` (roll-bar button), `dicex-settings-open`, `dicex-settings-render` (+ `data-value`), `dicex-settings-others`, `dicex-look-open`, `dicex-look-style` (+ `data-value`), `dicex-look-body`, `dicex-look-pips`, `dicex-look-material` (+ `data-value`), `dicex-look-save`, `dicex-look-reset`, `dicex-look-contrast`; `dicex-throw` (+ `data-record-id` = first entry id, `data-count` = entries coalesced, `data-render` = 3d \| flat, `data-state` = pending \| moving \| rest), `dicex-throw-die` (+ `data-entry-id`, `data-faces`, `data-value` = server value, `data-settled` = `upFace` at rest, `data-kept`, `data-flat`, `data-offered`), `dicex-throw-more`; `dicex-notation` (+ `data-value` = canonical expression). Manual step reuses `dice-manual-*`. *(Sprint 4)* `dicex-screen` (the dice layer; + `data-state` = idle \| moving \| rest \| handoff); `dicex-throw` gains `data-arena` = screen \| zone \| pip and `data-render` = 3d \| flat; `dicex-popup` (+ `data-record-id` = first entry id, `data-count` = entries, `data-dice` = dice shown incl. chips, `data-hidden`, `data-state` = rolling \| rest \| closing); `dicex-popup-row` (+ `data-record-id` = entry id); `dicex-popup-total`; `dicex-popup-pip` (+ `data-mode` = handoff \| play \| chips); `dicex-popup-close`; `dicex-popup-settings`; `dicex-die` (every `DieShape`; + `data-shape` = d4 \| d6 \| d8 \| d10 \| d12 \| d20 \| round, `data-faces`, `data-value`, `data-kept`); `dicex-settings-display` (+ `data-value`, replaces `dicex-settings-render`), `dicex-settings-popup`. Canvas dice keep their DOM mirror (`dicex-throw-die`, `data-settled`).
 
 ## 8. Data model
 
@@ -142,8 +179,9 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 | | body, pips | text `#rrggbb` | |
 | | material | `plastic` \| `metal` \| `glass` \| `stone` | |
 | | updatedAt | timestamp | `ctx.clock` |
-| Device settings *(browser only)* | render, others | enum, bool | FR-DICEX-21; never sent |
+| Device settings *(browser only)* | ~~render~~, others; *(sprint 4)* display, popup | enum, bool, bool | FR-DICEX-36 (v2 key; v1 FR-DICEX-21 migrated); never sent |
 | Tray request, pending throw *(client memory)* | | | FR-DICEX-02, -09 |
+| Roll popup, PiP still *(client memory, sprint 4)* | first entry id, rows, dice, state, timer | | FR-DICEX-39–41; never stored or sent; gone on reload |
 
 - **Relations:** Campaign 1—* Dice look; Dice look → Player by id (no FK, as DICE §8). A player with no row uses the derived default.
 - **Derived:** default looks by sorted player `id`; throws (`throwDice`) from `roll` entries; up-faces; canonical notation.
@@ -176,6 +214,19 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 
 - No signal: throws are derived from entries already sent, so they follow the log's visibility with no new path.
 
+**Sprint 4: who sees what** (throw + popup consume the existing events above; **no new event, field, signal or record**; visibility = the `roll` entry's, [FR-DICE-15](dice-roll-log.md#6-functional-requirements), #190 rules)
+
+| Roll (source → event) | Entry `public` | DM | Roller (player) | Other players |
+|---|---|---|---|---|
+| Player roll: tray, roll bar, notation (`DiceRolled`), sheet (`CharacterRolled`), own attack / damage / initiative in combat (`AttackRolled`, `DamageRolled`, `InitiativeRolled`), own saves (`ConcentrationRolled`, `DeathSaveRolled`) | always true (#73) | big + popup | big + popup | big + popup |
+| DM roll, category ticked or eye on: roll bar, tray, sheet, Initiative anchors (`CombatantRolled`), DM completing a player's card ([FR-CBT-71](combat-tracker.md#6-functional-requirements)) | true | big + popup | — | big + popup |
+| DM hidden roll / category off; DM attack roll ([FR-CBT-52](combat-tracker.md#6-functional-requirements)); monster initiative at Start / add / Roll monsters ([FR-CBT-69](combat-tracker.md#6-functional-requirements); `EncounterStarted`, `CombatantsAdded`); HP rolled; NPC-sheet roll; hidden PC's death save | false | popup only, PiP plays, eye-off (FR-DICEX-38) | — | nothing: no frame, no placeholder |
+| `cbt.attack` / `cbt.hp` outcome lines (apply) | per FR-CBT-24 | no throw, no popup (no fresh dice; OQ-DICEX-31) | as DM | as DM |
+| Undo (`markUndone`), snapshot, resync, reconnect | — | nothing animates or pops | same | same |
+
+- Every throw and popup reads `payload` only; `dmPayload` never reaches a player frame and is never read by DICEX code (kind contract, FR-DICE-28).
+- Per-roll wire **measured, unchanged** (§12): no byte is added to any frame.
+
 ## 10. Permissions
 
 | Action | DM | Player | Server check |
@@ -186,6 +237,8 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 | Set another owner's look | ✗ | ✗ | no field exists |
 | See looks | all | all | full visibility |
 | See a throw | every entry | public entries only | FR-DICE-15 |
+| *(Sprint 4)* See a roll popup | every entry (DM-only: PiP only) | public entries only | FR-DICE-15 |
+| *(Sprint 4)* Change own display / popup settings | ✓ (this device) | ✓ (this device) | none (browser only) |
 
 ## 11. Edge cases & failure modes
 
@@ -199,6 +252,12 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 - **Many dice:** 50 d6 → 20 thrown + "+30 more"; 20 × d1000 → flat chips only. Many entries in one frame (`cbt.start`, Roll monsters) → one coalesced throw (FR-DICEX-11).
 - **Invalid / malicious input:** notation over limits stays text; text is never parsed as HTML; `dicex.setLook` with a bad colour or enum → `invalid`. A client that fakes throw faces only fools itself: the log and server rows are the truth.
 - **WebGL context lost** mid-throw → that throw falls back to flat at rest values; next throw retries 3D.
+- *(Sprint 4)* **Reload mid-animation:** the entry is in the snapshot → log line once, no throw, no popup (popups are live-only, nothing stored). **Disconnect / reconnect:** a running throw and its popup finish; rolls committed while offline appear in the log only (no popup storm on return). **Server crash:** nothing to recover (no server state); after restart no popup replays; device settings are in the browser.
+- *(Sprint 4)* **Burst** (five rolls in 2 s): each new throw hands the running one to its popup at once (FR-DICEX-35); ≤ 3 popups, the oldest closes; the log keeps all five.
+- *(Sprint 4)* **Dialog open:** dice still fly over it (topmost, no input); the dialog keeps focus and clicks.
+- *(Sprint 4)* **No free area** in `zone` (windows everywhere): the throw plays in the PiP instead (FR-DICEX-41 b). **Popups off + `flat`:** flat chips in the zone as sprint 3.
+- *(Sprint 4)* **Slow tunnel:** the frame arrives late; the throw starts then, on the server's faces; the chunk was preloaded (FR-DICEX-37), else that throw is flat. Different viewports → different paths, same faces (FR-DICEX-34).
+- *(Sprint 4)* **Tab hidden:** no animation while `document.hidden`; on return, throws that arrived meanwhile show only as popups at rest (no backlog of animations).
 
 ## 12. Performance & bandwidth
 
@@ -215,7 +274,22 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 - **Sprint context (gate G3, #208):** D's +2,158 B is the smallest track delta; the sprint total with every pick is 712,310 B heavy DM. The DM ceiling is now **1 MiB** (players stay 512 KiB) and the "≥ 100 KiB DM headroom" guard is **dropped** (#208). The constant and protocol CON-44 change in V0 (`fix/vision-core`), not here.
 - **Not a lazy type (seams S1):** every client needs every owner's look the moment any entry arrives (a throw starts in the frame it arrives, FR-DICEX-16); loading on demand would draw the first throw in a default look or delay it, to save ≈ 2 KB.
 
-- **Client bundle:** initial chunk + ≤ 15 KB gz per client; 3D chunk lazy, ≤ 170 KB gz with the pick. Both asserted by a size test on `bun run build` output. Measured library sizes: [§14](#14-dependencies).
+- **Sprint 4 CON-44 (measured 2026-10-17**, throwaway probes deleted before commit: `snapshot-size.ts` `buildRealisticHeavy` on `session-sim`, and real sockets on `dice-log` reading raw event frames):
+
+| What | Before (`main`) | After (picks) | Note |
+|---|---|---|---|
+| Heavy DM snapshot | 670,423 B | **670,423 B** (+0) | 378,153 B left of 1 MiB |
+| Heavy player snapshots | 277,356–280,416 B | **unchanged** | ceiling 524,288 B |
+| Player `1d20+5` skill (`DiceRolled`) | DM 782 B, other player 765 B | **same** | popup + throw read this frame |
+| Player `1d20+4` adv attack | 820 / 803 B | same | |
+| Player `10d6` damage | 1,084 / 1,067 B | same | |
+| DM public `2d6+3` | 819 / 752 B | same | |
+| DM hidden `1d20` | 782 B / **0 frames** | same | nothing reaches players |
+| Player `50d6` (schema max) | 2,439 / 2,422 B | same | |
+| ~~Per-player prefs on the look row~~ (OQ-DICEX-22 B) | 315 B/row | 377 B/row (+62) | +434 B heavy DM and each player (7 rows, full visibility) |
+
+- **Client bundle:** initial chunk + ≤ 15 KB gz per client; 3D chunk lazy, ≤ 170 KB gz with the pick. Both asserted by a size test on `bun run build` output. Measured library sizes: [§14](#14-dependencies). *(Sprint 4)* `DieShape`, the popup and the settings stay in the initial chunks (+ ≤ 6 KB gz est., inside the 15 KB budget, asserted); the screen layer and PiP are in the lazy 3D chunk (`vite build` today: `dice3d` 629.6 KB / **161.3 KB gz**).
+- *(Sprint 4)* **Screen layer cost:** fill rate grows with the screen: pixel ratio ≤ 1.5 and no shadows above 2.5 MP (FR-DICEX-44); one WebGL context; render loop only while dice move or fly. Precompute ≤ 50 ms for 20 dice in any arena (tested).
 - **Frame rate:** target median ≥ 50 fps for 20 dice; physics precompute ≤ 50 ms for 20 dice (≤ 150 steps); auto-flat below 30 fps (FR-DICEX-23). Headless Playwright (software GL) can't judge this: the walkthrough logs fps for information only; the DM checks it on the table laptop at the sprint gate.
 - **Parser:** a 4,000-char note parses < 1 ms; memoised per text.
 
@@ -258,6 +332,36 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 12 | Hard-kill + restart server while B has "1d20+3" staged | — | B: Roll disabled, staged dice kept; after restart Roll works; looks unchanged |
 | 13 | Roll `20d6` (render 3D) | — | 20 dice thrown, `data-settled == data-value`; `50d6` → 20 + "+30 more". Median fps logged in `report.md` for information only (no PASS / FAIL; the DM checks on the table laptop at the sprint gate) |
 
+*(Sprint 4)* Steps 1–13 stay as a regression of the **`zone`** option: set Display → Tray throw on A, B, C first. Changed expectations: 5 → C sees B's dice in the popup PiP only (FR-DICEX-43); 7 → A sees the hidden roll only in the popup PiP (FR-DICEX-38).
+
+**Sprint 4 fixtures:** no new unit (no new record type). **Bundle `dice-display`** = `combat` (session-sim + `player-2` + `char-thorn` + `thorn-battlemap`; encounter "Ambush at the Ford") + `rolls-1` (log history with the hidden "DM-SECRET-ROLL") + `dicex-looks` + `dicex-notation-text`. Composes as patches (seams S10); existing bundles unchanged.
+
+| Level | What (sprint 4) | Fixtures |
+|---|---|---|
+| Unit | `FR-DICEX-39 popup gets every public roll source`: frames built from real entries of each source (`dice.roll` tray / roll bar / notation, `char.roll` check / save / skill / attack, `cbt.attack` and `cbt.rollDamage` player roll entries, `cbt.rollInitiative` PC, `cbtx.rollDeathSave`, `cbtx.rollConcentration`, DM public `dice.roll`, DM completing a player card) → one popup each, right rows and totals; `cbt.start` frame with 3 monster entries → one popup, 3 named rows (sim-7 "Ogre · 3 rolls"); snapshot, resync, `markUndone` upsert, reconnect → none; `popup` off → none. `FR-DICEX-40 content`: no `dmPayload` sentinel in any popup text; adv / natural / physical / offered markers as the line. `FR-DICEX-42 die-shape chips per die type`: d4 / d6 / d8 / d10 / d12 / d20 → `data-shape`; d100 = tens + units kites (100 → "00" + "0"); d3, d1000, manual total → round; dropped struck, offered dashed, colours from the look. `FR-DICEX-34 animation lands on the server's faces`: headless settle in screen arenas 1280×720, 1440×900, 1920×1080, 390×844 and the PiP arena × d4–d20, d100 × every target × 10 seeds → `upFace` = target, ≤ 150 steps, ≤ 50 ms for 20 dice; a resize-scaled arena keeps the faces; relabel never changes `data-value`. `FR-DICEX-38 DM-only`: a `public: false` entry → no screen / zone throw, PiP `play` + eye-off. `FR-DICEX-41 PiP same dice`: PiP dice keys, values and count = the throw's in `handoff`, `play` and `chips` modes. `FR-DICEX-45 reduced motion`: no `dicex-screen` frames, chips without transition, no 3D chunk import. `FR-DICEX-36 settings v2`: defaults, v1 `3d` → `screen` migration, invalid → defaults, throwing storage → memory. `FR-DICEX-37 preload`: `screen` → chunk import at idle after the first snapshot; `flat` / `off` → none; a throw during load waits ≤ 1.5 s then 3D, else flat. `FR-DICEX-39 stacking`: 5 rolls in 2 s → ≤ 3 popups, oldest closed first, a notification toast keeps its place; hover pauses the 6 s timer; click → `focusLogEntry(entryId)` | in-code |
+| Integration | `FR-DICEX-38 hidden roll never reaches a player frame` (real sockets, `dice-display`): DM `dice.roll` eye off "DM-SECRET-DICE", DM Initiative ▸ Attack on Mira, `cbt.start` → player-1 / player-2 raw frames contain neither the entry ids nor the label; leak scan clean (DICE's). CON-44: no new type or field; heavy snapshots under the ceilings (DM 1 MiB, players 512 KiB); a player `1d20+5` `DiceRolled` frame ≤ 1.2 KB (measured 765–782 B) | `dice-display` |
+| E2E (thin) | B (player-1): Mira's sheet → Athletics; C (player-2) sees `dicex-popup` with one d20 (`data-dice` = 1) and `dicex-screen` reaching `rest` with `data-settled == data-value` (or `data-render="flat"` without WebGL) | `dice-display` |
+| Bundle | Initial chunks + ≤ 15 KB gz vs `main` (sprint-3 budget, cumulative); 3D chunk ≤ 170 KB gz | — |
+
+**Sprint 4 walkthrough** — `PP_TEST_MODE=1`; `bun run build`; `fixtures:reset-load dice-display --profile verify`; `start --profile verify`. Contexts **A** DM 1440×900, **B** `player-1` (Mira) 1280×800, **C** `player-2` (Thorn) 1280×800 **throttled** (CDP `Network.emulateNetworkConditions`: 400 kbit/s down, 400 ms latency) from step 14. Default display (Full screen). Open on every context before rolling: Game log, Character sheet / Initiative, so windows cover the screen. Check per throw: `data-settled == data-value`; same `data-dice` in A / B / C popups; *total = kept dice + constants*.
+
+| # | DM (A) | Players (B, C) | Expected |
+|---|---|---|---|
+| 14 | Log in | B, C open links | Network logs: the 3D chunk loads at idle before any roll (A, B, C); popups none; log shows `rolls-1` with die chips (DICE §13) |
+| 15 | — | B: Mira's sheet → **Athletics** (sheet check) | A, B, C: d20 flies over every window (`dicex-screen` topmost: a click at a window's centre still hits the window), rests on the server face; **first throw of the session is 3D** (sim-7); then flies into the popup: B, C bottom-right, A top-centre; row "Mira — Athletics", 1 d20, total; C later but same face |
+| 16 | — | B: tray `10d6`, Roll | 10 dice everywhere; every popup `data-dice` = 10; no caption over any token label |
+| 17 | — | C: popup gear → Display **Tray throw**; B clicks "1d20+3" in "Notation test" → Roll | C: zone throw bottom centre, no caption (name in the popup); A, B: full screen |
+| 18 | Eye off; roll `1d20`, label "DM-SECRET-DICE" | — | A: no big dice; popup PiP plays, eye-off; B, C: nothing; frames without the label |
+| 19 | Encounters → Start "Ambush at the Ford" | B: Initiative from the sheet | A: one popup, one named row per monster (no "· N rolls"), PiP only; B's roll: big for A, B, C + popups |
+| 20 | — | B: Light crossbow **Attack + damage** on a Goblin | A, B, C: to-hit and damage dice big, one popup; A applies → outcome line (no new popup) |
+| 21 | Initiative ▸ Goblin Attack on Mira; apply | — | A: PiP only, eye-off; B, C: no throw, no popup; after apply the outcome line in their log |
+| 22 | Game log | Game log | Every roll line shows die-shape chips in the roller's colours (d20 hexagon, d6 squares, d8 diamond); dropped d20 struck; A's Goblin outcome line shows its dice breakdown as chips, B / C's as text; ≥ 6 lines at default size (FR-DICE-35) |
+| 23 | — | B: roll `10d6`; reload B mid-throw | B: line once, no throw, no popup, no console errors; A, C unaffected |
+| 24 | — | C: Probes → Drop connection; B rolls twice; C back | C: both lines in the log, no throw or popup replayed |
+| 25 | — | C: emulate reduced motion, reload; B rolls | C: no `dicex-screen`; popup with chips, no motion; no 3D chunk request |
+| 26 | — | B: 5 rolls in 2 s; A sends a test notification to all | C: ≤ 3 roll popups, the toast still shows; hover pauses; click a popup → Game log fronted, entry highlighted |
+| 27 | Hard-kill + restart | — | No popup or throw replays; device settings kept; logs unchanged |
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -268,6 +372,12 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | [character-sheet-full](character-sheet-full.md) | Text fields rendered through `DiceText`; `char.putRow` for the fixture | complete; sheet folder sequenced V5 → R3 → R6 → C2 → **D4** → P4 / C4 (seams S3, X2) |
 | [effect-modifiers](effect-modifiers.md) | Tier 2 builds on FR-DICEX-08; MOD parts on `roll` payloads (FR-MOD-19) and `offered` trigger parts, both with per-die `dice` (R1, D9); `subject` on `RollControlOptions`, `previewMode` and `manualParts` on `RollRequest` (R14, seams S4) | revising (R, sprint 3) |
 | New dependency | 3D rendering + physics, lazy chunk (OQ-DICEX-01) | **DM OK at gate 1** (#207, G1: `three` 0.186 + `cannon-es` 0.20; AGENTS §3) |
+| *(Sprint 4)* [play-shell](play-shell.md) | Dice layer topmost in the layer order (FR-SHELL-01 row); the toast region takes a third stack (roll popups) | OQ-DICEX-29 (proposed amendment, doc + `toast-region.ts`) |
+| *(Sprint 4)* [notifications](notifications.md) | Roll popups share the toast region; notification and alert stacks keep their place; DM keep-out ([FR-NOTE-32](notifications.md#6-functional-requirements)) applies to popups | OQ-DICEX-30 |
+| *(Sprint 4)* [combat-tracker](combat-tracker.md), [combat-extras](combat-extras.md) | Their rolls already write `roll` entries with the #190 public rules; nothing new needed. DM attack rolls stay DM-only for players | OQ-DICEX-31 (DM: no change, pick) |
+| *(Sprint 4)* [character-sheet-full](character-sheet-full.md) | Sheet checks already go through `char.roll` → `roll` entries: popups and throws come free | no change |
+| *(Sprint 4)* [dice-roll-log](dice-roll-log.md) | Die-shape chips in log lines, `focusLogEntry` ([FR-DICE-35–37](dice-roll-log.md#6-functional-requirements)) | this track (same owner) |
+| *(Sprint 4)* New dependency | none (pick A, below) | — |
 
 **Library candidates** (OQ-DICEX-01) — measured 2026-10-16 by bundling each with `bun build --minify --target browser` in a scratch dir:
 
@@ -279,6 +389,23 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | D. `@react-three/fiber` 8 + `three` + `@react-three/rapier` 1.5 | MIT (rapier3d-compat Apache-2.0) | 8.18.0 / 1.5.0 (2024-10-03) | 2,998 KB / **1,025 KB** (rapier wasm inlined ≈ 764 KB gz) | none (wasm inlined) | ours | locked to old lines: current rapier 2.x and fiber 9 need React 19 | Heaviest JS; dead-end versions on React 18 |
 
 - No candidate fetches from a CDN (bundles grepped for cdn / unpkg / jsdelivr / gstatic). All in a lazy chunk (FR-DICEX-22); everything bundled.
+
+**Sprint 4 library comparison** (#244, OQ-DICEX-28) — measured 2026-10-17: ours = `bun run build` (Vite) on `main`; others = `bun build --minify --target browser` of the package entry in a scratch dir outside the repo, gzip -9; npm / GitHub data the same day. "Shares ours" = uses our `three` + `cannon-es` instead of its own copy.
+
+| Option | Min / **gzip** (measured) | Licence | Offline (no CDN / remote assets) | Look | Lands on given results | React 19 / Vite / lazy | Maintenance |
+|---|---|---|---|---|---|---|---|
+| **A. Ours: `three` 0.186 + `cannon-es` 0.20, hand-rolled** | 629.6 KB / **161.3 KB** (lazy `dice3d` chunk, built) | MIT / MIT | yes; no assets (CanvasTexture faces) | our meshes, 8 styles × colours × 4 materials, per-owner looks (#207) | **yes**: headless sim + relabel, tested for every die × target (D3) | built and lazy today; framework-free | three monthly (0.186.1, 2026-09-24); cannon-es 0.20.0 (2022-08), repo idle since 2024-01, only in the headless precompute, swappable |
+| B. `@drdreo/dice-box-threejs` 1.1.0 (fork of `@3d-dice/dice-box-threejs`) | 618.4 KB / **159.6 KB** (vendors its own three + cannon-es; doesn't share ours) | MIT | yes with textures / sounds off (1.7 MB textures, 0.7 MB sounds to copy into `dist` if wanted) | colour sets, textures, materials built in | yes (`"6d6@4,4,4,4,4,4"`) | class API, dynamic import OK; peer `three` ^0.176 (ours 0.186: out of range) | 1 maintainer, 4 stars, last release 2025-05 (17 months) |
+| C. `@3d-dice/dice-box-threejs` 0.0.12 | 549.9 KB / **144.5 KB** (vendors three r143) | MIT | as B | as B | yes (`@` notation) | as B | idle since 2022-10 (repo 2023-11), 0.0.x |
+| D. `@3d-dice/dice-box` 1.1.4 (Babylon + Ammo) | 2,724.7 KB / **708.8 KB** + required assets ≈ 283 KB gz (`ammo.wasm`, theme; sprint-3 figure) | MIT | assets must be copied and served from `assetPath` | best stock themes | **no** (physics decides) | needs asset copy step in Vite | 252 stars; last release 2024-08, repo 2024-10 |
+| E. `@planarally/dice` 0.8.0 (Babylon 8 + Havok) | 5,678.6 KB / **1,275.8 KB** + Havok wasm 2,095 KB (658 KB gz) | MIT | wasm served locally | Babylon PBR | no (returns physics results) | heavy; Babylon in our stack twice over | active (PlanarAlly VTT, 559 stars; release 2025-08) |
+| F. `react-ttrpg-dice` 0.4.0 (R3F 9 + Rapier) | 3,352.1 KB / **1,139.6 KB** | MIT | yes (wasm inlined) | stock | yes (`predeterminedValues`) | React 19 OK | first release 2026-04, 0 stars |
+| G. `@diegesis/dice` 0.2.1 (three + cannon-es in a worker) | +198.8 KB / **+58.2 KB** on top of shared three + cannon-es (291.2 KB gz whole) | MIT | textures / sounds from `assetPath` | themes, textures | yes ("you pass results in") | framework-free; peer `three` ^0.182 (out of range) | first release 2026-09-28, 4 versions, 0 stars |
+| H. `@lambersond/3d-dice-core` 0.4.0 (vendored dice-box-threejs fork) | 713.4 KB / **186.4 KB** (pulls its own `three` ^0.184) | MIT on npm; repo has no licence file | asset copy for textures | as B | yes | framework-free | first release 2026-06, 0 stars |
+| ~~I. `dddice-js`~~ | — | MIT SDK | **no**: a hosted service (API key, rolls on their server) | — | — | — | rejected: not offline, results not ours |
+
+- **Pick A** (OQ-DICEX-28): full screen, the popup PiP and die-shape chips are presentation work (arena, camera, one canvas, SVG); no candidate does them for us. A keeps the tested settle-to-result, per-owner looks and the 161 KB lazy chunk, and adds **no dependency** (no DM OK needed, [ADR-0044](../architecture/adr/0044-3d-dice.md) library row unchanged). B is the only like-for-like alternative (same size, results built in, stock themes) but a 1-person fork, 17 months idle, with its own `three` copy and a rewrite of D3. D–F cost 4–8× the bytes on the players' tunnel. G and H are too young to bet on.
+- [ADR-0044](../architecture/adr/0044-3d-dice.md) needs an amendment anyway for **where** dice draw (topmost full screen, not "never over a window") and the popup: [proposed-dice-display](../architecture/adr/proposed-dice-display.md).
 
 **Shared changes needed** (AGENTS §9.9; the orchestrator picks sequence or shared branch first)
 - `src/client/{dm,player}/windows.ts` — append `dicex.tray` (append-only, seams S8).
@@ -300,9 +427,26 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 Walkthrough steps per slice: D1 → 2–5, 7–12 (flat); D2 → 6 (data via frames); D3 → 4, 6, 11, 13 (3D); D4 → 2–3.
 
+**Sprint 4 shared changes** (AGENTS §9.9): **no** schema, event, protocol, ws, record type, registry, `package.json` or fixture-registry line except the bundle.
+- `src/client/common/features/play-shell/{toast-region.ts, ShellToaster.tsx}` (play-shell frame, shared): the region takes the roll-popup stack's height as a third stack (players: above the notification + alert stacks; DM: below them). Same corner as M's placement fixes → **sequence** (toast-region lock, OQ-DICEX-30).
+- Dice layer: portalled to `document.body` from the dice-extras runtime (no `PlayFrame.tsx` line). play-shell's layer order (FR-SHELL-01) gains the row at merge (doc, integrator; OQ-DICEX-29).
+- `src/client/common/features/dice-roll-log/` + `src/shared/dice-roll-log/{kind-types.ts, roll-kind.ts}`: D owns (dice display hotspot). `kinds.ts` unchanged. R's Divine Fury log line [15] goes **after** D5.
+- `fixtures/bundles/index.ts` + `fixtures/bundles/dice-display.ts` (append-only line).
+- Docs at merge: play-shell layer row, protocol §26 roll-control / log-segment row, glossary (OQ-DICEX-32), ADR (proposed-dice-display).
+
+**Sprint 4 build split** (no schema slot: D's place in V → R → D → M → C is empty unless OQ-DICEX-22 B)
+
+| # | Branch | Content | Shared files | After |
+|---|---|---|---|---|
+| D5 | `build/dice-shapes` | `DieShape` (FR-DICEX-42) replacing `FlatDie` squares in tray / flat / zone; log die segments + chips (FR-DICE-35, -36); `focusLogEntry` (FR-DICE-37); bundle `dice-display` | `fixtures/bundles/index.ts` (append) | first; **R's [15] log-line work waits for it** |
+| D6 | `build/dice-screen` | Dice layer (portal, topmost), screen arena + headless tests in viewport arenas (FR-DICEX-33, -34), timing (-35), settings v2 + migration (-36), idle preload (-37, sim-7), DM-only rule (-38), others / slow / reduced motion (-43–45), zone caption rule (-17) | none | D5 (same folder) |
+| D7 | `build/roll-popup` | Popup stack, content, coalesced named rows (FR-DICEX-39, -40, sim-7), PiP hand-off / miniature / chips (-41), popup gear, pending in the popup (-09) | `toast-region.ts`, `ShellToaster.tsx` | D6; toast-region lock with M's placement fixes (either order, not parallel) |
+
+Walkthrough steps per slice: D5 → 14, 22; D6 → 15–18, 21, 23, 25, 27 (big dice; DM-only rolls show nothing big and wait for D7's popup); D7 → 15–21 popups, 24, 26; regression 1–13 on the zone option after D7.
+
 ## 15. Open questions
 
-All rows decided. Rows 01–12: DM at sprint-3 gate 1 ([#207](../decisions-log.md), 2026-10-16; gate rows G1, G16–G18 + bulk-accept D); the decided option is in bold, rejected ones are kept for the record. Rows 13–17 were settled by the seams ruling (2026-10-16; 17 = terms the integrator adds after the gate).
+Rows 01–17 decided. Rows 01–12: DM at sprint-3 gate 1 ([#207](../decisions-log.md), 2026-10-16; gate rows G1, G16–G18 + bulk-accept D); the decided option is in bold, rejected ones are kept for the record. Rows 13–17 were settled by the seams ruling (2026-10-16; 17 = terms the integrator adds after the gate). **Rows 18–32: sprint 4, for the DM gate** (pick in bold; owner `spec-dice`; none blocks the spec, each has a pick the builds follow until the DM rules). Not open: full screen as default, popup for every public roll, die-shape chips, log dice (DM, #243 [10–12, 17]).
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
@@ -323,6 +467,21 @@ All rows decided. Rows 01–12: DM at sprint-3 gate 1 ([#207](../decisions-log.m
 | OQ-DICEX-15 | compendium (C): descriptions | **Settled by seams S7:** C's markdown-lite component wraps text runs in `DiceText` once D1 is on `main`; context (actor) is C's | no | [compendium](post-mvp/compendium.md) |
 | OQ-DICEX-16 | play-shell: throw layer | **Settled by seams S3:** one mount line in `PlayFrame.tsx` (overlay layer, inside the free area), assigned to D1 by sequencing; DOM / WebGL, no Konva layer | no | [play-shell](play-shell.md) |
 | OQ-DICEX-17 | Glossary | **Settled by seams S9 (integrator adds after the gate):** Dice tray (window to compose / adjust a roll), Throw (the animation of one received `roll` entry), Dice look (an owner's dice appearance: style, colours, material), Dice style (a named starting look: Ivory, Obsidian, …; not "preset", which is MOD's), Notation link | no | glossary |
+| OQ-DICEX-18 | How long do the dice bounce? | **A settle ≤ 2.5 s, rest 1 s, fly to the popup 0.4 s (≤ 3.9 s on screen)**: today's tested budget, the map is covered briefly. B settle ≤ 4 s: more bouncing, the table waits longer to read. C ≤ 1.5 s: snappy, dice look dropped rather than thrown | no | FR-DICEX-35 |
+| OQ-DICEX-19 | Does every roll animate full screen (8 monster initiatives, 10 damage dice, batches)? | **A every public roll; one frame = one throw (8 initiatives = one throw of 8 d20), ≤ 20 3D dice, rest as chips** (today's cap). B only rolls with a d20 go full screen; damage etc. popup only: calmer, but [10] says "the default". C cap 10 3D dice: lighter on phones, big damage rolls lose dice to "+N more" | no | FR-DICEX-14, -32 |
+| OQ-DICEX-20 | DM hidden / DM-only rolls (hidden, monster attacks, monster initiative, HP) | **A only in the DM's popup PiP, never full screen: big dice always mean "the table saw it"**. B full screen on the DM's screen too, eye-off in the popup: same feel, but the DM can't tell secret from public at a glance. C no animation, chips only | no | FR-DICEX-38 |
+| OQ-DICEX-21 | Private player rolls ([11] "unless private") | **A not this sprint: player rolls stay public (#73); whispers stay tier C**. B a player "DM only" toggle (roller + DM see it): changes FR-DICE-13 / -15 and the visibility filter, V's hotspot this sprint. C blind rolls (only the DM sees, roller too doesn't) | no | [dice-roll-log](dice-roll-log.md), live-sync |
+| OQ-DICEX-22 | Where do display / reduced-motion settings live? | **A per device (browser), as today; OS reduced motion → flat**: zero bytes, fits a weak laptop vs a strong desktop. B per player, server-stored on the look row (+62 B/row measured, +434 B heavy DM): follows a player across devices; a schema slot. C one campaign setting by the DM: one switch for the table; can't help one slow device | no | FR-DICEX-36, CON-44 |
+| OQ-DICEX-23 | Who gets a popup? | **A everyone who received the roll, the roller too: the roller reads the total there**. B others only (Owlbear): the roller reads the tray / log | no | FR-DICEX-39 |
+| OQ-DICEX-24 | Popup placement, stacking, duration | **A in each client's toast region (players bottom-right; DM top-centre, clear of Initiative) as a third stack beyond notifications and alerts, ≤ 3 popups, 6 s after the dice rest, hover pauses**. B the DM's popups bottom-right too ([11] literally): one place for everyone, but it collides with the DM's right-edge Initiative. C one popup slot, each roll replaces the last: tidiest, fast rolls get lost | no | FR-DICEX-39; notifications, play-shell |
+| OQ-DICEX-25 | What does the popup show? | **A actor name, label, the dice, total + adv / natural / physical markers**. B A + the full log line text: complete, twice as tall. C name + total only: smallest, loses the dice [11] asks for | no | FR-DICEX-40 |
+| OQ-DICEX-26 | How does the popup show "the same animated dice"? | **A one canvas: the big dice land, then fly into the popup and stay as a still; the PiP plays the throw itself when the big one didn't run (DM-only, others off)**. B a second canvas replays the throw in the popup at the same time: always moving, 2 WebGL contexts, double GPU cost on phones. C die-shape chips only: cheapest, no animation in the popup | no | FR-DICEX-41 |
+| OQ-DICEX-27 | What plays on a slow phone over the tunnel? | **A the same default everywhere; preload the 3D chunk at idle, a late chunk → that throw flat, auto-flat when slow; the popup never needs 3D**. B phones (touch, < 768 px) default to popup only: saves battery, players with good phones miss the dice. C phones default to flat | no | FR-DICEX-37, -44 |
+| OQ-DICEX-28 | Dice library (#244) | **A keep `three` + `cannon-es` hand-rolled (161 KB gz, no new dependency, tested settle-to-result)**. B `@drdreo/dice-box-threejs` 1.1.0 (160 KB gz, results + themes built in; 1-person fork, 17 months idle, own `three` copy, rewrite of D3). C `@3d-dice/dice-box` (709 KB gz + 283 KB assets; no forced results). Table: §14 | no | [ADR-0044](../architecture/adr/0044-3d-dice.md), `package.json` |
+| OQ-DICEX-29 | play-shell: dice layer and layer order | **A dice layer portalled to `body`, topmost (over dialogs too), no input; FR-SHELL-01's order gains the row** (proposed; play-shell confirms). B below dialogs: a confirm is never covered, but needs a slot in `PlayFrame.tsx` and conflicts with toasts sitting above dialogs today | no | [play-shell](play-shell.md) |
+| OQ-DICEX-30 | notifications / play-shell: popups in the toast region | **A a third stack in `toast-region.ts`; notification and alert stacks keep their place; sequenced with M's placement fixes (toast-region lock)**. B popups as sonner custom toasts (no shared edit; sonner's 3-visible cap and collapse then mix popups with alerts) | no | [notifications](notifications.md), [play-shell](play-shell.md), track M |
+| OQ-DICEX-31 | combat-tracker: should players see dice for DM attack rolls? | **A no change: DM attack rolls stay DM-only ([FR-CBT-52](combat-tracker.md#6-functional-requirements), #171); players read the outcome line at apply**. B a popup for public outcome lines with the to-hit d20 chip (from public `payload.toHit`): players see monster rolls, but after the DM's ruling, not live. C make DM attack rolls follow the Attack tickbox: reverses #171 | no | [combat-tracker](combat-tracker.md) |
+| OQ-DICEX-32 | Glossary | Add (integrator after the gate): **Dice layer** (the full-screen, topmost canvas the dice fly on), **Roll popup** (the card in the toast region that shows a received roll with its dice), **Die shape** (a die drawn flat as its outline with the value). "Throw" gains "on the dice layer, in the zone or in a popup" | no | glossary |
 
 ## 16. Out of scope
 
