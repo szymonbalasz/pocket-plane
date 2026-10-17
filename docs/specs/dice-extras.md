@@ -418,14 +418,14 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | ~~I. `dddice-js`~~ | — | MIT SDK | **no**: a hosted service (API key, rolls on their server) | — | — | — | rejected: not offline, results not ours |
 
 - **Decided: A** (OQ-DICEX-28; DM, sprint-4 gate 1, #245 G1): full screen, the popup PiP and die-shape chips are presentation work (arena, camera, one canvas, SVG); no candidate does them for us. A keeps the tested settle-to-result, per-owner looks and the 161 KB lazy chunk, and adds **no dependency** (no DM OK needed, [ADR-0044](../architecture/adr/0044-3d-dice.md) library row unchanged). B is the only like-for-like alternative (same size, results built in, stock themes) but a 1-person fork, 17 months idle, with its own `three` copy and a rewrite of D3. D–F cost 4–8× the bytes on the players' tunnel. G and H are too young to bet on.
-- [ADR-0044](../architecture/adr/0044-3d-dice.md) is amended for **where** dice draw (topmost full screen, not "never over a window") and the popup by the dice-display ADR, accepted at the gate (#245 G4): [proposed-dice-display](../architecture/adr/proposed-dice-display.md) (the integrator numbers it).
+- [ADR-0044](../architecture/adr/0044-3d-dice.md) is amended for **where** dice draw (topmost full screen, not "never over a window") and the popup by the dice-display ADR, accepted at the gate (#245 G4): [ADR-0048](../architecture/adr/0048-dice-display.md) (the integrator numbers it).
 
 **Sprint 4 shared changes** (AGENTS §9.9): **no** schema, event, protocol, ws, record type, registry, `package.json` or fixture-registry line except the bundle.
 - `src/client/common/features/play-shell/{toast-region.ts, ShellToaster.tsx}` (play-shell frame, shared): the region takes the roll-popup stack's height as a third stack (players: above the notification + alert stacks; DM: below them). Order **M4 `fix/window-placement` → D7** (seams S7): M4 holds the play-shell frame first and keeps auto-placed windows out of the toast region.
 - Dice layer: portalled to `document.body` from the dice-extras runtime (no `PlayFrame.tsx` line). play-shell's layer order (FR-SHELL-01) gains the row at merge (doc, integrator; seams S7).
 - `src/client/common/features/dice-roll-log/` + `src/shared/dice-roll-log/{kind-types.ts, roll-kind.ts}`: D owns (dice display hotspot). `kinds.ts` unchanged. R's Divine Fury log line [15] (R S4-5 `fix/fury-log-line`) goes **after** D5 and emits its parts through D5's per-die segments (seams S8).
 - `fixtures/bundles/index.ts` + `fixtures/bundles/dice-display.ts` (append-only line).
-- Docs at merge: play-shell layer row, protocol §26 roll-control / log-segment row, glossary (OQ-DICEX-32), ADR (proposed-dice-display).
+- Docs at merge: play-shell layer row, protocol §26 roll-control / log-segment row, glossary (OQ-DICEX-32), ADR (ADR-0048).
 
 **Sprint 4 build split** (no schema slot: D's place in V → R → D → M → C is empty unless OQ-DICEX-22 B)
 
