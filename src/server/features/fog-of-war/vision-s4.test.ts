@@ -4,10 +4,17 @@
 // the one-time vision-model upgrade (FR-FOG-40, review A4).
 import { afterEach, describe, expect, test } from "bun:test";
 import { type VisionServices, visionServices } from "@fixtures/units/fog-of-war/vision-harness";
-import { VISION_TYPE, type VisionRecord } from "@shared/fog-of-war/schemas";
-import { MAP_INTENTS as I } from "@shared/scenes-map/schemas";
+import {
+  FOG_INTENTS as F,
+  FOG_SETTINGS_TYPE,
+  VISION_TYPE,
+  type VisionRecord,
+} from "@shared/fog-of-war/schemas";
+import { MAP_INTENTS as I, TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { eq, inArray, isNull } from "drizzle-orm";
 import { realContext } from "../../commands/context";
+import { armCrashHook } from "../../commands/crash";
+import { stateDigest } from "../../db/digest";
 import { VISION_MODEL, VISION_MODEL_KEY } from "../../db/meta";
 import { asset, dbMeta, fogSettings, scene, sceneFog, token } from "../../db/schema";
 import { type Logger, silentLogger } from "../../log";
@@ -25,6 +32,7 @@ async function setup(bundle?: string) {
   return t;
 }
 afterEach(() => {
+  armCrashHook(null);
   for (const t of opened.splice(0)) t.stop();
 });
 
@@ -229,5 +237,93 @@ describe("FR-FOG-40 vision-model upgrade (review A4)", () => {
     for (const r of rows) expect(r.visionStale).toBe(r.sceneId !== t.ambushId);
     // Rerun: nothing.
     expect(upgradeVisionModel(t.db, realContext(t.s.clock))).toBe(0);
+  });
+});
+
+describe("FR-FOG-49 party vision switch (in-process)", () => {
+  test("FR-FOG-49 setPartyVision: one transaction = row + active-scene re-derive + visionStale elsewhere + one logged PartyVisionSet; same value → no event", async () => {
+    const t = await setup("vision-party");
+    const n = t.events.length;
+    t.run(F.setPartyVision, { on: true });
+    expect(t.events.length).toBe(n + 1);
+    const ev = t.last();
+    expect(ev?.type).toBe("PartyVisionSet");
+    expect(ev?.payload).toEqual({ on: true });
+    expect(ev?.changes[0]).toMatchObject({
+      type: FOG_SETTINGS_TYPE,
+      before: { partyVision: false },
+      after: { partyVision: true },
+    });
+    // Every player's `vision` is listed with its new `shared` flag.
+    const visions = (ev?.changes ?? []).filter((c) => c.type === VISION_TYPE);
+    expect(visions.map((c) => (c.after as { shared: boolean }).shared)).toEqual([true, true]);
+    expect(visions.map((c) => (c.before as { shared: boolean }).shared)).toEqual([false, false]);
+    for (const r of t.db.select().from(sceneFog).all()) {
+      expect(r.visionStale).toBe(r.sceneId !== t.ambushId);
+    }
+    t.run(F.setPartyVision, { on: true });
+    expect(t.events.length).toBe(n + 1);
+    expect(() => t.run(F.setPartyVision, { on: false }, t.actor("p1"))).toThrow();
+  });
+
+  test("FR-FOG-49 PP_TEST_CRASH fog.setPartyVision:before-commit → digest and per-player snapshots unchanged; :after-commit → as switched after a restart", async () => {
+    const t = await setup("vision-party");
+    const kill = () => {
+      throw new Error("killed");
+    };
+    const snaps = () => JSON.stringify([t.snapshot("p1"), t.snapshot("p2"), t.snapshot("dm")]);
+    const digest = () => stateDigest(t.db.$client).sha256;
+    const d0 = digest();
+    const s0 = snaps();
+    armCrashHook({ point: "before-commit", target: F.setPartyVision }, kill);
+    expect(() => t.run(F.setPartyVision, { on: true })).toThrow();
+    armCrashHook(null);
+    clearVisionCache();
+    expect(digest()).toBe(d0);
+    expect(snaps()).toBe(s0);
+    armCrashHook({ point: "after-commit", target: F.setPartyVision }, kill);
+    expect(() => t.run(F.setPartyVision, { on: true })).toThrow();
+    armCrashHook(null);
+    const d1 = digest();
+    const s1 = snaps();
+    expect(d1).not.toBe(d0);
+    clearVisionCache();
+    expect(digest()).toBe(d1);
+    expect(snaps()).toBe(s1);
+    // Switched: each player holds the other's `vision`.
+    expect((t.snapshot("p1")[VISION_TYPE] as unknown[]).length).toBe(2);
+  });
+
+  test("FR-FOG-50 party-blind: both players' sources in darkness without see-through → nobody but own tokens; one sees again → the party's sight", async () => {
+    const t = await setup("vision-party");
+    t.run(F.setPartyVision, { on: true });
+    // Both PCs into the darkness [12.5, 9, 1.5]; Thorn without see-through.
+    t.run("char.edit", {
+      creatureId: t.charId("Thorn"),
+      set: { senses: { visionFt: 0, darkvisionFt: 60, seesMagicalDarkness: false } },
+    });
+    t.run(I.moveToken, { tokenId: t.tokenRow("Mira").id, col: 12, row: 9 });
+    t.run(I.moveToken, { tokenId: t.tokenRow("Thorn").id, col: 11, row: 9 });
+    const names = (w: "p1" | "p2") =>
+      (t.snapshot(w)[TOKEN_TYPE] as { name: string; sceneId: string }[])
+        .filter((x) => x.sceneId === t.ambushId)
+        .map((x) => x.name)
+        .sort();
+    expect(names("p1")).toEqual(["Mira"]);
+    expect(names("p2")).toEqual(["Thorn"]);
+    // Thorn sees through again: the whole party sees Thorn's sight (Goblin 2 too: Sees invisible).
+    t.run("char.edit", {
+      creatureId: t.charId("Thorn"),
+      set: {
+        senses: { visionFt: 0, darkvisionFt: 60, seesMagicalDarkness: true, seesInvisible: true },
+      },
+    });
+    expect(names("p1")).toContain("Goblin 2");
+    expect(names("p1")).toEqual(names("p2"));
+    // Mira herself is blind (her `vision` says so) but keeps the party's sight (OQ-FOG-48).
+    const own = (t.snapshot("p1")[VISION_TYPE] as VisionRecord[]).find(
+      (v) => v.playerId === t.pid.p1,
+    );
+    expect(own?.blind).toBe(true);
   });
 });
