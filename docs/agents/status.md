@@ -11,7 +11,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | V vision + fog spec | `spec/s4-vision` (w4Z) | spec-vision | Writing | Seams |
 | D animated dice spec | `spec/s4-dice` (w40) | spec-dice | Draft in-review (04a569d) | Seams |
 | M map tools spec | `spec/s4-maptools` (w51) | spec-maptools | Writing | Seams |
-| R rules + effects spec | `spec/s4-rules` (w52) | spec-rules | Effects review, then spec | Seams |
+| R rules + effects spec | `spec/s4-rules` (w52) | spec-rules | Draft in-review (40c113e); review: keep model, 2 extensions | Seams |
 | C compendium spec | `spec/s4-compendium` (w53) | spec-compendium | Writing | Seams |
 
 ## Shared-file locks
