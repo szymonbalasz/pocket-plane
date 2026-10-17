@@ -6,20 +6,31 @@
 // the window) or no use left → `conflict` unless `force` (recorded `forced`, spends nothing).
 // Feature uses go through CHARX's one helper pair (`resources.ts`, FR-MOD-61).
 // `cbt.undo` → `revert`: the row's uses back to `offered`, feature uses refunded.
+// FR-MOD-57 (sprint 4, rulings B3 / B4): each landed part's roll (`expression` + per-die `dice`
+// from its roll row) goes in `dmPayload.parts`; a **public character** trigger's also in the
+// public part (unless the DM set its value: players see the DM's value only).
 import type { AttackLineDmPart, AttackLinePart } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_FACTOR } from "@shared/combat-tracker/rules";
 import type { HpTriggerPart } from "@shared/combat-tracker/schemas";
 import { windowed, windowWords } from "@shared/effect-modifiers/trigger-fire";
 import { and, eq } from "drizzle-orm";
 import type { z } from "zod";
+import type { CommandEnv } from "../../commands/commands";
 import { CommandError, invalid } from "../../commands/errors";
-import { ruleTrigger, triggerUse } from "../../db/schema";
+import { roll, ruleTrigger, triggerUse } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { refundFeatureUse, spendFeatureUse } from "../character-sheet/resources";
 import type { ApplyHook, ApplyTargetResult } from "../combat-tracker/apply-hooks";
-import { chargeFree, featureUses } from "./trigger-hook";
+import { chargeFree, dieValues, featureUses } from "./trigger-hook";
 
 const none = (): ApplyTargetResult => ({ extraRaw: 0, parts: [], dm: {}, changes: [] });
+
+/** FR-MOD-57: an offered part's roll as a line part carries it; no stored dice → expression only. */
+function partRoll(env: Pick<CommandEnv, "tx">, rollId: string) {
+  const r = env.tx.select({ dice: roll.dice }).from(roll).where(eq(roll.id, rollId)).get();
+  const dice = r ? dieValues({ dice: r.dice as { value: number | null }[] }) : undefined;
+  return dice ? { dice } : {};
+}
 
 /**
  * FR-MOD-38, -40: a used charge / no use left. The issue names the part (`["triggers",
@@ -106,20 +117,26 @@ export const modApplyHook: ApplyHook = {
           .run();
       }
       out.extraRaw += value;
+      const set = x.value !== undefined && x.value !== part.value;
+      const rolled = { expression: part.expression, ...partRoll(env, part.rollId) };
+      // FR-MOD-57 (B3, B4): monster triggers' dice stay DM-only whatever `public` says.
+      const publicDice = !!t?.public && t.characterId !== null && !set;
       // FR-MOD-47: the label in public lines iff the trigger is public; values always.
       parts.push({
         label: t?.public ? part.label : null,
         value,
         type: part.type,
         ...(multiplier !== "normal" ? { multiplier } : {}),
+        ...(publicDice ? rolled : {}),
       });
       dmParts.push({
         triggerId: part.triggerId,
         label: part.label,
         rolled: part.value,
         // FR-MOD-40: "(DM set; rolled 7)" after an edited value.
-        ...(x.value !== undefined && x.value !== part.value ? { set: true as const } : {}),
+        ...(set ? { set: true as const } : {}),
         ...(forced ? { forced: true as const } : {}),
+        ...rolled,
       });
       triggerParts.push({
         triggerId: part.triggerId,
