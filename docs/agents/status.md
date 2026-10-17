@@ -12,7 +12,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Docs pass | merged bd07224 | — | Done | — |
 | C-search | `build/cmp-search` (w59, slot 3) | test-cmp-search | Walkthrough (check 2907, e2e green; DM search 0.5 s → 2 ms) | Merge → C-all |
 | V6 vision core | `fix/vision-s4-core` (w54, slot 0) | test-vision-core | Walkthrough (check, build, e2e green) | Merge → R0, V7 |
-| D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83) | main gates running |
+| D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | D6 full-screen dice | `build/dice-screen` (w5A, slot 2) | build-dice-screen | Building | Walkthrough |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
 | M4 window placement | `fix/window-placement` (w57, slot 4) | test-window-placement | Walkthrough (check 2915, e2e 83) | Merge |
