@@ -222,19 +222,7 @@ export function sceneSight(
   const out = new Map<string, SightEntry>();
   if (sources.size === 0) return out;
   const cache = visionCache(read);
-  const s = read
-    .select({ rev: sceneStructure.rev })
-    .from(sceneStructure)
-    .where(eq(sceneStructure.sceneId, inputs.sceneId))
-    .get();
-  const bounds = sceneBounds(read, inputs.sceneId);
-  const base = [
-    inputs.fogRev,
-    s?.rev ?? -1,
-    bounds?.join(",") ?? "-",
-    inputs.party ? "party" : "own",
-    JSON.stringify(inputs.darkness.map(geomOf)),
-  ].join("|");
+  const { base, bounds } = sightBase(read, inputs);
   let occ: SceneOccluders | null = null;
   for (const [p, list] of sources) {
     const key = sightKey(base, list);
@@ -248,6 +236,30 @@ export function sceneSight(
     out.set(p, { key, sources: list, vision });
   }
   return out;
+}
+
+/**
+ * FR-FOG-38: the scene part of a sight cache key: fog `rev`, structure `rev`, the map rectangle
+ * (review A8), the party flag and the darkness geometry. Also the drag preview's (FR-FOG-53).
+ */
+export function sightBase(
+  read: SceneRead,
+  inputs: SightInputs & { darkness: readonly Parameters<typeof geomOf>[0][] },
+): { base: string; bounds: MapBounds | null } {
+  const s = read
+    .select({ rev: sceneStructure.rev })
+    .from(sceneStructure)
+    .where(eq(sceneStructure.sceneId, inputs.sceneId))
+    .get();
+  const bounds = sceneBounds(read, inputs.sceneId);
+  const base = [
+    inputs.fogRev,
+    s?.rev ?? -1,
+    bounds?.join(",") ?? "-",
+    inputs.party ? "party" : "own",
+    JSON.stringify(inputs.darkness.map(geomOf)),
+  ].join("|");
+  return { base, bounds };
 }
 
 /** FR-SCN-37 + FR-FOG-28 / -33: walls, doors not open, map edges and darkness, prepared once. */

@@ -1609,3 +1609,16 @@ From [character-sheet-full](../specs/character-sheet-full.md) FR-CHARX-54–57, 
 
 - **Derived (never stored):** rolled numbers = stored `toHit` / `damage` + `bonus` (`attackRollSpecs`, `attackNumbers`); the line's merged run.
 - **Fixtures:** `weapon-flame-tongue` (S4-0) reused; no new unit or bundle. **CON-44:** `part` markers +3,780 B per viewer on 30 heavy entries.
+
+## 55. Sprint 4: sight while dragging (V8)
+
+From [fog-of-war](../specs/fog-of-war.md) FR-FOG-53 / -54, [scenes-map](../specs/scenes-map.md) FR-MAP-39. **Built by `build/vision-drag`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing is written while dragging. Protocol side: [protocol §72](../protocol/README.md#72-sprint-4-sight-while-dragging-v8).
+
+| Piece | Kind | Contents | Visibility | Source |
+|---|---|---|---|---|
+| `map.checkMove` ack hint `fog-sight` | wire (ack) | `{guard, tokenId, see, dark}` | the sender only (player: own token; DM: owned tokens, from cells the owner's guards allow) | FR-FOG-53 |
+| Preview cache | server memory | `(connection, scene sight base, tokenId@col,row,size:senses)` → `{see, dark}`, LRU 64, separate from the vision cache (256) | never on a wire; restart → empty | FR-FOG-53, -38 |
+| Drag state | client memory | `DragState {tokenId, size, from, to}` (`pointers.drag`) + `previews.local {tokenId, x, y}` | — | FR-MAP-39 (seams S1) |
+| Sight preview store | client memory, per canvas | `local {tokenId, see, dark} \| null`, `remote: tokenId → {see, dark}` | — | FR-FOG-54 |
+
+- **Derived (never stored):** the drawn sight = the owner's `vision` with the previewed token's polygons swapped (`previewVision`).
