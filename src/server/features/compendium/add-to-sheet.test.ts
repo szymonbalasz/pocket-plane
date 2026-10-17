@@ -9,6 +9,7 @@ import { loadBundle } from "@fixtures/index";
 import { DIVINE_FURY_RULE } from "@fixtures/units/compendium/cmp-homebrew";
 import { CHARX_INTENTS, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { CMP_INTENTS } from "@shared/compendium/homebrew";
+import { TRIGGER_INTENTS } from "@shared/effect-modifiers/trigger-intents";
 import { RULE_TRIGGER_TYPE } from "@shared/effect-modifiers/trigger-records";
 import { and, eq } from "drizzle-orm";
 import { armCrashHook } from "../../commands/crash";
@@ -174,6 +175,93 @@ describe("cmp.addToSheet (C4)", () => {
       name: "Moonblade Shard",
       qty: 1,
     });
+  });
+
+  test("FR-CMP-28 duplicate by presetKey (#241): Thorn already has Sneak Attack → the row is added, the trigger skipped (ack triggerSkipped); a renamed copy with the preset's rule still counts", () => {
+    const thorn = charId("Thorn");
+    const before = counts(thorn);
+    expect(triggers(thorn).map((t) => t.name)).toContain("Sneak Attack");
+    const r = run({ entryId: entryId("Sneak Attack"), characterId: thorn }) as {
+      rowId: string;
+      triggerId?: string;
+      triggerSkipped?: boolean;
+    };
+    expect(r.triggerId).toBeUndefined();
+    expect(r.triggerSkipped).toBe(true);
+    expect(sheet(thorn)?.features.find((f) => f.id === r.rowId)?.name).toBe("Sneak Attack");
+    expect(counts(thorn)).toEqual({ ...before, features: before.features + 1 });
+    expect(readEventLog(db, cid).at(-1)?.type).toBe("CharacterSheetEdited");
+
+    const existing = triggers(thorn).find((t) => t.name === "Sneak Attack");
+    db.update(ruleTrigger)
+      .set({ name: "Backstab" })
+      .where(eq(ruleTrigger.id, existing?.id as string))
+      .run();
+    try {
+      const again = run({ entryId: entryId("Sneak Attack"), characterId: thorn }) as {
+        triggerSkipped?: boolean;
+      };
+      expect(again.triggerSkipped).toBe(true);
+      expect(counts(thorn).triggers).toBe(before.triggers);
+    } finally {
+      db.update(ruleTrigger)
+        .set({ name: "Sneak Attack" })
+        .where(eq(ruleTrigger.id, existing?.id as string))
+        .run();
+    }
+  });
+
+  test("FR-CMP-28 duplicate by name (#241): homebrew Divine Fury twice on Mira (inline preset, name case-insensitive) → one trigger", () => {
+    const mira = charId("Mira");
+    const existing = triggers(mira).filter((t) => t.name === "Divine Fury");
+    expect(existing).toHaveLength(1);
+    db.update(ruleTrigger)
+      .set({ name: "DIVINE fury" })
+      .where(eq(ruleTrigger.id, existing[0]?.id as string))
+      .run();
+    const before = counts(mira);
+    const r = run({ entryId: entryId("Divine Fury"), characterId: mira }) as {
+      triggerId?: string;
+      triggerSkipped?: boolean;
+    };
+    expect([r.triggerId, r.triggerSkipped]).toEqual([undefined, true]);
+    expect(counts(mira)).toEqual({ ...before, features: before.features + 1 });
+  });
+
+  test("FR-CMP-28 delete-then-add (#241): after mod.deleteTrigger, Add to sheet adds the compendium's Divine Fury trigger", () => {
+    const mira = charId("Mira");
+    for (const t of triggers(mira).filter((x) => x.name.toLowerCase() === "divine fury")) {
+      h.s.commands.run(TRIGGER_INTENTS.deleteTrigger, { triggerId: t.id }, { actor: dmActor() });
+    }
+    const r = run({ entryId: entryId("Divine Fury"), characterId: mira }) as {
+      triggerId?: string;
+      triggerSkipped?: boolean;
+    };
+    expect(r.triggerSkipped).toBeUndefined();
+    const t = triggers(mira).find((x) => x.id === r.triggerId);
+    expect(t).toMatchObject({ name: "Divine Fury", rule: DIVINE_FURY_RULE });
+    expect(triggers(mira).filter((x) => x.name.toLowerCase() === "divine fury")).toHaveLength(1);
+  });
+
+  test("FR-CMP-28 non-duplicate unchanged (#241): Thorn with Sneak Attack still gets a Divine Fury trigger", () => {
+    const thorn = charId("Thorn");
+    const before = counts(thorn);
+    const r = run({ entryId: entryId("Divine Fury"), characterId: thorn }) as {
+      triggerId?: string;
+      triggerSkipped?: boolean;
+    };
+    expect(r.triggerSkipped).toBeUndefined();
+    expect(triggers(thorn).find((x) => x.id === r.triggerId)?.name).toBe("Divine Fury");
+    expect(counts(thorn)).toEqual({
+      ...before,
+      features: before.features + 1,
+      triggers: before.triggers + 1,
+    });
+    expect(
+      readEventLog(db, cid)
+        .slice(-2)
+        .map((x) => x.type),
+    ).toEqual(["CharacterSheetEdited", "RuleTriggerSaved"]);
   });
 
   test("FR-CMP-28 refusals write nothing: another's character / locked sheet → forbidden; unshared homebrew, a monster entry or an NPC → not_found; a condition → invalid", () => {

@@ -51,6 +51,8 @@ export const AddToSheetResult = z.strictObject({
   rowId: Id,
   /** Set when FR-CMP-29 resolved a trigger preset. */
   triggerId: Id.optional(),
+  /** Set when a preset resolved but the character already had that trigger (#241). */
+  triggerSkipped: z.literal(true).optional(),
 });
 export type AddToSheetResult = z.infer<typeof AddToSheetResult>;
 

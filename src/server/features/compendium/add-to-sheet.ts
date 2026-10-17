@@ -1,7 +1,8 @@
 // `cmp.addToSheet` (FR-CMP-28, -29; intent, DM + player): one transaction: entry visible to the
 // caller (FR-CMP-14, else `not_found`) → `char.putRow`'s authorisation (DM any campaign
 // character; the owner unless locked) → CHARX internal row insert → if FR-CMP-29 resolves a
-// trigger preset, MOD's `addTriggerFromPreset`. Any failure (MOD validation included) → nothing
+// trigger preset, MOD's `addTriggerFromPreset`, unless the character already has that trigger
+// (#241: skipped, `triggerSkipped` in the ack). Any failure (MOD validation included) → nothing
 // written. Events: `CharacterSheetEdited` (+ `RuleTriggerSaved` with the trigger row).
 import {
   AddToSheetIntent,
@@ -10,11 +11,14 @@ import {
   clip,
   ROW_TEXT_MAX,
 } from "@shared/compendium/homebrew";
-import { resolvePreset } from "@shared/compendium/presets";
+import { type ResolvedPreset, resolvePreset } from "@shared/compendium/presets";
 import type { BodyOf, FacetsOf } from "@shared/compendium/schemas";
+import { getTriggerPreset } from "@shared/effect-modifiers/trigger-presets";
 import { RuleTriggerSaved } from "@shared/events/effect-modifiers";
+import { and, eq, isNull } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { invalid, notFound } from "../../commands/errors";
+import { ruleTrigger } from "../../db/schema";
 import { editableCreature } from "../character-sheet/access";
 import { insertSheetRows, type NewSheetRows } from "../character-sheet/row-insert";
 import { addTriggerFromPreset } from "../effect-modifiers";
@@ -65,6 +69,32 @@ export function sheetRowOf(env: Pick<CommandEnv, "tx">, e: EntryRow): NewSheetRo
   }
 }
 
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * #241: the character already has the trigger `preset` would add. A built-in key: a trigger
+ * named like the preset (case-insensitive) or with its exact rule (rows don't keep the key they
+ * started from); an inline preset: a trigger with the entry's name.
+ */
+export function hasTriggerFor(
+  env: Pick<CommandEnv, "tx">,
+  characterId: string,
+  preset: ResolvedPreset,
+): boolean {
+  const rows = env.tx
+    .select({ name: ruleTrigger.name, rule: ruleTrigger.rule })
+    .from(ruleTrigger)
+    .where(and(eq(ruleTrigger.characterId, characterId), isNull(ruleTrigger.definitionId)))
+    .all();
+  if (!("presetKey" in preset.from)) {
+    const { name } = preset.from;
+    return rows.some((r) => sameName(r.name, name));
+  }
+  const p = getTriggerPreset(preset.from.presetKey);
+  if (!p) return false;
+  return rows.some((r) => sameName(r.name, p.name) || Bun.deepEquals(r.rule, p.rule));
+}
+
 export const addToSheet = defineCommand({
   name: CMP_INTENTS.addToSheet,
   input: AddToSheetIntent,
@@ -83,7 +113,9 @@ export const addToSheet = defineCommand({
     const { rowIds } = insertSheetRows(env, characterId, add);
     const result: AddToSheetResult = { list: add.list, rowId: rowIds[0] as string };
     const preset = resolvePreset(e);
-    if (preset) {
+    if (preset && hasTriggerFor(env, characterId, preset)) {
+      result.triggerSkipped = true;
+    } else if (preset) {
       const { triggerId, changes } = addTriggerFromPreset(env, characterId, preset.from);
       env.emit({
         type: RuleTriggerSaved.type,
