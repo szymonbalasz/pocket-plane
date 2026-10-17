@@ -147,9 +147,31 @@ export async function pushSchema(
       `Schema change would lose data:\n${lossy.join("\n")}\nOn a disposable dir run \`bun run fixtures:reset\`.`,
     );
   }
+  const stmts = dropDuplicateIndexCreates(res.statementsToExecute);
   const backup = opts.backup !== false && isFileDb(sqlite) ? backupDb(sqlite, opts.now?.()) : null;
-  applyStatements(sqlite, res.statementsToExecute);
-  return { applied: res.statementsToExecute.length, backup };
+  applyStatements(sqlite, stmts);
+  return { applied: stmts.length, backup };
+}
+
+/**
+ * drizzle-kit 0.31 emits a rebuilt table's `CREATE INDEX` statements twice (a column type change,
+ * e.g. SCN sprint 4's `aoe_template.x` → `real`), so the second one fails with "index … already
+ * exists". Keeps the first CREATE of a name until a `DROP INDEX` of that name; drops the repeats.
+ */
+export function dropDuplicateIndexCreates(stmts: readonly string[]): string[] {
+  const live = new Set<string>();
+  return stmts.filter((s) => {
+    const drop = /^DROP INDEX `(\w+)`/.exec(s.trim())?.[1];
+    if (drop) {
+      live.delete(drop);
+      return true;
+    }
+    const create = /^CREATE (?:UNIQUE )?INDEX `(\w+)`/.exec(s.trim())?.[1];
+    if (!create) return true;
+    if (live.has(create)) return false;
+    live.add(create);
+    return true;
+  });
 }
 
 /**

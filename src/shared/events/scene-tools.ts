@@ -47,10 +47,15 @@ export const TemplateDeleted = defineEvent({
   payload: templatePayload,
   ...logged,
 });
-/** `scn.clearTemplates`: every kept template of the scene. */
+/**
+ * `scn.clearTemplates` (FR-SCN-44): the scene's DM-placed kept templates, or (`players: true`)
+ * every kept one.
+ */
 export const TemplatesCleared = defineEvent({
   type: "TemplatesCleared",
-  payload: z.object({ sceneId: z.string(), templateIds: z.array(z.string()) }).strict(),
+  payload: z
+    .object({ sceneId: z.string(), templateIds: z.array(z.string()), players: z.boolean() })
+    .strict(),
   ...logged,
 });
 

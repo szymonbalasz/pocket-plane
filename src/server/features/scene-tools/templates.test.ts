@@ -126,7 +126,15 @@ describe("FR-SCN-25 Keep: scn.placeTemplate", () => {
     expect(t.tpl(wide)?.width).toBe(10);
     expect(t.tpl(cone)?.width).toBeNull();
     // FR-SCN-20 ranges come from the schema.
-    for (const bad of [{ size: 0 }, { size: 7 }, { size: 305 }, { angle: 10 }, { width: 65 }]) {
+    for (const bad of [
+      { size: 0 },
+      { size: 7 },
+      { size: 305 },
+      { angle: 12.25 },
+      { angle: 360 },
+      { x: 3.375 },
+      { width: 65 },
+    ]) {
       expect(t.err(() => t.place({ ...sphere(t.ambush.id), ...bad })).code).toBe("invalid");
     }
   });
@@ -272,27 +280,55 @@ describe("FR-SCN-26 persistent edits", () => {
     expect(t.tpl(mine)).toBeNull();
   });
 
-  test("FR-SCN-26 Clear templates: DM only; every kept template of the scene; none → no event", () => {
+  test("FR-SCN-44 Clear templates scope: DM-placed only unless players; none → no event", () => {
     const t = setup();
-    const a = t.place(sphere(t.ambush.id), t.p1);
-    const b = t.place(sphere(t.ambush.id, { hidden: true }));
-    const c = t.place(sphere(t.cellar.id));
-    expect(t.err(() => t.run(S.clearTemplates, { sceneId: t.ambush.id }, t.p1)).code).toBe(
-      "forbidden",
-    );
+    const mine = t.place(sphere(t.ambush.id), t.p1);
+    const glyph = t.place(sphere(t.ambush.id, { hidden: true }));
+    const web = t.place(sphere(t.ambush.id, { x: 0.5, y: 6.25, angle: 37.5 }));
+    const cellar = t.place(sphere(t.cellar.id));
+    for (const input of [{ sceneId: t.ambush.id }, { sceneId: t.ambush.id, players: true }]) {
+      expect(t.err(() => t.run(S.clearTemplates, input, t.p1)).code).toBe("forbidden");
+    }
     const events = t.events.length;
+    const log = t.logTypes().length;
     t.run(S.clearTemplates, { sceneId: t.ambush.id });
-    expect([t.tpl(a), t.tpl(b), t.tpl(c)?.id]).toEqual([null, null, c]);
-    const e = t.events.slice(events);
+    expect([t.tpl(mine)?.id, t.tpl(glyph), t.tpl(web), t.tpl(cellar)?.id]).toEqual([
+      mine,
+      null,
+      null,
+      cellar,
+    ]);
+    let e = t.events.slice(events);
     expect(e.map((x) => x.event.type)).toEqual(["TemplatesCleared"]);
-    expect(e[0]?.event.payload).toEqual({ sceneId: t.ambush.id, templateIds: [a, b] });
-    // Players get a delete for the visible one only; the hidden one was never theirs.
-    const p2 = t.h.viewer("player", t.h.p2.id);
-    expect(
-      (e[0]?.event.changes ?? []).map((ch) => t.s.records.filterChange(ch, p2)?.op ?? null),
-    ).toEqual(["delete", null]);
-    t.run(S.clearTemplates, { sceneId: t.ambush.id });
+    expect(t.logTypes().slice(log)).toEqual(["TemplatesCleared"]);
+    expect(e[0]?.event.payload).toEqual({
+      sceneId: t.ambush.id,
+      templateIds: [glyph, web],
+      players: false,
+    });
+    // Players get a delete for the visible one only (Glyph was never theirs), and none for
+    // their own template, which stays.
+    for (const pid of [t.h.p1.id, t.h.p2.id]) {
+      const v = t.h.viewer("player", pid);
+      expect(
+        (e[0]?.event.changes ?? []).map((ch) => t.s.records.filterChange(ch, v)?.op ?? null),
+      ).toEqual([null, "delete"]);
+      expect(t.ids(v)).toEqual([mine]);
+    }
+    // Nothing DM-placed left → no write, no event.
+    t.run(S.clearTemplates, { sceneId: t.ambush.id, players: false });
     expect(t.events.length).toBe(events + 1);
+    t.run(S.clearTemplates, { sceneId: t.ambush.id, players: true });
+    e = t.events.slice(events + 1);
+    expect(e[0]?.event.payload).toEqual({
+      sceneId: t.ambush.id,
+      templateIds: [mine],
+      players: true,
+    });
+    expect(t.tpl(mine)).toBeNull();
+    expect(t.tpl(cellar)?.id).toBe(cellar);
+    t.run(S.clearTemplates, { sceneId: t.ambush.id, players: true });
+    expect(t.events.length).toBe(events + 2);
     expect(t.err(() => t.run(S.clearTemplates, { sceneId: "no-such-scene" })).code).toBe(
       "not_found",
     );

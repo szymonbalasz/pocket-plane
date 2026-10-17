@@ -227,13 +227,92 @@ describe("SCN §13 templates over sockets (scene-tools bundle)", () => {
     const fresh = await h.live(p2Cred());
     const c = convergence(h.s, p2, fresh);
     expect(c.live).toEqual(c.fresh);
-    // Clear templates: every kept one gone for players; the DM sees none on Goblin Ambush.
-    await intent(dm, S.clearTemplates, { sceneId: ambush() });
+    // FR-SCN-44 Clear templates (default): DM-placed only. Glyph goes; players' kept ones stay,
+    // and no player frame carries a delete for them (nothing visible changed → no frame at all).
+    const mark = [p1, p2].map((x) => x.frames.length);
+    expect(await intent(dm, S.clearTemplates, { sceneId: ambush() })).toMatchObject({
+      type: "ack",
+    });
+    for (const x of [p1, p2]) await barrier(x);
+    expect(labels(dm)).toEqual(["Fireball", "Spirit Guardians"]);
+    for (const [i, x] of [p1, p2].entries()) {
+      expect(labels(x)).toEqual(["Fireball", "Spirit Guardians"]);
+      const frames = x.frames.slice(mark[i]).filter((f) => f.type === "event");
+      expect(frames.flatMap((f) => (f.type === "event" ? f.changes : []))).toEqual([]);
+      expect(JSON.stringify(frames)).not.toContain("Glyph");
+    }
+    // With the tick: every kept one gone for everyone.
+    await intent(dm, S.clearTemplates, { sceneId: ambush(), players: true });
     for (const x of [p1, p2]) await barrier(x);
     expect(labels(p1)).toEqual([]);
     expect(labels(p2)).toEqual([]);
     expect(labels(dm)).toEqual([]);
+    expect(await intent(p1, S.clearTemplates, { sceneId: ambush(), players: true })).toMatchObject({
+      type: "reject",
+      code: "forbidden",
+    });
+    expect(leakScan(h.s, p1)).toEqual([]);
     for (const x of [dm, p1, p2, fresh]) x.close();
+  });
+
+  test("FR-SCN-20 decimals: place / update / signal with a 2-decimal origin and 37.5° → stored and broadcast as sent; convergent", async () => {
+    const dm = await h.live(dmCred());
+    const p1 = await h.live(p1Cred());
+    const p2 = await h.live(p2Cred());
+    const cone = { sceneId: ambush(), shape: "cone", x: 3.37, y: 7.64, size: 15, angle: 37.5 };
+    const kept = await intent(p1, S.placeTemplate, { ...cone, label: "Burning Hands" });
+    const id = ((kept as Extract<ServerFrame, { type: "ack" }>).result as { templateId: string })
+      .templateId;
+    for (const c of [dm, p2]) await barrier(c);
+    expect(
+      db
+        .select()
+        .from(aoeTemplate)
+        .all()
+        .find((r) => r.id === id),
+    ).toMatchObject({
+      x: 3.37,
+      y: 7.64,
+      angle: 37.5,
+    });
+    for (const c of [dm, p1, p2]) {
+      expect(c.store.records[AOE_TEMPLATE_TYPE]?.[id]).toMatchObject({
+        x: 3.37,
+        y: 7.64,
+        angle: 37.5,
+      });
+    }
+    await intent(p1, S.updateTemplate, { templateId: id, x: 0.05, y: 13.99, angle: 359.9 });
+    expect(await intent(p1, S.updateTemplate, { templateId: id, x: 0.055 })).toMatchObject({
+      type: "reject",
+      code: "invalid",
+    });
+    for (const c of [dm, p2]) await barrier(c);
+    for (const c of [dm, p2]) {
+      expect(c.store.records[AOE_TEMPLATE_TYPE]?.[id]).toMatchObject({
+        x: 0.05,
+        y: 13.99,
+        angle: 359.9,
+      });
+    }
+    const mark = p2.frames.length;
+    p1.send({ type: "signal", name: SCN_SIGNALS.template, data: { ...cone, key: "free" } });
+    await barrier(p1);
+    await barrier(p2);
+    const sig = p2.frames
+      .slice(mark)
+      .find((f) => f.type === "signal" && f.name === SCN_SIGNALS.template);
+    expect(sig && sig.type === "signal" && sig.data).toMatchObject({
+      x: 3.37,
+      y: 7.64,
+      angle: 37.5,
+    });
+    for (const c of [dm, p2]) {
+      const c2 = convergence(h.s, c, await h.live(c === dm ? dmCred() : p2Cred()));
+      expect(c2.live).toEqual(c2.fresh);
+    }
+    await intent(dm, S.deleteTemplate, { templateId: id });
+    for (const c of [dm, p1, p2]) c.close();
   });
 
   test("SCN §11 restart: kept templates survive on the same DB; ephemerals never existed there", async () => {
