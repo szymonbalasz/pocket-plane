@@ -215,3 +215,34 @@ describe("FR-CHARX-55 char.roll with weapon parts", () => {
     );
   });
 });
+
+describe("FR-CBT-86 creature form keeps the fields", () => {
+  test("FR-CBT-86 creature form keeps the fields: a whole PUT of an NPC with bonus + extraDamage stores them; Save unchanged keeps them", () => {
+    const t = setup();
+    const row = (id: string) => t.s.db.select().from(entity).where(eq(entity.id, id)).get();
+    const elite = row(t.eliteId);
+    if (!elite) throw new Error("no Elite");
+    const flame = {
+      ...FLAME,
+      id: "row-1",
+      extraDamage: [
+        { damage: "2d6", type: "fire" },
+        { damage: "1d4", type: "cold" },
+      ],
+    };
+    const body = (statBlock: unknown) => ({
+      id: t.eliteId,
+      name: elite.name,
+      portraitAssetId: elite.portraitAssetId,
+      statBlock,
+      tokenShape: null,
+    });
+    const statBlock = { ...(elite.statBlock as object), attacks: [flame] };
+    t.run("entities.update", body(statBlock));
+    const stored = row(t.eliteId)?.statBlock as { attacks: unknown[] };
+    expect(stored.attacks).toEqual([flame]);
+    // The form's unedited Save sends the same stat block back: nothing changes, nothing dropped.
+    t.run("entities.update", body(stored));
+    expect(row(t.eliteId)?.statBlock).toEqual(stored);
+  });
+});
