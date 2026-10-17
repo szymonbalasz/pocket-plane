@@ -26,7 +26,7 @@ import {
 } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Layer, Stage } from "react-konva";
+import { Group, Layer, Stage } from "react-konva";
 import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
 import { FogBlindChip } from "../fog-of-war/BlindChip";
 import { blindStore, isBlind } from "../fog-of-war/blind";
@@ -59,7 +59,7 @@ import {
 } from "./drag-preview";
 import { toastReject, useLive, useMapIntent } from "./intents";
 import { LaserSender } from "./laser";
-import { layerSlots } from "./layers";
+import { layerSlots, stageLayers } from "./layers";
 import { createMiddlePan, type MiddlePan } from "./middle-pan";
 import {
   clearOverlay,
@@ -820,9 +820,13 @@ export function MapCanvas(props: MapCanvasProps) {
     token: tokenHandlers,
   };
 
-  // FR-SCN-02/03/05: this client's layers; DM toggles that are off drop theirs.
+  // FR-SCN-02/03/05: this client's layers; DM toggles that are off drop theirs. FR-MAP-29: in at
+  // most four Konva layers (BL-07).
   const layersOff = useLayerToggles((s) => s.off);
-  const slots = useMemo(() => layerSlots(canvasLayers, client, layersOff), [client, layersOff]);
+  const layers = useMemo(
+    () => stageLayers(layerSlots(canvasLayers, client, layersOff)),
+    [client, layersOff],
+  );
 
   const acceptsDrop = (e: React.DragEvent) =>
     props.onDropDefinition !== undefined &&
@@ -912,20 +916,30 @@ export function MapCanvas(props: MapCanvasProps) {
         >
           <SyncContext.Provider value={syncStore}>
             <CanvasContext.Provider value={ctx}>
-              {slots.map((slot) => {
-                const entries = slot.layers.map((l) => {
-                  const C = l.component as React.ComponentType;
-                  return <C key={l.id} />;
-                });
-                // FR-SCN-03: same-group neighbours render as Groups inside one Konva layer.
-                return slot.group === null ? (
-                  entries
-                ) : (
-                  <Layer key={slot.key} name={slot.group}>
-                    {entries}
-                  </Layer>
-                );
-              })}
+              {layers.map((layer) => (
+                // The fog layer never takes pointer events: no hit canvas for it.
+                <Layer key={layer.key} name={layer.name} listening={layer.key !== "fog"}>
+                  {layer.slots.map((slot) => {
+                    // FR-MAP-29: each registry entry is a Group named by its id.
+                    const entries = slot.layers.map((l) => {
+                      const C = l.component as React.ComponentType;
+                      return (
+                        <Group key={l.id} name={l.id}>
+                          <C />
+                        </Group>
+                      );
+                    });
+                    // FR-SCN-03: same-group neighbours share one more Group (`scn-objects`).
+                    return slot.group === null ? (
+                      entries
+                    ) : (
+                      <Group key={slot.key} name={slot.group}>
+                        {entries}
+                      </Group>
+                    );
+                  })}
+                </Layer>
+              ))}
             </CanvasContext.Provider>
           </SyncContext.Provider>
         </Stage>

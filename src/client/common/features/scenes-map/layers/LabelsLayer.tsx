@@ -11,7 +11,7 @@ import { cellToPx, footprint } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { useEffect, useMemo, useRef } from "react";
-import { Group, Layer, Rect, Text } from "react-konva";
+import { Group, Rect, Text } from "react-konva";
 import { useStore } from "zustand";
 import { withoutDmOnly } from "../../scene-tools/layer-switches";
 import { useCanvas } from "../canvas-context";
@@ -171,7 +171,7 @@ function TokenLabel({ t }: { t: TokenView }) {
  * (BL-04: over a "+N" badge, the hidden badges).
  * Hit-tested from the stage's own pointer moves, so the layer stays non-listening.
  */
-function useFullNameOnHover(layer: React.RefObject<Konva.Layer | null>) {
+function useFullNameOnHover(layer: React.RefObject<Konva.Group | null>) {
   useEffect(() => {
     const stage = layer.current?.getStage();
     if (!stage) return;
@@ -212,7 +212,7 @@ export function LabelsLayer() {
   // FR-SCN-05: the DM's "DM-only items" switch off → hidden tokens' labels go with them.
   const off = useLayerToggles((s) => s.off);
   const tokens = useMemo(() => withoutDmOnly(all, client, off), [all, client, off]);
-  const layer = useRef<Konva.Layer>(null);
+  const layer = useRef<Konva.Group>(null);
   useFullNameOnHover(layer);
   // Changes only when a drag or preview starts / stops, not per frame.
   const movingKey = useStore(previews, (s) =>
@@ -224,10 +224,10 @@ export function LabelsLayer() {
     return [...tokens.filter((t) => !moving.has(t.id)), ...tokens.filter((t) => moving.has(t.id))];
   }, [tokens, movingKey]);
   return (
-    <Layer ref={layer} name="map-labels" listening={false}>
+    <Group ref={layer} name="map-labels" listening={false}>
       {ordered.map((t) => (
         <TokenLabel key={t.id} t={t} />
       ))}
-    </Layer>
+    </Group>
   );
 }

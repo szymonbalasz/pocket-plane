@@ -1,10 +1,17 @@
 // SCN canvas core (SCN §13 unit rows): FR-SCN-03 layer registry (clients, group, toggles, duplicate
-// order throws, layer budget) and FR-SCN-06 tool dispatch (Space pan, Esc to the tool, tokens
+// order throws), FR-MAP-29 the ≤ 4 Konva layers (BL-07) and FR-SCN-06 tool dispatch (Space pan, Esc to the tool, tokens
 // ignore left-press, registry validation).
 import { describe, expect, test } from "bun:test";
 import { canvasLayers } from "./canvas-layers";
 import { canvasTools } from "./canvas-tools";
-import { LAYER_ORDER, type LayerDef, layerSlots, layerToggles, orderLayers } from "./layers";
+import {
+  LAYER_ORDER,
+  type LayerDef,
+  layerSlots,
+  layerToggles,
+  orderLayers,
+  stageLayers,
+} from "./layers";
 import {
   activeTool,
   type CanvasToolDef,
@@ -39,7 +46,7 @@ describe("FR-SCN-02/03 canvas layers", () => {
     expect(LAYER_ORDER.fog).toBeLessThan(LAYER_ORDER.scnTemplates);
   });
 
-  test("FR-SCN-03 props + structure share one Konva layer; scn-edit is DM only; budget ≤ 8 (9 drawing) with fog", () => {
+  test("FR-SCN-03 props + structure share one Group; scn-edit is DM only", () => {
     const dm = layerSlots(canvasLayers, "dm");
     expect(ids(dm)).toEqual([
       ["map"],
@@ -55,18 +62,63 @@ describe("FR-SCN-02/03 canvas layers", () => {
     expect(dm[2]?.group).toBe("scn-objects");
     const player = layerSlots(canvasLayers, "player");
     expect(player.flatMap((s) => s.layers.map((l) => l.id))).not.toContain("scn-edit");
-    // scn-edit renders a Konva layer only while drawing; FOG's is one of them (order 30).
-    const always = dm.filter((s) => s.layers[0]?.id !== "scn-edit").length;
-    expect(always).toBeLessThanOrEqual(8);
-    expect(always + 1).toBeLessThanOrEqual(9);
+  });
+
+  test("FR-MAP-29 layers: every entry in one of 4 Konva layers, in order (BL-07)", () => {
+    const named = (client: "dm" | "player", off = {}) =>
+      stageLayers(layerSlots(canvasLayers, client, off)).map((l) => [
+        l.name,
+        l.slots.flatMap((s) => s.layers.map((x) => x.id)),
+      ]);
+    expect(named("dm")).toEqual([
+      ["map-layer-base", ["map", "grid", "scn-props", "scn-structure"]],
+      ["map-layer-fog", ["fog"]],
+      ["map-layer-objects", ["scn-templates", "tokens", "labels"]],
+      ["map-layer-top", ["scn-edit", "pointers"]],
+    ]);
+    expect(named("player")).toEqual([
+      ["map-layer-base", ["map", "grid", "scn-props", "scn-structure"]],
+      ["map-layer-fog", ["fog"]],
+      ["map-layer-objects", ["scn-templates", "tokens", "labels"]],
+      ["map-layer-top", ["pointers"]],
+    ]);
+    // Konva warns above 5; the budget is 4 on both clients, whatever the switches say.
+    for (const client of ["dm", "player"] as const) {
+      expect(stageLayers(layerSlots(canvasLayers, client)).length).toBeLessThanOrEqual(4);
+      const off = { props: true, walls: true, templates: true, fog: true };
+      expect(stageLayers(layerSlots(canvasLayers, client, off)).length).toBeLessThanOrEqual(4);
+    }
+    // scn-objects stays one Group inside `base`.
+    const base = stageLayers(layerSlots(canvasLayers, "dm"))[0];
+    expect(base?.slots.map((s) => s.key)).toEqual(["map", "grid", "scn-objects:scn-props"]);
+    // Order across layers = the lowest order in each: an entry can't sit out of its layer.
+    expect(() =>
+      orderLayers([
+        { id: "a", order: 1, layer: "objects", component: C },
+        { id: "b", order: 2, layer: "base", component: C },
+      ]),
+    ).toThrow(/out of its Konva layer/);
+    // A group never spans two Konva layers.
+    const split = layerSlots(
+      orderLayers([
+        { id: "a", order: 1, layer: "base", component: C, group: "g" },
+        { id: "b", order: 2, layer: "objects", component: C, group: "g" },
+      ]),
+      "dm",
+    );
+    expect(split.map((s) => s.key)).toEqual(["g:a", "g:b"]);
   });
 
   test("FR-SCN-05 toggles: off drops the entry on the DM client only; an empty group drops its layer", () => {
     expect(layerToggles(canvasLayers).map((t) => [t.key, t.label, t.layer])).toEqual([
       ["props", "Props", "objects"],
       ["walls", "Walls & doors", "objects"],
+      ["fog", "Fog", "fog"],
       ["templates", "Templates", "objects"],
     ]);
+    // The Fog switch (`show`) never unmounts the fog layer (FR-FOG-20 draws or hides it).
+    expect(ids(layerSlots(canvasLayers, "dm", { fog: false })).flat()).toContain("fog");
+    expect(ids(layerSlots(canvasLayers, "dm", { fog: true })).flat()).toContain("fog");
     const walls = layerSlots(canvasLayers, "dm", { walls: true });
     expect(ids(walls)[2]).toEqual(["scn-props"]);
     const both = layerSlots(canvasLayers, "dm", { walls: true, props: true, templates: true });
@@ -79,10 +131,10 @@ describe("FR-SCN-02/03 canvas layers", () => {
 
   test("FR-SCN-03 clients default both; a group split by another layer gives two keyed slots", () => {
     const layers: LayerDef<object>[] = orderLayers([
-      { id: "a", order: 1, component: C, group: "g" },
-      { id: "b", order: 2, component: C },
-      { id: "c", order: 3, component: C, group: "g" },
-      { id: "d", order: 4, component: C, clients: ["player"] },
+      { id: "a", order: 1, layer: "base", component: C, group: "g" },
+      { id: "b", order: 2, layer: "base", component: C },
+      { id: "c", order: 3, layer: "base", component: C, group: "g" },
+      { id: "d", order: 4, layer: "base", component: C, clients: ["player"] },
     ]);
     const dm = layerSlots(layers, "dm");
     expect(dm.map((s) => s.key)).toEqual(["g:a", "b", "g:c"]);
@@ -92,21 +144,21 @@ describe("FR-SCN-02/03 canvas layers", () => {
   test("FR-SCN-03 duplicate id, order or toggle key throws at load", () => {
     expect(() =>
       orderLayers([
-        { id: "a", order: 1, component: C },
-        { id: "b", order: 1, component: C },
+        { id: "a", order: 1, layer: "base", component: C },
+        { id: "b", order: 1, layer: "base", component: C },
       ]),
     ).toThrow(/order 1/);
     expect(() =>
       orderLayers([
-        { id: "a", order: 1, component: C },
-        { id: "a", order: 2, component: C },
+        { id: "a", order: 1, layer: "base", component: C },
+        { id: "a", order: 2, layer: "base", component: C },
       ]),
     ).toThrow(/twice/);
     const toggle = { key: "k", label: "K", layer: "objects" as const };
     expect(() =>
       orderLayers([
-        { id: "a", order: 1, component: C, toggle },
-        { id: "b", order: 2, component: C, toggle },
+        { id: "a", order: 1, layer: "base", component: C, toggle },
+        { id: "b", order: 2, layer: "base", component: C, toggle },
       ]),
     ).toThrow(/toggle "k"/);
   });
