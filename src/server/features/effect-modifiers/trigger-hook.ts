@@ -219,7 +219,7 @@ function fireValue(t: Trigger, o: TriggerOwner, crit: boolean): FormulaValue | s
 }
 
 /** Per-die values of a server roll in expression order (FR-MOD-19, D9): ≤ 20 dice, else none. */
-function dieValues(r: { dice: { value: number | null }[] }): number[] | undefined {
+export function dieValues(r: { dice: { value: number | null }[] }): number[] | undefined {
   const vs = r.dice.map((d) => d.value);
   if (vs.length === 0 || vs.length > PART_DICE_MAX || vs.some((v) => v === null)) return undefined;
   return vs as number[];

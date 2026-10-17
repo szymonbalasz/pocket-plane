@@ -42,7 +42,7 @@ export interface ApplyTargetContext {
 
 /** The DM's line facts a hook may set (`AttackLogDmPayload` fields; `parts` same index as the line's). */
 export type ApplyHookDm = Partial<
-  Pick<AttackLogDmPayload, "acMods" | "defense" | "extraDefense">
+  Pick<AttackLogDmPayload, "acMods" | "defense" | "extraDefense" | "rollIds">
 > & {
   parts?: AttackLineDmPart[];
 };
@@ -52,6 +52,8 @@ export interface ApplyTargetResult {
   extraRaw: number;
   /** Player-safe line parts (`AttackLogPayload.parts`), inside `extraRaw`. */
   parts: AttackLinePart[];
+  /** FR-MOD-57: roll ids that join the line entry's public `rollIds` (DM-only ones: `dm.rollIds`). */
+  rollIds?: string[];
   dm: ApplyHookDm;
   /** The hp_change row's `triggerParts` (DM). */
   triggerParts?: HpTriggerPart[];
@@ -77,6 +79,7 @@ export const applyHooks: readonly ApplyHook[] = [
 export interface MergedApplyResult {
   extraRaw: number;
   parts: AttackLinePart[];
+  rollIds: string[];
   dm: ApplyHookDm;
   triggerParts: HpTriggerPart[];
   targetAc: number;
@@ -108,6 +111,7 @@ export class ApplyHooks {
     const out: MergedApplyResult = {
       extraRaw: 0,
       parts: [],
+      rollIds: [],
       dm: {},
       triggerParts: [],
       targetAc: a.targetAc,
@@ -124,9 +128,11 @@ export class ApplyHooks {
       }
       out.extraRaw += r.extraRaw;
       out.parts.push(...r.parts);
-      const { parts: dmParts, ...dm } = r.dm;
+      out.rollIds.push(...(r.rollIds ?? []));
+      const { parts: dmParts, rollIds: dmRollIds, ...dm } = r.dm;
       Object.assign(out.dm, dm);
       if (dmParts?.length) out.dm.parts = [...(out.dm.parts ?? []), ...dmParts];
+      if (dmRollIds?.length) out.dm.rollIds = [...(out.dm.rollIds ?? []), ...dmRollIds];
       out.triggerParts.push(...(r.triggerParts ?? []));
       if (r.targetAc !== undefined) out.targetAc = r.targetAc;
       out.changes.push(...r.changes);

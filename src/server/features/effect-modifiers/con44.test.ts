@@ -453,7 +453,8 @@ describe("CON-44 with MOD sprint-4 rows (MOD §12 sprint 4, #208)", () => {
         .run();
     }
     // FR-CBT-84 / FR-MOD-57: outcome lines with 2 typed extra parts + 1 max trigger part with
-    // its expression and 20 dice (a public character trigger), the DM's facts the same.
+    // its expression and 20 dice (a public character trigger), the DM's facts the same; its roll
+    // id joins the entry's `rollIds` (S4-5; a non-public part's goes in `dmPayload.rollIds`).
     const lines = db
       .select()
       .from(gameLogEntry)
@@ -465,6 +466,7 @@ describe("CON-44 with MOD sprint-4 rows (MOD §12 sprint 4, #208)", () => {
       const dp = { type: "lightning", value: 999, multiplier: "double" };
       db.update(gameLogEntry)
         .set({
+          rollIds: [...(l.rollIds as string[]), uuid("roll")],
           payload: {
             ...(l.payload as object),
             damageParts: [dp, dp],
