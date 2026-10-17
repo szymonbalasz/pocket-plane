@@ -112,6 +112,30 @@ interface Keep {
 }
 
 /**
+ * The camera positions (one axis, screen px) at which each of `keeps` that lies in [f0, f1]
+ * (minus its inset) at `pos` still does; none does → null.
+ */
+function keepRange(
+  pos: number,
+  scale: number,
+  [f0, f1]: readonly [number, number],
+  keeps: readonly (Keep | null)[],
+): [number, number] | null {
+  const eps = 1e-6;
+  let lo = Number.NEGATIVE_INFINITY;
+  let hi = Number.POSITIVE_INFINITY;
+  for (const k of keeps) {
+    if (!k) continue;
+    const kLo = f0 + k.inset - k.at * scale;
+    const kHi = f1 - k.inset - (k.at + k.len) * scale;
+    if (pos < kLo - eps || pos > kHi + eps) continue;
+    lo = Math.max(lo, Math.min(kLo, pos));
+    hi = Math.min(hi, Math.max(kHi, pos));
+  }
+  return lo === Number.NEGATIVE_INFINITY ? null : [lo, hi];
+}
+
+/**
  * BL-01, one axis, after the fit: the map (`map` long, map px) centred in the view [v0, v1]
  * (screen px) when it fits, else panned the least to cover it (`startFirst`: its start edge at
  * v0, so the top row shows and the crop falls at the dock, FOG §13 step 26), so no empty band
@@ -127,18 +151,9 @@ function fillAxis(
   keeps: readonly (Keep | null)[],
   startFirst = false,
 ): number {
-  const eps = 1e-6;
-  let lo = Number.NEGATIVE_INFINITY;
-  let hi = Number.POSITIVE_INFINITY;
-  for (const k of keeps) {
-    if (!k) continue;
-    const kLo = f0 + k.inset - k.at * scale;
-    const kHi = f1 - k.inset - (k.at + k.len) * scale;
-    if (pos < kLo - eps || pos > kHi + eps) continue;
-    lo = Math.max(lo, Math.min(kLo, pos));
-    hi = Math.min(hi, Math.max(kHi, pos));
-  }
-  if (lo === Number.NEGATIVE_INFINITY) return pos;
+  const range = keepRange(pos, scale, [f0, f1], keeps);
+  if (!range) return pos;
+  const [lo, hi] = range;
   const len = map * scale;
   const want =
     len <= v1 - v0 ? (v0 + v1 - len) / 2 : startFirst ? v0 : Math.min(Math.max(pos, v1 - len), v0);
@@ -163,7 +178,8 @@ function tokensIn(box: Box, map: Size, cell: number): Box {
  * per axis where it can't. BL-01: last, per axis, the map is centred in the work area right of
  * the tool rail (if larger: panned the least to cover it; vertically its top row under the top
  * bar), as far as the tokens' footprints and the lower half of their labels (and at the floor the
- * PCs, with the margin) stay in the free area.
+ * PCs, with the margin) stay in the free area; vertically never at the cost of the top row while
+ * the tokens stay in the work area and the PCs in the free area.
  */
 export function fitContent(
   box: Box,
@@ -210,18 +226,30 @@ export function fitContent(
     [free.x, free.x + free.w],
     [{ at: t.x, len: t.w, inset: 0 }, keepPcs && { at: keepPcs.x, len: keepPcs.w, inset: m }],
   );
+  const tokensY = { at: t.y, len: t.h + label, inset: 0 };
+  const fitY = y;
   y = fillAxis(
     y,
     scale,
     map.h,
     [view.y, view.y + view.h],
     [free.y, free.y + free.h],
-    [
-      { at: t.y, len: t.h + label, inset: 0 },
-      keepPcs && { at: keepPcs.y, len: keepPcs.h, inset: m },
-    ],
+    [tokensY, keepPcs && { at: keepPcs.y, len: keepPcs.h, inset: m }],
     true,
   );
+  // FOG §13 step 26: a map taller than the free area (a short strip above the Game log) never
+  // goes up under the top bar to keep every token in that strip: its top row shows wherever the
+  // tokens stay in the work area and the PCs (with their labels; at the floor with the margin) in
+  // the free area. Only the other tokens may then sit beside a window.
+  if (y < view.y) {
+    const pcsY =
+      pcs &&
+      (floor ? { at: pcs.y, len: pcs.h, inset: m } : { at: pcs.y, len: pcs.h + label, inset: 0 });
+    const inView = keepRange(fitY, scale, [view.y, view.y + view.h], [tokensY]);
+    const pcsFree = keepRange(fitY, scale, [free.y, free.y + free.h], [pcsY]);
+    const ok = (r: [number, number] | null) => !r || (r[0] <= view.y && view.y <= r[1]);
+    if (ok(inView) && ok(pcsFree)) y = view.y;
+  }
   return { x, y, scale, floor };
 }
 
