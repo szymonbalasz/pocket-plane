@@ -10,16 +10,16 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
 | Docs pass | merged bd07224 | — | Done | — |
-| V7 pan / plain map / Fit | `build/map-pan-plain` (w5D, slot 3) | build-map-pan-plain | Building | Walkthrough → V8 |
-| C-all All tab | `build/cmp-all-tab` (w5E, slot 6) | build-cmp-all-tab | Building | Walkthrough |
+| V7 pan / plain map / Fit | `build/map-pan-plain` (w5D, slot 3) | build-map-pan-plain | Final gates in branch | Walkthrough → V8 |
+| C-all All tab | `build/cmp-all-tab` (w5E, slot 6) | test-cmp-all-tab | Walkthrough (check 2992, e2e 85) | Merge |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
-| R0 rules core | `fix/rules4-core` (w5C, slot 0) | test-rules4-core | Regression walkthrough (check 3015, e2e green; DM worst 863 KB) | Merge → R slices, Mc |
+| R0 rules core | `fix/rules4-core` (w5C, slot 0) | — | Regression walkthrough 9/9; merged main, branch gates running | Merge → R slices, Mc |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
-| M4 window placement | `fix/window-placement` (w57, slot 4) | test-window-placement-r2 | Re-test 2 (measured heights, ae6fd6f) | Merge → D7 |
+| M4 window placement | `fix/window-placement` (w57, slot 4) | fix-window-placement-3 | Re-test 2: Initiative closed before Start still overlaps → re-place after first layout | Re-walk, merge → D7 |
 
 ## Shared-file locks
 
