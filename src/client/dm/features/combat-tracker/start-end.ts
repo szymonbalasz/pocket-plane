@@ -39,9 +39,11 @@ export interface ShellEffects {
 }
 
 /**
- * FR-CBT-60: send `cbt.start`; once **this tab's** intent is acked, Initiative opens and comes to
- * front, Encounters minimises, then one appearance is noted (the map refits if still fitted). A
- * reject or a dropped connection (`undefined`) changes nothing; nothing here runs on snapshots.
+ * FR-CBT-60: send `cbt.start`; once **this tab's** intent is acked, Encounters minimises, then
+ * Initiative opens and comes to front, then one appearance is noted (the map refits if still
+ * fitted). Encounters goes first so Initiative's placement sees the layout after Start
+ * (FR-SHELL-41: it may take Encounters' spot, never another window's). A reject or a dropped
+ * connection (`undefined`) changes nothing; nothing here runs on snapshots.
  */
 export async function startAndFollow(
   send: () => Promise<unknown>,
@@ -49,8 +51,8 @@ export async function startAndFollow(
 ): Promise<unknown> {
   const r = await send();
   if (r === undefined) return r;
-  fx.dispatch({ type: "open", kind: INITIATIVE_KIND, by: "feature" }); // FR-SHELL-41
   fx.dispatch({ type: "minimise", kind: ENCOUNTERS_KIND });
+  fx.dispatch({ type: "open", kind: INITIATIVE_KIND, by: "feature" }); // FR-SHELL-41
   fx.noteAppearance();
   return r;
 }

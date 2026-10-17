@@ -1,9 +1,16 @@
 // FR-CBT-59 End confirm count, FR-CBT-60 windows after the DM's own Start / End.
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { DAMAGE_CARD_END_RULE } from "@shared/combat-tracker/end-rule";
 import { DAMAGE_CARD_KIND } from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
-import type { WindowAction } from "@ui/features/play-shell/manager";
+import { renderedWindowRects } from "@ui/features/play-shell/free-area";
+import type { Rect } from "@ui/features/play-shell/geometry";
+import {
+  defaultLayout,
+  reduce,
+  type WindowAction,
+  type Windows,
+} from "@ui/features/play-shell/manager";
 import { dmNotificationViews } from "../../notification-views";
 import {
   END_FIRST_SENTENCE,
@@ -13,6 +20,10 @@ import {
   idleInitiativeOnLoad,
   startAndFollow,
 } from "./start-end";
+
+// The players panel pulls in the DM session at import (no DOM in bun test).
+mock.module("../campaign-management/PlayersPanel", () => ({ PlayersPanel: () => null }));
+const { dmWindows } = await import("../../windows");
 
 let seq = 0;
 const note = (kind: string, encounterId: string, state: NotificationRecord["state"] = "pending") =>
@@ -72,14 +83,55 @@ describe("FR-CBT-60 windows follow the DM's own Start / End", () => {
     };
   }
 
-  test("FR-CBT-60 own Start ack → open Initiative, minimise Encounters, one noteAppearance()", async () => {
+  test("FR-CBT-60 own Start ack → minimise Encounters, then open Initiative, one noteAppearance()", async () => {
     const f = fx();
     expect(await startAndFollow(async () => null, f)).toBeNull();
     expect(f.actions).toEqual([
-      { type: "open", kind: "cbt.initiative", by: "feature" },
       { type: "minimise", kind: "cbt.encounters" },
+      { type: "open", kind: "cbt.initiative", by: "feature" },
     ]);
     expect(f.appearances()).toBe(1);
+  });
+
+  test("FR-CBT-60 / FR-SHELL-41 Start at 1280×720, Compendium on Initiative's spot: Initiative lands clear of the Game log, the Compendium and every open window", async () => {
+    const viewport = { w: 1280, h: 720 };
+    const available = new Set(dmWindows.defs.map((d) => d.kind));
+    const ctx = { registry: dmWindows, viewport, available };
+    const overlaps = (a: Rect, b: Rect) =>
+      a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    // Reset layout, Initiative idle (minimised); Compendium dragged over its spot; Encounters open.
+    let ws: Windows = reduce(defaultLayout(dmWindows, viewport), { type: "reset" }, ctx);
+    ws = reduce(ws, { type: "minimise", kind: "cbt.initiative" }, ctx);
+    ws = reduce(ws, { type: "open", kind: "cmp.compendium" }, ctx);
+    const spot = { x: 808, y: 104, w: 440, h: 560 };
+    ws = reduce(ws, { type: "setRect", kind: "cmp.compendium", rect: spot }, ctx);
+    ws = reduce(ws, { type: "open", kind: "cbt.encounters" }, ctx);
+    await startAndFollow(async () => null, {
+      dispatch: (a) => {
+        ws = reduce(ws, a, ctx);
+      },
+      noteAppearance: () => {},
+    });
+    const of = (kind: string) => {
+      const w = ws.find((x) => x.kind === kind);
+      if (!w) throw new Error(`${kind} not in the layout`);
+      return w;
+    };
+    const init = of("cbt.initiative");
+    expect(init.state).toBe("open");
+    expect(of("cbt.encounters").state).toBe("minimised");
+    const [shown] = renderedWindowRects([init], dmWindows, available, viewport);
+    if (!shown) throw new Error("Initiative not rendered");
+    for (const kind of ["dice.log", "cmp.compendium"]) {
+      expect(of(kind).state).toBe("open");
+      expect(overlaps(shown, of(kind)) ? `Initiative over ${kind}` : "ok").toBe("ok");
+    }
+    const others = ws.filter((w) => w.kind !== "cbt.initiative");
+    for (const o of renderedWindowRects(others, dmWindows, available, viewport)) {
+      expect(overlaps(shown, o) ? `Initiative over ${JSON.stringify(o)}` : "ok").toBe("ok");
+    }
+    // Initiative is in front of every other window.
+    expect(Math.max(...ws.map((w) => w.z))).toBe(init.z);
   });
 
   test("FR-CBT-60 own End ack → minimise Initiative", async () => {
