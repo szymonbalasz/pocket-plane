@@ -2,14 +2,15 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 4 Phase B (builds)**. DM gate 1 "go" (#245, #246). All five spec branches merged; ADRs 0047–0050 numbered; C's cross-spec text applied; spec index updated. Docs pass (glossary, AGENTS registries, colours) queued as `fix/s4-docs`.
+**Phase:** **Sprint 4 Phase B (builds)**. DM gate 1 "go" (#245, #246). All five spec branches merged; ADRs 0047–0050 numbered; C's cross-spec text applied; spec index updated. Docs pass merged.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
-| Docs pass | `fix/s4-docs` (w58) | docs-s4 | Writing | Merge |
+| Docs pass | merged bd07224 | — | Done | — |
+| C-search | `build/cmp-search` (w59, slot 3) | build-cmp-search | Building | Walkthrough |
 | V6 vision core | `fix/vision-s4-core` (w54, slot 0) | build-vision-core | Building | Walkthrough |
 | D5 die shapes + log dice | `build/dice-shapes` (w55, slot 2) | build-dice-shapes | Building | Walkthrough |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
