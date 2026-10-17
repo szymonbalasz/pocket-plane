@@ -5,11 +5,7 @@
 // never the DM), the DM drag as the owner, the hint phase after every guard, order against
 // `TokenMoved`, drop-not-delay, drag traffic within FOG §12, and a hard kill mid-drag.
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import {
-  answer,
-  visionHarness,
-  visionServices,
-} from "@fixtures/units/fog-of-war/vision-harness";
+import { answer, visionHarness, visionServices } from "@fixtures/units/fog-of-war/vision-harness";
 import { FOG_INTENTS as F, FOG_SIGNALS, type FogSightPayload } from "@shared/fog-of-war/schemas";
 import type { ServerFrame } from "@shared/protocol/frames";
 import {
