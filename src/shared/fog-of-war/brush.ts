@@ -1,12 +1,14 @@
-// FR-FOG-26 / -55 (sprint 4): containment of the brush's fog shapes. Pure, leaf (no imports, so
-// `shapes.ts` can use it without a cycle through `mask.ts` → `schemas.ts`).
+// FR-FOG-26 / -55 / -57 (sprint 4): containment of the brush's fog shapes. Pure.
 // - `stroke [r, x0, y0, x1, y1, …]`: a point is inside iff its distance to the polyline ≤ r (a
 //   single point = a circle); boundary-inclusive.
 // - `cells {box: [col0, row0, cols, rows], runs}`: whole cells (FR-FOG-04 codec over the box,
 //   "1" = painted); a point is inside iff a cell holding it (boundary-inclusive: a point on a cell
 //   edge belongs to both cells) is painted.
-// Local helper until M0's `src/shared/scenes-map/area.ts` lands (seams S2): the brush's snapped
-// stamp and these tests move there then; callers only use `brushContains`.
+// Stroke containment and box come from the shared area helper (`@shared/scenes-map/area`, seams
+// S2, review A13), so fog and AoE share one implementation; the cells codec is fog's (FR-FOG-04).
+// Also the cells encoder and the server's same-op merge (FR-FOG-57). No import from this folder,
+// so `shapes.ts` can use it without a cycle through `mask.ts` → `schemas.ts`.
+import { areaBox, contains } from "@shared/scenes-map/area";
 
 /** FR-FOG-26: stroke radius 0.5–10 cells, 1–256 points. */
 export const STROKE_R_MIN = 0.5;
@@ -52,56 +54,21 @@ export function decodeCells(c: CellsGeom): Uint8Array | null {
 /** Runs in a codec string. */
 export const cellsRunCount = (runs: string) => (runs === "" ? 0 : runs.split(",").length);
 
-/** Squared distance from (px, py) to the segment a → b. */
-function segDist2(px: number, py: number, ax: number, ay: number, bx: number, by: number) {
-  const ex = bx - ax;
-  const ey = by - ay;
-  const ll = ex * ex + ey * ey;
-  let t = ll === 0 ? 0 : ((px - ax) * ex + (py - ay) * ey) / ll;
-  t = t < 0 ? 0 : t > 1 ? 1 : t;
-  const dx = px - (ax + t * ex);
-  const dy = py - (ay + t * ey);
-  return dx * dx + dy * dy;
-}
-
-/** A brush shape prepared for repeated tests (1/100-cell integers, like `PreparedShape`). */
+/** A brush shape prepared for repeated tests (cells decoded once). */
 export type PreparedBrush =
-  | { kind: "stroke"; r: number; pts: Float64Array }
+  | { kind: "stroke"; stroke: readonly number[] }
   | { kind: "cells"; box: readonly [number, number, number, number]; cells: Uint8Array };
 
 export function prepareBrush(s: BrushShape): PreparedBrush {
-  if ("stroke" in s) {
-    const [r, ...xy] = s.stroke;
-    return {
-      kind: "stroke",
-      r: Math.round((r ?? 0) * 100),
-      pts: Float64Array.from(xy, (v) => Math.round(v * 100)),
-    };
-  }
+  if ("stroke" in s) return { kind: "stroke", stroke: s.stroke };
   const box = [...s.cells.box] as [number, number, number, number];
   return { kind: "cells", box, cells: decodeCells(s.cells) ?? new Uint8Array(box[2] * box[3]) };
 }
 
 /** FR-FOG-26: the point (1/100-cell integers) lies inside or on the brush shape. Exact. */
 export function brushContains(p: PreparedBrush, px: number, py: number): boolean {
-  if (p.kind === "stroke") {
-    const r2 = p.r * p.r;
-    const v = p.pts;
-    if (v.length === 2)
-      return segDist2(px, py, v[0] as number, v[1] as number, v[0] as number, v[1] as number) <= r2;
-    for (let i = 0; i + 3 < v.length; i += 2) {
-      const d = segDist2(
-        px,
-        py,
-        v[i] as number,
-        v[i + 1] as number,
-        v[i + 2] as number,
-        v[i + 3] as number,
-      );
-      if (d <= r2) return true;
-    }
-    return false;
-  }
+  // The stroke's coordinates carry ≤ 2 decimals, so area.ts's tolerance keeps this exact.
+  if (p.kind === "stroke") return contains({ stroke: p.stroke }, px / 100, py / 100);
   const [col0, row0, cols, rows] = p.box;
   const cs = px % 100 === 0 ? [px / 100 - 1, px / 100] : [Math.floor(px / 100)];
   const rs = py % 100 === 0 ? [py / 100 - 1, py / 100] : [Math.floor(py / 100)];
@@ -122,19 +89,78 @@ export function brushBox(s: BrushShape): [number, number, number, number] {
     const [c0, r0, cols, rows] = s.cells.box;
     return [c0, r0, c0 + cols, r0 + rows];
   }
-  const [r = 0, ...xy] = s.stroke;
-  let x0 = Number.POSITIVE_INFINITY;
-  let y0 = Number.POSITIVE_INFINITY;
-  let x1 = Number.NEGATIVE_INFINITY;
-  let y1 = Number.NEGATIVE_INFINITY;
-  for (let i = 0; i + 1 < xy.length; i += 2) {
-    x0 = Math.min(x0, xy[i] as number);
-    y0 = Math.min(y0, xy[i + 1] as number);
-    x1 = Math.max(x1, xy[i] as number);
-    y1 = Math.max(y1, xy[i + 1] as number);
-  }
-  return [x0 - r, y0 - r, x1 + r, y1 + r];
+  return areaBox({ stroke: s.stroke });
 }
+
+/** A built `cells` geometry (a mutable box, as zod's `FogBrushGeom` types it). */
+export type CellsOut = {
+  box: [col0: number, row0: number, cols: number, rows: number];
+  runs: string;
+};
+
+/** FR-FOG-04 codec, first run painted: the `runs` of a `cells` shape over its box. */
+export function encodeCells(cells: Uint8Array): string {
+  const runs: number[] = [];
+  let want = 1;
+  let n = 0;
+  for (const c of cells) {
+    if (c === want) {
+      n++;
+      continue;
+    }
+    runs.push(n);
+    want = 1 - want;
+    n = 1;
+  }
+  runs.push(n);
+  return runs.map((r) => r.toString(36)).join(",");
+}
+
+/**
+ * FR-FOG-26: the `cells` shape painting exactly these cells (tight box), or null when there are
+ * none, the box exceeds 128 × 128 or the runs exceed 500.
+ */
+export function cellsOf(list: Iterable<readonly [col: number, row: number]>): CellsOut | null {
+  const cells = [...list];
+  if (cells.length === 0) return null;
+  let c0 = Number.POSITIVE_INFINITY;
+  let r0 = Number.POSITIVE_INFINITY;
+  let c1 = Number.NEGATIVE_INFINITY;
+  let r1 = Number.NEGATIVE_INFINITY;
+  for (const [c, r] of cells) {
+    c0 = Math.min(c0, c);
+    r0 = Math.min(r0, r);
+    c1 = Math.max(c1, c);
+    r1 = Math.max(r1, r);
+  }
+  const cols = c1 - c0 + 1;
+  const rows = r1 - r0 + 1;
+  if (cols > CELLS_BOX_MAX || rows > CELLS_BOX_MAX) return null;
+  const grid = new Uint8Array(cols * rows);
+  for (const [c, r] of cells) grid[(r - r0) * cols + (c - c0)] = 1;
+  const runs = encodeCells(grid);
+  if (cellsRunCount(runs) > CELLS_RUNS_MAX) return null;
+  return { box: [c0, r0, cols, rows], runs };
+}
+
+/** The painted cells of a `cells` shape, row-major. */
+export function paintedCells(c: CellsGeom): [col: number, row: number][] {
+  const grid = decodeCells(c);
+  if (!grid) return [];
+  const [col0, row0, cols] = c.box;
+  const out: [number, number][] = [];
+  grid.forEach((v, i) => {
+    if (v === 1) out.push([col0 + (i % cols), row0 + Math.floor(i / cols)]);
+  });
+  return out;
+}
+
+/**
+ * FR-FOG-57: the union of two `cells` shapes, or null when it would leave the caps (box over
+ * 128 × 128, runs over 500): then the edit appends instead.
+ */
+export const mergeCells = (a: CellsGeom, b: CellsGeom): CellsOut | null =>
+  cellsOf([...paintedCells(a), ...paintedCells(b)]);
 
 /** A brush shape's geometry (`stroke` / `cells`), as `shapes.ts` types it. */
 export type BrushShape = { stroke: readonly number[] } | { cells: CellsGeom };
