@@ -3,6 +3,7 @@
 // loader), measured as the gzip of exactly the dice-extras modules in the initial chunks (an
 // upper bound on the growth vs `main`, which doesn't drift as other features land). `three` and
 // `cannon-es` sit only in the lazy 3D chunk, reached by dynamic import only; it's ≤ 170 KB gz.
+// The roll popup UI is a lazy chunk ≤ 8 KB gz (sprint 4, §12).
 import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
@@ -14,6 +15,8 @@ const ROOT = path.resolve(import.meta.dir, "../../../../..");
 const KB = 1024;
 const INITIAL_DICEX_MAX = 15 * KB;
 const CHUNK_3D_MAX = 170 * KB;
+/** FR-DICEX-39 / §12: the lazy roll-popup UI chunk. */
+const POPUP_MAX = 8 * KB;
 
 const gz = (code: string) => gzipSync(code, { level: 9 }).length;
 const slash = (id: string) => id.replaceAll("\\", "/");
@@ -57,7 +60,7 @@ function closure(start: Rollup.OutputChunk, byFile: Map<string, Rollup.OutputChu
 }
 
 describe("DICEX bundle size", () => {
-  test("FR-DICEX-22 initial chunks ≤ 15 KB gz of dice-extras per client; 3D only in a lazy chunk ≤ 170 KB gz", async () => {
+  test("FR-DICEX-22 FR-DICEX-39 initial chunks ≤ 15 KB gz of dice-extras per client; 3D only in a lazy chunk ≤ 170 KB gz; lazy RollPopup ≤ 8 KB gz", async () => {
     const chunks = await bundle();
     const byFile = new Map(chunks.map((c) => [c.fileName, c]));
     const initial = new Set<Rollup.OutputChunk>();
@@ -115,6 +118,25 @@ describe("DICEX bundle size", () => {
     const viewsOwn = [...closure(views, byFile)].filter((c) => !initial.has(c));
     expect(viewsOwn.flatMap((c) => Object.keys(c.modules)).filter(is3dLib)).toEqual([]);
     report.push(`throw views: ${(gz(views.code) / KB).toFixed(1)} KB gz`);
+
+    // FR-DICEX-39 (DICEX §12): the roll popup UI is its own lazy chunk `RollPopup`, reached by
+    // dynamic import only, ≤ 8 KB gz with what it alone pulls in (the settings pane it opens on
+    // demand is a further lazy chunk, shared with the tray).
+    const popup = chunks.find(
+      (c) =>
+        c.isDynamicEntry &&
+        Object.keys(c.modules).some((id) => slash(id).endsWith("/dice-extras/RollPopup.tsx")),
+    );
+    if (!popup) throw new Error("no lazy RollPopup chunk");
+    for (const c of initial) expect(c.imports).not.toContain(popup.fileName);
+    expect([...initial].some((c) => c.dynamicImports.includes(popup.fileName))).toBe(true);
+    const others = chunks.filter((c) => c.isDynamicEntry && c !== popup);
+    const shared = new Set([...initial, ...others.flatMap((c) => [...closure(c, byFile)])]);
+    const popupOwn = [...closure(popup, byFile)].filter((c) => c === popup || !shared.has(c));
+    expect(popupOwn.flatMap((c) => Object.keys(c.modules)).filter(is3dLib)).toEqual([]);
+    const sizePopup = popupOwn.reduce((s, c) => s + gz(c.code), 0);
+    report.push(`RollPopup: ${(sizePopup / KB).toFixed(1)} KB gz`);
+    expect(sizePopup).toBeLessThanOrEqual(POPUP_MAX);
     console.log(`[bundle] ${report.join("; ")}`);
   }, 60_000);
 });

@@ -185,17 +185,20 @@ describe("FR-DICEX-35 timing", () => {
     expect(s.api.getState().current).toBeNull();
   });
 
-  test("FR-DICEX-35 flat dice rest after their 0.3 s fade-in; a lost 3D throw turns flat in the zone", () => {
+  test("FR-DICEX-35 flat dice rest after their 0.3 s fade-in; a lost 3D throw turns flat in the zone (popups off) or ends (popups on: its popup takes the dice)", () => {
     const t = fakeTimers();
     const s = createDiceExtrasStore(t);
-    s.play(aThrow("a"), { ...screen3d, draw: "flat", arena: "zone" });
+    s.play(aThrow("a"), { ...screen3d, draw: "flat", arena: "zone", handoff: false });
     t.advance(300);
     expect(phases(s).current).toBe("rest");
-    s.play(aThrow("b"), screen3d);
+    s.play(aThrow("b"), { ...screen3d, handoff: false });
     const n = s.api.getState().current?.seq ?? -1;
     s.flat(n);
     expect(s.api.getState().current?.plan).toMatchObject({ arena: "zone", draw: "flat" });
     t.advance(300);
     expect(phases(s).current).toBe("rest");
+    s.play(aThrow("c"), screen3d);
+    s.flat(s.api.getState().current?.seq ?? -1);
+    expect(s.api.getState().current).toBeNull();
   });
 });

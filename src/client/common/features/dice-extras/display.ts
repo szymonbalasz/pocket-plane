@@ -8,11 +8,10 @@ import type { DiceSettings, DisplaySetting } from "./settings";
 import { isOwn } from "./throw-source";
 
 /**
- * The roll popup (FR-DICEX-39–41) exists: D7 turns this on. Until then nothing hosts a popup, so
- * flat dice and "Rolling…" show in the zone as with popups off; the caption and the hand-off
- * timing already follow the `popup` setting.
+ * The roll popup (FR-DICEX-39–41) hosts each frame's dice, name and total (D7). Off, flat dice
+ * and "Rolling…" would show in the zone as with the `popup` setting off.
  */
-export const ROLL_POPUPS = false;
+export const ROLL_POPUPS = true;
 
 export interface ThrowPlan {
   /** `screen`: the dice layer's viewport arena; `zone`: the free-area zone (FR-DICEX-17). */
@@ -33,7 +32,7 @@ export interface PlanInput {
 }
 
 /** Popups take this throw's dice (D7), so none show in the zone. */
-const popupHost = (s: DiceSettings) => ROLL_POPUPS && s.popup;
+export const popupHost = (s: DiceSettings) => ROLL_POPUPS && s.popup;
 
 /** FR-DICEX-32 §7 table: one frame's big throw and how it draws, or null. */
 export function planThrow(
