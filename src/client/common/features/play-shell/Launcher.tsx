@@ -4,6 +4,7 @@
 // "⋯" menu (`launcher-fit.ts`).
 import { EllipsisIcon } from "lucide-react";
 import { DropdownMenu as M } from "radix-ui";
+import { useRef } from "react";
 import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
@@ -12,9 +13,10 @@ import { useActivityDots } from "./activity";
 import { badgeText, useBadgeVersion } from "./badges";
 import type { Viewport } from "./geometry";
 import { SHELL_ZONE_ATTR } from "./keys";
-import { fitLauncher, launcherMetrics } from "./launcher-fit";
+import { fitLauncher, type LauncherFit, launcherMetrics } from "./launcher-fit";
 import { launcherState, launcherTooltip, type WindowAction, type Windows } from "./manager";
 import type { WindowDef } from "./registry";
+import { useShellState } from "./ShellContext";
 
 let canvas: CanvasRenderingContext2D | null | undefined;
 const widths = new Map<string, number>();
@@ -45,6 +47,7 @@ export function Launcher({
   dispatch: (a: WindowAction) => void;
 }) {
   const store = useSync((s) => s.store);
+  const layoutKey = useShellState((s) => s.key);
   useBadgeVersion(); // re-render on `refreshBadges()`
   const dots = useActivityDots(windows);
   const entries = defs
@@ -55,9 +58,16 @@ export function Launcher({
     order: d.launcher?.order ?? 0,
     state: launcherState(windows, d.kind),
   }));
-  // Label widths are measured once each; the fit itself is a few additions per render.
+  // Recomputed on viewport resize, availability change and layout restore only (FR-SHELL-43):
+  // opening a window from the menu leaves it there until then. Label widths: measured once each.
   const labels = new Map(entries.map((d) => [d.kind, d.launcher?.label ?? ""]));
-  const fit = fitLauncher(items, viewport.w, launcherMetrics(labels, labelWidth));
+  const fitKey = `${viewport.w}|${layoutKey}|${[...labels].join(",")}`;
+  const fitRef = useRef<{ key: string; fit: LauncherFit } | null>(null);
+  if (fitRef.current?.key !== fitKey) {
+    const fit = fitLauncher(items, viewport.w, launcherMetrics(labels, labelWidth));
+    fitRef.current = { key: fitKey, fit };
+  }
+  const { fit } = fitRef.current;
   const inBar = new Set(fit.bar);
   const overflow = entries.filter((d) => !inBar.has(d.kind));
   return (
