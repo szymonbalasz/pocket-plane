@@ -12,9 +12,11 @@ import {
   activeFilterCount,
   badgeLabel,
   crText,
+  emptyText,
   entryForDefinition,
   FILTER_FIELDS,
   footerLabel,
+  groupParams,
   isEntryless,
   scoreText,
   searchParams,
@@ -29,7 +31,9 @@ import {
   openEntry,
   resetCmpNav,
   setFilters,
+  setQuery,
   setTab,
+  toggleGroup,
 } from "./nav";
 
 describe("FR-CMP-18 window logic", () => {
@@ -77,6 +81,51 @@ describe("FR-CMP-18 window logic", () => {
     openDefinition("d1");
     expect(cmpNav.getState().view).toEqual({ mode: "definition", definitionId: "d1" });
     resetCmpNav();
+  });
+});
+
+describe("FR-CMP-35 FR-CMP-36 group rows (window)", () => {
+  test("FR-CMP-35 expand / collapse: a click toggles; opening a member and Back keep it open; a new search, tab or filter collapses all", () => {
+    resetCmpNav();
+    toggleGroup("asi-barbarian");
+    toggleGroup("extra-attack");
+    expect(cmpNav.getState().expanded).toEqual(["asi-barbarian", "extra-attack"]);
+    toggleGroup("extra-attack");
+    expect(cmpNav.getState().expanded).toEqual(["asi-barbarian"]);
+    openEntry("asi-fighter");
+    backToList();
+    expect(cmpNav.getState().view).toEqual({ mode: "list" });
+    expect(cmpNav.getState().expanded).toEqual(["asi-barbarian"]);
+    // Same search (only spaces differ) keeps it; a new one collapses.
+    setQuery(" ");
+    expect(cmpNav.getState().expanded).toEqual(["asi-barbarian"]);
+    setQuery("ability");
+    expect(cmpNav.getState().expanded).toEqual([]);
+    toggleGroup("asi-barbarian");
+    setTab("feature");
+    expect(cmpNav.getState().expanded).toEqual([]);
+    toggleGroup("asi-barbarian");
+    setFilters({ className: "Fighter" });
+    expect(cmpNav.getState().expanded).toEqual([]);
+    resetCmpNav();
+  });
+
+  test("FR-CMP-35 members query: `sameAs` + the list's trimmed q only (never kind or filters); empty q → all members", () => {
+    expect(groupParams("asi-barbarian", "")).toEqual({ sameAs: "asi-barbarian" });
+    expect(groupParams("asi-barbarian", "  ability score ")).toEqual({
+      sameAs: "asi-barbarian",
+      q: "ability score",
+    });
+  });
+
+  test("FR-CMP-33 FR-CMP-36 empty copy: 'No matches for ‘zzqx’. Every word must match.'; empty q + filters 'No matches'; nothing at all per role", () => {
+    expect(emptyText(" zzqx ", false, "dm")).toBe("No matches for ‘zzqx’. Every word must match.");
+    expect(emptyText("zzqx", false, "player")).toBe(
+      "No matches for ‘zzqx’. Every word must match.",
+    );
+    expect(emptyText("", false, "dm")).toBe("No matches");
+    expect(emptyText("", true, "dm")).toBe("Nothing imported yet");
+    expect(emptyText("", true, "player")).toBe("The DM hasn't set up the compendium yet");
   });
 });
 
