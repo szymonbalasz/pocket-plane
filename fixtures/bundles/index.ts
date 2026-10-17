@@ -22,6 +22,7 @@ import notifications from "./notifications";
 import partyBoard from "./party-board";
 import partyLoot from "./party-loot";
 import ruleTriggers from "./rule-triggers";
+import rulesEffects from "./rules-effects";
 import sceneTools from "./scene-tools";
 import sceneToolsProps from "./scene-tools-props";
 import scenes from "./scenes";
@@ -62,4 +63,5 @@ export const bundles: readonly Bundle[] = [
   compendiumFull,
   visionParty,
   diceDisplay,
+  rulesEffects,
 ];
