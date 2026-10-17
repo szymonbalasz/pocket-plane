@@ -7,7 +7,7 @@
 // Healing, checks, saves and skills are never claimed: they stay `char.roll` (FR-CBT-45). A PC
 // hidden from its owner isn't in the player's store, so the sheet falls back to `char.roll`
 // (OQ-CBT-28).
-import { type RollSheet, resolveSheetAttack } from "@shared/character-sheet/logic";
+import { attackRollSpecs, type RollSheet, resolveSheetAttack } from "@shared/character-sheet/logic";
 import type { SheetRollKind } from "@shared/character-sheet/schemas";
 import { CREATURE_SHEET_TYPE, type SpellRow } from "@shared/character-sheet/sheet";
 import { critExpression } from "@shared/combat-tracker/rules";
@@ -54,18 +54,39 @@ const sheetOf = (store: RecordStore, characterId: string) =>
   (store.records[CREATURE_SHEET_TYPE]?.[characterId] ?? null) as RollSheet;
 
 /**
- * The row's damage expression from this client's store (full entity + `creature-sheet`, DM and
- * owner), or null: unknown row, no damage, or not in the store.
+ * The row's damage expressions from this client's store (full entity + `creature-sheet`, DM and
+ * owner): the base part (with the weapon's `bonus`), then each extra part (FR-CBT-81); null:
+ * unknown row, no damage, or not in the store.
  */
-function attackDamageOf(
+function attackDamagesOf(
   store: RecordStore,
   characterId: string,
   ref?: RollRouteRef,
-): string | null {
+): string[] | null {
   const stats = statBlockOf(store, characterId);
   if (!stats) return null;
   const r = resolveSheetAttack(stats, sheetOf(store, characterId), ref ?? {});
-  return r.ok ? r.attack.damage : null;
+  return r.ok
+    ? attackRollSpecs(r.attack)
+        .slice(1)
+        .map((s) => s.expression)
+    : null;
+}
+
+/**
+ * FR-CBT-81 (sprint 4): the roll control's physical entries in spec order ([to-hit,] base,
+ * extra parts…) as the combat intents take them: `manual` (+ `manualParts`) for the first `n`,
+ * `manualExtra` for the extra parts.
+ */
+function manualFields(input: { manual?: unknown[]; manualParts?: unknown[] }, n: number) {
+  const extra = input.manual?.slice(n) ?? [];
+  return {
+    ...(input.manual ? { manual: n === 1 ? input.manual[0] : input.manual.slice(0, n) } : {}),
+    ...(input.manualParts
+      ? { manualParts: n === 1 ? input.manualParts[0] : input.manualParts.slice(0, n) }
+      : {}),
+    ...(extra.length ? { manualExtra: extra } : {}),
+  };
 }
 
 function spellOf(store: RecordStore, characterId: string, spellId: string): SpellRow | null {
@@ -152,22 +173,27 @@ export const combatRollRoute: RollRoute = {
       if (!spell?.damage || spell.effect === "healing") return null;
       if (kind !== "spellDamage" && spell.roll !== "attack") return null;
     }
-    const damage = spell ? (spell.damage ?? null) : attackDamageOf(store, characterId, ref);
+    const damages = spell
+      ? spell.damage
+        ? [spell.damage]
+        : null
+      : attackDamagesOf(store, characterId, ref);
+    // FR-CBT-83: a crit doubles every part's dice, one crit expression per damage slot.
+    const critExpressions = damages?.map(critExpression);
     if (kind === "damage" || kind === "spellDamage") {
       // FR-CBT-74: after a natural 20 on the row's pending to-hit card the Damage is critical:
       // the roll control shows the extra critical dice from the start.
       const card = pendingToHitCard(notesOf(store), c.id, cardRef(store, characterId, ref));
-      const crit = card?.toHit?.natural === 20 && damage !== null;
+      const crit = card?.toHit?.natural === 20 && critExpressions !== undefined;
       const claim: RollRouteClaim = {
         badge: "In combat",
-        ...(crit && damage ? { critExpressions: [critExpression(damage)], crit: true } : {}),
+        ...(crit && critExpressions ? { critExpressions, crit: true } : {}),
         // FR-MOD-27: the damage completes this card (its to-hit mode) or makes a damage-only one.
         card: card ? { toHitMode: card.mode } : {},
         send: (sendIntent, input) =>
           sendIntent("cbt.rollDamage", {
             attackerId: c.id,
-            ...(input.manual?.[0] ? { manual: input.manual[0] } : {}),
-            ...(input.manualParts?.[0] ? { manualParts: input.manualParts[0] } : {}),
+            ...manualFields(input, 1),
             ...refFields(ref),
           }),
       };
@@ -176,15 +202,19 @@ export const combatRollRoute: RollRoute = {
     const toHitOnly = kind === "toHit" || kind === "spellToHit";
     return {
       badge: "In combat",
-      ...(damage && !toHitOnly ? { critExpressions: [critExpression(damage)] } : {}),
+      ...(critExpressions && !toHitOnly ? { critExpressions } : {}),
       card: {},
       send: (sendIntent, input) =>
         sendIntent("cbt.attack", {
           attackerId: c.id,
           mode: input.mode,
           ...(toHitOnly ? { rolls: "toHit" } : {}),
-          ...(input.manual ? { manual: input.manual } : {}),
-          ...(input.manualParts ? { manualParts: input.manualParts } : {}),
+          ...(toHitOnly
+            ? {
+                ...(input.manual ? { manual: input.manual } : {}),
+                ...(input.manualParts ? { manualParts: input.manualParts } : {}),
+              }
+            : manualFields(input, 2)),
           ...refFields(ref),
         }),
     };
