@@ -321,10 +321,16 @@ describe("FR-FOG-53 order, rate and traffic (party on)", () => {
 });
 
 describe("FR-FOG-53 preview cache and crash (in-process)", () => {
-  afterEach(() => armCrashHook(null));
+  const stops: (() => void)[] = [];
+  afterEach(() => {
+    armCrashHook(null);
+    for (const stop of stops.splice(0)) stop();
+    clearVisionCache();
+  });
 
   test("FR-FOG-38 preview cache: own LRU (≤ 64), keyed by cell; a hit recomputes nothing; players' sight cache untouched", async () => {
     const v = await visionServices("vision-party");
+    stops.push(v.stop);
     clearVisionCache();
     const mira = v.tokenRow("Mira").id;
     const n0 = previewsComputed();
@@ -340,6 +346,7 @@ describe("FR-FOG-53 preview cache and crash (in-process)", () => {
 
   test("FR-FOG-53 no write on crash mid-drag (digest): checks flow, then a kill at map.checkMove before / after commit → digest and snapshots equal the pre-drag state", async () => {
     const v = await visionServices("vision-party");
+    stops.push(v.stop);
     v.run(F.setPartyVision, { on: true });
     const kill = () => {
       throw new Error("killed");
