@@ -9,10 +9,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | V vision + fog spec | `spec/s4-vision` (w4Z) | spec-vision | Writing | Seams |
-| D animated dice spec | `spec/s4-dice` (w40) | spec-dice | Writing (+ library comparison) | Seams |
+| D animated dice spec | `spec/s4-dice` (w40) | spec-dice | Draft in-review (04a569d) | Seams |
 | M map tools spec | `spec/s4-maptools` (w51) | spec-maptools | Writing | Seams |
 | R rules + effects spec | `spec/s4-rules` (w52) | spec-rules | Effects review, then spec | Seams |
-| C compendium spec | `spec/s4-compendium` | — | Queued (brief ready) | Starts when a slot frees |
+| C compendium spec | `spec/s4-compendium` (w53) | spec-compendium | Writing | Seams |
 
 ## Shared-file locks
 
