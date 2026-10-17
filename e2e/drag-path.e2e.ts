@@ -36,10 +36,11 @@ async function paths(page: Page): Promise<PathNode[]> {
 /** Whether the token is drawn from another client's drag preview (FR-MAP-40). */
 async function previewed(page: Page, tokenId: string): Promise<boolean> {
   return page.evaluate((id) => {
-    type KNode = { getAttr(a: string): unknown };
-    type KStage = { findOne(s: string): KNode | undefined };
+    type KNode = { id(): string; getAttr(a: string): unknown };
+    type KStage = { find(s: string): KNode[] };
     const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
-    return K?.stages[0]?.findOne(`#${id}`)?.getAttr("preview") === true;
+    const n = K?.stages[0]?.find(".map-token").find((t) => t.id() === id);
+    return n?.getAttr("preview") === true;
   }, tokenId);
 }
 
