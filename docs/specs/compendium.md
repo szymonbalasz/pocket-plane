@@ -1,9 +1,9 @@
 ---
 title: Compendium
 prefix: CMP
-status: complete
+status: claimed
 owner: spec-compendium
-phase: post-mvp-3
+phase: post-mvp-4
 ---
 
 # Compendium
