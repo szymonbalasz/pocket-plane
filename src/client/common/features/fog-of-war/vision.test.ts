@@ -322,8 +322,11 @@ describe("FR-FOG-17 No vision set hint", () => {
     },
   };
 
-  test("FR-FOG-17 lists owned tokens on the viewed scene whose senses are all 0, each name once", () => {
-    expect(noVisionNames(records, "s")).toEqual(["Ash", "Brakka"]);
+  test("FR-FOG-17 lists owned tokens on the viewed scene whose senses are stored 0 / 0, each name once (sprint 4: absent = Normal)", () => {
+    // Brakka (no senses) and Ash (definition not loaded) see Normal 999 ft: not listed.
+    expect(noVisionNames(records, "s")).toEqual([]);
+    const legacy = { ...records, entity: { ...records.entity, brakka: senses(0, 0) } };
+    expect(noVisionNames(legacy, "s")).toEqual(["Brakka"]);
     expect(noVisionNames(records, "other")).toEqual(["Sela"]);
     expect(noVisionNames(records, "empty")).toEqual([]);
     expect(NO_VISION_PREFIX).toBe("No vision set for: ");
@@ -333,8 +336,9 @@ describe("FR-FOG-17 No vision set hint", () => {
     const r = { token: { a: tok("a", "Wolf", "imp", "p1") } };
     expect(noVisionDefinitionIds(r, "s")).toEqual(["imp"]);
     expect(noVisionNames(r, "s", new Map([["imp", senses(0, 60)]]))).toEqual([]);
-    // Not loaded yet: unknown counts as 0 (FR-FOG-32).
-    expect(noVisionNames(r, "s")).toEqual(["Wolf"]);
+    expect(noVisionNames(r, "s", new Map([["imp", senses(0, 0)]]))).toEqual(["Wolf"]);
+    // Not loaded yet: unknown is not listed (sprint 4: absent senses = Normal, FR-FOG-32).
+    expect(noVisionNames(r, "s")).toEqual([]);
   });
 });
 
@@ -371,6 +375,7 @@ describe("FR-FOG-20 / -43 / -47 View as and Invisible (DM)", () => {
     blind: false,
     see: [rect(0, 0, 4, 4)],
     dark: [],
+    src: ["t1"],
     ...v,
   });
   const storeWith = (fog: FogRecord | null, v: VisionRecord | null): RecordStore => ({

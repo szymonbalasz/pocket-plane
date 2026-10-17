@@ -1,13 +1,22 @@
 // Fog of war wire shapes (FOG §8, §9; protocol §5). The mask codec and raster live beside this
 // (`mask.ts`, `raster.ts`); visibility of fog subjects in `visibility.ts`.
 import { z } from "zod";
-import { DarknessShape, FogLayerShape, FogShapeGeom, isDec2, SHAPE_COORD_MAX } from "./shapes";
+import {
+  DarknessShape,
+  FogBrushGeom,
+  FogLayerShape,
+  FogShapeGeom,
+  isDec2,
+  SHAPE_COORD_MAX,
+} from "./shapes";
 
 export const FOG_TYPE = "fog";
 /** FR-FOG-37: explored memory, one per (scene, player); `dmWindow: "view-as"` (FR-FOG-43). */
 export const FOG_EXPLORED_TYPE = "fog-explored";
 /** FR-FOG-39: derived per (scene, player), no table; `dmWindow: "view-as"` (FR-FOG-43). */
 export const VISION_TYPE = "vision";
+/** FR-FOG-49 (sprint 4): the campaign's fog settings (party vision), campaign scope. */
+export const FOG_SETTINGS_TYPE = "fog-settings";
 
 /** FR-FOG-01: value of every cell outside the box (and of every box cell when `runs` is ""). */
 export const FOG_FILLS = ["fog", "clear"] as const;
@@ -18,8 +27,8 @@ export type FogFill = z.infer<typeof FogFill>;
 export const FOG_BOX_MAX = 513;
 /** FR-FOG-04 (OQ-FOG-19): ≤ 2,000 runs per scene. */
 export const FOG_RUNS_MAX = 2000;
-/** FR-FOG-07 (OQ-FOG-08): ≤ 20 undo entries per scene. */
-export const FOG_UNDO_MAX = 20;
+/** FR-FOG-07 (sprint 4, OQ-FOG-53): ≤ 50 undo entries per scene (was 20). */
+export const FOG_UNDO_MAX = 50;
 /** FR-FOG-05 / FOG §9: polygon 3–64 vertices; every coordinate |v| ≤ 1,024. */
 export const FOG_VERTICES_MIN = 3;
 export const FOG_VERTICES_MAX = 64;
@@ -83,13 +92,20 @@ export type FogShape = z.infer<typeof FogShape>;
 export const FogOp = z.enum(["reveal", "fog", "explored", "hide"]);
 export type FogOp = z.infer<typeof FogOp>;
 
-/** DM wire: the latest undo entry and the stack depth, or null when empty. */
+/**
+ * DM wire: the latest undo entry and the stack depth, or null when empty. `redo` (FR-FOG-56): the
+ * most recently undone entry and the redo depth, absent when nothing can be redone.
+ */
 export const FogUndoInfo = z.object({
   n: z.number().int().min(1).max(FOG_UNDO_MAX),
   editId: z.string(),
   kind: FogEditKind,
 });
 export type FogUndoInfo = z.infer<typeof FogUndoInfo>;
+
+/** FR-FOG-56: a fog row's base mask `{fill, box, runs}` (`scene_fog_edit.nextBase`). */
+export const FogBaseState = z.object({ fill: FogFill, box: FogBox, runs: z.string() });
+export type FogBaseState = z.infer<typeof FogBaseState>;
 
 /** FR-SCN-36 (sprint 3): `scene-structure.doorSeen`, door `n` → player ids. Server only. */
 export type DoorSeen = Record<string, string[]>;
@@ -108,6 +124,7 @@ export const FogRecord = z.object({
   darkness: z.array(DarknessShape),
   explored: z.boolean(),
   undo: FogUndoInfo.nullable(),
+  redo: FogUndoInfo.optional(),
 });
 export type FogRecord = z.infer<typeof FogRecord>;
 
@@ -140,8 +157,10 @@ export const FogExploredRecord = z.object({
 export type FogExploredRecord = z.infer<typeof FogExploredRecord>;
 
 /**
- * `vision` (FR-FOG-39, derived): the player's rounded sight polygons, flat `[x, y, …]`; `inv` =
- * indices into `see ++ dark` of the polygons whose source sees invisible (omitted when empty).
+ * `vision` (FR-FOG-39, derived): the player's rounded, simplified sight polygons, flat
+ * `[x, y, …]`; `inv` = indices into `see ++ dark` of the polygons whose source sees invisible
+ * (omitted when empty; never in another player's copy, FR-FOG-51); `src` (sprint 4) = the source
+ * token id of each polygon of `see ++ dark`.
  */
 export const VisionRecord = z.object({
   id: z.string(),
@@ -151,8 +170,26 @@ export const VisionRecord = z.object({
   see: z.array(z.array(z.number())),
   dark: z.array(z.array(z.number())),
   inv: z.array(z.number().int().min(0)).optional(),
+  src: z.array(z.string()),
 });
 export type VisionRecord = z.infer<typeof VisionRecord>;
+
+/**
+ * FR-FOG-53 (sprint 4): signal `fog.sight` (server-originated, OQ-FOG-58): a dragged source's
+ * polygons at the previewed cell (rounded, simplified, FR-FOG-33); map sight only, no records.
+ */
+export const FOG_SIGNALS = { sight: "fog.sight" } as const;
+export const FogSightPayload = z.object({
+  sceneId: z.string(),
+  tokenId: z.string(),
+  see: z.array(z.array(z.number())),
+  dark: z.array(z.array(z.number())),
+});
+export type FogSightPayload = z.infer<typeof FogSightPayload>;
+
+/** `fog-settings` (FR-FOG-49): id = the campaign id; every viewer full; no row = off. */
+export const FogSettingsRecord = z.object({ id: z.string(), partyVision: z.boolean() });
+export type FogSettingsRecord = z.infer<typeof FogSettingsRecord>;
 
 /** WS intents (FOG §9; DM only, ADR-0021 D). */
 export const FOG_INTENTS = {
@@ -166,15 +203,20 @@ export const FOG_INTENTS = {
   setExplored: "fog.setExplored",
   forgetExplored: "fog.forgetExplored",
   setInvisible: "fog.setInvisible",
+  setPartyVision: "fog.setPartyVision",
+  redo: "fog.redo",
 } as const;
 
 const Id = z.string().min(1).max(64);
 
-/** FR-FOG-05: append one fog shape (v2 geometry, or a sprint-2 legacy form). */
+/**
+ * FR-FOG-05: append one fog shape (v2 geometry, a brush `stroke` / `cells` (sprint 4, FR-FOG-26),
+ * or a sprint-2 legacy form).
+ */
 export const FogEditInput = z.strictObject({
   sceneId: Id,
   op: FogOp,
-  shape: z.union([FogShapeGeom, FogShape]),
+  shape: z.union([FogShapeGeom, FogBrushGeom, FogShape]),
 });
 export type FogEditInput = z.input<typeof FogEditInput>;
 
@@ -185,6 +227,12 @@ export type FogSetAllInput = z.input<typeof FogSetAllInput>;
 /** FR-FOG-07: undo the latest edit, guarded by its id. */
 export const FogUndoInput = z.strictObject({ sceneId: Id, expectedEditId: Id });
 export type FogUndoInput = z.input<typeof FogUndoInput>;
+
+/** FR-FOG-56: redo the most recently undone edit, guarded by its id. */
+export const FogRedoInput = z.strictObject({ sceneId: Id, expectedEditId: Id });
+export type FogRedoInput = z.input<typeof FogRedoInput>;
+export const FogRedoResult = z.object({ editId: z.string() });
+export type FogRedoResult = z.infer<typeof FogRedoResult>;
 
 /** `fog.edit` / `fog.setAll` / darkness ack: the new undo entry, or null on a no-op. */
 export const FogEditResult = z.object({ editId: z.string().nullable() });
@@ -232,3 +280,7 @@ export type FogForgetExploredInput = z.input<typeof FogForgetExploredInput>;
 /** FR-FOG-45 (#210): the DM-only Invisible token state; same value → no-op. */
 export const FogSetInvisibleInput = z.strictObject({ tokenId: Id, invisible: z.boolean() });
 export type FogSetInvisibleInput = z.input<typeof FogSetInvisibleInput>;
+
+/** FR-FOG-49 (sprint 4): the campaign's party vision switch (DM); same value → no-op. */
+export const FogSetPartyVisionInput = z.strictObject({ on: z.boolean() });
+export type FogSetPartyVisionInput = z.input<typeof FogSetPartyVisionInput>;

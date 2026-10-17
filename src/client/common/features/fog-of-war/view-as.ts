@@ -72,7 +72,7 @@ export function pairRows(
 
 /** A `vision` record as the shared fns' `PlayerVision` (no record = no polygons, not blind). */
 export function visionOf(v: VisionRecord | null): PlayerVision {
-  if (!v) return { blind: false, see: [], dark: [], inv: [], polys: [] };
+  if (!v) return { blind: false, see: [], dark: [], inv: [], src: [], polys: [] };
   const inv = v.inv ?? [];
   const polys: SightPoly[] = [...v.see, ...v.dark].map((poly, i) => ({
     poly,
@@ -81,7 +81,7 @@ export function visionOf(v: VisionRecord | null): PlayerVision {
     seesInvisible: inv.includes(i),
     contains: (x, y) => pointInPolygon(poly, x, y),
   }));
-  return { blind: v.blind, see: v.see, dark: v.dark, inv, polys };
+  return { blind: v.blind, see: v.see, dark: v.dark, inv, src: v.src, polys };
 }
 
 const layers = new WeakMap<object, StaticLayer>();

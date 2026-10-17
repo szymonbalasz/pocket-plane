@@ -83,9 +83,11 @@ describe("FOG §13 V2 leak walkthrough: dynamic vision (player-1, player-2)", ()
     const ev1 = t.events(t.c.p1, m.p1, "TokenMoved");
     expect(ev1).toHaveLength(1);
     // Mira + Goblin, P1's vision and memory; the darkness now meets P1's sight (FR-FOG-44: `fog`
-    // upsert) and d2's samples are in it (`doorSeen`, the structure row).
+    // upsert). Sprint 4 (FR-FOG-33): d2's nearest sample (7.5, 11.5) lies exactly 6 cells from
+    // Mira, on the bound; the inward-only simplification may leave it unseen (fail closed), so no
+    // `doorSeen` change.
     expect([...new Set(ev1[0]?.changes.map((c) => c.type))].sort()).toEqual(
-      [FOG_EXPLORED_TYPE, FOG_TYPE, "scene-structure", TOKEN_TYPE, VISION_TYPE].sort(),
+      [FOG_EXPLORED_TYPE, FOG_TYPE, TOKEN_TYPE, VISION_TYPE].sort(),
     );
   });
 

@@ -1735,3 +1735,56 @@ From [dice-extras](../specs/dice-extras.md) (FR-DICEX-42) and [dice-roll-log](..
 | `focusLogEntry(entryId)` (`@ui/features/dice-roll-log/focus`) | Client memory only. Opens / restores and fronts `dice.log` through the window's companion (`diceLogWindowBase.companion`, mounted while the kind is available), scrolls the entry into view, `dice-log-entry` `data-focused` + accent ring for 2 s; an entry not in the store → the log opens only. Caller: the roll popup (FR-DICEX-39, D7) |
 | Bundle | **`dice-display`** = `combat` + `rolls-1` + `dicex-looks` + `dicex-notation-text` (no new unit) |
 | CON-44 | 0 B on the wire: chips are drawn from the payloads already sent. `dice-display` snapshots: DM 19,233 B, P1 11,967 B, P2 10,235 B |
+
+## 63. Sprint 4: vision core (V6)
+
+From [fog-of-war](../specs/fog-of-war.md) (FOG sprint 4, `complete`; gate 1 #245; [ADR-0047](../architecture/adr/0047-party-vision.md), refines [ADR-0042](../architecture/adr/0042-dynamic-vision.md)), [character-sheet-full](../specs/character-sheet-full.md) (FR-CHARX-49 / -50 amended), [live-sync](../specs/live-sync.md) (OQ-FOG-58). **Built by `fix/vision-s4-core`** (V6; schema + ws + sheet locks): the 999 ft default, map edges and inward simplification, party vision on the server, the redo stack, the brush shape schemas, server-originated signals and View as → Party. No party-vision or brush UI yet (V9 / V10); `fog.sight` is sent by V8's `map.checkMove` hint. Data side: [data model §48](../data-model/README.md#48-sprint-4-vision-core-v6).
+
+**Intents** (DM only, ADR-0021 D; a player → `forbidden`)
+
+| Intent | Payload (zod, `@shared/fog-of-war/schemas`) | Ack | Rejects | Source |
+|---|---|---|---|---|
+| `fog.setPartyVision` | `FogSetPartyVisionInput {on}` | `{}`; same value → no event | `invalid` (zod) | FR-FOG-49 |
+| `fog.redo` | `FogRedoInput {sceneId, expectedEditId}` | `{editId}` | `not_found` (scene); `conflict` "Nothing to redo" / "Fog changed — check and redo again" (not the most recently undone entry) | FR-FOG-56 |
+| `fog.edit` (extended) | `shape` may be a brush shape `stroke [r, x0, y0, …]` (r 0.5–10, 1–256 points) or `cells {box: [col0, row0, cols, rows], runs}` (box ≤ 128 × 128, FR-FOG-04 runs ≤ 500, "1" painted, ≥ 1 cell) | `{editId}` (kind `‹op›-shape`) | as before; a brush shape in `fog.placeDarkness` → `invalid` (zod) | FR-FOG-26 |
+| `sync.loadScene` (extended, hub) | `viewAs: "party"` (`VIEW_AS_PARTY`) | `ack {records}` = every player's `vision` + `fog-explored` of the scene (DM wire) | as before (DM only) | FR-FOG-43 |
+
+- **`fog.setPartyVision`**, one transaction: the `fog_settings` row + the **active** scene re-derived for every player (subjects, darkness `seenBy`, memory, every `vision` listed with its new `shared` flag) + `visionStale` on the campaign's other scenes with a fog row (scenes without one re-derive at once) + one log entry → **`PartyVisionSet {on}`** (logged, not undoable). Changes: `fog-settings` first, then the re-derive rows. Prep or live. Crash hooks `fog.setPartyVision:before-commit` / `:after-commit`.
+- **Undo / redo** (FR-FOG-07 / -56): the stack is ≤ **50** entries (was 20). `fog.undo` now marks the entry undone (`undoneAt`, `next*` = the state it replaced) instead of deleting it; undone entries are the redo list (always the newest `seq`s). `fog.redo` re-applies the most recently undone entry (the undone one with the lowest `seq`), clears its mark → **`FogRedone {sceneId, editId, kind}`** (logged, not undoable; changes as `FogEdited`). Any new fog edit / setAll / darkness intent deletes the redo list first. Survives reload and restart.
+- **`fog` record (DM wire):** + `redo?: {n, editId, kind}` (the next redo entry and the redo depth; absent when nothing to redo); `undo.n` ≤ 50. Players: unchanged (no `undo`, no `redo`).
+
+**Record types**
+
+| Type | Scope | DM wire | Player visibility | Snapshot | Source |
+|---|---|---|---|---|---|
+| `fog-settings` *(new)* | campaign; id = campaignId | `{id, partyVision}` | full | everyone, one record per campaign (no row = `partyVision: false`) | FR-FOG-49 |
+| `vision` (amended) | as [§37](#37-sprint-3-vision-core-v0) | `{id, sceneId, playerId, blind, see, dark, inv?, src}`; server-only `shared` never on a wire | own row: full (minus `campaignId`, `shared`); another player's row: **redacted without `inv`** iff `shared` (party vision on at compute time), else hidden | players: every row of the active scene the fn allows (own; + every other player's while party vision is on); DM: View-as loads only | FR-FOG-39, -51 |
+
+- `src` = the source token id of each polygon of `see ++ dark`. Polygons are rounded to 0.01 and simplified inward-only at 0.05 cell (FR-FOG-33); `dark` is omitted when darkvision ≤ vision.
+- **Switch transitions** (one `PartyVisionSet`, per player): on = upserts of every other player's `vision` on the active scene and of every subject another player sees, own memory grown; off = deletes of the others' `vision` and of every subject not seen by own sight (incl. invisible tokens seen only through another player's Sees invisible); memory kept. After the event each store equals that player's fresh snapshot (convergence). Reconnect: the snapshot reads stored `seenBy` and computes `vision` with `shared` from `fog_settings`.
+
+**Server-originated signals** (OQ-FOG-58; `src/server/ws/signals.ts`, `hub.ts`)
+
+| Piece | Contract |
+|---|---|
+| `registerServer(def)` on `SignalRegistry` (`defineServerSignal({name, schema, rate?: {perSecond, key(data)}})`) | A signal type only the server sends; a client sending its name → `unknown_intent` |
+| `withSignals(result, [{name, payload, audience: playerId[]}])` | A command result carrying signals on a symbol key (never serialized with the ack); `resultSignals(result)` reads them |
+| Hub fan-out | After the intent's `ack`, in that connection's frame order: the payload through the registered schema (unregistered / invalid → `error` log, nothing sent), then every **other** live connection of the sender's campaign whose **player** is in the audience (never a DM connection, never the origin connection) gets `{type: "signal", name, data, from}` (`from` = the intent's sender). Rate per receiver: ≤ `perSecond` frames with the same `key` in any 1 s window; an excess frame is **dropped, never delayed** (nothing is held, so no preview can follow a later event) |
+
+| Signal | From | Audience | Rate | Source |
+|---|---|---|---|---|
+| `fog.sight {sceneId, tokenId, see, dark}` (`FogSightPayload`) | the server, on a `map.checkMove` that returned a `fog-sight` hint (V8); `from` = the sender | `fogSightAudience(read, token, sender)` (`fog-of-war/sight-signal.ts`): nobody unless the token's scene is **active** and the token isn't hidden; only players who hold it (`seenBy` + owner); party vision off: the owner when the sender isn't the owner; on: every holder but the sender, nobody while party-blind; never the DM | ≤ 4 / s per token per receiver, excess dropped | FR-FOG-53 |
+
+**Registries**
+
+| Registry | Member | Signature |
+|---|---|---|
+| `scenes-map/scene-hooks.ts` | `mapChanged?` *(new, non-append member, review A8)* | `(env, scene) → RecordChange[]` in `map.setGrid` / `map.setSceneMap` after the scene row, **only when the map rectangle moved** (map size, cell size or offsets); rows join `SceneUpdated`. Fog's line: re-derives the scene (sight is cut by the map edges); memory grows only on the active scene |
+
+- **Fog's `activated` line** (FR-FOG-35): a stale scene's re-derive rows carry each subject's `before` as seen by nobody (`seenBy: []`, `doorSeen: {}`): players held nothing of a non-active scene, so a stale copy that over-included them becomes nothing instead of a `delete` naming a record they never got.
+- **Senses** (FR-CHARX-49 amended, `@shared/entities/schemas`): `senses.visionFt` optional, 0–995 step 5; absent (or no `senses`) = Normal = 999 ft; `999` / `1000` → `invalid`. `char.edit {set: {senses}}` without `visionFt` clears a stored value. Open5e adapter: no `visionFt` with SRD darkvision; `ADAPTER_VERSION` "2".
+- **Shared geometry** (`@shared/fog-of-war/vision`): `senseRadii(senses)` (`[see, dark]` cells; vision ≤ 999 ft = 199.8, darkvision ≤ 120 ft, `dark` 0 when ≤ `see`); `mapBounds(scene)` (grid units, rounded inward) + `boundsEdges`; `prepareScene(walls, darkness, bounds?)`; `simplifyInward(flat, origin)`; `sourcePolygons(scene, source)`; `playerVision` adds `src`; `partyVision(list)` (FR-FOG-50); `NORMAL_SENSES`, `VISION_NORMAL_FT`, `SIMPLIFY_CELLS`. `@shared/fog-of-war/brush` (stroke / cells containment, local until M0's `area.ts`); `@shared/fog-of-war/shapes`: `FogBrushGeom`, `FogLayerShape` + `stroke` / `cells`, `isBrush`, `LayerShapeLike`.
+- **Server** (`fog-of-war`): `sight.ts` sources with Normal default and the 12-source party cut (round robin over players in campaign order, `warn`, FR-FOG-52); cache key + map rectangle + party flag (FR-FOG-38); `derive.ts` party sight into `seenBy` (`visionOf` = the party's while on; party-blind); `rederive.ts` party memory (every player's row grows from the changed players' polygons) and `shared` on `vision` changes; `settings.ts` (`fog-settings`); `upgrade.ts` start hook `fog-of-war.vision-model-upgrade` (FR-FOG-40: `db_meta` `fog-vision-model` < 2 → re-derive each campaign's active scene, mark the rest `visionStale`, write 2 last; a DB created from scratch is stamped 2).
+- **Test helpers:** `convergence` projects `view-as` rows by the ids the loaded pair's `loadViewAs` returns now (party and party vision included); harness `visionHarness(bundle)` / `visionServices(bundle)`, `expectSee(want, marks, {party})`; fog `legacySenses(db)` (0 / 0 senses for static-fog tests).
+- **Benchmark** (`vision-s4.bench.test.ts`, r 199.8, 2,000 walls on 120 × 120 + edges, medians): one polygon 1.48 ms (≤ 10), a move with party vision on at 12 sources 22.6 ms (≤ 30), the switch 125.7 ms (≤ 150), own `vision` at 4 sources 23,250 B (≤ 48 KiB).
+- **CON-44** (#208, never raised; `con44-s4.test.ts`, measured): data model §47.

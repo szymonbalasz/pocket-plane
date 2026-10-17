@@ -239,20 +239,32 @@ function updateScene(
   before: SceneRecord,
   set: Partial<typeof scene.$inferInsert>,
 ): SceneRecord {
-  const { tx, ctx, emit } = env;
+  const { tx, ctx, actor, emit } = env;
   tx.update(scene)
     .set({ ...set, updatedAt: ctx.clock.iso() })
     .where(eq(scene.id, before.id))
     .run();
   const after = readScene(tx, before.id);
+  // Review A8 (FR-FOG-33): the map rectangle bounds sight, so a moved rectangle runs `mapChanged`.
+  const hooks = mapRectMoved(before, after)
+    ? lifecycleHooks.mapChanged({ tx, ctx, actor }, after)
+    : [];
   emit({
     type: SceneUpdated.type,
     campaignId: before.campaignId,
     payload: { sceneId: before.id },
-    changes: [sceneChange(before, after)],
+    changes: [sceneChange(before, after), ...hooks],
   });
   return after;
 }
+
+/** The map rectangle (image size, cell size, offsets) differs. */
+const mapRectMoved = (a: SceneRecord, b: SceneRecord) =>
+  a.mapWidth !== b.mapWidth ||
+  a.mapHeight !== b.mapHeight ||
+  a.gridCellSize !== b.gridCellSize ||
+  a.gridOffsetX !== b.gridOffsetX ||
+  a.gridOffsetY !== b.gridOffsetY;
 
 /** PATCH body (`PatchSceneBody`) + the path id. */
 export const UpdateSceneInput = z.strictObject({

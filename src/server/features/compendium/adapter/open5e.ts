@@ -31,7 +31,7 @@ import {
 import { z } from "zod";
 import { slugify, splitSections, toMarkdownLite } from "./text";
 
-export const ADAPTER_VERSION = "1";
+export const ADAPTER_VERSION = "2";
 export const SRD_DOCUMENT_SLUG = "wotc-srd";
 
 export const OPEN5E_ENDPOINTS = [
@@ -300,7 +300,8 @@ function hpFormula(c: Run, key: string, m: z.infer<typeof RawMonster>) {
 function darkvision(c: Run, key: string, senses: string | undefined) {
   const m = /darkvision\s+(\d+)\s*ft/i.exec(senses ?? "");
   if (!m) return undefined;
-  const s = { visionFt: 0, darkvisionFt: Number(m[1]), seesMagicalDarkness: false };
+  // FR-CHARX-49 (sprint 4, OQ-CHARX-30): no `visionFt` = Normal vision (999 ft).
+  const s = { darkvisionFt: Number(m[1]), seesMagicalDarkness: false };
   if (Senses.safeParse(s).success) return s;
   c.warn(key, "statBlock.senses", `Darkvision ${m[1]} ft doesn't fit; dropped`);
   return undefined;

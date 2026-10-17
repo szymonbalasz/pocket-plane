@@ -28,6 +28,7 @@ import sessionSim from "./session-sim";
 import sessionSim7 from "./session-sim-7";
 import syncProbe from "./sync-probe";
 import vision from "./vision";
+import visionParty from "./vision-party";
 
 export const bundles: readonly Bundle[] = [
   base,
@@ -57,5 +58,6 @@ export const bundles: readonly Bundle[] = [
   ruleTriggers,
   vision,
   sessionSim7,
+  visionParty,
   diceDisplay,
 ];

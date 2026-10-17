@@ -49,7 +49,10 @@ import enemyCustomSecond from "./entities/enemy-custom-second";
 import fogAmbush from "./fog-of-war/fog-ambush";
 import fogAmbushPartial from "./fog-of-war/fog-ambush-partial";
 import fogScn from "./fog-of-war/fog-scn";
+import visionBrakka from "./fog-of-war/vision-brakka";
 import visionCrypt from "./fog-of-war/vision-crypt";
+import visionInvisible from "./fog-of-war/vision-invisible";
+import visionLegacy from "./fog-of-war/vision-legacy";
 import syncProbes from "./live-sync/sync-probes";
 import notificationsTest from "./notifications/notifications-test";
 import handoutImages from "./party-board/handout-images";
@@ -136,4 +139,7 @@ export const units: readonly Fixture[] = [
   cmpHomebrewSecond,
   visionCrypt,
   dicexLooks,
+  visionLegacy,
+  visionInvisible,
+  visionBrakka,
 ];

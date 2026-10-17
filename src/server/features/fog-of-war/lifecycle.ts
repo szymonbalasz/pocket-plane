@@ -2,7 +2,9 @@
 // - scenes-map `scene-hooks.ts`: `created` (a fully fogged row, FR-FOG-02), `duplicated` (the
 //   source's row, not its undo stack, memory or `visionStale`), `deleting` (the `fog` delete and
 //   every `fog-explored` row, FR-FOG-23), `activated` (a `visionStale` scene re-derives inside the
-//   activation, FR-FOG-35).
+//   activation, FR-FOG-35), `mapChanged` (sprint 4, review A8: `map.setGrid` / `map.setSceneMap`
+//   moved the map rectangle, whose edges bound sight, FR-FOG-33: the scene re-derives; memory
+//   grows only on the active scene).
 // - campaign-management `player-hooks.ts`: `added` (OQ-FOG-39: the new player joins `seenBy` on
 //   the active scene; other scenes are marked `visionStale`).
 // - entities' definition-changed hooks: `fogSensesHook` (FR-FOG-35: a senses edit re-derives the
@@ -30,6 +32,14 @@ import { readFogRecord, sceneExploredRecords } from "./rows";
 import { isSource } from "./sight";
 
 const boxColumns = ([col0, row0, cols, rows]: FogBox) => ({ col0, row0, cols, rows });
+
+/** A subject change whose `before` copy is seen by nobody (`seenBy` / `doorSeen` emptied). */
+function unseenBefore(c: RecordChange): RecordChange {
+  const b = c.before as { seenBy?: unknown; doorSeen?: unknown } | null;
+  if (!b) return c;
+  if (c.type === SCENE_STRUCTURE_TYPE) return { ...c, before: { ...b, doorSeen: {} } };
+  return "seenBy" in b ? { ...c, before: { ...b, seenBy: [] } } : c;
+}
 
 /** FR-FOG-02 (create, duplicate) / FR-FOG-23 (delete) / FR-FOG-35 (activate): lifecycle lines. */
 export const fogSceneHook: SceneHook = {
@@ -86,7 +96,12 @@ export const fogSceneHook: SceneHook = {
       ...explored,
     ];
   },
-  /** FR-FOG-35: a `visionStale` scene re-derives inside the activation and clears the flag. */
+  /**
+   * FR-FOG-35: a `visionStale` scene re-derives inside the activation and clears the flag. No
+   * player held anything of the scene before (scene gate, CON-22), so each subject's `before`
+   * reads as seen by nobody: a stale copy that over-included a player turns into nothing for them
+   * rather than a `delete` naming a record they never got (players resync on activation anyway).
+   */
   activated(env, scene): RecordChange[] {
     const row = env.tx
       .select({ stale: sceneFog.visionStale })
@@ -95,6 +110,10 @@ export const fogSceneHook: SceneHook = {
       .get();
     if (!row?.stale) return [];
     env.tx.update(sceneFog).set({ visionStale: false }).where(eq(sceneFog.sceneId, scene.id)).run();
+    return rederiveScene(env, scene.id).map(unseenBefore);
+  },
+  /** FR-FOG-33 / -35 (review A8): the map edges moved: every player's sight on the scene. */
+  mapChanged(env, scene): RecordChange[] {
     return rederiveScene(env, scene.id);
   },
 };
@@ -148,11 +167,12 @@ export function fogRederive(env: SceneHookEnv, change: RecordChange): RecordChan
 
 bindFogRederive(fogRederive);
 
+/** What sight reads of a creature's senses; absent senses / `visionFt` = Normal (sprint 4). */
 const sensesKey = (e: EntityRecord) => {
   const s = (e.statBlock as { senses?: Record<string, unknown> } | null)?.senses;
   return s
-    ? `${s.visionFt},${s.darkvisionFt},${s.seesMagicalDarkness === true},${s.seesInvisible === true}`
-    : "0,0,false,false";
+    ? `${s.visionFt ?? "normal"},${s.darkvisionFt},${s.seesMagicalDarkness === true},${s.seesInvisible === true}`
+    : "normal,0,false,false";
 };
 
 /**
