@@ -21,7 +21,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
-| M4 window placement | `fix/window-placement` (w57, slot 4) | — | Re-test 3: 5/5 PASS; merged main, branch gates running | Merge → D7 |
+| M4 window placement | merged c308458 | — | Done (re-test 3 5/5; check 3097, e2e 91) | — |
+| D7 roll popup | — | — | Queued: next free slot (brief next) | — |
 | Mc map-tools core | `fix/maptools-core` (w5H, slot 5) | build-maptools-core | Building | Review → M1, C-art core |
 
 ## Shared-file locks
@@ -29,7 +30,6 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 - `fix/maptools-core` (Mc): schema, `src/shared/events/scene-tools.ts`.
 - `build/weapon-rows` (S4-1a): sheet folder, `creature-form.tsx`, `src/shared/dice-roll-log/{schemas.ts,roll-kind.ts}` (additive `part` on roll items; D7 rebases on it).
 - `build/weapon-combat` (S4-1b): combat lock (attack / damage / apply, card, popup, `log-kinds.ts`).
-- `fix/window-placement` (M4): play-shell frame + `toast-region.ts`, windows.ts handout line, combat Start line, `e2e/rule-triggers-combat.e2e.ts`.
 - `build/map-pan-plain` (V7): canvas lock (`MapCanvas.tsx`, `canvas-layers.ts`, `camera.ts`), scene-tools Layers popover, BL-01 e2e specs + `e2e/support` `mapPoint`.
 - Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
