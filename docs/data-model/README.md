@@ -1483,9 +1483,17 @@ From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #209). 
 - **Derived (never stored):** `featureKey` (`<source>:<sourceKey>`, homebrew `campaign:<id>`), the resolved preset name ("Preset: ‹name›"), the row source label (source name / "Homebrew").
 - **CON-44:** no new record shape; snapshots change only by the sheet rows / triggers a DM or player adds (as CHARX / MOD rows).
 
-## 47. Sprint 4: vision core (V6)
+## 47. Sprint 4: die shapes and log dice (D5)
 
-From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG sprint 4; #245) and [character-sheet-full](../specs/character-sheet-full.md#81-stat-block-additions-entities-json-leaf-zod-only-no-column) (FR-CHARX-49). **Built by `fix/vision-s4-core`** (schema lock first this sprint; drizzle push, push-safe: one new table, nullable columns). Protocol side: [protocol §61](../protocol/README.md#61-sprint-4-vision-core-v6).
+From [dice-roll-log](../specs/dice-roll-log.md#8-data-model) (FR-DICE-35–37) and [dice-extras](../specs/dice-extras.md#8-data-model) (FR-DICEX-42). **Built by `build/dice-shapes`**: no table, column, record type or payload change. Protocol side: [protocol §62](../protocol/README.md#62-sprint-4-die-shapes-and-log-dice-d5).
+
+- **Derived (never stored):** a log line's `die` segments (`{faces, value, kept, offered?, label?}`, one per die) from the entry's `payload` (every viewer) or `dmPayload` (DM client only), on render; rows written before sprint 4 render chips too. Faces: `roll` items from their `DieResult.faces`; other kinds' `RollBreakdown` dice from the expression's term order (else unknown → round chip).
+- **Client memory only:** the focused log entry (`focusLogEntry`, 2 s).
+- **CON-44:** 0 B; no new record shape.
+
+## 48. Sprint 4: vision core (V6)
+
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG sprint 4; #245) and [character-sheet-full](../specs/character-sheet-full.md#81-stat-block-additions-entities-json-leaf-zod-only-no-column) (FR-CHARX-49). **Built by `fix/vision-s4-core`** (schema lock first this sprint; drizzle push, push-safe: one new table, nullable columns). Protocol side: [protocol §63](../protocol/README.md#63-sprint-4-vision-core-v6).
 
 ### Fog settings (`fog_settings`, record type `fog-settings`) — owner [fog-of-war](../specs/fog-of-war.md#8-data-model)
 

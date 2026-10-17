@@ -1705,7 +1705,38 @@ From [compendium](../specs/compendium.md) (CMP, `complete`; #207, #209). **Built
 
 **Test IDs:** `cmp-new`, `cmp-derive`, `cmp-derive-dialog`, `cmp-derive-name`, `cmp-derive-field` (+ `data-field`), `cmp-derive-copy-text`, `cmp-derive-save`, `cmp-derive-error`, `cmp-clone`, `cmp-edit`, `cmp-delete`, `cmp-delete-dialog`, `cmp-delete-confirm`, `cmp-form`, `cmp-form-kind`, `cmp-form-name`, `cmp-form-field` (+ `data-field`), `cmp-form-text`, `cmp-form-preview`, `cmp-form-shared`, `cmp-form-save`, `cmp-form-error`, `cmp-add-to-sheet`, `cmp-add-to-sheet-panel`, `cmp-add-to-sheet-character`, `cmp-add-to-sheet-confirm`, `cmp-preset`.
 
-## 61. Sprint 4: vision core (V6)
+## 61. Sprint 4: area / coverage helper (M0)
+
+Built by `fix/area-geom` ([FR-SCN-41/42](../specs/scene-tools.md#6-functional-requirements), seams S2). Pure, no dependency, no wire change: no caller switched yet (Mc switches `templateCells`, V9's brush imports it).
+
+| Export (`@shared/scenes-map/area`) | Contract | Source |
+|---|---|---|
+| `AreaShape` | Template kinds in grid units `{kind: circle, x, y, r}` \| `{kind: cone, x, y, length, angle}` \| `{kind: line, …, width}` \| `{kind: square, x, y, side, angle}` (origin = a corner, sides along `angle` / `angle + 90°`), plus FOG geometry as is: `{rect}` \| `{polygon}` (simple, even-odd) \| `{circle}` \| `{stroke [r, x0, y0, …]}` | FR-SCN-42, FR-FOG-26 |
+| `templateArea(t)` | `TemplateGeometry` → shape (ft / 5; line width default 5 ft) | FR-SCN-42 |
+| `cellCoverage(shape)` | `{col, row, share}[]`, row-major, share in (0, 1], exact (closed-form circle ∩ cell; cell clipped against convex templates, four corners inside = 1; polygons clipped on edge cells, scanline inside). Strokes throw | FR-SCN-41 |
+| `cells(shape, mode, {axis?, rule?})` | `half`: share > 0.5 + `AREA_TOL` (1e-9); a tie counts iff the cell centre is strictly right of the axis (line, cone), of either centre line (square), of `axis` (FOG geometry; absent → never), never for circles; strokes throw. `centre`: `contains(centre)`. `distance` (circles, strokes): cells within `r × 5` ft of the cell holding each centre / stroke point by `rule` (default `5-10-5`), deduped, row-major; other shapes throw | FR-SCN-41/42, FR-FOG-55 |
+| `contains(shape, x, y)` | Boundary-inclusive; template kinds within `AREA_TOL`; FOG rect / polygon / circle exact on 1/100-cell integers (as FR-FOG-26); stroke = distance to the polyline ≤ r | FR-SCN-21, FR-FOG-26 |
+| `areaBox`, `snapPoint(p, free)`, `snapAngle(deg, free)` | Bounding box; nearest vertex or 0.01 cell; 15° or 0.1° in [0, 360) | FR-SCN-43 |
+
+- Measured: 300-ft sphere at a free origin (11,553 cells) `cells(…, "half")` ≈ 0.3 ms median, p95 ≤ 1.2 ms (bound 3 ms).
+
+## 62. Sprint 4: die shapes and log dice (D5)
+
+From [dice-extras](../specs/dice-extras.md) (FR-DICEX-42) and [dice-roll-log](../specs/dice-roll-log.md) (FR-DICE-35–37); seams S8 as amended by ruling B5. **Built by `build/dice-shapes`**: no record type, intent, event, signal or wire field. Data side: [data model §47](../data-model/README.md#47-sprint-4-die-shapes-and-log-dice-d5).
+
+| Piece | Contract |
+|---|---|
+| `LineSegment.die?` (`@shared/dice-roll-log/kind-types`) | `LineDie {faces: number \| null, value, kept, offered?: true, label?}`, **one die per segment**; `text` stays the die's number ("13"; struck `style: "dropped"` when `kept: false`), so `lineText`, copy, the Tooltip and screen readers read the line as before. `faces` null = no single die type (a physical total of several dice; an unparsable breakdown) → round chip. `kept: false` = dropped (adv / dis) only; `offered: true` = an offered trigger die (dashed, never struck). No `{kind: "dice", values[]}` shape, no `muted` field. A `die` segment is DM-only exactly when its text is (FR-DICE-28 kind contract) |
+| `rollSegments(item)` | One `die` segment per base die, faces from the stored `DieResult`; a manual total without per-die values → one segment with the sum (faces of the die when the roll has one, else null) |
+| `rollBreakdownSegments(r)` | Faces from `parseExpression(r.expression)` dice terms in order (N dice each; "1d8+1d6" → d8, d6); unparsable or a count mismatch → round chips (faces null), dice in stored order. Built only from what the caller passes (`payload` or `dmPayload`, never `rollIds`, ruling B4) |
+| Log-entry kinds (registry row, §26) | Kinds emit dice through these helpers (or the same per-die segments). MOD / offered-part chips (`modSegments`, `rollOfferSegments` in `@shared/effect-modifiers/`) are R S4-5's (ruling B9); until then those parts stay text |
+| `DieShape` (`@ui/features/dice-extras/DieShape`) | `{faces, value, kept, offered, look, size: sm 18 px \| md 36 px, round?, part?, negative?}`, inline SVG: d4 triangle, d6 square, d8 diamond, d10 kite, d12 pentagon, d20 hexagon + centre triangle, d100 tens kite + units kite (100 → "00" + "0"), others → round. Fill = look `body`, number + outline = `pips`. Test ID `dicex-die` (+ `data-shape` d4 … d20 \| round, `data-faces`, `data-value`, `data-kept`, `data-offered`). `FlatDie` (tray result `dicex-result-die`, throw zone `dicex-throw-die`) wraps one |
+| Game log (`GameLog.tsx`) | Each `die` segment → `dice-log-die` wrapper (+ `data-faces`, `data-value`, `data-kept`, `data-offered`) around a `sm` `DieShape` in the entry roller's look (`dice-look` row, else the default); chips centred on the text, line height unchanged (FR-SHELL-35) |
+| `focusLogEntry(entryId)` (`@ui/features/dice-roll-log/focus`) | Client memory only. Opens / restores and fronts `dice.log` through the window's companion (`diceLogWindowBase.companion`, mounted while the kind is available), scrolls the entry into view, `dice-log-entry` `data-focused` + accent ring for 2 s; an entry not in the store → the log opens only. Caller: the roll popup (FR-DICEX-39, D7) |
+| Bundle | **`dice-display`** = `combat` + `rolls-1` + `dicex-looks` + `dicex-notation-text` (no new unit) |
+| CON-44 | 0 B on the wire: chips are drawn from the payloads already sent. `dice-display` snapshots: DM 19,233 B, P1 11,967 B, P2 10,235 B |
+
+## 63. Sprint 4: vision core (V6)
 
 From [fog-of-war](../specs/fog-of-war.md) (FOG sprint 4, `complete`; gate 1 #245; ADR [proposed-party-vision](../architecture/adr/proposed-party-vision.md), refines [ADR-0042](../architecture/adr/0042-dynamic-vision.md)), [character-sheet-full](../specs/character-sheet-full.md) (FR-CHARX-49 / -50 amended), [live-sync](../specs/live-sync.md) (OQ-FOG-58). **Built by `fix/vision-s4-core`** (V6; schema + ws + sheet locks): the 999 ft default, map edges and inward simplification, party vision on the server, the redo stack, the brush shape schemas, server-originated signals and View as → Party. No party-vision or brush UI yet (V9 / V10); `fog.sight` is sent by V8's `map.checkMove` hint. Data side: [data model §47](../data-model/README.md#47-sprint-4-vision-core-v6).
 

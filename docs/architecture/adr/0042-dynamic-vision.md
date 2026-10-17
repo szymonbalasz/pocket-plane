@@ -1,6 +1,7 @@
 # 0042 — Dynamic vision: freeform fog layers, darkvision and magical darkness
 
 - Status: accepted (#207, 2026-10-16). Direction decided by the DM (#201, #202); every pick accepted at sprint-3 gate 1 (#207); DM snapshot ceiling raised to 1 MiB (#208); Invisible token state + Sees invisible sense added (#210). File keeps its proposed name; the integrator renames it to `0042-dynamic-vision.md` at merge
+- Refined by [ADR-0047](0047-party-vision.md) (party vision, sight while dragging, 999 ft default; sprint 4)
 - Date: 2026-10-16
 - Supersedes (part): [ADR-0007](0007-product-scope.md) Out "Dynamic lighting / vision" → **vision (sight radius, darkvision, walls blocking sight) is in; dynamic lighting (light sources, colour, shadows) stays out** unless the DM adds it
 - Refines: [ADR-0039](0039-fog-visibility.md) (fog copies become per player; `tokenHiddenForPlayers` = `hidden || fogged`; new scene hook `activated`), [ADR-0040](0040-token-move-guards.md) (guards may return a hint for a dry run; walls also block sight), [ADR-0033](0033-signal-audience.md) (audience may be a player list), [ADR-0041](0041-active-scene-window.md) (`fog` joins the window; a `view-as` window kind and `sync.loadScene {viewAs}`, seams S1), [ADR-0021](0021-sync-protocol-conventions.md) / FR-SYNC-19 (identical upserts dropped per connection)

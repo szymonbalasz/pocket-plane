@@ -143,7 +143,7 @@ describe("FR-DICEX-13 throwDice", () => {
     expect(t.totals).toEqual([8]);
   });
 
-  test("manual with per-die values → flat physical dice; without → one chip with the dice total", () => {
+  test("FR-DICEX-13 manual with per-die values → flat physical dice; without → one chip (sum) with the dice total", () => {
     const withDice = one([
       item({
         expression: "2d6-1",
@@ -156,9 +156,9 @@ describe("FR-DICEX-13 throwDice", () => {
         total: 8,
       }),
     ]);
-    expect(withDice.dice.map((d) => [d.value, d.flat, d.physical, d.shape])).toEqual([
-      [4, true, true, null],
-      [5, true, true, null],
+    expect(withDice.dice.map((d) => [d.value, d.flat, d.physical, d.shape, d.sum])).toEqual([
+      [4, true, true, null, undefined],
+      [5, true, true, null, undefined],
     ]);
     const total = one([
       item({
@@ -172,8 +172,8 @@ describe("FR-DICEX-13 throwDice", () => {
         total: 8,
       }),
     ]);
-    expect(total.dice.map((d) => [d.faces, d.value, d.flat, d.physical])).toEqual([
-      [6, 9, true, true],
+    expect(total.dice.map((d) => [d.faces, d.value, d.flat, d.physical, d.sum])).toEqual([
+      [6, 9, true, true, true],
     ]);
   });
 

@@ -9,6 +9,7 @@ import characterSheetFull from "./character-sheet-full";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
 import compendium from "./compendium";
+import diceDisplay from "./dice-display";
 import diceExtras from "./dice-extras";
 import diceLog from "./dice-log";
 import effectModifiers from "./effect-modifiers";
@@ -58,4 +59,5 @@ export const bundles: readonly Bundle[] = [
   vision,
   sessionSim7,
   visionParty,
+  diceDisplay,
 ];

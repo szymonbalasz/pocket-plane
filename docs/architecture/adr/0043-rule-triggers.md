@@ -1,6 +1,7 @@
 # ADR-0043 — Rule triggers: conditional, event-driven modifiers (class features like Divine Fury)
 
 - Status: **accepted (#207, 2026-10-16)**. Need decided by the DM (#203); every pick below accepted at sprint-3 gate 1 (#207), presets changed by #209 (five built-ins, no non-SRD built-in), snapshot guard by #208. The integrator renames this file to `0043-rule-triggers.md` at merge
+- Client-visibility consequence (use rows never reach clients) superseded by [ADR-0049](0049-trigger-state.md) (derived trigger-state copy; sprint 4)
 - Date: 2026-10-16
 - Refines: [ADR-0038](0038-effect-modifiers.md) (effect modifiers: static roll-time riders via `rollHooks`), [ADR-0035](0035-combat-rule-hooks.md) (combat rule hooks in the causing command's transaction), [ADR-0016](0016-domain-events-pending-actions.md) (domain events), [ADR-0037](0037-split-attack-damage.md) (a card's damage may be rolled after its to-hit)
 - Not a plugin system ([ADR-0007](0007-product-scope.md) Out "extension / plugin system"): triggers are data interpreted by built-in code, not user code
