@@ -1891,9 +1891,31 @@ Built by `fix/maptools-core` ([FR-SCN-20, -21, -41, -44, -46](../specs/scene-too
 - Sprint-2 cubes stored at a non-right angle (any 15° step was accepted, the client only placed 0 / 90 / 180 / 270) now draw rotated along `angle` (FR-SCN-20 sprint 4).
 - CON-44: freeform rows add 7.6 B each; the heavy DM at the template cap is 676,555 B, players ≤ 285,490 B ([data model §52](../data-model/README.md#52-sprint-4-map-tools-core-mc)).
 
-## 69. Sprint 4: trigger state (S4-3)
+## 69. Sprint 4: weapon damage parts in combat (S4-1b)
 
-Built by `build/trigger-state` ([FR-MOD-53–56, -60](../specs/effect-modifiers.md#6-functional-requirements); [ADR-0049](../architecture/adr/0049-trigger-state.md); #245). MOD writes the `trigger-state` rows of [§66](#66-sprint-4-rules-core-s4-0); no new record type, intent, signal or event name. Data side: [data model §53](../data-model/README.md#53-sprint-4-trigger-state-s4-3).
+From [combat-tracker](../specs/combat-tracker.md) FR-CBT-81–85 and [effect-modifiers](../specs/effect-modifiers.md) FR-MOD-58 (MOD §14.3 S4-1b). **Built by `build/weapon-combat`** (combat lock). Schemas from [§66](#66-sprint-4-rules-core-s4-0) plus the rows below; optional fields, old intents / lines parse unchanged.
+
+| Intent / payload | Change | Source |
+|---|---|---|
+| `cbt.attack` | rolls the row's parts (CHARX `attackRollSpecs`: to-hit `1d20 + toHit + bonus`, base `damage` + `bonus`, then each extra part); + `manualExtra?` ≤ 2 `ManualEntry` (one per extra part, row order, only with `manual`; not with `rolls: "toHit"`); a count other than the row's extra parts → `invalid` "Enter N physical damage part(s)". `manual` / `manualParts` stay to-hit + base | FR-CBT-81 |
+| `cbt.rollDamage` | same parts; + `manualExtra?` as above (with `manual`) | FR-CBT-81 |
+| Roll line (`roll` entry of `cbt.attack` / `cbt.rollDamage`) | one payload item per extra part after the base roll (label "‹attack› damage (fire)", "…, critical)"); no roll subject, so no effect mods on it; `rollIds` gain them. Visibility unchanged (player's own public, DM's DM-only) | FR-CBT-81, FR-DICE-26 |
+| Crit | natural 20: every part's dice count doubled, constants not; physical entries checked per part against the doubled expression; the route's `critExpressions` = one per damage slot | FR-CBT-83 |
+| Damage card text | "Brakka: 22 to hit, 15 slashing + 8 fire" (damage-only "… (Flame Tongue greatsword)"); over 280 chars: offers collapse to "(+ N trigger parts on a hit)", then the text is cut to 279 + "…" | FR-CBT-81 |
+| Damage card payload fit | over 4 KB after offers dropped (FR-MOD-37): `mods[].label`s cut to 12 chars + "…", then `attackerName` / `attackName` to 20 + "…"; `damage.extra` never drops | FR-CBT-81 |
+| `cbt.applyCard` | per Hit target `raw = floor(damageTotal × m) + Σ floor(extraTotal_i × m_i)` + trigger parts; `extraTotals` / `extraMultipliers` longer than the card's `damage.extra` → `invalid` | FR-CBT-82 |
+| `AttackLogPayload.damageParts` | written on Hit lines with extra parts (value after its multiplier); text "… — DM: hit. 15 slashing + 4 fire (half) damage + 6 radiant (Divine Fury)" (base multiplier after the base part when parts exist; no parts → as before) | FR-CBT-84 |
+| `AttackLogDmPayload.rolls.extra` *(new)* | ≤ 2 `{type, expression, dice [value, kept], constant, rolled, set?: true}` (card order): the DM's per-part breakdown and "(DM set; rolled N)"; **DM only** (rulings B4: players' lines carry no extra-part dice) | FR-CBT-84 |
+| `AttackLogDmPayload.extraDefense` *(new)* | ≤ 2 `{type, level, label}`: MOD's target-facts apply hook, the defense behind each extra part's preset on a Hit; DM only | FR-MOD-58 |
+| `hp-change.damageParts` | written per target when the card has extra parts (miss: `raw` 0) | FR-CBT-84 |
+| Players' `cbt.attack` wording | "— DM: hit." / "— DM: miss" / "— DM: critical hit!" for every players' line (ruled or not); natural rulings "— DM ruled hit / miss" unchanged; DM line unchanged. Client-side from `payload`; no schema or event change | FR-CBT-85 (BL-10) |
+
+- `ApplyHookDm` (apply hooks, [§26](#26-combat-registries-and-seams)) gains `extraDefense`.
+- OQ-MOD-44: the tray / throw layer throws each payload item of a new `roll` entry, so extra parts throw as labelled dice of the same entry; no dice-extras change.
+
+## 70. Sprint 4: trigger state (S4-3)
+
+Built by `build/trigger-state` ([FR-MOD-53–56, -60](../specs/effect-modifiers.md#6-functional-requirements); [ADR-0049](../architecture/adr/0049-trigger-state.md); #245). MOD writes the `trigger-state` rows of [§66](#66-sprint-4-rules-core-s4-0); no new record type, intent, signal or event name. Data side: [data model §54](../data-model/README.md#54-sprint-4-trigger-state-s4-3).
 
 **Writes** — one function, `triggerStates(env, encounter, combatantIds?)` (`src/server/features/effect-modifiers/trigger-state-writes.ts`): derives the rows from committed rows (FR-MOD-53) and inserts / updates / deletes only what differs, in the causing command's transaction; the rows join that command's event `changes` (no event of their own, no post-commit write). An encounter that isn't started has no rows.
 

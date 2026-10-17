@@ -10,13 +10,15 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
 | Docs pass | merged bd07224 | — | Done | — |
-| V7 pan / plain map / Fit | `build/map-pan-plain` (w5D, slot 3) | test-map-pan-plain-r | Re-test of the Fit fix (2493c7e) | Merge → V8, M1 |
+| V7 pan / plain map / Fit | `build/map-pan-plain` (w5D, slot 3) | test-map-pan-plain-r2 | Re-test 2 of the Fit (4a22b77: zoom out to keep row 0 + PCs) | Merge → V8, M1 |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
-| R S4-1a weapon rows | `build/weapon-rows` (w5F, slot 0) | test-weapon-rows | Walkthrough | Merge → S4-2 |
-| R S4-1b weapon combat + BL-10 | `build/weapon-combat` (w5G, slot 2) | test-weapon-combat | Walkthrough | Merge → S4-5 |
+| R S4-1a weapon rows | `build/weapon-rows` (w5F, slot 0) | — | Walkthrough 6/6 (+1 N/A); merged main, branch gates running | Merge → S4-2 |
+| R S4-1b weapon combat + BL-10 | merged | — | Done (walkthrough 8/8; check 3138, e2e 92) | — |
+| R S4-5 Divine Fury log line | `fix/fury-log-line` (w5M, slot 2) | build-fury-log-line | Building | Walkthrough |
+| R S4-3 trigger state + tray | `build/trigger-state` (w5K, slot 5) | build-trigger-state | Building | Walkthrough → S4-4 |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
@@ -29,7 +31,6 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 - `build/roll-popup` (D7): toast-region lock (`toast-region.ts` constants, `ShellToaster.tsx`).
 - `build/weapon-rows` (S4-1a): sheet folder, `creature-form.tsx`, `src/shared/dice-roll-log/{schemas.ts,roll-kind.ts}` (additive `part` on roll items; D7 rebases on it).
-- `build/weapon-combat` (S4-1b): combat lock (attack / damage / apply, card, popup, `log-kinds.ts`).
 - `build/map-pan-plain` (V7): canvas lock (`MapCanvas.tsx`, `canvas-layers.ts`, `camera.ts`), scene-tools Layers popover, BL-01 e2e specs + `e2e/support` `mapPoint`.
 - Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).

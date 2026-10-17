@@ -2,7 +2,8 @@
 // `applyHooks`): per target of `cbt.applyCard`, the effective AC (stored AC + Σ `flat` on `ac` of
 // its active effects) becomes the row's `targetAc` and the hit hint's, its parts go to the line's
 // `dmPayload.acMods`; on a hit, the defense preset for the card's damage type goes to
-// `dmPayload.defense`. Facts only: no extra damage, no writes; the DM's multiplier is applied as
+// `dmPayload.defense` (sprint 4, FR-MOD-58: each extra weapon part's to `dmPayload.extraDefense`).
+// Facts only: no extra damage, no writes; the DM's multiplier is applied as
 // sent (FR-MOD-25). Players never get AC or defense facts (`dmPayload`).
 import { AcModPart, DefenseFact } from "@shared/combat-tracker/log-kinds";
 import { defenseFor, effectiveAc } from "@shared/effect-modifiers/rules";
@@ -33,6 +34,14 @@ export const modTargetFactsHook: ApplyHook = {
     const defense = a.input.hit ? defenseFor(effects, who, a.card.damageType) : null;
     if (defense)
       dm.defense = DefenseFact.parse({ level: defense.level, label: clip(defense.label) });
+    // FR-MOD-58 (sprint 4): each extra weapon part's own preset, by its type (DM facts only).
+    const extraDefense = a.input.hit
+      ? (a.card.damage?.extra ?? []).flatMap((x) => {
+          const d = defenseFor(effects, who, x.type);
+          return d ? [{ type: x.type, level: d.level, label: clip(d.label) }] : [];
+        })
+      : [];
+    if (extraDefense.length) dm.extraDefense = extraDefense;
     return { extraRaw: 0, parts: [], dm, targetAc: ac.ac, changes: [] };
   },
 };

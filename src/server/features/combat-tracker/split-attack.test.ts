@@ -275,7 +275,7 @@ describe("FR-CBT-72 / -73 apply partial cards", () => {
       damageRolled: null,
       toHitRolled: 6,
     });
-    expect(t.lines(false).at(-1)).toBe("Mira attacks Goblin: 2 + 4 = 6 (physical) — miss");
+    expect(t.lines(false).at(-1)).toBe("Mira attacks Goblin: 2 + 4 = 6 (physical) — DM: miss");
   });
 
   test("FR-CBT-72 to-hit-only with a hit and no total → invalid; a typed total = DM set", () => {
@@ -291,7 +291,7 @@ describe("FR-CBT-72 / -73 apply partial cards", () => {
       "Mira attacks Goblin: 15 + 4 = 19 (physical) vs AC 15 — hit! 5 piercing damage (DM set)",
     );
     expect(t.lines(false).at(-1)).toBe(
-      "Mira attacks Goblin: 15 + 4 = 19 (physical) — hit! 5 piercing damage",
+      "Mira attacks Goblin: 15 + 4 = 19 (physical) — DM: hit. 5 piercing damage",
     );
   });
 

@@ -73,6 +73,7 @@ function insertHpChange(
   facts: FactsInput,
   entryId: string,
   triggerParts: HpChangeRecord["triggerParts"] = [],
+  damageParts: HpChangeRecord["damageParts"] = null,
 ): HpChangeRecord {
   const row = env.tx
     .insert(hpChange)
@@ -84,6 +85,7 @@ function insertHpChange(
       ...facts,
       noteIds: [],
       triggerParts,
+      damageParts,
       entryId,
       undone: false,
       undoneAt: null,
@@ -166,6 +168,19 @@ export const applyCardWith = (hooks: ApplyHooks) =>
       const allMiss = input.targets.every((t) => !t.hit);
       if (input.damageTotal === undefined && (p.damage || !allMiss)) throw invalid("Damage needed");
       const damageTotal = input.damageTotal ?? 0;
+      // FR-CBT-82 (sprint 4): the extra parts' values and per-target multipliers, card order;
+      // never more than the card has.
+      const extraParts = p.damage?.extra ?? [];
+      if ((input.extraTotals?.length ?? 0) > extraParts.length) {
+        const message = "More part totals than the card has";
+        throw invalid(message, [{ path: ["extraTotals"], message }]);
+      }
+      input.targets.forEach((t, i) => {
+        if ((t.extraMultipliers?.length ?? 0) > extraParts.length) {
+          const message = "More part multipliers than the card has";
+          throw invalid(message, [{ path: ["targets", i, "extraMultipliers"], message }]);
+        }
+      });
       // FR-CBT-34: every target active and non-removed, checked before anything is written.
       const targets = input.targets.map((t) => ({ ...t, c: activeCombatant(env, t.targetId).c }));
       const attacker = getCombatant(env.tx, enc.campaignId, p.attackerId);
@@ -176,6 +191,11 @@ export const applyCardWith = (hooks: ApplyHooks) =>
       // summed into the base), so an unedited effect-modified total never reads as "DM set".
       const toHitRolled = toHitRoll ? rolledOf(toHitRoll.total, p.toHit) : null;
       const damageRolled = damageRoll ? rolledOf(damageRoll.total, p.damage) : null;
+      // FR-CBT-82: each part's rolled value from its roll row; the DM's value, else rolled.
+      const extras = extraParts.map((x, i) => {
+        const r = cardRoll(env, x.rollId);
+        return { type: x.type, roll: r, rolled: r.total, total: input.extraTotals?.[i] ?? r.total };
+      });
       // FR-MOD-20: the DM line names every part (from the roll line's `dmPayload`).
       const toHitNames = p.toHit?.mods ? dmModNames(env, p.toHit.rollId) : null;
       const damageNames = p.damage?.mods ? dmModNames(env, p.damage.rollId) : null;
@@ -213,14 +233,37 @@ export const applyCardWith = (hooks: ApplyHooks) =>
               },
             }
           : {}),
+        // FR-CBT-84: the extra parts' dice stay DM-only (rulings B4).
+        ...(extras.length
+          ? {
+              extra: extras.map((x) => ({
+                type: x.type,
+                expression: x.roll.expression,
+                dice: x.roll.dice,
+                constant: x.roll.constant,
+                rolled: x.rolled,
+                ...(x.total !== x.rolled ? { set: true as const } : {}),
+              })),
+            }
+          : {}),
       };
       const playerCard = card.audience === "player";
-      const rollIds = [...cardRollIds(p.toHit), ...cardRollIds(p.damage)];
+      const rollIds = [
+        ...cardRollIds(p.toHit),
+        ...cardRollIds(p.damage),
+        ...extraParts.map((x) => x.rollId),
+      ];
       const hpChangeIds: string[] = [];
       const outcomes: DamageCardTargetOutcome[] = [];
       for (const { c: target, ...targetInput } of targets) {
         const { hit, multiplier } = targetInput;
-        const weaponRaw = rawDamage(hit, damageTotal, multiplier);
+        // FR-CBT-82: raw = floor(base × m) + Σ floor(extra_i × m_i); a miss lands nothing.
+        const parts = extras.map((x, i) => {
+          const m = targetInput.extraMultipliers?.[i] ?? multiplier;
+          return { ...x, multiplier: m, raw: rawDamage(hit, x.total, m) };
+        });
+        const weaponRaw =
+          rawDamage(hit, damageTotal, multiplier) + parts.reduce((s, x) => s + x.raw, 0);
         // Allocated first: effects ended `down` point at this row (FR-CBTX-16, -22), and the apply
         // hooks name it (FR-MOD-38).
         const hpChangeId = env.ctx.ids.next();
@@ -271,6 +314,16 @@ export const applyCardWith = (hooks: ApplyHooks) =>
           crit: p.crit,
           manual,
           ...(hooked.parts.length ? { parts: hooked.parts } : {}),
+          // FR-CBT-84: the extra parts after their multiplier (public, like the damage).
+          ...(hit && parts.length
+            ? {
+                damageParts: parts.map((x) => ({
+                  type: x.type,
+                  value: x.raw,
+                  ...(x.multiplier !== "normal" ? { multiplier: x.multiplier } : {}),
+                })),
+              }
+            : {}),
         };
         const dmPayload: AttackLogDmPayload = {
           targetAc,
@@ -332,7 +385,24 @@ export const applyCardWith = (hooks: ApplyHooks) =>
           hpAfter: hp.hpAfter,
           ...playFacts(hp),
         };
-        const row = insertHpChange(env, hpChangeId, facts, entry.id, hooked.triggerParts);
+        // FR-CBT-84: hp_change `damageParts` (DM, stats); `raw` above keeps the whole amount.
+        const damageParts = parts.length
+          ? parts.map((x) => ({
+              type: x.type,
+              rolled: x.rolled,
+              total: x.total,
+              multiplier: x.multiplier,
+              raw: x.raw,
+            }))
+          : null;
+        const row = insertHpChange(
+          env,
+          hpChangeId,
+          facts,
+          entry.id,
+          hooked.triggerParts,
+          damageParts,
+        );
         emitWithCards(env, AttackApplied.type, hp, row, facts, [entry, ...hooked.changes]);
         hpChangeIds.push(row.id);
         // #138: the rolling player sees each outcome; a hidden target's name never. FR-CBTX-15:

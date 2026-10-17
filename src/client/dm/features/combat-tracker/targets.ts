@@ -4,8 +4,14 @@
 // started encounter, not the attacker. Client memory only; the server re-checks on apply.
 import { absorb } from "@shared/combat-extras/rules";
 import { naturalMark, publicRuling } from "@shared/combat-tracker/log-kinds";
-import { clampHp, hitHint, undoGroup } from "@shared/combat-tracker/rules";
-import { APPLY_TARGETS_MAX, type HpChangeRecord } from "@shared/combat-tracker/schemas";
+import { clampHp, hitHint, rawDamage, undoGroup } from "@shared/combat-tracker/rules";
+import {
+  APPLY_TARGETS_MAX,
+  type DamageMultiplier,
+  type HpChangeRecord,
+} from "@shared/combat-tracker/schemas";
+import type { ModEffect } from "@shared/effect-modifiers/rules";
+import { defensePreset, type TargetLike } from "@shared/effect-modifiers/target-facts";
 
 export interface TargetCandidate {
   id: string;
@@ -212,4 +218,45 @@ export function applyReady(
 ): boolean {
   if (hits.length === 0 || tooMany) return false;
   return damageTotal !== null || hits.every((h) => !h);
+}
+
+// ---------- weapon damage parts (FR-CBT-82, FR-MOD-58; sprint 4) ----------
+
+/** An extra part's preset on one target row: its multiplier and the defense hint behind it. */
+export interface PartPreset {
+  multiplier: DamageMultiplier;
+  /** "Half (Fire Ward)"; null = no defense applies (Normal). */
+  hint: string | null;
+}
+
+/**
+ * FR-MOD-58: each extra part's multiplier preset from the target's defenses for that part's own
+ * type (`defensePreset`: resistance Half, immunity None, vulnerability Double, both Normal);
+ * none → Normal. The base part keeps the row's preset (the card's `damageType`).
+ */
+export function extraPartPresets(
+  effects: readonly ModEffect[],
+  target: TargetLike,
+  types: readonly string[],
+): PartPreset[] {
+  return types.map((type) => {
+    const d = defensePreset(effects, target, type);
+    return { multiplier: d?.multiplier ?? "normal", hint: d?.hint ?? null };
+  });
+}
+
+/**
+ * FR-CBT-82: a row's weapon damage: floor(base × m) + Σ floor(part_i × m_i); a miss → 0 (the
+ * server decides at apply; this is the preview).
+ */
+export function weaponRaw(
+  hit: boolean,
+  base: number,
+  multiplier: DamageMultiplier,
+  parts: readonly { total: number; multiplier: DamageMultiplier }[],
+): number {
+  return parts.reduce(
+    (s, x) => s + rawDamage(hit, x.total, x.multiplier),
+    rawDamage(hit, base, multiplier),
+  );
 }

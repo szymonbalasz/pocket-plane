@@ -10,7 +10,9 @@
 // Popup parts (FR-MOD-39, ADR-0043): every `popupParts` line renders under each target row and
 // merges its share into that row's apply entry. Effect modifiers tier 2 (FR-MOD-24, -25): Hit is
 // preset vs the effective AC (AC cell with its parts) and the multiplier from the target's
-// defenses against the card's damage type.
+// defenses against the card's damage type. Weapon damage parts (FR-CBT-82, FR-MOD-58; sprint 4):
+// each extra part's total is editable beside the base part's, and every target row gets one chip
+// per extra part with its own multiplier, preset from the target's defenses for that part's type.
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
@@ -82,6 +84,7 @@ import {
   applyReady,
   cardShape,
   eligibleTargets,
+  extraPartPresets,
   type HpTemp,
   naturalContradiction,
   previewText,
@@ -89,6 +92,7 @@ import {
   shownTotal,
   targetList,
   totalOf,
+  weaponRaw,
 } from "./targets";
 
 const MULTS: DamageMultiplier[] = ["normal", "half", "none", "double"];
@@ -207,6 +211,65 @@ interface PerTarget {
   /** Toggled hit; null = follow the preset. */
   hit: boolean | null;
   mult: DamageMultiplier;
+  /** FR-CBT-82: each extra part's picked multiplier; null / absent = its defense preset. */
+  extra?: (DamageMultiplier | null)[];
+}
+
+/** FR-CBT-82: one extra part's multiplier chip under a target row ("fire" + Half (Fire Ward)). */
+function PartChip({
+  targetId,
+  index,
+  type,
+  value,
+  hint,
+  onChange,
+}: {
+  targetId: string;
+  index: number;
+  type: string;
+  value: DamageMultiplier;
+  hint: string | null;
+  onChange(m: DamageMultiplier): void;
+}) {
+  return (
+    <div
+      data-testid="cbt-popup-target-part"
+      data-record-id={targetId}
+      data-value={index}
+      className="flex flex-wrap items-center gap-1.5 rounded-md border border-dashed px-1.5 py-0.5 text-xs"
+    >
+      <span className="font-medium">{type}</span>
+      <ToggleGroup
+        type="single"
+        data-testid="cbt-popup-target-part-mult"
+        data-record-id={targetId}
+        data-value={value}
+        value={value}
+        onValueChange={(v) => v && onChange(v as DamageMultiplier)}
+      >
+        {MULTS.map((m) => (
+          <ToggleGroupItem
+            key={m}
+            value={m}
+            className="h-5 px-1 text-xs"
+            data-testid="cbt-popup-target-part-mult-option"
+            data-value={m}
+          >
+            {MULTIPLIER_LABEL[m]}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+      {hint && (
+        <span
+          data-testid="mod-popup-part-defense"
+          data-value={index}
+          className="text-amber-500 dark:text-amber-400"
+        >
+          {hint}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function PopupBody({ card, close }: { card: NotificationRecord; close(): void }) {
@@ -219,6 +282,8 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   // Null = follow the card's rolled value (a Damage attaching while open fills the cell).
   const [toHitDraft, setToHit] = useState<string | null>(null);
   const [damageDraft, setDamage] = useState<string | null>(null);
+  // FR-CBT-82: the extra parts' typed totals, card order (null = follow the roll).
+  const [extraDrafts, setExtraDrafts] = useState<(string | null)[]>([]);
   const [added, setAdded] = useState<string[]>([]);
   const [per, setPer] = useState<Record<string, PerTarget>>({});
   // Popup parts' values, one per line (client memory; lost on close).
@@ -262,6 +327,10 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   const natural = naturalMark(rolledNatural);
   // An empty / non-number cell falls back to the roll; none yet → null (FR-CBT-72).
   const damageTotal = totalOf(damage) ?? p.damage?.total ?? null;
+  // FR-CBT-82: each extra part's total (an empty / non-number cell falls back to the roll).
+  const extraParts = p.damage?.extra ?? [];
+  const extraShown = extraParts.map((x, i) => shownTotal(extraDrafts[i] ?? null, x.total));
+  const extraTotals = extraParts.map((x, i) => totalOf(extraShown[i] as string) ?? x.total);
   const base = list.rows.map(({ c, source }) => {
     const ac = acOf(c, defs);
     // FR-MOD-24, -25: Hit vs the effective AC; the multiplier preset from the target's defenses.
@@ -269,10 +338,40 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
     const preset = rowPreset(shape, rolledNatural, toHitTotal, facts.ac?.value ?? ac);
     const st = per[c.id] ?? { hit: null, mult: presetMultiplier(facts) };
     const hit = st.hit ?? preset;
-    const raw = damageTotal === null ? null : rawDamage(hit, damageTotal, st.mult);
+    // FR-MOD-58: each extra part preset from the target's defenses for its own type.
+    const target = { id: c.id, kind: c.kind, entityId: c.entityId ?? null };
+    const presets = extraPartPresets(
+      effects,
+      target,
+      extraParts.map((x) => x.type),
+    );
+    const extraMults = presets.map((pr, i) => st.extra?.[i] ?? pr.multiplier);
+    const parts = extraTotals.map((total, i) => ({
+      total,
+      multiplier: extraMults[i] as DamageMultiplier,
+    }));
+    const raw =
+      damageTotal === null
+        ? null
+        : parts.length
+          ? weaponRaw(hit, damageTotal, st.mult, parts)
+          : rawDamage(hit, damageTotal, st.mult);
     const hp = hpOf(c, defs);
     const contra = naturalContradiction(rolledNatural, hit);
-    return { c, source, ac, facts, preset, hit, mult: st.mult, raw, hp, contra };
+    return {
+      c,
+      source,
+      ac,
+      facts,
+      preset,
+      hit,
+      mult: st.mult,
+      raw,
+      hp,
+      contra,
+      presets,
+      extraMults,
+    };
   });
   const views: PopupRowView[] = base.map((x) => ({
     targetId: x.c.id,
@@ -320,11 +419,14 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
         cardId: card.id,
         ...(p.toHit ? { toHitTotal } : {}),
         ...(damageTotal !== null ? { damageTotal } : {}),
+        // FR-CBT-82: the extra parts' values and each row's part multipliers, card order.
+        ...(extraTotals.length ? { extraTotals } : {}),
         targets: rows.map((x) => ({
           ...partInputs(popupParts, partValues, x.view, views, p),
           targetId: x.c.id,
           hit: x.hit,
           multiplier: x.mult,
+          ...(x.extraMults.length ? { extraMultipliers: x.extraMults } : {}),
         })),
       });
       // FR-CBT-54: closing clears the map selection (popup-store).
@@ -411,6 +513,12 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
               </span>
             )}
             {p.damageType ? ` ${p.damageType}` : ""}
+            {extraParts.length > 0 && (
+              // FR-CBT-82: "15 slashing + 8 fire".
+              <span className="font-normal text-muted-foreground">
+                {extraParts.map((x, i) => ` + ${extraTotals[i]} ${x.type}`).join("")}
+              </span>
+            )}
             {p.damage && damageTotal !== p.damage.total && (
               <>
                 <Badge variant="secondary">edited</Badge>
@@ -427,6 +535,34 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
             value={damage}
             onChange={(e) => setDamage(e.target.value)}
           />
+          {extraParts.map((x, i) => (
+            // FR-CBT-82: each extra part's total, editable like the base part's.
+            // biome-ignore lint/suspicious/noArrayIndexKey: parts are the card's, in order
+            <div key={i} className="flex items-center gap-1.5">
+              <Label htmlFor={`cbt-popup-damage-part-${i + 1}`} className="w-14 text-xs">
+                + {x.type}
+              </Label>
+              <Input
+                id={`cbt-popup-damage-part-${i + 1}`}
+                data-testid="cbt-popup-damage-part"
+                data-value={i + 1}
+                inputMode="numeric"
+                className="h-7"
+                value={extraShown[i]}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setExtraDrafts((d) => {
+                    const next = [...d];
+                    next[i] = v;
+                    return next;
+                  });
+                }}
+              />
+              {extraTotals[i] !== x.total && (
+                <span className="text-xs text-muted-foreground">rolled {x.total}</span>
+              )}
+            </div>
+          ))}
           {p.saveDc && (
             <p className="text-xs text-muted-foreground">
               DC {p.saveDc.dc} {p.saveDc.ability.toUpperCase()} · Half on a successful save
@@ -541,6 +677,25 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                         : `${x.c.name}: ${x.raw}`}
                   </span>
                 </div>
+                {x.hit && extraParts.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {extraParts.map((part, i) => (
+                      <PartChip
+                        // biome-ignore lint/suspicious/noArrayIndexKey: parts are the card's, in order
+                        key={i}
+                        targetId={x.c.id}
+                        index={i}
+                        type={part.type}
+                        value={x.extraMults[i] as DamageMultiplier}
+                        hint={x.presets[i]?.hint ?? null}
+                        onChange={(m) => {
+                          const extra = x.extraMults.map((v, j) => (j === i ? m : v));
+                          setRow(x.c.id, { extra });
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
                 {popupParts.map((part) => (
                   <part.Chips
                     key={part.id}

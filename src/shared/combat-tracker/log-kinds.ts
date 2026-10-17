@@ -146,6 +146,24 @@ export const AttackLogRolls = z.strictObject({
       crit: z.boolean(),
     })
     .optional(),
+  /**
+   * FR-CBT-84 (sprint 4): the extra weapon parts' rolls (card order), DM-only like the base
+   * part's dice (rulings B4): `rolled` = dice + constant, `set` = the DM edited the value.
+   */
+  extra: z
+    .array(
+      z.strictObject({
+        type: PartDamageType,
+        expression: z.string().max(80),
+        dice: CompactDice,
+        constant: z.int(),
+        rolled: z.int(),
+        set: z.literal(true).optional(),
+      }),
+    )
+    .min(1)
+    .max(EXTRA_DAMAGE_MAX)
+    .optional(),
 });
 export type AttackLogRolls = z.infer<typeof AttackLogRolls>;
 
@@ -181,6 +199,15 @@ export const AttackLogDmPayload = z.strictObject({
   parts: z.array(AttackLineDmPart).min(1).max(TRIGGER_PARTS_MAX).optional(),
   acMods: z.array(AcModPart).min(1).max(6).optional(),
   defense: DefenseFact.optional(),
+  /**
+   * FR-MOD-58 (sprint 4): the defense preset behind each extra part's multiplier, by type (only
+   * the parts a defense applies to). Absent = none.
+   */
+  extraDefense: z
+    .array(DefenseFact.extend({ type: PartDamageType }))
+    .min(1)
+    .max(EXTRA_DAMAGE_MAX)
+    .optional(),
 });
 export type AttackLogDmPayload = z.infer<typeof AttackLogDmPayload>;
 
@@ -223,7 +250,10 @@ export function publicRuling(natural: number | null, hit: boolean): boolean {
 /**
  * "6 slashing damage (half)", then the DM's "(DM set; rolled 4)" / dice breakdown; rule-trigger
  * parts after it (FR-MOD-48, R7): "14 slashing damage + 6 radiant (Divine Fury)" (`damage` =
- * weapon + parts, so the weapon's share is `damage` − Σ parts).
+ * weapon + parts, so the weapon's share is `damage` − Σ parts). FR-CBT-84 (sprint 4): extra
+ * weapon parts after the base part, each with its own multiplier, then "damage": "15 slashing +
+ * 4 fire (half) damage + 6 radiant (Divine Fury)"; the DM's line adds each part's "DM set" and
+ * dice after it (players get no extra-part dice, rulings B4).
  */
 function damageSegments(
   p: AttackLogPayload,
@@ -231,18 +261,41 @@ function damageSegments(
   suffix: string,
 ): LineSegment[] {
   const type = p.damageType ? ` ${p.damageType}` : "";
-  const weapon = p.damage - (p.parts ?? []).reduce((s, x) => s + x.value, 0);
-  const out: LineSegment[] = [
-    { text: `${weapon}${type} damage${MULT_TEXT[p.multiplier]}${suffix}` },
-  ];
+  const extra = p.damageParts ?? [];
+  const sum = (xs: readonly { value: number }[]) => xs.reduce((s, x) => s + x.value, 0);
+  const weapon = p.damage - sum(p.parts ?? []) - sum(extra);
+  const baseDm: LineSegment[] = [];
   if (dm?.overrides.damage) {
     const rolled = dm.damageRolled === null ? "" : `; rolled ${dm.damageRolled}`;
-    out.push({ text: ` (DM set${rolled})`, style: "muted" });
+    baseDm.push({ text: ` (DM set${rolled})`, style: "muted" });
   }
-  if (dm?.rolls?.damage) out.push(...rollBreakdownSegments(dm.rolls.damage));
-  if (dm?.mods?.damage) out.push(...modSegments(dm.mods.damage));
+  if (dm?.rolls?.damage) baseDm.push(...rollBreakdownSegments(dm.rolls.damage));
+  if (dm?.mods?.damage) baseDm.push(...modSegments(dm.mods.damage));
+  const out: LineSegment[] = [];
+  if (extra.length === 0) {
+    out.push({ text: `${weapon}${type} damage${MULT_TEXT[p.multiplier]}${suffix}` }, ...baseDm);
+  } else {
+    out.push({ text: `${weapon}${type}${MULT_TEXT[p.multiplier]}` }, ...baseDm);
+    extra.forEach((x, i) => {
+      out.push({ text: ` + ${x.value} ${x.type}${MULT_TEXT[x.multiplier ?? "normal"]}` });
+      const r = dm?.rolls?.extra?.[i];
+      if (r?.set) out.push({ text: ` (DM set; rolled ${r.rolled})`, style: "muted" });
+      if (r) out.push(...rollBreakdownSegments(r));
+    });
+    out.push({ text: ` damage${suffix}` });
+  }
   out.push(...linePartSegments(p.parts, dm?.parts, p.damageType));
   return out;
+}
+
+/**
+ * FR-CBT-85 (BL-10, #245): the players' hit / miss words credit the DM on every line, ruled or
+ * not (a ruling against a non-natural roll stays DM-only, #178 G8); the DM's line keeps its own.
+ */
+function outcomeText(hit: boolean, crit: boolean, ruled: boolean, dmView: boolean): string {
+  if (ruled) return hit ? " — DM ruled hit " : " — DM ruled miss";
+  if (dmView) return hit ? (crit ? " — critical hit! " : " — hit! ") : " — miss";
+  return hit ? (crit ? " — DM: critical hit! " : " — DM: hit. ") : " — DM: miss";
 }
 
 /**
@@ -254,7 +307,8 @@ function damageSegments(
  * a miss reads as any miss. DM only (FR-CBT-53 b, c; FR-DICE-28: built from `dmPayload` alone):
  * "(DM set; rolled 13)" after an edited total, kept / dropped d20s and the damage dice in a muted
  * run, "vs AC 15", and "— DM ruled hit" / "— DM ruled miss" when the DM overrode the hit of any
- * other roll.
+ * other roll. Players (FR-CBT-85, BL-10) read "— DM: hit." / "— DM: miss" / "— DM: critical hit!"
+ * in place of the DM's "— hit!" / "— miss" / "— critical hit!".
  */
 export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof AttackLogDmPayload>>({
   kind: LOG_KIND_ATTACK,
@@ -298,13 +352,11 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
       out.push({ text: ` vs AC ${dm.targetAc}` });
     }
     const ruled = dm?.overrides.hit === true || publicRuling(t.natural, p.hit);
+    out.push({ text: outcomeText(p.hit, p.crit, ruled, !!dm) });
     if (p.hit) {
-      out.push({ text: ruled ? " — DM ruled hit " : p.crit ? " — critical hit! " : " — hit! " });
       out.push(...damageSegments(p, dm, ""));
       if (damageBadge) out.push(...PHYSICAL);
       out.push(...absorbedSegments(dm));
-    } else {
-      out.push({ text: ruled ? " — DM ruled miss" : " — miss" });
     }
     return out;
   },

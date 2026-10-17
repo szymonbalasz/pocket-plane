@@ -4,7 +4,9 @@ import { LABEL_MAX, RollLabel } from "@shared/dice-roll-log/schemas";
 import {
   abilityBlock,
   attackLine,
+  attackNumbers,
   attackRollSpecs,
+  baseDamage,
   characterRolls,
   clampHp,
   eligibleCharacters,
@@ -18,6 +20,7 @@ import {
   selectCharacter,
   signed,
   speedText,
+  withDamageBonus,
 } from "./logic";
 import { CharAdjustHpIntent, SheetRollIntent } from "./schemas";
 import type { SpellRow } from "./sheet";
@@ -314,19 +317,27 @@ describe("FR-CHARX-24 resolveSheetAttack (combat's sheetAttack)", () => {
     ],
   };
 
+  const plain = { bonus: 0, extraDamage: [] };
+
   test("FR-CHARX-24 no ref = first attack; attackId = that row; spellId = spell attack bonus + damage", () => {
     expect(resolveSheetAttack(stats, sheet, {})).toEqual({
       ok: true,
-      attack: { name: "Mace", toHit: 2, damage: "1d6", damageType: null },
+      attack: { name: "Mace", toHit: 2, damage: "1d6", damageType: null, ...plain },
     });
     expect(resolveSheetAttack(stats, sheet, { attackId: "a2" })).toEqual({
       ok: true,
-      attack: { name: "Light crossbow", toHit: 4, damage: "1d8+2", damageType: "piercing" },
+      attack: {
+        name: "Light crossbow",
+        toHit: 4,
+        damage: "1d8+2",
+        damageType: "piercing",
+        ...plain,
+      },
     });
     // WIS 16 (+3) + PB 2.
     expect(resolveSheetAttack(stats, sheet, { spellId: "bolt" })).toEqual({
       ok: true,
-      attack: { name: "bolt", toHit: 5, damage: "4d6", damageType: "radiant" },
+      attack: { name: "bolt", toHit: 5, damage: "4d6", damageType: "radiant", ...plain },
     });
   });
 
@@ -348,7 +359,13 @@ describe("FR-CHARX-24 resolveSheetAttack (combat's sheetAttack)", () => {
 
   test("FR-CHAR-05 attackRollSpecs: to-hit (d20, attack) then damage, labels as char.roll's", () => {
     expect(
-      attackRollSpecs({ name: "Guiding Bolt", toHit: 5, damage: "4d6", damageType: "radiant" }),
+      attackRollSpecs({
+        name: "Guiding Bolt",
+        toHit: 5,
+        damage: "4d6",
+        damageType: "radiant",
+        ...plain,
+      }),
     ).toEqual([
       { expression: "1d20+5", category: "attack", label: "Guiding Bolt attack", d20: true },
       {
@@ -358,5 +375,115 @@ describe("FR-CHARX-24 resolveSheetAttack (combat's sheetAttack)", () => {
         d20: false,
       },
     ]);
+  });
+});
+
+describe("FR-CHARX-55 rolls with parts (magic weapon rows)", () => {
+  const flame = {
+    id: "ft",
+    name: "Flame Tongue greatsword",
+    toHit: 7,
+    damage: "2d6+4",
+    damageType: "slashing" as const,
+    bonus: 1,
+    extraDamage: [{ damage: "2d6", type: "fire" as const }],
+  };
+  const stats = {
+    initBonus: 0,
+    level: 1,
+    attacks: [{ id: "ga", name: "Greataxe", toHit: 5, damage: "1d12+3" }, flame],
+  };
+
+  test("FR-CHARX-55 +1 to hit and damage: 1d20+8, 2d6+5 slashing + 2d6 fire, typed parts", () => {
+    const r = characterRolls(stats, null, "attack", { attackId: "ft" });
+    expect(r).toEqual({
+      ok: true,
+      specs: [
+        {
+          expression: "1d20+8",
+          category: "attack",
+          label: "Flame Tongue greatsword attack",
+          d20: true,
+        },
+        {
+          expression: "2d6+5",
+          category: "damage",
+          label: "Flame Tongue greatsword damage (slashing)",
+          d20: false,
+          part: { type: "slashing", extra: false },
+        },
+        {
+          expression: "2d6",
+          category: "damage",
+          label: "Flame Tongue greatsword damage (fire)",
+          d20: false,
+          part: { type: "fire", extra: true },
+        },
+      ],
+    });
+    // Manual counts: Damage 1 + n, Attack + damage 2 + n, Attack 1.
+    const n = (kind: "damage" | "toHit" | "attack") => {
+      const x = characterRolls(stats, null, kind, { attackId: "ft" });
+      return x.ok ? x.specs.map((s) => s.expression) : x;
+    };
+    expect(n("damage")).toEqual(["2d6+5", "2d6"]);
+    expect(n("toHit")).toEqual(["1d20+8"]);
+    expect(n("attack")).toHaveLength(3);
+  });
+
+  test("FR-CHARX-55 rows without the fields build the same specs as before (no part)", () => {
+    const r = characterRolls(stats, null, "attack", { attackId: "ga" });
+    expect(r.ok && r.specs.map((s) => [s.expression, "part" in s])).toEqual([
+      ["1d20+5", false],
+      ["1d12+3", false],
+    ]);
+    // bonus without extra parts: folded in, still one damage roll, no part marker.
+    const plus2 = { ...flame, bonus: 2, extraDamage: [] };
+    const specs = attackRollSpecs(plus2);
+    expect(specs.map((s) => s.expression)).toEqual(["1d20+9", "2d6+6"]);
+    expect(specs.some((s) => s.part)).toBe(false);
+    // an untyped base keeps `type: null`; two extras in row order.
+    const two = {
+      ...flame,
+      damageType: null,
+      bonus: 0,
+      extraDamage: [
+        { damage: "1d4", type: "cold" as const },
+        { damage: "6d12+10", type: "necrotic" as const },
+      ],
+    };
+    expect(attackRollSpecs(two).map((s) => [s.label, s.part?.type, s.part?.extra])).toEqual([
+      ["Flame Tongue greatsword attack", undefined, undefined],
+      ["Flame Tongue greatsword damage", null, false],
+      ["Flame Tongue greatsword damage (cold)", "cold", true],
+      ["Flame Tongue greatsword damage (necrotic)", "necrotic", true],
+    ]);
+  });
+
+  test("FR-CHARX-55 the bonus goes on the base part's constant; resolveSheetAttack carries the fields", () => {
+    expect(withDamageBonus("2d6+4", 1)).toBe("2d6+5");
+    expect(withDamageBonus("1d8", 3)).toBe("1d8+3");
+    expect(withDamageBonus("1d6-1", 1)).toBe("1d6");
+    expect(withDamageBonus("1d6-3", 1)).toBe("1d6-2");
+    expect(withDamageBonus("1d6+2", 0)).toBe("1d6+2");
+    const r = resolveSheetAttack(stats, null, { attackId: "ft" });
+    expect(r).toEqual({
+      ok: true,
+      attack: {
+        name: "Flame Tongue greatsword",
+        toHit: 7,
+        damage: "2d6+4",
+        damageType: "slashing",
+        bonus: 1,
+        extraDamage: [{ damage: "2d6", type: "fire" }],
+      },
+    });
+    expect(r.ok && baseDamage(r.attack)).toBe("2d6+5");
+  });
+
+  test("FR-CHARX-56 row numbers: bonus folded in, parts joined", () => {
+    expect(attackNumbers(flame)).toBe("+8 · 2d6+5 slashing + 2d6 fire");
+    expect(attackLine(flame)).toBe("Flame Tongue greatsword +8 · 2d6+5 slashing + 2d6 fire");
+    expect(attackNumbers({ name: "Club", toHit: -1, damage: "1d4", bonus: 1 })).toBe("+0 · 1d4+1");
   });
 });

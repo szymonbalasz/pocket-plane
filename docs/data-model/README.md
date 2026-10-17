@@ -1585,11 +1585,24 @@ From [scene-tools](../specs/scene-tools.md#8-data-model) sprint 4 (FR-SCN-20, -2
 - **Persisted runtime state:** unchanged (kept templates, their copies).
 - **CON-44** (#208; `src/server/features/scene-tools/con44.test.ts`, measured): realistic-heavy DM 671,095 B; the active battle scene filled to the cap (20 kept templates, 40-char labels) 676,425 B with integer fields → **676,555 B freeform** (+130 B over 17 freeform rows, 7.6 B per row; **372,021 B left of 1 MiB**). Players 282,260–285,490 B (19 visible templates; **238,798 B left of 512 KiB**). Battle scene load ack 43,249 B.
 
-## 53. Sprint 4: trigger state (S4-3)
+## 53. Sprint 4: weapon damage parts in combat (S4-1b)
 
-From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) (FR-MOD-53, -54); [ADR-0049](../architecture/adr/0049-trigger-state.md). **Built by `build/trigger-state`**: MOD now writes the `trigger_state` rows of [§51](#51-sprint-4-rules-core-s4-0); no schema change. Protocol side: [protocol §69](../protocol/README.md#69-sprint-4-trigger-state-s4-3).
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-81–84 and [effect-modifiers](../specs/effect-modifiers.md) FR-MOD-58. **Built by `build/weapon-combat`**; no table or column change (all fields from [§51](#51-sprint-4-rules-core-s4-0) are now written).
+
+| Leaf | Change | Visibility | Source |
+|---|---|---|---|
+| damage card payload | `damage.extra` written by `cbt.attack` / `cbt.rollDamage` (one per extra weapon part, row order); fit order to the 4 KB cap: offers, mod labels (12 chars), names (20 chars); parts never drop | as the card | FR-CBT-81 |
+| `game_log_entry.dmPayload` (`cbt.attack`) | + `rolls.extra?` ≤ 2 `{type, expression, dice ≤ 51 [value, kept], constant, rolled, set?}`; + `extraDefense?` ≤ 2 `{type, level, label ≤ 60}` | DM only | FR-CBT-84, FR-MOD-58 |
+| `game_log_entry.payload` (`cbt.attack`) | `damageParts` written on Hit lines with parts | public | FR-CBT-84 |
+| `hp_change.damage_parts` | written per target of a card with parts (`raw` 0 on a miss); null otherwise | DM only | FR-CBT-84 |
+
+- **Derived:** each extra part's popup preset (`extraPartPresets`: the target's defenses for the part's type). **CON-44:** no new record type; the worst card with 2 extra parts is measured in MOD's `con44.test.ts` (§51) and fitted by `fitCardPayload` (`card-fit.test.ts`).
+
+## 54. Sprint 4: trigger state (S4-3)
+
+From [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) (FR-MOD-53, -54); [ADR-0049](../architecture/adr/0049-trigger-state.md). **Built by `build/trigger-state`**: MOD now writes the `trigger_state` rows of [§51](#51-sprint-4-rules-core-s4-0); no schema change. Protocol side: [protocol §70](../protocol/README.md#70-sprint-4-trigger-state-s4-3).
 
 - **Rows:** one per (enabled trigger, owner combatant) of the started encounter: every active combatant (a removed one keeps its rows), a PC → its character's triggers, a monster → its definition's triggers, one row per combatant. `characterId` / `ownerPlayerId` copy the trigger's (null / null for monsters), `name` / `on` the trigger's.
 - **Derived:** `armed` = `requires` met by the owner's active effects (origin match, FR-MOD-36); `charge` = `waiting` while an `ownTurn` filter fails, else `used` iff a `used` `trigger_use` row holds the current window key of a `turn` / `round` / `encounter` trigger, else `ready`; `featureId` = `every.feature`.
-- **Written** only by `triggerStates` in the causing transaction (paths: protocol §69); `updatedAt` from `ctx.clock`, ids from `ctx.ids`. Deleted at End, with their trigger (listed before the FK cascade), never on combatant remove. Crash: rows commit with the use row / effect / turn they follow, or not at all.
+- **Written** only by `triggerStates` in the causing transaction (paths: protocol §70); `updatedAt` from `ctx.clock`, ids from `ctx.ids`. Deleted at End, with their trigger (listed before the FK cascade), never on combatant remove. Crash: rows commit with the use row / effect / turn they follow, or not at all.
 - **CON-44:** no new bytes beyond §51's measured rows (≤ 428 B/row). `rules-effects` vs `rule-triggers` with CJK names, every state row counted: DM +4,290 B (trigger-state 2,555), player-1 +1,920 B (1,234), player-2 +765 B (499); within MOD's bounds (192 KiB DM / 60 KiB per player).

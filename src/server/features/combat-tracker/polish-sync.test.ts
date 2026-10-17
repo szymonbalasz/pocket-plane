@@ -105,7 +105,7 @@ describe("polish over WS (mid-combat)", () => {
     );
     for (const c of [p1, p2]) {
       expect(attackLines(c).at(-1)).toBe(
-        "Mira attacks Goblin: 9 + 4 = 13 — hit! 6 piercing damage (physical)",
+        "Mira attacks Goblin: 9 + 4 = 13 — DM: hit. 6 piercing damage (physical)",
       );
     }
 

@@ -206,7 +206,7 @@ describe("FR-CBT-53 outcome line detail", () => {
       expect(data && "dmPayload" in data ? data.dmPayload : undefined).toBeUndefined();
       expect(data?.payload).toMatchObject({ manual: { toHit: true, damage: true } });
       expect(playerText(data)).toBe(
-        "Goblin attacks Mira: 9 + 4 = 13 — hit! 6 slashing damage (physical)",
+        "Goblin attacks Mira: 9 + 4 = 13 — DM: hit. 6 slashing damage (physical)",
       );
       const raw = JSON.stringify(data);
       for (const leak of ['"rolls"', "DM ruled", "DM set", "targetAc"]) {
@@ -221,7 +221,7 @@ describe("FR-CBT-53 outcome line detail", () => {
       "Goblin attacks Mira: 18 (DM set; rolled 13) vs AC 16 — hit! 9 slashing damage (DM set; rolled 6) (1d6+2: 4 + 2) (physical)",
     );
     expect(playerText(players[0])).toBe(
-      "Goblin attacks Mira: 18 — hit! 9 slashing damage (physical)",
+      "Goblin attacks Mira: 18 — DM: hit. 9 slashing damage (physical)",
     );
   });
 
