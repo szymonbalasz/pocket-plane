@@ -606,7 +606,16 @@ export function RollButton({
           {control.physical && <PhysicalMarker />}
         </Button>
       </PopoverAnchor>
-      <PopoverContent align="end" side="top" className="w-80">
+      {/* BL-19: focus moving out never closes the form. A menu item that rolls through an
+          invisible anchor (DM Initiative Attack ▸, Check ▸, Save ▸) closes its menu, which then
+          refocuses its trigger: that dismissed the form before anything was entered. A click
+          outside, Escape and Cancel still close it. */}
+      <PopoverContent
+        align="end"
+        side="top"
+        className="w-80"
+        onFocusOutside={(e) => e.preventDefault()}
+      >
         <ManualForm control={control} />
       </PopoverContent>
     </Popover>

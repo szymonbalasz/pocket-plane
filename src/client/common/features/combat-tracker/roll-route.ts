@@ -76,9 +76,9 @@ function attackDamagesOf(
 /**
  * FR-CBT-81 (sprint 4): the roll control's physical entries in spec order ([to-hit,] base,
  * extra parts…) as the combat intents take them: `manual` (+ `manualParts`) for the first `n`,
- * `manualExtra` for the extra parts.
+ * `manualExtra` for the extra parts. Also the DM Initiative row's Attack ▸ (BL-19).
  */
-function manualFields(input: { manual?: unknown[]; manualParts?: unknown[] }, n: number) {
+export function manualFields(input: { manual?: unknown[]; manualParts?: unknown[] }, n: number) {
   const extra = input.manual?.slice(n) ?? [];
   return {
     ...(input.manual ? { manual: n === 1 ? input.manual[0] : input.manual.slice(0, n) } : {}),
