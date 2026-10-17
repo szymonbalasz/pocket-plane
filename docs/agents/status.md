@@ -2,15 +2,17 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 3 done (recap #241–#244). **Sprint 4** planned in [sprint-4](sprint-4.md) (#243, #244); Phase A (specs) starts with the DM's kickoff prompt.
+**Phase:** **Sprint 4 Phase A (specs)** per [sprint-4](sprint-4.md) (#243, #244). Next: seams → two reviews → DM gate 1.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Sprint 3 recap with the DM | — | — | Duplicate-trigger fix merged (#241, #242) | DM: glitch list priorities, 3D dice on the table laptop, "hit!" copy (BL-10) |
-| Merged in sprint 3 | — | — | All slices + session-sim-7 bundle (#212–#240); backlog BL-02, 03, 04, 06, 08, 11, 12, 13, 14 | — |
-| Backlog (BL-nn) | — | — | Open: BL-01, 05, 07, 10, 15, 16 | After the recap |
+| V vision + fog spec | `spec/s4-vision` (w4Z) | spec-vision | Writing | Seams |
+| D animated dice spec | `spec/s4-dice` (w40) | spec-dice | Writing (+ library comparison) | Seams |
+| M map tools spec | `spec/s4-maptools` (w51) | spec-maptools | Writing | Seams |
+| R rules + effects spec | `spec/s4-rules` (w52) | spec-rules | Effects review, then spec | Seams |
+| C compendium spec | `spec/s4-compendium` | — | Queued (brief ready) | Starts when a slot frees |
 
 ## Shared-file locks
 
