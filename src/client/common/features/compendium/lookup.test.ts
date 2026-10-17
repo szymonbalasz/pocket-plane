@@ -1,5 +1,6 @@
-// FR-CMP-17: lookups merge store rows (customs, characters) with the server's imported monsters,
-// in FR-ENT-18 order, ranked by FR-CBT-63 (≤ 8); rows keep their shape, ids are definitions.
+// FR-CMP-17 / -37: lookups merge store rows (customs, characters) with the server's imported
+// monsters: shared name tier, then store before imported, then the server's order (≤ 8); rows
+// keep their shape, ids are definitions.
 import { describe, expect, test } from "bun:test";
 import type { EntrySummary } from "@shared/compendium/rest";
 import type { LookupRow } from "../combat-tracker/lookup";
@@ -26,7 +27,7 @@ const summary = (
 });
 
 describe("FR-CMP-17 creature lookup", () => {
-  test("FR-CMP-17 lookup merge: imported rows use the definition id; customs before imported on equal names; FR-CBT-63 tiers; ≤ 8", () => {
+  test("FR-CMP-17 FR-CMP-37 lookup merge: imported rows use the definition id; tier, then store before imported, then the server's order; ≤ 8", () => {
     const imported = importedLookupRows([
       summary("def-gob", "Goblin"),
       summary("def-hob", "Hobgoblin"),
@@ -59,5 +60,33 @@ describe("FR-CMP-17 creature lookup", () => {
     );
     expect(mergeLookup([], many, "wo")).toHaveLength(8);
     expect(mergeLookup(store, imported, "")).toEqual([]);
+    // Multi-word: every word must match a store or server row's name, any order.
+    expect(mergeLookup(store, imported, "boss gob").map((r) => r.id)).toEqual(["def-boss"]);
+    expect(mergeLookup(store, imported, "goblin elite").map((r) => r.id)).toEqual(["c-elite"]);
+    // A server row matching on its text only (no name tier) is not a suggestion.
+    const worg = importedLookupRows([summary("def-worg", "Worg")]);
+    expect(mergeLookup([], worg, "goblin")).toEqual([]);
+  });
+
+  test("FR-CMP-38 SRD Goblin above fixture Goblin in the lookup merge (server order kept on equal tiers)", () => {
+    const fromServer = importedLookupRows([
+      summary("srd-gob", "Goblin"),
+      { ...summary("fx-gob", "Goblin"), sourceLabel: "fixture" },
+      summary("srd-hob", "Hobgoblin"),
+    ]);
+    // "a-…" would sort first by id; the server's order (source rank) wins.
+    const store = [custom("a-sneak", "Goblin Sneak")];
+    expect(mergeLookup(store, fromServer, "gob").map((r) => [r.id, r.badge])).toEqual([
+      ["a-sneak", "Custom"],
+      ["srd-gob", "SRD"],
+      ["fx-gob", "Fixture"],
+      ["srd-hob", "SRD"],
+    ]);
+    expect(mergeLookup(store, fromServer, "goblin").map((r) => r.id)).toEqual([
+      "srd-gob",
+      "fx-gob",
+      "a-sneak",
+      "srd-hob",
+    ]);
   });
 });
