@@ -123,6 +123,27 @@ export function pressGoesToTool(
 }
 
 /**
+ * What a stage press does, decided in MapCanvas before any tool or Konva node sees it:
+ * `pan` = a middle-mouse pan starts; `ignore` = swallowed (a middle press during a left-button
+ * drag, OQ-MAP-45, or any press while a middle pan runs); `tool` = the active drawing tool's;
+ * `canvas` = MapCanvas's own select / ruler / ping / laser handling.
+ */
+export type PointerIntent = "pan" | "ignore" | "tool" | "canvas";
+
+/**
+ * FR-MAP-12 (sprint 4): the middle mouse (button 1) pans with every tool and never reaches one
+ * (`pressGoesToTool` stays left-only); ignored while the left button is down (`buttons` bit 1).
+ */
+export function pointerIntent(
+  def: CanvasToolDef | null,
+  e: { button: number; buttons: number; space: boolean; live: boolean; panning: boolean },
+): PointerIntent {
+  if (e.button === 1) return e.panning || (e.buttons & 1) !== 0 ? "ignore" : "pan";
+  if (e.panning) return "ignore";
+  return pressGoesToTool(def, e) ? "tool" : "canvas";
+}
+
+/**
  * FR-SCN-06: while a drawing tool is active, tokens take no left-press (no select, no
  * double-click, no drag); right-click menus still open.
  */

@@ -9,19 +9,36 @@ import {
   type Attack,
   DAMAGE_RE,
   DAMAGE_TYPES,
+  type ExtraDamage,
   SPELL_LEVELS,
   spellAttackBonus,
   spellSaveDc,
 } from "@shared/entities/schemas";
+import { useState } from "react";
+import { Button } from "../../components/ui/button";
+import { Badge, Input } from "../../components/ui/primitives";
 import { useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
 import { SheetRoll } from "./CharacterSheet";
-import { IntField, OverrideControl, SelectField, SheetField, TextField, useBusy } from "./fields";
+import {
+  IntField,
+  OverrideControl,
+  SELECT,
+  SelectField,
+  SheetField,
+  TextField,
+  useBusy,
+} from "./fields";
 import { type PublicOverrides, PublicSwitch, usePublicOverrides } from "./rolls";
 import { AddRow, RowTools, useRows } from "./rows";
 import { notationContext, useSheet, useSheetIntents } from "./sheet-context";
 import {
   attackButtons,
+  attackRowView,
+  canAddExtraPart,
+  type ExtraPartDraft,
+  extraPart,
+  MAGIC_OPTIONS,
   pipDelta,
   type RowRollButton,
   slotPips,
@@ -29,8 +46,6 @@ import {
   spellGroups,
   spellLevelLabel,
 } from "./view-model";
-
-const damageText = (damage: string, type?: string) => (type ? `${damage} ${type}` : damage);
 
 function DamageField({
   path,
@@ -103,6 +118,222 @@ function RowButtons({
   );
 }
 
+type PutAttack = (patch: Partial<Attack>) => Promise<unknown>;
+
+/** FR-CHARX-56: the Magic Select (none, +1 … +3); `data-value` = the stored bonus. */
+function MagicSelect({ a, put }: { a: Attack; put: PutAttack }) {
+  const live = useSync((s) => s.state === "live");
+  const busy = useBusy();
+  const bonus = a.bonus ?? 0;
+  return (
+    <select
+      data-testid="charx-attack-bonus"
+      data-value={bonus}
+      aria-label="Magic"
+      className={SELECT}
+      value={bonus}
+      disabled={!live || busy.busy || a.id === undefined}
+      onChange={(e) => {
+        const n = Number(e.target.value);
+        busy.run(() => put({ bonus: n > 0 ? n : undefined }));
+      }}
+    >
+      {MAGIC_OPTIONS.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/**
+ * FR-CHARX-56: one extra part in edit mode (`charx-attack-extra`, `data-value` = index): dice
+ * Input + type Select + delete. A new part (`part` null) stays local until both are valid (the
+ * FR-CHARX-54 mirror: inline "7d6" / no-type errors, nothing sent).
+ */
+function ExtraPartRow({
+  a,
+  index,
+  part,
+  parts,
+  commit,
+  onDone,
+}: {
+  a: Attack;
+  index: number;
+  part: ExtraDamage | null;
+  parts: readonly ExtraDamage[];
+  commit(next: ExtraDamage[]): Promise<unknown>;
+  onDone?: () => void;
+}) {
+  const live = useSync((s) => s.state === "live");
+  const busy = useBusy();
+  const [draft, setDraft] = useState<ExtraPartDraft>({ damage: "", type: null });
+  const [error, setError] = useState<string | null>(null);
+  const path = `attacks.${a.id}.extraDamage.${index}.damage`;
+  const tryAdd = (d: ExtraPartDraft) => {
+    setDraft(d);
+    if (d.damage.trim() === "") return setError(null);
+    const r = extraPart(d);
+    if ("error" in r) return setError(r.error);
+    setError(null);
+    busy.run(() => commit([...parts, r.part]).then(() => onDone?.()));
+  };
+  const set = (x: ExtraDamage) => parts.map((p, j) => (j === index ? x : p));
+  return (
+    <div
+      data-testid="charx-attack-extra"
+      data-value={index}
+      className="flex flex-wrap items-start gap-1 pl-2"
+    >
+      {part ? (
+        <SheetField<string>
+          path={path}
+          label="Extra damage"
+          placeholder="2d6"
+          value={part.damage}
+          inputClassName="w-20"
+          format={(v) => v}
+          parse={(t) => {
+            const r = extraPart({ damage: t, type: part.type });
+            return "error" in r ? { error: r.error } : { value: r.part.damage };
+          }}
+          commit={(damage) => commit(set({ ...part, damage }))}
+        />
+      ) : (
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <Input
+            data-testid="charx-field"
+            data-value={path}
+            aria-label="Extra damage"
+            aria-invalid={error !== null}
+            placeholder="2d6"
+            className="h-7 w-20 px-1.5 text-xs"
+            value={draft.damage}
+            disabled={!live || busy.busy}
+            onChange={(e) => setDraft({ ...draft, damage: e.target.value })}
+            onBlur={() => tryAdd(draft)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") tryAdd(draft);
+              if (e.key === "Escape") onDone?.();
+            }}
+          />
+          {error && (
+            <span data-testid="charx-attack-extra-error" className="text-[10px] text-destructive">
+              {error}
+            </span>
+          )}
+        </div>
+      )}
+      <select
+        data-testid="charx-attack-extra-type"
+        data-value={index}
+        aria-label="Extra damage type"
+        className={SELECT}
+        value={part?.type ?? draft.type ?? ""}
+        disabled={!live || busy.busy}
+        onChange={(e) => {
+          const type = e.target.value || null;
+          if (!part) return tryAdd({ ...draft, type });
+          const next = extraPart({ damage: part.damage, type });
+          if ("part" in next) busy.run(() => commit(set(next.part)));
+        }}
+      >
+        {!part && <option value="">Type…</option>}
+        {DAMAGE_TYPES.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+      </select>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-6"
+        data-testid="charx-attack-extra-delete"
+        data-value={index}
+        aria-label="Remove damage type"
+        disabled={!live || busy.busy}
+        onClick={() =>
+          part ? busy.run(() => commit(parts.filter((_, j) => j !== index))) : onDone?.()
+        }
+      >
+        ×
+      </Button>
+    </div>
+  );
+}
+
+/** FR-CHARX-56: the row's extra parts in edit mode + "Add damage type" (≤ 2, then disabled). */
+function ExtraParts({ a, put }: { a: Attack; put: PutAttack }) {
+  const live = useSync((s) => s.state === "live");
+  const [adding, setAdding] = useState(false);
+  const parts = a.extraDamage ?? [];
+  const commit = (next: ExtraDamage[]) => put({ extraDamage: next.length > 0 ? next : undefined });
+  return (
+    <div className="flex flex-col gap-1">
+      {parts.map((p, i) => (
+        <ExtraPartRow
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts are positional (no ids).
+          key={i}
+          a={a}
+          index={i}
+          part={p}
+          parts={parts}
+          commit={commit}
+        />
+      ))}
+      {adding && (
+        <ExtraPartRow
+          a={a}
+          index={parts.length}
+          part={null}
+          parts={parts}
+          commit={commit}
+          onDone={() => setAdding(false)}
+        />
+      )}
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 w-fit px-2 text-xs"
+        data-testid="charx-attack-extra-add"
+        disabled={!live || adding || !canAddExtraPart(a) || a.id === undefined}
+        onClick={() => setAdding(true)}
+      >
+        Add damage type
+      </Button>
+    </div>
+  );
+}
+
+/** FR-CHARX-56: view mode: name + "+1" Badge, then "+8 · 2d6+5 slashing + 2d6 fire". */
+function AttackLine({ a }: { a: Attack }) {
+  const v = attackRowView(a);
+  return (
+    <div className="flex flex-col text-sm">
+      <span className="flex items-center gap-1.5">
+        {v.name}{" "}
+        {v.badge && (
+          <Badge data-testid="charx-attack-bonus" data-value={a.bonus} variant="secondary">
+            {v.badge}
+          </Badge>
+        )}
+      </span>
+      <span data-testid="charx-attack-numbers" className="text-muted-foreground">
+        {v.parts.map((p, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts are positional.
+          <span key={i} className="whitespace-nowrap">
+            {i > 0 ? " " : ""}
+            {p}
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
 function AttackRow({
   a,
   index,
@@ -160,15 +391,14 @@ function AttackRow({
             options={typeOptions}
             commit={(t) => put({ damageType: t ?? undefined })}
           />
+          <MagicSelect a={a} put={put} />
           <RowTools list="attacks" rowId={a.id} index={index} count={count} />
+          <div className="basis-full">
+            <ExtraParts a={a} put={put} />
+          </div>
         </div>
       ) : (
-        <span className="text-sm">
-          {a.name}{" "}
-          <span className="text-muted-foreground">
-            {signed(a.toHit)} · {damageText(a.damage, a.damageType)}
-          </span>
-        </span>
+        <AttackLine a={a} />
       )}
       <RowButtons
         buttons={attackButtons()}

@@ -314,3 +314,88 @@ describe("FR-DICE-36 sources", () => {
     expect(dice(roll.segments)).toEqual([{ faces: 20, value: 12, kept: true }]);
   });
 });
+
+describe("FR-CHARX-55 weapon damage parts on the roll line", () => {
+  const base = item({
+    rollId: "b",
+    expression: "2d6+5",
+    dice: [
+      { faces: 6, value: 3, kept: true },
+      { faces: 6, value: 5, kept: true },
+    ],
+    constant: 5,
+    total: 13,
+    natural: null,
+    label: "Flame Tongue greatsword damage (slashing)",
+  });
+  const fire = item({
+    rollId: "f",
+    expression: "2d6",
+    dice: [
+      { faces: 6, value: 2, kept: true },
+      { faces: 6, value: 6, kept: true },
+    ],
+    constant: 0,
+    total: 8,
+    natural: null,
+    label: "Flame Tongue greatsword damage (fire)",
+  });
+  const line = (payload: RollPayloadItem[], dmPayload: unknown = null) =>
+    lineText(
+      formatEntry({ kind: "roll", actorName: "Brakka", category: "damage", payload, dmPayload })
+        .segments,
+    );
+  const parted = [
+    { ...base, part: { type: "slashing" as const, extra: false } },
+    { ...fire, part: { type: "fire" as const, extra: true } },
+  ];
+
+  test("FR-CHARX-55 +1 to hit and damage: parts merge into one run with one total", () => {
+    expect(line(parted)).toBe(
+      "Brakka — Flame Tongue greatsword damage: 2d6+5 (3 + 5) slashing + 2d6 (2 + 6) fire = 21",
+    );
+    const segs = formatEntry({
+      kind: "roll",
+      actorName: "Brakka",
+      category: "damage",
+      payload: parted,
+      dmPayload: null,
+    }).segments;
+    // One die segment per die of every part (seams S8).
+    expect(dice(segs).map((d) => d?.value)).toEqual([3, 5, 2, 6]);
+  });
+
+  test("FR-CHARX-55 to-hit stays its own run; mods sit on the base part; physical marks the run", () => {
+    const hit = item({
+      label: "Flame Tongue greatsword attack",
+      expression: "1d20+8",
+      constant: 8,
+      total: 20,
+    });
+    const rage = {
+      ...parted[0],
+      mods: [{ label: "Rage", value: 2 }],
+      total: 15,
+      manual: true,
+    } as RollPayloadItem;
+    expect(line([hit, rage, parted[1] as RollPayloadItem])).toBe(
+      "Brakka — Flame Tongue greatsword attack: 12 + 8 = 20; Flame Tongue greatsword damage: " +
+        "2d6+5 (3 + 5) + 2 Rage slashing + 2d6 (2 + 6) fire = 23 (physical)",
+    );
+  });
+
+  test("FR-CHARX-55 rows without `part` render exactly as before", () => {
+    expect(line([base, fire])).toBe(
+      "Brakka — Flame Tongue greatsword damage (slashing): 3 + 5 + 5 = 13; " +
+        "Flame Tongue greatsword damage (fire): 2 + 6 = 8",
+    );
+    // A lone base part, or an extra part with no base before it, renders as a plain roll.
+    expect(line([parted[0] as RollPayloadItem])).toBe(line([base]));
+    expect(line([parted[1] as RollPayloadItem])).toBe(line([fire]));
+    // An untyped base keeps its label; a cut label ("…") stays as is.
+    const untyped = { ...parted[0], label: "Club damage", part: { type: null, extra: false } };
+    expect(line([untyped as RollPayloadItem, parted[1] as RollPayloadItem])).toBe(
+      "Brakka — Club damage: 2d6+5 (3 + 5) + 2d6 (2 + 6) fire = 21",
+    );
+  });
+});

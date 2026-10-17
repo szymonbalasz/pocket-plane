@@ -6,7 +6,7 @@
 import { distanceFt } from "@shared/scene-tools/geometry";
 import { cellToPx } from "@shared/scenes-map/geometry";
 import { useEffect, useState } from "react";
-import { Circle, Group, Label, Layer, Line, Rect, Tag, Text } from "react-konva";
+import { Circle, Group, Label, Line, Rect, Tag, Text } from "react-konva";
 import { useStore } from "zustand";
 import { diagonalRuleIn, rulerText } from "../../scene-tools/diagonal-rule";
 import { useCanvas } from "../canvas-context";
@@ -101,7 +101,7 @@ export function PointersLayer() {
   const accent = (role: "dm" | "player") => (role === "dm" ? colors.dmAccent : colors.playerAccent);
 
   return (
-    <Layer listening={false} name="pointers-layer">
+    <Group listening={false} name="pointers-layer">
       {st.drag && (
         <Group name="map-drag-target">
           <Rect
@@ -183,6 +183,6 @@ export function PointersLayer() {
           />
         );
       })}
-    </Layer>
+    </Group>
   );
 }

@@ -3,7 +3,7 @@
 // `@shared/entities` (overrides honoured), never computed twice.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import { hitDieMax, slotMax } from "@shared/character-sheet/counters";
-import { levelLine, signed } from "@shared/character-sheet/logic";
+import { levelLine, signed, withDamageBonus } from "@shared/character-sheet/logic";
 import type { SheetRollKind } from "@shared/character-sheet/schemas";
 import {
   type CreatureSheetRecord,
@@ -13,7 +13,13 @@ import {
 } from "@shared/character-sheet/sheet";
 import {
   type AbilityStats,
+  ATTACK_BONUS_MAX,
+  type Attack,
   type ClassRow,
+  DAMAGE_TYPES,
+  EXTRA_DAMAGE_MAX,
+  EXTRA_DAMAGE_RE,
+  ExtraDamage,
   HIT_DICE,
   type HitDie,
   isOverridden,
@@ -256,6 +262,62 @@ export interface RowRollButton {
  * FR-CHARX-41 (§6.1): every attack row shows Attack (to-hit only), Damage, Attack + damage, in
  * that order. The same on DM and player, PC and NPC sheets.
  */
+/**
+ * FR-CHARX-56: an attack row in view mode: name + "+1" Badge (bonus > 0); numbers with the bonus
+ * folded in, one chunk per part so the line wraps between parts ("+8 · 2d6+5 slashing",
+ * "+ 2d6 fire").
+ */
+export interface AttackRowView {
+  name: string;
+  badge: string | null;
+  parts: string[];
+}
+
+export function attackRowView(a: Attack): AttackRowView {
+  const bonus = a.bonus ?? 0;
+  const base = withDamageBonus(a.damage, bonus);
+  return {
+    name: a.name,
+    badge: bonus > 0 ? `+${bonus}` : null,
+    parts: [
+      `${signed(a.toHit + bonus)} · ${a.damageType ? `${base} ${a.damageType}` : base}`,
+      ...(a.extraDamage ?? []).map((x) => `+ ${x.damage} ${x.type}`),
+    ],
+  };
+}
+
+/** FR-CHARX-56: the Magic Select (none, +1 … +3). */
+export const MAGIC_OPTIONS = Array.from({ length: ATTACK_BONUS_MAX + 1 }, (_, n) => ({
+  value: n,
+  label: n === 0 ? "No magic" : `Magic +${n}`,
+}));
+
+/** FR-CHARX-56: "Add damage type" only while the row has fewer than two extra parts. */
+export const canAddExtraPart = (a: Pick<Attack, "extraDamage">): boolean =>
+  (a.extraDamage?.length ?? 0) < EXTRA_DAMAGE_MAX;
+
+export const EXTRA_DICE_HINT = "Use NdM+K: up to 6d12+10";
+export const EXTRA_TYPE_HINT = "Pick a damage type";
+
+/** An extra part as typed in the editor (dice text, type or none yet). */
+export interface ExtraPartDraft {
+  damage: string;
+  type: string | null;
+}
+
+/**
+ * FR-CHARX-56: the client mirror of FR-CHARX-54 for one extra part: the part to store, or the
+ * inline error ("7d6" → dice hint; no type → type hint). Nothing is sent while it errors.
+ */
+export function extraPart(d: ExtraPartDraft): { part: ExtraDamage } | { error: string } {
+  const damage = d.damage.trim();
+  if (!EXTRA_DAMAGE_RE.test(damage)) return { error: EXTRA_DICE_HINT };
+  if (!d.type || !(DAMAGE_TYPES as readonly string[]).includes(d.type)) {
+    return { error: EXTRA_TYPE_HINT };
+  }
+  return { part: ExtraDamage.parse({ damage, type: d.type }) };
+}
+
 export function attackButtons(): RowRollButton[] {
   return [
     { kind: "toHit", label: "Attack", testId: "charx-roll-attack" },

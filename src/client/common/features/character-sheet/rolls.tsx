@@ -125,7 +125,9 @@ export function useSheetRollControl({
       : attackRow?.ok
         ? attackRow.attack.name
         : undefined;
-  const categories = specs.map((s) => s.category).join(",");
+  // FR-CHARX-55: an extra damage part has no subject (mods attach to the base part), as on the
+  // server; "part" maps to none.
+  const categories = specs.map((s) => (s.part?.extra ? "part" : s.category)).join(",");
   const subject = useMemo(
     () =>
       ctx.npc || ctx.creature.kind !== "character"

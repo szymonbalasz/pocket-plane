@@ -1,15 +1,15 @@
 // Grid layer: drawn as one shape over the map rectangle (MAP §7), 1 screen px wide lines.
-import { Layer, Shape } from "react-konva";
+import { Group, Shape } from "react-konva";
 import { useCanvas } from "../canvas-context";
 
 export function GridLayer() {
   const { scene, grid, cam } = useCanvas();
-  if (!grid.gridVisible) return <Layer listening={false} name="grid-layer" />;
+  if (!grid.gridVisible) return <Group listening={false} name="grid-layer" />;
   const { gridCellSize: cell, gridOffsetX: ox, gridOffsetY: oy } = grid;
   const w = scene.mapWidth;
   const h = scene.mapHeight;
   return (
-    <Layer listening={false} name="grid-layer">
+    <Group listening={false} name="grid-layer">
       <Shape
         name="map-grid"
         stroke={grid.gridColor}
@@ -29,6 +29,6 @@ export function GridLayer() {
           ctx.strokeShape(shape);
         }}
       />
-    </Layer>
+    </Group>
   );
 }

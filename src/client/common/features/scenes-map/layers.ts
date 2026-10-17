@@ -1,7 +1,9 @@
 // Canvas layer registry core (FR-MAP-29, FR-SCN-02/03): an ordered list, map 0 < grid 10 <
 // scn-props 20 < scn-structure 26 < fog 30 < scn-templates 35 < tokens 40 < labels 45 < scn-edit 48
 // < pointers 50. Later features add layers at their slots without touching scene or token code.
-// DOM-free so it runs under `bun test`.
+// Sprint 4 (BL-07): every entry is a Konva Group (named by its id) inside one of four Konva layers
+// (`map-layer-<base|fog|objects|top>`), picked by its `layer` key. DOM-free so it runs under
+// `bun test`.
 
 /** Order slots (FR-SCN-02); a new layer picks a free number between its neighbours. */
 export const LAYER_ORDER = {
@@ -23,6 +25,14 @@ export const LAYER_ORDER = {
 
 export type CanvasClient = "dm" | "player";
 
+/**
+ * FR-MAP-29 (BL-07): the stage's Konva layers, bottom → top. `base` = static, rarely redrawn
+ * (map, grid, scn-objects); `fog` = the one cached fog shape; `objects` = templates, tokens,
+ * labels; `top` = drafts and animations (scn-edit, pointers).
+ */
+export const KONVA_LAYERS = ["base", "fog", "objects", "top"] as const;
+export type KonvaLayerKey = (typeof KONVA_LAYERS)[number];
+
 /** Which product layer a DM Layers-popover switch hides (FR-SCN-01, -05). */
 export type LayerToggleTarget = "objects" | "tokens" | "dm-only" | "fog";
 
@@ -31,25 +41,42 @@ export interface LayerToggle {
   key: string;
   label: string;
   layer: LayerToggleTarget;
+  /**
+   * `show` (FR-FOG-20, sprint 4): off by default; on = the layer draws even when it otherwise
+   * wouldn't (the layer reads `toggleOn` itself; the entry is always mounted). Default `hide`:
+   * on by default; off = not drawn and not hit (FR-SCN-05).
+   */
+  kind?: "hide" | "show";
+}
+
+/** Whether a switch is on, given the store's `off` (an unset `show` switch is off). */
+export function toggleOn(t: LayerToggle, off: Readonly<Record<string, boolean>>): boolean {
+  const v = off[t.key];
+  return v === undefined ? t.kind !== "show" : !v;
 }
 
 export interface LayerDef<P> {
   /** Unique, kebab-case. */
   id: string;
   order: number;
+  /** FR-MAP-29: the Konva layer it draws in; never a Layer of its own. */
+  layer: KonvaLayerKey;
   component: (props: P) => unknown;
   /** Clients that mount it; default both. */
   clients?: readonly CanvasClient[];
   /**
-   * Entries next to each other with the same group render inside one Konva `<Layer>` (named
-   * after the group); their components render a Konva `<Group>`, not a `<Layer>`.
+   * Entries next to each other with the same group render inside one more Konva `<Group>`
+   * (named after the group), e.g. `scn-objects`.
    */
   group?: string;
   /** A DM Layers-popover switch: off = not drawn and not hit on this DM client (FR-SCN-05). */
   toggle?: LayerToggle;
 }
 
-/** Validated, sorted copy; duplicate ids, orders or toggle keys throw at load. */
+/**
+ * Validated, sorted copy; duplicate ids, orders or toggle keys throw at load, and so does an
+ * order that would interleave two Konva layers (their order is the lowest `order` in each).
+ */
 export function orderLayers<P>(layers: readonly LayerDef<P>[]): LayerDef<P>[] {
   const ids = new Set<string>();
   const orders = new Set<number>();
@@ -64,14 +91,21 @@ export function orderLayers<P>(layers: readonly LayerDef<P>[]): LayerDef<P>[] {
     ids.add(l.id);
     orders.add(l.order);
   }
-  return [...layers].sort((a, b) => a.order - b.order);
+  const sorted = [...layers].sort((a, b) => a.order - b.order);
+  let at = 0;
+  for (const l of sorted) {
+    const k = KONVA_LAYERS.indexOf(l.layer);
+    if (k < at) throw new Error(`Canvas layer "${l.id}" (${l.layer}) is out of its Konva layer`);
+    at = k;
+  }
+  return sorted;
 }
 
-/** One Konva layer to mount: a lone entry, or a run of same-group entries. */
+/** A run of entries inside one Konva layer: a lone entry, or same-group neighbours. */
 export interface LayerSlot<P> {
   /** React key: the entry id, or `<group>:<first entry id>`. */
   key: string;
-  /** Null = the entry renders its own `<Layer>`. */
+  /** Null = the entry's own Group sits directly in the Konva layer. */
   group: string | null;
   layers: LayerDef<P>[];
 }
@@ -88,13 +122,30 @@ export function layerSlots<P>(
   const out: LayerSlot<P>[] = [];
   for (const l of layers) {
     if (l.clients && !l.clients.includes(client)) continue;
-    if (client === "dm" && l.toggle && off[l.toggle.key]) continue;
+    if (client === "dm" && l.toggle && l.toggle.kind !== "show" && off[l.toggle.key]) continue;
     const last = out.at(-1);
-    if (l.group && last?.group === l.group) last.layers.push(l);
+    if (l.group && last?.group === l.group && last.layers[0]?.layer === l.layer)
+      last.layers.push(l);
     else
       out.push({ key: l.group ? `${l.group}:${l.id}` : l.id, group: l.group ?? null, layers: [l] });
   }
   return out;
+}
+
+/** FR-MAP-29: one Konva layer to mount and the slots it holds. */
+export interface StageLayer<P> {
+  key: KonvaLayerKey;
+  /** Konva name: `map-layer-<key>`. */
+  name: string;
+  slots: LayerSlot<P>[];
+}
+
+/** FR-MAP-29 (BL-07): `layerSlots` grouped into the ≤ 4 Konva layers, in order; empty ones dropped. */
+export function stageLayers<P>(slots: readonly LayerSlot<P>[]): StageLayer<P>[] {
+  return KONVA_LAYERS.flatMap((key) => {
+    const mine = slots.filter((s) => s.layers[0]?.layer === key);
+    return mine.length === 0 ? [] : [{ key, name: `map-layer-${key}`, slots: mine }];
+  });
 }
 
 /** FR-SCN-05: every registered toggle, in layer order (the Layers popover's switches). */

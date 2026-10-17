@@ -175,15 +175,76 @@ export function rollBreakdownSegments(r: RollBreakdown): LineSegment[] {
   ];
 }
 
+/**
+ * FR-CHARX-55: a weapon's damage parts as one run: "Flame Tongue greatsword damage: 2d6+5
+ * (3 + 5) slashing + 2d6 (2 + 6) fire = 21". The name is the base item's label without its
+ * " (type)" suffix; each part shows its expression, its dice in parentheses, the base part's
+ * mods, then its type; one total (the items' totals summed). `dm[i]` names part i's mods.
+ */
+export function partRunSegments(
+  parts: readonly RollPayloadItem[],
+  dm: readonly (RollItemDmMods | undefined)[] = [],
+): LineSegment[] {
+  const base = parts[0] as RollPayloadItem;
+  const type = base.part?.type;
+  const suffix = type ? ` (${type})` : "";
+  const label = base.label ?? "Damage";
+  const name = suffix && label.endsWith(suffix) ? label.slice(0, -suffix.length) : label;
+  const out: LineSegment[] = [{ text: name }, { text: ": " }];
+  parts.forEach((item, i) => {
+    if (i > 0) out.push({ text: " + " });
+    out.push({ text: item.expression });
+    const dice = diceSegments(item);
+    if (dice.length > 0) out.push({ text: " (" }, ...dice, { text: ")" });
+    out.push(...modSegments(item.mods, dm[i]?.mods));
+    if (item.part?.type) out.push({ text: ` ${item.part.type}` });
+  });
+  const total = parts.reduce((n, p) => n + p.total, 0);
+  out.push({ text: " = " }, { text: String(total), style: "total" });
+  out.push(...rollOfferSegments(base.offered, dm[0]?.offered));
+  const notes = parts.flatMap((p) => (p.note ? [p.note] : []));
+  for (const note of notes) out.push({ text: ` — ${note}` });
+  if (parts.some((p) => p.manual)) out.push({ text: " " }, { text: "physical", style: "badge" });
+  return out;
+}
+
+/**
+ * FR-CHARX-55: the entry's items grouped into runs: a base part (`part.extra` false) with the
+ * extra parts after it, every other item alone. Items without `part` are always alone, so old
+ * rows group exactly as before.
+ */
+function itemRuns(payload: readonly RollPayloadItem[]): number[][] {
+  const runs: number[][] = [];
+  payload.forEach((item, i) => {
+    const last = runs[runs.length - 1];
+    const lastItem = last ? payload[last[0] as number] : undefined;
+    if (item.part?.extra && last && lastItem?.part && !lastItem.part.extra) last.push(i);
+    else runs.push([i]);
+  });
+  return runs;
+}
+
 export const rollKind = defineLogKind({
   kind: ROLL_KIND,
   payload: RollEntryPayload,
   dmPayload: RollEntryDmPayload,
   formatLine({ actorName, payload, dmPayload, category }) {
     const out: LineSegment[] = [{ text: actorName, style: "actor" }, { text: " — " }];
-    payload.forEach((item, i) => {
-      if (i > 0) out.push({ text: "; " });
-      out.push(...rollSegments(item, { category, dm: dmPayload?.items[i] }));
+    itemRuns(payload).forEach((run, r) => {
+      if (r > 0) out.push({ text: "; " });
+      const i = run[0] as number;
+      if (run.length === 1) {
+        out.push(
+          ...rollSegments(payload[i] as RollPayloadItem, { category, dm: dmPayload?.items[i] }),
+        );
+      } else {
+        out.push(
+          ...partRunSegments(
+            run.map((j) => payload[j] as RollPayloadItem),
+            run.map((j) => dmPayload?.items[j]),
+          ),
+        );
+      }
     });
     return out;
   },
