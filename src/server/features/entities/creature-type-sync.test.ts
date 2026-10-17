@@ -10,7 +10,7 @@ import { srdMini } from "@fixtures/srd/open5e";
 import { CBT_INTENTS } from "@shared/combat-tracker/schemas";
 import { MAP_INTENTS, TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
 import { asc, eq } from "drizzle-orm";
-import { closeDb, type Db, openFileDb } from "../../db/client";
+import { closeDb, openFileDb } from "../../db/client";
 import {
   asset,
   assetSeqNext,
@@ -22,7 +22,7 @@ import {
   token,
 } from "../../db/schema";
 import type { Actor } from "../../events/types";
-import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
+import { startTestServer, type TestClient } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
 import { leakScan } from "../../ws/testing/convergence";
 import { IMPORT_RECORDED } from "../compendium/import";
@@ -186,7 +186,8 @@ describe("FR-ENT-27 / -30 compendium-full over WS", () => {
       const ev = eventFrames(c, marks[i] as number);
       expect(ev.flatMap((f) => f.changes.map((x) => x.id))).toEqual([art.srdGoblin as string]);
       expect(
-        (c.store.records[TOKEN_TYPE]?.[art.srdGoblin as string] as TokenRecord).creatureType,
+        (c.store.records[TOKEN_TYPE]?.[art.srdGoblin as string] as TokenRecord | undefined)
+          ?.creatureType,
       ).toBe("initials");
       expect(c.raw().includes(art.ogre as string)).toBe(false);
     }
