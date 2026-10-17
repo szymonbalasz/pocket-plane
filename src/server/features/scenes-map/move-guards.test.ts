@@ -10,8 +10,9 @@ import { eq } from "drizzle-orm";
 import { conflict } from "../../commands/errors";
 import { token } from "../../db/schema";
 import { readEventLog } from "../../events/log";
+import { resultSignals } from "../../ws/signals";
 import { MAP_REST as R } from "./commands";
-import { moveGuards, tokenMoveGuards } from "./move-guards";
+import { MoveGuards, moveGuards, moveHints, tokenMoveGuards } from "./move-guards";
 import { scenesSetup } from "./testing";
 import { tokenHooks } from "./token-hooks";
 import { visibilityHooks } from "./visibility-hooks";
@@ -136,5 +137,61 @@ describe("ADR-0040 move guards", () => {
     t.run(I.duplicateToken, { tokenId: g });
     t.run(R.duplicateScene, { id: t.scene.id });
     expect(trace).toEqual([]);
+  });
+
+  test("FR-FOG-53 hint phase: hints run only when every guard passed (whatever the order); `as` gates on that player's guards, the sender's ok stays; signals ride the result", () => {
+    expect(moveHints.map((h) => h.name)).toEqual(["fog-of-war.sight"]);
+    const actors: string[] = [];
+    const g = new MoveGuards(
+      [],
+      [
+        {
+          name: "test.hint",
+          hint: (env) => {
+            actors.push(`hint ${env.actor.role}`);
+            return {
+              hint: { guard: "test.hint", segments: [] },
+              signals: [{ name: "test.sig", payload: {}, audience: ["p1"] }],
+            };
+          },
+        },
+      ],
+    );
+    let refuseFor: string | null = null;
+    g.register("test.later", (env) => {
+      actors.push(`guard ${env.actor.role}:${env.actor.playerId}`);
+      return env.actor.role === refuseFor ? { refuse: "No" } : undefined;
+    });
+    const tok = { id: "t", sceneId: "s", ownerPlayerId: "p1" } as never;
+    const env = {
+      read: {} as never,
+      actor: { role: "dm" as const, playerId: null, campaignId: "c" },
+    };
+    const from = { col: 0, row: 0 };
+    const to = { col: 1, row: 0 };
+    const ok = g.check(env, tok, from, to);
+    expect(ok.hints.map((h) => h.guard)).toEqual(["test.hint"]);
+    expect(resultSignals(ok)).toEqual([{ name: "test.sig", payload: {}, audience: ["p1"] }]);
+    // A guard registered after the hint member still refuses first: no hint, no signal.
+    refuseFor = "dm";
+    const refused = g.check(env, tok, from, to);
+    expect(refused).toEqual({ ok: false, hints: [] });
+    expect(resultSignals(refused)).toEqual([]);
+    // `as` the owner: the DM's own run passes (ok), the owner's refuses → no hint.
+    refuseFor = "player";
+    actors.length = 0;
+    const asOwner = g.check(env, tok, from, to, { as: { role: "player", playerId: "p1" } });
+    expect(asOwner).toEqual({ ok: true, hints: [] });
+    expect(actors).toEqual(["guard dm:null", "guard player:p1"]);
+    refuseFor = null;
+    actors.length = 0;
+    const passed = g.check(env, tok, from, to, { as: { role: "player", playerId: "p1" } });
+    expect(passed.hints).toHaveLength(1);
+    // The hint member sees the real sender (the DM), never the owner.
+    expect(actors).toEqual(["guard dm:null", "guard player:p1", "hint dm"]);
+    // `run` (the real move) never runs the hint phase.
+    actors.length = 0;
+    g.run(env, tok, from, to);
+    expect(actors).toEqual(["guard dm:null"]);
   });
 });

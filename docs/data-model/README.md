@@ -1627,3 +1627,16 @@ From [scene-tools](../specs/scene-tools.md#8-data-model) sprint 4 (FR-SCN-43–4
 - **Client only (never stored or sent):** each drawn template's covered cells (memoised per geometry), the Free chip state, the gesture in progress (`place` from the raw press point, `move` of a kept origin, `end` handle preview).
 - **Fixtures:** `mt-templates` (`fixtures/units/scene-tools/`): **Thunderwave** kept cube 15 ft at (1.5, 10.5), angle 300, `placedByPlayerId` player-2 (8 golden squares); **Web** kept DM cube 20 ft at (0, 6), angle 0 (seen by both players). `mt-crowd` (`fixtures/units/scenes-map/`): Goblin Sneak (4, 9), Goblin Sneak 2 (5, 9) (`enemy-1`), Crypt Ogre (4, 10) (`scenes-extras`' Cave Ogre, large); all visible, seen by both players. Bundle **`map-tools`** = `vision` + `scn-templates` + `mt-templates` + `mt-crowd` (Goblin Ambush inactive at load).
 - **CON-44:** no new record type and no new field; the heavy harness is unchanged (template cap with decimals measured in §52).
+
+## 57. Sprint 4: sight while dragging (V8)
+
+From [fog-of-war](../specs/fog-of-war.md) FR-FOG-53 / -54, [scenes-map](../specs/scenes-map.md) FR-MAP-39. **Built by `build/vision-drag`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing is written while dragging. Protocol side: [protocol §74](../protocol/README.md#74-sprint-4-sight-while-dragging-v8).
+
+| Piece | Kind | Contents | Visibility | Source |
+|---|---|---|---|---|
+| `map.checkMove` ack hint `fog-sight` | wire (ack) | `{guard, tokenId, see, dark}` | the sender only (player: own token; DM: owned tokens, from cells the owner's guards allow) | FR-FOG-53 |
+| Preview cache | server memory | `(connection, scene sight base, tokenId@col,row,size:senses)` → `{see, dark}`, LRU 64, separate from the vision cache (256) | never on a wire; restart → empty | FR-FOG-53, -38 |
+| Drag state | client memory | `DragState {tokenId, size, from, to}` (`pointers.drag`) + `previews.local {tokenId, x, y}` | — | FR-MAP-39 (seams S1) |
+| Sight preview store | client memory, per canvas | `local {tokenId, see, dark} \| null`, `remote: tokenId → {see, dark}` | — | FR-FOG-54 |
+
+- **Derived (never stored):** the drawn sight = the owner's `vision` with the previewed token's polygons swapped (`previewVision`).

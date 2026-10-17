@@ -57,6 +57,7 @@ import {
   TokenDrag,
   tokenIdsOf,
 } from "./drag-preview";
+import { DragProbe, probesDrag } from "./drag-probe";
 import { toastReject, useLive, useMapIntent } from "./intents";
 import { LaserSender } from "./laser";
 import { layerSlots, stageLayers } from "./layers";
@@ -192,6 +193,8 @@ export function MapCanvas(props: MapCanvasProps) {
   const spaceFromButton = useRef(false);
   useEffect(() => useMapTool.setState({ client }), [client]);
   const sendIntent = useMapIntent();
+  const sendIntentRef = useRef(sendIntent);
+  sendIntentRef.current = sendIntent;
   const sendSignal = useSendSignal();
   /** A stage pointer event as the active tool receives it (FR-SCN-06). */
   const toolPointerRef = useRef<(evt: MouseEvent) => ToolPointer | null>(() => null);
@@ -206,6 +209,17 @@ export function MapCanvas(props: MapCanvasProps) {
   sceneRef.current = scene;
   /** This client's token drag in progress (FR-MAP-39), if any. */
   const dragRef = useRef<TokenDrag | null>(null);
+  /** FR-MAP-39 (sprint 4, seams S1): `map.checkMove` per previewed cell; hints to subscribers. */
+  const [probe] = useState(
+    () =>
+      new DragProbe({
+        check: (tokenId, to) =>
+          sendIntentRef.current(MAP_INTENTS.checkMove, { tokenId, col: to.col, row: to.row }),
+        now: () => performance.now(),
+        setTimer: (fn, ms) => setTimeout(fn, ms),
+        clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+      }),
+  );
 
   // ---- camera (FR-MAP-12, -44, -45): fit the tokens into the free area ----
   const [cam, setCam] = useState<Camera>({ x: 0, y: 0, scale: 1 });
@@ -348,9 +362,10 @@ export function MapCanvas(props: MapCanvasProps) {
     if (isSnapshotStore(prevStore.current, store)) {
       setOverlay(clearOverlay());
       clearPreviews(previews);
+      probe.snapshot();
     }
     prevStore.current = store;
-  }, [store, previews]);
+  }, [store, previews, probe]);
   // FR-FOG-36: a blind player draws no other placer's templates, pings or laser (fog-of-war).
   const blind = client === "player" && isBlind(store, scene.id, myPlayerId);
   const blindRef = useRef(blind);
@@ -363,7 +378,10 @@ export function MapCanvas(props: MapCanvasProps) {
   // ---- drag previews (FR-MAP-40): dropped on a `token` change, a scene switch or 3 s silence ----
   useEventFrame((f) => clearPreviews(previews, tokenIdsOf(f.changes)));
   // biome-ignore lint/correctness/useExhaustiveDependencies: a scene switch drops every preview.
-  useEffect(() => clearPreviews(previews), [scene.id, previews]);
+  useEffect(() => {
+    clearPreviews(previews);
+    probe.clear();
+  }, [scene.id, previews, probe]);
   useEffect(() => {
     const id = setInterval(() => prunePreviews(previews, performance.now()), 250);
     return () => clearInterval(id);
@@ -396,10 +414,17 @@ export function MapCanvas(props: MapCanvasProps) {
       previews.setState({ local: null });
     }
     pointers.setState({ drag: null });
+    probe.clear();
     laser.current = null;
-  }, [live, pointers, previews]);
-  // Unmount mid-drag: no more frames from this canvas.
-  useEffect(() => () => dragRef.current?.abort(), []);
+  }, [live, pointers, previews, probe]);
+  // Unmount mid-drag: no more frames or checks from this canvas.
+  useEffect(
+    () => () => {
+      dragRef.current?.abort();
+      probe.clear();
+    },
+    [probe],
+  );
 
   const targeting = props.targeting ?? false;
   const canMove = useCallback(
@@ -418,10 +443,12 @@ export function MapCanvas(props: MapCanvasProps) {
       overlayRef.current = next;
       setOverlay(next);
       const settle = () => setOverlay((o) => settleMove(o, t.id, key));
-      sendIntent(MAP_INTENTS.moveToken, { tokenId: t.id, col, row }).then(settle, (err) => {
+      const sent = sendIntent(MAP_INTENTS.moveToken, { tokenId: t.id, col, row });
+      sent.then(settle, (err) => {
         settle();
         toastReject(err);
       });
+      return sent;
     },
     [sendIntent],
   );
@@ -443,6 +470,7 @@ export function MapCanvas(props: MapCanvasProps) {
         dragRef.current = new TokenDrag(sceneIdRef.current, t.id, { col: t.col, row: t.row }, (d) =>
           sendSignal(MAP_SIGNALS.drag, d),
         );
+        probe.start(t.id, { col: t.col, row: t.row }, probesDrag(client, t));
         previews.setState({ local: { tokenId: t.id, x: node.x(), y: node.y() } });
         if (!selectedRef.current.has(t.id)) onTokenClick?.(t, false);
         const c = node.getStage()?.container();
@@ -455,6 +483,7 @@ export function MapCanvas(props: MapCanvasProps) {
         const d = pointers.getState().drag;
         if (d && (d.to.col !== to.col || d.to.row !== to.row))
           pointers.setState({ drag: { ...d, to } });
+        probe.move(to);
       },
       dragEnd(t, node) {
         pointers.setState({ drag: null });
@@ -466,9 +495,14 @@ export function MapCanvas(props: MapCanvasProps) {
         dragRef.current = null;
         const drop = dropCell(gridRef.current, node.x(), node.y());
         // Drop → `map.moveToken`, then `end`; Esc, not live or unmoved → snap back (FR-MAP-15/28/39).
+        let settled: Promise<unknown> | undefined;
         const at = drag
-          ? drag.finish(drop, liveRef.current, (to) => move(t, to.col, to.row))
+          ? drag.finish(drop, liveRef.current, (to) => {
+              settled = move(t, to.col, to.row);
+            })
           : { col: t.col, row: t.row };
+        // FR-FOG-54: the dragger's sight preview lasts until the drop's ack / reject.
+        probe.finish(settled);
         node.position(cellToPx(gridRef.current, at.col, at.row));
         resizeRefit.current?.drop();
       },
@@ -481,7 +515,7 @@ export function MapCanvas(props: MapCanvasProps) {
         onTokenDoubleClick?.(t);
       },
     }),
-    [pointers, previews, onTokenClick, onTokenDoubleClick, move, sendSignal],
+    [pointers, previews, probe, client, onTokenClick, onTokenDoubleClick, move, sendSignal],
   );
 
   // ---- incoming signals (FR-MAP-25): only for the scene this client shows ----
@@ -808,6 +842,7 @@ export function MapCanvas(props: MapCanvasProps) {
     colors,
     pointers,
     previews,
+    probe,
     tool,
     activeTool: toolDef,
     drawing,
