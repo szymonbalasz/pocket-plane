@@ -16,9 +16,11 @@ import {
 } from "@shared/effect-modifiers/trigger-state";
 import type { TriggerRule } from "@shared/effect-modifiers/triggers";
 import { asc } from "drizzle-orm";
+import { armCrashHook } from "../../commands/crash";
 import { triggerState } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import type { Viewer } from "../../ws/records";
+import { applyCard, undoCommand } from "../combat-tracker/hp";
 import { setRemoved } from "../combat-tracker/initiative";
 import { divineFury, type RtSetup, rtSetup } from "./trigger-testing";
 
@@ -226,5 +228,34 @@ describe("FR-MOD-54 effect hooks", () => {
     });
     expect(stateChanges(t, "EffectsAdded")).toEqual([]);
     expect(furyRow(t)?.armed).toBe(false);
+  });
+});
+
+describe("FR-MOD-51 crash safety (trigger state)", () => {
+  test("FR-MOD-51 hard kill: cbt.applyCard before-commit → state still ready; after-commit → used with the use row; cbt.undo before-commit → still used", () => {
+    class Killed extends Error {}
+    const kill = () => {
+      throw new Killed();
+    };
+    const t = rtSetup();
+    t.nextTo("Brakka", 1);
+    t.rage(true);
+    const { cardId } = t.attack("Brakka");
+    try {
+      armCrashHook({ point: "before-commit", target: applyCard.name }, kill);
+      expect(() => t.applyTo(cardId, [{ name: "Goblin", triggers: assignFury(t) }])).toThrow();
+      expect(furyRow(t)?.charge).toBe("ready");
+      armCrashHook({ point: "after-commit", target: applyCard.name }, kill);
+      expect(() => t.applyTo(cardId, [{ name: "Goblin", triggers: assignFury(t) }])).toThrow(
+        Killed,
+      );
+      expect(furyRow(t)?.charge).toBe("used");
+      expect(t.usesOf(t.furyId).map((u) => u.state)).toEqual(["used"]);
+      armCrashHook({ point: "before-commit", target: undoCommand.name }, kill);
+      expect(() => t.undo()).toThrow();
+      expect(furyRow(t)?.charge).toBe("used");
+    } finally {
+      armCrashHook(null);
+    }
   });
 });
