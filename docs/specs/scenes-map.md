@@ -1,7 +1,7 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: in-review
+status: complete
 owner: spec-vision
 wave: 3
 phase: post-mvp-4
@@ -329,8 +329,8 @@ Isolated per worktree: `bun test` on `:memory:` DB, temp asset dir, port 0; walk
 | ~~OQ-MAP-33~~ | ~~R1: default windows cover tokens on the battlemap; how do we keep tokens visible?~~ | **Decided #178: A + B**, auto-fit to the free area on scene open and on appearances, plus a Fit button (FR-MAP-44/45, FR-SHELL-34). Rejected: auto-fit only, button only, changed window defaults, refit on every window change | — | play-shell |
 | ~~OQ-MAP-34~~ | ~~(G2) Fitted battlemap tokens are tiny (~29 px at 1440×900, ~15 px at 1280×720). How do we keep them readable?~~ | **Decided (#190): A, minimum cell when fitting, 48 px** (FR-MAP-46): PCs kept in the open area, edge monsters may sit under a window. Rejected: B zoom hint, C per-scene opening view | — | play-shell (FR-SHELL-34 coverage test) |
 | ~~OQ-CBTX-24~~ *(from combat-extras)* | ~~Player token redaction drops `definitionId`, so FR-CBTX-50 can't tell which character a token shows on player clients~~ | **Decided (orchestrator, phase-1 seams; reworked by review ruling P2b-1):** ~~keep `definitionId` on player tokens of character definitions~~ (a visibility fn may read only the record, ADR-0021 / ADR-0024) → new token display copy `characterId`, sent to players (FR-MAP-50, FR-MAP-26); `definitionId` never reaches players; column in P2a's `fix/combat2-core` | — | combat-extras |
-| OQ-MAP-45 *(sprint 4; was V's OQ-MAP-35, renumbered by seams S10)* | Middle mouse while a left-button drag runs (token drag, box, brush stroke) | **Ignored until the left drag ends** — no surprises mid-move · pan anyway (the dragged token stays under the pointer) — handy on big maps, but the map slides under the drop | no · owner: spec-vision | — |
-| OQ-MAP-46 *(sprint 4; was V's OQ-MAP-36, S10)* | BL-01's e2e specs click fixed cells that the new Fit puts under the Game log | **A `e2e/support` `mapPoint(page, col, row)`: returns the cell's screen point and middle-drags the map until no window covers it; the BL-01 specs use it** — robust to any layout · B those specs minimise the Game log first — simple, but hides a real layout · C they pick other cells — breaks again with the next layout change. *Seams S11: V7 builds the helper; M3's Show-to-players specs use an `e2e/support` helper too (rebase on V7 if the same file)* | no · owner: spec-vision | e2e |
+| OQ-MAP-45 *(sprint 4; was V's OQ-MAP-35, renumbered by seams S10)* | Middle mouse while a left-button drag runs (token drag, box, brush stroke) | **Decided (DM, sprint-4 gate 1, #245, bulk-accept V): ignored until the left drag ends** (FR-MAP-12). Rejected: ~~pan anyway~~ | — · owner: V7 | — |
+| OQ-MAP-46 *(sprint 4; was V's OQ-MAP-36, S10)* | BL-01's e2e specs click fixed cells that the new Fit puts under the Game log | **Decided (DM, sprint-4 gate 1, #245, bulk-accept V): `e2e/support` `mapPoint(page, col, row)` returns the cell's screen point and middle-drags the map until no window covers it; the BL-01 specs use it.** Seams S11: V7 builds the helper; M3's Show-to-players specs use an `e2e/support` helper too (rebase on V7 if the same file). Rejected: ~~minimise the Game log first~~, ~~pick other cells~~ | — · owner: V7 | e2e |
 | OQ-MAP-27 | Movement colours | **Reuse `hp.bloodied` (amber) and `hp.down` (red) until theme-system names `move.*`** / new placeholder tokens now | no · owner: spec-feedback | visual-direction |
 
 ## 16. Out of scope

@@ -1,9 +1,9 @@
-# Proposed — Party vision, sight while dragging, 999 ft default vision
+# Party vision, sight while dragging, 999 ft default vision
 
-- Status: **proposed** (sprint 4, track V; for DM gate 1). Picks are marked as picks, not decisions. The integrator numbers it at merge
+- Status: **accepted** (DM, sprint-4 gate 1, #245, G4; every pick below decided). File keeps its proposed name; the integrator numbers it at merge
 - Date: 2026-10-17
 - Refines: [ADR-0042](0042-dynamic-vision.md) (dynamic vision). Supersedes in part its picks OQ-FOG-20 A (own characters only → still the default, plus a party switch), OQ-FOG-26 A (vision on drop only) and OQ-FOG-35's senses numbers (0–120 ft, default 0)
-- Extends: [ADR-0021](0021-sync-protocol-conventions.md) (fns read record + viewer: kept), [ADR-0033](0033-signal-audience.md) (a server-originated signal from an intent result), [ADR-0040](0040-token-move-guards.md) (a never-refusing guard line that only adds a dry-run hint), [ADR-0041](0041-active-scene-window.md) (`sync.loadScene {viewAs: "party"}`)
+- Extends: [ADR-0021](0021-sync-protocol-conventions.md) (fns read record + viewer: kept), [ADR-0033](0033-signal-audience.md) (a server-originated signal from an intent result), [ADR-0040](0040-token-move-guards.md) (a dry-run hint phase run only when every guard passed; a DM drag's hint runs the owner's guards), [ADR-0041](0041-active-scene-window.md) (`sync.loadScene {viewAs: "party"}`)
 - Affects: [fog-of-war](../../specs/fog-of-war.md) (FR-FOG-48–57), [scenes-map](../../specs/scenes-map.md) (FR-MAP-39), [character-sheet-full](../../specs/character-sheet-full.md) (FR-CHARX-49), [live-sync](../../specs/live-sync.md) (OQ-FOG-58), [combat-extras](../../specs/combat-extras.md) (OQ-FOG-57), [protocol](../../protocol/README.md), [AGENTS §9.9](../../../AGENTS.md#99-shared-files)
 
 ## Context
@@ -27,7 +27,7 @@
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. Write time (pick): `derive` / re-derive write `seenBy` from the party's sight while the switch is on; the switch command re-derives the active scene and marks the rest `visionStale`** | Fns unchanged (record + viewer); the transition matrix gives every player's upserts / deletes on the switch; crash-safe (one transaction); reconnect = the stored state | The switch is a re-derive (≈ 102 ms at caps, arithmetic); prep scenes stale until activation (as senses edits today) |
+| **A. Write time (chosen): `derive` / re-derive write `seenBy` from the party's sight while the switch is on; the switch command re-derives the active scene and marks the rest `visionStale`** | Fns unchanged (record + viewer); the transition matrix gives every player's upserts / deletes on the switch; crash-safe (one transaction); reconnect = the stored state | The switch is a re-derive (≈ 102 ms at caps, arithmetic); prep scenes stale until activation (as senses edits today) |
 | B. Read time: fns read a campaign flag | No re-derive on the switch | Breaks ADR-0021 (fn reads campaign state); the matrix has no before-state for the flag, so every switch needs a full resync of every player |
 | C. A second column `partySeenBy` | Both answers stored | Two writes per subject per derive; every fn picks a column by a flag it can't read |
 
@@ -35,15 +35,15 @@
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. Share each player's `vision` record (pick): unchanged content (own sources) + `src`; server-only `shared` flag; others get it redacted without `inv`; the client draws every record it holds** | A move changes only the mover's record: 591 B to each player (measured); no geometry dependency; one record shape | Each player holds N records (+3,297 B typical, measured); over 512 KiB at caps without a source cap (→ option 5) |
+| **A. Share each player's `vision` record (chosen): unchanged content (own sources) + `src`; server-only `shared` flag; others get it redacted without `inv`; the client draws every record it holds** | A move changes only the mover's record: 591 B to each player (measured); no geometry dependency; one record shape | Each player holds N records (+3,297 B typical, measured); over 512 KiB at caps without a source cap (→ option 5) |
 | B. One `party-vision` record per scene with every polygon | One record | Every move resends all polygons to everyone (3.9 KB × 6 typical, ≈ 125 KB × 6 at caps) |
 | C. A geometric union on the server | Fewest bytes | Needs a clipping dependency (below), CPU per move, robustness work |
 
-**3. Sight while dragging** (rate and audience are DM questions, OQ-FOG-49)
+**3. Sight while dragging** (rate and audience decided by the DM, OQ-FOG-49, #245 G12)
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. Server, through the existing per-cell `map.checkMove` (pick): a hint phase in the move guards (run only when every guard passed) returns the source's polygon at that cell; a DM drag's hint runs the owner's guards; the hub fans it out as signal `fog.sight`, on the active scene only, to players who hold the token: the owner (if the DM drags) and, with party vision on, every such player** | No new intent; one in flight per dragger; refused cells give no sight (no peeking past walls); nothing written | Needs a hub capability: signals from an intent result (OQ-FOG-58) |
+| **A. Server, through the existing per-cell `map.checkMove` (chosen): a hint phase in the move guards (run only when every guard passed) returns the source's polygon at that cell; a DM drag's hint runs the owner's guards; the hub fans it out as signal `fog.sight`, on the active scene only, to players who hold the token: the owner (if the DM drags) and, with party vision on, every such player** | No new intent; one in flight per dragger; refused cells give no sight (no peeking past walls); nothing written | Needs a hub capability: signals from an intent result (OQ-FOG-58) |
 | B. A separate `fog.preview` intent per cell | Independent of guards | Two round trips per cell; must re-check guards anyway |
 | C. Client-predicted sight | No server cost | Needs walls on players: FR-SCN-14 leak (rejected in sprint 3 too) |
 
@@ -51,17 +51,17 @@
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. `visionFt` absent = 999 ft (199.8 cells); stored values kept; the map rectangle's edges join the occluders; `dark` omitted when ≤ vision; polygons simplified inward-only at 0.05 cell; a one-time vision-model re-derive on upgrade (pick)** | No row rewrite; sprint-3 fixtures stay exact; −42 % `vision` bytes from the map edges (measured: 609–720 B vs 761–1,235 B); the simplification keeps one player's record ≤ 48 KiB at caps (measured 64,752–92,672 B exact → 14,597–22,236 B) and sight fail-closed | A sheet saved with 0 in sprint 3 stays sightless beyond darkvision until set to Normal; a stored radius reduces vision beyond #243 [1]'s literal "only blinding effects" (DM question OQ-FOG-51) |
+| **A. `visionFt` absent = 999 ft (199.8 cells); stored values kept; the map rectangle's edges join the occluders; `dark` omitted when ≤ vision; polygons simplified inward-only at 0.05 cell; a one-time vision-model re-derive on upgrade (chosen)** | No row rewrite; sprint-3 fixtures stay exact; −42 % `vision` bytes from the map edges (measured: 609–720 B vs 761–1,235 B); the simplification keeps one player's record ≤ 48 KiB at caps (measured 64,752–92,672 B exact → 14,597–22,236 B) and sight fail-closed | A sheet saved with 0 in sprint 3 stays sightless beyond darkvision until set to Normal; a stored radius reduces vision beyond #243 [1]'s literal "only blinding effects" (DM question OQ-FOG-51) |
 | B. Unbounded radius | "Infinite" | Same polygon as A once the map edges bound it; an extra code path |
 | C. Keep default 0 | Nothing changes | Contradicts #243 [1] |
 
-**5. Party source cap** (re-measured in the review pass, each source at its own origin, simplified polygons: 12 sources 339,085–342,145 B per player at caps, 24 sources 389,757–392,817 B; both under 512 KiB, so the cap now bounds the switch's CPU, not bytes): **A ≤ 12 sources for the party, round robin by player (pick)** · B 4 per player (24) · C 8 for the party.
+**5. Party source cap** (re-measured in the review pass, each source at its own origin, simplified polygons: 12 sources 339,085–342,145 B per player at caps, 24 sources 389,757–392,817 B; both under 512 KiB, so the cap now bounds the switch's CPU, not bytes): **A ≤ 12 sources for the party, round robin by player (chosen; #245 G20)** · B 4 per player (24) · C 8 for the party.
 
 **Dependency.** None needed: party sight is a list of polygons (drawn with nonzero fill, tested "any polygon holds it"), the brush is a distance test and whole cells. Only option 2C would need one: `polygon-clipping` 0.15.7 (MIT, 29 KB UMD min, last release 2023-12), `martinez-polygon-clipping` 0.9.0 (MIT, ~11 KB + splaytree / tinyqueue / robust-predicates), `polyclip-ts` 0.16.8 (MIT, 42 KB + bignumber.js) — figures as recorded in ADR-0042, not re-checked; all run in Bun and browsers. Pick: **hand-rolled / none** (as ADR-0042 G2).
 
-## Proposed decision
+## Decision
 
-Picks: 1 **A**, 2 **A**, 3 **A**, 4 **A**, 5 **A**; no new dependency. Why a new ADR rather than amending ADR-0042: ADR-0042 is accepted and records sprint 3's picks (own sight only, drop only, default 0); the gate should accept or reject party vision on its own, and an accepted record shouldn't change under it.
+**Accepted** (DM, sprint-4 gate 1, #245, G4): 1 **A** write-time union into `seenBy`, 2 **A** shared redacted `vision` records, 3 **A** sight while dragging via the guards' hint phase (active scene, token holders only, owner's guards for a DM drag), 4 **A** 999 ft default (absent = Normal, stored values kept) bounded by map edges with inward simplification and an upgrade re-derive, 5 **A** ≤ 12 party sources; no new dependency (#245 G2). With the gate's related decisions: party vision per campaign (G9), memory grows from the party's sight (G10), a blind player sees the party's sight (G11), map sight only while dragging (G12), Blinded + darkness reduce vision (G13), a secret Blinded counts with a generic chip (G15). Rejected options stay above for the record. Why a new ADR rather than amending ADR-0042: ADR-0042 is accepted and records sprint 3's picks (own sight only, drop only, default 0); the gate should accept or reject party vision on its own, and an accepted record shouldn't change under it.
 
 | Contract | Rule |
 |---|---|
@@ -74,7 +74,7 @@ Picks: 1 **A**, 2 **A**, 3 **A**, 4 **A**, 5 **A**; no new dependency. Why a new
 | Cache / grid | Sight depends on the map rectangle, so the cache keys carry a map-rect revision and `map.setGrid` / `map.setSceneMap` re-derive the scene (new `scene-hooks.ts` member `mapChanged`) |
 | Upgrade | A one-time boot step keyed by a vision-model version re-derives each campaign's active scene and marks the rest `visionStale`; same version → no-op |
 | Blinded | A source whose character has an active `blinded` effect has no polygon; effect writes re-derive via fog's line in R0's append-only `effectsChanged` hook point (in or out of combat, causing transaction; seams S6, OQ-FOG-57) |
-| Blinded, secret | DM question OQ-FOG-61 (pick B: it counts, generic "You can't see" chip, others see a non-source) |
+| Blinded, secret | Counts, with a generic "You can't see" chip; with party vision on, others get a non-source copy (OQ-FOG-61, decided #245 G15) |
 | Budget | Measured (FOG §12, review pass): players 281,337–284,397 B with party vision on (typical), 339,085–342,145 B at caps with the 12-source cap; own `vision` ≤ 22,236 B at caps; View-as-Party ack 5,920 B typical / 99,268 B at caps (bound 192 KiB); DM unchanged; drag ack 372–558 B typical / 2,717–6,865 B caps at ≤ 10 / s; `fog.sight` ≤ 4 / s (≤ 27.5 KB/s per receiver at caps) |
 
 ## Consequences
