@@ -1,7 +1,14 @@
 // Fog of war wire shapes (FOG §8, §9; protocol §5). The mask codec and raster live beside this
 // (`mask.ts`, `raster.ts`); visibility of fog subjects in `visibility.ts`.
 import { z } from "zod";
-import { DarknessShape, FogLayerShape, FogShapeGeom, isDec2, SHAPE_COORD_MAX } from "./shapes";
+import {
+  DarknessShape,
+  FogBrushGeom,
+  FogLayerShape,
+  FogShapeGeom,
+  isDec2,
+  SHAPE_COORD_MAX,
+} from "./shapes";
 
 export const FOG_TYPE = "fog";
 /** FR-FOG-37: explored memory, one per (scene, player); `dmWindow: "view-as"` (FR-FOG-43). */
@@ -189,11 +196,14 @@ export const FOG_INTENTS = {
 
 const Id = z.string().min(1).max(64);
 
-/** FR-FOG-05: append one fog shape (v2 geometry, or a sprint-2 legacy form). */
+/**
+ * FR-FOG-05: append one fog shape (v2 geometry, a brush `stroke` / `cells` (sprint 4, FR-FOG-26),
+ * or a sprint-2 legacy form).
+ */
 export const FogEditInput = z.strictObject({
   sceneId: Id,
   op: FogOp,
-  shape: z.union([FogShapeGeom, FogShape]),
+  shape: z.union([FogShapeGeom, FogBrushGeom, FogShape]),
 });
 export type FogEditInput = z.input<typeof FogEditInput>;
 

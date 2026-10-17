@@ -64,7 +64,8 @@ describe("FOG §13 V6 party vision leak walkthrough (player-1, player-2)", () =>
     expect(thornForP1.dark).toHaveLength(1);
     expect(thornForP1.src).toEqual([t.id("Thorn")]);
     expect("inv" in thornForP1).toBe(false);
-    expect((t.c.p2.store.records[VISION_TYPE]?.[pair("p2")] as VisionRecord).inv).toEqual([0]);
+    const own = t.c.p2.store.records[VISION_TYPE]?.[pair("p2")] as VisionRecord | undefined;
+    expect(own?.inv).toEqual([0]);
     expect(t.c.p1.raw()).not.toContain('"inv"');
     // FR-FOG-37 (OQ-FOG-47): P2's memory now holds the cell Mira sees through d1.
     expect(explores(t.exploredOf(t.c.p2, "p2"), 11, 6)).toBe(true);

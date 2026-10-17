@@ -31,6 +31,7 @@
 import type { FogMask } from "./mask";
 import {
   type FogShapeOp,
+  type LayerShapeLike,
   type PreparedShape,
   preparedContains,
   prepareShape,
@@ -1159,7 +1160,7 @@ export interface StaticLayer {
 
 export function prepareStaticLayer(
   mask: FogMask,
-  shapes: readonly (ShapeLike & { op: FogShapeOp })[],
+  shapes: readonly (LayerShapeLike & { op: FogShapeOp })[],
   darkness: readonly ShapeLike[],
 ): StaticLayer {
   return {

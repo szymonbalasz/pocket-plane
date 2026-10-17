@@ -5,7 +5,7 @@
 // darkness and explored commands land in V1, `TokenInvisibleSet` in V2; sprint 4 (V6) adds
 // `PartyVisionSet` and `FogRedone`.
 import { FogEditKind, FogShape } from "@shared/fog-of-war/schemas";
-import { FogShapeGeom } from "@shared/fog-of-war/shapes";
+import { FogBrushGeom, FogShapeGeom } from "@shared/fog-of-war/shapes";
 import { z } from "zod";
 import { defineEvent } from "./types";
 
@@ -20,7 +20,7 @@ export const FogEdited = defineEvent({
       sceneId: z.string(),
       editId: z.string(),
       kind: FogEditKind,
-      shape: z.union([FogShapeGeom, FogShape]).optional(),
+      shape: z.union([FogShapeGeom, FogBrushGeom, FogShape]).optional(),
     })
     .strict(),
   logged: true,

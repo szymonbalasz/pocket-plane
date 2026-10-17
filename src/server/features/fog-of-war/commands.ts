@@ -58,9 +58,11 @@ import {
   type DarknessRow,
   FOG_ROW_BYTES_MAX,
   FOG_SHAPES_MAX,
+  type FogBrushGeom,
   type FogLayerShape,
   FogShapeGeom,
   type FogShapeOp,
+  isBrush,
   legacyShape,
   normaliseShape,
   type ShapeLike,
@@ -243,6 +245,9 @@ function commitEdit(
   return editId;
 }
 
+/** A fog-layer shape's geometry as `fog.edit` appends it (FR-FOG-26). */
+type LayerGeom = FogShapeGeom | FogBrushGeom;
+
 /** FR-FOG-26: a refused shape → `invalid` with the gesture's copy. */
 function checkShape(s: ShapeLike, path: string[]) {
   const problem = shapeProblem(s);
@@ -276,8 +281,14 @@ export function fogCommands(log: Logger) {
     input: FogEditInput,
     execute({ sceneId, op, shape }, env): FogEditResult {
       const { s, prev, now } = target(env, sceneId);
-      const geom = "kind" in shape ? legacyShape(shape) : normaliseShape(shape);
-      checkShape(geom, ["shape"]);
+      // FR-FOG-26 (sprint 4): brush shapes are valid by zod (radius, points, decodable cells).
+      const geom: LayerGeom =
+        "kind" in shape
+          ? legacyShape(shape)
+          : "stroke" in shape || "cells" in shape
+            ? shape
+            : normaliseShape(shape);
+      if (!isBrush(geom)) checkShape(geom, ["shape"]);
       if (now.shapes.length >= FOG_SHAPES_MAX) throw conflict(FOG_TOO_DETAILED);
       const fogOp: FogShapeOp = op === "hide" ? "fog" : op;
       const added = { op: fogOp, ...geom } as FogLayerShape;

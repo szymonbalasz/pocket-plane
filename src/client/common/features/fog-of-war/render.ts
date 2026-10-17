@@ -8,7 +8,12 @@
 //   statically clear (never over Fog or Explored): painted first, erased under base fog and under
 //   each fog / explored shape, re-painted inside each reveal shape; explored memory turns Fog
 //   into Explored (V3). Sight, darkvision and the blind screen go on top: `vision-render.ts`.
+// Sprint 4 (FR-FOG-26): the brush's `cells` (one rect per painted cell) and `stroke` (a circle per
+// point + a quad per segment, wound one way) shapes fill with the nonzero rule (a union); the
+// others keep even-odd. The brush tool itself is V9.
 // DOM-free (a minimal 2D-context interface) so it runs under `bun test`.
+
+import { decodeCells } from "@shared/fog-of-war/brush";
 import { exploredMask } from "@shared/fog-of-war/explored";
 import { type FogRow, fogBox, maskOf, rebase } from "@shared/fog-of-war/mask";
 import {
@@ -20,11 +25,12 @@ import {
   VISION_TYPE,
   type VisionRecord,
 } from "@shared/fog-of-war/schemas";
-import type {
-  DarknessShape,
-  FogLayerShape,
-  FogShapeGeom,
-  ShapeLike,
+import {
+  type DarknessShape,
+  type FogLayerShape,
+  isBrush,
+  type LayerShapeLike,
+  type ShapeLike,
 } from "@shared/fog-of-war/shapes";
 import { prepareStaticLayer, samplePoint } from "@shared/fog-of-war/vision";
 import type { MapRect } from "@shared/scenes-map/geometry";
@@ -135,11 +141,47 @@ export interface GridPx {
   gridOffsetY: number;
 }
 
+/** The fill rule a fog-layer shape's path needs: brush shapes are unions of subpaths. */
+export const shapeRule = (s: LayerShapeLike): "nonzero" | "evenodd" =>
+  isBrush(s) ? "nonzero" : "evenodd";
+
 /** Adds a shape's outline (grid units → map px), offset by `(dx, dy)` grid units. */
-export function shapePath(ctx: PaintCtx, s: ShapeLike, g: GridPx, dx = 0, dy = 0): void {
+export function shapePath(ctx: PaintCtx, s: LayerShapeLike, g: GridPx, dx = 0, dy = 0): void {
   const cs = g.gridCellSize;
   const X = (x: number) => g.gridOffsetX + (x + dx) * cs;
   const Y = (y: number) => g.gridOffsetY + (y + dy) * cs;
+  if ("cells" in s) {
+    const [col0, row0, cols] = s.cells.box;
+    const cells = decodeCells(s.cells);
+    cells?.forEach((v, i) => {
+      if (v === 1) ctx.rect(X(col0 + (i % cols)), Y(row0 + Math.floor(i / cols)), cs, cs);
+    });
+    return;
+  }
+  if ("stroke" in s) {
+    const [r = 0, ...xy] = s.stroke;
+    const R = r * cs;
+    for (let i = 0; i + 1 < xy.length; i += 2) {
+      const x = X(xy[i] as number);
+      const y = Y(xy[i + 1] as number);
+      ctx.moveTo(x + R, y);
+      ctx.arc(x, y, R, 0, 2 * Math.PI);
+      if (i + 3 >= xy.length) continue;
+      const x2 = X(xy[i + 2] as number);
+      const y2 = Y(xy[i + 3] as number);
+      const len = Math.hypot(x2 - x, y2 - y);
+      if (len === 0) continue;
+      // The quad wound like `arc` (increasing angle: +x towards +y).
+      const nx = (-(y2 - y) / len) * R;
+      const ny = ((x2 - x) / len) * R;
+      ctx.moveTo(x - nx, y - ny);
+      ctx.lineTo(x2 - nx, y2 - ny);
+      ctx.lineTo(x2 + nx, y2 + ny);
+      ctx.lineTo(x + nx, y + ny);
+      ctx.closePath();
+    }
+    return;
+  }
   if ("rect" in s) {
     const [a, b, c, d] = s.rect as [number, number, number, number];
     ctx.rect(X(Math.min(a, c)), Y(Math.min(b, d)), Math.abs(c - a) * cs, Math.abs(d - b) * cs);
@@ -186,7 +228,7 @@ export function fogOpacity(client: CanvasClient): number {
   return FOG_ALPHA[client].fog;
 }
 
-function fillWith(ctx: PaintCtx, p: Paint, draw: () => void, rule?: "evenodd") {
+function fillWith(ctx: PaintCtx, p: Paint, draw: () => void, rule?: "nonzero" | "evenodd") {
   ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = p.alpha;
   ctx.fillStyle = p.color;
@@ -195,7 +237,7 @@ function fillWith(ctx: PaintCtx, p: Paint, draw: () => void, rule?: "evenodd") {
   ctx.fill(rule);
 }
 
-function erase(ctx: PaintCtx, draw: () => void, rule?: "evenodd") {
+function erase(ctx: PaintCtx, draw: () => void, rule?: "nonzero" | "evenodd") {
   ctx.globalCompositeOperation = "destination-out";
   ctx.globalAlpha = 1;
   ctx.fillStyle = "#000000";
@@ -213,7 +255,7 @@ function fogToMemory(
   paints: FogPaints,
   memory: readonly FogRun[],
   clip: () => void,
-  rule?: "evenodd",
+  rule?: "nonzero" | "evenodd",
 ) {
   if (memory.length === 0) return;
   const cells = () => {
@@ -255,18 +297,19 @@ export function paintFog(
   if (darkness.length > 0) erase(ctx, baseRuns);
   fillWith(ctx, paints.fog, baseRuns);
   if (base.length > 0) fogToMemory(ctx, paints, memory, baseRuns);
-  for (const s of shapes as readonly (FogShapeGeom & { op: FogLayerShape["op"] })[]) {
+  for (const s of shapes as readonly FogLayerShape[]) {
     const path = () => shapePath(ctx, s, m);
-    erase(ctx, path, "evenodd");
+    const rule = shapeRule(s);
+    erase(ctx, path, rule);
     if (s.op === "fog") {
-      fillWith(ctx, paints.fog, path, "evenodd");
-      fogToMemory(ctx, paints, memory, path, "evenodd");
-    } else if (s.op === "explored") fillWith(ctx, paints.explored, path, "evenodd");
+      fillWith(ctx, paints.fog, path, rule);
+      fogToMemory(ctx, paints, memory, path, rule);
+    } else if (s.op === "explored") fillWith(ctx, paints.explored, path, rule);
     else if (darkness.length > 0) {
       ctx.save();
       ctx.beginPath();
       path();
-      ctx.clip("evenodd");
+      ctx.clip(rule);
       darknessFill();
       ctx.restore();
     }
