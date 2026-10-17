@@ -6,7 +6,6 @@ import { signed } from "@shared/character-sheet/logic";
 import { notRestoredText } from "@shared/combat-extras/rules";
 import {
   canRollInitiative,
-  critExpression,
   d20Expression,
   healthBand,
   showRollMonsters,
@@ -54,7 +53,7 @@ import { characterOf, deadPc, deathStateFor, MORE_W } from "@ui/features/combat-
 import { RowName } from "@ui/features/combat-extras/parts";
 import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
 import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
-import { pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
+import { manualFields, pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
 import {
   startedIn,
   toastIntentError,
@@ -119,7 +118,7 @@ import {
 import { CbtxRuntime } from "../combat-extras/runtime";
 import { skipText } from "../combat-extras/skip";
 import { useCbtxDialogs } from "../combat-extras/store";
-import { attackChoices } from "./attack-choices";
+import { type AttackAction, attackChoices, attackRolls } from "./attack-choices";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
@@ -235,20 +234,20 @@ const ATTACK_ACTIONS = [
   { value: "both", label: "Attack + damage" },
   { value: "toHit", label: "Attack" },
   { value: "damage", label: "Damage" },
-] as const;
-type AttackAction = (typeof ATTACK_ACTIONS)[number]["value"];
+] as const satisfies readonly { value: AttackAction; label: string }[];
 
 /**
  * FR-MOD-15, -27: the preview subjects of an attack row's action, as `cbt.attack` /
  * `cbt.rollDamage` roll them: the to-hit, then the card's damage (`card: true`; Damage alone
- * reads the pending to-hit card's mode).
+ * reads the pending to-hit card's mode); an extra damage part has none (FR-CHARX-55).
  */
 function attackSubjects(
   combatantId: string,
   row: string,
   action: AttackAction,
   cardMode: RollMode | undefined,
-): RollSubject[] {
+  extraParts: number,
+): (RollSubject | null)[] {
   const base = { creature: { combatantId }, via: "weapon" as const, row: row.slice(0, 60) };
   const hit: RollSubject = { ...base, roll: "attack" };
   const damage: RollSubject = {
@@ -257,7 +256,12 @@ function attackSubjects(
     card: true,
     ...(action === "damage" && cardMode ? { toHitMode: cardMode } : {}),
   };
-  return action === "toHit" ? [hit] : action === "damage" ? [damage] : [hit, damage];
+  const extra = Array<null>(extraParts).fill(null);
+  return action === "toHit"
+    ? [hit]
+    : action === "damage"
+      ? [damage, ...extra]
+      : [hit, damage, ...extra];
 }
 
 /**
@@ -266,6 +270,8 @@ function attackSubjects(
  * {rolls: "toHit"}`), Damage (`cbt.rollDamage`; after a natural 20 on that row's pending to-hit
  * card the roll control opens critical). The pick rolls through one control once it has
  * re-rendered with that attack and action (as Check ▸ / Save ▸); the result's card opens.
+ * Physical dice (BL-19): one entry per part as the server rolls them (FR-CBT-81), the extra
+ * parts sent as `manualExtra`.
  */
 function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | undefined }) {
   const { send, disabled } = useCbtIntent();
@@ -288,37 +294,34 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
   const rowId = chosen?.attackId ?? attacks[0]?.id;
   const card = pendingToHitCard(notes, c.id, rowId === undefined ? {} : { attackId: rowId });
   const crit = action === "damage" && card?.toHit?.natural === 20;
+  const rolls = attack ? attackRolls(attack, action) : null;
   const control = useRollControl({
-    expressions: !attack
-      ? ["1d20"]
-      : action === "toHit"
-        ? [d20Expression(attack.toHit)]
-        : action === "damage"
-          ? [attack.damage]
-          : [d20Expression(attack.toHit), attack.damage],
-    critExpressions: attack && action !== "toHit" ? [critExpression(attack.damage)] : undefined,
+    expressions: rolls?.expressions ?? ["1d20"],
+    critExpressions: rolls?.critExpressions,
     crit,
     category: action === "damage" ? "damage" : "attack",
     label: attack
       ? `${c.name} — ${attack.name} ${action === "damage" ? "damage" : "attack"}`
       : undefined,
-    ...(attack ? { subject: attackSubjects(c.id, attack.name, action, card?.mode) } : {}),
+    ...(attack && rolls
+      ? { subject: attackSubjects(c.id, attack.name, action, card?.mode, rolls.extraParts) }
+      : {}),
     onRoll: async (r) => {
       const ref = attackId ? { attackId } : {};
+      // `cbt.rollDamage` takes one entry, `cbt.attack` a list (to-hit [+ base]); then the parts.
+      const manual = manualFields(r, action === "damage" ? 1 : 2);
       const res =
         action === "damage"
           ? await send<{ cardId: string }>("cbt.rollDamage", {
               attackerId: c.id,
-              ...(r.manual?.[0] ? { manual: r.manual[0] } : {}),
-              ...manualPartsOf(r),
+              ...manual,
               ...ref,
             })
           : await send<{ cardId: string }>("cbt.attack", {
               attackerId: c.id,
               mode: r.mode,
               ...(action === "toHit" ? { rolls: "toHit" } : {}),
-              ...(r.manual ? { manual: r.manual } : {}),
-              ...(r.manualParts ? { manualParts: r.manualParts } : {}),
+              ...manual,
               ...ref,
             });
       if (res) openCard(res.cardId);
