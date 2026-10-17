@@ -6,6 +6,7 @@ import {
   DM_WINDOW_VIEW_AS,
   DM_WINDOWS,
   type DmWindow,
+  VIEW_AS_PARTY,
 } from "@shared/protocol/scene-window";
 import { cutWindow, type RecordWindow, type WindowIds } from "@shared/protocol/window";
 import type { z } from "zod";
@@ -356,8 +357,9 @@ export class RecordRegistry {
   /**
    * `sync.loadScene {sceneId, viewAs}` result (FR-FOG-43): every `view-as` type's rows of one
    * scene that player `viewAs` may see (their visibility fn as that player; no active-scene
-   * gate: the DM previews any scene), rendered as the DM's wire. DM only; the caller checks the
-   * scene and the player belong to the viewer's campaign.
+   * gate: the DM previews any scene), rendered as the DM's wire. `viewAs: "party"` (sprint 4):
+   * every row of the scene (every player's). DM only; the caller checks the scene and the
+   * player belong to the viewer's campaign.
    */
   loadViewAs(
     src: SnapshotSource,
@@ -365,6 +367,16 @@ export class RecordRegistry {
     sceneId: string,
     viewAs: string,
   ): Record<string, unknown[]> {
+    if (viewAs === VIEW_AS_PARTY) {
+      const out: Record<string, unknown[]> = {};
+      for (const def of this.viewAsTypes()) {
+        out[def.type] = def
+          .snapshot(src, v, { sceneId })
+          .filter((r) => def.sceneOf?.(r) === sceneId && def.campaignOf?.(r) === v.campaignId)
+          .map((r) => this.view(def.type, r, v).data);
+      }
+      return out;
+    }
     const as: Viewer = {
       connId: v.connId,
       campaignId: v.campaignId,

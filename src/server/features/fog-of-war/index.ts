@@ -11,6 +11,7 @@ import { fogCommands } from "./commands";
 import { fogExploredRecordType, fogRecordType, visionRecordType } from "./records";
 import { fogSettingsRecordType } from "./settings";
 import { setFogLogger } from "./sight";
+import { fogSightSignal } from "./sight-signal";
 import { upgradeVisionModel } from "./upgrade";
 
 export const fogOfWar: Feature = {
@@ -33,6 +34,8 @@ export const fogOfWar: Feature = {
     r.command(c.forgetExplored, { intent: true });
     r.command(c.setInvisible, { intent: true });
     r.command(c.setPartyVision, { intent: true });
+    // FR-FOG-53: the server-originated sight preview (sent by V8's `map.checkMove` hint).
+    r.services.signals.registerServer(fogSightSignal);
     setFogLogger(r.services.log);
     r.onStart("fog-of-war.seen-by-backfill", (s) => {
       const n = backfillSeenBy(s.db, realContext(s.clock));

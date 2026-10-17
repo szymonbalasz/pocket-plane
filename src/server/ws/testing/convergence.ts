@@ -2,7 +2,8 @@
 // (ADR-0029, CON-39): for a windowed type only pinned rows and rows at or above the window
 // floor are compared; older rows a client still holds are real, just not resent. For the
 // DM's `dmWindow` types (ADR-0041) only the active scene + the loaded scenes are compared; for
-// `view-as` types (FR-FOG-43) only the loaded `(sceneId, playerId)` pair (none → nothing).
+// `view-as` types (FR-FOG-43) only the rows the loaded `(sceneId, playerId)` pair's load returns
+// now (none → nothing; `"party"` and party vision included, sprint 4).
 // Per-player helpers (ADR-0042): `playerViewer` and `leakScan` on each player's client.
 // Lazy types (ADR-0045, FR-SYNC-38): compared only for the client's loaded types / ids.
 import type { ServerFrame } from "@shared/protocol/frames";
@@ -49,14 +50,13 @@ export function sceneWindowProjection(
 ): RecordMap {
   if (v.role !== "dm") return records;
   const out: RecordMap = { ...records };
+  const want = viewAs ? s.records.loadViewAs(sourceOf(s), v, viewAs.sceneId, viewAs.playerId) : {};
   for (const def of s.records.viewAsTypes()) {
     const byId = records[def.type];
     if (!byId) continue;
+    const ids = new Set((want[def.type] ?? []).map((r) => (r as { id: string }).id));
     const kept: Record<string, unknown> = {};
-    for (const [id, r] of Object.entries(byId)) {
-      const pid = (r as { playerId?: unknown }).playerId;
-      if (viewAs && def.sceneOf?.(r) === viewAs.sceneId && pid === viewAs.playerId) kept[id] = r;
-    }
+    for (const [id, r] of Object.entries(byId)) if (ids.has(id)) kept[id] = r;
     out[def.type] = kept;
   }
   for (const def of s.records.dmWindowed()) {

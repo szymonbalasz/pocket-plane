@@ -174,6 +174,19 @@ export const VisionRecord = z.object({
 });
 export type VisionRecord = z.infer<typeof VisionRecord>;
 
+/**
+ * FR-FOG-53 (sprint 4): signal `fog.sight` (server-originated, OQ-FOG-58): a dragged source's
+ * polygons at the previewed cell (rounded, simplified, FR-FOG-33); map sight only, no records.
+ */
+export const FOG_SIGNALS = { sight: "fog.sight" } as const;
+export const FogSightPayload = z.object({
+  sceneId: z.string(),
+  tokenId: z.string(),
+  see: z.array(z.array(z.number())),
+  dark: z.array(z.array(z.number())),
+});
+export type FogSightPayload = z.infer<typeof FogSightPayload>;
+
 /** `fog-settings` (FR-FOG-49): id = the campaign id; every viewer full; no row = off. */
 export const FogSettingsRecord = z.object({ id: z.string(), partyVision: z.boolean() });
 export type FogSettingsRecord = z.infer<typeof FogSettingsRecord>;
