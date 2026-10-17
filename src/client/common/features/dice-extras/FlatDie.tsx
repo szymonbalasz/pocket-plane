@@ -1,8 +1,8 @@
 // A flat die (FR-DICEX-21 `flat`, FR-DICEX-13 chips): the face at its server value in the
 // roller's look (`data-style` / `data-material`, FR-DICEX-20), drawn as its die shape
-// (FR-DICEX-42; a chip without a mesh → round). Dropped dice dimmed, MOD / offered dice
-// labelled, physical dice badged. The wrapper keeps the throw / result test IDs; the shape
-// inside carries `dicex-die`.
+// (FR-DICEX-42; only a sum without per-die values → round, physical dice keep their shape).
+// Dropped dice dimmed, MOD / offered dice labelled, physical dice badged. The wrapper keeps the
+// throw / result test IDs; the shape inside carries `dicex-die`.
 import type { DiceLook } from "@shared/dice-extras/looks";
 import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import type { ThrowDie } from "@shared/dice-extras/throw";
@@ -44,7 +44,7 @@ export function FlatDie({
         offered={die.offered === true}
         look={look}
         size={size}
-        round={die.shape === null}
+        round={die.sum === true}
         part={die.d100}
         negative={die.sign === -1}
       />

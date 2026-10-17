@@ -108,6 +108,54 @@ describe("FR-DICEX-42 die-shape chips", () => {
     expect(chip).toContain("physical");
   });
 
+  test("FR-DICEX-42 die-shape chips: physical dice with per-die values keep their shape (d6, d100 kites)", () => {
+    const t = throwDice([
+      {
+        id: "e1",
+        n: 1,
+        kind: "roll",
+        public: true,
+        rollerRole: "player",
+        rollerPlayerId: "p1",
+        actorName: "Mira",
+        payload: [
+          {
+            expression: "2d6-1",
+            manual: true,
+            dice: [
+              { faces: 6, value: 4, kept: true },
+              { faces: 6, value: 5, kept: true },
+            ],
+            constant: -1,
+            total: 8,
+            label: null,
+          },
+          {
+            expression: "1d100",
+            manual: true,
+            dice: [{ faces: 100, value: 46, kept: true }],
+            constant: 0,
+            total: 46,
+            label: null,
+          },
+        ],
+      },
+    ]);
+    const dice = t?.dice ?? [];
+    expect(dice).toHaveLength(3);
+    const shapes = dice.map((d) => {
+      const h = html(<FlatDie die={d} />);
+      expect(h).toContain("physical");
+      expect(attr(h, "data-flat")).toBe("true");
+      return [attr(h.slice(h.indexOf("dicex-die")), "data-shape"), texts(h)];
+    });
+    expect(shapes).toEqual([
+      ["d6", ["4"]],
+      ["d6", ["5"]],
+      ["d10", ["40", "6"]],
+    ]);
+  });
+
   test("FR-DICEX-42 die-shape chips: dropped struck + 40 %, offered dashed never struck, colours from the look", () => {
     const look = STYLE_LOOK.crimson;
     const dropped = html(<DieShape faces={20} value={7} kept={false} look={look} />);
