@@ -1,7 +1,7 @@
 ---
 title: Combat extras
 prefix: CBTX
-status: claimed
+status: in-review
 owner: spec-rules
 phase: post-mvp-4
 ---
@@ -16,6 +16,7 @@ phase: post-mvp-4
 - Every capability is a server command ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). Rules (expiry, concentration prompts, death-save failures, temp HP absorption) run **inside the causing command's transaction** as rule hooks and the HP rules helper; no post-commit listener writes state ([ADR-0035](../architecture/adr/0035-combat-rule-hooks.md), accepted #178). A crash loses nothing.
 - Players see what the table sees: conditions and effects on visible creatures, their own PC's numbers, a monster's health band only (#138), other PCs' death state but no HP.
 - **Sprint 2, phase 1** (DM notes #188 + session-sim-4; FR-CBTX-44–50): the Add dialog rolls initiative on the way in, creates tokens (hidden by default) at the centre of the DM's view and offers average / rolled HP (N5); a token-less combatant can be **linked** to a token dropped later, which fixes missing movement and targeting for added creatures (N6, N6.1); chips use the room they have (G1); death-save lines no longer show counters (G7); concentration cards show in Initiative and on the DM's bell, close as "Closed", and cue the player's token on the DM map (G9, N11); a dead or downed PC keeps its map cue after End (item 14).
+- **Sprint 4** (track R, DM [#243](../decisions-log.md) [19]; FR-CBTX-51–53): **trigger badges**: Initiative rows show the rule triggers in effect (Divine Fury, Sneak Attack) with their state (ready / used this turn / uses left) beside the effect chips, tokens show one trigger icon with the list on hover; data from MOD's `trigger-state` ([FR-MOD-53–55](effect-modifiers.md#6-functional-requirements)). A new `combatRuleHooks` point `effectsChanged` keeps "in effect" right when an effect starts or ends. Test plan: [MOD §13.1](effect-modifiers.md#131-sprint-4-track-r-mod-cbt-cbtx-charx).
 
 ## 2. Scope
 
@@ -123,6 +124,10 @@ All commands: rows + event-log entry + domain event in one transaction; IDs, tim
 | FR-CBTX-48 | **Concentration card cues** (G9; amends FR-CBTX-37, -43): the `cbtx-concentration` views declare `encounterIdOf: (p) => p.encounterId` ([FR-NOTE-29](notifications.md#6-functional-requirements)), so the DM's Initiative "Pending" lists it ([FR-CBT-79](combat-tracker.md#6-functional-requirements): "Waiting for Mira: concentration save DC 10 (Bless)"); the DM's bell counts a player-owned card ([FR-NOTE-27](notifications.md#6-functional-requirements)); rule closures (`ended`, `undone`) record no actor ([FR-NOTE-28](notifications.md#6-functional-requirements)), so History reads "Ended · Closed", not "Resolved by DM". End rule unchanged (none, OQ-CBTX-15). | G9 |
 | FR-CBTX-49 | **Action cue for a concentration save** (N11): the DM view's `cueTokens(n, store)` ([FR-NOTE-30](notifications.md#6-functional-requirements)) returns the token bound to the target character's active combatant, else that character's tokens on the viewed scene. Only player-owned cards cue (FR-NOTE-30); a DM-owned card (monster, hidden PC) already toasts for the DM. Label = the notification text (FR-NOTE-30), e.g. "Mira: concentration save DC 10 (Bless)". | N11 |
 | FR-CBTX-50 | **Death state stays on the map after End** (report item 14, seam S5; extends FR-CBTX-30): the `cbtx` overlay also decorates a token **not** bound to an active combatant when its definition is a character with `deathState` ≠ null: badge "Dead" (`hp.down`) always while dead; "Dying" / "Stable" while at 0 HP; plus the Down X while at 0 HP or dead (same `cross` as FR-CBT-48). So a dead PC keeps its X + "Dead" after End and on any scene, until healed or the DM resets the counters. For everyone who receives the token: DM and owner read the full character; other players read the redacted `deathState` / `down`. The token → character link is the token's **`characterId`** display copy ([FR-MAP-26](scenes-map.md#6-functional-requirements) as amended, ruling P2b-1: players get `characterId` on character tokens, never `definitionId`; OQ-CBTX-24 settled); DM clients may also use `definitionId`. | Item 14 |
+| **Sprint 4: trigger badges** (track R, #243 [19]) | | |
+| FR-CBTX-51 | **`effectsChanged` hook point** (amends FR-CBTX-01; seam for [FR-MOD-54](effect-modifiers.md#6-functional-requirements)): `combatRuleHooks` gains `effectsChanged(env, encounter, {creatures: TargetRef[]}) → RecordChange[]`, called **after** the effect rows are written, in the same transaction, whenever effect rows of creatures in the started encounter are inserted, ended or restored: `cbtx.addEffect`, `updateEffect`, `endEffect`, `setConcentration` (incl. replaced and linked ends), incapacitating conditions (FR-CBTX-11), 0 HP ends (FR-CBTX-16, inside `hpRules.apply`), undo restores (FR-CBTX-22), and MOD's `mod.apply` / `mod.toggle` (through CBTX's insert / end helpers). One choke point: CBTX's effect insert and end helpers collect the creatures; the hook runs once per command. Expiry / restore on Next / Prev and End don't call it (`turnChanged` / `ended` already run). No hook line → no-op. | ADR-0035 pattern |
+| FR-CBTX-52 | **Trigger chips on Initiative rows** ([19]; amends FR-CBTX-33, -34, -46; content per OQ-MOD-40 A): after the effect chips, one chip per `trigger-state` row the viewer receives for that combatant that is `armed`: lightning icon + name ("Divine Fury"); state: ready = normal; `used` = muted + check icon, Tooltip "Used this turn" ("… this round" / "… this fight"); a `feature` trigger adds uses left from the sheet ("Divine Fury 2"; "−1" in `hp.down`; DM and owner only). Tooltip = the state sentence (pure `badgeFor`, MOD). Same one-line fitting as effect chips (FR-CBTX-46: compact labels, tighten, then "+N"; effect chips first, trigger chips last into "+N"); the "+N" hover and the row menu list both. DM rows: every row; player rows: what FR-MOD-55 sends (own PC's, other PCs' public, never monsters'). | [19] |
+| FR-CBTX-53 | **Trigger icon on tokens** ([19]; amends FR-CBTX-29): the `cbtx` overlay's icon row gains one lightning icon (`cbtx-token-trigger`) on a token bound to a combatant with ≥ 1 armed trigger the viewer receives: full tone while any is ready (or `each`, or uses left > 0), muted when all are used; it counts toward the row's 4 icons + "+N" (placed last). Hover Tooltip lists each: "Divine Fury — ready", "Sneak Attack — used this turn". Same audience as FR-CBTX-52; nothing after End (rows deleted). | [19] |
 
 ## 7. UI/UX notes
 
@@ -133,6 +138,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, de
 - **Map layout:** bar on the footprint's top edge inside the token group (moves with drags and previews); icons in a row below it, top-left; death badge in the label row. Exact pixels per scenes-map's renderer; screenshot at §13 step 1.
 - **Sprint 2:** Add dialog = lookup on top, rows below (name, − count +, HP Select, remove), tickboxes and the preview above the Add button; notes "This encounter has no scene" / "Tokens go to ‹scene›" (FR-CBT-65). Chips: compact labels, ellipsis at 96 px (FR-CBTX-46). Token menu "Link to ‹name›" under Add to combat.
 - **States:** no encounter: DM effect / temp HP / death controls still work on characters (sheet sections); Initiative empty as CBT. Disconnected: last state + banner, controls disabled. Errors: Toast.
+- **Sprint 4 (badges):** trigger chips use the effect chip look (Badge, lucide `Zap` icon), muted + `Check` when used; uses count as a small number after the name. Token: one `Zap` icon in the icon row, muted when all used. Test IDs: `cbtx-trigger-chip` (+ `data-record-id` = trigger-state id, `data-state` = `ready` \| `used` \| `uses`, `data-value` = uses left when shown), `cbtx-token-trigger` (Konva node name; id = token id; `data-state` via the node's `state` attr for the query helper). Screenshot at MOD §13.1 step 2.
 - **Test IDs:** `cbtx-init-row-<temp|effect|death|conditions|effect-new|concentration|temp-set|death-roll|stabilise|death-set>` (`effect` + `data-record-id` = effect id, `data-value` = key or `custom`; `death` + `data-value` = state), `cbtx-init-add`, `cbtx-add-<picker|qty|binding|confirm>` (*sprint 2:* `picker` = the lookup input, options `cbt-lookup-option`; + `cbtx-add-<row|hp|create-tokens|hidden|remove>`, `binding` + `data-value` = `token` \| `new` \| `none`), `cbtx-token-menu-link` (+ `data-record-id` = combatant id), `cbtx-token-menu-unlink`, `cbtx-effect-<tab|label|duration|source|link|secret|save|end>`, `cbtx-conc-<label|duration|save>`, `cbtx-temp-<input|save>`, `cbtx-death-<success|failure|state>`, `cbtx-token-menu-<conditions|effect|temp|add>`, `cbtx-note-roll`, `cbtx-expired-toast`; Konva `cbtx-token-bar` (attr `tone`, `fraction`), `cbtx-token-effect`, `cbtx-token-death` (id = token id).
 
 ### 7.1 Character sheet seam (CHARX boundary)
@@ -234,6 +240,7 @@ Settled by the orchestrator (D/S seam). CBTX owns data, rules, intents and visib
 
 - **Player disconnect / reconnect:** a concentration card waits pending; summary toast on return (FR-NOTE-15); the DM may roll it meanwhile. Chips, bars, pips rebuild from the snapshot; nothing replays.
 - **DM disconnect:** players still roll death and concentration saves; expiry needs Next, so nothing expires while the DM is away.
+- **Sprint 4 (badges):** reconnect → badges from the snapshot's `trigger-state` rows. An effect ended by any path in a started encounter rewrites "in effect" in that transaction (FR-CBTX-51), so a crash leaves effect and badge consistent. Prev / Next / Undo: MOD rewrites the state (FR-MOD-54). A hidden token's combatant: other players get the rows' delete with the hide (MOD's token hook line). Chips never grow the row (FR-CBTX-46 fitting).
 - **Server crash:** every rule runs in its command's transaction: apply ⇔ temp ⇔ death counters ⇔ concentration card ⇔ effects ended; Next ⇔ expiry; undo ⇔ restores. Restart → identical snapshots. No post-commit work.
 - **Concurrent:** two tabs roll one card → second `conflict`. Player rolls a death save while the DM heals → serial: the roll after the heal → `conflict` "Not dying". Concentration ends (save failed) while a second card is open → that card closes `ended` in the same transaction.
 - **Prev / Next races:** `expected*` guards (FR-CBT-14). Next + Prev restores exactly the effects that Next expired.
@@ -251,6 +258,7 @@ Settled by the orchestrator (D/S seam). CBTX owns data, rules, intents and visib
 - `effect` ≈ 300 B (DM), ≈ 200 B (player); cap 300 active per campaign → ≤ 90 KB DM snapshot worst, typ. < 5 KB. CON-44 heavy DM snapshot 491 KB + 5 KB.
 - One `TurnChanged` frame grows by the expired rows (typ. 0–3 × 300 B). An apply adds ≤ 1 card per target (≤ 20 × 1.5 KB worst). Bulk condition on 20 tokens = one event ≤ 6 KB.
 - Overlays are pure, per token per render; `bar` + `icons` add ≤ 6 Konva nodes per token; 60 active tokens stay within the canvas budget.
+- Sprint 4: the trigger icon is one of the existing ≤ 4 icons (no node budget change); `effectsChanged` costs one indexed read of the listed creatures' effects and triggers per command. Badge data is MOD's `trigger-state` (measured: DM +22,326 B realistic, +84,102 B worst; players ≤ 12,660 B; [MOD §12](effect-modifiers.md#12-performance--bandwidth)); CBTX adds no bytes.
 - Sprint 2: an add with 20 instances = one event with ≤ 20 token creates, ≤ 40 DM-only roll entries (≤ ~25 KB DM, ≤ ~8 KB players); `CombatantBound` ≤ 1 KB. Chip measuring is one ResizeObserver per window. No new record type; CON-44 re-run (created tokens count in scenes-map's budget).
 
 ## 13. Test plan
@@ -341,12 +349,21 @@ Builders report `shared change needed:`. **No** DB column, record type or visibi
 - **Order:** after combat-tracker's sprint-2 shared-first branch (encounter columns, card zod, scenes-map helper, notifications helpers); FR-CBTX-44 and FR-CBT-64 share the placement rule, so the same `fix/*` builds both.
 - **Docs (integrator):** protocol §32 (intents, `CombatantBound`, `CombatantsAdded` changes); log-line note in §32 (death save without counters).
 
+### Shared changes — sprint 4 (track R)
+
+Split and order in [MOD §14.3](effect-modifiers.md#143-build-split-sprint-4-track-r). No DB column, record type, intent or event in CBTX.
+
+- **S4-0 `fix/rules4-core`:** `combatRuleHooks` contract gains `effectsChanged` (`src/server/features/combat-tracker/rule-hooks.ts` types, CBT core; the registry stays append-only); CBTX's effect insert / end helpers and `hpRules` call it (own folder). Protocol §26 registry row (integrator).
+- **S4-4 `build/trigger-state` (b):** Initiative chip line (`row.tsx`, common `parts.tsx`, player row) and the `cbtx` token overlay icon (`token-overlay.ts`), own files; reads MOD's `trigger-state` via `badgeFor`. Combat client files: not in parallel with another branch editing the same files (S4-1b edits the popup only).
+- **Tests and walkthrough:** [MOD §13.1](effect-modifiers.md#131-sprint-4-track-r-mod-cbt-cbtx-charx) (`FR-CBTX-52/53 badges render`, `FR-MOD-53/54 state follows the turn` covers `effectsChanged`; steps 2, 4, 8–11, 13). Named test here: `FR-CBTX-51 effectsChanged runs once per command` (addEffect on 3 targets → one call with 3 creatures; 0 HP concentration end inside an apply → called; Next expiry → not called).
+
 ## 15. Open questions
 
-Sprint-1 rows: all decided (the DM accepted every pick, #178; the D/S seam rows were settled by the orchestrator before the gate and accepted with it). Sprint-2 rows: all decided (#190 for OQ-CBTX-22 and -25; seam rulings for -23 and -24).
+Sprint-1 rows: all decided (the DM accepted every pick, #178; the D/S seam rows were settled by the orchestrator before the gate and accepted with it). Sprint-2 rows: all decided (#190 for OQ-CBTX-22 and -25; seam rulings for -23 and -24). **Sprint 4:** badge content and audience are MOD's OQ-MOD-40 / -41 (DM, gate); OQ-CBTX-26 below is cross-spec, non-blocking.
 
 | ID | Question | Decision | Blocking? | Affects |
 |---|---|---|---|---|
+| OQ-CBTX-26 *(sprint 4)* | **scenes-map (M, V):** the token trigger icon (FR-CBTX-53) joins the `cbtx` icon row (inside the footprint, below the HP bar), not the label row, to stay clear of M's label-collision work (sim-7: badges over names). Needs: hover Tooltips on Konva overlay icons (as BL-04's "+N" hover), and MOD's `tokenChangedHooks` line for the `hidden` copy (append-only) | **Open: confirm placement with M's label slice; no scenes-map code change beyond the hover reuse** | no · owner: scenes-map (M) | scenes-map |
 | ~~OQ-CBTX-22~~ | ~~"Add hidden" when Create tokens is off (N5)~~ | **Decided (#190):** disabled; token-less creatures join visible as today (FR-CBT-08); hidden token-less combatants stay out of scope (CBT §4). Rejected: allow them plus a row "Reveal" | — | combat-tracker |
 | ~~OQ-CBTX-23~~ | ~~Linking a token (FR-CBTX-45): whose name wins?~~ | **Settled S3:** the token's (FR-CBT-08 copy rule); no scenes-map change | — | — |
 | ~~OQ-CBTX-24~~ | ~~scenes-map: FR-CBTX-50 on player clients needs the token → character link~~ | **Settled (scenes-map FR-MAP-26):** ~~player token data keeps `definitionId` for character tokens only~~ *(ruling P2b-1)* a `characterId` display copy on the token, sent to players on character tokens; `definitionId` never reaches players | — | scenes-map |
@@ -379,6 +396,7 @@ Sprint-1 rows: all decided (the DM accepted every pick, #178; the D/S seam rows 
 - Custom monster / NPC actions auto-rolled vs targets ([compendium](post-mvp/compendium.md) first); AoE / multi-target **saves** (multi-target damage is MVP, FR-CBT-34).
 - Drag-to-reorder initiative (tier B); legendary / lair actions, reaction-used tracker (tier C).
 - Advantage / disadvantage from conditions, condition immunities, exhaustion effects, massive damage (OQ-CBTX-06, -11).
+- *(Sprint 4)* Clicking a trigger chip to act on it (chips are display only; the sheet and the DM's trigger editor stay the entry points).
 - Effects on tokens or monsters outside an encounter; end-of-turn durations (OQ-CBTX-03); concentration on non-creatures.
 - Spells, slots, hit dice (→ character-sheet-full / levelling); stats UI (→ [stats](post-mvp/stats.md)).
 - Sheet spells marked concentration (CHARX `spells[].concentration`) don't start CBTX concentration; the player uses **Concentrate…** with a free-text label.
