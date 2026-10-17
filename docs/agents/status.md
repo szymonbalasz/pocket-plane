@@ -13,13 +13,13 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | V7 pan / plain map / Fit | merged 13c15f6 | — | Done (BL-01, BL-07; check 3158, e2e 94) | V8, M1 next |
 | V8 vision while dragging | merged ec3fd3a | — | Done (walkthrough 8/8; main check 3231, e2e 99 green) | — |
 | M1 freeform AoE | merged | — | Done (walkthrough 7/7; BL-05 done) | — |
-| M2 drag path | `build/drag-path` (w61, slot 0) | fix-drag-path | Walkthrough 9/9; after merging main fury-log-line e2e finds 2 Divine Fury dice (deterministic) → fixing | Merge |
-| M5 labels + best-rectangle Fit | `fix/map-labels-fit` (w65, slot 2; on build/drag-path) | test-map-labels-fit | Walkthrough | Merge after M2 → C-art |
+| M2 drag path | merged | — | Done (walkthrough 9/9; check 3356, e2e 107) | — |
+| M5 labels + best-rectangle Fit | `fix/map-labels-fit` (w65, slot 2; on build/drag-path) | fix-map-labels-fit | Walkthrough 11/11; rectangle choice must keep the top row (ruling) → fixing | Merge after M2 → C-art |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | Physical dice in combat (BL-19, BL-25) | merged | — | Done (walkthrough 5/5; check 3314, e2e 105) | — |
 | C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
 | V9 fog brush + Ctrl+Z | merged | — | Done (walkthrough 13/13) | — |
-| V10 party vision + Blinded | `build/party-vision` (w64, slot 5) | build-party-vision (idle) | Built; merges main after V9 lands, then walkthrough | Walkthrough → merge |
+| V10 party vision + Blinded | `build/party-vision` (w64, slot 5) | test-party-vision | Walkthrough (with V9 merged in; check 3363, e2e 108) | Merge |
 | session-sim-8 bundle | merged | — | Done (49 fixtures, ~1 s; skipped mt-crowd, art-update-tokens, vision-legacy, vision-invisible, rolls-1; V10 / M5 / C-art may add units) | Sprint gate after the last slices |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |

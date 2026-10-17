@@ -4,7 +4,8 @@
 // (FR-MAP-42). Konva node `name` = `map-token`, `id` = token id, attrs `shape`, `preview`
 // (FR-MAP-40); ring `map-token-ring` (attr `state`); crosses, bars and icons named by their
 // overlay id (bar attrs `tone`, `fraction`; icon attrs `value`, `icon`, `tone`, `label`); "+N"
-// `map-token-icons-more` (attr `count`); a cue (FR-MAP-49) named by its id, attr `label`.
+// `map-token-icons-more` (attr `count`); a cue (FR-MAP-49) named by its id, attr `label`. Drag
+// paths and combat trails (FR-MAP-52–55) are drawn first, below every token (`DragPaths`).
 import { cellToPx, footprint, initials } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
@@ -21,6 +22,7 @@ import { barGeometry, cueGeometry, cuePulse, iconRow } from "../token-decor";
 import type { TokenBar, TokenCross, TokenCue, TokenIcon } from "../token-overlays";
 import { tokenOverlays } from "../token-overlays";
 import { useLayerToggles } from "../tool-store";
+import { DragPaths } from "./DragPaths";
 import { toneColor } from "./tone";
 
 const INSET = 0.92;
@@ -436,6 +438,7 @@ export function TokensLayer() {
   const drawn = useMemo(() => withoutDmOnly(tokens, client, off), [tokens, client, off]);
   return (
     <Group name="tokens-layer">
+      <DragPaths tokens={drawn} />
       {drawn.map((t) => (
         <TokenNode key={t.id} t={t} />
       ))}

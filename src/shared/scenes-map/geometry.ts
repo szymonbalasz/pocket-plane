@@ -8,6 +8,8 @@ export interface Grid {
   gridOffsetY: number;
 }
 
+type Cell = { col: number; row: number };
+
 export interface MapRect extends Grid {
   mapWidth: number;
   mapHeight: number;
@@ -61,6 +63,27 @@ export function distanceFt(a: { col: number; row: number }, b: { col: number; ro
   const dx = Math.abs(a.col - b.col);
   const dy = Math.abs(a.row - b.row);
   return 5 * (Math.max(dx, dy) + Math.floor(Math.min(dx, dy) / 2));
+}
+
+/**
+ * FR-MAP-52 (OQ-MAP-36): the cells a dragged token's top-left steps through on the straight line
+ * `from` → `to`, both ends included: `max(|dx|, |dy|) + 1` cells, one per step along the longer
+ * axis; on the other axis the cell whose centre is nearest the line, a tie going toward the target.
+ * `min(|dx|, |dy|)` steps are diagonal, so the steps' cost under either diagonal rule is the
+ * drag's distance (FR-MAP-22, FR-SCN-30).
+ */
+export function dragPath(from: Cell, to: Cell): Cell[] {
+  const dx = to.col - from.col;
+  const dy = to.row - from.row;
+  const n = Math.max(Math.abs(dx), Math.abs(dy));
+  // Nearest integer to `v`; a half goes the way the axis moves (toward the target).
+  const near = (v: number, d: number) => (d >= 0 ? Math.floor(v + 0.5) : Math.ceil(v - 0.5));
+  const out: Cell[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = n === 0 ? 0 : i / n;
+    out.push({ col: near(from.col + t * dx, dx) + 0, row: near(from.row + t * dy, dy) + 0 });
+  }
+  return out;
 }
 
 /** Ruler (FR-MAP-22) and drag (FR-MAP-15) label text. */
@@ -139,7 +162,6 @@ export function insideMap(m: MapRect, col: number, row: number, size: TokenSize)
   return x >= -eps && y >= -eps && x + side <= m.mapWidth + eps && y + side <= m.mapHeight + eps;
 }
 
-type Cell = { col: number; row: number };
 type Placed = Cell & { size: TokenSize };
 
 /**
