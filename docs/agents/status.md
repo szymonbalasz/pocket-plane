@@ -9,10 +9,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
-| Docs pass | `fix/s4-docs` | docs-s4 | Queued (brief ready) | First free slot |
+| Docs pass | `fix/s4-docs` (w58) | docs-s4 | Writing | Merge |
 | V6 vision core | `fix/vision-s4-core` (w54, slot 0) | build-vision-core | Building | Walkthrough |
 | D5 die shapes + log dice | `build/dice-shapes` (w55, slot 2) | build-dice-shapes | Building | Walkthrough |
-| M0 area helper | `fix/area-geom` (w56, slot 3) | build-area-geom | Building | Walkthrough (unit-only: check + review) |
+| M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
 | M4 window placement | `fix/window-placement` (w57, slot 4) | build-window-placement | Building | Walkthrough |
 
 ## Shared-file locks
