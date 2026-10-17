@@ -49,9 +49,16 @@ describe("scenes-map feedback: shape + speed copies", () => {
     const t = setup();
     const s = t.newScene();
     const ogre = t.place(s.id, t.caveOgre(), 9, 10);
-    expect(ogre).toMatchObject({ shape: "none", speed: 40, size: "large" });
+    expect(ogre).toMatchObject({ shape: "none", speed: 40, size: "large", creatureType: null });
     const goblin = t.place(s.id, t.h.goblinId, 1, 1);
-    expect(goblin).toMatchObject({ shape: "round", speed: 30 });
+    expect(goblin).toMatchObject({ shape: "round", speed: 30, creatureType: null });
+    // FR-ENT-27: a typed definition's type rides along.
+    const typed = t.run<{ id: string }>(createEntity.name, {
+      kind: "monster",
+      name: "Hill Giant",
+      statBlock: { ...wolfBlock, size: "huge", type: "giant" },
+    });
+    expect(t.place(s.id, typed.id, 15, 1)).toMatchObject({ shape: "round", creatureType: "giant" });
     const { speed: _speed, ...noSpeed } = wolfBlock;
     const unknown = t.run<{ id: string }>(createEntity.name, {
       kind: "monster",

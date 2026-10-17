@@ -1,6 +1,7 @@
 // scenes-map commands (MAP §6, §9; protocol §13, §16). Each: validated intent → rows + event-log
 // entry in one transaction (except `TokenMoved`, not logged) → domain event. IDs and time from ctx;
 // `seq` from the DB (CON-20). Campaign = `actor.campaignId`, fixed at authentication (CON-21).
+import { creatureTypeOf } from "@shared/entities/schemas";
 import {
   SceneActivated,
   SceneCreated,
@@ -576,9 +577,10 @@ export type PlaceTokenSpec = z.output<typeof PlaceTokenInput>;
  *
  * FR-MAP-13: name = definition name, numbered (FR-MAP-16); image = portrait or none; size =
  * `statBlock.size`; shape = definition `tokenShape`, else round (FR-MAP-35); speed =
- * `statBlock.speed`, else null (FR-MAP-36); owner = the character's owner, else none; visible;
- * `characterId` copy (FR-MAP-50); `fogged` / `seenBy` derived (FR-FOG-10). Optional overrides
- * (fixtures) for name, image, owner, hidden, shape; never size, speed, `characterId` or `fogged`.
+ * `statBlock.speed`, else null (FR-MAP-36); `creatureType` = the monster's `statBlock.type`, else
+ * null (FR-ENT-27); owner = the character's owner, else none; visible; `characterId` copy
+ * (FR-MAP-50); `fogged` / `seenBy` derived (FR-FOG-10). Optional overrides (fixtures) for name,
+ * image, owner, hidden, shape; never size, speed, `creatureType`, `characterId` or `fogged`.
  * `dependants` = the visibility hooks' `rederive` rows (FR-FOG-35, ADR-0042); a caller lists them
  * after `change` in its event (none until vision sources exist, V2).
  */
@@ -610,6 +612,7 @@ export function placeTokenIn(
     imageAssetId,
     size,
     shape: input.shape ?? def.tokenShape ?? "round",
+    creatureType: creatureTypeOf(def),
     speed: def.statBlock.speed ?? null,
     col: input.col,
     row: input.row,
@@ -736,8 +739,8 @@ export const checkMove = defineCommand({
   },
 });
 
-/** FR-MAP-18: rename, image (custom art), shape (FR-MAP-35), owner; never size or speed. Runs
- * token-changed hooks. */
+/** FR-MAP-18: rename, image (custom art), shape (FR-MAP-35), creature type (FR-ENT-27), owner;
+ * never size or speed. Runs token-changed hooks. */
 export function updateTokenCommand(hooks: TokenHooks) {
   return defineCommand({
     name: MAP_INTENTS.updateToken,
@@ -754,6 +757,7 @@ export function updateTokenCommand(hooks: TokenHooks) {
         set.ownerPlayerId = input.ownerPlayerId;
       }
       if (input.shape !== undefined) set.shape = input.shape;
+      if (input.creatureType !== undefined) set.creatureType = input.creatureType;
       // FR-FOG-10 / -34: the owner decides the copies (owner + party rule).
       const copies =
         set.ownerPlayerId !== undefined && set.ownerPlayerId !== before.ownerPlayerId
@@ -804,7 +808,7 @@ export function setTokenHiddenCommand(hooks: TokenHooks) {
 }
 
 /**
- * FR-MAP-17: same definition, image, size, shape, speed, owner, hidden flag, `invisible`
+ * FR-MAP-17: same definition, image, size, shape, `creatureType`, speed, owner, hidden flag, `invisible`
  * (FR-FOG-45); numbered name; at `col + footprint` same row if valid, else `col − footprint`,
  * else the source cell; `fogged` / `seenBy` derived at that cell (FR-FOG-10).
  */
@@ -827,6 +831,7 @@ export const duplicateToken = defineCommand({
       imageAssetId: assetOrNull(env, src.imageAssetId),
       size: src.size,
       shape: src.shape,
+      creatureType: src.creatureType,
       speed: src.speed,
       col: cell.col,
       row: cell.row,

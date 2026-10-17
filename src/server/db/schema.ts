@@ -14,7 +14,7 @@ import type { Modifier } from "@shared/effect-modifiers/schemas";
 import { TRIGGER_USE_STATES } from "@shared/effect-modifiers/trigger-records";
 import { TRIGGER_CHARGES } from "@shared/effect-modifiers/trigger-state";
 import { TRIGGER_EVENTS, type TriggerRule } from "@shared/effect-modifiers/triggers";
-import { TOKEN_SHAPES } from "@shared/entities/schemas";
+import { TOKEN_CREATURE_TYPES, TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
 import { LOOT_ENTRY_KINDS } from "@shared/events/party-loot";
@@ -316,6 +316,8 @@ export const token = sqliteTable(
     hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
     /** Token-owned; from the definition's `tokenShape` at place (FR-MAP-35). */
     shape: text("shape", { enum: TOKEN_SHAPES }).notNull().default("round"),
+    /** Display copy of `statBlock.type` at place, token-owned after; null = not known (FR-ENT-27). */
+    creatureType: text("creature_type", { enum: TOKEN_CREATURE_TYPES }),
     /** Display copy of `statBlock.speed`; players: own tokens only (FR-MAP-36). */
     speed: integer("speed"),
     /** Display copy: `definitionId` on character tokens, else null; players see it (FR-MAP-50). */

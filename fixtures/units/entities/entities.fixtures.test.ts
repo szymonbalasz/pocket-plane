@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { closeDb } from "@server/db/client";
-import { campaign, entity } from "@server/db/schema";
+import { campaign, compendiumSource, entity, token } from "@server/db/schema";
 import { readEventLog } from "@server/events/log";
 import { asc, sql } from "drizzle-orm";
 import { loadBundle } from "../../index";
@@ -25,8 +25,10 @@ async function loaded(bundle: string) {
   const rows = db.select().from(entity).orderBy(asc(sql`rowid`)).all();
   const campaigns = db.select().from(campaign).orderBy(asc(sql`rowid`)).all();
   const log = readEventLog(db);
+  const tokens = db.select().from(token).orderBy(asc(token.seq)).all();
+  const sources = db.select().from(compendiumSource).all();
   closeDb(db);
-  return { ...r, rows, campaigns, log };
+  return { ...r, rows, campaigns, log, tokens, sources };
 }
 
 describe("entities fixtures (ENT §13)", () => {
@@ -48,6 +50,7 @@ describe("entities fixtures (ENT §13)", () => {
       abilities: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 },
       attacks: [{ name: "Scimitar", toHit: 4, damage: "1d6+2", damageType: "slashing" }],
       cr: "1/4",
+      type: "humanoid",
     });
     expect(imported[1]?.statBlock).toEqual({
       size: "medium",
@@ -59,6 +62,7 @@ describe("entities fixtures (ENT §13)", () => {
       abilities: { str: 12, dex: 15, con: 12, int: 3, wis: 12, cha: 6 },
       attacks: [{ name: "Bite", toHit: 4, damage: "2d4+2", damageType: "piercing" }],
       cr: "1/4",
+      type: "beast",
     });
     expect(imported.map((e) => e.tokenShape)).toEqual([null, null]);
     expect(r.manifest.records["enemy-1"]?.["imported-entity"]).toEqual([imported[0]?.id as string]);
@@ -90,6 +94,7 @@ describe("entities fixtures (ENT §13)", () => {
       saveProficiencies: ["dex"],
       attacks: [{ name: "Scimitar", toHit: 5, damage: "1d6+3", damageType: "slashing" }],
       cr: "1/2",
+      type: "humanoid",
     });
     expect(by("Mira")).toMatchObject({
       kind: "character",
@@ -131,12 +136,54 @@ describe("entities fixtures (ENT §13)", () => {
       speed: 30,
       attacks: [{ name: "Claw", toHit: 7, damage: "2d6+4", damageType: "slashing" }],
       cr: "5",
+      type: "giant",
     });
     expect(r.manifest.records["char-mira"]?.entity).toEqual([by("Mira")?.id as string]);
     expect(r.manifest.records["enemy-custom-second"]?.entity).toEqual([
       by("Marsh Troll")?.id as string,
     ]);
     expect(r.rows).toHaveLength(6);
+  });
+
+  test("FR-ENT-27 ent-art-tokens (compendium-full): each token's creatureType from its definition; Ogre hidden", async () => {
+    const r = await loaded("compendium-full");
+    const mine = r.manifest.records["ent-art-tokens"]?.token ?? [];
+    const art = mine.map((id) => r.tokens.find((t) => t.id === id));
+    expect(art.map((t) => [t?.name, t?.creatureType, t?.hidden, t?.imageAssetId !== null])).toEqual(
+      [
+        ["Goblin 2", "humanoid", false, false],
+        ["Goblin 3", "humanoid", false, false],
+        ["Elite Goblin Warrior 2", "humanoid", false, false],
+        ["Adult Red Dragon", "dragon", false, false],
+        ["Wolf 2", "beast", false, true],
+        ["Plain Brute", null, false, false],
+        ["Ogre", "giant", true, false],
+      ],
+    );
+    const brute = r.rows.find((e) => e.name === "Plain Brute");
+    expect(brute?.statBlock).not.toHaveProperty("type");
+    expect(brute?.portraitAssetId).toBeNull();
+  }, 60_000);
+
+  test("FR-ENT-27 token-art-update: sprint-3 SRD definitions (no type), version mini-s3; Goblin / Ogre null, Wolf Initials", async () => {
+    const r = await loaded("token-art-update");
+    const srd = r.rows.filter((e) => e.source === "srd-5.1");
+    expect(srd.map((e) => e.name).sort()).toEqual([
+      "Adult Red Dragon",
+      "Goblin",
+      "Hobgoblin",
+      "Ogre",
+      "Wolf",
+    ]);
+    for (const e of srd) expect(e.statBlock).not.toHaveProperty("type");
+    expect(r.sources.map((x) => [x.key, x.version])).toEqual([["srd-5.1", "mini-s3"]]);
+    const mine = r.manifest.records["art-update-tokens"]?.token ?? [];
+    const art = mine.map((id) => r.tokens.find((t) => t.id === id));
+    expect(art.map((t) => [t?.name, t?.creatureType])).toEqual([
+      ["Goblin 2", null],
+      ["Ogre", null],
+      ["Wolf 2", "initials"],
+    ]);
   });
 
   test("FR-FIX-08 two loads → identical rows; same IDs in session-sim", async () => {

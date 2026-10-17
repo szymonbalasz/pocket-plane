@@ -28,6 +28,7 @@ import cmpHomebrewSecond from "./compendium/cmp-homebrew-second";
 import cmpSearchHomebrew from "./compendium/cmp-search-homebrew";
 import cmpSrdFull from "./compendium/cmp-srd-full";
 import cmpSrdMini from "./compendium/cmp-srd-mini";
+import cmpSrdMiniS3 from "./compendium/cmp-srd-mini-s3";
 import dicexLooks from "./dice-extras/dicex-looks";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
 import diceSettings from "./dice-roll-log/dice-settings";
@@ -46,12 +47,14 @@ import trgMonsters from "./effect-modifiers/trg-monsters";
 import trgThorn from "./effect-modifiers/trg-thorn";
 import usesRageSpent from "./effect-modifiers/uses-rage-spent";
 import weaponFlameTongue from "./effect-modifiers/weapon-flame-tongue";
+import artUpdateTokens from "./entities/art-update-tokens";
 import charMira from "./entities/char-mira";
 import charThorn from "./entities/char-thorn";
 import enemy1 from "./entities/enemy-1";
 import enemy2 from "./entities/enemy-2";
 import enemyCustom from "./entities/enemy-custom";
 import enemyCustomSecond from "./entities/enemy-custom-second";
+import entArtTokens from "./entities/ent-art-tokens";
 import fogAmbush from "./fog-of-war/fog-ambush";
 import fogAmbushPartial from "./fog-of-war/fog-ambush-partial";
 import fogScn from "./fog-of-war/fog-scn";
@@ -158,4 +161,7 @@ export const units: readonly Fixture[] = [
   trgMiraUses,
   mtTemplates,
   mtCrowd,
+  entArtTokens,
+  cmpSrdMiniS3,
+  artUpdateTokens,
 ];

@@ -51,6 +51,7 @@ const token = (
   ownerPlayerId: owner,
   hidden,
   shape: "round",
+  creatureType: null,
   speed: 30,
   createdAt: "t",
   updatedAt: "t",

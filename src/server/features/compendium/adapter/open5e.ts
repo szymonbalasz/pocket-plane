@@ -23,7 +23,10 @@ import {
   ATTACKS_MAX,
   Attack,
   abilityMod,
+  CREATURE_TYPES,
+  type CreatureType,
   DAMAGE_TYPES,
+  ExtraDamage,
   MonsterStatBlock,
   Senses,
   SIZES,
@@ -31,7 +34,7 @@ import {
 import { z } from "zod";
 import { slugify, splitSections, toMarkdownLite } from "./text";
 
-export const ADAPTER_VERSION = "2";
+export const ADAPTER_VERSION = "3";
 export const SRD_DOCUMENT_SLUG = "wotc-srd";
 
 export const OPEN5E_ENDPOINTS = [
@@ -91,7 +94,8 @@ const RawBlock = z.looseObject({
 });
 const RawMonster = Doc.extend({
   size: z.string(),
-  type: z.string(),
+  /** FR-CMP-39: absent (a sprint-3 recording, `cmp-srd-mini-s3`) = no type. */
+  type: str,
   subtype: str,
   alignment: str,
   armor_class: z.number(),
@@ -255,6 +259,23 @@ const ABILITY_ABBR: Record<Ability, string> = {
 
 const DAMAGE_TYPE_RE = new RegExp(`\\b(${DAMAGE_TYPES.join("|")})\\s+damage\\b`, "i");
 const DICE_TERM_RE = /^(\d+d\d+)/;
+/** OQ-CMP-33: the SRD's second part, "… plus 7 (2d6) fire damage". */
+const PLUS_PART_RE = /\bplus\s+\d+\s+\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)\s+([a-z]+)\s+damage\b/i;
+
+/**
+ * OQ-CMP-33 (R's FR-CHARX-54 shape): `damage_dice` "2d10+2d6" with "… plus 7 (2d6) fire damage"
+ * → one `extraDamage` part `{damage: "2d6", type: "fire"}`. A part that doesn't fit (two types,
+ * dice over 6d12+10) stays text with a warning.
+ */
+function extraPart(rest: string, hit: string): ExtraDamage | undefined {
+  const term = /^\+(\d+d\d+)$/.exec(rest)?.[1];
+  const m = PLUS_PART_RE.exec(hit);
+  if (!term || !m?.[1] || !m[2]) return undefined;
+  const damage = m[1].replace(/\s+/g, "");
+  if (DICE_TERM_RE.exec(damage)?.[1] !== term) return undefined;
+  const part = ExtraDamage.safeParse({ damage, type: m[2].toLowerCase() });
+  return part.success ? part.data : undefined;
+}
 
 function attacks(c: Run, key: string, raw: readonly z.infer<typeof RawBlock>[]) {
   const out: Attack[] = [];
@@ -267,15 +288,17 @@ function attacks(c: Run, key: string, raw: readonly z.infer<typeof RawBlock>[]) 
       c.warn(key, field, `Damage "${a.damage_dice}" not dice; attack dropped`);
       continue;
     }
-    if (first !== dice) c.warn(key, field, `Extra damage "${dice}" kept as text only`);
     const bonus = a.damage_bonus ?? 0;
     const hit = (a.desc ?? "").split(/Hit:/i)[1] ?? "";
     const type = DAMAGE_TYPE_RE.exec(hit)?.[1]?.toLowerCase();
+    const extra = first === dice ? undefined : extraPart(dice.slice(first.length), hit);
+    if (first !== dice && !extra) c.warn(key, field, `Extra damage "${dice}" kept as text only`);
     const attack = {
       name: a.name.trim(),
       toHit: a.attack_bonus,
       damage: bonus === 0 ? first : `${first}${signed(bonus)}`,
       ...(type ? { damageType: type } : {}),
+      ...(extra ? { extraDamage: [extra] } : {}),
     };
     if (!Attack.safeParse(attack).success) c.warn(key, field, "Doesn't fit; dropped");
     else if (out.length >= ATTACKS_MAX) c.warn(key, field, "More than 20 attacks; dropped");
@@ -304,6 +327,15 @@ function darkvision(c: Run, key: string, senses: string | undefined) {
   const s = { darkvisionFt: Number(m[1]), seesMagicalDarkness: false };
   if (Senses.safeParse(s).success) return s;
   c.warn(key, "statBlock.senses", `Darkvision ${m[1]} ft doesn't fit; dropped`);
+  return undefined;
+}
+
+/** FR-CMP-39: Open5e "Humanoid" → `humanoid`; outside the 14 SRD types → dropped + warning. */
+function creatureType(c: Run, key: string, raw: string | null | undefined) {
+  if (!raw) return undefined;
+  const t = raw.trim().toLowerCase();
+  if ((CREATURE_TYPES as readonly string[]).includes(t)) return t as CreatureType;
+  c.warn(key, "statBlock.type", `Type "${raw}" isn't an SRD creature type; dropped`);
   return undefined;
 }
 
@@ -346,6 +378,7 @@ function monster(c: Run, raw: unknown, i: number) {
     saveProficiencies: saves.length > 0 ? saves : undefined,
     attacks: attacks(c, key, m.actions ?? []),
     cr: m.challenge_rating,
+    type: creatureType(c, key, m.type),
   };
   for (const k of Object.keys(sb)) if (sb[k] === undefined) delete sb[k];
   // Drop optional fields that don't fit; a required one failing drops the record.
@@ -415,7 +448,8 @@ function monster(c: Run, raw: unknown, i: number) {
       name,
       facets: {
         cr: m.challenge_rating,
-        type: m.type.toLowerCase(),
+        // FR-CMP-39: a recording without `type` (`cmp-srd-mini-s3`) still needs the facet.
+        type: m.type?.trim().toLowerCase() || "unknown",
         size: size as MonsterStatBlock["size"],
       },
       body: {
