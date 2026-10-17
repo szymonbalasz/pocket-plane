@@ -55,6 +55,7 @@ export interface PlayFrameProps {
 export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }: PlayFrameProps) {
   const registry = useRegistry();
   const windows = useShellState((s) => s.windows);
+  const placed = useShellState((s) => s.placed);
   const available = useAvailableKinds();
   const dispatch = useWindowDispatch();
   const viewport = useViewport();
@@ -89,6 +90,7 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
               key={`${w.kind}:${w.instance}`}
               win={w}
               def={def}
+              placed={placed.get(`${w.kind}:${w.instance}`)}
               viewport={viewport}
               focused={top === w}
               dispatch={dispatch}

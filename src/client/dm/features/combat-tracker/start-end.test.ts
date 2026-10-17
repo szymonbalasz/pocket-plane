@@ -76,7 +76,7 @@ describe("FR-CBT-60 windows follow the DM's own Start / End", () => {
     const f = fx();
     expect(await startAndFollow(async () => null, f)).toBeNull();
     expect(f.actions).toEqual([
-      { type: "open", kind: "cbt.initiative" },
+      { type: "open", kind: "cbt.initiative", by: "feature" },
       { type: "minimise", kind: "cbt.encounters" },
     ]);
     expect(f.appearances()).toBe(1);

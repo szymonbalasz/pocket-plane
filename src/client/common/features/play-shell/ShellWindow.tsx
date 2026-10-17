@@ -31,7 +31,7 @@ import {
   windowRect,
 } from "./geometry";
 import { SHELL_ZONE_ATTR } from "./keys";
-import { type WindowAction, windowId } from "./manager";
+import { type Placed, type WindowAction, windowId } from "./manager";
 import type { WindowDef } from "./registry";
 
 function applyRect(el: HTMLElement, r: Rect) {
@@ -83,12 +83,15 @@ export function useWindowShown(): boolean {
 export function ShellWindow({
   win,
   def,
+  placed,
   viewport,
   focused,
   dispatch,
 }: {
   win: WindowState;
   def: WindowDef;
+  /** How its current rect was chosen (FR-SHELL-40; walkthroughs read `data-placed`). */
+  placed?: Placed | undefined;
   viewport: Viewport;
   focused: boolean;
   dispatch: (a: WindowAction) => void;
@@ -165,6 +168,7 @@ export function ShellWindow({
       data-testid="ui-window"
       data-record-id={wid}
       data-state={win.state}
+      data-placed={placed}
       data-focused={focused}
       aria-label={def.title}
       aria-hidden={parked || undefined}

@@ -6,6 +6,8 @@ import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
 import { availableKinds } from "@ui/features/play-shell/registry";
+import { toastKeepOut } from "@ui/features/play-shell/toast-region";
+import { coveredArea } from "@ui/features/play-shell/token-boxes";
 import {
   contentBox,
   FIT_MIN_CELL_PX,
@@ -78,7 +80,7 @@ function openOnDefaults(kinds: string[], viewport: { w: number; h: number }, com
     .map((w) => ({ kind: w.kind, ...clampRect(w, viewport) }));
 }
 
-const at = (rects: (Rect & { kind: string })[], kind: string) => {
+const at = (rects: readonly (Rect & { kind: string })[], kind: string) => {
   const r = rects.find((x) => x.kind === kind);
   if (!r) throw new Error(`${kind} not open`);
   return r;
@@ -270,4 +272,62 @@ test("FR-SHELL-08 player default-open product windows don't overlap (1280×720, 
         }
     }
   }
+});
+
+// ---- sprint 4: auto placement (FR-SHELL-40, -42) ----
+
+const SPRINT4 = [LAPTOP, { w: 1280, h: 800 }, DESKTOP];
+const same = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+
+test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: player Initiative appearing over the goblins goes where it covers less, at an edge, over no window; no tokens → where the default layout put it", () => {
+  for (const viewport of SPRINT4) {
+    const where = `${viewport.w}×${viewport.h}`;
+    const all = new Set(playerWindows.defs.map((d) => d.kind));
+    const layout = defaultLayout(playerWindows, viewport);
+    const home = at(layout, "cbt.initiative");
+    const ctx = { registry: playerWindows, viewport, available: all };
+    const appear = { type: "appear", kind: "cbt.initiative" } as const;
+    expect(same(at(reduce(layout, appear, ctx), "cbt.initiative"), home)).toBe(true);
+    // Zoomed in (120 px cells) on the two goblins, under Initiative; the PCs off-screen left.
+    const cell = 120;
+    const ox = home.x + 20 - 12 * cell;
+    const oy = home.y + 20 - 6 * cell;
+    const boxes = VISIBLE_TOKENS.map((t) => ({
+      x: ox + t.col * cell,
+      y: oy + t.row * cell,
+      w: cell,
+      h: cell,
+    }));
+    const ws = reduce(layout, appear, { ...ctx, avoid: () => boxes });
+    const init = at(ws, "cbt.initiative");
+    expect(coveredArea(init, boxes)).toBeLessThan(coveredArea(home, boxes));
+    expect(["left", "right"]).toContain(touchedEdge(init, viewport) ?? `mid-map at ${where}`);
+    const others = ws.filter((w) => w.kind !== "cbt.initiative");
+    for (const o of renderedWindowRects(others, playerWindows, all, viewport)) {
+      expect(overlaps(init, o) ? `Initiative over a window at ${where}` : "ok").toBe("ok");
+    }
+  }
+});
+
+test("FR-SHELL-40 toast keep-out: player Initiative and Notifications stay off the bottom-right box (1280×720, 1280×800, 1600×900)", () => {
+  for (const viewport of SPRINT4) {
+    const box = toastKeepOut("player", viewport);
+    const rects = openOnDefaults(["note.history"], viewport);
+    for (const kind of ["cbt.initiative", "note.history"]) {
+      const r = at(rects, kind);
+      expect(
+        overlaps(r, box) ? `${kind} over the toast box at ${viewport.w}×${viewport.h}` : "ok",
+      ).toBe("ok");
+    }
+    // Out of combat too (Notifications opened before Initiative exists).
+    const calm = at(openOnDefaults(["note.history"], viewport, false), "note.history");
+    expect(overlaps(calm, box) ? `note.history over the toast box at ${viewport.w}` : "ok").toBe(
+      "ok",
+    );
+  }
+});
+
+test("FR-SHELL-42 player handout viewer registers restoreOpen: false; nothing else does", () => {
+  const off = playerWindows.defs.filter((d) => d.restoreOpen === false).map((d) => d.kind);
+  expect(off).toEqual(["party.handout"]);
 });

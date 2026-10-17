@@ -6,6 +6,8 @@ import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
 import { availableKinds } from "@ui/features/play-shell/registry";
+import { toastKeepOut } from "@ui/features/play-shell/toast-region";
+import { coveredArea } from "@ui/features/play-shell/token-boxes";
 import {
   contentBox,
   FIT_MIN_CELL_PX,
@@ -310,4 +312,127 @@ test("FR-SHELL-14 DM default layout = every default-open window in the registry 
     const layout = defaultLayout(dmWindows, viewport);
     expect(layout.map((w) => w.kind).sort()).toEqual(expected);
   }
+});
+
+// ---- sprint 4: auto placement (FR-SHELL-40–42) ----
+
+const MID = { w: 1280, h: 800 };
+const SPRINT4 = [LAPTOP, MID, DESKTOP];
+const allKinds = () => new Set(dmWindows.defs.map((d) => d.kind));
+const win = (ws: readonly { kind: string }[], kind: string) => {
+  const w = ws.find((x) => x.kind === kind);
+  if (!w) throw new Error(`${kind} not in the layout`);
+  return w as Rect & { kind: string; state: string };
+};
+const same = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+
+/** Goblin Ambush token boxes at a moved camera: `cell` px, the Goblin's cell at `at`. */
+function ambushBoxes(at: { x: number; y: number }, cell: number, tokens = GOBLIN_AMBUSH) {
+  const ox = at.x - 12 * cell;
+  const oy = at.y - 6 * cell;
+  return tokens.map((t) => ({ x: ox + t.col * cell, y: oy + t.row * cell, w: cell, h: cell }));
+}
+
+test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: DM Initiative opened at Start clears the monsters under its default top-right rect; no tokens → default rect; first load unchanged", () => {
+  const def = dmWindows.get("cbt.initiative");
+  if (!def) throw new Error("no cbt.initiative");
+  for (const viewport of SPRINT4) {
+    const at = `${viewport.w}×${viewport.h}`;
+    // First load: no tokens drawn → the default layout keeps Initiative's fitted default rect.
+    const layout = defaultLayout(dmWindows, viewport);
+    const home = win(layout, "cbt.initiative");
+    expect(same(home, fittedDefaultRect(def, viewport)) ? "ok" : `moved at ${at}`).toBe("ok");
+    const plain = { registry: dmWindows, viewport, available: allKinds() };
+    // Idle on load / End: minimised. Start: combat opens it by itself.
+    const idle = reduce(layout, { type: "minimise", kind: "cbt.initiative" }, plain);
+    const start = { type: "open", kind: "cbt.initiative", by: "feature" } as const;
+    expect(same(win(reduce(idle, start, plain), "cbt.initiative"), home)).toBe(true);
+    // The camera zoomed in (120 px cells) on the monsters, under the whole right column; the
+    // PCs are off-screen left.
+    const boxes = ambushBoxes({ x: home.x - 40, y: home.y + 2 * 120 }, 120);
+    const monsters = boxes.filter((_, i) => !GOBLIN_AMBUSH[i]?.pc);
+    expect(monsters.every((b) => overlaps(b, home))).toBe(true);
+    const ws = reduce(idle, start, { ...plain, avoid: () => boxes });
+    const init = win(ws, "cbt.initiative");
+    expect(coveredArea(init, boxes)).toBeLessThan(coveredArea(home, boxes));
+    expect(touchedEdge(init, viewport)).toBe("left");
+    const others = ws.filter((w) => w.kind !== "cbt.initiative");
+    for (const o of renderedWindowRects(others, dmWindows, allKinds(), viewport)) {
+      expect(overlaps(init, o) ? `Initiative over a window at ${at}` : "ok").toBe("ok");
+    }
+    // Ties (tokens under no candidate) → the default column.
+    const midMap = [{ x: viewport.w / 2, y: viewport.h / 2, w: 10, h: 10 }];
+    const tie = reduce(idle, start, { ...plain, avoid: () => midMap });
+    expect(same(win(tie, "cbt.initiative"), home)).toBe(true);
+  }
+});
+
+test("FR-SHELL-40 toast keep-out: DM windows opened at 1280×720 / 1280×800 / 1600×900 stay off the top-centre box while a clear candidate exists; default layout clear of it", () => {
+  for (const viewport of SPRINT4) {
+    const box = toastKeepOut("dm", viewport);
+    for (const w of defaultLayout(dmWindows, viewport)) {
+      expect(overlaps(w, box) ? `${w.kind} over the toast box at ${viewport.w}` : "ok").toBe("ok");
+    }
+    // The Compendium (440 wide) at the left edge would reach the box at 1280 wide.
+    const cmp = win(openOnDefaults(["cmp.compendium"], viewport), "cmp.compendium");
+    expect(overlaps(cmp, box) ? `compendium over the toast box at ${viewport.w}` : "ok").toBe("ok");
+  }
+});
+
+test("FR-SHELL-41 DM: Compendium dragged onto Initiative's stored rect; Start restores Initiative into a free slot, written with its area; a user open keeps the stored rect", () => {
+  for (const viewport of SPRINT4) {
+    const ctx = { registry: dmWindows, viewport, available: allKinds() };
+    let ws = reduce(
+      defaultLayout(dmWindows, viewport),
+      { type: "minimise", kind: "cbt.initiative" },
+      ctx,
+    );
+    ws = reduce(ws, { type: "open", kind: "cmp.compendium" }, ctx);
+    const home = win(ws, "cbt.initiative");
+    ws = reduce(
+      ws,
+      { type: "setRect", kind: "cmp.compendium", rect: { ...home, w: 440, h: 400 } },
+      ctx,
+    );
+    const cmp = win(ws, "cmp.compendium");
+    const started = reduce(ws, { type: "open", kind: "cbt.initiative", by: "feature" }, ctx);
+    const init = started.find((w) => w.kind === "cbt.initiative");
+    expect(init?.state).toBe("open");
+    expect(
+      init && overlaps(init, cmp) ? `over the Compendium at ${viewport.w}×${viewport.h}` : "ok",
+    ).toBe("ok");
+    expect(init?.area).toEqual(workArea(viewport));
+    for (const by of [undefined, "user"] as const) {
+      const user = win(
+        reduce(ws, { type: "open", kind: "cbt.initiative", by }, ctx),
+        "cbt.initiative",
+      );
+      expect(same(user, home)).toBe(true);
+    }
+  }
+});
+
+test('FR-SHELL-08 user opens keep the stored rect: the Not-shown badge → Scenes, a notification "Open" over another window', () => {
+  const viewport = DESKTOP;
+  const ctx = { registry: dmWindows, viewport, available: allKinds() };
+  const layout = defaultLayout(dmWindows, viewport);
+  const init = win(layout, "cbt.initiative");
+  for (const kind of ["map.scenes", "note.history", "char.sheet"]) {
+    let ws = reduce(layout, { type: "open", kind }, ctx);
+    const spot = { x: init.x + 10, y: init.y + 10, w: 300, h: 300 };
+    ws = reduce(ws, { type: "setRect", kind, rect: spot }, ctx);
+    const stored = win(reduce(ws, { type: "close", kind }, ctx), kind);
+    // `useOpenWindow()(kind)` dispatches `by: "user"`.
+    const back = win(
+      reduce(reduce(ws, { type: "close", kind }, ctx), { type: "open", kind, by: "user" }, ctx),
+      kind,
+    );
+    expect(same(back, stored)).toBe(true);
+    expect(overlaps(back, init)).toBe(true);
+  }
+});
+
+test("FR-SHELL-42 DM handout viewer registers restoreOpen: false; nothing else does", () => {
+  const off = dmWindows.defs.filter((d) => d.restoreOpen === false).map((d) => d.kind);
+  expect(off).toEqual(["party.handout"]);
 });

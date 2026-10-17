@@ -49,7 +49,7 @@ export async function startAndFollow(
 ): Promise<unknown> {
   const r = await send();
   if (r === undefined) return r;
-  fx.dispatch({ type: "open", kind: INITIATIVE_KIND });
+  fx.dispatch({ type: "open", kind: INITIATIVE_KIND, by: "feature" }); // FR-SHELL-41
   fx.dispatch({ type: "minimise", kind: ENCOUNTERS_KIND });
   fx.noteAppearance();
   return r;
