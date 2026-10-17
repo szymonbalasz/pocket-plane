@@ -16,7 +16,9 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | M2 drag path | `build/drag-path` (w61, slot 0) | build-drag-path | Building | Walkthrough → M5 |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | Physical dice in combat (BL-19, BL-25) | `fix/physical-dice-combat` (w62, slot 3) | build-physical-dice | Building (sprint fix, found by 3 walkthroughs) | Walkthrough |
-| C-art core (token creature type) | `fix/cmp-art-core` (w50, slot 6) | build-cmp-art-core | Building | Review → C-art (after M5) |
+| C-art core (token creature type) | `fix/cmp-art-core` (w50, slot 6) | — | Done (no UI); merged main; gates queued | Merge → C-art (after M5) |
+| V9 fog brush + Ctrl+Z | `build/fog-brush` (w63, slot 4) | build-fog-brush | Building | Walkthrough |
+| V10 party vision + Blinded | `build/party-vision` (w64, slot 5) | build-party-vision | Building (∥ V9; FogBar merge after V9) | Walkthrough |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
 | R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
