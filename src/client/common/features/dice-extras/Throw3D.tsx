@@ -54,6 +54,7 @@ export function useRun3D(
     const layer = host.current;
     const { run: r, dice: ds, rect: rectOf } = input.current;
     const start = rectOf();
+    let slow = false;
     if (!mod || !layer || !start) {
       diceExtras.flat(seq);
       return;
@@ -76,9 +77,7 @@ export function useRun3D(
         onRest: (info) => {
           setRest(info);
           diceExtras.rested(seq);
-          if (info.medianFrameMs !== null && info.medianFrameMs > SLOW_FRAME_MS) {
-            input.current.onSlow();
-          }
+          slow = info.medianFrameMs !== null && info.medianFrameMs > SLOW_FRAME_MS;
         },
         onLost: () => diceExtras.flat(seq),
       });
@@ -91,6 +90,11 @@ export function useRun3D(
       handle.current = null;
       still.current?.remove();
       still.current = null;
+      // Unmounted before its end (the display changed): the run shows flat in the zone.
+      const s = diceExtras.api.getState();
+      if (s.current?.seq === seq || s.leaving?.seq === seq) diceExtras.flat(seq);
+      // FR-DICEX-23: a slow throw finishes as it is; the device turns flat once it has gone.
+      if (slow) input.current.onSlow();
     };
   }, [seq, host]);
 
