@@ -12,14 +12,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Docs pass | merged bd07224 | — | Done | — |
 | C-search | `build/cmp-search` (w59, slot 3) | test-cmp-search | Walkthrough (check 2907, e2e green; DM search 0.5 s → 2 ms) | Merge → C-all |
 | V6 vision core | `fix/vision-s4-core` (w54, slot 0) | test-vision-core | Walkthrough (check, build, e2e green) | Merge → R0, V7 |
-| D5 die shapes + log dice | `build/dice-shapes` (w55, slot 2) | test-dice-shapes-r | Re-test of the physical-dice fix (d3a8ae7) | Merge → D6 |
+| D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83) | main gates running |
+| D6 full-screen dice | `build/dice-screen` (w5A, slot 2) | build-dice-screen | Building | Walkthrough |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
 | M4 window placement | `fix/window-placement` (w57, slot 4) | test-window-placement | Walkthrough (check 2915, e2e 83) | Merge |
 
 ## Shared-file locks
 
 - `fix/vision-s4-core` (V6): schema, `src/server/ws/` + protocol, entities `senses`, sheet folder (Senses), scene-hooks `mapChanged`, Open5e adapter line, bundles index + `fog.ts`.
-- `build/dice-shapes` (D5): bundles index (append).
 - `fix/window-placement` (M4): play-shell frame + `toast-region.ts`, windows.ts handout line, combat Initiative open lines.
 - Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
