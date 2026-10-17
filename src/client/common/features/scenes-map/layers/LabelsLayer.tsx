@@ -276,7 +276,7 @@ function usePointerHover(
     const move = () => {
       const p = stage.getPointerPosition();
       hover.current?.(layer.current?.getRelativePointerPosition() ?? null);
-      // Tips in the objects layer: labels' badges and the tokens' icons.
+      // Tips in the objects layer: cut names, badges and the tokens' icons.
       const nodes = layer.current?.getLayer()?.find((n: Konva.Node) => Boolean(n.getAttr("tip")));
       const hit = p
         ? (nodes ?? []).findLast((n) => {
@@ -338,9 +338,15 @@ export function LabelsLayer() {
   const hover = useRef<(p: { x: number; y: number } | null) => void>(() => {});
   hover.current = (p) => {
     if (!p) return setHovered(null);
-    const s = previews.getState();
-    const fits = layoutLabels(boxes(s), m.pillH, gap);
-    const drawn = boxes(s).map((b) => ({ ...b, drawn: fits.get(b.id)?.width ?? b.width }));
+    const all = boxes(previews.getState());
+    const fits = layoutLabels(all, m.pillH, gap);
+    // As drawn: the hovered label in full and on top, so moving along it keeps it.
+    const drawn = all.map((b, i) => {
+      const name = tokens[i]?.name ?? "";
+      const w = b.id === hovered ? namePill(name, Infinity, m, measureText).width : undefined;
+      return { ...b, drawn: w ?? fits.get(b.id)?.width ?? b.width };
+    });
+    drawn.sort((a, b) => Number(a.id === hovered) - Number(b.id === hovered));
     setHovered(hoverTarget(p, drawn, m.pillH));
   };
   usePointerHover(layer, hover);
