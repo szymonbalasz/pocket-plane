@@ -20,7 +20,7 @@ import { readCombatant } from "../combat-tracker/rows";
 import { dice, gameLog } from "../dice-roll-log";
 import { resolveNotification } from "../notifications";
 import { loadNotification } from "../notifications/helpers";
-import { closeCardsOfEnded, endEffects } from "./effects";
+import { closeCardsOfEnded, endEffects, runEffectHooks } from "./effects";
 import { pcCombatant, readCharacter, readEffect } from "./rows";
 
 export const rollConcentration = defineCommand({
@@ -126,7 +126,7 @@ export const rollConcentration = defineCommand({
         dc: p.dc,
         success,
       },
-      changes: [entry, ...(ended?.changes ?? [])],
+      changes: [entry, ...(ended?.changes ?? []), ...runEffectHooks(env)],
     });
     resolveNotification(env, card.id, { total, dc: p.dc, success });
     // FR-CBTX-10: a lost concentration closes its other open cards (same transaction).

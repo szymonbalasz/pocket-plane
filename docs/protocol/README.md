@@ -766,6 +766,7 @@ Server registry owned by scenes-map, **append-only**, created by `build/scenes-m
 | Roll hooks (server) *(sprint 2)* | `src/server/features/dice-roll-log/roll-hooks.ts` (`rollHooks`) | `fix/mod-core` (empty, built) | MOD's hook (build/effect-modifiers). Run by `dice.evaluate` only when the caller passes a `subject`; [§34](#34-sprint-2-phase-1-effect-modifiers-tier-1). *(sprint 3, types built, fix/rt-core)* `modes()`, `offered`, `notes`, `manualParts`, subject `card` / `toHitMode` / `row`; [§40](#40-sprint-3-rule-triggers-core-r0) | [FR-MOD-13](../specs/effect-modifiers.md#6-functional-requirements), [ADR-0038](../architecture/adr/0038-effect-modifiers.md) |
 | Apply hooks (server) *(sprint 3)* | `src/server/features/combat-tracker/apply-hooks.ts` (`applyHooks`) | `fix/rt-core` (empty, built) | — (MOD R1: effective AC + defense facts; R4: trigger parts settle + undo). Run by `cbt.applyCard` per target before `hpRules.apply` and by `cbt.undo` per undone row; [§40](#40-sprint-3-rule-triggers-core-r0) | [FR-MOD-38, -41](../specs/effect-modifiers.md#6-functional-requirements), [ADR-0043](../architecture/adr/0043-rule-triggers.md) |
 | Popup parts (DM client) *(sprint 3)* | `src/client/dm/features/combat-tracker/popup-parts.ts` (`popupParts`) | `fix/rt-core` (empty, built) | — (MOD R7: trigger chips; R2: AC / defense). Rendered under every target row of the attack popup, merged into the apply intent; [§40](#40-sprint-3-rule-triggers-core-r0) | [FR-MOD-39, -40](../specs/effect-modifiers.md#6-functional-requirements), ADR-0043 |
+| Effect hooks (server) *(sprint 4)* | `src/server/features/combat-extras/effect-hooks.ts` (`effectHooks`) | `fix/rules4-core` (empty) | — (MOD S4-3: trigger state `armed`; fog-of-war V10: Blinded). `effectsChanged(env, {creatures, encounter \| null})` once per command after every effect insert / update / end / restore, in or out of combat; [§65](#65-sprint-4-rules-core-s4-0) | [FR-CBTX-51](../specs/combat-extras.md#6-functional-requirements), [ADR-0049](../architecture/adr/0049-trigger-state.md) |
 | Tray extras (client) *(sprint 3)* | `src/client/common/features/dice-extras/tray-extras.ts` (`trayExtras`) | `build/dicex-tray` (empty, built) | — (MOD tier 2 / R2: "box per bonus die" groups). Entry `{key, order, useDice(request, mode) → {label, faces, count, sign}[]}`; `useDice` is a hook, called every render in `order`; chips labelled, read-only, beside the base dice in `compose` / `adjust` (`dicex-tray-extra` + `data-value` = key) | [FR-DICEX-08](../specs/dice-extras.md#6-functional-requirements) b |
 | Definition-changed hooks | entities' folder | `build/entities` | CBT FR-CBT-06 | [FR-ENT-19](../specs/entities.md#6-functional-requirements) |
 | `creatureActions` (DM) | entities' folder | `build/entities` | CBT New / Derive / Edit | [FR-ENT-20](../specs/entities.md#6-functional-requirements), FR-CBT-05 |
@@ -1821,3 +1822,37 @@ From [dice-extras](../specs/dice-extras.md) (FR-DICEX-15, -17, -18, -32–38, -4
 | Bundle | dice-extras code in each client's initial chunks **10.0 KB gz** (cap 15; was 11.1); 3D chunk **157.0 KB gz** (cap 170); throw views 3.0 KB gz, lazy |
 | CON-44 | 0 B: no record, field or frame added |
 
+## 66. Sprint 4: rules core (S4-0)
+
+From [effect-modifiers](../specs/effect-modifiers.md) sprint 4 (MOD §6.5, §14.3 S4-0), [combat-tracker](../specs/combat-tracker.md) (FR-CBT-81–84 schemas), [combat-extras](../specs/combat-extras.md) (FR-CBTX-51), [character-sheet-full](../specs/character-sheet-full.md) (FR-CHARX-54, -58 zod); [ADR-0049](../architecture/adr/0049-trigger-state.md) (supersedes ADR-0043's visibility consequence, refines ADR-0035). **Built by `fix/rules4-core`** (schema lock 2nd this sprint, after V6): the `trigger-state` record type, the `effectHooks` registry and the sprint-4 zod. **No behaviour change**: no command writes `trigger-state` yet (S4-3), nothing reads the new fields yet (S4-1a / S4-1b / S4-2 / S4-5). Data side: [data model §51](../data-model/README.md#51-sprint-4-rules-core-s4-0).
+
+**Record types**
+
+| Type | Scope | DM wire | Player visibility | Snapshot | Source |
+|---|---|---|---|---|---|
+| `trigger-state` *(new)* | campaign | the row `{id, campaignId, encounterId, combatantId, triggerId, characterId \| null, ownerPlayerId \| null, name, on, armed, charge: ready \| used \| waiting, featureId \| null, updatedAt}` (`TriggerStateRecord`, `@shared/effect-modifiers/trigger-state`) | **full** to the owning player (`characterId` set and `ownerPlayerId` = theirs); every other player and every monster (definition) row: hidden (OQ-MOD-41 pick A, #245) | everyone (players: their own rows); not lazy, not windowed; rows exist only while an encounter is started | FR-MOD-53, -55 |
+
+- Registered in MOD's `index.ts` (`triggerStateRecordType`, `src/server/features/effect-modifiers/trigger-state.ts`). Rows ride in the causing event's `changes` (no event of their own, FR-MOD-54, S4-3); an owner change lists the row, so the old owner gets its delete and the new owner the upsert (transition matrix). A trigger's `public` never shows a row to other players.
+
+**Schemas** (zod; optional fields, old rows / cards / lines parse unchanged)
+
+| Schema | Change | Source |
+|---|---|---|
+| `Attack` (`@shared/entities/schemas`, both kinds, `char.putRow` attacks, `PUT /api/entities`) | + `bonus?` int 0–3; + `extraDamage?` ≤ 2 × `{damage: NdM[+K] (N 1–6, M 4/6/8/10/12, K 0–10), type: DamageType}` (type required) | FR-CHARX-54 |
+| `FeatureRow.used` (`@shared/character-sheet/sheet`, also `char.putRow` features) | 0 … `usesMax + 9` (`FEATURE_OVERSPEND_MAX`; uses left down to −9); no `usesMax` → 0. Commands still clamp at the max until S4-2 | FR-CHARX-58 |
+| `CardDamage` (damage card) | + `extra?` ≤ 2 `CardExtraPart {type, rollId, dice ≤ 12 [value, kept], constant, total, manual}`, attack-row order, not in the base part's `total` | FR-CBT-81 |
+| `cbt.applyCard` | + `extraTotals?` ≤ 2 int 0–999 (absent = rolled); `targets[].extraMultipliers?` ≤ 2 (absent = the row's `multiplier`); more than the card's extra parts → `invalid` (S4-1b) | FR-CBT-82 |
+| `AttackLogPayload` (`cbt.attack`) | + `damageParts?` ≤ 2 `{type, value, multiplier? (not normal)}` (inside `damage`) | FR-CBT-84 |
+| `AttackLinePart` / `AttackLineDmPart` | + `expression?` ≤ 20, `dice?` 1–20 ints ≥ 1 (public line: public character triggers only; DM facts: every part) | FR-MOD-57 |
+| `HpChangeRecord` (`hp-change`, DM only) | + `damageParts` ≤ 2 `{type, rolled, total 0–999, multiplier, raw}` \| null | FR-CBT-84 |
+| `mod.toggle` | + `overspend?: true` (read from S4-2) | FR-MOD-59 |
+
+**Registries** (append-only, [AGENTS §9.9](../../AGENTS.md#99-shared-files); created **empty** by `fix/rules4-core`)
+
+| Registry | Contract |
+|---|---|
+| Effect hooks (server) `src/server/features/combat-extras/effect-hooks.ts` (`effectHooks`) | `EffectHook {id, effectsChanged(env, {creatures: TargetRef[], encounter: EncounterRecord \| null}) → RecordChange[]}`. Runs **once per command** (once per target event of a multi-target apply), after the effect rows are written and after the command's own rule-hook lines, in its transaction, **in or out of combat**, whenever an effect row was inserted, updated, ended or restored. CBTX's helpers (`effects.ts`: `insertEffect`, `updateEffectRow`, hence `endEffects`, `restoreEffects`) collect the creatures (once each, first-touch order: a monster `{combatantId}`, a PC `{characterId}`); `runEffectHooks(env, encounter?)` runs the registry at each path's end: `cbtx.addEffect`, `updateEffect`, `endEffect`, `setConcentration` (replaced + linked ends), `rollConcentration` (lost), `hpRules.apply` (0 HP ends) / `revert` (undo restores), MOD's `mod.apply` / `mod.toggle` / `mod.setModifiers`, and CBTX's last `combatRuleHooks` line `combat-extras.effect-hooks` (Next expiry, Prev restore, End; `encounter` = as the command left it). Elsewhere `encounter` = the campaign's started encounter, else null. Its rows join the causing event's `changes`; a throw rolls the command back; no creature or no line → nothing runs. Hooks write through `env.tx`, never emit, never write effect rows. Live list `effectsChangedHooks` (seeded from the registry; tests `register` / `unregister`). Lines to come: MOD trigger state (S4-3), fog-of-war Blinded (V10) |
+
+- `combatRuleHooks` gains CBTX's line `combat-extras.effect-hooks` (last): it only runs the effect hooks.
+- **Internal commands** (fixtures only, not intents): `mod.useFeatureByName {characterId, feature, delta}` (`char.useResource {feature}` by the row's name), `mod.putTriggerWithFeature {trigger, feature}` (`mod.putTrigger` with `every: {feature}` = that row).
+- FR-MOD-61: MOD's apply hook spends / refunds feature uses through CHARX's `spendFeatureUse` / `refundFeatureUse` (`resources.ts`); the interim `feature-uses.ts` is gone. No behaviour change.

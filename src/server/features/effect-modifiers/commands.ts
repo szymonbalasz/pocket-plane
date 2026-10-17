@@ -1,7 +1,7 @@
 // effect-modifiers intents (MOD §9): `mod.putPreset`, `mod.deletePreset` (DM; owner on their
 // own character presets while unlocked), `mod.apply`, `mod.setModifiers` (DM), `mod.toggle`
 // (DM; owner). Effects go through CBTX's internal helpers (limits, insert, soft end, cards), so
-// every CBTX rule moves them. Tier 3: a toggle on spends a feature use through CHARX's
+// every CBTX rule moves them and the effect hooks run (FR-CBTX-51). Tier 3: a toggle on spends a feature use through CHARX's
 // `spendFeatureUse` (FR-MOD-12). One transaction per command (FR-MOD-30); nothing in memory.
 import { endsRoundOf } from "@shared/combat-extras/rules";
 import type { CombatantRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
@@ -49,6 +49,7 @@ import {
   type Ended,
   endEffects,
   insertEffect,
+  runEffectHooks,
   updateEffectRow,
 } from "../combat-extras/effects";
 import {
@@ -367,7 +368,7 @@ export const applyPreset = defineCommand({
         effectIds: ids,
         ...(started ? { concentrationId: started } : {}),
       },
-      changes: [...ended.changes, ...changes],
+      changes: [...ended.changes, ...changes, ...runEffectHooks(env, enc)],
     });
     closeCardsOfEnded(env, ended);
     return { effectIds: ids, skipped };
@@ -453,7 +454,12 @@ function toggleOnCmd(
     type: EffectToggled.type,
     campaignId: cid,
     payload: { characterId: c.id, presetId: p.id, on: true, effectId: e.id },
-    changes: [effectChange(null, e), setActive(env, p, e.id), ...(sheet ? [sheet] : [])],
+    changes: [
+      effectChange(null, e),
+      setActive(env, p, e.id),
+      ...(sheet ? [sheet] : []),
+      ...runEffectHooks(env, enc),
+    ],
   });
   return { effectId: e.id };
 }
@@ -465,7 +471,7 @@ function toggleOffCmd(env: Env, c: CharacterRecord, p: EffectPresetRecord): Togg
     type: EffectToggled.type,
     campaignId: p.campaignId,
     payload: { characterId: c.id, presetId: p.id, on: false, effectId },
-    changes: [...ended.changes, setActive(env, p, null)],
+    changes: [...ended.changes, setActive(env, p, null), ...runEffectHooks(env)],
   });
   closeCardsOfEnded(env, ended);
   return { effectId: null };
@@ -485,7 +491,10 @@ export const setModifiers = defineCommand({
       type: EffectModifiersSet.type,
       campaignId: e.campaignId,
       payload: { effectId: e.id },
-      changes: [updateEffectRow(env, e, { modifiers: modifiers as Modifier[] })],
+      changes: [
+        updateEffectRow(env, e, { modifiers: modifiers as Modifier[] }),
+        ...runEffectHooks(env),
+      ],
     });
   },
 });

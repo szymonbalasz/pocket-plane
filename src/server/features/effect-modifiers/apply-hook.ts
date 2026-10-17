@@ -4,6 +4,7 @@
 // target (summed into the one `hpRules.apply`), its `trigger_use` row turns `used` (target,
 // hp_change) and a feature-frequency trigger spends a use. A used charge (another `used` row in
 // the window) or no use left → `conflict` unless `force` (recorded `forced`, spends nothing).
+// Feature uses go through CHARX's one helper pair (`resources.ts`, FR-MOD-61).
 // `cbt.undo` → `revert`: the row's uses back to `offered`, feature uses refunded.
 import type { AttackLineDmPart, AttackLinePart } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_FACTOR } from "@shared/combat-tracker/rules";
@@ -14,8 +15,8 @@ import type { z } from "zod";
 import { CommandError, invalid } from "../../commands/errors";
 import { ruleTrigger, triggerUse } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
+import { refundFeatureUse, spendFeatureUse } from "../character-sheet/resources";
 import type { ApplyHook, ApplyTargetResult } from "../combat-tracker/apply-hooks";
-import { refundFeatureUse, spendFeatureUse } from "./feature-uses";
 import { chargeFree, featureUses } from "./trigger-hook";
 
 const none = (): ApplyTargetResult => ({ extraRaw: 0, parts: [], dm: {}, changes: [] });
@@ -77,8 +78,8 @@ export const modApplyHook: ApplyHook = {
             }
             forced = true;
           } else {
-            const change = spendFeatureUse(env, t.characterId, every.feature);
-            if (change) changes.push(change);
+            const spent = spendFeatureUse(env, t.characterId, every.feature);
+            if (spent.ok) changes.push(spent.change);
             featureId = every.feature;
           }
         }
