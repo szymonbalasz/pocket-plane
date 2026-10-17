@@ -1,6 +1,7 @@
 // Pointer overlays of one canvas (ruler, drag target, box select, pings, laser trails): a small store per
 // canvas so 20 laser frames/s re-render only the pointer layer. DOM-free (testable).
 import { createStore, type StoreApi } from "zustand";
+import type { DragState } from "./drag-preview";
 import { LASER_FADE_MS } from "./laser";
 import type { Box } from "./selection-logic";
 
@@ -30,12 +31,7 @@ export interface RulerState {
   to: { col: number; row: number };
 }
 
-export interface DragState {
-  tokenId: string;
-  size: number;
-  from: { col: number; row: number };
-  to: { col: number; row: number };
-}
+export type { DragState } from "./drag-preview";
 
 export interface PointerState {
   ruler: RulerState | null;
