@@ -24,7 +24,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | R S4-5 Divine Fury log line | merged | — | Done (walkthrough 9/9; own e2e bundle `fury-log-line`) | — |
 | R S4-3 trigger state + tray | merged e3e203b | — | Done (walkthrough 8/8; check 3185, e2e 96) | — |
 | R S4-4 trigger badges | `build/trigger-badges` (w5Y, slot 5) | — | Walkthrough: badges all PASS (DF dice = S4-5, now merged in; physical DF field → BL-25); merged main, gates queued | Merge |
-| R S4-2 negative uses | `fix/uses-negative` (w5Z, slot 2) | build-uses-negative | Building | Walkthrough |
+| R S4-2 negative uses | `fix/uses-negative` (w5Z, slot 2) | test-uses-negative | Walkthrough | Merge |
 | D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
 | M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
