@@ -175,7 +175,12 @@ describe("CHARX §9 intents", () => {
     expect(ok({ kind: "attack", spellId: "s1" })).toBe(false);
     const m = { diceTotal: 4 };
     expect(ok({ kind: "skill", skill: "stealth", manual: [m] })).toBe(true);
-    expect(ok({ kind: "damage", manual: [m, m] })).toBe(false);
+    // FR-CHARX-55: damage 1 + n, attack 2 + n (n ≤ 2 extra parts), exact count at commit.
+    expect(ok({ kind: "damage", manual: [m, m] })).toBe(true);
+    expect(ok({ kind: "damage", manual: [m, m, m, m] })).toBe(false);
+    expect(ok({ kind: "attack", manual: [m] })).toBe(false);
+    expect(ok({ kind: "attack", manual: [m, m, m, m] })).toBe(true);
+    expect(ok({ kind: "toHit", manual: [m, m] })).toBe(false);
     // spellAttack: 1 or 2, checked against the spell at commit.
     expect(ok({ kind: "spellAttack", spellId: "s1", manual: [m, m] })).toBe(true);
   });

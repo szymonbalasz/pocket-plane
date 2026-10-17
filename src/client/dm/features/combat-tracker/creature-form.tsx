@@ -3,7 +3,8 @@
 // the six ability scores (all or none) and save proficiencies; entities' zod and REST (`POST` /
 // `PUT /api/entities`); server errors shown inline. PUT is a whole replace: the form always sends
 // `tokenShape` (Default = null) and the whole stat block (source fields kept). Sprint 2: optional
-// HP formula with an "Average N" hint and "Use as HP max" (FR-CBT-62, FR-ENT-25).
+// HP formula with an "Average N" hint and "Use as HP max" (FR-CBT-62, FR-ENT-25). Sprint 4: the
+// first attack's `bonus` / `extraDamage` (and the rows after it) ride through (FR-CBT-86).
 
 import { hpAverage, parseHpFormula } from "@shared/entities/hp-formula";
 import {
@@ -110,6 +111,9 @@ function initial(mode: Mode): Fields {
   };
 }
 
+/** FR-CBT-86: attack fields the form doesn't show; kept from the attack it loaded. */
+const KEPT_ATTACK_FIELDS: readonly string[] = ["id", "bonus", "extraDamage"];
+
 /** FR-CBT-62: the form's "Average N" hint, or null while the formula is empty / invalid. */
 export function formulaAverage(formula: string): number | null {
   return formula.trim() !== "" && parseHpFormula(formula) ? hpAverage(formula) : null;
@@ -132,16 +136,27 @@ export function formStatBlock(
     ...rest
   } = source ?? {};
   const formula = f.hpFormula === undefined ? sourceFormula : f.hpFormula.trim() || undefined;
+  // FR-CBT-86: the loaded attack keeps what the form doesn't edit (row id, `bonus`,
+  // `extraDamage`; the NPC sheet edits them) and the rows after it ride along, so Edit never
+  // drops them.
+  const [first, ...others] = Array.isArray(rest.attacks)
+    ? (rest.attacks as Record<string, unknown>[])
+    : [];
+  const kept = Object.fromEntries(
+    Object.entries(first ?? {}).filter(([k]) => KEPT_ATTACK_FIELDS.includes(k)),
+  );
   const attacks =
     f.attackName.trim() === ""
-      ? []
+      ? others
       : [
           {
+            ...kept,
             name: f.attackName,
             toHit: Number(f.toHit),
             damage: f.damage.trim(),
             ...(f.damageType !== NONE ? { damageType: f.damageType } : {}),
           },
+          ...others,
         ];
   const abilities =
     filled.length === 0

@@ -51,23 +51,23 @@ describe("scenes-map client logic", () => {
   test("FR-MAP-29 layer registry orders layers; a test layer slots in at its order", () => {
     const c = () => null;
     const layers = orderLayers([
-      { id: "pointers", order: LAYER_ORDER.pointers, component: c },
-      { id: "map", order: LAYER_ORDER.map, component: c },
-      { id: "tokens", order: LAYER_ORDER.tokens, component: c },
-      { id: "test-fog", order: LAYER_ORDER.fog, component: c },
-      { id: "grid", order: LAYER_ORDER.grid, component: c },
+      { id: "pointers", order: LAYER_ORDER.pointers, layer: "top", component: c },
+      { id: "map", order: LAYER_ORDER.map, layer: "base", component: c },
+      { id: "tokens", order: LAYER_ORDER.tokens, layer: "objects", component: c },
+      { id: "test-fog", order: LAYER_ORDER.fog, layer: "fog", component: c },
+      { id: "grid", order: LAYER_ORDER.grid, layer: "base", component: c },
     ]);
     expect(layers.map((l) => l.id)).toEqual(["map", "grid", "test-fog", "tokens", "pointers"]);
     expect(() =>
       orderLayers([
-        { id: "a", order: 1, component: c },
-        { id: "a", order: 2, component: c },
+        { id: "a", order: 1, layer: "base", component: c },
+        { id: "a", order: 2, layer: "base", component: c },
       ]),
     ).toThrow();
     expect(() =>
       orderLayers([
-        { id: "a", order: 1, component: c },
-        { id: "b", order: 1, component: c },
+        { id: "a", order: 1, layer: "base", component: c },
+        { id: "b", order: 1, layer: "base", component: c },
       ]),
     ).toThrow();
   });
