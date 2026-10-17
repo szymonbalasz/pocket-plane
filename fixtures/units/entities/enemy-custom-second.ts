@@ -21,6 +21,7 @@ export default defineFixture({
         speed: 30,
         attacks: [{ name: "Claw", toHit: 7, damage: "2d6+4", damageType: "slashing" }],
         cr: "5",
+        type: "giant",
       },
     }),
     step(activateCampaign, (r) => ({ id: r.id("campaign", "campaign") })),

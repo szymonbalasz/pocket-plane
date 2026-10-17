@@ -31,6 +31,8 @@ import scenes from "./scenes";
 import sessionSim from "./session-sim";
 import sessionSim7 from "./session-sim-7";
 import syncProbe from "./sync-probe";
+import tokenArtUpdate from "./token-art-update";
+import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
 
@@ -68,4 +70,6 @@ export const bundles: readonly Bundle[] = [
   rulesEffects,
   mapTools,
   furyLogLine,
+  tokenArtUpdate,
+  usesNegative,
 ];

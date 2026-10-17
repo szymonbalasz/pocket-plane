@@ -2,7 +2,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { srdMini } from "@fixtures/srd/open5e";
 import { EntryDraft } from "@shared/compendium/schemas";
-import { MonsterStatBlock, Senses } from "@shared/entities/schemas";
+import {
+  CREATURE_TYPES,
+  type CreatureType,
+  MonsterStatBlock,
+  Senses,
+} from "@shared/entities/schemas";
 import { loadSrd51 } from "../sources/srd-5.1";
 import { ADAPTER_VERSION, type AdapterRecord, type AdapterResult, adaptOpen5e } from "./open5e";
 import { toMarkdownLite } from "./text";
@@ -75,6 +80,7 @@ describe("FR-CMP-05 adapter", () => {
         { name: "Shortbow", toHit: 4, damage: "1d6+2", damageType: "piercing" },
       ],
       cr: "1/4",
+      type: "humanoid",
       senses: { darkvisionFt: 60, seesMagicalDarkness: false },
     });
     const entry = rec("monster/goblin")?.data;
@@ -228,6 +234,58 @@ describe("FR-CMP-05 adapter", () => {
   });
 });
 
+describe("FR-CMP-39 adapter type, OQ-CMP-33 extra damage", () => {
+  test("FR-CMP-39 adapter type: 322 / 322 bundled monsters get one of the 14 types; swarm → dropped + 1 warning", () => {
+    const monsters = result.records.flatMap((r) => (r.kind === "monster" ? [r.definition] : []));
+    expect(monsters).toHaveLength(322);
+    for (const m of monsters) expect(CREATURE_TYPES).toContain(m.statBlock.type as CreatureType);
+    expect(result.warnings.filter((w) => w.field === "statBlock.type")).toEqual([]);
+    expect(monsterDef("monster/ogre").statBlock.type).toBe("giant");
+    expect(monsterDef("monster/wolf").statBlock.type).toBe("beast");
+    expect(monsterDef("monster/adult-red-dragon").statBlock.type).toBe("dragon");
+    const goblin = srdMini.monsters?.find(
+      (m) => (m as { slug: string }).slug === "goblin",
+    ) as Record<string, unknown>;
+    const swarm = adaptOpen5e({ monsters: [{ ...goblin, type: "swarm" }] });
+    const def = swarm.records[0]?.kind === "monster" ? swarm.records[0].definition : null;
+    expect(def?.statBlock.type).toBeUndefined();
+    expect(swarm.warnings.map((w) => `${w.sourceKey} ${w.field}`)).toEqual([
+      "monster/goblin statBlock.type",
+    ]);
+    // A sprint-3 recording without `type` (`cmp-srd-mini-s3`): no type, no warning.
+    const { type: _type, ...untyped } = goblin;
+    const old = adaptOpen5e({ monsters: [untyped] });
+    const oldDef = old.records[0]?.kind === "monster" ? old.records[0].definition : null;
+    expect(oldDef?.statBlock.type).toBeUndefined();
+    expect(old.warnings).toEqual([]);
+  });
+
+  test("OQ-CMP-33 SRD second damage dice → Attack.extraDamage (43 / 44); Djinni's 'lightning or thunder' stays text", () => {
+    const bite = monsterDef("monster/adult-red-dragon").statBlock.attacks.find(
+      (a) => a.name === "Bite",
+    );
+    expect(bite).toMatchObject({
+      damage: "2d10+8",
+      damageType: "piercing",
+      extraDamage: [{ damage: "2d6", type: "fire" }],
+    });
+    // Behir's second part carries its own constant; Azer's two-handed "or" clause is skipped.
+    const constrict = monsterDef("monster/behir").statBlock.attacks.find(
+      (a) => a.name === "Constrict",
+    );
+    expect(constrict?.extraDamage).toEqual([{ damage: "2d10+6", type: "slashing" }]);
+    const hammer = monsterDef("monster/azer").statBlock.attacks.find((a) => a.name === "Warhammer");
+    expect(hammer?.extraDamage).toEqual([{ damage: "1d6", type: "fire" }]);
+    const parts = result.records.flatMap((r) =>
+      r.kind === "monster" ? r.definition.statBlock.attacks.filter((a) => a.extraDamage) : [],
+    );
+    expect(parts).toHaveLength(43);
+    expect(
+      result.warnings.filter((w) => w.message.startsWith("Extra damage")).map((w) => w.sourceKey),
+    ).toEqual(["monster/djinni"]);
+  });
+});
+
 describe("FR-CMP-04 version", () => {
   const files = [
     { name: "monsters.json", text: "[]\n" },
@@ -253,11 +311,9 @@ describe("FR-CMP-04 version", () => {
 });
 
 describe("FR-CMP-05 adapter: mini fixture set", () => {
-  test("fixtures/srd/open5e maps; only the dragon's Bite fire rider warns", () => {
+  test("fixtures/srd/open5e maps without warnings (the dragon's Bite fire rider is an extra part)", () => {
     const r = adaptOpen5e(srdMini);
-    expect(r.warnings.map((w) => `${w.sourceKey} ${w.field}`)).toEqual([
-      "monster/adult-red-dragon attacks[1]",
-    ]);
+    expect(r.warnings).toEqual([]);
     expect(r.counts).toMatchObject({ monster: 5, spell: 4, item: 4, condition: 3 });
     expect(r.records.map((x) => x.sourceKey)).toContain("feature/rogue/sneak-attack");
     expect(r.records.map((x) => x.sourceKey)).toContain("spell/hunters-mark");

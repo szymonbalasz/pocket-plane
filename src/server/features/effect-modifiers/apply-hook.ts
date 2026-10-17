@@ -3,13 +3,16 @@
 // card's offered parts: each lands floor((value ?? rolled) × (multiplier ?? row's)) on this Hit
 // target (summed into the one `hpRules.apply`), its `trigger_use` row turns `used` (target,
 // hp_change) and a feature-frequency trigger spends a use. A used charge (another `used` row in
-// the window) or no use left → `conflict` unless `force` (recorded `forced`, spends nothing).
+// the window) or no use left → `conflict` unless `force` (recorded `forced`; a window charge
+// spends nothing, a feature use is spent below zero to the floor, FR-MOD-59).
 // Feature uses go through CHARX's one helper pair (`resources.ts`, FR-MOD-61).
-// `cbt.undo` → `revert`: the row's uses back to `offered`, feature uses refunded.
+// `cbt.undo` → `revert`: the row's uses back to `offered`, the one feature use its apply spent
+// refunded (also from below zero, FR-MOD-59 (c)).
 // FR-MOD-57 (sprint 4, rulings B3 / B4): each landed part's roll (`expression` + per-die `dice`
 // from its roll row) goes in `dmPayload.parts`; a **public character** trigger's also in the
 // public part (unless the DM set its value: players see the DM's value only).
 // Both rewrite the owner's trigger state after the use rows flip (FR-MOD-54).
+import { leftText } from "@shared/character-sheet/counters";
 import type { AttackLineDmPart, AttackLinePart } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_FACTOR } from "@shared/combat-tracker/rules";
 import type { HpTriggerPart } from "@shared/combat-tracker/schemas";
@@ -105,10 +108,20 @@ export const modApplyHook: ApplyHook = {
               throw usedConflict(t.id, `${part.label}: no ${uses?.name ?? "feature"} uses left`);
             }
             forced = true;
-          } else {
-            const spent = spendFeatureUse(env, t.characterId, every.feature);
-            if (spent.ok) changes.push(spent.change);
-            featureId = every.feature;
+          }
+          // FR-MOD-59 (b): Force spends the use too (below zero, to the floor; at the floor
+          // `conflict` even with Force). A broken link (no row / `usesMax`) spends nothing.
+          if (uses) {
+            const spent = spendFeatureUse(env, t.characterId, every.feature, { overspend: forced });
+            if (spent.ok) {
+              changes.push(spent.change);
+              featureId = every.feature;
+            } else if (spent.reason === "floor") {
+              throw usedConflict(
+                t.id,
+                `${part.label}: ${spent.name} is at ${leftText(spent.left)} / ${spent.max} — reset it first`,
+              );
+            }
           }
         }
       }

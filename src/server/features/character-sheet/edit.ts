@@ -2,6 +2,7 @@
 // `moveRow` (FR-CHARX-16). Stat-block fields go through entities' `updateIn` (names, clamp,
 // definition-changed hooks: token / combatant copies, CHARX's owner copy + counter clamp); sheet
 // fields and rows through `writeSheet`. One transaction, one `CharacterSheetEdited`.
+import { featureUsedCap } from "@shared/character-sheet/counters";
 import {
   CHARACTER_ONLY_FIELDS,
   CHARX_INTENTS,
@@ -298,10 +299,10 @@ export function charPutRowCommand(hooks: DefinitionHooks) {
         rowId = id;
         let row: AnyRow;
         if (list === "features") {
-          // `used` is a counter (FR-CHARX-17): kept, clamped to the new uses.
+          // `used` is a counter (FR-CHARX-17): kept, clamped to the new uses + 9 (FR-CHARX-58).
           const { used: _ignored, ...f } = input.row as FeatureRow;
           const prevUsed = (existing as FeatureRow | undefined)?.used ?? 0;
-          const feature: FeatureRow = { ...f, id, used: Math.min(prevUsed, f.usesMax ?? 0) };
+          const feature: FeatureRow = { ...f, id, used: Math.min(prevUsed, featureUsedCap(f)) };
           row = feature;
         } else {
           row = { ...(input.row as SpellRow | ItemRow | Attack), id };

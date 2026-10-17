@@ -1,9 +1,9 @@
 // scenes-map boundary schemas (MAP §6, §8, §9; protocol §12, §13, §15): wire records, WS intent
 // payloads, REST bodies and signal data. One schema for server, fixtures and both clients.
-import { TokenShape } from "@shared/entities/schemas";
+import { TokenCreatureType, TokenShape } from "@shared/entities/schemas";
 import { z } from "zod";
 
-export { TokenShape };
+export { TokenCreatureType, TokenShape };
 
 // ---------- record type names ----------
 
@@ -197,6 +197,11 @@ const tokenFields = {
   hidden: z.boolean(),
   /** Token-owned (FR-MAP-35). */
   shape: TokenShape,
+  /**
+   * Display copy of the monster's `statBlock.type` at placement, token-owned afterwards; null =
+   * not known yet (FR-ENT-27, ADR-0050). Players get it on tokens they receive (FR-ENT-30).
+   */
+  creatureType: TokenCreatureType.nullable(),
   /** Display copy: `definitionId` on character tokens, else null; players get it (FR-MAP-50). */
   characterId: z.string().nullable(),
   /** Server copy: every footprint cell fogged (FR-FOG-10); on the wire only when true. */
@@ -245,7 +250,8 @@ export type SetGridInput = z.input<typeof SetGridInput>;
 export const SetLockedInput = z.strictObject({ sceneId: Id, locked: z.boolean() });
 
 /**
- * Never `size` or `speed` (#120, FR-MAP-36). Optional fields are for fixtures and the DM menu.
+ * Never `size`, `speed` (#120, FR-MAP-36) or `creatureType` (FR-ENT-27). Optional fields are for
+ * fixtures and the DM menu.
  * `shape` absent → the definition's `tokenShape`, else `round` (FR-MAP-35).
  */
 export const PlaceTokenInput = z.strictObject({
@@ -308,6 +314,8 @@ export const UpdateTokenInput = z.strictObject({
   ownerPlayerId: Id.nullable().optional(),
   /** FR-MAP-35; never `size` or `speed`. */
   shape: TokenShape.optional(),
+  /** FR-ENT-27: a type or `"initials"`; null is never sent (it only means "not known yet"). */
+  creatureType: TokenCreatureType.optional(),
 });
 export type UpdateTokenInput = z.input<typeof UpdateTokenInput>;
 

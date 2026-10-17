@@ -178,6 +178,8 @@ describe("scenes-map commands", () => {
       ownerPlayerId: null,
       hidden: false,
       definitionId: t.h.goblinId,
+      // FR-ENT-27: the test goblin has no `type` (a pre-S4 definition).
+      creatureType: null,
     });
     expect(t.place(s.id, t.h.goblinId, 13, 6).name).toBe("Goblin 2");
     expect(t.place(s.id, t.h.goblinId, 14, 6).name).toBe("Goblin 3");
@@ -187,6 +189,7 @@ describe("scenes-map commands", () => {
       imageAssetId: "art-mira",
       ownerPlayerId: t.h.p1.id,
       size: "medium",
+      creatureType: null,
     });
     // Fixture overrides; never size.
     const wolf = t.place(s.id, t.h.wolfId, 14, 4, { hidden: true, imageAssetId: "art-elite" });
@@ -379,7 +382,7 @@ describe("scenes-map commands", () => {
     ]);
   });
 
-  test("FR-MAP-20 definition edit: size follows in the same commit; portrait only where unchanged", () => {
+  test("FR-MAP-20 definition edit: size follows in the same commit; portrait only where unchanged; creatureType fills null only", () => {
     const t = setup();
     const s = t.newScene();
     const ogre = t.run<EntityRecord>(createEntity.name, {
@@ -390,14 +393,16 @@ describe("scenes-map commands", () => {
     });
     const a = t.place(s.id, ogre.id, 9, 10);
     const b = t.place(s.id, ogre.id, 5, 10);
+    const c = t.place(s.id, ogre.id, 1, 10);
     t.run(I.updateToken, { tokenId: b.id, imageAssetId: "art-elite", name: "Hugo" });
+    t.run(I.updateToken, { tokenId: c.id, creatureType: "initials" });
     addAsset(t.s, "art-ogre-2", t.h.campaignId);
     const logBefore = readEventLog(t.s.db).length;
     t.run(UPDATE, {
       id: ogre.id,
       name: "Cave Ogre",
       portraitAssetId: "art-ogre-2",
-      statBlock: { ...goblinBlock, size: "huge" },
+      statBlock: { ...goblinBlock, size: "huge", type: "giant" },
     });
     expect(t.tokenRow(a.id)).toMatchObject({
       size: "huge",
@@ -405,19 +410,28 @@ describe("scenes-map commands", () => {
       name: "Cave Ogre",
       col: 9,
       row: 10,
+      creatureType: "giant",
     });
     expect(t.tokenRow(b.id)).toMatchObject({
       size: "huge",
       imageAssetId: "art-elite",
       name: "Hugo",
+      creatureType: "giant",
     });
+    expect(t.tokenRow(c.id)).toMatchObject({ size: "huge", creatureType: "initials" });
     const ev = t.lastEvent();
     expect(ev?.type).toBe("EntityUpdated");
-    expect(ev?.changes.map((c) => [c.type, c.id])).toEqual([
+    // Copies hook first, then the FR-ENT-27 fill (a later registry line): its rows come last
+    // and carry both changes; the Initials token gets no fill row.
+    expect(ev?.changes.map((x) => [x.type, x.id])).toEqual([
       ["entity", ogre.id],
       ["token", a.id],
       ["token", b.id],
+      ["token", c.id],
+      ["token", a.id],
+      ["token", b.id],
     ]);
+    expect(ev?.changes.at(-1)?.after).toMatchObject({ size: "huge", creatureType: "giant" });
     expect(
       readEventLog(t.s.db)
         .slice(logBefore)

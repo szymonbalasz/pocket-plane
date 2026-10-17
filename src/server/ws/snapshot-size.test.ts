@@ -253,6 +253,38 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect(dmBuildMs(b.s)).toBeLessThan(Math.max(BUILD_MS, before * 2));
     });
 
+    // Mutates the scenario (every token's creatureType): after the read-only cases.
+    test("FR-ENT-27 CON-44 token creatureType: null on every token, worst case `monstrosity` ≤ +9 B per received token; ceilings hold", () => {
+      const typed = b.s.db.$client
+        .query<{ id: string; t: string }, []>(
+          "SELECT id, creature_type AS t FROM token WHERE creature_type IS NOT NULL",
+        )
+        .all();
+      b.s.db.$client.run("UPDATE token SET creature_type = NULL");
+      const before = snapshotSizes(b.s);
+      const tokenBytes = (v: ViewerSize) => v.types[TOKEN_TYPE]?.bytes ?? 0;
+      const rows = (v: ViewerSize) => v.types[TOKEN_TYPE]?.rows ?? 0;
+      // Worst case (ENT §12): the longest value on every token (a size probe, not a command).
+      b.s.db.$client.run("UPDATE token SET creature_type = 'monstrosity'");
+      const after = snapshotSizes(b.s);
+      expectUnderCeilings(after);
+      for (const [i, v] of after.entries()) {
+        const was = before[i] as ViewerSize;
+        // `"creatureType":null` → `"creatureType":"monstrosity"`: +9 B per token received.
+        expect(tokenBytes(v) - tokenBytes(was)).toBe(9 * rows(v));
+        expect(v.bytes - was.bytes).toBe(9 * rows(v));
+      }
+      const [dm, ...players] = after as [ViewerSize, ...ViewerSize[]];
+      const loads = sceneLoadSizes(b.s);
+      expect(loads[0]?.bytes).toBeLessThan(SCENE_LOAD_MAX);
+      console.log(
+        `ENT CON-44 token creatureType: ${rows(dm)} tokens per frame; DM ${before[0]?.bytes} B (null) → ${dm.bytes} B (monstrosity), ${1_048_576 - dm.bytes} B left of 1 MiB; players ${Math.min(...players.map((p) => p.bytes))}–${Math.max(...players.map((p) => p.bytes))} B; largest scene load ${loads[0]?.bytes} B`,
+      );
+      b.s.db.$client.run("UPDATE token SET creature_type = NULL");
+      const restore = b.s.db.$client.query("UPDATE token SET creature_type = ? WHERE id = ?");
+      for (const r of typed) restore.run(r.t, r.id);
+    });
+
     // Mutates the scenario (adds tokens): keep last.
     test("ADR-0041 a non-active scene at the 200-token cap: its load < 512 KiB; the DM snapshot doesn't grow", () => {
       const dmBefore = snapshotSizes(b.s)[0]?.bytes ?? 0;
