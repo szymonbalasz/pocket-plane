@@ -54,6 +54,25 @@ Sprint 2 phase 1 also revised combat-tracker, combat-extras, entities, notificat
 
 Sprint 3 also revised live-sync (lazy record types, FR-SYNC-30–38) and party-loot (item rows, split).
 
+## Sprint 4 (post-MVP)
+
+All revisions, gate 1 #245 (ADRs 0047–0050).
+
+| Spec | Prefix | Status | Owner |
+|---|---|---|---|
+| [Fog of war](fog-of-war.md) (party vision, sight while dragging, 999 ft default, brush, Ctrl+Z) | FOG | complete | spec-vision |
+| [Dice extras](dice-extras.md) (full-screen dice, roll popup, die-shape chips) | DICEX | complete | spec-dice |
+| [Dice and game log](dice-roll-log.md) (dice in log lines) | DICE | complete | spec-dice |
+| [Scene tools](scene-tools.md) (freeform AoE, coverage) | SCN | complete | spec-maptools |
+| [Scenes and map](scenes-map.md) (pan, Fit, drag path, labels, Show to players) | MAP | complete | spec-maptools |
+| [Play shell](play-shell.md) (window placement, launcher) | SHELL | complete | spec-maptools |
+| [Effect modifiers](effect-modifiers.md) (effects review, trigger state, badges) | MOD | complete | spec-rules |
+| [Combat tracker](combat-tracker.md) (weapon damage parts, BL-10 copy) | CBT | complete | spec-rules |
+| [Combat extras](combat-extras.md) (badges, effect hooks) | CBTX | complete | spec-rules |
+| [Character sheet full](character-sheet-full.md) (senses default, magic weapons, negative uses) | CHARX | complete | spec-rules |
+| [Compendium](compendium.md) (word search, ranking, groups) | CMP | complete | spec-compendium |
+| [Entities](entities.md) (creature type, token art) | ENT | complete | spec-compendium |
+
 ## Post-MVP
 
 Stubs only. Not to be claimed during MVP spec phase.
