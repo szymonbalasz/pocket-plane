@@ -10,6 +10,9 @@
 //   the FK cascade come after) → `SceneDeleted`.
 // - `activated(env, scene)`: `map.activateScene`, after both `active` flags flip → `SceneActivated`
 //   (ADR-0042: fog re-derives a `visionStale` scene, FR-FOG-35).
+// - `mapChanged(env, scene)` (sprint 4, review A8): `map.setGrid` / `map.setSceneMap`, after the
+//   scene row is written, only when the map rectangle moved (map size, cell size or offsets) →
+//   `SceneUpdated` (fog re-derives the scene: the map edges bound sight, FR-FOG-33).
 // Hooks write through `env.tx` only and never emit. No line registered → no behaviour change.
 import type { SceneRecord } from "@shared/scenes-map/schemas";
 import type { CommandEnv } from "../../commands/commands";
@@ -26,11 +29,12 @@ export interface SceneHook {
   duplicated?(env: SceneHookEnv, source: SceneRecord, copy: SceneRecord): RecordChange[];
   deleting?(env: SceneHookEnv, scene: SceneRecord): RecordChange[];
   activated?(env: SceneHookEnv, scene: SceneRecord): RecordChange[];
+  mapChanged?(env: SceneHookEnv, scene: SceneRecord): RecordChange[];
 }
 
 /** The registry. Append your feature's line; order = run order. */
 export const sceneHooks: readonly SceneHook[] = [
-  fogSceneHook, // fog-of-war (FR-FOG-02 created / duplicated, FR-FOG-23 deleting, -35 activated)
+  fogSceneHook, // fog-of-war (FR-FOG-02 created / duplicated, -23 deleting, -35 activated, -33 mapChanged)
   scnSceneHook, // scene-tools (FR-SCN-31)
 ];
 
@@ -68,6 +72,10 @@ export class SceneHooks {
 
   activated(env: SceneHookEnv, scene: SceneRecord): RecordChange[] {
     return this.list.flatMap((h) => h.activated?.(env, scene) ?? []);
+  }
+
+  mapChanged(env: SceneHookEnv, scene: SceneRecord): RecordChange[] {
+    return this.list.flatMap((h) => h.mapChanged?.(env, scene) ?? []);
   }
 }
 

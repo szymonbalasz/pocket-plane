@@ -1,6 +1,7 @@
-// Senses on the sheet (CHARX §13 unit, sprint 3): the line's parts and "Senses —" (FR-CHARX-50),
-// edit inputs + Switches, NPC sheet, no roll button; Sees invisible part and its owner-disabled
-// Switch (FR-CHARX-53). Static server render over a fake sync store.
+// Senses on the sheet (CHARX §13 unit, sprint 3): the line's parts (FR-CHARX-50), edit inputs +
+// Switches, NPC sheet, no roll button; Sees invisible part and its owner-disabled Switch
+// (FR-CHARX-53). Sprint 4 (FR-CHARX-49 / -50): "Vision normal" / "Vision 30 ft" / "No vision" and
+// the Normal toggle. Static server render over a fake sync store.
 import { describe, expect, test } from "bun:test";
 import { defaultSheetData } from "@shared/character-sheet/sheet";
 import {
@@ -17,7 +18,7 @@ import { SyncContext, type SyncState } from "../../sync/store";
 import { DARKNESS_HINT, invisibleHint, SensesLine } from "./Senses";
 import type { SheetCtx } from "./sheet-context";
 import { SheetContext } from "./sheet-context";
-import { NO_SENSES, sensesEdit, sensesParts, sensesText } from "./view-model";
+import { NO_SENSES, NORMAL_SENSES, sensesEdit, sensesParts, sensesText } from "./view-model";
 
 const base = { size: "medium", ac: 15, hpMax: 10, initBonus: 1, attacks: [] };
 const DEVIL: Senses = { visionFt: 0, darkvisionFt: 60, seesMagicalDarkness: true };
@@ -91,19 +92,20 @@ function tag(html: string, testId: string, value?: string): string {
 }
 
 describe("FR-CHARX-50 senses line", () => {
-  test("FR-CHARX-50 senses line: parts omitted at 0 / false, all default → 'Senses —'", () => {
-    expect(sensesParts(undefined)).toEqual([]);
-    expect(sensesText(undefined)).toBe("—");
-    expect(sensesText(NO_SENSES)).toBe("—");
+  test("FR-CHARX-50 senses line: 'Vision normal' / 'Vision 30 ft' / 'No vision' first, other parts omitted at 0 / false", () => {
+    expect(sensesParts(undefined)).toEqual(["Vision normal"]);
+    expect(sensesText(undefined)).toBe("Vision normal");
+    expect(sensesText(NORMAL_SENSES)).toBe("Vision normal");
+    expect(sensesText(NO_SENSES)).toBe("No vision");
     expect(sensesText({ visionFt: 30, darkvisionFt: 0, seesMagicalDarkness: false })).toBe(
       "Vision 30 ft",
     );
     expect(sensesText({ ...DEVIL, visionFt: 30, seesInvisible: true })).toBe(
       "Vision 30 ft · Darkvision 60 ft · Sees through magical darkness · Sees invisible",
     );
-    expect(text(render())).toBe("Senses —");
+    expect(text(render())).toBe("Senses Vision normal");
     expect(text(render({ senses: DEVIL }))).toBe(
-      "Senses Darkvision 60 ft · Sees through magical darkness",
+      "Senses No vision · Darkvision 60 ft · Sees through magical darkness",
     );
   });
 
@@ -132,6 +134,10 @@ describe("FR-CHARX-50 senses line", () => {
       }
       expect(vision).toContain('value="0"');
       expect(dark).toContain('value="60"');
+      // A stored vision: the Normal toggle is off and the input enabled.
+      const normal = tag(html, "charx-senses-vision-normal");
+      expect(normal).toContain('data-state="off"');
+      expect(vision).not.toContain('disabled=""');
       const sw = tag(html, "charx-senses-darkness");
       expect(sw).toContain('data-state="checked"');
       expect(sw).not.toContain('disabled=""');
@@ -140,9 +146,37 @@ describe("FR-CHARX-50 senses line", () => {
     }
   });
 
+  test("FR-CHARX-50 Normal toggle: on (no stored vision) disables the input; owner and DM both", () => {
+    for (const client of ["player", "dm"] as const) {
+      const html = render({ senses: NORMAL_SENSES, editing: true, client });
+      const normal = tag(html, "charx-senses-vision-normal");
+      expect(normal).toContain('data-state="on"');
+      expect(normal).toContain('aria-pressed="true"');
+      const vision = tag(html, "charx-field", "senses.visionFt");
+      expect(vision).toContain('disabled=""');
+      expect(vision).toContain('placeholder="Normal"');
+    }
+    // Without senses at all: Normal too.
+    expect(tag(render({ editing: true }), "charx-senses-vision-normal")).toContain(
+      'data-state="on"',
+    );
+  });
+
+  test("FR-CHARX-49 vision default: Normal = the payload without visionFt (clears a stored value); a stored 0 is kept", () => {
+    expect(sensesEdit({ ...DEVIL, visionFt: 30 }, { visionFt: undefined }, "player")).toEqual({
+      darkvisionFt: 60,
+      seesMagicalDarkness: true,
+    });
+    expect(sensesEdit(undefined, { visionFt: 0 }, "player")).toEqual({
+      visionFt: 0,
+      darkvisionFt: 0,
+      seesMagicalDarkness: false,
+    });
+    expect(sensesEdit(NORMAL_SENSES, { visionFt: 995 }, "player")).toMatchObject({ visionFt: 995 });
+  });
+
   test("FR-CHARX-50 edit payload: the whole object; a player never sends seesInvisible, the DM always does", () => {
     expect(sensesEdit(undefined, { darkvisionFt: 30 }, "player")).toEqual({
-      visionFt: 0,
       darkvisionFt: 30,
       seesMagicalDarkness: false,
     });

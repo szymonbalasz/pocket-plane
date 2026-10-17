@@ -76,7 +76,12 @@ import {
 } from "./store";
 import { setViewAs, useViewAs, VIEW_AS_DM } from "./view-as";
 
-const SHAPE_NAMES = { rect: "rectangle", polygon: "polygon", circle: "circle" } as const;
+const SHAPE_NAMES = {
+  rect: "rectangle",
+  polygon: "polygon",
+  circle: "circle",
+  brush: "brush stroke",
+} as const;
 
 /** Sprint-2 kinds (legacy `fog.edit` forms) and Fog all / Reveal all. */
 const KIND_LABELS: Partial<Record<FogEditKind, string>> = {
@@ -93,7 +98,15 @@ const KIND_LABELS: Partial<Record<FogEditKind, string>> = {
 };
 
 const shapeKind = (s: FogLayerShape | undefined) =>
-  !s ? "shape" : "rect" in s ? "rect" : "circle" in s ? "circle" : "polygon";
+  !s
+    ? "shape"
+    : "rect" in s
+      ? "rect"
+      : "circle" in s
+        ? "circle"
+        : "polygon" in s
+          ? "polygon"
+          : "brush";
 
 /**
  * FR-FOG-17: "Undo: ‹reveal | fog | explored› ‹rectangle | polygon | circle | all›" or "Undo:

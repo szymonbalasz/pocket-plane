@@ -360,7 +360,7 @@ function ResultView({ entries }: { entries: GameLogEntryView[] }) {
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-1">
         {t?.dice.map((d) => (
-          <FlatDie key={d.key} die={d} size="sm" look={look} />
+          <FlatDie key={d.key} die={d} look={look} />
         ))}
         {t && t.more > 0 && <span className="text-xs text-muted-foreground">+{t.more} more</span>}
         {t && t.totals.length > 0 && (

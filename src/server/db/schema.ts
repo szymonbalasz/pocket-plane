@@ -17,7 +17,12 @@ import { TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
 import { LOOT_ENTRY_KINDS } from "@shared/events/party-loot";
-import { type DoorSeen, FOG_EDIT_KINDS, FOG_FILLS } from "@shared/fog-of-war/schemas";
+import {
+  type DoorSeen,
+  FOG_EDIT_KINDS,
+  FOG_FILLS,
+  type FogBaseState,
+} from "@shared/fog-of-war/schemas";
 import type { DarknessRow, FogLayerShape } from "@shared/fog-of-war/shapes";
 import type { SharedWith } from "@shared/party-board/schemas";
 import { DIAGONAL_RULES, type Door, TEMPLATE_SHAPES, type Wall } from "@shared/scene-tools/schemas";
@@ -1010,6 +1015,14 @@ export const sceneFogEdit = sqliteTable(
     /** FR-FOG-07: shapes / darkness before the edit; null on pre-v2 rows. */
     prevShapes: text("prev_shapes", { mode: "json" }).$type<FogLayerShape[]>(),
     prevDarkness: text("prev_darkness", { mode: "json" }).$type<DarknessRow[]>(),
+    /**
+     * FR-FOG-56 (sprint 4): set when undone (the entry joins the redo list); `next*` = the state
+     * the undo replaced (base mask, shapes, darkness), re-applied by `fog.redo`. Null otherwise.
+     */
+    undoneAt: text("undone_at"),
+    nextBase: text("next_base", { mode: "json" }).$type<FogBaseState>(),
+    nextShapes: text("next_shapes", { mode: "json" }).$type<FogLayerShape[]>(),
+    nextDarkness: text("next_darkness", { mode: "json" }).$type<DarknessRow[]>(),
     createdAt: text("created_at").notNull(),
   },
   (t) => [
@@ -1051,6 +1064,18 @@ export const fogExplored = sqliteTable(
     index("fog_explored_player").on(t.playerId),
   ],
 );
+
+/**
+ * FR-FOG-49 (sprint 4, ADR party vision): the campaign's fog settings; no row = party vision off.
+ * Wire record `fog-settings` `{id = campaignId, partyVision}`.
+ */
+export const fogSettings = sqliteTable("fog_settings", {
+  campaignId: text("campaign_id")
+    .primaryKey()
+    .references((): AnySQLiteColumn => campaign.id),
+  partyVision: integer("party_vision", { mode: "boolean" }).notNull().default(false),
+  updatedAt: text("updated_at").notNull(),
+});
 
 // ---------------------------------------------------------------------------------------------
 // Scene tools (SCN §8, data model §25; fix/scn-core). scene-tools writes the rows. Every scene
@@ -1286,6 +1311,7 @@ export const schema = {
   sceneFog,
   sceneFogEdit,
   fogExplored,
+  fogSettings,
   sceneStructure,
   prop,
   aoeTemplate,

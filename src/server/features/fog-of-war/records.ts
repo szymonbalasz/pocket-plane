@@ -5,7 +5,9 @@
 //   viewer in `seenBy`, FR-FOG-44), active scene only via the scene gate (CON-22).
 // - `fog-explored` (FR-FOG-37) and `vision` (FR-FOG-39, derived): `dmWindow: "view-as"`
 //   (FR-FOG-43): the DM snapshot carries none; `sync.loadScene {sceneId, viewAs}` loads one
-//   player's. Players: their own rows only. `vision` is derived (no table): the snapshot computes
+//   player's (`viewAs: "party"`: every player's). Players: their own rows; sprint 4 (FR-FOG-51):
+//   while party vision is on, every other player's `vision` too, redacted (no `inv`), through
+//   the record's server-only `shared` flag. `vision` is derived (no table): the snapshot computes
 //   it from the DB through the vision cache; commands list before / after (`rederive.ts`).
 import {
   FOG_EXPLORED_TYPE,
@@ -67,6 +69,13 @@ export const fogRecordType = defineRecordType<ServerFogRecord>({
 const ownRow = (r: { playerId: string }, v: Viewer): Visibility =>
   v.playerId !== null && r.playerId === v.playerId ? "redacted" : "hidden";
 
+/**
+ * FR-FOG-51: `vision` = the owner, and every other player of the campaign while the record is
+ * `shared` (party vision on at compute time); the scope gate checks the campaign.
+ */
+export const visionVisibility = (r: ServerVisionRecord, v: Viewer): Visibility =>
+  v.playerId !== null && (r.playerId === v.playerId || r.shared) ? "redacted" : "hidden";
+
 const wireExplored = ({ campaignId: _c, ...r }: ServerExploredRecord): FogExploredRecord => r;
 
 export const fogExploredRecordType = defineRecordType<ServerExploredRecord>({
@@ -89,8 +98,9 @@ export const fogExploredRecordType = defineRecordType<ServerExploredRecord>({
 });
 
 /**
- * FR-FOG-39: `vision` rows computed from the DB (cached sight, FR-FOG-38). A player: their own row
- * on the active scene (or the loaded scene); the DM: only on a View-as load (`scope`, FR-FOG-43).
+ * FR-FOG-39: `vision` rows computed from the DB (cached sight, FR-FOG-38), `shared` from the
+ * campaign's switch (FR-FOG-51). A player: every row of the active scene (the visibility fn keeps
+ * their own, plus the others' while shared); the DM: only on a View-as load (`scope`, FR-FOG-43).
  */
 function visionSnapshot(db: Db, v: Viewer, scope?: { sceneId: string }): ServerVisionRecord[] {
   if (v.role === "dm" && !scope) return [];
@@ -105,12 +115,18 @@ function visionSnapshot(db: Db, v: Viewer, scope?: { sceneId: string }): ServerV
   const loaded = loadSceneSight(db, sceneId);
   if (!loaded || loaded.campaignId !== v.campaignId) return [];
   const sc = { sceneId, campaignId: loaded.campaignId };
-  return [...loaded.sight]
-    .filter(([p]) => v.role === "dm" || p === v.playerId)
-    .map(([p, e]) => toVisionRecord(sc, p, e.vision));
+  return [...loaded.sight].map(([p, e]) => toVisionRecord(sc, p, e.vision, loaded.party));
 }
 
-const wireVision = ({ campaignId: _c, ...r }: ServerVisionRecord): VisionRecord => r;
+const wireVision = ({ campaignId: _c, shared: _s, ...r }: ServerVisionRecord): VisionRecord => r;
+
+/** FR-FOG-51: own row in full; another player's shared copy without `inv`. */
+export function redactVision(r: ServerVisionRecord, v: Viewer): VisionRecord {
+  const w = wireVision(r);
+  if (r.playerId === v.playerId) return w;
+  const { inv: _inv, ...rest } = w;
+  return rest;
+}
 
 export const visionRecordType = defineRecordType<ServerVisionRecord>({
   type: VISION_TYPE,
@@ -120,8 +136,8 @@ export const visionRecordType = defineRecordType<ServerVisionRecord>({
   idOf: (r) => r.id,
   campaignOf: (r) => r.campaignId,
   sceneOf: (r) => r.sceneId,
-  visibility: ownRow,
-  redact: wireVision,
+  visibility: visionVisibility,
+  redact: redactVision,
   dmRedact: wireVision,
   dmWindow: "view-as",
   snapshot: ({ db }, v, scope) => visionSnapshot(db, v, scope),
