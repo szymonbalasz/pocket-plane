@@ -30,7 +30,7 @@ import {
   VISION_TYPE,
 } from "@shared/fog-of-war/schemas";
 import type { DarknessRow } from "@shared/fog-of-war/shapes";
-import { type PlayerVision, polygonCells } from "@shared/fog-of-war/vision";
+import { polygonCells } from "@shared/fog-of-war/vision";
 import {
   doorCells,
   doorSamplePoints,
@@ -76,7 +76,7 @@ import {
   subjectCopies,
 } from "./derive";
 import { readExploredRecord, readFogRecord, type ServerVisionRecord, toVisionRecord } from "./rows";
-import { fogLog, isSource, type SourceLike } from "./sight";
+import { type FogVision, fogLog, isSource, type SourceLike } from "./sight";
 import { type VisionEntry, visionCache } from "./vision-cache";
 
 /** A token as a possible vision source (FR-FOG-32). */
@@ -381,9 +381,11 @@ const unknownVision = (
 ): ServerVisionRecord =>
   toVisionRecord(sc, p, { blind: false, see: [[]], dark: [], inv: [], src: [], polys: [] }, shared);
 
-/** Same wire content (FR-FOG-39): a sight whose inputs moved but whose polygons didn't. */
-const sameVision = (a: PlayerVision, b: PlayerVision) =>
+/** Same wire content (FR-FOG-39, -48): a sight whose inputs moved but whose polygons didn't. */
+const sameVision = (a: FogVision, b: FogVision) =>
   a.blind === b.blind &&
+  a.reason === b.reason &&
+  a.secret === b.secret &&
   JSON.stringify([a.see, a.dark, a.inv, a.src]) === JSON.stringify([b.see, b.dark, b.inv, b.src]);
 
 /**

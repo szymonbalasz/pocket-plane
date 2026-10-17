@@ -10,12 +10,12 @@
 //   on: every such player but the sender, and nobody while the party is blind (FR-FOG-50);
 // - never the DM (players only; the hub skips DM connections anyway).
 import { FOG_SIGNALS, FogSightPayload } from "@shared/fog-of-war/schemas";
-import { partyVision } from "@shared/fog-of-war/vision";
 import { eq } from "drizzle-orm";
 import { scene } from "../../db/schema";
 import { defineServerSignal } from "../../ws/signals";
 import type { SceneRead } from "../scenes-map/visibility-hooks";
 import { loadSceneSight } from "./derive";
+import { partyOf } from "./sight";
 
 /** FR-FOG-53: ≤ 4 frames per token per receiver in any second. */
 export const FOG_SIGHT_PER_SECOND = 4;
@@ -53,7 +53,7 @@ export function fogSightAudience(
   const me = sender.role === "player" ? sender.playerId : null;
   const loaded = loadSceneSight(read, token.sceneId);
   if (!loaded?.party) return owner !== null && owner !== me ? [owner] : [];
-  const party = partyVision([...loaded.sight.values()].map((e) => e.vision));
+  const party = partyOf([...loaded.sight.values()].map((e) => e.vision));
   if (party?.blind) return [];
   return holders.filter((p) => p !== me);
 }

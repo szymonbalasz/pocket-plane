@@ -157,10 +157,18 @@ export const FogExploredRecord = z.object({
 export type FogExploredRecord = z.infer<typeof FogExploredRecord>;
 
 /**
+ * FR-FOG-21 / -48 (sprint 4): why a blind player can't see (the chip's `data-reason`): a Blinded
+ * source, or `unknown` when a secret Blinded is among the causes (OQ-FOG-61). Absent = darkness.
+ */
+export const BlindReason = z.enum(["blinded", "unknown"]);
+export type BlindReason = z.infer<typeof BlindReason>;
+
+/**
  * `vision` (FR-FOG-39, derived): the player's rounded, simplified sight polygons, flat
  * `[x, y, …]`; `inv` = indices into `see ++ dark` of the polygons whose source sees invisible
  * (omitted when empty; never in another player's copy, FR-FOG-51); `src` (sprint 4) = the source
- * token id of each polygon of `see ++ dark`.
+ * token id of each polygon of `see ++ dark`; `reason` (sprint 4, FR-FOG-48) = the blind chip's
+ * reason, only while blind for a Blinded source, never in another player's copy.
  */
 export const VisionRecord = z.object({
   id: z.string(),
@@ -171,6 +179,7 @@ export const VisionRecord = z.object({
   dark: z.array(z.array(z.number())),
   inv: z.array(z.number().int().min(0)).optional(),
   src: z.array(z.string()),
+  reason: BlindReason.optional(),
 });
 export type VisionRecord = z.infer<typeof VisionRecord>;
 

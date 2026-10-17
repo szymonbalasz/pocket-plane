@@ -27,7 +27,8 @@ export const previewsComputed = () => computed;
 
 /**
  * FR-FOG-53: the source's polygons with the token at `to`, or null when the token gives no
- * vision (not owned, hidden, beyond the 4 / 12 source caps, owner not a campaign player).
+ * vision (not owned, hidden, beyond the 4 / 12 source caps, owner not a campaign player,
+ * Blinded, FR-FOG-48).
  */
 export function previewSight(
   read: SceneRead,
@@ -45,7 +46,7 @@ export function previewSight(
   const party = partyVisionOn(read, s.campaignId);
   const sources = sceneSources(read, t.sceneId, campaignPlayers(read, s.campaignId), party);
   const src = sources.get(owner)?.find((x) => x.tokenId === t.id);
-  if (!src) return null;
+  if (!src || src.blinded) return null;
   // The origin is the footprint's centre (FR-FOG-32): keep its offset from the top-left cell.
   const moved = {
     ...src,

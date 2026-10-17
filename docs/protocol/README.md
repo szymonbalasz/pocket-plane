@@ -2040,7 +2040,7 @@ From [dice-extras](../specs/dice-extras.md) (FR-DICEX-09, -38–41; [ADR-0048](.
 
 ## 76. Sprint 4: token creature type (C-art core)
 
-Built by `fix/cmp-art-core` ([FR-ENT-26, -27, -30](../specs/entities.md#6-functional-requirements), [FR-CMP-39](../specs/compendium.md#6-functional-requirements), OQ-CMP-33; [ADR-0050](../architecture/adr/0050-token-creature-type.md)). No new record type, intent, signal or event name. The draw and the Art menu are C-art (`build/cmp-token-art`); until then tokens carry `creatureType` and still draw initials. Data side: [data model §59](../data-model/README.md#59-sprint-4-token-creature-type-c-art-core).
+Built by `fix/cmp-art-core` ([FR-ENT-26, -27, -30](../specs/entities.md#6-functional-requirements), [FR-CMP-39](../specs/compendium.md#6-functional-requirements), OQ-CMP-33; [ADR-0050](../architecture/adr/0050-token-creature-type.md)). No new record type, intent, signal or event name. The draw and the Art menu are C-art (`build/cmp-token-art`); until then tokens carry `creatureType` and still draw initials. Data side: [data model §60](../data-model/README.md#59-sprint-4-token-creature-type-c-art-core).
 
 | Change | Contract | Source |
 |---|---|---|
@@ -2050,4 +2050,17 @@ Built by `fix/cmp-art-core` ([FR-ENT-26, -27, -30](../specs/entities.md#6-functi
 | `EntityUpdated` / `ImportedEntityUpdated` | `changes` may list tokens filled by the definition-changed hook line `scenes-map.creature-type-fill`: the definition gained a type, its tokens with `creatureType` null get it (never `"initials"`); imported: every campaign's, frames only to the active one (one log row per campaign, FR-CMP-08) | FR-ENT-27, FR-MAP-20 |
 | Monster `statBlock.type` (entity / imported-entity, DM only) | optional, 14 lower-case types; the Open5e adapter maps it (`ADAPTER_VERSION` 3), and SRD second damage dice into `attacks[].extraDamage` | FR-ENT-26, FR-CMP-39, OQ-CMP-33 |
 
-- CON-44: +20 B per token received as null, ≤ +29 B with `monstrosity`; heavy DM ≤ 637,897 B, players ≤ 258,017 B ([data model §59](../data-model/README.md#59-sprint-4-token-creature-type-c-art-core)).
+- CON-44: +20 B per token received as null, ≤ +29 B with `monstrosity`; heavy DM ≤ 637,897 B, players ≤ 258,017 B ([data model §60](../data-model/README.md#59-sprint-4-token-creature-type-c-art-core)).
+
+## 77. Sprint 4: party vision client, View as Party, Blinded (V10)
+
+From [fog-of-war](../specs/fog-of-war.md) (FR-FOG-48, -21, -20, -43, -49–51; OQ-FOG-50, -55, -61; [ADR-0047](../architecture/adr/0047-party-vision.md), [ADR-0049](../architecture/adr/0049-trigger-state.md) D2; seams S6). **Built by `build/party-vision`**. No new record type, intent, event or signal; one optional wire field on `vision`. Data side: [data model §60](../data-model/README.md#60-sprint-4-party-vision-client-view-as-party-blinded-v10).
+
+| Piece | Contract |
+|---|---|
+| Fog's `effectHooks` line `fog-of-war.blinded` (`fog-of-war/blinded.ts`) | For each `{characterId}` creature: the character's source tokens (owned, not hidden); `markScenesStale` on their scenes → the active one (and any without a fog row) re-derives for the tokens' owners (party vision on: every player), in the causing transaction; the others get `visionStale`. `{combatantId}` (monsters) → nothing. Rows join the causing event (`EffectsAdded`, `EffectsEnded`, `EffectUpdated`, `HpApplied`, …) |
+| Blinded source (`sight.ts`) | A source whose character has an active `blinded` condition effect (`effect.kind = condition`, `condition = blinded`, `endedAt` null; secret or not) has **no polygon**. Blind = every source Blinded or dark-blind. The sight cache key carries each source's Blinded bit (`-` / `open` / `secret`, FR-FOG-38). The drag hint (`fog-sight`) of a Blinded source: none |
+| `vision` (amended) | + optional **`reason`** = `blinded` \| `unknown` (`BlindReason`): only while blind with a Blinded source among the causes; `unknown` when a **secret** one is (OQ-FOG-61). Absent = not blind or darkness only. Server-only `secret: true` (never on a wire) |
+| Visibility (amended `redactVision`) | Own row: full (with `reason`). Another player's shared copy: no `inv`, **no `reason`**; when `secret`: a **non-source** `{id, sceneId, playerId, blind: false, see: [], dark: [], src: []}`. DM (View as): full, with `reason` |
+| Party sight with a secret Blinded (`partyOf`) | A `secret` player's sight counts as none (no polygon, not blind), so party-blind and every `seenBy` match the others' copies |
+| Leak tests (`blinded.test.ts`, `vision-party`) | Per player: snapshot, every frame, a fresh connection, a `resync`; the secret case: no P1 or P2 frame contains `Blinded`, `blinded`, `"secret"` or the effect id |

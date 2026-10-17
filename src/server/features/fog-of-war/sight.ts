@@ -9,13 +9,21 @@
 //   without see-through) are read and prepared only on a cache miss.
 // - Cache key: fog `rev`, structure `rev`, the darkness geometry, the map rectangle (size, cell
 //   size, offsets: its edges occlude), the party-vision flag and the sources'
-//   `(tokenId, col, row, size, senses)` (FR-FOG-38).
+//   `(tokenId, col, row, size, senses, blinded)` (FR-FOG-38).
+// - FR-FOG-48 (sprint 4): a source whose character has an active `blinded` condition effect has no
+//   polygon; P is blind when every source is Blinded or dark-blind (FR-FOG-36). The blind sight
+//   carries its chip reason (`blinded`; `unknown` when a **secret** Blinded is among the causes,
+//   OQ-FOG-61) and, for a secret one, the server-only `secret` flag: party vision then treats P as
+//   a non-source (`partyOf`), and other players' copies say nothing (`records.ts`).
+import type { BlindReason } from "@shared/fog-of-war/schemas";
 import { geomOf } from "@shared/fog-of-war/shapes";
 import {
+  EMPTY_VISION,
   type MapBounds,
   mapBounds,
   NORMAL_SENSES,
   type PlayerVision,
+  partyVision,
   playerVision,
   prepareScene,
   type SceneOccluders,
@@ -25,8 +33,8 @@ import {
 } from "@shared/fog-of-war/vision";
 import { sightOccluders } from "@shared/scene-tools/geometry";
 import { footprint } from "@shared/scenes-map/geometry";
-import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
-import { entity, scene, sceneStructure, token } from "../../db/schema";
+import { and, asc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { effect, entity, scene, sceneStructure, token } from "../../db/schema";
 import { type Logger, silentLogger } from "../../log";
 import type { SceneRead } from "../scenes-map/visibility-hooks";
 import { visionCache } from "./vision-cache";
@@ -47,6 +55,9 @@ export const sightsComputed = () => computed;
 /** FR-FOG-52 (OQ-FOG-56): ≤ 12 sources for the whole party while party vision is on. */
 export const PARTY_SOURCES_MAX = 12;
 
+/** FR-FOG-48: a source's Blinded condition: none, an open one, a secret one (OQ-FOG-61). */
+export type Blinded = false | "open" | "secret";
+
 /** One vision source (FR-FOG-32). */
 export interface SourceToken extends VisionSource {
   id: string;
@@ -55,6 +66,18 @@ export interface SourceToken extends VisionSource {
   col: number;
   row: number;
   size: string;
+  /** FR-FOG-48: the character's active `blinded` condition (no polygon). */
+  blinded: Blinded;
+}
+
+/**
+ * A player's sight as the server keeps it: FR-FOG-48's chip reason while blind because of a
+ * Blinded source (`unknown` when a secret one is among the causes) and the server-only `secret`
+ * flag (blind with a secret Blinded among the causes: a non-source for the party, FR-FOG-48).
+ */
+export interface FogVision extends PlayerVision {
+  reason?: BlindReason;
+  secret?: boolean;
 }
 
 /** The token fields that make it a source (FR-FOG-32). */
@@ -75,6 +98,29 @@ const sensesOf = (statBlock: unknown): Senses => {
   const s = (statBlock as { senses?: Senses } | null)?.senses;
   return s ?? NORMAL_SENSES;
 };
+
+/**
+ * FR-FOG-48: the characters among `ids` with an active `blinded` condition effect → open or
+ * secret (one active condition per target and key, CBTX §8).
+ */
+export function blindedCharacters(read: SceneRead, ids: readonly string[]): Map<string, Blinded> {
+  if (ids.length === 0) return new Map();
+  return new Map(
+    read
+      .select({ id: effect.targetCharacterId, secret: effect.secret })
+      .from(effect)
+      .where(
+        and(
+          inArray(effect.targetCharacterId, [...ids]),
+          eq(effect.kind, "condition"),
+          eq(effect.condition, "blinded"),
+          isNull(effect.endedAt),
+        ),
+      )
+      .all()
+      .map((e) => [e.id as string, e.secret ? "secret" : "open"]),
+  );
+}
 
 /**
  * Each player's sources on a scene (≤ 4, oldest `seq` first); only the campaign's players. With
@@ -101,14 +147,16 @@ export function sceneSources(
     .all();
   const out = new Map<string, SourceToken[]>();
   if (rows.length === 0) return out;
+  const defIds = [...new Set(rows.map((r) => r.definitionId))].sort();
   const defs = new Map(
     read
       .select({ id: entity.id, statBlock: entity.statBlock })
       .from(entity)
-      .where(inArray(entity.id, [...new Set(rows.map((r) => r.definitionId))].sort()))
+      .where(inArray(entity.id, defIds))
       .all()
       .map((d) => [d.id, sensesOf(d.statBlock)]),
   );
+  const blinded = blindedCharacters(read, defIds);
   const known = new Set(players);
   for (const r of rows) {
     const p = r.owner as string;
@@ -131,6 +179,7 @@ export function sceneSources(
       x: r.col + n / 2,
       y: r.row + n / 2,
       senses: defs.get(r.definitionId) ?? NORMAL_SENSES,
+      blinded: blinded.get(r.definitionId) ?? false,
     });
     out.set(p, list);
   }
@@ -173,10 +222,31 @@ function partyCut(
 const sensesKey = (s: Senses) =>
   `${s.visionFt ?? "n"},${s.darkvisionFt},${s.seesMagicalDarkness ? 1 : 0},${s.seesInvisible ? 1 : 0}`;
 
-/** FR-FOG-38: the cache key of one player's sight. */
+/** FR-FOG-38 / -48: the cache key of one player's sight (the Blinded bit per source). */
 export function sightKey(base: string, sources: readonly SourceToken[]): string {
-  return `${base}|${sources.map((s) => `${s.tokenId}@${s.col},${s.row},${s.size}:${sensesKey(s.senses)}`).join(";")}`;
+  return `${base}|${sources.map((s) => `${s.tokenId}@${s.col},${s.row},${s.size}:${sensesKey(s.senses)}:${s.blinded || "-"}`).join(";")}`;
 }
+
+/**
+ * FR-FOG-36 / -48: one player's sight. Blinded sources have no polygon; the rest as
+ * `playerVision`. Blind = ≥ 1 source and none has a polygon because each is Blinded or dark-blind;
+ * then the chip reason: `unknown` with a secret Blinded among the causes, `blinded` with an open
+ * one, none for darkness only.
+ */
+export function sourcesVision(occ: SceneOccluders, list: readonly SourceToken[]): FogVision {
+  const seeing = list.filter((s) => !s.blinded);
+  if (seeing.length === list.length) return playerVision(occ, list);
+  const v = seeing.length > 0 ? playerVision(occ, seeing) : null;
+  if (v && !v.blind) return v;
+  const secret = list.some((s) => s.blinded === "secret");
+  return { ...EMPTY_VISION, blind: true, reason: secret ? "unknown" : "blinded", secret };
+}
+
+/** FR-FOG-48: a secret-Blinded player is a non-source for the party (no polygon, not blind). */
+const forParty = (v: FogVision): PlayerVision => (v.secret ? EMPTY_VISION : v);
+
+/** FR-FOG-50: the party's sight from every player's (secret-Blinded players count as none). */
+export const partyOf = (list: Iterable<FogVision>) => partyVision([...list].map(forParty));
 
 /** What a scene's sight is computed from, besides the sources. */
 export interface SightInputs {
@@ -207,7 +277,7 @@ export function sceneBounds(read: SceneRead, sceneId: string): MapBounds | null 
 export interface SightEntry {
   key: string;
   sources: SourceToken[];
-  vision: PlayerVision;
+  vision: FogVision;
 }
 
 /**
@@ -229,7 +299,7 @@ export function sceneSight(
     let vision = cache.get(inputs.sceneId, p, key);
     if (!vision) {
       occ ??= sceneOccluders(read, inputs.sceneId, inputs.darkness, bounds);
-      vision = playerVision(occ, list);
+      vision = sourcesVision(occ, list);
       computed++;
       cache.set(inputs.sceneId, p, { key, vision });
     }
