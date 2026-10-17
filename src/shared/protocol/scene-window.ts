@@ -17,9 +17,14 @@ export type DmWindow = (typeof DM_WINDOWS)[number];
 /** WS intent, DM only, read-only; answered by the hub in frame order (not a command). */
 export const SYNC_LOAD_SCENE = "sync.loadScene";
 
+/** FR-FOG-43 (sprint 4, OQ-FOG-58): `viewAs` = every player's `view-as` rows of the scene. */
+export const VIEW_AS_PARTY = "party";
+
 /**
- * `viewAs` absent: the scene's `active-scene` rows. `viewAs` = a player of the campaign: that
- * player's `view-as` rows of the scene only (FR-FOG-43); another campaign's → `not_found`.
+ * `viewAs` absent: the scene's `active-scene` rows. `viewAs` = a player of the campaign: the
+ * `view-as` rows of the scene that player may see (FR-FOG-43; with party vision on, every
+ * player's `vision` too); another campaign's → `not_found`. `viewAs: "party"` (sprint 4): every
+ * player's `view-as` rows of the scene; the DM client's loaded pair is `(sceneId, "party")`.
  */
 export const LoadScenePayload = z.object({
   sceneId: z.string().min(1).max(64),
@@ -72,7 +77,7 @@ export const sceneWindowAfterSnapshot = (store: RecordStore): SceneWindowState =
   return { loaded: active === null ? [] : [active], loading: [] };
 };
 
-/** One `(sceneId, playerId)` pair (FR-FOG-43). */
+/** One `(sceneId, playerId)` pair (FR-FOG-43); `playerId` may be `VIEW_AS_PARTY`. */
 export interface ViewAsPair {
   sceneId: string;
   playerId: string;

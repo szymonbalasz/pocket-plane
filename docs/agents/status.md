@@ -10,17 +10,20 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | Specs V, D, M, R, C | merged (#245) | — | Done | — |
 | Docs pass | merged bd07224 | — | Done | — |
-| C-search | `build/cmp-search` (w59, slot 3) | test-cmp-search | Walkthrough (check 2907, e2e green; DM search 0.5 s → 2 ms) | Merge → C-all |
-| V6 vision core | `fix/vision-s4-core` (w54, slot 0) | test-vision-core | Walkthrough (check, build, e2e green) | Merge → R0, V7 |
-| D5 die shapes + log dice | `build/dice-shapes` (w55, slot 2) | test-dice-shapes-r | Re-test of the physical-dice fix (d3a8ae7) | Merge → D6 |
+| C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
+| V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
+| R0 rules core | `fix/rules4-core` (w5C, slot 0) | build-rules4-core | Building | Review (no UI) |
+| D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
+| M3 Show to players | `fix/show-to-players` (w5B, slot 5) | test-show-to-players | Walkthrough (check 2988, e2e 85) | Merge |
+| D6 full-screen dice | `build/dice-screen` (w5A, slot 2) | test-dice-screen | Walkthrough (check 2957, e2e green; 3D chunk 157 KB) | Merge → D7 (after M4) |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
-| M4 window placement | `fix/window-placement` (w57, slot 4) | test-window-placement | Walkthrough (check 2915, e2e 83) | Merge |
+| M4 window placement | `fix/window-placement` (w57, slot 4) | fix-window-placement-2 | Re-test: Start order fixed; Initiative placed shorter than its min height → fixing | Re-walk M8, merge |
 
 ## Shared-file locks
 
-- `fix/vision-s4-core` (V6): schema, `src/server/ws/` + protocol, entities `senses`, sheet folder (Senses), scene-hooks `mapChanged`, Open5e adapter line, bundles index + `fog.ts`.
-- `build/dice-shapes` (D5): bundles index (append).
-- `fix/window-placement` (M4): play-shell frame + `toast-region.ts`, windows.ts handout line, combat Initiative open lines.
+- `fix/rules4-core` (R0): schema, entities `Attack`, combat schemas, sheet `FeatureRow`, record-type registry, new `effect-hooks.ts`.
+- `fix/window-placement` (M4): play-shell frame + `toast-region.ts`, windows.ts handout line, combat Start line, `e2e/rule-triggers-combat.e2e.ts`.
+- `fix/show-to-players` (M3): DM scenes-map files, `e2e/support` helper + specs using the Show button.
 - Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
 
@@ -35,6 +38,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 - Sprint 1: CON-44 headroom is tight (heavy DM snapshot 746 KB vs 768 KiB after cbtx-core). D build: snapshot only active effects; never raise a ceiling without a look.
 - Sprint 1 nit (not a FAIL): Notifications window opens ~250 px tall vs spec §7 360×480 (test-polish-notes).
 
+- Known flake: `vision-s4.bench.test.ts` party move ≤ 30 ms fails only under parallel load (32 ms with 4 suites running; 11 ms alone). Re-run alone before treating it as real.
 - Known flake: `snapshot-size.test.ts` (CON-44) fails with SQLITE_BUSY when several worktrees run the suite at once; passes alone and on re-run. Builders re-run before treating it as real.
 
 - Integrator picks #142–#144 (badge, snapshot ceilings, registry-driven shell tests, reconnect probe 204, lazy Konva, window layout).

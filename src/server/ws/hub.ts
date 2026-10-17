@@ -14,13 +14,15 @@ import {
   type SnapshotFrame,
 } from "@shared/protocol/frames";
 import { LoadPayload, SYNC_LOAD } from "@shared/protocol/lazy";
-import { LoadScenePayload, SYNC_LOAD_SCENE } from "@shared/protocol/scene-window";
+import { LoadScenePayload, SYNC_LOAD_SCENE, VIEW_AS_PARTY } from "@shared/protocol/scene-window";
 import { CommandError, zodIssues } from "../commands/errors";
 import type { DispatchedEvent, RecordChange, Role } from "../events/types";
 import type { Services } from "../services";
 import type { PresenceView, Viewer, WireChange } from "./records";
 import {
+  type ResultSignal,
   reaches,
+  resultSignals,
   type SignalAudience,
   type SignalRead,
   type SignalSender,
@@ -84,6 +86,8 @@ export interface Connection {
   helloTimer: TimerHandle | null;
   /** Counted in presence (live player connection). */
   presenceCounted: boolean;
+  /** Server signals sent here (OQ-FOG-58 rate): `name + key` → send times in the last second. */
+  signalTimes?: Map<string, number[]>;
 }
 
 export type ConnSelector = (c: Readonly<Connection>) => boolean;
@@ -344,6 +348,40 @@ export class Hub implements HubApi {
       c,
       result === undefined ? { type: "ack", intentId } : { type: "ack", intentId, result },
     );
+    // OQ-FOG-58: signals the result carries go out right after the ack, in this frame order.
+    for (const sig of resultSignals(result)) this.serverSignal(c, sig);
+  }
+
+  /**
+   * A server-originated signal (OQ-FOG-58) from intent sender `c`: the registered schema, then
+   * every other live connection of the campaign whose player is in the audience (never a DM),
+   * each under the type's rate: an excess frame is dropped, never held.
+   */
+  private serverSignal(c: Connection, sig: ResultSignal): void {
+    const def = this.s.signals.getServer(sig.name);
+    const parsed = def?.schema.safeParse(sig.payload);
+    if (!def || !parsed?.success) {
+      this.s.log.error(`server signal ${sig.name} refused (unregistered or invalid payload)`);
+      return;
+    }
+    const from: SignalFrom =
+      c.role === "dm" ? { role: "dm" } : { role: "player", playerId: c.playerId ?? "" };
+    const frame: ServerSignalFrame = { type: "signal", name: sig.name, data: parsed.data, from };
+    const key = def.rate ? `${sig.name}|${def.rate.key(parsed.data)}` : null;
+    const now = this.s.clock.now();
+    for (const o of this.conns.values()) {
+      if (o === c || o.phase !== "live" || o.campaignId !== c.campaignId) continue;
+      if (o.role !== "player" || o.playerId === null) continue;
+      if (!sig.audience.includes(o.playerId)) continue;
+      if (def.rate && key !== null) {
+        o.signalTimes ??= new Map();
+        const recent = (o.signalTimes.get(key) ?? []).filter((t) => now - t < 1000);
+        o.signalTimes.set(key, recent);
+        if (recent.length >= def.rate.perSecond) continue;
+        recent.push(now);
+      }
+      this.send(o, frame);
+    }
   }
 
   /**
@@ -367,8 +405,9 @@ export class Hub implements HubApi {
       if (viewAs === undefined) {
         records = this.s.records.loadScene(src, this.viewer(c), sceneId);
       } else {
-        // FR-FOG-43: a player of the DM's campaign only (another campaign's looks unknown).
-        if (this.s.records.playerCampaignOf(viewAs) !== c.campaignId) {
+        // FR-FOG-43: a player of the DM's campaign only (another campaign's looks unknown);
+        // `"party"` (sprint 4): every player's rows.
+        if (viewAs !== VIEW_AS_PARTY && this.s.records.playerCampaignOf(viewAs) !== c.campaignId) {
           return this.reject(c, intentId, "not_found", "Player not found");
         }
         records = this.s.records.loadViewAs(src, this.viewer(c), sceneId, viewAs);

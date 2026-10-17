@@ -1,6 +1,7 @@
 // entities boundary schemas (ENT §6, §8, §9): kind registry, creature core, wire records,
 // REST bodies, derived values. One schema for pipeline, commands, fixtures and clients.
 import { DeathSaveCount, TempHp } from "@shared/combat-extras/schemas";
+import { sourceRank } from "@shared/compendium/match";
 import { z } from "zod";
 import { HP_FORMULA_MESSAGE, normalizeHpFormula, parseHpFormula } from "./hp-formula";
 
@@ -214,17 +215,21 @@ export const HpFormula = z
   .transform(normalizeHpFormula)
   .refine((f) => parseHpFormula(f) !== null, { message: HP_FORMULA_MESSAGE });
 
-/** FR-CHARX-49: 0–120 ft, step 5 (OQ-FOG-35). */
+/** FR-CHARX-49: darkvision 0–120 ft, step 5 (OQ-FOG-35). */
 export const SENSE_FT_MAX = 120;
-const SenseFt = int(0, SENSE_FT_MAX).refine((v) => v % 5 === 0, "Must be a multiple of 5");
+/** FR-CHARX-49 (sprint 4, OQ-FOG-51): stored vision 0–995 ft; Normal (999) is "absent", never stored. */
+export const VISION_FT_MAX = 995;
+const step5 = (max: number) => int(0, max).refine((v) => v % 5 === 0, "Must be a multiple of 5");
+const SenseFt = step5(SENSE_FT_MAX);
 
 /**
- * FR-CHARX-49 / -53 (ADR-0042): stored senses that drive fog's dynamic vision. Absent = vision 0,
- * darkvision 0, no see-through, no sees-invisible (every existing creature: FOG v2 changes
- * nothing until set). `seesInvisible` (#210) absent = false.
+ * FR-CHARX-49 / -53 (ADR-0042): stored senses that drive fog's dynamic vision. Sprint 4 (#243 [1],
+ * OQ-FOG-51): `visionFt` absent (or no `senses`) = Normal = 999 ft; a stored value, 0 included,
+ * is kept. Darkvision absent = 0; no see-through, no sees-invisible. `seesInvisible` (#210)
+ * absent = false.
  */
 export const Senses = z.strictObject({
-  visionFt: SenseFt,
+  visionFt: step5(VISION_FT_MAX).optional(),
   darkvisionFt: SenseFt,
   seesMagicalDarkness: z.boolean(),
   seesInvisible: z.boolean().optional(),
@@ -729,19 +734,21 @@ export function hitDice(stats: { classes?: readonly ClassRow[] }): Partial<Recor
 }
 
 /**
- * Creatures window order (FR-ENT-18): name case-insensitive, then custom before imported,
- * then id. Code-point order on the folded name, so it is the same on every machine.
+ * Creatures window order (FR-ENT-18): name case-insensitive, then custom before imported, then
+ * imported by source rank (FR-CMP-38: `srd-5.1` before `fixture`), then id. Code-point order on
+ * the folded name, so it is the same on every machine.
  */
 export function definitionOrder(
-  a: { id: string; name: string; campaignId: string | null },
-  b: { id: string; name: string; campaignId: string | null },
+  a: { id: string; name: string; campaignId: string | null; source?: string | null },
+  b: { id: string; name: string; campaignId: string | null; source?: string | null },
 ): number {
   const ka = entityNameKey(a.name);
   const kb = entityNameKey(b.name);
   if (ka !== kb) return ka < kb ? -1 : 1;
-  const ia = a.campaignId === null ? 1 : 0;
-  const ib = b.campaignId === null ? 1 : 0;
-  if (ia !== ib) return ia - ib;
+  // Customs rank 0 (the campaign's own); imported 1–3 by source.
+  const ra = a.campaignId === null ? sourceRank(a.source ?? "") : 0;
+  const rb = b.campaignId === null ? sourceRank(b.source ?? "") : 0;
+  if (ra !== rb) return ra - rb;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 

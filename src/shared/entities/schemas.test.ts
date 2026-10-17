@@ -143,15 +143,27 @@ describe("entities schemas", () => {
     expect(effectiveStats(def, { id: "token-1" })).toBe(def.statBlock);
   });
 
-  test("FR-ENT-18 list sort: name ci, then custom before imported, then id", () => {
+  test("FR-ENT-18 order: name ci, then custom, then imported by source rank (srd-5.1 before fixture), then id", () => {
     const rows = [
-      { id: "b", name: "goblin", campaignId: null },
+      { id: "b", name: "goblin", campaignId: null, source: "fixture" },
       { id: "c", name: "Wolf", campaignId: "x" },
       { id: "z", name: "Goblin", campaignId: "x" },
       { id: "a", name: "Goblin", campaignId: "x" },
       { id: "m", name: "Elite Goblin Warrior", campaignId: "x" },
+      { id: "s", name: "Goblin", campaignId: null, source: "srd-5.1" },
+      { id: "o", name: "Goblin", campaignId: null, source: "open5e-x" },
+      { id: "f", name: "Goblin", campaignId: null, source: "fixture" },
     ];
-    expect([...rows].sort(definitionOrder).map((r) => r.id)).toEqual(["m", "a", "z", "b", "c"]);
+    expect([...rows].sort(definitionOrder).map((r) => r.id)).toEqual([
+      "m",
+      "a",
+      "z",
+      "s",
+      "o",
+      "b",
+      "f",
+      "c",
+    ]);
   });
 
   test("FR-ENT-21 optional speed: int 0–200, multiple of 5, both kinds", () => {

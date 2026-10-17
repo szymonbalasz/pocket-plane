@@ -17,13 +17,19 @@ import { fogExplored, sceneFog, sceneFogEdit } from "../../db/schema";
 import type { SceneRead } from "../scenes-map/visibility-hooks";
 
 type FogRow = typeof sceneFog.$inferSelect;
-type EditRow = Pick<typeof sceneFogEdit.$inferSelect, "id" | "sceneId" | "kind">;
+type EditRow = Pick<typeof sceneFogEdit.$inferSelect, "id" | "sceneId" | "kind" | "undoneAt">;
 type ExploredRow = typeof fogExplored.$inferSelect;
 
 /** The server's `fog` record: darkness shapes keep their server-only `seenBy`. */
 export type ServerFogRecord = Omit<FogRecord, "darkness"> & { darkness: DarknessRow[] };
 
-export function toFogRecord(r: FogRow, undo: FogUndoInfo | null): ServerFogRecord {
+/** A scene's undo / redo info (FR-FOG-07 / -56). */
+interface StackInfo {
+  undo: FogUndoInfo | null;
+  redo?: FogUndoInfo;
+}
+
+export function toFogRecord(r: FogRow, stack: StackInfo = { undo: null }): ServerFogRecord {
   return {
     id: r.sceneId,
     campaignId: r.campaignId,
@@ -33,7 +39,8 @@ export function toFogRecord(r: FogRow, undo: FogUndoInfo | null): ServerFogRecor
     shapes: r.shapes,
     darkness: r.darkness,
     explored: r.explored,
-    undo,
+    undo: stack.undo,
+    ...(stack.redo ? { redo: stack.redo } : {}),
   };
 }
 
@@ -50,17 +57,30 @@ export function dmFogRecord(r: ServerFogRecord): FogRecord {
   return { ...r, darkness: r.darkness.map(wireDarkness) };
 }
 
-/** Undo info per scene from its entries in `seq` order (latest = last). */
-function undoByScene(edits: readonly EditRow[]): Map<string, FogUndoInfo> {
-  const out = new Map<string, FogUndoInfo>();
+/**
+ * Undo / redo info per scene from its entries in `seq` order: undo = the latest entry not undone
+ * and the stack depth; redo (FR-FOG-56) = the first undone entry (the most recently undone) and
+ * the redo depth (undone entries always follow the others in `seq` order).
+ */
+function undoByScene(edits: readonly EditRow[]): Map<string, StackInfo> {
+  const out = new Map<string, StackInfo>();
   for (const e of edits) {
-    const n = (out.get(e.sceneId)?.n ?? 0) + 1;
-    out.set(e.sceneId, { n, editId: e.id, kind: e.kind });
+    const cur = out.get(e.sceneId) ?? { undo: null };
+    if (e.undoneAt === null) {
+      cur.undo = { n: (cur.undo?.n ?? 0) + 1, editId: e.id, kind: e.kind };
+    } else if (cur.redo) cur.redo = { ...cur.redo, n: cur.redo.n + 1 };
+    else cur.redo = { n: 1, editId: e.id, kind: e.kind };
+    out.set(e.sceneId, cur);
   }
   return out;
 }
 
-const editColumns = { id: sceneFogEdit.id, sceneId: sceneFogEdit.sceneId, kind: sceneFogEdit.kind };
+const editColumns = {
+  id: sceneFogEdit.id,
+  sceneId: sceneFogEdit.sceneId,
+  kind: sceneFogEdit.kind,
+  undoneAt: sceneFogEdit.undoneAt,
+};
 
 /** The `fog` record of a scene, or null (no row = every cell clear, FR-FOG-01). */
 export function readFogRecord(read: SceneRead, sceneId: string): ServerFogRecord | null {
@@ -72,7 +92,7 @@ export function readFogRecord(read: SceneRead, sceneId: string): ServerFogRecord
     .where(eq(sceneFogEdit.sceneId, sceneId))
     .orderBy(asc(sceneFogEdit.seq))
     .all();
-  return toFogRecord(row, undoByScene(edits).get(sceneId) ?? null);
+  return toFogRecord(row, undoByScene(edits).get(sceneId));
 }
 
 /** Every scene's `fog` record of a campaign (snapshot; ≤ 1 row + 20 entries per scene). */
@@ -92,7 +112,7 @@ export function campaignFogRecords(read: SceneRead, campaignId: string): ServerF
       .orderBy(asc(sceneFogEdit.seq))
       .all(),
   );
-  return rows.map((r) => toFogRecord(r, undo.get(r.sceneId) ?? null));
+  return rows.map((r) => toFogRecord(r, undo.get(r.sceneId)));
 }
 
 export function toExploredRecord(r: ExploredRow): FogExploredRecord {
@@ -152,23 +172,29 @@ export function readExploredRecord(
   return r ? serverExplored(r) : null;
 }
 
-/** Server `vision` rows carry `campaignId` for the scope gate (FR-FOG-39). */
-export type ServerVisionRecord = VisionRecord & { campaignId: string };
+/**
+ * Server `vision` rows carry `campaignId` for the scope gate (FR-FOG-39) and the server-only
+ * `shared` flag (party vision on at compute time: other players get it redacted, FR-FOG-51).
+ */
+export type ServerVisionRecord = VisionRecord & { campaignId: string; shared: boolean };
 
 /** FR-FOG-39: the derived `vision` record of one player's sight (`inv` omitted when empty). */
 export function toVisionRecord(
   scene: { sceneId: string; campaignId: string },
   playerId: string,
   v: PlayerVision,
+  shared: boolean,
 ): ServerVisionRecord {
   return {
     id: scenePlayerId(scene.sceneId, playerId),
     sceneId: scene.sceneId,
     playerId,
     campaignId: scene.campaignId,
+    shared,
     blind: v.blind,
     see: v.see,
     dark: v.dark,
     ...(v.inv.length > 0 ? { inv: v.inv } : {}),
+    src: v.src,
   };
 }

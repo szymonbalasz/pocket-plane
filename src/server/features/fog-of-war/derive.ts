@@ -7,7 +7,10 @@
 // player (FR-FOG-34 / -36); an unowned invisible token: only through a Sees-invisible polygon
 // (FR-FOG-46). A player with no source sees the static state only (sprint 2). FR-FOG-44: a
 // darkness shape's `seenBy` = the players whose polygons meet its bounding box, or with a cell
-// centre inside the box that is statically clear / explored or in their explored memory. Pure
+// centre inside the box that is statically clear / explored or in their explored memory.
+// FR-FOG-50 (sprint 4): while party vision is on, every player's sight (and blindness) is the
+// party's (`partyVision`: every player's polygons; party-blind = every player with sources is
+// blind), written into `seenBy` here, so visibility fns still read only record + viewer. Pure
 // apart from the reads.
 import { exploredMask } from "@shared/fog-of-war/explored";
 import { type FogMask as Mask, maskOf } from "@shared/fog-of-war/mask";
@@ -16,6 +19,7 @@ import { type Box, type DarknessRow, shapeBox } from "@shared/fog-of-war/shapes"
 import {
   invisibleSeen,
   type PlayerVision,
+  partyVision,
   pointInPolygon,
   pointVisible,
   prepareStaticLayer,
@@ -26,6 +30,7 @@ import {
 import { asc, eq, sql } from "drizzle-orm";
 import { fogExplored, player, scene, sceneFog } from "../../db/schema";
 import type { SceneCells, SceneObject, SceneRead } from "../scenes-map/visibility-hooks";
+import { partyVisionOn } from "./settings";
 import { type SightEntry, sceneSight, sceneSources } from "./sight";
 
 /** What a re-derive reads once per scene (FR-FOG-35: static state once per point). */
@@ -41,6 +46,10 @@ export interface SceneStatic {
   players: string[];
   /** Each player's sight (players with ≥ 1 source only; none = static only, FR-FOG-32). */
   sight?: ReadonlyMap<string, SightEntry>;
+  /** FR-FOG-49: the campaign's party vision switch. */
+  party?: boolean;
+  /** FR-FOG-50: the party's sight while `party` (null: nobody has a source). */
+  partySight?: PlayerVision | null;
 }
 
 /** The campaign's player ids, oldest first (the `player` snapshot order). */
@@ -72,10 +81,11 @@ export function loadSceneStatic(read: SceneRead, sceneId: string): SceneStatic |
   ).mask;
   const players = campaignPlayers(read, s.campaignId);
   const darkness = r?.darkness ?? [];
+  const party = partyVisionOn(read, s.campaignId);
   const sight = sceneSight(
     read,
-    { sceneId: s.id, fogRev: r ? r.rev : -1, darkness },
-    sceneSources(read, s.id, players),
+    { sceneId: s.id, fogRev: r ? r.rev : -1, darkness, party },
+    sceneSources(read, s.id, players, party),
   );
   return sceneStatic({
     sceneId: s.id,
@@ -85,14 +95,18 @@ export function loadSceneStatic(read: SceneRead, sceneId: string): SceneStatic |
     darkness,
     players,
     sight,
+    party,
   });
 }
 
-/** FR-FOG-39: every player's sight on a scene without its static layer (`vision` snapshot). */
+/**
+ * FR-FOG-39: every player's sight on a scene without its static layer (`vision` snapshot), and
+ * the party switch (the records' `shared` flag, FR-FOG-51).
+ */
 export function loadSceneSight(
   read: SceneRead,
   sceneId: string,
-): { campaignId: string; sight: Map<string, SightEntry> } | null {
+): { campaignId: string; sight: Map<string, SightEntry>; party: boolean } | null {
   const s = read
     .select({ campaignId: scene.campaignId })
     .from(scene)
@@ -105,17 +119,20 @@ export function loadSceneSight(
     .where(eq(sceneFog.sceneId, sceneId))
     .get();
   const players = campaignPlayers(read, s.campaignId);
+  const party = partyVisionOn(read, s.campaignId);
   const sight = sceneSight(
     read,
-    { sceneId, fogRev: r ? r.rev : -1, darkness: r?.darkness ?? [] },
-    sceneSources(read, sceneId, players),
+    { sceneId, fogRev: r ? r.rev : -1, darkness: r?.darkness ?? [], party },
+    sceneSources(read, sceneId, players, party),
   );
-  return { campaignId: s.campaignId, sight };
+  return { campaignId: s.campaignId, sight, party };
 }
 
-/** A `SceneStatic` with its prepared layer. */
-export function sceneStatic(st: Omit<SceneStatic, "layer">): SceneStatic {
-  return { ...st, layer: prepareStaticLayer(st.mask, st.shapes, st.darkness) };
+/** A `SceneStatic` with its prepared layer (and the party's sight while party vision is on). */
+export function sceneStatic(st: Omit<SceneStatic, "layer" | "partySight">): SceneStatic {
+  const partySight =
+    st.party === true ? partyVision([...(st.sight?.values() ?? [])].map((e) => e.vision)) : null;
+  return { ...st, partySight, layer: prepareStaticLayer(st.mask, st.shapes, st.darkness) };
 }
 
 /** The centres of a footprint's cells (FR-FOG-34 sample points), row-major for a block. */
@@ -148,11 +165,17 @@ export interface SubjectCopies {
   seenBy: string[];
 }
 
-/** P's vision on the scene, or null (no source: the static state only). */
+/**
+ * The sight P's copies are derived from, or null (no source: the static state only). FR-FOG-50:
+ * while party vision is on, the party's sight for every player (with or without sources).
+ */
 export const visionOf = (st: SceneStatic, p: string): PlayerVision | null =>
-  st.sight?.get(p)?.vision ?? null;
+  st.party === true ? (st.partySight ?? null) : (st.sight?.get(p)?.vision ?? null);
 
-/** FR-FOG-36: P has ≥ 1 source and all are in darkness without see-through. */
+/**
+ * FR-FOG-36: P has ≥ 1 source and all are in darkness without see-through; FR-FOG-50: while party
+ * vision is on, party-blind instead.
+ */
 export const isBlind = (st: SceneStatic, p: string) => visionOf(st, p)?.blind === true;
 
 /** FR-FOG-34: P sees one of the points (a player without sources: statically visible). */

@@ -156,7 +156,7 @@ describe("FR-FOG-35 re-derive triggers", () => {
     expect(stale(t, t.ambushId)).toBe(false);
   });
 
-  test("FR-FOG-35 (#216) scene duplicated: the copy's subjects derived with its own sources, not stale; grid recalibration re-derives nothing", async () => {
+  test("FR-FOG-35 (#216) scene duplicated: the copy's subjects derived with its own sources, not stale; grid recalibration re-derives the scene (sprint 4, review A8)", async () => {
     const t = await setup();
     t.run(SCN_INTENTS.setDoor, { sceneId: t.ambushId, n: 4, state: 0 });
     t.run(I.moveToken, { tokenId: t.tokenRow("Mira").id, col: 7, row: 5 });
@@ -186,8 +186,25 @@ describe("FR-FOG-35 re-derive triggers", () => {
       color: "#000000",
       opacity: 0.5,
     });
+    // Sprint 4 (FR-FOG-33, review A8): the map edges moved, so sight is recomputed in the same
+    // event (`mapChanged`): the scene row first, then the re-derive rows (memory rebased).
+    const types = (t.last()?.changes ?? []).map((c) => c.type);
+    expect(types[0]).toBe("scene");
+    expect(types).toContain("vision");
+    expect(sightsComputed()).toBeGreaterThan(n);
+    // A colour-only change leaves the map rectangle: no re-derive.
+    const m = sightsComputed();
+    t.run(I.setGrid, {
+      sceneId: t.ambushId,
+      cellSize: 70,
+      offsetX: 10,
+      offsetY: 0,
+      visible: true,
+      color: "#ffffff",
+      opacity: 0.5,
+    });
     expect((t.last()?.changes ?? []).map((c) => c.type)).toEqual(["scene"]);
-    expect(sightsComputed()).toBe(n);
+    expect(sightsComputed()).toBe(m);
   });
 
   test("FR-FOG-35 (#216) combat placement (`TokenPlacer`, Start / Add): a placed source's re-derive rows follow its create", async () => {

@@ -25,6 +25,8 @@ import goblin2 from "./combat-tracker/goblin-2";
 import thornBattlemap from "./combat-tracker/thorn-battlemap";
 import cmpHomebrew from "./compendium/cmp-homebrew";
 import cmpHomebrewSecond from "./compendium/cmp-homebrew-second";
+import cmpSearchHomebrew from "./compendium/cmp-search-homebrew";
+import cmpSrdFull from "./compendium/cmp-srd-full";
 import cmpSrdMini from "./compendium/cmp-srd-mini";
 import dicexLooks from "./dice-extras/dicex-looks";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
@@ -49,7 +51,10 @@ import enemyCustomSecond from "./entities/enemy-custom-second";
 import fogAmbush from "./fog-of-war/fog-ambush";
 import fogAmbushPartial from "./fog-of-war/fog-ambush-partial";
 import fogScn from "./fog-of-war/fog-scn";
+import visionBrakka from "./fog-of-war/vision-brakka";
 import visionCrypt from "./fog-of-war/vision-crypt";
+import visionInvisible from "./fog-of-war/vision-invisible";
+import visionLegacy from "./fog-of-war/vision-legacy";
 import syncProbes from "./live-sync/sync-probes";
 import notificationsTest from "./notifications/notifications-test";
 import handoutImages from "./party-board/handout-images";
@@ -136,4 +141,9 @@ export const units: readonly Fixture[] = [
   cmpHomebrewSecond,
   visionCrypt,
   dicexLooks,
+  cmpSrdFull,
+  cmpSearchHomebrew,
+  visionLegacy,
+  visionInvisible,
+  visionBrakka,
 ];

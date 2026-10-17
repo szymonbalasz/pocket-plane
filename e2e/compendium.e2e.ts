@@ -18,16 +18,23 @@ test("FR-CMP-10 FR-CMP-13 FR-CMP-15 FR-CMP-17 Creatures search + lookup via the 
   await loginDm(dm, secret);
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
 
-  // Creatures: "gob" → the custom Elite Goblin Warrior (store), SRD Goblin + Hobgoblin and the
-  // fixture Goblin (server); CR from the definitions loaded on demand.
+  // Creatures: "gob" → SRD Goblin + Hobgoblin and the fixture Goblin (server), the custom Elite
+  // Goblin Warrior (store); by shared tier (FR-CMP-37), the SRD Goblin first (FR-CMP-38); CR from
+  // the definitions loaded on demand.
   const win = await openWindow(dm, "ent.creatures");
   await win.getByTestId("ent-list-search").fill("gob");
   const rows = win.getByTestId("ent-list-row");
   await expect(rows.getByTestId("ent-list-row-name")).toHaveText([
+    "Goblin",
+    "Goblin",
     "Elite Goblin Warrior",
-    "Goblin",
-    "Goblin",
     "Hobgoblin",
+  ]);
+  await expect(rows.getByTestId("ent-list-row-badge")).toHaveText([
+    "SRD",
+    "Fixture",
+    "Custom",
+    "SRD",
   ]);
   const hob = rows.filter({ hasText: "Hobgoblin" });
   await expect(hob.getByTestId("ent-list-row-cr")).toHaveText("CR 1/2 · 100 XP");

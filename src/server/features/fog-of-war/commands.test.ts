@@ -26,7 +26,7 @@ import { tokenHooks } from "../scenes-map/token-hooks";
 import { visibilityHooks } from "../scenes-map/visibility-hooks";
 import { FOG_CHANGED, FOG_NOTHING_TO_UNDO, FOG_TOO_DETAILED, fogUndoStack } from "./commands";
 import { dmFogRecord, readFogRecord } from "./rows";
-import { dropFogRow } from "./testing";
+import { dropFogRow, legacySenses } from "./testing";
 
 afterEach(() => {
   visibilityHooks.unregister("test.hides");
@@ -39,6 +39,7 @@ const AT = "2026-01-01T00:00:00.000Z";
 function setup() {
   const cap = captureLogger();
   const t = scenesSetup(cap.log);
+  legacySenses(t.s.db);
   // Scenes as before this build (no fog row); FR-FOG-02's fogged start is in hooks.test.ts.
   const newScene = (name = "Goblin Ambush", mapAssetId = "map-battle") => {
     const s = t.run<SceneRecord>(R.createScene, { name, mapAssetId });
@@ -526,7 +527,10 @@ describe("FR-FOG-07 fog.undo", () => {
     const n = t.events.length;
     const log = readEventLog(t.s.db).length;
     t.undo(d);
-    expect(t.fog()).toEqual(hidden);
+    // FR-FOG-56: the undone edit is now the redo entry; the rest equals the state before.
+    const { redo, ...after } = t.fog() as FogRecord;
+    expect(after).toEqual(hidden);
+    expect(redo).toEqual({ n: 1, editId: d, kind: "reveal-rect" });
     expect(t.events.length).toBe(n + 1);
     expect(t.lastEvent()).toMatchObject({
       type: "FogUndone",
@@ -538,7 +542,8 @@ describe("FR-FOG-07 fog.undo", () => {
         .map((l) => l.type),
     ).toEqual(["FogUndone"]);
     t.undo(c);
-    expect(t.fog()).toEqual(fogged);
+    expect({ ...t.fog(), redo: undefined }).toEqual({ ...fogged, redo: undefined });
+    expect(t.fog()?.redo).toEqual({ n: 2, editId: c, kind: "hide-rect" });
     t.undo(b);
     expect(t.tok(goblin)?.fogged).toBe(true);
     expect(t.lastEvent()?.changes.map((x) => x.id)).toEqual([t.ambush.id, goblin]);

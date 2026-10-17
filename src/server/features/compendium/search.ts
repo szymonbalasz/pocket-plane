@@ -1,52 +1,30 @@
-// FR-CMP-10 / -11 search (OQ-CMP-09 pick: SQL narrowing + name ranking, no FTS). Ranking: name
-// prefix, word start, substring, then (q ≥ 3 chars) body text; ties by name key, then id. The
-// cursor is an opaque keyset (rank, name key, id), validated on the way in.
+// FR-CMP-10 / -11 / -32–36 / -38 search over the in-memory index (FR-CMP-34). Every query word
+// must match the name or the text (shared matcher, FR-CMP-37); tiers 0–5, ties by source rank,
+// shorter folded name, folded name, id. Visibility (FR-CMP-14) and filters narrow first, then
+// duplicate names collapse into one group row (FR-CMP-35), then the page. The cursor is an
+// opaque keyset of the row's tuple (a group: its best member's), validated on the way in.
+import { nameTier, queryWords, type SearchTier, searchTier } from "@shared/compendium/match";
 import {
   type EntrySummary,
   HOMEBREW_LABEL,
   SEARCH_PAGE,
   type SearchQuery,
-  TEXT_MATCH_MIN,
 } from "@shared/compendium/rest";
-import { entryNameKey } from "@shared/compendium/schemas";
-import { CR_VALUES, MonsterStatBlock } from "@shared/entities/schemas";
-import { and, eq, isNull, or, type SQL, sql } from "drizzle-orm";
+import { LINE_MAX } from "@shared/compendium/schemas";
+import { CR_VALUES } from "@shared/entities/schemas";
 import { z } from "zod";
 import { invalid } from "../../commands/errors";
 import type { Db } from "../../db/client";
-import { compendiumEntry, compendiumSource, entity } from "../../db/schema";
+import { type IndexRow, type SearchIndex, searchIndex } from "./search-index";
 import { type EntryViewer, entryVisibleTo } from "./visibility";
-
-/** 0 name prefix, 1 word start, 2 substring, 3 text match. */
-export type Rank = 0 | 1 | 2 | 3;
-
-/** Lower-case NFC, trimmed (as `nameKey` / `searchText` are stored). */
-export const normalizeQ = (q: string | undefined) =>
-  (q ?? "").trim().normalize("NFC").toLowerCase();
-
-const isWordChar = (ch: string) => /[\p{L}\p{N}]/u.test(ch);
-
-/**
- * FR-CMP-10 rank of one entry for a normalized `q`; null = no match. Empty `q` → 0 (by name).
- * `textHit`: the entry's `searchText` contains `q` (only counts for q ≥ 3 chars).
- */
-export function rankOf(nameKey: string, q: string, textHit: boolean): Rank | null {
-  if (q === "") return 0;
-  const first = nameKey.indexOf(q);
-  if (first === 0) return 0;
-  if (first > 0) {
-    for (let at = first; at >= 0; at = nameKey.indexOf(q, at + 1)) {
-      if (!isWordChar(nameKey.charAt(at - 1))) return 1;
-    }
-    return 2;
-  }
-  return q.length >= TEXT_MATCH_MIN && textHit ? 3 : null;
-}
 
 // ---------- cursor ----------
 
+/** FR-CMP-33 keyset: `[tier, sourceRank, folded name length, folded name, id]`. */
 const CursorKey = z.tuple([
+  z.number().int().min(0).max(5),
   z.number().int().min(0).max(3),
+  z.number().int().min(0).max(200),
   z.string().max(200),
   z.string().min(1).max(64),
 ]);
@@ -68,11 +46,16 @@ export function decodeCursor(s: string): CursorKey {
   return r.data;
 }
 
-function compareKeys(a: CursorKey, b: CursorKey): number {
-  if (a[0] !== b[0]) return a[0] - b[0];
-  if (a[1] !== b[1]) return a[1] < b[1] ? -1 : 1;
-  if (a[2] !== b[2]) return a[2] < b[2] ? -1 : 1;
-  return 0;
+const cmpStr = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+/** FR-CMP-33 order: tier, source rank, shorter folded name, folded name, id. */
+function compareRanked(a: CursorKey, b: CursorKey): number {
+  return a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || cmpStr(a[3], b[3]) || cmpStr(a[4], b[4]);
+}
+
+/** FR-CMP-36 default list (empty `q`): folded name, then source rank, then id. */
+function compareByName(a: CursorKey, b: CursorKey): number {
+  return cmpStr(a[3], b[3]) || a[1] - b[1] || cmpStr(a[4], b[4]);
 }
 
 // ---------- filters (FR-CMP-11) ----------
@@ -109,130 +92,144 @@ export interface SearchPage {
   nextCursor: string | null;
 }
 
-/** Imported source key → its name; homebrew → "Homebrew". */
-function sourceLabels(db: Db): Map<string, string> {
-  return new Map(
-    db
-      .select({ key: compendiumSource.key, name: compendiumSource.name })
-      .from(compendiumSource)
-      .all()
-      .map((s) => [s.key, s.name]),
-  );
+/** A matching row with its tier and tuple. */
+export interface Hit {
+  row: IndexRow;
+  tier: SearchTier;
+  key: CursorKey;
 }
 
-export function searchEntries(db: Db, v: EntryViewer, query: SearchQuery): SearchPage {
+/**
+ * FR-CMP-33 tier of one index row for `words`; empty `words` → 0 (the default list). Entry-less
+ * definitions match on the name only (tiers 0–3).
+ */
+export function rowTier(row: IndexRow, words: readonly string[]): SearchTier | null {
+  if (words.length === 0) return 0;
+  return row.entryless ? nameTier(row.folded, words) : searchTier(row.folded, row.textWords, words);
+}
+
+const keyOf = (row: IndexRow, tier: SearchTier): CursorKey => [
+  tier,
+  row.rank,
+  Math.min(row.folded.folded.length, 200),
+  row.folded.folded.slice(0, 200),
+  row.id,
+];
+
+/** Visible rows matching kind, filters and words (FR-CMP-14 / -11 / -33), unsorted. */
+export function matchingRows(
+  idx: SearchIndex,
+  v: EntryViewer,
+  query: SearchQuery,
+  words: readonly string[],
+): Hit[] {
+  const hits: Hit[] = [];
+  for (const row of idx.rows) {
+    if (query.kind !== undefined && row.kind !== query.kind) continue;
+    // Entry-less definitions: DM only (they are global monsters, so `entryVisibleTo` agrees).
+    if (row.entryless && v.role !== "dm") continue;
+    if (!entryVisibleTo(row, v) || !matchesFilters(row.facets, query)) continue;
+    const tier = rowTier(row, words);
+    if (tier !== null) hits.push({ row, tier, key: keyOf(row, tier) });
+  }
+  return hits;
+}
+
+function summaryOf(idx: SearchIndex, row: IndexRow): EntrySummary {
+  const s: EntrySummary = {
+    id: row.id,
+    kind: row.kind,
+    name: row.name,
+    sourceLabel: row.source === null ? HOMEBREW_LABEL : (idx.labels.get(row.source) ?? row.source),
+    line: row.line,
+  };
+  if (row.definitionId !== null) s.definitionId = row.definitionId;
+  return s;
+}
+
+/** FR-CMP-35 group line: "‹count› entries" (+ " · ‹distinct classes›" for features), ≤ 80. */
+export function groupLine(members: readonly IndexRow[]): string {
+  const head = `${members.length} entries`;
+  const classes = [
+    ...new Set(
+      members.flatMap((m) => {
+        const c = (m.facets as { className?: unknown } | null)?.className;
+        return m.kind === "feature" && typeof c === "string" ? [c] : [];
+      }),
+    ),
+  ].sort();
+  if (classes.length === 0) return head;
+  const full = `${head} · ${classes.join(", ")}`;
+  if (full.length <= LINE_MAX) return full;
+  let line = `${head} · ${classes[0]}`;
+  for (const c of classes.slice(1)) {
+    if (`${line}, ${c}…`.length > LINE_MAX) break;
+    line = `${line}, ${c}`;
+  }
+  return `${line}…`;
+}
+
+/** `pageSize`: tests only (FR-CMP-35 paging across a group); the route always pages by 50. */
+export function searchEntries(
+  db: Db,
+  v: EntryViewer,
+  query: SearchQuery,
+  pageSize = SEARCH_PAGE,
+): SearchPage {
+  if (query.sameAs !== undefined) return sameAsPage(db, v, query.sameAs, query.q);
   const after = query.cursor === undefined ? null : decodeCursor(query.cursor);
-  const q = normalizeQ(query.q);
   // A player never sees monsters (FR-CMP-14): an empty page without a read.
   if (v.role === "player" && query.kind === "monster") return { results: [], nextCursor: null };
-  const where: (SQL | undefined)[] = [
-    or(isNull(compendiumEntry.campaignId), eq(compendiumEntry.campaignId, v.campaignId)),
-  ];
-  if (query.kind !== undefined) where.push(eq(compendiumEntry.kind, query.kind));
-  if (q !== "") {
-    where.push(
-      q.length >= TEXT_MATCH_MIN
-        ? sql`(instr(${compendiumEntry.nameKey}, ${q}) > 0 or instr(${compendiumEntry.searchText}, ${q}) > 0)`
-        : sql`instr(${compendiumEntry.nameKey}, ${q}) > 0`,
-    );
-  }
-  const rows = db
-    .select({
-      id: compendiumEntry.id,
-      campaignId: compendiumEntry.campaignId,
-      kind: compendiumEntry.kind,
-      name: compendiumEntry.name,
-      nameKey: compendiumEntry.nameKey,
-      line: compendiumEntry.line,
-      facets: compendiumEntry.facets,
-      source: compendiumEntry.source,
-      definitionId: compendiumEntry.definitionId,
-      shared: compendiumEntry.shared,
-      // Only needed for the text tier; the SQL above already matched it.
-      textHit:
-        q.length >= TEXT_MATCH_MIN
-          ? sql<number>`instr(${compendiumEntry.searchText}, ${q}) > 0`
-          : sql<number>`0`,
-    })
-    .from(compendiumEntry)
-    .where(and(...where))
-    .all();
+  const words = queryWords(query.q ?? "");
+  const compare = words.length === 0 ? compareByName : compareRanked;
+  const idx = searchIndex(db);
+  const hits = matchingRows(idx, v, query, words);
 
-  const labels = sourceLabels(db);
-  const ranked: { key: CursorKey; summary: EntrySummary }[] = [];
-  const add = (rank: Rank | null, nameKey: string, summary: EntrySummary) => {
-    if (rank === null) return;
-    const key: CursorKey = [rank, nameKey, summary.id];
-    if (after && compareKeys(key, after) <= 0) return;
-    ranked.push({ key, summary });
-  };
-  for (const r of rows) {
-    if (!entryVisibleTo(r, v) || !matchesFilters(r.facets, query)) continue;
-    const s: EntrySummary = {
-      id: r.id,
-      kind: r.kind,
-      name: r.name,
-      sourceLabel: r.source === null ? HOMEBREW_LABEL : (labels.get(r.source) ?? r.source),
-      line: r.line,
-    };
-    if (r.kind === "monster" && r.definitionId !== null) s.definitionId = r.definitionId;
-    add(rankOf(r.nameKey, q, Boolean(r.textHit)), r.nameKey, s);
+  // FR-CMP-35: matching visible members per group; ≥ 2 collapse into the best member's row.
+  const members = new Map<string, Hit[]>();
+  for (const h of hits) {
+    if (h.row.entryless) continue;
+    const g = members.get(h.row.groupKey);
+    if (g) g.push(h);
+    else members.set(h.row.groupKey, [h]);
   }
-  if (v.role === "dm" && (query.kind === undefined || query.kind === "monster")) {
-    for (const d of entrylessDefinitions(db, query)) {
-      add(rankOf(d.nameKey, q, false), d.nameKey, {
-        ...d.summary,
-        sourceLabel: labels.get(d.source) ?? d.source,
-      });
-    }
+  const items: { best: Hit; group: Hit[] | null }[] = [];
+  for (const h of hits) {
+    const g = h.row.entryless ? undefined : members.get(h.row.groupKey);
+    if (!g || g.length === 1) items.push({ best: h, group: null });
+    else if (g.every((m) => m === h || compare(h.key, m.key) < 0))
+      items.push({ best: h, group: g });
   }
-  ranked.sort((a, b) => compareKeys(a.key, b.key));
-  const page = ranked.slice(0, SEARCH_PAGE);
+  items.sort((a, b) => compare(a.best.key, b.best.key));
+  const rest = after ? items.filter((x) => compare(x.best.key, after) > 0) : items;
+  const page = rest.slice(0, pageSize);
   const last = page.at(-1);
   return {
-    results: page.map((x) => x.summary),
-    nextCursor: ranked.length > SEARCH_PAGE && last ? encodeCursor(last.key) : null,
+    results: page.map(({ best, group }) => {
+      const s = summaryOf(idx, best.row);
+      if (group === null) return s;
+      return {
+        ...s,
+        line: groupLine(group.map((m) => m.row)),
+        group: { count: group.length },
+      };
+    }),
+    nextCursor: rest.length > pageSize && last ? encodeCursor(last.best.key) : null,
   };
 }
 
 /**
- * Imported definitions without a compendium entry (e.g. the `fixture` Goblin and Wolf): DM
- * monster results too, so lookups and the Creatures window keep finding them (FR-CMP-17,
- * orchestrator pick A). `id` = `definitionId`; there is no entry, so GET on it is 404. Name
- * tiers only (no `searchText`); `type` can't match (the creature core has no type).
+ * FR-CMP-35 `sameAs`: the visible members of `id`'s group that match `q` (empty: all), by line,
+ * then id; ≤ 50. Unknown, not visible or entry-less id → an empty page (no existence oracle).
  */
-function entrylessDefinitions(
-  db: Db,
-  query: SearchQuery,
-): { nameKey: string; source: string; summary: Omit<EntrySummary, "sourceLabel"> }[] {
-  if (query.type !== undefined) return [];
-  const rows = db
-    .select({
-      id: entity.id,
-      name: entity.name,
-      statBlock: entity.statBlock,
-      source: entity.source,
-    })
-    .from(entity)
-    .leftJoin(compendiumEntry, eq(compendiumEntry.definitionId, entity.id))
-    .where(and(isNull(entity.campaignId), eq(entity.kind, "monster"), isNull(compendiumEntry.id)))
-    .all();
-  const out: { nameKey: string; source: string; summary: Omit<EntrySummary, "sourceLabel"> }[] = [];
-  for (const r of rows) {
-    const sb = MonsterStatBlock.safeParse(r.statBlock);
-    if (!sb.success || !matchesFilters({ cr: sb.data.cr }, query)) continue;
-    const size = sb.data.size;
-    out.push({
-      nameKey: entryNameKey(r.name),
-      source: r.source ?? "",
-      summary: {
-        id: r.id,
-        kind: "monster",
-        name: r.name,
-        line: `CR ${sb.data.cr} · ${size.charAt(0).toUpperCase()}${size.slice(1)}`,
-        definitionId: r.id,
-      },
-    });
-  }
-  return out;
+function sameAsPage(db: Db, v: EntryViewer, id: string, q: string | undefined): SearchPage {
+  const idx = searchIndex(db);
+  const row = idx.byId.get(id);
+  if (!row || row.entryless || !entryVisibleTo(row, v)) return { results: [], nextCursor: null };
+  const words = queryWords(q ?? "");
+  const members = (idx.groups.get(row.groupKey) ?? []).filter(
+    (m) => entryVisibleTo(m, v) && rowTier(m, words) !== null,
+  );
+  members.sort((a, b) => cmpStr(a.line, b.line) || cmpStr(a.id, b.id));
+  return { results: members.slice(0, SEARCH_PAGE).map((m) => summaryOf(idx, m)), nextCursor: null };
 }

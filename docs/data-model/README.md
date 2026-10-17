@@ -1491,9 +1491,46 @@ From [dice-roll-log](../specs/dice-roll-log.md#8-data-model) (FR-DICE-35–37) a
 - **Client memory only:** the focused log entry (`focusLogEntry`, 2 s).
 - **CON-44:** 0 B; no new record shape.
 
-## 48. Sprint 4: full-screen dice layer (D6)
+## 48. Sprint 4: vision core (V6)
 
-From [dice-extras](../specs/dice-extras.md#8-data-model) (FR-DICEX-15, -17, -32–38, -43–45; [ADR-0048](../architecture/adr/0048-dice-display.md)). **Built by `build/dice-screen`**: no table, column, record type, event, intent or payload change. Protocol side: [protocol §63](../protocol/README.md#63-sprint-4-full-screen-dice-layer-d6).
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG sprint 4; #245) and [character-sheet-full](../specs/character-sheet-full.md#81-stat-block-additions-entities-json-leaf-zod-only-no-column) (FR-CHARX-49). **Built by `fix/vision-s4-core`** (schema lock first this sprint; drizzle push, push-safe: one new table, nullable columns). Protocol side: [protocol §63](../protocol/README.md#63-sprint-4-vision-core-v6).
+
+### Fog settings (`fog_settings`, record type `fog-settings`) — owner [fog-of-war](../specs/fog-of-war.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| campaignId (PK) | ID → Campaign | one row per campaign; no row = party vision off | FR-FOG-49 |
+| partyVision | bool, default false | `fog.setPartyVision` | FR-FOG-49 |
+| updatedAt | timestamp | `ctx.clock` | — |
+
+### Changed
+
+| Table / field | Change | Rule | Source |
+|---|---|---|---|
+| `scene_fog_edit.undoneAt` | + timestamp \| null | set by `fog.undo` (the entry joins the redo list), cleared by `fog.redo`; undone entries are deleted by any new edit | FR-FOG-56 |
+| `scene_fog_edit.nextBase`, `nextShapes`, `nextDarkness` | + JSON \| null (`{fill, box, runs}`, shapes, darkness) | the state the undo replaced; null while not undone | FR-FOG-56 |
+| `scene_fog_edit` depth | ≤ 50 per scene (was 20) | the oldest dropped past 50 | FR-FOG-07 |
+| `scene_fog.shapes` | + `{op, stroke: [r, x0, y0, …]}`, `{op, cells: {box, runs}}` | fog shapes only, never darkness; containment `@shared/fog-of-war/brush` | FR-FOG-26 |
+| `entity.statBlock.senses.visionFt` | optional, 0–995 step 5 (JSON leaf, zod) | absent = Normal 999 ft (never stored); a stored value, 0 included, kept; no row rewrite | FR-CHARX-49 |
+| `db_meta` key `fog-vision-model` | "2" | the vision-model version; a DB created from scratch is stamped 2; a DB without it (sprint 3) gets the one-time boot re-derive | FR-FOG-40 |
+
+- **Derived (not stored):** the `vision` record's `src` (source token id per polygon) and server-only `shared` (party vision on at compute time); party sight and party-blind (FR-FOG-50); the 12-source party set (FR-FOG-52, round robin); redo depth.
+- **Written differently** (no new column): with party vision on, every subject's `seenBy` = every player iff any player sees it (owned tokens: the owner always, the rest unless party-blind); darkness `seenBy` by the party's polygons; each player's `fog_explored` row grows from the party's polygons (kept when switched off). Senses absent = Normal: sources see 999 ft bounded by walls, closed doors and the map rectangle's edges (FR-FOG-32 / -33).
+- **Fixtures:** units `vision-legacy` (Mira, Thorn senses 0 / 0; first in bundle `fog`), `vision-invisible` (Goblin 2 Invisible; Thorn Sees invisible), `vision-brakka` (for session-sim-8); bundle `vision-party` = `vision` + `vision-invisible`. `session-sim-7`: Brakka (no senses) is one of player-1's Normal sources.
+- **CON-44** (#208, `con44-s4.test.ts`, measured on the realistic-heavy harness; PCs at Normal 999 ft): DM 670,513 B (party on 670,512 B; 378,064 B left of 1 MiB); players party off 277,670–280,900 B (own `vision` ≤ 659 B), party on 280,730–283,790 B (+2,890 B; `vision` type ≤ 3,513 B; 240,498 B left of 512 KiB). Caps (2,000 random walls on 120 × 120, own origins), party on: 12 sources 324,284–327,344 B, 24 on the scene (12 count) 330,069–333,129 B, `vision` type ≤ 68,953 B (≤ 192 KiB); own `vision` at 4 sources ≤ 22,451 B (≤ 48 KiB); View as Party ack 94,958 B (≤ 192 KiB); DM ≤ 710,432 B (the 2,000-wall structure row).
+
+## 49. Sprint 4: compendium search (C-search)
+
+From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #245). **Built by `build/cmp-search`**: no table, column or record type change. Protocol side: [protocol §64](../protocol/README.md#64-sprint-4-compendium-search-c-search).
+
+- **Search index (derived, server-only, never persisted or sent):** one row per `compendium_entry` and per imported monster `entity` without an entry (FR-CMP-17): id, kind, campaign, shared, source + `sourceRank`, facets (entry-less: `{cr}`), line, folded name + its words, sorted unique folded words of `search_text` (entry-less: none), group key (kind + folded name + source, homebrew: `campaign:<id>`). Built from `compendium_entry` and `entity` at the first search after start, dropped on the five compendium / imported-definition events (FR-CMP-34). Replaces the `instr` scan and the entry-less `LEFT JOIN`.
+- **Derived at read:** tier (FR-CMP-33), source rank (FR-CMP-38), group `{count}` and group line (FR-CMP-35); `name_key` and `search_text` stay as stored (folding happens in the index).
+- **Fixtures:** `cmp-srd-full` (the bundled `srd-5.1` at its bundled version via `cmp.importRecorded`: 1,150 entries, 322 definitions), `cmp-search-homebrew` (Fixture Campaign items "Potion of Healing", DM only, text marker `CMP-HB-POTION`; "Healing Draught", shared); bundle `compendium-full` = `compendium` + both.
+- **CON-44:** no record added to any snapshot (entries are REST only; the full import's definitions stay lazy, §44).
+
+## 50. Sprint 4: full-screen dice layer (D6)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) (FR-DICEX-15, -17, -32–38, -43–45; [ADR-0048](../architecture/adr/0048-dice-display.md)). **Built by `build/dice-screen`**: no table, column, record type, event, intent or payload change. Protocol side: [protocol §65](../protocol/README.md#65-sprint-4-full-screen-dice-layer-d6).
 
 - **Browser storage:** `pp.dicex.v2.<campaignId>.<dm | playerId>` = `{display, others, popup}` (Not in the DB table above; v1 migrated once on read).
 - **Client memory only:** the running / leaving throw `{t, seq, plan {arena: screen | zone, draw: 3d | flat, caption, handoff}, phase: moving | rest | handoff | fading, looks}`; timeline constants in `dice-extras/timing.ts` (settle ≤ 2.5 s, rest 1 s / 1.5 s with popups off, hand-off 0.4 s, fade 0.3 s). Gone on reload.
