@@ -21,6 +21,7 @@ import {
   PartyVisionSet,
   TokenInvisibleSet,
 } from "@shared/events/fog-of-war";
+import { mergeCells } from "@shared/fog-of-war/brush";
 import {
   type FogRow,
   fogBox,
@@ -248,6 +249,20 @@ function commitEdit(
 /** A fog-layer shape's geometry as `fog.edit` appends it (FR-FOG-26). */
 type LayerGeom = FogShapeGeom | FogBrushGeom;
 
+/**
+ * FR-FOG-57: the shape list with a `cells` shape merged into the last one (same op, also `cells`,
+ * union within 128 × 128 and 500 runs), or null when it appends instead.
+ */
+export function mergeIntoLast(
+  shapes: readonly FogLayerShape[],
+  added: FogLayerShape,
+): FogLayerShape[] | null {
+  const last = shapes.at(-1);
+  if (!last || !("cells" in last) || !("cells" in added) || last.op !== added.op) return null;
+  const cells = mergeCells(last.cells, added.cells);
+  return cells ? [...shapes.slice(0, -1), { op: last.op, cells }] : null;
+}
+
 /** FR-FOG-26: a refused shape → `invalid` with the gesture's copy. */
 function checkShape(s: ShapeLike, path: string[]) {
   const problem = shapeProblem(s);
@@ -289,22 +304,20 @@ export function fogCommands(log: Logger) {
             ? shape
             : normaliseShape(shape);
       if (!isBrush(geom)) checkShape(geom, ["shape"]);
-      if (now.shapes.length >= FOG_SHAPES_MAX) throw conflict(FOG_TOO_DETAILED);
       const fogOp: FogShapeOp = op === "hide" ? "fog" : op;
       const added = { op: fogOp, ...geom } as FogLayerShape;
+      // FR-FOG-57: a snapped brush stroke joins the last shape when that is `cells` of the same op
+      // and the union stays within the caps; the undo entry still restores the list before it.
+      const merged = mergeIntoLast(now.shapes, added);
+      if (!merged && now.shapes.length >= FOG_SHAPES_MAX) throw conflict(FOG_TOO_DETAILED);
+      const shapes = merged ?? [...now.shapes, added];
       // Sprint-2 inputs keep their sprint-2 kinds (FR-FOG-05: they behave as before).
       const legacy = "kind" in shape && (op === "reveal" || op === "hide");
       const kind = (legacy ? `${op}-${shape.kind}` : `${fogOp}-shape`) as FogEditKind;
-      const editId = commitEdit(
-        env,
-        s,
-        prev,
-        { row: prev, extra: { shapes: [...now.shapes, added] }, kind },
-        (id) => ({
-          type: FogEdited.type,
-          payload: { sceneId: s.id, editId: id, kind, shape: geom },
-        }),
-      );
+      const editId = commitEdit(env, s, prev, { row: prev, extra: { shapes }, kind }, (id) => ({
+        type: FogEdited.type,
+        payload: { sceneId: s.id, editId: id, kind, shape: geom },
+      }));
       return { editId };
     },
   });
