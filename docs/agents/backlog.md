@@ -28,6 +28,8 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-20 | Physical dice entry groups show only "2d6+5" / "2d6" without the damage type of each part ("slashing", "fire") (S4-1b walkthrough) | S | dice-roll-log manual form / tray groups | none | dice client work | open |
 | BL-21 | The 3D dice chunk is served uncompressed (632 KB; 21 s on a 400 kbit/s link, first roll after a reload falls back to chips): serve static assets gzip / brotli from Hono (D7 walkthrough, `.verify/20261017-roll-popup-d7/` in `build/roll-popup`) | S | server static serving (`src/server/app.ts` / index) | none | server core | open |
 | BL-22 | A 10d6 hand-off still shrinks to tiny dots in the roll popup (D7 walkthrough) | S | dice-extras popup PiP | none | dice client work | open |
+| BL-23 | Trigger parts lose their damage type on the log line ("+ 10 Sneak Attack") while the DM popup shows it ("+ 10 piercing Sneak Attack") (S4-5 walkthrough, `.verify/20261017-fury-log-line/` in `fix/fury-log-line`) | S | effect-modifiers line parts / combat log-kinds | none | combat lock | open |
+| BL-24 | The DM's ruling line runs on without punctuation: "vs AC 16 — DM ruled hit 10 slashing …" (pre-existing; S4-5 walkthrough) | S | combat-tracker log-kinds DM text | none | combat lock | open |
 
 ## How to add items
 
