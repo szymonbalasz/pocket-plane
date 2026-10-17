@@ -18,6 +18,7 @@ import {
   type Timers,
   ZOOM_MAX,
 } from "./camera";
+import { labelMetrics } from "./label";
 
 /** The `battlemap` fixture: 20 × 14 cells at 70 px, no offset. */
 const GRID = { gridCellSize: 70, gridOffsetX: 0, gridOffsetY: 0 };
@@ -398,6 +399,72 @@ describe("FR-MAP-44 BL-01 fit fills the canvas (session-sim, DM)", () => {
         }
       }
     }
+  });
+
+  /**
+   * FOG §13 step 26 re-test (V7, `vision-party`, DM): the client's own fitContent inputs.
+   * Goblin Ambush tokens at their fixture cells, Thorn dragged to (4, 10); the floor case also
+   * has Mira dragged to (2, 3). Before: row 0 at y −27.4 (0.72, Thorn would end under the Game
+   * log with the top row pinned) and at y 1.4 (the floor).
+   */
+  const v7Retest = (mira: ReturnType<typeof tok>) => {
+    const pcs = [mira, tok(4, 10)];
+    const others = [
+      tok(14, 4),
+      tok(14, 6),
+      tok(12, 8),
+      tok(15, 8),
+      tok(9, 10, "large"),
+      tok(17, 11),
+    ];
+    return { name: "Goblin Ambush (V7 re-test)", tokens: [...pcs, ...others], pcs };
+  };
+  /** The PCs' footprints with their labels' lower half, screen px. */
+  const pcsOnScreen = (cam: Camera, pcs: Box) => {
+    const label = (labelMetrics(70, cam.scale).pillH * cam.scale) / 2;
+    return {
+      x0: cam.x + pcs.x * cam.scale,
+      y0: cam.y + pcs.y * cam.scale,
+      x1: cam.x + (pcs.x + pcs.w) * cam.scale,
+      y1: cam.y + (pcs.y + pcs.h) * cam.scale + label,
+    };
+  };
+
+  test("FR-MAP-44 BL-01 FOG step 26 re-test at 1440×900 with the Game log: Thorn at (4, 10) → zoomed out to keep the top row and the PCs in the free area", () => {
+    for (const [mira, floor] of [
+      [tok(2, 7), false],
+      [tok(2, 3), true],
+    ] as const) {
+      const scene = v7Retest(mira);
+      const { cam, map, view, free } = fit(scene, sim6, [gameLog(sim6)]);
+      const at = `Mira (${mira.col}, ${mira.row})`;
+      expect(free).toEqual({ x: 68, y: 48, w: 1372, h: 536 });
+      expect({ at, top: map.y, floor: cam.floor }).toEqual({ at, top: view.y, floor });
+      expect(70 * cam.scale).toBeGreaterThanOrEqual(FIT_MIN_CELL_PX - 1e-9);
+      if (!floor) expect(cam.scale).toBeLessThan(0.72);
+      const pcs = footprintBox(scene.pcs, GRID);
+      if (!pcs) throw new Error("no PCs");
+      const p = pcsOnScreen(cam, pcs);
+      expect(p.y0).toBeGreaterThanOrEqual(free.y);
+      expect(p.y1).toBeLessThanOrEqual(free.y + free.h + 1e-6);
+      expect(p.x0).toBeGreaterThanOrEqual(free.x);
+      expect(p.x1).toBeLessThanOrEqual(free.x + free.w);
+    }
+    // Same layout at 1280×720: the top row at the top bar (unchanged).
+    const laptopFit = fit(v7Retest(tok(2, 7)), laptop, [gameLog(laptop)]);
+    expect(laptopFit.map.y).toBe(laptopFit.view.y);
+  });
+
+  test("FR-MAP-46 the PC rule wins only where the PCs can't fit the free area with the top row pinned", () => {
+    // PCs at rows 1 and 12: 12 rows at the 48 px floor never fit the 536 px strip below row 0.
+    const scene = {
+      name: "spread PCs",
+      tokens: [tok(2, 1), tok(4, 12)],
+      pcs: [tok(2, 1), tok(4, 12)],
+    };
+    const { cam, map, view } = fit(scene, sim6, [gameLog(sim6)]);
+    expect(cam.floor).toBe(true);
+    expect(map.y).toBeLessThan(view.y);
   });
 });
 

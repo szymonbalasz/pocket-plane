@@ -178,8 +178,10 @@ function tokensIn(box: Box, map: Size, cell: number): Box {
  * per axis where it can't. BL-01: last, per axis, the map is centred in the work area right of
  * the tool rail (if larger: panned the least to cover it; vertically its top row under the top
  * bar), as far as the tokens' footprints and the lower half of their labels (and at the floor the
- * PCs, with the margin) stay in the free area; vertically never at the cost of the top row while
- * the tokens stay in the work area and the PCs in the free area.
+ * PCs, with the margin) stay in the free area. FOG §13 step 26 (V7 ruling) when that still puts
+ * the top row under the top bar: (1) the PCs in the free area, (2) the top row at the top bar,
+ * zooming out for it down to the floor, (3) the other tokens anywhere (cut at the dock or under
+ * a window); only where (1) and (2) can't both hold does the PC rule keep the pan.
  */
 export function fitContent(
   box: Box,
@@ -199,6 +201,39 @@ export function fitContent(
   );
   const floor = fits < min;
   const scale = floor ? min : fits;
+  const view = { x: RAIL_CLEAR, y: TOP_BAR_H, w: Math.max(1, work.w - RAIL_CLEAR), h: work.h };
+  const at = panAt(box, free, map, view, cell, pcs, scale, floor);
+  if (at.y >= view.y) return { ...at, scale, floor };
+  if (!pcs) return { x: at.x, y: view.y, scale, floor };
+  // The PCs with their labels' lower half in the free area with the top row at the top bar: the
+  // largest scale (≤ the fit's, ≥ the floor) for that. The label only shrinks as the scale does.
+  const label = (labelMetrics(cell, scale).pillH * scale) / 2;
+  const s = Math.min(scale, (free.y + free.h - view.y - label) / (pcs.y + pcs.h));
+  // A free area starting below the top bar: the PCs' top edge must clear it too.
+  const clear = free.y - view.y;
+  const low =
+    clear <= 0 ? min : pcs.y > 0 ? Math.max(min, clear / pcs.y) : Number.POSITIVE_INFINITY;
+  if (s < low - 1e-9) return { ...at, scale, floor };
+  const pinned = s < scale ? panAt(box, free, map, view, cell, pcs, s, floor) : at;
+  const x0 = pinned.x + pcs.x * s;
+  if (x0 < free.x - 1e-6 || x0 + pcs.w * s > free.x + free.w + 1e-6) return { ...at, scale, floor };
+  return { x: pinned.x, y: view.y, scale: s, floor };
+}
+
+/**
+ * The fit's pan at `scale`: `box` centred in `free`, at the floor the PCs panned into it, then
+ * BL-01 per axis (see `fitContent`).
+ */
+function panAt(
+  box: Box,
+  free: Box,
+  map: Size,
+  view: Box,
+  cell: number,
+  pcs: Box | null,
+  scale: number,
+  floor: boolean,
+): { x: number; y: number } {
   let x = free.x + free.w / 2 - (box.x + box.w / 2) * scale;
   let y = free.y + free.h / 2 - (box.y + box.h / 2) * scale;
   const m = Math.min(FIT_MARGIN, free.w / 2, free.h / 2);
@@ -213,7 +248,6 @@ export function fitContent(
   // BL-01: fill the work area right of the rail with the map, as far as the tokens with their
   // name labels' lower half (FR-MAP-42) and, at the floor, the PCs with the margin stay in the
   // free area.
-  const view = { x: RAIL_CLEAR, y: TOP_BAR_H, w: Math.max(1, work.w - RAIL_CLEAR), h: work.h };
   const t = tokensIn(box, map, cell);
   /** The name label's lower half below the footprint (map px). */
   const label = labelMetrics(cell, scale).pillH / 2;
@@ -226,31 +260,19 @@ export function fitContent(
     [free.x, free.x + free.w],
     [{ at: t.x, len: t.w, inset: 0 }, keepPcs && { at: keepPcs.x, len: keepPcs.w, inset: m }],
   );
-  const tokensY = { at: t.y, len: t.h + label, inset: 0 };
-  const fitY = y;
   y = fillAxis(
     y,
     scale,
     map.h,
     [view.y, view.y + view.h],
     [free.y, free.y + free.h],
-    [tokensY, keepPcs && { at: keepPcs.y, len: keepPcs.h, inset: m }],
+    [
+      { at: t.y, len: t.h + label, inset: 0 },
+      keepPcs && { at: keepPcs.y, len: keepPcs.h, inset: m },
+    ],
     true,
   );
-  // FOG §13 step 26: a map taller than the free area (a short strip above the Game log) never
-  // goes up under the top bar to keep every token in that strip: its top row shows wherever the
-  // tokens stay in the work area and the PCs (with their labels; at the floor with the margin) in
-  // the free area. Only the other tokens may then sit beside a window.
-  if (y < view.y) {
-    const pcsY =
-      pcs &&
-      (floor ? { at: pcs.y, len: pcs.h, inset: m } : { at: pcs.y, len: pcs.h + label, inset: 0 });
-    const inView = keepRange(fitY, scale, [view.y, view.y + view.h], [tokensY]);
-    const pcsFree = keepRange(fitY, scale, [free.y, free.y + free.h], [pcsY]);
-    const ok = (r: [number, number] | null) => !r || (r[0] <= view.y && view.y <= r[1]);
-    if (ok(inView) && ok(pcsFree)) y = view.y;
-  }
-  return { x, y, scale, floor };
+  return { x, y };
 }
 
 /** `data-camera` (FR-MAP-44 (b)): where the last fit put it, or moved by the user since. */
