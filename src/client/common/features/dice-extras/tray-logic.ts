@@ -7,7 +7,7 @@ import {
   type Term,
   toNotation,
 } from "@shared/dice-roll-log/grammar";
-import type { RollMode } from "@shared/dice-roll-log/schemas";
+import type { DmRollActorRef, RollCategory, RollMode } from "@shared/dice-roll-log/schemas";
 import type { Rect } from "../play-shell/geometry";
 
 export const PALETTE = [4, 6, 8, 10, 12, 20, 100] as const;
@@ -110,4 +110,28 @@ export function throwZone(free: Rect, windows: readonly Rect[]): Rect | null {
   const w = Math.min(ZONE_MAX.w, free.w);
   const h = Math.min(ZONE_MAX.h, free.h);
   return { x: Math.round(free.x + (free.w - w) / 2), y: free.y + free.h - h, w, h };
+}
+
+/** A `free` request's fields (FR-DICEX-02). */
+export interface FreeFields {
+  expression: string;
+  mode: RollMode;
+  category: RollCategory;
+  label?: string;
+  actor?: DmRollActorRef;
+}
+
+/**
+ * The `free` request after a palette click: it adds to the staged request, but after a result
+ * it starts a new roll with nothing of the old one's label, actor or category (BL-18: a
+ * notation's "Notation test" label stuck to the next palette roll).
+ */
+export function paletteRequest(
+  staged: FreeFields | null,
+  expression: string,
+  mode: RollMode,
+  fresh: boolean,
+): FreeFields {
+  if (staged && !fresh) return { ...staged, expression };
+  return { expression, mode, category: "other" };
 }

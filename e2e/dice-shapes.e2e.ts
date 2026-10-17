@@ -2,7 +2,7 @@
 // Thin die-shape flows (D5; DICEX §13 step 22, DICE §13 sprint 4): A (DM) and B (player-1, Mira)
 // see `rolls-1` with die chips (e4's manual 15 a d20 + "physical"), B never the hidden rolls; B
 // rolls with advantage and `1d8+2d6` → chips in B's look (Crimson) in both logs, the dropped d20
-// struck; B's flat throw draws die shapes. A's log at default size still shows ≥ 6 single-line
+// struck; B's flat dice (popup chips, D7) draw die shapes. A's log at default size still shows ≥ 6 single-line
 // entries with d20 chips (FR-SHELL-35).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
@@ -89,11 +89,12 @@ test("FR-DICE-35 FR-DICE-36 FR-DICEX-42 log die chips: history, adv and mixed di
     expect((await chipsOf(mixed)).map((c) => c.shape)).toEqual(["d8", "d6", "d6"]);
   }
 
-  // B's own throw (flat zone or 3D DOM mirror): flat dice are die shapes at the server's values.
-  const thrown = p1.locator('[data-testid="dicex-throw"][data-record-id]').last();
-  await expect(thrown).toHaveAttribute("data-state", "rest");
-  if ((await thrown.getAttribute("data-render")) === "flat") {
-    const shapes = thrown.locator("[data-testid='dicex-throw-die'] [data-testid='dicex-die']");
+  // B's own popup (D7): flat dice (chips) are die shapes at the server's values.
+  const id = await lastEntry(log, "1d8+2d6").getAttribute("data-record-id");
+  const popup = p1.locator(`[data-testid="dicex-popup"][data-record-id="${id}"]`);
+  await expect(popup).toHaveAttribute("data-state", "rest", { timeout: 6_000 });
+  if ((await popup.getByTestId("dicex-popup-pip").getAttribute("data-mode")) === "chips") {
+    const shapes = popup.locator("[data-testid='dicex-throw-die'] [data-testid='dicex-die']");
     await expect(shapes).toHaveCount(3);
     expect(await shapes.evaluateAll((els) => els.map((e) => e.getAttribute("data-shape")))).toEqual(
       ["d8", "d6", "d6"],

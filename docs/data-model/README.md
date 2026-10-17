@@ -1640,3 +1640,12 @@ From [fog-of-war](../specs/fog-of-war.md) FR-FOG-53 / -54, [scenes-map](../specs
 | Sight preview store | client memory, per canvas | `local {tokenId, see, dark} \| null`, `remote: tokenId → {see, dark}` | — | FR-FOG-54 |
 
 - **Derived (never stored):** the drawn sight = the owner's `vision` with the previewed token's polygons swapped (`previewVision`).
+
+## 58. Sprint 4: roll popup (D7)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) (FR-DICEX-09, -38–41; [ADR-0048](../architecture/adr/0048-dice-display.md)). **Built by `build/roll-popup`**: no table, column, record type, event, intent or payload change. Protocol side: [protocol §75](../protocol/README.md#75-sprint-4-roll-popup-d7).
+
+- **Client memory only** (`dice-extras/popups.ts`): roll popups `{id (first entry id), seq, entries (the frame's received roll entries), t (throwDice of them), looks, hidden, bigId, parts {handoff?, play? : {ids, state: moving | rest, chips}}, stills {handoff?, play? : 2D canvas}, state: rolling | rest | closing, hovered}`, ≤ 3; timers (6 s after rest, hover pauses). Never stored or sent; gone on reload (a reload, reconnect or snapshot pops nothing).
+- **Derived (never stored):** rows (`popupRows`: one per entry, `payload` only), PiP mode (`handoff` / `play` / `chips`), the miniature's arena and clip, the stack's place in the toast region.
+- **Browser storage:** unchanged (`pp.dicex.v2.*`, `popup` switch). *(#247)* The effective display no longer turns `flat` under the OS reduced-motion preference (ignored); only no WebGL / a failed chunk does.
+- **CON-44:** 0 B.

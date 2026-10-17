@@ -1,7 +1,7 @@
 // e2e-bundle: dice-extras
 // Thin dice-extras flows (DICEX §13 E2E, D1 flat): DM (A) + player-1 (B, Mira). B stages "1d12+5"
 // from the roll bar's tray Button, adds a d6, sets the constant to 6 and rolls; A sees the line;
-// B's flat throw (reduced motion → flat in the zone, FR-DICEX-45) rests on the server's values. B Alt+clicks Athletics on Mira's sheet → the tray
+// B's flat dice (Display → Flat in the tray gear: chips in B's own roll popup, D7) rest on the server's values. B Alt+clicks Athletics on Mira's sheet → the tray
 // adjusts the sheet roll and its Roll sends the sheet's own intent. Sheet notation (D4): B clicks
 // "1d12 + 5" in Mira's "Notation test" feature → `compose` as Mira → Roll; A sees the line.
 // Looks (D2): fixture looks thrown in their style; player-2 saves Emerald glass, seen by A and B.
@@ -20,13 +20,16 @@ test("FR-DICEX-01 FR-DICEX-04 FR-DICEX-06 FR-DICEX-10 FR-DICEX-11 FR-DICEX-17 tr
   await loginDm(dm, secret);
   await live(dm);
   const p1 = await rolePage(browser);
-  // Reduced motion: the default Full screen display shows flat in the zone (FR-DICEX-32, -45).
-  await p1.emulateMedia({ reducedMotion: "reduce" });
   await p1.goto(link("Player 1"));
   await live(p1);
 
   // Map-first: no tray open by default (FR-DICEX-01).
   await expect(shellWindow(p1, "dicex.tray")).toHaveCount(0);
+  // B: tray gear → Display "Flat" (a per-device choice, FR-DICEX-32).
+  const gear = await openWindow(p1, "dicex.tray");
+  await gear.getByTestId("dicex-settings-open").click();
+  await p1.locator('[data-testid="dicex-settings-display"][data-value="flat"]').click();
+  await p1.keyboard.press("Escape");
   const dmLog = await openWindow(dm, "dice.log");
   const log = await openWindow(p1, "dice.log");
 
@@ -51,11 +54,12 @@ test("FR-DICEX-01 FR-DICEX-04 FR-DICEX-06 FR-DICEX-10 FR-DICEX-11 FR-DICEX-17 tr
     1,
   );
 
-  // B's flat throw rests on the server's values (data-settled == data-value, every die flat).
-  const thrown = p1.locator('[data-testid="dicex-throw"][data-record-id]');
-  await expect(thrown).toHaveAttribute("data-render", "flat");
-  await expect(thrown).toHaveAttribute("data-state", "rest");
-  const dice = thrown.getByTestId("dicex-throw-die");
+  // B's flat dice: chips in B's own popup (FR-DICEX-41 c), at rest on the server's values
+  // (data-settled == data-value, every die flat).
+  const popup = p1.locator('[data-testid="dicex-popup"][data-record-id]');
+  await expect(popup.getByTestId("dicex-popup-pip")).toHaveAttribute("data-mode", "chips");
+  await expect(popup).toHaveAttribute("data-state", "rest");
+  const dice = popup.getByTestId("dicex-throw-die");
   await expect(dice).toHaveCount(2);
   for (const d of await dice.all()) {
     const value = await d.getAttribute("data-value");
@@ -100,10 +104,16 @@ test("FR-DICEX-20 FR-DICEX-26 FR-DICEX-27 looks: fixture looks thrown; player-2 
   await p2.goto(link("Player 2"));
   await live(p2);
 
-  /** `page`'s throw of a fresh roll: every die in `style` / `material`. */
-  const seesLook = async (page: Page, style: string, material: string) => {
+  /**
+   * `page`'s dice of the entry `id`: its big throw's DOM mirror, else its popup's chips or
+   * miniature (D7: a throw before the 3D chunk is in shows in the popup); every die in `style` /
+   * `material`.
+   */
+  const seesLook = async (page: Page, id: string, style: string, material: string) => {
     const dice = page
-      .locator('[data-testid="dicex-throw"][data-record-id]')
+      .locator(
+        `[data-testid="dicex-throw"][data-record-id="${id}"], [data-testid="dicex-popup"][data-record-id="${id}"]`,
+      )
       .getByTestId("dicex-throw-die");
     await expect(dice.first()).toHaveAttribute("data-style", style);
     for (const d of await dice.all()) {
@@ -112,15 +122,22 @@ test("FR-DICEX-20 FR-DICEX-26 FR-DICEX-27 looks: fixture looks thrown; player-2 
     }
   };
   const log1 = await openWindow(p1, "dice.log");
+  /** Rolls 1d20 from `log`; the new entry's id (the log's newest, last). */
   const roll = async (log: Locator) => {
+    const entries = log.getByTestId("dice-log-entry");
+    const before = await entries.count();
     await log.getByTestId("dice-roll-expression").fill("1d20");
     await log.getByTestId("dice-roll-expression").press("Enter");
+    await expect(entries).toHaveCount(before + 1);
+    return (await entries.last().getAttribute("data-record-id")) as string;
   };
 
   // Fixture `dicex-looks`: player-1 Crimson metal, seen by A.
-  await roll(log1);
-  await seesLook(dm, "crimson", "metal");
-  await p1.locator('[data-testid="dicex-throw"][data-state="rest"]').waitFor();
+  const first = await roll(log1);
+  await seesLook(dm, first, "crimson", "metal");
+  await p1
+    .locator(`[data-testid="dicex-popup"][data-record-id="${first}"][data-state="rest"]`)
+    .waitFor();
 
   // C: tray gear → Dice look (default Sapphire) → Emerald, glass → Save.
   const tray = await openWindow(p2, "dicex.tray");
@@ -140,15 +157,15 @@ test("FR-DICEX-20 FR-DICEX-26 FR-DICEX-27 looks: fixture looks thrown; player-2 
 
   // C rolls; A and B see C's throw in Emerald glass.
   const log2 = await openWindow(p2, "dice.log");
-  await roll(log2);
-  await seesLook(dm, "emerald", "glass");
-  await seesLook(p1, "emerald", "glass");
+  const second = await roll(log2);
+  await seesLook(dm, second, "emerald", "glass");
+  await seesLook(p1, second, "emerald", "glass");
 
   // Reload B: C's next throw is still Emerald glass.
   await p1.reload();
   await live(p1);
-  await roll(log2);
-  await seesLook(p1, "emerald", "glass");
+  const third = await roll(log2);
+  await seesLook(p1, third, "emerald", "glass");
 
   for (const page of [p1, p2, dm]) await page.context().close();
 });

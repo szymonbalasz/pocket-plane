@@ -286,6 +286,30 @@ describe("FR-DICE-37 focusLogEntry", () => {
     expect(html).toMatch(/data-record-id="e2"[^>]*data-focused="true"[^>]*ring-2/);
   });
 
+  test("FR-DICE-37 FR-DICEX-39 focusLogEntry: the default timers run unbound (no 'Illegal invocation'); the highlight clears after 2 s", () => {
+    // Browser-strict fake timers: like the DOM's, they throw when called on another receiver.
+    const { timers, advance } = fakeTimers();
+    const g = globalThis as { setTimeout: unknown; clearTimeout: unknown };
+    const real = { setTimeout: g.setTimeout, clearTimeout: g.clearTimeout };
+    const strict = <A extends unknown[], R>(f: (...a: A) => R) =>
+      function (this: unknown, ...a: A): R {
+        if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+        return f(...a);
+      };
+    g.setTimeout = strict(timers.setTimeout);
+    g.clearTimeout = strict(timers.clearTimeout);
+    try {
+      const f = createLogFocus();
+      expect(() => f.focus("e1")).not.toThrow();
+      expect(() => f.focus("e1")).not.toThrow();
+      expect(f.api.getState().entryId).toBe("e1");
+      advance(FOCUS_MS);
+      expect(f.api.getState().entryId).toBeNull();
+    } finally {
+      Object.assign(g, real);
+    }
+  });
+
   test("FR-DICE-37 focusLogEntry: scrolls the focused row into view", () => {
     const calls: unknown[] = [];
     const row = { scrollIntoView: (o: unknown) => calls.push(o) };

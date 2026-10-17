@@ -111,14 +111,14 @@ describe("FR-DICEX-37 preload", () => {
     expect(m.imports()).toBe(0);
   });
 
-  test("FR-DICEX-45 reduced motion: effective flat, so no preload and no chunk import", () => {
-    const display = effectiveDisplay("screen", { reducedMotion: true, threeD: true });
-    expect(display).toBe("flat");
+  test("FR-DICEX-45 (#247) reduced motion is ignored: `screen` stays 3D, so the chunk preloads at idle as usual", () => {
+    const display = effectiveDisplay("screen", { threeD: true });
+    expect(display).toBe("screen");
     const m = manualLoader();
     const e = idleEnv(true);
     preloadAtIdle(m.loader, display, e.env);
-    expect(e.idle).toHaveLength(0);
-    expect(m.imports()).toBe(0);
+    for (const fn of e.idle) fn();
+    expect(m.imports()).toBe(1);
   });
 
   test("FR-DICEX-37 preload: a throw during the load waits ≤ 1.5 s, then 3D", async () => {
@@ -173,7 +173,7 @@ describe("FR-DICEX-37 preload", () => {
     expect(threeDUnavailable("ready", false)).toBe("no-webgl");
     expect(threeDUnavailable("idle", true)).toBeNull();
     // `threeD` false → the stored `screen` shows flat.
-    expect(effectiveDisplay("screen", { reducedMotion: false, threeD: false })).toBe("flat");
+    expect(effectiveDisplay("screen", { threeD: false })).toBe("flat");
   });
 
   test("FR-DICEX-22 throwDraw: 3D only for screen / zone with the chunk ready", () => {
