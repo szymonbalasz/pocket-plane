@@ -23,6 +23,7 @@ import midCombat from "./mid-combat";
 import notifications from "./notifications";
 import partyBoard from "./party-board";
 import partyLoot from "./party-loot";
+import physicalDiceCombat from "./physical-dice-combat";
 import ruleTriggers from "./rule-triggers";
 import sceneTools from "./scene-tools";
 import sceneToolsProps from "./scene-tools-props";
@@ -66,4 +67,5 @@ export const bundles: readonly Bundle[] = [
   diceDisplay,
   mapTools,
   furyLogLine,
+  physicalDiceCombat,
 ];
