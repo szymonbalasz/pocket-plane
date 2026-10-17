@@ -1,6 +1,6 @@
 # Proposed — Token creature type as a player-visible display copy
 
-- Status: proposed (sprint 4, track C; review-b B6). The DM accepts or rejects it at DM gate 1. The integrator numbers it at merge.
+- Status: accepted (DM, sprint-4 gate 1, #245; G4, G44). Raised by review-b B6. The integrator numbers it at merge.
 - Date: 2026-10-17
 - Refines: [ADR-0024](0024-definition-visibility.md) (token display copies)
 - Affects: [entities](../../specs/entities.md) (FR-ENT-26–30), [scenes-map](../../specs/scenes-map.md) (token record, placement, definition-changed hook), [compendium](../../specs/compendium.md) (FR-CMP-39)
@@ -23,7 +23,7 @@
 
 ## Decision
 
-**A** (proposed; the default, A vs B, is DM question OQ-ENT-29, bold pick A).
+**A** (DM, sprint-4 gate 1, #245). Players see the type art on visible monster tokens by default; the DM sets Art ▸ Initials per token to hide it (OQ-ENT-29 decided, G44). Rejected: B (DM opt-in per token), C (DM-only art).
 
 - ADR-0024's token display copies become: name, image, size and **creature type**.
 - `creatureType` is written at placement / duplicate, by the DM's token menu, and once by the definition-changed hook when the definition gains a type it didn't have (null tokens only; a DM's `"initials"` is kept). Like the other copies, it is written only in the instance's own create, its own commands, or the definition's update transaction (never by a listener).
