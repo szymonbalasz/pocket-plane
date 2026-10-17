@@ -1,8 +1,9 @@
 // Small combat-extras parts for both clients: effect chips on one line ("+N" for the rest: the
 // hidden ones on hover and click, P3 glitch 6; FR-CBTX-33/34; compact labels measured against the room left, FR-CBTX-46; tighter tiers before "+N", BL-08), death pips + state badge (FR-CBTX-33/34), roll / intent helpers.
+// Sprint 4 (FR-CBTX-52): trigger chips after the effect chips on the same line, last into "+N".
 import type { DeathCounters, EffectView } from "@shared/combat-extras/schemas";
 import type { DeathState } from "@shared/entities/schemas";
-import { EyeOffIcon } from "lucide-react";
+import { CheckIcon, EyeOffIcon, ZapIcon } from "lucide-react";
 import { type ComponentProps, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import {
   DropdownMenu,
@@ -16,6 +17,7 @@ import {
 import { Tooltip } from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
+import { type TriggerChip, triggerLine } from "../effect-modifiers/trigger-badges";
 import { EffectIcon, effectValue } from "./icons";
 import {
   CHIP_MAX_W,
@@ -182,13 +184,81 @@ export function EffectChip({
   return compact ? <Tooltip content={chipText(e, round)}>{badge}</Tooltip> : badge;
 }
 
+export const TRIGGER_CHIP_ID = "cbtx-trigger-chip";
+
+/** Ready looks ready (success), waiting stays neutral (never a false Ready), used is muted. */
+const TRIGGER_CLASS: Record<TriggerChip["state"], string> = {
+  ready: "border-success/50 text-success",
+  uses: "border-success/50 text-success",
+  waiting: "",
+  used: "",
+};
+
 /**
- * One line of chips, concentration first; what doesn't fit collapses into "+N" (hover and click
- * list the hidden ones).
- * `menu(e)` (DM): the chip opens a menu with those items.
+ * FR-CBTX-52 trigger chip: lightning + name, uses left after it ("Divine Fury 2"; "−1" in
+ * `hp.down`), muted + check once used (or no use left). Compact tiers cut the name and keep the
+ * count. Display only (CBTX §4).
+ */
+function TriggerChipBadge({
+  t,
+  testId,
+  tier = 0,
+  natural = false,
+  style,
+  ...trigger
+}: Omit<ComponentProps<"span">, "children"> & {
+  t: TriggerChip;
+  testId?: string;
+  tier?: number;
+  natural?: boolean;
+}) {
+  const cap = (CHIP_TIERS[tier] ?? CHIP_TIERS[0]).cap;
+  return (
+    <Badge
+      {...trigger}
+      variant="outline"
+      data-testid={testId}
+      data-record-id={testId && t.id}
+      data-state={testId ? t.state : undefined}
+      data-value={testId && t.uses ? t.uses.left : undefined}
+      data-muted={testId ? t.muted : undefined}
+      data-tier={testId ? tier : undefined}
+      className={cn(
+        "shrink-0 gap-0.5 truncate px-1 py-0 text-[11px] font-normal",
+        t.muted ? "text-muted-foreground opacity-70" : TRIGGER_CLASS[t.state],
+      )}
+      style={{ ...style, maxWidth: natural ? CHIP_MAX_W : cap }}
+    >
+      <ZapIcon className="size-3 shrink-0" aria-hidden />
+      <span className="min-w-0 truncate">{t.name}</span>
+      {t.uses && (
+        <span className={cn("ml-0.5 shrink-0", t.down && "text-hp-down")}>{t.uses.text}</span>
+      )}
+      {t.muted && <CheckIcon className="size-3 shrink-0" aria-label="Used" />}
+    </Badge>
+  );
+}
+
+export function TriggerChipView({ t, tier = 0 }: { t: TriggerChip; tier?: number }) {
+  return (
+    <Tooltip content={t.tooltip}>
+      <TriggerChipBadge t={t} testId={TRIGGER_CHIP_ID} tier={tier} />
+    </Tooltip>
+  );
+}
+
+type ChipItem = { kind: "effect"; e: EffectView } | { kind: "trigger"; t: TriggerChip };
+
+const itemKey = (i: ChipItem) => (i.kind === "effect" ? i.e.id : `t:${i.t.id}`);
+
+/**
+ * One line of chips, concentration first, then the trigger chips (FR-CBTX-52, compact rows only);
+ * what doesn't fit collapses into "+N" (hover and click list the hidden ones).
+ * `menu(e)` (DM): an effect chip opens a menu with those items.
  */
 export function EffectChips({
   effects,
+  triggers = [],
   round,
   testId,
   menu,
@@ -196,17 +266,27 @@ export function EffectChips({
   compact = false,
 }: {
   effects: readonly EffectView[];
+  triggers?: readonly TriggerChip[];
   round: number | null;
   testId: string;
   menu?: (e: EffectView) => ReactNode;
   className?: string;
   compact?: boolean;
 }) {
-  const list = chipOrder(effects);
+  const list: ChipItem[] = [
+    ...chipOrder(effects).map((e) => ({ kind: "effect" as const, e })),
+    ...triggers.map((t) => ({ kind: "trigger" as const, t })),
+  ];
   const { ref, fit, tier, left } = useFit(
     list.length,
     compact,
-    list.map((e) => `${e.id}:${compact ? chipLabel(e, round) : chipText(e, round)}`).join(),
+    list
+      .map((i) =>
+        i.kind === "effect"
+          ? `${i.e.id}:${compact ? chipLabel(i.e, round) : chipText(i.e, round)}`
+          : `${i.t.id}:${i.t.name}:${i.t.uses?.text ?? ""}:${i.t.muted}`,
+      )
+      .join(),
   );
   if (list.length === 0) return null;
   const shown = list.slice(0, fit);
@@ -227,19 +307,38 @@ export function EffectChips({
           aria-hidden
           className="pointer-events-none invisible absolute top-0 left-0 flex w-max gap-0.5"
         >
-          {list.map((e) => (
-            <span key={e.id} data-chip-measure className="flex gap-0.5">
-              <ChipBadge e={e} round={round} compact natural />
-              <ChipBadge e={e} round={round} compact natural tier={CHIP_TIERS.length - 1} />
+          {list.map((i) => (
+            <span key={itemKey(i)} data-chip-measure className="flex gap-0.5">
+              {i.kind === "effect" ? (
+                <>
+                  <ChipBadge e={i.e} round={round} compact natural />
+                  <ChipBadge e={i.e} round={round} compact natural tier={CHIP_TIERS.length - 1} />
+                </>
+              ) : (
+                <TriggerChipBadge t={i.t} natural />
+              )}
             </span>
           ))}
         </div>
       )}
-      {list.map((e, i) => {
+      {list.map((item, i) => {
+        const hidden = i >= fit;
+        if (item.kind === "trigger") {
+          return (
+            <span
+              key={itemKey(item)}
+              data-chip
+              className={cn("flex shrink-0", hidden && "invisible")}
+              aria-hidden={hidden}
+            >
+              <TriggerChipView t={item.t} tier={tier} />
+            </span>
+          );
+        }
+        const e = item.e;
         const chip = (
           <EffectChip e={e} round={round} testId={testId} compact={compact} tier={tier} />
         );
-        const hidden = i >= fit;
         return (
           <span
             key={e.id}
@@ -270,8 +369,8 @@ export function EffectChips({
 }
 
 /**
- * The "+N" chip (P3 glitch 6): its Tooltip names the hidden effects only; a click lists them,
- * full text (DM: each with its chip menu, Edit… / End).
+ * The "+N" chip (P3 glitch 6): its Tooltip names the hidden effects and triggers only; a click
+ * lists them, full text (DM: each effect with its chip menu, Edit… / End; triggers display only).
  */
 function MoreChip({
   hidden,
@@ -280,13 +379,14 @@ function MoreChip({
   left,
   menu,
 }: {
-  hidden: readonly EffectView[];
+  hidden: readonly ChipItem[];
   round: number | null;
   testId: string;
   left: number;
   menu?: (e: EffectView) => ReactNode;
 }) {
-  const names = hidden.map((e) => chipText(e, round)).join(", ");
+  const text = (i: ChipItem) => (i.kind === "effect" ? chipText(i.e, round) : triggerLine(i.t));
+  const names = hidden.map(text).join(", ");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -309,7 +409,23 @@ function MoreChip({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" data-testid={`${testId}-more-list`}>
-        {hidden.map((e) => {
+        {hidden.map((item) => {
+          if (item.kind === "trigger") {
+            const t = item.t;
+            return (
+              <DropdownMenuItem
+                key={itemKey(item)}
+                data-testid={`${TRIGGER_CHIP_ID}-more-item`}
+                data-record-id={t.id}
+                data-state={t.state}
+                className={cn(t.muted && "text-muted-foreground")}
+              >
+                <ZapIcon className="size-3.5 shrink-0" aria-hidden />
+                <span className="truncate">{triggerLine(t)}</span>
+              </DropdownMenuItem>
+            );
+          }
+          const e = item.e;
           const Icon = EffectIcon(e);
           const label = (
             <>
