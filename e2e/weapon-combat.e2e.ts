@@ -25,11 +25,14 @@ function dmIntent(page: Page, secret: string, name: string, payload: unknown) {
     ([secret, name, payload]) =>
       new Promise<unknown>((resolve, reject) => {
         const ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}/ws`);
-        ws.onopen = () => ws.send(JSON.stringify({ type: "hello", credential: { role: "dm", secret } }));
+        ws.onopen = () =>
+          ws.send(JSON.stringify({ type: "hello", credential: { role: "dm", secret } }));
         ws.onmessage = (m) => {
           const f = JSON.parse(String(m.data)) as { type: string; result?: unknown };
           if (f.type === "snapshot") {
-            ws.send(JSON.stringify({ type: "intent", intentId: crypto.randomUUID(), name, payload }));
+            ws.send(
+              JSON.stringify({ type: "intent", intentId: crypto.randomUUID(), name, payload }),
+            );
           } else if (f.type === "ack") {
             ws.close();
             resolve(f.result);
@@ -101,7 +104,9 @@ test("FR-CBT-81 FR-CBT-82 FR-CBT-84 FR-CBT-85 Flame Tongue: parts on the card, f
   await card.click();
   const popup = dm.getByTestId("cbt-popup");
   await expect(popup).toBeVisible();
-  await expect(popup.locator('[data-testid="cbt-popup-damage-part"][data-value="1"]')).toBeVisible();
+  await expect(
+    popup.locator('[data-testid="cbt-popup-damage-part"][data-value="1"]'),
+  ).toBeVisible();
   await popup.getByTestId("cbt-popup-target-add").click();
   await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${goblin}"]`).click();
   const trow = popup.locator(`[data-testid="cbt-popup-target-row"][data-record-id="${goblin}"]`);
@@ -109,7 +114,10 @@ test("FR-CBT-81 FR-CBT-82 FR-CBT-84 FR-CBT-85 Flame Tongue: parts on the card, f
   if ((await hit.getAttribute("data-value")) === "miss") await hit.click();
   const part = trow.locator('[data-testid="cbt-popup-target-part"][data-value="0"]');
   await expect(part).toContainText("fire");
-  await expect(part.getByTestId("cbt-popup-target-part-mult")).toHaveAttribute("data-value", "half");
+  await expect(part.getByTestId("cbt-popup-target-part-mult")).toHaveAttribute(
+    "data-value",
+    "half",
+  );
   await expect(part.getByTestId("mod-popup-part-defense")).toHaveText("Half (Fire Ward)");
   await expect(trow.getByTestId("cbt-popup-target-mult")).toHaveAttribute("data-value", "normal");
   await popup.getByTestId("cbt-popup-apply").click();

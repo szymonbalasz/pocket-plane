@@ -85,11 +85,11 @@ describe("weapon parts over WS (rules-effects)", () => {
     const brakka = byName(p1, "Brakka") as CombatantRecord;
     const goblin = byName(dm, "Goblin") as CombatantRecord;
     const stats = (
-      dm.store.records.entity?.[brakka.entityId as string] as {
-        statBlock: { attacks: Attack[] };
-      }
-    ).statBlock;
-    const flame = stats.attacks.find((a) => a.name === "Flame Tongue greatsword") as Attack;
+      dm.store.records.entity?.[brakka.entityId as string] as
+        | { statBlock: { attacks: Attack[] } }
+        | undefined
+    )?.statBlock;
+    const flame = stats?.attacks.find((a) => a.name === "Flame Tongue greatsword") as Attack;
 
     // Step 3 (Rage spent: no Divine Fury offer): d20 14; slashing 3 + 5; fire 2 + 6.
     p1.intent("cbt.attack", {
@@ -122,9 +122,9 @@ describe("weapon parts over WS (rules-effects)", () => {
       expect(lastLine(c)).toBe(
         "Brakka attacks Goblin: 14 + 8 = 22 — DM: hit. 13 slashing + 4 fire (half) damage (physical)",
       );
-      expect((attackEntries(c).at(-1)?.payload as AttackLogPayload).damageParts).toEqual([
-        { type: "fire", value: 4, multiplier: "half" },
-      ]);
+      expect(
+        (attackEntries(c).at(-1)?.payload as AttackLogPayload | undefined)?.damageParts,
+      ).toEqual([{ type: "fire", value: 4, multiplier: "half" }]);
     }
     for (const [i, c] of [p1, p2].entries()) {
       const frames = JSON.stringify(c.frames.slice(before[i]));
