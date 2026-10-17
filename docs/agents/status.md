@@ -12,7 +12,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Docs pass | merged bd07224 | — | Done | — |
 | V7 pan / plain map / Fit | merged 13c15f6 | — | Done (BL-01, BL-07; check 3158, e2e 94) | V8, M1 next |
 | V8 vision while dragging | `build/vision-drag` (w5N, slot 0) | test-vision-drag | Walkthrough | Merge → M2 |
-| M1 freeform AoE | `build/aoe-freeform` (w5X, slot 3) | test-aoe-freeform | Walkthrough | Merge → M2 (after V8) |
+| M1 freeform AoE | `build/aoe-freeform` (w5X, slot 3) | — | Walkthrough 7/7; merged main, branch gates running | Merge → M2 (after V8) |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
 | V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
@@ -28,7 +28,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
 | M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
 | M4 window placement | merged c308458 | — | Done (re-test 3 5/5; check 3097, e2e 91) | — |
-| D7 roll popup | `build/roll-popup` (w5J, slot 4) | — | Walkthrough 13/14 + fix (be064b4, real-browser e2e); merged main, branch gates running | Merge |
+| D7 roll popup | `build/roll-popup` (w5J, slot 4) | fix-roll-popup-2 | After merging main: combat popup no longer opens over its toast (FR-CBT-75, deterministic) → fixing | Merge |
 | Mc map-tools core | merged | — | Done (check 3109, e2e 91; drizzle duplicate-index fix) | M1 after V7 |
 
 ## Shared-file locks
