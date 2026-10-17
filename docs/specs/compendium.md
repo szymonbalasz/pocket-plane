@@ -1,7 +1,7 @@
 ---
 title: Compendium
 prefix: CMP
-status: claimed
+status: in-review
 owner: spec-compendium
 phase: post-mvp-4
 ---
@@ -9,6 +9,8 @@ phase: post-mvp-4
 # Compendium
 
 > **Guideline:** five-minute read. Decided at sprint-3 DM gate 1 ([#207](../decisions-log.md); changes #208 snapshot ceilings, #209 class features as trigger data). Measured figures come from a throwaway probe on the realistic-heavy harness and real SRD 5.1 data (Open5e v1, document `wotc-srd`), deleted before commit. Sprint-3 seams ruling applied (S1, S3, S5–S8, S10, S11; cited as "seams S<n>"), then the review rulings (C1–C15, X2).
+>
+> **Sprint 4 revision (track C, [#243](../decisions-log.md) [20], [#244](../decisions-log.md), session-sim-7 glitch 4):** search splits on whitespace and every word must match ("potion heal" → Potion of Healing), with a ranking that puts the SRD Goblin above the thin fixture one; duplicate names (12 × "Ability Score Improvement") collapse into one row. Token art for compendium / derived monsters is specified in [entities §6](entities.md#6-functional-requirements) (FR-ENT-26–30). New FRs: FR-CMP-32–39; amended: FR-CMP-10, -17, -18. Figures in §12 from a throwaway probe on the realistic-heavy harness + the full bundled `srd-5.1` import (deleted before commit). Every pick marked **(DM)** in §15 waits for DM gate 1.
 
 ## 1. Summary
 
@@ -22,6 +24,8 @@ phase: post-mvp-4
 - **C2 read:** REST search / get for DM and players with per-role visibility; `imported-entity` loads on demand; creature lookups search the server.
 - **C3 window:** Compendium window (both clients), entry views, DM import button, DM token menu **Stat block** (OQ-CMP-10).
 - **C4 homebrew:** homebrew entries (spells, items, conditions, features), clone, derive a monster from an entry (traits copied to the NPC sheet), **Add to sheet**, class-feature seam for rule-trigger presets.
+- **Sprint 4 (S4):** word search with AND and a tier ranking (FR-CMP-32–34), source rank (FR-CMP-38), duplicate-name groups and the All tab's default list (FR-CMP-35, -36), one shared matcher for the window, the creature lookups and the Creatures window (FR-CMP-37), the adapter's creature `type` for token art (FR-CMP-39; art itself: entities FR-ENT-26–30).
+- **Not in S4:** typo-tolerant (fuzzy) search, search syntax beyond plain words (OQ-CMP-26), 5etools class import ([compendium-expansion](post-mvp/compendium-expansion.md), #244).
 
 ## 3. Goals
 
@@ -29,6 +33,7 @@ phase: post-mvp-4
 - One click imports the whole SRD offline in ≤ 2 s; re-import never touches DM work.
 - Players can read rules (spells, items, conditions, features) and never learn monsters or unshared homebrew.
 - Zero bytes added to any snapshot.
+- *(S4)* Typing the words you remember, in any order, finds the entry: "potion heal", "heal potion", "hunters mark". The real SRD entry beats a thin fixture copy with the same name. Search answers in ≤ 5 ms on the server over the full import.
 
 ## 4. Non-goals
 
@@ -44,10 +49,13 @@ phase: post-mvp-4
 - As the DM, I want to derive "Goblin Sneak" from the SRD goblin with its traits copied, so my NPC keeps Nimble Escape.
 - As the DM, I want my homebrew items hidden from players until I tick "Shared".
 - As the DM, I want "Stat block" on a monster token's menu.
+- *(S4)* As the DM, I want "potion heal" to find Potion of Healing, and "goblin" to give me the SRD Goblin first.
+- *(S4)* As the DM, I want the All tab to show one "Ability Score Improvement" row I can expand, not twelve.
 
 **Player**
 - As a player, I want to look up Fireball or Poisoned mid-session without leaving the app.
 - As a player, I want to add Sneak Attack from the compendium to my sheet's Features.
+- *(S4)* As a player, I want "cure wound" to find Cure Wounds, without ever seeing the DM's unshared homebrew.
 
 ## 6. Functional requirements
 
@@ -66,16 +74,16 @@ All writes: one transaction (rows + event-log entry), then the domain event ([AD
 | FR-CMP-08 | Events: created monster definition → `EntityImported` (FR-FIX-23); updated imported definition → `ImportedEntityUpdated`, running entities' definition-changed hooks ([FR-ENT-19](entities.md#6-functional-requirements)) over instances in **every** campaign that uses it; then one `CompendiumImported {source, version, counts}` (log `campaignId` null). Logging: the definition upserts go in a `campaignId` null row; hook-changed instances go in **one log row per affected campaign** with that campaign's changes. Broadcast: definition upserts to DM connections; instance changes only to the active campaign (inactive campaigns pick them up from the DB at their next snapshot). Nothing created or updated → no event, no log entry. | |
 | FR-CMP-09 | Re-import never touches homebrew, clones, derived customs or NPC sheets (independent copies, ADR-0010 i). Entries missing from a newer source stay unchanged. | OQ-CMP-16 |
 | **C2 read** | | |
-| FR-CMP-10 | `GET /api/compendium/search` `{q ≤ 100, kind?, filters?, cursor?}` → ≤ 50 summaries `{id, kind, name, sourceLabel, line, definitionId?}` + `nextCursor`. Order: name prefix, word start, substring, then (q ≥ 3 chars) text match; ties by name, id. Empty `q` lists by name. | OQ-CMP-09 |
+| FR-CMP-10 | `GET /api/compendium/search` `{q ≤ 100, kind?, filters?, cursor?, sameAs?}` → ≤ 50 summaries `{id, kind, name, sourceLabel, line, definitionId?, group?}` + `nextCursor`. ~~Order: name prefix, word start, substring, then (q ≥ 3 chars) text match; ties by name, id.~~ *(S4: matching and order per FR-CMP-32–35, 38; `sameAs` and `group` per FR-CMP-35.)* Empty `q` lists by name (groups collapsed, FR-CMP-36). | OQ-CMP-09 |
 | FR-CMP-11 | Filters: monster `crMin`/`crMax`, `type`; spell `level`, `school`, `className`; item `category`, `rarity`; feature `className`, `subclass`. Unknown key or value → `invalid`. | |
 | FR-CMP-12 | `GET /api/compendium/entries/:id` → the entry + its source attribution; a monster also carries its definition's stat block. `ETag` = entry `updatedAt` + source `version`. Order: auth → visibility (FR-CMP-14: not visible → `404` before any conditional check) → `If-None-Match` → `304`. Every compendium response (incl. errors and search) sends `Cache-Control: private, no-cache`. | |
 | FR-CMP-13 | Auth: DM secret, or the player's link token as `Authorization: Player <token>` (CAMP's `resolvePlayerLink`); player of an inactive campaign → `409`. Campaign = the credential's (DM: active campaign). The `Authorization: Player` check is route-local middleware in `src/server/features/compendium/`, not server core. | OQ-CMP-20 |
 | FR-CMP-14 | **Visibility** `entryVisibleTo(entry, viewer)`, one pure fn for both routes: DM: imported + own campaign's homebrew. Player: imported non-monster + own campaign's homebrew with `shared`. Other campaigns: never. Not visible = absent from search; GET → `404 not_found`, same as an unknown id. A player's `kind=monster` → empty page. | OQ-CMP-07; [ADR-0024](../architecture/adr/0024-definition-visibility.md) |
 | FR-CMP-15 | `imported-entity` registers as a **lazy** record type, global scope, ids mode ([ADR-0045](../architecture/adr/0045-lazy-record-types.md), party-board; the one on-demand path, seams S1): in no snapshot; DM loads by ids with `sync.load`; players never (audience `dm` unchanged). Live upserts still reach DM connections. | OQ-CMP-04 |
 | FR-CMP-16 | Client hook `useDefinitions(ids)` (`src/client/common/features/compendium/`, on `fix/lazy-records`' client API; no ws / store edit, seams S3) returns campaign `entity` rows from the store and imported ones loaded on demand (missing ids in one `sync.load`, ≤ 50 per call, reloaded after each snapshot; `loading` / `ready` / `error`). Player client: store only, never loads. It replaces every `useRecords("imported-entity")` call (§14). A boundary-style `bun test` forbids reading `imported-entity` from the store anywhere outside `useDefinitions`, so sprint-3 code built before C2 (R's trigger editor, V's `senses` reads) fails loudly instead of silently seeing nothing. | |
-| FR-CMP-17 | Creature lookups ([FR-CBT-63](combat-tracker.md#6-functional-requirements): builder, Add dialog) and the Creatures window ([FR-ENT-18](entities.md#6-functional-requirements)) take customs from the store and imported monsters from FR-CMP-10 (`kind=monster`, debounced 150 ms); merged with FR-CBT-63's ranking, ≤ 8 suggestions, row and drag data (`{definitionId}`) unchanged. For the DM, with kind absent or `monster`, search results also include imported creature definitions that have no compendium entry (e.g. the fixture Goblin and Wolf) as monster summaries with id = `definitionId`; they match on name only (no text tier, no type filter), `GET /entries/:id` on such an id returns `404`; players never get them (#236). | |
+| FR-CMP-17 | Creature lookups ([FR-CBT-63](combat-tracker.md#6-functional-requirements): builder, Add dialog) and the Creatures window ([FR-ENT-18](entities.md#6-functional-requirements)) take customs from the store and imported monsters from FR-CMP-10 (`kind=monster`, debounced 150 ms); merged with FR-CBT-63's ranking *(S4: merged per FR-CMP-37: shared tiers, then store before imported, then the server's order, so the SRD Goblin precedes the fixture Goblin)*, ≤ 8 suggestions, row and drag data (`{definitionId}`) unchanged. For the DM, with kind absent or `monster`, search results also include imported creature definitions that have no compendium entry (e.g. the fixture Goblin and Wolf) as monster summaries with id = `definitionId`; they match on name only (no text tier, no type filter), `GET /entries/:id` on such an id returns `404`; players never get them (#236). | |
 | **C3 window** | | |
-| FR-CMP-18 | Window `cmp.compendium` in both clients' registries: default closed, launcher "Compendium", 440×560, min 320×360. Search input (debounced 200 ms), kind Tabs (DM: All, Monsters, Spells, Items, Conditions, Features; player: no Monsters), Filters popover, results with **More**, entry view with Back. Passes the registry-driven layout tests (fits at 1280×720, no product overlap at 1600×900). | [play-shell](play-shell.md); seams S8 |
+| FR-CMP-18 | Window `cmp.compendium` in both clients' registries: default closed, launcher "Compendium", 440×560, min 320×360. Search input (debounced 200 ms), kind Tabs (DM: All, Monsters, Spells, Items, Conditions, Features; player: no Monsters), Filters popover, results with **More** *(S4: group rows expand in place, FR-CMP-35)*, entry view with Back. Passes the registry-driven layout tests (fits at 1280×720, no product overlap at 1600×900). | [play-shell](play-shell.md); seams S8 |
 | FR-CMP-19 | Entry views: monster stat block (core from the definition + reference sections), spell, item, condition, feature. Footer: "SRD 5.1 · CC BY 4.0" + **About** dialog with the full attribution; homebrew shows "Homebrew" (+ "Shared" / "DM only" for the DM). | CC BY 4.0 |
 | FR-CMP-20 | DM import panel: no source imported → empty state with **Import SRD 5.1**; imported → "SRD 5.1 · N entries · imported ‹date›" and **Update** when the bundled `version` differs. Click → confirm AlertDialog "Players will pause for ~2 s" → `POST /api/compendium/import` → Toast with counts, or the error ("End combat first" while an encounter is started). Button disabled while running. | |
 | FR-CMP-21 | DM: monster result rows are HTML5 drag sources with entities' MIME `{definitionId}` (map drop FR-MAP-13, unchanged). | |
@@ -91,19 +99,29 @@ All writes: one transaction (rows + event-log entry), then the domain event ([AD
 | **Cross-cutting** | | |
 | FR-CMP-30 | No compendium row in any snapshot; the CON-44 test imports the full bundled source on the heavy harness and asserts the compendium's per-type bound (DM snapshot does not grow: 0 B) and that the snapshot stays under the DM ceiling (1 MiB, [#208](../decisions-log.md)). No headroom guard (dropped, #208). | CON-44 |
 | FR-CMP-31 | Full import of `srd-5.1`: target ≤ 2 s, logged by the test (warn above); the test fails only above 10 s (wall clock on Windows / CI). Re-import of an unchanged source: target ≤ 0.5 s, no writes (asserted). | FIX budget style |
+| **S4 search** | | |
+| FR-CMP-32 | **Folding and words.** `fold(s)`: Unicode NFD, combining marks removed, lower-case, `'` and `’` removed ("Hunter's" → `hunters`), every other run of characters that are not letters or digits → one space, trimmed. Query words = `fold(q)` split on spaces, duplicates dropped, first 8 kept. Name words / text words = `fold(name)` / `fold(searchText)` split the same way. A query word of ≥ 4 chars ending in `s` also matches without that `s` ("potions" → `potion`; tiers 2–5 only, tiers 0–1 compare `q` as typed) (**DM**, OQ-CMP-27). `q` that folds to nothing = empty `q` (FR-CMP-36). | [20] |
+| FR-CMP-33 | **AND match and tiers.** An entry matches iff **every** query word matches its name or its text. A word matches the name if a name word **starts with** it, or (tier 3) the folded name contains it; it matches the text if a text word starts with it and the query word has ≥ 3 chars (`TEXT_MATCH_MIN`, now per word). Tier = the lowest that applies: **0** folded name = folded `q`; **1** folded name starts with folded `q`; **2** every word starts a name word, any order; **3** every word is in the name, ≥ 1 only inside a word; **4** ≥ 1 word in the name, the rest only in the text; **5** text only. Ties: source rank (FR-CMP-38), then shorter folded name, then folded name, then id. `cursor` = opaque keyset of that tuple, validated (`invalid`). Kind and filters (FR-CMP-11) narrow first; entry-less imported definitions (FR-CMP-17) have name tiers 0–3 only. | **(DM)** OQ-CMP-28; examples §13 |
+| FR-CMP-34 | **Search index.** Server-only, in memory: one row per compendium entry and per entry-less imported monster definition (`id`, kind, campaignId, shared, source, facets, folded name words, folded text words). Built at the first search after start, dropped by a listener on `EntityImported`, `ImportedEntityUpdated`, `CompendiumImported`, `CompendiumEntrySaved`, `CompendiumEntryDeleted` and rebuilt at the next search, so a search never answers from rows older than the last commit. Visibility (FR-CMP-14) is applied per request before grouping and paging. Replaces today's `instr` scan and the entry-less join. No DB column, FTS table or package. Budget: ≤ 5 ms p95 per search over the full import (logged; the test fails above 50 ms). | OQ-CMP-09 revised; §12 |
+| FR-CMP-35 | **Duplicate groups.** After ranking and visibility, results with the same kind, folded name and source (homebrew: same campaign) collapse into **one summary**: `id` = the member first by `line`, then id; `group {count}` (visible members only); `line` = "‹count› entries · ‹distinct className, comma-separated›" for features, else "‹count› entries", ≤ 80 chars; ranked at its best member; counts as one of the 50. `GET /search?sameAs=<id>` (no other parameter, else `invalid`) lists that id's group members visible to the caller, ≤ 50, by `line`, then id. An id that is unknown, not visible or entry-less → empty page, never an error (no existence oracle). | sim-7 glitch 4 |
+| FR-CMP-36 | **Default list** (empty `q`), every tab: by folded name, groups collapsed (All opens with one "Ability Score Improvement · 12 entries" row, not 12) (**DM**, OQ-CMP-29). | sim-7 glitch 4 |
+| FR-CMP-37 | **One matcher everywhere.** `@shared/compendium/match.ts` (pure) exports `fold`, `queryWords`, `nameTier(name, words)` (tiers 0–3 or null) and `sourceRank`. The server index uses it; the DM client uses it for store rows in the Creatures window filter ([FR-ENT-18](entities.md#6-functional-requirements), amended) and the creature lookups ([FR-CBT-63](combat-tracker.md#6-functional-requirements), amended; OQ-CMP-31), so a multi-word query matches the same everywhere. Lookup merge: tier, then store rows (customs, characters) before imported, then the server's order; ≤ 8. | |
+| FR-CMP-38 | **Source rank** (**DM**, OQ-CMP-30): 0 the campaign's own (homebrew entries, custom definitions), 1 bundled sources (`srd-5.1`), 2 other imported sources (later adapters), 3 `fixture` (exists only on disposable data, [AGENTS §9.3](../../AGENTS.md#93-fixtures)). Applies to search ties (FR-CMP-33), lookups (FR-CMP-37) and the Creatures window order (FR-ENT-18). Badges unchanged. | sim-7 glitch 4; amends OQ-CMP-22 |
+| FR-CMP-39 | **Creature type for token art.** The Open5e adapter maps a monster's `type` to the creature core's `type` ([FR-ENT-26](entities.md#6-functional-requirements)); a value outside the 14 SRD types is dropped with a warning. `ADAPTER_VERSION` is bumped, so the bundled `version` changes and the DM sees **Update**; the Update writes the 322 definitions as `updated` in place (FR-CMP-07, -08), which runs the definition-changed hooks (token art fill, [FR-ENT-27](entities.md#6-functional-requirements)). Measured: all 322 SRD monsters carry one of the 14 types. | Token art |
 
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
 
 - **Window `cmp.compendium`** (FR-CMP-18): top: search Input + Filters Popover (Selects / number inputs per kind) ; Tabs; results as a compact list (name, muted line "CR 1/4 · Small humanoid", "Level 3 evocation", "Rare wondrous item", source Badge `SRD` / `Homebrew`); **More** at the bottom. Entry view replaces the list; Back returns with scroll kept.
+- *(S4)* **Search**: placeholder "Search: words in any order". A **group row** (FR-CMP-35) shows the name, the muted group line ("12 entries · Barbarian, Bard, Cleric…") and a chevron; click expands the members in place below it (fetched with `sameAs`, each with its own line, e.g. "Fighter · 4th level"); click a member opens it; click the group row again collapses. Expanded groups reset on a new search. No match → "No matches for ‘…’. Every word must match." Same in both clients.
 - **Stat block**: header (name, size / type / alignment), AC / HP (formula) / speed row, six scores with mods, saves / skills / senses / languages / CR + XP, then Traits, Actions, Reactions, Legendary sections. DM actions row: **Derive…**, drag handle.
 - **Homebrew form** (Dialog): kind (create only), name, facets per kind, text Textarea with a live markdown-lite preview, **Shared with players** Switch. Clone / Edit / Delete on homebrew views (DM).
 - **Add to sheet**: Popover with a character Select (player: own characters only) → Toast "Added to Mira's Features" (+ "and Triggers" when a preset was added).
 - **Import / Update**: AlertDialog "Players will pause for ~2 s" with Import / Cancel.
 - **States**: empty "No matches for ‘…’"; nothing imported: DM empty state with Import, player "The DM hasn't set up the compendium yet"; loading skeleton rows; error Toast + retry; disconnected: REST still works, but writes follow the shell's offline rule (buttons disabled while not `live`).
 - **DM view**: everything above + import panel + token menu **Stat block**. **Player view**: no Monsters tab, no Derive / Clone / Edit / import; Add to sheet for own characters.
-- **Test IDs**: `cmp-window`, `cmp-search`, `cmp-filters`, `cmp-tab` (+ `data-value` kind \| `all`), `cmp-result` (+ `data-record-id`, `data-value` = kind), `cmp-more`, `cmp-empty`, `cmp-entry` (+ `data-record-id`), `cmp-back`, `cmp-statblock-<header|scores|traits|actions|reactions|legendary>`, `cmp-attribution`, `cmp-about`, `cmp-import`, `cmp-import-confirm`, `cmp-import-status`, `cmp-update`, `cmp-derive`, `cmp-derive-copy-text`, `cmp-clone`, `cmp-edit`, `cmp-delete`, `cmp-form-<kind|name|text|preview|shared|save>`, `cmp-add-to-sheet`, `cmp-add-to-sheet-character`, `cmp-preset`, `cmp-token-menu-statblock`.
+- **Test IDs**: `cmp-window`, `cmp-search`, `cmp-filters`, `cmp-tab` (+ `data-value` kind \| `all`), `cmp-result` (+ `data-record-id`, `data-value` = kind), `cmp-more`, `cmp-empty`, `cmp-entry` (+ `data-record-id`), `cmp-back`, `cmp-statblock-<header|scores|traits|actions|reactions|legendary>`, `cmp-attribution`, `cmp-about`, `cmp-import`, `cmp-import-confirm`, `cmp-import-status`, `cmp-update`, `cmp-derive`, `cmp-derive-copy-text`, `cmp-clone`, `cmp-edit`, `cmp-delete`, `cmp-form-<kind|name|text|preview|shared|save>`, `cmp-add-to-sheet`, `cmp-add-to-sheet-character`, `cmp-preset`, `cmp-token-menu-statblock`. *(S4)* `cmp-result` gains `data-group-count` on group rows; `cmp-group-toggle` (+ `data-record-id`, `aria-expanded`), `cmp-group-member` (+ `data-record-id`).
 
 ## 8. Data model
 
@@ -141,6 +159,7 @@ Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
 
 - **Relations:** source 1—* imported entry; campaign 1—* homebrew entry; monster entry 1—1 imported definition (`entity`); homebrew → base (informational). Sheet rows and derived customs are copies, never linked.
 - **Derived:** `readOnly = source != null`, `line`, `featureKey`, XP (from CR, FR-ENT-03), `sourceLabel`.
+- *(S4)* **No schema change for search.** `nameKey` and `searchText` stay as stored; folding happens when the in-memory **search index** (FR-CMP-34) is built: derived, server-only, never persisted, never sent. Summary gains derived `group? {count}` (FR-CMP-35). Monster definitions gain the creature core's optional `type` (JSON leaf, zod only, [entities §8](entities.md#8-data-model)).
 - **Persisted runtime state:** none; the compendium is prep / reference data.
 - **Not a record type:** entries and sources never travel on the WS; only `imported-entity` (entities) does, lazily.
 
@@ -150,7 +169,7 @@ Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| GET | `/api/compendium/search` | DM, player | FR-CMP-10/11/14 |
+| GET | `/api/compendium/search` | DM, player | FR-CMP-10/11/14; *(S4)* matching FR-CMP-32–34, `sameAs` + `group` FR-CMP-35 |
 | GET | `/api/compendium/entries/:id` | DM, player | FR-CMP-12/14 |
 | GET | `/api/compendium/sources` | DM | Sources + bundled versions (import panel) |
 | POST | `/api/compendium/import` | DM | `cmp.import {source}` (FR-CMP-07) → `200 {counts, warnings}` |
@@ -170,6 +189,8 @@ All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12).
 | `CharacterSheetEdited` + MOD's trigger event (`cmp.addToSheet`, FR-CMP-28) | sheet row; `rule-trigger` row if a preset resolved | as CHARX / MOD (owner + DM; trigger per MOD's fns) |
 | `CompendiumImported {source, version, counts}` | none (entries aren't a record type) | DM only; log `campaignId` null |
 | `CompendiumEntrySaved {entryId, kind, shared}` / `CompendiumEntryDeleted {entryId}` | none | DM only |
+
+*(S4)* No new event, intent or record type. A server listener on the five events in FR-CMP-34 drops the search index (no state change, no frame). The adapter's `type` reaches DM connections inside the existing `imported-entity` upserts of the Update (FR-CMP-39).
 | `EntityCreated` + `CharacterSheetEdited` (derive, FR-CMP-27) | as entities / CHARX | as entities / CHARX |
 
 ## 10. Permissions
@@ -183,6 +204,7 @@ All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12).
 | Edit / delete imported | ✗ (`forbidden`) | ✗ | FR-CMP-24/25 |
 | Add to sheet | any campaign character | own, unless locked | `cmp.addToSheet`: entry visibility + `char.putRow`'s rule (FR-CMP-28) |
 | Import while an encounter is started | ✗ (`conflict`) | ✗ | FR-CMP-07 |
+| *(S4)* Search groups, `sameAs` | ✓ (own + imported) | visible members only; hidden → not counted, empty page | FR-CMP-14 before FR-CMP-35 |
 
 ## 11. Edge cases & failure modes
 
@@ -192,7 +214,10 @@ All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12).
 - **Import during combat:** refused while an encounter is started (FR-CMP-07); the one-transaction write would pause every command, including combat, for up to ~2 s.
 - **Concurrent edits:** two imports (two DM tabs) serialise; the second is all `existing`. Homebrew: last whole replace wins. Delete while a player views it → their next fetch is 404 ("No longer available").
 - **Campaign switch:** homebrew of the old campaign leaves DM results; imported entries stay.
-- **Duplicate names:** fixture goblin (source `fixture`) and SRD goblin (`srd-5.1`) both exist after an import; source Badges tell them apart (OQ-CMP-22).
+- **Duplicate names:** fixture goblin (source `fixture`) and SRD goblin (`srd-5.1`) both exist after an import; source Badges tell them apart (OQ-CMP-22). *(S4)* The SRD one ranks first everywhere (FR-CMP-38). Same name and source (12 × Ability Score Improvement) → one group row (FR-CMP-35); different sources never group.
+- *(S4)* **Search index after a crash or restart:** in memory only, so it is empty after start and rebuilt at the first search (≈ 12 ms measured); nothing to recover. A search racing an import sees either the old rows or the new ones, never a mix: the index is dropped after the commit, by the event listener.
+- *(S4)* **Player and the index:** the index holds every campaign's homebrew; FR-CMP-14 filters every row per request before groups and counts, so a player never sees a hidden entry, its name in a group line, or a count that includes it.
+- *(S4)* **Disconnect / reconnect:** unchanged (REST); an expanded group refetches its members on the next open.
 - **Invalid / malicious input:** strict zod; `q` ≤ 100; cursor opaque and validated; text rendered as text nodes only (FR-CMP-26); recorded sources are repo files, never client input (`cmp.import` takes a source key, not data).
 - **Leaks:** a player never receives a monster entry, a monster definition, unshared homebrew or another campaign's homebrew, in REST bodies, errors or WS frames.
 
@@ -215,6 +240,23 @@ Measured with real SRD 5.1 data (Open5e v1 `wotc-srd`) on the realistic-heavy ha
 | Search | name `LIKE` over 1,127 rows 1.1 ms; FTS5 prefix 0.04 ms (bun:sqlite ships FTS5) |
 | Live import frames | ≈ 341 KB of `imported-entity` upserts to DM connections, once per full import |
 
+**Sprint 4 (S4)**: throwaway probe, `session-sim` + realistic-heavy harness + full bundled `srd-5.1` import (1,150 entries, 324 imported definitions incl. fixture Goblin / Wolf), `bun test` on Windows, 30 runs each (deleted before commit).
+
+| Figure | Value |
+|---|---|
+| Today's search, DM | median 47–54 ms, p95 ≤ 64 ms for every query tried (`""`, `a`, `gob`, `goblin`, `fire`, `potion heal`, `the`) |
+| Today's search, player | median 1.0–3.1 ms, p95 ≤ 3.7 ms |
+| Cause of the DM's 48 ms | the entry-less definitions query (FR-CMP-17): `LEFT JOIN compendium_entry` on `definition_id`, which has no index: 47.8 ms alone; the same as `NOT EXISTS`: 4.0 ms |
+| Index build (read every name + `searchText`, fold both) | median 11.9 ms, p95 12.8 ms; `searchText` totals 970,850 chars |
+| AND match over the prebuilt index | `a` 0.06 ms (1,141 hits), `the` 0.12 ms (1,030), `potion heal` 0.34 ms (3); p95 ≤ 0.46 ms |
+| Folding the text on every query instead (no index) | 6–13 ms: why FR-CMP-34 keeps a folded index |
+| Today's results | `potion heal` → **0** results; `hunters mark` → 0; `goblin` → fixture Goblin, then SRD Goblin; `""` (All) → first 12 rows are all "Ability Score Improvement" |
+| Prototype results (FR-CMP-33 tiers) | `potion heal` and `heal potion` → Potion of Healing first (tier 2), then Potion of Poison (4), Robe of Useful Items (5); `hunters mark` → Hunter's Mark (0); `goblin` → Goblin (0), Hobgoblin (3), then text-only Worg, Bugbear…; `fire` (136 hits) → Fireball, Fire Bolt, Fire Giant… (tier 1, shorter first); `cure` → Cure Wounds, Mass Cure Wounds, then text |
+| Duplicate names (same kind, name, source) | Ability Score Improvement 12, Spellcasting 7, Extra Attack 5, Fighting Style 3, six more × 2 (all features) |
+| Names with accents / apostrophes | 0 / 14 (e.g. Hunter's Mark) |
+| Monster types | 14 SRD types on 322 / 322 monsters: beast 97, dragon 43, humanoid 40, monstrosity 39, fiend 23, undead 18, elemental 16, giant 10, construct 9, aberration 5, celestial 6, fey 6, plant 6, ooze 4 |
+| Snapshot | Search: **0 B** (REST). Token art adds one token field: see [entities §12](entities.md#12-performance--bandwidth) |
+
 - REST: search page ≤ 50 × ~130 B ≈ 7 KB; an entry ≤ 32 KB; `ETag` makes repeat opens cheap over the tunnel ([ADR-0003](../architecture/adr/0003-local-hosting.md)): `private, no-cache` revalidates every open, `304` carries no body.
 - `sync.load` of imported definitions: ≤ 50 rows × ≤ 1.3 KB ≈ 66 KB worst case.
 
@@ -229,6 +271,10 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | `cmp-srd-mini` | setup | — | `cmp.importRecorded` with recorded responses as TS modules `fixtures/srd/open5e/<endpoint>.ts` exporting the (filtered, `wotc-srd` only) data, per AGENTS §9.3 (source `srd-5.1`, version `mini`): monsters Goblin, Hobgoblin, Wolf, Ogre, Adult Red Dragon (legendary); spells Fireball, Cure Wounds, Hunter's Mark, Bless; items Potion of Healing, Bag of Holding, Longsword, Chain Mail; conditions Poisoned, Prone, Grappled; classes Rogue (Sneak Attack), Barbarian (Rage, Path of the Berserker) |
 | `cmp-homebrew` | setup | `cmp-srd-mini` | Fixture Campaign homebrew: item "Moonblade Shard" (shared); item "CMP-SECRET-ITEM" (DM only); spell "Fireball (house)" cloned from Fireball (DM only); feature "Divine Fury", Barbarian, level 3, own words, trigger inline as `preset: TriggerRule` (first hit on each own turn while raging: 1d6 + ⌊level(Barbarian) / 2⌋ radiant; no built-in, #209) (shared) |
 | `cmp-homebrew-second` | setup | `campaign-second` | Activate Second Campaign; item "CMP-SECOND-HOMEBREW" (shared); re-activate Fixture Campaign |
+| `cmp-srd-full` *(S4)* | setup | `cmp-srd-mini` | `cmp.importRecorded` of the **bundled** `srd-5.1` source at its bundled version (≈ 1.2 s): the mini entries are `existing`, the rest created; 1,150 entries |
+| `cmp-search-homebrew` *(S4)* | setup | `cmp-srd-mini` | Fixture Campaign homebrew: item "Potion of Healing" (**DM only**, same name as the SRD item, own words "CMP-HB-POTION"), item "Healing Draught" (shared, text "a potion that heals 2d4 + 2") |
+
+**Bundle `compendium-full`** *(S4)* = `compendium` + `cmp-srd-full` + `cmp-search-homebrew` (+ entities' `ent-art-tokens`, [entities §13](entities.md#13-test-plan)). The `compendium` bundle stays the fast mini set.
 
 **Bundle `compendium`** = `base` + `player-2` + `campaign-second` + `char-mira` + `char-thorn` + `enemy-1` + `enemy-2` + `enemy-custom` + `images` + `battlemap` + `encounter-1` + `cmp-srd-mini` + `cmp-homebrew` + `cmp-homebrew-second`.
 
@@ -242,6 +288,35 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | Integration | `FR-CMP-24/25/27 homebrew`: put / replace / delete, `forbidden` on imported, name `conflict`; clone independent; derive-monster: entity + sheet features (Nimble Escape) in one tx, rollback on a bad body. `FR-CMP-28 addToSheet`: Sneak Attack → Thorn row + `sneak-attack` trigger in one tx; DM adds homebrew "Divine Fury" → Mira row + a "Divine Fury" trigger with the inline rule (#209); MOD validation failure → neither; player on another's character or locked sheet → `forbidden`; player on unshared homebrew → `not_found`; crash `cmp.addToSheet:before-commit` → neither | `compendium` |
 | Integration | `FR-CMP-15/30 lazy + CON-44`: DM snapshot holds no `imported-entity`; `sync.load` returns ids; player load hidden; heavy harness + full bundled import → DM snapshot ≤ the pre-import figure (per-type bound) and ≤ the 1 MiB DM ceiling (#208). `FR-CMP-18` window in the registry-driven layout tests. `FR-CMP-31` timing (logged; fail > 10 s). **Leak scan** over player REST bodies and WS frames: never "CMP-SECRET-ITEM", "CMP-SECOND-HOMEBREW", "Nimble Escape", "Fireball (house)" | `compendium`, heavy |
 | E2E (thin) | DM opens Compendium, searches "goblin", opens Goblin; `player-1` searches "fire", opens Fireball, has no Monsters tab | `compendium` |
+| Unit *(S4)* | `FR-CMP-32 fold`: "Hunter's Mark" ← `hunters mark`, `HUNTER'S`, `hunter’s`; "Mordenkainén" ← `mordenkainen`; `potion   heal` = 2 words; `"potion" -heal` folds to `potion heal`; 9 words → 8; `potions` also matches `potion`, `gas` stays `gas` (< 4). `FR-CMP-33 tiers`: one case per tier 0–5 on hand-made names; `a` never reaches the text tier; ties by source rank, then length, then name, id; cursor round-trip and tamper → `invalid`. `FR-CMP-37 matcher parity`: client `nameTier` = server tier for 40 SRD names × 10 queries. `FR-CMP-38 sourceRank` (homebrew 0, `srd-5.1` 1, `open5e-x` 2, `fixture` 3). `FR-CMP-39 adapter type`: 322 / 322 bundled monsters get a type; `swarm` (made up) → dropped + 1 warning | In-code, bundled source |
+| Integration *(S4)* | **`FR-CMP-33 "potion heal" → Potion of Healing first`** (DM: the homebrew one, then the SRD one; player: the SRD one first). **`FR-CMP-33 word order`**: `heal potion` returns the same list as `potion heal`. **`FR-CMP-33 ranking table`** (below). **`FR-CMP-38 SRD Goblin above fixture Goblin`** in search, in the lookup merge (FR-CMP-37) and in the Creatures order (FR-ENT-18). **`FR-CMP-35/36 All tab default`**: empty `q`, no kind → one "Ability Score Improvement" summary with `group.count` 12 among the first 50, no second ASI row; `sameAs` → 12 members by line; `sameAs` + `q` → `invalid`. **`FR-CMP-14 player search never returns hidden entries`**: for `potion heal`, `potion`, `CMP-HB`, `""` and every tab, player pages, groups, counts and `sameAs` (on the hidden homebrew id → empty page) never contain "CMP-HB-POTION", "CMP-SECRET-ITEM", a monster or an entry-less definition; GET of the hidden id → 404, also with `If-None-Match` (never 304). **`FR-CMP-34 index freshness`**: put → next search finds it; delete → gone; `cmp.importRecorded` with an edited goblin → new name found; timing over the full import logged, fail > 50 ms | `compendium-full` |
+| E2E (thin) *(S4)* | DM searches "potion heal" → first row Potion of Healing; All tab shows one ASI group row, expands to 12 | `compendium-full` |
+
+**Ranking table** (`FR-CMP-33 ranking table`, full import + `cmp-search-homebrew`, DM unless marked)
+
+| q | Expected (first rows, in order) |
+|---|---|
+| `goblin` | Goblin (SRD), Goblin (Fixture), Hobgoblin, then text-only matches (e.g. Bugbear, Worg) |
+| `potion heal`, `heal potion` | Potion of Healing (Homebrew), Potion of Healing (SRD), Healing Draught, Potion of Poison |
+| `potion heal` (player) | Potion of Healing (SRD), Healing Draught, Potion of Poison; never the homebrew one |
+| `hunters mark`, `HUNTER'S MARK` | Hunter's Mark |
+| `fire` | Fireball, Fire Bolt (tier 1, shorter first), then other tier-1 names |
+| `cure wound` | Cure Wounds, Mass Cure Wounds |
+| `potions` | Potion of Healing (Homebrew) and the SRD potions at tier ≤ 2 |
+| `a` | name matches only; no text-only row |
+| `zzqx` | empty, "No matches" |
+
+**Browser walkthrough (S4)**: `bun run build`, `fixtures:reset-load compendium-full --profile verify`, `start --profile verify`. Contexts: A DM, B `player-1`. Player REST + WS logs as above. Token art steps: [entities §13](entities.md#13-test-plan). Teardown as above.
+
+| # | DM (A) | Player (B) | Expected |
+|---|---|---|---|
+| S1 | Open Compendium, All tab, empty search | — | One "Ability Score Improvement · 12 entries · Barbarian, Bard, …" row near the top, not 12; expand → 12 rows with class lines; open "Fighter · 4th level"; Back keeps the group open |
+| S2 | Search "potion heal", then "heal potion" | — | Both: Potion of Healing (Homebrew, DM only) first, Potion of Healing (SRD) second, Healing Draught next |
+| S3 | Search "goblin"; Creatures window search "goblin"; Encounters lookup "gob" | — | SRD Goblin above Fixture Goblin in all three; Hobgoblin after both in the Compendium |
+| S4 | Search "hunters mark", "cure wound", "potions" | — | Hunter's Mark first; Cure Wounds first; potions listed |
+| S5 | — | B: search "potion heal"; Features tab, empty search | Potion of Healing (SRD) first, Healing Draught; no homebrew Potion of Healing; one ASI group. B's logs: no "CMP-HB-POTION", "CMP-SECRET-ITEM", monster or the hidden id |
+| S6 | Clone Cure Wounds → "Cure Wounds (house)" Shared; search "cure wound" | B: search "cure wound" | Both see it at once, first (tier 1 like Cure Wounds; homebrew ranks first, FR-CMP-38); Delete it → gone on the next search |
+| S7 | Kill + restart the server; search "potion heal" | B: same | Same order as S2 / S5; no console errors |
 
 **Existing tests C2 updates** (the fixture goblin and wolf leave the DM snapshot; sprint-2 bundles still pass, their DM reads go through `sync.load`):
 - `src/server/features/entities/records.test.ts` "FR-ENT-16 imported-entity: DM full in every campaign…" → DM snapshot has none; `sync.load` by ids returns both in every campaign; players still never.
@@ -280,6 +355,18 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | [effect-modifiers](effect-modifiers.md), [ADR-0043](../architecture/adr/0043-rule-triggers.md) | Built-in trigger presets list `featureKey`s (five built-ins, no Divine Fury, #209); `presetKey` / `TriggerRule` zod; exported server helper `addTriggerFromPreset(env, characterId, {presetKey} \| {name, rule})` (signature R's, FR-MOD-46; R4 / R5 before C4) | seams S5 |
 | [scenes-map](scenes-map.md), [play-shell](play-shell.md) | Token menu registry; window registries | built |
 | Packages | **None.** Data is bundled JSON (CC BY 4.0 SRD 5.1); no markdown or search library | — |
+| *(S4)* [combat-tracker](combat-tracker.md) | FR-CBT-63 lookup matches with FR-CMP-37's shared matcher (multi-word, tiers 0–3) and merges per FR-CMP-37; `src/client/common/features/combat-tracker/lookup.ts` | OQ-CMP-31 |
+| *(S4)* [entities](entities.md) | FR-ENT-18 order gains source rank; the Creatures window filter uses the matcher; creature core `type` (FR-ENT-26) | same author (this track) |
+| *(S4)* Search package | **None (pick)**: hand-rolled index + tiers (≈ 150 lines, measured ≤ 0.5 ms). Alternatives if the DM wants typo tolerance (OQ-CMP-27 C): **MiniSearch** (MIT; prefix + fuzzy + field boosts; ≈ 7 KB gzip by its published build, not measured here), **Fuse.js** (Apache-2.0; fuzzy only, no word AND by default; ≈ 8 KB gzip), FlexSearch (Apache-2.0; fastest, more complex API). Server-side only, so client bundle size doesn't matter; each is a new dependency outside ADR-0001 (DM OK) | OQ-CMP-27 |
+
+**Build split, sprint 4** (hotspots per [sprint-4](../agents/sprint-4.md#boundaries-and-hotspots-sequence-these)). Search needs **no schema, ws, protocol or canvas lock**, so C-search can start at the beginning of Phase B, in parallel with V core. Token art (schema + canvas) is entities' part: [entities §14](entities.md#14-dependencies).
+
+| Slice | Branch | Delivers | Shared files (AGENTS §9.9) |
+|---|---|---|---|
+| C-search | `build/cmp-search` | `@shared/compendium/match.ts`, in-memory index + listener, tiers, source rank, groups + `sameAs` (server), Creatures window filter + order (FR-ENT-18), lookup merge; fixtures `cmp-srd-full`, `cmp-search-homebrew`, bundle `compendium-full`; FR-CMP-32–35, 37, 38; tests §13 | Listener registry (append); `fixtures/bundles/index.ts` (append); `src/client/common/features/combat-tracker/lookup.ts` (another feature's common file: orchestrator assigns, OQ-CMP-31); `@shared/entities/schemas.ts` (`definitionOrder`; entities-owned, this track); protocol §search (summary `group`, `sameAs`). FIX §8 rows (integrator) |
+| C-all | `build/cmp-all-tab` | Window: group rows, expand / collapse, default list, empty copy, test IDs (FR-CMP-35 client, -36); thin e2e | After C-search. Compendium client folder only (feature-owned); none shared |
+
+- Order inside C: C-search → C-all. FR-CMP-39 (adapter `type`, `ADAPTER_VERSION` bump) ships in the token-art core ([entities §14](entities.md#14-dependencies)), not here, so the Update that fills `type` always meets the art fill hook (FR-ENT-27).
 
 **Build split** (hotspots per [sprint-3](../agents/sprint-3.md#boundaries-and-hotspots-sequence-these) and seams S3; schema cores V0 → R0 → P core → **C1** → D style; C touches no `src/server/ws/`, protocol or common store file)
 
@@ -306,7 +393,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | OQ-CMP-06 | Use entries directly? | **Decided (#207, bulk): yes; clone / derive only to edit.** Rejected: must clone first | — | combat-tracker |
 | OQ-CMP-07 | Who browses | **Decided (#207, G32): players read spells, items, conditions, features + shared homebrew; monsters DM-only** (ADR-0024). Rejected: DM only, everything | — | campaign-management |
 | OQ-CMP-08 | Homebrew editor scope | **Decided (#207, G33):** monsters: existing creature form + NPC sheet, "Derive" copies traits / actions text into sheet Features; other kinds: one text form (name, facets, markdown-lite text, Shared). Rejected: monsters only, structured editors per kind | — | combat-tracker, character-sheet-full |
-| OQ-CMP-09 | Search | **SQL name ranking + `LIKE` on text (1.1 ms measured)** / FTS5 (0.04 ms; virtual table outside drizzle-kit push) / client filter (ships the index) | no (owner: spec-compendium) | — |
+| OQ-CMP-09 | Search | ~~SQL name ranking + `LIKE` on text (1.1 ms measured)~~ *(S4, revised: built as `instr` + JS ranking; DM 48 ms measured over the full import, see §12)* → **in-memory folded index on the server, rebuilt after writes (FR-CMP-34; ≤ 0.5 ms match, 12 ms build)** / FTS5 with `unicode61 remove_diacritics` (word prefix built in; virtual table outside drizzle-kit push, needs a backfill) / stored folded column (schema + backfill of existing rows) | no (owner: spec-compendium) | — |
 | OQ-CMP-10 | Stat block on token click (tier B) | **Decided (#207, bulk): in, DM token menu "Stat block"** (registry entry, opens the window). Rejected: out | — | scenes-map |
 | OQ-CMP-11 | Import run, crash | **DM button; one transaction (≤ 0.5 s est.); atomic; no resume; result Toast**; refused while an encounter is running, "players pause ~2 s" confirm (decided, #207 bulk) / chunked with progress events + resume (unneeded at this size) / automatic at first start (no click; surprises a real DB) | no (owner: spec-compendium) | — |
 | OQ-CMP-12 | Changed upstream entry on re-import (OQ-FIX-18) | **Update in place; customs, clones, sheets untouched; instances follow via hooks** / version and pin / skip changes | no (owner: spec-compendium) | fixtures-adapters, entities |
@@ -319,14 +406,22 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | OQ-CMP-19 | **party-board / live-sync**: lazy record types ADR | Integrator side settled by seams S1 (P's option A is the one on-demand path, with global scope + id loads; `fix/lazy-records` after V0, before P core and C2). **Decided (#207, G4): ADR accepted, option A** → [ADR-0045](../architecture/adr/0045-lazy-record-types.md) | — | party-board, live-sync |
 | OQ-CMP-20 | **campaign-management**: player credential on REST | Settled by seams S11: **`Authorization: Player <link token>` on compendium routes via `resolvePlayerLink`**; integrator adds a note on campaign-management; no other track uses player REST | no (settled) | campaign-management, protocol §2 |
 | OQ-CMP-21 | Glossary | **Update "Compendium" (design settled, link here); "Clone" (monsters: derive); add "Bundled source"** (recorded copy of an external source shipped in the repo, imported offline). Integrator adds after the gate (seams S9) | no (owner: integrator) | glossary |
-| OQ-CMP-22 | Fixture goblin / wolf (`fixture`) duplicate SRD ones after an import | **Keep both; source Badge** / move fixtures to `srd-5.1` (touches every bundle's IDs) | no (owner: spec-compendium) | fixtures-adapters |
+| OQ-CMP-22 | Fixture goblin / wolf (`fixture`) duplicate SRD ones after an import | **Keep both; source Badge** / move fixtures to `srd-5.1` (touches every bundle's IDs). *(S4: sim-7 shows the badge alone isn't enough: equal names tie on id and the fixture won. Amended: keep both, **plus source rank** FR-CMP-38, OQ-CMP-30)* | no (owner: spec-compendium) | fixtures-adapters |
 | OQ-CMP-23 | SRD 5.2 (2024) | **Later, as a second source** (table plays 2014, #23) / now | no (owner: spec-compendium) | — |
 | OQ-CMP-24 | **Seams S3 gap**: C2 switches `CharacterSheet.tsx` to `useDefinitions` (must land with the lazy switch) | Settled by review ruling X2: **sheet lock V5 → R3 → R6 → C2 → D4 → P4 / C4; C2 also after R7** | no (settled) | character-sheet-full |
 | OQ-CMP-25 | **ADR amendments**: [ADR-0046](../architecture/adr/0046-compendium-scope.md) option A amends ADR-0004 (second global-record exception: `compendium_source`, `compendium_entry`), ADR-0018 (scope table row) and ADR-0019 (player REST header) | **Decided (#207, G4): accepted with the three amendments.** Rejected: accept without player REST; reject A (per-campaign import) | — | ADR-0004, ADR-0018, ADR-0019 |
+| OQ-CMP-26 | *(S4, DM)* Search syntax beyond plain words | **A. Plain words only, AND; quotes, `-`, `:` fold away as punctuation** (what the DM asked for; nothing to learn) / B. + `"quoted phrase"` (exact order; rarely needed with tier 1) / C. + quotes + `-word` to exclude (power-user; one more rule to explain) / D. + `kind:` / `cr:` prefixes (duplicates the Tabs and Filters) | no (DM gate 1; owner: spec-compendium) | — |
+| OQ-CMP-27 | *(S4, DM)* Matching | **A. Word prefix in names and text, name substring as a lower tier, case + accent + apostrophe folding, plural `s` fallback (FR-CMP-32, -33)**: predictable, "heal" finds Healing / B. substring everywhere (noisier: `the` hits "Other", "Weather"…) / C. typo-tolerant fuzzy ("fierball"), needs MiniSearch or similar (new dependency, DM OK; surprising matches) / D. A without the plural fallback (one rule less; "potions" finds nothing) | no (DM gate 1; owner: spec-compendium) | — |
+| OQ-CMP-28 | *(S4, DM)* Ranking weights | **A. Tiers: exact > name starts with the query > every word starts a name word > all words in the name > name + text > text only; ties: source, shorter name, A–Z (FR-CMP-33)**: explainable, measured on real data / B. A + kind weight (monsters first for the DM, spells first for players; good for lookups, odd in a tab) / C. scored relevance (BM25-style, word counts in text; needs tuning or a package) | no (DM gate 1; owner: spec-compendium) | combat-tracker (lookups) |
+| OQ-CMP-29 | *(S4, DM)* What the All tab shows with an empty search | **A. Alphabetical, duplicate names collapsed into one expandable row (FR-CMP-36)**: fixes the 12 × ASI, keeps browsing / B. sections per kind (first 5 Monsters, Spells, Items…, each with "More"; longer page, more scrolling) / C. nothing until you type ("Type to search"; loses browsing) / D. A + B | no (DM gate 1; owner: spec-compendium) | — |
+| OQ-CMP-30 | *(S4, DM)* Source rank on equal tiers | **A. Own homebrew / customs > bundled SRD > other imports > fixture (FR-CMP-38)**: the DM's own version first, the thin fixture last / B. SRD > homebrew > fixture (canonical rules first; the DM's house version second) / C. no source rank, badges only (today; sim-7 glitch stays) | no (DM gate 1; owner: spec-compendium) | entities, combat-tracker |
+| OQ-CMP-31 | *(S4)* **combat-tracker**: FR-CBT-63 lookup matching | **Amend FR-CBT-63: match with FR-CMP-37's `nameTier` (multi-word AND, tiers 0–3) instead of the single-phrase prefix / word / substring; merge per FR-CMP-37; C-search edits `lookup.ts` (orchestrator assigns; R doesn't touch the lookup)** / keep the old lookup rank (a multi-word query finds SRD rows from the server but drops matching customs) | no (owner: integrator) | combat-tracker |
+| OQ-CMP-32 | *(S4)* Glossary | **Add "Search group"** (compendium entries with the same kind, name and source shown as one expandable search row) and **"Source rank"** (order of sources on equal search tiers: own, bundled, other imported, fixture) | no (owner: integrator) | glossary |
 
 ## 16. Out of scope
 
 - Runtime Open5e, SRD 5.2, 5etools, homebrew files, Griffon's Saddlebag, AI paste (§4). Rules quick reference / DM screen; races, backgrounds, feats.
 - Real class / subclass data beyond the SRD (e.g. Zealot): the 5etools import ([compendium-expansion](post-mvp/compendium-expansion.md)) maps class features to `preset: TriggerRule` on the feature entry, `ask` where the model can't express a part (#209). This spec's `feature` body already carries the field.
 - Custom monster actions auto-rolled vs targets beyond today's attacks ([combat-extras §16](combat-extras.md#16-out-of-scope)); legendary / lair action tracking.
+- *(S4)* Typo-tolerant search, search syntax beyond plain words, search inside the stat block's numbers (e.g. "cr 5": use Filters), result snippets showing where the text matched.
 - Linking condition chips to compendium text (CBTX): later, small. (Clickable notation in entry text is in, via `DiceText`, FR-CMP-26.)
