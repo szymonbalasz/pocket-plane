@@ -1,6 +1,6 @@
-# Trigger state for clients and effect-changed hooks
+# 0049 — Trigger state for clients and effect-changed hooks
 
-- Status: **accepted** (DM, sprint-4 gate 1, decision #245, G4; raised by review-b B1). The integrator numbers it at merge (file name stays `proposed-trigger-state.md` until then)
+- Status: accepted (DM, sprint-4 gate 1, #245, G4; raised by review-b B1).
 - Date: 2026-10-17
 - Supersedes: [ADR-0043](0043-rule-triggers.md) D3 / D4 **visibility consequence only** ("use rows never sent", "0 B in the snapshot", trigger rows to the DM and the owner only via the lazy load). ADR-0043's model (rule, offers, window keys, `trigger_use` as the truth) stays
 - Refines: [ADR-0035](0035-combat-rule-hooks.md) (rules in the causing transaction) with a new append-only `effectHooks` registry that also runs out of combat
