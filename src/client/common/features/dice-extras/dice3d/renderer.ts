@@ -1,6 +1,9 @@
-// The 3D throw renderer (FR-DICEX-14, -15, -20, -23; ADR-0044), in the lazy chunk only. Settles
-// the throw headless first (settle.ts), then plays the recorded motion with three.js. One
-// renderer per page, reused across throws; the render loop runs only while a throw moves.
+// The 3D throw renderer (FR-DICEX-14, -15, -20, -23, -33, -34, -44; ADR-0044, ADR-0048), in the
+// lazy chunk only. Settles each throw headless in its arena first (settle.ts), then plays the
+// recorded motion with three.js. **One WebGL canvas per page**, in the dice layer (fixed,
+// full-viewport, topmost): every running throw is an arena of it with its own scene, camera,
+// viewport and scissor rect (the screen arena = the viewport; the zone = its free-area rect),
+// drawn in one render loop that runs only while a throw moves. Pixel ratio ≤ 1.5.
 import type { DiceLook, DiceMaterial } from "@shared/dice-extras/looks";
 import type { DieShape } from "@shared/dice-extras/throw";
 import {
@@ -21,11 +24,13 @@ import {
   ShadowMaterial,
   SRGBColorSpace,
   type Texture,
+  Vector3,
   WebGLRenderer,
 } from "three";
+import { type Arena, pixelRatioOf } from "../arena";
 import { dieMesh, drawAtlas, drawD4 } from "./faces";
 import { geometryOf, type LabelKind, labelKindOf, type Quat, upFace } from "./geometry";
-import { ARENA, poseAt, STEP_HZ, settleLabels, simulate } from "./settle";
+import { poseAt, STEP_HZ, settleLabels, simulate } from "./settle";
 
 export interface Die3D {
   key: string;
@@ -40,16 +45,29 @@ export interface Die3D {
 export interface RestInfo {
   /** `upFace` per die key, read from the rendered mesh at rest (`data-settled`). */
   settled: Record<string, number>;
-  /** Die centre per key in canvas CSS px (labels for MOD / offered dice). */
+  /** Die centre per key in CSS px from the arena rect's top-left (MOD / offered labels). */
   at: Record<string, { x: number; y: number }>;
   /** Median frame time of the throw; null when too few frames to judge (FR-DICEX-23). */
   medianFrameMs: number | null;
 }
 
+/** A rect in viewport CSS px. */
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface PlayOptions {
-  host: HTMLElement;
-  width: number;
-  height: number;
+  /** The dice layer element (FR-DICEX-33): the page's one canvas lives in it. */
+  layer: HTMLElement;
+  /** The arena's rect in viewport CSS px, read every frame (a resize scales the running arena). */
+  rect(): Rect;
+  /** The simulation's arena (world units), fixed for the throw (FR-DICEX-34). */
+  arena: Arena;
+  /** FR-DICEX-44: no shadows above 2.5 MP. */
+  shadows: boolean;
   dice: readonly Die3D[];
   seed: number;
   onRest(info: RestInfo): void;
@@ -57,16 +75,25 @@ export interface PlayOptions {
   onLost(): void;
 }
 
+/** Rested dice copied off the shared canvas, at their rect (viewport CSS px). */
+export interface Still {
+  canvas: HTMLCanvasElement;
+  rect: Rect;
+}
+
 export interface PlayHandle {
+  /** FR-DICEX-18: jump to the final pose (reports rest if not yet). */
+  snap(): void;
   /**
-   * FR-DICEX-18: jump to the final pose (reports rest if not yet), keep that frame as a still
-   * image in the host and hand the shared canvas back for the next throw.
+   * FR-DICEX-35 / -41: snap if needed, then copy the rested dice (cropped to them) into a 2D
+   * canvas in the same task as the frame that rendered them (no `preserveDrawingBuffer`), and
+   * take them off the shared canvas. Null once released or when nothing could be copied.
    */
-  freeze(): void;
+  handoff(): Still | null;
   stop(): void;
 }
 
-/** FR-DICEX-21 materials, the default looks' and every look D2 stores. */
+/** FR-DICEX-24 materials, the default looks' and every look D2 stores. */
 const MATERIAL: Record<DiceMaterial, (map: Texture) => Material> = {
   plastic: (map) => new MeshStandardMaterial({ map, roughness: 0.42, metalness: 0 }),
   metal: (map) => new MeshStandardMaterial({ map, roughness: 0.3, metalness: 0.6 }),
@@ -90,17 +117,33 @@ export const materialOf = (look: DiceLook, map: Texture): Material => MATERIAL[l
 const DROPPED_OPACITY = 0.38;
 /** FR-DICEX-23 needs this many frames to judge. */
 const MIN_FRAMES = 10;
-const TEXTURE_CACHE = 24;
+const TEXTURE_CACHE = 48;
+/** Camera height (straight down; orthographic, so a die's height doesn't change its size). */
+const EYE = 40;
+
+interface Play {
+  scene: Scene;
+  camera: OrthographicCamera;
+  rect(): Rect;
+  arena: Arena;
+  /** Last fitted rect size (a resize refits the camera, FR-DICEX-34). */
+  fitted: { w: number; h: number };
+  moving(): boolean;
+  /** Advance the motion to `time`; false once at rest. */
+  tick(time: number): boolean;
+  lost(): void;
+}
 
 interface Stage {
   renderer: WebGLRenderer;
-  scene: Scene;
-  camera: OrthographicCamera;
+  layer: HTMLElement;
+  plays: Set<Play>;
+  looping: boolean;
   lost: boolean;
+  size: { w: number; h: number };
 }
 
 let stage: Stage | null = null;
-let active: { onLost(): void; freeze(): void } | null = null;
 const textures = new Map<string, CanvasTexture>();
 const materials = new Map<string, Material>();
 
@@ -132,60 +175,65 @@ function material(key: string, look: DiceLook, map: Texture): Material {
   return m;
 }
 
-function createStage(): Stage {
+const viewportOf = (layer: HTMLElement) => ({
+  w: Math.max(1, layer.clientWidth || globalThis.innerWidth || 1),
+  h: Math.max(1, layer.clientHeight || globalThis.innerHeight || 1),
+});
+
+function createStage(layer: HTMLElement): Stage {
   const renderer = new WebGLRenderer({
     antialias: true,
     alpha: true,
     powerPreference: "low-power",
   });
-  renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(pixelRatioOf(globalThis.devicePixelRatio));
   renderer.setClearColor(0x000000, 0);
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFShadowMap;
+  renderer.autoClear = false;
   const canvas = renderer.domElement;
-  canvas.style.display = "block";
+  canvas.style.cssText = "position:absolute;inset:0;display:block;pointer-events:none";
+  canvas.setAttribute("aria-hidden", "true");
   const s: Stage = {
     renderer,
-    scene: new Scene(),
-    camera: new OrthographicCamera(-ARENA.x, ARENA.x, ARENA.z, -ARENA.z, 0.1, 100),
+    layer,
+    plays: new Set(),
+    looping: false,
     lost: false,
+    size: { w: 0, h: 0 },
   };
   canvas.addEventListener("webglcontextlost", (e) => {
     e.preventDefault();
     s.lost = true;
-    active?.onLost();
+    for (const p of [...s.plays]) p.lost();
   });
-  s.scene.add(new HemisphereLight(0xffffff, 0x8a8a96, 1.6));
-  const sun = new DirectionalLight(0xffffff, 2.2);
-  sun.position.set(-4, 14, 6);
-  sun.castShadow = true;
-  sun.shadow.mapSize.width = 1024;
-  sun.shadow.mapSize.height = 1024;
-  sun.shadow.camera.left = -ARENA.x - 1;
-  sun.shadow.camera.right = ARENA.x + 1;
-  sun.shadow.camera.top = ARENA.z + 1;
-  sun.shadow.camera.bottom = -ARENA.z - 1;
-  sun.shadow.camera.updateProjectionMatrix();
-  sun.shadow.bias = -0.002;
-  s.scene.add(sun);
-  const floor = new Mesh(
-    new PlaneGeometry(ARENA.x * 2 + 2, ARENA.z * 2 + 2).rotateX(-Math.PI / 2),
-    new ShadowMaterial({ opacity: 0.28 }),
-  );
-  floor.receiveShadow = true;
-  s.scene.add(floor);
-  // Slightly tilted top-down view: up-faces read straight on.
-  s.camera.position.set(0, 30, 5);
-  s.camera.lookAt(0, 0, 0);
+  // A resize clears the canvas: draw the arenas again (rested dice stay put).
+  globalThis.addEventListener?.("resize", () => {
+    if (stage === s && !s.lost && !s.looping) draw(s);
+  });
   return s;
 }
 
-/** Fit the fixed arena into the canvas (letterboxed), so every viewport sees the same tumble. */
-function fit(camera: OrthographicCamera, width: number, height: number) {
-  let halfW = ARENA.x * 1.04;
-  let halfH = ARENA.z * 1.08;
-  const aspect = width / Math.max(1, height);
+/** The page's stage in `layer`, created (or re-created after a lost context) on demand. */
+function stageIn(layer: HTMLElement): Stage {
+  if (stage && (stage.lost || stage.layer !== layer)) {
+    stage.renderer.setAnimationLoop(null);
+    stage.renderer.dispose();
+    stage.renderer.domElement.remove();
+    stage = null;
+  }
+  if (!stage) stage = createStage(layer);
+  const canvas = stage.renderer.domElement;
+  if (canvas.parentElement !== layer) layer.appendChild(canvas);
+  return stage;
+}
+
+/** Fit the arena into a rect (letterboxed), straight down: screen x = world x, down = +z. */
+function fit(camera: OrthographicCamera, arena: Arena, w: number, h: number) {
+  let halfW = arena.x;
+  let halfH = arena.z;
+  const aspect = w / Math.max(1, h);
   if (aspect > halfW / halfH) halfW = halfH * aspect;
   else halfH = halfW / aspect;
   camera.left = -halfW;
@@ -195,38 +243,114 @@ function fit(camera: OrthographicCamera, width: number, height: number) {
   camera.updateProjectionMatrix();
 }
 
+/** Clear the whole canvas, then draw every arena into its own viewport + scissor rect. */
+function draw(s: Stage) {
+  const { renderer } = s;
+  const vp = viewportOf(s.layer);
+  if (vp.w !== s.size.w || vp.h !== s.size.h) {
+    renderer.setSize(vp.w, vp.h);
+    s.size = vp;
+  }
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, vp.w, vp.h);
+  renderer.clear();
+  for (const p of s.plays) {
+    const r = p.rect();
+    if (r.w < 1 || r.h < 1) continue;
+    if (r.w !== p.fitted.w || r.h !== p.fitted.h) {
+      fit(p.camera, p.arena, r.w, r.h);
+      p.fitted = { w: r.w, h: r.h };
+    }
+    const y = vp.h - r.y - r.h; // WebGL viewports count from the bottom
+    renderer.setViewport(r.x, y, r.w, r.h);
+    renderer.setScissor(r.x, y, r.w, r.h);
+    renderer.setScissorTest(true);
+    renderer.render(p.scene, p.camera);
+  }
+  renderer.setScissorTest(false);
+}
+
+/** One loop for every arena; it stops once nothing moves (FR-DICEX-23: idle = no frames). */
+function loop(s: Stage) {
+  if (s.looping) return;
+  s.looping = true;
+  s.renderer.setAnimationLoop((time) => {
+    let moving = false;
+    for (const p of [...s.plays]) if (p.moving() && p.tick(time)) moving = true;
+    draw(s);
+    if (!moving) {
+      s.looping = false;
+      s.renderer.setAnimationLoop(null);
+    }
+  });
+}
+
 function median(xs: number[]): number | null {
   if (xs.length < MIN_FRAMES) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? (s[m] as number) : ((s[m - 1] as number) + (s[m] as number)) / 2;
+  const sorted = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? (sorted[m] as number)
+    : ((sorted[m - 1] as number) + (sorted[m] as number)) / 2;
+}
+
+/** An arena's scene: lights, the shadow floor (when shadows are on) and a straight-down camera. */
+function arenaScene(arena: Arena, shadows: boolean) {
+  const scene = new Scene();
+  scene.add(new HemisphereLight(0xffffff, 0x8a8a96, 1.6));
+  const sun = new DirectionalLight(0xffffff, 2.2);
+  sun.position.set(-4, 14, 6);
+  sun.castShadow = shadows;
+  sun.shadow.mapSize.width = 1024;
+  sun.shadow.mapSize.height = 1024;
+  sun.shadow.camera.left = -arena.x - 1;
+  sun.shadow.camera.right = arena.x + 1;
+  sun.shadow.camera.top = arena.z + 1;
+  sun.shadow.camera.bottom = -arena.z - 1;
+  sun.shadow.camera.updateProjectionMatrix();
+  sun.shadow.bias = -0.002;
+  scene.add(sun);
+  const own: { dispose(): void }[] = [sun]; // its shadow map
+  if (shadows) {
+    const plane = new PlaneGeometry(arena.x * 2 + 2, arena.z * 2 + 2).rotateX(-Math.PI / 2);
+    const shade = new ShadowMaterial({ opacity: 0.28 });
+    const floor = new Mesh(plane, shade);
+    floor.receiveShadow = true;
+    scene.add(floor);
+    own.push(plane, shade);
+  }
+  const camera = new OrthographicCamera(-arena.x, arena.x, arena.z, -arena.z, 0.1, 100);
+  camera.position.set(0, EYE, 0);
+  camera.up.set(0, 0, -1);
+  camera.lookAt(0, 0, 0);
+  return { scene, camera, own };
+}
+
+/** Die centre in CSS px from the rect's top-left. */
+function project(m: Mesh, camera: OrthographicCamera, r: Rect) {
+  const v = new Vector3(m.position.x, m.position.y, m.position.z).project(camera);
+  return { x: ((v.x + 1) / 2) * r.w, y: ((1 - v.y) / 2) * r.h };
 }
 
 /**
- * FR-DICEX-15: simulate, relabel, play. Throws when WebGL can't start (the caller draws flat).
+ * FR-DICEX-15 / -34: simulate in the arena, relabel, play on the page's one canvas. Throws when
+ * WebGL can't start (the caller draws flat).
  */
 export function playThrow(o: PlayOptions): PlayHandle {
-  // FR-DICEX-18: one throw at a time; the running one snaps to rest before the canvas moves on.
-  active?.freeze();
-  if (stage?.lost) stage.renderer.dispose();
-  if (!stage || stage.lost) stage = createStage();
-  const s = stage;
-  const { renderer, scene, camera } = s;
-  renderer.setSize(o.width, o.height);
-  fit(camera, o.width, o.height);
-  o.host.appendChild(renderer.domElement);
+  const s = stageIn(o.layer);
+  const { scene, camera, own } = arenaScene(o.arena, o.shadows);
 
   const kinds = o.dice.map((d) => labelKindOf(d.shape, d.d100));
   const sim = simulate(
     o.dice.map((d, i) => ({ shape: d.shape, kind: kinds[i] as LabelKind })),
     o.seed,
+    o.arena,
   );
   const labels = settleLabels(
     sim,
     o.dice.map((d) => d.value),
   );
   const group = new Group();
-  const own: { dispose(): void }[] = [];
   const meshes = o.dice.map((d, i) => {
     const g = geometryOf(d.shape);
     const l = labels[i] as number[];
@@ -254,7 +378,7 @@ export function playThrow(o: PlayOptions): PlayHandle {
       );
     }
     const mesh = new Mesh(geometry, mat);
-    mesh.castShadow = true;
+    mesh.castShadow = o.shadows;
     group.add(mesh);
     return mesh;
   });
@@ -273,12 +397,10 @@ export function playThrow(o: PlayOptions): PlayHandle {
   const deltas: number[] = [];
   let released = false;
   let rested = false;
-  let still: HTMLCanvasElement | null = null;
   const last = sim.frameCount - 1;
 
   const rest = () => {
     rested = true;
-    renderer.setAnimationLoop(null);
     pose(last);
     meshes.forEach((m, i) => {
       if (o.dice[i]?.kept) return;
@@ -289,65 +411,127 @@ export function playThrow(o: PlayOptions): PlayHandle {
       m.material = dim;
       own.push(dim);
     });
-    renderer.render(scene, camera);
+    const r = o.rect();
     const settled: Record<string, number> = {};
     const at: Record<string, { x: number; y: number }> = {};
     o.dice.forEach((d, i) => {
       const m = meshes[i] as Mesh;
       const q: Quat = [m.quaternion.x, m.quaternion.y, m.quaternion.z, m.quaternion.w];
       settled[d.key] = upFace(geometryOf(d.shape), labels[i] as number[], q);
-      const v = m.position.clone().project(camera);
-      at[d.key] = { x: ((v.x + 1) / 2) * o.width, y: ((1 - v.y) / 2) * o.height };
+      at[d.key] = project(m, camera, r);
     });
     o.onRest({ settled, at, medianFrameMs: median(deltas) });
+  };
+
+  const play: Play = {
+    scene,
+    camera,
+    rect: o.rect,
+    arena: o.arena,
+    fitted: { w: 0, h: 0 },
+    moving: () => !rested && !released,
+    tick(time) {
+      if (start === null) start = time;
+      if (prev !== null) deltas.push(time - prev);
+      prev = time;
+      const f = ((time - start) / 1000) * STEP_HZ;
+      if (f >= last) {
+        rest();
+        return false;
+      }
+      pose(f);
+      return true;
+    },
+    lost: () => {
+      if (!released) o.onLost();
+    },
   };
 
   const release = () => {
     if (released) return;
     released = true;
-    if (active === me) active = null;
-    renderer.setAnimationLoop(null);
+    s.plays.delete(play);
     scene.remove(group);
     for (const x of own) x.dispose();
-    if (renderer.domElement.parentElement === o.host) o.host.removeChild(renderer.domElement);
   };
-  const freeze = () => {
-    if (released) return;
-    if (rested) renderer.render(scene, camera);
-    else rest();
-    // Copied in the same task as the render, so the drawing buffer still holds the frame.
-    const src = renderer.domElement;
-    still = o.host.ownerDocument.createElement("canvas");
-    still.width = src.width;
-    still.height = src.height;
-    still.style.cssText = `display:block;width:${o.width}px;height:${o.height}px`;
-    still.getContext("2d")?.drawImage(src, 0, 0);
-    release();
-    o.host.appendChild(still);
-  };
-  const me = { onLost: () => !released && o.onLost(), freeze };
-  active = me;
-  pose(0);
-  renderer.setAnimationLoop((time) => {
-    if (released) return;
-    if (start === null) start = time;
-    if (prev !== null) deltas.push(time - prev);
-    prev = time;
-    const f = ((time - start) / 1000) * STEP_HZ;
-    if (f >= last) {
-      rest();
-      return;
-    }
-    pose(f);
-    renderer.render(scene, camera);
-  });
 
+  s.plays.add(play);
+  pose(0);
+  draw(s);
+  loop(s);
   return {
-    freeze,
+    snap() {
+      if (released || rested) return;
+      rest();
+      if (!s.lost) draw(s);
+    },
+    handoff() {
+      if (released) return null;
+      if (!rested) rest();
+      let still: Still | null = null;
+      if (!s.lost) {
+        draw(s);
+        // Copied in the same task as the render, so the drawing buffer still holds the frame.
+        still = copy(s, crop(o.rect(), camera, meshes, o.dice));
+      }
+      release();
+      if (!s.lost) draw(s);
+      return still;
+    },
     stop() {
       release();
-      still?.remove();
-      still = null;
+      if (!s.lost) draw(s);
     },
   };
+}
+
+/** The rested dice's bounding box (viewport CSS px), inside the arena rect. */
+function crop(r: Rect, camera: OrthographicCamera, meshes: Mesh[], dice: readonly Die3D[]): Rect {
+  const perUnit = r.w / Math.max(1e-6, camera.right - camera.left);
+  let x0 = Number.POSITIVE_INFINITY;
+  let y0 = Number.POSITIVE_INFINITY;
+  let x1 = Number.NEGATIVE_INFINITY;
+  let y1 = Number.NEGATIVE_INFINITY;
+  meshes.forEach((m, i) => {
+    const c = project(m, camera, r);
+    const half = geometryOf((dice[i] as Die3D).shape).radius * perUnit * 1.25;
+    x0 = Math.min(x0, r.x + c.x - half);
+    y0 = Math.min(y0, r.y + c.y - half);
+    x1 = Math.max(x1, r.x + c.x + half);
+    y1 = Math.max(y1, r.y + c.y + half);
+  });
+  if (!Number.isFinite(x0)) return { ...r, w: 0, h: 0 };
+  const x = Math.max(r.x, Math.floor(x0));
+  const y = Math.max(r.y, Math.floor(y0));
+  return {
+    x,
+    y,
+    w: Math.min(r.x + r.w, Math.ceil(x1)) - x,
+    h: Math.min(r.y + r.h, Math.ceil(y1)) - y,
+  };
+}
+
+/** `box` of the shared canvas into a new 2D canvas placed at `box`. */
+function copy(s: Stage, box: Rect): Still | null {
+  if (box.w < 1 || box.h < 1) return null;
+  const src = s.renderer.domElement;
+  const ratio = src.width / Math.max(1, s.size.w);
+  const canvas = src.ownerDocument.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(box.w * ratio));
+  canvas.height = Math.max(1, Math.round(box.h * ratio));
+  canvas.style.cssText = `position:absolute;display:block;left:${box.x}px;top:${box.y}px;width:${box.w}px;height:${box.h}px`;
+  canvas
+    .getContext("2d")
+    ?.drawImage(
+      src,
+      Math.round(box.x * ratio),
+      Math.round(box.y * ratio),
+      canvas.width,
+      canvas.height,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+  return { canvas, rect: box };
 }

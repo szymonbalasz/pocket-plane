@@ -30,7 +30,7 @@ import {
   STYLE_NAME,
 } from "./look-editor";
 import { useOwnLook } from "./own-look";
-import { useDiceSettings } from "./settings";
+import { is3dDisplay, useDiceSettings } from "./settings";
 
 const PREVIEW_PX = 72;
 
@@ -84,10 +84,10 @@ function Preview3D({ look, onFail }: { look: DiceLook; onFail(): void }) {
 }
 
 function LookPreview({ look }: { look: DiceLook }) {
-  const { render } = useDiceSettings();
+  const { display } = useDiceSettings();
   const threeD = useThreeD();
   const [failed, setFailed] = useState(false);
-  const mode = render === "3d" && threeD.available && !failed ? "3d" : "flat";
+  const mode = is3dDisplay(display) && threeD.available && !failed ? "3d" : "flat";
   return (
     <div
       data-testid="dicex-look-preview"

@@ -130,6 +130,7 @@ declare module "three" {
       camera: OrthographicCamera;
       bias: number;
     };
+    dispose(): void;
   }
 
   export interface WebGLRendererParameters {
@@ -143,10 +144,15 @@ declare module "three" {
     domElement: HTMLCanvasElement;
     outputColorSpace: string;
     shadowMap: { enabled: boolean; type: number };
+    autoClear: boolean;
     setPixelRatio(value: number): void;
     setSize(width: number, height: number, updateStyle?: boolean): void;
     setClearColor(color: number | string, alpha?: number): void;
     setAnimationLoop(callback: ((time: number) => void) | null): void;
+    setViewport(x: number, y: number, width: number, height: number): void;
+    setScissor(x: number, y: number, width: number, height: number): void;
+    setScissorTest(enable: boolean): void;
+    clear(color?: boolean, depth?: boolean, stencil?: boolean): void;
     render(scene: Object3D, camera: Camera): void;
     dispose(): void;
     forceContextLoss(): void;

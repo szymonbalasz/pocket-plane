@@ -1,107 +1,185 @@
-// FR-DICEX-21 / -22: the 3D chunk loads only for a 3D throw; flat / off never ask for it; a
-// load failure → flat for the session with one warning; a throw draws 3D only once it's ready.
+// FR-DICEX-22 / -37 / -45: the 3D chunk preloads at idle after the first snapshot when the display
+// draws 3D; flat / off / reduced motion never load it; a throw during the load waits ≤ 1.5 s
+// then 3D, else flat; a load failure → flat for the session with one warning.
 import { describe, expect, test } from "bun:test";
-import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
-import { emptyStore } from "@shared/protocol/store";
-import { onRollFrame } from "./frame-handler";
-import { createChunkLoader, type Dice3DModule, threeDUnavailable, throwDraw } from "./lazy3d";
-import { DEFAULT_SETTINGS, effectiveRender, type RenderSetting } from "./settings";
+import {
+  createChunkLoader,
+  type Dice3DModule,
+  type IdleEnv,
+  preloadAtIdle,
+  threeDUnavailable,
+  throwDraw,
+  whenChunk,
+} from "./lazy3d";
+import { effectiveDisplay } from "./settings";
+import { CHUNK_WAIT_MS, IDLE_FALLBACK_MS } from "./timing";
 
-const entry = (o: Partial<GameLogEntryView> = {}) =>
-  ({
-    id: "e1",
-    n: 5,
-    kind: "roll",
-    public: true,
-    rollerRole: "player",
-    rollerPlayerId: "p1",
-    actorName: "Mira",
-    payload: [
-      {
-        expression: "1d20",
-        manual: false,
-        dice: [{ faces: 20, value: 14, kept: true }],
-        constant: 0,
-        total: 14,
-        label: null,
-      },
-    ],
-    ...o,
-  }) as unknown as GameLogEntryView;
-
-function frame(render: RenderSetting, others = true) {
-  const calls = { load: 0, play: 0, own: 0 };
-  const store = { ...emptyStore(), you: { campaignId: "c1", role: "player", playerId: "p1" } };
-  onRollFrame(
-    [entry()],
-    store as never,
-    { settings: { ...DEFAULT_SETTINGS, others }, render },
-    {
-      load3d: () => {
-        calls.load += 1;
-      },
-      play: () => {
-        calls.play += 1;
-      },
-      ownRolled: () => {
-        calls.own += 1;
-      },
+/** A loader whose import resolves only when `resolve()` / `reject()` is called. */
+function manualLoader() {
+  let resolve: (m: Dice3DModule) => void = () => {};
+  let reject: (e: unknown) => void = () => {};
+  let imports = 0;
+  const warnings: string[] = [];
+  const loader = createChunkLoader(
+    () => {
+      imports += 1;
+      return new Promise<Dice3DModule>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
     },
+    (m) => warnings.push(m),
   );
-  return calls;
+  return {
+    loader,
+    imports: () => imports,
+    warnings,
+    resolve: () => resolve({} as Dice3DModule),
+    reject: () => reject(new Error("chunk 404")),
+  };
 }
 
-describe("FR-DICEX-22 lazy chunk", () => {
-  test("FR-DICEX-22 flat / off never load the 3D chunk; 3d asks on the throw", () => {
-    expect(frame("flat")).toEqual({ load: 0, play: 1, own: 1 });
-    expect(frame("off")).toEqual({ load: 0, play: 0, own: 1 });
-    expect(frame("3d")).toEqual({ load: 1, play: 1, own: 1 });
+/** Idle callbacks and timers fired by hand. */
+function idleEnv(withIdle: boolean) {
+  const idle: (() => void)[] = [];
+  const timers = new Map<number, { ms: number; fn: () => void }>();
+  let id = 0;
+  const env: IdleEnv = {
+    ...(withIdle && {
+      requestIdleCallback: (fn: () => void) => {
+        idle.push(fn);
+        return idle.length;
+      },
+      cancelIdleCallback: (h: number) => {
+        idle[h - 1] = () => {};
+      },
+    }),
+    setTimeout: (fn, ms) => {
+      timers.set(++id, { ms, fn });
+      return id;
+    },
+    clearTimeout: (h) => void timers.delete(h as number),
+  };
+  return {
+    env,
+    idle,
+    timers,
+    fireTimers() {
+      for (const [k, t] of [...timers]) {
+        timers.delete(k);
+        t.fn();
+      }
+    },
+  };
+}
+
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+describe("FR-DICEX-37 preload", () => {
+  test("FR-DICEX-37 preload: screen / zone → the chunk import at idle after the first snapshot", () => {
+    for (const display of ["screen", "zone"] as const) {
+      const m = manualLoader();
+      const e = idleEnv(true);
+      preloadAtIdle(m.loader, display, e.env);
+      expect(m.imports()).toBe(0); // not before idle
+      for (const fn of e.idle) fn();
+      expect(m.imports()).toBe(1);
+      expect(m.loader.state()).toBe("loading");
+    }
+    // No requestIdleCallback → after 2 s.
+    const m = manualLoader();
+    const e = idleEnv(false);
+    preloadAtIdle(m.loader, "screen", e.env);
+    expect([...e.timers.values()].map((t) => t.ms)).toEqual([IDLE_FALLBACK_MS]);
+    e.fireTimers();
+    expect(m.imports()).toBe(1);
   });
 
-  test("FR-DICEX-21 reduced motion / no WebGL → flat, so the chunk is never asked for", () => {
-    const r1 = effectiveRender("3d", { reducedMotion: true, threeD: true });
-    const r2 = effectiveRender("3d", { reducedMotion: false, threeD: false });
-    expect([r1, r2]).toEqual(["flat", "flat"]);
-    expect(frame(r1).load).toBe(0);
+  test("FR-DICEX-37 preload: flat / off never load the chunk; a cancel before idle loads nothing", () => {
+    for (const display of ["flat", "off"] as const) {
+      const m = manualLoader();
+      const e = idleEnv(true);
+      preloadAtIdle(m.loader, display, e.env);
+      expect(e.idle).toHaveLength(0);
+      expect(m.imports()).toBe(0);
+    }
+    const m = manualLoader();
+    const e = idleEnv(true);
+    const cancel = preloadAtIdle(m.loader, "screen", e.env);
+    cancel();
+    for (const fn of e.idle) fn();
+    expect(m.imports()).toBe(0);
   });
 
-  test("FR-DICEX-22 loads once; the throw that started the load is flat, the next one 3D", async () => {
-    let imports = 0;
-    const mod = {} as Dice3DModule;
-    const loader = createChunkLoader(async () => {
-      imports += 1;
-      return mod;
-    });
-    expect(throwDraw("3d", loader.state())).toBe("flat");
-    loader.load();
-    loader.load();
-    expect(loader.state()).toBe("loading");
-    expect(throwDraw("3d", loader.state())).toBe("flat");
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(imports).toBe(1);
-    expect(loader.state()).toBe("ready");
-    expect(loader.module()).toBe(mod);
-    expect(throwDraw("3d", loader.state())).toBe("3d");
-    expect(throwDraw("flat", loader.state())).toBe("flat");
+  test("FR-DICEX-45 reduced motion: effective flat, so no preload and no chunk import", () => {
+    const display = effectiveDisplay("screen", { reducedMotion: true, threeD: true });
+    expect(display).toBe("flat");
+    const m = manualLoader();
+    const e = idleEnv(true);
+    preloadAtIdle(m.loader, display, e.env);
+    expect(e.idle).toHaveLength(0);
+    expect(m.imports()).toBe(0);
+  });
+
+  test("FR-DICEX-37 preload: a throw during the load waits ≤ 1.5 s, then 3D", async () => {
+    const m = manualLoader();
+    const e = idleEnv(true);
+    m.loader.load();
+    const got: boolean[] = [];
+    whenChunk(m.loader, (ready) => got.push(ready), e.env);
+    expect(got).toEqual([]);
+    expect([...e.timers.values()].map((t) => t.ms)).toEqual([CHUNK_WAIT_MS]);
+    m.resolve();
+    await tick();
+    expect(got).toEqual([true]);
+    expect(e.timers.size).toBe(0);
+    expect(throwDraw("screen", m.loader.state())).toBe("3d");
+    // Ready already → at once.
+    whenChunk(m.loader, (ready) => got.push(ready), e.env);
+    expect(got).toEqual([true, true]);
+  });
+
+  test("FR-DICEX-37 preload: still loading after 1.5 s → that throw flat; the next one 3D", async () => {
+    const m = manualLoader();
+    const e = idleEnv(true);
+    const got: boolean[] = [];
+    whenChunk(m.loader, (ready) => got.push(ready), e.env); // starts the load (preload missed)
+    expect(m.imports()).toBe(1);
+    e.fireTimers();
+    expect(got).toEqual([false]);
+    expect(throwDraw("screen", m.loader.state())).toBe("flat");
+    m.resolve();
+    await tick();
+    expect(got).toEqual([false]); // called once
+    expect(throwDraw("screen", m.loader.state())).toBe("3d");
   });
 
   test("FR-DICEX-22 load failure → flat for the session + one console warning", async () => {
-    const warnings: string[] = [];
-    const loader = createChunkLoader(
-      () => Promise.reject(new Error("chunk 404")),
-      (m) => warnings.push(m),
-    );
-    loader.load();
-    await new Promise((r) => setTimeout(r, 0));
-    loader.load();
-    await new Promise((r) => setTimeout(r, 0));
-    expect(loader.state()).toBe("failed");
-    expect(warnings).toHaveLength(1);
-    expect(threeDUnavailable(loader.state(), true)).toBe("failed");
+    const m = manualLoader();
+    const e = idleEnv(true);
+    const got: boolean[] = [];
+    whenChunk(m.loader, (ready) => got.push(ready), e.env);
+    m.reject();
+    await tick();
+    expect(got).toEqual([false]);
+    m.loader.load();
+    await tick();
+    expect(m.loader.state()).toBe("failed");
+    expect(m.imports()).toBe(1);
+    expect(m.warnings).toHaveLength(1);
+    whenChunk(m.loader, (ready) => got.push(ready), e.env);
+    expect(got).toEqual([false, false]);
+    expect(threeDUnavailable(m.loader.state(), true)).toBe("failed");
     expect(threeDUnavailable("ready", false)).toBe("no-webgl");
     expect(threeDUnavailable("idle", true)).toBeNull();
-    // `threeD` false → the setting's `3d` draws flat.
-    expect(effectiveRender("3d", { reducedMotion: false, threeD: false })).toBe("flat");
+    // `threeD` false → the stored `screen` shows flat.
+    expect(effectiveDisplay("screen", { reducedMotion: false, threeD: false })).toBe("flat");
+  });
+
+  test("FR-DICEX-22 throwDraw: 3D only for screen / zone with the chunk ready", () => {
+    expect(throwDraw("screen", "ready")).toBe("3d");
+    expect(throwDraw("zone", "ready")).toBe("3d");
+    expect(throwDraw("flat", "ready")).toBe("flat");
+    expect(throwDraw("screen", "loading")).toBe("flat");
   });
 });

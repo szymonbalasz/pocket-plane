@@ -57,7 +57,7 @@ import { FlatDie } from "./FlatDie";
 import { LookEditor } from "./LookEditor";
 import { useThreeD } from "./lazy3d";
 import { useOwnLook } from "./own-look";
-import { useDiceSettings } from "./settings";
+import { DisplaySetting, is3dDisplay, useDiceSettings } from "./settings";
 import { diceExtras, type TrayRequest, useDiceExtras } from "./store";
 import { trayExtras } from "./tray-extras";
 import {
@@ -258,13 +258,24 @@ function Extras({ request, mode }: { request: TrayRequest; mode: RollMode }) {
 
 const signed = (n: number) => (n === 0 ? "" : n > 0 ? `+${n}` : `−${-n}`);
 
-/** FR-DICEX-21 / DICEX §7: render 3D / Flat / Off, "Show others' rolls", "Dice look…". */
+const DISPLAY_LABEL: Record<DisplaySetting, string> = {
+  screen: "Full screen",
+  zone: "Tray throw",
+  flat: "Flat",
+  off: "Off",
+};
+
+/**
+ * FR-DICEX-36 / DICEX §7 settings popover: Display Full screen / Tray throw / Flat / Off,
+ * "Show others' rolls", "Roll popups", "Dice look…". Reduced motion / no WebGL: the 3D modes are disabled
+ * with the reason (the stored setting is kept, FR-DICEX-32).
+ */
 function SettingsPopover() {
-  const { settings, set } = useDiceSettings();
+  const { settings, display, reducedMotion, set } = useDiceSettings();
   const threeD = useThreeD();
   const live = useSync((s) => s.state === "live");
   const [pane, setPane] = useState<"settings" | "look">("settings");
-  const shown = settings.render === "3d" && !threeD.available ? "flat" : settings.render;
+  const no3d = reducedMotion || !threeD.available;
   return (
     <Popover onOpenChange={(o) => !o && setPane("settings")}>
       <PopoverTrigger asChild>
@@ -281,7 +292,7 @@ function SettingsPopover() {
       <PopoverContent
         align="end"
         side="bottom"
-        className={cn("flex flex-col gap-3", pane === "look" ? "w-72" : "w-64")}
+        className={cn("flex flex-col gap-3", pane === "look" ? "w-72" : "w-80")}
       >
         {pane === "look" ? (
           <LookEditor onBack={() => setPane("settings")} />
@@ -291,30 +302,32 @@ function SettingsPopover() {
               <p className="text-sm font-medium">Dice on this device</p>
               <ToggleGroup
                 type="single"
-                aria-label="Dice rendering"
-                value={shown}
+                aria-label="Dice display"
+                value={display}
                 onValueChange={(v) => {
-                  if (v) set({ render: v as "3d" | "flat" | "off" });
+                  if (v) set({ display: v as DisplaySetting });
                 }}
               >
-                {(["3d", "flat", "off"] as const).map((r) => (
+                {DisplaySetting.options.map((d) => (
                   <ToggleGroupItem
-                    key={r}
-                    value={r}
-                    data-testid="dicex-settings-render"
-                    data-value={r}
-                    disabled={r === "3d" && !threeD.available}
-                    className="h-7 px-3"
+                    key={d}
+                    value={d}
+                    data-testid="dicex-settings-display"
+                    data-value={d}
+                    disabled={no3d && is3dDisplay(d)}
+                    className="h-7 px-2 text-xs"
                   >
-                    {r === "3d" ? "3D" : r === "flat" ? "Flat" : "Off"}
+                    {DISPLAY_LABEL[d]}
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
-              {threeD.reason && (
+              {(reducedMotion || threeD.reason) && (
                 <p data-testid="dicex-settings-3d-hint" className="text-xs text-muted-foreground">
-                  {threeD.reason === "no-webgl"
-                    ? "3D unavailable on this device"
-                    : "3D dice couldn't load: dice show flat this session."}
+                  {reducedMotion
+                    ? "Reduced motion is on: dice show flat."
+                    : threeD.reason === "no-webgl"
+                      ? "3D unavailable on this device"
+                      : "3D dice couldn't load: dice show flat this session."}
                 </p>
               )}
             </div>
@@ -326,6 +339,15 @@ function SettingsPopover() {
                 onCheckedChange={(v) => set({ others: v })}
               />
               <label htmlFor="dicex-settings-others">Show others' rolls</label>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Switch
+                id="dicex-settings-popup"
+                data-testid="dicex-settings-popup"
+                checked={settings.popup}
+                onCheckedChange={(v) => set({ popup: v })}
+              />
+              <label htmlFor="dicex-settings-popup">Roll popups</label>
             </div>
             <Button
               data-testid="dicex-look-open"
