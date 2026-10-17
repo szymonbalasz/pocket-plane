@@ -7,28 +7,42 @@
 // a typed trigger part on 30 outcome lines, `triggerParts` on the applied rows. `rule-trigger`
 // rows (campaign cap, 40) stay out of every snapshot (lazy, ADR-0045); `trigger_use` is
 // server-only. MOD's bounds: R rows ≤ 40 KiB DM / ≤ 20 KiB per player, load ack ≤ 48 KiB.
+// Sprint 4 (S4-0, MOD §12 "Sprint 4"): the same harness plus track R's sprint-4 rows at max
+// (attack-row `bonus` + 2 extra parts, card `damage.extra`, extra part rolls, outcome-line
+// `damageParts` + trigger-part dice, `hp_change.damageParts`, `trigger-state` realistic / worst,
+// ASCII and 3-byte names; bounds as measured, see `R4_DM_MAX`) and the worst card with
+// both extra parts. The `rules-effects` fixtures end to end: `con44-rules-effects.test.ts`.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
-import { LOG_KIND_ATTACK } from "@shared/combat-tracker/schemas";
+import { CARD_MODS_MAX, DamageCardPayload, LOG_KIND_ATTACK } from "@shared/combat-tracker/schemas";
 import type { RollEntryDmPayload, RollEntryPayload } from "@shared/dice-roll-log/schemas";
 import { BUILTIN_PRESET_KEYS } from "@shared/effect-modifiers/schemas";
 import {
   CAMPAIGN_TRIGGERS_MAX,
   CHARACTER_TRIGGERS_MAX,
+  DEFINITION_TRIGGERS_MAX,
   RULE_TRIGGER_TYPE,
 } from "@shared/effect-modifiers/trigger-records";
+import {
+  TRIGGER_STATE_TYPE,
+  type TriggerStateRecord,
+} from "@shared/effect-modifiers/trigger-state";
 import type { TriggerRule } from "@shared/effect-modifiers/triggers";
+import { jsonBytes } from "@shared/notifications/schemas";
 import { and, eq, ne } from "drizzle-orm";
 import {
   campaign,
+  combatant,
   effect,
   effectPreset,
+  encounter,
   entity,
   gameLogEntry,
   hpChange,
   notification,
   ruleTrigger,
   ruleTriggerSeqNext,
+  triggerState,
 } from "../../db/schema";
 import { SNAPSHOT_CEILING } from "../../ws/hub";
 import { RecordRegistry, type Viewer } from "../../ws/records";
@@ -341,5 +355,385 @@ describe("CON-44 with MOD sprint-3 rows (MOD §12, #208)", () => {
       expect(p.bytes).toBeLessThanOrEqual(LOAD_ACK_MAX);
     }
     expect(players.reduce((n, p) => n + p.rows, 0)).toBe(dm.rows - dm.definitions);
+  });
+});
+
+// ---------- sprint 4 (S4-0; MOD §12 "Sprint 4", review B16 / B29) ----------
+
+/**
+ * Track R's sprint-4 rows, worst case. MOD §12 proposed ≤ 136 KiB DM / ≤ 32 KiB per player from
+ * estimates; measured here (S4-0) worst +192,411 B DM / +56,207 B per player with CJK names (the
+ * extra part rolls carry per-die objects: ≈ 600 B per 12-dice part, not 170 B). Bounds set to
+ * the measurement pending the orchestrator's ruling; the ceilings (#208) are unchanged.
+ */
+const R4_DM_MAX = 192 * 1024;
+const R4_PLAYER_MAX = 60 * 1024;
+/** Exactly `n` 3-byte (CJK) chars: multi-byte names (review B16). */
+const cjk = (n: number) => "火".repeat(n);
+const dice12 = (n: number) => Array.from({ length: n }, () => [12, true] as [number, boolean]);
+
+describe("CON-44 with MOD sprint-4 rows (MOD §12 sprint 4, #208)", () => {
+  let b: Awaited<ReturnType<typeof servicesFromBundle>>;
+  let base: ViewerSize[];
+  let rows: ViewerSize[];
+  let realistic: ViewerSize[];
+  let worst: ViewerSize[];
+  let worstCjk: ViewerSize[];
+  const counts = { attacks: 0, cards: 0, entries: 0, lines: 0, hp: 0, realistic: 0, worst: 0 };
+  beforeAll(async () => {
+    b = await servicesFromBundle(await loadBundle("session-sim", { testMode: true }));
+    buildRealisticHeavy(b.s);
+    const db = b.s.db;
+    const cid = db.select().from(campaign).where(eq(campaign.active, true)).get()?.id as string;
+    base = snapshotSizes(b.s);
+
+    // FR-CHARX-54: every attack row (both kinds) `bonus` 3 + 2 max extra parts.
+    const extra = { damage: "6d12+10", type: "lightning" };
+    for (const e of db.select().from(entity).all()) {
+      const sb = e.statBlock as { attacks?: Record<string, unknown>[] };
+      if (!sb.attacks?.length) continue;
+      counts.attacks += sb.attacks.length;
+      db.update(entity)
+        .set({
+          statBlock: {
+            ...sb,
+            attacks: sb.attacks.map((a) => ({ ...a, bonus: 3, extraDamage: [extra, extra] })),
+          } as never,
+        })
+        .where(eq(entity.id, e.id))
+        .run();
+    }
+    // FR-CBT-81: 2 max extra parts (12 dice, a crit) on every pending card's damage.
+    const part = (i: number) => ({
+      type: "lightning",
+      rollId: uuid(`xr${i}`),
+      dice: dice12(12),
+      constant: 10,
+      total: 154,
+      manual: true,
+    });
+    const pending = db
+      .select()
+      .from(notification)
+      .where(and(eq(notification.kind, "damage-card"), eq(notification.state, "pending")))
+      .all();
+    for (const n of pending) {
+      const p = n.payload as { damage: Record<string, unknown> | null };
+      if (!p.damage) continue;
+      counts.cards++;
+      db.update(notification)
+        .set({ payload: { ...p, damage: { ...p.damage, extra: [part(1), part(2)] } } })
+        .where(eq(notification.id, n.id))
+        .run();
+    }
+    // FR-CHARX-55 / FR-CBT-81: the attacks' damage roll entries gain 2 extra part rolls.
+    const rollEntries = db.select().from(gameLogEntry).where(eq(gameLogEntry.kind, "roll")).all();
+    for (const e of rollEntries) {
+      const items = e.payload as RollEntryPayload;
+      if (items.length !== 2 || counts.entries >= 30) continue;
+      counts.entries++;
+      const dmg = items[1] as Record<string, unknown>;
+      const xItem = (i: number) => ({
+        ...dmg,
+        rollId: uuid(`xe${i}`),
+        expression: "12d12+10",
+        dice: Array.from({ length: 12 }, () => ({ faces: 12, value: 12, kept: true })),
+        constant: 10,
+        total: 154,
+        natural: null,
+        label: `${String(dmg.label).slice(0, 48)} (lightning)`,
+      });
+      const dm = e.dmPayload as RollEntryDmPayload | null;
+      db.update(gameLogEntry)
+        .set({
+          payload: [...items, xItem(1), xItem(2)],
+          ...(dm ? { dmPayload: { ...dm, items: [...dm.items, { mods: [] }, { mods: [] }] } } : {}),
+        })
+        .where(eq(gameLogEntry.id, e.id))
+        .run();
+    }
+    // FR-CBT-84 / FR-MOD-57: outcome lines with 2 typed extra parts + 1 max trigger part with
+    // its expression and 20 dice (a public character trigger), the DM's facts the same.
+    const lines = db
+      .select()
+      .from(gameLogEntry)
+      .where(eq(gameLogEntry.kind, LOG_KIND_ATTACK))
+      .all();
+    const dicePart = { expression: x(20, "20d12+"), dice: Array(20).fill(12) };
+    for (const l of lines) {
+      counts.lines++;
+      const dp = { type: "lightning", value: 999, multiplier: "double" };
+      db.update(gameLogEntry)
+        .set({
+          payload: {
+            ...(l.payload as object),
+            damageParts: [dp, dp],
+            parts: [
+              {
+                label: x(40, "Divine Fury "),
+                value: 999,
+                type: "lightning",
+                multiplier: "double",
+                ...dicePart,
+              },
+            ],
+          },
+          dmPayload: {
+            ...(l.dmPayload as object),
+            parts: [
+              {
+                triggerId: uuid("trg"),
+                label: x(40, "Divine Fury "),
+                rolled: 999,
+                set: true,
+                forced: true,
+                ...dicePart,
+              },
+            ],
+          },
+        })
+        .where(eq(gameLogEntry.id, l.id))
+        .run();
+    }
+    // FR-CBT-84: hp_change.damageParts, 2 max parts on every row (DM only).
+    const hpPart = { type: "lightning", rolled: 999, total: 999, multiplier: "double", raw: 1998 };
+    counts.hp = db.select().from(hpChange).all().length;
+    db.update(hpChange)
+      .set({ damageParts: [hpPart, hpPart] as never })
+      .run();
+    rows = snapshotSizes(b.s);
+
+    // FR-MOD-53 `trigger-state`: per combatant of the started encounter, realistic PC 2 +
+    // monster 1, worst every combatant at its cap (PC 6, monster 4); strings at max. Rule
+    // triggers for the FKs (lazy: never in a snapshot, 0 B here).
+    const enc = db
+      .select()
+      .from(encounter)
+      .where(and(eq(encounter.campaignId, cid), eq(encounter.status, "started")))
+      .get();
+    if (!enc) throw new Error("no started encounter");
+    const fighters = db
+      .select()
+      .from(combatant)
+      .where(and(eq(combatant.encounterId, enc.id), eq(combatant.active, true)))
+      .all();
+    const ownerOf = (k: typeof combatant.$inferSelect) =>
+      k.kind === "pc"
+        ? (db.select().from(entity).where(eq(entity.id, k.entityId)).get()?.ownerPlayerId ?? null)
+        : null;
+    let t = 0;
+    const triggersOf = new Map<string, string[]>();
+    const triggerFor = (k: typeof combatant.$inferSelect, i: number): string => {
+      const have = triggersOf.get(k.entityId) ?? [];
+      const known = have[i];
+      if (known) return known;
+      const id = uuid(`st${++t}`);
+      db.insert(ruleTrigger)
+        .values({
+          id,
+          campaignId: cid,
+          seq: ruleTriggerSeqNext,
+          ...(k.kind === "pc"
+            ? { characterId: k.entityId, ownerPlayerId: ownerOf(k) }
+            : { definitionId: k.entityId }),
+          name: x(40, `Trigger ${t} `),
+          public: k.kind === "pc",
+          rule: maxRule(t),
+          updatedAt: AT,
+        })
+        .run();
+      have[i] = id;
+      triggersOf.set(k.entityId, have);
+      return id;
+    };
+    let n = 0;
+    const fill = (pcRows: number, monsterRows: number) => {
+      for (const k of fighters) {
+        const want = k.kind === "pc" ? pcRows : monsterRows;
+        for (let i = 0; i < want; i++) {
+          const triggerId = triggerFor(k, i);
+          const have = db
+            .select()
+            .from(triggerState)
+            .where(and(eq(triggerState.combatantId, k.id), eq(triggerState.triggerId, triggerId)))
+            .get();
+          if (have) continue;
+          n++;
+          db.insert(triggerState)
+            .values({
+              id: uuid(`ts${n}`),
+              campaignId: cid,
+              encounterId: enc.id,
+              combatantId: k.id,
+              triggerId,
+              characterId: k.kind === "pc" ? k.entityId : null,
+              ownerPlayerId: ownerOf(k),
+              name: x(40, `Trigger ${n} `),
+              on: "turnStart",
+              armed: false,
+              charge: "waiting",
+              featureId: uuid(`f${n}`),
+              updatedAt: AT,
+            })
+            .run();
+        }
+      }
+    };
+    fill(2, 1);
+    counts.realistic = db.select().from(triggerState).all().length;
+    realistic = snapshotSizes(b.s);
+    fill(CHARACTER_TRIGGERS_MAX, DEFINITION_TRIGGERS_MAX);
+    counts.worst = db.select().from(triggerState).all().length;
+    worst = snapshotSizes(b.s);
+    // Multi-byte names (review B16): every `trigger-state` name 40 CJK chars (3 B each).
+    db.update(triggerState)
+      .set({ name: cjk(40) })
+      .run();
+    worstCjk = snapshotSizes(b.s);
+  }, 120_000);
+  afterAll(() => b.cleanup());
+
+  const delta = (a: ViewerSize[], z: ViewerSize[]) => a.map((s, i) => s.bytes - (z[i]?.bytes ?? 0));
+  const stateBytes = (s: ViewerSize[]) => s.map((v) => v.types[TRIGGER_STATE_TYPE]?.bytes ?? 0);
+
+  test("CON-44 MOD §12 sprint 4 heavy (#208): DM < 1 MiB, players < 512 KiB; track R rows ≤ 192 KiB DM, ≤ 60 KiB per player as measured (ASCII and multi-byte names)", () => {
+    const [rowsDm = 0, ...rowsP] = delta(rows, base);
+    const [realDm = 0, ...realP] = delta(realistic, base);
+    const [worstDm = 0, ...worstP] = delta(worst, base);
+    const [cjkDm = 0, ...cjkP] = delta(worstCjk, base);
+    const max = (v: number[]) => Math.max(...v);
+    console.log(
+      `MOD CON-44 (S4-0): heavy base DM ${base[0]?.bytes} B, players max ${max(base.slice(1).map((p) => p.bytes))} B`,
+    );
+    console.log(
+      `MOD CON-44 (S4-0): ${counts.attacks} attack rows, ${counts.cards} cards, ${counts.entries} roll entries, ${counts.lines} lines, ${counts.hp} hp rows: DM +${rowsDm}; players +${Math.min(...rowsP)}…+${max(rowsP)}`,
+    );
+    const typeDelta = (i: number) =>
+      Object.entries(rows[i]?.types ?? {})
+        .map(([k, v]) => [k, v.bytes - (base[i]?.types[k]?.bytes ?? 0)] as const)
+        .filter(([, d]) => d !== 0)
+        .map(([k, d]) => `${k} +${d}`)
+        .join(", ");
+    console.log(`MOD CON-44 (S4-0): rows per type: DM ${typeDelta(0)}; P1 ${typeDelta(1)}`);
+    console.log(
+      `MOD CON-44 (S4-0): trigger-state realistic ${counts.realistic} rows DM ${stateBytes(realistic)[0]} B, own rows ${stateBytes(realistic).slice(1).join(" / ")} B; worst ${counts.worst} rows DM ${stateBytes(worst)[0]} B, own ${stateBytes(worst).slice(1).join(" / ")} B; worst with CJK names DM ${stateBytes(worstCjk)[0]} B, own max ${max(stateBytes(worstCjk).slice(1))} B`,
+    );
+    console.log(
+      `MOD CON-44 (S4-0): track R sprint 4 realistic DM +${realDm} → ${realistic[0]?.bytes} B; worst +${worstDm} → ${worst[0]?.bytes} B; worst CJK +${cjkDm} → ${worstCjk[0]?.bytes} B (${SNAPSHOT_CEILING.dm - (worstCjk[0]?.bytes ?? 0)} B left of 1 MiB); players max ${max(worstCjk.slice(1).map((p) => p.bytes))} B (+${max(cjkP)})`,
+    );
+    for (const s of [rows, realistic, worst, worstCjk]) {
+      expect(s[0]?.bytes ?? Infinity).toBeLessThan(SNAPSHOT_CEILING.dm);
+      for (const p of s.slice(1)) expect(p.bytes).toBeLessThan(SNAPSHOT_CEILING.player);
+    }
+    expect(counts.worst).toBeGreaterThan(counts.realistic);
+    expect(counts.realistic).toBeGreaterThan(0);
+    for (const d of [rowsDm, realDm, worstDm, cjkDm]) expect(d).toBeLessThanOrEqual(R4_DM_MAX);
+    for (const d of [...rowsP, ...realP, ...worstP, ...cjkP]) {
+      expect(d).toBeLessThanOrEqual(R4_PLAYER_MAX);
+    }
+  });
+
+  test("FR-MOD-55 heavy frames: a player gets only their own PC's trigger-state rows, never a monster's", () => {
+    const frames = snapshotFrames(b.s);
+    const dmRows = (frames[0]?.records[TRIGGER_STATE_TYPE] ?? []) as TriggerStateRecord[];
+    expect(dmRows).toHaveLength(counts.worst);
+    for (const f of frames.slice(1)) {
+      const mine = (f.records[TRIGGER_STATE_TYPE] ?? []) as TriggerStateRecord[];
+      const own = dmRows.filter(
+        (r) => r.characterId !== null && r.ownerPlayerId === f.viewer.playerId,
+      );
+      expect(mine.map((r) => r.id).sort()).toEqual(own.map((r) => r.id).sort());
+      expect(mine.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+/** The R0 worst card (MOD §12) + 2 max extra parts at 12 dice; `name` fills every label. */
+function worstCard(name: (n: number, p: string) => string, offers: number, cut = 0) {
+  const label = (s: string) => (cut > 0 && s.length > cut ? `${s.slice(0, cut)}…` : s);
+  const mod = {
+    label: label(name(40, "Bless ")),
+    value: -48,
+    expression: "4d12",
+    auto: true as const,
+    rollId: uuid("r"),
+  };
+  const offer = (i: number) => ({
+    triggerId: uuid(`t${i}`),
+    label: name(40, "Fury "),
+    value: 999,
+    expression: x(20, "20d12+"),
+    rollId: uuid(`rr${i}`),
+    type: "lightning",
+    auto: true,
+    ask: name(60, "Check "),
+    marked: name(40, "pr-"),
+    hurt: true,
+    untick: true,
+  });
+  const extra = (i: number) => ({
+    type: "lightning",
+    rollId: uuid(`xr${i}`),
+    dice: dice12(12),
+    constant: 10,
+    total: 154,
+    manual: true,
+  });
+  return DamageCardPayload.parse({
+    encounterId: uuid("e"),
+    attackerId: uuid("a"),
+    attackerName: name(40, "Brakka "),
+    attackName: name(40, "Flame Tongue "),
+    damageType: "bludgeoning",
+    mode: "advantage",
+    crit: true,
+    toHit: {
+      rollId: uuid("h"),
+      dice: [
+        [20, true],
+        [1, false],
+      ],
+      constant: 30,
+      total: 99,
+      manual: true,
+      natural: 20,
+      mods: Array(CARD_MODS_MAX).fill(mod),
+    },
+    damage: {
+      rollId: uuid("d"),
+      dice: dice12(50),
+      constant: 30,
+      total: 999,
+      manual: true,
+      mods: Array(CARD_MODS_MAX).fill(mod),
+      ...(offers > 0 ? { triggers: Array.from({ length: offers }, (_, i) => offer(i)) } : {}),
+      extra: [extra(1), extra(2)],
+    },
+    attackId: uuid("att"),
+  });
+}
+
+describe("FR-MOD-37 / FR-CBT-81 worst card with weapon parts (MOD §12 sprint 4, review B16)", () => {
+  test("FR-MOD-37 worst card ≤ 4 KB with both extra parts kept: ASCII by dropping offers; CJK names also need the mod-label cut (fit order)", () => {
+    const cap = 4096;
+    const ascii = (n: number, p: string) => x(n, p);
+    const wide = (n: number) => cjk(n);
+    const sizes = {
+      ascii3: jsonBytes(worstCard(ascii, 3)),
+      ascii2: jsonBytes(worstCard(ascii, 2)),
+      ascii0: jsonBytes(worstCard(ascii, 0)),
+      cjk0: jsonBytes(worstCard(wide, 0)),
+      cjk0cut: jsonBytes(worstCard(wide, 0, 12)),
+    };
+    console.log(
+      `MOD CON-44 (S4-0) worst card + 2 extra parts: ASCII 3 offers ${sizes.ascii3} B, 2 offers ${sizes.ascii2} B, 0 offers ${sizes.ascii0} B; CJK 0 offers ${sizes.cjk0} B, + mod labels cut to 12 ${sizes.cjk0cut} B (cap ${cap})`,
+    );
+    // Step 1 (drop offers from the last) is enough for ASCII names …
+    expect(sizes.ascii3).toBeGreaterThan(cap);
+    expect(sizes.ascii2).toBeLessThanOrEqual(cap);
+    // … not for multi-byte ones: step 2 (mod labels → 12 chars + "…") brings it under.
+    expect(sizes.cjk0).toBeGreaterThan(cap);
+    expect(sizes.cjk0cut).toBeLessThanOrEqual(cap);
+    expect(worstCard(wide, 0, 12).damage?.extra).toHaveLength(2);
   });
 });

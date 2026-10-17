@@ -66,9 +66,11 @@ describe("CHARX §8.2 creature-sheet schema", () => {
     expect(ItemRow.safeParse({ id: "i", name: " ", qty: 1 }).success).toBe(false);
     expect(FeatureRow.safeParse({ id: "f", name: "Rage", text: fill(601) }).success).toBe(false);
     expect(FeatureRow.safeParse({ id: "f", name: "Rage", usesMax: 21 }).success).toBe(false);
-    expect(FeatureRow.safeParse({ id: "f", name: "Rage", usesMax: 2, used: 3 }).success).toBe(
+    // FR-CHARX-58 (sprint 4): `used` up to `usesMax + 9` (uses left down to −9).
+    expect(FeatureRow.safeParse({ id: "f", name: "Rage", usesMax: 2, used: 12 }).success).toBe(
       false,
     );
+    expect(FeatureRow.safeParse({ id: "f", name: "Rage", used: 1 }).success).toBe(false);
     expect(ok({ slotsUsed: { "10": 1 } })).toBe(false);
     expect(ok({ hitDiceUsed: { d20: 1 } })).toBe(false);
   });

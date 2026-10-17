@@ -2,6 +2,7 @@
 // renderer): every seeded throw rests or snaps within 150 steps and shows the server value.
 import { describe, expect, test } from "bun:test";
 import { type DieShape, throwDice } from "@shared/dice-extras/throw";
+import { type Arena, arenaOf, dieSizePx, pixelRatioOf, screenArena, shadowsFor } from "../arena";
 import {
   cross,
   defaultLabels,
@@ -185,5 +186,117 @@ describe("FR-DICEX-15 headless settle", () => {
       });
     }
     expect(best).toBeLessThanOrEqual(50);
+  });
+});
+
+/** FR-DICEX-34: the screen arenas of DICEX §13 and the popup's PiP (≈ 260×96, small dice). */
+const ARENAS: [string, Arena][] = [
+  ["1280×720", screenArena({ w: 1280, h: 720 })],
+  ["1440×900", screenArena({ w: 1440, h: 900 })],
+  ["1920×1080", screenArena({ w: 1920, h: 1080 })],
+  ["390×844", screenArena({ w: 390, h: 844 })],
+  ["PiP 260×96", arenaOf({ w: 260, h: 96 }, 24)],
+];
+const TYPES: [DieShape, LabelKind][] = [
+  ...SHAPES.map((s) => [s, s] as [DieShape, LabelKind]),
+  ["d10", "d10-tens"],
+  ["d10", "d10-units"],
+];
+
+describe("FR-DICEX-34 animation lands on the server's faces", () => {
+  test.each(ARENAS)(
+    "%s: every die type × every target × 10 seeds → upFace = target",
+    (_, arena) => {
+      for (const [shape, kind] of TYPES) {
+        const g = geometryOf(shape);
+        for (let s = 0; s < 10; s++) {
+          const sim = simulate([{ shape, kind }], seedOf(`arena-${s}`), arena);
+          expect(sim.steps).toBeLessThanOrEqual(MAX_STEPS);
+          const q = sim.final[0] as Quat;
+          expect(tilt(g, q)).toBeLessThanOrEqual((12 * Math.PI) / 180);
+          // The die rests inside the arena's walls.
+          const last = (sim.frameCount - 1) * POSE;
+          expect(Math.abs(sim.frames[last] as number)).toBeLessThanOrEqual(arena.x);
+          expect(Math.abs(sim.frames[last + 2] as number)).toBeLessThanOrEqual(arena.z);
+          for (const target of LABEL_VALUES[kind]) {
+            const [labels] = settleLabels(sim, [target]);
+            expect(upFace(g, labels as number[], q)).toBe(target);
+          }
+        }
+      }
+    },
+  );
+
+  test.each(ARENAS)(
+    "%s: 20 dice ≤ 50 ms (best of 3), ≤ 150 steps, every face = its value",
+    (_, arena) => {
+      const dice = Array.from({ length: 20 }, (_, i) => {
+        const s = SHAPES[i % SHAPES.length] as DieShape;
+        return { shape: s, kind: s };
+      });
+      const values = dice.map((d, i) => (i % Number(d.shape.slice(1))) + 1);
+      let best = Number.POSITIVE_INFINITY;
+      for (let k = 0; k < 3; k++) {
+        const t0 = performance.now();
+        const sim = simulate(dice, seedOf(`arena-twenty-${k}`), arena);
+        best = Math.min(best, performance.now() - t0);
+        expect(sim.steps).toBeLessThanOrEqual(MAX_STEPS);
+        const labels = settleLabels(sim, values);
+        // Relabelling moves face labels only: the values themselves never change.
+        expect(values).toEqual(dice.map((d, i) => (i % Number(d.shape.slice(1))) + 1));
+        sim.final.forEach((q, i) => {
+          const g = geometryOf(dice[i]?.shape as DieShape);
+          expect(upFace(g, labels[i] as number[], q)).toBe(values[i] as number);
+        });
+      }
+      expect(best).toBeLessThanOrEqual(50);
+    },
+  );
+
+  test("dice enter from the bottom edge and cross the screen to the far wall (1440×900)", () => {
+    const arena = screenArena({ w: 1440, h: 900 });
+    let reached = 0;
+    for (let s = 0; s < 10; s++) {
+      const sim = simulate([{ shape: "d20", kind: "d20" }], seedOf(`cross-${s}`), arena);
+      expect(sim.frames[2] as number).toBeGreaterThan(arena.z / 2); // starts in the bottom half
+      let minZ = Number.POSITIVE_INFINITY;
+      for (let f = 0; f < sim.frameCount; f++)
+        minZ = Math.min(minZ, sim.frames[f * POSE + 2] as number);
+      if (minZ < -arena.z / 2) reached += 1;
+    }
+    expect(reached).toBeGreaterThanOrEqual(7);
+  });
+
+  test("equal viewports (to 50 px) run the same simulation; another shape another path, same faces", () => {
+    const a = screenArena({ w: 1280, h: 720 });
+    expect(screenArena({ w: 1290, h: 715 })).toEqual(a);
+    const dice = [{ shape: "d20", kind: "d20" }] as const;
+    const one = simulate(dice, seedOf("e1"), a);
+    const two = simulate(dice, seedOf("e1"), screenArena({ w: 1290, h: 715 }));
+    expect(Array.from(two.frames)).toEqual(Array.from(one.frames));
+    const other = simulate(dice, seedOf("e1"), screenArena({ w: 390, h: 844 }));
+    expect(Array.from(other.frames)).not.toEqual(Array.from(one.frames));
+    const g = geometryOf("d20");
+    for (const sim of [one, other]) {
+      const [labels] = settleLabels(sim, [17]);
+      expect(upFace(g, labels as number[], sim.final[0] as Quat)).toBe(17);
+    }
+  });
+});
+
+describe("FR-DICEX-33 FR-DICEX-44 die size, pixel ratio, shadows", () => {
+  test("FR-DICEX-33 dice layer die size: 7 % of the short side, clamped 40–96 px", () => {
+    expect(dieSizePx({ w: 390, h: 844 })).toBe(40);
+    expect(dieSizePx({ w: 1440, h: 900 })).toBe(63);
+    expect(dieSizePx({ w: 2560, h: 1440 })).toBe(96);
+  });
+
+  test("FR-DICEX-44 slow devices: pixel ratio ≤ 1.5; no shadows above 2.5 MP", () => {
+    expect(pixelRatioOf(1)).toBe(1);
+    expect(pixelRatioOf(2)).toBe(1.5);
+    expect(pixelRatioOf(3)).toBe(1.5);
+    expect(pixelRatioOf(0)).toBe(1);
+    expect(shadowsFor({ w: 2560, h: 1440 })).toBe(false);
+    expect(shadowsFor({ w: 1440, h: 900 })).toBe(true);
   });
 });

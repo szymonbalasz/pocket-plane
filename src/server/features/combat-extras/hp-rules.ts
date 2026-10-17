@@ -3,7 +3,8 @@
 // (`revert`), `char.adjustHp`, `cbtx.rollDeathSave` (natural 20). In the caller's transaction:
 //   1. `apply` writes HP (monsters on the combatant, PCs via `characters.adjustHp`), temp HP
 //      (absorbs first, FR-CBTX-15), death counters (FR-CBTX-20), ends concentration at 0 HP
-//      (FR-CBTX-16) and returns the rows + facts for the caller's event;
+//      (FR-CBTX-16), runs the effect hooks when it did (FR-CBTX-51) and returns the rows +
+//      facts for the caller's event;
 //   2. the caller emits its event;
 //   3. `after` creates the concentration card (FR-CBTX-17) and closes the cards of an ended
 //      concentration (FR-CBTX-10), so their events follow the owner's.
@@ -36,6 +37,7 @@ import {
   endEffects,
   endedByHpChange,
   restoreEffects,
+  runEffectHooks,
 } from "./effects";
 import {
   activeConcentrationOf,
@@ -194,7 +196,13 @@ export function apply(env: Env, target: HpTarget, input: ApplyInput): Applied {
       card = { concentration: conc, dc: concentrationDc(input.raw), damage: input.raw };
     }
   }
-  return { target, ...r, changes: [...r.changes, ...ended.changes], ended, card };
+  return {
+    target,
+    ...r,
+    changes: [...r.changes, ...ended.changes, ...runEffectHooks(env)],
+    ended,
+    card,
+  };
 }
 
 /**
@@ -291,7 +299,7 @@ export function revert(env: Env, row: HpChangeRecord, target: CombatantRecord): 
           .all()
           .map((n) => n.id);
   return {
-    changes: [...changes, ...restored.changes],
+    changes: [...changes, ...restored.changes, ...runEffectHooks(env)],
     notRestored: restored.notRestored,
     pendingNoteIds,
   };

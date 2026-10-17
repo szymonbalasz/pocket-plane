@@ -6,6 +6,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
+import { showToPlayers } from "./support/scenes";
 import { openWindow } from "./support/shell";
 
 async function idByName(scope: Locator, name: string): Promise<string> {
@@ -58,7 +59,7 @@ test("FR-CBTX-17 FR-CBTX-18 FR-CBTX-28 FR-CBTX-29 bar + icons for both; concentr
     .first()
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
-  await dm.getByTestId("map-show-to-players").click();
+  await showToPlayers(dm, "Goblin Ambush");
   await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
 
   // FR-CBTX-28/29: Goblin (3 temp HP, prone): DM proportional bar, player band bar; prone icon.

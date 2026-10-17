@@ -4,6 +4,7 @@
 // sees it live with its squares, Keep, reload, it is still there.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 interface TemplateNode {
@@ -75,7 +76,7 @@ test("FR-SCN-22 / -23 / -25 player places a sphere, the DM sees it live, Keep, r
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
-  await dm.getByTestId("map-show-to-players").click();
+  await showToPlayers(dm, "Goblin Ambush");
   await expect(dm.getByTestId("map-not-shown-badge")).toHaveCount(0);
   await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
   // FR-SCN-27: the DM sees both kept templates, Glyph in hidden styling.

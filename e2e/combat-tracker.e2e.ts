@@ -10,6 +10,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, tokenNode } from "./support/konva";
+import { showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 const row = (scope: Page | Locator, id: string) =>
@@ -56,7 +57,7 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
     .first()
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
-  await dm.getByTestId("map-show-to-players").click();
+  await showToPlayers(dm, "Goblin Ambush");
 
   // Step 1: the encounter card.
   const enc = await openWindow(dm, "cbt.encounters");

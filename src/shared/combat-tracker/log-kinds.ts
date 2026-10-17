@@ -7,11 +7,13 @@ import { DmModPart, ROLL_MODS_MAX, RollModPart } from "@shared/dice-roll-log/sch
 import { linePartSegments } from "@shared/effect-modifiers/combat-parts";
 import { modSegments } from "@shared/effect-modifiers/line";
 import { PartDamageType } from "@shared/effect-modifiers/schemas";
+import { EXTRA_DAMAGE_MAX } from "@shared/entities/schemas";
 import { z } from "zod";
 import {
   CardDie,
   LOG_KIND_ATTACK,
   LOG_KIND_HP,
+  TRIGGER_EXPRESSION_MAX,
   TRIGGER_LABEL_MAX,
   TRIGGER_PARTS_MAX,
 } from "./schemas";
@@ -24,11 +26,22 @@ const Multiplier = z.enum(["normal", "half", "none", "double"]);
  * its multiplier (inside `damage`); `type` null = the attack's type; `multiplier` its own when
  * not normal (R7). "+ 6 radiant (Divine Fury)".
  */
+/** FR-MOD-57 (sprint 4): per-die values of a landed trigger part, `expression`'s dice order. */
+export const LINE_PART_DICE_MAX = 20;
+const PartExpression = z.string().min(1).max(TRIGGER_EXPRESSION_MAX);
+const PartDice = z.array(z.int().min(1)).min(1).max(LINE_PART_DICE_MAX);
+
 export const AttackLinePart = z.strictObject({
   label: z.string().max(TRIGGER_LABEL_MAX).nullable(),
   value: z.int().min(0),
   type: PartDamageType.nullable(),
   multiplier: Multiplier.exclude(["normal"]).optional(),
+  /**
+   * FR-MOD-57 (sprint 4, rulings B3 / B4): the part's roll, **public character triggers only**
+   * (every other part keeps them in `dmPayload.parts`). Absent = none; old rows parse.
+   */
+  expression: PartExpression.optional(),
+  dice: PartDice.optional(),
 });
 export type AttackLinePart = z.infer<typeof AttackLinePart>;
 
@@ -42,6 +55,9 @@ export const AttackLineDmPart = z.strictObject({
   rolled: z.int(),
   set: z.literal(true).optional(),
   forced: z.literal(true).optional(),
+  /** FR-MOD-57 (sprint 4): every part's roll, for the DM's line. Absent = none; old rows parse. */
+  expression: PartExpression.optional(),
+  dice: PartDice.optional(),
 });
 export type AttackLineDmPart = z.infer<typeof AttackLineDmPart>;
 
@@ -56,6 +72,17 @@ export const DefenseFact = z.strictObject({
   level: z.enum(["resistance", "vulnerability", "immunity", "both"]),
   label: z.string().max(60),
 });
+
+/**
+ * FR-CBT-84 (sprint 4): one extra weapon damage part of the line (public, like the damage):
+ * `value` = after its own multiplier, which shows when not normal. "15 slashing + 4 fire (half)".
+ */
+export const AttackLineDamagePart = z.strictObject({
+  type: PartDamageType,
+  value: z.int().min(0),
+  multiplier: Multiplier.exclude(["normal"]).optional(),
+});
+export type AttackLineDamagePart = z.infer<typeof AttackLineDamagePart>;
 
 export const AttackLogPayload = z.strictObject({
   targetName: z.string(),
@@ -87,6 +114,11 @@ export const AttackLogPayload = z.strictObject({
    * parts). Absent = none; old rows parse. Rendered by R7 (card text, outcome lines).
    */
   parts: z.array(AttackLinePart).min(1).max(TRIGGER_PARTS_MAX).optional(),
+  /**
+   * FR-CBT-84 (sprint 4): the extra weapon parts in `damage` (`damage` = base + Σ extra + Σ
+   * trigger parts), attack-row order. Absent = none; old rows parse.
+   */
+  damageParts: z.array(AttackLineDamagePart).min(1).max(EXTRA_DAMAGE_MAX).optional(),
 });
 export type AttackLogPayload = z.infer<typeof AttackLogPayload>;
 

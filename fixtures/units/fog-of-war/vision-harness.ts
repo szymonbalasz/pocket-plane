@@ -70,8 +70,9 @@ export function tokenRecordsIn(frames: readonly ServerFrame[]): Record<string, u
 
 export type Who = "p1" | "p2";
 
-export async function visionHarness() {
-  const loaded = await loadBundle("vision", { dmSecret: TEST_SECRET, testMode: true });
+/** `bundle`: `vision` (default) or `vision-party` (sprint 4, + `vision-invisible`). */
+export async function visionHarness(bundle = "vision") {
+  const loaded = await loadBundle(bundle, { dmSecret: TEST_SECRET, testMode: true });
   const db: Db = openFileDb(loaded.config.dbPath);
   const players = db.select().from(player).all();
   const links = Object.fromEntries(players.map((r) => [r.name, r.linkToken]));
@@ -176,9 +177,14 @@ export async function visionHarness() {
    * Both players hold exactly `want` (token names on Goblin Ambush), then per player: leak scan,
    * no secret key on any frame, no upsert since `marks` of a token hidden for them now, `fogged`
    * only on own tokens; a fresh connection converges (tokens, `fog`, `vision`, `fog-explored`) and
-   * names no hidden token; a `resync` lands on the same state.
+   * names no hidden token; a `resync` lands on the same state. `o.party` (sprint 4, FR-FOG-51):
+   * the other player's `vision` id may appear (party vision has been on).
    */
-  async function expectSee(want: Record<Who, string[]>, marks?: Record<Who, number>) {
+  async function expectSee(
+    want: Record<Who, string[]>,
+    marks?: Record<Who, number>,
+    o: { party?: boolean } = {},
+  ) {
     for (const w of ["p1", "p2"] as const) {
       await until(() => names(c[w]).join() === [...want[w]].sort().join());
     }
@@ -194,7 +200,8 @@ export async function visionHarness() {
         '"doorSeen"',
         '"walls"',
         '"invisible"',
-        `${ambushId}:${other}`,
+        '"shared"',
+        ...(o.party ? [] : [`${ambushId}:${other}`]),
       ]) {
         expect(raw).not.toContain(key);
       }
@@ -295,8 +302,8 @@ export function explores(r: FogExploredRecord | undefined, col: number, row: num
  * The `vision` bundle on in-process services (no sockets): Goblin Ambush active, commands run as
  * the DM (or a player), every dispatched event captured, snapshots per viewer.
  */
-export async function visionServices() {
-  const loaded = await loadBundle("vision", { dmSecret: TEST_SECRET, testMode: true });
+export async function visionServices(bundle = "vision") {
+  const loaded = await loadBundle(bundle, { dmSecret: TEST_SECRET, testMode: true });
   const db: Db = openFileDb(loaded.config.dbPath);
   const s = createTestServices({ db });
   const events: DispatchedEvent[] = [];

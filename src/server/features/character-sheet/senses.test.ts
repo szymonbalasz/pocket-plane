@@ -67,11 +67,13 @@ describe("FR-CHARX-49 char.edit senses", () => {
     expect(t.events).toEqual([]);
   });
 
-  test("FR-CHARX-49 senses schema at the intent: 0–120 step 5, strict, whole object; nothing written", () => {
+  test("FR-CHARX-49 senses schema at the intent: vision 0–995 / darkvision 0–120 step 5, strict, whole object; nothing written", () => {
     const t = setup();
     const n = t.logCount();
     for (const bad of [
-      { ...TORCH, visionFt: 125 },
+      { ...TORCH, darkvisionFt: 125 },
+      { ...TORCH, visionFt: 999 },
+      { ...TORCH, visionFt: 1000 },
       { ...TORCH, darkvisionFt: 7 },
       { ...TORCH, visionFt: -5 },
       { ...TORCH, extra: true },
@@ -84,6 +86,16 @@ describe("FR-CHARX-49 char.edit senses", () => {
     ).toBe("invalid");
     expect(t.logCount()).toBe(n);
     expect(t.senses(t.t.miraId)).toBeUndefined();
+  });
+
+  test("FR-CHARX-49 vision default: a char.edit without visionFt clears a stored value (Normal); 995 and a stored 0 are kept", () => {
+    const t = setup();
+    t.edit(t.t.miraId, { ...TORCH, visionFt: 995 });
+    expect(t.senses(t.t.miraId)).toMatchObject({ visionFt: 995 });
+    t.edit(t.t.miraId, { darkvisionFt: 0, seesMagicalDarkness: false });
+    expect(t.senses(t.t.miraId)).toEqual({ darkvisionFt: 0, seesMagicalDarkness: false });
+    t.edit(t.t.miraId, { ...TORCH, visionFt: 0 });
+    expect(t.senses(t.t.miraId)).toMatchObject({ visionFt: 0 });
   });
 
   test("FR-CHARX-49 permissions: locked Mira, player-2 on Mira, imported Goblin → forbidden; DM on a custom NPC and a locked sheet ✓", () => {

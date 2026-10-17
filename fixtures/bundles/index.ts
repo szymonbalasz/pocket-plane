@@ -9,6 +9,8 @@ import characterSheetFull from "./character-sheet-full";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
 import compendium from "./compendium";
+import compendiumFull from "./compendium-full";
+import diceDisplay from "./dice-display";
 import diceExtras from "./dice-extras";
 import diceLog from "./dice-log";
 import effectModifiers from "./effect-modifiers";
@@ -27,6 +29,7 @@ import sessionSim from "./session-sim";
 import sessionSim7 from "./session-sim-7";
 import syncProbe from "./sync-probe";
 import vision from "./vision";
+import visionParty from "./vision-party";
 
 export const bundles: readonly Bundle[] = [
   base,
@@ -56,4 +59,7 @@ export const bundles: readonly Bundle[] = [
   ruleTriggers,
   vision,
   sessionSim7,
+  compendiumFull,
+  visionParty,
+  diceDisplay,
 ];

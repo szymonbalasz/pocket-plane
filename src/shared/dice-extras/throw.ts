@@ -27,6 +27,8 @@ export interface ThrowDie {
   flat: boolean;
   /** Typed in from physical dice (FR-DICE-06). */
   physical?: true;
+  /** A sum without per-die values (a part's sum, a manual total): a round chip (FR-DICEX-42). */
+  sum?: true;
   /** MOD / offered part label ("DM" when the part's label is null). */
   label?: string;
   sign: 1 | -1;
@@ -38,6 +40,12 @@ export interface ThrowDie {
 export interface DiceThrow {
   /** The first entry's id (`data-record-id`). */
   id: string;
+  /**
+   * FR-DICEX-15: the tumble's seed source, the first **public** entry's id (else the first
+   * entry's), so a DM frame mixing a DM-only entry with public ones tumbles the public dice
+   * exactly as the players see them.
+   */
+  seedId: string;
   entryIds: string[];
   /** Entries coalesced (FR-DICEX-11). */
   count: number;
@@ -125,6 +133,7 @@ const chipOf = (faces: number, sum: number, rest: Partial<DieInit>): DieInit => 
   flat: true,
   sign: 1,
   ...rest,
+  sum: true,
 });
 
 const ONE_DIE = /^([+-]?)1d(\d+)$/i;
@@ -229,6 +238,7 @@ export function throwDice(entries: readonly ThrowEntry[]): DiceThrow | null {
   }
   return {
     id: first.id,
+    seedId: (rolls.find((e) => e.public) ?? first).id,
     entryIds: rolls.map((e) => e.id),
     count: rolls.length,
     roller: { role: first.rollerRole, playerId: first.rollerPlayerId, name: first.actorName },

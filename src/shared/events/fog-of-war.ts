@@ -2,9 +2,10 @@
 // has its own per-scene stack, FR-FOG-07). Changes: the `fog` upsert, every subject whose
 // copies change, `scene-structure` door flags, `vision` / `fog-explored` rows and token-changed
 // hook rows (FR-FOG-08, -35). FOG v2 events (darkness, explored, Invisible) are declared in V0;
-// darkness and explored commands land in V1, `TokenInvisibleSet` in V2.
+// darkness and explored commands land in V1, `TokenInvisibleSet` in V2; sprint 4 (V6) adds
+// `PartyVisionSet` and `FogRedone`.
 import { FogEditKind, FogShape } from "@shared/fog-of-war/schemas";
-import { FogShapeGeom } from "@shared/fog-of-war/shapes";
+import { FogBrushGeom, FogShapeGeom } from "@shared/fog-of-war/shapes";
 import { z } from "zod";
 import { defineEvent } from "./types";
 
@@ -19,7 +20,7 @@ export const FogEdited = defineEvent({
       sceneId: z.string(),
       editId: z.string(),
       kind: FogEditKind,
-      shape: z.union([FogShapeGeom, FogShape]).optional(),
+      shape: z.union([FogShapeGeom, FogBrushGeom, FogShape]).optional(),
     })
     .strict(),
   logged: true,
@@ -87,6 +88,22 @@ export const ExploredForgotten = defineEvent({
 export const TokenInvisibleSet = defineEvent({
   type: "TokenInvisibleSet",
   payload: z.object({ sceneId: z.string(), tokenId: z.string(), invisible: z.boolean() }).strict(),
+  logged: true,
+  undoable: false,
+});
+
+/** FR-FOG-49 (sprint 4): `fog.setPartyVision` (campaign-wide; the active scene re-derived). */
+export const PartyVisionSet = defineEvent({
+  type: "PartyVisionSet",
+  payload: z.object({ on: z.boolean() }).strict(),
+  logged: true,
+  undoable: false,
+});
+
+/** FR-FOG-56 (sprint 4): `fog.redo`; `editId` = the re-applied entry, `kind` its kind. */
+export const FogRedone = defineEvent({
+  type: "FogRedone",
+  payload: z.object({ sceneId: z.string(), editId: z.string(), kind: FogEditKind }).strict(),
   logged: true,
   undoable: false,
 });

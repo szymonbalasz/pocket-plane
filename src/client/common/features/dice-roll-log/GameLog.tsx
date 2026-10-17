@@ -1,13 +1,21 @@
 // Window `dice.log` body, both clients (FR-DICE-21, 22, 27, 30; DICE §7). Entries from the synced
 // store; rolls go out as `dice.roll` intents. DM-only parts (public eye toggle, settings gear)
-// render from `you.role` / the `dmTools` slot.
+// render from `you.role` / the `dmTools` slot. Sprint 4: each `die` segment is an inline die-shape
+// chip in the roller's look (FR-DICE-35); `focusLogEntry` highlights an entry (FR-DICE-37).
 
+import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
   COMBATANT_TYPE,
   type CombatantRecord,
   ENCOUNTER_TYPE,
   type EncounterRecord,
 } from "@shared/combat-tracker/schemas";
+import {
+  DICE_LOOK_TYPE,
+  type DiceLook,
+  type DiceLookRecord,
+  lookOf,
+} from "@shared/dice-extras/looks";
 import type { LineSegment } from "@shared/dice-roll-log/kind-types";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import {
@@ -38,7 +46,9 @@ import { Badge, Input, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
+import { DieShape } from "../dice-extras/DieShape";
 import { stageTray } from "../dice-extras/store";
+import { scrollToEntry, useLogFocus } from "./focus";
 import {
   type ActorOption,
   actorOptions,
@@ -53,7 +63,33 @@ import { RollButton, useRollControl } from "./roll-control";
 const SELECT =
   "h-7 min-w-0 shrink-0 rounded-md border border-input bg-background px-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 
-function Segment({ s }: { s: LineSegment }) {
+function Segment({ s, look }: { s: LineSegment; look: DiceLook }) {
+  if (s.die) {
+    // FR-DICE-35: a wrapper per chip (review B31); the shape inside keeps `dicex-die`. A dropped
+    // die's wrapper is `<s>`, as its text was (struck for assistive tech too).
+    const d = s.die;
+    const Wrap = d.kept ? "span" : "s";
+    return (
+      <Wrap
+        data-testid="dice-log-die"
+        data-faces={d.faces ?? ""}
+        data-value={d.value}
+        data-kept={d.kept}
+        data-offered={d.offered === true}
+        className="-my-0.5 inline-flex align-middle"
+      >
+        <DieShape
+          faces={d.faces}
+          value={d.value}
+          kept={d.kept}
+          offered={d.offered === true}
+          look={look}
+          size="sm"
+          label={`${d.label ? `${d.label} ` : ""}${d.faces ? `d${d.faces}` : "dice"}: ${s.text}`}
+        />
+      </Wrap>
+    );
+  }
   switch (s.style) {
     case "actor":
     case "total":
@@ -95,7 +131,17 @@ function tooltipOf(e: GameLogEntryView): ReactNode {
   );
 }
 
-function Entry({ e, isDm }: { e: GameLogEntryView; isDm: boolean }) {
+function Entry({
+  e,
+  isDm,
+  look,
+  focused,
+}: {
+  e: GameLogEntryView;
+  isDm: boolean;
+  look: DiceLook;
+  focused: boolean;
+}) {
   const { segments } = useMemo(() => formatEntry(e), [e]);
   const hidden = isDm && !e.public;
   return (
@@ -104,10 +150,13 @@ function Entry({ e, isDm }: { e: GameLogEntryView; isDm: boolean }) {
       data-record-id={e.id}
       data-public={e.public}
       data-undone={e.undone}
+      data-focused={focused}
       // visibility.hidden token (visual-direction): hidden entries muted with an eye-off marker.
+      // FR-DICE-37: a focused entry gets the accent ring for 2 s.
       className={cn(
-        "flex items-start gap-1.5 py-px text-sm leading-snug",
+        "flex items-start gap-1.5 rounded-sm py-px text-sm leading-snug transition-shadow",
         hidden && "text-visibility-hidden",
+        focused && "ring-2 ring-ring",
       )}
     >
       {hidden && (
@@ -121,7 +170,7 @@ function Entry({ e, isDm }: { e: GameLogEntryView; isDm: boolean }) {
         <span className={cn("min-w-0 flex-1 break-words", e.undone && "line-through")}>
           {segments.map((s, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: segments are positional and immutable
-            <Segment key={i} s={s} />
+            <Segment key={i} s={s} look={look} />
           ))}
         </span>
       </Tooltip>
@@ -138,6 +187,9 @@ function Entry({ e, isDm }: { e: GameLogEntryView; isDm: boolean }) {
  */
 function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
+  const looks = useRollerLooks();
+  const focusedId = useLogFocus((s) => s.entryId);
+  const focusSeq = useLogFocus((s) => s.seq);
   const [stick] = useState(createStickToBottom);
   const seen = useRef<number>(0);
   const [unseen, setUnseen] = useState(0);
@@ -166,6 +218,12 @@ function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boole
     return () => ro.disconnect();
   }, [stick]);
 
+  // FR-DICE-37: scroll the focused entry into view (on a new focus, and when the log mounts).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per focus request (`focusSeq`)
+  useLayoutEffect(() => {
+    if (scrollToEntry(ref.current, focusedId)) stick.scrolled(ref.current as HTMLDivElement);
+  }, [focusSeq]);
+
   const toBottom = () => {
     const el = ref.current;
     if (!el) return;
@@ -193,7 +251,7 @@ function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boole
       >
         <ul className="flex flex-col">
           {entries.map((e) => (
-            <Entry key={e.id} e={e} isDm={isDm} />
+            <Entry key={e.id} e={e} isDm={isDm} look={looks(e)} focused={focusedId === e.id} />
           ))}
         </ul>
       </div>
@@ -534,6 +592,26 @@ function PhysicalStrip({ onOff }: { onOff: () => void }) {
       </button>
     </div>
   );
+}
+
+/** FR-DICE-35: chips in the roller's look (FR-DICEX-20): their `dice-look` row, else the default. */
+function useRollerLooks(): (e: GameLogEntryView) => DiceLook {
+  const rows = useRecords<DiceLookRecord>(DICE_LOOK_TYPE);
+  const players = useRecords<PlayerRecord>("player");
+  return useMemo(() => {
+    const ids = players.map((p) => p.id);
+    const cache = new Map<string, DiceLook>();
+    return (e) => {
+      const owner = e.rollerRole === "dm" ? null : e.rollerPlayerId;
+      const key = owner ?? "";
+      let look = cache.get(key);
+      if (!look) {
+        look = lookOf(owner, rows, ids);
+        cache.set(key, look);
+      }
+      return look;
+    };
+  }, [rows, players]);
 }
 
 /** The `dice.log` window body. `dmTools`: the DM's settings gear (FR-DICE-22). */

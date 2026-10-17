@@ -337,27 +337,41 @@ export function walletLine(w: Coins | undefined): string {
   return (w && formatCoins(w)) || "0 gp";
 }
 
-/** FR-CHARX-49: absent senses = vision 0, darkvision 0, both switches off. */
+/**
+ * FR-CHARX-49 (sprint 4, OQ-FOG-51): absent senses = Normal vision (no `visionFt`, 999 ft),
+ * darkvision 0, both switches off.
+ */
+export const NORMAL_SENSES: Senses = { darkvisionFt: 0, seesMagicalDarkness: false };
+/** Stored 0 / 0: no vision at all (sprint 3's default). */
 export const NO_SENSES: Senses = { visionFt: 0, darkvisionFt: 0, seesMagicalDarkness: false };
 
-/** FR-CHARX-50 / -53: the Senses line's parts; zero / false parts omitted. */
+/**
+ * FR-CHARX-50 / -53: the Senses line's parts. Vision first (sprint 4): absent "Vision normal", a
+ * stored value "Vision 30 ft", a stored 0 "No vision"; zero / false other parts omitted.
+ */
 export function sensesParts(senses: Senses | undefined): string[] {
-  const s = senses ?? NO_SENSES;
+  const s = senses ?? NORMAL_SENSES;
+  const vision =
+    s.visionFt === undefined
+      ? "Vision normal"
+      : s.visionFt > 0
+        ? `Vision ${s.visionFt} ft`
+        : "No vision";
   return [
-    s.visionFt > 0 ? `Vision ${s.visionFt} ft` : null,
+    vision,
     s.darkvisionFt > 0 ? `Darkvision ${s.darkvisionFt} ft` : null,
     s.seesMagicalDarkness ? "Sees through magical darkness" : null,
     s.seesInvisible ? "Sees invisible" : null,
   ].filter((p): p is string => p !== null);
 }
 
-/** The line after "Senses": parts joined by " · ", or "—" when all default. */
-export const sensesText = (senses: Senses | undefined): string =>
-  sensesParts(senses).join(" · ") || "—";
+/** The line after "Senses": parts joined by " · " (vision is always there, sprint 4). */
+export const sensesText = (senses: Senses | undefined): string => sensesParts(senses).join(" · ");
 
 /**
- * The whole `senses` object for `char.edit` (FR-CHARX-49): the shown value with `patch` applied.
- * A player never sends `seesInvisible` (absent = the stored value; changing it is DM only,
+ * The whole `senses` object for `char.edit` (FR-CHARX-49): the shown value with `patch` applied;
+ * `visionFt: undefined` in the patch = Normal (the key is omitted, clearing a stored value). A
+ * player never sends `seesInvisible` (absent = the stored value; changing it is DM only,
  * FR-CHARX-53).
  */
 export function sensesEdit(
@@ -365,6 +379,7 @@ export function sensesEdit(
   patch: Partial<Senses>,
   client: "dm" | "player",
 ): Senses {
-  const { seesInvisible, ...rest } = { ...NO_SENSES, ...senses, ...patch };
-  return client === "dm" ? { ...rest, seesInvisible: seesInvisible ?? false } : rest;
+  const { seesInvisible, visionFt, ...rest } = { ...NORMAL_SENSES, ...senses, ...patch };
+  const out: Senses = visionFt === undefined ? rest : { visionFt, ...rest };
+  return client === "dm" ? { ...out, seesInvisible: seesInvisible ?? false } : out;
 }

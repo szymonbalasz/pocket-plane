@@ -1,5 +1,6 @@
 // Creature lookup (FR-CBT-63): the builder's and the Add dialog's autocomplete. Pure; the part is
-// `CreatureLookup` in `./parts`.
+// `CreatureLookup` in `./parts`. Matches with the compendium's shared matcher (FR-CMP-37).
+import { type NameTier, nameTier, queryWords } from "@shared/compendium/match";
 
 /** What a suggestion row shows: name, CR, XP, source Badge (FR-CBT-63). */
 export interface LookupRow {
@@ -13,34 +14,22 @@ export interface LookupRow {
 /** FR-CBT-63: up to 8 suggestions. */
 export const LOOKUP_MAX = 8;
 
-const WORD_START = /[\s\-–—(/,.'’]/;
-
-/** 0 = name prefix, 1 = a word starts with it, 2 = substring, null = no match. */
-function rank(name: string, q: string): 0 | 1 | 2 | null {
-  const n = name.toLowerCase();
-  const at = n.indexOf(q);
-  if (at < 0) return null;
-  if (at === 0) return 0;
-  for (let i = at; i >= 0; i = n.indexOf(q, i + 1)) {
-    if (i > 0 && WORD_START.test(n[i - 1] as string)) return 1;
-  }
-  return 2;
-}
-
 /**
- * FR-CBT-63: from one typed character, case-insensitive; name prefix, then word start, then
- * substring; ties keep `rows`' order (FR-ENT-18). Empty input → no list.
+ * FR-CBT-63 (S4, FR-CMP-37): from one typed character; every typed word must match the name
+ * (folded: case, accents, apostrophes), ranked by the shared `nameTier` (0 exact, 1 name starts
+ * with the query, 2 every word starts a name word, 3 every word inside the name); ties keep
+ * `rows`' order (FR-ENT-18, or the lookup merge's). Empty input → no list.
  */
 export function lookupMatches<R extends { name: string }>(
   rows: readonly R[],
   query: string,
   max = LOOKUP_MAX,
 ): R[] {
-  const q = query.trim().toLowerCase();
-  if (q === "") return [];
+  const words = queryWords(query);
+  if (words.length === 0) return [];
   return rows
-    .map((r, i) => ({ r, i, k: rank(r.name, q) }))
-    .filter((x): x is { r: R; i: number; k: 0 | 1 | 2 } => x.k !== null)
+    .map((r, i) => ({ r, i, k: nameTier(r.name, words) }))
+    .filter((x): x is { r: R; i: number; k: NameTier } => x.k !== null)
     .sort((a, b) => a.k - b.k || a.i - b.i)
     .slice(0, max)
     .map((x) => x.r);

@@ -23,6 +23,7 @@ import {
   sceneStructure,
   token,
 } from "@server/db/schema";
+import { loadSceneSight } from "@server/features/fog-of-war/derive";
 import { SNAPSHOT_CEILING } from "@server/ws/hub";
 import type { Viewer } from "@server/ws/records";
 import { playerViewer, sourceOf } from "@server/ws/testing/convergence";
@@ -212,6 +213,16 @@ describe("session-sim-7 bundle (sprint-3 gate)", () => {
     });
     const brakka = sheetOf(db, "Brakka");
     expect(brakka.e?.ownerPlayerId).toBe(p1 as string);
+    // V (sprint 4, review A4 / A14): Brakka has no senses, so she sees Normal 999 ft: her token is
+    // one of player-1's sources on Goblin Ambush, its polygon bounded by walls and the map edges
+    // (no "No vision set" hint for her; `vision-brakka` goes to session-sim-8, not here).
+    expect(senses(brakka.e)).toBeUndefined();
+    const brakkaToken = tokens.find((t) => t.name === "Brakka");
+    const p1Sight = loadSceneSight(db, ambush?.id ?? "")?.sight.get(p1 as string);
+    expect(p1Sight?.sources.map((x) => x.tokenId)).toContain(brakkaToken?.id as string);
+    const i = p1Sight?.vision.src.indexOf(brakkaToken?.id as string) ?? -1;
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(p1Sight?.vision.see.length).toBe(2);
     const rageRow = brakka.sheet.features.find((f) => f.name === "Rage");
     expect([rageRow?.usesMax, rageRow?.used]).toEqual([3, 0]);
     const rage = db

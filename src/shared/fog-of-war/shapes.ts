@@ -2,8 +2,25 @@
 // units (corner (i, j) = map point `offset + (i, j) × cellSize`; cell (c, r) covers
 // [c, c + 1) × [r, r + 1), centre (c + ½, r + ½)). Numbers carry ≤ 2 decimals; containment tests
 // run on 1/100-cell integers, so they are exact. Pure; shared by server and clients.
-// Leaf module: imports only types (`./schemas` imports these zod shapes for the `fog` record).
+// Sprint 4 (FR-FOG-26, -55): the brush's fog-only shapes `stroke` and `cells` (containment in
+// `./brush.ts`); never darkness.
+// Leaf module: imports only types and `./brush` (itself a leaf; `./schemas` imports these zod
+// shapes for the `fog` record).
 import { z } from "zod";
+import {
+  type BrushShape,
+  brushBox,
+  brushContains,
+  CELLS_BOX_MAX,
+  CELLS_RUNS_MAX,
+  cellsRunCount,
+  decodeCells,
+  type PreparedBrush,
+  prepareBrush,
+  STROKE_POINTS_MAX,
+  STROKE_R_MAX,
+  STROKE_R_MIN,
+} from "./brush";
 import type { FogMask } from "./mask";
 
 /** FR-FOG-26: |coord| ≤ 1,024. */
@@ -51,16 +68,47 @@ export const FogShapeGeom = z.union([
 ]);
 export type FogShapeGeom = z.infer<typeof FogShapeGeom>;
 
+const strokeField = {
+  /** FR-FOG-26 (sprint 4): `[r, x0, y0, …]`, r 0.5–10 cells, 1–256 points. */
+  stroke: z
+    .array(Dec2)
+    .min(3)
+    .max(1 + 2 * STROKE_POINTS_MAX)
+    .refine((a) => a.length % 2 === 1, "A radius, then pairs of x, y")
+    .refine(
+      (a) => (a[0] ?? 0) >= STROKE_R_MIN && (a[0] ?? 0) <= STROKE_R_MAX,
+      `Radius ${STROKE_R_MIN}–${STROKE_R_MAX} cells`,
+    ),
+};
+const CellsDim = z.number().int().min(1).max(CELLS_BOX_MAX);
+const CellsAt = z.number().int().min(-SHAPE_COORD_MAX).max(SHAPE_COORD_MAX);
+const cellsField = {
+  /** FR-FOG-26 (sprint 4): whole cells, box ≤ 128 × 128, FR-FOG-04 runs ("1" painted) ≤ 500. */
+  cells: z
+    .strictObject({
+      box: z.tuple([CellsAt, CellsAt, CellsDim, CellsDim]),
+      runs: z.string().max(8 * CELLS_RUNS_MAX),
+    })
+    .refine((c) => cellsRunCount(c.runs) <= CELLS_RUNS_MAX, `At most ${CELLS_RUNS_MAX} runs`)
+    .refine((c) => decodeCells(c) !== null, "Runs must cover the box and paint a cell"),
+};
+
+/** FR-FOG-26 (sprint 4): the brush's fog-only shapes (never darkness, FR-FOG-57). */
+export const FogBrushGeom = z.union([z.strictObject(strokeField), z.strictObject(cellsField)]);
+export type FogBrushGeom = z.infer<typeof FogBrushGeom>;
+
 /** FR-FOG-01: what a fog-layer shape paints. */
 export const FOG_SHAPE_OPS = ["reveal", "fog", "explored"] as const;
 export const FogShapeOp = z.enum(FOG_SHAPE_OPS);
 export type FogShapeOp = z.infer<typeof FogShapeOp>;
 
-/** FR-FOG-26: a fog-layer shape `{op, <shape>}`. */
+/** FR-FOG-26: a fog-layer shape `{op, <shape>}` (sprint 4: + `stroke`, `cells`). */
 export const FogLayerShape = z.union([
   z.strictObject({ op: FogShapeOp, ...rectField }),
   z.strictObject({ op: FogShapeOp, ...polygonField }),
   z.strictObject({ op: FogShapeOp, ...circleField }),
+  z.strictObject({ op: FogShapeOp, ...strokeField }),
+  z.strictObject({ op: FogShapeOp, ...cellsField }),
 ]);
 export type FogLayerShape = z.infer<typeof FogLayerShape>;
 
@@ -82,6 +130,12 @@ export type ShapeLike =
   | { rect: readonly number[] }
   | { polygon: readonly number[] }
   | { circle: readonly number[] };
+
+/** A fog-layer shape's geometry: a `ShapeLike` or a brush shape (sprint 4). */
+export type LayerShapeLike = ShapeLike | BrushShape;
+
+/** Is it a brush shape (`stroke` / `cells`)? */
+export const isBrush = (s: LayerShapeLike): s is BrushShape => "stroke" in s || "cells" in s;
 
 /** `[x0, y0, x1, y1]`, x0 ≤ x1, y0 ≤ y1. */
 export type Box = [x0: number, y0: number, x1: number, y1: number];
@@ -182,14 +236,17 @@ export function shapeProblem(s: ShapeLike): "crossing" | "zero-area" | null {
 
 /** A shape on 1/100-cell integers, normalised, for repeated containment tests. */
 export interface PreparedShape {
-  /** 0 rect `[x0, y0, x1, y1]`, 1 circle `[cx, cy, r]`, 2 polygon flat. */
-  kind: 0 | 1 | 2;
+  /** 0 rect `[x0, y0, x1, y1]`, 1 circle `[cx, cy, r]`, 2 polygon flat, 3 brush (`brush`). */
+  kind: 0 | 1 | 2 | 3;
   v: Float64Array;
   /** Bounding box in grid units. */
   box: Box;
+  brush?: PreparedBrush;
 }
 
-export function prepareShape(s: ShapeLike): PreparedShape {
+export function prepareShape(s: LayerShapeLike): PreparedShape {
+  if (isBrush(s))
+    return { kind: 3, v: new Float64Array(0), box: brushBox(s), brush: prepareBrush(s) };
   if ("rect" in s) {
     const [a, b, c, d] = s.rect.map(S) as [number, number, number, number];
     const v = Float64Array.of(Math.min(a, c), Math.min(b, d), Math.max(a, c), Math.max(b, d));
@@ -201,6 +258,7 @@ export function prepareShape(s: ShapeLike): PreparedShape {
 
 /** `shapeContains` on a prepared shape, the point already on 1/100-cell integers. Exact. */
 export function preparedContains(p: PreparedShape, px: number, py: number): boolean {
+  if (p.kind === 3) return p.brush ? brushContains(p.brush, px, py) : false;
   const v = p.v;
   if (p.kind === 0) {
     return (
@@ -247,13 +305,14 @@ export function preparedContains(p: PreparedShape, px: number, py: number): bool
  * FR-FOG-01: the point lies inside or on the shape (boundary-inclusive; polygons even-odd).
  * The point is compared at 1/100-cell resolution (cell centres and 2-decimal points are exact).
  */
-export function shapeContains(s: ShapeLike | PreparedShape, x: number, y: number): boolean {
+export function shapeContains(s: LayerShapeLike | PreparedShape, x: number, y: number): boolean {
   const p = "kind" in s ? s : prepareShape(s);
   return preparedContains(p, S(x), S(y));
 }
 
 /** Bounding box `[x0, y0, x1, y1]` of a shape (FR-FOG-44 darkness filter). */
-export function shapeBox(s: ShapeLike): Box {
+export function shapeBox(s: LayerShapeLike): Box {
+  if (isBrush(s)) return brushBox(s);
   if ("rect" in s) {
     const [a, b, c, d] = s.rect as [number, number, number, number];
     return [Math.min(a, c), Math.min(b, d), Math.max(a, c), Math.max(b, d)];
@@ -398,7 +457,7 @@ function baseFogged(mask: FogMask, col: number, row: number): boolean {
  */
 export function staticState(
   mask: FogMask,
-  shapes: readonly (ShapeLike & { op: FogShapeOp })[],
+  shapes: readonly (LayerShapeLike & { op: FogShapeOp })[],
   x: number,
   y: number,
 ): StaticState {

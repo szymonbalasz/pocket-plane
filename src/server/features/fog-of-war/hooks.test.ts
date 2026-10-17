@@ -19,7 +19,7 @@ import { tokenVisibility } from "../scenes-map/visibility";
 import { sceneVisibilityHooks } from "../scenes-map/visibility-hooks";
 import { fogUndoStack } from "./commands";
 import { readFogRecord } from "./rows";
-import { dropFogRow } from "./testing";
+import { dropFogRow, legacySenses } from "./testing";
 
 const placeOne = defineCommand({
   name: "test.placeOne",
@@ -38,6 +38,7 @@ const placeOne = defineCommand({
 
 function setup() {
   const t = scenesSetup();
+  legacySenses(t.s.db);
   t.s.commands.register(placeOne as unknown as CommandDef);
   // Scenes as before this build (no fog row); `fresh` keeps FR-FOG-02's fully fogged row.
   const fresh = (name: string) =>

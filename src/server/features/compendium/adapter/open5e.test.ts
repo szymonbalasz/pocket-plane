@@ -75,7 +75,7 @@ describe("FR-CMP-05 adapter", () => {
         { name: "Shortbow", toHit: 4, damage: "1d6+2", damageType: "piercing" },
       ],
       cr: "1/4",
-      senses: { visionFt: 0, darkvisionFt: 60, seesMagicalDarkness: false },
+      senses: { darkvisionFt: 60, seesMagicalDarkness: false },
     });
     const entry = rec("monster/goblin")?.data;
     expect(entry?.kind === "monster" && entry.body.traits.map((t) => t.name)).toEqual([

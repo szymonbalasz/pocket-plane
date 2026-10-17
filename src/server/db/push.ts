@@ -1,5 +1,6 @@
 // Schema creation via drizzle-kit push (ADR-0001: push in dev; migrations start at release).
 import type { Database } from "bun:sqlite";
+import { FRESH_DB_META } from "./meta";
 import { schema } from "./schema";
 
 type KitApi = typeof import("drizzle-kit/api");
@@ -17,10 +18,18 @@ export async function createSchemaStatements(): Promise<string[]> {
   return api.generateSQLiteMigration(empty, current);
 }
 
+/** Stamps a DB just created from scratch with the current model versions (`FRESH_DB_META`). */
+function stampFresh(sqlite: Database): void {
+  for (const [key, value] of FRESH_DB_META) {
+    sqlite.query("INSERT INTO db_meta (key, value) VALUES (?, ?)").run(key, value);
+  }
+}
+
 export async function createSchema(sqlite: Database): Promise<void> {
   const stmts = await createSchemaStatements();
   sqlite.transaction(() => {
     for (const s of stmts) sqlite.run(s);
+    stampFresh(sqlite);
   })();
 }
 
@@ -105,6 +114,7 @@ export async function pushSchema(
     const stmts = await createSchemaStatements();
     sqlite.transaction(() => {
       for (const s of stmts) sqlite.run(s);
+      stampFresh(sqlite);
     })();
     return { applied: stmts.length, backup: null };
   }

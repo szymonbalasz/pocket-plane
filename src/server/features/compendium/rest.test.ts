@@ -100,11 +100,12 @@ describe("compendium REST (C2)", () => {
     expect((await get("/search?bogus=1", "dm")).res.status).toBe(400);
   });
 
-  test("FR-CMP-10 FR-CMP-14 search: DM 'goblin' → Goblin then Hobgoblin with definitions; player gets no monsters; kind=monster empty for a player", async () => {
-    // SRD entries only here (the fixture Goblin without an entry: the FR-CMP-17 test below).
-    const dm = (await search({ q: "goblin" }, "dm")).filter((r) => r.sourceLabel === "SRD 5.1");
-    expect(dm.slice(0, 2).map((r) => [r.name, r.kind, r.sourceLabel])).toEqual([
+  test("FR-CMP-10 FR-CMP-14 FR-CMP-38 search: DM 'goblin' → SRD Goblin, fixture Goblin, Hobgoblin with definitions; player gets no monsters; kind=monster empty for a player", async () => {
+    // The fixture Goblin has no entry (FR-CMP-17): same tier, ranked after the SRD one.
+    const dm = await search({ q: "goblin" }, "dm");
+    expect(dm.slice(0, 3).map((r) => [r.name, r.kind, r.sourceLabel])).toEqual([
       ["Goblin", "monster", "SRD 5.1"],
+      ["Goblin", "monster", "fixture"],
       ["Hobgoblin", "monster", "SRD 5.1"],
     ]);
     expect(dm[0]?.definitionId).toBeTruthy();
@@ -144,11 +145,18 @@ describe("compendium REST (C2)", () => {
       line: "CR 1/4 · Medium",
       definitionId: fixtureIds.Wolf as string,
     });
-    // Same tiers as entries: both Wolves are name prefixes; ties by name key, then id.
-    expect(wo.map((r) => r.name)).toEqual(["Wolf", "Wolf"]);
+    // Same tiers as entries: both Wolves are name prefixes; the fixture one ranks after the SRD
+    // one (FR-CMP-38).
+    expect(wo.map((r) => [r.name, r.sourceLabel])).toEqual([
+      ["Wolf", "SRD 5.1"],
+      ["Wolf", "fixture"],
+    ]);
     const all = await search({ q: "goblin" }, "dm");
-    expect(all.some((r) => r.id === fixtureIds.Goblin)).toBe(true);
-    expect(all.slice(0, 2).map((r) => r.name)).toEqual(["Goblin", "Goblin"]);
+    expect(all.slice(0, 2).map((r) => [r.name, r.sourceLabel])).toEqual([
+      ["Goblin", "SRD 5.1"],
+      ["Goblin", "fixture"],
+    ]);
+    expect(all[1]?.id).toBe(fixtureIds.Goblin as string);
     // CR filter applies; a type filter can't match (the creature core has no type).
     expect(
       (await search({ kind: "monster", crMin: "1" }, "dm")).some(
@@ -193,10 +201,11 @@ describe("compendium REST (C2)", () => {
     expect(await search({ q: "CMP-SECRET" }, "Player 1")).toEqual([]);
     expect(await search({ q: "CMP-SECOND" }, "Player 2")).toEqual([]);
     expect((await search({ q: "fire" }, "Player 2")).map((r) => r.name)).toEqual(["Fireball"]);
-    // Name prefixes first, then text matches (the dragon's fire breath).
+    // Name tiers first (homebrew before SRD on a tie, FR-CMP-38), then text matches (the
+    // dragon's fire breath).
     expect((await search({ q: "fire" }, "dm")).map((r) => r.name)).toEqual([
-      "Fireball",
       "Fireball (house)",
+      "Fireball",
       "Adult Red Dragon",
     ]);
   });

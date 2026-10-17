@@ -7,17 +7,23 @@ import {
   EFFECT_ENDED_REASONS,
   EFFECT_KINDS,
 } from "@shared/combat-extras/schemas";
-import { HP_MODES, type HpTriggerPart } from "@shared/combat-tracker/schemas";
+import { HP_MODES, type HpDamagePart, type HpTriggerPart } from "@shared/combat-tracker/schemas";
 import { COMPENDIUM_KINDS } from "@shared/compendium/schemas";
 import { DICE_MATERIALS, DICE_STYLES } from "@shared/dice-extras/looks";
 import type { Modifier } from "@shared/effect-modifiers/schemas";
 import { TRIGGER_USE_STATES } from "@shared/effect-modifiers/trigger-records";
-import type { TriggerRule } from "@shared/effect-modifiers/triggers";
+import { TRIGGER_CHARGES } from "@shared/effect-modifiers/trigger-state";
+import { TRIGGER_EVENTS, type TriggerRule } from "@shared/effect-modifiers/triggers";
 import { TOKEN_SHAPES } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
 import { LOOT_ENTRY_KINDS } from "@shared/events/party-loot";
-import { type DoorSeen, FOG_EDIT_KINDS, FOG_FILLS } from "@shared/fog-of-war/schemas";
+import {
+  type DoorSeen,
+  FOG_EDIT_KINDS,
+  FOG_FILLS,
+  type FogBaseState,
+} from "@shared/fog-of-war/schemas";
 import type { DarknessRow, FogLayerShape } from "@shared/fog-of-war/shapes";
 import type { SharedWith } from "@shared/party-board/schemas";
 import { DIAGONAL_RULES, type Door, TEMPLATE_SHAPES, type Wall } from "@shared/scene-tools/schemas";
@@ -623,6 +629,12 @@ export const hpChange = sqliteTable(
       .$type<HpTriggerPart[]>()
       .notNull()
       .default([]),
+    /**
+     * combat-tracker (FR-CBT-84, sprint 4): JSON leaf ≤ 2 extra weapon damage parts
+     * `{type, rolled, total, multiplier, raw}` (the base part keeps `damageType`, `damageRolled`,
+     * `damageTotal`, `multiplier`; `raw` above stays the whole amount); null = none. DM only.
+     */
+    damageParts: text("damage_parts", { mode: "json" }).$type<HpDamagePart[] | null>(),
     entryId: text("entry_id")
       .notNull()
       .references((): AnySQLiteColumn => gameLogEntry.id),
@@ -937,6 +949,44 @@ export const triggerUse = sqliteTable(
   ],
 );
 
+/**
+ * Trigger state (effect-modifiers, `trigger-state`, in the snapshot; FR-MOD-53–55, ADR-0049,
+ * data model §27): a derived display copy, one row per (enabled trigger, owner combatant) while
+ * the encounter is `started` (deleted at End), rewritten in the causing transaction.
+ * `characterId` / `ownerPlayerId` are visibility copies (null / null for monsters); `featureId`
+ * is soft. `trigger_use` stays the truth for charges.
+ */
+export const triggerState = sqliteTable(
+  "trigger_state",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    encounterId: text("encounter_id")
+      .notNull()
+      .references((): AnySQLiteColumn => encounter.id),
+    combatantId: text("combatant_id")
+      .notNull()
+      .references((): AnySQLiteColumn => combatant.id),
+    triggerId: text("trigger_id")
+      .notNull()
+      .references((): AnySQLiteColumn => ruleTrigger.id, { onDelete: "cascade" }),
+    characterId: text("character_id"),
+    ownerPlayerId: text("owner_player_id"),
+    name: text("name").notNull(),
+    on: text("on", { enum: TRIGGER_EVENTS }).notNull(),
+    armed: integer("armed", { mode: "boolean" }).notNull(),
+    charge: text("charge", { enum: TRIGGER_CHARGES }).notNull(),
+    featureId: text("feature_id"),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("trigger_state_owner").on(t.encounterId, t.combatantId, t.triggerId),
+    index("trigger_state_campaign").on(t.campaignId),
+  ],
+);
+
 /** CON-20: `seq` values for Combat inserts, computed by the DB inside the insert's transaction. */
 export const notificationSeqNext = sql<number>`(select coalesce(max(${notification.seq}), 0) + 1 from ${notification})`;
 export const encounterSeqNext = sql<number>`(select coalesce(max(${encounter.seq}), 0) + 1 from ${encounter})`;
@@ -1010,6 +1060,14 @@ export const sceneFogEdit = sqliteTable(
     /** FR-FOG-07: shapes / darkness before the edit; null on pre-v2 rows. */
     prevShapes: text("prev_shapes", { mode: "json" }).$type<FogLayerShape[]>(),
     prevDarkness: text("prev_darkness", { mode: "json" }).$type<DarknessRow[]>(),
+    /**
+     * FR-FOG-56 (sprint 4): set when undone (the entry joins the redo list); `next*` = the state
+     * the undo replaced (base mask, shapes, darkness), re-applied by `fog.redo`. Null otherwise.
+     */
+    undoneAt: text("undone_at"),
+    nextBase: text("next_base", { mode: "json" }).$type<FogBaseState>(),
+    nextShapes: text("next_shapes", { mode: "json" }).$type<FogLayerShape[]>(),
+    nextDarkness: text("next_darkness", { mode: "json" }).$type<DarknessRow[]>(),
     createdAt: text("created_at").notNull(),
   },
   (t) => [
@@ -1051,6 +1109,18 @@ export const fogExplored = sqliteTable(
     index("fog_explored_player").on(t.playerId),
   ],
 );
+
+/**
+ * FR-FOG-49 (sprint 4, ADR party vision): the campaign's fog settings; no row = party vision off.
+ * Wire record `fog-settings` `{id = campaignId, partyVision}`.
+ */
+export const fogSettings = sqliteTable("fog_settings", {
+  campaignId: text("campaign_id")
+    .primaryKey()
+    .references((): AnySQLiteColumn => campaign.id),
+  partyVision: integer("party_vision", { mode: "boolean" }).notNull().default(false),
+  updatedAt: text("updated_at").notNull(),
+});
 
 // ---------------------------------------------------------------------------------------------
 // Scene tools (SCN §8, data model §25; fix/scn-core). scene-tools writes the rows. Every scene
@@ -1283,9 +1353,11 @@ export const schema = {
   effectPreset,
   ruleTrigger,
   triggerUse,
+  triggerState,
   sceneFog,
   sceneFogEdit,
   fogExplored,
+  fogSettings,
   sceneStructure,
   prop,
   aoeTemplate,

@@ -1,8 +1,8 @@
 // FR-CMP-19 entry views (static render over a fake store): the Goblin stat block (core from the
 // definition + reference sections), spell, homebrew item, footer + About; FR-CMP-21 the DM's drag
-// handle; FR-CMP-18 the window body's search, Filters and Tabs per role.
+// handle; FR-CMP-18 the window body's search, Filters and Tabs per role; FR-CMP-35 group rows.
 import { describe, expect, test } from "bun:test";
-import type { EntryResponse } from "@shared/compendium/rest";
+import type { EntryResponse, EntrySummary } from "@shared/compendium/rest";
 import { emptyStore } from "@shared/protocol/store";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -10,7 +10,7 @@ import { createStore } from "zustand";
 import type { Api } from "../../api";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
-import { CompendiumBody } from "./CompendiumWindow";
+import { CompendiumBody, GroupMembers, GroupRow } from "./CompendiumWindow";
 import type { Role } from "./logic";
 import { resetCmpNav } from "./nav";
 import { EntryView } from "./views";
@@ -238,5 +238,76 @@ describe("FR-CMP-18 window body", () => {
     const player = render("player", <CompendiumBody api={api} viewer="player" />);
     expect(player.match(/data-testid="cmp-tab"/g)).toHaveLength(5);
     expect(player).not.toContain('data-value="monster"');
+  });
+});
+
+describe("FR-CMP-35 group rows", () => {
+  const CLASSES = ["Barbarian", "Bard", "Cleric", "Druid", "Fighter", "Monk"];
+  const ASI: EntrySummary = {
+    id: "asi-barbarian",
+    kind: "feature",
+    name: "Ability Score Improvement",
+    sourceLabel: "SRD 5.1",
+    line: "12 entries · Barbarian, Bard, Cleric, Druid, Fighter, Monk, Paladin, Ranger, Rogue",
+    group: { count: 12 },
+  };
+  const members: EntrySummary[] = CLASSES.map((c) => ({
+    id: `asi-${c.toLowerCase()}`,
+    kind: "feature",
+    name: "Ability Score Improvement",
+    sourceLabel: "SRD 5.1",
+    line: `${c} · 4th level`,
+  }));
+
+  test("FR-CMP-35 FR-CMP-36 collapsed group row: one cmp-result with data-group-count, name + group line, toggle aria-expanded false, no members", () => {
+    const html = render("dm", <GroupRow r={ASI} expanded={false} />);
+    expect(html.match(/data-testid="cmp-result"/g)).toHaveLength(1);
+    expect(html).toContain(
+      'data-record-id="asi-barbarian" data-value="feature" data-group-count="12"',
+    );
+    expect(html).toMatch(
+      /data-testid="cmp-group-toggle" data-record-id="asi-barbarian" aria-expanded="false"/,
+    );
+    expect(text(html)).toContain("Ability Score Improvement");
+    expect(text(html)).toContain("12 entries · Barbarian, Bard, Cleric");
+    expect(html).not.toContain("cmp-group-member");
+  });
+
+  test("FR-CMP-35 expanded: members in place below the row, each with its own line; loading skeleton first; same in the player client", () => {
+    for (const role of ["dm", "player"] as const) {
+      const html = render(
+        role,
+        <GroupRow r={ASI} expanded>
+          <GroupMembers group={ASI} members={{ state: "ready", members }} viewer={role} />
+        </GroupRow>,
+      );
+      expect(html).toContain('aria-expanded="true"');
+      expect(html.match(/data-testid="cmp-group-member"/g)).toHaveLength(members.length);
+      expect(html).toContain('data-testid="cmp-group-member" data-record-id="asi-fighter"');
+      expect(text(html)).toContain("Fighter · 4th level");
+      // The toggle precedes its members.
+      expect(html.indexOf("cmp-group-toggle")).toBeLessThan(html.indexOf("cmp-group-member"));
+    }
+    const loading = render(
+      "dm",
+      <GroupRow r={ASI} expanded>
+        <GroupMembers group={ASI} members={{ state: "loading" }} viewer="dm" />
+      </GroupRow>,
+    );
+    expect(loading).toContain('data-testid="cmp-group-loading"');
+    const collapsed = render(
+      "dm",
+      <GroupRow r={ASI} expanded={false}>
+        <GroupMembers group={ASI} members={{ state: "ready", members }} viewer="dm" />
+      </GroupRow>,
+    );
+    expect(collapsed).not.toContain("cmp-group-member");
+  });
+
+  test("FR-CMP-35 search placeholder 'Search: words in any order'", () => {
+    resetCmpNav();
+    expect(render("dm", <CompendiumBody api={{} as Api} viewer="dm" />)).toContain(
+      'placeholder="Search: words in any order"',
+    );
   });
 });

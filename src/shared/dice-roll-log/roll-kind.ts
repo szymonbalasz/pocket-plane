@@ -6,8 +6,8 @@
 // from `dmPayload`, players see "(DM)" for parts of effects they don't receive.
 import { rollOfferSegments } from "@shared/effect-modifiers/combat-parts";
 import { AUTO_PART_TEXT, modeLabels, modSegments, modsTotal } from "@shared/effect-modifiers/line";
-import { parseExpression } from "./grammar";
-import { defineLogKind, type LineSegment } from "./kind-types";
+import { diceTerms, parseExpression } from "./grammar";
+import { defineLogKind, type LineDie, type LineSegment } from "./kind-types";
 import {
   type RollCategory,
   RollEntryDmPayload,
@@ -19,17 +19,45 @@ import {
 
 export const ROLL_KIND = "roll";
 
+/** A die as a line run shows it; `faces` null = unknown (a round chip). */
+interface RunDie {
+  faces: number | null;
+  value: number | null;
+  kept: boolean;
+  auto?: true;
+}
+
+/** FR-DICE-35: the die's number, with its `die` (one per segment, seams S8) when it has a value. */
+function dieSegment(d: RunDie): LineSegment {
+  const text = String(d.value);
+  if (d.value === null) return d.kept ? { text } : { text, style: "dropped" };
+  const die: LineDie = { faces: d.faces, value: d.value, kept: d.kept };
+  return d.kept ? { text, die } : { text, style: "dropped", die };
+}
+
+/** One group's dice: "3 + 5" between kept dice, " " next to a dropped one. */
+function groupSegments(dice: readonly RunDie[], out: LineSegment[]): void {
+  dice.forEach((d, i) => {
+    const prev = dice[i - 1];
+    if (prev) out.push({ text: prev.kept && d.kept ? " + " : " " });
+    out.push(dieSegment(d));
+    if (d.auto) out.push({ text: ` ${AUTO_PART_TEXT}`, style: "muted" });
+  });
+}
+
 /** Dice values of one roll, grouped per dice term in notation order. */
 function diceSegments(item: RollPayloadItem): LineSegment[] {
   const parsed = parseExpression(item.expression);
   const allNull = item.dice.length > 0 && item.dice.every((d) => d.value === null);
   if (allNull || !parsed.ok) {
-    // Manual total of several dice (values unknown), or an unparsable stored expression.
+    // Manual total of several dice (values unknown), or an unparsable stored expression: one
+    // chip with the sum (round unless it is a single die's value).
     if (item.dice.length === 0) return [];
     const sum = allNull
       ? item.total - item.constant - modsTotal(item.mods)
       : item.dice.reduce((s, d) => s + (d.kept ? (d.value ?? 0) : 0), 0);
-    return [{ text: String(sum) }];
+    const faces = item.dice.length === 1 ? (item.dice[0]?.faces ?? null) : null;
+    return [{ text: String(sum), die: { faces, value: sum, kept: true } }];
   }
   const out: LineSegment[] = [];
   let cursor = 0;
@@ -46,27 +74,25 @@ function diceSegments(item: RollPayloadItem): LineSegment[] {
     first = false;
     const group = t.sign === -1 && dice.length > 1;
     if (group) out.push({ text: "(" });
-    dice.forEach((d, i) => {
-      const prev = dice[i - 1];
-      if (prev) out.push({ text: prev.kept && d.kept ? " + " : " " });
-      out.push(d.kept ? { text: String(d.value) } : { text: String(d.value), style: "dropped" });
-      if (d.auto) out.push({ text: ` ${AUTO_PART_TEXT}`, style: "muted" });
-    });
+    groupSegments(dice, out);
     if (group) out.push({ text: ")" });
   }
   return out;
 }
 
-/** "<dice> + <constants>" of one roll (no total); [] → nothing to show. */
-function termSegments(item: RollPayloadItem): LineSegment[] {
-  const out = diceSegments(item);
-  if (item.constant !== 0 || out.length === 0) {
-    const abs = Math.abs(item.constant);
-    if (out.length === 0) out.push({ text: String(item.constant) });
-    else out.push({ text: item.constant < 0 ? ` - ${abs}` : ` + ${abs}` });
+/** Appends " + <constant>" (or the constant alone when there are no dice). */
+function withConstant(out: LineSegment[], constant: number): LineSegment[] {
+  if (constant !== 0 || out.length === 0) {
+    const abs = Math.abs(constant);
+    if (out.length === 0) out.push({ text: String(constant) });
+    else out.push({ text: constant < 0 ? ` - ${abs}` : ` + ${abs}` });
   }
   return out;
 }
+
+/** "<dice> + <constants>" of one roll (no total); [] → nothing to show. */
+const termSegments = (item: RollPayloadItem): LineSegment[] =>
+  withConstant(diceSegments(item), item.constant);
 
 /**
  * One roll's segments. FR-DICE-29 (#172): no natural 20 / 1 marker on an `initiative`-category
@@ -108,27 +134,43 @@ export interface RollBreakdown {
 /**
  * FR-DICE-28: a DM-only dice run for other kinds' lines, e.g. "(1d6+2: 4 + 2)" or
  * "(2d20kh1+4 adv: 15 ~7~ + 4)", muted, dropped dice struck through. Dice without values (a
- * physical total of several dice) → [] (nothing to show).
+ * physical total of several dice) → [] (nothing to show). FR-DICE-36 (B10): each die's faces
+ * come from the expression's dice terms in order ("1d8+1d6" → d8, d6); an unparsable expression
+ * or a die count that doesn't match the terms → round chips (faces unknown), in stored order.
  */
 export function rollBreakdownSegments(r: RollBreakdown): LineSegment[] {
   if (r.dice.length === 0 || r.dice.some(([v]) => v === null)) return [];
-  const item: RollPayloadItem = {
-    rollId: "-",
-    expression: r.expression,
-    mode: r.mode ?? "normal",
-    manual: false,
-    dice: r.dice.map(([value, kept]) => ({ faces: 2, value, kept })),
-    constant: r.constant,
-    total: 0,
-    natural: null,
-    label: null,
-  };
+  const parsed = parseExpression(r.expression);
+  const terms = parsed.ok ? diceTerms(parsed.value) : [];
+  const faces = terms.flatMap((t) => Array.from({ length: t.count }, () => t.faces));
+  const fits = parsed.ok && faces.length === r.dice.length;
+  let run: LineSegment[];
+  if (fits) {
+    run = termSegments({
+      rollId: "-",
+      expression: r.expression,
+      mode: r.mode ?? "normal",
+      manual: false,
+      dice: r.dice.map(([value, kept], i) => ({ faces: faces[i] as number, value, kept })),
+      constant: r.constant,
+      total: 0,
+      natural: null,
+      label: null,
+    });
+  } else {
+    run = [];
+    groupSegments(
+      r.dice.map(([value, kept]) => ({ faces: null, value, kept })),
+      run,
+    );
+    withConstant(run, r.constant);
+  }
   const mode = r.mode === "advantage" ? " adv" : r.mode === "disadvantage" ? " dis" : "";
   const muted = (s: LineSegment): LineSegment =>
-    s.style === "dropped" ? s : { text: s.text, style: "muted" };
+    s.style === "dropped" ? s : { ...s, style: "muted" };
   return [
     { text: ` (${r.expression}${mode}: `, style: "muted" },
-    ...termSegments(item).map(muted),
+    ...run.map(muted),
     { text: ")", style: "muted" },
   ];
 }

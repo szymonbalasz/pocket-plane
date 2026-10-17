@@ -830,9 +830,9 @@ One applied HP change to one target: the stats unit (#54, gate I9). Written by `
 | Dice engine | `ctx.dice` on the command context: CSPRNG real; seeded per fixture key / test, disposable data only | [FR-DICE-03](../specs/dice-roll-log.md#6-functional-requirements), #137, [ADR-0022](../architecture/adr/0022-deterministic-seams.md) |
 | Physical-dice mode | browser storage `pp.dice.v1.<campaignId>.<dm \| playerId>` | [FR-DICE-07](../specs/dice-roll-log.md#6-functional-requirements), gate I5 |
 | Notification seen marker | `localStorage` `pp.note.seen.v1.<campaignId>.<dm \| playerId>`; never sent | [FR-NOTE-18](../specs/notifications.md#6-functional-requirements), #139 P27 |
-| *(sprint 3, built, build/dicex-tray)* Dice render settings | browser storage `pp.dicex.v1.<campaignId>.<dm \| playerId>` = `{render: 3d \| flat \| off, others: bool}`, zod-parsed; invalid / unavailable → defaults (`3d`, others on) in memory; never sent. Reduced motion or no 3D → drawn `flat` | [FR-DICEX-21](../specs/dice-extras.md#6-functional-requirements) |
-| *(sprint 3, built, build/dicex-3d)* 3D throw | client only: lazy chunk `dice-extras/dice3d/` (`three` + `cannon-es`); motion seeded by FNV-1a of the throw's first entry id (cosmetic, never `ctx.dice`); headless settle ≤ 150 steps, faces relabelled to the server values; nothing stored or sent. `3d` draws only with WebGL and a chunk that loaded (failure → `flat` for the session); median frame > 33 ms → settings `render` written `flat` | [FR-DICEX-15](../specs/dice-extras.md#6-functional-requirements), -21, -22, -23 |
-| *(sprint 3, built, build/dicex-tray)* Dice tray request, pending throw, tray result, running throw | client memory (`free {expression, mode, category, label?, actor?}` or `control {options, mode, previewMode?}`, options verbatim); a reload starts `idle`. Throws are derived from live `roll` entries (`throwDice`, payload only), never stored or sent | [FR-DICEX-02](../specs/dice-extras.md#6-functional-requirements), -09, -11, -13 |
+| *(sprint 4, build/dice-screen)* Dice display settings v2 | browser storage `pp.dicex.v2.<campaignId>.<dm \| playerId>` = `{display: screen \| zone \| flat \| off, others: bool, popup: bool}`, zod-parsed; invalid / unavailable → defaults (`screen`, on, on) in memory; never sent. A v1 entry (`{render: 3d \| flat \| off, others}`, sprint 3, FR-DICEX-21 retired) migrates once on read (`3d` → `screen`) and is written as v2. Reduced motion or no 3D → shown `flat` (stored value kept) | [FR-DICEX-36](../specs/dice-extras.md#6-functional-requirements), -32 |
+| *(sprint 3, built, build/dicex-3d; sprint 4 build/dice-screen)* 3D throw | client only: lazy chunk `dice-extras/dice3d/` (`three` + `cannon-es`), preloaded at idle when the display draws 3D; motion seeded by FNV-1a of the throw's first **public** entry id (cosmetic, never `ctx.dice`); headless settle in the throw's arena (viewport or zone, [§48](#48-sprint-4-full-screen-dice-layer-d6)) ≤ 150 steps, faces relabelled to the server values; nothing stored or sent. 3D only with WebGL and a chunk that loaded (failure → `flat` for the session); median frame > 33 ms → settings `display` written `flat` once that throw has gone | [FR-DICEX-15](../specs/dice-extras.md#6-functional-requirements), -22, -23, -34, -37 |
+| *(sprint 3, built, build/dicex-tray)* Dice tray request, pending throw, tray result, running throw | client memory (`free {expression, mode, category, label?, actor?}` or `control {options, mode, previewMode?}`, options verbatim); a reload starts `idle`. Throws are derived from live `roll` entries (`throwDice`, payload only), never stored or sent. *(Sprint 4)* The running and the leaving throw carry `{plan, phase, looks}` ([§48](#48-sprint-4-full-screen-dice-layer-d6)) | [FR-DICEX-02](../specs/dice-extras.md#6-functional-requirements), -09, -11, -13, -35 |
 | Toasts, timers; sheet picker selection; attack popup edits and targets | client memory (popup edits lost on reload; the card stays) | [FR-NOTE-14](../specs/notifications.md#6-functional-requirements), [FR-CHAR-02](../specs/character-sheet.md#6-functional-requirements), CBT §8 |
 | Log-entry kinds; notification kinds + views; `difficultyMethods`; roll routes; token-changed hooks; token menu entries | code registries ([protocol §26](../protocol/README.md#26-combat-registries-and-seams)) | FR-DICE-18, FR-NOTE-03/19, [FR-CBT-03](../specs/combat-tracker.md#6-functional-requirements), [FR-CHAR-16](../specs/character-sheet.md#6-functional-requirements), [FR-MAP-29/30](../specs/scenes-map.md#6-functional-requirements) |
 
@@ -1482,3 +1482,89 @@ From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #209). 
 - **Add to sheet** (`cmp.addToSheet`): one `creature_sheet` row-list append (`spells` / `items` / `features`) and, when FR-CMP-29 resolves, one `rule_trigger` row (character owner) in the same transaction, unless the character already has that trigger (same preset name or rule; inline: same name, case-insensitive; #241). Copies, never linked to the entry.
 - **Derived (never stored):** `featureKey` (`<source>:<sourceKey>`, homebrew `campaign:<id>`), the resolved preset name ("Preset: ‹name›"), the row source label (source name / "Homebrew").
 - **CON-44:** no new record shape; snapshots change only by the sheet rows / triggers a DM or player adds (as CHARX / MOD rows).
+
+## 47. Sprint 4: die shapes and log dice (D5)
+
+From [dice-roll-log](../specs/dice-roll-log.md#8-data-model) (FR-DICE-35–37) and [dice-extras](../specs/dice-extras.md#8-data-model) (FR-DICEX-42). **Built by `build/dice-shapes`**: no table, column, record type or payload change. Protocol side: [protocol §62](../protocol/README.md#62-sprint-4-die-shapes-and-log-dice-d5).
+
+- **Derived (never stored):** a log line's `die` segments (`{faces, value, kept, offered?, label?}`, one per die) from the entry's `payload` (every viewer) or `dmPayload` (DM client only), on render; rows written before sprint 4 render chips too. Faces: `roll` items from their `DieResult.faces`; other kinds' `RollBreakdown` dice from the expression's term order (else unknown → round chip).
+- **Client memory only:** the focused log entry (`focusLogEntry`, 2 s).
+- **CON-44:** 0 B; no new record shape.
+
+## 48. Sprint 4: vision core (V6)
+
+From [fog-of-war](../specs/fog-of-war.md#8-data-model) (FOG sprint 4; #245) and [character-sheet-full](../specs/character-sheet-full.md#81-stat-block-additions-entities-json-leaf-zod-only-no-column) (FR-CHARX-49). **Built by `fix/vision-s4-core`** (schema lock first this sprint; drizzle push, push-safe: one new table, nullable columns). Protocol side: [protocol §63](../protocol/README.md#63-sprint-4-vision-core-v6).
+
+### Fog settings (`fog_settings`, record type `fog-settings`) — owner [fog-of-war](../specs/fog-of-war.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| campaignId (PK) | ID → Campaign | one row per campaign; no row = party vision off | FR-FOG-49 |
+| partyVision | bool, default false | `fog.setPartyVision` | FR-FOG-49 |
+| updatedAt | timestamp | `ctx.clock` | — |
+
+### Changed
+
+| Table / field | Change | Rule | Source |
+|---|---|---|---|
+| `scene_fog_edit.undoneAt` | + timestamp \| null | set by `fog.undo` (the entry joins the redo list), cleared by `fog.redo`; undone entries are deleted by any new edit | FR-FOG-56 |
+| `scene_fog_edit.nextBase`, `nextShapes`, `nextDarkness` | + JSON \| null (`{fill, box, runs}`, shapes, darkness) | the state the undo replaced; null while not undone | FR-FOG-56 |
+| `scene_fog_edit` depth | ≤ 50 per scene (was 20) | the oldest dropped past 50 | FR-FOG-07 |
+| `scene_fog.shapes` | + `{op, stroke: [r, x0, y0, …]}`, `{op, cells: {box, runs}}` | fog shapes only, never darkness; containment `@shared/fog-of-war/brush` | FR-FOG-26 |
+| `entity.statBlock.senses.visionFt` | optional, 0–995 step 5 (JSON leaf, zod) | absent = Normal 999 ft (never stored); a stored value, 0 included, kept; no row rewrite | FR-CHARX-49 |
+| `db_meta` key `fog-vision-model` | "2" | the vision-model version; a DB created from scratch is stamped 2; a DB without it (sprint 3) gets the one-time boot re-derive | FR-FOG-40 |
+
+- **Derived (not stored):** the `vision` record's `src` (source token id per polygon) and server-only `shared` (party vision on at compute time); party sight and party-blind (FR-FOG-50); the 12-source party set (FR-FOG-52, round robin); redo depth.
+- **Written differently** (no new column): with party vision on, every subject's `seenBy` = every player iff any player sees it (owned tokens: the owner always, the rest unless party-blind); darkness `seenBy` by the party's polygons; each player's `fog_explored` row grows from the party's polygons (kept when switched off). Senses absent = Normal: sources see 999 ft bounded by walls, closed doors and the map rectangle's edges (FR-FOG-32 / -33).
+- **Fixtures:** units `vision-legacy` (Mira, Thorn senses 0 / 0; first in bundle `fog`), `vision-invisible` (Goblin 2 Invisible; Thorn Sees invisible), `vision-brakka` (for session-sim-8); bundle `vision-party` = `vision` + `vision-invisible`. `session-sim-7`: Brakka (no senses) is one of player-1's Normal sources.
+- **CON-44** (#208, `con44-s4.test.ts`, measured on the realistic-heavy harness; PCs at Normal 999 ft): DM 670,513 B (party on 670,512 B; 378,064 B left of 1 MiB); players party off 277,670–280,900 B (own `vision` ≤ 659 B), party on 280,730–283,790 B (+2,890 B; `vision` type ≤ 3,513 B; 240,498 B left of 512 KiB). Caps (2,000 random walls on 120 × 120, own origins), party on: 12 sources 324,284–327,344 B, 24 on the scene (12 count) 330,069–333,129 B, `vision` type ≤ 68,953 B (≤ 192 KiB); own `vision` at 4 sources ≤ 22,451 B (≤ 48 KiB); View as Party ack 94,958 B (≤ 192 KiB); DM ≤ 710,432 B (the 2,000-wall structure row).
+
+## 49. Sprint 4: compendium search (C-search)
+
+From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; #245). **Built by `build/cmp-search`**: no table, column or record type change. Protocol side: [protocol §64](../protocol/README.md#64-sprint-4-compendium-search-c-search).
+
+- **Search index (derived, server-only, never persisted or sent):** one row per `compendium_entry` and per imported monster `entity` without an entry (FR-CMP-17): id, kind, campaign, shared, source + `sourceRank`, facets (entry-less: `{cr}`), line, folded name + its words, sorted unique folded words of `search_text` (entry-less: none), group key (kind + folded name + source, homebrew: `campaign:<id>`). Built from `compendium_entry` and `entity` at the first search after start, dropped on the five compendium / imported-definition events (FR-CMP-34). Replaces the `instr` scan and the entry-less `LEFT JOIN`.
+- **Derived at read:** tier (FR-CMP-33), source rank (FR-CMP-38), group `{count}` and group line (FR-CMP-35); `name_key` and `search_text` stay as stored (folding happens in the index).
+- **Fixtures:** `cmp-srd-full` (the bundled `srd-5.1` at its bundled version via `cmp.importRecorded`: 1,150 entries, 322 definitions), `cmp-search-homebrew` (Fixture Campaign items "Potion of Healing", DM only, text marker `CMP-HB-POTION`; "Healing Draught", shared); bundle `compendium-full` = `compendium` + both.
+- **CON-44:** no record added to any snapshot (entries are REST only; the full import's definitions stay lazy, §44).
+
+## 50. Sprint 4: full-screen dice layer (D6)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) (FR-DICEX-15, -17, -32–38, -43–45; [ADR-0048](../architecture/adr/0048-dice-display.md)). **Built by `build/dice-screen`**: no table, column, record type, event, intent or payload change. Protocol side: [protocol §65](../protocol/README.md#65-sprint-4-full-screen-dice-layer-d6).
+
+- **Browser storage:** `pp.dicex.v2.<campaignId>.<dm | playerId>` = `{display, others, popup}` (Not in the DB table above; v1 migrated once on read).
+- **Client memory only:** the running / leaving throw `{t, seq, plan {arena: screen | zone, draw: 3d | flat, caption, handoff}, phase: moving | rest | handoff | fading, looks}`; timeline constants in `dice-extras/timing.ts` (settle ≤ 2.5 s, rest 1 s / 1.5 s with popups off, hand-off 0.4 s, fade 0.3 s). Gone on reload.
+- **Derived (never stored):** the big throw = the frame's `public` entries (and only own ones with "Show others' rolls" off); `seedId` = first public entry id (else the first); arena from the rect rounded to 50 px (`dice-extras/arena.ts`: die size 7 % of the viewport's short side, 40–96 px); effective display (reduced motion / no WebGL → `flat`).
+- **CON-44:** 0 B; no new record shape, no wire field (throws read the `roll` entries already sent).
+
+## 51. Sprint 4: rules core (S4-0)
+
+From [effect-modifiers](../specs/effect-modifiers.md#82-records) sprint 4 (MOD §8.2, FR-MOD-53, -55), [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-81, -84) and [character-sheet-full](../specs/character-sheet-full.md) (FR-CHARX-54, -58); [ADR-0049](../architecture/adr/0049-trigger-state.md). **Built by `fix/rules4-core`** (schema lock 2nd this sprint, after V6; drizzle push, push-safe: one new table, one nullable column). No command writes the new table or fields yet (S4-1a / S4-1b / S4-2 / S4-3). Protocol side: [protocol §66](../protocol/README.md#66-sprint-4-rules-core-s4-0).
+
+### Trigger state (`trigger_state`, record type `trigger-state`) — owner [effect-modifiers](../specs/effect-modifiers.md#82-records)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId, encounterId | ID, ID → Campaign, ID → Encounter | rows only while the encounter is `started`; deleted at End (S4-3) | FR-MOD-53 |
+| combatantId, triggerId | ID → Combatant, ID → Rule trigger (`ON DELETE CASCADE`) | unique (`encounter_id`, `combatant_id`, `trigger_id`): one row per (enabled trigger, owner combatant) | FR-MOD-53 |
+| characterId, ownerPlayerId | text \| null ×2 (copies, no FK) | visibility copies: null / null for a monster (definition) trigger; owner rewritten on reassignment | FR-MOD-54, -55 |
+| name, on | text 1–40, `hit` \| `roll` \| `turnStart` | copies of the trigger | FR-MOD-53 |
+| armed, charge, featureId | bool, `ready` \| `used` \| `waiting` (`TRIGGER_CHARGES`, text enum), soft ID \| null | derived display copy; `trigger_use` stays the truth; no server rule reads it | FR-MOD-53 |
+| updatedAt | timestamp | `ctx.clock` | — |
+
+Indexes `trigger_state_owner` (unique, above), `trigger_state_campaign` (`campaign_id`; the snapshot read).
+
+### Changed
+
+| Table / leaf | Change | Default (push-safe) | Visibility | Source |
+|---|---|---|---|---|
+| `hp_change` | + `damage_parts` (**JSON leaf** ≤ 2 `{type, rolled, total 0–999, multiplier, raw}` \| null; extra weapon parts only, the base part keeps `damage_type` / `damage_rolled` / `damage_total` / `multiplier`; `raw` stays the whole amount) | null | DM only | FR-CBT-84 |
+| `entity.statBlock.attacks[]` (JSON leaf, zod) | + `bonus?` 0–3; + `extraDamage?` ≤ 2 `{damage: NdM[+K] N 1–6 M 4–12 K 0–10, type}` (type required); stored `toHit` / `damage` stay the weapon's own numbers | absent | as the stat block (DM + owner; definitions DM only) | FR-CHARX-54, -57 |
+| `creature_sheet.features[].used` (JSON leaf, zod) | range 0 … `usesMax + 9` (was 0 … `usesMax`) | unchanged | as the sheet | FR-CHARX-58 |
+| damage card payload (`damage-card`) | `damage.extra?` ≤ 2 `{type, rollId, dice ≤ 12, constant, total, manual}` | absent; old cards parse | as the card | FR-CBT-81 |
+| `game_log_entry.payload` (`cbt.attack`) | + `damageParts?` ≤ 2 `{type, value, multiplier?}`; `parts[]` + `expression?` ≤ 20, `dice?` ≤ 20 ints | absent | public (public character-trigger dice only) | FR-CBT-84, FR-MOD-57 |
+| `game_log_entry.dmPayload` (`cbt.attack`) | `parts[]` + `expression?`, `dice?` | absent | DM only | FR-MOD-57 |
+
+- **Relations:** Trigger state → encounter, combatant, rule trigger (cascade). **Derived:** `armed`, `charge` (S4-3 writes them in the causing transaction). **Persisted runtime state:** `trigger_state` rows.
+- **Fixtures** (`fixtures/units/effect-modifiers/`, MOD §13.1): `weapon-flame-tongue` (Brakka's Flame Tongue greatsword row: `2d6+4` slashing, `bonus` 1, `extraDamage` [`2d6` fire]), `mod-fire-ward` (campaign preset "Fire Ward", resistance fire, on Goblin), `uses-rage-spent` (Rage 0 / 3 left via `char.useResource`), `trg-mira-uses` (Mira's "Searing Strike" feature 1 / 2 left + its `every: {feature}` trigger, 1d8 fire, public). Bundle `rules-effects` (= `rule-triggers` + those four + `char-mira-full`) is test-local (`rules-effects.ts`) until S4-4 registers it.
+- **CON-44** (#208; MOD's `con44.test.ts` + `con44-rules-effects.test.ts`, measured, max-length ASCII unless noted; realistic-heavy harness base DM 671,112 B, players max 280,928 B): attack rows (71, `bonus` 3 + 2 max parts), 20 cards with 2 extra parts at 12 dice, 30 damage roll entries with 2 extra part rolls (12 dice), 30 outcome lines with 2 `damageParts` + 1 trigger part with 20 dice (public and DM), 30 `hp_change.damageParts`: DM **+79,224 B** (game-log-entry +57,540, notification +9,720, entity +7,314, hp-change +4,650), players +51,712…+52,410 (game-log-entry +49,830). `trigger-state` realistic (52 rows, PC 2 + monster 1): DM 26,053 B, a player's own 2 rows 1,123 B; worst (196 rows, PC 6 + monster 4): DM 97,525 B, own 6 rows 3,335 B; worst with 40-char CJK names: DM 113,205 B, own 3,815 B. **Track R sprint 4:** realistic DM +105,259 → 776,371 B; worst +176,731 → 847,843 B; worst CJK +192,411 → **863,523 B** (185,053 B left of 1 MiB); players max **337,135 B** (+56,207; 187,153 B left of 512 KiB). MOD §12's proposed bounds (136 KiB / 32 KiB, from estimates) don't hold: the extra part roll items carry per-die objects (≈ 600 B per 12-dice part); the test bounds are the measurement (192 KiB DM / 60 KiB per player) pending a ruling. Worst card + 2 extra parts (12 dice): ASCII 3 offers 4,466 B, 2 offers 4,088 B (fits), 0 offers 3,319 B; CJK 0 offers 4,439 B (> 4 KB), + mod labels cut to 12 chars 3,467 B (fits). `rules-effects` vs `rule-triggers` end to end with CJK names (5 `trigger-state` rows): DM +4,280 B, player-1 +1,904 B, player-2 +749 B.
