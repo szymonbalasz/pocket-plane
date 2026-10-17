@@ -1,6 +1,7 @@
 // **Add to sheet** (FR-CMP-28, CMP §7), both clients, on spell / item / feature views: Popover with
 // a character Select (DM: campaign characters; player: own) → `cmp.addToSheet` → Toast "Added
-// to Mira's Features" (+ "and Triggers"). Disabled while not live (shell offline rule).
+// to Mira's Features" (+ "and Triggers", or the #241 skip note). Disabled while not live (shell
+// offline rule).
 import { AddToSheetResult, CMP_INTENTS } from "@shared/compendium/homebrew";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { PlusIcon } from "lucide-react";

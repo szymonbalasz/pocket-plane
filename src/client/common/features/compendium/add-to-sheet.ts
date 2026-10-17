@@ -37,7 +37,17 @@ const LIST_LABEL: Record<AddToSheetResult["list"], string> = {
   features: "Features",
 };
 
-/** "Added to Mira's Features" (+ " and Triggers" when a preset was added). */
-export function addedMessage(name: string, r: Pick<AddToSheetResult, "list" | "triggerId">) {
-  return `Added to ${name}'s ${LIST_LABEL[r.list]}${r.triggerId ? " and Triggers" : ""}`;
+/**
+ * "Added to Mira's Features" (+ " and Triggers" when a preset was added; + the skip note when the
+ * sheet already had that trigger, #241).
+ */
+export function addedMessage(
+  name: string,
+  r: Pick<AddToSheetResult, "list" | "triggerId" | "triggerSkipped">,
+) {
+  const added = `Added to ${name}'s ${LIST_LABEL[r.list]}`;
+  if (r.triggerSkipped) {
+    return `${added}. Trigger already on the sheet — delete it first to use the compendium's.`;
+  }
+  return `${added}${r.triggerId ? " and Triggers" : ""}`;
 }
