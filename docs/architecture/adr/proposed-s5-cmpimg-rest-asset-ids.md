@@ -28,6 +28,7 @@
 ## Consequences
 
 - FR-ASSET-12 gains the exception (FR-ASSET-36); no other REST route may return asset IDs to players without its own amendment.
-- The asset leak property also scans player compendium REST bodies (FR-ASSET-38).
+- The asset leak property also scans player compendium REST bodies (FR-ASSET-38) and headers: the entry `ETag` is an opaque hash over the delivered IDs, never the IDs themselves.
+- Only the compendium entry read is covered; handout images stay record fields delivered by sync (FR-ASSET-12 as written).
 - Unshare / delete works like a hide: the next fetch omits the IDs; IDs already learned keep working (ADR-0023, accepted).
 - Glossary "Asset reference" widens to compendium entry fields (OQ-ASSET-20).
