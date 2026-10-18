@@ -1,9 +1,10 @@
 ---
 title: Party loot
 prefix: LOOT
-status: complete
-owner: spec-party-loot
+status: claimed
+owner: spec-party
 wave: 3
+phase: post-mvp-5
 ---
 
 # Party loot
