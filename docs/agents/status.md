@@ -17,7 +17,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | M5 labels + best-rectangle Fit | merged b7a8303 | — | Done (11/11 + fit-priority fix; check 3367, e2e 108). **Track M complete** | — |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | Physical dice in combat (BL-19, BL-25) | merged | — | Done (walkthrough 5/5; check 3314, e2e 105) | — |
-| C-art token art (last slice) | `build/cmp-token-art` (w67, slot 0) | build-cmp-token-art | Building | Walkthrough |
+| C-art token art (last slice) | `build/cmp-token-art` (w67, slot 0) | test-token-art | Walkthrough (check 3402, e2e 111; +16 KB gz lazy) | Merge → session-sim-8 |
 | C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
 | V9 fog brush + Ctrl+Z | merged | — | Done (walkthrough 13/13) | — |
 | V10 party vision + Blinded | merged | — | Done (check 3386, e2e 110). **Track V complete** | — |
