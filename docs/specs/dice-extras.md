@@ -1,9 +1,9 @@
 ---
 title: Dice extras
 prefix: DICEX
-status: complete
+status: claimed
 owner: spec-dice
-phase: post-mvp-4
+phase: post-mvp-5
 ---
 
 # Dice extras
