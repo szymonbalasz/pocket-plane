@@ -8,7 +8,7 @@
 ## Context
 
 - BL-17 (DM, decided): players and the DM pick a colour; it marks their laser, pings, templates, drag path, log lines and notifications.
-- Every one of those already names its person: signals carry the server-stamped `from {role, playerId?}` ([ADR-0026](0026-signal-routing.md)); templates `placedByPlayerId`; tokens `ownerPlayerId`; log entries `rollerRole` / `rollerPlayerId`. Notifications name nobody today.
+- Every one of those already names its person: signals carry the server-stamped `from {role, playerId?}` ([ADR-0026](0026-signal-routing.md)); templates `placedByPlayerId`; tokens `ownerPlayerId`; log entries `rollerRole` / `rollerPlayerId`. Notifications name the people they're for and who closed them (`audiencePlayerId`, `actionPlayerId`, `closedByRole` / `closedByPlayerId`), but not who **caused** them; that is the one person reference sprint 5 adds (`byRole` / `byPlayerId`, FR-NOTE-38).
 - Measured (realistic-heavy harness, `session-sim`, 2026-10-18): a palette key on 7 player rows + the campaign row = **+149 B** per snapshot frame. A colour copy on every kept template and log entry = +2,163 B (DM) and +21 B on every signal frame (ping 176 → 197 B, laser 613 → 634 B).
 
 ## Options
@@ -24,7 +24,8 @@
 **Proposed: A** (pending DM gate 1; rejected options struck there).
 
 - Colour = a key of one fixed palette (OQ-CAMP-17), or `#rrggbb` if the DM picks the free picker; the wire carries the key, each client maps it to a theme token (`player.<key>`, [visual-direction](../../design/visual-direction.md), OQ-CAMP-23).
-- No feature copies a colour into its own rows or frames. A feature that needs "whose colour" stores or receives a player id (or the DM role) and calls the shared client helper `colorOf`.
+- **Person ids per record are allowed; colour values are not.** A feature that needs "whose colour" stores or receives a player id (or the DM role) on its own rows or frames, as templates, tokens, log entries and notifications do, and calls the shared client helper `colorOf`. No feature copies a colour key or hex into its rows or frames.
+- The system actor (boot backfills, upgrades) is no person: it gets no colour anywhere (FR-NOTE-38, FR-DICE-61).
 
 ## Consequences
 
