@@ -189,7 +189,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Launcher** | Bottom bar of buttons that open, bring to front or minimise windows. | — |
 | **Minimised** (window) | Parked on the launcher: keeps its state and shows a dot when something new happens in it. A closed window keeps only its geometry ([play-shell](specs/play-shell.md)). | Closed |
 | **Work area** | The part of the viewport below the top bar and above the launcher; windows and the attack popup fit into it (decisions #172). | Viewport |
-| **Free area** | The largest part of the work area, right of the tool rail, that no open window covers; the map frames its tokens there (FR-SHELL-34, FR-MAP-44). | Work area |
+| **Free area** | A part of the work area, right of the tool rail, that no open window covers; the map frames its tokens there (FR-SHELL-34, FR-MAP-44). *(Sprint 4)* Fit picks among the candidate free rectangles: PCs inside first, then the map's top row visible, then other tokens clear of windows, then the largest scale (FR-MAP-58). | Work area |
 | **Auto placement** | Where a window opens when the user didn't choose: the free edge slot covering the fewest tokens ([play-shell](specs/play-shell.md)). | Layout |
 | **Alert** | The shell's attention signal for one client: screen flash, short UI sound ([ADR-0030](architecture/adr/0030-ui-notification-sounds.md)) and a Toast; per-browser mute and volume. Not persisted. | Notification |
 | **Layout** | Every window's state, geometry and z-order for one (campaign, owner); stored only in browser `localStorage` (decisions #121). | — |
