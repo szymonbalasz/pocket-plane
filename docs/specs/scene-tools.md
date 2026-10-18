@@ -1,9 +1,9 @@
 ---
 title: Scene tools
 prefix: SCN
-status: complete
-owner: spec-maptools
-phase: post-mvp-4
+status: claimed
+owner: spec-colours
+phase: post-mvp-5
 ---
 
 # Scene tools

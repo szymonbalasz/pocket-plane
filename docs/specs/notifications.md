@@ -1,9 +1,10 @@
 ---
 title: Notifications
 prefix: NOTE
-status: complete
-owner: spec-notifications
+status: claimed
+owner: spec-colours
 wave: 2
+phase: post-mvp-5
 ---
 
 # Notifications
