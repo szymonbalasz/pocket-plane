@@ -117,7 +117,7 @@ phase: post-mvp-5
 
 Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, semantic tokens (`visibility.hidden` for the hidden marker).
 
-- *(Sprint 5, W)* **Window `dice.log`:** 2.5× wide on wide + tall screens (DM 1150×240, player 850×280), 1.5× wide / 160 high on laptops (FR-DICE-38 ◆); lines use the width, roll bar stays compact on the left (FR-DICE-39). Toasts and roll popups sit in the bottom-right corner, over the DM log's right end at 1440×900 only. **DM view / player view:** same layout, own sizes.
+- *(Sprint 5, W)* **Window `dice.log`:** 2.5× wide on wide + tall screens (DM 1150×240, player 850×280), 1.5× wide / 160 high on laptops (FR-DICE-38 ◆); lines use the width, roll bar stays compact on the left (FR-DICE-39). ◆ (OQ-SHELL-32 A, DM gate) Toasts and roll popups sit in the bottom-right corner, over the DM log's right end at 1440×900 only. **DM view / player view:** same layout, own sizes.
 
 - **Window `dice.log`** "Game log": both clients, default open, bottom-left above the launcher, 420×320, min 300×200, launcher "Log" (OQ-SHELL-06, I12).
 - **Line:** actor bold, body text, total bold; category as a small muted Badge; Tooltip = time + expression + all dice. "physical" Badge for manual. *(Sprint 4)* Dice as inline die-shape chips (FR-DICE-35), vertically centred on the text; a focused entry (FR-DICE-37) gets the accent ring for 2 s.
@@ -296,7 +296,7 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 **Combat lines (R4, sprint 1):** [combat-tracker](combat-tracker.md) FR-CBT-57/58 add natural markers to `cbt.attack` lines from public `payload` fields only, so FR-DICE-28 holds unchanged.
 
-**Shared changes — sprint 5, track W:** none in this spec's own server or shared code. The `dice.log` window lines (`src/client/{dm,player}/features/dice-roll-log/log-window.tsx`, common `dice-roll-log/window.ts`: size function, min 300×160, `belowToasts`, `previousDefaults`) and `GameLog.tsx` (FR-DICE-39 widths) go in play-shell's slice **W1** `fix/window-layout` (assigned; [play-shell §14](play-shell.md#14-dependencies)), which needs the new `WindowDef` fields. `GameLog.tsx` order, settled by seams S15: **W1 (width) → D8 (held lines) → K4 (name colour)**; R2 never edits `GameLog.tsx`.
+**Shared changes — sprint 5, track W:** none in this spec's own server or shared code. The `dice.log` window lines (`src/client/{dm,player}/features/dice-roll-log/log-window.tsx`, common `dice-roll-log/window.ts`: size function, min 300×160, `belowToasts`, `previousDefaults`) and `GameLog.tsx` (FR-DICE-39 widths) go in play-shell's slice **W1** `fix/window-layout` (assigned; [play-shell §14](play-shell.md#14-dependencies)), which needs the new `WindowDef` fields. `GameLog.tsx` order, settled by seams S15: **W1 (width) → D8 (held lines) → D9 → K4 (name colour)** (S15 as amended by rulings-a); R2 never edits `GameLog.tsx`.
 
 ## 15. Open questions
 
@@ -316,7 +316,7 @@ All rows decided or settled; sprint-4 rows by the DM at sprint-4 gate 1 ([#245](
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-DICE-29 | **play-shell:** how the 2.5× Game log ([7]) shrinks on small screens is [OQ-SHELL-31](play-shell.md#15-open-questions) (DM gate); FR-DICE-38 follows the DM's pick | **A. 2.5× from 1440 wide and 900 high; 1.5× wide / 160 high below** / B. 2.5× at every size / C. 2.5× on the DM only (tradeoffs in OQ-SHELL-31) | yes (with OQ-SHELL-31) | play-shell |
+| OQ-DICE-29 | **play-shell:** how the 2.5× Game log ([7]) shrinks on small screens is [OQ-SHELL-31](play-shell.md#15-open-questions) (DM gate); FR-DICE-38 follows the DM's pick | **A. 2.5× from 1440 wide and 900 high; 1.5× wide / 160 high below** / B. 2.5× at every size / C. 2.5× on the DM only (tradeoffs in OQ-SHELL-31) | yes (gate, with OQ-SHELL-31) | play-shell |
 
 ## 16. Out of scope
 

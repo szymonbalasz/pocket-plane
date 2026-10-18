@@ -28,7 +28,7 @@ phase: post-mvp-5
 | FR | What | Slice | Named test / walk step |
 |---|---|---|---|
 | 58 ◆ | Fog bar placed by FR-MAP-60 in a gap no window covers; wraps there by control group | W3 `fix/tool-bar-spot` | `FR-FOG-58 fog bar wraps in its gap` · W4 |
-| 59 | The token menu's one Invisible item (fog's), with a Tooltip | W4 `fix/init-chips-effect` | `FR-FOG-59 Invisible tooltip`, CBTX `FR-CBTX-56 one Invisible item` · W7 |
+| 59 ◆ | The token menu's one Invisible item (fog's, OQ-CBTX-29), with a Tooltip | W4 `fix/init-chips-effect` | `FR-FOG-59 Invisible tooltip`, CBTX `FR-CBTX-56 one Invisible item` · W7 |
 
 Built sprint-3 material below stays in place (collapsing it would mean moving ~300 lines of FR rows other specs link by anchor; not cheap, review A25).
 
@@ -168,7 +168,7 @@ Built sprint-3 material below stays in place (collapsing it would mean moving ~3
 | FR-FOG-25 | Ripple unchanged: units / helpers that create scenes reveal them. ~~Nothing new to ripple (senses default to 0).~~ *(Sprint 4, review A4: senses now default to Normal 999 ft, so bundles that relied on "no senses = no sight" take the `vision-legacy` patch; concrete list in §13.)* | |
 | **Sprint 5, track W** (sim-8 #1, #9) | | |
 | FR-FOG-58 ◆ | **Fog bar in a clear gap** (decided; amends FR-FOG-17's "floating fog bar"; layout rule OQ-MAP-47, written for bold pick A): the fog bar is the Fog tool's panel, placed by [FR-MAP-60](scenes-map.md#6-functional-requirements) (top strip gap, else bottom strip, else above windows). Its max width = the gap's width (the fixed `min(62rem, 100vw − 7rem)` cap goes); it wraps into rows **by control group**: Mode, Shape (+ Brush radius), Reveal all / Fog all…, Undo / Redo, Remember explored areas, Party vision switch, View as. A group never splits, so the Party vision switch and View as stay together. Every row of the wrapped bar lies inside the gap (no window, no toast corner over it). The "No vision set" hint (`fog-no-vision`) hangs under the bar's last row, inside the same gap, or is dropped from view while it doesn't fit (it is also a Tooltip on the Fog tool). At 1440×900 with Scenes + Initiative: 2 rows in the 680-px gap; at 1280×720: up to 3 rows in the 520-px gap. | sim-8 #1 |
-| FR-FOG-59 | **The one Invisible item** (decided; sim-8 #9; amends FR-FOG-47): the DM token menu's only "Invisible" is fog's checkbox (`fog.setInvisible`); Conditions ▸ no longer lists the Invisible condition ([FR-CBTX-56](combat-extras.md#6-functional-requirements)). Its Tooltip says what it does: "Players don't see it unless they see invisible" (DM only). Behaviour, intent and visibility unchanged (#210: not coupled to the condition). | sim-8 #9 |
+| FR-FOG-59 ◆ | **The one Invisible item** (the outcome is decided, sim-8 #9; which item stays is [OQ-CBTX-29](combat-extras.md#15-open-questions), written for its bold pick A; amends FR-FOG-47): the DM token menu's only "Invisible" is fog's checkbox (`fog.setInvisible`); Conditions ▸ no longer lists the Invisible condition ([FR-CBTX-56](combat-extras.md#6-functional-requirements)). Its Tooltip says what it does: "Players don't see it unless they see invisible" (DM only). Behaviour, intent and visibility unchanged (#210: not coupled to the condition). | sim-8 #9 |
 
 **Party vision filter** (FR-FOG-49–52; ADR [ADR-0047](../architecture/adr/0047-party-vision.md))
 
@@ -633,7 +633,7 @@ Isolated per worktree: `bun test` on `:memory:`, temp asset dir, port 0; walkthr
 | V9 | `build/fog-brush` (M; after V7 and M0) | Brush (FR-FOG-55, `area.ts` `distance` + campaign diagonal rule; containment via `area.ts`, A13), merge (FR-FOG-57), redo + keys (FR-FOG-56, FR-FOG-17) | fog folders, `canvas-tools.ts` line, `FogBar.tsx` | brush results | 16, 17 |
 | V10 | `build/party-vision` (M; after V9 and R0; renamed: it also carries the server Blinded line) | **Server:** Blinded (`effectsChanged` line, FR-FOG-48) incl. secret Blinded (OQ-FOG-61) with leak tests. **Client:** Party vision Switch, union render, View as Party, grey darkvision ring + `canvasPixel` helper, blind reason chip, e2e, the rest of the sprint-4 walkthrough | R0's hook point (S6), fog client + server folders, `FogBar.tsx`, `e2e/support` | party vision, Blinded, grey ring | 21–25, 28, full run 14–30 at the end |
 
-**Sprint 5, track W** (split and order: [play-shell §14](play-shell.md#14-dependencies)): FR-FOG-58 in **W3** `fix/tool-bar-spot` (`FogBar.tsx`: width from the spot, `fog-bar-group` wrappers, hint placement; after W1, parallel with W2); FR-FOG-59 in **W4** `fix/init-chips-effect` (fog's DM `token-menu-entries.tsx`: Tooltip only). No server, schema, intent, event, record or wire change (0 B); no shared file.
+**Sprint 5, track W** (split and order: [play-shell §14](play-shell.md#14-dependencies)): FR-FOG-58 in **W3** `fix/tool-bar-spot` (`FogBar.tsx`: width from the spot, `fog-bar-group` wrappers, hint placement; after W1, parallel with W2: DOM tool bar, outside the S10 canvas lock, rulings-a #22); FR-FOG-59 in **W4** `fix/init-chips-effect` (fog's DM `token-menu-entries.tsx`: Tooltip only). No server, schema, intent, event, record or wire change (0 B); no shared file.
 
 ## 15. Open questions
 
@@ -695,7 +695,7 @@ OQ-FOG-34 is retired (merged into SCN's OQ-SCN-22 while drafting).
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-FOG-62 | **scenes-map:** the fog bar is the widest tool bar (≈ 900 px in one row); how a bar that doesn't fit one row behaves is [OQ-MAP-47](scenes-map.md#15-open-questions) (DM gate); FR-FOG-58 follows the pick | **A. Wrap by control group inside the gap** / B. One row + "⋯" menu (Brush radius, Remember explored, Party vision, View as need menu forms) / C. One row, horizontal scroll (tradeoffs in OQ-MAP-47) | yes (with OQ-MAP-47) | scenes-map |
+| OQ-FOG-62 | **scenes-map:** the fog bar is the widest tool bar (≈ 900 px in one row); how a bar that doesn't fit one row behaves is [OQ-MAP-47](scenes-map.md#15-open-questions) (DM gate); FR-FOG-58 follows the pick | **A. Wrap by control group inside the gap** / B. One row + "⋯" menu (Brush radius, Remember explored, Party vision, View as need menu forms) / C. One row, horizontal scroll (tradeoffs in OQ-MAP-47) | yes (gate, with OQ-MAP-47) | scenes-map |
 
 ## 16. Out of scope
 
