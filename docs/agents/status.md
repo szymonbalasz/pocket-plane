@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 4 Phase B (builds)**. DM gate 1 "go" (#245, #246). All five spec branches merged; ADRs 0047–0050 numbered; C's cross-spec text applied; spec index updated. Docs pass merged.
+**Phase:** **Sprint 4 builds complete** — every slice merged (tracks V, D, M, R, C + physical-dice fix). Next: final main gates → session-sim-8 → Playtest section → recap with the DM.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
@@ -17,7 +17,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | M5 labels + best-rectangle Fit | merged b7a8303 | — | Done (11/11 + fit-priority fix; check 3367, e2e 108). **Track M complete** | — |
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | Physical dice in combat (BL-19, BL-25) | merged | — | Done (walkthrough 5/5; check 3314, e2e 105) | — |
-| C-art token art (last slice) | `build/cmp-token-art` (w67, slot 0) | test-token-art | Walkthrough (check 3402, e2e 111; +16 KB gz lazy) | Merge → session-sim-8 |
+| C-art token art (last slice) | merged eacb98a | — | Done (9/10 + credits fix). **Track C complete** | — |
+| Sprint gate: session-sim-8 | main | — | Final main gates running | test-session-8 |
 | C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
 | V9 fog brush + Ctrl+Z | merged | — | Done (walkthrough 13/13) | — |
 | V10 party vision + Blinded | merged | — | Done (check 3386, e2e 110). **Track V complete** | — |
@@ -42,8 +43,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Shared-file locks
 
-- `build/roll-popup` (D7): toast-region lock (`toast-region.ts` constants, `ShellToaster.tsx`).
-- `build/cmp-token-art` (C-art): canvas lock, token menu registry, creature form.
+- None (all sprint-4 branches merged).
 - Order: schema V6 → R0 → Mc → C-art core; canvas V7 → V8 → M2 → M5 → C-art; sheet V6 → R weapon rows → R negative uses; toast region M4 → D7; log D5 → R Fury line; creature form R weapon rows → C-art.
 - Protocol / data-model section numbers: assigned at merge (parallel branches collide; `resolve_docs.py` in the scratch dir renumbers the later one).
 
