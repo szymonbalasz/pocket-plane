@@ -34,6 +34,6 @@
 ## Consequences
 
 - No protocol, schema, event or record change; CON-44 0 B (re-run 2026-10-18: heavy DM 674,452 B, players ≤ 284,256 B).
-- `toast-region.ts` popup constants 320 × 190 (keep-out height 304 → 334 px), after track W's toast-region change.
+- `toast-region.ts` popup constants 320 × 190, set by track W's W1 with the toast corner sized for them (seams S2); D's popup slice edits only the popup's internals.
 - Whole client lighter on the wire: player initial 1.21 MB → 322 KB brotli; repeat loads transfer nothing unchanged.
 - Numbers outside the dice surfaces (Initiative order, combat cards) are not held unless the DM picks otherwise (OQ-DICEX-39).
