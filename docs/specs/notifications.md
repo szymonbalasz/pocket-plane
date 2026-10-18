@@ -9,7 +9,7 @@ phase: post-mvp-5
 
 # Notifications
 
-> **Sprint 5 (track K, BL-17 via [#251](../decisions-log.md)).** Decided by the DM (not open): the **player colour** appears in notifications ([campaign-management](campaign-management.md) FR-CAMP-23–29 owns the colour). New FR-NOTE-38–41 (track K's range; P adds handout rows in parallel). One schema change: `notify` stamps **who caused** the notification (`byRole`, `byPlayerId`), measured ≤ 8.4 KB on the heavy DM snapshot. Walkthrough: [CAMP §13](campaign-management.md#13-test-plan) K7, K12.
+> **Sprint 5 (track K, BL-17 via [#251](../decisions-log.md)).** Decided by the DM (not open): the **player colour** appears in notifications ([campaign-management](campaign-management.md) FR-CAMP-23–29 owns the colour). New FR-NOTE-38–41 (track K's range; P adds handout rows in parallel). *(Seams S3: W edits FR-NOTE-31 / -32 in its own branch; K owns FR-NOTE-38–41.)* One schema change: `notify` stamps **who caused** the notification (`byRole`, `byPlayerId`), measured ≤ 8.4 KB on the heavy DM snapshot. Walkthrough: [CAMP §13](campaign-management.md#13-test-plan) K7, K12.
 
 **Sprint 5 at a glance** (track K)
 
@@ -279,9 +279,9 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 - Docs (integrator): protocol §8 / §22 event row, §23 note ("pending rows may be updated by their kind owner"); glossary **Action cue** (OQ-NOTE-18); ADR "split attack and damage" (accepted #190; integrator numbers it) (amends this spec's non-goal).
 
 **Shared changes — sprint 5** (track K; full split [CAMP §14](campaign-management.md#sprint-5-build-split-track-k)):
-- **K0** (schema lock after P core → C core): ★ `src/server/db/` columns `notification.by_role`, `by_player_id` (nullable, no backfill); notifications-owned `helpers.ts` (`notify` stamps from `env.actor`), `@shared/notifications/schemas.ts` (`NotificationRecord` fields); `note.testSend` unchanged. Docs (assigned): data model (notification columns), protocol (record fields, CON-44 figure).
-- **K4** (after K0; ∥ K2, K3): notifications-owned client toast + history row components (stripe, `data-by`, `data-color`, the "Resolved by" name colour). P's handout force-open (track P) may add a kind in parallel: no shared file with K4 beyond the append-only view registries, which K4 doesn't touch.
-- **K3** (canvas holder): the cue ring colour through scenes-map's `cue.color?` (FR-MAP-72) and notifications' own `tokenOverlays` line passing the action owner's colour.
+- **K0** (*seams S1:* schema lane 2 after R0; merges after P0 → R0 → C5 core; grants per S15): ★ `src/server/db/` columns `notification.by_role`, `by_player_id` (nullable, no backfill); notifications-owned `helpers.ts` (`notify` stamps from `env.actor`), `@shared/notifications/schemas.ts` (`NotificationRecord` fields); `note.testSend` unchanged. Docs (assigned): data model (notification columns), protocol (record fields, CON-44 figure).
+- **K4** (after K0; ∥ K2, K3): notifications-owned client toast + history row components (stripe, `data-by`, `data-color`, the "Resolved by" name colour). P's `handout-shared` kind gets the stamp for free; P needs nothing (seams S15). No shared file with K4 beyond the append-only view registries, which K4 doesn't touch.
+- **K3** (last canvas holder, seams S10; `cue.color?` contract change granted to K3, S15): the cue ring colour through scenes-map's `cue.color?` (FR-MAP-72) and notifications' own `tokenOverlays` line passing the action owner's colour.
 
 ## 15. Open questions
 

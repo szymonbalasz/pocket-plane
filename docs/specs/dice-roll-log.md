@@ -23,13 +23,13 @@ phase: post-mvp-5
 - **Sprint 4** (DM [#243](../decisions-log.md) [17]; FR-DICE-35–37): log lines show **the same dice as the tray**: each die as an inline die-shape chip in the roller's look ([FR-DICEX-42](dice-extras.md#6-functional-requirements)); the roll popup opens the log at its entry. No kind, event or schema change; one payload exception is R's (public character-trigger `dice`, FR-DICE-36).
 - **Sprint 5, track K** (BL-17; FR-DICE-60, 61): each line's actor name is drawn in the **roller's player colour** (the DM's rolls in the DM colour), derived from the entry's `rollerRole` / `rollerPlayerId`: 0 B.
 
-> **Sprint 5 (track K, BL-17 via [#251](../decisions-log.md)).** Decided by the DM (not open): log lines show the **player colour** of whoever rolled ([campaign-management](campaign-management.md) FR-CAMP-23–29 owns the colour). New FR-DICE-60–61 (track K's range; D adds its own rows in parallel and **owns the log client**: K4 builds after D's log edits). No kind, payload, event or schema change: entries already carry `rollerRole` / `rollerPlayerId`. Walkthrough: [CAMP §13](campaign-management.md#13-test-plan) K6, K10, K12.
+> **Sprint 5 (track K, BL-17 via [#251](../decisions-log.md)).** Decided by the DM (not open): log lines show the **player colour** of whoever rolled ([campaign-management](campaign-management.md) FR-CAMP-23–29 owns the colour). New FR-DICE-60–61 (track K's range; D adds its own rows in parallel and **owns the log client**: `GameLog.tsx` order **W1 → D8 → K4**, seams S15). No kind, payload, event or schema change: entries already carry `rollerRole` / `rollerPlayerId`. Walkthrough: [CAMP §13](campaign-management.md#13-test-plan) K6, K10, K12.
 
 **Sprint 5 at a glance** (track K)
 
 | FR | What | Slice | Named test |
 |---|---|---|---|
-| FR-DICE-60 | The line's actor name in the roller's colour | K4 (after D) | `FR-DICE-60 log name colour` |
+| FR-DICE-60 | The line's actor name in the roller's colour | K4 (after W1 → D8, S15) | `FR-DICE-60 log name colour` |
 | FR-DICE-61 | Every kind, fallback, recolour, 0 B | K4 | `FR-DICE-61 kinds and fallback` |
 
 DM questions: §15 OQ-DICE-39, -40.
@@ -281,7 +281,7 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 | On | What we need | Status |
 |---|---|---|
 | *(Sprint 5)* [campaign-management](campaign-management.md) (K) | `colorOf` + palette (FR-CAMP-28); bundle `player-colours` | revised with this spec |
-| *(Sprint 5)* [dice-extras](dice-extras.md) (D) | Owns the log client this sprint: K4 after D's log edits; popup name colour (OQ-DICE-40) | sequencing; open question |
+| *(Sprint 5)* [dice-extras](dice-extras.md) (D) | Owns the log client this sprint: `GameLog.tsx` W1 → D8 → K4; popup name colour (OQ-DICE-40): K4's line after D11 if picked | settled by seams S15; DM question open |
 | [live-sync](live-sync.md), [protocol](../protocol/README.md) | Intents, record types, `audience: dm`; windowed type per [ADR-0029](../architecture/adr/0029-windowed-record-types.md) | complete; ADR accepted (#137) |
 | [campaign-management](campaign-management.md), [entities](entities.md), [scenes-map](scenes-map.md), [play-shell](play-shell.md) | Player name; `resolveDefinition`, character owner; token display name (copied server-side); window registry `dice.log`, no header slot (gear in body) | complete |
 | [character-sheet](character-sheet.md) | `char.roll` calls `dice.evaluate` + `gameLog.append`, emits `CharacterRolled` (I1); sheet buttons use the roll control (FR-DICE-24) | in revision |
@@ -306,7 +306,7 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 **Shared changes — sprint 4** (#243 [17]): none in AGENTS §9.9. Feature-owned (D owns the dice display hotspot): `src/shared/dice-roll-log/{kind-types.ts (optional `die` on `LineSegment`), roll-kind.ts (segments)}`, `src/client/common/features/dice-roll-log/{GameLog.tsx (chips, focus), focus.ts (new)}`; `DieShape` from dice-extras. `kinds.ts`, schema, events, protocol unchanged. **Not D5's** (ruling B9): `@shared/effect-modifiers/{line.ts (modSegments), combat-parts.ts (rollOfferSegments)}` are R's; MOD / offered chips land in R S4-5. Order (seams S8): D5 `build/dice-shapes` (wave 1, lock-free) → R S4-5 `fix/fury-log-line` (also after R S4-1b, which holds combat's `log-kinds.ts`). Docs at consolidation: protocol §26 log-kinds row (`die` segment).
 
-**Shared changes — sprint 5** (track K, BL-17): none in AGENTS §9.9. Feature-owned (D owns the log client; **K4 builds after D's log slice**): `src/client/common/features/dice-roll-log/GameLog.tsx` (the actor name span reads `colorOf`, `data-color`, `data-roller`). Consumes CAMP's new common `src/client/common/features/campaign-management/colors.ts` (K0). No kind, payload, event, record or schema change. Full split: [CAMP §14](campaign-management.md#sprint-5-build-split-track-k).
+**Shared changes — sprint 5** (track K, BL-17): none in AGENTS §9.9. Feature-owned (D owns the log client; *seams S15:* `GameLog.tsx` **W1 (width) → D8 (held lines) → K4**; R2 never edits it): `src/client/common/features/dice-roll-log/GameLog.tsx` (the actor name span reads `colorOf`, `data-color`, `data-roller`). Consumes CAMP's new common `src/client/common/features/campaign-management/colors.ts` (K0). No kind, payload, event, record or schema change. Full split: [CAMP §14](campaign-management.md#sprint-5-build-split-track-k).
 
 **Combat lines (R4, sprint 1):** [combat-tracker](combat-tracker.md) FR-CBT-57/58 add natural markers to `cbt.attack` lines from public `payload` fields only, so FR-DICE-28 holds unchanged.
 
@@ -329,7 +329,7 @@ All rows decided or settled; sprint-4 rows by the DM at sprint-4 gate 1 ([#245](
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-DICE-39 | **Whose colour** colours a line's name? | **A. The roller's** (`rollerRole` / `rollerPlayerId`: who clicked Roll; the DM's rolls for a PC or monster are amber) (0 B; matches "who did it", like the dice look) / B. The actor's owner (Mira rose even when the DM rolls for her): the entry stores only `actorName`, so it needs a new `actorPlayerId` on entries (schema + kind callers) / C. Only player-rolled lines coloured, the DM's plain: quieter log, but BL-17 says the DM colour shows too | no · owner: DM | — |
-| OQ-DICE-40 | **dice-extras:** the roll popup (FR-DICEX-39) names the roller too: colour it the same way? | **A. Yes, the popup's roller name in the roller's colour, D's slice, with `colorOf` from K0** (one rule for log and popup) / B. Log only this sprint | no · owner: D (dice-extras) | dice-extras |
+| OQ-DICE-40 | **dice-extras:** the roll popup (FR-DICEX-39) names the roller too: colour it the same way? | **A. Yes: K4 adds the `colorOf` line in the popup after D11 merges; D11 leaves the name plain** (one rule for log and popup) / B. Log only this sprint | no · owner: DM · *who / when settled by seams S15 (K4's line after D11)* | dice-extras |
 
 ## 16. Out of scope
 
