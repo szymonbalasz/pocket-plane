@@ -2,6 +2,7 @@
 // read-only. Characters and customs live from sync; imported monsters from the compendium search
 // (FR-CMP-17: debounced 150 ms, pages of 50 + More), their definitions loaded on demand
 // (`useDefinitions`). Rows are HTML5 drag sources for the canvas (FR-MAP-13), data unchanged.
+// Footer **Credits** opens the About dialog with the token art credits (FR-ENT-29).
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import type { SearchResponse } from "@shared/compendium/rest";
 import {
@@ -22,6 +23,7 @@ import {
 } from "@ui/components/ui/primitives";
 import { Tabs, TabsList, TabsTrigger } from "@ui/components/ui/tabs";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
+import { CreditsLink } from "@ui/features/compendium/credits";
 import { useDefinitions } from "@ui/features/compendium/definitions";
 import { lazyApi, searchCompendium, useCompendiumSearch } from "@ui/features/compendium/search";
 import { defineWindow } from "@ui/features/play-shell/registry";
@@ -230,6 +232,10 @@ export function CreaturesList({
           More
         </Button>
       )}
+      {/* FR-ENT-29: the token art credit, always reachable. */}
+      <footer className="mt-auto flex justify-end border-t pt-0.5">
+        <CreditsLink api={api} testId="ent-list-credits" />
+      </footer>
     </section>
   );
 }

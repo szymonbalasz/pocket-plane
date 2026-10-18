@@ -6,6 +6,7 @@ import { cbtxTokenMenu } from "../combat-extras/token-menu-entries";
 import { combatTokenMenu } from "../combat-tracker/token-menu-entries";
 import { cmpTokenMenu } from "../compendium/token-menu-entries";
 import { modTokenMenu } from "../effect-modifiers/token-menu-entries";
+import { entTokenMenu } from "../entities/token-menu-entries";
 import { fogTokenMenu } from "../fog-of-war/token-menu-entries";
 import { scenesMapTokenMenu } from "./token-menu-entries";
 
@@ -48,6 +49,7 @@ export const tokenMenuEntries: readonly TokenMenuEntry[] = [
   ...modTokenMenu, // effect-modifiers: Apply effect ▸, Effect modifiers…, Rule triggers… (FR-MOD-28)
   ...fogTokenMenu, // fog-of-war: Invisible (FR-FOG-47, #210)
   ...cmpTokenMenu, // compendium: Stat block (FR-CMP-22)
+  ...entTokenMenu, // entities: Art ▸ Creature type / Initials (FR-ENT-28)
 ];
 
 /** Token double-click: the first available entry by order runs. Append your feature's line. */

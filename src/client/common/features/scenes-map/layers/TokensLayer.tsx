@@ -1,24 +1,29 @@
 // Tokens layer (FR-MAP-14–19, -31, -34, -35, -43): image or initials per shape, DM hidden styling,
 // selection / target ring, overlay cross, bar, icons and dim (inside the token's group, so they
 // move with a drag and show in drag previews). Names and badges are on the labels layer
-// (FR-MAP-42). Konva node `name` = `map-token`, `id` = token id, attrs `shape`, `preview`
-// (FR-MAP-40); ring `map-token-ring` (attr `state`); crosses, bars and icons named by their
-// overlay id (bar attrs `tone`, `fraction`; icon attrs `value`, `icon`, `tone`, `label`, `muted`, and
+// (FR-MAP-42). No image: the creature-type glyph on its type colour, else initials (FR-ENT-28).
+// Konva node `name` = `map-token`, `id` = token id, attrs `shape`, `preview` (FR-MAP-40), `art`
+// (`image` | `<type>` | `initials`, FR-ENT-28); glyph `map-token-art` (attr `creature`); ring
+// `map-token-ring` (attr `state`); crosses, bars and icons named by their overlay id (bar attrs
+// `tone`, `fraction`; icon attrs `value`, `icon`, `tone`, `label`, `muted`, and
 // `tip` = the hover tooltip the labels layer shows, FR-MAP-57 / S9); "+N" `map-token-icons-more`
 // (attrs `count`, `tip`); a cue (FR-MAP-49) named by its id, attr `label`. Drag
 // paths and combat trails (FR-MAP-52–55) are drawn first, below every token (`DragPaths`).
+import type { CreatureType } from "@shared/entities/schemas";
 import { cellToPx, footprint, initials } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { useEffect, useMemo, useRef } from "react";
-import { Circle, Group, Image, Line, Rect, Shape, Text } from "react-konva";
+import { Circle, Group, Image, Line, Path, Rect, Shape, Text } from "react-konva";
 import { useStore } from "zustand";
 import { retryAssetImage, useAssetImage } from "../../assets-pipeline/useAssetImage";
+import { glyphRect, tokenArtOf } from "../../entities/art";
+import { CREATURE_ART } from "../../entities/creature-art";
 import { withoutDmOnly } from "../../scene-tools/layer-switches";
 import { useCanvas } from "../canvas-context";
 import { decorateToken, type MergedDecoration } from "../decorations";
 import { CROSS_OPACITY, crossGeometry } from "../label";
-import { containRect, coverCrop, initialsBackdropOf, outlineOf } from "../shape";
+import { artBackdropOf, containRect, coverCrop, initialsBackdropOf, outlineOf } from "../shape";
 import { barGeometry, cueGeometry, cuePulse, iconRow } from "../token-decor";
 import type { TokenBar, TokenCross, TokenCue, TokenIcon } from "../token-overlays";
 import { tokenOverlays } from "../token-overlays";
@@ -28,7 +33,60 @@ import { toneColor } from "./tone";
 
 const INSET = 0.92;
 
-/** Token art per shape (FR-MAP-35); initials when there is no image (yet). */
+/** Backdrop per shape: a disc (round) or a rounded square inset like the outline. */
+function Backdrop({
+  kind,
+  side,
+  fill,
+}: {
+  kind: "circle" | "rounded-square";
+  side: number;
+  fill: string;
+}) {
+  const r = side / 2;
+  const inset = r * (1 - INSET);
+  return kind === "circle" ? (
+    <Circle x={r} y={r} radius={r * INSET} fill={fill} />
+  ) : (
+    <Rect
+      x={inset}
+      y={inset}
+      width={side - 2 * inset}
+      height={side - 2 * inset}
+      cornerRadius={side * 0.15}
+      fill={fill}
+    />
+  );
+}
+
+/** FR-ENT-28: the type's glyph (white, ≈ 65 % of the footprint) on its colour per shape. */
+function CreatureArt({ t, side, type }: { t: TokenView; side: number; type: CreatureType }) {
+  const { colors } = useCanvas();
+  const glyph = CREATURE_ART[type];
+  const box = glyphRect(side);
+  const vb = glyph.viewBox.split(" ").map(Number);
+  const k = box.size / (vb[2] ?? 512);
+  const backdrop = artBackdropOf(t.shape);
+  return (
+    <>
+      {backdrop && <Backdrop kind={backdrop} side={side} fill={colors.creature[type]} />}
+      <Path
+        name="map-token-art"
+        creature={type}
+        data={glyph.path}
+        x={box.x - (vb[0] ?? 0) * k}
+        y={box.y - (vb[1] ?? 0) * k}
+        scaleX={k}
+        scaleY={k}
+        fill={colors.creatureGlyph}
+        listening={false}
+        perfectDrawEnabled={false}
+      />
+    </>
+  );
+}
+
+/** Token art per shape (FR-MAP-35); creature-type art or initials when there is no image (yet). */
 function TokenBody({
   t,
   side,
@@ -52,21 +110,11 @@ function TokenBody({
       <Group clipFunc={(ctx) => ctx.arc(r, r, r * INSET, 0, Math.PI * 2, false)}>{cover}</Group>
     );
   }
-  const inset = r * (1 - INSET);
+  const art = tokenArtOf({ imageAssetId: null, creatureType: t.creatureType });
+  if (art !== "initials" && art !== "image") return <CreatureArt t={t} side={side} type={art} />;
   return (
     <>
-      {initialsBackdropOf(t.shape) === "circle" ? (
-        <Circle x={r} y={r} radius={r * INSET} fill={colors.muted} />
-      ) : (
-        <Rect
-          x={inset}
-          y={inset}
-          width={side - 2 * inset}
-          height={side - 2 * inset}
-          cornerRadius={side * 0.15}
-          fill={colors.muted}
-        />
-      )}
+      <Backdrop kind={initialsBackdropOf(t.shape)} side={side} fill={colors.muted} />
       <Text
         text={initials(t.name)}
         x={0}
@@ -402,6 +450,7 @@ function TokenNode({ t }: { t: TokenView }) {
       name="map-token"
       id={t.id}
       shape={t.shape}
+      art={tokenArtOf(t)}
       preview={preview ? true : undefined}
       x={x}
       y={y}

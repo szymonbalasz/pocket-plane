@@ -1722,3 +1722,16 @@ From [fog-of-war](../specs/fog-of-war.md) FR-FOG-48, -20, -21, -43, -49–51. **
 - **Derived (client, never stored):** the drawn union (`party-view.ts`): every drawn record's polygons (each through its owner's sight previews), party-blind, the chip reason, the union of drawn memory rows.
 - **Read, not stored:** a source's Blinded state = an active `blinded` condition `effect` row on the token's definition (the character); one per character (CBTX §8 partial unique index).
 - **CON-44:** `reason` adds ≤ 20 B to a blind player's own `vision` row; nothing else.
+
+## 64. Sprint 4: token art (C-art)
+
+From [entities](../specs/entities.md#8-data-model) FR-ENT-28, -29. **Built by `build/cmp-token-art`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent beyond [§59](#59-sprint-4-token-creature-type-c-art-core)'s `token.creatureType`. Protocol side: [protocol §81](../protocol/README.md#81-sprint-4-token-art-c-art).
+
+| Piece | Kind | Contents | Visibility | Source |
+|---|---|---|---|---|
+| Token art | derived per render | `tokenArtOf(token)` = `image` if `imageAssetId`, else the `creatureType` type, else `initials` (`"initials"` and null) | each client its own tokens (players: only tokens they receive, FR-ENT-30) | FR-ENT-27, -28 |
+| Glyphs, credits | client bundle (both clients) | 14 path strings + `{icon, author, url}`; `creature-art/ATTRIBUTION.md` | not secret | FR-ENT-28, -29 |
+| Type colours | canvas colour tokens | `creature.<type>` (`--creature-<type>`, fallback visual-direction's values), white glyph | — | OQ-ENT-30 |
+| Credits sources | read on demand (dialog open) | attributions of the imported sources (search page + one entry per source) | as the compendium's REST reads | FR-CMP-19 |
+
+- **Fixtures:** none new; `compendium-full` (`ent-art-tokens`) and `token-art-update` (`art-update-tokens`, from C-art core) cover the walkthroughs T1–T7, U1–U3.

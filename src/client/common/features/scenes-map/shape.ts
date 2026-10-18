@@ -32,3 +32,7 @@ export const outlineOf = (shape: TokenShape): "circle" | "square" =>
 /** No image: initials in a circle (round) or a rounded square (square, none). */
 export const initialsBackdropOf = (shape: TokenShape): "circle" | "rounded-square" =>
   shape === "round" ? "circle" : "rounded-square";
+
+/** No image, a creature type (FR-ENT-28): the type colour in a circle, rounded square or none. */
+export const artBackdropOf = (shape: TokenShape): "circle" | "rounded-square" | null =>
+  shape === "none" ? null : initialsBackdropOf(shape);
