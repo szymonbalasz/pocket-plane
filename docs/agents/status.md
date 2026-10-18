@@ -15,6 +15,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | P party + uploads | spec/s5-party (w6K) | spec-party | spec drafted, idle | seams |
 | C compendium images | spec/s5-cmpimg (w6M) | spec-cmpimg | Phase A spec | report → seams |
 | K player colours + template delete [1] | spec/s5-colours (w6N) | spec-colours | Phase A spec | report → seams |
+| backfill (BL-28) load-tolerant bench gate | fix/bl-28-bench-tolerant (w6P) | fix-bl-28 | building | merge |
+| backfill (BL-16) stable useRecords array | fix/bl-16-stable-records (w6Q) | fix-bl-16 | building; holds `src/client/common/sync/store.ts` | merge |
 
 New ID ranges per track (parallel edits of shared specs): in the briefs `%TEMP%/pocket-plane/briefs/spec-s5-*.md`.
 
