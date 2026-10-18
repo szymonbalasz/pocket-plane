@@ -10,11 +10,11 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | Sprint 4 | merged | — | Done (#243–#251) | — |
 | W windows + layout | spec/s5-windows (w6G) | spec-windows | Phase A spec | report → seams |
-| D dice polish | spec/s5-dice (w6H) | spec-dice | Phase A spec | report → seams |
-| R late damage + log | spec/s5-combat (w6J) | spec-combat | Phase A spec | report → seams |
-| P party + uploads | spec/s5-party (w6K) | spec-party | Phase A spec | report → seams |
-| C compendium images | — | — | queued (next free slot) | — |
-| K player colours + template delete [1] | — | — | queued | — |
+| D dice polish | spec/s5-dice (w6H) | spec-dice | spec drafted, idle | seams |
+| R late damage + log + ally side (#252) | spec/s5-combat (w6J) | spec-combat | drafted; adding ally side | report → seams |
+| P party + uploads | spec/s5-party (w6K) | spec-party | spec drafted, idle | seams |
+| C compendium images | spec/s5-cmpimg (w6M) | spec-cmpimg | Phase A spec | report → seams |
+| K player colours + template delete [1] | spec/s5-colours (w6N) | spec-colours | Phase A spec | report → seams |
 
 New ID ranges per track (parallel edits of shared specs): in the briefs `%TEMP%/pocket-plane/briefs/spec-s5-*.md`.
 
