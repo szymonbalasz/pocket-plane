@@ -18,7 +18,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | Physical dice in combat (BL-19, BL-25) | merged | — | Done (walkthrough 5/5; check 3314, e2e 105) | — |
 | C-art token art (last slice) | merged eacb98a | — | Done (9/10 + credits fix). **Track C complete** | — |
-| Sprint gate: session-sim-8 | main | — | Final main gates running | test-session-8 |
+| Sprint gate: session-sim-8 | main (eacb98a; check 3403, e2e 111 green) | test-session-8 (tab wR:p1X, server wR:p1Y) | Running (`.verify/20261018-030613-session-sim-8/`) | Playtest section, recap |
 | C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
 | V9 fog brush + Ctrl+Z | merged | — | Done (walkthrough 13/13) | — |
 | V10 party vision + Blinded | merged | — | Done (check 3386, e2e 110). **Track V complete** | — |
