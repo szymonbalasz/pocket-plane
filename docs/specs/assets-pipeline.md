@@ -1,13 +1,15 @@
 ---
 title: Assets pipeline
 prefix: ASSET
-status: claimed
+status: in-review
 owner: spec-cmpimg
 wave: 1
 phase: post-mvp-5
 ---
 
 # Assets pipeline
+
+> **Sprint 5 revision, track C (DM [#250](../decisions-log.md) [10] [12]; this block only):** compendium homebrew entries hold image asset IDs ([compendium FR-CMP-45–53](compendium.md#6-functional-requirements)). Entries are read over REST, not the WS, so a player learns those IDs from a compendium REST body: **FR-ASSET-12 gains one exception** (FR-ASSET-36, [proposed ADR](../architecture/adr/proposed-s5-cmpimg-rest-asset-ids.md) amending ADR-0023; OQ-ASSET-17). New FR-ASSET-35–38; amended FR-ASSET-12. Upload, paste and the attach control are track P's revision of this spec (FR-ASSET-20–27). 0 B to any snapshot (measured, [CMP §12](compendium.md#12-performance--bandwidth)).
 
 ## 1. Summary
 
@@ -18,6 +20,7 @@ phase: post-mvp-5
 ## 2. Scope
 
 - Ingest (DM upload over REST; fixture loader in-process), dedupe per campaign by hash, derivatives `thumb` + `display`. Asset record per campaign (DM only); serving by ID; client image loader; DM asset picker with upload. `assets.require` for specs that store asset IDs. Fixture `images` ([fixtures-adapters §8](fixtures-adapters.md#8-data-model)), test fixtures, bundles.
+- *(S5, track C)* Compendium entry images as asset references, the REST-body rule for them, stale-reference handling and the leak property over REST (FR-ASSET-35–38).
 
 ## 3. Goals
 
@@ -51,7 +54,7 @@ phase: post-mvp-5
 | FR-ASSET-09 | An asset belongs to `ctx.campaignId`, resolved when the request is authenticated ([FR-CAMP-11](campaign-management.md#6-functional-requirements)). No context ever lists or receives another campaign's `asset` record. | [ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md) |
 | FR-ASSET-10 | Record type `asset`: scope `campaign`; DM `full`, player `hidden`. Snapshot: all the campaign's assets; array order not significant. Picker order: `createdAt` desc, then `seq` desc. | [FR-SYNC-18](live-sync.md#6-functional-requirements) |
 | FR-ASSET-11 | `GET /api/assets/:id/:file`, `file` ∈ `thumb \| display`. No credential: knowing the ID is the permission (#123). Served iff the asset exists and belongs to the active campaign. Originals are never served. | Same for DM and players |
-| FR-ASSET-12 | Asset IDs reach a player only as fields of records that player receives through the filtered sync (snapshot or record change). Never in a REST body, error, toast, URL or log a player can read. Specs that store asset IDs drop or redact those fields where the player may not see the image. Bytes already loaded stay usable after a hide (accepted). | Owning specs' visibility fns |
+| FR-ASSET-12 | Asset IDs reach a player only as fields of records that player receives through the filtered sync (snapshot or record change). Never in a REST body, error, toast, URL or log a player can read. Specs that store asset IDs drop or redact those fields where the player may not see the image. Bytes already loaded stay usable after a hide (accepted). *(S5: one exception, compendium REST bodies under `entryVisibleTo`, FR-ASSET-36.)* | Owning specs' visibility fns |
 | FR-ASSET-13 | GET denials (unknown ID, inactive or other campaign's asset, invalid `file`) → the same 404 body. POST: missing or wrong DM secret → 401 ([FR-CAMP-04](campaign-management.md#6-functional-requirements)); throttled → 429 ([FR-CAMP-05](campaign-management.md#6-functional-requirements)). | No existence oracle |
 | FR-ASSET-14 | 200 responses: exact `Content-Type`, `Cache-Control: private, max-age=31536000, immutable`, `ETag: "<id>-<file>"`, `X-Content-Type-Options: nosniff`. `If-None-Match` → 304 only when FR-ASSET-11 would serve. | `private`: no Cloudflare edge copy outside the active-campaign check |
 | FR-ASSET-15 | Every command that sets an asset-ID field calls `assets.require(ctx, id)` → `not_found` unless it is an asset of `ctx.campaignId`. Propagated copies (e.g. token image from a definition edit, #120) are written in the same transaction. | Same campaign only |
@@ -59,6 +62,15 @@ phase: post-mvp-5
 | FR-ASSET-17 | DM asset picker: the campaign's assets (thumb, name, display size); upload via file input or drop; "Select" returns the asset ID. Upload disabled unless `live`. Upload: progress %, then "Processing…"; `existing` → Toast "Already uploaded"; on `created` / `existing` the item is selected once the `asset` record with that ID is in the store (after the reconnect snapshot if not `live`). 413 / 415 / 422 / other → inline error naming the cause. | [FR-SYNC-24](live-sync.md#6-functional-requirements) |
 | FR-ASSET-18 | Fixture `images` ingests committed SVGs via FR-ASSET-01. Two loads of a bundle give identical asset IDs and record fields; on the same machine also identical hashes and file bytes. | [FR-FIX-08](fixtures-adapters.md#6-functional-requirements) |
 | FR-ASSET-19 | Test mode only (`PP_TEST_MODE=1`): DM window type `asset.test` ([FR-SHELL-07](play-shell.md#6-functional-requirements)) hosting the picker. Absent otherwise. | *(proposed)* OQ-ASSET-08 |
+
+### 6.2 Sprint 5, track C: compendium entry images
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-ASSET-35 | **Asset reference** `CompendiumEntry.imageAssetIds` (homebrew entries, 0–4, [FR-CMP-45](compendium.md#6-functional-requirements)): set only by `cmp.putEntry`, each ID through `assets.require` (FR-ASSET-15) in that transaction; listed assets and attachments both accepted. Imported (global) entries carry none (OQ-CMP-39). | |
+| FR-ASSET-36 | **REST-body exception to FR-ASSET-12** (OQ-ASSET-17): an asset ID may also reach a player inside a **compendium REST response** (`GET /api/compendium/entries/:id`; search pages if OQ-CMP-42 C is picked), only when compendium's `entryVisibleTo` lets that player read the entry ([FR-CMP-14](compendium.md#6-functional-requirements), [FR-CMP-48](compendium.md#6-functional-requirements)), on the player's own credential (`Authorization: Player`), with `Cache-Control: private, no-cache`. Never in an error body, a 304, a log line or a toast. No other REST route may return asset IDs to players without its own amendment. | Proposed ADR (amends ADR-0023 "Secrecy") |
+| FR-ASSET-37 | **Stale references in lists**: a reader that returns asset IDs from a JSON-leaf list (compendium entry images) drops IDs without an asset row in the campaign, so clients never get an ID that can only 404. Single-ID fields (map, token image, portrait) keep today's rule (broken-image placeholder, FR-ASSET-16). | Today only via DB edits; a future delete (OQ-ASSET-19) |
+| FR-ASSET-38 | **Leak property over REST**: the FR-ASSET-12 leak property also scans every player compendium REST body (search, `sameAs`, GET incl. 404 / 304): each asset ID found belongs to an entry that player may read at that moment. Test lives in compendium's folder (`image-leak.test.ts`), not here. | §13 |
 
 ## 7. UI/UX notes
 
@@ -81,7 +93,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 | | createdAt | timestamp | Clock seam |
 | Asset files *(disk)* | `<hash>/original`, `display.webp`, `thumb.webp` | files | Layout *(proposed)*; one set per hash |
 
-- **Relations:** Campaign 1—* Asset. Asset-ID fields: `Scene.mapAssetId`, `Token.imageAssetId` ([scenes-map](scenes-map.md)), `Entity.portraitAssetId` ([entities](entities.md)): many records → one asset, same campaign only (FR-ASSET-15). Imported (global) definitions carry no asset in MVP.
+- **Relations:** Campaign 1—* Asset. Asset-ID fields: `Scene.mapAssetId`, `Token.imageAssetId` ([scenes-map](scenes-map.md)), `Entity.portraitAssetId` ([entities](entities.md)): many records → one asset, same campaign only (FR-ASSET-15). Imported (global) definitions carry no asset in MVP. *(S5, track C: + `CompendiumEntry.imageAssetIds`, JSON leaf 0–4, homebrew only, [compendium §8](compendium.md#8-data-model); imported entries none.)*
 - **Derived values:** `thumb` size. **Persisted runtime state:** none beyond rows and files. No JSON leaf fields; files are not records.
 
 ## 9. API & events
@@ -113,6 +125,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 | See asset list | ✓ | ✗ | `asset` visibility = DM only |
 | Fetch `thumb` / `display` | Any ID it holds | Any ID it holds (learned only via FR-ASSET-12) | Asset exists in the active campaign |
 | Set an asset-ID field | Per owning spec | Per owning spec | `assets.require` (same campaign) |
+| *(S5)* Receive entry image IDs over REST | ✓ own campaign's entries | entries `entryVisibleTo` allows | FR-ASSET-36 |
 
 ## 11. Edge cases & failure modes
 
@@ -120,6 +133,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 - **Server crash mid-action:** before commit → no row; temp and orphan files removed at next start (FR-ASSET-07). After commit → asset complete; re-upload returns `existing`.
 - **Concurrent edits:** two tabs upload the same image → one `created`, one `existing` (DB uniqueness). Same image in two campaigns → two rows, two IDs, one file set. Campaign switched mid-upload → the asset lands in the campaign active when the upload was authenticated; the DM sees it after switching back.
 - **Reveal / hide:** reveal sends the record, so the player learns the ID then; after a hide the ID still works for that player (bytes were legitimately seen).
+- *(S5, track C)* **Compendium entry images:** share = the player's next fetch returns the IDs; unshare / image removed = the next fetch omits them, IDs already learned keep working (as any hide). A forged `PUT` naming another campaign's asset → `not_found` (FR-ASSET-35). REST has no reconnect step; a player's reconnect snapshot never holds entry image IDs. Crash: `cmp.putEntry` is one transaction; an upload that finished before it stays an unreferenced attachment.
 - **Invalid / malicious input:** guessing a 128-bit ID is infeasible; leaked IDs work until revoke exists (post-MVP, OQ-ASSET-05); `id` and `file` zod-validated, never used as paths; decompression bombs stopped by the pixel limit; SVG never served; renamed `.png` text file → 415. Seeded fixture IDs are predictable: fixture data is never tunnelled ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)).
 
 ## 12. Performance & bandwidth
@@ -127,6 +141,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 - Budgets *(proposed)*: ingest of a 50 MP image incl. derivatives ≤ 5 s on the DM laptop; `images` fixture ≤ 300 ms in-process (share of FR-FIX-10); DM snapshot ≤ ~300 assets × ~250 B ≈ 75 KB (revisit with the tier-A library).
 - Map `display` 1–3 MB per player; 6 players ≈ 5–15 s at 10 Mbit/s DM upload; token `thumb` ≲ 50 KB; revisits 0 bytes.
 - Files streamed from disk; no derivatives on request; originals never leave the laptop.
+- *(S5, track C, measured)* Entry images: snapshots +0 B (DM and players); entry GET +25 B per ID (+118 B at 4); a library image costs ≈ 325 B in the DM snapshot (80-char name), an attachment 0 B. Gallery loads `thumb` (19–76 KB for a noisy 1600 × 1200 / 800 × 800 image), the lightbox `display` (271–816 KB). Figures and probe: [CMP §12](compendium.md#12-performance--bandwidth).
 
 ## 13. Test plan
 
@@ -167,6 +182,8 @@ Isolated per worktree: `bun test` uses `:memory:` DB + temp asset dir per file; 
 | 3 | Reveal wolf | B reloads | Wolf renders ≤ 1 s; after reload same view, images from browser cache |
 | 4 | Hard-kill, restart; then hide wolf | — | All reconnect, images render, `token-elite` ID still absent; wolf gone from canvas |
 
+**Sprint 5, track C** (bundle `cmp-images`, [CMP §13.1](compendium.md#131-sprint-5-entry-images-track-c)): `FR-ASSET-35` = CMP's `FR-CMP-46 assets.require refusal`; **`FR-ASSET-36 leak property over REST`** (`image-leak.test.ts`: random sequences of put / share / unshare / image add / remove over `cmp-images`; after each step every asset ID in player-1's and player-2's search, `sameAs` and GET bodies (200, 304, 404) belongs to an entry that player may read; error bodies never hold one); `FR-ASSET-37 stale reference dropped` = CMP's `FR-CMP-47 asset deleted`. Walkthrough: CMP walkthrough I.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -178,6 +195,7 @@ Isolated per worktree: `bun test` uses `:memory:` DB + temp asset dir per file; 
 | [play-shell](play-shell.md) | Window registry (FR-SHELL-07) for `asset.test`; no shell change | agreed |
 | [fixtures-adapters](fixtures-adapters.md) | Loader passes SVG bytes to `assets.ingest`; manifest lists asset IDs by fixture key. Add `image-large`, `images-second`, bundles `asset-library`, `asset-access` to FIX §8 at merge (integrator) | agreed (FR-FIX-17) |
 | [data model](../data-model/README.md) | Asset `id` from `ctx.tokens`, not `ctx.ids` (consolidation, integrator) | done ([CON-19](../data-model/README.md#8-conflicts-log)) |
+| *(S5)* [compendium](compendium.md) (track C) | `imageAssetIds` on homebrew entries via `assets.require` (FR-ASSET-35); REST-body exception (FR-ASSET-36); consumes P's `ImageAttach` (OQ-ASSET-18). Build: CMP §14 C5 core / C5 UI; no file of this feature is edited by C | this revision |
 
 ## 15. Open questions
 
@@ -195,7 +213,12 @@ Isolated per worktree: `bun test` uses `:memory:` DB + temp asset dir per file; 
 | OQ-ASSET-08 | Where can the DM open the picker outside scene / token / portrait flows? | **Test-mode-only window `asset.test` (like `shell.test`, FR-SHELL-23)** (no product scope; walkthrough A runs before scenes-map) / DM window `asset.images` (≈ tier-A library) / host flows only | no · owner: spec-assets-pipeline | play-shell |
 | OQ-ASSET-09 | ~~Glossary: add **Asset reference**~~ | **Decided (integrator, Scenes consolidation):** added to the [glossary](../glossary.md) as suggested | no (decided) | all specs with images |
 | ~~OQ-ASSET-10~~ | ~~entities: FR-ENT-08/11 call `assets.require` for `portraitAssetId`~~ | **Decided:** yes; [FR-ENT-08/11](entities.md#6-functional-requirements) call it (CON-27) | — | — |
+| OQ-ASSET-17 | *(S5, track C, DM)* Compendium entries travel over REST, but FR-ASSET-12 / ADR-0023 say a player learns asset IDs only through the filtered sync. How do entry image IDs reach players? | **A: allow them in compendium REST bodies gated by `entryVisibleTo` (FR-ASSET-36), via a [proposed ADR](../architecture/adr/proposed-s5-cmpimg-rest-asset-ids.md) amending ADR-0023's Secrecy rule** — same guarantee (a visibility fn per reader), no new path / B: a lazy record type `cmp-entry-images` loaded with `sync.load` — IDs stay on the WS, but a second read path for one field and per-entry visibility in the WS filter / C: an image route behind the player credential — `<img>` can't send headers; ADR-0023 rejected it (option B there) | **yes** (C5 core can't ship player images without it) · owner: DM (gate 1) | ADR-0023, compendium |
+| OQ-ASSET-18 | *(S5, track C)* **Seam with track P's `ImageAttach`** (FR-ASSET-20–27, P's OQ-ASSET-15) | **No new prop: C passes `max` 4, `count`, `owner = "cmp-form"`, `pasteTarget` / `dropTarget` = the form's Dialog content (portalled: P's paste listener must accept a ref inside a portal), `disabled` while saving; C ignores an `onAdd` ID it already holds (dedupe returns the same ID); C's fixture uses P's `ingestStep(file, {listed: false})`; C5 UI starts after P1 merges** / P's control dedupes per caller (a `heldIds` prop) | no · owner: orchestrator (seams) | compendium |
+| OQ-ASSET-19 | *(S5, track C)* Future asset delete / revoke (OQ-ASSET-05) and entry images | **When delete lands: "unreferenced" also checks `compendium_entry.image_asset_ids` (and `Handout.imageAssetIds`); until then readers drop missing IDs (FR-ASSET-37)** / cascade: deleting an asset strips it from entries (silent content loss) | no · owner: spec-assets-pipeline | compendium, party-board |
+| OQ-ASSET-20 | *(S5, track C)* Glossary | **Amend "Asset reference": "A record field, or a compendium entry field, holding an asset ID … a player learns the ID only if they can see the field (sync) or read the entry (REST, ADR-0023 as amended)"; add "Entry image": an image slot on a homebrew compendium entry; the first is the main image** | no · owner: integrator | glossary |
 
 ## 16. Out of scope
 
 - See §4. Also art for imported definitions ([compendium](post-mvp/compendium.md)); handouts ([party-board](post-mvp/party-board.md)) reuse the store and loader.
+- *(S5, track C)* Asset IDs in any other player REST body; images on imported compendium entries (OQ-CMP-39).
