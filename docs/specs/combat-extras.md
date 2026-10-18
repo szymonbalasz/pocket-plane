@@ -1,9 +1,9 @@
 ---
 title: Combat extras
 prefix: CBTX
-status: complete
-owner: spec-rules
-phase: post-mvp-4
+status: claimed
+owner: spec-windows
+phase: post-mvp-5
 ---
 
 # Combat extras

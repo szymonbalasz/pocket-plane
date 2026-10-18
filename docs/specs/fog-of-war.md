@@ -1,9 +1,9 @@
 ---
 title: Fog of war
 prefix: FOG
-status: complete
-owner: spec-vision
-phase: post-mvp-4
+status: claimed
+owner: spec-windows
+phase: post-mvp-5
 ---
 
 # Fog of war (FOG v2: freeform fog, dynamic vision, magical darkness)

@@ -1,9 +1,9 @@
 ---
 title: Play shell
 prefix: SHELL
-status: complete
-owner: spec-maptools
-phase: post-mvp-4
+status: claimed
+owner: spec-windows
+phase: post-mvp-5
 ---
 
 # Play shell
