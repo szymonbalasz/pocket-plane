@@ -1,7 +1,7 @@
 ---
 title: Compendium
 prefix: CMP
-status: claimed
+status: in-review
 owner: spec-party
 phase: post-mvp-5
 ---
@@ -11,6 +11,8 @@ phase: post-mvp-5
 > **Guideline:** five-minute read. Decided at sprint-3 DM gate 1 ([#207](../decisions-log.md); changes #208 snapshot ceilings, #209 class features as trigger data). Measured figures come from a throwaway probe on the realistic-heavy harness and real SRD 5.1 data (Open5e v1, document `wotc-srd`), deleted before commit. Sprint-3 seams ruling applied (S1, S3, S5–S8, S10, S11; cited as "seams S<n>"), then the review rulings (C1–C15, X2).
 >
 > **Sprint 4 revision (track C, [#243](../decisions-log.md) [20], [#244](../decisions-log.md), session-sim-7 glitch 4):** search splits on whitespace and every word must match ("potion heal" → Potion of Healing), with a ranking that puts the SRD Goblin above the thin fixture one; duplicate names (12 × "Ability Score Improvement") collapse into one row. Token art for compendium / derived monsters is specified in [entities §6](entities.md#6-functional-requirements) (FR-ENT-26–30). New FRs: FR-CMP-32–39; amended: FR-CMP-10, -17, -18. Figures in §12 from a throwaway probe on the realistic-heavy harness + the full bundled `srd-5.1` import (deleted before commit). Decided at sprint-4 DM gate 1 ([#245](../decisions-log.md); G41–G43, G3, G44, G7).
+>
+> **Sprint 5 revision, track P (DM [#250](../decisions-log.md) [9]; this block only):** **Add to party** on item entries puts the item into the [party inventory](party-board.md#63-party-inventory) through party-board's existing `party.addItem` (compendium's action, party-board's command). New FR-CMP-40–42; DM question OQ-CMP-34 (**bold** = pick). 0 B to any snapshot. Entry images [10] are track C's revision of this spec, using the shared [image attach control](assets-pipeline.md#61-sprint-5-image-attach-control-and-attachments) (FR-ASSET-20).
 
 ### Sprint 4 at a glance
 
@@ -121,6 +123,10 @@ All writes: one transaction (rows + event-log entry), then the domain event ([AD
 | FR-CMP-37 | **One matcher everywhere.** `@shared/compendium/match.ts` (pure) exports `fold`, `queryWords`, `nameTier(name, words)` (tiers 0–3 or null) and `sourceRank`. The server index uses it; the DM client uses it for store rows in the Creatures window filter ([FR-ENT-18](entities.md#6-functional-requirements), amended) and the creature lookups ([FR-CBT-63](combat-tracker.md#6-functional-requirements), amended; OQ-CMP-31; replacement text in this track's summary, applied by the integrator at merge, rulings B8), so a multi-word query matches the same everywhere. Lookup merge: tier, then store rows (customs, characters) before imported, then the server's order; ≤ 8. | |
 | FR-CMP-38 | **Source rank** (OQ-CMP-30, decided #245): 0 the campaign's own (homebrew entries, custom definitions), 1 bundled sources (`srd-5.1`), 2 other imported sources (later adapters), 3 `fixture` (exists only on disposable data, [AGENTS §9.3](../../AGENTS.md#93-fixtures)). Applies to search ties (FR-CMP-33), lookups (FR-CMP-37) and the Creatures window order (FR-ENT-18). Badges unchanged. | sim-7 glitch 4; amends OQ-CMP-22 |
 | FR-CMP-39 | **Creature type for token art.** The Open5e adapter maps a monster's `type` to the creature core's `type` ([FR-ENT-26](entities.md#6-functional-requirements)); a value outside the 14 SRD types is dropped with a warning. `ADAPTER_VERSION` is bumped, so the bundled `version` changes and the DM sees **Update**; the Update writes the 322 definitions as `updated` in place (FR-CMP-07, -08), which runs the definition-changed hooks (token art fill, [FR-ENT-27](entities.md#6-functional-requirements)). Measured: all 322 SRD monsters carry one of the 14 types; an Update that changes every monster's creature core (317 `updated`, hooks run) takes 403 ms, an unchanged re-import 161 ms (§12; FR-CMP-31 targets 2 s / 0.5 s). V6 bumps `ADAPTER_VERSION` for its own `visionFt: 0` line too (rulings B40), so the two bumps are independent. | Token art |
+| **S5 Add to party** (track P) | | |
+| FR-CMP-40 | **Add to party** [9] on **item** entry views (imported and homebrew), **DM client only** (OQ-CMP-34): a Button next to Add to sheet opens a Popover with a qty Input (int 1–9 999, default 1) and **Add**. Add sends party-board's `party.addItem {name, qty, notes: ""}` ([FR-PARTY-19](party-board.md#63-party-inventory)): `name` = the entry name clipped to 60 chars with the same `clip` as Add to sheet (FR-CMP-28), so it merges with an existing party row of that name (case-insensitive, empty notes) or adds one; the server validates, logs the `world → party` item row and sends `loot-received` to everyone. No new intent, command, event or record. | [9]; seam P ↔ C |
+| FR-CMP-41 | Popover states: Add disabled while qty is invalid, not `live` or in flight; `ack` → Popover closes (the `loot-received` toast "Party loot: ‹name› ×‹qty›" is the confirmation); `reject` → inline message in the Popover, qty kept ("Party inventory is full (60)", "Too many — max 9 999"); lost intent → Toast "Connection lost — check the party inventory before adding again". Unshared homebrew item → hint "Players will see ‹name› in the party inventory" (`cmp-add-to-party-hint`). | as FR-PARTY-24 |
+| FR-CMP-42 | Not on other kinds (spells, features, conditions, monsters) and not in the player client (players use Add to sheet, then Give to the party, FR-PARTY-22). No link from the party row back to the entry (OQ-PARTY-13 stays later). | OQ-CMP-34 |
 
 ## 7. UI/UX notes
 
@@ -131,6 +137,7 @@ Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
 - **Stat block**: header (name, size / type / alignment), AC / HP (formula) / speed row, six scores with mods, saves / skills / senses / languages / CR + XP, then Traits, Actions, Reactions, Legendary sections. DM actions row: **Derive…**, drag handle.
 - **Homebrew form** (Dialog): kind (create only), name, facets per kind, text Textarea with a live markdown-lite preview, **Shared with players** Switch. Clone / Edit / Delete on homebrew views (DM).
 - **Add to sheet**: Popover with a character Select (player: own characters only) → Toast "Added to Mira's Features" (+ "and Triggers" when a preset was added).
+- *(S5)* **Add to party** (DM, item views): Button "Add to party" beside Add to sheet → Popover: qty Input + Add; inline error under it. Test IDs: `cmp-add-to-party`, `cmp-add-to-party-qty`, `cmp-add-to-party-submit`, `cmp-add-to-party-error`.
 - **Import / Update**: AlertDialog "Players will pause for ~2 s" with Import / Cancel.
 - **States**: empty "No matches for ‘…’"; nothing imported: DM empty state with Import, player "The DM hasn't set up the compendium yet"; loading skeleton rows; error Toast + retry; disconnected: REST still works, but writes follow the shell's offline rule (buttons disabled while not `live`).
 - **DM view**: everything above + import panel + token menu **Stat block**. **Player view**: no Monsters tab, no Derive / Clone / Edit / import; Add to sheet for own characters.
@@ -191,7 +198,7 @@ Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
 
 All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12).
 
-**WS intents:** `cmp.addToSheet {entryId, characterId}` (DM; player for own characters; FR-CMP-28), registered feature-locally (no protocol file). Also uses `sync.load {type: "imported-entity", ids}` (P's lazy ADR).
+**WS intents:** `cmp.addToSheet {entryId, characterId}` (DM; player for own characters; FR-CMP-28), registered feature-locally (no protocol file). Also uses `sync.load {type: "imported-entity", ids}` (P's lazy ADR). *(S5)* Add to party sends party-board's `party.addItem` (FR-CMP-40); its events (`PartyItemAdded`, `NotificationCreated` `loot-received`) and visibility (everyone in the campaign) are party-board's.
 
 **Domain events** (all logged; none transient or undoable)
 
@@ -217,6 +224,7 @@ All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12).
 | Edit / delete imported | ✗ (`forbidden`) | ✗ | FR-CMP-24/25 |
 | Add to sheet | any campaign character | own, unless locked | `cmp.addToSheet`: entry visibility + `char.putRow`'s rule (FR-CMP-28) |
 | Import while an encounter is started | ✗ (`conflict`) | ✗ | FR-CMP-07 |
+| *(S5)* Add to party (items) | ✓ | ✗ (no button; `party.addItem` → `forbidden`) | party-board's role check (FR-PARTY-19) |
 | *(S4)* Search groups, `sameAs` | ✓ (own + imported) | visible members only; hidden → not counted, empty page | FR-CMP-14 before FR-CMP-35 |
 
 ## 11. Edge cases & failure modes
@@ -233,6 +241,7 @@ All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12).
 - *(S4)* **Disconnect / reconnect:** unchanged (REST); an expanded group refetches its members on the next open.
 - **Invalid / malicious input:** strict zod; `q` ≤ 100; cursor opaque and validated; text rendered as text nodes only (FR-CMP-26); recorded sources are repo files, never client input (`cmp.import` takes a source key, not data).
 - **Leaks:** a player never receives a monster entry, a monster definition, unshared homebrew or another campaign's homebrew, in REST bodies, errors or WS frames.
+- *(S5)* **Add to party:** the party row holds a name copy only, so adding an **unshared homebrew** item tells players its name (the party inventory is public by design); the Popover says "Players will see ‹name› in the party inventory" for unshared homebrew. Disconnect → button disabled (needs `live`); lost intent → toast (FR-CMP-41). Crash: `party.addItem` is one transaction (item row, loot row, notification). Two DM tabs adding the same item → both commit, quantities sum (merge).
 
 ## 12. Performance & bandwidth
 
@@ -274,6 +283,7 @@ Measured with real SRD 5.1 data (Open5e v1 `wotc-srd`) on the realistic-heavy ha
 
 - REST: search page ≤ 50 × ~130 B ≈ 7 KB; an entry ≤ 32 KB; `ETag` makes repeat opens cheap over the tunnel ([ADR-0003](../architecture/adr/0003-local-hosting.md)): `private, no-cache` revalidates every open, `304` carries no body.
 - `sync.load` of imported definitions: ≤ 50 rows × ≤ 1.3 KB ≈ 66 KB worst case.
+- *(S5)* Add to party: **0 B** to any snapshot (`party-item` is lazy; the `loot-entry` row stays inside its 100-row window; measured in [PARTY §12](party-board.md#12-performance--bandwidth)); per add, party-board's existing frames (`PartyItemAdded`, `loot-received`).
 
 ## 13. Test plan
 
@@ -366,6 +376,16 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 9 | Clone Potion of Healing → "Potion of Greater Healing (house)", Shared on | B: search "greater" | B finds it after the search |
 | 10 | Reload all; kill + restart server | All rejoin | Compendium intact; encounter shows Ogre + Goblin Sneak; Stat block works; no console errors |
 
+**Sprint 5, Add to party** (track P; bundle `party-s5` = `party-board` + `cmp-srd-mini` + PARTY's S5 units, [PARTY §13.1](party-board.md#131-sprint-5-track-p-party-loot-asset-cmp)):
+
+| Level | Named tests |
+|---|---|
+| Unit (client) | `FR-CMP-40 Add to party only on item views` (spell / feature / condition / monster views: no button; player client: no button); `FR-CMP-40 name clip` (81-char homebrew name → 59 + "…", same `clip` as Add to sheet); `FR-CMP-41 states` (qty 0 / 10 000 / 1.5 → Add disabled; not `live` → disabled; reject keeps qty; lost-intent toast); unshared homebrew → hint shown |
+| Integration | **`FR-CMP-40 add compendium item to party`** (`party-s5`: DM `party.addItem` with SRD "Potion of Healing" ×2 → merges into "Potion of healing" ×4, one `world → party` item row, one `loot-received`; players see the row; player sending it → `forbidden`) |
+| E2E (thin) | DM: Compendium → Potion of Healing → Add to party ×2 → Party → Inventory shows ×4 |
+
+Walkthrough: [PARTY §13.1](party-board.md#131-sprint-5-track-p-party-loot-asset-cmp) step S5-9.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -385,6 +405,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | *(S4)* fog-of-war / character-sheet-full (V6) | V6's one-line Open5e adapter change (`visionFt: 0`, V's OQ-CHARX-30) lands before C-art core touches the adapter | seams S5, S14 |
 | *(S4)* [entities](entities.md) | FR-ENT-18 order gains source rank; the Creatures window filter uses the matcher; creature core `type` (FR-ENT-26) | same author (this track) |
 | *(S4)* Search package | **None**: hand-rolled index + tiers (≈ 150 lines, measured ≤ 0.5 ms). Typo-tolerant search (MiniSearch / Fuse.js) was rejected at the gate (OQ-CMP-27, #245) | decided (#245) |
+
+*(S5, track P)* Add to party depends on [party-board](party-board.md) `party.addItem` (built, P4 sprint 3); no new dependency, schema, intent or shared file. **Build:** slice P4 `build/cmp-add-to-party` ([PARTY §14.2](party-board.md#142-sprint-5-build-split)): DM entry actions (`src/client/dm/features/compendium/EntryActions.tsx`, a new `AddToParty.tsx` beside it) — starts at once, and merges **before** track C's client slice edits the same entry views (one holder at a time, OQ-CMP-35).
 
 **Build split, sprint 4** (hotspots per [sprint-4](../agents/sprint-4.md#boundaries-and-hotspots-sequence-these)). Search needs **no schema, ws, protocol or canvas lock**, so C-search can start at the beginning of Phase B, in parallel with V core. *(Seams S14: C-search is lock-free, waves 1–2 / any free slot; then C-all.)* Token art (schema + canvas) is entities' part: [entities §14](entities.md#14-dependencies).
 
@@ -445,6 +467,9 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | OQ-CMP-31 | *(S4)* **combat-tracker**: FR-CBT-63 lookup matching | Settled by seams S14 and rulings B8 (the integrator applies C's replacement text for FR-CBT-63 at merge; R doesn't edit for it): **amend FR-CBT-63: match with FR-CMP-37's `nameTier` (multi-word AND, tiers 0–3) instead of the single-phrase prefix / word / substring; merge per FR-CMP-37; `lookup.ts` granted to C-search, R's slices don't touch it**. Rejected: keep the old lookup rank (a multi-word query finds SRD rows from the server but drops matching customs) | no (settled) | combat-tracker |
 | OQ-CMP-32 | *(S4)* Glossary | **Add "Search group"** (compendium entries with the same kind, name and source shown as one expandable search row) and **"Source rank"** (order of sources on equal search tiers: own, bundled, other imported, fixture) | no (owner: integrator) · **Glossary: applied (#246)** | glossary |
 | OQ-CMP-33 | *(S4, review B22)* **character-sheet-full / effect-modifiers**: SRD second damage dice ("plus 2d6 fire", 44 SRD monsters, FR-CMP-05 keeps them as text today) into R0's `Attack.extraDamage` (R's OQ-CHARX-28) | **Map them in C-art core, riding its `ADAPTER_VERSION` bump, after R0 merged (shape per R's FR; a part that doesn't fit stays text with a warning)** / later, own slice (one more Update prompt) / never (the DM adds them by hand after Derive) | no (owner: C-art core `fix/cmp-art-core`; R confirms the shape) | character-sheet-full, effect-modifiers |
+| OQ-CMP-34 | *(S5, DM)* Add to party [9]: which entries, how many, from which client? | **A: item entries only, quantity field (default 1), DM only** — matches FR-PARTY-19 (only the DM adds to the party); players already have Add to sheet, then Give to the party / B: items, DM and players — players would create items from nothing (as player-added loot, OQ-LOOT-03: no); needs a new player rule / C: any kind (spells as scrolls) — odd names in the inventory | no · owner: DM (gate 1) | party-board, party-loot |
+| OQ-CMP-35 | *(S5)* **Track C (compendium images)**: P4 and C's client slice edit the same entry views | **P4 merges first (small, no schema); C rebases; C's image slots use ASSET's `ImageAttach` ([OQ-ASSET-15](assets-pipeline.md#15-open-questions)), no upload code in compendium** | no · owner: orchestrator (seams) | compendium (C) |
+| OQ-CMP-36 | *(S5)* **party-board**: should the party row link back to the entry (open it from the inventory)? | **Later, with OQ-PARTY-13's nullable `party_item.itemRef`** (additive; also lets images show in the inventory) / now (schema + party-board UI this sprint) | no · owner: spec-party | party-board |
 
 ## 16. Out of scope
 
