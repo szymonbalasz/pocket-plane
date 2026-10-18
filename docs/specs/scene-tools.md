@@ -1,7 +1,7 @@
 ---
 title: Scene tools
 prefix: SCN
-status: claimed
+status: in-review
 owner: spec-colours
 phase: post-mvp-5
 ---
@@ -11,6 +11,20 @@ phase: post-mvp-5
 > **Sprint 3 (track V, DM decisions [#201](../decisions-log.md), [#202](../decisions-log.md)).** Decided by the DM (not open): walls are drawn **freeform while Ctrl is held**, grid-snapped otherwise; while a token is dragged over a wall, the **wall under the drag path highlights red** before the drop; walls take part in dynamic vision ([fog-of-war](fog-of-war.md) v2, [ADR-0042](../architecture/adr/0042-dynamic-vision.md)). Amended here: FR-SCN-07, 08, 10, 12, 13, 36; new FR-SCN-37–40; §8, §9, §12–§15. *Review pass (rulings 2026-10-16):* door samples = `doorCells` on integer doors (A8), the wall hint is the first crossing only (A3), a token the player can't see → `not_found` in `map.checkMove` (A4), build order (A10). Everything else is the built sprint-2 spec. *Sprint-3 gate 1 (DM, 2026-10-16):* §15's new rows decided (**#207**); DM snapshot ceiling 1 MiB (**#208**, §12).
 
 > **Sprint 4 (track M, DM decisions [#243](../decisions-log.md) [8], BL-05).** Decided by the DM (not open): **freeform AoE templates** that still highlight affected cells, a cell counting when **> 50 % covered**. Amended here: FR-SCN-20–23, 26; new FR-SCN-41–46; §7–§15. *Sprint-4 gate 1 (DM, 2026-10-17, **#245**):* every §15 sprint-4 question decided as picked: one-side tie rule, exact area, snapped unless Ctrl, Clear confirm + tick, end handle kept, no dependency (OQ-SCN-28–32, -36). One map-tools design with [scenes-map](scenes-map.md) (drag path, labels, Show to players) and [play-shell](play-shell.md) (window placement); seams with track V ([fog-of-war](fog-of-war.md): fog brush, drag-time vision) in §14. *Seams pass (orchestrator ruling):* S1 (the `map.checkMove` probe moves to V8's `drag-probe.ts`, FR-SCN-38), S2 (helper at `@shared/scenes-map/area`, FR-SCN-42, OQ-SCN-33 settled), S4 / S5 (M1 after V7; schema V6 → R0 → Mc) applied.
+
+> **Sprint 5 (track K; DM decisions [#250](../decisions-log.md) [1], BL-17 via [#251](../decisions-log.md)).** Decided by the DM (not open): a **kept AoE template can be deleted from a right-click menu** [1]; templates (the players' only "drawings": freehand is out, #21) show their **placer's player colour** (BL-17; the colour itself is [campaign-management](campaign-management.md)'s, FR-CAMP-23–29). Amended: FR-SCN-23, -26; new FR-SCN-47–51. The canvas side of the right press (menu vs laser) is [scenes-map](scenes-map.md) FR-MAP-71. Walkthrough: [CAMP §13](campaign-management.md#13-test-plan) K1, K2, K4, K8, K9, K12.
+
+**Sprint 5 at a glance**
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-SCN-47 | Template colour = placer's (kept) / sender's (ephemeral); hidden styling wins; "by ‹name›" on the label | K3 | `FR-SCN-47 template colour` |
+| FR-SCN-48 | Right-click menu on a kept template you may edit: Delete; DM Hide / Reveal; Edit… | K1 | `FR-SCN-48 template menu` |
+| FR-SCN-49 | Pure hit test `templateAt` (true outline, topmost editable) | K1 | `FR-SCN-49 templateAt` |
+| FR-SCN-50 | Menu Delete removes it for everyone (existing `scn.deleteTemplate`); menu closes when its template goes | K1 | `FR-SCN-50 delete for everyone`, `FR-SCN-26 delete permissions` |
+| FR-SCN-51 | `LayerDef.contextMenu?` (SCN's entry shape) for FR-MAP-71's routing | K1 | `FR-SCN-51 contextMenu hook` |
+
+DM questions: §15 OQ-SCN-37–41. Wire: 0 B (no field, intent or signal change; §12).
 
 **Sprint 4 at a glance** (review A25; the rest of the spec is the built sprint-2 / sprint-3 detail)
 
@@ -32,6 +46,7 @@ Decided at sprint-4 gate 1 (#245): OQ-SCN-28 (one-side ties), -29 (exact area), 
 - ~~Movement only: walls never affect vision~~ *(sprint 3)*: walls and doors not open block player moves **and sight** (FR-SCN-37, #207, OQ-FOG-21 / -24); never light (dynamic lighting stays out). Fog of war is its own spec ([fog-of-war](fog-of-war.md), FOG). This spec owns the layer model and the tool registry fog registers into, and exposes what fog's filter needs (FR-SCN-35, FR-SCN-37).
 - Hard constraint: CON-44 (DM snapshot ≈ 4.4 KiB left). Decided (#196): the DM snapshot carries only the **active scene's** tokens and SCN records; other scenes load on view ([active-scene window ADR](../architecture/adr/0041-active-scene-window.md), accepted #196; [OQ-SCN-01](#15-open-questions)).
 - **Sprint 4** (FR-SCN-41–46): templates go **freeform** (origin anywhere, any angle; snapped unless Ctrl); affected squares = cells **> 50 % covered** (exact area; a tie counts on one side only), from one shared **area helper** that V's fog brush also uses (FR-SCN-42); **Clear templates** asks first and keeps players' templates unless ticked (BL-05); kept templates get an end handle (all decided #245). Measured: +8 B per template row (§12).
+- **Sprint 5** (FR-SCN-47–51): a kept template you placed (or any, as the DM) opens a **right-click menu**: Delete, Edit…, and for the DM Hide / Reveal ([1]); templates are drawn in their **placer's player colour** with "by ‹name›" on the label (BL-17). No server change: both use what exists (`scn.deleteTemplate`, `placedByPlayerId`, the signal's `from`).
 
 ## 2. Scope
 
@@ -40,6 +55,7 @@ Decided at sprint-4 gate 1 (#245): OQ-SCN-28 (one-side ties), -29 (exact area), 
 - **AoE templates:** five shapes, ~~snapped to the grid~~ *(sprint 4)* freeform: snapped unless Ctrl (#245), affected squares shown (*sprint 4:* > 50 % covered). Placed by the DM and players (#196, OQ-SCN-03). Ephemeral by default; **Keep** makes one persistent (#196, OQ-SCN-02). *(Sprint 4)* Clear templates with a confirm and a scope (BL-05).
 - **Props:** DM-placed images on the objects layer, cell-snapped, 90° rotation.
 - **Diagonal rule:** campaign setting, 5/10/5 (default, #145) or 5 ft (#196, OQ-SCN-04).
+- *(Sprint 5)* **Template menu** (right-click a kept template: [1]) and **template colours** (placer's player colour, BL-17).
 
 ## 3. Goals
 
@@ -54,7 +70,8 @@ Decided at sprint-4 gate 1 (#245): OQ-SCN-28 (one-side ties), -29 (exact area), 
 
 - Lighting ([ADR-0007](../architecture/adr/0007-product-scope.md)); vision math itself (owned by FOG; walls only supply occluders, FR-SCN-37); one-way, terrain or window walls; freehand (brush) drawing (#21).
 - Automatic AoE damage, saves or target lists ([combat-extras](combat-extras.md) multi-target is out); speed enforcement (#145: indicators only).
-- *(Sprint 4)* Free template sizes (sizes and widths stay 5 ft steps: spells come in them); templates blocked by walls (an area ignores walls, as today); per-player template colours (BL-17, backlog).
+- *(Sprint 4)* Free template sizes (sizes and widths stay 5 ft steps: spells come in them); templates blocked by walls (an area ignores walls, as today); ~~per-player template colours (BL-17, backlog)~~ *(in scope sprint 5, FR-SCN-47)*.
+- *(Sprint 5)* A colour per template other than its placer's; right-click menus on others' templates, on ephemeral templates, on fog shapes or walls (OQ-SCN-40); undo of a template delete.
 - Props that block movement; overhead props above tokens; free rotation or sizing *(OQ-SCN-10)*.
 - Map pins (tier B), player-ready indicator, scene preload, server-side (event-log) undo of scene edits.
 
@@ -107,10 +124,10 @@ Decided at sprint-4 gate 1 (#245): OQ-SCN-28 (one-side ties), -29 (exact area), 
 | FR-SCN-20 | **Shapes**, ~~all with the origin at a vertex~~ *(sprint 4)* origin = any point `(x, y)` in grid units with ≤ 2 decimals (a vertex when snapped, FR-SCN-43). **Sphere / cylinder:** radius `size`. **Cube:** square of side `size`; the origin is a corner; ~~axis-aligned; `angle` picks the quadrant (0 / 90 / 180 / 270)~~ *(sprint 4)* sides along `angle` and `angle + 90°` (0 / 90 / 180 / 270 = sprint 2's quadrants SE / SW / NW / NE). **Cone:** length `size`; its width at any distance = that distance (5e); direction `angle`. **Line:** length `size`, width `width` (default 5 ft), direction `angle`. Angles: 0 = east, 90 = south (screen). Ranges: `size` 5–300 ft step 5; `width` 5–60 step 5; `angle` ~~0–345 step 15~~ *(sprint 4)* 0 ≤ angle < 360, ≤ 1 decimal (15° steps when snapped). | Amended sprint 4 [8] |
 | FR-SCN-21 | **Affected squares:** ~~cells whose centre lies inside or on the shape~~ *(sprint 4, [8])* cells **more than 50 % covered** by the shape (FR-SCN-41). Pure `templateCells(template, scene, {cut})` in `@shared/scene-tools/geometry` (same name and signature; it calls FR-SCN-42's helper). Drawing and the count use `cut: true` (cut to the map); `derive` uses `cut: false`, so `fogged` stays right after a map change. Drawn tinted, with the label "‹label› · N squares" at the origin. | OQ-SCN-09 superseded by [8]; X8 |
 | FR-SCN-22 | **AoE tool** (DM, players). Panel: shape, size, width (line only), label (0–40 chars). Dragging from ~~a vertex~~ *(sprint 4)* the press point (FR-SCN-43) sets the direction (cone, line, cube) or the size (sphere, cylinder; rounded to 5 ft); release → an **ephemeral** template. One per connection: a new placement replaces it; Clear or Esc removes it. | |
-| FR-SCN-23 | **Ephemeral:** signal `scn.template {sceneId, key, shape, x, y, size, width?, angle, label?, dmOnly?}` / `{sceneId, key, end: true}` (*sprint 4:* `x`, `y`, `angle` per FR-SCN-20). ≤ 20 sends/s while dragging, repeated every 1 s at rest. Receivers drop it on `end`, on a snapshot, or after 3 s of silence. Never persisted. Placer colour = role accent (as ping). Receivers compute the squares themselves (FR-SCN-41), so no cell list is ever sent. | Like `map.drag` |
+| FR-SCN-23 | **Ephemeral:** signal `scn.template {sceneId, key, shape, x, y, size, width?, angle, label?, dmOnly?}` / `{sceneId, key, end: true}` (*sprint 4:* `x`, `y`, `angle` per FR-SCN-20). ≤ 20 sends/s while dragging, repeated every 1 s at rest. Receivers drop it on `end`, on a snapshot, or after 3 s of silence. Never persisted. Placer colour = ~~role accent (as ping)~~ *(sprint 5)* the sender's player colour, from the signal's `from` (FR-SCN-47; no field added). Receivers compute the squares themselves (FR-SCN-41), so no cell list is ever sent. | Like `map.drag` |
 | FR-SCN-24 | **Signal audience** ([ADR-0033](../architecture/adr/0033-signal-audience.md)). **Player sender:** `sceneId` must be the active scene (else `invalid`), then `"all"`. **DM sender:** `"dm"` if `dmOnly`, if the scene isn't active, or if FOG's hook finds every uncut `templateCells` cell fogged; else `"all"`. An `end` frame carries no geometry and routes `"all"`. Player templates are never fog-hidden. Receivers draw only for the scene they show. | S5; F5 |
 | FR-SCN-25 | **Keep:** the panel's Keep button turns the ephemeral into a record with `scn.placeTemplate` (same fields; `hidden` = `dmOnly`), then sends `end`. ≤ 20 per scene and ≤ 3 per player per scene, else `conflict`. A player's `sceneId` must be the active scene. The DM may set `placedByPlayerId` (a player of the campaign; fixtures); a player sending it → `invalid`. | OQ-SCN-02; B1 |
-| FR-SCN-26 | **Persistent edits.** The placer (`placedByPlayerId = ctx.playerId`) or the DM: move (drag the origin), rotate / resize (panel; *sprint 4:* also the end handle, FR-SCN-45), Delete → `scn.updateTemplate`, `scn.deleteTemplate`. DM only: Hide / Reveal (`hidden`), and "Clear templates" per scene → `scn.clearTemplates` (*sprint 4:* confirm + scope, FR-SCN-44). Others' templates have no menu and can't be dragged. | |
+| FR-SCN-26 | **Persistent edits.** The placer (`placedByPlayerId = ctx.playerId`) or the DM: move (drag the origin), rotate / resize (panel; *sprint 4:* also the end handle, FR-SCN-45), Delete → `scn.updateTemplate`, `scn.deleteTemplate`. DM only: Hide / Reveal (`hidden`), and "Clear templates" per scene → `scn.clearTemplates` (*sprint 4:* confirm + scope, FR-SCN-44). Others' templates have no menu and can't be dragged. *(Sprint 5, [1])* Delete, Edit… and Hide / Reveal are also reachable from the template's right-click menu under any tool (FR-SCN-48); same permissions. | |
 | FR-SCN-27 | **Visibility:** `hidden` or fog-hidden (FOG's `hides`; never for a player-placed template) → hidden; else full (incl. `placedByPlayerId`). | S5 |
 | ~~FR-SCN-28~~ | ~~Select creatures inside a template~~: **out** (#196, OQ-SCN-21). | B6 |
 | **Diagonal rule** | | |
@@ -135,6 +152,12 @@ Decided at sprint-4 gate 1 (#245): OQ-SCN-28 (one-side ties), -29 (exact area), 
 | FR-SCN-44 | **Clear templates** (BL-05; scope decided #245, OQ-SCN-31): the DM's "Clear templates on this scene" opens an AlertDialog "Clear N DM templates on this scene?" with a Checkbox **"Also players' kept templates (M)"**, unticked by default; Confirm (disabled while the chosen scope holds 0) sends `scn.clearTemplates {sceneId, players?}` (absent = false); Cancel / Esc sends nothing. Server: deletes the scene's kept templates with `placedByPlayerId = null`, or every kept one with `players: true`; nothing to delete → no write, no event. Ephemeral templates are signals, never touched. | Was: no confirm, all kept (sim-6 #9, sim-7 #14) |
 | FR-SCN-45 | *(In scope, decided #245, OQ-SCN-36)* **End handle** (kept templates; placer or DM, FR-SCN-26): the selected template shows an origin handle (drag = move) and an end handle (cone, line, cube: direction; sphere, cylinder: radius in 5-ft steps). The drag previews locally; release sends one `scn.updateTemplate {x?, y?, angle?, size?}`; others see it on commit (≤ 1 s). Snapping per FR-SCN-43. | |
 | FR-SCN-46 | **Compatibility + fog** (FOG seam, FR-SCN-35): existing rows (integer `x`, `y`; `angle` in 15° steps) stay valid and draw the same shapes; only their affected squares follow FR-SCN-41. `derive` and the DM ephemeral audience (FR-SCN-24) use FR-SCN-41's uncut cells; a template with no covered cell samples the cell holding its origin. A **boot re-derive** (scene-tools' feature start, one transaction, before the hub accepts connections) re-runs `derive` for every DM-placed kept template whose `fogged` / `seenBy` would change under the new cells; rerun = no-op. | No stale `fogged` after the rule change |
+| **Sprint 5: template colours and menu** (BL-17; [#250](../decisions-log.md) [1]) | | |
+| FR-SCN-47 | **Template colour** (BL-17; amends FR-SCN-23's "role accent"): a **kept** template draws in `colorOf(store, placer)` ([FR-CAMP-28](campaign-management.md#6-functional-requirements)): `placedByPlayerId` → that player's colour, null → the DM colour; an **ephemeral** one in its sender's (`from`); the own ephemeral in the own colour. Tint (25 %) and outline in that colour, the outline over the dark casing (FR-CAMP-28). A **hidden** template (DM-only) keeps `visibility.hidden` styling (OQ-SCN-41). The label pill starts with an 8 px dot in the colour; on hover or while selected it reads "‹label› · N squares · by ‹name›" (player name, or "DM") (colour-blind backup, OQ-CAMP-25). A colour change redraws existing templates ≤ 1 s (OQ-CAMP-21). Konva attrs on `scn-template`: `color` (the drawn hex), `by` (player id \| `dm`). Client only, 0 B. | BL-17 |
+| FR-SCN-48 | **Template menu** ([1]): a **right-click** on a kept template this client may edit (FR-SCN-26: its placer, or the DM; for the DM hidden ones too while "DM-only items" is on, FR-SCN-05) opens a DropdownMenu at the pointer, **under any tool** unless the active tool takes the right press for its own menu (fog Darkness, FR-FOG-42; FR-MAP-71 order). "Right-click" = button-2 press and release with < 4 px movement; a right-*drag* from the template is the laser, as today (FR-MAP-71). Items (OQ-SCN-37): **Delete** → `scn.deleteTemplate` (FR-SCN-50); **Edit…** → the AoE tool becomes active with this template selected (its panel, origin + end handles, FR-SCN-26 / -45); DM only: **Hide** / **Reveal** → `scn.updateTemplate {hidden}`. No confirm (OQ-SCN-38; as the token menu's delete). A template someone else placed (player client), an ephemeral one, or none under the pointer → no menu. Esc, a click outside or a scene switch closes it. | [1] |
+| FR-SCN-49 | **Hit test:** pure `templateAt(p, templates, {client, myPlayerId, dmOnlyOff, scale})` in scene-tools' client `templates.ts` → the topmost (draw order) template this client may edit (FR-SCN-26) whose **true outline** contains map point `p` or lies within 6 screen px of it (FR-SCN-42's `templateArea`, uncut, so a template off the map's edge still hits), else null. Hidden ones only for the DM with DM-only items on. One function for the menu and FR-MAP-71's press decision. | |
+| FR-SCN-50 | **Delete for everyone:** Delete sends the existing `scn.deleteTemplate {templateId}` (permissions unchanged, FR-SCN-26, §9: another player's → `forbidden`; unknown or already gone → `not_found` → Toast "Template already removed"). Not optimistic: on commit `TemplateDeleted` removes it on every client that had it ≤ 1 s. An open menu whose template leaves the store (deleted by another tab, Clear templates, hidden for this player, scene switch, snapshot) closes. While not `live` the items are disabled (FR-SCN-34). | |
+| FR-SCN-51 | **Layer context menus** (SCN owns `LayerDef`, FR-SCN-03): optional `contextMenu?: {hit(p, ctx) → boolean, open(p, screen, ctx) → void}` on a layer entry. scenes-map's right-press routing (FR-MAP-71) asks entries top-down by `order`; the first `hit` wins. `scn-templates` is the only one in sprint 5 (FR-SCN-48 via FR-SCN-49). Doors keep their own node-level menu (FR-SCN-09). No new registry. | Seam with FR-MAP-71 |
 
 ## 7. UI/UX notes
 
@@ -148,6 +171,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 - **DM view:** walls; doors (a glyph per state); every prop and template, with hidden ones in `visibility.hidden` styling; drawing previews on `scn-edit`; handles on the selected prop; the "through wall" tag and **red** crossed segments while dragging; *(sprint 3)* the "Free" chip at the cursor while Ctrl is held in Wall / Door mode; off-grid points drawn as small open dots on the preview.
 - **Player view:** doors (open / closed; only those the player sees, FR-SCN-36); visible props; visible templates; their own and others' ephemeral templates; *(sprint 3)* red wall pieces under the drag line before the drop (FR-SCN-38); the blocked-cell flash.
 - *(Sprint 4)* **Both views:** a template draws its true outline (off-grid allowed) over the tinted affected squares (one shape per template, memoised per geometry change); "Free" chip while Ctrl is held in the AoE tool; selected kept template: origin + end handles (FR-SCN-45). DM only: the Clear confirm. Same squares on every client (one pure helper, FR-SCN-42).
+- *(Sprint 5)* **Both views:** templates in their placer's colour (tint + cased outline), a colour dot on the label pill, "· by ‹name›" while hovered or selected; DM-hidden ones stay grey-translucent. **Template menu** (shadcn DropdownMenu at the pointer, as the door menu): Delete (destructive style, lucide `trash-2`), Edit… (`pencil`); DM: Hide / Reveal (`eye-off` / `eye`). **DM view:** the menu on every kept template (hidden ones while DM-only items are on). **Player view:** the menu on their own kept templates only; others' templates: no menu.
 - **States.**
   - Empty scene: nothing extra.
   - Loading (DM, non-active scene): a "Loading scene…" chip on the canvas; tools stay disabled until the scene loads.
@@ -170,6 +194,7 @@ All rows are per campaign; `seq` comes from the DB (CON-20); timestamps from `ct
 - **Derived:** segment geometry; a door's open / closed for players; `propCells`, `templateCells`, `doorCells`; distance per rule. *(Sprint 3)* `blockingSegments`, `sightOccluders`, door sample points.
 - **Client only:** ephemeral templates `key → {from, template, lastAt}` (receivers); undo stacks with the id remap; layer toggles; the loaded-scenes set; prop selection; a polyline in progress; *(sprint 3)* the player's current wall hint pieces (from the latest `map.checkMove` ack); *(sprint 4)* each template's covered cells (memoised per geometry), the Free chip state, a kept template's handle drag.
 - **Derived (sprint 4):** `cellCoverage` / `coveredCells` (FR-SCN-41, -42); never stored or sent.
+- *(Sprint 5)* **No data change.** Derived: a template's colour = `colorOf(placer)` (`placedByPlayerId`, or the signal's `from`); client only: the open template menu `{templateId, at}`.
 - **Persisted runtime state:** door states and `f`, props, persistent templates, `fogged` copies, the diagonal rule.
 
 ## 9. API & events
@@ -201,6 +226,8 @@ Envelopes and rejects: [live-sync](live-sync.md). Everything is WS (canvas actio
 
 **Signal:** `scn.template` (DM, player), audience per FR-SCN-24. Not logged, persisted or in a snapshot.
 
+*(Sprint 5)* **No wire change:** the menu uses `scn.deleteTemplate` / `scn.updateTemplate` and their events (`TemplateDeleted`, `TemplateUpdated`, visibility as above); colours come from `aoe-template.placedByPlayerId` (already sent in full) and the signal's server-stamped `from`.
+
 **Domain events.** All logged; none transient or undoable. Visibility: each change follows its record type above (transition matrix, FR-SYNC-19); players see only `cause.name`.
 
 | Event | Payload | Changes |
@@ -223,6 +250,8 @@ Envelopes and rejects: [live-sync](live-sync.md). Everything is WS (canvas actio
 | Edit / delete persistent template | any | own | FR-SCN-26 |
 | *(Sprint 4)* Clear templates (DM-placed; + players' with the box) | ✓ | ✗ | Default-DM intent (FR-SCN-44) |
 | *(Sprint 4)* Free placement (Ctrl) | ✓ | ✓ | zod decimals (FR-SCN-20) |
+| *(Sprint 5)* Template menu: Delete, Edit… | any kept template | own kept templates | `scn.deleteTemplate` / `updateTemplate` (FR-SCN-26) |
+| *(Sprint 5)* Template menu: Hide / Reveal | ✓ | ✗ (no item) | `hidden` DM only (§9) |
 
 ## 11. Edge cases & failure modes
 
@@ -248,6 +277,13 @@ Envelopes and rejects: [live-sync](live-sync.md). Everything is WS (canvas actio
   - Concurrent: a player keeps a template while the DM clears DM-only → the player's survives; the DM clears with players' while a player edits theirs → the edit gets `not_found` (Toast), as any deleted template.
   - Two clients disagree on squares: impossible by construction (one pure helper, exact arithmetic with a fixed tolerance); golden tests pin the cells.
   - Invalid: 3-decimal origin, angle 360 or 12.25 → `invalid`; `players` from a player → `forbidden`.
+- **Sprint 5:**
+  - Menu open when the connection drops: items disabled (FR-SCN-50); reconnect → the snapshot; the menu closes if its template is gone. A Delete in flight when the server crashes: committed → gone after the restart; not committed → no `ack`, the template is back in the snapshot, the user deletes again.
+  - DM and placer delete at once → one `TemplateDeleted`, the other gets `not_found` → Toast "Template already removed".
+  - The DM hides or clears a player's template while that player's menu is open → it leaves the player's store and the menu closes (FR-SCN-50).
+  - Overlapping templates: the topmost editable one gets the menu (FR-SCN-49); a player's template under another player's: the own one is found even if drawn below.
+  - Placer's colour changes while the template is shown → redrawn in the new colour ≤ 1 s (OQ-CAMP-21); a player not in the store (unknown id) → role accent fallback.
+  - Malicious: a crafted `scn.deleteTemplate` for another player's template → `forbidden` (server-side, unchanged); the menu is only a shortcut.
 - **Accepted leaks:**
   - A refused move tells the player something blocks that line (that is the feature). *(Sprint 3)* Before the drop, `map.checkMove` shows ≤ 0.5 cell either side of the **first** crossing only, also under fog (OQ-SCN-23); probing many cells still tells the player whether **something** blocks each line from the token (an oracle, not geometry); the sight polygon's edges show walls inside the player's own sight (FOG).
   - `StructureEdited` upserts tell players the DM edited the active scene's structure, but not what.
@@ -298,6 +334,7 @@ Measured by spec-fog-of-war with the realistic-heavy harness on `main`. Fog and 
 
 - No cell list is ever sent: every client computes the squares (FR-SCN-23). Clear templates adds no bytes (one `TemplatesCleared` event with deletes, as today).
 - **Canvas:** one shape per template (outline + tinted cells), memoised per geometry change; recomputed per ephemeral frame (≤ 20 / s, ≤ 2.2 ms at the 300-ft worst case). No new Konva layer (BL-07).
+- **Sprint 5 (measured by spec-colours, 2026-10-18, heavy harness, [CAMP §12](campaign-management.md#12-performance--bandwidth)):** templates add **0 B** (colour from `placedByPlayerId` / `from`; the menu reuses existing intents and events). The rejected colour copy: +21 B per `scn.template` frame (258 B today) and +2,163 B on the DM snapshot together with log entries. Client: `templateAt` is one point-in-shape test per kept template (≤ 20 per scene) on a right press; the menu is one DropdownMenu island (as `DoorMenu`).
 
 ## 13. Test plan
 
@@ -367,6 +404,16 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 | Integration | `FR-SCN-44 Clear templates scope`: DM `scn.clearTemplates {sceneId}` → deletes Web + Glyph only, one `TemplatesCleared {players: false}`, Spirit Guardians + Thunderwave stay; P1 / P2 frames get Web's delete (they saw it), no delete of their own templates; again with `players: true` → the rest; nothing left → no event; a player sending it → `forbidden`. `FR-SCN-20 decimals`: place / update / signal with 2-decimal origin and 37.5° → stored and broadcast as sent; convergence. `FR-SCN-46`: a fixture DM template whose `fogged` flips under the new cells → boot re-derive fixes it in one transaction; rerun no-op; per-player snapshots before / after equal except that row. Crash `scn.clearTemplates:before-commit` / `:after-commit` → `state:digest`. CON-44: the heavy test gains the 20-template cap with decimals (DM < 1 MiB, players < 512 KiB) | `map-tools`, heavy |
 | E2E (thin) | `// e2e-bundle: map-tools`: `player-1` places a Ctrl cone, Keep → `scn-template` `cells` attr equal on DM and `player-2`; DM Clear (default) keeps it, Clear with the box removes it | `map-tools` |
 
+**Sprint 5** (bundle `player-colours` = `map-tools` + CAMP's `pc-colours`, [CAMP §13](campaign-management.md#13-test-plan)): Spirit Guardians (`player-1`), Thunderwave (`player-2`), Web (DM), hidden Glyph (DM). Leak property: a player's frames never carry the hidden Glyph, also not after a DM menu Reveal → Hide cycle (upsert then delete).
+
+| Level | What | Fixtures |
+|---|---|---|
+| Unit (client) | `FR-SCN-47 template colour` (kept: `player-1` → their key's hex, null → DM colour; ephemeral: `from` → sender's; hidden → `visibility.hidden`, not the colour; unknown player → role accent; label "· by Player 1" on hover / selection; Konva `color`, `by` attrs). `FR-SCN-49 templateAt` (inside each shape's true outline, within 6 px, outside → null; topmost editable wins; a player's own under another's is found; another player's → null for a player; hidden: DM with DM-only on only; uncut off the map edge). `FR-SCN-48 template menu` (static render per role: DM on Web → Delete, Edit…, Hide; DM on Glyph → Reveal; `player-1` on Spirit Guardians → Delete, Edit…, no Hide; `player-1` on Thunderwave → no menu; Edit… activates the AoE tool with `selectedId`; items disabled while not live). `FR-SCN-51 contextMenu hook` (entries asked top-down by `order`, first `hit` wins; none → null) | In-code |
+| Integration | `FR-SCN-50 delete for everyone` (harness DM, `player-1`, `player-2`: DM `scn.deleteTemplate` Spirit Guardians → `TemplateDeleted` delete to all three; `player-1` deletes own → delete to all; `player-2` deletes `player-1`'s → `forbidden`, nothing to anyone; a second delete → `not_found`). `FR-SCN-26 delete permissions` row kept (DM any, placer own, hidden → `not_found` for players) | `player-colours` |
+| E2E (thin) | In CAMP's `player-colours` spec: DM right-clicks Thunderwave → `scn-template-ctx-delete` → no `scn-template` with its id on DM, `player-1`, `player-2`; `player-1` right-click on Thunderwave → no `scn-template-ctx` | `player-colours` |
+
+**Sprint 5 walkthrough:** [CAMP §13](campaign-management.md#13-test-plan) K1, K2 (recolour), K4 (template colours, "by"), K8 (DM menu: Delete, Hide, Edit…; right-drag = laser), K9 (player menu own only), K12 (reload, crash).
+
 **Sprint 4 walkthrough:** steps M1–M3, M10 and M12 of the map-tools walkthrough in [scenes-map §13](scenes-map.md#13-test-plan) (freeform cone with its squares, the snapped line tie, Thunderwave's 8 squares, Clear templates confirm + scope, crash with decimals).
 
 ## 14. Dependencies
@@ -381,6 +428,9 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 | [fixtures-adapters](fixtures-adapters.md) | Units + bundle above; FIX §8 rows at merge | complete |
 | *(Sprint 4)* [fog-of-war](fog-of-war.md) (V) | The brush imports FR-SCN-42 at `@shared/scenes-map/area` (seams S2); FOG's template derive takes the new cells (OQ-SCN-34); V8's drag probe sends `map.checkMove` (S1); V7 (Konva layers ≤ 4, the Layers popover "Fog" switch) merges before M1 (S4) | revised in parallel (track V) |
 | *(Sprint 4)* [scenes-map](scenes-map.md) | Bundle `map-tools`, the shared walkthrough, `mt-crowd` | revised with this spec |
+| *(Sprint 5)* [scenes-map](scenes-map.md) | Right-press routing that asks `LayerDef.contextMenu` before the laser, with the 4 px rule (FR-MAP-71) | revised with this spec (track K) |
+| *(Sprint 5)* [campaign-management](campaign-management.md) | `colorOf`, the palette, the casing rule (FR-CAMP-28); bundle `player-colours` | revised with this spec (track K) |
+| *(Sprint 5)* [fog-of-war](fog-of-war.md) | Nothing (its Darkness menu keeps the right press first, FR-FOG-42); whether fog shapes / walls get the same menu is OQ-SCN-40 | open question, not blocking |
 
 **Registries** (BO5; same table as FOG §14):
 
@@ -428,6 +478,13 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 | M0 `fix/area-geom` (first, lock-free, pure; wave 1) | `src/shared/scenes-map/area.ts` (FR-SCN-42, seams S2) + unit tests and goldens; no caller switched yet (no behaviour change) | the new file + its test only. Must merge before V9's brush imports it |
 | Mc `fix/maptools-core` (schema lock, seams S5: V6 → R0 → **Mc** → C-art core; wave 3) | ★ `aoe_template.x`, `y`, `angle` → `real`; decimal zod for place / update / signal; `scn.clearTemplates {players?}`; `TemplatesCleared.players` (`src/shared/events/scene-tools.ts`); `templateCells` → coverage (FR-SCN-21); FR-SCN-46 boot re-derive; CON-44 heavy at the template cap | ★ `src/server/db/`, ★ `src/shared/events/`, scene-tools server + shared (own); docs: data model §25 + protocol §36 rows (integrator) |
 | M1 `build/aoe-freeform` (seams S4: after V7, in parallel with V9 / V10; own folders + append-only registries only, drawing inside V7's layer scheme; wave 4) | AoE tool: Ctrl / Free chip, decimal origin + angle, end handle, coverage drawing + count; Clear confirm + scope (FR-SCN-44, client + the command's `players` rule); `mt-templates` + the `map-tools` bundle line; e2e | scene-tools client folder, `TemplatesLayer.tsx`, `aoe-tool.tsx`; `fixtures/bundles/index.ts` (append) |
+
+**Sprint 5** (track K; full split, order and locks in [CAMP §14](campaign-management.md#sprint-5-build-split-track-k)). SCN parts:
+
+| Slice | SCN contents | Touches (AGENTS §9.9) |
+|---|---|---|
+| **K1** `fix/tpl-menu` ([1]; first canvas holder, right after the gate) | FR-SCN-48–51: `templateAt`, `TemplateMenu.tsx` island, `LayerDef.contextMenu?`, the `scn-templates` entry's `contextMenu`; with MAP's FR-MAP-71 routing in `MapCanvas.tsx` | scene-tools client (`layers.ts` entry shape, `templates.ts`, `aoe-store.ts`, new `TemplateMenu.tsx`), `canvas-layers.ts` (SCN's own line), `MapCanvas.tsx` (single holder). No server, schema, event or protocol change |
+| **K3** `build/map-colours` (after K0 + K1) | FR-SCN-47 in `layers/TemplatesLayer.tsx` (colour per placer / sender, label dot and "by") | `TemplatesLayer.tsx` (canvas holder with MAP's K3 files) |
 
 ## 15. Open questions
 
@@ -478,6 +535,16 @@ Sprint-2 rows: all decided at DM gate 2 (#196, "go with picks") or settled earli
 | OQ-SCN-36 | Scope: the end handle on kept templates (FR-SCN-45) | **Decided** (DM, sprint-4 gate 1, #245; G30): **keep** (re-aim without delete + re-place). Rejected: ~~cut~~ | — | — |
 | OQ-SCN-35 | Glossary | Reword **AoE template**: "… placed freely (Ctrl) or snapped; its affected squares are the cells more than half inside it"; add **Affected squares** | no · owner: **integrator at the sprint-4 spec merge** · **Glossary: applied (#246)** | glossary |
 
+**Sprint 5** (track K). Decided by the DM before the spec: right-click delete for kept templates [1]; templates in their placer's colour (BL-17). **Bold** = suggested pick, for DM gate 1.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-SCN-37 | **Menu items** on a kept template ([1]) | A. Delete only: smallest / **B. Delete + Edit… (opens the AoE tool on it: re-aim, resize, label, handles) + DM Hide / Reveal** (one entry point, no second editor) / C. Inline re-aim, resize and colour in the menu: duplicates the panel; colour is the placer's (OQ-CAMP-21), so no "change colour" item | no · owner: DM | — |
+| OQ-SCN-38 | **Who may delete, and confirm?** | **A. Placer and DM (= FR-SCN-26 today), no confirm** (like the token menu; a template is cheap to redo) / B. DM only: players can't tidy their own / C. Anyone in the campaign: griefing / D. A confirm dialog: one more click per cleanup | no · owner: DM | — |
+| OQ-SCN-39 | Right-click vs laser on a template (seam with FR-MAP-71) | **A. Click (< 4 px) opens the menu, a right-drag still lasers** (laser inside a big area keeps working) / B. Door style: any right-press on an editable template opens the menu, never the laser (no `MapCanvas.tsx` change; no laser from inside your own templates) | no · owner: DM | scenes-map |
+| OQ-SCN-40 | **fog-of-war, scene-tools:** the same right-click menu for fog shapes and walls? | **A. No change in sprint 5:** darkness shapes already have right-click Remove (FR-FOG-42); fog Reveal / Fog / Explored shapes are mask edits, not objects (Undo / Redo instead); walls: Erase mode; doors: the door menu (FR-SCN-09) / B. Walls and doors get a right-click Delete under any tool (DM), via FR-SCN-51's hook: later, a small SCN + FOG item | no · owner: DM | fog-of-war |
+| OQ-SCN-41 | Colour of a **hidden** (DM-only) template on the DM's map | **A. `visibility.hidden` styling wins (grey, eye-off)** (the DM's "players can't see this" cue stays) / B. Placer colour at 50 % + eye-off: keeps whose it is, weaker hidden cue | no · owner: DM | — |
+
 ## 16. Out of scope
 
 - Fog → [fog-of-war](fog-of-war.md). HP bar / condition icons on tokens → built by [combat-extras](combat-extras.md) (FR-CBTX-28/29). Drag previews → built by [scenes-map](scenes-map.md) (#171).
@@ -490,6 +557,7 @@ Sprint-2 rows: all decided at DM gate 2 (#196, "go with picks") or settled earli
   - Door menu: `scn-door-menu-<open|close|lock|unlock|delete>`.
   - Props: `scn-prop-menu-<rotate|hide|lock|front|back|duplicate|image|delete>`, `scn-prop-image`.
   - AoE: `scn-aoe-shape-<cone|sphere|cylinder|cube|line>`, `scn-aoe-<size|width|label|keep|clear>`, `scn-template-menu-<hide|delete>`.
+  - *(Sprint 5)* Template right-click menu: `scn-template-ctx` (+ `data-record-id` = template id), items `scn-template-ctx-<delete|edit|hide>` (`hide` carries `data-hidden` = `true` \| `false`; label Reveal when `true`). (The panel's `scn-template-menu-*` stay as built.)
   - Other: `scn-layer-toggle-<key>`, `scn-diagonal-rule` (`data-value`), `scn-scene-loading`.
 - **Konva** (name = test ID, id = record ID):
   - `scn-walls`: one shape; attr `count`.
@@ -499,6 +567,7 @@ Sprint-2 rows: all decided at DM gate 2 (#196, "go with picks") or settled earli
   - `scn-blocked-cell`, `scn-through-wall`.
   - *(Sprint 3)* `scn-wall-hint` (player, one shape per piece; attr `segment`); DM crossed segments: `scn-wall-crossed`; `scn-draft-point` (id = index, attr `free`); DOM chip `scn-free-chip`.
   - *(Sprint 4)* `scn-template` gains attrs `origin` ("x,y" in grid units) and `angle`; `cells` = the FR-SCN-41 squares as "c,r c,r …" (row-major); handles `scn-template-handle-origin` / `-end` (id = template id). DOM: `scn-free-chip` also in the AoE tool; Clear dialog `scn-aoe-clear-dialog`, Checkbox `scn-aoe-clear-players` (`data-count`), `scn-aoe-clear-confirm` (`data-count`), `scn-aoe-clear-cancel`.
+  - *(Sprint 5)* `scn-template` gains attrs `color` (the drawn hex) and `by` (placer player id \| `dm`; ephemeral: the sender's).
 
 ## Appendix B: snapshot arithmetic
 

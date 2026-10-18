@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: claimed
+status: in-review
 owner: spec-colours
 wave: 2
 phase: post-mvp-5
@@ -21,6 +21,18 @@ phase: post-mvp-5
 - **Polish pass** (sprint 1, R3; FR-DICE-30): the roll bar collapses to one row, so the Game log shows ≥ 6 lines of history at default size ([FR-SHELL-35](play-shell.md#6-functional-requirements)).
 - **Sprint 2 phase 1** (P2b; FR-DICE-31–34): physical dice after a natural 20 ask only for the **extra critical dice** and keep what was typed (G6); a Roll that can't go never fails silently; a minimised Game log shows a "new" dot (N1, decided #190, [OQ-SHELL-21](play-shell.md#15-open-questions)); the DM can roll as a token-less combatant (S4).
 - **Sprint 4** (DM [#243](../decisions-log.md) [17]; FR-DICE-35–37): log lines show **the same dice as the tray**: each die as an inline die-shape chip in the roller's look ([FR-DICEX-42](dice-extras.md#6-functional-requirements)); the roll popup opens the log at its entry. No kind, event or schema change; one payload exception is R's (public character-trigger `dice`, FR-DICE-36).
+- **Sprint 5, track K** (BL-17; FR-DICE-60, 61): each line's actor name is drawn in the **roller's player colour** (the DM's rolls in the DM colour), derived from the entry's `rollerRole` / `rollerPlayerId`: 0 B.
+
+> **Sprint 5 (track K, BL-17 via [#251](../decisions-log.md)).** Decided by the DM (not open): log lines show the **player colour** of whoever rolled ([campaign-management](campaign-management.md) FR-CAMP-23–29 owns the colour). New FR-DICE-60–61 (track K's range; D adds its own rows in parallel and **owns the log client**: K4 builds after D's log edits). No kind, payload, event or schema change: entries already carry `rollerRole` / `rollerPlayerId`. Walkthrough: [CAMP §13](campaign-management.md#13-test-plan) K6, K10, K12.
+
+**Sprint 5 at a glance** (track K)
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-DICE-60 | The line's actor name in the roller's colour | K4 (after D) | `FR-DICE-60 log name colour` |
+| FR-DICE-61 | Every kind, fallback, recolour, 0 B | K4 | `FR-DICE-61 kinds and fallback` |
+
+DM questions: §15 OQ-DICE-39, -40.
 
 **Sprint 4 at a glance**
 
@@ -102,6 +114,9 @@ phase: post-mvp-5
 | FR-DICE-35 | **Dice in log lines** (OQ-DICE-27): a `roll` line (FR-DICE-20) shows each die as an inline **die-shape chip** ([FR-DICEX-42](dice-extras.md#6-functional-requirements), size `sm` 18 px, the roller's look) in place of its number: "Mira — Athletics: ⬡13 + 5 = 18". Dropped dice (`kept: false`, adv / dis only) struck and dimmed, offered trigger dice (`offered: true`) dashed exactly as in the popup, tray and flat zone (FR-DICEX-42), manual dice with per-die values as chips plus the "physical" badge, a manual total without per-die values as one round chip. Built from a new optional `die {faces, value, kept, offered?, label?}` on `LineSegment` (`@shared/dice-roll-log/kind-types.ts`; seams S8 as amended by ruling B5), emitted by `rollSegments` / `rollBreakdownSegments`. D5 ships the type (incl. `offered`) and the base dice; **MOD and offered-part chips come from R's helpers** (`modSegments`, `rollOfferSegments` in `@shared/effect-modifiers/`) in R S4-5 (ruling B9); `text` stays on every segment, so `lineText`, copy, the Tooltip and screen readers read "d20: 13". A chip fits the line height: FR-SHELL-35's ≥ 6 single-line entries hold. | [17] |
 | FR-DICE-36 | **Other kinds** get chips through the shared helpers, with no change of their own, for exactly the dice their line already shows: the DM's `cbt.attack` dice breakdown ([FR-CBT-53](combat-tracker.md#6-functional-requirements)) shows chips on the DM client; players' `cbt.attack` to-hit ("12 + 4", a sum in `payload`) stays text. The FR-DICE-28 kind contract still holds (a `die` segment is DM-only exactly when its text is). **Sources** (ruling B4): `die` segments are built only from `payload` (every viewer) or `dmPayload` (DM client only), never from `rollIds` or roll rows; weapon extra-part dice on `cbt.attack` outcome lines stay DM-only (`dmPayload`); R puts non-public trigger roll ids in `dmPayload`. **Payload amendment** (B4): the earlier "no new payload field" gains one exception: R's **public character-trigger** parts carry per-die `dice` in `payload` (FR-MOD-57), so players see those chips; monster trigger parts keep expression and dice in `dmPayload` whatever `public` says (#171 P5, #190). **Faces** (B10): `RollBreakdown` has `expression` and `[value, kept][]` only, so `rollBreakdownSegments` maps dice to faces by `parseExpression(expression)` term order (dice terms in order, N dice each; "1d8+1d6" → d8 then d6); an unparsable expression or a count mismatch → round chips. *(Seams S8, amended by B5)* **Segment format (D's, binding for every kind):** optional `die {faces, value, kept, offered?, label?}` on `LineSegment`, **one segment per die**, from `rollSegments` / `rollBreakdownSegments`; no `{kind: "dice", values[]}` shape, no `muted` field. `kept: false` = dropped (adv / dis) only; `offered: true` = an offered trigger die, drawn dashed in log, popup, tray and flat zone alike. Trigger and weapon extra parts (R: Divine Fury, Flame Tongue fire) carry `label` = the part's name. "Not applied" shows only on R's outcome line, never by striking a roll-line die. Order: R S4-5 after D5. | Seam R (S8, B4, B5, B9, B10) |
 | FR-DICE-37 | **Focus an entry**: `focusLogEntry(entryId)` (`@ui`, dice-roll-log client) opens or restores and fronts `dice.log` ([FR-SHELL-08](play-shell.md#6-functional-requirements)), scrolls the entry into view and highlights it for 2 s (`dice-log-entry` `data-focused`); an entry not in the store (below the window, FR-DICE-17) → the log opens only. Caller: the roll popup ([FR-DICEX-39](dice-extras.md#6-functional-requirements)). | [11] |
+| **Sprint 5** (track K, BL-17) | | |
+| FR-DICE-60 | **Name colour** (BL-17): in every `game-log-entry` line the **actor name** (the bold `actorName` that starts the line, FR-DICE-20) is drawn in `colorOf(store, {role: rollerRole, playerId: rollerPlayerId})` ([FR-CAMP-28](campaign-management.md#6-functional-requirements)): the **roller's** colour (OQ-DICE-39), so a player's rolls show their colour (for any of their characters) and the DM's rolls the DM colour (also when the DM rolls for a PC or a monster). Still bold; no other part of the line changes (targets, totals, chips, badges). Text contrast: every palette key ≥ 4.5 : 1 on the window surface (measured, CAMP §7). `dice-log-entry` gains `data-color` (the key) and `data-roller` (player id \| `dm`). | BL-17 |
+| FR-DICE-61 | **All kinds, fallback, recolour:** the rule is generic over kinds (`roll`, combat's, effect-modifiers', rule triggers'): it reads only the entry's `rollerRole` / `rollerPlayerId`, never the payload, so a kind adds nothing. An entry whose roller has no `player` record in the store → the default text colour (no role accent in text). A colour change recolours every line in the store ≤ 1 s (OQ-CAMP-21); entries written before sprint 5 render coloured too (fields exist since MVP). Client only: no kind, payload, event, record or schema change (0 B). Hidden-entry markers (DM view) unchanged. | |
 
 ## 7. UI/UX notes
 
@@ -115,6 +130,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - **Keyboard:** Enter / Shift+Enter / Ctrl+Enter in the expression input. macOS Ctrl+click opens a context menu: Mac users use the toggle (laptops per ADR-0007; accepted).
 - **Test IDs:** `dice-log`, `dice-log-empty`, `dice-log-new`, `dice-log-entry` + `data-record-id` + `data-public` + `data-undone`, `dice-log-entry-manual`; `dice-roll-expression`, `-category`, `-label`, `-actor`, `-mode` (+ `data-value=normal|advantage|disadvantage`), `-physical`, `-public`, `-submit`, `-error`; `dice-manual-total`, `dice-manual-die` (+ `data-value` = expression position), `dice-manual-submit`; `dice-settings-open`, `dice-settings-category` + `data-value=<category>`. *(R3)* `dice-roll-options` (+ `data-state=open|closed`, `data-dirty`); `dice-roll-public` is the eye toggle (+ `data-state=public|hidden`). *(G6)* `dice-manual-crit-total`, `dice-manual-crit-die` (+ `data-value` = expression position), `dice-manual-error`. *(Sprint 4)* `dice-log-die`: a **wrapper** `<span>` around one chip in a line (+ `data-faces`, `data-value`, `data-kept`, `data-offered`); the `DieShape` inside keeps its own `dicex-die` (+ `data-shape`), so no element carries two test IDs (review B31). `dice-log-entry` gains `data-focused`. *(sprint 4 build, rulings)* The manual popover's effect / trigger groups ([MOD §7](effect-modifiers.md#7-uiux-notes), FR-MOD-18) add `mod-tray-group-crit` (+ `data-value` = part key, `data-slot`), `mod-tray-group-crit-total`, `mod-tray-group-crit-die` (+ `data-index`), `mod-tray-group-crit-label` after a crit.
 - *(Sprint 4)* **DM view:** chips on every line incl. hidden ones and the DM-only dice breakdowns. **Player view:** chips only for dice in public payloads.
+- *(Sprint 5, K)* **Line:** the bold actor name in the roller's colour ("**Mira**" in rose when Player 1 rolled; "**Goblin**" in amber for the DM). **DM view:** every line coloured, hidden ones keep their muted + eye-off styling with the name still coloured. **Player view:** the public lines they get, same colours. Test IDs: `dice-log-entry` `data-color`, `data-roller` (FR-DICE-60).
 
 ## 8. Data model
 
@@ -140,7 +156,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 | | attack … other | bool × 9 | No row = all false |
 
 - **Relations:** Campaign 1—* Roll, Entry; Entry → Rolls via `rollIds` (no entry references a roll = never logged → hidden for stats; I24, no `Roll.entryId`); Roll → Player, Entity, Token by id (no FK; names copied).
-- **Derived:** line text (`formatLine`), natural 20/1, effective settings; *(sprint 4)* `die` segments and their chips from the same payload (FR-DICE-35). **Persisted:** rolls, entries, settings. Physical-dice mode: browser only.
+- **Derived:** line text (`formatLine`), natural 20/1, effective settings; *(sprint 4)* `die` segments and their chips from the same payload (FR-DICE-35); *(sprint 5)* the actor name colour from `rollerRole` / `rollerPlayerId` (FR-DICE-60). **Persisted:** rolls, entries, settings. Physical-dice mode: browser only.
 - **Gems later (#140):** a reroll = new roll + new entry, old entry's `supersededBy` set (shown struck through); a modified damage die = new roll row with `replacesRollId`, written by the owning command. No MVP command sets either field. Manual rolls stored without per-die values (FR-DICE-06) need them entered before a Combat gem applies.
 
 ## 9. API & events
@@ -191,12 +207,14 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - **Compact bar (R3):** a DM rolling with Options closed still gets the category preset for Public (the eye shows it), so a hidden roll can't go public by surprise; the dot warns when a hidden option is set. Storage unavailable → Options closed, in memory. Disconnect: bar disabled as before; Options toggle still works (client only).
 - **Physical crit (G6):** the popover is client state; a disconnect while it is open disables Roll (not `live`) and keeps the typed values; reconnect → Roll works again. Server crash: nothing was sent. A manual crit entry still validates server-side against the crit expression (FR-DICE-06), so a client bug can't log an impossible total.
 - **Log growth:** rows kept forever (~1 KB/roll; 10 k rolls ≈ 10 MB); snapshots stay bounded (FR-DICE-17).
+- *(Sprint 5)* **Name colour:** disconnect → lines keep their colours, banner; reconnect / server crash → the snapshot carries the entries and every colour, nothing to lose (client derivation; no new write). A roller's colour changes → all their lines recolour (OQ-CAMP-21: the log shows today's colour, not the one at roll time). Two players sharing a repeated default (9th player, FR-CAMP-26) → same colour, the name still differs.
 - *(Sprint 4)* **Chips:** rows written before sprint 4 render chips too (same payload); a manual roll without per-die values → one round chip with the dice total; > 20 dice in a line → all chips, wrapping (the Tooltip still lists them). Disconnect / reconnect / crash: chips are derived on render, nothing to recover. Reload: same lines, same chips. `focusLogEntry` on an entry below the window → the log opens, no scroll.
 
 ## 12. Performance & bandwidth
 
 - Entry 300–600 B typical on the wire; schema max (20 rolls × 50 dice) ≈ 8 KB. `DiceRolled` ≈ 0.6 KB × 7 connections per roll; human-paced.
 - Snapshot budget `game-log-entry`: 100 entries ≈ 60 KB typical, ≤ 100 KB (protocol per-type budget table, I17).
+- *(Sprint 5, measured by spec-colours 2026-10-18, heavy harness, [CAMP §12](campaign-management.md#12-performance--bandwidth))* FR-DICE-60–61 add **0 B** (`rollerRole` / `rollerPlayerId` already on every entry). The rejected colour copy (on each entry and kept template): +2,163 B on the heavy DM snapshot (100 entries + 3 templates), +2,142 B per player.
 - *(Sprint 4, measured 2026-10-17 on real sockets, `dice-log`)* `DiceRolled` frame: player `1d20+5` 782 B to the DM / 765 B to another player; `10d6` 1,084 / 1,067 B; `50d6` 2,439 / 2,422 B; a DM hidden roll sends players **no frame**. FR-DICE-35–37 add **0 B** (chips are drawn from the payload already sent). Evaluation of ≤ 50 dice sub-millisecond; commit → frame < 50 ms locally ([live-sync §12](live-sync.md#12-performance--bandwidth)).
 
 ## 13. Test plan
@@ -247,12 +265,23 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outcome lines) is walked in [combat-tracker §13](combat-tracker.md#13-test-plan) step 9a.
 
+**Sprint 5 (track K):** bundle `player-colours` ([CAMP §13](campaign-management.md#13-test-plan); Player 1 jade, Player 2 blue, DM amber).
+
+| Level | What | Fixtures |
+|---|---|---|
+| Unit (client) | `FR-DICE-60 log name colour` (static `GameLog` render over a fake store: a `player-1` roll → actor name in jade's hex, `data-color="jade"`, `data-roller` = player-1's id; a DM roll for Mira → amber, `data-roller="dm"`; a `player-2` combat attack line (`cbt.attack`) → blue; bold kept; nothing else in the line coloured). `FR-DICE-61 kinds and fallback` (an entry of a test kind gets the colour without kind code; a roller absent from the store → default text colour; a `player` upsert with a new `color` → the name recolours; a pre-sprint-5 entry fixture renders coloured) | In-code |
+| Integration | None: no server change. The `game-log-entry` leak rules are unchanged (CAMP's `FR-CAMP-29` covers the colour fields) | — |
+
+**Sprint 5 walkthrough:** [CAMP §13](campaign-management.md#13-test-plan) K6 (three rollers, three colours), K10 (DM colour change recolours the DM's lines), K12 (reload, crash).
+
 **Sprint 4 walkthrough:** log chips and `focusLogEntry` are walked with the dice display in [dice-extras §13](dice-extras.md#13-test-plan) steps 14, 22 and 26 (bundle `dice-display`). Also here, on `dice-log`: step 1 again → e1–e4 show die chips (e4's manual 15 as a d20 chip + "physical"); step 3 → B's adv line shows two d20 chips, one struck.
 
 ## 14. Dependencies
 
 | On | What we need | Status |
 |---|---|---|
+| *(Sprint 5)* [campaign-management](campaign-management.md) (K) | `colorOf` + palette (FR-CAMP-28); bundle `player-colours` | revised with this spec |
+| *(Sprint 5)* [dice-extras](dice-extras.md) (D) | Owns the log client this sprint: K4 after D's log edits; popup name colour (OQ-DICE-40) | sequencing; open question |
 | [live-sync](live-sync.md), [protocol](../protocol/README.md) | Intents, record types, `audience: dm`; windowed type per [ADR-0029](../architecture/adr/0029-windowed-record-types.md) | complete; ADR accepted (#137) |
 | [campaign-management](campaign-management.md), [entities](entities.md), [scenes-map](scenes-map.md), [play-shell](play-shell.md) | Player name; `resolveDefinition`, character owner; token display name (copied server-side); window registry `dice.log`, no header slot (gear in body) | complete |
 | [character-sheet](character-sheet.md) | `char.roll` calls `dice.evaluate` + `gameLog.append`, emits `CharacterRolled` (I1); sheet buttons use the roll control (FR-DICE-24) | in revision |
@@ -277,6 +306,8 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 **Shared changes — sprint 4** (#243 [17]): none in AGENTS §9.9. Feature-owned (D owns the dice display hotspot): `src/shared/dice-roll-log/{kind-types.ts (optional `die` on `LineSegment`), roll-kind.ts (segments)}`, `src/client/common/features/dice-roll-log/{GameLog.tsx (chips, focus), focus.ts (new)}`; `DieShape` from dice-extras. `kinds.ts`, schema, events, protocol unchanged. **Not D5's** (ruling B9): `@shared/effect-modifiers/{line.ts (modSegments), combat-parts.ts (rollOfferSegments)}` are R's; MOD / offered chips land in R S4-5. Order (seams S8): D5 `build/dice-shapes` (wave 1, lock-free) → R S4-5 `fix/fury-log-line` (also after R S4-1b, which holds combat's `log-kinds.ts`). Docs at consolidation: protocol §26 log-kinds row (`die` segment).
 
+**Shared changes — sprint 5** (track K, BL-17): none in AGENTS §9.9. Feature-owned (D owns the log client; **K4 builds after D's log slice**): `src/client/common/features/dice-roll-log/GameLog.tsx` (the actor name span reads `colorOf`, `data-color`, `data-roller`). Consumes CAMP's new common `src/client/common/features/campaign-management/colors.ts` (K0). No kind, payload, event, record or schema change. Full split: [CAMP §14](campaign-management.md#sprint-5-build-split-track-k).
+
 **Combat lines (R4, sprint 1):** [combat-tracker](combat-tracker.md) FR-CBT-57/58 add natural markers to `cbt.attack` lines from public `payload` fields only, so FR-DICE-28 holds unchanged.
 
 ## 15. Open questions
@@ -292,6 +323,13 @@ All rows decided or settled; sprint-4 rows by the DM at sprint-4 gate 1 ([#245](
 | OQ-DICE-27 | Sprint 4 [17]: how do log lines show the dice? | **Decided** (DM, sprint-4 gate 1, #245, bulk D): inline die-shape chips in place of the dice numbers; ≥ 6 lines still fit. Rejected: a chip row under each line; chips only in the Tooltip | no (decided) | FR-DICE-35, play-shell (FR-SHELL-35) |
 | ~~OQ-DICE-28~~ | ~~Sprint 4 seam with R ([15] Divine Fury in the combat log): who builds the trigger part's dice in the line?~~ | **Settled by seams S8:** A: R, in R S4-5 `fix/fury-log-line` after D5 (and after R S4-1b), through D5's per-die `die` segments (`label` = part name; offered dice `offered: true`, `kept: false` only for dropped dice: ruling B5); MOD / offered chips are R's (B9); `die` segments DM-only exactly when their text is. Rejected: B D edits combat's `log-kinds.ts` | — | [effect-modifiers](effect-modifiers.md), [combat-tracker](combat-tracker.md) |
 | ~~OQ-DICE-24~~ | ~~G12 verdicts (dice part)~~ | **Decided (#172):** verdicts accepted: "— natural 1" per FR-DICE-20 except initiative (FR-DICE-29); no group roll (each combatant rolls, FR-CBT-11); fixture clock by design (FR-FIX-08) | — | fixtures-adapters |
+
+**Sprint 5** (track K). Decided by the DM before the spec: the colour shows in log lines (BL-17). **Bold** = suggested pick, for DM gate 1.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-DICE-39 | **Whose colour** colours a line's name? | **A. The roller's** (`rollerRole` / `rollerPlayerId`: who clicked Roll; the DM's rolls for a PC or monster are amber) (0 B; matches "who did it", like the dice look) / B. The actor's owner (Mira rose even when the DM rolls for her): the entry stores only `actorName`, so it needs a new `actorPlayerId` on entries (schema + kind callers) / C. Only player-rolled lines coloured, the DM's plain: quieter log, but BL-17 says the DM colour shows too | no · owner: DM | — |
+| OQ-DICE-40 | **dice-extras:** the roll popup (FR-DICEX-39) names the roller too: colour it the same way? | **A. Yes, the popup's roller name in the roller's colour, D's slice, with `colorOf` from K0** (one rule for log and popup) / B. Log only this sprint | no · owner: D (dice-extras) | dice-extras |
 
 ## 16. Out of scope
 
