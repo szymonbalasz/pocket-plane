@@ -321,7 +321,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | `a` | Aid [1], Ape [1], Azer [1], Alarm [1], Ankheg [1], Augury [1]; no text-only row | 816 |
 | `zzqx` | none: "No matches for ‘zzqx’. Every word must match." | 0 |
 
-(Group rows don't change these: none of these names has two entries in one source.)
+(Group rows don't change these: none of these names has two entries in one source.) *(sprint 4 build, rulings)* **Hits** count matching entries incl. group members, not collapsed rows. `compendium-full` also loads `cmp-homebrew` (via `compendium`), which the table leaves out: its "Fireball (house)" (tier 1, FR-CMP-38) ranks first for `fire`, above Fireball SRD.
 
 **Browser walkthrough (S4)**: `bun run build`, `fixtures:reset-load compendium-full --profile verify`, `start --profile verify`. Contexts: A DM, B `player-1`. Player REST + WS logs as above. Token art steps: [entities §13](entities.md#13-test-plan). Teardown as above.
 
