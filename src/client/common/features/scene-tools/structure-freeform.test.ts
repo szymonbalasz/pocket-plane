@@ -195,4 +195,31 @@ describe("BL-12 Erase on a door over a wall", () => {
       ),
     ).toBe(1);
   });
+
+  test("BL-12 a freeform door a rounding step off a diagonal wall still wins, at any point along it", () => {
+    // S1 wall 6 (10, 2)–(12.4, 3.65); the door's ends are rounded to 0.01 cell, so it sits a
+    // fraction of a px off the wall's line and the wall used to be nearer on some clicks.
+    const v = structureView({ ...REC, doors: [[8, 10.8, 2.55, 11.6, 3.1, 1, 0]] });
+    const [x1, y1, x2, y2] = [10.8, 2.55, 11.6, 3.1];
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    for (let t = 0.05; t < 1; t += 0.05) {
+      for (let off = -6; off <= 6; off += 0.5) {
+        const p = {
+          x: (x1 + t * (x2 - x1)) * CS - ((y2 - y1) / len) * off,
+          y: (y1 + t * (y2 - y1)) * CS + ((x2 - x1) / len) * off,
+        };
+        expect(hitSegment(v, GRID, p, 8)).toBe(8);
+      }
+    }
+    // Off the door's span the wall is the target again.
+    expect(hitSegment(v, GRID, { x: 12.2 * CS, y: (2 + (1.65 * 2.2) / 2.4) * CS }, 8)).toBe(6);
+  });
+
+  test("BL-12 a door in a gap between walls: a click on the wall next to it still takes the wall", () => {
+    // Goblin Ambush x = 8: wall 1 (8, 0)–(8, 5), door 4 (8, 5)–(8, 6), wall 2 (8, 6)–(8, 11).
+    const v = structureView(REC);
+    expect(hitSegment(v, GRID, { x: 8 * CS + 2, y: 5 * CS - 5 }, 8)).toBe(1);
+    expect(hitSegment(v, GRID, { x: 8 * CS + 2, y: 6 * CS + 5 }, 8)).toBe(2);
+    expect(hitSegment(v, GRID, { x: 8 * CS + 2, y: 5.5 * CS }, 8)).toBe(4);
+  });
 });
