@@ -1,9 +1,9 @@
 ---
 title: Effect modifiers
 prefix: MOD
-status: complete
-owner: spec-rules
-phase: post-mvp-4
+status: claimed
+owner: spec-combat
+phase: post-mvp-5
 ---
 
 # Effect modifiers
