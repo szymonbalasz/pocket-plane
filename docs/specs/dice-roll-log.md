@@ -296,7 +296,7 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 **Combat lines (R4, sprint 1):** [combat-tracker](combat-tracker.md) FR-CBT-57/58 add natural markers to `cbt.attack` lines from public `payload` fields only, so FR-DICE-28 holds unchanged.
 
-**Shared changes — sprint 5, track W:** none in this spec's own server or shared code. The `dice.log` window lines (`src/client/{dm,player}/features/dice-roll-log/log-window.tsx`, common `dice-roll-log/window.ts`: size function, min 300×160, `belowToasts`, `previousDefaults`) and `GameLog.tsx` (FR-DICE-39 widths) go in play-shell's slice **W1** `fix/window-layout` (assigned; [play-shell §14](play-shell.md#14-dependencies)), which needs the new `WindowDef` fields. D's dice-display edits to `GameLog.tsx` (BL-15 hint, BL-20) sequence with W1 on that file (orchestrator).
+**Shared changes — sprint 5, track W:** none in this spec's own server or shared code. The `dice.log` window lines (`src/client/{dm,player}/features/dice-roll-log/log-window.tsx`, common `dice-roll-log/window.ts`: size function, min 300×160, `belowToasts`, `previousDefaults`) and `GameLog.tsx` (FR-DICE-39 widths) go in play-shell's slice **W1** `fix/window-layout` (assigned; [play-shell §14](play-shell.md#14-dependencies)), which needs the new `WindowDef` fields. `GameLog.tsx` order, settled by seams S15: **W1 (width) → D8 (held lines) → K4 (name colour)**; R2 never edits `GameLog.tsx`.
 
 ## 15. Open questions
 
