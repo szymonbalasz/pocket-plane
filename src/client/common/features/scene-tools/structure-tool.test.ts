@@ -161,6 +161,36 @@ describe("FR-SCN-08 Structure tool", () => {
     expect(structureTool.getState().box).toBeNull();
   });
 
+  test("BL-12 eraser on a door over a wall removes the door", async () => {
+    // V0 walkthrough step 4: a 3-segment wall, then a door drawn on its middle segment.
+    const walls: SceneStructureRecord["walls"] = [
+      [1, 2, 2, 5, 2],
+      [2, 5, 2, 5, 5],
+      [3, 5, 5, 8, 5],
+    ];
+    const rec: SceneStructureRecord = {
+      ...AMBUSH,
+      nextN: 5,
+      walls,
+      doors: [[4, 5, 3, 5, 4, 1, 0]],
+    };
+    const h = harness(rec);
+    setStructureMode("erase");
+    const onDoor = h.at(0, 0, { x: 5 * 70 + 3, y: 3.5 * 70 });
+    h.p.move?.(onDoor);
+    expect(structureTool.getState().hoverN).toBe(4);
+    h.p.down?.(onDoor);
+    await flush();
+    // The ack's StructureEdited drops the door; the same click now takes the wall under it.
+    shownStructure.setState({ view: structureView({ ...rec, doors: [] }) });
+    h.p.down?.(onDoor);
+    await flush();
+    expect(h.sent).toEqual([
+      [S.removeSegments, { sceneId: "s1", ns: [4] }],
+      [S.removeSegments, { sceneId: "s1", ns: [2] }],
+    ]);
+  });
+
   test("FR-SCN-32 nothing is sent until the shown scene's rows are loaded, or for another scene", async () => {
     const h = harness(AMBUSH, false);
     h.p.down?.(h.at(1, 1));
