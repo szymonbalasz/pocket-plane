@@ -712,7 +712,7 @@ One test plan for the whole track; CBT, CBTX and CHARX §13 point here. **Refere
 
 ## 14. Dependencies
 
-> **Sprint 5:** build split in [CBT §14.1](combat-tracker.md#141-build-split-sprint-5-track-r-cbt-mod-map): FR-MOD-62 in R2 `fix/combat-lines` (`@shared/effect-modifiers/{line,combat-parts}.ts`, after D's log edits and R1), FR-MOD-63 in R1 `build/late-damage` (`@shared/effect-modifiers/settle.ts`, DM `effect-modifiers/popup-facts.ts`). No new dependency.
+> **Sprint 5:** build split in [CBT §14.1](combat-tracker.md#141-build-split-sprint-5-track-r-cbt-mod-map): FR-MOD-62 in R2 `fix/combat-lines` (`@shared/effect-modifiers/{line,combat-parts}.ts`, after D8 and R1, seams S7; D never edits these files), FR-MOD-63 in R1 `build/late-damage` (`@shared/effect-modifiers/settle.ts`, DM `effect-modifiers/popup-facts.ts`). No new dependency.
 
 | On | What we need | Status |
 |---|---|---|
