@@ -3,12 +3,12 @@
 // move with a drag and show in drag previews). Names and badges are on the labels layer
 // (FR-MAP-42). No image: the creature-type glyph on its type colour, else initials (FR-ENT-28).
 // Konva node `name` = `map-token`, `id` = token id, attrs `shape`, `preview` (FR-MAP-40), `art`
-// (`image` | `<type>` | `initials`, FR-ENT-28); glyph `map-token-art` (attr `type`); ring `map-token-ring` (attr `state`); crosses, bars and icons named by their
-// overlay id (bar attrs `tone`, `fraction`; icon attrs `value`, `icon`, `tone`, `label`, `muted`, and
+// (`image` | `<type>` | `initials`, FR-ENT-28); glyph `map-token-art` (attr `creature`); ring
+// `map-token-ring` (attr `state`); crosses, bars and icons named by their overlay id (bar attrs
+// `tone`, `fraction`; icon attrs `value`, `icon`, `tone`, `label`, `muted`, and
 // `tip` = the hover tooltip the labels layer shows, FR-MAP-57 / S9); "+N" `map-token-icons-more`
 // (attrs `count`, `tip`); a cue (FR-MAP-49) named by its id, attr `label`. Drag
 // paths and combat trails (FR-MAP-52–55) are drawn first, below every token (`DragPaths`).
-
 import type { CreatureType } from "@shared/entities/schemas";
 import { cellToPx, footprint, initials } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
@@ -72,7 +72,7 @@ function CreatureArt({ t, side, type }: { t: TokenView; side: number; type: Crea
       {backdrop && <Backdrop kind={backdrop} side={side} fill={colors.creature[type]} />}
       <Path
         name="map-token-art"
-        type={type}
+        creature={type}
         data={glyph.path}
         x={box.x - (vb[0] ?? 0) * k}
         y={box.y - (vb[1] ?? 0) * k}
