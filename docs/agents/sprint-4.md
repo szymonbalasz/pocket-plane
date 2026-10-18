@@ -58,3 +58,100 @@ DM feedback numbers in brackets ([#243](../decisions-log.md)). "sim-7" = the [se
 - Map tools: AoE cell rule exactly at 50 %; snapping for freeform templates (Ctrl like fog?); whether the drag path stays after the drop (until next move / turn end).
 - Rules: magic weapon model (bonus on the weapon row vs an effect); several damage parts on crit; how far negative uses may go and how it shows; trigger badge content.
 - Compendium: search syntax beyond AND (quotes, prefix); ranking weights; token art source (bundled SVG per type vs generated).
+
+## Playtest: sprint 4 features
+
+Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira, and Brakka in part 4) + **Player 2** (another browser: Thorn). Regression run: [session-sim-8 report](../../.verify/20261018-030613-session-sim-8/report.md) (local, gitignored): **16 / 17 PASS** on final `main` (check 3,403, e2e 111), leak scan clean (WS + REST, both players) with party vision, drag sight, secret Blinded, roll popups, trigger state and compendium in play; a hard kill mid-combat kept a pending Flame Tongue crit card with its Divine Fury offer byte-identical (applied once). The one FAIL is the first known gap below.
+
+### Setup
+
+```powershell
+bun install
+bun run build
+bun run fixtures:reset-load vision-party --profile verify
+bun run start --profile verify
+```
+
+Open the printed DM URL (paste the secret) and each player link in its own browser. To switch bundles: `Ctrl+C`, `bun run fixtures:reset-load <bundle> --profile verify`, `bun run start --profile verify`; player links change on every load. Everything at once: bundle `session-sim-8` (Town is live at load: show Goblin Ambush from the Scenes window).
+
+### Part 1: vision and fog (`vision-party`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Show Goblin Ambush from the **Scenes** window (hover the row → cast icon) | Players switch at once; the map rail has no Show button any more |
+| 2 | Select tool, then the Fog tool; Layers → **Fog** switch | Select: the plain battlemap (no fog for you). Fog tool: fog, Explored and darkness drawn. The Layers switch shows fog with any tool |
+| 3 | Hold the **middle mouse** and drag, under every tool | The map pans; nothing is drawn, a polygon draft keeps its points |
+| 4 | Fog tool → Brush, Reveal, 10 ft; drag along a row; then Fog + **Ctrl** | Whole squares revealed, then a smooth round stroke; players get only the result |
+| 5 | **Ctrl+Z**, Ctrl+Z, **Ctrl+Y**; reload; Ctrl+Y | One stroke per step; the undo / redo depths survive the reload |
+| 6 | Player 1 drags Mira slowly through the open door, holds, drops | Her sight follows the token while dragging; goblins appear only on the drop. Player 2 sees nothing of it |
+| 7 | You drag Thorn | Player 2's sight follows (only as far as Thorn could walk); you and Player 1 get nothing |
+| 8 | Fog bar → **Party vision** on | Both players see the union of both sights (Thorn's darkness sight included); off → each back to their own |
+| 9 | Fog bar → View as → **Party** | The party's combined view on your screen |
+| 10 | In combat: Mira → Conditions → **Blinded** (party vision off); then a **secret** Blinded (Effect…, Hidden from players) | Player 1: dark screen "Blinded — you can't see"; secret: only "You can't see", no condition name |
+| 11 | A token with no stored vision | Sees to the walls and map edges (999 ft); its sheet reads "Vision normal" |
+
+### Part 2: animated dice and the roll popup (`dice-display`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Player 1: Mira's sheet → a skill check | Full-screen 3D dice bounce over every window for all three of you, land on the result, fly into the popup (players bottom-right, you top-centre); the roller gets one too |
+| 2 | Player 1: tray 10d6 | 10 dice everywhere; the popup shows the same 10 as die shapes |
+| 3 | You: eye off, roll 1d20 | Only your popup shows it (miniature dice); players see nothing |
+| 4 | Click a popup | The Game log comes forward with that roll highlighted for 2 s |
+| 5 | Game log | Each roll shows die-shape chips (d20 hexagon, d6 squares…); a dropped advantage die is struck |
+| 6 | Player 2: tray gear → Display **Tray throw**; Windows animation effects off | The old zone throw for Player 2 only; full screen still works with reduced motion on (#247) |
+
+### Part 3: map tools and windows (`map-tools`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Player 1: AoE → Cone 15 ft, hold **Ctrl**, place it freely, Keep | A "Free" chip; squares more than half covered are highlighted ("· N squares") for everyone |
+| 2 | Player 1: AoE → Line 30 ft without Ctrl from a corner | Snapped; exactly one row of 6 squares |
+| 3 | Drag a kept template's end handle | It re-aims; squares recomputed |
+| 4 | AoE panel → **Clear templates** | A confirm "Clear N DM templates?"; players' kept templates go only if you tick the box |
+| 5 | Player 1 drags Mira, holds | Everyone who sees Mira sees her path (the squares the distance counts); you drag a goblin: only you see its path |
+| 6 | Start the encounter; Player 1 moves twice | A faint trail of this turn's moves; **Next** clears it |
+| 7 | Goblin Sneak and Goblin Sneak 2 side by side; make one Invisible | Names shorten with "…" and show in full on hover; the badge becomes an icon chip |
+| 8 | 1280×720: launcher; Reset layout; Fit with the Game log open | The launcher goes icons-only then "⋯"; Fit keeps the map's top row and your PCs visible |
+
+### Part 4: magic weapons, triggers, negative uses (`rules-effects`)
+
+Brakka (Player 1) has a **Flame Tongue greatsword +1** (2d6 slashing + 2d6 fire, +1 to hit and damage), Rage at 0 / 3 and Divine Fury; a goblin has a Fire Ward.
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Player 1: Brakka's sheet | The row reads "+8 · 2d6+5 slashing + 2d6 fire" with a "+1" badge |
+| 2 | Next to Brakka; Player 1: Rage switch | "No Rage uses left (0 / 3). Rage anyway?" → Rage on, "−1 / 3" in red |
+| 3 | Initiative row and Brakka's token | A lightning "Divine Fury" chip (ready); you and Player 1 see it, Player 2 doesn't |
+| 4 | Player 1: Flame Tongue Attack + damage on the warded goblin; you Hit + Apply | Card with both damage types; the popup halves the fire only; players read "… — DM: hit. 15 slashing + 4 fire (half) damage + 6 radiant (Divine Fury)" with the Divine Fury die in the log |
+| 5 | Player 1 attacks again the same turn | No Divine Fury in the tray; the chip shows used; other turns read "On Brakka's turn" |
+| 6 | A natural 20 | Every part's dice doubled (4d6 + 4d6 + Divine Fury 2d6) |
+| 7 | Physical dice on: your Initiative-row Attack + damage; Player 1 types the Divine Fury die | The entry form opens for you; Player 1 types every die, nothing "rolled for you" |
+
+### Part 5: compendium (`compendium-full`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Compendium: "potion heal", then "heal potion" | Potion of Healing first both ways |
+| 2 | "goblin" in the Compendium, the Creatures window and the Encounters lookup | The SRD Goblin above the fixture Goblin everywhere |
+| 3 | All tab, empty search | One "Ability Score Improvement · 12 entries" row; expand → 12; Back keeps it open |
+| 4 | Show the battlemap | Monster tokens without a picture show their creature-type art (dragon, giant, humanoid…); token menu → Art → Initials hides it |
+| 5 | Compendium footer → **Credits** | Token art (game-icons.net, CC BY 3.0) and the SRD attribution |
+
+### Known gaps / later
+
+- **Auto-placed windows stack (the session-sim-8 FAIL):** with the Game log and Initiative open, Compendium / Party / Encounters opened from the launcher land on top of each other and over the Game log (and a token). Fix proposed for the recap.
+- Tool bars under default windows: the DM's fog bar wraps to two rows and its second row (Party vision, View as) sits under the Scenes window; the players' AoE panel opens under their Initiative window.
+- At 1280×800 the players' map still runs under the Character sheet (Player 2 couldn't see the Crypt Ogre); the DM's top-centre roll popup and card toast cover the top of the map.
+- At 1280×720 with the Game log and Initiative open, Fit hides the top rows (PCs first, by the sprint ruling); with Scenes + Game log + Initiative open a monster can sit under a window after Fit.
+- Combat trails can differ between clients after a reload; Initiative chips still collapse ("Rage 10r +1" hides Divine Fury); the tray / log total shows before the dice land.
+- Two "Invisible" items in your token menu (fog Invisible vs the condition); the Effect… dialog defaults its source to a hidden monster; dragging a cube aims its diagonal (drag south-east for 0°).
+- Small: your applied line can read "14 slashing + 2 Rage + 6 fire" (Rage counted in the 14, BL-27); trigger parts lose their damage type on log lines (BL-23); the manual form doesn't name damage types (BL-20); the 3D dice download isn't compressed (BL-21).
+
+### Teardown
+
+`Ctrl+C` the server, then:
+
+```powershell
+bun run fixtures:reset --profile verify
+```

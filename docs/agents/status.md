@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 4 builds complete** — every slice merged (tracks V, D, M, R, C + physical-dice fix). Next: final main gates → session-sim-8 → Playtest section → recap with the DM.
+**Phase:** **Sprint 4 done — paused for the recap with the DM.** Builds merged (#248); gate session-sim-8 16 / 17 (#249); Playtest section written. Waiting on the DM.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
@@ -18,7 +18,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
 | Physical dice in combat (BL-19, BL-25) | merged | — | Done (walkthrough 5/5; check 3314, e2e 105) | — |
 | C-art token art (last slice) | merged eacb98a | — | Done (9/10 + credits fix). **Track C complete** | — |
-| Sprint gate: session-sim-8 | main (eacb98a; check 3403, e2e 111 green) | test-session-8 (tab wR:p1X, server wR:p1Y) | Running (`.verify/20261018-030613-session-sim-8/`) | Playtest section, recap |
+| Sprint gate: session-sim-8 | main eacb98a | — | 16 / 17 PASS (FAIL j: launcher windows stack); leak scan clean | Recap with the DM |
 | C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
 | V9 fog brush + Ctrl+Z | merged | — | Done (walkthrough 13/13) | — |
 | V10 party vision + Blinded | merged | — | Done (check 3386, e2e 110). **Track V complete** | — |
@@ -49,7 +49,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Pending DM decisions
 
-- None.
+- Sprint 4 recap: the window-stacking FAIL fix (proposed), the ranked glitch list, cube drag direction, Fit with three windows open, the DM snapshot worst case (863 KB of 1 MiB).
 
 ## Resolved locally (report at gate)
 
