@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 5 Phase A (specs), [sprint-5](sprint-5.md). Kickoff 2026-10-18.
+**Phase:** Sprint 5 Phase A (specs: seams done `.verify/sprint5/seams.md`; reviews running, rulings `.verify/sprint5/rulings-{a,b}.md`), [sprint-5](sprint-5.md). Kickoff 2026-10-18.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
@@ -15,7 +15,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | P party + uploads | spec/s5-party (w6K) | spec-party | spec drafted, idle | seams |
 | C compendium images | spec/s5-cmpimg (w6M) | spec-cmpimg | Phase A spec | report → seams |
 | K player colours + template delete [1] | spec/s5-colours (w6N) | spec-colours | Phase A spec | report → seams |
-| backfill (BL-16) stable useRecords array | fix/bl-16-stable-records (w6Q) | fix-bl-16 | building; holds `src/client/common/sync/store.ts` | merge |
+| backfill (BL-12) door eraser hit test | fix/bl-12-door-eraser (w6R) | fix-bl-12 | building | merge |
+| backfill (BL-31) nat-1 e2e assertion | fix/bl-31-nat1-e2e (w6S) | fix-bl-31 | building | merge |
 
 New ID ranges per track (parallel edits of shared specs): in the briefs `%TEMP%/pocket-plane/briefs/spec-s5-*.md`.
 
