@@ -2,14 +2,21 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 4 done (gate #249, recap #250–#251). **Sprint 5** planned in [sprint-5](sprint-5.md); Phase A (specs) starts with the DM's kickoff prompt.
+**Phase:** Sprint 5 Phase A (specs), [sprint-5](sprint-5.md). Kickoff 2026-10-18.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Sprint 4 | merged | — | Done: builds #248, gate session-sim-8 16 / 17 #249, playtest section, recap #250–#251 | — |
-| Sprint 5 | — | — | Planned ([sprint-5](sprint-5.md)) | Phase A: specs W, D, R, P, then C, K |
+| Sprint 4 | merged | — | Done (#243–#251) | — |
+| W windows + layout | spec/s5-windows (w6G) | spec-windows | Phase A spec | report → seams |
+| D dice polish | spec/s5-dice (w6H) | spec-dice | Phase A spec | report → seams |
+| R late damage + log | spec/s5-combat (w6J) | spec-combat | Phase A spec | report → seams |
+| P party + uploads | spec/s5-party (w6K) | spec-party | Phase A spec | report → seams |
+| C compendium images | — | — | queued (next free slot) | — |
+| K player colours + template delete [1] | — | — | queued | — |
+
+New ID ranges per track (parallel edits of shared specs): in the briefs `%TEMP%/pocket-plane/briefs/spec-s5-*.md`.
 
 ## Shared-file locks
 
