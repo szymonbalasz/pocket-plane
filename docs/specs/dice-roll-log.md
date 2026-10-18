@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: claimed
+status: in-review
 owner: spec-windows
 wave: 2
 phase: post-mvp-5
@@ -30,6 +30,13 @@ phase: post-mvp-5
 | FR-DICE-36 | Other kinds' chips; sources, faces from expression, S8 format | D5 (format, faces); R S4-5 (MOD / offered chips) | `FR-DICE-36 sources`, `… faces from expression`, `… segment format` |
 | FR-DICE-37 | `focusLogEntry` for the popup | D5 | `FR-DICE-37 focusLogEntry` |
 | FR-DICE-31 *(amended)* | Per-part crit sub-rows for weapons with several parts | none (works today; R supplies parts) | `FR-DICE-31 per-part crit` |
+
+> **Sprint 5, track W (owner spec-windows for these rows only; DM [#250](../decisions-log.md) [7]).** Decided, not open: **Game log default width 2.5× today's.** How it shrinks on small screens is OQ-SHELL-31 (◆, DM gate). Window geometry, placement and the toast corner are [play-shell](play-shell.md)'s (FR-SHELL-45–54); walkthrough W0, W1, W3 there. Other sprint-5 tracks (D, R, K) edit this spec too; their rows are theirs.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-DICE-38 ◆ | Default size 2.5× wide (DM 1150×240, player 850×280) on wide + tall screens; 1.5× / 160 high below; old defaults migrate | W1 `fix/window-layout` | `FR-DICE-38 Game log width` |
+| FR-DICE-39 | The wide log uses its width: lines run full width, roll bar compact on the left | W1 | `FR-DICE-39 wide log` |
 
 ## 2. Scope
 
@@ -102,10 +109,15 @@ phase: post-mvp-5
 | FR-DICE-35 | **Dice in log lines** (OQ-DICE-27): a `roll` line (FR-DICE-20) shows each die as an inline **die-shape chip** ([FR-DICEX-42](dice-extras.md#6-functional-requirements), size `sm` 18 px, the roller's look) in place of its number: "Mira — Athletics: ⬡13 + 5 = 18". Dropped dice (`kept: false`, adv / dis only) struck and dimmed, offered trigger dice (`offered: true`) dashed exactly as in the popup, tray and flat zone (FR-DICEX-42), manual dice with per-die values as chips plus the "physical" badge, a manual total without per-die values as one round chip. Built from a new optional `die {faces, value, kept, offered?, label?}` on `LineSegment` (`@shared/dice-roll-log/kind-types.ts`; seams S8 as amended by ruling B5), emitted by `rollSegments` / `rollBreakdownSegments`. D5 ships the type (incl. `offered`) and the base dice; **MOD and offered-part chips come from R's helpers** (`modSegments`, `rollOfferSegments` in `@shared/effect-modifiers/`) in R S4-5 (ruling B9); `text` stays on every segment, so `lineText`, copy, the Tooltip and screen readers read "d20: 13". A chip fits the line height: FR-SHELL-35's ≥ 6 single-line entries hold. | [17] |
 | FR-DICE-36 | **Other kinds** get chips through the shared helpers, with no change of their own, for exactly the dice their line already shows: the DM's `cbt.attack` dice breakdown ([FR-CBT-53](combat-tracker.md#6-functional-requirements)) shows chips on the DM client; players' `cbt.attack` to-hit ("12 + 4", a sum in `payload`) stays text. The FR-DICE-28 kind contract still holds (a `die` segment is DM-only exactly when its text is). **Sources** (ruling B4): `die` segments are built only from `payload` (every viewer) or `dmPayload` (DM client only), never from `rollIds` or roll rows; weapon extra-part dice on `cbt.attack` outcome lines stay DM-only (`dmPayload`); R puts non-public trigger roll ids in `dmPayload`. **Payload amendment** (B4): the earlier "no new payload field" gains one exception: R's **public character-trigger** parts carry per-die `dice` in `payload` (FR-MOD-57), so players see those chips; monster trigger parts keep expression and dice in `dmPayload` whatever `public` says (#171 P5, #190). **Faces** (B10): `RollBreakdown` has `expression` and `[value, kept][]` only, so `rollBreakdownSegments` maps dice to faces by `parseExpression(expression)` term order (dice terms in order, N dice each; "1d8+1d6" → d8 then d6); an unparsable expression or a count mismatch → round chips. *(Seams S8, amended by B5)* **Segment format (D's, binding for every kind):** optional `die {faces, value, kept, offered?, label?}` on `LineSegment`, **one segment per die**, from `rollSegments` / `rollBreakdownSegments`; no `{kind: "dice", values[]}` shape, no `muted` field. `kept: false` = dropped (adv / dis) only; `offered: true` = an offered trigger die, drawn dashed in log, popup, tray and flat zone alike. Trigger and weapon extra parts (R: Divine Fury, Flame Tongue fire) carry `label` = the part's name. "Not applied" shows only on R's outcome line, never by striking a roll-line die. Order: R S4-5 after D5. | Seam R (S8, B4, B5, B9, B10) |
 | FR-DICE-37 | **Focus an entry**: `focusLogEntry(entryId)` (`@ui`, dice-roll-log client) opens or restores and fronts `dice.log` ([FR-SHELL-08](play-shell.md#6-functional-requirements)), scrolls the entry into view and highlights it for 2 s (`dice-log-entry` `data-focused`); an entry not in the store (below the window, FR-DICE-17) → the log opens only. Caller: the roll popup ([FR-DICEX-39](dice-extras.md#6-functional-requirements)). | [11] |
+| **Sprint 5, track W** ([7]) | | |
+| FR-DICE-38 ◆ | **Game log default width 2.5×** (decided [7]; sizes for small screens per OQ-SHELL-31, written for bold pick A; amends FR-SHELL-35 numbers, protocol §24 `dice.log`): `dice.log` `defaultSize` by viewport class ([FR-SHELL-51](play-shell.md#6-functional-requirements)): **DM** 1150 wide (2.5 × 460) at vw ≥ 1440, else 690 (1.5×); **player** 850 (2.5 × 340) at vw ≥ 1440, else 510; height DM 240 / player 280 at vh ≥ 900, else **160** (both). Position unchanged (bottom-left, `dx` 56); min size unchanged (300×200 → **300×160**, so the short default isn't below min). `belowToasts: true` (the DM's 1150-wide log runs under the toast corner's left 150 px at 1440×900, [FR-SHELL-49](play-shell.md#6-functional-requirements)). `previousDefaults` DM [460×240], player [340×280] ([FR-SHELL-53](play-shell.md#6-functional-requirements): a log never resized by the user takes the new default once). History at default size with the roll bar collapsed (FR-DICE-30): ≥ 6 single-line entries with Physical dice off and ≥ 4 with it on at the tall sizes (as FR-SHELL-35); at 160 high ≥ 3 / ≥ 2 (amends FR-SHELL-28's "≥ 3 with all chrome on" for the short size only). | [7] |
+| FR-DICE-39 | **The wide log uses its width:** entry text runs the full body width (no max-width on lines), so an attack + damage line with die chips takes about half the lines (sim-8: the Flame Tongue crit line wrapped to 6 lines at 460 px; ≤ 3 at 1150); the category Badge stays at the line's right end; the collapsed roll bar (FR-DICE-30) keeps its controls left-aligned at their sprint-4 widths (expression input ≤ 320 px), the Options row likewise, so nothing stretches across 1150 px. Same in both clients. | [7] |
 
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, semantic tokens (`visibility.hidden` for the hidden marker).
+
+- *(Sprint 5, W)* **Window `dice.log`:** 2.5× wide on wide + tall screens (DM 1150×240, player 850×280), 1.5× wide / 160 high on laptops (FR-DICE-38 ◆); lines use the width, roll bar stays compact on the left (FR-DICE-39). Toasts and roll popups sit in the bottom-right corner, over the DM log's right end at 1440×900 only. **DM view / player view:** same layout, own sizes.
 
 - **Window `dice.log`** "Game log": both clients, default open, bottom-left above the launcher, 420×320, min 300×200, launcher "Log" (OQ-SHELL-06, I12).
 - **Line:** actor bold, body text, total bold; category as a small muted Badge; Tooltip = time + expression + all dice. "physical" Badge for manual. *(Sprint 4)* Dice as inline die-shape chips (FR-DICE-35), vertically centred on the text; a focused entry (FR-DICE-37) gets the accent ring for 2 s.
@@ -142,6 +154,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - **Relations:** Campaign 1—* Roll, Entry; Entry → Rolls via `rollIds` (no entry references a roll = never logged → hidden for stats; I24, no `Roll.entryId`); Roll → Player, Entity, Token by id (no FK; names copied).
 - **Derived:** line text (`formatLine`), natural 20/1, effective settings; *(sprint 4)* `die` segments and their chips from the same payload (FR-DICE-35). **Persisted:** rolls, entries, settings. Physical-dice mode: browser only.
 - **Gems later (#140):** a reroll = new roll + new entry, old entry's `supersededBy` set (shown struck through); a modified damage die = new roll row with `replacesRollId`, written by the owning command. No MVP command sets either field. Manual rolls stored without per-die values (FR-DICE-06) need them entered before a Combat gem applies.
+- *(Sprint 5, track W)* No data-model change: client-only geometry and view state ([play-shell §8](play-shell.md#8-data-model)); no table, column, record type or stored field.
 
 ## 9. API & events
 
@@ -168,6 +181,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 | *(callers' events)* | via `gameLog.append` / `markUndone` | caller's, incl. `rollIds` | `game-log-entry` upserts listed by caller | per entry rule |
 
 - No intent is optimistic ([ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md) E). No listeners, no signals. Stats join immutable `roll` rows via `rollIds`.
+- *(Sprint 5, track W)* No REST route, intent, record type, event or signal; nothing new on the wire, so no visibility rule to add (CON-44: 0 B).
 
 ## 10. Permissions
 
@@ -192,6 +206,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - **Physical crit (G6):** the popover is client state; a disconnect while it is open disables Roll (not `live`) and keeps the typed values; reconnect → Roll works again. Server crash: nothing was sent. A manual crit entry still validates server-side against the crit expression (FR-DICE-06), so a client bug can't log an impossible total.
 - **Log growth:** rows kept forever (~1 KB/roll; 10 k rolls ≈ 10 MB); snapshots stay bounded (FR-DICE-17).
 - *(Sprint 4)* **Chips:** rows written before sprint 4 render chips too (same payload); a manual roll without per-die values → one round chip with the dice total; > 20 dice in a line → all chips, wrapping (the Tooltip still lists them). Disconnect / reconnect / crash: chips are derived on render, nothing to recover. Reload: same lines, same chips. `focusLogEntry` on an entry below the window → the log opens, no scroll.
+- *(Sprint 5, W)* The wider default is browser layout only: disconnect, reconnect and a server crash change nothing; a log still at its old default size takes the new one once on load ([FR-SHELL-53](play-shell.md#6-functional-requirements)); a user-resized log keeps its size.
 
 ## 12. Performance & bandwidth
 
@@ -249,6 +264,8 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 **Sprint 4 walkthrough:** log chips and `focusLogEntry` are walked with the dice display in [dice-extras §13](dice-extras.md#13-test-plan) steps 14, 22 and 26 (bundle `dice-display`). Also here, on `dice-log`: step 1 again → e1–e4 show die chips (e4's manual 15 as a d20 chip + "physical"); step 3 → B's adv line shows two d20 chips, one struck.
 
+**Sprint 5, track W:** unit `FR-DICE-38 Game log width` (both registries: `defaultSize` at 1280×720 / 1280×800 / 1440×900 / 1600×900 = DM 690×160 / 690×160 / 1150×240 / 1150×240, player 510×160 / 510×160 / 850×280 / 850×280; min 300×160; `belowToasts`; `previousDefaults` listed; DOM: 8 single-line `1d4` entries at each default size with Physical dice off / on → ≥ 6 / ≥ 4 visible at the tall sizes, ≥ 3 / ≥ 2 at 160 high); `FR-DICE-39 wide log` (DOM at 1150 px: the sim-8 Flame Tongue crit line (6 lines at 460 px) renders on ≤ 3, the category Badge right-aligned; roll-bar expression input ≤ 320 px wide). Fixtures: `windows-s5` (play-shell §13); walkthrough W0, W1, W3 in [play-shell §13](play-shell.md#13-test-plan).
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -279,6 +296,8 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 **Combat lines (R4, sprint 1):** [combat-tracker](combat-tracker.md) FR-CBT-57/58 add natural markers to `cbt.attack` lines from public `payload` fields only, so FR-DICE-28 holds unchanged.
 
+**Shared changes — sprint 5, track W:** none in this spec's own server or shared code. The `dice.log` window lines (`src/client/{dm,player}/features/dice-roll-log/log-window.tsx`, common `dice-roll-log/window.ts`: size function, min 300×160, `belowToasts`, `previousDefaults`) and `GameLog.tsx` (FR-DICE-39 widths) go in play-shell's slice **W1** `fix/window-layout` (assigned; [play-shell §14](play-shell.md#14-dependencies)), which needs the new `WindowDef` fields. D's dice-display edits to `GameLog.tsx` (BL-15 hint, BL-20) sequence with W1 on that file (orchestrator).
+
 ## 15. Open questions
 
 All rows decided or settled; sprint-4 rows by the DM at sprint-4 gate 1 ([#245](../decisions-log.md)) and the seams ruling (S8, rulings B5 / B9).
@@ -292,6 +311,12 @@ All rows decided or settled; sprint-4 rows by the DM at sprint-4 gate 1 ([#245](
 | OQ-DICE-27 | Sprint 4 [17]: how do log lines show the dice? | **Decided** (DM, sprint-4 gate 1, #245, bulk D): inline die-shape chips in place of the dice numbers; ≥ 6 lines still fit. Rejected: a chip row under each line; chips only in the Tooltip | no (decided) | FR-DICE-35, play-shell (FR-SHELL-35) |
 | ~~OQ-DICE-28~~ | ~~Sprint 4 seam with R ([15] Divine Fury in the combat log): who builds the trigger part's dice in the line?~~ | **Settled by seams S8:** A: R, in R S4-5 `fix/fury-log-line` after D5 (and after R S4-1b), through D5's per-die `die` segments (`label` = part name; offered dice `offered: true`, `kept: false` only for dropped dice: ruling B5); MOD / offered chips are R's (B9); `die` segments DM-only exactly when their text is. Rejected: B D edits combat's `log-kinds.ts` | — | [effect-modifiers](effect-modifiers.md), [combat-tracker](combat-tracker.md) |
 | ~~OQ-DICE-24~~ | ~~G12 verdicts (dice part)~~ | **Decided (#172):** verdicts accepted: "— natural 1" per FR-DICE-20 except initiative (FR-DICE-29); no group roll (each combatant rolls, FR-CBT-11); fixture clock by design (FR-FIX-08) | — | fixtures-adapters |
+
+**Sprint 5, track W** (owner spec-windows).
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-DICE-29 | **play-shell:** how the 2.5× Game log ([7]) shrinks on small screens is [OQ-SHELL-31](play-shell.md#15-open-questions) (DM gate); FR-DICE-38 follows the DM's pick | **A. 2.5× from 1440 wide and 900 high; 1.5× wide / 160 high below** / B. 2.5× at every size / C. 2.5× on the DM only (tradeoffs in OQ-SHELL-31) | yes (with OQ-SHELL-31) | play-shell |
 
 ## 16. Out of scope
 

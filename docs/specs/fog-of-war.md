@@ -1,7 +1,7 @@
 ---
 title: Fog of war
 prefix: FOG
-status: claimed
+status: in-review
 owner: spec-windows
 phase: post-mvp-5
 ---
@@ -22,6 +22,13 @@ phase: post-mvp-5
 | 26, 55, 56, 57, 07, 17 | Brush, merge, redo, Ctrl+Z / Ctrl+Shift+Z | V9 | brush / redo integration, key bindings · 16, 17 |
 | 48, 36, 21 | Blinded (secret too), blind reason, grey darkvision ring | V10 | `FR-FOG-48 …`, `FR-FOG-48 secret Blinded` · 23, 25 |
 | 20, 22 + MAP 12, 29, 44 | DM plain map, middle-mouse pan, 4 Konva layers, Fit with the Game log | V7 | `FR-MAP-12 middle pan`, `FR-MAP-29 layers`, `FR-MAP-44 BL-01` · 14, 15, 26, 27 |
+
+> **Sprint 5, track W (owner spec-windows; session-sim-8 glitches 1, 9).** Decided, not open: the fog bar never sits under a default window (sim-8: its second row, Party vision switch and View as, and the Reveal button under the Scenes window); one "Invisible" item in the DM token menu. How a bar that doesn't fit in one row behaves is [OQ-MAP-47](scenes-map.md#15-open-questions) (◆, DM gate). Walkthrough W4, W7 in [play-shell §13](play-shell.md#13-test-plan).
+
+| FR | What | Slice | Named test / walk step |
+|---|---|---|---|
+| 58 ◆ | Fog bar placed by FR-MAP-60 in a gap no window covers; wraps there by control group | W3 `fix/tool-bar-spot` | `FR-FOG-58 fog bar wraps in its gap` · W4 |
+| 59 | The token menu's one Invisible item (fog's), with a Tooltip | W4 `fix/init-chips-effect` | `FR-FOG-59 Invisible tooltip`, CBTX `FR-CBTX-56 one Invisible item` · W7 |
 
 Built sprint-3 material below stays in place (collapsing it would mean moving ~300 lines of FR rows other specs link by anchor; not cheap, review A25).
 
@@ -159,6 +166,9 @@ Built sprint-3 material below stays in place (collapsing it would mean moving ~3
 | FR-FOG-23 | *(amended)* Scene delete: `deleting` lists the `fog` delete and every `fog-explored` / `vision` row of the scene; FK cascade removes rows and stack. Activation: a `visionStale` scene re-derives first, inside the activation transaction (FR-FOG-35); players get the new scene's `fog`, their `vision` and `fog-explored` in the resync snapshot. | |
 | FR-FOG-24 | *(amended)* **Registries** (scenes-map's, append-only): `visibility-hooks.ts` members become `derive(read, obj) → {fogged, seenBy}`, `hides(type, record, viewer)`, `dragAudience(read, token, at) → playerId[]` (replaces `dragToDm`), new `rederive(env, change) → RecordChange[]` (dependants of a token / subject write, run after the write); `scene-hooks.ts` gains the member `activated(env, scene)` (run in the activation transaction; fog re-derives a `visionStale` scene, FR-FOG-35). Fog also appends a line to entities' definition-changed hooks (senses, FR-FOG-35). **V0 creates** `src/server/features/campaign-management/player-hooks.ts` (append-only, `added(env, player) → RecordChange[]`, called in the REST player-add transaction, [CAMP §9](campaign-management.md#9-api--events)); fog's line re-derives that player's membership (OQ-FOG-39). Both registries go on the AGENTS §9.9 list (integrator, at the gate). | Call sites in `fix/vision-core`; review A11 |
 | FR-FOG-25 | Ripple unchanged: units / helpers that create scenes reveal them. ~~Nothing new to ripple (senses default to 0).~~ *(Sprint 4, review A4: senses now default to Normal 999 ft, so bundles that relied on "no senses = no sight" take the `vision-legacy` patch; concrete list in §13.)* | |
+| **Sprint 5, track W** (sim-8 #1, #9) | | |
+| FR-FOG-58 ◆ | **Fog bar in a clear gap** (decided; amends FR-FOG-17's "floating fog bar"; layout rule OQ-MAP-47, written for bold pick A): the fog bar is the Fog tool's panel, placed by [FR-MAP-60](scenes-map.md#6-functional-requirements) (top strip gap, else bottom strip, else above windows). Its max width = the gap's width (the fixed `min(62rem, 100vw − 7rem)` cap goes); it wraps into rows **by control group**: Mode, Shape (+ Brush radius), Reveal all / Fog all…, Undo / Redo, Remember explored areas, Party vision switch, View as. A group never splits, so the Party vision switch and View as stay together. Every row of the wrapped bar lies inside the gap (no window, no toast corner over it). The "No vision set" hint (`fog-no-vision`) hangs under the bar's last row, inside the same gap, or is dropped from view while it doesn't fit (it is also a Tooltip on the Fog tool). At 1440×900 with Scenes + Initiative: 2 rows in the 680-px gap; at 1280×720: up to 3 rows in the 520-px gap. | sim-8 #1 |
+| FR-FOG-59 | **The one Invisible item** (decided; sim-8 #9; amends FR-FOG-47): the DM token menu's only "Invisible" is fog's checkbox (`fog.setInvisible`); Conditions ▸ no longer lists the Invisible condition ([FR-CBTX-56](combat-extras.md#6-functional-requirements)). Its Tooltip says what it does: "Players don't see it unless they see invisible" (DM only). Behaviour, intent and visibility unchanged (#210: not coupled to the condition). | sim-8 #9 |
 
 **Party vision filter** (FR-FOG-49–52; ADR [ADR-0047](../architecture/adr/0047-party-vision.md))
 
@@ -203,7 +213,8 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, th
 - **Player view:** FR-FOG-21. No fog controls. Party tokens over fog (unless blind). An invisible token the player sees (FR-FOG-46) looks like any other token.
 - *(Sprint 4)* **DM view:** the plain battlemap until the Fog tool is picked (badges stay); fog bar gains Brush (lucide `brush`) with the radius Slider ("10 ft"), Redo (lucide `redo-2`), the **Party vision** Switch, and "Party vision" in View as. Brush cursor = a ring (free) or highlighted cells (snapped); "Free" chip while Ctrl is held. **Player view:** the fog peels back around a dragged own token as it moves (and around any party member's while party vision is on); monsters there appear on the drop. With party vision on: the whole party's sight, nothing else changes. Blinded: the dark screen with "Blinded — you can't see".
 - *(Sprint 4)* **Darkvision ring:** greyscale map, dimmed; no colour survives (the red map art turns grey).
-- **Test IDs:** `map-tool-fog` (rail), `fog-bar`, `fog-mode-<reveal|fog|explored|darkness>`, `fog-shape-<rect|polygon|circle>`, `fog-reveal-all`, `fog-fog-all`, `fog-fog-all-confirm`, `fog-undo` (`data-depth`), `fog-explored-toggle` (`data-state`), `fog-forget-explored`, `fog-forget-explored-confirm`, `fog-clear-darkness`, `fog-clear-darkness-confirm`, `fog-view-as` (`data-value` = playerId \| `dm`, `data-loading` while the FR-FOG-43 load is in flight), `fog-darkness-menu-remove`, `fog-token-menu-invisible` (`data-state`, DM token menu, FR-FOG-47), `fog-blind` (*s4:* `data-reason`), `fog-no-vision` (DM; text lists the names). *(Sprint 4)* `fog-shape-brush`, `fog-brush-radius` (`data-value` = ft), `fog-redo` (`data-depth`), `fog-party-vision` (`data-state`), `fog-view-as` `data-value` = `party`, `scn-layer-toggle-fog` (Layers popover). Konva (s4): `fog-layer` attr `visible` = `true` \| `false` (DM: false outside the Fog tool); `fog-vision` attrs `src` (flat token ids), `shared` (ids of other players whose records it drew), `preview` (token id of a drawn preview, else empty); `fog-brush-draft` (attrs `mode` = `snapped` \| `free`, `cells` or `points`, `r`); `fog-darkvision-grey` (attr `on`). Konva: layer `fog-layer`; shape `fog-mask` (attrs `shapes`, `darkness`, `fogged-cells`); `fog-darkness` (id = darkness id, attr `selected`); `fog-vision` (attrs `sources`, `blind`, `see`, `dark` = the record's flat polygons, so a walkthrough can assert where sight is cut); `fog-explored` (attr `cells`); `fog-draft`, `fog-draft-vertex` (id = index, attr `free`); badges `fog-token-fogged`, `fog-token-invisible` (id = token id).
+- *(Sprint 5, W)* **DM view:** the fog bar sits in the open strip at the top between the Scenes window and Initiative (else above the launcher), wrapping by control group; never under a window. The token menu's Invisible carries a Tooltip. **Player view:** unchanged (no fog controls).
+- **Test IDs:** *(sprint 5)* `fog-bar` attr `data-rows` (wrapped row count); groups `fog-bar-group` + `data-group` = `mode` \| `shape` \| `all` \| `history` \| `explored` \| `party` \| `view-as`. `map-tool-fog` (rail), `fog-bar`, `fog-mode-<reveal|fog|explored|darkness>`, `fog-shape-<rect|polygon|circle>`, `fog-reveal-all`, `fog-fog-all`, `fog-fog-all-confirm`, `fog-undo` (`data-depth`), `fog-explored-toggle` (`data-state`), `fog-forget-explored`, `fog-forget-explored-confirm`, `fog-clear-darkness`, `fog-clear-darkness-confirm`, `fog-view-as` (`data-value` = playerId \| `dm`, `data-loading` while the FR-FOG-43 load is in flight), `fog-darkness-menu-remove`, `fog-token-menu-invisible` (`data-state`, DM token menu, FR-FOG-47), `fog-blind` (*s4:* `data-reason`), `fog-no-vision` (DM; text lists the names). *(Sprint 4)* `fog-shape-brush`, `fog-brush-radius` (`data-value` = ft), `fog-redo` (`data-depth`), `fog-party-vision` (`data-state`), `fog-view-as` `data-value` = `party`, `scn-layer-toggle-fog` (Layers popover). Konva (s4): `fog-layer` attr `visible` = `true` \| `false` (DM: false outside the Fog tool); `fog-vision` attrs `src` (flat token ids), `shared` (ids of other players whose records it drew), `preview` (token id of a drawn preview, else empty); `fog-brush-draft` (attrs `mode` = `snapped` \| `free`, `cells` or `points`, `r`); `fog-darkvision-grey` (attr `on`). Konva: layer `fog-layer`; shape `fog-mask` (attrs `shapes`, `darkness`, `fogged-cells`); `fog-darkness` (id = darkness id, attr `selected`); `fog-vision` (attrs `sources`, `blind`, `see`, `dark` = the record's flat polygons, so a walkthrough can assert where sight is cut); `fog-explored` (attr `cells`); `fog-draft`, `fog-draft-vertex` (id = index, attr `free`); badges `fog-token-fogged`, `fog-token-invisible` (id = token id).
 
 ## 8. Data model
 
@@ -228,6 +239,7 @@ JSON leaf fields per [ADR-0006](../architecture/adr/0006-persistence.md): `shape
 - **Relations:** Scene 1—0..1 Fog; Scene 1—* Fog edit; Scene × Player 1—0..1 Explored memory; fog subjects → Scene; vision source = Token → Entity (senses), Player (owner).
 - **Derived:** static state, darkness, sight polygons, blind, `seenBy` (subjects and darkness shapes; for invisible tokens per FR-FOG-46), `fogged`, `vision` (incl. `inv`), undo depth. Client only: draft, selection, View as + its loaded `(sceneId, playerId)` pair. *(Sprint 4)* Derived: party sight and party-blind (FR-FOG-50), the 12-source party set (FR-FOG-52), redo depth, sight previews (never stored). Client only: brush draft + radius (per browser), the newest preview per dragged token, the `(sceneId, "party")` View-as set, the greyscale map copy.
 - **Persisted runtime state:** fog rows, undo stacks, explored memory, `seenBy` / `fogged` / `doorSeen` copies, committed together. The vision cache is memory only.
+- *(Sprint 5, track W)* No data-model change: client-only geometry and view state ([play-shell §8](play-shell.md#8-data-model)); no table, column, record type or stored field.
 
 ## 9. API & events
 
@@ -286,6 +298,8 @@ JSON leaf fields per [ADR-0006](../architecture/adr/0006-persistence.md): `shape
 | CBTX effect events touching `blinded` on a character *(s4)* | unchanged | + re-derive rows (FR-FOG-48) |
 | Token events, `StructureEdited`, `EntityUpdated` (senses), player added (CAMP, `player-hooks.ts`), `SceneActivated` (stale scene) | unchanged | + flipped subjects, `vision`, `fog-explored` (re-derive) |
 
+- *(Sprint 5, track W)* No REST route, intent, record type, event or signal; nothing new on the wire, so no visibility rule to add (CON-44: 0 B).
+
 ## 10. Permissions
 
 | Action | DM | Player | Server check |
@@ -328,6 +342,7 @@ JSON leaf fields per [ADR-0006](../architecture/adr/0006-persistence.md): `shape
   - events with no changes for P still reach P with their `cause` name (e.g. `TokenMoved`, `DarknessMoved` for an unseen move): a timing side channel.
   - *(sprint 4)* map geometry (wall pieces as polygon edges) seen from cells a source was **dragged over but not dropped on** (legal cells only, FR-FOG-53; a DM drag previews only cells the owner could reach, review A2; never a prep scene, review A1): a free peek without spending movement; records never;
   - *(sprint 4, party vision on)* the other players' sight polygons and `blind` flags, their source token ids (`src`; party tokens are visible anyway), and their drag previews (`fog.sight`). Never: their `inv`, memory rows or senses.
+- *(Sprint 5, W)* The fog bar's spot and the Invisible Tooltip are client-only: reconnect and a server crash change nothing; while disconnected the bar stays in its spot, disabled as today; it re-spots when a window opens, closes or moves.
 
 ## 12. Performance & bandwidth
 
@@ -517,6 +532,8 @@ Isolated per worktree: `bun test` on `:memory:`, temp asset dir, port 0; walkthr
 | 29 | `state:digest`; then B starts dragging Mira (preview showing) and the server is hard-killed; restart | All rejoin | B: banner, preview gone; digest after restart = before the drag; Party vision still on; every view = the committed state; no console errors |
 | 30 | Party vision off. Mira's sheet → Edit → Vision **Normal**, Save; later back to 30 ft | B watches | Senses line "Vision normal"; B's `see` polygon now ends only at walls, closed doors and the map's edges (vertices on x = 0 / y = 0 / y = 14, none farther than the map); no `fog-no-vision` hint; back at 30 ft: the sprint-3 polygon again |
 
+**Sprint 5, track W:** fixtures / bundle `windows-s5` ([play-shell §13](play-shell.md#13-test-plan); Goblin Ambush shown, Scenes opened in the walk). Unit / DOM: `FR-FOG-58 fog bar wraps in its gap` (the bar laid out at gap widths 1,000 / 680 / 520 / 300 px: rows = 1 / 2 / ≤ 3 / ≤ 6, no `fog-bar-group` split across rows, Party vision switch and View as in one row, every group's rect inside the gap; the `fog-no-vision` hint inside the gap or hidden); `FR-FOG-59 Invisible tooltip` (the DM token menu's "Invisible" item has the Tooltip; toggling still sends one `fog.setInvisible`). Walkthrough W4 (fog bar at 1440×900 and 1280×720 with Scenes + Initiative) and W7 (one Invisible) in play-shell §13.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -616,6 +633,8 @@ Isolated per worktree: `bun test` on `:memory:`, temp asset dir, port 0; walkthr
 | V9 | `build/fog-brush` (M; after V7 and M0) | Brush (FR-FOG-55, `area.ts` `distance` + campaign diagonal rule; containment via `area.ts`, A13), merge (FR-FOG-57), redo + keys (FR-FOG-56, FR-FOG-17) | fog folders, `canvas-tools.ts` line, `FogBar.tsx` | brush results | 16, 17 |
 | V10 | `build/party-vision` (M; after V9 and R0; renamed: it also carries the server Blinded line) | **Server:** Blinded (`effectsChanged` line, FR-FOG-48) incl. secret Blinded (OQ-FOG-61) with leak tests. **Client:** Party vision Switch, union render, View as Party, grey darkvision ring + `canvasPixel` helper, blind reason chip, e2e, the rest of the sprint-4 walkthrough | R0's hook point (S6), fog client + server folders, `FogBar.tsx`, `e2e/support` | party vision, Blinded, grey ring | 21–25, 28, full run 14–30 at the end |
 
+**Sprint 5, track W** (split and order: [play-shell §14](play-shell.md#14-dependencies)): FR-FOG-58 in **W3** `fix/tool-bar-spot` (`FogBar.tsx`: width from the spot, `fog-bar-group` wrappers, hint placement; after W1, parallel with W2); FR-FOG-59 in **W4** `fix/init-chips-effect` (fog's DM `token-menu-entries.tsx`: Tooltip only). No server, schema, intent, event, record or wire change (0 B); no shared file.
+
 ## 15. Open questions
 
 Sprint-2 rows OQ-FOG-01–19 were decided at gate 2 (#196) and stay in force except: **05 / 06** (cell mask, corner snap) superseded by #201 (freeform shapes, Ctrl); **14** (every footprint cell) restated as FR-FOG-34's samples (same cells); **03** (owned tokens visible to all) refined by FR-FOG-36 (blind); **04** (CON-44) continued by OQ-FOG-30 (ceiling raised by #208); **16 / 17** carry on below. Sprint-3 rows OQ-FOG-20–44 were decided at sprint-3 gate 1 (**#207**, "go" with every pick; 2026-10-16) unless a row says otherwise; OQ-FOG-45 was added by **#210**. Rejected options stay struck for the record.
@@ -671,6 +690,12 @@ OQ-FOG-34 is retired (merged into SCN's OQ-SCN-22 while drafting).
 | OQ-FOG-59 | **scene-tools / track M:** one drag pipeline, one coverage helper, middle mouse vs tools | **Settled by seams S1–S4:** V8 builds the pipeline (drag state in `drag-preview.ts`, `drag-probe.ts` moved from SCN's `wall-hint.ts`, one `checkMove` per cell carrying SCN + FOG hints); M2's path is client-derived (0 bytes); one helper `src/shared/scenes-map/area.ts` (modes `half` / `centre` / `distance`) built first by M0; `MapCanvas` takes button 1 before tool dispatch (V7); canvas order V7 → V8 → M2 → M5 (§14). Rejected: ~~each feature its own probe~~, ~~M owns the pipeline~~ | no · settled | scene-tools, scenes-map |
 | OQ-FOG-60 | Glossary | Integrator: **Party vision** ("a campaign switch: every player sees what any player sees"), **Sight preview**, **Fog brush**, **Normal vision** (999 ft); **Blind (dark screen)** gains "or Blinded". *(Review A17)* Amend **Vision source** ("≤ 4 per player; ≤ 12 for the party while party vision is on") and **Sight** ("cut by walls, closed doors, darkness and the map's edges"); add **Konva layer group** ("one of the canvas's four drawing surfaces, `base` / `fog` / `objects` / `top`; registry layers render as groups inside them"), distinct from **Canvas layer** (registry slot) | no · owner: integrator (at the spec merge) · **Glossary: applied (#246)** | glossary |
 | OQ-FOG-61 | **Secret Blinded** (review A5; combat-extras' goal: no secret effect reaches a player) | **Decided (DM, sprint-4 gate 1, #245, G15): it counts, with a generic chip "You can't see" (`data-reason=unknown`, no condition name), and no other player learns it: with party vision on that player's shared copy is a non-source (`blind: false`, no polygons)** (FR-FOG-48). Rejected: ~~a secret Blinded has no effect until revealed~~ | — | combat-extras |
+
+**Sprint 5, track W** (owner spec-windows).
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-FOG-62 | **scenes-map:** the fog bar is the widest tool bar (≈ 900 px in one row); how a bar that doesn't fit one row behaves is [OQ-MAP-47](scenes-map.md#15-open-questions) (DM gate); FR-FOG-58 follows the pick | **A. Wrap by control group inside the gap** / B. One row + "⋯" menu (Brush radius, Remember explored, Party vision, View as need menu forms) / C. One row, horizontal scroll (tradeoffs in OQ-MAP-47) | yes (with OQ-MAP-47) | scenes-map |
 
 ## 16. Out of scope
 
