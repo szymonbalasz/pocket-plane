@@ -9,12 +9,12 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Sprint 4 | merged | — | Done (#243–#251) | — |
-| W windows + layout | spec/s5-windows (w6G) | spec-windows | spec drafted | reviewed | DM gate |
+| W windows + layout | spec/s5-windows (w6G) | spec-windows | reviewed | DM gate |
 | D dice polish | spec/s5-dice (w6H) | spec-dice | reviewed | DM gate |
-| R late damage + log + ally side (#252) | spec/s5-combat (w6J) | spec-combat | drafted; adding ally side | reviewed | DM gate |
+| R late damage + log + ally side (#252) | spec/s5-combat (w6J) | spec-combat | reviewed | DM gate |
 | P party + uploads | spec/s5-party (w6K) | spec-party | reviewed | DM gate |
-| C compendium images | spec/s5-cmpimg (w6M) | spec-cmpimg | spec drafted | reviewed | DM gate |
-| K player colours + template delete [1] | spec/s5-colours (w6N) | spec-colours | spec drafted | reviewed | DM gate |
+| C compendium images | spec/s5-cmpimg (w6M) | spec-cmpimg | reviewed | DM gate |
+| K player colours + template delete [1] | spec/s5-colours (w6N) | spec-colours | reviewed | DM gate |
 
 New ID ranges per track (parallel edits of shared specs): in the briefs `%TEMP%/pocket-plane/briefs/spec-s5-*.md`.
 
