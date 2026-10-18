@@ -6,32 +6,40 @@ Start your agent CLI (any Herdr agent kind; Claude Code today) in `C:\Repos\pock
 
 ---
 
-You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, brief templates and phase plan are in [orchestrator-prompt.md](orchestrator-prompt.md). Read it first, then this file, then [status.md](status.md), the current sprint plan [sprint-3.md](sprint-3.md) and the [backlog](backlog.md). Follow [AGENTS.md](../../AGENTS.md) §1: short replies; 1–2 questions at a time, each with options and your pick.
+You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, brief templates and phase plan are in [orchestrator-prompt.md](orchestrator-prompt.md). Read it first, then this file, then [status.md](status.md), the current sprint plan [sprint-5.md](sprint-5.md) and the [backlog](backlog.md). Follow [AGENTS.md](../../AGENTS.md) §1: short replies; 1–2 questions at a time, each with options and your pick.
 
 **Working mode (DM, #141):** run long autonomous stretches. Merge, fix and sequence on your own; settle technical questions yourself and log them. Come back to the DM only when blocked: product decisions, phase gates, ADR acceptance, new dependencies, anything destructive. **Sprint milestones first** (#204, #205, [orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill)): pick a small backlog item without asking only during downtime (one agent working, nothing in the sprint queue can start); stop picking near the sprint's end.
 
-## 1. Where we are (2026-10-16)
+## 1. Where we are (2026-10-18)
 
 | Area | State |
 |---|---|
-| MVP, sprint 1 | Done (#176, #177–#186). |
-| Sprint 2 | **Builds done (#187–#199).** Phase 1: DM playtest notes N1–N11, session-sim-4 glitches G1–G10, effect modifiers tier 1 (MOD), P3 polish. Phase 2: fog of war (FOG), scene tools (SCN: walls / doors, props, AoE templates, layers, diagonal rule), DM active-scene window (ADR-0041).  Session-sim-6 17/18, its FAIL fixed by `fix/sim6-popup` (#200); final `main` 1884 tests, e2e 61/61; leak scan clean. Playtest scripts: [sprint-2 §Playtest: phase 1 fixes](sprint-2.md#playtest-phase-1-fixes), [§Playtest: sprint 2 features](sprint-2.md#playtest-sprint-2-features). |
-| Verification | Evidence `%TEMP%\pocket-planeerify-*` (latest `verify-session-sim-6`; also `.verify/20261015-232530-session-sim-6/` in the main checkout, 12 ranked glitches). |
-| Specs / ADRs | All specs `complete`. ADRs 0001–0041 accepted (0037 split attack / damage, 0038 effect modifiers, 0039 fog visibility, 0040 token move guards, 0041 active-scene window). |
-| Decisions | Up to #204 in [decisions-log](../decisions-log.md). Proposed ADRs waiting for sprint-3 gate 1: [dynamic vision](../architecture/adr/0042-dynamic-vision.md), [rule triggers](../architecture/adr/0043-rule-triggers.md). |
-| CON-44 | Heavy DM snapshot 676,059 B of 786,432 B (active-scene window freed ~110 KB). Re-measure for every new record type. |
+| MVP, sprints 1–3 | Done (#176–#242). Playtest scripts in [sprint-2](sprint-2.md), [sprint-3](sprint-3.md#playtest-sprint-3-features). |
+| Sprint 4 | **Done (#243–#249).** Vision + fog (middle-mouse pan, plain DM map, 999 ft default, sight while dragging, party vision + View as Party, Blinded, fog brush + Ctrl+Z), dice (die-shape chips, full-screen dice, roll popup, log dice; #247 OS reduced motion ignored), map tools (freeform AoE, drag path + trail, Show to players in Scenes, window placement, labels + best-rectangle Fit), rules (Flame Tongue +1 damage parts, "— DM: hit.", trigger state + badges, negative uses, Divine Fury log line, physical dice in combat), compendium (word search, groups, token art). Gate session-sim-8 16 / 17 (FAIL: launcher windows stack). Playtest script: [sprint-4 §Playtest: sprint 4 features](sprint-4.md#playtest-sprint-4-features). |
+| Verification | Evidence in the main checkout's `.verify/` (latest `20261018-030613-session-sim-8/`, ranked glitches); sprint-4 seams / rulings / reviews / gate in `.verify/sprint4/`. |
+| Specs / ADRs | All specs `complete`. ADRs 0001–0050 accepted (0047 party vision, 0048 dice display, 0049 trigger state, 0050 token creature type). |
+| Decisions | Up to #251 in [decisions-log](../decisions-log.md). |
+| CON-44 | Ceilings DM 1 MiB, players 512 KiB (#208). Worst measured DM 863 KB (sprint-4 rules data, 3-byte names), players ≤ 346 KB. Images must stay out of the snapshot. |
 | Agents | Herdr kind `claude` (`-- --permission-mode auto`, `--strict-mcp-config` except test agents). |
-| Helpers | [`docs/agents/tools/`](tools/), orchestrator only, run from the main checkout by absolute path (`bash /c/Repos/pocket-plane/docs/agents/tools/<x>.sh`): `mkwt.sh <branch> <label> [build]` (prints `ws= root= dir=`), `startagent.sh <pane> <name> <brief> [test]`, `starttest.sh <ws> <name> <brief-template>` (new tab + server pane, fills `{{SRVPANE}}`, starts a test agent), `poll.sh <agent…>`. Change them on `main` only. Brief generators used in sprint 2 lived in the session scratchpad (mktest.py: §5 template filler; mkbuild.py: spec-slice builder brief); recreate if needed. |
-| Scratch | `%TEMP%\pocket-plane\`: `briefs/` (test brief templates `tpl-*.md`), agent reports `<name>.md`, archived evidence `verify-*/`, gate files `gate-sprint2-phase{1,2}.md`. Storage Sense may clear it. |
-| Worktrees | `main` only (slot 1; test agents on `main` use 4113). |
+| Helpers | [`docs/agents/tools/`](tools/), orchestrator only, run from the main checkout by absolute path: `mkwt.sh <branch> <label> [build]`, `startagent.sh <pane> <name> <brief> [test]`, `starttest.sh <ws> <name> <brief-template>`, `poll.sh <agent…>`; **sprint 4 additions:** `gates.sh <dir> <tag>` (check + full e2e, logs `%TEMP%/pocket-plane/{check,e2e}-<tag>.log`, writes a `gates-<tag>.done` marker), `waitgates.sh <tag>` (wait for that marker), `waitrep.sh <agent…>` (wait until an agent is blocked or idle with a finished reply and no background shell), `resolve_docs.py <files>` (resolve protocol / data-model section-number conflicts: main's sections first, the branch's renumbered after; then fix the branch's cross-links by hand), `mkbuild.py <key>…` (builder briefs from `%TEMP%/pocket-plane/slices.json`). Change them on `main` only, and **never edit a script while a background job runs it** (bash reads it as it goes). |
+| Scratch | `%TEMP%\pocket-plane\`: `briefs/` (builder briefs, test templates `tpl-*.md`), `slices.json`, logs. Storage Sense may clear it. |
+| Worktrees | `main` only (slot 1; verify port 4112; test agents on `main` use 4113). |
 
 ## 2. Next, in order
 
-**Sprint 3, DM decisions #201–#204: [sprint-3](sprint-3.md).** Tracks V (fog v2 + dynamic vision + walls), D (3D dice, tray, clickable notation, customisation), R (effect modifiers tiers 1–3 + rule triggers, Zealot Divine Fury), P (party board + handouts), C (compendium). Phase A specs → seams → two reviews → **one DM gate** → Phase B builds per the hotspot table → session-sim-7 → "Playtest: sprint 3 features" → pause and recap.
+**Sprint 5, DM decisions #250–#251: [sprint-5](sprint-5.md).** Tracks W (windows + layout: the session-sim-8 FAIL and glitches, Game log 2.5× wider), D (dice polish: popup dice in a line, 3D dice in the tray, total after landing), R (late damage roll joins the open apply popup, log wording), P (Loot tab, forced handout images, direct upload + clipboard paste, compendium → party inventory), C (compendium images), K (player colours, BL-17). 5etools import: not yet. UI / art sprint later (BL-29). Phase A specs → seams → two reviews → **one DM gate** → Phase B builds per the hotspot table → session-sim-9 → "Playtest: sprint 5 features" → pause and recap.
 
 **Idle slots (#204, #205, [orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill)):** the goal is the sprint's milestones. Only when one agent is working and nothing in the sprint queue can start, pick one small eligible item from [backlog](backlog.md) without asking (max two at once; sprint work always wins the next slot); stop picking once the last sprint slices are in flight. If nothing fits, ask the DM.
 
-The DM's sprint-2 playtest feedback became #201–#203; their playtest scripts are in [sprint-2](sprint-2.md#playtest-sprint-2-features).
+Lessons from sprint 4 (2026-10-17/18), on top of the ones below:
+- **Track every unblocked slice.** Two slices (fog brush, party vision) sat ready for hours because nothing listed them as startable; after each merge, scan the plan for what just became unblocked.
+- Two slices that share one file can still run in parallel with a merge order (the second rebases); stack a slice on an unmerged branch with `--base` when it needs that branch's code.
+- Protocol / data-model section numbers collide on almost every merge: `resolve_docs.py` + fix the moved section's cross-links (`§NN](…#NN-…)`), also in-file `#NN-` anchors.
+- Fixture bundles share one server per e2e run: a new spec that changes state (Rage on, a trigger used) breaks the next spec in the same bundle. Give state-changing specs their own bundle name.
+- Seeded-looking failures can be real randomness: a test that assumes one die breaks on a natural-20 crit. Ask builders to cover crits / edge rolls in e2e.
+- A walkthrough re-test can fail the same way after a fix because the fix's condition doesn't hold in the real layout: have the fixer reproduce the exact browser inputs in a unit test.
+- Load-sensitive timing tests (`vision-s4.bench`, `weapon-combat` e2e) flake when several suites run at once: run gates one at a time where possible (`waitgates.sh`), re-run a failure alone before calling it real.
+- The DM tests on their own machine during the sprint: answer setup questions first (bundle, profile, settings that disable features such as OS reduced motion).
 
 Lessons from sprint 2 (2026-10-15/16), on top of the ones below:
 - **Wait for the builder's commit before you check its worktree.** Running `check` / `e2e` while a builder's own e2e runs collides (Playwright trace ENOENT, ports) and merging main into a dirty tree mixes states. Poll `git status --short` clean + agent not working + "ready" in its output.

@@ -2,44 +2,14 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 4 done — paused for the recap with the DM.** Builds merged (#248); gate session-sim-8 16 / 17 (#249); Playtest section written. Waiting on the DM.
+**Phase:** Sprint 4 done (gate #249, recap #250–#251). **Sprint 5** planned in [sprint-5](sprint-5.md); Phase A (specs) starts with the DM's kickoff prompt.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Specs V, D, M, R, C | merged (#245) | — | Done | — |
-| Docs pass | merged bd07224 | — | Done | — |
-| V7 pan / plain map / Fit | merged 13c15f6 | — | Done (BL-01, BL-07; check 3158, e2e 94) | V8, M1 next |
-| V8 vision while dragging | merged ec3fd3a | — | Done (walkthrough 8/8; main check 3231, e2e 99 green) | — |
-| M1 freeform AoE | merged | — | Done (walkthrough 7/7; BL-05 done) | — |
-| M2 drag path | merged | — | Done (walkthrough 9/9; check 3356, e2e 107) | — |
-| M5 labels + best-rectangle Fit | merged b7a8303 | — | Done (11/11 + fit-priority fix; check 3367, e2e 108). **Track M complete** | — |
-| C-all All tab | merged | — | Done (walkthrough 16/16; check 3064, e2e 89) | C-art core after Mc |
-| Physical dice in combat (BL-19, BL-25) | merged | — | Done (walkthrough 5/5; check 3314, e2e 105) | — |
-| C-art token art (last slice) | merged eacb98a | — | Done (9/10 + credits fix). **Track C complete** | — |
-| Sprint gate: session-sim-8 | main eacb98a | — | 16 / 17 PASS (FAIL j: launcher windows stack); leak scan clean | Recap with the DM |
-| C-art core (token creature type) | merged | — | Done (check 3297, e2e 102) | C-art after M5 |
-| V9 fog brush + Ctrl+Z | merged | — | Done (walkthrough 13/13) | — |
-| V10 party vision + Blinded | merged | — | Done (check 3386, e2e 110). **Track V complete** | — |
-| Sprint-end spec amendments | merged c679d0a | — | Done (+ glossary Free area) | — |
-| session-sim-8 bundle | merged | — | Done (49 fixtures, ~1 s; skipped mt-crowd, art-update-tokens, vision-legacy, vision-invisible, rolls-1; V10 / M5 / C-art may add units) | Sprint gate after the last slices |
-| C-search | merged daff171 | — | Done (walkthrough 12/13; main check 2985, e2e 84 green) | C-all next |
-| V6 vision core | merged 9e01f25 | — | Done (walkthrough 10/10; check 2966, e2e 83) | — |
-| R0 rules core | merged 5e74d2f | — | Done (regression 9/9; check 3057, e2e 88) | — |
-| R S4-1a weapon rows | merged 9859252 | — | Done (walkthrough 6/6; main check 3174, e2e 95 green) | S4-2 next |
-| R S4-1b weapon combat + BL-10 | merged | — | Done (walkthrough 8/8; check 3138, e2e 92) | — |
-| R S4-5 Divine Fury log line | merged | — | Done (walkthrough 9/9; own e2e bundle `fury-log-line`) | — |
-| R S4-3 trigger state + tray | merged e3e203b | — | Done (walkthrough 8/8; check 3185, e2e 96) | — |
-| R S4-4 trigger badges | merged 5a84b98 | — | Done (badges PASS) | — |
-| R S4-2 negative uses | merged 9f10c6b | — | Done (walkthrough 7/7; main check 3309, e2e 103 green). **Track R complete** | — |
-| D5 die shapes + log dice | merged 4259979 | — | Done (walkthrough 6/7 + re-test 5/5; check 2918, e2e 83; main green) | — |
-| M3 Show to players | merged 0901b9b | — | Done (walkthrough 6/7 accepted; main check 3027, e2e 88) | — |
-| D6 full-screen dice | merged 18bfabd | — | Done (walkthrough 9/9; main green) | D7 after M4 |
-| M0 area helper | merged 7c5d3cf | — | Done (check 2888 green) | V9 brush imports it |
-| M4 window placement | merged c308458 | — | Done (re-test 3 5/5; check 3097, e2e 91) | — |
-| D7 roll popup | merged 91b610d | — | Done (13/14 + fixes; #247 in; main check 3280, e2e 102 green) | — |
-| Mc map-tools core | merged | — | Done (check 3109, e2e 91; drizzle duplicate-index fix) | M1 after V7 |
+| Sprint 4 | merged | — | Done: builds #248, gate session-sim-8 16 / 17 #249, playtest section, recap #250–#251 | — |
+| Sprint 5 | — | — | Planned ([sprint-5](sprint-5.md)) | Phase A: specs W, D, R, P, then C, K |
 
 ## Shared-file locks
 
@@ -49,7 +19,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 ## Pending DM decisions
 
-- Sprint 4 recap: the window-stacking FAIL fix (proposed), the ranked glitch list, cube drag direction, Fit with three windows open, the DM snapshot worst case (863 KB of 1 MiB).
+- None (sprint 5 starts with the kickoff prompt).
 
 ## Resolved locally (report at gate)
 
