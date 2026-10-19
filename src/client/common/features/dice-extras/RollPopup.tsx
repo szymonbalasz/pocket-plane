@@ -63,6 +63,7 @@ import {
   TAG_OVERHANG,
 } from "./popup-logic";
 import {
+  CELL_STILL_PAD,
   MORE_CELL,
   pipModeOf,
   type RollPopup,
@@ -113,19 +114,36 @@ function paint(canvas: HTMLCanvasElement | null, src: HTMLCanvasElement) {
   ctx.drawImage(src, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
 }
 
+/** The still's overhang around its cell (the die's margin in the copied box, px). */
+const STILL_OUT = (CELL_PX * (CELL_STILL_PAD - 1)) / 2;
+
 /** FR-DICEX-46 a: a handed-off die's still in its cell (the flight reads the cell's rect). */
 function StillCanvas({ still }: { still: HTMLCanvasElement | undefined }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     if (still) paint(canvas.current, still);
   }, [still]);
-  return <canvas ref={canvas} className="absolute inset-0 size-full" />;
+  return (
+    <canvas
+      ref={canvas}
+      className="pointer-events-none absolute"
+      style={{
+        left: -STILL_OUT,
+        top: -STILL_OUT,
+        width: CELL_PX * CELL_STILL_PAD,
+        height: CELL_PX * CELL_STILL_PAD,
+      }}
+    />
+  );
 }
 
 /** Simulation px per world unit of a miniature die (FR-DICEX-46 b). */
 const MINI_PER_UNIT = MINI_DIE_PX / DIE_WORLD;
-/** Every miniature tumbles in the same arena (two full lines), whatever its line count. */
-const MINI_ARENA = arenaOf({ w: LINE_W, h: linesH(CELL_LINES) }, MINI_DIE_PX);
+/**
+ * Every miniature tumbles in the same arena (a line wide, three lines deep: room to roll in from
+ * below), whatever its line count; then into its cells.
+ */
+const MINI_ARENA = arenaOf({ w: LINE_W, h: linesH(CELL_LINES + 1) }, MINI_DIE_PX);
 
 /**
  * FR-DICEX-46 b: the miniature, on the dice layer's one canvas over the line box (same seed),

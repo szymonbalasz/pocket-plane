@@ -29,7 +29,7 @@ import {
   popupLine,
   popupsThatFit,
 } from "./popup-logic";
-import { rollPopups } from "./popups";
+import { CELL_STILL_PAD, rollPopups } from "./popups";
 import { RollPopupStack } from "./RollPopup";
 import type { DisplaySetting } from "./settings";
 import { diceExtras } from "./store";
@@ -240,7 +240,7 @@ describe("FR-DICEX-46 popup line layout", () => {
     expect(html).toMatch(/class="absolute -bottom-1 left-0 w-full truncate[^"]*">Divine Fury</);
   });
 
-  test("FR-DICEX-46 popup line layout: hand-off targets = cell centres scaled to the cell; dice past cell 11 target '+N' and fade", () => {
+  test("FR-DICEX-46 popup line layout: hand-off targets = cell centres, the die at full size (44 px), turned upright; dice past cell 11 target '+N' and fade", () => {
     const cell = (i: number) => ({
       x: 900 + (i % 6) * 48,
       y: 500 + Math.floor(i / 6) * 48,
@@ -248,23 +248,27 @@ describe("FR-DICEX-46 popup line layout", () => {
       h: 44,
     });
     const boxes: Record<string, { x: number; y: number; w: number; h: number }> = {};
+    const turns: Record<string, number> = {};
     const cells = new Map<string, { x: number; y: number; w: number; h: number }>();
     for (let i = 0; i < 13; i++) {
       boxes[`e1:${i}`] = { x: 100 + i * 70, y: 300, w: 66, h: 66 };
+      turns[`e1:${i}`] = 0.5;
       if (i < 11) cells.set(`e1:${i}`, cell(i));
     }
     const more = cell(11);
-    const flights = handoffFlights(boxes, cells, more);
+    const flights = handoffFlights(boxes, cells, more, turns);
     expect(flights.size).toBe(13);
     for (const [key, f] of flights) {
       const box = boxes[key] as { x: number; y: number; w: number; h: number };
       const i = Number(key.split(":")[1]);
       const to = i < 11 ? cell(i) : more;
       expect(f.fade).toBe(i >= 11);
-      expect(f.k).toBeCloseTo(44 / 66);
+      expect(f.turn).toBe(i < 11 ? 0.5 : 0);
+      // The box holds the die and its margin: the die itself ends 44 px wide.
+      expect((box.w * f.k) / CELL_STILL_PAD).toBeCloseTo(44);
       // The box's centre after the flight = the target cell's centre.
-      expect(box.x + f.dx + (box.w * f.k) / 2).toBeCloseTo(to.x + to.w / 2);
-      expect(box.y + f.dy + (box.h * f.k) / 2).toBeCloseTo(to.y + to.h / 2);
+      expect(box.x + box.w / 2 + f.dx).toBeCloseTo(to.x + to.w / 2);
+      expect(box.y + box.h / 2 + f.dy).toBeCloseTo(to.y + to.h / 2);
     }
     // No "+N" on screen: dice without a cell don't fly.
     expect(handoffFlights(boxes, cells, null).size).toBe(11);

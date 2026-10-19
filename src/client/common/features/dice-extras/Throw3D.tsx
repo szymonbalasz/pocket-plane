@@ -1,8 +1,8 @@
 // A 3D throw run (FR-DICEX-14, -15, -20, -23, -34, -35, -41, -46), drawn by the lazy chunk's
 // renderer on the dice layer's one canvas at its arena rect (the viewport, or the zone's dice
-// area). At its hand-off the rested dice are copied off the canvas; each die flies to its popup
-// cell, scaling to it (0.4 s), and the cell keeps its pixels; dice past cell 11 fly into "+N" and
-// fade. With no popup on screen (or popups off) the still fades out. Dice data stays in the DOM for walkthroughs: one hidden `dicex-throw-die` per 3D die
+// area). At its hand-off the rested dice are copied off the canvas one by one; each die flies to
+// its popup cell, scaling to it and turning its value upright (0.4 s), and the cell keeps its
+// pixels; dice past cell 11 fly into "+N" and fade. With no popup on screen (or popups off) the still fades out. Dice data stays in the DOM for walkthroughs: one hidden `dicex-throw-die` per 3D die
 // with `data-settled` = the up-face read from the rendered mesh at rest. MOD / offered dice get a
 // label under the die at rest.
 import type { DiceLook } from "@shared/dice-extras/looks";
@@ -13,7 +13,7 @@ import { type Arena, arenaOf, dieSizePx, screenArena, shadowsFor } from "./arena
 import type { PlayHandle, Rect, RestInfo, Still } from "./dice3d/index";
 import { rectOf } from "./layer-host";
 import { dice3d } from "./lazy3d";
-import { handoffCells, MORE_CELL, rollPopups } from "./popups";
+import { CELL_STILL_PAD, handoffCells, MORE_CELL, rollPopups } from "./popups";
 import { diceExtras, type ThrowRun } from "./store";
 import { FADE_MS, HANDOFF_MS } from "./timing";
 
@@ -118,10 +118,11 @@ export function useRun3D(
     const target = run.phase === "handoff" ? handoffCells(run.t.id) : null;
     if (target && s.dice) {
       const flown = flyToCells(s, s.dice, target.cells, layer, ms);
-      stills.current = [...flown.values()];
+      stills.current = [...flown.values()].map((f) => f.canvas);
       setTimeout(() => {
+        // The cells keep upright copies (the flown canvases go with the run).
         const kept: Record<string, HTMLCanvasElement> = {};
-        for (const [key, c] of flown) if (target.cells.has(key)) kept[key] = c;
+        for (const [key, f] of flown) if (!f.fade) kept[key] = turned(f.canvas, f.turn);
         rollPopups.still(target.id, kept);
       }, ms);
       return;
@@ -141,86 +142,92 @@ export function useRun3D(
   return rest;
 }
 
-/** One die's flight: to its cell (or "+N", fading), scaled to it, centred. */
+/** One die's flight: centre to its cell's (or "+N"'s, fading), scaled, turned upright. */
 export interface Flight {
   to: Rect;
   fade: boolean;
+  /** Centre to centre (px). */
   dx: number;
   dy: number;
   k: number;
+  /** Screen turn (radians, clockwise) standing the value upright. */
+  turn: number;
 }
 
 /**
- * FR-DICEX-46 a: each rested die's flight from its `boxes` rect to its cell (`cells` by die key,
- * viewport rects); a die without a cell flies into `more` ("+N") and fades. Pure.
+ * FR-DICEX-46 a: each rested die's flight from its `boxes` rect (the die and a margin,
+ * `CELL_STILL_PAD`) to its cell (`cells` by die key, viewport rects): the die spans the cell
+ * (44 px, a full-size die), turned upright (`turns`); a die without a cell flies into `more`
+ * ("+N") and fades. Pure.
  */
 export function handoffFlights(
   boxes: Record<string, Rect>,
   cells: ReadonlyMap<string, Rect>,
   more: Rect | null,
+  turns: Record<string, number> = {},
 ): Map<string, Flight> {
   const out = new Map<string, Flight>();
   for (const [key, box] of Object.entries(boxes)) {
     const cell = cells.get(key);
     const to = cell ?? more;
     if (!to || to.w <= 0 || to.h <= 0 || box.w <= 0 || box.h <= 0) continue;
-    const k = Math.min(to.w / box.w, to.h / box.h);
+    const k = Math.min(to.w / box.w, to.h / box.h) * CELL_STILL_PAD;
     out.set(key, {
       to,
       fade: !cell,
       k,
-      dx: to.x + (to.w - box.w * k) / 2 - box.x,
-      dy: to.y + (to.h - box.h * k) / 2 - box.y,
+      dx: to.x + to.w / 2 - (box.x + box.w / 2),
+      dy: to.y + to.h / 2 - (box.y + box.h / 2),
+      turn: cell ? (turns[key] ?? 0) : 0,
     });
   }
   return out;
 }
 
+/** A copy of `src` turned by `turn` radians about its centre (an upright still). */
+function turned(src: HTMLCanvasElement, turn: number): HTMLCanvasElement {
+  if (turn === 0) return src;
+  const c = src.ownerDocument.createElement("canvas");
+  c.width = src.width;
+  c.height = src.height;
+  const ctx = c.getContext("2d");
+  if (!ctx) return src;
+  ctx.translate(c.width / 2, c.height / 2);
+  ctx.rotate(turn);
+  ctx.drawImage(src, -c.width / 2, -c.height / 2);
+  return c;
+}
+
 /**
- * FR-DICEX-46 a: cut each die out of the hand-off still, put it on the layer where it rested and
- * fly it to its cell (`cells` by die key), scaled to the cell; a die without a cell flies into
- * "+N" and fades. Returns the flying canvases by die key.
+ * FR-DICEX-46 a: put each die's own still (`dice`, drawn alone) on the layer where it rested and
+ * fly it to its cell (`cells` by die key), scaled to the cell and turned upright; a die without a
+ * cell flies into "+N" and fades. Returns the flights with their canvases by die key.
  */
 function flyToCells(
   s: Still,
-  boxes: Record<string, Rect>,
+  dice: Record<string, Still>,
   cells: ReadonlyMap<string, HTMLElement>,
   layer: HTMLElement,
   ms: number,
-): Map<string, HTMLCanvasElement> {
-  const out = new Map<string, HTMLCanvasElement>();
-  const ratio = s.canvas.width / Math.max(1, s.rect.w);
+): Map<string, Flight & { canvas: HTMLCanvasElement }> {
+  const out = new Map<string, Flight & { canvas: HTMLCanvasElement }>();
   const rects = new Map<string, Rect>();
   for (const [key, el] of cells) {
     const r = key === MORE_CELL ? null : rectOf(el);
     if (r) rects.set(key, r);
   }
-  const flights = handoffFlights(boxes, rects, rectOf(cells.get(MORE_CELL) ?? null));
+  const boxes = Object.fromEntries(Object.entries(dice).map(([key, d]) => [key, d.rect]));
+  const flights = handoffFlights(boxes, rects, rectOf(cells.get(MORE_CELL) ?? null), s.turns);
   for (const [key, f] of flights) {
-    const box = boxes[key] as Rect;
-    const c = layer.ownerDocument.createElement("canvas");
-    c.width = Math.max(1, Math.round(box.w * ratio));
-    c.height = Math.max(1, Math.round(box.h * ratio));
-    c.style.cssText = `position:absolute;display:block;left:${box.x}px;top:${box.y}px;width:${box.w}px;height:${box.h}px`;
-    c.getContext("2d")?.drawImage(
-      s.canvas,
-      Math.round((box.x - s.rect.x) * ratio),
-      Math.round((box.y - s.rect.y) * ratio),
-      c.width,
-      c.height,
-      0,
-      0,
-      c.width,
-      c.height,
-    );
+    const c = (dice[key] as Still).canvas;
     layer.appendChild(c);
-    c.style.transformOrigin = "0 0";
+    c.style.transformOrigin = "50% 50%";
     c.style.transition = `transform ${ms}ms ease-in-out${f.fade ? `, opacity ${ms}ms ease-in` : ""}`;
     requestAnimationFrame(() => {
-      c.style.transform = `translate(${f.dx}px, ${f.dy}px) scale(${f.k})`;
+      c.style.transform = `translate(${f.dx}px, ${f.dy}px) rotate(${f.turn}rad) scale(${f.k})`;
       if (f.fade) c.style.opacity = "0";
     });
-    out.set(key, c);
+    out.set(key, { ...f, canvas: c });
   }
   return out;
 }

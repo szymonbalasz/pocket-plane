@@ -323,6 +323,11 @@ export function useRollPopups<T>(selector: (s: RollPopupsState) => T): T {
 
 // The popup cells (FR-DICEX-46 a): where each handed-off die lands (by die key) and the "+N"
 // cell the dice past cell 11 fly into; the throw's flight reads their rects when it starts.
+/**
+ * A handed-off die's still is its box: the die and a margin (the renderer's crop, 1.25 × its
+ * circumradius), so the box is this much bigger than the die; a cell's still overhangs it so.
+ */
+export const CELL_STILL_PAD = 1.25;
 /** The "+N" cell's key. */
 export const MORE_CELL = "+N";
 const cells = new Map<string, Map<string, HTMLElement>>();

@@ -30,7 +30,16 @@ import {
 } from "three";
 import { type Arena, pixelRatioOf } from "../arena";
 import { dieMesh, drawAtlas, drawD4 } from "./faces";
-import { geometryOf, type LabelKind, labelKindOf, type Quat, upFace } from "./geometry";
+import {
+  geometryOf,
+  type LabelKind,
+  labelKindOf,
+  multiply,
+  type Quat,
+  upFace,
+  uprightTurn,
+  yaw,
+} from "./geometry";
 import { poseAt, type Simulation, STEP_HZ, settleLabels, simulate } from "./settle";
 
 export interface Die3D {
@@ -76,8 +85,9 @@ export interface PlayOptions {
   view?: Arena;
   /**
    * FR-DICEX-46 b: per die, where it rests (CSS px from the rect's top-left; null = where the
-   * simulation leaves it): the recorded motion is shifted there over the throw, so the dice
-   * tumble into their cells with the same orientations (faces unchanged).
+   * simulation leaves it): the recorded motion is shifted there over the throw and each die turns
+   * about the vertical so its value ends upright, so the dice tumble into their cells (the up
+   * face and value unchanged).
    */
   cells?: readonly ({ x: number; y: number } | null)[];
   /** The motion plays within this (ms; the recording sped up). Default: real time. */
@@ -101,8 +111,10 @@ export interface PlayOptions {
 export interface Still {
   canvas: HTMLCanvasElement;
   rect: Rect;
-  /** FR-DICEX-46 a (hand-off): each die's box inside `rect` (viewport CSS px), by key. */
-  dice?: Record<string, Rect>;
+  /** FR-DICEX-46 a (hand-off): each die alone (drawn without its neighbours) at its box, by key. */
+  dice?: Record<string, Still>;
+  /** FR-DICEX-46 a: per die key, the screen turn (radians, clockwise) standing its value upright. */
+  turns?: Record<string, number>;
 }
 
 export interface PlayHandle {
@@ -449,11 +461,16 @@ export function playThrow(o: PlayOptions): PlayHandle {
   // FR-DICEX-46 b: each die's shift from where the simulation rests it to its cell (world units),
   // eased in over the throw; orientations stay the recording's.
   const shifts = cellShifts(o, sim, last);
+  const turns = o.cells
+    ? o.dice.map((d, i) => uprightTurn(geometryOf(d.shape), poseAt(sim, i, last).q))
+    : null;
   const pose = (f: number) => {
     const k = ease(Math.min(1, f / Math.max(1, last)));
     meshes.forEach((m, i) => {
-      const { p, q } = poseAt(sim, i, f);
+      const { p, q: q0 } = poseAt(sim, i, f);
       const d = shifts?.[i];
+      const t = turns?.[i];
+      const q = t ? multiply(yaw(t * k), q0) : q0;
       m.position.set(p[0] + (d ? d.x * k : 0), p[1], p[2] + (d ? d.z * k : 0));
       m.quaternion.set(q[0], q[1], q[2], q[3]);
     });
@@ -558,13 +575,23 @@ export function playThrow(o: PlayOptions): PlayHandle {
         const box = crop(r, camera, meshes, o.dice);
         still = copy(s, box);
         if (still) {
-          const dice: Record<string, Rect> = {};
+          // FR-DICEX-46 a: each die drawn alone and copied at its box, so a neighbour resting
+          // close never shows in its cell.
+          const dice: Record<string, Still> = {};
+          const turns: Record<string, number> = {};
           meshes.forEach((m, i) => {
             const d = o.dice[i] as Die3D;
-            const one = crop(r, camera, [m], [d]);
-            if (one.w > 0 && one.h > 0) dice[d.key] = one;
+            const q: Quat = [m.quaternion.x, m.quaternion.y, m.quaternion.z, m.quaternion.w];
+            // A world turn θ about +Y shows on screen (x right, z down) as −θ.
+            turns[d.key] = -uprightTurn(geometryOf(d.shape), q);
+            for (const [j, other] of meshes.entries()) other.visible = j === i;
+            draw(s);
+            const alone = copy(s, crop(r, camera, [m], [d]));
+            if (alone) dice[d.key] = alone;
           });
+          for (const m of meshes) m.visible = true;
           still.dice = dice;
+          still.turns = turns;
         }
       }
       release();

@@ -227,8 +227,11 @@ export function pipClip(
   return r;
 }
 
-/** FR-DICEX-46 b: a miniature die's size in its 44 px cell (px; the flown-in dice match it). */
-export const MINI_DIE_PX = 36;
+/**
+ * FR-DICEX-46: a die at full size spans its cell (the die size px of FR-DICEX-33: 44 px per
+ * `DIE_WORLD`); the miniature's and the flown-in dice match.
+ */
+export const MINI_DIE_PX = CELL_PX;
 
 /**
  * FR-DICEX-39 / FR-NOTE-32 rule for the DM's popup stack: centred at `top`; over a rect it keeps
