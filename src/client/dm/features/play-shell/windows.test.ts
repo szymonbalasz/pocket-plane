@@ -617,3 +617,50 @@ test("FR-SHELL-43 dm launcher, test-mode kinds included, at 1280 / 1440 / 1600 w
     }
   }
 });
+
+// ---- W1 walkthrough re-test (2026-10-19): PC centres under auto-placed windows ----
+
+/** A 46-px token box centred on (x, y): the walkthrough's measured PC centres on Town. */
+const pcAt = (x: number, y: number) => ({ x: x - 23, y: y - 23, w: 46, h: 46, pc: true });
+const pcUnder = (r: Rect, pcs: readonly Rect[]) =>
+  pcs.filter((p) => {
+    const c = { x: p.x + p.w / 2, y: p.y + p.h / 2 };
+    return c.x > r.x && c.x < r.x + r.w && c.y > r.y && c.y < r.y + r.h;
+  }).length;
+
+test("FR-SHELL-45 (2) W1 repro: DM 1440×900 on Town (Thorn 463,363, Mira 516,363), Reset, Compendium then Party → neither holds a PC centre (shrunk to ≥ min size rather than full size over a PC)", () => {
+  const pcs = [pcAt(463, 363), pcAt(516, 363)];
+  const { steps } = launcherSequence(dmWindows, WIDE, ["cmp.compendium", "party.board"], {
+    avoid: () => pcs,
+  });
+  for (const s of steps) {
+    expect(s.hits).toEqual([]);
+    expect(
+      s.rect && pcUnder(s.rect, pcs) ? `${s.kind} over a PC: ${JSON.stringify(s.rect)}` : "ok",
+    ).toBe("ok");
+    const def = dmWindows.get(s.kind);
+    expect(s.rect && def && s.rect.w >= def.minSize.w && s.rect.h >= def.minSize.h).toBe(true);
+  }
+});
+
+test("FR-SHELL-45 (2) sweep (DM, Town): every launcher window in registry order at 1280×720 / 1440×900 / 1600×900 holds no PC centre", () => {
+  const cases = [
+    [LAPTOP, [pcAt(410, 312), pcAt(458, 312)]],
+    [WIDE, [pcAt(463, 363), pcAt(516, 363)]],
+    [DESKTOP, [pcAt(543, 363), pcAt(596, 363)]],
+  ] as const;
+  for (const [viewport, pcs] of cases) {
+    const kinds = launcherKinds(dmWindows, product);
+    const { steps } = launcherSequence(dmWindows, viewport, kinds, {
+      available: product,
+      avoid: () => pcs,
+    });
+    for (const s of steps) {
+      const at = `${s.kind} at ${viewport.w}×${viewport.h}`;
+      expect(s.hits.length === 0 ? "ok" : `${at} on ${s.hits.join(", ")}`).toBe("ok");
+      expect(
+        s.rect && pcUnder(s.rect, pcs) ? `${at} over a PC: ${JSON.stringify(s.rect)}` : "ok",
+      ).toBe("ok");
+    }
+  }
+});

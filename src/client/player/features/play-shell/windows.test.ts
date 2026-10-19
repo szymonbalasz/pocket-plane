@@ -545,3 +545,36 @@ test("FR-SHELL-43 player launcher, test-mode kinds included, at 1280 / 1440 / 16
     }
   }
 });
+
+// ---- W1 walkthrough re-test (2026-10-19): PC centres under auto-placed windows ----
+
+const pcAt = (x: number, y: number) => ({ x: x - 23, y: y - 23, w: 46, h: 46, pc: true });
+const pcUnder = (r: Rect, pcs: readonly Rect[]) =>
+  pcs.filter((p) => {
+    const c = { x: p.x + p.w / 2, y: p.y + p.h / 2 };
+    return c.x > r.x && c.x < r.x + r.w && c.y > r.y && c.y < r.y + r.h;
+  }).length;
+
+test("FR-SHELL-45 (2) sweep (player-1, Town): every launcher window in registry order at 1280×720 / 1440×900 / 1600×900 holds no PC centre", () => {
+  const cases = [
+    [LAPTOP, [pcAt(410, 312), pcAt(458, 312)]],
+    [WIDE, [pcAt(463, 363), pcAt(516, 363)]],
+    [DESKTOP, [pcAt(543, 363), pcAt(596, 363)]],
+  ] as const;
+  for (const [viewport, pcs] of cases) {
+    const available = new Set(product);
+    available.delete("cbt.initiative"); // Town: no encounter
+    const kinds = launcherKinds(playerWindows, product);
+    const { steps } = launcherSequence(playerWindows, viewport, kinds, {
+      available,
+      avoid: () => pcs,
+    });
+    for (const s of steps) {
+      const at = `${s.kind} at ${viewport.w}×${viewport.h}`;
+      expect(s.hits.length === 0 ? "ok" : `${at} on ${s.hits.join(", ")}`).toBe("ok");
+      expect(
+        s.rect && pcUnder(s.rect, pcs) ? `${at} over a PC: ${JSON.stringify(s.rect)}` : "ok",
+      ).toBe("ok");
+    }
+  }
+});

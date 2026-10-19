@@ -224,12 +224,35 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   let best: { rect: Rect; rank: number[] } | null = null;
   const seen = new Set<string>();
   let cur: Column = inColumn(base.x, w);
-  const consider = (rect: Rect, inward: boolean) => {
+  const minW = Math.min(def.minSize.w, w);
+  /**
+   * A candidate over PC token centres, shrunk (≥ min size) to clear them: narrower keeping its
+   * left or right edge, shorter keeping its top or bottom (#245: cover only when no size avoids
+   * it), so rank (2) beats (6) full size.
+   */
+  const clearOfPcs = (r: Rect): Rect[] => {
+    const under = cur.pcs.filter((p) => inside(p.x, p.y, r));
+    if (under.length === 0) return [];
+    const px = under.map((p) => p.x);
+    const py = under.map((p) => p.y);
+    const out: Rect[] = [];
+    const lw = Math.floor(Math.min(...px) - r.x);
+    if (lw >= minW) out.push({ ...r, w: lw });
+    const rx = Math.ceil(Math.max(...px));
+    if (r.x + r.w - rx >= minW) out.push({ ...r, x: rx, w: r.x + r.w - rx });
+    const th = Math.floor(Math.min(...py) - r.y);
+    if (th >= minH) out.push({ ...r, h: th });
+    const by = Math.ceil(Math.max(...py));
+    if (r.y + r.h - by >= minH) out.push({ ...r, y: by, h: r.y + r.h - by });
+    return out;
+  };
+  const consider = (rect: Rect, inward: boolean): void => {
     const key = `${rect.x},${rect.y},${rect.w},${rect.h},${inward}`;
     if (seen.has(key)) return;
     seen.add(key);
     const r = rank(rect, inward, cur);
     if (!best || lexLess(r, best.rank)) best = { rect, rank: r };
+    if (r[5] === 1) for (const s of clearOfPcs(rect)) consider(s, inward);
   };
   const column = (x0: number, inward: boolean, cw = w) => {
     const x = Math.max(minX, Math.min(x0, a.right - cw));
@@ -263,7 +286,6 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
     for (const x of inwardXs(w)) column(x, true);
   }
   // FR-SHELL-45's last resort: min size (FR-SHELL-47 calls it once nothing is left to park).
-  const minW = Math.min(def.minSize.w, w);
   if (input.lastResort && minW < w && (best as { rank: number[] } | null)?.rank[0] !== 0) {
     for (const x of edges(minW)) column(x, false, minW);
     for (const x of inwardXs(minW)) column(x, true, minW);
