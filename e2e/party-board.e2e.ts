@@ -117,7 +117,7 @@ test("FR-PARTY-15 FR-PARTY-14 FR-PARTY-13 FR-PARTY-10 DM creates Wanted Poster w
   await expect(editor.getByTestId("party-editor-save")).toBeDisabled(); // no title yet
   await editor.getByTestId("party-editor-title").fill("Wanted Poster");
   await editor.getByTestId("party-editor-body").fill("Reward 50 gp");
-  await editor.getByTestId("party-editor-add-image").click();
+  await editor.getByTestId("asset-attach-library").click();
   await dm.locator(`[data-testid="asset-picker-item"][data-record-id="${poster}"]`).click();
   await dm.getByTestId("asset-picker-select").click();
   await expect(editor.getByTestId("party-editor-image")).toHaveAttribute("data-record-id", poster);

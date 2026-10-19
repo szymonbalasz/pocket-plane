@@ -1,6 +1,7 @@
-// DM asset picker (FR-ASSET-17, ASSET §7): the campaign's images, upload by file input or
-// drop, "Select" returns the asset ID. Hosted by scene / token / portrait flows (Dialog) and
-// the test-mode `asset.test` window.
+// DM asset picker (FR-ASSET-17, ASSET §7): the campaign's listed images, upload by file input or
+// drop, "Select" returns the asset ID. Hosted by scene / token / portrait flows (Dialog), the
+// attach control's "From library" (FR-ASSET-23) and the test-mode `asset.test` window. In `@ui`
+// since S5; uploads go through the client's uploader context (FR-ASSET-27).
 import { type AssetRecord, pickerOrder } from "@shared/assets-pipeline/schemas";
 import { Button } from "@ui/components/ui/button";
 import {
@@ -18,7 +19,7 @@ import { useRecords, useSync } from "@ui/sync/store";
 import { UploadIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { uploadAsset } from "./upload";
+import { useAttachUploader } from "./uploader";
 
 type Upload =
   | { phase: "idle" }
@@ -51,6 +52,8 @@ export function AssetPicker({
   const [upload, setUpload] = useState<Upload>({ phase: "idle" });
   const [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const uploader = useAttachUploader();
+  const canUpload = live && uploader !== null;
   const busy = upload.phase === "sending" || upload.phase === "processing";
 
   // FR-ASSET-17: select an uploaded item once its record is in the store (after the
@@ -63,19 +66,19 @@ export function AssetPicker({
   }, [pending, assets]);
 
   async function send(file: File) {
-    // Lazy: the session module reads localStorage at load (keeps window registries importable in tests).
-    const { useDmSession } = await import("../campaign-management/session");
-    const secret = useDmSession.getState().secret;
-    if (!secret || !live || busy) return;
+    if (!uploader || !live || busy) return;
     setUpload({ phase: "sending", pct: 0 });
-    const r = await uploadAsset(file, secret, {
-      onProgress: (pct) => setUpload({ phase: "sending", pct }),
-      onProcessing: () => setUpload({ phase: "processing" }),
-    });
-    if (r.kind === "unauthorized") {
-      useDmSession.getState().setSecret(null);
-      return;
-    }
+    // The library's own uploads stay listed (FR-ASSET-24).
+    const r = await uploader.upload(
+      file,
+      { listed: true },
+      {
+        onProgress: (pct) => setUpload({ phase: "sending", pct }),
+        onProcessing: () => setUpload({ phase: "processing" }),
+      },
+    );
+    // The uploader reset the secret (back to login).
+    if (r.kind === "unauthorized") return;
     if (r.kind === "error") {
       setUpload({ phase: "error", message: r.message });
       return;
@@ -101,14 +104,14 @@ export function AssetPicker({
         className,
       )}
       onDragOver={(e) => {
-        if (!live || busy || !e.dataTransfer.types.includes("Files")) return;
+        if (!canUpload || busy || !e.dataTransfer.types.includes("Files")) return;
         e.preventDefault();
         setDragging(true);
       }}
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => {
         setDragging(false);
-        if (!live || busy || e.dataTransfer.files.length === 0) return;
+        if (!canUpload || busy || e.dataTransfer.files.length === 0) return;
         e.preventDefault();
         onFiles(e.dataTransfer.files);
       }}
@@ -119,7 +122,7 @@ export function AssetPicker({
           size="sm"
           variant="secondary"
           data-testid="asset-picker-upload"
-          disabled={!live || busy}
+          disabled={!canUpload || busy}
           onClick={() => input.current?.click()}
         >
           <UploadIcon className="size-4" /> Upload
@@ -130,7 +133,7 @@ export function AssetPicker({
           accept="image/png,image/jpeg,image/webp,image/svg+xml"
           className="hidden"
           data-testid="asset-picker-file-input"
-          disabled={!live || busy}
+          disabled={!canUpload || busy}
           onChange={(e) => {
             onFiles(e.target.files);
             e.target.value = "";
