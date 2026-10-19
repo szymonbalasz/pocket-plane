@@ -38,6 +38,7 @@ DM notes in brackets ([#250](../decisions-log.md)). "sim-8" = the [session-sim-8
 | 2026-10-18 | Phase A: six specs, seams ([`.verify/sprint5/seams.md`](../../.verify/sprint5/seams.md)), two reviews + rulings, gate ([`gate.md`](../../.verify/sprint5/gate.md)). Ally side added to R ([#252](../decisions-log.md)). Backfill merged: BL-28 bench gates, BL-16 stable `useRecords`, BL-12 door eraser, BL-31 nat-1 e2e (#253–#255) |
 | 2026-10-19 | **Gate 1 passed** ([#256](../decisions-log.md)): every pick, DM ceiling 1.5 MiB, DM popups stay top-centre, map tools push covering windows right. Phase B starts |
 | 2026-10-19 | Merged: party core (handout force-open record, attachment images) [#257](../decisions-log.md). `session-sim-9` gains a handout with an attachment and one presented to Player 1 (UI comes with the popup slice) |
+| 2026-10-19 | Merged: combat core (hit rulings, stored trails, ally sides, Apply-hit command) [#258](../decisions-log.md). Unblocks late damage, ally-switch UI, trails, colours core |
 
 ## Check `main` any time (DM)
 
