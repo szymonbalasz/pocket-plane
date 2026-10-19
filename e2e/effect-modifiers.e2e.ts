@@ -53,6 +53,8 @@ test("FR-MOD-15 FR-MOD-16 FR-MOD-20 FR-MOD-28 sheet attack with Bless → line +
     const log = await openWindow(page, "dice.log");
     const entry = log.getByTestId("dice-log-entry").filter({ hasText: "Bless" }).last();
     await expect(entry).toBeVisible();
+    // FR-DICE-40: the numbers show once this client's dice land.
+    await expect(entry).toHaveAttribute("data-landed", "true", { timeout: 10_000 });
     return (await entry.textContent()) ?? "";
   };
   const pm = BLESS_LINE.exec(await lineOf(player));
