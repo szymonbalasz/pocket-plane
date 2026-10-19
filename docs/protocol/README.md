@@ -2384,9 +2384,24 @@ From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-49–
 | Tests | `homebrew-images.test.tsx` (FR-CMP-50 form slots ×5, FR-CMP-49 clone prefill), `gallery.test.tsx` (FR-CMP-51 entry gallery ×6: none, spell 2, item 3, lightbox wrap / counter, error tile, player markup), `e2e/cmpimg-ui.e2e.ts` (upload + paste "E2E Lamp", dedupe, move, share; DM lightbox; player-1 main image `naturalWidth > 0`) |
 | CON-44 | No record, no snapshot bytes (entry images are REST-only attachments, §86) |
 
-## 95. Sprint 5: combat log wording (R2)
+## 95. Sprint 5: Initiative trigger chips, Effect… source, one Invisible (W4)
 
-From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-95, -96 and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) FR-MOD-62 (BL-24, BL-27, BL-23). **Built by `fix/combat-lines`**: line text only. No intent, event, record type, payload field or schema change; built from `payload` / `dmPayload` alone, so old rows render the new way. Data side: [data model §74](../data-model/README.md#74-sprint-5-combat-log-wording-r2).
+From [combat-extras](../specs/combat-extras.md) FR-CBTX-54–56 (OQ-CBTX-27 B, -28 A, -29 A, #256; seams S9) and [fog-of-war](../specs/fog-of-war.md) FR-FOG-59. **Built by `fix/init-chips-effect`**: client only; no record type, intent, event, signal or wire field (CON-44: 0 B). Amends [§51](#51-sprint-3-rule-trigger-sheet-ui-r6)'s "Initiative trigger chips" row (FR-CBTX-52: triggers no longer go into "+N"). Data model: [§74](../data-model/README.md#74-sprint-5-initiative-trigger-chips-effect-source-one-invisible-w4).
+
+| Piece | Contract | Source |
+|---|---|---|
+| `fitChipRow(effects, triggers, room, gap) → {n, tier, icons, wrap}` (`@ui/features/combat-extras/logic`) | Pure, over measured natural widths (effects `{full, short}` per BL-08 tier; triggers `full` = with name, `short` = icon-only). In order: (1) effect chips tighten (`fitChipTiers`) beside full trigger chips; (2) trigger chips icon-only; (3) effect chips fold into "+N", last first (`n` counts effect chips only); (4) `wrap`: the icon-only triggers don't fit even with every effect folded. No triggers → BL-08's rule unchanged | FR-CBTX-54 |
+| `EffectChips` compact rows (`parts.tsx`; DM `row.tsx` and the player Initiative row) | Order: shown effect chips, "+N" (in flow), trigger chips. Folded effects leave the flow (measured on the hidden copy, `data-chip-measure="effect"` / `"trigger"`). `wrap` (`data-wrap="true"` on `data-chip-row`): the chip line takes its own line under the name (flex-basis 100 %, last; the name line wraps only meanwhile), held until the name line widens or the chips change. "+N" Tooltip / list: effects only (`cbtx-trigger-chip-more-item` retired) | FR-CBTX-54 |
+| Icon trigger chip `cbtx-trigger-chip` | `data-compact` `true` \| `false`; icon-only = `Zap` + uses ("⚡2", `hp.down` below zero) + check when muted, the name `sr-only`; Tooltip "‹name› — ‹state›" (`triggerLine`). Full chips: name, at most 96 px (no tier cut) | FR-CBTX-54 |
+| Effect… source (`dialogs.tsx`, `effect-source.ts` `defaultEffectSource`) | Default = turn combatant if not hidden and not removed (`data-default="turn"` on `cbtx-effect-source`); else the first target's own active combatant in the started encounter (`target`); else none (`none`). Hidden combatants listed with an eye-off icon. `sourceCombatantId` sent as chosen | FR-CBTX-55 |
+| Token menu Conditions ▸ (`cbtx-token-menu-conditions`) | 14 options: `ConditionsMenu omit` = `TOKEN_MENU_OMIT` (`invisible`). The Initiative row's `cbtx-init-row-conditions` keeps 15 | FR-CBTX-56 |
+| `fog-token-menu-invisible` | The menu's only "Invisible"; Tooltip "Players don't see it unless they see invisible" (`INVISIBLE_TIP`). Intent unchanged (`fog.setInvisible`) | FR-FOG-59 |
+
+- **Fixtures:** none new (W4 adds no record); e2e bundle `init-chips-effect` = `windows-s5` under its own name (own e2e server).
+
+## 96. Sprint 5: combat log wording (R2)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-95, -96 and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) FR-MOD-62 (BL-24, BL-27, BL-23). **Built by `fix/combat-lines`**: line text only. No intent, event, record type, payload field or schema change; built from `payload` / `dmPayload` alone, so old rows render the new way. Data side: [data model §75](../data-model/README.md#75-sprint-5-combat-log-wording-r2).
 
 | Piece | Contract |
 |---|---|
