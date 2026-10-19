@@ -3,6 +3,7 @@
 import { attackRollSpecs } from "@shared/character-sheet/logic";
 import { critExpression } from "@shared/combat-tracker/rules";
 import type { Attack } from "@shared/entities/schemas";
+import { slotLabelsOf } from "@ui/features/dice-roll-log/logic";
 
 export interface AttackChoice {
   attack: Attack;
@@ -32,6 +33,8 @@ export interface AttackRolls {
   critExpressions?: string[];
   /** Damage parts after the base part (their slots have no roll subject, FR-CHARX-55). */
   extraParts: number;
+  /** FR-DICE-41: one per expression ("To hit", "Slashing", "Fire"); none for Attack alone. */
+  slotLabels?: (string | null)[];
 }
 
 /**
@@ -53,7 +56,9 @@ export function attackRolls(attack: Attack, action: AttackAction): AttackRolls {
   if (action === "toHit") return { expressions: [hit], extraParts: 0 };
   const critExpressions = damage.map(critExpression);
   const extraParts = damage.length - 1;
+  const specs = action === "damage" ? damageSpecs : [hitSpec, ...damageSpecs];
+  const slotLabels = slotLabelsOf(specs) ?? [];
   return action === "damage"
-    ? { expressions: damage, critExpressions, extraParts }
-    : { expressions: [hit, ...damage], critExpressions, extraParts };
+    ? { expressions: damage, critExpressions, extraParts, slotLabels }
+    : { expressions: [hit, ...damage], critExpressions, extraParts, slotLabels };
 }

@@ -30,6 +30,7 @@ import {
   RollButton,
   type RollControl,
   type RollKeys,
+  StageHint,
   useRollControl,
 } from "@ui/features/dice-roll-log/roll-control";
 import { useTriggerChips } from "@ui/features/effect-modifiers/trigger-badges";
@@ -159,11 +160,12 @@ export function useDeathSaveRoll(c: CombatantView): RollControl {
   });
 }
 
-/** Invisible anchor for the death save's physical-dice popover. */
+/** Invisible anchor for the death save's physical-dice popover (the menu item shows the Alt hint). */
 export function DeathSaveAnchor({ control }: { control: RollControl }) {
   return (
     <RollButton
       control={control}
+      hint={false}
       tabIndex={-1}
       aria-hidden
       className="pointer-events-none size-0 overflow-hidden p-0 opacity-0"
@@ -343,7 +345,14 @@ export function RowMenuItems({ c, deathRoll }: { c: CombatantView; deathRoll: Ro
               keys.current = {};
             }}
           >
-            <DicesIcon /> Death save
+            <DicesIcon />
+            <span className="flex flex-col">
+              Death save
+              {/* FR-DICEX-51: the item rolls through an invisible anchor, so it shows the hint. */}
+              <span className="text-xs text-muted-foreground">
+                <StageHint />
+              </span>
+            </span>
           </DropdownMenuItem>
           <DropdownMenuItem
             data-testid="cbtx-init-row-stabilise"

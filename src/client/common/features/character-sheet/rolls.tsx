@@ -19,7 +19,8 @@ import { type ComponentProps, type ReactNode, useId, useMemo, useState } from "r
 import type { Button } from "../../components/ui/button";
 import { Switch } from "../../components/ui/controls";
 import { useRecords, useSync } from "../../sync/store";
-import { STAGE_HINT, useRollControl } from "../dice-roll-log/roll-control";
+import { slotLabelsOf } from "../dice-roll-log/logic";
+import { useRollControl } from "../dice-roll-log/roll-control";
 import { useBusy } from "./fields";
 import {
   claimRollOptions,
@@ -30,8 +31,8 @@ import {
 } from "./routing";
 import { useSheet } from "./sheet-context";
 
-/** FR-DICEX-06: sheet roll buttons also stage in the dice tray on Alt+click. */
-export const ROLL_HINT = `Shift: advantage · Ctrl: disadvantage · ${STAGE_HINT}`;
+/** Sheet roll buttons' tooltip; `RollButton` adds "Alt: adjust in tray" (FR-DICEX-51). */
+export const ROLL_HINT = "Shift: advantage · Ctrl: disadvantage";
 
 /** DM per-roll public override per category; absent = the category's setting. */
 export function usePublicOverrides() {
@@ -153,10 +154,13 @@ export function useSheetRollControl({
       claim?.card,
     ],
   );
+  const slotLabels = slotLabelsOf(specs);
   const control = useRollControl({
     expressions: specs.map((s) => s.expression),
     category,
     label: `${ctx.creature.name} — ${title}`,
+    // FR-DICE-41: "To hit", "Slashing", "Fire" in the physical form and the tray.
+    ...(slotLabels ? { slotLabels } : {}),
     ...(subject ? { subject } : {}),
     // FR-CBT-74: a routed Damage after a natural 20 opens with the extra critical dice.
     ...claimRollOptions(claim),

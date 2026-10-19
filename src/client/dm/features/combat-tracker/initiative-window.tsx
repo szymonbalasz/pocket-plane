@@ -77,6 +77,7 @@ import {
   RollButton,
   type RollControl,
   type RollKeys,
+  StageHint,
   useRollControl,
 } from "@ui/features/dice-roll-log/roll-control";
 import { actionButton } from "@ui/features/notifications/logic";
@@ -211,25 +212,20 @@ function InitiativeCell({
         />
       </Tooltip>
       {canRoll && (
-        <Tooltip
-          content={`Roll initiative: d20${bonus < 0 ? "" : "+"}${bonus} (Shift adv, Ctrl dis)`}
+        <RollButton
+          control={control}
+          hint={`Roll initiative: d20${bonus < 0 ? "" : "+"}${bonus} (Shift adv, Ctrl dis)`}
+          data-testid="cbt-init-row-roll"
+          data-record-id={c.id}
+          size={unset ? "sm" : "icon"}
+          variant={unset ? "outline" : "ghost"}
+          className={unset ? "h-7 gap-1 px-2 text-xs" : "size-7"}
+          aria-label={`Roll initiative for ${c.name}`}
+          disabled={disabled}
         >
-          <span>
-            <RollButton
-              control={control}
-              data-testid="cbt-init-row-roll"
-              data-record-id={c.id}
-              size={unset ? "sm" : "icon"}
-              variant={unset ? "outline" : "ghost"}
-              className={unset ? "h-7 gap-1 px-2 text-xs" : "size-7"}
-              aria-label={`Roll initiative for ${c.name}`}
-              disabled={disabled}
-            >
-              <DicesIcon className="size-3.5" />
-              {unset && "Roll"}
-            </RollButton>
-          </span>
-        </Tooltip>
+          <DicesIcon className="size-3.5" />
+          {unset && "Roll"}
+        </RollButton>
       )}
     </div>
   );
@@ -304,6 +300,8 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
   const control = useRollControl({
     expressions: rolls?.expressions ?? ["1d20"],
     critExpressions: rolls?.critExpressions,
+    // FR-DICE-41: "To hit", "Slashing", "Fire" in the physical form and the tray.
+    slotLabels: rolls?.slotLabels,
     crit,
     category: action === "damage" ? "damage" : "attack",
     label: attack
@@ -346,10 +344,21 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
   };
   return (
     <>
-      {/* Invisible anchor for the physical-dice popover of the picked attack. */}
-      <RollButton control={control} tabIndex={-1} aria-hidden className={ANCHOR} />
+      {/* Invisible anchor for the physical-dice popover of the picked attack; the Alt hint is
+          the trigger's (FR-DICEX-51). */}
+      <RollButton control={control} hint={false} tabIndex={-1} aria-hidden className={ANCHOR} />
       <DropdownMenu>
-        <Tooltip content={attack ? "Attack ▸ (Shift adv, Ctrl dis)" : "No weapon attack"}>
+        <Tooltip
+          content={
+            attack ? (
+              <>
+                Attack ▸ · Shift: advantage · Ctrl: disadvantage · <StageHint />
+              </>
+            ) : (
+              "No weapon attack"
+            )
+          }
+        >
           <DropdownMenuTrigger asChild>
             <Button
               data-testid="cbt-init-row-attack"
@@ -487,6 +496,8 @@ function AbilityMenu({
             </span>
           </DropdownMenuItem>
         ))}
+        {/* FR-DICEX-51: the anchor is invisible, so the open submenu carries the Alt hint. */}
+        <StageHint line />
         {control.isDm && (
           <>
             <DropdownMenuSeparator />
@@ -701,8 +712,20 @@ function Row({
       {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸, out of the flow
           (no gaps: the name line keeps the room, FR-CBTX-46). */}
       <span className="pointer-events-none absolute top-1/2 right-16 flex size-0">
-        <RollButton control={check.control} tabIndex={-1} aria-hidden className={ANCHOR} />
-        <RollButton control={save.control} tabIndex={-1} aria-hidden className={ANCHOR} />
+        <RollButton
+          control={check.control}
+          hint={false}
+          tabIndex={-1}
+          aria-hidden
+          className={ANCHOR}
+        />
+        <RollButton
+          control={save.control}
+          hint={false}
+          tabIndex={-1}
+          aria-hidden
+          className={ANCHOR}
+        />
         {c.kind === "pc" && <DeathSaveAnchor control={deathRoll} />}
       </span>
       <DropdownMenu>
