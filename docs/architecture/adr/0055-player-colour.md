@@ -1,6 +1,6 @@
-# Proposed — Player colour stored once, derived everywhere
+# 0055 — Player colour stored once, derived everywhere
 
-- Status: accepted (DM, sprint-5 gate 1, #256; OQ-CAMP-22); numbered at merge
+- Status: accepted (DM, sprint-5 gate 1, #256; raised by spec-colours, sprint 5 track K)
 - Date: 2026-10-18
 - Affects: [campaign-management](../../specs/campaign-management.md) (FR-CAMP-23–29), [scenes-map](../../specs/scenes-map.md) (FR-MAP-68–73), [scene-tools](../../specs/scene-tools.md) (FR-SCN-47), [dice-roll-log](../../specs/dice-roll-log.md) (FR-DICE-60–61), [notifications](../../specs/notifications.md) (FR-NOTE-38–41)
 - Raised by: [OQ-CAMP-22](../../specs/campaign-management.md#15-open-questions)

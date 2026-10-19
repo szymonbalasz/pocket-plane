@@ -60,6 +60,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0052](0052-static-serving.md) | Static client served precompressed with cache headers | accepted (#256) |
 | [0053](0053-apply-hit.md) | Apply hit: a damage card applied in two steps | accepted (#256; refines 0037) |
 | [0054](0054-compendium-rest-asset-ids.md) | Asset IDs in compendium REST bodies after the entry visibility check | accepted (#256; amends 0023) |
+| [0055](0055-player-colour.md) | Player colour stored once per person, derived everywhere | accepted (#256) |
 
 ## Proposing a new ADR
 
