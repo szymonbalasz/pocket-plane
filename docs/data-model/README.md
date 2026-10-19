@@ -1901,7 +1901,20 @@ From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-C
 - **Fixtures:** none new (`rules-effects` holds every unit L12–L14 needs).
 - **Snapshot size** (CON-44): 0 B stored; rendered text grows by ≤ 12 B per trigger part (MOD §12).
 
-## 76. Sprint 5: compressed + cached built client (D12)
+## 76. Sprint 5: Fit keeps every token visible (W2)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-59, -61. **Built by `fix/map-fit-visible`**: no table, column, record type or payload change. Protocol side: [protocol §97](../protocol/README.md#97-sprint-5-fit-keeps-every-token-visible-w2).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Fit obstacles | derived per render (`MapCanvas`) | rendered open windows + this client's toast box (`fitObstacles`); tool bars never count | [FR-MAP-59](../specs/scenes-map.md#6-functional-requirements) |
+| Fit outcome | client memory, per canvas | `all` \| `pcs` of the last fit (`data-fit-visible`); never stored or sent | FR-MAP-59 |
+| Pending appearance refit | client memory, per canvas | one animation-frame handle + wait count (≤ 10) | [FR-MAP-61](../specs/scenes-map.md#6-functional-requirements) |
+
+- **Fixtures:** no new unit. `windows-s5` (`session-sim-8` + `win-layout`) has every token the W5 / W10 steps fit; `session-sim-9` needs nothing extra (sim-8's tokens; sim-9 creates "Crypt" live).
+- **Snapshot size** (CON-44): 0 B.
+
+## 77. Sprint 5: compressed + cached built client (D12)
 
 From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-52 and [ADR-0052](../architecture/adr/0052-static-serving.md). **Built by `fix/static-compress`**: no table, column, record type or snapshot change (CON-44: 0 B). Protocol side: [protocol §97](../protocol/README.md#97-sprint-5-compressed--cached-built-client-d12).
 
