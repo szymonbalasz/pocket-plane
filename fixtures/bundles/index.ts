@@ -27,6 +27,7 @@ import partyBoard from "./party-board";
 import partyLoot from "./party-loot";
 import partyS5 from "./party-s5";
 import physicalDiceCombat from "./physical-dice-combat";
+import playerColours from "./player-colours";
 import ruleTriggers from "./rule-triggers";
 import rulesEffects from "./rules-effects";
 import sceneTools from "./scene-tools";
@@ -86,4 +87,5 @@ export const bundles: readonly Bundle[] = [
   partyS5,
   cmpImages,
   tplMenu,
+  playerColours,
 ];

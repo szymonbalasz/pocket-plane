@@ -1,6 +1,7 @@
 // Drizzle schema. Shared file (AGENTS §9.9). Entities and rules: docs/data-model/README.md.
 // Timestamps are ISO-8601 UTC strings from ctx.clock.
 
+import { DM_DEFAULT_COLOR, PLAYER_COLOR_KEYS } from "@shared/campaign-management/colors";
 import { CONDITIONS } from "@shared/combat-extras/conditions";
 import {
   type DeathCounters,
@@ -52,6 +53,8 @@ export const campaign = sqliteTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     active: integer("active", { mode: "boolean" }).notNull().default(false),
+    /** FR-CAMP-24: the DM colour, a palette key; the default makes the push-time add safe. */
+    dmColor: text("dm_color", { enum: PLAYER_COLOR_KEYS }).notNull().default(DM_DEFAULT_COLOR),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -73,6 +76,12 @@ export const player = sqliteTable(
     name: text("name").notNull(),
     /** Never in a sync record, event or log entry (FR-CAMP-13). */
     linkToken: text("link_token").notNull(),
+    /**
+     * FR-CAMP-23: a palette key. Nullable only so drizzle push can add it to a populated table;
+     * the boot backfill fills it before any snapshot (the wire record is non-null). Not unique:
+     * defaults repeat past 8 players (FR-CAMP-26).
+     */
+    color: text("color", { enum: PLAYER_COLOR_KEYS }),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -484,6 +493,13 @@ export const notification = sqliteTable(
     closedAt: text("closed_at"),
     closedByRole: text("closed_by_role", { enum: ROLE }),
     closedByPlayerId: text("closed_by_player_id").references((): AnySQLiteColumn => player.id),
+    /**
+     * FR-NOTE-38: who caused it, from `env.actor` at `notify`; immutable; null = system / old row.
+     * No FK on `by_player_id`: drizzle push adds it to an existing table only by a second-boot
+     * table rebuild; the value is server-written (a player of the row's campaign).
+     */
+    byRole: text("by_role", { enum: ROLE }),
+    byPlayerId: text("by_player_id"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
