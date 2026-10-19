@@ -1954,3 +1954,14 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-48. **Built by
 
 - **Fixtures:** no new unit. Walkthrough step 29 walks on `dice-polish` (player-1 Crimson metal, `dicex-looks`); `session-sim-9` needs nothing extra.
 - **Snapshot size** (CON-44): 0 B added.
+
+## 81. Sprint 5: roll-button hints and slot labels (D9)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-51 and [dice-roll-log](../specs/dice-roll-log.md#8-data-model) FR-DICE-41. **Built by `fix/dice-roll-buttons`**: no table, column, record type or payload change. Protocol side: [protocol §103](../protocol/README.md#103-sprint-5-roll-button-hints-and-slot-labels-d9).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Slot labels | caller props (`RollControlOptions.slotLabels`), derived from `CharacterRollSpec` (`slotLabelsOf`) | client only, never sent; staged verbatim with the control in the tray | [FR-DICE-41](../specs/dice-roll-log.md#6-functional-requirements) |
+
+- **Fixtures:** no new unit. Walkthrough steps 34 and 36 walk on `dice-polish` (Brakka's Flame Tongue, "Ambush at the Ford"); `session-sim-9` needs nothing extra.
+- **Snapshot size** (CON-44): 0 B added.
