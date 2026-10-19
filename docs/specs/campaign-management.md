@@ -1,26 +1,43 @@
 ---
 title: Campaign management
 prefix: CAMP
-status: complete
-owner: spec-campaign-management
+status: in-review
+owner: spec-colours
 wave: 1
+phase: post-mvp-5
 ---
 
 # Campaign management
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
+> **Sprint 5 (track K, BL-17; DM decisions [#243](../decisions-log.md) [4], [#251](../decisions-log.md)).** Decided by the DM (not open): **players and the DM pick a colour**; it carries through to their laser pointer, pings, templates (the only player "drawings": freehand is out, #21), drag path, and shows in log lines and notifications. This spec owns the colour (record field, intent, picker, palette, client helper); the surfaces are in [scenes-map](scenes-map.md) (FR-MAP-68–73), [scene-tools](scene-tools.md) (FR-SCN-47; plus the kept-template right-click menu, DM #250 [1], FR-SCN-48–51), [dice-roll-log](dice-roll-log.md) (FR-DICE-60–61), [notifications](notifications.md) (FR-NOTE-38–41). New FR-CAMP-23–29; proposed [ADR: player colour stored once](../architecture/adr/proposed-s5-colours-player-colour.md). The shared **§13 colours walkthrough** (K1–K12) is here.
+
+**Sprint 5 at a glance**
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-CAMP-23, -24 | `player.color` (default = next free palette key), `campaign.dmColor` (default `amber`), boot backfill | K0 | `FR-CAMP-23 default colour`, `FR-CAMP-23 backfill`, `FR-CAMP-24 DM colour` |
+| FR-CAMP-25, -26 | Intent `camp.setColor`; a pick must be free in the campaign | K0 | `FR-CAMP-25 setColor permissions`, `FR-CAMP-26 uniqueness` |
+| FR-CAMP-27 | Picker: player header dot, DM Players panel swatches | K2 | `FR-CAMP-27 picker` |
+| FR-CAMP-28 | Palette (8 keys, measured) + client `colorOf`; dark casing on the canvas | K0 | `FR-CAMP-28 colorOf` |
+| FR-CAMP-29 | Visible to everyone in the campaign; +149 B per snapshot | K0 | `FR-CAMP-29 colours visibility`, `CON-44 colours` |
+
+Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-CAMP-17–21, -25, -26 (palette, uniqueness, DM colour, default, recolour, colour-blind backup, who sets). Measured: +149 B per snapshot frame, 0 B per signal (§12).
+
 ## 1. Summary
 
 - Several campaigns, one **active campaign** per server; the DM creates and switches ([ADR-0004](../architecture/adr/0004-tenancy-auth-permissions.md), [ADR-0020](../architecture/adr/0020-single-active-campaign.md)).
 - DM secret for the DM; one player link per player, opened with no other setup ([ADR-0019](../architecture/adr/0019-auth-credentials.md)). Built first, in the Phase 2 skeleton ([roadmap](../roadmap.md#build-order-mvp)).
 - **Sprint 2 phase 1** (P2b, N3; FR-CAMP-21, 22): the DM's players panel shows, under each player, their characters at a glance: level, AC, HP (+ temp HP), passive Perception / Investigation / Insight; a click opens that sheet. DM client only; no new data.
+- **Sprint 5** (track K, BL-17; FR-CAMP-23–29): every player and the DM has a **player colour** from a fixed, measured palette of 8 (OQ-CAMP-17); new players get the next free one; a player picks their own from the header dot, the DM any from the Players panel; a pick must be free in the campaign. Stored once on the `player` / `campaign` row; every other feature derives it from the person it already names (no copies, 0 B on signals).
 
 ## 2. Scope
 
 - DM secret from env config; DM login. Campaigns: create, list, rename, switch. Players: add, rename, copy link.
 - Player page (joined, invalid-link, waiting). Links that survive server restarts and tunnel URL changes ([ADR-0003](../architecture/adr/0003-local-hosting.md)).
 - *(Sprint 2, N3)* Players panel: per-player character lines (read-only numbers from the DM's store) that open the sheet.
+- *(Sprint 5, K)* Player colour and DM colour: field, default, backfill, intent, uniqueness, picker, palette, client helper `colorOf`. The surfaces that draw it belong to their specs (summary banner).
 
 ## 3. Goals
 
@@ -35,6 +52,7 @@ wave: 1
 - Removing players; link revocation, rotation, kick (tier F, [feature tiers](../feature-tiers.md#5-dm-tools); D2).
 - Several campaigns live at once; campaign delete / archive.
 - Backup UI (tier D: copy the SQLite file + asset dir). Session tracking ([ADR-0013](../architecture/adr/0013-session-journal-scope.md)). Managing the tunnel.
+- *(Sprint 5)* A colour per record (a template, a ping) different from its person's; colours per character (a player's PCs share the player's colour); the dice look following the colour ([dice-extras](dice-extras.md) keeps its own look); freehand drawing (#21); the UI / art restyle (BL-29). The DM's drawing-tool previews (fog shapes and brush, darkness, wall / door drafts, prop handles) keep their semantic colours: they are local drafts only the DM's own client draws, so a person colour would identify no one (review #51). BL-17's "drawing tools" for players = AoE templates (FR-SCN-47).
 
 ## 5. User stories
 
@@ -62,11 +80,19 @@ N/A — the goals in §3 are the stories; listing them again adds nothing.
 | FR-CAMP-16 | Valid link, active campaign → joined with no input; page shows player and campaign name. Reload keeps the player joined. The same link may be open in several browsers; all connect as that player. | Later: active scene ([play-shell](play-shell.md)) |
 | FR-CAMP-17 | Unknown token → invalid-link screen (§7). REST 404; WS closed as invalid credential before any data frame. | |
 | FR-CAMP-18 | Valid token, inactive campaign (on open or after a switch) → waiting screen naming the campaign. The page joins ≤ 10 s after the DM activates that campaign, no reload. | live-sync retry, cap 5 s ± 20 % |
-| FR-CAMP-19 | Player connections never receive the DM secret, any link token, or another campaign's data. *(proposed)* They receive `{id, name}` of every player in their own campaign. | [OQ-CAMP-13](#15-open-questions) |
+| FR-CAMP-19 | Player connections never receive the DM secret, any link token, or another campaign's data. *(proposed)* They receive `{id, name}` of every player in their own campaign (*sprint 5:* plus `color`, and the campaign's `dmColor`, FR-CAMP-29). | [OQ-CAMP-13](#15-open-questions) |
 | FR-CAMP-20 | Every mutation is a server command committing in one transaction with its event log entry ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)). Fixtures call the same commands. | |
 | **Sprint 2 phase 1** (P2b, N3) | | |
 | FR-CAMP-21 | **Party at a glance** (DM players panel): under each player row, one line per `character` entity they own (drafts too, marked "Draft"), sorted as FR-CHAR-02: name, **Lvl**, **AC**, **HP** `current / max` (+ "+N temp" when temp HP > 0; "Down" at 0), **PP**, **Inv**, **Ins**. Sources (all already in the DM's store, DM full visibility): `statBlock.level` (written from classes, [FR-CHARX-04](character-sheet-full.md#6-functional-requirements)), `statBlock.ac`, `statBlock.hpMax` (stored, [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md)); `hpCurrent` (entity, CHAR); temp HP = combat-extras' `entity.tempHp` ([FR-CBTX-14](combat-extras.md#6-functional-requirements); read only, not modelled here); passives = `passiveScore(statBlock, perception \| investigation \| insight)` from `@shared/entities` (derived, overrides honoured, [FR-CHARX-05/06](character-sheet-full.md#6-functional-requirements)); no ability scores → "—". A committed change shows ≤ 1 s. Player without a character: "No character yet". | N3 |
 | FR-CAMP-22 | Clicking a character line opens the DM's `char.sheet` on it (CHARX's `openSheetFor` + `openWindow`, brought to front; FR-CHARX-47 stores the pick). No intent; no other action on the line. | N3 |
+| **Sprint 5** (track K, BL-17) | | |
+| FR-CAMP-23 | *(OQ-CAMP-17, -18, -20, decided #256)* **Player colour:** column `player.color` = a palette key (FR-CAMP-28), **nullable in the DB** (drizzle push can't add a NOT NULL column without a default to the DM's populated `player` table; review #9); the wire `player` record and its zod are **non-null**: the boot backfill runs before any snapshot is served. **Default** at player add (FR-CAMP-12, same transaction): the first key in palette order not used by the DM colour or another player of the campaign; all 8 taken → the least-used key (ties in palette order). Deterministic: no `ctx` generator needed. **Boot backfill** (campaign-management's feature start, one transaction, before the hub accepts connections): per campaign, players whose colour is null get defaults ordered by **`createdAt`, then `rowid`** (as `records.ts`' snapshot order; fixture clocks give equal `createdAt`); rerun = no-op. Fixtures may set it via `camp.setColor` (FR-CAMP-25). | OQ-CAMP-20; review #9 |
+| FR-CAMP-24 | *(OQ-CAMP-19 A, decided #256)* **DM colour:** column `campaign.dmColor` (text, not null, default `amber`: a default makes the NOT NULL add safe under drizzle push): one per campaign, shared by every DM tab. Existing rows get `amber`. A new campaign starts at `amber`. | OQ-CAMP-19 |
+| FR-CAMP-25 | **Intent `camp.setColor {playerId: Id \| null, color}`** (WS; DM, player; `null` = the DM colour): **player** sender: `playerId` must be `ctx.playerId` (another player or `null` → `forbidden`); **DM**: *(OQ-CAMP-26 A, decided #256)* any player of `ctx.campaignId` (else `not_found`) or `null`. `color` not a palette key → `invalid`. Same as the current colour → `ack`, no write, no event. Else one transaction: write + event `PlayerColorSet {playerId, color}` (logged) with the `player` or `campaign` upsert. Not optimistic (ADR-0021 E). Disabled while not `live`. | First CAMP WS intent; OQ-CAMP-26 |
+| FR-CAMP-26 | *(OQ-CAMP-18 A, decided #256)* **Uniqueness:** a **pick** must be free among the campaign's DM colour and every other player's colour, checked in the command's transaction → else `conflict` "Taken by ‹name›" (‹name› = the player's name or "DM"). Only **defaults** may repeat, and only once all 8 are taken (FR-CAMP-23), so a 9th player still joins. No DB unique index (defaults may repeat); SQLite's single writer serialises two racing picks: one wins, the other gets `conflict`. | OQ-CAMP-18 |
+| FR-CAMP-27 | **Picker** (UI §7): **player**: a colour dot before their name in the header ("Playing as ● **Player 1** in …", campaign-management's `screens.tsx` header node, no play-shell frame edit) opens a Popover with the 8 swatches; **DM**: in `camp.players`, a swatch per player row (same Popover) and one **"Your colour (DM)"** swatch above the table. Swatches taken by someone else are disabled with a Tooltip "Taken by ‹name›"; the own one is checked. A click sends FR-CAMP-25; `reject` → Toast with the message, the swatch shows the server's colour. Every client shows a change ≤ 1 s after commit, no reload. | |
+| FR-CAMP-28 | *(OQ-CAMP-17 A, OQ-CAMP-25 A, decided #256)* **Palette + helper:** `@shared/campaign-management/colors.ts` exports `PLAYER_COLORS` (keys in default order: `amber`, `jade`, `sky`, `rose`, `yellow`, `blue`, `vermillion`, `bronze`; hex values in §7), `DM_DEFAULT_COLOR = "amber"`, pure `defaultColor(taken)`, and the pure checks behind §7's figures (WCAG 2.x contrast; CIEDE2000 after colour-blind simulation), exercised by `FR-CAMP-28 palette contrast` (review #50). Client hook / fn `colorOf(store, {role, playerId?})` (`src/client/common/features/campaign-management/colors.ts`, new file) → the hex of that person's colour from the store's `player` / `campaign` records via theme tokens `--player-<key>` (FR-CAMP-29); unknown player or key (old client, deleted row) → today's role accent (`dmAccent` / `playerAccent`); **system actor → neutral** (no colour; FR-NOTE-38, FR-DICE-61). **Canvas rule** (every player-coloured stroke or fill on the map, FR-MAP-72): drawn over a dark **casing** (opaque `#000`, 2 screen px wider than the stroke; the contrast figures are against it), since on light maps the colours alone fall to 1.0–2.9 : 1 (measured, §12). | OQ-CAMP-17, -25 |
+| FR-CAMP-29 | **Visibility:** `player {id, campaignId, name, color}` and `campaign {id, name, dmColor}` go to every connection of their campaign (as today, FR-CAMP-19): a colour is not secret. Still no `linkToken` anywhere. A colour change is one record upsert to the campaign; every surface redraws from it (OQ-CAMP-21 A: existing marks recolour, #256). | ADR (proposed) |
 
 ## 7. UI/UX notes
 
@@ -79,8 +105,21 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark onl
   - *(playtest pass, to build; #171 G10)* Online dots muted (no dot, "–") while the DM client is not `live`: presence is unknown then ([FR-SYNC-29](live-sync.md#6-functional-requirements)).
   - *(Sprint 2, N3)* Under each player row, indented compact lines: "Mira · Lvl 1 · AC 16 · HP 12 / 12 +5 · PP 14 · Inv 10 · Ins 11" (labels muted, numbers tabular; Tooltip on PP / Inv / Ins with the full name and "override" when overridden). Draft Badge; HP 0 in the `hp.down` token. Whole line is a button (hover, focus ring). Window size unchanged (400×220); the body scrolls (OQ-CAMP-16). Test IDs: `camp-player-char` (+ `data-record-id` = character id), `camp-player-char-<level|ac|hp|temp|pp|inv|ins>`, `camp-player-char-draft`, `camp-player-nochar`.
   - Empty: "Create your first campaign" / "Add a player to get a link". Validation inline; server errors as Toast; disconnected banner from [live-sync](live-sync.md).
+  - *(Sprint 5, K)* Players panel: above the table "Your colour (DM)" + a 16 px swatch Button; each player row starts with that player's swatch (before the name). A swatch opens a Popover: 8 round swatches (24 px, 4 × 2), the key's name as `aria-label` and Tooltip ("Rose"; taken: "Rose — taken by Player 2", disabled, 40 % opacity), a check on the current one. Window size unchanged (400×220; the body scrolls, OQ-CAMP-16).
+- **Palette** (OQ-CAMP-17, decided #256; dark mode; the integrator copies it to [visual-direction](../design/visual-direction.md) as `player.<key>` tokens, OQ-CAMP-23). Tuned from the Okabe–Ito colour-blind-safe set; amber replaces today's DM gold `#eab308`, jade today's player green `#22c55e`. Contrast measured (WCAG) on the app background `#0a0a0a` / window surface `#171717` / the `#000` canvas casing:
+
+| Key | Hex | On `#0a0a0a` | On `#171717` | On casing | | Key | Hex | On `#0a0a0a` | On `#171717` | On casing |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `amber` *(DM default)* | `#e69f00` | 8.79 | 7.96 | 9.32 | | `yellow` | `#f0e442` | 14.97 | 13.56 | 15.88 |
+| `jade` | `#19b98a` | 7.87 | 7.13 | 8.35 | | `blue` | `#5b8ff0` | 6.25 | 5.66 | 6.63 |
+| `sky` | `#56b4e9` | 8.58 | 7.77 | 9.10 | | `vermillion` | `#d55e00` | 5.12 | 4.64 | 5.43 |
+| `rose` | `#e08ab8` | 8.01 | 7.25 | 8.50 | | `bronze` | `#a07850` | 4.99 | 4.52 | 5.30 |
+
+  - Every key ≥ 4.5 : 1 on the window surface (log names are text, AA); ≥ 3 : 1 non-text against the casing on any map. No white or grey key: white is the selection / drag-target outline (`primary`) and grey is `visibility.hidden`; no pure red: `accent.danger` marks blocked paths and wall hints.
+  - **Colour-blind check** (CIEDE2000 between every pair, Machado 2009 simulation at full severity): normal vision min ΔE 14.1 (sky–blue); deuteranopia min 9.7 (sky–blue), protanopia 9.6 (sky–rose), tritanopia 6.8 (sky–jade, rare). The 10 bright Tailwind-400 colours tried first: deuteranopia min 4.3 (gold–lime), 6 of 45 pairs < 10. Hence the name chips (OQ-CAMP-25) as the backup, not colour alone.
+- *(Sprint 5)* **Test IDs:** `camp-color-dm` (DM swatch Button, `data-value` = key), `camp-player-color` (+ `data-record-id` = player id, `data-value`), `camp-color-popover`, `camp-color-swatch` (+ `data-value` = key, `data-taken-by` = player id \| `dm` \| absent, `data-state` = `checked` \| `unchecked`); player: `camp-my-color` (header dot Button, `data-value`).
 - **Player view** (`/p/<token>`, loading first). This spec owns the wording; live-sync's player `rejected` state shows the invalid-link screen.
-  - Joined (skeleton): "Playing as **Player 1** in **Fixture Campaign**". Later: the active scene.
+  - Joined (skeleton): "Playing as **Player 1** in **Fixture Campaign**". Later: the active scene. *(Sprint 5)* "Playing as ● **Player 1** in …": the dot (12 px, the player's colour, Tooltip "Your colour") is a Button opening the same Popover as the DM's; taken swatches disabled with the taker's name. The player sees everyone's colours on their marks, never a list of who has which beyond the Tooltips.
   - Invalid link: "This link isn't recognised. Check that you opened the whole link your DM sent."
   - Waiting: "**Fixture Campaign** isn't running right now. This page joins automatically when the DM starts it."
 
@@ -99,12 +138,14 @@ No JSON leaf fields ([ADR-0006](../architecture/adr/0006-persistence.md)). DM se
 | | name | text | 1–40, unique case-insensitive per campaign |
 | | linkToken | text | Unique; plain text so the DM can re-copy. Never in a sync record, event or log entry |
 | | createdAt, updatedAt | timestamp | |
+| | color *(sprint 5)* | text \| null in the DB, a palette key; non-null on the wire after the boot backfill | FR-CAMP-23; not unique in the DB (defaults may repeat past 8, FR-CAMP-26) |
+| Campaign | dmColor *(sprint 5)* | text, a palette key, default `amber` | FR-CAMP-24 |
 
-- **Relations:** Campaign 1—* Player 1—* owned records ([entities](entities.md), [scenes-map](scenes-map.md)); no removal → no dangling owners. **Derived:** link URL = public base URL + path + `linkToken`; online state from presence; *(N3)* party lines (FR-CAMP-21: passives derived by entities' helpers; level, AC, HP stored; temp HP read from combat-extras' column), client only. **Persisted runtime state:** `Campaign.active` (throttle counter: memory only).
+- **Relations:** Campaign 1—* Player 1—* owned records ([entities](entities.md), [scenes-map](scenes-map.md)); no removal → no dangling owners. **Derived:** link URL = public base URL + path + `linkToken`; online state from presence; *(N3)* party lines (FR-CAMP-21: passives derived by entities' helpers; level, AC, HP stored; temp HP read from combat-extras' column), client only; *(sprint 5)* a person's hex = `colorOf(store, {role, playerId})` (FR-CAMP-28), never stored elsewhere. **Persisted runtime state:** `Campaign.active` (throttle counter: memory only); *(sprint 5)* `player.color`, `campaign.dmColor`.
 
 ## 9. API & events
 
-Envelopes, errors and close codes: [live-sync](live-sync.md). CRUD over REST (OQ-SYNC-04). Paths per OQ-CAMP-15. **WS intents:** none.
+Envelopes, errors and close codes: [live-sync](live-sync.md). CRUD over REST (OQ-SYNC-04). Paths per OQ-CAMP-15. **WS intents:** none until sprint 5; *(sprint 5)* `camp.setColor {playerId: Id | null, color}` (DM, player; FR-CAMP-25) → `ack {}` / `reject` `forbidden` \| `not_found` \| `invalid` \| `conflict`. WS, not REST: players have no REST write route, and the change must reach every open client ≤ 1 s.
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
@@ -116,7 +157,7 @@ Envelopes, errors and close codes: [live-sync](live-sync.md). CRUD over REST (OQ
 | PATCH | `/api/players/:id` | DM | Rename |
 | GET | `/api/join/:token` | token holder | `{playerName, campaignName, campaignActive}` or 404 |
 
-- **Record types** (generic record changes `{type, id, op, data}` + cause, OQ-SYNC-07): `campaign {id, name}` and `player {id, campaignId, name}` (no token field exists). Scope `campaign`; visibility = full for connections of their own campaign; snapshot = own campaign row / all its players.
+- **Record types** (generic record changes `{type, id, op, data}` + cause, OQ-SYNC-07): `campaign {id, name}` and `player {id, campaignId, name}` (no token field exists). Scope `campaign`; visibility = full for connections of their own campaign; snapshot = own campaign row / all its players. *(Sprint 5)* `campaign` gains `dmColor`, `player` gains `color` (FR-CAMP-29); same visibility (every connection of the campaign, DM and players), same snapshot.
 - **Close reason `campaign-inactive`** (retryable; also sent at `hello` for a valid token of an inactive campaign): player client → waiting screen, keeps retrying; DM client → reconnects at once.
 - *(N3)* No new intent, record type, event or field. The party lines read `entity` records the DM already receives in full ([FR-ENT-15](entities.md#6-functional-requirements)); `camp.players` is a DM-only window, so nothing new reaches any player (owning player or others).
 - **Provided to live-sync:** `verifyDmCredential(value) → {campaignId} | invalid | throttled | noActiveCampaign`; `resolvePlayerLink(token) → {campaignId, playerId, campaignActive} | null`. With no active campaign the DM client stays on REST and opens no WS.
@@ -126,7 +167,8 @@ Envelopes, errors and close codes: [live-sync](live-sync.md). CRUD over REST (OQ
 | CampaignCreated | `campaign` upsert | yes | no | no | — (new campaign has no connections) |
 | CampaignRenamed | `campaign` upsert | yes | no | no | — |
 | CampaignActivated `{campaignId, previousCampaignId}` | none | yes | no | no | `disconnect(previous campaign, campaign-inactive)` |
-| PlayerAdded / PlayerRenamed | `player` upsert | yes | no | no | — |
+| PlayerAdded / PlayerRenamed | `player` upsert (*sprint 5:* with its default `color`) | yes | no | no | — |
+| PlayerColorSet `{playerId: Id \| null, color}` *(sprint 5)* | `player` upsert, or `campaign` upsert when `playerId = null` (DM colour); visibility: every connection of the campaign | yes | no | no | — |
 
 ## 10. Permissions
 
@@ -136,8 +178,11 @@ Envelopes, errors and close codes: [live-sync](live-sync.md). CRUD over REST (OQ
 | Create / rename / switch campaign; add / rename player; read link tokens | ✓ | ✗ | DM credential |
 | Join a campaign | — | Own link only | Token resolves; campaign active |
 | Read own campaign name + player names | ✓ | ✓ | Campaign from the connection context |
+| *(Sprint 5)* Read every player's colour + the DM colour | ✓ | ✓ | Campaign from the connection context |
+| *(Sprint 5)* Set a player's colour | any player of the campaign | own only | `camp.setColor`: `playerId = ctx.playerId` for players (FR-CAMP-25) |
+| *(Sprint 5)* Set the DM colour | ✓ | ✗ | `playerId = null` → DM only |
 
-No player-writable actions in this spec.
+~~No player-writable actions in this spec.~~ *(Sprint 5)* One player-writable action: their own colour.
 
 ## 11. Edge cases & failure modes
 
@@ -146,11 +191,23 @@ No player-writable actions in this spec.
 - **Server crash:** each command is one transaction (row + log): all or nothing. Retried create → unique-name error. Activation flips both flags at once: never zero or two active. Crash after the activation commit: connections drop anyway; old-campaign players then get `campaign-inactive`. After restart: DM still logged in, same active campaign, links work, throttle cleared. Server or tunnel down: page can't load; new tunnel host → DM re-copies links.
 - **Concurrent edits:** two DM tabs → last write wins; racing creates/renames → DB uniqueness gives one success, one error. A switch closes the other DM tabs too; in-flight intents are not resent ([FR-SYNC-05](live-sync.md#6-functional-requirements)).
 - **Party lines (N3):** client-only view of the store: disconnect → last values + banner; reconnect / server crash → the snapshot refreshes them; nothing to lose. Character reassigned → it moves under the new owner ≤ 1 s. Temp HP absent (column missing in old data) → treated as 0. A sheet edit by the owner shows ≤ 1 s.
-- **Invalid / malicious input:** zod on every route; names trimmed, control characters rejected, rendered as text. Unknown token → 404, no detail; 128-bit tokens need no join rate limit. A player on the DM route sees only the login screen. Anyone reaching the tunnel can keep the DM locked out in 60 s windows (accepted, trusted table; OQ-CAMP-12).
+- **Colours (sprint 5):** *disconnect* → picker disabled (FR-CAMP-25), marks keep the last known colours + banner; *reconnect* → the snapshot carries every colour, marks redraw. *Server crash* → `camp.setColor` is one transaction: the colour and its log row commit together or not at all; a pick in flight gets no `ack` and the snapshot after the restart shows the stored colour. *Racing picks* (two players, one key; or the DM and a player) → one `ack`, one `conflict` "Taken by ‹name›" (FR-CAMP-26). *A colour changes mid-gesture* (laser, drag, template preview) → the next frame draws in the new colour; nothing resent. *Backfill crash* → one transaction, rerun at the next boot. *9th player* → a repeated default; the picker still only offers free keys (none free → every swatch but the own disabled, Tooltip names the taker). *Campaign switch* → the new campaign's colours arrive with its snapshot. *Unknown key on the wire* (a newer server, a hand-edited DB) → role accent fallback (FR-CAMP-28), no crash.
+- **Invalid / malicious input:** zod on every route; names trimmed, control characters rejected, rendered as text. *(Sprint 5)* `camp.setColor`: strict zod (`color` one of the 8 keys, `playerId` an id or null); another campaign's player → `not_found`; a player naming someone else → `forbidden`, nothing written. Unknown token → 404, no detail; 128-bit tokens need no join rate limit. A player on the DM route sees only the login screen. Anyone reaching the tunnel can keep the DM locked out in 60 s windows (accepted, trusted table; OQ-CAMP-12).
 
 ## 12. Performance & bandwidth
 
 - A handful of campaigns, ≤ ~7 players each; payloads < 2 KB; no assets. Join = one small REST call + the snapshot ([ADR-0003](../architecture/adr/0003-local-hosting.md)). Switch: close ≤ 1 s after commit; DM live ≤ 2 s later; waiting players join ≤ 10 s after reactivation.
+- **Sprint 5, CON-44 (measured by spec-colours, 2026-10-18;** throwaway probe on `spec/s5-colours` @ a94ccac (= `main` 04d11e9): `servicesFromBundle(session-sim)` + `buildRealisticHeavy`, then the candidate fields added to each viewer's real snapshot records and the whole frame re-serialised; probe deleted**):**
+
+| Viewer | Snapshot today | + `player.color` ×7 + `campaign.dmColor` (worst key `vermillion`) | + hex `#rrggbb` instead | + NOTE `byRole` + `byPlayerId` (FR-NOTE-38, worst: every row by a player) | Rejected: colour copies on templates + log entries |
+|---|---|---|---|---|---|
+| DM | 672,302–672,320 B (ids vary per run) | **+149 B** | +128 B | +8,400 B (120 rows) | +2,163 B |
+| Each player (6) | 278,877–282,120 B | **+149 B** | +128 B | +7,210–7,280 B (103–104 rows) | +2,142 B |
+
+  - With every sprint-5 colour field (CAMP + NOTE): DM ≈ 680.9 KB, players ≤ 289.6 KB; on the sprint-4 worst DM (863 KB) ≈ 871.6 KB. Under the ceilings (DM **1.5 MiB** since DM gate 1, #256 (was 1 MiB, #208); players 512 KiB). *(Seams S14)* all sprint-5 tracks together: DM ≈ 940 KB of 1.5 MiB (≈ 632 KB left; K's share ≈ 8.6 KB = 149 B + 8,400 B), players ≈ 357 KB of 512 KiB (346 + R 3 + P 0.3 + **K 7.3**; review #46: K's player share = 149 B colours + 7,280 B NOTE stamp worst = 7,429 B ≈ 7.3 KiB); K0 adds its colour fields and the NOTE stamp to `snapshot-size.test.ts`'s worst case.
+  - **Signals: 0 B** (colour derived from the server-stamped `from`). The rejected "colour in the frame" alternative: +21 B per frame on ping (176 B), laser (613 B at 32 points), `scn.template` (258 B), `map.drag` (207 B), i.e. ≈ +420 B/s per receiver at 20 frames/s.
+  - **Events:** `PlayerColorSet` = one `player` (≈ 120 B) or `campaign` (≈ 70 B) upsert to every connection of the campaign; a human click, ≤ a few per session.
+  - Client: `colorOf` is a map lookup per mark (≤ 8 players); the palette Popover renders 8 buttons.
 
 ## 13. Test plan
 
@@ -184,6 +241,41 @@ Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from wo
 10. **C:** Sela edit WIS 16 → 18; **A:** Sela's PP and Ins rise by 1 ≤ 1 s. **A:** Mira's sheet → Temp HP 5; Damage 3 from **B** → Mira line "HP 12 / 12 +2 temp".
 11. **A:** click Thorn's line → `char.sheet` opens (or comes to front) on Thorn. Hard-kill + restart → lines unchanged after rejoin. B, C: no Players window in their launcher.
 
+### Sprint 5: player colours (track K) and the kept-template menu ([1])
+
+| Key | Contents | Requires |
+|---|---|---|
+| `pc-colours` *(new, `fixtures/units/campaign-management/`)* | Setup, as DM: `camp.setColor {playerId: player-2, color: "blue"}` (a pick, so the fixture path runs the command); `player-1` keeps its default `jade`; DM keeps `amber`. Stable: no ids or tokens created | `base`, `player-2` |
+
+- **Bundle `player-colours`** *(new)* = `map-tools` ([MAP §13](scenes-map.md#13-test-plan): Goblin Ambush with Mira (`player-1`), Thorn (`player-2`), Goblin Sneak; kept templates Spirit Guardians (`player-1`), Thunderwave (`player-2`), Web (DM), hidden Glyph (DM)) + `pc-colours`. Two players with different colours (jade, blue) and the DM (amber).
+- **Existing bundles:** keep behaving; the backfill gives every player a default (FR-CAMP-23), so marks change from today's two role accents to per-person colours. Tests that assert `dmAccent` / `playerAccent` on templates, pings or laser switch to `colorOf` (K3 / K4 update them). `session-sim-9` gains `pc-colours` (orchestrator, sprint gate).
+- **Leak strings / properties** (player frames): no `linkToken`; `player.color` and `campaign.dmColor` present (not secret); no signal frame has a `color` key (0 B rule, ADR proposed); NOTE's `byPlayerId` only on rows the player may see (FR-NOTE-06 unchanged).
+
+| Level | What | Fixtures |
+|---|---|---|
+| Unit | `FR-CAMP-23 default colour` (pure `defaultColor`: add order jade, sky, rose…; the DM's key skipped; a picked key skipped; 9th player → least used, ties in palette order); `FR-CAMP-28 colorOf` (player → its key's token; DM → `dmColor`; unknown player / key → role accent; system → none; `--player-<key>` read with the hex fallback); `FR-CAMP-28 palette contrast` (review #50; `@shared/campaign-management/colors.test.ts`, pure TS, no dependency: WCAG 2.x relative-luminance contrast of every key ≥ 4.5 : 1 on `#171717` and `#0a0a0a`, ≥ 5.0 : 1 on `#000`; pairwise **CIEDE2000** (Sharma, Wu & Dalal 2005) between the keys after the **Machado, Oliveira & Fernandes (2009)** linear-RGB simulation at severity 1.0: min ≥ 14 normal, ≥ 9.5 deuteranopia and protanopia, ≥ 6.5 tritanopia; plus ΔE ≥ 15 from `accent.danger` `#ef4444`; reproduces §7's figures to 0.1) | In-code |
+| Integration | `FR-CAMP-23 backfill` (rows with a null colour filled in `createdAt`, `rowid` order, one transaction, also with equal fixture `createdAt`; rerun no-op; snapshot never carries a null `color`); `FR-CAMP-24 DM colour` (new campaign `amber`; `campaign` record carries `dmColor`); `FR-CAMP-25 setColor permissions` (player own ✓ + `PlayerColorSet` + log row; player → other player `forbidden`; player → `null` `forbidden`; DM → any ✓, → `null` ✓; other campaign's player `not_found`; key outside the palette `invalid`; same colour → `ack`, no event, no log row); `FR-CAMP-26 uniqueness` (pick taken by a player → `conflict` "Taken by Player 2"; by the DM → "Taken by DM"; two queued picks of one key → one `ack`, one `conflict`; a default may repeat only after 8); `FR-CAMP-29 colours visibility` (harness DM + `player-1` + `player-2`: both players get `player.color` for every player and `campaign.dmColor`; a change reaches all three ≤ 1 s; no `linkToken` in any frame); `CON-44 colours` (realistic heavy: each viewer's growth from the colour fields ≤ 160 B; with NOTE's stamp, DM < 1.5 MiB (#256), players < 512 KiB; *seams S14:* the rows join `snapshot-size.test.ts`'s worst case, which by then holds R, P and C's rows too) | `player-colours`; heavy harness |
+| Integration (crash, review #47) | `FR-CAMP-25 crash` (`PP_TEST_MODE=1`, disposable data, AGENTS §9.2 `PP_TEST_CRASH`): `camp.setColor:before-commit` → the server SIGKILLs itself; after restart `player-1` has its old colour, no `PlayerColorSet` log row, `state:digest` equal to before the intent; `camp.setColor:after-commit` → after restart the new colour and exactly one log row (the `ack` was lost; a resend is a same-colour no-op). `FR-CAMP-23 backfill rerun` (null a colour in the DB file, restart twice: the first boot fills it, the second leaves `state:digest` unchanged) | `player-colours` |
+| Client | `FR-CAMP-27 picker` (static render: 8 swatches, taken ones disabled with "Taken by ‹name›", own checked; click sends `camp.setColor`; not live → disabled; reject → Toast and the server's colour) | In-code |
+| E2E (thin) | `// e2e-bundle: player-colours`: `player-1` picks `rose` from `camp-my-color` → the DM's `camp-player-color` for Player 1 reads `data-value="rose"` and Spirit Guardians' `scn-template` reads `color` = rose's hex on the DM and `player-2`; the DM right-clicks Thunderwave → `scn-template-ctx-delete` → gone on all three (SCN FR-SCN-48) | `player-colours` |
+
+**Colours walkthrough** (sprint 5; covers CAMP FR-CAMP-23–29, MAP FR-MAP-68–73, SCN FR-SCN-47–51, DICE FR-DICE-60–61, NOTE FR-NOTE-38–41). `PP_TEST_MODE=1` (for `note.testSend`); `bun run build`, `fixtures:reset-load player-colours --profile verify`, `start --profile verify` (Herdr pane). **A** DM at 1440×900, **B** `player-1` at 1280×800, **C** `player-2` at 1440×900. B, C frames logged; canvas points via the `e2e/support` Konva helper. Konva colour attrs: MAP / SCN test IDs (`color` attr = the drawn hex).
+
+| # | DM (A) | Players (B, C) | Expected |
+|---|---|---|---|
+| K1 | Log in; Show Goblin Ambush (Scenes); open Players | B, C open links | A's panel: DM swatch amber, Player 1 jade, Player 2 blue. B's header dot jade, C's blue. Spirit Guardians jade, Thunderwave blue, Web amber on all three; Glyph hidden-grey on A only |
+| K2 | — | B: header dot → Popover; hover blue, then amber; click **rose** | Blue "Taken by Player 2" and amber "Taken by DM" disabled. After the click, ≤ 1 s: A's Player 1 swatch and B's dot rose; Spirit Guardians redraws rose on A, B, C (recolour, no reload) |
+| K3 | Ping tool: click; Shift+click (pull) | B: right-drag a laser across empty map; Ping click. C watches | A, C: B's laser trail rose over a dark casing with a "Player 1" chip at its head; B's ping pulse rose + chip. B, C: A's ping and pull amber + "DM" chip. B's own marks rose locally. Frames: no `color` key |
+| K4 | — | B: AoE → Cone 15 ft, place, Keep, label "Burning Hands"; C: AoE → Sphere 20 ft, hold (ephemeral) | B's cone rose live and kept on A, C; hover its label → "by Player 1". C's live sphere blue on A, B; Esc removes it |
+| K5 | Drag Thorn, hold; then Goblin Sneak, hold | B drags Mira, holds 2 s, drops | Mira's path rose on A, B, C (owner's colour); Thorn's path blue on all (owner, though the DM drags); Goblin Sneak's path amber on A only, players: glide, no path. Blocked part (if any) stays dashed red |
+| K6 | Roll bar `1d20` (public) | B: roll bar `1d20`; C: sheet skill check | Game log on A, B, C: B's line actor name rose, C's blue, A's amber; names bold, readable (OQ-DICE-39 A′: roll lines only; an applied attack line stays neutral, #256) |
+| K7 | `note.history` → Test send to Player 2, info | B: `note.history` → Test send (behaves like a damage card) | A: B's pending toast + history row with a rose left stripe; "Resolved by DM" after A acts ("DM" in amber, OQ-CAMP-27). C: A's info toast with an amber stripe |
+| K8 | Select tool: right-click B's kept cone (no drag) | — | *(OQ-SCN-37 B, decided #256)* Menu at the pointer: **Delete**, **Hide**, **Edit…**; no laser frame sent. Esc closes it. Right-click again → Edit… → AoE tool active with the cone selected (handles). Right-click again → **Delete** → gone on A, B, C ≤ 1 s. Right-*drag* starting on Web → laser trail, no menu; right-click on Mira's token where it overlaps a template → the token menu (FR-MAP-71 step 2) |
+| K9 | — | C: right-click Spirit Guardians (B's), off any token; then right-click own Thunderwave → Delete; then right-click Thorn's token | Spirit Guardians: no menu; C's right press is the laser as today (a blue dot / trail on A, B). Thunderwave: menu with **Delete** and **Edit…** (no Hide) → gone on A, B, C. Thorn's token (no template under it): nothing, no laser frame (FR-MAP-24) |
+| K10 | Players panel: Player 2 swatch → rose; then DM swatch → yellow | — | Rose disabled for Player 2 ("Taken by Player 1"; the forced intent's `conflict` is the integration test's). Yellow: Web, A's pings and log names turn yellow on A, B, C ≤ 1 s |
+| K11 | — | B: Probes "drop connection", open the header Popover; reconnect | Disconnected: swatches disabled, marks keep their colours. Back live: picker works |
+| K12 | Reload all; hard-kill + restart | — | Colours kept (A amber → yellow, B rose, C blue); deleted templates stay deleted; log names and NOTE stripes in the same colours; `state:digest` before = after the restart. Leak scan of B, C frames clean (list above); no console errors |
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -193,8 +285,31 @@ Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from wo
 | [play-shell](play-shell.md), [entities](entities.md), [scenes-map](scenes-map.md) | Placement of switcher, players panel and player landing; owned records reference `Player.id` | phase 2 |
 | Build conventions (AGENTS.md) | `PP_DM_SECRET`, `PP_PUBLIC_BASE_URL`, `PP_DATA_DISPOSABLE`, `ctx.ids/tokens/clock` (AGENTS §9.2–9.3) | agreed, pending merge |
 | [character-sheet-full](character-sheet-full.md), [entities](entities.md), [combat-extras](combat-extras.md) (N3) | `passiveScore` (overrides), stored `level` / `ac` / `hpMax`, `hpCurrent`; `entity.tempHp` (CBTX, read only); `openSheetFor` (FR-CHARX-47). No change to those specs | built |
+| *(Sprint 5)* [scenes-map](scenes-map.md), [scene-tools](scene-tools.md), [dice-roll-log](dice-roll-log.md), [notifications](notifications.md) | Draw with `colorOf` from the person they already carry (FR-MAP-68–73, FR-SCN-47, FR-DICE-60–61, FR-NOTE-38–41) | revised with this spec (track K) |
+| *(Sprint 5)* [play-shell](play-shell.md) / W | No frame edit: the player picker lives in this spec's header node (`screens.tsx`), the DM's in `camp.players`. **One K ↔ W seam** (review-a #21, S15 amended): W1 edits notifications' toast stack (`ToastRuntime.tsx`, `keep-out.ts`), so K4's toast stripe goes **after W1** | sequencing (W1 first) |
+| *(Sprint 5)* [dice-extras](dice-extras.md) | Roller name colour in the roll popup (OQ-DICE-40, decided #256): K4's `colorOf` line after D11; D11 leaves it plain (seams S15) | decided (#256) |
+
+**Shared changes** (sprint 5, track K; slices and order: [§14 build split](#sprint-5-build-split-track-k)):
+- ★ `src/server/db/`: `player.color` text **null** (filled by the boot backfill, zod non-null on the wire, FR-CAMP-23, review #9), `campaign.dm_color` text not null default `amber`; NOTE's `notification.by_role`, `by_player_id` (FR-NOTE-38). One schema batch (K0): lane 2 after R0; merges last (**P0 → R0 → C5 core → K0**, seams S1). Grants: seams S15; plus one line in dice-roll-log's server `game-log.ts` (system actor throws, FR-DICE-61; **granted by the orchestrator**, 2026-10-19).
+- ★ `src/shared/events/campaign-management.ts`: `PlayerColorSet`. Record schemas in `@shared/campaign-management` (own folder): `color`, `dmColor`; `colors.ts` (palette, `defaultColor`).
+- ★ `src/client/common/styles.css`: 8 `--player-<key>` custom properties (existing shared UI file, as `--creature-*`). New common file `src/client/common/features/campaign-management/colors.ts` (`colorOf`).
+- ★ `fixtures/bundles/index.ts` (append `player-colours`). Docs (assigned): data model (player, campaign, notification columns), protocol (`camp.setColor`, `PlayerColorSet`, record fields, CON-44 figures), visual-direction `player.<key>` tokens (OQ-CAMP-23), glossary (OQ-CAMP-24).
 
 **Shared changes** (sprint 2 phase 1, N3): none shared. Built in `fix/charx-cues` (after `fix/charx-buttons`; it needs `openSheetFor` + picker memory, FR-CHARX-47). Feature-owned: `src/client/dm/features/campaign-management/PlayersPanel.tsx` + a pure `party-lines.ts` (view model, tested). Imports `@shared/entities` helpers and `@ui/features/character-sheet/selection` (allowed, AGENTS §9.1). No DB, event, protocol, record type or window geometry change (unless OQ-CAMP-16 picks a taller default: protocol §24 `camp.players` row + layout tests).
+
+### Sprint 5 build split (track K)
+
+Hotspot rules ([sprint-5](../agents/sprint-5.md#boundaries-and-hotspots-sequence-these)): *(settled by seams S1, S10, S15)* **schema in two lanes**: lane 1 P0 → C5 core, lane 2 **R0 → K0**; merge order **P0 → R0 → C5 core → K0** (K0 rebases on all three). **Canvas** single-holder files (`MapCanvas.tsx`, `TokensLayer.tsx`, `LabelsLayer.tsx`, `DragPaths.tsx`, `drag-path.ts`, `drag-preview.ts`, `PointersLayer.tsx`, `TemplatesLayer.tsx`, tools): one holder at a time, **K1 → W2 (Fit) → R3 (trails) → K3**; a slice ready early waits or stacks with `--base` on the holder's branch. **`GameLog.tsx`:** **W1 (width) → D8 (held lines) → D9 → K4** (review-a #20); notifications' toast components **W1 → K4** (review-a #21); the roll popup's name colour (OQ-DICE-40) is K4's line after D11. No-schema slices (incl. K1) start at once in Phase B. `bun run check` + full e2e per slice.
+
+| Slice | Contents | Touches (★ = shared, via the orchestrator) | Order / lock | Walk |
+|---|---|---|---|---|
+| **K1** `fix/tpl-menu` ([1]) | FR-SCN-48–51 (template right-click menu: Delete; OQ-SCN-37 B: DM Hide / Reveal, Edit…; `templateAt` hit test; menu island like `DoorMenu`), FR-MAP-71 (right-press routing as built + the layer `contextMenu` step, 4 px rule; player token right-press → template menu or nothing); e2e | `MapCanvas.tsx` (single holder), `laser.ts` (deferred laser from the press point), scenes-map's `src/client/common/features/scenes-map/layers.ts` (`LayerDef.contextMenu?`: contract change **granted to K1**, review-a #11), `canvas-layers.ts` (SCN's `scn-templates` line, granted), new `TemplateMenu.tsx`, `templates.ts`, `aoe-store.ts`. Docs: protocol §26 layer-entry row (`contextMenu?`). **No** server, schema or event change (`scn.deleteTemplate` / `updateTemplate` exist, FR-SCN-26) | Phase B at once (no schema, S1); **first canvas holder** (S10: K1 → W2 → R3 → K3); ∥ K0, ∥ every non-canvas slice | K8, K9 (on `map-tools` if `player-colours` isn't on `main` yet) |
+| **K0** `fix/colours-core` | FR-CAMP-23–26, 29 (columns, backfill, `camp.setColor`, uniqueness, records), FR-NOTE-38 (`notify` stamps `byRole` / `byPlayerId`); `@shared/campaign-management/colors.ts`; client `colorOf` + `--player-*` vars (so K2–K4 run in parallel); `pc-colours` + bundle `player-colours`; `CON-44 colours` | ★ `src/server/db/`, ★ `src/shared/events/campaign-management.ts`, ★ `src/client/common/styles.css` (8 lines), ★ `fixtures/bundles/index.ts` (append); CAMP server + shared (own); notifications server `helpers.ts` + `@shared/notifications/schemas.ts` (notifications' files, assigned to K0); dice-roll-log server `game-log.ts` (one line: a system actor throws, FR-DICE-61; **granted by the orchestrator**); docs (assigned) | **Lane 2 after R0**; merges after P0, R0, C5 core (S1); adds its rows to `snapshot-size.test.ts` worst case (S14); ∥ K1 | integration + unit |
+| **K2** `build/colour-picker` | FR-CAMP-27: player header dot + Popover, DM Players panel swatches + DM swatch | CAMP client: `src/client/player/features/campaign-management/screens.tsx`, `src/client/dm/features/campaign-management/PlayersPanel.tsx`, new common `ColorPopover.tsx` | After K0; ∥ K1, K3, K4 (no shared file) | K1, K2, K10, K11 |
+| **K3** `build/map-colours` | FR-MAP-68–73 (laser, ping / pull + name chips, drag path / trail owner colour, casing, recolour), FR-SCN-47 (template colour, "by ‹name›"), FR-NOTE-40's cue ring | `layers/PointersLayer.tsx`, `pointers.ts` (keep the sender), `layers/DragPaths.tsx`, `drag-path.ts`, `theme.ts`, `layers/TokensLayer.tsx` (cue ring, single holder), scene-tools `layers/TemplatesLayer.tsx` | After K0; canvas **last** in S10's order (after K1, W2, R3); colours R3's stored `trail` (FR-MAP-70); `token-overlays.ts` `cue.color?` contract change granted to K3 only (S15) | K3, K4, K5 |
+| **K4** `build/log-note-colours` | FR-DICE-60–61 (actor name colour on `roll` lines, OQ-DICE-39), FR-NOTE-39–41 (stripe; OQ-CAMP-27: resolved-by name; old rows) | dice-roll-log client (`GameLog.tsx`, line render) **after W1 → D8 → D9** (S15 as amended by review-a #20); the roll popup's roller name (dice-extras, OQ-DICE-40) after D11; notifications client (toast + history row components, own files) **after W1** (review-a #21) | After K0; `GameLog.tsx` after W1 → D8 → D9, toasts after W1, popup after D11; ∥ K2, K3 | K6, K7; last slice walks K1–K12 |
+
+- **Parallel:** K1 ∥ K0 at once; then K2 ∥ K3 ∥ K4 (K3 waits for K1 → W2 → R3, K4's log part for W1 → D8 → D9, its toast part for W1). Tool bars (`ToolRail.tsx`, `FogBar.tsx`) are outside the canvas lock (review-a #22). **No** new registry, Konva layer, signal or dependency.
 
 ## 15. Open questions
 
@@ -216,6 +331,22 @@ Isolated per worktree: fresh temp DB and asset dir, own ports, DM secret from wo
 | OQ-CAMP-14 | ~~Glossary~~ **Decided (integrator):** added **Active campaign**, **Public base URL**, **Link token**; **Player link** reworded to "bound to one player" (rename keeps the token; [ADR-0019](../architecture/adr/0019-auth-credentials.md) refines ADR-0004). | — | — | — |
 | ~~OQ-CAMP-16~~ | ~~N3: `camp.players` is 400×220; two players with two characters each plus the add row already scroll~~ | **Decided (#190):** keep 400×220, the body scrolls (no geometry or layout-test change) | — | play-shell, protocol §24 |
 | OQ-CAMP-15 | Routes: DM client, player page, REST prefix | **DM `/`, player `/p/<token>`, REST `/api/*` as in §9** *(proposed)* / other | no · owner: spec-campaign-management | live-sync, AGENTS §9.1 |
+
+**Sprint 5** (track K, BL-17). Decided by the DM before the spec: players and the DM pick a colour; it marks laser, pings, templates, drag path, log lines, notifications. Every row below **decided at sprint-5 DM gate 1 (#256, 2026-10-19) as picked**; rejected options struck.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-CAMP-17 | **Palette:** fixed set or free picker? | **Decided (#256): fixed 8, measured (amber = DM default, jade, sky, rose, yellow, blue, vermillion, bronze).** Pick as proposed: A. Fixed 8, measured (§7): tuned Okabe–Ito, every key ≥ 4.5 : 1 on windows, colour-blind min ΔE 9.6–9.7 (deutan / protan); stored as a key, so the UI sprint (BL-29) can restyle it. Rejected: ~~B. 12 bright colours: more choice, but 5–6 pairs blur for colour-blind players (min ΔE 4.3)~~, ~~C. Free picker (native `<input type="color">`, no dependency; stored `#rrggbb`, +128 B per frame vs A's +149 B): any colour, no contrast or colour-blind guarantee; uniqueness becomes "ΔE ≥ 10 from every other"~~ | — · decided | all five specs, visual-direction |
+| OQ-CAMP-18 | **Uniqueness** per campaign | **Decided (#256): a pick must be free (players + DM); only defaults repeat, after all 8 are taken.** Pick as proposed: A. A pick must be free (players + DM); only defaults repeat, once all 8 are taken (FR-CAMP-26): colour always identifies a person up to 8. Rejected: ~~B. Duplicates allowed, the picker shows who has which: no conflicts, but two "rose" players are ambiguous~~, ~~C. Strictly unique, 9th player refused: contradicts uncapped players (FR-CAMP-12)~~ | — · decided | — |
+| OQ-CAMP-19 | **DM colour's home** | **Decided (#256): `campaign.dmColor`, default amber, pickable.** Pick as proposed: A. `campaign.dmColor`, one per campaign, default amber (in the snapshot already; every DM tab agrees). Rejected: ~~B. Fixed amber, not pickable: simplest, but BL-17 says the DM picks~~, ~~C. Per browser (localStorage): other clients can't see it~~ | — · decided | — |
+| OQ-CAMP-20 | **Default for a new player** | **Decided (#256): next free key in palette order.** Pick as proposed: A. Next free key in palette order (jade, sky, rose, …) (deterministic, no seam; each player distinct from the start). Rejected: ~~B. Random free key (needs `ctx.dice` / tokens seeding in fixtures)~~, ~~C. No colour until picked (today's shared player green): everyone looks the same until they act~~ | — · decided | fixtures-adapters |
+| OQ-CAMP-21 | **Marks made before a colour change** | **Decided (#256): recolour (derived, 0 B).** Pick as proposed: A. Recolour: everything derives from the person, so pings, trails, templates, paths, log lines and notifications redraw at once (0 B). Rejected: ~~B. Keep: copy the colour onto each record when made (+2.2 KB DM snapshot, +21 B per signal frame, schema on templates, log, notifications; ADR option B)~~ | — · decided | ADR (proposed) |
+| OQ-CAMP-22 | ADR: [player colour stored once, derived everywhere](../architecture/adr/proposed-s5-colours-player-colour.md) | **Decided (#256): accept A (store once, derive everywhere).** Pick as proposed: Accept A. Rejected: ~~B (copies)~~, ~~C (per browser)~~ | — · decided | all five specs |
+| OQ-CAMP-25 | **Colour-blind safety**: what backs up colour on the map? | **Decided (#256): dark casing on every coloured mark + name chips on ping / pull / laser + "by ‹name›" on template labels.** Pick as proposed: A. Dark casing on every coloured mark + a name chip ("Player 1" / "DM") on pings, pulls and the laser head; template labels show "by ‹name›" on hover / selection; log and notifications already carry names. Rejected: ~~B. A dash pattern or glyph per player (8 patterns; clashes with the dashed blocked path and hidden styling)~~, ~~C. Colour only (measured: 1 deutan, 1 protan, 3 tritan pairs under ΔE 10)~~ | — · decided | scenes-map, scene-tools |
+| OQ-CAMP-26 | **Who sets a player's colour** | **Decided (#256): the player (own) and the DM (anyone's, incl. the DM colour).** Pick as proposed: A. The player (own) and the DM (anyone's, incl. the DM colour) (DM can fix a clash or a player who never picks). Rejected: ~~B. Only the player; the DM only the DM colour~~ | — · decided | — |
+| OQ-CAMP-27 | **Cut list: beyond BL-17** (review #12; gate bulk, in or out): (a) the "Resolved by ‹name›" badge's name in the closer's colour; (b) the DM's action-cue ring on a player's token in that player's colour (FR-NOTE-40; K3's `cue.color?` contract change exists only for this) | **Decided (#256): in ("Resolved by" name coloured; the DM's cue ring in the action owner's colour).** Pick as proposed: A. In (two small client lines; (b) costs K3 one contract field). Rejected: ~~B. Out: both stay as built (plain name, role-accent ring); K3 drops `cue.color?`~~ | — · decided | notifications, scenes-map |
+| OQ-CAMP-23 | visual-direction: add a "Player colours (proposed)" table, tokens `player.<key>` with §7's values and contrast (as `creature.<type>`) | Integrator at the sprint-5 spec merge (this spec can't edit visual-direction) | no · **settled by seams S12**: integrator at the gate merge | visual-direction |
+| OQ-CAMP-24 | Glossary: add **Player colour** ("the colour a player or the DM picks from the palette; marks their laser, pings, templates, drag paths, log names and notifications; one per person per campaign") | Integrator | no · **settled by seams S12**: integrator at the gate merge | glossary |
 
 ## 16. Out of scope
 
