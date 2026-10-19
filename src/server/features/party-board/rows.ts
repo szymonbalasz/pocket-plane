@@ -2,12 +2,13 @@
 // provider never reads `body`. Nothing here writes.
 import type {
   HandoutBodyRecord,
+  HandoutPresentRecord,
   HandoutRecord,
   PartyItemRecord,
 } from "@shared/party-board/schemas";
 import { and, asc, count, eq, inArray } from "drizzle-orm";
 import type { Db, Tx } from "../../db/client";
-import { handout, partyItem, player } from "../../db/schema";
+import { handout, handoutPresent, partyItem, player } from "../../db/schema";
 
 type Reader = Pick<Db | Tx, "select">;
 type HandoutRow = typeof handout.$inferSelect;
@@ -133,4 +134,71 @@ export function campaignPlayerIds(db: Reader, campaignId: string): string[] {
     .orderBy(asc(player.createdAt), asc(player.id))
     .all()
     .map((p) => p.id);
+}
+
+/** Players of the campaign with their names, creation order (FR-PARTY-32 messages). */
+export function campaignPlayers(db: Reader, campaignId: string): { id: string; name: string }[] {
+  return db
+    .select({ id: player.id, name: player.name })
+    .from(player)
+    .where(eq(player.campaignId, campaignId))
+    .orderBy(asc(player.createdAt), asc(player.id))
+    .all();
+}
+
+type PresentRow = typeof handoutPresent.$inferSelect;
+
+export function toPresentRecord(r: PresentRow): HandoutPresentRecord {
+  return {
+    id: r.id,
+    campaignId: r.campaignId,
+    handoutId: r.handoutId,
+    playerId: r.playerId,
+    presentedAt: r.presentedAt,
+  };
+}
+
+const presentOrder = [asc(handoutPresent.presentedAt), asc(handoutPresent.id)] as const;
+
+/** FR-PARTY-31 snapshot rows: the campaign's presents (`playerId` given → only that player's). */
+export function listPresents(
+  db: Reader,
+  campaignId: string,
+  playerId?: string,
+): HandoutPresentRecord[] {
+  return db
+    .select()
+    .from(handoutPresent)
+    .where(
+      playerId === undefined
+        ? eq(handoutPresent.campaignId, campaignId)
+        : and(eq(handoutPresent.campaignId, campaignId), eq(handoutPresent.playerId, playerId)),
+    )
+    .orderBy(...presentOrder)
+    .all()
+    .map(toPresentRecord);
+}
+
+/** Every present row of one handout, `presentedAt` order. */
+export function presentsOfHandout(db: Reader, handoutId: string): HandoutPresentRecord[] {
+  return db
+    .select()
+    .from(handoutPresent)
+    .where(eq(handoutPresent.handoutId, handoutId))
+    .orderBy(...presentOrder)
+    .all()
+    .map(toPresentRecord);
+}
+
+export function getPresent(
+  db: Reader,
+  campaignId: string,
+  id: string,
+): HandoutPresentRecord | null {
+  const r = db
+    .select()
+    .from(handoutPresent)
+    .where(and(eq(handoutPresent.id, id), eq(handoutPresent.campaignId, campaignId)))
+    .get();
+  return r ? toPresentRecord(r) : null;
 }

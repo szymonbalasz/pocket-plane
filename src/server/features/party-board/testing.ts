@@ -1,8 +1,10 @@
 // Test support for party-board: party-loot's seed (two players, Mira + Thorn, a second campaign)
 // plus image assets written straight to the table (two in Fixture Campaign, one in Second).
+import { sharedWithPlayer } from "@shared/party-board/visibility";
 import { eq } from "drizzle-orm";
 import { manualClock } from "../../commands/context";
-import { asset, assetSeqNext, player } from "../../db/schema";
+import type { Db } from "../../db/client";
+import { asset, assetSeqNext, handout, handoutPresent, player } from "../../db/schema";
 import { createTestServices } from "../../testing/services";
 import type { Viewer } from "../../ws/records";
 import { seedLoot } from "../party-loot/testing";
@@ -57,3 +59,32 @@ export function seedParty() {
 }
 
 export type PartySeed = ReturnType<typeof seedParty>;
+
+/**
+ * FR-PARTY-35 invariant: every `handout-present` row is for a player of its campaign who can see
+ * its handout (same campaign). Returns the violating rows' ids (empty = holds).
+ */
+export function presentInvariantViolations(db: Db): string[] {
+  const rows = db
+    .select({
+      id: handoutPresent.id,
+      campaignId: handoutPresent.campaignId,
+      playerId: handoutPresent.playerId,
+      handoutCampaignId: handout.campaignId,
+      sharedWith: handout.sharedWith,
+      playerCampaignId: player.campaignId,
+    })
+    .from(handoutPresent)
+    .leftJoin(handout, eq(handout.id, handoutPresent.handoutId))
+    .leftJoin(player, eq(player.id, handoutPresent.playerId))
+    .all();
+  return rows
+    .filter(
+      (r) =>
+        r.sharedWith === null ||
+        r.handoutCampaignId !== r.campaignId ||
+        r.playerCampaignId !== r.campaignId ||
+        !sharedWithPlayer(r.sharedWith, r.playerId),
+    )
+    .map((r) => r.id);
+}

@@ -1,7 +1,8 @@
 // party-board commands (PARTY §6, §9): handouts `party.createHandout` / `updateHandout` /
 // `shareHandout` / `deleteHandout` and `party.addItem` (DM), and the `handout-shared` notification
 // (FR-PARTY-06). `editItem` / `removeItem` / `moveItem` live in `item-commands.ts`; `loot.split`
-// in party-loot.
+// in party-loot. *(S5)* Share and delete close lost presents (FR-PARTY-35); share can present to
+// the gainers (FR-PARTY-33); `presentHandout` / `closePresent` live in `present-commands.ts`.
 import {
   HandoutCreated,
   HandoutDeleted,
@@ -41,6 +42,7 @@ import type { RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
 import { notify } from "../notifications/helpers";
 import { insertItemEntry } from "../party-loot/item-entries";
+import { closeLostPresents, presentTo } from "./presents";
 import {
   campaignPlayerIds,
   getHandoutRow,
@@ -60,9 +62,11 @@ export const PARTY_INTENTS = {
   editItem: "party.editItem",
   removeItem: "party.removeItem",
   moveItem: "party.moveItem",
+  presentHandout: "party.presentHandout",
+  closePresent: "party.closePresent",
 } as const;
 
-const HANDOUT_NOT_FOUND = "Handout not found";
+export const HANDOUT_NOT_FOUND = "Handout not found";
 const WORLD = { kind: "world" } as const;
 const PARTY = { kind: "party" } as const;
 
@@ -187,11 +191,13 @@ export const updateHandout = defineCommand({
  * same share → `ack`, no event. `sharedAt` = now iff some player newly gains access. Changes:
  * header + body, so gainers get upserts and losers deletes (FR-PARTY-07). Then FR-PARTY-06:
  * `handout-shared` to the gainers (one to `all` for `none` → `all`), after the event.
+ * *(S5)* The losers' presents of this handout go in the same event (FR-PARTY-35); `present: true`
+ * then presents to the gainers only (FR-PARTY-33, review #23): `HandoutPresented` last.
  */
 export const shareHandout = defineCommand({
   name: PARTY_INTENTS.shareHandout,
   input: ShareHandoutIntent,
-  execute({ handoutId, sharedWith }, env): void {
+  execute({ handoutId, sharedWith, present }, env): void {
     const cid = campaignOf(env);
     const before = loadHandout(env, cid, handoutId);
     const players = campaignPlayerIds(env.tx, cid);
@@ -213,6 +219,7 @@ export const shareHandout = defineCommand({
       changes: [
         { type: HANDOUT_TYPE, id: handoutId, before: header(before), after: header(after) },
         { type: HANDOUT_BODY_TYPE, id: handoutId, before: body(before), after: body(after) },
+        ...closeLostPresents(env, handoutId, sharedWith),
       ],
     });
     const text = handoutSharedText(after.title);
@@ -225,16 +232,18 @@ export const shareHandout = defineCommand({
         payload: { handoutId },
       });
     }
+    if (present === true && gainers.length > 0) presentTo(env, cid, handoutId, gainers);
   },
 });
 
-/** FR-PARTY-08: deletes the row; its notifications stay. */
+/** FR-PARTY-08: deletes the row; its notifications stay. *(S5)* Its presents too (FR-PARTY-35). */
 export const deleteHandout = defineCommand({
   name: PARTY_INTENTS.deleteHandout,
   input: DeleteHandoutIntent,
   execute({ handoutId }, env): void {
     const cid = campaignOf(env);
     const before = loadHandout(env, cid, handoutId);
+    const closed = closeLostPresents(env, handoutId, null);
     env.tx.delete(handout).where(eq(handout.id, handoutId)).run();
     env.emit({
       type: HandoutDeleted.type,
@@ -243,6 +252,7 @@ export const deleteHandout = defineCommand({
       changes: [
         { type: HANDOUT_TYPE, id: handoutId, before: header(before), after: null },
         { type: HANDOUT_BODY_TYPE, id: handoutId, before: body(before), after: null },
+        ...closed,
       ],
     });
   },
