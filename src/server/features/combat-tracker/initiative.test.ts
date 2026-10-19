@@ -356,6 +356,7 @@ describe("FR-CBT-14 FR-CBT-31 FR-CBT-15 turns and removal", () => {
         imageAssetId: "art-mira",
         removed: true,
         movedFt: 0,
+        side: "ally",
       },
     });
     expect(wire.some((w) => w?.type === ENCOUNTER_TYPE)).toBe(true);

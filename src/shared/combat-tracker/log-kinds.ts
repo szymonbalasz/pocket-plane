@@ -119,6 +119,11 @@ export const AttackLogPayload = z.strictObject({
    * trigger parts), attack-row order. Absent = none; old rows parse.
    */
   damageParts: z.array(AttackLineDamagePart).min(1).max(EXTRA_DAMAGE_MAX).optional(),
+  /**
+   * FR-CBT-88 (sprint 5, ADR-0053): an Apply hit line, written before the damage exists: no
+   * damage segments (`damage` 0). Absent = an outcome line; old rows parse.
+   */
+  awaitingDamage: z.literal(true).optional(),
 });
 export type AttackLogPayload = z.infer<typeof AttackLogPayload>;
 
@@ -364,7 +369,10 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
       out.push({ text: ` vs AC ${dm.targetAc}` });
     }
     const ruled = dm?.overrides.hit === true || publicRuling(t.natural, p.hit);
-    out.push({ text: outcomeText(p.hit, p.crit, ruled, !!dm) });
+    const outcome = outcomeText(p.hit, p.crit, ruled, !!dm);
+    // FR-CBT-88: an Apply hit line ends at its outcome ("— DM: hit.").
+    if (p.awaitingDamage) return [...out, { text: outcome.trimEnd() }];
+    out.push({ text: outcome });
     if (p.hit) {
       out.push(...damageSegments(p, dm, ""));
       if (damageBadge) out.push(...PHYSICAL);

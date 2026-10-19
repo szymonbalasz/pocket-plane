@@ -75,6 +75,11 @@ const SAMPLES: Record<string, { payload: unknown; dmPayload: unknown | null }> =
     payload: { targetName: "Mira", kind: "damage", amount: 5 },
     dmPayload: { applied: N, hpBefore: N, hpAfter: N },
   },
+  // FR-CBT-99 (#252): "(secret)" lives in `dmPayload` alone.
+  "cbt.side": {
+    payload: { targetName: "Goblin 2", side: "ally" },
+    dmPayload: { secret: true },
+  },
 };
 
 describe("FR-DICE-28 kind contract", () => {

@@ -649,6 +649,7 @@ All scope `campaign` (no scene gate: combat runs whatever the active scene). DM 
 | `resolveNotification(env, id, resolution?)` | NOTE | `not_found` / `conflict` (not pending) / `forbidden` (not action owner or DM) / `invalid` → **whole command rolls back**; emits `NotificationResolved` | [FR-NOTE-08](../specs/notifications.md#6-functional-requirements) |
 | `reopenNotification(env, id)` | NOTE | `resolved` → `pending` (clears `closed*`, `resolution`), else `conflict`; emits `NotificationReopened` after the owner's event | [FR-NOTE-10](../specs/notifications.md#6-functional-requirements), gate I28 |
 | `dismissForEncounter(env, encounterId) → RecordChange[]` *(polish, built)* | NOTE | Called by the command that ends an encounter (`cbt.end`), in its transaction, after its own event: every `pending` row of `env.actor.campaignId` whose kind has an end rule (`onEncounterEnd: "dismiss"`) and whose `encounterIdOf(payload)` = `encounterId` → `dismissed` (`closed*` from the actor and clock), one `NotificationDismissed` each in row `seq` order. None → no change, no event | [FR-NOTE-23](../specs/notifications.md#6-functional-requirements), [ADR-0034](../architecture/adr/0034-encounter-scoped-notifications.md) |
+| Kind `onClose?(env, row) → RecordChange[]` *(sprint 5, built, fix/s5-combat-core)* | NOTE | Optional on a server kind definition (`kind.ts`). Runs on every dismissal (`note.dismiss` via `dismissNotification`, and each row of `dismissForEncounter`), in its transaction, with the dismissed row; its record changes ride on that `NotificationDismissed` after the `notification` change. Writes through `env.tx` only, never emits; a throw rolls the dismissal (and its command) back. Resolution runs no hook (the kind owner's own command). First user: `damage-card` sends the card's `hit-ruling` delete | [FR-CBT-91](../specs/combat-tracker.md#6-functional-requirements), [§83](#83-sprint-5-combat-core-r0) |
 | `characters.adjustHp(env, characterId, delta) → {hpBefore, hpAfter, change}` | CHAR | Clamp 0…hpMax; returns the `entity` change for the caller's event; emits nothing. Only writer of `hpCurrent` besides entities' create / update | [FR-CHAR-13](../specs/character-sheet.md#6-functional-requirements) |
 | `characterRolls(statBlock, kind)` | CHAR (`@shared/character-sheet`) | Pure: initiative d20 + `initBonus`; attack d20 + `toHit` and the attack's damage. *(feedback pass, built)*: `characterRolls(statBlock, kind, ability?)`, check / save = `1d20 + bonus` (FR-ENT-24), category `ability-check` / `saving-throw` | [FR-CHAR-05](../specs/character-sheet.md#6-functional-requirements) |
 | *Built (build/character-sheet)* | CHAR | Import `{ characters }` from `@server/features/character-sheet`; `adjustHp` returns `change: RecordChange \| null` (null = clamp left HP unchanged: add nothing to the event). `characterRolls` (`@shared/character-sheet/logic`) → `{expression, category, label, d20}[]` or `null` (no attack → caller `conflict`); mode applies where `d20`. Client roll routes: `rollRoutes` list in `@ui/features/character-sheet/roll-routes`; contract `RollRoute {name, claim(store, characterId, kind) → RollRouteClaim \| null}`, `RollRouteClaim {badge, critExpressions?, send(sendIntent, {mode, manual?, public?})}` in `@ui/features/character-sheet/routing`; first claim wins, a throwing `claim` passes | FR-CHAR-05, FR-CHAR-13, FR-CHAR-16 |
@@ -787,6 +788,7 @@ Server registry owned by scenes-map, **append-only**, created by `build/scenes-m
 | `badge?(store)` on window types | `src/client/common/` shell (existing files) | Launcher unread badge | [OQ-NOTE-13](../specs/notifications.md#15-open-questions) *(proposed)* |
 | Roll control ↔ dice tray *(sprint 3, built, build/dicex-tray)* | `src/client/common/features/dice-roll-log/roll-control.tsx`, `GameLog.tsx` (D1 → R2 hotspot) | `control.roll(keys)`: `keys.altKey` → `stageTray({kind: "control", options, mode})` with the caller's `RollControlOptions` **verbatim** (unknown fields such as MOD's `subject` pass through) and nothing rolled; else as before, and every finished roll starts a pending throw (`diceExtras.sent`, ends on the first own `roll` entry or 3 s). The tray runs `useRollControl` on the staged options with its own mode and calls the caller's `onRoll` with the same `RollRequest` object (`previewMode`, `manualParts` untouched); physical mode → the exported `ManualForm` inside the tray. `STAGE_HINT` = "Alt: adjust in tray". Roll bar: tray Button (`dicex-tray-open`) and Alt+click on Roll stage `free`; Enter still rolls at once. Hosts that pass their own key state (Initiative anchors, death-save menu item) stage only if they forward `altKey` | [FR-DICEX-05](../specs/dice-extras.md#6-functional-requirements), -06, -07, -08, -09 |
 | 3D dice chunk *(sprint 3, built, build/dicex-3d)* | `src/client/common/features/dice-extras/lazy3d.ts` → dynamic `import("./dice3d/index")` | No wire change: throws stay derived from received `roll` entries. The chunk (`three` 0.186 + `cannon-es` 0.20, renderer, meshes; ≈ 160 KB gz) loads on the first 3D throw only (that throw draws flat); *(sprint 4, build/dice-screen: preloaded at idle, [§63](#63-sprint-4-full-screen-dice-layer-d6))* never imported statically (bundle-size test). D2's stored looks plug into `looksOf` in `ThrowLayer.tsx` (built, [§52](#52-sprint-3-dice-looks-d2)); materials for all four `material` values exist; the chunk also exports the look editor's `previewDie` (first look preview loads it) | [FR-DICEX-15](../specs/dice-extras.md#6-functional-requirements), -20, -22, [ADR-0044](../architecture/adr/0044-3d-dice.md) |
+| Notification kind `onClose` *(sprint 5, built, fix/s5-combat-core)* | `src/server/features/notifications/{kind.ts, helpers.ts}` | A kind may define `onClose(env, row)`: its changes ride on the row's `NotificationDismissed` (§21 helper row). `damage-card` uses it for the `hit-ruling` delete on Dismiss and End | [FR-CBT-91](../specs/combat-tracker.md#6-functional-requirements), [§83](#83-sprint-5-combat-core-r0) |
 
 ## 27. Combat: build notes
 
@@ -2143,3 +2145,42 @@ From [party-board](../specs/party-board.md#66-sprint-5-loot-tab-present-uploads)
 | `AssetListed {assetId}` (`src/shared/events/assets-pipeline.ts`) | Logged, not undoable; change `asset` upsert (before null) |
 | Fixtures | `ingestStep(file, {listed: false})` (ruling #26; a string option is still the name); `fixtureAttachmentId(key, file, draw?)` = the seeded id an attachment ingest gets in fixture `key` (no record change, so `r.id` can't see it). Units `handout-attachment`, `handout-present-1`; bundle `party-s5`; both units in `session-sim-9` |
 | CON-44 | `handout-present` DM 1,459 B at 6 rows, 259 B per player, 4,819 B at 20 rows (bound 5,100); attachments 0 B. Ceilings DM 1.5 MiB, players 512 KiB hold |
+
+## 83. Sprint 5: combat core (R0)
+
+From [combat-tracker](../specs/combat-tracker.md#9-api--events) (FR-CBT-88, -91, -94, -97–100; [ADR-0053](../architecture/adr/0053-apply-hit.md); #252) and [scenes-map](../specs/scenes-map.md#9-api--events) (FR-MAP-65, -66). **Built by `fix/s5-combat-core`**. Data side: [data model §66](../data-model/README.md#66-sprint-5-combat-core-r0).
+
+**Intents** (strict zod, `@shared/combat-tracker/schemas`)
+
+| Intent | Who | Validation | Result | Source |
+|---|---|---|---|---|
+| `cbt.applyHit {cardId, toHitTotal (−20…99), targets [{targetId, hit, multiplier}] (1–20, unique)}` *(new)* | DM | encounter ended / card not pending / already ruled → `conflict` ("Hit already applied"); card without `toHit`, no `hit: true`, duplicate or > 20 targets → `invalid`; unknown or removed target → `not_found` | `{rulingId}` | FR-CBT-88 |
+| `cbt.setSide {combatantId, side: ally \| enemy, secret?}` *(new)* | DM | no started encounter → `conflict` "No encounter running"; unknown, other campaign or not in the started encounter → `not_found`; removed allowed; same side and (secret, or already shown to players) → no-op ack | — | FR-CBT-99 |
+| `cbt.applyCard` + `damageRollId?: string \| null` | DM | ≠ the card's damage `rollId` (null = none) → `conflict` "Damage just arrived — check and Apply again", nothing written; absent = no check (R1's popup sends it) | as before | FR-CBT-94 |
+| `cbt.rollDamage` result + `unused?: true` | DM, player | zod only (written by R1) | as before | FR-CBT-92 |
+| REST encounter bodies: entries + `side?` | DM | `ally` \| `enemy`, absent = `enemy` | as before | FR-CBT-98 |
+
+**Record types**
+
+| Type | Player visibility | Snapshot | Source |
+|---|---|---|---|
+| `hit-ruling` *(new)* | `audience: dm` | the started encounter's rulings whose card is pending, card order; live: Apply, Dismiss and End list its delete, Undo's reopen its upsert (the DB row stays) | FR-CBT-88, -91 |
+| `combatant` + `side`, `publicSide` | redactions gain `side = publicSideOf(c)`; the true `side` and `publicSide` never reach players | as before | FR-CBT-100 |
+| `encounter-entry` + `side` | DM only (as before) | as before | FR-CBT-98 |
+| `token` + `trail` | DM: every token's; players: on player tokens only (`ownerPlayerId ≠ null`), key absent on every other token | as before | FR-MAP-66 |
+
+**Domain events** (`src/shared/events/combat-tracker.ts`)
+
+| Event | Changes | Player sees | Undoable |
+|---|---|---|---|
+| `HitApplied {cardId, encounterId, rulingId, entryIds}` *(new)* | `hit-ruling` create; one `game-log-entry` per target (`cbt.attack`, `awaitingDamage`, `public` per FR-CBT-36) | the lines they may see ("… = 15 — DM: hit."); never the ruling; no card upsert | no |
+| `CombatantSideChanged {encounterId, combatantId, side, secret}` *(new)* | `combatant`; one `cbt.side` `game-log-entry` | the upsert iff their side changed (an unchanged redaction is never sent); the line iff `public` | no |
+| `AttackApplied` (the apply's last) / `CombatEntryUndone` (the undo's last) / `NotificationDismissed` (`note.dismiss`, and End's dismissals) | + the card's `hit-ruling` delete / upsert / delete (dismissal: the kind's `onClose`, §26) | nothing (DM only) | as before |
+| `TokenMoved` / `TokenRevealed` | the one `token` upsert is read **after** the token-changed hooks, so it carries the appended / reset `trail` | per token visibility; `trail` on player tokens only | no |
+| `TurnChanged` (Next, Prev, Start round 1), `EncounterEnded` | + one `token` upsert per cleared trail (`clearTrails`) | as above | no |
+
+**Helpers and hooks**
+
+- scenes-map server (`src/server/features/scenes-map/trail.ts`): `appendTrail(env, token, from, to)` (nothing while `hidden` or for a move that stays put; starts at `from`; keeps the newest 21 cells), `resetTrail(env, token)`, `clearTrails(env, sceneId) → RecordChange[]`. Server code only.
+- Combat's token-changed hook (`combat-tracker.combatant-copies`) runs the trail step first: a move of any token on the started encounter's scene (bound or not, any mover) appends; a reveal resets. A guard-refused move never reaches it.
+- Log-entry kind `cbt.side` (`@shared/combat-tracker/side-kind.ts`, appended to `src/shared/dice-roll-log/kinds.ts`): players "Goblin 2 is now an ally"; DM "DM — Goblin 2 is now an ally" (+ " (secret)" from `dmPayload`).

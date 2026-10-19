@@ -6,7 +6,21 @@ import type {
   DamageCardTargetOutcome,
   DamageMultiplier,
   HealthBand,
+  Side,
 } from "./schemas";
+
+// ---------- side (FR-CBT-98, #252) ----------
+
+/** The kind's default side: PCs are the party's, monsters against it. */
+export const defaultSide = (kind: CombatantKind): Side => (kind === "pc" ? "ally" : "enemy");
+
+/** The true side (DM, likely targets); null = the kind's default. */
+export const sideOf = (c: { kind: CombatantKind; side?: Side | null }): Side =>
+  c.side ?? defaultSide(c.kind);
+
+/** The side players were last openly shown (FR-CBT-100); null = the kind's default. */
+export const publicSideOf = (c: { kind: CombatantKind; publicSide?: Side | null }): Side =>
+  c.publicSide ?? defaultSide(c.kind);
 
 // ---------- order (FR-CBT-13) ----------
 

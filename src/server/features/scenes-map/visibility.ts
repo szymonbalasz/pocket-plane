@@ -37,7 +37,8 @@ export const folderVisibility = (): Visibility => "hidden";
  * `definitionId`, `seenBy` and `invisible` (#210: players never get the key), and `speed` only on
  * the viewer's own tokens (FR-MAP-36: a monster's speed is a stat, #120), `fogged` likewise
  * (FOG §9). `characterId` stays: set only on character tokens, whose entity every player sees
- * redacted (FR-MAP-26, FR-MAP-50).
+ * redacted (FR-MAP-26, FR-MAP-50). FR-MAP-66 (sprint 5): `trail` only on player tokens (a
+ * monster's moves this turn never reach a player).
  */
 export function tokenVisibility(r: TokenRecord, v: Viewer): Visibility {
   return tokenHiddenFor(r, v.playerId, v.campaignId) ? "hidden" : "redacted";
@@ -50,10 +51,12 @@ export function redactToken(r: TokenRecord, v: Viewer): PlayerTokenRecord {
     fogged,
     invisible: _invisible,
     seenBy: _seenBy,
+    trail,
     ...rest
   } = r;
+  const shown = r.ownerPlayerId !== null ? { ...rest, trail: trail ?? null } : rest;
   // FOG §9: `fogged` reaches a player only on their own tokens (as `speed`).
   return r.ownerPlayerId !== null && r.ownerPlayerId === v.playerId
-    ? { ...rest, speed, ...(fogged ? { fogged } : {}) }
-    : rest;
+    ? { ...shown, speed, ...(fogged ? { fogged } : {}) }
+    : shown;
 }

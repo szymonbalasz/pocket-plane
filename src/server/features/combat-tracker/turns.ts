@@ -16,6 +16,7 @@ import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict } from "../../commands/errors";
 import { combatant, encounter, entity } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
+import { clearTrails } from "../scenes-map/trail";
 import { playerTurnOf } from "./ranks";
 import {
   campaignOf,
@@ -88,6 +89,8 @@ export function turnCommand(direction: "next" | "prev", hooks: CombatRuleHooks) 
         env.tx.update(combatant).set({ movedFt: 0 }).where(eq(combatant.id, r.id)).run();
         changes.push(combatantChange(r, readCombatant(env.tx, r.id)));
       }
+      // FR-CBT-97 (sprint 5): every turn change (Next, Prev, Start round 1) clears the trails.
+      if (after.sceneId) changes.push(...clearTrails(env, after.sceneId));
       env.emit({
         type: TurnChanged.type,
         campaignId: cid,

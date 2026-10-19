@@ -13,6 +13,7 @@ import type { RecordChange } from "../../events/types";
 import type { HookEnv } from "../entities/definition-hooks";
 import { diagonalRuleOf } from "../scene-tools/rows";
 import type { TokenHookEnv } from "../scenes-map/token-hooks";
+import { appendTrail, resetTrail } from "../scenes-map/trail";
 import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 import { combatantDiff, encounterDiff, rerank, syncPlayerTurn } from "./ranks";
 import {
@@ -20,6 +21,7 @@ import {
   combatantsOf,
   readCombatant,
   readEncounter,
+  startedEncounter,
   toCombatantRecord,
 } from "./rows";
 
@@ -32,13 +34,15 @@ export const TOKEN_IN_ENCOUNTER = "Token is in a running encounter";
  * and the size refresh flip it (FR-FOG-13). Delete →
  * `conflict`, unless every bound active combatant is removed (FR-CBT-68): their `tokenId` → null.
  * Tokens bound only to inactive combatants: nothing (the FK sets `tokenId` null on delete). May
- * run as a player (their own token's move): it never rejects a move (ADR-0031).
+ * run as a player (their own token's move): it never rejects a move (ADR-0031). FR-CBT-97
+ * (sprint 5): first, the trail of any token on the started encounter's scene.
  */
 export function combatantTokenHook(
   env: TokenHookEnv,
   before: TokenRecord,
   after: TokenRecord | null,
 ): RecordChange[] {
+  if (after) trailHook(env, before, after);
   const bound = env.tx
     .select()
     .from(combatant)
@@ -91,6 +95,19 @@ export function combatantTokenHook(
     out.push(...combatantDiff(env.tx, rows), ...encounterDiff(encBefore, encAfter));
   }
   return out;
+}
+
+/**
+ * FR-CBT-97 (sprint 5): a committed move of any token on the started encounter's scene (bound
+ * or not, any mover) appends to its trail, not while it is hidden (FR-MAP-66); its reveal resets
+ * the trail. The caller's token upsert is read after the hooks, so this returns nothing.
+ */
+function trailHook(env: TokenHookEnv, before: TokenRecord, after: TokenRecord): void {
+  if (before.hidden && !after.hidden && after.trail) resetTrail(env, after);
+  if (before.col === after.col && before.row === after.row) return;
+  const enc = startedEncounter(env.tx, after.campaignId);
+  if (enc?.sceneId !== after.sceneId) return;
+  appendTrail(env, after, { col: before.col, row: before.row }, { col: after.col, row: after.row });
 }
 
 /**
