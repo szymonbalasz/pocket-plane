@@ -100,6 +100,7 @@ function transition(
     | "NotificationDismissed"
     | "NotificationReopened"
     | "NotificationUpdated",
+  extra: RecordChange[] = [],
 ): RecordChange {
   const after: NotificationRecord = { ...before, ...patch, updatedAt: env.ctx.clock.iso() };
   env.tx
@@ -121,7 +122,7 @@ function transition(
     type: eventType,
     campaignId: before.campaignId,
     payload: { notificationId: before.id, kind: before.kind },
-    changes: [change],
+    changes: [change, ...extra],
   });
   return change;
 }
@@ -329,11 +330,23 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
     );
   }
 
+  /** `pending` → `dismissed`; the kind's `onClose` changes ride on the same event (sprint 5). */
+  function dismiss(env: CommandEnv, n: NotificationRecord): RecordChange {
+    const extra = kindOf(n.kind)?.onClose?.(env, n) ?? [];
+    return transition(
+      env,
+      n,
+      { state: "dismissed", ...closedFields(env) },
+      "NotificationDismissed",
+      extra,
+    );
+  }
+
   /** FR-NOTE-11: `pending` → `dismissed` (the `note.dismiss` intent; DM only). */
   function dismissNotification(env: CommandEnv, id: string): void {
     const before = loadNotification(env, id);
     if (before.state !== "pending") throw conflict("No longer pending");
-    transition(env, before, { state: "dismissed", ...closedFields(env) }, "NotificationDismissed");
+    dismiss(env, before);
   }
 
   /**
@@ -363,9 +376,7 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
     return rows
       .map(toNotificationRecord)
       .filter((n) => endsWithEncounter(kindOf(n.kind)?.endRule, n.payload, encounterId))
-      .map((n) =>
-        transition(env, n, { state: "dismissed", ...closedFields(env) }, "NotificationDismissed"),
-      );
+      .map((n) => dismiss(env, n));
   }
 
   return {

@@ -1751,7 +1751,7 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-88, -91, 
 | targets | **JSON leaf** 1–20 × `{targetId, hit, multiplier}` | ruling order, unique target ids | FR-CBT-88 |
 | createdAt | timestamp | `ctx.clock`; never edited | — |
 
-- **Lifecycle:** written only by `cbt.applyHit`; the row stays after its card resolves (Undo reopens into the damage step) and goes with its encounter. On the wire it leaves with its card: Apply and End send its delete, Undo's reopen its upsert (FR-CBT-91). *Dismiss (`note.dismiss`) does not send it yet: that needs a close hook in notifications (open question in the R0 report).*
+- **Lifecycle:** written only by `cbt.applyHit`; the row stays after its card resolves (Undo reopens into the damage step) and goes with its encounter. On the wire it leaves with its card: Apply sends its delete, a dismissal (`note.dismiss`, End) sends it through the `damage-card` kind's `onClose` ([protocol §26](../protocol/README.md#26-combat-registries-and-seams)), Undo's reopen its upsert (FR-CBT-91).
 
 ### Changed
 

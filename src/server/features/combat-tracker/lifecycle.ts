@@ -31,8 +31,6 @@ import {
   encounterChange,
   entriesOf,
   getEncounter,
-  hitRulingChange,
-  pendingRulings,
   readEncounter,
   startedEncounter,
 } from "./rows";
@@ -237,15 +235,14 @@ export const endCommandWith = (hooks: CombatRuleHooks) =>
       const changes = [
         encounterChange(before, after),
         ...rows.map((r) => combatantChange(r, { ...r, active: false })),
-        // FR-CBT-91 (sprint 5): the hit rulings of the cards End dismisses leave the DM's store.
-        ...pendingRulings(env, encounterId).map((r) => hitRulingChange(r, null)),
         // FR-CBT-97: End clears the trails.
         ...(before.sceneId ? clearTrails(env, before.sceneId) : []),
       ];
       env.emit({ type: EncounterEnded.type, campaignId: cid, payload: { encounterId }, changes });
       changes.push(...hooks.run("ended", env, after, { combatantIds: rows.map((r) => r.id) }));
       // FR-CBT-59 / FR-CBT-61: after `EncounterEnded`, one `NotificationDismissed` per pending card
-      // of this encounter whose kind opts in (`damage-card`); same transaction.
+      // of this encounter whose kind opts in (`damage-card`; its hit-ruling delete rides on it,
+      // `onClose`); same transaction.
       dismissForEncounter(env, encounterId);
     },
   });

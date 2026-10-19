@@ -305,9 +305,23 @@ describe("FR-CBT-91 ruling lifecycle (R0) and FR-CBT-94 damageRollId", () => {
     t.undo();
     expect(fresh()).toHaveLength(1);
     expect(store()).toEqual(fresh());
+    // Dismiss (`note.dismiss`, the generic path): the delete rides on `NotificationDismissed`.
+    const other = t.toHit("Mira", 12);
+    t.applyHit(other.cardId, 16, [t.target("Goblin 2", true)]);
+    expect(store()).toEqual(fresh());
+    t.run(noteDismiss.name, { id: other.cardId });
+    const dismissed = t.events.at(-1)?.event;
+    expect(dismissed?.type).toBe("NotificationDismissed");
+    expect(dismissed?.changes.map((c) => [c.type, c.after === null])).toEqual([
+      ["notification", false],
+      [HIT_RULING_TYPE, true],
+    ]);
+    expect(store()).toEqual(fresh());
+    expect(fresh()).toHaveLength(1);
+    // End dismisses the reopened card: its delete rides on that dismissal.
     t.endEncounter();
     expect(store()).toEqual([]);
-    expect(t.rulings()).toHaveLength(1);
+    expect(t.rulings()).toHaveLength(2);
   });
 
   test("FR-CBT-94 a stale damageRollId → conflict, nothing written; the right one applies", () => {
