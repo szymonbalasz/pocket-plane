@@ -121,7 +121,8 @@ test("FR-DICEX-49 FR-DICE-40 a tray roll: the line and the tray total wait for t
     );
     // An auto-flat device (slow software GL) lands at the end of its chip fade instead.
     if (rest) {
-      expect(shownAt).toBeGreaterThanOrEqual(rest.t);
+      // The layer and the line commit separately in the rest's task: one frame either way.
+      expect(shownAt).toBeGreaterThanOrEqual(rest.t - 16);
       expect(shownAt - rest.t).toBeLessThan(100);
       expect(rest.t).toBeGreaterThan(heldAt);
     }
