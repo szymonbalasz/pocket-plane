@@ -1764,9 +1764,42 @@ Indexes unique `handout_present_campaign_player` (`campaign_id`, `player_id`), `
 - **Fixtures:** `handout-attachment` (`ransom-note.svg` as an attachment + h6 "Ransom Note", unshared; its asset id from `fixtureAttachmentId`, since an attachment's ingest has no record change for `r.id`), `handout-present-1` (h2 → player-1); bundle `party-s5` = `party-board` + `cmp-srd-mini` + both; both units also in `session-sim-9`.
 - **Snapshot size** (CON-44, #256; `con44-s5.test.ts`, `snapshot-size.test.ts` worst case): heavy harness + party-s5 units, a present for every player: `handout-present` DM **1,459 B** at 6 rows (heavy DM 674,871 B, 897,993 B left of 1.5 MiB), **259 B** in each player frame (players max 282,383 B); at the 20-row cap (20 players) DM **4,819 B** (bound 5,100). 50 attachments: every snapshot byte-identical.
 
-## 66. Sprint 5: kept-template right-click menu (K1)
+## 66. Sprint 5: combat core (R0)
 
-From [scene-tools](../specs/scene-tools.md#8-data-model) sprint 5 (FR-SCN-48–51) and [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-71. **Built by `fix/tpl-menu`**; no table, column, record type or field. Protocol side: [protocol §83](../protocol/README.md#83-sprint-5-kept-template-right-click-menu-k1).
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-88, -91, -92, -94, -97–100; [ADR-0053](../architecture/adr/0053-apply-hit.md); #252) and [scenes-map](../specs/scenes-map.md#8-data-model) (FR-MAP-65, -66). **Built by `fix/s5-combat-core`** (schema lane 2, seams S1; drizzle push, push-safe: one new table, nullable / defaulted columns, no backfill). Protocol side: [protocol §83](../protocol/README.md#83-sprint-5-combat-core-r0).
+
+### Hit ruling (`hit_ruling`, record type `hit-ruling`) — owner [combat-tracker](../specs/combat-tracker.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId | ID, ID → Campaign | `ctx.ids` | — |
+| encounterId | ID → Encounter, `ON DELETE CASCADE` | the card's encounter | FR-CBT-88 |
+| cardId | ID → Notification, **unique** | one ruling per damage card; a second `cbt.applyHit` → `conflict` "Hit already applied" | FR-CBT-88 |
+| toHitTotal, toHitSet | int −20…99, bool | the DM's to-hit; `toHitSet` = it differs from the rolled total (base + mods) | FR-CBT-23, -88 |
+| targets | **JSON leaf** 1–20 × `{targetId, hit, multiplier}` | ruling order, unique target ids | FR-CBT-88 |
+| createdAt | timestamp | `ctx.clock`; never edited | — |
+
+- **Lifecycle:** written only by `cbt.applyHit`; the row stays after its card resolves (Undo reopens into the damage step) and goes with its encounter. On the wire it leaves with its card: Apply sends its delete, a dismissal (`note.dismiss`, End) sends it through the `damage-card` kind's `onClose` ([protocol §26](../protocol/README.md#26-combat-registries-and-seams)), Undo's reopen its upsert (FR-CBT-91).
+
+### Changed
+
+| Table / field | Change | Rule | Source |
+|---|---|---|---|
+| `combatant.side`, `combatant.public_side` | + `ally` \| `enemy` \| null ×2 | null = the kind's default (PC ally, monster enemy; `sideOf` / `publicSideOf`, `@shared/combat-tracker/rules.ts`); `publicSide` = the side players were last openly shown, written only by a non-secret `cbt.setSide` and by Start (a friendly entry's instances: `ally` / `ally`); DM only | FR-CBT-98, -99 |
+| `encounter_entry.side` | + `ally` \| `enemy`, not null, default `enemy` | the builder's "Friendly"; REST entries `side?`; one definition's friendly and enemy entries stay apart (merged per definition + side) | FR-CBT-98 |
+| `token.trail` | + **JSON leaf** `{cells: [[col, row]]}` (2–21) \| null | this turn's combat trail, oldest first; written only by scenes-map's `appendTrail` / `resetTrail` / `clearTrails` (combat calls them); null outside combat, on other scenes and on a duplicated scene's copies | FR-MAP-65, FR-CBT-97 |
+| Damage card payload | + `unusedRolls?` ≤ 3 × `{rollId, total}` (zod only; written by R1) | the owner's later damage rolls | FR-CBT-92 |
+| Damage card resolution | + `targets[].dropped?` `true` (zod only; written by R1) | a ruled hit dropped from the damage step | FR-CBT-91 |
+| `cbt.attack` line payload | + `awaitingDamage?` `true` | an Apply hit line: no damage segments | FR-CBT-88 |
+| Log-entry kind `cbt.side` *(new)* | payload `{targetName, side}`, dmPayload `{secret}` | players read it iff the combatant is visible to them and their side changed (`public`) | FR-CBT-99 |
+
+- **Derived (not stored):** `sideOf`, `publicSideOf`; the players' combatant `side` (= `publicSideOf`).
+- **Fixtures:** bundle `late-damage` = `rules-effects` (R1 / R3 / R4 append their units).
+- **CON-44** (`src/server/ws/snapshot-size.test.ts`, realistic-heavy harness, every row at its worst): DM 640,788 → 697,783 B (20 rulings × 20 targets +39,659 B; 3 unused rolls on every damage card +4,040 B; 60 active-scene trails at the 20-segment cap +13,020 B; `side` + `publicSide` set on every combatant +276 B over the null baseline); 875,081 B left of 1.5 MiB. Players 256,904–260,336 B (trails +1,302 B each, player tokens only; rulings 0 B).
+
+## 67. Sprint 5: kept-template right-click menu (K1)
+
+From [scene-tools](../specs/scene-tools.md#8-data-model) sprint 5 (FR-SCN-48–51) and [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-71. **Built by `fix/tpl-menu`**; no table, column, record type or field. Protocol side: [protocol §84](../protocol/README.md#84-sprint-5-kept-template-right-click-menu-k1).
 
 - **Client only (never stored or sent):** the open template menu `{templateId, sceneId, at}` (one per page, `aoe-store.ts`); the deferred right press `{screen, p, laser, menu}` (`MapCanvas.tsx`, FR-MAP-71 step 4: dropped on release, a ≥ 4 px drag, leaving live).
 - **Derived:** the menu's template = `templateAt` over the shown scene's kept templates in draw order (FR-SCN-49); its items from the role and `hidden` (Delete, Edit…, DM Hide / Reveal), disabled while not live.

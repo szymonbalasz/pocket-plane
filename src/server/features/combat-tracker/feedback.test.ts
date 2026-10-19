@@ -279,6 +279,7 @@ describe("FR-CBT-37 removed, for players", () => {
       imageAssetId: t.row("Goblin")?.imageAssetId,
       removed: true,
       movedFt: 0,
+      side: "enemy",
     });
     // Hidden + removed: never sent.
     t.run(setRemoved.name, { combatantId: t.id("Wolf"), removed: true });

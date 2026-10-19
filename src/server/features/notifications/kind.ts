@@ -1,12 +1,15 @@
 // Server notification kind contract (FR-NOTE-03). Kinds are listed in `./kinds.ts`
 // (append-only, AGENTS §9.9); kind owners define theirs with `defineNotificationKind`.
 import { checkEndRule, type EncounterEndRule } from "@shared/notifications/end-rule";
+import type { NotificationRecord } from "@shared/notifications/schemas";
 import {
   NOTIFICATION_KIND_RE,
   PAYLOAD_MAX_BYTES,
   RESOLUTION_MAX_BYTES,
 } from "@shared/notifications/schemas";
 import type { z } from "zod";
+import type { CommandEnv } from "../../commands/commands";
+import type { RecordChange } from "../../events/types";
 
 export interface NotificationKindDef {
   /** `^[a-z][a-z0-9-]{0,31}$` */
@@ -28,6 +31,14 @@ export interface NotificationKindDef {
    * owner's shared constant, also on its client views. Absent = pending until resolved / dismissed.
    */
   endRule?: EncounterEndRule;
+  /**
+   * Sprint 5 (FR-CBT-91): runs when a row of this kind is dismissed (`note.dismiss`,
+   * `dismissForEncounter`), in that transaction, with the dismissed row; the record changes it
+   * returns ride on that `NotificationDismissed` (e.g. the card's DM-only hit-ruling delete).
+   * Writes through `env.tx` only, never emits; a throw rolls the dismissal back. Resolution is the
+   * kind owner's own command, so it runs no hook. Absent = nothing.
+   */
+  onClose?: (env: CommandEnv, row: NotificationRecord) => RecordChange[];
 }
 
 /** The kind's resolution cap (FR-NOTE-03): its own, else 256 B. */

@@ -1,6 +1,6 @@
 // Record types (CBT §9, protocol §20). Campaign scope; DM always full. Visibility fns read only
 // the record and the viewer (FR-CBT-27).
-import { healthBand } from "@shared/combat-tracker/rules";
+import { healthBand, publicSideOf } from "@shared/combat-tracker/rules";
 import {
   COMBATANT_TYPE,
   CombatantRecord,
@@ -9,6 +9,8 @@ import {
   ENCOUNTER_WINDOW,
   EncounterEntryRecord,
   EncounterRecord,
+  HIT_RULING_TYPE,
+  HitRulingRecord,
   HP_CHANGE_TYPE,
   HP_CHANGE_WINDOW,
   HpChangeRecord,
@@ -21,6 +23,7 @@ import type { Db } from "../../db/client";
 import { combatant, encounter, encounterEntry, hpChange } from "../../db/schema";
 import { defineRecordType, type Visibility } from "../../ws/records";
 import {
+  pendingRulings,
   startedEncounter,
   toCombatantRecord,
   toEncounterRecord,
@@ -61,7 +64,10 @@ export function combatantVisibility(r: CombatantRecord): Visibility {
   return !r.active || r.hidden ? "hidden" : "redacted";
 }
 
-/** FR-CBT-37: removed → no rank, band or initiative; else the PC / monster redaction. */
+/**
+ * FR-CBT-37: removed → no rank, band or initiative; else the PC / monster redaction. FR-CBT-100
+ * (#252): `side` = the side players were last openly shown; the true side never.
+ */
 export function redactCombatant(r: CombatantRecord): PlayerCombatant {
   const base = {
     id: r.id,
@@ -70,6 +76,7 @@ export function redactCombatant(r: CombatantRecord): PlayerCombatant {
     name: r.name,
     imageAssetId: r.imageAssetId,
     movedFt: r.movedFt,
+    side: publicSideOf(r),
   };
   if (r.removed) return { ...base, kind: r.kind, removed: true };
   const ranked = { ...base, playerPosition: r.playerPosition, removed: false as const };
@@ -156,5 +163,20 @@ export const combatRecordTypes = [
         .map(toHpChangeRecord);
     },
     window: { orderBy: "seq", size: HP_CHANGE_WINDOW },
+  }),
+  // FR-CBT-88, -91 (sprint 5, ADR-0053): DM only; the started encounter's rulings whose card is
+  // pending (≤ 1 per card). Live: Apply, Dismiss and End send the delete, Undo the upsert.
+  defineRecordType<HitRulingRecord>({
+    type: HIT_RULING_TYPE,
+    scope: "campaign",
+    audience: "dm",
+    schema: HitRulingRecord,
+    idOf: (r) => r.id,
+    campaignOf: (r) => r.campaignId,
+    visibility: () => "hidden",
+    snapshot: ({ db }, v) => {
+      const enc = startedEncounter(db, v.campaignId);
+      return enc ? pendingRulings({ tx: db }, enc.id) : [];
+    },
   }),
 ];

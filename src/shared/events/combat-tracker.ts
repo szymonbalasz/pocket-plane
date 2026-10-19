@@ -206,3 +206,39 @@ export const CombatEntryUndone = defineEvent({
   logged: true,
   undoable: false,
 });
+
+/**
+ * `cbt.applyHit` (sprint 5, FR-CBT-88, ADR-0053): `hit-ruling` create (DM only) and one
+ * `game-log-entry` per ruled target (`awaitingDamage`); no HP, the card unchanged. Not undoable.
+ */
+export const HitApplied = defineEvent({
+  type: "HitApplied",
+  payload: z
+    .object({
+      cardId: Id,
+      encounterId: Id,
+      rulingId: Id,
+      entryIds: z.array(Id).min(1).max(20),
+    })
+    .strict(),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * `cbt.setSide` (sprint 5, #252, FR-CBT-99): `combatant` upsert + one `cbt.side` line. `side` =
+ * the new true side (the schemas' `Side`); `secret` = players keep the side they were shown.
+ */
+export const CombatantSideChanged = defineEvent({
+  type: "CombatantSideChanged",
+  payload: z
+    .object({
+      encounterId: Id,
+      combatantId: Id,
+      side: z.enum(["ally", "enemy"]),
+      secret: z.boolean(),
+    })
+    .strict(),
+  logged: true,
+  undoable: false,
+});
