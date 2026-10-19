@@ -209,7 +209,7 @@ describe("FR-SCN-23 ephemeral receivers", () => {
     receiveTemplate(s, p2, place("s1", "a"), 10);
     receiveTemplate(s, { role: "dm" }, { ...place("s1", "d"), dmOnly: true }, 10);
     const on = ephemeralsOn(s.getState(), "s1");
-    expect(on.map((e) => [e.id, e.template.size, e.role, e.dmOnly])).toEqual([
+    expect(on.map((e) => [e.id, e.template.size, e.from.role, e.dmOnly])).toEqual([
       ["player:p1:a", 30, "player", false],
       ["player:p2:a", 20, "player", false],
       ["dm:d", 20, "dm", true],

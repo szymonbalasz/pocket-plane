@@ -6,6 +6,7 @@
 // per sender connection; drawn only for the shown scene), who may edit a kept template
 // (FR-SCN-26) and the right-click menu's hit test and items (FR-SCN-48, -49).
 import type { SignalFrom } from "@shared/protocol/frames";
+import type { RecordStore } from "@shared/protocol/store";
 import {
   FT_PER_CELL,
   TEMPLATE_SIZE,
@@ -19,7 +20,9 @@ import { contains, snapAngle, snapPoint, templateArea } from "@shared/scenes-map
 import type { Grid } from "@shared/scenes-map/geometry";
 import { DRAG_INTERVAL_MS, DRAG_REPEAT_MS, DRAG_TIMEOUT_MS } from "@shared/scenes-map/schemas";
 import { createStore, type StoreApi } from "zustand";
+import type { ReadVar } from "../campaign-management/colors";
 import type { LaserTimers } from "../scenes-map/laser";
+import { type MarkPerson, markColor } from "../scenes-map/mark-colors";
 
 /** FR-SCN-23: like `map.drag` (≤ 20/s, 1 s repeat at rest, 3 s receiver timeout). */
 export const TEMPLATE_INTERVAL_MS = DRAG_INTERVAL_MS;
@@ -274,6 +277,24 @@ export function templateCaption(label: string, n: number): string {
   return label ? `${label} · ${squares}` : squares;
 }
 
+/** FR-SCN-47: while hovered or selected the label also names its person ("· by Player 1"). */
+export const templateCaptionBy = (label: string, n: number, byName: string | null) =>
+  byName === null ? templateCaption(label, n) : `${templateCaption(label, n)} · by ${byName}`;
+
+/**
+ * FR-SCN-47: a drawn template's colour: its person's (`colorOf`; unknown → role accent), but a
+ * hidden one keeps `visibility.hidden` styling (OQ-SCN-41 A).
+ */
+export function templateColor(
+  store: Pick<RecordStore, "you" | "records">,
+  who: MarkPerson,
+  hidden: boolean,
+  hiddenColor: string,
+  read?: ReadVar,
+): string {
+  return hidden ? hiddenColor : markColor(store, who, read);
+}
+
 /** A kept record as drawn. */
 export const keptView = (r: TemplateRecordView): TemplateView => ({
   shape: r.shape,
@@ -517,7 +538,8 @@ export interface EphemeralTemplate {
   /** Store key: sender + the frame's `key` (one per sender connection; senders can't clash). */
   id: string;
   sceneId: string;
-  role: SignalFrom["role"];
+  /** The server-stamped sender: its colour resolves at draw time (FR-SCN-47). */
+  from: SignalFrom;
   template: TemplateView;
   dmOnly: boolean;
   /** Receipt time of the last frame (`performance.now()`), for the 3 s timeout. */
@@ -564,7 +586,7 @@ export function receiveTemplate(
       [id]: {
         id,
         sceneId: d.sceneId,
-        role: from.role,
+        from,
         template,
         dmOnly: d.dmOnly === true,
         at: now,

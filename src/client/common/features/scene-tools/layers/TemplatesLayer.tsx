@@ -3,14 +3,19 @@
 // (`scn.template` signals, dropped on `end`, a snapshot, leaving live or 3 s of silence; only
 // the shown scene's), this connection's own ephemeral and a kept template being moved or re-aimed
 // (FR-SCN-45, local preview until the commit). Each: the affected squares (> 50 % covered,
-// FR-SCN-41; cut to the map) tinted in the placer's role accent, the shape's true outline
-// (off-grid allowed) and "‹label› · N squares" at the origin. With the AoE tool: an origin handle
-// on every template this client may edit, and an end handle on the selected one. DM: hidden /
-// DM-only ones in `visibility.hidden` styling; the "DM-only items" switch (`dm-only`) drops
-// hidden ones. No pointer events: the AoE tool works on the stage. Konva: name `scn-template`,
-// id = record ID or `eph-<key>`, attrs `shape`, `cells` ("c,r c,r …"), `origin` ("x,y"),
-// `angle`, `ephemeral`; handles `scn-template-handle-origin` / `-end` (id = template id). Mounts
-// the right-click menu island (FR-SCN-48; the press routing is MapCanvas', FR-MAP-71).
+// FR-SCN-41; cut to the map) tinted in its person's player colour (kept: the placer, null = the
+// DM; ephemeral: the sender; own: the own; FR-SCN-47), the shape's true outline (off-grid allowed)
+// over a dark casing (FR-MAP-72) and a label pill at the origin: a colour dot + "‹label› · N
+// squares", plus " · by ‹name›" while hovered or selected. With the AoE tool: an origin handle on
+// every template this client may edit, and an end handle on the selected one. DM: hidden /
+// DM-only ones in `visibility.hidden` styling (OQ-SCN-41 A); the "DM-only items" switch
+// (`dm-only`) drops hidden ones. No pointer events: the AoE tool works on the stage; the label
+// hover is read from the stage's pointer. Konva: name `scn-template`, id = record ID or
+// `eph-<key>`, attrs `shape`, `cells` ("c,r c,r …"), `origin` ("x,y"), `angle`, `ephemeral`,
+// `color` (the drawn hex), `by` (player id | `dm`); `map-casing` (id = template id) under the
+// outline; label `scn-template-label` (attr `templateId`) with `scn-template-label-dot`; handles
+// `scn-template-handle-origin` / `-end` (id = template id). Mounts the right-click menu island
+// (FR-SCN-48; the press routing is MapCanvas', FR-MAP-71).
 import { templateCells } from "@shared/scene-tools/geometry";
 import {
   AOE_TEMPLATE_TYPE,
@@ -18,12 +23,23 @@ import {
   type TemplateRecordView,
   TemplateSignalData,
 } from "@shared/scene-tools/schemas";
-import { useContext, useEffect, useMemo, useState } from "react";
-import { Circle, Group, Label, Line, Shape, Tag, Text } from "react-konva";
+import Konva from "konva";
+import { type RefObject, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Circle, Group, Line, Rect, Shape, Text } from "react-konva";
 import { useStore } from "zustand";
 import { SyncContext, useSignal, useSync } from "../../../sync/store";
 import { canvasBlind } from "../../fog-of-war/blind";
 import { useCanvas } from "../../scenes-map/canvas-context";
+import {
+  byAttr,
+  CASING_COLOR,
+  CASING_NAME,
+  casingWidth,
+  type MarkPerson,
+  personName,
+  placerOf,
+  selfOf,
+} from "../../scenes-map/mark-colors";
 import { useLayerToggles } from "../../scenes-map/tool-store";
 import { type AoeGesture, useAoe } from "../aoe-store";
 import { useTemplateMenuIsland } from "../TemplateMenu";
@@ -40,7 +56,8 @@ import {
   receiveTemplate,
   resetEphemerals,
   type TemplateView,
-  templateCaption,
+  templateCaptionBy,
+  templateColor,
   templateHandles,
   templateOutline,
 } from "../templates";
@@ -48,7 +65,8 @@ import {
 interface Drawn {
   id: string;
   template: TemplateView;
-  accent: string;
+  /** Whose template (FR-SCN-47): colour, `by` attr and "by ‹name›". */
+  who: MarkPerson;
   /** Hidden for players (kept `hidden`, or a DM-only ephemeral): DM styling. */
   hidden: boolean;
   ephemeral: boolean;
@@ -87,8 +105,74 @@ function Handle({
   );
 }
 
-function TemplateNode({ d }: { d: Drawn }) {
-  const { scene, grid, cam, colors } = useCanvas();
+/** Text width in map px for the label pill (Konva measures off-stage). */
+let measurer: Konva.Text | null = null;
+function textWidth(text: string, fontSize: number, padding: number): number {
+  measurer ??= new Konva.Text({});
+  measurer.setAttrs({ text, fontSize, padding });
+  return measurer.width();
+}
+
+/** FR-SCN-47: the label pill: a colour dot, then the caption (+ " · by ‹name›" when `named`). */
+function TemplateLabel({
+  d,
+  x,
+  y,
+  squares,
+  color,
+  named,
+}: {
+  d: Drawn;
+  x: number;
+  y: number;
+  squares: number;
+  color: string;
+  named: boolean;
+}) {
+  const { cam, colors, store } = useCanvas();
+  const s = cam.scale;
+  const text = templateCaptionBy(
+    d.template.label,
+    squares,
+    named ? personName(store, d.who) : null,
+  );
+  const font = 12 / s;
+  const pad = 3 / s;
+  const dot = 8 / s;
+  const lead = pad + dot;
+  const h = font + 2 * pad;
+  return (
+    <Group x={x} y={y} name="scn-template-label" templateId={d.id}>
+      <Rect
+        width={lead + textWidth(text, font, pad)}
+        height={h}
+        fill={colors.background}
+        opacity={0.85}
+        cornerRadius={4 / s}
+      />
+      <Circle
+        name="scn-template-label-dot"
+        x={pad + dot / 2}
+        y={h / 2}
+        radius={dot / 2}
+        fill={color}
+        stroke={CASING_COLOR}
+        strokeWidth={1 / s}
+      />
+      <Text
+        x={lead}
+        text={text}
+        fontSize={font}
+        padding={pad}
+        fill={colors.foreground}
+        name="scn-template-label-text"
+      />
+    </Group>
+  );
+}
+
+function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
+  const { scene, grid, cam, colors, store } = useCanvas();
   const t = d.template;
   const { shape, x, y, size, width, angle } = t;
   const { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy } = grid;
@@ -116,11 +200,16 @@ function TemplateNode({ d }: { d: Drawn }) {
     const g = { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy };
     return { origin: mapPx(g, h.origin), end: mapPx(g, h.end) };
   }, [shape, x, y, size, width, angle, cs, gx, gy]);
-  const stroke = d.hidden ? colors.hidden : d.accent;
+  // FR-SCN-47: resolved per draw, so a `player` / `campaign` upsert recolours (OQ-CAMP-21).
+  const stroke = templateColor(store, d.who, d.hidden, colors.hidden);
   const ox = gx + x * cs;
   const oy = gy + y * cs;
-  const sw = (d.selected ? 3 : 1.5) / cam.scale;
+  const swPx = d.selected ? 3 : 1.5;
+  const sw = swPx / cam.scale;
   const dash = d.hidden || d.ephemeral ? [6 / cam.scale, 4 / cam.scale] : undefined;
+  // FR-MAP-72: the coloured outline over an opaque casing (hidden: grey styling, no casing).
+  const casing = { name: CASING_NAME, id: d.id, stroke: CASING_COLOR, dash };
+  const casingSw = casingWidth(swPx, cam.scale);
   return (
     <Group
       name="scn-template"
@@ -131,6 +220,8 @@ function TemplateNode({ d }: { d: Drawn }) {
       angle={angle}
       ephemeral={d.ephemeral}
       hidden={d.hidden}
+      color={stroke}
+      by={byAttr(d.who)}
       listening={false}
       opacity={d.hidden ? 0.6 : 1}
     >
@@ -145,6 +236,18 @@ function TemplateNode({ d }: { d: Drawn }) {
           ctx.fillShape(shape);
         }}
       />
+      {!d.hidden &&
+        (outline.kind === "circle" ? (
+          <Circle
+            {...casing}
+            x={outline.x}
+            y={outline.y}
+            radius={outline.r}
+            strokeWidth={casingSw}
+          />
+        ) : (
+          <Line {...casing} points={outline.points} closed strokeWidth={casingSw} />
+        ))}
       {outline.kind === "circle" ? (
         <Circle
           x={outline.x}
@@ -173,16 +276,14 @@ function TemplateNode({ d }: { d: Drawn }) {
           stroke={stroke}
         />
       )}
-      <Label x={ox + 8 / cam.scale} y={oy + 8 / cam.scale} name="scn-template-label">
-        <Tag fill={colors.background} opacity={0.85} cornerRadius={4 / cam.scale} />
-        <Text
-          text={templateCaption(t.label, cells.length)}
-          fontSize={12 / cam.scale}
-          padding={3 / cam.scale}
-          fill={colors.foreground}
-          name="scn-template-label-text"
-        />
-      </Label>
+      <TemplateLabel
+        d={d}
+        x={ox + 8 / cam.scale}
+        y={oy + 8 / cam.scale}
+        squares={cells.length}
+        color={stroke}
+        named={hovered || d.selected === true}
+      />
     </Group>
   );
 }
@@ -194,8 +295,40 @@ function previewOf(r: TemplateRecordView, g: AoeGesture | null): TemplateView {
   return keptView(r);
 }
 
+/**
+ * FR-SCN-47: the template whose label pill is under the pointer, read from the stage's pointer
+ * (the layer takes no pointer events, so tools and press routing are unchanged).
+ */
+function useLabelHover(groupRef: RefObject<Konva.Group | null>): string | null {
+  const [hovered, setHovered] = useState<string | null>(null);
+  useEffect(() => {
+    const stage = groupRef.current?.getStage();
+    if (!stage) return;
+    const onMove = () => {
+      const p = stage.getPointerPosition();
+      let hit: string | null = null;
+      for (const n of groupRef.current?.find(".scn-template-label") ?? []) {
+        const r = n.getClientRect();
+        if (p && p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height) {
+          hit = n.getAttr("templateId") as string;
+        }
+      }
+      setHovered(hit);
+    };
+    const onLeave = () => setHovered(null);
+    stage.on("mousemove.scnTemplateLabel", onMove);
+    stage.on("mouseleave.scnTemplateLabel", onLeave);
+    return () => {
+      stage.off("mousemove.scnTemplateLabel", onMove);
+      stage.off("mouseleave.scnTemplateLabel", onLeave);
+    };
+  }, [groupRef]);
+  return hovered;
+}
+
 export function ScnTemplatesLayer() {
-  const { client, scene, store, colors, myPlayerId, live, activeTool } = useCanvas();
+  const { client, scene, store, myPlayerId, live, activeTool } = useCanvas();
+  const groupRef = useRef<Konva.Group>(null);
   const dmOnlyOff = useLayerToggles((s) => s.off["dm-only"] === true);
   const own = useAoe((s) => s.own);
   const gesture = useAoe((s) => s.gesture);
@@ -246,7 +379,6 @@ export function ScnTemplatesLayer() {
     [blind, ephById, scene.id],
   );
 
-  const accent = (role: "dm" | "player") => (role === "dm" ? colors.dmAccent : colors.playerAccent);
   const drawn: Drawn[] = [];
   for (const r of kept) {
     if (r.hidden && dmOnlyOff) continue;
@@ -255,7 +387,7 @@ export function ScnTemplatesLayer() {
       id: r.id,
       recordId: r.id,
       template: previewOf(r, gesture),
-      accent: accent(r.placedByPlayerId === null ? "dm" : "player"),
+      who: placerOf(r),
       hidden: r.hidden,
       ephemeral: false,
       selected: r.id === selectedId,
@@ -268,7 +400,7 @@ export function ScnTemplatesLayer() {
     drawn.push({
       id: `eph-${e.id}`,
       template: e.template,
-      accent: accent(e.role),
+      who: e.from,
       hidden: e.dmOnly,
       ephemeral: true,
     });
@@ -278,16 +410,17 @@ export function ScnTemplatesLayer() {
     drawn.push({
       id: "eph-own",
       template: own.template,
-      accent: accent(client),
+      who: selfOf(client, myPlayerId),
       hidden: client === "dm" && dmOnly,
       ephemeral: true,
       handle: toolOn,
     });
   }
+  const hovered = useLabelHover(groupRef);
   return (
-    <Group name="scn-templates" listening={false}>
+    <Group ref={groupRef} name="scn-templates" listening={false}>
       {drawn.map((d) => (
-        <TemplateNode key={d.id} d={d} />
+        <TemplateNode key={d.id} d={d} hovered={hovered === d.id} />
       ))}
     </Group>
   );
