@@ -2427,7 +2427,23 @@ From [scenes-map](../specs/scenes-map.md) FR-MAP-59, -61 (DM gate #256: OQ-MAP-4
 | Named outcomes (registry-driven `fit-visible.test.ts`, `session-sim-8` Goblin Ambush incl. Brakka) | DM Game log + Initiative: `pcs` 1280×720, `all` 25 / 26 / 31 px at 1280×800 / 1440×900 / 1600×900; + Scenes: `all` 25 px at 1280×800 only. Players sheet + log (+ Initiative): `all` at all four sizes (33 / 34 / 42 / 48 px with Initiative) | FR-MAP-59 |
 | CON-44 | 0 B | — |
 
-## 98. Sprint 5: popup line (D11)
+## 98. Sprint 5: colour picker (K2)
+
+From [campaign-management](../specs/campaign-management.md#7-uiux-notes) FR-CAMP-27 ([ADR-0055](../architecture/adr/0055-player-colour.md); DM gate #256). **Built by `build/colour-picker`**: client only; sends K0's `camp.setColor` ([§91](#91-sprint-5-player-colours-core-k0)). No new route, intent, event, record type, registry or snapshot byte. No data-model change.
+
+| Piece | Contract |
+|---|---|
+| `ColorPopover` (`@ui/features/campaign-management/ColorPopover.tsx`) | Trigger: a round 12 / 16 px Button filled with `colorOf` of the target, Tooltip = its `tip`; `data-value` = the target's stored key. Popover: 8 round 24 px swatches, 4 × 2, palette order. `colorSwatches(holders, target)` (pure): the target's own key checked and never taken (also when a repeated default shares it); any other key held by the DM (target ≠ DM) or another player → taken, disabled, label "‹Key› — taken by ‹name›" ("DM" for the DM); free → "‹Key›". Label = `aria-label` and Tooltip |
+| Send | A click closes the Popover and sends `camp.setColor {playerId: target, color}` (`target` null = the DM colour). Not optimistic: trigger and swatches read the `player` / `campaign` records, so a `reject` (Toast with the server's message, scenes-map's `toastReject`; `disconnected` / `offline` → the banner only) leaves the server's colour |
+| Not live | Every swatch disabled; the trigger still opens the Popover; marks keep the last colours |
+| Player (`@player/features/campaign-management/screens.tsx` `JoinedHeader`) | "Playing as ● **Player 1** in …": the dot before the name, target = `you.playerId`, Tooltip "Your colour" (no play-shell frame edit) |
+| DM (`@dm/features/campaign-management/PlayersPanel.tsx`, `camp.players`) | "Your colour (DM)" + swatch (target null) as one 16 px line above the table, inside the scrolling body (body / footer gaps 4 / 6 px, so two players with two character lines each still fit 400×220 unscrolled at 1440×900, the P3 glitch-5 guard); each player row starts with that player's swatch (Tooltip "‹name›'s colour"). Window size unchanged (400×220) |
+| Test IDs | `camp-my-color` (player dot, `data-value`), `camp-color-dm` (`data-value`), `camp-player-color` (+ `data-record-id` = player id, `data-value`), `camp-color-popover`, `camp-color-swatch` (+ `data-value` = key, `data-taken-by` = player id \| `dm` \| absent, `data-state` = `checked` \| `unchecked`) |
+| Fixtures | Bundle `player-colours` and unit `pc-colours` (K0); `session-sim-9` already holds `pc-colours`; nothing new |
+| Tests | `ColorPopover.test.tsx` (FR-CAMP-27 picker ×7: swatch model per target, 9th player, static render taken / checked / not live, send, reject keeps the server's colour), player `screens.test.tsx` (header dot); e2e `colour-picker.e2e.ts` (`player-colours`: CAMP §13 K1, K2, K10, K11) |
+| CON-44 | 0 B (no record) |
+
+## 99. Sprint 5: popup line (D11)
 
 From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-46, -47 (§6.1 tables A, B; OQ-DICEX-33 A, -34 A, DM gate #256; seams S2, S15). **Built by `build/popup-line`**: popup internals only, both clients. No record type, intent, event, signal or wire field; W1's `toast-region.ts` constants (`ROLL_POPUP_W` 320, `ROLL_POPUP_H` 190, `ROLL_POPUPS_MAX` 3) and `dmStackAt` unchanged. Amends §75's card and PiP rows. Data side: [data model §77](../data-model/README.md#77-sprint-5-popup-line-d11).
 

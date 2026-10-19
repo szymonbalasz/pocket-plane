@@ -577,7 +577,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 35 | — | B: Physical off; Mira's "Notation test" → "1d12 + 5" → Roll; then palette d6 | Tray header "Mira — Notation test", then after the palette click "Other", no label; Roll → line "Player 1 — 1d6 …" (no "Notation test"); "Roll again" on a notation result keeps the label |
 | 36 | Start "Ambush at the Ford"; set Mira's HP to 0 | B: hover sheet death save; roll bar Roll | `dicex-stage-hint` once in each: A's Initiative row initiative tooltip, Attack ▸ trigger tooltip, open Check ▸ / Save ▸ submenus, Mira's death-save item on A's combat row; B's sheet death save and roll bar Roll tooltips. B: Alt+click roll bar Roll with `2d6` typed → tray `compose` 2d6. A: Roll monsters → no hint |
 | 37 | — | B: roll `10d6`; reload B as soon as B's recorder shows `dicex-screen` `data-state="moving"` | After reload: the line once with its total shown at once (snapshot entry, `data-landed="true"` from the first record), no throw, no popup, no console errors |
-| 38 | — | C: throttle (400 kbit/s, 400 ms) from a fresh load (cache disabled) | C's `dice3d` loads in ≈ 3 s (was ≈ 13 s raw); B's next roll plays 3D on C (not flat) |
+| 38 | — | C: throttle (400 kbit/s, 400 ms) from a fresh load (cache disabled) | C's `dice3d` loads in ≈ 3 s on its own, ≈ 6 s inside a fresh page load that shares the link (was ≈ 13 s raw; D12 walkthrough ruling #274); B's next roll plays 3D on C (not flat) |
 | 39 | Hard-kill + restart | — | No popup, throw or hold replays; assets still served `br`; logs unchanged |
 
 ## 14. Dependencies
