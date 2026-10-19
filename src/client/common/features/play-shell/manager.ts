@@ -1,9 +1,10 @@
-// Window manager reducer (FR-SHELL-08–12, 14, 16–18, 29, 40–42, 45–53). Pure: no DOM, no
+// Window manager reducer (FR-SHELL-08–12, 14, 16–18, 29, 40–42, 45–53, 55). Pure: no DOM, no
 // storage. Holds every window's *stored* state; rendering fits and clamps (geometry.ts) without
 // writing back. Every geometry it sets is stamped with the work area it was set in (`area`).
 import { GEOMETRY_LIMIT, Layout, MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
 import {
   clampRect,
+  EDGE_GAP,
   growsToContent,
   LAUNCHER_CLEAR,
   type Rect,
@@ -20,6 +21,8 @@ import {
   type Placeable,
   type PlacementToken,
   placeWindow,
+  RAIL_CLEAR,
+  usableArea,
 } from "./placement";
 import { defaultSizeAt, knownDefaultSizes, type WindowRegistry } from "./registry";
 
@@ -51,6 +54,16 @@ export type WindowAction =
    * grew taller than the slot it got (FR-SHELL-40, -41). Once; a user's stored rect never moves.
    */
   | { type: "settle"; kind: string; instance?: string }
+  /**
+   * A map tool bar appeared at `rect` (viewport px) or changed size (FR-SHELL-55): windows over it
+   * are pushed right of it, written; nothing moves back when it goes.
+   */
+  | { type: "push"; rect: Rect }
+  /**
+   * The viewport changed while the page is shown (FR-SHELL-51, -53): never-resized windows at a
+   * default size follow this viewport's default and placement, as on applying the entry.
+   */
+  | { type: "viewport" }
   | { type: "reset" };
 
 export interface ManagerContext {
@@ -74,9 +87,16 @@ export interface ManagerContext {
 /**
  * How a window's current rect was chosen (`ui-window` `data-placed`; client memory only):
  * `default` = auto placement kept its fitted default rect, `auto` = it chose another one,
- * `stored` = read from the layout entry or set by the user (move / resize end).
+ * `stored` = read from the layout entry or set by the user (move / resize end), `pushed` = moved
+ * off a map tool bar (FR-SHELL-55).
  */
-export type Placed = "auto" | "stored" | "default";
+export type Placed = "auto" | "stored" | "default" | "pushed";
+
+/** Actions naming no window: the whole layout may change. */
+export type LayoutAction = Extract<WindowAction, { type: "push" | "viewport" | "reset" }>;
+
+export const isLayoutAction = (a: WindowAction): a is LayoutAction =>
+  a.type === "push" || a.type === "viewport" || a.type === "reset";
 
 const sameRect = (a: Rect | undefined, b: Rect) =>
   a !== undefined && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
@@ -259,7 +279,7 @@ function needsAutoPlace(ws: Windows, cur: WindowState, ctx: ManagerContext): boo
   const hard = hardRects(keepOutsOf(ctx));
   if (hard.some((k) => overlaps(shown, k))) return true;
   const how = ctx.placed?.(windowId(cur.kind, cur.instance));
-  if (how === "auto" || how === "default") return true;
+  if (how === "auto" || how === "default" || how === "pushed") return true;
   const asDefault = defaultLayout(ctx.registry, ctx.viewport).find((w) => w.kind === cur.kind);
   return sameRect(asDefault, cur) || sameRect(fittedDefaultRect(def, ctx.viewport, hard), cur);
 }
@@ -316,6 +336,115 @@ function followDefaults(
     changed = true;
   }
   return changed;
+}
+
+/**
+ * A live viewport change (FR-SHELL-51, -53; W2 walkthrough, #269): the same follow as applying
+ * the entry, so a never-resized Game log at 1150×240 takes 690×160 at 1280×720 without a reload.
+ * Other windows keep their stored rect (render-only fit and clamp, FR-SHELL-29). Same array when
+ * nothing follows.
+ */
+export function followViewport(
+  ws: Windows,
+  registry: WindowRegistry,
+  vp: Viewport,
+  regions: readonly KeepOut[] = keepOuts(registry.client, vp),
+): Windows {
+  const windows = [...ws];
+  return followDefaults(windows, registry, vp, regions) ? windows : ws;
+}
+
+/**
+ * FR-SHELL-55: every rendered open window overlapping `bar` grown by 12 px is pushed right, in x
+ * order: x = the bar's right edge + 12, then past each open window it lands on (its right edge +
+ * 12), repeatedly; same y and height; its width kept if it fits before vw − 12, else shrunk toward
+ * its min. No room to the right even at min width: it moves below the bar (`belowBar`). Neither
+ * fits: a launcher window is auto-minimised (FR-SHELL-47), a protected (`defaultOpen`) or
+ * `fixedDefault` one goes to the right edge at min width. Written with `area`; never restored.
+ */
+function pushWindows(ws: Windows, bar: Rect, ctx: ManagerContext): Windows {
+  const vp = ctx.viewport;
+  const grown = {
+    x: bar.x - EDGE_GAP,
+    y: bar.y - EDGE_GAP,
+    w: bar.w + 2 * EDGE_GAP,
+    h: bar.h + 2 * EDGE_GAP,
+  };
+  const shown = [...shownRects(ws, ctx)];
+  const hit = shown
+    .filter(([, r]) => overlaps(r, grown))
+    .sort(([a, ra], [b, rb]) => ra.x - rb.x || ra.y - rb.y || a.z - b.z);
+  if (hit.length === 0) return ws;
+  const moving = new Set(hit.map(([w]) => w));
+  // Where the others are now: windows not pushed, then each pushed one at its new rect.
+  const taken = shown.filter(([w]) => !moving.has(w)).map(([, r]) => r);
+  const right = vp.w - EDGE_GAP;
+  const area = workArea(vp);
+  let out = ws;
+  for (const [win, r] of hit) {
+    const def = ctx.registry.get(win.kind);
+    if (!def) continue;
+    const min = Math.min(def.minSize.w, r.w);
+    let x = bar.x + bar.w + EDGE_GAP;
+    let landed: Rect | null = null;
+    while (x + min <= right) {
+      const cand = { ...r, x, w: Math.min(r.w, right - x) };
+      const on = taken.filter((o) => overlaps(cand, o));
+      if (on.length === 0) {
+        landed = cand;
+        break;
+      }
+      x = Math.max(...on.map((o) => o.x + o.w)) + EDGE_GAP;
+    }
+    const base = renderedRect(win, def.minSize, vp); // stored height: growth is never written
+    const under = landed ? null : belowBar({ ...r, h: base.h }, def.minSize.h, bar, taken, vp);
+    if (!landed && !under && !def.defaultOpen && !def.fixedDefault) {
+      out = patch(out, win.kind, win.instance, (w) => ({ ...w, state: "minimised" }));
+      continue;
+    }
+    const at = landed ?? under ?? { ...r, x: right - min, w: min };
+    taken.push(at);
+    const stored = under ?? { x: at.x, y: base.y, w: at.w, h: base.h };
+    out = patch(out, win.kind, win.instance, (w) => ({ ...w, ...stored, area }));
+  }
+  return out;
+}
+
+/**
+ * FR-SHELL-55 (orchestrator ruling, W3): a pushed window with no room right of the bar goes below
+ * it: top = the bar's bottom + 12, same width, at the x nearest its own column (its x, else
+ * beside a window it would land on; never under the rail) where it lands on no other window;
+ * its height kept, else shrunk to the clear space above the next window / the usable bottom,
+ * never below `minH`. Null when nothing fits.
+ */
+function belowBar(
+  r: Rect,
+  minH: number,
+  bar: Rect,
+  taken: readonly Rect[],
+  vp: Viewport,
+): Rect | null {
+  const usable = usableArea(vp);
+  const top = bar.y + bar.h + EDGE_GAP;
+  const xs = [r.x, ...taken.flatMap((o) => [o.x - EDGE_GAP - r.w, o.x + o.w + EDGE_GAP])]
+    .filter((x) => x >= RAIL_CLEAR && x + r.w <= usable.right)
+    .sort((a, b) => Math.abs(a - r.x) - Math.abs(b - r.x) || a - b);
+  for (const x of xs) {
+    let bottom = usable.bottom;
+    let blocked = false;
+    for (const o of taken) {
+      if (o.x >= x + r.w || x >= o.x + o.w) continue;
+      if (o.y + o.h <= top) continue; // above the slot
+      if (o.y < top + minH) {
+        blocked = true; // spans the slot's top
+        break;
+      }
+      bottom = Math.min(bottom, o.y - EDGE_GAP);
+    }
+    const h = Math.min(r.h, bottom - top);
+    if (!blocked && h >= minH) return { x, y: top, w: r.w, h };
+  }
+  return null;
 }
 
 /**
@@ -404,6 +533,10 @@ function toFront(ws: Windows, kind: string, instance: string, state?: WindowStat
 export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): Windows {
   if (action.type === "reset") {
     return defaultLayout(ctx.registry, ctx.viewport, ctx.avoid?.(), keepOutsOf(ctx));
+  }
+  if (action.type === "push") return pushWindows(ws, action.rect, ctx);
+  if (action.type === "viewport") {
+    return followViewport(ws, ctx.registry, ctx.viewport, keepOutsOf(ctx));
   }
   const instance = action.instance ?? MAIN_INSTANCE;
   const { kind } = action;
