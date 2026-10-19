@@ -33,9 +33,11 @@ async function coverage(page: Page) {
 async function expectUncovered(page: Page, count: number, pcs: readonly string[]) {
   const canvas = page.getByTestId("map-canvas");
   await expect(canvas).toHaveAttribute("data-camera", "fitted");
+  // FR-MAP-59 (#256): the 48 px floor yields down to 24 px only to keep every token visible ("all").
+  const min = (await canvas.getAttribute("data-fit-visible")) === "all" ? 24 : 48;
   await expect
     .poll(async () => Number(await canvas.getAttribute("data-cell-px")))
-    .toBeGreaterThanOrEqual(48);
+    .toBeGreaterThanOrEqual(min);
   await expect
     .poll(async () => {
       const { count: n, covered } = await coverage(page);
