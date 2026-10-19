@@ -1,7 +1,7 @@
 ---
 title: Combat tracker
 prefix: CBT
-status: claimed
+status: in-review
 owner: spec-windows
 phase: post-mvp-6
 wave: 3
@@ -10,6 +10,8 @@ wave: 3
 # Combat tracker
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
+
+> **Sprint 6, track WF (window + layout fix pack; spec-windows; session-sim-9 FAIL c, BL-43).** Decided, not open (#286): the last Initiative row never bleeds under the "↓ N more" footer (c03: the Elite row's text painted below the footer). Likely cause (WF4 confirms it first): the footer is `sticky` inside the scrolling list (FR-CBT-77), and the grown window's body doesn't clip the list, so a partly hidden row paints past it. New **FR-CBT-125** (WF4, with [FR-CBTX-57 / -58](combat-extras.md#6-functional-requirements) for the names and chips). Client only, 0 B; no open question. Walkthrough F10 in [play-shell §13](play-shell.md#13-test-plan). CP (companions) edits this spec in parallel with its own range; its owned rows follow these rules (WF4 merges first).
 
 ## 1. Summary
 
@@ -228,6 +230,7 @@ All commands: rows + event-log entry + domain event in one transaction, then hel
 | FR-CBT-102 | **Difficulty counts enemies only** (amends FR-CBT-03; OQ-CBT-74 decided #256): the encounter card rates `rate(partyLevels, CRs of enemy entries)`; total CR = enemy entries only; a "Friendly: Goblin ×1 (CR 1/4)" line under it when any entry is friendly; all friendly → "—". **Planning-only**: the rating reads the entries, so a mid-fight `cbt.setSide` doesn't change it (entries are never edited by Start or setSide). | #252 |
 | FR-CBT-103 | **What stays on kind, not side** (each checked; #252 changes none): ties in turn order "PC before monster" (FR-CBT-13); turn alerts only for the owner's PCs (FR-CBT-41; friendly monsters have no owner until BL-30); round-1 roll controls and the player's Roll (FR-CBT-46/47) and "Roll monsters" (every monster without initiative, friendly too); a monster at 0 HP is skipped (FR-CBT-14, -50); monster HP band vs PC HP for players (#138, FR-CBT-26); combat-extras' death saves and End's effect clean-up (monsters' effects end, PCs' stay, [FR-CBTX-12](combat-extras.md#6-functional-requirements)); drag paths, trails and vision sources follow token **ownership** (FR-MAP-53, -66; FR-FOG-32); effect-modifier triggers have no side filter ("an ally within 5 ft" is an `ask` the DM confirms, [MOD §6.3](effect-modifiers.md#63-what-the-model-cant-express-dm-confirms-with-ask-a-reminder-or-by-hand)); trigger badges stay DM-only for monsters (FR-MOD-55); party loot has no XP (nothing to change). | #252 |
 | FR-CBT-104 | **Side in the UI**: DM Initiative row menu **Set as ally** / **Set as enemy** (`cbt-init-row-side`) with a "Secret" tickbox in its submenu (`cbt-init-row-side-secret`); token menu the same entry for bound tokens (FR-CBT-30). Rows show an "Ally" chip (lucide `handshake`, `cbt-init-row-ally`, `data-value` `ally` \| `enemy`) on monsters set to ally and an "Enemy" chip on PCs set to enemy (the kind's default shows nothing); the DM's chip is dashed while players see another side (`sideOf ≠ publicSideOf`). *(Seams S9)* The side chip follows W4's chip-overflow rule ([combat-extras](combat-extras.md#6-functional-requirements)): it never folds into "+N" and sits before the effect chips. `tokenOverlays` line `cbt` adds the same chip as a badge. Builder entry rows: a "Friendly" Switch (`cbt-enc-entry-friendly`). Players: the chip on their Initiative rows and tokens (FR-CBT-100). | #252 |
+| FR-CBT-125 | **Nothing below "↓ N more"** (sprint 6, BL-43; sim-9 c03; amends FR-CBT-77's footer): in both Initiative windows the combatant list is its own **clipping viewport** (`overflow` hidden on the outside, its own scroll inside); the "↓ N more" footer (`cbt-init-more`) sits **below** that viewport, in its own space, not over the list. No row content paints below the viewport's bottom edge or under / past the footer, and nothing paints outside the window body. A row cut by the viewport is cut at the viewport's edge (above the footer); N = rows wholly or partly below that edge (as built). With no row below the fold the footer is absent and the viewport takes its space. Same for the DM Pending section's own scroll (capped at 3 rows). Applies to owned / companion rows (CP) too. Client only. | sim-9 c03 |
 
 ### 6.1 N7 combat route semantics
 
@@ -623,6 +626,10 @@ One test plan for the track; [MOD §13](effect-modifiers.md#13-test-plan) and [M
 | A6 | Set Goblin 2 ally again; reload A, B, C | B, C reload | Same chips and sides after the reload for every client; Ambush rating still unchanged; no console errors |
 | L16 | — | — | No console errors; leak scan of B, C frames clean (list above); teardown `fixtures:reset --profile verify` |
 
+### 13.2 Sprint 6 (track WF)
+
+Bundle **`session-sim-9`** (Goblin Ambush combat with ≥ 7 rows and a pending card; no new fixture). Unit / DOM (`below-fold.test.tsx`, both Initiative windows): `FR-CBT-125 nothing below N more`: 9 rows in a window 400 × 500 (DM) / 280 × 400 (player) → the footer's top ≥ the list viewport's bottom; every row's painted box is clipped to the viewport (`getBoundingClientRect` ∩ below-viewport area = the clip, checked via the viewport's `overflow` and the row's offset); `elementFromPoint` 4 px below the footer inside the window body is not a row; N = rows wholly or partly below; scroll to the end → footer gone, the last row whole; Pending capped at 3 with its own scroll, same rule; grown window (FR-SHELL-39) at its cap → same. E2E: none new (walkthrough). Walkthrough F10 in [play-shell §13](play-shell.md#13-test-plan) (c03 repro at 1440×900, DM Initiative default height, Ambush round 1 with the pending card). Disconnect / reconnect / crash: layout only, re-rendered from the store; nothing to lose.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -700,6 +707,10 @@ One test plan for the track; [MOD §13](effect-modifiers.md#13-test-plan) and [M
 | **R3** `fix/combat-trails` | FR-CBT-97, FR-MAP-65–67 (sim-8 #6) | server `combat-tracker/{hooks.ts, turns.ts, lifecycle.ts}`; client `src/client/common/features/scenes-map/{drag-path.ts, drag-preview.ts, MapCanvas.tsx, layers/DragPaths.tsx}`; fixture `trail-moves`, appended to bundle `late-damage` | canvas files: one holder at a time (sprint-5 hotspot). **Conflicts with K's colours** on `DragPaths.tsx` / `MapCanvas.tsx` (path colour) | After R0; **∥ R1**. *(Seams S10)* Canvas holder order **K1 template menu [1] → W2 Fit → R3 → K3 colours**, one holder at a time; ready early → wait or stack with `--base` on the holder's branch. K3 colours R3's stored `trail` (owner's colour at draw time) |
 | **R4** `build/combat-sides` *(#252)* | FR-CBT-98–104 | server `combat-tracker/{sides.ts (new: cbt.setSide), records.ts (redaction), lifecycle.ts (Start copies), encounters.ts (REST entry side)}`; `@shared/combat-tracker/{difficulty.ts, side-kind.ts (new `cbt.side` log kind)}`; DM `combat-tracker/{initiative-window.tsx, token-menu-entries.tsx, encounters-window.tsx, popup-placement.ts}`; `src/client/common/features/combat-tracker/token-overlay.ts`; player `combat-tracker/initiative-window.tsx`; fixture `enc-friendly`, appended to bundle `late-damage` | log-entry kinds `src/shared/dice-roll-log/kinds.ts` (append one line) | After R0; **∥ R3**; after R1 on `initiative-window.tsx` (or stacked on it). *(Seams S9)* **after W4** (chip overflow, one Invisible, Effect… source): R4 rebases and follows W4's overflow rule. *(Seams S8)* D9 (roll-button hints) comes after R1 and R4 on `initiative-window.tsx` |
 
+### 14.2 Build split (sprint 6, track WF)
+
+- **WF4** `fix/init-rows-s6` (FR-CBT-125 with [FR-CBTX-57 / -58](combat-extras.md#6-functional-requirements)): `src/client/common/features/combat-tracker/below-fold.tsx` (footer outside the viewport), the list viewport in DM `initiative-window.tsx` and player `initiative-window.tsx`; combat-extras' `parts.tsx` / DM `row.tsx` / player row (CBTX's lines). No shared file (AGENTS §9.9), no server, schema or wire change. Starts at once; **before CP's owned Initiative rows** (turn modes, owned / summoned rows, Dismiss): CP rebases on WF4 and its rows follow FR-CBT-125 and FR-CBTX-57 / -58. Full split: [play-shell §14](play-shell.md#14-dependencies).
+
 ## 15. Open questions
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
@@ -748,6 +759,8 @@ One test plan for the track; [MOD §13](effect-modifiers.md#13-test-plan) and [M
 | ~~OQ-CBT-40~~ | ~~Server refuses `cbt.rollInitiative` from round 1? (P4)~~ | **Decided (#172):** server refuses re-rolls from round 1: a `cbt.rollInitiative` listing any combatant that already has initiative → `conflict`, whole intent, DM and player; combatants without initiative still roll (P4 amended, FR-CBT-46/47) | — | character-sheet |
 | ~~OQ-CBT-41~~ | ~~PC Down Badge also in players' Initiative rows? (G9)~~ | **Decided (#172):** PC Down Badge in players' Initiative rows too (FR-CBT-49) | — | — |
 | ~~OQ-CBT-42~~ | ~~Glitch verdicts in this spec (playtest)~~ | **Decided (#172):** verdicts accepted: G4 → FR-CBT-50; G5 → FR-CBT-54; G6 → FR-CBT-51; G9 → FR-CBT-49; G2 popup → FR-CBT-55; G1 fixture (`thorn-battlemap` in `session-sim`); G12 "group roll" not a bug | — | scenes-map, play-shell |
+
+*(Sprint 6, track WF)* No open question: FR-CBT-125's outcome is decided (#286).
 
 ## 16. Out of scope
 
