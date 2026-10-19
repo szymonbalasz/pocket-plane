@@ -37,6 +37,9 @@ export const NotificationRecord = z.object({
   closedAt: z.string().nullable(),
   closedByRole: z.enum(ACTION_ROLES).nullable(),
   closedByPlayerId: z.string().nullable(),
+  /** FR-NOTE-38 (sprint 5): who caused it, stamped by `notify`; null = system or an older row. */
+  byRole: z.enum(ACTION_ROLES).nullable(),
+  byPlayerId: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
