@@ -1,6 +1,6 @@
-# Apply hit: a damage card applied in two steps
+# 0053 — Apply hit: a damage card applied in two steps
 
-- Status: accepted (DM, sprint-5 gate 1, #256; raised by spec-combat, sprint 5 track R; the integrator numbers it at merge)
+- Status: accepted (DM, sprint-5 gate 1, #256; raised by spec-combat, sprint 5 track R)
 - Date: 2026-10-18
 - Refines: [ADR-0037](0037-split-attack-damage.md) in three places: "`cbt.applyCard` accepts a missing damage total only when every target misses"; "Undo: unchanged"; and **`cbt.rollDamage` "completes or creates a card"**: a second roll by the card's owner on a completed pending card of that row now creates no card (kept as `unusedRolls`); every other case still completes or creates as ADR-0037 says. Keeps [ADR-0016](0016-domain-events-pending-actions.md) (one undo step per apply) and [ADR-0027](0027-notification-creation.md) (notifications change only in the causing transaction).
 - Affects: [combat-tracker](../../specs/combat-tracker.md) (FR-CBT-87–94, §6.2), [effect-modifiers](../../specs/effect-modifiers.md) (FR-MOD-63), [data model](../../data-model/README.md) (new `hit_ruling` table), [protocol](../../protocol/README.md) (intent `cbt.applyHit`, event `HitApplied`, record type `hit-ruling`), [glossary](../../glossary.md) (OQ-CBT-68)

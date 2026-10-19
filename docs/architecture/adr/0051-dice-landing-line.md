@@ -1,11 +1,11 @@
-# Proposed — Dice landing, popup line and tray preview
+# 0051 — Dice landing, popup line and tray preview
 
-- Status: proposed (sprint 5, track D; for DM gate 1)
+- Status: accepted (DM, sprint-5 gate 1, #256; raised by spec-dice, sprint 5 track D)
 - Date: 2026-10-18
 - Amends: [ADR-0044](0044-3d-dice.md) row **Truth** ("the log line never waits for the animation"); [ADR-0048](0048-dice-display.md) rows **Truth** and **Popup: dice**. Adds a row **Previews**.
 - Keeps: [ADR-0001](0001-tech-stack.md) server-authoritative dice; [ADR-0022](0022-deterministic-seams.md) `ctx.dice`; ADR-0044 rows Library, Looks, Source, Visibility, Randomness, Roll control, Limits (its Where and Cost were already amended by ADR-0048); ADR-0048 rows Where, Which rolls, Popup: who, DM-only, Timing, Cost, Settings, Library. ADR-0048's **Popup: where** is amended by track W's [proposed-s5-windows-toast-corner](proposed-s5-windows-toast-corner.md), not here.
 - Affects: [dice-extras](../../specs/dice-extras.md) (FR-DICEX-46–51), [dice-roll-log](../../specs/dice-roll-log.md) (FR-DICE-40, 41), [play-shell](../../specs/play-shell.md) (popup size constants, set by W1)
-- Static serving (BL-21) has its own record: [proposed-s5-dice-static-serving](proposed-s5-dice-static-serving.md).
+- Static serving (BL-21) has its own record: [ADR-0052](0052-static-serving.md).
 
 ## Context
 

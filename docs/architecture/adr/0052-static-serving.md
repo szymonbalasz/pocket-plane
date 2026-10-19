@@ -1,6 +1,6 @@
-# Proposed — Built client served precompressed and cached
+# 0052 — Built client served precompressed and cached
 
-- Status: proposed (sprint 5, track D; for DM gate 1)
+- Status: accepted (DM, sprint-5 gate 1, #256; raised by spec-dice, sprint 5 track D)
 - Date: 2026-10-18
 - Amends: none (no earlier ADR covers how `start` serves `dist/client`; [ADR-0001](0001-tech-stack.md) stack and [ADR-0002](0002-single-package.md) single package kept)
 - Affects: server core `src/server/app.ts`, tooling `vite.config.ts`, every client file a browser downloads; spec home [dice-extras FR-DICEX-52](../../specs/dice-extras.md#6-functional-requirements) (BL-21)
