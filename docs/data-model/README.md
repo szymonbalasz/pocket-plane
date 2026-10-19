@@ -1848,3 +1848,13 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-49, -50 and [d
 
 - **Fixtures:** no new unit. Bundle `dice-polish` = `dice-display` + `char-brakka` + `weapon-flame-tongue` (Brakka, `player-1`, Flame Tongue `1d20+8`, `2d6+5` slashing + `2d6` fire); `session-sim-9` needs nothing extra (sim-8 has both units).
 - **Snapshot size** (CON-44): 0 B added; `dice-polish` DM 21,098 B, players ≤ 13,882 B.
+
+## 71. Sprint 5: Initiative trigger chips, Effect… source, one Invisible (W4)
+
+From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-54–56 and [fog-of-war](../specs/fog-of-war.md) FR-FOG-59. **Built by `fix/init-chips-effect`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent. Protocol side: [protocol §91](../protocol/README.md#91-sprint-5-initiative-trigger-chips-effect-source-one-invisible-w4).
+
+| Piece | Kind | Contents | Visibility | Source |
+|---|---|---|---|---|
+| Chip row fit | derived per render | `fitChipRow` → effect chips shown, tier, icon-only triggers, second line | each client its own rows (players: what FR-MOD-55 sends) | FR-CBTX-54 |
+| Second-line hold | client memory, per row | the name line's width when the row wrapped | — | FR-CBTX-54 |
+| Effect… default source | derived on open | `defaultEffectSource(rows, turnCombatantId, targets)` → id + `turn` \| `target` \| `none` | DM only | FR-CBTX-55 |

@@ -2308,3 +2308,18 @@ From [dice-extras](../specs/dice-extras.md) FR-DICEX-49, -50 and [dice-roll-log]
 | Test IDs | `dice-log-entry` + `data-landed`; `dice-log-die` and `dicex-die` drop `data-value` while held; `dicex-tray-total` + `data-landed`; `dicex-popup` + `data-landed` (every entry); `dicex-popup-row` + `data-landed` |
 | Bundle | dice-extras in each client's initial chunks **13.0 KB gz** (cap 15); `RollPopup` **4.8 KB gz** (cap 8) |
 | CON-44 | 0 B: no record, field or frame added. Bundle `dice-polish` DM 21,098 B, P1 13,882 B, P2 10,684 B |
+
+## 91. Sprint 5: Initiative trigger chips, Effect… source, one Invisible (W4)
+
+From [combat-extras](../specs/combat-extras.md) FR-CBTX-54–56 (OQ-CBTX-27 B, -28 A, -29 A, #256; seams S9) and [fog-of-war](../specs/fog-of-war.md) FR-FOG-59. **Built by `fix/init-chips-effect`**: client only; no record type, intent, event, signal or wire field (CON-44: 0 B). Amends [§51](#51-sprint-3-rule-trigger-sheet-ui-r6)'s "Initiative trigger chips" row (FR-CBTX-52: triggers no longer go into "+N"). Data model: [§71](../data-model/README.md#71-sprint-5-initiative-trigger-chips-effect-source-one-invisible-w4).
+
+| Piece | Contract | Source |
+|---|---|---|
+| `fitChipRow(effects, triggers, room, gap) → {n, tier, icons, wrap}` (`@ui/features/combat-extras/logic`) | Pure, over measured natural widths (effects `{full, short}` per BL-08 tier; triggers `full` = with name, `short` = icon-only). In order: (1) effect chips tighten (`fitChipTiers`) beside full trigger chips; (2) trigger chips icon-only; (3) effect chips fold into "+N", last first (`n` counts effect chips only); (4) `wrap`: the icon-only triggers don't fit even with every effect folded. No triggers → BL-08's rule unchanged | FR-CBTX-54 |
+| `EffectChips` compact rows (`parts.tsx`; DM `row.tsx` and the player Initiative row) | Order: shown effect chips, "+N" (in flow), trigger chips. Folded effects leave the flow (measured on the hidden copy, `data-chip-measure="effect"` / `"trigger"`). `wrap` (`data-wrap="true"` on `data-chip-row`): the chip line takes its own line under the name (flex-basis 100 %, last; the name line wraps only meanwhile), held until the name line widens or the chips change. "+N" Tooltip / list: effects only (`cbtx-trigger-chip-more-item` retired) | FR-CBTX-54 |
+| Icon trigger chip `cbtx-trigger-chip` | `data-compact` `true` \| `false`; icon-only = `Zap` + uses ("⚡2", `hp.down` below zero) + check when muted, the name `sr-only`; Tooltip "‹name› — ‹state›" (`triggerLine`). Full chips: name, at most 96 px (no tier cut) | FR-CBTX-54 |
+| Effect… source (`dialogs.tsx`, `effect-source.ts` `defaultEffectSource`) | Default = turn combatant if not hidden and not removed (`data-default="turn"` on `cbtx-effect-source`); else the first target's own active combatant in the started encounter (`target`); else none (`none`). Hidden combatants listed with an eye-off icon. `sourceCombatantId` sent as chosen | FR-CBTX-55 |
+| Token menu Conditions ▸ (`cbtx-token-menu-conditions`) | 14 options: `ConditionsMenu omit` = `TOKEN_MENU_OMIT` (`invisible`). The Initiative row's `cbtx-init-row-conditions` keeps 15 | FR-CBTX-56 |
+| `fog-token-menu-invisible` | The menu's only "Invisible"; Tooltip "Players don't see it unless they see invisible" (`INVISIBLE_TIP`). Intent unchanged (`fog.setInvisible`) | FR-FOG-59 |
+
+- **Fixtures:** none new (W4 adds no record); e2e bundle `init-chips-effect` = `session-sim-8` (Rage forced on in the test; `windows-s5` replaces it once W1 is on main).
