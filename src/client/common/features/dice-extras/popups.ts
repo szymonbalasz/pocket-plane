@@ -67,8 +67,8 @@ export interface RollPopup {
   /** The big throw's id (its first entry) when its dice hand off here. */
   bigId: string | null;
   parts: Partial<Record<PartName, PipPart>>;
-  /** The PiP's still per part: copied pixels (FR-DICEX-41). */
-  stills: Partial<Record<PartName, HTMLCanvasElement>>;
+  /** FR-DICEX-46 a: each handed-off die's still (copied pixels) by die key, kept by its cell. */
+  stills: Record<string, HTMLCanvasElement>;
   state: "rolling" | "rest" | "closing";
   hovered: boolean;
 }
@@ -109,9 +109,12 @@ export interface RollPopups {
   rested(id: string, part: PartName): void;
   /** A part can't draw as planned: its dice play in miniature, or show as chips. */
   fallback(id: string, part: PartName, to: "play" | "chips"): void;
-  still(id: string, part: PartName, canvas: HTMLCanvasElement): void;
+  /** Hand-off stills by die key (FR-DICEX-46 a). */
+  still(id: string, stills: Record<string, HTMLCanvasElement>): void;
   hover(id: string, on: boolean): void;
   close(id: string): void;
+  /** FR-DICEX-47 short screens: these popups don't fit the toast region; gone at once. */
+  drop(ids: readonly string[]): void;
   /** The popup the big throw `bigId` hands its dice to. */
   ofBig(bigId: string): RollPopup | null;
 }
@@ -280,8 +283,8 @@ export function createRollPopups(
     },
     rested,
     fallback,
-    still(id, part, canvas) {
-      patch(id, (x) => ({ ...x, stills: { ...x.stills, [part]: canvas } }));
+    still(id, stills) {
+      patch(id, (x) => ({ ...x, stills: { ...x.stills, ...stills } }));
     },
     hover(id, on) {
       const p = get(id);
@@ -297,6 +300,9 @@ export function createRollPopups(
       }
     },
     close,
+    drop(ids) {
+      for (const id of ids) remove(id);
+    },
     ofBig,
   };
 }
@@ -315,19 +321,25 @@ export function useRollPopups<T>(selector: (s: RollPopupsState) => T): T {
   return useSyncExternalStore(rollPopups.api.subscribe, read, read);
 }
 
-// The PiP slots (FR-DICEX-41): where a popup's hand-off still lands; the throw's flight reads
-// the slot's rect when it starts.
-const slots = new Map<string, HTMLElement>();
-const slotKey = (id: string, part: PartName) => `${id}|${part}`;
+// The popup cells (FR-DICEX-46 a): where each handed-off die lands (by die key) and the "+N"
+// cell the dice past cell 11 fly into; the throw's flight reads their rects when it starts.
+/** The "+N" cell's key. */
+export const MORE_CELL = "+N";
+const cells = new Map<string, Map<string, HTMLElement>>();
 
-export function registerPipSlot(id: string, part: PartName, el: HTMLElement | null): void {
-  if (el) slots.set(slotKey(id, part), el);
-  else slots.delete(slotKey(id, part));
+export function registerPopupCell(id: string, key: string, el: HTMLElement | null): void {
+  const of = cells.get(id) ?? new Map<string, HTMLElement>();
+  if (el) of.set(key, el);
+  else of.delete(key);
+  if (of.size > 0) cells.set(id, of);
+  else cells.delete(id);
 }
 
-/** The hand-off slot of the popup the big throw `bigId` flies into, or null (none on screen). */
-export function handoffSlot(bigId: string): { id: string; el: HTMLElement } | null {
+/** The cells of the popup the big throw `bigId` flies into, or null (none on screen). */
+export function handoffCells(
+  bigId: string,
+): { id: string; cells: ReadonlyMap<string, HTMLElement> } | null {
   const p = rollPopups.ofBig(bigId);
-  const el = p ? slots.get(slotKey(p.id, "handoff")) : undefined;
-  return p && el ? { id: p.id, el } : null;
+  const of = p ? cells.get(p.id) : undefined;
+  return p && of ? { id: p.id, cells: of } : null;
 }

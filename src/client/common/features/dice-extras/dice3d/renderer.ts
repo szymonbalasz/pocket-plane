@@ -31,7 +31,7 @@ import {
 import { type Arena, pixelRatioOf } from "../arena";
 import { dieMesh, drawAtlas, drawD4 } from "./faces";
 import { geometryOf, type LabelKind, labelKindOf, type Quat, upFace } from "./geometry";
-import { poseAt, STEP_HZ, settleLabels, simulate } from "./settle";
+import { poseAt, type Simulation, STEP_HZ, settleLabels, simulate } from "./settle";
 
 export interface Die3D {
   key: string;
@@ -72,6 +72,16 @@ export interface PlayOptions {
   clip?(): Rect | null;
   /** The simulation's arena (world units), fixed for the throw (FR-DICEX-34). */
   arena: Arena;
+  /** The camera's extents (world units) fitted to the rect; default the arena. */
+  view?: Arena;
+  /**
+   * FR-DICEX-46 b: per die, where it rests (CSS px from the rect's top-left; null = where the
+   * simulation leaves it): the recorded motion is shifted there over the throw, so the dice
+   * tumble into their cells with the same orientations (faces unchanged).
+   */
+  cells?: readonly ({ x: number; y: number } | null)[];
+  /** The motion plays within this (ms; the recording sped up). Default: real time. */
+  maxMs?: number;
   /** FR-DICEX-44: no shadows above 2.5 MP. */
   shadows: boolean;
   dice: readonly Die3D[];
@@ -91,6 +101,8 @@ export interface PlayOptions {
 export interface Still {
   canvas: HTMLCanvasElement;
   rect: Rect;
+  /** FR-DICEX-46 a (hand-off): each die's box inside `rect` (viewport CSS px), by key. */
+  dice?: Record<string, Rect>;
 }
 
 export interface PlayHandle {
@@ -139,6 +151,8 @@ interface Play {
   rect(): Rect;
   clip?(): Rect | null;
   arena: Arena;
+  /** The camera's extents (default `arena`). */
+  view?: Arena;
   /** Last fitted rect size (a resize refits the camera, FR-DICEX-34). */
   fitted: { w: number; h: number };
   moving(): boolean;
@@ -244,13 +258,19 @@ function stageIn(layer: HTMLElement): Stage {
   return stage;
 }
 
-/** Fit the arena into a rect (letterboxed), straight down: screen x = world x, down = +z. */
-function fit(camera: OrthographicCamera, arena: Arena, w: number, h: number) {
+/** The camera's half extents for an arena letterboxed into a `w` × `h` rect. */
+function extents(arena: Arena, w: number, h: number) {
   let halfW = arena.x;
   let halfH = arena.z;
   const aspect = w / Math.max(1, h);
   if (aspect > halfW / halfH) halfW = halfH * aspect;
   else halfH = halfW / aspect;
+  return { halfW, halfH };
+}
+
+/** Fit the arena into a rect (letterboxed), straight down: screen x = world x, down = +z. */
+function fit(camera: OrthographicCamera, arena: Arena, w: number, h: number) {
+  const { halfW, halfH } = extents(arena, w, h);
   camera.left = -halfW;
   camera.right = halfW;
   camera.top = halfH;
@@ -273,7 +293,7 @@ function draw(s: Stage) {
     const r = p.rect();
     if (r.w < 1 || r.h < 1) continue;
     if (r.w !== p.fitted.w || r.h !== p.fitted.h) {
-      fit(p.camera, p.arena, r.w, r.h);
+      fit(p.camera, p.view ?? p.arena, r.w, r.h);
       p.fitted = { w: r.w, h: r.h };
     }
     const c = p.clip ? p.clip() : r;
@@ -350,6 +370,29 @@ function project(m: Mesh, camera: OrthographicCamera, r: Rect) {
   return { x: ((v.x + 1) / 2) * r.w, y: ((1 - v.y) / 2) * r.h };
 }
 
+/** Ease in-out (cubic). */
+const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+
+/** Per die: its cell minus where the simulation rests it (world x / z), or null. */
+function cellShifts(
+  o: PlayOptions,
+  sim: Simulation,
+  last: number,
+): ({ x: number; z: number } | null)[] | null {
+  if (!o.cells) return null;
+  const r = o.rect();
+  const { halfW, halfH } = extents(o.view ?? o.arena, r.w, r.h);
+  return o.dice.map((_, i) => {
+    const c = o.cells?.[i];
+    if (!c) return null;
+    const { p } = poseAt(sim, i, last);
+    // Screen x = world x, down = +z, the rect's centre at the origin.
+    const x = (c.x / Math.max(1, r.w)) * 2 * halfW - halfW;
+    const z = (c.y / Math.max(1, r.h)) * 2 * halfH - halfH;
+    return { x: x - p[0], z: z - p[2] };
+  });
+}
+
 /**
  * FR-DICEX-15 / -34: simulate in the arena, relabel, play on the page's one canvas. Throws when
  * WebGL can't start (the caller draws flat).
@@ -402,20 +445,26 @@ export function playThrow(o: PlayOptions): PlayHandle {
   });
   scene.add(group);
 
+  const last = sim.frameCount - 1;
+  // FR-DICEX-46 b: each die's shift from where the simulation rests it to its cell (world units),
+  // eased in over the throw; orientations stay the recording's.
+  const shifts = cellShifts(o, sim, last);
   const pose = (f: number) => {
+    const k = ease(Math.min(1, f / Math.max(1, last)));
     meshes.forEach((m, i) => {
       const { p, q } = poseAt(sim, i, f);
-      m.position.set(p[0], p[1], p[2]);
+      const d = shifts?.[i];
+      m.position.set(p[0] + (d ? d.x * k : 0), p[1], p[2] + (d ? d.z * k : 0));
       m.quaternion.set(q[0], q[1], q[2], q[3]);
     });
   };
+  const speed = o.maxMs ? Math.max(1, ((last / STEP_HZ) * 1000) / o.maxMs) : 1;
 
   let start: number | null = null;
   let prev: number | null = null;
   const deltas: number[] = [];
   let released = false;
   let rested = false;
-  const last = sim.frameCount - 1;
 
   const rest = () => {
     rested = true;
@@ -447,13 +496,14 @@ export function playThrow(o: PlayOptions): PlayHandle {
     rect: o.rect,
     ...(o.clip && { clip: o.clip }),
     arena: o.arena,
+    ...(o.view && { view: o.view }),
     fitted: { w: 0, h: 0 },
     moving: () => !rested && !released,
     tick(time) {
       if (start === null) start = time;
       if (prev !== null) deltas.push(time - prev);
       prev = time;
-      const f = ((time - start) / 1000) * STEP_HZ;
+      const f = ((time - start) / 1000) * STEP_HZ * speed;
       if (f >= last) {
         rest();
         return false;
@@ -504,7 +554,18 @@ export function playThrow(o: PlayOptions): PlayHandle {
       if (!s.lost) {
         draw(s);
         // Copied in the same task as the render, so the drawing buffer still holds the frame.
-        still = copy(s, crop(o.rect(), camera, meshes, o.dice));
+        const r = o.rect();
+        const box = crop(r, camera, meshes, o.dice);
+        still = copy(s, box);
+        if (still) {
+          const dice: Record<string, Rect> = {};
+          meshes.forEach((m, i) => {
+            const d = o.dice[i] as Die3D;
+            const one = crop(r, camera, [m], [d]);
+            if (one.w > 0 && one.h > 0) dice[d.key] = one;
+          });
+          still.dice = dice;
+        }
       }
       release();
       if (!s.lost) draw(s);

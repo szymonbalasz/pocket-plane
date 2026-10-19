@@ -1,8 +1,8 @@
-// A 3D throw run (FR-DICEX-14, -15, -20, -23, -34, -35, -41), drawn by the lazy chunk's renderer
-// on the dice layer's one canvas at its arena rect (the viewport, or the zone's dice area). At its
-// hand-off the rested dice are copied into a still on the layer that shrinks and flies into its
-// popup's PiP (0.4 s), which keeps the pixels; with no popup on screen (or popups off) the still
-// fades out. Dice data stays in the DOM for walkthroughs: one hidden `dicex-throw-die` per 3D die
+// A 3D throw run (FR-DICEX-14, -15, -20, -23, -34, -35, -41, -46), drawn by the lazy chunk's
+// renderer on the dice layer's one canvas at its arena rect (the viewport, or the zone's dice
+// area). At its hand-off the rested dice are copied off the canvas; each die flies to its popup
+// cell, scaling to it (0.4 s), and the cell keeps its pixels; dice past cell 11 fly into "+N" and
+// fade. With no popup on screen (or popups off) the still fades out. Dice data stays in the DOM for walkthroughs: one hidden `dicex-throw-die` per 3D die
 // with `data-settled` = the up-face read from the rendered mesh at rest. MOD / offered dice get a
 // label under the die at rest.
 import type { DiceLook } from "@shared/dice-extras/looks";
@@ -10,10 +10,10 @@ import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import { isMeshDie, type ThrowDie } from "@shared/dice-extras/throw";
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { type Arena, arenaOf, dieSizePx, screenArena, shadowsFor } from "./arena";
-import type { PlayHandle, Rect, RestInfo } from "./dice3d/index";
+import type { PlayHandle, Rect, RestInfo, Still } from "./dice3d/index";
 import { rectOf } from "./layer-host";
 import { dice3d } from "./lazy3d";
-import { handoffSlot, rollPopups } from "./popups";
+import { handoffCells, MORE_CELL, rollPopups } from "./popups";
 import { diceExtras, type ThrowRun } from "./store";
 import { FADE_MS, HANDOFF_MS } from "./timing";
 
@@ -49,7 +49,7 @@ export function useRun3D(
 ): RestInfo | null {
   const [rest, setRest] = useState<RestInfo | null>(null);
   const handle = useRef<PlayHandle | null>(null);
-  const still = useRef<HTMLCanvasElement | null>(null);
+  const stills = useRef<HTMLCanvasElement[]>([]);
   const input = useRef({ run, dice, rect, onSlow });
   input.current = { run, dice, rect, onSlow };
   const { seq } = run;
@@ -94,8 +94,8 @@ export function useRun3D(
     return () => {
       handle.current?.stop();
       handle.current = null;
-      still.current?.remove();
-      still.current = null;
+      for (const c of stills.current) c.remove();
+      stills.current = [];
       // Unmounted before its end (the display changed): the run shows flat in the zone.
       const s = diceExtras.api.getState();
       if (s.current?.seq === seq || s.leaving?.seq === seq) diceExtras.flat(seq);
@@ -113,25 +113,22 @@ export function useRun3D(
     handle.current = null;
     const layer = host.current;
     if (!s || !layer) return;
-    still.current = s.canvas;
-    layer.appendChild(s.canvas);
     const ms = run.phase === "handoff" ? HANDOFF_MS : FADE_MS;
-    const el = s.canvas;
-    // FR-DICEX-35 / -41 a: shrink and fly into the popup's PiP, which keeps the pixels.
-    const target = run.phase === "handoff" ? handoffSlot(run.t.id) : null;
-    const to = target && rectOf(target.el);
-    if (target && to && to.w > 0 && to.h > 0) {
-      const k = Math.min(1, to.w / s.rect.w, to.h / s.rect.h);
-      const dx = to.x + (to.w - s.rect.w * k) / 2 - s.rect.x;
-      const dy = to.y + (to.h - s.rect.h * k) / 2 - s.rect.y;
-      el.style.transformOrigin = "0 0";
-      el.style.transition = `transform ${ms}ms ease-in-out`;
-      requestAnimationFrame(() => {
-        el.style.transform = `translate(${dx}px, ${dy}px) scale(${k})`;
-      });
-      setTimeout(() => rollPopups.still(target.id, "handoff", el), ms);
+    // FR-DICEX-35 / -46 a: each die flies to its popup cell, which keeps its pixels.
+    const target = run.phase === "handoff" ? handoffCells(run.t.id) : null;
+    if (target && s.dice) {
+      const flown = flyToCells(s, s.dice, target.cells, layer, ms);
+      stills.current = [...flown.values()];
+      setTimeout(() => {
+        const kept: Record<string, HTMLCanvasElement> = {};
+        for (const [key, c] of flown) if (target.cells.has(key)) kept[key] = c;
+        rollPopups.still(target.id, kept);
+      }, ms);
       return;
     }
+    stills.current = [s.canvas];
+    layer.appendChild(s.canvas);
+    const el = s.canvas;
     el.style.transition = `opacity ${ms}ms ease-in, transform ${ms}ms ease-in`;
     el.style.transformOrigin = "100% 100%";
     // Next frame: from the copied pixels to gone (D7 swaps this for the flight into its PiP).
@@ -142,6 +139,90 @@ export function useRun3D(
   }, [run.phase, leaving, host, run.t.id]);
 
   return rest;
+}
+
+/** One die's flight: to its cell (or "+N", fading), scaled to it, centred. */
+export interface Flight {
+  to: Rect;
+  fade: boolean;
+  dx: number;
+  dy: number;
+  k: number;
+}
+
+/**
+ * FR-DICEX-46 a: each rested die's flight from its `boxes` rect to its cell (`cells` by die key,
+ * viewport rects); a die without a cell flies into `more` ("+N") and fades. Pure.
+ */
+export function handoffFlights(
+  boxes: Record<string, Rect>,
+  cells: ReadonlyMap<string, Rect>,
+  more: Rect | null,
+): Map<string, Flight> {
+  const out = new Map<string, Flight>();
+  for (const [key, box] of Object.entries(boxes)) {
+    const cell = cells.get(key);
+    const to = cell ?? more;
+    if (!to || to.w <= 0 || to.h <= 0 || box.w <= 0 || box.h <= 0) continue;
+    const k = Math.min(to.w / box.w, to.h / box.h);
+    out.set(key, {
+      to,
+      fade: !cell,
+      k,
+      dx: to.x + (to.w - box.w * k) / 2 - box.x,
+      dy: to.y + (to.h - box.h * k) / 2 - box.y,
+    });
+  }
+  return out;
+}
+
+/**
+ * FR-DICEX-46 a: cut each die out of the hand-off still, put it on the layer where it rested and
+ * fly it to its cell (`cells` by die key), scaled to the cell; a die without a cell flies into
+ * "+N" and fades. Returns the flying canvases by die key.
+ */
+function flyToCells(
+  s: Still,
+  boxes: Record<string, Rect>,
+  cells: ReadonlyMap<string, HTMLElement>,
+  layer: HTMLElement,
+  ms: number,
+): Map<string, HTMLCanvasElement> {
+  const out = new Map<string, HTMLCanvasElement>();
+  const ratio = s.canvas.width / Math.max(1, s.rect.w);
+  const rects = new Map<string, Rect>();
+  for (const [key, el] of cells) {
+    const r = key === MORE_CELL ? null : rectOf(el);
+    if (r) rects.set(key, r);
+  }
+  const flights = handoffFlights(boxes, rects, rectOf(cells.get(MORE_CELL) ?? null));
+  for (const [key, f] of flights) {
+    const box = boxes[key] as Rect;
+    const c = layer.ownerDocument.createElement("canvas");
+    c.width = Math.max(1, Math.round(box.w * ratio));
+    c.height = Math.max(1, Math.round(box.h * ratio));
+    c.style.cssText = `position:absolute;display:block;left:${box.x}px;top:${box.y}px;width:${box.w}px;height:${box.h}px`;
+    c.getContext("2d")?.drawImage(
+      s.canvas,
+      Math.round((box.x - s.rect.x) * ratio),
+      Math.round((box.y - s.rect.y) * ratio),
+      c.width,
+      c.height,
+      0,
+      0,
+      c.width,
+      c.height,
+    );
+    layer.appendChild(c);
+    c.style.transformOrigin = "0 0";
+    c.style.transition = `transform ${ms}ms ease-in-out${f.fade ? `, opacity ${ms}ms ease-in` : ""}`;
+    requestAnimationFrame(() => {
+      c.style.transform = `translate(${f.dx}px, ${f.dy}px) scale(${f.k})`;
+      if (f.fade) c.style.opacity = "0";
+    });
+    out.set(key, c);
+  }
+  return out;
 }
 
 /**

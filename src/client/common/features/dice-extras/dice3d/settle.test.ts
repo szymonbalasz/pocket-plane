@@ -186,13 +186,16 @@ describe("FR-DICEX-15 headless settle", () => {
   });
 });
 
-/** FR-DICEX-34: the screen arenas of DICEX §13 and the popup's PiP (≈ 260×96, small dice). */
+/**
+ * FR-DICEX-34: the screen arenas of DICEX §13 and the popup miniature's (FR-DICEX-46 b: two full
+ * lines of 44 px cells, 284×92, 36 px dice; every miniature tumbles there, then into its cells).
+ */
 const ARENAS: [string, Arena][] = [
   ["1280×720", screenArena({ w: 1280, h: 720 })],
   ["1440×900", screenArena({ w: 1440, h: 900 })],
   ["1920×1080", screenArena({ w: 1920, h: 1080 })],
   ["390×844", screenArena({ w: 390, h: 844 })],
-  ["PiP 260×96", arenaOf({ w: 260, h: 96 }, 24)],
+  ["popup line 284×92", arenaOf({ w: 284, h: 92 }, 36)],
 ];
 const TYPES: [DieShape, LabelKind][] = [
   ...SHAPES.map((s) => [s, s] as [DieShape, LabelKind]),

@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { type DiceThrow, throwDice } from "@shared/dice-extras/throw";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
-import { dmStackAt, pipClip, pipDiePx, popupRows } from "./popup-logic";
+import { dmStackAt, pipClip, popupRows } from "./popup-logic";
 import { createRollPopups, pipModeOf, pipPlan, type RollPopup } from "./popups";
 import { createDiceExtrasStore } from "./store";
 import { FLAT_IN_MS, POPUP_CLOSE_MS, POPUP_MS, POPUP_ROLLING_MAX_MS } from "./timing";
@@ -184,7 +184,7 @@ describe("FR-DICEX-41 PiP", () => {
     }
   });
 
-  test("FR-DICEX-35 FR-DICEX-41 handoff: the popup rests when its big throw rests; the still lands in the PiP", () => {
+  test("FR-DICEX-35 FR-DICEX-41 handoff: the popup rests when its big throw rests; each die's still lands in its cell", () => {
     const { t, throws, popups, one } = setup();
     const entries = [entry()];
     const { t: big, big: ref } = bigOf(entries);
@@ -195,8 +195,8 @@ describe("FR-DICEX-41 PiP", () => {
     throws.rested(throws.api.getState().current?.seq ?? -1);
     expect(one().state).toBe("rest");
     const canvas = {} as HTMLCanvasElement;
-    popups.still("e1", "handoff", canvas);
-    expect(one().stills.handoff).toBe(canvas);
+    popups.still("e1", { "e1:0": canvas });
+    expect(one().stills["e1:0"]).toBe(canvas);
   });
 
   test("FR-DICEX-18 interrupt: a new throw snaps the running one to rest, so its popup gets its dice at once", () => {
@@ -250,10 +250,6 @@ describe("FR-DICEX-41 PiP", () => {
     expect(pipClip(pip, [card, vp], [{ x: 900, y: 300, w: 400, h: 400 }])).toBeNull();
     // Half off the card (it scrolled / is closing): clipped to the card.
     expect(pipClip({ ...pip, y: 520 }, [card, vp], [])).toEqual({ ...pip, y: 520, h: 40 });
-    // Dice fit the PiP: 1 die big, 20 dice small, never below 18 px.
-    expect(pipDiePx(pip, 1)).toBe(40);
-    expect(pipDiePx(pip, 20)).toBeLessThan(40);
-    expect(pipDiePx({ w: 60, h: 40 }, 20)).toBe(18);
   });
 });
 

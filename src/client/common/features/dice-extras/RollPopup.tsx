@@ -1,51 +1,79 @@
 // The roll popup stack (FR-DICEX-39–41; DICEX §7 "Roll popup"), a lazy chunk (≤ 8 KB gz) loaded
 // at idle and portalled into the shell's toast region (players bottom-right, newest at the
-// bottom; the DM top-centre, newest on top, clear of Initiative). A card per live frame: one
-// named row per entry (actor, label, total with its markers), the PiP with the frame's dice (the
-// big throw's still, a miniature on the dice layer's one canvas scissored to the card's visible
-// rect, or die-shape chips), ✕ and the gear. Click → the Game log at the entry (FR-DICE-37).
-// Sprint 5: each row's total waits for its entry's landing ("Rolling…"), chips blank till then
-// (FR-DICEX-49, table E).
+// bottom; the DM top-centre, newest on top, clear of Initiative). A card per live frame (320 ×
+// ≤ 190, §6.1 table B): one named row per entry (actor, label, its total with its markers at the
+// right), ✕ and the gear on the first row, then the frame's dice in a line of 44 px cells
+// (FR-DICEX-46: the big throw's dice flown in, a miniature tumbling into the cells on the dice
+// layer's one canvas, or die-shape chips; ≤ 2 lines, then "+N"). Click → the Game log at the
+// entry (FR-DICE-37). Sprint 5: each row's total waits for its entry's landing ("Rolling…"),
+// chips blank till then (FR-DICEX-49, table E); only the popups that fit the region show
+// (FR-DICEX-47).
 // State and timers live in `popups.ts`; nothing here is stored or sent.
 import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import { isMeshDie, type ThrowDie } from "@shared/dice-extras/throw";
 import { EyeOffIcon, SettingsIcon, XIcon } from "lucide-react";
-import { lazy, type RefObject, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  type RefObject,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/controls";
+import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { focusLogEntry } from "../dice-roll-log/focus";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
+import { EDGE_GAP, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
 import type { ShellClient } from "../play-shell/registry";
 import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
 import { ROLL_POPUP_H, ROLL_POPUP_W } from "../play-shell/toast-region";
-import { arenaOf } from "./arena";
+import { arenaOf, DIE_WORLD } from "./arena";
 import type { Rect } from "./dice3d/index";
 import { FlatDie } from "./FlatDie";
 import { useAllLanded, useHolding, useLanded } from "./landing";
 import { diceLayerHost, rectOf } from "./layer-host";
 import { dice3d, whenChunk } from "./lazy3d";
 import {
+  CELL_LINES,
+  CELL_PX,
+  cellTag,
   dmStackAt,
+  LINE_W,
+  linesH,
+  MINI_DIE_PX,
+  POPUP_PAD,
+  type PopupCell,
   type PopupItem,
+  type PopupLine,
   type PopupRow,
   pipClip,
-  pipDiePx,
+  popupHeight,
+  popupLine,
   popupRows,
+  popupsThatFit,
+  ROW_H,
+  ROWS_SHOWN,
+  TAG_OVERHANG,
 } from "./popup-logic";
 import {
-  type PartName,
+  MORE_CELL,
   pipModeOf,
   type RollPopup,
-  registerPipSlot,
+  registerPopupCell,
   rollPopups,
   useRollPopups,
 } from "./popups";
 import type { SettingsPane } from "./SettingsPanel";
 import { type DisplaySetting, is3dDisplay } from "./settings";
 import { useDiceExtras } from "./store";
+import { MINIATURE_MS } from "./timing";
 
 const SettingsPanel = lazy(() =>
   import("./SettingsPanel").then((m) => ({ default: m.SettingsPanel })),
@@ -85,70 +113,68 @@ function paint(canvas: HTMLCanvasElement | null, src: HTMLCanvasElement) {
   ctx.drawImage(src, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
 }
 
-/** FR-DICEX-41 a: the big throw's still lands here (the flight reads this slot's rect). */
-function HandoffSlot({ p, grow }: { p: RollPopup; grow: number }) {
+/** FR-DICEX-46 a: a handed-off die's still in its cell (the flight reads the cell's rect). */
+function StillCanvas({ still }: { still: HTMLCanvasElement | undefined }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const still = p.stills.handoff;
   useEffect(() => {
     if (still) paint(canvas.current, still);
   }, [still]);
-  return (
-    <div
-      ref={(el) => registerPipSlot(p.id, "handoff", el)}
-      className="relative h-full min-w-12"
-      style={{ flex: grow }}
-    >
-      <canvas ref={canvas} className="absolute inset-0 size-full" />
-    </div>
-  );
+  return <canvas ref={canvas} className="absolute inset-0 size-full" />;
 }
 
+/** Simulation px per world unit of a miniature die (FR-DICEX-46 b). */
+const MINI_PER_UNIT = MINI_DIE_PX / DIE_WORLD;
+/** Every miniature tumbles in the same arena (two full lines), whatever its line count. */
+const MINI_ARENA = arenaOf({ w: LINE_W, h: linesH(CELL_LINES) }, MINI_DIE_PX);
+
 /**
- * FR-DICEX-41 b: the miniature, on the dice layer's one canvas at this slot's rect (same seed),
- * scissored each frame to the card's visible rect minus dialogs; at rest its pixels are copied
- * into this slot's canvas in the same task. No 3D here or now → chips.
+ * FR-DICEX-46 b: the miniature, on the dice layer's one canvas over the line box (same seed),
+ * each die tumbling into its cell (≤ 1.2 s), scissored each frame to the card's visible rect
+ * minus dialogs; at rest its pixels are copied into this canvas in the same task. No 3D here or
+ * now → chips.
  */
-function PlaySlot({
+function Miniature({
   p,
-  dice,
+  cells,
   card,
   display,
-  grow,
 }: {
   p: RollPopup;
-  dice: readonly ThrowDie[];
+  cells: readonly PopupCell[];
   card: RefObject<HTMLElement | null>;
   display: DisplaySetting;
-  grow: number;
 }) {
-  const slot = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLSpanElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [settled, setSettled] = useState<Record<string, number> | null>(null);
-  const input = useRef({ p, dice, display });
-  input.current = { p, dice, display };
-  const key = dice.map((d) => d.key).join();
+  const input = useRef({ p, cells, display });
+  input.current = { p, cells, display };
+  const key = cells.map((c) => c.die.key).join();
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per dice set (`key`)
   useEffect(() => {
-    const { p: pop, dice: ds, display: shown } = input.current;
+    const { p: pop, cells: cs, display: shown } = input.current;
     const chips = () => rollPopups.fallback(pop.id, "play", "chips");
     if (!is3dDisplay(shown)) return chips();
     let stop: (() => void) | null = null;
     const cancel = whenChunk(dice3d, (ready) => {
       const mod = dice3d.module();
       const layer = diceLayerHost.current;
-      const start = rectOf(slot.current);
+      const start = rectOf(box.current);
       if (!ready || !mod || !layer || !start) return chips();
-      const area = () => rectOf(slot.current) ?? start;
+      const area = () => rectOf(box.current) ?? start;
       const vp = () => ({ x: 0, y: 0, w: innerWidth, h: innerHeight });
       try {
         const h = mod.playThrow({
           layer,
           rect: area,
           clip: () => pipClip(area(), [rectOf(card.current) ?? area(), vp()], coverRects()),
-          arena: arenaOf(start, pipDiePx(start, ds.length)),
+          arena: MINI_ARENA,
+          view: { x: start.w / 2 / MINI_PER_UNIT, z: start.h / 2 / MINI_PER_UNIT },
+          cells: cs.map((c) => ({ x: c.x + CELL_PX / 2, y: c.y + CELL_PX / 2 })),
+          maxMs: MINIATURE_MS,
           shadows: false,
           seed: mod.seedOf(pop.t.seedId),
-          dice: ds.map((d) => ({
+          dice: cs.map(({ die: d }) => ({
             key: d.key,
             shape: d.shape as NonNullable<ThrowDie["shape"]>,
             ...(d.d100 && { d100: d.d100 }),
@@ -164,7 +190,7 @@ function PlaySlot({
           onStill: (s) => {
             // Same task as the rest frame: place the copied pixels where they were drawn.
             const c = canvas.current;
-            const at = rectOf(slot.current);
+            const at = rectOf(box.current);
             const ctx = c?.getContext("2d");
             if (!c || !ctx || !at) return;
             const ratio = s.canvas.width / Math.max(1, s.rect.w);
@@ -184,9 +210,9 @@ function PlaySlot({
     };
   }, [key]);
   return (
-    <div ref={slot} className="relative h-full min-w-12" style={{ flex: grow }}>
+    <span ref={box} className="absolute inset-0">
       <canvas ref={canvas} className="absolute inset-0 size-full" />
-      {dice.map((d) => (
+      {cells.map(({ die: d }) => (
         <span
           key={d.key}
           data-testid="dicex-throw-die"
@@ -201,16 +227,79 @@ function PlaySlot({
           className="sr-only"
         />
       ))}
-    </div>
+    </span>
   );
 }
 
+/** What a cell draws: a chip (flat, or not a mesh die), a hand-off still, or the miniature's. */
+type CellDraw = "chip" | "handoff" | "play";
+
+/** FR-DICEX-46: one die's 44 px cell; `data-value` once its entry landed (FR-DICEX-49). */
+function Cell({
+  p,
+  cell,
+  draw,
+  held,
+  shown,
+}: {
+  p: RollPopup;
+  cell: PopupCell;
+  draw: CellDraw;
+  held: boolean;
+  shown: boolean;
+}) {
+  const d = cell.die;
+  const tag = cellTag(d);
+  const look = p.looks[d.entryId];
+  const el = (
+    <span
+      ref={(e) => registerPopupCell(p.id, d.key, e)}
+      data-testid="dicex-popup-cell"
+      data-entry-id={d.entryId}
+      data-line={cell.line}
+      data-index={cell.index}
+      data-faces={d.faces}
+      data-kept={d.kept}
+      data-offered={d.offered === true}
+      {...(!held && { "data-value": d.value ?? "" })}
+      className={cn(
+        "absolute flex items-center justify-center rounded-md",
+        d.offered && draw !== "chip" && "border border-dashed border-muted-foreground",
+      )}
+      style={{ left: cell.x, top: cell.y, width: CELL_PX, height: CELL_PX }}
+    >
+      {draw === "chip" ? (
+        <span
+          className={cn("transition-opacity duration-300", shown ? "opacity-100" : "opacity-0")}
+        >
+          <FlatDie die={d} look={look} size="lg" settled flat blank={held} />
+        </span>
+      ) : (
+        draw === "handoff" && <StillCanvas still={p.stills[d.key]} />
+      )}
+      {tag && (
+        <span className="absolute -bottom-1 left-0 w-full truncate rounded bg-background/80 px-0.5 text-center text-[9px] leading-tight text-muted-foreground">
+          {tag.tag}
+        </span>
+      )}
+    </span>
+  );
+  return tag ? <Tooltip content={tag.full}>{el}</Tooltip> : el;
+}
+
+/**
+ * FR-DICEX-46: the frame's dice in a line of 44 px cells (≤ 2 lines, then 11 + "+N"); hand-off
+ * stills, the miniature or chips fill the same cells. Click → the Game log at the entry; "+N" →
+ * at the first hidden die's entry (FR-DICE-37).
+ */
 function Pip({
   p,
+  line,
   card,
   display,
 }: {
   p: RollPopup;
+  line: PopupLine;
   card: RefObject<HTMLElement | null>;
   display: DisplaySetting;
 }) {
@@ -218,78 +307,63 @@ function Pip({
   const holding = useHolding();
   const mode = pipModeOf(p);
   const { handoff, play } = p.parts;
-  const { slots, chips } = useMemo(() => {
-    const live = (part?: { ids: string[]; chips: boolean }) =>
-      part && !part.chips
-        ? p.t.dice.filter((d) => part.ids.includes(d.entryId) && isMeshDie(d))
-        : [];
-    const out: { part: PartName; dice: ThrowDie[] }[] = [];
-    const h = live(handoff);
-    const m = live(play);
-    if (h.length > 0) out.push({ part: "handoff", dice: h });
-    if (m.length > 0) out.push({ part: "play", dice: m });
-    const in3d = new Set([...h, ...m]);
-    return { slots: out, chips: p.t.dice.filter((d) => !in3d.has(d)) };
-  }, [p.t, handoff, play]);
-  const small = chips.length > 6 || slots.length > 0;
+  const live = (d: ThrowDie, part?: { ids: string[]; chips: boolean }) =>
+    part !== undefined && !part.chips && part.ids.includes(d.entryId) && isMeshDie(d);
+  const drawOf = (d: ThrowDie): CellDraw =>
+    live(d, handoff) ? "handoff" : live(d, play) ? "play" : "chip";
+  const mini = line.cells.filter((c) => drawOf(c.die) === "play");
+  const more = line.more;
   return (
     <div
       data-testid="dicex-popup-pip"
       data-mode={mode}
-      className="flex h-24 min-w-0 flex-1 items-center gap-1"
+      className="relative shrink-0"
+      style={{ width: line.w, height: line.h + TAG_OVERHANG }}
     >
-      {slots.map((s) =>
-        s.part === "handoff" ? (
-          <HandoffSlot key="h" p={p} grow={s.dice.length} />
-        ) : (
-          <PlaySlot
-            key="m"
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Show in the Game log"
+        className="absolute top-0 left-0 block"
+        style={{ width: line.w, height: line.h }}
+        onClick={() => focusLogEntry(p.id)}
+      >
+        {mini.length > 0 && <Miniature p={p} cells={mini} card={card} display={display} />}
+        {line.cells.map((c) => (
+          <Cell
+            key={c.die.key}
             p={p}
-            dice={s.dice}
-            card={card}
-            display={display}
-            grow={s.dice.length}
+            cell={c}
+            draw={drawOf(c.die)}
+            held={holding.has(c.die.entryId)}
+            shown={shown}
           />
-        ),
-      )}
-      {(chips.length > 0 || p.t.more > 0) && (
-        <div
-          className={cn(
-            "flex max-h-full flex-wrap content-center items-center justify-center gap-1 overflow-hidden transition-opacity duration-300",
-            slots.length > 0 ? "shrink-0 basis-1/3" : "flex-1",
-            shown ? "opacity-100" : "opacity-0",
-          )}
+        ))}
+      </button>
+      {more && (
+        <button
+          type="button"
+          ref={(e) => registerPopupCell(p.id, MORE_CELL, e)}
+          data-testid="dicex-popup-more"
+          data-value={more.n}
+          data-entry-id={more.entryId}
+          aria-label={`${more.n} more dice: show in the Game log`}
+          className="absolute flex items-center justify-center rounded-md border text-sm font-semibold text-muted-foreground tabular-nums hover:bg-accent"
+          style={{ left: more.x, top: more.y, width: CELL_PX, height: CELL_PX }}
+          onClick={() => focusLogEntry(more.entryId)}
         >
-          {chips.map((d) => (
-            <FlatDie
-              key={d.key}
-              die={d}
-              look={p.looks[d.entryId]}
-              size={small ? "sm" : "md"}
-              settled
-              flat
-              blank={holding.has(d.entryId)}
-            />
-          ))}
-          {p.t.more > 0 && (
-            <span data-testid="dicex-throw-more" className="text-xs text-muted-foreground">
-              +{p.t.more} more
-            </span>
-          )}
-        </div>
+          +{more.n}
+        </button>
       )}
     </div>
   );
 }
 
 /** One item's total and markers, as the line (FR-DICE-20, -29). */
-function Total({ item, big }: { item: PopupItem; big?: boolean }) {
+function Total({ item }: { item: PopupItem }) {
   return (
-    <span className="flex flex-wrap items-baseline justify-end gap-x-1 text-right">
-      <strong
-        data-testid="dicex-popup-total"
-        className={cn("tabular-nums", big ? "text-2xl leading-none" : "text-sm")}
-      >
+    <span className="flex shrink-0 items-baseline gap-x-1 whitespace-nowrap">
+      <strong data-testid="dicex-popup-total" className="text-sm tabular-nums">
         {item.total}
       </strong>
       {item.natural && <span className="text-xs font-medium">{item.natural}</span>}
@@ -309,7 +383,8 @@ const itemLabel = (i: PopupItem) => (i.mode ? `${i.label} (${i.mode})` : i.label
 
 const ROLLING_TEXT = "Rolling…";
 
-function Row({ row, totals }: { row: PopupRow; totals: boolean }) {
+/** FR-DICEX-40 / -47: actor, label, the row's own total at its right ("Rolling…" till landed). */
+function Row({ row }: { row: PopupRow }) {
   const landed = useLanded(row.entryId);
   return (
     <button
@@ -317,22 +392,21 @@ function Row({ row, totals }: { row: PopupRow; totals: boolean }) {
       data-testid="dicex-popup-row"
       data-record-id={row.entryId}
       data-landed={landed}
-      className="flex w-full items-baseline gap-1.5 text-left text-sm"
+      className="flex w-full shrink-0 items-center gap-1.5 text-left text-sm"
+      style={{ height: ROW_H }}
       onClick={() => focusLogEntry(row.entryId)}
     >
-      {row.hidden && (
-        <EyeOffIcon aria-label="Hidden from players" className="size-3.5 shrink-0 self-center" />
-      )}
+      {row.hidden && <EyeOffIcon aria-label="Hidden from players" className="size-3.5 shrink-0" />}
+      {/* Plain here; K4 colours it in the roller's colour (seams S15). */}
       <strong className="shrink-0 font-semibold">{row.actor}</strong>
       <span className="min-w-0 flex-1 truncate text-muted-foreground">
         {row.items.map(itemLabel).join(" · ")}
       </span>
-      {totals &&
-        (landed ? (
-          row.items.map((i) => <Total key={i.key} item={i} />)
-        ) : (
-          <span className="shrink-0 text-xs text-muted-foreground">{ROLLING_TEXT}</span>
-        ))}
+      {landed ? (
+        row.items.map((i) => <Total key={i.key} item={i} />)
+      ) : (
+        <span className="shrink-0 text-xs text-muted-foreground">{ROLLING_TEXT}</span>
+      )}
     </button>
   );
 }
@@ -346,7 +420,7 @@ function Gear() {
           data-testid="dicex-popup-settings"
           size="icon"
           variant="ghost"
-          className="size-6 shrink-0"
+          className="size-5 shrink-0"
           aria-label="Dice settings"
         >
           <SettingsIcon className="size-3.5" />
@@ -364,10 +438,19 @@ function Gear() {
   );
 }
 
+/** The card's padding, its 1 px border included: 10 px top and bottom (table B), 12 px sides. */
+const CARD_PAD = { paddingBlock: POPUP_PAD - 1, paddingInline: POPUP_PAD + 1 };
+
+/** A popup's rows, dice line and height (FR-DICEX-46, -47). */
+function layoutOf(p: RollPopup) {
+  const rows = popupRows(p.entries);
+  const line = popupLine(p.t.dice, p.t.more);
+  return { rows, line, h: popupHeight(rows.length, line.lines) };
+}
+
 function Card({ p, display }: { p: RollPopup; display: DisplaySetting }) {
   const card = useRef<HTMLElement>(null);
-  const rows = useMemo(() => popupRows(p.entries), [p.entries]);
-  const single = rows.length === 1 ? rows[0] : undefined;
+  const { rows, line } = useMemo(() => layoutOf(p), [p]);
   const landed = useAllLanded(p.t.entryIds);
   const hover = (on: boolean) => rollPopups.hover(p.id, on);
   return (
@@ -376,17 +459,18 @@ function Card({ p, display }: { p: RollPopup; display: DisplaySetting }) {
       data-testid="dicex-popup"
       data-record-id={p.id}
       data-count={rows.length}
-      data-dice={p.t.dice.length}
+      data-dice={p.t.dice.length + p.t.more}
+      data-shown={line.cells.length}
       data-hidden={p.hidden}
       data-state={p.state}
       data-landed={landed}
       aria-label="Roll"
       className={cn(
-        "pointer-events-auto flex flex-col gap-1 overflow-hidden rounded-lg border p-2 text-popover-foreground shadow-lg transition-opacity duration-150",
+        "pointer-events-auto flex shrink-0 flex-col gap-2 overflow-hidden rounded-lg border text-popover-foreground shadow-lg transition-opacity duration-150",
         p.hidden ? "bg-muted" : "bg-popover",
         p.state === "closing" ? "opacity-0" : "opacity-100",
       )}
-      style={{ width: ROLL_POPUP_W, maxHeight: ROLL_POPUP_H }}
+      style={{ width: ROLL_POPUP_W, maxHeight: ROLL_POPUP_H, ...CARD_PAD }}
       onMouseEnter={() => hover(true)}
       onMouseLeave={() => hover(false)}
       onFocus={() => hover(true)}
@@ -394,49 +478,37 @@ function Card({ p, display }: { p: RollPopup; display: DisplaySetting }) {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) hover(false);
       }}
     >
-      <header className="flex items-start gap-1">
-        {/* Rows beyond 2 scroll inside (DICEX §7). */}
-        <div className="flex max-h-10 min-w-0 flex-1 flex-col overflow-y-auto">
+      <header className="flex shrink-0 items-start gap-1">
+        {/* Rows beyond 3 scroll inside (§6.1 table B). */}
+        <div
+          className="flex min-w-0 flex-1 flex-col overflow-y-auto"
+          style={{ maxHeight: ROWS_SHOWN * ROW_H }}
+        >
           {rows.map((r) => (
-            <Row key={r.entryId} row={r} totals={!single} />
+            <Row key={r.entryId} row={r} />
           ))}
         </div>
-        <Gear />
-        <Button
-          data-testid="dicex-popup-close"
-          size="icon"
-          variant="ghost"
-          className="size-6 shrink-0"
-          aria-label="Close"
-          onClick={() => rollPopups.close(p.id)}
-        >
-          <XIcon className="size-3.5" />
-        </Button>
+        <span className="flex shrink-0 items-center gap-0.5" style={{ height: ROW_H }}>
+          <Gear />
+          <Button
+            data-testid="dicex-popup-close"
+            size="icon"
+            variant="ghost"
+            className="size-5 shrink-0"
+            aria-label="Close"
+            onClick={() => rollPopups.close(p.id)}
+          >
+            <XIcon className="size-3.5" />
+          </Button>
+        </span>
       </header>
-      {/* Body click → the Game log at the entry (FR-DICE-37). */}
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label="Show in the Game log"
-        className="flex min-h-0 items-center gap-2 text-left"
-        onClick={() => focusLogEntry(p.id)}
-      >
-        <Pip p={p} card={card} display={display} />
-        {single && !landed ? (
-          <span className="shrink-0 text-xs text-muted-foreground">{ROLLING_TEXT}</span>
-        ) : (
-          single && (
-            <span className="flex shrink-0 flex-col items-end gap-0.5">
-              {single.items.map((i) => (
-                <Total key={i.key} item={i} big />
-              ))}
-            </span>
-          )
-        )}
-      </button>
+      {line.lines > 0 && <Pip p={p} line={line} card={card} display={display} />}
     </section>
   );
 }
+
+/** FR-DICEX-09: the pending card's height (one row). */
+const PENDING_H = popupHeight(1, 0);
 
 /** FR-DICEX-09: the own roll in flight, until its entry arrives (or 3 s). */
 function PendingCard() {
@@ -446,8 +518,8 @@ function PendingCard() {
       data-state="rolling"
       data-pending="true"
       aria-label="Rolling"
-      className="pointer-events-auto rounded-lg border bg-popover p-2 text-sm text-muted-foreground shadow-lg"
-      style={{ width: ROLL_POPUP_W }}
+      className="pointer-events-auto flex shrink-0 items-center rounded-lg border bg-popover text-sm text-muted-foreground shadow-lg"
+      style={{ width: ROLL_POPUP_W, height: PENDING_H, ...CARD_PAD }}
     >
       Rolling…
     </section>
@@ -541,13 +613,32 @@ export function RollPopupStack({
     const h = Math.round(el?.getBoundingClientRect().height ?? 0);
     setBox((b) => (b.top === top && b.h === h ? b : { top, h }));
   }, [popups, pending, vp]);
+  const clear = initiative ? [initiative, ...dialogs] : dialogs;
+  const at = dmStackAt(vp, box.top, { w: ROLL_POPUP_W, h: box.h }, clear);
+  // FR-DICEX-47 short screens: only the popups that fit the region (newest first; the oldest
+  // drops), never past the viewport's bottom (DM) or over the top bar (players).
+  useLayoutEffect(() => {
+    const el = stack.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const room = dm ? vp.h - EDGE_GAP - r.top : r.bottom - TOP_BAR_H - EDGE_GAP;
+    const open = popups.filter((p) => p.state !== "closing");
+    const heights = open.map((p) => layoutOf(p).h).reverse();
+    if (pending) heights.unshift(PENDING_H);
+    const keep = Math.max(1, popupsThatFit(heights, room) - (pending ? 1 : 0));
+    if (open.length > keep) rollPopups.drop(open.slice(0, open.length - keep).map((p) => p.id));
+  });
   if (popups.length === 0 && !pending) return null;
   // Newest nearest the region's anchor: the DM's top, the players' bottom.
   const cards = popups.map((p) => <Card key={p.id} p={p} display={display} />);
   if (pending) cards.push(<PendingCard key="pending" />);
-  if (!dm) return <div className="flex flex-col gap-2">{cards}</div>;
-  const clear = initiative ? [initiative, ...dialogs] : dialogs;
-  const at = dmStackAt(vp, box.top, { w: ROLL_POPUP_W, h: box.h }, clear);
+  if (!dm) {
+    return (
+      <div ref={stack} className="flex flex-col gap-2">
+        {cards}
+      </div>
+    );
+  }
   return (
     <div
       ref={stack}

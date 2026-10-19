@@ -1,12 +1,119 @@
-// The roll popup's content and geometry (FR-DICEX-38–41), pure, in the lazy popup chunk. One
-// named row per entry (sim-7: no "· N rolls"), read from `payload` only (never `dmPayload`); the
-// miniature's clip to its popup's visible rect; the DM stack's keep-clear of Initiative and the
-// open combat popup.
+// The roll popup's content and geometry (FR-DICEX-38–41, -46, -47), pure, in the lazy popup
+// chunk. One named row per entry (sim-7: no "· N rolls"), read from `payload` only (never
+// `dmPayload`); the dice line's cells and the card's pixel budget (§6.1 tables A, B); how many
+// popups fit the toast region; the miniature's clip to its popup's visible rect; the DM stack's
+// keep-clear of Initiative and the open combat popup.
+import type { ThrowDie } from "@shared/dice-extras/throw";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import { z } from "zod";
 import type { Rect } from "../play-shell/geometry";
 import { EDGE_GAP } from "../play-shell/geometry";
 import { RAIL_CLEAR } from "../play-shell/placement";
+import { STACK_GAP } from "../play-shell/toast-region";
+
+// ---- the dice line (FR-DICEX-46, §6.1 table A) ----
+
+/** One cell: a die at full size, never scaled by the count or the viewport (OQ-DICEX-34). */
+export const CELL_PX = 44;
+export const CELL_GAP = 4;
+export const CELLS_PER_LINE = 6;
+/** ≤ 2 lines (OQ-DICEX-33): > 6 dice wrap; > 12 → 11 dice + a "+N" cell. */
+export const CELL_LINES = 2;
+/** The line's width: 6 cells and their gaps (284 px, inside the card's 296 px). */
+export const LINE_W = CELLS_PER_LINE * CELL_PX + (CELLS_PER_LINE - 1) * CELL_GAP;
+
+/** A slot of the line: `index` from 0, `line` 1 | 2, `x` / `y` its top-left in px. */
+export interface CellSlot {
+  index: number;
+  line: number;
+  x: number;
+  y: number;
+}
+
+export interface PopupCell extends CellSlot {
+  die: ThrowDie;
+}
+
+export interface PopupLine {
+  /** The dice drawn in cells, in `throwDice` order. */
+  cells: PopupCell[];
+  /** The "+N" cell: every die not shown; `entryId` = the first hidden die's entry. */
+  more: (CellSlot & { n: number; entryId: string }) | null;
+  /** Lines used (0 without dice). */
+  lines: number;
+  /** The line box: `LINE_W` × the lines' height. */
+  w: number;
+  h: number;
+}
+
+const slotAt = (index: number): CellSlot => ({
+  index,
+  line: Math.floor(index / CELLS_PER_LINE) + 1,
+  x: (index % CELLS_PER_LINE) * (CELL_PX + CELL_GAP),
+  y: Math.floor(index / CELLS_PER_LINE) * (CELL_PX + CELL_GAP),
+});
+
+/** Height of `lines` dice lines (px). */
+export const linesH = (lines: number) => (lines > 0 ? lines * CELL_PX + (lines - 1) * CELL_GAP : 0);
+
+/**
+ * FR-DICEX-46: the frame's dice (`throwDice` order) in cells; `more` = dice beyond the throw's 20
+ * (FR-DICEX-14), counted in "+N" too.
+ */
+export function popupLine(dice: readonly ThrowDie[], more = 0): PopupLine {
+  const cap = CELLS_PER_LINE * CELL_LINES;
+  const all = dice.length + more;
+  const shown = all > cap ? cap - 1 : dice.length;
+  const cells = dice.slice(0, shown).map((die, i) => ({ ...slotAt(i), die }));
+  const first = dice[shown];
+  const plus =
+    all > shown && first ? { ...slotAt(shown), n: all - shown, entryId: first.entryId } : null;
+  const used = plus ? shown + 1 : shown;
+  const lines = Math.ceil(used / CELLS_PER_LINE);
+  return { cells, more: plus, lines, w: LINE_W, h: linesH(lines) };
+}
+
+/** A MOD / offered die's tag (cut to the cell with "…") and its full text (the die's Tooltip). */
+export function cellTag(d: ThrowDie): { tag: string; full: string } | null {
+  if (!d.label && !d.offered) return null;
+  const tag = `${d.sign === -1 ? "−" : ""}${d.label ?? ""}`;
+  return { tag, full: d.offered ? `${tag} on a hit` : tag };
+}
+
+// ---- the card's pixel budget (FR-DICEX-47, §6.1 table B) ----
+
+/** Padding top and bottom (border included). */
+export const POPUP_PAD = 10;
+/** One entry row: actor, label, its total at the right (the first also holds ✕ and ⚙). */
+export const ROW_H = 22;
+/** Rows shown; more scroll inside. */
+export const ROWS_SHOWN = 3;
+/** Gap rows → dice. */
+export const ROWS_GAP = 8;
+/** Cell tags overhang the last line by this. */
+export const TAG_OVERHANG = 4;
+
+/** FR-DICEX-47: a card's height with `rows` entry rows and `lines` dice lines (≤ 190). */
+export function popupHeight(rows: number, lines: number): number {
+  const body = lines > 0 ? ROWS_GAP + linesH(lines) + TAG_OVERHANG : 0;
+  return 2 * POPUP_PAD + Math.min(Math.max(rows, 1), ROWS_SHOWN) * ROW_H + body;
+}
+
+/**
+ * FR-DICEX-47 short screens: how many cards (heights newest first) fit `room` px with
+ * `STACK_GAP` between them; the newest always shows.
+ */
+export function popupsThatFit(heights: readonly number[], room: number): number {
+  let used = 0;
+  let n = 0;
+  for (const h of heights) {
+    const next = used + (n > 0 ? STACK_GAP : 0) + h;
+    if (n > 0 && next > room) break;
+    used = next;
+    n += 1;
+  }
+  return n;
+}
 
 /** One payload item as its row shows it (FR-DICEX-40: as the line, FR-DICE-20, -29). */
 export interface PopupItem {
@@ -120,11 +227,8 @@ export function pipClip(
   return r;
 }
 
-/** FR-DICEX-41: the miniature's die size, so `count` dice fit the PiP rect (px). */
-export function pipDiePx(rect: { w: number; h: number }, count: number): number {
-  const fit = Math.sqrt((rect.w * rect.h) / Math.max(1, count) / 3);
-  return Math.round(Math.max(18, Math.min(40, rect.h * 0.42, fit)));
-}
+/** FR-DICEX-46 b: a miniature die's size in its 44 px cell (px; the flown-in dice match it). */
+export const MINI_DIE_PX = 36;
 
 /**
  * FR-DICEX-39 / FR-NOTE-32 rule for the DM's popup stack: centred at `top`; over a rect it keeps
