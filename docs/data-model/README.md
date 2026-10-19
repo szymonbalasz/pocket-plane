@@ -1874,3 +1874,16 @@ From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–
 - **Writes:** the existing `party.addItem` ([§31](#31-sprint-3-party-board-core-p-core)): one `party_item` insert or merge, one `loot_entry {kind: item, world → party}`, one `loot-received` notification, one transaction. The party row keeps a name copy only (no link back to the entry, OQ-PARTY-13; Add to party copies no images, FR-CMP-49).
 - **Fixtures:** bundle `party-cmp` = `party-board` + `cmp-srd-mini` (existing units; SRD "Potion of Healing" merges into `party-items-1`'s "Potion of healing" ×2 → ×4).
 - **Snapshot size** (CON-44): no new record type or field, so +0 B per viewer at a given state; an add writes the same rows as the Inventory tab's Add (`party-item` lazy; the `loot-entry` row as PARTY §12 already budgets).
+
+## 73. Sprint 5: Fit keeps every token visible (W2)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-59, -61. **Built by `fix/map-fit-visible`**: no table, column, record type or payload change. Protocol side: [protocol §93](../protocol/README.md#93-sprint-5-fit-keeps-every-token-visible-w2).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Fit obstacles | derived per render (`MapCanvas`) | rendered open windows + this client's toast box (`fitObstacles`); tool bars never count | [FR-MAP-59](../specs/scenes-map.md#6-functional-requirements) |
+| Fit outcome | client memory, per canvas | `all` \| `pcs` of the last fit (`data-fit-visible`); never stored or sent | FR-MAP-59 |
+| Pending appearance refit | client memory, per canvas | one animation-frame handle + wait count (≤ 10) | [FR-MAP-61](../specs/scenes-map.md#6-functional-requirements) |
+
+- **Fixtures:** no new unit. `windows-s5` (`session-sim-8` + `win-layout`) has every token the W5 / W10 steps fit; `session-sim-9` needs nothing extra (sim-8's tokens; sim-9 creates "Crypt" live).
+- **Snapshot size** (CON-44): 0 B.
