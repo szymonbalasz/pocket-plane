@@ -73,7 +73,22 @@ test("FR-SHELL-45 FR-SHELL-47 DM at 1440×900: Compendium, Party, Encounters fro
     .first()
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
   await scenes.getByTestId("ui-window-close").click();
+  // Placement scores the tokens drawn now: wait until the scene's fit has settled.
+  const at = async () => JSON.stringify((await konvaNodes(dm, "map-token")).map((t) => [t.x, t.y]));
+  let last = "";
+  await expect
+    .poll(
+      async () => {
+        const now = await at();
+        const stable = now === last && now !== "[]";
+        last = now;
+        return stable;
+      },
+      { intervals: [300] },
+    )
+    .toBe(true);
   await expect(scenes).toHaveCount(0);
   // FR-DICE-38: the wide log at 1440×900.
   const log = await shellWindow(dm, "dice.log").boundingBox();

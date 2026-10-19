@@ -8,7 +8,8 @@
 // Rank, lexicographic (FR-SHELL-45):
 //   (1) clear of every open window and hard keep-out region (else, screen full: no protected
 //       window, no title bar, least protected area, least overlap; FR-SHELL-47's fallback);
-//   (1b) `minOpenH` windows: clear at ≥ `minOpenH`; (2) covers no PC token centre;
+//   (2) covers no PC token centre; (1b) `minOpenH` windows: clear at ≥ `minOpenH` (after (2):
+//   a slightly shorter window beats one over a PC, walkthrough W1);
 //   (3) edge column before inward; (4) clear of soft keep-out regions; (5) least token area;
 //   (6) full size (≥ `minOpenH` counts as full; else, `minOpenH` windows: the tallest, FR-NOTE-31);
 //   (7) default column; (8) nearest to the fitted default rect, then taller, higher, more left,
@@ -204,8 +205,8 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
       title,
       prot,
       overlap,
-      keepsOpenH,
       pc,
+      keepsOpenH,
       inward ? 1 : 0,
       softArea > 0 ? 1 : 0,
       tokenArea,
