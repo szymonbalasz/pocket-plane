@@ -1,25 +1,20 @@
-// FR-MAP-53 path visibility, FR-MAP-54 trail reducer, FR-MAP-55 blocked step (sprint 4). The
-// path's cells are tested with `dragPath` (`@shared/scenes-map/drag-path.test.ts`).
+// FR-MAP-53 path visibility, FR-MAP-55 blocked step (sprint 4), FR-MAP-67 trail drawn from the
+// stored `trail` (sprint 5; replaces the FR-MAP-54 reducer). The path's cells are tested with
+// `dragPath` (`@shared/scenes-map/drag-path.test.ts`).
 import { describe, expect, test } from "bun:test";
-import { ENCOUNTER_TYPE } from "@shared/combat-tracker/schemas";
-import type { RecordStore } from "@shared/protocol/store";
 import { wallHint } from "@shared/scene-tools/geometry";
 import type { Segment, Wall } from "@shared/scene-tools/schemas";
-import { TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
+import type { TokenView } from "@shared/scenes-map/schemas";
 import {
   blockedStep,
   cellsAttr,
-  combatTurnKey,
-  knownCells,
-  nextTrails,
-  noTrails,
   ownDragBlocked,
   pathFootprint,
   pathShown,
-  type TrailState,
-  tokenMovesOf,
+  trailCellsAttr,
+  trailSegments,
 } from "./drag-path";
-import { clearTrails, createPreviewStore } from "./drag-preview";
+import { createPreviewStore } from "./drag-preview";
 
 const SCENE = "s-ambush";
 const tok = (id: string, col: number, row: number, extra: Partial<TokenView> = {}) =>
@@ -33,15 +28,6 @@ const tok = (id: string, col: number, row: number, extra: Partial<TokenView> = {
     hidden: false,
     ...extra,
   }) as TokenView;
-
-const storeOf = (tokens: TokenView[], encounters: Record<string, unknown>[] = []): RecordStore => ({
-  you: null,
-  seq: 5,
-  records: {
-    [TOKEN_TYPE]: Object.fromEntries(tokens.map((t) => [t.id, t])),
-    [ENCOUNTER_TYPE]: Object.fromEntries(encounters.map((e) => [e.id as string, e])),
-  },
-});
 
 describe("FR-MAP-53 path visibility", () => {
   test("FR-MAP-53 path visibility: DM / owner / other player × player token / unowned visible / hidden / not in store", () => {
@@ -118,96 +104,24 @@ describe("FR-MAP-55 blocked step", () => {
   });
 });
 
-describe("FR-MAP-54 trail", () => {
-  const started = (round: number, turn: string | null, extra: Record<string, unknown> = {}) => ({
-    id: "enc-1",
-    status: "started",
-    sceneId: SCENE,
-    round,
-    turnCombatantId: turn,
-    playerTurnCombatantId: turn,
-    ...extra,
-  });
-  const upsert = (id: string) => ({ type: TOKEN_TYPE, id, op: "upsert" as const });
-
-  /** One applied frame as MapCanvas runs it: moves from `known`, then the reducer. */
-  function frame(
-    st: { trails: TrailState; known: Record<string, { col: number; row: number }> },
-    store: RecordStore,
-    changes: { type: string; id: string; op: "upsert" | "delete" }[],
-    client: "dm" | "player" = "dm",
-  ) {
-    const r = tokenMovesOf(changes, st.known, store, SCENE);
-    return {
-      known: r.known,
-      trails: nextTrails(st.trails, combatTurnKey(store, client, SCENE), r.moves, r.deleted),
+describe("FR-MAP-67 trail from the record", () => {
+  test("FR-MAP-67 trail drawn from the record: a straight path per cell pair, `cells` attr", () => {
+    // Mira (6, 8) → (6, 7) → (8, 5): two segments, each `dragPath` of its pair.
+    const trail = {
+      cells: [
+        [6, 8],
+        [6, 7],
+        [8, 5],
+      ] as [number, number][],
     };
-  }
-
-  test("FR-MAP-54 trail: a segment per committed token upsert in combat; none outside combat", () => {
-    const mira = tok("mira", 5, 8, { ownerPlayerId: "p1" });
-    let st = { trails: noTrails, known: knownCells([mira]) };
-    // Out of combat: the move commits, no trail.
-    st = frame(st, storeOf([{ ...mira, col: 6 }]), [upsert("mira")]);
-    expect(st.trails.byToken).toEqual({});
-    expect(st.known.mira).toEqual({ col: 6, row: 8 });
-    // Round 1, Mira's turn: (6, 8) → (6, 7), then → (7, 7): two segments, each a straight path.
-    const enc = [started(1, "c-mira")];
-    st = frame(st, storeOf([{ ...mira, col: 6, row: 7 }], enc), [upsert("mira")]);
-    st = frame(st, storeOf([{ ...mira, col: 7, row: 7 }], enc), [upsert("mira")]);
-    expect(st.trails.byToken.mira?.map(cellsAttr)).toEqual(["6,8 6,7", "6,7 7,7"]);
-    // An upsert that doesn't move (rename, HP) adds none; nor does a token first seen.
-    st = frame(st, storeOf([{ ...mira, col: 7, row: 7 }, tok("thorn", 2, 9)], enc), [
-      upsert("mira"),
-      upsert("thorn"),
-    ]);
-    expect(st.trails.byToken.mira).toHaveLength(2);
-    expect(st.trails.byToken.thorn).toBeUndefined();
-    // A refused move sends no upsert: an unrelated frame changes nothing (same state object).
-    const before = st.trails;
-    st = frame(st, storeOf([{ ...mira, col: 7, row: 7 }], enc), []);
-    expect(st.trails).toBe(before);
+    expect(trailSegments(trail).map(cellsAttr)).toEqual(["6,8 6,7", "6,7 7,6 8,5"]);
+    expect(trailCellsAttr(trail)).toBe("6,8 6,7 8,5");
+    // Null / absent (outside combat, a player's copy of a monster): nothing drawn.
+    expect(trailSegments(null)).toEqual([]);
+    expect(trailSegments(undefined)).toEqual([]);
   });
 
-  test("FR-MAP-54 trail cleared on turn / round change, end, scene change, snapshot; DM: other scene → none", () => {
-    const mira = tok("mira", 5, 8, { ownerPlayerId: "p1" });
-    const moved = (col: number, enc: Record<string, unknown>[]) => storeOf([{ ...mira, col }], enc);
-    const withTrail = () => {
-      let st = { trails: noTrails, known: knownCells([mira]) };
-      st = frame(st, moved(6, [started(1, "c-mira")]), [upsert("mira")]);
-      expect(st.trails.byToken.mira).toHaveLength(1);
-      return st;
-    };
-    // Next / Prev (turn), Start round 1 (round): the encounter upsert's frame.
-    const enc = { type: ENCOUNTER_TYPE, id: "enc-1", op: "upsert" as const };
-    expect(frame(withTrail(), moved(6, [started(1, "c-thorn")]), [enc]).trails.byToken).toEqual({});
-    expect(frame(withTrail(), moved(6, [started(2, "c-mira")]), [enc]).trails.byToken).toEqual({});
-    // End: no started encounter.
-    const ended = [started(1, "c-mira", { status: "ended" })];
-    expect(frame(withTrail(), moved(6, ended), [enc]).trails).toEqual(noTrails);
-    // Players read their copy of the turn (no sceneId): a hidden monster's turn (null) clears too.
-    const pl = (turn: string | null) => [
-      { id: "enc-1", status: "started", round: 1, playerTurnCombatantId: turn },
-    ];
-    let p = { trails: noTrails, known: knownCells([mira]) };
-    p = frame(p, moved(6, pl("c-mira")), [upsert("mira")], "player");
-    expect(p.trails.byToken.mira).toHaveLength(1);
-    expect(frame(p, moved(6, pl(null)), [enc], "player").trails.byToken).toEqual({});
-    // DM: an encounter started on another scene → no trails on this one.
-    const elsewhere = [started(1, "c-mira", { sceneId: "s-cellar" })];
-    let d = { trails: noTrails, known: knownCells([mira]) };
-    d = frame(d, moved(6, elsewhere), [upsert("mira")]);
-    expect(d.trails.byToken).toEqual({});
-    // A deleted token (or one moved off the scene) loses its trail.
-    const st = withTrail();
-    expect(
-      frame(st, storeOf([], [started(1, "c-mira")]), [{ ...upsert("mira"), op: "delete" }]).trails
-        .byToken,
-    ).toEqual({});
-    // Scene change and snapshot: MapCanvas drops the store's trails (clearTrails).
-    const s = createPreviewStore();
-    s.setState({ trails: withTrail().trails });
-    clearTrails(s);
-    expect(s.getState().trails).toBe(noTrails);
+  test("FR-MAP-67 no client trail state: the preview store keeps no trails", () => {
+    expect(Object.keys(createPreviewStore().getState()).sort()).toEqual(["local", "previews"]);
   });
 });
