@@ -38,6 +38,7 @@ import {
 } from "@ui/components/ui/overlays";
 import { Badge, Input, Label, Skeleton } from "@ui/components/ui/primitives";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
+import { AssetPicker } from "@ui/features/assets-pipeline/AssetPicker";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { toastReject, useLive, useMapIntent } from "@ui/features/scenes-map/intents";
 import { cn } from "@ui/lib/utils";
@@ -57,7 +58,6 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { AssetPicker } from "../assets-pipeline/AssetPicker";
 import { NameFormDialog } from "./NameFormDialog";
 import { scenesRest } from "./rest";
 import { useDmMap, viewedScene } from "./view-state";

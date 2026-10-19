@@ -39,6 +39,14 @@ test("FR-PARTY-36 popup on connect FR-PARTY-37 close: h2 waits for player-1, ope
   await loginDm(dm, secret);
   await live(dm);
   const dmBoard = await openWindow(dm, "party.board");
+  // h2 is presented to player-1 (`handout-present-1`); a spec file earlier in this bundle may
+  // have closed it, so present it again while player-1 is offline (the row waits either way).
+  await row(dmBoard, thievesMap).getByTestId("party-handout-menu").click();
+  await dm
+    .locator(`[role="menuitem"][data-testid="party-present-open"][data-record-id="${thievesMap}"]`)
+    .click();
+  await dm.getByTestId("party-present-submit").click();
+  await expect(dm.getByTestId("party-present-dialog")).toHaveCount(0);
   const badge = row(dmBoard, thievesMap).getByTestId("party-present-count");
   await expect(badge).toHaveAttribute("data-value", "1");
   await expect(badge).toHaveText("On screen: 1");

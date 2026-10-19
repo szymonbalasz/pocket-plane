@@ -4,6 +4,7 @@
 // Sprint 4 (BL-07): every entry is a Konva Group (named by its id) inside one of four Konva layers
 // (`map-layer-<base|fog|objects|top>`), picked by its `layer` key. DOM-free so it runs under
 // `bun test`.
+import type { CanvasContextValue } from "./canvas-context";
 
 /** Order slots (FR-SCN-02); a new layer picks a free number between its neighbours. */
 export const LAYER_ORDER = {
@@ -71,6 +72,28 @@ export interface LayerDef<P> {
   group?: string;
   /** A DM Layers-popover switch: off = not drawn and not hit on this DM client (FR-SCN-05). */
   toggle?: LayerToggle;
+  /** FR-SCN-51: a right-click menu on this layer's objects (FR-MAP-71 step 4). */
+  contextMenu?: LayerContextMenu;
+}
+
+/** FR-SCN-51: what a layer's `contextMenu` reads: the canvas context + the DM's layer switches. */
+export interface LayerMenuContext extends CanvasContextValue {
+  off: Readonly<Record<string, boolean>>;
+}
+
+/** A map point (map px) and a page point (`clientX`, `clientY`). */
+export interface MenuPoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * FR-SCN-51: a layer's right-click menu. `hit` (pure) says whether a right press at map point `p`
+ * would open it; `open` opens it at page point `screen` (on the release, FR-MAP-71).
+ */
+export interface LayerContextMenu {
+  hit(p: MenuPoint, ctx: LayerMenuContext): boolean;
+  open(p: MenuPoint, screen: MenuPoint, ctx: LayerMenuContext): void;
 }
 
 /**
@@ -151,4 +174,21 @@ export function stageLayers<P>(slots: readonly LayerSlot<P>[]): StageLayer<P>[] 
 /** FR-SCN-05: every registered toggle, in layer order (the Layers popover's switches). */
 export function layerToggles<P>(layers: readonly LayerDef<P>[]): LayerToggle[] {
   return layers.flatMap((l) => (l.toggle ? [l.toggle] : []));
+}
+
+/**
+ * FR-SCN-51 / FR-MAP-71 step 4: the first entry this client mounts (`layerSlots`' rules) whose
+ * `contextMenu.hit(p)` is true, asked top-down by `order`; null when none hits.
+ */
+export function layerMenuAt<P>(
+  layers: readonly LayerDef<P>[],
+  p: MenuPoint,
+  ctx: LayerMenuContext,
+): LayerDef<P> | null {
+  const mounted = layerSlots(layers, ctx.client, ctx.off).flatMap((s) => s.layers);
+  for (let i = mounted.length - 1; i >= 0; i--) {
+    const l = mounted[i] as LayerDef<P>;
+    if (l.contextMenu?.hit(p, ctx)) return l;
+  }
+  return null;
 }

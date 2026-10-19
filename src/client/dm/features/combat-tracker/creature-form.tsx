@@ -41,10 +41,10 @@ import {
   Tooltip,
 } from "@ui/components/ui/overlays";
 import { Input, Label } from "@ui/components/ui/primitives";
+import { AssetPickerDialog } from "@ui/features/assets-pipeline/AssetPicker";
 import { creatureTypeLabel } from "@ui/features/entities/art";
 import { CopyPlusIcon, PencilIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
-import { AssetPickerDialog } from "../assets-pipeline/AssetPicker";
 import type { CreatureAction } from "../entities/creature-actions";
 import type { CreatureRow } from "../entities/list";
 import { combatRest } from "./rest";
