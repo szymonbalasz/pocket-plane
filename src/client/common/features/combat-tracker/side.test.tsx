@@ -5,6 +5,7 @@ import type { Side } from "@shared/combat-tracker/schemas";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TooltipProvider } from "../../components/ui/overlays";
+import { chipGlyph } from "../scenes-map/canvas-icons";
 import { SideChip } from "./parts";
 import { sideChip, sideMenuOf } from "./side";
 import { sideBadge } from "./token-overlay";
@@ -133,5 +134,23 @@ describe("FR-CBT-103 kind rules unchanged (client)", () => {
     });
     expect(turnAlertFor(frame("g2"), store)).toBeNull();
     expect(turnAlertFor(frame("mira"), store)?.detail).toBe("mira");
+  });
+});
+
+describe("FR-CBT-104 side badge icon chip", () => {
+  test("FR-CBT-104 side UI: the badge's icon chip draws lucide handshake / swords, not a letter", () => {
+    const ally = sideBadge({
+      id: "g2",
+      kind: "monster",
+      side: "ally",
+      publicSide: "ally",
+    } as never);
+    const enemy = sideBadge({ id: "m", kind: "pc", side: "enemy", publicSide: "enemy" } as never);
+    for (const b of [ally, enemy]) {
+      if (!b) throw new Error("no badge");
+      const glyph = chipGlyph(b.icon, b.label);
+      expect("path" in glyph).toBe(true);
+    }
+    expect([ally?.icon, enemy?.icon]).toEqual(["handshake", "swords"]);
   });
 });
