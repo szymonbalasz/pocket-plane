@@ -238,3 +238,91 @@ describe("FR-MOD-39 chips render", () => {
     expect(render(rows[0] as PopupRowView, { ...c, damage: null })).toBe("");
   });
 });
+
+describe("BL-45 no silent drop of an unticked offered part", () => {
+  // Thorn's Sneak Attack without advantage: soft mode unmet → unticked by default (FR-MOD-37, -39).
+  const sneak: CardTriggerPart = {
+    triggerId: "sa",
+    label: "Sneak Attack",
+    value: 8,
+    expression: "3d6",
+    rollId: "r5",
+    type: "piercing",
+    ask: "finesse or ranged; or an ally within 5 ft",
+    untick: true,
+  };
+  const dagger = { ...card([sneak]), attackerName: "Thorn", attackName: "Dagger" };
+
+  test("BL-45 FR-MOD-39 the soft default stays unticked; the chip is marked skipped on a Hit row, not on a Miss row", () => {
+    const [v] = chipViews(dagger, [row("gob")], {}, facts());
+    expect(v).toMatchObject({ on: false, targetId: "gob", skipped: true, lands: 0 });
+    expect(chipViews(dagger, [row("gob", false)], {}, facts())[0]?.skipped).toBe(false);
+    expect(chipViews(card([fury]), [row("gob")], {}, facts())[0]?.skipped).toBe(false);
+  });
+
+  test("BL-45 FR-MOD-40 Include (a tick) lands the part on its row; unticking again marks it skipped", () => {
+    const rows = [row("gob")];
+    const v = lineValue(dagger, rows);
+    const chip = v.chips[0];
+    if (!chip) throw new Error("no chip");
+    const on = lineValue(dagger, rows, touch(v, chip, { on: true, targetId: "gob" }));
+    expect(on.chips[0]).toMatchObject({ on: true, skipped: false, lands: 8 });
+    expect(chipsInput(on, rows[0] as PopupRowView)).toEqual({
+      triggers: [{ triggerId: "sa", multiplier: "normal" }],
+    });
+    const onChip = on.chips[0];
+    if (!onChip) throw new Error("no chip");
+    const off = lineValue(dagger, rows, touch(on, onChip, { on: false }));
+    expect(off.chips[0]?.skipped).toBe(true);
+  });
+
+  test("BL-45 FR-MOD-39 render: struck chip text + 'Not applied: + 8 piercing Sneak Attack' with Include; none when ticked", () => {
+    const sync = createStore<SyncState>()(
+      () =>
+        ({
+          state: "live",
+          store: {
+            ...emptyStore(),
+            you: { campaignId: "c1", role: "dm", playerId: null },
+            records: { [EFFECT_TYPE]: {}, [EFFECT_PRESET_TYPE]: {} },
+          },
+          notLiveSince: null,
+          everLive: true,
+          lazy: lazyAfterSnapshot(1),
+          connection: { sendIntent: () => Promise.resolve({}) },
+        }) as unknown as SyncState,
+    );
+    const Chips = modTriggersPart.Chips;
+    const rows = [row("gob")];
+    const render = (c: DamageCardPayload, value?: ChipsValue) =>
+      renderToStaticMarkup(
+        <SyncContext.Provider value={sync}>
+          <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+            <Chips
+              card={c}
+              cardId="n1"
+              row={rows[0] as PopupRowView}
+              rows={rows}
+              value={value}
+              onChange={() => {}}
+              disabled={false}
+            />
+          </TooltipProvider>
+        </SyncContext.Provider>,
+      );
+    const html = render(dagger);
+    expect(html).toContain('data-testid="mod-popup-part" data-record-id="sa" data-state="off"');
+    expect(html).toContain('data-testid="mod-popup-part-skipped" data-record-id="sa"');
+    expect(html.replace(/<[^>]+>/g, "")).toContain("Not applied: + 8 piercing Sneak Attack");
+    expect(html).toContain('data-testid="mod-popup-part-include" data-record-id="sa"');
+    expect(html).toContain("line-through");
+    // Ticked (the DM included it): no "Not applied" line, no strike.
+    const v = lineValue(dagger, rows);
+    const chip = v.chips[0];
+    if (!chip) throw new Error("no chip");
+    const ticked = render(dagger, lineValue(dagger, rows, touch(v, chip, { on: true })));
+    expect(ticked).toContain('data-testid="mod-popup-part" data-record-id="sa" data-state="on"');
+    expect(ticked).not.toContain("mod-popup-part-skipped");
+    expect(ticked).not.toContain("line-through");
+  });
+});

@@ -217,7 +217,17 @@ test("BL-25 FR-MOD-18 FR-DICE-31 physical Flame Tongue crit: the Divine Fury die
   await expect(form.getByTestId("dice-manual-error")).toHaveText(
     "Enter the total for Divine Fury (1d6+2)",
   );
-  await fury.getByTestId("mod-tray-group-total").fill("3");
+  // BL-45: the empty group is marked and focused, again on every Roll; typing clears the mark.
+  const furyTotal = fury.getByTestId("mod-tray-group-total");
+  await expect(fury).toHaveAttribute("data-state", "invalid");
+  await expect(furyTotal).toHaveAttribute("aria-invalid", "true");
+  await expect(furyTotal).toBeFocused();
+  await form.getByTestId("dice-manual-submit").click();
+  await expect(furyTotal).toBeFocused();
+  await expect(form.getByTestId("dice-manual-error")).toBeVisible();
+  await furyTotal.fill("3");
+  await expect(fury).not.toHaveAttribute("data-state", "invalid");
+  await expect(form.getByTestId("dice-manual-error")).toHaveCount(0);
   await fury.getByTestId("mod-tray-group-crit-total").fill("2");
   await form.getByTestId("dice-manual-submit").click();
   await expect(form).toHaveCount(0);
