@@ -11,5 +11,7 @@ export default defineBundle({
   fixtures: [
     // R1: Mira's Light crossbow ruled a hit on Goblin 2, waiting for damage
     "late-hit-ruled",
+    // R4: planned "Escort to the Ford", Goblin ×2 + 1 friendly
+    "enc-friendly",
   ],
 });

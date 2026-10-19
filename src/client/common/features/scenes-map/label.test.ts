@@ -222,6 +222,111 @@ describe("FR-MAP-42 label", () => {
     for (const b of big.badges) expect(b.y).toBeGreaterThanOrEqual(big.font * 0.6);
   });
 
+  test("FR-MAP-43 BL-35 below 48 px cells a token's badges squeeze into a chip + '+N' or a '+N', never vanish or cover a name", () => {
+    const three = [
+      { id: "fog-token-invisible", label: "Invisible" },
+      { id: "cnd-poisoned", label: "Poisoned" },
+      { id: "cnd-prone", label: "Prone" },
+    ];
+    const labels = three.map((b) => b.label);
+    const shown = (px: number) => {
+      const scale = px / 70;
+      const r = labelRow("Goblin 3", three, 70, 70, scale, measure);
+      const neighbour = labelRow("Goblin 5", [], 70, 70, scale, measure);
+      for (const b of r.badges) {
+        // Inside the footprint, clear of its own name and every neighbour's.
+        expect(b.x).toBeGreaterThanOrEqual(-1e-9);
+        expect(b.y).toBeGreaterThanOrEqual(0);
+        expect(b.x + b.width).toBeLessThanOrEqual(70 + 1e-9);
+        expect(overlaps(b, r.name, 0, 0) ? `${px}: ${b.id} covers its name` : "ok").toBe("ok");
+        for (const [dx, dy] of [
+          [70, 0],
+          [-70, 0],
+          [0, -70],
+          [0, 70],
+          [70, -70],
+          [-70, -70],
+          [70, 70],
+          [-70, 70],
+        ] as const) {
+          const hit = overlaps(b, neighbour.name, dx, dy);
+          expect(hit ? `${px}: ${b.id} covers the name at ${dx},${dy}` : "ok").toBe("ok");
+        }
+      }
+      // Every badge is drawn or listed in the "+N"'s hover.
+      const more = r.badges.find((b) => b.id === MORE_BADGE_ID);
+      const drawn = r.badges.filter((b) => b.id !== MORE_BADGE_ID);
+      const listed = more?.full?.split(", ") ?? [];
+      expect(more?.text).toBe(`+${listed.length}`);
+      expect([...drawn.map((b) => three.find((t) => t.id === b.id)?.label), ...listed]).toEqual(
+        labels,
+      );
+      return r.badges.map((b) => [b.id, b.compact === true]);
+    };
+    // 44 px (the default fit with windows open): Invisible stays as an icon chip, "+2" for the rest.
+    expect(shown(44)).toEqual([
+      ["fog-token-invisible", true],
+      [MORE_BADGE_ID, false],
+    ]);
+    // 40 px: the chip shrinks to the row's height so both still fit.
+    expect(shown(40)).toEqual([
+      ["fog-token-invisible", true],
+      [MORE_BADGE_ID, false],
+    ]);
+    // 32 px: no room for both: one "+3" pill.
+    expect(shown(32)).toEqual([[MORE_BADGE_ID, false]]);
+    // 24 px (the fit floor): no full row fits between the names: a smaller "+3", centred.
+    expect(shown(24)).toEqual([[MORE_BADGE_ID, false]]);
+    const tiny = labelRow("Goblin 3", three, 70, 70, 24 / 70, measure);
+    const more = tiny.badges[0];
+    expect(more?.height).toBeLessThan(tiny.name.height);
+    expect(more?.font).toBeCloseTo((more?.height ?? 0) / 1.2);
+    expect((more?.y ?? 0) + (more?.height ?? 0) / 2).toBeCloseTo(35);
+    expect((more?.x ?? 0) + (more?.width ?? 0) / 2).toBeCloseTo(35);
+    // One badge at 24 px: its icon chip, no "+1".
+    const one = labelRow("Goblin 3", three.slice(0, 1), 70, 70, 24 / 70, measure);
+    expect(one.badges).toMatchObject([{ id: "fog-token-invisible", compact: true, text: "" }]);
+    // Too small to read (a 6 px row): nothing, still never over a name.
+    expect(labelRow("Goblin 3", three, 70, 70, 16 / 70, measure).badges).toEqual([]);
+    // At 48 px and up the rows are unchanged: no squeeze, two rows.
+    const big = labelRow("Goblin 3", three, 70, 70, 48 / 70, measure);
+    expect(big.badges.some((b) => b.id === MORE_BADGE_ID || b.font !== undefined)).toBe(false);
+    expect(new Set(big.badges.map((b) => b.y + b.height / 2)).size).toBe(2);
+  });
+
+  test("FR-MAP-43 BL-35 a '+N' hiding a Dying badge takes the danger tone (24–35 px and full rows)", () => {
+    const dying = { id: "cbtx-token-death", label: "Dying", tone: "down" as const };
+    const invisible = { id: "fog-token-invisible", label: "Invisible", tone: "neutral" as const };
+    const more = (r: ReturnType<typeof labelRow>) => r.badges.find((b) => b.id === MORE_BADGE_ID);
+    // A Dying PC with another badge, 24–35 px: one "+2" in Dying's tone, hover lists both.
+    for (const px of [24, 28, 32, 35]) {
+      const r = labelRow("Thorn", [dying, invisible], 70, 70, px / 70, measure);
+      expect(r.badges.map((b) => [b.id, b.text, b.tone, b.full])).toEqual([
+        [MORE_BADGE_ID, "+2", "down", "Dying, Invisible"],
+      ]);
+    }
+    // Dying drawn as its own chip: the "+2" for the rest stays neutral.
+    const poisoned = { id: "cnd-poisoned", label: "Poisoned", tone: "neutral" as const };
+    const shown = labelRow("Thorn", [dying, invisible, poisoned], 70, 70, 40 / 70, measure);
+    expect(shown.badges.map((b) => [b.id, b.compact === true, b.tone])).toEqual([
+      ["cbtx-token-death", true, undefined],
+      [MORE_BADGE_ID, false, undefined],
+    ]);
+    // Full rows (48 px): a Dying hidden in the "+N" colours it too; neutral-only stays neutral.
+    const four = [
+      { id: "cbt-token-out", label: "Out" },
+      { id: "fog-token-fogged", label: "Fog" },
+      invisible,
+    ];
+    const at48 = (b: typeof four) => more(labelRow("Thorn", b, 70, 70, 48 / 70, measure));
+    expect(at48([...four, dying])).toMatchObject({ text: "+3", tone: "down" });
+    expect(at48([...four, { id: "x-hex", label: "Hex" }])?.tone).toBeUndefined();
+    // Bloodied ranks below down.
+    const bloodied = { id: "x-b", label: "Bloodied", tone: "bloodied" as const };
+    expect(at48([...four, bloodied])?.tone).toBe("bloodied");
+    expect(at48([...four, bloodied, dying])?.tone).toBe("down");
+  });
+
   test("FR-MAP-42 label: layer order map < grid < tokens < labels < pointers", () => {
     const C = () => null;
     const layers = orderLayers([

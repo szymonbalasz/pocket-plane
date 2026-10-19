@@ -1930,9 +1930,22 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-46, -47. **Bui
 - **Derived (never stored):** the line (`popupLine`: cells, lines, "+N" with its entry), the card height (`popupHeight`), how many popups fit (`popupsThatFit`), each die's upright turn (`uprightTurn`).
 - **Fixtures:** none new (no record type; DICEX §13 walks on `dice-polish`). **Snapshot size** (CON-44): +0 B.
 
-## 79. Sprint 5: tray preview (D10)
+## 79. Sprint 5: ally side client (R4)
 
-From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-48. **Built by `build/dice-tray-3d`**: no table, column, record type or payload change. Protocol side: [protocol §101](../protocol/README.md#101-sprint-5-tray-preview-d10).
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-98–104 (#252). **Built by `build/combat-sides`**: no table, column or record type (R0's `combatant.side` / `public_side` and `encounter_entry.side`, [§66](#66-sprint-5-combat-core-r0)). Protocol side: [protocol §101](../protocol/README.md#101-sprint-5-ally-side-client-r4).
+
+| Piece | Kind | Contents | Visibility | Source |
+|---|---|---|---|---|
+| Side chip / token badge | derived per render (`sideChip`) | DM: true side, shown when ≠ the kind's default or secret (`sideOf ≠ publicSideOf`, dashed); players: their redacted `side` when ≠ the kind's default | each client what it holds | FR-CBT-104 |
+| Encounter rating | derived (`rateEncounter`) | enemy entries' CRs → rating, XP, total CR; friendly entries listed; all friendly → "—" | DM only | FR-CBT-102 |
+| Builder draft entry | client memory until the debounced PUT | `{definitionId, quantity, hpMode, side}`, keyed per definition + side | DM only | FR-CBT-98 |
+| "Secret" tick | client memory per open menu | default off | DM only | FR-CBT-104 |
+
+- **Fixtures:** `enc-friendly` (bundles `late-damage`, `session-sim-9`). **Snapshot size** (CON-44): +0 B (no new field; §66 measured `side` + `publicSide` on every combatant and entry).
+
+## 80. Sprint 5: tray preview (D10)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-48. **Built by `build/dice-tray-3d`**: no table, column, record type or payload change. Protocol side: [protocol §102](../protocol/README.md#102-sprint-5-tray-preview-d10).
 
 | State | Where | Rule | Source |
 |---|---|---|---|

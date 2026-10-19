@@ -49,6 +49,8 @@ export const setSideCommand = defineCommand({
       campaignId: cid,
       payload: { encounterId: enc.id, combatantId: before.id, side, secret },
       changes: [combatantChange(before, after), entry],
+      // A secret change leaves players' view as it was: no frame at all for them, not an empty one.
+      quietWhenUnchanged: true,
     });
   },
 });

@@ -170,4 +170,49 @@ describe("sprint 5 core over WS (late-damage)", () => {
     expect(dm2.store.records[HIT_RULING_TYPE]).toEqual(dm.store.records[HIT_RULING_TYPE]);
     expect(byName(p22, "Goblin 2")).toEqual(byName(p2, "Goblin 2") as CombatantRecord);
   });
+
+  test("FR-CBT-100 secret side changes send players no frame at all (A4, A5 secret, Mira → ally); an open change does", async () => {
+    const dm = await h.live(DM);
+    const p1 = await h.live(p("Player 1"));
+    const p2 = await h.live(p("Player 2"));
+    const mira = byName(dm, "Mira") as CombatantRecord;
+    const goblin2 = byName(dm, "Goblin 2") as CombatantRecord;
+    const sideFrames = (c: TestClient, from: number) =>
+      c.frames
+        .slice(from)
+        .filter((f) => f.type === "event" && f.cause.name === "CombatantSideChanged");
+    /** One `cbt.setSide`; the players' side frames it caused (after a barrier). */
+    const set = async (combatantId: string, side: string, secret?: boolean) => {
+      const from = [p1.frames.length, p2.frames.length];
+      const id = dm.intent("cbt.setSide", { combatantId, side, ...(secret ? { secret } : {}) });
+      for (;;) {
+        const f = await dm.next("ack");
+        if (f.intentId === id) break;
+      }
+      for (const c of [p1, p2]) await barrier(c);
+      return [sideFrames(p1, from[0] as number), sideFrames(p2, from[1] as number)];
+    };
+    // Goblin 2 openly an ally (players may already see "ally": then nothing new for them either).
+    await set(goblin2.id, "ally");
+    expect(byName(p1, "Goblin 2")).toMatchObject({ side: "ally" });
+    // A4: Mira secretly an enemy: no frame for either player.
+    expect(await set(mira.id, "enemy", true)).toEqual([[], []]);
+    // A5: Goblin 2's secret betrayal: none either.
+    expect(await set(goblin2.id, "enemy", true)).toEqual([[], []]);
+    // Mira openly an ally: players always saw "ally": none.
+    expect(await set(mira.id, "ally")).toEqual([[], []]);
+    expect(byName(dm, "Mira")).toMatchObject({ side: "ally", publicSide: "ally" });
+    // The open reveal of Goblin 2 reaches both players: the upsert and the line.
+    const open = await set(goblin2.id, "enemy");
+    for (const frames of open) {
+      expect(frames).toHaveLength(1);
+      const types = (frames[0] as { changes: { type: string }[] }).changes.map((c) => c.type);
+      expect(types.sort()).toEqual([COMBATANT_TYPE, GAME_LOG_ENTRY_TYPE].sort());
+    }
+    for (const c of [p1, p2]) {
+      expect(byName(c, "Goblin 2")).toMatchObject({ side: "enemy" });
+      expect(byName(c, "Mira")).toMatchObject({ side: "ally" });
+      expect(JSON.stringify(c.frames)).not.toContain("publicSide");
+    }
+  });
 });

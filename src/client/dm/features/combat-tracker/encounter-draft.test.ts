@@ -5,8 +5,20 @@
 // with React's rules (setState with the same object is a no-op; a new one re-renders and the
 // effect runs again because `server` changed).
 import { describe, expect, test } from "bun:test";
-import type { EncounterEntryRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
-import { adoptServerDraft, type Draft, draftOf, sameDraft } from "./encounter-draft";
+import {
+  EncounterBody,
+  type EncounterEntryRecord,
+  type EncounterRecord,
+} from "@shared/combat-tracker/schemas";
+import {
+  addPick,
+  adoptServerDraft,
+  type Draft,
+  draftOf,
+  entryKey,
+  sameDraft,
+  setEntrySide,
+} from "./encounter-draft";
 
 const encounter = {
   id: "enc-1",
@@ -100,5 +112,41 @@ describe("F1 Encounters editor draft adoption", () => {
     expect(runEditor(frames, adoptServerDraft)).toBe(300);
     // The replaced-every-time effect it fixes never settles (the #185 loop).
     expect(runEditor(frames, (_d, server) => server, 5_000)).toBe(5_000);
+  });
+});
+
+describe("FR-CBT-104 side UI (builder)", () => {
+  test("FR-CBT-104 side UI: builder 'Friendly' Switch sets `side` in the PUT", () => {
+    const draft: Draft = {
+      name: "Escort to the Ford",
+      partyCharacterIds: null,
+      entries: [],
+      createTokens: true,
+      addHidden: false,
+    };
+    // A pick adds an enemy entry; a second pick adds to it.
+    let entries = addPick(addPick(draft.entries, "gob"), "gob");
+    expect(entries).toEqual([
+      { definitionId: "gob", quantity: 2, hpMode: "average", side: "enemy" },
+    ]);
+    entries = [...addPick(entries, "wolf")];
+    // Friendly on: the Wolf entry becomes an ally entry; the PUT carries it.
+    entries = setEntrySide(entries, entryKey({ definitionId: "wolf", side: "enemy" }), "ally");
+    const body = EncounterBody.parse({ ...draft, entries });
+    expect(body.entries.map((e) => [e.definitionId, e.quantity, e.side])).toEqual([
+      ["gob", 2, "enemy"],
+      ["wolf", 1, "ally"],
+    ]);
+    // A pick of the same creature again adds an enemy entry beside the friendly one.
+    entries = addPick(entries, "wolf");
+    expect(entries.map(entryKey)).toEqual(["gob:enemy", "wolf:ally", "wolf:enemy"]);
+    // Moving onto a side the creature already has merges, as the server would on save.
+    entries = setEntrySide(entries, "wolf:enemy", "ally");
+    expect(entries).toEqual([
+      { definitionId: "gob", quantity: 2, hpMode: "average", side: "enemy" },
+      { definitionId: "wolf", quantity: 2, hpMode: "average", side: "ally" },
+    ]);
+    // Same side: unchanged.
+    expect(setEntrySide(entries, "gob:enemy", "enemy")).toEqual(entries);
   });
 });
