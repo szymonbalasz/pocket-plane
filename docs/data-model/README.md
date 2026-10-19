@@ -1900,3 +1900,15 @@ From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-C
 - **Derived (line text):** the ruling's full stop; the DM's damage parts (`dmPayload.mods.damage`) inside the base part's muted run; a trigger part's type word = `parts[].type` ?? `damageType`.
 - **Fixtures:** none new (`rules-effects` holds every unit L12–L14 needs).
 - **Snapshot size** (CON-44): 0 B stored; rendered text grows by ≤ 12 B per trigger part (MOD §12).
+
+## 76. Sprint 5: tray preview (D10)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-48. **Built by `build/dice-tray-3d`**: no table, column, record type or payload change. Protocol side: [protocol §97](../protocol/README.md#97-sprint-5-tray-preview-d10).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Tray preview still | client memory: the tray's own 2D canvas (`dicex-tray-preview`) | redrawn from the staged request and the viewer's look on every change; never stored or sent | [FR-DICEX-48](../specs/dice-extras.md#6-functional-requirements) |
+| Waiting still | client memory (`renderer.ts` stage `stills`, keyed by tray canvas) | at most one per tray, only while a throw's loop runs; emptied by the loop's next frame or the tray's unmount | FR-DICEX-48 |
+
+- **Fixtures:** no new unit. Walkthrough step 29 walks on `dice-polish` (player-1 Crimson metal, `dicex-looks`); `session-sim-9` needs nothing extra.
+- **Snapshot size** (CON-44): 0 B added.

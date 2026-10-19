@@ -2413,3 +2413,19 @@ From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-C
 | Tests | `combat-lines.test.ts` (`FR-CBT-95 ruling punctuation`, `FR-CBT-96 Rage once in the DM line`, `FR-MOD-62 damage types on trigger parts`), `late-fill.test.tsx` (damage-only header), `e2e/combat-lines.e2e.ts` (CBT §13.1 L12–L14, bundle `late-damage`) |
 | Fixtures | None new: L12–L14 walk on `rules-effects` (Brakka, Flame Tongue, Fire Ward, Rage spent, Divine Fury; Thorn's Sneak Attack) |
 | CON-44 | 0 B: no record or field; rendered text only |
+
+## 97. Sprint 5: tray preview (D10)
+
+From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-48 (§6.1 table C; [ADR-0051](../architecture/adr/0051-dice-landing-line.md) Previews; DM gate #256: OQ-DICEX-35 A, -36 A, -37 A). **Built by `build/dice-tray-3d`**: client only. No intent, event, record type, signal or wire field. Data side: [data model §76](../data-model/README.md#76-sprint-5-tray-preview-d10).
+
+| Piece | Contract |
+|---|---|
+| Preview (`TrayPreview.tsx`, `@ui`) | `compose`, `adjust` and `rolling` (dimmed, read-only): one `dicex-tray-die` per die of the staged expression (crit per FR-DICE-31; the first expression's d20 pair tagged in adv / dis) and of each `trayExtras` entry (inside its labelled `dicex-tray-extra-die`), highest face up (`data-value` = faces), then the constant ("+1"). More than 12 dice (`GROUP_OVER`, extras counted) → one die per term with `data-group` = N and "×N". `compose`: a button (click removes one of its term; hover / focus → red ring); otherwise a span |
+| Mode (`trayPreviewMode`, `tray-logic.ts`) | `3d` iff the effective display is `screen` / `zone` (so not Flat, Off, auto-flat, no WebGL, failed chunk), the chunk is `ready` and the stills haven't thrown; else `chips` (`DieShape` `md`, the highest face; d100 "00" + "0"). The tray loads the chunk only in a 3D display (`trayWantsChunk`); a chunk arriving later swaps chips for dice. d2, d3, d1000 → round `DieShape` in either mode |
+| Stills (`dice3d/preview.ts` `drawTrayStills`, lazy chunk) | Each mesh die's DOM mirror holds `[data-still]` cells (40 px; a d100 two: `d10:tens`, `d10:units`). A redraw (dice, tags, look or the area's size change; `ResizeObserver`, no rAF) renders them as a **temporary arena** at the top-left of the page's one WebGL canvas (`renderer.ts` `drawStill`: box scissor-cleared, the cells rendered alone, `drawImage`d into the tray's own 2D canvas `dicex-tray-preview`, the dice taken out of the scene, then the canvas drawn again without them) in one task; `addStillArena` stays the look editor's. Pose: `stillPose` (`dice3d/stills.ts`, pure), default labels with the top value up, turned 0.35 rad, camera tilted as the look editor's. Backing store at the renderer's pixel ratio (≤ 1.5) |
+| Running throw | `requestStill`: no loop → now; a loop → kept per tray canvas (a newer redraw replaces it) and run by `draw` right after the loop's next frame (`flushStills`); unmount → `cancelTrayStills` |
+| Failure | A throw from `drawTrayStills` (no WebGL, lost context) or no dice layer → `chips` until the preview remounts, one console warning |
+| Test IDs | `dicex-tray-preview` (+ `data-mode` = `3d` \| `chips`); `dicex-tray-die` gains `data-group` and `data-value` (its `data-faces`, `data-term`, `data-tag` and the `dicex-tray-extra` / `dicex-tray-extra-die` structure unchanged) |
+| Tests | `tray-preview.test.tsx` (`FR-DICEX-48 tray preview per die type`, poses, round chips, grouping, adv, extras, compose / rolling, fallback, no 3D import in flat / off, one-task arena, next-frame copy, 0 rAF), `e2e/dice-tray-3d.e2e.ts` (3D or chips; Game log over the tray wins `elementFromPoint` and hides every Crimson pixel at a die's centre) |
+| Bundle | dice-extras in each client's initial chunks 13.0 KB gz (cap 15); `dice3d` 158.2 KB gz (cap 170) |
+| CON-44 | 0 B: no record, field or frame |

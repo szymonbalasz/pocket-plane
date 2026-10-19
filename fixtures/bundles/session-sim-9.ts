@@ -13,6 +13,7 @@ export default defineBundle({
   fixtures: [
     // W: windows + layout
     // D: dice polish
+    // D10: no new unit (the tray preview walks on sim-7's `dicex-looks`)
     // R: late damage, trails, ally side
     // R1: a ruled card in its damage step (Mira → Goblin 2, waiting for damage)
     "late-hit-ruled",
