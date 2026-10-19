@@ -247,9 +247,9 @@ test("FR-CBT-77 a short window: Initiative grows to the work area, '↓ N more' 
   const n = Number(await more.getAttribute("data-value"));
   expect(n).toBeGreaterThan(0);
   await expect(more).toHaveText(`${n} more`);
-  // Grown to the work area's bottom (above the launcher).
+  // Grown to the work area's bottom, 12 px above the launcher strip (FR-SHELL-52).
   const box = await init.boundingBox();
-  expect(Math.round((box?.y ?? 0) + (box?.height ?? 0))).toBeGreaterThan(480 - 64 - 4);
+  expect(Math.round((box?.y ?? 0) + (box?.height ?? 0))).toBeGreaterThan(480 - 76 - 4);
   // The count is what is really below the fold (rows not wholly above the footer).
   const below = (win: Locator) =>
     win.evaluate((w) => {

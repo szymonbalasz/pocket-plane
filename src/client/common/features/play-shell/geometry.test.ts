@@ -168,7 +168,8 @@ describe("FR-SHELL-39 grow to content", () => {
   const win = { x: 1188, y: 60, w: 400, h: 300 };
   /** Window height for `rows` rows of 36 px under a 34 px title bar + borders and 24 px padding. */
   const rows = (n: number) => 34 + 24 + 36 * n;
-  const waBottom = TOP_BAR_H + workArea(vp).h; // 836 at 1600×900
+  // FR-SHELL-52: 12 px above the work area's bottom (the usable area), 824 at 1600×900.
+  const waBottom = TOP_BAR_H + workArea(vp).h - EDGE_GAP;
 
   test("FR-SHELL-39 content 6 → 9 rows: rendered height grows, render-only", () => {
     expect(windowRect(win, grow, vp, rows(6))).toEqual(win); // 274 < stored 300: stored wins
@@ -176,18 +177,19 @@ describe("FR-SHELL-39 grow to content", () => {
     expect(win.h).toBe(300); // nothing written
   });
 
-  test("FR-SHELL-39 capped at the work-area bottom (then the body scrolls)", () => {
+  test("FR-SHELL-39 FR-SHELL-52 capped 12 px above the work-area bottom (then the body scrolls)", () => {
     expect(windowRect(win, grow, vp, rows(40))).toEqual({ ...win, h: waBottom - win.y });
     // Already past the cap (a user-placed window): never shorter than its rendered rect.
     const low = { ...win, y: 700 };
     expect(windowRect(low, grow, vp, rows(40))).toEqual(low);
   });
 
-  test("FR-SHELL-39 a bottom-anchored type keeps its bottom and grows up, to the top bar", () => {
+  test("FR-SHELL-39 a bottom-anchored type keeps its bottom and grows up, to 12 px below the top bar", () => {
     const up = { ...grow, defaultPosition: { anchor: "bottom-right" as const } };
     const w = { x: 1188, y: 500, w: 280, h: 300 };
     expect(windowRect(w, up, vp, 400)).toEqual({ ...w, y: 400, h: 400 });
-    expect(windowRect(w, up, vp, 2000)).toEqual({ ...w, y: TOP_BAR_H, h: 800 - TOP_BAR_H });
+    const top = TOP_BAR_H + EDGE_GAP;
+    expect(windowRect(w, up, vp, 2000)).toEqual({ ...w, y: top, h: 800 - top });
   });
 
   test("FR-SHELL-39 no growth after a user resize (`fixedH`), without opt-in, or unmeasured", () => {
@@ -206,7 +208,19 @@ describe("FR-SHELL-39 grow to content", () => {
       windowRect(stored, grow, small, rows(9)),
     );
     expect(windowRect(stored, grow, small, rows(40)).h).toBe(
-      TOP_BAR_H + workArea(small).h - fitted.y,
+      TOP_BAR_H + workArea(small).h - EDGE_GAP - fitted.y,
     );
+  });
+
+  test("FR-SHELL-52 growth cap: stops 12 px above the first window or hard keep-out below whose x-range overlaps it", () => {
+    const log = { x: 68, y: 584, w: 1150, h: 240 };
+    const init = { x: 1028, y: 60, w: 400, h: 500 };
+    expect(windowRect(init, grow, { w: 1440, h: 900 }, 900, [log]).h).toBe(572 - 60);
+    // Not across: the work area (12 px above the launcher strip).
+    const aside = { x: 68, y: 484, w: 690, h: 160 };
+    const init720 = { x: 868, y: 60, w: 400, h: 500 };
+    expect(windowRect(init720, grow, { w: 1280, h: 720 }, 900, [aside]).h).toBe(644 - 60);
+    // Already past a window below: never shorter than its rendered rect.
+    expect(windowRect(init, grow, { w: 1440, h: 900 }, 900, [{ ...log, y: 300 }]).h).toBe(500);
   });
 });

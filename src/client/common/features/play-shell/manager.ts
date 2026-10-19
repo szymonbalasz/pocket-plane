@@ -1,18 +1,27 @@
-// Window manager reducer (FR-SHELL-08–12, 14, 16–18, 29, 40–42). Pure: no DOM, no storage.
-// Holds every window's *stored* state; rendering fits and clamps (geometry.ts) without writing
-// back. Every geometry it sets is stamped with the work area it was set in (`area`).
+// Window manager reducer (FR-SHELL-08–12, 14, 16–18, 29, 40–42, 45–53). Pure: no DOM, no
+// storage. Holds every window's *stored* state; rendering fits and clamps (geometry.ts) without
+// writing back. Every geometry it sets is stamped with the work area it was set in (`area`).
 import { GEOMETRY_LIMIT, Layout, MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
 import {
   clampRect,
   growsToContent,
+  LAUNCHER_CLEAR,
   type Rect,
+  renderedRect,
+  TOP_BAR_H,
   type Viewport,
-  windowRect,
+  windowRects,
   workArea,
 } from "./geometry";
-import { fittedDefaultRect, placeRect } from "./placement";
-import type { WindowRegistry } from "./registry";
-import { toastKeepOut } from "./toast-region";
+import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
+import {
+  fittedDefaultRect,
+  type Obstacle,
+  type Placeable,
+  type PlacementToken,
+  placeWindow,
+} from "./placement";
+import { defaultSizeAt, knownDefaultSizes, type WindowRegistry } from "./registry";
 
 export type Windows = readonly WindowState[];
 
@@ -49,8 +58,13 @@ export interface ManagerContext {
   viewport: Viewport;
   /** Kinds rendered right now (registered + available). */
   available: ReadonlySet<string>;
-  /** On-screen map token boxes an auto-placed window covers the least of (FR-SHELL-40). */
-  avoid?: () => readonly Rect[];
+  /**
+   * On-screen map token boxes an auto-placed window covers the least of (FR-SHELL-40); `pc`
+   * marks a token with an owner, whose centre it never covers while it can (FR-SHELL-45 (2)).
+   */
+  avoid?: () => readonly PlacementToken[];
+  /** This client's keep-out regions now (FR-SHELL-48); default `keepOuts(client, viewport)`. */
+  keepOuts?: () => readonly KeepOut[];
   /** How a window's current rect was chosen, if known on this page (`data-placed`). */
   placed?: (id: string) => Placed | undefined;
   /** Measured content height of a `growToContent` window (FR-SHELL-39), by window id. */
@@ -68,9 +82,16 @@ const sameRect = (a: Rect | undefined, b: Rect) =>
   a !== undefined && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 
 /** `default` when an auto-placed `r` is the type's fitted default rect, else `auto`. */
-export function placedAs(def: Parameters<typeof fittedDefaultRect>[0], r: Rect, vp: Viewport) {
-  return sameRect(fittedDefaultRect(def, vp), r) ? "default" : "auto";
+export function placedAs(def: Placeable, r: Rect, vp: Viewport, hard: readonly Rect[] = []) {
+  return sameRect(fittedDefaultRect(def, vp, hard), r) ? "default" : "auto";
 }
+
+/** The context's keep-out regions. */
+const keepOutsOf = (ctx: Pick<ManagerContext, "keepOuts" | "registry" | "viewport">) =>
+  ctx.keepOuts?.() ?? keepOuts(ctx.registry.client, ctx.viewport);
+
+const softRects = (list: readonly KeepOut[]) =>
+  list.filter((k) => k.kind === "soft").map((k) => k.rect);
 
 export const windowId = (kind: string, instance: string = MAIN_INSTANCE) => `${kind}:${instance}`;
 
@@ -99,24 +120,30 @@ export function topWindow(ws: Windows, available: ReadonlySet<string>): WindowSt
 }
 
 /**
- * This client's default layout: every `defaultOpen` type auto-placed in registry order
- * (FR-SHELL-14, -40): its fitted default rect unless that overlaps an earlier one, or covers
- * more of `avoid` (on-screen token boxes; none drawn on first load) or of the toast keep-out box.
+ * This client's default layout (FR-SHELL-14, -50): every `defaultOpen` type auto-placed in
+ * registry order (FR-SHELL-45): on token-free input (first load) its fitted default rect
+ * (FR-SHELL-51) wherever that is clear of the earlier ones and the hard keep-outs; with `avoid`
+ * (tokens drawn) the rank decides. The named layouts (1280×720 / ×800, 1440×900, 1600×900) are
+ * play-shell §7's table.
  */
 export function defaultLayout(
   registry: WindowRegistry,
   vp: Viewport,
-  avoid: readonly Rect[] = [],
+  avoid: readonly PlacementToken[] = [],
+  regions: readonly KeepOut[] = keepOuts(registry.client, vp),
 ): WindowState[] {
-  const keepOut = toastKeepOut(registry.client, vp);
+  const hard = hardRects(regions);
+  const soft = softRects(regions);
   const out: WindowState[] = [];
   for (const d of registry.defs) {
     if (!d.defaultOpen) continue;
+    const windows = out.map((w) => ({ ...clampRect(w, vp), protected: true }));
+    const { rect } = placeWindow(d, vp, { windows, hard, soft, tokens: avoid });
     out.push({
       kind: d.kind,
       instance: MAIN_INSTANCE,
       state: "open",
-      ...placeRect(d, vp, out, avoid, keepOut),
+      ...rect,
       z: out.length + 1,
       area: workArea(vp),
     });
@@ -127,54 +154,114 @@ export function defaultLayout(
 const overlaps = (a: Rect, b: Rect) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-/** Where a stored window renders now (fit + clamp + grown to content); unknown kinds clamp only. */
-function shownRect(w: WindowState, ctx: ManagerContext): Rect {
-  const def = ctx.registry.get(w.kind);
-  if (!def) return clampRect(w, ctx.viewport);
-  return windowRect(w, def, ctx.viewport, ctx.heights?.(windowId(w.kind, w.instance)));
+const isShown = (w: WindowState, available: ReadonlySet<string>) =>
+  w.state === "open" && available.has(w.kind);
+
+/**
+ * Rendered rects (fit + clamp + grown to content, growth capped by the others and the hard
+ * keep-outs, FR-SHELL-52) of the windows on screen now, plus `extra` as if on screen; unknown
+ * kinds clamp only.
+ */
+function shownRects(ws: Windows, ctx: ManagerContext, extra?: WindowState) {
+  const vp = ctx.viewport;
+  const shown = ws.filter((w) => isShown(w, ctx.available));
+  if (extra && !shown.includes(extra)) shown.push(extra);
+  const out = new Map<WindowState, Rect>();
+  const known = shown.flatMap((w) => {
+    const def = ctx.registry.get(w.kind);
+    if (!def) out.set(w, clampRect(w, vp));
+    return def ? [{ win: w, def, needed: ctx.heights?.(windowId(w.kind, w.instance)) }] : [];
+  });
+  const rects = windowRects(known, vp, hardRects(keepOutsOf(ctx)));
+  for (const [i, k] of known.entries()) out.set(k.win, rects[i] as Rect);
+  return out;
 }
 
-/** Rendered rects of the windows on screen now, except (kind, instance). */
-function onScreen(ws: Windows, ctx: ManagerContext, kind: string, instance: string): Rect[] {
-  return ws
-    .filter(
-      (w) =>
-        w.state === "open" &&
-        ctx.available.has(w.kind) &&
-        !(w.kind === kind && w.instance === instance),
-    )
-    .map((w) => shownRect(w, ctx));
+/** Where a stored window renders now, among the windows on screen. */
+function shownRect(ws: Windows, w: WindowState, ctx: ManagerContext): Rect {
+  return shownRects(ws, ctx, w).get(w) ?? clampRect(w, ctx.viewport);
+}
+
+/** Rendered rects of the windows on screen now, except (kind, instance); defaults protected. */
+function onScreen(ws: Windows, ctx: ManagerContext, kind: string, instance: string): Obstacle[] {
+  const out: Obstacle[] = [];
+  for (const [w, r] of shownRects(ws, ctx)) {
+    if (w.kind === kind && w.instance === instance) continue;
+    out.push({ ...r, protected: ctx.registry.get(w.kind)?.defaultOpen === true });
+  }
+  return out;
 }
 
 /**
- * Auto placement of (kind, instance) against what is on screen now (FR-SHELL-40), never shorter
+ * Auto placement of (kind, instance) against what is on screen now (FR-SHELL-45), never shorter
  * than the height it renders at: a growing window's measured content height (FR-SHELL-39).
+ * Screen full (FR-SHELL-47): the least recently used launcher-opened window (open, type neither
+ * `defaultOpen` nor `fixedDefault`; lowest z) is minimised and placement runs again, repeatedly.
+ * Returns the windows (incl. any auto-minimised) and the rect.
  */
-function autoRect(ws: Windows, ctx: ManagerContext, kind: string, instance: string): Rect | null {
+function autoPlace(
+  ws: Windows,
+  ctx: ManagerContext,
+  kind: string,
+  instance: string,
+): { windows: Windows; rect: Rect } | null {
   const def = ctx.registry.get(kind);
   if (!def) return null;
-  const vp = ctx.viewport;
-  const others = onScreen(ws, ctx, kind, instance);
+  const regions = keepOutsOf(ctx);
+  const input = { hard: hardRects(regions), soft: softRects(regions), tokens: ctx.avoid?.() ?? [] };
   const cur = find(ws, kind, instance);
   const need = growsToContent(cur ?? {}, def) ? ctx.heights?.(windowId(kind, instance)) : undefined;
-  const keepOut = toastKeepOut(ctx.registry.client, vp);
-  return placeRect(def, vp, others, ctx.avoid?.() ?? [], keepOut, need);
+  let windows = ws;
+  for (;;) {
+    const others = onScreen(windows, ctx, kind, instance);
+    const p = placeWindow(def, ctx.viewport, { ...input, windows: others, need });
+    if (p.clear) return { windows, rect: p.rect };
+    let lru: WindowState | undefined;
+    for (const w of windows) {
+      const d = ctx.registry.get(w.kind);
+      if (!d || d.defaultOpen || d.fixedDefault || !isShown(w, ctx.available)) continue;
+      if (w.kind === kind && w.instance === instance) continue;
+      if (!lru || w.z < lru.z) lru = w;
+    }
+    if (!lru) {
+      const last = placeWindow(def, ctx.viewport, {
+        ...input,
+        windows: others,
+        need,
+        lastResort: true,
+      });
+      return { windows, rect: last.rect };
+    }
+    const parked = lru;
+    windows = windows.map((w) => (w === parked ? { ...w, state: "minimised" as const } : w));
+  }
+}
+
+/** `ws` with (kind, instance) auto-placed (and any window auto-minimised for it), written. */
+function withAutoPlaced(ws: Windows, ctx: ManagerContext, kind: string, instance: string): Windows {
+  const placed = autoPlace(ws, ctx, kind, instance);
+  if (!placed) return ws;
+  const area = workArea(ctx.viewport);
+  return patch(placed.windows, kind, instance, (w) => ({ ...w, ...placed.rect, area }));
 }
 
 /**
  * A stored window a feature brings up (feature open, appearance) is auto-placed when it would
- * cover a window on screen (FR-SHELL-41) or sits at a rect the user didn't choose: auto-placed
- * on this page, or at its default-layout / fitted default rect (FR-SHELL-40).
+ * cover a window on screen or a hard keep-out region (FR-SHELL-41, -48) or sits at a rect the
+ * user didn't choose: auto-placed on this page, or at its default-layout / fitted default rect
+ * (FR-SHELL-40).
  */
 function needsAutoPlace(ws: Windows, cur: WindowState, ctx: ManagerContext): boolean {
   const def = ctx.registry.get(cur.kind);
   if (!def) return false;
-  const shown = shownRect(cur, ctx);
+  const shown = shownRect(ws, cur, ctx);
   if (onScreen(ws, ctx, cur.kind, cur.instance).some((o) => overlaps(shown, o))) return true;
+  const hard = hardRects(keepOutsOf(ctx));
+  if (hard.some((k) => overlaps(shown, k))) return true;
   const how = ctx.placed?.(windowId(cur.kind, cur.instance));
   if (how === "auto" || how === "default") return true;
   const asDefault = defaultLayout(ctx.registry, ctx.viewport).find((w) => w.kind === cur.kind);
-  return sameRect(asDefault, cur) || sameRect(fittedDefaultRect(def, ctx.viewport), cur);
+  return sameRect(asDefault, cur) || sameRect(fittedDefaultRect(def, ctx.viewport, hard), cur);
 }
 
 export interface Restored {
@@ -183,32 +270,81 @@ export interface Restored {
   warning?: string;
   /** The windows come from the stored entry (else: the default layout). */
   stored?: true;
+  /** Default-sized windows took this viewport's default (FR-SHELL-53): write the entry. */
+  migrated?: true;
+}
+
+/**
+ * FR-SHELL-53: a stored window whose size equals one of its type's default sizes (any viewport
+ * class) or `previousDefaults`, never resized by the user, takes the current viewport's default
+ * size: at its stored position if that rect is inside the work area and clear of the other open
+ * windows and the hard keep-outs, else auto-placed; written with `area`.
+ */
+function followDefaults(
+  windows: WindowState[],
+  registry: WindowRegistry,
+  vp: Viewport,
+  regions: readonly KeepOut[],
+): boolean {
+  const hard = hardRects(regions);
+  let changed = false;
+  for (let i = 0; i < windows.length; i++) {
+    const w = windows[i] as WindowState;
+    const def = registry.get(w.kind);
+    if (!def || w.fixedH) continue;
+    if (!knownDefaultSizes(def).some((s) => s.w === w.w && s.h === w.h)) continue;
+    const size = defaultSizeAt(def, vp);
+    if (size.w === w.w && size.h === w.h) continue;
+    const others: Obstacle[] = [];
+    for (const o of windows) {
+      const d = registry.get(o.kind);
+      if (o === w || o.state !== "open" || !d) continue;
+      others.push({ ...renderedRect(o, d.minSize, vp), protected: d.defaultOpen === true });
+    }
+    const keep = { x: w.x, y: w.y, ...size };
+    const inside =
+      keep.x >= 0 &&
+      keep.y >= TOP_BAR_H &&
+      keep.x + keep.w <= vp.w &&
+      keep.y + keep.h <= vp.h - LAUNCHER_CLEAR;
+    const clear = ![...others, ...hard].some((o) => overlaps(keep, o));
+    const rect =
+      inside && clear
+        ? keep
+        : placeWindow(def, vp, { windows: others, hard, soft: softRects(regions) }).rect;
+    windows[i] = { ...w, ...rect, area: workArea(vp) };
+    changed = true;
+  }
+  return changed;
 }
 
 /**
  * Builds state from a stored entry (FR-SHELL-16/17/18). `raw` = the stored string, or null.
  * Missing → default; bad JSON or schema → default + warning. Unknown kinds are kept in memory
  * (skipped when rendering) and dropped at the next write by `serialise`. A type with
- * `restoreOpen: false` loads closed, its geometry kept (FR-SHELL-42).
+ * `restoreOpen: false` loads closed, its geometry kept (FR-SHELL-42). Default-sized windows
+ * follow the viewport (FR-SHELL-53).
  */
 export function restoreLayout(
   registry: WindowRegistry,
   raw: string | null,
   vp: Viewport,
-  avoid: readonly Rect[] = [],
+  avoid: readonly PlacementToken[] = [],
+  regions: readonly KeepOut[] = keepOuts(registry.client, vp),
 ): Restored {
-  if (raw === null) return { windows: defaultLayout(registry, vp, avoid) };
+  const fresh = () => defaultLayout(registry, vp, avoid, regions);
+  if (raw === null) return { windows: fresh() };
   let json: unknown;
   try {
     json = JSON.parse(raw);
   } catch {
-    return { windows: defaultLayout(registry, vp, avoid), warning: "layout entry is not JSON" };
+    return { windows: fresh(), warning: "layout entry is not JSON" };
   }
   const parsed = Layout.safeParse(json);
   if (!parsed.success) {
     const first = parsed.error.issues[0];
     return {
-      windows: defaultLayout(registry, vp, avoid),
+      windows: fresh(),
       warning: `layout entry invalid (${first?.path.join(".")}: ${first?.message})`,
     };
   }
@@ -217,7 +353,8 @@ export function restoreLayout(
       ? { ...w, state: "closed" as const }
       : w,
   );
-  return { windows: normaliseZ(windows), stored: true };
+  const migrated = followDefaults(windows, registry, vp, regions);
+  return { windows: normaliseZ(windows), stored: true, ...(migrated && { migrated: true }) };
 }
 
 /** What gets written: unknown kinds dropped, unavailable ones kept (FR-SHELL-18). */
@@ -265,7 +402,9 @@ function toFront(ws: Windows, kind: string, instance: string, state?: WindowStat
  * Every change returned here is one of the FR-SHELL-15 writes.
  */
 export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): Windows {
-  if (action.type === "reset") return defaultLayout(ctx.registry, ctx.viewport, ctx.avoid?.());
+  if (action.type === "reset") {
+    return defaultLayout(ctx.registry, ctx.viewport, ctx.avoid?.(), keepOutsOf(ctx));
+  }
   const instance = action.instance ?? MAIN_INSTANCE;
   const { kind } = action;
   const def = ctx.registry.get(kind);
@@ -273,21 +412,25 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
 
   switch (action.type) {
     case "open": {
-      // FR-SHELL-08: last geometry, else auto placement (FR-SHELL-40); front; minimised →
+      // FR-SHELL-08: last geometry, else auto placement (FR-SHELL-45); front; minimised →
       // restored. A feature open never lands on another window (FR-SHELL-41).
-      const area = workArea(ctx.viewport);
       const cur = find(ws, kind, instance);
       if (cur) {
         let next = ws;
         const feature = action.by === "feature" && cur.state !== "open";
         if (feature && ctx.available.has(kind) && needsAutoPlace(ws, cur, ctx)) {
-          const rect = autoRect(ws, ctx, kind, instance);
-          if (rect) next = patch(ws, kind, instance, (w) => ({ ...w, ...rect, area }));
+          next = withAutoPlaced(ws, ctx, kind, instance);
         }
         return toFront(next, kind, instance, "open");
       }
-      const rect = autoRect(ws, ctx, kind, instance) ?? fittedDefaultRect(def, ctx.viewport);
-      return normaliseZ([...ws, { kind, instance, state: "open", ...rect, z: maxZ(ws) + 1, area }]);
+      const added = {
+        kind,
+        instance,
+        state: "open" as const,
+        ...fittedDefaultRect(def, ctx.viewport),
+      };
+      const next = [...ws, { ...added, z: maxZ(ws) + 1, area: workArea(ctx.viewport) }];
+      return normaliseZ([...withAutoPlaced(next, ctx, kind, instance)]);
     }
     case "close":
       return patch(ws, kind, instance, (w) => ({ ...w, state: "closed" }));
@@ -310,20 +453,17 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
       const cur = find(ws, kind, instance);
       if (cur?.state !== "open" || !ctx.available.has(kind)) return ws;
       if (!needsAutoPlace(ws, cur, ctx)) return ws;
-      const rect = autoRect(ws, ctx, kind, instance);
-      if (!rect) return ws;
-      return patch(ws, kind, instance, (w) => ({ ...w, ...rect, area: workArea(ctx.viewport) }));
+      return withAutoPlaced(ws, ctx, kind, instance);
     }
     case "settle": {
       const cur = find(ws, kind, instance);
       if (cur?.state !== "open" || !ctx.available.has(kind)) return ws;
       if (ctx.placed?.(windowId(kind, instance)) === "stored") return ws;
-      const shown = shownRect(cur, ctx);
-      const covers = onScreen(ws, ctx, kind, instance).some((o) => overlaps(shown, o));
+      const shown = shownRect(ws, cur, ctx);
+      const blocked = [...onScreen(ws, ctx, kind, instance), ...hardRects(keepOutsOf(ctx))];
+      const covers = blocked.some((o) => overlaps(shown, o));
       if (!covers && shown.h <= cur.h) return ws;
-      const rect = autoRect(ws, ctx, kind, instance);
-      if (!rect) return ws;
-      return patch(ws, kind, instance, (w) => ({ ...w, ...rect, area: workArea(ctx.viewport) }));
+      return withAutoPlaced(ws, ctx, kind, instance);
     }
     case "setRect": {
       const r = action.rect;

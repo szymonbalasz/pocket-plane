@@ -76,6 +76,7 @@ import partySecond from "./party-board/party-second";
 import loot1 from "./party-loot/loot-1";
 import lootSecond from "./party-loot/loot-second";
 import lootWallets from "./party-loot/loot-wallets";
+import winLayout from "./play-shell/win-layout";
 import mtTemplates from "./scene-tools/mt-templates";
 import scnPropImages from "./scene-tools/scn-prop-images";
 import scnProps from "./scene-tools/scn-props";
@@ -169,6 +170,7 @@ export const units: readonly Fixture[] = [
   entArtTokens,
   cmpSrdMiniS3,
   artUpdateTokens,
+  winLayout,
   handoutAttachment,
   handoutPresent1,
   lateHitRuled,

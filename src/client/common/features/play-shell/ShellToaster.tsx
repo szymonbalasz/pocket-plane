@@ -4,8 +4,15 @@
 // portals its stack into `useRollPopupMount()`'s element.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Toaster } from "sonner";
+import { useViewport } from "./hooks";
 import type { ShellClient } from "./registry";
-import { NOTE_STACK_SELECTOR, popupRegion, ROLL_POPUP_W, toastRegion } from "./toast-region";
+import {
+  NOTE_STACK_SELECTOR,
+  popupRegion,
+  ROLL_POPUP_W,
+  toastKeepOut,
+  toastRegion,
+} from "./toast-region";
 
 /** Height of the element matching `selector` (0 while absent); follows mounts and resizes. */
 function useElementHeight(selector: string): number {
@@ -108,8 +115,18 @@ export function ShellToaster({ client }: { client: ShellClient }) {
   const noteH = useElementHeight(NOTE_STACK_SELECTOR);
   const region = toastRegion(client, noteH);
   const popups = popupRegion(client, noteH, useSonnerHeight());
+  const box = toastKeepOut(client, useViewport());
   return (
     <>
+      {/* FR-SHELL-49: the region's box (players' toast corner, the DM's top-centre box), for
+          walkthroughs; draws nothing, takes no input. */}
+      <div
+        data-testid="ui-toast-corner"
+        data-rect={`${box.x},${box.y},${box.w},${box.h}`}
+        aria-hidden
+        className="pointer-events-none fixed"
+        style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
+      />
       <Toaster
         theme="dark"
         position={region.position}

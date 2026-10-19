@@ -6,7 +6,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { tokenNode } from "./support/konva";
-import { openWindow } from "./support/shell";
+import { openWindow, shellWindow } from "./support/shell";
 
 async function triggersOn(page: Page, characterId?: string) {
   const sheet = await openWindow(page, "char.sheet");
@@ -76,6 +76,7 @@ test("FR-MOD-49 FR-MOD-47 FR-MOD-28 Triggers blocks per player; DM entries for m
   }
 
   // DM: Brakka's token → Rule triggers… → her Triggers block.
+  await creatures.getByTestId("ui-window-close").click();
   const scenes = await openWindow(dm, "map.scenes");
   const battlemap = recordId("battlemap", "scene");
   await scenes
@@ -83,6 +84,10 @@ test("FR-MOD-49 FR-MOD-47 FR-MOD-28 Triggers blocks per player; DM entries for m
     .first()
     .click();
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", battlemap);
+  // Sprint 5: the Game log is wide (FR-DICE-38): close Scenes, park the log (neither refits) so
+  // Brakka's token is on open canvas.
+  await scenes.getByTestId("ui-window-close").click();
+  await shellWindow(dm, "dice.log").getByTestId("ui-window-minimise").click();
   const token = recordId("char-brakka", "token");
   // The canvas may still be fitting the scene under load: right-click again until the menu opens.
   const entry = dm.getByTestId("mod-token-menu-triggers");

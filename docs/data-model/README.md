@@ -1839,7 +1839,7 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-89–94) 
 
 ## 70. Sprint 5: player colours core (K0)
 
-From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP-23–26, -28, -29 and [notifications](../specs/notifications.md#8-data-model) FR-NOTE-38 ([ADR-0055](../architecture/adr/0055-player-colour.md): stored once, derived everywhere; DM gate #256; seams S1, S14, S15). **Built by `fix/colours-core`** (schema lane 2, after R0): drizzle push, push-safe (nullable or defaulted columns, one boot, no table rebuild). Protocol side: [protocol §89](../protocol/README.md#89-sprint-5-player-colours-core-k0).
+From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP-23–26, -28, -29 and [notifications](../specs/notifications.md#8-data-model) FR-NOTE-38 ([ADR-0055](../architecture/adr/0055-player-colour.md): stored once, derived everywhere; DM gate #256; seams S1, S14, S15). **Built by `fix/colours-core`** (schema lane 2, after R0): drizzle push, push-safe (nullable or defaulted columns, one boot, no table rebuild). Protocol side: [protocol §90](../protocol/README.md#90-sprint-5-player-colours-core-k0).
 
 | Table / column | Change | Default (push-safe) | Visibility | Source |
 |---|---|---|---|---|

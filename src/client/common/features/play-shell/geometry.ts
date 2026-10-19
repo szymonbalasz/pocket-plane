@@ -120,18 +120,31 @@ export function renderedRect(
 }
 
 /**
- * Grow to content (FR-SHELL-39), render-only: `r` (the rendered rect) made as tall as `needed`
- * (the window height its content asks for), never shorter than `r`, capped so it stays inside the
- * work area. Grows down from its top; `up` (bottom-anchored types) keeps its bottom, grows up.
+ * Grow to content (FR-SHELL-39, -52), render-only: `r` (the rendered rect) made as tall as
+ * `needed` (the window height its content asks for), never shorter than `r`, capped 12 px before
+ * the usable area's edge (above the launcher) and before the first of `caps` (other rendered
+ * windows, hard keep-out regions) in its way whose x-range overlaps it. Grows down from its top;
+ * `up` (bottom-anchored types) keeps its bottom, grows up.
  */
-export function grownRect(r: Rect, needed: number | undefined, up: boolean, vp: Viewport): Rect {
+export function grownRect(
+  r: Rect,
+  needed: number | undefined,
+  up: boolean,
+  vp: Viewport,
+  caps: readonly Rect[] = [],
+): Rect {
   if (needed === undefined || needed <= r.h) return r;
+  const across = caps.filter((c) => c.x < r.x + r.w && r.x < c.x + c.w);
   if (up) {
     const bottom = r.y + r.h;
-    const h = Math.max(r.h, Math.min(Math.ceil(needed), bottom - TOP_BAR_H));
+    let top = TOP_BAR_H + EDGE_GAP;
+    for (const c of across) if (c.y + c.h < r.y + r.h) top = Math.max(top, c.y + c.h + EDGE_GAP);
+    const h = Math.max(r.h, Math.min(Math.ceil(needed), bottom - top));
     return { ...r, y: bottom - h, h };
   }
-  const h = Math.max(r.h, Math.min(Math.ceil(needed), TOP_BAR_H + workArea(vp).h - r.y));
+  let bottom = TOP_BAR_H + workArea(vp).h - EDGE_GAP;
+  for (const c of across) if (c.y > r.y) bottom = Math.min(bottom, c.y - EDGE_GAP);
+  const h = Math.max(r.h, Math.min(Math.ceil(needed), bottom - r.y));
   return { ...r, h };
 }
 
@@ -142,19 +155,40 @@ export const growsToContent = (win: { fixedH?: true | undefined }, def: GrowDef)
   def.growToContent === true && win.fixedH !== true;
 
 /**
- * Where a window draws (FR-SHELL-29, -12, -39): fit + clamp, then, while it grows to content,
- * the height `needed` measured by `ShellWindow`. `ShellWindow` and `renderedWindowRects` both
- * use it, so what is drawn is what the free area and other consumers see.
+ * Where a window draws (FR-SHELL-29, -12, -39, -52): fit + clamp, then, while it grows to
+ * content, the height `needed` measured by `ShellWindow`, capped by `caps`. `ShellWindow` and
+ * `renderedWindowRects` both use it, so what is drawn is what the free area and other consumers
+ * see.
  */
 export function windowRect(
   win: Rect & { area?: Viewport | undefined; fixedH?: true | undefined },
   def: GrowDef,
   vp: Viewport,
   needed?: number,
+  caps: readonly Rect[] = [],
 ): Rect {
   const r = renderedRect(win, def.minSize, vp);
   if (!growsToContent(win, def)) return r;
-  return grownRect(r, needed, def.defaultPosition.anchor.startsWith("bottom"), vp);
+  return grownRect(r, needed, def.defaultPosition.anchor.startsWith("bottom"), vp, caps);
+}
+
+/**
+ * Rendered rects of several windows at once (FR-SHELL-52): each growing window is capped by the
+ * others' fitted rects (not grown) and by `hard` regions. Same order as `items`.
+ */
+export function windowRects<
+  W extends Rect & { area?: Viewport | undefined; fixedH?: true | undefined },
+>(
+  items: readonly { win: W; def: GrowDef; needed?: number | undefined }[],
+  vp: Viewport,
+  hard: readonly Rect[] = [],
+): Rect[] {
+  const plain = items.map(({ win, def }) => renderedRect(win, def.minSize, vp));
+  return items.map(({ win, def, needed }, i) =>
+    growsToContent(win, def)
+      ? windowRect(win, def, vp, needed, [...plain.filter((_, j) => j !== i), ...hard])
+      : (plain[i] as Rect),
+  );
 }
 
 /** Title-bar drag from `start` (the rendered rect) by (dx, dy); result clamped. */
