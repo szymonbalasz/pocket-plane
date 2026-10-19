@@ -1,5 +1,5 @@
-// Pure client rules of `loot.log` (FR-LOOT-14–19, FR-PARTY-25/27): display order, wallet rows,
-// form drafts → intent payloads (FR-LOOT-02/06/07, FR-PARTY-26 mirrored with the shared zod
+// Pure client rules of the Loot tab body (FR-LOOT-14–21, FR-PARTY-25/27): display order, wallet
+// rows, form drafts → intent payloads (FR-LOOT-02/06/07, FR-PARTY-26 mirrored with the shared zod
 // schemas), Move form options, item-row text, the Split… dialog. No React.
 import type { CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { itemRowText, splitPreview } from "@shared/party-board/format";
@@ -18,8 +18,6 @@ import {
   ZERO_COINS,
 } from "@shared/party-loot/schemas";
 import { IntentRejected } from "../../sync/connection";
-
-export const LOOT_LOG_KIND = "loot.log";
 
 /** The coin Inputs' raw text, per coin. */
 export type CoinDraft = Record<CoinKey, string>;

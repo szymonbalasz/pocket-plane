@@ -364,12 +364,6 @@ test("FR-SHELL-53 previous defaults (player): a stored 340×280 log takes the vi
   expect(r.windows[0]).toMatchObject({ x: 68, y: 544, w: 850, h: 280, area: workArea(WIDE) });
 });
 
-test("#162 player Loot opens at the left edge (shorter, not mid-map)", () => {
-  for (const viewport of [LAPTOP, { w: 1280, h: 800 }, WIDE, DESKTOP]) {
-    expect(at(openOnDefaults(["loot.log"], viewport, false), "loot.log").x).toBe(12 + 56);
-  }
-});
-
 test("FR-SHELL-18 player Initiative appearing on Start avoids an open Notifications (layout check 7)", () => {
   for (const viewport of [LAPTOP, WIDE, DESKTOP]) {
     const all = new Set(playerWindows.defs.map((d) => d.kind));
