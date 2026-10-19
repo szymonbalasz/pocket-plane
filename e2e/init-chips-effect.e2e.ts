@@ -82,7 +82,7 @@ async function shownWhole(chip: Locator) {
 async function bothShown(row: Locator, rageFolds = false) {
   const rage = row.getByTestId("cbtx-init-row-effect").filter({ hasText: "Rage" });
   if (rageFolds) {
-    await expect(rage).toHaveCount(0);
+    await expect(rage).toBeHidden();
     await expect(row.getByRole("button", { name: /^More effects: Rage/ })).toHaveCount(1);
   } else await shownWhole(rage);
   const fury = row.getByTestId("cbtx-trigger-chip").filter({ hasText: "Divine Fury" });

@@ -352,9 +352,6 @@ export function EffectChips({
       )}
       {fx.map((e, i) => {
         const hidden = i >= n;
-        // Compact rows drop folded chips from the flow (measured on the copy), so "+N" and the
-        // trigger chips follow the last chip shown.
-        if (hidden && compact) return null;
         const chip = (
           <EffectChip e={e} round={round} testId={testId} compact={compact} tier={tier} />
         );
@@ -362,7 +359,9 @@ export function EffectChips({
           <span
             key={e.id}
             data-chip
-            className={cn("flex shrink-0", hidden && "invisible")}
+            // Compact rows take folded chips out of the flow (measured on the copy), so "+N" and
+            // the trigger chips follow the last chip shown.
+            className={cn("flex shrink-0", hidden && (compact ? "hidden" : "invisible"))}
             aria-hidden={hidden}
           >
             {menu && !hidden ? (
