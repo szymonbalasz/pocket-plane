@@ -21,7 +21,7 @@
 
 ## Decision
 
-**A** (proposed; dice-extras ◆ OQ-DICEX-40, caching ◆ OQ-DICEX-41, a scope flag beyond BL-21).
+**A** (proposed; dice-extras OQ-DICEX-40 A and caching OQ-DICEX-41 A, a scope flag beyond BL-21, both decided #256).
 
 | Rule | Detail |
 |---|---|

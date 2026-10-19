@@ -22,16 +22,16 @@
 
 ## Decision
 
-**A** (proposed; framing in dice-extras OQ-DICEX-33–38, dice-roll-log OQ-DICE-30). Rows marked ◆ follow an open DM pick.
+**A** (proposed; picks decided by the DM at sprint-5 gate 1, #256: dice-extras OQ-DICEX-33–39, dice-roll-log OQ-DICE-30).
 
 | Rule | Detail |
 |---|---|
-| Truth (amends ADR-0044 Truth, ADR-0048 Truth) | Unchanged: the server's values, relabelled faces, pre-computed motion. **The line still renders on arrival; its die values and total wait until this client's dice land.** The client holds only entries its live-throw path put in `holding` (deadline arrival + 6 s); everything else, snapshots included, is shown. ◆ Without animation (Flat, Off, others off): OQ-DICEX-38 |
-| Popup: dice (amends ADR-0048) | The same dice, laid out in a line of fixed cells (◆ 44 px, OQ-DICEX-34), wrapping to 2 lines, then "+N" (◆ OQ-DICEX-33); big dice fly to their cells; miniatures tumble into them; chips use the same cells |
-| Previews (new) | The tray draws the staged dice as 3D stills on the page's one WebGL context: a temporary arena rendered and copied into the tray's own 2D canvas in one task, so it keeps the window's z-order; no render loop (◆ OQ-DICEX-35) |
+| Truth (amends ADR-0044 Truth, ADR-0048 Truth) | Unchanged: the server's values, relabelled faces, pre-computed motion. **The line still renders on arrival; its die values and total wait until this client's dice land.** The client holds only entries its live-throw path put in `holding` (deadline arrival + 6 s); everything else, snapshots included, is shown. Without animation (Flat, Off, others off) each client shows numbers when its own presentation rests (OQ-DICEX-38 A) |
+| Popup: dice (amends ADR-0048) | The same dice, laid out in a line of fixed cells (44 px, OQ-DICEX-34 A), wrapping to 2 lines, then "+N" (OQ-DICEX-33 A); big dice fly to their cells; miniatures tumble into them; chips use the same cells |
+| Previews (new) | The tray draws the staged dice as 3D stills on the page's one WebGL context: a temporary arena rendered and copied into the tray's own 2D canvas in one task, so it keeps the window's z-order; no render loop (OQ-DICEX-35 decided #256) |
 
 ## Consequences
 
 - No protocol, schema, event or record change; CON-44 0 B (re-run 2026-10-18: heavy DM 674,452 B, players ≤ 284,256 B).
-- `toast-region.ts` popup constants become 320 × 190, set by track W's W1 with the toast corner sized for them (seams S2); D's popup slice edits only the popup's internals.
-- Numbers outside the dice surfaces (Initiative order, combat cards) are not held unless the DM picks otherwise (OQ-DICEX-39).
+- `toast-region.ts` popup constants become 320 × 190, set by track W's W1 with both toast regions sized for them (seams S2; DM top-centre kept, OQ-SHELL-32 C, #256); D's popup slice edits only the popup's internals.
+- Numbers outside the dice surfaces (Initiative order, combat cards) are not held (OQ-DICEX-39 A, #256).
