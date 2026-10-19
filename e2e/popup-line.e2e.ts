@@ -189,9 +189,12 @@ test("FR-DICEX-47 short screens: with a toast up only the popups that fit show (
     // A toast in each region (FR-SHELL-27's test alert), then three 10d6 popups (146 px each).
     for (const page of [p1, dm]) {
       const win = await openWindow(page, "shell.test");
-      // The last round's popups may cover the button: no pointer needed for the alert.
-      await win.getByTestId("shell-test-alert").dispatchEvent("click");
-      await expect(page.getByTestId("ui-alert-toast").first()).toBeVisible();
+      // The last round's popups may cover the button: no pointer needed for the alert. The same
+      // alert id re-fired while its last toast leaves can be swallowed: fire until one shows.
+      await expect(async () => {
+        await win.getByTestId("shell-test-alert").dispatchEvent("click");
+        await expect(page.getByTestId("ui-alert-toast").first()).toBeVisible({ timeout: 1_000 });
+      }).toPass({ timeout: 8_000 });
     }
     const ids: string[] = [];
     for (let i = 0; i < 3; i++) ids.push(await roll(p1, "10d6"));
