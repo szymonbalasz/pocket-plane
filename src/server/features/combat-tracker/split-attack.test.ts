@@ -89,8 +89,13 @@ function setup() {
   const lastEntry = () => entries().at(-1) as GameLogEntryRecord;
   const rollRow = (id: string) => t.s.db.select().from(roll).where(eq(roll.id, id)).get();
   const hpRows = () => t.s.db.select().from(hpChange).all() as HpChangeRecord[];
+  // FR-CBT-94: the card's damage roll as stored (a test may name another one).
   const apply = (cardId: string, input: object) =>
-    t.run<HpChangesResult>(applyCard.name, { cardId, ...input });
+    t.run<HpChangesResult>(applyCard.name, {
+      cardId,
+      damageRollId: card(cardId).p.damage?.rollId ?? null,
+      ...input,
+    });
   const target = (name: string, hit: boolean, multiplier = "normal") => ({
     targetId: t.id(name),
     hit,

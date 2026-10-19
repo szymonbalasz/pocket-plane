@@ -1,6 +1,8 @@
 // DM "Share…" dialog (FR-PARTY-16): Not shared / Everyone / Chosen players, a checkbox per player
 // (name, online dot) under Chosen, the unshare-vs-images hint, Share disabled while Chosen has
 // none ticked, unchanged, not live or in flight. Sends `party.shareHandout` (share and unshare).
+// FR-PARTY-38 (a): "Also open it on the screens of players who newly get it" (gainers named;
+// "Nobody new" disables it; hidden for Not shared) → `present: true` (FR-PARTY-33).
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import type { HandoutRecord, ShareMode } from "@shared/party-board/schemas";
 import { Button } from "@ui/components/ui/button";
@@ -26,6 +28,12 @@ import {
   sharePayload,
   togglePlayer,
 } from "@ui/features/party-board/logic";
+import {
+  draftGainers,
+  opensOnText,
+  PRESENT_TICK,
+  presentFlag,
+} from "@ui/features/party-board/present-logic";
 import { onlineDot } from "@ui/sync/presence";
 import { usePresence, useRecords } from "@ui/sync/store";
 import { useEffect, useMemo, useState } from "react";
@@ -45,6 +53,24 @@ export function usePlayers(): PlayerRecord[] {
   );
 }
 
+/** A player's online dot (FR-SYNC-29), as the Share and present dialogs show it. */
+export function OnlineDot({ dot }: { dot: ReturnType<typeof onlineDot> }) {
+  return (
+    <>
+      <span
+        aria-hidden
+        data-online={dot === "unknown" ? undefined : dot === "online"}
+        className={
+          dot === "online"
+            ? "size-2 rounded-full bg-emerald-500"
+            : "size-2 rounded-full bg-muted-foreground/40"
+        }
+      />
+      <span className="sr-only">{dot === "online" ? "online" : "offline"}</span>
+    </>
+  );
+}
+
 export function ShareDialog({
   handout,
   open,
@@ -59,19 +85,26 @@ export function ShareDialog({
   const presence = usePresence();
   const live = useLive();
   const [draft, setDraft] = useState<ShareDraft>(() => shareDraftOf(handout.sharedWith));
+  const [present, setPresent] = useState(false);
   const { busy, error, setError, send } = useIntent(LOST_SHARE);
-  // A fresh draft from the stored share each time the dialog opens.
+  // A fresh draft from the stored share each time the dialog opens; the tick starts unticked.
   useEffect(() => {
     if (open) {
       setDraft(shareDraftOf(handout.sharedWith));
+      setPresent(false);
       setError(null);
     }
   }, [open, handout.sharedWith, setError]);
   const enabled = shareEnabled(draft, handout.sharedWith, order, { live, busy });
+  const gainers = draftGainers(handout.sharedWith, sharePayload(draft, order), players);
   const submit = async () => {
     const p = sharePayload(draft, order);
     if (!enabled || !p.ok) return;
-    const ok = await send("party.shareHandout", { handoutId: handout.id, sharedWith: p.value });
+    const ok = await send("party.shareHandout", {
+      handoutId: handout.id,
+      sharedWith: p.value,
+      ...(presentFlag(present, p.value.mode, gainers.length) && { present: true }),
+    });
     if (ok) onOpenChange(false);
   };
   return (
@@ -130,16 +163,7 @@ export function ShareDialog({
                       className="flex items-center gap-1.5 text-sm font-normal"
                     >
                       {p.name}
-                      <span
-                        aria-hidden
-                        data-online={dot === "unknown" ? undefined : dot === "online"}
-                        className={
-                          dot === "online"
-                            ? "size-2 rounded-full bg-emerald-500"
-                            : "size-2 rounded-full bg-muted-foreground/40"
-                        }
-                      />
-                      <span className="sr-only">{dot === "online" ? "online" : "offline"}</span>
+                      <OnlineDot dot={dot} />
                     </Label>
                   </li>
                 );
@@ -148,6 +172,28 @@ export function ShareDialog({
                 <li className="text-xs text-muted-foreground">{SHARE_PLAYERS_NOTE}</li>
               )}
             </ul>
+          )}
+          {draft.mode !== "none" && (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="party-share-present"
+                  data-testid="party-share-present"
+                  disabled={gainers.length === 0}
+                  checked={present && gainers.length > 0}
+                  onCheckedChange={(c) => setPresent(c === true)}
+                />
+                <Label htmlFor="party-share-present" className="text-sm font-normal">
+                  {PRESENT_TICK}
+                </Label>
+              </div>
+              <p
+                data-testid="party-share-present-names"
+                className="pl-6 text-xs text-muted-foreground"
+              >
+                {opensOnText(gainers)}
+              </p>
+            </div>
           )}
         </fieldset>
         {error && (

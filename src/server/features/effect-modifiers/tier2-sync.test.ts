@@ -99,6 +99,7 @@ describe("FR-MOD-31 mod-tier2 fixture", () => {
       cardId,
       toHitTotal: 20,
       damageTotal: p.damage?.total,
+      damageRollId: p.damage?.rollId ?? null,
       targets: [{ targetId: elite.id, hit: true, multiplier: "normal" }],
       public: true,
     });

@@ -1,7 +1,11 @@
 // Test support for combat-tracker: the scenes seed (two campaigns, players, goblin + wolf, Mira,
 // Thorn) plus "Elite Goblin Warrior" and a battlemap like CBT §13's `combat` bundle: Mira,
 // Goblin, Goblin 2 visible; Wolf, Elite hidden; Thorn.
-import type { CombatantRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
+import {
+  type CombatantRecord,
+  DamageCardPayload,
+  type EncounterRecord,
+} from "@shared/combat-tracker/schemas";
 import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import { asc, eq } from "drizzle-orm";
 import { combatant } from "../../db/schema";
@@ -11,6 +15,14 @@ import { createScene, placeToken } from "../scenes-map/commands";
 import { scenesSetup } from "../scenes-map/testing";
 import { createEncounter } from "./encounters";
 import { toCombatantRecord } from "./rows";
+
+/**
+ * FR-CBT-94 (sprint 5): the card's damage `rollId` as `cbt.applyCard` must name it (null = none
+ * yet), from a card row or a client store's notification record.
+ */
+export const damageRollIdOf = (card: unknown): string | null =>
+  DamageCardPayload.parse((card as { payload?: unknown } | undefined)?.payload).damage?.rollId ??
+  null;
 
 export const eliteBlock = {
   ...goblinBlock,

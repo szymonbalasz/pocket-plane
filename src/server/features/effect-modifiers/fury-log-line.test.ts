@@ -169,6 +169,7 @@ describe("FR-MOD-57 Divine Fury line in the combat log", () => {
       cardId: elite,
       toHitTotal: p.toHit?.total,
       damageTotal: p.damage?.total,
+      damageRollId: p.damage?.rollId ?? null,
       public: true,
       targets: [
         { targetId: t.id("Thorn"), hit: true, multiplier: "normal", triggers: [{ triggerId: ma }] },

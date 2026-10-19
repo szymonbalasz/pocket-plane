@@ -75,6 +75,7 @@ function flameTongue(o: { rage?: boolean; ward?: boolean } = {}) {
       cardId,
       ...(p.toHit ? { toHitTotal: p.toHit.total } : {}),
       damageTotal: p.damage?.total ?? 0,
+      damageRollId: p.damage?.rollId ?? null,
       targets,
       ...more,
     });
@@ -164,6 +165,8 @@ describe("FR-CBT-81 card parts", () => {
     expect(r).toMatchObject({ cardId, attached: true });
     expect(t.note(cardId)?.text).toBe("Brakka: 22 to hit, 13 slashing + 9 fire");
     expect(r.rollIds).toContain(t.card(cardId).damage?.extra?.[0]?.rollId as string);
+    // FR-CBT-92 (sprint 5): while that completed card is pending, a second roll is unused.
+    t.run("note.dismiss", { id: cardId });
     const only = t.seeded<RollDamageResult>(
       rollDamageCommand.name,
       { attackerId: t.id("Brakka"), attackId: t.attackId },

@@ -275,6 +275,7 @@ describe("FR-MOD-24/25 target side at apply (tier 2)", () => {
       cardId: r.cardId,
       toHitTotal,
       damageTotal: p.damage?.total,
+      damageRollId: p.damage?.rollId ?? null,
       targets: [{ targetId: t.id(target), hit, multiplier: "normal" }],
     });
     const row = t.hpRows().at(-1) as HpChangeRecord;

@@ -13,6 +13,11 @@ export interface SetupStep {
   command: string;
   /** A function input may be async; the loader awaits it before running the command. */
   input: unknown | ((refs: Refs) => unknown | Promise<unknown>);
+  /**
+   * The player who sends it: a loaded fixture's key whose `player` record is the actor (e.g.
+   * `"player-1"`); absent = the DM (CBT §13.1 `late-hit-ruled`: "as player-1").
+   */
+  as?: string;
 }
 
 interface FixtureBase {
@@ -53,8 +58,9 @@ export interface FixtureLibrary {
 export function step<C extends CommandDef>(
   command: C,
   input: z.input<C["input"]> | ((refs: Refs) => z.input<C["input"]> | Promise<z.input<C["input"]>>),
+  opts: { as?: string } = {},
 ): SetupStep {
-  return { command: command.name, input };
+  return { command: command.name, input, ...(opts.as !== undefined ? { as: opts.as } : {}) };
 }
 
 export const defineFixture = <F extends Fixture>(f: F): F => f;

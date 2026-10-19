@@ -111,7 +111,11 @@ describe("FR-CBT-81 / -82 / -84 combat parts", () => {
   });
 
   test("FR-CBT-82 apply input: extraTotals 0–999 and per-target extraMultipliers, ≤ 2 each; absent as before", () => {
-    const base = { cardId: "n", targets: [{ targetId: "g", hit: true, multiplier: "normal" }] };
+    const base = {
+      cardId: "n",
+      damageRollId: null,
+      targets: [{ targetId: "g", hit: true, multiplier: "normal" }],
+    };
     const ok = (v: unknown) => ApplyCardTargetsInput.safeParse(v).success;
     expect(ok(base)).toBe(true);
     expect(ok({ ...base, extraTotals: [8] })).toBe(true);

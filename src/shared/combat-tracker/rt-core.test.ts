@@ -156,6 +156,7 @@ describe("R0 combat schema fields (FR-MOD-37, -38, -48)", () => {
       cardId: "c",
       toHitTotal: 22,
       damageTotal: 14,
+      damageRollId: "r2",
       targets: [
         t("g1", true, [{ triggerId: "trg", value: 9, multiplier: "half", force: true }]),
         t("g2", true),

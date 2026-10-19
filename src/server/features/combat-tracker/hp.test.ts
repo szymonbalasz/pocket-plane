@@ -18,7 +18,7 @@ import { attackCommand } from "./attack";
 import { applyCard, applyHp, undoCommand } from "./hp";
 import { setInitiative, setRemoved } from "./initiative";
 import { endCommand, startCommand } from "./lifecycle";
-import { combatSetup, eliteBlock } from "./testing";
+import { combatSetup, damageRollIdOf, eliteBlock } from "./testing";
 
 function started() {
   const t = combatSetup();
@@ -48,6 +48,7 @@ function started() {
       cardId,
       toHitTotal: p.toHit.total,
       damageTotal: p.damage.total,
+      damageRollId: p.damage.rollId,
       targets: targets.map((x) => {
         const [name, per] = typeof x === "string" ? [x, {}] : x;
         return { targetId: id(name), hit, multiplier, ...per };
@@ -314,6 +315,7 @@ describe("FR-CBT-34 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
           cardId: r2.cardId,
           toHitTotal: 1,
           damageTotal: 1,
+          damageRollId: damageRollIdOf(t.card(r2.cardId)),
           targets: [{ targetId: "nope", hit: true, multiplier: "normal" }],
         }),
       ).code,
@@ -328,6 +330,7 @@ describe("FR-CBT-34 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
           cardId: other.id,
           toHitTotal: 1,
           damageTotal: 1,
+          damageRollId: null,
           targets: [{ targetId: t.id("Goblin"), hit: true, multiplier: "normal" }],
         }),
       ).code,
