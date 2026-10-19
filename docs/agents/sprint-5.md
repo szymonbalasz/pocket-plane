@@ -48,6 +48,9 @@ DM notes in brackets ([#250](../decisions-log.md)). "sim-8" = the [session-sim-8
 | 2026-10-19 | Merged: **Add to party** (Compendium → an item → Add to party, with a quantity) and the player-colour core (colours stored; the picker and map colours come next) [#267](../decisions-log.md) |
 | 2026-10-19 | Merged: **Loot tab** in the Party window (right of Inventory); the old Party loot window and the Coin button are gone [#268](../decisions-log.md) |
 | 2026-10-19 | Merged: **compendium images** — a homebrew entry takes up to 4 images (upload, drag in, paste); gallery + lightbox for you and players who can see the entry [#269](../decisions-log.md) |
+| 2026-10-19 | Merged: **Initiative chips** — Divine Fury no longer hides behind Rage (trigger chips shrink to icons, rows wrap instead of cutting names); one Invisible item in your token menu; Effect… never picks a hidden monster as the source [#271](../decisions-log.md) |
+| 2026-10-19 | Merged: **combat log wording** — "— DM ruled hit.", Rage shown once, "+ 10 piercing (Sneak Attack)" [#272](../decisions-log.md) |
+| 2026-10-19 | Merged: **Fit keeps every token visible** with the Game log, Initiative and Scenes open (cells may go down to 24 px; else PCs first) [#273](../decisions-log.md) |
 
 ## Check `main` any time (DM)
 

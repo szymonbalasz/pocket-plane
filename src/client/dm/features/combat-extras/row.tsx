@@ -207,14 +207,17 @@ function SafeSub({ trigger, children }: { trigger: ReactNode; children: ReactNod
 
 /**
  * FR-CBTX-35 / -33: Conditions ▸ — 15 toggles over `targets` (checked when all have it; toggling
- * on adds to all, off ends each one's); exhaustion has a level submenu.
+ * on adds to all, off ends each one's); exhaustion has a level submenu. `omit`: conditions left
+ * out (the token menu's Invisible, FR-CBTX-56).
  */
 export function ConditionsMenu({
   targets,
   testId,
+  omit = [],
 }: {
   targets: { target: Target; effects: EffectView[] }[];
   testId: string;
+  omit?: readonly Condition[];
 }) {
   const { send, disabled } = useCbtIntent();
   const has = (k: Condition) =>
@@ -240,7 +243,7 @@ export function ConditionsMenu({
         </DropdownMenuSubTrigger>
       }
     >
-      {CONDITIONS.map((k) => {
+      {CONDITIONS.filter((k) => !omit.includes(k)).map((k) => {
         const Icon = conditionIcon(k);
         const all = has(k).every(Boolean);
         if (k === "exhaustion") {

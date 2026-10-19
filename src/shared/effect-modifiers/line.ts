@@ -73,7 +73,8 @@ export function partDiceView(
 
 /**
  * Segments after the base dice and constant; `dm` = `dmPayload` names, same index. FR-MOD-57: a
- * part with per-die values shows its dice (`partDiceView`).
+ * part with per-die values shows its dice (`partDiceView`). A rolled part's (`expression`) value
+ * is `numeric`, so a held line blanks it (FR-DICE-40).
  */
 export function modSegments(
   mods: readonly RollModPart[] | undefined,
@@ -84,9 +85,10 @@ export function modSegments(
     const label = named ?? DM_PART_LABEL;
     // A part players read as "(DM)" shows its value only (rulings B4).
     const dice = partDiceView(named === null ? {} : m, m.value, label);
+    const value = m.expression ? { ...dice.value, numeric: true as const } : dice.value;
     const out: LineSegment[] = [
       { text: m.value < 0 ? " − " : " + " },
-      dice.value,
+      value,
       { text: ` ${label}`, style: "muted" },
     ];
     if (m.auto) out.push({ text: ` ${AUTO_PART_TEXT}`, style: "muted" });

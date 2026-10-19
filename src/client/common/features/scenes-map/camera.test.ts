@@ -3,17 +3,22 @@ import type { TokenSize } from "@shared/scenes-map/schemas";
 import { freeArea, freeAreas } from "../play-shell/free-area";
 import { defaultRect, type Rect, workArea } from "../play-shell/geometry";
 import {
+  APPEARANCE_REFIT_MAX_WAITS,
+  allClear,
   type Box,
   bestFreeRect,
   type Camera,
   type CameraMode,
   cameraOn,
   contentBox,
+  createAppearanceRefit,
   createResizeRefit,
   FIT_MARGIN,
   FIT_MIN_CELL_PX,
   fitCamera,
   fitContent,
+  fitScene,
+  fitVisible,
   footprintBox,
   RESIZE_REFIT_MS,
   type Timers,
@@ -738,5 +743,214 @@ describe("FR-MAP-58 best free rectangle", () => {
     expect(cam.floor).toBe(true);
     if (!pcs) throw new Error("no PCs");
     expect(inside(cam, pcs, rect)).toBe(true);
+  });
+});
+
+describe("FR-MAP-59 every token visible (fitVisible)", () => {
+  const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
+
+  test("FR-MAP-59 every token visible: step 1 already clear → step 1 unchanged (no needless shrink)", () => {
+    const from = { x: 100, y: 80, scale: 1 };
+    const tokens = [box(0, 0, 70, 70), box(140, 70, 70, 70)];
+    const area = box(84, 64, 1000, 600);
+    const obstacles = [box(600, 64, 300, 300)];
+    expect(fitVisible(tokens, obstacles, area, from, 70)).toEqual({ ...from, visible: "all" });
+  });
+
+  test("FR-MAP-59 every token visible: a pocket bounded by edges of two different forbidden rectangles is found (review #16)", () => {
+    // One 50-px token at scale 1; two windows in an L. Step 1's pan (10, 10) is under both.
+    // Forbidden pans: (−50, 100) × (−50, 50) and (−50, 50) × (−50, 100); the nearest allowed
+    // pan is the L's inner corner: x from the second rectangle, y from the first.
+    const tokens = [box(0, 0, 50, 50)];
+    const obstacles = [box(0, 0, 100, 50), box(0, 0, 50, 100)];
+    const area = box(0, 0, 250, 250);
+    const from = { x: 10, y: 10, scale: 1 };
+    expect(fitVisible(tokens, obstacles, area, from, 50)).toEqual({
+      x: 50,
+      y: 50,
+      scale: 1,
+      visible: "all",
+    });
+  });
+
+  /**
+   * A feasibility gap: tokens in cols 0 and 4 of a 100-px grid, a full-height window 144 px wide
+   * at x 200, the area 394 px wide. The window fits between the tokens (3 cells ≥ 144 px) from
+   * 48 to 50 px; right of both tokens only up to 40 px (5 cells ≤ 200 px). So: allowed at 40,
+   * not at 44, allowed at 48 (and 49, 50), not at 51.
+   */
+  const gap = {
+    tokens: [box(0, 0, 100, 100), box(400, 0, 100, 100)],
+    obstacles: [box(200, 0, 144, 1000)],
+    area: box(0, 0, 394, 1000),
+  };
+
+  test("FR-MAP-59 every token visible: feasibility gap (allowed at 40, not at 44, allowed at 48): from 60 px → 48 is the first 4-px step allowed, refined to 50 (51 not allowed)", () => {
+    const { tokens, obstacles, area } = gap;
+    // 60, 56, 52 → none; 48 → allowed; refine 51 (no), 50 (yes): the largest allowed wins.
+    expect(fitVisible(tokens, obstacles, area, { x: 0, y: 0, scale: 0.6 }, 100)).toEqual({
+      x: 144,
+      y: 0,
+      scale: 0.5,
+      visible: "all",
+    });
+  });
+
+  test("FR-MAP-59 every token visible: feasibility gap from 44 px → 40 (44 not allowed; the method never steps back up to 48)", () => {
+    const { tokens, obstacles, area } = gap;
+    expect(fitVisible(tokens, obstacles, area, { x: 0, y: 0, scale: 0.44 }, 100)).toEqual({
+      x: 0,
+      y: 0,
+      scale: 0.4,
+      visible: "all",
+    });
+  });
+
+  test("FR-MAP-59 every token visible: the map's top row stays at or below the top bar (FR-MAP-44): a clear step 1 above it searches; the nearest pan above it is out of range", () => {
+    // Step 1 (y 4) clears the window but cuts the map's top row: the search keeps y ≥ 48.
+    const tokens = [box(0, 140, 70, 70)];
+    const area = box(0, 0, 1000, 600);
+    const obstacles = [box(0, 300, 1000, 300)];
+    const from = { x: 100, y: 4, scale: 1 };
+    expect(fitVisible(tokens, obstacles, area, from, 70)).toEqual({ ...from, visible: "all" });
+    const r = fitVisible(tokens, obstacles, area, from, 70, 48);
+    expect(r).toEqual({ x: 100, y: 48, scale: 1, visible: "all" });
+    // A token pushed up against the bound: nothing allowed at any scale → pcs.
+    const low = [box(0, 0, 70, 70), box(0, 840, 70, 70)];
+    const stuck = fitVisible(low, [box(0, 200, 1000, 400)], area, from, 70, 48);
+    expect(stuck).toEqual({ ...from, visible: "pcs" });
+  });
+
+  test("FR-MAP-59 every token visible: a token boxed in by windows at every scale → pcs = step 1's result", () => {
+    const tokens = [box(0, 0, 70, 70), box(700, 0, 70, 70)];
+    const area = box(84, 64, 1000, 600);
+    // A window across the middle of the area: the two tokens (10 cells apart) never both clear it.
+    const obstacles = [box(300, 64, 600, 600)];
+    const from = { x: 100, y: 100, scale: 48 / 70 };
+    expect(fitVisible(tokens, obstacles, area, from, 70)).toEqual({ ...from, visible: "pcs" });
+  });
+
+  test("FR-MAP-59 every token visible: more than 30 tokens or 6 obstacles → pcs without search", () => {
+    const area = box(0, 0, 1000, 600);
+    const from = { x: 0, y: 0, scale: 1 };
+    // Token 0 under a small window at step 1; a short pan clears it.
+    const tokens = (n: number) =>
+      Array.from({ length: n }, (_, i) => box((i % 10) * 20, Math.floor(i / 10) * 20, 10, 10));
+    const blocker = box(5, 0, 10, 10);
+    const windows = (n: number) =>
+      Array.from({ length: n }, (_, i) => box(500, 300 + i * 10, 5, 5));
+    expect(fitVisible(tokens(30), [blocker], area, from, 30).visible).toBe("all");
+    expect(fitVisible(tokens(31), [blocker], area, from, 30)).toEqual({ ...from, visible: "pcs" });
+    expect(fitVisible(tokens(1), [blocker, ...windows(5)], area, from, 30).visible).toBe("all");
+    const seven = [blocker, ...windows(6)];
+    expect(fitVisible(tokens(1), seven, area, from, 30)).toEqual({ ...from, visible: "pcs" });
+    // Windows outside the area don't count toward the bound.
+    const outside = Array.from({ length: 6 }, (_, i) => box(2000 + i * 10, 0, 5, 5));
+    expect(fitVisible(tokens(1), [blocker, ...outside], area, from, 30).visible).toBe("all");
+  });
+
+  test("FR-MAP-59 every token visible: determinism (same input → same camera; window order doesn't matter)", () => {
+    const tokens = [box(0, 0, 70, 70), box(350, 140, 70, 70), box(700, 420, 140, 140)];
+    const area = box(84, 64, 1196, 592);
+    const obstacles = [box(68, 484, 690, 160), box(868, 60, 400, 500), box(462, 100, 356, 238)];
+    const from = { x: 200, y: 70, scale: 48 / 70 };
+    const a = fitVisible(tokens, obstacles, area, from, 70);
+    expect(fitVisible(tokens, obstacles, area, from, 70)).toEqual(a);
+    expect(fitVisible(tokens, [...obstacles].reverse(), area, from, 70)).toEqual(a);
+    expect(a.visible).toBe("all");
+    expect(allClear(a, tokens, obstacles, area)).toBe(true);
+    const cell = a.scale * 70;
+    expect(Math.abs(cell - Math.round(cell))).toBeLessThan(1e-9);
+  });
+
+  test("FR-MAP-59 every token visible: fitScene with nothing in the way = today's fit (fitContent)", () => {
+    const vp = { w: 1440, h: 900 };
+    const tokens = [
+      { ...tok(2, 7), pc: true },
+      { ...tok(12, 6), pc: false },
+    ];
+    const areas = freeAreas([], vp);
+    const room = { areas, obstacles: [], windowsOnly: areas };
+    const fit = fitScene(tokens, GRID, MAP, vp, room);
+    const pcs = footprintBox([tok(2, 7)], GRID);
+    const rect = areas[0] as Rect;
+    const today = fitContent(contentBox(tokens, GRID, MAP), rect, MAP, workArea(vp), 70, pcs);
+    expect({ x: fit.x, y: fit.y, scale: fit.scale, floor: fit.floor }).toEqual(today);
+    expect(fit.visible).toBe("all");
+  });
+});
+
+describe("FR-MAP-61 appearance refit", () => {
+  /** Fake animation frames: `tick()` runs the callbacks queued so far. */
+  function fakeFrames() {
+    let queue = new Map<number, () => void>();
+    let next = 1;
+    return {
+      request: (fn: () => void) => {
+        queue.set(next, fn);
+        return next++;
+      },
+      cancel: (h: unknown) => {
+        queue.delete(h as number);
+      },
+      tick() {
+        const run = [...queue.values()];
+        queue = new Map();
+        for (const fn of run) fn();
+      },
+      pending: () => queue.size,
+    };
+  }
+
+  test("FR-MAP-61 appearance refit: a frame that starts an encounter and creates a visible token while fitted → the refit's content includes it", () => {
+    const frames = fakeFrames();
+    // The canvas's inputs as the refit reads them; Start's token reaches the canvas after the
+    // availability tick that counted the appearance.
+    let tokens = [tok(2, 7), tok(12, 6)];
+    const ogre = tok(18, 6, "large");
+    const boxes: Box[] = [];
+    const refit = createAppearanceRefit(() => boxes.push(contentBox(tokens, GRID, MAP)), frames);
+    refit.appearance();
+    tokens = [...tokens, ogre];
+    refit.applied();
+    frames.tick();
+    expect(boxes).toEqual([contentBox([tok(2, 7), tok(12, 6), ogre], GRID, MAP)]);
+    // The ogre's cols 18–19 (+ the 1-cell pad, cut at the map) are in the content box.
+    expect((boxes[0]?.x ?? 0) + (boxes[0]?.w ?? 0)).toBe(MAP.w);
+    expect(frames.pending()).toBe(0);
+  });
+
+  test("FR-MAP-61 appearance refit: one refit per appearance; changes with nothing pending don't refit; waits are capped", () => {
+    const frames = fakeFrames();
+    let runs = 0;
+    const refit = createAppearanceRefit(() => {
+      runs += 1;
+    }, frames);
+    refit.applied();
+    frames.tick();
+    expect(runs).toBe(0);
+    refit.appearance();
+    refit.applied();
+    refit.applied();
+    frames.tick();
+    expect(runs).toBe(1);
+    // A canvas that never settles: the refit still runs after the capped waits.
+    refit.appearance();
+    for (let i = 0; i < APPEARANCE_REFIT_MAX_WAITS; i++) {
+      refit.applied();
+      expect(runs).toBe(1);
+    }
+    refit.applied(); // over the cap: no more waiting
+    frames.tick();
+    expect(runs).toBe(2);
+    refit.appearance();
+    refit.dispose();
+    frames.tick();
+    expect(runs).toBe(2);
+  });
+
+  test("FR-MAP-61 appearance refit: a moved camera never refits", () => {
+    expect(cameraOn("moved", "appearance")).toEqual({ mode: "moved", fit: false });
+    expect(cameraOn("fitted", "appearance")).toEqual({ mode: "fitted", fit: true });
   });
 });

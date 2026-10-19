@@ -1,8 +1,8 @@
 // Rule-trigger parts in combat's text (FR-MOD-40, -47, -48; MOD §7 "Card and toast", "Roll
 // lines"). Card: offered parts after the damage, named (the card's audience is the owner or the
 // DM): "Brakka: 17 to hit, 12 slashing (+ 6 radiant Divine Fury on a hit)". Outcome line: each
-// landed part after the weapon damage, typed when its type differs: "+ 6 radiant (Divine Fury)",
-// an untyped one like a roll part "+ 9 Martial Advantage"; a non-public trigger's label reads
+// landed part after the weapon damage, always typed (FR-MOD-62): "+ 6 radiant (Divine Fury)",
+// one with neither its own nor the attack's type like a roll part "+ 9 Martial Advantage"; a non-public trigger's label reads
 // "(DM)" for players, the DM's line names it, with "(DM set; rolled 7)" / "(DM ruled)". Pure.
 // FR-MOD-57 (sprint 4): a part's dice follow it as die segments (seams S8 / rulings B5, B9).
 import type { LineSegment } from "@shared/dice-roll-log/kind-types";
@@ -67,7 +67,7 @@ export const offeredDieLabel = (label: string) => `${label} (on a hit)`;
  * a server-rolled part of a physical roll. FR-MOD-57: each part's dice (the payload's, which
  * every viewer of the roll gets) follow it, `offered: true` (dashed, never struck: whether the
  * offer landed shows only on the outcome line): " (+ 6 radiant Divine Fury (1d6+2: 4 + 2) on a
- * hit)".
+ * hit)". Each value is `numeric` (blanked on a held line, FR-DICE-40).
  */
 export function rollOfferSegments(
   offered: readonly RollOfferView[] | undefined,
@@ -75,10 +75,10 @@ export function rollOfferSegments(
 ): LineSegment[] {
   if (!offered?.length) return [];
   const out: LineSegment[] = [];
-  // Plain text runs merge, so a line without dice reads as one muted segment, as before.
+  // Plain text runs merge (never into a die or a part's value: a held line blanks those).
   const text = (t: string) => {
     const last = out[out.length - 1];
-    if (last && !last.die) last.text += t;
+    if (last && !last.die && !last.numeric) last.text += t;
     else out.push({ text: t, style: "muted" });
   };
   text(" (");
@@ -88,8 +88,8 @@ export function rollOfferSegments(
     // A part players read as "(DM)" shows its value only (rulings B4).
     const dice = partDiceView(named === null ? {} : o, o.value, offeredDieLabel(label), true);
     text(`${i > 0 ? ", " : ""}+ `);
-    if (dice.value.die) out.push({ ...dice.value, style: "muted" });
-    else text(dice.value.text);
+    // The value is rolled (FR-DICE-40: `numeric`, "…" while the line is held).
+    out.push({ ...dice.value, style: "muted", numeric: true });
     text(`${o.type ? ` ${o.type}` : ""} ${label}${o.auto ? ` ${AUTO_PART_TEXT}` : ""}`);
     out.push(...dice.after);
   });
@@ -122,9 +122,10 @@ export interface LineDmPartView {
 }
 
 /**
- * Segments of the parts after the weapon damage: " + 6 radiant (Divine Fury)" (typed: its type
- * differs from the attack's), " + 9 Martial Advantage" (untyped), " + 9 (DM)" (non-public, for
- * players); then the part's own multiplier; the DM's line names every part and adds " (DM set;
+ * Segments of the parts after the weapon damage: " + 6 radiant (Divine Fury)", " + 10 piercing
+ * (Sneak Attack)" (FR-MOD-62: always typed, the part's type else the attack's), " + 9 Martial
+ * Advantage" (neither typed), " + 9 slashing (DM)" (non-public, for players); then the part's own
+ * multiplier; the DM's line names every part and adds " (DM set;
  * rolled 7)" after an edited value and " (DM ruled)" after a forced charge. FR-MOD-57: then the
  * part's dice, labelled with its name: " (1d6+2: 4 + 2)", from `dm` on the DM's line (`dm`
  * given) and from the part on players' (built only from `payload` / `dmPayload`, rulings B4).
@@ -137,13 +138,13 @@ export function linePartSegments(
   return (parts ?? []).flatMap((p, i) => {
     const d = dm?.[i];
     const label = d?.label ?? p.label;
-    const typed = p.type !== null && p.type !== damageType;
+    const type = p.type ?? damageType;
     // Players' dice come from the part (payload), the DM's from `dm` (rulings B4).
     const dice = label === null ? null : partDiceView(d?.dice ? d : p, p.value, label);
     const out: LineSegment[] = [{ text: " + " }, dice?.value ?? { text: String(p.value) }];
-    if (typed) out.push({ text: ` ${p.type}` });
+    if (type) out.push({ text: ` ${type}` });
     if (label === null) out.push({ text: ` ${DM_PART_LABEL}`, style: "muted" });
-    else out.push({ text: typed ? ` (${label})` : ` ${label}`, style: "muted" });
+    else out.push({ text: type ? ` (${label})` : ` ${label}`, style: "muted" });
     if (p.multiplier) out.push({ text: MULT_TEXT[p.multiplier] });
     if (d?.set) out.push({ text: ` (DM set; rolled ${d.rolled})`, style: "muted" });
     if (d?.forced) out.push({ text: " (DM ruled)", style: "muted" });

@@ -617,8 +617,9 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
               Hit applied
             </Badge>
           ) : (
+            // A damage-only card has no to-hit (§7): its header says what it shows.
             <span data-testid="cbt-popup-step" data-value={step} className="sr-only">
-              To-hit step
+              {shape === "damage" ? "Damage only, no to-hit" : "To-hit step"}
             </span>
           )}
         </div>

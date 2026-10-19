@@ -3,6 +3,8 @@
 // encounter runs. They act on every selected token of the same kind if the right-clicked one is
 // in the selection, else on it alone (FR-MAP-31). Sprint 2 (FR-CBTX-45): Link to ‹Goblin 6›
 // (submenu if several) on an unbound token; Unlink from combat on a bound one (this token only).
+// Sprint 5 (FR-CBTX-56): Conditions ▸ here has no Invisible; fog's item is the one.
+import type { Condition } from "@shared/combat-extras/conditions";
 import { CBTX_INTENTS } from "@shared/combat-extras/intents";
 import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
 import type { TokenRecord } from "@shared/scenes-map/schemas";
@@ -49,6 +51,12 @@ function useTargets(token: TokenRecord): CombatantView[] {
   return bound.some((c) => c.tokenId === token.id) ? bound : [];
 }
 
+/**
+ * FR-CBTX-56 (OQ-CBTX-29 A): the token menu's one "Invisible" is fog's token state (FR-FOG-59);
+ * the condition stays on Initiative rows, in Effect… and on the sheet (#210: not coupled).
+ */
+export const TOKEN_MENU_OMIT: readonly Condition[] = ["invisible"];
+
 export const cbtxTokenMenu: readonly TokenMenuEntry[] = [
   {
     id: "cbtx.conditions",
@@ -67,6 +75,7 @@ export const cbtxTokenMenu: readonly TokenMenuEntry[] = [
               effects: effectsOn(fx, creatureOf(c)),
             }))}
             testId="cbtx-token-menu-conditions"
+            omit={TOKEN_MENU_OMIT}
           />
         </>
       );

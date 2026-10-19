@@ -1883,9 +1883,40 @@ From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-49–
 - **Derived:** the view's main image = `imageAssetIds[0]`; the lightbox index is local UI state.
 - **Fixtures:** none new (`cmp-images`, §68). **Snapshot size** (CON-44): +0 B per viewer (no record; attachments are outside the `asset` record type).
 
-## 74. Sprint 5: popup line (D11)
+## 74. Sprint 5: Initiative trigger chips, Effect… source, one Invisible (W4)
 
-From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-46, -47. **Built by `build/popup-line`**: client only; no table, column, record type, event, intent or payload change. Protocol side: [protocol §95](../protocol/README.md#95-sprint-5-popup-line-d11).
+From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-54–56 and [fog-of-war](../specs/fog-of-war.md) FR-FOG-59. **Built by `fix/init-chips-effect`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent. Protocol side: [protocol §95](../protocol/README.md#95-sprint-5-initiative-trigger-chips-effect-source-one-invisible-w4).
+
+| Piece | Kind | Contents | Visibility | Source |
+|---|---|---|---|---|
+| Chip row fit | derived per render | `fitChipRow` → effect chips shown, tier, icon-only triggers, second line | each client its own rows (players: what FR-MOD-55 sends) | FR-CBTX-54 |
+| Second-line hold | client memory, per row | the name line's width when the row wrapped | — | FR-CBTX-54 |
+| Effect… default source | derived on open | `defaultEffectSource(rows, turnCombatantId, targets)` → id + `turn` \| `target` \| `none` | DM only | FR-CBTX-55 |
+
+## 75. Sprint 5: combat log wording (R2)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-95, -96 and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) FR-MOD-62. **Built by `fix/combat-lines`**: no table, column, record type or payload change; `cbt.attack` lines render differently from the same stored `payload` / `dmPayload` (old rows included). Protocol side: [protocol §96](../protocol/README.md#96-sprint-5-combat-log-wording-r2).
+
+- **Derived (line text):** the ruling's full stop; the DM's damage parts (`dmPayload.mods.damage`) inside the base part's muted run; a trigger part's type word = `parts[].type` ?? `damageType`.
+- **Fixtures:** none new (`rules-effects` holds every unit L12–L14 needs).
+- **Snapshot size** (CON-44): 0 B stored; rendered text grows by ≤ 12 B per trigger part (MOD §12).
+
+## 76. Sprint 5: Fit keeps every token visible (W2)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-59, -61. **Built by `fix/map-fit-visible`**: no table, column, record type or payload change. Protocol side: [protocol §97](../protocol/README.md#97-sprint-5-fit-keeps-every-token-visible-w2).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Fit obstacles | derived per render (`MapCanvas`) | rendered open windows + this client's toast box (`fitObstacles`); tool bars never count | [FR-MAP-59](../specs/scenes-map.md#6-functional-requirements) |
+| Fit outcome | client memory, per canvas | `all` \| `pcs` of the last fit (`data-fit-visible`); never stored or sent | FR-MAP-59 |
+| Pending appearance refit | client memory, per canvas | one animation-frame handle + wait count (≤ 10) | [FR-MAP-61](../specs/scenes-map.md#6-functional-requirements) |
+
+- **Fixtures:** no new unit. `windows-s5` (`session-sim-8` + `win-layout`) has every token the W5 / W10 steps fit; `session-sim-9` needs nothing extra (sim-8's tokens; sim-9 creates "Crypt" live).
+- **Snapshot size** (CON-44): 0 B.
+
+## 77. Sprint 5: popup line (D11)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-46, -47. **Built by `build/popup-line`**: client only; no table, column, record type, event, intent or payload change. Protocol side: [protocol §98](../protocol/README.md#98-sprint-5-popup-line-d11).
 
 - **Client memory** (`dice-extras/popups.ts`): a popup's `stills` are now per die key (`{[dieKey]: 2D canvas}`, the hand-off's upright copies; was per part). The cell registry (`registerPopupCell`) maps popup id → die key / "+N" → element. Never stored or sent.
 - **Derived (never stored):** the line (`popupLine`: cells, lines, "+N" with its entry), the card height (`popupHeight`), how many popups fit (`popupsThatFit`), each die's upright turn (`uprightTurn`).
