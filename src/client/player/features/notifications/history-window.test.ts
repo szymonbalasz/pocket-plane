@@ -22,12 +22,17 @@ test("FR-NOTE-31 history geometry: player def is 360×480, min 280×240, unshrun
   }
 });
 
-test("FR-NOTE-31 history geometry: opened on the default layout (player) it is 360×480 inside the work area at 1440×900 and 1280×720", () => {
-  for (const viewport of [
-    { w: 1440, h: 900 },
-    { w: 1280, h: 720 },
-  ]) {
+// Sprint 5 (FR-NOTE-31 as amended, FR-SHELL-45): 480 high where a clear slot allows, else the
+// tallest clear slot, never over the Game log: 472 at 1440×900 (the band above the 280-high log),
+// 412 at 1280×720; with Initiative open (combat) beside it.
+test("FR-NOTE-31 history geometry: opened on the default layout (player) it is 360 wide, 480 where a clear slot allows, else the tallest clear slot (412 at 1280×720), inside the work area", () => {
+  for (const [viewport, h, combat] of [
+    [{ w: 1440, h: 900 }, 472, true],
+    [{ w: 1440, h: 900 }, 472, false],
+    [{ w: 1280, h: 720 }, 412, true],
+  ] as const) {
     const all = new Set(playerWindows.defs.map((d) => d.kind));
+    if (!combat) all.delete("cbt.initiative");
     const ctx = { registry: playerWindows, viewport, available: all };
     const ws = [
       ...reduce(
@@ -39,7 +44,7 @@ test("FR-NOTE-31 history geometry: opened on the default layout (player) it is 3
     const w = ws.find((x) => x.kind === "note.history");
     if (!w) throw new Error("note.history not open");
     const r = clampRect(w, viewport);
-    expect({ w: r.w, h: r.h }).toEqual({ w: 360, h: 480 });
+    expect({ w: r.w, h: r.h }).toEqual({ w: 360, h });
     const a = usableArea(viewport);
     expect(r.y >= a.top && r.y + r.h <= a.bottom).toBe(true);
   }

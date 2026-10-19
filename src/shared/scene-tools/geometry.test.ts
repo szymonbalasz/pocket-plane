@@ -90,23 +90,7 @@ describe("FR-SCN-10 blocking", () => {
     expect(segmentsTouch([0, 0], [4, 0], [5, 0], [6, 0])).toBe(false);
   });
 
-  test("SCN §12 benchmark: 2,000 segments, p95 ≤ 1 ms per move", () => {
-    const walls: Wall[] = Array.from({ length: 2000 }, (_, i) => [
-      i + 1,
-      (i * 7) % 200,
-      (i * 13) % 140,
-      ((i * 7) % 200) + 1,
-      ((i * 13) % 140) + 2,
-    ]);
-    const times: number[] = [];
-    for (let i = 0; i < 200; i++) {
-      const t0 = performance.now();
-      blockingSegments(at(i % 200, 3), at((i * 3) % 200, 130), 1, walls, []);
-      times.push(performance.now() - t0);
-    }
-    times.sort((a, b) => a - b);
-    expect(times[Math.floor(times.length * 0.95)] as number).toBeLessThan(1);
-  });
+  // SCN §12 benchmark (2,000 segments, p95 ≤ 1 ms per move): ./geometry.bench.ts.
 });
 
 describe("FR-SCN-07 segments", () => {

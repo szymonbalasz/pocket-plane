@@ -102,6 +102,7 @@ describe("FR-MOD-15/16 cbt.attack and apply", () => {
         cardId: r.cardId,
         toHitTotal,
         damageTotal: p.damage?.total,
+        damageRollId: p.damage?.rollId ?? null,
         targets: [{ targetId: t.id("Mira"), hit: true, multiplier: "normal" }],
         public: true,
       });

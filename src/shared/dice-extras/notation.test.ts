@@ -84,14 +84,5 @@ describe("FR-DICEX-28 notation parser", () => {
     expect(splitNotation("")).toEqual([]);
   });
 
-  test("a 4,000-char note parses in < 1 ms", () => {
-    const chunk = "The ogre swings for 2d8 + 4 bludgeoning, then 1d6 more. ";
-    const text = chunk.repeat(Math.ceil(4000 / chunk.length)).slice(0, 4000);
-    findNotation(text); // warm-up (JIT)
-    const runs = 20;
-    const t0 = performance.now();
-    for (let i = 0; i < runs; i++) findNotation(text);
-    const per = (performance.now() - t0) / runs;
-    expect(per).toBeLessThan(1);
-  });
+  // "a 4,000-char note parses in < 1 ms": ./notation.bench.ts (`bun run bench`).
 });

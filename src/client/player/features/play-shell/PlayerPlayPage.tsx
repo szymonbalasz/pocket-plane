@@ -4,6 +4,7 @@
 import { PlayFrame } from "@ui/features/play-shell/PlayFrame";
 import { ShellProvider } from "@ui/features/play-shell/ShellContext";
 import { playerWindows } from "../../windows";
+import { PlayerPresentPopup } from "../party-board/present-popup";
 import { PlayerMapBase, PlayerMapToolRail } from "../scenes-map/PlayerMap";
 
 export function PlayerPlayPage({
@@ -24,6 +25,8 @@ export function PlayerPlayPage({
           toolRail={<PlayerMapToolRail />}
         />
       )}
+      {/* FR-PARTY-36: a handout the DM presents, over every window and toast (seams S4). */}
+      <PlayerPresentPopup />
     </ShellProvider>
   );
 }

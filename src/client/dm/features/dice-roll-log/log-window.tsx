@@ -9,7 +9,7 @@ import {
 import { Button } from "@ui/components/ui/button";
 import { Checkbox, Popover, PopoverContent, PopoverTrigger } from "@ui/components/ui/controls";
 import { GameLog } from "@ui/features/dice-roll-log/GameLog";
-import { diceLogWindowBase } from "@ui/features/dice-roll-log/window";
+import { diceLogWindowBase, logSize } from "@ui/features/dice-roll-log/window";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { useRecords, useSync } from "@ui/sync/store";
 import { SettingsIcon } from "lucide-react";
@@ -74,8 +74,10 @@ function DmLogBody() {
 export const dmDiceLogWindow = defineWindow({
   ...diceLogWindowBase,
   clients: ["dm"],
-  // DM: bottom-left, clear of the tool rail (map-first, #162; protocol §24).
-  defaultSize: { w: 460, h: 240 },
+  // DM: bottom-left, clear of the tool rail (map-first, #162; protocol §24); 1150×240 wide +
+  // tall, 690 / 160 below (FR-DICE-38); the sprint-4 460×240 migrates (FR-SHELL-53).
+  defaultSize: logSize({ w: 1150, h: 240 }),
+  previousDefaults: [{ w: 460, h: 240 }],
   defaultPosition: { anchor: "bottom-left", dx: 56 },
   component: DmLogBody,
 });

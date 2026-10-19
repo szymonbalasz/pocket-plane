@@ -242,6 +242,13 @@ function HomebrewForm({ api, mode, close }: { api: Api; mode: FormMode; close():
         entry: draftOf(f) as Parameters<typeof putEntry>[2]["entry"],
         shared: f.shared,
         derivedFromId: mode.kind === "clone" ? mode.base.id : null,
+        // Kept from the source until the form shows slots (FR-CMP-49, -50).
+        imageAssetIds:
+          mode.kind === "edit"
+            ? mode.entry.imageAssetIds
+            : mode.kind === "clone"
+              ? mode.base.imageAssetIds
+              : [],
       });
       toast.success(`Saved ${f.name.trim()}`);
       close();

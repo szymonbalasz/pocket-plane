@@ -119,6 +119,7 @@ describe("FR-CBT-52 DM attack roll line", () => {
       cardId: r.cardId,
       toHitTotal: p.toHit.total,
       damageTotal: p.damage.total,
+      damageRollId: p.damage.rollId,
       targets: [{ targetId: t.id("Mira"), hit: true, multiplier: "normal" }],
     });
     t.run(undoCommand.name, { expectedHpChangeId: res.hpChangeIds[0] });
@@ -148,6 +149,7 @@ describe("FR-CBT-53 outcome line detail", () => {
       cardId: r.cardId,
       toHitTotal: opts.toHitTotal ?? p.toHit.total,
       damageTotal: opts.damage ?? p.damage.total,
+      damageRollId: p.damage.rollId,
       targets: [{ targetId: t.id("Mira"), hit: opts.hit ?? true, multiplier: "normal" }],
     });
     const change = t.events[n]?.event.changes.find((c) => c.type === GAME_LOG_ENTRY_TYPE);

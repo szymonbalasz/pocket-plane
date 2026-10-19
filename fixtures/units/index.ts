@@ -22,9 +22,11 @@ import combatHit from "./combat-tracker/combat-hit";
 import combatPending from "./combat-tracker/combat-pending";
 import encounter1 from "./combat-tracker/encounter-1";
 import goblin2 from "./combat-tracker/goblin-2";
+import lateHitRuled from "./combat-tracker/late-hit-ruled";
 import thornBattlemap from "./combat-tracker/thorn-battlemap";
 import cmpHomebrew from "./compendium/cmp-homebrew";
 import cmpHomebrewSecond from "./compendium/cmp-homebrew-second";
+import cmpImages from "./compendium/cmp-images";
 import cmpSearchHomebrew from "./compendium/cmp-search-homebrew";
 import cmpSrdFull from "./compendium/cmp-srd-full";
 import cmpSrdMini from "./compendium/cmp-srd-mini";
@@ -73,6 +75,7 @@ import partySecond from "./party-board/party-second";
 import loot1 from "./party-loot/loot-1";
 import lootSecond from "./party-loot/loot-second";
 import lootWallets from "./party-loot/loot-wallets";
+import winLayout from "./play-shell/win-layout";
 import mtTemplates from "./scene-tools/mt-templates";
 import scnPropImages from "./scene-tools/scn-prop-images";
 import scnProps from "./scene-tools/scn-props";
@@ -166,6 +169,9 @@ export const units: readonly Fixture[] = [
   entArtTokens,
   cmpSrdMiniS3,
   artUpdateTokens,
+  winLayout,
   handoutAttachment,
   handoutPresent1,
+  lateHitRuled,
+  cmpImages,
 ];

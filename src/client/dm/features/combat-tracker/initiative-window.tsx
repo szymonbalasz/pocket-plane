@@ -12,11 +12,14 @@ import {
   skippedOnStep,
   unrolledMonsters,
 } from "@shared/combat-tracker/rules";
-import type {
-  CombatantView,
-  EncounterView,
-  TurnResult,
-  UndoResult,
+import {
+  COMBATANT_TYPE,
+  type CombatantView,
+  type EncounterView,
+  HIT_RULING_TYPE,
+  type HitRulingRecord,
+  type TurnResult,
+  type UndoResult,
 } from "@shared/combat-tracker/schemas";
 import type { RollMode } from "@shared/dice-roll-log/schemas";
 import type { RollSubject } from "@shared/effect-modifiers/schemas";
@@ -123,7 +126,7 @@ import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpDialog } from "./hp-dialog";
-import { isDamageCard, pendingRowText } from "./pending";
+import { damageCardRow, isDamageCard, pendingRowText } from "./pending";
 import { useCombatDialogs } from "./popup-store";
 import { rollKeys } from "./roll-keys";
 import { idleInitiativeOnLoad } from "./start-end";
@@ -770,21 +773,30 @@ const ANCHOR = "pointer-events-none size-0 overflow-hidden p-0 opacity-0";
 function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteActions }) {
   const openCard = useCombatDialogs((s) => s.openCard);
   const live = useSync((s) => s.state === "live");
+  const rulings = useRecords<HitRulingRecord>(HIT_RULING_TYPE);
+  const combatants = useRecords<CombatantView>(COMBATANT_TYPE);
   const view = dmNotificationViews.get(n.kind);
   if (isDamageCard(n)) {
+    // FR-CBT-89 (sprint 5): a ruled card reads "Mira: hit Goblin — waiting for damage".
+    const row = damageCardRow(
+      n,
+      rulings.find((r) => r.cardId === n.id),
+      (id) => combatants.find((c) => c.id === id)?.name,
+    );
     return (
       <li>
         {/* P3 glitch 10: the full text on hover when the row cuts it. */}
-        <Tooltip content={n.text}>
+        <Tooltip content={row.text}>
           <Button
             variant="outline"
             size="sm"
             data-testid="cbt-init-card"
             data-record-id={n.id}
+            data-step={row.step}
             className="w-full justify-start truncate"
             onClick={() => openCard(n.id)}
           >
-            <SwordIcon className="size-3.5" /> <span className="min-w-0 truncate">{n.text}</span>
+            <SwordIcon className="size-3.5" /> <span className="min-w-0 truncate">{row.text}</span>
           </Button>
         </Tooltip>
       </li>

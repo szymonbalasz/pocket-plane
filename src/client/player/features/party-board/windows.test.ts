@@ -1,6 +1,7 @@
 // FR-PARTY-11 / FR-PARTY-14 layout (seams S8) on the player registry: fit at 1280×720 / 1600×900;
-// open at an edge on the default layout, clear of the default-open windows (or, with no
-// full-size slot, at `minOpenH` on top, FR-NOTE-31 ruling).
+// open clear of the open windows on the default layout: an edge first, else beside an edge window
+// (FR-SHELL-45, -46); screen full → the least recently used launcher window is auto-minimised
+// (FR-SHELL-47).
 import { expect, test } from "bun:test";
 import { clampRect, type Rect, TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
@@ -46,32 +47,26 @@ test("FR-PARTY-11 FR-PARTY-14 Player party windows fit 1280×720 and keep their 
   }
 });
 
-test("FR-PARTY-11 Player board opens at the left edge, clear of the sheet and the log (or minOpenH on top at an edge)", () => {
+test("FR-PARTY-11 Player board opens clear of the sheet, the log and Initiative (an edge, else beside an edge window)", () => {
   for (const vp of SIZES) {
     const rects = openOnDefaults(["party.board"], vp);
     const r = rects.find((w) => w.kind === "party.board") as Rect & { kind: string };
     const hit = rects.filter((b) => b.kind !== "party.board" && overlaps(r, b)).map((b) => b.kind);
-    // A full-size or shorter (≥ min) free slot at the left edge; else `minOpenH` on top at the
-    // edge covering the least (1280×720).
-    if (hit.length > 0) {
-      expect([vp.w, r.h, ["left", "right"].includes(touchedEdge(r, vp) ?? "")]).toEqual([
-        vp.w,
-        400,
-        true,
-      ]);
-    } else {
-      expect([vp.w, touchedEdge(r, vp)]).toEqual([vp.w, "left"]);
-      expect(r.h).toBeGreaterThanOrEqual(360);
-    }
+    expect([vp.w, hit]).toEqual([vp.w, []]);
+    expect(touchedEdge(r, vp)).not.toBeNull();
+    expect(r.h).toBeGreaterThanOrEqual(360);
   }
 });
 
-test("FR-PARTY-14 Player viewer opens at an edge; on top at minOpenH where no full-size slot is free", () => {
+test("FR-PARTY-14 Player viewer opens clear of every open window (the board auto-minimised if the screen is full)", () => {
   for (const vp of SIZES) {
     const rects = openOnDefaults(["party.board", "party.handout"], vp);
     const r = rects.find((w) => w.kind === "party.handout") as Rect & { kind: string };
-    expect(touchedEdge(r, vp)).not.toBeNull();
-    expect(r.h).toBeGreaterThanOrEqual(400);
+    const hit = rects
+      .filter((b) => b.kind !== "party.handout" && overlaps(r, b))
+      .map((b) => b.kind);
+    expect([vp.w, hit]).toEqual([vp.w, []]);
+    expect(r.h).toBeGreaterThanOrEqual(320); // min size: the last resort at 1280×720
     expect(r.w).toBeGreaterThanOrEqual(360);
   }
 });

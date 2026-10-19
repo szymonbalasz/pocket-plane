@@ -2,6 +2,7 @@
 // (FR-SHELL-15/16). One per play page; survives waiting / reconnect screens.
 import { createStore, type StoreApi } from "zustand";
 import type { Rect, Viewport } from "./geometry";
+import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import {
   type Placed,
   placedAs,
@@ -12,6 +13,7 @@ import {
   type Windows,
   windowId,
 } from "./manager";
+import type { PlacementToken } from "./placement";
 import type { WindowRegistry } from "./registry";
 import type { LayoutStorage } from "./storage";
 
@@ -26,6 +28,11 @@ export interface ShellState {
    * layout to `settle` (FR-SHELL-40, -41); client memory only.
    */
   settling: ReadonlySet<string>;
+  /**
+   * Windows auto-minimised to make room (FR-SHELL-47, `data-auto-minimised`) until restored or
+   * closed; client memory only (a reload loads them plain `minimised`).
+   */
+  autoMinimised: ReadonlySet<string>;
 }
 
 export interface ShellController {
@@ -52,6 +59,7 @@ function nextPlaced(
   action: WindowAction,
   registry: WindowRegistry,
   vp: Viewport,
+  hard: readonly Rect[],
 ): ReadonlyMap<string, Placed> {
   const out = new Map<string, Placed>();
   for (const w of next) {
@@ -60,7 +68,7 @@ function nextPlaced(
     const def = registry.get(w.kind);
     const moved = action.type === "reset" || !before || !sameRect(before, w);
     if (action.type === "setRect" && moved) out.set(id, "stored");
-    else if (moved && def) out.set(id, placedAs(def, w, vp));
+    else if (moved && def) out.set(id, placedAs(def, w, vp, hard));
     else {
       const kept = prev.placed.get(id);
       if (kept) out.set(id, kept);
@@ -96,12 +104,35 @@ function nextSettling(
   return new Set(prev).add(id);
 }
 
+/**
+ * `autoMinimised` after a change: a window the change minimised that the action didn't name (it
+ * made room, FR-SHELL-47) is added; one no longer minimised is dropped.
+ */
+function nextAutoMinimised(
+  prev: ReadonlySet<string>,
+  before: Windows,
+  next: Windows,
+  action: WindowAction,
+): ReadonlySet<string> {
+  const named = action.type === "reset" ? null : windowId(action.kind, action.instance);
+  const out = new Set<string>();
+  for (const w of next) {
+    if (w.state !== "minimised") continue;
+    const id = windowId(w.kind, w.instance);
+    const b = before.find((p) => p.kind === w.kind && p.instance === w.instance);
+    if (prev.has(id) || (b?.state === "open" && id !== named)) out.add(id);
+  }
+  return out.size === prev.size && [...out].every((id) => prev.has(id)) ? prev : out;
+}
+
 export function createShellController(opts: {
   registry: WindowRegistry;
   storage: LayoutStorage;
   viewport: () => Viewport;
-  /** On-screen map token boxes auto placement covers the least of (FR-SHELL-40). */
-  avoid?: () => readonly Rect[];
+  /** On-screen map token boxes auto placement covers the least of (FR-SHELL-40, -45). */
+  avoid?: () => readonly PlacementToken[];
+  /** This client's keep-out regions (FR-SHELL-48); default `keepOuts(client, viewport)`. */
+  keepOuts?: (vp: Viewport) => readonly KeepOut[];
   /** Measured content heights of growing windows (FR-SHELL-39): placement never goes below them. */
   heights?: (id: string) => number | undefined;
   warn?: (msg: string) => void;
@@ -113,22 +144,33 @@ export function createShellController(opts: {
     windows: [],
     placed: new Map(),
     settling: new Set(),
+    autoMinimised: new Set(),
   }));
+  const regionsAt = (vp: Viewport) => opts.keepOuts?.(vp) ?? keepOuts(registry.client, vp);
   return {
     store,
     registry,
     restore(key) {
       if (store.getState().key === key) return;
       const vp = opts.viewport();
-      const r = restoreLayout(registry, storage.read(key), vp, opts.avoid?.() ?? []);
+      const regions = regionsAt(vp);
+      const r = restoreLayout(registry, storage.read(key), vp, opts.avoid?.() ?? [], regions);
       if (r.warning) warn(`play-shell: ${r.warning}; using the default layout`);
       const placed = new Map<string, Placed>();
       for (const w of r.windows) {
         const def = registry.get(w.kind);
-        const how = r.stored || !def ? "stored" : placedAs(def, w, vp);
+        const how = r.stored || !def ? "stored" : placedAs(def, w, vp, hardRects(regions));
         placed.set(windowId(w.kind, w.instance), how);
       }
-      store.setState({ key, windows: r.windows, placed, settling: new Set() });
+      store.setState({
+        key,
+        windows: r.windows,
+        placed,
+        settling: new Set(),
+        autoMinimised: new Set(),
+      });
+      // FR-SHELL-53: default-sized windows took this viewport's default; written with `area`.
+      if (r.migrated) storage.write(key, serialise(r.windows, registry));
     },
     dispatch(action, available) {
       const state = store.getState();
@@ -139,11 +181,13 @@ export function createShellController(opts: {
         return;
       }
       const viewport = opts.viewport();
+      const regions = regionsAt(viewport);
       const next = reduce(windows, action, {
         registry,
         viewport,
         available,
         avoid: opts.avoid,
+        keepOuts: () => regions,
         heights: opts.heights,
         placed: (id) => state.placed.get(id),
       });
@@ -154,8 +198,9 @@ export function createShellController(opts: {
       }
       store.setState({
         windows: next,
-        placed: nextPlaced(state, next, action, registry, viewport),
+        placed: nextPlaced(state, next, action, registry, viewport, hardRects(regions)),
         settling,
+        autoMinimised: nextAutoMinimised(state.autoMinimised, windows, next, action),
       });
       storage.write(key, serialise(next, registry));
     },

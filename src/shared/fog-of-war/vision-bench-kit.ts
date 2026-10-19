@@ -1,24 +1,26 @@
-// FOG §12 V0 benchmark = the V0 exit gate (FOG §12 "Target" table). Best of N after warm-up; the
-// numbers are logged for the build report. Caps = the true caps: 2,000 segments all within
-// r = 24 cells of every source, 100 fog + 20 darkness shapes, 200 tokens of 16 cells each,
-// 6 players × 4 sources. Typical = 150 walls, 12 fog shapes, 2 darkness shapes, PCs vision 30 ft /
-// darkvision 60 ft. caps-rooms: the same caps with the 2,000 segments as a room grid.
-import { describe, expect, test } from "bun:test";
+// Scenes for the FOG §12 vision benchmarks (timing: ../bench-kit). The ms gates (`*.bench.ts`) run only via
+// `bun run bench`, alone, so parallel suites can't skew them (BL-32); the size gates on the same
+// scenes stay in `bun test` (`vision-sizes.test.ts`).
+// V0 scenes: caps = the true caps: 2,000 segments all within r = 24 cells of every source, 100
+// fog + 20 darkness shapes, 200 tokens of 16 cells each, 6 players × 4 sources. Typical = 150
+// walls, 12 fog shapes, 2 darkness shapes, PCs vision 30 ft / darkvision 60 ft. caps-rooms: the
+// same caps with the 2,000 segments as a room grid.
+// Sprint-4 scene (r 199.8): 2,000 random walls on a 120 × 120 map + its edges, 100 fog + 20
+// darkness shapes, 200 tokens of 16 cells, 6 players × 4 sources each at its own origin (12 count
+// with party vision on, FR-FOG-52).
 import { type FogMask, uniformMask } from "./mask";
 import type { FogShapeOp, ShapeLike } from "./shapes";
 import {
+  NORMAL_SENSES,
   type PlayerVision,
-  playerVision,
   pointVisible,
   polygonCells,
-  prepareOccluders,
   prepareScene,
   prepareStaticLayer,
   type SamplePoint,
   type Seg,
   type Senses,
   samplePoint,
-  sightPolygon,
   type VisionSource,
 } from "./vision";
 
@@ -34,25 +36,12 @@ function rng(seed: number) {
 }
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
-/**
- * Fastest ms of `runs` timed calls after `warm` untimed ones. Best of N, not the median: load from
- * parallel suites only adds time, so the minimum is the load-tolerant cost estimate (BL-28).
- */
-function best(fn: () => void, runs = 15, warm = 3): number {
-  for (let i = 0; i < warm; i++) fn();
-  let min = Number.POSITIVE_INFINITY;
-  for (let i = 0; i < runs; i++) {
-    const t0 = performance.now();
-    fn();
-    min = Math.min(min, performance.now() - t0);
-  }
-  return min;
-}
+// ---- V0 scenes ----
 
 const CX = 60;
 const CY = 60;
 
-interface Scene {
+export interface Scene {
   walls: Seg[];
   shapes: (ShapeLike & { op: FogShapeOp })[];
   darkness: ShapeLike[];
@@ -63,7 +52,14 @@ interface Scene {
   mask: FogMask;
 }
 
-type Kind = "typical" | "caps" | "caps-rooms";
+export type Kind = "typical" | "caps" | "caps-rooms";
+
+/** V0 scene kinds with their ms caps: one polygon, a move, a full-scene re-derive. */
+export const V0_KINDS = [
+  ["typical", 2, 10, 20],
+  ["caps", 10, 30, 60],
+  ["caps-rooms", 10, 30, 60],
+] as const;
 
 /**
  * caps-rooms: 2,000 wall pieces of a 2-cell room grid with a doorway gap in every side, all
@@ -90,8 +86,8 @@ function roomWalls(): Seg[] {
   return out;
 }
 
-function buildScene(kind: Kind, seed: number): Scene {
-  const rand = rng(seed);
+export function buildScene(kind: Kind): Scene {
+  const rand = rng(kind === "typical" ? 2 : 1);
   const caps = kind !== "typical";
   // Walls: caps = 2,000 short freeform segments, every one within 24 cells of the centre
   // (so of every source); typical = 150 room walls on a 40 × 30 map.
@@ -169,7 +165,7 @@ function buildScene(kind: Kind, seed: number): Scene {
 }
 
 /** Every token footprint cell centre, with its static state (computed once per re-derive). */
-function samples(s: Scene): SamplePoint[] {
+export function samples(s: Scene): SamplePoint[] {
   const layer = prepareStaticLayer(s.mask, s.shapes, s.darkness);
   const out: SamplePoint[] = [];
   for (const t of s.tokens)
@@ -178,97 +174,75 @@ function samples(s: Scene): SamplePoint[] {
   return out;
 }
 
-function visibleCount(v: PlayerVision, pts: readonly SamplePoint[]): number {
+export function visibleCount(v: PlayerVision, pts: readonly SamplePoint[]): number {
   let n = 0;
   for (const p of pts) if (pointVisible(v, p)) n++;
   return n;
 }
 
-function exploredCells(v: PlayerVision): number {
+export function exploredCells(v: PlayerVision): number {
   const cells = new Set<number>();
   for (const p of v.polys) polygonCells(p.poly, (c, r) => cells.add(r * 4096 + c));
   return cells.size;
 }
 
-const results: Record<string, number> = {};
+// ---- Sprint-4 scene (r 199.8) ----
 
-describe("FOG §12 V0 benchmark (exit gate)", () => {
-  for (const [kind, polyMs, moveMs, fullMs] of [
-    ["typical", 2, 10, 20],
-    ["caps", 10, 30, 60],
-    ["caps-rooms", 10, 30, 60],
-  ] as const) {
-    const s = buildScene(kind, kind === "typical" ? 2 : 1);
+const SIZE = 120;
+const BOUNDS = [0, 0, SIZE, SIZE] as const;
 
-    test(`FOG §12 ${kind}: one sight polygon ≤ ${polyMs} ms`, () => {
-      const prep = prepareOccluders(s.walls);
-      const src = s.players[0]?.[0] as VisionSource;
-      const r = kind === "typical" ? 12 : 24;
-      const ms = best(() => {
-        sightPolygon(src, r, prep);
-      }, 31);
-      const poly = sightPolygon(src, r, prep) as number[];
-      results[`${kind} polygon ms`] = ms;
-      results[`${kind} polygon vertices`] = poly.length / 2;
-      results[`${kind} prepare ms`] = best(() => {
-        prepareScene(s.walls, s.darkness);
-      });
-      expect(ms).toBeLessThanOrEqual(polyMs);
-    });
-
-    test(`FOG §12 ${kind}: a move (mover's polygons + sample tests + explored cells) ≤ ${moveMs} ms`, () => {
-      const ms = best(() => {
-        const scene = prepareScene(s.walls, s.darkness);
-        const pts = samples(s);
-        const v = playerVision(scene, s.players[0] as VisionSource[]);
-        visibleCount(v, pts);
-        exploredCells(v);
-      });
-      results[`${kind} move ms`] = ms;
-      expect(ms).toBeLessThanOrEqual(moveMs);
-    });
-
-    test(`FOG §12 ${kind}: full-scene re-derive (static once, then per player) ≤ ${fullMs} ms`, () => {
-      const ms = best(() => {
-        const scene = prepareScene(s.walls, s.darkness);
-        const pts = samples(s);
-        for (const srcs of s.players) {
-          const v = playerVision(scene, srcs);
-          visibleCount(v, pts);
-          exploredCells(v);
-        }
-      }, 9);
-      results[`${kind} full re-derive ms`] = ms;
-      expect(ms).toBeLessThanOrEqual(fullMs);
-    });
-
-    test(`FOG §12 ${kind}: the vision record at ${kind === "typical" ? 1 : 4} source(s) ≤ 48 KiB`, () => {
-      const scene = prepareScene(s.walls, s.darkness);
-      let max = 0;
-      for (const srcs of s.players) {
-        const v = playerVision(scene, srcs);
-        const rec = {
-          id: "scene-0123456789:player-0123456789",
-          sceneId: "scene-0123456789",
-          playerId: "player-0123456789",
-          blind: v.blind,
-          see: v.see,
-          dark: v.dark,
-          ...(v.inv.length > 0 ? { inv: v.inv } : {}),
-        };
-        max = Math.max(max, Buffer.byteLength(JSON.stringify(rec), "utf8"));
-      }
-      results[`${kind} vision record max B`] = max;
-      expect(max).toBeLessThanOrEqual(48 * 1024);
-    });
+function buildCaps(seed: number) {
+  const rand = rng(seed);
+  const walls: Seg[] = [];
+  for (let i = 0; i < 2000; i++) {
+    const x = rand() * SIZE;
+    const y = rand() * SIZE;
+    const a = rand() * 2 * Math.PI;
+    const len = 0.5 + rand() * 1.5;
+    walls.push([r2(x), r2(y), r2(x + len * Math.cos(a)), r2(y + len * Math.sin(a))]);
   }
+  const shapes: (ShapeLike & { op: FogShapeOp })[] = [];
+  const ops: FogShapeOp[] = ["reveal", "fog", "explored"];
+  for (let i = 0; i < 100; i++) {
+    const x = rand() * (SIZE - 10);
+    const y = rand() * (SIZE - 10);
+    shapes.push({ op: ops[i % 3] as FogShapeOp, rect: [r2(x), r2(y), r2(x + 4), r2(y + 4)] });
+  }
+  const darkness: ShapeLike[] = [];
+  for (let i = 0; i < 20; i++) {
+    darkness.push({ circle: [r2(rand() * SIZE), r2(rand() * SIZE), r2(1 + rand() * 2)] });
+  }
+  const players: VisionSource[][] = [];
+  for (let p = 0; p < 6; p++) {
+    const srcs: VisionSource[] = [];
+    for (let s = 0; s < 4; s++) {
+      srcs.push({
+        x: Math.floor(10 + rand() * (SIZE - 20)) + 0.5,
+        y: Math.floor(10 + rand() * (SIZE - 20)) + 0.5,
+        senses: { ...NORMAL_SENSES, darkvisionFt: 60, seesMagicalDarkness: s === 0 },
+        id: `t${p}-${s}`,
+      });
+    }
+    players.push(srcs);
+  }
+  const tokens: { col: number; row: number }[] = [];
+  for (let i = 0; i < 200; i++) {
+    tokens.push({ col: Math.floor(rand() * (SIZE - 4)), row: Math.floor(rand() * (SIZE - 4)) });
+  }
+  const mask: FogMask = uniformMask("fog", [0, 0, SIZE, SIZE]);
+  return { walls, shapes, darkness, players, tokens, mask };
+}
 
-  test("FOG §12 benchmark numbers (logged)", () => {
-    console.log(
-      `FOG §12 V0 benchmark:\n${Object.entries(results)
-        .map(([k, v]) => `  ${k}: ${Number.isInteger(v) ? v : v.toFixed(2)}`)
-        .join("\n")}`,
-    );
-    expect(Object.keys(results).length).toBeGreaterThan(0);
-  });
-});
+/** The sprint-4 caps scene, prepared: occluders, every token sample, the 12 counted sources. */
+export function sprint4Scene() {
+  const s = buildCaps(4);
+  const scene = prepareScene(s.walls, s.darkness, BOUNDS);
+  const layer = prepareStaticLayer(s.mask, s.shapes, s.darkness);
+  const samples: SamplePoint[] = [];
+  for (const t of s.tokens)
+    for (let r = t.row; r < t.row + 4; r++)
+      for (let c = t.col; c < t.col + 4; c++) samples.push(samplePoint(layer, c + 0.5, r + 0.5));
+  // Party vision on: 12 sources, 2 per player in round robin (FR-FOG-52).
+  const counted = s.players.map((srcs) => srcs.slice(0, 2));
+  return { players: s.players, scene, samples, counted };
+}

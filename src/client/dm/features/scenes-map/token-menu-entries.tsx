@@ -11,6 +11,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from "@ui/components/ui/menus";
+import { AssetPickerDialog } from "@ui/features/assets-pipeline/AssetPicker";
 import { toastReject, useMapIntent } from "@ui/features/scenes-map/intents";
 import { useRecords } from "@ui/sync/store";
 import {
@@ -23,7 +24,6 @@ import {
   Trash2Icon,
   UserIcon,
 } from "lucide-react";
-import { AssetPickerDialog } from "../assets-pipeline/AssetPicker";
 import { NameFormDialog } from "./NameFormDialog";
 import { setMapSelection } from "./selection";
 import type { TokenMenuDialogProps, TokenMenuEntry, TokenMenuItemProps } from "./token-menu";

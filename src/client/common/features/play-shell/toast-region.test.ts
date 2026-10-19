@@ -50,17 +50,32 @@ describe("roll-popup stack (FR-DICEX-39, seams S7)", () => {
     expect(sonnerStackH(53, 5)).toBe(81);
   });
 
-  test("FR-DICEX-39 DICEX §7 popup sizes: 280 × 160 max, ≤ 3 popups", () => {
-    expect([ROLL_POPUP_W, ROLL_POPUP_H, ROLL_POPUPS_MAX]).toEqual([280, 160, 3]);
+  test("FR-SHELL-49 popup sizes from D's spec (FR-DICEX-46/47, seams S2): 320 × 190, ≤ 3 popups", () => {
+    expect([ROLL_POPUP_W, ROLL_POPUP_H, ROLL_POPUPS_MAX]).toEqual([320, 190, 3]);
   });
 });
 
-describe("toast keep-out (FR-SHELL-40, seams S7, review A11)", () => {
-  test("FR-SHELL-40 toast keep-out box: 3 toasts + one roll popup (DICEX §7), DM top-centre, player bottom-right above the launcher", () => {
-    // 3 × 40 toasts + one 160 popup + 3 gaps of 8; as wide as the widest stack (sonner 356).
-    expect(KEEP_OUT_H).toBe(3 * 40 + ROLL_POPUP_H + 3 * 8);
-    expect(KEEP_OUT_W).toBeGreaterThanOrEqual(320); // notifications `w-80`
-    expect(KEEP_OUT_W).toBeGreaterThanOrEqual(ROLL_POPUP_W);
+describe("toast regions (FR-SHELL-40, -49; seams S2, S7)", () => {
+  test("FR-SHELL-49 toast regions: both boxes 356 × 238 (1 toast + 1 popup + 8), players at (vw − 372, vh − 310), the DM at ((vw − 356) / 2, 100), at the four sizes", () => {
+    expect([KEEP_OUT_W, KEEP_OUT_H]).toEqual([356, 40 + ROLL_POPUP_H + 8]);
+    const sizes = [
+      { w: 1280, h: 720 },
+      { w: 1280, h: 800 },
+      { w: 1440, h: 900 },
+      { w: 1600, h: 900 },
+    ];
+    for (const vp of sizes) {
+      expect(toastKeepOut("player", vp)).toEqual({ x: vp.w - 372, y: vp.h - 310, w: 356, h: 238 });
+      expect(toastKeepOut("dm", vp)).toEqual({ x: (vp.w - 356) / 2, y: 100, w: 356, h: 238 });
+    }
+    // Regions unchanged from sprint 4 (#256, OQ-SHELL-32 C): DM top-centre, players bottom-right;
+    // player stack order notifications → alerts → popups (each beyond the one before).
+    expect(toastRegion("dm", 0).position).toBe("top-center");
+    expect(toastRegion("player", 0).position).toBe("bottom-right");
+    expect(popupRegion("player", 40, 53)).toEqual({ right: 16, bottom: 72 + 48 + 61 });
+  });
+
+  test("FR-SHELL-40 the box sits where each client's stacks start", () => {
     for (const vp of [
       { w: 1280, h: 720 },
       { w: 1280, h: 800 },

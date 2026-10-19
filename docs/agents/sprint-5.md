@@ -39,6 +39,10 @@ DM notes in brackets ([#250](../decisions-log.md)). "sim-8" = the [session-sim-8
 | 2026-10-19 | **Gate 1 passed** ([#256](../decisions-log.md)): every pick, DM ceiling 1.5 MiB, DM popups stay top-centre, map tools push covering windows right. Phase B starts |
 | 2026-10-19 | Merged: party core (handout force-open record, attachment images) [#257](../decisions-log.md). `session-sim-9` gains a handout with an attachment and one presented to Player 1 (UI comes with the popup slice) |
 | 2026-10-19 | Merged: combat core (hit rulings, stored trails, ally sides, Apply-hit command) [#258](../decisions-log.md). Unblocks late damage, ally-switch UI, trails, colours core |
+| 2026-10-19 | Merged: **kept-template right-click menu** (Delete, Edit…, DM Hide / Reveal) [#259](../decisions-log.md) — try it in `session-sim-9` on Goblin Ambush's kept templates |
+| 2026-10-19 | Merged: **image picker** in the handout editor: Upload, drag a file in, or paste an image (Ctrl+V) [#260](../decisions-log.md) |
+| 2026-10-19 | Merged: compendium image storage (server) [#261](../decisions-log.md); **handout force-open**: Share… → tick "Also open it on the screens of players who newly get it", or the viewer's "Open on screens…" / "Close on all screens" [#263](../decisions-log.md). In `session-sim-9`, Player 1 gets a presented handout popup on load |
+| 2026-10-19 | Merged: **late damage** — in your attack popup, **Apply hit** tells the table "— DM: hit." and waits; the player's damage roll then fills the empty fields (your typed numbers stay) [#264](../decisions-log.md) |
 
 ## Check `main` any time (DM)
 

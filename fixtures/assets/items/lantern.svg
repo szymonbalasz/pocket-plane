@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>lantern</title>
+  <!-- Fixture "lantern" (compendium §13.1, `cmp-images`): an unlit hooded lantern, main image of
+       "Moonlit Lantern", ingested as an attachment (listed = false). -->
+  <rect width="256" height="256" fill="#1d2433"/>
+  <circle cx="128" cy="40" r="18" fill="none" stroke="#8a8f99" stroke-width="8"/>
+  <path d="M84 70 L172 70 L160 92 L96 92 Z" fill="#5b616b"/>
+  <rect x="92" y="92" width="72" height="104" rx="8" fill="#3a4250" stroke="#8a8f99" stroke-width="6"/>
+  <line x1="128" y1="92" x2="128" y2="196" stroke="#8a8f99" stroke-width="5"/>
+  <rect x="116" y="150" width="24" height="34" rx="4" fill="#d9d4c7"/>
+  <path d="M80 196 L176 196 L184 220 L72 220 Z" fill="#5b616b"/>
+</svg>

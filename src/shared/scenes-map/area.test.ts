@@ -380,20 +380,5 @@ describe("FR-SCN-42 helper", () => {
     expect(() => cells(templateArea(tpl({ shape: "cone" })), "distance")).toThrow();
   });
 
-  test("FR-SCN-42 coverage benchmark: a 300-ft sphere ≤ 3 ms (p95)", () => {
-    const shape = templateArea(tpl({ shape: "sphere", x: 40.37, y: 22.81, size: 300 }));
-    for (let i = 0; i < 5; i++) cells(shape, "half");
-    const t: number[] = [];
-    for (let i = 0; i < 40; i++) {
-      const t0 = performance.now();
-      cells(shape, "half");
-      t.push(performance.now() - t0);
-    }
-    t.sort((a, b) => a - b);
-    const p95 = t[Math.floor(t.length * 0.95)] as number;
-    console.log(
-      `FR-SCN-42 300-ft sphere: p95 ${p95.toFixed(2)} ms, ${cellCoverage(shape).length} cells`,
-    );
-    expect(p95).toBeLessThanOrEqual(3);
-  });
+  // "FR-SCN-42 coverage benchmark: a 300-ft sphere ≤ 3 ms (p95)": ./area.bench.ts.
 });

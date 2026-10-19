@@ -6,6 +6,7 @@ import base from "./base";
 import campaignSwitch from "./campaign-switch";
 import characterSheet from "./character-sheet";
 import characterSheetFull from "./character-sheet-full";
+import cmpImages from "./cmp-images";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
 import compendium from "./compendium";
@@ -38,9 +39,11 @@ import sessionSim8 from "./session-sim-8";
 import sessionSim9 from "./session-sim-9";
 import syncProbe from "./sync-probe";
 import tokenArtUpdate from "./token-art-update";
+import tplMenu from "./tpl-menu";
 import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
+import windowsS5 from "./windows-s5";
 
 export const bundles: readonly Bundle[] = [
   base,
@@ -81,7 +84,10 @@ export const bundles: readonly Bundle[] = [
   usesNegative,
   sessionSim8,
   sessionSim9,
+  windowsS5,
   lateDamage,
   partyS5,
   dicePolish,
+  cmpImages,
+  tplMenu,
 ];

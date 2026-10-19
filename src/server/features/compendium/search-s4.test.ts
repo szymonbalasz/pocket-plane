@@ -1,7 +1,7 @@
 // CMP §13 S4 integration on `compendium-full` (full bundled SRD + `cmp-search-homebrew`):
 // FR-CMP-33 ranking table, word order, FR-CMP-38 source rank, FR-CMP-35 / -36 groups + `sameAs`
-// + paging, FR-CMP-14 players never see hidden entries, FR-CMP-34 index freshness + timing,
-// FR-CMP-37 matcher parity (client `nameTier` = server tier).
+// + paging, FR-CMP-14 players never see hidden entries, FR-CMP-34 index freshness (timing:
+// ./search-s4.bench.ts), FR-CMP-37 matcher parity (client `nameTier` = server tier).
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
@@ -15,7 +15,7 @@ import { startTestServer, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
 import { IMPORT_RECORDED } from "./import";
 import { rowTier, searchEntries } from "./search";
-import { dropSearchIndex, searchIndex } from "./search-index";
+import { searchIndex } from "./search-index";
 import { loadSrd51, SRD_51_SOURCE } from "./sources/srd-5.1";
 import type { EntryViewer } from "./visibility";
 
@@ -398,31 +398,8 @@ describe("compendium search S4 (C-search)", () => {
     expect(named).toBeGreaterThan(20);
   });
 
-  test("FR-CMP-34 index freshness: put → found, delete → gone, re-import with an edited goblin → new name; timing over the full import (fail > 50 ms)", async () => {
-    // Timing: build once, then p95 per search (logged; budget 5 ms, fails above 50 ms).
-    dropSearchIndex(db);
-    const t0 = performance.now();
-    searchIndex(db);
-    const build = performance.now() - t0;
-    const lines: string[] = [];
-    let worst = 0;
-    for (const v of [DM_VIEW(), { role: "player" as const, campaignId: cid, playerId: "p" }]) {
-      for (const q of ["", "a", "gob", "goblin", "fire", "potion heal", "the"]) {
-        const times: number[] = [];
-        for (let i = 0; i < 30; i++) {
-          const s = performance.now();
-          searchEntries(db, v, SearchQuery.parse({ q }));
-          times.push(performance.now() - s);
-        }
-        times.sort((a, b) => a - b);
-        const p95 = times[28] as number;
-        worst = Math.max(worst, p95);
-        lines.push(`${v.role} "${q}" median ${times[15]?.toFixed(2)} p95 ${p95.toFixed(2)} ms`);
-      }
-    }
-    console.log(`FR-CMP-34 index build ${build.toFixed(1)} ms; ${lines.join("; ")}`);
-    expect(worst).toBeLessThan(50);
-
+  // The timing over the full import (fail > 50 ms): ./search-s4.bench.ts (`bun run bench`).
+  test("FR-CMP-34 index freshness: put → found, delete → gone, re-import with an edited goblin → new name", async () => {
     const dm = { "Content-Type": "application/json", ...auth("dm") };
     const created = await fetch(`${h.http}/api/compendium/entries`, {
       method: "POST",

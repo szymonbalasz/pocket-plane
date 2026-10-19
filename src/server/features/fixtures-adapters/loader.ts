@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { playerLinkUrl } from "@shared/campaign-management/schemas";
+import { AssetIngested } from "@shared/events/assets-pipeline";
 import { asc, eq, sql } from "drizzle-orm";
 import { seededContext, systemClock } from "../../commands/context";
 import { CommandError } from "../../commands/errors";
@@ -207,6 +208,16 @@ async function runFixtures(services: Services, config: Config, bundle: string, o
       bucket[ch.type] = list;
       list.push(ch.id);
     }
+    // An attachment's ingest has no record change (FR-ASSET-24): its id comes from the event, so
+    // `r.id(key, "asset")` counts attachments and listed assets alike, in ingest order.
+    if (event.type === AssetIngested.type) {
+      const p = AssetIngested.payload.parse(event.payload);
+      if (!p.listed) {
+        const list = bucket.asset ?? [];
+        bucket.asset = list;
+        list.push(p.assetId);
+      }
+    }
   });
   const refs: Refs = {
     ids: (key, type) => {
@@ -235,10 +246,14 @@ async function runFixtures(services: Services, config: Config, bundle: string, o
             ? await (s.input as (r: Refs) => unknown | Promise<unknown>)(refs)
             : s.input;
         const active = activeCampaign(services.db);
-        services.commands.run(s.command, input, {
-          actor: { role: "dm", playerId: null, campaignId: active?.id ?? null },
-          ctx,
-        });
+        const campaignId = active?.id ?? null;
+        // A step `as` a player fixture runs as that player (default: the DM).
+        const as = "as" in s ? s.as : undefined;
+        const actor =
+          as === undefined
+            ? { role: "dm" as const, playerId: null, campaignId }
+            : { role: "player" as const, playerId: refs.id(as, "player"), campaignId };
+        services.commands.run(s.command, input, { actor, ctx });
       } catch (err) {
         const msg =
           err instanceof CommandError

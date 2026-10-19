@@ -3,6 +3,8 @@
 // waiting / reconnect screens so windows come back as they were (FR-SHELL-04). Also owns the
 // page's alert controller (FR-SHELL-22–25): one per play page, both clients.
 import { layoutKey } from "@shared/play-shell/layout";
+import { type RecordStore, recordsOf } from "@shared/protocol/store";
+import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import {
   createContext,
   useCallback,
@@ -36,6 +38,21 @@ const AlertContext = createContext<AlertController | null>(null);
 
 const browserViewport = () => ({ w: window.innerWidth, h: window.innerHeight });
 
+/**
+ * The drawn tokens' screen boxes for auto placement (FR-SHELL-40, -45): `pc` = the token has an
+ * owner in this client's store (a PC).
+ */
+function placementTokens(store: RecordStore | undefined) {
+  const owned = new Set(
+    store
+      ? recordsOf<{ id: string; ownerPlayerId: string | null }>(store, TOKEN_TYPE)
+          .filter((t) => t.ownerPlayerId)
+          .map((t) => t.id)
+      : [],
+  );
+  return tokenScreenBoxes("all").map((b) => ({ ...b, pc: b.id !== undefined && owned.has(b.id) }));
+}
+
 export function ShellProvider({
   registry,
   children,
@@ -43,12 +60,13 @@ export function ShellProvider({
   registry: WindowRegistry;
   children: React.ReactNode;
 }) {
+  const sync = useContext(SyncContext);
   const [controller] = useState(() =>
     createShellController({
       registry,
       storage: browserLayoutStorage(),
       viewport: browserViewport,
-      avoid: () => tokenScreenBoxes("all"),
+      avoid: () => placementTokens(sync?.getState().store),
       heights: (id) => contentHeights().get(id),
     }),
   );
