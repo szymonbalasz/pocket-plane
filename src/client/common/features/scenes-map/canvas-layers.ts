@@ -5,6 +5,7 @@
 // wraps it in a Group named by its id; entries with a `group` share one more Group.
 import { FogLayer } from "../fog-of-war/FogLayer";
 import { FOG_LAYER_SWITCH } from "../fog-of-war/plain-map";
+import { templateContextMenu } from "../scene-tools/aoe-store";
 import { ScnEditLayer } from "../scene-tools/layers/EditLayer";
 import { ScnPropsLayer } from "../scene-tools/layers/PropsLayer";
 import { ScnStructureLayer } from "../scene-tools/layers/StructureLayer";
@@ -46,6 +47,8 @@ export const canvasLayers: readonly LayerDef<object>[] = orderLayers<object>([
     layer: "objects",
     component: ScnTemplatesLayer,
     toggle: { key: "templates", label: "Templates", layer: "objects" },
+    // FR-SCN-48 / -51: right-click menu on a kept template (FR-MAP-71 step 4).
+    contextMenu: templateContextMenu,
   },
   {
     id: "scn-edit",
