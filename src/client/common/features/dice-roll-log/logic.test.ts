@@ -168,8 +168,13 @@ describe("FR-DICE-24 roll control", () => {
     const o = { expressions: ["1d20+4", "2d6kh1+2"], critExpressions: ["4d6kh1+2"] };
     const nat20 = [{ for: "1d20+4", base: g("20"), extra: g() }];
     expect(slotsOf(o, nat20)).toEqual([
-      { base: { expression: "1d20+4", faces: [20] }, extra: null, crit: false },
-      { base: { expression: "4d6kh1+2", faces: [6, 6, 6, 6] }, extra: null, crit: true },
+      { base: { expression: "1d20+4", faces: [20] }, extra: null, crit: false, label: null },
+      {
+        base: { expression: "4d6kh1+2", faces: [6, 6, 6, 6] },
+        extra: null,
+        crit: true,
+        label: null,
+      },
     ]);
   });
 
@@ -232,6 +237,7 @@ describe("FR-DICE-31 physical crit keeps what was typed", () => {
       base: { expression: "4d6+3", faces: [6, 6, 6, 6] },
       extra: { expression: "4d6", faces: [6, 6, 6, 6] },
       crit: true,
+      label: null,
     });
     expect(inputs[1]?.base.dice).toEqual(["3", "4", "5", "6"]);
     expect(inputs[1]?.extra).toEqual(g("", ["", "", "", ""]));
@@ -293,6 +299,7 @@ describe("FR-DICE-31 physical crit keeps what was typed", () => {
         base: { expression: "1d8+2", faces: [8] },
         extra: { expression: "1d8", faces: [8] },
         crit: true,
+        label: null,
       },
     ]);
     const t = typer(dmg);

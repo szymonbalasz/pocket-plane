@@ -36,11 +36,13 @@ describe("BL-19 DM Attack ▸ physical entries per part", () => {
       expressions: ["1d20+8", "2d6+5", "2d6"],
       critExpressions: ["4d6+5", "4d6"],
       extraParts: 1,
+      slotLabels: ["To hit", "Slashing", "Fire"],
     });
     expect(attackRolls(flameTongue, "damage")).toEqual({
       expressions: ["2d6+5", "2d6"],
       critExpressions: ["4d6+5", "4d6"],
       extraParts: 1,
+      slotLabels: ["Slashing", "Fire"],
     });
     expect(attackRolls(flameTongue, "toHit")).toEqual({ expressions: ["1d20+8"], extraParts: 0 });
   });
@@ -50,6 +52,7 @@ describe("BL-19 DM Attack ▸ physical entries per part", () => {
       expressions: ["1d20+4", "1d6+2"],
       critExpressions: ["2d6+2"],
       extraParts: 0,
+      slotLabels: ["To hit", "Damage"],
     });
   });
 });

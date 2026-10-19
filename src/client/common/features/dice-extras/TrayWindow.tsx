@@ -364,7 +364,8 @@ export function TrayWindow() {
 
   const terms = free ? (termsOf(draft) ?? lastValid.current) : [];
   // FR-DICEX-48: what the dice area previews: `free` = the composed terms; `control` = each
-  // expression's dice (crit per FR-DICE-31), the first with the previewed mode.
+  // expression's dice (crit per FR-DICE-31), the first with the previewed mode, each group with
+  // its slot label (FR-DICE-41).
   const groups = useMemo((): TrayGroup[] => {
     if (request?.kind !== "control") {
       return [{ chips: chipsOf(terms, shownMode), constant: constantOfTerms(terms) }];
@@ -373,7 +374,11 @@ export function TrayWindow() {
     const exprs = o.crit && o.critExpressions ? o.critExpressions : o.expressions;
     return exprs.map((x, i) => {
       const t = termsOf(x) ?? [];
-      return { chips: chipsOf(t, i === 0 ? shownMode : "normal"), constant: constantOfTerms(t) };
+      return {
+        chips: chipsOf(t, i === 0 ? shownMode : "normal"),
+        constant: constantOfTerms(t),
+        label: o.slotLabels?.[i] ?? null,
+      };
     });
   }, [request, terms, shownMode]);
   const { options: actorList, selected } = actorSelection(

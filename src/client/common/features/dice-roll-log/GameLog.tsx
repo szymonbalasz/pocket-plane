@@ -21,6 +21,7 @@ import { formatEntry } from "@shared/dice-roll-log/line";
 import {
   CATEGORY_LABEL,
   type DiceRollIntent,
+  type DmRollActorRef,
   GAME_LOG_ENTRY_TYPE,
   type GameLogEntryView,
   ROLL_CATEGORIES,
@@ -48,7 +49,7 @@ import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
 import { DieShape } from "../dice-extras/DieShape";
 import { useLanded, useLandingFade } from "../dice-extras/landing";
-import { stageTray } from "../dice-extras/store";
+import { stageTray, type TrayRequest } from "../dice-extras/store";
 import { scrollToEntry, useLogFocus } from "./focus";
 import {
   type ActorOption,
@@ -56,12 +57,13 @@ import {
   actorSelection,
   createStickToBottom,
   heldSegments,
+  modeFromKeys,
   optionsDirty,
   type ShownSegment,
   sortEntries,
 } from "./logic";
 import { usePhysicalDice, useRollOptionsOpen } from "./physical";
-import { RollButton, useRollControl } from "./roll-control";
+import { RollButton, type RollKeys, useRollControl } from "./roll-control";
 
 const SELECT =
   "h-7 min-w-0 shrink-0 rounded-md border border-input bg-background px-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
@@ -301,6 +303,33 @@ function errorText(err: unknown): string {
   return err instanceof Error ? err.message : "Roll failed";
 }
 
+/** FR-DICEX-51 (§6.1 table G): the roll bar Roll's tooltip; `RollButton` adds the Alt hint. */
+export const ROLL_BAR_HINT = "Shift: advantage · Ctrl: disadvantage";
+
+/**
+ * FR-DICEX-06: what the tray Button stages — and Alt+click on Roll (FR-DICEX-51, OQ-DICEX-45 A),
+ * Shift / Ctrl picking the mode as a roll would: the bar's expression, `free`.
+ */
+export function rollBarStage(
+  bar: {
+    expression: string;
+    mode: RollMode;
+    label: string;
+    category: RollCategory;
+    actor?: DmRollActorRef | undefined;
+  },
+  keys?: RollKeys,
+): TrayRequest {
+  return {
+    kind: "free",
+    expression: bar.expression.trim(),
+    mode: modeFromKeys(keys, bar.mode),
+    category: bar.category,
+    ...(bar.label.trim() ? { label: bar.label.trim() } : {}),
+    ...(bar.actor ? { actor: bar.actor } : {}),
+  };
+}
+
 /** FR-DICE-22 / FR-DICE-30: the roll bar (window footer). */
 function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const you = useSync((s) => s.store.you);
@@ -357,16 +386,8 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   });
   const disabled = !live || busy;
   const shownError = error ?? control.error;
-  // FR-DICEX-06: the tray Button (and Alt+click on Roll) stages the current expression, `free`.
-  const stage = (m: RollMode = mode) =>
-    stageTray({
-      kind: "free",
-      expression: expression.trim(),
-      mode: m,
-      category,
-      ...(label.trim() ? { label: label.trim() } : {}),
-      ...(actorRef ? { actor: actorRef } : {}),
-    });
+  const stage = (keys?: RollKeys) =>
+    stageTray(rollBarStage({ expression, mode, label, category, actor: actorRef }, keys));
   const [optionsOpen, setOptionsOpen] = useRollOptionsOpen();
   const [physical, setPhysical] = usePhysicalDice();
   const dirty = optionsDirty({
@@ -453,6 +474,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
         )}
         <RollButton
           control={control}
+          hint={ROLL_BAR_HINT}
           data-testid="dice-roll-submit"
           type="button"
           size="sm"
@@ -461,7 +483,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
           onClick={(e) => {
             if (!e.altKey) return;
             e.preventDefault();
-            stage();
+            stage(e);
           }}
         >
           Roll

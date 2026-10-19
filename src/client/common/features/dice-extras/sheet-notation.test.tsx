@@ -202,8 +202,8 @@ describe("FR-DICEX-30 sheet text through DiceText (view mode)", () => {
 });
 
 describe("FR-DICEX-06 sheet roll buttons", () => {
-  test("FR-DICEX-06 the sheet roll tooltip adds 'Alt: adjust in tray'", () => {
-    expect(ROLL_HINT).toBe(`Shift: advantage · Ctrl: disadvantage · ${STAGE_HINT}`);
+  test("FR-DICEX-06 FR-DICEX-51 the sheet's hint drops its 'Alt: adjust in tray' (RollButton adds it)", () => {
+    expect(ROLL_HINT).toBe("Shift: advantage · Ctrl: disadvantage");
     expect(STAGE_HINT).toBe("Alt: adjust in tray");
   });
 });
