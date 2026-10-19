@@ -3,12 +3,13 @@
 // (`cueTokens`, e.g. combat-extras' concentration card, FR-CBTX-49), else the default: the action
 // player's tokens on the viewed scene bound to an active combatant of the started encounter, else
 // all their tokens there. Drawn as scenes-map's `cue` decoration through the `note` line of the
-// token overlay registry (FR-MAP-49). Never from a snapshot, resync or reconnect. Client memory
-// only; the label is always the notification text.
+// token overlay registry (FR-MAP-49), in the action owner's player colour (FR-NOTE-40). Never from
+// a snapshot, resync or reconnect. Client memory only; the label is always the notification text.
 import { COMBATANT_TYPE, ENCOUNTER_TYPE } from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
+import { colorOf } from "../campaign-management/colors";
 import type { TokenOverlay } from "../scenes-map/token-overlays";
 import { createdIn, NOTIFICATION_TYPE, type SyncView, type Transition } from "./logic";
 import type { NotificationView } from "./views";
@@ -100,20 +101,22 @@ export const liveCues = (cues: readonly Cue[], now: number) => cues.filter((c) =
 
 /**
  * The cue on one drawn token: the newest live cue naming it whose row is still pending (a second
- * cue on a token restarts its 4 s); label = the notification text.
+ * cue on a token restarts its 4 s); label = the notification text; colour = the action owner's
+ * (FR-NOTE-40; an unknown player → the role accent).
  */
 export function cueOn(
   cues: readonly Cue[],
   token: Pick<TokenView, "id" | "sceneId">,
   store: RecordStore,
   now: number,
-): { id: string; label: string } | null {
+): { id: string; label: string; color?: string } | null {
   const rows = store.records[NOTIFICATION_TYPE] ?? {};
   for (const c of [...liveCues(cues, now)].reverse()) {
     const n = rows[c.notificationId] as NotificationRecord | undefined;
     if (n?.state !== "pending") continue;
     if (c.tokensFor(store, token.sceneId).includes(token.id)) {
-      return { id: NOTE_CUE_ID, label: n.text };
+      const color = colorOf(store, { role: "player", playerId: n.actionPlayerId });
+      return { id: NOTE_CUE_ID, label: n.text, ...(color ? { color } : {}) };
     }
   }
   return null;

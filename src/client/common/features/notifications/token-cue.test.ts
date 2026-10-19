@@ -1,9 +1,11 @@
-// FR-NOTE-30 action cue (predicate, default tokens, hook, 4 s expiry and restart, DM only) and
-// FR-CBTX-49 concentration cue tokens.
+// FR-NOTE-30 action cue (predicate, default tokens, hook, 4 s expiry and restart, DM only),
+// FR-NOTE-40 its colour (the action owner's) and FR-CBTX-49 concentration cue tokens.
 import { afterEach, describe, expect, test } from "bun:test";
+import { PLAYER_COLORS } from "@shared/campaign-management/colors";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
+import { ROLE_ACCENT_FALLBACK } from "../campaign-management/colors";
 import { concentrationCueTokens } from "../combat-extras/concentration";
 import type { TokenOverlayView } from "../scenes-map/token-overlays";
 import type { SyncView } from "./logic";
@@ -41,7 +43,13 @@ const tok = (id: string, sceneId: string, o: Partial<TokenView> = {}) =>
 
 function store(
   you: RecordStore["you"],
-  o: { notes?: NotificationRecord[]; tokens?: TokenView[]; seq?: number; bound?: string[] } = {},
+  o: {
+    notes?: NotificationRecord[];
+    tokens?: TokenView[];
+    seq?: number;
+    bound?: string[];
+    players?: { id: string; color: string }[];
+  } = {},
 ): RecordStore {
   const byId = (rows: { id: string }[]) => Object.fromEntries(rows.map((r) => [r.id, r]));
   return {
@@ -61,6 +69,8 @@ function store(
         })),
       ),
       effect: { fx: { id: "fx", targetCharacterId: "mira" } },
+      player: byId(o.players ?? []),
+      campaign: { c: { id: "c", name: "C", dmColor: "amber" } },
     },
   };
 }
@@ -136,7 +146,11 @@ describe("FR-NOTE-30 cue lifetime", () => {
     expect(changes).toBe(1);
     const t = tokens[0] as TokenView;
     expect(noteCueOverlay.decorate?.(t, s, view("dm"))).toEqual({
-      cue: { id: NOTE_CUE_ID, label: "Mira: concentration save DC 10 (Bless)" },
+      cue: {
+        id: NOTE_CUE_ID,
+        label: "Mira: concentration save DC 10 (Bless)",
+        color: ROLE_ACCENT_FALLBACK.player, // no `player` record here → the role accent
+      },
     });
     expect(noteCueOverlay.decorate?.(t, s, view("player"))).toBeNull();
     now += CUE_MS - 1000;
@@ -150,6 +164,26 @@ describe("FR-NOTE-30 cue lifetime", () => {
     const resolved = store(DM, { notes: [{ ...ask, state: "resolved" }], tokens });
     expect(noteCueOverlay.decorate?.(t, resolved, view("dm"))).toBeNull();
     off?.();
+  });
+});
+
+describe("FR-NOTE-40 cue colour", () => {
+  afterEach(() => {
+    clearCues();
+    setCueClock(null);
+  });
+
+  test("FR-NOTE-40 names and cue: the cue decoration's color = the action owner's; a recolour redraws it", () => {
+    setCueClock(() => 1000);
+    const ask = note("a", 1, { kind: "test" });
+    const t = tok("t-mira", "s1");
+    const view = { client: "dm" as const, selected: false, targeting: false };
+    startCues([ask], () => undefined);
+    const jade = store(DM, { notes: [ask], tokens: [t], players: [{ id: "p1", color: "jade" }] });
+    expect(noteCueOverlay.decorate?.(t, jade, view)?.cue?.color).toBe(PLAYER_COLORS.jade);
+    // OQ-CAMP-21: derived at draw time, so a `player` upsert recolours the live cue.
+    const rose = store(DM, { notes: [ask], tokens: [t], players: [{ id: "p1", color: "rose" }] });
+    expect(noteCueOverlay.decorate?.(t, rose, view)?.cue?.color).toBe(PLAYER_COLORS.rose);
   });
 });
 
