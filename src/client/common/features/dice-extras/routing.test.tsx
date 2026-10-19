@@ -264,7 +264,7 @@ describe("FR-DICEX-03 tray states", () => {
       mode: "normal",
     });
     const html = render(<TrayWindow />);
-    expect(html.match(/data-faces="8"/g)).toHaveLength(2);
+    expect(html.match(/data-testid="dicex-tray-die" data-faces="8"/g)).toHaveLength(2);
   });
 
   test("FR-DICEX-08 b a test trayExtras entry shows its labelled chips beside the base dice", () => {

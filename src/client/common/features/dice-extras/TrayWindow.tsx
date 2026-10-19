@@ -63,7 +63,7 @@ import { useHolding, useLandingFade } from "./landing";
 import { useOwnLook } from "./own-look";
 import { SettingsPanel } from "./SettingsPanel";
 import { diceExtras, type TrayRequest, useDiceExtras } from "./store";
-import { trayExtras } from "./tray-extras";
+import { type TrayGroup, TrayPreview } from "./TrayPreview";
 import {
   addDie,
   chipsOf,
@@ -75,7 +75,6 @@ import {
   previewMode,
   removeDie,
   setConstant,
-  type TrayChip,
   termsOf,
 } from "./tray-logic";
 
@@ -175,94 +174,6 @@ function useHeldMode(): [RollMode | null, (e: { shiftKey: boolean; ctrlKey: bool
   }, []);
   return [held, track];
 }
-
-/** A die chip; `onRemove` makes it a button (compose: removes one die of its term). */
-function Chip({ chip, onRemove }: { chip: TrayChip; onRemove?: () => void }) {
-  const text = `${chip.sign === -1 ? "−" : ""}d${chip.faces}`;
-  const cls = cn(
-    "relative flex h-8 min-w-9 items-center justify-center rounded-md border bg-secondary px-1.5 font-mono text-xs",
-    chip.tag && "border-primary",
-  );
-  const body = (
-    <>
-      {text}
-      {chip.tag && (
-        <span className="absolute -top-1.5 -right-1.5 rounded bg-primary px-1 text-[9px] leading-tight text-primary-foreground">
-          {chip.tag}
-        </span>
-      )}
-    </>
-  );
-  const attrs = {
-    "data-testid": "dicex-tray-die",
-    "data-faces": chip.faces,
-    "data-term": chip.term,
-    ...(chip.tag && { "data-tag": chip.tag }),
-  };
-  return onRemove ? (
-    <button
-      type="button"
-      {...attrs}
-      aria-label={`Remove one ${text}`}
-      className={cn(cls, "hover:border-destructive hover:line-through")}
-      onClick={onRemove}
-    >
-      {body}
-    </button>
-  ) : (
-    <span {...attrs} className={cls}>
-      {body}
-    </span>
-  );
-}
-
-/** FR-DICEX-08 b: one registry entry's labelled read-only chips (its hook runs every render). */
-function ExtraChips({
-  extra,
-  request,
-  mode,
-}: {
-  extra: (typeof trayExtras)[number];
-  request: TrayRequest;
-  mode: RollMode;
-}) {
-  const dice = extra.useDice(request, mode);
-  if (dice.length === 0) return null;
-  return (
-    <span
-      data-testid="dicex-tray-extra"
-      data-value={extra.key}
-      className="flex flex-wrap items-center gap-1"
-    >
-      {dice.map((d, i) => (
-        <span
-          // biome-ignore lint/suspicious/noArrayIndexKey: positional per render
-          key={i}
-          data-testid="dicex-tray-extra-die"
-          data-faces={d.faces}
-          {...(d.key ? { "data-key": d.key } : {})}
-          className="flex h-8 items-center rounded-md border border-dashed px-1.5 font-mono text-xs text-muted-foreground"
-        >
-          {d.label} {d.sign === -1 ? "−" : "+"}
-          {d.count}d{d.faces}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function Extras({ request, mode }: { request: TrayRequest; mode: RollMode }) {
-  const sorted = useMemo(() => [...trayExtras].sort((a, b) => a.order - b.order), []);
-  return (
-    <>
-      {sorted.map((x) => (
-        <ExtraChips key={x.key} extra={x} request={request} mode={mode} />
-      ))}
-    </>
-  );
-}
-
-const signed = (n: number) => (n === 0 ? "" : n > 0 ? `+${n}` : `−${-n}`);
 
 /** FR-DICEX-36 / DICEX §7: the tray's gear → the settings popover. */
 function SettingsPopover() {
@@ -452,19 +363,19 @@ export function TrayWindow() {
   };
 
   const terms = free ? (termsOf(draft) ?? lastValid.current) : [];
-  const controlChips = useMemo(() => {
-    if (request?.kind !== "control") return [];
+  // FR-DICEX-48: what the dice area previews: `free` = the composed terms; `control` = each
+  // expression's dice (crit per FR-DICE-31), the first with the previewed mode.
+  const groups = useMemo((): TrayGroup[] => {
+    if (request?.kind !== "control") {
+      return [{ chips: chipsOf(terms, shownMode), constant: constantOfTerms(terms) }];
+    }
     const o = request.options;
     const exprs = o.crit && o.critExpressions ? o.critExpressions : o.expressions;
     return exprs.map((x, i) => {
       const t = termsOf(x) ?? [];
-      return {
-        expr: x,
-        chips: chipsOf(t, i === 0 ? shownMode : "normal"),
-        constant: constantOfTerms(t),
-      };
+      return { chips: chipsOf(t, i === 0 ? shownMode : "normal"), constant: constantOfTerms(t) };
     });
-  }, [request, shownMode]);
+  }, [request, terms, shownMode]);
   const { options: actorList, selected } = actorSelection(
     actors,
     free?.actor
@@ -509,40 +420,18 @@ export function TrayWindow() {
 
       {/* Dice area */}
       <div className="flex min-h-10 flex-wrap items-center gap-1">
-        {state === "compose" &&
-          chipsOf(terms, shownMode).map((c, i) => (
-            <Chip
-              // biome-ignore lint/suspicious/noArrayIndexKey: one chip per die position
-              key={i}
-              chip={c}
-              onRemove={c.tag ? undefined : () => setTerms(removeDie(terms, c.term))}
-            />
-          ))}
-        {state === "compose" && constantOfTerms(terms) !== 0 && (
-          <span className="font-mono text-sm text-muted-foreground">
-            {signed(constantOfTerms(terms))}
-          </span>
+        {(state === "compose" || state === "adjust" || state === "rolling") && request && (
+          <TrayPreview
+            request={request}
+            groups={groups}
+            mode={shownMode}
+            onRemove={state === "compose" ? (term) => setTerms(removeDie(terms, term)) : undefined}
+            dimmed={state === "rolling"}
+          />
         )}
-        {state === "adjust" &&
-          controlChips.map((g, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: one group per expression position
-            <span key={i} className="flex flex-wrap items-center gap-1">
-              {i > 0 && <span className="px-1 text-muted-foreground">·</span>}
-              {g.chips.map((c, j) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: one chip per die position
-                <Chip key={j} chip={c} />
-              ))}
-              {g.constant !== 0 && (
-                <span className="font-mono text-sm text-muted-foreground">
-                  {signed(g.constant)}
-                </span>
-              )}
-            </span>
-          ))}
-        {(state === "compose" || state === "adjust") && request && (
-          <Extras request={request} mode={shownMode} />
+        {state === "rolling" && !request && (
+          <p className="text-sm text-muted-foreground">Rolling…</p>
         )}
-        {state === "rolling" && <p className="text-sm text-muted-foreground">Rolling…</p>}
         {state === "result" && result && <ResultView entries={result} />}
       </div>
 
