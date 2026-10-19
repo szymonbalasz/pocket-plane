@@ -47,13 +47,18 @@ import { activeCombatant, statsOf } from "./guards";
 import {
   campaignOf,
   getCombatant,
+  hitRulingChange,
   hpChangeChange,
   readCombatant,
   readEncounter,
   readHpChange,
+  rulingOfCard,
   startedEncounter,
   toHpChangeRecord,
 } from "./rows";
+
+/** FR-CBT-94 (sprint 5): the card gained (other) damage since the popup was built. */
+export const DAMAGE_JUST_ARRIVED = "Damage just arrived — check and Apply again";
 
 type Env = CommandEnv;
 
@@ -124,7 +129,7 @@ function emitWithCards(
 }
 
 /** A card's roll row: totals for apply, dice for the DM's line (FR-CBT-53). */
-function cardRoll(env: Env, id: string) {
+export function cardRoll(env: Env, id: string) {
   const r = env.tx
     .select({
       total: roll.total,
@@ -159,6 +164,12 @@ export const applyCardWith = (hooks: ApplyHooks) =>
       // FR-CBT-10: End also dismissed the card (FR-CBT-59); the ended encounter is the reason.
       if (enc.status !== "started") throw conflict("Encounter has ended");
       if (card.state !== "pending") throw conflict("No longer pending");
+      // FR-CBT-94 (sprint 5): the DM applies only the damage the popup showed.
+      if (input.damageRollId !== undefined && input.damageRollId !== (p.damage?.rollId ?? null)) {
+        throw conflict(DAMAGE_JUST_ARRIVED);
+      }
+      // FR-CBT-91 (sprint 5): the hit ruling leaves the wire with its card (the row stays).
+      const ruling = rulingOfCard(env.tx, card.id);
       // FR-CBT-72: `toHitTotal` iff the card has a to-hit roll; `damageTotal` unless the card has
       // no damage roll and every target misses. A typed total on a card without a damage roll =
       // "DM set" (`damageRolled` null).
@@ -255,7 +266,7 @@ export const applyCardWith = (hooks: ApplyHooks) =>
       ];
       const hpChangeIds: string[] = [];
       const outcomes: DamageCardTargetOutcome[] = [];
-      for (const { c: target, ...targetInput } of targets) {
+      for (const [i, { c: target, ...targetInput }] of targets.entries()) {
         const { hit, multiplier } = targetInput;
         // FR-CBT-82: raw = floor(base × m) + Σ floor(extra_i × m_i); a miss lands nothing.
         const parts = extras.map((x, i) => {
@@ -404,7 +415,13 @@ export const applyCardWith = (hooks: ApplyHooks) =>
           hooked.triggerParts,
           damageParts,
         );
-        emitWithCards(env, AttackApplied.type, hp, row, facts, [entry, ...hooked.changes]);
+        const rulingGone =
+          ruling && i === targets.length - 1 ? [hitRulingChange(ruling, null)] : [];
+        emitWithCards(env, AttackApplied.type, hp, row, facts, [
+          entry,
+          ...hooked.changes,
+          ...rulingGone,
+        ]);
         hpChangeIds.push(row.id);
         // #138: the rolling player sees each outcome; a hidden target's name never. FR-CBTX-15:
         // `applied` = damage dealt (HP lost + absorbed), so a target's temp HP never shows.
@@ -516,7 +533,9 @@ export const undoCommandWith = (hooks: ApplyHooks) =>
       if (!enc || !last) throw conflict("Nothing to undo");
       if (last.id !== expectedHpChangeId) throw conflict("Something else changed — check Undo");
       const notRestored: string[] = [];
-      for (const row of unit) {
+      // FR-CBT-91 (sprint 5): the reopened card's hit ruling comes back with it.
+      const ruling = last.cardId ? rulingOfCard(env.tx, last.cardId) : null;
+      for (const [i, row] of unit.entries()) {
         const target = readCombatant(env.tx, row.targetId);
         // I2: the inverse delta, clamped; it restores only this entry's own change. FR-CBTX-22:
         // temp HP, death counters by delta, effects it ended (free slots only).
@@ -539,6 +558,7 @@ export const undoCommandWith = (hooks: ApplyHooks) =>
             hpChangeChange(row, readHpChange(env.tx, row.id)),
             entry,
             ...hookChanges,
+            ...(ruling && i === unit.length - 1 ? [hitRulingChange(null, ruling)] : []),
           ],
         });
         // FR-CBTX-22: this row's pending concentration cards close `undone` after its event.

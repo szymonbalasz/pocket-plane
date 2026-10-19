@@ -335,6 +335,8 @@ export const duplicateScene = defineCommand({
           sceneId: id,
           seq: tokenSeqNext,
           ...tokenCopies(tx, { ...t, sceneId: id }),
+          // FR-MAP-65: a trail lives on the started encounter's scene only.
+          trail: null,
           createdAt: now,
           updatedAt: now,
         })
@@ -666,7 +668,8 @@ function authorizeTokenMove(tx: Tx, actor: Actor, tokenId: string): void {
  * Hooks never reject a move; a throw rolls it back (`internal`). Order (ADR-0040 / ADR-0042,
  * FR-FOG-10): validate → guards → `derive` (`fogged`, `seenBy`) → one write → re-derive
  * dependants → token-changed hooks, so a move into fog is already fogged in its own change
- * (players get one `delete`).
+ * (players get one `delete`). FR-MAP-65 (sprint 5): the one `token` upsert is read after the
+ * hooks, so it carries the trail combat's hook appended (no second upsert).
  */
 export function moveTokenCommand(hooks: TokenHooks) {
   return defineCommand({
@@ -701,7 +704,7 @@ export function moveTokenCommand(hooks: TokenHooks) {
         type: TokenMoved.type,
         campaignId: cid,
         payload: { tokenId, sceneId: before.sceneId, col, row },
-        changes: [tokenChange(before, after), ...dependants, ...hookChanges],
+        changes: [tokenChange(before, readToken(tx, tokenId)), ...dependants, ...hookChanges],
       });
     },
   });
@@ -780,7 +783,10 @@ export function updateTokenCommand(hooks: TokenHooks) {
   });
 }
 
-/** FR-MAP-19: hide → players get a `delete`; reveal → an `upsert`. Unchanged → no event. */
+/**
+ * FR-MAP-19: hide → players get a `delete`; reveal → an `upsert`. Unchanged → no event. The
+ * upsert is read after the hooks: a reveal resets the trail (FR-MAP-66, sprint 5).
+ */
 export function setTokenHiddenCommand(hooks: TokenHooks) {
   return defineCommand({
     name: MAP_INTENTS.setTokenHidden,
@@ -801,7 +807,7 @@ export function setTokenHiddenCommand(hooks: TokenHooks) {
         type: hidden ? TokenHidden.type : TokenRevealed.type,
         campaignId: cid,
         payload: { tokenId, sceneId: before.sceneId },
-        changes: [tokenChange(before, after), ...dependants, ...hookChanges],
+        changes: [tokenChange(before, readToken(tx, tokenId)), ...dependants, ...hookChanges],
       });
     },
   });

@@ -2,7 +2,13 @@
 // sprint 2: Start options, created tokens, HP modes, monster initiative, FR-CBT-64–66).
 // `started` / `ended` rule hooks run after the event (FR-CBTX-01, ADR-0035).
 import { type BindSlot, planBindings } from "@shared/combat-tracker/rules";
-import { CBT_INTENTS, EndInput, type HpMode, StartInput } from "@shared/combat-tracker/schemas";
+import {
+  CBT_INTENTS,
+  EndInput,
+  type HpMode,
+  type Side,
+  StartInput,
+} from "@shared/combat-tracker/schemas";
 import { type DefinitionRecord, entityNameKey } from "@shared/entities/schemas";
 import { EncounterEnded, EncounterStarted } from "@shared/events/combat-tracker";
 import { and, eq } from "drizzle-orm";
@@ -13,6 +19,7 @@ import type { RecordChange } from "../../events/types";
 import { resolveDefinition } from "../entities/commands";
 import { dismissForEncounter } from "../notifications";
 import { getScene, sceneTokens } from "../scenes-map/rows";
+import { clearTrails } from "../scenes-map/trail";
 import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 import { rollInitiativeFor } from "./initiative";
 import { monsterHp, TokenPlacer } from "./join";
@@ -24,6 +31,8 @@ import {
   encounterChange,
   entriesOf,
   getEncounter,
+  hitRulingChange,
+  pendingRulings,
   readEncounter,
   startedEncounter,
 } from "./rows";
@@ -57,7 +66,8 @@ export function partyOf(env: Pick<CommandEnv, "tx">, cid: string, ids: string[] 
     });
 }
 
-type StartSlot = BindSlot & { def: DefinitionRecord | null; hpMode: HpMode };
+/** `side`: the entry's (FR-CBT-98); null = the kind's default (PCs). */
+type StartSlot = BindSlot & { def: DefinitionRecord | null; hpMode: HpMode; side: Side | null };
 
 /**
  * FR-CBT-07 / -08, sprint 2 FR-CBT-64–66: party PCs (minus `excludeCharacterIds`) by name, then
@@ -97,6 +107,7 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
           portraitAssetId: c.portraitAssetId,
           def: null,
           hpMode: "average",
+          side: null,
         });
       }
       for (const e of entriesOf(tx, before)) {
@@ -109,6 +120,8 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
             portraitAssetId: def.portraitAssetId,
             def,
             hpMode: e.hpMode,
+            // FR-CBT-98 (#252): a friendly entry's instances start as allies, shown to players.
+            side: e.side === "ally" ? "ally" : null,
           });
         }
       }
@@ -159,6 +172,8 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
             playerPosition: null,
             hpCurrent: hp,
             hpMax: hp,
+            side: slot.side,
+            publicSide: slot.side,
           })
           .run();
       });
@@ -222,6 +237,10 @@ export const endCommandWith = (hooks: CombatRuleHooks) =>
       const changes = [
         encounterChange(before, after),
         ...rows.map((r) => combatantChange(r, { ...r, active: false })),
+        // FR-CBT-91 (sprint 5): the hit rulings of the cards End dismisses leave the DM's store.
+        ...pendingRulings(env, encounterId).map((r) => hitRulingChange(r, null)),
+        // FR-CBT-97: End clears the trails.
+        ...(before.sceneId ? clearTrails(env, before.sceneId) : []),
       ];
       env.emit({ type: EncounterEnded.type, campaignId: cid, payload: { encounterId }, changes });
       changes.push(...hooks.run("ended", env, after, { combatantIds: rows.map((r) => r.id) }));

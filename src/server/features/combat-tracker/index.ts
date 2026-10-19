@@ -1,5 +1,5 @@
 // combat-tracker (CBT): encounters (REST), combat intents, record types `encounter`,
-// `encounter-entry`, `combatant`, `hp-change`; token-changed and definition-changed hooks
+// `encounter-entry`, `combatant`, `hp-change`, `hit-ruling` (sprint 5); token-changed and definition-changed hooks
 // (registered in scenes-map's / entities' append-only registries); the combat rule hook list
 // (FR-CBTX-01, ADR-0035) that start / turns / end run; the apply hook list (FR-MOD-38,
 // ADR-0043) that apply / undo run.
@@ -10,11 +10,13 @@ import { ApplyHooks, applyHooks, bindApplyHooks } from "./apply-hooks";
 import { attackCommand } from "./attack";
 import { rollDamageCommand } from "./damage";
 import { createEncounter, deleteEncounter, updateEncounter } from "./encounters";
+import { applyHitCommand } from "./hit";
 import { applyCardWith, applyHp, undoCommandWith } from "./hp";
 import { rollInitiative, setInitiative, setRemoved } from "./initiative";
 import { endCommandWith, startCommandWith } from "./lifecycle";
 import { combatRecordTypes } from "./records";
 import { bindCombatRuleHooks, CombatRuleHooks, combatRuleHooks } from "./rule-hooks";
+import { setSideCommand } from "./sides";
 import { turnCommand } from "./turns";
 
 export const combatTracker: Feature = {
@@ -42,6 +44,8 @@ export const combatTracker: Feature = {
       applyHp,
       undoCommandWith(apply),
       rollAbility,
+      applyHitCommand,
+      setSideCommand,
     ] as unknown as CommandDef[];
     for (const c of intents) r.command(c, { intent: true });
     for (const t of combatRecordTypes) r.recordType(t);
