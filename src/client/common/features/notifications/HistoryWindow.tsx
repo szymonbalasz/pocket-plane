@@ -7,22 +7,67 @@ import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
+import { colorHex } from "../campaign-management/colors";
+import { useColorKeyOf } from "../dice-roll-log/name-color";
 import { useWindowShown } from "../play-shell/ShellWindow";
 import { isTestMode } from "../play-shell/test-windows";
 import {
   actionButton,
   audienceLabel,
+  closerOf,
   dismissButton,
   historySections,
   stateLabel,
   viewerOf,
 } from "./logic";
 import type { NoteClient } from "./note-client";
-import { NoteBody, timeOf, useNoteActions, usePlayerNames } from "./parts";
+import {
+  NoteBody,
+  NoteStripe,
+  timeOf,
+  useNoteActions,
+  useNoteStripe,
+  usePlayerNames,
+} from "./parts";
 import { TestSendForm } from "./TestSendForm";
 import { type NotificationViews, originOf } from "./views";
 
 const ROW_SELECTOR = '[data-testid="note-history-row"]';
+
+/**
+ * FR-NOTE-17 state badge; FR-NOTE-40 (OQ-CAMP-27 A): "Resolved by ‹name›" draws the name in the
+ * closer's colour, on an outline badge so it sits on the window surface (every key ≥ 4.5 : 1
+ * there, CAMP §7; the secondary fill drops vermillion / bronze below 4). "Closed" unchanged.
+ */
+function StateBadge({ n, label }: { n: NotificationRecord; label: string }) {
+  const keyOf = useColorKeyOf();
+  const nameOf = usePlayerNames();
+  const closer = closerOf(n);
+  if (!closer) {
+    return (
+      <Badge
+        variant={n.state === "pending" ? "default" : "secondary"}
+        data-testid="note-history-state"
+      >
+        {label}
+      </Badge>
+    );
+  }
+  const color = keyOf(closer);
+  return (
+    <Badge variant="outline" data-testid="note-history-state">
+      Resolved by{" "}
+      <span
+        data-testid="note-history-closed-by"
+        data-color={color ?? undefined}
+        className="font-semibold"
+        style={color ? { color: colorHex(color) } : undefined}
+      >
+        {closer.role === "player" ? nameOf(closer.playerId) : "DM"}
+      </span>
+    </Badge>
+  );
+}
 
 function Row({
   n,
@@ -36,6 +81,7 @@ function Row({
   const you = useSync((s) => s.store.you);
   const live = useSync((s) => s.state === "live");
   const nameOf = usePlayerNames();
+  const stripe = useNoteStripe(n);
   if (!you) return null;
   const v = { role: you.role, playerId: you.playerId };
   const action = actionButton(n, v, live, views.get(n.kind));
@@ -48,11 +94,13 @@ function Row({
       data-testid="note-history-row"
       data-record-id={n.id}
       data-state={n.state}
+      {...stripe.attrs}
       className={cn(
-        "flex flex-col gap-1.5 rounded-md border p-2",
+        "relative flex flex-col gap-1.5 rounded-md border p-2",
         n.state === "pending" ? "border-primary" : "text-muted-foreground",
       )}
     >
+      <NoteStripe color={stripe.color} />
       <NoteBody n={n} views={views} />
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
         <Tooltip content={time.full}>
@@ -65,14 +113,7 @@ function Row({
             {audienceLabel(n, nameOf)}
           </Badge>
         )}
-        {state && (
-          <Badge
-            variant={n.state === "pending" ? "default" : "secondary"}
-            data-testid="note-history-state"
-          >
-            {state}
-          </Badge>
-        )}
+        {state && <StateBadge n={n} label={state} />}
         <div className="ml-auto flex gap-1">
           {action !== "none" && (
             <Button

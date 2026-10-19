@@ -196,6 +196,26 @@ export function stateLabel(n: NotificationRecord, nameOf: Names): string | null 
   }
 }
 
+/** Who a row names: the DM or a player (a `ColorPerson`, FR-CAMP-28). */
+export interface NotePerson {
+  role: "dm" | "player";
+  playerId: string | null;
+}
+
+/** FR-NOTE-39: who caused the row (`byRole` / `byPlayerId`); null = no one (old row, system). */
+export const causerOf = (n: NotificationRecord): NotePerson | null =>
+  n.byRole === null ? null : { role: n.byRole, playerId: n.byPlayerId };
+
+/** FR-NOTE-40: who "Resolved by ‹name›" names; null for every other badge ("Closed" too). */
+export const closerOf = (n: NotificationRecord): NotePerson | null =>
+  n.state === "resolved" && n.closedByRole !== null
+    ? { role: n.closedByRole, playerId: n.closedByPlayerId }
+    : null;
+
+/** `data-by` on toasts and rows: the causer's player id, `dm`, or absent. */
+export const byAttr = (n: NotificationRecord): string | undefined =>
+  n.byRole === "dm" ? "dm" : n.byRole === "player" ? (n.byPlayerId ?? undefined) : undefined;
+
 /** FR-NOTE-17 DM audience tag. */
 export function audienceLabel(n: NotificationRecord, nameOf: Names): string {
   if (n.audience === "dm") return "DM";
