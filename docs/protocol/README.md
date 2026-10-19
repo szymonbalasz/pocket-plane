@@ -2292,9 +2292,62 @@ From [play-shell](../specs/play-shell.md) FR-SHELL-45–54, [dice-roll-log](../s
 | `note.history` | Placement only: 480 high where a clear slot allows, else the tallest clear slot (412 at 1280×720; player 472 at 1440×900 above the 280-high log); never over the Game log | FR-NOTE-31 |
 | Placement tokens (`ShellContext`) | `tokenScreenBoxes("all")` boxes carry the token `id`; `pc` from this client's token records (`ownerPlayerId`) | FR-SHELL-45 (2) |
 
-## 90. Sprint 5: Add to party from the compendium (P4)
+## 90. Sprint 5: dice landing (D8)
 
-From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–42 (OQ-CMP-34, DM gate #256; seams S5; ruling P #19). **Built by `build/cmp-add-to-party`**: DM client only. No new route, intent, event, record type or registry: the action sends party-board's `party.addItem` ([§44](#44-sprint-3-party-board-core-p-core)). Data side: [data model §70](../data-model/README.md#70-sprint-5-add-to-party-from-the-compendium-p4).
+From [dice-extras](../specs/dice-extras.md) FR-DICEX-49, -50 and [dice-roll-log](../specs/dice-roll-log.md) FR-DICE-40 ([ADR-0051](../architecture/adr/0051-dice-landing-line.md); DM gate #256: OQ-DICEX-38 A, OQ-DICE-30 A). **Built by `build/dice-landing`**: no record type, intent, event, signal or wire field; the server never waits ([ADR-0001](../architecture/adr/0001-tech-stack.md), ADR-0044). Data side: [data model §70](../data-model/README.md#70-sprint-5-dice-landing-d8).
+
+| Piece | Contract |
+|---|---|
+| Holding (`dice-extras/landing.ts`, initial chunk) | Client memory `holding: Map<entryId, deadline>`. Filled **only** by the runtime's live-frame handler (`ThrowLayer.tsx`, after the popup and the throw exist): the frame's new `roll` entries (FR-DICEX-11 source), none with display `off` or a hidden tab, never a manual-only entry (every payload item `manual`). Snapshots, resyncs, reconnects, undo upserts and rows below the window floor never add one. Deadline = arrival + 6 s (`LANDING_MAX_MS` = `POPUP_ROLLING_MAX_MS`) |
+| Landing | An entry leaves when none of its presentations on this client moves: a throw run in `moving` (an interrupted run snaps to `rest`), a popup part in `moving` (popup not `closing`: hand-off, miniature, chip fade-in), a throw waiting for the 3D chunk (`landing.wait` / `unwait`); swept on every change of either store. Else at the deadline. A resync changes none of these, so a held entry stays held; a reload starts empty |
+| Hooks (`@ui`) | `useLanded(entryId)` (= not held), `useAllLanded(ids)`, `useHolding()`, `useLandingFade(landed)` (at the landing each `[data-landing]` child fades in over 150 ms, Web Animations API; no keyframes) |
+| Log line (`GameLog.tsx`, FR-DICE-40) | Held: `heldSegments` (`dice-roll-log/logic.ts`, render only): `die` chips blank (`DieShape` `blank`: shape in the look, no number), total "…", "(adv)" / "(dis)" marker "(…)", natural 20 / 1 marker left out until the landing; Tooltip without the dice; `aria-busy="true"`. `formatLine`, `lineText`, copy and the stored entry unchanged; the "N new" count and the launcher dot don't wait |
+| Tray result (FR-DICEX-10) | Held: `FlatDie` blank, total "…", the line text through `heldSegments` |
+| Popup (FR-DICEX-40) | Each row's total waits for its own entry ("Rolling…"); chips blank till then. `data-state` and the 6 s timer stay the popup's own (an Off viewer: totals at once, the card still fades its chips) |
+| Label reset (FR-DICEX-50, `tray-logic.ts`) | `editStartsFresh(state, kind)`: an edit (palette die, expression or constant input) in `result` or over a non-`free` request starts fresh (`editRequest`: expression only, category `other`, no label, no actor); while composing it keeps the staged request. The expression and constant inputs show in `result` too. The tray header names the actor only when one is picked ("Other" for a fresh request). "Roll again" re-sends the staged request; a stage (notation, roll bar, Alt+click) replaces it |
+| Test IDs | `dice-log-entry` + `data-landed`; `dice-log-die` and `dicex-die` drop `data-value` while held; `dicex-tray-total` + `data-landed`; `dicex-popup` + `data-landed` (every entry); `dicex-popup-row` + `data-landed` |
+| Bundle | dice-extras in each client's initial chunks **13.0 KB gz** (cap 15); `RollPopup` **4.8 KB gz** (cap 8) |
+| CON-44 | 0 B: no record, field or frame added. Bundle `dice-polish` DM 21,098 B, P1 13,882 B, P2 10,684 B |
+
+## 91. Sprint 5: player colours core (K0)
+
+From [campaign-management](../specs/campaign-management.md#9-api--events) FR-CAMP-23–26, -28, -29, [notifications](../specs/notifications.md#9-api--events) FR-NOTE-38 and [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-61 ([ADR-0055](../architecture/adr/0055-player-colour.md); DM gate #256). **Built by `fix/colours-core`**: server, zod, the client helper and theme tokens; the picker is K2, map / log / notification colouring K3 / K4. **No signal change** (0 B: the colour derives from the server-stamped `from`). Data side: [data model §71](../data-model/README.md#71-sprint-5-player-colours-core-k0).
+
+**Intent** (strict zod `SetColorInput`, `@shared/campaign-management/schemas`; command in `src/server/features/campaign-management/colors.ts`)
+
+| Intent | Who | Validation | Result | Source |
+|---|---|---|---|---|
+| `camp.setColor {playerId: Id \| null, color}` *(new; the first CAMP WS intent)* | DM, player | player: `playerId` ≠ own (another player or `null`) → `forbidden`; DM: not a player of the connection's campaign → `not_found`; `color` not one of the 8 keys, or extra keys → `invalid`; same as the current colour → `ack`, no write, no event; taken by the DM colour or another player of the campaign → `conflict` "Taken by ‹name›" (the player's name or "DM"), checked in the transaction (racing picks: one `ack`, one `conflict`) | `{}` | FR-CAMP-25, -26 |
+
+**Record types** (scope, visibility and snapshot as before: every connection of the campaign)
+
+| Type | Change | Source |
+|---|---|---|
+| `campaign` | + `dmColor` (palette key) | FR-CAMP-24, -29 |
+| `player` | + `color` (palette key, never null: the boot backfill runs before the server listens); still no `linkToken` | FR-CAMP-23, -29 |
+| `notification` | + `byRole` (`dm` \| `player` \| null), `byPlayerId` (ID \| null): who caused it; null on older rows and system rows; never in a helper argument or intent (`note.testSend {byPlayerId}` → `invalid`) | FR-NOTE-38 |
+
+- The wire zod reads `color` / `dmColor` as a non-empty string: a client meeting a key it doesn't know (newer server, edited DB) falls back to the role accent instead of failing the frame.
+
+**Domain events** (`src/shared/events/campaign-management.ts`)
+
+| Event | Changes | Player sees | Logged | Undoable |
+|---|---|---|---|---|
+| `PlayerColorSet {playerId: Id \| null, color}` *(new)* | one `player` upsert, or one `campaign` upsert when `playerId` is null (DM colour) | the upsert (every connection of the campaign) | yes | no |
+| `PlayerAdded` | its `player` upsert carries the default `color` (payload unchanged) | as before | yes | no |
+| `CampaignCreated` / `CampaignRenamed` | the `campaign` upsert carries `dmColor` | as before | yes | no |
+| `NotificationCreated` | the `notification` upsert carries `byRole` / `byPlayerId` | per FR-NOTE-06 (unchanged) | yes | no |
+
+**Helpers, hooks and seams**
+
+- Start hook `campaign-management.color-backfill` (`backfillPlayerColors`): fills null `player.color` before the server listens; one transaction, no event, no log row.
+- `notify` (`src/server/features/notifications/helpers.ts`) stamps the causer from `env.actor`; a **system** actor stamps null / null and closes with null closer fields (`resolveNotification`, dismiss). `gameLog.append` (`src/server/features/dice-roll-log/game-log.ts`) **throws** under a system actor (the command fails `internal`, nothing written).
+- Client: `colorOf(store, {role, playerId?})`, `colorKeyOf`, `colorHex`, `useColorOf()` (`@ui/features/campaign-management/colors`); tokens `--player-<key>` in `src/client/common/styles.css`. Palette, `defaultColor` and the contrast / CIEDE2000 checks: `@shared/campaign-management/colors`.
+- Tests: `@shared/campaign-management/colors.test.ts` (FR-CAMP-23 default colour, FR-CAMP-28 palette contrast ×3), server `campaign-management/colors.test.ts` (FR-CAMP-23 default ×2, backfill ×2, backfill rerun; FR-CAMP-24; FR-CAMP-25 permissions, crash; FR-CAMP-26), `stamp.test.ts` (FR-NOTE-38 ×3, FR-DICE-61 system actor), `colours-sync.test.ts` (FR-CAMP-29 ×2 over WS with reconnect, restart and leak scan; FR-NOTE-38 visibility), client `colors.test.tsx` (FR-CAMP-28 colorOf ×4), `db/colours-schema.test.ts` (push), `ws/snapshot-size.test.ts` (CON-44 colours).
+
+## 92. Sprint 5: Add to party from the compendium (P4)
+
+From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–42 (OQ-CMP-34, DM gate #256; seams S5; ruling P #19). **Built by `build/cmp-add-to-party`**: DM client only. No new route, intent, event, record type or registry: the action sends party-board's `party.addItem` ([§44](#44-sprint-3-party-board-core-p-core)). Data side: [data model §72](../data-model/README.md#72-sprint-5-add-to-party-from-the-compendium-p4).
 
 | Piece | Contract |
 |---|---|

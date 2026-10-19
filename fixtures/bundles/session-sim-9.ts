@@ -25,5 +25,7 @@ export default defineBundle({
     // C5 core: "Moonlit Lantern" (shared, 2 attachment images), "CMP-IMG-SECRET" (DM only, 1)
     "cmp-images",
     // K: player colours, kept-template menu
+    // K0: Player 2 picks blue (Player 1 jade, DM amber by default)
+    "pc-colours",
   ],
 });

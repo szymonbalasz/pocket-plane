@@ -57,6 +57,8 @@ function note(p: Partial<NotificationRecord> = {}): NotificationRecord {
     closedAt: null,
     closedByRole: null,
     closedByPlayerId: null,
+    byRole: null,
+    byPlayerId: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     ...p,

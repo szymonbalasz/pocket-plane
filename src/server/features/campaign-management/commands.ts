@@ -1,4 +1,5 @@
-// campaign-management commands (CAMP §6, §9). All DM-only; REST and fixtures call them.
+// campaign-management commands (CAMP §6, §9). All DM-only; REST and fixtures call them. The one
+// WS intent, `camp.setColor` (sprint 5), is in `colors.ts`.
 import {
   AddPlayerBody,
   CreateCampaignBody,
@@ -12,6 +13,7 @@ import { defineCommand, IdSchema } from "../../commands/commands";
 import { conflict, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { campaign, player } from "../../db/schema";
+import { nextDefaultColor } from "./colors";
 import { playerLifecycleHooks } from "./player-hooks";
 import { toCampaignRecord, toPlayerRecord } from "./records";
 
@@ -49,10 +51,13 @@ export const createCampaign = defineCommand({
     const id = ctx.ids.next();
     const now = ctx.clock.iso();
     const becomesActive = activeCampaign(tx) === null;
-    tx.insert(campaign)
+    // FR-CAMP-24: a new campaign starts at the column default (amber).
+    const row = tx
+      .insert(campaign)
       .values({ id, name, active: becomesActive, createdAt: now, updatedAt: now })
-      .run();
-    const rec = toCampaignRecord({ id, name });
+      .returning()
+      .get();
+    const rec = toCampaignRecord(row);
     emit({
       type: "CampaignCreated",
       campaignId: id,
@@ -89,7 +94,7 @@ export const renameCampaign = defineCommand({
           type: "campaign",
           id,
           before: toCampaignRecord(row),
-          after: toCampaignRecord({ id, name }),
+          after: toCampaignRecord({ ...row, name }),
         },
       ],
     });
@@ -125,8 +130,9 @@ export const activateCampaign = defineCommand({
 });
 
 /**
- * FR-CAMP-12/13: adds to the active campaign; token from ctx.tokens. Player hooks (`added`,
- * ADR-0042) run after the insert; their rows join `PlayerAdded`.
+ * FR-CAMP-12/13: adds to the active campaign; token from ctx.tokens; colour = the next free key
+ * (FR-CAMP-23). Player hooks (`added`, ADR-0042) run after the insert; their rows join
+ * `PlayerAdded`.
  */
 export const addPlayer = defineCommand({
   name: "player.add",
@@ -141,10 +147,12 @@ export const addPlayer = defineCommand({
       linkToken = ctx.tokens.next();
     }
     const now = ctx.clock.iso();
+    // FR-CAMP-23: the next free palette key, in the same transaction.
+    const color = nextDefaultColor(tx, active.id);
     tx.insert(player)
-      .values({ id, campaignId: active.id, name, linkToken, createdAt: now, updatedAt: now })
+      .values({ id, campaignId: active.id, name, linkToken, color, createdAt: now, updatedAt: now })
       .run();
-    const after = toPlayerRecord({ id, campaignId: active.id, name });
+    const after = toPlayerRecord({ id, campaignId: active.id, name, color });
     const hookChanges = playerLifecycleHooks.added({ tx, ctx, actor }, after);
     emit({
       type: "PlayerAdded",

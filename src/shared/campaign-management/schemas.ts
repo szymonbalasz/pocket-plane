@@ -1,5 +1,6 @@
 // campaign-management boundary schemas (CAMP §6, §9). Used by server and both clients.
 import { z } from "zod";
+import { PlayerColor } from "./colors";
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control characters is the point (CAMP §11).
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
@@ -25,11 +26,29 @@ export const nameKey = (s: string) => s.normalize("NFC").toLowerCase();
 export const LinkToken = z.string().regex(/^[A-Za-z0-9_-]{22}$/);
 
 // ---- Sync record types (wire shapes; no token field exists) ----
-export const CampaignRecord = z.object({ id: z.string(), name: z.string() });
+/**
+ * A colour on the wire (FR-CAMP-28, -29): a palette key, never null (the boot backfill runs
+ * first). Read as any string so a client survives a key it doesn't know (role-accent fallback).
+ */
+const WireColor = z.string().min(1);
+
+export const CampaignRecord = z.object({ id: z.string(), name: z.string(), dmColor: WireColor });
 export type CampaignRecord = z.infer<typeof CampaignRecord>;
 
-export const PlayerRecord = z.object({ id: z.string(), campaignId: z.string(), name: z.string() });
+export const PlayerRecord = z.object({
+  id: z.string(),
+  campaignId: z.string(),
+  name: z.string(),
+  color: WireColor,
+});
 export type PlayerRecord = z.infer<typeof PlayerRecord>;
+
+// ---- WS intents ----
+/** `camp.setColor` (FR-CAMP-25): `playerId` null = the DM colour. */
+export const SetColorInput = z
+  .object({ playerId: z.string().min(1).max(64).nullable(), color: PlayerColor })
+  .strict();
+export type SetColorInput = z.infer<typeof SetColorInput>;
 
 // ---- REST bodies and responses ----
 export const CreateCampaignBody = z.object({ name: CampaignName });

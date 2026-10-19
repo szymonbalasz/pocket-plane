@@ -14,6 +14,7 @@ import compendiumFull from "./compendium-full";
 import diceDisplay from "./dice-display";
 import diceExtras from "./dice-extras";
 import diceLog from "./dice-log";
+import dicePolish from "./dice-polish";
 import effectModifiers from "./effect-modifiers";
 import entities from "./entities";
 import fog from "./fog";
@@ -28,6 +29,7 @@ import partyCmp from "./party-cmp";
 import partyLoot from "./party-loot";
 import partyS5 from "./party-s5";
 import physicalDiceCombat from "./physical-dice-combat";
+import playerColours from "./player-colours";
 import ruleTriggers from "./rule-triggers";
 import rulesEffects from "./rules-effects";
 import sceneTools from "./scene-tools";
@@ -87,7 +89,9 @@ export const bundles: readonly Bundle[] = [
   windowsS5,
   lateDamage,
   partyS5,
+  dicePolish,
   cmpImages,
   tplMenu,
   partyCmp,
+  playerColours,
 ];

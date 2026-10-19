@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { player } from "../../db/schema";
 import type { Feature } from "../../services";
 import { createResolvers, DmSecretChecker } from "./auth";
+import { backfillPlayerColors, setColor } from "./colors";
 import {
   activateCampaign,
   addPlayer,
@@ -17,14 +18,21 @@ export const campaignManagement: Feature = {
   name: "campaign-management",
   register(r) {
     const s = r.services;
-    // No WS intents (CAMP §9): REST + fixtures only.
+    // REST + fixtures only (CAMP §9).
     r.command(createCampaign);
     r.command(renameCampaign);
     r.command(activateCampaign);
     r.command(addPlayer);
     r.command(renamePlayer);
+    // Sprint 5: the one WS intent (FR-CAMP-25).
+    r.command(setColor, { intent: true });
     r.recordType(campaignRecordType);
     r.recordType(playerRecordType);
+    // FR-CAMP-23: fill null colours before the server listens (no snapshot carries a null).
+    r.onStart("campaign-management.color-backfill", (sv) => {
+      const n = backfillPlayerColors(sv.db);
+      if (n > 0) sv.log.info(`campaign-management: backfilled ${n} player colour(s) (FR-CAMP-23)`);
+    });
     r.provideAuth(createResolvers(s.db, new DmSecretChecker(s.config.dmSecret, s.clock)));
     // FR-FOG-43: `sync.loadScene {viewAs}` accepts only a player of the DM's campaign.
     s.records.providePlayerCampaign(
