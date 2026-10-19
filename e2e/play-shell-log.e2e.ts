@@ -1,8 +1,9 @@
 // e2e-bundle: dice-log
-// FR-SHELL-35 (R3, amends FR-SHELL-28 for `dice.log`): at its default size, with the one-row
-// roll bar (FR-DICE-30), the Game log shows ≥ 6 single-line entries fully above the bar, ≥ 4
-// with Physical dice on (strip shown). The roll bar is a pinned footer: always fully shown, and
-// only the entry list scrolls (DM 460×240, player 340×280).
+// FR-SHELL-35 (R3, amends FR-SHELL-28 for `dice.log`), sizes per FR-DICE-38 (sprint 5): at its
+// default size, with the one-row roll bar (FR-DICE-30), the Game log shows ≥ 6 single-line
+// entries fully above the bar, ≥ 4 with Physical dice on (strip shown), at the tall sizes
+// (DM 1150×240, player 850×280 at 1440×900); ≥ 3 / ≥ 2 at 160 high (DM 690×160, player 510×160 at
+// 1280×720). The roll bar is a pinned footer: always fully shown, and only the entry list scrolls.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { shellWindow } from "./support/shell";
@@ -78,49 +79,83 @@ async function expectHistory(log: Locator, min: number) {
   expect((await fullyShown(log)).multiLine).toBe(0);
 }
 
-for (const role of ["DM", "player"] as const) {
-  test(`FR-SHELL-35 ${role} game log at default size: ≥ 6 single-line entries, ≥ 4 with Physical dice on`, async ({
-    browser,
-  }) => {
-    const { secret, link } = e2eEnv();
-    const page = await rolePage(browser);
-    await page.setViewportSize({ width: 1280, height: 720 }); // the tightest laptop layout
-    if (role === "DM") await loginDm(page, secret);
-    else await page.goto(link("Player 1"));
-    const log = shellWindow(page, "dice.log");
-    await expect(log).toBeVisible(); // default open, default size
-    expect(await windowSize(log)).toEqual(role === "DM" ? { w: 460, h: 240 } : { w: 340, h: 280 });
-    await expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+const SIZES = [
+  {
+    vp: { width: 1280, height: 720 },
+    dm: { w: 690, h: 160 },
+    player: { w: 510, h: 160 },
+    min: [3, 2],
+  },
+  {
+    vp: { width: 1440, height: 900 },
+    dm: { w: 1150, h: 240 },
+    player: { w: 850, h: 280 },
+    min: [6, 4],
+  },
+] as const;
 
-    // FR-DICE-30: Options closed by default → one row.
-    await expect(log.getByTestId("dice-roll-options")).toHaveAttribute("data-state", "closed");
-    await expect(log.getByTestId("dice-roll-category")).toHaveCount(0);
-    await expect(log.getByTestId("dice-log-physical")).toHaveCount(0);
+for (const role of ["DM", "player"] as const)
+  for (const size of SIZES) {
+    const [off, on] = size.min;
+    test(`FR-SHELL-35 FR-DICE-38 ${role} game log at default size at ${size.vp.width}×${size.vp.height}: ≥ ${off} single-line entries, ≥ ${on} with Physical dice on`, async ({
+      browser,
+    }) => {
+      const { secret, link } = e2eEnv();
+      const page = await rolePage(browser);
+      await page.setViewportSize(size.vp);
+      if (role === "DM") await loginDm(page, secret);
+      else await page.goto(link("Player 1"));
+      const log = shellWindow(page, "dice.log");
+      await expect(log).toBeVisible(); // default open, default size
+      expect(await windowSize(log)).toEqual(role === "DM" ? size.dm : size.player);
+      await expect(page.getByTestId("sync-connection-status")).toHaveAttribute(
+        "data-state",
+        "live",
+      );
 
-    await rollMany(log, 8);
-    await expectHistory(log, 6);
-    expect(await clippedRollBar(log, ROW_1)).toEqual([]);
-    // The body itself does not scroll: only the entry list does.
-    const bodyScrolls = await log.evaluate((w) => {
-      const body = w.querySelector("[data-testid='dice-log']")?.parentElement;
-      return body ? body.scrollHeight > body.clientHeight + 0.5 : true;
+      // FR-DICE-30: Options closed by default → one row.
+      await expect(log.getByTestId("dice-roll-options")).toHaveAttribute("data-state", "closed");
+      await expect(log.getByTestId("dice-roll-category")).toHaveCount(0);
+      await expect(log.getByTestId("dice-log-physical")).toHaveCount(0);
+
+      await rollMany(log, 8);
+      await expectHistory(log, off);
+      expect(await clippedRollBar(log, ROW_1)).toEqual([]);
+      // The body itself does not scroll: only the entry list does.
+      const bodyScrolls = await log.evaluate((w) => {
+        const body = w.querySelector("[data-testid='dice-log']")?.parentElement;
+        return body ? body.scrollHeight > body.clientHeight + 0.5 : true;
+      });
+      expect(bodyScrolls).toBe(false);
+
+      await physicalOnOptionsClosed(page, log);
+      await expectHistory(log, on);
+      expect(await clippedRollBar(log, [...ROW_1, "dice-log-physical-off"])).toEqual([]);
+
+      // Options open with the strip on: the whole bar (incl. the DM gear) stays in the window at
+      // the tall sizes; at 160 high the body scrolls to it as a last resort (GameLog `min-h-fit`).
+      await log.getByTestId("dice-roll-options").click();
+      const row2 = [
+        "dice-roll-category",
+        "dice-roll-actor",
+        "dice-roll-label",
+        "dice-roll-physical",
+      ];
+      if (role === "DM") row2.push("dice-settings-open");
+      if (size.vp.height >= 900) {
+        expect(await clippedRollBar(log, [...ROW_1, ...row2, "dice-log-physical-off"])).toEqual([]);
+        expect((await fullyShown(log)).count).toBeGreaterThanOrEqual(1);
+      } else {
+        for (const id of row2) {
+          await log.getByTestId(id).scrollIntoViewIfNeeded();
+          expect(await clippedRollBar(log, [id])).toEqual([]);
+        }
+        await log.getByTestId("dice-log-physical-off").scrollIntoViewIfNeeded();
+      }
+
+      // Leave the mode off for later specs on this server's browser contexts.
+      await log.getByTestId("dice-log-physical-off").click();
+      await expect(log.getByTestId("dice-log-physical")).toHaveCount(0);
+      await page.context().close();
     });
-    expect(bodyScrolls).toBe(false);
-
-    await physicalOnOptionsClosed(page, log);
-    await expectHistory(log, 4);
-    expect(await clippedRollBar(log, [...ROW_1, "dice-log-physical-off"])).toEqual([]);
-
-    // Options open with the strip on: the whole bar (incl. the DM gear) stays in the window.
-    await log.getByTestId("dice-roll-options").click();
-    const row2 = ["dice-roll-category", "dice-roll-actor", "dice-roll-label", "dice-roll-physical"];
-    if (role === "DM") row2.push("dice-settings-open");
-    expect(await clippedRollBar(log, [...ROW_1, ...row2, "dice-log-physical-off"])).toEqual([]);
-    expect((await fullyShown(log)).count).toBeGreaterThanOrEqual(1);
-
-    // Leave the mode off for later specs on this server's browser contexts.
-    await log.getByTestId("dice-log-physical-off").click();
-    await expect(log.getByTestId("dice-log-physical")).toHaveCount(0);
-    await page.context().close();
-  });
-}
+  }

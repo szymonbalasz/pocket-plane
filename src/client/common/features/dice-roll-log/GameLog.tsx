@@ -365,7 +365,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   // "Physical dice on" strip shows below the first row whenever the mode is on (FR-DICE-07).
   // FR-DICE-39: in the wide log the controls stay left at their narrow widths (input ≤ 320 px).
   return (
-    <div className="flex shrink-0 flex-col gap-1.5 border-t pt-1.5">
+    <div className="flex shrink-0 flex-col gap-1 border-t pt-1">
       <form
         className="flex items-center gap-1.5"
         onSubmit={(e) => {
@@ -627,7 +627,9 @@ export function GameLog({ dmTools }: { dmTools?: ReactNode }) {
       aria-label="Game log"
       // h-full: the roll bar is a pinned footer and only the entry list scrolls. Below the roll
       // bar's own height (a window resized near its minimum) the body scrolls as a last resort.
-      className="flex h-full min-h-fit flex-col gap-1.5"
+      // FR-DICE-38: it reaches into the body's vertical padding (6 px each side) and keeps its
+      // gaps tight, so the 160-high log shows ≥ 3 entries (≥ 2 with Physical dice on).
+      className="-my-1.5 flex h-[calc(100%+0.75rem)] min-h-fit flex-col gap-1"
     >
       {!everLive ? (
         <div className="flex flex-1 flex-col gap-1.5">
