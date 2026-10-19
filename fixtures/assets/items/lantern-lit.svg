@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>lantern-lit</title>
+  <!-- Fixture "lantern-lit" (compendium §13.1, `cmp-images`): the same lantern lit with a pale
+       moon-blue flame and a halo, second image of "Moonlit Lantern" (attachment). -->
+  <rect width="256" height="256" fill="#10162a"/>
+  <circle cx="128" cy="140" r="104" fill="#3d5a99" opacity="0.35"/>
+  <circle cx="128" cy="140" r="70" fill="#7fa4e8" opacity="0.35"/>
+  <circle cx="128" cy="40" r="18" fill="none" stroke="#b9c4d9" stroke-width="8"/>
+  <path d="M84 70 L172 70 L160 92 L96 92 Z" fill="#7a8394"/>
+  <rect x="92" y="92" width="72" height="104" rx="8" fill="#cfe0ff" stroke="#b9c4d9" stroke-width="6"/>
+  <path d="M128 112 C146 136 142 160 128 176 C114 160 110 136 128 112 Z" fill="#6f9cf0"/>
+  <path d="M80 196 L176 196 L184 220 L72 220 Z" fill="#7a8394"/>
+</svg>

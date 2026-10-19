@@ -112,7 +112,8 @@ describe("party-s5 fixtures (PARTY §13.1, FR-PARTY-40)", () => {
       expect.arrayContaining([HANDOUT_ATTACHMENT.key, "handout-present-1"]),
     );
     expect(r.handouts.map((h) => h.body)).toContain(HANDOUT_ATTACHMENT.body);
-    expect(r.assets.filter((a) => !a.listed).map((a) => a.name)).toEqual(["ransom-note"]);
+    // Other sprint-5 units add their own attachments (C5: cmp-images).
+    expect(r.assets.filter((a) => !a.listed).map((a) => a.name)).toContain("ransom-note");
     expect(r.presents.map((p) => r.players[p.playerId])).toEqual(["Player 1"]);
   }, 60_000);
 });
