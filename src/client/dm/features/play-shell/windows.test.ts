@@ -104,9 +104,10 @@ test("FR-SHELL-14 DM default layout, map-first (#162): Initiative top-right, log
   }
 });
 
-test("#162 DM Loot, Encounters, Creatures, Scenes open at the left edge (shorter, not mid-map)", () => {
+test("#162 DM Encounters, Creatures, Scenes open at the left edge (shorter, not mid-map)", () => {
+  // `loot.log` retired (FR-LOOT-21); its body is the Party window's Loot tab.
   for (const viewport of [LAPTOP, { w: 1280, h: 800 }, WIDE, DESKTOP]) {
-    for (const kind of ["loot.log", "cbt.encounters", "ent.creatures", "map.scenes"]) {
+    for (const kind of ["cbt.encounters", "ent.creatures", "map.scenes"]) {
       const r = openOnDefaults([kind], viewport).find((w) => w.kind === kind);
       expect({ kind, x: r?.x }).toEqual({ kind, x: 12 + 56 });
     }
