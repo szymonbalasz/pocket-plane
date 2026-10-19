@@ -38,6 +38,7 @@ import tokenArtUpdate from "./token-art-update";
 import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
+import windowsS5 from "./windows-s5";
 
 export const bundles: readonly Bundle[] = [
   base,
@@ -78,4 +79,5 @@ export const bundles: readonly Bundle[] = [
   usesNegative,
   sessionSim8,
   sessionSim9,
+  windowsS5,
 ];
