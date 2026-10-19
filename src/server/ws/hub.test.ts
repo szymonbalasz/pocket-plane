@@ -435,7 +435,7 @@ describe("hub unit", () => {
       /snapshot for dm c1: \d+ B over the 200 B ceiling \(CON-44\); largest: \w/,
     );
     expect(warns[0]).toContain("campaign ");
-    expect(SNAPSHOT_CEILING).toEqual({ dm: 1_048_576, player: 524_288 }); // #208
+    expect(SNAPSHOT_CEILING).toEqual({ dm: 1_572_864, player: 524_288 }); // #208, #256
     expect(snapshotTypeBytes({ a: [1], bb: [] })).toEqual([
       ["a", 7],
       ["bb", 7],

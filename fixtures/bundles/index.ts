@@ -32,6 +32,7 @@ import scenes from "./scenes";
 import sessionSim from "./session-sim";
 import sessionSim7 from "./session-sim-7";
 import sessionSim8 from "./session-sim-8";
+import sessionSim9 from "./session-sim-9";
 import syncProbe from "./sync-probe";
 import tokenArtUpdate from "./token-art-update";
 import usesNegative from "./uses-negative";
@@ -76,4 +77,5 @@ export const bundles: readonly Bundle[] = [
   tokenArtUpdate,
   usesNegative,
   sessionSim8,
+  sessionSim9,
 ];

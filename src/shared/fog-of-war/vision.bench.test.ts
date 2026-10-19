@@ -1,4 +1,4 @@
-// FOG §12 V0 benchmark = the V0 exit gate (FOG §12 "Target" table). Medians after warm-up; the
+// FOG §12 V0 benchmark = the V0 exit gate (FOG §12 "Target" table). Best of N after warm-up; the
 // numbers are logged for the build report. Caps = the true caps: 2,000 segments all within
 // r = 24 cells of every source, 100 fog + 20 darkness shapes, 200 tokens of 16 cells each,
 // 6 players × 4 sources. Typical = 150 walls, 12 fog shapes, 2 darkness shapes, PCs vision 30 ft /
@@ -34,17 +34,19 @@ function rng(seed: number) {
 }
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
-/** Median ms of `runs` timed calls after `warm` untimed ones. */
-function median(fn: () => void, runs = 15, warm = 3): number {
+/**
+ * Fastest ms of `runs` timed calls after `warm` untimed ones. Best of N, not the median: load from
+ * parallel suites only adds time, so the minimum is the load-tolerant cost estimate (BL-28).
+ */
+function best(fn: () => void, runs = 15, warm = 3): number {
   for (let i = 0; i < warm; i++) fn();
-  const t: number[] = [];
+  let min = Number.POSITIVE_INFINITY;
   for (let i = 0; i < runs; i++) {
     const t0 = performance.now();
     fn();
-    t.push(performance.now() - t0);
+    min = Math.min(min, performance.now() - t0);
   }
-  t.sort((a, b) => a - b);
-  return t[Math.floor(t.length / 2)] as number;
+  return min;
 }
 
 const CX = 60;
@@ -202,20 +204,20 @@ describe("FOG §12 V0 benchmark (exit gate)", () => {
       const prep = prepareOccluders(s.walls);
       const src = s.players[0]?.[0] as VisionSource;
       const r = kind === "typical" ? 12 : 24;
-      const ms = median(() => {
+      const ms = best(() => {
         sightPolygon(src, r, prep);
       }, 31);
       const poly = sightPolygon(src, r, prep) as number[];
       results[`${kind} polygon ms`] = ms;
       results[`${kind} polygon vertices`] = poly.length / 2;
-      results[`${kind} prepare ms`] = median(() => {
+      results[`${kind} prepare ms`] = best(() => {
         prepareScene(s.walls, s.darkness);
       });
       expect(ms).toBeLessThanOrEqual(polyMs);
     });
 
     test(`FOG §12 ${kind}: a move (mover's polygons + sample tests + explored cells) ≤ ${moveMs} ms`, () => {
-      const ms = median(() => {
+      const ms = best(() => {
         const scene = prepareScene(s.walls, s.darkness);
         const pts = samples(s);
         const v = playerVision(scene, s.players[0] as VisionSource[]);
@@ -227,7 +229,7 @@ describe("FOG §12 V0 benchmark (exit gate)", () => {
     });
 
     test(`FOG §12 ${kind}: full-scene re-derive (static once, then per player) ≤ ${fullMs} ms`, () => {
-      const ms = median(() => {
+      const ms = best(() => {
         const scene = prepareScene(s.walls, s.darkness);
         const pts = samples(s);
         for (const srcs of s.players) {

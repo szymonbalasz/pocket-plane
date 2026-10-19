@@ -1,14 +1,17 @@
 ---
 title: Party loot
 prefix: LOOT
-status: complete
-owner: spec-party-loot
+status: in-review
+owner: spec-party
 wave: 3
+phase: post-mvp-5
 ---
 
 # Party loot
 
 > **Sprint 3 revision (DM gate 1, #207; owned by [party-board](party-board.md), seams S8):** loot entries gain kind `item` and a `qty` column (party inventory moves are logged here), a DM `loot.split` (⌊coin / n⌋ per denomination, remainder stays in the pot), item rows in `loot.log`, and `loot-received` also from `party.addItem` (amends FR-LOOT-13). Party-board builders edit this feature's folders by orchestrator assignment. The rest of this spec is unchanged.
+>
+> **Sprint 5 revision (track P, DM [#250](../decisions-log.md) [4]; owned by [party-board](party-board.md)):** the loot view moves into a **Loot** tab of the Party window, right of Inventory ([FR-PARTY-29](party-board.md#66-sprint-5-loot-tab-present-uploads)); the "Coin: open Party loot" button goes; the `loot.log` window retires (decided #256, OQ-LOOT-17). New FR-LOOT-21–24; amended FR-LOOT-14, -15, OQ-LOOT-07. Records, intents, events and the snapshot are unchanged (0 B, [PARTY §12](party-board.md#12-performance--bandwidth)).
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
@@ -71,13 +74,18 @@ wave: 3
 | FR-LOOT-11 | `loot-entry` snapshot per ADR-0029: `window {orderBy: seq, size: 100}`, no pin, cut before the filter. An edit below the floor is delivered live. A fresh snapshot omits that row, but the pot and wallets still count it. | #137 |
 | FR-LOOT-12 | Pure fns in `@shared/party-loot`. `formatCoins(coins)` = the non-zero coins in order pp, gp, ep, sp, cp, negatives with "−" (e.g. "50 gp, 30 sp", "−2 gp"); all zero → "". `gpValue(coins)` = pp×10 + gp + ep/2 + sp/10 + cp/100, shown to 2 decimals. | |
 | FR-LOOT-13 | Notification kind `loot-received` (server kind registry): owner LOOT, audience `all`, no action (state `info`), payload `{entryId}`, `genericResolve` false. Created only by `partyLoot.add` when no coin < 0, so spends, change-making entries and moves create none. Text uses the values at add time: "Party loot: ‹text› (‹coins›)", "Party loot: ‹text›" or "Party loot: ‹coins›". Over 280 chars → cut to 279 + "…". Toasts follow [FR-NOTE-13/14](notifications.md#6-functional-requirements), DM included. An edit leaves the notification row unchanged. | #146, review 1 |
-| FR-LOOT-14 | Client notification view `loot-received` (both clients): coins icon. The renderer = the generic row, plus the suffix " (edited)" when the entry is in the store with `editedAt` set, plus an "Open" link that opens `loot.log` via `useOpenWindow`. No `onAction`. Entry outside the window → no suffix (accepted). | [FR-NOTE-19](notifications.md#6-functional-requirements) |
-| FR-LOOT-15 | Window `loot.log` "Party loot", both clients, closed by default, `center` 440×560, min 320×320. Launcher "Loot"; icon and order are the builder's pick. Top to bottom: **Party pot** strip; **Wallets**; DM add form (FR-LOOT-16); Move form (FR-LOOT-18); log. Strip = one Badge per non-zero coin (pp → cp), negatives with "−" in `text.muted`, Tooltip "≈ ‹gpValue› gp"; all zero → "No coin". Wallets = one row per `character` entity in the store, sorted by name: name + coin Badges, the same way. The viewer's own characters come first, marked "You". No characters → "No characters". Log is newest first. A loot row = text, coin Badges, time (local hh:mm, Tooltip full date), and an "Edited" Badge (Tooltip edit time) if edited. A move row = "‹from› → ‹to›" (names; "Party pot", "Outside the party"), coins, text, time. Changes show ≤ 1 s after commit. | [FR-SHELL-07](play-shell.md#6-functional-requirements) |
+| FR-LOOT-14 | Client notification view `loot-received` (both clients): coins icon. The renderer = the generic row, plus the suffix " (edited)" when the entry is in the store with `editedAt` set, plus an "Open" link that opens `loot.log` via `useOpenWindow` *(S5: opens the Party window on its Loot tab, FR-LOOT-22)*. No `onAction`. Entry outside the window → no suffix (accepted). | [FR-NOTE-19](notifications.md#6-functional-requirements) |
+| FR-LOOT-15 | Window `loot.log` "Party loot", both clients, closed by default, `center` 440×560, min 320×320. Launcher "Loot"; icon and order are the builder's pick. *(S5: the window retires; the same body is the Party window's Loot tab, FR-LOOT-21.)* Top to bottom: **Party pot** strip; **Wallets**; DM add form (FR-LOOT-16); Move form (FR-LOOT-18); log. Strip = one Badge per non-zero coin (pp → cp), negatives with "−" in `text.muted`, Tooltip "≈ ‹gpValue› gp"; all zero → "No coin". Wallets = one row per `character` entity in the store, sorted by name: name + coin Badges, the same way. The viewer's own characters come first, marked "You". No characters → "No characters". Log is newest first. A loot row = text, coin Badges, time (local hh:mm, Tooltip full date), and an "Edited" Badge (Tooltip edit time) if edited. A move row = "‹from› → ‹to›" (names; "Party pot", "Outside the party"), coins, text, time. Changes show ≤ 1 s after commit. | [FR-SHELL-07](play-shell.md#6-functional-requirements) |
 | FR-LOOT-16 | DM add form: text Input, five coin Inputs (pp, gp, ep, sp, cp; a leading "-" allowed), "Add" Button; Enter submits. Add is disabled while the input is invalid (FR-LOOT-02, mirrored client-side), while the client is not `live` and while its intent is in flight. `ack` → the form clears. `reject` → inline message, values kept. Intent lost to a disconnect (never resent, [FR-SYNC-05](live-sync.md#6-functional-requirements)) → Toast "Connection lost — check the loot log before adding again". | as FR-CHAR-12 |
 | FR-LOOT-17 | DM "Edit" on each loot row (not on moves) turns the row into the same inputs, prefilled, with "Save" / "Cancel". Enter saves, Esc cancels. One row can be in edit at a time. Save is disabled while the input is invalid or unchanged, while not `live` and while in flight. `ack` → the row returns to view. `reject` → inline message, values kept. Lost intent → Toast "Connection lost — check the entry before saving again". On a campaign switch the open edit is discarded. | review 9 |
 | FR-LOOT-18 | Move form (both clients): "From" and "To" Selects, five coin Inputs (non-negative), optional note, "Move" Button. Options: DM = Party pot, every character, Outside the party (with the FR-LOOT-06 pairing). Player: From = own characters + Party pot. To = Party pot + other characters when From is an own character, or own characters only when From = Party pot. Move is disabled while the input is invalid (FR-LOOT-06/07 mirrored), not `live` or in flight. `ack` → coins and note clear, Selects kept. `reject` → inline message. Lost intent → Toast "Connection lost — check the loot log before moving again". Player with no character → the form is hidden. | #150 |
 | FR-LOOT-19 | Player `loot.log`: no add form and no Edit. Otherwise the same as the DM's view. | |
 | FR-LOOT-20 | Fixtures `loot-1`, `loot-wallets`, `loot-second` and bundle `party-loot` (§13). `fixtures:reset-load party-loot` works from empty and is deterministic ([FR-FIX-08](fixtures-adapters.md#6-functional-requirements)). | ADR-0017 |
+| **Sprint 5** (track P) | | |
+| FR-LOOT-21 | **Loot tab** [4]: the FR-LOOT-15 body (pot strip, wallets, DM add form, Move form, DM Split…, log) renders as the Party window's **Loot** tab, right of Inventory ([FR-PARTY-29](party-board.md#66-sprint-5-loot-tab-present-uploads)), in one scroll area; content, order, forms and test IDs unchanged. Window type `loot.log` and its launcher entry (whatever its label) are **removed** from both clients' registries (OQ-LOOT-17; P3 deletes LOOT's own lines, seams S4). A stored layout that still lists `loot.log` drops it as an unknown kind (play-shell's layout parse; no migration, no warning toast). | Amends FR-LOOT-15, OQ-LOOT-07 |
+| FR-LOOT-22 | The `loot-received` view's "Open" (`loot-note-open`) calls `openPartyTab("loot")` ([FR-PARTY-30](party-board.md#66-sprint-5-loot-tab-present-uploads)). | Amends FR-LOOT-14 |
+| FR-LOOT-23 | The character sheet's wallet link (`charx-wallet-open`, "Move coin in Party loot") calls `openPartyTab("loot")` instead of opening `loot.log`. One call in CHARX's `MoreTabs.tsx`, by assignment. | |
+| FR-LOOT-24 | No other change: records, intents, events, notifications, permissions, snapshot window and figures as §8–§12. Test IDs inside the tab as §7; `loot-log` now sits inside `party-board`. | |
 
 ## 7. UI/UX notes
 
@@ -86,6 +94,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Input, Button, Bad
 - **States:** empty log "No loot yet"; pot "No coin". Loading = shell skeleton. Disconnected = the last view + reconnect banner, with every form, Edit and Save disabled. Reject = inline error under the form or the edited row.
 - **DM view:** pot, all wallets, add form, Move form (any ends), log with Edit on loot rows. The DM sees their own add as a toast (audience `all`).
 - **Player view:** pot, wallets (own first, "You"), Move form limited per FR-LOOT-18, log. A toast for each non-spend loot entry and an unread badge on the bell (notifications). No toast for edits, spends or moves.
+- *(S5)* **Where:** Party window → Loot tab (both clients). No separate window or launcher button. The DM's Split… stays where it is in the body.
 - **Test IDs** (AGENTS §9.5): `loot-log`, `loot-log-empty`, `loot-pot`, `loot-pot-coin` + `data-value=pp|gp|ep|sp|cp`, `loot-pot-empty`, `loot-wallet` + `data-record-id` (character id) + `data-own`, `loot-wallet-coin` + `data-value`, `loot-entry` + `data-record-id` + `data-kind` + `data-edited`, `loot-entry-edit`, `loot-edit-save`, `loot-edit-cancel`, `loot-edit-error`, `loot-add-text`, `loot-add-coin` + `data-value`, `loot-add-submit`, `loot-add-error`, `loot-move-from`, `loot-move-to`, `loot-move-coin` + `data-value`, `loot-move-text`, `loot-move-submit`, `loot-move-error`, `loot-note-open` (the "Open" link), `loot-add` and `loot-move` (form wrappers), `loot-move-option` + `data-value` (each From / To option), `loot-entry-coin`, `loot-entry-edited`, `loot-entry-route` (log rows). Edit inputs reuse `loot-add-*` inside the row, scoped by `data-record-id`.
 
 ## 8. Data model
@@ -148,6 +157,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Input, Button, Bad
 
 - **Player disconnect / reconnect:** the snapshot restores the newest 100 entries, plus the full pot and every wallet. Older entries are not resent (no "load older"). No per-item toasts; the bell's unread badge shows missed adds (FR-NOTE-18). Edits made while away show "Edited".
 - **DM disconnect / reconnect:** players are unaffected and can keep moving coin. On the DM side, forms, Edit and Save are disabled. An in-flight intent is lost → FR-LOOT-16/17/18 toast; the reconnect snapshot shows whether it committed. On a campaign switch the server closes the DM connection (`4409`), the open edit is discarded, and the next snapshot shows only the new campaign.
+- *(S5)* **Loot tab:** disconnect / reconnect / crash behave as above inside the tab (the records are in the snapshot, so the tab needs no reload); a stored layout from before S5 that has `loot.log` open opens without it (FR-LOOT-21).
 - **Server crash mid-action:** the row, its event-log row and the notification (adds) commit together or not at all. Balances are recomputed from entries, so they can't drift. After a restart, snapshots equal the pre-crash state.
 - **Concurrency:** commands serialise. A double click sends one intent (the button locks while in flight). Two players taking from the pot at once → both commit, and the pot may show negative; the DM moves coin back. Two DM tabs edit one entry → last commit wins, both are logged, and the other tab's row updates live (an open edit keeps its typed values). An owner change between click and commit → FR-LOOT-07 checks at commit (`forbidden`).
 - **Mistakes:** a typo such as −100 instead of −10 isn't blocked (#150). The DM sees the negative pot and edits it. A wrong move is corrected by a reverse move; both rows stay.
@@ -188,7 +198,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 1 | Log in, open Loot | — | Pot 5 pp, 30 gp. Wallets Mira 21 gp, Thorn 8 gp 30 sp. Log m4…m1, e5…e1 newest first. e3 shows 50 gp + "Edited". No per-item toasts |
 | 2 | — | B, C open links, open Loot | Same pot, wallets and log. B's own wallet is Mira ("You", first); C's is Thorn. Move form shown; no add form, no Edit. "SECOND-CAMPAIGN-LOOT" not in the DOM |
 | 3 | Add "Silver dagger" + 50 gp, Enter | — | Row on top; pot 5 pp, 80 gp. Toast "Party loot: Silver dagger (50 gp)" in A, B, C. New row in `note.history` |
-| 4 | — | B closes Loot, opens Notifications, clicks "Open" on the dagger row | `loot.log` opens |
+| 4 | — | B closes Loot, opens Notifications, clicks "Open" on the dagger row | `loot.log` opens *(S5: the Party window opens on its Loot tab, FR-LOOT-22)* |
 | 5 | Try Add with empty text and no coins, then with 1.5 gp | — | Add disabled / inline error; no entry anywhere |
 | 6 | Edit "Silver dagger" to 5 gp, Save | — | Row shows 5 gp + "Edited"; pot 5 pp, 35 gp. No toast. B's `note.history` row reads "Party loot: Silver dagger (50 gp) (edited)" with no new row |
 | 7 | Move Party pot → Thorn 5 pp | — | Row "Party pot → Thorn 5 pp". Pot 35 gp; Thorn 5 pp, 8 gp, 30 sp. No toast |
@@ -201,6 +211,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 Teardown: stop the server, then `fixtures:reset --profile verify`.
 
+*(S5)* "Open Loot" in the steps above = Party → Loot tab. Sprint-5 tests (fixtures `party-loot`, `party-s5`): `FR-LOOT-21 no loot.log window` (both registries hold no window kind `loot.log` and both launchers no entry for that kind, asserted by kind, not by label, review #21; a stored layout with `loot.log` parses, the kind is dropped, other windows keep their geometry); `FR-LOOT-22 Open goes to the Loot tab` (Party closed / minimised / on Handouts → open on Loot); `FR-LOOT-23 sheet wallet link`; every existing `loot-*` client test passes with the body mounted in the tab. Walkthrough: [PARTY §13.1](party-board.md#131-sprint-5-track-p-party-loot-asset-cmp) step S5-8; the thin `party-loot` e2e opens Loot through Party.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -209,6 +221,7 @@ Teardown: stop the server, then `fixtures:reset --profile verify`.
 | [entities](entities.md) | `character` entities with `ownerPlayerId`; other characters redacted but named (FR-ENT-15); no delete (FR-ENT-14); fixtures `char-mira`, `char-thorn` | complete |
 | [notifications](notifications.md) | `notify`, server kind registry, client view registries with a custom renderer, toasts, `note.history` | complete |
 | [play-shell](play-shell.md), [campaign-management](campaign-management.md), [fixtures-adapters](fixtures-adapters.md) | Window registry, `useOpenWindow` (confirms `loot.log`, both, for OQ-SHELL-06); campaign scope + switch; `base`, `player-2`, `campaign-second`, bundle registry | complete |
+| *(S5)* [party-board](party-board.md) | Loot tab, `openPartyTab` (FR-PARTY-29, -30); built in slice P3 `build/party-loot-tab` ([PARTY §14.2](party-board.md#142-sprint-5-build-split)): both `windows.ts` (delete LOOT's own `loot.log` line, seams S4), LOOT client folder, CHARX `MoreTabs.tsx` one call. No schema, no dependency | this track |
 
 **Shared changes needed** (AGENTS §9.9; the orchestrator routes them)
 - `src/server/db/`: table `loot_entry` (§8), index (campaignId, seq). `src/shared/events/party-loot.ts`: `LootAdded`, `LootEdited`, `CoinMoved`.
@@ -224,7 +237,7 @@ A **bold** option is the suggested pick unless the row says Decided.
 |---|---|---|---|---|
 | ~~OQ-LOOT-01, 02, 05, 06~~ | ~~Entry shape; correction; coin total; loot notification~~ | **Decided (#146):** text + optional coins; DM **edits** (logged, "Edited"), no void; running total in MVP (spec: derived); `loot-received` info to all, toast + history | — | post-mvp/party-board, notifications |
 | OQ-LOOT-03, 04 | 03: Can players add loot entries? 04: Should an entry reference an item entity? | 03: **No in MVP** (additive `addedByPlayerId` later) / yes. 04: **No MVP column; nullable `itemEntityId` later** / reserve the column now | no · owner: spec-party-loot | post-mvp/party-board, post-mvp/world-builder |
-| OQ-LOOT-07 | Is `loot.log` open by default? | **Closed; the toast and the launcher open it** / open for players | no · owner: spec-party-loot | play-shell |
+| OQ-LOOT-07 | Is `loot.log` open by default? | **Closed; the toast and the launcher open it** / open for players *(S5: superseded by FR-LOOT-21, #256: the Party window's rules apply)* | no · owner: spec-party-loot | play-shell |
 | OQ-LOOT-08 | Gems (DM award, per character) and the loot log? | **Gems own their counters; a gem award may also call `partyLoot.add`; no MVP field** / gems as loot entries | no · owner: gems | post-mvp/gems |
 | ~~OQ-LOOT-09~~ | ~~Glossary terms~~ | **Decided (#152):** glossary amends **Party loot** and adds **Loot entry**, **Party pot**, **Wallet**, **Coin move** | — | glossary |
 | ~~OQ-LOOT-10~~ | ~~Does the tracker record spending, and is there a guard?~~ | **Decided (#150):** signed coins; no below-zero guard; negatives shown with "−"; the DM edits typos | — | post-mvp/party-board |
@@ -234,6 +247,8 @@ A **bold** option is the suggested pick unless the row says Decided.
 | ~~OQ-LOOT-14~~ | ~~Coin from / to outside the party~~ | **Decided (#152):** DM only, via a move with a `world` end ("Outside the party") | — | — |
 | ~~OQ-LOOT-15~~ | ~~Moves: notify? editable?~~ | **Decided (#152):** no notification; not editable, corrected by a reverse move | — | — |
 | ~~OQ-LOOT-16~~ | ~~Wallet on `char.sheet`?~~ | **Decided (#152):** not in MVP; the loot window shows wallets | — | character-sheet |
+| OQ-LOOT-17 | *(S5)* After the Loot tab [4], does the separate "Party loot" window stay? | **Decided (#256): no, it retires (window and launcher entry); every "open loot" link opens Party on Loot** (FR-LOOT-21–23). Rejected: ~~B keep both~~. *How (settled by seams S4):* P3 deletes LOOT's own `loot.log` line from both `windows.ts` (the owning feature may delete its own line from an append-only registry) | — | play-shell |
+| OQ-LOOT-18 | *(S5)* **character-sheet-full**: the wallet link (FR-LOOT-23) is a CHARX file | **Settled by seams S4:** P3 changes the one call (`openPartyTab("loot")`), granted; no sheet UI change | no · settled | character-sheet-full |
 
 ## 16. Out of scope
 

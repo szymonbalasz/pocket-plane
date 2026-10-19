@@ -41,7 +41,7 @@ export interface SocketLike {
  * CON-44 snapshot ceilings (#142, raised for the DM by #208): DM 1 MiB, players 512 KiB. Not
  * enforced (a bigger snapshot is still sent); over → `warn` with per-type bytes (#163).
  */
-export const SNAPSHOT_CEILING = { dm: 1024 * 1024, player: 512 * 1024 } as const;
+export const SNAPSHOT_CEILING = { dm: 1.5 * 1024 * 1024, player: 512 * 1024 } as const;
 /**
  * Send-buffer limit before closing 4000 (FR-SYNC-21) and Bun's `backpressureLimit` /
  * `maxPayloadLength` (#163): well above the largest allowed snapshot, so a slow tunnel never

@@ -41,10 +41,26 @@ export function useSync<T>(selector: (s: SyncState) => T): T {
   return useStore(store, selector);
 }
 
-/** Records of one type, as a stable array per store version. */
+/** One shared empty list, so "no records" is a stable reference too. Frozen: never mutate. */
+const EMPTY: never[] = Object.freeze([]) as never[];
+
+/** byId map → its values; the reducer replaces a type's map only when that type changes (BL-16). */
+const valuesCache = new WeakMap<object, unknown[]>();
+
+function valuesOf<T>(byId: Record<string, unknown> | undefined): T[] {
+  if (!byId) return EMPTY;
+  let list = valuesCache.get(byId);
+  if (!list) {
+    // Frozen because it is shared by every caller: an in-place sort would throw, not corrupt.
+    list = Object.freeze(Object.values(byId)) as unknown[];
+    valuesCache.set(byId, list);
+  }
+  return list as T[];
+}
+
+/** Records of one type: the same frozen array while the type's records are unchanged (BL-16). */
 export function useRecords<T>(type: string): T[] {
-  const byId = useSync((s) => s.store.records[type]);
-  return byId ? (Object.values(byId) as T[]) : [];
+  return valuesOf<T>(useSync((s) => s.store.records[type]));
 }
 
 export function useHasType(type: string): boolean {
@@ -81,7 +97,7 @@ export function useLazyRecords<T>(type: string, ids?: readonly string[]): LazyRe
     if (live && needs) connection.load(type, want)?.catch(() => {});
   }, [connection, live, needs, type, want]);
   const rows = useMemo(() => {
-    if (!byId) return [];
+    if (!byId) return EMPTY;
     const keep = want === undefined ? null : new Set(want);
     return Object.entries(byId)
       .filter(([id]) => (keep === null || keep.has(id)) && isLoaded(lazy.loaded, type, id))

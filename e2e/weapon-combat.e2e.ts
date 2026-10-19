@@ -47,6 +47,8 @@ test("FR-CBT-81 FR-CBT-82 FR-CBT-84 FR-CBT-85 Flame Tongue: parts on the card, f
   const card = init.getByTestId("cbt-init-card");
   await expect(card).toHaveCount(1);
   await expect(card).toContainText(/\d+ slashing \+ \d+ fire/);
+  // The d20 is real: the card marks a natural 1 / 20 (FR-CBT-57), which sets the players' words.
+  const natural = /\(natural (1|20)\)/.exec((await card.textContent()) ?? "")?.[1];
   await card.click();
   const popup = dm.getByTestId("cbt-popup");
   await expect(popup).toBeVisible();
@@ -69,12 +71,20 @@ test("FR-CBT-81 FR-CBT-82 FR-CBT-84 FR-CBT-85 Flame Tongue: parts on the card, f
   await popup.getByTestId("cbt-popup-apply").click();
   await expect(popup).toHaveCount(0);
 
-  // The outcome line: players read "— DM: hit." (BL-10); the DM's line keeps its own words.
+  // The outcome line: players read "— DM: hit." (BL-10), "— DM: critical hit!" on a natural 20,
+  // "(natural 1) — DM ruled hit" when the DM rules a natural 1 a hit (FR-CBT-58); the DM's line
+  // keeps its own words.
+  const words =
+    natural === "1"
+      ? "\\(natural 1\\) — DM ruled hit"
+      : natural === "20"
+        ? "— DM: critical hit!"
+        : "— DM: hit\\.";
   const p1Log = await openWindow(p1, "dice.log");
   await expect(
     p1Log
       .getByTestId("dice-log-entry")
-      .filter({ hasText: /— DM: (hit\.|critical hit!) \d+ slashing \+ \d+ fire \(half\) damage/ }),
+      .filter({ hasText: new RegExp(`${words} \\d+ slashing \\+ \\d+ fire \\(half\\) damage`) }),
   ).toHaveCount(1);
   const dmLog = await openWindow(dm, "dice.log");
   await expect(
