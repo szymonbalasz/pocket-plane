@@ -23,6 +23,7 @@ import { withoutDmOnly } from "../../scene-tools/layer-switches";
 import { useCanvas } from "../canvas-context";
 import { decorateToken, type MergedDecoration } from "../decorations";
 import { CROSS_OPACITY, crossGeometry } from "../label";
+import { CASING_COLOR, CASING_EXTRA_PX, CASING_NAME } from "../mark-colors";
 import { artBackdropOf, containRect, coverCrop, initialsBackdropOf, outlineOf } from "../shape";
 import { barGeometry, cueGeometry, cuePulse, iconRow } from "../token-decor";
 import type { TokenBar, TokenCross, TokenCue, TokenIcon } from "../token-overlays";
@@ -351,10 +352,12 @@ function bellPath(ctx: Konva.Context, r: number) {
 
 /** FR-MAP-49: pulsing accent ring + bell, above image, bar and icons; steady if reduced motion. */
 function TokenCueMark({ t, side, cue }: { t: TokenView; side: number; cue: TokenCue }) {
-  const { colors, client } = useCanvas();
+  const { colors, client, cam } = useCanvas();
   const ringRef = useRef<Konva.Circle>(null);
   const g = cueGeometry(side);
-  const accent = client === "dm" ? colors.dmAccent : colors.playerAccent;
+  // FR-NOTE-40 / FR-MAP-72: the cue's person colour over the casing, else the role accent.
+  const accent = cue.color ?? (client === "dm" ? colors.dmAccent : colors.playerAccent);
+  const casingRef = useRef<Konva.Circle>(null);
   useEffect(() => {
     const reduced = prefersReducedMotion();
     const ring = ringRef.current;
@@ -363,8 +366,10 @@ function TokenCueMark({ t, side, cue }: { t: TokenView; side: number; cue: Token
     const start = performance.now();
     const tick = (now: number) => {
       const p = cuePulse(now - start, false);
-      ring.opacity(p.opacity);
-      ring.scale({ x: p.scale, y: p.scale });
+      for (const r of [ring, casingRef.current]) {
+        r?.opacity(p.opacity);
+        r?.scale({ x: p.scale, y: p.scale });
+      }
       ring.getLayer()?.batchDraw();
       frame = requestAnimationFrame(tick);
     };
@@ -372,7 +377,17 @@ function TokenCueMark({ t, side, cue }: { t: TokenView; side: number; cue: Token
     return () => cancelAnimationFrame(frame);
   }, []);
   return (
-    <Group name={cue.id} id={t.id} label={cue.label} listening={false}>
+    <Group name={cue.id} id={t.id} label={cue.label} color={accent} listening={false}>
+      <Circle
+        ref={casingRef}
+        name={CASING_NAME}
+        id={t.id}
+        x={g.ring.x}
+        y={g.ring.y}
+        radius={g.ring.radius}
+        stroke={CASING_COLOR}
+        strokeWidth={g.ring.strokeWidth + CASING_EXTRA_PX / cam.scale}
+      />
       <Circle
         ref={ringRef}
         x={g.ring.x}

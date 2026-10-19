@@ -74,12 +74,17 @@ export interface TokenIcon {
 /**
  * A transient cue (FR-MAP-49): pulsing accent ring + bell glyph in the token group, above the
  * image, bar and icons; steady under `prefers-reduced-motion`. Konva `name` = `id`, `id` attr =
- * token id, attr `label` (no tooltip: the owning feature's UI explains it).
+ * token id, attrs `label` (no tooltip: the owning feature's UI explains it), `color`.
  */
 export interface TokenCue {
   /** Test id; Konva `name` of the cue. */
   id: string;
   label: string;
+  /**
+   * A person's colour (hex, from `colorOf`) for ring and bell, drawn over the dark casing
+   * (FR-MAP-72; e.g. NOTE's action owner, FR-NOTE-40); absent → the client's role accent.
+   */
+  color?: string;
 }
 
 export interface TokenDecoration {
