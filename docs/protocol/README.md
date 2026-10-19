@@ -2124,3 +2124,42 @@ From [entities](../specs/entities.md) FR-ENT-28, -29 (OQ-ENT-22, -30), [compendi
 | Creature form Type (`dm/features/combat-tracker/creature-form.tsx`) | Select `cbt-form-type`: None + the 14 types; Derive / Edit prefill from the source's `statBlock.type`; None omits `type` from the whole `PUT` / `POST` stat block | FR-CBT-43, FR-ENT-26 |
 | Credits (`common/features/compendium/credits.tsx`) | Footer **Credits** in the Compendium list view (both clients, `cmp-credits`, always shown) and the DM Creatures window (`ent-list-credits`) → About dialog `cmp-about-dialog`: each imported source (`cmp-about-source` + `data-record-id` = key, `cmp-about-text`) then **Token art** (`cmp-about-token-art`, 14 × `cmp-about-token-art-row` + `data-value` = type). Sources read on open: one `GET /api/compendium/search` page (empty `q`), then one `GET /entries/:id` per non-homebrew source label. The entry view's **About** opens the same dialog with its own source | FR-CMP-19, FR-ENT-29 |
 | Bundle (measured, in-memory Vite build, gzip -9 of exactly these modules) | Glyphs 13.1 KB gz in the lazy `canvas-layers` chunk (both clients; raw 27.4 KB); credits 1.9 KB + `art.ts` 0.3 KB in shared chunks; the DM menu 0.7 KB in the DM entry. 16.0 KB gz upper bound in all | §12 (≈ 12.7 KB expected) |
+
+## 82. Sprint 5: combat core (R0)
+
+From [combat-tracker](../specs/combat-tracker.md#9-api--events) (FR-CBT-88, -91, -94, -97–100; [ADR-0053](../architecture/adr/0053-apply-hit.md); #252) and [scenes-map](../specs/scenes-map.md#9-api--events) (FR-MAP-65, -66). **Built by `fix/s5-combat-core`**. Data side: [data model §65](../data-model/README.md#65-sprint-5-combat-core-r0).
+
+**Intents** (strict zod, `@shared/combat-tracker/schemas`)
+
+| Intent | Who | Validation | Result | Source |
+|---|---|---|---|---|
+| `cbt.applyHit {cardId, toHitTotal (−20…99), targets [{targetId, hit, multiplier}] (1–20, unique)}` *(new)* | DM | encounter ended / card not pending / already ruled → `conflict` ("Hit already applied"); card without `toHit`, no `hit: true`, duplicate or > 20 targets → `invalid`; unknown or removed target → `not_found` | `{rulingId}` | FR-CBT-88 |
+| `cbt.setSide {combatantId, side: ally \| enemy, secret?}` *(new)* | DM | no started encounter → `conflict` "No encounter running"; unknown, other campaign or not in the started encounter → `not_found`; removed allowed; same side and (secret, or already shown to players) → no-op ack | — | FR-CBT-99 |
+| `cbt.applyCard` + `damageRollId?: string \| null` | DM | ≠ the card's damage `rollId` (null = none) → `conflict` "Damage just arrived — check and Apply again", nothing written; absent = no check (R1's popup sends it) | as before | FR-CBT-94 |
+| `cbt.rollDamage` result + `unused?: true` | DM, player | zod only (written by R1) | as before | FR-CBT-92 |
+| REST encounter bodies: entries + `side?` | DM | `ally` \| `enemy`, absent = `enemy` | as before | FR-CBT-98 |
+
+**Record types**
+
+| Type | Player visibility | Snapshot | Source |
+|---|---|---|---|
+| `hit-ruling` *(new)* | `audience: dm` | the started encounter's rulings whose card is pending, card order; live: Apply and End list its delete, Undo's reopen its upsert (the DB row stays) | FR-CBT-88, -91 |
+| `combatant` + `side`, `publicSide` | redactions gain `side = publicSideOf(c)`; the true `side` and `publicSide` never reach players | as before | FR-CBT-100 |
+| `encounter-entry` + `side` | DM only (as before) | as before | FR-CBT-98 |
+| `token` + `trail` | DM: every token's; players: on player tokens only (`ownerPlayerId ≠ null`), key absent on every other token | as before | FR-MAP-66 |
+
+**Domain events** (`src/shared/events/combat-tracker.ts`)
+
+| Event | Changes | Player sees | Undoable |
+|---|---|---|---|
+| `HitApplied {cardId, encounterId, rulingId, entryIds}` *(new)* | `hit-ruling` create; one `game-log-entry` per target (`cbt.attack`, `awaitingDamage`, `public` per FR-CBT-36) | the lines they may see ("… = 15 — DM: hit."); never the ruling; no card upsert | no |
+| `CombatantSideChanged {encounterId, combatantId, side, secret}` *(new)* | `combatant`; one `cbt.side` `game-log-entry` | the upsert iff their side changed (an unchanged redaction is never sent); the line iff `public` | no |
+| `AttackApplied` (the apply's last) / `CombatEntryUndone` (the undo's last) / `EncounterEnded` | + the card's `hit-ruling` delete / upsert / delete | nothing (DM only) | as before |
+| `TokenMoved` / `TokenRevealed` | the one `token` upsert is read **after** the token-changed hooks, so it carries the appended / reset `trail` | per token visibility; `trail` on player tokens only | no |
+| `TurnChanged` (Next, Prev, Start round 1), `EncounterEnded` | + one `token` upsert per cleared trail (`clearTrails`) | as above | no |
+
+**Helpers and hooks**
+
+- scenes-map server (`src/server/features/scenes-map/trail.ts`): `appendTrail(env, token, from, to)` (nothing while `hidden` or for a move that stays put; starts at `from`; keeps the newest 21 cells), `resetTrail(env, token)`, `clearTrails(env, sceneId) → RecordChange[]`. Server code only.
+- Combat's token-changed hook (`combat-tracker.combatant-copies`) runs the trail step first: a move of any token on the started encounter's scene (bound or not, any mover) appends; a reveal resets. A guard-refused move never reaches it.
+- Log-entry kind `cbt.side` (`@shared/combat-tracker/side-kind.ts`, appended to `src/shared/dice-roll-log/kinds.ts`): players "Goblin 2 is now an ally"; DM "DM — Goblin 2 is now an ally" (+ " (secret)" from `dmPayload`).

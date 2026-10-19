@@ -123,6 +123,19 @@ export type TokenSize = z.infer<typeof TokenSize>;
 export const CELL_INDEX_MAX = 100_000;
 export const CellIndex = z.number().int().min(-CELL_INDEX_MAX).max(CELL_INDEX_MAX);
 
+/**
+ * FR-MAP-65 (sprint 5): a token's combat trail this turn, cells oldest first (the start cell,
+ * then each move's end cell); beyond 20 segments the oldest cell drops. Cells only: its colour
+ * is derived at draw time (seams S10).
+ */
+export const TRAIL_CELLS_MAX = 21;
+export const TrailCell = z.tuple([CellIndex, CellIndex]);
+export type TrailCell = z.infer<typeof TrailCell>;
+export const TokenTrail = z.strictObject({
+  cells: z.array(TrailCell).min(2).max(TRAIL_CELLS_MAX),
+});
+export type TokenTrail = z.infer<typeof TokenTrail>;
+
 /** FR-MAP-14 *(proposed, OQ-MAP-20)*. */
 export const TOKENS_PER_SCENE_MAX = 200;
 export const TOKENS_PER_CAMPAIGN_MAX = 1000;
@@ -206,6 +219,12 @@ const tokenFields = {
   characterId: z.string().nullable(),
   /** Server copy: every footprint cell fogged (FR-FOG-10); on the wire only when true. */
   fogged: z.literal(true).optional(),
+  /**
+   * FR-MAP-65, -66 (sprint 5): this turn's combat trail, written by combat through
+   * `appendTrail` / `clearTrails`; null outside combat. Players get it on player tokens only
+   * (absent on every other token they receive).
+   */
+  trail: TokenTrail.nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 };
