@@ -709,7 +709,7 @@ Bundle **`session-sim-9`** (Goblin Ambush combat with ≥ 7 rows and a pending c
 
 ### 14.2 Build split (sprint 6, track WF)
 
-- **WF4** `fix/init-rows-s6` (FR-CBT-125 with [FR-CBTX-57 / -58](combat-extras.md#6-functional-requirements)): `src/client/common/features/combat-tracker/below-fold.tsx` (footer outside the viewport), the list viewport in DM `initiative-window.tsx` and player `initiative-window.tsx`; combat-extras' `parts.tsx` / DM `row.tsx` / player row (CBTX's lines). No shared file (AGENTS §9.9), no server, schema or wire change. Starts at once; **before CP's owned Initiative rows** (turn modes, owned / summoned rows, Dismiss): CP rebases on WF4 and its rows follow FR-CBT-125 and FR-CBTX-57 / -58. Full split: [play-shell §14](play-shell.md#14-dependencies).
+- **WF4** `fix/init-rows-s6` (FR-CBT-125 with [FR-CBTX-57 / -58](combat-extras.md#6-functional-requirements)): `src/client/common/features/combat-tracker/below-fold.tsx` (footer outside the viewport), the list viewport in DM `initiative-window.tsx` and player `initiative-window.tsx`; combat-extras' `parts.tsx` / DM `row.tsx` / player row (CBTX's lines). No shared file (AGENTS §9.9), no server, schema or wire change. Starts at once; *(settled by seams S4)* **merges before CP2 `build/cp-turns`** (turn modes, owned / summoned rows, Dismiss): CP2 starts once CP0 and WF4 are on `main`, and its rows (incl. the in-owner-turn companion line) pass FR-CBT-125 and FR-CBTX-57 / -58's tests. Full split: [play-shell §14](play-shell.md#14-dependencies).
 
 ## 15. Open questions
 

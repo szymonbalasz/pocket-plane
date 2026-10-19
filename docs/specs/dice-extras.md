@@ -701,8 +701,8 @@ Walkthrough steps per slice: D8 → 30, 32, 33, 35, 37; D11 → 30, 31, 33; D12 
 
 | # | Branch | Content | Files | After / parallel |
 |---|---|---|---|---|
-| WF5 | `fix/tray-roll-visible` | FR-DICEX-53, -54 | `TrayWindow.tsx` (body grid: fixed parts + one flexible dice area), `TrayPreview.tsx` (still size 40 / 28, room-forced "×N", own scroll, attrs), tests | starts at once; ∥ every WF slice. PF (Preferences) may later move tray-gear settings: PF edits `SettingsPanel.tsx` / the gear, and touches `TrayWindow.tsx` only after WF5 |
-| WF3 (assigned lines) | `fix/fit-s6` | FR-DICEX-55 | `popup-logic.ts` (`dmStackAt` callers pass hard regions), `RollPopup.tsx` (one `reportShownStack` line under OQ-MAP-57 C) | with WF3, after WF1 (the `reportShownStack` export) |
+| WF5 | `fix/tray-roll-visible` | FR-DICEX-53, -54 | `TrayWindow.tsx` (body grid: fixed parts + one flexible dice area), `TrayPreview.tsx` (still size 40 / 28, room-forced "×N", own scroll, attrs), tests | starts at once; ∥ every WF slice. *(Settled by seams S9)* **PF2 `build/colour-picker-2` merges after WF5** if it touches `TrayWindow.tsx` (the gear shortcut, OQ-DICEX-48 A); `SettingsPanel.tsx` is PF's |
+| WF3 (assigned lines) | `fix/fit-s6` | FR-DICEX-55 | `popup-logic.ts` (`dmStackAt` callers pass hard regions), `RollPopup.tsx` (one `reportShownStack` line under OQ-MAP-57 C) | with WF3 (S9: stays there), after WF1 only under OQ-MAP-57 C (the `reportShownStack` export) |
 
 - No new dependency; no record, event or frame (0 B). Docs at consolidation: protocol §18 / the popup row (hard keep-outs in the DM stack).
 
