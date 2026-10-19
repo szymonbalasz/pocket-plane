@@ -2429,7 +2429,7 @@ From [scenes-map](../specs/scenes-map.md) FR-MAP-59, -61 (DM gate #256: OQ-MAP-4
 
 ## 98. Sprint 5: compressed + cached built client (D12)
 
-From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-52 (§6.1 table H; BL-21; OQ-DICEX-40 A, -41 A, #256) and [ADR-0052](../architecture/adr/0052-static-serving.md). **Built by `fix/static-compress`** (seams S11: `src/server/app.ts`, `vite.config.ts`). HTTP headers on the built client only; no intent, event, record, signal or WS change. Data side: [data model §76](../data-model/README.md#76-sprint-5-compressed--cached-built-client-d12).
+From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-52 (§6.1 table H; BL-21; OQ-DICEX-40 A, -41 A, #256) and [ADR-0052](../architecture/adr/0052-static-serving.md). **Built by `fix/static-compress`** (seams S11: `src/server/app.ts`, `vite.config.ts`). HTTP headers on the built client only; no intent, event, record, signal or WS change. Data side: [data model §77](../data-model/README.md#77-sprint-5-compressed--cached-built-client-d12).
 
 | Route (`start` only; dev = Vite) | Answer | Source |
 |---|---|---|

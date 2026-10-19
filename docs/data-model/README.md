@@ -1916,7 +1916,7 @@ From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-59, -61. **Built b
 
 ## 77. Sprint 5: compressed + cached built client (D12)
 
-From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-52 and [ADR-0052](../architecture/adr/0052-static-serving.md). **Built by `fix/static-compress`**: no table, column, record type or snapshot change (CON-44: 0 B). Protocol side: [protocol §97](../protocol/README.md#97-sprint-5-compressed--cached-built-client-d12).
+From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-52 and [ADR-0052](../architecture/adr/0052-static-serving.md). **Built by `fix/static-compress`**: no table, column, record type or snapshot change (CON-44: 0 B). Protocol side: [protocol §98](../protocol/README.md#98-sprint-5-compressed--cached-built-client-d12).
 
 | Piece | Kind | Contents | Visibility | Source |
 |---|---|---|---|---|
