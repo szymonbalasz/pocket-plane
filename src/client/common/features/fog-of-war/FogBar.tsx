@@ -8,7 +8,9 @@
 // (Players + "DM", FR-FOG-43; spinner while the load is in flight) and the DM-only hint "No vision
 // set for: ‹names›". Sprint 4 (V9): Shape Brush + its radius Slider, Redo, and the history keys
 // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y (`BrushControls.tsx`, `history.ts`). V10: the Party vision Switch
-// (FR-FOG-49) and View as "Party vision".
+// (FR-FOG-49) and View as "Party vision". Sprint 5 (W3, FR-FOG-58): the bar sits at the tool bar
+// home spot (FR-MAP-60), takes its max width from there and wraps by control group
+// (`fog-bar-group`); the "No vision set" hint hangs under its last row, inside the panel's rect.
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
@@ -68,6 +70,7 @@ import { SyncContext, useRecords, useSync } from "../../sync/store";
 import { useDefinitions } from "../compendium/definitions";
 import { useBaseKeyDown } from "../play-shell/hooks";
 import { toastReject, useLive, useMapIntent } from "../scenes-map/intents";
+import { BAR_GROUP_ATTR } from "../scenes-map/tool-bar-spot";
 import { BrushRadius, RedoButton } from "./BrushControls";
 import { type FogShapeMode, gestureKey } from "./gesture";
 import { type HistoryStep, historyKey, stepHistory } from "./history";
@@ -387,10 +390,12 @@ function NoVisionHint({ sceneId }: { sceneId: string | null }) {
   );
   if (names.length === 0) return null;
   return (
-    // Under the bar, not in it (the bar keeps one row); text only, so the map takes the pointer.
+    // Under the bar's last row, in the tool panel's rect (FR-FOG-58); text only, so the map takes
+    // the pointer (inline: the panel gives its children pointer events).
     <div
       data-testid="fog-no-vision"
-      className="pointer-events-none absolute top-full left-0 mt-1 max-w-full rounded-md bg-background/85 px-2 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur"
+      className="max-w-full rounded-md bg-background/85 px-2 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur"
+      style={{ pointerEvents: "none" }}
       role="note"
     >
       {NO_VISION_PREFIX}
@@ -400,6 +405,28 @@ function NoVisionHint({ sceneId }: { sceneId: string | null }) {
 }
 
 type Confirming = "fog-all" | "forget" | "clear-darkness" | null;
+
+/** FR-FOG-58: the bar's control groups, in order; a group never splits across rows. */
+export const FOG_BAR_GROUPS = ["mode", "shape", "all", "history", "explored", "vision"] as const;
+export type FogBarGroupId = (typeof FOG_BAR_GROUPS)[number];
+
+/**
+ * One control group; `sep` = a divider before it (made invisible, not removed, when the group
+ * starts a row: `data-row-start` set by the tool panel, so the wrap never flips back).
+ */
+function Group({ id, sep, children }: { id: FogBarGroupId; sep?: boolean; children: ReactNode }) {
+  return (
+    <div
+      data-testid="fog-bar-group"
+      data-record-id={id}
+      {...{ [BAR_GROUP_ATTR]: id }}
+      className="group/bar flex shrink-0 items-center gap-1"
+    >
+      {sep && <div className="mx-0.5 h-6 w-px bg-border group-data-row-start/bar:invisible" />}
+      {children}
+    </div>
+  );
+}
 
 export function FogBar() {
   const live = useLive();
@@ -471,165 +498,179 @@ export function FogBar() {
     </Button>
   );
   const explored = fog?.explored ?? false;
-  const sep = <div className="mx-0.5 h-6 w-px bg-border" />;
 
   return (
-    <div
-      data-testid="fog-bar"
-      data-disabled={off}
-      className="relative flex max-w-[min(62rem,calc(100vw-7rem))] flex-wrap items-center gap-1 rounded-md border bg-background/85 p-1 shadow-sm backdrop-blur"
-    >
-      {/* Each item sits in a span: the Tooltip trigger's `data-state` would hide the item's "on". */}
-      <ToggleGroup
-        type="single"
-        value={mode}
-        disabled={off}
-        onValueChange={(v) => v && setFogMode({ mode: v as FogMode })}
-        aria-label="Fog mode"
+    <>
+      <div
+        data-testid="fog-bar"
+        data-disabled={off}
+        className="relative flex max-w-full flex-wrap items-center gap-1 rounded-md border bg-background/85 p-1 shadow-sm backdrop-blur"
       >
-        {MODES.map((m) => (
-          <Tooltip key={m.value} content={m.tip}>
-            <span className="inline-flex">
-              <ToggleGroupItem
-                value={m.value}
-                aria-label={m.label}
-                data-testid={`fog-mode-${m.value}`}
-              >
-                {m.icon}
-              </ToggleGroupItem>
-            </span>
+        {/* Each item sits in a span: the Tooltip trigger's `data-state` would hide the item's "on". */}
+        <Group id="mode">
+          <ToggleGroup
+            type="single"
+            value={mode}
+            disabled={off}
+            onValueChange={(v) => v && setFogMode({ mode: v as FogMode })}
+            aria-label="Fog mode"
+          >
+            {MODES.map((m) => (
+              <Tooltip key={m.value} content={m.tip}>
+                <span className="inline-flex">
+                  <ToggleGroupItem
+                    value={m.value}
+                    aria-label={m.label}
+                    data-testid={`fog-mode-${m.value}`}
+                  >
+                    {m.icon}
+                  </ToggleGroupItem>
+                </span>
+              </Tooltip>
+            ))}
+          </ToggleGroup>
+        </Group>
+        <Group id="shape" sep>
+          <ToggleGroup
+            type="single"
+            value={shape}
+            disabled={off}
+            onValueChange={(v) => v && setFogMode({ shape: v as FogShapeMode })}
+            aria-label="Fog shape"
+          >
+            {SHAPES.map((s) => (
+              <Tooltip key={s.value} content={s.tip}>
+                <span className="inline-flex">
+                  <ToggleGroupItem
+                    value={s.value}
+                    aria-label={s.label}
+                    data-testid={`fog-shape-${s.value}`}
+                    disabled={s.value === "brush" && mode === "darkness"}
+                  >
+                    {s.icon}
+                  </ToggleGroupItem>
+                </span>
+              </Tooltip>
+            ))}
+          </ToggleGroup>
+          {shape === "brush" && <BrushRadius disabled={off} />}
+        </Group>
+        <Group id="all" sep>
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="fog-reveal-all"
+            disabled={off}
+            onClick={() => setAll(false)}
+          >
+            <SunIcon className="size-4" />
+            Reveal all
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="fog-fog-all"
+            disabled={off}
+            onClick={() => setConfirming("fog-all")}
+          >
+            <CloudFogIcon className="size-4" />
+            Fog all…
+          </Button>
+          {mode === "darkness" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              data-testid="fog-clear-darkness"
+              disabled={off || (fog?.darkness.length ?? 0) === 0}
+              onClick={() => setConfirming("clear-darkness")}
+            >
+              <Trash2Icon className="size-4" />
+              Clear darkness…
+            </Button>
+          )}
+        </Group>
+        <Group id="history">
+          <Tooltip content={undoHint(fog)}>
+            {/* A disabled button gets no pointer events: the wrapper carries the tooltip. */}
+            {undoOff ? <span className="inline-flex">{undoButton}</span> : undoButton}
           </Tooltip>
-        ))}
-      </ToggleGroup>
-      {sep}
-      <ToggleGroup
-        type="single"
-        value={shape}
-        disabled={off}
-        onValueChange={(v) => v && setFogMode({ shape: v as FogShapeMode })}
-        aria-label="Fog shape"
-      >
-        {SHAPES.map((s) => (
-          <Tooltip key={s.value} content={s.tip}>
-            <span className="inline-flex">
-              <ToggleGroupItem
-                value={s.value}
-                aria-label={s.label}
-                data-testid={`fog-shape-${s.value}`}
-                disabled={s.value === "brush" && mode === "darkness"}
-              >
-                {s.icon}
-              </ToggleGroupItem>
-            </span>
+          <RedoButton
+            fog={fog}
+            disabled={off}
+            hint={redoHint(fog)}
+            onRedo={() => history("redo")}
+          />
+        </Group>
+        <Group id="explored" sep>
+          <div className="flex items-center gap-1.5 px-1 text-xs">
+            <Switch
+              id="fog-explored-toggle"
+              data-testid="fog-explored-toggle"
+              checked={explored}
+              disabled={off}
+              onCheckedChange={(on) => {
+                if (sceneId !== null) run(FOG_INTENTS.setExplored, { sceneId, on });
+              }}
+            />
+            <label htmlFor="fog-explored-toggle">Remember explored areas</label>
+          </div>
+          <Tooltip content="Forget explored…">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8"
+              aria-label="Forget explored"
+              data-testid="fog-forget-explored"
+              disabled={off}
+              onClick={() => setConfirming("forget")}
+            >
+              <EraserIcon className="size-4" />
+            </Button>
           </Tooltip>
-        ))}
-      </ToggleGroup>
-      {shape === "brush" && <BrushRadius disabled={off} />}
-      {sep}
-      <Button
-        size="sm"
-        variant="ghost"
-        data-testid="fog-reveal-all"
-        disabled={off}
-        onClick={() => setAll(false)}
-      >
-        <SunIcon className="size-4" />
-        Reveal all
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        data-testid="fog-fog-all"
-        disabled={off}
-        onClick={() => setConfirming("fog-all")}
-      >
-        <CloudFogIcon className="size-4" />
-        Fog all…
-      </Button>
-      <Tooltip content={undoHint(fog)}>
-        {/* A disabled button gets no pointer events: the wrapper carries the tooltip. */}
-        {undoOff ? <span className="inline-flex">{undoButton}</span> : undoButton}
-      </Tooltip>
-      <RedoButton fog={fog} disabled={off} hint={redoHint(fog)} onRedo={() => history("redo")} />
-      {mode === "darkness" && (
-        <Button
-          size="sm"
-          variant="ghost"
-          data-testid="fog-clear-darkness"
-          disabled={off || (fog?.darkness.length ?? 0) === 0}
-          onClick={() => setConfirming("clear-darkness")}
-        >
-          <Trash2Icon className="size-4" />
-          Clear darkness…
-        </Button>
-      )}
-      {sep}
-      <div className="flex items-center gap-1.5 px-1 text-xs">
-        <Switch
-          id="fog-explored-toggle"
-          data-testid="fog-explored-toggle"
-          checked={explored}
+        </Group>
+        <Group id="vision" sep>
+          <PartyVisionSwitch disabled={off} />
+          <ViewAsSelect disabled={off} />
+        </Group>
+        <Confirm
+          open={confirming === "fog-all"}
+          onOpenChange={(o) => setConfirming(o ? "fog-all" : null)}
+          testId="fog-fog-all"
+          title={FOG_ALL_TITLE}
+          text={FOG_ALL_TEXT}
+          action="Fog all"
           disabled={off}
-          onCheckedChange={(on) => {
-            if (sceneId !== null) run(FOG_INTENTS.setExplored, { sceneId, on });
+          onConfirm={() => setAll(true)}
+        />
+        <Confirm
+          open={confirming === "forget"}
+          onOpenChange={(o) => setConfirming(o ? "forget" : null)}
+          testId="fog-forget-explored"
+          title={FORGET_TITLE}
+          text={FORGET_TEXT}
+          action="Forget"
+          disabled={off}
+          onConfirm={() => {
+            if (sceneId !== null) run(FOG_INTENTS.forgetExplored, { sceneId });
           }}
         />
-        <label htmlFor="fog-explored-toggle">Remember explored areas</label>
-      </div>
-      <Tooltip content="Forget explored…">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8"
-          aria-label="Forget explored"
-          data-testid="fog-forget-explored"
+        <Confirm
+          open={confirming === "clear-darkness"}
+          onOpenChange={(o) => setConfirming(o ? "clear-darkness" : null)}
+          testId="fog-clear-darkness"
+          title={CLEAR_DARKNESS_TITLE}
+          text={CLEAR_DARKNESS_TEXT}
+          action="Clear darkness"
           disabled={off}
-          onClick={() => setConfirming("forget")}
-        >
-          <EraserIcon className="size-4" />
-        </Button>
-      </Tooltip>
-      {sep}
-      <PartyVisionSwitch disabled={off} />
-      <ViewAsSelect disabled={off} />
+          onConfirm={() => {
+            if (sceneId !== null) run(FOG_INTENTS.clearDarkness, { sceneId });
+          }}
+        />
+        <GestureHintTip />
+        <FreeChip />
+        <DarknessMenu />
+      </div>
       <NoVisionHint sceneId={sceneId} />
-      <Confirm
-        open={confirming === "fog-all"}
-        onOpenChange={(o) => setConfirming(o ? "fog-all" : null)}
-        testId="fog-fog-all"
-        title={FOG_ALL_TITLE}
-        text={FOG_ALL_TEXT}
-        action="Fog all"
-        disabled={off}
-        onConfirm={() => setAll(true)}
-      />
-      <Confirm
-        open={confirming === "forget"}
-        onOpenChange={(o) => setConfirming(o ? "forget" : null)}
-        testId="fog-forget-explored"
-        title={FORGET_TITLE}
-        text={FORGET_TEXT}
-        action="Forget"
-        disabled={off}
-        onConfirm={() => {
-          if (sceneId !== null) run(FOG_INTENTS.forgetExplored, { sceneId });
-        }}
-      />
-      <Confirm
-        open={confirming === "clear-darkness"}
-        onOpenChange={(o) => setConfirming(o ? "clear-darkness" : null)}
-        testId="fog-clear-darkness"
-        title={CLEAR_DARKNESS_TITLE}
-        text={CLEAR_DARKNESS_TEXT}
-        action="Clear darkness"
-        disabled={off}
-        onConfirm={() => {
-          if (sceneId !== null) run(FOG_INTENTS.clearDarkness, { sceneId });
-        }}
-      />
-      <GestureHintTip />
-      <FreeChip />
-      <DarknessMenu />
-    </div>
+    </>
   );
 }

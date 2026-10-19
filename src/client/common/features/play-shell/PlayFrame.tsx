@@ -67,6 +67,9 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
   const testMode = available.has(SHELL_TEST_KIND);
   const lastSound = useAlertState((s) => s.lastSound);
   useAppearPlacement(available, dispatch);
+  // FR-SHELL-51, -53: a live resize lets never-resized default-sized windows follow (W2 finding).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the viewport size is the trigger
+  useEffect(() => dispatch({ type: "viewport" }), [viewport.w, viewport.h, dispatch]);
 
   return (
     // overflow-clip (not hidden): a clipped box can't be scrolled at all, so focusing something
