@@ -2370,3 +2370,19 @@ From [party-board](../specs/party-board.md#66-sprint-5-loot-tab-present-uploads)
 | Registries | `loot.log` removed from `src/client/dm/windows.ts` and `src/client/player/windows.ts` (owner deletes its own line, seams S4); `@ui/features/party-loot/window.ts` and both `loot-window.tsx` deleted. A stored layout listing `loot.log` restores without a warning; the unknown kind is not rendered and dropped at the next write (FR-SHELL-18) |
 | Tests | `board.test.tsx` (FR-PARTY-29 ×3 per role), `logic.test.ts` (FR-PARTY-29 tab memory), both clients' `party-board/windows.test.ts` (FR-LOOT-21 registry + stored layout, FR-PARTY-30 closed / minimised / open); e2e `party-loot-tab.e2e.ts` (`party-s5`: FR-PARTY-29, FR-LOOT-21, -22, -23), `party-loot.e2e.ts` opens Loot through Party |
 | CON-44 | 0 B (no record) |
+
+## 94. Sprint 5: colour picker (K2)
+
+From [campaign-management](../specs/campaign-management.md#7-uiux-notes) FR-CAMP-27 ([ADR-0055](../architecture/adr/0055-player-colour.md); DM gate #256). **Built by `build/colour-picker`**: client only; sends K0's `camp.setColor` ([§91](#91-sprint-5-player-colours-core-k0)). No new route, intent, event, record type, registry or snapshot byte. No data-model change.
+
+| Piece | Contract |
+|---|---|
+| `ColorPopover` (`@ui/features/campaign-management/ColorPopover.tsx`) | Trigger: a ghost icon Button (24 px hit area) holding a 12 / 16 px dot in `colorOf` of the target, Tooltip = its `tip`; `data-value` = the target's stored key. Popover: 8 round 24 px swatches, 4 × 2, palette order. `colorSwatches(holders, target)` (pure): the target's own key checked and never taken (also when a repeated default shares it); any other key held by the DM (target ≠ DM) or another player → taken, disabled, label "‹Key› — taken by ‹name›" ("DM" for the DM); free → "‹Key›". Label = `aria-label` and Tooltip |
+| Send | A click closes the Popover and sends `camp.setColor {playerId: target, color}` (`target` null = the DM colour). Not optimistic: trigger and swatches read the `player` / `campaign` records, so a `reject` (Toast with the server's message, scenes-map's `toastReject`; `disconnected` / `offline` → the banner only) leaves the server's colour |
+| Not live | Every swatch disabled; the trigger still opens the Popover; marks keep the last colours |
+| Player (`@player/features/campaign-management/screens.tsx` `JoinedHeader`) | "Playing as ● **Player 1** in …": the dot before the name, target = `you.playerId`, Tooltip "Your colour" (no play-shell frame edit) |
+| DM (`@dm/features/campaign-management/PlayersPanel.tsx`, `camp.players`) | "Your colour (DM)" + swatch (target null) above the table, inside the scrolling body; each player row starts with that player's swatch (Tooltip "‹name›'s colour"). Window size unchanged (400×220) |
+| Test IDs | `camp-my-color` (player dot, `data-value`), `camp-color-dm` (`data-value`), `camp-player-color` (+ `data-record-id` = player id, `data-value`), `camp-color-popover`, `camp-color-swatch` (+ `data-value` = key, `data-taken-by` = player id \| `dm` \| absent, `data-state` = `checked` \| `unchecked`) |
+| Fixtures | Bundle `player-colours` and unit `pc-colours` (K0); `session-sim-9` already holds `pc-colours`; nothing new |
+| Tests | `ColorPopover.test.tsx` (FR-CAMP-27 picker ×7: swatch model per target, 9th player, static render taken / checked / not live, send, reject keeps the server's colour), player `screens.test.tsx` (header dot); e2e `colour-picker.e2e.ts` (`player-colours`: CAMP §13 K1, K2, K10, K11) |
+| CON-44 | 0 B (no record) |
