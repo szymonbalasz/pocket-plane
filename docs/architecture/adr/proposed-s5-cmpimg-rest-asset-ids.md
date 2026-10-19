@@ -1,6 +1,6 @@
-# Proposed — Asset IDs in compendium REST bodies
+# 00xx — Asset IDs in compendium REST bodies
 
-- Status: proposed (sprint 5, track C; DM gate 1). Integrator numbers it at merge.
+- Status: accepted (DM, sprint-5 gate 1, [#256](../../decisions-log.md); OQ-ASSET-17 A). Integrator numbers it at merge.
 - Date: 2026-10-18
 - Amends: [ADR-0023](0023-asset-access-by-capability-id.md) (Decision, "Secrecy" row)
 - Affects: [assets-pipeline](../../specs/assets-pipeline.md) (FR-ASSET-12, FR-ASSET-35–38), [compendium](../../specs/compendium.md) (FR-CMP-45–53); [ADR-0046](0046-compendium-scope.md) (delivery 1: entries over REST)
@@ -21,9 +21,9 @@
 | B. Entry images as a lazy record type loaded with `sync.load` | IDs stay WS-only | A second read path for one field; per-entry visibility in the WS filter; client stitches REST + WS |
 | C. Image route behind the player credential | IDs never leave for players | `<img>` and Konva can't send headers; ADR-0023 rejected this (its option B) |
 
-## Decision (proposed)
+## Decision
 
-**A.** ADR-0023's Secrecy row becomes: "A player receives an asset ID only as a field of a record it may see, **or in a compendium REST response for an entry that compendium's `entryVisibleTo` lets that player read** (never in its errors or `304`s)."
+**A** (DM, #256). ADR-0023's Secrecy row becomes: "A player receives an asset ID only as a field of a record it may see, **or in a compendium REST response for an entry that compendium's `entryVisibleTo` lets that player read** (never in its errors or `304`s)."
 
 ## Consequences
 
