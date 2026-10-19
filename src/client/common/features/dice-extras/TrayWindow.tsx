@@ -45,7 +45,13 @@ import { Input } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
-import { actorOptions, actorSelection, modeFromKeys } from "../dice-roll-log/logic";
+import {
+  actorOptions,
+  actorSelection,
+  HELD_TEXT,
+  heldSegments,
+  modeFromKeys,
+} from "../dice-roll-log/logic";
 import {
   ManualForm,
   type RollControlOptions,
@@ -53,6 +59,7 @@ import {
   useRollControl,
 } from "../dice-roll-log/roll-control";
 import { FlatDie } from "./FlatDie";
+import { useHolding, useLandingFade } from "./landing";
 import { useOwnLook } from "./own-look";
 import { SettingsPanel } from "./SettingsPanel";
 import { diceExtras, type TrayRequest, useDiceExtras } from "./store";
@@ -61,9 +68,10 @@ import {
   addDie,
   chipsOf,
   constantOfTerms,
+  editRequest,
+  editStartsFresh,
   notationOf,
   PALETTE,
-  paletteRequest,
   previewMode,
   removeDie,
   setConstant,
@@ -283,29 +291,36 @@ function SettingsPopover() {
   );
 }
 
-/** `result`: the last own roll as flat dice, its total and the log line (FR-DICEX-10). */
+/**
+ * `result`: the last own roll as flat dice, its total and the log line (FR-DICEX-10). FR-DICEX-49
+ * (table E): while its entries are held, blank die shapes and "…"; at the landing the numbers
+ * fade in.
+ */
 function ResultView({ entries }: { entries: GameLogEntryView[] }) {
   const t = useMemo(() => throwDice(entries), [entries]);
   const look = useOwnLook();
-  const lines = useMemo(
-    () =>
-      entries.map((e) =>
-        formatEntry(e)
-          .segments.map((s) => s.text)
-          .join(""),
-      ),
-    [entries],
-  );
+  const holding = useHolding();
+  const landed = entries.every((e) => !holding.has(e.id));
+  const fade = useLandingFade<HTMLDivElement>(landed);
+  const lines = entries.map((e) => {
+    const { segments } = formatEntry(e);
+    return (holding.has(e.id) ? heldSegments(segments) : segments).map((s) => s.text).join("");
+  });
   return (
-    <div className="flex flex-col gap-1.5">
+    <div ref={fade} className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-1">
         {t?.dice.map((d) => (
-          <FlatDie key={d.key} die={d} look={look} />
+          <FlatDie key={d.key} die={d} look={look} blank={holding.has(d.entryId)} />
         ))}
         {t && t.more > 0 && <span className="text-xs text-muted-foreground">+{t.more} more</span>}
         {t && t.totals.length > 0 && (
-          <strong data-testid="dicex-tray-total" className="ml-1 text-lg">
-            {t.totals.join(" · ")}
+          <strong
+            data-testid="dicex-tray-total"
+            data-landed={landed}
+            data-landing
+            className="ml-1 text-lg"
+          >
+            {landed ? t.totals.join(" · ") : HELD_TEXT}
           </strong>
         )}
       </div>
@@ -356,10 +371,9 @@ export function TrayWindow() {
   useEffect(() => {
     const r = diceExtras.api.getState().request;
     setError(null);
-    if (r?.kind === "free") {
-      setDraft(r.expression);
-      lastValid.current = termsOf(r.expression) ?? [];
-    }
+    const expression = r?.kind === "free" ? r.expression : "";
+    setDraft(expression);
+    lastValid.current = termsOf(expression) ?? [];
   }, [staged]);
 
   const update = (patch: Partial<Extract<TrayRequest, { kind: "free" }>>) => {
@@ -371,15 +385,18 @@ export function TrayWindow() {
     };
     diceExtras.api.setState({ request: { ...base, ...patch }, result: null });
   };
+  /** FR-DICEX-50: `fresh` = after a result: a new roll carries nothing of the old request. */
+  const edit = (expression: string, fresh: boolean) => {
+    if (!fresh) return update({ expression });
+    const next = editRequest(free, expression, mode, true);
+    diceExtras.api.setState({ request: { kind: "free", ...next }, result: null });
+  };
   const setTerms = (terms: ReturnType<typeof addDie>, fresh = false) => {
     const expression = notationOf(terms);
     lastValid.current = terms;
     setDraft(expression);
     setError(null);
-    if (!fresh) return update({ expression });
-    // BL-18: a new roll after a result carries nothing of the old request.
-    const next = paletteRequest(free, expression, mode, true);
-    diceExtras.api.setState({ request: { kind: "free", ...next }, result: null });
+    edit(expression, fresh);
   };
 
   // One RollControl for the staged request: `control` options verbatim (FR-DICEX-08 a) with the
@@ -403,6 +420,8 @@ export function TrayWindow() {
   const options = trayControlOptions(request, draft, mode, sendFree);
   const control = useRollControl(options, { tray: request?.kind === "control" });
   const state = trayState({ request, rolling, result, manual: control.manual !== null });
+  // FR-DICEX-50 (table F): an edit after a result, or over a `control` request, starts fresh.
+  const fresh = editStartsFresh(state, request?.kind ?? null);
   // FR-DICEX-08 e: MOD's preview (FR-MOD-27) combines the tray's mode with the effects (5e);
   // without a subject, the tray's own mode first, else the request's `previewMode`.
   const shownMode = control.preview.active
@@ -452,7 +471,8 @@ export function TrayWindow() {
       ? (actors.find((a) => a.value && refKey(a.ref) === refKey(free.actor)) ?? null)
       : null,
   );
-  const who = selected?.label;
+  // The header names a picked actor only (FR-DICEX-50: a fresh request reads "Other").
+  const who = free?.actor ? selected?.label : undefined;
 
   return (
     <section
@@ -546,7 +566,6 @@ export function TrayWindow() {
               className="h-7 px-2 font-mono text-xs"
               onClick={() => {
                 // After a result the palette starts a new roll; else it adds to the request.
-                const fresh = state === "result" || !free;
                 diceExtras.api.setState({ result: null });
                 setTerms(addDie(fresh ? [] : terms, f), fresh);
               }}
@@ -557,7 +576,8 @@ export function TrayWindow() {
         </fieldset>
       )}
 
-      {state === "compose" && (
+      {/* FR-DICEX-50: typing after a result starts a fresh request, as the palette does. */}
+      {(state === "compose" || state === "result") && (
         <div className="flex items-center gap-1.5">
           <Input
             data-testid="dicex-tray-expression"
@@ -570,10 +590,8 @@ export function TrayWindow() {
               setDraft(v);
               setError(null);
               const t = termsOf(v);
-              if (t) {
-                lastValid.current = t;
-                update({ expression: v });
-              }
+              if (t) lastValid.current = t;
+              if (t || fresh) edit(t ? v : "", fresh);
             }}
             onKeyDown={(e) => {
               if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
@@ -589,7 +607,7 @@ export function TrayWindow() {
             value={String(constantOfTerms(terms))}
             onChange={(e) => {
               const n = Number.parseInt(e.target.value.replace("−", "-"), 10);
-              setTerms(setConstant(terms, Number.isNaN(n) ? 0 : n));
+              setTerms(setConstant(terms, Number.isNaN(n) ? 0 : n), fresh);
             }}
           />
         </div>
