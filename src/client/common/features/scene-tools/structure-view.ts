@@ -90,9 +90,20 @@ export function distToSegment(
   return Math.hypot(p.x - (ax + t * dx), p.y - (ay + t * dy));
 }
 
+/** A door with both ends within this many cells of a wall lies on it (freeform 0.01 rounding). */
+export const ON_WALL_CELLS = 0.02;
+
+/** Whether the `door` segment lies along the `wall` segment, within `slack` map px. */
+function liesOn(g: Grid, door: Segment, wall: Segment, slack: number): boolean {
+  const [ax, ay, bx, by] = segmentPx(g, door);
+  const w = segmentPx(g, wall);
+  return distToSegment({ x: ax, y: ay }, w) <= slack && distToSegment({ x: bx, y: by }, w) <= slack;
+}
+
 /**
- * FR-SCN-08 Erase: the nearest wall or door within `tol` map px of `p`, or null. On a tie the
- * door wins, so a door drawn over a wall is erased before the wall under it (BL-12).
+ * FR-SCN-08 Erase: the nearest wall or door within `tol` map px of `p`, or null. A door is the
+ * more specific target: it wins a tie, and it wins over the nearest wall when it lies on that
+ * wall, so a door drawn over a wall is erased before the wall under it (BL-12).
  */
 export function hitSegment(
   s: StructureView,
@@ -100,16 +111,21 @@ export function hitSegment(
   p: { x: number; y: number },
   tol: number,
 ): number | null {
-  let best: { n: number; d: number } | null = null;
-  const all: [number, Segment][] = [
-    ...s.doors.map((d): [number, Segment] => [d.n, d.seg]),
-    ...s.walls.map((w): [number, Segment] => [w[0], [w[1], w[2], w[3], w[4]]]),
-  ];
-  for (const [n, seg] of all) {
-    const d = distToSegment(p, segmentPx(g, seg));
-    if (d <= tol && (!best || d < best.d)) best = { n, d };
+  const near = (seg: Segment) => distToSegment(p, segmentPx(g, seg));
+  let wall: { n: number; d: number; seg: Segment } | null = null;
+  for (const w of s.walls) {
+    const seg: Segment = [w[1], w[2], w[3], w[4]];
+    const d = near(seg);
+    if (d <= tol && (!wall || d < wall.d)) wall = { n: w[0], d, seg };
   }
-  return best?.n ?? null;
+  const slack = ON_WALL_CELLS * g.gridCellSize;
+  let door: { n: number; d: number } | null = null;
+  for (const dr of s.doors) {
+    const d = near(dr.seg);
+    if (d > tol || (door && d >= door.d)) continue;
+    if (!wall || d <= wall.d || liesOn(g, dr.seg, wall.seg, slack)) door = { n: dr.n, d };
+  }
+  return door?.n ?? wall?.n ?? null;
 }
 
 export interface PxBox {

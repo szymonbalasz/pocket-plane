@@ -6,7 +6,7 @@
 // token sample against the party's polygons + memory from the mover's polygons only; the others'
 // sight is cached with its containment grids, as the server's vision cache keeps them); the switch
 // (every counted source + samples + memory) ≤ 150 ms; one player's `vision` at 4 sources ≤ 48 KiB.
-// Medians after warm-up; numbers logged for the build report.
+// Best of N after warm-up; numbers logged for the build report.
 import { describe, expect, test } from "bun:test";
 import { type FogMask, uniformMask } from "./mask";
 import type { FogShapeOp, ShapeLike } from "./shapes";
@@ -38,16 +38,17 @@ function rng(seed: number) {
 }
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
-function median(fn: () => void, runs = 9, warm = 2): number {
+// Best of N, not the median: load from parallel suites only adds time, so the fastest run is the
+// load-tolerant estimate of the code's own cost and a real regression still lifts it (BL-28).
+function best(fn: () => void, runs = 9, warm = 2): number {
   for (let i = 0; i < warm; i++) fn();
-  const t: number[] = [];
+  let min = Number.POSITIVE_INFINITY;
   for (let i = 0; i < runs; i++) {
     const t0 = performance.now();
     fn();
-    t.push(performance.now() - t0);
+    min = Math.min(min, performance.now() - t0);
   }
-  t.sort((a, b) => a - b);
-  return t[Math.floor(t.length / 2)] as number;
+  return min;
 }
 
 const SIZE = 120;
@@ -115,7 +116,7 @@ describe("FOG §12 sprint-4 benchmark (V core exit gate at r 199.8)", () => {
 
   test("FR-FOG-33 sprint 4: one polygon at r 199.8 + map edges + simplification ≤ 10 ms", () => {
     const src = s.players[0]?.[1] as VisionSource;
-    const ms = median(() => {
+    const ms = best(() => {
       sourcePolygons(scene, src);
     }, 31);
     const [see] = sourcePolygons(scene, src);
@@ -130,7 +131,7 @@ describe("FOG §12 sprint-4 benchmark (V core exit gate at r 199.8)", () => {
     const warmParty = partyVision(others) as PlayerVision;
     for (const pt of samples) pointVisible(warmParty, pt);
     let k = 0;
-    const ms = median(() => {
+    const ms = best(() => {
       const moved = (counted[0] as VisionSource[]).map((src) => ({ ...src, x: src.x + (k++ % 2) }));
       const mine = playerVision(scene, moved);
       const party = partyVision([mine, ...others]) as PlayerVision;
@@ -144,7 +145,7 @@ describe("FOG §12 sprint-4 benchmark (V core exit gate at r 199.8)", () => {
   });
 
   test("FR-FOG-49 the switch (every counted source + samples + memory) ≤ 150 ms", () => {
-    const ms = median(
+    const ms = best(
       () => {
         const visions = counted.map((srcs) => playerVision(scene, srcs));
         const party = partyVision(visions) as PlayerVision;

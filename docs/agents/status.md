@@ -2,14 +2,21 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 4 done (gate #249, recap #250–#251). **Sprint 5** planned in [sprint-5](sprint-5.md); Phase A (specs) starts with the DM's kickoff prompt.
+**Phase:** Sprint 5 Phase A done: specs, seams, two reviews + rulings applied. **Waiting on DM gate 1** (`.verify/sprint5/gate.md`), [sprint-5](sprint-5.md). Kickoff 2026-10-18.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Sprint 4 | merged | — | Done: builds #248, gate session-sim-8 16 / 17 #249, playtest section, recap #250–#251 | — |
-| Sprint 5 | — | — | Planned ([sprint-5](sprint-5.md)) | Phase A: specs W, D, R, P, then C, K |
+| Sprint 4 | merged | — | Done (#243–#251) | — |
+| W windows + layout | spec/s5-windows (w6G) | spec-windows | reviewed | DM gate |
+| D dice polish | spec/s5-dice (w6H) | spec-dice | reviewed | DM gate |
+| R late damage + log + ally side (#252) | spec/s5-combat (w6J) | spec-combat | reviewed | DM gate |
+| P party + uploads | spec/s5-party (w6K) | spec-party | reviewed | DM gate |
+| C compendium images | spec/s5-cmpimg (w6M) | spec-cmpimg | reviewed | DM gate |
+| K player colours + template delete [1] | spec/s5-colours (w6N) | spec-colours | reviewed | DM gate |
+
+New ID ranges per track (parallel edits of shared specs): in the briefs `%TEMP%/pocket-plane/briefs/spec-s5-*.md`.
 
 ## Shared-file locks
 
@@ -28,6 +35,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 - Sprint 1: CON-44 headroom is tight (heavy DM snapshot 746 KB vs 768 KiB after cbtx-core). D build: snapshot only active effects; never raise a ceiling without a look.
 - Sprint 1 nit (not a FAIL): Notifications window opens ~250 px tall vs spec §7 360×480 (test-polish-notes).
 
+- Known flake: `e2e/weapon-rows.e2e.ts` "2d6+5 slashing" text check under a parallel full e2e (sprint 5; 3 / 3 alone).
 - Known flake: `e2e/weapon-combat.e2e.ts` (Flame Tongue line count) under a loaded full run; passes alone.
 - Known flake: `vision-s4.bench.test.ts` party move ≤ 30 ms fails only under parallel load (32 ms with 4 suites running; 11 ms alone). Re-run alone before treating it as real.
 - Known flake: `snapshot-size.test.ts` (CON-44) fails with SQLITE_BUSY when several worktrees run the suite at once; passes alone and on re-run. Builders re-run before treating it as real.
