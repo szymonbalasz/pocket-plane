@@ -14,7 +14,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { useStore } from "zustand";
+import { createStore, useStore } from "zustand";
 import { SyncContext, useSync } from "../../sync/store";
 import { showAlertToast } from "./alert-toast";
 import {
@@ -26,6 +26,7 @@ import {
 } from "./alerts";
 import { browserAudioContext, createAudioEngine } from "./audio";
 import { contentHeights } from "./content-heights";
+import type { Rect } from "./geometry";
 import type { OpenBy, WindowAction } from "./manager";
 import { availableKinds, type WindowRegistry } from "./registry";
 import { createShellController, type ShellController, type ShellState } from "./shell-store";
@@ -174,17 +175,24 @@ export function useAvailableKinds(): ReadonlySet<string> {
   return useMemo(() => new Set(joined ? joined.split(",") : []), [joined]);
 }
 
+/** Kinds available in the synced store now (every registered kind before a store exists). */
+function availableNow(
+  controller: ShellController,
+  sync: React.ContextType<typeof SyncContext>,
+): ReadonlySet<string> {
+  const store = sync?.getState().store;
+  return store
+    ? availableKinds(controller.registry, store)
+    : new Set(controller.registry.defs.map((d) => d.kind));
+}
+
 /** Dispatch a window action against the current availability. */
 export function useWindowDispatch(): (action: WindowAction) => void {
   const controller = useController();
   const sync = useContext(SyncContext);
   return useCallback(
     (action: WindowAction) => {
-      const store = sync?.getState().store;
-      const available = store
-        ? availableKinds(controller.registry, store)
-        : new Set(controller.registry.defs.map((d) => d.kind));
-      controller.dispatch(action, available);
+      controller.dispatch(action, availableNow(controller, sync));
     },
     [controller, sync],
   );
@@ -204,3 +212,24 @@ export function useOpenWindow(): (kind: string, instance?: string, opts?: { by?:
     [dispatch],
   );
 }
+
+/**
+ * Feature API (FR-SHELL-55): `push(rect)` moves every open window overlapping a map tool bar at
+ * `rect` (viewport px) right of it; call it when the bar appears or changes size, never on window
+ * changes. `layoutKey` changes when a layout is applied (first snapshot, campaign switch): a bar
+ * shown then pushes again. Outside a ShellProvider: a no-op and null.
+ */
+export function usePushWindows(): { push: (rect: Rect) => void; layoutKey: string | null } {
+  const controller = useContext(ShellContext);
+  const sync = useContext(SyncContext);
+  const layoutKey = useStore(controller?.store ?? NO_SHELL, (s) => s.key);
+  const push = useCallback(
+    (rect: Rect) => {
+      if (controller) controller.dispatch({ type: "push", rect }, availableNow(controller, sync));
+    },
+    [controller, sync],
+  );
+  return { push, layoutKey };
+}
+
+const NO_SHELL = createStore<Pick<ShellState, "key">>()(() => ({ key: null }));

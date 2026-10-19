@@ -12,6 +12,7 @@ export default defineBundle({
   includes: ["session-sim-8"],
   fixtures: [
     // W: windows + layout
+    // W3: no new unit (tool bars walk on sim-8's Goblin Ambush, Scenes and the running encounter)
     // D: dice polish
     // D10: no new unit (the tray preview walks on sim-7's `dicex-looks`)
     // D11: no new unit (the popup line walks on any roll; DICEX §13 uses `dice-polish`)

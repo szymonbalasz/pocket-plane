@@ -4,6 +4,7 @@ import { createStore, type StoreApi } from "zustand";
 import type { Rect, Viewport } from "./geometry";
 import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import {
+  isLayoutAction,
   type Placed,
   placedAs,
   reduce,
@@ -50,8 +51,9 @@ export interface ShellController {
 const sameRect = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 
 /**
- * `placed` after a change: a move / resize end → `stored`; a rect the reducer chose (new
- * window, auto placement, reset) → `default` / `auto`; any other window keeps its value.
+ * `placed` after a change: a move / resize end → `stored`; a push off a tool bar → `pushed`
+ * (FR-SHELL-55); a rect the reducer chose (new window, auto placement, reset, viewport follow) →
+ * `default` / `auto`; any other window keeps its value.
  */
 function nextPlaced(
   prev: ShellState,
@@ -68,6 +70,7 @@ function nextPlaced(
     const def = registry.get(w.kind);
     const moved = action.type === "reset" || !before || !sameRect(before, w);
     if (action.type === "setRect" && moved) out.set(id, "stored");
+    else if (action.type === "push" && moved) out.set(id, "pushed");
     else if (moved && def) out.set(id, placedAs(def, w, vp, hard));
     else {
       const kept = prev.placed.get(id);
@@ -87,7 +90,7 @@ function nextSettling(
   next: Windows,
   action: WindowAction,
 ): ReadonlySet<string> {
-  if (action.type === "reset") return prev;
+  if (isLayoutAction(action)) return prev;
   const id = windowId(action.kind, action.instance);
   const without = () => {
     if (!prev.has(id)) return prev;
@@ -114,7 +117,7 @@ function nextAutoMinimised(
   next: Windows,
   action: WindowAction,
 ): ReadonlySet<string> {
-  const named = action.type === "reset" ? null : windowId(action.kind, action.instance);
+  const named = isLayoutAction(action) ? null : windowId(action.kind, action.instance);
   const out = new Set<string>();
   for (const w of next) {
     if (w.state !== "minimised") continue;
