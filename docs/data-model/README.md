@@ -1824,7 +1824,7 @@ From [compendium](../specs/compendium.md#8-data-model) FR-CMP-45–49, -53 and [
 
 ## 69. Sprint 5: Add to party from the compendium (P4)
 
-From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–42 (DM gate #256). **Built by `build/cmp-add-to-party`**: DM client only; no table, column or record type. Protocol side: [protocol §87](../protocol/README.md#87-sprint-5-add-to-party-from-the-compendium-p4).
+From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–42 (DM gate #256). **Built by `build/cmp-add-to-party`**: DM client only; no table, column or record type. Protocol side: [protocol §88](../protocol/README.md#88-sprint-5-add-to-party-from-the-compendium-p4).
 
 - **Writes:** the existing `party.addItem` ([§31](#31-sprint-3-party-board-core-p-core)): one `party_item` insert or merge, one `loot_entry {kind: item, world → party}`, one `loot-received` notification, one transaction. The party row keeps a name copy only (no link back to the entry, OQ-PARTY-13; Add to party copies no images, FR-CMP-49).
 - **Fixtures:** bundle `party-cmp` = `party-board` + `cmp-srd-mini` (existing units; SRD "Potion of Healing" merges into `party-items-1`'s "Potion of healing" ×2 → ×4).
