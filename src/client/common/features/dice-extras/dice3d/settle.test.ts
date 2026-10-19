@@ -168,16 +168,14 @@ describe("FR-DICEX-15 headless settle", () => {
     );
   });
 
-  test("20 dice: precompute ≤ 50 ms (best of 3), ≤ 150 steps, every die at rest", () => {
+  // The ≤ 50 ms precompute budget: ./settle.bench.ts (`bun run bench`).
+  test("20 dice: ≤ 150 steps, every die at rest", () => {
     const dice = Array.from({ length: 20 }, (_, i) => {
       const s = SHAPES[i % SHAPES.length] as DieShape;
       return { shape: s, kind: s };
     });
-    let best = Number.POSITIVE_INFINITY;
     for (let k = 0; k < 3; k++) {
-      const t0 = performance.now();
       const sim = simulate(dice, seedOf(`twenty-${k}`));
-      best = Math.min(best, performance.now() - t0);
       expect(sim.steps).toBeLessThanOrEqual(MAX_STEPS);
       sim.final.forEach((q, i) => {
         expect(tilt(geometryOf(dice[i]?.shape as DieShape), q)).toBeLessThanOrEqual(
@@ -185,7 +183,6 @@ describe("FR-DICEX-15 headless settle", () => {
         );
       });
     }
-    expect(best).toBeLessThanOrEqual(50);
   });
 });
 
@@ -227,31 +224,25 @@ describe("FR-DICEX-34 animation lands on the server's faces", () => {
     },
   );
 
-  test.each(ARENAS)(
-    "%s: 20 dice ≤ 50 ms (best of 3), ≤ 150 steps, every face = its value",
-    (_, arena) => {
-      const dice = Array.from({ length: 20 }, (_, i) => {
-        const s = SHAPES[i % SHAPES.length] as DieShape;
-        return { shape: s, kind: s };
+  // The ≤ 50 ms budget per arena: ./settle.bench.ts (`bun run bench`).
+  test.each(ARENAS)("%s: 20 dice ≤ 150 steps, every face = its value", (_, arena) => {
+    const dice = Array.from({ length: 20 }, (_, i) => {
+      const s = SHAPES[i % SHAPES.length] as DieShape;
+      return { shape: s, kind: s };
+    });
+    const values = dice.map((d, i) => (i % Number(d.shape.slice(1))) + 1);
+    for (let k = 0; k < 3; k++) {
+      const sim = simulate(dice, seedOf(`arena-twenty-${k}`), arena);
+      expect(sim.steps).toBeLessThanOrEqual(MAX_STEPS);
+      const labels = settleLabels(sim, values);
+      // Relabelling moves face labels only: the values themselves never change.
+      expect(values).toEqual(dice.map((d, i) => (i % Number(d.shape.slice(1))) + 1));
+      sim.final.forEach((q, i) => {
+        const g = geometryOf(dice[i]?.shape as DieShape);
+        expect(upFace(g, labels[i] as number[], q)).toBe(values[i] as number);
       });
-      const values = dice.map((d, i) => (i % Number(d.shape.slice(1))) + 1);
-      let best = Number.POSITIVE_INFINITY;
-      for (let k = 0; k < 3; k++) {
-        const t0 = performance.now();
-        const sim = simulate(dice, seedOf(`arena-twenty-${k}`), arena);
-        best = Math.min(best, performance.now() - t0);
-        expect(sim.steps).toBeLessThanOrEqual(MAX_STEPS);
-        const labels = settleLabels(sim, values);
-        // Relabelling moves face labels only: the values themselves never change.
-        expect(values).toEqual(dice.map((d, i) => (i % Number(d.shape.slice(1))) + 1));
-        sim.final.forEach((q, i) => {
-          const g = geometryOf(dice[i]?.shape as DieShape);
-          expect(upFace(g, labels[i] as number[], q)).toBe(values[i] as number);
-        });
-      }
-      expect(best).toBeLessThanOrEqual(50);
-    },
-  );
+    }
+  });
 
   test("dice enter from the bottom edge and cross the screen to the far wall (1440×900)", () => {
     const arena = screenArena({ w: 1440, h: 900 });
