@@ -1900,3 +1900,11 @@ From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-C
 - **Derived (line text):** the ruling's full stop; the DM's damage parts (`dmPayload.mods.damage`) inside the base part's muted run; a trigger part's type word = `parts[].type` ?? `damageType`.
 - **Fixtures:** none new (`rules-effects` holds every unit L12–L14 needs).
 - **Snapshot size** (CON-44): 0 B stored; rendered text grows by ≤ 12 B per trigger part (MOD §12).
+
+## 76. Sprint 5: compressed + cached built client (D12)
+
+From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-52 and [ADR-0052](../architecture/adr/0052-static-serving.md). **Built by `fix/static-compress`**: no table, column, record type or snapshot change (CON-44: 0 B). Protocol side: [protocol §97](../protocol/README.md#97-sprint-5-compressed--cached-built-client-d12).
+
+| Piece | Kind | Contents | Visibility | Source |
+|---|---|---|---|---|
+| `dist/client/assets/*.{js,css}.br`, `.gz` | build output (gitignored, rewritten per build) | brotli q11 / gzip -9 of each JS / CSS file ≥ 1 KB | public, same for DM and players | FR-DICEX-52 |

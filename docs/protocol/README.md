@@ -2413,3 +2413,17 @@ From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-C
 | Tests | `combat-lines.test.ts` (`FR-CBT-95 ruling punctuation`, `FR-CBT-96 Rage once in the DM line`, `FR-MOD-62 damage types on trigger parts`), `late-fill.test.tsx` (damage-only header), `e2e/combat-lines.e2e.ts` (CBT §13.1 L12–L14, bundle `late-damage`) |
 | Fixtures | None new: L12–L14 walk on `rules-effects` (Brakka, Flame Tongue, Fire Ward, Rage spent, Divine Fury; Thorn's Sneak Attack) |
 | CON-44 | 0 B: no record or field; rendered text only |
+
+## 97. Sprint 5: compressed + cached built client (D12)
+
+From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-52 (§6.1 table H; BL-21; OQ-DICEX-40 A, -41 A, #256) and [ADR-0052](../architecture/adr/0052-static-serving.md). **Built by `fix/static-compress`** (seams S11: `src/server/app.ts`, `vite.config.ts`). HTTP headers on the built client only; no intent, event, record, signal or WS change. Data side: [data model §76](../data-model/README.md#76-sprint-5-compressed--cached-built-client-d12).
+
+| Route (`start` only; dev = Vite) | Answer | Source |
+|---|---|---|
+| `GET /assets/*` | `serveStatic({ root, precompressed: true, onFound })`: `Accept-Encoding` has `br` → the `.br` sibling, `Content-Encoding: br`; else `gzip` → `.gz`, `gzip`; else the plain file. `Vary: Accept-Encoding` and `Cache-Control: public, max-age=31536000, immutable` on every found file, plain ones too; a missing file → 404 without them. No `ETag` / `Last-Modified` | FR-DICEX-52 |
+| `GET /`, `GET /p/*` | DM / player `index.html`, `Cache-Control: no-cache`, never compressed | FR-DICEX-52 |
+| Build (`vite.config.ts` `precompress()`) | `writeBundle`: every `assets/*.js` / `*.css` ≥ 1,024 B gets `.br` (quality 11) and `.gz` (level 9) beside it; an in-memory build (`write: false`) writes none | FR-DICEX-52 |
+
+- **Visibility:** the same files and headers for the DM and every player (public build output, no secrets). The asset store (`/api/assets/*`, §14) is unchanged.
+- **Tests:** `src/server/static.test.ts` (`FR-DICEX-52 compressed chunk served`: br / gzip / none, `Vary` on a sibling-less file, 404 bare, HTML `no-cache`), `e2e/static-compress.e2e.ts` (`FR-DICEX-52 compressed build output`: siblings decompress to the same bytes, none under 1 KB, `dice3d` `.br` ≤ 140 KB, the e2e server's `dice3d` answer).
+- **Measured** (this build): `dice3d` 632,343 B → 132,499 B br / 160,853 B gz.
