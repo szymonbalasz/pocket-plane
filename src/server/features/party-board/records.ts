@@ -1,21 +1,25 @@
 // Record types `handout`, `handout-body` (one table) and `party-item` (FR-PARTY-01, FR-PARTY-17):
 // campaign scope, **lazy** (ADR-0045): never in a snapshot, loaded with `sync.load`. Handout
 // visibility is the shared pure fn (FR-PARTY-07); party items are full for the campaign.
+// *(S5)* `handout-present` (FR-PARTY-31) is **in the snapshot**: own row per player.
 import {
   HANDOUT_BODY_TYPE,
+  HANDOUT_PRESENT_TYPE,
   HANDOUT_TYPE,
   HandoutBodyRecord,
+  HandoutPresentRecord,
   HandoutRecord,
   PARTY_ITEM_TYPE,
   PartyItemRecord,
 } from "@shared/party-board/schemas";
 import {
   handoutVisibility,
+  presentVisibility,
   redactHandout,
   redactHandoutBody,
 } from "@shared/party-board/visibility";
 import { defineRecordType, type Visibility } from "../../ws/records";
-import { handoutBodiesByIds, listHandouts, listPartyItems } from "./rows";
+import { handoutBodiesByIds, listHandouts, listPartyItems, listPresents } from "./rows";
 
 /** FR-PARTY-01 header: lazy `"all"` (the board loads every visible header). */
 export const handoutType = defineRecordType<HandoutRecord>({
@@ -62,4 +66,23 @@ export const partyItemType = defineRecordType<PartyItemRecord>({
   campaignOf: (r) => r.campaignId,
   visibility: partyItemVisibility,
   snapshot: ({ db }, v) => listPartyItems(db, v.campaignId),
+});
+
+/**
+ * FR-PARTY-31 (S5): not lazy (it must reach a player who never opens the board): ≤ 20 rows for
+ * the DM, ≤ 1 for a player (the provider reads only the viewer's row; the filter is the rule).
+ */
+export const handoutPresentType = defineRecordType<HandoutPresentRecord>({
+  type: HANDOUT_PRESENT_TYPE,
+  scope: "campaign",
+  schema: HandoutPresentRecord,
+  idOf: (r) => r.id,
+  campaignOf: (r) => r.campaignId,
+  visibility: (r, v) => presentVisibility(r, v),
+  snapshot: ({ db }, v) =>
+    v.role === "dm"
+      ? listPresents(db, v.campaignId)
+      : v.playerId === null
+        ? []
+        : listPresents(db, v.campaignId, v.playerId),
 });

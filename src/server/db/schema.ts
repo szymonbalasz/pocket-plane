@@ -7,7 +7,13 @@ import {
   EFFECT_ENDED_REASONS,
   EFFECT_KINDS,
 } from "@shared/combat-extras/schemas";
-import { HP_MODES, type HpDamagePart, type HpTriggerPart } from "@shared/combat-tracker/schemas";
+import {
+  type HitRulingTarget,
+  HP_MODES,
+  type HpDamagePart,
+  type HpTriggerPart,
+  SIDES,
+} from "@shared/combat-tracker/schemas";
 import { COMPENDIUM_KINDS } from "@shared/compendium/schemas";
 import { DICE_MATERIALS, DICE_STYLES } from "@shared/dice-extras/looks";
 import type { Modifier } from "@shared/effect-modifiers/schemas";
@@ -27,6 +33,7 @@ import {
 import type { DarknessRow, FogLayerShape } from "@shared/fog-of-war/shapes";
 import type { SharedWith } from "@shared/party-board/schemas";
 import { DIAGONAL_RULES, type Door, TEMPLATE_SHAPES, type Wall } from "@shared/scene-tools/schemas";
+import type { TokenTrail } from "@shared/scenes-map/schemas";
 import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
@@ -140,6 +147,12 @@ export const asset = sqliteTable(
     displayWidth: integer("display_width").notNull(),
     displayHeight: integer("display_height").notNull(),
     createdAt: text("created_at").notNull(),
+    /**
+     * FR-ASSET-24 (S5): false = an **attachment** (upload / paste through the attach control):
+     * outside the library and every snapshot (the `asset` provider reads listed rows only).
+     * Server-only, not on the wire. Existing rows: true.
+     */
+    listed: integer("listed", { mode: "boolean" }).notNull().default(true),
   },
   (t) => [
     // FR-ASSET-03: dedupe per campaign.
@@ -331,6 +344,12 @@ export const token = sqliteTable(
     seenBy: text("seen_by", { mode: "json" }).$type<string[]>(),
     /** FR-FOG-45 (#210): DM-only token state; DM wire only when true, never to players. */
     invisible: integer("invisible", { mode: "boolean" }).notNull().default(false),
+    /**
+     * FR-MAP-65 (sprint 5): JSON leaf `{cells}` (2–21) | null: this turn's combat trail, written
+     * only by scenes-map's `appendTrail` / `clearTrails` (combat calls them). Players: player
+     * tokens only (FR-MAP-66).
+     */
+    trail: text("trail", { mode: "json" }).$type<TokenTrail | null>(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -525,6 +544,8 @@ export const encounterEntry = sqliteTable(
     quantity: integer("quantity").notNull(),
     /** FR-CBT-62: `average` = stat block `hpMax`; `rolled` = the `hpFormula` at Start. */
     hpMode: text("hp_mode", { enum: HP_MODES }).notNull().default("average"),
+    /** FR-CBT-98 (#252): the builder's "Friendly" = `ally`; Start copies it onto each instance. */
+    side: text("side", { enum: SIDES }).notNull().default("enemy"),
   },
   (t) => [
     uniqueIndex("encounter_entry_seq").on(t.seq),
@@ -568,6 +589,12 @@ export const combatant = sqliteTable(
     movedFt: integer("moved_ft").notNull().default(0),
     /** Monsters only, 0–999 (FR-CBTX-14); PCs' lives on the character. Never sent to players. */
     tempHp: integer("temp_hp").notNull().default(0),
+    /**
+     * FR-CBT-98 (#252): the true side and the side players were last openly shown (written only
+     * by non-secret changes); null = the kind's default (PC ally, monster enemy). DM only.
+     */
+    side: text("side", { enum: SIDES }),
+    publicSide: text("public_side", { enum: SIDES }),
   },
   (t) => [uniqueIndex("combatant_seq").on(t.seq), index("combatant_encounter").on(t.encounterId)],
 );
@@ -648,6 +675,37 @@ export const hpChange = sqliteTable(
   (t) => [
     uniqueIndex("hp_change_seq").on(t.seq),
     index("hp_change_encounter").on(t.encounterId, t.seq),
+  ],
+);
+
+/**
+ * Hit ruling (combat-tracker, record type `hit-ruling`, sprint 5, ADR-0053): one per damage
+ * card, written by `cbt.applyHit`, never edited. DM only. The row outlives its card's
+ * resolution (undo reopens into the damage step) and goes with its encounter.
+ */
+export const hitRuling = sqliteTable(
+  "hit_ruling",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    encounterId: text("encounter_id")
+      .notNull()
+      .references((): AnySQLiteColumn => encounter.id, { onDelete: "cascade" }),
+    cardId: text("card_id")
+      .notNull()
+      .references((): AnySQLiteColumn => notification.id),
+    /** The DM's to-hit at Apply hit; `toHitSet` = it differs from the rolled total. */
+    toHitTotal: integer("to_hit_total").notNull(),
+    toHitSet: integer("to_hit_set", { mode: "boolean" }).notNull(),
+    /** JSON leaf 1–20 × `{targetId, hit, multiplier}`, ruling order. */
+    targets: text("targets", { mode: "json" }).$type<HitRulingTarget[]>().notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("hit_ruling_card").on(t.cardId),
+    index("hit_ruling_encounter").on(t.encounterId),
   ],
 );
 
@@ -744,6 +802,33 @@ export const partyItem = sqliteTable(
   (t) => [
     uniqueIndex("party_item_seq").on(t.seq),
     index("party_item_campaign_seq").on(t.campaignId, t.seq),
+  ],
+);
+
+/**
+ * Handout present (party-board, `handout-present`, data model §65; S5 P0): a shared handout open
+ * on one player's screen until closed (FR-PARTY-31). At most one row per player (unique
+ * `(campaignId, playerId)`); a row exists only for a player who can see its handout
+ * (FR-PARTY-35, kept by the commands; the cascade is the backstop for a handout delete).
+ */
+export const handoutPresent = sqliteTable(
+  "handout_present",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    handoutId: text("handout_id")
+      .notNull()
+      .references((): AnySQLiteColumn => handout.id, { onDelete: "cascade" }),
+    playerId: text("player_id")
+      .notNull()
+      .references((): AnySQLiteColumn => player.id),
+    presentedAt: text("presented_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("handout_present_campaign_player").on(t.campaignId, t.playerId),
+    index("handout_present_handout").on(t.handoutId),
   ],
 );
 
@@ -1348,9 +1433,11 @@ export const schema = {
   encounterEntry,
   combatant,
   hpChange,
+  hitRuling,
   lootEntry,
   handout,
   partyItem,
+  handoutPresent,
   creatureSheet,
   effect,
   effectPreset,

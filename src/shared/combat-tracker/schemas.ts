@@ -21,9 +21,13 @@ export const ENCOUNTER_TYPE = "encounter";
 export const ENCOUNTER_ENTRY_TYPE = "encounter-entry";
 export const COMBATANT_TYPE = "combatant";
 export const HP_CHANGE_TYPE = "hp-change";
+/** Sprint 5 (FR-CBT-88, ADR-0053): the DM-only hit ruling of a pending card. */
+export const HIT_RULING_TYPE = "hit-ruling";
 export const DAMAGE_CARD_KIND = "damage-card";
 export const LOG_KIND_ATTACK = "cbt.attack";
 export const LOG_KIND_HP = "cbt.hp";
+/** Sprint 5 (#252, FR-CBT-99): "Goblin 2 is now an ally". */
+export const LOG_KIND_SIDE = "cbt.side";
 
 /** FR-CBT-01 limits. */
 export const ENCOUNTER_NAME_MAX = 60;
@@ -55,6 +59,10 @@ export const CBT_INTENTS = {
   applyHp: "cbt.applyHp",
   undo: "cbt.undo",
   rollAbility: "cbt.rollAbility",
+  /** FR-CBT-88 (sprint 5, ADR-0053): rule the hit before the damage exists. */
+  applyHit: "cbt.applyHit",
+  /** FR-CBT-99 (sprint 5, #252): a combatant's side, secret or not. */
+  setSide: "cbt.setSide",
 } as const;
 
 const Id = z.string().min(1).max(64);
@@ -78,11 +86,21 @@ export const HP_MODES = ["average", "rolled"] as const;
 export const HpMode = z.enum(HP_MODES);
 export type HpMode = z.infer<typeof HpMode>;
 
+/**
+ * FR-CBT-98 (#252): `ally` = the party's, `enemy` = against it. Combatant `side` / `publicSide`
+ * null = the kind's default (`sideOf`, `publicSideOf` in `./rules`).
+ */
+export const SIDES = ["ally", "enemy"] as const;
+export const Side = z.enum(SIDES);
+export type Side = z.infer<typeof Side>;
+
 export const EncounterEntryInput = z.strictObject({
   definitionId: Id,
   quantity: z.int().min(1).max(QUANTITY_MAX),
   /** FR-CBT-62: omitted = `average`. */
   hpMode: HpMode.optional(),
+  /** FR-CBT-98 (#252): the builder's "Friendly" (`ally`); omitted = `enemy`. */
+  side: Side.optional(),
 });
 
 /** POST / PUT `/api/encounters` (whole replace). */
@@ -147,6 +165,8 @@ export const EncounterEntryRecord = z.object({
   definitionId: z.string(),
   quantity: z.int(),
   hpMode: HpMode,
+  /** FR-CBT-98 (#252): Start copies it onto each instance; difficulty counts enemies only. */
+  side: Side,
 });
 export type EncounterEntryRecord = z.infer<typeof EncounterEntryRecord>;
 
@@ -176,6 +196,12 @@ export const CombatantRecord = z.object({
   movedFt: z.int().min(0).max(MOVED_FT_MAX),
   /** Monsters' temp HP (FR-CBTX-14). DM only: no player view below carries it (FR-CBTX-32). */
   tempHp: TempHp,
+  /**
+   * FR-CBT-98 (#252): the true side and the side players were last openly shown; null = the
+   * kind's default. DM only: players get `side = publicSideOf` (FR-CBT-100).
+   */
+  side: Side.nullable(),
+  publicSide: Side.nullable(),
 });
 export type CombatantRecord = z.infer<typeof CombatantRecord>;
 
@@ -197,6 +223,8 @@ export const PlayerPcCombatant = z.object({
   initiative: z.int().nullable(),
   removed: z.literal(false),
   movedFt,
+  /** FR-CBT-100 (#252): `publicSideOf`; the true side never reaches players. */
+  side: Side,
 });
 /** Player view of a visible monster combatant: band, never HP numbers (FR-CBT-26). */
 export const PlayerMonsterCombatant = z.object({
@@ -210,6 +238,7 @@ export const PlayerMonsterCombatant = z.object({
   band: HealthBand,
   removed: z.literal(false),
   movedFt,
+  side: Side,
 });
 /** Player view of an active, removed, non-hidden combatant: no rank, band or initiative (FR-CBT-37). */
 export const PlayerRemovedCombatant = z.object({
@@ -221,6 +250,7 @@ export const PlayerRemovedCombatant = z.object({
   imageAssetId: z.string().nullable(),
   removed: z.literal(true),
   movedFt,
+  side: Side,
 });
 export type PlayerCombatant =
   | z.infer<typeof PlayerPcCombatant>
@@ -393,6 +423,11 @@ export type CardDamage = z.infer<typeof CardDamage>;
 /** A save spell's DC on a damage-only card ("— DC 13 DEX", FR-CBT-71). */
 export const CardSaveDc = z.strictObject({ dc: z.int().min(1).max(30), ability: Ability });
 
+/** FR-CBT-92 (sprint 5): a card keeps the owner's last 3 unused damage rolls (oldest dropped). */
+export const UNUSED_ROLLS_MAX = 3;
+export const CardUnusedRoll = z.strictObject({ rollId: Id, total: z.int() });
+export type CardUnusedRoll = z.infer<typeof CardUnusedRoll>;
+
 /**
  * Card payload. Sprint 2 (FR-CBT-70/71, ADR-0037): `toHit` and `damage` each nullable, never both
  * (to-hit-only card from `cbt.attack {rolls: "toHit"}`, completed or damage-only from
@@ -413,6 +448,8 @@ export const DamageCardPayload = z
     attackId: z.string().optional(),
     spellId: z.string().optional(),
     saveDc: CardSaveDc.optional(),
+    /** FR-CBT-92 (sprint 5): the owner's later damage rolls, not used ("Also rolled: 9"). */
+    unusedRolls: z.array(CardUnusedRoll).min(1).max(UNUSED_ROLLS_MAX).optional(),
   })
   .refine((p) => p.toHit !== null || p.damage !== null, {
     path: ["damage"],
@@ -436,6 +473,8 @@ export const DamageCardTargetOutcome = z.strictObject({
   hit: z.boolean(),
   multiplier: DamageMultiplier,
   applied: z.int(),
+  /** FR-CBT-91 (sprint 5): a ruled hit the DM dropped from the damage step (`applied: 0`). */
+  dropped: z.literal(true).optional(),
 });
 export type DamageCardTargetOutcome = z.infer<typeof DamageCardTargetOutcome>;
 
@@ -580,6 +619,8 @@ export const RollDamageResult = z.object({
   cardId: z.string(),
   rollIds: z.array(z.string()),
   attached: z.boolean(),
+  /** FR-CBT-92 (sprint 5): kept on the owner's completed card as an unused roll, no new card. */
+  unused: z.literal(true).optional(),
 });
 export type RollDamageResult = z.infer<typeof RollDamageResult>;
 /**
@@ -652,6 +693,12 @@ export const ApplyCardTargetsInput = z.strictObject({
       { message: "Each trigger part on at most one target" },
     ),
   public: z.boolean().optional(),
+  /**
+   * FR-CBT-94 (sprint 5): the card's damage `rollId` the popup was built from (null = none yet);
+   * another one on the card → `conflict` "Damage just arrived — check and Apply again". Absent =
+   * no check (callers from before sprint 5).
+   */
+  damageRollId: Id.nullable().optional(),
 });
 export type ApplyCardTargetsInput = z.input<typeof ApplyCardTargetsInput>;
 export const ApplyHpInput = z.strictObject({
@@ -697,3 +744,53 @@ export const RollAbilityInput = z
 export type RollAbilityInput = z.input<typeof RollAbilityInput>;
 export const RollAbilityResult = z.object({ rollIds: z.array(z.string()), entryId: z.string() });
 export type RollAbilityResult = z.infer<typeof RollAbilityResult>;
+
+// ---------- sprint 5: Apply hit (ADR-0053), side (#252) ----------
+
+/** One ruled target, ruling order: Hit / Miss and the base part's multiplier preset. */
+export const HitRulingTarget = z.strictObject({
+  targetId: Id,
+  hit: z.boolean(),
+  multiplier: DamageMultiplier,
+});
+export type HitRulingTarget = z.infer<typeof HitRulingTarget>;
+
+/** `cbt.applyHit` (FR-CBT-88): DM only; 1–20 unique targets, ≥ 1 `hit: true` (the command). */
+export const ApplyHitInput = z.strictObject({
+  cardId: Id,
+  toHitTotal: z.int().min(-20).max(99),
+  targets: z
+    .array(HitRulingTarget)
+    .min(1)
+    .max(APPLY_TARGETS_MAX)
+    .refine((ts) => new Set(ts.map((t) => t.targetId)).size === ts.length, {
+      message: "Each target at most once",
+    }),
+});
+export type ApplyHitInput = z.input<typeof ApplyHitInput>;
+export const ApplyHitResult = z.object({ rulingId: z.string() });
+export type ApplyHitResult = z.infer<typeof ApplyHitResult>;
+
+/**
+ * `hit-ruling` (CBT §8 sprint 5, DM only): one per card, written by `cbt.applyHit`, never edited;
+ * `toHitSet` = the DM's total differs from the rolled one (stats, FR-CBT-23).
+ */
+export const HitRulingRecord = z.object({
+  id: z.string(),
+  campaignId: z.string(),
+  encounterId: z.string(),
+  cardId: z.string(),
+  toHitTotal: z.int(),
+  toHitSet: z.boolean(),
+  targets: z.array(HitRulingTarget).min(1).max(APPLY_TARGETS_MAX),
+  createdAt: z.string(),
+});
+export type HitRulingRecord = z.infer<typeof HitRulingRecord>;
+
+/** `cbt.setSide` (FR-CBT-99): DM only, any combatant of the started encounter, both ways. */
+export const SetSideInput = z.strictObject({
+  combatantId: Id,
+  side: Side,
+  secret: z.boolean().optional(),
+});
+export type SetSideInput = z.input<typeof SetSideInput>;

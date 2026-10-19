@@ -9,12 +9,19 @@ export interface IngestRequest {
   bytes: Uint8Array;
   filename: string;
   name?: string;
+  /** FR-ASSET-24 (S5): false = an attachment. Absent = listed. */
+  listed?: boolean;
 }
 
 /** Async half of an ingest; the result is the `assets.ingest` command input. */
 export async function prepareIngest(req: IngestRequest): Promise<IngestInput> {
   const image = await processImage(req.bytes);
-  return { image, filename: req.filename, ...(req.name !== undefined ? { name: req.name } : {}) };
+  return {
+    image,
+    filename: req.filename,
+    ...(req.name !== undefined ? { name: req.name } : {}),
+    ...(req.listed !== undefined ? { listed: req.listed } : {}),
+  };
 }
 
 /** Throws `IngestRejected` (413/415/422) or `CommandError`; nothing written on rejection. */

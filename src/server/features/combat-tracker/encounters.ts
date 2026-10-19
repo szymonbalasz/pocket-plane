@@ -5,6 +5,7 @@ import {
   type HpMode,
   OPEN_ENCOUNTERS_MAX,
   QUANTITY_MAX,
+  type Side,
 } from "@shared/combat-tracker/schemas";
 import {
   EncounterCreated,
@@ -66,11 +67,12 @@ function checkParty(env: CommandEnv, cid: string, ids: string[] | null): string[
   return unique;
 }
 
-type Entry = { definitionId: string; quantity: number; hpMode: HpMode };
+type Entry = { definitionId: string; quantity: number; hpMode: HpMode; side: Side };
 
 /**
  * FR-CBT-01: monsters via `resolveDefinition`; duplicates merged (order and `hpMode` of first
- * use). FR-CBT-62: `rolled` needs the definition's `hpFormula`.
+ * use). FR-CBT-62: `rolled` needs the definition's `hpFormula`. FR-CBT-98 (#252): a friendly
+ * and an enemy entry of one definition stay apart (merged per definition and side).
  */
 function checkEntries(env: CommandEnv, entries: Body["entries"]): Entry[] {
   const merged = new Map<string, Entry>();
@@ -86,9 +88,11 @@ function checkEntries(env: CommandEnv, entries: Body["entries"]): Entry[] {
       const message = `${def.name} has no HP formula`;
       throw invalid(message, [{ path: ["entries", i, "hpMode"], message }]);
     }
-    const prev = merged.get(def.id);
+    const side = e.side ?? "enemy";
+    const key = `${def.id}:${side}`;
+    const prev = merged.get(key);
     if (prev) prev.quantity += e.quantity;
-    else merged.set(def.id, { definitionId: def.id, quantity: e.quantity, hpMode });
+    else merged.set(key, { definitionId: def.id, quantity: e.quantity, hpMode, side });
   });
   for (const { definitionId, quantity } of merged.values()) {
     if (quantity > QUANTITY_MAX) {

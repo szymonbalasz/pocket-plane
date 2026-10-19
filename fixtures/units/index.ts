@@ -64,7 +64,9 @@ import visionInvisible from "./fog-of-war/vision-invisible";
 import visionLegacy from "./fog-of-war/vision-legacy";
 import syncProbes from "./live-sync/sync-probes";
 import notificationsTest from "./notifications/notifications-test";
+import handoutAttachment from "./party-board/handout-attachment";
 import handoutImages from "./party-board/handout-images";
+import handoutPresent1 from "./party-board/handout-present-1";
 import handouts1 from "./party-board/handouts-1";
 import partyItems1 from "./party-board/party-items-1";
 import partySecond from "./party-board/party-second";
@@ -166,4 +168,6 @@ export const units: readonly Fixture[] = [
   cmpSrdMiniS3,
   artUpdateTokens,
   winLayout,
+  handoutAttachment,
+  handoutPresent1,
 ];

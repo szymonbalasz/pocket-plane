@@ -6,6 +6,8 @@ import {
   ENCOUNTER_TYPE,
   type EncounterEntryRecord,
   type EncounterRecord,
+  HIT_RULING_TYPE,
+  type HitRulingRecord,
   HP_CHANGE_TYPE,
   type HpChangeRecord,
 } from "@shared/combat-tracker/schemas";
@@ -13,7 +15,15 @@ import type { StatBlock } from "@shared/entities/schemas";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { conflict, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
-import { combatant, encounter, encounterEntry, entity, hpChange } from "../../db/schema";
+import {
+  combatant,
+  encounter,
+  encounterEntry,
+  entity,
+  hitRuling,
+  hpChange,
+  notification,
+} from "../../db/schema";
 import type { Actor, RecordChange } from "../../events/types";
 
 type Read = Pick<Tx, "select">;
@@ -31,6 +41,8 @@ export const toHpChangeRecord = (r: typeof hpChange.$inferSelect): HpChangeRecor
   ...r,
   rollIds: r.rollIds as string[],
 });
+
+export const toHitRulingRecord = (r: typeof hitRuling.$inferSelect): HitRulingRecord => ({ ...r });
 
 export function campaignOf(actor: Actor): string {
   if (!actor.campaignId) throw conflict("No active campaign");
@@ -51,6 +63,26 @@ export const combatantChange = (b: CombatantRecord | null, a: CombatantRecord | 
   change(COMBATANT_TYPE, b, a);
 export const hpChangeChange = (b: HpChangeRecord | null, a: HpChangeRecord | null) =>
   change(HP_CHANGE_TYPE, b, a);
+export const hitRulingChange = (b: HitRulingRecord | null, a: HitRulingRecord | null) =>
+  change(HIT_RULING_TYPE, b, a);
+
+/** The encounter's hit rulings whose card is pending (the `hit-ruling` snapshot), card order. */
+export function pendingRulings(env: { tx: Read }, encounterId: string): HitRulingRecord[] {
+  return env.tx
+    .select({ r: hitRuling })
+    .from(hitRuling)
+    .innerJoin(notification, eq(notification.id, hitRuling.cardId))
+    .where(and(eq(hitRuling.encounterId, encounterId), eq(notification.state, "pending")))
+    .orderBy(asc(notification.seq))
+    .all()
+    .map(({ r }) => toHitRulingRecord(r));
+}
+
+/** The card's hit ruling (FR-CBT-88), or null. */
+export function rulingOfCard(tx: Read, cardId: string): HitRulingRecord | null {
+  const r = tx.select().from(hitRuling).where(eq(hitRuling.cardId, cardId)).get();
+  return r ? toHitRulingRecord(r) : null;
+}
 
 export function readEncounter(tx: Read, id: string): EncounterRecord {
   return toEncounterRecord(

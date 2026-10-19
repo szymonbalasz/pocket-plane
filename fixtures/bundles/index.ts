@@ -18,11 +18,13 @@ import entities from "./entities";
 import fog from "./fog";
 import fogScn from "./fog-scn";
 import furyLogLine from "./fury-log-line";
+import lateDamage from "./late-damage";
 import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
 import partyBoard from "./party-board";
 import partyLoot from "./party-loot";
+import partyS5 from "./party-s5";
 import physicalDiceCombat from "./physical-dice-combat";
 import ruleTriggers from "./rule-triggers";
 import rulesEffects from "./rules-effects";
@@ -80,4 +82,6 @@ export const bundles: readonly Bundle[] = [
   sessionSim8,
   sessionSim9,
   windowsS5,
+  lateDamage,
+  partyS5,
 ];

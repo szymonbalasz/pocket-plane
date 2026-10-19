@@ -334,6 +334,7 @@ erDiagram
 | mime, bytes, width, height | text, int ×3 | Stored original (SVG stored as PNG) | [FR-ASSET-02](../specs/assets-pipeline.md#6-functional-requirements), ASSET §8 |
 | displayWidth, displayHeight | int ×2 | `display` derivative size; grid calibration space | [FR-ASSET-05](../specs/assets-pipeline.md#6-functional-requirements), [OQ-ASSET-07](../specs/assets-pipeline.md#15-open-questions) |
 | createdAt | timestamp | `ctx.clock` | FR-ASSET-08 |
+| listed *(S5)* | bool, default true | false = **attachment** (attach-control upload / paste): not in the `asset` record type (snapshot and changes); **server-only**, not on the wire. Existing rows true. See [§65](#65-sprint-5-party-core-p0) | [FR-ASSET-24](../specs/assets-pipeline.md#61-sprint-5-image-attach-control-and-attachments) |
 
 - **Files (disk, not records):** `PP_ASSET_DIR/<hash>/{original, display.webp, thumb.webp}`, one set per hash, shared by every campaign's row with that hash. Temp dir + rename; existing hash dir reused ([FR-ASSET-04](../specs/assets-pipeline.md#6-functional-requirements); layout *proposed*). `thumb` ≤ 512 px, `display` ≤ 4096 px, WebP, never upscaled (FR-ASSET-05).
 - **Write order:** image processing (sniff, rasterise, derivatives) runs async with no disk writes; then the synchronous `assets.ingest` command writes the files (`PP_ASSET_DIR/.tmp/<hash>` → rename to `<hash>`, retried on transient Windows locks) and the row + event-log entry in one transaction ([FR-ASSET-06](../specs/assets-pipeline.md#6-functional-requirements)). Server start (`r.onStart`, [protocol §19](../protocol/README.md#19-scenes-build-notes)): delete `.tmp` and every 64-hex dir no row references (other files untouched); missing files → error log (hash, never the ID), 404 ([FR-ASSET-07](../specs/assets-pipeline.md#6-functional-requirements)). **Durability (#163):** each file is fsynced, then the hash dir and the asset dir, before the row insert (SQLite runs `synchronous = FULL`). The asset dir holds `.pocket-plane-db` = the DB's `db_meta.db-id` (written at the first sweep); a different id → the sweep is skipped with an error (two DBs sharing one `PP_ASSET_DIR` never delete each other's files). A re-upload whose hash dir is incomplete rewrites the files and answers `existing`.
@@ -1735,3 +1736,63 @@ From [entities](../specs/entities.md#8-data-model) FR-ENT-28, -29. **Built by `b
 | Credits sources | read on demand (dialog open) | attributions of the imported sources (search page + one entry per source) | as the compendium's REST reads | FR-CMP-19 |
 
 - **Fixtures:** none new; `compendium-full` (`ent-art-tokens`) and `token-art-update` (`art-update-tokens`, from C-art core) cover the walkthroughs T1–T7, U1–U3.
+
+## 65. Sprint 5: party core (P0)
+
+From [party-board](../specs/party-board.md#8-data-model) FR-PARTY-31–35, -40 and [assets-pipeline](../specs/assets-pipeline.md#8-data-model) FR-ASSET-24–26 (DM gate #256; seams S1, S5, S10, S14; rulings P #23, #26). **Built by `build/party-s5-core`** (schema lane 1, first): one table, one column (drizzle push, push-safe). Protocol side: [protocol §82](../protocol/README.md#82-sprint-5-party-core-p0).
+
+| Table / column | Change | Default (push-safe) | Visibility | Source |
+|---|---|---|---|---|
+| `handout_present` (new; record type `handout-present`, **in the snapshot**) | see below | — | DM full; a player only their own row (`playerId` = theirs), else hidden | [FR-PARTY-31](../specs/party-board.md#66-sprint-5-loot-tab-present-uploads) |
+| `asset.listed` | bool; false = attachment | true (old rows listed) | server-only; an attachment has no `asset` record (DM included) | [FR-ASSET-24](../specs/assets-pipeline.md#61-sprint-5-image-attach-control-and-attachments) |
+
+### Handout present (`handout_present`, record type `handout-present`) — owner [party-board](../specs/party-board.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id | ID | `env.ctx.ids`, new per present (a re-present gives a new row) | FR-PARTY-32 |
+| campaignId | ID → Campaign | the handout's campaign | FR-PARTY-31 |
+| handoutId | ID → Handout, **cascade delete** | a handout the player can see (FR-PARTY-35, kept by the commands; cascade = backstop) | FR-PARTY-35 |
+| playerId | ID → Player | **unique `(campaignId, playerId)`**: one open present per player (≤ 20 per campaign) | FR-PARTY-31 |
+| presentedAt | timestamp | `env.ctx.clock` | FR-PARTY-32 |
+
+Indexes unique `handout_present_campaign_player` (`campaign_id`, `player_id`), `handout_present_handout` (`handout_id`). Record = every column.
+
+- **Invariant (FR-PARTY-35, tested after every command):** a row exists only for a player of its campaign who can see its handout (`sharedWith`). `party.shareHandout` deletes the losers' rows of that handout, `party.deleteHandout` every row of it, in the same transaction.
+- **Persisted runtime state:** rows stay until closed (player, DM or access loss); a crash keeps committed rows (the next snapshot reopens the popup).
+- **Attachments:** handouts (and, from C5, compendium entries) reference attachments like any asset; `assets.require` ignores `listed`. A re-upload of an attachment's bytes with `listed: true` sets `listed` (FR-ASSET-26); `listed: false` never unlists. Unreferenced attachments stay (no delete, OQ-ASSET-05).
+- **Fixtures:** `handout-attachment` (`ransom-note.svg` as an attachment + h6 "Ransom Note", unshared; its asset id from `fixtureAttachmentId`, since an attachment's ingest has no record change for `r.id`), `handout-present-1` (h2 → player-1); bundle `party-s5` = `party-board` + `cmp-srd-mini` + both; both units also in `session-sim-9`.
+- **Snapshot size** (CON-44, #256; `con44-s5.test.ts`, `snapshot-size.test.ts` worst case): heavy harness + party-s5 units, a present for every player: `handout-present` DM **1,459 B** at 6 rows (heavy DM 674,871 B, 897,993 B left of 1.5 MiB), **259 B** in each player frame (players max 282,383 B); at the 20-row cap (20 players) DM **4,819 B** (bound 5,100). 50 attachments: every snapshot byte-identical.
+
+## 66. Sprint 5: combat core (R0)
+
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-88, -91, -92, -94, -97–100; [ADR-0053](../architecture/adr/0053-apply-hit.md); #252) and [scenes-map](../specs/scenes-map.md#8-data-model) (FR-MAP-65, -66). **Built by `fix/s5-combat-core`** (schema lane 2, seams S1; drizzle push, push-safe: one new table, nullable / defaulted columns, no backfill). Protocol side: [protocol §83](../protocol/README.md#83-sprint-5-combat-core-r0).
+
+### Hit ruling (`hit_ruling`, record type `hit-ruling`) — owner [combat-tracker](../specs/combat-tracker.md#8-data-model)
+
+| Field | Type | Rule | Source |
+|---|---|---|---|
+| id, campaignId | ID, ID → Campaign | `ctx.ids` | — |
+| encounterId | ID → Encounter, `ON DELETE CASCADE` | the card's encounter | FR-CBT-88 |
+| cardId | ID → Notification, **unique** | one ruling per damage card; a second `cbt.applyHit` → `conflict` "Hit already applied" | FR-CBT-88 |
+| toHitTotal, toHitSet | int −20…99, bool | the DM's to-hit; `toHitSet` = it differs from the rolled total (base + mods) | FR-CBT-23, -88 |
+| targets | **JSON leaf** 1–20 × `{targetId, hit, multiplier}` | ruling order, unique target ids | FR-CBT-88 |
+| createdAt | timestamp | `ctx.clock`; never edited | — |
+
+- **Lifecycle:** written only by `cbt.applyHit`; the row stays after its card resolves (Undo reopens into the damage step) and goes with its encounter. On the wire it leaves with its card: Apply sends its delete, a dismissal (`note.dismiss`, End) sends it through the `damage-card` kind's `onClose` ([protocol §26](../protocol/README.md#26-combat-registries-and-seams)), Undo's reopen its upsert (FR-CBT-91).
+
+### Changed
+
+| Table / field | Change | Rule | Source |
+|---|---|---|---|
+| `combatant.side`, `combatant.public_side` | + `ally` \| `enemy` \| null ×2 | null = the kind's default (PC ally, monster enemy; `sideOf` / `publicSideOf`, `@shared/combat-tracker/rules.ts`); `publicSide` = the side players were last openly shown, written only by a non-secret `cbt.setSide` and by Start (a friendly entry's instances: `ally` / `ally`); DM only | FR-CBT-98, -99 |
+| `encounter_entry.side` | + `ally` \| `enemy`, not null, default `enemy` | the builder's "Friendly"; REST entries `side?`; one definition's friendly and enemy entries stay apart (merged per definition + side) | FR-CBT-98 |
+| `token.trail` | + **JSON leaf** `{cells: [[col, row]]}` (2–21) \| null | this turn's combat trail, oldest first; written only by scenes-map's `appendTrail` / `resetTrail` / `clearTrails` (combat calls them); null outside combat, on other scenes and on a duplicated scene's copies | FR-MAP-65, FR-CBT-97 |
+| Damage card payload | + `unusedRolls?` ≤ 3 × `{rollId, total}` (zod only; written by R1) | the owner's later damage rolls | FR-CBT-92 |
+| Damage card resolution | + `targets[].dropped?` `true` (zod only; written by R1) | a ruled hit dropped from the damage step | FR-CBT-91 |
+| `cbt.attack` line payload | + `awaitingDamage?` `true` | an Apply hit line: no damage segments | FR-CBT-88 |
+| Log-entry kind `cbt.side` *(new)* | payload `{targetName, side}`, dmPayload `{secret}` | players read it iff the combatant is visible to them and their side changed (`public`) | FR-CBT-99 |
+
+- **Derived (not stored):** `sideOf`, `publicSideOf`; the players' combatant `side` (= `publicSideOf`).
+- **Fixtures:** bundle `late-damage` = `rules-effects` (R1 / R3 / R4 append their units).
+- **CON-44** (`src/server/ws/snapshot-size.test.ts`, realistic-heavy harness, every row at its worst): DM 640,788 → 697,783 B (20 rulings × 20 targets +39,659 B; 3 unused rolls on every damage card +4,040 B; 60 active-scene trails at the 20-segment cap +13,020 B; `side` + `publicSide` set on every combatant +276 B over the null baseline); 875,081 B left of 1.5 MiB. Players 256,904–260,336 B (trails +1,302 B each, player tokens only; rulings 0 B).

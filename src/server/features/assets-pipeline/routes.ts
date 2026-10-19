@@ -29,6 +29,12 @@ export const NOT_FOUND_BODY = errorBody("not_found", "Not found");
 /** FR-ASSET-14 */
 export const CACHE_CONTROL = "private, max-age=31536000, immutable";
 
+/** FR-ASSET-24: the multipart `listed` field: absent = listed, `"true"` / `"false"`, else null. */
+function parseListed(v: string | File | undefined): boolean | null {
+  if (v === undefined || v === "true") return true;
+  return v === "false" ? false : null;
+}
+
 /** Multipart framing on top of the file itself. */
 const MULTIPART_SLACK = 64 * 1024;
 
@@ -64,6 +70,15 @@ export function assetRoutes(s: Services) {
           }
           const file = form.file;
           const name = typeof form.name === "string" ? form.name : undefined;
+          const listed = parseListed(form.listed);
+          if (listed === null) {
+            return c.json(
+              errorBody("invalid", "Invalid listed", [
+                { path: ["listed"], message: 'Expected "true" or "false"' },
+              ]),
+              400,
+            );
+          }
           if (!(file instanceof File)) {
             return c.json(
               errorBody("invalid", "Missing file", [{ path: ["file"], message: "Required" }]),
@@ -82,9 +97,13 @@ export function assetRoutes(s: Services) {
               filename: file.name,
               ...(name !== undefined ? { name } : {}),
             });
-            const r = s.commands.run(INGEST, input, {
-              actor: dmActor(campaignId),
-            }) as IngestResult;
+            const r = s.commands.run(
+              INGEST,
+              { ...input, listed },
+              {
+                actor: dmActor(campaignId),
+              },
+            ) as IngestResult;
             const body: UploadResponse = { asset: r.asset };
             return c.json(body, r.outcome === "created" ? 201 : 200);
           } catch (err) {
