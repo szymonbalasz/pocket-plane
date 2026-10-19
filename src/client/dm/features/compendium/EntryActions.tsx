@@ -1,7 +1,8 @@
 // DM entry actions (CMP §7; FR-CMP-24/25/27): monster entries **Derive…**; other kinds **Clone**
 // (homebrew form prefilled, independent copy); homebrew also **Edit** and **Delete** (confirm;
-// sheet rows added from it stay). Toolbar **New** opens a blank homebrew form. Writes are
-// disabled while not live (shell offline rule); the window refetches after each.
+// sheet rows added from it stay). Item entries also **Add to party** (FR-CMP-40). Toolbar **New**
+// opens a blank homebrew form. Writes are disabled while not live (shell offline rule); the window
+// refetches after each.
 import type { EntryResponse } from "@shared/compendium/rest";
 import { isReadOnlyEntry } from "@shared/compendium/schemas";
 import { type Api, ApiError } from "@ui/api";
@@ -19,6 +20,8 @@ import { backToList } from "@ui/features/compendium/nav";
 import { CopyIcon, CopyPlusIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AddToParty } from "./AddToParty";
+import { hasAddToParty } from "./add-to-party";
 import { DeriveDialog } from "./DeriveDialog";
 import { HomebrewDialog } from "./HomebrewForm";
 import type { FormMode } from "./homebrew-form";
@@ -143,6 +146,7 @@ export function EntryActions({ api, data }: { api: Api; data: EntryResponse }) {
           />
         </>
       )}
+      {hasAddToParty(e) && <AddToParty entry={e} />}
       <HomebrewDialog api={api} mode={mode} onClose={() => setMode(null)} />
     </>
   );
