@@ -1,7 +1,8 @@
 // DM `cbt.initiative` (CBT §7): round + turns (skip cue, FR-CBT-50), Undo (one apply,
 // FR-CBT-35), Roll monsters (FR-CBT-46), End encounter (FR-CBT-51), Pending (FR-CBT-79), rows by
 // `position` (initiative roll / set, AC, HP, band or PC Down (FR-CBT-49), moved (FR-CBT-39),
-// Attack; menu Check ▸ / Save ▸ (FR-CBT-44), Damage / heal, Remove), Removed.
+// Attack; menu Check ▸ / Save ▸ (FR-CBT-44), Damage / heal, Set as ally / enemy (FR-CBT-104),
+// Remove; the side chip), Removed.
 import { signed } from "@shared/character-sheet/logic";
 import { notRestoredText } from "@shared/combat-extras/rules";
 import {
@@ -55,7 +56,7 @@ import { Input, Skeleton } from "@ui/components/ui/primitives";
 import { characterOf, deadPc, deathStateFor, MORE_W } from "@ui/features/combat-extras/logic";
 import { RowName } from "@ui/features/combat-extras/parts";
 import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
-import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
+import { BandBadge, Portrait, SideChip, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { manualFields, pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
 import {
   startedIn,
@@ -125,10 +126,12 @@ import { type AttackAction, attackChoices, attackRolls } from "./attack-choices"
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
+import { useHoverSafeSub } from "./hover-sub";
 import { HpDialog } from "./hp-dialog";
 import { damageCardRow, isDamageCard, pendingRowText } from "./pending";
 import { useCombatDialogs } from "./popup-store";
 import { rollKeys } from "./roll-keys";
+import { SideMenu } from "./side-menu";
 import { idleInitiativeOnLoad } from "./start-end";
 import { startReason } from "./start-reason";
 
@@ -443,30 +446,6 @@ function useAbilityRoll(c: CombatantView, kind: AbilityKind, bonus: (a: Ability)
   };
 }
 
-/** Close delay of a row-menu submenu, ms: long enough to cross from the trigger to an item. */
-const SUB_CLOSE_DELAY = 300;
-
-/**
- * Hover-safe submenu state. At the screen's right edge the submenu flips left, and Radix closes
- * it when the pointer leaves the trigger in any other direction than its last move (a direct
- * move from "Save" to "Dexterity"). A close waits `SUB_CLOSE_DELAY`; entering the submenu keeps
- * it open. Opening is immediate.
- */
-function useHoverSafeSub() {
-  const [open, setOpen] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  return {
-    open,
-    onOpenChange(next: boolean) {
-      clearTimeout(timer.current);
-      if (next) setOpen(true);
-      else timer.current = setTimeout(() => setOpen(false), SUB_CLOSE_DELAY);
-    },
-    keep: () => clearTimeout(timer.current),
-  };
-}
-
 function AbilityMenu({
   c,
   kind,
@@ -652,7 +631,7 @@ function Row({
   const rowRef = useRef<HTMLLIElement>(null);
   const movedBelow = useMovedBelow(
     rowRef,
-    `${c.name}:${c.movedFt}:${round}:${wideInit}:${skipped}:${c.hidden}:${hp?.cur}:${down}:${hasDeathState}`,
+    `${c.name}:${c.movedFt}:${round}:${wideInit}:${skipped}:${c.hidden}:${hp?.cur}:${down}:${hasDeathState}:${c.side}:${c.publicSide}`,
   );
   return (
     <li
@@ -692,6 +671,8 @@ function Row({
               </span>
             </Tooltip>
           )}
+          {/* FR-CBT-104 (#252): the side chip never folds; before the effect chips (FR-CBTX-54). */}
+          <SideChip c={c} testId="cbt-init-row-ally" />
           {/* FR-CBTX-33: effect chips, one line ("+N" for the rest). */}
           <RowEffects c={c} round={round} />
           {/* On the name line, right-aligned; below when the name needs the room. From round 1
@@ -749,6 +730,8 @@ function Row({
           <DropdownMenuItem data-testid="cbt-init-row-hp-adjust" onSelect={() => openHp(c.id)}>
             <HeartPulseIcon /> Damage / heal…
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <SideMenu c={c} testId="cbt-init-row-side" />
           <DropdownMenuItem
             variant="destructive"
             data-testid="cbt-init-row-remove"

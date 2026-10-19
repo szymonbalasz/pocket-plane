@@ -37,9 +37,9 @@ Decided at sprint-4 gate 1 (#245): OQ-SHELL-24 (token-aware placement), -25 (ico
 | FR-SHELL-49 | Toast regions as today: players bottom-right corner, DM top-centre (#256, OQ-SHELL-32 C); boxes sized for the 320 × 190 popup | W1 | `FR-SHELL-49 toast regions` |
 | FR-SHELL-50, -51 | Named default layouts at 1280×720 / 1280×800 / 1440×900 / 1600×900; viewport-dependent default sizes (#256, OQ-SHELL-31 A) | W1 | `FR-SHELL-50 default layouts` |
 | FR-SHELL-52 | Grow-to-content stops above the next window or keep-out | W1 | `FR-SHELL-52 growth cap` |
-| FR-SHELL-53 | Windows still at a default size (any viewport class, or an old default) follow the current viewport's default | W1 | `FR-SHELL-53 previous defaults` |
+| FR-SHELL-53 | Windows still at a default size (any viewport class, or an old default) follow the current viewport's default *(W3, #278: also on a live viewport-class change: a never-resized default window follows the new class without a reload; a user-resized one keeps its size, clamped.)* | W1 | `FR-SHELL-53 previous defaults` |
 | FR-SHELL-54 | Map-first coverage floors re-baselined for the wide Game log (#256, OQ-SHELL-39 A; amends #162) | W1 | `#162 … map-first` (updated floors) |
-| FR-SHELL-55 | Opening a map tool pushes windows off its top-left tool bar (#256, DM addition to OQ-SHELL-38) | W3 | `FR-SHELL-55 push right` |
+| FR-SHELL-55 | Opening a map tool pushes windows off its top-left tool bar (#256, DM addition to OQ-SHELL-38) *(W3 ruling #278: a pushed window with no room to the right moves below the tool bar in its column before it auto-minimises.)* | W3 | `FR-SHELL-55 push right` |
 
 Decided at DM gate 1 (**#256**): OQ-SHELL-38 A (+ FR-SHELL-55), -30 A, -31 A, **-32 C**, -39 A here, [OQ-MAP-47](scenes-map.md#15-open-questions) A, [OQ-CBTX-27](combat-extras.md#15-open-questions) B, -28 A, -29 A. CON-44 DM ceiling now 1.5 MiB (#256; players 512 KiB). 0 bytes on the wire (browser-only, §12). Bundle `windows-s5` (§13).
 

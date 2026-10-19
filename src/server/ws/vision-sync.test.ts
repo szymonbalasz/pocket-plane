@@ -232,8 +232,8 @@ async function setup() {
   h.s.commands.registerEvent(ProbeTouched);
   const touch = defineCommand({
     name: "viewprobe.touch",
-    input: z.object({ id: z.string(), text: z.string().optional() }),
-    execute({ id, text }, { emit }) {
+    input: z.object({ id: z.string(), text: z.string().optional(), quiet: z.boolean().optional() }),
+    execute({ id, text, quiet }, { emit }) {
       const before = rows.get(id) as R;
       const after = { ...before, ...(text !== undefined ? { text } : {}) };
       rows.set(id, after);
@@ -242,6 +242,7 @@ async function setup() {
         campaignId: before.campaignId,
         payload: { id },
         changes: [{ type: "view-probe", id, before, after }],
+        ...(quiet ? { quietWhenUnchanged: true as const } : {}),
       });
     },
   });
@@ -287,6 +288,36 @@ describe("ADR-0042 over real sockets", () => {
     expect(e2.changes).toEqual([
       expect.objectContaining({ op: "upsert", data: expect.objectContaining({ text: "changed" }) }),
     ]);
+    expect(pc1.gap).toBe(false);
+  });
+
+  test("FR-SYNC-19 FR-CBT-100 a quietWhenUnchanged event left empty sends no frame; with a change it goes out as usual", async () => {
+    const { seed } = await setup();
+    const dmc = await h.live({ role: "dm", secret: TEST_SECRET });
+    const pc1 = await h.live({ role: "player", token: seed.p1.linkToken });
+    const probes = (c: TestClient) =>
+      c.frames.filter((f) => f.type === "event" && f.cause.name === "ProbeTouched");
+    // Identical for everyone: no event frame anywhere; the sender still gets its ack.
+    const quietId = dmc.intent("viewprobe.touch", { id: "A:p1", quiet: true });
+    await until(dmc, quietId);
+    await Bun.sleep(100);
+    expect(probes(pc1)).toEqual([]);
+    expect(probes(dmc)).toEqual([]);
+    const seq = Math.max(0, ...pc1.frames.flatMap((f) => (f.type === "event" ? [f.seq] : [])));
+    // A real change still reaches the player, seq continuous (nothing was skipped).
+    dmc.intent("viewprobe.touch", { id: "A:p1", text: "changed", quiet: true });
+    for (;;) {
+      const f = await pc1.next("event");
+      if (f.cause.name !== "ProbeTouched") continue;
+      expect(f.seq).toBe(seq + 1);
+      expect(f.changes).toEqual([
+        expect.objectContaining({
+          op: "upsert",
+          data: expect.objectContaining({ text: "changed" }),
+        }),
+      ]);
+      break;
+    }
     expect(pc1.gap).toBe(false);
   });
 

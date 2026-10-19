@@ -1,8 +1,9 @@
 // Combat's token overlay `cbt` (FR-CBT-38, FR-CBT-39, FR-CBT-48; registry FR-MAP-34): on a token
 // bound to an active combatant of the started encounter, Out (removed: dim + badge), Down (a cross;
-// 0 HP: a monster's HP or band, a PC's character HP or redacted `down`), the target ring while the DM targets, and
-// movement used this turn. Pure over the record store each client already holds, so players see
-// badges only on what they receive, and nothing after End.
+// 0 HP: a monster's HP or band, a PC's character HP or redacted `down`), the target ring while the
+// DM targets, movement used this turn, and the side badge (FR-CBT-104: the row's "Ally" / "Enemy"
+// chip). Pure over the record store each client already holds, so players see badges only on what
+// they receive, and nothing after End.
 import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
@@ -14,6 +15,7 @@ import type {
   TokenDecoration,
   TokenOverlay,
 } from "../scenes-map/token-overlays";
+import { SIDE_LABEL, sideChip } from "./side";
 import { startedIn } from "./store";
 
 /** The attacker of the DM's open attack popup: never a target, so no ring (FR-CBT-33). */
@@ -29,6 +31,18 @@ export const OUT_BADGE: TokenBadge = {
 };
 /** FR-CBT-48 (#171): Down is a translucent X in `hp.down`, no longer a badge. */
 export const DOWN_CROSS: TokenCross = { id: "cbt-token-down", tone: "down" };
+
+/** FR-CBT-104 (#252): the row's side chip as a badge (the same rule: `sideChip`). */
+export function sideBadge(c: CombatantView): TokenBadge | null {
+  const chip = sideChip(c);
+  if (!chip) return null;
+  return {
+    id: "cbt-token-side",
+    icon: chip.side === "ally" ? "handshake" : "swords",
+    tone: "neutral",
+    label: SIDE_LABEL[chip.side],
+  };
+}
 
 /** The active combatant of the started encounter bound to the token, if any. */
 export function boundCombatant(store: RecordStore, tokenId: string): CombatantView | null {
@@ -69,7 +83,9 @@ export const cbtTokenOverlay: TokenOverlay = {
     if (view.targeting && view.selected && c.id !== useTargetingAttacker.getState().attackerId) {
       out.ring = "target";
     }
-    return out.cross || out.ring ? out : null;
+    const side = sideBadge(c);
+    if (side) out.badges = [side];
+    return out.cross || out.ring || out.badges ? out : null;
   },
   movedFt(token, store) {
     return boundCombatant(store, token.id)?.movedFt ?? null;

@@ -7,8 +7,8 @@
 // cell, current cell; kept in `pointers.drag`, changed only when the cell changes) + the pointer's
 // x / y (`PreviewState.local`, every move, so a pointer move re-renders only the dragged token's
 // label). It feeds `map.drag` (`TokenDrag`), the drag probe (`drag-probe.ts`: `map.checkMove`
-// per cell) and anything derived on the client (the drag path, `drag-path.ts`). The preview
-// store also keeps this canvas' combat trails (FR-MAP-54: client memory, cleared with the turn).
+// per cell) and anything derived on the client (the drag path, `drag-path.ts`). Combat trails are
+// not kept here: they are stored on the token (sprint 5, FR-MAP-65–67).
 import {
   DRAG_INTERVAL_MS,
   DRAG_REPEAT_MS,
@@ -16,7 +16,6 @@ import {
   type DragData,
 } from "@shared/scenes-map/schemas";
 import { createStore, type StoreApi } from "zustand";
-import { noTrails, type TrailState } from "./drag-path";
 import type { LaserTimers } from "./laser";
 
 export type DragTimers = LaserTimers;
@@ -154,14 +153,12 @@ export interface PreviewState {
   previews: Record<string, DragPreview>;
   /** This client's own drag position, so the token's label can follow it (FR-MAP-42). */
   local: { tokenId: string; x: number; y: number } | null;
-  /** This turn's committed moves per token (FR-MAP-54); dropped with the turn, scene, snapshot. */
-  trails: TrailState;
 }
 
 export type PreviewStore = StoreApi<PreviewState>;
 
 export const createPreviewStore = (): PreviewStore =>
-  createStore<PreviewState>()(() => ({ previews: {}, local: null, trails: noTrails }));
+  createStore<PreviewState>()(() => ({ previews: {}, local: null }));
 
 export interface PreviewView {
   /** The scene this canvas shows (player: active; DM: viewed). */
@@ -196,11 +193,6 @@ export function clearPreviews(s: PreviewStore, ids?: Iterable<string>): void {
     delete next[id];
   }
   if (next) s.setState({ previews: next });
-}
-
-/** FR-MAP-54: a scene switch or a snapshot drops every trail. */
-export function clearTrails(s: PreviewStore): void {
-  if (s.getState().trails !== noTrails) s.setState({ trails: noTrails });
 }
 
 /** Drops previews with no frame for 3 s; true while any is left. */

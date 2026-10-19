@@ -3,9 +3,11 @@
 // remote preview (start = the token's cell, target = `dropCell` of the preview), for the tokens
 // `pathShown` allows; per step the footprint cells tinted (`primary`, 25 %), a line through the
 // step centres and a dot. The dragging player's part past the first wall crossing is dashed in
-// `destructive` (the wall hint in the probe's ack). Trails (opacity 0.4) under the live paths.
+// `destructive` (the wall hint in the probe's ack). Trails (opacity 0.4) under the live paths,
+// drawn from each held token's stored `trail` (sprint 5, FR-MAP-67), in today's tint (K3 colours
+// them by the owner at draw time; nothing stored).
 // Konva: `map-drag-path` (id = token id; attrs `cells`, `blocked`, `preview` = local | remote),
-// `map-drag-trail` (id = token id; attr `segments`).
+// `map-drag-trail` (id = token id; attrs `segments` = cells − 1, `cells` = the stored cells).
 
 import type { Segment } from "@shared/scene-tools/schemas";
 import { cellToPx, dragPath, dropCell, footprint } from "@shared/scenes-map/geometry";
@@ -15,9 +17,17 @@ import { Circle, Group, Line, Rect } from "react-konva";
 import { useStore } from "zustand";
 import { subscribeWallHint } from "../../scene-tools/wall-hint";
 import { useCanvas } from "../canvas-context";
-import { type Cell, cellsAttr, ownDragBlocked, pathFootprint, pathShown } from "../drag-path";
+import {
+  type Cell,
+  cellsAttr,
+  ownDragBlocked,
+  pathFootprint,
+  pathShown,
+  trailCellsAttr,
+  trailSegments,
+} from "../drag-path";
 
-/** Path tint (FR-MAP-52) and trail opacity (FR-MAP-54). */
+/** Path tint (FR-MAP-52) and trail opacity (FR-MAP-54, -67). */
 const TINT = 0.25;
 const TRAIL_OPACITY = 0.4;
 
@@ -115,9 +125,18 @@ export function DragPaths({ tokens }: { tokens: readonly TokenView[] }) {
       .sort()
       .join("|"),
   );
-  const trails = useStore(previews, (s) => s.trails.byToken);
   const pieces = useWallPieces();
   const byId = useMemo(() => new Map(tokens.map((t) => [t.id, t])), [tokens]);
+  // FR-MAP-67: every held token's stored trail (players hold it on player tokens only, FR-MAP-66).
+  const trails = useMemo(
+    () =>
+      tokens.flatMap((t) =>
+        t.trail && pathShown(t, client)
+          ? [{ t, trail: t.trail, segments: trailSegments(t.trail) }]
+          : [],
+      ),
+    [tokens, client],
+  );
 
   const remote = useMemo(() => {
     const out: { t: TokenView; path: Cell[] }[] = [];
@@ -137,25 +156,21 @@ export function DragPaths({ tokens }: { tokens: readonly TokenView[] }) {
 
   return (
     <Group name="map-drag-paths" listening={false}>
-      {Object.entries(trails).map(([id, segments]) => {
-        const t = byId.get(id);
-        if (!t || !pathShown(t, client)) return null;
-        const n = footprint(t.size);
-        return (
-          <Group
-            key={`trail-${id}`}
-            name="map-drag-trail"
-            id={id}
-            segments={segments.length}
-            opacity={TRAIL_OPACITY}
-          >
-            {segments.map((path, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: segments only ever append.
-              <PathMarks key={i} path={path} n={n} blocked={-1} />
-            ))}
-          </Group>
-        );
-      })}
+      {trails.map(({ t, trail, segments }) => (
+        <Group
+          key={`trail-${t.id}`}
+          name="map-drag-trail"
+          id={t.id}
+          segments={segments.length}
+          cells={trailCellsAttr(trail)}
+          opacity={TRAIL_OPACITY}
+        >
+          {segments.map((path, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: a segment = its cell pair, in order.
+            <PathMarks key={i} path={path} n={footprint(t.size)} blocked={-1} />
+          ))}
+        </Group>
+      ))}
       {remote.map(({ t, path }) => (
         <Group
           key={`path-${t.id}`}

@@ -1,5 +1,6 @@
 // Player `cbt.initiative` (CBT §7), read-only: Round N; rows by `playerPosition` with the turn
-// marker (`playerTurnCombatantId`), portrait, name, band (monsters) or Down (PCs, FR-CBT-49),
+// marker (`playerTurnCombatantId`), portrait, name, the side chip of the side they were openly
+// shown (FR-CBT-100, -104), band (monsters, any side) or Down (PCs, FR-CBT-49),
 // initiative (PCs); effect chips the player receives (one line + "+N"; then own PCs' trigger
 // chips, FR-CBTX-52) and PCs' death state
 // (own PC with pips, FR-CBTX-34). Removed combatants reach players (FR-CBT-37, map badge) but
@@ -17,7 +18,7 @@ import {
 } from "@ui/features/combat-extras/logic";
 import { DeathBadge, DeathPips, EffectChips, RowName } from "@ui/features/combat-extras/parts";
 import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
-import { BandBadge, Portrait, TurnMarker } from "@ui/features/combat-tracker/parts";
+import { BandBadge, Portrait, SideChip, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
 import { TurnAlertRuntime } from "@ui/features/combat-tracker/turn-alert-runtime";
@@ -105,6 +106,8 @@ function PlayerInitiativeBody() {
                     chips get the width left after the full name, as on the DM's rows. */}
                 <div className="flex min-w-0 items-center gap-1">
                   <RowName name={c.name} testId="cbt-init-row-name" className="text-sm" />
+                  {/* FR-CBT-104: never folds, before the effect chips (FR-CBTX-54). */}
+                  <SideChip c={c} testId="cbt-init-row-ally" />
                   <EffectChips
                     compact
                     effects={effectsOn(fx, creatureOf(c))}

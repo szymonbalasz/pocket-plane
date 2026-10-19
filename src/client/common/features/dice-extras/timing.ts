@@ -27,3 +27,5 @@ export const POPUP_CLOSE_MS = 150;
  * a part nothing reported on (its view never mounted) rests then, so no popup stays "Rolling…".
  */
 export const POPUP_ROLLING_MAX_MS = CHUNK_WAIT_MS + SETTLE_MAX_MS + 2000;
+/** FR-DICEX-46 b: a popup miniature's dice tumble into their cells within this. */
+export const MINIATURE_MS = 1200;

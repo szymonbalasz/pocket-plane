@@ -1,5 +1,7 @@
 // Player page states; this wording is owned by campaign-management §7.
 import { Card, CardContent } from "@ui/components/ui/primitives";
+import { ColorPopover } from "@ui/features/campaign-management/ColorPopover";
+import { useSync } from "@ui/sync/store";
 
 export function InvalidLinkScreen() {
   return (
@@ -25,9 +27,21 @@ export function JoinedHeader({
   playerName: string;
   campaignName: string;
 }) {
+  const playerId = useSync((s) => s.store.you?.playerId);
   return (
     <p data-testid="camp-player-joined">
-      Playing as <strong data-testid="camp-joined-player-name">{playerName}</strong> in{" "}
+      {/* FR-CAMP-27: the own colour dot opens the picker. */}
+      Playing as{" "}
+      {playerId && (
+        <ColorPopover
+          target={playerId}
+          testId="camp-my-color"
+          size={12}
+          tip="Your colour"
+          className="mr-1"
+        />
+      )}
+      <strong data-testid="camp-joined-player-name">{playerName}</strong> in{" "}
       <strong data-testid="camp-joined-campaign-name">{campaignName}</strong>
     </p>
   );

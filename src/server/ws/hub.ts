@@ -526,7 +526,7 @@ export class Hub implements HubApi {
       if (c.campaignId === null) continue;
       const deliver = () => {
         const intentId = c.connId === meta.originConnId ? (meta.intentId ?? undefined) : undefined;
-        this.deliver(c, event.changes, { name: event.type, intentId });
+        this.deliver(c, event.changes, { name: event.type, intentId }, event.quietWhenUnchanged);
       };
       if (c.phase === "snapshotting") c.pending.push(deliver);
       else if (c.phase === "live") deliver();
@@ -536,13 +536,19 @@ export class Hub implements HubApi {
   /**
    * FR-SYNC-17 / -19 (ADR-0042): nothing when no change passes the transition matrix; an event
    * whose surviving changes were all identical upserts (dropped per change) still goes out,
-   * empty, so `seq` stays aligned with the events that touched this connection.
+   * empty, so `seq` stays aligned with the events that touched this connection; unless the event
+   * is `quiet` (`quietWhenUnchanged`): then nothing.
    */
-  private deliver(c: Connection, changes: RecordChange[], cause: EventFrame["cause"]): undefined {
+  private deliver(
+    c: Connection,
+    changes: RecordChange[],
+    cause: EventFrame["cause"],
+    quiet?: true,
+  ): undefined {
     let out: WireChange[];
     try {
       const r = this.s.records.filterChanges(changes, this.viewer(c));
-      if (!r.touched) return;
+      if (!r.touched || (quiet && r.changes.length === 0)) return;
       out = r.changes;
     } catch (err) {
       this.s.log.error(`broadcaster failed for ${c.connId}`, err);

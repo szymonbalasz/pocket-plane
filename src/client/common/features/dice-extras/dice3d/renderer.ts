@@ -5,6 +5,7 @@
 // viewport and scissor rect (the screen arena = the viewport; the zone = its free-area rect; a
 // popup's PiP = its slot, scissored to the popup's visible rect each frame; the look editor's
 // preview die), drawn in one render loop that runs only while a throw moves. Pixel ratio ≤ 1.5.
+// The tray's stills (FR-DICEX-48) are temporary: drawn, copied out and removed in one task.
 import type { DiceLook, DiceMaterial } from "@shared/dice-extras/looks";
 import type { DieShape } from "@shared/dice-extras/throw";
 import {
@@ -30,8 +31,18 @@ import {
 } from "three";
 import { type Arena, pixelRatioOf } from "../arena";
 import { dieMesh, drawAtlas, drawD4 } from "./faces";
-import { geometryOf, type LabelKind, labelKindOf, type Quat, upFace } from "./geometry";
-import { poseAt, STEP_HZ, settleLabels, simulate } from "./settle";
+import {
+  geometryOf,
+  type LabelKind,
+  labelKindOf,
+  multiply,
+  type Quat,
+  upFace,
+  uprightTurn,
+  yaw,
+} from "./geometry";
+import { poseAt, type Simulation, STEP_HZ, settleLabels, simulate } from "./settle";
+import { flushStills, requestStill, type StillStage, stillOnce } from "./stills";
 
 export interface Die3D {
   key: string;
@@ -72,6 +83,17 @@ export interface PlayOptions {
   clip?(): Rect | null;
   /** The simulation's arena (world units), fixed for the throw (FR-DICEX-34). */
   arena: Arena;
+  /** The camera's extents (world units) fitted to the rect; default the arena. */
+  view?: Arena;
+  /**
+   * FR-DICEX-46 b: per die, where it rests (CSS px from the rect's top-left; null = where the
+   * simulation leaves it): the recorded motion is shifted there over the throw and each die turns
+   * about the vertical so its value ends upright, so the dice tumble into their cells (the up
+   * face and value unchanged).
+   */
+  cells?: readonly ({ x: number; y: number } | null)[];
+  /** The motion plays within this (ms; the recording sped up). Default: real time. */
+  maxMs?: number;
   /** FR-DICEX-44: no shadows above 2.5 MP. */
   shadows: boolean;
   dice: readonly Die3D[];
@@ -91,6 +113,10 @@ export interface PlayOptions {
 export interface Still {
   canvas: HTMLCanvasElement;
   rect: Rect;
+  /** FR-DICEX-46 a (hand-off): each die alone (drawn without its neighbours) at its box, by key. */
+  dice?: Record<string, Still>;
+  /** FR-DICEX-46 a: per die key, the screen turn (radians, clockwise) standing its value upright. */
+  turns?: Record<string, number>;
 }
 
 export interface PlayHandle {
@@ -139,6 +165,8 @@ interface Play {
   rect(): Rect;
   clip?(): Rect | null;
   arena: Arena;
+  /** The camera's extents (default `arena`). */
+  view?: Arena;
   /** Last fitted rect size (a resize refits the camera, FR-DICEX-34). */
   fitted: { w: number; h: number };
   moving(): boolean;
@@ -149,7 +177,7 @@ interface Play {
   lost(): void;
 }
 
-interface Stage {
+interface Stage extends StillStage {
   renderer: WebGLRenderer;
   layer: HTMLElement;
   plays: Set<Play>;
@@ -217,6 +245,7 @@ function createStage(layer: HTMLElement): Stage {
     looping: false,
     lost: false,
     size: { w: 0, h: 0 },
+    stills: new Map(),
   };
   canvas.addEventListener("webglcontextlost", (e) => {
     e.preventDefault();
@@ -244,13 +273,19 @@ function stageIn(layer: HTMLElement): Stage {
   return stage;
 }
 
-/** Fit the arena into a rect (letterboxed), straight down: screen x = world x, down = +z. */
-function fit(camera: OrthographicCamera, arena: Arena, w: number, h: number) {
+/** The camera's half extents for an arena letterboxed into a `w` × `h` rect. */
+function extents(arena: Arena, w: number, h: number) {
   let halfW = arena.x;
   let halfH = arena.z;
   const aspect = w / Math.max(1, h);
   if (aspect > halfW / halfH) halfW = halfH * aspect;
   else halfH = halfW / aspect;
+  return { halfW, halfH };
+}
+
+/** Fit the arena into a rect (letterboxed), straight down: screen x = world x, down = +z. */
+function fit(camera: OrthographicCamera, arena: Arena, w: number, h: number) {
+  const { halfW, halfH } = extents(arena, w, h);
   camera.left = -halfW;
   camera.right = halfW;
   camera.top = halfH;
@@ -258,14 +293,23 @@ function fit(camera: OrthographicCamera, arena: Arena, w: number, h: number) {
   camera.updateProjectionMatrix();
 }
 
-/** Clear the whole canvas, then draw every arena into its own viewport + scissor rect. */
-function draw(s: Stage) {
-  const { renderer } = s;
+/** The canvas sized to the layer (CSS px). */
+function resize(s: Stage) {
   const vp = viewportOf(s.layer);
   if (vp.w !== s.size.w || vp.h !== s.size.h) {
-    renderer.setSize(vp.w, vp.h);
+    s.renderer.setSize(vp.w, vp.h);
     s.size = vp;
   }
+  return vp;
+}
+
+/**
+ * Clear the whole canvas, then draw every arena into its own viewport + scissor rect; then the
+ * tray stills waiting for this frame (FR-DICEX-48).
+ */
+function draw(s: Stage) {
+  const { renderer } = s;
+  const vp = resize(s);
   renderer.setScissorTest(false);
   renderer.setViewport(0, 0, vp.w, vp.h);
   renderer.clear();
@@ -273,7 +317,7 @@ function draw(s: Stage) {
     const r = p.rect();
     if (r.w < 1 || r.h < 1) continue;
     if (r.w !== p.fitted.w || r.h !== p.fitted.h) {
-      fit(p.camera, p.arena, r.w, r.h);
+      fit(p.camera, p.view ?? p.arena, r.w, r.h);
       p.fitted = { w: r.w, h: r.h };
     }
     const c = p.clip ? p.clip() : r;
@@ -286,6 +330,7 @@ function draw(s: Stage) {
   }
   renderer.setScissorTest(false);
   for (const p of [...s.plays]) p.drawn?.();
+  flushStills(s);
 }
 
 /** One loop for every arena; it stops once nothing moves (FR-DICEX-23: idle = no frames). */
@@ -350,6 +395,29 @@ function project(m: Mesh, camera: OrthographicCamera, r: Rect) {
   return { x: ((v.x + 1) / 2) * r.w, y: ((1 - v.y) / 2) * r.h };
 }
 
+/** Ease in-out (cubic). */
+const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+
+/** Per die: its cell minus where the simulation rests it (world x / z), or null. */
+function cellShifts(
+  o: PlayOptions,
+  sim: Simulation,
+  last: number,
+): ({ x: number; z: number } | null)[] | null {
+  if (!o.cells) return null;
+  const r = o.rect();
+  const { halfW, halfH } = extents(o.view ?? o.arena, r.w, r.h);
+  return o.dice.map((_, i) => {
+    const c = o.cells?.[i];
+    if (!c) return null;
+    const { p } = poseAt(sim, i, last);
+    // Screen x = world x, down = +z, the rect's centre at the origin.
+    const x = (c.x / Math.max(1, r.w)) * 2 * halfW - halfW;
+    const z = (c.y / Math.max(1, r.h)) * 2 * halfH - halfH;
+    return { x: x - p[0], z: z - p[2] };
+  });
+}
+
 /**
  * FR-DICEX-15 / -34: simulate in the arena, relabel, play on the page's one canvas. Throws when
  * WebGL can't start (the caller draws flat).
@@ -402,20 +470,31 @@ export function playThrow(o: PlayOptions): PlayHandle {
   });
   scene.add(group);
 
+  const last = sim.frameCount - 1;
+  // FR-DICEX-46 b: each die's shift from where the simulation rests it to its cell (world units),
+  // eased in over the throw; orientations stay the recording's.
+  const shifts = cellShifts(o, sim, last);
+  const turns = o.cells
+    ? o.dice.map((d, i) => uprightTurn(geometryOf(d.shape), poseAt(sim, i, last).q))
+    : null;
   const pose = (f: number) => {
+    const k = ease(Math.min(1, f / Math.max(1, last)));
     meshes.forEach((m, i) => {
-      const { p, q } = poseAt(sim, i, f);
-      m.position.set(p[0], p[1], p[2]);
+      const { p, q: q0 } = poseAt(sim, i, f);
+      const d = shifts?.[i];
+      const t = turns?.[i];
+      const q = t ? multiply(yaw(t * k), q0) : q0;
+      m.position.set(p[0] + (d ? d.x * k : 0), p[1], p[2] + (d ? d.z * k : 0));
       m.quaternion.set(q[0], q[1], q[2], q[3]);
     });
   };
+  const speed = o.maxMs ? Math.max(1, ((last / STEP_HZ) * 1000) / o.maxMs) : 1;
 
   let start: number | null = null;
   let prev: number | null = null;
   const deltas: number[] = [];
   let released = false;
   let rested = false;
-  const last = sim.frameCount - 1;
 
   const rest = () => {
     rested = true;
@@ -447,13 +526,14 @@ export function playThrow(o: PlayOptions): PlayHandle {
     rect: o.rect,
     ...(o.clip && { clip: o.clip }),
     arena: o.arena,
+    ...(o.view && { view: o.view }),
     fitted: { w: 0, h: 0 },
     moving: () => !rested && !released,
     tick(time) {
       if (start === null) start = time;
       if (prev !== null) deltas.push(time - prev);
       prev = time;
-      const f = ((time - start) / 1000) * STEP_HZ;
+      const f = ((time - start) / 1000) * STEP_HZ * speed;
       if (f >= last) {
         rest();
         return false;
@@ -504,7 +584,28 @@ export function playThrow(o: PlayOptions): PlayHandle {
       if (!s.lost) {
         draw(s);
         // Copied in the same task as the render, so the drawing buffer still holds the frame.
-        still = copy(s, crop(o.rect(), camera, meshes, o.dice));
+        const r = o.rect();
+        const box = crop(r, camera, meshes, o.dice);
+        still = copy(s, box);
+        if (still) {
+          // FR-DICEX-46 a: each die drawn alone and copied at its box, so a neighbour resting
+          // close never shows in its cell.
+          const dice: Record<string, Still> = {};
+          const turns: Record<string, number> = {};
+          meshes.forEach((m, i) => {
+            const d = o.dice[i] as Die3D;
+            const q: Quat = [m.quaternion.x, m.quaternion.y, m.quaternion.z, m.quaternion.w];
+            // A world turn θ about +Y shows on screen (x right, z down) as −θ.
+            turns[d.key] = -uprightTurn(geometryOf(d.shape), q);
+            for (const [j, other] of meshes.entries()) other.visible = j === i;
+            draw(s);
+            const alone = copy(s, crop(r, camera, [m], [d]));
+            if (alone) dice[d.key] = alone;
+          });
+          for (const m of meshes) m.visible = true;
+          still.dice = dice;
+          still.turns = turns;
+        }
       }
       release();
       if (!s.lost) draw(s);
@@ -548,6 +649,80 @@ export function addStillArena(
       redraw();
     },
   };
+}
+
+/** A still's dice: one scene, one camera per cell (rect in CSS px from the box's top-left). */
+export interface StillScene {
+  scene: Scene;
+  cells: { camera: OrthographicCamera; rect: Rect }[];
+  /** Take the dice out of the scene (the arena's removal). */
+  remove(): void;
+}
+
+export interface StillJob {
+  /** Runs in the job (the latest input): the box size (CSS px) and its scene, or null. */
+  build(ratio: number): { box: { w: number; h: number }; still: StillScene } | null;
+  /** `src` holds the box at its top-left, `ratio` device px per CSS px. */
+  copy(src: HTMLCanvasElement, ratio: number, box: Rect): void;
+}
+
+/**
+ * FR-DICEX-48 (ADR-0051 Previews): a temporary arena at the shared canvas's top-left, rendered
+ * alone (its box cleared), copied out and removed in one task, then the canvas is drawn again
+ * without it, so nothing of it ever reaches the screen's dice layer. Now when no loop runs, else
+ * in the loop's next frame (a newer request for the same `key` replaces a waiting one). No loop
+ * of its own. Throws when WebGL can't start or the context is lost (the caller shows chips).
+ */
+export function drawStill(layer: HTMLElement, key: object, job: StillJob): void {
+  const s = stageIn(layer);
+  requestStill(s, key, () => {
+    if (s.lost) return;
+    const vp = resize(s);
+    const ratio = s.renderer.domElement.width / Math.max(1, vp.w);
+    const built = job.build(ratio);
+    if (!built) return;
+    const box = { x: 0, y: 0, w: Math.min(built.box.w, vp.w), h: Math.min(built.box.h, vp.h) };
+    if (box.w < 1 || box.h < 1) return built.still.remove();
+    const { renderer } = s;
+    stillOnce({
+      add: () => built.still,
+      draw(a) {
+        renderer.setScissorTest(true);
+        renderer.setViewport(0, vp.h - box.h, box.w, box.h);
+        renderer.setScissor(0, vp.h - box.h, box.w, box.h);
+        renderer.clear();
+        for (const c of a.cells) {
+          const r = c.rect;
+          renderer.setViewport(r.x, vp.h - r.y - r.h, r.w, r.h);
+          renderer.setScissor(r.x, vp.h - r.y - r.h, r.w, r.h);
+          renderer.render(a.scene, c.camera);
+        }
+        renderer.setScissorTest(false);
+      },
+      copy: () => job.copy(renderer.domElement, ratio, box),
+      remove: (a) => a.remove(),
+      restore: () => draw(s),
+    });
+  });
+}
+
+/** Drop a waiting still of `key` (its tray unmounted). */
+export function cancelStillOf(key: object): void {
+  stage?.stills.delete(key);
+}
+
+/** A still die's material in a look, cached as the throws' (d4: the default corner labels). */
+export function stillMaterial(
+  shape: DieShape,
+  kind: LabelKind,
+  labels: readonly number[],
+  look: DiceLook,
+): Material {
+  const key = `${shape === "d4" ? "d4-still" : kind}${look.body}${look.pips}${look.material}`;
+  const map = texture(key, () =>
+    shape === "d4" ? drawD4(geometryOf("d4"), labels, look) : drawAtlas(kind, shape, look),
+  );
+  return material(key, look, map);
 }
 
 /** The rested dice's bounding box (viewport CSS px), inside the arena rect. */

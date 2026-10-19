@@ -24,7 +24,7 @@ phase: post-mvp-5
 | FR | What | Slice | Named test |
 |---|---|---|---|
 | FR-MAP-59 | Fit keeps every token visible: the 48 px floor (#190) yields down to 24 px before a token is left under a window or a toast box (#256, OQ-SHELL-39 A) | W2 `fix/map-fit-visible` | `FR-MAP-59 every token visible` |
-| FR-MAP-60 | Tool bars (the active tool's panel) stay at their top-left home spot, wrap by control group (#256, OQ-MAP-47 A); windows over them are pushed right (FR-SHELL-55) | W3 `fix/tool-bar-spot` | `FR-MAP-60 tool bar spot` |
+| FR-MAP-60 | Tool bars (the active tool's panel) stay at their top-left home spot, wrap by control group (#256, OQ-MAP-47 A); windows over them are pushed right (FR-SHELL-55) *(W3 build ruling #278: the rail renders 54 px, so the home spot is x 62 (rail + 8) and the DM max widths are 392 / 472 / 552.)* | W3 `fix/tool-bar-spot` | `FR-MAP-60 tool bar spot` |
 | FR-MAP-61 | The appearance refit counts the tokens of the frame that caused it | W2 | `FR-MAP-61 appearance refit` |
 | FR-MAP-65–67 | Combat trail stored on the token for the turn, sent with it, drawn from the record (track R, sim-8 #6) | R0 / R3 | `FR-MAP-66 trail visibility`, `FR-MAP-67 trail equality after reload` |
 | FR-MAP-68 | Laser trail in the sender's colour + name chip at its head | K3 | `FR-MAP-68 laser colour` |

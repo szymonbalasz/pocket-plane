@@ -22,6 +22,12 @@ export interface DomainEvent<P = unknown> {
   campaignId: string | null;
   payload: P;
   changes: RecordChange[];
+  /**
+   * Transport hint (never logged): a connection whose surviving changes were all identical
+   * upserts gets **no** frame, not an empty one (FR-SYNC-19's exception; e.g. a secret
+   * `CombatantSideChanged`, FR-CBT-100). Acks are separate frames, so the sender loses nothing.
+   */
+  quietWhenUnchanged?: true;
 }
 
 export interface DispatchMeta {

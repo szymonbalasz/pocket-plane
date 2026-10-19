@@ -21,10 +21,12 @@ import cbtxTemp from "./combat-extras/cbtx-temp";
 import combat1 from "./combat-tracker/combat-1";
 import combatHit from "./combat-tracker/combat-hit";
 import combatPending from "./combat-tracker/combat-pending";
+import encFriendly from "./combat-tracker/enc-friendly";
 import encounter1 from "./combat-tracker/encounter-1";
 import goblin2 from "./combat-tracker/goblin-2";
 import lateHitRuled from "./combat-tracker/late-hit-ruled";
 import thornBattlemap from "./combat-tracker/thorn-battlemap";
+import trailMoves from "./combat-tracker/trail-moves";
 import cmpHomebrew from "./compendium/cmp-homebrew";
 import cmpHomebrewSecond from "./compendium/cmp-homebrew-second";
 import cmpImages from "./compendium/cmp-images";
@@ -176,4 +178,6 @@ export const units: readonly Fixture[] = [
   lateHitRuled,
   cmpImages,
   pcColours,
+  trailMoves,
+  encFriendly,
 ];
