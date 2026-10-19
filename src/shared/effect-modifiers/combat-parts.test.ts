@@ -69,14 +69,14 @@ describe("FR-MOD-20 roll line offers (R7)", () => {
 });
 
 describe("FR-MOD-48 outcome line parts", () => {
-  test("FR-MOD-48 typed '+ 6 radiant (Divine Fury)', untyped '+ 9 Martial Advantage', players '(DM)'; own multiplier; DM set / ruled", () => {
+  test("FR-MOD-48 typed '+ 6 radiant (Divine Fury)', the attack's type '+ 9 slashing (Martial Advantage)', players '(DM)'; own multiplier; DM set / ruled", () => {
     const parts = [
       { label: "Divine Fury", value: 6, type: "radiant" },
       { label: null, value: 9, type: null },
       { label: "Hex", value: 2, type: "necrotic", multiplier: "half" as const },
     ];
     expect(lineText(linePartSegments(parts, null, "slashing"))).toBe(
-      " + 6 radiant (Divine Fury) + 9 (DM) + 2 necrotic (Hex) (half)",
+      " + 6 radiant (Divine Fury) + 9 slashing (DM) + 2 necrotic (Hex) (half)",
     );
     const dm = [
       { label: "Divine Fury", rolled: 6 },
@@ -84,11 +84,11 @@ describe("FR-MOD-48 outcome line parts", () => {
       { label: "Hex", rolled: 4, forced: true as const },
     ];
     expect(lineText(linePartSegments(parts, dm, "slashing"))).toBe(
-      " + 6 radiant (Divine Fury) + 9 Martial Advantage (DM set; rolled 7) + 2 necrotic (Hex) (half) (DM ruled)",
+      " + 6 radiant (Divine Fury) + 9 slashing (Martial Advantage) (DM set; rolled 7) + 2 necrotic (Hex) (half) (DM ruled)",
     );
-    // A part typed as the attack reads untyped.
+    // FR-MOD-62: a part typed as the attack names its type too.
     expect(lineText(linePartSegments([{ ...fury, type: "slashing" }], null, "slashing"))).toBe(
-      " + 6 Divine Fury",
+      " + 6 slashing (Divine Fury)",
     );
   });
 
@@ -116,7 +116,7 @@ describe("FR-MOD-48 outcome line parts", () => {
         payload: { ...payload, parts: [{ label: null, value: 9, type: null }], damage: 23 },
       }),
     );
-    expect(nonPublic).toContain("14 slashing damage + 9 (DM)");
+    expect(nonPublic).toContain("14 slashing damage + 9 slashing (DM)");
     expect(players).not.toContain("(DM)");
   });
 });

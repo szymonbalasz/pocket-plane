@@ -1892,3 +1892,11 @@ From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-54–56 and
 | Chip row fit | derived per render | `fitChipRow` → effect chips shown, tier, icon-only triggers, second line | each client its own rows (players: what FR-MOD-55 sends) | FR-CBTX-54 |
 | Second-line hold | client memory, per row | the name line's width when the row wrapped | — | FR-CBTX-54 |
 | Effect… default source | derived on open | `defaultEffectSource(rows, turnCombatantId, targets)` → id + `turn` \| `target` \| `none` | DM only | FR-CBTX-55 |
+
+## 75. Sprint 5: combat log wording (R2)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-95, -96 and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) FR-MOD-62. **Built by `fix/combat-lines`**: no table, column, record type or payload change; `cbt.attack` lines render differently from the same stored `payload` / `dmPayload` (old rows included). Protocol side: [protocol §96](../protocol/README.md#96-sprint-5-combat-log-wording-r2).
+
+- **Derived (line text):** the ruling's full stop; the DM's damage parts (`dmPayload.mods.damage`) inside the base part's muted run; a trigger part's type word = `parts[].type` ?? `damageType`.
+- **Fixtures:** none new (`rules-effects` holds every unit L12–L14 needs).
+- **Snapshot size** (CON-44): 0 B stored; rendered text grows by ≤ 12 B per trigger part (MOD §12).

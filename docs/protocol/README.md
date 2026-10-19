@@ -2398,3 +2398,18 @@ From [combat-extras](../specs/combat-extras.md) FR-CBTX-54–56 (OQ-CBTX-27 B, -
 | `fog-token-menu-invisible` | The menu's only "Invisible"; Tooltip "Players don't see it unless they see invisible" (`INVISIBLE_TIP`). Intent unchanged (`fog.setInvisible`) | FR-FOG-59 |
 
 - **Fixtures:** none new (W4 adds no record); e2e bundle `init-chips-effect` = `windows-s5` under its own name (own e2e server).
+
+## 96. Sprint 5: combat log wording (R2)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-95, -96 and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) FR-MOD-62 (BL-24, BL-27, BL-23). **Built by `fix/combat-lines`**: line text only. No intent, event, record type, payload field or schema change; built from `payload` / `dmPayload` alone, so old rows render the new way. Data side: [data model §75](../data-model/README.md#75-sprint-5-combat-log-wording-r2).
+
+| Piece | Contract |
+|---|---|
+| Ruling (`outcomeText`, `@shared/combat-tracker/log-kinds.ts`, FR-CBT-95) | A ruled hit ends with a full stop before the damage: DM "vs AC 16 — DM ruled hit. 10 slashing damage"; players' natural ruling "(natural 1) — DM ruled hit. 6 piercing damage"; an Apply hit line ends at "— DM ruled hit."; "— DM ruled miss" unchanged |
+| DM damage run (`includedRun`, FR-CBT-96) | `dmPayload.mods.damage` (roll-hook parts already in the base part's total) render inside the base part's muted run after its dice: "14 slashing (2d6+5: 4 + 3 + 5, incl. + 2 Rage) + 6 fire (2d6: 2 + 4) damage"; no dice run (physical total, DM set) → " (incl. + 2 Rage)". Text outside muted runs sums to the line's damage. Players' line and to-hit parts unchanged |
+| Trigger parts (`linePartSegments`, `@shared/effect-modifiers/combat-parts.ts`, FR-MOD-62) | Every landed part names its type: the part's `type`, else the card's `damageType`: "+ 10 piercing (Sneak Attack)", "+ 9 slashing (DM)"; neither typed → "+ 10 Sneak Attack". DM and players alike; die segments unchanged. Roll-line offers (`rollOfferSegments`) and card text unchanged |
+| Held part sums (FR-DICE-40, D8 ruling #259) | `LineSegment.numeric?: true` (`@shared/dice-roll-log/kind-types.ts`, granted to R2): a number from dice that is not a die. `modSegments` sets it on a rolled part's value (`expression` present: "+ 5 Hunter's Mark", "− 3 (DM)"), `rollOfferSegments` on every offered value (own segment, never merged into the muted run); `heldSegments` (`dice-roll-log/logic.ts`) draws it "…" until the landing. Constants ("+ 2 Rage") stay. Test `FR-DICE-40 held line blanks MOD part sums` (`effect-modifiers/held-parts.test.ts`) |
+| DM popup (`attack-popup.tsx`) | `cbt-popup-step` (screen-reader text) on a damage-only card reads "Damage only, no to-hit" (was "To-hit step"); `data-value` unchanged |
+| Tests | `combat-lines.test.ts` (`FR-CBT-95 ruling punctuation`, `FR-CBT-96 Rage once in the DM line`, `FR-MOD-62 damage types on trigger parts`), `late-fill.test.tsx` (damage-only header), `e2e/combat-lines.e2e.ts` (CBT §13.1 L12–L14, bundle `late-damage`) |
+| Fixtures | None new: L12–L14 walk on `rules-effects` (Brakka, Flame Tongue, Fire Ward, Rage spent, Divine Fury; Thorn's Sneak Attack) |
+| CON-44 | 0 B: no record or field; rendered text only |

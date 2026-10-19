@@ -145,7 +145,7 @@ describe("FR-MOD-57 Divine Fury line in the combat log", () => {
     ]);
   });
 
-  test("FR-MOD-57 Martial Advantage (monster) marked public: players '+ N Martial Advantage' with no expression / dice / die segment; the DM sees its dice; leak scan per player, snapshot and live", () => {
+  test("FR-MOD-57 Martial Advantage (monster) marked public: players '+ N slashing (Martial Advantage)' with no expression / dice / die segment; the DM sees its dice; leak scan per player, snapshot and live", () => {
     const t = rtSetup();
     t.run("map.setTokenHidden", { tokenId: t.tokens.elite, hidden: false });
     const ma = t.trig({
@@ -180,7 +180,7 @@ describe("FR-MOD-57 Divine Fury line in the combat log", () => {
     expect(l.payload.parts).toEqual([{ label: "Martial Advantage", value: v, type: null }]);
     expect(l.dmPayload.rollIds).toEqual([offer?.rollId as string]);
     expect(l.entry.rollIds as string[]).not.toContain(offer?.rollId as string);
-    expect(lineText(l.players)).toContain(`+ ${v} Martial Advantage`);
+    expect(lineText(l.players)).toContain(`+ ${v} slashing (Martial Advantage)`);
     expect(dice(l.players)).toEqual([]);
     expect(l.dmPayload.parts?.[0]?.expression).toBe("2d6");
     expect(dice(l.dm).filter((d) => d.label === "Martial Advantage")).toHaveLength(2);
