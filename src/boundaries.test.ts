@@ -94,7 +94,7 @@ describe("import boundaries (AGENTS §9.1)", () => {
           continue;
         }
         if (t === "package") {
-          const isTest = /\.test\.tsx?$/.test(file);
+          const isTest = /\.(test|bench)\.tsx?$/.test(file);
           if (area === "shared" && imp.spec !== "zod" && !(isTest && imp.spec === "bun:test")) {
             violations.push(`${file}: @shared may import zod only, not "${imp.spec}"`);
           }

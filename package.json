@@ -12,6 +12,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "check": "bun scripts/check.ts",
+    "bench": "bun test ./src/shared/fog-of-war/vision.bench.ts ./src/shared/fog-of-war/vision-s4.bench.ts",
     "e2e": "bun scripts/e2e.ts",
     "fixtures:reset": "bun scripts/fixtures.ts reset",
     "fixtures:load": "bun scripts/fixtures.ts load",
