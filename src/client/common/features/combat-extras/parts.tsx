@@ -44,8 +44,9 @@ type Fit = { n: number; tier: number; icons: boolean; wrap: boolean; left: numbe
  * after the full name). Plain rows (`fitChips`): the rest stay in flow but invisible (clipped by the
  * row) and "+N" sits after the last one that fits. Compact rows (`fitChipRow`, FR-CBTX-54) are
  * measured on an invisible copy of the chips at natural width (`data-chip-measure`): effect chips
- * tighten (BL-08), trigger chips go icon-only, effect chips fold, and only then does the chip row
- * take a line of its own under the name (`wrap`: the name line wraps, the row grows one line; kept
+ * tighten (BL-08), trigger chips go icon-only, effect chips fold, and only then (or as soon as the
+ * name beside them is cut, #182) does the chip row take a line of its own under the name (`wrap`:
+ * the name line wraps, the row grows one line; kept
  * until the name line widens or the chips change, so it never flips back and forth). Measured
  * after layout, on resize (ResizeObserver) and when the chips change.
  */
@@ -90,12 +91,17 @@ function useFit(count: number, compact: boolean, deps: unknown) {
             );
             return { full, short };
           });
-        const r = fitChipRow(widths("effect"), widths("trigger"), room, GAP);
         if (fit.wrap) {
+          const r = fitChipRow(widths("effect"), widths("trigger"), room, GAP);
           // On its own line: the same rule on the full width; still too narrow → the chips wrap.
           setFit({ ...(r.wrap ? { n: 0, tier: 0, icons: true } : r), wrap: true, left: 0 });
           return;
         }
+        // #182: the chip line keeps its minimum width, so a squeezed name (a hidden row's eye-off
+        // icon takes room too) is cut while the chips "fit": that also takes the second line.
+        const name = el.parentElement?.querySelector<HTMLElement>("[data-name-base]");
+        const cut = !!name && name.scrollWidth > name.clientWidth;
+        const r = fitChipRow(widths("effect"), widths("trigger"), room, GAP, cut);
         if (r.wrap) wrapAt.current = line;
         setFit({ ...r, left: 0 });
         return;

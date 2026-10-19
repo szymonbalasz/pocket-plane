@@ -138,13 +138,19 @@ export interface ChipRowFit {
  * then its trigger chips (`full` = name, `short` = icon-only) in `room`. In order: (1) effect
  * chips tighten (`fitChipTiers`) next to full trigger chips; (2) trigger chips go icon-only;
  * (3) effect chips fold into "+N", last first; (4) a trigger never folds: the row wraps.
+ * `nameCut`: the name beside the chips is cut (the chip line holds its minimum width, e.g. after a
+ * hidden row's eye-off icon): the chips take the second line too, so the name is never cut (#182).
  */
 export function fitChipRow(
   effects: readonly ChipWidths[],
   triggers: readonly ChipWidths[],
   room: number,
   gap = 2,
+  nameCut = false,
 ): ChipRowFit {
+  if (nameCut && effects.length + triggers.length > 0) {
+    return { n: 0, tier: 0, icons: triggers.length > 0, wrap: true };
+  }
   // The room the trigger chips take after the effect chips (or "+N"), gap included.
   const after = (ws: readonly number[]) =>
     ws.length === 0

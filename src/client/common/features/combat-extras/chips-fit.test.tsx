@@ -78,6 +78,29 @@ describe("FR-CBTX-54 trigger chips never fold", () => {
     }
   });
 
+  test("FR-CBTX-54 trigger chips never fold: a hidden row at 320 px (eye-off icon) never cuts the name (#182, W4 walkthrough W6c)", () => {
+    // The Wolf's chip line holds its 28 px minimum while "Wolf" is squeezed to 3ch beside the
+    // eye-off icon: Divine Fury's icon (22) "fits" 28, yet the name is cut → the second line.
+    const minLine = 28;
+    expect(fitChipRow([], [fury], minLine).wrap).toBe(false);
+    expect(fitChipRow([], [fury], minLine, 2, true)).toEqual({
+      n: 0,
+      tier: 0,
+      icons: true,
+      wrap: true,
+    });
+    // Goblin: one effect only ("+1" for Fire Ward) beside a cut name → the second line too.
+    expect(fitChipRow([rage], [], minLine, 2, true)).toEqual({
+      n: 0,
+      tier: 0,
+      icons: false,
+      wrap: true,
+    });
+    // Name whole: the rule as before; no chips: nothing to move.
+    expect(fitChipRow([rage], [fury], 100, 2, false).wrap).toBe(false);
+    expect(fitChipRow([], [], 0, 2, true).wrap).toBe(false);
+  });
+
   test("FR-CBTX-54 trigger chips never fold: the icon chip — ⚡ + uses, data-compact, the used look kept, Tooltip names it", () => {
     const icon = tagOf(
       render(<TriggerChipView t={chip({ uses: { left: 2, text: "2" }, state: "uses" })} icon />),

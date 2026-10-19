@@ -92,6 +92,23 @@ test("FR-CBTX-54 W6 trigger chips never fold: 'Rage 10r' + Divine Fury on Brakka
     // Narrow: Divine Fury goes icon-only first ("Rage 10r" whole), still shown.
     await toMinWidth(page, init, min);
     const compact = await bothShown(brakka, rageFolds);
+    // #182 on every row, hidden ones too (eye-off after the name; W4 walkthrough W6c): no name
+    // cut, every trigger chip kept (on the name line or the row's second line).
+    await expect
+      .poll(() =>
+        init
+          .locator("[data-name-base]")
+          .evaluateAll((els) =>
+            els.filter((el) => el.scrollWidth > el.clientWidth).map((el) => el.textContent),
+          ),
+      )
+      .toEqual([]);
+    // The DM's rows include the hidden ones (Wolf, Goblin, Elite); players get none.
+    if (page === dm) {
+      await expect(
+        init.locator('[data-testid="cbt-init-row"][data-hidden="true"]'),
+      ).not.toHaveCount(0);
+    }
     await expect(compact).toHaveAttribute("data-compact", "true");
     await expect(compact.locator("svg.lucide-zap")).toBeVisible();
     await compact.hover();
