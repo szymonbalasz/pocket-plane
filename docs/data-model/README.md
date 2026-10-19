@@ -1331,7 +1331,7 @@ From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; gate 1 
 | definitionId | ID → Entity \| null | Monster entries: the imported creature definition with the same `(source, sourceKey)` | FR-CMP-03 |
 | shared | bool, default false | Homebrew only | FR-CMP-24 |
 | derivedFromId | ID \| null | Informational, no FK | CMP §8 |
-| imageAssetIds *(S5, [§67](#67-sprint-5-compendium-entry-images-c5-core))* | **JSON leaf** 0–4 asset IDs, default `[]` | Homebrew only; unique; slot order, first = main | FR-CMP-45 |
+| imageAssetIds *(S5, [§68](#68-sprint-5-compendium-entry-images-c5-core))* | **JSON leaf** 0–4 asset IDs, default `[]` | Homebrew only; unique; slot order, first = main | FR-CMP-45 |
 | createdAt, updatedAt, importedAt | timestamp ×2, timestamp \| null | `importedAt` on imported rows only | CMP §8 |
 
 Indexes: unique `compendium_entry_source_key` (`source`, `source_key`); unique `compendium_entry_campaign_kind_name` (`campaign_id`, `kind`, `name_key`) where `campaign_id is not null`; `compendium_entry_kind_name`, `compendium_entry_campaign`.
@@ -1762,7 +1762,7 @@ Indexes unique `handout_present_campaign_player` (`campaign_id`, `player_id`), `
 - **Invariant (FR-PARTY-35, tested after every command):** a row exists only for a player of its campaign who can see its handout (`sharedWith`). `party.shareHandout` deletes the losers' rows of that handout, `party.deleteHandout` every row of it, in the same transaction.
 - **Persisted runtime state:** rows stay until closed (player, DM or access loss); a crash keeps committed rows (the next snapshot reopens the popup).
 - **Attachments:** handouts (and, from C5, compendium entries) reference attachments like any asset; `assets.require` ignores `listed`. A re-upload of an attachment's bytes with `listed: true` sets `listed` (FR-ASSET-26); `listed: false` never unlists. Unreferenced attachments stay (no delete, OQ-ASSET-05).
-- **Fixtures:** `handout-attachment` (`ransom-note.svg` as an attachment + h6 "Ransom Note", unshared; its asset id from `r.id(key, "asset")`: since C5 core the loader records an attachment's `AssetIngested` id, [§67](#67-sprint-5-compendium-entry-images-c5-core)), `handout-present-1` (h2 → player-1); bundle `party-s5` = `party-board` + `cmp-srd-mini` + both; both units also in `session-sim-9`.
+- **Fixtures:** `handout-attachment` (`ransom-note.svg` as an attachment + h6 "Ransom Note", unshared; its asset id from `r.id(key, "asset")`: since C5 core the loader records an attachment's `AssetIngested` id, [§68](#68-sprint-5-compendium-entry-images-c5-core)), `handout-present-1` (h2 → player-1); bundle `party-s5` = `party-board` + `cmp-srd-mini` + both; both units also in `session-sim-9`.
 - **Snapshot size** (CON-44, #256; `con44-s5.test.ts`, `snapshot-size.test.ts` worst case): heavy harness + party-s5 units, a present for every player: `handout-present` DM **1,459 B** at 6 rows (heavy DM 674,871 B, 897,993 B left of 1.5 MiB), **259 B** in each player frame (players max 282,383 B); at the 20-row cap (20 players) DM **4,819 B** (bound 5,100). 50 attachments: every snapshot byte-identical.
 
 ## 66. Sprint 5: combat core (R0)
@@ -1798,9 +1798,18 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-88, -91, 
 - **Fixtures:** bundle `late-damage` = `rules-effects` (R1 / R3 / R4 append their units).
 - **CON-44** (`src/server/ws/snapshot-size.test.ts`, realistic-heavy harness, every row at its worst): DM 640,788 → 697,783 B (20 rulings × 20 targets +39,659 B; 3 unused rolls on every damage card +4,040 B; 60 active-scene trails at the 20-segment cap +13,020 B; `side` + `publicSide` set on every combatant +276 B over the null baseline); 875,081 B left of 1.5 MiB. Players 256,904–260,336 B (trails +1,302 B each, player tokens only; rulings 0 B).
 
-## 67. Sprint 5: compendium entry images (C5 core)
+## 67. Sprint 5: kept-template right-click menu (K1)
 
-From [compendium](../specs/compendium.md#8-data-model) FR-CMP-45–49, -53 and [assets-pipeline](../specs/assets-pipeline.md#8-data-model) FR-ASSET-35–38 ([ADR-0054](../architecture/adr/0054-compendium-rest-asset-ids.md); DM gate #256; seams S1, S5, S14). **Built by `fix/cmpimg-core`** (schema lane 1, after P0): one column (drizzle push, push-safe, no backfill). Server only; the form slots and gallery are C5 UI. Protocol side: [protocol §84](../protocol/README.md#84-sprint-5-compendium-entry-images-c5-core).
+From [scene-tools](../specs/scene-tools.md#8-data-model) sprint 5 (FR-SCN-48–51) and [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-71. **Built by `fix/tpl-menu`**; no table, column, record type or field. Protocol side: [protocol §84](../protocol/README.md#84-sprint-5-kept-template-right-click-menu-k1).
+
+- **Client only (never stored or sent):** the open template menu `{templateId, sceneId, at}` (one per page, `aoe-store.ts`); the deferred right press `{screen, p, laser, menu}` (`MapCanvas.tsx`, FR-MAP-71 step 4: dropped on release, a ≥ 4 px drag, leaving live).
+- **Derived:** the menu's template = `templateAt` over the shown scene's kept templates in draw order (FR-SCN-49); its items from the role and `hidden` (Delete, Edit…, DM Hide / Reveal), disabled while not live.
+- **Fixtures:** no new unit; bundle **`tpl-menu`** = `map-tools` (Spirit Guardians `player-1`, Thunderwave `player-2`, Web DM, hidden Glyph), its own server for the e2e (which deletes templates). The K8 / K9 walkthrough runs on `map-tools` until `player-colours` is on `main`.
+- **CON-44:** no new bytes (no record or field).
+
+## 68. Sprint 5: compendium entry images (C5 core)
+
+From [compendium](../specs/compendium.md#8-data-model) FR-CMP-45–49, -53 and [assets-pipeline](../specs/assets-pipeline.md#8-data-model) FR-ASSET-35–38 ([ADR-0054](../architecture/adr/0054-compendium-rest-asset-ids.md); DM gate #256; seams S1, S5, S14). **Built by `fix/cmpimg-core`** (schema lane 1, after P0): one column (drizzle push, push-safe, no backfill). Server only; the form slots and gallery are C5 UI. Protocol side: [protocol §86](../protocol/README.md#86-sprint-5-compendium-entry-images-c5-core).
 
 | Table / column | Change | Default (push-safe) | Visibility | Source |
 |---|---|---|---|---|

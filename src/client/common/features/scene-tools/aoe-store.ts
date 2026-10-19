@@ -2,15 +2,20 @@
 // rail) and `TemplatesLayer`: the panel settings, this connection's ephemeral template and its
 // sender, a press in progress (a new placement, or a kept template's origin / end handle drag,
 // FR-SCN-45), the selected kept template and the kept templates this client may edit on the
-// shown scene (the layer keeps that fresh). Client only; the server validates every intent.
+// shown scene (the layer keeps that fresh), and the kept-template right-click menu (FR-SCN-48).
+// Client only; the server validates every intent.
 import {
+  AOE_TEMPLATE_TYPE,
   SCN_INTENTS,
   SCN_SIGNALS,
   type TemplateRecordView,
   type TemplateSignalData,
 } from "@shared/scene-tools/schemas";
 import { create } from "zustand";
+import { canvasBlind } from "../fog-of-war/blind";
 import { toastReject } from "../scenes-map/intents";
+import type { LayerContextMenu, LayerMenuContext, MenuPoint } from "../scenes-map/layers";
+import { useMapTool } from "../scenes-map/tool-store";
 import type { ToolCancelReason } from "../scenes-map/tools";
 import {
   type AoeSettings,
@@ -19,6 +24,7 @@ import {
   type GridPoint,
   placeFrame,
   type TemplateView,
+  templateAt,
 } from "./templates";
 
 type Send = (name: string, data: unknown) => unknown;
@@ -140,3 +146,56 @@ export function cancelAoe(reason: ToolCancelReason): boolean {
   else endOwn();
   return dropped;
 }
+
+// ---------- right-click menu (FR-SCN-48) ----------
+
+export interface TemplateMenuOpen {
+  templateId: string;
+  sceneId: string;
+  /** Page px of the release (`clientX`, `clientY`). */
+  at: { x: number; y: number };
+}
+
+/** FR-SCN-48: the open template menu, if any (one per page). */
+export const useTemplateMenu = create<{ open: TemplateMenuOpen | null }>(() => ({ open: null }));
+
+export const openTemplateMenu = (open: TemplateMenuOpen): void =>
+  useTemplateMenu.setState({ open });
+
+export function closeTemplateMenu(): void {
+  if (useTemplateMenu.getState().open) useTemplateMenu.setState({ open: null });
+}
+
+/** FR-SCN-48 Edit…: the AoE tool becomes active with the template selected (panel + handles). */
+export function editFromMenu(templateId: string): void {
+  closeTemplateMenu();
+  useMapTool.getState().setTool("aoe");
+  useAoe.setState({ selectedId: templateId, gesture: null });
+}
+
+/** FR-SCN-49: the kept template a right press at map point `p` hits on the shown scene. */
+function menuTemplateAt(p: MenuPoint, ctx: LayerMenuContext): TemplateRecordView | null {
+  const byId = ctx.store.records[AOE_TEMPLATE_TYPE] as
+    | Record<string, TemplateRecordView>
+    | undefined;
+  // Draw order = the layer's (`TemplatesLayer`): the store's order, the shown scene's only.
+  const kept = Object.values(byId ?? {}).filter((t) => t.sceneId === ctx.scene.id);
+  return templateAt(p, kept, {
+    client: ctx.client,
+    myPlayerId: ctx.myPlayerId,
+    dmOnlyOff: ctx.off["dm-only"] === true,
+    templatesOff: ctx.client === "dm" && ctx.off.templates === true,
+    blind: canvasBlind(ctx.client, ctx.store, ctx.scene.id, ctx.myPlayerId),
+    scale: ctx.cam.scale,
+    grid: ctx.grid,
+  });
+}
+
+/** FR-SCN-51: `scn-templates`' layer menu (FR-MAP-71 step 4). */
+export const templateContextMenu: LayerContextMenu = {
+  hit: (p, ctx) => menuTemplateAt(p, ctx) !== null,
+  open(p, screen, ctx) {
+    const t = menuTemplateAt(p, ctx);
+    if (t) openTemplateMenu({ templateId: t.id, sceneId: ctx.scene.id, at: screen });
+  },
+};
