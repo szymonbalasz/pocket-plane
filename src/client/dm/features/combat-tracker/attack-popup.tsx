@@ -602,10 +602,11 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
     <div className="flex min-h-0 flex-col gap-3">
       {/* FR-CBT-76: the header drags the popup (handled by the panel). */}
       <div data-testid="cbt-popup-drag" className="-mx-3 -mt-3 cursor-move select-none px-3 pt-3">
-        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-          <span className="min-w-0 truncate">
+        <div className="flex items-center gap-1.5">
+          <h2 className="min-w-0 truncate text-sm font-semibold">
             {p.attackerName} — {p.attackName}
-          </span>
+          </h2>
+          {/* FR-CBT-89: the step marker sits beside the heading (the heading stays the name). */}
           {ruling ? (
             <Badge
               variant="secondary"
@@ -620,7 +621,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
               To-hit step
             </span>
           )}
-        </h2>
+        </div>
         <p className="text-xs text-muted-foreground">
           {p.mode !== "normal" ? `${p.mode} · ` : ""}
           {p.crit ? "Critical! " : ""}
