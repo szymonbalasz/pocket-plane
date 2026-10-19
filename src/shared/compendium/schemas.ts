@@ -1,5 +1,6 @@
 // compendium boundary schemas (CMP §8, FR-CMP-01 / -04 / -29): kind registry (strict facets +
 // body per kind), entry and source rows, derived values. zod is the source of truth.
+import { AssetId } from "@shared/assets-pipeline/schemas";
 import { TriggerRule } from "@shared/effect-modifiers/triggers";
 import { Cr, Size } from "@shared/entities/schemas";
 import { z } from "zod";
@@ -21,6 +22,14 @@ export const SHORT_TEXT_MAX = 200;
 export const MATERIAL_MAX = 1_000;
 export const NAME_MAX = 80;
 export const LINE_MAX = 80;
+/** FR-CMP-45 (OQ-CMP-37): image slots per homebrew entry; the first is the main image. */
+export const IMAGE_SLOTS_MAX = 4;
+
+/** FR-CMP-45: 0–4 unique asset IDs in slot order (first = main). */
+export const EntryImages = z
+  .array(AssetId)
+  .max(IMAGE_SLOTS_MAX, `At most ${IMAGE_SLOTS_MAX} images`)
+  .refine((ids) => new Set(ids).size === ids.length, { message: "Same image twice" });
 
 /** The SRD's twelve classes, spelled as CHARX `classes[].name` (FR-CMP-29). */
 export const SRD_CLASSES = [
@@ -243,6 +252,8 @@ export const CompendiumEntry = z
     definitionId: Id.nullable(),
     shared: z.boolean(),
     derivedFromId: Id.nullable(),
+    /** FR-CMP-45 / -47: homebrew only; as delivered (stale IDs dropped at read). */
+    imageAssetIds: EntryImages,
     createdAt: Iso,
     updatedAt: Iso,
     importedAt: Iso.nullable(),
@@ -266,6 +277,13 @@ export const CompendiumEntry = z
     }
     if (e.source === null && e.kind === "monster") {
       c.addIssue({ code: "custom", path: ["kind"], message: "Homebrew monsters are customs" });
+    }
+    if (e.source !== null && e.imageAssetIds.length > 0) {
+      c.addIssue({
+        code: "custom",
+        path: ["imageAssetIds"],
+        message: "Imported entries have no images",
+      });
     }
   });
 export type CompendiumEntry = z.infer<typeof CompendiumEntry>;

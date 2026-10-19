@@ -1370,6 +1370,11 @@ export const compendiumEntry = sqliteTable(
     shared: integer("shared", { mode: "boolean" }).notNull().default(false),
     /** Plain id, no FK (informational). */
     derivedFromId: text("derived_from_id"),
+    /** FR-CMP-45 (S5): 0–4 asset IDs, slot order, first = main; homebrew only (imported `[]`). */
+    imageAssetIds: text("image_asset_ids", { mode: "json" })
+      .$type<string[]>()
+      .notNull()
+      .default([]),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     importedAt: text("imported_at"),

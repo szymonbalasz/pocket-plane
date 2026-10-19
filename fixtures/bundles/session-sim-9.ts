@@ -19,6 +19,8 @@ export default defineBundle({
     "handout-attachment",
     "handout-present-1",
     // C: compendium images
+    // C5 core: "Moonlit Lantern" (shared, 2 attachment images), "CMP-IMG-SECRET" (DM only, 1)
+    "cmp-images",
     // K: player colours, kept-template menu
   ],
 });

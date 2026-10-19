@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>relic</title>
+  <!-- Fixture "relic" (compendium §13.1, `cmp-images`): a gilded reliquary with a red gem, image
+       of the DM-only "CMP-IMG-SECRET" (attachment); its ID must never reach a player. -->
+  <rect width="256" height="256" fill="#2b1d14"/>
+  <path d="M60 196 L196 196 L204 224 L52 224 Z" fill="#8c6a2a"/>
+  <rect x="72" y="104" width="112" height="92" fill="#c9a03a" stroke="#f0d27a" stroke-width="6"/>
+  <path d="M64 104 L128 44 L192 104 Z" fill="#d9b04a" stroke="#f0d27a" stroke-width="6"/>
+  <polygon points="128,124 150,150 128,176 106,150" fill="#b0202a" stroke="#ffb0a0" stroke-width="4"/>
+  <circle cx="128" cy="36" r="10" fill="#f0d27a"/>
+</svg>

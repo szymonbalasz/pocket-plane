@@ -6,6 +6,7 @@ import base from "./base";
 import campaignSwitch from "./campaign-switch";
 import characterSheet from "./character-sheet";
 import characterSheetFull from "./character-sheet-full";
+import cmpImages from "./cmp-images";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
 import compendium from "./compendium";
@@ -85,5 +86,6 @@ export const bundles: readonly Bundle[] = [
   windowsS5,
   lateDamage,
   partyS5,
+  cmpImages,
   tplMenu,
 ];
