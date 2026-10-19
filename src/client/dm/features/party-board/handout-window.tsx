@@ -1,5 +1,6 @@
 // DM `party.handout` (FR-PARTY-14–16): the viewer with the DM extras (share Badge, Edit, Share…,
-// Share with everyone, Unshare), or the editor (Edit / New handout).
+// Share with everyone, Unshare; *(S5)* "On screen" Badge, Open on screens…, Close on all screens,
+// FR-PARTY-38), or the editor (Edit / New handout).
 import {
   type HandoutBodyRecord,
   type HandoutRecord,
@@ -17,6 +18,7 @@ import { useState } from "react";
 import { useStore } from "zustand";
 import { useShareLabel } from "./board-window";
 import { HandoutEditor } from "./Editor";
+import { CloseAllButton, OnScreenBadge, PresentDialog } from "./present";
 import { ShareDialog } from "./ShareDialog";
 import { useIntent, useLive } from "./send";
 
@@ -26,6 +28,7 @@ function DmExtras({ h }: { h: HandoutRecord }) {
   const live = useLive();
   const label = useShareLabel();
   const [sharing, setSharing] = useState(false);
+  const [presenting, setPresenting] = useState(false);
   const share = useIntent(LOST_SHARE);
   const shared = h.sharedWith.mode !== "none";
   const send = (sharedWith: SharedWith) =>
@@ -34,6 +37,7 @@ function DmExtras({ h }: { h: HandoutRecord }) {
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-1.5">
         <ShareBadge label={label(h)} muted={!shared} />
+        <OnScreenBadge handoutId={h.id} />
         <Button
           size="sm"
           variant="outline"
@@ -76,6 +80,20 @@ function DmExtras({ h }: { h: HandoutRecord }) {
             Unshare
           </Button>
         )}
+        {shared && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2"
+            data-testid="party-present-open"
+            data-record-id={h.id}
+            disabled={!live}
+            onClick={() => setPresenting(true)}
+          >
+            Open on screens…
+          </Button>
+        )}
+        <CloseAllButton handoutId={h.id} />
       </div>
       {share.error && (
         <p data-testid="party-share-error" role="alert" className="text-xs text-destructive">
@@ -83,6 +101,7 @@ function DmExtras({ h }: { h: HandoutRecord }) {
         </p>
       )}
       <ShareDialog handout={h} open={sharing} onOpenChange={setSharing} />
+      <PresentDialog handout={h} open={presenting} onOpenChange={setPresenting} />
     </div>
   );
 }
