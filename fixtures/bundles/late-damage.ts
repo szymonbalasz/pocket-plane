@@ -8,5 +8,8 @@ import { defineBundle } from "@server/features/fixtures-adapters/fixture-types";
 export default defineBundle({
   name: "late-damage",
   includes: ["rules-effects"],
-  fixtures: [],
+  fixtures: [
+    // R1: Mira's Light crossbow ruled a hit on Goblin 2, waiting for damage
+    "late-hit-ruled",
+  ],
 });

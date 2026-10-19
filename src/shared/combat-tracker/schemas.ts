@@ -695,10 +695,10 @@ export const ApplyCardTargetsInput = z.strictObject({
   public: z.boolean().optional(),
   /**
    * FR-CBT-94 (sprint 5): the card's damage `rollId` the popup was built from (null = none yet);
-   * another one on the card → `conflict` "Damage just arrived — check and Apply again". Absent =
-   * no check (callers from before sprint 5).
+   * another one on the card → `conflict` "Damage just arrived — check and Apply again". Required
+   * (R1): every caller says which damage it applies.
    */
-  damageRollId: Id.nullable().optional(),
+  damageRollId: Id.nullable(),
 });
 export type ApplyCardTargetsInput = z.input<typeof ApplyCardTargetsInput>;
 export const ApplyHpInput = z.strictObject({

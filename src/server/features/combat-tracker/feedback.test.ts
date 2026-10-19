@@ -26,7 +26,7 @@ import { applyCard, applyHp, undoCommand } from "./hp";
 import { setInitiative, setRemoved } from "./initiative";
 import { endCommand, startCommand } from "./lifecycle";
 import { readEncounter } from "./rows";
-import { combatSetup, eliteBlock } from "./testing";
+import { combatSetup, damageRollIdOf, eliteBlock } from "./testing";
 import { nextTurn, prevTurn } from "./turns";
 
 function started() {
@@ -54,6 +54,7 @@ function started() {
       cardId,
       toHitTotal: p.toHit.total,
       damageTotal: p.damage.total,
+      damageRollId: p.damage.rollId,
       targets: targets.map(([n, hit, multiplier]) => ({ targetId: id(n), hit, multiplier })),
       ...o,
     });
@@ -178,7 +179,12 @@ describe("FR-CBT-34 FR-CBT-36 multi-target apply", () => {
         ]),
       ),
     ).toBe("not_found");
-    const base = { cardId: r.cardId, toHitTotal: 13, damageTotal: 5 };
+    const base = {
+      cardId: r.cardId,
+      toHitTotal: 13,
+      damageTotal: 5,
+      damageRollId: damageRollIdOf(t.card(r.cardId)),
+    };
     const tgt = (targetId: string) => ({ targetId, hit: true, multiplier: "normal" });
     expect(
       code(() => t.run(applyCard.name, { ...base, targets: [tgt(t.id("Mira")), tgt("x")] })),

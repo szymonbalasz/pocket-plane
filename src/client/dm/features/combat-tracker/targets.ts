@@ -25,7 +25,8 @@ export interface TargetCandidate {
 
 export interface TargetRow<C extends TargetCandidate> {
   c: C;
-  source: "selection" | "added";
+  /** "ruled": a ruled hit of the damage step (FR-CBT-89, sprint 5). */
+  source: "selection" | "added" | "ruled";
 }
 
 export function eligibleTargets<C extends TargetCandidate>(
