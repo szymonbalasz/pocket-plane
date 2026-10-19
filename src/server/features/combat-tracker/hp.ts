@@ -165,15 +165,23 @@ export const applyCardWith = (hooks: ApplyHooks) =>
       if (enc.status !== "started") throw conflict("Encounter has ended");
       if (card.state !== "pending") throw conflict("No longer pending");
       // FR-CBT-94 (sprint 5): the DM applies only the damage the popup showed.
-      if (input.damageRollId !== undefined && input.damageRollId !== (p.damage?.rollId ?? null)) {
-        throw conflict(DAMAGE_JUST_ARRIVED);
-      }
-      // FR-CBT-91 (sprint 5): the hit ruling leaves the wire with its card (the row stays).
+      if (input.damageRollId !== (p.damage?.rollId ?? null)) throw conflict(DAMAGE_JUST_ARRIVED);
+      // FR-CBT-91 (sprint 5): a ruled card takes its to-hit from the hit ruling and applies only
+      // ruled hits; the ruling leaves the wire with its card (the row stays).
       const ruling = rulingOfCard(env.tx, card.id);
+      if (ruling) {
+        if (input.toHitTotal !== undefined) throw invalid("Hit already applied: no to-hit total");
+        const hits = new Set(ruling.targets.filter((t) => t.hit).map((t) => t.targetId));
+        input.targets.forEach((t, i) => {
+          if (t.hit && hits.has(t.targetId)) return;
+          const message = "Not a hit target";
+          throw invalid(message, [{ path: ["targets", i], message }]);
+        });
+      }
       // FR-CBT-72: `toHitTotal` iff the card has a to-hit roll; `damageTotal` unless the card has
       // no damage roll and every target misses. A typed total on a card without a damage roll =
       // "DM set" (`damageRolled` null).
-      const { toHitTotal } = input;
+      const toHitTotal = ruling ? ruling.toHitTotal : input.toHitTotal;
       if (p.toHit && toHitTotal === undefined) throw invalid("To-hit total needed");
       if (!p.toHit && toHitTotal !== undefined) throw invalid("This card has no to-hit roll");
       const allMiss = input.targets.every((t) => !t.hit);
@@ -193,7 +201,19 @@ export const applyCardWith = (hooks: ApplyHooks) =>
         }
       });
       // FR-CBT-34: every target active and non-removed, checked before anything is written.
-      const targets = input.targets.map((t) => ({ ...t, c: activeCombatant(env, t.targetId).c }));
+      // FR-CBT-91: a ruled card applies in ruling order: the DM's ruled hits, a `raw 0` row per
+      // ruled miss still in the fight, and a ruled hit the DM dropped resolves as dropped.
+      const plan = ruling
+        ? ruling.targets.flatMap((rt) => {
+            const given = input.targets.find((t) => t.targetId === rt.targetId);
+            if (given) return [{ ...given, c: activeCombatant(env, given.targetId).c }];
+            const c = getCombatant(env.tx, enc.campaignId, rt.targetId);
+            if (rt.hit) return [{ ...rt, c, dropped: true as const }];
+            if (!c.active || c.removed || c.encounterId !== enc.id) return [];
+            return [{ targetId: rt.targetId, hit: false, multiplier: rt.multiplier, c }];
+          })
+        : input.targets.map((t) => ({ ...t, c: activeCombatant(env, t.targetId).c }));
+      const targets = plan.filter((t) => !("dropped" in t));
       const attacker = getCombatant(env.tx, enc.campaignId, p.attackerId);
       // Rolled values come from the card's roll rows, never the client (gems: FR-CBT-32).
       const toHitRoll = p.toHit ? cardRoll(env, p.toHit.rollId) : null;
@@ -266,7 +286,20 @@ export const applyCardWith = (hooks: ApplyHooks) =>
       ];
       const hpChangeIds: string[] = [];
       const outcomes: DamageCardTargetOutcome[] = [];
-      for (const [i, { c: target, ...targetInput }] of targets.entries()) {
+      for (const planned of plan) {
+        if ("dropped" in planned) {
+          const { c, multiplier } = planned;
+          outcomes.push({
+            targetName: c.hidden ? null : c.name,
+            hit: true,
+            multiplier,
+            applied: 0,
+            dropped: true,
+          });
+          continue;
+        }
+        const { c: target, ...targetInput } = planned;
+        const last = planned === targets.at(-1);
         const { hit, multiplier } = targetInput;
         // FR-CBT-82: raw = floor(base × m) + Σ floor(extra_i × m_i); a miss lands nothing.
         const parts = extras.map((x, i) => {
@@ -304,8 +337,9 @@ export const applyCardWith = (hooks: ApplyHooks) =>
         // `applied` = HP lost; temp HP took `absorbed` first (FR-CBTX-15).
         const applied = Math.abs(hp.hpBefore - hp.hpAfter);
         const overkill = Math.max(0, raw - hp.absorbed - hp.hpBefore);
+        // FR-CBT-91: a ruled card's lines are damage-only (Apply hit wrote the to-hit lines).
         const lineToHit =
-          toHitRoll && p.toHit && toHitTotal !== undefined
+          !ruling && toHitRoll && p.toHit && toHitTotal !== undefined
             ? {
                 dice: toHitTotal === toHitRolled ? toHitRoll.total - p.toHit.constant : null,
                 constant: p.toHit.constant,
@@ -366,7 +400,14 @@ export const applyCardWith = (hooks: ApplyHooks) =>
           // FR-MOD-57: + public character-trigger rolls (the others ride in `dmPayload.rollIds`).
           rollIds: [...rollIds, ...hooked.rollIds],
           encounterId: enc.id,
-          public: attacker.hidden || target.hidden ? false : playerCard ? true : input.public,
+          // FR-CBT-91: a ruled miss's line is the DM's record of its `raw 0` row (players read
+          // its miss on the Apply hit line).
+          public:
+            attacker.hidden || target.hidden || (ruling && !hit)
+              ? false
+              : playerCard
+                ? true
+                : input.public,
         });
         const facts: FactsInput = {
           encounterId: enc.id,
@@ -415,8 +456,7 @@ export const applyCardWith = (hooks: ApplyHooks) =>
           hooked.triggerParts,
           damageParts,
         );
-        const rulingGone =
-          ruling && i === targets.length - 1 ? [hitRulingChange(ruling, null)] : [];
+        const rulingGone = ruling && last ? [hitRulingChange(ruling, null)] : [];
         emitWithCards(env, AttackApplied.type, hp, row, facts, [
           entry,
           ...hooked.changes,

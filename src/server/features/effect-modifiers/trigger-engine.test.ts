@@ -223,6 +223,8 @@ describe("FR-MOD-37 offers at the damage roll", () => {
     // The damage `roll` entry carries the same offered part (R1).
     const items = entryOf(t, ticked?.rollId as string)?.payload as RollEntryPayload;
     expect(items[0]?.offered?.[0]).toMatchObject({ value: ticked?.value, label: "Sneak Attack" });
+    // FR-CBT-92 (sprint 5): while the completed card is pending, the owner's next roll is unused.
+    t.run("note.dismiss", { id: toHit });
     const only = t.rollDamage("Thorn", 3);
     expect(only.attached).toBe(false);
     expect(t.card(only.cardId).damage?.triggers?.[0]).toMatchObject({

@@ -252,6 +252,7 @@ describe("FR-MOD-47 rule-triggers leak scan per player", () => {
         cardId,
         toHitTotal: p.toHit?.total,
         damageTotal: p.damage?.total,
+        damageRollId: p.damage?.rollId ?? null,
         targets: [{ targetId: x.k(target)?.id, hit: true, multiplier: "normal", triggers }],
       });
     };

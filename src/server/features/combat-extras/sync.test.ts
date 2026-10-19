@@ -172,6 +172,7 @@ describe("combat-extras over WS", () => {
       cardId,
       toHitTotal: pay.toHit.total,
       damageTotal: pay.damage.total,
+      damageRollId: pay.damage.rollId,
       targets: [{ targetId: mira.id, hit: true, multiplier: "normal" }],
     });
     await nextEvent(p1, "AttackApplied");

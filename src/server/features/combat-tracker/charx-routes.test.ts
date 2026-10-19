@@ -175,6 +175,7 @@ describe("FR-CHARX-24 FR-CBT-16 cbt.attack with a sheet row", () => {
       cardId: r.cardId,
       toHitTotal: p.toHit.total,
       damageTotal: p.damage.total,
+      damageRollId: p.damage.rollId,
       targets: [{ targetId: t.id("Goblin"), hit: true, multiplier: "normal" }],
     });
     const rows = t.s.db.select().from(hpChange).all() as HpChangeRecord[];
