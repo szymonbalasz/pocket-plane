@@ -39,6 +39,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-31 | `e2e/weapon-combat.e2e.ts` fails ~1 run in 20: a natural 1 on the to-hit makes the player's line read "— DM ruled hit …", which the test's regex rejects (found by the BL-16 builder, sprint 5). Cover nat-1 / nat-20 in the assertion or seed the roll | S | weapon-combat e2e | none | combat lock (R slices) | done (#255) |
 | BL-32 | `src/shared/fog-of-war/vision.bench.test.ts` "FOG §12 caps: full-scene re-derive (static once, then per player) ≤ 60 ms" failed once at 897 ms in `main`'s check while four builders ran suites (13 / 13 alone, twice). The "static once" step is a single timed run; give it the BL-28 best-of-N treatment | S | fog bench test | none | — | open |
 | BL-33 | `weapon-combat-sync` leak test flaked once: a random record ID happened to contain "2d6", which the leak scan treats as a leaked damage string (R1 build, sprint 5; 3 / 3 on re-run). Scan for the full leak strings, or seed the IDs | S | combat-tracker test | none | combat slices | open |
+| BL-34 | `e2e/combat2-polish.e2e.ts` "FR-CBT-75 sim-6 N8" (popup opens over its toast or the nearest free spot) fails on `main` when run alone (3 / 3 with `-g`: 260–261 vs < 259; 1 / 3 for the file) and often in full runs; not caused by W1 (found by the W1 builder, sprint 5). Fix the test's geometry assumption or the placement edge case | S | combat-tracker popup placement / e2e | none | R slices on the popup | open |
 
 ## How to add items
 
