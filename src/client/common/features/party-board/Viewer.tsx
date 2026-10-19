@@ -8,6 +8,7 @@ import {
   type HandoutBodyView,
   type HandoutView,
 } from "@shared/party-board/schemas";
+import type { LazyStatus } from "@shared/protocol/lazy";
 import { type ReactNode, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/primitives";
@@ -42,7 +43,7 @@ export function RetryLoad({ onRetry }: { onRetry(): void }) {
 }
 
 /** Both loads' combined state: an error anywhere wins, then loading. */
-export function combined(a: LazyRecords<unknown>, b: LazyRecords<unknown>) {
+export function combined(a: LazyRecords<unknown>, b: LazyRecords<unknown>): LazyStatus {
   if (a.state === "error" || b.state === "error") return "error";
   if (a.state === "loading" || b.state === "loading") return "loading";
   return "ready";

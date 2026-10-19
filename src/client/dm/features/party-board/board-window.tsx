@@ -1,6 +1,7 @@
 // DM `party.board` (FR-PARTY-11, -12): "New handout", every handout incl. unshared prep, newest
 // first; row: thumb, title, share Badge ("Not shared" / "Everyone" / player names), Updated time;
-// row menu Edit, Share…, Unshare (while shared), Delete (inline confirm).
+// row menu Edit, Share…, Unshare (while shared), Delete (inline confirm). *(S5)* "Open on
+// screens…" (shared only) and the "On screen: ‹n›" Badge (FR-PARTY-38).
 import { dmShareLabel } from "@shared/party-board/format";
 import { type HandoutRecord, NOT_SHARED } from "@shared/party-board/schemas";
 import { Button } from "@ui/components/ui/button";
@@ -30,6 +31,7 @@ import { defineWindow } from "@ui/features/play-shell/registry";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { EllipsisVerticalIcon, PlusIcon } from "lucide-react";
 import { useMemo, useState } from "react";
+import { OnScreenBadge, PresentDialog } from "./present";
 import { ShareDialog, usePlayers } from "./ShareDialog";
 import { useIntent, useLive } from "./send";
 
@@ -44,6 +46,7 @@ function RowMenu({ h }: { h: HandoutRecord }) {
   const live = useLive();
   const openWindow = useOpenWindow();
   const [sharing, setSharing] = useState(false);
+  const [presenting, setPresenting] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const unshare = useIntent(LOST_SHARE);
   const del = useIntent(LOST_DELETE);
@@ -108,6 +111,16 @@ function RowMenu({ h }: { h: HandoutRecord }) {
           </DropdownMenuItem>
           {shared && (
             <DropdownMenuItem
+              data-testid="party-present-open"
+              data-record-id={h.id}
+              disabled={!live}
+              onSelect={() => setPresenting(true)}
+            >
+              Open on screens…
+            </DropdownMenuItem>
+          )}
+          {shared && (
+            <DropdownMenuItem
               data-testid="party-handout-unshare"
               disabled={!live || unshare.busy}
               onSelect={() =>
@@ -128,6 +141,7 @@ function RowMenu({ h }: { h: HandoutRecord }) {
         </DropdownMenuContent>
       </DropdownMenu>
       <ShareDialog handout={h} open={sharing} onOpenChange={setSharing} />
+      <PresentDialog handout={h} open={presenting} onOpenChange={setPresenting} />
     </>
   );
 }
@@ -160,7 +174,12 @@ function DmHandouts() {
             key={h.id}
             h={h}
             badge={<ShareBadge label={label(h)} muted={h.sharedWith.mode === "none"} />}
-            sub={<span>Updated {timeOf(h.updatedAt).short}</span>}
+            sub={
+              <>
+                <span>Updated {timeOf(h.updatedAt).short}</span>
+                <OnScreenBadge handoutId={h.id} />
+              </>
+            }
             menu={<RowMenu h={h} />}
           />
         ))}
