@@ -16,7 +16,7 @@ phase: post-mvp-6
 
 ### Sprint 6 at a glance (track IM)
 
-| FR | What | Slice ([ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split)) | Named test ([§13.2](#132-sprint-6-track-im-image-search)) |
+| FR | What | Slice ([ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split)) | Named test ([§13.3](#133-sprint-6-track-im-image-search)) |
 |---|---|---|---|
 | FR-PARTY-47 | Editor attach control + From library: `context="handout"` | IM-3 `build/im-wiring` | `FR-PARTY-47 editor picker searches and tags` |
 | FR-PARTY-48 | Images row above the body (BL-48) | IM-3 | `FR-PARTY-48 images above the fold`; walkthrough IM5 |
@@ -157,7 +157,7 @@ phase: post-mvp-6
 | FR-PARTY-39 | **Editor uploads** [11] [12]: the editor's images strip hosts ASSET's **image attach control** ([FR-ASSET-20–27](assets-pipeline.md#6-functional-requirements)) with `max = 10`, `count` = images in the draft, `owner = "party-editor"`, paste target = the whole editor (title Input and body Textarea included), drop target = the editor. Upload, drop and paste add **attachments** (FR-ASSET-24) to the end of the strip, in order; "From library" keeps the picker. Save unchanged (`assets.require` per id, FR-PARTY-02). A pasted image never changes the text (OQ-PARTY-21). Dedupe is the caller's (seams S5): an id already in the strip (same bytes → same id) is not added again (handout ids stay unique, FR-PARTY-02); hint "Already in this handout" (`party-editor-duplicate`). | Amends FR-PARTY-15 |
 | FR-PARTY-40 | Fixtures `handout-attachment` (an attachment-only image in a new unshared handout h6) and `handout-present-1` (h2 presented to player-1), bundle **`party-s5`** (§13). Patches only (seams S10); `fixtures:reset-load party-s5` works from empty and is deterministic. | ADR-0017 |
 
-### 6.7 Sprint 6: image search in the editor (track IM)
+### 6.8 Sprint 6: image search in the editor (track IM)
 
 | ID | Requirement | Notes |
 |---|---|---|
@@ -394,7 +394,7 @@ Teardown: stop the server, then `fixtures:reset --profile verify`.
 
 Teardown: stop the server, then `fixtures:reset --profile verify`.
 
-### 13.2 Sprint 6 (track IM, image search)
+### 13.3 Sprint 6 (track IM, image search)
 
 Bundle **`image-search`** ([ASSET §13.1](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im)); isolated per worktree as above.
 
@@ -458,7 +458,7 @@ flowchart LR
 
 - Walkthrough S5 runs once P0–P4 are on `main` (each slice walks its own steps first: P1 S5-2–S5-3, P2 S5-1, S5-4–S5-7, P3 S5-8, P4 S5-9).
 
-### 14.3 Sprint 6 build split (track IM)
+### 14.4 Sprint 6 build split (track IM)
 
 Full split: [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split). PARTY part: **IM-3 `build/im-wiring`** (after IM-2): `Editor.tsx` (one `context` prop; the Images block moves above the body, FR-PARTY-48) + DOM tests. No schema, event, §9.9 shared file or dependency. CP1's **Companions** tab (after Loot, OQ-PARTY-24) touches other Party files: no overlap with IM-3 (settled by seams S7). The FR-PARTY-48 item of BL-48 is done by IM-3 (the integrator updates the backlog row).
 
