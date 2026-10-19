@@ -20,6 +20,7 @@ import {
 import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
 import { reportContentHeight } from "./content-heights";
+import { useGrowthCaps } from "./free-area";
 import {
   growsToContent,
   moveRect,
@@ -85,6 +86,7 @@ export function ShellWindow({
   def,
   placed,
   settling,
+  autoMinimised,
   viewport,
   focused,
   dispatch,
@@ -95,6 +97,8 @@ export function ShellWindow({
   placed?: Placed | undefined;
   /** Just placed by a feature open / appearance / auto placement: settle after first layout. */
   settling?: boolean;
+  /** Minimised to make room for another window (FR-SHELL-47; `data-auto-minimised`). */
+  autoMinimised?: boolean;
   viewport: Viewport;
   focused: boolean;
   dispatch: (a: WindowAction) => void;
@@ -105,6 +109,7 @@ export function ShellWindow({
   const grows = growsToContent(win, def);
   const wid = windowId(win.kind, win.instance);
   const needed = useNeededHeight(wid, grows, ref, bodyRef, contentRef);
+  const caps = useGrowthCaps(wid);
   // Measured heights are reported as they are taken; a window that stops growing reports none.
   useEffect(() => {
     if (!grows) reportContentHeight(wid, null);
@@ -118,8 +123,9 @@ export function ShellWindow({
     }
   }, [settling, open, grows, needed, dispatch, win.kind, win.instance]);
   // Render-only fit to the work area, then clamp (FR-SHELL-29, -12), then grow to content
-  // (FR-SHELL-39); a gesture starts here and its end stores the result with the current work area.
-  const rect = windowRect(win, def, viewport, needed);
+  // (FR-SHELL-39), capped by the next window or hard keep-out (FR-SHELL-52); a gesture starts here
+  // and its end stores the result with the current work area.
+  const rect = windowRect(win, def, viewport, needed, caps);
   const id = { kind: win.kind, instance: win.instance };
   const parked = win.state === "minimised";
   const Body = def.component;
@@ -182,6 +188,7 @@ export function ShellWindow({
       data-record-id={wid}
       data-state={win.state}
       data-placed={placed}
+      data-auto-minimised={(parked && autoMinimised) || undefined}
       data-focused={focused}
       aria-label={def.title}
       aria-hidden={parked || undefined}

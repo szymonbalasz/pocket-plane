@@ -363,6 +363,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   // FR-DICE-30: a one-row pinned footer (expression, mode, DM eye, Roll, Options chevron), so
   // the entry list keeps the window's height (FR-SHELL-35). Options open a second row; the
   // "Physical dice on" strip shows below the first row whenever the mode is on (FR-DICE-07).
+  // FR-DICE-39: in the wide log the controls stay left at their narrow widths (input ≤ 320 px).
   return (
     <div className="flex shrink-0 flex-col gap-1.5 border-t pt-1.5">
       <form
@@ -375,7 +376,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
           data-testid="dice-roll-expression"
           aria-label="Dice expression"
           placeholder="1d20+4"
-          className="h-7 w-16 min-w-0 flex-1 font-mono text-sm"
+          className="h-7 w-16 min-w-0 max-w-80 flex-1 font-mono text-sm"
           value={expression}
           disabled={!live}
           onChange={(e) => setExpression(e.target.value)}
@@ -538,7 +539,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
             aria-label="Label"
             placeholder="Label"
             maxLength={60}
-            className="h-7 w-12 min-w-0 flex-1 text-xs"
+            className="h-7 w-12 min-w-0 max-w-60 flex-1 text-xs"
             value={label}
             disabled={!live}
             onChange={(e) => setLabel(e.target.value)}

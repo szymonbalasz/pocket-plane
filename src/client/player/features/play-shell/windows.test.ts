@@ -2,16 +2,23 @@ import { expect, test } from "bun:test";
 import { emptyStore } from "@shared/protocol/store";
 import { freeArea, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
 import { clampRect, type Rect, TOP_BAR_H, workArea } from "@ui/features/play-shell/geometry";
+import { keepOuts } from "@ui/features/play-shell/keep-outs";
 import {
   fitLauncher,
   fittedBarWidth,
   LAUNCHER_GUTTER,
   launcherMetrics,
 } from "@ui/features/play-shell/launcher-fit";
-import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
+import {
+  launcherKinds,
+  launcherSequence,
+  REFERENCE_VIEWPORTS,
+  rectIn,
+} from "@ui/features/play-shell/layout-checks";
+import { defaultLayout, reduce, restoreLayout } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
-import { availableKinds } from "@ui/features/play-shell/registry";
+import { availableKinds, defaultSizeAt } from "@ui/features/play-shell/registry";
 import { toastKeepOut } from "@ui/features/play-shell/toast-region";
 import { coveredArea } from "@ui/features/play-shell/token-boxes";
 import {
@@ -113,8 +120,11 @@ test("FR-SHELL-14 player default layout (#162): sheet top-right, Initiative at a
   }
 });
 
-test("#162 player map-first: battlemap uncovered ≥ 65% at 1440×900 and 1280×720 (sheet, log and Initiative open)", () => {
-  for (const viewport of [WIDE, LAPTOP]) {
+test("FR-SHELL-54 player map-first: battlemap uncovered ≥ 55% at 1440×900, ≥ 65% at 1280×720 (sheet, log and Initiative open)", () => {
+  for (const [viewport, min] of [
+    [WIDE, 0.55],
+    [LAPTOP, 0.65],
+  ] as const) {
     // The `battlemap` fixture's map (20 × 14 cells at 70 px); the gated Initiative counts (combat).
     const map = fittedMapRect({ w: 1400, h: 980 }, viewport);
     const open = openOnDefaults([], viewport);
@@ -123,7 +133,7 @@ test("#162 player map-first: battlemap uncovered ≥ 65% at 1440×900 and 1280×
     console.info(
       `player default layout at ${viewport.w}×${viewport.h} leaves ${(share * 100).toFixed(1)}% of the battlemap uncovered`,
     );
-    expect(share).toBeGreaterThanOrEqual(0.65);
+    expect(share).toBeGreaterThanOrEqual(min);
   }
 });
 
@@ -182,30 +192,176 @@ test("FR-SHELL-34 default layout leaves tokens uncovered: player, the four visib
   }
 });
 
-test("#162 every player window type opens at the left / right edge (1280×720, 1440×900, 1600×900); clear of the open windows out of combat, and in combat where there is room", () => {
-  // Registry-driven. Test-mode windows (fixed walkthrough spots) only need some edge. In combat
-  // at 1280×720 sheet, Initiative and log fill both edge columns: a window may overlap there.
-  const product = availableKinds(playerWindows, emptyStore());
-  for (const viewport of [LAPTOP, WIDE, DESKTOP]) {
+// ---- sprint 5: placement, wide Game log, default layouts (FR-SHELL-45–54, FR-DICE-38) ----
+
+const MID = { w: 1280, h: 800 };
+// Product kinds, gated ones included (Initiative in combat): every kind but the test-mode ones.
+const product = new Set(
+  playerWindows.defs
+    .map((d) => d.kind)
+    .filter((k) => !TEST_KINDS.includes(k) && k !== "asset.test"),
+);
+
+test("FR-SHELL-45 launcher opens never stack (player, 1280×720 / 1280×800 / 1440×900 / 1600×900, in and out of combat): every non-default product kind opened in registry order lands on no open window and not in the toast corner, auto-minimising first (FR-SHELL-47)", () => {
+  const kinds = launcherKinds(playerWindows, product);
+  expect(kinds.length).toBeGreaterThan(3);
+  for (const viewport of REFERENCE_VIEWPORTS) {
     for (const combat of [false, true]) {
-      for (const d of playerWindows.defs) {
-        if (!combat && d.kind === "cbt.initiative") continue;
-        const rects = openOnDefaults([d.kind], viewport, combat);
-        const r = at(rects, d.kind);
-        const edge = touchedEdge(r, viewport);
-        const ok = product.has(d.kind) ? edge === "left" || edge === "right" : edge !== null;
-        const where = `${viewport.w}×${viewport.h}${combat ? " in combat" : ""}`;
-        expect(ok ? "ok" : `${d.kind} opens mid-map at ${where}: x${r.x} y${r.y}`).toBe("ok");
-        if (!product.has(d.kind) || (combat && viewport === LAPTOP)) continue;
-        // `minOpenH` (FR-NOTE-31 ruling): no full-size free slot → that height, on top of others.
-        if (d.minOpenH !== undefined && r.h >= d.minOpenH) continue;
-        for (const b of rects) {
-          if (b.kind === d.kind) continue;
-          expect(overlaps(r, b) ? `${d.kind} overlaps ${b.kind} at ${where}` : "ok").toBe("ok");
+      const available = new Set(product);
+      if (!combat) available.delete("cbt.initiative");
+      const { steps } = launcherSequence(playerWindows, viewport, kinds, { available });
+      for (const s of steps) {
+        const where = `${s.kind} at ${viewport.w}×${viewport.h}${combat ? " in combat" : ""}`;
+        expect(s.rect ? "open" : `${where} not open`).toBe("open");
+        expect(s.hits.length === 0 ? "ok" : `${where} on ${s.hits.join(", ")}`).toBe("ok");
+        for (const k of s.parked) {
+          expect(playerWindows.get(k)?.defaultOpen ? `${where} parked ${k}` : "ok").toBe("ok");
         }
       }
     }
   }
+});
+
+test("FR-SHELL-48 keep-outs (player): the toast corner is hard: auto placement stays out; a feature open stored over it is re-placed, a user open isn't", () => {
+  for (const viewport of REFERENCE_VIEWPORTS) {
+    expect(keepOuts("player", viewport)).toEqual([
+      { id: "toasts", rect: toastKeepOut("player", viewport), kind: "hard" },
+    ]);
+  }
+  const viewport = MID;
+  const corner = toastKeepOut("player", viewport);
+  const ctx = { registry: playerWindows, viewport, available: new Set(product) };
+  let ws = reduce(
+    defaultLayout(playerWindows, viewport),
+    { type: "open", kind: "note.history" },
+    ctx,
+  );
+  expect(overlaps(rectIn(ws, "note.history"), corner)).toBe(false);
+  const over = { x: corner.x, y: corner.y - 100, w: 360, h: 300 };
+  ws = reduce(ws, { type: "setRect", kind: "note.history", rect: over }, ctx);
+  ws = reduce(ws, { type: "minimise", kind: "note.history" }, ctx);
+  const user = reduce(ws, { type: "open", kind: "note.history", by: "user" }, ctx);
+  expect(rectIn(user, "note.history")).toEqual(over);
+  const feature = reduce(ws, { type: "open", kind: "note.history", by: "feature" }, ctx);
+  expect(overlaps(rectIn(feature, "note.history"), corner)).toBe(false);
+});
+
+test("FR-SHELL-50 default layouts (player, token-free): exactly §7's table at the four sizes; Initiative from its top-left line", () => {
+  const table = [
+    [
+      LAPTOP,
+      { x: 948, y: 60, w: 320, h: 338 },
+      { x: 68, y: 484, w: 510, h: 160 },
+      { x: 908, y: 410 },
+    ],
+    [MID, { x: 948, y: 60, w: 320, h: 418 }, { x: 68, y: 564, w: 510, h: 160 }, { x: 908, y: 490 }],
+    [
+      WIDE,
+      { x: 1108, y: 60, w: 320, h: 440 },
+      { x: 68, y: 544, w: 850, h: 280 },
+      { x: 1068, y: 590 },
+    ],
+    [
+      DESKTOP,
+      { x: 1268, y: 60, w: 320, h: 440 },
+      { x: 68, y: 544, w: 850, h: 280 },
+      { x: 1228, y: 590 },
+    ],
+  ] as const;
+  expect(playerWindows.get("cbt.initiative")?.defaultPosition).toEqual({
+    anchor: "top-left",
+    dx: 56,
+  });
+  for (const [viewport, sheet, log, corner] of table) {
+    const layout = defaultLayout(playerWindows, viewport);
+    expect(rectIn(layout, "char.sheet")).toEqual(sheet);
+    expect(rectIn(layout, "dice.log")).toEqual(log);
+    expect(rectIn(layout, "cbt.initiative")).toEqual({ x: 68, y: 60, w: 280, h: 400 });
+    expect(toastKeepOut("player", viewport)).toEqual({ ...corner, w: 356, h: 238 });
+  }
+});
+
+test("FR-SHELL-50 at Start with tokens (player): Initiative appears in the left column above the Game log, y by token cover", () => {
+  for (const viewport of REFERENCE_VIEWPORTS) {
+    const all = new Set(product);
+    const layout = defaultLayout(playerWindows, viewport);
+    const log = rectIn(layout, "dice.log");
+    // A goblin under Initiative's token-free spot.
+    const boxes = [{ x: 120, y: 100, w: 60, h: 60 }];
+    const ctx = { registry: playerWindows, viewport, available: all, avoid: () => boxes };
+    const ws = reduce(layout, { type: "appear", kind: "cbt.initiative" }, ctx);
+    const init = rectIn(ws, "cbt.initiative");
+    expect(init.x).toBe(68);
+    expect(init.y + init.h).toBeLessThanOrEqual(log.y - 12);
+    expect(coveredArea(init, boxes)).toBeLessThanOrEqual(
+      coveredArea(rectIn(layout, "cbt.initiative"), boxes),
+    );
+  }
+});
+
+test("FR-SHELL-51 fitted default (player): the sheet 320×338 at 1280×720 and 320×418 at 1280×800 in its default column (12 px above the toast corner)", () => {
+  for (const [viewport, h] of [
+    [LAPTOP, 338],
+    [MID, 418],
+    [WIDE, 440],
+  ] as const) {
+    const sheet = rectIn(defaultLayout(playerWindows, viewport), "char.sheet");
+    expect(sheet).toMatchObject({ x: viewport.w - 332, h });
+    expect(sheet.y + sheet.h).toBeLessThanOrEqual(toastKeepOut("player", viewport).y - 12);
+  }
+});
+
+test("FR-DICE-38 Game log width (player): 510×160 / 510×160 / 850×280 / 850×280; min 300×160; previous default 340×280", () => {
+  const log = playerWindows.get("dice.log");
+  if (!log) throw new Error("no dice.log");
+  expect(REFERENCE_VIEWPORTS.map((vp) => defaultSizeAt(log, vp))).toEqual([
+    { w: 510, h: 160 },
+    { w: 510, h: 160 },
+    { w: 850, h: 280 },
+    { w: 850, h: 280 },
+  ]);
+  expect(log.minSize).toEqual({ w: 300, h: 160 });
+  expect(log.previousDefaults).toEqual([{ w: 340, h: 280 }]);
+});
+
+test("FR-SHELL-52 growth cap (player): Initiative with 900 px of content stops 12 px above the Game log", () => {
+  for (const viewport of REFERENCE_VIEWPORTS) {
+    const layout = defaultLayout(playerWindows, viewport);
+    const log = rectIn(layout, "dice.log");
+    const measured = new Map([["cbt.initiative:main", 900]]);
+    const open = layout.filter((w) => w.kind !== "cbt.initiative");
+    const init = layout.filter((w) => w.kind === "cbt.initiative");
+    const rects = renderedWindowRects(
+      [...open, ...init],
+      playerWindows,
+      new Set(product),
+      viewport,
+      measured,
+    );
+    const r = rects[rects.length - 1] as Rect;
+    expect(r.y + r.h).toBe(log.y - 12);
+  }
+});
+
+test("FR-SHELL-53 previous defaults (player): a stored 340×280 log takes the viewport's default, written with area", () => {
+  const raw = JSON.stringify({
+    windows: [
+      {
+        kind: "dice.log",
+        instance: "main",
+        state: "open",
+        x: 68,
+        y: 544,
+        w: 340,
+        h: 280,
+        z: 1,
+        area: workArea(WIDE),
+      },
+    ],
+  });
+  const r = restoreLayout(playerWindows, raw, WIDE);
+  expect(r.migrated).toBe(true);
+  expect(r.windows[0]).toMatchObject({ x: 68, y: 544, w: 850, h: 280, area: workArea(WIDE) });
 });
 
 test("#162 player Loot opens at the left edge (shorter, not mid-map)", () => {
@@ -214,7 +370,7 @@ test("#162 player Loot opens at the left edge (shorter, not mid-map)", () => {
   }
 });
 
-test("FR-SHELL-18 player Initiative appearing on Start avoids an open Notifications, at an edge (layout check 7)", () => {
+test("FR-SHELL-18 player Initiative appearing on Start avoids an open Notifications (layout check 7)", () => {
   for (const viewport of [LAPTOP, WIDE, DESKTOP]) {
     const all = new Set(playerWindows.defs.map((d) => d.kind));
     const before = new Set([...all].filter((k) => k !== "cbt.initiative"));
@@ -236,9 +392,7 @@ test("FR-SHELL-18 player Initiative appearing on Start avoids an open Notificati
       .filter((w) => w.state === "open")
       .map((w) => ({ kind: w.kind, ...clampRect(w, viewport) }));
     const init = at(rects, "cbt.initiative");
-    expect(["left", "right"]).toContain(touchedEdge(init, viewport) ?? "none");
-    // 1280×720: sheet, log and Notifications fill both edge columns (see above).
-    if (viewport === LAPTOP) continue;
+    // Sprint 5: an edge, else beside an edge window (FR-SHELL-46); never on a window.
     for (const r of rects) {
       if (r.kind === init.kind) continue;
       expect(overlaps(init, r) ? `cbt.initiative overlaps ${r.kind} at ${viewport.w}` : "ok").toBe(

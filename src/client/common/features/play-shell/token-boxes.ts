@@ -2,12 +2,13 @@
 // toast stack, open placement of new windows; P3 glitches 2 and 13). `coveredArea` is pure;
 // `tokenScreenBoxes` reads the live map canvas.
 
-/** A token's on-screen box, px. */
+/** A token's on-screen box, px; `id` = its token record id when read from the canvas. */
 export interface TokenBox {
   x: number;
   y: number;
   w: number;
   h: number;
+  id?: string;
 }
 
 /** Area of `boxes` under the rect (x, y, w, h), px². */
@@ -49,6 +50,6 @@ export function tokenScreenBoxes(tokenIds: readonly string[] | "all"): TokenBox[
     .filter((n) => want === null || want.has(n.id()))
     .map((n) => {
       const r = n.getClientRect();
-      return { x: box.left + r.x, y: box.top + r.y, w: r.width, h: r.height };
+      return { x: box.left + r.x, y: box.top + r.y, w: r.width, h: r.height, id: n.id() };
     });
 }

@@ -148,13 +148,13 @@ function PlayerInitiativeBody() {
 export const playerInitiativeWindow = defineWindow({
   ...initiativeWindowBase,
   clients: ["player"],
-  // Player right edge, below `char.sheet` (map-first, #162; protocol §24), shrunk (≥ min)
-  // to the room there; none (1280×720) → the left edge, above `dice.log`. Never mid-map: it
-  // auto-opens on Start, over the tokens. Compact: read-only rows.
+  // Player left edge, clear of the tool rail, above `dice.log` (FR-SHELL-50, #256; protocol §24):
+  // token-free 68, 60; at Start auto-placed in the left column, y by token cover. Compact:
+  // read-only rows.
   defaultSize: { w: 280, h: 400 },
   minSize: { w: 240, h: 200 },
-  defaultPosition: { anchor: "bottom-right" },
-  // FR-CBT-77 (G4): grows up to its rows until resized (FR-SHELL-39); "new" dot while minimised
+  defaultPosition: { anchor: "top-left", dx: 56 },
+  // FR-CBT-77 (G4): grows to its rows until resized (FR-SHELL-39, -52); "new" dot while minimised
   // on a round / turn change (players never get `turnCombatantId`).
   growToContent: true,
   activity: (store) => {

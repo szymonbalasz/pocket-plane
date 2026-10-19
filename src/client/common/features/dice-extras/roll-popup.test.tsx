@@ -110,8 +110,8 @@ describe("FR-DICEX-39 roll popup rendering", () => {
     expect(html).toContain("Athletics (adv)");
     expect(html).toMatch(/data-testid="dicex-popup-total"[^>]*>25</);
     expect(html).toContain("natural 20!");
-    // Popup width / height from the toast region's constants (DICEX §7: 280 × 160 max).
-    expect(html).toContain("width:280px;max-height:160px");
+    // Popup width / height from the toast region's constants (FR-DICEX-46/47, seams S2: 320 × 190).
+    expect(html).toContain("width:320px;max-height:190px");
   });
 
   test("FR-DICEX-42 FR-DICEX-41 chips: die shapes in the roller's look, the dropped d20 struck; same count as the throw", () => {
