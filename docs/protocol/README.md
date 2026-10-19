@@ -877,7 +877,7 @@ Built by `build/party-loot` from [party-loot](../specs/party-loot.md) (LOOT, #14
 | `LootEdited` | `loot.edit` | `{entryId, before {text, cp…pp}, after {text, cp…pp}}` | `loot-entry`; `party-pot` iff its value changed |
 | `CoinMoved` | `loot.move` | `{entryId, from, to, text, cp…pp}` | `loot-entry` (before null); `party-pot` iff an end is `party`; `wallet` per character end (before null on its first move) |
 
-**Window** `loot.log` "Party loot" *(S5: **retired**, window type and launcher entry removed from both registries; the same body is the Party window's Loot tab, [FR-LOOT-21](../specs/party-loot.md#6-functional-requirements), [§91](#91-sprint-5-loot-tab-p3))*: both clients, closed by default, `center` 440×560, min 320×320; launcher "Loot" (coins icon, order 60). Body: pot strip, wallets, DM add form, Move form, log newest first ([FR-LOOT-15](../specs/party-loot.md#6-functional-requirements)).
+**Window** `loot.log` "Party loot" *(S5: **retired**, window type and launcher entry removed from both registries; the same body is the Party window's Loot tab, [FR-LOOT-21](../specs/party-loot.md#6-functional-requirements), [§93](#93-sprint-5-loot-tab-p3))*: both clients, closed by default, `center` 440×560, min 320×320; launcher "Loot" (coins icon, order 60). Body: pot strip, wallets, DM add form, Move form, log newest first ([FR-LOOT-15](../specs/party-loot.md#6-functional-requirements)).
 
 **Snapshot budget:** ≤ 100 × 471 B (measured, 200-char text, #163) + pot + ≤ 10 wallets ≈ 50 KB worst, same for DM and players (LOOT §12, CON-44).
 
@@ -2309,7 +2309,56 @@ From [dice-extras](../specs/dice-extras.md) FR-DICEX-49, -50 and [dice-roll-log]
 | Bundle | dice-extras in each client's initial chunks **13.0 KB gz** (cap 15); `RollPopup` **4.8 KB gz** (cap 8) |
 | CON-44 | 0 B: no record, field or frame added. Bundle `dice-polish` DM 21,098 B, P1 13,882 B, P2 10,684 B |
 
-## 91. Sprint 5: Loot tab (P3)
+## 91. Sprint 5: player colours core (K0)
+
+From [campaign-management](../specs/campaign-management.md#9-api--events) FR-CAMP-23–26, -28, -29, [notifications](../specs/notifications.md#9-api--events) FR-NOTE-38 and [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-61 ([ADR-0055](../architecture/adr/0055-player-colour.md); DM gate #256). **Built by `fix/colours-core`**: server, zod, the client helper and theme tokens; the picker is K2, map / log / notification colouring K3 / K4. **No signal change** (0 B: the colour derives from the server-stamped `from`). Data side: [data model §71](../data-model/README.md#71-sprint-5-player-colours-core-k0).
+
+**Intent** (strict zod `SetColorInput`, `@shared/campaign-management/schemas`; command in `src/server/features/campaign-management/colors.ts`)
+
+| Intent | Who | Validation | Result | Source |
+|---|---|---|---|---|
+| `camp.setColor {playerId: Id \| null, color}` *(new; the first CAMP WS intent)* | DM, player | player: `playerId` ≠ own (another player or `null`) → `forbidden`; DM: not a player of the connection's campaign → `not_found`; `color` not one of the 8 keys, or extra keys → `invalid`; same as the current colour → `ack`, no write, no event; taken by the DM colour or another player of the campaign → `conflict` "Taken by ‹name›" (the player's name or "DM"), checked in the transaction (racing picks: one `ack`, one `conflict`) | `{}` | FR-CAMP-25, -26 |
+
+**Record types** (scope, visibility and snapshot as before: every connection of the campaign)
+
+| Type | Change | Source |
+|---|---|---|
+| `campaign` | + `dmColor` (palette key) | FR-CAMP-24, -29 |
+| `player` | + `color` (palette key, never null: the boot backfill runs before the server listens); still no `linkToken` | FR-CAMP-23, -29 |
+| `notification` | + `byRole` (`dm` \| `player` \| null), `byPlayerId` (ID \| null): who caused it; null on older rows and system rows; never in a helper argument or intent (`note.testSend {byPlayerId}` → `invalid`) | FR-NOTE-38 |
+
+- The wire zod reads `color` / `dmColor` as a non-empty string: a client meeting a key it doesn't know (newer server, edited DB) falls back to the role accent instead of failing the frame.
+
+**Domain events** (`src/shared/events/campaign-management.ts`)
+
+| Event | Changes | Player sees | Logged | Undoable |
+|---|---|---|---|---|
+| `PlayerColorSet {playerId: Id \| null, color}` *(new)* | one `player` upsert, or one `campaign` upsert when `playerId` is null (DM colour) | the upsert (every connection of the campaign) | yes | no |
+| `PlayerAdded` | its `player` upsert carries the default `color` (payload unchanged) | as before | yes | no |
+| `CampaignCreated` / `CampaignRenamed` | the `campaign` upsert carries `dmColor` | as before | yes | no |
+| `NotificationCreated` | the `notification` upsert carries `byRole` / `byPlayerId` | per FR-NOTE-06 (unchanged) | yes | no |
+
+**Helpers, hooks and seams**
+
+- Start hook `campaign-management.color-backfill` (`backfillPlayerColors`): fills null `player.color` before the server listens; one transaction, no event, no log row.
+- `notify` (`src/server/features/notifications/helpers.ts`) stamps the causer from `env.actor`; a **system** actor stamps null / null and closes with null closer fields (`resolveNotification`, dismiss). `gameLog.append` (`src/server/features/dice-roll-log/game-log.ts`) **throws** under a system actor (the command fails `internal`, nothing written).
+- Client: `colorOf(store, {role, playerId?})`, `colorKeyOf`, `colorHex`, `useColorOf()` (`@ui/features/campaign-management/colors`); tokens `--player-<key>` in `src/client/common/styles.css`. Palette, `defaultColor` and the contrast / CIEDE2000 checks: `@shared/campaign-management/colors`.
+- Tests: `@shared/campaign-management/colors.test.ts` (FR-CAMP-23 default colour, FR-CAMP-28 palette contrast ×3), server `campaign-management/colors.test.ts` (FR-CAMP-23 default ×2, backfill ×2, backfill rerun; FR-CAMP-24; FR-CAMP-25 permissions, crash; FR-CAMP-26), `stamp.test.ts` (FR-NOTE-38 ×3, FR-DICE-61 system actor), `colours-sync.test.ts` (FR-CAMP-29 ×2 over WS with reconnect, restart and leak scan; FR-NOTE-38 visibility), client `colors.test.tsx` (FR-CAMP-28 colorOf ×4), `db/colours-schema.test.ts` (push), `ws/snapshot-size.test.ts` (CON-44 colours).
+
+## 92. Sprint 5: Add to party from the compendium (P4)
+
+From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–42 (OQ-CMP-34, DM gate #256; seams S5; ruling P #19). **Built by `build/cmp-add-to-party`**: DM client only. No new route, intent, event, record type or registry: the action sends party-board's `party.addItem` ([§44](#44-sprint-3-party-board-core-p-core)). Data side: [data model §72](../data-model/README.md#72-sprint-5-add-to-party-from-the-compendium-p4).
+
+| Piece | Contract |
+|---|---|
+| DM entry actions (`@dm/features/compendium/AddToParty.tsx`, `add-to-party.ts`) | **Add to party** on `item` entries (imported and homebrew) only; the player client mounts no entry actions. Popover: qty Input (default 1; whole number 1–9 999, party-board's `addPayload` rules) + **Add** → `party.addItem {name: clip(entry name, 60), qty, notes: ""}` (Add to sheet's `clip`). Add disabled while qty invalid, not `live` or in flight. `ack` → closes (the `loot-received` toast confirms); `reject` → inline, qty kept; lost intent (`disconnected` / `offline`) → Toast "Connection lost — check the party inventory before adding again". Unshared homebrew → hint "Players will see ‹name› in the party inventory" |
+| Wire | `party.addItem` unchanged: merge into the row with the same key, else insert; the log row and the `loot-received` text use the **party row's** name after a merge (e.g. "Potion of healing ×2" for SRD "Potion of Healing") |
+| Test IDs | `cmp-add-to-party`, `cmp-add-to-party-panel`, `cmp-add-to-party-qty`, `cmp-add-to-party-submit`, `cmp-add-to-party-error`, `cmp-add-to-party-hint` |
+| Fixtures | Bundle `party-cmp` = `party-board` + `cmp-srd-mini` (existing units); nothing new in `session-sim-9` (sim-7 holds both units) |
+| Tests | `add-to-party.test.tsx` (FR-CMP-40 only on item views, name clip; FR-CMP-41 states, hint; FR-CMP-42 not in the player client), `party-cmp.fixtures.test.ts` (FR-CMP-40 merge ×2 → ×4 over real sockets, player → `forbidden`, leak scan live + reconnected) |
+| CON-44 | No record, no snapshot bytes |
+
+## 93. Sprint 5: Loot tab (P3)
 
 From [party-board](../specs/party-board.md#66-sprint-5-loot-tab-present-uploads) FR-PARTY-29, -30 and [party-loot](../specs/party-loot.md#6-functional-requirements) FR-LOOT-21–24 (DM gate #256, OQ-LOOT-17; seams S4; rulings P #20, #21). **Built by `build/party-loot-tab`**: client only; no record type, intent, event, notification or snapshot byte (0 B, PARTY §12). No data-model change.
 

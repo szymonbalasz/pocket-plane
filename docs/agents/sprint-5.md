@@ -44,6 +44,8 @@ DM notes in brackets ([#250](../decisions-log.md)). "sim-8" = the [session-sim-8
 | 2026-10-19 | Merged: compendium image storage (server) [#261](../decisions-log.md); **handout force-open**: Share… → tick "Also open it on the screens of players who newly get it", or the viewer's "Open on screens…" / "Close on all screens" [#263](../decisions-log.md). In `session-sim-9`, Player 1 gets a presented handout popup on load |
 | 2026-10-19 | Merged: **late damage** — in your attack popup, **Apply hit** tells the table "— DM: hit." and waits; the player's damage roll then fills the empty fields (your typed numbers stay) [#264](../decisions-log.md) |
 | 2026-10-19 | Merged: **window layout** — launcher windows no longer stack or land on PC tokens, the Game log is 2.5× wide from 1440×900 (1.5× on laptops), a full screen minimises the oldest launcher window [#265](../decisions-log.md). Try Reset layout, then open Compendium, Party, Encounters |
+| 2026-10-19 | Merged: **dice totals wait for the dice** in tray, popup and log; a fresh tray roll never keeps an old label [#266](../decisions-log.md) |
+| 2026-10-19 | Merged: **Add to party** (Compendium → an item → Add to party, with a quantity) and the player-colour core (colours stored; the picker and map colours come next) [#267](../decisions-log.md) |
 
 ## Check `main` any time (DM)
 

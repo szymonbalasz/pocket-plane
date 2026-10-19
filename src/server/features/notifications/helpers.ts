@@ -55,6 +55,8 @@ export function toNotificationRecord(r: Row): NotificationRecord {
     closedAt: r.closedAt,
     closedByRole: r.closedByRole,
     closedByPlayerId: r.closedByPlayerId,
+    byRole: r.byRole,
+    byPlayerId: r.byPlayerId,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -73,11 +75,14 @@ export function loadNotification(env: CommandEnv, id: string): NotificationRecor
   return toNotificationRecord(row);
 }
 
-/** Who closed it: the actor's role (server-internal counts as the DM) and player. */
-function closer(env: CommandEnv): { role: ActionRole; playerId: string | null } {
-  return env.actor.role === "player"
-    ? { role: "player", playerId: env.actor.playerId }
-    : { role: "dm", playerId: null };
+/**
+ * The person behind the command (FR-NOTE-38): DM → `dm` / null; player → `player` / their id;
+ * the system actor is no person → null / null (neutral everywhere, review #44).
+ */
+function person(env: CommandEnv): { role: ActionRole | null; playerId: string | null } {
+  if (env.actor.role === "player") return { role: "player", playerId: env.actor.playerId };
+  if (env.actor.role === "dm") return { role: "dm", playerId: null };
+  return { role: null, playerId: null };
 }
 
 function isPlayerOf(tx: Tx, playerId: string, campaignId: string): boolean {
@@ -127,9 +132,9 @@ function transition(
   return change;
 }
 
-/** Closed-by fields for a close at the command's clock (FR-NOTE-07). */
+/** Closed-by fields for a close at the command's clock (FR-NOTE-07; system → null, FR-NOTE-38). */
 function closedFields(env: CommandEnv) {
-  const c = closer(env);
+  const c = person(env);
   return { closedAt: env.ctx.clock.iso(), closedByRole: c.role, closedByPlayerId: c.playerId };
 }
 
@@ -194,6 +199,8 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
 
     const id = env.ctx.ids.next();
     const now = env.ctx.clock.iso();
+    // FR-NOTE-38: who caused it, in the same insert; never from an argument.
+    const by = person(env);
     const row = env.tx
       .insert(notification)
       .values({
@@ -210,6 +217,8 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
         actionPlayerId,
         state: actionRole ? "pending" : "info",
         resolution: null,
+        byRole: by.role,
+        byPlayerId: by.playerId,
         createdAt: now,
         updatedAt: now,
       })

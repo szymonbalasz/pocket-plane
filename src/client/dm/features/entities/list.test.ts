@@ -59,7 +59,7 @@ const mira = {
   derivedFromId: null,
 };
 const customGoblin = { ...elite, id: "cg", name: "goblin", derivedFromId: null };
-const players = [{ id: "p1", campaignId: "c", name: "Player 1" }];
+const players = [{ id: "p1", campaignId: "c", name: "Player 1", color: "jade" }];
 
 describe("Creatures list model", () => {
   test("FR-ENT-18 sorted by name ci, custom before imported, then source rank, then id; badges, CR + XP", () => {

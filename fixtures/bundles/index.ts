@@ -25,9 +25,11 @@ import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
 import partyBoard from "./party-board";
+import partyCmp from "./party-cmp";
 import partyLoot from "./party-loot";
 import partyS5 from "./party-s5";
 import physicalDiceCombat from "./physical-dice-combat";
+import playerColours from "./player-colours";
 import ruleTriggers from "./rule-triggers";
 import rulesEffects from "./rules-effects";
 import sceneTools from "./scene-tools";
@@ -90,4 +92,6 @@ export const bundles: readonly Bundle[] = [
   dicePolish,
   cmpImages,
   tplMenu,
+  partyCmp,
+  playerColours,
 ];

@@ -50,6 +50,7 @@ Delivered via the [theme system](../specs/post-mvp/theme-system.md). MVP markup 
 | Texture | `texture.panel`, `texture.parchment` |
 | Game state | `hp.full`, `hp.bloodied`, `hp.down`, `visibility.hidden` |
 | Creature type (canvas) | `creature.<type>`, 14 tokens, values below |
+| Player colour | `player.<key>`, 8 tokens, values below |
 
 ### Creature type colours (proposed)
 
@@ -64,3 +65,17 @@ Token art backdrops ([entities §7](../specs/entities.md#7-uiux-notes), [OQ-ENT-
 | `creature.dragon` | `#b3261e` | 6.54 | | `creature.plant` | `#3b7a32` | 5.23 |
 | `creature.elemental` | `#b4530f` | 5.02 | | `creature.undead` | `#4b4f63` | 8.08 |
 | `creature.fey` | `#2f7d5b` | 4.99 | | `creature.fiend` | `#8c1d40` | 8.88 |
+
+### Player colours (proposed)
+
+Each player's and the DM's colour ([campaign-management §7](../specs/campaign-management.md#7-uiux-notes), FR-CAMP-28; OQ-CAMP-17 decided #256): it marks their laser, pings, templates, drag paths, log names and notification stripes. Tuned from the Okabe–Ito colour-blind-safe set, dark mode; CSS `--player-<key>`; stored as a key, so the theme system may restyle them. WCAG contrast on the app background `#0a0a0a`, the window surface `#171717` and the `#000` casing drawn under every coloured map mark:
+
+| Token | Colour | On `#0a0a0a` | On `#171717` | On casing | | Token | Colour | On `#0a0a0a` | On `#171717` | On casing |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `player.amber` *(DM default)* | `#e69f00` | 8.79 | 7.96 | 9.32 | | `player.yellow` | `#f0e442` | 14.97 | 13.56 | 15.88 |
+| `player.jade` | `#19b98a` | 7.87 | 7.13 | 8.35 | | `player.blue` | `#5b8ff0` | 6.25 | 5.66 | 6.63 |
+| `player.sky` | `#56b4e9` | 8.58 | 7.77 | 9.10 | | `player.vermillion` | `#d55e00` | 5.12 | 4.64 | 5.43 |
+| `player.rose` | `#e08ab8` | 8.01 | 7.25 | 8.50 | | `player.bronze` | `#a07850` | 4.99 | 4.52 | 5.30 |
+
+- Every key ≥ 4.5 : 1 on the window surface (log names are text) and ≥ 5 : 1 on the casing. No white or grey key (selection outline, `visibility.hidden`); no pure red (`accent.danger`: every key ΔE2000 ≥ 15 from it).
+- Colour-blind check (CIEDE2000 between every pair after the Machado 2009 simulation at full severity): normal min 14.1 (sky–blue), deuteranopia 9.7 (sky–blue), protanopia 9.6 (sky–rose), tritanopia 6.8 (sky–jade). Name chips and "by ‹name›" labels back colour up (OQ-CAMP-25). Checked by `FR-CAMP-28 palette contrast`.
