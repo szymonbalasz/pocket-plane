@@ -3,7 +3,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
 import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
-import { COMBATANT_TYPE } from "@shared/combat-tracker/schemas";
+import {
+  COMBATANT_TYPE,
+  ENCOUNTER_ENTRY_TYPE,
+  HIT_RULING_TYPE,
+} from "@shared/combat-tracker/schemas";
 import { GAME_LOG_WINDOW } from "@shared/dice-roll-log/schemas";
 import { EFFECT_PRESET_TYPE } from "@shared/effect-modifiers/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
@@ -251,6 +255,98 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       const src = { db: b.s.db, presence: { list: () => [] } };
       expect(b.s.records.get("game-log-entry")?.snapshot(src, v)).toHaveLength(GAME_LOG_WINDOW);
       expect(dmBuildMs(b.s)).toBeLessThan(Math.max(BUILD_MS, before * 2));
+    });
+
+    // Mutates the scenario, then restores it: after the read-only cases.
+    test("CBT §12 sprint 5 (track R) worst case: 20 rulings × 20 targets, 3 unused rolls per card, 60 trails at the cap, side + publicSide everywhere; ceilings hold", () => {
+      const sql = b.s.db.$client;
+      const enc = sql
+        .query<{ id: string; cid: string; scene: string }, []>(
+          "SELECT id, campaign_id AS cid, scene_id AS scene FROM encounter WHERE status = 'started'",
+        )
+        .get();
+      if (!enc) throw new Error("no started encounter");
+      const before = snapshotSizes(b.s);
+      const typeBytes = (v: ViewerSize, t: string) => v.types[t]?.bytes ?? 0;
+      // (1) One hit ruling per pending card, 20 targets each (FR-CBT-88; the max).
+      const cards = sql
+        .query<{ id: string }, [string]>(
+          "SELECT id FROM notification WHERE kind = 'damage-card' AND state = 'pending' AND json_extract(payload, '$.encounterId') = ?",
+        )
+        .all(enc.id);
+      expect(cards).toHaveLength(HEAVY.pendingCards);
+      const targetIds = sql
+        .query<{ id: string }, [string]>("SELECT id FROM combatant WHERE encounter_id = ? LIMIT 20")
+        .all(enc.id)
+        .map((r) => r.id);
+      const targets = JSON.stringify(
+        targetIds.map((targetId) => ({ targetId, hit: true, multiplier: "double" })),
+      );
+      const insert = sql.query(
+        "INSERT INTO hit_ruling (id, campaign_id, encounter_id, card_id, to_hit_total, to_hit_set, targets, created_at) VALUES (?, ?, ?, ?, -20, 1, ?, '2026-10-19T00:00:00.000Z')",
+      );
+      for (const [i, c] of cards.entries()) {
+        insert.run(`ruling-${String(i).padStart(29, "0")}`, enc.cid, enc.id, c.id, targets);
+      }
+      const ruled = snapshotSizes(b.s);
+      // (2) 3 unused rolls on every damage card (FR-CBT-92): UUID ids, 3-digit totals.
+      const unused = JSON.stringify(
+        [1, 2, 3].map((i) => ({ rollId: `unused-${i}`.padEnd(36, "0"), total: 999 })),
+      );
+      sql.run(
+        `UPDATE notification SET payload = json_set(payload, '$.unusedRolls', json('${unused}')) WHERE kind = 'damage-card'`,
+      );
+      const withUnused = snapshotSizes(b.s);
+      // (3) Every active-scene token at the 20-segment cap (FR-MAP-65): 21 three-digit cells.
+      const trail = JSON.stringify({
+        cells: Array.from({ length: 21 }, (_, i) => [100 + i, 200 + i]),
+      });
+      sql.query("UPDATE token SET trail = ? WHERE scene_id = ?").run(trail, enc.scene);
+      const trailed = snapshotSizes(b.s);
+      // (4) Side + publicSide on every combatant, side on every entry (#252; entries default).
+      sql.run("UPDATE combatant SET side = 'enemy', public_side = 'enemy'");
+      const sided = snapshotSizes(b.s);
+      try {
+        expectUnderCeilings(sided);
+        const [dm0, ...p0] = before as [ViewerSize, ...ViewerSize[]];
+        const [dm1, ...p1] = ruled as [ViewerSize, ...ViewerSize[]];
+        // CBT §12: one ruling ≈ 2 KB, 20 ≈ 40 KB, DM only.
+        expect(dm1.types[HIT_RULING_TYPE]?.rows).toBe(HEAVY.pendingCards);
+        expect(dm1.bytes - dm0.bytes).toBeLessThan(42_000);
+        for (const [i, v] of p1.entries()) expect(v.bytes).toBe((p0[i] as ViewerSize).bytes);
+        const dUnused = (withUnused[0]?.bytes ?? 0) - dm1.bytes;
+        const dTrail = (trailed[0]?.bytes ?? 0) - (withUnused[0]?.bytes ?? 0);
+        const dSide = (sided[0]?.bytes ?? 0) - (trailed[0]?.bytes ?? 0);
+        // Entries already carry `side` (NOT NULL default); combatants gain two values.
+        expect(sided[0]?.types[ENCOUNTER_ENTRY_TYPE]?.rows).toBeGreaterThan(0);
+        expect(dUnused).toBeLessThan(10_000);
+        expect(dTrail).toBeLessThan(16_000);
+        expect(dSide).toBeLessThan(4_000);
+        const pTrail = trailed.slice(1).map((v, i) => v.bytes - (withUnused[i + 1]?.bytes ?? 0));
+        for (const d of pTrail) expect(d).toBeLessThan(2_000);
+        // FR-MAP-66: players get trails on player tokens only.
+        for (const f of snapshotFrames(b.s).filter((x) => x.viewer.role === "player")) {
+          for (const t of (f.records[TOKEN_TYPE] ?? []) as Record<string, unknown>[]) {
+            if (t.ownerPlayerId === null) expect(Object.keys(t)).not.toContain("trail");
+          }
+          const raw = JSON.stringify(f.records);
+          for (const leak of [HIT_RULING_TYPE, "publicSide", "ruling-"]) {
+            expect(raw).not.toContain(leak);
+          }
+        }
+        const players = sided.slice(1).map((v) => v.bytes);
+        console.log(
+          `CBT S5 CON-44: DM ${dm0.bytes} → ${sided[0]?.bytes} B (rulings +${dm1.bytes - dm0.bytes}, unused +${dUnused}, trails +${dTrail}, side +${dSide}); ${1.5 * 1_048_576 - (sided[0]?.bytes ?? 0)} B left of 1.5 MiB; players ${Math.min(...players)}–${Math.max(...players)} B (trails +${Math.min(...pTrail)}–${Math.max(...pTrail)}); hit-ruling type ${typeBytes(dm1, HIT_RULING_TYPE)} B`,
+        );
+      } finally {
+        sql.run("DELETE FROM hit_ruling");
+        sql.run(
+          "UPDATE notification SET payload = json_remove(payload, '$.unusedRolls') WHERE kind = 'damage-card'",
+        );
+        sql.run("UPDATE token SET trail = NULL");
+        sql.run("UPDATE combatant SET side = NULL, public_side = NULL");
+      }
+      expect(snapshotSizes(b.s).map((v) => v.bytes)).toEqual(before.map((v) => v.bytes));
     });
 
     // Mutates the scenario (every token's creatureType): after the read-only cases.
