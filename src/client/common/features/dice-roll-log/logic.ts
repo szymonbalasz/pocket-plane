@@ -9,6 +9,7 @@ import {
   prepareExpression,
   toNotation,
 } from "@shared/dice-roll-log/grammar";
+import type { LineSegment } from "@shared/dice-roll-log/kind-types";
 import type {
   GameLogEntryView,
   ManualEntry,
@@ -75,6 +76,32 @@ export function optionsDirty(o: {
 }
 
 /** FR-DICE-21: entries oldest first by `n`. */
+/** A held line's placeholder for every number (FR-DICE-40, OQ-DICE-30 A). */
+export const HELD_TEXT = "…";
+
+/** A line segment as drawn; `blank` = a die chip drawn without its number (held). */
+export type ShownSegment = LineSegment & { blank?: true };
+
+const MODE_MARK = /^ \((adv|dis)(: .*)?\)$/;
+const NATURAL_MARK = /^ — natural (20!|1)$/;
+
+/**
+ * FR-DICE-40: a held `roll` line, render only (`formatLine` and the stored entry unchanged). Each
+ * die chip blank (its text "…" for copy and screen readers; dropped / offered kept), the total
+ * "…", the "(adv)" / "(dis)" marker "(…)". The natural 20 / 1 marker is left out until the
+ * landing: a "…" only on naturals would tell one before the dice land.
+ */
+export function heldSegments(segments: readonly LineSegment[]): ShownSegment[] {
+  const out: ShownSegment[] = [];
+  for (const s of segments) {
+    if (s.die) out.push({ ...s, text: HELD_TEXT, blank: true });
+    else if (s.style === "total") out.push({ ...s, text: HELD_TEXT });
+    else if (MODE_MARK.test(s.text)) out.push({ ...s, text: ` (${HELD_TEXT})` });
+    else if (!NATURAL_MARK.test(s.text)) out.push(s);
+  }
+  return out;
+}
+
 export const sortEntries = <T extends Pick<GameLogEntryView, "n">>(entries: readonly T[]): T[] =>
   [...entries].sort((a, b) => a.n - b.n);
 

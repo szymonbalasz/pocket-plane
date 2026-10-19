@@ -122,11 +122,18 @@ export interface FreeFields {
 }
 
 /**
- * The `free` request after a palette click: it adds to the staged request, but after a result
- * it starts a new roll with nothing of the old one's label, actor or category (BL-18: a
- * notation's "Notation test" label stuck to the next palette roll).
+ * FR-DICEX-50 (table F): the `free` request after an edit in the tray (a palette die, the
+ * expression or the constant input). While composing it keeps the staged request; after a result
+ * (or over a `control` request) it starts a new roll with nothing of the old one's label, actor or
+ * category (BL-18: a notation's "Notation test" label stuck to the next palette roll). "Roll
+ * again" re-sends the staged request as it is; a new stage (notation, roll bar, Alt+click)
+ * replaces it with its own. Fresh = the tray is in `result`, or nothing `free` is staged.
  */
-export function paletteRequest(
+export const editStartsFresh = (state: string, request: "free" | "control" | null): boolean =>
+  state === "result" || request !== "free";
+
+/** The request `editStartsFresh` decides on: the staged one with the edit, or a fresh one. */
+export function editRequest(
   staged: FreeFields | null,
   expression: string,
   mode: RollMode,

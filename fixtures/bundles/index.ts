@@ -14,6 +14,7 @@ import compendiumFull from "./compendium-full";
 import diceDisplay from "./dice-display";
 import diceExtras from "./dice-extras";
 import diceLog from "./dice-log";
+import dicePolish from "./dice-polish";
 import effectModifiers from "./effect-modifiers";
 import entities from "./entities";
 import fog from "./fog";
@@ -87,6 +88,7 @@ export const bundles: readonly Bundle[] = [
   windowsS5,
   lateDamage,
   partyS5,
+  dicePolish,
   cmpImages,
   tplMenu,
   playerColours,
