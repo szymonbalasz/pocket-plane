@@ -1,17 +1,17 @@
 // DM handout editor in `party.handout` (FR-PARTY-15): title, body with a counter, images strip
-// (add via the asset picker, remove, move left / right), Save / Cancel. Save disabled while
-// invalid (FR-PARTY-02 mirrored), unchanged, not live or in flight; a reject keeps the values; a
-// remote change to the open handout keeps the draft and shows "Changed in another tab".
+// (add via the image attach control: upload, drop, paste anywhere in the editor, From library,
+// FR-PARTY-39; remove, move left / right), Save / Cancel. Save disabled while invalid
+// (FR-PARTY-02 mirrored), unchanged, not live or in flight; a reject keeps the values; a remote
+// change to the open handout keeps the draft and shows "Changed in another tab".
 import type { HandoutBodyRecord, HandoutRecord } from "@shared/party-board/schemas";
 import { HANDOUT_IMAGES_MAX, HANDOUT_TITLE_MAX } from "@shared/party-board/schemas";
 import { Button } from "@ui/components/ui/button";
 import { Input, Label } from "@ui/components/ui/primitives";
 import { ScrollArea } from "@ui/components/ui/scroll-area";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
-import { AssetPickerDialog } from "@ui/features/assets-pipeline/AssetPicker";
+import { ImageAttach } from "@ui/features/assets-pipeline/attach/ImageAttach";
 import { Textarea } from "@ui/features/party-board/controls";
 import {
-  addImage,
   bodyCounter,
   CHANGED_ELSEWHERE,
   draftUnchanged,
@@ -22,8 +22,9 @@ import {
   moveImage,
   removeImage,
 } from "@ui/features/party-board/logic";
-import { ArrowLeftIcon, ArrowRightIcon, ImagePlusIcon, XIcon } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { ArrowLeftIcon, ArrowRightIcon, XIcon } from "lucide-react";
+import { type FormEvent, useRef, useState } from "react";
+import { ALREADY_IN_HANDOUT, attachImage } from "./attach";
 import { useIntent, useLive } from "./send";
 
 export interface EditorProps {
@@ -46,7 +47,11 @@ export function HandoutEditor({ stored, onSaved, onCancel }: EditorProps) {
       : EMPTY_HANDOUT,
   );
   const [startRev] = useState(stored?.header.rev ?? null);
-  const [picking, setPicking] = useState(false);
+  const [duplicate, setDuplicate] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
+  // The strip as of the last add: several uploads can finish before a re-render.
+  const ids = useRef(draft.imageAssetIds);
+  ids.current = draft.imageAssetIds;
   const [touched, setTouched] = useState(false);
   const { busy, error, send } = useIntent(LOST_SAVE);
   const parsed = handoutPayload(draft);
@@ -76,9 +81,17 @@ export function HandoutEditor({ stored, onSaved, onCancel }: EditorProps) {
       if (id) onSaved(id);
     }
   };
+  const attach = (id: string) => {
+    const r = attachImage(ids.current, id);
+    setDuplicate(r.duplicate);
+    if (r.duplicate) return;
+    ids.current = r.ids;
+    set({ imageAssetIds: r.ids });
+  };
   const message = error ?? (!parsed.ok && touched ? parsed.message : null);
   return (
     <form
+      ref={form}
       data-testid="party-editor"
       data-record-id={stored?.header.id}
       onSubmit={submit}
@@ -163,20 +176,21 @@ export function HandoutEditor({ stored, onSaved, onCancel }: EditorProps) {
                   </span>
                 </li>
               ))}
-              <li>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="size-[5.5rem] flex-col gap-1 text-xs"
-                  data-testid="party-editor-add-image"
-                  disabled={draft.imageAssetIds.length >= HANDOUT_IMAGES_MAX}
-                  onClick={() => setPicking(true)}
-                >
-                  <ImagePlusIcon className="size-5" />
-                  Add image
-                </Button>
-              </li>
             </ul>
+            <ImageAttach
+              owner="party-editor"
+              max={HANDOUT_IMAGES_MAX}
+              count={draft.imageAssetIds.length}
+              onAdd={attach}
+              pasteTarget={form}
+              dropTarget={form}
+              disabled={busy}
+            />
+            {duplicate && (
+              <p data-testid="party-editor-duplicate" className="text-xs text-muted-foreground">
+                {ALREADY_IN_HANDOUT}
+              </p>
+            )}
           </div>
         </fieldset>
       </ScrollArea>
@@ -204,13 +218,6 @@ export function HandoutEditor({ stored, onSaved, onCancel }: EditorProps) {
           Save
         </Button>
       </div>
-      <AssetPickerDialog
-        open={picking}
-        onOpenChange={setPicking}
-        title="Add an image"
-        selectLabel="Add"
-        onSelect={(id) => set({ imageAssetIds: addImage(draft.imageAssetIds, id) })}
-      />
     </form>
   );
 }
