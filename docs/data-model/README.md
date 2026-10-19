@@ -1824,7 +1824,7 @@ From [compendium](../specs/compendium.md#8-data-model) FR-CMP-45–49, -53 and [
 
 ## 69. Sprint 5: late damage (R1)
 
-From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-89–94) and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) (FR-MOD-63). **Built by `build/late-damage`**; no schema change (R0's [§66](#66-sprint-5-combat-core-r0) fields, now written). Protocol side: [protocol §86](../protocol/README.md#87-sprint-5-late-damage-r1).
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-89–94) and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) (FR-MOD-63). **Built by `build/late-damage`**; no schema change (R0's [§66](#66-sprint-5-combat-core-r0) fields, now written). Protocol side: [protocol §87](../protocol/README.md#87-sprint-5-late-damage-r1).
 
 | Table / field | Written by | Rule | Source |
 |---|---|---|---|
