@@ -208,7 +208,7 @@ describe("MOD §13 leak scan (R7 combat parts)", () => {
     const { hpChangeIds } = t.applyTo(elite, [
       { name: "Thorn", triggers: [{ triggerId: ma, value: 9 }] },
     ]);
-    expect(lines(t, hpChangeIds[0] as string).players).toContain("+ 9 (DM)");
+    expect(lines(t, hpChangeIds[0] as string).players).toContain("+ 9 slashing (DM)");
 
     const src = sourceOf(t.s);
     const changes = t.events.flatMap((e) => e.event.changes);

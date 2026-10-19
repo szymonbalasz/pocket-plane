@@ -339,4 +339,11 @@ describe("FR-CBT-89 popup render (fresh load: card + ruling only)", () => {
     expect(html).toContain("cbt-popup-target-add");
     expect(html).toContain('data-testid="cbt-popup-waiting-damage"');
   });
+
+  test("FR-CBT-72 a damage-only card's header says what it shows, never 'To-hit step' (R1 note, sprint 5 R2)", () => {
+    const html = render(card({ toHit: null, damage }), []);
+    expect(html).toContain("Damage only, no to-hit");
+    expect(html).not.toContain("To-hit step");
+    expect(render(card(), [])).toContain("To-hit step");
+  });
 });
