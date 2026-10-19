@@ -67,7 +67,7 @@ export const offeredDieLabel = (label: string) => `${label} (on a hit)`;
  * a server-rolled part of a physical roll. FR-MOD-57: each part's dice (the payload's, which
  * every viewer of the roll gets) follow it, `offered: true` (dashed, never struck: whether the
  * offer landed shows only on the outcome line): " (+ 6 radiant Divine Fury (1d6+2: 4 + 2) on a
- * hit)".
+ * hit)". Each value is `numeric` (blanked on a held line, FR-DICE-40).
  */
 export function rollOfferSegments(
   offered: readonly RollOfferView[] | undefined,
@@ -75,10 +75,10 @@ export function rollOfferSegments(
 ): LineSegment[] {
   if (!offered?.length) return [];
   const out: LineSegment[] = [];
-  // Plain text runs merge, so a line without dice reads as one muted segment, as before.
+  // Plain text runs merge (never into a die or a part's value: a held line blanks those).
   const text = (t: string) => {
     const last = out[out.length - 1];
-    if (last && !last.die) last.text += t;
+    if (last && !last.die && !last.numeric) last.text += t;
     else out.push({ text: t, style: "muted" });
   };
   text(" (");
@@ -88,8 +88,8 @@ export function rollOfferSegments(
     // A part players read as "(DM)" shows its value only (rulings B4).
     const dice = partDiceView(named === null ? {} : o, o.value, offeredDieLabel(label), true);
     text(`${i > 0 ? ", " : ""}+ `);
-    if (dice.value.die) out.push({ ...dice.value, style: "muted" });
-    else text(dice.value.text);
+    // The value is rolled (FR-DICE-40: `numeric`, "…" while the line is held).
+    out.push({ ...dice.value, style: "muted", numeric: true });
     text(`${o.type ? ` ${o.type}` : ""} ${label}${o.auto ? ` ${AUTO_PART_TEXT}` : ""}`);
     out.push(...dice.after);
   });
