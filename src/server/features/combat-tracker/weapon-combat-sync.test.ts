@@ -22,7 +22,7 @@ import { closeDb, type Db, openFileDb } from "../../db/client";
 import { player } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
-import { damageRollIdOf } from "./testing";
+import { damageRollIdOf, leaksIn } from "./testing";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
 
@@ -130,7 +130,7 @@ describe("weapon parts over WS (rules-effects)", () => {
     }
     for (const [i, c] of [p1, p2].entries()) {
       const frames = JSON.stringify(c.frames.slice(before[i]));
-      for (const leak of [...LEAKS, ...LINE_LEAKS]) expect(frames).not.toContain(leak);
+      expect(leaksIn(frames, [...LEAKS, ...LINE_LEAKS])).toEqual([]);
     }
 
     // Reconnect: the snapshot carries the same player-safe line, nothing more.
@@ -138,9 +138,9 @@ describe("weapon parts over WS (rules-effects)", () => {
       const again = await h.live(p(name));
       expect(lastLine(again)).toContain("13 slashing + 4 fire (half) damage");
       const snapshot = JSON.stringify(again.frames);
-      for (const leak of LEAKS) expect(snapshot).not.toContain(leak);
+      expect(leaksIn(snapshot, LEAKS)).toEqual([]);
       const line = JSON.stringify(attackEntries(again).at(-1));
-      for (const leak of LINE_LEAKS) expect(line).not.toContain(leak);
+      expect(leaksIn(line, LINE_LEAKS)).toEqual([]);
     }
   });
 });
