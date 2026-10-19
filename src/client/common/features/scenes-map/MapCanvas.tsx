@@ -32,20 +32,22 @@ import { Group, Layer, Stage } from "react-konva";
 import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
 import { FogBlindChip } from "../fog-of-war/BlindChip";
 import { blindStore, isBlind } from "../fog-of-war/blind";
-import { useFreeArea } from "../play-shell/free-area";
-import { workArea } from "../play-shell/geometry";
+import { useContentHeights } from "../play-shell/content-heights";
+import { fitObstacles, renderedWindowRects, useFreeArea } from "../play-shell/free-area";
+import { useViewport } from "../play-shell/hooks";
+import { hardRects, useKeepOuts } from "../play-shell/keep-outs";
+import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
 import { withoutDmOnly } from "../scene-tools/layer-switches";
 import {
-  bestFreeRect,
   type Camera,
   type CameraEvent,
   type CameraMode,
   cameraOn,
   centreOn,
-  contentBox,
+  createAppearanceRefit,
   createResizeRefit,
-  fitContent,
-  footprintBox,
+  type FitVisible,
+  fitScene,
   zoomAt,
 } from "./camera";
 import { CanvasContext, type CanvasContextValue, type EffectiveGrid } from "./canvas-context";
@@ -242,43 +244,65 @@ export function MapCanvas(props: MapCanvasProps) {
   const [fitFloor, setFitFloor] = useState(false);
   /** FR-MAP-58: the free rectangle the last fit used, "x,y,w,h" (`data-fit-rect`). */
   const [fitRect, setFitRect] = useState("");
+  /** FR-MAP-59: every token footprint clear of windows and the toast box (`data-fit-visible`). */
+  const [fitVisible, setFitVisible] = useState<FitVisible>("all");
   const free = useFreeArea();
+  // FR-MAP-59 obstacles: the rendered open windows + this client's toast box (FR-SHELL-48 (a)).
+  const registry = useRegistry();
+  const shellWindows = useShellState((s) => s.windows);
+  const available = useAvailableKinds();
+  const vp = useViewport();
+  const measured = useContentHeights();
+  const regions = useKeepOuts(registry.client);
+  const obstacles = useMemo(() => {
+    const shown = renderedWindowRects(
+      shellWindows,
+      registry,
+      available,
+      vp,
+      measured,
+      hardRects(regions),
+    );
+    return fitObstacles(shown, regions);
+  }, [shellWindows, registry, available, vp, measured, regions]);
   const fitNow = useRef(() => {});
   fitNow.current = () => {
     if (size.w === 0) return;
-    const map = { w: scene.mapWidth, h: scene.mapHeight };
-    const box = contentBox(tokens, grid, map);
-    // PC tokens = tokens with an owner, in this client's store (FR-MAP-46).
-    const pcs = footprintBox(
-      tokens.filter((t) => t.ownerPlayerId !== null),
+    // FR-MAP-58 in the room the toast box leaves (FR-SHELL-48 (a)), then FR-MAP-59; PC tokens =
+    // tokens with an owner, in this client's store (FR-MAP-46).
+    const fit = fitScene(
+      tokens.map((t) => ({ col: t.col, row: t.row, size: t.size, pc: t.ownerPlayerId !== null })),
       grid,
+      { w: scene.mapWidth, h: scene.mapHeight },
+      size,
+      { areas: free.toastFreeAreas, obstacles, windowsOnly: free },
     );
-    const work = workArea(size);
-    // FR-MAP-58: the candidate free rectangle that best keeps the V7 fit priority (PCs, top
-    // row, tokens on screen), then fits the content box at the largest scale.
-    const footprints = tokens.flatMap((t) => footprintBox([t], grid) ?? []);
-    const rect = bestFreeRect(box, free.areas, free.area, map, work, {
-      cell: grid.gridCellSize,
-      pcs,
-      tokens: footprints,
-    });
-    const { floor, ...fit } = fitContent(box, rect, map, work, grid.gridCellSize, pcs);
-    setCam(fit);
-    setFitFloor(floor);
-    setFitRect(`${rect.x},${rect.y},${rect.w},${rect.h}`);
+    setCam({ x: fit.x, y: fit.y, scale: fit.scale });
+    setFitFloor(fit.floor);
+    setFitVisible(fit.visible);
+    setFitRect(`${fit.rect.x},${fit.rect.y},${fit.rect.w},${fit.rect.h}`);
   };
-  /** Applies a camera event; fits now (or next frame, once the window change is laid out). */
-  const onCamera = useCallback((e: CameraEvent, deferred = false) => {
-    const next = cameraOn(cameraModeRef.current, e);
-    cameraModeRef.current = next.mode;
-    setCameraMode(next.mode);
-    if (!next.fit) return;
-    if (!deferred) fitNow.current();
-    else
-      requestAnimationFrame(() => {
-        if (cameraModeRef.current === "fitted") fitNow.current();
-      });
-  }, []);
+  /** FR-MAP-61: the appearance refit, once the frame that caused it reached the canvas. */
+  const [appearanceRefit] = useState(() =>
+    createAppearanceRefit(() => {
+      if (cameraModeRef.current === "fitted") fitNow.current();
+    }),
+  );
+  useEffect(() => () => appearanceRefit.dispose(), [appearanceRefit]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each new token list or window rect set re-arms a pending refit
+  useEffect(() => appearanceRefit.applied(), [appearanceRefit, tokens, obstacles]);
+  /** Applies a camera event; fits now (or later, once the window change is laid out). */
+  const onCamera = useCallback(
+    (e: CameraEvent, deferred = false) => {
+      const next = cameraOn(cameraModeRef.current, e);
+      cameraModeRef.current = next.mode;
+      setCameraMode(next.mode);
+      if (!next.fit) return;
+      if (!deferred) fitNow.current();
+      else appearanceRefit.appearance();
+    },
+    [appearanceRefit],
+  );
   // ---- FR-MAP-12 (sprint 4): the middle mouse pans with any tool, before Konva and the tools ----
   const [panning, setPanning] = useState(false);
   const camRef = useRef(cam);
@@ -975,6 +999,7 @@ export function MapCanvas(props: MapCanvasProps) {
       data-camera={cameraMode}
       data-cell-px={Math.round(cam.scale * grid.gridCellSize)}
       data-fit-floor={fitFloor}
+      data-fit-visible={fitVisible}
       data-fit-rect={fitRect}
       data-loading={loading}
       className="absolute inset-0"
