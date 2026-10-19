@@ -1874,3 +1874,11 @@ From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–
 - **Writes:** the existing `party.addItem` ([§31](#31-sprint-3-party-board-core-p-core)): one `party_item` insert or merge, one `loot_entry {kind: item, world → party}`, one `loot-received` notification, one transaction. The party row keeps a name copy only (no link back to the entry, OQ-PARTY-13; Add to party copies no images, FR-CMP-49).
 - **Fixtures:** bundle `party-cmp` = `party-board` + `cmp-srd-mini` (existing units; SRD "Potion of Healing" merges into `party-items-1`'s "Potion of healing" ×2 → ×4).
 - **Snapshot size** (CON-44): no new record type or field, so +0 B per viewer at a given state; an add writes the same rows as the Inventory tab's Add (`party-item` lazy; the `loot-entry` row as PARTY §12 already budgets).
+
+## 73. Sprint 5: compendium entry images client (C5 UI)
+
+From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-49–52 (DM gate #256). **Built by `build/cmpimg-ui`**: client only; no table, column or record type (writes and reads §68's `compendium_entry.image_asset_ids` through the existing REST routes). Protocol side: [protocol §93](../protocol/README.md#93-sprint-5-compendium-entry-images-client-c5-ui).
+
+- **Client draft:** the homebrew form holds `images: string[]` (slot order, first = main) and sends it as `imageAssetIds` in the whole replace; uploads and pastes become attachments (`asset.listed = false`) at once, whether or not the entry is saved (P's "Never saved" case).
+- **Derived:** the view's main image = `imageAssetIds[0]`; the lightbox index is local UI state.
+- **Fixtures:** none new (`cmp-images`, §68). **Snapshot size** (CON-44): +0 B per viewer (no record; attachments are outside the `asset` record type).
