@@ -1,9 +1,10 @@
 // Dice-extras runtime, the `dicex.tray` companion (mounted while the kind is available, open or
 // not): opens the tray on a stage, drops the request when the tray closes, preloads the 3D chunk
 // at idle (FR-DICEX-37) and turns live `roll` entries into roll popups (FR-DICEX-39) and throws
-// (FR-DICEX-11, -32, -38, -43) in the stores, which run their timelines (FR-DICEX-18, -35). The
-// views that draw them (dice layer, zone) and the popup stack (`RollPopup.tsx`, portalled into the
-// shell's toast region) are lazy chunks loaded at idle too.
+// (FR-DICEX-11, -32, -38, -43) in the stores, which run their timelines (FR-DICEX-18, -35), and
+// holds their numbers until their dice land (FR-DICEX-49). The views that draw them (dice layer,
+// zone) and the popup stack (`RollPopup.tsx`, portalled into the shell's toast region) are lazy
+// chunks loaded at idle too.
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
@@ -22,6 +23,7 @@ import { useOpenWindow, useRegistry, useShellState } from "../play-shell/ShellCo
 import { useRollPopupMount } from "../play-shell/ShellToaster";
 import { popupHost, type ThrowPlan } from "./display";
 import { onRollFrame } from "./frame-handler";
+import { heldOnArrival, landing } from "./landing";
 import { createChunkLoader, dice3d, loadAtIdle, preloadAtIdle, whenChunk } from "./lazy3d";
 import { rollPopups, setThreeDReady, useRollPopups } from "./popups";
 import { is3dDisplay, useDiceSettings } from "./settings";
@@ -153,19 +155,25 @@ export function DiceExtrasRuntime() {
             if (p) rollPopups.fallback(p.id, "handoff", "chips");
             return p !== null;
           };
+          // FR-DICEX-49: its entries stay held through the wait (popups off: nothing else moves).
+          landing.wait(t.entryIds);
           const cancel = whenChunk(dice3d, (ready) => {
             waiting.current = null;
-            if (ready) return start(plan);
-            if (!toChips()) start({ ...plan, arena: "zone", draw: "flat" });
+            if (ready) start(plan);
+            else if (!toChips()) start({ ...plan, arena: "zone", draw: "flat" });
+            landing.unwait(t.entryIds);
           });
           if (waiting.current === null) return; // ready at once: started
           waiting.current = () => {
             cancel();
             toChips();
+            landing.unwait(t.entryIds);
           };
         },
       },
     );
+    // FR-DICEX-49: after the popup and the throw exist, so what nothing presents lands at once.
+    landing.hold(heldOnArrival(entries, cfg.current.display, tabHidden));
   });
 
   // FR-DICEX-23 / -44: slow 3D → flat on this device (switched back in the tray settings).
