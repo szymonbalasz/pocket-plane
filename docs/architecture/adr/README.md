@@ -28,7 +28,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0020](0020-single-active-campaign.md) | Several campaigns, one active per server | accepted |
 | [0021](0021-sync-protocol-conventions.md) | Sync protocol conventions | accepted, C refined by 0041, 0045, D refined by 0036, 0038 |
 | [0022](0022-deterministic-seams.md) | Deterministic IDs, tokens and clock for fixtures and tests | accepted |
-| [0023](0023-asset-access-by-capability-id.md) | Asset access by capability ID | accepted |
+| [0023](0023-asset-access-by-capability-id.md) | Asset access by capability ID | accepted; amended by 0054 |
 | [0024](0024-definition-visibility.md) | Creature definitions DM-only for players; instances carry read-only display copies | accepted (refines 0009), redaction whitelist refined by 0036; refined by 0050 |
 | [0025](0025-play-shell-windows.md) | Feature UI as play-shell windows; layout in browser storage | accepted |
 | [0026](0026-signal-routing.md) | Signal routing: sender stamp, DM-only pull, receiver scene filter | accepted, amended by 0033 |
@@ -59,6 +59,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0051](0051-dice-landing-line.md) | Dice landing: totals wait for the dice, popup dice in a line, tray previews | accepted (#256; amends 0044, 0048) |
 | [0052](0052-static-serving.md) | Static client served precompressed with cache headers | accepted (#256) |
 | [0053](0053-apply-hit.md) | Apply hit: a damage card applied in two steps | accepted (#256; refines 0037) |
+| [0054](0054-compendium-rest-asset-ids.md) | Asset IDs in compendium REST bodies after the entry visibility check | accepted (#256; amends 0023) |
 
 ## Proposing a new ADR
 

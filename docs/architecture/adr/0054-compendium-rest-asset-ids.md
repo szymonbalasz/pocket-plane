@@ -1,6 +1,6 @@
-# 00xx — Asset IDs in compendium REST bodies
+# 0054 — 00xx — Asset IDs in compendium REST bodies
 
-- Status: accepted (DM, sprint-5 gate 1, [#256](../../decisions-log.md); OQ-ASSET-17 A). Integrator numbers it at merge.
+- Status: accepted (DM, sprint-5 gate 1, #256; raised by spec-cmpimg, sprint 5 track C)
 - Date: 2026-10-18
 - Amends: [ADR-0023](0023-asset-access-by-capability-id.md) (Decision, "Secrecy" row)
 - Affects: [assets-pipeline](../../specs/assets-pipeline.md) (FR-ASSET-12, FR-ASSET-35–38), [compendium](../../specs/compendium.md) (FR-CMP-45–53); [ADR-0046](0046-compendium-scope.md) (delivery 1: entries over REST)
