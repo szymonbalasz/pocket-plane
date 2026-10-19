@@ -8,12 +8,13 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Specs D, R, P, C | merged | — | done | — |
-| Spec W (DM changes #256) | spec/s5-windows (w6G) | spec-windows | applying OQ-SHELL-32 C + tool-bar push | merge → W1 |
-| Spec K | spec/s5-colours (w6N) | spec-colours | merging main (conflicts) | merge → K1 |
-| P0 party core | build/party-s5-core (w6T) | build-party-s5-core | building | walkthrough → merge (schema lane 1, first) |
-| R0 combat core | fix/s5-combat-core (w6V) | build-s5-combat-core | building | merge after P0 (schema lane 2) |
-| Queue | — | — | W1, K1 (after their specs), D8, D12, W4, P3, P4 | as slots free (≤ 4 working) |
+| Specs (all six) | merged, complete | — | done (#256); ADRs 0051–0055 | — |
+| P0 party core | build/party-s5-core (w6T) | build-party-s5-core | ready; gates after merging main | merge (schema lane 1, first) |
+| R0 combat core | fix/s5-combat-core (w6V) | build-s5-combat-core | building | merge after P0 (lane 2) |
+| K1 template menu | fix/tpl-menu (w6W) | build-tpl-menu | building (canvas holder #1) | walkthrough |
+| W1 window layout | fix/window-layout (w6X) | build-window-layout | building (frame + toast lock) | walkthrough |
+| D8 dice landing | build/dice-landing (w6Y) | build-dice-landing | building | walkthrough, merge after W1 |
+| Queue | — | — | D12, W4, P3, P4; after P0: P1, P2, C5 core; after R0: R1, R4, K0 | as slots free |
 
 ## Shared-file locks
 
