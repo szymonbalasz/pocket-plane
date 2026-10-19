@@ -2233,3 +2233,16 @@ From [compendium](../specs/compendium.md#9-api--events) FR-CMP-45–49, -53 and 
 | Fixture loader (`src/server/features/fixtures-adapters/loader.ts`) | Records an attachment's `AssetIngested.assetId` (no record change) under type `asset`: `r.id(key, "asset", i)` and the manifest `records` count attachments and listed ingests in order |
 | Fixtures | Unit `cmp-images` (3 attachments; "Moonlit Lantern" shared, "CMP-IMG-SECRET" DM only); bundle `cmp-images`; unit in `session-sim-9` |
 | Tests | `images.test.ts` (FR-CMP-45 over REST, -46, -47, -48 ×2, -49, `cmp.putEntry:before-commit`), `image-leak.test.ts` (`FR-ASSET-36 leak property over REST`: 60 seeded steps, both players), `snapshot-size.test.ts` `FR-CMP-53` (+0 B every viewer) |
+
+## 87. Sprint 5: Add to party from the compendium (P4)
+
+From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–42 (OQ-CMP-34, DM gate #256; seams S5; ruling P #19). **Built by `build/cmp-add-to-party`**: DM client only. No new route, intent, event, record type or registry: the action sends party-board's `party.addItem` ([§44](#44-sprint-3-party-board-core-p-core)). Data side: [data model §69](../data-model/README.md#69-sprint-5-add-to-party-from-the-compendium-p4).
+
+| Piece | Contract |
+|---|---|
+| DM entry actions (`@dm/features/compendium/AddToParty.tsx`, `add-to-party.ts`) | **Add to party** on `item` entries (imported and homebrew) only; the player client mounts no entry actions. Popover: qty Input (default 1; whole number 1–9 999, party-board's `addPayload` rules) + **Add** → `party.addItem {name: clip(entry name, 60), qty, notes: ""}` (Add to sheet's `clip`). Add disabled while qty invalid, not `live` or in flight. `ack` → closes (the `loot-received` toast confirms); `reject` → inline, qty kept; lost intent (`disconnected` / `offline`) → Toast "Connection lost — check the party inventory before adding again". Unshared homebrew → hint "Players will see ‹name› in the party inventory" |
+| Wire | `party.addItem` unchanged: merge into the row with the same key, else insert; the log row and the `loot-received` text use the **party row's** name after a merge (e.g. "Potion of healing ×2" for SRD "Potion of Healing") |
+| Test IDs | `cmp-add-to-party`, `cmp-add-to-party-panel`, `cmp-add-to-party-qty`, `cmp-add-to-party-submit`, `cmp-add-to-party-error`, `cmp-add-to-party-hint` |
+| Fixtures | Bundle `party-cmp` = `party-board` + `cmp-srd-mini` (existing units); nothing new in `session-sim-9` (sim-7 holds both units) |
+| Tests | `add-to-party.test.tsx` (FR-CMP-40 only on item views, name clip; FR-CMP-41 states, hint; FR-CMP-42 not in the player client), `party-cmp.fixtures.test.ts` (FR-CMP-40 merge ×2 → ×4 over real sockets, player → `forbidden`, leak scan live + reconnected) |
+| CON-44 | No record, no snapshot bytes |

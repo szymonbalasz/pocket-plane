@@ -24,6 +24,7 @@ import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
 import partyBoard from "./party-board";
+import partyCmp from "./party-cmp";
 import partyLoot from "./party-loot";
 import partyS5 from "./party-s5";
 import physicalDiceCombat from "./physical-dice-combat";
@@ -86,4 +87,5 @@ export const bundles: readonly Bundle[] = [
   partyS5,
   cmpImages,
   tplMenu,
+  partyCmp,
 ];
