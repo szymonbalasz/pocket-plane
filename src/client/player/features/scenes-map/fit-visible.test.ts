@@ -1,10 +1,5 @@
 import { expect, test } from "bun:test";
-import {
-  fitObstacles,
-  freeArea,
-  freeAreas,
-  renderedWindowRects,
-} from "@ui/features/play-shell/free-area";
+import { fitObstacles, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
 import { keepOuts } from "@ui/features/play-shell/keep-outs";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { toastKeepOut } from "@ui/features/play-shell/toast-region";
@@ -77,7 +72,7 @@ test("FR-MAP-59 every token visible: player sheet + Game log, then + Initiative 
       const obstacles = fitObstacles(windows, keepOuts("player", vp));
       // The players' bottom-right toast box is an obstacle (FR-SHELL-48 (a)).
       expect(obstacles).toContainEqual(toastKeepOut("player", vp));
-      const windowsOnly = { areas: freeAreas(windows, vp), area: freeArea(windows, vp) };
+      const windowsOnly = freeAreas(windows, vp);
       const room = { areas: freeAreas(obstacles, vp), obstacles, windowsOnly };
       const fit = fitScene(SIM8_AMBUSH_PLAYER, GRID, MAP, vp, room);
       const cell = fit.scale * GRID.gridCellSize;

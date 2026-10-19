@@ -855,7 +855,7 @@ describe("FR-MAP-59 every token visible (fitVisible)", () => {
       { ...tok(12, 6), pc: false },
     ];
     const areas = freeAreas([], vp);
-    const room = { areas, obstacles: [], windowsOnly: { areas, area: freeArea([], vp) } };
+    const room = { areas, obstacles: [], windowsOnly: areas };
     const fit = fitScene(tokens, GRID, MAP, vp, room);
     const pcs = footprintBox([tok(2, 7)], GRID);
     const rect = areas[0] as Rect;

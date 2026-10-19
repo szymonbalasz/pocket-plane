@@ -275,7 +275,7 @@ export function MapCanvas(props: MapCanvasProps) {
       grid,
       { w: scene.mapWidth, h: scene.mapHeight },
       size,
-      { areas: free.toastFreeAreas, obstacles, windowsOnly: free },
+      { areas: free.toastFreeAreas, obstacles, windowsOnly: free.areas },
     );
     setCam({ x: fit.x, y: fit.y, scale: fit.scale });
     setFitFloor(fit.floor);

@@ -565,8 +565,8 @@ export interface FitRoom {
   areas: readonly Box[];
   /** Rendered open windows + this client's toast box (FR-SHELL-48 (a)). */
   obstacles: readonly Box[];
-  /** No `areas`: the windows-only candidates and FR-SHELL-34's free area (`useFreeArea`). */
-  windowsOnly: { areas: readonly Box[]; area: Box };
+  /** No `areas`: FR-SHELL-44's windows-only candidates (`useFreeArea().areas`). */
+  windowsOnly: readonly Box[];
 }
 
 /** A scene fit: the camera, the free rectangle step 1 used, and FR-MAP-59's outcome. */
@@ -578,10 +578,11 @@ export interface SceneFit extends Fit {
 /**
  * The whole fit (FR-MAP-44 → -58 → -46, then FR-MAP-59): the candidate free rectangle that best
  * keeps the V7 fit priority, the content box fitted into it; then, if a token footprint is still
- * under a window or the toast box, `fitVisible`. `view` = the canvas (the viewport). The free area
- * is the largest candidate, even below FR-SHELL-34's 25 % share (the DM's toast box takes it there
- * at 1280×720, and the whole work area would put the PCs under the Game log); no candidate (the
- * DM at 1280×720 with Scenes) → the windows-only room, so the PCs still clear every window.
+ * under a window or the toast box, `fitVisible`. `view` = the canvas (the viewport). Candidates:
+ * the toast-free ones; none (the DM at 1280×720 with Scenes) → the windows-only ones. The free area
+ * is the largest candidate, even below FR-SHELL-34's 25 % share (the DM's toast box or a resized
+ * layout takes it there, and the whole work area would put the PCs under the Game log); no
+ * candidate at all → the work area right of the rail.
  */
 export function fitScene(
   tokens: readonly FitToken[],
@@ -598,10 +599,9 @@ export function fitScene(
   const work = workArea(view);
   const footprints = tokens.flatMap((t) => footprintBox([t], grid) ?? []);
   const cell = grid.gridCellSize;
-  const first = room.areas[0];
-  const [areas, area] = first
-    ? [room.areas, first]
-    : [room.windowsOnly.areas, room.windowsOnly.area];
+  const areas = room.areas.length > 0 ? room.areas : room.windowsOnly;
+  const rail = { x: RAIL_CLEAR, y: TOP_BAR_H, w: Math.max(1, work.w - RAIL_CLEAR), h: work.h };
+  const area = areas[0] ?? rail;
   const rect = bestFreeRect(box, areas, area, map, work, { cell, pcs, tokens: footprints });
   const step1 = fitContent(box, rect, map, work, cell, pcs);
   const { visible, ...cam } = fitVisible(

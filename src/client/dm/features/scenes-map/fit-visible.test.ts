@@ -1,10 +1,5 @@
 import { expect, mock, test } from "bun:test";
-import {
-  fitObstacles,
-  freeArea,
-  freeAreas,
-  renderedWindowRects,
-} from "@ui/features/play-shell/free-area";
+import { fitObstacles, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
 import type { Rect } from "@ui/features/play-shell/geometry";
 import { keepOuts } from "@ui/features/play-shell/keep-outs";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
@@ -78,8 +73,7 @@ function dmFit(vp: { w: number; h: number }, scenes: boolean) {
   );
   const windows = renderedWindowRects(ws, dmWindows, all, vp);
   const obstacles = fitObstacles(windows, keepOuts("dm", vp));
-  const windowsOnly = { areas: freeAreas(windows, vp), area: freeArea(windows, vp) };
-  const room = { areas: freeAreas(obstacles, vp), obstacles, windowsOnly };
+  const room = { areas: freeAreas(obstacles, vp), obstacles, windowsOnly: freeAreas(windows, vp) };
   return { windows, obstacles, fit: fitScene(SIM8_AMBUSH_DM, GRID, MAP, vp, room) };
 }
 
