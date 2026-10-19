@@ -13,6 +13,7 @@ import compendiumFull from "./compendium-full";
 import diceDisplay from "./dice-display";
 import diceExtras from "./dice-extras";
 import diceLog from "./dice-log";
+import dicePolish from "./dice-polish";
 import effectModifiers from "./effect-modifiers";
 import entities from "./entities";
 import fog from "./fog";
@@ -80,4 +81,5 @@ export const bundles: readonly Bundle[] = [
   sessionSim8,
   sessionSim9,
   partyS5,
+  dicePolish,
 ];
