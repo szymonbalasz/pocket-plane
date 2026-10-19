@@ -1,4 +1,4 @@
-# 0054 — 00xx — Asset IDs in compendium REST bodies
+# 0054 — Asset IDs in compendium REST bodies
 
 - Status: accepted (DM, sprint-5 gate 1, #256; raised by spec-cmpimg, sprint 5 track C)
 - Date: 2026-10-18
