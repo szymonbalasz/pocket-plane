@@ -1331,6 +1331,7 @@ From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; gate 1 
 | definitionId | ID → Entity \| null | Monster entries: the imported creature definition with the same `(source, sourceKey)` | FR-CMP-03 |
 | shared | bool, default false | Homebrew only | FR-CMP-24 |
 | derivedFromId | ID \| null | Informational, no FK | CMP §8 |
+| imageAssetIds *(S5, [§67](#67-sprint-5-compendium-entry-images-c5-core))* | **JSON leaf** 0–4 asset IDs, default `[]` | Homebrew only; unique; slot order, first = main | FR-CMP-45 |
 | createdAt, updatedAt, importedAt | timestamp ×2, timestamp \| null | `importedAt` on imported rows only | CMP §8 |
 
 Indexes: unique `compendium_entry_source_key` (`source`, `source_key`); unique `compendium_entry_campaign_kind_name` (`campaign_id`, `kind`, `name_key`) where `campaign_id is not null`; `compendium_entry_kind_name`, `compendium_entry_campaign`.
@@ -1761,7 +1762,7 @@ Indexes unique `handout_present_campaign_player` (`campaign_id`, `player_id`), `
 - **Invariant (FR-PARTY-35, tested after every command):** a row exists only for a player of its campaign who can see its handout (`sharedWith`). `party.shareHandout` deletes the losers' rows of that handout, `party.deleteHandout` every row of it, in the same transaction.
 - **Persisted runtime state:** rows stay until closed (player, DM or access loss); a crash keeps committed rows (the next snapshot reopens the popup).
 - **Attachments:** handouts (and, from C5, compendium entries) reference attachments like any asset; `assets.require` ignores `listed`. A re-upload of an attachment's bytes with `listed: true` sets `listed` (FR-ASSET-26); `listed: false` never unlists. Unreferenced attachments stay (no delete, OQ-ASSET-05).
-- **Fixtures:** `handout-attachment` (`ransom-note.svg` as an attachment + h6 "Ransom Note", unshared; its asset id from `fixtureAttachmentId`, since an attachment's ingest has no record change for `r.id`), `handout-present-1` (h2 → player-1); bundle `party-s5` = `party-board` + `cmp-srd-mini` + both; both units also in `session-sim-9`.
+- **Fixtures:** `handout-attachment` (`ransom-note.svg` as an attachment + h6 "Ransom Note", unshared; its asset id from `r.id(key, "asset")`: since C5 core the loader records an attachment's `AssetIngested` id, [§67](#67-sprint-5-compendium-entry-images-c5-core)), `handout-present-1` (h2 → player-1); bundle `party-s5` = `party-board` + `cmp-srd-mini` + both; both units also in `session-sim-9`.
 - **Snapshot size** (CON-44, #256; `con44-s5.test.ts`, `snapshot-size.test.ts` worst case): heavy harness + party-s5 units, a present for every player: `handout-present` DM **1,459 B** at 6 rows (heavy DM 674,871 B, 897,993 B left of 1.5 MiB), **259 B** in each player frame (players max 282,383 B); at the 20-row cap (20 players) DM **4,819 B** (bound 5,100). 50 attachments: every snapshot byte-identical.
 
 ## 66. Sprint 5: combat core (R0)
@@ -1796,3 +1797,18 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-88, -91, 
 - **Derived (not stored):** `sideOf`, `publicSideOf`; the players' combatant `side` (= `publicSideOf`).
 - **Fixtures:** bundle `late-damage` = `rules-effects` (R1 / R3 / R4 append their units).
 - **CON-44** (`src/server/ws/snapshot-size.test.ts`, realistic-heavy harness, every row at its worst): DM 640,788 → 697,783 B (20 rulings × 20 targets +39,659 B; 3 unused rolls on every damage card +4,040 B; 60 active-scene trails at the 20-segment cap +13,020 B; `side` + `publicSide` set on every combatant +276 B over the null baseline); 875,081 B left of 1.5 MiB. Players 256,904–260,336 B (trails +1,302 B each, player tokens only; rulings 0 B).
+
+## 67. Sprint 5: compendium entry images (C5 core)
+
+From [compendium](../specs/compendium.md#8-data-model) FR-CMP-45–49, -53 and [assets-pipeline](../specs/assets-pipeline.md#8-data-model) FR-ASSET-35–38 ([ADR-0054](../architecture/adr/0054-compendium-rest-asset-ids.md); DM gate #256; seams S1, S5, S14). **Built by `fix/cmpimg-core`** (schema lane 1, after P0): one column (drizzle push, push-safe, no backfill). Server only; the form slots and gallery are C5 UI. Protocol side: [protocol §84](../protocol/README.md#84-sprint-5-compendium-entry-images-c5-core).
+
+| Table / column | Change | Default (push-safe) | Visibility | Source |
+|---|---|---|---|---|
+| `compendium_entry.image_asset_ids` | **JSON leaf** 0–4 unique asset IDs, slot order, first = main | `[]` (old rows: none) | the entry's (FR-CMP-14): only in the REST body of a readable entry, stale IDs dropped; never on the WS, never in search summaries | [FR-CMP-45](../specs/compendium.md#6-functional-requirements), -47, -48 |
+
+- **Writes:** only `cmp.putEntry` (whole replace, default `[]`); each ID through `assets.require` in the entry's campaign before any write (listed assets and attachments alike), else `not_found` "Image not found". Imported rows are always `[]` (zod refuses images on an entry with a `source`). Not in `body`: `dataHash`, `searchText` and the per-kind zod are untouched.
+- **Relations:** homebrew entry *—* Asset (same campaign; many entries may share one). No FK: a missing asset row is dropped at read (FR-CMP-47, FR-ASSET-37); no asset delete exists (OQ-ASSET-05), a future one must count entry images as references (OQ-ASSET-19). Deleting an entry never touches its assets.
+- **Derived:** main image = `imageAssetIds[0]`; the delivered list = stored IDs with an asset row in the entry's campaign; the entry `ETag` hashes it (never the raw IDs).
+- **Fixture loader:** an attachment's `AssetIngested` (no record change) is recorded under type `asset`, so `r.id(key, "asset", i)` and the load manifest's `records` list attachments and listed assets in ingest order (P0's `fixtureAttachmentId` removed).
+- **Fixtures:** `cmp-images` (`fixtures/assets/items/{lantern, lantern-lit, relic}.svg`, 256 × 256, as attachments; "Moonlit Lantern" shared `[lantern, lantern-lit]`, "CMP-IMG-SECRET" DM only `[relic]`); bundle `cmp-images` = `compendium` + `cmp-images`; the unit also in `session-sim-9`.
+- **Snapshot size** (CON-44, `snapshot-size.test.ts`): heavy harness + 20 homebrew entries × 4 attachment images (half shared): every viewer **+0 B** (DM 642,270 B, 930,594 B left of 1.5 MiB; players max 258,498 B).
