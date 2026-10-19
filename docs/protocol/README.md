@@ -2308,3 +2308,39 @@ From [dice-extras](../specs/dice-extras.md) FR-DICEX-49, -50 and [dice-roll-log]
 | Test IDs | `dice-log-entry` + `data-landed`; `dice-log-die` and `dicex-die` drop `data-value` while held; `dicex-tray-total` + `data-landed`; `dicex-popup` + `data-landed` (every entry); `dicex-popup-row` + `data-landed` |
 | Bundle | dice-extras in each client's initial chunks **13.0 KB gz** (cap 15); `RollPopup` **4.8 KB gz** (cap 8) |
 | CON-44 | 0 B: no record, field or frame added. Bundle `dice-polish` DM 21,098 B, P1 13,882 B, P2 10,684 B |
+
+## 91. Sprint 5: player colours core (K0)
+
+From [campaign-management](../specs/campaign-management.md#9-api--events) FR-CAMP-23–26, -28, -29, [notifications](../specs/notifications.md#9-api--events) FR-NOTE-38 and [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-61 ([ADR-0055](../architecture/adr/0055-player-colour.md); DM gate #256). **Built by `fix/colours-core`**: server, zod, the client helper and theme tokens; the picker is K2, map / log / notification colouring K3 / K4. **No signal change** (0 B: the colour derives from the server-stamped `from`). Data side: [data model §71](../data-model/README.md#71-sprint-5-player-colours-core-k0).
+
+**Intent** (strict zod `SetColorInput`, `@shared/campaign-management/schemas`; command in `src/server/features/campaign-management/colors.ts`)
+
+| Intent | Who | Validation | Result | Source |
+|---|---|---|---|---|
+| `camp.setColor {playerId: Id \| null, color}` *(new; the first CAMP WS intent)* | DM, player | player: `playerId` ≠ own (another player or `null`) → `forbidden`; DM: not a player of the connection's campaign → `not_found`; `color` not one of the 8 keys, or extra keys → `invalid`; same as the current colour → `ack`, no write, no event; taken by the DM colour or another player of the campaign → `conflict` "Taken by ‹name›" (the player's name or "DM"), checked in the transaction (racing picks: one `ack`, one `conflict`) | `{}` | FR-CAMP-25, -26 |
+
+**Record types** (scope, visibility and snapshot as before: every connection of the campaign)
+
+| Type | Change | Source |
+|---|---|---|
+| `campaign` | + `dmColor` (palette key) | FR-CAMP-24, -29 |
+| `player` | + `color` (palette key, never null: the boot backfill runs before the server listens); still no `linkToken` | FR-CAMP-23, -29 |
+| `notification` | + `byRole` (`dm` \| `player` \| null), `byPlayerId` (ID \| null): who caused it; null on older rows and system rows; never in a helper argument or intent (`note.testSend {byPlayerId}` → `invalid`) | FR-NOTE-38 |
+
+- The wire zod reads `color` / `dmColor` as a non-empty string: a client meeting a key it doesn't know (newer server, edited DB) falls back to the role accent instead of failing the frame.
+
+**Domain events** (`src/shared/events/campaign-management.ts`)
+
+| Event | Changes | Player sees | Logged | Undoable |
+|---|---|---|---|---|
+| `PlayerColorSet {playerId: Id \| null, color}` *(new)* | one `player` upsert, or one `campaign` upsert when `playerId` is null (DM colour) | the upsert (every connection of the campaign) | yes | no |
+| `PlayerAdded` | its `player` upsert carries the default `color` (payload unchanged) | as before | yes | no |
+| `CampaignCreated` / `CampaignRenamed` | the `campaign` upsert carries `dmColor` | as before | yes | no |
+| `NotificationCreated` | the `notification` upsert carries `byRole` / `byPlayerId` | per FR-NOTE-06 (unchanged) | yes | no |
+
+**Helpers, hooks and seams**
+
+- Start hook `campaign-management.color-backfill` (`backfillPlayerColors`): fills null `player.color` before the server listens; one transaction, no event, no log row.
+- `notify` (`src/server/features/notifications/helpers.ts`) stamps the causer from `env.actor`; a **system** actor stamps null / null and closes with null closer fields (`resolveNotification`, dismiss). `gameLog.append` (`src/server/features/dice-roll-log/game-log.ts`) **throws** under a system actor (the command fails `internal`, nothing written).
+- Client: `colorOf(store, {role, playerId?})`, `colorKeyOf`, `colorHex`, `useColorOf()` (`@ui/features/campaign-management/colors`); tokens `--player-<key>` in `src/client/common/styles.css`. Palette, `defaultColor` and the contrast / CIEDE2000 checks: `@shared/campaign-management/colors`.
+- Tests: `@shared/campaign-management/colors.test.ts` (FR-CAMP-23 default colour, FR-CAMP-28 palette contrast ×3), server `campaign-management/colors.test.ts` (FR-CAMP-23 default ×2, backfill ×2, backfill rerun; FR-CAMP-24; FR-CAMP-25 permissions, crash; FR-CAMP-26), `stamp.test.ts` (FR-NOTE-38 ×3, FR-DICE-61 system actor), `colours-sync.test.ts` (FR-CAMP-29 ×2 over WS with reconnect, restart and leak scan; FR-NOTE-38 visibility), client `colors.test.tsx` (FR-CAMP-28 colorOf ×4), `db/colours-schema.test.ts` (push), `ws/snapshot-size.test.ts` (CON-44 colours).

@@ -62,6 +62,7 @@ function stampPublic(env: CommandEnv, cid: string, input: AppendInput): boolean 
 }
 
 export function append(env: CommandEnv, input: AppendInput): RecordChange {
+  if (env.actor.role === "system") throw new Error("gameLog.append: the system actor never logs"); // FR-DICE-61
   const cid = campaignOf(env.actor);
   const def = getLogKind(input.kind);
   // FR-DICE-18: an unregistered kind or a bad payload is a programming error → `internal`.
