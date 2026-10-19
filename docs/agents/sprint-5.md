@@ -56,6 +56,7 @@ DM notes in brackets ([#250](../decisions-log.md)). "sim-8" = the [session-sim-8
 | 2026-10-19 | Merged: **popup dice in a line at full size** (10d6 in two rows, 20d6 → 11 + "+9") [#276](../decisions-log.md) |
 | 2026-10-19 | Merged: **ally switch** — Initiative row menu → Set as ally / enemy (Secret tick for a hidden betrayal), Friendly switch in the encounter builder; and **small-cell badges** ("+N" instead of nothing; red when it hides Dying) [#277](../decisions-log.md) |
 | 2026-10-19 | Merged: **3D dice in the tray** before you roll (the dice you staged, highest face up) [#278](../decisions-log.md) |
+| 2026-10-19 | Merged: **combat trails** the same on every screen after a reload [#279](../decisions-log.md) |
 
 ## Check `main` any time (DM)
 
