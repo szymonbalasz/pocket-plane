@@ -3,10 +3,14 @@
 // signal field, ack hint or record (0 bytes). `pathShown` is a draw rule over frames already
 // routed (FR-MAP-53); the blocked step comes from the SCN wall hint in the drag probe's ack
 // (FR-MAP-55). Combat trails are drawn from the token's stored `trail` (sprint 5, FR-MAP-65–67):
-// no client trail state. DOM-free so it runs under `bun test`.
+// no client trail state. Path and trail colour = the token owner's, at draw time (FR-MAP-70).
+// DOM-free so it runs under `bun test`.
+import type { RecordStore } from "@shared/protocol/store";
 import type { Segment } from "@shared/scene-tools/schemas";
 import { dragPath } from "@shared/scenes-map/geometry";
 import type { TokenTrail, TokenView } from "@shared/scenes-map/schemas";
+import type { ReadVar } from "../campaign-management/colors";
+import { byAttr, markColor, ownerOf } from "./mark-colors";
 
 export interface Cell {
   col: number;
@@ -24,6 +28,19 @@ export function pathShown(
 ): boolean {
   if (!t) return false;
   return client === "dm" || t.ownerPlayerId !== null;
+}
+
+/**
+ * FR-MAP-70 (OQ-MAP-52 A): a token's path and trail colour (+ Konva `by`) = its owner's, no owner
+ * → the DM's; whoever drags it. Resolved per draw, so a recolour needs no resend (FR-MAP-73).
+ */
+export function pathPaint(
+  store: Pick<RecordStore, "you" | "records">,
+  t: Pick<TokenView, "ownerPlayerId"> | undefined,
+  read?: ReadVar,
+): { color: string; by: string } {
+  const who = ownerOf(t ?? { ownerPlayerId: null });
+  return { color: markColor(store, who, read), by: byAttr(who) };
 }
 
 /** "c,r c,r …": the `cells` attr of `map-drag-path`. */

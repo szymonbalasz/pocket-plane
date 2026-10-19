@@ -1,8 +1,11 @@
 // Pointers layer: drag target + movement indicator (FR-MAP-15/22/37), ruler (FR-MAP-22), DM box
 // select (FR-MAP-32), ping pulses (FR-MAP-23) and laser trails (FR-MAP-24). Reads the canvas'
 // pointer store, so 20 laser frames/s re-render only this layer. Ruler and movement distances
-// follow the campaign's diagonal rule (FR-SCN-30). Konva names: `map-move-label` (attr `tone`),
-// `map-ruler-label`, `map-select-box`, `map-ping`, `map-laser`.
+// follow the campaign's diagonal rule (FR-SCN-30). Pings and trails draw in their sender's player
+// colour over a dark casing, with a name chip on others' (FR-MAP-68, -69, -72); ruler, drag target
+// and box stay `primary` (OQ-MAP-53 A). Konva names: `map-move-label` (attr `tone`),
+// `map-ruler-label`, `map-select-box`, `map-ping`, `map-laser` (id = mark id; attrs `color`, `by`),
+// `map-casing` (id = its mark's id), `map-pointer-chip` (id = mark id; attr `by`).
 import { distanceFt } from "@shared/scene-tools/geometry";
 import { cellToPx } from "@shared/scenes-map/geometry";
 import { useEffect, useState } from "react";
@@ -11,9 +14,9 @@ import { useStore } from "zustand";
 import { diagonalRuleIn, rulerText } from "../../scene-tools/diagonal-rule";
 import { useCanvas } from "../canvas-context";
 import { movedFtOf } from "../decorations";
-import { LASER_FADE_MS } from "../laser";
+import { CASING_COLOR, CASING_NAME, casingWidth } from "../mark-colors";
 import { type MoveTone, movementIndicator } from "../movement";
-import { PING_MS, prune } from "../pointers";
+import { pingMark, prune, type SignalMark, trailMark } from "../pointers";
 import { tokenOverlays } from "../token-overlays";
 
 /** Re-renders every animation frame while `active`. */
@@ -85,6 +88,52 @@ function MoveLabel({
   return <DistanceLabel name="map-move-label" x={x} y={y} text={m.text} tone={m.tone} />;
 }
 
+/**
+ * FR-MAP-68 / -69: the sender's name on a dark pill, in their colour (11 px). `side` = where the
+ * pill sits from (x, y): `below` centred under it (ping), `right` up-right of it (laser head).
+ */
+function NameChip({
+  m,
+  x,
+  y,
+  side,
+}: {
+  m: SignalMark;
+  x: number;
+  y: number;
+  side: "below" | "right";
+}) {
+  const { cam } = useCanvas();
+  if (m.chip === null) return null;
+  const gap = 8 / cam.scale;
+  return (
+    <Label
+      name="map-pointer-chip"
+      id={m.id}
+      by={m.by}
+      x={side === "below" ? x : x + gap}
+      y={side === "below" ? y + 1.5 * gap : y - gap}
+      opacity={m.opacity}
+    >
+      <Tag
+        fill={CASING_COLOR}
+        opacity={0.85}
+        cornerRadius={8 / cam.scale}
+        pointerDirection={side === "below" ? "up" : "left"}
+        pointerWidth={0}
+        pointerHeight={0}
+      />
+      <Text
+        text={m.chip}
+        fontSize={11 / cam.scale}
+        padding={3 / cam.scale}
+        fill={m.color}
+        name="map-pointer-chip-text"
+      />
+    </Label>
+  );
+}
+
 export function PointersLayer() {
   const { grid, cam, colors, pointers, store } = useCanvas();
   const st = useStore(pointers);
@@ -98,7 +147,6 @@ export function PointersLayer() {
     const p = cellToPx(grid, c.col, c.row);
     return { x: p.x + (n * cell) / 2, y: p.y + (n * cell) / 2 };
   };
-  const accent = (role: "dm" | "player") => (role === "dm" ? colors.dmAccent : colors.playerAccent);
 
   return (
     <Group listening={false} name="pointers-layer">
@@ -151,36 +199,68 @@ export function PointersLayer() {
         </Group>
       )}
       {st.pings.map((p) => {
-        const t = Math.min(1, Math.max(0, (now - p.at) / PING_MS));
+        const m = pingMark(p, store, now);
+        const radius = (10 + 50 * m.t) / cam.scale;
         return (
-          <Circle
-            key={p.id}
-            name="map-ping"
-            x={p.x}
-            y={p.y}
-            radius={(10 + 50 * t) / cam.scale}
-            stroke={accent(p.role)}
-            strokeWidth={3 / cam.scale}
-            opacity={1 - t}
-          />
+          <Group key={p.id}>
+            <Circle
+              name={CASING_NAME}
+              id={m.id}
+              x={p.x}
+              y={p.y}
+              radius={radius}
+              stroke={CASING_COLOR}
+              strokeWidth={casingWidth(3, cam.scale)}
+              opacity={m.opacity}
+            />
+            <Circle
+              name="map-ping"
+              id={m.id}
+              color={m.color}
+              by={m.by}
+              x={p.x}
+              y={p.y}
+              radius={radius}
+              stroke={m.color}
+              strokeWidth={3 / cam.scale}
+              opacity={m.opacity}
+            />
+            <NameChip m={{ ...m, opacity: 1 }} x={p.x} y={p.y} side="below" />
+          </Group>
         );
       })}
       {Object.values(st.trails).map((tr) => {
-        const last = tr.points.at(-1);
-        const age = last ? now - last.at : LASER_FADE_MS;
+        const m = trailMark(tr, store, now);
+        const points = tr.points.flatMap((p) => [p.x, p.y]);
+        const head = tr.points.at(-1);
         return (
-          <Line
-            key={tr.key}
-            name="map-laser"
-            points={tr.points.flatMap((p) => [p.x, p.y])}
-            stroke={accent(tr.role)}
-            strokeWidth={4 / cam.scale}
-            lineCap="round"
-            lineJoin="round"
-            opacity={Math.max(0, 1 - age / LASER_FADE_MS)}
-            shadowColor={accent(tr.role)}
-            shadowBlur={8 / cam.scale}
-          />
+          <Group key={tr.key}>
+            <Line
+              name={CASING_NAME}
+              id={m.id}
+              points={points}
+              stroke={CASING_COLOR}
+              strokeWidth={casingWidth(4, cam.scale)}
+              lineCap="round"
+              lineJoin="round"
+              opacity={m.opacity}
+            />
+            <Line
+              name="map-laser"
+              id={m.id}
+              color={m.color}
+              by={m.by}
+              points={points}
+              stroke={m.color}
+              strokeWidth={4 / cam.scale}
+              lineCap="round"
+              lineJoin="round"
+              opacity={m.opacity}
+              shadowColor={m.color}
+              shadowBlur={8 / cam.scale}
+            />
+            {head && <NameChip m={m} x={head.x} y={head.y} side="right" />}
+          </Group>
         );
       })}
     </Group>
