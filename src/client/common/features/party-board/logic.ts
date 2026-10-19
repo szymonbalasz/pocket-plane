@@ -18,7 +18,8 @@ import { IntentRejected } from "../../sync/connection";
 export const PARTY_BOARD_KIND = "party.board";
 export const PARTY_HANDOUT_KIND = "party.handout";
 
-export const PARTY_TABS = ["handouts", "inventory"] as const;
+// FR-PARTY-29: Loot right of Inventory.
+export const PARTY_TABS = ["handouts", "inventory", "loot"] as const;
 export type PartyTab = (typeof PARTY_TABS)[number];
 
 export const EMPTY_HANDOUTS = "No handouts yet";

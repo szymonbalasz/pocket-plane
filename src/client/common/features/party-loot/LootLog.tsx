@@ -1,4 +1,4 @@
-// Window `loot.log` body, both clients (FR-LOOT-15–19, FR-PARTY-25/27): pot strip with the DM's
+// Party window Loot tab body (FR-LOOT-21; was window `loot.log`), both clients (FR-LOOT-15–19, FR-PARTY-25/27): pot strip with the DM's
 // Split… dialog, wallets, DM add form, Move form, log (newest first) with DM Edit on loot rows and
 // item rows. Reads the synced store; every change is an intent (`loot.add`, `loot.edit`,
 // `loot.move`, `loot.split`). DM-only parts render from `you.role`.
@@ -610,7 +610,7 @@ interface CharacterRecordLike extends CharacterRef {
   kind: string;
 }
 
-/** The whole `loot.log` body. */
+/** The whole Loot tab body (FR-LOOT-21). */
 export function LootLog() {
   const you = useSync((s) => s.store.you);
   const live = useSync((s) => s.state === "live");

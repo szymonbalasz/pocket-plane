@@ -116,13 +116,43 @@ export function createSeenState(mem: PartyMemory) {
   };
 }
 
-let page: { memory: PartyMemory; seen: ReturnType<typeof createSeenState> } | null = null;
+/**
+ * One per page: the bound key's tab (FR-PARTY-11), reactive so `openPartyTab` (FR-PARTY-30)
+ * switches an open board as a click would.
+ */
+export function createTabState(mem: PartyMemory) {
+  const state = createStore<{ key: string | null; tab: PartyTab }>(() => ({
+    key: null,
+    tab: "handouts",
+  }));
+  return {
+    state,
+    /** Binds the viewer's key (campaign + viewer); reads its stored tab once per key. */
+    bind(key: string | null) {
+      if (state.getState().key === key) return;
+      state.setState({ key, tab: key ? mem.readTab(key) : "handouts" });
+    },
+    /** A tab click or `openPartyTab`: shown at once, stored for the key. */
+    choose(key: string | null, tab: PartyTab) {
+      state.setState({ key, tab });
+      if (key) mem.writeTab(key, tab);
+    },
+  };
+}
+
+export type TabState = ReturnType<typeof createTabState>;
+
+let page: {
+  memory: PartyMemory;
+  seen: ReturnType<typeof createSeenState>;
+  tabs: TabState;
+} | null = null;
 
 /** The page's memory (browser `localStorage`), made on first use. */
 export function partyMemory() {
   if (!page) {
     const memory = createPartyMemory();
-    page = { memory, seen: createSeenState(memory) };
+    page = { memory, seen: createSeenState(memory), tabs: createTabState(memory) };
   }
   return page;
 }

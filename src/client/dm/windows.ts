@@ -13,7 +13,6 @@ import { creaturesWindow } from "./features/entities/creatures-window";
 import { notificationsHistoryWindow } from "./features/notifications/history-window";
 import { dmPartyBoardWindow } from "./features/party-board/board-window";
 import { dmHandoutWindow } from "./features/party-board/handout-window";
-import { dmLootLogWindow } from "./features/party-loot/loot-window";
 import { playersWindow } from "./features/play-shell/players-window";
 import { scenesWindow } from "./features/scenes-map/scenes-window";
 
@@ -29,7 +28,6 @@ const windows: WindowDef[] = [
   dmCharSheetWindow, // char.sheet (character-sheet, FR-CHAR-15)
   dmInitiativeWindow, // cbt.initiative (combat-tracker, CBT §7)
   encountersWindow, // cbt.encounters (combat-tracker, CBT §7)
-  dmLootLogWindow, // loot.log (party-loot, FR-LOOT-15)
   dmTrayWindow, // dicex.tray (dice-extras, FR-DICEX-01)
   dmPartyBoardWindow, // party.board (party-board, FR-PARTY-11)
   { ...dmHandoutWindow, restoreOpen: false }, // party.handout (party-board, FR-PARTY-14; FR-SHELL-42)

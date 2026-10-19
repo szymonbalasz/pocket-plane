@@ -11,7 +11,7 @@ export const partyBoardWindowBase = {
   title: "Party",
   defaultSize: { w: 440, h: 560 },
   minSize: { w: 340, h: 360 },
-  // Left edge, clear of the tool rail, as `loot.log` (#162).
+  // Left edge, clear of the tool rail (#162; where `loot.log` was before FR-PARTY-29).
   defaultPosition: { anchor: "top-left", dx: 56 },
   // No full-size slot at 1280×720 (above `dice.log`): open this tall on top, not shrunk.
   minOpenH: 400,
