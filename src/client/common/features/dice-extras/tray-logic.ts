@@ -1,4 +1,6 @@
-// Tray composing and display (FR-DICEX-04, -05, -08 e), and the throw zone (FR-DICEX-17). Pure.
+// Tray composing and display (FR-DICEX-04, -05, -08 e, -48), and the throw zone (FR-DICEX-17).
+// Pure.
+import type { DieShape } from "@shared/dice-extras/throw";
 import {
   constantOf,
   type DiceTerm,
@@ -9,6 +11,9 @@ import {
 } from "@shared/dice-roll-log/grammar";
 import type { DmRollActorRef, RollCategory, RollMode } from "@shared/dice-roll-log/schemas";
 import type { Rect } from "../play-shell/geometry";
+import type { ChunkState } from "./lazy3d";
+import { type DisplaySetting, is3dDisplay } from "./settings";
+import type { TrayExtraDice } from "./tray-extras";
 
 export const PALETTE = [4, 6, 8, 10, 12, 20, 100] as const;
 
@@ -47,6 +52,65 @@ export function chipsOf(terms: readonly Term[], mode: RollMode = "normal"): Tray
     for (let i = 0; i < t.count; i++) out.push({ faces: t.faces, term, sign: t.sign });
   });
   return out;
+}
+
+/** A `trayExtras` entry's dice as chips (`term` = the entry's index), one per die. */
+export const extraChips = (dice: readonly TrayExtraDice[]): TrayChip[] =>
+  dice.flatMap((d, term) =>
+    Array.from({ length: d.count }, () => ({ faces: d.faces, term, sign: d.sign })),
+  );
+
+/** FR-DICEX-48 (OQ-DICEX-36 A): more dice than this → one die per term with "×N". */
+export const GROUP_OVER = 12;
+
+/** One die of the tray preview; `group` = N when it stands for N dice of its term. */
+export interface PreviewDie extends TrayChip {
+  group?: number;
+}
+
+/** One die per chip, or (grouped) one per run of a term's chips with their count. */
+export function previewDice(chips: readonly TrayChip[], grouped: boolean): PreviewDie[] {
+  if (!grouped) return [...chips];
+  const out: PreviewDie[] = [];
+  for (const c of chips) {
+    const last = out[out.length - 1];
+    if (last && last.term === c.term && last.tag === c.tag) last.group = (last.group ?? 1) + 1;
+    else out.push({ ...c });
+  }
+  return out;
+}
+
+/** A 3D still cell: a mesh shape, a d100 part. */
+export type StillPart = `${DieShape}` | "d10:tens" | "d10:units";
+
+const MESH: readonly number[] = [4, 6, 8, 10, 12, 20];
+
+/** The still cells of a die (d100 = tens + units d10s); null → a round `DieShape` chip. */
+export function stillParts(faces: number): StillPart[] | null {
+  if (faces === 100) return ["d10:tens", "d10:units"];
+  return MESH.includes(faces) ? [`d${faces}` as DieShape] : null;
+}
+
+export function parseStill(
+  s: string | undefined,
+): { shape: DieShape; part?: "tens" | "units" } | null {
+  const [shape, part] = (s ?? "").split(":");
+  if (!MESH.some((f) => `d${f}` === shape)) return null;
+  const d = shape as DieShape;
+  return part === "tens" || part === "units" ? { shape: d, part } : { shape: d };
+}
+
+/**
+ * FR-DICEX-48 (table C): 3D stills when the effective display draws 3D (so not `flat` / `off`,
+ * auto-flat, no WebGL, failed chunk) and the chunk is ready; else `DieShape` chips.
+ */
+export function trayPreviewMode(display: DisplaySetting, chunk: ChunkState, failed: boolean) {
+  return is3dDisplay(display) && chunk === "ready" && !failed ? "3d" : "chips";
+}
+
+/** The tray asks for the chunk only in a 3D display (FR-DICEX-22: never in `flat` / `off`). */
+export function trayWantsChunk(display: DisplaySetting, loader: { load(): void }): void {
+  if (is3dDisplay(display)) loader.load();
 }
 
 /** The mode the tray previews: its own (toggle / keys) first, else the request's `previewMode`. */

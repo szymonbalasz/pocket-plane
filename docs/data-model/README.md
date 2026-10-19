@@ -1689,7 +1689,7 @@ From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-52–55. **Built b
 | Piece | Kind | Contents | Visibility | Source |
 |---|---|---|---|---|
 | Drag path | derived per render | `dragPath(from, to)` from the drag state (dragger) or the preview (receivers) | `pathShown`: DM every token's; players player tokens they hold | FR-MAP-52, -53 |
-| Trails *(Sprint 5: removed, [§80](#80-sprint-5-combat-trails-drawn-from-the-token-r3))* | client memory, per canvas (`previews.trails`) | `TrailState {key: "encounter:round:turn" \| null, byToken: tokenId → Cell[][]}` | as the path | FR-MAP-54 |
+| Trails *(Sprint 5: removed, [§81](#81-sprint-5-combat-trails-drawn-from-the-token-r3))* | client memory, per canvas (`previews.trails`) | `TrailState {key: "encounter:round:turn" \| null, byToken: tokenId → Cell[][]}` | as the path | FR-MAP-54 |
 | Known cells | client memory, per canvas | tokenId → the stored cell before the next frame (the move's start) | — | FR-MAP-54 |
 
 - **Lost on reload or reconnect** (snapshot) mid-turn: accepted (FR-MAP-54).
@@ -1943,9 +1943,21 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-98–104 (
 
 - **Fixtures:** `enc-friendly` (bundles `late-damage`, `session-sim-9`). **Snapshot size** (CON-44): +0 B (no new field; §66 measured `side` + `publicSide` on every combatant and entry).
 
-## 80. Sprint 5: combat trails drawn from the token (R3)
+## 80. Sprint 5: tray preview (D10)
 
-From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-65–67 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-97. **Built by `fix/combat-trails`**: no table, column, record type or payload change (R0 added `token.trail`, §66). Protocol side: [protocol §102](../protocol/README.md#102-sprint-5-combat-trails-drawn-from-the-token-r3).
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-48. **Built by `build/dice-tray-3d`**: no table, column, record type or payload change. Protocol side: [protocol §102](../protocol/README.md#102-sprint-5-tray-preview-d10).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Tray preview still | client memory: the tray's own 2D canvas (`dicex-tray-preview`) | redrawn from the staged request and the viewer's look on every change; never stored or sent | [FR-DICEX-48](../specs/dice-extras.md#6-functional-requirements) |
+| Waiting still | client memory (`renderer.ts` stage `stills`, keyed by tray canvas) | at most one per tray, only while a throw's loop runs; emptied by the loop's next frame or the tray's unmount | FR-DICEX-48 |
+
+- **Fixtures:** no new unit. Walkthrough step 29 walks on `dice-polish` (player-1 Crimson metal, `dicex-looks`); `session-sim-9` needs nothing extra.
+- **Snapshot size** (CON-44): 0 B added.
+
+## 81. Sprint 5: combat trails drawn from the token (R3)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-65–67 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-97. **Built by `fix/combat-trails`**: no table, column, record type or payload change (R0 added `token.trail`, §66). Protocol side: [protocol §103](../protocol/README.md#103-sprint-5-combat-trails-drawn-from-the-token-r3).
 
 - **Removed:** the client trail state (§61's `previews.trails`); each client draws `token.trail` from its store.
 - **Derived (not stored):** a trail's segments (`dragPath` per cell pair) and its colour (today's tint; K3: the owner's `colorOf` at draw time).
