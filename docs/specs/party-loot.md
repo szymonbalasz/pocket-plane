@@ -11,7 +11,7 @@ phase: post-mvp-5
 
 > **Sprint 3 revision (DM gate 1, #207; owned by [party-board](party-board.md), seams S8):** loot entries gain kind `item` and a `qty` column (party inventory moves are logged here), a DM `loot.split` (⌊coin / n⌋ per denomination, remainder stays in the pot), item rows in `loot.log`, and `loot-received` also from `party.addItem` (amends FR-LOOT-13). Party-board builders edit this feature's folders by orchestrator assignment. The rest of this spec is unchanged.
 >
-> **Sprint 5 revision (track P, DM [#250](../decisions-log.md) [4]; owned by [party-board](party-board.md)):** the loot view moves into a **Loot** tab of the Party window, right of Inventory ([FR-PARTY-29](party-board.md#66-sprint-5-loot-tab-present-uploads)); the "Coin: open Party loot" button goes; the `loot.log` window retires (pick, OQ-LOOT-17). New FR-LOOT-21–24; amended FR-LOOT-14, -15, OQ-LOOT-07. Records, intents, events and the snapshot are unchanged (0 B, [PARTY §12](party-board.md#12-performance--bandwidth)).
+> **Sprint 5 revision (track P, DM [#250](../decisions-log.md) [4]; owned by [party-board](party-board.md)):** the loot view moves into a **Loot** tab of the Party window, right of Inventory ([FR-PARTY-29](party-board.md#66-sprint-5-loot-tab-present-uploads)); the "Coin: open Party loot" button goes; the `loot.log` window retires (decided #256, OQ-LOOT-17). New FR-LOOT-21–24; amended FR-LOOT-14, -15, OQ-LOOT-07. Records, intents, events and the snapshot are unchanged (0 B, [PARTY §12](party-board.md#12-performance--bandwidth)).
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
@@ -237,7 +237,7 @@ A **bold** option is the suggested pick unless the row says Decided.
 |---|---|---|---|---|
 | ~~OQ-LOOT-01, 02, 05, 06~~ | ~~Entry shape; correction; coin total; loot notification~~ | **Decided (#146):** text + optional coins; DM **edits** (logged, "Edited"), no void; running total in MVP (spec: derived); `loot-received` info to all, toast + history | — | post-mvp/party-board, notifications |
 | OQ-LOOT-03, 04 | 03: Can players add loot entries? 04: Should an entry reference an item entity? | 03: **No in MVP** (additive `addedByPlayerId` later) / yes. 04: **No MVP column; nullable `itemEntityId` later** / reserve the column now | no · owner: spec-party-loot | post-mvp/party-board, post-mvp/world-builder |
-| OQ-LOOT-07 | Is `loot.log` open by default? | **Closed; the toast and the launcher open it** / open for players *(S5: superseded by FR-LOOT-21 if OQ-LOOT-17 A holds: the Party window's rules apply)* | no · owner: spec-party-loot | play-shell |
+| OQ-LOOT-07 | Is `loot.log` open by default? | **Closed; the toast and the launcher open it** / open for players *(S5: superseded by FR-LOOT-21, #256: the Party window's rules apply)* | no · owner: spec-party-loot | play-shell |
 | OQ-LOOT-08 | Gems (DM award, per character) and the loot log? | **Gems own their counters; a gem award may also call `partyLoot.add`; no MVP field** / gems as loot entries | no · owner: gems | post-mvp/gems |
 | ~~OQ-LOOT-09~~ | ~~Glossary terms~~ | **Decided (#152):** glossary amends **Party loot** and adds **Loot entry**, **Party pot**, **Wallet**, **Coin move** | — | glossary |
 | ~~OQ-LOOT-10~~ | ~~Does the tracker record spending, and is there a guard?~~ | **Decided (#150):** signed coins; no below-zero guard; negatives shown with "−"; the DM edits typos | — | post-mvp/party-board |
@@ -247,7 +247,7 @@ A **bold** option is the suggested pick unless the row says Decided.
 | ~~OQ-LOOT-14~~ | ~~Coin from / to outside the party~~ | **Decided (#152):** DM only, via a move with a `world` end ("Outside the party") | — | — |
 | ~~OQ-LOOT-15~~ | ~~Moves: notify? editable?~~ | **Decided (#152):** no notification; not editable, corrected by a reverse move | — | — |
 | ~~OQ-LOOT-16~~ | ~~Wallet on `char.sheet`?~~ | **Decided (#152):** not in MVP; the loot window shows wallets | — | character-sheet |
-| OQ-LOOT-17 | *(S5, DM)* After the Loot tab [4], does the separate "Party loot" window stay? | **A: no, it retires (window, launcher button); every "open loot" link opens Party on Loot** — one place, as "moves" reads; a stored layout drops it / B: keep both — two routes to the same view, an extra launcher button. *How (settled by seams S4):* with A, P3 deletes LOOT's own `loot.log` line from both `windows.ts` (the owning feature may delete its own line from an append-only registry) | yes (gate) | play-shell |
+| OQ-LOOT-17 | *(S5)* After the Loot tab [4], does the separate "Party loot" window stay? | **Decided (#256): no, it retires (window and launcher entry); every "open loot" link opens Party on Loot** (FR-LOOT-21–23). Rejected: ~~B keep both~~. *How (settled by seams S4):* P3 deletes LOOT's own `loot.log` line from both `windows.ts` (the owning feature may delete its own line from an append-only registry) | — | play-shell |
 | OQ-LOOT-18 | *(S5)* **character-sheet-full**: the wallet link (FR-LOOT-23) is a CHARX file | **Settled by seams S4:** P3 changes the one call (`openPartyTab("loot")`), granted; no sheet UI change | no · settled | character-sheet-full |
 
 ## 16. Out of scope
