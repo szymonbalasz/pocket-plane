@@ -14,6 +14,7 @@ export default defineBundle({
     // W: windows + layout
     // D: dice polish
     // D10: no new unit (the tray preview walks on sim-7's `dicex-looks`)
+    // D11: no new unit (the popup line walks on any roll; DICEX §13 uses `dice-polish`)
     // R: late damage, trails, ally side
     // R1: a ruled card in its damage step (Mira → Goblin 2, waiting for damage)
     "late-hit-ruled",

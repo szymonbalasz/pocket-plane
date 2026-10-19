@@ -109,8 +109,13 @@ test("FR-DICEX-39 FR-DICEX-40 FR-DICEX-41 a sheet roll pops on every client in i
 
   // Hover keeps it past its 6 s; a click fronts the Game log at the entry, highlighted.
   const popup2 = popupOf(p2, entryId);
-  await popup2.hover();
-  await p2.waitForTimeout(6_500);
+  // A slow software-GL device's "3D was slow" toast lifts the stack after the throw has gone and
+  // drops it again when it leaves; the 98 px card (FR-DICEX-47) can slide from under a still
+  // pointer, so the pointer follows the card for the whole wait.
+  for (let t = 0; t < 6_500; t += 500) {
+    await popup2.hover();
+    await p2.waitForTimeout(500);
+  }
   await expect(popup2).toHaveAttribute("data-state", "rest");
   // Real timers: the highlight's native setTimeout must run unbound (FR-DICE-37, 2 s).
   const errors: string[] = [];
