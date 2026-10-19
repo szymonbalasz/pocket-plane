@@ -215,7 +215,8 @@ function TokenLabel({ t, cut, full }: { t: TokenView; cut: boolean; full: boolea
         attrs={{ cut: isCut, full }}
       />
       {row.badges.map((p) => {
-        // BL-04: the "+N" for badges that don't fit above the name; hover lists them.
+        // BL-04: the "+N" for badges that don't fit above the name; hover lists them (BL-35:
+        // squeezed below one row's room, in a smaller font).
         if (p.id === MORE_BADGE_ID) {
           return (
             <Pill
@@ -223,7 +224,7 @@ function TokenLabel({ t, cut, full }: { t: TokenView; cut: boolean; full: boolea
               {...p}
               name={p.id}
               id={t.id}
-              font={row.font}
+              font={p.font ?? row.font}
               fill={colors.muted}
               fillOpacity={1}
               color={colors.foreground}

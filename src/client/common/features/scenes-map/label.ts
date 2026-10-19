@@ -82,6 +82,8 @@ export interface BadgePill extends Pill {
   full?: string;
   /** FR-MAP-57: an icon chip (`ICON_CHIP_PX` square, centred on its row); `text` is "". */
   compact?: boolean;
+  /** BL-35: a squeezed "+N" smaller than the name's font; absent = the row's font. */
+  font?: number;
 }
 
 export interface LabelRow {
@@ -112,6 +114,40 @@ export function namePill(
 /** Konva name of the "+N" badge standing for the badges that don't fit (BL-04). */
 export const MORE_BADGE_ID = "map-token-badge-more";
 
+/** BL-35: a squeezed row narrower than this on screen (px) isn't drawn. */
+export const SQUEEZE_MIN_PX = 6;
+
+/**
+ * BL-35: the badges in one row `h` high and no wider than `side`, at x = 0: the first as an icon
+ * chip (`chip` square) + "+N" for the rest, else "+N" alone; `full` = the hidden badges' labels.
+ */
+function squeeze(
+  badges: readonly { id: string; label: string }[],
+  side: number,
+  h: number,
+  chip: number,
+  measure: Measure,
+): BadgePill[] {
+  const font = h / PILL_PER_FONT;
+  const gap = font * GAP_PER_FONT;
+  const more = (hidden: readonly { label: string }[]): BadgePill => {
+    const text = `+${hidden.length}`;
+    const width = Math.min(side, measure(text, font, true) + 2 * font * PAD_PER_FONT);
+    const full = hidden.map((b) => b.label).join(", ");
+    return { id: MORE_BADGE_ID, text, x: 0, y: 0, width, height: h, full, font };
+  };
+  const [first, ...rest] = badges;
+  if (!first) return [];
+  const lead = { id: first.id, text: "", x: 0, y: (h - chip) / 2, width: chip, height: chip };
+  if (rest.length === 0) return [{ ...lead, compact: true }];
+  const plus = more(rest);
+  if (chip + gap + plus.width > side) return [more(badges)];
+  return [
+    { ...lead, compact: true },
+    { ...plus, x: chip + gap },
+  ];
+}
+
 /**
  * The label of a token whose footprint is `side` map px (= footprint × cell): the name pill
  * centred on the footprint and vertically on its bottom edge (`y = side`), no wider than
@@ -119,7 +155,9 @@ export const MORE_BADGE_ID = "map-token-badge-more";
  * centred on the footprint and never wider than it, the first row right above the name, more rows
  * stacking upwards; FR-MAP-57: a badge whose text doesn't fit the footprint is an icon chip.
  * Rows never rise into the band where the upper neighbour's name sits (half a pill below the
- * footprint's top edge); what doesn't fit collapses into a last "+N" badge.
+ * footprint's top edge); what doesn't fit collapses into a last "+N" badge. BL-35: with room for
+ * one row and only "+N" left in it, the first badge stays as an icon chip if both fit; with room
+ * for none, the badges squeeze into one smaller row centred between the two names.
  */
 export function labelRow(
   name: string,
@@ -157,6 +195,20 @@ export function labelRow(
   if (row.length > 0) rows.push(row);
   // Rows whose top stays at or below the upper neighbour's name band (pillH / 2).
   const fit = Math.max(0, Math.floor((y - m.pillH / 2) / (m.pillH + m.gap) + 1e-9));
+  const result = (out: BadgePill[]): LabelRow => ({
+    font: m.font,
+    name: { text, x: (side - nameW) / 2, y, width: nameW, height: m.pillH },
+    badges: out,
+  });
+  // BL-35: no row fits: squeeze into the band between the two names (side - pillH), keeping a
+  // tenth of it clear, centred on the footprint.
+  if (fit === 0 && badges.length > 0) {
+    const h = Math.min(m.pillH, (side - m.pillH) * 0.9);
+    if (h * scale < SQUEEZE_MIN_PX) return result([]);
+    const out = squeeze(badges, side, h, h, measure);
+    const w = out.reduce((n, b) => Math.max(n, b.x + b.width), 0);
+    return result(out.map((b) => ({ ...b, x: b.x + (side - w) / 2, y: b.y + (side - h) / 2 })));
+  }
   let hidden: (typeof rows)[number] = [];
   if (rows.length > fit) {
     hidden = rows.slice(fit).flat();
@@ -190,11 +242,17 @@ export function labelRow(
       x += b.width + m.gap;
     }
   });
-  return {
-    font: m.font,
-    name: { text, x: (side - nameW) / 2, y, width: nameW, height: m.pillH },
-    badges: out,
-  };
+  // BL-35: one row, holding only "+N": keep the first badge as an icon chip (no taller than the
+  // row) beside a "+N" for the rest, if both fit the footprint.
+  if (fit === 1 && out.length === 1 && out[0]?.id === MORE_BADGE_ID && badges.length > 1) {
+    const sq = squeeze(badges, side, m.pillH, Math.min(chip, m.pillH), measure);
+    if (sq.length === 2) {
+      const w = sq.reduce((n, b) => Math.max(n, b.x + b.width), 0);
+      const by = y - (m.pillH + m.gap);
+      return result(sq.map((b) => ({ ...b, x: b.x + (side - w) / 2, y: b.y + by })));
+    }
+  }
+  return result(out);
 }
 
 /** FR-MAP-56: the gap a label pill keeps from another (screen px). */

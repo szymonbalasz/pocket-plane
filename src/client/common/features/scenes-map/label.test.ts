@@ -222,6 +222,78 @@ describe("FR-MAP-42 label", () => {
     for (const b of big.badges) expect(b.y).toBeGreaterThanOrEqual(big.font * 0.6);
   });
 
+  test("FR-MAP-43 BL-35 below 48 px cells a token's badges squeeze into a chip + '+N' or a '+N', never vanish or cover a name", () => {
+    const three = [
+      { id: "fog-token-invisible", label: "Invisible" },
+      { id: "cnd-poisoned", label: "Poisoned" },
+      { id: "cnd-prone", label: "Prone" },
+    ];
+    const labels = three.map((b) => b.label);
+    const shown = (px: number) => {
+      const scale = px / 70;
+      const r = labelRow("Goblin 3", three, 70, 70, scale, measure);
+      const neighbour = labelRow("Goblin 5", [], 70, 70, scale, measure);
+      for (const b of r.badges) {
+        // Inside the footprint, clear of its own name and every neighbour's.
+        expect(b.x).toBeGreaterThanOrEqual(-1e-9);
+        expect(b.y).toBeGreaterThanOrEqual(0);
+        expect(b.x + b.width).toBeLessThanOrEqual(70 + 1e-9);
+        expect(overlaps(b, r.name, 0, 0) ? `${px}: ${b.id} covers its name` : "ok").toBe("ok");
+        for (const [dx, dy] of [
+          [70, 0],
+          [-70, 0],
+          [0, -70],
+          [0, 70],
+          [70, -70],
+          [-70, -70],
+          [70, 70],
+          [-70, 70],
+        ] as const) {
+          const hit = overlaps(b, neighbour.name, dx, dy);
+          expect(hit ? `${px}: ${b.id} covers the name at ${dx},${dy}` : "ok").toBe("ok");
+        }
+      }
+      // Every badge is drawn or listed in the "+N"'s hover.
+      const more = r.badges.find((b) => b.id === MORE_BADGE_ID);
+      const drawn = r.badges.filter((b) => b.id !== MORE_BADGE_ID);
+      const listed = more?.full?.split(", ") ?? [];
+      expect(more?.text).toBe(`+${listed.length}`);
+      expect([...drawn.map((b) => three.find((t) => t.id === b.id)?.label), ...listed]).toEqual(
+        labels,
+      );
+      return r.badges.map((b) => [b.id, b.compact === true]);
+    };
+    // 44 px (the default fit with windows open): Invisible stays as an icon chip, "+2" for the rest.
+    expect(shown(44)).toEqual([
+      ["fog-token-invisible", true],
+      [MORE_BADGE_ID, false],
+    ]);
+    // 40 px: the chip shrinks to the row's height so both still fit.
+    expect(shown(40)).toEqual([
+      ["fog-token-invisible", true],
+      [MORE_BADGE_ID, false],
+    ]);
+    // 32 px: no room for both: one "+3" pill.
+    expect(shown(32)).toEqual([[MORE_BADGE_ID, false]]);
+    // 24 px (the fit floor): no full row fits between the names: a smaller "+3", centred.
+    expect(shown(24)).toEqual([[MORE_BADGE_ID, false]]);
+    const tiny = labelRow("Goblin 3", three, 70, 70, 24 / 70, measure);
+    const more = tiny.badges[0];
+    expect(more?.height).toBeLessThan(tiny.name.height);
+    expect(more?.font).toBeCloseTo((more?.height ?? 0) / 1.2);
+    expect((more?.y ?? 0) + (more?.height ?? 0) / 2).toBeCloseTo(35);
+    expect((more?.x ?? 0) + (more?.width ?? 0) / 2).toBeCloseTo(35);
+    // One badge at 24 px: its icon chip, no "+1".
+    const one = labelRow("Goblin 3", three.slice(0, 1), 70, 70, 24 / 70, measure);
+    expect(one.badges).toMatchObject([{ id: "fog-token-invisible", compact: true, text: "" }]);
+    // Too small to read (a 6 px row): nothing, still never over a name.
+    expect(labelRow("Goblin 3", three, 70, 70, 16 / 70, measure).badges).toEqual([]);
+    // At 48 px and up the rows are unchanged: no squeeze, two rows.
+    const big = labelRow("Goblin 3", three, 70, 70, 48 / 70, measure);
+    expect(big.badges.some((b) => b.id === MORE_BADGE_ID || b.font !== undefined)).toBe(false);
+    expect(new Set(big.badges.map((b) => b.y + b.height / 2)).size).toBe(2);
+  });
+
   test("FR-MAP-42 label: layer order map < grid < tokens < labels < pointers", () => {
     const C = () => null;
     const layers = orderLayers([
