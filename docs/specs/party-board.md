@@ -20,7 +20,7 @@ phase: post-mvp-6
 |---|---|---|---|
 | FR-PARTY-41, -42, -44 | Companions tab, rows (owner full HP, others band), empty state | CP1 `build/cp-pets` | `FR-PARTY-41 companions tab`, `FR-PARTY-42 band for other players` |
 | FR-PARTY-43 | DM New pet…, rename, mode, owner, release | CP1 | `FR-PARTY-43 release` |
-| FR-PARTY-45, -46 | No new data; layout | CP1 | `FR-PARTY-46 tab fits` |
+| FR-PARTY-45, -46 | No new data; layout | CP1 | `FR-PARTY-46 tabs fit at min width` |
 
 ### Sprint 5 at a glance
 
@@ -169,7 +169,7 @@ phase: post-mvp-6
 | FR-PARTY-43 | **DM**: header **New pet…** → entities' dialog ([FR-ENT-32](entities.md#6-functional-requirements)); row menu **Rename**, **Turn mode ▸** (three radio items), **Owner…** (PC Select), **Open NPC sheet** (FR-CHARX-31), **Release…** (AlertDialog "Owlbear becomes a plain creature. Mira loses its card." → `PUT` with `companionOf: null`, [FR-ENT-33](entities.md#6-functional-requirements)). Rename, mode and owner send entities' `PUT` with the loaded fields (whole replace). While the pet is in a fight: Owner… and Release… disabled with Tooltip "Dismiss it from the fight first". Reject → inline; lost request → Toast "Connection lost — check the pet before trying again". | |
 | FR-PARTY-44 | **Empty and other states**: no pets → "No companions yet" (players: "… — your DM can give you one"); a muted footer "Summons show in Initiative" while a fight runs; disconnected: last list, actions disabled; a pet released or reassigned while shown → the row moves group or leaves (live upsert / delete). | |
 | FR-PARTY-45 | **No new data**: the tab reads `entity` (pets) and `combatant` rows already in the snapshot (not lazy, unlike handouts); no record type, intent or event of PARTY's. Visibility is entities' (FR-ENT-37) and combat's (FR-CBT-116). | 0 B |
-| FR-PARTY-46 | **Layout**: window size unchanged (440×560, min 340×360, FR-PARTY-29's seams S4 width); the four-tab strip fits 340 px (labels shorten to icons + Tooltip below 380 px); rows wrap their badges, never cut a name (as W4's rule). | Seams S4 |
+| FR-PARTY-46 | **Layout**: window size unchanged (440×560, min 340×360, FR-PARTY-29's seams S4 width); the four tabs keep their full labels; where they don't fit (the min width, 340 px) the strip scrolls horizontally, never cutting a label (seams S7); rows wrap their badges, never cut a name (as W4's rule). | Seams S4, S7 |
 
 ## 7. UI/UX notes
 
@@ -374,7 +374,7 @@ Teardown: stop the server, then `fixtures:reset --profile verify`.
 
 ### Sprint 6 tests (track CP)
 
-Fixtures (`pet-owlbear`, `pet-drake`), bundles `companions-prep` / `companions` and the walkthrough (C1, C7, C10) are in [CBT §13.2](combat-tracker.md#132-sprint-6-track-cp-cbt-ent-charx-party-map). PARTY's named tests: `FR-PARTY-41 companions tab` (client: tab order Handouts, Inventory, Loot, Companions; stored `companions` restores; groups by PC with the colour dot); `FR-PARTY-42 band for other players` (client + leak: `player-2` sees the Owlbear's band "Bloodied" at 24 / 59, no numbers, no Card; `player-1` sees "24 / 59" and Card; in a fight both read the combatant); `FR-PARTY-43 release` (client: Release confirm sends `PUT` with `companionOf: null`; disabled in a fight; reject inline); `FR-PARTY-44 empty states`; `FR-PARTY-46 tab fits` (the registry-driven layout tests at 1280×720 / 1440×900 with four tabs; 340 px icon labels).
+Fixtures (`pet-owlbear`, `pet-drake`), bundles `companions-prep` / `companions` and the walkthrough (C1, C7, C10) are in [CBT §13.2](combat-tracker.md#132-sprint-6-track-cp-cbt-ent-charx-party-map). PARTY's named tests: `FR-PARTY-41 companions tab` (client: tab order Handouts, Inventory, Loot, Companions; stored `companions` restores; groups by PC with the colour dot); `FR-PARTY-42 band for other players` (client + leak: `player-2` sees the Owlbear's band "Bloodied" at 24 / 59, no numbers, no Card; `player-1` sees "24 / 59" and Card; in a fight both read the combatant); `FR-PARTY-43 release` (client: Release confirm sends `PUT` with `companionOf: null`; disabled in a fight; reject inline); `FR-PARTY-44 empty states`; `FR-PARTY-46 tabs fit at min width` (seams S7: at 340 px every tab label is whole, the strip scrolls to Companions; the registry-driven layout tests at 1280×720 / 1440×900 pass with four tabs).
 
 ### 13.1 Sprint 5 (track P: PARTY, LOOT, ASSET, CMP)
 
@@ -441,7 +441,7 @@ Sprint locks (seams S3, gate 1 build plan): ws / protocol / common store V0 → 
 ### Sprint 6 dependencies and build (track CP)
 
 - **Depends on** [entities](entities.md) FR-ENT-31–37 (pets, REST, visibility; CP0 / CP1), [combat-tracker](combat-tracker.md) FR-CBT-116 (combatant HP / band in a fight), [character-sheet-full](character-sheet-full.md) FR-CHARX-59 (Card opens the window: until CP4 merges the button is hidden), [campaign-management](campaign-management.md) colour dot (built; PF may change the colour storage: PARTY reads `colorOf`, unchanged API).
-- **Slice:** the tab ships in **CP1** `build/cp-pets` ([CBT §14.2](combat-tracker.md#142-build-split-sprint-6-track-cp)): `src/client/common/features/party-board/{Board.tsx (tab), Companions.tsx (new), logic.ts (`PARTY_TABS`, tab memory)}`; feature-owned files (#154), no shared file. Coordinate with IM if IM's picker slice also edits `Board.tsx` (one holder at a time; IM's handout-editor picker lives in the editor files, so no overlap expected).
+- **Slice:** the tab ships in **CP1** `build/cp-pets` ([CBT §14.2](combat-tracker.md#142-build-split-sprint-6-track-cp)): `src/client/common/features/party-board/{Board.tsx (tab), Companions.tsx (new), logic.ts (`PARTY_TABS`, tab memory)}`; feature-owned files (#154), no shared file. IM-3 edits only the handout `Editor.tsx` (FR-PARTY-48): no overlap (seams S7).
 
 ### 14.2 Sprint 5 build split
 
@@ -478,7 +478,7 @@ DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G
 | OQ-PARTY-24 *(S6)* | Where pets live in the Party window | **A Companions tab after Loot** (Loot keeps its place right of Inventory, #268) / a section at the end of Inventory (no new tab; a pet isn't an item) / their own window | no · owner: CP1 | play-shell |
 | OQ-PARTY-25 *(S6)* | List summons too? | **No: pets only** (#252; summons live in Initiative and the card; a footer points there) / yes, under "In this fight" | no · owner: CP1 | combat-tracker |
 | OQ-PARTY-26 *(S6)* | Do other players see every pet? | **Yes: name, owner, band** (the party knows Mira has an owlbear; follows OQ-CBT-80) / own pets only | no (follows OQ-CBT-80) | entities |
-| OQ-PARTY-27 *(S6)* | **campaign-management (PF):** the group header's owner colour dot reads `colorOf(player)`; PF's free colour picker may change the stored value but not that helper | **PARTY reads `colorOf` unchanged; PF keeps its signature** / PARTY waits for PF's colour core | no · owner: orchestrator (seams) | campaign-management |
+| OQ-PARTY-27 *(S6)* | **campaign-management (PF):** the group header's owner colour dot reads `colorOf(player)`; PF's free colour picker may change the stored value but not that helper | **Settled by seams S8:** `colorOf(player)` keeps its signature and returns a CSS colour string after PF0 (`#rrggbb`); the group header and the companion marker call `colorOf` only, never switching on palette keys. Rejected: ~~PARTY waits for PF's colour core~~ | no (settled) | campaign-management |
 | OQ-PARTY-01 | Handout share model vs entity visibility | **Decided (#207, G26):** handout-own `sharedWith` {none / all / chosen players} + its own visibility fn; shape exported from `@shared` for later reuse (world-builder NPCs). Terms Share / Unshare per seams S9. Rejected: reuse entity visibility (fixed per kind; needs a share field on entities and a handout entity kind), `hidden` boolean like tokens (no chosen players) | — | entities, post-mvp/world-builder |
 | OQ-PARTY-02 | Content types; where files live | **Decided (#207, G26):** text + 0–10 images via the assets pipeline (capability IDs, ADR-0023); PDF out (DM exports pages as images). Rejected: PDF served as an original with the browser viewer (breaks "originals never served", script risk), PDF rasterised at ingest (new dependency) | — | assets-pipeline |
 | OQ-PARTY-03 | Snapshot cost (CON-44, measured §12) | **Decided (#207, G4): lazy types + `sync.load`** ([ADR-0045](../architecture/adr/0045-lazy-record-types.md), the one on-demand path, also for C `imported-entity` and R `rule-trigger`); +1.1 KB DM. Ceilings per #208 (§12). Rejected: headers + items in the snapshot with bodies on demand (+37–80 KB DM), feature `party.load` command (re-implements the filter; ruled out by S1) | — | live-sync, compendium, effect-modifiers |
