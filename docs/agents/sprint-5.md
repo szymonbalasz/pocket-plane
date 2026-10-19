@@ -31,6 +31,26 @@ DM notes in brackets ([#250](../decisions-log.md)). "sim-8" = the [session-sim-8
 7. Every slice: builder → "ready for walkthrough" → test agent → fixes → `check` + full `e2e` in the branch after merging main → merge → `check` + full `e2e` on `main`. **Wait for the builder's commit before you check its worktree.** Never rebuild a worktree's client while a test agent walks it.
 8. Sprint gate: session-sim-9 on final `main` (bundle = session-sim-8 + sprint-5 units; incl. launcher windows opening without stacking at 1280×720 / 1440×900 with the Game log + Initiative open, the fog bar and AoE panel reachable, a wide Game log, popup dice in a line at full size, 3D dice in the tray before rolling, a late damage roll filling the apply popup without overriding, deleting a kept template from its right-click menu, the Loot tab, a handout forced open for one player, an image uploaded and pasted into a handout and a homebrew item, a compendium item added to party inventory, player colours on pointer / template / path / log), leak scan per player, a "Playtest: sprint 5 features" section here, then **pause and recap with the DM**.
 
+## Progress (updated as slices merge)
+
+| Date | What |
+|---|---|
+| 2026-10-18 | Phase A: six specs, seams ([`.verify/sprint5/seams.md`](../../.verify/sprint5/seams.md)), two reviews + rulings, gate ([`gate.md`](../../.verify/sprint5/gate.md)). Ally side added to R ([#252](../decisions-log.md)). Backfill merged: BL-28 bench gates, BL-16 stable `useRecords`, BL-12 door eraser, BL-31 nat-1 e2e (#253–#255) |
+| 2026-10-19 | **Gate 1 passed** ([#256](../decisions-log.md)): every pick, DM ceiling 1.5 MiB, DM popups stay top-centre, map tools push covering windows right. Phase B starts |
+
+## Check `main` any time (DM)
+
+Run from `C:\Repos\pocket-plane` on `main` (PowerShell). Bundle **`session-sim-9`** = everything through sprint 4 (`session-sim-8`) plus every sprint-5 unit merged so far; it grows as slices land (see Progress).
+
+```powershell
+git pull; bun install
+bun run build
+bun run fixtures:reset-load session-sim-9 --profile verify
+bun run start --profile verify
+```
+
+Open the printed DM URL (paste the secret) and each player link in its own browser (Player 1 = Mira, Player 2 = Thorn). Town is live at load: show Goblin Ambush from the Scenes window. Stop with `Ctrl+C`; re-run the last three lines after pulling new merges (player links change on every load).
+
 ## Boundaries and hotspots (sequence these)
 
 | Overlap | Rule |
