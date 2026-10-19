@@ -460,7 +460,7 @@ flowchart LR
 
 ### 14.3 Sprint 6 build split (track IM)
 
-Full split: [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split). PARTY part: **IM-3 `build/im-wiring`** (after IM-2): `Editor.tsx` (one `context` prop; the Images block moves above the body, FR-PARTY-48) + DOM tests. No schema, event, §9.9 shared file or dependency. CP (pets listed in the Party window) touches other Party files; if it also edits `Editor.tsx`, whichever merges second rebases. The FR-PARTY-48 item of BL-48 is done by IM-3 (the integrator updates the backlog row).
+Full split: [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split). PARTY part: **IM-3 `build/im-wiring`** (after IM-2): `Editor.tsx` (one `context` prop; the Images block moves above the body, FR-PARTY-48) + DOM tests. No schema, event, §9.9 shared file or dependency. CP1's **Companions** tab (after Loot, OQ-PARTY-24) touches other Party files: no overlap with IM-3 (settled by seams S7). The FR-PARTY-48 item of BL-48 is done by IM-3 (the integrator updates the backlog row).
 
 ## 15. Open questions
 
