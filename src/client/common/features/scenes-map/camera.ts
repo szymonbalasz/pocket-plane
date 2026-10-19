@@ -418,7 +418,8 @@ const sortedUnique = (vs: readonly number[]) => [...new Set(vs)].sort((a, b) => 
  * null. Each (token, obstacle) pair forbids an open rectangle of pans (Minkowski difference); the
  * area bounds the pan range. Candidates = the cross product of the x-values {range bounds, `from`
  * clamped, every forbidden rectangle's left and right edge} and the y-values likewise; a sweep over
- * the x-values marks, per x, the y-candidates inside an active rectangle's open y-interval.
+ * the x-values marks, per x, the y-candidates inside an active rectangle's open y-interval. Pans
+ * above `minY` (the map's top edge, FR-MAP-44's top row) are out of range.
  */
 function panAtScale(
   tokens: readonly Box[],
@@ -426,6 +427,7 @@ function panAtScale(
   area: Box,
   scale: number,
   from: { x: number; y: number },
+  minY: number,
 ): { x: number; y: number } | null {
   let x0 = Number.NEGATIVE_INFINITY;
   let x1 = Number.POSITIVE_INFINITY;
@@ -437,6 +439,7 @@ function panAtScale(
     y0 = Math.max(y0, area.y - t.y * scale);
     y1 = Math.min(y1, area.y + area.h - (t.y + t.h) * scale);
   }
+  y0 = Math.max(y0, minY);
   if (x0 > x1 + EPS || y0 > y1 + EPS) return null;
   x1 = Math.max(x0, x1);
   y1 = Math.max(y0, y1);
@@ -508,7 +511,8 @@ function panAtScale(
  * `FIT_HARD_MIN_CELL_PX` in steps of 4 px; at the first step with an allowed pan, also + 3, + 2,
  * + 1 (below the previous step); the largest allowed wins (no monotonicity assumed). Step 1
  * already clear → `from`; nothing allowed at 24 px, or more than 30 tokens or 6 obstacles in the
- * area → `from` (FR-MAP-46's PCs first), `pcs`.
+ * area → `from` (FR-MAP-46's PCs first), `pcs`. `minY`: `all` keeps the map's top edge (map
+ * px 0) at or below it (FR-MAP-44's top row under the top bar), step 1 included.
  */
 export function fitVisible(
   tokens: readonly Box[],
@@ -516,9 +520,12 @@ export function fitVisible(
   area: Box,
   from: Camera,
   cell: number,
+  minY = Number.NEGATIVE_INFINITY,
 ): Camera & { visible: FitVisible } {
   const inArea = obstacles.filter((o) => cross(o, area));
-  if (allClear(from, tokens, inArea, area)) return { ...from, visible: "all" };
+  if (from.y >= minY - EPS && allClear(from, tokens, inArea, area)) {
+    return { ...from, visible: "all" };
+  }
   const pcs = { ...from, visible: "pcs" as const };
   if (
     cell <= 0 ||
@@ -530,7 +537,7 @@ export function fitVisible(
   const at = (c: number) => {
     const scale = c / cell;
     if (scale < ZOOM_MIN || scale > ZOOM_MAX) return null;
-    const pan = panAtScale(tokens, inArea, area, scale, from);
+    const pan = panAtScale(tokens, inArea, area, scale, from, minY);
     return pan && { ...pan, scale };
   };
   const top = Math.floor(from.scale * cell + EPS);
@@ -610,6 +617,7 @@ export function fitScene(
     visibleArea(view),
     step1,
     cell,
+    TOP_BAR_H,
   );
   const same = cam.x === step1.x && cam.y === step1.y && cam.scale === step1.scale;
   return { ...cam, floor: same ? step1.floor : false, rect, visible };

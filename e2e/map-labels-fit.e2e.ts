@@ -143,6 +143,18 @@ test("FR-MAP-56 / -57 / -58 labels shrink on collision, full on hover; Invisible
   await dm.mouse.move(5, 300);
   await expect.poll(async () => (await pair())[0]?.attrs.full).toBe(false);
 
+  // FR-MAP-59: the fit may go below 48 px (44 here, top row kept); badge rows above the name need
+  // the 48 px this check was built for (BL-04), so zoom in one notch first.
+  const dmCanvas = dm.getByTestId("map-canvas");
+  if (Number(await dmCanvas.getAttribute("data-cell-px")) < 48) {
+    const at = await tokenNode(dm, sneak2);
+    if (!at) throw new Error("no Goblin Sneak 2 token");
+    await dm.mouse.move(at.x, at.y);
+    await dm.mouse.wheel(0, -100);
+    await expect
+      .poll(async () => Number(await dmCanvas.getAttribute("data-cell-px")))
+      .toBeGreaterThanOrEqual(48);
+  }
   // FR-MAP-57: Goblin Sneak 2 → Invisible: an icon chip, never cut text, clear of the name.
   const t2 = await tokenNode(dm, sneak2);
   if (!t2) throw new Error("no Goblin Sneak 2 token");

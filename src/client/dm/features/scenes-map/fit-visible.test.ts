@@ -1,6 +1,7 @@
 import { expect, mock, test } from "bun:test";
 import { fitObstacles, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
 import type { Rect } from "@ui/features/play-shell/geometry";
+import { TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { keepOuts } from "@ui/features/play-shell/keep-outs";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { toastKeepOut } from "@ui/features/play-shell/toast-region";
@@ -106,6 +107,8 @@ test("FR-MAP-59 every token visible: DM Game log + Initiative → all at 1280×8
         // and the toast box; an integer cell ≥ 24 px.
         expect(allClear(fit, footprints(SIM8_AMBUSH_DM), obstacles, visibleArea(vp))).toBe(true);
         expect(cell).toBeGreaterThanOrEqual(FIT_HARD_MIN_CELL_PX);
+        // FR-MAP-44: the map's top row stays at or below the top bar.
+        expect(fit.y).toBeGreaterThanOrEqual(TOP_BAR_H - 1e-6);
         expect(Math.abs(cell - Math.round(cell))).toBeLessThan(1e-9);
       } else {
         // PCs first (FR-MAP-46): every PC clear of every window.

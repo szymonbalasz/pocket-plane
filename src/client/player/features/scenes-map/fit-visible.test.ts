@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { fitObstacles, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
+import { TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { keepOuts } from "@ui/features/play-shell/keep-outs";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { toastKeepOut } from "@ui/features/play-shell/toast-region";
@@ -80,6 +81,8 @@ test("FR-MAP-59 every token visible: player sheet + Game log, then + Initiative 
       expect({ at, visible: fit.visible }).toEqual({ at, visible: "all" });
       expect(allClear(fit, footprints, obstacles, visibleArea(vp))).toBe(true);
       expect(cell).toBeGreaterThanOrEqual(FIT_HARD_MIN_CELL_PX);
+      // FR-MAP-44: the map's top row stays at or below the top bar.
+      expect(fit.y).toBeGreaterThanOrEqual(TOP_BAR_H - 1e-6);
     }
   }
   console.info(`FR-MAP-59 player cells: ${cells.join("; ")}`);

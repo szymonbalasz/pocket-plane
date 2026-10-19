@@ -806,6 +806,21 @@ describe("FR-MAP-59 every token visible (fitVisible)", () => {
     });
   });
 
+  test("FR-MAP-59 every token visible: the map's top row stays at or below the top bar (FR-MAP-44): a clear step 1 above it searches; the nearest pan above it is out of range", () => {
+    // Step 1 (y 4) clears the window but cuts the map's top row: the search keeps y ≥ 48.
+    const tokens = [box(0, 140, 70, 70)];
+    const area = box(0, 0, 1000, 600);
+    const obstacles = [box(0, 300, 1000, 300)];
+    const from = { x: 100, y: 4, scale: 1 };
+    expect(fitVisible(tokens, obstacles, area, from, 70)).toEqual({ ...from, visible: "all" });
+    const r = fitVisible(tokens, obstacles, area, from, 70, 48);
+    expect(r).toEqual({ x: 100, y: 48, scale: 1, visible: "all" });
+    // A token pushed up against the bound: nothing allowed at any scale → pcs.
+    const low = [box(0, 0, 70, 70), box(0, 840, 70, 70)];
+    const stuck = fitVisible(low, [box(0, 200, 1000, 400)], area, from, 70, 48);
+    expect(stuck).toEqual({ ...from, visible: "pcs" });
+  });
+
   test("FR-MAP-59 every token visible: a token boxed in by windows at every scale → pcs = step 1's result", () => {
     const tokens = [box(0, 0, 70, 70), box(700, 0, 70, 70)];
     const area = box(84, 64, 1000, 600);
