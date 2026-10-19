@@ -12,11 +12,10 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
-import { Tooltip } from "../../components/ui/overlays";
 import { Skeleton } from "../../components/ui/primitives";
 import { useRecords, useSync } from "../../sync/store";
 import { useDefinitions } from "../compendium/definitions";
-import { RollButton, rollTooltip } from "../dice-roll-log/roll-control";
+import { RollButton } from "../dice-roll-log/roll-control";
 import { CreateCharacterDialog } from "./CreateCharacter";
 import { SELECT } from "./fields";
 import { rollRoutes } from "./roll-routes";
@@ -37,7 +36,8 @@ import { type CreatureLike, pickerModel, type SummaryInput } from "./view-model"
 
 const NEW = "__new";
 
-// ---------- roll buttons (FR-CHARX-23, FR-CHAR-25: hints are the shared Tooltip) ----------
+// ---------- roll buttons (FR-CHARX-23, FR-CHAR-25: hints are the shared Tooltip, drawn by
+// `RollButton` with the Alt hint, FR-DICEX-51) ----------
 // The tabs import these from here; they render only inside a sheet (module cycle is
 // render-time only).
 
@@ -67,18 +67,17 @@ export function SheetRoll({
   });
   if (rollActionView(claim, kind) !== "button") return null;
   return (
-    <Tooltip content={rollTooltip(control, hint ? `${hint} · ${ROLL_HINT}` : ROLL_HINT)}>
-      <RollButton
-        control={control}
-        type="button"
-        size="sm"
-        variant="secondary"
-        {...button}
-        disabled={disabled || button.disabled}
-      >
-        {children}
-      </RollButton>
-    </Tooltip>
+    <RollButton
+      control={control}
+      hint={hint ? `${hint} · ${ROLL_HINT}` : ROLL_HINT}
+      type="button"
+      size="sm"
+      variant="secondary"
+      {...button}
+      disabled={disabled || button.disabled}
+    >
+      {children}
+    </RollButton>
   );
 }
 
@@ -107,18 +106,17 @@ export function RoutedRoll({
   }
   if (view === "none") return null;
   return (
-    <Tooltip content={ROLL_HINT}>
-      <RollButton
-        control={control}
-        type="button"
-        size="sm"
-        variant="secondary"
-        {...button}
-        disabled={disabled || button.disabled}
-      >
-        {children}
-      </RollButton>
-    </Tooltip>
+    <RollButton
+      control={control}
+      hint={ROLL_HINT}
+      type="button"
+      size="sm"
+      variant="secondary"
+      {...button}
+      disabled={disabled || button.disabled}
+    >
+      {children}
+    </RollButton>
   );
 }
 

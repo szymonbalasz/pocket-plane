@@ -259,6 +259,8 @@ export interface FormSlot {
    * when it fell back to the crit expression itself. MOD's bonus dice double on it (FR-MOD-18).
    */
   crit: boolean;
+  /** FR-DICE-41: the caller's slot label ("Slashing"), or null. */
+  label: string | null;
 }
 
 export interface FormOptions {
@@ -267,6 +269,32 @@ export interface FormOptions {
   critExpressions?: readonly string[] | undefined;
   /** The caller knows the hit is critical: every slot shows its extra group from the start. */
   crit?: boolean | undefined;
+  /** FR-DICE-41: one label per expression ("To hit", "Slashing"); null / absent = none. */
+  slotLabels?: readonly (string | null)[] | undefined;
+}
+
+/**
+ * FR-DICE-41: a slot as the form names it — "2d6 fire", "2d6 fire (critical)"; without a label
+ * the expression alone, as before.
+ */
+export const slotName = (expression: string, label: string | null, critical = false): string =>
+  `${expression}${label ? ` ${label.toLowerCase()}` : ""}${critical ? " (critical)" : ""}`;
+
+/**
+ * FR-DICE-41: the slot labels of an attack's roll specs: to-hit → "To hit", each damage part →
+ * its type capitalised ("Slashing"), a part without one → "Damage". Undefined unless a damage
+ * part is among them (a check or save is one unlabelled slot, as before).
+ */
+export function slotLabelsOf(
+  specs: readonly { category: RollCategory; part?: { type: string | null } | undefined }[],
+): (string | null)[] | undefined {
+  if (!specs.some((s) => s.category === "damage")) return undefined;
+  return specs.map((s) => {
+    if (s.category === "attack") return "To hit";
+    if (s.category !== "damage") return null;
+    const t = s.part?.type;
+    return t ? `${t.charAt(0).toUpperCase()}${t.slice(1)}` : "Damage";
+  });
 }
 
 export interface GroupInput {
@@ -308,19 +336,20 @@ export function formSlots(
   }
   const out: FormSlot[] = [];
   for (const [i, slot] of base.entries()) {
+    const label = o.slotLabels?.[i] ?? null;
     const crit = o.crit ? crits[i] : natural20 && i > 0 ? crits[i - 1] : undefined;
     if (!crit) {
-      out.push({ base: slot, extra: null, crit: o.crit === true || (natural20 && i > 0) });
+      out.push({ base: slot, extra: null, crit: o.crit === true || (natural20 && i > 0), label });
       continue;
     }
     const extra = critExtra(slot.expression, crit);
     if (extra) {
-      out.push({ base: slot, extra, crit: true });
+      out.push({ base: slot, extra, crit: true, label });
       continue;
     }
     const swapped = manualSlots([crit], "normal");
     if (typeof swapped === "string") return swapped;
-    out.push({ base: swapped[0] as ManualSlot, extra: null, crit: true });
+    out.push({ base: swapped[0] as ManualSlot, extra: null, crit: true, label });
   }
   return out;
 }
@@ -499,7 +528,7 @@ export function formEntries(slots: readonly FormSlot[], inputs: readonly SlotInp
   for (const [i, s] of slots.entries()) {
     const input = inputs[i];
     const baseInput = input && input.for === s.base.expression ? input.base : emptyGroup(s.base);
-    const b = checkGroup(s.base, baseInput, s.base.expression);
+    const b = checkGroup(s.base, baseInput, slotName(s.base.expression, s.label));
     if (!("entry" in b))
       return { ok: false, message: b.message, focus: { slot: i, group: "base", die: b.die } };
     if (!s.extra) {
@@ -507,7 +536,7 @@ export function formEntries(slots: readonly FormSlot[], inputs: readonly SlotInp
       continue;
     }
     const extraInput = input && input.for === s.base.expression ? input.extra : emptyGroup(s.extra);
-    const e = checkGroup(s.extra, extraInput, `${s.extra.expression} (critical)`);
+    const e = checkGroup(s.extra, extraInput, slotName(s.extra.expression, s.label, true));
     if (!("entry" in e))
       return { ok: false, message: e.message, focus: { slot: i, group: "extra", die: e.die } };
     entries.push(mergeCrit(s.base, b.entry, s.extra, e.entry));

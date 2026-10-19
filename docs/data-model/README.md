@@ -1979,9 +1979,19 @@ From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-60, [fog-of-war](.
 - **Fixtures:** no new unit. `windows-s5` has the running encounter (player Initiative) and Goblin Ambush the W4 / W11 steps use; `session-sim-9` needs nothing extra.
 - **Snapshot size** (CON-44): 0 B.
 
-## 83. Sprint 5: player colours on the map (K3)
+## 83. Sprint 5: roll-button hints and slot labels (D9)
 
-From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-68–73, [scene-tools](../specs/scene-tools.md#8-data-model) FR-SCN-47 and [notifications](../specs/notifications.md#8-data-model) FR-NOTE-40 ([ADR-0055](../architecture/adr/0055-player-colour.md)). **Built by `build/map-colours`**: no table, column, record type or payload change. Protocol side: [protocol §105](../protocol/README.md#105-sprint-5-player-colours-on-the-map-k3).
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-51 and [dice-roll-log](../specs/dice-roll-log.md#8-data-model) FR-DICE-41. **Built by `fix/dice-roll-buttons`**: no table, column, record type or payload change. Protocol side: [protocol §105](../protocol/README.md#105-sprint-5-roll-button-hints-and-slot-labels-d9).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Slot labels | caller props (`RollControlOptions.slotLabels`), derived from `CharacterRollSpec` (`slotLabelsOf`) | client only, never sent; staged verbatim with the control in the tray | [FR-DICE-41](../specs/dice-roll-log.md#6-functional-requirements) |
+
+- **Fixtures:** no new unit. Walkthrough steps 34 and 36 walk on `dice-polish` (Brakka's Flame Tongue, "Ambush at the Ford"); `session-sim-9` needs nothing extra.
+
+## 84. Sprint 5: player colours on the map (K3)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-68–73, [scene-tools](../specs/scene-tools.md#8-data-model) FR-SCN-47 and [notifications](../specs/notifications.md#8-data-model) FR-NOTE-40 ([ADR-0055](../architecture/adr/0055-player-colour.md)). **Built by `build/map-colours`**: no table, column, record type or payload change. Protocol side: [protocol §106](../protocol/README.md#106-sprint-5-player-colours-on-the-map-k3).
 
 | State | Where | Rule | Source |
 |---|---|---|---|

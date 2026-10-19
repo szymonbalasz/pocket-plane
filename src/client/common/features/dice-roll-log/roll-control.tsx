@@ -6,7 +6,9 @@
 // control in the tray instead (FR-DICEX-06), every roll starts a pending throw (FR-DICEX-09), and
 // the tray hosts the same `ManualForm` (FR-DICEX-07). Effect modifiers tier 2 (FR-MOD-27, -18):
 // `options.subject` feeds the preview — the d20 slots follow the expected final mode, and the
-// form asks one labelled group per bonus die / trigger die, sent as `manualParts`.
+// form asks one labelled group per bonus die / trigger die, sent as `manualParts`. Sprint 5:
+// `RollButton` draws the Alt hint in its own tooltip (FR-DICEX-51) and `slotLabels` names each
+// slot of the form and the tray (FR-DICE-41).
 import {
   CATEGORY_LABEL,
   categoryPublic,
@@ -22,6 +24,7 @@ import { HandIcon } from "lucide-react";
 import {
   type ComponentProps,
   type Dispatch,
+  type ReactNode,
   type SetStateAction,
   useMemo,
   useRef,
@@ -29,6 +32,7 @@ import {
 } from "react";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/controls";
+import { Tooltip } from "../../components/ui/overlays";
 import { Input } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
@@ -54,6 +58,7 @@ import {
   publicState,
   reconcileInputs,
   type SlotInput,
+  slotName,
   updateInputs,
 } from "./logic";
 import { usePhysicalDice } from "./physical";
@@ -105,6 +110,12 @@ export interface RollControlOptions {
    * FR-CBT-74): every slot shows its extra critical group from the start (FR-DICE-31, X-1).
    */
   crit?: boolean;
+  /**
+   * FR-DICE-41: what each slot is, parallel to `expressions` ("To hit", "Slashing", "Fire"):
+   * the physical form's slot headings and the tray's `adjust` groups. Client only, never sent;
+   * absent / null = the expression alone.
+   */
+  slotLabels?: readonly (string | null)[];
   /** The mode toggle's value; Shift / Ctrl override it for one roll. Default normal. */
   mode?: RollMode;
   /**
@@ -126,6 +137,22 @@ export interface RollKeys {
 
 /** FR-DICEX-06: tooltip line for stageable roll buttons. */
 export const STAGE_HINT = "Alt: adjust in tray";
+
+/**
+ * FR-DICEX-51: the Alt hint, exactly once on every stageable roll surface (§6.1 table G):
+ * `RollButton` draws it in its tooltip; a hidden-anchor roll (DM Initiative menus) in its
+ * trigger's tooltip or the open menu. `line`: a muted line of its own (menus).
+ */
+export function StageHint({ line = false }: { line?: boolean }) {
+  return (
+    <span
+      data-testid="dicex-stage-hint"
+      className={line ? "block px-2 pb-1 text-xs text-muted-foreground" : undefined}
+    >
+      {STAGE_HINT}
+    </span>
+  );
+}
 
 export interface RollControl {
   /**
@@ -256,6 +283,20 @@ export const manualPartsOf = (r: RollRequest, i = 0): { manualParts?: ManualPart
 export const rollTooltip = (control: Pick<RollControl, "preview">, hint: string): string =>
   control.preview.text ? `${control.preview.text} · ${hint}` : hint;
 
+/**
+ * FR-DICEX-51: a `RollButton`'s tooltip — the parts the roll picks up (FR-MOD-27), the caller's
+ * `hint`, then the Alt hint, once.
+ */
+export function rollButtonTip(control: Pick<RollControl, "preview">, hint?: string): ReactNode {
+  const lead = hint ? rollTooltip(control, hint) : control.preview.text;
+  return (
+    <>
+      {lead && `${lead} · `}
+      <StageHint />
+    </>
+  );
+}
+
 /** FR-MOD-18: a part group's test ids (`mod-tray-group-*`, `data-value` = its key). */
 interface PartIds {
   key: string;
@@ -271,6 +312,7 @@ function GroupInputs({
   extra,
   autoFocus,
   part,
+  label = null,
   onChange,
 }: {
   slot: ManualSlot;
@@ -280,6 +322,8 @@ function GroupInputs({
   autoFocus: boolean;
   /** A bonus / trigger die group (FR-MOD-18) instead of the expression's own dice. */
   part?: PartIds;
+  /** FR-DICE-41: the slot's label ("Slashing"); null = the expression alone. */
+  label?: string | null;
   onChange(patch: Partial<GroupInput>): void;
 }) {
   const prefix = `${part ? "mod-tray-group" : "dice-manual"}${extra ? "-crit" : ""}`;
@@ -288,9 +332,7 @@ function GroupInputs({
   const computed = computedTotal(slot, input);
   const name = part
     ? `${part.label} (${slot.expression}${extra ? ", critical" : ""})`
-    : extra
-      ? `${slot.expression} (critical)`
-      : slot.expression;
+    : slotName(slot.expression, label, extra);
   return (
     <>
       <div className="flex items-center gap-2">
@@ -302,6 +344,15 @@ function GroupInputs({
             className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
           >
             Extra critical dice: {slot.expression}
+            {!part && label && ` (${label.toLowerCase()})`}
+          </span>
+        ) : label && !part ? (
+          <span
+            data-testid="dice-manual-slot-label"
+            data-slot={index}
+            className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
+          >
+            {label} — <code>{slot.expression}</code>
           </span>
         ) : part ? (
           <span
@@ -609,6 +660,7 @@ export function ManualForm({ control }: { control: RollControl }) {
             index={i}
             extra={false}
             autoFocus={i === 0}
+            label={slot.label}
             onChange={(p) => update(i, "base", p)}
           />
           {slot.extra && (
@@ -623,6 +675,7 @@ export function ManualForm({ control }: { control: RollControl }) {
                 index={i}
                 extra
                 autoFocus={false}
+                label={slot.label}
                 onChange={(p) => update(i, "extra", p)}
               />
             </div>
@@ -689,14 +742,36 @@ function PhysicalMarker() {
   );
 }
 
-/** A button that rolls through `control`; the manual popover anchors to it. */
+/**
+ * A button that rolls through `control`; the manual popover anchors to it. Its tooltip is
+ * `rollButtonTip` (FR-DICEX-51): a caller with tooltip text of its own passes it as `hint`
+ * instead of wrapping the button in a Tooltip. `hint={false}`: an invisible anchor (the roll
+ * starts from a menu, whose trigger or open menu shows the Alt hint), no tooltip.
+ */
 export function RollButton({
   control,
+  hint,
   onClick,
   className,
   children,
   ...props
-}: { control: RollControl } & ComponentProps<typeof Button>) {
+}: { control: RollControl; hint?: string | false } & ComponentProps<typeof Button>) {
+  const anchor = (
+    <PopoverAnchor asChild>
+      <Button
+        {...props}
+        data-physical={control.physical}
+        className={cn(className, control.physical && "relative")}
+        onClick={(e) => {
+          onClick?.(e);
+          if (!e.defaultPrevented) control.roll(e);
+        }}
+      >
+        {children}
+        {control.physical && <PhysicalMarker />}
+      </Button>
+    </PopoverAnchor>
+  );
   return (
     <Popover
       open={control.manual !== null}
@@ -704,20 +779,7 @@ export function RollButton({
         if (!o) control.cancelManual();
       }}
     >
-      <PopoverAnchor asChild>
-        <Button
-          {...props}
-          data-physical={control.physical}
-          className={cn(className, control.physical && "relative")}
-          onClick={(e) => {
-            onClick?.(e);
-            if (!e.defaultPrevented) control.roll(e);
-          }}
-        >
-          {children}
-          {control.physical && <PhysicalMarker />}
-        </Button>
-      </PopoverAnchor>
+      {hint === false ? anchor : <Tooltip content={rollButtonTip(control, hint)}>{anchor}</Tooltip>}
       {/* BL-19: focus moving out never closes the form. A menu item that rolls through an
           invisible anchor (DM Initiative Attack ▸, Check ▸, Save ▸) closes its menu, which then
           refocuses its trigger: that dismissed the form before anything was entered. A click

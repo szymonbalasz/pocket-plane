@@ -70,6 +70,7 @@ test("FR-CHAR-25 roll buttons carry no title; the hint is a Tooltip", () => {
   const rollButtons = openingTags(src).filter((t) => t.name === "RollButton");
   expect(rollButtons.length).toBeGreaterThanOrEqual(2);
   for (const t of rollButtons) expect(t.attrs).not.toMatch(/(^|\s)title=/);
-  expect(src).toContain("<Tooltip content={ROLL_HINT}>");
+  // FR-DICEX-51: `RollButton` draws the Tooltip; the sheet passes its text as `hint`.
+  expect(src).toContain("hint={ROLL_HINT}");
   expect(src).not.toMatch(/title=\{proficient/);
 });

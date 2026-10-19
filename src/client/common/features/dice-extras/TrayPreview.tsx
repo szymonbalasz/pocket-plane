@@ -32,6 +32,8 @@ import {
 export interface TrayGroup {
   chips: TrayChip[];
   constant: number;
+  /** FR-DICE-41: the control's slot label ("Slashing"); absent / null = none. */
+  label?: string | null;
 }
 
 const signed = (n: number) => (n === 0 ? "" : n > 0 ? `+${n}` : `−${-n}`);
@@ -271,6 +273,15 @@ export function TrayPreview({
         // biome-ignore lint/suspicious/noArrayIndexKey: one group per expression position
         <span key={i} className="flex flex-wrap items-center gap-1">
           {i > 0 && <span className="px-1 text-muted-foreground">·</span>}
+          {g.label && (
+            <span
+              data-testid="dicex-tray-group-label"
+              data-index={i}
+              className="relative text-xs text-muted-foreground"
+            >
+              {g.label}
+            </span>
+          )}
           {(dice[i] ?? []).map((d, j) => (
             <TrayDie
               // biome-ignore lint/suspicious/noArrayIndexKey: one die per position
