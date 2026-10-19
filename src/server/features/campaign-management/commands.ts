@@ -131,8 +131,8 @@ export const activateCampaign = defineCommand({
 
 /**
  * FR-CAMP-12/13: adds to the active campaign; token from ctx.tokens; colour = the next free key
- * (FR-CAMP-23). Player hooks (`added`,
- * ADR-0042) run after the insert; their rows join `PlayerAdded`.
+ * (FR-CAMP-23). Player hooks (`added`, ADR-0042) run after the insert; their rows join
+ * `PlayerAdded`.
  */
 export const addPlayer = defineCommand({
   name: "player.add",
