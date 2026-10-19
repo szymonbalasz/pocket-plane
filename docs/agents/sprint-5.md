@@ -60,7 +60,8 @@ DM notes in brackets ([#250](../decisions-log.md)). "sim-8" = the [session-sim-8
 | 2026-10-19 | Merged: **tool bars never hidden** — opening AoE / fog / structure / props pushes a covering window aside (e.g. the players' Initiative); the Game log follows a live window resize [#280](../decisions-log.md) |
 | 2026-10-19 | Merged: **roll-button hints** ("Alt: adjust in tray" everywhere; Alt+click on the log's roll bar stages) and damage types in the physical dice form [#281](../decisions-log.md) |
 | 2026-10-19 | Merged: **player colours on the map** — pointers, pings, templates ("by ‹name›"), drag paths and trails in each player's colour [#282](../decisions-log.md) |
-| 2026-10-19 | Merged: **player colours in the log, roll popup and notifications** — all 26 build slices done [#283](../decisions-log.md). Next: session-sim-9 |
+| 2026-10-19 | Merged: **player colours in the log, roll popup and notifications** — all 26 build slices done [#283](../decisions-log.md) |
+| 2026-10-20 | **Sprint gate:** session-sim-9 **13 / 17 PASS**, leak scan clean, crash test identical [#284](../decisions-log.md); see Playtest: sprint 5 features. Paused for the recap |
 
 ## Check `main` any time (DM)
 
@@ -74,6 +75,99 @@ bun run start --profile verify
 ```
 
 Open the printed DM URL (paste the secret) and each player link in its own browser (Player 1 = Mira, Player 2 = Thorn). Town is live at load: show Goblin Ambush from the Scenes window. Stop with `Ctrl+C`; re-run the last three lines after pulling new merges (player links change on every load).
+
+## Playtest: sprint 5 features
+
+Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira, and Brakka in part 3) + **Player 2** (another browser: Thorn). Regression run: [session-sim-9 report](../../.verify/20261019-211926-session-sim-9/report.md) (local, gitignored): **13 / 17 PASS** on final `main` (check 3,793, e2e 151), leak scan clean (WS + REST, both players) with hit rulings, secret sides, handout presents, attachments, hidden compendium images and colours in play; a hard kill mid-combat kept a ruled card waiting for its damage and a secret side byte-identical (digest equal). The four FAILs are the first known gaps below.
+
+### Setup
+
+```powershell
+git pull; bun install
+bun run build
+bun run fixtures:reset-load session-sim-9 --profile verify
+bun run start --profile verify
+```
+
+Open the printed DM URL (paste the secret) and each player link in its own browser. Town is live at load: show Goblin Ambush from the Scenes window. Player 1 gets a presented handout popup at load (part 4) — close it or leave it for later. To switch bundles: `Ctrl+C`, `bun run fixtures:reset-load <bundle> --profile verify`, `bun run start --profile verify`; player links change on every load.
+
+### Part 1: windows and layout (`session-sim-9`, or `windows-s5`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | 1440×900, Game log + Initiative open; launcher → Compendium, Party, Encounters | None overlap each other, the Game log or Initiative; they avoid PC tokens (shrinking if needed); when the screen is full the oldest launcher window minimises to the launcher |
+| 2 | Look at the Game log; resize the browser to 1280×720 without reloading | 2.5× wide (1150 px) at 1440×900; follows to 1.5× (690 px) at 1280×720 (a log you resized by hand keeps its size) |
+| 3 | Fit (rail) with Game log + Initiative, then + Scenes | Every token stays visible (cells may go down to 24 px), the top row below the top bar; if that's impossible, PCs first |
+| 4 | Fog tool, AoE, Structure with a window over the top-left (Scenes); Player 1: AoE with their Initiative at its default top-left spot | The window is pushed right of the tool bar (or below it); every control is reachable; the fog bar wraps by control group |
+| 5 | Brakka's Initiative row with Rage and Divine Fury; narrow the window to 320 px | Both stay visible (trigger chips shrink to ⚡ icons, never into "+N"); names are never cut — rows wrap instead |
+| 6 | Right-click a goblin | Exactly one "Invisible" item; Conditions ▸ no longer lists it |
+| 7 | During a hidden monster's turn: Mira's row → Effect… → Blinded | Source defaults to Mira, not the hidden monster |
+| 8 | Zoom out until cells are small (< 48 px) on a token with Invisible + conditions | A compact "+N" stays on the token (red when it hides Dying); hover lists them |
+
+### Part 2: dice (`dice-polish` or `session-sim-9`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Player 1: tray → d6, d6, d8, +1 | **Before rolling** the tray shows the 3D dice (no "[1d6]" badge); a window dragged over the tray covers them |
+| 2 | Roll it | Tray, popup and log show "…" until the dice land, then the numbers (a natural 20 marker appears only after landing) |
+| 3 | Player 1: tray 10d6, then 20d6 | Popup dice in a line at full size: 10d6 in two rows; 20d6 → 11 dice + "+9" (click → the Game log at that roll) |
+| 4 | Hover roll buttons: sheet checks, death saves, concentration, Initiative menus, the log's roll bar | "Alt: adjust in tray" once on each; Alt+click on the roll bar stages the roll in the tray |
+| 5 | Physical dice on: Brakka's Flame Tongue Attack + damage | The form names each part: "To hit — 1d20+8", "Slashing — 2d6+5", "Fire — 2d6" |
+| 6 | Reload on a slow connection (or check DevTools → Network) | The 3D dice file comes compressed (~132 KB instead of 632 KB) and later reloads come from cache |
+
+### Part 3: combat (`late-damage` or `session-sim-9`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Player 1: Mira attacks a goblin (to-hit only); you set Hit → **Apply hit** | Players read "— DM: hit." at once; your popup stays open in its damage step |
+| 2 | Player 1: Damage | Your popup fills the damage (only empty fields: type 7 first and the 7 stays, "rolled N" beside it); Apply |
+| 3 | Player 1 rolls Damage twice | The first value is used; the card says "Also rolled: N — not used" |
+| 4 | Brakka (Rage on) Flame Tongue on the warded goblin; Thorn's Sneak Attack | Your line shows Rage once ("14 slashing (…, incl. + 2 Rage) + 6 fire"); "+ 10 piercing (Sneak Attack)" keeps its type; a ruling reads "— DM ruled hit. N slashing damage" |
+| 5 | Goblin 2's row → **Set as ally** | "Ally" chip on its row and token; players see it and a log line; its attack popup aims at the goblins. Encounters → "Escort to the Ford" → Friendly switch: difficulty counts enemies only |
+| 6 | Mira → Set as enemy with **Secret** | Dashed chip for you; players see nothing at all |
+| 7 | Move tokens; reload you and a player | The same combat trails on every screen; Next clears them |
+
+### Part 4: party, handouts, images (`session-sim-9` or `party-s5`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Party window | Tabs Handouts · Inventory · **Loot**; no Coin "open Party loot" button, no separate loot window |
+| 2 | New handout: **Upload** an image, drag one in, **paste** one (Ctrl+V in the text) | Three image tiles; the text unchanged; uploads don't appear in your Assets library |
+| 3 | Share… → Player 1 only, tick **Also open it on the screens of players who newly get it** | Player 1: a popup over everything; Player 2 nothing. Viewer → Open on screens… / Close on all screens |
+| 4 | Player 1 offline when you present; reconnect | The popup opens when they come back |
+| 5 | Compendium → Potion of Healing → **Add to party**, qty 2 | Toast for everyone; Inventory merged (×N); players have no button |
+| 6 | Compendium → a homebrew item → images: upload + paste (up to 4), move one to Main, share | Gallery + lightbox for you and players; a DM-only entry's images never reach players |
+
+### Part 5: player colours and the template menu (`player-colours` or `session-sim-9`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Player 1: header colour dot → pick rose; you: Players panel → change Player 2, then your own | Taken colours disabled ("Taken by ‹name›"); every client updates live |
+| 2 | Player 1: right-drag a laser, ping; AoE cone, Keep | In rose with a "Player 1" chip over a dark outline; the template label says "by Player 1" |
+| 3 | Drag Thorn, then Mira | Paths in the token owner's colour (Thorn blue even when you drag) |
+| 4 | Rolls from Player 1 and Player 2 | Their names in their colours in the Game log and the roll popup; your applied hit lines stay neutral |
+| 5 | A player's damage card / notification | A coloured stripe for who caused it; "Resolved by DM" in your colour |
+| 6 | Right-click a kept template (Select tool) | Delete / Edit… / Hide (you only); players can delete their own; a right-drag still draws the laser |
+
+### Known gaps / later
+
+- **Reopened windows stack again (FAIL a, BL-38):** a window reopened from the launcher comes back at its stored spot without re-checking, so at 1440×900 Encounters can land exactly on Compendium, and after a resize Party sits on Initiative. First opens after Reset layout never overlap. Needs your call (re-place on reopen vs keep your spot).
+- **First placement can still half-cover a PC (FAIL a, BL-39):** the PC rule uses token centres, so a window can stop at a PC's centre; and a launcher window may open mid-map over tokens while an edge spot is free.
+- **Your "N pending actions" toast covers the Fog bar's second row (FAIL b, BL-40)** and the map's top-left once windows are open.
+- **Initiative still cuts a hidden Ally's name** ("Goblin Lur…") and shows Mira's Searing Strike as cut text instead of an icon; the last row bleeds under "↓ N more" (FAIL c, BL-43).
+- **"by Player 1" on a kept template shows only while selected**, not on hover (FAIL j, BL-47).
+- **Fit squeezes the map:** at 1440×900 cells drop to 28 px with the right half empty (it avoids your top-centre box); at 1280×720 the PCs-first fallback puts the top row half under the top bar (BL-41, the OQ-SHELL-40 trade-off).
+- **Players' east third under the Character sheet at 1280×800** (sim-8 #3 still open, BL-42).
+- The dice tray at its default size hides its Roll button once dice are staged (BL-44); the Sneak Attack offer starts unticked even with a finesse weapon, and the physical form's Roll silently does nothing while the Divine Fury total is empty (BL-45); a downed goblin is back at full HP when bound into the next encounter (BL-46).
+- Accepted for later: a d6 sits tilted like a diamond in its popup cell (art sprint); a popup can slide out from under the pointer when a toast arrives; pushed windows stay where they were pushed after the tool closes; tinted path cells have no dark outline; the colour-swatch tooltip covers the row above (BL-36); Space doesn't press buttons app-wide (BL-37); clipboard paste untested in Firefox / Edge; small copy (BL-48).
+
+### Teardown
+
+`Ctrl+C` the server, then:
+
+```powershell
+bun run fixtures:reset --profile verify
+```
 
 ## Boundaries and hotspots (sequence these)
 
