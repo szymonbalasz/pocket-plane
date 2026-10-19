@@ -121,7 +121,10 @@ export const senderKey = (from: { role: string; playerId?: string | null }) =>
 
 /** How a ping or trail draws (FR-MAP-68, -69): the sender's colour, `by` attr and name chip. */
 export interface SignalMark {
-  /** Konva `id` of the mark, its casing and its chip. */
+  /**
+   * Konva `id` of the mark, its casing and its chip (MAP §7): the sender key (own marks too, no
+   * `self`); a ping adds `:<n>`.
+   */
   id: string;
   color: string;
   by: string;
@@ -150,7 +153,7 @@ const markOf = (
 /** FR-MAP-69: a pulse over 2 s; the chip stays for those 2 s (none on the own). */
 export function pingMark(p: Ping, store: Records, now: number, read?: ReadVar) {
   const t = Math.min(1, Math.max(0, (now - p.at) / PING_MS));
-  return { ...markOf(store, `ping-${p.id}`, p.from, p.own, 1 - t, read), t };
+  return { ...markOf(store, `${senderKey(p.from)}:${p.id}`, p.from, p.own, 1 - t, read), t };
 }
 
 /** FR-MAP-68: a trail fades 1 s after its newest point; its chip at the head fades with it. */
@@ -158,5 +161,5 @@ export function trailMark(tr: Trail, store: Records, now: number, read?: ReadVar
   const last = tr.points.at(-1);
   const age = last ? now - last.at : LASER_FADE_MS;
   const opacity = Math.max(0, 1 - age / LASER_FADE_MS);
-  return markOf(store, tr.key, tr.from, tr.key === SELF_KEY, opacity, read);
+  return markOf(store, senderKey(tr.from), tr.from, tr.key === SELF_KEY, opacity, read);
 }

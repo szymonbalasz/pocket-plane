@@ -61,7 +61,12 @@ describe("FR-MAP-68 laser colour", () => {
     });
     expect(m("dm")).toMatchObject({ color: PLAYER_COLORS.amber, by: "dm", chip: "DM" });
     // Own trail: own colour, `by` = own id (no `self`), no chip.
-    expect(m(SELF_KEY)).toMatchObject({ color: PLAYER_COLORS.jade, by: "p1", chip: null });
+    expect(m(SELF_KEY)).toMatchObject({
+      id: "player:p1",
+      color: PLAYER_COLORS.jade,
+      by: "p1",
+      chip: null,
+    });
     // Chip and trail share one opacity: half-way through the fade, then gone.
     expect(m("player:p1", LASER_FADE_MS / 2).opacity).toBeCloseTo(0.5);
     expect(m("player:p1", LASER_FADE_MS).opacity).toBe(0);
@@ -77,6 +82,7 @@ describe("FR-MAP-69 ping colour", () => {
     const [a, b, c] = ptr.getState().pings;
     expect(a?.from).toEqual(P1);
     expect(pingMark(a as never, S, 0, none)).toMatchObject({
+      id: expect.stringMatching(/^player:p1:\d+$/),
       color: PLAYER_COLORS.jade,
       by: "p1",
       chip: "Player 1",
