@@ -2,14 +2,15 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 5 **done** — 26 / 26 slices merged (#257–#283), gate session-sim-9 13 / 17 (#284), playtest section in [sprint-5](sprint-5.md#playtest-sprint-5-features). **Paused for the DM recap.**
+**Phase:** Sprint 5 **done** — 26 / 26 slices merged (#257–#283), gate session-sim-9 13 / 17 (#284), playtest section in [sprint-5](sprint-5.md#playtest-sprint-5-features). Recap done (#285, #286). **Sprint 6 planned** in [sprint-6](sprint-6.md); Phase A starts with the DM's kickoff prompt.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Sprint 5 builds | merged | — | 26 / 26 (+ BL-12, 16, 28, 31, 32, 34, 35 backfill) | — |
-| session-sim-9 | main | — | 13 / 17 PASS (#284), `.verify/20261019-211926-session-sim-9/` | DM recap; FAILs in backlog BL-38–BL-48 |
+| session-sim-9 | main | — | 13 / 17 PASS (#284), `.verify/20261019-211926-session-sim-9/` | FAILs in backlog BL-38–BL-48 (WF track in sprint 6) |
+| Sprint 6 | — | — | planned ([sprint-6](sprint-6.md)) | Phase A: specs CP, WF, PF, IM at once |
 
 ## Shared-file locks
 
