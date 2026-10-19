@@ -6,12 +6,13 @@ import type { CommandContext } from "../../commands/context";
 import * as contextModule from "../../commands/context";
 import { parseConfig } from "../../config";
 import { closeDb, openFileDb } from "../../db/client";
-import { campaign } from "../../db/schema";
+import { campaign, gameLogEntry } from "../../db/schema";
 import { silentLogger } from "../../log";
 import { acquireLock, LockHeldError, lockPath } from "../../runtime/lock";
 import { readManifest, writeManifest } from "../../runtime/manifest";
 import { StartupError, startServer } from "../../server";
 import { addPlayer, createCampaign } from "../campaign-management/commands";
+import { rollCommand } from "../dice-roll-log/commands";
 import { defineBundle, defineFixture, type FixtureLibrary, step } from "./fixture-types";
 import { FixtureError, load, reset, resetAndLoad, resolveBundle } from "./loader";
 
@@ -71,6 +72,24 @@ const fx = {
     ownerSpec: "t",
     steps: [step(addPlayer, { name: "OK" }), step(addPlayer, { name: "p1" })],
   }),
+  // A step sent as a player (CBT §13.1 `late-hit-ruled`): `as` names a loaded player fixture.
+  asP1: defineFixture({
+    key: "as-p1",
+    kind: "setup",
+    requires: ["p1"],
+    ownerSpec: "t",
+    steps: [
+      step(rollCommand, { expression: "1d20", manual: { diceTotal: 7 } }, { as: "p1" }),
+      step(rollCommand, { expression: "1d20", manual: { diceTotal: 8 } }),
+    ],
+  }),
+  asMissing: defineFixture({
+    key: "as-missing",
+    kind: "setup",
+    requires: ["p1"],
+    ownerSpec: "t",
+    steps: [step(rollCommand, { expression: "1d20" }, { as: "p2" })],
+  }),
   cycA: defineFixture({
     key: "cyc-a",
     kind: "setup",
@@ -105,6 +124,8 @@ const lib: FixtureLibrary = {
     defineBundle({ name: "cycle", includes: ["base"], fixtures: ["cyc-a"] }),
     defineBundle({ name: "missing", includes: ["base"], fixtures: ["missing"] }),
     defineBundle({ name: "unknown", includes: ["base"], fixtures: ["what"] }),
+    defineBundle({ name: "as-player", includes: ["base"], fixtures: ["as-p1"] }),
+    defineBundle({ name: "as-missing", includes: ["base"], fixtures: ["as-missing"] }),
   ],
 };
 
@@ -164,6 +185,23 @@ describe("reset and load", () => {
     const db = openFileDb(config.dbPath);
     expect(db.select().from(campaign).all()).toHaveLength(0);
     closeDb(db);
+  });
+
+  test("FR-FIX-05 a step `as` a player fixture runs as that player; the others as the DM; an unloaded one fails", async () => {
+    const config = tempConfig();
+    const m = await resetAndLoad(config, lib, "as-player");
+    const db = openFileDb(config.dbPath);
+    const rows = db.select().from(gameLogEntry).all();
+    closeDb(db);
+    expect(rows.map((r) => [r.rollerRole, r.rollerPlayerId])).toEqual([
+      ["player", m.records.p1?.player?.[0] ?? null],
+      ["dm", null],
+    ]);
+    const err = (await resetAndLoad(tempConfig(), lib, "as-missing").catch(
+      (e: unknown) => e,
+    )) as Error;
+    expect(err).toBeInstanceOf(FixtureError);
+    expect(err.message).toContain('Fixture "p2" has not been loaded yet');
   });
 
   test("FR-FIX-04 pre-flight failure writes nothing", async () => {
