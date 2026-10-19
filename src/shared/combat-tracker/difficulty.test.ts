@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { dmg2014, formatCr, totalCr } from "./difficulty";
+import { dmg2014, formatCr, rateEncounter, totalCr } from "./difficulty";
 
 describe("FR-CBT-03 dmg-2014", () => {
   test("FR-CBT-03 CBT §13 step 1: Goblin ×2, Wolf, Elite vs two L1 → 250 / 625, Deadly", () => {
@@ -41,5 +41,36 @@ describe("FR-CBT-03 dmg-2014", () => {
     expect(dmg2014.rate([], ["1"])).toMatchObject({ rating: "—", thresholds: null, baseXp: 200 });
     expect(dmg2014.rate([1, 1, 1], []).rating).toBe("Trivial");
     expect(dmg2014.rate([20, 20, 20, 20], ["1"]).rating).toBe("Trivial");
+  });
+});
+
+describe("FR-CBT-102 difficulty counts enemies only (#252)", () => {
+  const goblin = (quantity: number, side: "ally" | "enemy") => ({
+    name: "Goblin",
+    cr: "1/4",
+    quantity,
+    side,
+  });
+
+  test("FR-CBT-102 difficulty enemies only: enc-friendly rates Goblin ×2, lists the friendly one", () => {
+    const r = rateEncounter(dmg2014, [1, 1], [goblin(2, "enemy"), goblin(1, "ally")]);
+    // As if only Goblin ×2: 100 XP × 1.5 (2 monsters) +1 step (< 3 PCs) = ×2.
+    expect(r).toMatchObject(dmg2014.rate([1, 1], ["1/4", "1/4"]));
+    expect(formatCr(r.totalCr)).toBe("0.5");
+    expect(r.friendly).toBe("Friendly: Goblin ×1 (CR 1/4)");
+    // Friendly off (all three enemies): rating and total CR rise.
+    const off = rateEncounter(dmg2014, [1, 1], [goblin(3, "enemy")]);
+    expect(off.adjustedXp).toBeGreaterThan(r.adjustedXp);
+    expect(formatCr(off.totalCr)).toBe("0.75");
+    expect(off.friendly).toBeNull();
+  });
+
+  test("FR-CBT-102 difficulty enemies only: all friendly → '—'; several friendly entries listed", () => {
+    const wolf = { name: "Wolf", cr: "1/4", quantity: 1, side: "ally" as const };
+    const r = rateEncounter(dmg2014, [1, 1], [goblin(2, "ally"), wolf]);
+    expect([r.rating, r.baseXp, r.totalCr]).toEqual(["—", 0, 0]);
+    expect(r.friendly).toBe("Friendly: Goblin ×2 (CR 1/4), Wolf ×1 (CR 1/4)");
+    // No entries at all keeps FR-CBT-03's rule (Trivial with a party).
+    expect(rateEncounter(dmg2014, [1, 1], []).rating).toBe("Trivial");
   });
 });

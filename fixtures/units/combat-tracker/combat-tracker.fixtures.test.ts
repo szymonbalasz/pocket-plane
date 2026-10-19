@@ -162,9 +162,29 @@ describe("CBT §13.1 late-damage fixtures (sprint 5)", () => {
     });
   });
 
-  test("CBT §13.1 session-sim-9 carries late-hit-ruled", async () => {
+  test("CBT §13.1 session-sim-9 carries late-hit-ruled and enc-friendly", async () => {
     const r = await ruled("session-sim-9");
     expect(r.manifest.fixtures).toContain("late-hit-ruled");
+    expect(r.manifest.fixtures).toContain("enc-friendly");
     expect(r.rulings).toHaveLength(1);
+  });
+
+  test("CBT §13.1 enc-friendly (#252): planned 'Escort to the Ford', Goblin ×2 enemy + Goblin ×1 friendly, party null", async () => {
+    const r = await loadBundle("late-damage");
+    dirs.push(r.dir);
+    expect(r.manifest.fixtures).toContain("enc-friendly");
+    const db = r.openDb();
+    const enc = db.select().from(encounter).where(eq(encounter.name, "Escort to the Ford")).get();
+    const entries = db
+      .select()
+      .from(encounterEntry)
+      .where(eq(encounterEntry.encounterId, enc?.id ?? ""))
+      .orderBy(asc(encounterEntry.seq))
+      .all();
+    closeDb(db);
+    expect(enc).toMatchObject({ status: "planned", partyCharacterIds: null });
+    // One definition (enemy-1's Goblin), two entries: the friendly one stays apart.
+    expect(new Set(entries.map((e) => e.definitionId)).size).toBe(1);
+    expect(entries.map((e) => `${e.quantity} ${e.side}`)).toEqual(["2 enemy", "1 ally"]);
   });
 });

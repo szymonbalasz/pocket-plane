@@ -13,5 +13,7 @@ export default defineBundle({
     "late-hit-ruled",
     // R3: this turn's moves (Mira ×2, Thorn ×1, Goblin ×1), stored on the tokens as trails
     "trail-moves",
+    // R4: planned "Escort to the Ford", Goblin ×2 + 1 friendly
+    "enc-friendly",
   ],
 });

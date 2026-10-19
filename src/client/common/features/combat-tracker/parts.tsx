@@ -1,14 +1,17 @@
-// Small combat UI parts for both clients: portrait / initials, health band badge, turn marker;
-// the creature lookup (FR-CBT-63) used by the DM's encounter builder and Add dialog.
-import type { HealthBand } from "@shared/combat-tracker/schemas";
+// Small combat UI parts for both clients: portrait / initials, health band badge, turn marker,
+// side chip (FR-CBT-104); the creature lookup (FR-CBT-63) used by the DM's encounter builder and
+// Add dialog.
+import type { CombatantKind, HealthBand, Side } from "@shared/combat-tracker/schemas";
 import { initials } from "@shared/scenes-map/geometry";
-import { ChevronRightIcon, SwordsIcon } from "lucide-react";
+import { ChevronRightIcon, HandshakeIcon, SwordsIcon } from "lucide-react";
 import { useState } from "react";
 import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/controls";
+import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Input } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { AssetImg } from "../assets-pipeline/AssetImg";
 import { type LookupRow, lookupMatches, noMatchText } from "./lookup";
+import { otherSide, SIDE_LABEL, sideChip } from "./side";
 
 export function Portrait({ name, imageAssetId }: { name: string; imageAssetId: string | null }) {
   if (imageAssetId) {
@@ -58,6 +61,40 @@ export function TurnMarker({ active }: { active: boolean }) {
 }
 
 export const InitiativeIcon = SwordsIcon;
+
+/**
+ * FR-CBT-104 (#252): "Ally" (lucide `handshake`) on a monster set to ally, "Enemy" on a PC set to
+ * enemy, `badge` look; dashed (DM) while players see another side. Never folds (FR-CBTX-54): the
+ * row puts it before the effect chips, outside "+N".
+ */
+export function SideChip({
+  c,
+  testId,
+}: {
+  c: { id: string; kind: CombatantKind; side?: Side | null; publicSide?: Side | null };
+  testId: string;
+}) {
+  const chip = sideChip(c);
+  if (!chip) return null;
+  const Icon = chip.side === "ally" ? HandshakeIcon : SwordsIcon;
+  const badge = (
+    <Badge
+      variant="outline"
+      data-testid={testId}
+      data-record-id={c.id}
+      data-value={chip.side}
+      data-secret={chip.secret}
+      className={cn("shrink-0 gap-1 px-1.5 text-[11px]", chip.secret && "border-dashed")}
+    >
+      <Icon className="size-3" aria-hidden />
+      {SIDE_LABEL[chip.side]}
+    </Badge>
+  );
+  if (!chip.secret) return badge;
+  return (
+    <Tooltip content={`Secret: players see ${SIDE_LABEL[otherSide(chip.side)]}`}>{badge}</Tooltip>
+  );
+}
 
 /**
  * FR-CBT-63: a text input with up to 8 suggestions while something is typed (no list when

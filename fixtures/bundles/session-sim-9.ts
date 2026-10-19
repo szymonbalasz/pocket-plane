@@ -13,9 +13,12 @@ export default defineBundle({
   fixtures: [
     // W: windows + layout
     // D: dice polish
+    // D11: no new unit (the popup line walks on any roll; DICEX §13 uses `dice-polish`)
     // R: late damage, trails, ally side
     // R1: a ruled card in its damage step (Mira → Goblin 2, waiting for damage)
     "late-hit-ruled",
+    // R4: planned "Escort to the Ford", Goblin ×2 + 1 friendly (the Friendly switch, A3)
+    "enc-friendly",
     // R2: no new unit (L12–L14 walk on rules-effects' Brakka, Thorn and Fire Ward)
     // R3: this turn's moves (Mira ×2, Thorn ×1, Goblin ×1), stored on the tokens as trails
     "trail-moves",

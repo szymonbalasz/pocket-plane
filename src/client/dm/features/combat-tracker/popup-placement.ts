@@ -7,7 +7,8 @@
 // open; then the DM may drag it (FR-CBT-76), always clamped into the work area. `popupPlacement`,
 // `placementTiers`, `clampIntoWorkArea` and `dragPopup` are pure; `measurePlacement` reads the
 // live screen.
-import type { CombatantKind } from "@shared/combat-tracker/schemas";
+import { sideOf } from "@shared/combat-tracker/rules";
+import type { CombatantKind, Side } from "@shared/combat-tracker/schemas";
 import { INITIATIVE_KIND } from "@ui/features/combat-tracker/window";
 import {
   EDGE_GAP,
@@ -37,11 +38,12 @@ interface TierInput<C> {
 /**
  * FR-CBT-55/56: the tokens the popup side is measured from, at open. Selection rows' tokens win;
  * with none, the attacker's **likely targets**: active, non-removed combatants of the encounter
- * of the other kind (monster → PCs, PC → monsters) bound to a token on the viewed scene.
+ * on the other side (FR-CBT-101, #252: `sideOf`; an ally Goblin → the enemies, an enemy Mira →
+ * the party) bound to a token on the viewed scene. Read at open: a later side change moves nothing.
  */
-export function placementTokenIds<C extends TargetCandidate & { kind: CombatantKind }>(
-  o: TierInput<C>,
-): string[] {
+export function placementTokenIds<
+  C extends TargetCandidate & { kind: CombatantKind; side?: Side | null },
+>(o: TierInput<C>): string[] {
   if (o.rowTokenIds.length > 0) return [...o.rowTokenIds];
   const attacker = o.combatants.find((c) => c.id === o.attackerId);
   if (!attacker || !o.viewedSceneId) return [];
@@ -50,7 +52,7 @@ export function placementTokenIds<C extends TargetCandidate & { kind: CombatantK
     c.id !== o.attackerId &&
     c.active !== false &&
     !c.removed &&
-    c.kind !== attacker.kind &&
+    sideOf(c) !== sideOf(attacker) &&
     c.tokenId &&
     o.tokenSceneOf(c.tokenId) === o.viewedSceneId
       ? [c.tokenId]
@@ -63,9 +65,9 @@ export function placementTokenIds<C extends TargetCandidate & { kind: CombatantK
  * rows' tokens, else the likely targets; (1) with rows, the other likely targets; (2) every other
  * active combatant's token on the viewed scene. A tier only breaks the ties of the ones before.
  */
-export function placementTiers<C extends TargetCandidate & { kind: CombatantKind }>(
-  o: TierInput<C>,
-): string[][] {
+export function placementTiers<
+  C extends TargetCandidate & { kind: CombatantKind; side?: Side | null },
+>(o: TierInput<C>): string[][] {
   const first = placementTokenIds(o);
   const likely =
     o.rowTokenIds.length > 0
