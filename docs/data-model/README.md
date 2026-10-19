@@ -1430,7 +1430,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V3). *
 From [party-board](../specs/party-board.md#64-gold-ledger-party-loot-evolved) (PARTY slice 3, on [party-loot](../specs/party-loot.md)). **Built by `build/party-gold`**: no new table, column or record type. Protocol side: [protocol §55](../protocol/README.md#55-sprint-3-party-board-gold-p3).
 
 - **Split rows:** `loot.split` writes one `loot_entry` per chosen character: `kind = move`, `party → character`, `text` "Split" (`SPLIT_TEXT`), coins = the share (⌊coin / n⌋ per denomination), `qty` null, `editedAt` null. The remainder is simply not moved, so it stays in the derived `party-pot` (FR-LOOT-09 sums, conservation unchanged). Split rows are ordinary moves: not editable, corrected by a reverse move.
-- **Item rows** (`kind = item`, from P core): read-only in `loot.log`; `loot.edit` refuses them (`conflict`).
+- **Item rows** (`kind = item`, from P core): read-only in `loot.log` *(S5: the Party window's Loot tab, FR-LOOT-21; no data change)*; `loot.edit` refuses them (`conflict`).
 - **Derived (client, `@ui/features/party-loot/logic`):** item-row line `itemLine` ("‹from› → ‹to›: ‹name› ×‹qty›"), Split… prefill (the pot's positive coins), default ticks (characters whose `creature-sheet.status` ≠ `draft`; no sheet = ready), preview (`splitPreview`, `@shared/party-board/format`).
 - **CON-44:** no new record shape; a split adds n ordinary move rows inside LOOT's 100-row window (≤ 471 B each, protocol §29 budget unchanged).
 
@@ -1875,9 +1875,17 @@ From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–
 - **Fixtures:** bundle `party-cmp` = `party-board` + `cmp-srd-mini` (existing units; SRD "Potion of Healing" merges into `party-items-1`'s "Potion of healing" ×2 → ×4).
 - **Snapshot size** (CON-44): no new record type or field, so +0 B per viewer at a given state; an add writes the same rows as the Inventory tab's Add (`party-item` lazy; the `loot-entry` row as PARTY §12 already budgets).
 
-## 73. Sprint 5: combat log wording (R2)
+## 73. Sprint 5: compendium entry images client (C5 UI)
 
-From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-95, -96 and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) FR-MOD-62. **Built by `fix/combat-lines`**: no table, column, record type or payload change; `cbt.attack` lines render differently from the same stored `payload` / `dmPayload` (old rows included). Protocol side: [protocol §93](../protocol/README.md#93-sprint-5-combat-log-wording-r2).
+From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-49–52 (DM gate #256). **Built by `build/cmpimg-ui`**: client only; no table, column or record type (writes and reads §68's `compendium_entry.image_asset_ids` through the existing REST routes). Protocol side: [protocol §94](../protocol/README.md#94-sprint-5-compendium-entry-images-client-c5-ui).
+
+- **Client draft:** the homebrew form holds `images: string[]` (slot order, first = main) and sends it as `imageAssetIds` in the whole replace; uploads and pastes become attachments (`asset.listed = false`) at once, whether or not the entry is saved (P's "Never saved" case).
+- **Derived:** the view's main image = `imageAssetIds[0]`; the lightbox index is local UI state.
+- **Fixtures:** none new (`cmp-images`, §68). **Snapshot size** (CON-44): +0 B per viewer (no record; attachments are outside the `asset` record type).
+
+## 74. Sprint 5: combat log wording (R2)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-95, -96 and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) FR-MOD-62. **Built by `fix/combat-lines`**: no table, column, record type or payload change; `cbt.attack` lines render differently from the same stored `payload` / `dmPayload` (old rows included). Protocol side: [protocol §95](../protocol/README.md#95-sprint-5-combat-log-wording-r2).
 
 - **Derived (line text):** the ruling's full stop; the DM's damage parts (`dmPayload.mods.damage`) inside the base part's muted run; a trigger part's type word = `parts[].type` ?? `damageType`.
 - **Fixtures:** none new (`rules-effects` holds every unit L12–L14 needs).

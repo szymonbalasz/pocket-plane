@@ -2,6 +2,7 @@
 // from a visible non-monster entry; independent) and Edit (homebrew; kind fixed). One text form:
 // name, the kind's facets plus its required short fields, markdown-lite text, Shared. Fields the
 // form doesn't show (material, higher levels, cost, presets, …) are kept from the source.
+// Images (FR-CMP-49, -50): ordered slots, first = main; Clone and Edit prefill the source's.
 import { clip } from "@shared/compendium/homebrew";
 import {
   type CompendiumEntry,
@@ -42,12 +43,14 @@ export interface HomebrewFields {
   className: SrdClass;
   subclass: string;
   featureLevel: string;
+  /** Image asset IDs in slot order, first = main (FR-CMP-45). */
+  images: string[];
   /** The source's facets / body: what the form doesn't show is kept from here. */
   facets: Record<string, unknown>;
   body: Record<string, unknown>;
 }
 
-const BLANK: Omit<HomebrewFields, "kind" | "facets" | "body"> = {
+const BLANK: Omit<HomebrewFields, "kind" | "images" | "facets" | "body"> = {
   name: "",
   text: "",
   shared: false,
@@ -73,7 +76,7 @@ const bool = (v: unknown) => v === true;
 
 export function initialFields(mode: FormMode, kind: HomebrewKind = "item"): HomebrewFields {
   const src = mode.kind === "clone" ? mode.base : mode.kind === "edit" ? mode.entry : null;
-  if (!src || src.kind === "monster") return { ...BLANK, kind, facets: {}, body: {} };
+  if (!src || src.kind === "monster") return { ...BLANK, kind, images: [], facets: {}, body: {} };
   const f = (src.facets ?? {}) as Record<string, unknown>;
   const b = (src.body ?? {}) as Record<string, unknown>;
   const name =
@@ -99,6 +102,8 @@ export function initialFields(mode: FormMode, kind: HomebrewKind = "item"): Home
     className: str(f.className, BLANK.className) as SrdClass,
     subclass: str(f.subclass, ""),
     featureLevel: src.kind === "feature" && typeof f.level === "number" ? String(f.level) : "",
+    // Imported bases have none (FR-CMP-45); a homebrew base's carry over (FR-CMP-49).
+    images: src.source === null ? [...src.imageAssetIds] : [],
     facets: f,
     body: b,
   };
@@ -173,4 +178,28 @@ export function draftError(f: HomebrewFields): string | null {
   if (!i) return "Invalid entry";
   const field = i.path.at(-1);
   return field === undefined ? i.message : `${String(field)}: ${i.message}`;
+}
+
+// ---- Image slots (FR-CMP-50) ----
+
+export const ALREADY_IN_ENTRY = "Already in this entry";
+
+/**
+ * An image from the attach control joins the end; dedupe is the form's (seams S5): an id already
+ * held (same bytes → same id) is not added again.
+ */
+export function attachImage(ids: readonly string[], id: string) {
+  const duplicate = ids.includes(id);
+  return { ids: duplicate ? [...ids] : [...ids, id], duplicate };
+}
+
+export const removeImage = (ids: readonly string[], i: number) => ids.filter((_, j) => j !== i);
+
+/** Swap slot `i` with its neighbour; out of range → unchanged. */
+export function moveImage(ids: readonly string[], i: number, by: -1 | 1): string[] {
+  const j = i + by;
+  if (i < 0 || i >= ids.length || j < 0 || j >= ids.length) return [...ids];
+  const out = [...ids];
+  [out[i], out[j]] = [out[j] as string, out[i] as string];
+  return out;
 }

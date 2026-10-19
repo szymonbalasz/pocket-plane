@@ -3,6 +3,13 @@
 // (FR-SHELL-45, -46); screen full → the least recently used launcher window is auto-minimised
 // (FR-SHELL-47).
 import { expect, test } from "bun:test";
+import {
+  lootLogTraces,
+  openPartyTabRuns,
+  RETIRED_LOOT_KIND,
+  restoreWithLootLog,
+  STORED_BOARD,
+} from "@ui/features/party-board/loot-tab-checks";
 import { clampRect, type Rect, TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { touchedEdge } from "@ui/features/play-shell/map-coverage";
@@ -69,4 +76,28 @@ test("FR-PARTY-14 Player viewer opens clear of every open window (the board auto
     expect(r.h).toBeGreaterThanOrEqual(320); // min size: the last resort at 1280×720
     expect(r.w).toBeGreaterThanOrEqual(360);
   }
+});
+
+// ---- sprint 5: Loot tab (FR-PARTY-30, FR-LOOT-21) ----
+
+test("FR-LOOT-21 no loot.log window (Player): no window kind, no launcher entry; a stored layout with it parses, the kind dropped, the board keeps its geometry", () => {
+  expect(lootLogTraces(playerWindows)).toEqual({ kind: false, launcher: false, available: false });
+  const r = restoreWithLootLog(playerWindows);
+  expect(r.warning).toBeUndefined();
+  expect(r.stored).toBe(true);
+  expect(r.board).toMatchObject({ state: "open", ...STORED_BOARD });
+  expect(r.written).toContain("party.board");
+  expect(r.written).not.toContain(RETIRED_LOOT_KIND);
+});
+
+test("FR-PARTY-30 open on a tab (Player): closed / minimised / open board → open, in front, tab Loot, by feature", () => {
+  const stored = JSON.stringify({ tab: "loot" });
+  const call = [{ kind: "party.board", by: "feature" }];
+  expect(
+    openPartyTabRuns(playerWindows, { campaignId: "c1", role: "player", playerId: "p1" }),
+  ).toEqual([
+    { before: "closed", calls: call, state: "open", onTop: true, tab: "loot", stored },
+    { before: "minimised", calls: call, state: "open", onTop: true, tab: "loot", stored },
+    { before: "open", calls: call, state: "open", onTop: true, tab: "loot", stored },
+  ]);
 });

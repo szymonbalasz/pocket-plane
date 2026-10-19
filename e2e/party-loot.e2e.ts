@@ -1,7 +1,8 @@
 // e2e-bundle: party-loot
 // Thin party-loot flow (LOOT §13 E2E): DM adds 50 gp → player-1 sees the row, the toast and the
 // pot +50 gp; player-1 takes 10 gp from the pot → the DM sees Mira +10 gp. Role matrix, window,
-// conservation, restart: bun test (party-loot commands.test.ts, sync.test.ts).
+// conservation, restart: bun test (party-loot commands.test.ts, sync.test.ts). Loot opens through
+// Party → Loot tab (FR-LOOT-21; the `loot.log` window retired).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { launcherButton, openWindow } from "./support/shell";
@@ -13,12 +14,20 @@ const walletCoin = (win: Locator, characterId: string, coin: string) =>
     `[data-testid="loot-wallet"][data-record-id="${characterId}"] [data-testid="loot-wallet-coin"][data-value="${coin}"]`,
   );
 
+/** Party → Loot tab (FR-PARTY-29); the tab's scope stands in for the retired window. */
+async function openLoot(page: Page): Promise<Locator> {
+  const board = await openWindow(page, "party.board");
+  await board.locator('[data-testid="party-tab"][data-value="loot"]').click();
+  await board.getByTestId("loot-log").waitFor({ state: "visible" });
+  return board;
+}
+
 async function pick(page: Page, win: Locator, select: string, value: string) {
   await win.getByTestId(select).click();
   await page.locator(`[data-testid="loot-move-option"][data-value="${value}"]`).click();
 }
 
-test("FR-LOOT-03 FR-LOOT-13 FR-LOOT-15 FR-LOOT-18 DM adds 50 gp → player-1 row, toast, pot; player takes 10 gp → DM sees Mira +10 gp", async ({
+test("FR-LOOT-03 FR-LOOT-13 FR-LOOT-15 FR-LOOT-18 FR-LOOT-21 DM adds 50 gp → player-1 row, toast, pot; player takes 10 gp → DM sees Mira +10 gp", async ({
   browser,
 }) => {
   const { secret, link, recordId } = e2eEnv();
@@ -30,13 +39,11 @@ test("FR-LOOT-03 FR-LOOT-13 FR-LOOT-15 FR-LOOT-18 DM adds 50 gp → player-1 row
   await player.goto(link("Player 1"));
   await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
 
-  // P3 glitch 12: one name: the launcher says what the window says.
-  for (const page of [dm, player]) {
-    await expect(launcherButton(page, "loot.log")).toHaveAttribute("aria-label", "Party loot");
-  }
-  const dmWin = await openWindow(dm, "loot.log");
-  const pWin = await openWindow(player, "loot.log");
-  await expect(dmWin.getByTestId("ui-window-title")).toHaveText("Party loot");
+  // FR-LOOT-21: no `loot.log` launcher entry; the body is the Party window's Loot tab.
+  for (const page of [dm, player]) await expect(launcherButton(page, "loot.log")).toHaveCount(0);
+  const dmWin = await openLoot(dm);
+  const pWin = await openLoot(player);
+  await expect(dmWin.getByTestId("ui-window-title")).toHaveText("Party");
   // Bundle state: pot 5 pp, 30 gp; Mira 21 gp (own, first); 9 rows; player has no add form.
   for (const w of [dmWin, pWin]) {
     await expect(potCoin(w, "gp")).toHaveText("30 gp");
@@ -93,8 +100,8 @@ test("FR-PARTY-26 FR-PARTY-27 DM Split… Mira + Thorn, prefilled from the pot �
   const player = await rolePage(browser);
   await player.goto(link("Player 2"));
   await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
-  const dmWin = await openWindow(dm, "loot.log");
-  const pWin = await openWindow(player, "loot.log");
+  const dmWin = await openLoot(dm);
+  const pWin = await openLoot(player);
   await expect(pWin.getByTestId("loot-split-open")).toHaveCount(0);
 
   await dmWin.getByTestId("loot-split-open").click();
@@ -148,7 +155,7 @@ test("FR-LOOT-18 DM Move form in a campaign without characters: empty state, Mov
     await expect(dm.getByTestId("camp-campaign-name")).toHaveText(name);
   };
   await switchTo("Second Campaign");
-  const move = (await openWindow(dm, "loot.log")).getByTestId("loot-move");
+  const move = (await openLoot(dm)).getByTestId("loot-move");
   await expect(move.getByTestId("loot-move-empty")).toHaveText(
     "No characters to move coin to/from",
   );
