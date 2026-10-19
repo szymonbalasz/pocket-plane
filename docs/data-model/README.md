@@ -1796,3 +1796,12 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-88, -91, 
 - **Derived (not stored):** `sideOf`, `publicSideOf`; the players' combatant `side` (= `publicSideOf`).
 - **Fixtures:** bundle `late-damage` = `rules-effects` (R1 / R3 / R4 append their units).
 - **CON-44** (`src/server/ws/snapshot-size.test.ts`, realistic-heavy harness, every row at its worst): DM 640,788 → 697,783 B (20 rulings × 20 targets +39,659 B; 3 unused rolls on every damage card +4,040 B; 60 active-scene trails at the 20-segment cap +13,020 B; `side` + `publicSide` set on every combatant +276 B over the null baseline); 875,081 B left of 1.5 MiB. Players 256,904–260,336 B (trails +1,302 B each, player tokens only; rulings 0 B).
+
+## 67. Sprint 5: kept-template right-click menu (K1)
+
+From [scene-tools](../specs/scene-tools.md#8-data-model) sprint 5 (FR-SCN-48–51) and [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-71. **Built by `fix/tpl-menu`**; no table, column, record type or field. Protocol side: [protocol §84](../protocol/README.md#84-sprint-5-kept-template-right-click-menu-k1).
+
+- **Client only (never stored or sent):** the open template menu `{templateId, sceneId, at}` (one per page, `aoe-store.ts`); the deferred right press `{screen, p, laser, menu}` (`MapCanvas.tsx`, FR-MAP-71 step 4: dropped on release, a ≥ 4 px drag, leaving live).
+- **Derived:** the menu's template = `templateAt` over the shown scene's kept templates in draw order (FR-SCN-49); its items from the role and `hidden` (Delete, Edit…, DM Hide / Reveal), disabled while not live.
+- **Fixtures:** no new unit; bundle **`tpl-menu`** = `map-tools` (Spirit Guardians `player-1`, Thunderwave `player-2`, Web DM, hidden Glyph), its own server for the e2e (which deletes templates). The K8 / K9 walkthrough runs on `map-tools` until `player-colours` is on `main`.
+- **CON-44:** no new bytes (no record or field).

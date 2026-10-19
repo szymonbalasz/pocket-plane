@@ -5,8 +5,9 @@
 // (FR-MAP-28), the live drag preview (FR-MAP-39/40), the canvas tool core (FR-SCN-06: stage
 // dispatch to the active registry tool, Space + drag pans, Esc to the tool first, tokens ignore
 // left-press while drawing), the middle-mouse pan before all of it (FR-MAP-12, sprint 4) and the
-// combat trails' moves (FR-MAP-54, read from this client's store). No feature logic: the server
-// decides.
+// combat trails' moves (FR-MAP-54, read from this client's store) and the right-press routing
+// (FR-MAP-71: node menus → token → tool menu → layer `contextMenu` → laser). No feature logic:
+// the server decides.
 import { DEFINITION_DRAG_MIME, DefinitionDragData } from "@shared/entities/schemas";
 import { pxToVertex } from "@shared/scene-tools/geometry";
 import {
@@ -64,7 +65,14 @@ import {
 import { DragProbe, probesDrag } from "./drag-probe";
 import { toastReject, useLive, useMapIntent } from "./intents";
 import { LaserSender } from "./laser";
-import { layerSlots, stageLayers } from "./layers";
+import {
+  type LayerContextMenu,
+  type LayerMenuContext,
+  layerMenuAt,
+  layerSlots,
+  type MenuPoint,
+  stageLayers,
+} from "./layers";
 import { createMiddlePan, type MiddlePan } from "./middle-pan";
 import {
   clearOverlay,
@@ -77,6 +85,7 @@ import {
   startMove,
 } from "./overlay";
 import { addPing, addTrailPoints, createPointerStore, senderKey } from "./pointers";
+import { deferredMove, rightPress } from "./right-press";
 import { isClick, tokensInBox } from "./selection-logic";
 import { useCanvasColors } from "./theme";
 import { tokenOverlays } from "./token-overlays";
@@ -420,6 +429,14 @@ export function MapCanvas(props: MapCanvasProps) {
 
   // ---- FR-MAP-28: a drag in progress when the connection drops snaps back, unsent ----
   const laser = useRef<LaserSender | null>(null);
+  /** FR-MAP-71 step (4): a right press on a layer menu, waiting for its release or a 4 px drag. */
+  const rightRef = useRef<{
+    screen: MenuPoint;
+    p: MenuPoint;
+    laser: boolean;
+    menu: LayerContextMenu;
+    ctx: LayerMenuContext;
+  } | null>(null);
   useEffect(() => {
     if (live) return;
     for (const n of stageRef.current?.find(".map-token") ?? []) {
@@ -438,6 +455,7 @@ export function MapCanvas(props: MapCanvasProps) {
     pointers.setState({ drag: null });
     probe.clear();
     laser.current = null;
+    rightRef.current = null;
   }, [live, pointers, previews, probe]);
   // Unmount mid-drag: no more frames or checks from this canvas.
   useEffect(
@@ -649,6 +667,17 @@ export function MapCanvas(props: MapCanvasProps) {
         laser.current = null;
         addTrailPoints(pointers, "self", client, [], true, performance.now());
       }
+      // FR-MAP-71 (4): a release < 4 px from a deferred right press opens the layer's menu.
+      const right = rightRef.current;
+      rightRef.current = null;
+      if (
+        right &&
+        e &&
+        liveRef.current &&
+        isClick(e.clientX - right.screen.x, e.clientY - right.screen.y)
+      ) {
+        right.menu.open(right.p, { x: e.clientX, y: e.clientY }, right.ctx);
+      }
     },
     [pointers, client, onBoxSelect, onEmptyClick, endBox, trackBox],
   );
@@ -772,15 +801,31 @@ export function MapCanvas(props: MapCanvasProps) {
     if (!p) return;
     const onToken = tokenNodeOf(e.target) !== null;
     if (e.evt.button === 2) {
-      if (onToken) return;
+      // FR-MAP-71: doors' and props' menus never get here (`cancelBubble`).
+      rightRef.current = null;
+      const isLive = liveRef.current;
       // A drawing tool may take the right press for its own menu (FR-FOG-42).
-      const menuTool = drawingRef.current && liveRef.current ? toolDefRef.current : null;
+      const menuTool = !onToken && drawingRef.current && isLive ? toolDefRef.current : null;
       const tp = menuTool?.pointer?.menu ? toolPointerRef.current(e.evt) : null;
-      if (tp && menuTool?.pointer?.menu?.(tp)) return;
-      if (!signalsLive) return;
-      laser.current = new LaserSender(scene.id, (d) => sendSignal(MAP_SIGNALS.laser, d));
-      laser.current.push(p.x, p.y);
-      addTrailPoints(pointers, "self", client, [[p.x, p.y]], false, performance.now());
+      const toolMenu = tp !== null && menuTool?.pointer?.menu?.(tp) === true;
+      const menuCtx: LayerMenuContext = { ...ctx, off: useLayerToggles.getState().off };
+      const asks = isLive && !toolMenu && !(onToken && client === "dm");
+      const hit = asks ? layerMenuAt(canvasLayers, p, menuCtx) : null;
+      const action = rightPress({
+        client,
+        live: isLive,
+        signalsLive,
+        nodeMenu: false,
+        onToken,
+        toolMenu,
+        layerHit: hit !== null,
+      });
+      if (action.kind === "deferred" && hit?.contextMenu) {
+        const screen = { x: e.evt.clientX, y: e.evt.clientY };
+        rightRef.current = { screen, p, laser: action.laser, menu: hit.contextMenu, ctx: menuCtx };
+      } else if (action.kind === "laser") {
+        startLaser([p]);
+      }
       return;
     }
     if (e.evt.button !== 0) return;
@@ -817,9 +862,28 @@ export function MapCanvas(props: MapCanvasProps) {
     }
   };
 
+  /** FR-MAP-24: this client's laser from `points` (a deferred one from its press point). */
+  const startLaser = (points: readonly MenuPoint[]) => {
+    const sender = new LaserSender(scene.id, (d) => sendSignal(MAP_SIGNALS.laser, d));
+    laser.current = sender;
+    for (const q of points) sender.push(q.x, q.y);
+    const trail = points.map((q): [number, number] => [q.x, q.y]);
+    addTrailPoints(pointers, "self", client, trail, false, performance.now());
+  };
+
   const onMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
     // A middle pan keeps the map point under the pointer: nothing for the tools (FR-MAP-12).
     if (pan.active) return;
+    // FR-MAP-71 (4): a deferred right press dragged ≥ 4 px is the laser (or nothing on a token).
+    const right = rightRef.current;
+    if (right) {
+      const dx = e.evt.clientX - right.screen.x;
+      const dy = e.evt.clientY - right.screen.y;
+      const step = deferredMove(right.laser && signalsLive, dx, dy);
+      if (step !== "menu") rightRef.current = null;
+      // Its first point is the press point; this move's point follows below.
+      if (step === "laser") startLaser([right.p]);
+    }
     if (drawingRef.current && liveRef.current && !spaceRef.current) {
       const tp = toolPointerRef.current(e.evt);
       if (tp) toolDefRef.current?.pointer?.move?.(tp);

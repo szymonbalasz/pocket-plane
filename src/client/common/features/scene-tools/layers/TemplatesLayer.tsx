@@ -9,7 +9,8 @@
 // DM-only ones in `visibility.hidden` styling; the "DM-only items" switch (`dm-only`) drops
 // hidden ones. No pointer events: the AoE tool works on the stage. Konva: name `scn-template`,
 // id = record ID or `eph-<key>`, attrs `shape`, `cells` ("c,r c,r …"), `origin` ("x,y"),
-// `angle`, `ephemeral`; handles `scn-template-handle-origin` / `-end` (id = template id).
+// `angle`, `ephemeral`; handles `scn-template-handle-origin` / `-end` (id = template id). Mounts
+// the right-click menu island (FR-SCN-48; the press routing is MapCanvas', FR-MAP-71).
 import { templateCells } from "@shared/scene-tools/geometry";
 import {
   AOE_TEMPLATE_TYPE,
@@ -17,14 +18,15 @@ import {
   type TemplateRecordView,
   TemplateSignalData,
 } from "@shared/scene-tools/schemas";
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { Circle, Group, Label, Line, Shape, Tag, Text } from "react-konva";
 import { useStore } from "zustand";
-import { useSignal, useSync } from "../../../sync/store";
+import { SyncContext, useSignal, useSync } from "../../../sync/store";
 import { canvasBlind } from "../../fog-of-war/blind";
 import { useCanvas } from "../../scenes-map/canvas-context";
 import { useLayerToggles } from "../../scenes-map/tool-store";
 import { type AoeGesture, useAoe } from "../aoe-store";
+import { useTemplateMenuIsland } from "../TemplateMenu";
 import {
   canEditTemplate,
   cellsAttr,
@@ -215,6 +217,7 @@ export function ScnTemplatesLayer() {
     });
   }, [kept, scene.id, client, myPlayerId, dmOnlyOff]);
   useEffect(() => () => useAoe.setState({ editable: [], sceneId: null }), []);
+  useTemplateMenuIsland(useContext(SyncContext));
 
   // ---- others' ephemerals (FR-SCN-23) ----
   const [eph] = useState(createEphemeralStore);
