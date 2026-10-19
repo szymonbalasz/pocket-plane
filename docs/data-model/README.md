@@ -1837,3 +1837,20 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-89–94) 
 - **Fixtures:** `late-hit-ruled` (bundles `late-damage`, `session-sim-9`).
 - **CON-44:** no new bytes (R0 measured `unusedRolls` and rulings).
 
+## 70. Sprint 5: player colours core (K0)
+
+From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP-23–26, -28, -29 and [notifications](../specs/notifications.md#8-data-model) FR-NOTE-38 ([ADR-0055](../architecture/adr/0055-player-colour.md): stored once, derived everywhere; DM gate #256; seams S1, S14, S15). **Built by `fix/colours-core`** (schema lane 2, after R0): drizzle push, push-safe (nullable or defaulted columns, one boot, no table rebuild). Protocol side: [protocol §89](../protocol/README.md#89-sprint-5-player-colours-core-k0).
+
+| Table / column | Change | Default (push-safe) | Visibility | Source |
+|---|---|---|---|---|
+| `player.color` | palette key (`PLAYER_COLOR_KEYS`, `@shared/campaign-management/colors.ts`) | **null** (a NOT NULL add without a default can't be pushed onto a populated table); filled by the boot backfill before the server listens | every connection of the campaign (`player` record, non-null on the wire) | [FR-CAMP-23](../specs/campaign-management.md#6-functional-requirements) |
+| `campaign.dm_color` | palette key, not null | `amber` (old rows and new campaigns) | every connection of the campaign (`campaign` record) | FR-CAMP-24 |
+| `notification.by_role`, `notification.by_player_id` | `dm` \| `player` \| null, ID \| null: who **caused** the row | null (old rows: no stripe, no backfill) | the row's (FR-NOTE-06 unchanged) | [FR-NOTE-38](../specs/notifications.md#6-functional-requirements) |
+
+- **Palette** (code data; only the key is stored): `amber`, `jade`, `sky`, `rose`, `yellow`, `blue`, `vermillion`, `bronze` (default order); hex values in [CAMP §7](../specs/campaign-management.md#7-uiux-notes) and visual-direction `player.<key>`.
+- **Writes:** `player.color` at `player.add` (the default, same transaction) and by `camp.setColor`; `campaign.dm_color` only by `camp.setColor {playerId: null}`; the backfill (system: no event, no log row). `by_role` / `by_player_id` only by `notify`, from `env.actor` (DM → `dm` / null; player → `player` / id; system → null / null); immutable after (update, resolve, dismiss, reopen never touch them).
+- **Rules:** a **pick** must be free among the DM colour and the other players' colours of the campaign (checked in the command's transaction, FR-CAMP-26); defaults may repeat once all 8 are taken, so there is **no unique index**. `by_player_id` has **no FK**: drizzle push adds one to an existing table only through a second-boot table rebuild; the value is server-written (a player of the row's campaign). A system-actor close (`resolveNotification`, dismiss) leaves `closed_by_role` / `closed_by_player_id` null.
+- **Derived (client only, never stored elsewhere):** a person's hex = `colorOf(store, {role, playerId})` (`src/client/common/features/campaign-management/colors.ts`): the key's `--player-<key>` token (fallback: the palette hex); unknown player or key → role accent; system → none. Default = `defaultColor(taken)`: first free key in palette order; all 8 taken → least used, ties in palette order.
+- **Boot backfill** (start hook `campaign-management.color-backfill`, one transaction): per campaign, null colours in `createdAt`, then `rowid` order, each seeing the defaults before it; rerun = no-op.
+- **Fixtures:** `pc-colours` (as DM, `player-2` picks blue; `player-1` keeps jade, the DM amber; no ids or tokens); bundle **`player-colours`** = `map-tools` + `pc-colours`; the unit also in `session-sim-9`.
+- **Snapshot size** (CON-44, `snapshot-size.test.ts` worst case: `vermillion` on every player + the DM, every notification stamped by a player with the longest id): colours **+149 B** in every frame (DM and each of 6 players); stamp **+8,400 B** DM (120 rows), **+7,210–7,280 B** per player. Heavy DM 650,803 B with K's rows; 707,798 B with R's worst case on top (865,066 B left of 1.5 MiB); players max 268,030 B.
