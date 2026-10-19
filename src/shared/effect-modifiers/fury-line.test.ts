@@ -258,7 +258,7 @@ describe("FR-DICE-28 kind contract (S4-5 fields)", () => {
     expect(lineText(players)).not.toContain(S);
     expect(lineText(players)).not.toContain(String(N));
     expect(dice(players)).toEqual([]);
-    expect(lineText(players)).toContain("+ 9 Martial Advantage");
+    expect(lineText(players)).toContain("+ 9 slashing (Martial Advantage)");
     const dmLine = attack(payload, dm);
     expect(dice(dmLine).map((d) => d.value)).toEqual([N, N]);
   });

@@ -31,10 +31,10 @@ describe("FR-CBT-58 formatLine", () => {
 
   test("FR-CBT-58 natural 1 + hit → '(natural 1) — DM ruled hit' for player and DM", () => {
     expect(line({ payload: nat1 })).toBe(
-      "Mira attacks Goblin: 1 + 4 = 5 (natural 1) — DM ruled hit 6 piercing damage (physical)",
+      "Mira attacks Goblin: 1 + 4 = 5 (natural 1) — DM ruled hit. 6 piercing damage (physical)",
     );
     expect(line({ payload: nat1, dmPayload: dm(false, true) })).toBe(
-      "Mira attacks Goblin: 1 + 4 = 5 (natural 1) vs AC 15 — DM ruled hit 6 piercing damage (physical)",
+      "Mira attacks Goblin: 1 + 4 = 5 (natural 1) vs AC 15 — DM ruled hit. 6 piercing damage (physical)",
     );
   });
 
@@ -81,7 +81,7 @@ describe("FR-CBT-58 formatLine", () => {
     );
     expect(line({ payload: p })).not.toContain("DM ruled");
     expect(line({ payload: p, dmPayload: { ...dm(false, true), toHitRolled: 13 } })).toBe(
-      "Mira attacks Goblin: 9 + 4 = 13 vs AC 15 — DM ruled hit 6 piercing damage",
+      "Mira attacks Goblin: 9 + 4 = 13 vs AC 15 — DM ruled hit. 6 piercing damage",
     );
   });
 

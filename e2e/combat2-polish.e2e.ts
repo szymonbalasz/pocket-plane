@@ -594,11 +594,11 @@ for (const [width, height] of [
     const p2 = await popup.boundingBox();
     if (!p2) throw new Error("no popup box");
     const placed = { x: p2.x, y: p2.y, w: p2.width, h: p2.height };
-    // Clear of every likely target, and near the toast: within one popup height of its spot there
-    // (sim-6: it went to the far bottom centre, 500+ px away).
+    // Clear of every likely target, and near the toast: still overlapping its spot there (sim-6: it
+    // went to the far bottom centre, 500+ px away). Not "within one popup height": the nearest free
+    // spot (#200) may be diagonal, beside one target and below another (BL-34: 261 px at 259 tall).
     for (const t of await monsters()) expect(overlaps(placed, t)).toBe(false);
-    const o = origin(card.box);
-    expect(Math.hypot(placed.x - o.x, placed.y - o.y)).toBeLessThan(size.h);
+    expect(overlaps(placed, origin(card.box))).toBe(true);
     await popup.getByTestId("cbt-popup-dismiss").click();
     await expect(popup).toHaveCount(0);
 

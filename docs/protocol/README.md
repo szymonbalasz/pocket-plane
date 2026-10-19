@@ -2384,7 +2384,37 @@ From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-49–
 | Tests | `homebrew-images.test.tsx` (FR-CMP-50 form slots ×5, FR-CMP-49 clone prefill), `gallery.test.tsx` (FR-CMP-51 entry gallery ×6: none, spell 2, item 3, lightbox wrap / counter, error tile, player markup), `e2e/cmpimg-ui.e2e.ts` (upload + paste "E2E Lamp", dedupe, move, share; DM lightbox; player-1 main image `naturalWidth > 0`) |
 | CON-44 | No record, no snapshot bytes (entry images are REST-only attachments, §86) |
 
-## 95. Sprint 5: Fit keeps every token visible (W2)
+## 95. Sprint 5: Initiative trigger chips, Effect… source, one Invisible (W4)
+
+From [combat-extras](../specs/combat-extras.md) FR-CBTX-54–56 (OQ-CBTX-27 B, -28 A, -29 A, #256; seams S9) and [fog-of-war](../specs/fog-of-war.md) FR-FOG-59. **Built by `fix/init-chips-effect`**: client only; no record type, intent, event, signal or wire field (CON-44: 0 B). Amends [§51](#51-sprint-3-rule-trigger-sheet-ui-r6)'s "Initiative trigger chips" row (FR-CBTX-52: triggers no longer go into "+N"). Data model: [§74](../data-model/README.md#74-sprint-5-initiative-trigger-chips-effect-source-one-invisible-w4).
+
+| Piece | Contract | Source |
+|---|---|---|
+| `fitChipRow(effects, triggers, room, gap) → {n, tier, icons, wrap}` (`@ui/features/combat-extras/logic`) | Pure, over measured natural widths (effects `{full, short}` per BL-08 tier; triggers `full` = with name, `short` = icon-only). In order: (1) effect chips tighten (`fitChipTiers`) beside full trigger chips; (2) trigger chips icon-only; (3) effect chips fold into "+N", last first (`n` counts effect chips only); (4) `wrap`: the icon-only triggers don't fit even with every effect folded. No triggers → BL-08's rule unchanged | FR-CBTX-54 |
+| `EffectChips` compact rows (`parts.tsx`; DM `row.tsx` and the player Initiative row) | Order: shown effect chips, "+N" (in flow), trigger chips. Folded effects leave the flow (measured on the hidden copy, `data-chip-measure="effect"` / `"trigger"`). `wrap` (`data-wrap="true"` on `data-chip-row`): the chip line takes its own line under the name (flex-basis 100 %, last; the name line wraps only meanwhile), held until the name line widens or the chips change. "+N" Tooltip / list: effects only (`cbtx-trigger-chip-more-item` retired) | FR-CBTX-54 |
+| Icon trigger chip `cbtx-trigger-chip` | `data-compact` `true` \| `false`; icon-only = `Zap` + uses ("⚡2", `hp.down` below zero) + check when muted, the name `sr-only`; Tooltip "‹name› — ‹state›" (`triggerLine`). Full chips: name, at most 96 px (no tier cut) | FR-CBTX-54 |
+| Effect… source (`dialogs.tsx`, `effect-source.ts` `defaultEffectSource`) | Default = turn combatant if not hidden and not removed (`data-default="turn"` on `cbtx-effect-source`); else the first target's own active combatant in the started encounter (`target`); else none (`none`). Hidden combatants listed with an eye-off icon. `sourceCombatantId` sent as chosen | FR-CBTX-55 |
+| Token menu Conditions ▸ (`cbtx-token-menu-conditions`) | 14 options: `ConditionsMenu omit` = `TOKEN_MENU_OMIT` (`invisible`). The Initiative row's `cbtx-init-row-conditions` keeps 15 | FR-CBTX-56 |
+| `fog-token-menu-invisible` | The menu's only "Invisible"; Tooltip "Players don't see it unless they see invisible" (`INVISIBLE_TIP`). Intent unchanged (`fog.setInvisible`) | FR-FOG-59 |
+
+- **Fixtures:** none new (W4 adds no record); e2e bundle `init-chips-effect` = `windows-s5` under its own name (own e2e server).
+
+## 96. Sprint 5: combat log wording (R2)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-95, -96 and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) FR-MOD-62 (BL-24, BL-27, BL-23). **Built by `fix/combat-lines`**: line text only. No intent, event, record type, payload field or schema change; built from `payload` / `dmPayload` alone, so old rows render the new way. Data side: [data model §75](../data-model/README.md#75-sprint-5-combat-log-wording-r2).
+
+| Piece | Contract |
+|---|---|
+| Ruling (`outcomeText`, `@shared/combat-tracker/log-kinds.ts`, FR-CBT-95) | A ruled hit ends with a full stop before the damage: DM "vs AC 16 — DM ruled hit. 10 slashing damage"; players' natural ruling "(natural 1) — DM ruled hit. 6 piercing damage"; an Apply hit line ends at "— DM ruled hit."; "— DM ruled miss" unchanged |
+| DM damage run (`includedRun`, FR-CBT-96) | `dmPayload.mods.damage` (roll-hook parts already in the base part's total) render inside the base part's muted run after its dice: "14 slashing (2d6+5: 4 + 3 + 5, incl. + 2 Rage) + 6 fire (2d6: 2 + 4) damage"; no dice run (physical total, DM set) → " (incl. + 2 Rage)". Text outside muted runs sums to the line's damage. Players' line and to-hit parts unchanged |
+| Trigger parts (`linePartSegments`, `@shared/effect-modifiers/combat-parts.ts`, FR-MOD-62) | Every landed part names its type: the part's `type`, else the card's `damageType`: "+ 10 piercing (Sneak Attack)", "+ 9 slashing (DM)"; neither typed → "+ 10 Sneak Attack". DM and players alike; die segments unchanged. Roll-line offers (`rollOfferSegments`) and card text unchanged |
+| Held part sums (FR-DICE-40, D8 ruling #259) | `LineSegment.numeric?: true` (`@shared/dice-roll-log/kind-types.ts`, granted to R2): a number from dice that is not a die. `modSegments` sets it on a rolled part's value (`expression` present: "+ 5 Hunter's Mark", "− 3 (DM)"), `rollOfferSegments` on every offered value (own segment, never merged into the muted run); `heldSegments` (`dice-roll-log/logic.ts`) draws it "…" until the landing. Constants ("+ 2 Rage") stay. Test `FR-DICE-40 held line blanks MOD part sums` (`effect-modifiers/held-parts.test.ts`) |
+| DM popup (`attack-popup.tsx`) | `cbt-popup-step` (screen-reader text) on a damage-only card reads "Damage only, no to-hit" (was "To-hit step"); `data-value` unchanged |
+| Tests | `combat-lines.test.ts` (`FR-CBT-95 ruling punctuation`, `FR-CBT-96 Rage once in the DM line`, `FR-MOD-62 damage types on trigger parts`), `late-fill.test.tsx` (damage-only header), `e2e/combat-lines.e2e.ts` (CBT §13.1 L12–L14, bundle `late-damage`) |
+| Fixtures | None new: L12–L14 walk on `rules-effects` (Brakka, Flame Tongue, Fire Ward, Rage spent, Divine Fury; Thorn's Sneak Attack) |
+| CON-44 | 0 B: no record or field; rendered text only |
+
+## 97. Sprint 5: Fit keeps every token visible (W2)
 
 From [scenes-map](../specs/scenes-map.md) FR-MAP-59, -61 (DM gate #256: OQ-MAP-49 / OQ-SHELL-39 A; OQ-SHELL-40 A). **Built by `fix/map-fit-visible`**. Client only: no record, intent, signal, frame or Konva layer.
 

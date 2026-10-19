@@ -88,14 +88,14 @@ const NATURAL_MARK = /^ — natural (20!|1)$/;
 /**
  * FR-DICE-40: a held `roll` line, render only (`formatLine` and the stored entry unchanged). Each
  * die chip blank (its text "…" for copy and screen readers; dropped / offered kept), the total
- * "…", the "(adv)" / "(dis)" marker "(…)". The natural 20 / 1 marker is left out until the
+ * and each `numeric` segment (a rolled part's sum, R2) "…", the "(adv)" / "(dis)" marker "(…)". The natural 20 / 1 marker is left out until the
  * landing: a "…" only on naturals would tell one before the dice land.
  */
 export function heldSegments(segments: readonly LineSegment[]): ShownSegment[] {
   const out: ShownSegment[] = [];
   for (const s of segments) {
     if (s.die) out.push({ ...s, text: HELD_TEXT, blank: true });
-    else if (s.style === "total") out.push({ ...s, text: HELD_TEXT });
+    else if (s.style === "total" || s.numeric) out.push({ ...s, text: HELD_TEXT });
     else if (MODE_MARK.test(s.text)) out.push({ ...s, text: ` (${HELD_TEXT})` });
     else if (!NATURAL_MARK.test(s.text)) out.push(s);
   }
