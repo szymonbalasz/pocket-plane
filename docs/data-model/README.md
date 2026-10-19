@@ -1892,3 +1892,16 @@ From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-54–56 and
 | Chip row fit | derived per render | `fitChipRow` → effect chips shown, tier, icon-only triggers, second line | each client its own rows (players: what FR-MOD-55 sends) | FR-CBTX-54 |
 | Second-line hold | client memory, per row | the name line's width when the row wrapped | — | FR-CBTX-54 |
 | Effect… default source | derived on open | `defaultEffectSource(rows, turnCombatantId, targets)` → id + `turn` \| `target` \| `none` | DM only | FR-CBTX-55 |
+
+## 75. Sprint 5: ally side client (R4)
+
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-98–104 (#252). **Built by `build/combat-sides`**: no table, column or record type (R0's `combatant.side` / `public_side` and `encounter_entry.side`, [§66](#66-sprint-5-combat-core-r0)). Protocol side: [protocol §96](../protocol/README.md#96-sprint-5-ally-side-client-r4).
+
+| Piece | Kind | Contents | Visibility | Source |
+|---|---|---|---|---|
+| Side chip / token badge | derived per render (`sideChip`) | DM: true side, shown when ≠ the kind's default or secret (`sideOf ≠ publicSideOf`, dashed); players: their redacted `side` when ≠ the kind's default | each client what it holds | FR-CBT-104 |
+| Encounter rating | derived (`rateEncounter`) | enemy entries' CRs → rating, XP, total CR; friendly entries listed; all friendly → "—" | DM only | FR-CBT-102 |
+| Builder draft entry | client memory until the debounced PUT | `{definitionId, quantity, hpMode, side}`, keyed per definition + side | DM only | FR-CBT-98 |
+| "Secret" tick | client memory per open menu | default off | DM only | FR-CBT-104 |
+
+- **Fixtures:** `enc-friendly` (bundles `late-damage`, `session-sim-9`). **Snapshot size** (CON-44): +0 B (no new field; §66 measured `side` + `publicSide` on every combatant and entry).

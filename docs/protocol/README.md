@@ -2398,3 +2398,19 @@ From [combat-extras](../specs/combat-extras.md) FR-CBTX-54–56 (OQ-CBTX-27 B, -
 | `fog-token-menu-invisible` | The menu's only "Invisible"; Tooltip "Players don't see it unless they see invisible" (`INVISIBLE_TIP`). Intent unchanged (`fog.setInvisible`) | FR-FOG-59 |
 
 - **Fixtures:** none new (W4 adds no record); e2e bundle `init-chips-effect` = `windows-s5` under its own name (own e2e server).
+
+## 96. Sprint 5: ally side client (R4)
+
+From [combat-tracker](../specs/combat-tracker.md#63-sprint-5-ally-side) FR-CBT-98–104 (#252; OQ-CBT-71 A, -72 C, -73 A, -74 A, #256; seams S9). **Built by `build/combat-sides`** on R0's server core ([§83](#83-sprint-5-combat-core-r0): `cbt.setSide`, `CombatantSideChanged`, the redaction, the `cbt.side` kind). **No wire change**: no new intent, event, record type, signal or field (CON-44: 0 B beyond §83's measured rows). Data model: [§75](../data-model/README.md#75-sprint-5-ally-side-client-r4).
+
+| Piece | Contract | Source |
+|---|---|---|
+| `sideChip(c)` (`@ui/features/combat-tracker/side`) | `{side, secret}` or null. DM (row carries `publicSide`): `sideOf(c)` when it differs from the kind's default **or** players see another side (`secret` = `sideOf ≠ publicSideOf`, dashed); players: their `side` (= `publicSideOf`) when it differs from the kind's default, never secret | FR-CBT-104 |
+| Initiative row chip `cbt-init-row-ally` (both clients) | `data-value` `ally` \| `enemy`, `data-secret`; lucide `handshake` "Ally" / `swords` "Enemy", `badge` look, dashed while secret (Tooltip "Secret: players see …"). In the name line before the effect chips, never folds (FR-CBTX-54) | FR-CBT-104 |
+| Token badge `cbt-token-side` (overlay `cbt`) | The chip's rule as a `TokenBadge` (`icon` `handshake` \| `swords`, `neutral`, label "Ally" / "Enemy"); not on removed tokens (Out) | FR-CBT-104 |
+| DM row menu `cbt-init-row-side` / token menu `cbt-token-menu-side` (entry `cbt.side`, order 70.5) | Submenu trigger "Set as ‹other side›" (`data-value` = that side); items `-secret` (tick, `data-value` `true` \| `false`, keeps the menu open) and `-apply` → `cbt.setSide {combatantId, side, secret}`; while secret, a top-level `-reveal` "Set as ‹true side› (show players)" → `cbt.setSide {side: sideOf, secret: false}` | FR-CBT-99, -104 |
+| Likely targets (`placementTokenIds`, DM popup / card toast) | The other **side** (`sideOf`), read at open | FR-CBT-101 |
+| Builder entry `cbt-enc-entry-friendly` (Switch, `data-value` = entry side; entry row `data-side`) | Sets the entry's `side` in the whole-replace PUT (§83's `side?`); a pick adds to the creature's enemy entry; switching onto a side the creature already has merges the two entries (the server's merge, per definition + side) | FR-CBT-98, -104 |
+| Difficulty card (`rateEncounter`, `@shared/combat-tracker/difficulty`) | Rates enemy entries only; total CR of enemy entries; `cbt-enc-friendly` "Friendly: Goblin ×1 (CR 1/4)" when any entry is friendly; all friendly → rating "—". Reads the entries, never the combatants (planning-only) | FR-CBT-102 |
+
+- **Fixtures:** unit `enc-friendly` (planned "Escort to the Ford": Goblin ×2 enemy + Goblin ×1 friendly, party null), appended to bundles `late-damage` and `session-sim-9`.
