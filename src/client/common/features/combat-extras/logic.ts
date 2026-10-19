@@ -123,6 +123,50 @@ export function fitChipTiers(
   return best;
 }
 
+/** `fitChipRow`'s pick: `n` effect chips shown at `tier`, the rest in "+N" (triggers never). */
+export interface ChipRowFit {
+  n: number;
+  tier: number;
+  /** Trigger chips icon-only (⚡ + uses). */
+  icons: boolean;
+  /** Even icon-only with every effect folded the triggers don't fit: a second line. */
+  wrap: boolean;
+}
+
+/**
+ * FR-CBTX-54 (OQ-CBTX-27 B, BL-26): a compact row's effect chips (`ChipWidths` per BL-08 tier)
+ * then its trigger chips (`full` = name, `short` = icon-only) in `room`. In order: (1) effect
+ * chips tighten (`fitChipTiers`) next to full trigger chips; (2) trigger chips go icon-only;
+ * (3) effect chips fold into "+N", last first; (4) a trigger never folds: the row wraps.
+ * `nameCut`: the name beside the chips is cut (the chip line holds its minimum width, e.g. after a
+ * hidden row's eye-off icon): the chips take the second line too, so the name is never cut (#182).
+ */
+export function fitChipRow(
+  effects: readonly ChipWidths[],
+  triggers: readonly ChipWidths[],
+  room: number,
+  gap = 2,
+  nameCut = false,
+): ChipRowFit {
+  if (nameCut && effects.length + triggers.length > 0) {
+    return { n: 0, tier: 0, icons: triggers.length > 0, wrap: true };
+  }
+  // The room the trigger chips take after the effect chips (or "+N"), gap included.
+  const after = (ws: readonly number[]) =>
+    ws.length === 0
+      ? 0
+      : ws.reduce((s, w) => s + w, 0) + (ws.length - 1) * gap + (effects.length > 0 ? gap : 0);
+  if (triggers.length === 0)
+    return { ...fitChipTiers(effects, room, gap), icons: false, wrap: false };
+  const fullRoom = room - after(triggers.map((t) => t.full));
+  const full = fitChipTiers(effects, fullRoom, gap);
+  if (fullRoom >= 0 && full.n === effects.length) return { ...full, icons: false, wrap: false };
+  const iconRoom = room - after(triggers.map((t) => t.short));
+  const icon = fitChipTiers(effects, iconRoom, gap);
+  const fits = icon.n === effects.length ? iconRoom >= 0 : icon.n > 0 || MORE_W <= iconRoom;
+  return fits ? { ...icon, icons: true, wrap: false } : { n: 0, tier: 0, icons: true, wrap: true };
+}
+
 /** "N rounds left" (sheet chips). */
 export function roundsLeftText(e: EffectView, round: number | null): string | null {
   if (e.endsRound == null || round === null) return null;

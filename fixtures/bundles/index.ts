@@ -20,6 +20,7 @@ import entities from "./entities";
 import fog from "./fog";
 import fogScn from "./fog-scn";
 import furyLogLine from "./fury-log-line";
+import initChipsEffect from "./init-chips-effect";
 import lateDamage from "./late-damage";
 import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
@@ -92,6 +93,7 @@ export const bundles: readonly Bundle[] = [
   dicePolish,
   cmpImages,
   tplMenu,
+  initChipsEffect,
   partyCmp,
   playerColours,
 ];
