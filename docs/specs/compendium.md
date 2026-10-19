@@ -1,7 +1,7 @@
 ---
 title: Compendium
 prefix: CMP
-status: in-review
+status: complete
 owner: spec-cmpimg
 phase: post-mvp-5
 ---

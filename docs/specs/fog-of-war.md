@@ -1,7 +1,7 @@
 ---
 title: Fog of war
 prefix: FOG
-status: in-review
+status: complete
 owner: spec-windows
 phase: post-mvp-5
 ---

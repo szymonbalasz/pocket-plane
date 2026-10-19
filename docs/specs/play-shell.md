@@ -1,7 +1,7 @@
 ---
 title: Play shell
 prefix: SHELL
-status: in-review
+status: complete
 owner: spec-windows
 phase: post-mvp-5
 ---

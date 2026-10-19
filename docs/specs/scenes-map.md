@@ -1,7 +1,7 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: in-review
+status: complete
 owner: spec-windows
 wave: 3
 phase: post-mvp-5
