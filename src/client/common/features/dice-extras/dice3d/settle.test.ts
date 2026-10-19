@@ -11,12 +11,20 @@ import {
   LABEL_VALUES,
   type LabelKind,
   labelKindOf,
+  multiply,
   normalize,
   type Quat,
   relabel,
+  restingPose,
+  rotate,
+  scale,
   sub,
   tilt,
   upFace,
+  upIndex,
+  uprightTurn,
+  type Vec3,
+  yaw,
 } from "./geometry";
 import { MAX_STEPS, POSE, prng, seedOf, settleLabels, simulate } from "./settle";
 
@@ -85,6 +93,34 @@ describe("FR-DICEX-15 upFace + relabel", () => {
         expect([...labels].sort((a, b) => a - b)).toEqual([...LABEL_VALUES[kind]]);
       }
     }
+  });
+});
+
+describe("FR-DICEX-46 upright values", () => {
+  test.each(SHAPES.filter((x) => x !== "d4"))(
+    "FR-DICEX-46 %s: the upright turn keeps the up face and points its label's up at the screen's top",
+    (shape) => {
+      const g = geometryOf(shape);
+      const r = prng(11);
+      for (let k = 0; k < 40; k++) {
+        const { q } = restingPose(g, randomQuat(r));
+        const up = upIndex(g, q);
+        const q2 = multiply(yaw(uprightTurn(g, q)), q);
+        expect(upIndex(g, q2)).toBe(up);
+        // The label's up = the up face's first vertex from its centre (as the atlas maps it).
+        const pts = (g.faces[up] as number[]).map((i) => g.vertices[i] as Vec3);
+        const c = scale(
+          pts.reduce<Vec3>((a, p) => [a[0] + p[0], a[1] + p[1], a[2] + p[2]], [0, 0, 0]),
+          1 / pts.length,
+        );
+        const v = normalize(rotate(q2, sub(pts[0] as Vec3, c)));
+        expect(v[0]).toBeCloseTo(0, 5); // no sideways lean
+        expect(v[2]).toBeLessThan(0); // screen up = world −Z
+      }
+    },
+  );
+  test("FR-DICEX-46 d4 reads at its corners: no turn", () => {
+    expect(uprightTurn(geometryOf("d4"), [0, 0, 0, 1])).toBe(0);
   });
 });
 
@@ -186,13 +222,16 @@ describe("FR-DICEX-15 headless settle", () => {
   });
 });
 
-/** FR-DICEX-34: the screen arenas of DICEX §13 and the popup's PiP (≈ 260×96, small dice). */
+/**
+ * FR-DICEX-34: the screen arenas of DICEX §13 and the popup miniature's (FR-DICEX-46 b: a line
+ * wide, three lines deep, 284×140, 44 px dice; every miniature tumbles there, then into its cells).
+ */
 const ARENAS: [string, Arena][] = [
   ["1280×720", screenArena({ w: 1280, h: 720 })],
   ["1440×900", screenArena({ w: 1440, h: 900 })],
   ["1920×1080", screenArena({ w: 1920, h: 1080 })],
   ["390×844", screenArena({ w: 390, h: 844 })],
-  ["PiP 260×96", arenaOf({ w: 260, h: 96 }, 24)],
+  ["popup line 284×140", arenaOf({ w: 284, h: 140 }, 44)],
 ];
 const TYPES: [DieShape, LabelKind][] = [
   ...SHAPES.map((s) => [s, s] as [DieShape, LabelKind]),

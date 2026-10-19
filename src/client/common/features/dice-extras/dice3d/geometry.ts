@@ -309,6 +309,23 @@ export function upIndex(g: DieGeometry, q: Quat): number {
   return best;
 }
 
+/**
+ * FR-DICEX-46: the turn about +Y (radians) that stands the up face's label upright for a camera
+ * looking straight down with screen up = −Z (a label's up points at its face's first vertex, as
+ * the atlas maps it). A d4 reads at its corners: 0. The up face (and value) never changes.
+ */
+export function uprightTurn(g: DieGeometry, q: Quat): number {
+  if (g.shape === "d4") return 0;
+  const pts = (g.faces[upIndex(g, q)] as number[]).map((i) => g.vertices[i] as Vec3);
+  const c = scale(pts.reduce(add, [0, 0, 0]), 1 / pts.length);
+  const v = rotate(q, sub(pts[0] as Vec3, c));
+  const a = Math.PI - Math.atan2(v[0], v[2]);
+  return Math.atan2(Math.sin(a), Math.cos(a)); // shortest way round
+}
+
+/** A turn of `a` radians about +Y. */
+export const yaw = (a: number): Quat => [0, Math.sin(a / 2), 0, Math.cos(a / 2)];
+
 /** FR-DICEX-15: the value a die shows in orientation `q`. */
 export const upFace = (g: DieGeometry, labels: readonly number[], q: Quat): number =>
   labels[upIndex(g, q)] as number;

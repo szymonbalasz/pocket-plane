@@ -1914,9 +1914,25 @@ From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-59, -61. **Built b
 - **Fixtures:** no new unit. `windows-s5` (`session-sim-8` + `win-layout`) has every token the W5 / W10 steps fit; `session-sim-9` needs nothing extra (sim-8's tokens; sim-9 creates "Crypt" live).
 - **Snapshot size** (CON-44): 0 B.
 
-## 77. Sprint 5: ally side client (R4)
+## 77. Sprint 5: compressed + cached built client (D12)
 
-From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-98–104 (#252). **Built by `build/combat-sides`**: no table, column or record type (R0's `combatant.side` / `public_side` and `encounter_entry.side`, [§66](#66-sprint-5-combat-core-r0)). Protocol side: [protocol §99](../protocol/README.md#99-sprint-5-ally-side-client-r4).
+From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-52 and [ADR-0052](../architecture/adr/0052-static-serving.md). **Built by `fix/static-compress`**: no table, column, record type or snapshot change (CON-44: 0 B). Protocol side: [protocol §99](../protocol/README.md#99-sprint-5-compressed--cached-built-client-d12).
+
+| Piece | Kind | Contents | Visibility | Source |
+|---|---|---|---|---|
+| `dist/client/assets/*.{js,css}.br`, `.gz` | build output (gitignored, rewritten per build) | brotli q11 / gzip -9 of each JS / CSS file ≥ 1 KB | public, same for DM and players | FR-DICEX-52 |
+
+## 78. Sprint 5: popup line (D11)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-46, -47. **Built by `build/popup-line`**: client only; no table, column, record type, event, intent or payload change. Protocol side: [protocol §100](../protocol/README.md#100-sprint-5-popup-line-d11).
+
+- **Client memory** (`dice-extras/popups.ts`): a popup's `stills` are now per die key (`{[dieKey]: 2D canvas}`, the hand-off's upright copies; was per part). The cell registry (`registerPopupCell`) maps popup id → die key / "+N" → element. Never stored or sent.
+- **Derived (never stored):** the line (`popupLine`: cells, lines, "+N" with its entry), the card height (`popupHeight`), how many popups fit (`popupsThatFit`), each die's upright turn (`uprightTurn`).
+- **Fixtures:** none new (no record type; DICEX §13 walks on `dice-polish`). **Snapshot size** (CON-44): +0 B.
+
+## 79. Sprint 5: ally side client (R4)
+
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-98–104 (#252). **Built by `build/combat-sides`**: no table, column or record type (R0's `combatant.side` / `public_side` and `encounter_entry.side`, [§66](#66-sprint-5-combat-core-r0)). Protocol side: [protocol §101](../protocol/README.md#101-sprint-5-ally-side-client-r4).
 
 | Piece | Kind | Contents | Visibility | Source |
 |---|---|---|---|---|

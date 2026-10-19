@@ -2443,9 +2443,39 @@ From [campaign-management](../specs/campaign-management.md#7-uiux-notes) FR-CAMP
 | Tests | `ColorPopover.test.tsx` (FR-CAMP-27 picker ×7: swatch model per target, 9th player, static render taken / checked / not live, send, reject keeps the server's colour), player `screens.test.tsx` (header dot); e2e `colour-picker.e2e.ts` (`player-colours`: CAMP §13 K1, K2, K10, K11) |
 | CON-44 | 0 B (no record) |
 
-## 99. Sprint 5: ally side client (R4)
+## 99. Sprint 5: compressed + cached built client (D12)
 
-From [combat-tracker](../specs/combat-tracker.md#63-sprint-5-ally-side) FR-CBT-98–104 (#252; OQ-CBT-71 A, -72 C, -73 A, -74 A, #256; seams S9). **Built by `build/combat-sides`** on R0's server core ([§83](#83-sprint-5-combat-core-r0): `cbt.setSide`, `CombatantSideChanged`, the redaction, the `cbt.side` kind). **No wire change**: no new intent, event, record type, signal or field (CON-44: 0 B beyond §83's measured rows). Data model: [§77](../data-model/README.md#77-sprint-5-ally-side-client-r4).
+From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-52 (§6.1 table H; BL-21; OQ-DICEX-40 A, -41 A, #256) and [ADR-0052](../architecture/adr/0052-static-serving.md). **Built by `fix/static-compress`** (seams S11: `src/server/app.ts`, `vite.config.ts`). HTTP headers on the built client only; no intent, event, record, signal or WS change. Data side: [data model §77](../data-model/README.md#77-sprint-5-compressed--cached-built-client-d12).
+
+| Route (`start` only; dev = Vite) | Answer | Source |
+|---|---|---|
+| `GET /assets/*` | `serveStatic({ root, precompressed: true, onFound })`: `Accept-Encoding` has `br` → the `.br` sibling, `Content-Encoding: br`; else `gzip` → `.gz`, `gzip`; else the plain file. `Vary: Accept-Encoding` and `Cache-Control: public, max-age=31536000, immutable` on every found file, plain ones too; a missing file → 404 without them. No `ETag` / `Last-Modified` | FR-DICEX-52 |
+| `GET /`, `GET /p/*` | DM / player `index.html`, `Cache-Control: no-cache`, never compressed | FR-DICEX-52 |
+| Build (`vite.config.ts` `precompress()`) | `writeBundle`: every `assets/*.js` / `*.css` ≥ 1,024 B gets `.br` (quality 11) and `.gz` (level 9) beside it; an in-memory build (`write: false`) writes none | FR-DICEX-52 |
+
+- **Visibility:** the same files and headers for the DM and every player (public build output, no secrets). The asset store (`/api/assets/*`, §14) is unchanged.
+- **Tests:** `src/server/static.test.ts` (`FR-DICEX-52 compressed chunk served`: br / gzip / none, `Vary` on a sibling-less file, 404 bare, HTML `no-cache`), `e2e/static-compress.e2e.ts` (`FR-DICEX-52 compressed build output`: siblings decompress to the same bytes, none under 1 KB, `dice3d` `.br` ≤ 140 KB, the e2e server's `dice3d` answer).
+- **Measured** (this build): `dice3d` 632,343 B → 132,499 B br / 160,853 B gz.
+
+## 100. Sprint 5: popup line (D11)
+
+From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-46, -47 (§6.1 tables A, B; OQ-DICEX-33 A, -34 A, DM gate #256; seams S2, S15). **Built by `build/popup-line`**: popup internals only, both clients. No record type, intent, event, signal or wire field; W1's `toast-region.ts` constants (`ROLL_POPUP_W` 320, `ROLL_POPUP_H` 190, `ROLL_POPUPS_MAX` 3) and `dmStackAt` unchanged. Amends §75's card and PiP rows. Data side: [data model §78](../data-model/README.md#78-sprint-5-popup-line-d11).
+
+| Piece | Contract |
+|---|---|
+| Line (`popup-logic.ts` `popupLine`) | The frame's `throwDice` list in order, in 44 px cells (`CELL_PX`), 4 px gap, 6 per line (284 px wide), ≤ 2 lines; > 12 dice (dice beyond the throw's 20 counted too) → 11 cells + a "+N" cell (N = every die not shown, its `entryId` = the first hidden die's entry; click → `focusLogEntry` there). Never scaled by count or viewport |
+| Card (`RollPopup.tsx`) | 320 wide, padding 10 top / bottom, 12 sides (border included); rows 22 px each (actor plain, label, **each row's own total** at its right with its markers, "Rolling…" until its entry lands), ≤ 3 visible (more scroll); ✕ and ⚙ at the first row's right; 8 px; the line(s); 4 px tag overhang. `popupHeight(rows, lines)`: 98 (1 + 1) … 190 (3 + 2) |
+| Cells | `chip` (flat / off / no 3D, non-mesh dice: `FlatDie` / `DieShape` size `lg`, 44 px, fading in), `handoff` (the die's own still, kept upright), `play` (the miniature). Dropped dice dimmed (3D: the renderer's dropped opacity; chips struck), offered dashed. MOD / offered tag on the cell's bottom edge cut with "…"; full label (+ "on a hit") in the cell's `Tooltip` |
+| Hand-off (`Throw3D.tsx`) | `PlayHandle.handoff()` also returns each die drawn **alone** (`Still.dice`, no neighbour in its box) and its upright screen turn (`Still.turns`, from `uprightTurn`). Each flies centre to its cell (`registerPopupCell` / `handoffCells`), scaled so the die spans 44 px (`CELL_STILL_PAD` 1.25 margin), turning upright (0.4 s); dice without a cell fly into "+N" and fade. The cell keeps an upright copy (`rollPopups.still(id, {key: canvas})`) |
+| Miniature (`Miniature`) | One `playThrow` over the line box: simulation arena = a line wide, 3 lines deep (44 px dice, same seed); `PlayOptions.view` (camera extents: 44 px per `DIE_WORLD`), `cells` (each die's rest point: the recorded motion is shifted there and turned about +Y so its value ends upright; the up face never changes) and `maxMs` 1200 (`MINIATURE_MS`, the recording sped up). Clip and same-task still as §75 |
+| Short screens (FR-DICEX-47) | On each render the stack counts the cards that fit (`popupsThatFit`, heights from `popupHeight`, 8 px gaps, newest first incl. the pending card): players from the stack's bottom up to the top bar + 12, the DM from the stack's top down to the viewport bottom − 12; the oldest beyond are dropped at once (`rollPopups.drop`); the newest always shows |
+| Test IDs | `dicex-popup` + `data-shown` (cells), `data-dice` = every die of the frame (incl. those beyond 20); `dicex-popup-cell` (+ `data-entry-id`, `data-line` = 1 \| 2, `data-index`, `data-faces`, `data-kept`, `data-offered`, `data-value` only once its entry landed); `dicex-popup-more` (+ `data-value` = N, `data-entry-id`); §75's other IDs unchanged |
+| Bundle | Lazy `RollPopup` **5.8 KB gz** (cap 8); dice-extras initial 13.1 KB gz (cap 15); 3D chunk 157.6 KB gz (cap 170) |
+| CON-44 | 0 B: no record, field or frame added |
+
+## 101. Sprint 5: ally side client (R4)
+
+From [combat-tracker](../specs/combat-tracker.md#63-sprint-5-ally-side) FR-CBT-98–104 (#252; OQ-CBT-71 A, -72 C, -73 A, -74 A, #256; seams S9). **Built by `build/combat-sides`** on R0's server core ([§83](#83-sprint-5-combat-core-r0): `cbt.setSide`, `CombatantSideChanged`, the redaction, the `cbt.side` kind). **No wire change**: no new intent, event, record type, signal or field (CON-44: 0 B beyond §83's measured rows). Data model: [§79](../data-model/README.md#79-sprint-5-ally-side-client-r4).
 
 | Piece | Contract | Source |
 |---|---|---|
