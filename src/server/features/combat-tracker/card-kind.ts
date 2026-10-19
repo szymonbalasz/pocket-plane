@@ -2,7 +2,8 @@
 // by `cbt.applyCard`, reopened by `cbt.undo`; never by `note.resolve` (#136). Resolution
 // `{targets […]}` (1–20) is over notifications' 256 B default: the kind declares 8 KB (#157).
 // Payload: a crit card with non-ASCII names passes the 1 KB default: 4 KB (#163). End rule:
-// dismissed when its encounter ends (FR-CBT-59).
+// dismissed when its encounter ends (FR-CBT-59). Closing (sprint 5): a dismissal sends the
+// card's hit-ruling delete (`onClose`, FR-CBT-91).
 import { DAMAGE_CARD_END_RULE } from "@shared/combat-tracker/end-rule";
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import {
@@ -17,6 +18,7 @@ import { withOffersText } from "@shared/effect-modifiers/combat-parts";
 import { jsonBytes, TEXT_MAX } from "@shared/notifications/schemas";
 import type { Roll } from "../dice-roll-log";
 import { defineNotificationKind } from "../notifications/kind";
+import { hitRulingChange, rulingOfCard } from "./rows";
 
 /** Per-kind payload cap (FR-NOTE-03, #163): ASCII worst ≈ 950 B; 3-byte names ≈ 1.3 KB. */
 export const DAMAGE_CARD_PAYLOAD_MAX_BYTES = 4096;
@@ -31,6 +33,12 @@ export const damageCardKind = defineNotificationKind({
   genericResolve: false,
   // FR-CBT-59: pending cards are dismissed when their encounter ends.
   endRule: DAMAGE_CARD_END_RULE,
+  // FR-CBT-91 (sprint 5): a dismissed card (`note.dismiss`, End) takes its hit ruling off the
+  // wire; the row stays.
+  onClose: (env, row) => {
+    const ruling = rulingOfCard(env.tx, row.id);
+    return ruling ? [hitRulingChange(ruling, null)] : [];
+  },
 });
 
 /**

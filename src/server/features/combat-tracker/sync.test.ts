@@ -204,6 +204,7 @@ describe("mid-combat over WS", () => {
       imageAssetId: goblin2.imageAssetId,
       removed: true,
       movedFt: 0,
+      side: "enemy",
     });
     for (const [live, cred] of [
       [p1, p("Player 1")],

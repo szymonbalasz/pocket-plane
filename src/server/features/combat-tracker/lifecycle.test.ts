@@ -193,6 +193,7 @@ describe("FR-CBT-07 FR-CBT-08 FR-CBT-10 start / end", () => {
       band: "healthy",
       removed: false,
       movedFt: 0,
+      side: "enemy",
     });
     expect(Object.keys(cs[0] ?? {}).sort()).toEqual(
       [
@@ -206,6 +207,7 @@ describe("FR-CBT-07 FR-CBT-08 FR-CBT-10 start / end", () => {
         "name",
         "playerPosition",
         "removed",
+        "side",
         "tokenId",
       ].sort(),
     );

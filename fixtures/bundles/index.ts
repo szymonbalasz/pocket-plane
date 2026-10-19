@@ -19,6 +19,7 @@ import entities from "./entities";
 import fog from "./fog";
 import fogScn from "./fog-scn";
 import furyLogLine from "./fury-log-line";
+import lateDamage from "./late-damage";
 import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
@@ -80,6 +81,7 @@ export const bundles: readonly Bundle[] = [
   usesNegative,
   sessionSim8,
   sessionSim9,
+  lateDamage,
   partyS5,
   dicePolish,
 ];

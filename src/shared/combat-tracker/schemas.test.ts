@@ -99,6 +99,8 @@ describe("combat-tracker schemas (feedback pass)", () => {
       hpCurrent: 7,
       hpMax: 7,
       tempHp: 0,
+      side: null,
+      publicSide: null,
     };
     expect(CombatantRecord.safeParse({ ...row, movedFt: 0 }).success).toBe(true);
     expect(CombatantRecord.safeParse({ ...row, movedFt: 9999 }).success).toBe(true);
@@ -127,6 +129,8 @@ describe("combat-tracker schemas (feedback pass)", () => {
       hpCurrent: 7,
       hpMax: 7,
       movedFt: 0,
+      side: null,
+      publicSide: null,
     };
     expect(CombatantRecord.safeParse({ ...row, tempHp: 0 }).success).toBe(true);
     expect(CombatantRecord.safeParse({ ...row, tempHp: 999 }).success).toBe(true);
