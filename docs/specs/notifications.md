@@ -1,12 +1,26 @@
 ---
 title: Notifications
 prefix: NOTE
-status: complete
-owner: spec-notifications
+status: in-review
+owner: spec-windows
 wave: 2
+phase: post-mvp-5
 ---
 
 # Notifications
+
+> **Sprint 5 (track K, BL-17 via [#251](../decisions-log.md)).** Decided by the DM (not open): the **player colour** appears in notifications ([campaign-management](campaign-management.md) FR-CAMP-23–29 owns the colour). New FR-NOTE-38–41 (track K's range; P adds handout rows in parallel). *(Seams S3: W edits FR-NOTE-31 / -32 in its own branch; K owns FR-NOTE-38–41.)* One schema change: `notify` stamps **who caused** the notification (`byRole`, `byPlayerId`), measured ≤ 8.4 KB on the heavy DM snapshot. Walkthrough: [CAMP §13](campaign-management.md#13-test-plan) K7, K12.
+
+**Sprint 5 at a glance** (track K)
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-NOTE-38 | `notify` stamps `byRole` / `byPlayerId` from `env.actor` | K0 | `FR-NOTE-38 notify stamps by`, `FR-NOTE-38 visibility` |
+| FR-NOTE-39 | Toast + history row: a left stripe in the creator's colour | K4 | `FR-NOTE-39 accent stripe` |
+| FR-NOTE-40 | *(OQ-CAMP-27, cut list, decided #256)* "Resolved by ‹name›" in the closer's colour; the action cue ring in the action owner's | K4 (+ K3 for the ring) | `FR-NOTE-40 names and cue` |
+| FR-NOTE-41 | Old rows, fallback, recolour | K4 | `FR-NOTE-41 old rows` |
+
+Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 
 ## 1. Summary
 
@@ -15,6 +29,7 @@ wave: 2
 - Created and resolved **inside the causing command's transaction** ([ADR-0027](../architecture/adr/0027-notification-creation.md), #135).
 - **Polish pass** (sprint 1, R5; FR-NOTE-23, 24): a kind may declare that its pending rows are **dismissed when their encounter ends** (damage cards do; decided #178, [OQ-CBT-45](combat-tracker.md#15-open-questions)); handled action rows no longer count as unread.
 - **Sprint 2** (track P2a; FR-NOTE-25–32; 31/32 are sprint-1 leftovers: history window size, toasts clear of Initiative): a kind owner may **update** a pending row (combat's split Attack / Damage card, N7); a view's action learns **where it was clicked** and can close its toast (N8); the DM's bell counts pending actions owned by players and rule closures read "Closed" (G9); the DM sees a few-second **action cue** on a player's token when that player gets an action (N11).
+- **Sprint 5** (tracks W and K). **W** (seams S3; FR-NOTE-31 / -32): toasts, alerts and roll popups stay where they are (players bottom-right, DM top-centre; decided #256, OQ-SHELL-32 C), so FR-NOTE-32 is unchanged; the boxes are sized for the 320 × 190 roll popup ([FR-SHELL-49](play-shell.md#6-functional-requirements)); the history window opens 480 high where a clear slot allows, else 412 at 1280×720 (FR-NOTE-31). Stack order unchanged (notifications nearest the launcher). Other sprint-5 NOTE rows are track K's. **K** (BL-17; FR-NOTE-38–41): each notification records **who caused it** (the command's actor); toasts and history rows carry a stripe in that person's **player colour**; "Resolved by ‹name›" and the action cue use the closer's / action owner's colour.
 
 ## 2. Scope
 
@@ -81,8 +96,13 @@ wave: 2
 | FR-NOTE-28 | **Rule closures have no actor** (G9; amends FR-NOTE-07, -17 and [FR-CBTX-43](combat-extras.md#6-functional-requirements)): `resolveNotification(…, {byRule: true})` writes `closedByRole` and `closedByPlayerId` **null** (`closedAt` set). The history state badge reads **"Closed"** (no name) for a resolved row with no actor; the kind's resolved view gives the reason (e.g. CBTX "Ended", "Undone"). Rows closed by rule before this pass keep "Resolved by DM" (no backfill). | G9 "Resolved by DM" after End |
 | FR-NOTE-29 | **Encounter link on a view** (G9): a client view may declare `encounterIdOf?(payload) → string \| null` (plain function; the end rule's `encounterIdOf` counts too). Combat's DM Initiative lists pending rows whose view links them to the started encounter ([FR-CBT-79](combat-tracker.md#6-functional-requirements)). Notifications itself only carries the field. | G9 |
 | FR-NOTE-30 | **Action cue** (N11, DM client only; OQ-NOTE-16 settled S3; scope decided #190: **pending action notifications only, info rows never cue**; the label is always the notification text): when an `event` frame (`cause.name = NotificationCreated`) brings a row new to the store with `state = pending` and `actionRole = player`, the DM sees a cue for **4 s** on the tokens returned by the kind's DM view `cueTokens?(n, store) → tokenId[]`; no hook → default = tokens on the DM's viewed scene owned by `actionPlayerId` that are bound to an active combatant of the started encounter, else all their tokens on that scene. Cue = scenes-map decoration `cue {id: "note-token-cue", label}` (pulsing accent ring + bell above the token; static under reduced motion), label = the notification text; a second cue on a token restarts the 4 s. Drawn through notifications' own `tokenOverlays` line `note` (new file `token-cue.ts`, DM client only; registry append-only). Never from a snapshot, resync or reconnect; a token not on the viewed scene gets none (the Pending row and the bell still show it). Players: nothing. | N11 |
-| FR-NOTE-31 | **History window opens at its size** (sprint-1 leftover, seam S5; amends FR-NOTE-17 geometry): `note.history` opens at its default **360×480** at both 1440×900 and 1280×720 (it opened ~250 px tall), under FR-SHELL-29's fit unchanged; a stored (user-resized) size is respected as today. **Root cause first** (the window def declares 360×480, `window.tsx`): if the cause is in the play-shell frame (default rect, anchor offset or fit), the fix goes into P2b's `fix/shell-minimise` (frame lock), not into notifications' files. | Leftover |
-| FR-NOTE-32 | **Toasts keep clear of Initiative** (sprint-1 leftover, seam S5; amends FR-NOTE-14 placement within the shell's toast region, FR-SHELL-01): on the DM client the toast stack is placed so it doesn't overlap the rendered rect of an open, non-minimised `cbt.initiative` window (incl. its Undo and footer): it shifts left within the toast region, keeping a 12 px gap; if the region left of Initiative is narrower than a toast, the stack drops below Initiative's bottom edge. Rects come from play-shell's rendered window rects (consumed, no shell change). Players unchanged (bottom-right). | Leftover; FR-CBT-77 |
+| FR-NOTE-31 | **History window opens at its size** (sprint-1 leftover, seam S5; amends FR-NOTE-17 geometry): `note.history` opens at its default **360×480** at both 1440×900 and 1280×720 (it opened ~250 px tall), under FR-SHELL-29's fit unchanged; a stored (user-resized) size is respected as today. **Root cause first** (the window def declares 360×480, `window.tsx`): if the cause is in the play-shell frame (default rect, anchor offset or fit), the fix goes into P2b's `fix/shell-minimise` (frame lock), not into notifications' files. *(Sprint 5, track W, settled by seams S3; [FR-SHELL-45](play-shell.md#6-functional-requirements))* 480 high **where a clear slot allows**; else the tallest slot clear of every window and keep-out region (≥ min size), never over the Game log: **412 high at 1280×720** (both clients). Placement does it (`minOpenH` counts as full size there); no notifications code. | Leftover; s5 |
+| FR-NOTE-32 | **Toasts keep clear of Initiative** (sprint-1 leftover, seam S5; amends FR-NOTE-14 placement within the shell's toast region, FR-SHELL-01): on the DM client the toast stack is placed so it doesn't overlap the rendered rect of an open, non-minimised `cbt.initiative` window (incl. its Undo and footer): it shifts left within the toast region, keeping a 12 px gap; if the region left of Initiative is narrower than a toast, the stack drops below Initiative's bottom edge. Rects come from play-shell's rendered window rects (consumed, no shell change). Players unchanged (bottom-right). *(Sprint 5: unchanged, decided #256, OQ-SHELL-32 C; the stack keeps its top-centre region and `avoidTokens`.)* | Leftover; FR-CBT-77; s5 |
+| **Sprint 5** (track K, BL-17) | | |
+| FR-NOTE-38 | *(OQ-NOTE-22 A, decided #256)* **Who caused it:** `notify` (FR-NOTE-02) writes `byRole` (`dm` \| `player` \| null) and `byPlayerId` (ID \| null) from `env.actor` in the same insert: DM actor → `dm` / null; player actor → `player` / their id. **System actor = neutral everywhere** (review #44; same rule as FR-DICE-61): `notify` under a system actor stamps null / null (no stripe), and `resolveNotification` / `note.dismiss` under a system actor write `closedByRole` / `closedByPlayerId` null (the badge reads "Closed", FR-NOTE-28), never "DM" (both in `helpers.ts`, K0's grant, S15). Never in a helper argument or intent (a kind can't set it); `updateNotification`, resolve, dismiss and reopen never change it. Visibility unchanged (FR-NOTE-06: the whole row to its audience); a player only ever learns a player id of their own campaign, whose names they already have (FR-CAMP-19). `note.testSend` (test mode) stamps its sender. | OQ-NOTE-22; review #44 |
+| FR-NOTE-39 | *(OQ-NOTE-22, -24, decided #256)* **Accent stripe:** a toast (FR-NOTE-13) and a `note.history` row draw a 3 px **left stripe** in `colorOf(store, {role: byRole, playerId: byPlayerId})` ([FR-CAMP-28](campaign-management.md#6-functional-requirements)); `byRole` null → no stripe. Pending rows keep their accent border (§7) besides the stripe. The stripe is decoration: the text names the person where it matters (colour-blind backup, OQ-CAMP-25). | |
+| FR-NOTE-40 | *(OQ-CAMP-27, decided #256: in)* **Names and cue:** the history state badge "Resolved by ‹name›" (FR-NOTE-17) draws ‹name› in the closer's colour (`closedByRole` / `closedByPlayerId`; "Closed" rows unchanged, FR-NOTE-28). The DM's **action cue** ring (FR-NOTE-30) draws in the **action owner's** colour (`actionPlayerId`) instead of the client's role accent: the cue decoration passes `color` (scenes-map's `cue.color?`, [FR-MAP-72](scenes-map.md#6-functional-requirements), drawn over the casing). | review #12 |
+| FR-NOTE-41 | *(OQ-NOTE-23 A, decided #256)* **Old rows, fallback, recolour:** rows created before sprint 5 have `byRole` null → no stripe (no backfill: the actor isn't recoverable). A person without a `player` record in the store → no stripe / default text colour. A colour change restripes every row and open toast ≤ 1 s (OQ-CAMP-21, #256). | OQ-NOTE-23 |
 
 ## 7. UI/UX notes
 
@@ -93,7 +113,8 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 - **DM view:** toasts for info aimed at DM/all and every pending action the DM owns (damage cards). Window shows everything with audience tags; action on any pending row; Dismiss.
 - **Player view:** toasts for info aimed at them or all and for pending actions they own. Window shows their own and `all` notifications, incl. their damage cards' state and resolution (#138); no Dismiss.
 - **Sprint 2:** an updated pending row re-renders in place (no new toast). DM: pending rows owned by a player (audience tag "‹player›") count on the bell (FR-NOTE-27); rule-closed rows show a neutral "Closed" badge (FR-NOTE-28). Action cue: accent ring pulse + small bell above the token for 4 s, DM map only (FR-NOTE-30).
-- **Test IDs** (AGENTS §9.5): `note-toast` + `data-record-id`, `note-toast-action`, `note-toast-close`, `note-toast-more`, `note-toast-pending-summary`, `note-history`, `note-history-row` + `data-record-id` + `data-state`, `note-history-action`, `note-history-dismiss`, `note-history-empty`, `note-launcher-badge`, *(sprint 2)* `note-history-closed` (the "Closed" badge); Konva `note-token-cue` (id = token id, attr `label`); test mode: `note-test-text`, `note-test-audience`, `note-test-owner`, `note-test-label`, `note-test-send`.
+- **Test IDs** (AGENTS §9.5): `note-toast` + `data-record-id`, `note-toast-action`, `note-toast-close`, `note-toast-more`, `note-toast-pending-summary`, `note-history`, `note-history-row` + `data-record-id` + `data-state`, `note-history-action`, `note-history-dismiss`, `note-history-empty`, `note-launcher-badge`, *(sprint 2)* `note-history-closed` (the "Closed" badge); Konva `note-token-cue` (id = token id, attr `label`); test mode: `note-test-text`, `note-test-audience`, `note-test-owner`, `note-test-label`, `note-test-send`. *(Sprint 5)* `note-toast` and `note-history-row` gain `data-by` (player id \| `dm` \| absent) and `data-color` (the stripe's key, absent = none); the "Resolved by" name span `note-history-closed-by` (`data-color`); Konva `note-token-cue` gains attr `color`.
+- *(Sprint 5, K)* *(OQ-NOTE-22, -24, decided #256)* A thin colour stripe on the left edge of each toast and history row: whose action raised it (a player's damage card in their colour, the DM's loot / handout in the DM colour). *(OQ-CAMP-27, cut list, decided #256)* "Resolved by **Player 1**" with the name in their colour; the DM's token cue ring in the action owner's colour. **DM view:** stripes on every row. **Player view:** stripes on the rows they receive.
 
 ## 8. Data model
 
@@ -109,6 +130,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 | | state | `info` \| `pending` \| `resolved` \| `dismissed` | FR-NOTE-07; index (campaignId, state) |
 | | resolution | **JSON leaf** ≤ 256 B \| null | Per-kind zod; visible to the audience |
 | | closedAt, closedByRole, closedByPlayerId | timestamp, `dm` \| `player` \| null, ID \| null | From the command's clock and `env.actor` |
+| | byRole, byPlayerId *(sprint 5)* | `dm` \| `player` \| null, ID → Player \| null | Who caused it: `notify` from `env.actor` (FR-NOTE-38); immutable; null on rows before sprint 5 |
 | | createdAt, updatedAt | timestamp | `env.ctx.clock` |
 | Kind / View *(code)* | server: kind, ownerSpec, payload, resolution?, genericResolve, *(R5)* endRule?; client: kind, icon, render?, onAction?, *(R5)* endRule? (same shared constant), *(sprint 2)* encounterIdOf?, cueTokens? | — | Registries, not stored |
 | Seen marker *(browser)* | lastSeenSeq | int | Per (campaign, owner); never sent |
@@ -137,6 +159,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 | `NotificationResolved`, `NotificationDismissed`, `NotificationReopened` | `{notificationId, kind}` | `notification` upsert | yes | no | Record fn |
 | `NotificationUpdated` *(sprint 2, FR-NOTE-25)* | `{notificationId, kind}` | `notification` upsert (pending → pending, new text / payload) | yes | no | Record fn: the row's audience (e.g. a damage card: the rolling player + DM); others nothing |
 
+- *(Sprint 5)* The `notification` record gains `byRole`, `byPlayerId` (FR-NOTE-38); same visibility rule, same events and payloads; no intent change (`note.testSend` gains no field: the stamp comes from the sender).
 - Helpers emit their own event (protocol rule I15) via `env.emit`, after the kind owner's event. Each goes out as its own `event` frame, all before the sender's `ack` ([FR-SYNC-14](live-sync.md#6-functional-requirements)). No listeners, no signals.
 
 ## 10. Permissions
@@ -148,6 +171,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 | Resolve | any pending | if action owner (never damage cards: owner `dm`) | FR-NOTE-08/09 |
 | Dismiss | any pending | no (close toast locally) | FR-NOTE-11 |
 | Reopen | via kind owner (undo) | no | FR-NOTE-10 |
+| *(Sprint 5)* Set `byRole` / `byPlayerId` | never (server stamps it) | never | Not in any helper argument or intent schema (FR-NOTE-38) |
 
 ## 11. Edge cases & failure modes
 
@@ -160,6 +184,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 - **Row closes below the window floor:** delivered live; a fresh snapshot omits it (ADR-0029). **Campaign switch:** list and seen markers are per campaign.
 - **Encounter end (R5):** dismissals commit with the end or not at all (crash-safe). A client offline at End sees the rows `dismissed` in its reconnect snapshot; no summary toast for them; no per-item toast either way. Two DM tabs: whatever is pending at commit is dismissed; a racing `note.dismiss` / apply on one of them gets `conflict` (FR-NOTE-20 "No longer pending"). A dismissed card is final (no reopen: undo after End is refused by combat).
 - **Sprint 2.** *Update:* commits with the owner's change or not at all; an update racing a resolve / dismiss → whichever commits first wins, the other gets `conflict` (FR-NOTE-20). A client offline during an update gets the new text in its reconnect snapshot; nothing replays. *Hidden toast* (FR-NOTE-26) is page memory: a reload shows the summary toast as usual (FR-NOTE-15). *DM bell* (FR-NOTE-27) is derived from the store, so it survives reconnect and restart. *Action cue* is live-only: a DM offline or on another scene at creation sees no cue, and a crash between commit and send loses it (the row stays pending; accepted, as the turn alert).
+- *(Sprint 5)* **Colours:** the stamp is part of the insert: it commits with the notification or not at all (crash-safe, nothing new to lose); disconnect → stripes keep their last colours; reconnect / restart → the snapshot brings rows and colours. A player sending `byPlayerId` in `note.testSend` → `invalid` (strict schema). The creator's colour changes → existing rows restripe (derived). A row created by one DM tab shows the DM colour in every tab.
 - **Invalid / malicious input:** players create only via feature commands and test mode; text per FR-NOTE-21, never HTML; frames > 64 KB closed by live-sync.
 
 ## 12. Performance & bandwidth
@@ -167,6 +192,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 - ~50–150 notifications per evening (one per player attack). Record ~300 B typical, ≤ ~1.9 KB max (text + 1 KB payload + 256 B resolution).
 - Snapshot: pending + 100 → typical ≤ 40 KB, worst ~190 KB plus pending. Pending > 100 → server warning. Budget line for the protocol table (I17).
 - One `event` frame per create, resolve, dismiss, reopen. Nothing on the token-move hot path.
+- *(Sprint 5, measured by spec-colours 2026-10-18 on the realistic-heavy harness, [CAMP §12](campaign-management.md#12-performance--bandwidth))* `byRole` + `byPlayerId` with **every** row caused by a player (worst case): **+8,400 B** on the DM snapshot (120 rows: 100 + 20 pending), **+7,210–7,280 B** per player (103–104 rows); ≈ +70 B per `notification` upsert. With CAMP's colour fields: DM ≈ 680.9 KB of 1.5 MiB (#256), players ≤ 289.6 KB of 512 KiB. A `byPlayerId`-only variant (null = DM) measured +6,240 B DM, but can't tell the DM from a system row (OQ-NOTE-22).
 
 ## 13. Test plan
 
@@ -194,6 +220,9 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | Integration (sprint 2) | `FR-NOTE-25 updateNotification`, test-registered kind `t-upd` (player audience): update pending row → one `NotificationUpdated` after the caller's event, `seq` unchanged, `player-1` gets the upsert, `player-2` nothing; on a resolved row → `conflict`, caller rolls back; payload over the kind's `payloadMaxBytes` → throws, nothing written. `FR-NOTE-28`: `resolveNotification(…, {byRule: true})` → `closedByRole` null; restart → identical snapshots | `notifications` |
 | Integration (polish) | `FR-NOTE-23 dismissForEncounter`, test-registered kinds `t-enc` (end rule `{onEncounterEnd: "dismiss", encounterIdOf: p => p.encounterId}`) and `t-keep`: pending `t-enc` for E1 (×2) and E2, resolved `t-enc` for E1, pending `t-keep` for E1 → helper(E1) dismisses the two pending E1 rows only, `NotificationDismissed` × 2 in `seq` order after the caller's event; caller throws → nothing; `player-1` audience row upsert reaches `player-1` only. The real end-to-end is combat's `FR-CBT-59` test | `notifications` |
 | E2E (thin) | DM `note.testSend` pending to player-1 → player toast → Done → DM row "Resolved by Player 1" | `notifications` |
+| Integration (sprint 5) | `FR-NOTE-38 notify stamps by` (a test command as DM → `byRole dm`, `byPlayerId` null; as `player-1` → `player` / their id; as system → null / null; `updateNotification`, resolve, dismiss, reopen keep it; `note.testSend` from a player stamps them; `note.testSend {byPlayerId}` → `invalid`). `FR-NOTE-38 visibility` (`player-1` / `player-2` frames: the stamp only on rows they may see; DM all; no row hidden from a player becomes visible) | `player-colours` |
+| Unit (sprint 5, client) | `FR-NOTE-39 accent stripe` (toast + row: `player-1`'s row → jade stripe `data-color="jade"`; DM's → amber; `byRole` null → none; pending border kept). `FR-NOTE-40 names and cue` ("Resolved by Player 1" name span in their colour; "Closed" unchanged; the cue decoration's `color` = the action owner's). `FR-NOTE-41 old rows` (null stamp → no stripe; unknown player → none; a `player` upsert restripes) | In-code |
+| Integration (sprint 5, K0) | `FR-NOTE-38 system actor` (a test command run as the system actor: `notify` → `byRole` / `byPlayerId` null; `resolveNotification` → `closedByRole` / `closedByPlayerId` null, badge "Closed") | In-code |
 
 **Browser walkthrough** — `PP_TEST_MODE=1`; `bun run build`; `fixtures:reset-load notifications --profile verify`; `start --profile verify` in the test agent's pane; evidence per [AGENTS §9.6](../../AGENTS.md#96-browser-verification-test-agents). Contexts **A** DM, **B** `player-1`, **C** `player-2`, **D** DM second tab. Changes show ≤ 1 s.
 
@@ -215,6 +244,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 Teardown: stop the server, `fixtures:reset --profile verify`.
 
+**Sprint 5 walkthrough:** [CAMP §13](campaign-management.md#13-test-plan) K7 (a player's test card striped in their colour on the DM's toast and row; "Resolved by DM" name in the DM colour; the DM's info to Player 2 striped amber), K10 (DM colour change restripes), K12 (reload, crash: stripes unchanged).
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -225,6 +256,8 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | [campaign-management](campaign-management.md) | Player names for "Resolved by ‹name›", campaign scope | complete |
 | [combat-tracker](combat-tracker.md) | Kind `damage-card` (audience = rolling player, owner `dm`; resolution incl. damage applied, #138), DM `onAction`, `cbt.applyCard` → `resolveNotification`, undo → `reopenNotification` | in-review |
 | [dice-roll-log](dice-roll-log.md) | None: game log and notifications stay separate (I6) | in-review |
+| *(Sprint 5)* [campaign-management](campaign-management.md) (K) | `colorOf` + palette (FR-CAMP-28); the K0 schema batch; bundle `player-colours` | revised with this spec |
+| *(Sprint 5)* [scenes-map](scenes-map.md) (K) | `cue.color?` on the token decoration (FR-MAP-72) for the cue ring | revised with this spec |
 | Sprint 2 (P2a) | [scenes-map](scenes-map.md) token decoration `cue` + overlay redraw on client-only state (OQ-NOTE-16); [combat-tracker](combat-tracker.md) FR-CBT-71 (update user), FR-CBT-75 (origin), FR-CBT-79 (encounter link); [combat-extras](combat-extras.md) FR-CBTX-48/49 (concentration view `encounterIdOf`, `cueTokens`) | in-review |
 
 **Shared changes needed** (AGENTS §9.9; gate §4):
@@ -246,6 +279,11 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 - scenes-map contract (scenes-map-owned, OQ-NOTE-16): `TokenDecoration.cue`, overlay redraw hook.
 - Docs (integrator): protocol §8 / §22 event row, §23 note ("pending rows may be updated by their kind owner"); glossary **Action cue** (OQ-NOTE-18); ADR "split attack and damage" (accepted #190; integrator numbers it) (amends this spec's non-goal).
 
+**Shared changes — sprint 5** (track K; full split [CAMP §14](campaign-management.md#sprint-5-build-split-track-k)):
+- **K0** (*seams S1:* schema lane 2 after R0; merges after P0 → R0 → C5 core; grants per S15): ★ `src/server/db/` columns `notification.by_role`, `by_player_id` (nullable, no backfill); notifications-owned `helpers.ts` (`notify` stamps from `env.actor`), `@shared/notifications/schemas.ts` (`NotificationRecord` fields); `note.testSend` unchanged. Docs (assigned): data model (notification columns), protocol (record fields, CON-44 figure).
+- **K4** (after K0; toast components **after W1**, which edits the same toast stack (`ToastRuntime.tsx`, `keep-out.ts`, FR-NOTE-32's retirement): seams S15 as amended by review-a #21, K ↔ W = these toast files, W1 first; ∥ K2, K3): notifications-owned client toast + history row components (stripe, `data-by`, `data-color`, the "Resolved by" name colour, OQ-CAMP-27). P's `handout-shared` kind gets the stamp for free; P needs nothing (seams S15). No other shared file with K4 beyond the append-only view registries, which K4 doesn't touch.
+- **K3** (last canvas holder, seams S10; `cue.color?` contract change granted to K3, S15; OQ-CAMP-27 decided in): the cue ring colour through scenes-map's `cue.color?` (FR-MAP-72) and notifications' own `tokenOverlays` line passing the action owner's colour.
+
 ## 15. Open questions
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
@@ -261,6 +299,14 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | ~~OQ-NOTE-17~~ | ~~G9: which pending rows count on the DM's bell~~ | **Decided (#190):** every pending row owned by a player (the DM may act on any, FR-NOTE-08; no toast). Rejected: per-kind opt-in flag | — | combat-extras |
 | OQ-NOTE-18 | Glossary: **Action cue** ("a few-second mark on a player's token on the DM's map when that player gets an action notification") | **Add** | no · owner: integrator | glossary |
 | ~~OQ-NOTE-14~~ | ~~Toast to the rolling player when the DM resolves their card?~~ | Decided (#141): **no**; the card's resolution in `note.history` shows it (FR-NOTE-13, -18 unchanged) | — | combat-tracker |
+
+**Sprint 5** (track K). Decided by the DM before the spec: the colour shows in notifications (BL-17). Every row below **decided at sprint-5 DM gate 1 (#256, 2026-10-19) as picked**; rejected options struck.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-NOTE-22 | **Whose colour** marks a notification? | **Decided (#256): who caused it (`byRole` / `byPlayerId` stamped by `notify`).** Pick as proposed: A. Who caused it: `notify` stamps `byRole` + `byPlayerId` from the command's actor (a player's damage card or draft in their colour, the DM's loot / handout in the DM colour; +8.4 KB DM worst, +7.3 KB per player, measured; one schema batch with CAMP's K0). Rejected: ~~B. Who it's for: the audience or action-owner player, 0 B, no schema; but a DM-audience row a player caused (a draft card) gets no colour, and DM-made rows to a player show the receiver's colour~~, ~~C. Per kind: each view declares `accentOf(n)` from its payload: 0 B, but every kind owner writes a line and most payloads don't name the actor~~ | — · decided | combat-tracker, party-loot, party-board, character-sheet-full (their rows get stamped; no change asked) |
+| OQ-NOTE-23 | Rows created before sprint 5 | **Decided (#256): no stripe.** Pick as proposed: A. No stripe (the actor isn't recorded; harmless). Rejected: ~~B. Infer from the kind (damage cards: the audience player): a per-kind backfill for a cosmetic stripe~~ | — · decided | — |
+| OQ-NOTE-24 | Toast colour beyond the stripe | **Decided (#256): stripe only (3 px).** Pick as proposed: A. Stripe only (3 px): the toast stays shadcn-neutral, the UI sprint (BL-29) may restyle. Rejected: ~~B. Tinted toast background: louder, fights the pending accent border~~ | — · decided | play-shell (toast region unchanged) |
 
 ## 16. Out of scope
 
