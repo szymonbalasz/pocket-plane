@@ -42,6 +42,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-34 | `e2e/combat2-polish.e2e.ts` "FR-CBT-75 sim-6 N8" (popup opens over its toast or the nearest free spot) fails on `main` when run alone (3 / 3 with `-g`: 260–261 vs < 259; 1 / 3 for the file) and often in full runs; not caused by W1 (found by the W1 builder, sprint 5). Fix the test's geometry assumption or the placement edge case | S | combat-tracker popup placement / e2e | none | R slices on the popup | done (#270) |
 | BL-35 | Below about 48 px cells `label.ts` drops a token's status badges (Invisible, conditions) entirely, with no "+N"; W2's Fit now lands at 24–47 px more often (W2 build, sprint 5). Show a "+N" or one compact badge | S | scenes-map labels | none | canvas lock (K3) | open |
 | BL-36 | A colour swatch Tooltip in the picker opens upward over the swatch row above it until the pointer moves (shared Tooltip has no side option; K2 build) | S | shared Tooltip / campaign-management picker | none | UI sprint (BL-29) | open |
+| BL-37 | Keyboard: Space doesn't activate buttons anywhere in the app (launcher buttons ignore it too; something blocks Space globally), and Tooltips don't open on keyboard focus (K2 walkthrough, sprint 5, `%TEMP%\pocket-plane\verify-colour-picker`) | S | shared shell key handling | none | play-shell frame work | open |
 
 ## How to add items
 
