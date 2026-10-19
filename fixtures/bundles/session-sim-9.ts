@@ -15,6 +15,9 @@ export default defineBundle({
     // D: dice polish
     // R: late damage, trails, ally side
     // P: Loot tab, handouts, uploads + paste, Add to party
+    // P0: h6 "Ransom Note" with an attachment (unshared); h2 presented to player-1 (S5-1)
+    "handout-attachment",
+    "handout-present-1",
     // C: compendium images
     // K: player colours, kept-template menu
   ],

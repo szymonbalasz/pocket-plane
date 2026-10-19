@@ -68,6 +68,7 @@ describe("ingest (FR-ASSET-01, -03, -04, -06, -08)", () => {
       assetId: a.body.asset.id,
       hash: assetRows()[0]?.hash,
       bytes: png.byteLength,
+      listed: true,
     });
     expect(h.hashDirs()).toHaveLength(1);
   });

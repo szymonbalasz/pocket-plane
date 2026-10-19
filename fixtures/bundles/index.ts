@@ -23,6 +23,7 @@ import midCombat from "./mid-combat";
 import notifications from "./notifications";
 import partyBoard from "./party-board";
 import partyLoot from "./party-loot";
+import partyS5 from "./party-s5";
 import physicalDiceCombat from "./physical-dice-combat";
 import ruleTriggers from "./rule-triggers";
 import rulesEffects from "./rules-effects";
@@ -78,4 +79,5 @@ export const bundles: readonly Bundle[] = [
   usesNegative,
   sessionSim8,
   sessionSim9,
+  partyS5,
 ];

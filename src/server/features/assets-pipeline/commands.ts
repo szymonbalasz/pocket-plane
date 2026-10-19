@@ -1,7 +1,7 @@
 // assets.ingest (FR-ASSET-01, -03, -04, -06, -08, -09) and assets.require (FR-ASSET-15).
 import { createHash } from "node:crypto";
 import { AssetName, type AssetRecord, nameFromFilename } from "@shared/assets-pipeline/schemas";
-import { AssetIngested } from "@shared/events/assets-pipeline";
+import { AssetIngested, AssetListed } from "@shared/events/assets-pipeline";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { defineCommand } from "../../commands/commands";
@@ -52,6 +52,8 @@ export const IngestInput = z.object({
   image: ProcessedImageSchema,
   filename: z.string().max(1024),
   name: z.string().optional(),
+  /** FR-ASSET-24 (S5): false = an attachment (outside the library and every snapshot). */
+  listed: z.boolean().optional(),
 });
 export type IngestInput = z.input<typeof IngestInput>;
 
@@ -74,6 +76,11 @@ export function resolveName(filename: string, name?: string) {
 function nextAssetId(ctx: CommandContext, sourceHash: string): string {
   const token = ctx.tokens.next();
   if (ctx.fixtureKey === undefined) return token;
+  return seededAssetId(token, sourceHash);
+}
+
+/** The seeded asset ID for a token draw and the source bytes' hash (fixtures, `bun test`). */
+export function seededAssetId(token: string, sourceHash: string): string {
   return createHash("sha256")
     .update(`${token}:${sourceHash}`)
     .digest()
@@ -85,13 +92,15 @@ function nextAssetId(ctx: CommandContext, sourceHash: string): string {
  * `assets.ingest`, DM authority, campaign = `actor.campaignId` fixed at authentication
  * (FR-ASSET-09, CON-21). Files go to disk first, then row + log entry commit together;
  * `AssetIngested` dispatches after commit (FR-ASSET-06). Same image in the campaign →
- * `existing`, nothing written (FR-ASSET-03).
+ * `existing`, nothing written (FR-ASSET-03), except that a `listed` request lists an existing
+ * attachment (`AssetListed`, FR-ASSET-26); `listed: false` never unlists. *(S5)* An attachment's
+ * `AssetIngested` carries no record change (FR-ASSET-24).
  */
 export function ingestCommand(store: AssetStore) {
   return defineCommand({
     name: INGEST,
     input: IngestInput,
-    execute({ image, filename, name }, { tx, ctx, actor, emit }): IngestResult {
+    execute({ image, filename, name, listed = true }, { tx, ctx, actor, emit }): IngestResult {
       const campaignId = actor.campaignId;
       if (!campaignId) throw conflict("No active campaign");
       const parsedName = resolveName(filename, name);
@@ -113,6 +122,17 @@ export function ingestCommand(store: AssetStore) {
       if (existing) {
         // Files lost since (FR-ASSET-07 404s): this upload heals them (#163).
         store.repairFiles(image);
+        if (listed && !existing.listed) {
+          tx.update(asset).set({ listed: true }).where(eq(asset.id, existing.id)).run();
+          const rec = toAssetRecord(existing);
+          emit({
+            type: AssetListed.type,
+            campaignId,
+            payload: { assetId: existing.id },
+            // New to the library: an upsert for the DM (players: `asset` is hidden).
+            changes: [{ type: "asset", id: existing.id, before: null, after: rec }],
+          });
+        }
         return { asset: toAssetRecord(existing), outcome: "existing" };
       }
 
@@ -136,6 +156,7 @@ export function ingestCommand(store: AssetStore) {
           displayWidth: image.display.width,
           displayHeight: image.display.height,
           createdAt: ctx.clock.iso(),
+          listed,
         })
         .run();
       const row = tx.select().from(asset).where(eq(asset.id, id)).get() as AssetRow;
@@ -143,8 +164,8 @@ export function ingestCommand(store: AssetStore) {
       emit({
         type: AssetIngested.type,
         campaignId,
-        payload: { assetId: id, hash: image.hash, bytes: row.bytes },
-        changes: [{ type: "asset", id, before: null, after: rec }],
+        payload: { assetId: id, hash: image.hash, bytes: row.bytes, listed },
+        changes: listed ? [{ type: "asset", id, before: null, after: rec }] : [],
       });
       return { asset: rec, outcome: "created" };
     },
