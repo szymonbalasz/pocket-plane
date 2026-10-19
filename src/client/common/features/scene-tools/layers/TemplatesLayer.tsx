@@ -13,7 +13,7 @@
 // hover is read from the stage's pointer. Konva: name `scn-template`, id = record ID or
 // `eph-<key>`, attrs `shape`, `cells` ("c,r c,r …"), `origin` ("x,y"), `angle`, `ephemeral`,
 // `color` (the drawn hex), `by` (player id | `dm`); `map-casing` (id = template id) under the
-// outline; label `scn-template-label` (attr `templateId`) with `scn-template-label-dot`; handles
+// outline; label `scn-template-label` (id = template id) with `scn-template-label-dot`; handles
 // `scn-template-handle-origin` / `-end` (id = template id). Mounts the right-click menu island
 // (FR-SCN-48; the press routing is MapCanvas', FR-MAP-71).
 import { templateCells } from "@shared/scene-tools/geometry";
@@ -142,7 +142,7 @@ function TemplateLabel({
   const lead = pad + dot;
   const h = font + 2 * pad;
   return (
-    <Group x={x} y={y} name="scn-template-label" templateId={d.id}>
+    <Group x={x} y={y} name="scn-template-label" id={d.id}>
       <Rect
         width={lead + textWidth(text, font, pad)}
         height={h}
@@ -310,7 +310,7 @@ function useLabelHover(groupRef: RefObject<Konva.Group | null>): string | null {
       for (const n of groupRef.current?.find(".scn-template-label") ?? []) {
         const r = n.getClientRect();
         if (p && p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height) {
-          hit = n.getAttr("templateId") as string;
+          hit = n.id();
         }
       }
       setHovered(hit);
