@@ -22,6 +22,7 @@ import fogScn from "./fog-scn";
 import furyLogLine from "./fury-log-line";
 import initChipsEffect from "./init-chips-effect";
 import lateDamage from "./late-damage";
+import logNoteColours from "./log-note-colours";
 import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
@@ -96,4 +97,5 @@ export const bundles: readonly Bundle[] = [
   initChipsEffect,
   partyCmp,
   playerColours,
+  logNoteColours,
 ];
