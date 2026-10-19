@@ -1763,3 +1763,15 @@ Indexes unique `handout_present_campaign_player` (`campaign_id`, `player_id`), `
 - **Attachments:** handouts (and, from C5, compendium entries) reference attachments like any asset; `assets.require` ignores `listed`. A re-upload of an attachment's bytes with `listed: true` sets `listed` (FR-ASSET-26); `listed: false` never unlists. Unreferenced attachments stay (no delete, OQ-ASSET-05).
 - **Fixtures:** `handout-attachment` (`ransom-note.svg` as an attachment + h6 "Ransom Note", unshared; its asset id from `fixtureAttachmentId`, since an attachment's ingest has no record change for `r.id`), `handout-present-1` (h2 → player-1); bundle `party-s5` = `party-board` + `cmp-srd-mini` + both; both units also in `session-sim-9`.
 - **Snapshot size** (CON-44, #256; `con44-s5.test.ts`, `snapshot-size.test.ts` worst case): heavy harness + party-s5 units, a present for every player: `handout-present` DM **1,459 B** at 6 rows (heavy DM 674,871 B, 897,993 B left of 1.5 MiB), **259 B** in each player frame (players max 282,383 B); at the 20-row cap (20 players) DM **4,819 B** (bound 5,100). 50 attachments: every snapshot byte-identical.
+
+## 66. Sprint 5: dice landing (D8)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-49, -50 and [dice-roll-log](../specs/dice-roll-log.md#8-data-model) FR-DICE-40. **Built by `build/dice-landing`**: no table, column, record type or payload change. Protocol side: [protocol §83](../protocol/README.md#83-sprint-5-dice-landing-d8).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Holding map | client memory (`dice-extras/landing.ts`) | held entry id → deadline (arrival + 6 s); filled only by the live-throw path; never stored or sent; a reload starts empty, so every snapshot entry is shown | [FR-DICEX-49](../specs/dice-extras.md#6-functional-requirements) |
+| Staged tray request after a result | client memory (`diceExtras.request`) | an edit after a result replaces it with a fresh `free` request (expression only, `other`, no label / actor) | [FR-DICEX-50](../specs/dice-extras.md#6-functional-requirements) |
+
+- **Fixtures:** no new unit. Bundle `dice-polish` = `dice-display` + `char-brakka` + `weapon-flame-tongue` (Brakka, `player-1`, Flame Tongue `1d20+8`, `2d6+5` slashing + `2d6` fire); `session-sim-9` needs nothing extra (sim-8 has both units).
+- **Snapshot size** (CON-44): 0 B added; `dice-polish` DM 21,098 B, players ≤ 13,882 B.
