@@ -2,6 +2,8 @@
 // rendered contract as a static server render over a fake sync store. Real paste / drop events,
 // the picker's Select and the Dialog portal: e2e/image-attach.e2e.ts.
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import type { AssetRecord } from "@shared/assets-pipeline/schemas";
 import { emptyStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -399,7 +401,12 @@ describe("FR-ASSET-20 contract", () => {
     expect(render({}, { assets: 0 })).not.toContain("asset-attach-library");
   });
 
-  test("FR-ASSET-20 contract: no uploader provider (player client) → renders nothing", () => {
+  test("FR-ASSET-27 no player upload: no uploader provider (player client) → renders nothing", () => {
     expect(render({}, { provider: false })).toBe("");
+    // Only the DM client root provides one.
+    const root = (client: string) =>
+      readFileSync(path.join(import.meta.dir, `../../../../${client}/main.tsx`), "utf8");
+    expect(root("dm")).toContain("<DmAttachUploaderProvider>");
+    expect(root("player")).not.toContain("Uploader");
   });
 });
