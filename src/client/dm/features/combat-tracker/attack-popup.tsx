@@ -21,6 +21,8 @@ import {
   type CombatantView,
   DamageCardPayload,
   type DamageMultiplier,
+  HIT_RULING_TYPE,
+  type HitRulingRecord,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { modSegments } from "@shared/effect-modifiers/line";
@@ -36,7 +38,12 @@ import {
   ToggleGroupItem,
 } from "@ui/components/ui/controls";
 import { Badge, Input, Label } from "@ui/components/ui/primitives";
-import { toastIntentError, useCbtIntent, useCombatants } from "@ui/features/combat-tracker/store";
+import {
+  toastIntentError,
+  useCbtIntent,
+  useCombatants,
+  useStartedEncounter,
+} from "@ui/features/combat-tracker/store";
 import { useTargetingAttacker } from "@ui/features/combat-tracker/token-overlay";
 import { hideToast } from "@ui/features/notifications/toasts";
 import {
@@ -64,6 +71,22 @@ import {
 } from "../scenes-map/selection";
 import { useDefinitions } from "./data";
 import {
+  blurField,
+  FIELD_EMPTY,
+  type FieldDraft,
+  fieldValue,
+  focusField,
+  isTyped,
+  lateNote,
+  popupStep,
+  primaryAction,
+  rolledHint,
+  ruledRows,
+  turnKey,
+  typeField,
+  unusedText,
+} from "./late-fill";
+import {
   type PopupRowView,
   partInputs,
   partPreviewExtra,
@@ -78,7 +101,13 @@ import {
   type Placement,
   placementTiers,
 } from "./popup-placement";
-import { type PopupOrigin, useCombatDialogs } from "./popup-store";
+import {
+  type CardDraft,
+  emptyDraft,
+  type PerTarget,
+  type PopupOrigin,
+  useCombatDialogs,
+} from "./popup-store";
 import {
   addAction,
   applyReady,
@@ -89,7 +118,6 @@ import {
   naturalContradiction,
   previewText,
   rowPreset,
-  shownTotal,
   targetList,
   totalOf,
   weaponRaw,
@@ -207,14 +235,6 @@ function AddTarget({
   );
 }
 
-interface PerTarget {
-  /** Toggled hit; null = follow the preset. */
-  hit: boolean | null;
-  mult: DamageMultiplier;
-  /** FR-CBT-82: each extra part's picked multiplier; null / absent = its defense preset. */
-  extra?: (DamageMultiplier | null)[];
-}
-
 /** FR-CBT-82: one extra part's multiplier chip under a target row ("fire" + Half (Fire Ward)). */
 function PartChip({
   targetId,
@@ -272,22 +292,78 @@ function PartChip({
   );
 }
 
-function PopupBody({ card, close }: { card: NotificationRecord; close(): void }) {
+const NO_DRAFT = emptyDraft();
+
+/**
+ * FR-CBT-90: one damage total that a late roll fills (base or an extra part): the DM's text once
+ * typed, else the roll; focused, it never fills ("rolled N" beside it) and fills on blur if empty.
+ */
+function DamageField({
+  id,
+  testId,
+  part,
+  value,
+  rolled,
+  className,
+  placeholder,
+  onEdit,
+}: {
+  id: string;
+  testId: string;
+  part: number | "base";
+  value: FieldDraft | undefined;
+  rolled: number | null | undefined;
+  className: string;
+  placeholder?: string;
+  onEdit(next: FieldDraft): void;
+}) {
+  const hint = rolledHint(value, rolled);
+  return (
+    <>
+      <Input
+        id={id}
+        data-testid={testId}
+        {...(part === "base" ? {} : { "data-value": part })}
+        data-typed={isTyped(value) ? "true" : undefined}
+        inputMode="numeric"
+        className={className}
+        placeholder={placeholder}
+        value={fieldValue(value, rolled)}
+        onFocus={() => onEdit(focusField(value, rolled))}
+        onChange={(e) => onEdit(typeField(e.target.value))}
+        onBlur={() => onEdit(blurField(value))}
+      />
+      {hint !== null && (
+        <span
+          data-testid="cbt-popup-rolled-hint"
+          data-value={part}
+          className="shrink-0 text-xs font-normal text-muted-foreground"
+        >
+          rolled {hint}
+        </span>
+      )}
+    </>
+  );
+}
+
+export function PopupBody({ card, close }: { card: NotificationRecord; close(): void }) {
   const payload = useMemo(() => DamageCardPayload.safeParse(card.payload), [card.payload]);
   const p = payload.success ? payload.data : null;
   const defs = useDefinitions();
   const combatants = useCombatants(p?.encounterId);
   const tokens = useRecords<{ id: string; sceneId: string }>(TOKEN_TYPE);
+  const rulings = useRecords<HitRulingRecord>(HIT_RULING_TYPE);
+  const encounter = useStartedEncounter();
   const selection = useMapSelection();
-  // Null = follow the card's rolled value (a Damage attaching while open fills the cell).
-  const [toHitDraft, setToHit] = useState<string | null>(null);
-  const [damageDraft, setDamage] = useState<string | null>(null);
-  // FR-CBT-82: the extra parts' typed totals, card order (null = follow the roll).
-  const [extraDrafts, setExtraDrafts] = useState<(string | null)[]>([]);
-  const [added, setAdded] = useState<string[]>([]);
-  const [per, setPer] = useState<Record<string, PerTarget>>({});
-  // Popup parts' values, one per line (client memory; lost on close).
-  const [partValues, setPartValues] = useState<Record<string, unknown>>({});
+  // FR-CBT-90: the DM's edits live per card in popup-store (kept across Later, another card, a
+  // reconnect; lost on reload). Untouched fields follow the card, so a late roll fills them.
+  const draft = useCombatDialogs((s) => s.drafts[card.id]) ?? NO_DRAFT;
+  const editDraft = useCombatDialogs((s) => s.editDraft);
+  const dropDraft = useCombatDialogs((s) => s.dropDraft);
+  const thawDraft = useCombatDialogs((s) => s.thawDraft);
+  const sawResolved = useCombatDialogs((s) => s.sawResolved);
+  const resolvedCards = useCombatDialogs((s) => s.resolved);
+  const edit = (patch: (d: CardDraft) => Partial<CardDraft>) => editDraft(card.id, patch);
   const effects = useActiveEffects();
   const { send, disabled: sending } = useCbtIntent();
   // Apply goes through the connection itself so popup parts see its reject (R7, `onReject`).
@@ -305,39 +381,60 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
       useTargetingAttacker.setState({ attackerId: null });
     };
   }, [attackerId]);
+  // FR-CBT-90: closing with a field focused (no blur) leaves it following its roll.
+  useEffect(() => () => thawDraft(card.id), [card.id, thawDraft]);
 
   if (!p) return <p className="text-sm text-destructive">Unreadable card</p>;
 
-  const list = targetList({
-    combatants,
-    encounterId: p.encounterId,
-    attackerId: p.attackerId,
-    selectedTokenIds: selection.tokenIds,
-    added,
-  });
+  // FR-CBT-89: the damage step iff the card has a hit ruling (also after a reload or restart).
+  const ruling = rulings.find((r) => r.cardId === card.id) ?? null;
+  const step = popupStep(ruling);
+  const ruled = ruling ? ruledRows(ruling, draft.dropped) : [];
+  const list = ruling
+    ? {
+        rows: ruled.flatMap((r) => {
+          const c = combatants.find((x) => x.id === r.targetId);
+          return c ? [{ c, source: "ruled" as const }] : [];
+        }),
+        notInCombat: 0,
+        tooMany: false,
+      }
+    : targetList({
+        combatants,
+        encounterId: p.encounterId,
+        attackerId: p.attackerId,
+        selectedTokenIds: selection.tokenIds,
+        added: draft.added,
+      });
   const inList = new Set(list.rows.map((r) => r.c.id));
   const addable = eligibleTargets(combatants, p.encounterId, p.attackerId).filter(
     (c) => !inList.has(c.id),
   );
   const shape = cardShape(p);
-  const toHit = shownTotal(toHitDraft, p.toHit?.total);
-  const damage = shownTotal(damageDraft, p.damage?.total);
-  const toHitTotal = totalOf(toHit) ?? p.toHit?.total ?? 0;
+  const toHit = fieldValue(draft.toHit, p.toHit?.total);
+  const damage = fieldValue(draft.damage, p.damage?.total);
+  const toHitTotal = ruling?.toHitTotal ?? totalOf(toHit) ?? p.toHit?.total ?? 0;
   const rolledNatural = p.toHit?.natural ?? null;
   const natural = naturalMark(rolledNatural);
   // An empty / non-number cell falls back to the roll; none yet → null (FR-CBT-72).
   const damageTotal = totalOf(damage) ?? p.damage?.total ?? null;
   // FR-CBT-82: each extra part's total (an empty / non-number cell falls back to the roll).
   const extraParts = p.damage?.extra ?? [];
-  const extraShown = extraParts.map((x, i) => shownTotal(extraDrafts[i] ?? null, x.total));
-  const extraTotals = extraParts.map((x, i) => totalOf(extraShown[i] as string) ?? x.total);
+  const extraTotals = extraParts.map(
+    (x, i) => totalOf(fieldValue(draft.extra[i], x.total)) ?? x.total,
+  );
   const base = list.rows.map(({ c, source }) => {
     const ac = acOf(c, defs);
-    // FR-MOD-24, -25: Hit vs the effective AC; the multiplier preset from the target's defenses.
+    // FR-MOD-24, -25: Hit vs the effective AC; the multiplier preset from the target's defenses
+    // (FR-CBT-89: in the damage step, the ruling's).
     const facts = rowFacts(effects, c, ac, p.damageType);
-    const preset = rowPreset(shape, rolledNatural, toHitTotal, facts.ac?.value ?? ac);
-    const st = per[c.id] ?? { hit: null, mult: presetMultiplier(facts) };
-    const hit = st.hit ?? preset;
+    const preset = ruling
+      ? true
+      : rowPreset(shape, rolledNatural, toHitTotal, facts.ac?.value ?? ac);
+    const ruledMult = ruled.find((r) => r.targetId === c.id)?.multiplier;
+    const st = draft.per[c.id] ?? { hit: null, mult: ruledMult ?? presetMultiplier(facts) };
+    // FR-CBT-89: a ruled hit stays a Hit (✕ drops it).
+    const hit = ruling ? true : (st.hit ?? preset);
     // FR-MOD-58: each extra part preset from the target's defenses for its own type.
     const target = { id: c.id, kind: c.kind, entityId: c.entityId ?? null };
     const presets = extraPartPresets(
@@ -357,7 +454,7 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
           ? weaponRaw(hit, damageTotal, st.mult, parts)
           : rawDamage(hit, damageTotal, st.mult);
     const hp = hpOf(c, defs);
-    const contra = naturalContradiction(rolledNatural, hit);
+    const contra = ruling ? null : naturalContradiction(rolledNatural, hit);
     return {
       c,
       source,
@@ -382,9 +479,10 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
     hp: x.hp,
   }));
   // FR-MOD-39: a line's parts on a Hit row join its preview (the server decides at apply).
+  // FR-MOD-63: in the damage step the first Hit row is the first ruled hit still listed.
   const rows = base.map((x, i) => {
     const view = views[i] as PopupRowView;
-    const extra = x.hit ? partPreviewExtra(popupParts, partValues, view, views, p) : 0;
+    const extra = x.hit ? partPreviewExtra(popupParts, draft.parts, view, views, p) : 0;
     return { ...x, view, raw: x.raw === null ? null : x.raw + extra };
   });
   const ready = applyReady(
@@ -392,12 +490,29 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
     damageTotal,
     list.tooMany,
   );
+  // FR-CBT-87: "Apply hit" while a Hit row waits for damage and no total is typed.
+  const action = primaryAction({
+    step,
+    card: p,
+    hits: rows.map((x) => x.hit),
+    typedTotal: totalOf(damage) !== null,
+  });
+  const turn = encounter ? turnKey(encounter) : null;
+  const note = lateNote({ seq: card.seq, p }, resolvedCards, turn);
+  const unused = unusedText(p);
   const setRow = (id: string, patch: Partial<PerTarget>) => {
     const mult = rows.find((x) => x.c.id === id)?.mult ?? "normal";
-    setPer((s) => ({ ...s, [id]: { ...(s[id] ?? { hit: null, mult }), ...patch } }));
+    edit((d) => ({
+      per: { ...d.per, [id]: { ...(d.per[id] ?? { hit: null, mult }), ...patch } },
+    }));
   };
   const remove = (c: CombatantView) => {
-    setAdded((a) => a.filter((id) => id !== c.id));
+    if (ruling) {
+      // FR-CBT-89: ✕ drops a ruled hit (it resolves `dropped` at Apply).
+      edit((d) => ({ dropped: [...d.dropped, c.id] }));
+      return;
+    }
+    edit((d) => ({ added: d.added.filter((id) => id !== c.id) }));
     if (c.tokenId && selection.tokenIds.includes(c.tokenId)) {
       setMapSelection(selection.tokenIds.filter((t) => t !== c.tokenId));
     }
@@ -406,29 +521,62 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
     const sceneOf = (tokenId: string) => tokens.find((t) => t.id === tokenId)?.sceneId ?? null;
     const a = addAction(c, sceneOf, selection.sceneId);
     if ("select" in a) setMapSelection([...selection.tokenIds, a.select]);
-    else setAdded((x) => [...x, a.add]);
+    else edit((d) => ({ added: [...d.added, a.add] }));
   };
 
+  const applyHit = async () => {
+    if (disabled || list.tooMany || rows.length === 0) return;
+    setApplying(true);
+    try {
+      // FR-CBT-88: the hit lines now; the popup stays open and its ruling makes the damage step.
+      await connection.sendIntent("cbt.applyHit", {
+        cardId: card.id,
+        toHitTotal,
+        targets: rows.map((x) => ({ targetId: x.c.id, hit: x.hit, multiplier: x.mult })),
+      });
+    } catch (err) {
+      toastIntentError(err);
+    } finally {
+      setApplying(false);
+    }
+  };
   const apply = async () => {
     if (!ready || disabled) return;
     setApplying(true);
     try {
-      // FR-CBT-72: a to-hit total iff the card has a to-hit roll; no damage total on an all-miss
-      // to-hit-only card.
+      // FR-CBT-72: a to-hit total iff the card has a to-hit roll (FR-CBT-91: a ruled card takes
+      // the ruling's); no damage total on an all-miss to-hit-only card.
       await connection.sendIntent("cbt.applyCard", {
         cardId: card.id,
-        ...(p.toHit ? { toHitTotal } : {}),
+        ...(p.toHit && !ruling ? { toHitTotal } : {}),
         ...(damageTotal !== null ? { damageTotal } : {}),
+        // FR-CBT-94: the damage this popup shows; a newer one → conflict, and the popup fills.
+        damageRollId: p.damage?.rollId ?? null,
         // FR-CBT-82: the extra parts' values and each row's part multipliers, card order.
         ...(extraTotals.length ? { extraTotals } : {}),
         targets: rows.map((x) => ({
-          ...partInputs(popupParts, partValues, x.view, views, p),
+          ...partInputs(popupParts, draft.parts, x.view, views, p),
           targetId: x.c.id,
           hit: x.hit,
           multiplier: x.mult,
           ...(x.extraMults.length ? { extraMultipliers: x.extraMults } : {}),
         })),
       });
+      // FR-CBT-93 (b): this client saw it resolved this turn (the late note's memory).
+      if (turn !== null) {
+        sawResolved({
+          cardId: card.id,
+          seq: card.seq,
+          encounterId: p.encounterId,
+          attackerId: p.attackerId,
+          attackerName: p.attackerName,
+          attackName: p.attackName,
+          ...(p.attackId !== undefined ? { attackId: p.attackId } : {}),
+          ...(p.spellId !== undefined ? { spellId: p.spellId } : {}),
+          turn,
+        });
+      }
+      dropDraft(card.id);
       // FR-CBT-54: closing clears the map selection (popup-store).
       close();
     } catch (err) {
@@ -436,7 +584,7 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
       toastIntentError(err);
       if (err instanceof IntentRejected) {
         const issues = (err.issues ?? []) as RejectIssue[];
-        setPartValues((s) => partRejects(popupParts, s, issues));
+        edit((d) => ({ parts: { ...partRejects(popupParts, d.parts, issues) } }));
       }
     } finally {
       setApplying(false);
@@ -444,15 +592,34 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
   };
   const dismiss = async () => {
     const r = await send("note.dismiss", { id: card.id });
-    if (r !== undefined) close();
+    if (r !== undefined) {
+      dropDraft(card.id);
+      close();
+    }
   };
 
   return (
     <div className="flex min-h-0 flex-col gap-3">
       {/* FR-CBT-76: the header drags the popup (handled by the panel). */}
       <div data-testid="cbt-popup-drag" className="-mx-3 -mt-3 cursor-move select-none px-3 pt-3">
-        <h2 className="text-sm font-semibold">
-          {p.attackerName} — {p.attackName}
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+          <span className="min-w-0 truncate">
+            {p.attackerName} — {p.attackName}
+          </span>
+          {ruling ? (
+            <Badge
+              variant="secondary"
+              data-testid="cbt-popup-step"
+              data-value={step}
+              className="shrink-0"
+            >
+              Hit applied
+            </Badge>
+          ) : (
+            <span data-testid="cbt-popup-step" data-value={step} className="sr-only">
+              To-hit step
+            </span>
+          )}
         </h2>
         <p className="text-xs text-muted-foreground">
           {p.mode !== "normal" ? `${p.mode} · ` : ""}
@@ -461,7 +628,21 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
         </p>
       </div>
       <div className={shape === "damage" ? "grid gap-2" : "grid grid-cols-2 gap-2"}>
-        {p.toHit && (
+        {p.toHit && ruling && (
+          // FR-CBT-89: the ruled to-hit, read-only.
+          <div className="grid content-start gap-1">
+            <span className="text-xs font-medium">To hit</span>
+            <span data-testid="cbt-popup-tohit-ruled" className="text-sm tabular-nums">
+              {ruling.toHitTotal} · hit applied
+            </span>
+            {natural !== null && (
+              <span data-testid="cbt-popup-natural" data-value={natural} className="text-xs">
+                natural {natural}
+              </span>
+            )}
+          </div>
+        )}
+        {p.toHit && !ruling && (
           <div className="grid gap-1">
             <Label htmlFor="cbt-popup-tohit" className="flex-wrap text-xs">
               To hit <Dice dice={p.toHit.dice} /> {p.toHit.constant >= 0 ? "+" : "−"}
@@ -491,7 +672,7 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
               inputMode="numeric"
               className="h-8"
               value={toHit}
-              onChange={(e) => setToHit(e.target.value)}
+              onChange={(e) => edit(() => ({ toHit: typeField(e.target.value) }))}
             />
           </div>
         )}
@@ -504,6 +685,14 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                 {Math.abs(p.damage.constant)}
                 {p.damage.mods && lineText(modSegments(p.damage.mods))}
               </>
+            ) : ruling ? (
+              // FR-CBT-89 (§7): muted, a slow pulse, no spinner, until the roll attaches.
+              <span
+                data-testid="cbt-popup-waiting"
+                className="animate-pulse font-normal text-muted-foreground [animation-duration:2.5s]"
+              >
+                Waiting for damage
+              </span>
             ) : (
               <span
                 data-testid="cbt-popup-waiting-damage"
@@ -519,22 +708,22 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                 {extraParts.map((x, i) => ` + ${extraTotals[i]} ${x.type}`).join("")}
               </span>
             )}
-            {p.damage && damageTotal !== p.damage.total && (
-              <>
-                <Badge variant="secondary">edited</Badge>
-                <span className="font-normal text-muted-foreground">rolled {p.damage.total}</span>
-              </>
+            {p.damage && damageTotal !== p.damage.total && isTyped(draft.damage) && (
+              <Badge variant="secondary">edited</Badge>
             )}
           </Label>
-          <Input
-            id="cbt-popup-damage"
-            data-testid="cbt-popup-damage"
-            inputMode="numeric"
-            className="h-8"
-            placeholder={p.damage ? undefined : "Total"}
-            value={damage}
-            onChange={(e) => setDamage(e.target.value)}
-          />
+          <div className="flex items-center gap-1.5">
+            <DamageField
+              id="cbt-popup-damage"
+              testId="cbt-popup-damage"
+              part="base"
+              value={draft.damage}
+              rolled={p.damage?.total}
+              className="h-8"
+              placeholder={p.damage ? undefined : "Total"}
+              onEdit={(next) => edit(() => ({ damage: next }))}
+            />
+          </div>
           {extraParts.map((x, i) => (
             // FR-CBT-82: each extra part's total, editable like the base part's.
             // biome-ignore lint/suspicious/noArrayIndexKey: parts are the card's, in order
@@ -542,27 +731,30 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
               <Label htmlFor={`cbt-popup-damage-part-${i + 1}`} className="w-14 text-xs">
                 + {x.type}
               </Label>
-              <Input
+              <DamageField
                 id={`cbt-popup-damage-part-${i + 1}`}
-                data-testid="cbt-popup-damage-part"
-                data-value={i + 1}
-                inputMode="numeric"
+                testId="cbt-popup-damage-part"
+                part={i + 1}
+                value={draft.extra[i]}
+                rolled={x.total}
                 className="h-7"
-                value={extraShown[i]}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setExtraDrafts((d) => {
-                    const next = [...d];
-                    next[i] = v;
-                    return next;
-                  });
-                }}
+                onEdit={(next) =>
+                  edit((d) => {
+                    const extra = [...d.extra];
+                    for (let j = extra.length; j < i; j++) extra[j] = FIELD_EMPTY;
+                    extra[i] = next;
+                    return { extra };
+                  })
+                }
               />
-              {extraTotals[i] !== x.total && (
-                <span className="text-xs text-muted-foreground">rolled {x.total}</span>
-              )}
             </div>
           ))}
+          {unused && (
+            // FR-CBT-92: the owner's later rolls, not used.
+            <p data-testid="cbt-popup-unused" className="text-xs text-muted-foreground">
+              {unused}
+            </p>
+          )}
           {p.saveDc && (
             <p className="text-xs text-muted-foreground">
               DC {p.saveDc.dc} {p.saveDc.ability.toUpperCase()} · Half on a successful save
@@ -581,7 +773,9 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
         </div>
         {rows.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            Select tokens on the map (Ctrl / Shift to add, drag a box) or add a target.
+            {ruling
+              ? "Every ruled hit dropped: Dismiss the card."
+              : "Select tokens on the map (Ctrl / Shift to add, drag a box) or add a target."}
           </p>
         ) : (
           <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto">
@@ -605,18 +799,20 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                   )}
                   {/* FR-CBT-72: a damage-only card has no to-hit to compare: AC alone. */}
                   <AcCell combatantId={x.c.id} facts={x.facts} damageOnly={shape === "damage"} />
-                  <Button
-                    size="sm"
-                    variant={x.hit ? "default" : "outline"}
-                    className="h-6 px-2 text-xs"
-                    data-testid="cbt-popup-target-hit"
-                    data-record-id={x.c.id}
-                    data-value={x.hit ? "hit" : "miss"}
-                    aria-pressed={x.hit}
-                    onClick={() => setRow(x.c.id, { hit: !x.hit })}
-                  >
-                    {x.hit ? "Hit" : "Miss"}
-                  </Button>
+                  {!ruling && (
+                    <Button
+                      size="sm"
+                      variant={x.hit ? "default" : "outline"}
+                      className="h-6 px-2 text-xs"
+                      data-testid="cbt-popup-target-hit"
+                      data-record-id={x.c.id}
+                      data-value={x.hit ? "hit" : "miss"}
+                      aria-pressed={x.hit}
+                      onClick={() => setRow(x.c.id, { hit: !x.hit })}
+                    >
+                      {x.hit ? "Hit" : "Miss"}
+                    </Button>
+                  )}
                   {x.contra && (
                     <span
                       data-testid="cbt-popup-target-natural"
@@ -631,9 +827,9 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                     size="icon"
                     variant="ghost"
                     className="size-6"
-                    data-testid="cbt-popup-target-remove"
+                    data-testid={ruling ? "cbt-popup-row-drop" : "cbt-popup-target-remove"}
                     data-record-id={x.c.id}
-                    aria-label={`Remove ${x.c.name}`}
+                    aria-label={`${ruling ? "Drop" : "Remove"} ${x.c.name}`}
                     onClick={() => remove(x.c)}
                   >
                     <XIcon className="size-3.5" />
@@ -703,8 +899,8 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
                     cardId={card.id}
                     row={x.view}
                     rows={views}
-                    value={partValues[part.id]}
-                    onChange={(v) => setPartValues((s) => ({ ...s, [part.id]: v }))}
+                    value={draft.parts[part.id]}
+                    onChange={(v) => edit((d) => ({ parts: { ...d.parts, [part.id]: v } }))}
                     disabled={disabled}
                   />
                 ))}
@@ -712,11 +908,18 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
             ))}
           </ul>
         )}
-        <AddTarget options={addable} onPick={add} disabled={disabled} />
+        {/* FR-CBT-89: the damage step adds no target. */}
+        {!ruling && <AddTarget options={addable} onPick={add} disabled={disabled} />}
       </section>
       {list.tooMany && (
         <p data-testid="cbt-popup-max-targets" className="text-xs text-destructive">
           Max {APPLY_TARGETS_MAX} targets
+        </p>
+      )}
+      {note && (
+        // FR-CBT-93 (b): the roll came after this turn's apply of the same attack.
+        <p data-testid="cbt-popup-late-note" className="text-xs text-muted-foreground">
+          {note}
         </p>
       )}
       <div className="flex justify-end gap-2">
@@ -732,14 +935,25 @@ function PopupBody({ card, close }: { card: NotificationRecord; close(): void })
         <Button size="sm" variant="outline" data-testid="cbt-popup-later" onClick={close}>
           Later
         </Button>
-        <Button
-          size="sm"
-          data-testid="cbt-popup-apply"
-          disabled={disabled || !ready}
-          onClick={apply}
-        >
-          Apply
-        </Button>
+        {action === "apply-hit" ? (
+          <Button
+            size="sm"
+            data-testid="cbt-popup-apply-hit"
+            disabled={disabled || list.tooMany}
+            onClick={applyHit}
+          >
+            Apply hit
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            data-testid="cbt-popup-apply"
+            disabled={disabled || !ready}
+            onClick={apply}
+          >
+            Apply
+          </Button>
+        )}
       </div>
     </div>
   );

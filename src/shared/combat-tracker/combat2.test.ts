@@ -120,10 +120,21 @@ describe("FR-CBT-70 / -71 split attack and damage", () => {
 
   test("FR-CBT-72 cbt.applyCard totals optional on the wire (the server enforces the rule)", () => {
     const t = { targetId: "g", hit: false, multiplier: "normal" };
-    expect(ok(ApplyCardTargetsInput, { cardId: "n", targets: [t] })).toBe(true);
+    // FR-CBT-94 (sprint 5): `damageRollId` (null = none yet) is required.
+    const r = { damageRollId: null };
+    expect(ok(ApplyCardTargetsInput, { cardId: "n", targets: [t], ...r })).toBe(true);
+    expect(ok(ApplyCardTargetsInput, { cardId: "n", targets: [t] })).toBe(false);
     expect(
-      ok(ApplyCardTargetsInput, { cardId: "n", toHitTotal: 15, damageTotal: 6, targets: [t] }),
+      ok(ApplyCardTargetsInput, {
+        cardId: "n",
+        toHitTotal: 15,
+        damageTotal: 6,
+        targets: [t],
+        damageRollId: "r2",
+      }),
     ).toBe(true);
-    expect(ok(ApplyCardTargetsInput, { cardId: "n", damageTotal: 1000, targets: [t] })).toBe(false);
+    expect(ok(ApplyCardTargetsInput, { cardId: "n", damageTotal: 1000, targets: [t], ...r })).toBe(
+      false,
+    );
   });
 });
