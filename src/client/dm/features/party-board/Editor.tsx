@@ -8,6 +8,7 @@ import { Button } from "@ui/components/ui/button";
 import { Input, Label } from "@ui/components/ui/primitives";
 import { ScrollArea } from "@ui/components/ui/scroll-area";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
+import { AssetPickerDialog } from "@ui/features/assets-pipeline/AssetPicker";
 import { Textarea } from "@ui/features/party-board/controls";
 import {
   addImage,
@@ -23,7 +24,6 @@ import {
 } from "@ui/features/party-board/logic";
 import { ArrowLeftIcon, ArrowRightIcon, ImagePlusIcon, XIcon } from "lucide-react";
 import { type FormEvent, useState } from "react";
-import { AssetPickerDialog } from "../assets-pipeline/AssetPicker";
 import { useIntent, useLive } from "./send";
 
 export interface EditorProps {

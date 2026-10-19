@@ -1,12 +1,12 @@
 // `asset.test` (FR-ASSET-19, OQ-ASSET-08, CON-28): test-mode-only DM window hosting the
 // picker, so the picker can be verified before scenes-map's flows exist.
 import type { AssetRecord } from "@shared/assets-pipeline/schemas";
+import { AssetPicker } from "@ui/features/assets-pipeline/AssetPicker";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { isTestMode } from "@ui/features/play-shell/test-windows";
 import { useRecords } from "@ui/sync/store";
 import { ImagesIcon } from "lucide-react";
 import { useState } from "react";
-import { AssetPicker } from "./AssetPicker";
 
 function AssetTestBody() {
   const assets = useRecords<AssetRecord>("asset");

@@ -1,4 +1,5 @@
-// DM upload over REST with progress (FR-ASSET-17). XHR because fetch has no upload progress.
+// DM upload over REST with progress (FR-ASSET-17, -21). XHR because fetch has no upload progress.
+// Moved to `@ui` (FR-ASSET-27): the DM's uploader context calls it with the DM secret.
 import { type AssetRecord, UploadResponse } from "@shared/assets-pipeline/schemas";
 import { RestError } from "@shared/protocol/codes";
 
@@ -34,7 +35,19 @@ export interface UploadHandlers {
   onProcessing(): void;
 }
 
-export function uploadAsset(file: File, secret: string, h: UploadHandlers): Promise<UploadOutcome> {
+export interface UploadOptions {
+  /** FR-ASSET-24: false = attachment (the attach control); the picker's own Upload sends true. */
+  listed: boolean;
+  /** Display name; absent = from the file name (FR-ASSET-01). */
+  name?: string;
+}
+
+export function uploadAsset(
+  file: File,
+  secret: string,
+  opts: UploadOptions,
+  h: UploadHandlers,
+): Promise<UploadOutcome> {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/assets");
@@ -49,6 +62,8 @@ export function uploadAsset(file: File, secret: string, h: UploadHandlers): Prom
     xhr.onabort = xhr.onerror;
     const body = new FormData();
     body.append("file", file);
+    body.append("listed", opts.listed ? "true" : "false");
+    if (opts.name !== undefined) body.append("name", opts.name);
     xhr.send(body);
   });
 }
