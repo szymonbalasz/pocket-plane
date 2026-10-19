@@ -8,6 +8,7 @@ import { AlertFlash, SoundControl } from "./AlertLayer";
 import { testSoundAttr } from "./alerts";
 import { TOP_BAR_H } from "./geometry";
 import { useBaseKeyDown, useViewport } from "./hooks";
+import { keepOutsAttr, useKeepOuts } from "./keep-outs";
 import { SHELL_ZONE_ATTR } from "./keys";
 import { Launcher } from "./Launcher";
 import { mountedWindows, topWindow, type WindowAction } from "./manager";
@@ -57,6 +58,8 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
   const windows = useShellState((s) => s.windows);
   const placed = useShellState((s) => s.placed);
   const settling = useShellState((s) => s.settling);
+  const autoMinimised = useShellState((s) => s.autoMinimised);
+  const regions = useKeepOuts(client);
   const available = useAvailableKinds();
   const dispatch = useWindowDispatch();
   const viewport = useViewport();
@@ -71,6 +74,7 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
     <div
       className="fixed inset-0 overflow-clip bg-background"
       data-testid="ui-play-page"
+      data-keep-outs={keepOutsAttr(regions)}
       onScroll={(e) => {
         e.currentTarget.scrollTop = 0;
         e.currentTarget.scrollLeft = 0;
@@ -93,6 +97,7 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
               def={def}
               placed={placed.get(`${w.kind}:${w.instance}`)}
               settling={settling.has(`${w.kind}:${w.instance}`)}
+              autoMinimised={autoMinimised.has(`${w.kind}:${w.instance}`)}
               viewport={viewport}
               focused={top === w}
               dispatch={dispatch}

@@ -123,7 +123,21 @@ test("FR-MAP-44 / -45 FR-SHELL-34 fit to the free area: open, reload, pan + Fit,
   await expectUncovered(dm, 6, pcs);
   await expectUncovered(player, 4, pcs);
   // P3 glitch 10: a cut map label ("Elite Goblin Wa…") shows the full name on hover.
-  const cut = (await konvaNodes(dm, "map-token-label")).find((l) => l.text?.endsWith("…"));
+  // With the wide Game log (FR-DICE-38) the 1280×720 fit keeps the PCs and the top row in the
+  // strip right of the log, so the Elite may lie off-screen right (every token visible is FR-MAP-59,
+  // W2): park the log (minimising never refits) and pan it into view for the hover.
+  await shellWindow(dm, "dice.log").getByTestId("ui-window-minimise").click();
+  const findCut = async () =>
+    (await konvaNodes(dm, "map-token-label")).find((l) => l.text?.endsWith("…"));
+  const first = await findCut();
+  if (!first) throw new Error("no cut label at 1280×720");
+  if (first.x > LAPTOP.width - 120) {
+    await dm.mouse.move(640, 56);
+    await dm.mouse.down();
+    await dm.mouse.move(640 - (first.x - 900), 56, { steps: 8 });
+    await dm.mouse.up();
+  }
+  const cut = await findCut();
   if (!cut) throw new Error("no cut label at 1280×720");
   await dm.mouse.move(cut.x, cut.y);
   const title = () =>
@@ -134,6 +148,7 @@ test("FR-MAP-44 / -45 FR-SHELL-34 fit to the free area: open, reload, pan + Fit,
   await expect.poll(title).toBe("Elite Goblin Warrior");
   await dm.mouse.move(5, 300);
   await expect.poll(title).toBe("");
+  await openWindow(dm, "dice.log");
   await pan(dm);
   await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-camera", "moved");
   await dm.getByTestId("map-tool-fit").click();

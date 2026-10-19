@@ -99,10 +99,9 @@ describe("FR-SHELL-40, -41 settle after first layout", () => {
   test("FR-SHELL-41 Initiative closed before Start (no measured height) ends clear of the Game log and the Compendium", () => {
     const { c, heights, init } = m8Controller({ state: "closed", x: 868, y: 60, w: 400, h: 500 });
     c.dispatch({ type: "open", kind: "cbt.initiative", by: "feature" }, kinds);
-    // Placed at its 240 px minimum: drawn 302 tall (3 rows), it would run over the Game log.
+    // Sprint 5 (FR-SHELL-45): the tallest clear slot, clear of both before its height is known.
     const first = init() as WindowState;
-    expect(first.h).toBe(240);
-    expect(overlaps({ ...first, h: 302 }, log)).toBe(true);
+    for (const o of [log, comp]) expect(overlaps(first, o)).toBe(false);
     expect(c.store.getState().settling.has(INIT)).toBe(true);
     // First layout: ShellWindow reports the measured height, then settles.
     heights.set(INIT, 302);
@@ -135,5 +134,76 @@ describe("FR-SHELL-40, -41 settle after first layout", () => {
     moved.heights.set(INIT, 302);
     moved.c.dispatch({ type: "settle", kind: "cbt.initiative" }, kinds);
     expect(moved.init()).toMatchObject(stored);
+  });
+});
+
+describe("sprint 5 (FR-SHELL-47, -53)", () => {
+  const big = { defaultSize: { w: 600, h: 584 }, minSize: { w: 600, h: 584 } };
+  const reg = createWindowRegistry("dm", [
+    def("b.one", big),
+    def("b.two", big),
+    def("b.three", big),
+  ]);
+  const small = { w: 1280, h: 720 };
+  const kinds = new Set(["b.one", "b.two", "b.three"]);
+
+  test("FR-SHELL-47 screen full: the least recently used launcher window is minimised, written, marked auto-minimised until restored; a reload loads it plain minimised", () => {
+    const backend = new Map<string, string>();
+    const storage = createLayoutStorage(() => ({
+      getItem: (k) => backend.get(k) ?? null,
+      setItem: (k, v) => void backend.set(k, v),
+    }));
+    const c = createShellController({ registry: reg, storage, viewport: () => small });
+    c.restore("k");
+    for (const kind of ["b.one", "b.two", "b.three"]) c.dispatch({ type: "open", kind }, kinds);
+    const state = (kind: string) => c.store.getState().windows.find((w) => w.kind === kind)?.state;
+    expect([state("b.one"), state("b.two"), state("b.three")]).toEqual([
+      "minimised",
+      "open",
+      "open",
+    ]);
+    expect([...c.store.getState().autoMinimised]).toEqual(["b.one:main"]);
+    const written = JSON.parse(backend.get("k") ?? "{}") as { windows: WindowState[] };
+    expect(written.windows.find((w) => w.kind === "b.one")?.state).toBe("minimised");
+    // A user minimise isn't auto; a user restore clears the mark and reopens at the stored rect.
+    const stored = c.store.getState().windows.find((w) => w.kind === "b.one");
+    c.dispatch({ type: "open", kind: "b.one" }, kinds);
+    expect(c.store.getState().autoMinimised.has("b.one:main")).toBe(false);
+    expect(c.store.getState().windows.find((w) => w.kind === "b.one")).toMatchObject({
+      x: stored?.x,
+      y: stored?.y,
+      state: "open",
+    });
+    c.dispatch({ type: "minimise", kind: "b.two" }, kinds);
+    expect(c.store.getState().autoMinimised.size).toBe(0);
+    const reloaded = createShellController({ registry: reg, storage, viewport: () => small });
+    reloaded.restore("k");
+    expect(reloaded.store.getState().autoMinimised.size).toBe(0);
+  });
+
+  test("FR-SHELL-53 a window still at a previous default takes the new one when the entry is applied, and the entry is written", () => {
+    const log = def("dice.log", {
+      defaultSize: (v) => (v.w >= 1440 ? { w: 900, h: 200 } : { w: 500, h: 160 }),
+      minSize: { w: 300, h: 160 },
+      previousDefaults: [{ w: 460, h: 240 }],
+      defaultPosition: { anchor: "bottom-left", dx: 56 },
+    });
+    const r2 = createWindowRegistry("dm", [log]);
+    const raw = JSON.stringify({
+      windows: [
+        { kind: "dice.log", instance: "main", state: "open", x: 68, y: 404, w: 460, h: 240, z: 1 },
+      ],
+    });
+    const backend = new Map([["k", raw]]);
+    const storage = createLayoutStorage(() => ({
+      getItem: (k) => backend.get(k) ?? null,
+      setItem: (k, v) => void backend.set(k, v),
+    }));
+    const c = createShellController({ registry: r2, storage, viewport: () => small });
+    c.restore("k");
+    const w = c.store.getState().windows[0];
+    expect(w).toMatchObject({ x: 68, y: 404, w: 500, h: 160, area: workArea(small) });
+    expect(backend.get("k")).not.toBe(raw);
+    expect(c.store.getState().placed.get("dice.log:main")).toBe("stored");
   });
 });

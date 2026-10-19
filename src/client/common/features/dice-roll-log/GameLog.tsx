@@ -363,8 +363,9 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   // FR-DICE-30: a one-row pinned footer (expression, mode, DM eye, Roll, Options chevron), so
   // the entry list keeps the window's height (FR-SHELL-35). Options open a second row; the
   // "Physical dice on" strip shows below the first row whenever the mode is on (FR-DICE-07).
+  // FR-DICE-39: in the wide log the controls stay left at their narrow widths (input ≤ 320 px).
   return (
-    <div className="flex shrink-0 flex-col gap-1.5 border-t pt-1.5">
+    <div className="flex shrink-0 flex-col gap-1 border-t pt-1">
       <form
         className="flex items-center gap-1.5"
         onSubmit={(e) => {
@@ -375,7 +376,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
           data-testid="dice-roll-expression"
           aria-label="Dice expression"
           placeholder="1d20+4"
-          className="h-7 w-16 min-w-0 flex-1 font-mono text-sm"
+          className="h-7 w-16 min-w-0 max-w-80 flex-1 font-mono text-sm"
           value={expression}
           disabled={!live}
           onChange={(e) => setExpression(e.target.value)}
@@ -538,7 +539,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
             aria-label="Label"
             placeholder="Label"
             maxLength={60}
-            className="h-7 w-12 min-w-0 flex-1 text-xs"
+            className="h-7 w-12 min-w-0 max-w-60 flex-1 text-xs"
             value={label}
             disabled={!live}
             onChange={(e) => setLabel(e.target.value)}
@@ -626,7 +627,9 @@ export function GameLog({ dmTools }: { dmTools?: ReactNode }) {
       aria-label="Game log"
       // h-full: the roll bar is a pinned footer and only the entry list scrolls. Below the roll
       // bar's own height (a window resized near its minimum) the body scrolls as a last resort.
-      className="flex h-full min-h-fit flex-col gap-1.5"
+      // FR-DICE-38: it reaches into the body's vertical padding (6 px each side) and keeps its
+      // gaps tight, so the 160-high log shows ≥ 3 entries (≥ 2 with Physical dice on).
+      className="-my-1.5 flex h-[calc(100%+0.75rem)] min-h-fit flex-col gap-1"
     >
       {!everLive ? (
         <div className="flex flex-1 flex-col gap-1.5">

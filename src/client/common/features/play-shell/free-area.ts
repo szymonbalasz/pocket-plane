@@ -4,8 +4,16 @@
 // The map frames its tokens there (FR-MAP-44). Read-only: nothing stored or sent.
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { contentHeights, useContentHeights } from "./content-heights";
-import { type Rect, TOP_BAR_H, type Viewport, windowRect, workArea } from "./geometry";
+import {
+  type Rect,
+  renderedRect,
+  TOP_BAR_H,
+  type Viewport,
+  windowRects,
+  workArea,
+} from "./geometry";
 import { useViewport } from "./hooks";
+import { hardRects, type KeepOut, keepOuts, TOASTS_KEEP_OUT, useKeepOuts } from "./keep-outs";
 import { type Windows, windowId } from "./manager";
 import { RAIL_CLEAR } from "./placement";
 import type { WindowRegistry } from "./registry";
@@ -26,7 +34,8 @@ export { contentHeights, reportContentHeight, useContentHeights } from "./conten
 
 /**
  * What each rendered window covers: open, available, fitted and clamped as `ShellWindow` draws it,
- * a `growToContent` window at its measured grown height (FR-SHELL-39). Every consumer of window
+ * a `growToContent` window at its measured grown height (FR-SHELL-39), capped by the next window
+ * or hard keep-out region (`hard`, default this client's; FR-SHELL-52). Every consumer of window
  * rects (free area, toast keep-out, attack popup) reads them here.
  */
 export function renderedWindowRects(
@@ -35,14 +44,35 @@ export function renderedWindowRects(
   available: ReadonlySet<string>,
   vp: Viewport,
   measured: ReadonlyMap<string, number> = contentHeights(),
+  hard: readonly Rect[] = hardRects(keepOuts(registry.client, vp)),
 ): Rect[] {
-  const out: Rect[] = [];
-  for (const w of windows) {
+  const items = windows.flatMap((w) => {
     const def = registry.get(w.kind);
-    if (!def || w.state !== "open" || !available.has(w.kind)) continue;
-    out.push(windowRect(w, def, vp, measured.get(windowId(w.kind, w.instance))));
-  }
-  return out;
+    if (!def || w.state !== "open" || !available.has(w.kind)) return [];
+    return [{ win: w, def, needed: measured.get(windowId(w.kind, w.instance)) }];
+  });
+  return windowRects(items, vp, hard);
+}
+
+/**
+ * What caps the growth of window `id` (FR-SHELL-52): the other rendered windows (fitted, not
+ * grown) and this client's hard keep-out regions. For `ShellWindow`.
+ */
+export function useGrowthCaps(id: string): Rect[] {
+  const registry = useRegistry();
+  const windows = useShellState((s) => s.windows);
+  const available = useAvailableKinds();
+  const vp = useViewport();
+  const regions = useKeepOuts(registry.client);
+  return useMemo(() => {
+    const out = hardRects(regions);
+    for (const w of windows) {
+      const def = registry.get(w.kind);
+      if (!def || w.state !== "open" || !available.has(w.kind)) continue;
+      if (windowId(w.kind, w.instance) !== id) out.push(renderedRect(w, def.minSize, vp));
+    }
+    return out;
+  }, [registry, windows, available, vp, regions, id]);
 }
 
 /**
@@ -98,6 +128,15 @@ export function freeArea(rects: readonly Rect[], vp: Viewport): Rect {
   const tooSmall =
     !best || best.w < FREE_MIN_W || best.h < FREE_MIN_H || bestArea < FREE_MIN_SHARE * wa.w * wa.h;
   return tooSmall || !best ? bounds : best;
+}
+
+/**
+ * What the free area avoids (FR-SHELL-48 (a)): the rendered windows plus the client's toast box,
+ * so the fit frames no token under the toasts (FR-MAP-59); reported chrome (tool bars) doesn't
+ * count: tool bars come and go, and the camera never refits on a tool change.
+ */
+export function fitObstacles(windows: readonly Rect[], regions: readonly KeepOut[]): Rect[] {
+  return [...windows, ...regions.filter((k) => k.id === TOASTS_KEEP_OUT).map((k) => k.rect)];
 }
 
 /** At most this many candidate rectangles (FR-SHELL-44). */
@@ -213,6 +252,11 @@ export interface FreeAreaState {
   area: Rect;
   /** Every candidate free rectangle, largest first (FR-SHELL-44); may be empty. */
   areas: readonly Rect[];
+  /**
+   * The same, also clear of this client's toast box (FR-SHELL-48 (a)): the fit that keeps every
+   * token out from under the toasts (FR-MAP-59, slice W2) switches the camera to these.
+   */
+  toastFreeAreas: readonly Rect[];
   /** Grows by one per appearance; compare with a previous value, never read as a total. */
   appearances: number;
   /** The layout is applied (FR-SHELL-16): a fit before that would use no windows. */
@@ -227,10 +271,22 @@ export function useFreeArea(): FreeAreaState {
   const available = useAvailableKinds();
   const vp = useViewport();
   const measured = useContentHeights();
-  const { area, areas } = useMemo(() => {
-    const rects = renderedWindowRects(windows, registry, available, vp, measured);
-    return { area: freeArea(rects, vp), areas: freeAreas(rects, vp) };
-  }, [windows, registry, available, vp, measured]);
+  const regions = useKeepOuts(registry.client);
+  const { area, areas, toastFreeAreas } = useMemo(() => {
+    const shown = renderedWindowRects(
+      windows,
+      registry,
+      available,
+      vp,
+      measured,
+      hardRects(regions),
+    );
+    return {
+      area: freeArea(shown, vp),
+      areas: freeAreas(shown, vp),
+      toastFreeAreas: freeAreas(fitObstacles(shown, regions), vp),
+    };
+  }, [windows, registry, available, vp, measured, regions]);
   const notedNow = useSyncExternalStore(subscribeNoted, notedAppearances);
   const [flips, setFlips] = useState(0);
   const windowsRef = useRef(windows);
@@ -241,5 +297,5 @@ export function useFreeArea(): FreeAreaState {
     if (isAppearance(seen.current, next, windowsRef.current)) setFlips((n) => n + 1);
     seen.current = next;
   }, [key, available]);
-  return { area, areas, appearances: flips + notedNow, ready: key !== null };
+  return { area, areas, toastFreeAreas, appearances: flips + notedNow, ready: key !== null };
 }

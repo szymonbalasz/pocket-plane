@@ -1,17 +1,24 @@
 import { expect, mock, test } from "bun:test";
 import { emptyStore } from "@shared/protocol/store";
-import { freeArea, renderedWindowRects } from "@ui/features/play-shell/free-area";
+import { freeArea, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
 import { clampRect, type Rect, TOP_BAR_H, workArea } from "@ui/features/play-shell/geometry";
+import { keepOuts, reportKeepOut } from "@ui/features/play-shell/keep-outs";
 import {
   fitLauncher,
   fittedBarWidth,
   LAUNCHER_GUTTER,
   launcherMetrics,
 } from "@ui/features/play-shell/launcher-fit";
-import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
+import {
+  launcherKinds,
+  launcherSequence,
+  REFERENCE_VIEWPORTS,
+  rectIn,
+} from "@ui/features/play-shell/layout-checks";
+import { defaultLayout, reduce, restoreLayout } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
-import { availableKinds } from "@ui/features/play-shell/registry";
+import { availableKinds, defaultSizeAt } from "@ui/features/play-shell/registry";
 import { toastKeepOut } from "@ui/features/play-shell/toast-region";
 import { coveredArea } from "@ui/features/play-shell/token-boxes";
 import {
@@ -57,7 +64,8 @@ test("FR-SHELL-08 every DM window's default rect fits the viewport (1280×720, 1
       expect(fits ? "ok" : `${d.kind} leaves the viewport at ${viewport.w}`).toBe("ok");
       // Fitting only trims what the viewport can't hold.
       if (viewport === DESKTOP && d.kind !== "cbt.initiative") {
-        expect({ kind: d.kind, ...d.defaultSize }).toEqual({ kind: d.kind, w: r.w, h: r.h });
+        const size = defaultSizeAt(d, viewport);
+        expect({ kind: d.kind, ...size }).toEqual({ kind: d.kind, w: r.w, h: r.h });
       }
     }
   }
@@ -105,32 +113,206 @@ test("#162 DM Loot, Encounters, Creatures, Scenes open at the left edge (shorter
   }
 });
 
-test("#162 every DM window type opens at the left / right edge on the default layout, clear of it (1280×720, 1440×900, 1600×900)", () => {
-  // Registry-driven. Test-mode windows (fixed walkthrough spots) only need some edge.
-  const product = availableKinds(dmWindows, emptyStore());
-  for (const viewport of [LAPTOP, WIDE, DESKTOP]) {
-    for (const d of dmWindows.defs) {
-      const rects = openOnDefaults([d.kind], viewport);
-      const r = rects.find((w) => w.kind === d.kind);
-      if (!r) throw new Error(`${d.kind} not open`);
-      const edge = touchedEdge(r, viewport);
-      const ok = product.has(d.kind) ? edge === "left" || edge === "right" : edge !== null;
-      const at = `${viewport.w}×${viewport.h}`;
-      expect(ok ? "ok" : `${d.kind} opens mid-map at ${at}: x${r.x} y${r.y}`).toBe("ok");
-      if (!product.has(d.kind)) continue;
-      // `minOpenH` (FR-NOTE-31 ruling): no full-size free slot → that height, on top of others.
-      if (d.minOpenH !== undefined && r.h >= d.minOpenH) continue;
-      for (const b of rects) {
-        if (b.kind === d.kind) continue;
-        expect(overlaps(r, b) ? `${d.kind} overlaps ${b.kind} at ${at}` : "ok").toBe("ok");
-      }
+// ---- sprint 5: placement, wide Game log, default layouts (FR-SHELL-45–54, FR-DICE-38) ----
+
+// Product kinds, gated ones included: every kind but the test-mode ones.
+const testOnlyKinds = new Set(
+  [...availableKinds(dmWindows, testMode)].filter(
+    (k) => !availableKinds(dmWindows, emptyStore()).has(k),
+  ),
+);
+const product = new Set(dmWindows.defs.map((d) => d.kind).filter((k) => !testOnlyKinds.has(k)));
+
+test("FR-SHELL-45 launcher opens never stack (DM, 1280×720 / 1280×800 / 1440×900 / 1600×900): every non-default product kind opened in registry order lands on no open window and no hard keep-out, auto-minimising first (FR-SHELL-47)", () => {
+  const kinds = launcherKinds(dmWindows, product);
+  expect(kinds.length).toBeGreaterThan(5);
+  for (const viewport of REFERENCE_VIEWPORTS) {
+    const { steps } = launcherSequence(dmWindows, viewport, kinds, { available: product });
+    for (const s of steps) {
+      const at = `${s.kind} at ${viewport.w}×${viewport.h}`;
+      expect(s.rect ? "open" : `${at} not open`).toBe("open");
+      expect(s.hits.length === 0 ? "ok" : `${at} on ${s.hits.join(", ")}`).toBe("ok");
+      // Protected (default-open) windows are never parked.
+      for (const k of s.parked)
+        expect(dmWindows.get(k)?.defaultOpen ? `${at} parked ${k}` : "ok").toBe("ok");
     }
   }
 });
 
-test("#162 DM map-first: battlemap uncovered by the default layout ≥ 70% at 1440×900, ≥ 60% at 1280×720", () => {
+test("FR-SHELL-45 FR-SHELL-46 FR-SHELL-47 sim-8 sequence (DM, Initiative + Game log): Compendium, Party, Encounters give §7's rects; Compendium and Party never share a rect", () => {
+  const seq = ["cmp.compendium", "party.board", "cbt.encounters"];
+  const wide = launcherSequence(dmWindows, WIDE, seq);
+  const [cmp, party, enc] = wide.steps;
+  expect(cmp?.rect).toEqual({ x: 68, y: 60, w: 440, h: 512 }); // minOpenH 400 ≤ the 512 band
+  expect(party?.rect).toEqual({ x: 520, y: 60, w: 440, h: 512 }); // inward, beside Compendium
+  expect(party?.rect).not.toEqual(cmp?.rect);
+  expect(enc?.parked).toEqual(["cmp.compendium"]);
+  expect(enc?.rect).toEqual({ x: 68, y: 60, w: 440, h: 512 });
+  const laptop = launcherSequence(dmWindows, LAPTOP, seq);
+  expect(laptop.steps[0]?.rect).toEqual({ x: 68, y: 60, w: 440, h: 412 });
+  expect(laptop.steps[1]?.parked).toEqual(["cmp.compendium"]);
+  expect(laptop.steps[2]?.parked).toEqual(["party.board"]);
+  for (const s of laptop.steps) expect(s.rect).toEqual({ x: 68, y: 60, w: 440, h: 412 });
+});
+
+test("FR-SHELL-47 screen full (DM): the auto-minimised window is written minimised; a user restore reopens at its stored rect", () => {
+  const seq = ["cmp.compendium", "party.board", "cbt.encounters"];
+  const { windows } = launcherSequence(dmWindows, WIDE, seq);
+  const cmp = windows.find((w) => w.kind === "cmp.compendium");
+  expect(cmp?.state).toBe("minimised");
+  const ctx = { registry: dmWindows, viewport: WIDE, available: allKinds() };
+  const back = reduce(windows, { type: "open", kind: "cmp.compendium" }, ctx);
+  expect(rectIn(back, "cmp.compendium")).toEqual({ x: 68, y: 60, w: 440, h: 512 });
+  expect(back.find((w) => w.kind === "cbt.encounters")?.state).toBe("open");
+  for (const w of back) {
+    if (dmWindows.get(w.kind)?.defaultOpen) expect(w.state).toBe("open");
+  }
+});
+
+test("FR-SHELL-48 keep-outs (DM): the top-centre toast box only ranks (4); a reported tool bar blocks auto placement but not freeAreas", () => {
+  for (const viewport of REFERENCE_VIEWPORTS) {
+    const regions = keepOuts("dm", viewport);
+    expect(regions).toEqual([{ id: "toasts", rect: toastKeepOut("dm", viewport), kind: "soft" }]);
+  }
+  // Party beside Compendium at 1440×900 sits partly under the soft box: allowed, nothing clearer.
+  const party = launcherSequence(dmWindows, WIDE, ["cmp.compendium", "party.board"]).steps[1];
+  expect(party?.rect && overlaps(party.rect, toastKeepOut("dm", WIDE))).toBe(true);
+  // The fog bar reported top-left: Scenes opens clear of it; the free areas ignore it.
+  const bar = { x: 68, y: 60, w: 520, h: 120 };
+  reportKeepOut("map.toolbar", bar);
+  try {
+    const scenes = launcherSequence(dmWindows, WIDE, ["map.scenes"]).steps[0];
+    expect(scenes?.rect && overlaps(scenes.rect, bar)).toBe(false);
+    const rects = renderedWindowRects(defaultLayout(dmWindows, WIDE), dmWindows, allKinds(), WIDE);
+    expect(freeAreas(rects, WIDE).some((r) => overlaps(r, bar))).toBe(true);
+  } finally {
+    reportKeepOut("map.toolbar", null);
+  }
+});
+
+test("FR-SHELL-50 default layouts (DM, token-free): exactly §7's table at 1280×720 / 1280×800 / 1440×900 / 1600×900", () => {
+  const table = [
+    [
+      LAPTOP,
+      { x: 868, y: 60, w: 400, h: 500 },
+      { x: 68, y: 484, w: 690, h: 160 },
+      { x: 462, y: 100 },
+    ],
+    [MID, { x: 868, y: 60, w: 400, h: 500 }, { x: 68, y: 564, w: 690, h: 160 }, { x: 462, y: 100 }],
+    [
+      WIDE,
+      { x: 1028, y: 60, w: 400, h: 500 },
+      { x: 68, y: 584, w: 1150, h: 240 },
+      { x: 542, y: 100 },
+    ],
+    [
+      DESKTOP,
+      { x: 1188, y: 60, w: 400, h: 500 },
+      { x: 68, y: 584, w: 1150, h: 240 },
+      { x: 622, y: 100 },
+    ],
+  ] as const;
+  for (const [viewport, init, log, box] of table) {
+    const layout = defaultLayout(dmWindows, viewport);
+    expect(rectIn(layout, "cbt.initiative")).toEqual(init);
+    expect(rectIn(layout, "dice.log")).toEqual(log);
+    expect(toastKeepOut("dm", viewport)).toEqual({ ...box, w: 356, h: 238 });
+  }
+});
+
+test("FR-SHELL-51 fitted default (DM): Initiative 400×500 at every reference size; a size function by viewport class", () => {
+  const init = dmWindows.get("cbt.initiative");
+  if (!init) throw new Error("no cbt.initiative");
+  for (const viewport of REFERENCE_VIEWPORTS) {
+    expect(fittedDefaultRect(init, viewport)).toMatchObject({ w: 400, h: 500 });
+  }
+});
+
+test("FR-DICE-38 Game log width (DM): 690×160 / 690×160 / 1150×240 / 1150×240; min 300×160; previous default 460×240", () => {
+  const log = dmWindows.get("dice.log");
+  if (!log) throw new Error("no dice.log");
+  const sizes = REFERENCE_VIEWPORTS.map((vp) => defaultSizeAt(log, vp));
+  expect(sizes).toEqual([
+    { w: 690, h: 160 },
+    { w: 690, h: 160 },
+    { w: 1150, h: 240 },
+    { w: 1150, h: 240 },
+  ]);
+  expect(log.minSize).toEqual({ w: 300, h: 160 });
+  expect(log.previousDefaults).toEqual([{ w: 460, h: 240 }]);
+  expect(defaultSizeAt(log, { w: 1440, h: 800 })).toEqual({ w: 1150, h: 160 });
+});
+
+test("FR-SHELL-52 growth cap (DM): Initiative with 900 px of content renders down to 644 / 724 / 572 / 572", () => {
+  const all = allKinds();
+  for (const [viewport, bottom] of [
+    [LAPTOP, 644],
+    [MID, 724],
+    [WIDE, 572],
+    [DESKTOP, 572],
+  ] as const) {
+    const layout = defaultLayout(dmWindows, viewport);
+    const measured = new Map([["cbt.initiative:main", 900]]);
+    const init = layout.filter((w) => w.kind === "cbt.initiative");
+    const rects = renderedWindowRects(layout, dmWindows, all, viewport, measured);
+    const r = renderedWindowRects(init, dmWindows, all, viewport, measured)[0];
+    expect(rects.some((x) => x.y + x.h === bottom)).toBe(true);
+    // Alone (no Game log below) it grows to the work area.
+    expect(r && r.y + r.h).toBe(viewport.h - 76);
+  }
+});
+
+test("FR-SHELL-53 previous defaults (DM): a stored 460×240 log → the viewport's default, written with area; a 1280×720 layout at 1440×900 and back; 470×240 kept; second apply = stored", () => {
+  const entry = (
+    log: { x: number; y: number; w: number; h: number },
+    area: { w: number; h: number },
+  ) =>
+    JSON.stringify({
+      windows: [
+        {
+          kind: "cbt.initiative",
+          instance: "main",
+          state: "open",
+          ...rectIn(defaultLayout(dmWindows, WIDE), "cbt.initiative"),
+          z: 1,
+          area,
+        },
+        { kind: "dice.log", instance: "main", state: "open", ...log, z: 2, area },
+      ],
+    });
+  const sprint4 = restoreLayout(
+    dmWindows,
+    entry({ x: 68, y: 584, w: 460, h: 240 }, workArea(WIDE)),
+    WIDE,
+  );
+  expect(sprint4.migrated).toBe(true);
+  const log = sprint4.windows.find((w) => w.kind === "dice.log");
+  expect(log).toMatchObject({ x: 68, y: 584, w: 1150, h: 240, area: workArea(WIDE) });
+  // Second apply: the stored entry is now the default, nothing to do.
+  const again = restoreLayout(dmWindows, JSON.stringify({ windows: sprint4.windows }), WIDE);
+  expect(again.migrated).toBeUndefined();
+  // Saved at 1280×720 (690×160 at 68,484), opened at 1440×900: over Initiative there → placed.
+  const small = restoreLayout(
+    dmWindows,
+    entry({ x: 68, y: 484, w: 690, h: 160 }, workArea(LAPTOP)),
+    WIDE,
+  );
+  expect(rectIn(small.windows, "dice.log")).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+  const back = restoreLayout(dmWindows, JSON.stringify({ windows: small.windows }), LAPTOP);
+  expect(rectIn(back.windows, "dice.log")).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+  // Resized by the user (470×240): kept.
+  const kept = restoreLayout(
+    dmWindows,
+    entry({ x: 68, y: 584, w: 470, h: 240 }, workArea(WIDE)),
+    WIDE,
+  );
+  expect(kept.migrated).toBeUndefined();
+  expect(rectIn(kept.windows, "dice.log")).toEqual({ x: 68, y: 584, w: 470, h: 240 });
+});
+
+test("FR-SHELL-54 DM map-first: battlemap uncovered by the default layout ≥ 55% at 1440×900, ≥ 60% at 1280×720", () => {
   for (const [viewport, min] of [
-    [WIDE, 0.7],
+    [WIDE, 0.55],
     [LAPTOP, 0.6],
   ] as const) {
     const map = fittedMapRect(BATTLEMAP, viewport);
@@ -209,48 +391,6 @@ test("FR-SHELL-32 DM Initiative default shows header + 6 rows at 1440×900; fits
   const small = openOnDefaults([], LAPTOP).find((w) => w.kind === "cbt.initiative");
   if (!small) throw new Error("cbt.initiative not open");
   expect(small.y + small.h).toBeLessThanOrEqual(LAPTOP.h - 64); // above the launcher; rows scroll
-});
-
-const RIGHT_COLUMN = new Set(["camp.players", "cbt.initiative"]);
-
-test("FR-SHELL-08 DM launcher windows open clear of the default-open ones (glitch 1)", () => {
-  const defaults = new Set(dmWindows.defs.filter((d) => d.defaultOpen).map((d) => d.kind));
-  const cases = [
-    ["ent.creatures"],
-    ["cbt.encounters"],
-    ["note.history"],
-    ["char.sheet"],
-    ["ent.creatures", "cbt.encounters"],
-    ["cbt.encounters", "ent.creatures"],
-    ["map.scenes"],
-    ["camp.players"],
-    ["loot.log"],
-    ["map.scenes", "cbt.encounters"],
-  ];
-  for (const viewport of VIEWPORTS) {
-    for (const kinds of cases) {
-      const rects = openOnDefaults(kinds, viewport);
-      for (const kind of kinds) {
-        const a = rects.find((r) => r.kind === kind);
-        if (!a) throw new Error(`${kind} not open`);
-        for (const b of rects) {
-          // Two at once don't fit 1280 px between Scenes and the right column, and since
-          // FR-SHELL-32 (Initiative 500 high) the right column has no 320 px slot left for
-          // Encounters at 1600×900 either: then they only stay off the right column
-          // (Initiative's "Roll monsters", Players) and cascade at the left edge.
-          const cramped = kinds.length > 1;
-          const guard = cramped
-            ? RIGHT_COLUMN.has(b.kind)
-            : defaults.has(b.kind) || kinds.includes(b.kind);
-          if (b.kind === kind || !guard) continue;
-          // `minOpenH` (FR-NOTE-31 ruling): opens at that height on top when nothing is free.
-          if ((dmWindows.get(kind)?.minOpenH ?? Infinity) <= a.h) continue;
-          const msg = `${kinds.join("+")}: ${kind} overlaps ${b.kind} at ${viewport.w}`;
-          expect(overlaps(a, b) ? msg : "ok").toBe("ok");
-        }
-      }
-    }
-  }
 });
 
 /**
@@ -361,7 +501,7 @@ test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: DM Initiative 
     const ws = reduce(idle, start, { ...plain, avoid: () => boxes });
     const init = win(ws, "cbt.initiative");
     expect(coveredArea(init, boxes)).toBeLessThan(coveredArea(home, boxes));
-    expect(touchedEdge(init, viewport)).toBe("left");
+    expect(["left", "right"]).toContain(touchedEdge(init, viewport) ?? "mid-map");
     const others = ws.filter((w) => w.kind !== "cbt.initiative");
     for (const o of renderedWindowRects(others, dmWindows, allKinds(), viewport)) {
       expect(overlaps(init, o) ? `Initiative over a window at ${at}` : "ok").toBe("ok");
@@ -474,6 +614,53 @@ test("FR-SHELL-43 dm launcher, test-mode kinds included, at 1280 / 1440 / 1600 w
       for (const k of open)
         expect(fit.overflow.includes(k) && fit.bar.length > open.length).toBe(false);
       if (w >= 1280) expect(fit.overflow).toEqual([]);
+    }
+  }
+});
+
+// ---- W1 walkthrough re-test (2026-10-19): PC centres under auto-placed windows ----
+
+/** A 46-px token box centred on (x, y): the walkthrough's measured PC centres on Town. */
+const pcAt = (x: number, y: number) => ({ x: x - 23, y: y - 23, w: 46, h: 46, pc: true });
+const pcUnder = (r: Rect, pcs: readonly Rect[]) =>
+  pcs.filter((p) => {
+    const c = { x: p.x + p.w / 2, y: p.y + p.h / 2 };
+    return c.x > r.x && c.x < r.x + r.w && c.y > r.y && c.y < r.y + r.h;
+  }).length;
+
+test("FR-SHELL-45 (2) W1 repro: DM 1440×900 on Town (Thorn 463,363, Mira 516,363), Reset, Compendium then Party → neither holds a PC centre (shrunk to ≥ min size rather than full size over a PC)", () => {
+  const pcs = [pcAt(463, 363), pcAt(516, 363)];
+  const { steps } = launcherSequence(dmWindows, WIDE, ["cmp.compendium", "party.board"], {
+    avoid: () => pcs,
+  });
+  for (const s of steps) {
+    expect(s.hits).toEqual([]);
+    expect(
+      s.rect && pcUnder(s.rect, pcs) ? `${s.kind} over a PC: ${JSON.stringify(s.rect)}` : "ok",
+    ).toBe("ok");
+    const def = dmWindows.get(s.kind);
+    expect(s.rect && def && s.rect.w >= def.minSize.w && s.rect.h >= def.minSize.h).toBe(true);
+  }
+});
+
+test("FR-SHELL-45 (2) sweep (DM, Town): every launcher window in registry order at 1280×720 / 1440×900 / 1600×900 holds no PC centre", () => {
+  const cases = [
+    [LAPTOP, [pcAt(410, 312), pcAt(458, 312)]],
+    [WIDE, [pcAt(463, 363), pcAt(516, 363)]],
+    [DESKTOP, [pcAt(543, 363), pcAt(596, 363)]],
+  ] as const;
+  for (const [viewport, pcs] of cases) {
+    const kinds = launcherKinds(dmWindows, product);
+    const { steps } = launcherSequence(dmWindows, viewport, kinds, {
+      available: product,
+      avoid: () => pcs,
+    });
+    for (const s of steps) {
+      const at = `${s.kind} at ${viewport.w}×${viewport.h}`;
+      expect(s.hits.length === 0 ? "ok" : `${at} on ${s.hits.join(", ")}`).toBe("ok");
+      expect(
+        s.rect && pcUnder(s.rect, pcs) ? `${at} over a PC: ${JSON.stringify(s.rect)}` : "ok",
+      ).toBe("ok");
     }
   }
 });
