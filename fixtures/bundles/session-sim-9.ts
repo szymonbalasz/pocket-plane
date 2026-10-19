@@ -12,6 +12,7 @@ export default defineBundle({
   includes: ["session-sim-8"],
   fixtures: [
     // W: windows + layout
+    // W3: no new unit (tool bars walk on sim-8's Goblin Ambush, Scenes and the running encounter)
     // D: dice polish
     // R: late damage, trails, ally side
     // R1: a ruled card in its damage step (Mira → Goblin 2, waiting for damage)

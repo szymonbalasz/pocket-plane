@@ -1913,3 +1913,18 @@ From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-59, -61. **Built b
 
 - **Fixtures:** no new unit. `windows-s5` (`session-sim-8` + `win-layout`) has every token the W5 / W10 steps fit; `session-sim-9` needs nothing extra (sim-8's tokens; sim-9 creates "Crypt" live).
 - **Snapshot size** (CON-44): 0 B.
+
+## 77. Sprint 5: tool bars at home, windows pushed right (W3)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-60, [fog-of-war](../specs/fog-of-war.md#8-data-model) FR-FOG-58 and [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-55. **Built by `fix/tool-bar-spot`**: no table, column, record type or payload change. Protocol side: [protocol §98](../protocol/README.md#98-sprint-5-tool-bars-at-home-windows-pushed-right-w3).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Tool bar keep-out `map.toolbar` | client memory (`reportKeepOut`) | the shown tool panel's rect (incl. the fog bar's "No vision set" hint); null when no panel | [FR-MAP-60](../specs/scenes-map.md#6-functional-requirements) |
+| Pushed window rect | browser layout entry (`localStorage`, #121) | written with `area` like an auto placement; never restored when the tool closes | [FR-SHELL-55](../specs/play-shell.md#6-functional-requirements) |
+| `data-placed="pushed"` | client memory (`placed`) | set by a push, replaced by the next move / placement; a reload reads it as `stored` | FR-SHELL-55 |
+| Last push | client memory, per tool panel | the rect last pushed for (tool, layout key): the same rect never pushes twice | FR-MAP-60 |
+
+- **Live viewport follow:** a never-resized window at one of its type's default sizes takes the new viewport's default on a live resize (same rule as applying the entry, FR-SHELL-53), written with `area`.
+- **Fixtures:** no new unit. `windows-s5` has the running encounter (player Initiative) and Goblin Ambush the W4 / W11 steps use; `session-sim-9` needs nothing extra.
+- **Snapshot size** (CON-44): 0 B.
