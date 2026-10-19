@@ -20,9 +20,12 @@ export default defineBundle({
     // P0: h6 "Ransom Note" with an attachment (unshared); h2 presented to player-1 (S5-1)
     "handout-attachment",
     "handout-present-1",
+    // P4: no new unit (Add to party walks on sim-7's `party-items-1` + `cmp-srd-mini`)
     // C: compendium images
     // C5 core: "Moonlit Lantern" (shared, 2 attachment images), "CMP-IMG-SECRET" (DM only, 1)
     "cmp-images",
     // K: player colours, kept-template menu
+    // K0: Player 2 picks blue (Player 1 jade, DM amber by default)
+    "pc-colours",
   ],
 });

@@ -13,8 +13,7 @@ import { WALLET_TYPE, type WalletRecord } from "@shared/party-loot/schemas";
 import { useState } from "react";
 import { useRecords, useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
-import { LOOT_LOG_KIND } from "../party-loot/logic";
-import { useOpenWindow } from "../play-shell/ShellContext";
+import { useOpenPartyTab } from "../party-board/open-tab";
 import { IntField, SelectField, TextField, useBusy } from "./fields";
 import { OverspendPopover, OverspentBadge } from "./overspend";
 import { AddRow, RowTools, useRows } from "./rows";
@@ -280,7 +279,7 @@ function ItemView({ it, index, count }: { it: ItemRow; index: number; count: num
 
 function WalletLine() {
   const ctx = useSheet();
-  const openWindow = useOpenWindow();
+  const openPartyTab = useOpenPartyTab();
   const wallets = useRecords<WalletRecord>(WALLET_TYPE);
   if (ctx.creature.kind !== "character") return null;
   const w = wallets.find((x) => x.characterId === ctx.creature.id);
@@ -293,7 +292,7 @@ function WalletLine() {
         type="button"
         data-testid="charx-wallet-open"
         className="text-[10px] text-muted-foreground underline"
-        onClick={() => openWindow(LOOT_LOG_KIND)}
+        onClick={() => openPartyTab("loot")}
       >
         Move coin in Party loot
       </button>

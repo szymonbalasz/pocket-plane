@@ -1,7 +1,8 @@
 // CON-44 snapshot ceilings + live-sync §12 build time (#163): session-sim and a "realistic
 // heavy" session built through commands. DM ≤ 768 KiB, players ≤ 512 KiB, DM build < 200 ms.
 // Worst-case rows per core (seams S14): PARTY S5 adds an open `handout-present` for every player;
-// CMP S5 (track C) 20 homebrew entries × 4 attachment images (0 B).
+// CMP S5 (track C) 20 homebrew entries × 4 attachment images (0 B); CAMP S5 (track K) the
+// longest colour key on every player + the DM, every notification stamped by a player.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
 import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
@@ -340,6 +341,62 @@ describe("CON-44 snapshot ceilings (#163)", () => {
         `CMP S5 entry images: 20 entries × 4 attachments, every viewer +0 B; heavy DM ${dm.bytes} B (${SNAPSHOT_CEILING.dm - dm.bytes} B left of 1.5 MiB); players max ${Math.max(...players.map((p) => p.bytes))} B`,
       );
     }, 60_000);
+
+    // Mutates the scenario and keeps it (seams S14): the later worst cases measure on top.
+    test("CON-44 colours (K0, FR-CAMP-29, FR-NOTE-38) worst case: `vermillion` on every player + the DM, every notification stamped by a player; colours ≤ 160 B per viewer, stamp ≤ 70 B per row; ceilings hold", () => {
+      const sql = b.s.db.$client;
+      const pids = sql
+        .query<{ id: string }, []>("SELECT id FROM player ORDER BY length(id) DESC, id")
+        .all();
+      const longest = pids[0]?.id as string;
+      // Without the sprint-5 fields: the frame as sprint 4 sent it (`color`, `dmColor`, stamp off).
+      const strip = (fields: Record<string, readonly string[]>) =>
+        snapshotFrames(b.s).map(({ viewer: v, records }) => {
+          const out: Record<string, unknown[]> = {};
+          for (const [type, rows] of Object.entries(records)) {
+            const drop = fields[type];
+            out[type] = drop
+              ? rows.map((r) =>
+                  Object.fromEntries(
+                    Object.entries(r as Record<string, unknown>).filter(([k]) => !drop.includes(k)),
+                  ),
+                )
+              : rows;
+          }
+          const you = { campaignId: v.campaignId, role: v.role, playerId: v.playerId };
+          return Buffer.byteLength(JSON.stringify({ type: "snapshot", seq: 0, you, records: out }));
+        });
+      sql.run("UPDATE player SET color = 'vermillion'");
+      sql.run("UPDATE campaign SET dm_color = 'vermillion'");
+      sql.query("UPDATE notification SET by_role = 'player', by_player_id = ?").run(longest);
+      const sizes = snapshotSizes(b.s);
+      const none = strip({
+        player: ["color"],
+        campaign: ["dmColor"],
+        notification: ["byRole", "byPlayerId"],
+      });
+      const noStamp = strip({ notification: ["byRole", "byPlayerId"] });
+      expectUnderCeilings(sizes);
+      const rows = sizes.map((v) => v.types.notification?.rows ?? 0);
+      for (const [i, v] of sizes.entries()) {
+        const colours = (noStamp[i] as number) - (none[i] as number);
+        const stamp = v.bytes - (noStamp[i] as number);
+        // CAMP §12: +149 B (7 player rows + the campaign row) at the worst key.
+        expect({ viewer: v.label, ok: colours > 0 && colours <= 160 }).toEqual({
+          viewer: v.label,
+          ok: true,
+        });
+        // NOTE §12: `,"byRole":"player","byPlayerId":"<36-char id>"` = 70 B a row.
+        expect(stamp).toBeLessThanOrEqual(70 * (rows[i] as number));
+        expect(stamp).toBeGreaterThan(0);
+      }
+      // Players: only rows they may see carry the stamp (FR-NOTE-06 unchanged).
+      expect(Math.max(...rows.slice(1))).toBeLessThan(rows[0] as number);
+      const [dm, ...players] = sizes as [ViewerSize, ...ViewerSize[]];
+      console.log(
+        `CAMP S5 colours CON-44: colours +${(noStamp[0] as number) - (none[0] as number)} B DM, +${Math.min(...players.map((_, i) => (noStamp[i + 1] as number) - (none[i + 1] as number)))}–${Math.max(...players.map((_, i) => (noStamp[i + 1] as number) - (none[i + 1] as number)))} B players; NOTE stamp +${dm.bytes - (noStamp[0] as number)} B DM (${rows[0]} rows), +${Math.min(...players.map((p, i) => p.bytes - (noStamp[i + 1] as number)))}–${Math.max(...players.map((p, i) => p.bytes - (noStamp[i + 1] as number)))} B players; heavy DM ${dm.bytes} B (${SNAPSHOT_CEILING.dm - dm.bytes} B left of 1.5 MiB); players max ${Math.max(...players.map((p) => p.bytes))} B`,
+      );
+    });
 
     // Mutates the scenario, then restores it: after the read-only cases.
     test("CBT §12 sprint 5 (track R) worst case: 20 rulings × 20 targets, 3 unused rolls per card, 60 trails at the cap, side + publicSide everywhere; ceilings hold", () => {

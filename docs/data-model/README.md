@@ -1430,7 +1430,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V3). *
 From [party-board](../specs/party-board.md#64-gold-ledger-party-loot-evolved) (PARTY slice 3, on [party-loot](../specs/party-loot.md)). **Built by `build/party-gold`**: no new table, column or record type. Protocol side: [protocol §55](../protocol/README.md#55-sprint-3-party-board-gold-p3).
 
 - **Split rows:** `loot.split` writes one `loot_entry` per chosen character: `kind = move`, `party → character`, `text` "Split" (`SPLIT_TEXT`), coins = the share (⌊coin / n⌋ per denomination), `qty` null, `editedAt` null. The remainder is simply not moved, so it stays in the derived `party-pot` (FR-LOOT-09 sums, conservation unchanged). Split rows are ordinary moves: not editable, corrected by a reverse move.
-- **Item rows** (`kind = item`, from P core): read-only in `loot.log`; `loot.edit` refuses them (`conflict`).
+- **Item rows** (`kind = item`, from P core): read-only in `loot.log` *(S5: the Party window's Loot tab, FR-LOOT-21; no data change)*; `loot.edit` refuses them (`conflict`).
 - **Derived (client, `@ui/features/party-loot/logic`):** item-row line `itemLine` ("‹from› → ‹to›: ‹name› ×‹qty›"), Split… prefill (the pot's positive coins), default ticks (characters whose `creature-sheet.status` ≠ `draft`; no sheet = ready), preview (`splitPreview`, `@shared/party-board/format`).
 - **CON-44:** no new record shape; a split adds n ordinary move rows inside LOOT's 100-row window (≤ 471 B each, protocol §29 budget unchanged).
 
@@ -1849,9 +1849,35 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-49, -50 and [d
 - **Fixtures:** no new unit. Bundle `dice-polish` = `dice-display` + `char-brakka` + `weapon-flame-tongue` (Brakka, `player-1`, Flame Tongue `1d20+8`, `2d6+5` slashing + `2d6` fire); `session-sim-9` needs nothing extra (sim-8 has both units).
 - **Snapshot size** (CON-44): 0 B added; `dice-polish` DM 21,098 B, players ≤ 13,882 B.
 
-## 71. Sprint 5: Initiative trigger chips, Effect… source, one Invisible (W4)
+## 71. Sprint 5: player colours core (K0)
 
-From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-54–56 and [fog-of-war](../specs/fog-of-war.md) FR-FOG-59. **Built by `fix/init-chips-effect`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent. Protocol side: [protocol §91](../protocol/README.md#91-sprint-5-initiative-trigger-chips-effect-source-one-invisible-w4).
+From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP-23–26, -28, -29 and [notifications](../specs/notifications.md#8-data-model) FR-NOTE-38 ([ADR-0055](../architecture/adr/0055-player-colour.md): stored once, derived everywhere; DM gate #256; seams S1, S14, S15). **Built by `fix/colours-core`** (schema lane 2, after R0): drizzle push, push-safe (nullable or defaulted columns, one boot, no table rebuild). Protocol side: [protocol §91](../protocol/README.md#91-sprint-5-player-colours-core-k0).
+
+| Table / column | Change | Default (push-safe) | Visibility | Source |
+|---|---|---|---|---|
+| `player.color` | palette key (`PLAYER_COLOR_KEYS`, `@shared/campaign-management/colors.ts`) | **null** (a NOT NULL add without a default can't be pushed onto a populated table); filled by the boot backfill before the server listens | every connection of the campaign (`player` record, non-null on the wire) | [FR-CAMP-23](../specs/campaign-management.md#6-functional-requirements) |
+| `campaign.dm_color` | palette key, not null | `amber` (old rows and new campaigns) | every connection of the campaign (`campaign` record) | FR-CAMP-24 |
+| `notification.by_role`, `notification.by_player_id` | `dm` \| `player` \| null, ID \| null: who **caused** the row | null (old rows: no stripe, no backfill) | the row's (FR-NOTE-06 unchanged) | [FR-NOTE-38](../specs/notifications.md#6-functional-requirements) |
+
+- **Palette** (code data; only the key is stored): `amber`, `jade`, `sky`, `rose`, `yellow`, `blue`, `vermillion`, `bronze` (default order); hex values in [CAMP §7](../specs/campaign-management.md#7-uiux-notes) and visual-direction `player.<key>`.
+- **Writes:** `player.color` at `player.add` (the default, same transaction) and by `camp.setColor`; `campaign.dm_color` only by `camp.setColor {playerId: null}`; the backfill (system: no event, no log row). `by_role` / `by_player_id` only by `notify`, from `env.actor` (DM → `dm` / null; player → `player` / id; system → null / null); immutable after (update, resolve, dismiss, reopen never touch them).
+- **Rules:** a **pick** must be free among the DM colour and the other players' colours of the campaign (checked in the command's transaction, FR-CAMP-26); defaults may repeat once all 8 are taken, so there is **no unique index**. `by_player_id` has **no FK**: drizzle push adds one to an existing table only through a second-boot table rebuild; the value is server-written (a player of the row's campaign). A system-actor close (`resolveNotification`, dismiss) leaves `closed_by_role` / `closed_by_player_id` null.
+- **Derived (client only, never stored elsewhere):** a person's hex = `colorOf(store, {role, playerId})` (`src/client/common/features/campaign-management/colors.ts`): the key's `--player-<key>` token (fallback: the palette hex); unknown player or key → role accent; system → none. Default = `defaultColor(taken)`: first free key in palette order; all 8 taken → least used, ties in palette order.
+- **Boot backfill** (start hook `campaign-management.color-backfill`, one transaction): per campaign, null colours in `createdAt`, then `rowid` order, each seeing the defaults before it; rerun = no-op.
+- **Fixtures:** `pc-colours` (as DM, `player-2` picks blue; `player-1` keeps jade, the DM amber; no ids or tokens); bundle **`player-colours`** = `map-tools` + `pc-colours`; the unit also in `session-sim-9`.
+- **Snapshot size** (CON-44, `snapshot-size.test.ts` worst case: `vermillion` on every player + the DM, every notification stamped by a player with the longest id): colours **+149 B** in every frame (DM and each of 6 players); stamp **+8,400 B** DM (120 rows), **+7,210–7,280 B** per player. Heavy DM 650,809 B with K's rows; 707,804 B with R's worst case on top (865,060 B left of 1.5 MiB); players max 268,034 B.
+
+## 72. Sprint 5: Add to party from the compendium (P4)
+
+From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–42 (DM gate #256). **Built by `build/cmp-add-to-party`**: DM client only; no table, column or record type. Protocol side: [protocol §92](../protocol/README.md#92-sprint-5-add-to-party-from-the-compendium-p4).
+
+- **Writes:** the existing `party.addItem` ([§31](#31-sprint-3-party-board-core-p-core)): one `party_item` insert or merge, one `loot_entry {kind: item, world → party}`, one `loot-received` notification, one transaction. The party row keeps a name copy only (no link back to the entry, OQ-PARTY-13; Add to party copies no images, FR-CMP-49).
+- **Fixtures:** bundle `party-cmp` = `party-board` + `cmp-srd-mini` (existing units; SRD "Potion of Healing" merges into `party-items-1`'s "Potion of healing" ×2 → ×4).
+- **Snapshot size** (CON-44): no new record type or field, so +0 B per viewer at a given state; an add writes the same rows as the Inventory tab's Add (`party-item` lazy; the `loot-entry` row as PARTY §12 already budgets).
+
+## 73. Sprint 5: Initiative trigger chips, Effect… source, one Invisible (W4)
+
+From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-54–56 and [fog-of-war](../specs/fog-of-war.md) FR-FOG-59. **Built by `fix/init-chips-effect`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent. Protocol side: [protocol §94](../protocol/README.md#94-sprint-5-initiative-trigger-chips-effect-source-one-invisible-w4).
 
 | Piece | Kind | Contents | Visibility | Source |
 |---|---|---|---|---|

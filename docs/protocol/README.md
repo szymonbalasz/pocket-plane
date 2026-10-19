@@ -522,7 +522,7 @@ Server registry owned by entities, **append-only** ([AGENTS §9.9](../../AGENTS.
 | `sync.probes` | SHELL (SYNC content) | both | no | — | Probes | test mode | FR-SHELL-21 |
 
 - Player: no window open by default in Scenes ([SHELL §7](../specs/play-shell.md#7-uiux-notes)).
-- **Default layout** (map-first, #162): designed for 1440×900, fits 1280×720. DM opens `cbt.initiative` (top-right) and `dice.log` (bottom-left) only; left edge `map.scenes` / `ent.creatures` / `cbt.encounters` / `loot.log`, right edge below `cbt.initiative` `camp.players` / `char.sheet` / `note.history`. Player: right edge `char.sheet`, `cbt.initiative` below it (left edge above `dice.log` at 1280×720); `dice.log` bottom-left; `note.history` = toasts + launcher, opened bottom-right. Default-open windows never overlap; every window type opens at the left or right edge at 1280×720, 1440×900 and 1600×900; battlemap uncovered by the default layout: DM ≥ 70% at 1440×900 / ≥ 60% at 1280×720, player ≥ 65% at both (unit tests, registry-driven). *(built, fix/polish-map-fit)* Token check ([FR-SHELL-34](../specs/play-shell.md#6-functional-requirements)): at 1280×720, 1440×900 and 1600×900 the `session-sim` Goblin Ambush tokens (DM: all six, Initiative open; player: the four visible, before and after Initiative appears), fitted per FR-MAP-44, have no centre inside a window rect. *(G2, built, fix/map-fit-floor)* Where that fit hits the FR-MAP-46 floor (DM at 1280×720), only the PC tokens (Mira, Thorn) must be clear; the cell is ≥ 48 px at every size.
+- **Default layout** (map-first, #162): designed for 1440×900, fits 1280×720. DM opens `cbt.initiative` (top-right) and `dice.log` (bottom-left) only; left edge `map.scenes` / `ent.creatures` / `cbt.encounters` / `party.board` *(S5: `loot.log` retired, its body is Party's Loot tab, FR-LOOT-21)*, right edge below `cbt.initiative` `camp.players` / `char.sheet` / `note.history`. Player: right edge `char.sheet`, `cbt.initiative` below it (left edge above `dice.log` at 1280×720); `dice.log` bottom-left; `note.history` = toasts + launcher, opened bottom-right. Default-open windows never overlap; every window type opens at the left or right edge at 1280×720, 1440×900 and 1600×900; battlemap uncovered by the default layout: DM ≥ 70% at 1440×900 / ≥ 60% at 1280×720, player ≥ 65% at both (unit tests, registry-driven). *(built, fix/polish-map-fit)* Token check ([FR-SHELL-34](../specs/play-shell.md#6-functional-requirements)): at 1280×720, 1440×900 and 1600×900 the `session-sim` Goblin Ambush tokens (DM: all six, Initiative open; player: the four visible, before and after Initiative appears), fitted per FR-MAP-44, have no centre inside a window rect. *(G2, built, fix/map-fit-floor)* Where that fit hits the FR-MAP-46 floor (DM at 1280×720), only the PC tokens (Mira, Thorn) must be clear; the cell is ≥ 48 px at every size.
 - **Open placement** (`placement.ts`): a window with no stored geometry opens at its default rect, fitted to the area below the top bar and above the launcher (shrunk, never below min size). If that overlaps a window on screen, edge-first (map-first, #162; never under the tool rail, never a mid-map column): a free slot in its default column (full size, nearest; else the tallest ≥ min height; *(P3 polish, fix/p3-polish)* of several full-size free slots at either edge, the one covering the least on-screen map token area wins first), else the same in the left or right edge column, else the spot covering least in its default column (a cascade), else at the other edge. A gated default-open window (player `cbt.initiative`) that becomes available while the page is shown, still at its default-layout geometry and over an open window, is placed the same way; a window the user moved keeps its spot. Stored geometry is always reused as is (FR-SHELL-08). The default layout is built the same way. `defineWindow({… fixedDefault: true})` opts out (always the default rect): `shell.test`, `sync.probes`, whose fixed spots walkthroughs rely on.
 - *(sprint 5, built, fix/window-layout)* **Placement, keep-outs, wide Game log, named default layouts**: [§89](#89-sprint-5-window-layout-w1) supersedes the two bullets above where they differ (clear of windows first, inward columns, screen full auto-minimises, keep-outs, default sizes by viewport, growth cap, old default sizes follow the viewport, floors DM / player ≥ 55 % at 1440×900).
 - **Registering a window** (build/play-shell): a feature exports `defineWindow({kind, title, clients, defaultSize, minSize, defaultPosition: {anchor, dx?, dy?}, defaultOpen?, launcher?: {icon, label, order}, available?(store), component})` from `@ui/features/play-shell/registry` and adds one import + one list line to the client's `windows.ts`. Anchors: `top-left`, `top-right`, `bottom-left`, `bottom-right`, `center`; top anchors start below the top bar. Bad kind, duplicate kind, wrong client or default < min size throw at load.
@@ -704,7 +704,7 @@ Server kind registry `src/server/features/notifications/kinds.ts`; client views 
 
 - Text: "‹attacker›: ‹to-hit› to hit, ‹damage› ‹type›" (FR-CBT-18); *(polish, built)* " (natural 1)" / " (natural 20)" after the to-hit ([FR-CBT-57](../specs/combat-tracker.md#6-functional-requirements)). End rule *(polish, built)*: `EncounterEndRule` type in `@shared/notifications/end-rule.ts`; server kind `endRule` and client view `endRule` hold the same constant, checked at load (`buildKindMap`, `createNotificationViews`). Views *(feedback pass, built)*: DM `onAction` opens the non-modal multi-target popup ([FR-CBT-33](../specs/combat-tracker.md#6-functional-requirements)); player: pending "Waiting for DM", resolved one part per target, "Hit Goblin: 6 · Hit Goblin 2: 3 (half) · Miss" ([FR-CBT-42](../specs/combat-tracker.md#6-functional-requirements); legacy rows render the same way).
 - Toasts: per [FR-NOTE-13–15](../specs/notifications.md#6-functional-requirements): event frames only; pending → the action owner only (so the rolling player gets no toast, on create or resolve; they read the resolution in `note.history`: [OQ-NOTE-14](../specs/notifications.md#15-open-questions), #141).
-- `loot-received` (built by `build/party-loot`): created only by `partyLoot.add` when no coin < 0 (spends, change-making entries and moves create none). Toasts per FR-NOTE-13/14, DM included. View (both clients): coins icon, generic text + " (edited)" while the entry is in the store and edited, an "Open" link to `loot.log` ([FR-LOOT-14](../specs/party-loot.md#6-functional-requirements)).
+- `loot-received` (built by `build/party-loot`): created only by `partyLoot.add` when no coin < 0 (spends, change-making entries and moves create none). Toasts per FR-NOTE-13/14, DM included. View (both clients): coins icon, generic text + " (edited)" while the entry is in the store and edited, an "Open" link (`loot-note-open`) *(S5: calls `openPartyTab("loot")`: Party opens on its Loot tab, [FR-LOOT-22](../specs/party-loot.md#6-functional-requirements); was `loot.log`)* ([FR-LOOT-14](../specs/party-loot.md#6-functional-requirements)).
 
 ## 24. Combat: windows
 
@@ -877,11 +877,11 @@ Built by `build/party-loot` from [party-loot](../specs/party-loot.md) (LOOT, #14
 | `LootEdited` | `loot.edit` | `{entryId, before {text, cp…pp}, after {text, cp…pp}}` | `loot-entry`; `party-pot` iff its value changed |
 | `CoinMoved` | `loot.move` | `{entryId, from, to, text, cp…pp}` | `loot-entry` (before null); `party-pot` iff an end is `party`; `wallet` per character end (before null on its first move) |
 
-**Window** `loot.log` "Party loot": both clients, closed by default, `center` 440×560, min 320×320; launcher "Loot" (coins icon, order 60). Body: pot strip, wallets, DM add form, Move form, log newest first ([FR-LOOT-15](../specs/party-loot.md#6-functional-requirements)).
+**Window** `loot.log` "Party loot" *(S5: **retired**, window type and launcher entry removed from both registries; the same body is the Party window's Loot tab, [FR-LOOT-21](../specs/party-loot.md#6-functional-requirements), [§93](#93-sprint-5-loot-tab-p3))*: both clients, closed by default, `center` 440×560, min 320×320; launcher "Loot" (coins icon, order 60). Body: pot strip, wallets, DM add form, Move form, log newest first ([FR-LOOT-15](../specs/party-loot.md#6-functional-requirements)).
 
 **Snapshot budget:** ≤ 100 × 471 B (measured, 200-char text, #163) + pot + ≤ 10 wallets ≈ 50 KB worst, same for DM and players (LOOT §12, CON-44).
 
-**Registry lines:** server feature `partyLootFeature`; record types `loot-entry`, `party-pot`, `wallet`; notification kind `loot-received` (server + both client views); window `loot.log` (both); bundle `party-loot`; fixture units `loot-1`, `loot-wallets`, `loot-second` ([data model §19](../data-model/README.md#19-reward-loot-entry-party-pot-wallet)).
+**Registry lines:** server feature `partyLootFeature`; record types `loot-entry`, `party-pot`, `wallet`; notification kind `loot-received` (server + both client views); window `loot.log` (both) *(S5: both lines removed by its owner, FR-LOOT-21)*; bundle `party-loot`; fixture units `loot-1`, `loot-wallets`, `loot-second` ([data model §19](../data-model/README.md#19-reward-loot-entry-party-pot-wallet)).
 
 ## 30. Playtest pass (to build)
 
@@ -1486,7 +1486,7 @@ From [party-board](../specs/party-board.md) (PARTY slice 2; #207, #221, #223). *
 
 | Kind | Owner | Clients | Default open | Default geometry | Launcher | Gate | Source |
 |---|---|---|---|---|---|---|---|
-| `party.board` | PARTY | both | no | top-left `dx` 56 (left edge, as `loot.log`), 440×560, min 340×360, `minOpenH` 400 (no full-size slot at 1280×720 → that height on top at the edge covering least). Tabs Handouts / Inventory (choice per browser), "Coin: open Party loot" → `loot.log`. `activity` = newest `seq` / `sharedAt` / `updatedAt` of the store's `handout` rows | "Party" (scroll icon, order 58) | — | [FR-PARTY-11](../specs/party-board.md#62-party-window-and-viewer) |
+| `party.board` | PARTY | both | no | top-left `dx` 56 (left edge), 440×560, min 340×360, `minOpenH` 400 (no full-size slot at 1280×720 → that height on top at the edge covering least). Tabs Handouts / Inventory *(S5: / Loot, FR-PARTY-29)* (choice per browser) ~~, "Coin: open Party loot" → `loot.log`~~ *(S5: removed)*. `activity` = newest `seq` / `sharedAt` / `updatedAt` of the store's `handout` rows | "Party" (scroll icon, order 58) | — | [FR-PARTY-11](../specs/party-board.md#62-party-window-and-viewer) |
 | `party.handout` | PARTY | both | no | top-right, 640×560, min 360×320, `minOpenH` 400 (opens on top rather than shrinking). Shows the client-selected handout (`@ui/features/party-board/selection`, never sent); DM: also the editor (Edit / New) | none | — | [FR-PARTY-14](../specs/party-board.md#62-party-window-and-viewer) |
 
 - **Loads** ([§38](#38-sprint-3-lazy-record-types)): the Handouts tab and the viewer `useLazyRecords("handout")` (whole type); the viewer `useLazyRecords("handout-body", [id])`; the Inventory tab `useLazyRecords("party-item")` (read-only list until P4). Loaded rows only (never store presence); every snapshot reloads open windows (FR-SYNC-37). Loading → Skeleton (`party-handout-loading`), reject → "Couldn't load — Retry" (`party-handout-retry`), loaded without the header or body → "No longer shared" (`party-handout-gone`).
@@ -1565,7 +1565,7 @@ From [party-board](../specs/party-board.md#64-gold-ledger-party-loot-evolved) (P
 
 **Event** `CoinSplit {entryIds, characterIds, shares}` (logged, not undoable; no notification): changes = one `loot-entry` per character (before null; `move`, `party → character`, text "Split", coins = `shares`), then `party-pot`, then one `wallet` per character in list order (before null on that character's first coin). Visibility as LOOT-10: the DM and every player of the campaign; other campaigns never (scope gate). One `event` frame before the DM's `ack` (FR-SYNC-14). Crash seams `PP_TEST_CRASH=loot.split:before-commit` / `:after-commit`.
 
-**Client** (`loot.log`, `@ui/features/party-loot/LootLog`)
+**Client** (`loot.log` *(S5: the Party window's Loot tab, FR-LOOT-21)*, `@ui/features/party-loot/LootLog`)
 
 - DM **Split…** Button by the pot (`loot-split-open`, disabled while not `live`) → Dialog `loot-split-dialog`: five coin Inputs pp → cp (`loot-split-coin` + `data-value`), prefilled with the pot's positive coins; a Checkbox per character by name (`loot-split-character` + `data-record-id`; approved = sheet not `draft` ticked); preview `loot-split-preview` ("Each gets 2 pp, 15 gp; 1 pp stays in the pot", or the validation message with `data-valid="false"`); Split `loot-split-submit` disabled while invalid, not `live` or in flight; reject → `loot-split-error`; ack → closes; lost intent → Toast "Connection lost — check the loot log before splitting again". Players have no Split….
 - **Item rows:** `loot-entry` `data-kind="item"`, line "‹from› → ‹to›: ‹name› ×‹qty›" ("Party", "Outside the party"), no coin Badges, no Edit.
@@ -2309,9 +2309,71 @@ From [dice-extras](../specs/dice-extras.md) FR-DICEX-49, -50 and [dice-roll-log]
 | Bundle | dice-extras in each client's initial chunks **13.0 KB gz** (cap 15); `RollPopup` **4.8 KB gz** (cap 8) |
 | CON-44 | 0 B: no record, field or frame added. Bundle `dice-polish` DM 21,098 B, P1 13,882 B, P2 10,684 B |
 
-## 91. Sprint 5: Initiative trigger chips, Effect… source, one Invisible (W4)
+## 91. Sprint 5: player colours core (K0)
 
-From [combat-extras](../specs/combat-extras.md) FR-CBTX-54–56 (OQ-CBTX-27 B, -28 A, -29 A, #256; seams S9) and [fog-of-war](../specs/fog-of-war.md) FR-FOG-59. **Built by `fix/init-chips-effect`**: client only; no record type, intent, event, signal or wire field (CON-44: 0 B). Amends [§51](#51-sprint-3-rule-trigger-sheet-ui-r6)'s "Initiative trigger chips" row (FR-CBTX-52: triggers no longer go into "+N"). Data model: [§71](../data-model/README.md#71-sprint-5-initiative-trigger-chips-effect-source-one-invisible-w4).
+From [campaign-management](../specs/campaign-management.md#9-api--events) FR-CAMP-23–26, -28, -29, [notifications](../specs/notifications.md#9-api--events) FR-NOTE-38 and [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-61 ([ADR-0055](../architecture/adr/0055-player-colour.md); DM gate #256). **Built by `fix/colours-core`**: server, zod, the client helper and theme tokens; the picker is K2, map / log / notification colouring K3 / K4. **No signal change** (0 B: the colour derives from the server-stamped `from`). Data side: [data model §71](../data-model/README.md#71-sprint-5-player-colours-core-k0).
+
+**Intent** (strict zod `SetColorInput`, `@shared/campaign-management/schemas`; command in `src/server/features/campaign-management/colors.ts`)
+
+| Intent | Who | Validation | Result | Source |
+|---|---|---|---|---|
+| `camp.setColor {playerId: Id \| null, color}` *(new; the first CAMP WS intent)* | DM, player | player: `playerId` ≠ own (another player or `null`) → `forbidden`; DM: not a player of the connection's campaign → `not_found`; `color` not one of the 8 keys, or extra keys → `invalid`; same as the current colour → `ack`, no write, no event; taken by the DM colour or another player of the campaign → `conflict` "Taken by ‹name›" (the player's name or "DM"), checked in the transaction (racing picks: one `ack`, one `conflict`) | `{}` | FR-CAMP-25, -26 |
+
+**Record types** (scope, visibility and snapshot as before: every connection of the campaign)
+
+| Type | Change | Source |
+|---|---|---|
+| `campaign` | + `dmColor` (palette key) | FR-CAMP-24, -29 |
+| `player` | + `color` (palette key, never null: the boot backfill runs before the server listens); still no `linkToken` | FR-CAMP-23, -29 |
+| `notification` | + `byRole` (`dm` \| `player` \| null), `byPlayerId` (ID \| null): who caused it; null on older rows and system rows; never in a helper argument or intent (`note.testSend {byPlayerId}` → `invalid`) | FR-NOTE-38 |
+
+- The wire zod reads `color` / `dmColor` as a non-empty string: a client meeting a key it doesn't know (newer server, edited DB) falls back to the role accent instead of failing the frame.
+
+**Domain events** (`src/shared/events/campaign-management.ts`)
+
+| Event | Changes | Player sees | Logged | Undoable |
+|---|---|---|---|---|
+| `PlayerColorSet {playerId: Id \| null, color}` *(new)* | one `player` upsert, or one `campaign` upsert when `playerId` is null (DM colour) | the upsert (every connection of the campaign) | yes | no |
+| `PlayerAdded` | its `player` upsert carries the default `color` (payload unchanged) | as before | yes | no |
+| `CampaignCreated` / `CampaignRenamed` | the `campaign` upsert carries `dmColor` | as before | yes | no |
+| `NotificationCreated` | the `notification` upsert carries `byRole` / `byPlayerId` | per FR-NOTE-06 (unchanged) | yes | no |
+
+**Helpers, hooks and seams**
+
+- Start hook `campaign-management.color-backfill` (`backfillPlayerColors`): fills null `player.color` before the server listens; one transaction, no event, no log row.
+- `notify` (`src/server/features/notifications/helpers.ts`) stamps the causer from `env.actor`; a **system** actor stamps null / null and closes with null closer fields (`resolveNotification`, dismiss). `gameLog.append` (`src/server/features/dice-roll-log/game-log.ts`) **throws** under a system actor (the command fails `internal`, nothing written).
+- Client: `colorOf(store, {role, playerId?})`, `colorKeyOf`, `colorHex`, `useColorOf()` (`@ui/features/campaign-management/colors`); tokens `--player-<key>` in `src/client/common/styles.css`. Palette, `defaultColor` and the contrast / CIEDE2000 checks: `@shared/campaign-management/colors`.
+- Tests: `@shared/campaign-management/colors.test.ts` (FR-CAMP-23 default colour, FR-CAMP-28 palette contrast ×3), server `campaign-management/colors.test.ts` (FR-CAMP-23 default ×2, backfill ×2, backfill rerun; FR-CAMP-24; FR-CAMP-25 permissions, crash; FR-CAMP-26), `stamp.test.ts` (FR-NOTE-38 ×3, FR-DICE-61 system actor), `colours-sync.test.ts` (FR-CAMP-29 ×2 over WS with reconnect, restart and leak scan; FR-NOTE-38 visibility), client `colors.test.tsx` (FR-CAMP-28 colorOf ×4), `db/colours-schema.test.ts` (push), `ws/snapshot-size.test.ts` (CON-44 colours).
+
+## 92. Sprint 5: Add to party from the compendium (P4)
+
+From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–42 (OQ-CMP-34, DM gate #256; seams S5; ruling P #19). **Built by `build/cmp-add-to-party`**: DM client only. No new route, intent, event, record type or registry: the action sends party-board's `party.addItem` ([§44](#44-sprint-3-party-board-core-p-core)). Data side: [data model §72](../data-model/README.md#72-sprint-5-add-to-party-from-the-compendium-p4).
+
+| Piece | Contract |
+|---|---|
+| DM entry actions (`@dm/features/compendium/AddToParty.tsx`, `add-to-party.ts`) | **Add to party** on `item` entries (imported and homebrew) only; the player client mounts no entry actions. Popover: qty Input (default 1; whole number 1–9 999, party-board's `addPayload` rules) + **Add** → `party.addItem {name: clip(entry name, 60), qty, notes: ""}` (Add to sheet's `clip`). Add disabled while qty invalid, not `live` or in flight. `ack` → closes (the `loot-received` toast confirms); `reject` → inline, qty kept; lost intent (`disconnected` / `offline`) → Toast "Connection lost — check the party inventory before adding again". Unshared homebrew → hint "Players will see ‹name› in the party inventory" |
+| Wire | `party.addItem` unchanged: merge into the row with the same key, else insert; the log row and the `loot-received` text use the **party row's** name after a merge (e.g. "Potion of healing ×2" for SRD "Potion of Healing") |
+| Test IDs | `cmp-add-to-party`, `cmp-add-to-party-panel`, `cmp-add-to-party-qty`, `cmp-add-to-party-submit`, `cmp-add-to-party-error`, `cmp-add-to-party-hint` |
+| Fixtures | Bundle `party-cmp` = `party-board` + `cmp-srd-mini` (existing units); nothing new in `session-sim-9` (sim-7 holds both units) |
+| Tests | `add-to-party.test.tsx` (FR-CMP-40 only on item views, name clip; FR-CMP-41 states, hint; FR-CMP-42 not in the player client), `party-cmp.fixtures.test.ts` (FR-CMP-40 merge ×2 → ×4 over real sockets, player → `forbidden`, leak scan live + reconnected) |
+| CON-44 | No record, no snapshot bytes |
+
+## 93. Sprint 5: Loot tab (P3)
+
+From [party-board](../specs/party-board.md#66-sprint-5-loot-tab-present-uploads) FR-PARTY-29, -30 and [party-loot](../specs/party-loot.md#6-functional-requirements) FR-LOOT-21–24 (DM gate #256, OQ-LOOT-17; seams S4; rulings P #20, #21). **Built by `build/party-loot-tab`**: client only; no record type, intent, event, notification or snapshot byte (0 B, PARTY §12). No data-model change.
+
+| Piece | Contract |
+|---|---|
+| `party.board` tabs (`@ui/features/party-board/Board.tsx`) | `PARTY_TABS` = `handouts`, `inventory`, `loot` (that order). Loot renders `LootLog` (party-loot's body, its own scroll area; test IDs unchanged, `loot-log` now inside `party-board`). "Coin: open Party loot" (`party-loot-link`) removed. Window geometry unchanged (440×560, §50) |
+| Tab memory (`seen.ts`) | Stored as before (`pp.party.tab.v1.<campaignId>.<dm \| playerId>` = `{tab}`); `loot` accepted, unknown → `handouts` + warning. `createTabState` = the page's reactive tab (bound per key), so a programmatic switch shows on an open board |
+| `openPartyTab(tab)` (`@ui/features/party-board/open-tab.ts`; hook `useOpenPartyTab()`) | Stores the tab for the viewer's key (as a click), then `openWindow("party.board", main, {by: "feature"})`: closed → opened (auto placed), minimised → restored, open → to front (FR-SHELL-08, -41). Callers: `loot-received` "Open" (`loot-note-open`, FR-LOOT-22), the sheet's wallet link (`charx-wallet-open`, CHARX `MoreTabs.tsx`, FR-LOOT-23) |
+| Registries | `loot.log` removed from `src/client/dm/windows.ts` and `src/client/player/windows.ts` (owner deletes its own line, seams S4); `@ui/features/party-loot/window.ts` and both `loot-window.tsx` deleted. A stored layout listing `loot.log` restores without a warning; the unknown kind is not rendered and dropped at the next write (FR-SHELL-18) |
+| Tests | `board.test.tsx` (FR-PARTY-29 ×3 per role), `logic.test.ts` (FR-PARTY-29 tab memory), both clients' `party-board/windows.test.ts` (FR-LOOT-21 registry + stored layout, FR-PARTY-30 closed / minimised / open); e2e `party-loot-tab.e2e.ts` (`party-s5`: FR-PARTY-29, FR-LOOT-21, -22, -23), `party-loot.e2e.ts` opens Loot through Party |
+| CON-44 | 0 B (no record) |
+
+## 94. Sprint 5: Initiative trigger chips, Effect… source, one Invisible (W4)
+
+From [combat-extras](../specs/combat-extras.md) FR-CBTX-54–56 (OQ-CBTX-27 B, -28 A, -29 A, #256; seams S9) and [fog-of-war](../specs/fog-of-war.md) FR-FOG-59. **Built by `fix/init-chips-effect`**: client only; no record type, intent, event, signal or wire field (CON-44: 0 B). Amends [§51](#51-sprint-3-rule-trigger-sheet-ui-r6)'s "Initiative trigger chips" row (FR-CBTX-52: triggers no longer go into "+N"). Data model: [§73](../data-model/README.md#73-sprint-5-initiative-trigger-chips-effect-source-one-invisible-w4).
 
 | Piece | Contract | Source |
 |---|---|---|
