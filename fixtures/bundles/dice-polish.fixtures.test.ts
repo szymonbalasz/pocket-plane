@@ -38,7 +38,7 @@ describe("dice-polish bundle (DICEX §13 sprint 5)", () => {
     const p1 = db.select().from(player).where(eq(player.name, "Player 1")).get()?.id;
     const brakka = db.select().from(entity).where(eq(entity.name, "Brakka")).get();
     expect(brakka?.ownerPlayerId).toBe(p1 as string);
-    expect((brakka?.statBlock as { attacks?: unknown[] }).attacks).toContainEqual(
+    expect((brakka?.statBlock as { attacks?: unknown[] } | undefined)?.attacks).toContainEqual(
       expect.objectContaining({
         name: "Flame Tongue greatsword",
         damage: "2d6+4",
