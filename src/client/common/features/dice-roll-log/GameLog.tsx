@@ -2,6 +2,7 @@
 // store; rolls go out as `dice.roll` intents. DM-only parts (public eye toggle, settings gear)
 // render from `you.role` / the `dmTools` slot. Sprint 4: each `die` segment is an inline die-shape
 // chip in the roller's look (FR-DICE-35); `focusLogEntry` highlights an entry (FR-DICE-37).
+// Sprint 5: a line this client's dice haven't landed yet shows blank chips and "…" (FR-DICE-40).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
@@ -16,7 +17,6 @@ import {
   type DiceLookRecord,
   lookOf,
 } from "@shared/dice-extras/looks";
-import type { LineSegment } from "@shared/dice-roll-log/kind-types";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import {
   CATEGORY_LABEL,
@@ -47,6 +47,7 @@ import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
 import { DieShape } from "../dice-extras/DieShape";
+import { useLanded, useLandingFade } from "../dice-extras/landing";
 import { stageTray } from "../dice-extras/store";
 import { scrollToEntry, useLogFocus } from "./focus";
 import {
@@ -54,7 +55,9 @@ import {
   actorOptions,
   actorSelection,
   createStickToBottom,
+  heldSegments,
   optionsDirty,
+  type ShownSegment,
   sortEntries,
 } from "./logic";
 import { usePhysicalDice, useRollOptionsOpen } from "./physical";
@@ -63,19 +66,21 @@ import { RollButton, useRollControl } from "./roll-control";
 const SELECT =
   "h-7 min-w-0 shrink-0 rounded-md border border-input bg-background px-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 
-function Segment({ s, look }: { s: LineSegment; look: DiceLook }) {
+function Segment({ s, look }: { s: ShownSegment; look: DiceLook }) {
   if (s.die) {
     // FR-DICE-35: a wrapper per chip (review B31); the shape inside keeps `dicex-die`. A dropped
-    // die's wrapper is `<s>`, as its text was (struck for assistive tech too).
+    // die's wrapper is `<s>`, as its text was (struck for assistive tech too). FR-DICE-40: held →
+    // blank, no `data-value`; it fades in at the landing (`data-landing`).
     const d = s.die;
     const Wrap = d.kept ? "span" : "s";
     return (
       <Wrap
         data-testid="dice-log-die"
         data-faces={d.faces ?? ""}
-        data-value={d.value}
+        data-value={s.blank ? undefined : d.value}
         data-kept={d.kept}
         data-offered={d.offered === true}
+        data-landing
         className="-my-0.5 inline-flex align-middle"
       >
         <DieShape
@@ -85,6 +90,7 @@ function Segment({ s, look }: { s: LineSegment; look: DiceLook }) {
           offered={d.offered === true}
           look={look}
           size="sm"
+          blank={s.blank === true}
           label={`${d.label ? `${d.label} ` : ""}${d.faces ? `d${d.faces}` : "dice"}: ${s.text}`}
         />
       </Wrap>
@@ -92,8 +98,13 @@ function Segment({ s, look }: { s: LineSegment; look: DiceLook }) {
   }
   switch (s.style) {
     case "actor":
-    case "total":
       return <strong className="font-semibold">{s.text}</strong>;
+    case "total":
+      return (
+        <strong data-landing className="font-semibold">
+          {s.text}
+        </strong>
+      );
     case "dropped":
       return <s className="text-muted-foreground">{s.text}</s>;
     case "badge":
@@ -113,13 +124,14 @@ function Segment({ s, look }: { s: LineSegment; look: DiceLook }) {
   }
 }
 
-function tooltipOf(e: GameLogEntryView): ReactNode {
+/** FR-DICE-40: a held line's Tooltip leaves out the dice until the landing. */
+function tooltipOf(e: GameLogEntryView, landed: boolean): ReactNode {
   const time = new Date(e.at).toLocaleTimeString();
-  const rolls = RollEntryPayload.safeParse(e.payload);
+  const rolls = landed ? RollEntryPayload.safeParse(e.payload) : null;
   return (
     <div className="flex flex-col gap-0.5">
       <span>{time}</span>
-      {rolls.success &&
+      {rolls?.success &&
         rolls.data.map((r) => (
           <span key={r.rollId}>
             {r.expression}: [
@@ -143,6 +155,10 @@ function Entry({
   focused: boolean;
 }) {
   const { segments } = useMemo(() => formatEntry(e), [e]);
+  // FR-DICE-40: only entries this client's live-throw path holds (FR-DICEX-49) wait.
+  const landed = useLanded(e.id);
+  const shown = useMemo(() => (landed ? segments : heldSegments(segments)), [segments, landed]);
+  const line = useLandingFade<HTMLSpanElement>(landed);
   const hidden = isDm && !e.public;
   return (
     <li
@@ -151,6 +167,8 @@ function Entry({
       data-public={e.public}
       data-undone={e.undone}
       data-focused={focused}
+      data-landed={landed}
+      aria-busy={landed ? undefined : true}
       // visibility.hidden token (visual-direction): hidden entries muted with an eye-off marker.
       // FR-DICE-37: a focused entry gets the accent ring for 2 s.
       className={cn(
@@ -166,9 +184,9 @@ function Entry({
           className="mt-0.5 size-3.5 shrink-0 text-visibility-hidden"
         />
       )}
-      <Tooltip content={tooltipOf(e)}>
-        <span className={cn("min-w-0 flex-1 break-words", e.undone && "line-through")}>
-          {segments.map((s, i) => (
+      <Tooltip content={tooltipOf(e, landed)}>
+        <span ref={line} className={cn("min-w-0 flex-1 break-words", e.undone && "line-through")}>
+          {shown.map((s, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: segments are positional and immutable
             <Segment key={i} s={s} look={look} />
           ))}

@@ -9,6 +9,7 @@ import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
 import { createWindowRegistry } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
+import { landing } from "./landing";
 import { rollPopups } from "./popups";
 import { RollPopupStack } from "./RollPopup";
 import type { DisplaySetting } from "./settings";
@@ -31,6 +32,7 @@ afterAll(() => {
 afterEach(() => {
   diceExtras.failed();
   rollPopups.api.setState({ popups: [] });
+  landing.api.setState({ holding: new Map() });
 });
 
 function render(role: "dm" | "player" = "player", display: DisplaySetting = "flat") {
@@ -90,9 +92,41 @@ const entry = (o: Partial<GameLogEntryView> = {}, items: unknown[] = []) =>
 const attr = (html: string, testId: string, name: string) =>
   new RegExp(`data-testid="${testId}"[^>]*?${name}="([^"]*)"`).exec(html)?.[1];
 
+describe("FR-DICEX-49 popup held until landed", () => {
+  test("FR-DICEX-49 total hidden until landed: popup rows 'Rolling…', chips blank, data-landed; shown at the landing", () => {
+    const second = entry({ id: "e2", n: 2, actorName: "Thorn" });
+    rollPopups.add({ entries: [entry(), second], looks: {}, big: null, threeD: false });
+    landing.hold(["e1", "e2"]);
+    let html = render();
+    expect(attr(html, "dicex-popup", "data-landed")).toBe("false");
+    const rows = [...html.matchAll(/data-testid="dicex-popup-row"[^>]*data-landed="(\w+)"/g)];
+    expect(rows.map((m) => m[1])).toEqual(["false", "false"]);
+    expect(html.match(/Rolling…/g)).toHaveLength(2);
+    expect(html).not.toContain('data-testid="dicex-popup-total"');
+    expect(html).not.toMatch(/data-testid="dicex-die"[^>]*data-value=/);
+    expect(html).not.toContain("natural 20!");
+    // The chips' fade-in (flat, 0.3 s) is the landing: totals and markers appear.
+    rollPopups.rested("e1", "play");
+    html = render();
+    expect(attr(html, "dicex-popup", "data-landed")).toBe("true");
+    expect(html).not.toContain("Rolling…");
+    expect(html).toMatch(/data-testid="dicex-popup-total"[^>]*>25</);
+    expect(html).toMatch(/data-testid="dicex-die"[^>]*data-value="20"/);
+  });
+
+  test("FR-DICEX-49 an entry never held (Off, snapshot) shows its total at once, whatever the popup's state", () => {
+    rollPopups.add({ entries: [entry()], looks: {}, big: null, threeD: false });
+    const html = render("player", "off");
+    expect(attr(html, "dicex-popup", "data-state")).toBe("rolling");
+    expect(attr(html, "dicex-popup", "data-landed")).toBe("true");
+    expect(html).toMatch(/data-testid="dicex-popup-total"[^>]*>25</);
+  });
+});
+
 describe("FR-DICEX-39 roll popup rendering", () => {
   test("FR-DICEX-39 FR-DICEX-40 a popup: test IDs, one row, total with its markers, 'Rolling…' until rest", () => {
     rollPopups.add({ entries: [entry()], looks: {}, big: null, threeD: false });
+    landing.hold(["e1"]); // as the runtime does after the popup (FR-DICEX-49)
     let html = render();
     expect(attr(html, "dicex-popup", "data-record-id")).toBe("e1");
     expect(attr(html, "dicex-popup", "data-count")).toBe("1");
