@@ -2,9 +2,10 @@
 // (the canvas tool registry), the picker in `@dm`. When the tool asks (`picking`), this opens the
 // picker: "Choose image…" sets the image the next click places; the menu's "Image…" swaps a prop's
 // image with `scn.updateProp {assetId}` (undoable, FR-SCN-15). Rendered once beside the DM rail.
+
+import { AssetPickerDialog } from "@ui/features/assets-pipeline/AssetPicker";
 import { updatePropFields, usePropTool } from "@ui/features/scene-tools/prop-tool";
 import { toastReject, useMapIntent } from "@ui/features/scenes-map/intents";
-import { AssetPickerDialog } from "../assets-pipeline/AssetPicker";
 
 export function ScnPropsDmHost() {
   const send = useMapIntent();
