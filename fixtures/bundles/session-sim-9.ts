@@ -36,5 +36,8 @@ export default defineBundle({
     // K: player colours, kept-template menu
     // K0: Player 2 picks blue (Player 1 jade, DM amber by default)
     "pc-colours",
+    // K4: three roll lines (Player 1 / Mira jade, Player 2 blue, the DM for Mira amber); the
+    // striped notification rows (`note-colours`) need test mode, so they stay in `log-note-colours`
+    "log-colours",
   ],
 });

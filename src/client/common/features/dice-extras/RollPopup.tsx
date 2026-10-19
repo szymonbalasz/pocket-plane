@@ -28,6 +28,7 @@ import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { focusLogEntry } from "../dice-roll-log/focus";
+import { RollerName } from "../dice-roll-log/name-color";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
 import { EDGE_GAP, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
@@ -415,8 +416,7 @@ function Row({ row }: { row: PopupRow }) {
       onClick={() => focusLogEntry(row.entryId)}
     >
       {row.hidden && <EyeOffIcon aria-label="Hidden from players" className="size-3.5 shrink-0" />}
-      {/* Plain here; K4 colours it in the roller's colour (seams S15). */}
-      <strong className="shrink-0 font-semibold">{row.actor}</strong>
+      <RollerName entryId={row.entryId} name={row.actor} />
       <span className="min-w-0 flex-1 truncate text-muted-foreground">
         {row.items.map(itemLabel).join(" · ")}
       </span>

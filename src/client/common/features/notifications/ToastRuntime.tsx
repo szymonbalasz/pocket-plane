@@ -44,7 +44,7 @@ import {
   viewerOf,
 } from "./logic";
 import type { NoteClient } from "./note-client";
-import { NoteBody, useNoteActions } from "./parts";
+import { NoteBody, NoteStripe, useNoteActions, useNoteStripe } from "./parts";
 import {
   advance,
   closeToast,
@@ -85,6 +85,7 @@ function NoteToast({
   const mode = you
     ? actionButton(n, { role: you.role, playerId: you.playerId }, live, views.get(n.kind))
     : "none";
+  const stripe = useNoteStripe(n);
   return (
     <div
       role="status"
@@ -92,8 +93,10 @@ function NoteToast({
       data-record-id={n.id}
       data-state={n.state}
       data-sticky={t.sticky}
-      className="pointer-events-auto flex flex-col gap-2 rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg"
+      {...stripe.attrs}
+      className="pointer-events-auto relative flex flex-col gap-2 rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg"
     >
+      <NoteStripe color={stripe.color} />
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <NoteBody n={n} views={views} />

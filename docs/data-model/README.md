@@ -2001,3 +2001,16 @@ From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-68–73, [scene-to
 - **Derived (not stored):** every mark's hex = `colorOf(store, person)` at draw time (person: the sender, the token's `ownerPlayerId` → else the DM, the template's `placedByPlayerId` → else the DM, the notification's `actionPlayerId`); the name on chips and template labels = the `player` record's name or "DM".
 - **Fixtures:** none new (`player-colours`, `pc-colours` from K0).
 - **Snapshot size** (CON-44): 0 B added.
+
+## 85. Sprint 5: player colours in the Game log, roll popup and notifications (K4)
+
+From [dice-roll-log](../specs/dice-roll-log.md#8-data-model) FR-DICE-60, -61 and [notifications](../specs/notifications.md#8-data-model) FR-NOTE-39–41. **Built by `build/log-note-colours`**: no table, column, record type or payload change. Protocol side: [protocol §107](../protocol/README.md#107-sprint-5-player-colours-in-the-game-log-roll-popup-and-notifications-k4).
+
+| Derived (not stored) | From | Rule | Source |
+|---|---|---|---|
+| A log line's name colour | `game_log_entry.kind`, `roller_role`, `roller_player_id` + `player.color` / `campaign.dm_color` | `roll` kind only; other kinds, unknown player / key → default text colour | [FR-DICE-60](../specs/dice-roll-log.md#6-functional-requirements), -61 |
+| A notification's stripe | `notification.by_role`, `by_player_id` + the colours | `by_role` null (pre-sprint-5, system) or unknown player → none | [FR-NOTE-39](../specs/notifications.md#6-functional-requirements), -41 |
+| "Resolved by" name colour | `notification.closed_by_role`, `closed_by_player_id` | "Closed" (null closer) → no name | [FR-NOTE-40](../specs/notifications.md#6-functional-requirements) |
+
+- **Fixtures:** units `log-colours` (3 `roll` entries) and `note-colours` (3 notifications, test mode); bundle `log-note-colours`; `session-sim-9` + `log-colours`.
+- **Snapshot size** (CON-44): 0 B on the heavy harness (no field); bundle `log-note-colours` measured DM 15,121 B, P1 7,458 B, P2 6,681 B.

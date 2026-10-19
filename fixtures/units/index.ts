@@ -37,6 +37,7 @@ import cmpSrdMiniS3 from "./compendium/cmp-srd-mini-s3";
 import dicexLooks from "./dice-extras/dicex-looks";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
 import diceSettings from "./dice-roll-log/dice-settings";
+import logColours from "./dice-roll-log/log-colours";
 import rolls1 from "./dice-roll-log/rolls-1";
 import charBrakka from "./effect-modifiers/char-brakka";
 import modBane from "./effect-modifiers/mod-bane";
@@ -68,6 +69,7 @@ import visionCrypt from "./fog-of-war/vision-crypt";
 import visionInvisible from "./fog-of-war/vision-invisible";
 import visionLegacy from "./fog-of-war/vision-legacy";
 import syncProbes from "./live-sync/sync-probes";
+import noteColours from "./notifications/note-colours";
 import notificationsTest from "./notifications/notifications-test";
 import handoutAttachment from "./party-board/handout-attachment";
 import handoutImages from "./party-board/handout-images";
@@ -180,4 +182,6 @@ export const units: readonly Fixture[] = [
   pcColours,
   trailMoves,
   encFriendly,
+  logColours,
+  noteColours,
 ];

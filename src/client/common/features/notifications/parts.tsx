@@ -1,12 +1,16 @@
-// Shared pieces of rows and toasts: body (icon + text or the kind's renderer), action runner.
+// Shared pieces of rows and toasts: body (icon + text or the kind's renderer), action runner,
+// the causer's colour stripe (FR-NOTE-39, -41).
+import type { PlayerColor } from "@shared/campaign-management/colors";
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { BellIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useRecords, useSync } from "../../sync/store";
+import { colorHex } from "../campaign-management/colors";
+import { useColorKeyOf } from "../dice-roll-log/name-color";
 import { useOpenWindow } from "../play-shell/ShellContext";
-import { rejectMessage } from "./logic";
+import { byAttr, causerOf, rejectMessage } from "./logic";
 import { hideToast } from "./toasts";
 import type {
   NotificationActionContext,
@@ -26,6 +30,37 @@ export function NoteBody({ n, views }: { n: NotificationRecord; views: Notificat
         {Render ? <Render notification={n} /> : n.text}
       </div>
     </div>
+  );
+}
+
+/**
+ * FR-NOTE-39, -41 (OQ-NOTE-22, -24 A): the causer's palette key for a toast / row (null: no
+ * stamp, an old row, or no `player` record → no stripe) and its `data-by` / `data-color`.
+ * Re-renders on a colour change (restripe, OQ-CAMP-21).
+ */
+export function useNoteStripe(n: NotificationRecord): {
+  color: PlayerColor | null;
+  attrs: { "data-by"?: string; "data-color"?: string };
+} {
+  const keyOf = useColorKeyOf();
+  const by = causerOf(n);
+  const color = by ? keyOf(by) : null;
+  return { color, attrs: { "data-by": byAttr(n), "data-color": color ?? undefined } };
+}
+
+/**
+ * The 3 px left stripe, inside the box's border (the parent is `relative`; a pending row's accent
+ * border stays). Decoration only: the text names the person where it matters (OQ-CAMP-25).
+ */
+export function NoteStripe({ color }: { color: PlayerColor | null }) {
+  if (!color) return null;
+  return (
+    <span
+      aria-hidden
+      data-testid="note-stripe"
+      className="pointer-events-none absolute inset-y-0 left-0 w-[3px] rounded-l-[inherit]"
+      style={{ backgroundColor: colorHex(color) }}
+    />
   );
 }
 
