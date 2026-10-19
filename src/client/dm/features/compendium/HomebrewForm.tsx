@@ -1,8 +1,11 @@
 // Homebrew form Dialog (FR-CMP-24, -25; CMP §7): kind (New only), name, the kind's facets and
 // short fields, text Textarea with a live markdown-lite preview, **Shared with players** Switch.
+// Images strip (FR-CMP-50): one tile per image (first "Main"), Remove / Move left / right, then
+// the image attach control (upload, drop or paste anywhere in the Dialog, From library).
 // Saves with `POST` (New, Clone) or `PUT` (Edit); server errors inline; the window refetches.
 import {
   HOMEBREW_TEXT_MAX,
+  IMAGE_SLOTS_MAX,
   ITEM_CATEGORIES,
   SPELL_SCHOOLS,
   SRD_CLASSES,
@@ -21,14 +24,20 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
 } from "@ui/components/ui/overlays";
-import { Input, Label } from "@ui/components/ui/primitives";
+import { Badge, Input, Label } from "@ui/components/ui/primitives";
+import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
+import { ImageAttach } from "@ui/features/assets-pipeline/attach/ImageAttach";
 import { useLive } from "@ui/features/combat-tracker/store";
 import { MarkdownLite } from "@ui/features/compendium/MarkdownLite";
 import { openEntry, refetch } from "@ui/features/compendium/nav";
-import { type ReactNode, useState } from "react";
+import { ArrowLeftIcon, ArrowRightIcon, XIcon } from "lucide-react";
+import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  ALREADY_IN_ENTRY,
+  attachImage,
   draftError,
   draftOf,
   type FormMode,
@@ -36,6 +45,8 @@ import {
   type HomebrewFields,
   type HomebrewKind,
   initialFields,
+  moveImage,
+  removeImage,
 } from "./homebrew-form";
 import { putEntry } from "./homebrew-rest";
 
@@ -220,13 +231,162 @@ function KindFields({
   }
 }
 
-function HomebrewForm({ api, mode, close }: { api: Api; mode: FormMode; close(): void }) {
+function SlotButton({
+  label,
+  testId,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  testId: string;
+  disabled?: boolean;
+  onClick(): void;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip content={label}>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="size-6"
+        aria-label={label}
+        data-testid={testId}
+        disabled={disabled}
+        onClick={onClick}
+      >
+        {children}
+      </Button>
+    </Tooltip>
+  );
+}
+
+/**
+ * FR-CMP-50: "Images (n / 4)", the tiles in slot order (first badged "Main") with Move left /
+ * Remove / Move right, then `ImageAttach` (paste / drop on `target`, the Dialog content). An id
+ * the draft already holds is skipped with "Already in this entry".
+ */
+export function ImageSlots({
+  images,
+  onChange,
+  target,
+  busy,
+  duplicate,
+  onAdd,
+}: {
+  images: readonly string[];
+  onChange(ids: string[]): void;
+  target?: RefObject<HTMLElement | null>;
+  busy: boolean;
+  duplicate: boolean;
+  onAdd(id: string): void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5" data-testid="cmp-form-images" data-value={images.length}>
+      <span className="text-xs font-medium">
+        Images ({images.length} / {IMAGE_SLOTS_MAX})
+      </span>
+      {images.length > 0 && (
+        <ul className="flex flex-wrap gap-2">
+          {images.map((id, i) => (
+            <li
+              key={id}
+              data-testid="cmp-form-image"
+              data-record-id={id}
+              data-value={i + 1}
+              className="relative flex flex-col items-center gap-1 rounded-md border p-1"
+            >
+              <AssetImg id={id} file="thumb" alt={`Image ${i + 1}`} className="size-16 rounded" />
+              {i === 0 && (
+                <Badge
+                  data-testid="cmp-form-image-main"
+                  className="absolute left-1 top-1 px-1 py-0 text-[10px]"
+                >
+                  Main
+                </Badge>
+              )}
+              <span className="flex gap-0.5">
+                <SlotButton
+                  label="Move left"
+                  testId="cmp-form-image-left"
+                  disabled={i === 0}
+                  onClick={() => onChange(moveImage(images, i, -1))}
+                >
+                  <ArrowLeftIcon className="size-3.5" />
+                </SlotButton>
+                <SlotButton
+                  label="Remove"
+                  testId="cmp-form-image-remove"
+                  onClick={() => onChange(removeImage(images, i))}
+                >
+                  <XIcon className="size-3.5" />
+                </SlotButton>
+                <SlotButton
+                  label="Move right"
+                  testId="cmp-form-image-right"
+                  disabled={i === images.length - 1}
+                  onClick={() => onChange(moveImage(images, i, 1))}
+                >
+                  <ArrowRightIcon className="size-3.5" />
+                </SlotButton>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <ImageAttach
+        owner="cmp-form"
+        max={IMAGE_SLOTS_MAX}
+        count={images.length}
+        onAdd={onAdd}
+        pasteTarget={target}
+        dropTarget={target}
+        disabled={busy}
+      />
+      {duplicate && (
+        <p data-testid="cmp-form-image-dup" className="text-xs text-muted-foreground">
+          {ALREADY_IN_ENTRY}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function HomebrewForm({
+  api,
+  mode,
+  close,
+  target,
+}: {
+  api: Api;
+  mode: FormMode;
+  close(): void;
+  target: RefObject<HTMLElement | null>;
+}) {
   const [f, setF] = useState<HomebrewFields>(() => initialFields(mode));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [duplicate, setDuplicate] = useState(false);
   const live = useLive();
   const set = <K extends keyof HomebrewFields>(k: K, v: HomebrewFields[K]) =>
     setF((x) => ({ ...x, [k]: v }));
+  // The strip as of the last add: several uploads can finish before a re-render.
+  const images = useRef(f.images);
+  images.current = f.images;
+  const setImages = (ids: string[]) => {
+    images.current = ids;
+    setDuplicate(false);
+    set("images", ids);
+  };
+  const attach = (id: string) => {
+    const r = attachImage(images.current, id);
+    if (r.duplicate) {
+      setDuplicate(true);
+      return;
+    }
+    setImages(r.ids);
+  };
 
   const save = async () => {
     const invalid = draftError(f);
@@ -242,13 +402,7 @@ function HomebrewForm({ api, mode, close }: { api: Api; mode: FormMode; close():
         entry: draftOf(f) as Parameters<typeof putEntry>[2]["entry"],
         shared: f.shared,
         derivedFromId: mode.kind === "clone" ? mode.base.id : null,
-        // Kept from the source until the form shows slots (FR-CMP-49, -50).
-        imageAssetIds:
-          mode.kind === "edit"
-            ? mode.entry.imageAssetIds
-            : mode.kind === "clone"
-              ? mode.base.imageAssetIds
-              : [],
+        imageAssetIds: f.images,
       });
       toast.success(`Saved ${f.name.trim()}`);
       close();
@@ -323,6 +477,16 @@ function HomebrewForm({ api, mode, close }: { api: Api; mode: FormMode; close():
             <MarkdownLite text={f.text} context={{ kind: "plain", label: f.name || "Homebrew" }} />
           )}
         </div>
+        <div className="col-span-2">
+          <ImageSlots
+            images={f.images}
+            onChange={setImages}
+            target={target}
+            busy={saving}
+            duplicate={duplicate}
+            onAdd={attach}
+          />
+        </div>
         <div className="col-span-2 flex items-center gap-2">
           <Switch
             id="cmp-form-shared"
@@ -359,10 +523,17 @@ export function HomebrewDialog({
   mode: FormMode | null;
   onClose(): void;
 }) {
+  // Paste / drop anywhere in the Dialog (name and text included) adds images (FR-CMP-50).
+  const content = useRef<HTMLDivElement>(null);
   return (
     <Dialog open={mode !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent data-testid="cmp-form" className="max-w-lg" aria-describedby={undefined}>
-        {mode && <HomebrewForm api={api} mode={mode} close={onClose} />}
+      <DialogContent
+        ref={content}
+        data-testid="cmp-form"
+        className="max-w-lg"
+        aria-describedby={undefined}
+      >
+        {mode && <HomebrewForm api={api} mode={mode} close={onClose} target={content} />}
       </DialogContent>
     </Dialog>
   );
