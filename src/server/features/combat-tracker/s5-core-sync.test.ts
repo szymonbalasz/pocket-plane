@@ -110,7 +110,8 @@ describe("sprint 5 core over WS (late-damage)", () => {
     });
     await dm.next("ack");
     for (const c of [p1, p2]) await nextEvent(c, "HitApplied");
-    expect(Object.keys(dm.store.records[HIT_RULING_TYPE] ?? {})).toHaveLength(1);
+    // The bundle's `late-hit-ruled` (R1) already holds one ruling.
+    expect(Object.keys(dm.store.records[HIT_RULING_TYPE] ?? {})).toHaveLength(2);
     for (const c of [p1, p2]) {
       expect(attackLines(c).at(-1)).toMatch(/^Mira attacks Goblin 2: .* — DM: hit\.$/);
     }
