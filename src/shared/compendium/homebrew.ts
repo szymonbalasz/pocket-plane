@@ -2,7 +2,7 @@
 // monster, and the `cmp.addToSheet` intent. zod is the source of truth.
 import { CreateEntityBody, EntityRecord } from "@shared/entities/schemas";
 import { z } from "zod";
-import { EntryDraft } from "./schemas";
+import { EntryDraft, EntryImages } from "./schemas";
 
 const Id = z.string().min(1).max(64);
 
@@ -14,6 +14,8 @@ export const PutEntryBody = z.strictObject({
   shared: z.boolean().default(false),
   /** A visible entry (Clone's base); informational, no link (FR-CMP-25). */
   derivedFromId: Id.nullable().default(null),
+  /** FR-CMP-45 / -46: slot order, first = main; each checked with `assets.require`. */
+  imageAssetIds: EntryImages.default([]),
 });
 export type PutEntryBody = z.output<typeof PutEntryBody>;
 

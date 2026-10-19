@@ -1,4 +1,4 @@
-import { fixtureAttachmentId, ingestStep } from "@server/features/assets-pipeline/fixtures";
+import { ingestStep } from "@server/features/assets-pipeline/fixtures";
 import { defineFixture, step } from "@server/features/fixtures-adapters/fixture-types";
 import { createHandout } from "@server/features/party-board/commands";
 
@@ -16,8 +16,8 @@ export const HANDOUT_ATTACHMENT = {
  * PARTY §13.1 `handout-attachment` (patch: one asset + one handout): ingests `ransom-note` as an
  * **attachment** (`listed: false`, FR-ASSET-24; outside the library and every snapshot), then
  * creates h6 "Ransom Note" (body "PARTY-ATTACH-6") with that image, **unshared**. No
- * notification. The attachment has no record change, so h6 takes its seeded id from
- * `fixtureAttachmentId` (the fixture test asserts it is the stored row's id).
+ * notification. h6 takes the attachment's id from the loader (`r.id`, which records an
+ * attachment's `AssetIngested`).
  */
 export default defineFixture({
   key: HANDOUT_ATTACHMENT.key,
@@ -27,10 +27,10 @@ export default defineFixture({
   assets: [FILE],
   steps: [
     ingestStep(FILE, { listed: false }),
-    step(createHandout, async () => ({
+    step(createHandout, (r) => ({
       title: HANDOUT_ATTACHMENT.title,
       body: HANDOUT_ATTACHMENT.body,
-      imageAssetIds: [await fixtureAttachmentId(HANDOUT_ATTACHMENT.key, FILE)],
+      imageAssetIds: [r.id(HANDOUT_ATTACHMENT.key, "asset")],
     })),
   ],
 });
