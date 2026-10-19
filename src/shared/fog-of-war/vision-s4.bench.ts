@@ -7,6 +7,7 @@
 // counted source + samples + memory) ≤ 150 ms. Run alone via `bun run bench` (not part of
 // `bun test`, BL-32). Best of N after warm-up; numbers logged for the build report.
 import { describe, expect, test } from "bun:test";
+import { best, GATE_TIMEOUT, logResults } from "../bench-kit";
 import {
   type PlayerVision,
   partyVision,
@@ -16,7 +17,7 @@ import {
   sourcePolygons,
   type VisionSource,
 } from "./vision";
-import { best, GATE_TIMEOUT, logResults, sprint4Scene } from "./vision-bench-kit";
+import { sprint4Scene } from "./vision-bench-kit";
 
 const results: Record<string, number> = {};
 

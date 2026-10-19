@@ -2,6 +2,7 @@
 // ./vision-bench-kit, the 48 KiB record gate in ./vision-sizes.test. Run alone via `bun run bench`
 // (not part of `bun test`, BL-32). Best of N after warm-up; numbers logged for the build report.
 import { describe, expect, test } from "bun:test";
+import { best, GATE_TIMEOUT, logResults } from "../bench-kit";
 import {
   playerVision,
   prepareOccluders,
@@ -9,16 +10,7 @@ import {
   sightPolygon,
   type VisionSource,
 } from "./vision";
-import {
-  best,
-  buildScene,
-  exploredCells,
-  GATE_TIMEOUT,
-  logResults,
-  samples,
-  V0_KINDS,
-  visibleCount,
-} from "./vision-bench-kit";
+import { buildScene, exploredCells, samples, V0_KINDS, visibleCount } from "./vision-bench-kit";
 
 const results: Record<string, number> = {};
 

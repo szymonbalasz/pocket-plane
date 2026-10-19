@@ -85,7 +85,7 @@ describe("import boundaries (AGENTS §9.1)", () => {
   test("each area imports only what it may", () => {
     const violations: string[] = [];
     for (const { file, area } of all) {
-      if (/\.test\.tsx?$/.test(file) && area === "server") continue; // server tests may use anything server-side
+      if (/\.(test|bench)\.tsx?$/.test(file) && area === "server") continue; // server tests may use anything server-side
       const src = readFileSync(path.join(ROOT, file), "utf8");
       for (const imp of imports(src)) {
         const t = target(file, imp.spec);

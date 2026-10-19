@@ -1,4 +1,4 @@
-// Scenes and timing for the FOG §12 vision benchmarks. The ms gates (`*.bench.ts`) run only via
+// Scenes for the FOG §12 vision benchmarks (timing: ../bench-kit). The ms gates (`*.bench.ts`) run only via
 // `bun run bench`, alone, so parallel suites can't skew them (BL-32); the size gates on the same
 // scenes stay in `bun test` (`vision-sizes.test.ts`).
 // V0 scenes: caps = the true caps: 2,000 segments all within r = 24 cells of every source, 100
@@ -35,42 +35,6 @@ function rng(seed: number) {
   };
 }
 const r2 = (v: number) => Math.round(v * 100) / 100;
-
-export const PATIENCE_MS = 15_000;
-/** Test timeout for a timed gate: the N runs plus the patience window, with room under load. */
-export const GATE_TIMEOUT = 60_000;
-
-/**
- * Fastest ms of `runs` timed calls after `warm` untimed ones. Best of N, not the median: load
- * only adds time, so the minimum is the load-tolerant cost estimate (BL-28). While the fastest
- * is still over `budget`, keep sampling, one run per 200 ms (few, spread out), for up to
- * PATIENCE_MS: a burst of load longer than the N runs then passes, a real regression still fails.
- */
-export async function best(fn: () => void, budget: number, runs = 15, warm = 3): Promise<number> {
-  for (let i = 0; i < warm; i++) fn();
-  const time = () => {
-    const t0 = performance.now();
-    fn();
-    return performance.now() - t0;
-  };
-  let min = Number.POSITIVE_INFINITY;
-  for (let i = 0; i < runs; i++) min = Math.min(min, time());
-  const deadline = performance.now() + PATIENCE_MS;
-  while (min > budget && performance.now() < deadline) {
-    await Bun.sleep(200);
-    min = Math.min(min, time());
-  }
-  return min;
-}
-
-/** Logs a benchmark's numbers for the build report. */
-export function logResults(title: string, results: Record<string, number>): void {
-  console.log(
-    `${title}:\n${Object.entries(results)
-      .map(([k, v]) => `  ${k}: ${Number.isInteger(v) ? v : v.toFixed(2)}`)
-      .join("\n")}`,
-  );
-}
 
 // ---- V0 scenes ----
 
