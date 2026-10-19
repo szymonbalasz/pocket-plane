@@ -3,8 +3,8 @@
 // origin / end handles (FR-SCN-45), the Clear templates scope (FR-SCN-44), the ephemeral sender
 // (≤ 20 sends/s while dragging, repeated every 1 s at rest, `end` on Clear / Esc / Keep;
 // FR-SCN-23), the receivers' store (dropped on `end`, on a snapshot or after 3 s of silence; one
-// per sender connection; drawn only for the shown scene) and who may edit a kept template
-// (FR-SCN-26).
+// per sender connection; drawn only for the shown scene), who may edit a kept template
+// (FR-SCN-26) and the right-click menu's hit test and items (FR-SCN-48, -49).
 import type { SignalFrom } from "@shared/protocol/frames";
 import {
   FT_PER_CELL,
@@ -15,7 +15,7 @@ import {
   type TemplateShape,
   type TemplateSignalData,
 } from "@shared/scene-tools/schemas";
-import { snapAngle, snapPoint } from "@shared/scenes-map/area";
+import { contains, snapAngle, snapPoint, templateArea } from "@shared/scenes-map/area";
 import type { Grid } from "@shared/scenes-map/geometry";
 import { DRAG_INTERVAL_MS, DRAG_REPEAT_MS, DRAG_TIMEOUT_MS } from "@shared/scenes-map/schemas";
 import { createStore, type StoreApi } from "zustand";
@@ -303,6 +303,108 @@ export function pickableTemplates<
 >(kept: readonly T[], client: "dm" | "player", myPlayerId: string | null, dmOnlyOff: boolean): T[] {
   return kept.filter(
     (t) => canEditTemplate(t, client, myPlayerId) && !(dmOnlyOff && client === "dm" && t.hidden),
+  );
+}
+
+// ---------- right-click menu (FR-SCN-48, -49) ----------
+
+/** FR-SCN-49: a press this close (screen px) to a template's outline still hits it. */
+export const TEMPLATE_HIT_PX = 6;
+
+export interface TemplateHitOptions {
+  client: "dm" | "player";
+  myPlayerId: string | null;
+  /** The DM's "DM-only items" switch is off: hidden ones are not drawn, so not hit. */
+  dmOnlyOff: boolean;
+  /** The DM's Layers switch "Templates" is off (FR-SCN-05): nothing hits. */
+  templatesOff: boolean;
+  /** FR-FOG-36: a blind player hits only their own kept templates. */
+  blind: boolean;
+  /** Camera scale (screen px per map px), for the 6 px tolerance. */
+  scale: number;
+  grid: Grid;
+}
+
+/** Distance (map px) from (x, y) to an outline's edge. */
+function outlineDistance(o: TemplateOutline, x: number, y: number): number {
+  if (o.kind === "circle") return Math.abs(Math.hypot(x - o.x, y - o.y) - o.r);
+  let best = Number.POSITIVE_INFINITY;
+  const n = o.points.length >> 1;
+  for (let i = 0; i < n; i++) {
+    const ax = o.points[2 * i] as number;
+    const ay = o.points[2 * i + 1] as number;
+    const bx = o.points[2 * ((i + 1) % n)] as number;
+    const by = o.points[2 * ((i + 1) % n) + 1] as number;
+    const len2 = (bx - ax) ** 2 + (by - ay) ** 2;
+    const k = len2 === 0 ? 0 : clamp(((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / len2, 0, 1);
+    best = Math.min(best, Math.hypot(x - (ax + k * (bx - ax)), y - (ay + k * (by - ay))));
+  }
+  return best;
+}
+
+/**
+ * FR-SCN-49: the topmost (last in draw order) kept template this client may edit (FR-SCN-26) whose
+ * true outline (FR-SCN-42's `templateArea`, uncut: off the map's edge still hits) contains map
+ * point `p` (map px) or lies within 6 screen px of it; else null. Hidden ones only for the DM
+ * with DM-only items on; nothing while the Templates switch is off; a blind player only their own.
+ */
+export function templateAt<
+  T extends TemplateGeometry & Pick<TemplateRecordView, "placedByPlayerId" | "hidden">,
+>(p: GridPoint, templates: readonly T[], o: TemplateHitOptions): T | null {
+  if (o.templatesOff) return null;
+  const g = gridPoint(o.grid, p.x, p.y);
+  const tol = TEMPLATE_HIT_PX / o.scale;
+  for (let i = templates.length - 1; i >= 0; i--) {
+    const t = templates[i] as T;
+    if (!canEditTemplate(t, o.client, o.myPlayerId)) continue;
+    if (t.hidden && (o.client !== "dm" || o.dmOnlyOff)) continue;
+    if (o.blind && (o.myPlayerId === null || t.placedByPlayerId !== o.myPlayerId)) continue;
+    if (contains(templateArea(t), g.x, g.y)) return t;
+    if (outlineDistance(templateOutline(t, o.grid), p.x, p.y) <= tol) return t;
+  }
+  return null;
+}
+
+export type TemplateMenuItem = "delete" | "edit" | "hide";
+
+export interface TemplateMenuEntry {
+  item: TemplateMenuItem;
+  label: string;
+  disabled: boolean;
+}
+
+/**
+ * FR-SCN-48 / -50: the menu's items for a template this client may edit: Delete, Edit…, and for
+ * the DM Hide (Reveal when hidden). Disabled while not live; none for a template it may not edit.
+ */
+export function templateMenuItems(
+  t: Pick<TemplateRecordView, "placedByPlayerId" | "hidden">,
+  client: "dm" | "player",
+  myPlayerId: string | null,
+  live: boolean,
+): TemplateMenuEntry[] {
+  if (!canEditTemplate(t, client, myPlayerId)) return [];
+  const disabled = !live;
+  const out: TemplateMenuEntry[] = [
+    { item: "delete", label: "Delete", disabled },
+    { item: "edit", label: "Edit…", disabled },
+  ];
+  if (client === "dm") out.push({ item: "hide", label: t.hidden ? "Reveal" : "Hide", disabled });
+  return out;
+}
+
+/**
+ * FR-SCN-50: an open menu stays only while its template is one this client may edit on the shown
+ * scene (`editable`); deleted, cleared, hidden for this player, a scene switch or a snapshot that
+ * drops it close it.
+ */
+export function templateMenuStays(
+  open: { templateId: string; sceneId: string } | null,
+  editable: readonly { id: string }[],
+  shownSceneId: string | null,
+): boolean {
+  return (
+    open !== null && open.sceneId === shownSceneId && editable.some((t) => t.id === open.templateId)
   );
 }
 
