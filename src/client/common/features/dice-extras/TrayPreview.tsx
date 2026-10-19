@@ -197,6 +197,7 @@ export function TrayPreview({
   const { display } = useDiceSettings();
   const chunk = useChunk3d();
   const [failed, setFailed] = useState(false);
+  const [waited, setWaited] = useState(false);
   const render = trayPreviewMode(display, chunk, failed);
   useEffect(() => trayWantsChunk(display, dice3d), [display]);
 
@@ -217,7 +218,12 @@ export function TrayPreview({
     const c = canvas.current;
     if (render !== "3d" || !mod || !el || !c) return;
     const layer = diceLayerHost.current;
-    if (!layer) return setFailed(true);
+    if (!layer) {
+      // The dice layer mounting in this same commit (display just turned 3D): look once more.
+      if (waited) return setFailed(true);
+      const t = setTimeout(() => setWaited(true), 0);
+      return () => clearTimeout(t);
+    }
     const paint = () => {
       try {
         mod.drawTrayStills(layer, c, cellsOf(el, c), look);
@@ -242,7 +248,7 @@ export function TrayPreview({
       ro?.disconnect();
       mod.cancelTrayStills(c);
     };
-  }, [render, drawKey]);
+  }, [render, drawKey, waited]);
 
   return (
     <div
