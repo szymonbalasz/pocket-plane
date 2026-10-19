@@ -73,6 +73,7 @@ import {
   type MenuPoint,
   stageLayers,
 } from "./layers";
+import { selfOf } from "./mark-colors";
 import { createMiddlePan, type MiddlePan } from "./middle-pan";
 import {
   clearOverlay,
@@ -84,7 +85,7 @@ import {
   signalForShownScene,
   startMove,
 } from "./overlay";
-import { addPing, addTrailPoints, createPointerStore, senderKey } from "./pointers";
+import { addPing, addTrailPoints, createPointerStore, SELF_KEY, senderKey } from "./pointers";
 import { deferredMove, rightPress } from "./right-press";
 import { isClick, tokensInBox } from "./selection-logic";
 import { useCanvasColors } from "./theme";
@@ -179,6 +180,8 @@ if (typeof window !== "undefined") {
 
 export function MapCanvas(props: MapCanvasProps) {
   const { client, scene, tokens, myPlayerId, signalsOn } = props;
+  /** This client's person: own pings and laser draw in the own colour (FR-MAP-68, -69). */
+  const self = useMemo(() => selfOf(client, myPlayerId), [client, myPlayerId]);
   const syncStore = useContext(SyncContext);
   const box = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -576,12 +579,12 @@ export function MapCanvas(props: MapCanvasProps) {
   };
   useSignal(MAP_SIGNALS.ping, (s) => {
     const d = signalsFor(s.data, PingData);
-    if (d && !blindRef.current) addPing(pointers, d.x, d.y, s.from.role, performance.now());
+    if (d && !blindRef.current) addPing(pointers, d.x, d.y, s.from, performance.now());
   });
   useSignal(MAP_SIGNALS.pull, (s) => {
     const d = signalsFor(s.data, PingData);
     if (!d) return;
-    if (!blindRef.current) addPing(pointers, d.x, d.y, s.from.role, performance.now());
+    if (!blindRef.current) addPing(pointers, d.x, d.y, s.from, performance.now());
     // Forced recentre, zoom unchanged; players may pan away (OQ-MAP-08).
     if (client !== "player") return;
     setCam((c) => centreOn(c, d, size));
@@ -593,7 +596,7 @@ export function MapCanvas(props: MapCanvasProps) {
     addTrailPoints(
       pointers,
       senderKey(s.from),
-      s.from.role,
+      s.from,
       d.data.points,
       d.data.end ?? false,
       performance.now(),
@@ -676,7 +679,7 @@ export function MapCanvas(props: MapCanvasProps) {
       if (laser.current) {
         laser.current.end();
         laser.current = null;
-        addTrailPoints(pointers, "self", client, [], true, performance.now());
+        addTrailPoints(pointers, SELF_KEY, self, [], true, performance.now());
       }
       // FR-MAP-71 (4): a release < 4 px from a deferred right press opens the layer's menu.
       const right = rightRef.current;
@@ -690,7 +693,7 @@ export function MapCanvas(props: MapCanvasProps) {
         right.menu.open(right.p, { x: e.clientX, y: e.clientY }, right.ctx);
       }
     },
-    [pointers, client, onBoxSelect, onEmptyClick, endBox, trackBox],
+    [pointers, client, self, onBoxSelect, onEmptyClick, endBox, trackBox],
   );
   useEffect(() => {
     window.addEventListener("pointerup", endGestures);
@@ -861,7 +864,7 @@ export function MapCanvas(props: MapCanvasProps) {
       const data = { sceneId: scene.id, x: p.x, y: p.y };
       const pull = client === "dm" && e.evt.shiftKey;
       sendSignal(pull ? MAP_SIGNALS.pull : MAP_SIGNALS.ping, data);
-      addPing(pointers, p.x, p.y, client, performance.now());
+      addPing(pointers, p.x, p.y, self, performance.now(), true);
     } else {
       press.current = { x: e.evt.clientX, y: e.evt.clientY, onToken };
       if (!onToken && onBoxSelect && (e.evt.ctrlKey || e.evt.shiftKey)) {
@@ -879,7 +882,7 @@ export function MapCanvas(props: MapCanvasProps) {
     laser.current = sender;
     for (const q of points) sender.push(q.x, q.y);
     const trail = points.map((q): [number, number] => [q.x, q.y]);
-    addTrailPoints(pointers, "self", client, trail, false, performance.now());
+    addTrailPoints(pointers, SELF_KEY, self, trail, false, performance.now());
   };
 
   const onMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -910,7 +913,7 @@ export function MapCanvas(props: MapCanvasProps) {
     }
     if (laser.current) {
       laser.current.push(p.x, p.y);
-      addTrailPoints(pointers, "self", client, [[p.x, p.y]], false, performance.now());
+      addTrailPoints(pointers, SELF_KEY, self, [[p.x, p.y]], false, performance.now());
     }
   };
 
