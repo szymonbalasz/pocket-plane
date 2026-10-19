@@ -11,5 +11,7 @@ export default defineBundle({
   fixtures: [
     // R1: Mira's Light crossbow ruled a hit on Goblin 2, waiting for damage
     "late-hit-ruled",
+    // R3: this turn's moves (Mira ×2, Thorn ×1, Goblin ×1), stored on the tokens as trails
+    "trail-moves",
   ],
 });

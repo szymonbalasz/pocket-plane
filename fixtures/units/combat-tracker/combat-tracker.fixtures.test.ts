@@ -133,7 +133,7 @@ describe("CBT §13.1 late-damage fixtures (sprint 5)", () => {
 
   test("CBT §13.1 late-hit-ruled: player-1's Light crossbow card, ruled a hit on Goblin 2, waiting for damage", async () => {
     const r = await ruled("late-damage");
-    expect(r.manifest.fixtures.at(-1)).toBe("late-hit-ruled");
+    expect(r.manifest.fixtures).toContain("late-hit-ruled");
     const card = r.cards.find(
       (c) => c.id === r.manifest.records["late-hit-ruled"]?.notification?.[0],
     );

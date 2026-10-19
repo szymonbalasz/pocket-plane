@@ -128,7 +128,8 @@ describe("sprint 5 core over WS (late-damage)", () => {
     }
     expect(byName(dm, "Goblin 2")).toMatchObject({ side: "enemy", publicSide: "ally" });
 
-    // FR-CBT-97 / FR-MAP-66: the Goblin (DM) and Mira (player-1) move; trails ride the tokens.
+    // FR-CBT-97 / FR-MAP-66: the Goblin (DM) and Mira (player-1) move; trails ride the tokens
+    // (appended to the bundle's `trail-moves`: Goblin 12,6 → 10,6; Mira 2,7 → 4,7 → 5,6).
     dm.intent("map.moveToken", { tokenId: goblin.tokenId, col: 11, row: 6 });
     await dm.next("ack");
     p1.intent("map.moveToken", { tokenId: mira.tokenId, col: 3, row: 7 });
@@ -138,10 +139,11 @@ describe("sprint 5 core over WS (late-damage)", () => {
     for (const c of [dm, p1, p2]) await barrier(c);
     expect(trails(dm)[goblin.tokenId as string]).toEqual([
       [12, 6],
+      [10, 6],
       [11, 6],
     ]);
     for (const c of [dm, p1, p2]) {
-      expect(trails(c)[mira.tokenId as string]).toHaveLength(3);
+      expect(trails(c)[mira.tokenId as string]).toHaveLength(5);
     }
 
     // Leak scan of every player frame since the start (CBT §13.1 leak strings).
