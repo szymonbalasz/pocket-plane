@@ -1,7 +1,7 @@
 // Tool rail content (MAP §7): Select, Ruler, Ping, then the canvas tool registry's tools for this
 // client (FR-SCN-06; off while not live, FR-SCN-34) and Fit (FR-MAP-45); DM extras as children.
-// The active registry tool's panel (or a base tool's, `basePanels`) shows beside the rail, below
-// shell windows (`ToolPanel`).
+// The active registry tool's panel (or a base tool's, `basePanels`) shows at its home spot beside
+// the rail, below shell windows, and pushes windows off it (`ToolPanel`, FR-MAP-60).
 import { MousePointer2Icon, RadarIcon, RulerIcon, ScanIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -9,8 +9,20 @@ import { Button } from "../../components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "../../components/ui/menus";
 import { Tooltip } from "../../components/ui/overlays";
 import { ToggleTip } from "../../components/ui/toggle-tip";
+import { cn } from "../../lib/utils";
+import type { Rect } from "../play-shell/geometry";
+import { reportKeepOut } from "../play-shell/keep-outs";
+import { usePushWindows } from "../play-shell/ShellContext";
 import { canvasTools } from "./canvas-tools";
 import { useLive } from "./intents";
+import {
+  BAR_GROUP_ATTR,
+  barRect,
+  barRows,
+  TOOL_BAR_KEEP_OUT,
+  toolBarMaxWidth,
+  toolBarSpot,
+} from "./tool-bar-spot";
 import { type MapTool, useMapFit, useMapTool } from "./tool-store";
 import { activeTool, type BaseTool, toolsFor } from "./tools";
 
@@ -40,10 +52,16 @@ export function panelSpot(
   return { top: rail.top - host.top, left: rail.right - host.left + 8 };
 }
 
+const sameRect = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+
 /**
- * The active tool's panel. The rail lives in the chrome (z-20), so a panel inside it would cover
- * shell windows; it is portalled into the play page at `TOOL_PANEL_Z`, placed beside the rail.
- * Outside a play page (no host) it renders inline.
+ * The active tool's panel at its home spot (FR-MAP-60): beside the rail, max width per
+ * `toolBarMaxWidth` (wider content wraps by control group, FR-FOG-58). The rail lives in the
+ * chrome (z-20), so a panel inside it would cover shell windows; it is portalled into the play
+ * page at `TOOL_PANEL_Z`. While shown it reports its rect as keep-out `map.toolbar` (FR-SHELL-48)
+ * and, when it appears or changes size (tool change, viewport resize, its own content), pushes
+ * windows off it (FR-SHELL-55); never on window changes. Outside a play page (no host) it renders
+ * inline.
  */
 function ToolPanel({
   rail,
@@ -56,6 +74,12 @@ function ToolPanel({
 }) {
   const [host, setHost] = useState<HTMLElement | null>(null);
   const [spot, setSpot] = useState<{ top: number; left: number } | null>(null);
+  const [maxW, setMaxW] = useState<number | undefined>(undefined);
+  const [rows, setRows] = useState(1);
+  const client = useMapTool((s) => s.client);
+  const { push, layoutKey } = usePushWindows();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const lastPush = useRef<{ trigger: string; rect: Rect } | null>(null);
   useLayoutEffect(() => {
     const el = rail.current;
     const page = el?.closest<HTMLElement>('[data-testid="ui-play-page"]') ?? null;
@@ -65,6 +89,8 @@ function ToolPanel({
       const r = el.getBoundingClientRect();
       const h = page.getBoundingClientRect();
       setSpot(panelSpot(r, h));
+      const vp = { w: window.innerWidth, h: window.innerHeight };
+      setMaxW(client ? toolBarMaxWidth(client, toolBarSpot(r), vp) : undefined);
     };
     place();
     const ro = new ResizeObserver(place);
@@ -74,13 +100,49 @@ function ToolPanel({
       ro.disconnect();
       window.removeEventListener("resize", place);
     };
-  }, [rail]);
+  }, [rail, client]);
+  // Measure after layout: rows, keep-out, push when the rect changed. A new tool (`id`) or a
+  // layout applied after a reload with the tool active (`layoutKey`) pushes again.
+  useLayoutEffect(() => {
+    const el = panelRef.current;
+    if (!el || !host || !spot) return;
+    const trigger = `${id}|${layoutKey}`;
+    const measure = () => {
+      const groups = [...el.querySelectorAll<HTMLElement>(`[${BAR_GROUP_ATTR}]`)];
+      let prevTop: number | null = null;
+      for (const g of groups) {
+        const top = g.getBoundingClientRect().top;
+        g.toggleAttribute("data-row-start", prevTop === null || Math.abs(top - prevTop) > 2);
+        prevTop = top;
+      }
+      setRows(barRows(groups.map((g) => g.getBoundingClientRect().top)));
+      const b = el.getBoundingClientRect();
+      const rect = barRect([{ x: b.x, y: b.y, w: b.width, h: b.height }]);
+      if (!rect || rect.w === 0 || rect.h === 0) return;
+      reportKeepOut(TOOL_BAR_KEEP_OUT, rect);
+      const last = lastPush.current;
+      if (last?.trigger === trigger && sameRect(last.rect, rect)) return;
+      lastPush.current = { trigger, rect };
+      push(rect);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [host, spot, id, layoutKey, push]);
+  useEffect(() => () => reportKeepOut(TOOL_BAR_KEEP_OUT, null), []);
   const panel = (inline: boolean) => (
     <div
+      ref={panelRef}
       data-testid="map-tool-panel"
       data-tool={id}
-      className={inline ? "absolute top-0 left-full ml-2" : "absolute"}
-      style={inline ? undefined : { ...spot, zIndex: TOOL_PANEL_Z }}
+      data-spot={inline ? undefined : "home"}
+      data-rows={inline ? undefined : rows}
+      className={cn(
+        "pointer-events-none flex flex-col items-start gap-1 *:pointer-events-auto",
+        inline ? "absolute top-0 left-full ml-2" : "absolute",
+      )}
+      style={inline ? undefined : { ...spot, maxWidth: maxW, zIndex: TOOL_PANEL_Z }}
     >
       {children}
     </div>
