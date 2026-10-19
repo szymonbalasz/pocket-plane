@@ -2,11 +2,10 @@
 // never copied into the asset dir.
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { seededContext } from "../../commands/context";
 import { WORKTREE_ROOT } from "../../config";
 import type { SetupStep } from "../fixtures-adapters/fixture-types";
 import { ASSETS_ROOT } from "../fixtures-adapters/loader";
-import { INGEST, seededAssetId } from "./commands";
+import { INGEST } from "./commands";
 import { type ProcessedImage, processImage } from "./image";
 
 /**
@@ -50,23 +49,4 @@ export function ingestStep(file: string, opts: string | IngestStepOptions = {}):
       ...(listed !== undefined ? { listed } : {}),
     }),
   };
-}
-
-/**
- * The seeded ID of the attachment that fixture `fixtureKey` ingests from `file` with its
- * `draw`-th token (0 = its first ingest). An attachment's `AssetIngested` carries no record
- * change (FR-ASSET-24), so the loader's `r.id(key, "asset")` never sees it; a later step of the
- * same fixture computes it here instead (the loader's per-fixture seeded context, same formula as
- * `assets.ingest`). Pure: draws from a fresh seeded context, writes nothing. The fixture tests
- * assert it equals the stored row's ID.
- */
-export async function fixtureAttachmentId(
-  fixtureKey: string,
-  file: string,
-  draw = 0,
-): Promise<string> {
-  const tokens = seededContext({ disposable: true, key: fixtureKey }).tokens;
-  let token = tokens.next();
-  for (let i = 0; i < draw; i++) token = tokens.next();
-  return seededAssetId(token, (await processFixtureImage(file)).sourceHash);
 }

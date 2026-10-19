@@ -1,6 +1,7 @@
 // CON-44 snapshot ceilings + live-sync §12 build time (#163): session-sim and a "realistic
 // heavy" session built through commands. DM ≤ 768 KiB, players ≤ 512 KiB, DM build < 200 ms.
-// Worst-case rows per core (seams S14): PARTY S5 adds an open `handout-present` for every player.
+// Worst-case rows per core (seams S14): PARTY S5 adds an open `handout-present` for every player;
+// CMP S5 (track C) 20 homebrew entries × 4 attachment images (0 B).
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
 import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
@@ -20,6 +21,10 @@ import {
   SCENE_STRUCTURE_TYPE,
 } from "@shared/scene-tools/schemas";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
+import { INGEST, type IngestResult } from "../features/assets-pipeline/commands";
+import { processImage } from "../features/assets-pipeline/image";
+import { testPng } from "../features/assets-pipeline/testing";
+import { PUT_ENTRY } from "../features/compendium/homebrew";
 import { writeWorstPresents } from "../features/party-board/testing";
 import { SNAPSHOT_CEILING } from "./hub";
 import {
@@ -284,6 +289,57 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect(b.s.records.get("game-log-entry")?.snapshot(src, v)).toHaveLength(GAME_LOG_WINDOW);
       expect(dmBuildMs(b.s)).toBeLessThan(Math.max(BUILD_MS, before * 2));
     });
+
+    // Adds compendium rows and attachments only (no record type): every snapshot byte-identical.
+    test("FR-CMP-53 CON-44 entry images 0 B: 20 homebrew entries × 4 attachment images (half shared) → every viewer +0 B; ceilings hold", async () => {
+      const cid = b.s.db.$client
+        .query<{ id: string }, []>("SELECT id FROM campaign WHERE active = 1")
+        .get()?.id as string;
+      const actor = { role: "dm" as const, playerId: null, campaignId: cid };
+      const before = snapshotSizes(b.s);
+      const text = "A lantern of blackened silver that sheds moonlight. "
+        .repeat(20)
+        .slice(0, 1_040);
+      for (let e = 0; e < 20; e++) {
+        const imageAssetIds: string[] = [];
+        for (let i = 0; i < 4; i++) {
+          const image = await processImage(await testPng(1_000 + e * 4 + i));
+          const r = b.s.commands.run(
+            INGEST,
+            { image, filename: `${"entry-image-".repeat(6)}${e}-${i}.png`, listed: false },
+            { actor },
+          ) as IngestResult;
+          imageAssetIds.push(r.asset.id);
+        }
+        b.s.commands.run(
+          PUT_ENTRY,
+          {
+            entry: {
+              kind: "item",
+              name: `CON-44 Item ${e}`,
+              facets: { category: "magic", rarity: "rare", attunement: false },
+              body: { typeLine: "Wondrous item", text },
+            },
+            shared: e % 2 === 0,
+            imageAssetIds,
+          },
+          { actor },
+        );
+      }
+      const rows = b.s.db.$client
+        .query<{ n: number }, []>(
+          "SELECT count(*) AS n FROM compendium_entry WHERE json_array_length(image_asset_ids) = 4",
+        )
+        .get();
+      expect(rows?.n).toBe(20);
+      const after = snapshotSizes(b.s);
+      expect(after.map((v) => [v.label, v.bytes])).toEqual(before.map((v) => [v.label, v.bytes]));
+      expectUnderCeilings(after);
+      const [dm, ...players] = after as [ViewerSize, ...ViewerSize[]];
+      console.log(
+        `CMP S5 entry images: 20 entries × 4 attachments, every viewer +0 B; heavy DM ${dm.bytes} B (${SNAPSHOT_CEILING.dm - dm.bytes} B left of 1.5 MiB); players max ${Math.max(...players.map((p) => p.bytes))} B`,
+      );
+    }, 60_000);
 
     // Mutates the scenario, then restores it: after the read-only cases.
     test("CBT §12 sprint 5 (track R) worst case: 20 rulings × 20 targets, 3 unused rolls per card, 60 trails at the cap, side + publicSide everywhere; ceilings hold", () => {
