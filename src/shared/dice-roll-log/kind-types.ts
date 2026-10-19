@@ -26,6 +26,8 @@ export interface LineSegment {
   style?: "actor" | "total" | "dropped" | "badge" | "muted";
   /** One die per segment (seams S8); DM-only exactly when its text is (FR-DICE-28). */
   die?: LineDie;
+  /** A number from dice that is not a die (a rolled part's sum): "…" on a held line (FR-DICE-40). */
+  numeric?: true;
 }
 
 export interface LineInput<P, D> {

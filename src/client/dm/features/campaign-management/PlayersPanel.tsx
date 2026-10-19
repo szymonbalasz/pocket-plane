@@ -1,5 +1,6 @@
 // Players panel: name, online dot, copy link, rename; add player (CAMP §7, FR-CAMP-12–15).
 // Under each player, their characters at a glance; a line opens the sheet (FR-CAMP-21/22, N3).
+// Colour swatches: the DM's own above the table, one per player row (FR-CAMP-27, sprint 5).
 import {
   isLoopbackUrl,
   PlayerName,
@@ -21,6 +22,7 @@ import {
   TableCell,
   TableRow,
 } from "@ui/components/ui/primitives";
+import { ColorPopover } from "@ui/features/campaign-management/ColorPopover";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { cn } from "@ui/lib/utils";
 import { onlineDot } from "@ui/sync/presence";
@@ -187,8 +189,13 @@ export function PlayersPanel() {
     // The `camp.players` window body (its title says "Players"). Rows scroll; the add-player
     // row and the link base / loopback warning are a pinned footer, so all of it shows at the
     // window's default size with two players (CAMP §7).
-    <section data-testid="camp-players-panel" className="flex h-full min-h-fit flex-col gap-2">
+    <section data-testid="camp-players-panel" className="flex h-full min-h-fit flex-col gap-1">
       <div className="min-h-9 flex-1 overflow-y-auto">
+        {/* One 16 px line: two players' rows still fit the default window unscrolled. */}
+        <div className="flex h-4 items-center gap-1.5 px-1 text-xs">
+          Your colour (DM)
+          <ColorPopover target={null} testId="camp-color-dm" size={16} tip="Your colour (DM)" />
+        </div>
         {players.length === 0 ? (
           <p className="text-sm text-muted-foreground" data-testid="camp-players-empty">
             Add a player to get a link.
@@ -203,6 +210,15 @@ export function PlayersPanel() {
                 return (
                   <Fragment key={p.id}>
                     <TableRow data-testid="camp-player-row" data-record-id={p.id}>
+                      <TableCell className="w-0 py-1 pr-0 pl-1">
+                        <ColorPopover
+                          target={p.id}
+                          testId="camp-player-color"
+                          recordId={p.id}
+                          size={16}
+                          tip={`${p.name}'s colour`}
+                        />
+                      </TableCell>
                       {/* Name takes the free width, one line; long names truncate. */}
                       <TableCell
                         data-testid="camp-player-name"
@@ -274,7 +290,7 @@ export function PlayersPanel() {
                       </TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell colSpan={3} className="px-1 pt-0 pb-1 pl-3">
+                      <TableCell colSpan={4} className="px-1 pt-0 pb-1 pl-3">
                         {own.length === 0 ? (
                           <span
                             data-testid="camp-player-nochar"
@@ -294,7 +310,7 @@ export function PlayersPanel() {
           </Table>
         )}
       </div>
-      <div className="flex shrink-0 flex-col gap-2">
+      <div className="flex shrink-0 flex-col gap-1.5">
         <form className="flex gap-2" onSubmit={add}>
           <Input
             data-testid="camp-player-add-name"

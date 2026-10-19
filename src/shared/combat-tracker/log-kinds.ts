@@ -262,6 +262,26 @@ export function publicRuling(natural: number | null, hit: boolean): boolean {
 const withDieLabel = (s: LineSegment, label: string): LineSegment =>
   s.die ? { ...s, die: { ...s.die, label } } : s;
 
+const muted = (s: LineSegment): LineSegment =>
+  s.style === "dropped" ? s : { ...s, style: "muted" };
+const close: LineSegment = { text: ")", style: "muted" };
+
+/**
+ * FR-CBT-96 (BL-27): the base part's DM-only run, its roll-hook parts (already in its total)
+ * inside it after the dice: " (2d6+5: 4 + 3 + 5, incl. + 2 Rage)"; no dice → " (incl. + 2
+ * Rage)". Text outside the muted runs then sums to the line's damage.
+ */
+function includedRun(
+  roll: AttackLogRolls["damage"],
+  mods: readonly RollModPart[] | undefined,
+): LineSegment[] {
+  const run = roll ? rollBreakdownSegments(roll) : [];
+  if (!mods?.length) return run;
+  const incl = modSegments(mods).map(muted);
+  if (run.length === 0) return [{ text: " (incl.", style: "muted" }, ...incl, close];
+  return [...run.slice(0, -1), { text: ", incl.", style: "muted" }, ...incl, close];
+}
+
 /**
  * "6 slashing damage (half)", then the DM's "(DM set; rolled 4)" / dice breakdown; rule-trigger
  * parts after it (FR-MOD-48, R7): "14 slashing damage + 6 radiant (Divine Fury)" (`damage` =
@@ -284,8 +304,7 @@ function damageSegments(
     const rolled = dm.damageRolled === null ? "" : `; rolled ${dm.damageRolled}`;
     baseDm.push({ text: ` (DM set${rolled})`, style: "muted" });
   }
-  if (dm?.rolls?.damage) baseDm.push(...rollBreakdownSegments(dm.rolls.damage));
-  if (dm?.mods?.damage) baseDm.push(...modSegments(dm.mods.damage));
+  baseDm.push(...includedRun(dm?.rolls?.damage, dm?.mods?.damage));
   const out: LineSegment[] = [];
   if (extra.length === 0) {
     out.push({ text: `${weapon}${type} damage${MULT_TEXT[p.multiplier]}${suffix}` }, ...baseDm);
@@ -310,7 +329,8 @@ function damageSegments(
  * not (a ruling against a non-natural roll stays DM-only, #178 G8); the DM's line keeps its own.
  */
 function outcomeText(hit: boolean, crit: boolean, ruled: boolean, dmView: boolean): string {
-  if (ruled) return hit ? " — DM ruled hit " : " — DM ruled miss";
+  // FR-CBT-95 (BL-24): the ruling ends with a full stop before the damage, as "— DM: hit." does.
+  if (ruled) return hit ? " — DM ruled hit. " : " — DM ruled miss";
   if (dmView) return hit ? (crit ? " — critical hit! " : " — hit! ") : " — miss";
   return hit ? (crit ? " — DM: critical hit! " : " — DM: hit. ") : " — DM: miss";
 }
@@ -323,8 +343,8 @@ function outcomeText(hit: boolean, crit: boolean, ruled: boolean, dmView: boolea
  * (FR-CBT-73): "Mira → Goblin: 6 piercing damage (Light crossbow)"; a to-hit-only card applied as
  * a miss reads as any miss. DM only (FR-CBT-53 b, c; FR-DICE-28: built from `dmPayload` alone):
  * "(DM set; rolled 13)" after an edited total, kept / dropped d20s and the damage dice in a muted
- * run, "vs AC 15", and "— DM ruled hit" / "— DM ruled miss" when the DM overrode the hit of any
- * other roll. Players (FR-CBT-85, BL-10) read "— DM: hit." / "— DM: miss" / "— DM: critical hit!"
+ * run, "vs AC 15", and "— DM ruled hit." / "— DM ruled miss" when the DM overrode the hit of any
+ * other roll (FR-CBT-95: "— DM ruled hit. 10 slashing damage"). Players (FR-CBT-85, BL-10) read "— DM: hit." / "— DM: miss" / "— DM: critical hit!"
  * in place of the DM's "— hit!" / "— miss" / "— critical hit!".
  */
 export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof AttackLogDmPayload>>({

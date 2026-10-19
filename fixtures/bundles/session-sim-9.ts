@@ -18,6 +18,7 @@ export default defineBundle({
     "late-hit-ruled",
     // R4: planned "Escort to the Ford", Goblin ×2 + 1 friendly (the Friendly switch, A3)
     "enc-friendly",
+    // R2: no new unit (L12–L14 walk on rules-effects' Brakka, Thorn and Fire Ward)
     // P: Loot tab, handouts, uploads + paste, Add to party
     // P0: h6 "Ransom Note" with an attachment (unshared); h2 presented to player-1 (S5-1)
     "handout-attachment",
