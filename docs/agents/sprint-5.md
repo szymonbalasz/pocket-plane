@@ -59,6 +59,7 @@ DM notes in brackets ([#250](../decisions-log.md)). "sim-8" = the [session-sim-8
 | 2026-10-19 | Merged: **combat trails** the same on every screen after a reload [#279](../decisions-log.md) |
 | 2026-10-19 | Merged: **tool bars never hidden** — opening AoE / fog / structure / props pushes a covering window aside (e.g. the players' Initiative); the Game log follows a live window resize [#280](../decisions-log.md) |
 | 2026-10-19 | Merged: **roll-button hints** ("Alt: adjust in tray" everywhere; Alt+click on the log's roll bar stages) and damage types in the physical dice form [#281](../decisions-log.md) |
+| 2026-10-19 | Merged: **player colours on the map** — pointers, pings, templates ("by ‹name›"), drag paths and trails in each player's colour [#282](../decisions-log.md) |
 
 ## Check `main` any time (DM)
 
