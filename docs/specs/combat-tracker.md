@@ -1,9 +1,9 @@
 ---
 title: Combat tracker
 prefix: CBT
-status: complete
-owner: spec-combat
-phase: post-mvp-5
+status: claimed
+owner: spec-windows
+phase: post-mvp-6
 wave: 3
 ---
 

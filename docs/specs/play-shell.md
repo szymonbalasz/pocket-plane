@@ -1,9 +1,9 @@
 ---
 title: Play shell
 prefix: SHELL
-status: complete
+status: claimed
 owner: spec-windows
-phase: post-mvp-5
+phase: post-mvp-6
 ---
 
 # Play shell
