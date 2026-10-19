@@ -877,7 +877,7 @@ Built by `build/party-loot` from [party-loot](../specs/party-loot.md) (LOOT, #14
 | `LootEdited` | `loot.edit` | `{entryId, before {text, cp…pp}, after {text, cp…pp}}` | `loot-entry`; `party-pot` iff its value changed |
 | `CoinMoved` | `loot.move` | `{entryId, from, to, text, cp…pp}` | `loot-entry` (before null); `party-pot` iff an end is `party`; `wallet` per character end (before null on its first move) |
 
-**Window** `loot.log` "Party loot" *(S5: **retired**, window type and launcher entry removed from both registries; the same body is the Party window's Loot tab, [FR-LOOT-21](../specs/party-loot.md#6-functional-requirements), [§90](#90-sprint-5-loot-tab-p3))*: both clients, closed by default, `center` 440×560, min 320×320; launcher "Loot" (coins icon, order 60). Body: pot strip, wallets, DM add form, Move form, log newest first ([FR-LOOT-15](../specs/party-loot.md#6-functional-requirements)).
+**Window** `loot.log` "Party loot" *(S5: **retired**, window type and launcher entry removed from both registries; the same body is the Party window's Loot tab, [FR-LOOT-21](../specs/party-loot.md#6-functional-requirements), [§91](#91-sprint-5-loot-tab-p3))*: both clients, closed by default, `center` 440×560, min 320×320; launcher "Loot" (coins icon, order 60). Body: pot strip, wallets, DM add form, Move form, log newest first ([FR-LOOT-15](../specs/party-loot.md#6-functional-requirements)).
 
 **Snapshot budget:** ≤ 100 × 471 B (measured, 200-char text, #163) + pot + ≤ 10 wallets ≈ 50 KB worst, same for DM and players (LOOT §12, CON-44).
 
@@ -2292,7 +2292,24 @@ From [play-shell](../specs/play-shell.md) FR-SHELL-45–54, [dice-roll-log](../s
 | `note.history` | Placement only: 480 high where a clear slot allows, else the tallest clear slot (412 at 1280×720; player 472 at 1440×900 above the 280-high log); never over the Game log | FR-NOTE-31 |
 | Placement tokens (`ShellContext`) | `tokenScreenBoxes("all")` boxes carry the token `id`; `pc` from this client's token records (`ownerPlayerId`) | FR-SHELL-45 (2) |
 
-## 90. Sprint 5: Loot tab (P3)
+## 90. Sprint 5: dice landing (D8)
+
+From [dice-extras](../specs/dice-extras.md) FR-DICEX-49, -50 and [dice-roll-log](../specs/dice-roll-log.md) FR-DICE-40 ([ADR-0051](../architecture/adr/0051-dice-landing-line.md); DM gate #256: OQ-DICEX-38 A, OQ-DICE-30 A). **Built by `build/dice-landing`**: no record type, intent, event, signal or wire field; the server never waits ([ADR-0001](../architecture/adr/0001-tech-stack.md), ADR-0044). Data side: [data model §70](../data-model/README.md#70-sprint-5-dice-landing-d8).
+
+| Piece | Contract |
+|---|---|
+| Holding (`dice-extras/landing.ts`, initial chunk) | Client memory `holding: Map<entryId, deadline>`. Filled **only** by the runtime's live-frame handler (`ThrowLayer.tsx`, after the popup and the throw exist): the frame's new `roll` entries (FR-DICEX-11 source), none with display `off` or a hidden tab, never a manual-only entry (every payload item `manual`). Snapshots, resyncs, reconnects, undo upserts and rows below the window floor never add one. Deadline = arrival + 6 s (`LANDING_MAX_MS` = `POPUP_ROLLING_MAX_MS`) |
+| Landing | An entry leaves when none of its presentations on this client moves: a throw run in `moving` (an interrupted run snaps to `rest`), a popup part in `moving` (popup not `closing`: hand-off, miniature, chip fade-in), a throw waiting for the 3D chunk (`landing.wait` / `unwait`); swept on every change of either store. Else at the deadline. A resync changes none of these, so a held entry stays held; a reload starts empty |
+| Hooks (`@ui`) | `useLanded(entryId)` (= not held), `useAllLanded(ids)`, `useHolding()`, `useLandingFade(landed)` (at the landing each `[data-landing]` child fades in over 150 ms, Web Animations API; no keyframes) |
+| Log line (`GameLog.tsx`, FR-DICE-40) | Held: `heldSegments` (`dice-roll-log/logic.ts`, render only): `die` chips blank (`DieShape` `blank`: shape in the look, no number), total "…", "(adv)" / "(dis)" marker "(…)", natural 20 / 1 marker left out until the landing; Tooltip without the dice; `aria-busy="true"`. `formatLine`, `lineText`, copy and the stored entry unchanged; the "N new" count and the launcher dot don't wait |
+| Tray result (FR-DICEX-10) | Held: `FlatDie` blank, total "…", the line text through `heldSegments` |
+| Popup (FR-DICEX-40) | Each row's total waits for its own entry ("Rolling…"); chips blank till then. `data-state` and the 6 s timer stay the popup's own (an Off viewer: totals at once, the card still fades its chips) |
+| Label reset (FR-DICEX-50, `tray-logic.ts`) | `editStartsFresh(state, kind)`: an edit (palette die, expression or constant input) in `result` or over a non-`free` request starts fresh (`editRequest`: expression only, category `other`, no label, no actor); while composing it keeps the staged request. The expression and constant inputs show in `result` too. The tray header names the actor only when one is picked ("Other" for a fresh request). "Roll again" re-sends the staged request; a stage (notation, roll bar, Alt+click) replaces it |
+| Test IDs | `dice-log-entry` + `data-landed`; `dice-log-die` and `dicex-die` drop `data-value` while held; `dicex-tray-total` + `data-landed`; `dicex-popup` + `data-landed` (every entry); `dicex-popup-row` + `data-landed` |
+| Bundle | dice-extras in each client's initial chunks **13.0 KB gz** (cap 15); `RollPopup` **4.8 KB gz** (cap 8) |
+| CON-44 | 0 B: no record, field or frame added. Bundle `dice-polish` DM 21,098 B, P1 13,882 B, P2 10,684 B |
+
+## 91. Sprint 5: Loot tab (P3)
 
 From [party-board](../specs/party-board.md#66-sprint-5-loot-tab-present-uploads) FR-PARTY-29, -30 and [party-loot](../specs/party-loot.md#6-functional-requirements) FR-LOOT-21–24 (DM gate #256, OQ-LOOT-17; seams S4; rulings P #20, #21). **Built by `build/party-loot-tab`**: client only; no record type, intent, event, notification or snapshot byte (0 B, PARTY §12). No data-model change.
 

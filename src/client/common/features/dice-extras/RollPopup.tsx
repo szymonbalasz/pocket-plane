@@ -4,6 +4,8 @@
 // named row per entry (actor, label, total with its markers), the PiP with the frame's dice (the
 // big throw's still, a miniature on the dice layer's one canvas scissored to the card's visible
 // rect, or die-shape chips), ✕ and the gear. Click → the Game log at the entry (FR-DICE-37).
+// Sprint 5: each row's total waits for its entry's landing ("Rolling…"), chips blank till then
+// (FR-DICEX-49, table E).
 // State and timers live in `popups.ts`; nothing here is stored or sent.
 import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import { isMeshDie, type ThrowDie } from "@shared/dice-extras/throw";
@@ -22,6 +24,7 @@ import { ROLL_POPUP_H, ROLL_POPUP_W } from "../play-shell/toast-region";
 import { arenaOf } from "./arena";
 import type { Rect } from "./dice3d/index";
 import { FlatDie } from "./FlatDie";
+import { useAllLanded, useHolding, useLanded } from "./landing";
 import { diceLayerHost, rectOf } from "./layer-host";
 import { dice3d, whenChunk } from "./lazy3d";
 import {
@@ -212,6 +215,7 @@ function Pip({
   display: DisplaySetting;
 }) {
   const shown = useShown();
+  const holding = useHolding();
   const mode = pipModeOf(p);
   const { handoff, play } = p.parts;
   const { slots, chips } = useMemo(() => {
@@ -264,6 +268,7 @@ function Pip({
               size={small ? "sm" : "md"}
               settled
               flat
+              blank={holding.has(d.entryId)}
             />
           ))}
           {p.t.more > 0 && (
@@ -302,12 +307,16 @@ function Total({ item, big }: { item: PopupItem; big?: boolean }) {
 
 const itemLabel = (i: PopupItem) => (i.mode ? `${i.label} (${i.mode})` : i.label);
 
-function Row({ row, rolling, totals }: { row: PopupRow; rolling: boolean; totals: boolean }) {
+const ROLLING_TEXT = "Rolling…";
+
+function Row({ row, totals }: { row: PopupRow; totals: boolean }) {
+  const landed = useLanded(row.entryId);
   return (
     <button
       type="button"
       data-testid="dicex-popup-row"
       data-record-id={row.entryId}
+      data-landed={landed}
       className="flex w-full items-baseline gap-1.5 text-left text-sm"
       onClick={() => focusLogEntry(row.entryId)}
     >
@@ -318,7 +327,12 @@ function Row({ row, rolling, totals }: { row: PopupRow; rolling: boolean; totals
       <span className="min-w-0 flex-1 truncate text-muted-foreground">
         {row.items.map(itemLabel).join(" · ")}
       </span>
-      {totals && !rolling && row.items.map((i) => <Total key={i.key} item={i} />)}
+      {totals &&
+        (landed ? (
+          row.items.map((i) => <Total key={i.key} item={i} />)
+        ) : (
+          <span className="shrink-0 text-xs text-muted-foreground">{ROLLING_TEXT}</span>
+        ))}
     </button>
   );
 }
@@ -352,9 +366,9 @@ function Gear() {
 
 function Card({ p, display }: { p: RollPopup; display: DisplaySetting }) {
   const card = useRef<HTMLElement>(null);
-  const rolling = p.state === "rolling";
   const rows = useMemo(() => popupRows(p.entries), [p.entries]);
   const single = rows.length === 1 ? rows[0] : undefined;
+  const landed = useAllLanded(p.t.entryIds);
   const hover = (on: boolean) => rollPopups.hover(p.id, on);
   return (
     <section
@@ -365,6 +379,7 @@ function Card({ p, display }: { p: RollPopup; display: DisplaySetting }) {
       data-dice={p.t.dice.length}
       data-hidden={p.hidden}
       data-state={p.state}
+      data-landed={landed}
       aria-label="Roll"
       className={cn(
         "pointer-events-auto flex flex-col gap-1 overflow-hidden rounded-lg border p-2 text-popover-foreground shadow-lg transition-opacity duration-150",
@@ -383,7 +398,7 @@ function Card({ p, display }: { p: RollPopup; display: DisplaySetting }) {
         {/* Rows beyond 2 scroll inside (DICEX §7). */}
         <div className="flex max-h-10 min-w-0 flex-1 flex-col overflow-y-auto">
           {rows.map((r) => (
-            <Row key={r.entryId} row={r} rolling={rolling} totals={!single} />
+            <Row key={r.entryId} row={r} totals={!single} />
           ))}
         </div>
         <Gear />
@@ -407,8 +422,8 @@ function Card({ p, display }: { p: RollPopup; display: DisplaySetting }) {
         onClick={() => focusLogEntry(p.id)}
       >
         <Pip p={p} card={card} display={display} />
-        {rolling ? (
-          <span className="shrink-0 text-xs text-muted-foreground">Rolling…</span>
+        {single && !landed ? (
+          <span className="shrink-0 text-xs text-muted-foreground">{ROLLING_TEXT}</span>
         ) : (
           single && (
             <span className="flex shrink-0 flex-col items-end gap-0.5">

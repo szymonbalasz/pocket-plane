@@ -61,6 +61,8 @@ test("FR-MOD-57 Divine Fury's d6: offered (dashed) on the roll line, a chip afte
   const p1Log = await openWindow(p1, "dice.log");
   const rollLine = p1Log.getByTestId("dice-log-entry").filter({ hasText: "on a hit" });
   await expect(rollLine).toHaveCount(1);
+  // FR-DICE-40: the numbers show once this client's dice land.
+  await expect(rollLine).toHaveAttribute("data-landed", "true", { timeout: 10_000 });
   // The dice are real: a natural 20 (5%) doubles the trigger's dice too (FR-CBT-16), 2d6.
   const crit = (await rollLine.textContent())?.includes("natural 20") ?? false;
   const offered = chips(rollLine, "Divine Fury (on a hit)");
