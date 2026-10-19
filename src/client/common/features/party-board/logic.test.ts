@@ -22,13 +22,22 @@ import {
   LOST_SAVE,
   markOf,
   moveImage,
+  PARTY_TABS,
   playerOrder,
   removeImage,
   shareEnabled,
   sharePayload,
   togglePlayer,
 } from "./logic";
-import { createPartyMemory, createSeenState, SEEN_MAX, seenKey, tabKey, withSeen } from "./seen";
+import {
+  createPartyMemory,
+  createSeenState,
+  createTabState,
+  SEEN_MAX,
+  seenKey,
+  tabKey,
+  withSeen,
+} from "./seen";
 import { partyBoardWindowBase, partyHandoutWindowBase } from "./window";
 
 const NONE: SharedWith = { mode: "none", playerIds: [] };
@@ -154,6 +163,43 @@ describe("FR-PARTY-13 New / Updated marks and the seen map", () => {
     mem.writeTab("t", "inventory");
     expect(mem.readTab("t")).toBe("inventory");
     expect(warnings).toHaveLength(1);
+  });
+});
+
+describe("FR-PARTY-29 tab memory", () => {
+  const backend = (init: Record<string, string> = {}) => {
+    const m = new Map(Object.entries(init));
+    return {
+      getItem: (k: string) => m.get(k) ?? null,
+      setItem: (k: string, v: string) => void m.set(k, v),
+    };
+  };
+
+  test("FR-PARTY-29 Loot tab right of Inventory (order; stored loot restored; unknown value → Handouts)", () => {
+    expect(PARTY_TABS).toEqual(["handouts", "inventory", "loot"]);
+    const warnings: string[] = [];
+    const store = backend({
+      a: JSON.stringify({ tab: "loot" }),
+      b: JSON.stringify({ tab: "log" }),
+    });
+    const mem = createPartyMemory(
+      () => store,
+      (m) => void warnings.push(m),
+    );
+    expect(mem.readTab("a")).toBe("loot");
+    expect(mem.readTab("b")).toBe("handouts");
+    expect(warnings).toHaveLength(1);
+
+    const tabs = createTabState(mem);
+    tabs.bind("a");
+    expect(tabs.state.getState()).toEqual({ key: "a", tab: "loot" });
+    tabs.bind("b");
+    expect(tabs.state.getState().tab).toBe("handouts");
+    tabs.choose("b", "loot"); // a click: shown at once and stored
+    expect(tabs.state.getState()).toEqual({ key: "b", tab: "loot" });
+    expect(store.getItem("b")).toBe(JSON.stringify({ tab: "loot" }));
+    tabs.bind("b"); // same key: the chosen tab stays
+    expect(tabs.state.getState().tab).toBe("loot");
   });
 });
 

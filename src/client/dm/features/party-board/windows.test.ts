@@ -2,6 +2,13 @@
 // open at an edge on the default layout, clear of the default-open windows (or, with no
 // full-size slot, at `minOpenH` on top, FR-NOTE-31 ruling).
 import { expect, mock, test } from "bun:test";
+import {
+  lootLogTraces,
+  openPartyTabRuns,
+  RETIRED_LOOT_KIND,
+  restoreWithLootLog,
+  STORED_BOARD,
+} from "@ui/features/party-board/loot-tab-checks";
 import { clampRect, type Rect, TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { touchedEdge } from "@ui/features/play-shell/map-coverage";
@@ -75,4 +82,26 @@ test("FR-PARTY-14 DM viewer opens at an edge; on top at minOpenH where no full-s
     expect(r.h).toBeGreaterThanOrEqual(400);
     expect(r.w).toBeGreaterThanOrEqual(360);
   }
+});
+
+// ---- sprint 5: Loot tab (FR-PARTY-30, FR-LOOT-21) ----
+
+test("FR-LOOT-21 no loot.log window (DM): no window kind, no launcher entry; a stored layout with it parses, the kind dropped, the board keeps its geometry", () => {
+  expect(lootLogTraces(dmWindows)).toEqual({ kind: false, launcher: false, available: false });
+  const r = restoreWithLootLog(dmWindows);
+  expect(r.warning).toBeUndefined();
+  expect(r.stored).toBe(true);
+  expect(r.board).toMatchObject({ state: "open", ...STORED_BOARD });
+  expect(r.written).toContain("party.board");
+  expect(r.written).not.toContain(RETIRED_LOOT_KIND);
+});
+
+test("FR-PARTY-30 open on a tab (DM): closed / minimised / open board → open, in front, tab Loot, by feature", () => {
+  const stored = JSON.stringify({ tab: "loot" });
+  const call = [{ kind: "party.board", by: "feature" }];
+  expect(openPartyTabRuns(dmWindows, { campaignId: "c1", role: "dm", playerId: null })).toEqual([
+    { before: "closed", calls: call, state: "open", onTop: true, tab: "loot", stored },
+    { before: "minimised", calls: call, state: "open", onTop: true, tab: "loot", stored },
+    { before: "open", calls: call, state: "open", onTop: true, tab: "loot", stored },
+  ]);
 });
