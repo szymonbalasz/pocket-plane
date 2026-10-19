@@ -1195,7 +1195,7 @@ From [fog-of-war](../specs/fog-of-war.md) v2 (FOG, `complete`; gate 1 #207, #208
 
 | Piece | Contract |
 |---|---|
-| Identical-upsert drop (FR-SYNC-19 amended, OQ-FOG-37) | `RecordRegistry.classifyChange(change, viewer)` → wire change \| `"same"` \| null: `visible → visible` whose wire data (after `redact` / `dmRedact`) is deep-equal for that connection = `"same"` (dropped). Stateless before / after compare, **per change**. The hub sends nothing when no change passes the matrix (FR-SYNC-17); an event whose surviving changes were all dropped still goes out **empty** (keeps `seq`); the frame schema allows `changes: []` and the client advances `seq` with no store change and no `resync`. `filterChange` = the wire change or null; `filterChanges(changes, v) → {changes, touched}` |
+| Identical-upsert drop (FR-SYNC-19 amended, OQ-FOG-37) | `RecordRegistry.classifyChange(change, viewer)` → wire change \| `"same"` \| null: `visible → visible` whose wire data (after `redact` / `dmRedact`) is deep-equal for that connection = `"same"` (dropped). Stateless before / after compare, **per change**. The hub sends nothing when no change passes the matrix (FR-SYNC-17); an event whose surviving changes were all dropped still goes out **empty** (keeps `seq`), unless the event carries `quietWhenUnchanged: true` ([§96](#96-sprint-5-ally-side-client-r4)): then that connection gets no frame; the frame schema allows `changes: []` and the client advances `seq` with no store change and no `resync`. `filterChange` = the wire change or null; `filterChanges(changes, v) → {changes, touched}` |
 | `dmRedact?(record)` on registration | The DM's `full` wire: strips server-only copies. `token` (`seenBy`), `scene-prop` / `aoe-template` (`seenBy`), `scene-structure` (`doorSeen`), `fog` (darkness `seenBy`), `fog-explored` / `vision` (`campaignId`) |
 | `derived?: true` | No table; `snapshot` computes rows (`vision`); commands list before / after |
 | `snapshot(src, v, scope?: {sceneId})` | A scene load passes the scene; providers may return only its rows |
@@ -2175,7 +2175,7 @@ From [combat-tracker](../specs/combat-tracker.md#9-api--events) (FR-CBT-88, -91,
 | Event | Changes | Player sees | Undoable |
 |---|---|---|---|
 | `HitApplied {cardId, encounterId, rulingId, entryIds}` *(new)* | `hit-ruling` create; one `game-log-entry` per target (`cbt.attack`, `awaitingDamage`, `public` per FR-CBT-36) | the lines they may see ("… = 15 — DM: hit."); never the ruling; no card upsert | no |
-| `CombatantSideChanged {encounterId, combatantId, side, secret}` *(new)* | `combatant`; one `cbt.side` `game-log-entry` | the upsert iff their side changed (an unchanged redaction is never sent); the line iff `public` | no |
+| `CombatantSideChanged {encounterId, combatantId, side, secret}` *(new)* | `combatant`; one `cbt.side` `game-log-entry` | the upsert iff their side changed (an unchanged redaction is never sent); the line iff `public`; **no frame at all** otherwise (`quietWhenUnchanged`, R4 walkthrough fix) | no |
 | `AttackApplied` (the apply's last) / `CombatEntryUndone` (the undo's last) / `NotificationDismissed` (`note.dismiss`, and End's dismissals) | + the card's `hit-ruling` delete / upsert / delete (dismissal: the kind's `onClose`, §26) | nothing (DM only) | as before |
 | `TokenMoved` / `TokenRevealed` | the one `token` upsert is read **after** the token-changed hooks, so it carries the appended / reset `trail` | per token visibility; `trail` on player tokens only | no |
 | `TurnChanged` (Next, Prev, Start round 1), `EncounterEnded` | + one `token` upsert per cleared trail (`clearTrails`) | as above | no |
@@ -2472,3 +2472,20 @@ From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-4
 | Test IDs | `dicex-popup` + `data-shown` (cells), `data-dice` = every die of the frame (incl. those beyond 20); `dicex-popup-cell` (+ `data-entry-id`, `data-line` = 1 \| 2, `data-index`, `data-faces`, `data-kept`, `data-offered`, `data-value` only once its entry landed); `dicex-popup-more` (+ `data-value` = N, `data-entry-id`); §75's other IDs unchanged |
 | Bundle | Lazy `RollPopup` **5.8 KB gz** (cap 8); dice-extras initial 13.1 KB gz (cap 15); 3D chunk 157.6 KB gz (cap 170) |
 | CON-44 | 0 B: no record, field or frame added |
+
+## 101. Sprint 5: ally side client (R4)
+
+From [combat-tracker](../specs/combat-tracker.md#63-sprint-5-ally-side) FR-CBT-98–104 (#252; OQ-CBT-71 A, -72 C, -73 A, -74 A, #256; seams S9). **Built by `build/combat-sides`** on R0's server core ([§83](#83-sprint-5-combat-core-r0): `cbt.setSide`, `CombatantSideChanged`, the redaction, the `cbt.side` kind). **No wire change**: no new intent, event, record type, signal or field (CON-44: 0 B beyond §83's measured rows). Data model: [§79](../data-model/README.md#79-sprint-5-ally-side-client-r4).
+
+| Piece | Contract | Source |
+|---|---|---|
+| `sideChip(c)` (`@ui/features/combat-tracker/side`) | `{side, secret}` or null. DM (row carries `publicSide`): `sideOf(c)` when it differs from the kind's default **or** players see another side (`secret` = `sideOf ≠ publicSideOf`, dashed); players: their `side` (= `publicSideOf`) when it differs from the kind's default, never secret | FR-CBT-104 |
+| Initiative row chip `cbt-init-row-ally` (both clients) | `data-value` `ally` \| `enemy`, `data-secret`; lucide `handshake` "Ally" / `swords` "Enemy", `badge` look, dashed while secret (Tooltip "Secret: players see …"). In the name line before the effect chips, never folds (FR-CBTX-54) | FR-CBT-104 |
+| Token badge `cbt-token-side` (overlay `cbt`) | The chip's rule as a `TokenBadge` (`icon` `handshake` \| `swords`, `neutral`, label "Ally" / "Enemy"); not on removed tokens (Out) | FR-CBT-104 |
+| DM row menu `cbt-init-row-side` / token menu `cbt-token-menu-side` (entry `cbt.side`, order 70.5) | Submenu trigger "Set as ‹other side›" (`data-value` = that side); items `-secret` (tick, `data-value` `true` \| `false`, keeps the menu open) and `-apply` → `cbt.setSide {combatantId, side, secret}`; while secret, a top-level `-reveal` "Set as ‹true side› (show players)" → `cbt.setSide {side: sideOf, secret: false}` | FR-CBT-99, -104 |
+| Likely targets (`placementTokenIds`, DM popup / card toast) | The other **side** (`sideOf`), read at open | FR-CBT-101 |
+| Builder entry `cbt-enc-entry-friendly` (Switch, `data-value` = entry side; entry row `data-side`) | Sets the entry's `side` in the whole-replace PUT (§83's `side?`); a pick adds to the creature's enemy entry; switching onto a side the creature already has merges the two entries (the server's merge, per definition + side) | FR-CBT-98, -104 |
+| Difficulty card (`rateEncounter`, `@shared/combat-tracker/difficulty`) | Rates enemy entries only; total CR of enemy entries; `cbt-enc-friendly` "Friendly: Goblin ×1 (CR 1/4)" when any entry is friendly; all friendly → rating "—". Reads the entries, never the combatants (planning-only) | FR-CBT-102 |
+
+- **`DomainEvent.quietWhenUnchanged?: true`** (`src/server/events/types.ts`; transport hint, never in the event log, which stores type and payload only): `hub.deliver` sends a connection **no** frame when the event's surviving changes for it were all identical upserts (FR-SYNC-19's empty frame otherwise). Acks are separate frames, so the sender loses nothing; `seq` stays continuous (it counts frames sent). Set only on `CombatantSideChanged`: a secret side change (or an open one players already see) sends players nothing (FR-CBT-100; walkthrough R4 leak fix).
+- **Fixtures:** unit `enc-friendly` (planned "Escort to the Ford": Goblin ×2 enemy + Goblin ×1 friendly, party null), appended to bundles `late-damage` and `session-sim-9`.

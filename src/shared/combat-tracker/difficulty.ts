@@ -117,3 +117,42 @@ export function totalCr(monsterCrs: readonly string[]): number {
 export function formatCr(v: number): string {
   return String(Math.round(v * 1000) / 1000);
 }
+
+/** One encounter entry as the card rates it (FR-CBT-102). */
+export interface RatedEntry {
+  name: string;
+  cr: string;
+  quantity: number;
+  side: "ally" | "enemy";
+}
+
+export interface EncounterRating extends DifficultyResult {
+  /** Total CR of the enemy entries. */
+  totalCr: number;
+  /** "Friendly: Goblin ×1 (CR 1/4)"; null without a friendly entry. */
+  friendly: string | null;
+}
+
+/**
+ * FR-CBT-102 (#252, OQ-CBT-74 A): the card rates the enemy entries only and lists the friendly
+ * ones; all friendly → "—". Planning-only: it reads the entries, never the combatants' sides.
+ */
+export function rateEncounter(
+  method: DifficultyMethod,
+  partyLevels: readonly number[],
+  entries: readonly RatedEntry[],
+): EncounterRating {
+  const enemies = entries.filter((e) => e.side !== "ally");
+  const friends = entries.filter((e) => e.side === "ally");
+  const crs = enemies.flatMap((e) => Array<string>(e.quantity).fill(e.cr));
+  const r = method.rate(partyLevels, crs);
+  return {
+    ...r,
+    rating: friends.length > 0 && crs.length === 0 ? "—" : r.rating,
+    totalCr: totalCr(crs),
+    friendly:
+      friends.length > 0
+        ? `Friendly: ${friends.map((e) => `${e.name} ×${e.quantity} (CR ${e.cr})`).join(", ")}`
+        : null,
+  };
+}
