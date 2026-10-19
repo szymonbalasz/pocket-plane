@@ -189,9 +189,10 @@ export function PlayersPanel() {
     // The `camp.players` window body (its title says "Players"). Rows scroll; the add-player
     // row and the link base / loopback warning are a pinned footer, so all of it shows at the
     // window's default size with two players (CAMP §7).
-    <section data-testid="camp-players-panel" className="flex h-full min-h-fit flex-col gap-2">
+    <section data-testid="camp-players-panel" className="flex h-full min-h-fit flex-col gap-1">
       <div className="min-h-9 flex-1 overflow-y-auto">
-        <div className="flex items-center gap-1 px-1 text-sm">
+        {/* One 16 px line: two players' rows still fit the default window unscrolled. */}
+        <div className="flex h-4 items-center gap-1.5 px-1 text-xs">
           Your colour (DM)
           <ColorPopover target={null} testId="camp-color-dm" size={16} tip="Your colour (DM)" />
         </div>
@@ -209,7 +210,7 @@ export function PlayersPanel() {
                 return (
                   <Fragment key={p.id}>
                     <TableRow data-testid="camp-player-row" data-record-id={p.id}>
-                      <TableCell className="w-0 px-0 py-1">
+                      <TableCell className="w-0 py-1 pr-0 pl-1">
                         <ColorPopover
                           target={p.id}
                           testId="camp-player-color"
@@ -309,7 +310,7 @@ export function PlayersPanel() {
           </Table>
         )}
       </div>
-      <div className="flex shrink-0 flex-col gap-2">
+      <div className="flex shrink-0 flex-col gap-1.5">
         <form className="flex gap-2" onSubmit={add}>
           <Input
             data-testid="camp-player-add-name"

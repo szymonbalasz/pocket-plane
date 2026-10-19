@@ -30,10 +30,16 @@ export function JoinedHeader({
   const playerId = useSync((s) => s.store.you?.playerId);
   return (
     <p data-testid="camp-player-joined">
-      {/* FR-CAMP-27: the own colour dot opens the picker; its button's padding is the gap. */}
+      {/* FR-CAMP-27: the own colour dot opens the picker. */}
       Playing as{" "}
       {playerId && (
-        <ColorPopover target={playerId} testId="camp-my-color" size={12} tip="Your colour" />
+        <ColorPopover
+          target={playerId}
+          testId="camp-my-color"
+          size={12}
+          tip="Your colour"
+          className="mr-1"
+        />
       )}
       <strong data-testid="camp-joined-player-name">{playerName}</strong> in{" "}
       <strong data-testid="camp-joined-campaign-name">{campaignName}</strong>

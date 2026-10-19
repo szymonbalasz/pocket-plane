@@ -128,7 +128,8 @@ function useHolders(): ColorHolders & { store: Parameters<typeof colorOf>[0] } {
 }
 
 /**
- * The swatch Button (`testId`, `data-value` = the target's key) and its Popover. Swatches are
+ * The swatch Button (`size` px round, the colour itself; `testId`, `data-value` = the target's
+ * key) and its Popover. Swatches are
  * disabled while not live (FR-CAMP-25); the trigger stays usable so the Popover still opens.
  */
 export function ColorPopover({
@@ -137,6 +138,7 @@ export function ColorPopover({
   recordId,
   size,
   tip,
+  className,
 }: {
   target: ColorTarget;
   testId: string;
@@ -144,6 +146,7 @@ export function ColorPopover({
   /** Trigger diameter in px (header dot 12, Players panel 16; CAMP §7). */
   size: 12 | 16;
   tip: string;
+  className?: string;
 }) {
   const connection = useSync((s) => s.connection);
   const live = useSync((s) => s.state === "live");
@@ -168,19 +171,17 @@ export function ColorPopover({
         <PopoverTrigger asChild>
           <Button
             variant="ghost"
-            size="icon"
-            className="size-6 shrink-0 align-middle"
+            className={cn(
+              "shrink-0 rounded-full p-0 align-middle",
+              size === 12 ? "size-3" : "size-4",
+              className,
+            )}
+            style={{ backgroundColor: hex }}
             data-testid={testId}
             data-record-id={recordId}
             data-value={value}
             aria-label={`${tip}: ${name}`}
-          >
-            <span
-              aria-hidden
-              className={cn("rounded-full", size === 12 ? "size-3" : "size-4")}
-              style={{ backgroundColor: hex }}
-            />
-          </Button>
+          />
         </PopoverTrigger>
       </Tooltip>
       <PopoverContent data-testid="camp-color-popover" className="w-auto p-3">
