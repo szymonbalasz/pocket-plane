@@ -4,7 +4,8 @@
 // "Homebrew" (+ "Shared" / "DM only" for the DM). Text through `MarkdownLite` (FR-CMP-26).
 // Actions row: **Add to sheet** on spells / items / features (both clients, FR-CMP-28), the DM's
 // extras from the caller (Derive…, Clone / Edit / Delete; FR-CMP-25, -27); "Preset: ‹name›"
-// when FR-CMP-29 resolves a trigger preset.
+// when FR-CMP-29 resolves a trigger preset. Homebrew images (FR-CMP-51): the gallery under the
+// header, the same for every kind (`gallery.tsx`).
 import { isSheetable } from "@shared/compendium/homebrew";
 import { resolvePreset } from "@shared/compendium/presets";
 import type { EntryDefinition, EntryResponse, SourceAttribution } from "@shared/compendium/rest";
@@ -28,6 +29,7 @@ import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/primitives";
 import { AddToSheet } from "./AddToSheet";
 import { AboutDialog } from "./credits";
+import { EntryGallery } from "./gallery";
 import { crText, footerLabel, type Role, scoreText, signed } from "./logic";
 import { MarkdownLite, type TextContext } from "./MarkdownLite";
 
@@ -226,12 +228,15 @@ export function StatBlock({
 
 // ---------- other kinds ----------
 
-function Heading({ name, line }: { name: string; line: string }) {
+function Heading({ e, line }: { e: CompendiumEntry; line: string }) {
   return (
-    <header data-testid="cmp-entry-header">
-      <h2 className="text-lg font-semibold leading-tight text-primary">{name}</h2>
-      <div className="text-xs italic text-muted-foreground">{line}</div>
-    </header>
+    <>
+      <header data-testid="cmp-entry-header">
+        <h2 className="text-lg font-semibold leading-tight text-primary">{e.name}</h2>
+        <div className="text-xs italic text-muted-foreground">{line}</div>
+      </header>
+      <EntryGallery ids={e.imageAssetIds} name={e.name} />
+    </>
   );
 }
 
@@ -242,7 +247,7 @@ function SpellView({ e }: { e: CompendiumEntry }) {
   const tags = [f.ritual && "ritual", f.concentration && "concentration"].filter(Boolean);
   return (
     <div className="space-y-2 text-sm">
-      <Heading name={e.name} line={`${e.line}${tags.length ? ` (${tags.join(", ")})` : ""}`} />
+      <Heading e={e} line={`${e.line}${tags.length ? ` (${tags.join(", ")})` : ""}`} />
       <div className="space-y-0.5">
         <Fact label="Casting Time">{b.castingTime}</Fact>
         <Fact label="Range">{b.range}</Fact>
@@ -270,7 +275,7 @@ function ItemView({ e }: { e: CompendiumEntry }) {
     .join(", ");
   return (
     <div className="space-y-2 text-sm">
-      <Heading name={e.name} line={line} />
+      <Heading e={e} line={line} />
       <div className="space-y-0.5">
         {b.cost && <Fact label="Cost">{b.cost}</Fact>}
         {b.weight && <Fact label="Weight">{b.weight}</Fact>}
@@ -298,7 +303,7 @@ function TextView({ e }: { e: CompendiumEntry }) {
     : e.line;
   return (
     <div className="space-y-2 text-sm">
-      <Heading name={e.name} line={line} />
+      <Heading e={e} line={line} />
       <Rule />
       <MarkdownLite text={b.text} context={{ kind: "plain", label: e.name }} />
     </div>

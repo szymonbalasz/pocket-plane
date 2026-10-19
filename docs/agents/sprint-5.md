@@ -47,6 +47,7 @@ DM notes in brackets ([#250](../decisions-log.md)). "sim-8" = the [session-sim-8
 | 2026-10-19 | Merged: **dice totals wait for the dice** in tray, popup and log; a fresh tray roll never keeps an old label [#266](../decisions-log.md) |
 | 2026-10-19 | Merged: **Add to party** (Compendium → an item → Add to party, with a quantity) and the player-colour core (colours stored; the picker and map colours come next) [#267](../decisions-log.md) |
 | 2026-10-19 | Merged: **Loot tab** in the Party window (right of Inventory); the old Party loot window and the Coin button are gone [#268](../decisions-log.md) |
+| 2026-10-19 | Merged: **compendium images** — a homebrew entry takes up to 4 images (upload, drag in, paste); gallery + lightbox for you and players who can see the entry [#269](../decisions-log.md) |
 
 ## Check `main` any time (DM)
 
