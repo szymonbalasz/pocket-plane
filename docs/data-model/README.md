@@ -1866,3 +1866,11 @@ From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP
 - **Boot backfill** (start hook `campaign-management.color-backfill`, one transaction): per campaign, null colours in `createdAt`, then `rowid` order, each seeing the defaults before it; rerun = no-op.
 - **Fixtures:** `pc-colours` (as DM, `player-2` picks blue; `player-1` keeps jade, the DM amber; no ids or tokens); bundle **`player-colours`** = `map-tools` + `pc-colours`; the unit also in `session-sim-9`.
 - **Snapshot size** (CON-44, `snapshot-size.test.ts` worst case: `vermillion` on every player + the DM, every notification stamped by a player with the longest id): colours **+149 B** in every frame (DM and each of 6 players); stamp **+8,400 B** DM (120 rows), **+7,210–7,280 B** per player. Heavy DM 650,809 B with K's rows; 707,804 B with R's worst case on top (865,060 B left of 1.5 MiB); players max 268,034 B.
+
+## 72. Sprint 5: Add to party from the compendium (P4)
+
+From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–42 (DM gate #256). **Built by `build/cmp-add-to-party`**: DM client only; no table, column or record type. Protocol side: [protocol §92](../protocol/README.md#92-sprint-5-add-to-party-from-the-compendium-p4).
+
+- **Writes:** the existing `party.addItem` ([§31](#31-sprint-3-party-board-core-p-core)): one `party_item` insert or merge, one `loot_entry {kind: item, world → party}`, one `loot-received` notification, one transaction. The party row keeps a name copy only (no link back to the entry, OQ-PARTY-13; Add to party copies no images, FR-CMP-49).
+- **Fixtures:** bundle `party-cmp` = `party-board` + `cmp-srd-mini` (existing units; SRD "Potion of Healing" merges into `party-items-1`'s "Potion of healing" ×2 → ×4).
+- **Snapshot size** (CON-44): no new record type or field, so +0 B per viewer at a given state; an add writes the same rows as the Inventory tab's Add (`party-item` lazy; the `loot-entry` row as PARTY §12 already budgets).
