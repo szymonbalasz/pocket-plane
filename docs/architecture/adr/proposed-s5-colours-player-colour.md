@@ -1,6 +1,6 @@
 # Proposed — Player colour stored once, derived everywhere
 
-- Status: proposed (spec-colours, sprint 5 track K; for DM gate 1)
+- Status: accepted (DM, sprint-5 gate 1, #256; OQ-CAMP-22); numbered at merge
 - Date: 2026-10-18
 - Affects: [campaign-management](../../specs/campaign-management.md) (FR-CAMP-23–29), [scenes-map](../../specs/scenes-map.md) (FR-MAP-68–73), [scene-tools](../../specs/scene-tools.md) (FR-SCN-47), [dice-roll-log](../../specs/dice-roll-log.md) (FR-DICE-60–61), [notifications](../../specs/notifications.md) (FR-NOTE-38–41)
 - Raised by: [OQ-CAMP-22](../../specs/campaign-management.md#15-open-questions)
@@ -21,9 +21,9 @@
 
 ## Decision
 
-**Proposed: A** (pending DM gate 1; rejected options struck there).
+**A** (accepted by the DM at sprint-5 gate 1, #256; rejected: B copies, C per browser). The integrator numbers this ADR at merge.
 
-- Colour = a key of one fixed palette (OQ-CAMP-17), or `#rrggbb` if the DM picks the free picker; the wire carries the key, each client maps it to a theme token (`player.<key>`, [visual-direction](../../design/visual-direction.md), OQ-CAMP-23).
+- Colour = a key of one fixed palette of 8 (OQ-CAMP-17, decided #256); the wire carries the key, each client maps it to a theme token (`player.<key>`, [visual-direction](../../design/visual-direction.md), OQ-CAMP-23).
 - **Person ids per record are allowed; colour values are not.** A feature that needs "whose colour" stores or receives a player id (or the DM role) on its own rows or frames, as templates, tokens, log entries and notifications do, and calls the shared client helper `colorOf`. No feature copies a colour key or hex into its rows or frames.
 - The system actor (boot backfills, upgrades) is no person: it gets no colour anywhere (FR-NOTE-38, FR-DICE-61).
 
