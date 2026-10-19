@@ -5,6 +5,7 @@
 // viewport and scissor rect (the screen arena = the viewport; the zone = its free-area rect; a
 // popup's PiP = its slot, scissored to the popup's visible rect each frame; the look editor's
 // preview die), drawn in one render loop that runs only while a throw moves. Pixel ratio ≤ 1.5.
+// The tray's stills (FR-DICEX-48) are temporary: drawn, copied out and removed in one task.
 import type { DiceLook, DiceMaterial } from "@shared/dice-extras/looks";
 import type { DieShape } from "@shared/dice-extras/throw";
 import {
@@ -32,6 +33,7 @@ import { type Arena, pixelRatioOf } from "../arena";
 import { dieMesh, drawAtlas, drawD4 } from "./faces";
 import { geometryOf, type LabelKind, labelKindOf, type Quat, upFace } from "./geometry";
 import { poseAt, STEP_HZ, settleLabels, simulate } from "./settle";
+import { flushStills, requestStill, type StillStage, stillOnce } from "./stills";
 
 export interface Die3D {
   key: string;
@@ -149,7 +151,7 @@ interface Play {
   lost(): void;
 }
 
-interface Stage {
+interface Stage extends StillStage {
   renderer: WebGLRenderer;
   layer: HTMLElement;
   plays: Set<Play>;
@@ -217,6 +219,7 @@ function createStage(layer: HTMLElement): Stage {
     looping: false,
     lost: false,
     size: { w: 0, h: 0 },
+    stills: new Map(),
   };
   canvas.addEventListener("webglcontextlost", (e) => {
     e.preventDefault();
@@ -258,14 +261,23 @@ function fit(camera: OrthographicCamera, arena: Arena, w: number, h: number) {
   camera.updateProjectionMatrix();
 }
 
-/** Clear the whole canvas, then draw every arena into its own viewport + scissor rect. */
-function draw(s: Stage) {
-  const { renderer } = s;
+/** The canvas sized to the layer (CSS px). */
+function resize(s: Stage) {
   const vp = viewportOf(s.layer);
   if (vp.w !== s.size.w || vp.h !== s.size.h) {
-    renderer.setSize(vp.w, vp.h);
+    s.renderer.setSize(vp.w, vp.h);
     s.size = vp;
   }
+  return vp;
+}
+
+/**
+ * Clear the whole canvas, then draw every arena into its own viewport + scissor rect; then the
+ * tray stills waiting for this frame (FR-DICEX-48).
+ */
+function draw(s: Stage) {
+  const { renderer } = s;
+  const vp = resize(s);
   renderer.setScissorTest(false);
   renderer.setViewport(0, 0, vp.w, vp.h);
   renderer.clear();
@@ -286,6 +298,7 @@ function draw(s: Stage) {
   }
   renderer.setScissorTest(false);
   for (const p of [...s.plays]) p.drawn?.();
+  flushStills(s);
 }
 
 /** One loop for every arena; it stops once nothing moves (FR-DICEX-23: idle = no frames). */
@@ -548,6 +561,80 @@ export function addStillArena(
       redraw();
     },
   };
+}
+
+/** A still's dice: one scene, one camera per cell (rect in CSS px from the box's top-left). */
+export interface StillScene {
+  scene: Scene;
+  cells: { camera: OrthographicCamera; rect: Rect }[];
+  /** Take the dice out of the scene (the arena's removal). */
+  remove(): void;
+}
+
+export interface StillJob {
+  /** Runs in the job (the latest input): the box size (CSS px) and its scene, or null. */
+  build(ratio: number): { box: { w: number; h: number }; still: StillScene } | null;
+  /** `src` holds the box at its top-left, `ratio` device px per CSS px. */
+  copy(src: HTMLCanvasElement, ratio: number, box: Rect): void;
+}
+
+/**
+ * FR-DICEX-48 (ADR-0051 Previews): a temporary arena at the shared canvas's top-left, rendered
+ * alone (its box cleared), copied out and removed in one task, then the canvas is drawn again
+ * without it, so nothing of it ever reaches the screen's dice layer. Now when no loop runs, else
+ * in the loop's next frame (a newer request for the same `key` replaces a waiting one). No loop
+ * of its own. Throws when WebGL can't start or the context is lost (the caller shows chips).
+ */
+export function drawStill(layer: HTMLElement, key: object, job: StillJob): void {
+  const s = stageIn(layer);
+  requestStill(s, key, () => {
+    if (s.lost) return;
+    const vp = resize(s);
+    const ratio = s.renderer.domElement.width / Math.max(1, vp.w);
+    const built = job.build(ratio);
+    if (!built) return;
+    const box = { x: 0, y: 0, w: Math.min(built.box.w, vp.w), h: Math.min(built.box.h, vp.h) };
+    if (box.w < 1 || box.h < 1) return built.still.remove();
+    const { renderer } = s;
+    stillOnce({
+      add: () => built.still,
+      draw(a) {
+        renderer.setScissorTest(true);
+        renderer.setViewport(0, vp.h - box.h, box.w, box.h);
+        renderer.setScissor(0, vp.h - box.h, box.w, box.h);
+        renderer.clear();
+        for (const c of a.cells) {
+          const r = c.rect;
+          renderer.setViewport(r.x, vp.h - r.y - r.h, r.w, r.h);
+          renderer.setScissor(r.x, vp.h - r.y - r.h, r.w, r.h);
+          renderer.render(a.scene, c.camera);
+        }
+        renderer.setScissorTest(false);
+      },
+      copy: () => job.copy(renderer.domElement, ratio, box),
+      remove: (a) => a.remove(),
+      restore: () => draw(s),
+    });
+  });
+}
+
+/** Drop a waiting still of `key` (its tray unmounted). */
+export function cancelStillOf(key: object): void {
+  stage?.stills.delete(key);
+}
+
+/** A still die's material in a look, cached as the throws' (d4: the default corner labels). */
+export function stillMaterial(
+  shape: DieShape,
+  kind: LabelKind,
+  labels: readonly number[],
+  look: DiceLook,
+): Material {
+  const key = `${shape === "d4" ? "d4-still" : kind}${look.body}${look.pips}${look.material}`;
+  const map = texture(key, () =>
+    shape === "d4" ? drawD4(geometryOf("d4"), labels, look) : drawAtlas(kind, shape, look),
+  );
+  return material(key, look, map);
 }
 
 /** The rested dice's bounding box (viewport CSS px), inside the arena rect. */

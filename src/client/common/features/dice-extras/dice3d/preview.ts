@@ -1,8 +1,10 @@
 // The look editor's live preview die (FR-DICEX-27), in the lazy chunk: one d20 at rest with its
 // 20 up, in the draft look, drawn as a still arena of the page's one canvas on the dice layer
 // (FR-DICEX-41: one WebGL context per page) at its placeholder's rect. Drawn on demand, no render
-// loop; a throw arriving while the editor is open plays beside it in the same loop.
+// loop; a throw arriving while the editor is open plays beside it in the same loop. Also the
+// tray's stills (FR-DICEX-48): the staged dice copied into the tray's own 2D canvas.
 import type { DiceLook } from "@shared/dice-extras/looks";
+import type { DieShape } from "@shared/dice-extras/throw";
 import {
   BufferGeometry,
   CanvasTexture,
@@ -19,13 +21,23 @@ import { dieMesh, drawAtlas } from "./faces";
 import {
   defaultLabels,
   geometryOf,
+  type LabelKind,
   labelKindOf,
   multiply,
   type Quat,
   rotationBetween,
   type Vec3,
 } from "./geometry";
-import { addStillArena, materialOf, type Rect } from "./renderer";
+import {
+  addStillArena,
+  cancelStillOf,
+  drawStill,
+  materialOf,
+  type Rect,
+  type StillScene,
+  stillMaterial,
+} from "./renderer";
+import { stillPose } from "./stills";
 
 export interface PreviewHandle {
   /** Redraw in another look. */
@@ -92,3 +104,103 @@ export function previewDie(layer: HTMLElement, rect: () => Rect, look: DiceLook)
     },
   };
 }
+
+// --- FR-DICEX-48: the tray's stills ---------------------------------------------------------
+
+/** One die cell of the tray's preview, in CSS px from its 2D canvas's top-left. */
+export interface TrayStill {
+  shape: DieShape;
+  /** A d100's part (tens "00" / units "0"). */
+  part?: "tens" | "units";
+  x: number;
+  y: number;
+  size: number;
+}
+
+/** World units between two still dice (wider than any camera's view). */
+const SPACING = 4;
+
+const stillGeometry = new Map<LabelKind, { geometry: BufferGeometry; labels: number[]; q: Quat }>();
+
+function stillDie(shape: DieShape, kind: LabelKind) {
+  let hit = stillGeometry.get(kind);
+  if (!hit) {
+    const { labels, q } = stillPose(shape, kind);
+    const { positions, normals, uvs } = dieMesh(geometryOf(shape), labels, kind);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("normal", new Float32BufferAttribute(normals, 3));
+    geometry.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+    hit = { geometry, labels, q };
+    stillGeometry.set(kind, hit);
+  }
+  return hit;
+}
+
+let stillScene: Scene | null = null;
+
+function sceneOfStills(cells: readonly TrayStill[], look: DiceLook): StillScene {
+  if (!stillScene) {
+    stillScene = new Scene();
+    stillScene.add(new HemisphereLight(0xffffff, 0x8a8a96, 1.6));
+    const sun = new DirectionalLight(0xffffff, 2.2);
+    sun.position.set(-4, 14, 6);
+    stillScene.add(sun);
+  }
+  const scene = stillScene;
+  const meshes = cells.map((c, i) => {
+    const kind = labelKindOf(c.shape, c.part);
+    const die = stillDie(c.shape, kind);
+    const mesh = new Mesh(die.geometry, stillMaterial(c.shape, kind, die.labels, look));
+    mesh.quaternion.set(die.q[0], die.q[1], die.q[2], die.q[3]);
+    mesh.position.set(i * SPACING, 0, 0);
+    scene.add(mesh);
+    const r = geometryOf(c.shape).radius * 1.15;
+    const camera = new OrthographicCamera(-r, r, r, -r, 0.1, 100);
+    camera.position.set(i * SPACING, 10, 4);
+    camera.lookAt(i * SPACING, 0, 0);
+    const rect: Rect = { x: Math.round(c.x), y: Math.round(c.y), w: c.size, h: c.size };
+    return { mesh, cell: { camera, rect } };
+  });
+  return {
+    scene,
+    cells: meshes.map((m) => m.cell),
+    remove() {
+      for (const m of meshes) scene.remove(m.mesh);
+    },
+  };
+}
+
+/**
+ * FR-DICEX-48: draw `cells` (highest face up, in `look`) into the tray's own 2D canvas `target`,
+ * through a temporary arena of the page's one WebGL canvas in `layer` (`drawStill`). Throws
+ * without WebGL.
+ */
+export function drawTrayStills(
+  layer: HTMLElement,
+  target: HTMLCanvasElement,
+  cells: readonly TrayStill[],
+  look: DiceLook,
+): void {
+  drawStill(layer, target, {
+    build(ratio) {
+      const w = Math.max(1, target.clientWidth);
+      const h = Math.max(1, target.clientHeight);
+      const bw = Math.round(w * ratio);
+      const bh = Math.round(h * ratio);
+      if (target.width !== bw || target.height !== bh) {
+        target.width = bw;
+        target.height = bh;
+      } else target.getContext("2d")?.clearRect(0, 0, bw, bh);
+      return cells.length === 0 ? null : { box: { w, h }, still: sceneOfStills(cells, look) };
+    },
+    copy(src, ratio, box) {
+      const w = Math.round(box.w * ratio);
+      const h = Math.round(box.h * ratio);
+      target.getContext("2d")?.drawImage(src, 0, 0, w, h, 0, 0, w, h);
+    },
+  });
+}
+
+/** The tray unmounted: drop its waiting still. */
+export const cancelTrayStills = (target: HTMLCanvasElement) => cancelStillOf(target);
