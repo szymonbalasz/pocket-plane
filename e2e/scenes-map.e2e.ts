@@ -152,6 +152,8 @@ test("FR-MAP-15 / -19 / -06 drag, reveal, activate, reload (DM + player-1)", asy
   // Wolf may sit under it (closing never refits, FR-MAP-44).
   await scenes.getByTestId("ui-window-close").click();
   await expect(scenes).toBeHidden();
+  // The wide Game log (FR-DICE-38) covers the lower map at 1280×800: park it (never refits).
+  await shellWindow(dm, "dice.log").getByTestId("ui-window-minimise").click();
   const w = (await tokenNode(dm, wolf))!;
   await dm.mouse.click(w.x, w.y, { button: "right" });
   await expect(dm.getByTestId("map-token-menu")).toBeVisible();

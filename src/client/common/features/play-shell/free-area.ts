@@ -252,6 +252,11 @@ export interface FreeAreaState {
   area: Rect;
   /** Every candidate free rectangle, largest first (FR-SHELL-44); may be empty. */
   areas: readonly Rect[];
+  /**
+   * The same, also clear of this client's toast box (FR-SHELL-48 (a)): the fit that keeps every
+   * token out from under the toasts (FR-MAP-59, slice W2) switches the camera to these.
+   */
+  toastFreeAreas: readonly Rect[];
   /** Grows by one per appearance; compare with a previous value, never read as a total. */
   appearances: number;
   /** The layout is applied (FR-SHELL-16): a fit before that would use no windows. */
@@ -267,7 +272,7 @@ export function useFreeArea(): FreeAreaState {
   const vp = useViewport();
   const measured = useContentHeights();
   const regions = useKeepOuts(registry.client);
-  const { area, areas } = useMemo(() => {
+  const { area, areas, toastFreeAreas } = useMemo(() => {
     const shown = renderedWindowRects(
       windows,
       registry,
@@ -276,8 +281,11 @@ export function useFreeArea(): FreeAreaState {
       measured,
       hardRects(regions),
     );
-    const rects = fitObstacles(shown, regions);
-    return { area: freeArea(rects, vp), areas: freeAreas(rects, vp) };
+    return {
+      area: freeArea(shown, vp),
+      areas: freeAreas(shown, vp),
+      toastFreeAreas: freeAreas(fitObstacles(shown, regions), vp),
+    };
   }, [windows, registry, available, vp, measured, regions]);
   const notedNow = useSyncExternalStore(subscribeNoted, notedAppearances);
   const [flips, setFlips] = useState(0);
@@ -289,5 +297,5 @@ export function useFreeArea(): FreeAreaState {
     if (isAppearance(seen.current, next, windowsRef.current)) setFlips((n) => n + 1);
     seen.current = next;
   }, [key, available]);
-  return { area, areas, appearances: flips + notedNow, ready: key !== null };
+  return { area, areas, toastFreeAreas, appearances: flips + notedNow, ready: key !== null };
 }

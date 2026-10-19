@@ -127,7 +127,8 @@ test("FR-DICE-35 FR-SHELL-35 chips fit the line: the DM's log at default size sh
 }) => {
   const { secret } = e2eEnv();
   const dm = await rolePage(browser);
-  await dm.setViewportSize({ width: 1280, height: 720 });
+  // FR-DICE-38: ≥ 6 at the tall default size (1150×240 from 1440×900; 160 high below shows ≥ 3).
+  await dm.setViewportSize({ width: 1440, height: 900 });
   await loginDm(dm, secret);
   await live(dm);
   const log = shellWindow(dm, "dice.log");
