@@ -1,10 +1,10 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: complete
-owner: spec-windows
+status: in-review
+owner: spec-companions
 wave: 3
-phase: post-mvp-5
+phase: post-mvp-6
 ---
 
 # Scenes and map
@@ -18,6 +18,19 @@ phase: post-mvp-5
 > **Sprint 5, track R (trails; spec-combat).** Known bug, decided: **combat trails are the same in every client after a reload** (session-sim-8 glitch 6: after the DM's reload the DM drew 1 segment where a player drew 2). Cause: FR-MAP-54 keeps trails in client memory and drops them on a snapshot. Fix: the trail is **stored on the token** for the turn (FR-MAP-65), sent with the token (FR-MAP-66) and drawn from the record (FR-MAP-67); combat writes and clears it ([FR-CBT-97](combat-tracker.md#6-functional-requirements)). Amended: FR-MAP-54. Decided at sprint-5 gate 1 (#256): OQ-MAP-50 A, OQ-MAP-51 A. Test plan and slices: [CBT §13.1](combat-tracker.md#131-sprint-5-track-r-cbt-mod-map), [§14.1](combat-tracker.md#141-build-split-sprint-5-track-r-cbt-mod-map). Other sprint-5 tracks edit this spec too (W: Fit; K: colours); R touches only the trail rows.
 >
 > **Sprint 5 (track K; BL-17 via [#251](../decisions-log.md); [#250](../decisions-log.md) [1]).** Decided by the DM (not open): each person's **laser, pings and drag path** show their **player colour** ([campaign-management](campaign-management.md) FR-CAMP-23–29 owns the colour); a kept template's right-click menu ([scene-tools](scene-tools.md) FR-SCN-48) needs the canvas to tell a right-click from a laser drag. New FR-MAP-68–73 (track K's range; W and R add their own rows in parallel). Wire: 0 B. Walkthrough: [CAMP §13](campaign-management.md#13-test-plan) K3, K5, K8, K9, K12.
+
+> **Sprint 6 (track CP, DM [#252](../decisions-log.md) / BL-30; companions).** A companion's token is an **owned token**: today's owner rules (move, drag path, trail, fog vision) already cover it. New FR-MAP-74–79: owner default for pet tokens, summon tokens next to the owner, a companion marker in the owner's colour, the owner's double-click to the card, the owned-token vision question (OQ-MAP-54), and a delete helper for summon tokens. Canvas files only if the marker can't be drawn through `tokenOverlays` (then after WF's canvas work: WF → CP).
+
+**Sprint 6 at a glance** (track CP)
+
+| FR | What | Slice ([CBT §14.2](combat-tracker.md#142-build-split-sprint-6-track-cp)) | Named test |
+|---|---|---|---|
+| FR-MAP-74 | Pet token owned by the pet's player at placement | CP0 | `FR-MAP-74 owner default` |
+| FR-MAP-75 | Summon tokens on free cells next to the owner's token | CP3 (server) | `FR-MAP-75 summon placement` |
+| FR-MAP-76 | Companion marker (owned non-PC token) in the owner's colour | CP5 | `FR-MAP-76 companion marker` |
+| FR-MAP-77 | Owner double-click → companion card | CP5 | `FR-MAP-77 double-click opens the card` |
+| FR-MAP-78 | Owned-token vision (DM question) | none if A | `FR-MAP-78 companion is a vision source` |
+| FR-MAP-79 | `deleteTokenIn` for Dismiss / End | CP0 | `FR-MAP-79 summon token deleted` |
 
 **Sprint 5 at a glance** (tracks W, R, K)
 
@@ -175,6 +188,13 @@ Decided at sprint-4 gate 1 (#245): OQ-MAP-35 (combat trail), -36 (straight path)
 | FR-MAP-71 | **Right-press routing** (both clients). Today's order, as built (`MapCanvas.tsx`; review #43), with one new step (4): on a button-2 press over the canvas: **(1) node menus**: doors (FR-SCN-09) and props (FR-SCN-17) set `cancelBubble` on button 2, so their own menus always win (DM); **(2) a token** under the pointer: DM → the token menu on release (FR-MAP-18); **player → only step (4)**: if a layer `contextMenu` hits at that point (e.g. their own kept template under the token) it opens there, **else nothing**: no laser, so FR-MAP-24's "right-click on a token: player → nothing" stays true (review #10); **(3)** the active drawing tool's `pointer.menu` (FOG Darkness, FR-FOG-42) as built; **(4) new:** the first layer entry whose `contextMenu.hit(p)` is true (top-down by `order`, [FR-SCN-51](scene-tools.md#6-functional-requirements); sprint 5: kept templates the client may edit, FR-SCN-48) → *(OQ-SCN-39 A, decided #256)* **deferred**: no laser yet; release with < 4 px movement → `contextMenu.open` at the pointer, **nothing sent**; ≥ 4 px → the laser starts from the press point (its first point), as today; **(5)** else the laser starts at once (unchanged). The laser (immediate or deferred) is gated by `signalsLive` as built (DM: off while the viewed scene isn't the active one, FR-MAP-08; both: off while not `live`); the menu in (4) needs `live` (FR-MAP-28), not `signalsLive`. The browser context menu stays suppressed. Middle mouse unaffected (FR-MAP-12). | [1]; review #10, #43 |
 | FR-MAP-72 | *(OQ-CAMP-25 A, decided #256)* **Coloured marks on the map:** every mark drawn in a person's colour (laser, ping, pull, drag path, trail; SCN templates FR-SCN-47; NOTE's token cue FR-NOTE-40, OQ-CAMP-27) draws over a **dark casing** (opaque `#000`, 2 screen px wider than the stroke; fills get a 1 px casing outline), per FR-CAMP-28: on light maps the bare colours measure 1.0–2.9 : 1, against the casing 5.3–15.9 : 1. Each casing is a Konva node named `map-casing` (id = its mark's id), so tests assert it. Colour unknown (no `player` record yet, an unknown key) → today's role accent (`dmAccent` / `playerAccent`). *(OQ-MAP-53 A, decided #256)* Local-only aids keep `primary` (ruler, drag target, selection box). | OQ-CAMP-25 |
 | FR-MAP-73 | *(OQ-CAMP-21 A, decided #256)* **Recolour, 0 B:** colours resolve at draw time from the store's `player` / `campaign` records, so a `PlayerColorSet` upsert redraws live trails, pulses, paths and trails ≤ 1 s with no resend. No signal gains a field: `map.ping`, `map.pull`, `map.laser`, `map.drag` frames stay byte-identical (receivers use the server-stamped `from`, ADR-0026). A sender the receiver has no `player` record for (a player added since its snapshot arrives with `PlayerAdded`) → fallback until the upsert lands. | ADR (proposed) |
+| **Sprint 6** (track CP, #252 / BL-30; owned tokens of companions) | | |
+| FR-MAP-74 | **Owner default** (amends FR-MAP-13, -48 `placeTokenIn`): placing a token of a **pet** ([FR-ENT-31](entities.md#6-functional-requirements)) sets `ownerPlayerId` = the pet's `ownerPlayerId`, as a character's token takes its owner (#124); an explicit `ownerPlayerId` still wins; combat's summon passes the companion's owner ([FR-CBT-110](combat-tracker.md#6-functional-requirements)). Duplicate copies the owner. The DM changes it in the token menu as today. A release or owner change of the pet leaves placed tokens as they are (#124). | #252 |
+| FR-MAP-75 | **Summon placement**: `placeTokenIn` for a summon gets the cells from `freeCellsNear` around the owner PC's bound token on the encounter's scene (FR-MAP-48's order, footprint and map-bounds rules; tokens placed earlier in the command count as occupied); owner token not on that scene, or none → combat's `at` / map-centre rule ([FR-CBT-65](combat-tracker.md#6-functional-requirements)). | |
+| FR-MAP-76 | **Companion marker** (both clients, on every token they receive): a token with `ownerPlayerId ≠ null` and `characterId = null` (an owned non-PC token: pet, summon, a familiar the DM gave an owner) draws a small paw badge in the **owner's colour** (FR-MAP-70's resolution, dark casing per FR-MAP-72) at the footprint's top-left, through one `tokenOverlays` line (`companion`, FR-MAP-34; append-only `token-overlays.ts`), following BL-35's compact rule below 48 px cells. A pure token rule: no combat data, 0 B. Tooltip "‹player name›'s companion" ("Player 1's companion"; the `player` record). Konva node name `map-token-companion` (id = token id). | Whose creature is it |
+| FR-MAP-77 | **Owner double-click** (token double-click registry FR-MAP-29, one CHARX line): the DM or the token's owner double-clicking a token marked per FR-MAP-76 opens `charx.companion` ([FR-CHARX-59](character-sheet-full.md#6-functional-requirements)) on the active companion combatant bound to it (`combatant.tokenId`); with none (a pet out of a fight) it opens the card with its picker as last used (players never receive `definitionId`, FR-MAP-26, so the token can't name its pet; OQ-MAP-55). Other players: no handler. | |
+| FR-MAP-78 | **Vision** ([OQ-MAP-54](#15-open-questions), DM): **as built**: an owned token is a vision source for its owner ([FR-FOG-32](fog-of-war.md#6-functional-requirements): not hidden; ≤ 4 per player and ≤ 12 per party, earliest placed first), so a pet or summon reveals fog for its owner (and the party with party vision on). No change unless the DM picks B / C. | FOG unchanged |
+| FR-MAP-79 | **`deleteTokenIn(env, tokenId)`** (scenes-map server helper, sibling of `placeTokenIn`): deletes a token inside the caller's transaction, runs the token-changed hooks (FR-MAP-30) and returns the `token` delete (+ hook rows) for the caller's event. Combat calls it for a summon's token at Dismiss and End ([FR-CBT-112, -113](combat-tracker.md#6-functional-requirements)) **after** setting the combatant inactive, so FR-CBT-09's "Token is in a running encounter" doesn't fire. Its trail and fog copies go with the row. | Helper, as `placeTokenIn` (S3) |
 
 ## 7. UI/UX notes
 
@@ -247,6 +267,8 @@ Envelopes, rejects, close codes: [live-sync](live-sync.md). Per ADR-0021 D, scen
 Command → event (CON-31): `POST /api/scenes` → `SceneCreated`; `PATCH /api/scenes/:id` (rename, move), `map.setSceneMap`, `map.setGrid`, `map.setLocked` → `SceneUpdated`; duplicate → `SceneDuplicated`; `DELETE` → `SceneDeleted`; folder routes → `SceneFolderCreated` / `Renamed` / `Deleted`; `map.activateScene` → `SceneActivated`; `map.placeToken` → `TokenPlaced`; `map.updateToken` → `TokenUpdated`; `map.duplicateToken` → `TokenDuplicated`; `map.deleteToken` → `TokenDeleted`; `map.setTokenHidden` → `TokenHidden` (`hidden: true`) / `TokenRevealed` (`false`); `map.moveToken` → `TokenMoved`.
 - *(Sprint 5, track W)* No REST route, intent, record type, event or signal; nothing new on the wire, so no visibility rule to add (CON-44: 0 B).
 
+*(Sprint 6)* **No wire change of scenes-map's own.** Pet tokens are created with an owner (FR-MAP-74); summon tokens ride combat's `CompanionsSummoned` (creates) and `CompanionDismissed` / `EncounterEnded` (deletes, FR-MAP-79) under the token's visibility rule; the marker is derived from `ownerPlayerId` + `characterId` (already on every visible token). No new intent, record type, signal or event.
+
 ## 10. Permissions
 
 | Action | DM | Player | Server check |
@@ -262,7 +284,11 @@ Command → event (CON-31): `POST /api/scenes` → `SceneCreated`; `PATCH /api/s
 | *(Sprint 4)* Show to players (Scenes window) | ✓ | ✗ | `map.activateScene`, DM only (unchanged) |
 | *(Sprint 5)* Right-click menu on a layer item (kept template) | items the owning feature allows (SCN: any kept template) | items it allows (SCN: own kept templates) | The feature's intent (FR-SCN-26), not this routing |
 
+*(Sprint 6)* Owned companion tokens follow FR-MAP-21 unchanged: the owner moves them (on the active scene, not hidden), the DM any. Open the card by double-click: DM, the owner (FR-MAP-77).
+
 ## 11. Edge cases & failure modes
+
+- *(Sprint 6, companions)* *Reconnect:* the marker is derived from the token in the snapshot. *Crash:* summon tokens are created / deleted inside combat's transactions (FR-MAP-75, -79). *Summon at a full scene* → combat's `conflict` "Scene is full", nothing placed. *The owner drags the summon off into fog:* it is still visible to its owner (owned token, FR-FOG-34) and, as a source, reveals around it (FR-MAP-78 A). *More than 4 owned tokens* (Conjure Animals): the earliest placed 4 are sources (PCs placed first keep theirs, FR-FOG-32). *Token owner changed by the DM* to another player: the marker recolours; combat's companion owner is unchanged (#124: token and companion owners are separate fields). *Made a companion / released / turned hostile mid-fight:* `cbt.setCompanion` sets or clears the bound token's owner in the same transaction ([FR-CBT-111](combat-tracker.md#6-functional-requirements)), so owner moves, the marker and vision start or end with it; a pet's token keeps its owner after Dismiss and End.
 
 - *(Sprint 4)* **Middle pan edge cases:** button 1 released outside the canvas ends the pan (window-level `mouseup`); a middle press over a window or the rail does nothing on the map; disconnect mid-pan: the pan continues (camera only). **Drag probe:** an ack arriving after the drop is stale and dropped; disconnect mid-drag → the drag snaps back (FR-MAP-28) and the probe clears; crash → `checkMove` never wrote anything.
 
@@ -313,6 +339,8 @@ Command → event (CON-31): `POST /api/scenes` → `SceneCreated`; `PATCH /api/s
 - **Colours and right press (sprint 5):** *disconnect* → marks keep their colours; the deferred press opens no menu and sends no laser (FR-MAP-28). *Reconnect / server crash* → signals in flight are lost as before; the snapshot brings every colour; nothing about colours was persisted beyond CAMP's rows. A *colour change mid-trail* or mid-drag redraws the rest of it in the new colour (FR-MAP-73). A *sender without a `player` record* (the race with `PlayerAdded`) → role accent until the upsert. *Right press then the pointer leaves the canvas* → treated as a drag (laser per today's rule; nothing opens). *Template deleted while the press is deferred* → on release nothing opens. *DM right-clicks a template that covers a token* → the token menu (step 2 wins, as built); the template's menu is reachable off the token or from the AoE tool panel (review #43). *Player right-clicks their own template under their own token* → the template menu (step 2 → 4). *DM viewing a non-active scene* → menus work, no laser (`signalsLive`). *Two people with one colour* (a 9th player's repeated default, FR-CAMP-26) → the name chip tells them apart.
 
 ## 12. Performance & bandwidth
+
+- *(Sprint 6, track CP)* **0 B** of scenes-map's own: the marker is derived; owned summon tokens are ordinary tokens (≤ 400 B each, ≤ 8 per summon); their creates / deletes ride combat's events (measured totals in [CBT §12](combat-tracker.md#12-performance--bandwidth)).
 
 - **Sprint 5 trails (measured** by spec-combat, 2026-10-18, throwaway probe on the realistic-heavy harness via `snapshotFrames`, not committed**):** `trail` at the 20-segment cap on every active-scene token: DM 60 tokens **+13,800 B**; players 6 player tokens **+1,380 B**; a move's `token` upsert 578 → 808 B (+230 B at the cap; typ. +20–60 B). Next / End send one clearing upsert per trailed token (typ. 1–3). Totals with the rest of track R: [CBT §12](combat-tracker.md#12-performance--bandwidth) (track R +61,526 B DM / +3,094 B per player: **DM ≈ 925 KB of the 1.5 MiB ceiling (#256), players ≈ 349 KB < 512 KiB**; one figure in both specs, review B14).
 - **Sprint 5 (K, measured by spec-colours 2026-10-18, heavy harness + frame serialisation, [CAMP §12](campaign-management.md#12-performance--bandwidth)):** **0 B** on every signal and snapshot from this spec (frames today: `map.ping` 176 B, `map.laser` 613 B at 32 points, `map.drag` 207 B). The rejected alternative, a colour key in each frame: +21 B per frame (≈ +420 B/s per receiver at 20 frames/s, ×7 receivers over the tunnel). CAMP's colour fields: +149 B per snapshot frame. Client: one `colorOf` lookup per mark per draw (≤ 8 people); a name chip is one Konva Text + Rect per live pointer; the casing doubles the stroke count of pointers and paths (≤ 2 × (7 laser trails + 1 path) per frame).
@@ -414,6 +442,10 @@ Isolated per worktree: `bun test` on `:memory:` DB, temp asset dir, port 0; walk
 | Unit (pure, `camera.test.ts`, `tool-bar-spot.test.ts`; layouts from the client registries) | `FR-MAP-59 every token visible`: `session-sim-8` Goblin Ambush cells (play-shell §13 list) with the default layouts of play-shell §7 at 1280×720, 1280×800, 1440×900, 1600×900: player sheet + log, + Initiative → `all`; DM Game log + Initiative → `all` at 1280×800, 1440×900, 1600×900 and `pcs` at 1280×720; DM + Scenes → `all` at 1280×800 only, else `pcs` (§12); `all` = every footprint inside the inset work area and clear of every window rect and the client's toast box (the DM's top-centre box), cell ≥ 24 px; equal to step 1 when step 1 already clears (no needless shrink); a token boxed in by windows at every scale → `pcs` = step 1's result; 31 tokens or 7 obstacles → `pcs` without search; a pocket bounded by edges of two different forbidden rectangles is found (review #16); a feasibility gap (allowed at 40, not at 44, allowed at 48) → the method's result, stated in the test; determinism (same input → same camera). `FR-MAP-59 perf`: best of 5 ≤ 25 ms on the named worst case (§12). `FR-MAP-60 tool bar spot`: home spot right of the rail at y 56 for every tool and size; fog bar max width 390 / 390 / 470 / 550 px (the DM's top-centre box) and 560 px for player bars; wrapping by control group (row count from the size table measured in the build); reported keep-out = the bar's rect; not recomputed on window move end; the push itself is play-shell's `FR-SHELL-55 push right`. `FR-MAP-61 appearance refit`: a frame that starts an encounter and creates a visible token while `fitted` → the refit's content includes it; `moved` → no refit | In-code |
 | E2E (thin) | Covered by play-shell's `windows-s5` e2e (rects); no new map e2e | `windows-s5` |
 
+### Sprint 6: owned companion tokens (track CP)
+
+Fixtures, bundles (`companions-prep`, `companions`) and the walkthrough (C2, C3, C8, D7) are in [CBT §13.2](combat-tracker.md#132-sprint-6-track-cp-cbt-ent-charx-party-map). MAP's named tests: `FR-MAP-74 owner default` (integration: placing the pet Owlbear → owner `player-1`; explicit owner wins; a plain custom → null; duplicate copies it); `FR-MAP-75 summon placement` (integration: two Fire Elementals land on the nearest free large footprints around Mira's token; Mira token-less → `at` / centre); `FR-MAP-76 companion marker` (unit: overlay for owned `characterId = null` tokens only, owner colour, compact below 48 px; client: A, B, C draw it on the Owlbear); `FR-MAP-77 double-click opens the card` (client: owner and DM open the card on the bound combatant; another player: nothing); `FR-MAP-78 companion is a vision source` (integration, option A: the owned Owlbear reveals around itself for `player-1`; the 5th owned token isn't a source); `FR-MAP-79 summon token deleted` (integration: Dismiss / End delete the token in the same event, after the combatant goes inactive; trail and fog copies gone; a pet's token stays).
+
 ### Sprint 5: colours and the right press (track K)
 
 Bundle `player-colours` = `map-tools` + CAMP's `pc-colours` ([CAMP §13](campaign-management.md#13-test-plan)): Player 1 jade, Player 2 blue, DM amber. Leak properties: no signal frame carries a `color` key; paths still only for player tokens on player clients (FR-MAP-53 unchanged).
@@ -508,6 +540,18 @@ Order and locks per the sprint-4 seams ruling (S1, S2, S4, S5, S7, S11, S14) and
 
 **Sprint 5, track W** (full split and order: [play-shell §14](play-shell.md#14-dependencies)): **W2** `fix/map-fit-visible` (FR-MAP-59, -61): `camera.ts` (pure `fitVisible`), ★ canvas file `MapCanvas.tsx` (fit call: obstacles, `data-fit-visible`); after W1 (toast boxes in `freeAreas`). **Canvas holder order, settled by seams S10:** K1 (template menu [1]) → **W2** (≈ 15 lines) → R3 (trails) → K3 (colours); a slice ready while another holds the lock waits or stacks with `--base`. **W3** `fix/tool-bar-spot` (FR-MAP-60, FOG FR-FOG-58, SHELL FR-SHELL-55 push): `ToolRail.tsx` (`ToolPanel` home spot, keep-out report, push call), new `tool-bar-spot.ts`, fog's `FogBar.tsx`, the frame's push action; after W1 (`reportKeepOut`), parallel with W2: `ToolRail.tsx` / `FogBar.tsx` are DOM tool bars outside the S10 canvas lock (rulings-a #22). scene-tools' AoE panel content unchanged (OQ-MAP-48). No record type, intent, signal, Konva layer or dependency; protocol §18 / §79 notes at consolidation.
 
+### Sprint 6 build split (track CP)
+
+Full split, order and locks: [CBT §14.2](combat-tracker.md#142-build-split-sprint-6-track-cp). MAP parts:
+
+| Slice | MAP contents | Touches (AGENTS §9.9) | Order |
+|---|---|---|---|
+| **CP0** `fix/cp-core` | FR-MAP-74 (owner default in `placeTokenIn`), FR-MAP-79 (`deleteTokenIn`) | scenes-map's server files `src/server/features/scenes-map/commands.ts` (orchestrator assigns; scenes-map lock while it lands) | Schema lane after IM core |
+| **CP3** `build/cp-summon` | FR-MAP-75 (cells next to the owner) | none (calls `placeTokenIn` / `freeCellsNear`) | After CP2 |
+| **CP5** `fix/cp-tokens` | FR-MAP-76 marker, FR-MAP-77 double-click | `token-overlays.ts` (append `companion`), token double-click registry (append); canvas (`TokensLayer.tsx`, `canvas-icons.ts` for the paw icon) **only if** the overlay API can't draw it: then **after WF's canvas work** (WF Fit / BL-47 label → CP5, one holder at a time) | After CP0 |
+
+- `LabelsLayer.tsx` and `MapCanvas.tsx`: no CP change planned. No new record type, intent, Konva layer or dependency.
+
 ### Sprint 5 build split (track K)
 
 Full split, order and locks: [CAMP §14](campaign-management.md#sprint-5-build-split-track-k). MAP parts:
@@ -525,6 +569,9 @@ Full split, order and locks: [CAMP §14](campaign-management.md#sprint-5-build-s
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
+| OQ-MAP-54 *(sprint 6)* | **Does an owned companion token give its owner vision?** (5e: you don't see through your owlbear's eyes; Find Familiar's senses take an action) | **A. Yes, as built: every owned token is a source** (FR-FOG-32, ≤ 4 per player, earliest first): no change, the party sees what its creatures see / B. Never: companion tokens (owned, `characterId` null) are not sources (5e-accurate; a scouting owlbear reveals nothing; a FOG change) / C. A per-token "Gives vision" switch, default on for pets, off for summons (most control; one token field + DM menu item) | **yes** (DM) | fog-of-war |
+| OQ-MAP-55 *(sprint 6)* | Double-click on a pet token out of a fight: which pet? | **Open the card with its picker** (players never get `definitionId`) / send `definitionId` to the owner of an owned non-PC token (changes FR-MAP-26's "never on any token" rule and its leak string) / a token display copy `petId` (one more column) | no · owner: CP5 | entities |
+| OQ-MAP-56 *(sprint 6)* | **fog-of-war:** with companions a player can own > 4 tokens (Conjure Animals); FR-FOG-32 keeps the earliest 4 per player as sources | **Keep as built** (PCs are placed first, so they stay sources) / raise the per-player cap to 8 (perf: FOG §12's 12-source budget per party) / PCs always first, then companions by seq (a FOG change) | no · owner: fog-of-war (orchestrator) | fog-of-war |
 | OQ-MAP-50 *(sprint 5, R)* | **Where does a combat trail live so every client draws the same one after a reload?** (sim-8 glitch 6; amends OQ-MAP-35's "client memory, 0 B") | **Decided (#256): A**, on the token (`trail` column), written by combat's move hook through scenes-map's helpers, not appended while the token is hidden (FR-MAP-65, -66). Rejected: ~~B on the combatant~~, ~~C server memory per encounter~~ | — | combat-tracker |
 | OQ-MAP-51 *(sprint 5, R)* | **Prev and trails** | **Decided (#256): A**, every turn change clears trails (as built, Prev included). Rejected: ~~B trails keyed by turn, Prev shows them again~~ | — | combat-tracker |
 | ~~OQ-MAP-01, 02, 03~~ | ~~Diagonal rule; token owner; tokens per scene~~ | **Decided (#124):** ~~5 ft per diagonal square~~ → 5/10/5 diagonals (#145); one `ownerPlayerId` per token, defaulted from the character's owner, DM reassigns; tokens per scene, combatant-on-token-delete rule owned by combat-tracker | — | — |
@@ -579,5 +626,7 @@ Full split, order and locks: [CAMP §14](campaign-management.md#sprint-5-build-s
 | OQ-MAP-53 | Local-only aids (ruler, drag target cell, DM selection box) | **Decided (#256): keep `primary` (white) for local-only aids.** Pick as proposed: A. Keep `primary` (white): they are never seen by others, so colour adds nothing. Rejected: ~~B. Own colour: more consistent, but white is also the selection ring's cue~~ | — · decided | — |
 
 ## 16. Out of scope
+
+- *(Sprint 6)* Seeing through a companion's eyes on demand; per-token vision switches (OQ-MAP-54 C, unless picked); a companion leash / range indicator; summon placement by the player.
 
 - See §4. Notes from tokens → [world-builder](post-mvp/world-builder.md); combatants → [combat-tracker](combat-tracker.md).
