@@ -2,8 +2,10 @@
 // store; rolls go out as `dice.roll` intents. DM-only parts (public eye toggle, settings gear)
 // render from `you.role` / the `dmTools` slot. Sprint 4: each `die` segment is an inline die-shape
 // chip in the roller's look (FR-DICE-35); `focusLogEntry` highlights an entry (FR-DICE-37).
-// Sprint 5: a line this client's dice haven't landed yet shows blank chips and "…" (FR-DICE-40).
+// Sprint 5: a line this client's dice haven't landed yet shows blank chips and "…" (FR-DICE-40);
+// a `roll` line's actor name in the roller's player colour (FR-DICE-60, -61).
 
+import type { PlayerColor } from "@shared/campaign-management/colors";
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
   COMBATANT_TYPE,
@@ -47,6 +49,7 @@ import { Badge, Input, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
+import { colorHex } from "../campaign-management/colors";
 import { DieShape } from "../dice-extras/DieShape";
 import { useLanded, useLandingFade } from "../dice-extras/landing";
 import { stageTray, type TrayRequest } from "../dice-extras/store";
@@ -62,13 +65,23 @@ import {
   type ShownSegment,
   sortEntries,
 } from "./logic";
+import { rollerAttr, rollerColorKey, useColorKeyOf } from "./name-color";
 import { usePhysicalDice, useRollOptionsOpen } from "./physical";
 import { RollButton, type RollKeys, useRollControl } from "./roll-control";
 
 const SELECT =
   "h-7 min-w-0 shrink-0 rounded-md border border-input bg-background px-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 
-function Segment({ s, look }: { s: ShownSegment; look: DiceLook }) {
+function Segment({
+  s,
+  look,
+  nameColor,
+}: {
+  s: ShownSegment;
+  look: DiceLook;
+  /** FR-DICE-60: the actor name's colour; null = the default text colour. */
+  nameColor: string | null;
+}) {
   if (s.die) {
     // FR-DICE-35: a wrapper per chip (review B31); the shape inside keeps `dicex-die`. A dropped
     // die's wrapper is `<s>`, as its text was (struck for assistive tech too). FR-DICE-40: held →
@@ -100,7 +113,15 @@ function Segment({ s, look }: { s: ShownSegment; look: DiceLook }) {
   }
   switch (s.style) {
     case "actor":
-      return <strong className="font-semibold">{s.text}</strong>;
+      return (
+        <strong
+          data-testid="dice-log-entry-actor"
+          className="font-semibold"
+          style={nameColor ? { color: nameColor } : undefined}
+        >
+          {s.text}
+        </strong>
+      );
     case "total":
       return (
         <strong data-landing className="font-semibold">
@@ -149,11 +170,13 @@ function Entry({
   e,
   isDm,
   look,
+  color,
   focused,
 }: {
   e: GameLogEntryView;
   isDm: boolean;
   look: DiceLook;
+  color: PlayerColor | null;
   focused: boolean;
 }) {
   const { segments } = useMemo(() => formatEntry(e), [e]);
@@ -162,10 +185,13 @@ function Entry({
   const shown = useMemo(() => (landed ? segments : heldSegments(segments)), [segments, landed]);
   const line = useLandingFade<HTMLSpanElement>(landed);
   const hidden = isDm && !e.public;
+  const nameColor = color ? colorHex(color) : null;
   return (
     <li
       data-testid="dice-log-entry"
       data-record-id={e.id}
+      data-color={color ?? undefined}
+      data-roller={rollerAttr(e)}
       data-public={e.public}
       data-undone={e.undone}
       data-focused={focused}
@@ -190,7 +216,7 @@ function Entry({
         <span ref={line} className={cn("min-w-0 flex-1 break-words", e.undone && "line-through")}>
           {shown.map((s, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: segments are positional and immutable
-            <Segment key={i} s={s} look={look} />
+            <Segment key={i} s={s} look={look} nameColor={nameColor} />
           ))}
         </span>
       </Tooltip>
@@ -208,6 +234,7 @@ function Entry({
 function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const looks = useRollerLooks();
+  const keyOf = useColorKeyOf();
   const focusedId = useLogFocus((s) => s.entryId);
   const focusSeq = useLogFocus((s) => s.seq);
   const [stick] = useState(createStickToBottom);
@@ -271,7 +298,14 @@ function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boole
       >
         <ul className="flex flex-col">
           {entries.map((e) => (
-            <Entry key={e.id} e={e} isDm={isDm} look={looks(e)} focused={focusedId === e.id} />
+            <Entry
+              key={e.id}
+              e={e}
+              isDm={isDm}
+              look={looks(e)}
+              color={rollerColorKey(keyOf, e)}
+              focused={focusedId === e.id}
+            />
           ))}
         </ul>
       </div>
