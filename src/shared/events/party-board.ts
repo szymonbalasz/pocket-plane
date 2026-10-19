@@ -85,3 +85,27 @@ export const ItemMoved = defineEvent({
   logged: true,
   undoable: false,
 });
+
+/**
+ * `party.presentHandout` (FR-PARTY-32) and `party.shareHandout {present: true}` (FR-PARTY-33):
+ * changes = `handout-present`, per target their old row deleted (any handout) and a new row
+ * upserted. Each target receives only their own rows (FR-PARTY-31).
+ */
+export const HandoutPresented = defineEvent({
+  type: "HandoutPresented",
+  payload: z.strictObject({ handoutId: Id, playerIds: z.array(Id).min(1) }),
+  logged: true,
+  undoable: false,
+});
+
+/** `party.closePresent` (FR-PARTY-34): changes = `handout-present` → null for each closed row. */
+export const HandoutPresentClosed = defineEvent({
+  type: "HandoutPresentClosed",
+  payload: z.strictObject({
+    handoutId: Id,
+    playerIds: z.array(Id).min(1),
+    by: z.enum(["dm", "player"]),
+  }),
+  logged: true,
+  undoable: false,
+});

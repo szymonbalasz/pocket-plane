@@ -1,7 +1,7 @@
 ---
 title: Assets pipeline
 prefix: ASSET
-status: in-review
+status: complete
 owner: spec-cmpimg
 wave: 1
 phase: post-mvp-5

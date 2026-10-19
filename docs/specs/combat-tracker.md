@@ -1,7 +1,7 @@
 ---
 title: Combat tracker
 prefix: CBT
-status: in-review
+status: complete
 owner: spec-combat
 phase: post-mvp-5
 wave: 3

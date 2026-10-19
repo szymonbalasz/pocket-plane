@@ -1,5 +1,6 @@
 // CON-44 snapshot ceilings + live-sync §12 build time (#163): session-sim and a "realistic
 // heavy" session built through commands. DM ≤ 768 KiB, players ≤ 512 KiB, DM build < 200 ms.
+// Worst-case rows per core (seams S14): PARTY S5 adds an open `handout-present` for every player.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
 import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
@@ -11,6 +12,7 @@ import {
 import { GAME_LOG_WINDOW } from "@shared/dice-roll-log/schemas";
 import { EFFECT_PRESET_TYPE } from "@shared/effect-modifiers/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
+import { HANDOUT_PRESENT_TYPE } from "@shared/party-board/schemas";
 import {
   AOE_TEMPLATE_TYPE,
   MAP_SETTINGS_TYPE,
@@ -18,6 +20,7 @@ import {
   SCENE_STRUCTURE_TYPE,
 } from "@shared/scene-tools/schemas";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
+import { writeWorstPresents } from "../features/party-board/testing";
 import { SNAPSHOT_CEILING } from "./hub";
 import {
   buildRealisticHeavy,
@@ -73,9 +76,14 @@ describe("CON-44 snapshot ceilings (#163)", () => {
   describe("realistic heavy", () => {
     let b: Awaited<ReturnType<typeof sessionSim>>;
     let counts: Record<string, number>;
+    let presents: number;
     beforeAll(async () => {
       b = await sessionSim();
       counts = buildRealisticHeavy(b.s);
+      const cid = b.s.db.$client
+        .query<{ id: string }, []>("SELECT id FROM campaign WHERE active = 1")
+        .get()?.id as string;
+      presents = writeWorstPresents(b.s.db, cid);
     }, 60_000);
     afterAll(() => b.cleanup());
 
@@ -101,6 +109,26 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect(sizes).toHaveLength(1 + HEAVY.players);
       expectUnderCeilings(sizes);
       expect(dmBuildMs(b.s)).toBeLessThan(BUILD_MS);
+    });
+
+    test("PARTY S5 FR-PARTY-31 worst case: an open handout-present per player; DM all rows, each player only its own; ceilings hold", () => {
+      const sizes = snapshotSizes(b.s);
+      expect(presents).toBe(HEAVY.players);
+      const [dm, ...players] = sizes as [ViewerSize, ...ViewerSize[]];
+      expect(dm.types[HANDOUT_PRESENT_TYPE]?.rows).toBe(HEAVY.players);
+      for (const p of players) expect(p.types[HANDOUT_PRESENT_TYPE]?.rows).toBe(1);
+      // PARTY §12 S5 measured +1,517 B DM at 6 rows, +267 B per player (≈ 250 B a row).
+      expect(dm.types[HANDOUT_PRESENT_TYPE]?.bytes ?? Infinity).toBeLessThan(HEAVY.players * 270);
+      for (const p of players)
+        expect(p.types[HANDOUT_PRESENT_TYPE]?.bytes ?? Infinity).toBeLessThan(300);
+      for (const f of snapshotFrames(b.s).filter((x) => x.viewer.role === "player")) {
+        const own = (f.records[HANDOUT_PRESENT_TYPE] ?? []) as { playerId: string }[];
+        expect(own.map((r) => r.playerId)).toEqual([f.viewer.playerId as string]);
+      }
+      expectUnderCeilings(sizes);
+      console.log(
+        `PARTY S5 handout-present worst case: DM ${dm.types[HANDOUT_PRESENT_TYPE]?.bytes} B (${HEAVY.players} rows), player ${players[0]?.types[HANDOUT_PRESENT_TYPE]?.bytes} B; heavy DM ${dm.bytes} B, ${SNAPSHOT_CEILING.dm - dm.bytes} B left of 1.5 MiB; players max ${Math.max(...players.map((p) => p.bytes))} B`,
+      );
     });
 
     test("ADR-0041 DM token window: the active scene's 60 tokens only; largest scene load < 512 KiB", () => {

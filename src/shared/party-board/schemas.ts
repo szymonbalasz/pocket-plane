@@ -9,13 +9,15 @@ export const HANDOUT_TYPE = "handout";
 export const HANDOUT_BODY_TYPE = "handout-body";
 export const PARTY_ITEM_TYPE = "party-item";
 export const HANDOUT_SHARED_KIND = "handout-shared";
+/** S5 (FR-PARTY-31): a shared handout open on one player's screen. */
+export const HANDOUT_PRESENT_TYPE = "handout-present";
 
 /** FR-PARTY-01: handouts per campaign. */
 export const HANDOUT_MAX = 200;
 export const HANDOUT_TITLE_MAX = 80;
 export const HANDOUT_BODY_MAX = 10_000;
 export const HANDOUT_IMAGES_MAX = 10;
-/** FR-PARTY-05: chosen players per share. */
+/** FR-PARTY-05: chosen players per share; FR-PARTY-32: per present. */
 export const SHARE_PLAYERS_MAX = 20;
 /** FR-PARTY-17: party rows per campaign. */
 export const PARTY_ITEM_MAX = 60;
@@ -38,6 +40,10 @@ export const SPLIT_TEXT = "Split";
 /** FR-PARTY-25: `loot.edit` on an item row. */
 export const ITEM_EDIT_MESSAGE = "Item moves can't be edited — move it back";
 export const onlyLeftMessage = (n: number) => `Only ${n} left`;
+/** FR-PARTY-32: no target can see the handout. */
+export const SHARE_FIRST_MESSAGE = "Share it first";
+/** FR-PARTY-32: a chosen target can't see the handout. */
+export const cantSeeMessage = (name: string) => `${name} can't see this handout — share it first`;
 
 const Id = z.string().min(1).max(64);
 
@@ -111,8 +117,20 @@ export type HandoutInput = z.output<typeof CreateHandoutIntent>;
 export const UpdateHandoutIntent = z.strictObject({ handoutId: Id, ...handoutFields });
 export type UpdateHandoutIntent = z.input<typeof UpdateHandoutIntent>;
 
-/** `party.shareHandout` (DM, FR-PARTY-05): share and unshare. */
-export const ShareHandoutIntent = z.strictObject({ handoutId: Id, sharedWith: SharedWith });
+/**
+ * `party.shareHandout` (DM, FR-PARTY-05): share and unshare. *(S5)* `present: true` also opens it
+ * on the gainers' screens (FR-PARTY-33); with `mode: none` → `invalid`.
+ */
+export const ShareHandoutIntent = z
+  .strictObject({ handoutId: Id, sharedWith: SharedWith, present: z.boolean().optional() })
+  .superRefine((v, ctx) => {
+    if (v.present === true && v.sharedWith.mode === "none")
+      ctx.addIssue({
+        code: "custom",
+        message: "Can't open an unshared handout",
+        path: ["present"],
+      });
+  });
 export type ShareHandoutIntent = z.input<typeof ShareHandoutIntent>;
 
 /** `party.deleteHandout` (DM, FR-PARTY-08). */
@@ -170,6 +188,49 @@ export type HandoutBodyView = z.infer<typeof HandoutBodyView>;
 /** Notification `handout-shared` payload (FR-PARTY-06). */
 export const HandoutSharedPayload = z.strictObject({ handoutId: z.string() });
 export type HandoutSharedPayload = z.infer<typeof HandoutSharedPayload>;
+
+// ── Handout present (S5) ────────────────────────────────────────────────────
+
+/** FR-PARTY-32 targets: everyone who can see it, or 1–20 unique chosen players. */
+export const PresentTo = z.discriminatedUnion("mode", [
+  z.strictObject({ mode: z.literal("all") }),
+  z.strictObject({
+    mode: z.literal("players"),
+    playerIds: z
+      .array(Id)
+      .min(1, "Choose at least one player")
+      .max(SHARE_PLAYERS_MAX)
+      .refine(unique, { message: "Each player once" }),
+  }),
+]);
+export type PresentTo = z.infer<typeof PresentTo>;
+
+/** `party.presentHandout` (DM, FR-PARTY-32). */
+export const PresentHandoutIntent = z.strictObject({ handoutId: Id, to: PresentTo });
+export type PresentHandoutIntent = z.input<typeof PresentHandoutIntent>;
+
+export const PresentHandoutResult = z.strictObject({ presentIds: z.array(z.string()) });
+export type PresentHandoutResult = z.infer<typeof PresentHandoutResult>;
+
+/**
+ * `party.closePresent` (FR-PARTY-34): `{presentId}` (player: own row; DM: any) or `{handoutId}`
+ * (DM: every row of that handout). Exactly one key.
+ */
+export const ClosePresentIntent = z.union([
+  z.strictObject({ presentId: Id }),
+  z.strictObject({ handoutId: Id }),
+]);
+export type ClosePresentIntent = z.input<typeof ClosePresentIntent>;
+
+/** Record `handout-present` (FR-PARTY-31, §8); DM all rows, a player only their own. */
+export const HandoutPresentRecord = z.strictObject({
+  id: z.string(),
+  campaignId: z.string(),
+  handoutId: z.string(),
+  playerId: z.string(),
+  presentedAt: z.string(),
+});
+export type HandoutPresentRecord = z.infer<typeof HandoutPresentRecord>;
 
 // ── Party inventory ─────────────────────────────────────────────────────────
 

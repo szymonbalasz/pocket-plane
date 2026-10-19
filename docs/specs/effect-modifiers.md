@@ -1,7 +1,7 @@
 ---
 title: Effect modifiers
 prefix: MOD
-status: in-review
+status: complete
 owner: spec-combat
 phase: post-mvp-5
 ---

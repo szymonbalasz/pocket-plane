@@ -147,6 +147,12 @@ export const asset = sqliteTable(
     displayWidth: integer("display_width").notNull(),
     displayHeight: integer("display_height").notNull(),
     createdAt: text("created_at").notNull(),
+    /**
+     * FR-ASSET-24 (S5): false = an **attachment** (upload / paste through the attach control):
+     * outside the library and every snapshot (the `asset` provider reads listed rows only).
+     * Server-only, not on the wire. Existing rows: true.
+     */
+    listed: integer("listed", { mode: "boolean" }).notNull().default(true),
   },
   (t) => [
     // FR-ASSET-03: dedupe per campaign.
@@ -800,6 +806,33 @@ export const partyItem = sqliteTable(
 );
 
 /**
+ * Handout present (party-board, `handout-present`, data model §65; S5 P0): a shared handout open
+ * on one player's screen until closed (FR-PARTY-31). At most one row per player (unique
+ * `(campaignId, playerId)`); a row exists only for a player who can see its handout
+ * (FR-PARTY-35, kept by the commands; the cascade is the backstop for a handout delete).
+ */
+export const handoutPresent = sqliteTable(
+  "handout_present",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    handoutId: text("handout_id")
+      .notNull()
+      .references((): AnySQLiteColumn => handout.id, { onDelete: "cascade" }),
+    playerId: text("player_id")
+      .notNull()
+      .references((): AnySQLiteColumn => player.id),
+    presentedAt: text("presented_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("handout_present_campaign_player").on(t.campaignId, t.playerId),
+    index("handout_present_handout").on(t.handoutId),
+  ],
+);
+
+/**
  * Effect (combat-extras, `effect`, data model §21): a condition, custom effect or concentration
  * on a monster's combatant or a PC's character. Soft end (`endedAt` + reason) so Prev and undo
  * restore. Partial unique indexes: one active concentration per target, one active condition per
@@ -1404,6 +1437,7 @@ export const schema = {
   lootEntry,
   handout,
   partyItem,
+  handoutPresent,
   creatureSheet,
   effect,
   effectPreset,

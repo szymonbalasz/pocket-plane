@@ -2,6 +2,7 @@
 // record-type registry, the leak tests and the clients share one rule.
 import type {
   HandoutBodyRecord,
+  HandoutPresentRecord,
   HandoutRecord,
   PlayerHandoutBodyRecord,
   PlayerHandoutRecord,
@@ -99,4 +100,13 @@ export function sameShare(a: SharedWith, b: SharedWith): boolean {
   if (a.playerIds.length !== b.playerIds.length) return false;
   const set = new Set(a.playerIds);
   return b.playerIds.every((p) => set.has(p));
+}
+
+/** FR-PARTY-31: `handout-present`: DM full; a player only their own row, else hidden. */
+export function presentVisibility(
+  r: Pick<HandoutPresentRecord, "playerId">,
+  v: HandoutViewer,
+): HandoutVisibility {
+  if (v.role === "dm") return "full";
+  return v.playerId !== null && r.playerId === v.playerId ? "full" : "hidden";
 }
