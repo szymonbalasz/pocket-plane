@@ -1,6 +1,7 @@
 // Small combat-extras parts for both clients: effect chips on one line ("+N" for the rest: the
 // hidden ones on hover and click, P3 glitch 6; FR-CBTX-33/34; compact labels measured against the room left, FR-CBTX-46; tighter tiers before "+N", BL-08), death pips + state badge (FR-CBTX-33/34), roll / intent helpers.
-// Sprint 4 (FR-CBTX-52): trigger chips after the effect chips on the same line, last into "+N".
+// Sprint 4 (FR-CBTX-52): trigger chips after the effect chips on the same line. Sprint 5
+// (FR-CBTX-54, BL-26): a trigger never folds into "+N"; it goes icon-only first.
 import type { DeathCounters, EffectView } from "@shared/combat-extras/schemas";
 import type { DeathState } from "@shared/entities/schemas";
 import { CheckIcon, EyeOffIcon, ZapIcon } from "lucide-react";
@@ -28,63 +29,90 @@ import {
   chipParts,
   chipText,
   DEATH_LABEL,
+  fitChipRow,
   fitChips,
-  fitChipTiers,
   splitNumbered,
-  tierWidths,
 } from "./logic";
 
 const GAP = 2;
 
+/** `left`: plain rows' "+N" offset, px. */
+type Fit = { n: number; tier: number; icons: boolean; wrap: boolean; left: number };
+
 /**
- * How many of a row's chips fit its width (FR-CBTX-46: the width left on the name line after the
- * full name, `fitChips`); the rest stay in flow but invisible (clipped by the row) and "+N" sits
- * after the last one that fits. Compact rows first try tighter tiers (BL-08, `fitChipTiers`),
- * measured on an invisible copy of the chips at natural width (`data-chip-measure`). Measured
- * after layout, on resize (ResizeObserver) and when the chips change, so a row never wraps or
- * grows (FR-SHELL-32's 6 rows hold).
+ * How many of a row's effect chips fit its width (FR-CBTX-46: the width left on the name line
+ * after the full name). Plain rows (`fitChips`): the rest stay in flow but invisible (clipped by the
+ * row) and "+N" sits after the last one that fits. Compact rows (`fitChipRow`, FR-CBTX-54) are
+ * measured on an invisible copy of the chips at natural width (`data-chip-measure`): effect chips
+ * tighten (BL-08), trigger chips go icon-only, effect chips fold, and only then does the chip row
+ * take a line of its own under the name (`wrap`: the name line wraps, the row grows one line; kept
+ * until the name line widens or the chips change, so it never flips back and forth). Measured
+ * after layout, on resize (ResizeObserver) and when the chips change.
  */
 function useFit(count: number, compact: boolean, deps: unknown) {
   const ref = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState({ n: count, tier: 0, left: 0 });
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the chips change
+  const [fit, setFit] = useState<Fit>({ n: count, tier: 0, icons: false, wrap: false, left: 0 });
+  const wrapAt = useRef<number | null>(null);
+  const lastDeps = useRef(deps);
+  // The name line wraps only while the chips sit on their own line (FR-CBTX-54 (4)).
+  useLayoutEffect(() => {
+    const line = ref.current?.parentElement;
+    if (!fit.wrap || !line) return;
+    const before = line.style.flexWrap;
+    line.style.flexWrap = "wrap";
+    return () => {
+      line.style.flexWrap = before;
+    };
+  }, [fit.wrap]);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    const changed = lastDeps.current !== deps;
+    lastDeps.current = deps;
     const measure = () => {
-      const room = el.clientWidth;
-      if (room === 0) {
-        setFit({ n: count, tier: 0, left: 0 });
+      const line = el.parentElement?.clientWidth ?? 0;
+      if (fit.wrap && (changed || wrapAt.current === null || line > wrapAt.current)) {
+        // Chips changed or the name line widened: measure on the name line again.
+        wrapAt.current = null;
+        setFit((f) => ({ ...f, wrap: false }));
         return;
       }
-      let widths: number[];
-      let n: number;
-      let tier = 0;
-      if (compact) {
-        const chips: ChipWidths[] = [
-          ...el.querySelectorAll<HTMLElement>("[data-chip-measure]"),
-        ].map((m) => {
-          const [full = 0, short = full] = [...m.children].map(
-            (c) => (c as HTMLElement).offsetWidth,
-          );
-          return { full, short };
-        });
-        ({ n, tier } = fitChipTiers(chips, room, GAP));
-        widths = tierWidths(chips, tier);
-      } else {
-        widths = [...el.querySelectorAll<HTMLElement>("[data-chip]")].map((k) => k.offsetWidth);
-        n = fitChips(widths, room, GAP);
+      const room = el.clientWidth;
+      if (room === 0) {
+        setFit((f) => ({ n: count, tier: 0, icons: false, wrap: f.wrap, left: 0 }));
+        return;
       }
-      // "+N" right after the last chip shown, at the chosen tier's widths.
-      const left = n < widths.length ? widths.slice(0, n).reduce((a, w) => a + w + GAP, 0) : 0;
-      setFit({ n, tier, left });
+      if (compact) {
+        const widths = (kind: string): ChipWidths[] =>
+          [...el.querySelectorAll<HTMLElement>(`[data-chip-measure="${kind}"]`)].map((m) => {
+            const [full = 0, short = full] = [...m.children].map(
+              (c) => (c as HTMLElement).offsetWidth,
+            );
+            return { full, short };
+          });
+        const r = fitChipRow(widths("effect"), widths("trigger"), room, GAP);
+        if (fit.wrap) {
+          // On its own line: the same rule on the full width; still too narrow → the chips wrap.
+          setFit({ ...(r.wrap ? { n: 0, tier: 0, icons: true } : r), wrap: true, left: 0 });
+          return;
+        }
+        if (r.wrap) wrapAt.current = line;
+        setFit({ ...r, left: 0 });
+        return;
+      }
+      const ws = [...el.querySelectorAll<HTMLElement>("[data-chip]")].map((k) => k.offsetWidth);
+      const n = fitChips(ws, room, GAP);
+      // "+N" right after the last chip shown.
+      const left = n < ws.length ? ws.slice(0, n).reduce((a, w) => a + w + GAP, 0) : 0;
+      setFit({ n, tier: 0, icons: false, wrap: false, left });
     };
     measure();
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
     ro?.observe(el);
+    if (el.parentElement) ro?.observe(el.parentElement);
     return () => ro?.disconnect();
-  }, [count, compact, deps]);
-  return { ref, fit: Math.min(fit.n, count), tier: fit.tier, left: fit.left };
+  }, [count, compact, deps, fit.wrap]);
+  return { ref, ...fit, n: Math.min(fit.n, count) };
 }
 
 /**
@@ -196,23 +224,21 @@ const TRIGGER_CLASS: Record<TriggerChip["state"], string> = {
 
 /**
  * FR-CBTX-52 trigger chip: lightning + name, uses left after it ("Divine Fury 2"; "−1" in
- * `hp.down`), muted + check once used (or no use left). Compact tiers cut the name and keep the
- * count. Display only (CBTX §4).
+ * `hp.down`), muted + check once used (or no use left), at most `CHIP_MAX_W`. `icon` (FR-CBTX-54):
+ * lightning + uses only ("⚡2"), the used look kept, the name for screen readers. Display only
+ * (CBTX §4).
  */
 function TriggerChipBadge({
   t,
   testId,
-  tier = 0,
-  natural = false,
+  icon = false,
   style,
   ...trigger
 }: Omit<ComponentProps<"span">, "children"> & {
   t: TriggerChip;
   testId?: string;
-  tier?: number;
-  natural?: boolean;
+  icon?: boolean;
 }) {
-  const cap = (CHIP_TIERS[tier] ?? CHIP_TIERS[0]).cap;
   return (
     <Badge
       {...trigger}
@@ -222,38 +248,42 @@ function TriggerChipBadge({
       data-state={testId ? t.state : undefined}
       data-value={testId && t.uses ? t.uses.left : undefined}
       data-muted={testId ? t.muted : undefined}
-      data-tier={testId ? tier : undefined}
+      data-compact={testId ? icon : undefined}
       className={cn(
         "shrink-0 gap-0.5 truncate px-1 py-0 text-[11px] font-normal",
         t.muted ? "text-muted-foreground opacity-70" : TRIGGER_CLASS[t.state],
       )}
-      style={{ ...style, maxWidth: natural ? CHIP_MAX_W : cap }}
+      style={{ ...style, maxWidth: CHIP_MAX_W }}
     >
       <ZapIcon className="size-3 shrink-0" aria-hidden />
-      <span className="min-w-0 truncate">{t.name}</span>
+      {icon ? (
+        <span className="sr-only">{t.name}</span>
+      ) : (
+        <span className="min-w-0 truncate">{t.name}</span>
+      )}
       {t.uses && (
-        <span className={cn("ml-0.5 shrink-0", t.down && "text-hp-down")}>{t.uses.text}</span>
+        <span className={cn(!icon && "ml-0.5", "shrink-0", t.down && "text-hp-down")}>
+          {t.uses.text}
+        </span>
       )}
       {t.muted && <CheckIcon className="size-3 shrink-0" aria-label="Used" />}
     </Badge>
   );
 }
 
-export function TriggerChipView({ t, tier = 0 }: { t: TriggerChip; tier?: number }) {
+/** Tooltip: the state sentence; icon-only it names the trigger too ("Divine Fury — ready"). */
+export function TriggerChipView({ t, icon = false }: { t: TriggerChip; icon?: boolean }) {
   return (
-    <Tooltip content={t.tooltip}>
-      <TriggerChipBadge t={t} testId={TRIGGER_CHIP_ID} tier={tier} />
+    <Tooltip content={icon ? triggerLine(t) : t.tooltip}>
+      <TriggerChipBadge t={t} testId={TRIGGER_CHIP_ID} icon={icon} />
     </Tooltip>
   );
 }
 
-type ChipItem = { kind: "effect"; e: EffectView } | { kind: "trigger"; t: TriggerChip };
-
-const itemKey = (i: ChipItem) => (i.kind === "effect" ? i.e.id : `t:${i.t.id}`);
-
 /**
- * One line of chips, concentration first, then the trigger chips (FR-CBTX-52, compact rows only);
- * what doesn't fit collapses into "+N" (hover and click list the hidden ones).
+ * One line of chips, concentration first, then the trigger chips (FR-CBTX-52, compact rows only).
+ * Effect chips that don't fit collapse into "+N" (hover and click list them); trigger chips never
+ * do (FR-CBTX-54): they go icon-only first, and wrap under the name as a last resort.
  * `menu(e)` (DM): an effect chip opens a menu with those items.
  */
 export function EffectChips({
@@ -273,69 +303,58 @@ export function EffectChips({
   className?: string;
   compact?: boolean;
 }) {
-  const list: ChipItem[] = [
-    ...chipOrder(effects).map((e) => ({ kind: "effect" as const, e })),
-    ...triggers.map((t) => ({ kind: "trigger" as const, t })),
-  ];
-  const { ref, fit, tier, left } = useFit(
-    list.length,
+  const fx = chipOrder(effects);
+  const trig = compact ? triggers : [];
+  const { ref, n, tier, icons, wrap, left } = useFit(
+    fx.length,
     compact,
-    list
-      .map((i) =>
-        i.kind === "effect"
-          ? `${i.e.id}:${compact ? chipLabel(i.e, round) : chipText(i.e, round)}`
-          : `${i.t.id}:${i.t.name}:${i.t.uses?.text ?? ""}:${i.t.muted}`,
-      )
-      .join(),
+    [
+      ...fx.map((e) => `${e.id}:${compact ? chipLabel(e, round) : chipText(e, round)}`),
+      ...trig.map((t) => `${t.id}:${t.name}:${t.uses?.text ?? ""}:${t.muted}`),
+    ].join(),
   );
-  if (list.length === 0) return null;
-  const shown = list.slice(0, fit);
-  const more = list.length - shown.length;
+  if (fx.length === 0 && trig.length === 0) return null;
+  const folded = fx.slice(n);
   return (
     <div
       ref={ref}
       data-chip-row
+      data-wrap={compact ? wrap : undefined}
       className={cn(
         // Never narrower than the "+N" chip; chips collapse before the name truncates.
-        "relative flex min-w-7 flex-1 flex-nowrap items-center gap-0.5 overflow-hidden",
+        "relative flex min-w-7 flex-1 items-center gap-0.5 overflow-hidden",
+        wrap ? "flex-wrap" : "flex-nowrap",
         className,
       )}
+      // FR-CBTX-54 (4): a line of its own under the name, after everything else on it.
+      style={wrap ? { flexBasis: "100%", order: 1 } : undefined}
     >
       {compact && (
-        // BL-08: each chip's natural width with "3r" and with "3"; never shown.
+        // BL-08: each effect chip's natural width with "3r" and with "3"; each trigger chip's
+        // with its name and icon-only (FR-CBTX-54). Never shown.
         <div
           aria-hidden
           className="pointer-events-none invisible absolute top-0 left-0 flex w-max gap-0.5"
         >
-          {list.map((i) => (
-            <span key={itemKey(i)} data-chip-measure className="flex gap-0.5">
-              {i.kind === "effect" ? (
-                <>
-                  <ChipBadge e={i.e} round={round} compact natural />
-                  <ChipBadge e={i.e} round={round} compact natural tier={CHIP_TIERS.length - 1} />
-                </>
-              ) : (
-                <TriggerChipBadge t={i.t} natural />
-              )}
+          {fx.map((e) => (
+            <span key={e.id} data-chip-measure="effect" className="flex gap-0.5">
+              <ChipBadge e={e} round={round} compact natural />
+              <ChipBadge e={e} round={round} compact natural tier={CHIP_TIERS.length - 1} />
+            </span>
+          ))}
+          {trig.map((t) => (
+            <span key={t.id} data-chip-measure="trigger" className="flex gap-0.5">
+              <TriggerChipBadge t={t} />
+              <TriggerChipBadge t={t} icon />
             </span>
           ))}
         </div>
       )}
-      {list.map((item, i) => {
-        const hidden = i >= fit;
-        if (item.kind === "trigger") {
-          return (
-            <span
-              key={itemKey(item)}
-              data-chip
-              className={cn("flex shrink-0", hidden && "invisible")}
-              aria-hidden={hidden}
-            >
-              <TriggerChipView t={item.t} tier={tier} />
-            </span>
-          );
-        }
-        const e = item.e;
+      {fx.map((e, i) => {
+        const hidden = i >= n;
+        // Compact rows drop folded chips from the flow (measured on the copy), so "+N" and the
+        // trigger chips follow the last chip shown.
+        if (hidden && compact) return null;
         const chip = (
           <EffectChip e={e} round={round} testId={testId} compact={compact} tier={tier} />
         );
@@ -361,16 +380,28 @@ export function EffectChips({
           </span>
         );
       })}
-      {more > 0 && (
-        <MoreChip hidden={list.slice(fit)} round={round} testId={testId} left={left} menu={menu} />
+      {folded.length > 0 && (
+        <MoreChip
+          hidden={folded}
+          round={round}
+          testId={testId}
+          left={compact ? undefined : left}
+          menu={menu}
+        />
       )}
+      {trig.map((t) => (
+        <span key={`t:${t.id}`} data-trigger className="flex shrink-0">
+          <TriggerChipView t={t} icon={icons} />
+        </span>
+      ))}
     </div>
   );
 }
 
 /**
- * The "+N" chip (P3 glitch 6): its Tooltip names the hidden effects and triggers only; a click
- * lists them, full text (DM: each effect with its chip menu, Edit… / End; triggers display only).
+ * The "+N" chip (P3 glitch 6): its Tooltip names the folded effects only (a trigger never folds,
+ * FR-CBTX-54); a click lists them, full text (DM: each with its chip menu, Edit… / End). In flow on
+ * compact rows; plain rows place it at `left`.
  */
 function MoreChip({
   hidden,
@@ -379,21 +410,20 @@ function MoreChip({
   left,
   menu,
 }: {
-  hidden: readonly ChipItem[];
+  hidden: readonly EffectView[];
   round: number | null;
   testId: string;
-  left: number;
+  left?: number;
   menu?: (e: EffectView) => ReactNode;
 }) {
-  const text = (i: ChipItem) => (i.kind === "effect" ? chipText(i.e, round) : triggerLine(i.t));
-  const names = hidden.map(text).join(", ");
+  const names = hidden.map((e) => chipText(e, round)).join(", ");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="absolute flex shrink-0 rounded-md"
-          style={{ left }}
+          className={cn("flex shrink-0 rounded-md", left !== undefined && "absolute")}
+          style={left !== undefined ? { left } : undefined}
           aria-label={`More effects: ${names}`}
         >
           <Tooltip content={names}>
@@ -409,23 +439,7 @@ function MoreChip({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" data-testid={`${testId}-more-list`}>
-        {hidden.map((item) => {
-          if (item.kind === "trigger") {
-            const t = item.t;
-            return (
-              <DropdownMenuItem
-                key={itemKey(item)}
-                data-testid={`${TRIGGER_CHIP_ID}-more-item`}
-                data-record-id={t.id}
-                data-state={t.state}
-                className={cn(t.muted && "text-muted-foreground")}
-              >
-                <ZapIcon className="size-3.5 shrink-0" aria-hidden />
-                <span className="truncate">{triggerLine(t)}</span>
-              </DropdownMenuItem>
-            );
-          }
-          const e = item.e;
+        {hidden.map((e) => {
           const Icon = EffectIcon(e);
           const label = (
             <>
