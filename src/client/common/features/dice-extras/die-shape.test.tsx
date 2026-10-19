@@ -30,6 +30,43 @@ describe("FR-DICEX-42 die-shape chips", () => {
     expect(attr(d20, "aria-label")).toBe("d20: 13");
   });
 
+  test("FR-DICEX-46 DieShape size lg: 44 px outlines and round chips (a popup cell)", () => {
+    const d6 = html(<DieShape faces={6} value={4} size="lg" />);
+    expect(attr(d6, "width")).toBe("44");
+    expect(attr(d6, "height")).toBe("44");
+    const round = html(<DieShape faces={3} value={2} size="lg" />);
+    expect(attr(round, "data-shape")).toBe("round");
+    expect(round).toContain("h-11 min-w-11");
+    // FlatDie passes it through; its label stays off (the popup cell draws the tag).
+    const [die] =
+      throwDice([
+        {
+          id: "e1",
+          n: 1,
+          kind: "roll",
+          public: true,
+          rollerRole: "player",
+          rollerPlayerId: "p1",
+          actorName: "Mira",
+          payload: [
+            {
+              expression: "1d6",
+              manual: false,
+              dice: [{ faces: 6, value: 4, kept: true }],
+              constant: 0,
+              total: 9,
+              label: null,
+              mods: [{ label: "Bless", value: 5, expression: "1d6", dice: [5] }],
+            },
+          ],
+        },
+      ])?.dice.slice(1) ?? [];
+    if (!die) throw new Error("no MOD die");
+    const flat = html(<FlatDie die={die} size="lg" settled flat />);
+    expect(attr(flat, "width")).toBe("44");
+    expect(flat).not.toContain("Bless");
+  });
+
   test("FR-DICEX-42 die-shape chips: d100 = tens kite + units kite (100 → '00' + '0')", () => {
     expect(d100Faces(100)).toEqual(["00", "0"]);
     expect(d100Faces(40)).toEqual(["40", "0"]);

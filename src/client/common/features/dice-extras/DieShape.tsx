@@ -33,8 +33,18 @@ export function d100Faces(value: number): [string, string] {
   return [String(tens).padStart(2, "0"), String(value % 10)];
 }
 
-/** Pixel size per `size` (FR-DICEX-42): `sm` game log, `md` popup / tray / flat zone. */
-export const DIE_PX = { sm: 18, md: 36 } as const;
+/**
+ * Pixel size per `size` (FR-DICEX-42): `sm` game log, `md` tray / flat zone, `lg` a roll popup
+ * cell (FR-DICEX-46: 44 px, never scaled).
+ */
+export const DIE_PX = { sm: 18, md: 36, lg: 44 } as const;
+
+/** The round chip per `size`. */
+const ROUND: Record<keyof typeof DIE_PX, string> = {
+  sm: "h-[18px] min-w-[18px] px-1 text-[10px]",
+  md: "h-9 min-w-9 px-1.5 text-sm",
+  lg: "h-11 min-w-11 px-1.5 text-base",
+};
 
 // Outlines in a 100 × 100 box; `cy` = where the number sits.
 const OUTLINE: Record<Exclude<DieShapeKind, "round">, { d: string; cy: number; scale?: number }> = {
@@ -168,7 +178,7 @@ export function DieShape({
         <span
           className={cn(
             "inline-flex items-center justify-center rounded-full border font-bold tabular-nums",
-            size === "sm" ? "h-[18px] min-w-[18px] px-1 text-[10px]" : "h-9 min-w-9 px-1.5 text-sm",
+            ROUND[size],
             offered && "border-dashed",
             dimmed && "line-through",
           )}
