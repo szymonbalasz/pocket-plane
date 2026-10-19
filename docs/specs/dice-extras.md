@@ -585,7 +585,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 38 | — | C: throttle (400 kbit/s, 400 ms) from a fresh load (cache disabled) | C's `dice3d` loads in ≈ 3 s on its own, ≈ 6 s inside a fresh page load that shares the link (was ≈ 13 s raw; D12 walkthrough ruling #274); B's next roll plays 3D on C (not flat) |
 | 39 | Hard-kill + restart | — | No popup, throw or hold replays; assets still served `br`; logs unchanged |
 
-**Sprint 6 (track PF, if OQ-SHELL-47 A).** Bundle `prefs-s6` ([play-shell §13](play-shell.md#13-test-plan)); no dice fixture needed (device settings are browser-only; looks default).
+**Sprint 6 (track PF, if OQ-SHELL-47 A).** Bundle `prefs-s6` ([play-shell §13](play-shell.md#13-test-plan); e2e on `prefs-s6-e2e`, seams S12); no dice fixture needed (device settings are browser-only; looks default).
 
 | Level | What | Fixtures |
 |---|---|---|
@@ -743,7 +743,7 @@ Rows 01–17 decided. Rows 01–12: DM at sprint-3 gate 1 ([#207](../decisions-l
 |---|---|---|---|---|
 | OQ-DICEX-48 | *(Only if [OQ-SHELL-47](play-shell.md#15-open-questions) A)* Keep the tray and roll-popup gears once the Dice section exists? | **A. Keep both gears as shortcuts to the same panel (FR-DICEX-58)**: settings stay one click from the dice, one home in Preferences / B. Remove the gears; Preferences only: one place, but changing Display mid-roll takes a window | no · owner: DM | FR-DICEX-57, -58; [play-shell](play-shell.md) FR-SHELL-75 |
 
-**Sprint 6 build:** FR-DICEX-57, -58 go in slice **PF2** ([play-shell §14](play-shell.md#14-dependencies)): one line in each client's `pref-sections.ts` (append) + `SettingsPanel.tsx` (a layout prop at most; dice-extras' own file). WF's tray fix (BL-44) should touch `TrayWindow.tsx`, not the panel; if it edits `SettingsPanel.tsx`, PF2 goes after it (seams). No dependency.
+**Sprint 6 build:** FR-DICEX-57, -58 go in slice **PF2** ([play-shell §14](play-shell.md#14-dependencies)): one line in each client's `pref-sections.ts` (append) + `SettingsPanel.tsx` (a layout prop at most; dice-extras' own file). *(Seams S9)* WF5 `fix/tray-roll-visible` owns `TrayWindow.tsx` / `TrayPreview.tsx`; `SettingsPanel.tsx` is PF's. PF2 does not edit `TrayWindow.tsx` (the gear already opens `SettingsPanel`, so OQ-DICEX-48 A needs no tray change); if it ever must, PF2 merges after WF5. No dependency.
 
 ## 16. Out of scope
 
