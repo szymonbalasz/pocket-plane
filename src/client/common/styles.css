@@ -30,6 +30,15 @@
   --hp-bloodied: oklch(0.795 0.184 86.047);
   --hp-down: oklch(0.637 0.237 25.331);
   --visibility-hidden: oklch(0.708 0 0 / 55%);
+  /* Player colours (CAMP FR-CAMP-28, visual-direction player.<key>): read by colorOf. */
+  --player-amber: #e69f00;
+  --player-jade: #19b98a;
+  --player-sky: #56b4e9;
+  --player-rose: #e08ab8;
+  --player-yellow: #f0e442;
+  --player-blue: #5b8ff0;
+  --player-vermillion: #d55e00;
+  --player-bronze: #a07850;
 }
 
 @theme inline {
