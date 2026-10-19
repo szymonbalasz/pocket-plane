@@ -57,49 +57,65 @@ function controller(vp: { current: Viewport }) {
   return { c, backend };
 }
 
-test("FR-SHELL-55 push right (DM): the Fog tool with Scenes and Compendium open → Scenes pushed right of the wrapped fog bar, same y and size; Compendium past it and Initiative finds no room → auto-minimised; nothing lands on another window", () => {
+test("FR-SHELL-55 push right (DM): the Fog tool with Scenes and Compendium open at the four sizes → Scenes right of the wrapped fog bar (same y and size); Compendium, with no room right, below the bar beside Scenes (1440 / 1600 wide) or auto-minimised where no 360-high slot is left (1280 wide); nothing lands on another window", () => {
+  // Compendium below the bar: top = bar bottom + 12 (196), left of Scenes, cut 12 above the Game
+  // log (584 − 12 − 196 = 376 ≥ min 360). At 1280 wide the log (484 / 564) leaves < 360.
+  const compendium: Record<string, Rect | "minimised"> = {
+    "1280×720": "minimised",
+    "1280×800": "minimised",
+    "1440×900": { x: 94, y: 196, w: 440, h: 376 },
+    "1600×900": { x: 174, y: 196, w: 440, h: 376 },
+  };
   for (const vp of REFERENCE_VIEWPORTS) {
     const bar = fogBar(vp);
+    const label = `${vp.w}×${vp.h}`;
     // Scenes, then Compendium opened from the launcher (the bar not shown yet).
     const { windows: start } = launcherSequence(dmWindows, vp, ["map.scenes", "cmp.compendium"]);
     const before = shown(start, vp);
+    expect(overlaps(before.get("map.scenes") as Rect, bar), label).toBe(true);
+    expect(overlaps(before.get("cmp.compendium") as Rect, grownBy12(bar)), label).toBe(true);
     const ws = reduce(start, { type: "push", rect: bar }, ctxAt(vp));
     const after = shown(ws, vp);
-    const label = `${vp.w}×${vp.h}`;
-    const hit = [...before].filter(([, r]) => overlaps(r, grownBy12(bar))).map(([k]) => k);
-    expect(hit, label).toContain("map.scenes");
-    // Compendium (440 wide) would have to pass Scenes and then Initiative: no room at min width
-    // before vw − 12 at any reference size, so the launcher window is auto-minimised.
-    expect(ws.find((w) => w.kind === "cmp.compendium")?.state, label).toBe("minimised");
-    for (const [kind, r] of after) {
-      expect(overlaps(r, grownBy12(bar)), `${label} ${kind} still on the bar`).toBe(false);
-      const was = before.get(kind) as Rect;
-      if (!hit.includes(kind)) {
-        // Not on the bar: untouched (same stored object).
-        expect(ws.find((w) => w.kind === kind)).toBe(start.find((w) => w.kind === kind));
-        continue;
-      }
-      expect(r.x, `${label} ${kind}`).toBeGreaterThanOrEqual(bar.x + bar.w + 12);
-      expect({ y: r.y, h: r.h }, `${label} ${kind}`).toEqual({ y: was.y, h: was.h });
-      expect(r.w, `${label} ${kind} width`).toBeLessThanOrEqual(was.w);
-      expect(r.x + r.w, label).toBeLessThanOrEqual(vp.w - 12);
-    }
-    // The first one in x order lands right at the bar's right edge + 12.
     const scenes = after.get("map.scenes") as Rect;
-    expect(scenes.x, label).toBe(bar.x + bar.w + 12);
-    // Pushed windows land on no other window (Initiative, Game log, each other).
-    const kinds = [...after.keys()];
-    for (const a of hit.filter((k) => after.has(k))) {
-      for (const b of kinds) {
-        if (a === b) continue;
-        const pair = `${label} ${a} × ${b}`;
-        const was = overlaps(before.get(a) as Rect, before.get(b) as Rect);
-        if (!was) expect(overlaps(after.get(a) as Rect, after.get(b) as Rect), pair).toBe(false);
-      }
+    const was = before.get("map.scenes") as Rect;
+    expect(scenes, label).toEqual({ ...was, x: bar.x + bar.w + 12 });
+    const cmp = ws.find((w) => w.kind === "cmp.compendium") as WindowState;
+    const want = compendium[label] as Rect | "minimised";
+    if (want === "minimised") expect(cmp.state, label).toBe("minimised");
+    else expect({ state: cmp.state, ...rectOf(cmp) }, label).toEqual({ state: "open", ...want });
+    // Initiative and the Game log are off the bar: untouched (same stored object).
+    for (const kind of ["cbt.initiative", "dice.log"]) {
+      expect(
+        ws.find((w) => w.kind === kind),
+        `${label} ${kind}`,
+      ).toBe(start.find((w) => w.kind === kind));
     }
+    // Nothing on the bar; no shown window on another.
+    const list = [...after];
+    for (const [kind, r] of list) {
+      expect(overlaps(r, grownBy12(bar)), `${label} ${kind} on the bar`).toBe(false);
+    }
+    list.forEach(([a, ra], i) => {
+      for (const [b, rb] of list.slice(i + 1)) {
+        expect(overlaps(ra, rb), `${label} ${a} × ${b}`).toBe(false);
+      }
+    });
     // A second push with the same bar: nothing jumps twice.
     expect(reduce(ws, { type: "push", rect: bar }, ctxAt(vp))).toBe(ws);
   }
+});
+
+test("FR-SHELL-55 push right (DM): below the bar the height shrinks to the clear space, down to min, before anything is auto-minimised", () => {
+  const vp = { w: 1440, h: 900 };
+  const { windows: start } = launcherSequence(dmWindows, vp, ["map.scenes", "cmp.compendium"]);
+  // A taller bar: 584 − 12 − (56 + 150 + 12) = 354 < 360 → Compendium auto-minimised; 140 high:
+  // 364 → below at 364 high (min 360).
+  const tall = { ...fogBar(vp), h: 150 };
+  const parked = reduce(start, { type: "push", rect: tall }, ctxAt(vp));
+  expect(parked.find((w) => w.kind === "cmp.compendium")?.state).toBe("minimised");
+  const fits = { ...fogBar(vp), h: 140 };
+  const ws = reduce(start, { type: "push", rect: fits }, ctxAt(vp));
+  expect(rectIn(ws, "cmp.compendium")).toEqual({ x: 94, y: 56 + 140 + 12, w: 440, h: 364 });
 });
 
 test("FR-SHELL-55 push right (DM): written with area and data-placed pushed; closing the tool moves nothing back; a window off the bar untouched", () => {
@@ -125,7 +141,7 @@ test("FR-SHELL-55 push right (DM): written with area and data-placed pushed; clo
   expect(rectIn(c.store.getState().windows, "map.scenes")).toEqual(rectOf(scenes));
 });
 
-test("FR-SHELL-55 push right (DM): no room even at min width → a launcher window auto-minimised, protected Initiative at the right edge at min width", () => {
+test("FR-SHELL-55 push right (DM): no room right at min width nor below → a launcher window auto-minimised, protected Initiative at the right edge at min width", () => {
   for (const vp of REFERENCE_VIEWPORTS) {
     const label = `${vp.w}×${vp.h}`;
     const start = defaultLayout(dmWindows, vp);
@@ -138,8 +154,9 @@ test("FR-SHELL-55 push right (DM): no room even at min width → a launcher wind
     );
     const scenesMin = dmWindows.get("map.scenes")?.minSize.w ?? 0;
     const initMin = dmWindows.get("cbt.initiative")?.minSize.w ?? 0;
-    // A bar so wide that neither fits right of it (≥ min width left: < Scenes' min).
-    const bar = { x: 64, y: 56, w: vp.w - 64 - 12 - 12 - scenesMin + 20, h: 100 };
+    // A bar so wide that neither fits right of it (≥ min width left: < Scenes' min), and so tall
+    // that no min-height slot is left below it.
+    const bar = { x: 64, y: 56, w: vp.w - 64 - 12 - 12 - scenesMin + 20, h: vp.h - 200 };
     const next = reduce(ws, { type: "push", rect: bar }, ctxAt(vp));
     const scenes = next.find((w) => w.kind === "map.scenes") as WindowState;
     expect(scenes.state, label).toBe("minimised");

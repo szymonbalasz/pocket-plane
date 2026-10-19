@@ -21,6 +21,8 @@ import {
   type Placeable,
   type PlacementToken,
   placeWindow,
+  RAIL_CLEAR,
+  usableArea,
 } from "./placement";
 import { defaultSizeAt, knownDefaultSizes, type WindowRegistry } from "./registry";
 
@@ -356,9 +358,9 @@ export function followViewport(
  * FR-SHELL-55: every rendered open window overlapping `bar` grown by 12 px is pushed right, in x
  * order: x = the bar's right edge + 12, then past each open window it lands on (its right edge +
  * 12), repeatedly; same y and height; its width kept if it fits before vw − 12, else shrunk toward
- * its min. No room even at min width: a launcher window is auto-minimised (FR-SHELL-47), a
- * protected (`defaultOpen`) or `fixedDefault` one goes to the right edge at min width. Written
- * with `area`; never restored.
+ * its min. No room to the right even at min width: it moves below the bar (`belowBar`). Neither
+ * fits: a launcher window is auto-minimised (FR-SHELL-47), a protected (`defaultOpen`) or
+ * `fixedDefault` one goes to the right edge at min width. Written with `area`; never restored.
  */
 function pushWindows(ws: Windows, bar: Rect, ctx: ManagerContext): Windows {
   const vp = ctx.viewport;
@@ -394,23 +396,55 @@ function pushWindows(ws: Windows, bar: Rect, ctx: ManagerContext): Windows {
       }
       x = Math.max(...on.map((o) => o.x + o.w)) + EDGE_GAP;
     }
-    if (!landed && !def.defaultOpen && !def.fixedDefault) {
+    const base = renderedRect(win, def.minSize, vp); // stored height: growth is never written
+    const under = landed ? null : belowBar({ ...r, h: base.h }, def.minSize.h, bar, taken, vp);
+    if (!landed && !under && !def.defaultOpen && !def.fixedDefault) {
       out = patch(out, win.kind, win.instance, (w) => ({ ...w, state: "minimised" }));
       continue;
     }
-    const at = landed ?? { ...r, x: right - min, w: min };
+    const at = landed ?? under ?? { ...r, x: right - min, w: min };
     taken.push(at);
-    const base = renderedRect(win, def.minSize, vp); // stored height: growth is never written
-    out = patch(out, win.kind, win.instance, (w) => ({
-      ...w,
-      x: at.x,
-      y: base.y,
-      w: at.w,
-      h: base.h,
-      area,
-    }));
+    const stored = under ?? { x: at.x, y: base.y, w: at.w, h: base.h };
+    out = patch(out, win.kind, win.instance, (w) => ({ ...w, ...stored, area }));
   }
   return out;
+}
+
+/**
+ * FR-SHELL-55 (orchestrator ruling, W3): a pushed window with no room right of the bar goes below
+ * it: top = the bar's bottom + 12, same width, at the x nearest its own column (its x, else
+ * beside a window it would land on; never under the rail) where it lands on no other window;
+ * its height kept, else shrunk to the clear space above the next window / the usable bottom,
+ * never below `minH`. Null when nothing fits.
+ */
+function belowBar(
+  r: Rect,
+  minH: number,
+  bar: Rect,
+  taken: readonly Rect[],
+  vp: Viewport,
+): Rect | null {
+  const usable = usableArea(vp);
+  const top = bar.y + bar.h + EDGE_GAP;
+  const xs = [r.x, ...taken.flatMap((o) => [o.x - EDGE_GAP - r.w, o.x + o.w + EDGE_GAP])]
+    .filter((x) => x >= RAIL_CLEAR && x + r.w <= usable.right)
+    .sort((a, b) => Math.abs(a - r.x) - Math.abs(b - r.x) || a - b);
+  for (const x of xs) {
+    let bottom = usable.bottom;
+    let blocked = false;
+    for (const o of taken) {
+      if (o.x >= x + r.w || x >= o.x + o.w) continue;
+      if (o.y + o.h <= top) continue; // above the slot
+      if (o.y < top + minH) {
+        blocked = true; // spans the slot's top
+        break;
+      }
+      bottom = Math.min(bottom, o.y - EDGE_GAP);
+    }
+    const h = Math.min(r.h, bottom - top);
+    if (!blocked && h >= minH) return { x, y: top, w: r.w, h };
+  }
+  return null;
 }
 
 /**
