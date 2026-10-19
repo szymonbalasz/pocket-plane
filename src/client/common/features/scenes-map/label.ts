@@ -84,6 +84,25 @@ export interface BadgePill extends Pill {
   compact?: boolean;
   /** BL-35: a squeezed "+N" smaller than the name's font; absent = the row's font. */
   font?: number;
+  /** The "+N" badge only: the most severe tone it hides (Dying → `down`); absent = neutral. */
+  tone?: Exclude<BadgeTone, "neutral">;
+}
+
+/** A badge's palette tone (`TokenBadge["tone"]`, FR-MAP-34). */
+export type BadgeTone = "neutral" | "bloodied" | "down";
+
+/** A badge to lay out; `tone` (default neutral) colours a "+N" that hides it. */
+export interface BadgeIn {
+  id: string;
+  label: string;
+  tone?: BadgeTone;
+}
+
+/** The "+N"'s tone: the most severe hidden one, so a hidden Dying keeps its danger colour. */
+function worstTone(hidden: readonly { tone?: BadgeTone }[]): BadgePill["tone"] {
+  if (hidden.some((b) => b.tone === "down")) return "down";
+  if (hidden.some((b) => b.tone === "bloodied")) return "bloodied";
+  return undefined;
 }
 
 export interface LabelRow {
@@ -122,7 +141,7 @@ export const SQUEEZE_MIN_PX = 6;
  * chip (`chip` square) + "+N" for the rest, else "+N" alone; `full` = the hidden badges' labels.
  */
 function squeeze(
-  badges: readonly { id: string; label: string }[],
+  badges: readonly BadgeIn[],
   side: number,
   h: number,
   chip: number,
@@ -130,11 +149,13 @@ function squeeze(
 ): BadgePill[] {
   const font = h / PILL_PER_FONT;
   const gap = font * GAP_PER_FONT;
-  const more = (hidden: readonly { label: string }[]): BadgePill => {
+  const more = (hidden: readonly BadgeIn[]): BadgePill => {
     const text = `+${hidden.length}`;
     const width = Math.min(side, measure(text, font, true) + 2 * font * PAD_PER_FONT);
     const full = hidden.map((b) => b.label).join(", ");
-    return { id: MORE_BADGE_ID, text, x: 0, y: 0, width, height: h, full, font };
+    const tone = worstTone(hidden);
+    const pill = { id: MORE_BADGE_ID, text, x: 0, y: 0, width, height: h, full, font };
+    return tone ? { ...pill, tone } : pill;
   };
   const [first, ...rest] = badges;
   if (!first) return [];
@@ -155,13 +176,14 @@ function squeeze(
  * centred on the footprint and never wider than it, the first row right above the name, more rows
  * stacking upwards; FR-MAP-57: a badge whose text doesn't fit the footprint is an icon chip.
  * Rows never rise into the band where the upper neighbour's name sits (half a pill below the
- * footprint's top edge); what doesn't fit collapses into a last "+N" badge. BL-35: with room for
+ * footprint's top edge); what doesn't fit collapses into a last "+N" badge, in the most severe
+ * tone it hides (a hidden Dying keeps the danger colour). BL-35: with room for
  * one row and only "+N" left in it, the first badge stays as an icon chip if both fit; with room
  * for none, the badges squeeze into one smaller row centred between the two names.
  */
 export function labelRow(
   name: string,
-  badges: readonly { id: string; label: string }[],
+  badges: readonly BadgeIn[],
   side: number,
   cell: number,
   scale: number,
@@ -228,6 +250,8 @@ export function labelRow(
     }
   }
   const full = hidden.map((b) => b.label).join(", ");
+  const tones = new Map(badges.map((b) => [b.id, b.tone]));
+  const tone = worstTone(hidden.map((b) => ({ tone: tones.get(b.id) })));
   const out: LabelRow["badges"] = [];
   rows.forEach((r, k) => {
     const w = r.reduce((n, b) => n + b.width, 0) + m.gap * (r.length - 1);
@@ -235,7 +259,7 @@ export function labelRow(
     let x = (side - w) / 2;
     for (const b of r) {
       const pill = { id: b.id, text: b.text, x, y: by, width: b.width, height: m.pillH };
-      if (b.id === MORE_BADGE_ID) out.push({ ...pill, full });
+      if (b.id === MORE_BADGE_ID) out.push(tone ? { ...pill, full, tone } : { ...pill, full });
       else if (b.compact) {
         out.push({ ...pill, y: by + (m.pillH - b.width) / 2, height: b.width, compact: true });
       } else out.push(pill);

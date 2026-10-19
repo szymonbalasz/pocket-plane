@@ -294,6 +294,39 @@ describe("FR-MAP-42 label", () => {
     expect(new Set(big.badges.map((b) => b.y + b.height / 2)).size).toBe(2);
   });
 
+  test("FR-MAP-43 BL-35 a '+N' hiding a Dying badge takes the danger tone (24–35 px and full rows)", () => {
+    const dying = { id: "cbtx-token-death", label: "Dying", tone: "down" as const };
+    const invisible = { id: "fog-token-invisible", label: "Invisible", tone: "neutral" as const };
+    const more = (r: ReturnType<typeof labelRow>) => r.badges.find((b) => b.id === MORE_BADGE_ID);
+    // A Dying PC with another badge, 24–35 px: one "+2" in Dying's tone, hover lists both.
+    for (const px of [24, 28, 32, 35]) {
+      const r = labelRow("Thorn", [dying, invisible], 70, 70, px / 70, measure);
+      expect(r.badges.map((b) => [b.id, b.text, b.tone, b.full])).toEqual([
+        [MORE_BADGE_ID, "+2", "down", "Dying, Invisible"],
+      ]);
+    }
+    // Dying drawn as its own chip: the "+2" for the rest stays neutral.
+    const poisoned = { id: "cnd-poisoned", label: "Poisoned", tone: "neutral" as const };
+    const shown = labelRow("Thorn", [dying, invisible, poisoned], 70, 70, 40 / 70, measure);
+    expect(shown.badges.map((b) => [b.id, b.compact === true, b.tone])).toEqual([
+      ["cbtx-token-death", true, undefined],
+      [MORE_BADGE_ID, false, undefined],
+    ]);
+    // Full rows (48 px): a Dying hidden in the "+N" colours it too; neutral-only stays neutral.
+    const four = [
+      { id: "cbt-token-out", label: "Out" },
+      { id: "fog-token-fogged", label: "Fog" },
+      invisible,
+    ];
+    const at48 = (b: typeof four) => more(labelRow("Thorn", b, 70, 70, 48 / 70, measure));
+    expect(at48([...four, dying])).toMatchObject({ text: "+3", tone: "down" });
+    expect(at48([...four, { id: "x-hex", label: "Hex" }])?.tone).toBeUndefined();
+    // Bloodied ranks below down.
+    const bloodied = { id: "x-b", label: "Bloodied", tone: "bloodied" as const };
+    expect(at48([...four, bloodied])?.tone).toBe("bloodied");
+    expect(at48([...four, bloodied, dying])?.tone).toBe("down");
+  });
+
   test("FR-MAP-42 label: layer order map < grid < tokens < labels < pointers", () => {
     const C = () => null;
     const layers = orderLayers([
