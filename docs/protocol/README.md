@@ -233,7 +233,7 @@ CAMP has **no WS intents**; FIX has none ([FR-FIX-24](../specs/fixtures-adapters
 | Command | Caller | Input → output | Source |
 |---|---|---|---|
 | `import.batch` | Fixture loader only (in-process, DM authority) | `{source {key, name, licence, attribution, url?}, records {kind, sourceKey, data}[]}` → per record `{sourceKey, outcome: created \| existing, id}`. All-or-nothing; errors: `invalid` with every issue, path `[sourceKey, "kind"]` or `[sourceKey, "data", …field path]` | [FIX §9](../specs/fixtures-adapters.md#9-api--events), [FR-FIX-18–21](../specs/fixtures-adapters.md#6-functional-requirements) |
-| Setup fixture steps | Fixture loader | Any registered server command, DM authority (actor campaign = active campaign), same validation / events / log as UI; no `intentId` | [FR-FIX-13](../specs/fixtures-adapters.md#6-functional-requirements) |
+| Setup fixture steps | Fixture loader | Any registered server command, DM authority (actor campaign = active campaign), same validation / events / log as UI; no `intentId`. *(Sprint 5, R1:)* a step `as` a loaded player fixture (`step(cmd, input, {as: "player-1"})`) runs as that player (`playerId` = the fixture's `player` record); an unloaded key fails the step | [FR-FIX-13](../specs/fixtures-adapters.md#6-functional-requirements), [§86](#86-sprint-5-late-damage-r1) |
 
 - The pipeline writes through a definition store + kind registry that entities plugs in (Scenes); the skeleton ships the core and tests it with a test-only kind (CON-03).
 - **Crash hook** *(test mode only, #163)*: `PP_TEST_CRASH` ([AGENTS §9.2](../../AGENTS.md#92-env-ports-and-data)) makes the process SIGKILL itself at one seam: `<command>:before-commit` (in `Commands.run`, after `execute` and the event-log append, before commit: the transaction never commits), `<command>:after-commit` (committed; before commit hooks, listeners and the `ack`), `assets.ingest:after-files` (files renamed into place, no row: next start sweeps the orphan set) or `fixture:<key>` (`fixtures:*` only: before the commit of that fixture's first command; manifest stays `loading`). Refused at config parse unless `PP_TEST_MODE=1` and `PP_DATA_DISPOSABLE=1`; an unknown command refuses server start. `src/server/commands/crash.ts`; no wire change.
@@ -2156,8 +2156,8 @@ From [combat-tracker](../specs/combat-tracker.md#9-api--events) (FR-CBT-88, -91,
 |---|---|---|---|---|
 | `cbt.applyHit {cardId, toHitTotal (−20…99), targets [{targetId, hit, multiplier}] (1–20, unique)}` *(new)* | DM | encounter ended / card not pending / already ruled → `conflict` ("Hit already applied"); card without `toHit`, no `hit: true`, duplicate or > 20 targets → `invalid`; unknown or removed target → `not_found` | `{rulingId}` | FR-CBT-88 |
 | `cbt.setSide {combatantId, side: ally \| enemy, secret?}` *(new)* | DM | no started encounter → `conflict` "No encounter running"; unknown, other campaign or not in the started encounter → `not_found`; removed allowed; same side and (secret, or already shown to players) → no-op ack | — | FR-CBT-99 |
-| `cbt.applyCard` + `damageRollId?: string \| null` | DM | ≠ the card's damage `rollId` (null = none) → `conflict` "Damage just arrived — check and Apply again", nothing written; absent = no check (R1's popup sends it) | as before | FR-CBT-94 |
-| `cbt.rollDamage` result + `unused?: true` | DM, player | zod only (written by R1) | as before | FR-CBT-92 |
+| `cbt.applyCard` + `damageRollId: string \| null` | DM | ≠ the card's damage `rollId` (null = none) → `conflict` "Damage just arrived — check and Apply again", nothing written; **required since R1** ([§86](#86-sprint-5-late-damage-r1)) | as before | FR-CBT-94 |
+| `cbt.rollDamage` result + `unused?: true` | DM, player | written by R1 ([§86](#86-sprint-5-late-damage-r1)) | as before | FR-CBT-92 |
 | REST encounter bodies: entries + `side?` | DM | `ally` \| `enemy`, absent = `enemy` | as before | FR-CBT-98 |
 
 **Record types**
@@ -2218,3 +2218,28 @@ From [assets-pipeline](../specs/assets-pipeline.md#61-sprint-5-image-attach-cont
 | Test IDs | `asset-attach` (+ `data-owner`, `data-remaining`), `asset-attach-upload`, `asset-attach-file-input`, `asset-attach-library`, `asset-attach-hint` / `asset-attach-full`, `asset-attach-progress`, `asset-attach-error` + `asset-attach-error-line`. `asset.test`: `asset-test-attached-id` (+ `data-record-id`), `asset-test-dialog-open`, `asset-test-dialog`, `asset-test-dialog-text`, `asset-test-dialog-drop`. Handout editor: `party-editor-duplicate` |
 | Callers | Handout editor: `max` 10, `owner` `party-editor`, paste and drop target = the whole editor form, `disabled` while a save is in flight; an id already in the strip → not added, "Already in this handout". `asset.test` (test mode): one control (`owner` `asset-test`) + one in a Dialog (`asset-test-dialog`, targets inside the portal) |
 | CON-44 | No record, no snapshot bytes (attachments are 0 B, §82) |
+
+## 86. Sprint 5: late damage (R1)
+
+From [combat-tracker](../specs/combat-tracker.md#62-sprint-5-late-damage) (FR-CBT-87–94; [ADR-0053](../architecture/adr/0053-apply-hit.md)) and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) (FR-MOD-63). **Built by `build/late-damage`** on R0's core ([§83](#83-sprint-5-combat-core-r0)). No new intent, event, record type or table. Data side: [data model §68](../data-model/README.md#68-sprint-5-late-damage-r1).
+
+**Intents** (strict zod, `@shared/combat-tracker/schemas`)
+
+| Intent | Who | Validation | Result | Source |
+|---|---|---|---|---|
+| `cbt.applyCard` `damageRollId` | DM | **required** (`string \| null`, every caller); ≠ the card's damage `rollId` → `conflict` "Damage just arrived — check and Apply again", nothing written | as before | FR-CBT-94 |
+| `cbt.applyCard` on a ruled card | DM | `toHitTotal` sent → `invalid`; a target outside the ruled hits, or `hit: false` → `invalid` "Not a hit target" (path `targets.i`). Applies in ruling order: each ruled hit sent → a damage-only `cbt.attack` line (`toHit: null`) + `hp_change` with the ruling's to-hit facts (`toHitTotal`, `toHitRolled`, `natural`, `hitComputed`); each ruled miss still active in the encounter → a `raw 0` `hp_change` + a **DM-only** miss line (`public: false`; players read its miss on the Apply hit line); a ruled hit not sent → resolution `{hit: true, applied: 0, dropped: true}`, no row. The ruling's delete rides on the last `AttackApplied` | as before | FR-CBT-91 |
+| `cbt.rollDamage`, no to-hit-only card of the row | DM, player | the latest pending card of that row has to-hit and damage, and the sender owns it (its player on a player card, the DM on a DM card) → **no card**: the roll entry as before (player public, DM DM-only), no offers rolled (`subject.card` false), the card's `unusedRolls` += `{rollId, total}` (newest 3; total = base with mods + extra parts) via `updateNotification` (text unchanged). Anyone else → a new damage-only card (FR-CBT-71) | `{cardId, rollIds, attached: false, unused: true}` | FR-CBT-92 |
+
+**Events** (no new type)
+
+| Event | Changes | Player sees | Undoable |
+|---|---|---|---|
+| `DamageRolled {cardId, rollIds, attached: false}` (unused: `cardId` = the completed card) + `NotificationUpdated` | roll line; card (`unusedRolls`) | owner: own card upsert + roll line; others: the roll line if public; never another owner's `unusedRolls` | no |
+
+**Fixtures:** unit `late-hit-ruled` (as `player-1`: Mira's Light crossbow to-hit, d20 9 + 4 + Bless 2 = 15; DM Apply hit Goblin 2) in bundles `late-damage` and `session-sim-9`. `fixtureSeededId(key, draw)` (`src/server/features/combat-tracker/fixtures.ts`) names a seeded ID no record change carries (a roll, a sheet attack row); `combat-hit` passes its damage `rollId` with it.
+
+**DM client** (`src/client/dm/features/combat-tracker/`): `late-fill.ts` (popup step from the `hit-ruling` record, "Apply hit" rule, per-field fill / focus / blur, late note, unused text); `popup-store.ts` keeps per-card drafts (fields, rows, multipliers, popup-part values, drops) until reload and the cards this client saw resolved (late note); Pending row text and `data-step` from `pending.ts`. Test IDs per CBT §7 sprint 5; `cbt-init-card` carries `data-step`.
+
+**CON-44:** no record, field or snapshot byte beyond R0's measured rows (`unusedRolls` at 3 per card already in the heavy harness).
+

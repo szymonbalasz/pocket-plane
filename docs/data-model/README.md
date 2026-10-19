@@ -1805,3 +1805,19 @@ From [scene-tools](../specs/scene-tools.md#8-data-model) sprint 5 (FR-SCN-48–5
 - **Derived:** the menu's template = `templateAt` over the shown scene's kept templates in draw order (FR-SCN-49); its items from the role and `hidden` (Delete, Edit…, DM Hide / Reveal), disabled while not live.
 - **Fixtures:** no new unit; bundle **`tpl-menu`** = `map-tools` (Spirit Guardians `player-1`, Thunderwave `player-2`, Web DM, hidden Glyph), its own server for the e2e (which deletes templates). The K8 / K9 walkthrough runs on `map-tools` until `player-colours` is on `main`.
 - **CON-44:** no new bytes (no record or field).
+
+## 68. Sprint 5: late damage (R1)
+
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-89–94) and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) (FR-MOD-63). **Built by `build/late-damage`**; no schema change (R0's [§66](#66-sprint-5-combat-core-r0) fields, now written). Protocol side: [protocol §86](../protocol/README.md#86-sprint-5-late-damage-r1).
+
+| Table / field | Written by | Rule | Source |
+|---|---|---|---|
+| Damage card payload `unusedRolls` | `cbt.rollDamage` (owner's second roll on a completed pending card) | ≤ 3, oldest dropped; `total` = the base part with its mods + extra parts; first to go in the 4 KB fit order | FR-CBT-92 |
+| Damage card resolution `targets[].dropped` | `cbt.applyCard` on a ruled card | a ruled hit the DM dropped: `{hit: true, applied: 0, dropped: true}`; ruled misses `{hit: false, applied: 0}`; ruling order | FR-CBT-91 |
+| `hp_change` of a ruled card | `cbt.applyCard` | to-hit facts from the hit ruling (`toHitTotal`, `toHitRolled`, `natural`, `hitComputed`); a ruled miss still active → a `raw 0` row whose entry is a DM-only miss line | FR-CBT-91 |
+| `cbt.attack` line of a ruled card | `cbt.applyCard` | damage-only payload (`toHit: null`), as FR-CBT-73 | FR-CBT-91 |
+
+- **Derived (DM client, not stored):** popup step (`damage` iff a `hit-ruling` row for the card); per-card drafts and per-field typed / focused state (`popup-store`, until reload); the late note's resolved cards (client memory, this turn).
+- **Fixtures:** `late-hit-ruled` (bundles `late-damage`, `session-sim-9`).
+- **CON-44:** no new bytes (R0 measured `unusedRolls` and rulings).
+
