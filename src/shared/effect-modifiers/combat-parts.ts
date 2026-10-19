@@ -1,8 +1,8 @@
 // Rule-trigger parts in combat's text (FR-MOD-40, -47, -48; MOD §7 "Card and toast", "Roll
 // lines"). Card: offered parts after the damage, named (the card's audience is the owner or the
 // DM): "Brakka: 17 to hit, 12 slashing (+ 6 radiant Divine Fury on a hit)". Outcome line: each
-// landed part after the weapon damage, typed when its type differs: "+ 6 radiant (Divine Fury)",
-// an untyped one like a roll part "+ 9 Martial Advantage"; a non-public trigger's label reads
+// landed part after the weapon damage, always typed (FR-MOD-62): "+ 6 radiant (Divine Fury)",
+// one with neither its own nor the attack's type like a roll part "+ 9 Martial Advantage"; a non-public trigger's label reads
 // "(DM)" for players, the DM's line names it, with "(DM set; rolled 7)" / "(DM ruled)". Pure.
 // FR-MOD-57 (sprint 4): a part's dice follow it as die segments (seams S8 / rulings B5, B9).
 import type { LineSegment } from "@shared/dice-roll-log/kind-types";
@@ -122,9 +122,10 @@ export interface LineDmPartView {
 }
 
 /**
- * Segments of the parts after the weapon damage: " + 6 radiant (Divine Fury)" (typed: its type
- * differs from the attack's), " + 9 Martial Advantage" (untyped), " + 9 (DM)" (non-public, for
- * players); then the part's own multiplier; the DM's line names every part and adds " (DM set;
+ * Segments of the parts after the weapon damage: " + 6 radiant (Divine Fury)", " + 10 piercing
+ * (Sneak Attack)" (FR-MOD-62: always typed, the part's type else the attack's), " + 9 Martial
+ * Advantage" (neither typed), " + 9 slashing (DM)" (non-public, for players); then the part's own
+ * multiplier; the DM's line names every part and adds " (DM set;
  * rolled 7)" after an edited value and " (DM ruled)" after a forced charge. FR-MOD-57: then the
  * part's dice, labelled with its name: " (1d6+2: 4 + 2)", from `dm` on the DM's line (`dm`
  * given) and from the part on players' (built only from `payload` / `dmPayload`, rulings B4).
@@ -137,13 +138,13 @@ export function linePartSegments(
   return (parts ?? []).flatMap((p, i) => {
     const d = dm?.[i];
     const label = d?.label ?? p.label;
-    const typed = p.type !== null && p.type !== damageType;
+    const type = p.type ?? damageType;
     // Players' dice come from the part (payload), the DM's from `dm` (rulings B4).
     const dice = label === null ? null : partDiceView(d?.dice ? d : p, p.value, label);
     const out: LineSegment[] = [{ text: " + " }, dice?.value ?? { text: String(p.value) }];
-    if (typed) out.push({ text: ` ${p.type}` });
+    if (type) out.push({ text: ` ${type}` });
     if (label === null) out.push({ text: ` ${DM_PART_LABEL}`, style: "muted" });
-    else out.push({ text: typed ? ` (${label})` : ` ${label}`, style: "muted" });
+    else out.push({ text: type ? ` (${label})` : ` ${label}`, style: "muted" });
     if (p.multiplier) out.push({ text: MULT_TEXT[p.multiplier] });
     if (d?.set) out.push({ text: ` (DM set; rolled ${d.rolled})`, style: "muted" });
     if (d?.forced) out.push({ text: " (DM ruled)", style: "muted" });
