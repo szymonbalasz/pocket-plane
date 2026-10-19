@@ -25,7 +25,7 @@ const outcome = (n: number, nameLength = 40) => ({
 describe("combat-tracker schemas (feedback pass)", () => {
   test("FR-CBT-34 applyCard targets[]: 1–20, unique, per-target hit + multiplier", () => {
     const t = (targetId: string) => ({ targetId, hit: true, multiplier: "normal" });
-    const base = { cardId: "card", toHitTotal: 17, damageTotal: 6 };
+    const base = { cardId: "card", toHitTotal: 17, damageTotal: 6, damageRollId: "r2" };
     const ok = (v: object) => ApplyCardTargetsInput.safeParse({ ...base, ...v }).success;
     expect(ok({ targets: [t("a")] })).toBe(true);
     expect(ok({ targets: [t("a"), { ...t("b"), hit: false, multiplier: "none" }] })).toBe(true);

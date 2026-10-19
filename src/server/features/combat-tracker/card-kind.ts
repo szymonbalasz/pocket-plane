@@ -85,12 +85,17 @@ const cut = (s: string, n: number) => {
 
 /**
  * FR-CBT-81, FR-MOD-37 (sprint 4): weapon parts never drop. A card still over the kind's 4 KB
- * after `withCardOffers` dropped offers gets its `mods[].label`s cut to 12 chars + "…", then
+ * after `withCardOffers` dropped offers loses its `unusedRolls` (FR-CBT-92), then gets its `mods[].label`s cut to 12 chars + "…", then
  * `attackerName` / `attackName` to 20 chars + "…" (multi-byte names, MOD §12).
  */
 export function fitCardPayload(p: DamageCardPayload): DamageCardPayload {
   const fits = (x: DamageCardPayload) => jsonBytes(x) <= DAMAGE_CARD_PAYLOAD_MAX_BYTES;
   if (fits(p)) return p;
+  // FR-CBT-92 (sprint 5): the unused rolls go first.
+  if (p.unusedRolls) {
+    const { unusedRolls: _, ...rest } = p;
+    return fitCardPayload(rest);
+  }
   const labels = <T extends { mods?: CardRoll["mods"] } | null>(r: T): T =>
     r?.mods
       ? {

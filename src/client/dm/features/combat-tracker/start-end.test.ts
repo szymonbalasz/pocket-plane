@@ -161,8 +161,8 @@ describe("FR-CBT-60 windows follow the DM's own Start / End", () => {
     };
     const overlaps = (a: Rect, b: Rect) =>
       a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-    // Reset layout (Game log 68,404; Initiative 868,60), idle Initiative minimised; Compendium
-    // from the launcher, then Encounters from the launcher.
+    // Reset layout (Game log 68,484 690×160, FR-DICE-38; Initiative 868,60), idle Initiative
+    // minimised; Compendium from the launcher, then Encounters from the launcher.
     let ws: Windows = reduce(defaultLayout(dmWindows, viewport), { type: "reset" }, ctx);
     ws = reduce(ws, { type: "minimise", kind: "cbt.initiative" }, ctx);
     ws = reduce(ws, { type: "open", kind: "cmp.compendium" }, ctx);
@@ -172,10 +172,15 @@ describe("FR-CBT-60 windows follow the DM's own Start / End", () => {
       if (!w) throw new Error(`${kind} not in the layout`);
       return w;
     };
-    expect(of("dice.log")).toMatchObject({ x: 68, y: 404, h: 240 });
-    const comp = renderedWindowRects([of("cmp.compendium")], dmWindows, available, viewport)[0];
+    expect(of("dice.log")).toMatchObject({ x: 68, y: 484, w: 690, h: 160 });
+    const launched = renderedWindowRects(
+      [of("cmp.compendium"), of("cbt.encounters")],
+      dmWindows,
+      available,
+      viewport,
+    );
     const initStored = of("cbt.initiative");
-    expect(comp && overlaps(comp, initStored)).toBe(true); // over Initiative's stored spot
+    expect(launched.some((r) => overlaps(r, initStored))).toBe(true); // over Initiative's spot
     heights.set("cbt.initiative:main", 302);
     await startAndFollow(async () => null, {
       dispatch: (a) => {

@@ -147,6 +147,7 @@ describe("rule-trigger fixtures (MOD §13, R4 units)", () => {
       cardId,
       toHitTotal: p.toHit?.total,
       damageTotal: p.damage?.total,
+      damageRollId: p.damage?.rollId ?? null,
       targets: [
         {
           targetId: goblin?.id,

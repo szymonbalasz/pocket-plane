@@ -24,11 +24,13 @@ test("FR-NOTE-31 history geometry: DM def is 360×480, min 280×240, unshrunk by
   }
 });
 
-test("FR-NOTE-31 history geometry: opened on the default layout (dm) it is 360×480 inside the work area at 1440×900 and 1280×720", () => {
-  for (const viewport of [
-    { w: 1440, h: 900 },
-    { w: 1280, h: 720 },
-  ]) {
+// Sprint 5 (FR-NOTE-31 as amended, FR-SHELL-45): 480 high where a clear slot allows (1440×900),
+// else the tallest clear slot, never over the Game log: 412 at 1280×720.
+test("FR-NOTE-31 history geometry: opened on the default layout (dm) it is 360×480 at 1440×900, 360×412 at 1280×720, inside the work area", () => {
+  for (const [viewport, h] of [
+    [{ w: 1440, h: 900 }, 480],
+    [{ w: 1280, h: 720 }, 412],
+  ] as const) {
     const all = new Set(dmWindows.defs.map((d) => d.kind));
     const ctx = { registry: dmWindows, viewport, available: all };
     const ws = [
@@ -37,7 +39,7 @@ test("FR-NOTE-31 history geometry: opened on the default layout (dm) it is 360×
     const w = ws.find((x) => x.kind === "note.history");
     if (!w) throw new Error("note.history not open");
     const r = clampRect(w, viewport);
-    expect({ w: r.w, h: r.h }).toEqual({ w: 360, h: 480 });
+    expect({ w: r.w, h: r.h }).toEqual({ w: 360, h });
     const a = usableArea(viewport);
     expect(r.y >= a.top && r.y + r.h <= a.bottom).toBe(true);
   }

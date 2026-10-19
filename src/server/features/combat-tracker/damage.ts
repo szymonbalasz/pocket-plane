@@ -1,7 +1,8 @@
 // `cbt.rollDamage` (FR-CBT-71, ADR-0037, N7): rolls one row's damage server-side. The attacker's
 // latest pending to-hit-only card of the same row gets it (doubled after a natural 20) through
 // `updateNotification`; none → a new damage-only card via `notify`. One transaction: roll, roll
-// line, card. Healing never makes a card (the sheet never routes it).
+// line, card. Healing never makes a card (the sheet never routes it). Sprint 5 (FR-CBT-92): the
+// card owner's second roll on a completed pending card makes no card (`unusedRolls`).
 import { characterRolls } from "@shared/character-sheet/logic";
 import { critExpression } from "@shared/combat-tracker/rules";
 import {
@@ -13,6 +14,7 @@ import {
   type EncounterRecord,
   RollDamageInput,
   type RollDamageResult,
+  UNUSED_ROLLS_MAX,
 } from "@shared/combat-tracker/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import { ROLL_ROW_MAX } from "@shared/effect-modifiers/schemas";
@@ -76,13 +78,18 @@ function damageRow(env: CommandEnv, c: CombatantRecord, ref: RowRef) {
 const sameRef = (p: DamageCardPayload, ref: RowRef) =>
   p.attackId === ref.attackId && p.spellId === ref.spellId;
 
-/** FR-CBT-71: the attacker's latest pending to-hit-only card of this row in the encounter. */
-function pendingToHitCard(
+type PendingCard = { card: NotificationRecord; p: DamageCardPayload };
+
+/**
+ * FR-CBT-71: the attacker's latest pending to-hit-only card of this row in the encounter
+ * (`toHit`), and FR-CBT-92: the latest pending card of this row whatever its shape (`latest`).
+ */
+function pendingCards(
   env: CommandEnv,
   enc: EncounterRecord,
   attackerId: string,
   ref: RowRef,
-): { card: NotificationRecord; p: DamageCardPayload } | null {
+): { toHit: PendingCard | null; latest: PendingCard | null } {
   const rows = env.tx
     .select()
     .from(notification)
@@ -95,15 +102,32 @@ function pendingToHitCard(
     )
     .orderBy(desc(notification.seq))
     .all();
+  let latest: PendingCard | null = null;
   for (const r of rows) {
     const parsed = DamageCardPayload.safeParse(r.payload);
     if (!parsed.success) continue;
     const p = parsed.data;
-    if (p.encounterId !== enc.id || p.attackerId !== attackerId) continue;
-    if (p.damage !== null || p.toHit === null || !sameRef(p, ref)) continue;
-    return { card: toNotificationRecord(r), p };
+    if (p.encounterId !== enc.id || p.attackerId !== attackerId || !sameRef(p, ref)) continue;
+    const found = { card: toNotificationRecord(r), p };
+    latest ??= found;
+    if (p.damage === null && p.toHit !== null) return { toHit: found, latest };
   }
-  return null;
+  return { toHit: null, latest };
+}
+
+/**
+ * FR-CBT-92 (sprint 5, ADR-0053): the card's owner rolls again while its latest pending card of
+ * the row is complete (to-hit and damage): that card keeps the roll as unused. The owner = the
+ * rolling player of a player card, the DM of a DM card; anyone else makes a new card (FR-CBT-71).
+ */
+function unusedTarget(env: CommandEnv, latest: PendingCard | null): PendingCard | null {
+  if (!latest || latest.p.toHit === null || latest.p.damage === null) return null;
+  const a = env.actor;
+  const owner =
+    latest.card.audience === "player"
+      ? a.role === "player" && latest.card.audiencePlayerId === a.playerId
+      : a.role === "dm";
+  return owner ? latest : null;
 }
 
 export const rollDamageCommand = defineCommand({
@@ -119,7 +143,9 @@ export const rollDamageCommand = defineCommand({
     const row = damageRow(env, c, asked);
     const ref = cardRowRef(env, c, asked);
     checkManualExtra(row.extra, input.manual, input.manualExtra);
-    const pending = pendingToHitCard(env, enc, c.id, ref);
+    const cards = pendingCards(env, enc, c.id, ref);
+    const pending = cards.toHit;
+    const unusedOn = pending ? null : unusedTarget(env, cards.latest);
     // A completed card doubles the dice after its natural 20; manual is checked against that.
     const crit = pending?.p.toHit?.natural === 20;
     const damage = dice.evaluate(env, {
@@ -139,7 +165,8 @@ export const rollDamageCommand = defineCommand({
         crit,
         // FR-MOD-13, -37: hit triggers offered on the card's damage; `mode` filters read the
         // completed card's to-hit mode (a damage-only card: normal); `row` filters the row name.
-        card: true,
+        // FR-CBT-92: an unused roll makes no card, so nothing is offered on it.
+        card: unusedOn === null,
         ...(pending ? { toHitMode: pending.p.mode } : {}),
         row: row.name.slice(0, ROLL_ROW_MAX),
       },
@@ -192,6 +219,18 @@ export const rollDamageCommand = defineCommand({
       changes: [entry],
     };
     env.emit(rolled);
+    if (unusedOn) {
+      // FR-CBT-92: no card; the completed card keeps the roll (its last 3), text unchanged.
+      const total = card.total + extra.reduce((s, x) => s + x.total, 0);
+      const unusedRolls = [...(unusedOn.p.unusedRolls ?? []), { rollId: damage.id, total }].slice(
+        -UNUSED_ROLLS_MAX,
+      );
+      rolled.payload.cardId = unusedOn.card.id;
+      updateNotification(env, unusedOn.card.id, {
+        payload: fitCardPayload({ ...unusedOn.p, unusedRolls }),
+      });
+      return { cardId: unusedOn.card.id, rollIds, attached: false, unused: true };
+    }
     if (pending) {
       updateNotification(env, pending.card.id, {
         text: damageCardText(payload),

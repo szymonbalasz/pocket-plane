@@ -1822,9 +1822,24 @@ From [compendium](../specs/compendium.md#8-data-model) FR-CMP-45–49, -53 and [
 - **Fixtures:** `cmp-images` (`fixtures/assets/items/{lantern, lantern-lit, relic}.svg`, 256 × 256, as attachments; "Moonlit Lantern" shared `[lantern, lantern-lit]`, "CMP-IMG-SECRET" DM only `[relic]`); bundle `cmp-images` = `compendium` + `cmp-images`; the unit also in `session-sim-9`.
 - **Snapshot size** (CON-44, `snapshot-size.test.ts`): heavy harness + 20 homebrew entries × 4 attachment images (half shared): every viewer **+0 B** (DM 642,270 B, 930,594 B left of 1.5 MiB; players max 258,498 B).
 
-## 69. Sprint 5: Add to party from the compendium (P4)
+## 69. Sprint 5: late damage (R1)
 
-From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–42 (DM gate #256). **Built by `build/cmp-add-to-party`**: DM client only; no table, column or record type. Protocol side: [protocol §88](../protocol/README.md#88-sprint-5-add-to-party-from-the-compendium-p4).
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-89–94) and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) (FR-MOD-63). **Built by `build/late-damage`**; no schema change (R0's [§66](#66-sprint-5-combat-core-r0) fields, now written). Protocol side: [protocol §88](../protocol/README.md#88-sprint-5-late-damage-r1).
+
+| Table / field | Written by | Rule | Source |
+|---|---|---|---|
+| Damage card payload `unusedRolls` | `cbt.rollDamage` (owner's second roll on a completed pending card) | ≤ 3, oldest dropped; `total` = the base part with its mods + extra parts; first to go in the 4 KB fit order | FR-CBT-92 |
+| Damage card resolution `targets[].dropped` | `cbt.applyCard` on a ruled card | a ruled hit the DM dropped: `{hit: true, applied: 0, dropped: true}`; ruled misses `{hit: false, applied: 0}`; ruling order | FR-CBT-91 |
+| `hp_change` of a ruled card | `cbt.applyCard` | to-hit facts from the hit ruling (`toHitTotal`, `toHitRolled`, `natural`, `hitComputed`); a ruled miss still active → a `raw 0` row whose entry is a DM-only miss line | FR-CBT-91 |
+| `cbt.attack` line of a ruled card | `cbt.applyCard` | damage-only payload (`toHit: null`), as FR-CBT-73 | FR-CBT-91 |
+
+- **Derived (DM client, not stored):** popup step (`damage` iff a `hit-ruling` row for the card); per-card drafts and per-field typed / focused state (`popup-store`, until reload); the late note's resolved cards (client memory, this turn).
+- **Fixtures:** `late-hit-ruled` (bundles `late-damage`, `session-sim-9`).
+- **CON-44:** no new bytes (R0 measured `unusedRolls` and rulings).
+
+## 70. Sprint 5: Add to party from the compendium (P4)
+
+From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–42 (DM gate #256). **Built by `build/cmp-add-to-party`**: DM client only; no table, column or record type. Protocol side: [protocol §90](../protocol/README.md#90-sprint-5-add-to-party-from-the-compendium-p4).
 
 - **Writes:** the existing `party.addItem` ([§31](#31-sprint-3-party-board-core-p-core)): one `party_item` insert or merge, one `loot_entry {kind: item, world → party}`, one `loot-received` notification, one transaction. The party row keeps a name copy only (no link back to the entry, OQ-PARTY-13; Add to party copies no images, FR-CMP-49).
 - **Fixtures:** bundle `party-cmp` = `party-board` + `cmp-srd-mini` (existing units; SRD "Potion of Healing" merges into `party-items-1`'s "Potion of healing" ×2 → ×4).

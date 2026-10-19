@@ -1,4 +1,5 @@
 import { attackCommand } from "@server/features/combat-tracker/attack";
+import { fixtureSeededId } from "@server/features/combat-tracker/fixtures";
 import { applyCard } from "@server/features/combat-tracker/hp";
 import { defineFixture, step } from "@server/features/fixtures-adapters/fixture-types";
 import { COMBATANT_TYPE } from "@shared/combat-tracker/schemas";
@@ -22,6 +23,8 @@ export default defineFixture({
       cardId: r.id("combat-hit", "notification"),
       toHitTotal: 19,
       damageTotal: 6,
+      // FR-CBT-94: the attack's second seeded ID is its damage roll (the fixture test asserts it).
+      damageRollId: fixtureSeededId("combat-hit", 1),
       targets: [
         {
           targetId: r.id("combat-1", COMBATANT_TYPE, COMBAT_1.mira),

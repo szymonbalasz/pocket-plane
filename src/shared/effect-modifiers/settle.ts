@@ -3,6 +3,8 @@
 // the first row (list order) marked Hit whose target-side facts pass: `marked` (an active effect
 // with that preset whose source is the attacker; the card names a campaign mark by its name, R7)
 // and `hurt` (HP below max). Ticked iff a default target exists and the part isn't `untick`.
+// FR-MOD-63 (sprint 5): in the damage step the rows are the ruled hits in ruling order, so the
+// first Hit row is the ruling's first hit target still listed.
 import { isBuiltinPresetKey } from "./schemas";
 import { type MarkEffect, targetMarkedBy } from "./trigger-fire";
 

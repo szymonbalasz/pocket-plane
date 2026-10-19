@@ -122,6 +122,7 @@ export function cbtxSetup(opts: { round1?: boolean } = {}) {
       cardId: r.cardId,
       toHitTotal: p.toHit.total,
       damageTotal: p.damage.total,
+      damageRollId: p.damage.rollId,
       targets: targets.map((n) => ({ targetId: id(n), hit: true, multiplier: "normal" })),
     });
     return { cardId: r.cardId, damage: p.damage.total };

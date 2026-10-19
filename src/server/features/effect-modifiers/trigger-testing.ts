@@ -124,6 +124,7 @@ export function rtSetup(opts: { round1?: boolean; inCombat?: boolean } = {}) {
       cardId,
       ...(p.toHit ? { toHitTotal: p.toHit.total } : {}),
       damageTotal: p.damage?.total ?? 0,
+      damageRollId: p.damage?.rollId ?? null,
       targets: targets.map((x) => ({
         targetId: t.id(x.name),
         hit: x.hit ?? true,

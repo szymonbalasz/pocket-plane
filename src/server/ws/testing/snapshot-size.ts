@@ -548,6 +548,7 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
         cardId: a.cardId,
         toHitTotal: p.toHit.total,
         damageTotal: p.damage.total,
+        damageRollId: p.damage.rollId,
         targets,
       });
     }

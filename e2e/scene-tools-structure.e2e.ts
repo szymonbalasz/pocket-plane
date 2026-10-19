@@ -85,6 +85,8 @@ test("FR-SCN-11 / -12 / -09 / -08 / -15 blocked move, door open, door menu, draw
   await showToPlayers(dm, "Goblin Ambush");
   await expect(dm.getByTestId("map-not-shown-badge")).toHaveCount(0);
   await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
+  // The wide Game log (FR-DICE-38) covers the lower map at 1280×800: park it (no refit).
+  await shellWindow(dm, "dice.log").getByTestId("ui-window-minimise").click();
 
   // DM: walls (one shape, 3 segments), d1 closed, d2 locked.
   await expect.poll(() => attr(dm, "scn-walls", null, "count")).toBe(3);

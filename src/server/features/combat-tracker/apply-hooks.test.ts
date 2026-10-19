@@ -48,6 +48,7 @@ function started() {
       cardId,
       toHitTotal: p.toHit.total,
       damageTotal: p.damage.total,
+      damageRollId: p.damage.rollId,
       targets,
     });
   };

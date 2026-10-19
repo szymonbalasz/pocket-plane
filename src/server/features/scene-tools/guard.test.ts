@@ -1,9 +1,10 @@
 // The wall move guard (FR-SCN-10, -11; ADR-0040) on Goblin Ambush with `scn-walls`: a player's
 // move across a wall or a non-open door is `conflict` with no write, event, log entry, derive or
 // token-changed hook (so no combat `movedFt`); open doors pass; the DM is never checked; the guard
-// reads the committed structure at drop (cached by rev). Benchmark: ≤ 1 ms p95 per move at 2,000.
+// reads the committed structure at drop (cached by rev). Benchmark (≤ 1 ms p95 per move at 2,000):
+// ./guard.bench.ts.
 import { afterEach, describe, expect, test } from "bun:test";
-import { SCN_INTENTS as S, SEGMENTS_MAX, type Wall } from "@shared/scene-tools/schemas";
+import { SCN_INTENTS as S } from "@shared/scene-tools/schemas";
 import { MAP_INTENTS as I, type TokenRecord } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
 import { combatant, token } from "../../db/schema";
@@ -150,29 +151,5 @@ describe("FR-SCN-11 combat (OQ-SCN-17)", () => {
     expect(moved()).toBe(0);
     t.run(I.moveToken, { tokenId: t.tokens.mira, col: 5, row: 7 }, t.player(t.h.p1));
     expect(moved()).toBe(15);
-  });
-});
-
-describe("SCN §12 guard benchmark", () => {
-  test("SCN §12 2,000 segments: the guard (row read + check) ≤ 1 ms p95 per move", () => {
-    const t = setup();
-    // 1,998 short walls away from the path plus the two Ambush doors.
-    const walls = Array.from(
-      { length: SEGMENTS_MAX - 2 },
-      (_, i): Wall => [i + 10, 10 + (i % 10), 13 - (i % 3), 11 + (i % 10), 13 - (i % 3)],
-    );
-    t.s.db.$client.run(`DELETE FROM scene_structure WHERE scene_id = '${t.sid}'`);
-    t.writeStructure(t.sid, walls, AMBUSH_DOORS);
-    const tok = t.s.db.transaction((tx) => readToken(tx, t.mira)) as TokenRecord;
-    const env = { read: t.s.db, actor: t.p1 };
-    const times: number[] = [];
-    for (let i = 0; i < 300; i++) {
-      const t0 = performance.now();
-      scnWallGuard.guard(env, tok, { col: 2, row: 7 }, { col: 7, row: 2 + (i % 10) });
-      times.push(performance.now() - t0);
-    }
-    times.sort((a, b) => a - b);
-    const p95 = times[Math.floor(times.length * 0.95)] as number;
-    expect(p95).toBeLessThan(1);
   });
 });

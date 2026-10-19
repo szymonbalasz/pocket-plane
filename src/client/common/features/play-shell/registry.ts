@@ -5,6 +5,7 @@
 import { WindowKind } from "@shared/play-shell/layout";
 import type { RecordStore } from "@shared/protocol/store";
 import type { ComponentType } from "react";
+import type { Viewport } from "./geometry";
 
 export type ShellClient = "dm" | "player";
 
@@ -26,6 +27,19 @@ export interface Size {
   h: number;
 }
 
+/** Viewport classes (FR-SHELL-51): wide = vw ≥ 1440, tall = vh ≥ 900. */
+export const WIDE_W = 1440;
+export const TALL_H = 900;
+export const isWide = (vp: Viewport) => vp.w >= WIDE_W;
+export const isTall = (vp: Viewport) => vp.h >= TALL_H;
+/** One viewport per class (narrow / wide × short / tall): every default size a type can have. */
+export const CLASS_VIEWPORTS: readonly Viewport[] = [
+  { w: 1280, h: 720 },
+  { w: WIDE_W, h: 720 },
+  { w: 1280, h: TALL_H },
+  { w: WIDE_W, h: TALL_H },
+];
+
 /** What the shell passes to a window body: its identity only, never data (SHELL §9). */
 export interface WindowProps {
   kind: string;
@@ -44,7 +58,13 @@ export interface WindowDef {
   kind: string;
   title: string;
   clients: readonly ShellClient[];
-  defaultSize: Size;
+  /** A size, or one per viewport class (FR-SHELL-51: `isWide` / `isTall`), e.g. `dice.log`. */
+  defaultSize: Size | ((vp: Viewport) => Size);
+  /**
+   * Default sizes of earlier releases (FR-SHELL-53): a stored window still at one of them (or at
+   * a default of any viewport class) takes the current viewport's default when the layout loads.
+   */
+  previousDefaults?: readonly Size[];
   minSize: Size;
   defaultPosition: DefaultPosition;
   /** Part of the client's default layout. */
@@ -101,6 +121,23 @@ export interface WindowRegistry {
   get(kind: string): WindowDef | undefined;
 }
 
+/** The type's default size in this viewport (FR-SHELL-51). */
+export function defaultSizeAt(def: Pick<WindowDef, "defaultSize">, vp: Viewport): Size {
+  return typeof def.defaultSize === "function" ? def.defaultSize(vp) : def.defaultSize;
+}
+
+/** Every default size the type has in any viewport class, then its `previousDefaults`. */
+export function knownDefaultSizes(def: Pick<WindowDef, "defaultSize" | "previousDefaults">) {
+  const out: Size[] = [];
+  for (const s of [
+    ...CLASS_VIEWPORTS.map((vp) => defaultSizeAt(def, vp)),
+    ...(def.previousDefaults ?? []),
+  ]) {
+    if (!out.some((o) => o.w === s.w && o.h === s.h)) out.push(s);
+  }
+  return out;
+}
+
 /** Identity helper so feature files get type checking without importing the registry list. */
 export function defineWindow(def: WindowDef): WindowDef {
   return def;
@@ -123,9 +160,12 @@ export function createWindowRegistry(
     if (!def.clients.includes(client)) {
       throw new Error(`window kind "${def.kind}" is not a ${client} window`);
     }
-    const { defaultSize: d, minSize: m } = def;
-    if (m.w < 1 || m.h < 1 || d.w < m.w || d.h < m.h) {
-      throw new Error(`window kind "${def.kind}": default size must be ≥ min size ≥ 1`);
+    const m = def.minSize;
+    for (const vp of CLASS_VIEWPORTS) {
+      const d = defaultSizeAt(def, vp);
+      if (m.w < 1 || m.h < 1 || d.w < m.w || d.h < m.h) {
+        throw new Error(`window kind "${def.kind}": default size must be ≥ min size ≥ 1`);
+      }
     }
     byKind.set(def.kind, def);
   }
