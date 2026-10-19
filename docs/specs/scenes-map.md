@@ -1,7 +1,7 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: claimed
+status: in-review
 owner: spec-images
 wave: 3
 phase: post-mvp-6
@@ -18,6 +18,15 @@ phase: post-mvp-6
 > **Sprint 5, track R (trails; spec-combat).** Known bug, decided: **combat trails are the same in every client after a reload** (session-sim-8 glitch 6: after the DM's reload the DM drew 1 segment where a player drew 2). Cause: FR-MAP-54 keeps trails in client memory and drops them on a snapshot. Fix: the trail is **stored on the token** for the turn (FR-MAP-65), sent with the token (FR-MAP-66) and drawn from the record (FR-MAP-67); combat writes and clears it ([FR-CBT-97](combat-tracker.md#6-functional-requirements)). Amended: FR-MAP-54. Decided at sprint-5 gate 1 (#256): OQ-MAP-50 A, OQ-MAP-51 A. Test plan and slices: [CBT §13.1](combat-tracker.md#131-sprint-5-track-r-cbt-mod-map), [§14.1](combat-tracker.md#141-build-split-sprint-5-track-r-cbt-mod-map). Other sprint-5 tracks edit this spec too (W: Fit; K: colours); R touches only the trail rows.
 >
 > **Sprint 5 (track K; BL-17 via [#251](../decisions-log.md); [#250](../decisions-log.md) [1]).** Decided by the DM (not open): each person's **laser, pings and drag path** show their **player colour** ([campaign-management](campaign-management.md) FR-CAMP-23–29 owns the colour); a kept template's right-click menu ([scene-tools](scene-tools.md) FR-SCN-48) needs the canvas to tell a right-click from a laser drag. New FR-MAP-68–73 (track K's range; W and R add their own rows in parallel). Wire: 0 B. Walkthrough: [CAMP §13](campaign-management.md#13-test-plan) K3, K5, K8, K9, K12.
+
+> **Sprint 6, track IM (image search, DM [#285](../decisions-log.md)).** The two scenes-map image pickers, **New scene**'s map and the token menu's **Image…**, get the search field (shared matcher: "Gob el" finds Elite Goblin), the tag filter and the tag editor of [assets-pipeline FR-ASSET-44–48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im); their uploads are tagged **Maps** / **Tokens**. New FR-MAP-86, -87. No canvas, record, event or visibility change. Other sprint-6 tracks (WF: Fit; CP: owned tokens) edit this spec in parallel.
+
+**Sprint 6 at a glance** (track IM)
+
+| FR | What | Slice ([ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split)) | Named test |
+|---|---|---|---|
+| FR-MAP-86 | New scene's map picker: search, tag filter, `context="map"` | IM-3 `build/im-wiring` | `FR-MAP-86 map picker searches and tags`; walkthrough IM2 |
+| FR-MAP-87 | Token menu Image…: search, tag filter, `context="token"` | IM-3 | `FR-MAP-87 token image picker searches and tags`; e2e; walkthrough IM1, IM7 |
 
 **Sprint 5 at a glance** (tracks W, R, K)
 
@@ -175,6 +184,8 @@ Decided at sprint-4 gate 1 (#245): OQ-MAP-35 (combat trail), -36 (straight path)
 | FR-MAP-71 | **Right-press routing** (both clients). Today's order, as built (`MapCanvas.tsx`; review #43), with one new step (4): on a button-2 press over the canvas: **(1) node menus**: doors (FR-SCN-09) and props (FR-SCN-17) set `cancelBubble` on button 2, so their own menus always win (DM); **(2) a token** under the pointer: DM → the token menu on release (FR-MAP-18); **player → only step (4)**: if a layer `contextMenu` hits at that point (e.g. their own kept template under the token) it opens there, **else nothing**: no laser, so FR-MAP-24's "right-click on a token: player → nothing" stays true (review #10); **(3)** the active drawing tool's `pointer.menu` (FOG Darkness, FR-FOG-42) as built; **(4) new:** the first layer entry whose `contextMenu.hit(p)` is true (top-down by `order`, [FR-SCN-51](scene-tools.md#6-functional-requirements); sprint 5: kept templates the client may edit, FR-SCN-48) → *(OQ-SCN-39 A, decided #256)* **deferred**: no laser yet; release with < 4 px movement → `contextMenu.open` at the pointer, **nothing sent**; ≥ 4 px → the laser starts from the press point (its first point), as today; **(5)** else the laser starts at once (unchanged). The laser (immediate or deferred) is gated by `signalsLive` as built (DM: off while the viewed scene isn't the active one, FR-MAP-08; both: off while not `live`); the menu in (4) needs `live` (FR-MAP-28), not `signalsLive`. The browser context menu stays suppressed. Middle mouse unaffected (FR-MAP-12). | [1]; review #10, #43 |
 | FR-MAP-72 | *(OQ-CAMP-25 A, decided #256)* **Coloured marks on the map:** every mark drawn in a person's colour (laser, ping, pull, drag path, trail; SCN templates FR-SCN-47; NOTE's token cue FR-NOTE-40, OQ-CAMP-27) draws over a **dark casing** (opaque `#000`, 2 screen px wider than the stroke; fills get a 1 px casing outline), per FR-CAMP-28: on light maps the bare colours measure 1.0–2.9 : 1, against the casing 5.3–15.9 : 1. Each casing is a Konva node named `map-casing` (id = its mark's id), so tests assert it. Colour unknown (no `player` record yet, an unknown key) → today's role accent (`dmAccent` / `playerAccent`). *(OQ-MAP-53 A, decided #256)* Local-only aids keep `primary` (ruler, drag target, selection box). | OQ-CAMP-25 |
 | FR-MAP-73 | *(OQ-CAMP-21 A, decided #256)* **Recolour, 0 B:** colours resolve at draw time from the store's `player` / `campaign` records, so a `PlayerColorSet` upsert redraws live trails, pulses, paths and trails ≤ 1 s with no resend. No signal gains a field: `map.ping`, `map.pull`, `map.laser`, `map.drag` frames stay byte-identical (receivers use the server-stamped `from`, ADR-0026). A sender the receiver has no `player` record for (a player added since its snapshot arrives with `PlayerAdded`) → fallback until the upsert lands. | ADR (proposed) |
+| FR-MAP-86 | *(S6, track IM)* **New scene's map picker searches and tags.** The inline picker in the Scenes window's **New scene** Dialog (`src/client/dm/features/scenes-map/scenes-window.tsx`, "Use as map") is ASSET's `AssetPicker` with `context="map"`: search field, tag filter, tag editor ([FR-ASSET-44–48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im)); an upload there is tagged **Maps** (FR-ASSET-41). The Dialog keeps the name Input above the picker; only the picker's grid scrolls. FR-MAP-01 (`assets.require`, display size) unchanged. | OQ-ASSET-23 |
+| FR-MAP-87 | *(S6, track IM)* **Token image picker searches and tags.** The DM token menu's **Image…** (FR-MAP-18; `src/client/dm/features/scenes-map/token-menu-entries.tsx`) opens `AssetPickerDialog` with `context="token"`; uploads tagged **Tokens**. `map.updateToken`, `assets.require` and token visibility unchanged: a player still learns an image ID only on a token they receive (FR-ASSET-12); tags never reach players (FR-ASSET-50). FR-MAP-09 `map.setSceneMap` has no UI today, so no picker (OQ-MAP-60). | OQ-ASSET-23 |
 
 ## 7. UI/UX notes
 
@@ -426,6 +437,17 @@ Bundle `player-colours` = `map-tools` + CAMP's `pc-colours` ([CAMP §13](campaig
 
 **Sprint 5 walkthrough:** [CAMP §13](campaign-management.md#13-test-plan) K3 (laser, ping, pull, chips), K5 (paths by owner), K8 / K9 (right press: menu vs laser), K10 (DM colour change recolours the DM's marks), K12 (reload, crash).
 
+### Sprint 6: image pickers (track IM)
+
+Bundle **`image-search`** ([ASSET §13.1](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im)); isolated per worktree as above.
+
+| Level | Named tests |
+|---|---|
+| Unit (DOM) | **`FR-MAP-86 map picker searches and tags`** (New scene renders `asset-picker` with `data-context="map"`; `gob cave` → Goblin Cave only; Maps chip; Upload sends `tags=["Maps"]`; "Use as map" still fills the form); **`FR-MAP-87 token image picker searches and tags`** (Image… → `data-context="token"`; "Gob el" → 2 items; Upload sends `tags=["Tokens"]`; Select sends `map.updateToken {imageAssetId}`) |
+| E2E (thin) | ASSET's: token Image… → "Gob el" → Tokens chip → Elite Goblin on the token |
+
+Walkthrough: [ASSET IM1, IM2, IM7, IM10](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im) (player-1's frames carry the new token image ID only because the token is visible, never a tag). Disconnect / reconnect / crash: unchanged for the canvas; the picker per [ASSET §11](assets-pipeline.md#11-edge-cases--failure-modes).
+
 ## 14. Dependencies
 
 > **Sprint 5 (trails):** slices in [CBT §14.1](combat-tracker.md#141-build-split-sprint-5-track-r-cbt-mod-map): **R0** (`token.trail` column in `src/server/db/`, `@shared/scenes-map/schemas.ts`, `appendTrail` / `clearTrails` and the move upsert after hooks in `src/server/features/scenes-map/commands.ts`, the player redaction in `visibility.ts` / `records.ts`) and **R3** (client `drag-path.ts`, `drag-preview.ts`, `MapCanvas.tsx`, `layers/DragPaths.tsx`; combat's hook and turn commands). *(Seams S10)* Canvas holder order, one at a time: **K1 template menu [1] → W2 Fit → R3 trails → K3 colours**; a slice ready while another holds the lock waits or stacks with `--base` on the holder's branch. K3 colours the trail R3 stores (owner's colour at draw time, nothing stored). No new dependency.
@@ -519,6 +541,10 @@ Full split, order and locks: [CAMP §14](campaign-management.md#sprint-5-build-s
 
 - **No** new record type, intent, signal field, Konva layer, registry or dependency.
 
+### Sprint 6 build split (track IM)
+
+Full split: [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split). MAP part: **IM-3 `build/im-wiring`** (after IM-2 `build/im-picker`): one `context` prop in `scenes-window.tsx` and in `token-menu-entries.tsx`, one DOM test each. Neither is a canvas hotspot file (`MapCanvas.tsx`, `TokensLayer.tsx`, `LabelsLayer.tsx`, tools), so IM-3 needs no canvas lock and runs alongside WF / CP canvas work. No schema, record type, event, §9.9 shared file or dependency.
+
 ## 15. Open questions
 
 **Bold** option = suggested pick unless the row says Decided.
@@ -577,6 +603,7 @@ Full split, order and locks: [CAMP §14](campaign-management.md#sprint-5-build-s
 |---|---|---|---|---|
 | OQ-MAP-52 | **Whose colour is a drag path?** | **Decided (#256): the token owner's (no owner: DM colour).** Pick as proposed: A. The token owner's (no owner: DM colour) (Mira's path is rose whoever drags it; the combat trail, R3's stored `trail` with no colour on it (seams S10), matches the live path). Rejected: ~~B. The dragger's (`from` of `map.drag`): the DM dragging Mira shows amber, but her trail can't follow unless R3 stores the dragger per segment~~ | — · decided | combat (R3 trail) |
 | OQ-MAP-53 | Local-only aids (ruler, drag target cell, DM selection box) | **Decided (#256): keep `primary` (white) for local-only aids.** Pick as proposed: A. Keep `primary` (white): they are never seen by others, so colour adds nothing. Rejected: ~~B. Own colour: more consistent, but white is also the selection ring's cue~~ | — · decided | — |
+| OQ-MAP-60 | *(S6, track IM)* `map.setSceneMap` (FR-MAP-09) has no UI: a scene's map can only be chosen at New scene. Add **Change map…** to the Scenes row menu with the picker (`context="map"`) now? | **A not this sprint: backlog row** (sprint 6 adds search to existing pickers only, #285) / B add it in IM-3 (one menu item + the picker; small, but a new flow to walk and test) | no · owner: spec-images | — |
 
 ## 16. Out of scope
 
