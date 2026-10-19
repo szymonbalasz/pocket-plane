@@ -12,7 +12,6 @@ import {
   notification,
   player,
 } from "@server/db/schema";
-import { fixtureAttachmentId } from "@server/features/assets-pipeline/fixtures";
 import { asc } from "drizzle-orm";
 import { loadBundle } from "../../index";
 import { HANDOUT_ATTACHMENT } from "./handout-attachment";
@@ -75,9 +74,8 @@ describe("party-s5 fixtures (PARTY §13.1, FR-PARTY-40)", () => {
     expect(note?.campaignId).toBe(r.fixture);
     // Every other asset stays in the library.
     expect(r.assets.filter((a) => !a.listed).map((a) => a.name)).toEqual(["ransom-note"]);
-    expect(note?.id).toBe(
-      await fixtureAttachmentId(HANDOUT_ATTACHMENT.key, HANDOUT_ATTACHMENT.file),
-    );
+    // The loader records an attachment's id (no record change) for `r.id` and the manifest.
+    expect(r.manifest.records[HANDOUT_ATTACHMENT.key]?.asset).toEqual([note?.id as string]);
 
     const h6 = r.handouts.at(-1);
     expect(h6).toMatchObject({
