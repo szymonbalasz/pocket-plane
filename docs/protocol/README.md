@@ -2371,7 +2371,35 @@ From [party-board](../specs/party-board.md#66-sprint-5-loot-tab-present-uploads)
 | Tests | `board.test.tsx` (FR-PARTY-29 ×3 per role), `logic.test.ts` (FR-PARTY-29 tab memory), both clients' `party-board/windows.test.ts` (FR-LOOT-21 registry + stored layout, FR-PARTY-30 closed / minimised / open); e2e `party-loot-tab.e2e.ts` (`party-s5`: FR-PARTY-29, FR-LOOT-21, -22, -23), `party-loot.e2e.ts` opens Loot through Party |
 | CON-44 | 0 B (no record) |
 
-## 94. Sprint 5: colour picker (K2)
+## 94. Sprint 5: compendium entry images client (C5 UI)
+
+From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-49–52 (OQ-CMP-37–42, DM gate #256; seams S5) and [assets-pipeline](../specs/assets-pipeline.md#6-functional-requirements) FR-ASSET-20 (the `ImageAttach` contract, consumed unchanged). **Built by `build/cmpimg-ui`**: client only, both clients. No new route, intent, event, record type or registry: the form sends §86's `imageAssetIds` on `POST` / `PUT /api/compendium/entries`; views read §86's `GET` body. Data side: [data model §73](../data-model/README.md#73-sprint-5-compendium-entry-images-client-c5-ui).
+
+| Piece | Contract |
+|---|---|
+| Homebrew form (`@dm/features/compendium/HomebrewForm.tsx`, `homebrew-form.ts`) | Every homebrew kind: "Images (‹n› / 4)" strip below the text preview; tiles in slot order (`thumb`), "Main" Badge on the first; Move left / Remove / Move right. `ImageAttach` with `max = IMAGE_SLOTS_MAX`, `count` = draft length, `owner = "cmp-form"`, `disabled` while saving, `pasteTarget` = `dropTarget` = the form `DialogContent` (portalled; name and text included). `onAdd` appends; an ID already in the draft is skipped with "Already in this entry" (caller-side dedupe, seams S5). Clone prefills a homebrew base's IDs (a copy); an imported base has none; Edit holds the entry's. Cancel drops the draft (uploaded attachments stay) |
+| Entry view (`@ui/features/compendium/gallery.tsx`, used by `views.tsx`) | Under the header of every non-monster kind: main image (`thumb`, full width, ≤ 240 px high), others as 64 px `thumb` tiles; nothing without images. Click → lightbox (`display`, ≤ 90 vw × 80 vh; Prev / Next wrap, ← / → keys; "‹n› / ‹N›"; Esc closes). `AssetImg` states (skeleton, broken tile with no text). Same markup in both clients; a player sees exactly what `GET` delivered (FR-CMP-48). Refresh unchanged (FR-CMP-23 / -52) |
+| Test IDs | Form: `cmp-form-images` (`data-value` = count), `cmp-form-image` (`data-record-id` = asset ID, `data-value` = slot 1–4), `cmp-form-image-main`, `cmp-form-image-left`, `cmp-form-image-right`, `cmp-form-image-remove`, `cmp-form-image-dup`; control `asset-attach[data-owner="cmp-form"]`. View: `cmp-entry-images` (`data-value` = count), `cmp-entry-image-main` (`data-record-id`), `cmp-entry-image` (`data-record-id`, `data-value` = position 2–4), `cmp-lightbox`, `cmp-lightbox-prev`, `cmp-lightbox-next`, `cmp-lightbox-count` |
+| Fixtures | None new: §86's `cmp-images` unit / bundle (already in `session-sim-9`) |
+| Tests | `homebrew-images.test.tsx` (FR-CMP-50 form slots ×5, FR-CMP-49 clone prefill), `gallery.test.tsx` (FR-CMP-51 entry gallery ×6: none, spell 2, item 3, lightbox wrap / counter, error tile, player markup), `e2e/cmpimg-ui.e2e.ts` (upload + paste "E2E Lamp", dedupe, move, share; DM lightbox; player-1 main image `naturalWidth > 0`) |
+| CON-44 | No record, no snapshot bytes (entry images are REST-only attachments, §86) |
+
+## 95. Sprint 5: Initiative trigger chips, Effect… source, one Invisible (W4)
+
+From [combat-extras](../specs/combat-extras.md) FR-CBTX-54–56 (OQ-CBTX-27 B, -28 A, -29 A, #256; seams S9) and [fog-of-war](../specs/fog-of-war.md) FR-FOG-59. **Built by `fix/init-chips-effect`**: client only; no record type, intent, event, signal or wire field (CON-44: 0 B). Amends [§51](#51-sprint-3-rule-trigger-sheet-ui-r6)'s "Initiative trigger chips" row (FR-CBTX-52: triggers no longer go into "+N"). Data model: [§74](../data-model/README.md#74-sprint-5-initiative-trigger-chips-effect-source-one-invisible-w4).
+
+| Piece | Contract | Source |
+|---|---|---|
+| `fitChipRow(effects, triggers, room, gap) → {n, tier, icons, wrap}` (`@ui/features/combat-extras/logic`) | Pure, over measured natural widths (effects `{full, short}` per BL-08 tier; triggers `full` = with name, `short` = icon-only). In order: (1) effect chips tighten (`fitChipTiers`) beside full trigger chips; (2) trigger chips icon-only; (3) effect chips fold into "+N", last first (`n` counts effect chips only); (4) `wrap`: the icon-only triggers don't fit even with every effect folded. No triggers → BL-08's rule unchanged | FR-CBTX-54 |
+| `EffectChips` compact rows (`parts.tsx`; DM `row.tsx` and the player Initiative row) | Order: shown effect chips, "+N" (in flow), trigger chips. Folded effects leave the flow (measured on the hidden copy, `data-chip-measure="effect"` / `"trigger"`). `wrap` (`data-wrap="true"` on `data-chip-row`): the chip line takes its own line under the name (flex-basis 100 %, last; the name line wraps only meanwhile), held until the name line widens or the chips change. "+N" Tooltip / list: effects only (`cbtx-trigger-chip-more-item` retired) | FR-CBTX-54 |
+| Icon trigger chip `cbtx-trigger-chip` | `data-compact` `true` \| `false`; icon-only = `Zap` + uses ("⚡2", `hp.down` below zero) + check when muted, the name `sr-only`; Tooltip "‹name› — ‹state›" (`triggerLine`). Full chips: name, at most 96 px (no tier cut) | FR-CBTX-54 |
+| Effect… source (`dialogs.tsx`, `effect-source.ts` `defaultEffectSource`) | Default = turn combatant if not hidden and not removed (`data-default="turn"` on `cbtx-effect-source`); else the first target's own active combatant in the started encounter (`target`); else none (`none`). Hidden combatants listed with an eye-off icon. `sourceCombatantId` sent as chosen | FR-CBTX-55 |
+| Token menu Conditions ▸ (`cbtx-token-menu-conditions`) | 14 options: `ConditionsMenu omit` = `TOKEN_MENU_OMIT` (`invisible`). The Initiative row's `cbtx-init-row-conditions` keeps 15 | FR-CBTX-56 |
+| `fog-token-menu-invisible` | The menu's only "Invisible"; Tooltip "Players don't see it unless they see invisible" (`INVISIBLE_TIP`). Intent unchanged (`fog.setInvisible`) | FR-FOG-59 |
+
+- **Fixtures:** none new (W4 adds no record); e2e bundle `init-chips-effect` = `windows-s5` under its own name (own e2e server).
+
+## 96. Sprint 5: colour picker (K2)
 
 From [campaign-management](../specs/campaign-management.md#7-uiux-notes) FR-CAMP-27 ([ADR-0055](../architecture/adr/0055-player-colour.md); DM gate #256). **Built by `build/colour-picker`**: client only; sends K0's `camp.setColor` ([§91](#91-sprint-5-player-colours-core-k0)). No new route, intent, event, record type, registry or snapshot byte. No data-model change.
 

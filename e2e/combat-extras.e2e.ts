@@ -212,6 +212,11 @@ test("walkthrough fixes: row names stay distinct (chips collapse first), Conditi
         suffixShown: suffix ? suffix.width > 0 && suffix.right <= box.right + 0.5 : null,
         movedClipped: m && line ? m.right > line.right + 0.5 || m.width === 0 : false,
         lineHeight: Math.round(line?.height ?? 0),
+        wrap: r.querySelector("[data-chip-row]")?.getAttribute("data-wrap") === "true",
+        cut: (() => {
+          const b = name.querySelector<HTMLElement>("[data-name-base]");
+          return !!b && b.scrollWidth > b.clientWidth;
+        })(),
       };
     });
   });
@@ -225,12 +230,17 @@ test("walkthrough fixes: row names stay distinct (chips collapse first), Conditi
     });
   }
   // One line of chips: no row grows past Wolf's (a monster row with no effect), so FR-SHELL-32's
-  // 6 rows hold; the name line stays one line.
+  // 6 rows hold; the name line stays one line. FR-CBTX-54 (W4 re-test, #182): a row grows only
+  // when its chips take the second line, and its name is then whole.
   const wolfHeight = byName.Wolf?.height ?? 0;
-  for (const f of fit)
-    expect({ name: f.name, grew: f.height > wolfHeight }).toEqual({ name: f.name, grew: false });
-  for (const f of fit)
-    expect({ name: f.name, line: f.lineHeight <= 24 }).toEqual({ name: f.name, line: true });
+  for (const f of fit) {
+    const grew = f.height > wolfHeight || f.lineHeight > 24;
+    expect({ name: f.name, grew: grew && !f.wrap, cut: f.wrap && f.cut }).toEqual({
+      name: f.name,
+      grew: false,
+      cut: false,
+    });
+  }
 
   // Walkthrough step 12 (mouse): Initiative row → Conditions ▸ Stunned by mouse click.
   await row(goblin).getByTestId("cbt-init-row-menu").click();

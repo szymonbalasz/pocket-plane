@@ -1,4 +1,5 @@
-// DM combat-extras dialogs (FR-CBTX-33/36): Effect (Condition / Custom, duration, source, link,
+// DM combat-extras dialogs (FR-CBTX-33/36): Effect (Condition / Custom, duration, source (default
+// FR-CBTX-55), link,
 // hidden), Concentration, Temp HP, Set death saves, Add combatants (`./add-dialog`: lookup,
 // count, HP mode, created tokens; preview as Start). Hosted by `cbt.initiative`'s companion; they send intents, nothing else.
 
@@ -29,9 +30,10 @@ import {
   useStartedEncounter,
 } from "@ui/features/combat-tracker/store";
 import { useSync } from "@ui/sync/store";
-import { TrashIcon } from "lucide-react";
+import { EyeOffIcon, TrashIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { AddForm } from "./add-dialog";
+import { defaultEffectSource } from "./effect-source";
 import { type Target, useCbtxDialogs } from "./store";
 
 const NONE = "none";
@@ -72,7 +74,15 @@ function EffectForm({ targets, editId }: { targets: Target[]; editId?: string })
   const [level, setLevel] = useState(String(edit?.level ?? 1));
   const [label, setLabel] = useState("");
   const [duration, setDuration] = useState(edit?.durationRounds ? String(edit.durationRounds) : "");
-  const [source, setSource] = useState<string>(enc?.turnCombatantId ?? NONE);
+  // FR-CBTX-55: never a hidden monster by default; the pick is sent unchanged.
+  const [initial] = useState(() =>
+    defaultEffectSource(
+      rows,
+      enc?.turnCombatantId,
+      targets.map((t) => t.ref),
+    ),
+  );
+  const [source, setSource] = useState<string>(initial.id ?? NONE);
   const [link, setLink] = useState(false);
   const [secret, setSecret] = useState(edit?.secret ?? false);
   const rounds = parseRounds(duration);
@@ -218,7 +228,7 @@ function EffectForm({ targets, editId }: { targets: Target[]; editId?: string })
           <div className="grid gap-1.5">
             <Label>Source</Label>
             <Select value={source} onValueChange={setSource}>
-              <SelectTrigger data-testid="cbtx-effect-source">
+              <SelectTrigger data-testid="cbtx-effect-source" data-default={initial.why}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -231,6 +241,12 @@ function EffectForm({ targets, editId }: { targets: Target[]; editId?: string })
                     data-value={c.id}
                   >
                     {c.name}
+                    {c.hidden && (
+                      <EyeOffIcon
+                        className="ml-1 inline size-3.5 text-muted-foreground"
+                        aria-label="Hidden"
+                      />
+                    )}
                   </SelectItem>
                 ))}
               </SelectContent>
