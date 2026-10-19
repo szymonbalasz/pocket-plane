@@ -12,8 +12,9 @@ import { CompendiumEntryDeleted, CompendiumEntrySaved } from "@shared/events/com
 import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
-import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
+import { CommandError, conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import { compendiumEntry } from "../../db/schema";
+import { requireAsset } from "../assets-pipeline/commands";
 import { activeCampaign } from "../campaign-management/commands";
 import { dataHash } from "../fixtures-adapters/import-pipeline";
 import { derivedColumns, EntryId, getEntry } from "./entries";
@@ -22,6 +23,7 @@ export const PUT_ENTRY = "cmp.putEntry";
 export const DELETE_ENTRY = "cmp.deleteEntry";
 export const READ_ONLY_ENTRY = "Imported entries are read-only. Clone to edit.";
 export const NAME_TAKEN = "An entry of this kind with this name already exists";
+export const IMAGE_NOT_FOUND = "Image not found";
 
 /** Kind + name + facets + body as `EntryDraft` (monster excluded: customs, FR-CMP-02). */
 export const PutEntryInput = PutEntryBody.extend({ id: EntryId.optional() });
@@ -52,10 +54,26 @@ function checkDraft(d: EntryDraft): void {
   }
 }
 
+/**
+ * FR-CMP-46: each image through `assets.require` in the entry's campaign (listed assets and
+ * attachments alike); unknown or another campaign's → `not_found`, before any write.
+ */
+function requireImages(env: CommandEnv, cid: string, ids: readonly string[]): void {
+  const actor = { ...env.actor, campaignId: cid };
+  for (const id of ids) {
+    try {
+      requireAsset({ tx: env.tx, actor }, id);
+    } catch (err) {
+      if (err instanceof CommandError && err.code === "not_found") throw notFound(IMAGE_NOT_FOUND);
+      throw err;
+    }
+  }
+}
+
 export const putEntry = defineCommand({
   name: PUT_ENTRY,
   input: PutEntryInput,
-  execute({ id, entry: d, shared, derivedFromId }, env): { entryId: string } {
+  execute({ id, entry: d, shared, derivedFromId, imageAssetIds }, env): { entryId: string } {
     const { tx, ctx } = env;
     const cid = campaignOf(env);
     checkDraft(d);
@@ -70,6 +88,7 @@ export const putEntry = defineCommand({
         throw invalid("Kind can't change", [{ path: ["entry", "kind"], message: "Immutable" }]);
       }
     }
+    requireImages(env, cid, imageAssetIds);
     const cols = derivedColumns(d);
     const clash = tx
       .select({ id: compendiumEntry.id })
@@ -91,6 +110,7 @@ export const putEntry = defineCommand({
       dataHash: dataHash(d),
       shared,
       derivedFromId,
+      imageAssetIds,
       updatedAt: now,
     };
     if (before) {

@@ -76,6 +76,7 @@ const BLINDED: EntryResponse = {
     definitionId: null,
     shared: false,
     derivedFromId: null,
+    imageAssetIds: [],
     createdAt: "t",
     updatedAt: "t",
     importedAt: "t",

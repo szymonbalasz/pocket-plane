@@ -16,6 +16,7 @@ import { draftError, draftOf, initialFields } from "./homebrew-form";
 
 const ROW = {
   derivedFromId: null,
+  imageAssetIds: [],
   createdAt: "t",
   updatedAt: "t",
   definitionId: null,

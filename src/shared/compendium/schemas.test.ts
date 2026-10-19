@@ -1,11 +1,14 @@
 // FR-CMP-01 kind schemas and limits; FR-CMP-29 featureKey; derived line.
 import { describe, expect, test } from "bun:test";
+import { PutEntryBody } from "./homebrew";
 import {
   CompendiumEntry,
   ENTRY_MAX_BYTES,
   EntryDraft,
+  EntryImages,
   entryLine,
   featureKey,
+  IMAGE_SLOTS_MAX,
   isReadOnlyEntry,
 } from "./schemas";
 
@@ -137,6 +140,7 @@ describe("FR-CMP-01 kind schemas", () => {
       definitionId: null,
       shared: false,
       derivedFromId: null,
+      imageAssetIds: [],
       createdAt: "2026-10-16T00:00:00.000Z",
       updatedAt: "2026-10-16T00:00:00.000Z",
       importedAt: "2026-10-16T00:00:00.000Z",
@@ -186,5 +190,53 @@ describe("CMP §8 derived line", () => {
         }),
       ),
     ).toBe("Uncommon wondrous item");
+  });
+
+  test('FR-CMP-45 slot limit: 0–4 unique asset IDs; 5 → "At most 4 images"; a duplicate or a non-ID refused; imported entries none', () => {
+    const ids = ["a", "b", "c", "d", "e"].map((c) => c.repeat(22));
+    const messages = (v: unknown) => {
+      const r = EntryImages.safeParse(v);
+      return r.success ? [] : r.error.issues.map((i) => i.message);
+    };
+    expect(IMAGE_SLOTS_MAX).toBe(4);
+    expect(messages([])).toEqual([]);
+    expect(messages(ids.slice(0, 4))).toEqual([]);
+    expect(messages(ids)).toEqual(["At most 4 images"]);
+    expect(messages([ids[0], ids[0]])).toEqual(["Same image twice"]);
+    expect(messages(["not an id"])).not.toEqual([]);
+    const draft = { kind: "condition", name: "Dazed", facets: {}, body: { text: "Reeling." } };
+    // `cmp.putEntry` body: default `[]`, slot order kept.
+    expect(PutEntryBody.parse({ entry: draft }).imageAssetIds).toEqual([]);
+    expect(
+      PutEntryBody.parse({ entry: draft, imageAssetIds: ids.slice(0, 2) }).imageAssetIds,
+    ).toEqual(ids.slice(0, 2));
+    expect(PutEntryBody.safeParse({ entry: draft, imageAssetIds: ids }).success).toBe(false);
+    const homebrew = {
+      id: "e2",
+      campaignId: "c1",
+      kind: "condition",
+      source: null,
+      sourceKey: null,
+      name: "Dazed",
+      line: "Condition",
+      facets: {},
+      body: { text: "Reeling." },
+      definitionId: null,
+      shared: true,
+      derivedFromId: null,
+      imageAssetIds: ids.slice(0, 3),
+      createdAt: "2026-10-16T00:00:00.000Z",
+      updatedAt: "2026-10-16T00:00:00.000Z",
+      importedAt: null,
+    };
+    expect(CompendiumEntry.safeParse(homebrew).success).toBe(true);
+    const imported = {
+      ...homebrew,
+      campaignId: null,
+      source: "srd-5.1",
+      sourceKey: "condition/dazed",
+    };
+    expect(CompendiumEntry.safeParse(imported).success).toBe(false);
+    expect(CompendiumEntry.safeParse({ ...imported, imageAssetIds: [] }).success).toBe(true);
   });
 });
