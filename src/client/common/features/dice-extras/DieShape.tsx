@@ -3,7 +3,8 @@
 // d12 pentagon, d20 flat icosahedron (hexagon + centre triangle); d100 = a tens kite + a units
 // kite; other faces and dice-less sums → a round chip. Dropped (adv / dis): 40 % opacity + struck;
 // offered trigger die: dashed outline, never struck. Used by the tray, the throw zone's flat
-// dice, the roll popup and the game log (FR-DICE-35).
+// dice, the roll popup and the game log (FR-DICE-35). `blank`: the shape without its number while
+// the entry is held (FR-DICEX-49, table E).
 import { type DiceLook, STYLE_LOOK } from "@shared/dice-extras/looks";
 import { cn } from "../../lib/utils";
 
@@ -63,6 +64,7 @@ function Outline({
   px,
 }: {
   kind: Exclude<DieShapeKind, "round">;
+  /** "" = blank. */
   text: string;
   look: DiceLook;
   kept: boolean;
@@ -81,18 +83,20 @@ function Outline({
     >
       <path d={o.d} fill={look.body} {...stroke} strokeDasharray={offered ? "12 9" : undefined} />
       {kind === "d20" && <path d={D20_FACE} fill="none" {...stroke} strokeWidth={3} />}
-      <text
-        x={50}
-        y={o.cy}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill={look.pips}
-        fontSize={fontOf(text, o.scale)}
-        fontWeight={700}
-        className="tabular-nums"
-      >
-        {text}
-      </text>
+      {text !== "" && (
+        <text
+          x={50}
+          y={o.cy}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill={look.pips}
+          fontSize={fontOf(text, o.scale)}
+          fontWeight={700}
+          className="tabular-nums"
+        >
+          {text}
+        </text>
+      )}
       {!kept && !offered && (
         <line x1={14} y1={o.cy} x2={86} y2={o.cy} stroke={look.pips} strokeWidth={7} />
       )}
@@ -111,6 +115,7 @@ export function DieShape({
   part,
   negative = false,
   label,
+  blank = false,
 }: {
   /** Faces as rolled (a d100 part keeps 100); null = unknown → round. */
   faces: number | null;
@@ -127,6 +132,8 @@ export function DieShape({
   negative?: boolean;
   /** Accessible name; default "d20: 13". */
   label?: string;
+  /** Held (FR-DICEX-49): the shape in the look, no number, no `data-value`. */
+  blank?: boolean;
 }) {
   const kind = round ? "round" : dieShapeOf(faces);
   const px = DIE_PX[size];
@@ -145,11 +152,13 @@ export function DieShape({
       data-testid="dicex-die"
       data-shape={kind}
       data-faces={faces ?? ""}
-      data-value={value}
+      data-value={blank ? undefined : value}
       data-kept={kept}
       data-offered={offered}
       role="img"
-      aria-label={label ?? `${faces ? `d${faces}` : "dice"}: ${sign}${value}`}
+      aria-label={
+        label ?? `${faces ? `d${faces}` : "dice"}: ${blank ? "rolling" : `${sign}${value}`}`
+      }
       className={cn(
         "inline-flex shrink-0 items-center gap-px align-middle leading-none",
         dimmed && "opacity-40",
@@ -170,8 +179,8 @@ export function DieShape({
             borderWidth: size === "sm" ? 1 : 2,
           }}
         >
-          {sign}
-          {value}
+          {!blank && sign}
+          {!blank && value}
         </span>
       ) : (
         texts.map((t, i) => (
@@ -179,7 +188,7 @@ export function DieShape({
             // biome-ignore lint/suspicious/noArrayIndexKey: d100 tens then units, positional
             key={i}
             kind={kind}
-            text={i === 0 ? `${sign}${t}` : t}
+            text={blank ? "" : i === 0 ? `${sign}${t}` : t}
             look={look}
             kept={kept}
             offered={offered}

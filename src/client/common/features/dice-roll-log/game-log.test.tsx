@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
+import { landing } from "../dice-extras/landing";
 import { createWindowRegistry, type WindowDef } from "../play-shell/registry";
 import { createShellController } from "../play-shell/shell-store";
 import {
@@ -21,6 +22,7 @@ import {
   scrollToEntry,
 } from "./focus";
 import { GameLog } from "./GameLog";
+import { heldSegments } from "./logic";
 import { DICE_LOG_KIND } from "./window";
 
 const entry = (o: Partial<GameLogEntryView> = {}): GameLogEntryView => ({
@@ -109,6 +111,7 @@ const chips = (html: string) =>
 
 afterEach(() => {
   logFocus.clear(logFocus.api.getState().seq);
+  landing.api.setState({ holding: new Map() });
 });
 
 describe("FR-DICE-35 log die chips (GameLog)", () => {
@@ -321,5 +324,78 @@ describe("FR-DICE-37 focusLogEntry", () => {
     expect(calls).toEqual([{ block: "nearest" }]);
     expect(scrollToEntry(list, "nope")).toBe(false);
     expect(scrollToEntry(list, null)).toBe(false);
+  });
+});
+
+describe("FR-DICE-40 log line held", () => {
+  /** Hold `ids` as the live-throw path does while their dice fly (FR-DICEX-49). */
+  const hold = (...ids: string[]) =>
+    landing.api.setState({ holding: new Map(ids.map((id) => [id, 6000])) });
+  const rowOf = (html: string, id: string) =>
+    html.split('data-testid="dice-log-entry"').find((r) => r.includes(`data-record-id="${id}"`)) ??
+    "";
+
+  test("FR-DICE-40 log line held: blank chips (no data-value, dropped kept), total and adv marker '…', aria-busy, no natural marker; others shown", () => {
+    hold("e1");
+    const html = render([entry(), entry({ id: "e2", n: 2 })]);
+    const held = rowOf(html, "e1");
+    expect(held).toContain('data-landed="false"');
+    expect(held).toContain('aria-busy="true"');
+    // Two blank chips: shapes in the look, no number, no value; the dropped one still struck.
+    expect(held).not.toMatch(/data-testid="dice-log-die"[^>]*data-value=/);
+    expect(held).toMatch(/<s data-testid="dice-log-die"[^>]*data-kept="false"/);
+    expect(held.match(/data-shape="d20"/g)).toHaveLength(2);
+    expect(held).not.toContain("<text");
+    expect(held).toContain("<span>Athletics</span><span> (…)</span>");
+    expect(held).toContain(">…</strong>");
+    expect(held).not.toContain(">18<");
+    expect(held).not.toContain("natural");
+    // Actor, label and category are not held.
+    expect(held).toContain("Mira");
+    expect(held).toContain("Skill check");
+
+    const shown = rowOf(html, "e2");
+    expect(shown).toContain('data-landed="true"');
+    expect(shown).not.toContain("aria-busy");
+    expect(shown).toContain('data-value="13"');
+    expect(shown).toContain(">18</strong>");
+  });
+
+  test("FR-DICE-40 at the landing the numbers show (and fade in: each number carries data-landing)", () => {
+    hold("e1");
+    expect(render([entry()])).toContain('data-landed="false"');
+    landing.api.setState({ holding: new Map() });
+    const html = render([entry()]);
+    expect(html).toContain('data-landed="true"');
+    expect(html).toMatch(/data-testid="dice-log-die"[^>]*data-value="13"[^>]*data-landing="true"/);
+    expect(html).toContain('<strong data-landing="true" class="font-semibold">18</strong>');
+  });
+
+  test("FR-DICE-40 render only: lineText and the stored entry unchanged; held segments keep every non-number run", () => {
+    const e = entry();
+    const before = JSON.stringify(e);
+    hold("e1");
+    render([e]);
+    expect(JSON.stringify(e)).toBe(before);
+    const segs = [
+      { text: "Mira", style: "actor" as const },
+      { text: " — " },
+      { text: "Attack" },
+      { text: " (dis: Prone)" },
+      { text: ": " },
+      { text: "1", die: { faces: 20, value: 1, kept: true } },
+      { text: " + 5" },
+      { text: " = " },
+      { text: "6", style: "total" as const },
+      { text: " — natural 1" },
+      { text: " " },
+      { text: "physical", style: "badge" as const },
+    ];
+    expect(
+      heldSegments(segs)
+        .map((s) => s.text)
+        .join(""),
+    ).toBe("Mira — Attack (…): … + 5 = … physical");
+    expect(heldSegments(segs).find((s) => s.die)?.blank).toBe(true);
   });
 });

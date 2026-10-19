@@ -3,8 +3,8 @@ import { toNotation } from "@shared/dice-roll-log/grammar";
 import {
   addDie,
   chipsOf,
+  editRequest,
   type FreeFields,
-  paletteRequest,
   previewMode,
   removeDie,
   setConstant,
@@ -104,7 +104,7 @@ describe("BL-18 palette after a result", () => {
   };
 
   test("FR-DICEX-04 BL-18 a fresh palette roll after a result keeps no label, actor or category", () => {
-    expect(paletteRequest(notation, "1d6", "normal", true)).toEqual({
+    expect(editRequest(notation, "1d6", "normal", true)).toEqual({
       expression: "1d6",
       mode: "normal",
       category: "other",
@@ -112,11 +112,11 @@ describe("BL-18 palette after a result", () => {
   });
 
   test("FR-DICEX-04 adding to a staged request keeps its label", () => {
-    expect(paletteRequest(notation, "1d12+1d6+5", "normal", false)).toEqual({
+    expect(editRequest(notation, "1d12+1d6+5", "normal", false)).toEqual({
       ...notation,
       expression: "1d12+1d6+5",
     });
-    expect(paletteRequest(null, "1d4", "advantage", false)).toEqual({
+    expect(editRequest(null, "1d4", "advantage", false)).toEqual({
       expression: "1d4",
       mode: "advantage",
       category: "other",

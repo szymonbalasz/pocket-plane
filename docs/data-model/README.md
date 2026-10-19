@@ -1837,3 +1837,14 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) (FR-CBT-89–94) 
 - **Fixtures:** `late-hit-ruled` (bundles `late-damage`, `session-sim-9`).
 - **CON-44:** no new bytes (R0 measured `unusedRolls` and rulings).
 
+## 70. Sprint 5: dice landing (D8)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-49, -50 and [dice-roll-log](../specs/dice-roll-log.md#8-data-model) FR-DICE-40. **Built by `build/dice-landing`**: no table, column, record type or payload change. Protocol side: [protocol §90](../protocol/README.md#90-sprint-5-dice-landing-d8).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Holding map | client memory (`dice-extras/landing.ts`) | held entry id → deadline (arrival + 6 s); filled only by the live-throw path; never stored or sent; a reload starts empty, so every snapshot entry is shown | [FR-DICEX-49](../specs/dice-extras.md#6-functional-requirements) |
+| Staged tray request after a result | client memory (`diceExtras.request`) | an edit after a result replaces it with a fresh `free` request (expression only, `other`, no label / actor) | [FR-DICEX-50](../specs/dice-extras.md#6-functional-requirements) |
+
+- **Fixtures:** no new unit. Bundle `dice-polish` = `dice-display` + `char-brakka` + `weapon-flame-tongue` (Brakka, `player-1`, Flame Tongue `1d20+8`, `2d6+5` slashing + `2d6` fire); `session-sim-9` needs nothing extra (sim-8 has both units).
+- **Snapshot size** (CON-44): 0 B added; `dice-polish` DM 21,098 B, players ≤ 13,882 B.
