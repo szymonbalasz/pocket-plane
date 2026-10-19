@@ -142,6 +142,9 @@ test("FR-ASSET-27 no player upload: the player client renders no attach control"
   const p1 = await rolePage(browser);
   await p1.goto(link("Player 1"));
   await live(p1);
+  // party-s5 presents h2 to player-1 (`handout-present-1`): close the popup over the launcher.
+  await p1.getByTestId("party-present-close").click();
+  await expect(p1.getByTestId("party-present-popup")).toHaveCount(0);
   const board = await openWindow(p1, "party.board");
   await expect(board.getByTestId("party-handout-row").first()).toBeVisible();
   await expect(p1.getByTestId("asset-attach")).toHaveCount(0);
