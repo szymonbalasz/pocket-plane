@@ -1689,7 +1689,7 @@ From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-52–55. **Built b
 | Piece | Kind | Contents | Visibility | Source |
 |---|---|---|---|---|
 | Drag path | derived per render | `dragPath(from, to)` from the drag state (dragger) or the preview (receivers) | `pathShown`: DM every token's; players player tokens they hold | FR-MAP-52, -53 |
-| Trails | client memory, per canvas (`previews.trails`) | `TrailState {key: "encounter:round:turn" \| null, byToken: tokenId → Cell[][]}` | as the path | FR-MAP-54 |
+| Trails *(Sprint 5: removed, [§78](#78-sprint-5-combat-trails-drawn-from-the-token-r3))* | client memory, per canvas (`previews.trails`) | `TrailState {key: "encounter:round:turn" \| null, byToken: tokenId → Cell[][]}` | as the path | FR-MAP-54 |
 | Known cells | client memory, per canvas | tokenId → the stored cell before the next frame (the move's start) | — | FR-MAP-54 |
 
 - **Lost on reload or reconnect** (snapshot) mid-turn: accepted (FR-MAP-54).
@@ -1921,3 +1921,12 @@ From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-5
 | Piece | Kind | Contents | Visibility | Source |
 |---|---|---|---|---|
 | `dist/client/assets/*.{js,css}.br`, `.gz` | build output (gitignored, rewritten per build) | brotli q11 / gzip -9 of each JS / CSS file ≥ 1 KB | public, same for DM and players | FR-DICEX-52 |
+
+## 78. Sprint 5: combat trails drawn from the token (R3)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-65–67 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-97. **Built by `fix/combat-trails`**: no table, column, record type or payload change (R0 added `token.trail`, §66). Protocol side: [protocol §100](../protocol/README.md#100-sprint-5-combat-trails-drawn-from-the-token-r3).
+
+- **Removed:** the client trail state (§61's `previews.trails`); each client draws `token.trail` from its store.
+- **Derived (not stored):** a trail's segments (`dragPath` per cell pair) and its colour (today's tint; K3: the owner's `colorOf` at draw time).
+- **Fixtures:** unit `trail-moves` (Mira ×2, Thorn ×1, Goblin ×1 this turn), appended to `late-damage` and `session-sim-9`.
+- **Snapshot size** (CON-44): 0 B beyond R0's worst-case trail rows (§66); the fixture's three trails are 5 cells in all.
