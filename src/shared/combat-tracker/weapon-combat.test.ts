@@ -60,7 +60,7 @@ describe("FR-CBT-85 BL-10 wording", () => {
     expect(line({ payload: base })).toBe(line({ payload: base }));
     expect(line({ payload: base })).toContain("— DM: hit.");
     expect(line({ payload: base, dmPayload: dm({ hitComputed: false, hit: true }) })).toBe(
-      "Mira attacks Goblin: 12 + 4 = 16 vs AC 15 — DM ruled hit 6 piercing damage",
+      "Mira attacks Goblin: 12 + 4 = 16 vs AC 15 — DM ruled hit. 6 piercing damage",
     );
     const miss = { ...base, hit: false, damage: 0 };
     expect(line({ payload: miss })).toBe("Mira attacks Goblin: 12 + 4 = 16 — DM: miss");
@@ -72,7 +72,7 @@ describe("FR-CBT-85 BL-10 wording", () => {
   test("FR-CBT-85 natural rulings stay public as FR-CBT-58", () => {
     const nat1 = { ...base, toHit: { dice: 1, constant: 4, total: 5, natural: 1 } };
     expect(line({ payload: nat1 })).toBe(
-      "Mira attacks Goblin: 1 + 4 = 5 (natural 1) — DM ruled hit 6 piercing damage",
+      "Mira attacks Goblin: 1 + 4 = 5 (natural 1) — DM ruled hit. 6 piercing damage",
     );
     const nat20 = {
       ...base,
