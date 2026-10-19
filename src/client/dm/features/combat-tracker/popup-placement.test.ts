@@ -331,3 +331,66 @@ describe("FR-CBT-56 FR-CBT-75 P3 glitch 2: free area away from the likely target
     expect(area(p)).toBeLessThan(area({ x: 68, y: 100 }));
   });
 });
+
+describe("FR-CBT-101 likely targets follow the side (#252)", () => {
+  const k = (id: string, kind: "pc" | "monster", side: "ally" | "enemy" | null = null) => ({
+    id,
+    encounterId: "e1",
+    kind,
+    tokenId: `t-${id}`,
+    name: id,
+    active: true,
+    removed: false,
+    side,
+  });
+  const ids = (combatants: ReturnType<typeof k>[], attackerId: string) =>
+    placementTokenIds({
+      rowTokenIds: [],
+      combatants,
+      encounterId: "e1",
+      attackerId,
+      tokenSceneOf: () => "s1",
+      viewedSceneId: "s1",
+    });
+
+  test("FR-CBT-101 likely targets by side: ally Goblin 2 → the other goblins and the Wolf, not the PCs", () => {
+    const all = [
+      k("goblin", "monster"),
+      k("goblin2", "monster", "ally"),
+      k("wolf", "monster"),
+      k("mira", "pc"),
+      k("thorn", "pc"),
+    ];
+    expect(ids(all, "goblin2")).toEqual(["t-goblin", "t-wolf"]);
+    // The other goblins now count the charmed Goblin 2 with the party.
+    expect(ids(all, "goblin")).toEqual(["t-goblin2", "t-mira", "t-thorn"]);
+    // The party's likely targets drop the ally.
+    expect(ids(all, "mira")).toEqual(["t-goblin", "t-wolf"]);
+  });
+
+  test("FR-CBT-101 likely targets by side: enemy Mira (dominated) → the party; kind's default when null", () => {
+    const all = [k("goblin", "monster"), k("mira", "pc", "enemy"), k("thorn", "pc")];
+    expect(ids(all, "mira")).toEqual(["t-thorn"]);
+    expect(ids(all, "thorn")).toEqual(["t-goblin", "t-mira"]);
+    expect(ids(all, "goblin")).toEqual(["t-thorn"]);
+  });
+
+  test("FR-CBT-101 likely targets by side: read at open, a later side change moves nothing", () => {
+    const all = [k("goblin", "monster"), k("goblin2", "monster"), k("mira", "pc")];
+    const atOpen = ids(all, "goblin2");
+    expect(atOpen).toEqual(["t-mira"]);
+    // The popup keeps its placement (placed once per open); the tiers are a value, not live.
+    const tiers = placementTiers({
+      rowTokenIds: [],
+      combatants: all,
+      encounterId: "e1",
+      attackerId: "goblin2",
+      tokenSceneOf: () => "s1",
+      viewedSceneId: "s1",
+    });
+    (all[1] as { side: string | null }).side = "ally";
+    expect(atOpen).toEqual(["t-mira"]);
+    expect(tiers[0]).toEqual(["t-mira"]);
+    expect(ids(all, "goblin2")).toEqual(["t-goblin"]);
+  });
+});
