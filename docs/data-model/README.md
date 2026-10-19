@@ -1689,7 +1689,7 @@ From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-52–55. **Built b
 | Piece | Kind | Contents | Visibility | Source |
 |---|---|---|---|---|
 | Drag path | derived per render | `dragPath(from, to)` from the drag state (dragger) or the preview (receivers) | `pathShown`: DM every token's; players player tokens they hold | FR-MAP-52, -53 |
-| Trails | client memory, per canvas (`previews.trails`) | `TrailState {key: "encounter:round:turn" \| null, byToken: tokenId → Cell[][]}` | as the path | FR-MAP-54 |
+| Trails *(Sprint 5: removed, [§81](#81-sprint-5-combat-trails-drawn-from-the-token-r3))* | client memory, per canvas (`previews.trails`) | `TrailState {key: "encounter:round:turn" \| null, byToken: tokenId → Cell[][]}` | as the path | FR-MAP-54 |
 | Known cells | client memory, per canvas | tokenId → the stored cell before the next frame (the move's start) | — | FR-MAP-54 |
 
 - **Lost on reload or reconnect** (snapshot) mid-turn: accepted (FR-MAP-54).
@@ -1955,9 +1955,18 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-48. **Built by
 - **Fixtures:** no new unit. Walkthrough step 29 walks on `dice-polish` (player-1 Crimson metal, `dicex-looks`); `session-sim-9` needs nothing extra.
 - **Snapshot size** (CON-44): 0 B added.
 
-## 81. Sprint 5: roll-button hints and slot labels (D9)
+## 81. Sprint 5: combat trails drawn from the token (R3)
 
-From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-51 and [dice-roll-log](../specs/dice-roll-log.md#8-data-model) FR-DICE-41. **Built by `fix/dice-roll-buttons`**: no table, column, record type or payload change. Protocol side: [protocol §103](../protocol/README.md#103-sprint-5-roll-button-hints-and-slot-labels-d9).
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-65–67 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-97. **Built by `fix/combat-trails`**: no table, column, record type or payload change (R0 added `token.trail`, §66). Protocol side: [protocol §103](../protocol/README.md#103-sprint-5-combat-trails-drawn-from-the-token-r3).
+
+- **Removed:** the client trail state (§61's `previews.trails`); each client draws `token.trail` from its store.
+- **Derived (not stored):** a trail's segments (`dragPath` per cell pair) and its colour (today's tint; K3: the owner's `colorOf` at draw time).
+- **Fixtures:** unit `trail-moves` (Mira ×2, Thorn ×1, Goblin ×1 this turn), appended to `late-damage` and `session-sim-9`.
+- **Snapshot size** (CON-44): 0 B beyond R0's worst-case trail rows (§66); the fixture's three trails are 5 cells in all.
+
+## 82. Sprint 5: roll-button hints and slot labels (D9)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-51 and [dice-roll-log](../specs/dice-roll-log.md#8-data-model) FR-DICE-41. **Built by `fix/dice-roll-buttons`**: no table, column, record type or payload change. Protocol side: [protocol §104](../protocol/README.md#104-sprint-5-roll-button-hints-and-slot-labels-d9).
 
 | State | Where | Rule | Source |
 |---|---|---|---|

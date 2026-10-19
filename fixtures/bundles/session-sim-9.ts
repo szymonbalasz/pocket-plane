@@ -22,6 +22,8 @@ export default defineBundle({
     // R4: planned "Escort to the Ford", Goblin ×2 + 1 friendly (the Friendly switch, A3)
     "enc-friendly",
     // R2: no new unit (L12–L14 walk on rules-effects' Brakka, Thorn and Fire Ward)
+    // R3: this turn's moves (Mira ×2, Thorn ×1, Goblin ×1), stored on the tokens as trails
+    "trail-moves",
     // P: Loot tab, handouts, uploads + paste, Add to party
     // P0: h6 "Ransom Note" with an attachment (unshared); h2 presented to player-1 (S5-1)
     "handout-attachment",

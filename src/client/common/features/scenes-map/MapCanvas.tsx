@@ -5,7 +5,7 @@
 // (FR-MAP-28), the live drag preview (FR-MAP-39/40), the canvas tool core (FR-SCN-06: stage
 // dispatch to the active registry tool, Space + drag pans, Esc to the tool first, tokens ignore
 // left-press while drawing), the middle-mouse pan before all of it (FR-MAP-12, sprint 4) and the
-// combat trails' moves (FR-MAP-54, read from this client's store) and the right-press routing
+// right-press routing
 // (FR-MAP-71: node menus → token → tool menu → layer `contextMenu` → laser). No feature logic:
 // the server decides.
 import { DEFINITION_DRAG_MIME, DefinitionDragData } from "@shared/entities/schemas";
@@ -54,10 +54,8 @@ import { CanvasContext, type CanvasContextValue, type EffectiveGrid } from "./ca
 import { canvasLayers } from "./canvas-layers";
 import { canvasTools } from "./canvas-tools";
 import { subscribeOverlays } from "./decorations";
-import { combatTurnKey, knownCells, nextTrails, tokenMovesOf } from "./drag-path";
 import {
   clearPreviews,
-  clearTrails,
   createPreviewStore,
   prunePreviews,
   receiveDrag,
@@ -404,7 +402,6 @@ export function MapCanvas(props: MapCanvasProps) {
     if (isSnapshotStore(prevStore.current, store)) {
       setOverlay(clearOverlay());
       clearPreviews(previews);
-      clearTrails(previews);
       probe.snapshot();
     }
     prevStore.current = store;
@@ -419,22 +416,12 @@ export function MapCanvas(props: MapCanvasProps) {
   );
 
   // ---- drag previews (FR-MAP-40): dropped on a `token` change, a scene switch or 3 s silence ----
-  // FR-MAP-54: each token's stored cell before the next frame (the shown scene's tokens).
-  const knownRef = useRef<Record<string, { col: number; row: number }>>({});
-  knownRef.current = knownCells(tokens);
-  useEventFrame((f, s) => {
+  useEventFrame((f) => {
     clearPreviews(previews, tokenIdsOf(f.changes));
-    // FR-MAP-54: a committed move adds its straight path to the turn's trail.
-    const r = tokenMovesOf(f.changes, knownRef.current, s, scene.id);
-    knownRef.current = r.known;
-    const cur = previews.getState().trails;
-    const next = nextTrails(cur, combatTurnKey(s, client, scene.id), r.moves, r.deleted);
-    if (next !== cur) previews.setState({ trails: next });
   });
   // biome-ignore lint/correctness/useExhaustiveDependencies: a scene switch drops every preview.
   useEffect(() => {
     clearPreviews(previews);
-    clearTrails(previews);
     probe.clear();
   }, [scene.id, previews, probe]);
   useEffect(() => {
