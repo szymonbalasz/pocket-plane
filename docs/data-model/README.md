@@ -1874,3 +1874,11 @@ From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–
 - **Writes:** the existing `party.addItem` ([§31](#31-sprint-3-party-board-core-p-core)): one `party_item` insert or merge, one `loot_entry {kind: item, world → party}`, one `loot-received` notification, one transaction. The party row keeps a name copy only (no link back to the entry, OQ-PARTY-13; Add to party copies no images, FR-CMP-49).
 - **Fixtures:** bundle `party-cmp` = `party-board` + `cmp-srd-mini` (existing units; SRD "Potion of Healing" merges into `party-items-1`'s "Potion of healing" ×2 → ×4).
 - **Snapshot size** (CON-44): no new record type or field, so +0 B per viewer at a given state; an add writes the same rows as the Inventory tab's Add (`party-item` lazy; the `loot-entry` row as PARTY §12 already budgets).
+
+## 73. Sprint 5: combat log wording (R2)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-95, -96 and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) FR-MOD-62. **Built by `fix/combat-lines`**: no table, column, record type or payload change; `cbt.attack` lines render differently from the same stored `payload` / `dmPayload` (old rows included). Protocol side: [protocol §93](../protocol/README.md#93-sprint-5-combat-log-wording-r2).
+
+- **Derived (line text):** the ruling's full stop; the DM's damage parts (`dmPayload.mods.damage`) inside the base part's muted run; a trigger part's type word = `parts[].type` ?? `damageType`.
+- **Fixtures:** none new (`rules-effects` holds every unit L12–L14 needs).
+- **Snapshot size** (CON-44): 0 B stored; rendered text grows by ≤ 12 B per trigger part (MOD §12).

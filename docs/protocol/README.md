@@ -2357,3 +2357,17 @@ From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-40–
 | Fixtures | Bundle `party-cmp` = `party-board` + `cmp-srd-mini` (existing units); nothing new in `session-sim-9` (sim-7 holds both units) |
 | Tests | `add-to-party.test.tsx` (FR-CMP-40 only on item views, name clip; FR-CMP-41 states, hint; FR-CMP-42 not in the player client), `party-cmp.fixtures.test.ts` (FR-CMP-40 merge ×2 → ×4 over real sockets, player → `forbidden`, leak scan live + reconnected) |
 | CON-44 | No record, no snapshot bytes |
+
+## 93. Sprint 5: combat log wording (R2)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-95, -96 and [effect-modifiers](../specs/effect-modifiers.md#6-functional-requirements) FR-MOD-62 (BL-24, BL-27, BL-23). **Built by `fix/combat-lines`**: line text only. No intent, event, record type, payload field or schema change; built from `payload` / `dmPayload` alone, so old rows render the new way. Data side: [data model §73](../data-model/README.md#73-sprint-5-combat-log-wording-r2).
+
+| Piece | Contract |
+|---|---|
+| Ruling (`outcomeText`, `@shared/combat-tracker/log-kinds.ts`, FR-CBT-95) | A ruled hit ends with a full stop before the damage: DM "vs AC 16 — DM ruled hit. 10 slashing damage"; players' natural ruling "(natural 1) — DM ruled hit. 6 piercing damage"; an Apply hit line ends at "— DM ruled hit."; "— DM ruled miss" unchanged |
+| DM damage run (`includedRun`, FR-CBT-96) | `dmPayload.mods.damage` (roll-hook parts already in the base part's total) render inside the base part's muted run after its dice: "14 slashing (2d6+5: 4 + 3 + 5, incl. + 2 Rage) + 6 fire (2d6: 2 + 4) damage"; no dice run (physical total, DM set) → " (incl. + 2 Rage)". Text outside muted runs sums to the line's damage. Players' line and to-hit parts unchanged |
+| Trigger parts (`linePartSegments`, `@shared/effect-modifiers/combat-parts.ts`, FR-MOD-62) | Every landed part names its type: the part's `type`, else the card's `damageType`: "+ 10 piercing (Sneak Attack)", "+ 9 slashing (DM)"; neither typed → "+ 10 Sneak Attack". DM and players alike; die segments unchanged. Roll-line offers (`rollOfferSegments`) and card text unchanged |
+| DM popup (`attack-popup.tsx`) | `cbt-popup-step` (screen-reader text) on a damage-only card reads "Damage only, no to-hit" (was "To-hit step"); `data-value` unchanged |
+| Tests | `combat-lines.test.ts` (`FR-CBT-95 ruling punctuation`, `FR-CBT-96 Rage once in the DM line`, `FR-MOD-62 damage types on trigger parts`), `late-fill.test.tsx` (damage-only header), `e2e/combat-lines.e2e.ts` (CBT §13.1 L12–L14, bundle `late-damage`) |
+| Fixtures | None new: L12–L14 walk on `rules-effects` (Brakka, Flame Tongue, Fire Ward, Rage spent, Divine Fury; Thorn's Sneak Attack) |
+| CON-44 | 0 B: no record or field; rendered text only |
