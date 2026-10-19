@@ -1,5 +1,5 @@
 // e2e-bundle: init-chips-effect
-// Sprint 5 W4 (play-shell §13 W6–W8): DM and player-1 at 1440×900. W6 Brakka's Rage forced on →
+// Sprint 5 W4 (play-shell §13 W6–W8): DM and player-1 at 1440×900. W6 Brakka's Rage on (`windows-s5`) →
 // "Rage 10r" and Divine Fury both shown on her Initiative row, no trigger in "+N"; at the min
 // width (DM 320, player 240) Divine Fury is an icon chip with a Tooltip naming it, DM and player-1
 // (FR-CBTX-54). W7 Goblin 2's token menu: one "Invisible" (fog's, with its Tooltip), Conditions ▸
@@ -23,33 +23,6 @@ async function idByName(scope: Locator, name: string): Promise<string> {
     has: scope.page().locator(`[data-testid="cbt-init-row-name"][data-value="${name}"]`),
   });
   return (await r.first().getAttribute("data-record-id")) as string;
-}
-
-/** One DM intent over a socket of its own (hello → snapshot → intent → ack result). */
-function dmIntent(page: Page, secret: string, name: string, payload: unknown) {
-  return page.evaluate(
-    ([secret, name, payload]) =>
-      new Promise<unknown>((resolve, reject) => {
-        const ws = new WebSocket(`${location.origin.replace(/^http/, "ws")}/ws`);
-        ws.onopen = () =>
-          ws.send(JSON.stringify({ type: "hello", credential: { role: "dm", secret } }));
-        ws.onmessage = (m) => {
-          const f = JSON.parse(String(m.data)) as { type: string; result?: unknown };
-          if (f.type === "snapshot") {
-            ws.send(
-              JSON.stringify({ type: "intent", intentId: crypto.randomUUID(), name, payload }),
-            );
-          } else if (f.type === "ack") {
-            ws.close();
-            resolve(f.result);
-          } else if (f.type === "reject" || f.type === "error") {
-            ws.close();
-            reject(new Error(String(m.data)));
-          }
-        };
-      }),
-    [secret, name, payload] as const,
-  );
 }
 
 /** Shrinks a window to its minimum width `min` (the handle dragged far left; the shell clamps). */
@@ -98,7 +71,7 @@ async function bothShown(row: Locator, rageFolds = false) {
 test("FR-CBTX-54 W6 trigger chips never fold: 'Rage 10r' + Divine Fury on Brakka's row at 1440×900 and at 320 wide, DM and player-1", async ({
   browser,
 }) => {
-  const { secret, link, recordId } = e2eEnv();
+  const { secret, link } = e2eEnv();
   const dm = await rolePage(browser);
   await dm.setViewportSize({ width: 1440, height: 900 });
   await loginDm(dm, secret);
@@ -107,14 +80,6 @@ test("FR-CBTX-54 W6 trigger chips never fold: 'Rage 10r' + Divine Fury on Brakka
   await p1.setViewportSize({ width: 1440, height: 900 });
   await p1.goto(link("Player 1"));
   await live(p1);
-
-  // sim-8 left Rage at 0 / 3: forced on, as the sim-8 run did ("Rage anyway").
-  await dmIntent(dm, secret, "mod.toggle", {
-    characterId: recordId("char-brakka", "entity"),
-    presetId: recordId("trg-brakka", "effect-preset"),
-    on: true,
-    force: true,
-  });
 
   // The DM's Initiative: 400 → 320 (min); the player's: 280 → 240 (min).
   for (const [page, min, rageFolds] of [

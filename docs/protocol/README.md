@@ -2322,4 +2322,4 @@ From [combat-extras](../specs/combat-extras.md) FR-CBTX-54–56 (OQ-CBTX-27 B, -
 | Token menu Conditions ▸ (`cbtx-token-menu-conditions`) | 14 options: `ConditionsMenu omit` = `TOKEN_MENU_OMIT` (`invisible`). The Initiative row's `cbtx-init-row-conditions` keeps 15 | FR-CBTX-56 |
 | `fog-token-menu-invisible` | The menu's only "Invisible"; Tooltip "Players don't see it unless they see invisible" (`INVISIBLE_TIP`). Intent unchanged (`fog.setInvisible`) | FR-FOG-59 |
 
-- **Fixtures:** none new (W4 adds no record); e2e bundle `init-chips-effect` = `session-sim-8` (Rage forced on in the test; `windows-s5` replaces it once W1 is on main).
+- **Fixtures:** none new (W4 adds no record); e2e bundle `init-chips-effect` = `windows-s5` under its own name (own e2e server).
