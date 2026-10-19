@@ -2,7 +2,7 @@
 // Clients may only `import type { AppType } from "@server/app"`.
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { assetRoutes } from "./features/assets-pipeline/routes";
 import { campaignRoutes } from "./features/campaign-management/routes";
@@ -47,9 +47,24 @@ export function createApp(s: Services, opts: AppOptions = {}) {
     const rel = path.relative(process.cwd(), dir) || ".";
     const dmHtml = path.join(rel, "dm", "index.html");
     const playerHtml = path.join(rel, "player", "index.html");
-    app.get("/assets/*", serveStatic({ root: rel }));
-    app.get("/", serveStatic({ path: dmHtml }));
-    app.get("/p/*", serveStatic({ path: playerHtml }));
+    // FR-DICEX-52 (ADR-0052): hashed build files are `.br` / `.gz` precompressed and cached for a
+    // year; `Vary` on every answer, plain files too. HTML is revalidated on every load.
+    app.get(
+      "/assets/*",
+      serveStatic({
+        root: rel,
+        precompressed: true,
+        onFound: (_path, c) => {
+          c.header("Vary", "Accept-Encoding");
+          c.header("Cache-Control", "public, max-age=31536000, immutable");
+        },
+      }),
+    );
+    const noCache = {
+      onFound: (_path: string, c: Context) => c.header("Cache-Control", "no-cache"),
+    };
+    app.get("/", serveStatic({ path: dmHtml, ...noCache }));
+    app.get("/p/*", serveStatic({ path: playerHtml, ...noCache }));
   }
   app.onError((err, c) => errorResponse(c, err, s));
   return app;
