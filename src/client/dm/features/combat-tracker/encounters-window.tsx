@@ -1,10 +1,11 @@
 // DM `cbt.encounters` (CBT §7): list + New; editor (name, creature lookup, entries with HP mode,
 // add options, party, difficulty card); Start on the viewed scene (binding preview, "Not on this
 // map" PCs, `at`) / End (confirm). Planned encounters save themselves (debounced whole replace);
-// started / ended are read-only. Sprint 2: FR-CBT-62–66.
+// started / ended are read-only. Sprint 2: FR-CBT-62–66. Sprint 5 (#252): an entry's "Friendly"
+// Switch; the card rates enemy entries only and lists the friendly ones (FR-CBT-102).
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
-import { difficultyMethods, formatCr, totalCr } from "@shared/combat-tracker/difficulty";
+import { difficultyMethods, formatCr, rateEncounter } from "@shared/combat-tracker/difficulty";
 import {
   ENCOUNTER_ENTRY_TYPE,
   ENCOUNTER_TYPE,
@@ -17,7 +18,7 @@ import { entityNameKey } from "@shared/entities/schemas";
 import type { SceneFolderRecord, SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
 import { ApiError } from "@ui/api";
 import { Button } from "@ui/components/ui/button";
-import { Checkbox } from "@ui/components/ui/controls";
+import { Checkbox, Switch } from "@ui/components/ui/controls";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Tooltip,
 } from "@ui/components/ui/overlays";
 import { Badge, Card, Input, Label, Skeleton } from "@ui/components/ui/primitives";
 import type { LookupRow } from "@ui/features/combat-tracker/lookup";
@@ -38,13 +40,27 @@ import { defineWindow } from "@ui/features/play-shell/registry";
 import { useSceneLoaded } from "@ui/features/scenes-map/scene-window";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
-import { ArrowLeftIcon, MinusIcon, PlusIcon, SwordsIcon, Trash2Icon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  HandshakeIcon,
+  MinusIcon,
+  PlusIcon,
+  SwordsIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { creatureRows } from "../entities/list";
 import { useDmMap, viewedScene } from "../scenes-map/view-state";
 import { useDefinitions } from "./data";
-import { adoptServerDraft, type Draft, draftOf } from "./encounter-draft";
+import {
+  addPick,
+  adoptServerDraft,
+  type Draft,
+  draftOf,
+  entryKey,
+  setEntrySide,
+} from "./encounter-draft";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpSelect, JoinPreviewRow } from "./join-parts";
 import { defaultJoiningIds, type JoinSlot, notOnMap, previewJoin, startBody } from "./join-preview";
@@ -113,13 +129,17 @@ function DifficultyCard({ draft, partyIds }: { draft: Draft; partyIds?: readonly
   const party = characters.filter((c) => joining.includes(c.id));
   const notCounted = partyIds ? [] : planned.filter((c) => !joining.includes(c.id));
   const levels = party.map((c) => (c.kind === "character" ? c.statBlock.level : 1));
-  const crs = draft.entries.flatMap((e) => {
+  // FR-CBT-102 (#252): enemy entries rated, friendly ones listed; the entries, never the sides
+  // combatants have now (planning-only).
+  const rated = draft.entries.flatMap((e) => {
     const d = defs.get(e.definitionId);
-    return d?.kind === "monster" ? Array<string>(e.quantity).fill(d.statBlock.cr) : [];
+    return d?.kind === "monster"
+      ? [{ name: d.name, cr: d.statBlock.cr, quantity: e.quantity, side: e.side }]
+      : [];
   });
   const method = difficultyMethods[0];
   if (!method) return null;
-  const r = method.rate(levels, crs);
+  const r = rateEncounter(method, levels, rated);
   return (
     <Card className="flex flex-col gap-1 p-3 text-xs">
       <div className="flex items-center gap-2">
@@ -136,9 +156,14 @@ function DifficultyCard({ draft, partyIds }: { draft: Draft; partyIds?: readonly
           Adjusted <b data-testid="cbt-enc-xp-adjusted">{r.adjustedXp}</b> XP (×{r.multiplier})
         </span>
         <span>
-          Total CR <b data-testid="cbt-enc-total-cr">{formatCr(totalCr(crs))}</b>
+          Total CR <b data-testid="cbt-enc-total-cr">{formatCr(r.totalCr)}</b>
         </span>
       </div>
+      {r.friendly && (
+        <div data-testid="cbt-enc-friendly" className="text-muted-foreground">
+          {r.friendly}
+        </div>
+      )}
       {notCounted.length > 0 && (
         <div data-testid="cbt-enc-rating-off-map" className="text-muted-foreground">
           Not on this map (not counted): {notCounted.map((c) => c.name).join(", ")}
@@ -373,11 +398,11 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
     dirty.current = true;
     setDraft((d) => f(d));
   };
-  const setQty = (id: string, q: number) =>
+  const setQty = (key: string, q: number) =>
     edit((d) => ({
       ...d,
       entries: d.entries
-        .map((e) => (e.definitionId === id ? { ...e, quantity: q } : e))
+        .map((e) => (entryKey(e) === key ? { ...e, quantity: q } : e))
         .filter((e) => e.quantity > 0),
     }));
   const partyIds = partyMembers(characters, draft.partyCharacterIds, drafts).map((c) => c.id);
@@ -412,34 +437,20 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
           rows={lookupRows}
           disabled={readOnly}
           onQueryChange={setLookupQuery}
-          onPick={(id) =>
-            edit((d) =>
-              d.entries.some((e) => e.definitionId === id)
-                ? {
-                    ...d,
-                    entries: d.entries.map((e) =>
-                      e.definitionId === id
-                        ? { ...e, quantity: Math.min(QUANTITY_MAX, e.quantity + 1) }
-                        : e,
-                    ),
-                  }
-                : {
-                    ...d,
-                    entries: [...d.entries, { definitionId: id, quantity: 1, hpMode: "average" }],
-                  },
-            )
-          }
+          onPick={(id) => edit((d) => ({ ...d, entries: addPick(d.entries, id) }))}
         />
       )}
       <ul className="flex flex-col gap-1">
         {draft.entries.map((e) => {
           const d = defs.get(e.definitionId);
+          const key = entryKey(e);
           return (
             <li
-              key={e.definitionId}
+              key={key}
               data-testid="cbt-enc-entry"
               data-record-id={e.definitionId}
               data-value={e.quantity}
+              data-side={e.side}
               className="flex items-center gap-2 text-sm"
             >
               <span className="flex-1 truncate">{d?.name ?? "(unknown)"}</span>
@@ -454,7 +465,7 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
                 data-record-id={e.definitionId}
                 aria-label="One fewer"
                 disabled={readOnly}
-                onClick={() => setQty(e.definitionId, e.quantity - 1)}
+                onClick={() => setQty(key, e.quantity - 1)}
               >
                 <MinusIcon className="size-3.5" />
               </Button>
@@ -467,7 +478,7 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
                 data-record-id={e.definitionId}
                 aria-label="One more"
                 disabled={readOnly || e.quantity >= QUANTITY_MAX}
-                onClick={() => setQty(e.definitionId, e.quantity + 1)}
+                onClick={() => setQty(key, e.quantity + 1)}
               >
                 <PlusIcon className="size-3.5" />
               </Button>
@@ -480,12 +491,30 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
                 onChange={(hpMode) =>
                   edit((x) => ({
                     ...x,
-                    entries: x.entries.map((y) =>
-                      y.definitionId === e.definitionId ? { ...y, hpMode } : y,
-                    ),
+                    entries: x.entries.map((y) => (entryKey(y) === key ? { ...y, hpMode } : y)),
                   }))
                 }
               />
+              {/* FR-CBT-98 (#252): a friendly entry's creatures start as allies. */}
+              <Tooltip content="Friendly: on the party's side, not counted in the difficulty">
+                <span className="flex shrink-0 items-center gap-1">
+                  <HandshakeIcon className="size-3.5 text-muted-foreground" aria-hidden />
+                  <Switch
+                    data-testid="cbt-enc-entry-friendly"
+                    data-record-id={e.definitionId}
+                    data-value={e.side}
+                    aria-label="Friendly"
+                    disabled={readOnly}
+                    checked={e.side === "ally"}
+                    onCheckedChange={(on) =>
+                      edit((x) => ({
+                        ...x,
+                        entries: setEntrySide(x.entries, key, on ? "ally" : "enemy"),
+                      }))
+                    }
+                  />
+                </span>
+              </Tooltip>
               <Button
                 size="icon"
                 variant="ghost"
@@ -494,7 +523,7 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
                 data-record-id={e.definitionId}
                 aria-label="Remove"
                 disabled={readOnly}
-                onClick={() => setQty(e.definitionId, 0)}
+                onClick={() => setQty(key, 0)}
               >
                 <Trash2Icon className="size-3.5" />
               </Button>
