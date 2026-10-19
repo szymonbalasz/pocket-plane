@@ -35,7 +35,7 @@ DM notes in brackets ([#285](../decisions-log.md)). "sim-9" = the [session-sim-9
 
 | Date | What |
 |---|---|
-| — | Not started (kickoff prompt from the sprint-5 recap) |
+| 2026-10-19 | Phase A started: four spec agents at once — companions + summons, window / layout fixes, Preferences + colour picker + Subtract, image search + tags (ID ranges per track in [status](status.md)) |
 
 ## Check `main` any time (DM)
 
