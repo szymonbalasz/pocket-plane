@@ -1960,6 +1960,19 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-48. **Built by
 From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-65–67 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-97. **Built by `fix/combat-trails`**: no table, column, record type or payload change (R0 added `token.trail`, §66). Protocol side: [protocol §103](../protocol/README.md#103-sprint-5-combat-trails-drawn-from-the-token-r3).
 
 - **Removed:** the client trail state (§61's `previews.trails`); each client draws `token.trail` from its store.
-- **Derived (not stored):** a trail's segments (`dragPath` per cell pair) and its colour (today's tint; K3: the owner's `colorOf` at draw time).
+- **Derived (not stored):** a trail's segments (`dragPath` per cell pair) and its colour (the owner's `colorOf` at draw time, K3, §82).
 - **Fixtures:** unit `trail-moves` (Mira ×2, Thorn ×1, Goblin ×1 this turn), appended to `late-damage` and `session-sim-9`.
 - **Snapshot size** (CON-44): 0 B beyond R0's worst-case trail rows (§66); the fixture's three trails are 5 cells in all.
+
+## 82. Sprint 5: player colours on the map (K3)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-68–73, [scene-tools](../specs/scene-tools.md#8-data-model) FR-SCN-47 and [notifications](../specs/notifications.md#8-data-model) FR-NOTE-40 ([ADR-0055](../architecture/adr/0055-player-colour.md)). **Built by `build/map-colours`**: no table, column, record type or payload change. Protocol side: [protocol §104](../protocol/README.md#104-sprint-5-player-colours-on-the-map-k3).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Ping / trail sender | client memory (`pointers.ts`: `Ping.from`, `Trail.from`, `{role, playerId}`) | from the frame's server-stamped `from` (own: the own person); dropped with the mark (2 s / 1 s fade) | FR-MAP-69 |
+| Ephemeral template sender | client memory (`templates.ts` `EphemeralTemplate.from`) | from the `scn.template` frame's `from`; dropped with the template | FR-SCN-47 |
+
+- **Derived (not stored):** every mark's hex = `colorOf(store, person)` at draw time (person: the sender, the token's `ownerPlayerId` → else the DM, the template's `placedByPlayerId` → else the DM, the notification's `actionPlayerId`); the name on chips and template labels = the `player` record's name or "DM".
+- **Fixtures:** none new (`player-colours`, `pc-colours` from K0).
+- **Snapshot size** (CON-44): 0 B added.
