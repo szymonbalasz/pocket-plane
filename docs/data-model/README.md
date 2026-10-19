@@ -1882,3 +1882,11 @@ From [compendium](../specs/compendium.md#6-functional-requirements) FR-CMP-49–
 - **Client draft:** the homebrew form holds `images: string[]` (slot order, first = main) and sends it as `imageAssetIds` in the whole replace; uploads and pastes become attachments (`asset.listed = false`) at once, whether or not the entry is saved (P's "Never saved" case).
 - **Derived:** the view's main image = `imageAssetIds[0]`; the lightbox index is local UI state.
 - **Fixtures:** none new (`cmp-images`, §68). **Snapshot size** (CON-44): +0 B per viewer (no record; attachments are outside the `asset` record type).
+
+## 74. Sprint 5: popup line (D11)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-46, -47. **Built by `build/popup-line`**: client only; no table, column, record type, event, intent or payload change. Protocol side: [protocol §95](../protocol/README.md#95-sprint-5-popup-line-d11).
+
+- **Client memory** (`dice-extras/popups.ts`): a popup's `stills` are now per die key (`{[dieKey]: 2D canvas}`, the hand-off's upright copies; was per part). The cell registry (`registerPopupCell`) maps popup id → die key / "+N" → element. Never stored or sent.
+- **Derived (never stored):** the line (`popupLine`: cells, lines, "+N" with its entry), the card height (`popupHeight`), how many popups fit (`popupsThatFit`), each die's upright turn (`uprightTurn`).
+- **Fixtures:** none new (no record type; DICEX §13 walks on `dice-polish`). **Snapshot size** (CON-44): +0 B.
