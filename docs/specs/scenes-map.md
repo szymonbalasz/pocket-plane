@@ -1,10 +1,10 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: complete
-owner: spec-windows
+status: claimed
+owner: spec-images
 wave: 3
-phase: post-mvp-5
+phase: post-mvp-6
 ---
 
 # Scenes and map

@@ -1,10 +1,10 @@
 ---
 title: Assets pipeline
 prefix: ASSET
-status: complete
-owner: spec-cmpimg
+status: claimed
+owner: spec-images
 wave: 1
-phase: post-mvp-5
+phase: post-mvp-6
 ---
 
 # Assets pipeline
