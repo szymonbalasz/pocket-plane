@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { playerLinkUrl } from "@shared/campaign-management/schemas";
+import { AssetIngested } from "@shared/events/assets-pipeline";
 import { asc, eq, sql } from "drizzle-orm";
 import { seededContext, systemClock } from "../../commands/context";
 import { CommandError } from "../../commands/errors";
@@ -206,6 +207,16 @@ async function runFixtures(services: Services, config: Config, bundle: string, o
       const list = bucket[ch.type] ?? [];
       bucket[ch.type] = list;
       list.push(ch.id);
+    }
+    // An attachment's ingest has no record change (FR-ASSET-24): its id comes from the event, so
+    // `r.id(key, "asset")` counts attachments and listed assets alike, in ingest order.
+    if (event.type === AssetIngested.type) {
+      const p = AssetIngested.payload.parse(event.payload);
+      if (!p.listed) {
+        const list = bucket.asset ?? [];
+        bucket.asset = list;
+        list.push(p.assetId);
+      }
     }
   });
   const refs: Refs = {

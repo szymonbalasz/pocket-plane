@@ -23,7 +23,13 @@ const SRD = {
   url: "https://api.open5e.com/",
   version: "mini",
 };
-const ROW = { campaignId: null, derivedFromId: null, createdAt: "t", updatedAt: "t" };
+const ROW = {
+  campaignId: null,
+  derivedFromId: null,
+  imageAssetIds: [],
+  createdAt: "t",
+  updatedAt: "t",
+};
 
 const GOBLIN: EntryResponse = {
   entry: {

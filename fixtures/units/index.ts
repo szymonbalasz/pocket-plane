@@ -26,6 +26,7 @@ import lateHitRuled from "./combat-tracker/late-hit-ruled";
 import thornBattlemap from "./combat-tracker/thorn-battlemap";
 import cmpHomebrew from "./compendium/cmp-homebrew";
 import cmpHomebrewSecond from "./compendium/cmp-homebrew-second";
+import cmpImages from "./compendium/cmp-images";
 import cmpSearchHomebrew from "./compendium/cmp-search-homebrew";
 import cmpSrdFull from "./compendium/cmp-srd-full";
 import cmpSrdMini from "./compendium/cmp-srd-mini";
@@ -170,4 +171,5 @@ export const units: readonly Fixture[] = [
   handoutAttachment,
   handoutPresent1,
   lateHitRuled,
+  cmpImages,
 ];

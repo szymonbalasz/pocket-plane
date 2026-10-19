@@ -20,6 +20,7 @@ const NPC = { id: "m-1", kind: "monster", name: "Elite Goblin Warrior", ownerPla
 const ROW = {
   campaignId: null,
   derivedFromId: null,
+  imageAssetIds: [],
   createdAt: "t",
   updatedAt: "t",
   definitionId: null,
