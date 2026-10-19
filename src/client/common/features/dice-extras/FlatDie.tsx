@@ -18,7 +18,7 @@ export function FlatDie({
 }: {
   die: ThrowDie;
   look?: DiceLook;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   /** At rest: `data-settled` carries the up-face (FR-DICEX-15; flat = the value). */
   settled?: boolean;
   /** Drawn by the flat renderer (FR-DICEX-21): every die is flat, not only chips. */

@@ -1921,3 +1921,11 @@ From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-5
 | Piece | Kind | Contents | Visibility | Source |
 |---|---|---|---|---|
 | `dist/client/assets/*.{js,css}.br`, `.gz` | build output (gitignored, rewritten per build) | brotli q11 / gzip -9 of each JS / CSS file ≥ 1 KB | public, same for DM and players | FR-DICEX-52 |
+
+## 78. Sprint 5: popup line (D11)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-46, -47. **Built by `build/popup-line`**: client only; no table, column, record type, event, intent or payload change. Protocol side: [protocol §100](../protocol/README.md#100-sprint-5-popup-line-d11).
+
+- **Client memory** (`dice-extras/popups.ts`): a popup's `stills` are now per die key (`{[dieKey]: 2D canvas}`, the hand-off's upright copies; was per part). The cell registry (`registerPopupCell`) maps popup id → die key / "+N" → element. Never stored or sent.
+- **Derived (never stored):** the line (`popupLine`: cells, lines, "+N" with its entry), the card height (`popupHeight`), how many popups fit (`popupsThatFit`), each die's upright turn (`uprightTurn`).
+- **Fixtures:** none new (no record type; DICEX §13 walks on `dice-polish`). **Snapshot size** (CON-44): +0 B.

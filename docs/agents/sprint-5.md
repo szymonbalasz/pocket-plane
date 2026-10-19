@@ -53,6 +53,7 @@ DM notes in brackets ([#250](../decisions-log.md)). "sim-8" = the [session-sim-8
 | 2026-10-19 | Merged: **Fit keeps every token visible** with the Game log, Initiative and Scenes open (cells may go down to 24 px; else PCs first) [#273](../decisions-log.md) |
 | 2026-10-19 | Merged: **colour picker** — players click the colour dot in their header; you set anyone's (and yours) in the Players panel [#274](../decisions-log.md). Map / log colours come with the next slices |
 | 2026-10-19 | Merged: **compressed + cached client** — the 3D dice file drops from 632 KB to 132 KB over the tunnel, and reloads re-use cached files [#275](../decisions-log.md). Run `bun run build` after pulling |
+| 2026-10-19 | Merged: **popup dice in a line at full size** (10d6 in two rows, 20d6 → 11 + "+9") [#276](../decisions-log.md) |
 
 ## Check `main` any time (DM)
 
