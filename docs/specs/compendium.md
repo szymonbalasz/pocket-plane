@@ -2,7 +2,7 @@
 title: Compendium
 prefix: CMP
 status: in-review
-owner: spec-party
+owner: spec-cmpimg
 phase: post-mvp-5
 ---
 
@@ -11,8 +11,6 @@ phase: post-mvp-5
 > **Guideline:** five-minute read. Decided at sprint-3 DM gate 1 ([#207](../decisions-log.md); changes #208 snapshot ceilings, #209 class features as trigger data). Measured figures come from a throwaway probe on the realistic-heavy harness and real SRD 5.1 data (Open5e v1, document `wotc-srd`), deleted before commit. Sprint-3 seams ruling applied (S1, S3, S5–S8, S10, S11; cited as "seams S<n>"), then the review rulings (C1–C15, X2).
 >
 > **Sprint 4 revision (track C, [#243](../decisions-log.md) [20], [#244](../decisions-log.md), session-sim-7 glitch 4):** search splits on whitespace and every word must match ("potion heal" → Potion of Healing), with a ranking that puts the SRD Goblin above the thin fixture one; duplicate names (12 × "Ability Score Improvement") collapse into one row. Token art for compendium / derived monsters is specified in [entities §6](entities.md#6-functional-requirements) (FR-ENT-26–30). New FRs: FR-CMP-32–39; amended: FR-CMP-10, -17, -18. Figures in §12 from a throwaway probe on the realistic-heavy harness + the full bundled `srd-5.1` import (deleted before commit). Decided at sprint-4 DM gate 1 ([#245](../decisions-log.md); G41–G43, G3, G44, G7).
->
-> **Sprint 5 revision, track P (DM [#250](../decisions-log.md) [9]; this block only):** **Add to party** on item entries puts the item into the [party inventory](party-board.md#63-party-inventory) through party-board's existing `party.addItem` (compendium's action, party-board's command). New FR-CMP-40–42; OQ-CMP-34 decided at sprint-5 gate 1 ([#256](../decisions-log.md)). 0 B to any snapshot. Entry images [10] are track C's revision of this spec, using the shared [image attach control](assets-pipeline.md#61-sprint-5-image-attach-control-and-attachments) (FR-ASSET-20).
 
 ### Sprint 4 at a glance
 
@@ -26,6 +24,24 @@ phase: post-mvp-5
 | FR-CMP-14 (S4 use) | Players never see hidden entries in pages, groups, `sameAs` | C-search | `FR-CMP-14 player search never returns hidden entries` |
 | FR-CMP-39 | Adapter `type` + `ADAPTER_VERSION` | C-art core ([entities](entities.md#sprint-4-at-a-glance)) | `FR-CMP-39 adapter type` |
 | FR-CMP-19 (S4) | Credits link (token art) | C-art | ENT `FR-ENT-29 licence`, walkthrough T6 |
+
+> **Sprint 5 revision, tracks P and C** (one block per track):
+>
+> **Track P (Add to party, DM [#250](../decisions-log.md) [9]):** **Add to party** on item entries puts the item into the [party inventory](party-board.md#63-party-inventory) through party-board's existing `party.addItem` (compendium's action, party-board's command). New FR-CMP-40–42; OQ-CMP-34 decided at sprint-5 gate 1 ([#256](../decisions-log.md)). 0 B to any snapshot. Entry images [10] are track C's revision of this spec, using the shared [image attach control](assets-pipeline.md#61-sprint-5-image-attach-control-and-attachments) (FR-ASSET-20).
+>
+> **Track C (entry images, DM [#250](../decisions-log.md) [10] [12], [#251](../decisions-log.md)):** homebrew entries get **images**: ordered image slots filled from the asset library, a direct upload or a clipboard paste through assets-pipeline's shared **image attach control** ([FR-ASSET-20](assets-pipeline.md#6-functional-requirements), track P); shown in the entry view in both clients and delivered only with the entry (FR-CMP-14). Entries stay REST-only, so images add **0 B** to every snapshot (measured, §12). New FR-CMP-45–53; no FR retired or renumbered. Decided at sprint-5 gate 1 ([#256](../decisions-log.md)): OQ-CMP-37–42 and OQ-ASSET-17, every pick A. Needs [OQ-ASSET-17](assets-pipeline.md#15-open-questions) (asset IDs in compendium REST bodies, ADR accepted #256).
+
+### Sprint 5 at a glance
+
+| FR | What | Slice (§14) | Named test (§13) |
+|---|---|---|---|
+| FR-CMP-40–42 | *(P)* Add to party on item views, DM only | P4 `build/cmp-add-to-party` | `FR-CMP-40 add compendium item to party`, `FR-CMP-41 states` |
+| FR-CMP-45, -46 | `imageAssetIds` on homebrew entries: limits, `assets.require` | C5 core | `FR-CMP-45 slot limit`, `FR-CMP-46 assets.require refusal` |
+| FR-CMP-47, -48 | Read: only with a visible entry; stale IDs dropped; ETag | C5 core | `FR-CMP-48 hidden entry's image IDs never reach a player`, `FR-CMP-48 image shown after share`, `FR-CMP-47 asset deleted` |
+| FR-CMP-49 | Clone carries images; delete, sheet, party copy none | C5 core (server) + C5 UI | `FR-CMP-49 clone carries images` |
+| FR-CMP-50 | Homebrew form slots + `ImageAttach` (upload, drop, paste, library) | C5 UI | `FR-CMP-50 form slots`, walkthrough I3–I6 |
+| FR-CMP-51, -52 | Entry view gallery + lightbox, both clients; refresh | C5 UI | `FR-CMP-51 entry gallery`, walkthrough I1, I2, I5 |
+| FR-CMP-53 | CON-44: 0 B | C5 core | `FR-CMP-53 CON-44 entry images 0 B` |
 
 ## 1. Summary
 
@@ -41,6 +57,7 @@ phase: post-mvp-5
 - **C4 homebrew:** homebrew entries (spells, items, conditions, features), clone, derive a monster from an entry (traits copied to the NPC sheet), **Add to sheet**, class-feature seam for rule-trigger presets.
 - **Sprint 4 (S4):** word search with AND and a tier ranking (FR-CMP-32–34), source rank (FR-CMP-38), duplicate-name groups and the All tab's default list (FR-CMP-35, -36), one shared matcher for the window, the creature lookups and the Creatures window (FR-CMP-37), the adapter's creature `type` for token art (FR-CMP-39; art itself: entities FR-ENT-26–30).
 - **Not in S4:** typo-tolerant (fuzzy) search, search syntax beyond plain words (OQ-CMP-26), 5etools class import ([compendium-expansion](post-mvp/compendium-expansion.md), #244).
+- **Sprint 5 (S5, track C):** image slots on homebrew entries (FR-CMP-45–49), the form's slots hosting `ImageAttach` (FR-CMP-50), the entry view's gallery + lightbox in both clients (FR-CMP-51, -52), CON-44 (FR-CMP-53). Upload / paste / drop code is track P's ([FR-ASSET-20–27](assets-pipeline.md#6-functional-requirements)). **Not in S5** (decided #256): images on imported (SRD) entries (OQ-CMP-39), per-image player toggle (OQ-CMP-40), images as token art (OQ-CMP-41), captions and result-row thumbnails (OQ-CMP-42), inline images in entry text.
 
 ## 3. Goals
 
@@ -49,13 +66,15 @@ phase: post-mvp-5
 - Players can read rules (spells, items, conditions, features) and never learn monsters or unshared homebrew.
 - Zero bytes added to any snapshot.
 - *(S4)* Typing the words you remember, in any order, finds the entry: "potion heal", "heal potion", "hunters mark". The real SRD entry beats a thin fixture copy with the same name. Search answers in ≤ 5 ms on the server over the full import.
+- *(S5)* The DM pastes a screenshot of an item's art into the homebrew form and players see it in the entry the moment it's shared; a player never learns an image of an entry they can't read. Still 0 B in any snapshot.
 
 ## 4. Non-goals
 
 - Open5e download at runtime, SRD 5.2 (2024), 5etools (→ [compendium-expansion](post-mvp/compendium-expansion.md)), homebrew **files**, Griffon's Saddlebag, AI paste ([ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md)): each is a later adapter or form helper.
 - Races, backgrounds, feats, rules chapters (rules quick reference, tier B); structured editors per kind (homebrew is one text form).
 - A rules engine: entries never change rolls or effects by themselves; presets are [effect-modifiers](effect-modifiers.md)' (OQ-CMP-14).
-- Overlays / patches on imported entries (ADR-0010 option C); per-campaign imports (option B). Deleting imported entries.
+- Overlays / patches on imported entries (ADR-0010 option C); per-campaign imports (option B). Deleting imported entries. *(S5: this is why imported entries get no images, OQ-CMP-39 decided #256.)*
+- *(S5)* Images inside entry text (markdown-lite stays text-only, FR-CMP-26; P's OQ-ASSET-13), an image library / gallery window, image editing or cropping, player uploads (OQ-ASSET-14).
 
 ## 5. User stories
 
@@ -66,11 +85,13 @@ phase: post-mvp-5
 - As the DM, I want "Stat block" on a monster token's menu.
 - *(S4)* As the DM, I want "potion heal" to find Potion of Healing, and "goblin" to give me the SRD Goblin first.
 - *(S4)* As the DM, I want the All tab to show one "Ability Score Improvement" row I can expand, not twelve.
+- *(S5)* As the DM, I want to give my homebrew "Moonlit Lantern" a picture by pasting it, plus a second one of it lit, and keep a secret relic's picture hidden until I share the relic.
 
 **Player**
 - As a player, I want to look up Fireball or Poisoned mid-session without leaving the app.
 - As a player, I want to add Sneak Attack from the compendium to my sheet's Features.
 - *(S4)* As a player, I want "cure wound" to find Cure Wounds, without ever seeing the DM's unshared homebrew.
+- *(S5)* As a player, I want to see what the item the DM just shared looks like, and open its picture large.
 
 ## 6. Functional requirements
 
@@ -112,7 +133,7 @@ All writes: one transaction (rows + event-log entry), then the domain event ([AD
 | FR-CMP-28 | **Add to sheet** (spell, item, feature views): DM picks a campaign character; a player only their own. Intent `cmp.addToSheet {entryId, characterId}` (feature-local command, `intent: true`), **one transaction**: entry visible to the caller (FR-CMP-14, else `not_found`); authorisation as `char.putRow` (DM any campaign character; owner unless locked, [FR-CHARX-12](character-sheet-full.md#6-functional-requirements), `forbidden` "Locked by the DM"); CHARX internal row insert: spell → `{name, level, concentration, ritual, roll: none, effect: damage}`; item → `{name, qty 1}`; feature → `{name, source (≤ 40), text (clipped 600)}`; if FR-CMP-29 resolves a trigger, MOD's exported `addTriggerFromPreset(env, characterId, {presetKey} \| {name, rule})` in the same transaction. If the character already has that trigger (built-in: a trigger with the preset's name, case-insensitive, or its exact rule; inline: a trigger with the entry's name, case-insensitive), the row is still added but the trigger is skipped; the ack returns `triggerSkipped: true` and the Toast reads "Added to ‹name›'s Features. Trigger already on the sheet — delete it first to use the compendium's." (#241). Any failure (incl. MOD validation) → nothing written, error Toast. Events: `CharacterSheetEdited` + MOD's trigger event. | CHARX §8.2; seams S5 |
 | FR-CMP-29 | **Feature key**: every `feature` **and `spell`** entry exposes `featureKey` = `<source>:<sourceKey>` (e.g. `srd-5.1:feature/rogue/sneak-attack`, `srd-5.1:spell/hunters-mark`; homebrew `campaign:<entryId>`); features also `className` from the SRD's twelve class names (same spelling as CHARX `classes[].name`, matched case-insensitively by MOD's `level(<class>)`). Preset resolution (**trigger presets only**): a feature's `presetKey` (a MOD built-in trigger key), else its `preset` (a `TriggerRule`, MOD's zod in `@shared/effect-modifiers/triggers.ts`, opaque here), else the MOD built-in **trigger** preset that lists this `featureKey`. An effect preset listing the key (e.g. `rage`) is ignored: no trigger and no character preset (the owner adds the toggle in the sheet, FR-MOD-07). Spells resolve by built-in only: Hunter's Mark → trigger `hunters-mark` (the mark itself stays a DM apply, FR-MOD-05). Found → the view shows "Preset: ‹name›" and Add to sheet also adds the trigger (FR-CMP-28). | Seam with R; seams S5 |
 | **Cross-cutting** | | |
-| FR-CMP-30 | No compendium row in any snapshot; the CON-44 test imports the full bundled source on the heavy harness and asserts the compendium's per-type bound (DM snapshot does not grow: 0 B) and that the snapshot stays under the DM ceiling (1 MiB, [#208](../decisions-log.md)). No headroom guard (dropped, #208). | CON-44 |
+| FR-CMP-30 | No compendium row in any snapshot; the CON-44 test imports the full bundled source on the heavy harness and asserts the compendium's per-type bound (DM snapshot does not grow: 0 B) and that the snapshot stays under the DM ceiling (1 MiB, [#208](../decisions-log.md); *S5: 1.5 MiB, [#256](../decisions-log.md)*). No headroom guard (dropped, #208). | CON-44 |
 | FR-CMP-31 | Full import of `srd-5.1`: target ≤ 2 s, logged by the test (warn above); the test fails only above 10 s (wall clock on Windows / CI). Re-import of an unchanged source: target ≤ 0.5 s, no writes (asserted). | FIX budget style |
 | **S4 search** | | |
 | FR-CMP-32 | **Folding and words.** `fold(s)`: Unicode NFD, combining marks removed, lower-case, `'` and `’` removed ("Hunter's" → `hunters`), every other run of characters that are not letters or digits → one space, trimmed. Query words = `fold(q)` split on spaces, duplicates dropped, first 8 kept. Name words / text words = `fold(name)` / `fold(searchText)` split the same way. The **query phrase** = `queryWords(q).join(" ")` (folded, deduplicated). A query word of ≥ 4 chars ending in `s` also matches without that `s` ("potions" → `potion`; tiers 2–5 only; tiers 0–1 compare the query phrase unchanged) (OQ-CMP-27, decided #245). `q` that folds to nothing = empty `q` (FR-CMP-36). | [20] |
@@ -127,6 +148,16 @@ All writes: one transaction (rows + event-log entry), then the domain event ([AD
 | FR-CMP-40 | **Add to party** [9] on **item** entry views (imported and homebrew), **DM client only** (OQ-CMP-34): a Button next to Add to sheet opens a Popover with a qty Input (int 1–9 999, default 1) and **Add**. Add sends party-board's `party.addItem {name, qty, notes: ""}` ([FR-PARTY-19](party-board.md#63-party-inventory)): `name` = the entry name clipped to 60 chars with the same `clip` as Add to sheet (FR-CMP-28), so it merges with an existing party row of that name (case-insensitive, empty notes) or adds one; the server validates, logs the `world → party` item row and sends `loot-received` to everyone. No new intent, command, event or record. | [9]; seam P ↔ C |
 | FR-CMP-41 | Popover states: Add disabled while qty is invalid, not `live` or in flight; `ack` → Popover closes (the `loot-received` toast "Party loot: ‹name› ×‹qty›" is the confirmation); `reject` → inline message in the Popover, qty kept ("Party inventory is full (60)", "Too many — max 9 999"); lost intent → Toast "Connection lost — check the party inventory before adding again". Unshared homebrew item → hint "Players will see ‹name› in the party inventory" (`cmp-add-to-party-hint`). | as FR-PARTY-24 |
 | FR-CMP-42 | Not on other kinds (spells, features, conditions, monsters) and not in the player client (players use Add to sheet, then Give to the party, FR-PARTY-22). No link from the party row back to the entry (OQ-PARTY-13 stays later). | OQ-CMP-34 |
+| **S5 entry images** (track C) | | |
+| FR-CMP-45 | **Image slots.** A homebrew entry of any kind (item, spell, condition, feature; OQ-CMP-38) holds `imageAssetIds`: an ordered list of **0–4** asset IDs (`IMAGE_SLOTS_MAX = 4`, OQ-CMP-37), unique; the **first is the main image** (OQ-CMP-42). Imported entries always have `[]` and the form never offers slots for them (OQ-CMP-39). No captions. | [10] |
+| FR-CMP-46 | **Write.** `cmp.putEntry` (FR-CMP-24) takes `imageAssetIds` (default `[]`) as part of the whole replace. In its one transaction, before any write: > 4 → `invalid` "At most 4 images"; a duplicate → `invalid` "Same image twice"; each ID through `assets.require` ([FR-ASSET-15](assets-pipeline.md#6-functional-requirements)): unknown or another campaign's → `not_found` "Image not found", nothing written. Listed assets and attachments are both accepted (P's FR-ASSET-24). `CompendiumEntrySaved` payload unchanged (no IDs). | ADR-0023 |
+| FR-CMP-47 | **Read.** `GET /entries/:id` (FR-CMP-12) returns `entry.imageAssetIds` after the visibility check, so a 404 never carries IDs. IDs whose asset row no longer exists in the entry's campaign are **dropped** from the response (stale references; no asset delete exists yet, OQ-ASSET-19). The ETag = an opaque hash of (`updatedAt`, source `version`, the delivered IDs), **never raw IDs** (as `entryEtag` today), so a dropped image changes it and no ID reaches a cache or log through the header. Search summaries (FR-CMP-10, -35) carry **no** image fields (OQ-CMP-42, decided #256). | |
+| FR-CMP-48 | **Visibility = the entry's** (FR-CMP-14; OQ-CMP-40, decided #256): a viewer who may read the entry gets all its images; one who may not gets a 404 / no search row and never any of its IDs (also with `If-None-Match`: 404, never 304). Entry images never travel on the WS: entries aren't a record type, `CompendiumEntrySaved` has none, attachments have no `asset` record (P's FR-ASSET-24). A player's REST body may carry an asset ID only under this rule ([FR-ASSET-36](assets-pipeline.md#6-functional-requirements), OQ-ASSET-17). | ADR-0023, ADR-0024 |
+| FR-CMP-49 | **Copies.** Clone (FR-CMP-25) prefills the base's `imageAssetIds` (homebrew of this campaign; imported bases have none); Save re-checks FR-CMP-46. Delete removes the entry, never its assets (no asset delete, OQ-ASSET-05). Add to sheet (FR-CMP-28), Add to party (FR-CMP-40), Derive (FR-CMP-27) copy no images. | |
+| FR-CMP-50 | **Homebrew form slots** (DM, `src/client/dm/features/compendium/HomebrewForm.tsx`): an images strip below the text: one tile per image (`thumb` via `AssetImg`, first tile badged "Main"), each with **Remove** and **Move left / right**; then ASSET's `ImageAttach` ([FR-ASSET-20](assets-pipeline.md#6-functional-requirements)) with `max = 4`, `count` = images in the draft, `owner = "cmp-form"`, `pasteTarget` and `dropTarget` = the whole form Dialog content (name Input and text Textarea included; refs inside the portal are supported, seams S5). `onAdd(id)` appends to the draft; dedupe is this form's job (seams S5): an ID already in the draft is ignored with the hint "Already in this entry". A pasted image never changes the text. Save / Cancel unchanged (Save needs `live`; Cancel drops the draft; uploaded attachments stay, P's ASSET §11 "Never saved" case). Shown for every homebrew kind (FR-CMP-45). | [10] [12]; OQ-ASSET-18 |
+| FR-CMP-51 | **Entry gallery** (both clients, `views.tsx` `EntryView`): with ≥ 1 image, the **main image** (`thumb`, aspect kept, full view width, max 240 px high) sits under the header, then a row of the others as 64 px `thumb` tiles. Click any → **lightbox** Dialog: `display` fitted to 90 vw × 80 vh, **Prev / Next** + "‹n› / ‹N›", Esc closes. States per FR-ASSET-16: skeleton while `loading`, neutral broken-image tile on `error` (no text). No images → the view is unchanged. Players see exactly what FR-CMP-48 delivers; nothing says an image is withheld. | |
+| FR-CMP-52 | **Refresh** as FR-CMP-23: the view refetches on open, search and Back; the DM's save refetches at once. A player's open view keeps its images until the next fetch; after an unshare that fetch is 404 "No longer available" (existing); bytes already loaded stay usable (FR-ASSET-12, accepted). | OQ-CMP-15 |
+| FR-CMP-53 | **CON-44**: the FR-CMP-30 test also saves homebrew entries with 4 images each (attachments) on the heavy harness and asserts **0 B** growth for every viewer. | §12 |
 
 ## 7. UI/UX notes
 
@@ -142,6 +173,9 @@ Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
 - **States**: empty "No matches for ‘…’"; nothing imported: DM empty state with Import, player "The DM hasn't set up the compendium yet"; loading skeleton rows; error Toast + retry; disconnected: REST still works, but writes follow the shell's offline rule (buttons disabled while not `live`).
 - **DM view**: everything above + import panel + token menu **Stat block**. **Player view**: no Monsters tab, no Derive / Clone / Edit / import; Add to sheet for own characters.
 - **Test IDs**: `cmp-window`, `cmp-search`, `cmp-filters`, `cmp-tab` (+ `data-value` kind \| `all`), `cmp-result` (+ `data-record-id`, `data-value` = kind), `cmp-more`, `cmp-empty`, `cmp-entry` (+ `data-record-id`), `cmp-back`, `cmp-statblock-<header|scores|traits|actions|reactions|legendary>`, `cmp-attribution`, `cmp-about`, `cmp-import`, `cmp-import-confirm`, `cmp-import-status`, `cmp-update`, `cmp-derive`, `cmp-derive-copy-text`, `cmp-clone`, `cmp-edit`, `cmp-delete`, `cmp-form-<kind|name|text|preview|shared|save>`, `cmp-add-to-sheet`, `cmp-add-to-sheet-character`, `cmp-preset`, `cmp-token-menu-statblock`. *(S4)* `cmp-result` gains `data-group-count` on group rows; `cmp-group-toggle` (+ `data-record-id`, `aria-expanded`), `cmp-group-member` (+ `data-record-id`), `cmp-credits` (list-view footer link, FR-CMP-19; opens `cmp-about`).
+- *(S5)* **Homebrew form images** (FR-CMP-50): label "Images (‹n› / 4)"; tiles in a wrapping row, ghost icon Buttons Remove / Move left / Move right with Tooltips; "Main" Badge on the first; the attach control below (its own look, P's [ASSET §7](assets-pipeline.md#7-uiux-notes)). Empty: just the control and its hint.
+- *(S5)* **Entry gallery** (FR-CMP-51): main image as a rounded block under the entry header; others as small tiles; the lightbox is a shadcn Dialog (dark backdrop), Prev / Next ghost Buttons, counter in muted text. Same in both clients; DM view adds nothing.
+- *(S5)* **Test IDs:** `cmp-form-images` (strip, `data-value` = count), `cmp-form-image` (+ `data-record-id` = asset ID, `data-value` = position 1–4), `cmp-form-image-remove`, `cmp-form-image-left`, `cmp-form-image-right`, `cmp-form-image-main`, `cmp-form-image-dup` (hint); the control is `asset-attach` with `data-owner="cmp-form"`. View: `cmp-entry-images`, `cmp-entry-image-main` (+ `data-record-id`), `cmp-entry-image` (+ `data-record-id`, `data-value` = position), `cmp-lightbox`, `cmp-lightbox-prev`, `cmp-lightbox-next`, `cmp-lightbox-count`.
 
 ## 8. Data model
 
@@ -165,6 +199,7 @@ Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
 | | definitionId | ID → Entity \| null | Monsters only (FR-CMP-03) |
 | | shared | bool | Homebrew only; imported = n/a |
 | | derivedFromId | ID \| null | Informational, no FK |
+| | imageAssetIds *(S5)* | **JSON leaf**, 0–4 asset IDs, default `[]` | Homebrew only (imported `[]`); unique; order = slot order, first = main; each via `assets.require` (FR-CMP-46) |
 | | createdAt, updatedAt, importedAt | timestamp | |
 
 ### 8.1 Kinds (facets / body)
@@ -180,6 +215,7 @@ Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
 - **Relations:** source 1—* imported entry; campaign 1—* homebrew entry; monster entry 1—1 imported definition (`entity`); homebrew → base (informational). Sheet rows and derived customs are copies, never linked.
 - **Derived:** `readOnly = source != null`, `line`, `featureKey`, XP (from CR, FR-ENT-03), `sourceLabel`.
 - *(S4)* **No schema change for search.** `nameKey` and `searchText` stay as stored; folding happens when the in-memory **search index** (FR-CMP-34) is built: derived, server-only, never persisted, never sent. Summary gains derived `group? {count}` (FR-CMP-35). Monster definitions gain the creature core's optional `type` (JSON leaf, zod only, [entities §8](entities.md#8-data-model)).
+- *(S5)* **Where image IDs live:** a column on the entry (`image_asset_ids`, JSON leaf, like `Handout.imageAssetIds` in [party-board §8](party-board.md#8-data-model)), not inside `body` (body is rules content: import `dataHash`, search text and the per-kind zod stay untouched) and not a join table (only needed for per-campaign images on global imported rows, rejected with OQ-CMP-39 B). Additive column, default `[]`: existing rows need no backfill. **Relations:** homebrew entry *—* Asset (many entries may share an image; same campaign only). **Derived:** main image = `imageAssetIds[0]`. **On asset delete:** none exists (OQ-ASSET-05); reads drop IDs without an asset row (FR-CMP-47), and a future delete / revoke must count entry images as references (OQ-ASSET-19). **Export / import:** no campaign export exists; entry images are not part of `cmp.import` (imported entries have none).
 - **Persisted runtime state:** none; the compendium is prep / reference data.
 - **Not a record type:** entries and sources never travel on the WS; only `imported-entity` (entities) does, lazily.
 
@@ -211,6 +247,8 @@ All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12).
 | `CompendiumEntrySaved {entryId, kind, shared}` / `CompendiumEntryDeleted {entryId}` | none | DM only |
 | `EntityCreated` + `CharacterSheetEdited` (derive, FR-CMP-27) | as entities / CHARX | as entities / CHARX |
 
+*(S5)* No new route, event, intent or record type. `POST` / `PUT /entries` bodies gain `imageAssetIds` (FR-CMP-46); `GET /entries/:id`'s `entry` gains `imageAssetIds` (FR-CMP-47); `CompendiumEntrySaved {entryId, kind, shared}` unchanged, DM only. Visibility rule for entry images: the entry's (FR-CMP-48); never on the WS. Uploads are `POST /api/assets` through P's control (`listed=false`).
+
 *(S4)* No new event, intent or record type. A server listener on the five events in FR-CMP-34 drops the search index (no state change, no frame). The adapter's `type` reaches DM connections inside the existing `imported-entity` upserts of the Update (FR-CMP-39).
 
 ## 10. Permissions
@@ -226,6 +264,8 @@ All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12).
 | Import while an encounter is started | ✗ (`conflict`) | ✗ | FR-CMP-07 |
 | *(S5)* Add to party (items) | ✓ | ✗ (no button; `party.addItem` → `forbidden`) | party-board's role check (FR-PARTY-19) |
 | *(S4)* Search groups, `sameAs` | ✓ (own + imported) | visible members only; hidden → not counted, empty page | FR-CMP-14 before FR-CMP-35 |
+| *(S5)* Set entry images (upload, paste, library) | ✓ own campaign's homebrew | ✗ (no form; control not rendered) | DM secret on `PUT` / `POST /api/assets`; `assets.require` per ID (FR-CMP-46) |
+| *(S5)* See entry images | ✓ | entries they may read only | FR-CMP-48 (the entry's FR-CMP-14 check) |
 
 ## 11. Edge cases & failure modes
 
@@ -239,8 +279,9 @@ All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12).
 - *(S4)* **Search index after a crash or restart:** in memory only, so it is empty after start and rebuilt at the first search (≈ 12 ms measured); nothing to recover. A search racing an import sees either the old rows or the new ones, never a mix: the index is dropped after the commit, by the event listener.
 - *(S4)* **Player and the index:** the index holds every campaign's homebrew; FR-CMP-14 filters every row per request before groups and counts, so a player never sees a hidden entry, its name in a group line, or a count that includes it.
 - *(S4)* **Disconnect / reconnect:** unchanged (REST); an expanded group refetches its members on the next open.
+- *(S5)* **Images, disconnect / reconnect:** REST and uploads don't need the WS; a finished upload or paste lands in the draft; Save waits for `live` (unchanged). Player reconnect: nothing to resync (no record); an `error` image retries once after the reconnect snapshot (FR-ASSET-16). **Server crash:** mid-upload → P's FR-ASSET-07 case (no row, "Upload failed, try again"); `cmp.putEntry` is one transaction (`PP_TEST_CRASH=cmp.putEntry:before-commit` → old entry and images unchanged; the uploaded attachments stay unreferenced, accepted). **Unshare / delete while a player looks:** their next fetch is 404; loaded bytes stay (accepted). **Image removed from the entry:** next fetch omits it; the player keeps the ID it already had (as any hide, FR-ASSET-12). **Asset row missing** (manual DB edit, future delete): dropped at read (FR-CMP-47); files missing (FR-ASSET-07) → broken tile. **Campaign switch:** the other campaign's homebrew and its assets 404 (FR-ASSET-11). **Two DM tabs:** last whole replace wins, images included. **Same image pasted twice:** dedupe returns the same ID → "Already in this entry".
 - **Invalid / malicious input:** strict zod; `q` ≤ 100; cursor opaque and validated; text rendered as text nodes only (FR-CMP-26); recorded sources are repo files, never client input (`cmp.import` takes a source key, not data).
-- **Leaks:** a player never receives a monster entry, a monster definition, unshared homebrew or another campaign's homebrew, in REST bodies, errors or WS frames.
+- **Leaks:** a player never receives a monster entry, a monster definition, unshared homebrew or another campaign's homebrew, in REST bodies, errors or WS frames. *(S5: nor the image asset IDs of any of them, FR-CMP-48; an image ID in another campaign's entry or a forged `PUT` → `not_found`, FR-CMP-46.)*
 - *(S5)* **Add to party:** the party row holds a name copy only, so adding an **unshared homebrew** item tells players its name (the party inventory is public by design); the Popover says "Players will see ‹name› in the party inventory" for unshared homebrew. Disconnect → button disabled (needs `live`); lost intent → toast (FR-CMP-41). Crash: `party.addItem` is one transaction (item row, loot row, notification). Two DM tabs adding the same item → both commit, quantities sum (merge).
 
 ## 12. Performance & bandwidth
@@ -285,6 +326,20 @@ Measured with real SRD 5.1 data (Open5e v1 `wotc-srd`) on the realistic-heavy ha
 - `sync.load` of imported definitions: ≤ 50 rows × ≤ 1.3 KB ≈ 66 KB worst case.
 - *(S5)* Add to party: **0 B** to any snapshot (`party-item` is lazy; the `loot-entry` row stays inside its 100-row window; measured in [PARTY §12](party-board.md#12-performance--bandwidth)); per add, party-board's existing frames (`PartyItemAdded`, `loot-received`).
 
+**Sprint 5 (S5), measured**: throwaway probe (deleted before commit), `session-sim` + `buildRealisticHeavy`, `bun test` on Windows; 20 homebrew items (1,040-char text, half shared) saved with `cmp.putEntry`; 4 images (1600 × 1200, 80-char names) ingested through `assets.ingest`; REST bodies through the real `readEntry`.
+
+| Figure | Value |
+|---|---|
+| Heavy snapshot before | DM 672,312 B; players 278,882–282,112 B |
+| 20 homebrew items saved | **DM +0 B, every player +0 B** (entries are not a record type) |
+| An image ID in the entry body (22-char ID) | entry GET 1,533 B → +43 B (1), +68 (2), **+118 (4)**, +268 (10); a hidden entry → `null` (404) before any field is built |
+| 4 images ingested as **library** assets (today; listed) | DM **+1,298 B** (≈ 325 B each, 80-char names); players 0 B. As **attachments** (P's FR-ASSET-24, the picked path for the attach control): 0 B (P's measure, [ASSET §12](assets-pipeline.md#12-performance--bandwidth)) |
+| Events per save | `CompendiumEntrySaved` log row 313 B (payload 79 B, no IDs), DM only; `AssetIngested` row 353 B, DM only |
+| Image bytes per view (synthetic noisy 1600 × 1200, worst case) | `thumb` 512 × 384: 19 KB; `display` 1600 × 1200: 816 KB (800 × 800: thumb 76 KB, display 271 KB). Why the gallery uses `thumb` and only the lightbox loads `display` (FR-CMP-51); revisits 0 B (immutable cache) |
+| `readEntry` | 0.14 ms per call (200 calls 27.8 ms); the stale-ID check adds one indexed lookup for ≤ 4 IDs |
+
+- Ceilings: DM **1.5 MiB** (1,572,864 B; raised at sprint-5 gate 1, [#256](../decisions-log.md)), players 512 KiB (#208). Worst case "every image in the library" (OQ-ASSET-12 B / C) would cost ≈ 325 B per image in the DM snapshot only; entry images themselves never enter it. *(Seams S14 budgets track C at ≈ 1.3 KB of the ≈ 940 KB DM worst case (≈ 632 KB left of 1.5 MiB): the 4 listed ingests above. As specified, entry images are attachments, so C adds 0 B; the 1.3 KB stays as headroom.)*
+
 ## 13. Test plan
 
 Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)); loop per [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md). **No network in any test:** recorded Open5e responses only.
@@ -298,6 +353,9 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | `cmp-homebrew-second` | setup | `campaign-second` | Activate Second Campaign; item "CMP-SECOND-HOMEBREW" (shared); re-activate Fixture Campaign |
 | `cmp-srd-full` *(S4)* | setup | `cmp-srd-mini` | `cmp.importRecorded` of the **bundled** `srd-5.1` source at its bundled version (≈ 1.2 s): the mini entries are `existing`, the rest created; 1,150 entries |
 | `cmp-search-homebrew` *(S4)* | setup | `cmp-srd-mini` | Fixture Campaign homebrew: item "Potion of Healing" (**DM only**, same name as the SRD item, own words "CMP-HB-POTION"), item "Healing Draught" (shared, text "a potion that heals 2d4 + 2") |
+| `cmp-images` *(S5)* | setup | `cmp-homebrew` | Ingests committed SVGs `fixtures/assets/items/lantern.svg`, `lantern-lit.svg`, `relic.svg` (new, 256 × 256, distinct silhouettes) as **attachments** (P's `ingestStep(file, {listed: false})`; C5 core starts after P0, seams S1). Fixture Campaign homebrew: item **"Moonlit Lantern"** (shared, images `[lantern, lantern-lit]`), item **"CMP-IMG-SECRET"** (DM only, images `[relic]`). Leaves `cmp-homebrew`'s entries and the SRD mini (e.g. Potion of Healing, no images) untouched |
+
+**Bundle `cmp-images`** *(S5)* = `compendium` + `cmp-images`. Session-sim-9 adds the `cmp-images` unit (orchestrator).
 
 **Bundle `compendium-full`** *(S4)* = `compendium` + `cmp-srd-full` + `cmp-search-homebrew` (+ entities' `ent-art-tokens`, [entities §13](entities.md#13-test-plan)). The `compendium` bundle stays the fast mini set.
 
@@ -385,6 +443,29 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | E2E (thin) | DM: Compendium → Potion of Healing → Add to party ×2 → Party → Inventory shows ×4 |
 
 Walkthrough: [PARTY §13.1](party-board.md#131-sprint-5-track-p-party-loot-asset-cmp) step S5-9.
+### 13.1 Sprint 5: entry images (track C)
+
+Bundle `cmp-images`. Isolation as above (`:memory:` DB + temp asset dir per test file; verify profile for the walkthrough). "Player frames" = the player's WS frames **and** compendium REST bodies.
+
+| Level | Named tests | Fixtures |
+|---|---|---|
+| Unit | `FR-CMP-45 slot limit` (zod: 0 and 4 IDs pass; 5 → `invalid` "At most 4 images"; a duplicate → `invalid`; non-ID string → `invalid`). `FR-CMP-50 form slots` (DOM: `ImageAttach` gets `max` 4, `count` = draft length, `owner` `cmp-form`; `onAdd` appends; an ID already held → ignored + `cmp-form-image-dup`; Remove; Move left / right; first tile "Main"; imported clone base → no slots prefilled). `FR-CMP-51 entry gallery` (no images → no `cmp-entry-images`; the same gallery on a **spell** entry with 2 images (non-item kind, review B27) renders main + 1 tile and the lightbox; 3 images → main + 2 tiles in order; lightbox Prev / Next wraps, counter "2 / 3"; `error` → broken tile, no text; same component in the player client) | In-code |
+| Integration | **`FR-CMP-46 assets.require refusal`**: `PUT` with an unknown ID, with Second Campaign's asset ID → `not_found` "Image not found", entry unchanged (body, images, `updatedAt`), no event, no log row; an attachment and a listed asset → saved. `FR-CMP-45 slot limit` over REST (5 IDs → 400 `invalid`, nothing written). **`FR-CMP-48 hidden entry's image IDs never reach a player`**: player-1 and player-2 search (`""`, `CMP`, `relic`, every tab) and GET "CMP-IMG-SECRET" (also with `If-None-Match` = the DM's ETag → 404, never 304); string scan of all their REST bodies and WS frames finds no `relic` asset ID; then both players disconnect, the DM edits the secret entry (adds a second image), players reconnect: the reconnect snapshot and the following frames and bodies still hold neither ID. **`FR-CMP-48 image shown after share`**: before → 404; DM `PUT` `shared: true` → player GET 200 with `imageAssetIds = [relic]`; direct `GET /api/assets/<relic>/thumb` from the player → 200; unshare → 404 again. **`FR-CMP-47 asset deleted`**: the test deletes the `lantern-lit` asset row (test-only SQL) → GET returns `[lantern]` and a new ETag (old `If-None-Match` → 200, not 304); files removed for `lantern` (FR-ASSET-07 case) → GET still lists it, `GET /api/assets/…/thumb` 404. `FR-CMP-49 clone carries images` (clone body of "Moonlit Lantern" saved under a new name → same two IDs, independent: removing one from the clone leaves the base). Crash `cmp.putEntry:before-commit` with new images → entry as before. **`FR-CMP-53 CON-44 entry images 0 B`**: heavy harness, 20 homebrew entries × 4 attachment images → every viewer's snapshot +0 B, DM < 1.5 MiB (#256), players < 512 KiB | `cmp-images`; heavy |
+| Integration (ASSET) | `FR-ASSET-36 leak property over REST` ([ASSET §13](assets-pipeline.md#13-test-plan)): every asset ID found in a player's compendium REST bodies belongs to an entry `entryVisibleTo` lets that player read; no `ETag` header (200 or 304) contains an asset ID (review B25) | `cmp-images` |
+| E2E (thin) | DM: Compendium → New item "E2E Lamp", Upload `fixtures/assets/items/lantern.svg`, Shared, Save; `player-1`: search "lamp", open → `cmp-entry-image-main` loads (`naturalWidth > 0`) | `cmp-images` |
+
+**Browser walkthrough I** — `bun run build`, `fixtures:reset-load cmp-images --profile verify`, `start --profile verify`. Contexts: A DM, B `player-1`, C `player-2`. Player evidence: REST + WS logs via `page.on('response')` / `page.on('websocket')`; asset IDs from the load manifest. Paste: the test agent dispatches a `paste` event with a PNG `File` in its `DataTransfer` (P's helper in `e2e/support/`, [ASSET §13](assets-pipeline.md#13-test-plan)), or copies a real screenshot. Teardown: stop, `fixtures:reset --profile verify`.
+
+| # | DM (A) | Players (B, C) | Expected |
+|---|---|---|---|
+| I1 | Open Compendium, search "lantern", open Moonlit Lantern; click the main image, Next | — | Main image + 1 tile; lightbox "1 / 2" → "2 / 2" (`display`); Esc closes |
+| I2 | — | B: search "lantern" → open; search "CMP-IMG", "relic" | B: same two images, lightbox works. No secret result. B's logs: no `relic` asset ID, no "CMP-IMG-SECRET" |
+| I3 | New item "Sky Compass" (DM only): **Upload** `fixtures/assets/props/prop-chest.svg`, then **paste** a PNG into the text Textarea | — | Two tiles in that order ("Main" on the chest); the text unchanged; the asset library (any picker) doesn't list either (attachments, OQ-ASSET-12 A) |
+| I4 | Move the pasted tile left; paste the same PNG again; add images until full | — | Pasted image is "Main"; second paste → "Already in this entry"; at 4: control disabled "No more images (4)" |
+| I5 | Remove down to 2, Save; then Edit → Shared on → Save | B: search "compass" before and after the share | Before: nothing, B's logs carry neither new ID. After: Sky Compass with the pasted image as main, then the chest |
+| I6 | Clone Sky Compass → "Sky Compass (copy)": two tiles prefilled; Cancel | — | Nothing saved; clone dialog showed both images |
+| I7 | Edit Moonlit Lantern → Shared off → Save | B: Back, reopen Moonlit Lantern | "No longer available"; later frames / bodies carry no new IDs |
+| I8 | Reload A; hard-kill and restart the server | B, C reload | Sky Compass images render for A and B (browser cache); C sees Sky Compass, not Moonlit Lantern or the secret; no console errors; C's logs: no `relic`, `lantern` IDs |
 
 ## 14. Dependencies
 
@@ -405,6 +486,22 @@ Walkthrough: [PARTY §13.1](party-board.md#131-sprint-5-track-p-party-loot-asset
 | *(S4)* fog-of-war / character-sheet-full (V6) | V6's one-line Open5e adapter change (`visionFt: 0`, V's OQ-CHARX-30) lands before C-art core touches the adapter | seams S5, S14 |
 | *(S4)* [entities](entities.md) | FR-ENT-18 order gains source rank; the Creatures window filter uses the matcher; creature core `type` (FR-ENT-26) | same author (this track) |
 | *(S4)* Search package | **None**: hand-rolled index + tiers (≈ 150 lines, measured ≤ 0.5 ms). Typo-tolerant search (MiniSearch / Fuse.js) was rejected at the gate (OQ-CMP-27, #245) | decided (#245) |
+| *(S5)* [assets-pipeline](assets-pipeline.md) (track P) | `ImageAttach` + attachments (FR-ASSET-20–27): props `max`, `count`, `onAdd`, `owner`, `pasteTarget`, `dropTarget`, `disabled`; no new prop needed; `ingestStep(file, {listed: false})` for the fixture; refs may point inside a portal (the form's Dialog); dedupe is the caller's | settled by seams S5 ([OQ-ASSET-18](assets-pipeline.md#15-open-questions), P's OQ-ASSET-15) |
+| *(S5)* [assets-pipeline](assets-pipeline.md), [ADR-0023](../architecture/adr/0023-asset-access-by-capability-id.md) | Asset IDs allowed in compendium REST bodies under `entryVisibleTo` (FR-ASSET-36; [ADR, accepted #256](../architecture/adr/proposed-s5-cmpimg-rest-asset-ids.md)) | decided (#256): ADR accepted ([OQ-ASSET-17](assets-pipeline.md#15-open-questions)) |
+| *(S5)* Track P's compendium block (FR-CMP-40–42, `build/cmp-add-to-party`) | Edits the same DM entry views (`EntryActions.tsx`); P4 merges first, C5 UI rebases (P's OQ-CMP-35) | settled by seams S5 |
+| *(S5)* [entities](entities.md) | None this sprint; only if OQ-CMP-41 B / C (portrait or token art from an entry image) | OQ-CMP-41 |
+| *(S5)* [party-board](party-board.md) | None: party rows hold a name copy, no image (P's OQ-CMP-36 / OQ-PARTY-13 would add a link, and with it the entry's main image, later) | — |
+| *(S5)* Packages | **None**: lightbox = shadcn Dialog; images via the existing `AssetImg` / `useAssetImage`; upload / paste are P's (browser APIs) | — |
+
+**Build split, sprint 5** (hotspots per [sprint-5](../agents/sprint-5.md#boundaries-and-hotspots-sequence-these); schema per seams S1: two lanes, **lane 1 P0 → C5 core**, lane 2 R0 → K0; **merge order P0 → R0 → C5 core → K core**)
+
+| Slice | Branch | Delivers | Shared files (AGENTS §9.9) |
+|---|---|---|---|
+| C5 core | `fix/cmpimg-core` | After P0 (schema lane 1, seams S1; P0 also gives `asset.listed` for the fixture). Merges after R0 (rebase schema.ts lines and data-model / protocol rows via `resolve_docs.py` if R0 merged first), before K core. Owns only its own column. Column `image_asset_ids` (default `[]`); `@shared/compendium` zod (`PutEntryBody`, `CompendiumEntry`: `imageAssetIds`, `IMAGE_SLOTS_MAX`); `cmp.putEntry` checks (FR-CMP-45, -46); read filter + ETag (FR-CMP-47, -48); fixture `cmp-images` + 3 SVGs + bundle; server tests §13.1 incl. CON-44 and the ASSET leak property over REST (FR-ASSET-35–38) | `src/server/db/schema.ts` (one column); `fixtures/bundles/index.ts` (append); the REST leak property lives in a new `src/server/features/compendium/image-leak.test.ts` (no edit to P's assets-pipeline files); `src/server/ws/snapshot-size.test.ts` (C's worst-case rows: 20 entries × 4 attachment images, 0 B; seams S14); data-model §34 row + protocol §58 / §60 rows (integrator or this slice, as assigned). No events, ws, protocol schema or registry change |
+| C5 UI | `build/cmpimg-ui` | After **P1** (`build/image-attach`) and **P4** (`build/cmp-add-to-party`) merge, and after C5 core. Form slots + `ImageAttach` (FR-CMP-50), gallery + lightbox (FR-CMP-51), clone prefill (FR-CMP-49), refresh (FR-CMP-52), test IDs, thin e2e, walkthrough I | None: `src/client/dm/features/compendium/`, `src/client/common/features/compendium/` (feature-owned). The DM root's `AttachUploaderProvider` line is P1's |
+
+- **Parallel:** C5 core runs alongside P1, P4, W, D, R slices (no ws / canvas / shell / registry files); it waits for P0 (lane 1) and runs in parallel with lane 2 (R0 → K0); merge order P0 → R0 → C5 core → K core (seams S1). C5 UI starts after **P1, P4 and C5 core** merge (seams S5) and runs alongside K core and any other non-compendium slice. Nothing in C touches the play-shell frame, toasts or the canvas.
+- **Cut order if late:** the lightbox (gallery tiles open nothing; `display` unused) goes first; then Move left / right (order = add order).
 
 *(S5, track P)* Add to party depends on [party-board](party-board.md) `party.addItem` (built, P4 sprint 3); no new dependency, schema, intent or shared file. **Build:** slice P4 `build/cmp-add-to-party` ([PARTY §14.2](party-board.md#142-sprint-5-build-split)): DM entry actions (`src/client/dm/features/compendium/EntryActions.tsx`, a new `AddToParty.tsx` beside it) — starts at once, and merges **before** C5 UI edits the same entry views (one holder at a time; settled by seams S5, OQ-CMP-35).
 
@@ -470,6 +567,12 @@ Walkthrough: [PARTY §13.1](party-board.md#131-sprint-5-track-p-party-loot-asset
 | OQ-CMP-34 | *(S5)* Add to party [9]: which entries, how many, from which client? | **Decided (#256): item entries only, quantity field (default 1), DM only** (FR-CMP-40–42). Rejected: ~~B items, DM and players~~, ~~C any kind~~ | — | party-board, party-loot |
 | OQ-CMP-35 | *(S5)* **Track C (compendium images)**: P4 and C's client slice edit the same entry views | **Settled by seams S5:** P4 merges before C5 UI (same DM entry views); C5 UI starts after P1, P4 and C5 core; C's image slots use ASSET's `ImageAttach` ([OQ-ASSET-15](assets-pipeline.md#15-open-questions)), no upload code in compendium | no · settled | compendium (C) |
 | OQ-CMP-36 | *(S5)* **party-board**: should the party row link back to the entry (open it from the inventory)? | **Later, with OQ-PARTY-13's nullable `party_item.itemRef`** (additive; also lets images show in the inventory) / now (schema + party-board UI this sprint) | no · owner: spec-party | party-board |
+| OQ-CMP-37 | *(S5)* How many image slots per entry? | **Decided (#256): A, up to 4** (first = main; one tile row in the 440 px window). Rejected: ~~B exactly 1~~, ~~C up to 10 like handouts~~ | — | — |
+| OQ-CMP-38 | *(S5)* Which entry kinds get images? | **Decided (#256): A, every homebrew kind (item, spell, condition, feature)**: one form, one shared `EntryView` wrapper, no kind-specific code (review B27); a spell is tested in FR-CMP-51. Rejected: ~~B homebrew items only~~, ~~C + custom creatures~~ | — | — |
+| OQ-CMP-39 | *(S5)* Imported (SRD) entries: read-only and global — images? | **Decided (#256): A, none; Clone to add images** (keeps ADR-0046, no overlays). Rejected: ~~B per-campaign image overlay~~, ~~C monsters via Derive~~ | — | — |
+| OQ-CMP-40 | *(S5)* For a shared entry, do players see every image? | **Decided (#256): A, all images of an entry they can read** (images follow the entry, FR-CMP-14). Rejected: ~~B per-image "DM only" toggle~~ | — | — |
+| OQ-CMP-41 | *(S5)* Entry images as monster token art ([ADR-0050](../architecture/adr/0050-token-creature-type.md))? | **Decided (#256): A, not this sprint** (customs keep their own portrait; SRD entries have no images). Rejected: ~~B Derive prefills the portrait~~, ~~C main image = token art~~ | — | — |
+| OQ-CMP-42 | *(S5)* Order, captions, main image, list thumbnails | **Decided (#256): A, ordered slots, first = main (Move left / right), no captions, no thumbnail in search rows**. Rejected: ~~B + captions~~, ~~C + 32 px thumbnails in search rows~~ | — | — |
 
 ## 16. Out of scope
 
@@ -478,3 +581,4 @@ Walkthrough: [PARTY §13.1](party-board.md#131-sprint-5-track-p-party-loot-asset
 - Custom monster actions auto-rolled vs targets beyond today's attacks ([combat-extras §16](combat-extras.md#16-out-of-scope)); legendary / lair action tracking.
 - *(S4)* Typo-tolerant search, search syntax beyond plain words, search inside the stat block's numbers (e.g. "cr 5": use Filters), result snippets showing where the text matched.
 - Linking condition chips to compendium text (CBTX): later, small. (Clickable notation in entry text is in, via `DiceText`, FR-CMP-26.)
+- *(S5)* Images on imported entries, per-image visibility, captions, result-row thumbnails, images as token art (OQ-CMP-39–42, decided #256); images inside entry text; images in party inventory rows (P's OQ-CMP-36); deleting an image's asset (OQ-ASSET-05).
