@@ -2,25 +2,18 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 5 **Phase B (builds)**, gate 1 passed (#256). Plan + build order: [sprint-5](sprint-5.md), `.verify/sprint5/gate.md`. DM check bundle: `session-sim-9`.
+**Phase:** Sprint 5 Phase B **done** — all 26 build slices merged (#257–#283). Next: session-sim-9 on final `main`, then "Playtest: sprint 5 features" in [sprint-5](sprint-5.md), then pause + recap with the DM.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Specs (all six) | merged, complete | — | done (#256); ADRs 0051–0055 | — |
-| P0 party core, R0 combat core | merged | — | done (#257, #258) | — |
-| K1 template menu | fix/tpl-menu (w6W) | build-tpl-menu, test-tpl-menu | walkthrough (port 4123) | merge (canvas holder #1) |
-| W1 window layout | fix/window-layout (w6X) | build-window-layout | building (frame + toast lock) | walkthrough |
-| D8 dice landing | build/dice-landing (w6Y) | build-dice-landing, test-dice-landing | walkthrough (port 4133) | merge after W1 |
-| P1 image attach | build/image-attach (w6Z) | build-image-attach, test-image-attach | walkthrough (port 4143) | merge |
-| Queue | — | — | P2 present UI, C5 core, R1 late damage, R4 ally UI (after W4), K0 colours core, D12, W4, P3, P4 | as slots free |
+| Sprint 5 builds | merged | — | 26 / 26 (+ BL-12, 16, 28, 31, 32, 34, 35 backfill) | — |
+| session-sim-9 | main | test-session-9 | about to start | report → playtest section |
 
 ## Shared-file locks
 
-- Schema: lane 1 P0 → C5 core; lane 2 R0 → K0; merge order P0 → R0 → C5 core → K0 (seams S1).
-- Canvas: K1 → W2 → R3 → K3 (S10). Play-shell frame + toast region: W1 (S2). `GameLog.tsx`: W1 → D8 → D9 → K4 (S15). `src/server/app.ts`: D12 (S11).
-- Protocol / data-model section numbers: assigned at merge (`resolve_docs.py`).
+- None (all sprint-5 branches merged).
 
 ## Pending DM decisions
 
