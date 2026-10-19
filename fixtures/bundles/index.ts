@@ -36,6 +36,7 @@ import sessionSim8 from "./session-sim-8";
 import sessionSim9 from "./session-sim-9";
 import syncProbe from "./sync-probe";
 import tokenArtUpdate from "./token-art-update";
+import tplMenu from "./tpl-menu";
 import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
@@ -80,4 +81,5 @@ export const bundles: readonly Bundle[] = [
   sessionSim8,
   sessionSim9,
   partyS5,
+  tplMenu,
 ];
