@@ -86,10 +86,13 @@ export function turnStartersOf(
   return [turnCombatantId, ...inTurnCompanionsOf(rows, turnCombatantId).map((c) => c.id)];
 }
 
-/** The turn combatant if not hidden or removed, else null (FR-CBT-31). */
+/**
+ * The turn combatant if not hidden or removed, else null (FR-CBT-31); sprint 6 (FR-CBT-116): nor
+ * a companion of a hidden owner.
+ */
 export function playerTurnOf(enc: EncounterRecord, rows: readonly CombatantRecord[]) {
   const t = rows.find((r) => r.id === enc.turnCombatantId);
-  return t && !t.hidden && !t.removed && t.active ? t.id : null;
+  return t && !t.hidden && !t.ownerHidden && !t.removed && t.active ? t.id : null;
 }
 
 /** Writes `playerTurnCombatantId` if it changed; returns the encounter after. */

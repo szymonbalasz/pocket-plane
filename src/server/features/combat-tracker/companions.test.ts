@@ -15,6 +15,8 @@ import {
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
+import { MOD_TRIGGER_KIND } from "@shared/effect-modifiers/reminders";
+import { TRIGGER_INTENTS } from "@shared/effect-modifiers/trigger-intents";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { CompanionChanged } from "@shared/events/combat-tracker";
 import { MAP_INTENTS, TOKEN_TYPE } from "@shared/scenes-map/schemas";
@@ -222,15 +224,53 @@ describe("FR-CBT-106–108 turn modes and owner states", () => {
     expect(fx()).toHaveLength(1);
     t.nextTo("Thorn", 2);
     expect(fx()).toHaveLength(0);
+    // A `turnStart` trigger on the drake's definition fires at Thorn's turn start (FR-MOD-44).
+    t.run(TRIGGER_INTENTS.putTrigger, {
+      trigger: {
+        definitionId: t.drake,
+        name: "Ember breath",
+        rule: {
+          on: "turnStart",
+          when: [],
+          every: "each",
+          // biome-ignore lint/suspicious/noThenProperty: the rule's effect field (MOD §8.4).
+          then: { do: "remind", text: "breath recharges" },
+        },
+      },
+    });
+    const reminders = () =>
+      t.s.db
+        .select()
+        .from(notification)
+        .where(eq(notification.kind, MOD_TRIGGER_KIND))
+        .all()
+        .map((r) => r.text);
+    t.nextTo("Thorn", 3);
+    expect(reminders()).toEqual(["Drake: Ember breath — breath recharges"]);
   });
 
   test("FR-CBT-108 owner hidden", () => {
     const t = cpSetup();
     const drake = t.combatantNamed("Drake");
     const before = t.ranked();
+    // An effect on the drake: hidden with it (combat-extras' hidden copy).
+    t.run(CBTX_INTENTS.addEffect, {
+      targets: [{ combatantId: drake.id }],
+      kind: "condition",
+      condition: "prone",
+    });
     const n = t.events.length;
     t.run(MAP_INTENTS.setTokenHidden, { tokenId: t.tokens.thorn, hidden: true });
     expect(t.combatantRow(drake.id).ownerHidden).toBe(true);
+    expect(t.active().find((e) => e.targetCombatantId === drake.id)?.hidden).toBe(true);
+    // Players get deletes only: the drake, its effect; no upsert names it.
+    for (const v of [t.p1V, t.p2V]) {
+      const upserts = t.events
+        .slice(n)
+        .flatMap((e) => t.wire(e.event.changes, v))
+        .filter((w) => typeof w !== "string" && w.op === "upsert");
+      expect(JSON.stringify(upserts)).not.toContain(drake.id);
+    }
     for (const v of [t.p1V, t.p2V]) {
       const w = t.events.slice(n).flatMap((e) => t.wire(e.event.changes, v));
       expect(w.filter((c) => typeof c !== "string" && c.id === drake.id)).toEqual([

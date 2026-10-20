@@ -36,11 +36,13 @@ export function syncHidden(
 ): RecordChange[] {
   const out: RecordChange[] = [];
   for (const c of rows) {
+    // Sprint 6 (FR-CBT-116): a companion of a hidden owner counts as hidden.
+    const hidden = c.hidden || c.ownerHidden;
     for (const e of activeEffectsOf(env.tx, combatantTargetColumns(c))) {
-      if (e.hidden === c.hidden) continue;
+      if (e.hidden === hidden) continue;
       env.tx
         .update(effect)
-        .set({ hidden: c.hidden, updatedAt: env.ctx.clock.iso() })
+        .set({ hidden, updatedAt: env.ctx.clock.iso() })
         .where(eq(effect.id, e.id))
         .run();
       out.push(effectChange(e, readEffect(env.tx, e.id)));
@@ -168,5 +170,22 @@ export function cbtxTokenHook(
     )
     .all()
     .map((r) => ({ ...toCombatantRecord(r), hidden }));
-  return syncHidden(env, bound);
+  // Sprint 6 (FR-CBT-116): a hidden owner PC hides its companions (and their effects) too.
+  const companions = bound
+    .filter((c) => c.kind === "pc")
+    .flatMap((pc) =>
+      env.tx
+        .select()
+        .from(combatant)
+        .where(
+          and(
+            eq(combatant.encounterId, pc.encounterId),
+            eq(combatant.ownerCharacterId, pc.entityId),
+            eq(combatant.active, true),
+          ),
+        )
+        .all()
+        .map((r) => ({ ...toCombatantRecord(r), ownerHidden: hidden })),
+    );
+  return syncHidden(env, [...bound, ...companions]);
 }

@@ -116,23 +116,23 @@ export const setCompanionCommand = defineCommand({
     let mode: TurnMode | null = null;
     if (owner === null) {
       if (before.pet) throw conflict(PET_OWNER_HERE);
-      if (before.ownerCharacterId === null && (side === undefined || side === before.side)) return;
-      lineOwner = ownerName(tx, rows, before);
-      if (before.ownerCharacterId !== null) {
-        // Release: mode `own`, keeping the owner's current number as its own (FR-CBT-111).
-        const ownerRow = rows.find(
-          (r) => r.kind === "pc" && r.entityId === before.ownerCharacterId,
-        );
-        Object.assign(set, {
-          ownerCharacterId: null,
-          ownerPlayerId: null,
-          turnMode: null,
-          card: null,
-          ownerHidden: false,
-          concentrationEffectId: null,
-          ...(before.turnMode !== "own" && ownerRow ? { initiative: ownerRow.initiative } : {}),
-        });
+      // Not a companion: nothing to release (a side alone is `cbt.setSide`'s).
+      if (before.ownerCharacterId === null) {
+        if (side === undefined) return;
+        throw invalid("Not a companion: set its side instead");
       }
+      lineOwner = ownerName(tx, rows, before);
+      // Release: mode `own`, keeping the owner's current number as its own (FR-CBT-111).
+      const ownerRow = rows.find((r) => r.kind === "pc" && r.entityId === before.ownerCharacterId);
+      Object.assign(set, {
+        ownerCharacterId: null,
+        ownerPlayerId: null,
+        turnMode: null,
+        card: null,
+        ownerHidden: false,
+        concentrationEffectId: null,
+        ...(before.turnMode !== "own" && ownerRow ? { initiative: ownerRow.initiative } : {}),
+      });
       action = side === "enemy" ? "hostile" : "release";
     } else {
       const o = ownerOfCompanion(tx, enc, owner.characterId);
