@@ -218,3 +218,51 @@ describe("FR-CAMP-27 picker", () => {
     expect(row).toContain('data-value="rose"');
   });
 });
+
+describe("FR-CAMP-32 / -36 sprint-5 picker on hex records (PF0, until PF2's ColorPicker)", () => {
+  const HX: ColorHolders = {
+    dmColor: PLAYER_COLORS.amber,
+    players: [
+      { id: "p1", name: "Player 1", color: PLAYER_COLORS.jade },
+      { id: "p2", name: "Player 2", color: "#b388ff" },
+    ],
+  };
+
+  test("FR-CAMP-32 distance rule: hex holders; a free lavender blocks Blue and Sky by distance, naming Player 2; own Jade checked", () => {
+    const s = byKey("p1", HX);
+    expect(s.jade).toMatchObject({ checked: true, takenBy: null });
+    expect(s.amber).toMatchObject({ takenBy: "dm", label: "Amber — taken by DM" });
+    for (const k of ["blue", "sky"] as const) {
+      expect(s[k]).toMatchObject({
+        takenBy: "p2",
+        label: `${k === "blue" ? "Blue" : "Sky"} — too close to Player 2's colour for colour-blind players`,
+      });
+    }
+    expect(s.rose).toMatchObject({ takenBy: null, checked: false });
+  });
+
+  test("FR-CAMP-36 colorOf hex: the trigger paints the stored hex; data-value is the palette name, or the hex for a free colour", () => {
+    const store = snapshotStore(
+      [
+        { id: "p1", name: "Player 1", color: PLAYER_COLORS.jade },
+        { id: "p2", name: "Player 2", color: "#b388ff" },
+      ],
+      PLAYER_COLORS.amber,
+    );
+    const mine = renderWith(
+      store,
+      "live",
+      <ColorPopover target="p1" testId="camp-my-color" size={12} tip="Your colour" />,
+    );
+    expect(mine).toContain('data-value="jade"');
+    expect(mine).toContain('aria-label="Your colour: Jade"');
+    const free = renderWith(
+      store,
+      "live",
+      <ColorPopover target="p2" testId="camp-player-color" size={16} tip="Player 2's colour" />,
+    );
+    expect(free).toContain('data-value="#b388ff"');
+    expect(free).toContain("background-color:#b388ff");
+    expect(free).toContain("Player 2&#x27;s colour: #b388ff");
+  });
+});

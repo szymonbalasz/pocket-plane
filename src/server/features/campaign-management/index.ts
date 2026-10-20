@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { player } from "../../db/schema";
 import type { Feature } from "../../services";
 import { createResolvers, DmSecretChecker } from "./auth";
-import { backfillPlayerColors, setColor } from "./colors";
+import { migratePlayerColors, setColor } from "./colors";
 import {
   activateCampaign,
   addPlayer,
@@ -28,10 +28,15 @@ export const campaignManagement: Feature = {
     r.command(setColor, { intent: true });
     r.recordType(campaignRecordType);
     r.recordType(playerRecordType);
-    // FR-CAMP-23: fill null colours before the server listens (no snapshot carries a null).
+    // FR-CAMP-23 / -34: keys → hex, then fill, before the server listens (no snapshot carries a
+    // null or a key).
     r.onStart("campaign-management.color-backfill", (sv) => {
-      const n = backfillPlayerColors(sv.db);
-      if (n > 0) sv.log.info(`campaign-management: backfilled ${n} player colour(s) (FR-CAMP-23)`);
+      const { normalised, filled } = migratePlayerColors(sv.db);
+      if (normalised + filled > 0) {
+        sv.log.info(
+          `campaign-management: ${normalised} colour(s) to hex, ${filled} default(s) filled (FR-CAMP-34)`,
+        );
+      }
     });
     r.provideAuth(createResolvers(s.db, new DmSecretChecker(s.config.dmSecret, s.clock)));
     // FR-FOG-43: `sync.loadScene {viewAs}` accepts only a player of the DM's campaign.

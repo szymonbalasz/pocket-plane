@@ -33,6 +33,8 @@ import partyLoot from "./party-loot";
 import partyS5 from "./party-s5";
 import physicalDiceCombat from "./physical-dice-combat";
 import playerColours from "./player-colours";
+import prefsS6 from "./prefs-s6";
+import prefsS6E2e from "./prefs-s6-e2e";
 import ruleTriggers from "./rule-triggers";
 import rulesEffects from "./rules-effects";
 import sceneTools from "./scene-tools";
@@ -100,6 +102,8 @@ export const bundles: readonly Bundle[] = [
   partyCmp,
   playerColours,
   logNoteColours,
+  prefsS6,
+  prefsS6E2e,
   imageSearch,
   sessionSim10,
 ];

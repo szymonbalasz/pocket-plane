@@ -16,6 +16,8 @@ export default defineBundle({
     // WF: window + layout fix pack
     // WF2: no new unit (the toast home walks on sim-9's ruled card summary, Scenes and the Fog tool)
     // PF: Preferences, free colour, Subtract
+    // PF0: Player 2 lavender `#b388ff` (one DM `camp.setColor`; Blue and Sky blocked for Player 1)
+    "pc-colour-free",
     // CP: companions + summons
   ],
 });
