@@ -581,6 +581,12 @@ export function CompanionCardView({
   return <SheetContext.Provider value={ctx}>{body}</SheetContext.Provider>;
 }
 
+/**
+ * The last request (`n`) the card applied, per page: a request made while the window was closed
+ * applies on open; reopening from the launcher later keeps the picker's own choice.
+ */
+let handledRequest = 0;
+
 export function CompanionCard({ dm }: { dm?: CompanionDmParts }) {
   const you = useSync((s) => s.store.you);
   const live = useSync((s) => s.state === "live");
@@ -608,12 +614,11 @@ export function CompanionCard({ dm }: { dm?: CompanionDmParts }) {
   // FR-CBT-119 / FR-PARTY-42 / FR-MAP-77: the latest open request selects its companion.
   const request = useCompanionCardRequest((s) => s.id);
   const requestN = useCompanionCardRequest((s) => s.n);
-  const handled = useRef(0);
   useEffect(() => {
-    if (requestN === handled.current) return;
+    if (requestN === handledRequest) return;
     const hit = entryFor(entries, request);
     if (!hit) return;
-    handled.current = requestN;
+    handledRequest = requestN;
     selectCompanion(hit.key);
   }, [requestN, request, entries]);
 
