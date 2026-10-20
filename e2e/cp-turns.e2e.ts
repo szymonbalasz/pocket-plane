@@ -5,7 +5,8 @@
 // indented with Mira's owner chip; the Wolf a line inside Thorn's row (FR-CBT-118). Player-1 sees
 // the Owlbear's HP and its card icon, player-2 a band (FR-CBT-119). Round 1: "Your turn — Mira",
 // "Your turn — Owlbear (Mira)", "Your turn — Thorn + Wolf" (FR-CBT-115). Companion ▸ Own
-// initiative and back (S3, FR-CBT-111). Rules, redaction and leaks: bun test (companion-rows,
+// initiative and back (S3); Goblin made Mira's through Owner ▸, then Turn hostile (S5's path,
+// FR-CBT-111). Rules, redaction and leaks: bun test (companion-rows,
 // start-pets, cp-turns, companions tests).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
@@ -167,6 +168,28 @@ test("FR-CBT-109 FR-CBT-115 FR-CBT-118 FR-CBT-119 companions-start: Start with p
     .getByTestId("cbt-init-row")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id")));
   expect(after.indexOf(owlbear)).toBe(after.indexOf(mira) + 1);
+
+  // S5's path on a plain monster: Goblin → Companion ▸ Owner ▸ Mira (a companion after Mira,
+  // player-1 sees its HP); then Turn hostile: owner chip gone for the DM and player-1.
+  const goblin = await idByName(init, "Goblin");
+  const companionMenu = async () => {
+    await row(init, goblin).getByTestId("cbt-init-row-menu").first().click();
+    await dm.getByTestId("cbt-init-row-companion").click();
+  };
+  await companionMenu();
+  await dm.getByTestId("cbt-companion-owner-menu").click();
+  await dm.locator(`[data-testid="cbt-companion-owner"][data-record-id="${miraChar}"]`).click();
+  await expect(row(init, goblin).getByTestId("cbt-init-row-owner")).toHaveAttribute(
+    "data-value",
+    miraChar,
+  );
+  await expect(row(i1, goblin).getByTestId("cbt-init-row-card")).toBeVisible();
+  await expect(row(i2, goblin).getByTestId("cbt-init-row-owner")).toHaveText("Mira");
+  await companionMenu();
+  await dm.getByTestId("cbt-companion-hostile").click();
+  await expect(row(init, goblin).getByTestId("cbt-init-row-owner")).toHaveCount(0);
+  await expect(row(i1, goblin).getByTestId("cbt-init-row-owner")).toHaveCount(0);
+  await expect(row(i1, goblin).getByTestId("cbt-init-row-card")).toHaveCount(0);
 
   for (const p of [p1, p2, dm]) await p.context().close();
 });
