@@ -3,12 +3,14 @@
 // 0 HP: a monster's HP or band, a PC's character HP or redacted `down`), the target ring while the
 // DM targets, movement used this turn, and the side badge (FR-CBT-104: the row's "Ally" / "Enemy"
 // chip). Pure over the record store each client already holds, so players see badges only on what
-// they receive, and nothing after End.
+// they receive, and nothing after End. Plus `companion` (FR-MAP-76): a paw on an owned non-PC
+// token in its owner's colour, on every client; a pure token rule (no combat data).
 import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import { create } from "zustand";
+import { markColor, ownerOf, personName } from "../scenes-map/mark-colors";
 import type {
   TokenBadge,
   TokenCross,
@@ -89,5 +91,41 @@ export const cbtTokenOverlay: TokenOverlay = {
   },
   movedFt(token, store) {
     return boundCombatant(store, token.id)?.movedFt ?? null;
+  },
+};
+
+/** FR-MAP-76: an owned non-PC token (pet, summon, a familiar the DM gave an owner). */
+export const isOwnedCompanionToken = (t: Pick<TokenView, "ownerPlayerId" | "characterId">) =>
+  t.ownerPlayerId !== null && t.characterId === null;
+
+/** FR-MAP-76's badge test id / Konva name (id = token id). */
+export const COMPANION_MARKER_ID = "map-token-companion";
+
+/**
+ * FR-MAP-76: the paw badge in the owner's colour (`colorOf`; unknown → the player accent),
+ * "Player 1's companion" as its tooltip; always a chip. In the label row, so BL-35's small-cell
+ * rules (chip + "+N", "+N") keep it off names.
+ */
+export function companionBadge(
+  token: Pick<TokenView, "ownerPlayerId" | "characterId">,
+  store: RecordStore,
+): TokenBadge | null {
+  if (!isOwnedCompanionToken(token)) return null;
+  const owner = ownerOf(token);
+  return {
+    id: COMPANION_MARKER_ID,
+    icon: "paw-print",
+    tone: "neutral",
+    label: `${personName(store, owner)}'s companion`,
+    color: markColor(store, owner),
+    compact: true,
+  };
+}
+
+export const companionTokenOverlay: TokenOverlay = {
+  id: "companion",
+  decorate(token, store) {
+    const badge = companionBadge(token, store);
+    return badge ? { badges: [badge] } : null;
   },
 };

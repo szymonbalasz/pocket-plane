@@ -2,6 +2,7 @@
 // a feature adds one import and its lines; nothing else changes here. Players get no menu.
 import type { TokenRecord } from "@shared/scenes-map/schemas";
 import type { ComponentType } from "react";
+import { companionDoubleClick } from "../character-sheet/companion-double-click";
 import { cbtxTokenMenu } from "../combat-extras/token-menu-entries";
 import { combatTokenMenu } from "../combat-tracker/token-menu-entries";
 import { cmpTokenMenu } from "../compendium/token-menu-entries";
@@ -53,7 +54,9 @@ export const tokenMenuEntries: readonly TokenMenuEntry[] = [
 ];
 
 /** Token double-click: the first available entry by order runs. Append your feature's line. */
-export const tokenDoubleClick: readonly TokenDoubleClick[] = [];
+export const tokenDoubleClick: readonly TokenDoubleClick[] = [
+  companionDoubleClick, // character-sheet-full: an owned non-PC token → companion card (FR-MAP-77)
+];
 
 export function menuFor(
   t: TokenRecord,

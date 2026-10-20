@@ -2876,3 +2876,18 @@ From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-45,
 | Goldens | DM `windows.golden.json` regenerated (`UPDATE_GOLDEN=1`): the token footprints moved with the Fit, so most token-placed rects move (e.g. 1280×720 Compendium 68,60,320×412 → 90,60,320×360; 1440×900 Compendium 194,60,336×400 → 102,172,320×400). Token-free defaults unchanged. Player goldens unchanged | FR-SHELL-62 |
 | Tests | DM `windows.test.ts`: `FR-SHELL-62 layout test cells at the sprint-6 Fit` (cells + clear); `FR-SHELL-58 token-free spot first (sim-9 a01)` rewritten: at 1440×900 every launcher window ranks as the oracle's best; Compendium has no token-free spot at the 42-px fit (`00001`), Scenes does (`00000`) | FR-SHELL-58, -62 |
 | CON-44 | 0 B | — |
+
+## 123. Sprint 6: companion marker and double-click to the card (CP5)
+
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-76, -77 (#252, #288; OQ-MAP-55 picker; seams S5, S8). **Built by `fix/cp-tokens`**: client only, no record type, intent, event, signal, frame or Konva layer (CON-44: 0 B).
+
+| Piece | Contract | Source |
+|---|---|---|
+| Overlay line `companion` (`combat-tracker/token-overlay.ts` `companionTokenOverlay`; registered above MOD's line, which stays last) | Both clients, every token they receive: `ownerPlayerId ≠ null` and `characterId = null` → badge `map-token-companion` (id = token id), `icon` `paw-print`, `label` "‹player name›'s companion" (`personName`: no `player` row → "Player"), `color` = `markColor(owner)` (`colorOf`; unknown → player accent), `compact: true`. No combat data | FR-MAP-76 |
+| `TokenBadge.color?`, `TokenBadge.compact?` (`token-overlays.ts`; `BadgeIn.compact?` in `label.ts`) | `color`: a person's hex: the pill / chip is filled `#000` (the chip's disc is a `map-casing`, id = token id), text / glyph in the colour; Konva attr `color`. `compact`: always an icon chip, even where the label fits; otherwise the label row's rules unchanged (BL-35: below 48 px cells chip + "+N" or "+N", the paw listed in the "+N" hover; never over a name) | FR-MAP-76, -72 |
+| Paw glyph (`canvas-icons.ts`) | lucide `paw-print` path data | FR-MAP-76 |
+| Double-click (`@ui/features/combat-tracker/companion-token-open`) | `companionCardTarget(token, store, viewer)`: a marked token, viewer the DM or `token.ownerPlayerId` → the active companion combatant of the started encounter bound to it (`tokenId`) → `useOpenCompanionCard()(combatantId)`; none → opens `charx.companion` as is (picker as last used). Another player / unmarked token / the card not registered → nothing | FR-MAP-77, OQ-MAP-55 |
+| DM: `tokenDoubleClick` line `charx.companion-card` (order 10, `available` = marked token; `dm/features/character-sheet/companion-double-click.tsx`) | Its `Dialog` opens the card once on mount and closes; `DmMap` resolves a double-click entry's `Dialog` as well as a menu entry's | FR-MAP-29, -77 |
+| Player: `PlayerMap` `onTokenDoubleClick` | `useCompanionTokenOpen("player")` (players have no token registry) | FR-MAP-77 |
+
+- **Fixtures:** none new; bundle `cp-tokens` (= `companions-start`, for the e2e). E2E `e2e/cp-tokens.e2e.ts`.

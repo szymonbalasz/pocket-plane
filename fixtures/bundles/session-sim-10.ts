@@ -27,5 +27,6 @@ export default defineBundle({
     // CP1: Mira's Owlbear (45 / 59) and Brakka's Drake Companion, tokens beside their owners
     "pet-owlbear",
     "pet-drake",
+    // CP5: no new unit (the companion marker walks on CP1's pet tokens)
   ],
 });

@@ -9,7 +9,9 @@
 // top. Konva names: Group `map-labels`, name `map-token-label` (id = token id, attrs `cut`,
 // `full`), badges by their test id (id = token id; icon chips attr `compact`). Tooltips (the
 // canvas' native title) for nodes with a `tip` attr: cut names, "+N" badges, icon chips, the tokens
-// layer's icons. The layer keeps not listening, so clicks and drags still reach the token below.
+// layer's icons. A badge in a person's colour (`color`, FR-MAP-76) draws its text / glyph in it
+// on the dark casing (FR-MAP-72; the chip's disc is a `map-casing`, id = token id; attr `color`).
+// The layer keeps not listening, so clicks and drags still reach the token below.
 import { cellToPx, footprint, type Grid } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
@@ -33,6 +35,7 @@ import {
   MORE_BADGE_ID,
   namePill,
 } from "../label";
+import { CASING_COLOR, CASING_NAME } from "../mark-colors";
 import type { TokenBadge } from "../token-overlays";
 import { tokenOverlays } from "../token-overlays";
 import { useLayerToggles } from "../tool-store";
@@ -123,8 +126,12 @@ function Pill({
 /** FR-MAP-57: a badge as an icon chip, its label as the hover tooltip; attr `compact`. */
 function IconChip({ p, b, tokenId }: { p: BadgePill; b: TokenBadge; tokenId: string }) {
   const { colors } = useCanvas();
-  const fill = b.tone === "neutral" ? colors.muted : toneColor(colors, b.tone);
-  const color = b.tone === "neutral" ? colors.foreground : colors.background;
+  const fill = b.color
+    ? CASING_COLOR
+    : b.tone === "neutral"
+      ? colors.muted
+      : toneColor(colors, b.tone);
+  const color = b.color ?? (b.tone === "neutral" ? colors.foreground : colors.background);
   const glyph = chipGlyph(b.icon, b.label);
   const r = p.width / 2;
   const inner = p.width * 0.7;
@@ -137,9 +144,17 @@ function IconChip({ p, b, tokenId }: { p: BadgePill; b: TokenBadge; tokenId: str
       icon={b.icon}
       label={b.label}
       tip={b.label}
+      color={b.color}
       compact
     >
-      <Circle x={r} y={r} radius={r} fill={fill} />
+      <Circle
+        name={b.color ? CASING_NAME : undefined}
+        id={b.color ? tokenId : undefined}
+        x={r}
+        y={r}
+        radius={r}
+        fill={fill}
+      />
       {"path" in glyph ? (
         <Path
           data={glyph.path}
@@ -244,11 +259,18 @@ function TokenLabel({ t, cut, full }: { t: TokenView; cut: boolean; full: boolea
             name={p.id}
             id={t.id}
             font={row.font}
-            fill={b.tone === "neutral" ? colors.muted : toneColor(colors, b.tone)}
+            fill={
+              b.color
+                ? CASING_COLOR
+                : b.tone === "neutral"
+                  ? colors.muted
+                  : toneColor(colors, b.tone)
+            }
             fillOpacity={1}
-            color={b.tone === "neutral" ? colors.foreground : colors.background}
+            color={b.color ?? (b.tone === "neutral" ? colors.foreground : colors.background)}
             bold
             icon={b.icon}
+            attrs={b.color ? { color: b.color } : undefined}
           />
         );
       })}
