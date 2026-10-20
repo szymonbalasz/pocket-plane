@@ -39,7 +39,7 @@ phase: post-mvp-7
 
 ### Sprint 7 at a glance (track FU, sprint-6 follow-ups; DM [#311](../decisions-log.md); session-sim-10 small copy)
 
-Decided, not open: the Creatures window cuts names ("Fire Elem…"); "Make pet from Drake Companion" on a pet row; the pet dialog's turn-mode radios lack names. Client only, 0 B; no open question. Walkthrough U15 in [play-shell §13](play-shell.md#13-test-plan) (bundle `fu-s7`); slices in [play-shell §14](play-shell.md#14-dependencies).
+Decided, not open: the Creatures window cuts names ("Fire Elem…"); "Make pet from Drake Companion" on a pet row; the pet dialog's turn-mode radios lack names. Client only, 0 B; no open question. Edge cases: client-only text and layout; reconnect re-renders from the store; crash: no server change. Walkthrough U15 in [play-shell §13](play-shell.md#13-test-plan) (bundle `fu-s7`); slices in [play-shell §14](play-shell.md#14-dependencies).
 
 | FR | What | Slice | Named test |
 |---|---|---|---|
