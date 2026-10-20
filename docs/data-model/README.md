@@ -2092,7 +2092,7 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-105–124 
 
 ## 90. Sprint 6: companion turns client (CP2)
 
-From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-107–109, -115, -118, -119. **Built by `build/cp-turns`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent beyond CP0's fields. Protocol side: [protocol §117](../protocol/README.md#117-sprint-6-companion-turns-client-cp2).
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-107–109, -115, -118, -119. **Built by `build/cp-turns`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent beyond CP0's fields. Protocol side: [protocol §118](../protocol/README.md#117-sprint-6-companion-turns-client-cp2).
 
 | Derived (not stored) | Where | Rule | Audience | Source |
 |---|---|---|---|---|
@@ -2101,3 +2101,17 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-107–109,
 | Own companion | per render | `ownerPlayerId = you` (players only receive HP / `card` on these) | player | FR-CBT-119 |
 | Pet offers | Start dialog | joining PCs' pets; ticked iff a token of the pet is on the scene (DM ticks override, reset on open) | DM | FR-CBT-109 |
 | Card request | client memory | `{id, n}`, lost on reload | player (DM when CP4 opens it there) | FR-CBT-119 |
+
+## 91. Sprint 6: colour picker and Dice section (PF2)
+
+From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP-35 and [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-57, -58. **Built by `build/colour-picker-2`**: client only. Protocol side: [protocol §118](../protocol/README.md#118-sprint-6-colour-picker-and-dice-section-pf2).
+
+| Item | Where | Rule | Source |
+|---|---|---|---|
+| Picker draft (HSV marker + exact hex, hex-field text, hovered swatch, the refused target while a drag is held) | picker component state only | never stored or sent; Apply sends `camp.setColor` with the draft hex; a reject or a matching store value resets it | FR-CAMP-35 |
+| "No allowed colour at this hue" cache | picker memory, per (hue, the others' colours) | search memo only | FR-CAMP-35 |
+| Preference sections `camp.color` (10), `dicex.dice` (30) | both clients' `pref-sections.ts` (append) | no new storage: `player.color` / `campaign.dmColor` (server), `pp.dicex.v2.*` (browser) and the `dice-look` record, as before | FR-SHELL-72, -76 |
+
+- **Derived (not stored):** a colour's verdict (FR-CAMP-31 / -32), the palette row's blocks, the shading mask.
+- **Fixtures:** none new (the walkthrough and e2e use `prefs-s6` / `prefs-s6-e2e`; `session-sim-10` already holds `pc-colour-free`).
+- **CON-44:** 0 B.
