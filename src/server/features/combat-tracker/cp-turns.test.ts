@@ -83,3 +83,34 @@ describe("FR-CBT-109 / -111 leak scan per player (CP2 flows)", () => {
     }
   });
 });
+
+describe("FR-CBT-106 own initiative keeps the effective number (walkthrough S3)", () => {
+  test("FR-CBT-106 mode change to own keeps the owner's number: Owlbear → own ranks by Mira's 15, not last; back → after Mira", () => {
+    const t = cpSetup();
+    const ob = t.id("Owlbear");
+    const miraNo = t.combatantNamed("Mira").initiative;
+    expect(miraNo).not.toBeNull();
+    expect(t.combatantRow(ob).initiative).toBeNull();
+    t.setCompanion({ combatantId: ob, owner: t.owner(t.miraId, "own") });
+    const own = t.combatantRow(ob);
+    expect(own).toMatchObject({ turnMode: "own", initiative: miraNo });
+    // Ranked by 15: before the Goblin (12), not at the end without a number.
+    const order = t.ranked();
+    expect(order.indexOf("Owlbear")).toBeLessThan(order.indexOf("Goblin"));
+    expect(order.indexOf("Owlbear")).toBeLessThan(order.length - 1);
+    // Players get its rank too.
+    expect(t.playerCombatant(t.p2V, ob)).toMatchObject({ playerPosition: expect.any(Number) });
+    // Back: after Mira again, right after her row.
+    t.setCompanion({ combatantId: ob, owner: t.owner(t.miraId, "after-owner") });
+    const back = t.ranked();
+    expect(back.indexOf("Owlbear")).toBe(back.indexOf("Mira") + 1);
+  });
+
+  test("FR-CBT-106 mode change to own with an owner without initiative (round 0): no number to keep, rolled by the DM", () => {
+    const t = cpSetup({ start: false });
+    t.run("cbt.start", { encounterId: t.enc.id, sceneId: t.sceneId, petIds: [t.owlbear] });
+    const ob = t.id("Owlbear");
+    t.setCompanion({ combatantId: ob, owner: t.owner(t.miraId, "own") });
+    expect(t.combatantRow(ob)).toMatchObject({ turnMode: "own", initiative: null });
+  });
+});
