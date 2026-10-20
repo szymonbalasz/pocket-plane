@@ -123,6 +123,18 @@ describe("FR-CBT-112 Companion ▸ Dismiss", () => {
     expect(dismissReasonOf({ id: "goblin", ownerCharacterId: null }, "wolf")).not.toBeNull();
     expect(CBT_INTENTS.dismiss).toBe("cbt.dismiss");
   });
+
+  test("FR-CBT-112 a dismissed companion (inactive in the DM's store) leaves the DM's Initiative", () => {
+    const s = companionStore("dm");
+    const rows = s.records.combatant as Record<string, Record<string, unknown>>;
+    const store = {
+      ...s,
+      records: { ...s.records, combatant: { ...rows, fe3: { ...rows.fe3, active: false } } },
+    } as RecordStore;
+    const html = renderWith(store, <Body kind="cbt.initiative" instance="" />);
+    expect(html).not.toContain('data-testid="cbt-init-row" data-record-id="fe3"');
+    expect(html).toContain('data-testid="cbt-init-row" data-record-id="thorn"');
+  });
 });
 
 describe("FR-CBT-120 the summon concentration card (DM view)", () => {
