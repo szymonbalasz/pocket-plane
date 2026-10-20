@@ -1,26 +1,20 @@
 // e2e-bundle: player-colours
-// Thin colour picker (CAMP FR-CAMP-27; §13 K1, K2, K10, K11), DM + player-1 + player-2 in separate
-// contexts. K1: the DM's Players panel shows DM amber, Player 1 jade, Player 2 blue; the players'
-// header dots jade / blue. K2: player-1 opens the header Popover, blue "taken by Player 2" and
-// amber "taken by DM" are disabled, a click on rose recolours the DM's row swatch and the dot.
-// K10: the DM's Player 2 Popover has rose taken by Player 1; the DM picks yellow for themself.
-// K11: player-1's socket is held down → swatches disabled; back live → a pick works.
-import { expect, type Locator, type Page, test } from "@playwright/test";
+// Thin colour picker on the sprint-5 bundle (CAMP §13 K1, K2, K10, K11; sprint 6: the FR-CAMP-35
+// picker), DM + player-1 + player-2 in separate contexts. K1: the DM's Players panel shows DM
+// amber, Player 1 jade, Player 2 blue; the players' chips jade / blue. K2: player-1's Preferences
+// picker has blue blocked by Player 2 and amber by the DM (reason in the status line, no Tooltip);
+// rose + Apply recolours the DM's row swatch and the chip. K10: the DM's Player 2 Popover has rose
+// blocked by Player 1; the DM picks yellow for themself. K11: player-1's socket is held down →
+// Apply disabled; back live → a pick works.
+import { expect, test } from "@playwright/test";
+import { PLAYER_COLORS } from "../src/shared/campaign-management/colors";
+import { closePrefs, ownPicker, popoverPicker, swatch } from "./support/colour";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
 
-const swatch = (page: Page, key: string) =>
-  page
-    .getByTestId("camp-color-popover")
-    .locator(`[data-testid="camp-color-swatch"][data-value="${key}"]`);
+const { amber, jade, sky, rose, yellow, blue } = PLAYER_COLORS;
 
-/** Hover a swatch's Tooltip wrapper (a disabled swatch takes no pointer events) → its Tooltip. */
-async function tooltipOf(page: Page, key: string, text: string): Promise<Locator> {
-  await swatch(page, key).locator("..").hover();
-  return page.getByTestId("ui-tooltip").filter({ hasText: text });
-}
-
-test("FR-CAMP-27 picker: player header dot and DM Players panel swatches (K1, K2, K10, K11)", async ({
+test("FR-CAMP-35 picker: Preferences picker and DM Players panel Popovers on the sprint-5 bundle (K1, K2, K10, K11)", async ({
   browser,
 }) => {
   const { secret, link, recordId } = e2eEnv();
@@ -66,81 +60,89 @@ test("FR-CAMP-27 picker: player header dot and DM Players panel swatches (K1, K2
   await p2.goto(link("Player 2"));
   await expect(p2.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
 
-  // K1: DM amber, Player 1 jade, Player 2 blue; header dots jade / blue.
-  await expect(dmSwatch).toHaveAttribute("data-value", "amber");
-  await expect(rowSwatch(p1Id)).toHaveAttribute("data-value", "jade");
-  await expect(rowSwatch(p2Id)).toHaveAttribute("data-value", "blue");
-  const p1Dot = p1.getByTestId("camp-my-color");
-  await expect(p1Dot).toHaveAttribute("data-value", "jade");
-  await expect(p2.getByTestId("camp-my-color")).toHaveAttribute("data-value", "blue");
+  // K1: DM amber, Player 1 jade, Player 2 blue; the chips jade / blue; no header dot.
+  await expect(dmSwatch).toHaveAttribute("data-value", amber);
+  await expect(rowSwatch(p1Id)).toHaveAttribute("data-value", jade);
+  await expect(rowSwatch(p2Id)).toHaveAttribute("data-value", blue);
+  const p1Dot = p1.getByTestId("ui-prefs-chip-dot");
+  await expect(p1Dot).toHaveAttribute("data-color", jade);
+  await expect(p2.getByTestId("ui-prefs-chip-dot")).toHaveAttribute("data-color", blue);
+  await expect(p1.getByTestId("camp-my-color")).toHaveCount(0);
   await expect(p1.getByTestId("camp-player-joined")).toHaveText(/^Playing as Player 1 in /);
 
-  // K2: player-1's Popover: 8 swatches, own checked, blue / amber taken and disabled.
-  await p1Dot.click();
-  await expect(p1.getByTestId("camp-color-popover")).toBeVisible();
-  await expect(p1.getByTestId("camp-color-swatch")).toHaveCount(8);
-  await expect(swatch(p1, "jade")).toHaveAttribute("data-state", "checked");
-  await expect(swatch(p1, "blue")).toBeDisabled();
-  await expect(swatch(p1, "blue")).toHaveAttribute("data-taken-by", p2Id);
-  await expect(swatch(p1, "amber")).toBeDisabled();
-  await expect(swatch(p1, "amber")).toHaveAttribute("data-taken-by", "dm");
-  // Amber (top row) first: its Tooltip opens above the grid, clear of the blue swatch below.
-  await expect(await tooltipOf(p1, "amber", "Amber — taken by DM")).toBeVisible();
-  await expect(await tooltipOf(p1, "blue", "Blue — taken by Player 2")).toBeVisible();
-  // Pointer off the grid: the Tooltip closes (it sits over the top row).
-  await p1.mouse.move(0, 0);
+  // K2: player-1's picker: 8 swatches, own checked, blue / amber blocked with reasons.
+  let picker = await ownPicker(p1);
+  await expect(picker.getByTestId("camp-color-swatch")).toHaveCount(8);
+  await expect(swatch(picker, jade)).toHaveAttribute("data-state", "checked");
+  await expect(swatch(picker, blue)).toHaveAttribute("data-blocked-by", p2Id);
+  await expect(swatch(picker, blue)).toBeDisabled();
+  await expect(swatch(picker, amber)).toHaveAttribute("data-blocked-by", "dm");
+  const status = picker.getByTestId("camp-color-status");
+  await swatch(picker, amber).hover();
+  await expect(status).toHaveText("Taken by DM");
+  await expect(status).toHaveAttribute("data-reason", "taken");
+  await swatch(picker, blue).hover();
+  await expect(status).toHaveText("Taken by Player 2");
+  // BL-36: the reason lives in the status line; no Tooltip opens over the row.
   await expect(p1.getByTestId("ui-tooltip")).toHaveCount(0);
-  await swatch(p1, "rose").click();
-  await expect(p1.getByTestId("camp-color-popover")).toHaveCount(0);
-  await expect(p1Dot).toHaveAttribute("data-value", "rose", { timeout: 1_000 });
-  await expect(rowSwatch(p1Id)).toHaveAttribute("data-value", "rose", { timeout: 1_000 });
+  await swatch(picker, rose).click();
+  await picker.getByTestId("camp-color-apply").click();
+  await expect(p1Dot).toHaveAttribute("data-color", rose, { timeout: 1_000 });
+  await expect(rowSwatch(p1Id)).toHaveAttribute("data-value", rose, { timeout: 1_000 });
+  await closePrefs(p1);
 
-  // K10: the DM's Popover for Player 2: rose taken by Player 1, own blue checked, amber by DM.
+  // K10: the DM's Popover for Player 2: rose blocked by Player 1, own blue checked, amber by DM.
   await rowSwatch(p2Id).click();
-  await expect(swatch(dm, "rose")).toBeDisabled();
-  await expect(swatch(dm, "rose")).toHaveAttribute("data-taken-by", p1Id);
-  await expect(swatch(dm, "blue")).toHaveAttribute("data-state", "checked");
-  await expect(swatch(dm, "amber")).toHaveAttribute("data-taken-by", "dm");
+  let dmPicker = popoverPicker(dm);
+  await expect(dm.getByTestId("camp-color-popover")).toContainText("Colour for Player 2");
+  await expect(dmPicker).toHaveAttribute("data-target", p2Id);
+  await expect(swatch(dmPicker, rose)).toHaveAttribute("data-blocked-by", p1Id);
+  await expect(swatch(dmPicker, blue)).toHaveAttribute("data-state", "checked");
+  await expect(swatch(dmPicker, amber)).toHaveAttribute("data-blocked-by", "dm");
   await dm.keyboard.press("Escape");
   await expect(dm.getByTestId("camp-color-popover")).toHaveCount(0);
-  // The DM's own swatch → yellow; player-1 then sees yellow taken by the DM.
+  // The DM's own swatch → yellow; player-1 then sees yellow blocked by the DM.
   await dmSwatch.click();
-  await expect(swatch(dm, "amber")).toHaveAttribute("data-state", "checked");
-  await expect(swatch(dm, "rose")).toHaveAttribute("data-taken-by", p1Id);
-  await swatch(dm, "yellow").click();
-  await expect(dmSwatch).toHaveAttribute("data-value", "yellow", { timeout: 1_000 });
-  await p1Dot.click();
-  await expect(swatch(p1, "yellow")).toHaveAttribute("data-taken-by", "dm");
-  await expect(swatch(p1, "amber")).toBeEnabled();
-  await p1.keyboard.press("Escape");
+  dmPicker = popoverPicker(dm);
+  await expect(dmPicker).toHaveAttribute("data-target", "dm");
+  await expect(swatch(dmPicker, amber)).toHaveAttribute("data-state", "checked");
+  await expect(swatch(dmPicker, rose)).toHaveAttribute("data-blocked-by", p1Id);
+  await swatch(dmPicker, yellow).click();
+  await dmPicker.getByTestId("camp-color-apply").click();
+  await expect(dmSwatch).toHaveAttribute("data-value", yellow, { timeout: 1_000 });
+  await dm.keyboard.press("Escape");
+  picker = await ownPicker(p1);
+  await expect(swatch(picker, yellow)).toHaveAttribute("data-blocked-by", "dm");
+  await expect(swatch(picker, amber)).not.toHaveAttribute("data-blocked-by", /.+/);
 
-  // K11: held down → the Popover still opens, every swatch disabled, the dot keeps rose.
+  // K11: held down → the picker still works as a draft, Apply disabled, the chip keeps rose.
   hold = true;
   await sockets.at(-1)?.close();
   await expect(p1Status).not.toHaveAttribute("data-state", "live");
-  await p1Dot.click();
-  await expect(p1.getByTestId("camp-color-swatch")).toHaveCount(8);
-  for (const s of await p1.getByTestId("camp-color-swatch").all()) await expect(s).toBeDisabled();
-  await expect(p1Dot).toHaveAttribute("data-value", "rose");
-  await p1.keyboard.press("Escape");
-  // Back live → the picker works again.
+  await swatch(picker, sky).click();
+  await expect(swatch(picker, sky)).toHaveAttribute("data-state", "checked");
+  await expect(picker.getByTestId("camp-color-apply")).toBeDisabled();
+  await expect(p1Dot).toHaveAttribute("data-color", rose);
+  // Back live → Apply works (the draft was kept).
   hold = false;
   await sockets.at(-1)?.close();
   await expect(p1Status).toHaveAttribute("data-state", "live", { timeout: 15_000 });
-  await p1Dot.click();
-  await expect(swatch(p1, "sky")).toBeEnabled();
-  await swatch(p1, "sky").click();
-  await expect(rowSwatch(p1Id)).toHaveAttribute("data-value", "sky", { timeout: 1_000 });
-  await expect(p2.getByTestId("camp-my-color")).toHaveAttribute("data-value", "blue");
+  await expect(picker.getByTestId("camp-color-apply")).toBeEnabled();
+  await picker.getByTestId("camp-color-apply").click();
+  await expect(rowSwatch(p1Id)).toHaveAttribute("data-value", sky, { timeout: 1_000 });
+  await expect(p2.getByTestId("ui-prefs-chip-dot")).toHaveAttribute("data-color", blue);
 
   // Leave the bundle as loaded (Player 1 jade, DM amber) for a rerun on this server.
-  await p1Dot.click();
-  await swatch(p1, "jade").click();
-  await expect(rowSwatch(p1Id)).toHaveAttribute("data-value", "jade");
+  await swatch(picker, jade).click();
+  await picker.getByTestId("camp-color-apply").click();
+  await expect(rowSwatch(p1Id)).toHaveAttribute("data-value", jade);
+  await closePrefs(p1);
   await dmSwatch.click();
-  await swatch(dm, "amber").click();
-  await expect(p1Dot).toHaveAttribute("data-value", "jade");
-  await expect(dmSwatch).toHaveAttribute("data-value", "amber");
+  dmPicker = popoverPicker(dm);
+  await swatch(dmPicker, amber).click();
+  await dmPicker.getByTestId("camp-color-apply").click();
+  await expect(p1Dot).toHaveAttribute("data-color", jade);
+  await expect(dmSwatch).toHaveAttribute("data-value", amber);
 
   expect(errors).toEqual([]);
   await p2.context().close();

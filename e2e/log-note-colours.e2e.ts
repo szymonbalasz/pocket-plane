@@ -6,6 +6,8 @@
 // K7: B's test card → A's toast + row with B's stripe, "Resolved by DM" in amber after A acts;
 // A's info to Player 2 → C's toast with an amber stripe.
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { PLAYER_COLORS, paletteKeyOf } from "../src/shared/campaign-management/colors";
+import { pickOwnColour } from "./support/colour";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
 
@@ -113,11 +115,7 @@ test("FR-DICE-60 FR-DICE-61 roll lines and popup names in the roller's colour; a
   await expectColored(lineOf(logs.p2, a1), "amber", "dm");
 
   // B picks rose: B's lines recolour on A and C, no reload (OQ-CAMP-21).
-  await p1.getByTestId("camp-my-color").click();
-  await p1
-    .getByTestId("camp-color-popover")
-    .locator('[data-testid="camp-color-swatch"][data-value="rose"]')
-    .click();
+  await pickOwnColour(p1, PLAYER_COLORS.rose);
   for (const log of [logs.dm, logs.p2]) {
     await expectColored(lineOf(log, fx[0] as string), "rose", p1Id);
     await expectColored(lineOf(log, b1), "rose", p1Id);
@@ -144,7 +142,9 @@ test("FR-NOTE-39 FR-NOTE-40 toasts and history rows striped in the causer's colo
   await p2.goto(link("Player 2"));
   await live(p2);
   // Player 1's colour: jade from the fixture, rose when K6 ran first on this server.
-  const k = (await p1.getByTestId("camp-my-color").getAttribute("data-value")) as keyof typeof HEX;
+  const k = paletteKeyOf(
+    (await p1.getByTestId("ui-prefs-chip-dot").getAttribute("data-color")) ?? "",
+  ) as keyof typeof HEX;
   expect(Object.keys(HEX)).toContain(k);
 
   // The fixture's resolved row: amber stripe (the DM sent it), "Resolved by Player 1" in jade.

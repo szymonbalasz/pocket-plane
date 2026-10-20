@@ -39,11 +39,11 @@ test("FR-SHELL-71 prefs window (player): shell.prefs registered with no launcher
   expect(def?.defaultOpen).toBeFalsy();
 });
 
-test("FR-SHELL-72 sections (player): Sound then Layout (colour and dice come with PF2); ids unique", () => {
-  expect(shownSections(playerPrefSections, emptyStore()).map((s) => s.id)).toEqual([
-    "shell.sound",
-    "shell.layout",
-  ]);
+test("FR-SHELL-72 sections (player): Your colour, Sound, Dice, Layout; ids unique", () => {
+  const you = { campaignId: "c1", role: "player", playerId: "p1" };
+  expect(
+    shownSections(playerPrefSections, { ...emptyStore(), you } as never).map((s) => s.id),
+  ).toEqual(["camp.color", "shell.sound", "dicex.dice", "shell.layout"]);
   const ids = playerPrefSections.map((s) => s.id);
   expect(new Set(ids).size).toBe(ids.length);
 });

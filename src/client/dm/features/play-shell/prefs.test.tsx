@@ -53,11 +53,16 @@ test("FR-SHELL-71 prefs window (DM): shell.prefs registered with no launcher ent
   expect(def?.defaultOpen).toBeFalsy();
 });
 
-test("FR-SHELL-72 sections (DM): Layout then Account (colour and dice come with PF2); no Sound while the DM has no alert; ids unique", () => {
-  expect(shownSections(dmPrefSections, emptyStore()).map((s) => s.id)).toEqual([
+test("FR-SHELL-72 sections (DM): Your colour, Dice, Layout, Account; no Sound while the DM has no alert; ids unique", () => {
+  const dm = { ...emptyStore(), you: { campaignId: "c1", role: "dm", playerId: null } } as never;
+  expect(shownSections(dmPrefSections, dm).map((s) => s.id)).toEqual([
+    "camp.color",
+    "dicex.dice",
     "shell.layout",
     "camp.account",
   ]);
+  // Before the first snapshot there is no own colour to pick.
+  expect(shownSections(dmPrefSections, emptyStore()).map((s) => s.id)).not.toContain("camp.color");
   const ids = dmPrefSections.map((s) => s.id);
   expect(new Set(ids).size).toBe(ids.length);
 });

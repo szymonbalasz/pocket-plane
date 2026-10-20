@@ -2,7 +2,7 @@
 // window over a fake sync store. Rows carry K0's `byRole` / `byPlayerId` stamp as `notify` writes
 // it (DM → dm / null, player → player / id, system and pre-sprint-5 rows → null / null).
 import { describe, expect, test } from "bun:test";
-import { PLAYER_COLORS, type PlayerColor } from "@shared/campaign-management/colors";
+import { type PaletteKey, PLAYER_COLORS } from "@shared/campaign-management/colors";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -77,7 +77,7 @@ const ALL = [p1Card, dmInfo, oldRow, ghost, byP1, byDm, closed];
 
 function storeOf(
   rows: NotificationRecord[],
-  colors: { p1?: PlayerColor; dm?: PlayerColor } = {},
+  colors: { p1?: PaletteKey; dm?: PaletteKey } = {},
 ): RecordStore {
   const byId = <T extends { id: string }>(xs: T[]) => Object.fromEntries(xs.map((r) => [r.id, r]));
   return {

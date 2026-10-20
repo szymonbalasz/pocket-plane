@@ -9,6 +9,7 @@
 // the DM's drag on Thorn blue on all; on Goblin Sneak amber on A only (players: no path).
 import { expect, type Page, test } from "@playwright/test";
 import { PLAYER_COLORS } from "../src/shared/campaign-management/colors";
+import { pickOwnColour } from "./support/colour";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
 import { gridPoint, mapPoint } from "./support/map";
@@ -140,11 +141,7 @@ test("FR-MAP-68 / -69 / -70 / -72 / -73 / FR-SCN-47 player colours on the map: t
   const glyphMark = (await marks(dm, "scn-template")).find((m) => m.id === glyph);
   expect(glyphMark?.by).toBe("dm");
   expect(glyphMark?.color).not.toBe(amber); // OQ-SCN-41 A: hidden styling wins
-  await b.getByTestId("camp-my-color").click();
-  await b
-    .getByTestId("camp-color-popover")
-    .locator('[data-testid="camp-color-swatch"][data-value="rose"]')
-    .click();
+  await pickOwnColour(b, rose);
   for (const page of all) {
     await expect.poll(() => colorOfMark(page, "scn-template", guardians)).toBe(rose);
   }

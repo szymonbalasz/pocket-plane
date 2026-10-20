@@ -4,7 +4,7 @@
 // combat's apply (`cbt.attack` / `cbt.hp`, appended by the DM: `rollerRole: "dm"`). Plus the roll
 // popup's name (OQ-DICE-40 A).
 import { describe, expect, test } from "bun:test";
-import { PLAYER_COLORS, type PlayerColor } from "@shared/campaign-management/colors";
+import { type PaletteKey, PLAYER_COLORS } from "@shared/campaign-management/colors";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -109,7 +109,7 @@ const dmApply: GameLogEntryView = {
 
 function storeOf(
   entries: GameLogEntryView[],
-  colors: { p1?: PlayerColor; p2?: PlayerColor; dm?: PlayerColor } = {},
+  colors: { p1?: PaletteKey; p2?: PaletteKey; dm?: PaletteKey } = {},
   role: "dm" | "player" = "player",
 ): RecordStore {
   const byId = <T extends { id: string }>(rows: T[]) =>
@@ -170,7 +170,7 @@ describe("FR-DICE-60 log name colour", () => {
     for (const role of ["dm", "player"] as const) {
       const l = lines(html(syncOf(storeOf(all, {}, role))));
       expect(l.size).toBe(5);
-      const check = (id: string, key: PlayerColor | undefined, roller: string) => {
+      const check = (id: string, key: PaletteKey | undefined, roller: string) => {
         const e = l.get(id);
         if (!e) throw new Error(`no line ${id}`);
         expect(attr(e.li, "data-color")).toBe(key);
