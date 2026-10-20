@@ -11,6 +11,8 @@ phase: post-mvp-7
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
+> **Sprint 7, track ST (stats tier A, DM [#311](../decisions-log.md); spec-stats).** [Stats](stats.md) count nat 20s / nat 1s and decide visibility from this spec's facts. **Supersede is GM's** (FR-DICE-62–67; seam S2): the old entry is kept with `supersededBy` and the final roll counts (FR-DICE-67). New **FR-DICE-72** lists only the stats read rules on top of that. New **FR-DICE-73** adds a read-only helper. No schema, record type, window or line change: 0 B. ST0 reads these facts **after GM0** (seam S4).
+
 ## 1. Summary
 
 - Server-side dice via `@dice-roller/rpg-dice-roller` ([ADR-0001](../architecture/adr/0001-tech-stack.md)). Numbers come from one seam, `ctx.dice` (#137). Any roll can be a **manual roll** from physical dice ([ADR-0014](../architecture/adr/0014-mvp-scope.md), #43).
@@ -72,7 +74,7 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): D's OQ-DICE-30 (OQ-DI
 - Manual roll (DM and players), marked manual; physical-dice mode per client.
 - Categories: attack, damage, saving throw, ability check, skill check, contested, initiative, healing, other. Public log settings per campaign, live; DM per-roll override at roll time.
 - Window `dice.log` (both clients); typed entries so text can join later (chat tier C–D, #61).
-- Every roll persisted with roller, actor, every die, automated vs manual ([stats](post-mvp/stats.md), #54).
+- Every roll persisted with roller, actor, every die, automated vs manual ([stats](stats.md), #54).
 - *(Sprint 4)* Dice chips in log lines; a `die` line segment for kinds; `focusLogEntry` for the roll popup (FR-DICE-35–37).
 - *(Sprint 5)* Held numbers until the landing (FR-DICE-40); per-slot labels on the roll control (FR-DICE-41).
 
@@ -157,6 +159,9 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): D's OQ-DICE-30 (OQ-DI
 | FR-DICE-69 | **Feature-tagged kinds:** `LogKindDef` gains optional `feature` (a key of FR-CAMP-41's registry). Entries of a tagged kind are hidden for every viewer whose `features` lack the key (DM too), by the hub rule (FR-CAMP-44); the window is cut before the filter, as for hidden entries (ADR-0029). First: `gem.award`, `gem.spend`. **Traces** (ADR; [OQ-GEM-21](gems.md#15-open-questions) pick B): the `roll` kind declares for `gems` `hides` = `supersededBy` set and `strip` = `replaces`, so while gems are off only final rolls show (no struck line, no "rerolled", no "(reroll, was 4)"); on again restores them. Under A: no trace declared. | ADR proposed |
 | FR-DICE-70 | **`rerollableRoll(entry) → rollId \| null`** (pure, `@shared/dice-roll-log`): the first roll of a `roll` entry whose expression has a d20 term, not `initiative`, entry not `undone` / superseded; else null. Used by the server check and the client action; callers add their own rules (gems: actor, window, card state, FR-GEM-18). | |
 | FR-DICE-71 | **CON-44** (measured 2026-10-20, §12): worst +2,816 B per viewer (33 superseded + 33 `replaces` in the 100-entry window); 0 B while no reroll exists. | |
+| **Sprint 7, track ST** (stats facts) | | |
+| FR-DICE-72 | **Stats read rules** (read by [stats](stats.md#6-functional-requirements) FR-STATS-02, -03, -10). Supersede and the counting contract are GM's FR-DICE-63 / -67 (seam S2): only a roll listed by an entry that is neither undone nor superseded counts, and a reroll is never an extra roll. Stats add three rules. (a) **Players: the hub filter for a viewer with no `playerId`** (public only): a roll counts only if a counted listing entry is `public` (stamped once, FR-DICE-13); `audiencePlayerId` lines count for the DM only. (b) Feature-tagged kinds (gems while off, seam S1) are skipped as in a snapshot. (c) `natural`, `category`, `rollIds`, `encounterId` and `public` keep their meaning; a change needs a stats review. | proposed ADR [stats read models](../architecture/adr/proposed-s7-st-stats-read-models.md) |
+| FR-DICE-73 | **Read helper** `dice-roll-log/stats-read.ts` (read-only, new file). `logTimeline(db, campaignId, afterN?)` → `{n, at, public}[]` ascending on the unique `(campaign_id, n)` index. `rollFacts(db, viewer, campaignId, fromN, toN)` → one row per counted roll (FR-DICE-67) listed in the range, after the viewer filter: `{rollId, natural, category, actorKind, actorId, public}`. No new index (measured: one session ≤ 7 ms at 94k entries, [stats §12](stats.md#12-performance--bandwidth)). | |
 
 ## 7. UI/UX notes
 
@@ -345,6 +350,8 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 Walkthrough: [gems §13](gems.md#13-test-plan) steps 4, 11, 12.
 
+**Sprint 7, track ST:** integration `FR-DICE-72 stats count the final roll` (on GM's real reroll: old entry and rolls unchanged, only the new roll counts, nat counted once), `FR-DICE-72 feature-tagged kinds skipped while off` (S1), `FR-DICE-73 rollFacts` (a roll in two entries returns once; `public` if any counted listing entry is public; an unreferenced roll is absent). Bundle `stats`; walkthrough [stats §13](stats.md#13-test-plan) step 5 (the hidden roll's nat 20 counts for the DM only).
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -387,6 +394,8 @@ Walkthrough: [gems §13](gems.md#13-test-plan) steps 4, 11, 12.
 
 **Shared changes — sprint 5, track W:** none in this spec's own server or shared code. The `dice.log` window lines (`src/client/{dm,player}/features/dice-roll-log/log-window.tsx`, common `dice-roll-log/window.ts`: size function, min 300×160, `previousDefaults`) and `GameLog.tsx` (FR-DICE-39 widths) go in play-shell's slice **W1** `fix/window-layout` (assigned; [play-shell §14](play-shell.md#14-dependencies)), which needs the new `WindowDef` fields. `GameLog.tsx` order, settled by seams S15: **W1 (width) → D8 (held lines) → D9 → K4 (name colour)** (S15 as amended by rulings-a); R2 never edits `GameLog.tsx`.
 
+**Shared changes — sprint 7, track ST:** none in AGENTS §9.9. Slice ST0 `fix/st-core` adds the new read-only file `src/server/features/dice-roll-log/stats-read.ts` after GM0 (the supersede columns, seam S4) merges. It doesn't touch `game-log.ts`, `kinds.ts` or the schema.
+
 ## 15. Open questions
 
 All rows up to OQ-DICE-28 decided or settled; sprint-4 rows by the DM at sprint-4 gate 1 ([#245](../decisions-log.md)) and the seams ruling (S8, rulings B5 / B9). **Sprint 5: OQ-DICE-30 decided (#256);** OQ-DICE-31 settled by seams S8; OQ-DICE-40 (popup name colour) is K's row, decided A (#256) and built as K4's line (seams S15); "what waits when nothing animates" is [OQ-DICEX-38](dice-extras.md#15-open-questions).
@@ -422,6 +431,12 @@ All rows up to OQ-DICE-28 decided or settled; sprint-4 rows by the DM at sprint-
 |---|---|---|---|---|
 | OQ-DICE-41 | How does a superseded line look? | **Decided (#315): A.** **A. Struck through + dimmed chips + a "rerolled" Badge that jumps to the new line (both stay readable; one extra line per reroll)** / B. Collapsed under the new line ("▸ was 4"), expandable (shorter log; the old roll is one click away, not "visible") / C. Old line unchanged, the new line says "reroll of #n" (no strike: fails #140) | — · decided | gems |
 | OQ-DICE-42 | Where does the supersede pointer live? | **Resolved (integrator, sprint-7 seams / rulings)** (S2; also answers OQ-DICE-45 / OQ-STATS-14): **A. Both:** the old entry's existing `supersededBy` (set once, like `undone`; 0 schema change) + `replaces` on the new roll element; roll rows immutable with `replacesRollId`. Rejected: ~~B. Only `replaces` on the new entry~~ | — · resolved | stats (ST) |
+
+**Sprint 7** (track ST).
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| ~~OQ-DICE-45~~ | ~~gems: how a reroll leaves the old entry~~ | **Resolved (integrator, sprint-7 seams / rulings)** (seam S2, = OQ-DICE-42 A): kept, with `supersededBy` set once; `replaces` on the new entry; roll rows immutable with `replacesRollId` (GM's FR-DICE-62–67). Stats count the final roll only | — | DICE, GEM, STATS |
 
 ## 16. Out of scope
 
