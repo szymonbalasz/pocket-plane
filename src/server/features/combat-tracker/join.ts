@@ -1,18 +1,29 @@
 // Creatures joining combat, shared by Start (FR-CBT-64/65) and combat-extras' add (FR-CBTX-44):
 // created tokens around an anchor cell, HP by mode (rolled → one DM-only `roll` entry). Monster
-// initiative before adding: `rollInitiativeFor` (initiative.ts).
+// initiative before adding: `rollInitiativeFor` (initiative.ts). Sprint 7 (FR-CBT-141): a monster
+// binding a token from an earlier fight keeps that fight's HP; a pet's tokens keep its owner
+// (FR-MAP-88's safety net).
 import type { GridCell, HpMode } from "@shared/combat-tracker/schemas";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import { clampRolledHp, hpRollSpec } from "@shared/entities/hp-formula";
-import { type DefinitionRecord, effectiveStats, type StatBlock } from "@shared/entities/schemas";
+import {
+  type DefinitionRecord,
+  effectiveStats,
+  type MonsterRecord,
+  type StatBlock,
+} from "@shared/entities/schemas";
 import { cellToPx, freeCellsNear, pxToCell } from "@shared/scenes-map/geometry";
 import type { SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
+import { and, asc, eq } from "drizzle-orm";
 import type { CommandEnv } from "../../commands/commands";
 import { CommandError, conflict } from "../../commands/errors";
+import type { Tx } from "../../db/client";
+import { combatant, encounter, gameLogEntry, token } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { dice, gameLog } from "../dice-roll-log";
 import { placeTokenIn } from "../scenes-map/commands";
 import { sceneTokens } from "../scenes-map/rows";
+import { setTokenOwnerIn } from "../scenes-map/token-owner";
 
 /** FR-CBT-65: scene / campaign token caps. */
 export const SCENE_FULL = "Scene is full";
@@ -121,4 +132,114 @@ export function monsterHp(
     public: false,
   });
   return { hp: clampRolledHp(r.total), entry };
+}
+
+/** FR-CBT-141: a token's last combatant (the latest-ended inactive row with that `tokenId`). */
+export interface KeptHp {
+  entityId: string;
+  encounterId: string;
+  name: string;
+  hp: number;
+  hpMax: number;
+}
+
+/**
+ * FR-CBT-141 (sprint 7, OQ-CBT-92 A): per token id, its last combatant in an ended encounter of
+ * the campaign (latest `endedAt`, ties → the higher `seq`). One pass over the campaign's monster
+ * combatant rows; no column (derived in the binding command's transaction).
+ */
+export function keptHpByToken(tx: Tx, cid: string): Map<string, KeptHp> {
+  const rows = tx
+    .select({
+      tokenId: combatant.tokenId,
+      entityId: combatant.entityId,
+      encounterId: combatant.encounterId,
+      name: combatant.name,
+      hp: combatant.hpCurrent,
+      hpMax: combatant.hpMax,
+    })
+    .from(combatant)
+    .innerJoin(encounter, eq(encounter.id, combatant.encounterId))
+    .where(
+      and(
+        eq(combatant.campaignId, cid),
+        eq(combatant.kind, "monster"),
+        eq(combatant.active, false),
+        eq(encounter.status, "ended"),
+      ),
+    )
+    .orderBy(asc(encounter.endedAt), asc(combatant.seq))
+    .all();
+  const out = new Map<string, KeptHp>();
+  for (const r of rows) {
+    if (r.tokenId === null || r.hp === null || r.hpMax === null) continue;
+    const { entityId, encounterId, name, hp, hpMax } = r;
+    // Ordered oldest first: the last write per token is its latest-ended row.
+    out.set(r.tokenId, { entityId, encounterId, name, hp, hpMax });
+  }
+  return out;
+}
+
+/** FR-CBT-141: the token's kept row if it was the same creature (`entityId`), else none. */
+export const keptFor = (
+  kept: ReadonlyMap<string, KeptHp>,
+  tokenId: string | null,
+  entityId: string,
+): KeptHp | null => {
+  const k = tokenId ? kept.get(tokenId) : undefined;
+  return k && k.entityId === entityId ? k : null;
+};
+
+/** FR-CBT-141's binding order: a token kept at 0 binds after the living ones (then by `seq`). */
+export const downedLast = <T extends { id: string; definitionId: string; seq: number }>(
+  tokens: readonly T[],
+  kept: ReadonlyMap<string, KeptHp>,
+): T[] => {
+  const down = (t: T) => (keptFor(kept, t.id, t.definitionId)?.hp === 0 ? 1 : 0);
+  return [...tokens].sort((a, b) => down(a) - down(b) || a.seq - b.seq);
+};
+
+/**
+ * FR-CBT-141: the HP a kept row starts with: its `hpMax` / `hpCurrent` (a rolled max kept);
+ * when an average row's max no longer matches the definition's (edited since), FR-CBT-06 / -67's
+ * rule: the new max, a full row stays full, else clamped. "Rolled" = the old fight logged its
+ * DM-only "HP (…)" roll for it (`monsterHp`). Not an `hp_change` (no fact, seams S8).
+ */
+export function keptHp(tx: Tx, k: KeptHp, def: DefinitionRecord): { hp: number; hpMax: number } {
+  const max = effectiveStats(def as { statBlock: StatBlock }).hpMax;
+  if (k.hpMax === max || rolledIn(tx, k)) return { hp: Math.min(k.hp, k.hpMax), hpMax: k.hpMax };
+  return { hpMax: max, hp: k.hp === k.hpMax ? max : Math.min(k.hp, max) };
+}
+
+function rolledIn(tx: Tx, k: KeptHp): boolean {
+  return tx
+    .select({ payload: gameLogEntry.payload })
+    .from(gameLogEntry)
+    .where(
+      and(
+        eq(gameLogEntry.encounterId, k.encounterId),
+        eq(gameLogEntry.kind, ROLL_KIND),
+        eq(gameLogEntry.actorName, k.name),
+        eq(gameLogEntry.public, false),
+      ),
+    )
+    .all()
+    .some((e) => {
+      const first = Array.isArray(e.payload) ? (e.payload[0] as { label?: unknown }) : null;
+      return typeof first?.label === "string" && first.label.startsWith("HP (");
+    });
+}
+
+/**
+ * FR-MAP-88 (sprint 7): every token of a joining pet carries the pet's owner. A safety net only
+ * (nothing clears it today, FU0's replay): rows only where a token differs.
+ */
+export function petTokenOwners(env: CommandEnv, pet: MonsterRecord): RecordChange[] {
+  const ids = env.tx
+    .select({ id: token.id })
+    .from(token)
+    .where(eq(token.definitionId, pet.id))
+    .orderBy(asc(token.seq))
+    .all();
+  return ids.flatMap((t) => setTokenOwnerIn(env, t.id, pet.ownerPlayerId));
 }

@@ -2167,3 +2167,18 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-110, -112,
 - **Persisted runtime state:** none new beyond the column and the notification rows.
 - **Fixtures:** unit `cp-combat` (pets join through Add; Thorn's Conjure Elemental; Fire Elemental for Mira after-owner, Brakka in-owner-turn, Thorn own 9 + linked), appended to `companions` and `session-sim-10` (loads on `session-sim-9`'s running fight).
 - **CON-44** (`snapshot-size.test.ts` heavy harness, measured with a throwaway probe): `summoned` on every combatant row → DM 765,752 → 766,523 B (+771 B; 806,341 B left of 1.5 MiB); players unchanged (the flag is never redacted in). `session-sim-10` with `cp-combat`: DM 64,264 B, players 32,243 / 24,394 B (+6,384 / +4,493 B over sim-9).
+
+## 96. Sprint 7: combat follow-ups (FU-combat)
+
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-141, -145 and [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (#315: OQ-CBT-92 A; seams S7, S8). **Built by `fix/fu-combat`**. Protocol side: [protocol §125](../protocol/README.md#125-sprint-7-combat-follow-ups-fu-combat). **No new entity, field or column.**
+
+| Field / record | Change | Rule | Source |
+|---|---|---|---|
+| `combatant.hp_current` / `hp_max` (monster, bound) | written from the token's **last combatant** at `cbt.start` / `cbtx.addCombatants` | the latest-ended inactive monster row of the campaign with that `token_id` and the same `entity_id` (ties → higher `seq`): its `hp_max` / `hp_current` (0 → Down). An average row whose max no longer matches the definition's follows FR-CBT-06 / -67 (full → new max, else clamped); "rolled" = its old fight logged the DM-only "HP (…)" roll. No row → today's `hpMode` HP. Not an `hp_change` (no fact, S8) | FR-CBT-141 |
+| Binding order (Start / Add) | tokens kept at 0 bind after the living ones, then `seq` | a fresh goblin is taken before one left at 0 | FR-CBT-141 |
+| `token` of a summoned combatant | deleted at End whatever its owner now (released, turned hostile, removed mid-fight) | only `summoned` rows; combatant rows and facts stay (S7) | FR-CBT-145 |
+| `token.owner_player_id` of a pet | kept through End; Start / Add re-assert it only where it differs (safety net) | every token of a pet = the pet's `ownerPlayerId` | FR-MAP-88 |
+
+- **Derived (not stored):** kept HP (one pass over the campaign's monster `combatant` rows joined to ended encounters; no index needed at ≤ a few thousand rows).
+- **Fixtures:** unit `fu-hurt-goblins` (Goblin −7 → 0 / 7, Goblin 2 −3 → 4 / 7 in the running ambush); bundles `fu-s7` (= `session-sim-10` + `cp-ally` + `fu-hurt-goblins`), `fu-s7-e2e`; both units appended to `session-sim-11` (FU group).
+- **CON-44: 0 B** (no field or record; kept HP fills existing columns).

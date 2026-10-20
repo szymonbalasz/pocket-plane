@@ -2919,3 +2919,16 @@ From [combat-tracker](../specs/combat-tracker.md#64-sprint-6-companions) FR-CBT-
 - **Registry lines (append-only):** notification kind `summonCardKind` (`kinds.ts`), DM view `dmSummonCardView` (`notification-views.ts`), effect hook `combat-tracker.summon-concentration` (`effect-hooks.ts`).
 - **DM UI:** header `cbt-init-summon` and a PC row's `cbt-init-row-summon` ("Summon for Mira…") open the Dialog `cbt-summon` (`cbt-summon-lookup` → `cbt-lookup-option`, `cbt-summon-picked`, `-count`, `-owner` (+ `data-value`), `-mode` (+ `data-value`, `data-state`), `-hp`, `-hidden`, `-concentration` (iff the owner concentrates), `-submit`, `-error`); Companion ▸ `cbt-companion-dismiss` (disabled on the turn combatant: "Press Next first"); the card's `cbt-summon-hostile` (`cbt.setCompanion` release + enemy per summon left) and `cbt-summon-outcome`. Companion card (`charx.companion`): `cbt-companion-dismiss` → inline confirm `cbt-companion-dismiss-text` / `cbt-companion-dismiss-confirm` → `cbt.dismiss`; shown to the DM for any companion in the fight and to the owner for a summon only (never a pet), disabled on the turn combatant. A dismissed companion (inactive in the DM's store) leaves `useCombatants`.
 - **Fixtures:** unit `cp-combat` (bundles `companions`, `session-sim-10`); e2e `e2e/companions.e2e.ts` on `companions-e2e`.
+
+## 125. Sprint 7: combat follow-ups (FU-combat)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-141, -145 (OQ-CBT-92 A, #315) and [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88. **Built by `fix/fu-combat`**. Data side: [data model §96](../data-model/README.md#96-sprint-7-combat-follow-ups-fu-combat). **No new intent, event, record type or signal.**
+
+| Event | `changes` (sprint 7) | Players receive | Undoable |
+|---|---|---|---|
+| `EncounterStarted` | combatant creates carry kept HP (FR-CBT-141; no HP roll entry for a kept row); + a pet token's owner upsert (`setTokenOwnerIn`) **only when it differs** (safety net, FR-MAP-88) | per FR-CBT-37 / -116; token upserts as any owner change | no |
+| `CombatantsAdded` | the same kept HP and pet-token safety net | as above | no |
+| `EncounterEnded` | + `token` deletes of **every** summoned combatant's surviving token (released, turned hostile, removed mid-fight; FR-CBT-145), before the other companions' rows; pets' tokens untouched (owner kept, FR-MAP-88); a `setCompanion` (charmed) companion's token owner cleared (#310 (2)) | token deletes to everyone | no |
+
+- **FR-MAP-88 root cause (FU0 replay on `session-sim-10`):** Dismiss Fire Elemental, Turn hostile Fire Elemental 3, End, Start "Escort to the Ford" with both pets → the drake's token gets **no change at all** (`ownerPlayerId` = Player 1 after every step; the Add-joined drake row has `pet: true`, so `companionLeaves` never runs for it). Suspect (1) refuted on the server; the marker's loss is client-side (FU3).
+- **Crash hooks:** `cbt.start:after-commit`, `cbt.end:before-commit` (all or nothing, `fu-combat-crash.test.ts`).
