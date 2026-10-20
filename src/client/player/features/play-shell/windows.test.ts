@@ -670,7 +670,13 @@ const withNewWindows = (): WindowRegistry =>
   ]);
 
 /** FR-SHELL-62 (d): the player's non-default product kinds on `main` when WF1 started. */
-const GOLDEN_KINDS = ["note.history", "dicex.tray", "party.board", "cmp.compendium"];
+const GOLDEN_KINDS = [
+  "note.history",
+  "dicex.tray",
+  "party.board",
+  "cmp.compendium",
+  "charx.companion", // CP4 (S2): appended, goldens regenerated
+];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */
 const userOpened = (registry: WindowRegistry) =>

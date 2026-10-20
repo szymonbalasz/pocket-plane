@@ -2,6 +2,7 @@
 // import and one line in the list for each of its player window types; nothing else changes here.
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
+import { playerCompanionWindow } from "./features/character-sheet/companion-window";
 import { playerCharSheetWindow } from "./features/character-sheet/sheet-window";
 import { playerInitiativeWindow } from "./features/combat-tracker/initiative-window";
 import { playerCompendiumWindow } from "./features/compendium/compendium-window";
@@ -22,6 +23,7 @@ const windows: WindowDef[] = [
   playerPartyBoardWindow, // party.board (party-board, FR-PARTY-11)
   { ...playerHandoutWindow, restoreOpen: false }, // party.handout (party-board, FR-PARTY-14; FR-SHELL-42)
   playerCompendiumWindow, // cmp.compendium (compendium, FR-CMP-18)
+  playerCompanionWindow, // charx.companion (character-sheet-full, FR-CHARX-59)
 ];
 
 export const playerWindows = createWindowRegistry("player", windows);

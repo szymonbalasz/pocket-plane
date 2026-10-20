@@ -24,6 +24,12 @@
     "parked": "dicex.tray"
   },
   {
+    "at": "open @1600×900 charx.companion",
+    "rect": "930,584,280×240",
+    "placed": "auto",
+    "parked": ""
+  },
+  {
     "at": "reopen @1600×900 note.history",
     "rect": "806,195,360×240",
     "placed": "stored",
@@ -46,6 +52,12 @@
     "rect": "360,60,320×400",
     "placed": "reopened",
     "parked": "dicex.tray"
+  },
+  {
+    "at": "reopen @1600×900 charx.companion",
+    "rect": "930,584,280×240",
+    "placed": "stored",
+    "parked": ""
   },
   {
     "at": "reopen 1440×900 @1440×900 note.history",
@@ -72,6 +84,12 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen 1440×900 @1440×900 charx.companion",
+    "rect": "688,192,320×240",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×800 @1280×800 note.history",
     "rect": "616,484,280×240",
     "placed": "reopened",
@@ -96,6 +114,12 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen 1280×800 @1280×800 charx.companion",
+    "rect": "590,484,280×240",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 note.history",
     "rect": "616,404,280×240",
     "placed": "stored",
@@ -118,6 +142,12 @@
     "rect": "474,84,326×400",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 charx.companion",
+    "rect": "505,158,320×326",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -156,6 +186,12 @@
     "parked": "party.board"
   },
   {
+    "at": "open @1440×900 charx.companion",
+    "rect": "688,192,320×240",
+    "placed": "auto",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen @1440×900 note.history",
     "rect": "648,192,360×240",
     "placed": "stored",
@@ -178,6 +214,12 @@
     "rect": "548,132,440×400",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen @1440×900 charx.companion",
+    "rect": "688,192,320×240",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×800 @1280×800 note.history",
@@ -204,6 +246,12 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen 1280×800 @1280×800 charx.companion",
+    "rect": "590,484,280×240",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 note.history",
     "rect": "616,404,280×240",
     "placed": "stored",
@@ -226,6 +274,12 @@
     "rect": "474,84,326×400",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 charx.companion",
+    "rect": "505,158,320×326",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -264,6 +318,12 @@
     "parked": "dicex.tray,party.board"
   },
   {
+    "at": "open @1280×800 charx.companion",
+    "rect": "590,484,280×240",
+    "placed": "auto",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen @1280×800 note.history",
     "rect": "474,72,286×480",
     "placed": "stored",
@@ -288,6 +348,12 @@
     "parked": "dicex.tray,party.board"
   },
   {
+    "at": "reopen @1280×800 charx.companion",
+    "rect": "590,484,280×240",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 note.history",
     "rect": "474,200,286×272",
     "placed": "reopened",
@@ -310,6 +376,12 @@
     "rect": "474,60,326×412",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 charx.companion",
+    "rect": "505,158,320×314",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -348,6 +420,12 @@
     "parked": "party.board"
   },
   {
+    "at": "open @1280×720 charx.companion",
+    "rect": "505,158,320×314",
+    "placed": "auto",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen @1280×720 note.history",
     "rect": "474,200,286×272",
     "placed": "stored",
@@ -370,6 +448,12 @@
     "rect": "474,60,326×412",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen @1280×720 charx.companion",
+    "rect": "505,158,320×314",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "protected @1280×720 note.history",
