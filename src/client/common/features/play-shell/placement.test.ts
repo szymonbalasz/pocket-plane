@@ -29,6 +29,21 @@ const place = (d: Placeable, v: { w: number; h: number }, input: PlaceInput = {}
 const overlaps = (a: Rect, b: Rect) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
+/** play-shell §12's timed case (./placement.bench.ts): 10 windows × 200 token boxes. */
+const benchWindows = Array.from({ length: 10 }, (_, i) => ({
+  x: 68 + i * 140,
+  y: 60 + (i % 3) * 200,
+  w: 120,
+  h: 180,
+}));
+const benchTokens = Array.from({ length: 200 }, (_, i) => ({
+  x: (i * 37) % 1500,
+  y: 60 + ((i * 53) % 760),
+  w: 48,
+  h: 48,
+  pc: i % 20 === 0,
+}));
+
 describe("open placement (FR-SHELL-08, -45)", () => {
   test("fitted default: a tall window ends above the launcher, never below min size", () => {
     const tall = def({
@@ -200,27 +215,10 @@ describe("sprint 5 placement (FR-SHELL-46–48, -51)", () => {
     for (const o of [init, log]) expect(overlaps(r, o)).toBe(false);
   });
 
-  test("FR-SHELL-46 inward column ≤ 5 ms best-of-5 for 10 windows × 200 token boxes", () => {
-    const windows = Array.from({ length: 10 }, (_, i) => ({
-      x: 68 + i * 140,
-      y: 60 + (i % 3) * 200,
-      w: 120,
-      h: 180,
-    }));
-    const tokens = Array.from({ length: 200 }, (_, i) => ({
-      x: (i * 37) % 1500,
-      y: 60 + ((i * 53) % 760),
-      w: 48,
-      h: 48,
-      pc: i % 20 === 0,
-    }));
-    let best = Number.POSITIVE_INFINITY;
-    for (let k = 0; k < 5; k++) {
-      const t0 = performance.now();
-      placeWindow(tall, vp, { windows, tokens });
-      best = Math.min(best, performance.now() - t0);
-    }
-    expect(best).toBeLessThanOrEqual(5);
+  test("FR-SHELL-46 inward column for 10 windows × 200 token boxes: same inputs, same rect (timed in ./placement.bench.ts)", () => {
+    const placed = placeWindow(tall, vp, { windows: benchWindows, tokens: benchTokens });
+    expect(placed).toEqual({ rect: { x: 1288, y: 424, w: 300, h: 400 }, clear: false });
+    expect(placeWindow(tall, vp, { windows: benchWindows, tokens: benchTokens })).toEqual(placed);
   });
 
   test("FR-SHELL-47 screen full: no clear candidate → clear false; the fallback covers no protected window and no title bar", () => {
@@ -406,7 +404,7 @@ describe("sprint 6 placement (FR-SHELL-57, -58)", () => {
     expect(r.h).toBe(500);
   });
 
-  test("FR-SHELL-58 spot cap: 200 boxes → ≤ 4,000 spots, window and edge rows / columns always kept; ≤ 5 ms best-of-5 for 10 windows × 200 boxes", () => {
+  test("FR-SHELL-58 spot cap: 200 boxes → ≤ 4,000 spots, window and edge rows / columns always kept; 10 windows × 200 boxes places (timed in ./placement.bench.ts)", () => {
     const cols = [
       ...[68, 1288, 500].map((v) => ({ v, token: false })),
       ...Array.from({ length: 400 }, (_, i) => ({ v: 100 + i * 3, token: true })),
@@ -421,42 +419,18 @@ describe("sprint 6 placement (FR-SHELL-57, -58)", () => {
     for (const v of [60, 324]) expect(kept.rows).toContain(v);
     // The farthest go first: the nearest token row stays.
     expect(kept.rows).toContain(61);
-    const windows = Array.from({ length: 10 }, (_, i) => ({
-      x: 68 + i * 140,
-      y: 60 + (i % 3) * 200,
-      w: 120,
-      h: 180,
-    }));
-    const tokens = Array.from({ length: 200 }, (_, i) => ({
-      x: (i * 37) % 1500,
-      y: 60 + ((i * 53) % 760),
-      w: 48,
-      h: 48,
-      pc: i % 20 === 0,
-    }));
-    const bestOf5 = (d: Placeable) => {
-      for (let k = 0; k < 3; k++) placeWindow(d, vp, { windows, tokens }); // warm the JIT
-      let best = Number.POSITIVE_INFINITY;
-      for (let k = 0; k < 5; k++) {
-        const t0 = performance.now();
-        placeWindow(d, vp, { windows, tokens });
-        best = Math.min(best, performance.now() - t0);
-      }
-      return best;
-    };
+    const input = { windows: benchWindows, tokens: benchTokens };
     // Sprint 5's inward-column shape (play-shell §12's bound).
     const tall = def({
       defaultSize: { w: 300, h: 500 },
       minSize: { w: 300, h: 400 },
       defaultPosition: { anchor: "top-left", dx: 56 },
     });
-    expect(bestOf5(tall)).toBeLessThanOrEqual(5);
-    // A window that may also narrow (min width < width) searches the columns twice when nothing
-    // token-free is found at full width: logged, bounded at twice the budget.
-    const narrowing = bestOf5(cmp);
-    console.info(
-      `FR-SHELL-58 10 windows × 200 boxes, narrowing window: ${narrowing.toFixed(2)} ms`,
-    );
-    expect(narrowing).toBeLessThanOrEqual(10);
+    expect(placeWindow(tall, vp, input).rect).toEqual({ x: 1288, y: 424, w: 300, h: 400 });
+    // A window that may also narrow (min width < width) searches the columns twice.
+    expect(placeWindow(cmp, vp, input)).toEqual({
+      rect: { x: 68, y: 524, w: 440, h: 300 },
+      clear: false,
+    });
   });
 });

@@ -1,5 +1,6 @@
 // CON-44 snapshot ceilings + live-sync §12 build time (#163): session-sim and a "realistic
-// heavy" session built through commands. DM ≤ 768 KiB, players ≤ 512 KiB, DM build < 200 ms.
+// heavy" session built through commands. DM ≤ 768 KiB, players ≤ 512 KiB (the < 200 ms DM build
+// is timed in ./snapshot-build.bench.ts).
 // Worst-case rows per core (seams S14): PARTY S5 adds an open `handout-present` for every player;
 // CMP S5 (track C) 20 homebrew entries × 4 attachment images (0 B); CAMP S5 (track K) the
 // longest colour key on every player + the DM, every notification stamped by a player; CBT S6
@@ -32,7 +33,6 @@ import { SNAPSHOT_CEILING } from "./hub";
 import {
   buildRealisticHeavy,
   CREATURE_SHEET_TYPE,
-  dmBuildMs,
   fillSceneToCap,
   HEAVY,
   SCENE_TOKEN_CAP,
@@ -43,7 +43,6 @@ import {
   type ViewerSize,
 } from "./testing/snapshot-size";
 
-const BUILD_MS = 200;
 /** ADR-0041: a `sync.loadScene` result stays under the player ceiling (512 KiB). */
 const SCENE_LOAD_MAX = 512 * 1024;
 const sessionSim = async () =>
@@ -60,13 +59,12 @@ function expectUnderCeilings(sizes: ViewerSize[]) {
 const SIM_SHEETS = 2;
 
 describe("CON-44 snapshot ceilings (#163)", () => {
-  test("session-sim: every viewer under its ceiling; DM build < 200 ms", async () => {
+  test("session-sim: every viewer under its ceiling", async () => {
     const b = await sessionSim();
     try {
       const sizes = snapshotSizes(b.s);
       expect(sizes.map((v) => v.label)).toEqual(["DM", "P1", "P2"]);
       expectUnderCeilings(sizes);
-      expect(dmBuildMs(b.s)).toBeLessThan(BUILD_MS);
       // ADR-0041: the DM gets the active scene's tokens; the inactive scene's load on view.
       const [dm, ...players] = sizes;
       const loads = sceneLoadSizes(b.s);
@@ -111,11 +109,10 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect(counts.loot).toBeGreaterThanOrEqual(HEAVY.loot);
     });
 
-    test("CON-44 (#208) DM < 1 MiB, every player < 512 KiB; DM build < 200 ms", () => {
+    test("CON-44 (#208) DM < 1 MiB, every player < 512 KiB", () => {
       const sizes = snapshotSizes(b.s);
       expect(sizes).toHaveLength(1 + HEAVY.players);
       expectUnderCeilings(sizes);
-      expect(dmBuildMs(b.s)).toBeLessThan(BUILD_MS);
     });
 
     test("PARTY S5 FR-PARTY-31 worst case: an open handout-present per player; DM all rows, each player only its own; ceilings hold", () => {
@@ -273,8 +270,7 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       }
     });
 
-    test("SQL windows: providers return the window, not the history (build time flat)", () => {
-      const before = dmBuildMs(b.s);
+    test("SQL windows: providers return the window, not the history (build time: snapshot-build.bench.ts)", () => {
       const cid = b.s.db.$client
         .query<{ id: string }, []>("SELECT id FROM campaign WHERE active = 1")
         .get()?.id;
@@ -289,7 +285,6 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       const v = { connId: "dm", campaignId: cid as string, role: "dm" as const, playerId: null };
       const src = { db: b.s.db, presence: { list: () => [] } };
       expect(b.s.records.get("game-log-entry")?.snapshot(src, v)).toHaveLength(GAME_LOG_WINDOW);
-      expect(dmBuildMs(b.s)).toBeLessThan(Math.max(BUILD_MS, before * 2));
     });
 
     // Adds compendium rows and attachments only (no record type): every snapshot byte-identical.
