@@ -60,7 +60,7 @@ test("FR-SHELL-30 no native title on interactive elements in src/client", () => 
     }
   }
   expect(bad).toEqual([]);
-});
+}, 30_000); // scans every .tsx under src/client: over the 5 s default while other suites run
 
 test("FR-CHAR-25 roll buttons carry no title; the hint is a Tooltip", () => {
   const src = readFileSync(
