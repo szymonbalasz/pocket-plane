@@ -2,12 +2,20 @@
 title: Entities (core)
 prefix: ENT
 status: complete
-owner: spec-compendium
+owner: spec-images
 wave: 2
-phase: post-mvp-4
+phase: post-mvp-6
 ---
 
 # Entities (core)
+
+> **Sprint 6, track IM (DM [#285](../decisions-log.md)):** the creature form's **Portrait** picker gets the image search and tag filter of every picker and tags its uploads **Portraits** ([assets-pipeline FR-ASSET-39–50](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im)). New FR-ENT-41; no data-model, event or visibility change. Other sprint-6 tracks (CP: owner on a creature, pet copies) edit this spec in parallel.
+
+### Sprint 6 at a glance (track IM)
+
+| FR | What | Slice ([ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split)) | Named test (§13) |
+|---|---|---|---|
+| FR-ENT-41 | Portrait picker: search, tag filter, `context="portrait"` | IM-3 `build/im-wiring` | `FR-ENT-41 portrait picker searches and tags`; walkthrough IM4 |
 
 ### Sprint 4 at a glance
 
@@ -89,6 +97,8 @@ phase: post-mvp-4
 | FR-ENT-28 | **Art set and menu.** One bundled glyph per creature type (14), SVG path data in `src/client/common/features/entities/creature-art/` (`index.ts`: type → `{path, viewBox}`), drawn by the tokens layer as the glyph (≈ 65 % of the footprint) on a backdrop that follows the token shape (round: disc; square: rounded square; none: glyph only), filled with the type's colour (one canvas colour token per type, `creature.<type>`, proposed values in §7, contrast-checked; visual-direction defines no such tokens yet: OQ-ENT-30; no hard-coded colours in components); the glyph is white; the name stays on the label layer (FR-MAP-42). DM token menu **Art** (token-menu registry, FR-MAP-29, append-only): "Creature type" (sets the definition's current type; disabled without one) and "Initials" (`"initials"`); the current one is checked (null shows neither checked). Players: no menu. | OQ-ENT-22 (decided #245) |
 | FR-ENT-29 | **Licence and attribution.** Glyphs: 14 icons from game-icons.net, CC BY 3.0, authors Lorc and Delapouite (OQ-ENT-22, decided #245). `creature-art/ATTRIBUTION.md` lists per type: icon name, author, licence, url (the 14 in OQ-ENT-22). The credit is **always reachable in both clients** (review B13): the Compendium window's footer link **Credits** (both clients, also with nothing imported, [FR-CMP-19](compendium.md#6-functional-requirements)) opens the About dialog with a "Token art" section listing the 14 icons, authors (Lorc, Delapouite), "CC BY 3.0" and game-icons.net; the DM's Creatures window footer has the same **Credits** link (`ent-list-credits`). The play shell has no About of its own. Files are copied by hand once (no network at runtime or in tests); a licence test checks one glyph per type, one attribution row per glyph, and that the module holds path strings only (no markup, no `href`). | As the SRD credit (FR-CMP-04, -19) |
 | FR-ENT-30 | **Visibility.** `creatureType` is a field of the `token` record, so it follows scenes-map's token visibility fn: a player receives it only on tokens they receive (never on hidden, fogged-out or invisible ones). No definition field reaches players. The art set ships in both clients (not secret). `creatureType` copies a stat-block value that players otherwise never see (FR-ENT-26), so this is a new player-visible display copy: players see the type art on every **visible** monster token by default; the DM sets Art ▸ Initials per token to hide it, e.g. a disguised fiend (OQ-ENT-29, decided #245). The [token creature type ADR](../architecture/adr/0050-token-creature-type.md) (accepted #245) adds `creatureType` to ADR-0024's token display copies. | ADR-0024 (refined) |
+| **Sprint 6** (S6, track IM, image search) | | |
+| FR-ENT-41 | **Portrait picker searches and tags.** The creature form's **Portrait…** picker (DM; `src/client/dm/features/combat-tracker/creature-form.tsx`, New / Derive / Edit custom) is ASSET's `AssetPickerDialog` with `context="portrait"`: the search field (shared matcher over name and tags), the tag filter and the tag editor ([FR-ASSET-44–48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im)); an upload there is tagged **Portraits** (FR-ASSET-41). `portraitAssetId`, `assets.require` (FR-ENT-08 / -11) and every visibility rule unchanged. **Not image pickers** (no search, no tags): the token **Art** menu (14 creature-type glyphs, FR-ENT-28); character portraits have no picker (fixtures / `PUT /api/entities` only, FR-ENT-10). The Creatures window filter already uses the shared matcher (FR-ENT-18; import path per [FR-CMP-54](compendium.md#6-functional-requirements)). | OQ-ASSET-23 |
 
 ## 7. UI/UX notes
 
@@ -223,6 +233,7 @@ Other writers of a character's `hpCurrent` (character-sheet's `CharacterHpAdjust
 | Unit *(S4)* | `FR-ENT-26 type`: the 14 types parse, `swarm` / `Humanoid` → `invalid` (path `statBlock.type`), a character with `type` → `invalid`, a block without it parses. `FR-ENT-28 art per creature type`: `creature-art` has exactly one glyph per `CREATURE_TYPES` entry, each a non-empty path + viewBox; `tokenArtOf(token)` → `image` when `imageAssetId` is set, else the type, else `initials` (for `"initials"` and null alike). `FR-ENT-29 licence`: one `ATTRIBUTION.md` row per glyph (name, author, licence, url); the module exports strings only (no `<`, no `href`). `FR-ENT-18 order`: equal names → custom, then `srd-5.1`, then `fixture`, then id | In-code |
 | Integration *(S4)* | **`FR-ENT-27 art per creature type`**: placing SRD Goblin → `humanoid`, Ogre → `giant`, Wolf → `beast`, Adult Red Dragon → `dragon`, Elite Goblin Warrior (derived) → `humanoid`, Mira → null; combat Start places its tokens with the type; Ctrl-D duplicate copies it; `map.updateToken {creatureType: "initials"}` then `{creatureType: "giant"}` (DM) → stored, `{creatureType: null}` → `invalid`, player → `forbidden`; a definition edit humanoid → fiend leaves placed tokens unchanged. **`FR-ENT-27 fill`**: a custom without type + 2 tokens (one left null, one set to Initials = `"initials"`) → update adds `fiend` → the null token becomes `fiend` in the same commit and is listed in `EntityUpdated.changes`; the Initials token stays `"initials"` and is not listed (review B7); `cmp.importRecorded` with recorded goblin lacking `type`, then with it → `ImportedEntityUpdated.changes` lists goblin tokens of both campaigns, frames only to the active one. **`FR-ENT-30 players never see hidden tokens' art`**: leak scan over `player-1` / `player-2` frames: hidden Ogre's token never appears (so neither does its `creatureType`); visible tokens carry theirs. CON-44: `snapshot-size.test.ts`, fog and compendium `con44` baselines + the §12 figures | `compendium-full` |
 | E2E (thin) *(S4)* | DM and `player-1`: the Goblin token node has `art = humanoid`; after Art ▸ Initials both see `art = initials` | `compendium-full` |
+| Unit (DOM) *(S6)* | **`FR-ENT-41 portrait picker searches and tags`**: the form's Portrait… opens `asset-picker` with `data-context="portrait"` and the search field; "Gob el" leaves Elite Goblin + Goblin Elder; Upload sends `tags=["Portraits"]`; Select still sets the form's portrait. Leak: unchanged FR-ENT-15 tests (no tag on `entity`); tags' own leak property is ASSET's `FR-ASSET-50` | `image-search` ([ASSET §13.1](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im)) |
 
 **Existing tests S4 updates** (review B36; assertions change, names keep their FR IDs):
 - `src/shared/entities/schemas.test.ts` "FR-ENT-18 list sort: name ci, then custom before imported, then id" and `src/client/dm/features/entities/list.test.ts` "FR-ENT-18 sorted by name ci, custom before imported, then id…" → then source rank (`srd-5.1` before `fixture`), then id.
@@ -319,6 +330,8 @@ Joins **bundle `compendium-full`** ([compendium §13](compendium.md#13-test-plan
 - C-art core needs no client change; until C-art merges, tokens carry `creatureType` and still draw initials (no visible change).
 - Cut order if the sprint runs late (gate G7, #245): token art (C-art core + C-art) goes first; C-search and C-all stay.
 
+**Sprint 6 (S6, track IM): dependencies and build.** On [assets-pipeline](assets-pipeline.md) (picker `context`, search, tags: IM-2) and [compendium](compendium.md) (matcher at `@shared/search/match.ts`: IM-0 changes the import line in `src/client/dm/features/entities/list.ts`). FR-ENT-41 ships in **IM-3 `build/im-wiring`** (one prop in `creature-form.tsx`, combat-tracker's folder) after IM-2; no schema, event or §9.9 shared file. Walkthrough: [ASSET IM4](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im). Data model, API, permissions, disconnect / reconnect / crash: unchanged (the picker's offline behaviour is [ASSET §11](assets-pipeline.md#11-edge-cases--failure-modes)). No package.
+
 ## 15. Open questions
 
 | ID | Question | Options (pick **bold**, not decided unless struck) | Blocking? | Affects |
@@ -349,6 +362,7 @@ Joins **bundle `compendium-full`** ([compendium §13](compendium.md#13-test-plan
 | OQ-ENT-28 | *(S4)* Glossary | **Add "Creature type"** (a monster's SRD type, e.g. humanoid; picks its token art) and **"Token art"** (the glyph on a type colour drawn for a token without an image) | no (owner: integrator) · **Glossary: applied (#246)** | glossary |
 | OQ-ENT-29 | *(S4, review B6)* Type art visible to players | **Decided** (DM, sprint-4 gate 1, #245; G44): **players see the type art on visible monster tokens by default; the DM sets Art ▸ Initials per token to hide it** (a disguised fiend). The [token creature type ADR](../architecture/adr/0050-token-creature-type.md) (accepted, G4) adds `creatureType` to ADR-0024's display copies. Rejected: DM opt-in per token | — | ADR-0024, scenes-map |
 | OQ-ENT-30 | *(S4, review B39)* **visual-direction**: 14 `creature.<type>` canvas colour tokens | **Add them as theme placeholders with the §7 values (white glyph ≥ 4.99 : 1, measured)**; the theme system may restyle later / pick per-type colours from shadcn's chart palette (5 colours, too few) / one neutral colour for all types (glyph only tells them apart) | no (owner: integrator) · **Visual-direction: applied (#246)** | visual-direction |
+| OQ-ENT-37 | *(S6)* **Track CP / combat-tracker**: CP (owner on a creature) and IM-3 (FR-ENT-41's `context` prop) may both edit `creature-form.tsx` | **Settled by seams S6: CP1 (Make pet) and IM-3 both edit it; whichever merges second rebases** (IM-3's change is one prop + one test). Rejected: ~~sequence IM-3 strictly after CP's form slice (delays the picker wiring)~~ | no · settled S6 | combat-tracker |
 | ~~OQ-ENT-19~~ | ~~Character data without an edit UI (review #11)~~ | **Decided (#154):** fixtures / `PUT /api/entities` in MVP; full PC / NPC editing and player-filled sheets design-for-later | — | character-sheet |
 
 ## 16. Out of scope

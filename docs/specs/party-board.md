@@ -2,8 +2,8 @@
 title: Party board
 prefix: PARTY
 status: complete
-owner: spec-party
-phase: post-mvp-5
+owner: spec-images
+phase: post-mvp-6
 ---
 
 # Party board
@@ -11,6 +11,15 @@ phase: post-mvp-5
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md). DM gate 1 decided every DM question (#207, 2026-10-16; snapshot ceilings #208) ([§15](#15-open-questions)). Seams pass applied (orchestrator ruling 2026-10-16, S1, S3, S7–S10). Review rulings applied (2026-10-16, P1–P4, L1–L3): cut options for inventory / split, `DiceText` context, unshare vs images already seen, loaded-set checks; lazy-type FRs live in [live-sync's sprint 3 revision block](live-sync.md) (FR-SYNC-30–38).
 >
 > **Sprint 5 revision (track P, DM [#250](../decisions-log.md) [4] [5] [11] [12], [#251](../decisions-log.md)):** Party Loot moves into a **Loot** tab right of Inventory and the "Coin: open Party loot" button goes [4]; the DM can **present** a shared handout: it opens over everything on chosen players' screens [5]; the handout editor gets **direct upload, drop and clipboard paste** through ASSET's image attach control [11] [12]. New FRs FR-PARTY-29–40; amended FR-PARTY-05, -06, -11, -15, -27. DM questions OQ-PARTY-18–21 decided at sprint-5 gate 1 ([#256](../decisions-log.md)): every pick accepted ([§15](#15-open-questions)). CON-44 measured with a throwaway probe on `session-sim-8` + the realistic-heavy harness (deleted).
+
+> **Sprint 6, track IM (image search, DM [#285](../decisions-log.md)).** The handout editor's image picking (its attach control's **From library** and its uploads / pastes) gets the search field (shared matcher: "Gob el" finds Elite Goblin), the tag filter and the tag editor of [assets-pipeline FR-ASSET-44–48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im); its uploads are tagged **Handouts**. Session-sim-9 found the editor's Images row **below the fold** (BL-48): it moves above the body. New FR-PARTY-47, -48. No record, event or visibility change. CP edits this spec in parallel (pets listed).
+
+### Sprint 6 at a glance (track IM)
+
+| FR | What | Slice ([ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split)) | Named test ([§13.3](#133-sprint-6-track-im-image-search)) |
+|---|---|---|---|
+| FR-PARTY-47 | Editor attach control + From library: `context="handout"` | IM-3 `build/im-wiring` | `FR-PARTY-47 editor picker searches and tags` |
+| FR-PARTY-48 | Images row above the body (BL-48) | IM-3 | `FR-PARTY-48 images above the fold`; walkthrough IM5 |
 
 ### Sprint 5 at a glance
 
@@ -148,6 +157,13 @@ phase: post-mvp-5
 | FR-PARTY-39 | **Editor uploads** [11] [12]: the editor's images strip hosts ASSET's **image attach control** ([FR-ASSET-20–27](assets-pipeline.md#6-functional-requirements)) with `max = 10`, `count` = images in the draft, `owner = "party-editor"`, paste target = the whole editor (title Input and body Textarea included), drop target = the editor. Upload, drop and paste add **attachments** (FR-ASSET-24) to the end of the strip, in order; "From library" keeps the picker. Save unchanged (`assets.require` per id, FR-PARTY-02). A pasted image never changes the text (OQ-PARTY-21). Dedupe is the caller's (seams S5): an id already in the strip (same bytes → same id) is not added again (handout ids stay unique, FR-PARTY-02); hint "Already in this handout" (`party-editor-duplicate`). | Amends FR-PARTY-15 |
 | FR-PARTY-40 | Fixtures `handout-attachment` (an attachment-only image in a new unshared handout h6) and `handout-present-1` (h2 presented to player-1), bundle **`party-s5`** (§13). Patches only (seams S10); `fixtures:reset-load party-s5` works from empty and is deterministic. | ADR-0017 |
 
+### 6.8 Sprint 6: image search in the editor (track IM)
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-PARTY-47 | **Editor picker searches and tags.** The editor's `ImageAttach` (FR-PARTY-39; `src/client/dm/features/party-board/Editor.tsx`) gets `context="handout"` ([FR-ASSET-48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im)): **From library** opens the picker with the search field, tag filter and tag editor (FR-ASSET-44–47); Upload / drop / paste attachments are tagged **Handouts** server-side (FR-ASSET-41; attachments stay out of the library, #256); an upload made inside From library's picker is listed and tagged Handouts. Draft, dedupe ("Already in this handout"), `max` 10, Save and `assets.require` unchanged. | Amends FR-PARTY-39 |
+| FR-PARTY-48 | **Images above the fold** (BL-48, session-sim-9): the editor's order becomes title → **Images** (label with count, strip, attach control, duplicate hint) → body Textarea (+ counter). At `party.handout`'s default size and 1280 × 720 the attach row (Upload, From library) is visible without scrolling, for New and for Edit with 10 images (the strip wraps; the body keeps ≥ 4 visible rows; the editor's ScrollArea scrolls the rest). Paste / drop targets unchanged (the whole editor). The player view's order (images, then text) is unchanged. | OQ-PARTY-28 |
+
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Textarea, Button, Badge, Dialog, RadioGroup, Checkbox, ScrollArea, Toast, Skeleton. Dark only. No custom styling.
@@ -159,6 +175,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Texta
 - *(S5)* **Loot tab:** `party-tab` `data-value="loot"`; LOOT's `loot-*` IDs inside it, unchanged; `party-loot-link` gone (a test asserts its absence).
 - *(S5)* **Present, DM:** Share dialog checkbox; "Open on screens…" in the row menu and viewer; "On screen: 2" Badge (muted while 0 is never shown); "Close on all screens". **Player:** the popup is a shadcn Dialog (modal, centred, max 90 vw × 90 vh), title in the header, Close focused, "Open in Party" secondary. No popup on the DM client.
 - *(S5)* **Editor:** the attach control sits at the end of the images strip ("Upload", "From library", hint "or drop / paste an image"); progress and errors under the strip (ASSET §7). States as FR-PARTY-15.
+- *(S6)* **Editor:** Images block directly under the title, body below it (FR-PARTY-48); From library opens ASSET's picker with search + tag chips (ASSET §7). Test IDs unchanged (`party-editor-*`, `asset-attach*` with `data-owner="party-editor"`; the picker's `asset-picker` gains `data-context="handout"`).
 - *(S5)* **Test IDs:** `party-share-present`, `party-share-present-names`, `party-present-open` (row menu / viewer) + `data-record-id`, `party-present-dialog`, `party-present-mode` + `data-value` (`all|players`), `party-present-player` + `data-record-id`, `party-present-submit`, `party-present-error`, `party-present-count` + `data-value` (n), `party-present-close-all`; player popup `party-present-popup` + `data-record-id` (handout id) + `data-present-id`, `party-present-title`, `party-present-image` + `data-record-id` (asset id), `party-present-prev`, `party-present-next`, `party-present-page`, `party-present-body`, `party-present-loading`, `party-present-retry`, `party-present-close`, `party-present-open-board`. Editor: ASSET's `asset-attach*` with `data-owner="party-editor"`, plus `party-editor-duplicate` (seams S5).
 
 ## 8. Data model
@@ -377,6 +394,17 @@ Teardown: stop the server, then `fixtures:reset --profile verify`.
 
 Teardown: stop the server, then `fixtures:reset --profile verify`.
 
+### 13.3 Sprint 6 (track IM, image search)
+
+Bundle **`image-search`** ([ASSET §13.1](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im)); isolated per worktree as above.
+
+| Level | Named tests |
+|---|---|
+| Unit (DOM) | **`FR-PARTY-47 editor picker searches and tags`** (the editor's `asset-attach` passes `context="handout"`; From library → `asset-picker` with `data-context="handout"` and the search field; "Gob el" → 2 items; a paste sends `tags=["Handouts"]` with `listed=false`; Select still appends to the strip; dedupe hint unchanged); **`FR-PARTY-48 images above the fold`** (DOM order: title, Images block, body; the DOM test can't measure layout, so the visibility check is walkthrough IM5 at 1280 × 720: `asset-attach-library` in view without scrolling, for New and for a handout with 10 images) |
+| Integration | none new (handout records, events and visibility unchanged; the leak property for tags is ASSET's `FR-ASSET-50`, which covers player handout frames) |
+
+Walkthrough: [ASSET IM5, IM7](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im). Disconnect / reconnect / crash: as FR-PARTY-15 / -39; the picker per [ASSET §11](assets-pipeline.md#11-edge-cases--failure-modes).
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -430,6 +458,10 @@ flowchart LR
 
 - Walkthrough S5 runs once P0–P4 are on `main` (each slice walks its own steps first: P1 S5-2–S5-3, P2 S5-1, S5-4–S5-7, P3 S5-8, P4 S5-9).
 
+### 14.4 Sprint 6 build split (track IM)
+
+Full split: [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split). PARTY part: **IM-3 `build/im-wiring`** (after IM-2): `Editor.tsx` (one `context` prop; the Images block moves above the body, FR-PARTY-48) + DOM tests. No schema, event, §9.9 shared file or dependency. CP1's **Companions** tab (after Loot, OQ-PARTY-24) touches other Party files: no overlap with IM-3 (settled by seams S7). The FR-PARTY-48 item of BL-48 is done by IM-3 (the integrator updates the backlog row).
+
 ## 15. Open questions
 
 DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G29 and the P bulk-accept). Rejected options kept for the record. Seam / integrator rows stay as settled. *(S5)* OQ-PARTY-18–21 decided at sprint-5 DM gate 1 (#256): every pick accepted.
@@ -459,6 +491,7 @@ DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G
 | OQ-PARTY-21 | *(S5)* Pasting an image into the handout text [12] | **Decided (#256): the image joins the handout's images (end of the strip); the text is unchanged** (FR-PARTY-39, FR-ASSET-22). Rejected: ~~B an inline image at the cursor (`![](asset:…)` in the body)~~, ~~C an attachment chip in the text~~. Same decision for the compendium homebrew text ([OQ-ASSET-13](assets-pipeline.md#15-open-questions)) | — | assets-pipeline, compendium |
 | OQ-PARTY-22 | *(S5)* **play-shell (track W)**: (a) one mount line for the player popup and one provider line for the DM uploader in the client roots; (b) the popup is a modal Dialog in FR-SHELL-01's dialog layer (over windows, chrome, toasts), under the dice layer; (c) removing `loot.log` from both window registries (append-only); (d) Party window default size with the Loot tab (440×560 today; the loot body was 440×472) | **Settled by seams S4:** (a) P1 and P2 each add one line to their client root, granted append-style, no wait on W1; (b) dialog layer, above windows and toasts, under the dice layer (W lists it in FR-SHELL-01); (c) the owning feature deletes its own line: P3 removes `loot.log` from both `windows.ts`; (d) Party stays 440×560 | no · settled | play-shell |
 | OQ-PARTY-23 | Glossary | **Add "Present (handout)": open a shared handout on chosen players' screens until each closes it ("show" stays the scenes' word, "Show to players"); amend "Party board" (+ Loot tab)**. Settled by seams S12 (integrator adds Present, Attachment, Asset library at the gate merge) | no · settled | glossary |
+| OQ-PARTY-28 | *(S6, BL-48)* How does the editor's Images row get above the fold? | **Decided (#288): A: Images block under the title, body below.** Options were: **A Images block under the title, body below** (always visible, any window size; the DM writes text after picking images) / B body Textarea down to 4 rows, Images stay last (keeps text-first order; a long strip still pushes it down) / C `party.handout` opens taller (WF's default sizes: a cross-track change that still fails on small screens) | — · decided (#288) | play-shell (C only) |
 
 ## 16. Out of scope
 
