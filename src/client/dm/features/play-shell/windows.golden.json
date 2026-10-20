@@ -259,7 +259,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 charx.companion",
-    "rect": "498,176,320×240",
+    "rect": "514,176,320×240",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -325,7 +325,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 charx.companion",
-    "rect": "68,60,280×248",
+    "rect": "68,60,320×360",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -535,7 +535,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 charx.companion",
-    "rect": "498,176,320×240",
+    "rect": "514,176,320×240",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -601,7 +601,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 charx.companion",
-    "rect": "68,60,280×248",
+    "rect": "68,60,320×360",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -679,7 +679,7 @@
   },
   {
     "at": "open @1280×800 charx.companion",
-    "rect": "498,176,320×240",
+    "rect": "514,176,320×240",
     "placed": "auto",
     "parked": "cmp.compendium"
   },
@@ -745,7 +745,7 @@
   },
   {
     "at": "reopen @1280×800 charx.companion",
-    "rect": "498,176,320×240",
+    "rect": "514,176,320×240",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -811,7 +811,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 charx.companion",
-    "rect": "68,60,280×248",
+    "rect": "68,60,320×360",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -889,8 +889,8 @@
   },
   {
     "at": "open @1280×720 charx.companion",
-    "rect": "498,96,320×240",
-    "placed": "auto",
+    "rect": "68,60,320×360",
+    "placed": "default",
     "parked": "cmp.compendium"
   },
   {
@@ -955,7 +955,7 @@
   },
   {
     "at": "reopen @1280×720 charx.companion",
-    "rect": "498,96,320×240",
+    "rect": "68,60,320×360",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
