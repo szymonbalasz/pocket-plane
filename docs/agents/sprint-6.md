@@ -48,15 +48,16 @@ DM notes in brackets ([#285](../decisions-log.md)). "sim-9" = the [session-sim-9
 | 2026-10-20 | Merged: **Fit** — the map uses the space (42 px cells at 1440×900 instead of 28), keeps the top row below the top bar, and players' maps re-frame once when new tokens come into sight under a window; your roll popups stay clear of tool bars and toasts [#302](../decisions-log.md). Last slice started: companion marker on the map. Backlog picking stopped (sprint end) |
 | 2026-10-20 | Merged: **colour picker** — Preferences → Your colour: any colour that passes the contrast / colour-blind rules, the 8 palette colours as suggestions, a clash shows why; Dice settings in Preferences too [#303](../decisions-log.md). **Preferences track done** |
 | 2026-10-20 | Merged: **companion card** (HP, AC, speed, attacks with Roll, conditions; the owner edits a pet; you open it from Initiative) [#304](../decisions-log.md); **pets** (Party → Companions, New pet / Make pet, pet HP outside a fight) [#305](../decisions-log.md); placement test follow-up [#306](../decisions-log.md); **paw marker** on companion tokens in the owner's colour, owner double-click opens the card [#307](../decisions-log.md). **Window track done.** Left: summon / Dismiss |
+| 2026-10-20 | Merged: **summons** — Mira's row → Summon for Mira… ("fire el" → Fire Elemental), Dismiss (you, or the owner from the card), the concentration card (Turn hostile / Dismiss summon(s)), End removes summon tokens [#308](../decisions-log.md). **All 20 slices merged**; final main check 4,126, e2e 170. session-sim-10 running |
 
 ## Check `main` any time (DM)
 
-Same as sprint 5: bundle **`session-sim-10`** once the sprint adds it (until then `session-sim-9`).
+Bundle **`session-sim-10`** (sim-9 + tagged images, Player 2's free colour, the Owlbear and drake pets, summons in the running fight).
 
 ```powershell
 git pull; bun install
 bun run build
-bun run fixtures:reset-load session-sim-9 --profile verify
+bun run fixtures:reset-load session-sim-10 --profile verify
 bun run start --profile verify
 ```
 
