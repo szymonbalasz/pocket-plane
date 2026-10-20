@@ -1,19 +1,28 @@
 // e2e-bundle: session-sim-9
 // Thin sprint-6 fixes for the dice tray and kept templates (track WF; play-shell §13 F11, F12).
 // WF5: the tray keeps Roll visible at its min size with dice staged, 12 d6 included
-// (FR-DICEX-53, -54); the real part heights match the pure layout's budget. Sends no intent.
+// (FR-DICEX-53, -54); the real part heights match the pure layout's budget. WF6: Player 1
+// hovers Player 2's kept Thunderwave (its area, then its label pill, then away) and reads
+// "· by Player 2" only while hovered, the grown pill keeping it (FR-SCN-52). The only intent:
+// the DM shows Goblin Ambush to players (as combat-trails does).
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { e2eEnv, rolePage } from "./support/env";
+import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { gridPoint } from "./support/map";
+import { showToPlayers } from "./support/scenes";
 import { openWindow } from "./support/shell";
 
 async function live(page: Page) {
   await expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
 }
 
-/** sim-9 presents a handout to Player 1 (P0 h2): close its popup first. */
+/**
+ * sim-9 presents a handout to Player 1 (P0 h2): close its popup when it shows (once per player,
+ * so only on the file's first visit; it arrives with the snapshot, so after live).
+ */
 async function closePresented(page: Page) {
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
+  await page.waitForTimeout(500);
+  if ((await dialog.count()) === 0) return;
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toHaveCount(0);
 }
@@ -106,4 +115,129 @@ test("FR-DICEX-53 tray Roll visible at min: 2d6 + 1d8 + 1 and 12 d6 as opened an
   await expect(tray.getByTestId("dicex-tray-die")).toHaveAttribute("data-group", "12");
   await check({ w: 300, h: 240 });
   await expect(preview).not.toHaveAttribute("data-scroll", "true");
+});
+
+/** The kept template `id`'s label: its text, `hovered` attr and page rect; its covered cells. */
+const labelOf = (page: Page, id: string) =>
+  page.evaluate((id) => {
+    type KNode = {
+      id(): string;
+      getAttr(a: string): unknown;
+      getClientRect(): { x: number; y: number; width: number; height: number };
+      findOne(s: string): (KNode & { text(): string }) | undefined;
+    };
+    type KStage = { container(): HTMLElement; find(s: string): KNode[] };
+    const st = (window as unknown as { Konva: { stages: KStage[] } }).Konva.stages[0] as KStage;
+    const box = st.container().getBoundingClientRect();
+    const label = st.find(".scn-template-label").find((n) => n.id() === id);
+    const group = st.find(".scn-template").find((n) => n.id() === id);
+    if (!label || !group) return null;
+    const r = label.getClientRect();
+    return {
+      text: label.findOne(".scn-template-label-text")?.text() ?? "",
+      hovered: label.getAttr("hovered") === true,
+      rect: { x: box.left + r.x, y: box.top + r.y, w: r.width, h: r.height },
+      cells: String(group.getAttr("cells") ?? "")
+        .split(" ")
+        .filter(Boolean)
+        .map((c) => c.split(",").map(Number) as [number, number]),
+      /** Squares of every other drawn template (Web overlaps Thunderwave). */
+      others: st
+        .find(".scn-template")
+        .filter((n) => n.id() !== id)
+        .flatMap((n) => String(n.getAttr("cells") ?? "").split(" ")),
+    };
+  }, id);
+
+/** Whether page point `p` is on the bare map canvas (no window or chrome over it). */
+const onCanvas = (page: Page, p: { x: number; y: number }) =>
+  page.evaluate(
+    (p) =>
+      document.elementFromPoint(p.x, p.y)?.closest('[data-testid="map-canvas"]') !== null &&
+      document.elementFromPoint(p.x, p.y)?.tagName === "CANVAS",
+    p,
+  );
+
+test("FR-SCN-52 template label on hover: Player 1 hovers Player 2's kept Thunderwave (area, then label) → '· by Player 2'; away → gone; the grown pill keeps it", async ({
+  browser,
+}) => {
+  const { link, recordId, secret } = e2eEnv();
+  const thunderwave = recordId("mt-templates", "aoe-template", 0);
+  const ambush = recordId("battlemap", "scene");
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await live(dm);
+  await showToPlayers(dm, "Goblin Ambush");
+
+  const p1 = await rolePage(browser);
+  await p1.goto(link("Player 1"));
+  await live(p1);
+  await closePresented(p1);
+  await expect(p1.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+  await expect.poll(async () => (await labelOf(p1, thunderwave))?.text ?? null).not.toBeNull();
+  const start = await labelOf(p1, thunderwave);
+  if (!start) throw new Error("no Thunderwave label");
+  expect(start.text).not.toContain("by Player 2");
+  expect(start.hovered).toBe(false);
+
+  // A covered square's centre away from the pill, on the bare canvas.
+  let onArea: { x: number; y: number } | null = null;
+  for (const [c, r] of start.cells) {
+    if (start.others.includes(`${c},${r}`)) continue;
+    const p = await gridPoint(p1, c + 0.5, r + 0.5);
+    const inPill =
+      p.x >= start.rect.x - 8 &&
+      p.x <= start.rect.x + start.rect.w + 120 &&
+      p.y >= start.rect.y - 8 &&
+      p.y <= start.rect.y + start.rect.h + 8;
+    if (!inPill && (await onCanvas(p1, p))) {
+      onArea = p;
+      break;
+    }
+  }
+  if (!onArea) throw new Error("no clear Thunderwave square");
+  await p1.mouse.move(onArea.x - 4, onArea.y - 4);
+  await p1.mouse.move(onArea.x, onArea.y, { steps: 3 });
+  await expect.poll(async () => (await labelOf(p1, thunderwave))?.text).toContain("· by Player 2");
+  expect((await labelOf(p1, thunderwave))?.hovered).toBe(true);
+
+  // Away (no template there): back to the short caption.
+  // The canvas point farthest from the area among a few on the bare canvas.
+  let away: { x: number; y: number } | null = null;
+  for (const p of [
+    { x: 760, y: 220 },
+    { x: 640, y: 400 },
+    { x: 900, y: 500 },
+  ]) {
+    if (await onCanvas(p1, p)) {
+      away = p;
+      break;
+    }
+  }
+  if (!away) throw new Error("no bare canvas point");
+  await p1.mouse.move(away.x, away.y, { steps: 3 });
+  await expect
+    .poll(async () => (await labelOf(p1, thunderwave))?.text)
+    .not.toContain("by Player 2");
+  expect((await labelOf(p1, thunderwave))?.hovered).toBe(false);
+
+  // The label pill itself, then its grown right end: still hovered (no flicker); away → gone.
+  const small = (await labelOf(p1, thunderwave))?.rect;
+  if (!small) throw new Error("no pill");
+  await p1.mouse.move(small.x + small.w / 2, small.y + small.h / 2, { steps: 3 });
+  await expect.poll(async () => (await labelOf(p1, thunderwave))?.hovered).toBe(true);
+  const grown = (await labelOf(p1, thunderwave))?.rect;
+  if (!grown) throw new Error("no pill");
+  expect(grown.w).toBeGreaterThan(small.w);
+  const states: boolean[] = [];
+  for (let i = 1; i <= 6; i++) {
+    await p1.mouse.move(
+      small.x + small.w / 2 + ((grown.w - small.w / 2 - 3) * i) / 6,
+      grown.y + grown.h / 2,
+    );
+    states.push((await labelOf(p1, thunderwave))?.hovered ?? false);
+  }
+  expect(states).toEqual([true, true, true, true, true, true]);
+  await p1.mouse.move(away.x, away.y, { steps: 3 });
+  await expect.poll(async () => (await labelOf(p1, thunderwave))?.hovered).toBe(false);
 });

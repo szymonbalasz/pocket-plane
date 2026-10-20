@@ -2743,3 +2743,15 @@ From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-5
 | Test IDs | `dicex-tray-preview` gains `data-cell` (40 \| 28), `data-grouped` (`true` when "×N" was forced by room), `data-scroll` (`true` when the grouped dice still don't fit); new `dicex-tray-area` (dice area), `dicex-tray-bar` (bottom bar); parts carry `data-tray-part` = header \| palette \| expression \| bar | FR-DICEX-53, -54 |
 | Tests | `tray-layout.test.tsx` (`FR-DICEX-53 tray Roll visible at min`: budget at 360 × 300, 320 × 260, 300 × 240 in compose / adjust / rolling / result, 3 dice + constant, 12, 20, MOD extra; the classes draw the assumed heights; `FR-DICEX-54 tray dice area fits`: 40 → 28 → grouped → scroll, attrs, chip size), `e2e/tray-label-s6.e2e.ts` (2d6 + 1d8 + 1 and 12 d6 as opened (360 × 300, or narrower when placement avoids PCs) and at 300 × 240: Roll inside the window and the `elementFromPoint` hit, body not scrolling, measured part heights) | — |
 | CON-44 | 0 B | — |
+
+## 115. Sprint 6: template "by ‹name›" on hover (WF6)
+
+From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-52 (amends FR-SCN-47's hover; sim-9 j09, BL-47). **Built by `fix/tray-roll-label`**: client only. No intent, event, record type, signal or wire field (CON-44: 0 B). Amends §106's label hover (pill only).
+
+| Piece | Contract | Source |
+|---|---|---|
+| Hover target (`templateUnder(p, drawn, scale, grid, pills)`, `templates.ts`, pure) | Map point `p` (map px) → the id of the topmost drawn template (last in draw order) whose true outline (`templateArea`, uncut) contains `p` or lies within `TEMPLATE_HIT_PX` 6 screen px, or whose label pill rect (map px, as drawn) contains `p`; else null. Shares `templateAt`'s geometry (`isUnder`) without its edit / role filters: every template this client draws counts (kept or ephemeral, others' too; the DM's hidden ones while drawn) | FR-SCN-52 |
+| Layer (`TemplatesLayer.tsx` `useTemplateHover`) | Still `listening={false}`; stage `mousemove` (any tool) → the pointer in the layer's map px, the pills' current client rects → `templateUnder`; a held button (dragging) or `mouseleave` → none. The hovered pill is read grown, so hover ends only once the pointer leaves both the area (+ 6 px) and the grown pill: no flicker. Hovered or selected → "‹label› · N squares · by ‹name›" | FR-SCN-52 |
+| Konva attrs | `scn-template-label` gains `hovered` (`true` \| absent) | FR-SCN-52 |
+| Tests | `template-hover.test.ts` (`FR-SCN-52 template label on hover`: any drawn template's area incl. one the player can't edit, 6-px tolerance per scale, topmost, the pill and its grown rect), `e2e/tray-label-s6.e2e.ts` (Player 1 hovers Player 2's kept Thunderwave on a square Web doesn't cover → "· by Player 2" + `hovered`; away → gone; the pill, then six steps across its grown part → hovered throughout) | — |
+| CON-44 | 0 B | — |
