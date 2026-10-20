@@ -280,9 +280,11 @@ function petView(r: unknown): PetView | null {
 }
 
 /**
- * The pet's active combatant: the DM's rows carry `entityId`; players' monster views don't, so
- * theirs match by owner PC and name (a pet joins under its own name, FR-CBT-109), never a row the
- * owner sees as a summon (`pet: false`).
+ * The pet's active combatant: by `entityId` where the view has it (the DM's rows; the owner's view
+ * of its pet combatant, CP4); other players' monster views never carry it, so theirs match by owner
+ * PC and name (a pet joins under its own name, FR-CBT-109), never a row the owner sees as a summon
+ * (`pet: false`). Accepted edge (ruling): a pet renamed mid-fight no longer matches for other
+ * players, who then read the pet row's band until End.
  */
 function combatantOf(
   pet: { id: string; name: string; companionOf: string },

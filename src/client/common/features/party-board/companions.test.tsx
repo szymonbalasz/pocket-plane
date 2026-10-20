@@ -245,6 +245,14 @@ describe("FR-PARTY-42 band for other players", () => {
       inCombat: false,
       hp: { current: 24 },
     });
+    // The owner's view with `entityId` (CP4) matches by id, also after a mid-fight rename; other
+    // players match by owner + name only, so a renamed pet falls back to its row (accepted edge).
+    const renamed = { ...cOwner, entityId: "owl", name: "Old Owlbear" };
+    expect(g(P1, [owlbearOwner], [renamed])).toMatchObject({ inCombat: true, hp: { current: 20 } });
+    expect(g(P2, [owlbearOther], [{ ...cOther, name: "Old Owlbear" }])).toMatchObject({
+      inCombat: false,
+      band: "bloodied",
+    });
     // An ended fight's combatant (DM: inactive) doesn't count.
     expect(g(DM, [owlbearDm], [{ ...cDm, active: false }])).toMatchObject({ inCombat: false });
     const html = render(P2, [mira, owlbearOther], [cOther]);

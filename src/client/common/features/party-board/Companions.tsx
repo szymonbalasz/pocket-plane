@@ -4,11 +4,9 @@
 // name, turn mode icon, "In combat"; HP "45 / 59" + bar for the DM and the owner (the combatant's
 // in a fight), a band for others; Card (DM, owner) opens the companion card. The DM's New pet… and
 // row menu come from the DM client (`dm`). Reads `entity` / `combatant` rows only (FR-PARTY-45).
-import type { TurnMode } from "@shared/entities/schemas";
-import { CornerDownRightIcon, DicesIcon, IdCardIcon, LinkIcon } from "lucide-react";
+import { IdCardIcon } from "lucide-react";
 import { type ComponentType, useMemo } from "react";
 import { Button } from "../../components/ui/button";
-import { Tooltip } from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { cn } from "../../lib/utils";
@@ -18,6 +16,7 @@ import {
   COMPANION_CARD_KIND,
   useOpenCompanionCard,
 } from "../combat-tracker/companion-card-request";
+import { ModeIcon } from "../combat-tracker/companions";
 import { BandBadge, Portrait } from "../combat-tracker/parts";
 import { useDefinitions } from "../compendium/definitions";
 import { useRegistry } from "../play-shell/ShellContext";
@@ -37,13 +36,6 @@ export interface CompanionsDmParts {
   header: ComponentType<{ disabled: boolean }>;
   menu: ComponentType<{ row: CompanionRow; disabled: boolean }>;
 }
-
-/** FR-PARTY-42: the turn mode as FR-CBT-118's icon; Tooltip names the mode. */
-const MODE: Record<TurnMode, { icon: typeof LinkIcon; label: string }> = {
-  "after-owner": { icon: CornerDownRightIcon, label: "After the owner" },
-  "in-owner-turn": { icon: LinkIcon, label: "In the owner's turn" },
-  own: { icon: DicesIcon, label: "Own initiative" },
-};
 
 const HP_BAR = { healthy: "bg-hp-full", bloodied: "bg-hp-bloodied", down: "bg-hp-down" } as const;
 
@@ -88,16 +80,17 @@ function Health({ row }: { row: CompanionRow }) {
 
 function Row({
   row,
+  ownerName,
   base,
   dm,
   live,
 }: {
   row: CompanionRow;
+  ownerName: string;
   base: string | null;
   dm?: CompanionsDmParts;
   live: boolean;
 }) {
-  const mode = row.turnMode ? MODE[row.turnMode] : null;
   return (
     <li
       data-testid="party-companion-row"
@@ -112,16 +105,14 @@ function Row({
           <span className="break-words font-medium" data-testid="party-companion-name">
             {row.name}
           </span>
-          {mode && (
-            <Tooltip content={mode.label}>
-              <span
-                className="text-muted-foreground"
-                data-testid="party-companion-mode-icon"
-                data-value={row.turnMode}
-              >
-                <mode.icon className="size-3.5" aria-label={mode.label} />
-              </span>
-            </Tooltip>
+          {/* FR-PARTY-42: FR-CBT-118's icon; the Tooltip names the mode. */}
+          {row.turnMode && (
+            <ModeIcon
+              id={row.id}
+              mode={row.turnMode}
+              ownerName={ownerName}
+              testId="party-companion-mode-icon"
+            />
           )}
           {row.inCombat && (
             <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
@@ -173,6 +164,7 @@ function Group({
           <Row
             key={r.id}
             row={r}
+            ownerName={g.characterName}
             base={r.baseId ? (bases.get(r.baseId) ?? null) : null}
             dm={dm}
             live={live}
