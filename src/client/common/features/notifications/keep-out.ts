@@ -10,6 +10,7 @@
 // FR-NOTE-44 (sim-10 b05): while a tool bar is shown (the windows it pushed among them), every
 // window's title bar and first 40 px of body block it too. Pure; players keep bottom-right.
 
+import { type FirstRow, firstRows } from "../play-shell/content-heights";
 import {
   EDGE_GAP,
   LAUNCHER_CLEAR,
@@ -67,8 +68,8 @@ const hits = (a: Rect, b: Rect, gap: number) =>
  * rendered rects; their title bars are never covered (P3 retest: the drag handle stays
  * reachable), their bodies only when no spot clear of them is (sim-6 glitch 3: the stack sat on
  * the Notifications rows). `hard`: hard keep-out rects (FR-NOTE-43: the active tool bar), never
- * covered; while one is (a tool bar pushed windows, FR-NOTE-44), each window's title bar + 40 px of
- * body is never covered either. Candidate spots (FR-NOTE-42): FR-NOTE-32's first, then the top row, below each title
+ * covered; while one is (a tool bar pushed windows, FR-NOTE-44), each window's title bar, first
+ * 40 px of body and first content row (`rows`: `ShellWindow`'s reports) are never covered either. Candidate spots (FR-NOTE-42): FR-NOTE-32's first, then the top row, below each title
  * bar, below each window, below each hard keep-out and above / below each token, at the home or
  * left of Initiative only. Of the spots clear of Initiative, the bars and the hard keep-outs, the
  * one covering the least token area, then the least window body, wins (ties keep the earlier
@@ -84,6 +85,7 @@ export function dmStackPlacement(
   avoid: readonly TokenBox[] = [],
   windows: readonly Rect[] = [],
   hard: readonly Rect[] = [],
+  rows: readonly FirstRow[] = [...firstRows().values()],
 ): { left: number; top: number } {
   const base = initiativeKeepOut(vp, initiative, stackH, width);
   const at = (p: { left: number; top: number }) => ({ x: p.left, y: p.top, w: width, h: stackH });
@@ -93,9 +95,14 @@ export function dmStackPlacement(
   const fits = (p: { top: number }) => p.top + stackH <= vp.h - LAUNCHER_CLEAR;
   if (stackH === 0) return base;
   if (avoid.length === 0 && windows.length === 0 && fits(base) && offHard(base)) return base;
-  // FR-NOTE-44: with a tool bar shown, a window's first 40 px of body counts with its title bar.
-  const strip = hard.length > 0 ? TITLE_H + PUSHED_BODY_CLEAR : TITLE_H;
-  const bars = windows.map((w) => ({ ...w, h: Math.min(w.h, strip) }));
+  // FR-NOTE-44: with a tool bar shown, a window's title bar, first 40 px of body and first
+  // content row (its reported bottom, walkthrough U4) count as its bar.
+  const strip = (w: Rect) => {
+    if (hard.length === 0) return TITLE_H;
+    const row = rows.find((r) => Math.abs(r.x - w.x) <= 1 && Math.abs(r.y - w.y) <= 1);
+    return Math.max(TITLE_H + PUSHED_BODY_CLEAR, row ? row.bottom - w.y : 0);
+  };
+  const bars = windows.map((w) => ({ ...w, h: Math.min(w.h, strip(w)) }));
   const clear = (p: { left: number; top: number }) =>
     !(initiative && hits(at(p), initiative, EDGE_GAP)) &&
     !bars.some((b) => hits(at(p), b, 0)) &&

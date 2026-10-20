@@ -146,23 +146,31 @@ test("FR-SHELL-87 (e) every sim-10 auto placement at the four sizes: launcher ki
   }
 });
 
-test("FR-SHELL-77 DM 1280×720 PCs are player characters (sim-10 b02, b03): Compendium, Party, Encounters on sim-10's fitted ambush → Party and Encounters clear of every PC footprint (Mira, Thorn, Brakka; the pets and summons rank like other tokens)", () => {
+test("FR-SHELL-77 DM 1280×720 PCs are player characters, min-size auto-minimise (sim-10 b02, b03; walkthrough U1, #319): Compendium 442,60 346×400; Party 442,60 346×400 auto-minimising Compendium; Encounters 442,60 368×320 auto-minimising Party; every one clear of every PC footprint (Mira, Thorn, Brakka)", () => {
   const tokens = fitted(LAPTOP);
   expect(tokens.filter((t) => t.pc).length).toBe(3);
+  const log: string[] = [];
   const ctx: ManagerContext = {
     registry: dmWindows,
     viewport: LAPTOP,
     available: all(),
     avoid: () => tokens,
+    onAutoMinimise: (id, forKind) => log.push(`${id.split(":")[0]}>${forKind}`),
   };
   let ws: Windows = defaultLayout(dmWindows, LAPTOP);
-  const out: string[] = [];
+  const got: Record<string, string> = {};
   for (const kind of ["cmp.compendium", "party.board", "cbt.encounters"]) {
     ws = reduce(ws, { type: "open", kind }, ctx);
     const r = rectIn(ws, kind);
-    out.push(`${kind} ${r.x},${r.y} ${r.w}×${r.h}`);
+    got[kind] = `${r.x},${r.y} ${r.w}×${r.h}`;
     expect({ kind, pcClear: pcClear(r, tokens) }).toEqual({ kind, pcClear: true });
   }
-  const parked = ws.filter((w) => w.state === "minimised").map((w) => w.kind);
-  console.info(`FR-SHELL-77 DM 1280×720: ${out.join("; ")}; auto-minimised ${parked.join(",")}`);
+  // No 440-wide spot is PC-free even on an empty map (U1's report): the min-size step (d) /
+  // look-ahead (d') auto-minimises the previous window for a PC-clear spot below useful size.
+  expect(got).toEqual({
+    "cmp.compendium": "442,60 346×400",
+    "party.board": "442,60 346×400",
+    "cbt.encounters": "442,60 368×320",
+  });
+  expect(log).toEqual(["cmp.compendium>party.board", "party.board>cbt.encounters"]);
 });

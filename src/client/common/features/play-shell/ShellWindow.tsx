@@ -19,7 +19,7 @@ import {
 } from "react";
 import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
-import { reportContentHeight } from "./content-heights";
+import { reportContentHeight, reportFirstRow } from "./content-heights";
 import { useGrowthCaps } from "./free-area";
 import {
   growsToContent,
@@ -131,6 +131,7 @@ export function ShellWindow({
   // (FR-SHELL-39), capped by the next window or hard keep-out (FR-SHELL-52); a gesture starts here
   // and its end stores the result with the current work area.
   const rect = windowRect(win, def, viewport, needed, caps);
+  useFirstRow(wid, open, rect, ref, bodyRef);
   const id = { kind: win.kind, instance: win.instance };
   const parked = win.state === "minimised";
   const Body = def.component;
@@ -288,6 +289,52 @@ export function ShellWindow({
  * at once too, not only after React re-renders, so a feature open placing this window right after
  * a layout frame (FR-SHELL-40) sees it.
  */
+/**
+ * FR-NOTE-44: reports where the open window's first content row ends: the first record row
+ * (`[data-record-id]`, AGENTS §9.5) whose bottom is below the body's top; none → nothing.
+ * Re-measured when the rect changes and when the body's content resizes.
+ */
+function useFirstRow(
+  wid: string,
+  open: boolean,
+  rect: Rect,
+  sectionRef: RefObject<HTMLElement | null>,
+  bodyRef: RefObject<HTMLDivElement | null>,
+) {
+  const { x, y, w, h } = rect;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the rect is the trigger
+  useLayoutEffect(() => {
+    const section = sectionRef.current;
+    const body = bodyRef.current;
+    if (!open || !section || !body) {
+      reportFirstRow(wid, null);
+      return;
+    }
+    const measure = () => {
+      const s = section.getBoundingClientRect();
+      const top = body.getBoundingClientRect().top;
+      let bottom: number | null = null;
+      for (const el of body.querySelectorAll("[data-record-id]")) {
+        const r = el.getBoundingClientRect();
+        if (r.height === 0 || r.bottom <= top) continue;
+        bottom = Math.ceil(r.bottom);
+        break;
+      }
+      reportFirstRow(
+        wid,
+        bottom === null ? null : { x: Math.round(s.x), y: Math.round(s.y), bottom },
+      );
+    };
+    measure();
+    if (typeof ResizeObserver !== "function") return;
+    const ro = new ResizeObserver(measure);
+    const content = body.firstElementChild;
+    if (content) ro.observe(content);
+    return () => ro.disconnect();
+  }, [wid, open, x, y, w, h]);
+  useEffect(() => () => reportFirstRow(wid, null), [wid]);
+}
+
 function useNeededHeight(
   wid: string,
   grows: boolean,
