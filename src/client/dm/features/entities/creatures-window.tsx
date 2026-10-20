@@ -28,6 +28,7 @@ import { CreditsLink } from "@ui/features/compendium/credits";
 import { useDefinitions } from "@ui/features/compendium/definitions";
 import { lazyApi, searchCompendium, useCompendiumSearch } from "@ui/features/compendium/search";
 import { defineWindow } from "@ui/features/play-shell/registry";
+import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
 import { LockIcon, PawPrintIcon, UserIcon } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -63,6 +64,10 @@ function Portrait({ row }: { row: CreatureRow }) {
   );
 }
 
+/** The name line's least width (6rem): every row's name stays readable beside its actions. */
+export const NAME_MIN = "min-w-24";
+const BADGE = "shrink-0 px-1.5 py-0 text-[11px]";
+
 function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof actionsOf>["row"] }) {
   return (
     <TableRow
@@ -80,13 +85,17 @@ function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof ac
       <TableCell className="w-10 p-1.5">
         <Portrait row={row} />
       </TableCell>
-      {/* Name column takes the free width (w-full + max-w-0: truncate inside a table). CR /
-          XP sit on the second line, so a narrow window still shows names. */}
+      {/* Name column takes the free width (w-full + max-w-0: truncate inside a table) but never
+          less than NAME_MIN (the inner min width raises the cell's min-content width), so row
+          actions can't squeeze names away (CP1 walkthrough). The source / owner / pet badge, kind,
+          CR and XP sit on the second line, so a narrow window (default 340 px) still shows names. */}
       <TableCell className="w-full max-w-0 p-1.5">
-        <div className="flex items-center gap-1.5">
-          <span className="truncate font-medium" data-testid="ent-list-row-name" title={row.name}>
-            {row.name}
-          </span>
+        <div className={cn("flex items-center gap-1.5", NAME_MIN)} data-testid="ent-list-row-main">
+          <Tooltip content={row.name}>
+            <span className="truncate font-medium" data-testid="ent-list-row-name">
+              {row.name}
+            </span>
+          </Tooltip>
           {row.readOnly && (
             <Tooltip content="Read-only — derive to customise">
               <span data-testid="ent-list-row-lock" className="shrink-0 text-muted-foreground">
@@ -95,34 +104,43 @@ function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof ac
             </Tooltip>
           )}
         </div>
-        <div className="truncate text-xs tabular-nums text-muted-foreground">
-          {row.kind === "character" ? "Character" : "Monster"}
-          {row.cr !== null && (
-            <>
-              {" · "}
-              <span data-testid="ent-list-row-cr">
-                CR {row.cr} · {row.xp} XP
-              </span>
-            </>
-          )}
-          {row.derivedFrom !== null && (
-            <span data-testid="ent-list-row-derived"> · derived from {row.derivedFrom}</span>
-          )}
-        </div>
-      </TableCell>
-      <TableCell className="w-px whitespace-nowrap p-1.5">
-        {row.pet ? (
-          // FR-ENT-39: "Pet of Mira", the owner player in the Tooltip.
-          <Tooltip content={row.pet.playerName}>
-            <Badge data-testid="ent-list-row-pet" data-record-id={row.id} variant="secondary">
+        <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          {row.pet ? (
+            // FR-ENT-39: "Pet of Mira", the owner player in the Tooltip.
+            <Tooltip content={row.pet.playerName}>
+              <Badge
+                data-testid="ent-list-row-pet"
+                data-record-id={row.id}
+                variant="secondary"
+                className={BADGE}
+              >
+                {row.badge}
+              </Badge>
+            </Tooltip>
+          ) : (
+            <Badge
+              data-testid="ent-list-row-badge"
+              variant={row.readOnly ? "outline" : "secondary"}
+              className={BADGE}
+            >
               {row.badge}
             </Badge>
-          </Tooltip>
-        ) : (
-          <Badge data-testid="ent-list-row-badge" variant={row.readOnly ? "outline" : "secondary"}>
-            {row.badge}
-          </Badge>
-        )}
+          )}
+          <span className="truncate tabular-nums">
+            {row.kind === "character" ? "Character" : "Monster"}
+            {row.cr !== null && (
+              <>
+                {" · "}
+                <span data-testid="ent-list-row-cr">
+                  CR {row.cr} · {row.xp} XP
+                </span>
+              </>
+            )}
+            {row.derivedFrom !== null && (
+              <span data-testid="ent-list-row-derived"> · derived from {row.derivedFrom}</span>
+            )}
+          </span>
+        </div>
       </TableCell>
       {actions.length > 0 && (
         <TableCell className="w-px whitespace-nowrap p-1.5">

@@ -91,6 +91,19 @@ test("FR-ENT-32 FR-PARTY-41 FR-PARTY-42 FR-ENT-39 FR-PARTY-43 New pet: owl → O
 
   // C2 part: Creatures lists it with the customs, badged "Pet of Mira".
   const creatures = await openWindow(dm, "ent.creatures");
+  // FR-ENT-39 (walkthrough step 7): at the default width every row's name stays readable beside
+  // its actions (Make pet… added one): the name line ≥ 96 px, the name text visible.
+  await expect(creatures.getByTestId("ent-list-row").first()).toBeVisible();
+  const widths = await creatures
+    .getByTestId("ent-list-row-main")
+    .evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)));
+  expect(widths.length).toBeGreaterThan(3);
+  expect(Math.min(...widths)).toBeGreaterThanOrEqual(96);
+  expect(
+    await creatures
+      .getByTestId("ent-list-row-name")
+      .evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().width < 24).length),
+  ).toBe(0);
   await creatures.getByTestId("ent-list-search").fill("owlbear");
   await expect(creatures.getByTestId("ent-list-row-pet")).toHaveText("Pet of Mira");
   // Make pet… on the row prefills the creature; the name rule gives "Owlbear (Mira)".

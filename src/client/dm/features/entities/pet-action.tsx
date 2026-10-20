@@ -17,7 +17,7 @@ function MakePetAction({ row }: { row: CreatureRow }) {
         <Button
           size="icon"
           variant="ghost"
-          className="size-7"
+          className="size-6"
           data-testid="ent-pet-make"
           data-record-id={row.id}
           aria-label={`Make pet from ${row.name}`}

@@ -80,9 +80,14 @@ export function monsterNameKeys(entities: readonly EntityRecord[]): Set<string> 
  * FR-ENT-32's name rule, as the server applies it: the stem, else "‹stem› (‹PC›)", then " 2",
  * " 3"… The dialog prefills this, so the default is always free.
  */
-export function suggestedPetName(stem: string, ownerName: string, taken: ReadonlySet<string>) {
+export function suggestedPetName(
+  stem: string,
+  ownerName: string | null,
+  taken: ReadonlySet<string>,
+) {
   const free = (n: string) => !taken.has(entityNameKey(n));
-  if (free(stem)) return stem;
+  // No owner picked yet: the plain stem (never "Owlbear ()").
+  if (ownerName === null || free(stem)) return stem;
   const base = `${stem} (${ownerName})`;
   if (free(base)) return base;
   for (let n = 2; ; n++) if (free(`${base} ${n}`)) return `${base} ${n}`;

@@ -84,8 +84,9 @@ function PetForm({ base: initialBase, onDone }: { base: PetBase | null; onDone()
   // The name follows the creature and owner until the DM types one.
   const [typed, setTyped] = useState<string | null>(null);
   const owner = owners.find((o) => o.id === ownerId) ?? null;
-  const name = typed ?? (base ? suggestedPetName(base.name, owner?.name ?? "", taken) : "");
-  const nameError = typed === null && name === "" ? null : petNameError(name, taken);
+  const name = typed ?? (base ? suggestedPetName(base.name, owner?.name ?? null, taken) : "");
+  // The prefilled name is checked once an owner gives it its free form (FR-ENT-32's rule).
+  const nameError = typed === null && owner === null ? null : petNameError(name, taken);
   const body = petBody({ baseId: base?.id ?? null, ownerId, name, mode }, taken);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);

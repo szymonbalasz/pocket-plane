@@ -14,7 +14,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { keptPetFields } from "../combat-tracker/creature-form";
 import { actionsOf, creatureActions } from "./creature-actions";
-import { CreaturesList } from "./creatures-window";
+import { CreaturesList, NAME_MIN } from "./creatures-window";
 import { creatureRows } from "./list";
 import { petCreatureAction } from "./pet-action";
 import {
@@ -123,6 +123,26 @@ describe("FR-ENT-39 Creatures window", () => {
     expect(html).toMatch(/data-testid="ent-list-row-badge"[^>]*>Custom</);
   });
 
+  test("FR-ENT-39 names readable at the default width: a least-width name line, the badge on the second line, actions last (layout: e2e/cp-pets.e2e.ts)", () => {
+    const html = render(records);
+    const rows = html.split('data-testid="ent-list-row"').slice(1);
+    expect(rows).toHaveLength(records.length);
+    for (const r of rows) {
+      // Name line with the least width (the cell can't collapse below it) and the full name.
+      expect(r).toMatch(
+        new RegExp(`class="[^"]*${NAME_MIN}[^"]*" data-testid="ent-list-row-main"`),
+      );
+      expect(r).toContain('data-testid="ent-list-row-name"');
+      // Three cells: portrait, name (+ badge line), actions; no badge column any more.
+      expect(r.match(/<td/g)).toHaveLength(3);
+      // The badge sits in the name cell (before the actions cell, the third).
+      const actionsAt = r.indexOf("<td", r.indexOf("<td", r.indexOf("<td") + 1) + 1);
+      const badgeAt = Math.max(r.indexOf("ent-list-row-badge"), r.indexOf("ent-list-row-pet"));
+      expect(badgeAt).toBeGreaterThan(r.indexOf("ent-list-row-name"));
+      expect(badgeAt).toBeLessThan(actionsAt);
+    }
+  });
+
   test("FR-ENT-32 Make pet… on every monster row, never on characters", () => {
     expect(actionsOf(creatureActions).row.map((a) => a.id)).toContain("ent.make-pet");
     const html = render(records);
@@ -152,6 +172,8 @@ describe("FR-ENT-32 pet dialog rules", () => {
 
   test("FR-ENT-32 make pet dialog: the prefilled name is the server's free name; 'Name taken' inline", () => {
     expect(suggestedPetName("Wolf", "Mira", taken)).toBe("Wolf");
+    // No owner picked yet: the plain name, never "Owlbear ()".
+    expect(suggestedPetName("Owlbear", null, taken)).toBe("Owlbear");
     // "Owlbear" is Mira's pet already → "Owlbear (Thorn)", then " 2".
     expect(suggestedPetName("Owlbear", "Thorn", taken)).toBe("Owlbear (Thorn)");
     const more = new Set([...taken, "owlbear (thorn)"]);
