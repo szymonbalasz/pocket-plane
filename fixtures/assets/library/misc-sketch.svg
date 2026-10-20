@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200">
+  <title>Misc Sketch</title>
+  <rect width="300" height="200" fill="#eeeeee"/><path d="M20 180L80 40L140 160L200 60L280 170" fill="none" stroke="#6d4c41" stroke-width="4"/>
+  <circle cx="150" cy="100" r="60" fill="#c62828" stroke="#111" stroke-width="3"/><circle cx="150" cy="100" r="30" fill="#111"/>
+  <rect x="45" y="182" width="19" height="10" fill="#fff" stroke="#000"/><rect x="66" y="181" width="19" height="11" fill="#fff" stroke="#000"/><rect x="87" y="176" width="19" height="16" fill="#fff" stroke="#000"/><rect x="108" y="184" width="19" height="8" fill="#fff" stroke="#000"/><rect x="129" y="179" width="19" height="13" fill="#fff" stroke="#000"/><rect x="150" y="180" width="19" height="12" fill="#fff" stroke="#000"/><rect x="171" y="183" width="19" height="9" fill="#fff" stroke="#000"/><rect x="192" y="182" width="19" height="10" fill="#fff" stroke="#000"/><rect x="213" y="184" width="19" height="8" fill="#fff" stroke="#000"/><rect x="234" y="188" width="19" height="4" fill="#fff" stroke="#000"/>
+</svg>

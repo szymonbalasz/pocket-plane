@@ -11,6 +11,8 @@ export interface IngestRequest {
   name?: string;
   /** FR-ASSET-24 (S5): false = an attachment. Absent = listed. */
   listed?: boolean;
+  /** FR-ASSET-41 (S6): the upload context's tags. Absent = none (`[]` on a new row). */
+  tags?: string[];
 }
 
 /** Async half of an ingest; the result is the `assets.ingest` command input. */
@@ -21,6 +23,7 @@ export async function prepareIngest(req: IngestRequest): Promise<IngestInput> {
     filename: req.filename,
     ...(req.name !== undefined ? { name: req.name } : {}),
     ...(req.listed !== undefined ? { listed: req.listed } : {}),
+    ...(req.tags !== undefined ? { tags: req.tags } : {}),
   };
 }
 

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Skeleton Guard</title>
+  <circle cx="128" cy="128" r="124" fill="#ad1457" stroke="#222" stroke-width="6"/>
+  <polygon points="128,51 146,85 182,74 171,110 205,128 171,146 182,182 146,171 128,205 110,171 74,182 85,146 51,128 85,110 74,74 110,85" fill="#00838f" stroke="#111" stroke-width="3"/>
+  <rect x="38" y="235" width="15" height="13" fill="#fff" stroke="#000"/><rect x="55" y="236" width="15" height="12" fill="#fff" stroke="#000"/><rect x="72" y="239" width="15" height="9" fill="#fff" stroke="#000"/><rect x="89" y="242" width="15" height="6" fill="#fff" stroke="#000"/><rect x="106" y="239" width="15" height="9" fill="#fff" stroke="#000"/><rect x="123" y="238" width="15" height="10" fill="#fff" stroke="#000"/><rect x="140" y="234" width="15" height="14" fill="#fff" stroke="#000"/><rect x="157" y="241" width="15" height="7" fill="#fff" stroke="#000"/><rect x="174" y="241" width="15" height="7" fill="#fff" stroke="#000"/><rect x="191" y="244" width="15" height="4" fill="#fff" stroke="#000"/>
+</svg>

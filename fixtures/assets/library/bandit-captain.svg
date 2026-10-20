@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Bandit Captain</title>
+  <circle cx="128" cy="128" r="124" fill="#9e9d24" stroke="#222" stroke-width="6"/>
+  <rect x="102.33333333333333" y="51" width="51.333333333333336" height="154" fill="#6d4c41" stroke="#111" stroke-width="3"/><rect x="51" y="102.33333333333333" width="154" height="51.333333333333336" fill="#6d4c41" stroke="#111" stroke-width="3"/>
+  <rect x="38" y="237" width="15" height="11" fill="#fff" stroke="#000"/><rect x="55" y="241" width="15" height="7" fill="#fff" stroke="#000"/><rect x="72" y="241" width="15" height="7" fill="#fff" stroke="#000"/><rect x="89" y="233" width="15" height="15" fill="#fff" stroke="#000"/><rect x="106" y="237" width="15" height="11" fill="#fff" stroke="#000"/><rect x="123" y="238" width="15" height="10" fill="#fff" stroke="#000"/><rect x="140" y="243" width="15" height="5" fill="#fff" stroke="#000"/><rect x="157" y="241" width="15" height="7" fill="#fff" stroke="#000"/><rect x="174" y="240" width="15" height="8" fill="#fff" stroke="#000"/><rect x="191" y="238" width="15" height="10" fill="#fff" stroke="#000"/>
+</svg>
