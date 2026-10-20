@@ -16,11 +16,12 @@ import { and, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, invalid, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
-import { combatant, entity } from "../../db/schema";
+import { combatant, entity, token } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { gameLog } from "../dice-roll-log";
 import { syncPetPresence } from "../entities/pet-presence";
 import { getRow } from "../entities/rows";
+import { deleteTokenIn } from "../scenes-map/commands";
 import { setTokenOwnerIn } from "../scenes-map/token-owner";
 import { resolveSummonCards } from "./concentration-card";
 import { companionLeaves, petWriteBack } from "./dismiss";
@@ -234,17 +235,20 @@ export { companionText };
 
 /**
  * FR-CBT-113 (End, inside `EncounterEnded`'s transaction, after its rows): each active pet
- * combatant's `hpCurrent` goes back to its pet (temp HP dropped); each summon's bound token is
- * deleted (FR-MAP-79, OQ-CBT-83b; only tokens `cbt.summon` made, #295); any other companion's
- * token loses its owner (`companionLeaves`); the pets' presence follows. Call with the rows
- * **before** End set them inactive; the combatants must already be inactive (the token hook then
- * allows the delete). Returns the rows for `EncounterEnded`'s changes.
+ * combatant's `hpCurrent` goes back to its pet (temp HP dropped), its tokens keep their owner
+ * (FR-MAP-88); any other companion's token loses its owner (`companionLeaves`); the pets'
+ * presence follows. FR-CBT-145 (sprint 7): **every summoned** combatant's token that still exists
+ * is deleted (FR-MAP-79; only tokens `cbt.summon` made, #295), whatever its owner now (released,
+ * turned hostile) and removed ones too. Call with the rows **before** End set them inactive; the
+ * combatants must already be inactive (the token hook then allows the delete). Returns the rows
+ * for `EncounterEnded`'s changes.
  */
 export function companionsAtEnd(env: CommandEnv, rows: readonly CombatantRecord[]): RecordChange[] {
   const out: RecordChange[] = [];
   const pets: string[] = [];
+  for (const c of endingSummons(env.tx, rows)) out.push(...deleteTokenIn(env, c.tokenId));
   for (const c of rows) {
-    if (!c.active || c.ownerCharacterId === null) continue;
+    if (c.summoned || !c.active || c.ownerCharacterId === null) continue;
     if (c.pet) {
       pets.push(c.entityId);
       out.push(...petWriteBack(env, c));
@@ -254,4 +258,20 @@ export function companionsAtEnd(env: CommandEnv, rows: readonly CombatantRecord[
   }
   out.push(...syncPetPresence(env, campaignOf(env.actor), { petIds: pets }));
   return out;
+}
+
+/**
+ * FR-CBT-145 / FR-CBT-144: the encounter's summoned combatants whose token still exists (active
+ * or removed, any owner; a dismissed one's token is gone already), in row order.
+ */
+export function endingSummons(
+  tx: Read,
+  rows: readonly CombatantRecord[],
+): (CombatantRecord & { tokenId: string })[] {
+  return rows.filter(
+    (c): c is CombatantRecord & { tokenId: string } =>
+      c.summoned &&
+      c.tokenId !== null &&
+      tx.select({ id: token.id }).from(token).where(eq(token.id, c.tokenId)).get() !== undefined,
+  );
 }

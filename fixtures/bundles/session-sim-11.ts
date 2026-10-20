@@ -13,5 +13,7 @@ export default defineBundle({
     // GM: gems (no unit: gems off by default, switched on live in the walkthrough)
     // ST: stats (a past session in the log: `st-past-crypt`, ST core)
     // FU: sprint-6 follow-ups (`cp-ally` charmed Goblin 2 + `fu-hurt-goblins`, FU-combat)
+    "cp-ally",
+    "fu-hurt-goblins",
   ],
 });

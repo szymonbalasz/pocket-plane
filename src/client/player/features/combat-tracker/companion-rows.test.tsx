@@ -145,3 +145,41 @@ describe("FR-CBT-107 'After Mira' on player rows (walkthrough fix)", () => {
     }
   });
 });
+
+/** The `cbt-init-companion` line `id` alone (up to the next line or the row's end). */
+const lineOf = (html: string, id: string) => {
+  const line = rowHtml(html, "cbt-init-companion", id);
+  const end = line.indexOf('data-testid="cbt-init-row"');
+  return end < 0 ? line : line.slice(0, end);
+};
+
+describe("FR-CBT-142 compact companion line (players)", () => {
+  test("FR-CBT-142 compact companion line: owner (player-1) — name, '22 / 22', AC from its card, chips slot, card icon; no ⋯", () => {
+    const drake = lineOf(as("p1"), "drake");
+    expect(drake).toContain(">Drake Companion<");
+    expect(drake).toMatch(/data-testid="cbt-init-row-hp" data-record-id="drake"[^>]*>22 \/ 22</);
+    expect(drake).toMatch(/data-testid="cbt-init-row-ac" data-record-id="drake"[^>]*>AC 13</);
+    expect(drake).toMatch(/data-testid="cbt-init-row-card" data-record-id="drake"/);
+    expect(drake).not.toContain("cbt-init-companion-menu");
+    expect(drake).not.toContain("cbt-init-row-menu");
+    expect(drake).not.toContain("cbt-init-row-band");
+    // One row: NameLine holds the stats (side) and the card icon (end); no portrait or marker.
+    expect(drake).toContain("data-name-end");
+    expect(drake).not.toContain("Current turn");
+  });
+
+  test("FR-CBT-142 compact companion line: other player (player-2) — name, band, chips; no AC, no card icon, no ⋯", () => {
+    const drake = lineOf(as("p2"), "drake");
+    expect(drake).toContain(">Drake Companion<");
+    expect(drake).toMatch(/data-testid="cbt-init-row-band"[^>]*data-value="healthy"/);
+    for (const id of ["cbt-init-row-hp", "cbt-init-row-ac", "cbt-init-row-card"]) {
+      expect(drake).not.toContain(id);
+    }
+    expect(drake).not.toContain("cbt-init-companion-menu");
+    expect(drake).not.toContain("cursor-pointer");
+    // player-2's own in-turn pet (Thorn's Wolf) gets the owner's line.
+    const wolf = lineOf(as("p2"), "wolfpet");
+    expect(wolf).toMatch(/data-testid="cbt-init-row-card" data-record-id="wolfpet"/);
+    expect(wolf).toContain("cbt-init-row-ac");
+  });
+});
