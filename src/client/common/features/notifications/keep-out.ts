@@ -6,8 +6,9 @@
 // default. Window title bars are never covered, their bodies only when no spot clear of them is
 // (sim-6 glitch 3). FR-NOTE-42 (sim-9 a01): the stack stays in its top-centre band (home, or the
 // left-of-Initiative shift) and moves down, never to the rail or beside windows / tokens.
-// FR-NOTE-43 (sim-9 b01): hard keep-outs (the active tool bar) block it like Initiative. Pure;
-// players keep bottom-right.
+// FR-NOTE-43 (sim-9 b01): hard keep-outs (the active tool bar) block it like Initiative.
+// FR-NOTE-44 (sim-10 b05): while a tool bar is shown (the windows it pushed among them), every
+// window's title bar and first 40 px of body block it too. Pure; players keep bottom-right.
 
 import {
   EDGE_GAP,
@@ -22,6 +23,9 @@ import { coveredArea, type TokenBox } from "../play-shell/token-boxes";
 
 /** The stack's width, px (`w-80`). */
 export const STACK_W = 320;
+
+/** FR-NOTE-44: body px under a title bar kept clear while a tool bar is shown. */
+export const PUSHED_BODY_CLEAR = 40;
 
 /** FR-NOTE-32 alone: centred, else left of Initiative, else below it. */
 function initiativeKeepOut(
@@ -63,7 +67,8 @@ const hits = (a: Rect, b: Rect, gap: number) =>
  * rendered rects; their title bars are never covered (P3 retest: the drag handle stays
  * reachable), their bodies only when no spot clear of them is (sim-6 glitch 3: the stack sat on
  * the Notifications rows). `hard`: hard keep-out rects (FR-NOTE-43: the active tool bar), never
- * covered. Candidate spots (FR-NOTE-42): FR-NOTE-32's first, then the top row, below each title
+ * covered; while one is (a tool bar pushed windows, FR-NOTE-44), each window's title bar + 40 px of
+ * body is never covered either. Candidate spots (FR-NOTE-42): FR-NOTE-32's first, then the top row, below each title
  * bar, below each window, below each hard keep-out and above / below each token, at the home or
  * left of Initiative only. Of the spots clear of Initiative, the bars and the hard keep-outs, the
  * one covering the least token area, then the least window body, wins (ties keep the earlier
@@ -88,7 +93,9 @@ export function dmStackPlacement(
   const fits = (p: { top: number }) => p.top + stackH <= vp.h - LAUNCHER_CLEAR;
   if (stackH === 0) return base;
   if (avoid.length === 0 && windows.length === 0 && fits(base) && offHard(base)) return base;
-  const bars = windows.map((w) => ({ ...w, h: Math.min(w.h, TITLE_H) }));
+  // FR-NOTE-44: with a tool bar shown, a window's first 40 px of body counts with its title bar.
+  const strip = hard.length > 0 ? TITLE_H + PUSHED_BODY_CLEAR : TITLE_H;
+  const bars = windows.map((w) => ({ ...w, h: Math.min(w.h, strip) }));
   const clear = (p: { left: number; top: number }) =>
     !(initiative && hits(at(p), initiative, EDGE_GAP)) &&
     !bars.some((b) => hits(at(p), b, 0)) &&
