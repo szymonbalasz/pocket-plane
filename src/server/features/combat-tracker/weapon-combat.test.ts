@@ -373,7 +373,8 @@ describe("FR-CBT-84 outcome line parts", () => {
     expect(e?.rollIds as string[]).toContain(extraId);
     const l = t.lines(id);
     expect(l.players).toBe(
-      `Brakka attacks Goblin: 14 + 8 = 22 — DM: hit. 15 slashing + 4 fire (half) damage + ${v} radiant (Divine Fury) (1d6+2: ${v - 2} + 2) (physical)`,
+      // FR-CBT-137 (sprint 7): 19+ on the 7 HP Goblin is an overkill callout.
+      `Brakka attacks Goblin: 14 + 8 = 22 — DM: hit. 15 slashing + 4 fire (half) damage + ${v} radiant (Divine Fury) (1d6+2: ${v - 2} + 2) (physical) — Overkill!`,
     );
     expect(l.dm).toContain("+ 4 fire (half) (2d6: 2 + 6) damage");
     // No extra-part dice in the players' copy (rulings B4).

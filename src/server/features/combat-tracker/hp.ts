@@ -37,6 +37,7 @@ import {
   HpApplied,
   type HpChangeFacts,
 } from "@shared/events/combat-tracker";
+import { isOverkillCallout } from "@shared/stats/callout";
 import { and, desc, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, invalid, notFound } from "../../commands/errors";
@@ -342,6 +343,8 @@ export const applyCardWith = (hooks: ApplyHooks) =>
         // `applied` = HP lost; temp HP took `absorbed` first (FR-CBTX-15).
         const applied = Math.abs(hp.hpBefore - hp.hpAfter);
         const overkill = Math.max(0, raw - hp.absorbed - hp.hpBefore);
+        // FR-CBT-137 (FR-STATS-21): the callout flag, for everyone; the amount stays `dmPayload`'s.
+        const callout = isOverkillCallout({ ...hp, overkill });
         // FR-CBT-91: a ruled card's lines are damage-only (Apply hit wrote the to-hit lines).
         const lineToHit =
           !ruling && toHitRoll && p.toHit && toHitTotal !== undefined
@@ -366,6 +369,7 @@ export const applyCardWith = (hooks: ApplyHooks) =>
           crit: p.crit,
           manual,
           ...(hooked.parts.length ? { parts: hooked.parts } : {}),
+          ...(callout ? { callout: "overkill" as const } : {}),
           // FR-CBT-84: the extra parts after their multiplier (public, like the damage).
           ...(hit && parts.length
             ? {
@@ -497,6 +501,9 @@ export const applyHp = defineCommand({
   input: ApplyHpInput,
   execute(input, env): HpChangeResult {
     const { c: target, enc } = activeCombatant(env, input.combatantId);
+    // FR-CBT-136: the From combatant (self-heal allowed); unknown, ended, inactive, removed →
+    // `not_found` (one started encounter per campaign, so it is the target's).
+    const source = input.sourceId === undefined ? null : activeCombatant(env, input.sourceId).c;
     const targetAc = statsOf(env, target).ac;
     const hpChangeId = env.ctx.ids.next();
     const hp = hpRules.apply(env, hpTargetOf(target), {
@@ -507,20 +514,30 @@ export const applyHp = defineCommand({
     const applied = Math.abs(hp.hpBefore - hp.hpAfter);
     const overkill =
       input.kind === "damage" ? Math.max(0, input.amount - hp.absorbed - hp.hpBefore) : 0;
+    // FR-CBT-137: direct damage stamps the callout too (amount DM-only).
+    const callout = input.kind === "damage" && isOverkillCallout({ ...hp, overkill });
     const entry = gameLog.append(env, {
       kind: LOG_KIND_HP,
       category: input.kind === "damage" ? "damage" : "healing",
-      actorName: "DM",
-      payload: { targetName: target.name, kind: input.kind, amount: input.amount },
+      actorName: source?.name ?? "DM",
+      payload: {
+        targetName: target.name,
+        kind: input.kind,
+        amount: input.amount,
+        ...(source ? { sourced: true as const } : {}),
+        ...(callout ? { callout: "overkill" as const } : {}),
+      },
       dmPayload: {
         applied,
         hpBefore: hp.hpBefore,
         hpAfter: hp.hpAfter,
         ...(hp.absorbed > 0 ? { absorbed: hp.absorbed } : {}),
+        ...(callout ? { overkill } : {}),
       },
       rollIds: [],
       encounterId: enc.id,
-      public: target.hidden ? false : input.public,
+      // FR-CBT-136: a hidden source makes the line DM-only, as FR-CBT-24's attacker rule.
+      public: target.hidden || source?.hidden ? false : input.public,
     });
     const facts: FactsInput = {
       encounterId: enc.id,
@@ -528,8 +545,8 @@ export const applyHp = defineCommand({
       source: "direct",
       cardId: null,
       rollIds: [],
-      attackerId: null,
-      attackerName: null,
+      attackerId: source?.id ?? null,
+      attackerName: source?.name ?? null,
       attackName: null,
       damageType: null,
       targetId: target.id,

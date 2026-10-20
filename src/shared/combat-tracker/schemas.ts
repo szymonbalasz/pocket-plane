@@ -766,6 +766,11 @@ export const ApplyHpInput = z.strictObject({
   kind: z.enum(["damage", "heal"]),
   amount: z.int().min(1).max(999),
   public: z.boolean().optional(),
+  /**
+   * FR-CBT-136 (sprint 7): the source ("From"): an active, non-removed combatant of the started
+   * encounter, the target included; absent = the DM. Written as `hp_change.attackerId`.
+   */
+  sourceId: Id.optional(),
 });
 export type ApplyHpInput = z.input<typeof ApplyHpInput>;
 export const UndoInput = z.strictObject({ expectedHpChangeId: Id });
