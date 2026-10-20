@@ -434,20 +434,19 @@ describe("FR-CBT-109 / -113 pets at Start and End", () => {
     expect(t.combatantNamed("Drake").position).toBeNull();
   });
 
-  test("FR-CBT-113 summon HP gone after End, pet HP kept", () => {
+  test("FR-CBT-113 End: pet HP written back, a setCompanion companion keeps its token", () => {
     const t = cpSetup();
-    // Goblin 2 made Mira's companion (a summon by the rule `ownerPlayerId ∧ ¬pet`).
+    // Goblin 2 made Mira's companion: not summoned, so End keeps its token (#295; CP3's
+    // `summon.test.ts` covers a summon's token delete).
     t.setCompanion({ combatantId: t.id("Goblin 2"), owner: t.owner(t.miraId) });
     t.run(applyHp.name, { combatantId: t.id("Owlbear"), kind: "damage", amount: 39 });
     expect(t.combatantNamed("Owlbear").hpCurrent).toBe(20);
     const n = t.events.length;
     t.endEncounter();
     expect(t.entityRow(t.owlbear)).toMatchObject({ hpCurrent: 20, petPresent: true });
-    // The summon's token is deleted (FR-MAP-79); the pet keeps its token.
     const ended = t.events.slice(n).find((e) => e.event.type === "EncounterEnded")?.event;
-    expect(
-      ended?.changes.filter((c) => c.type === TOKEN_TYPE && c.after === null).map((c) => c.id),
-    ).toEqual([t.tokens.goblin2]);
+    expect(ended?.changes.filter((c) => c.type === TOKEN_TYPE && c.after === null)).toEqual([]);
+    expect(t.tokenRow(t.tokens.goblin2).ownerPlayerId).toBeNull();
     expect(t.tokenRow(t.petTokens.owlbear).id).toBe(t.petTokens.owlbear);
     // A new encounter with the Owlbear (same DB): its combatant starts at 20.
     const enc2 = t.createAmbush();

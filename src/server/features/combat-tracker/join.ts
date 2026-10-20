@@ -50,7 +50,8 @@ export class TokenPlacer {
     this.tokens = sceneTokens(env.tx, scene.id);
   }
 
-  place(def: DefinitionRecord, hidden: boolean): TokenRecord {
+  /** `ownerPlayerId` (sprint 6, FR-MAP-75): a summon's token takes its owner's player. */
+  place(def: DefinitionRecord, hidden: boolean, ownerPlayerId?: string): TokenRecord {
     const size = def.statBlock.size;
     const cell = freeCellsNear(this.scene, this.tokens, this.at, size, 1)[0] ?? this.at;
     try {
@@ -60,6 +61,7 @@ export class TokenPlacer {
         col: cell.col,
         row: cell.row,
         hidden,
+        ...(ownerPlayerId !== undefined ? { ownerPlayerId } : {}),
         ...this.imageOf(def),
       });
       this.tokens.push(token);

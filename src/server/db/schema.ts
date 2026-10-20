@@ -669,6 +669,11 @@ export const combatant = sqliteTable(
     concentrationEffectId: text("concentration_effect_id"),
     /** FR-CBT-117: JSON leaf `companionCard(statBlock)` with stable row ids; companions only. */
     card: text("card", { mode: "json" }).$type<CompanionCard>(),
+    /**
+     * FR-CBT-110 / -112 / -113 (#295): made by `cbt.summon`, so its bound token is the summon's
+     * and goes at Dismiss / End; a companion made with `cbt.setCompanion` keeps its token. DM only.
+     */
+    summoned: integer("summoned", { mode: "boolean" }).notNull().default(false),
   },
   (t) => [uniqueIndex("combatant_seq").on(t.seq), index("combatant_encounter").on(t.encounterId)],
 );

@@ -16,6 +16,7 @@ import { creatureSheet, entity } from "../../db/schema";
 import { TEST_SECRET } from "../../testing/services";
 import type { Viewer } from "../../ws/records";
 import { cpSetup, owlbearBlock } from "../combat-tracker/cp-testing";
+import { summonSetup } from "../combat-tracker/summon-testing";
 import { sceneSources } from "../fog-of-war/sight";
 import { createScene } from "../scenes-map/commands";
 
@@ -428,20 +429,20 @@ describe("FR-MAP-74 / -78 / -79 map seams", () => {
   });
 
   test("FR-MAP-79 summon token deleted", () => {
-    const t = cpSetup();
-    t.setCompanion({ combatantId: t.id("Goblin 2"), owner: t.owner(t.miraId) });
-    const g2 = t.id("Goblin 2");
+    const t = summonSetup();
+    const [fe] = t.summon();
+    const feToken = t.combatantRow(fe as string).tokenId as string;
     const n = t.events.length;
     t.endEncounter();
     // `deleteTokenIn` ran in End's transaction after the combatant went inactive: no conflict,
     // the token delete rides on `EncounterEnded`, players get it, the FK clears `tokenId`.
     const ended = t.events.slice(n).find((e) => e.event.type === "EncounterEnded")?.event;
-    const del = ended?.changes.find((c) => c.type === TOKEN_TYPE && c.id === t.tokens.goblin2);
+    const del = ended?.changes.find((c) => c.type === TOKEN_TYPE && c.id === feToken);
     expect(del?.after).toBeNull();
     expect(t.wire(del ? [del] : [], t.p2V)).toEqual([
-      { type: TOKEN_TYPE, id: t.tokens.goblin2, op: "delete" },
+      { type: TOKEN_TYPE, id: feToken, op: "delete" },
     ]);
-    expect(t.combatantRow(g2).tokenId).toBeNull();
+    expect(t.combatantRow(fe as string).tokenId).toBeNull();
     // The pet's token stays.
     expect(t.tokenRow(t.petTokens.owlbear).id).toBe(t.petTokens.owlbear);
   });

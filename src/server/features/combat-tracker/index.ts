@@ -10,6 +10,7 @@ import { ApplyHooks, applyHooks, bindApplyHooks } from "./apply-hooks";
 import { attackCommand } from "./attack";
 import { setCompanionCommand } from "./companions";
 import { rollDamageCommand } from "./damage";
+import { dismissCommand } from "./dismiss";
 import { createEncounter, deleteEncounter, updateEncounter } from "./encounters";
 import { applyHitCommand } from "./hit";
 import { applyCardWith, applyHp, undoCommandWith } from "./hp";
@@ -18,6 +19,7 @@ import { endCommandWith, startCommandWith } from "./lifecycle";
 import { combatRecordTypes } from "./records";
 import { bindCombatRuleHooks, CombatRuleHooks, combatRuleHooks } from "./rule-hooks";
 import { setSideCommand } from "./sides";
+import { summonCommandWith } from "./summon";
 import { turnCommand } from "./turns";
 
 export const combatTracker: Feature = {
@@ -48,6 +50,8 @@ export const combatTracker: Feature = {
       applyHitCommand,
       setSideCommand,
       setCompanionCommand,
+      summonCommandWith(hooks),
+      dismissCommand,
     ] as unknown as CommandDef[];
     for (const c of intents) r.command(c, { intent: true });
     for (const t of combatRecordTypes) r.recordType(t);

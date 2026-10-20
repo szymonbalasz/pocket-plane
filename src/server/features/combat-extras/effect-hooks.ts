@@ -15,6 +15,7 @@ import type { TargetRef } from "@shared/combat-extras/intents";
 import type { EncounterRecord } from "@shared/combat-tracker/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
+import { summonConcentrationEffectHook } from "../combat-tracker/concentration-card";
 import { modTriggerStateEffectHook } from "../effect-modifiers/trigger-state-hooks";
 import { fogBlindedEffectHook } from "../fog-of-war/blinded";
 
@@ -40,6 +41,7 @@ export interface EffectHook {
 export const effectHooks: readonly EffectHook[] = [
   modTriggerStateEffectHook, // effect-modifiers: trigger state `armed` (FR-MOD-54)
   fogBlindedEffectHook, // fog-of-war: Blinded re-derives sight (FR-FOG-48)
+  summonConcentrationEffectHook, // combat-tracker: a summon's concentration ends → DM card (FR-CBT-120)
 ];
 
 /** Live hook list, seeded from the registry; tests may add hooks via `register`. */

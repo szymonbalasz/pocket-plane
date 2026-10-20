@@ -17,6 +17,7 @@ import { setCompanionCommand } from "./companions";
 import { applyHp } from "./hp";
 import { setInitiative } from "./initiative";
 import { endCommand, startCommand } from "./lifecycle";
+import { summonCommand } from "./summon";
 
 class Killed extends Error {}
 
@@ -167,6 +168,13 @@ describe("CP0 crash (PP_TEST_CRASH seams)", () => {
         }
       }
       const mira = byName(b.db, "Mira");
+      // CP3: a real summon (its token goes at End); Goblin 2 made Mira's keeps its token.
+      run(summonCommand.name, {
+        encounterId: enc?.id,
+        definitionId: byName(b.db, "Fire Elemental").id,
+        count: 1,
+        ownerCharacterId: mira.id,
+      });
       run(setCompanionCommand.name, {
         combatantId: combatantNamed(b.db, "Goblin 2").id,
         owner: { characterId: mira.id },
@@ -176,7 +184,8 @@ describe("CP0 crash (PP_TEST_CRASH seams)", () => {
         kind: "damage",
         amount: 39,
       });
-      const summonToken = combatantNamed(b.db, "Goblin 2").tokenId as string;
+      const summonToken = combatantNamed(b.db, "Fire Elemental").tokenId as string;
+      const charmedToken = combatantNamed(b.db, "Goblin 2").tokenId as string;
       b.close();
       await crashBoth(
         loaded.openDb,
@@ -185,6 +194,9 @@ describe("CP0 crash (PP_TEST_CRASH seams)", () => {
         (db) => {
           expect(petNamed(db, "Owlbear").hpCurrent).toBe(20);
           expect(db.select().from(token).where(eq(token.id, summonToken)).get()).toBeUndefined();
+          expect(db.select().from(token).where(eq(token.id, charmedToken)).get()?.id).toBe(
+            charmedToken,
+          );
           expect(
             db
               .select()
