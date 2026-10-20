@@ -2,9 +2,9 @@
 title: Dice and game log
 prefix: DICE
 status: complete
-owner: spec-windows
+owner: spec-gems
 wave: 2
-phase: post-mvp-5
+phase: post-mvp-7
 ---
 
 # Dice and game log
@@ -49,6 +49,23 @@ phase: post-mvp-5
 
 Decided at sprint-5 DM gate 1 (#256, every pick accepted): D's OQ-DICE-30 (OQ-DICE-31 settled by seams S8); K's OQ-DICE-39, -40 (§15).
 
+- **Sprint 7** (track GM, [gems](gems.md); DM #140, #312; FR-DICE-62–71): a log entry can be **rerolled**: a new roll row (`replacesRollId`, only the d20 rerolled) and a new `roll` entry (`replaces`), the old entry's **`supersededBy`** set once and drawn **struck through** with a "rerolled" badge. Generic dice facts (no gem named); the caller (gems' Inspiration) writes its own spend line. Log kinds may carry a **feature tag** (hidden while the campaign's feature is off, FR-CAMP-44); a client **entry-action registry** puts per-line buttons (gems' "Inspiration") without gems editing `GameLog.tsx`.
+
+**Sprint 7 at a glance**
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-DICE-62 | `dice.reroll` helper: new roll, d20 only, audience copied | GM1 `build/gems-reroll` | `FR-DICE-62 reroll d20 only`, `… adv both dice`, `… audience copied` |
+| FR-DICE-63 | `gameLog.supersede`: `supersededBy` once | GM1 | `FR-DICE-63 supersede once` |
+| FR-DICE-64 | `replaces {entryId, total}` on a `roll` payload element; "(reroll, was 4)" | GM1 | `FR-DICE-64 reroll line` |
+| FR-DICE-65 | Superseded line struck through + "rerolled" → jumps to the new line | GM1 | `FR-DICE-65 superseded line` |
+| FR-DICE-66 | Dice display: new entry throws and holds; the supersede upsert never throws | GM1 | `FR-DICE-66 throw once` |
+| FR-DICE-67 | Stats contract: superseded / undone entries' rolls don't count | GM1 | `FR-DICE-67 final roll` |
+| FR-DICE-68 | Entry-action registry (`entry-actions.ts`, append-only) | GM1 | `FR-DICE-68 entry actions` |
+| FR-DICE-69 | `LogKindDef.feature?`: tagged kinds hidden while off | GM0 `fix/gems-core` | `FR-DICE-69 tagged kind off` |
+| FR-DICE-70 | `rerollableRoll(entry)` pure helper | GM1 | `FR-DICE-70 rerollable` |
+| FR-DICE-71 | CON-44 measured | GM1 | `FR-DICE-71 CON-44 supersede` |
+
 ## 2. Scope
 
 - Free roll (roll bar) and a shared roll control for other features. Adv/dis on any d20 roll: toggle, or **Shift = advantage, Ctrl = disadvantage**.
@@ -63,14 +80,14 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): D's OQ-DICE-30 (OQ-DI
 
 - Every roll is server-made or explicitly manual, and visible to exactly the right people.
 - Players read what happened in combat from the log instead of asking. The DM hides what should stay hidden, per category, without per-roll effort.
-- Stats and [gems](post-mvp/gems.md) (#140) work later from persisted rolls without data changes.
+- Stats and [gems](gems.md) (#140) work later from persisted rolls without data changes.
 
 ## 4. Non-goals
 
 - 3D dice, inline rolls, macros, roll requests, whispers (→ [dice-extras](post-mvp/dice-extras.md)). Text chat (tier C–D).
 - Client-side authoritative rolling. Editing or deleting rolls or entries. Undo of plain rolls (#67). Retroactive category changes; single-entry reveal / hide (tier B, #139 P8).
 - Hit/miss and damage outcomes (→ [combat-tracker](combat-tracker.md) kinds). Contest winners (two entries, #139 P24).
-- History beyond the snapshot window ([ADR-0029](../architecture/adr/0029-windowed-record-types.md)). Stats UI. Gem UI (post-MVP, #140).
+- History beyond the snapshot window ([ADR-0029](../architecture/adr/0029-windowed-record-types.md)). Stats UI. Gem UI (→ [gems](gems.md); this spec only supersedes entries for its caller, FR-DICE-62–70).
 
 ## 5. User stories
 
@@ -129,6 +146,17 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): D's OQ-DICE-30 (OQ-DI
 | FR-DICE-41 | **Slot labels** (BL-20; amends FR-DICE-24, -31): `RollControlOptions` gains optional `slotLabels?: readonly (string \| null)[]`, parallel to `expressions` (client only, never sent). The physical form heads each slot "<label> — <expression>" ("To hit — 1d20+8", "Slashing — 2d6+5", "Fire — 2d6"), its crit sub-row reads "Extra critical dice: 2d6 (slashing)", and the inline error names it ("Enter the total for 2d6 fire (critical)"); the tray's `adjust` groups ([FR-DICEX-05](dice-extras.md#6-functional-requirements)) carry the same labels. Callers: sheet attacks (`CharacterRollSpec`: to-hit → "To hit", each damage part → its type capitalised, no type → "Damage") and the DM's Initiative Attack ▸ (same specs, `attack-choices.ts`) (OQ-DICE-31). Absent / null → the expression alone, as today. No intent or `ManualEntry` change. | BL-20 |
 | FR-DICE-60 | *(OQ-DICE-39 A′, decided #256)* **Name colour** (BL-17): in a **`roll`-kind** entry's line (`dice.roll`, sheet checks / saves / attacks, combat rolls: every `gameLog.append` with `kind: "roll"`) the **actor name** (the bold `actorName` that starts the line, FR-DICE-20) is drawn in `colorOf(store, {role: rollerRole, playerId: rollerPlayerId})` ([FR-CAMP-28](campaign-management.md#6-functional-requirements)): the **roller's** colour, so a player's rolls show their colour (for any of their characters) and the DM's rolls the DM colour (also when the DM rolls for a PC or a monster). **Other kinds stay neutral** (default text colour): combat's DM-applied outcome lines `cbt.attack` / `cbt.hp` are appended by the DM's apply, so their `rollerRole` is `dm` even when a player's card caused them (`hp.ts`, `game-log.ts`); colouring them would paint "**Mira** hits Goblin" amber under Mira's own rose to-hit line (review #5). Still bold; no other part of the line changes (targets, totals, chips, badges). Text contrast: every palette key ≥ 4.5 : 1 on the window surface (measured, CAMP §7). `dice-log-entry` gains `data-color` (the key; absent = neutral) and `data-roller` (player id \| `dm`). | BL-17; review #5 |
 | FR-DICE-61 | **Neutral kinds, system actor, fallback, recolour:** the rule reads only the entry's `kind` (`roll` or not) and `rollerRole` / `rollerPlayerId`, never the payload, so a kind adds nothing. **System actor = neutral everywhere** (review #44; same rule as FR-NOTE-38): `gameLog.append` today stamps a system actor as `dm`; K0 makes it **throw** under a system actor (one line in dice-roll-log's `game-log.ts`; no caller today: only fog's boot backfill and upgrade run as system, and neither logs), so no line is ever DM-coloured by the system. An entry whose roller has no `player` record in the store → the default text colour (no role accent in text). A colour change recolours every coloured line in the store ≤ 1 s (OQ-CAMP-21, #256); entries written before sprint 5 render coloured too (fields exist since MVP). Client only otherwise: no kind, payload, event, record or schema change (0 B). Hidden-entry markers (DM view) unchanged. | review #44 |
+| **Sprint 7** (track GM, #140, #312) | | |
+| FR-DICE-62 | **Reroll helper** `dice.reroll(env, {entryId, rollId, manual?}) → {roll, entry, changes}` (in the caller's transaction, no event of its own): the entry must be kind `roll`, not `undone`, not superseded (else `conflict` "Already rerolled" / "Undone"); `rollId` one of its `rollIds` with a `1d20` / `2d20kh1` / `2d20kl1` term. **New roll row**: `replacesRollId` = the old id; roller from `env.actor`; actor, target, category, label, source, expression, mode copied; **only the d20 dice** re-rolled from `ctx.dice` (adv / dis: both, kept recomputed), every other die and the constant **copied**; roll hooks **not** run, the old payload's `mods` copied (FR-MOD-19 parts stay as rolled), so effects keyed on `natural` (ADR-0043 rule triggers, crit-range mods) **don't fire** on a rerolled natural 20 (accepted; card crit doubling is FR-CBT-127's); `natural`, `total` recomputed. `manual` (a `ManualEntry` for the d20 term only, adv / dis: `dice` with both) → marked manual. **New `roll` entry**: payload = the old payload with that roll replaced (+ `replaces`, FR-DICE-64), other rolls copied as they are; `category`, `public`, `audiencePlayerId`, `encounterId` **copied from the old entry** (not re-stamped, so a reroll never reveals more or less, [ADR-0056](../architecture/adr/0056-companion-visibility.md)); `rollerRole` / `rollerPlayerId` from `env.actor`. Then FR-DICE-63 on the old entry. | #140 |
+| FR-DICE-63 | **Supersede** `gameLog.supersede(env, oldEntryId, newEntryId) → RecordChange`: sets `supersededBy` once (`null` → id), like `markUndone`; already set or `undone` → `conflict`. The roll row stays immutable (FR-DICE-08); rows are never deleted. Entries are records, not the event log: [ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)'s append-only log is untouched (the caller's event is appended as usual). | No new ADR |
+| FR-DICE-64 | **Reroll marker:** a `roll` payload element gains optional `replaces {entryId, total}` (the old total). `formatLine`: "**Mira** — Perception (reroll, was 4): ⬡17 + 3 = 20". Public by construction (the same audience saw the old total). No gem is named (a later reroll rule may reuse it). | |
+| FR-DICE-65 | **Superseded line** (both clients): text and chips struck through and dimmed (as `undone`), a muted "rerolled" Badge at the end; clicking it → `focusLogEntry(supersededBy)` (FR-DICE-37). Copy / Tooltip keep the full text + "rerolled". A line both `undone` and superseded shows "undone". `dice-log-entry` gains `data-superseded`. | #140 |
+| FR-DICE-66 | **Dice display:** the new entry is a live `roll` entry → it throws, opens its popup and holds its numbers like any roll (FR-DICE-40, [FR-DICEX-49](dice-extras.md#6-functional-requirements)); the old entry's supersede upsert never throws or holds (an old `n`, as `markUndone`, DICEX §11). No dice-extras change. | |
+| FR-DICE-67 | **Stats contract** (for [stats](stats.md); seams S2): natural 20 / 1 and roll counts use the final roll only (a reroll is not an extra roll); a roll counts iff some entry that is neither `undone` nor superseded lists it in `rollIds`; `replacesRollId` links a roll to the one it replaced (a reroll, or a maxed damage part, [FR-CBT-128](combat-tracker.md#6-functional-requirements)). A roll row nobody references is never counted (as today). | GM ↔ ST |
+| FR-DICE-68 | **Entry actions** (client): new append-only registry `src/client/common/features/dice-roll-log/entry-actions.ts`: `EntryAction {id "<prefix>.<name>", order, clients?, available(store, entry, you) → boolean, Icon, label, run(entry)}`. `GameLog.tsx` draws the available ones as icon Buttons (sm, ghost) at the line end, before the category Badge, on hover and keyboard focus of the line (always shown on touch); Tooltip = `label`. Empty registry (today) → lines unchanged. First entry: gems' `gem.reroll` (FR-GEM-33). | |
+| FR-DICE-69 | **Feature-tagged kinds:** `LogKindDef` gains optional `feature` (a key of FR-CAMP-41's registry). Entries of a tagged kind are hidden for every viewer whose `features` lack the key (DM too), by the hub rule (FR-CAMP-44); the window is cut before the filter, as for hidden entries (ADR-0029). First: `gem.award`, `gem.spend`. **Traces** (ADR; [OQ-GEM-21](gems.md#15-open-questions) pick B): the `roll` kind declares for `gems` `hides` = `supersededBy` set and `strip` = `replaces`, so while gems are off only final rolls show (no struck line, no "rerolled", no "(reroll, was 4)"); on again restores them. Under A: no trace declared. | ADR proposed |
+| FR-DICE-70 | **`rerollableRoll(entry) → rollId \| null`** (pure, `@shared/dice-roll-log`): the first roll of a `roll` entry whose expression has a d20 term, not `initiative`, entry not `undone` / superseded; else null. Used by the server check and the client action; callers add their own rules (gems: actor, window, card state, FR-GEM-18). | |
+| FR-DICE-71 | **CON-44** (measured 2026-10-20, §12): worst +2,816 B per viewer (33 superseded + 33 `replaces` in the 100-entry window); 0 B while no reroll exists. | |
 
 ## 7. UI/UX notes
 
@@ -145,6 +173,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - **Test IDs:** `dice-log`, `dice-log-empty`, `dice-log-new`, `dice-log-entry` + `data-record-id` + `data-public` + `data-undone`, `dice-log-entry-manual`; `dice-roll-expression`, `-category`, `-label`, `-actor`, `-mode` (+ `data-value=normal|advantage|disadvantage`), `-physical`, `-public`, `-submit`, `-error`; `dice-manual-total`, `dice-manual-die` (+ `data-value` = expression position), `dice-manual-submit`; `dice-settings-open`, `dice-settings-category` + `data-value=<category>`. *(R3)* `dice-roll-options` (+ `data-state=open|closed`, `data-dirty`); `dice-roll-public` is the eye toggle (+ `data-state=public|hidden`). *(G6)* `dice-manual-crit-total`, `dice-manual-crit-die` (+ `data-value` = expression position), `dice-manual-error`. *(Sprint 4)* `dice-log-die`: a **wrapper** `<span>` around one chip in a line (+ `data-faces`, `data-value`, `data-kept`, `data-offered`); the `DieShape` inside keeps its own `dicex-die` (+ `data-shape`), so no element carries two test IDs (review B31). `dice-log-entry` gains `data-focused`. *(sprint 4 build, rulings)* The manual popover's effect / trigger groups ([MOD §7](effect-modifiers.md#7-uiux-notes), FR-MOD-18) add `mod-tray-group-crit` (+ `data-value` = part key, `data-slot`), `mod-tray-group-crit-total`, `mod-tray-group-crit-die` (+ `data-index`), `mod-tray-group-crit-label` after a crit.
 - *(Sprint 4)* **DM view:** chips on every line incl. hidden ones and the DM-only dice breakdowns. **Player view:** chips only for dice in public payloads.
 - *(Sprint 5)* **Held line** (FR-DICE-40): "Mira — Athletics: ⬡ + 5 = …" (blank chip, "…" total) while the dice fly, then "⬡13 + 5 = 18". Same on DM and player clients, each by its own landing; the DM's DM-only entries land when their popup miniature rests. **Physical form** (FR-DICE-41): slot heading "Slashing — 2d6+5" above its inputs. **Test IDs:** `dice-log-entry` gains `data-landed` (`true` \| `false`); `dice-log-die` drops `data-value` while held; `dice-manual-slot-label` (+ `data-slot`) on each slot heading.
+- *(Sprint 7, GM)* **Superseded line** (FR-DICE-65): "~~Mira — Perception: ⬡4 + 3 = 7~~ `rerolled`" (struck, dimmed chips, muted Badge Button); the new line below: "Mira — Perception (reroll, was 4): ⬡17 + 3 = 20". **Entry actions** (FR-DICE-68): icon Buttons at the line end on hover / focus (gems: lucide `sparkles` "Inspiration: reroll"). **DM view:** every line, hidden ones muted; actions per their `available`. **Player view:** public lines; actions only on their own characters' lines (gems' rule). Test IDs: `dice-log-entry` `data-superseded`; `dice-log-rerolled` (Badge, + `data-record-id` = the new entry); `dice-log-action` (+ `data-value` = action id, `data-record-id` = entry id).
 - *(Sprint 5, K)* *(OQ-DICE-39 A′, decided #256)* **Line:** a roll line's bold actor name in the roller's colour ("**Mira** — Athletics …" in rose when Player 1 rolled; "**Goblin** — Attack …" in amber for the DM); the DM's applied outcome lines ("**Mira** hits Goblin …") neutral. **DM view:** every roll line coloured, hidden ones keep their muted + eye-off styling with the name still coloured. **Player view:** the public lines they get, same colours. Test IDs: `dice-log-entry` `data-color`, `data-roller` (FR-DICE-60).
 
 ## 8. Data model
@@ -173,6 +202,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - **Relations:** Campaign 1—* Roll, Entry; Entry → Rolls via `rollIds` (no entry references a roll = never logged → hidden for stats; I24, no `Roll.entryId`); Roll → Player, Entity, Token by id (no FK; names copied).
 - **Derived:** line text (`formatLine`), natural 20/1, effective settings; *(sprint 4)* `die` segments and their chips from the same payload (FR-DICE-35); *(sprint 5, K)* the actor name colour from `rollerRole` / `rollerPlayerId` (FR-DICE-60). **Persisted:** rolls, entries, settings. Physical-dice mode: browser only. *(Sprint 5, D)* No change: the landing set ([FR-DICEX-49](dice-extras.md#6-functional-requirements)) and `slotLabels` are client memory / caller props.
 - **Gems later (#140):** a reroll = new roll + new entry, old entry's `supersededBy` set (shown struck through); a modified damage die = new roll row with `replacesRollId`, written by the owning command. No MVP command sets either field. Manual rolls stored without per-die values (FR-DICE-06) need them entered before a Combat gem applies.
+- *(Sprint 7, GM)* **Now written:** `replacesRollId` by `dice.reroll` (FR-DICE-62) and combat's maxed parts (FR-CBT-128); `supersededBy` by `gameLog.supersede` (FR-DICE-63), once. New optional `replaces {entryId, total}` on a `roll` payload element (FR-DICE-64). New optional `feature` on `LogKindDef` (code, not data, FR-DICE-69). **No table or column change** (both columns exist since MVP).
 - *(Sprint 5, track W)* No data-model change: client-only geometry and view state ([play-shell §8](play-shell.md#8-data-model)); no table, column, record type or stored field.
 
 ## 9. API & events
@@ -202,6 +232,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - No intent is optimistic ([ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md) E). No listeners, no signals. Stats join immutable `roll` rows via `rollIds`.
 - *(Sprint 5)* No intent, event, record or visibility change (FR-DICE-40, 41 are client-only).
 - *(Sprint 5, track W)* No REST route, intent, record type, event or signal; nothing new on the wire, so no visibility rule to add (CON-44: 0 B).
+- *(Sprint 7, GM)* No new intent or event here: `dice.reroll` / `gameLog.supersede` are internal helpers; the caller (`gem.spend`, event `GemSpent`) lists both entry upserts. **Visibility:** `supersededBy` and `replaces` follow the entry's rule (DM full; a player iff `public` or `audiencePlayerId` names them; else hidden); a superseded entry's upsert reaches exactly the viewers of that entry. Tagged kinds (`gem.*`): the entry rule **and** feature on (FR-DICE-69).
 
 ## 10. Permissions
 
@@ -212,6 +243,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 | Change public log settings | ✓ | ✗ | role |
 | Read entries | all | public, redacted | FR-DICE-15 |
 | Edit / delete / re-hide rolls or entries | ✗ | ✗ | no command exists |
+| *(Sprint 7)* Reroll an entry (via a caller, e.g. `gem.spend`) | per caller | per caller | the caller's rule (FR-GEM-18) + FR-DICE-62 |
 
 ## 11. Edge cases & failure modes
 
@@ -228,6 +260,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - *(Sprint 5)* **Name colour:** disconnect → lines keep their colours, banner; reconnect / server crash → the snapshot carries the entries and every colour, nothing to lose (client derivation; no new write). A roller's colour changes → all their lines recolour (OQ-CAMP-21: the log shows today's colour, not the one at roll time). Two players sharing a repeated default (9th player, FR-CAMP-26) → same colour, the name still differs.
 - *(Sprint 4)* **Chips:** rows written before sprint 4 render chips too (same payload); a manual roll without per-die values → one round chip with the dice total; > 20 dice in a line → all chips, wrapping (the Tooltip still lists them). Disconnect / reconnect / crash: chips are derived on render, nothing to recover. Reload: same lines, same chips. `focusLogEntry` on an entry below the window → the log opens, no scroll.
 - *(Sprint 5)* **Held numbers:** reload mid-throw → `holding` is empty, snapshot entries show their numbers at once; disconnect / reconnect mid-throw → the entry stays held through the resync, the throw finishes, numbers show at rest (or at the 6 s deadline); an entry that never entered `holding` is never blank; crash → nothing to recover (client memory); a stuck animation → numbers at 6 s (FR-DICEX-49 cap). Copying a held line copies its full text (render-only hold, accepted). **Slot labels:** a caller passing fewer labels than expressions → the rest show the expression alone; a label is text (never HTML).
+- *(Sprint 7)* **Reroll:** new roll + new entry + supersede + the caller's line commit together or not at all (crash before commit → the old line unstruck; after → both). Disconnect mid-reroll → `disconnected`, never resent; the reconnect snapshot shows the struck line if it committed. Old entry below the window → not rerollable (caller rule); its supersede upsert still reaches clients live. Two rerolls of one entry → the second `conflict`. Reload → struck lines from the snapshot (never held, never thrown again). The new entry's audience equals the old one's, so a leak scan of the old entry covers the new.
 - *(Sprint 5, W)* The wider default is browser layout only: disconnect, reconnect and a server crash change nothing; a log still at its old default size takes the new one once on load ([FR-SHELL-53](play-shell.md#6-functional-requirements)); a user-resized log keeps its size.
 
 ## 12. Performance & bandwidth
@@ -237,6 +270,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - *(Sprint 5, measured by spec-colours 2026-10-18, heavy harness, [CAMP §12](campaign-management.md#12-performance--bandwidth))* FR-DICE-60–61 (A′) add **0 B** (`rollerRole` / `rollerPlayerId` already on every entry). The rejected colour copy (on each entry and kept template): +2,163 B on the heavy DM snapshot (100 entries + 3 templates), +2,142 B per player. *(Review pass, re-measured 2026-10-18, same harness, throwaway probe deleted)* OQ-DICE-39 **B** (`actorPlayerId` on every entry, 100 entries): **+2,100 B** per viewer when all null, **+5,500 B** when every entry names a player (36-char ids), DM and each player alike.
 - *(Sprint 4, measured 2026-10-17 on real sockets, `dice-log`)* `DiceRolled` frame: player `1d20+5` 782 B to the DM / 765 B to another player; `10d6` 1,084 / 1,067 B; `50d6` 2,439 / 2,422 B; a DM hidden roll sends players **no frame**. FR-DICE-35–37 add **0 B** (chips are drawn from the payload already sent). Evaluation of ≤ 50 dice sub-millisecond; commit → frame < 50 ms locally ([live-sync §12](live-sync.md#12-performance--bandwidth)).
 - *(Sprint 5)* FR-DICE-40, 41 add **0 B** to snapshots and frames (render-only hold; `slotLabels` never sent). Baseline re-run 2026-10-18: [dice-extras §12](dice-extras.md#12-performance--bandwidth).
+- *(Sprint 7, measured by spec-gems 2026-10-20, heavy harness, throwaway probe deleted)* 100-entry window (DM avg 945 B / player avg 825 B per entry): 33 entries with `supersededBy` set (36-char id vs `null`) **+1,122 B**; 33 `replaces {entryId, rollId?, total}` markers **+1,694 B**; together **+2,816 B** per viewer (DM and each player), 0 B with no reroll. A reroll's frame: old entry upsert + new entry ≈ 1.6 KB (inside `GemSpent`'s 2,702 B, [gems §12](gems.md#12-performance--bandwidth)).
 
 ## 13. Test plan
 
@@ -302,6 +336,15 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 **Sprint 5 walkthrough:** held numbers and slot labels are walked in [dice-extras §13](dice-extras.md#13-test-plan) steps 30, 32, 33, 37 (FR-DICE-40) and 34 (FR-DICE-41), bundle `dice-polish`. Also here, on `dice-log`: step 1 again → e1–e4 show numbers at once (snapshot, never held); step 3 → A and C see B's adv line with blank chips and "…" until the dice rest.
 **Sprint 5, track W:** unit `FR-DICE-38 Game log width` (both registries: `defaultSize` at 1280×720 / 1280×800 / 1440×900 / 1600×900 = DM 690×160 / 690×160 / 1150×240 / 1150×240, player 510×160 / 510×160 / 850×280 / 850×280; min 300×160; `previousDefaults` listed; DOM: 8 single-line `1d4` entries at each default size with Physical dice off / on → ≥ 6 / ≥ 4 visible at the tall sizes, ≥ 3 / ≥ 2 at 160 high); `FR-DICE-39 wide log` (DOM at 1150 px: the sim-8 Flame Tongue crit line (6 lines at 460 px) renders on ≤ 3, the category Badge right-aligned; roll-bar expression input ≤ 320 px wide). Fixtures: `windows-s5` (play-shell §13); walkthrough W0, W1, W3 in [play-shell §13](play-shell.md#13-test-plan).
 
+**Sprint 7 (track GM):** bundle `gems` ([gems §13](gems.md#13-test-plan); e-perc, e-adv, the hidden "DM-SECRET-GEM" roll).
+
+| Level | What | Fixtures |
+|---|---|---|
+| Unit | `FR-DICE-64 reroll line` (`replaces` → "(reroll, was 4)"; kind contract still clean); `FR-DICE-65 superseded line` (struck, `data-superseded`, "rerolled" Badge → `focusLogEntry(new)`; undone + superseded → "undone"); `FR-DICE-68 entry actions` (empty registry → DOM byte-identical to sprint 6; a test action shows on hover / focus only when `available`); `FR-DICE-70 rerollable` (`1d20+3` ✓, `2d20kh1+5` ✓, `2d6` ✗, initiative ✗, undone ✗, superseded ✗, multi-roll entry → the d20 roll) | in-code |
+| Integration | `FR-DICE-62 reroll d20 only` (seeded: new roll's d20 differs per seed, the `1d4` and constant copied, `replacesRollId` set, mods copied, roll hooks not called); `… adv both dice` (both d20s new, kept recomputed); `… audience copied` (hidden DM entry → new entry hidden, never in P1 / P2 frames; companion `audiencePlayerId` copied); `FR-DICE-63 supersede once` (second call → `conflict`; rollback with the caller → old entry unchanged); `FR-DICE-66 throw once` (the new entry throws once; the supersede upsert never throws or holds); `FR-DICE-67 final roll` (helper over entries: superseded and undone rolls excluded); `FR-DICE-69 tagged kind off` (test kind with `feature`: hidden for DM + players while off, window cut before the filter); `FR-DICE-69 traces off` (gems off: the superseded entry absent and `replaces` stripped for DM + players; on: back); `FR-DICE-62 no hook re-run` (an ADR-0043 trigger on `natural === 20` doesn't fire when the reroll lands a 20; the roll-hook spy is not called); `FR-DICE-71 CON-44 supersede` (heavy harness: ≤ 3 KB per viewer for 33 + 33) | `gems`, `dice-log` |
+
+Walkthrough: [gems §13](gems.md#13-test-plan) steps 4, 11, 12.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -313,7 +356,10 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 | [character-sheet](character-sheet.md) | `char.roll` calls `dice.evaluate` + `gameLog.append`, emits `CharacterRolled` (I1); sheet buttons use the roll control (FR-DICE-24) | in revision |
 | [combat-tracker](combat-tracker.md) | `dice.evaluate`, `gameLog.append` / `markUndone`; kinds `cbt.attack`, `cbt.hp`; `encounterId`, `dmPayload`; hidden preset (I4) | in revision |
 | [notifications](notifications.md) | Separate from the game log (I6); no dice notifications in MVP | in revision |
-| [gems](post-mvp/gems.md) | Reserved `supersededBy`, `replacesRollId`, per-die storage (#140) | stub |
+| [gems](gems.md) | Reserved `supersededBy`, `replacesRollId`, per-die storage (#140). *(Sprint 7)* Caller of `dice.reroll` / `gameLog.supersede`; first entry action (`gem.reroll`); first tagged kinds `gem.award`, `gem.spend` | revised with this spec |
+| *(Sprint 7)* [campaign-management](campaign-management.md) | Feature registry, viewer `features`, hub "off" rule (FR-CAMP-41, -44) for FR-DICE-69 | revised with this spec |
+| *(Sprint 7)* [stats](stats.md) (track ST) | Reads FR-DICE-67 (final roll); defines only its own "stats read" rules | settled (seams S2) |
+| *(Sprint 7)* [dice-extras](dice-extras.md) | Nothing: a new entry throws, a supersede upsert doesn't (DICEX §11) | — |
 
 **Shared changes needed** (AGENTS §9.9, gate §4; the orchestrator picks sequence or shared branch first)
 - `src/server/commands/context.ts` — `ctx.dice` engine (CSPRNG / seeded, disposable guard) — FR-DICE-03.
@@ -334,6 +380,8 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 **Shared changes — sprint 5** (track D): none in AGENTS §9.9. Feature-owned: `src/client/common/features/dice-roll-log/{GameLog.tsx (held line render: D8; roll bar Alt stage + hint: D9), roll-control.tsx (`slotLabels`, `RollButton` `hint`: D9), logic.ts (slot labels in errors: D9)}`; `useLanded` from dice-extras. Callers' `slotLabels`: `src/client/common/features/character-sheet/rolls.tsx`, `src/client/dm/features/combat-tracker/attack-choices.ts` (other features' files; settled by seams S8). Order (seams S7, S8, S15): `GameLog.tsx` **W1 (log width) → D8 (held lines) → D9 (roll bar Alt stage + hint) → K4 (name colour)** (review ruling #20); R2's log formatters (BL-23/24/27: `@shared/combat-tracker/log-kinds.ts`, `@shared/effect-modifiers/{line,combat-parts}.ts`) merge after D8 and R1, and R2 never edits `GameLog.tsx`; D never edits those formatter files. D9 after D8, the last slice on its caller files (after W4, R1, R4). Docs at consolidation: protocol §26 roll-control row (`slotLabels`, `hint`). Build split: [dice-extras §14](dice-extras.md#14-dependencies).
 **Shared changes — sprint 5** (track K, BL-17): none in AGENTS §9.9. Feature-owned (D owns the log client; *seams S15:* `GameLog.tsx` **W1 (width) → D8 (held lines) → D9 → K4**; R2 never edits it): `src/client/common/features/dice-roll-log/GameLog.tsx` (the actor name span reads `colorOf` for `roll` entries, `data-color`, `data-roller`). Consumes CAMP's new common `src/client/common/features/campaign-management/colors.ts` (K0). **K0** also edits dice-roll-log's server `game-log.ts` (one line: throw under a system actor, FR-DICE-61; **granted by the orchestrator**, 2026-10-19). No kind, payload, event, record or schema change (under A′). Full split: [CAMP §14](campaign-management.md#sprint-5-build-split-track-k).
+
+**Shared changes — sprint 7** (track GM; split [gems §14](gems.md#14-dependencies)): **GM0** `fix/gems-core`: `LogKindDef.feature?` in `@shared/dice-roll-log/kind-types.ts` (feature-owned) and ★ `src/shared/dice-roll-log/kinds.ts` (append `gem.award`, `gem.spend`, defined in `@shared/gems/`); the hub's tag check is GM0's ★ `src/server/ws/` change. **GM1** `build/gems-reroll` (dice-roll-log server / shared / client, feature-owned; **`GameLog.tsx` holder this sprint**): `src/server/features/dice-roll-log/{reroll.ts (new), game-log.ts (supersede)}`, `@shared/dice-roll-log/{roll-kind.ts (replaces, line), reroll.ts (rerollableRoll), schemas.ts}`, `src/client/common/features/dice-roll-log/{GameLog.tsx (struck line, actions), entry-actions.ts (new append-only registry; AGENTS §9.9 at integration)}`. No schema, event or protocol-envelope change. Docs at merge: protocol §26 (registry rows), data model §15 (fields now written). ST reads log facts after GM1 (sprint-7 hotspot).
 
 **Combat lines (R4, sprint 1):** [combat-tracker](combat-tracker.md) FR-CBT-57/58 add natural markers to `cbt.attack` lines from public `payload` fields only, so FR-DICE-28 holds unchanged.
 
@@ -367,6 +415,13 @@ All rows up to OQ-DICE-28 decided or settled; sprint-4 rows by the DM at sprint-
 |---|---|---|---|---|
 | OQ-DICE-39 | **Whose colour** colours a line's name? (review #5: combat's outcome lines are appended by the DM's apply, so `rollerRole` is `dm` on them) | **Decided (#256): A′, roll lines only in the roller's colour; DM-applied outcome / rule lines neutral.** Pick as proposed: A′. Roll lines only, in the roller's colour; DM-applied outcome / rule lines (`cbt.attack`, `cbt.hp`, any non-`roll` kind) stay neutral (0 B; "who rolled", like the dice look; Mira's to-hit rose, the applied "Mira hits Goblin" plain). Rejected: ~~B. `actorPlayerId` on log entries: outcome lines in the actor's owner's colour (Mira rose on every line), a nullable column written by each kind caller (combat, sheet, dice); measured **+2,100 B** (all null) to **+5,500 B** (all set) per snapshot frame on 100 entries~~, ~~C. Only player-rolled lines coloured, the DM's plain: quieter, but BL-17 says the DM colour shows too~~ | — · decided | combat-tracker (B: its callers write the field) |
 | OQ-DICE-40 | **dice-extras:** the roll popup (FR-DICEX-39) names the roller too: colour it the same way? | **Decided (#256): yes, K4 adds the popup's `colorOf` line after D11.** Pick as proposed: A. Yes: K4 adds the `colorOf` line in the popup after D11 merges; D11 leaves the name plain (one rule for log and popup). Rejected: ~~B. Log only this sprint~~ | — · decided | dice-extras |
+
+**Sprint 7** (track GM, owner spec-gems). Decided before the spec (#140): a reroll replaces the old roll, the old stays visible, struck through.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-DICE-41 | How does a superseded line look? | **Decided (#315): A.** **A. Struck through + dimmed chips + a "rerolled" Badge that jumps to the new line (both stay readable; one extra line per reroll)** / B. Collapsed under the new line ("▸ was 4"), expandable (shorter log; the old roll is one click away, not "visible") / C. Old line unchanged, the new line says "reroll of #n" (no strike: fails #140) | — · decided | gems |
+| OQ-DICE-42 | Where does the supersede pointer live? | **Resolved (integrator, sprint-7 seams / rulings)** (S2; also answers OQ-DICE-45 / OQ-STATS-14): **A. Both:** the old entry's existing `supersededBy` (set once, like `undone`; 0 schema change) + `replaces` on the new roll element; roll rows immutable with `replacesRollId`. Rejected: ~~B. Only `replaces` on the new entry~~ | — · resolved | stats (ST) |
 
 ## 16. Out of scope
 
