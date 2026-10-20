@@ -29,7 +29,7 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 
 ## 2. Next, in order
 
-**Sprint 6 is done and paused for the DM's recap** ([sprint-6](sprint-6.md), gate #309). Next: the recap decisions (FAIL a / b follow-ups, the charmed-companion owner question, compact companion lines BL-56), then plan sprint 7 the same way (a `sprint-7.md` from the recap, kickoff prompt from the DM).
+**Sprint 7, DM decisions #310–#311: [sprint-7](sprint-7.md).** Tracks GM (homebrew gems: award / spend, Inspiration reroll, Combat max dice; promote `post-mvp/gems.md`), ST (stats tier A: damage leaderboard + overkill callouts, session awards; promote `post-mvp/stats.md`), FU (sprint-6 follow-ups incl. #310 parking, drake marker, sheet vs revealed tokens with the card open, BL-56, concentration / End / hostile summon, encounter editor, BL-37) + leftovers BL-46, BL-48. Phase A specs (all three at once) → seams → two reviews → **one DM gate** → Phase B builds per the hotspot table → session-sim-11 → "Playtest: sprint 7 features" → pause and recap. Backlog backfill in idle slots (#286).
 
 **Idle slots (#204, #205, #286, [orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill)):** the goal is the sprint's milestones. When an agent slot is idle and nothing in the sprint queue can start (DM #286: "pull more stories from the backlog when there are idle agents"), pick one small eligible item from [backlog](backlog.md) without asking (max two at once; sprint work always wins the next slot); stop picking once the last sprint slices are in flight. If nothing fits, ask the DM.
 
