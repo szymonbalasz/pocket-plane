@@ -2033,3 +2033,17 @@ From [assets-pipeline](../specs/assets-pipeline.md#63-sprint-6-image-search-and-
 - **Persisted runtime state:** none beyond the column and the marker. Crash: each tag command is one transaction (all holders or none).
 - **Fixtures:** `image-tags` (requires `images`): 24 listed SVGs under `fixtures/assets/library/` with tags (Ruined Keep + DM tag `zz-lair-secret`, Misc Sketch `[]`) + 2 attachments tagged Handouts; `upload-ogre.svg` committed, not ingested. The `images` unit's steps carry tags (maps → Maps, token art → Tokens; IDs unchanged). Bundles `image-search` = `session-sim-9` + `image-tags`; **`session-sim-10`** = `session-sim-9` + `image-tags` (seams S12; later sprint-6 slices append). No fixture row is null.
 - **Snapshot size** (CON-44, `snapshot-size.test.ts` `FR-ASSET-39 CON-44 tags`): heavy harness + 500 library images (80-char names) → DM **817,909 B** no tags, **827,909 B** typical (Tokens + Portraits, +20 B per image), **925,409 B** worst (8 × 24 chars, +215 B per image; 647,455 B left of 1.5 MiB); every player frame byte-identical. `session-sim-10`: DM +6,498 B over `session-sim-9` (24 listed assets), players unchanged.
+
+## 87. Sprint 6: Fit without the empty box, pcs keeps the top row, players' reveal refit (WF3)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-80–82, [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-59, -60 and [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-55. **Built by `fix/fit-s6`**: no table, column, record type or payload change. Protocol side: [protocol §110](../protocol/README.md#110-sprint-6-fit-without-the-empty-box-pcs-keeps-the-top-row-players-reveal-refit-wf3).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Shown stack report `dicex.popups` | client memory (`reportShownStack`) | the DM roll-popup stack's rendered rect while it draws; null when empty or unmounted; starts empty on reload | [FR-SHELL-59](../specs/play-shell.md#6-functional-requirements) |
+| Drawn token ids | client memory (`MapCanvas`, per shown scene) | the ids of the last token list; a scene switch resets them without a reveal | [FR-MAP-82](../specs/scenes-map.md#6-functional-requirements) |
+| Pending reveal refit | client memory (`createRevealRefit`) | armed ≤ 1 s, or deferred to a pointer release; dropped on a gesture, unmount or scene change | FR-MAP-82 |
+| `data-fit-reason` | client memory | the last fit's cause | FR-MAP-82 |
+
+- **Fixtures:** no new unit (Fit, the `pcs` pan and the reveal refit walk on `session-sim-9`'s Goblin Ambush, door (8, 5), party vision, the hidden Elite and Wolf); `session-sim-10` gets a WF3 comment line only.
+- **Snapshot size** (CON-44): 0 B.
