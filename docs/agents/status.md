@@ -2,16 +2,16 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 7 **Phase A (specs)** started 2026-10-20 ([sprint-7](sprint-7.md)): specs written, seams ruled (`.verify/sprint7/seams.md`); reviews running (review-a GM+ST, review-b FU, tab `reviews` in wR).
+**Phase:** Sprint 7 **Phase A (specs)** started 2026-10-20 ([sprint-7](sprint-7.md)): specs written, seams + review rulings applied; **DM gate 1 open** (`.verify/sprint7/gate.md`).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Sprint 6 | merged | — | done (#290–#309), recap #310 | — |
-| GM gems spec | `spec/s7-gems` (ws w8H) | spec-gems | seams applied | review-a / review-b, rulings, DM gate |
-| ST stats spec | `spec/s7-stats` (ws w8J) | spec-stats | seams applied | review-a / review-b, rulings, DM gate |
-| FU follow-ups spec | `spec/s7-followups` (ws w8K) | spec-followups | seams applied | review-a / review-b, rulings, DM gate |
+| GM gems spec | `spec/s7-gems` (ws w8H) | spec-gems | rulings applied | DM gate 1, then integrate + merge |
+| ST stats spec | `spec/s7-stats` (ws w8J) | spec-stats | rulings applied | DM gate 1, then integrate + merge |
+| FU follow-ups spec | `spec/s7-followups` (ws w8K) | spec-followups | rulings applied | DM gate 1, then integrate + merge |
 | backfill (BL-55) fog log once | `fix/bl-55-fog-log-once` (ws w8N, slot 0) | fix-bl-55 | fixing | gates + merge |
 
 ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):
@@ -25,7 +25,7 @@ ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/
 
 ## Pending DM decisions
 
-- None (sprint 7 starts with the kickoff prompt).
+- Sprint 7 gate 1: `.verify/sprint7/gate.md` (51 picks, 2 ADRs, no dependency).
 
 ## Resolved locally (report at gate)
 
@@ -42,6 +42,7 @@ ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/
 - Known flake: `tooltip-titles.test.ts` FR-SHELL-30 scan times out (5 s) under parallel load; passes alone.
 - Known flake: `dice-extras` e2e bundle (dice-extras / dice-screen) 1 / 4 runs under load: login never live, or the 3D chunk (Fit build, sprint 6).
 - Known flake: `init-chips-effect.e2e.ts` Divine Fury hover tooltip under a loaded full run (3 / 3 alone; CP3 build).
+- Known flake: `fog-of-war/leak.test.ts` walkthrough 8 "No frame within 1500 ms" under a parallel suite (main after BL-49, sprint 7; 3 / 3 alone).
 - Known flake: `snapshot-size.test.ts` (CON-44) fails with SQLITE_BUSY when several worktrees run the suite at once; passes alone and on re-run. Builders re-run before treating it as real.
 
 - Integrator picks #142–#144 (badge, snapshot ceilings, registry-driven shell tests, reconnect probe 204, lazy Konva, window layout).
