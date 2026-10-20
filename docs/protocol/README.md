@@ -2582,3 +2582,36 @@ From [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DIC
 | Fixtures | Units `log-colours` (dice-roll-log: Mira's Athletics by `player-1`, a roll by `player-2`, the DM's DEX save for Mira) and `note-colours` (notifications, test mode: `player-1`'s pending card, the DM's info to Player 2, a row resolved by Player 1); bundle `log-note-colours` = `player-colours` + both; `session-sim-9` + `log-colours` |
 | Tests | `name-color.test.tsx` (`FR-DICE-60 log name colour` ×3 over real entry shapes incl. the DM's `cbt.attack` apply → neutral, hidden line, popup name; `FR-DICE-61 kinds and fallback` ×2), `note-colors.test.tsx` (`FR-NOTE-39 accent stripe` ×2, `FR-NOTE-40 names`, `FR-NOTE-41 old rows`), `log-note-colours.fixtures.test.ts`; e2e `log-note-colours.e2e.ts` (CAMP §13 K6, K7) |
 | CON-44 | 0 B: no record, field or frame |
+
+## 108. Sprint 6: free player colour core (PF0)
+
+From [campaign-management](../specs/campaign-management.md#9-api--events) FR-CAMP-30–34, -36, -37 ([ADR-0057](../architecture/adr/0057-free-player-colour.md); DM gate #288). **Built by `fix/colour-free-core`**: the colour on every field and frame is a lowercase `#rrggbb`. No new route, intent, event, record type, signal or registry; the picker is PF2. Data side: [data model §86](../data-model/README.md#86-sprint-6-free-player-colour-core-pf0).
+
+**Intent** (strict zod `SetColorInput`; command `src/server/features/campaign-management/colors.ts`)
+
+| Intent | Who | Validation (in the command's transaction, in order) | Result | Source |
+|---|---|---|---|---|
+| `camp.setColor {playerId: Id \| null, color}` *(changed)* | DM, player | zod: `color` = `^#[0-9a-fA-F]{6}$`, stored lowercase (palette names and `#rgb` → `invalid` "Invalid input"); permissions and `not_found` as [§91](#91-sprint-5-player-colours-core-k0); `colorProblem` → `invalid` "Too dark to read on the map" \| "Too grey" \| "Too close to the danger red"; same as the current colour → `ack`, no write, no event; distance < 9 from the DM colour (player targets only) or another player's → `conflict` "Taken by ‹name›" (distance 0) \| "Too close to ‹name›'s colour" (+ " for colour-blind players" when normal vision alone is ≥ 9); the closest holder is named | `{}` | FR-CAMP-31–33 |
+
+**Record types** (unchanged visibility: every connection of the campaign)
+
+| Type | Change | Source |
+|---|---|---|
+| `campaign` | `dmColor` = `#rrggbb` | FR-CAMP-30, -37 |
+| `player` | `color` = `#rrggbb` (never null, never a key: the boot migration runs before the server listens) | FR-CAMP-30, -34, -37 |
+
+- The wire zod still reads `color` / `dmColor` as a non-empty string: an older peer's key maps to its palette hex, anything else to the role accent (FR-CAMP-36).
+
+**Domain events**
+
+| Event | Changes | Player sees | Logged | Undoable |
+|---|---|---|---|---|
+| `PlayerColorSet {playerId: Id \| null, color}` *(changed)* | as §91; `color` = lowercase `#rrggbb` (old log rows: a palette key; the payload schema reads both) | the upsert (every connection of the campaign) | yes | no |
+
+**Helpers and seams**
+
+- `@shared/campaign-management/colors.ts`: `colorProblem`, `colorDistance`, `colorClash`, `defaultColor`, `normalizeColor`, `paletteKeyOf`, `colorName`, `HexColorInput`, `PaletteKey` (`PlayerColor` kept as a deprecated alias of `PaletteKey` for old tests).
+- Client `colorOf(store, person)` keeps its signature and returns a CSS colour string (seams S8); `colorHex(color)` takes a hex or a key; `colorKeyOf` gives the `data-color` value (palette name for a palette colour, else the hex). `GameLog.tsx`, `name-color.tsx`, notifications `parts.tsx`: type-only `PlayerColor` → `string`.
+- Start hook `campaign-management.color-backfill` now runs `migratePlayerColors` (two passes, one transaction).
+- Until PF2: the sprint-5 `ColorPopover` sends the palette hex and marks a swatch taken by FR-CAMP-32's distance; its `data-value` stays the palette name (the hex for a free colour).
+- **CON-44:** −21 to +14 B per snapshot frame (data model §86); event frames ± 3 B; signals 0 B.
