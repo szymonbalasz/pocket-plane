@@ -134,7 +134,7 @@ import { skipText } from "../combat-extras/skip";
 import { useCbtxDialogs } from "../combat-extras/store";
 import { type AttackAction, attackChoices, attackRolls } from "./attack-choices";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
-import { CompanionMenu } from "./companion-menu";
+import { CompanionCardButton, CompanionMenu } from "./companion-menu";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { useHoverSafeSub } from "./hover-sub";
@@ -791,6 +791,8 @@ function RowMain({
             HP {hp ? `${hp.cur}/${hp.max}` : "—"}
           </span>
           <RowTemp c={c} />
+          {/* FR-CHARX-59 (walkthrough 9): a companion's card, also on its line. */}
+          {companion && <CompanionCardButton c={c} />}
           {c.kind === "monster" && hp && (
             <BandBadge band={healthBand(hp.cur, hp.max)} testId="cbt-init-row-band" />
           )}

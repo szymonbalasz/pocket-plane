@@ -2081,6 +2081,8 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-105–124 
 | `combatant.concentration_effect_id` | + ID \| null, plain id; DM only | the owner's concentration a summon is linked to (CP3 writes it) | FR-CBT-110, -120 |
 | `combatant.card` | + **JSON leaf** `companionCard(statBlock)` \| null | `{size, type?, ac, hpMax, speed?, attacks ≤ 8 [{id, name, toHit, bonus?, damage, damageType?, extraDamage?}], more?}`; stable row ids (the row's own, else `ctx.ids` at copy, kept while the row at that index keeps its name); written at join / `setCompanion`, refreshed by the definition hook, cleared on release; ≤ 2,038 B | FR-CBT-117, FR-CHARX-60 |
 | `combatant.position` | 0 = **no rank** (record: null) | an `in-owner-turn` companion while its owner is eligible acts inside the owner's turn (the column stays NOT NULL: a nullable change makes push rebuild and empty the table) | FR-CBT-107 |
+| `combatant` owner view (wire) *(CP4, build/cp-card)* | + `entityId` on a **pet** companion's owner view | the owner's own pet row id (the owner has the row in full), so the companion card lists a pet in a fight once (FR-CHARX-61); a summon's owner view and other players' views never carry it; no column change | FR-CHARX-61, FR-CBT-116 |
+| `cbt.attack` line `dmPayload.toHitNatural` *(CP4 walkthrough 7, build/cp-card)* | + int \| null, optional | a companion attacker's d20 face; its `payload.toHit.natural` is null and its outcome entry's `rollIds` hold none of the card's rolls (players get totals only) | FR-CBT-114, ADR-0056 |
 | `game_log_entry.audience_player_id` | + ID \| null, plain id | a non-public entry also reaches this player: a companion's roll lines (DM + owner) | FR-CBT-114, ADR-0056 |
 | Log-entry kind `cbt.companion` *(new)* | payload `{action: summon \| dismiss \| follows \| release \| hostile, name, ownerName?, count?}`, dmPayload `{turnMode?}` | `public` iff the combatant is visible to players; DM text adds the mode | FR-CBT-122 |
 | `cbt.attack` line payload (companion attacker) | `toHit` = `{dice: null, constant: 0, total, natural}` | the "N + M" split, bonus and effect parts only in `dmPayload` | FR-CBT-114 |
@@ -2128,4 +2130,23 @@ From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP
 
 - **Derived (not stored):** a colour's verdict (FR-CAMP-31 / -32), the palette row's blocks, the shading mask.
 - **Fixtures:** none new (the walkthrough and e2e use `prefs-s6` / `prefs-s6-e2e`; `session-sim-10` already holds `pc-colour-free`).
+- **CON-44:** 0 B.
+
+## 93. Sprint 6: pets (CP1)
+
+From [entities](../specs/entities.md#8-data-model) FR-ENT-36, -39 and [party-board](../specs/party-board.md#67-sprint-6-companions-tab) FR-PARTY-41–46 (#252). **Built by `build/cp-pets`**. **No schema change**: CP0's columns ([§89](#89-sprint-6-companions-core-cp0)). Protocol side: [protocol §121](../protocol/README.md#121-sprint-6-pets--new-pet-pet-hp-companions-tab-cp1).
+
+| Table / field | Change | Rule | Source |
+|---|---|---|---|
+| `entity.hp_current` (pets) | now also written by `pet.adjustHp` | clamped 0…`statBlock.hpMax`; refused while the pet is an active combatant (its HP lives on the combatant) | FR-ENT-36 |
+| `event_log` | + `PetHpAdjusted {petId, before, after}` rows | logged, not undoable | FR-ENT-36 |
+
+- **Derived (client, not stored):** the Companions tab's groups and rows (`companionGroups`, `src/client/common/features/party-board/logic.ts`): owner PC, HP for the DM / owner (combatant in a fight, else the pet row), band for others, "In combat"; the Creatures row's `pet` (owner PC + player) and "Pet of ‹PC›" badge.
+- **Fixtures:** `pet-owlbear` gains `pet.adjustHp −14` (45 / 59); `session-sim-10` gains `pet-owlbear`, `pet-drake`; bundle `cp-pets-e2e`.
+
+## 94. Sprint 6: layout test cells at the new Fit (WF follow-up)
+
+From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-62. **Built by `fix/placement-s6`**: tests only; no table, column, record type, payload or browser state. Protocol side: [protocol §122](../protocol/README.md#122-sprint-6-layout-test-cells-at-the-new-fit-the-oracle-ranks-the-pc-cut-wf-follow-up).
+
+- **Fixtures:** no new unit (pure tests on `session-sim-9`'s Goblin Ambush cells); `session-sim-10` gets a comment line only.
 - **CON-44:** 0 B.

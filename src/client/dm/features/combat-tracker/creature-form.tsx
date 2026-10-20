@@ -6,7 +6,7 @@
 // HP formula with an "Average N" hint and "Use as HP max" (FR-CBT-62, FR-ENT-25). Sprint 4: the
 // first attack's `bonus` / `extraDamage` (and the rows after it) ride through (FR-CBT-86); the
 // monster **Type** (14 SRD types + None, FR-CBT-43 S4 / FR-ENT-26): Derive and Edit prefill it,
-// None omits `type`.
+// None omits `type`. Sprint 6: editing a pet keeps its `companionOf` / `turnMode` (FR-ENT-33).
 
 import { hpAverage, parseHpFormula } from "@shared/entities/hp-formula";
 import {
@@ -21,6 +21,7 @@ import {
   SIZES,
   TOKEN_SHAPES,
   type TokenShape,
+  type TurnMode,
   xpForCr,
 } from "@shared/entities/schemas";
 import { copyName } from "@shared/scenes-map/geometry";
@@ -116,6 +117,18 @@ export function initial(mode: Mode): Fields {
     hpFormula: sb?.hpFormula ?? "",
     type: sb?.type ?? NONE,
   };
+}
+
+/**
+ * FR-ENT-33 (sprint 6): `PUT` is a whole replace, so editing a pet sends the `companionOf` /
+ * `turnMode` it loaded (omitted = null would release it). Nothing for other creatures.
+ */
+export function keptPetFields(
+  def: DefinitionRecord,
+): { companionOf: string; turnMode: TurnMode | null } | Record<string, never> {
+  return def.kind === "monster" && def.campaignId !== null && def.companionOf !== null
+    ? { companionOf: def.companionOf, turnMode: def.turnMode }
+    : {};
 }
 
 /** FR-CBT-86: attack fields the form doesn't show; kept from the attack it loaded. */
@@ -239,6 +252,7 @@ export function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
           portraitAssetId: f.portraitAssetId,
           tokenShape,
           statBlock: parsed.data,
+          ...keptPetFields(mode.def),
         });
       } else {
         await combatRest.createEntity({

@@ -3,7 +3,11 @@
 // ruled target without damage (`awaitingDamage`), `HitApplied`. No HP, no `hp_change`, the card
 // stays pending and unchanged; nothing is spent (FR-MOD-63: no apply hooks run). Not undoable.
 
-import { companionSafeToHit, isCompanion } from "@shared/combat-tracker/companion";
+import {
+  companionLineRollIds,
+  companionSafeToHit,
+  isCompanion,
+} from "@shared/combat-tracker/companion";
 import type { AttackLogDmPayload, AttackLogPayload } from "@shared/combat-tracker/log-kinds";
 import { AcModPart } from "@shared/combat-tracker/log-kinds";
 import { hitHint } from "@shared/combat-tracker/rules";
@@ -93,6 +97,7 @@ export const applyHitCommand = defineCommand({
       };
       const dmPayload: AttackLogDmPayload = {
         targetAc: ac.ac,
+        ...(isCompanion(attacker) ? { toHitNatural: toHitRoll.natural } : {}),
         hitComputed,
         toHitRolled,
         damageRolled: null,
@@ -129,7 +134,8 @@ export const applyHitCommand = defineCommand({
         actorName: p.attackerName,
         payload,
         dmPayload,
-        rollIds,
+        // FR-CBT-114: a companion's roll ids stay on its DM + owner roll line.
+        rollIds: companionLineRollIds(attacker, rollIds),
         encounterId: enc.id,
         public: attacker.hidden || target.hidden ? false : playerCard ? true : undefined,
       });
