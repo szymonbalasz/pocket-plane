@@ -4,7 +4,8 @@
 // since S5; uploads go through the client's uploader context (FR-ASSET-27). S6 (FR-ASSET-44–48):
 // search (shared matcher over name + tags), tag chips, the selected image's tag editor and Manage
 // tags; `context` tags uploads. Search and filter work on the store while disconnected; tag
-// editing needs `live`. Both reset each time the picker mounts (opens).
+// editing needs `live`. Both reset each time the picker mounts (opens). BL-49: the header counts
+// the library's images and warns from ASSET_LIBRARY_WARN_AT on (the DM snapshot's ceiling, CON-44).
 import { type AssetRecord, pickerOrder } from "@shared/assets-pipeline/schemas";
 import {
   ALL_IMAGES,
@@ -58,6 +59,23 @@ export interface AssetPickerProps {
   searchRef?: Ref<HTMLInputElement>;
 }
 
+/**
+ * BL-49: from this many listed images on, the picker warns the DM. The DM snapshot reaches its
+ * 1.5 MiB ceiling (live-sync CON-44) at about 2,580 images with typical tags (sprint-6 measure).
+ */
+export const ASSET_LIBRARY_WARN_AT = 2000;
+
+const count = (n: number) => n.toLocaleString("en-US");
+
+/** BL-49: the header's image count. */
+export const libraryCountText = (n: number) => (n === 1 ? "1 image" : `${count(n)} images`);
+
+/** BL-49: the large-library warning, or null below ASSET_LIBRARY_WARN_AT. */
+export const librarySizeWarning = (n: number) =>
+  n < ASSET_LIBRARY_WARN_AT
+    ? null
+    : `Large library: ${count(n)} images. Above about 2,500 the live game slows down; delete images you no longer use.`;
+
 /** FR-ASSET-45 / -46: the empty result, with or without a tag chip on. */
 export const noMatchText = (q: string, tag: string | null) =>
   tag === null ? `No images match ${q}` : `No images match ${q} in ${tag}`;
@@ -89,6 +107,7 @@ export function AssetPicker({
   const uploader = useAttachUploader();
   const canUpload = live && uploader !== null;
   const busy = upload.phase === "sending" || upload.phase === "processing";
+  const sizeWarning = librarySizeWarning(assets.length);
   // FR-ASSET-45: a selection hidden by the search or filter stays selected.
   const selectedAsset = assets.find((a) => a.id === selected) ?? null;
   const filterLabel =
@@ -203,11 +222,19 @@ export function AssetPicker({
           }}
         />
         <span className="text-xs text-muted-foreground">or drop an image here</span>
+        {everLive && (
+          <span
+            data-testid="asset-library-count"
+            className="ml-auto text-xs text-muted-foreground tabular-nums"
+          >
+            {libraryCountText(assets.length)}
+          </span>
+        )}
         {/* type="button": hosts embed the picker in their own form (New scene, MAP §7). */}
         <Button
           type="button"
           size="sm"
-          className="ml-auto"
+          className={cn(!everLive && "ml-auto")}
           data-testid="asset-picker-select"
           disabled={selectedAsset === null}
           onClick={() => selected && onSelect(selected)}
@@ -215,6 +242,12 @@ export function AssetPicker({
           {selectLabel}
         </Button>
       </div>
+
+      {sizeWarning && (
+        <Alert variant="warning" data-testid="asset-library-size-warning" className="py-2 text-xs">
+          {sizeWarning}
+        </Alert>
+      )}
 
       <div className="flex items-center gap-1">
         <div className="relative flex-1">
