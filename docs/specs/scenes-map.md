@@ -1,7 +1,7 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: in-review
+status: complete
 owner: spec-followups
 wave: 3
 phase: post-mvp-7
@@ -748,7 +748,7 @@ Full split: [play-shell §14](play-shell.md#14-dependencies). MAP parts: **FU0**
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-MAP-61 | **Fit vs a shown card toast** (sim-10 b06: Game log + Initiative + Scenes + one card toast → 24 px in the top-left strip; #288 OQ-MAP-57 D keeps whatever shows clear) | **A. Keep shown toasts clear unless that costs more than a quarter of the cell size; then fit as if only the summary strip were there (a card toast may cover a token until resolved): readable map, the toast is temporary** / B. Always keep them clear (as built): nothing hidden, the map can drop to 24 px / C. Never count card toasts, only the summary strip: always the larger map, a sticky card often sits on the top row | no · owner: DM | FR-MAP-91; amends OQ-MAP-57 D only for card toasts |
+| OQ-MAP-61 | **Fit vs a shown card toast** (sim-10 b06: Game log + Initiative + Scenes + one card toast → 24 px in the top-left strip; #288 OQ-MAP-57 D keeps whatever shows clear) | **Decided (#315): A** (drop a shown card toast that costs more than a quarter of the cell size). **A. Keep shown toasts clear unless that costs more than a quarter of the cell size; then fit as if only the summary strip were there (a card toast may cover a token until resolved): readable map, the toast is temporary** / B. Always keep them clear (as built): nothing hidden, the map can drop to 24 px / C. Never count card toasts, only the summary strip: always the larger map, a sticky card often sits on the top row | no · owner: DM | FR-MAP-91; amends OQ-MAP-57 D only for card toasts |
 
 ## 16. Out of scope
 

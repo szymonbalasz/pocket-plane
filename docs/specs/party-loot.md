@@ -1,7 +1,7 @@
 ---
 title: Party loot
 prefix: LOOT
-status: in-review
+status: complete
 owner: spec-followups
 wave: 3
 phase: post-mvp-7

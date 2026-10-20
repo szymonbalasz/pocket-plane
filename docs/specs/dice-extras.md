@@ -1,7 +1,7 @@
 ---
 title: Dice extras
 prefix: DICEX
-status: in-review
+status: complete
 owner: spec-followups
 phase: post-mvp-7
 ---

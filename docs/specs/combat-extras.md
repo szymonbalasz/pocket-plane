@@ -1,7 +1,7 @@
 ---
 title: Combat extras
 prefix: CBTX
-status: in-review
+status: complete
 owner: spec-followups
 phase: post-mvp-7
 ---
@@ -469,7 +469,7 @@ Sprint-1 rows: all decided (the DM accepted every pick, #178; the D/S seam rows 
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CBTX-30 | **What the concentration chip does on click** (sim-10 a12: nothing; the player found Active effects → End) | **A. A small menu for the DM and the PC's owner: "Concentrating: Conjure Elemental · 10 rounds left", what ends with it (linked effects, summons), End concentration (+ Edit… for the DM); others: Tooltip only: the chip is where people look, one click to end** / B. Open the sheet's Active effects tab with the row highlighted: one place to end effects, but a window jump from Initiative / C. Nothing; only the whole label + Tooltip: no new control, ending stays in Active effects | no · owner: DM | FR-CBTX-60, -61 |
+| OQ-CBTX-30 | **What the concentration chip does on click** (sim-10 a12: nothing; the player found Active effects → End) | **Decided (#315): A** (menu with End concentration). **A. A small menu for the DM and the PC's owner: "Concentrating: Conjure Elemental · 10 rounds left", what ends with it (linked effects, summons), End concentration (+ Edit… for the DM); others: Tooltip only: the chip is where people look, one click to end** / B. Open the sheet's Active effects tab with the row highlighted: one place to end effects, but a window jump from Initiative / C. Nothing; only the whole label + Tooltip: no new control, ending stays in Active effects | no · owner: DM | FR-CBTX-60, -61 |
 
 ## 16. Out of scope
 
