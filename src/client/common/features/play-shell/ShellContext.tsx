@@ -40,8 +40,8 @@ const AlertContext = createContext<AlertController | null>(null);
 const browserViewport = () => ({ w: window.innerWidth, h: window.innerHeight });
 
 /**
- * The drawn tokens' screen boxes for auto placement (FR-SHELL-40, -45): `pc` = the token has an
- * owner in this client's store (a PC).
+ * The drawn tokens' footprints for auto placement (FR-SHELL-40, -45, -57): `pc` = the token has
+ * an owner in this client's store (a PC).
  */
 function placementTokens(store: RecordStore | undefined) {
   const owned = new Set(
@@ -51,7 +51,10 @@ function placementTokens(store: RecordStore | undefined) {
           .map((t) => t.id)
       : [],
   );
-  return tokenScreenBoxes("all").map((b) => ({ ...b, pc: b.id !== undefined && owned.has(b.id) }));
+  return tokenScreenBoxes("all", store).map((b) => ({
+    ...b,
+    pc: b.id !== undefined && owned.has(b.id),
+  }));
 }
 
 export function ShellProvider({

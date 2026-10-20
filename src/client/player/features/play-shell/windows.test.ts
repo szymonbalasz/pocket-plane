@@ -433,7 +433,7 @@ test("FR-SHELL-08 player default-open product windows don't overlap (1280×720, 
 const SPRINT4 = [LAPTOP, { w: 1280, h: 800 }, DESKTOP];
 const same = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 
-test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: player Initiative appearing over the goblins goes where it covers less, at an edge, over no window; no tokens → where the default layout put it", () => {
+test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: player Initiative appearing over the goblins goes where it covers less (a spot over none first, FR-SHELL-58, else an edge), over no window; no tokens → where the default layout put it", () => {
   for (const viewport of SPRINT4) {
     const where = `${viewport.w}×${viewport.h}`;
     const all = new Set(playerWindows.defs.map((d) => d.kind));
@@ -455,7 +455,9 @@ test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: player Initiat
     const ws = reduce(layout, appear, { ...ctx, avoid: () => boxes });
     const init = at(ws, "cbt.initiative");
     expect(coveredArea(init, boxes)).toBeLessThan(coveredArea(home, boxes));
-    expect(["left", "right"]).toContain(touchedEdge(init, viewport) ?? `mid-map at ${where}`);
+    if (coveredArea(init, boxes) > 0) {
+      expect(["left", "right"]).toContain(touchedEdge(init, viewport) ?? `mid-map at ${where}`);
+    }
     const others = ws.filter((w) => w.kind !== "cbt.initiative");
     for (const o of renderedWindowRects(others, playerWindows, all, viewport)) {
       expect(overlaps(init, o) ? `Initiative over a window at ${where}` : "ok").toBe("ok");
