@@ -15,6 +15,7 @@ import {
   ColorPickerPopover,
   draftOf,
   keyTarget,
+  moveTo,
   othersOf,
   ownColor,
   paletteSwatches,
@@ -23,7 +24,7 @@ import {
   SET_COLOR_INTENT,
 } from "./ColorPicker";
 import { colorSection, ownTarget } from "./ColorSection";
-import { clamp, hsvToHex, pickerRules } from "./color-picker";
+import { clamp, hexToHsv as hexToHsvOf, hsvToHex, pickerRules } from "./color-picker";
 
 const LAVENDER = "#b388ff";
 /** prefs-s6: DM amber, Player 1 jade, Player 2 lavender. */
@@ -260,6 +261,37 @@ describe("FR-CAMP-35 picker", () => {
       status: { reason: "too-dark", message: "Too dark to read on the map", block: true },
       canApply: true,
     });
+  });
+
+  test("FR-CAMP-35 clamp: a clamped hue / key step leaves no stale reason: #ff808c, hue ArrowRight → clamped, allowed, status empty (walkthrough finding)", () => {
+    const rules = pickerRules(othersOf(H, "p1"));
+    const start = draftOf("#ff808c");
+    expect(start).toMatchObject({ h: 354, s: 50, v: 100 });
+    expect(rules.allowed("#ff808c")).toBe(true);
+    // The hue thumb's ArrowRight: the marker where it is, at hue 355.
+    const target = { h: 355, s: start.s, v: start.v };
+    expect(rules.verdict(hsvToHex(target))?.reason).toBe("too-red");
+    const { pick, pushed } = moveTo(target, rules, new Set(), false);
+    expect(pick.s === target.s && pick.v === target.v).toBe(false);
+    expect(rules.allowed(pick.hex)).toBe(true);
+    expect(pushed).toBeNull();
+    const view = (p: typeof pushed) =>
+      pickerView({
+        draft: pick,
+        hexText: null,
+        hint: null,
+        pushed: p,
+        stored: PLAYER_COLORS.jade,
+        rules,
+        live: true,
+        inFlight: false,
+      });
+    expect(view(pushed)).toEqual({ badHex: false, status: null, canApply: true });
+    // A square key step likewise; only a held pointer drag names the refused target.
+    const key = { h: 162, s: 86, v: 5 };
+    expect(moveTo(key, rules, new Set(), false).pushed).toBeNull();
+    expect(moveTo(key, rules, new Set(), true).pushed?.reason).toBe("too-dark");
+    expect(moveTo(hexToHsvOf("#7fd8ff"), rules, new Set(), true).pushed).toBeNull();
   });
 
   test("FR-CAMP-35 picker: not live → the picker still renders the draft, Apply disabled", () => {

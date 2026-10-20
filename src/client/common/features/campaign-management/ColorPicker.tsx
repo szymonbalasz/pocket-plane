@@ -30,6 +30,7 @@ import { useSync } from "../../sync/store";
 import { toastReject } from "../scenes-map/intents";
 import {
   BAD_HEX_MESSAGE,
+  type ClampCache,
   type Clamped,
   clamp,
   type Hsv,
@@ -218,6 +219,22 @@ export function pickerView(p: {
   return { badHex, status, canApply };
 }
 
+/**
+ * A marker move (FR-CAMP-35): the clamped draft, and the refused target's verdict only while a
+ * pointer drag on the square is held (`held`). A key step or a hue change never keeps a reason:
+ * the status line then reflects the clamped colour itself.
+ */
+export function moveTo(
+  t: Hsv,
+  rules: PickerRules,
+  cache: ClampCache,
+  held: boolean,
+): { pick: Draft; pushed: Verdict | null } {
+  const pick = clamp(t, rules, cache);
+  const moved = pick.s !== t.s || pick.v !== t.v;
+  return { pick, pushed: held && moved ? rules.verdict(hsvToHex(t)) : null };
+}
+
 export function ColorPicker({ target }: { target: ColorTarget }) {
   const connection = useSync((s) => s.connection);
   const live = useSync((s) => s.state === "live");
@@ -250,11 +267,11 @@ export function ColorPicker({ target }: { target: ColorTarget }) {
     inFlight,
   });
 
-  const move = (t: Hsv) => {
-    const got = clamp(t, rules, cache);
+  const move = (t: Hsv, held = false) => {
+    const next = moveTo(t, rules, cache, held);
     setHexText(null);
-    setPick(got);
-    setPushed(got.s === t.s && got.v === t.v ? null : rules.verdict(hsvToHex(t)));
+    setPick(next.pick);
+    setPushed(next.pushed);
   };
   const take = (hex: string) => {
     setHexText(null);
@@ -281,11 +298,14 @@ export function ColorPicker({ target }: { target: ColorTarget }) {
     const r = square.current?.getBoundingClientRect();
     if (!r || r.width === 0 || r.height === 0) return;
     const c = (x: number) => Math.round(Math.min(1, Math.max(0, x)) * 100);
-    move({
-      h: draft.h,
-      s: c((e.clientX - r.left) / r.width),
-      v: c(1 - (e.clientY - r.top) / r.height),
-    });
+    move(
+      {
+        h: draft.h,
+        s: c((e.clientX - r.left) / r.width),
+        v: c(1 - (e.clientY - r.top) / r.height),
+      },
+      true,
+    );
   };
 
   return (
@@ -344,6 +364,7 @@ export function ColorPicker({ target }: { target: ColorTarget }) {
           if (e.currentTarget.hasPointerCapture(e.pointerId)) pointerTo(e);
         }}
         onPointerUp={() => setPushed(null)}
+        onLostPointerCapture={() => setPushed(null)}
         onKeyDown={(e) => {
           const t = keyTarget(e.key, e.shiftKey, draft);
           if (!t) return;
