@@ -62,6 +62,11 @@ export const campaign = sqliteTable(
      * push-time add safe; every insert writes a hex and the boot migration converts old keys.
      */
     dmColor: text("dm_color").notNull().default("amber"),
+    /**
+     * FR-CAMP-38 (ADR-0058, sprint 7): enabled feature keys (registered, FR-CAMP-41), JSON leaf;
+     * `[]` = every optional feature off (the default for old and new campaigns).
+     */
+    features: text("features", { mode: "json" }).$type<string[]>().notNull().default([]),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -1494,6 +1499,30 @@ export const diceLook = sqliteTable(
   (t) => [uniqueIndex("dice_look_campaign_owner").on(t.campaignId, t.ownerKey)],
 );
 
+/**
+ * Gem counts (gems, record type `character-gems`, sprint 7): one row per character, created on the
+ * first award; `id` = the character's entity id. Counts 0–99 (checked by the commands). Kept while
+ * the campaign's `gems` feature is off (FR-GEM-04). No owner copy (OQ-GEM-01 A).
+ */
+export const characterGems = sqliteTable(
+  "character_gems",
+  {
+    id: text("id")
+      .primaryKey()
+      .references((): AnySQLiteColumn => entity.id),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    inspiration: integer("inspiration").notNull().default(0),
+    fortune: integer("fortune").notNull().default(0),
+    combat: integer("combat").notNull().default(0),
+    divine: integer("divine").notNull().default(0),
+    action: integer("action").notNull().default(0),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("character_gems_campaign").on(t.campaignId)],
+);
+
 /** CON-20: `seq` for props and templates, computed by the DB inside the insert's transaction. */
 export const propSeqNext = sql<number>`(select coalesce(max(${prop.seq}), 0) + 1 from ${prop})`;
 export const aoeTemplateSeqNext = sql<number>`(select coalesce(max(${aoeTemplate.seq}), 0) + 1 from ${aoeTemplate})`;
@@ -1539,4 +1568,5 @@ export const schema = {
   compendiumSource,
   compendiumEntry,
   diceLook,
+  characterGems,
 };

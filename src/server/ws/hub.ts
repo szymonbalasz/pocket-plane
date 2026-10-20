@@ -78,6 +78,8 @@ export interface Connection {
   campaignId: string | null;
   role: Role | null;
   playerId: string | null;
+  /** ADR-0058: the campaign's enabled features, read when this connection's snapshot is built. */
+  features: readonly string[];
   seq: number;
   lastInboundAt: number;
   /** Domain events dispatched while snapshotting; delivered after the snapshot (FR-SYNC-10). */
@@ -149,6 +151,7 @@ export class Hub implements HubApi {
       campaignId: null,
       role: null,
       playerId: null,
+      features: [],
       seq: 0,
       lastInboundAt: this.s.clock.now(),
       pending: [],
@@ -281,6 +284,7 @@ export class Hub implements HubApi {
       campaignId: c.campaignId ?? "",
       role: c.role ?? "player",
       playerId: c.playerId,
+      features: c.features,
     };
   }
 
@@ -289,6 +293,8 @@ export class Hub implements HubApi {
     c.pending = [];
     let frame: SnapshotFrame;
     try {
+      // ADR-0058: features are read here (connect, `resync`, a switch's forced resync).
+      c.features = c.campaignId === null ? [] : this.s.records.featuresOf(c.campaignId);
       const v = this.viewer(c);
       frame = {
         type: "snapshot",
@@ -444,7 +450,10 @@ export class Hub implements HubApi {
     if (!parsed.success) return reject("invalid", "Invalid payload", zodIssues(parsed.error));
     const { type, ids } = parsed.data;
     const def = this.s.records.get(type);
-    if (!def) return reject("invalid", `Unknown record type "${type}"`);
+    // ADR-0058: a type whose feature is off answers as unknown (nothing names the feature).
+    if (!def || this.s.records.typeOff(def, this.viewer(c))) {
+      return reject("invalid", `Unknown record type "${type}"`);
+    }
     if (def.lazy === undefined) return reject("invalid", `Record type "${type}" is not lazy`);
     if (def.lazy === "ids" && ids === undefined) {
       return reject("invalid", `Record type "${type}" loads by ids only`);

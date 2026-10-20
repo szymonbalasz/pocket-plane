@@ -1,6 +1,7 @@
 // campaign-management boundary schemas (CAMP §6, §9). Used by server and both clients.
 import { z } from "zod";
 import { HexColorInput } from "./colors";
+import { FeatureKey } from "./features";
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control characters is the point (CAMP §11).
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
@@ -33,7 +34,17 @@ export const LinkToken = z.string().regex(/^[A-Za-z0-9_-]{22}$/);
  */
 const WireColor = z.string().min(1);
 
-export const CampaignRecord = z.object({ id: z.string(), name: z.string(), dmColor: WireColor });
+/**
+ * FR-CAMP-38 (ADR-0058): `features` = the enabled feature keys, present only when non-empty (a
+ * campaign with every feature off carries no key, 0 B). Read as plain strings: a client survives a
+ * key it doesn't know.
+ */
+export const CampaignRecord = z.object({
+  id: z.string(),
+  name: z.string(),
+  dmColor: WireColor,
+  features: z.array(z.string()).min(1).optional(),
+});
 export type CampaignRecord = z.infer<typeof CampaignRecord>;
 
 export const PlayerRecord = z.object({
@@ -50,6 +61,10 @@ export const SetColorInput = z
   .object({ playerId: z.string().min(1).max(64).nullable(), color: HexColorInput })
   .strict();
 export type SetColorInput = z.infer<typeof SetColorInput>;
+
+/** `camp.setFeature` (FR-CAMP-39): a registered key; `on` the wanted state. */
+export const SetFeatureInput = z.strictObject({ feature: FeatureKey, on: z.boolean() });
+export type SetFeatureInput = z.infer<typeof SetFeatureInput>;
 
 // ---- REST bodies and responses ----
 export const CreateCampaignBody = z.object({ name: CampaignName });

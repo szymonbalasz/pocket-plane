@@ -2,16 +2,18 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 7 **Phase A (specs)** started 2026-10-20 ([sprint-7](sprint-7.md)): specs written, seams + review rulings applied; DM gate 1 **passed** (#315); spec merge in progress (GM → ST → FU), then Phase B wave 1.
+**Phase:** Sprint 7 **Phase A (specs)** started 2026-10-20 ([sprint-7](sprint-7.md)): specs written, seams + review rulings applied; DM gate 1 **passed** (#315); specs merged + integrated (ADR-0058, -0059). **Phase B wave 1 building.**
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Sprint 6 | merged | — | done (#290–#309), recap #310 | — |
-| GM gems spec | `spec/s7-gems` (ws w8H) | spec-gems | gate passed | mark decided, merge (GM → ST → FU) |
-| ST stats spec | `spec/s7-stats` (ws w8J) | spec-stats | gate passed | mark decided, merge (GM → ST → FU) |
-| FU follow-ups spec | `spec/s7-followups` (ws w8K) | spec-followups | gate passed | mark decided, merge (GM → ST → FU) |
+| GM0 gems core | `fix/gems-core` (ws w8Q) | build-gm0 | building | walkthrough → merge; then GM1, ST-core, GM3 |
+| FU1 window frame | `fix/fu-frame` (ws w8R) | build-fu1 | building | walkthrough → merge; then FU3, ST2 |
+| FU-combat (FU0 + FU2) | `fix/fu-combat` (ws w8S) | build-fu-combat | building | walkthrough → merge |
+| FU4 small copy | `fix/fu-small-copy` (ws w8T) | build-fu4 | building | walkthrough → merge |
+| Wave 2 (after GM0) | GM1 `build/gems-reroll`, ST-core `fix/st-core`, GM3 `build/gems-sheet` | — | waiting | GM1 merges before ST-core |
+| Wave 3 | FU3 `fix/fu-map` (after FU1), ST2 `build/st-window` (after FU1 + ST-core), GM2 `build/gems-combat` (after GM1 + ST-core) | — | waiting | — |
 
 ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):
 - GM: GEM FR 01-40 / OQ 04-20; CAMP FR 38-45 / OQ 33-36; DICE FR 62-71 / OQ 41-44; DICEX FR 59-62 / OQ 49-50; CBT FR 126-135 / OQ 85-88; CHARX FR 71-80 / OQ 37-40; MOD FR 64-67 / OQ 47-48; SHELL FR 98-100 / OQ 61-62; NOTE FR 52-54 / OQ 30-31.
@@ -20,7 +22,9 @@ ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/
 
 ## Shared-file locks
 
-- None (all sprint-6 branches merged).
+- Schema lane + `src/server/ws/` + `src/shared/events/`: `fix/gems-core` (GM0).
+- Play-shell frame + `overlays.tsx`: `fix/fu-frame` (FU1). Canvas lock: FU1 first (MapCanvas.tsx), then FU3.
+- Combat-tracker lifecycle / DM Initiative + encounters files: `fix/fu-combat`. Apply path (hp.ts, cards.ts, hit.ts, schemas.ts, log-kinds.ts): free until GM1 / ST-core.
 
 ## Pending DM decisions
 

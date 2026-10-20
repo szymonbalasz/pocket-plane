@@ -29,6 +29,9 @@ import fogScn from "./fog-scn";
 import fuS7 from "./fu-s7";
 import fuS7E2e from "./fu-s7-e2e";
 import furyLogLine from "./fury-log-line";
+import gems from "./gems";
+import gemsE2e from "./gems-e2e";
+import gemsHidden from "./gems-hidden";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
 import initRowsE2e from "./init-rows-e2e";
@@ -135,4 +138,8 @@ export const bundles: readonly Bundle[] = [
   // Sprint 7 track FU (fix/fu-combat)
   fuS7,
   fuS7E2e,
+  // Sprint 7 track GM (fix/gems-core)
+  gems,
+  gemsHidden,
+  gemsE2e,
 ];

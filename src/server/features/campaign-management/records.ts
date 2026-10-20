@@ -5,11 +5,16 @@ import { asc, eq, sql } from "drizzle-orm";
 import { campaign, player } from "../../db/schema";
 import { defineRecordType } from "../../ws/records";
 
+/** FR-CAMP-38: `features` only when some feature is on (all off = no key, 0 B). */
 export const toCampaignRecord = (row: {
   id: string;
   name: string;
   dmColor: string;
-}): CampaignRecord => ({ id: row.id, name: row.name, dmColor: row.dmColor });
+  features: readonly string[];
+}): CampaignRecord =>
+  row.features.length === 0
+    ? { id: row.id, name: row.name, dmColor: row.dmColor }
+    : { id: row.id, name: row.name, dmColor: row.dmColor, features: [...row.features] };
 
 /**
  * The only mapping from a player row to anything synced: the token is dropped here. A null
@@ -34,7 +39,12 @@ export const campaignRecordType = defineRecordType<CampaignRecord>({
   visibility: () => "full",
   snapshot: ({ db }, v) =>
     db
-      .select({ id: campaign.id, name: campaign.name, dmColor: campaign.dmColor })
+      .select({
+        id: campaign.id,
+        name: campaign.name,
+        dmColor: campaign.dmColor,
+        features: campaign.features,
+      })
       .from(campaign)
       .where(eq(campaign.id, v.campaignId))
       .all()

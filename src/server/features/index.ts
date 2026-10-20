@@ -12,6 +12,7 @@ import { effectModifiers } from "./effect-modifiers";
 import { entities } from "./entities";
 import { fixturesAdapters } from "./fixtures-adapters";
 import { fogOfWar } from "./fog-of-war";
+import { gems } from "./gems";
 import { liveSync } from "./live-sync";
 import { notifications } from "./notifications";
 import { partyBoard } from "./party-board";
@@ -38,4 +39,5 @@ export const features: readonly Feature[] = [
   partyBoard,
   compendium,
   diceExtras,
+  gems,
 ];

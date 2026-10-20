@@ -10,6 +10,7 @@ import * as diceRollLog from "./dice-roll-log";
 import * as effectModifiers from "./effect-modifiers";
 import * as entities from "./entities";
 import * as fogOfWar from "./fog-of-war";
+import * as gems from "./gems";
 import * as liveSync from "./live-sync";
 import * as notifications from "./notifications";
 import * as partyBoard from "./party-board";
@@ -47,6 +48,8 @@ export const domainEvents: readonly DomainEventDef[] = [
   ...Object.values<unknown>(compendium).filter(isDomainEventDef),
   // dice-extras (fix/dicex-look-core).
   ...Object.values<unknown>(diceExtras).filter(isDomainEventDef),
+  // gems (fix/gems-core).
+  ...Object.values<unknown>(gems).filter(isDomainEventDef),
 ];
 
 /** `cause.name` of presence changes (not a domain event, CON-07). */
