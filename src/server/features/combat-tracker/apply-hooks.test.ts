@@ -10,6 +10,7 @@ import {
   type HpChangeRecord,
   type HpChangesResult,
   parseFullCard,
+  partRollIdsOf,
 } from "@shared/combat-tracker/schemas";
 import { eq } from "drizzle-orm";
 import { conflict } from "../../commands/errors";
@@ -49,6 +50,7 @@ function started() {
       toHitTotal: p.toHit.total,
       damageTotal: p.damage.total,
       damageRollId: p.damage.rollId,
+      partRollIds: partRollIdsOf(p),
       targets,
     });
   };

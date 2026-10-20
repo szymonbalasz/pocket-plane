@@ -3,7 +3,7 @@
 // (FR-CBT-98–100) and stored combat trails (FR-CBT-97, FR-MAP-65, -66). CBTX's ambush, round 1.
 import { describe, expect, test } from "bun:test";
 import { sideOf } from "@shared/combat-tracker/rules";
-import { COMBATANT_TYPE, HIT_RULING_TYPE } from "@shared/combat-tracker/schemas";
+import { COMBATANT_TYPE, HIT_RULING_TYPE, partRollIdsOf } from "@shared/combat-tracker/schemas";
 import type { GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
 import { MAP_INTENTS, TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
@@ -101,6 +101,7 @@ describe("FR-CBT-88 cbt.applyHit", () => {
         t.run(applyHitCommand.name, {
           cardId,
           toHitTotal: 15,
+          partRollIds: partRollIdsOf(t.card(cardId).p),
           targets: [t.target("Goblin", true), t.target("Goblin", true)],
         }),
       ).code,
@@ -176,6 +177,7 @@ describe("FR-CBT-91 ruling lifecycle (R0) and FR-CBT-94 damageRollId", () => {
       cardId,
       damageTotal: c.damage?.total,
       damageRollId: c.damage?.rollId,
+      partRollIds: partRollIdsOf(c),
       targets: [t.target("Goblin", true)],
     });
     expect(fresh()).toEqual([]);
@@ -214,6 +216,7 @@ describe("FR-CBT-91 ruling lifecycle (R0) and FR-CBT-94 damageRollId", () => {
       cardId,
       damageTotal: c.damage?.total,
       damageRollId: c.damage?.rollId ?? null,
+      partRollIds: partRollIdsOf(c),
       targets: [t.target("Goblin", true)],
     };
     const w = written(t);

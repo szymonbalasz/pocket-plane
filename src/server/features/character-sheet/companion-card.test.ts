@@ -4,7 +4,7 @@
 // FR-CHARX-63 / FR-ENT-38 (the owner edits a pet on the card; other players gain nothing).
 import { describe, expect, test } from "bun:test";
 import { attackLogKind } from "@shared/combat-tracker/log-kinds";
-import { DamageCardPayload } from "@shared/combat-tracker/schemas";
+import { DamageCardPayload, partRollIdsOf } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import { eq } from "drizzle-orm";
@@ -272,11 +272,13 @@ describe("FR-CBT-114 outcome line totals only", () => {
           damageTotal: 14,
           targets: [{ targetId: goblin, hit: c.hit, multiplier: "normal" }],
           damageRollId: card.damage?.rollId as string,
+          partRollIds: partRollIdsOf(card),
         });
       } else {
         t.run("cbt.applyHit", {
           cardId: r.cardId,
           toHitTotal: total,
+          partRollIds: partRollIdsOf(card),
           targets: [{ targetId: goblin, hit: c.hit, multiplier: "normal" }],
         });
       }

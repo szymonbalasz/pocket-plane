@@ -19,7 +19,7 @@ import { loadInProcess } from "@server/features/fixtures-adapters/loader";
 import type { Viewer } from "@server/ws/records";
 import { playerViewer, sourceOf } from "@server/ws/testing/convergence";
 import { servicesFromBundle, snapshotFrames } from "@server/ws/testing/snapshot-size";
-import { CBT_INTENTS, type DamageCardPayload } from "@shared/combat-tracker/schemas";
+import { CBT_INTENTS, type DamageCardPayload, partRollIdsOf } from "@shared/combat-tracker/schemas";
 import { MOD_INTENTS } from "@shared/effect-modifiers/intents";
 import { RULE_TRIGGER_TYPE } from "@shared/effect-modifiers/trigger-records";
 import { asc, eq } from "drizzle-orm";
@@ -253,6 +253,7 @@ describe("FR-MOD-47 rule-triggers leak scan per player", () => {
         toHitTotal: p.toHit?.total,
         damageTotal: p.damage?.total,
         damageRollId: p.damage?.rollId ?? null,
+        partRollIds: partRollIdsOf(p),
         targets: [{ targetId: x.k(target)?.id, hit: true, multiplier: "normal", triggers }],
       });
     };

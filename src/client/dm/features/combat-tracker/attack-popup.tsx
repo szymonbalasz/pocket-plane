@@ -23,6 +23,7 @@ import {
   type DamageMultiplier,
   HIT_RULING_TYPE,
   type HitRulingRecord,
+  partRollIdsOf,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { modSegments } from "@shared/effect-modifiers/line";
@@ -552,6 +553,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
         ...(damageTotal !== null ? { damageTotal } : {}),
         // FR-CBT-94: the damage this popup shows; a newer one → conflict, and the popup fills.
         damageRollId: p.damage?.rollId ?? null,
+        partRollIds: partRollIdsOf(p),
         // FR-CBT-82: the extra parts' values and each row's part multipliers, card order.
         ...(extraTotals.length ? { extraTotals } : {}),
         targets: rows.map((x) => ({

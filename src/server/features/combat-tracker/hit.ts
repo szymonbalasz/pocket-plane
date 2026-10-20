@@ -18,6 +18,7 @@ import {
   DAMAGE_CARD_KIND,
   DamageCardPayload,
   LOG_KIND_ATTACK,
+  samePartRollIds,
 } from "@shared/combat-tracker/schemas";
 import { effectiveAc } from "@shared/effect-modifiers/rules";
 import { HitApplied } from "@shared/events/combat-tracker";
@@ -29,7 +30,7 @@ import { cardRollIds, dmModNames, rolledOf } from "../effect-modifiers/card";
 import { activeEffects } from "../effect-modifiers/roll-hook";
 import { loadNotification } from "../notifications/helpers";
 import { activeCombatant, statsOf } from "./guards";
-import { cardRoll } from "./hp";
+import { CARD_CHANGED, cardRoll } from "./hp";
 import {
   campaignOf,
   getCombatant,
@@ -56,6 +57,8 @@ export const applyHitCommand = defineCommand({
     if (card.state !== "pending") throw conflict("No longer pending");
     if (rulingOfCard(env.tx, card.id)) throw conflict(HIT_ALREADY_APPLIED);
     if (!p.toHit) throw invalid("This card has no to-hit roll");
+    // FR-CBT-129 (sprint 7): the to-hit the popup showed (a reroll replaces it, FR-CBT-126).
+    if (!samePartRollIds(input.partRollIds, p)) throw conflict(CARD_CHANGED);
     if (!input.targets.some((t) => t.hit)) {
       const message = "Apply hit needs a Hit target";
       throw invalid(message, [{ path: ["targets"], message }]);

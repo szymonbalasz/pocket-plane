@@ -7,6 +7,7 @@ import {
   type HpChangeRecord,
   type HpChangesResult,
   parseFullCard,
+  partRollIdsOf,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
@@ -18,7 +19,7 @@ import { attackCommand } from "./attack";
 import { applyCard, applyHp, undoCommand } from "./hp";
 import { setInitiative, setRemoved } from "./initiative";
 import { endCommand, startCommand } from "./lifecycle";
-import { combatSetup, damageRollIdOf, eliteBlock } from "./testing";
+import { combatSetup, damageRollIdOf, eliteBlock, partRollIdsFor } from "./testing";
 
 function started() {
   const t = combatSetup();
@@ -49,6 +50,7 @@ function started() {
       toHitTotal: p.toHit.total,
       damageTotal: p.damage.total,
       damageRollId: p.damage.rollId,
+      partRollIds: partRollIdsOf(p),
       targets: targets.map((x) => {
         const [name, per] = typeof x === "string" ? [x, {}] : x;
         return { targetId: id(name), hit, multiplier, ...per };
@@ -316,6 +318,7 @@ describe("FR-CBT-34 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
           toHitTotal: 1,
           damageTotal: 1,
           damageRollId: damageRollIdOf(t.card(r2.cardId)),
+          partRollIds: partRollIdsFor(t.card(r2.cardId)),
           targets: [{ targetId: "nope", hit: true, multiplier: "normal" }],
         }),
       ).code,
@@ -331,6 +334,7 @@ describe("FR-CBT-34 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
           toHitTotal: 1,
           damageTotal: 1,
           damageRollId: null,
+          partRollIds: { toHit: null, extra: [] },
           targets: [{ targetId: t.id("Goblin"), hit: true, multiplier: "normal" }],
         }),
       ).code,

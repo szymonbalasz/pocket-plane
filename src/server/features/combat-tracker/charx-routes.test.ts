@@ -8,6 +8,7 @@ import {
   type EncounterRecord,
   type HpChangeRecord,
   parseFullCard,
+  partRollIdsOf,
 } from "@shared/combat-tracker/schemas";
 import { asc, eq } from "drizzle-orm";
 import { gameLogEntry, hpChange, notification, roll } from "../../db/schema";
@@ -176,6 +177,7 @@ describe("FR-CHARX-24 FR-CBT-16 cbt.attack with a sheet row", () => {
       toHitTotal: p.toHit.total,
       damageTotal: p.damage.total,
       damageRollId: p.damage.rollId,
+      partRollIds: partRollIdsOf(p),
       targets: [{ targetId: t.id("Goblin"), hit: true, multiplier: "normal" }],
     });
     const rows = t.s.db.select().from(hpChange).all() as HpChangeRecord[];

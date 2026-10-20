@@ -525,6 +525,41 @@ export function parseFullCard(v: unknown): FullDamageCardPayload {
   return p;
 }
 
+/**
+ * FR-CBT-129 (sprint 7): every card part's roll id the popup was built from, beside
+ * `damageRollId`: the to-hit (null = none) and each extra damage part's, card order. A reroll
+ * (FR-CBT-126) or a maxed die (FR-CBT-128) changes them; Apply with old ids → `conflict`.
+ */
+export const PartRollIds = z.strictObject({
+  toHit: Id.nullable(),
+  extra: z.array(Id).max(EXTRA_DAMAGE_MAX),
+});
+export type PartRollIds = z.infer<typeof PartRollIds>;
+
+/** FR-CBT-129: the part roll ids a client sends for this card as it shows it. */
+export const partRollIdsOf = (p: DamageCardPayload): PartRollIds => ({
+  toHit: p.toHit?.rollId ?? null,
+  extra: (p.damage?.extra ?? []).map((x) => x.rollId),
+});
+
+/** FR-CBT-129: do the sent ids still name the card's parts? */
+export const samePartRollIds = (sent: PartRollIds, p: DamageCardPayload): boolean => {
+  const now = partRollIdsOf(p);
+  return (
+    sent.toHit === now.toHit &&
+    sent.extra.length === now.extra.length &&
+    sent.extra.every((id, i) => id === now.extra[i])
+  );
+};
+
+/**
+ * FR-CBT-127 (sprint 7): a reroll flipped the crit while damage was on the card: the damage went
+ * to `unusedRolls` and the card waits for a new roll. Derived (0 B): a to-hit-only card never
+ * holds unused rolls otherwise (FR-CBT-92 keeps them on complete cards only).
+ */
+export const critChanged = (p: DamageCardPayload): boolean =>
+  p.toHit !== null && p.damage === null && (p.unusedRolls?.length ?? 0) > 0;
+
 /** One target's outcome, seen by the rolling player (#138): no DM-only ids. */
 export const DamageCardTargetOutcome = z.strictObject({
   targetName: z.string().nullable(),
@@ -759,6 +794,8 @@ export const ApplyCardTargetsInput = z.strictObject({
    * (R1): every caller says which damage it applies.
    */
   damageRollId: Id.nullable(),
+  /** FR-CBT-129 (sprint 7): required; another part on the card → `conflict` (CARD_CHANGED). */
+  partRollIds: PartRollIds,
 });
 export type ApplyCardTargetsInput = z.input<typeof ApplyCardTargetsInput>;
 export const ApplyHpInput = z.strictObject({
@@ -826,6 +863,8 @@ export const ApplyHitInput = z.strictObject({
     .refine((ts) => new Set(ts.map((t) => t.targetId)).size === ts.length, {
       message: "Each target at most once",
     }),
+  /** FR-CBT-129 (sprint 7): required; another to-hit on the card → `conflict` (CARD_CHANGED). */
+  partRollIds: PartRollIds,
 });
 export type ApplyHitInput = z.input<typeof ApplyHitInput>;
 export const ApplyHitResult = z.object({ rulingId: z.string() });

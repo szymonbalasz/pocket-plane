@@ -25,6 +25,8 @@ export default defineFixture({
       damageTotal: 6,
       // FR-CBT-94: the attack's second seeded ID is its damage roll (the fixture test asserts it).
       damageRollId: fixtureSeededId("combat-hit", 1),
+      // FR-CBT-129: the first seeded ID is its to-hit roll; no extra parts.
+      partRollIds: { toHit: fixtureSeededId("combat-hit", 0), extra: [] },
       targets: [
         {
           targetId: r.id("combat-1", COMBATANT_TYPE, COMBAT_1.mira),

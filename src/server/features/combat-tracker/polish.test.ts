@@ -14,7 +14,7 @@ import { encounter, notification } from "../../db/schema";
 import { attackCommand } from "./attack";
 import { applyCard } from "./hp";
 import { endCommand, startCommand } from "./lifecycle";
-import { combatSetup, damageRollIdOf } from "./testing";
+import { combatSetup, damageRollIdOf, partRollIdsFor } from "./testing";
 
 function started() {
   const t = combatSetup();
@@ -100,6 +100,7 @@ describe("FR-CBT-59 FR-CBT-61 End dismisses pending cards", () => {
         toHitTotal: 13,
         damageTotal: 6,
         damageRollId: damageRollIdOf(t.card(t.mira)),
+        partRollIds: partRollIdsFor(t.card(t.mira)),
         targets: [{ targetId: t.id("Goblin"), hit: true, multiplier: "normal" }],
       }),
     );

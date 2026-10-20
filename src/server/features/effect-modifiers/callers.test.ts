@@ -9,6 +9,7 @@ import type {
   HpChangeRecord,
   RollDamageResult,
 } from "@shared/combat-tracker/schemas";
+import { partRollIdsOf } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import type { RollEntryPayload, RollPayloadItem } from "@shared/dice-roll-log/schemas";
@@ -103,6 +104,7 @@ describe("FR-MOD-15/16 cbt.attack and apply", () => {
         toHitTotal,
         damageTotal: p.damage?.total,
         damageRollId: p.damage?.rollId ?? null,
+        partRollIds: partRollIdsOf(p),
         targets: [{ targetId: t.id("Mira"), hit: true, multiplier: "normal" }],
         public: true,
       });

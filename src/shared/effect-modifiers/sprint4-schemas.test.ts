@@ -114,6 +114,7 @@ describe("FR-CBT-81 / -82 / -84 combat parts", () => {
     const base = {
       cardId: "n",
       damageRollId: null,
+      partRollIds: { toHit: null, extra: [] },
       targets: [{ targetId: "g", hit: true, multiplier: "normal" }],
     };
     const ok = (v: unknown) => ApplyCardTargetsInput.safeParse(v).success;

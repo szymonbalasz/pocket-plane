@@ -5,6 +5,8 @@ import {
   type CombatantRecord,
   DamageCardPayload,
   type EncounterRecord,
+  type PartRollIds,
+  partRollIdsOf,
 } from "@shared/combat-tracker/schemas";
 import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
 import { asc, eq } from "drizzle-orm";
@@ -23,6 +25,10 @@ import { toCombatantRecord } from "./rows";
 export const damageRollIdOf = (card: unknown): string | null =>
   DamageCardPayload.parse((card as { payload?: unknown } | undefined)?.payload).damage?.rollId ??
   null;
+
+/** FR-CBT-129 (sprint 7): the card's part roll ids as Apply / Apply hit must name them. */
+export const partRollIdsFor = (card: unknown): PartRollIds =>
+  partRollIdsOf(DamageCardPayload.parse((card as { payload?: unknown } | undefined)?.payload));
 
 /** Record IDs (UUIDs, real or seeded) anywhere; tokens / asset IDs as whole JSON strings. */
 const ID_SHAPES =
