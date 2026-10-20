@@ -163,6 +163,16 @@ export const setCompanionCommand = defineCommand({
         card:
           before.card ?? companionCard(statsOf(env, before) as StatBlock, () => env.ctx.ids.next()),
       });
+      // FR-CBT-106 / -108: a companion acting with its owner that switches to `own` keeps its
+      // current effective number (its owner's), so it ranks there instead of dropping to the
+      // end without one; switching back ranks it by the owner again.
+      const boundBefore = before.turnMode === "after-owner" || before.turnMode === "in-owner-turn";
+      if (mode === "own" && boundBefore) {
+        const ownerRow = rows.find(
+          (r) => r.kind === "pc" && r.entityId === before.ownerCharacterId,
+        );
+        if (ownerRow?.initiative != null) Object.assign(set, { initiative: ownerRow.initiative });
+      }
       // FR-CBT-105: companions are on the party's side, shown openly.
       if (before.ownerCharacterId === null)
         Object.assign(set, { side: "ally", publicSide: "ally" });

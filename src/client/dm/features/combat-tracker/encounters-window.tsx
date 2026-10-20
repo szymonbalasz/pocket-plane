@@ -2,7 +2,8 @@
 // add options, party, difficulty card); Start on the viewed scene (binding preview, "Not on this
 // map" PCs, `at`) / End (confirm). Planned encounters save themselves (debounced whole replace);
 // started / ended are read-only. Sprint 2: FR-CBT-62–66. Sprint 5 (#252): an entry's "Friendly"
-// Switch; the card rates enemy entries only and lists the friendly ones (FR-CBT-102).
+// Switch; the card rates enemy entries only and lists the friendly ones (FR-CBT-102). Sprint 6
+// (FR-CBT-109): Start lists each joining PC's pets under it (ticked iff on the map).
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { difficultyMethods, formatCr, rateEncounter } from "@shared/combat-tracker/difficulty";
@@ -14,7 +15,7 @@ import {
   type EncounterRecord,
   QUANTITY_MAX,
 } from "@shared/combat-tracker/schemas";
-import { entityNameKey } from "@shared/entities/schemas";
+import { entityNameKey, type MonsterRecord } from "@shared/entities/schemas";
 import type { SceneFolderRecord, SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
 import { ApiError } from "@ui/api";
 import { Button } from "@ui/components/ui/button";
@@ -48,7 +49,7 @@ import {
   SwordsIcon,
   Trash2Icon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { creatureRows } from "../entities/list";
 import { useDmMap, viewedScene } from "../scenes-map/view-state";
@@ -63,7 +64,16 @@ import {
 } from "./encounter-draft";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpSelect, JoinPreviewRow } from "./join-parts";
-import { defaultJoiningIds, type JoinSlot, notOnMap, previewJoin, startBody } from "./join-preview";
+import {
+  defaultJoiningIds,
+  type JoinRow,
+  type JoinSlot,
+  notOnMap,
+  type PetOffer,
+  petOffers,
+  previewJoin,
+  startBody,
+} from "./join-preview";
 import { useOpenEncounter } from "./open-encounter";
 import { partyMembers, toggleParty } from "./party";
 import { freeAreaCell } from "./place-at";
@@ -86,6 +96,42 @@ function useCharacters() {
         .filter((d) => d.kind === "character")
         .sort((a, b) => (entityNameKey(a.name) < entityNameKey(b.name) ? -1 : 1)),
     [defs],
+  );
+}
+
+type Pet = MonsterRecord & { companionOf: string };
+
+/** FR-CBT-109: the campaign's pets (monsters with an owner PC), by name. */
+function usePets(): Pet[] {
+  const defs = useDefinitions();
+  return useMemo(
+    () =>
+      [...defs.values()]
+        .filter((d): d is Pet => d.kind === "monster" && "companionOf" in d && !!d.companionOf)
+        .sort((a, b) => (entityNameKey(a.name) < entityNameKey(b.name) ? -1 : 1)),
+    [defs],
+  );
+}
+
+/** FR-CBT-109: a pet's tick in the Start dialog (`cbt-enc-pet`). */
+function PetTick({
+  offer,
+  owner,
+  onChange,
+}: {
+  offer: PetOffer<Pet>;
+  owner: string;
+  onChange(ticked: boolean): void;
+}) {
+  return (
+    <Checkbox
+      data-testid="cbt-enc-pet"
+      data-record-id={offer.pet.id}
+      data-checked={offer.ticked}
+      aria-label={`${offer.pet.name} (${owner}'s pet) joins`}
+      checked={offer.ticked}
+      onCheckedChange={(v) => onChange(v === true)}
+    />
   );
 }
 
@@ -204,6 +250,33 @@ function useMonsterLookupRows(q: string): LookupRow[] {
 
 // ---------- start dialog (FR-CBT-07, FR-CBT-08) ----------
 
+/**
+ * FR-CBT-109: a pet on the map under its PC in the Start preview: its tick, then (ticked) its
+ * binding as for any combatant.
+ */
+function PetPreviewRow({
+  offer,
+  owner,
+  row,
+  onChange,
+}: {
+  offer: PetOffer<Pet>;
+  owner: string;
+  row: JoinRow | undefined;
+  onChange(ticked: boolean): void;
+}) {
+  const tick = <PetTick offer={offer} owner={owner} onChange={onChange} />;
+  if (row) {
+    return <JoinPreviewRow row={row} testId="cbt-enc-binding" lead={tick} className="pl-4" />;
+  }
+  return (
+    <li className="flex items-center gap-2 pl-4 text-muted-foreground">
+      {tick}
+      <span className="flex-1 truncate">{offer.pet.name}</span>
+    </li>
+  );
+}
+
 function StartDialog({
   encounter,
   draft,
@@ -228,11 +301,19 @@ function StartDialog({
   const { disabled } = useCbtIntent();
   const startEnd = useStartEnd();
   const free = useFreeArea();
-  // FR-CBT-66: "Not on this map" PCs are unticked each time the dialog opens.
+  const pets = usePets();
+  // FR-CBT-66: "Not on this map" PCs are unticked each time the dialog opens; FR-CBT-109: pets
+  // back to their default (ticked iff on the map).
   const [joining, setJoining] = useState<ReadonlySet<string>>(new Set());
+  const [petPicks, setPetPicks] = useState<ReadonlyMap<string, boolean>>(new Map());
   useEffect(() => {
-    if (open) setJoining(new Set());
+    if (open) {
+      setJoining(new Set());
+      setPetPicks(new Map());
+    }
   }, [open]);
+  const pickPet = (id: string, ticked: boolean) =>
+    setPetPicks((cur) => new Map(cur).set(id, ticked));
   const sceneTokens = useMemo(
     () => (scene ? tokens.filter((t) => t.sceneId === scene.id) : []),
     [scene, tokens],
@@ -240,6 +321,15 @@ function StartDialog({
   const party = partyMembers(characters, draft.partyCharacterIds, drafts);
   const offMap = sceneLoaded ? notOnMap(party, sceneTokens) : [];
   const joiningParty = party.filter((c) => !offMap.includes(c) || joining.has(c.id));
+  const offers = sceneLoaded
+    ? petOffers(
+        pets,
+        joiningParty.map((c) => c.id),
+        sceneTokens,
+        petPicks,
+      )
+    : [];
+  const joiningPets = offers.filter((o) => o.ticked).map((o) => o.pet);
   const slots: JoinSlot[] = [
     ...joiningParty.map((c) => ({
       kind: "pc" as const,
@@ -261,6 +351,16 @@ function StartDialog({
         hasFormula: Boolean(d.statBlock.hpFormula),
       }));
     }),
+    // FR-CBT-109: pets after the entries, as the server binds them.
+    ...joiningPets.map((p) => ({
+      kind: "monster" as const,
+      entityId: p.id,
+      name: p.name,
+      portraitAssetId: p.portraitAssetId,
+      hpMode: "average" as const,
+      hasFormula: false,
+      pet: true,
+    })),
   ];
   const rows =
     scene && sceneLoaded
@@ -284,12 +384,29 @@ function StartDialog({
           </DialogDescription>
         </DialogHeader>
         <ul className="flex max-h-72 flex-col gap-1 overflow-auto text-sm">
-          {rows.map((r, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: one row per combatant slot
-            <JoinPreviewRow key={i} row={r} testId="cbt-enc-binding" />
-          ))}
+          {rows.map((r, i) =>
+            r.pet ? null : (
+              // biome-ignore lint/suspicious/noArrayIndexKey: one row per combatant slot
+              <Fragment key={i}>
+                <JoinPreviewRow row={r} testId="cbt-enc-binding" />
+                {/* FR-CBT-109: the PC's pets on the map under it, each with its tick. */}
+                {r.kind === "pc" &&
+                  offers
+                    .filter((o) => o.pet.companionOf === r.entityId && o.onMap)
+                    .map((o) => (
+                      <PetPreviewRow
+                        key={o.pet.id}
+                        offer={o}
+                        owner={r.name}
+                        row={rows.find((x) => x.pet && x.entityId === o.pet.id)}
+                        onChange={(v) => pickPet(o.pet.id, v)}
+                      />
+                    ))}
+              </Fragment>
+            ),
+          )}
         </ul>
-        {offMap.length > 0 && (
+        {(offMap.length > 0 || offers.some((o) => !o.onMap)) && (
           <fieldset className="flex flex-col gap-1">
             <legend className="mb-1 text-xs font-medium text-muted-foreground">
               Not on this map
@@ -318,6 +435,23 @@ function StartDialog({
                 </div>
               );
             })}
+            {/* FR-CBT-109: pets with no token here join token-less if ticked. */}
+            {offers
+              .filter((o) => !o.onMap)
+              .map((o) => {
+                const owner = joiningParty.find((c) => c.id === o.pet.companionOf)?.name ?? "";
+                return (
+                  <div key={o.pet.id} className="flex items-center gap-2">
+                    <PetTick offer={o} owner={owner} onChange={(v) => pickPet(o.pet.id, v)} />
+                    <span>
+                      {o.pet.name}{" "}
+                      <span className="text-xs text-muted-foreground">
+                        ({owner}'s pet, no token)
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
           </fieldset>
         )}
         <DifficultyCard draft={draft} partyIds={joiningParty.map((c) => c.id)} />
@@ -332,7 +466,14 @@ function StartDialog({
               if (!scene || !sceneLoaded) return;
               // FR-CBT-65: created tokens go around the centre of this tab's free area.
               const at = freeAreaCell(free.area, scene);
-              const body = startBody(encounter.id, scene.id, offMap, joining, at);
+              const body = startBody(
+                encounter.id,
+                scene.id,
+                offMap,
+                joining,
+                at,
+                joiningPets.map((p) => p.id),
+              );
               // FR-CBT-60: once acked, Initiative opens in front, Encounters minimises, map refits.
               const r = await startEnd.start(body);
               if (r !== undefined) onOpenChange(false);
