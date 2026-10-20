@@ -19,13 +19,12 @@ import { ROLL_ROW_MAX } from "@shared/effect-modifiers/schemas";
 import { AttackRolled } from "@shared/events/combat-tracker";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import type { DomainEvent } from "../../events/types";
-import { characters } from "../character-sheet";
 import { dice, gameLog } from "../dice-roll-log";
 import { withCardMods } from "../effect-modifiers/card";
 import { recordOffers, rollLine, withCardOffers } from "../effect-modifiers/offers";
 import { notify } from "../notifications";
 import { cardRollOf, cardToHitOf, damageCardText, fitCardPayload } from "./card-kind";
-import { activeCombatant, statsOf } from "./guards";
+import { activeCombatant, attackRefFor, combatantAttack, statsOf } from "./guards";
 import { cardExtraOf, checkManualExtra, rollExtraParts } from "./parts";
 
 /**
@@ -70,8 +69,9 @@ export const attackCommand = defineCommand({
   execute(input, env): AttackResult {
     const { c, enc } = activeCombatant(env, input.attackerId, { own: true });
     // The attacker's own definition only: a row of another creature is `not_found` here.
-    const ref = { attackId: input.attackId, spellId: input.spellId };
-    const attack = characters.sheetAttack(env, c.entityId, ref);
+    // Sprint 6 (FR-CBT-114): a player's companion attack names a card row.
+    const ref = attackRefFor(env, c, { attackId: input.attackId, spellId: input.spellId });
+    const attack = combatantAttack(env, c, ref);
     // FR-CHARX-55: to-hit and the base part carry `bonus`; FR-CBT-81: the extra parts follow.
     const [hitSpec, dmgSpec, ...extraSpecs] = attackRollSpecs(attack);
     const actor = { kind: "entity" as const, id: c.entityId, name: c.name };
@@ -162,6 +162,8 @@ export const attackCommand = defineCommand({
       rollIds,
       encounterId: enc.id,
       ...(isPlayer ? {} : { public: false }),
+      // FR-CBT-114 (ADR-0056): a companion's roll line is DM + owner only, whoever rolls.
+      audiencePlayerId: c.kind === "monster" ? c.ownerPlayerId : null,
     });
     // Owner event first, the card's `NotificationCreated` after (protocol §22). The card id is
     // known only once `notify` ran; the payload is validated at commit, so fill it in then.

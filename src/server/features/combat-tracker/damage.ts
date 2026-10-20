@@ -4,6 +4,7 @@
 // line, card. Healing never makes a card (the sheet never routes it). Sprint 5 (FR-CBT-92): the
 // card owner's second roll on a completed pending card makes no card (`unusedRolls`).
 import { characterRolls } from "@shared/character-sheet/logic";
+import { withCardIds } from "@shared/combat-tracker/companion";
 import { critExpression } from "@shared/combat-tracker/rules";
 import {
   type CardSaveDc,
@@ -35,7 +36,7 @@ import { notify } from "../notifications";
 import { toNotificationRecord, updateNotification } from "../notifications/helpers";
 import { cardRowRef, critLabel } from "./attack";
 import { cardRollOf, damageCardText, fitCardPayload } from "./card-kind";
-import { activeCombatant } from "./guards";
+import { activeCombatant, attackRefFor } from "./guards";
 import { cardExtraOf, checkManualExtra, rollExtraParts, splitParts } from "./parts";
 
 type RowRef = { attackId?: string; spellId?: string };
@@ -48,7 +49,8 @@ function damageRow(env: CommandEnv, c: CombatantRecord, ref: RowRef) {
     .where(eq(entity.id, c.entityId))
     .get();
   if (!row) throw notFound("Creature not found");
-  const stats = row.statBlock as StatBlock;
+  // Sprint 6 (FR-CBT-117): a companion's id-less rows carry its card's stable ids.
+  const stats = withCardIds(row.statBlock as StatBlock, c.card);
   const sheet = row.campaignId === null ? null : getSheet(env.tx, c.entityId);
   const kind = ref.spellId !== undefined ? "spellDamage" : "damage";
   const res = characterRolls(stats, sheet, kind, ref);
@@ -139,7 +141,8 @@ export const rollDamageCommand = defineCommand({
   },
   execute(input, env): RollDamageResult {
     const { c, enc } = activeCombatant(env, input.attackerId, { own: true });
-    const asked = { attackId: input.attackId, spellId: input.spellId };
+    // Sprint 6 (FR-CBT-114): a player's companion damage names a card row.
+    const asked = attackRefFor(env, c, { attackId: input.attackId, spellId: input.spellId });
     const row = damageRow(env, c, asked);
     const ref = cardRowRef(env, c, asked);
     checkManualExtra(row.extra, input.manual, input.manualExtra);
@@ -211,6 +214,8 @@ export const rollDamageCommand = defineCommand({
       rollIds,
       encounterId: enc.id,
       ...(isPlayer ? {} : { public: ownerRule && !c.hidden }),
+      // FR-CBT-114 (ADR-0056): a companion's roll line is DM + owner only, whoever rolls.
+      audiencePlayerId: c.kind === "monster" ? c.ownerPlayerId : null,
     });
     const rolled: DomainEvent<{ cardId: string; rollIds: string[]; attached: boolean }> = {
       type: DamageRolled.type,

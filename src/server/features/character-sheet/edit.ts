@@ -23,7 +23,9 @@ import {
 } from "@shared/character-sheet/sheet";
 import {
   type Attack,
+  CARD_ATTACKS_MAX,
   type EntityRecord,
+  isPet,
   kindRegistry,
   type Senses,
   type StatBlock,
@@ -40,7 +42,7 @@ import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import type { RecordChange } from "../../events/types";
 import { followHpMax, updateIn } from "../entities/commands";
 import type { DefinitionHooks } from "../entities/definition-hooks";
-import { editableCreature } from "./access";
+import { editableCreature, PET_OWNER_FIELDS, petOwnerEdit } from "./access";
 import {
   getSheet,
   mergeChanges,
@@ -83,6 +85,8 @@ function writeEntity(
       tokenShape: c.tokenShape,
       statBlock: patch.statBlock,
       ...(c.kind === "character" ? { ownerPlayerId: patch.ownerPlayerId ?? c.ownerPlayerId } : {}),
+      // FR-ENT-33 (sprint 6): the whole replace keeps a pet a pet.
+      ...(c.kind === "monster" ? { companionOf: c.companionOf, turnMode: c.turnMode } : {}),
       ...(patch.hpCurrent !== undefined ? { hpCurrent: patch.hpCurrent } : {}),
     },
     hooks,
@@ -128,6 +132,11 @@ const isSheetField = (k: string) => (SHEET_FIELDS as readonly string[]).includes
 
 /** FR-CHARX-15: role and kind rules on the keys of `set`. */
 function checkKeys(env: CommandEnv, c: EntityRecord, keys: SheetEditField[]) {
+  // FR-ENT-38 (#288): a pet's owner edits AC, HP max and speed only.
+  if (petOwnerEdit(env, c)) {
+    const other = keys.filter((k) => !(PET_OWNER_FIELDS as readonly string[]).includes(k));
+    if (other.length) throw forbidden(`Only the DM can change ${other.join(", ")}`);
+  }
   if (env.actor.role === "player") {
     const dmOnly = keys.filter((k) => (DM_ONLY_FIELDS as readonly string[]).includes(k));
     if (dmOnly.length) throw forbidden(`Only the DM can change ${dmOnly.join(", ")}`);
@@ -214,6 +223,12 @@ export function charEditCommand(hooks: DefinitionHooks) {
             draft: sheetBefore?.status === "draft",
           });
         }
+        // FR-ENT-38: a pet's kept HP follows the same rule (never a draft).
+        if (isPet(c) && c.hpCurrent !== null && typeof set.hpMax === "number") {
+          hpCurrent = followHpMax({ hpCurrent: c.hpCurrent, hpMax: c.statBlock.hpMax }, set.hpMax, {
+            draft: false,
+          });
+        }
         entityChanges = writeEntity(
           env,
           hooks,
@@ -242,6 +257,16 @@ export function charEditCommand(hooks: DefinitionHooks) {
 }
 
 type AnyRow = { id?: string };
+
+/**
+ * FR-ENT-38 (#288): a pet's owner writes attack rows only (`forbidden` otherwise), at most the
+ * card's 8 so every row is on it; returns that cap, or null for anyone else.
+ */
+function petRowsOnly(env: CommandEnv, c: EntityRecord, list: SheetRowList): number | null {
+  if (!petOwnerEdit(env, c)) return null;
+  if (list !== "attacks") throw forbidden("Only the DM can change a pet's sheet");
+  return CARD_ATTACKS_MAX;
+}
 
 /** Index of `id` in `rows`, else `not_found` "Row was deleted". */
 function indexOf(rows: readonly { id?: string }[], id: string): number {
@@ -292,6 +317,7 @@ export function charPutRowCommand(hooks: DefinitionHooks) {
     execute(input, env): CharPutRowResult {
       const { creature: c, sheet } = editableCreature(env, input.creatureId);
       const list = input.list;
+      const petCap = petRowsOnly(env, c, list);
       let rowId = input.row.id;
       const changes = applyRows(env, hooks, c, sheet, list, (rows) => {
         const existing = rowId === undefined ? undefined : rows[indexOf(rows, rowId)];
@@ -308,6 +334,9 @@ export function charPutRowCommand(hooks: DefinitionHooks) {
           row = { ...(input.row as SpellRow | ItemRow | Attack), id };
         }
         if (existing) return rows.map((r) => (r.id === id ? row : r));
+        if (petCap !== null && rows.length >= petCap) {
+          throw conflict(`A pet's card holds ${petCap} attacks`);
+        }
         if (rows.length >= ROW_LIMITS[list]) {
           throw conflict(`This list is full (${ROW_LIMITS[list]} rows)`);
         }
@@ -328,6 +357,7 @@ export function charDeleteRowCommand(hooks: DefinitionHooks) {
     roles: ["dm", "player"],
     execute(input, env): Record<string, never> {
       const { creature: c, sheet } = editableCreature(env, input.creatureId);
+      petRowsOnly(env, c, input.list);
       const changes = applyRows(env, hooks, c, sheet, input.list, (rows) => {
         indexOf(rows, input.rowId);
         return rows.filter((r) => r.id !== input.rowId);
@@ -345,6 +375,8 @@ export function charMoveRowCommand(hooks: DefinitionHooks) {
     roles: ["dm", "player"],
     execute(input, env): Record<string, never> {
       const { creature: c, sheet } = editableCreature(env, input.creatureId);
+      // FR-ENT-38: a pet's owner adds, edits and deletes attack rows; moving them is the DM's.
+      if (petOwnerEdit(env, c)) throw forbidden("Only the DM can reorder a pet's rows");
       const changes = applyRows(env, hooks, c, sheet, input.list, (rows) =>
         moved(rows, indexOf(rows, input.rowId), input.toIndex),
       );

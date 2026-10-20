@@ -30,6 +30,11 @@ export interface AppendInput {
    * entry is DM-only whoever rolls; wins over `public` and the player stamp.
    */
   forcePrivate?: boolean;
+  /**
+   * Sprint 6 (ADR-0056, FR-CBT-114): a companion's roll line: DM + this player (the owner)
+   * only, whoever rolls (`public` false). Null / absent = the usual stamp.
+   */
+  audiencePlayerId?: string | null;
 }
 
 type EntryRow = typeof gameLogEntry.$inferSelect;
@@ -56,7 +61,7 @@ function getEntry(tx: Pick<Tx, "select">, campaignId: string, id: string): Entry
  * `forcePrivate` → false for anyone.
  */
 function stampPublic(env: CommandEnv, cid: string, input: AppendInput): boolean {
-  if (input.forcePrivate) return false;
+  if (input.forcePrivate || input.audiencePlayerId) return false;
   if (env.actor.role === "player") return true;
   return input.public ?? categoryPublic(readSettings(env.tx, cid), input.category);
 }
@@ -100,6 +105,7 @@ export function append(env: CommandEnv, input: AppendInput): RecordChange {
       dmPayload,
       rollIds: input.rollIds,
       encounterId: input.encounterId ?? null,
+      audiencePlayerId: input.forcePrivate ? null : (input.audiencePlayerId ?? null),
       supersededBy: null,
     })
     .run();

@@ -80,6 +80,11 @@ const SAMPLES: Record<string, { payload: unknown; dmPayload: unknown | null }> =
     payload: { targetName: "Goblin 2", side: "ally" },
     dmPayload: { secret: true },
   },
+  // FR-CBT-122 (sprint 6): the turn mode lives in `dmPayload` alone.
+  "cbt.companion": {
+    payload: { action: "follows", name: "Owlbear", ownerName: "Brakka" },
+    dmPayload: { turnMode: "in-owner-turn" },
+  },
 };
 
 describe("FR-DICE-28 kind contract", () => {

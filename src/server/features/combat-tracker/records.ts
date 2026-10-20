@@ -21,7 +21,7 @@ import { cutWindow, type RecordWindow } from "@shared/protocol/window";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { combatant, encounter, encounterEntry, hpChange } from "../../db/schema";
-import { defineRecordType, type Visibility } from "../../ws/records";
+import { defineRecordType, type Viewer, type Visibility } from "../../ws/records";
 import {
   pendingRulings,
   startedEncounter,
@@ -60,15 +60,22 @@ export function redactEncounter(r: EncounterRecord): PlayerEncounterRecord {
   };
 }
 
-export function combatantVisibility(r: CombatantRecord): Visibility {
-  return !r.active || r.hidden ? "hidden" : "redacted";
+/**
+ * FR-CBT-27; sprint 6 (FR-CBT-116, ADR-0056): a companion of a hidden owner (`ownerHidden`) is
+ * hidden from every player, the owner included, like a hidden or inactive one.
+ */
+export function combatantVisibility(r: CombatantRecord, _v?: Viewer): Visibility {
+  return !r.active || r.hidden || r.ownerHidden ? "hidden" : "redacted";
 }
 
 /**
  * FR-CBT-37: removed → no rank, band or initiative; else the PC / monster redaction. FR-CBT-100
- * (#252): `side` = the side players were last openly shown; the true side never.
+ * (#252): `side` = the side players were last openly shown; the true side never. Sprint 6
+ * (FR-CBT-116): a companion adds its owner ids and mode for everyone, and for its **owner** (the
+ * viewer is `ownerPlayerId`) also HP, temp HP, `pet` and `card`; `ownerHidden` and
+ * `concentrationEffectId` never.
  */
-export function redactCombatant(r: CombatantRecord): PlayerCombatant {
+export function redactCombatant(r: CombatantRecord, v?: Viewer): PlayerCombatant {
   const base = {
     id: r.id,
     encounterId: r.encounterId,
@@ -83,7 +90,29 @@ export function redactCombatant(r: CombatantRecord): PlayerCombatant {
   if (r.kind === "pc") {
     return { ...ranked, kind: "pc", entityId: r.entityId, initiative: r.initiative };
   }
-  return { ...ranked, kind: "monster", band: healthBand(r.hpCurrent ?? 0, r.hpMax ?? 1) };
+  const monster = {
+    ...ranked,
+    kind: "monster" as const,
+    band: healthBand(r.hpCurrent ?? 0, r.hpMax ?? 1),
+  };
+  if (r.ownerCharacterId === null || r.ownerPlayerId === null || r.turnMode === null) {
+    return monster;
+  }
+  const owned = {
+    ...monster,
+    ownerCharacterId: r.ownerCharacterId,
+    ownerPlayerId: r.ownerPlayerId,
+    turnMode: r.turnMode,
+  };
+  if (v?.playerId !== r.ownerPlayerId) return owned;
+  return {
+    ...owned,
+    hpCurrent: r.hpCurrent,
+    hpMax: r.hpMax,
+    tempHp: r.tempHp,
+    pet: r.pet,
+    card: r.card,
+  };
 }
 
 export const combatRecordTypes = [

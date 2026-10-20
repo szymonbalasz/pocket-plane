@@ -3,6 +3,7 @@
 // + game-log lines + card state. HP, temp HP, death counters and concentration go through
 // combat-extras' `hpRules` (FR-CBTX-01/02): owner event first, then its cards (FR-CBTX-17).
 
+import { companionSafeToHit, isCompanion } from "@shared/combat-tracker/companion";
 import type {
   AttackLogDmPayload,
   AttackLogPayload,
@@ -352,7 +353,8 @@ export const applyCardWith = (hooks: ApplyHooks) =>
           targetName: target.name,
           attackName: p.attackName,
           damageType: p.damageType,
-          toHit: lineToHit,
+          // FR-CBT-114 (sprint 6, ADR-0056): a companion attacker's line keeps the total only.
+          toHit: isCompanion(attacker) ? companionSafeToHit(lineToHit) : lineToHit,
           hit,
           damage: raw,
           multiplier,
@@ -546,6 +548,9 @@ export const applyHp = defineCommand({
   },
 });
 
+/** FR-CBT-112: Undo of a step with an entry on a dismissed companion. */
+export const UNDO_DISMISSED = "Dismissed: adjust it in the Party window";
+
 /** FR-CBT-35: the encounter's undo unit (latest non-undone entry + its card's), latest first. */
 export function undoUnit(env: Pick<CommandEnv, "tx">, encounterId: string): HpChangeRecord[] {
   const rows = env.tx
@@ -572,6 +577,10 @@ export const undoCommandWith = (hooks: ApplyHooks) =>
       const last = unit[0];
       if (!enc || !last) throw conflict("Nothing to undo");
       if (last.id !== expectedHpChangeId) throw conflict("Something else changed — check Undo");
+      // FR-CBT-112 (sprint 6): a step touching a dismissed (inactive) target is refused whole.
+      if (unit.some((row) => !readCombatant(env.tx, row.targetId).active)) {
+        throw conflict(UNDO_DISMISSED);
+      }
       const notRestored: string[] = [];
       // FR-CBT-91 (sprint 5): the reopened card's hit ruling comes back with it.
       const ruling = last.cardId ? rulingOfCard(env.tx, last.cardId) : null;

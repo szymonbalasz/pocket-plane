@@ -70,7 +70,7 @@ describe("FR-CBTX-44 add dialog options", () => {
       t
         .combatants(t.enc.id)
         .map((c) => c.position)
-        .sort((a, b) => a - b),
+        .sort((a, b) => (a ?? 0) - (b ?? 0)),
     ).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     const ev = t.events.at(-1)?.event;
     expect(ev?.type).toBe("CombatantsAdded");

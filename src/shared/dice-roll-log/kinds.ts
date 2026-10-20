@@ -1,5 +1,7 @@
 // Log-entry kind registry (FR-DICE-18, protocol §26). APPEND-ONLY (AGENTS §9.9): a feature adds
 // one import and one line in the list for each of its kinds; nothing else changes here.
+
+import { companionLogKind } from "../combat-tracker/companion-kind";
 import { attackLogKind, hpLogKind } from "../combat-tracker/log-kinds";
 import { sideLogKind } from "../combat-tracker/side-kind";
 import type { AnyLogKind } from "./kind-types";
@@ -10,6 +12,7 @@ const kinds: AnyLogKind[] = [
   attackLogKind, // cbt.attack (combat-tracker, FR-CBT-24)
   hpLogKind, // cbt.hp (combat-tracker, FR-CBT-24)
   sideLogKind, // cbt.side (combat-tracker, FR-CBT-99)
+  companionLogKind, // cbt.companion (combat-tracker, FR-CBT-122)
 ];
 
 const byKind = new Map<string, AnyLogKind>();

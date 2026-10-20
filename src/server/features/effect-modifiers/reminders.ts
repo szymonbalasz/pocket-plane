@@ -16,6 +16,7 @@ import { formulaOwnerOf } from "@shared/effect-modifiers/trigger-fire";
 import { reminderText } from "@shared/effect-modifiers/triggers";
 import { eq } from "drizzle-orm";
 import { combatant, entity } from "../../db/schema";
+import { turnStartersOf } from "../combat-tracker/ranks";
 import { toCombatantRecord } from "../combat-tracker/rows";
 import type {
   CombatRuleDetails,
@@ -51,11 +52,13 @@ function remind(
   detail: CombatRuleDetails["turnChanged"],
 ): void {
   if (detail.direction !== "next" || !detail.to.turnCombatantId) return;
-  const row = env.tx
-    .select()
-    .from(combatant)
-    .where(eq(combatant.id, detail.to.turnCombatantId))
-    .get();
+  // FR-CBT-108 (sprint 6): an in-owner-turn companion's `turnStart` is its owner's.
+  for (const id of turnStartersOf(env.tx, enc.id, detail.to.turnCombatantId))
+    remindFor(env, enc, id);
+}
+
+function remindFor(env: CombatRuleEnv, enc: EncounterRecord, combatantId: string): void {
+  const row = env.tx.select().from(combatant).where(eq(combatant.id, combatantId)).get();
   if (!row) return;
   const c = toCombatantRecord(row);
   const o = ownerOf(env, c.kind === "pc" ? { characterId: c.entityId } : { combatantId: c.id });
