@@ -2825,3 +2825,18 @@ From [campaign-management](../specs/campaign-management.md#6-functional-requirem
 | Bundle | The picker's own code (`ColorPicker.tsx`, `color-picker.ts`, `ColorSection.tsx`), measured as the OQ-CAMP-31 spike (`bun build --minify`, everything else external, `gzip -9`): **4.8 KB gz** (spike 3.6 KB; this build adds the Players panel Popover and the section); `bundle-size.test.ts` gate 5 KB. The Dice section adds no eager settings code | OQ-CAMP-31 |
 | Tests | `color-picker.test.ts` (`FR-CAMP-35 picker` model ×3; `FR-CAMP-35 clamp` (a) hue change → column, (b) row / rings and none + cache, (c) mask vs rules), `ColorPicker.test.tsx` (`FR-CAMP-35 picker` ×7: palette row, static render in the section and the Players panel trigger, reason line / Apply, not live, keyboard, send / reject; `FR-CAMP-35 clamp` held-drag reason), `bundle-size.test.ts`, player `screens.test.tsx` (`camp-my-color` gone), `{dm,player}/features/campaign-management/pref-sections.test.ts`, `dice-section.test.tsx` (`FR-DICEX-57 dice section` ×2, `FR-DICEX-58 one store`); e2e `colour-picker-2.e2e.ts` (`prefs-s6-e2e`: SHELL §13 P3–P6, P9, P10, P14); `colour-picker`, `map-colours`, `log-note-colours` and `prefs-window` moved to the Preferences picker / the new section lists | |
 | CON-44 | 0 B: no record, field or frame | — |
+
+## 120. Sprint 6: companion marker and double-click to the card (CP5)
+
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-76, -77 (#252, #288; OQ-MAP-55 picker; seams S5, S8). **Built by `fix/cp-tokens`**: client only, no record type, intent, event, signal, frame or Konva layer (CON-44: 0 B).
+
+| Piece | Contract | Source |
+|---|---|---|
+| Overlay line `companion` (`combat-tracker/token-overlay.ts` `companionTokenOverlay`; registered above MOD's line, which stays last) | Both clients, every token they receive: `ownerPlayerId ≠ null` and `characterId = null` → badge `map-token-companion` (id = token id), `icon` `paw-print`, `label` "‹player name›'s companion" (`personName`: no `player` row → "Player"), `color` = `markColor(owner)` (`colorOf`; unknown → player accent), `compact: true`. No combat data | FR-MAP-76 |
+| `TokenBadge.color?`, `TokenBadge.compact?` (`token-overlays.ts`; `BadgeIn.compact?` in `label.ts`) | `color`: a person's hex: the pill / chip is filled `#000` (the chip's disc is a `map-casing`, id = token id), text / glyph in the colour; Konva attr `color`. `compact`: always an icon chip, even where the label fits; otherwise the label row's rules unchanged (BL-35: below 48 px cells chip + "+N" or "+N", the paw listed in the "+N" hover; never over a name) | FR-MAP-76, -72 |
+| Paw glyph (`canvas-icons.ts`) | lucide `paw-print` path data | FR-MAP-76 |
+| Double-click (`@ui/features/combat-tracker/companion-token-open`) | `companionCardTarget(token, store, viewer)`: a marked token, viewer the DM or `token.ownerPlayerId` → the active companion combatant of the started encounter bound to it (`tokenId`) → `useOpenCompanionCard()(combatantId)`; none → opens `charx.companion` as is (picker as last used). Another player / unmarked token / the card not registered → nothing | FR-MAP-77, OQ-MAP-55 |
+| DM: `tokenDoubleClick` line `charx.companion-card` (order 10, `available` = marked token; `dm/features/character-sheet/companion-double-click.tsx`) | Its `Dialog` opens the card once on mount and closes; `DmMap` resolves a double-click entry's `Dialog` as well as a menu entry's | FR-MAP-29, -77 |
+| Player: `PlayerMap` `onTokenDoubleClick` | `useCompanionTokenOpen("player")` (players have no token registry) | FR-MAP-77 |
+
+- **Fixtures:** none new; bundle `cp-tokens` (= `companions-start`, for the e2e). E2E `e2e/cp-tokens.e2e.ts`.

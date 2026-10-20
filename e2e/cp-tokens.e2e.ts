@@ -106,7 +106,7 @@ test("FR-MAP-76 FR-MAP-77 cp-tokens: a paw in the owner's colour on owned pet to
   await dblClickToken(p1, owl);
   await dblClickToken(dm, owl);
   if (registered) {
-    await expect(card(p1)).toBeVisible();
+    await expect(card(p1).getByTestId("charx-companion-name")).toHaveText("Owlbear");
     await expect(card(dm)).toBeVisible();
   } else {
     await dm.waitForTimeout(500);
