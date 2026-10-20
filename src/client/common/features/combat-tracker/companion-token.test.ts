@@ -1,5 +1,6 @@
 // FR-MAP-76 companion marker (the `companion` token overlay: a paw badge in the owner's colour on
-// owned non-PC tokens, BL-35's small-cell rules). Pure: the store each client holds (companions-fixture).
+// owned non-PC tokens, BL-35's small-cell rules) and FR-MAP-77 (double-click → companion card:
+// DM and owner, never another player). Pure: the store each client holds (companions-fixture).
 import { describe, expect, test } from "bun:test";
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
@@ -8,6 +9,11 @@ import { chipGlyph } from "../scenes-map/canvas-icons";
 import { decorateToken } from "../scenes-map/decorations";
 import { labelRow, type Measure, MORE_BADGE_ID, type Pill } from "../scenes-map/label";
 import { tokenOverlays } from "../scenes-map/token-overlays";
+import {
+  type CompanionOpenDeps,
+  companionCardTarget,
+  openCompanionCardFor,
+} from "./companion-token-open";
 import { companionStore } from "./companions-fixture";
 import { COMPANION_MARKER_ID, companionBadge, sideBadge } from "./token-overlay";
 
@@ -161,5 +167,67 @@ describe("FR-MAP-76 companion marker", () => {
     // Alone on a 1×1 at 24 px (the fit floor): still its chip.
     const alone = labelRow("Owlbear", [paw], 70, 70, 24 / 70, measure);
     expect(alone.badges).toMatchObject([{ id: COMPANION_MARKER_ID, compact: true }]);
+  });
+});
+
+describe("FR-MAP-77 double-click opens the card", () => {
+  const spies = (store: RecordStore | undefined, hasCard = true) => {
+    const calls: string[] = [];
+    const deps: CompanionOpenDeps = {
+      store,
+      hasCard,
+      openCard: (id) => calls.push(`card:${id}`),
+      openCardAsIs: () => calls.push("card"),
+    };
+    return { calls, deps };
+  };
+
+  test("FR-MAP-77 double-click opens the card: owner and DM on the bound companion combatant; another player: nothing", () => {
+    const owner = spies(bound(companionStore("p1")));
+    expect(openCompanionCardFor(OWLBEAR, "player", owner.deps)).toBe(true);
+    expect(owner.calls).toEqual(["card:owlbear"]);
+    const dm = spies(bound(companionStore("dm")));
+    expect(openCompanionCardFor(OWLBEAR, "dm", dm.deps)).toBe(true);
+    expect(dm.calls).toEqual(["card:owlbear"]);
+    const other = spies(bound(companionStore("p2")));
+    expect(openCompanionCardFor(OWLBEAR, "player", other.deps)).toBe(false);
+    expect(other.calls).toEqual([]);
+    // Thorn's player opens their own Wolf's card; player-1 doesn't.
+    const wolf = (s: RecordStore) => bound(s, "wolfpet", "t-wolf");
+    expect(
+      companionCardTarget(WOLF, wolf(companionStore("p2")), { role: "player", playerId: "p2" }),
+    ).toEqual({ combatantId: "wolfpet" });
+    expect(
+      companionCardTarget(WOLF, wolf(companionStore("p1")), { role: "player", playerId: "p1" }),
+    ).toBeNull();
+  });
+
+  test("FR-MAP-77 double-click opens the card: out of a fight (or unbound) the card opens as last used (OQ-MAP-55)", () => {
+    for (const [store, client] of [
+      [outOfFight(companionStore("p1")), "player"],
+      [outOfFight(companionStore("dm")), "dm"],
+      [companionStore("p1"), "player"],
+    ] as const) {
+      const s = spies(store);
+      expect(openCompanionCardFor(OWLBEAR, client, s.deps)).toBe(true);
+      expect(s.calls).toEqual(["card"]);
+    }
+  });
+
+  test("FR-MAP-77 double-click opens the card: no handler on PC or unowned tokens, nor before the card is registered", () => {
+    for (const t of [MIRA, GOBLIN]) {
+      for (const [store, client] of [
+        [companionStore("dm"), "dm"],
+        [companionStore("p1"), "player"],
+      ] as const) {
+        const s = spies(bound(store));
+        expect(openCompanionCardFor(t, client, s.deps)).toBe(false);
+        expect(s.calls).toEqual([]);
+      }
+    }
+    const unregistered = spies(bound(companionStore("p1")), false);
+    expect(openCompanionCardFor(OWLBEAR, "player", unregistered.deps)).toBe(false);
+    expect(unregistered.calls).toEqual([]);
+    expect(openCompanionCardFor(OWLBEAR, "dm", spies(undefined).deps)).toBe(false);
   });
 });
