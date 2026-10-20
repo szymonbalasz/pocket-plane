@@ -54,3 +54,14 @@ export const PlayerColorSet = defineEvent({
   logged: true,
   undoable: false,
 });
+
+/**
+ * FR-CAMP-39 (ADR-0058): a feature switched on / off (a `campaign` upsert); every connection of
+ * the campaign resyncs after the commit (FR-CAMP-40). Logged, not undoable.
+ */
+export const CampaignFeatureSet = defineEvent({
+  type: "CampaignFeatureSet",
+  payload: z.object({ feature: z.string(), on: z.boolean() }).strict(),
+  logged: true,
+  undoable: false,
+});

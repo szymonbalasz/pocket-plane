@@ -16,6 +16,7 @@ import {
 import { GAME_LOG_WINDOW } from "@shared/dice-roll-log/schemas";
 import { EFFECT_PRESET_TYPE } from "@shared/effect-modifiers/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
+import { CHARACTER_GEMS_TYPE } from "@shared/gems/schemas";
 import { HANDOUT_PRESENT_TYPE } from "@shared/party-board/schemas";
 import {
   AOE_TEMPLATE_TYPE,
@@ -27,6 +28,7 @@ import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { INGEST, type IngestResult } from "../features/assets-pipeline/commands";
 import { processImage } from "../features/assets-pipeline/image";
 import { testPng } from "../features/assets-pipeline/testing";
+import { setFeature } from "../features/campaign-management/features";
 import { PUT_ENTRY } from "../features/compendium/homebrew";
 import { writeWorstPresents } from "../features/party-board/testing";
 import { SNAPSHOT_CEILING } from "./hub";
@@ -662,6 +664,42 @@ describe("CON-44 snapshot ceilings (#163)", () => {
         `ASSET S6 CON-44 tags: 500 library images, DM ${dm0.bytes} B (no tags) → ${typ[0]?.bytes} B (typical) → ${dm.bytes} B (worst 8 × 24), ${SNAPSHOT_CEILING.dm - dm.bytes} B left of 1.5 MiB; players ${Math.min(...players.map((p) => p.bytes))}–${Math.max(...players.map((p) => p.bytes))} B, unchanged`,
       );
       sql.run("DELETE FROM asset WHERE id LIKE 'con44-tags-%'");
+    });
+
+    test("FR-CAMP-45 CON-44 switch / FR-GEM-02 (sprint 7): 8 gem rows at 99 while off → every frame byte-identical; on → +20 B features + the rows per viewer; ceilings hold", () => {
+      const sql = b.s.db.$client;
+      const cid = sql.query<{ id: string }, []>("SELECT id FROM campaign WHERE active = 1").get()
+        ?.id as string;
+      const before = snapshotSizes(b.s);
+      // Worst case (GEM §12): 8 characters with every count at 99 (a size probe, not a command).
+      const chars = sql
+        .query<{ id: string }, [string]>(
+          "SELECT id FROM entity WHERE campaign_id = ? AND kind = 'character' ORDER BY id LIMIT 8",
+        )
+        .all(cid);
+      expect(chars.length).toBeGreaterThanOrEqual(6);
+      const put = sql.query(
+        "INSERT INTO character_gems (id, campaign_id, inspiration, fortune, combat, divine, action, updated_at) VALUES (?, ?, 99, 99, 99, 99, 99, '2026-01-01T00:00:00.000Z')",
+      );
+      for (const c of chars) put.run(c.id, cid);
+      const off = snapshotSizes(b.s);
+      expect(off.map((v) => v.bytes)).toEqual(before.map((v) => v.bytes));
+      const dmActor = { role: "dm" as const, playerId: null, campaignId: cid };
+      b.s.commands.run(setFeature, { feature: "gems", on: true }, { actor: dmActor });
+      const on = snapshotSizes(b.s);
+      expectUnderCeilings(on);
+      for (const [i, v] of on.entries()) {
+        const rows = v.types[CHARACTER_GEMS_TYPE];
+        expect(rows?.rows).toBe(chars.length);
+        expect(v.bytes - (before[i] as ViewerSize).bytes).toBe(20 + 1 + (rows?.bytes ?? 0));
+      }
+      const [dm, ...players] = on as [ViewerSize, ...ViewerSize[]];
+      console.log(
+        `GEM CON-44: off +0 B; on DM +${dm.bytes - (before[0]?.bytes ?? 0)} B → ${dm.bytes} B (${SNAPSHOT_CEILING.dm - dm.bytes} B left of 1.5 MiB); players +${players[0] ? players[0].bytes - (before[1]?.bytes ?? 0) : 0} B, max ${Math.max(...players.map((p) => p.bytes))} B of 512 KiB; ${chars.length} rows at 99`,
+      );
+      b.s.commands.run(setFeature, { feature: "gems", on: false }, { actor: dmActor });
+      sql.run("DELETE FROM character_gems");
+      expect(snapshotSizes(b.s).map((v) => v.bytes)).toEqual(before.map((v) => v.bytes));
     });
 
     // Mutates the scenario (every token's creatureType): after the read-only cases.

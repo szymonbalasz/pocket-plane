@@ -76,6 +76,9 @@ import visionBrakka from "./fog-of-war/vision-brakka";
 import visionCrypt from "./fog-of-war/vision-crypt";
 import visionInvisible from "./fog-of-war/vision-invisible";
 import visionLegacy from "./fog-of-war/vision-legacy";
+import gemsAwarded from "./gems/gems-awarded";
+import gemsHidden from "./gems/gems-hidden";
+import gemsOn from "./gems/gems-on";
 import syncProbes from "./live-sync/sync-probes";
 import noteColours from "./notifications/note-colours";
 import notificationsTest from "./notifications/notifications-test";
@@ -202,4 +205,8 @@ export const units: readonly Fixture[] = [
   imageTags,
   // Sprint 6 track CP (build/cp-summon): pets + summons in the running fight
   cpCombat,
+  // Sprint 7 track GM (fix/gems-core): gems switch + counts
+  gemsOn,
+  gemsAwarded,
+  gemsHidden,
 ];
