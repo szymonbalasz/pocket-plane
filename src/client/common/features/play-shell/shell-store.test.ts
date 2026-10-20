@@ -118,14 +118,17 @@ describe("FR-SHELL-40, -41 settle after first layout", () => {
   });
 
   test("FR-SHELL-08 a user's stored rect is never re-placed by settle", () => {
-    const stored = { x: 700, y: 300, w: 400, h: 240 };
-    // A user open at the stored rect (over both windows): not settling; a settle is ignored.
-    const user = m8Controller({ state: "closed", ...stored });
+    // A user open at a clear stored rect (FR-SHELL-56: kept, `stored`): not settling; a settle is
+    // ignored, even once its measured height would reach the Game log.
+    const clearSpot = { x: 68, y: 60, w: 400, h: 240 };
+    const user = m8Controller({ state: "closed", ...clearSpot });
     user.c.dispatch({ type: "open", kind: "cbt.initiative" }, kinds);
     expect(user.c.store.getState().settling.has(INIT)).toBe(false);
-    user.heights.set(INIT, 302);
+    expect(user.c.store.getState().placed.get(INIT)).toBe("stored");
+    user.heights.set(INIT, 400);
     user.c.dispatch({ type: "settle", kind: "cbt.initiative" }, kinds);
-    expect(user.init()).toMatchObject({ state: "open", ...stored });
+    expect(user.init()).toMatchObject({ state: "open", ...clearSpot });
+    const stored = { x: 700, y: 300, w: 400, h: 240 };
     // A feature-placed window the user moves before it settles keeps the user's rect.
     const moved = m8Controller({ state: "closed", x: 868, y: 60, w: 400, h: 500 });
     moved.c.dispatch({ type: "open", kind: "cbt.initiative", by: "feature" }, kinds);
@@ -147,7 +150,7 @@ describe("sprint 5 (FR-SHELL-47, -53)", () => {
   const small = { w: 1280, h: 720 };
   const kinds = new Set(["b.one", "b.two", "b.three"]);
 
-  test("FR-SHELL-47 screen full: the least recently used launcher window is minimised, written, marked auto-minimised until restored; a reload loads it plain minimised", () => {
+  test("FR-SHELL-47 FR-SHELL-56 screen full: the least recently used launcher window is minimised, written, marked auto-minimised until restored; its restore onto a taken spot is reopened; a reload loads it plain minimised", () => {
     const backend = new Map<string, string>();
     const storage = createLayoutStorage(() => ({
       getItem: (k) => backend.get(k) ?? null,
@@ -165,16 +168,21 @@ describe("sprint 5 (FR-SHELL-47, -53)", () => {
     expect([...c.store.getState().autoMinimised]).toEqual(["b.one:main"]);
     const written = JSON.parse(backend.get("k") ?? "{}") as { windows: WindowState[] };
     expect(written.windows.find((w) => w.kind === "b.one")?.state).toBe("minimised");
-    // A user minimise isn't auto; a user restore clears the mark and reopens at the stored rect.
-    const stored = c.store.getState().windows.find((w) => w.kind === "b.one");
+    // A user restore clears the mark; its spot is taken now (FR-SHELL-56), so it is re-placed and
+    // the least recently used other window is auto-minimised, never itself.
     c.dispatch({ type: "open", kind: "b.one" }, kinds);
     expect(c.store.getState().autoMinimised.has("b.one:main")).toBe(false);
-    expect(c.store.getState().windows.find((w) => w.kind === "b.one")).toMatchObject({
-      x: stored?.x,
-      y: stored?.y,
-      state: "open",
-    });
-    c.dispatch({ type: "minimise", kind: "b.two" }, kinds);
+    expect([state("b.one"), state("b.two"), state("b.three")]).toEqual([
+      "open",
+      "minimised",
+      "open",
+    ]);
+    expect(c.store.getState().placed.get("b.one:main")).toBe("reopened");
+    expect([...c.store.getState().autoMinimised]).toEqual(["b.two:main"]);
+    // A user minimise isn't auto; closing an auto-minimised window drops its mark.
+    c.dispatch({ type: "minimise", kind: "b.three" }, kinds);
+    expect([...c.store.getState().autoMinimised]).toEqual(["b.two:main"]);
+    c.dispatch({ type: "close", kind: "b.two" }, kinds);
     expect(c.store.getState().autoMinimised.size).toBe(0);
     const reloaded = createShellController({ registry: reg, storage, viewport: () => small });
     reloaded.restore("k");

@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { emptyStore } from "@shared/protocol/store";
 import { freeArea, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
 import { clampRect, type Rect, TOP_BAR_H, workArea } from "@ui/features/play-shell/geometry";
@@ -10,15 +12,29 @@ import {
   launcherMetrics,
 } from "@ui/features/play-shell/launcher-fit";
 import {
+  bruteBest,
+  contractProblems,
+  type LayoutStep,
   launcherKinds,
   launcherSequence,
+  layoutRun,
+  placeFields,
   REFERENCE_VIEWPORTS,
   rectIn,
 } from "@ui/features/play-shell/layout-checks";
 import { defaultLayout, reduce, restoreLayout } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
-import { availableKinds, defaultSizeAt } from "@ui/features/play-shell/registry";
+import {
+  availableKinds,
+  createWindowRegistry,
+  defaultSizeAt,
+  type WindowDef,
+  type WindowRegistry,
+} from "@ui/features/play-shell/registry";
+import { createShellController } from "@ui/features/play-shell/shell-store";
+import { createLayoutStorage } from "@ui/features/play-shell/storage";
+import { ambushTokens } from "@ui/features/play-shell/test-cells";
 import { toastKeepOut } from "@ui/features/play-shell/toast-region";
 import { coveredArea } from "@ui/features/play-shell/token-boxes";
 import {
@@ -222,7 +238,7 @@ test("FR-SHELL-45 launcher opens never stack (player, 1280×720 / 1280×800 / 14
   }
 });
 
-test("FR-SHELL-48 keep-outs (player): the toast corner is hard: auto placement stays out; a feature open stored over it is re-placed, a user open isn't", () => {
+test("FR-SHELL-48 FR-SHELL-56 keep-outs (player): the toast corner is hard: auto placement stays out; a feature open and a user reopen stored over it are both re-placed", () => {
   for (const viewport of REFERENCE_VIEWPORTS) {
     expect(keepOuts("player", viewport)).toEqual([
       { id: "toasts", rect: toastKeepOut("player", viewport), kind: "hard" },
@@ -240,8 +256,9 @@ test("FR-SHELL-48 keep-outs (player): the toast corner is hard: auto placement s
   const over = { x: corner.x, y: corner.y - 100, w: 360, h: 300 };
   ws = reduce(ws, { type: "setRect", kind: "note.history", rect: over }, ctx);
   ws = reduce(ws, { type: "minimise", kind: "note.history" }, ctx);
+  // FR-SHELL-56 (2): a hard keep-out covers a stored rect like a window does.
   const user = reduce(ws, { type: "open", kind: "note.history", by: "user" }, ctx);
-  expect(rectIn(user, "note.history")).toEqual(over);
+  expect(overlaps(rectIn(user, "note.history"), corner)).toBe(false);
   const feature = reduce(ws, { type: "open", kind: "note.history", by: "feature" }, ctx);
   expect(overlaps(rectIn(feature, "note.history"), corner)).toBe(false);
 });
@@ -433,7 +450,7 @@ test("FR-SHELL-08 player default-open product windows don't overlap (1280×720, 
 const SPRINT4 = [LAPTOP, { w: 1280, h: 800 }, DESKTOP];
 const same = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 
-test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: player Initiative appearing over the goblins goes where it covers less, at an edge, over no window; no tokens → where the default layout put it", () => {
+test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: player Initiative appearing over the goblins goes where it covers less (a spot over none first, FR-SHELL-58, else an edge), over no window; no tokens → where the default layout put it", () => {
   for (const viewport of SPRINT4) {
     const where = `${viewport.w}×${viewport.h}`;
     const all = new Set(playerWindows.defs.map((d) => d.kind));
@@ -455,7 +472,9 @@ test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: player Initiat
     const ws = reduce(layout, appear, { ...ctx, avoid: () => boxes });
     const init = at(ws, "cbt.initiative");
     expect(coveredArea(init, boxes)).toBeLessThan(coveredArea(home, boxes));
-    expect(["left", "right"]).toContain(touchedEdge(init, viewport) ?? `mid-map at ${where}`);
+    if (coveredArea(init, boxes) > 0) {
+      expect(["left", "right"]).toContain(touchedEdge(init, viewport) ?? `mid-map at ${where}`);
+    }
     const others = ws.filter((w) => w.kind !== "cbt.initiative");
     for (const o of renderedWindowRects(others, playerWindows, all, viewport)) {
       expect(overlaps(init, o) ? `Initiative over a window at ${where}` : "ok").toBe("ok");
@@ -549,7 +568,7 @@ const pcUnder = (r: Rect, pcs: readonly Rect[]) =>
     return c.x > r.x && c.x < r.x + r.w && c.y > r.y && c.y < r.y + r.h;
   }).length;
 
-test("FR-SHELL-45 (2) sweep (player-1, Town): every launcher window in registry order at 1280×720 / 1440×900 / 1600×900 holds no PC centre", () => {
+test("FR-SHELL-45 (2) sweep (player-1, Town): every launcher window in registry order at 1280×720 / 1440×900 / 1600×900 holds no PC (footprint + 4 px) while a clear spot avoiding them exists; screen full only when nothing is clear (FR-SHELL-47)", () => {
   const cases = [
     [LAPTOP, [pcAt(410, 312), pcAt(458, 312)]],
     [WIDE, [pcAt(463, 363), pcAt(516, 363)]],
@@ -566,9 +585,146 @@ test("FR-SHELL-45 (2) sweep (player-1, Town): every launcher window in registry 
     for (const s of steps) {
       const at = `${s.kind} at ${viewport.w}×${viewport.h}`;
       expect(s.hits.length === 0 ? "ok" : `${at} on ${s.hits.join(", ")}`).toBe("ok");
-      expect(
-        s.rect && pcUnder(s.rect, pcs) ? `${at} over a PC: ${JSON.stringify(s.rect)}` : "ok",
-      ).toBe("ok");
+      // Ruling #262's "park one more window to keep PCs clear" is retired (WF1 walkthrough
+      // finding 2): a PC under the window only when no clear spot avoids it.
+      const def = playerWindows.get(s.kind);
+      if (!s.rect || !def) continue;
+      const scene = { windows: s.others, hard: s.hard, tokens: pcs };
+      const got = placeFields(s.rect, def, viewport, scene);
+      expect(got[0] === 0 ? "ok" : `${at} not clear`).toBe("ok");
+      if (got[1] === 1) expect(bruteBest(def, viewport, scene)[1]).toBe(1);
     }
   }
+});
+
+// ---- sprint 6: reopen rule, footprints, token-free spots, contract, golden layouts ----
+// (FR-SHELL-56, -58, -61, -62; play-shell §13 sprint 6)
+
+const FULL_CHAIN = [...REFERENCE_VIEWPORTS].reverse(); // 1600×900 → 1440×900 → 1280×800 → 1280×720
+const ambush = (vp: { w: number; h: number }, windows: readonly Rect[]) =>
+  ambushTokens("player", vp, windows);
+const everyKind = () => new Set(playerWindows.defs.map((d) => d.kind));
+
+/** In-memory shell controller on `registry` (what the page runs), at `vp`. */
+function shellAt(registry: WindowRegistry, vp: { w: number; h: number }) {
+  const backend = new Map<string, string>();
+  const storage = createLayoutStorage(() => ({
+    getItem: (k) => backend.get(k) ?? null,
+    setItem: (k, v) => void backend.set(k, v),
+  }));
+  const c = createShellController({ registry, storage, viewport: () => vp });
+  c.restore("k");
+  return c;
+}
+
+test("FR-SHELL-56 reopen covered vs free spot (player, protected): the sheet closed, Compendium moved into the right column, the sheet reopened → the sheet at its stored rect (stored), Compendium re-placed clear of it (auto) or auto-minimised", () => {
+  for (const viewport of REFERENCE_VIEWPORTS) {
+    const where = `${viewport.w}×${viewport.h}`;
+    const c = shellAt(playerWindows, viewport);
+    const all = everyKind();
+    const home = rectIn(c.store.getState().windows, "char.sheet");
+    c.dispatch({ type: "close", kind: "char.sheet" }, all);
+    c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+    c.dispatch({ type: "setRect", kind: "cmp.compendium", rect: home }, all);
+    c.dispatch({ type: "open", kind: "char.sheet" }, all); // the launcher / token menu → sheet
+    const s = c.store.getState();
+    expect({ where, sheet: rectIn(s.windows, "char.sheet") }).toEqual({ where, sheet: home });
+    expect(s.placed.get("char.sheet:main")).toBe("stored");
+    const cmp = s.windows.find((w) => w.kind === "cmp.compendium");
+    if (cmp?.state === "open") {
+      expect(overlaps(cmp, home) ? `Compendium still over the sheet at ${where}` : "ok").toBe("ok");
+      expect(s.placed.get("cmp.compendium:main")).toBe("auto");
+    } else {
+      expect(cmp?.state).toBe("minimised");
+    }
+  }
+});
+
+/** FR-SHELL-61 (5): stand-ins for PF's Preferences and CP's companion card (S2, S3). */
+const PREFS_STUB = {
+  kind: "shell.prefs",
+  title: "Preferences",
+  clients: ["dm", "player"],
+  defaultSize: { w: 360, h: 560 },
+  minSize: { w: 320, h: 280 },
+  minOpenH: 400,
+  defaultPosition: { anchor: "top-right", dx: 12 },
+  component: () => null,
+} satisfies WindowDef;
+const COMPANION_STUB = {
+  kind: "charx.companion",
+  title: "Companion",
+  clients: ["player"],
+  defaultSize: { w: 320, h: 360 },
+  minSize: { w: 280, h: 240 },
+  defaultPosition: { anchor: "top-left", dx: 56 },
+  launcher: { icon: () => null, label: "Companion", order: 99 },
+  component: () => null,
+} satisfies WindowDef;
+
+/** The player registry with this sprint's new windows: the real lines once merged, else stubs. */
+const withNewWindows = (): WindowRegistry =>
+  createWindowRegistry("player", [
+    ...playerWindows.defs,
+    ...[PREFS_STUB, COMPANION_STUB].filter((d) => !playerWindows.get(d.kind)),
+  ]);
+
+/** FR-SHELL-62 (d): the player's non-default product kinds on `main` when WF1 started. */
+const GOLDEN_KINDS = ["note.history", "dicex.tray", "party.board", "cmp.compendium"];
+
+/** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */
+const userOpened = (registry: WindowRegistry) =>
+  registry.defs.filter((d) => !d.defaultOpen).map((d) => d.kind);
+
+const runs = (registry: WindowRegistry, kinds: readonly string[]) =>
+  FULL_CHAIN.flatMap((_, i) =>
+    layoutRun(registry, {
+      viewports: FULL_CHAIN.slice(i),
+      kinds,
+      available: new Set(registry.defs.map((d) => d.kind)),
+      tokensAt: ambush,
+      protectedKind: "char.sheet",
+    }),
+  );
+
+const problemsOf = (steps: readonly LayoutStep[]) =>
+  steps
+    .filter((s) => s.problems.length > 0)
+    .map((s) => `${s.step} ${s.vp.w}×${s.vp.h} ${s.kind}: ${s.problems.join("; ")}`);
+
+test("FR-SHELL-61 every user-opened kind (player): every non-default kind, launcher or not, test-mode included, opens through openWindow and passes FR-SHELL-62's invariants with Preferences and the companion card registered; a new kind keeps the contract", () => {
+  const registry = withNewWindows();
+  const kinds = userOpened(registry);
+  for (const k of ["shell.prefs", "charx.companion", "party.handout", "shell.test"]) {
+    expect(kinds).toContain(k);
+  }
+  expect(problemsOf(runs(registry, kinds))).toEqual([]);
+  for (const kind of kinds.filter((k) => !GOLDEN_KINDS.includes(k))) {
+    const def = registry.get(kind);
+    if (!def || def.fixedDefault || kind === "party.handout") continue;
+    expect({ kind, problems: contractProblems(def) }).toEqual({ kind, problems: [] });
+  }
+});
+
+const GOLDEN_FILE = fileURLToPath(new URL("./windows.golden.json", import.meta.url));
+
+test("FR-SHELL-62 golden layouts (player): four sizes, open / close / reopen / smaller viewport / protected reopen; invariants + brute check, golden rects per kind (UPDATE_GOLDEN=1 rewrites), deterministic", () => {
+  const t0 = performance.now();
+  const steps = runs(playerWindows, GOLDEN_KINDS);
+  expect(problemsOf(steps)).toEqual([]);
+  // Same inputs → same rects.
+  expect(runs(playerWindows, GOLDEN_KINDS)).toEqual(steps);
+  const golden = steps.map((s) => ({
+    at: `${s.step} @${s.vp.w}×${s.vp.h} ${s.kind}`,
+    rect: s.rect && `${s.rect.x},${s.rect.y},${s.rect.w}×${s.rect.h}`,
+    placed: s.placed,
+    parked: s.parked.join(","),
+  }));
+  if (process.env.UPDATE_GOLDEN === "1") {
+    writeFileSync(GOLDEN_FILE, `${JSON.stringify(golden, null, 2)}\n`);
+  }
+  expect(golden).toEqual(JSON.parse(readFileSync(GOLDEN_FILE, "utf8")));
+  console.info(
+    `FR-SHELL-62 player: ${steps.length} steps in ${(performance.now() - t0).toFixed(0)} ms`,
+  );
 });

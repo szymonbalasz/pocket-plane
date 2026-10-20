@@ -2036,7 +2036,7 @@ From [assets-pipeline](../specs/assets-pipeline.md#63-sprint-6-image-search-and-
 
 ## 87. Sprint 6: free player colour core (PF0)
 
-From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP-30–34, -36, -37 ([ADR-0057](../architecture/adr/0057-free-player-colour.md) amends [ADR-0055](../architecture/adr/0055-player-colour.md) bullet 1; DM gate #288, OQ-CAMP-29 B + danger (a), OQ-CAMP-30 A). **Built by `fix/colour-free-core`**: **no DDL** (both columns were already `text`); `schema.ts` only drops the `enum: PLAYER_COLOR_KEYS` typing on `player.color` and `campaign.dm_color` (rulings-b 7). Protocol side: [protocol §109](../protocol/README.md#109-sprint-6-free-player-colour-core-pf0).
+From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP-30–34, -36, -37 ([ADR-0057](../architecture/adr/0057-free-player-colour.md) amends [ADR-0055](../architecture/adr/0055-player-colour.md) bullet 1; DM gate #288, OQ-CAMP-29 B + danger (a), OQ-CAMP-30 A). **Built by `fix/colour-free-core`**: **no DDL** (both columns were already `text`); `schema.ts` only drops the `enum: PLAYER_COLOR_KEYS` typing on `player.color` and `campaign.dm_color` (rulings-b 7). Protocol side: [protocol §110](../protocol/README.md#110-sprint-6-free-player-colour-core-pf0).
 
 | Column | Value | Default / backfill | Visibility | Source |
 |---|---|---|---|---|

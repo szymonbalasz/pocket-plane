@@ -1,11 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { EDGE_GAP, LAUNCHER_CLEAR, type Rect, TOP_BAR_H } from "./geometry";
 import {
+  capSpots,
   fittedDefaultRect,
+  PC_MARGIN,
   type Placeable,
   type PlaceInput,
+  type PlacementToken,
+  pcBoxes,
+  pcClear,
   placeWindow,
   RAIL_CLEAR,
+  SPOTS_MAX,
   usableArea,
 } from "./placement";
 
@@ -98,12 +104,16 @@ describe("open placement (FR-SHELL-08, -45)", () => {
       defaultPosition: { anchor: "top-left", dx: 56 },
       minOpenH: 400,
     });
-    const tokens = [{ x: 300, y: 300, w: 60, h: 60 }];
-    const first = place(cmp, wide, { windows: [init, log], tokens });
+    const first = place(cmp, wide, { windows: [init, log] });
     expect(first).toEqual({ x: 68, y: 60, w: 440, h: 512 });
-    const second = place(party, wide, { windows: [init, log, first], tokens });
+    const second = place(party, wide, { windows: [init, log, first] });
     expect(second).not.toEqual(first);
     for (const o of [init, log, first]) expect(overlaps(second, o)).toBe(false);
+    // A goblin under the left slot: a clear spot over no token first (FR-SHELL-58).
+    const goblin = { x: 300, y: 300, w: 60, h: 60 };
+    const free = place(cmp, wide, { windows: [init, log], tokens: [goblin] });
+    expect(overlaps(free, goblin)).toBe(false);
+    for (const o of [init, log]) expect(overlaps(free, o)).toBe(false);
   });
 
   test("FR-SHELL-45 (1b) minOpenH takes a free slot: clear at ≥ minOpenH beats a taller one over a window", () => {
@@ -163,10 +173,11 @@ describe("sprint 5 placement (FR-SHELL-46–48, -51)", () => {
     const r = placeWindow(tall, vp, { windows: [leftWin, rightWin] });
     expect(r.clear).toBe(true);
     expect([leftWin.x + leftWin.w + EDGE_GAP, rightWin.x - EDGE_GAP - 300]).toContain(r.rect.x);
-    // Tokens beside the left window → beside the right one.
+    // Tokens beside the left window → a clear inward spot over none (beside them, FR-SHELL-58).
     const t = [{ x: leftWin.x + leftWin.w + 40, y: 60, w: 70, h: a.bottom - 60 }];
     const r2 = place(tall, vp, { windows: [leftWin, rightWin], tokens: t });
-    expect(r2.x).toBe(rightWin.x - EDGE_GAP - 300);
+    expect(overlaps(r2, t[0] as Rect)).toBe(false);
+    for (const o of [leftWin, rightWin]) expect(overlaps(r2, o)).toBe(false);
     // An edge slot clear and over no PC: no inward column (even over a monster).
     const monster = [{ x: 100, y: 100, w: 70, h: 70 }];
     expect(place(tall, vp, { tokens: monster }).x).toBe(RAIL_CLEAR);
@@ -264,5 +275,188 @@ describe("sprint 5 placement (FR-SHELL-46–48, -51)", () => {
     const fn = def({ defaultSize: (v) => (v.w >= 1440 ? { w: 500, h: 200 } : { w: 300, h: 150 }) });
     expect(fittedDefaultRect(fn, small)).toMatchObject({ w: 300, h: 150 });
     expect(fittedDefaultRect(fn, wide)).toMatchObject({ w: 500, h: 200 });
+  });
+});
+
+describe("sprint 6 placement (FR-SHELL-57, -58)", () => {
+  const a = usableArea(vp);
+  /** Everything right of x 520 taken: only the left band 68…508 is free. */
+  const wall = { x: 520, y: a.top, w: a.right - 520, h: a.bottom - a.top, protected: true };
+  const cmp = def({
+    defaultPosition: { anchor: "top-left", dx: 56 },
+    defaultSize: { w: 440, h: 500 },
+    minSize: { w: 300, h: 300 },
+  });
+  const tokensOver = (r: Rect, list: readonly Rect[]) => list.filter((t) => overlaps(r, t));
+
+  test("FR-SHELL-57 footprint rule: a PC footprint (1 × 1, 2 × 2) overlapping a candidate by 1 px fails (2), so does one inside the 4-px margin; one beyond it doesn't", () => {
+    const home = fittedDefaultRect(cmp, vp);
+    for (const side of [48, 96]) {
+      const by1 = { x: home.x + home.w - 1, y: 200, w: side, h: side, pc: true };
+      expect(overlaps(place(cmp, vp, { windows: [wall], tokens: [by1] }), by1)).toBe(false);
+      const inMargin = { ...by1, x: home.x + home.w + PC_MARGIN - 1 };
+      const r = place(cmp, vp, { windows: [wall], tokens: [inMargin] });
+      expect(pcClear(r, [inMargin])).toBe(true);
+      expect(r).not.toEqual(home);
+      // Beyond the margin: the default rect, untouched.
+      const beyond = { ...by1, x: home.x + home.w + PC_MARGIN };
+      expect(place(cmp, vp, { windows: [wall], tokens: [beyond] })).toEqual(home);
+    }
+    const boxes = pcBoxes([
+      { x: 10, y: 20, w: 48, h: 48, pc: true },
+      { x: 0, y: 0, w: 9, h: 9 },
+    ]);
+    expect(boxes).toEqual([{ x: 6, y: 16, w: 56, h: 56 }]);
+  });
+
+  test("FR-SHELL-57 footprint rule: clearOfPcs cuts 12 px before the grown box (never at a centre); a cut below min size is dropped", () => {
+    const mira = { x: 400, y: 400, w: 48, h: 48, pc: true };
+    // Narrower keeping its left edge: ends 12 px before the grown box (396 − 12 = 384).
+    const r = place(cmp, vp, { windows: [wall], tokens: [mira] });
+    expect(r).toEqual({ x: 68, y: 60, w: 316, h: 500 });
+    expect(r.x + r.w).not.toBe(mira.x + mira.w / 2);
+    // Min width 330: that cut (316) is dropped; shorter keeping its top instead (396 − 12 − 60).
+    const wideMin = { ...cmp, minSize: { w: 330, h: 300 } };
+    expect(place(wideMin, vp, { windows: [wall], tokens: [mira] })).toEqual({
+      x: 68,
+      y: 60,
+      w: 440,
+      h: 324,
+    });
+  });
+
+  test("FR-SHELL-57 sim-9 a01 / a05 shapes: a window edge at a PC centre never wins while a clear candidate avoids the footprint + 4 px", () => {
+    // DM 1440×900, Initiative + Game log; Mira's centre at x 164 (a01) or at a slot edge (a05).
+    const init = { x: 1028, y: 60, w: 400, h: 500, protected: true };
+    const log = { x: 68, y: 584, w: 1150, h: 240, protected: true };
+    const compendium = def({
+      defaultPosition: { anchor: "top-left", dx: 56 },
+      defaultSize: { w: 440, h: 560 },
+      minSize: { w: 320, h: 360 },
+      minOpenH: 400,
+    });
+    for (const cx of [164, 508, 576]) {
+      const mira = { x: cx - 24, y: 300, w: 48, h: 48, pc: true };
+      const r = place(compendium, wide, { windows: [init, log], tokens: [mira] });
+      expect(pcClear(r, [mira]) ? "ok" : `PC under the window at centre ${cx}`).toBe("ok");
+      for (const o of [init, log]) expect(overlaps(r, o)).toBe(false);
+    }
+  });
+
+  test("FR-SHELL-58 token-free spot first: a token-free gap between two token clusters that lines up with no window edge is found (token-derived candidates)", () => {
+    const narrow = def({
+      defaultPosition: { anchor: "top-left", dx: 56 },
+      defaultSize: { w: 280, h: 400 },
+      minSize: { w: 280, h: 300 },
+    });
+    const cluster = (x0: number, x1: number) => {
+      const out: PlacementToken[] = [];
+      for (let x = x0; x < x1; x += 48) {
+        for (let y = 48; y < 900; y += 48) out.push({ x, y, w: 48, h: 48 });
+      }
+      return out;
+    };
+    const tokens = [...cluster(48, 640), ...cluster(976, 1600)];
+    const r = place(narrow, vp, { tokens });
+    expect(tokensOver(r, tokens)).toEqual([]);
+    expect(r.x).toBeGreaterThanOrEqual(640);
+    expect(r.x + r.w).toBeLessThanOrEqual(976);
+  });
+
+  test("FR-SHELL-58 token-free spot first: every clear candidate covers tokens → edge before inward, then least token area (sprint 5's order)", () => {
+    const tall = def({
+      defaultPosition: { anchor: "top-left", dx: 56 },
+      defaultSize: { w: 300, h: 500 },
+      minSize: { w: 300, h: 400 },
+    });
+    const dense: PlacementToken[] = [];
+    for (let x = 0; x < 1600; x += 40) {
+      for (let y = 48; y < 900; y += 40) dense.push({ x, y, w: 20, h: 20 });
+    }
+    const r = place(tall, vp, { tokens: dense });
+    expect(tokensOver(r, dense).length).toBeGreaterThan(0);
+    expect([RAIL_CLEAR, a.right - 300]).toContain(r.x);
+  });
+
+  test("FR-SHELL-58 intent (i): a min-size spot over no token beats a full-size spot over one goblin", () => {
+    const tall = def({
+      defaultPosition: { anchor: "top-left", dx: 56 },
+      defaultSize: { w: 300, h: 500 },
+      minSize: { w: 300, h: 300 },
+    });
+    const walls = { x: 380, y: a.top, w: a.right - 380, h: a.bottom - a.top };
+    const goblin = { x: 100, y: 470, w: 48, h: 48 };
+    const r = place(tall, vp, { windows: [walls], tokens: [goblin] });
+    expect(r).toEqual({ x: 68, y: 60, w: 300, h: 300 });
+  });
+
+  test("FR-SHELL-58 intent (ii): a token-free spot inside the DM's soft box beats a full-size spot over tokens", () => {
+    const tall = def({
+      defaultPosition: { anchor: "top-left", dx: 56 },
+      defaultSize: { w: 300, h: 500 },
+      minSize: { w: 300, h: 400 },
+    });
+    const walls = { x: 760, y: a.top, w: a.right - 760, h: a.bottom - a.top };
+    const tokens: PlacementToken[] = [];
+    for (let y = 48; y < 900; y += 48) tokens.push({ x: 60, y, w: 320, h: 48 });
+    const soft = { x: 392, y: 48, w: 356, h: 852 };
+    const r = place(tall, vp, { windows: [walls], tokens, soft: [soft] });
+    expect(tokensOver(r, tokens)).toEqual([]);
+    expect(overlaps(r, soft)).toBe(true);
+    expect(r.h).toBe(500);
+  });
+
+  test("FR-SHELL-58 spot cap: 200 boxes → ≤ 4,000 spots, window and edge rows / columns always kept; ≤ 5 ms best-of-5 for 10 windows × 200 boxes", () => {
+    const cols = [
+      ...[68, 1288, 500].map((v) => ({ v, token: false })),
+      ...Array.from({ length: 400 }, (_, i) => ({ v: 100 + i * 3, token: true })),
+    ];
+    const rows = [
+      ...[60, 324].map((v) => ({ v, token: false })),
+      ...Array.from({ length: 800 }, (_, i) => ({ v: 61 + i, token: true })),
+    ];
+    const kept = capSpots(cols, rows, 68, 60);
+    expect(kept.cols.length * kept.rows.length).toBeLessThanOrEqual(SPOTS_MAX);
+    for (const v of [68, 1288, 500]) expect(kept.cols).toContain(v);
+    for (const v of [60, 324]) expect(kept.rows).toContain(v);
+    // The farthest go first: the nearest token row stays.
+    expect(kept.rows).toContain(61);
+    const windows = Array.from({ length: 10 }, (_, i) => ({
+      x: 68 + i * 140,
+      y: 60 + (i % 3) * 200,
+      w: 120,
+      h: 180,
+    }));
+    const tokens = Array.from({ length: 200 }, (_, i) => ({
+      x: (i * 37) % 1500,
+      y: 60 + ((i * 53) % 760),
+      w: 48,
+      h: 48,
+      pc: i % 20 === 0,
+    }));
+    const bestOf5 = (d: Placeable) => {
+      for (let k = 0; k < 3; k++) placeWindow(d, vp, { windows, tokens }); // warm the JIT
+      let best = Number.POSITIVE_INFINITY;
+      for (let k = 0; k < 5; k++) {
+        const t0 = performance.now();
+        placeWindow(d, vp, { windows, tokens });
+        best = Math.min(best, performance.now() - t0);
+      }
+      return best;
+    };
+    // Sprint 5's inward-column shape (play-shell §12's bound).
+    const tall = def({
+      defaultSize: { w: 300, h: 500 },
+      minSize: { w: 300, h: 400 },
+      defaultPosition: { anchor: "top-left", dx: 56 },
+    });
+    expect(bestOf5(tall)).toBeLessThanOrEqual(5);
+    // A window that may also narrow (min width < width) searches the columns twice when nothing
+    // token-free is found at full width: logged, bounded at twice the budget.
+    const narrowing = bestOf5(cmp);
+    console.info(
+      `FR-SHELL-58 10 windows × 200 boxes, narrowing window: ${narrowing.toFixed(2)} ms`,
+    );
+    expect(narrowing).toBeLessThanOrEqual(10);
   });
 });

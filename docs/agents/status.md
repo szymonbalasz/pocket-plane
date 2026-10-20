@@ -18,7 +18,7 @@ ID ranges per track (sprint 6): CP ENT FR 31–40 / OQ 31–36, CBT FR 105–124
 
 ## Shared-file locks
 
-- Play-shell frame (`manager.ts`, `placement.ts`, `token-boxes.ts`, `ShellWindow.tsx`, `toast-region.ts`, `ShellToaster.tsx`, `free-area.ts`): `fix/window-reopen` (WF1).
+- Play-shell frame: free (WF1 merged #292); next holder WF3 `fix/fit-s6` (`free-area.ts`).
 - Schema lane (`src/server/db/`): `fix/im-core` first, then `fix/cp-core` / PF0 in either order.
 
 ## Pending DM decisions

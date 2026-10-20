@@ -34,6 +34,7 @@ import {
 import { SHELL_ZONE_ATTR } from "./keys";
 import { type Placed, type WindowAction, windowId } from "./manager";
 import type { WindowDef } from "./registry";
+import { useShellState } from "./ShellContext";
 
 function applyRect(el: HTMLElement, r: Rect) {
   el.style.transform = `translate(${r.x}px, ${r.y}px)`;
@@ -110,6 +111,8 @@ export function ShellWindow({
   const wid = windowId(win.kind, win.instance);
   const needed = useNeededHeight(wid, grows, ref, bodyRef, contentRef);
   const caps = useGrowthCaps(wid);
+  // FR-SHELL-57: auto-placed with no PC footprint under it (walkthroughs read `data-pc-clear`).
+  const pcClear = useShellState((s) => s.pcClear.has(wid));
   // Measured heights are reported as they are taken; a window that stops growing reports none.
   useEffect(() => {
     if (!grows) reportContentHeight(wid, null);
@@ -188,6 +191,7 @@ export function ShellWindow({
       data-record-id={wid}
       data-state={win.state}
       data-placed={placed}
+      data-pc-clear={pcClear || undefined}
       data-auto-minimised={(parked && autoMinimised) || undefined}
       data-focused={focused}
       aria-label={def.title}
