@@ -235,7 +235,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 shell.prefs",
-    "rect": "90,152,360×400",
+    "rect": "68,152,360×400",
     "placed": "reopened",
     "parked": "party.board"
   },
@@ -295,7 +295,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 shell.prefs",
-    "rect": "496,72,360×400",
+    "rect": "400,60,360×324",
     "placed": "reopened",
     "parked": "party.board"
   },
@@ -487,7 +487,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 shell.prefs",
-    "rect": "90,152,360×400",
+    "rect": "68,152,360×400",
     "placed": "reopened",
     "parked": "party.board"
   },
@@ -547,7 +547,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 shell.prefs",
-    "rect": "496,72,360×400",
+    "rect": "400,60,360×324",
     "placed": "reopened",
     "parked": "party.board"
   },
@@ -619,7 +619,7 @@
   },
   {
     "at": "open @1280×800 shell.prefs",
-    "rect": "90,152,360×400",
+    "rect": "68,152,360×400",
     "placed": "auto",
     "parked": "party.board"
   },
@@ -679,7 +679,7 @@
   },
   {
     "at": "reopen @1280×800 shell.prefs",
-    "rect": "90,152,360×400",
+    "rect": "68,152,360×400",
     "placed": "reopened",
     "parked": "party.board"
   },
@@ -739,7 +739,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 shell.prefs",
-    "rect": "496,72,360×400",
+    "rect": "400,60,360×324",
     "placed": "reopened",
     "parked": "party.board"
   },
@@ -811,7 +811,7 @@
   },
   {
     "at": "open @1280×720 shell.prefs",
-    "rect": "90,72,360×400",
+    "rect": "400,60,360×324",
     "placed": "auto",
     "parked": "party.board"
   },
@@ -871,7 +871,7 @@
   },
   {
     "at": "reopen @1280×720 shell.prefs",
-    "rect": "90,72,360×400",
+    "rect": "400,60,360×324",
     "placed": "reopened",
     "parked": "party.board"
   },
