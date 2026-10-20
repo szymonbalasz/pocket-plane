@@ -1,14 +1,15 @@
-// Alert UI (FR-SHELL-22–25): the flash overlay and the player's top-bar speaker control. Alert
-// Toasts go to the client's one Toaster (ShellToaster). State lives in the alert controller (ShellContext).
-import { Volume2Icon, VolumeOffIcon, VolumeXIcon } from "lucide-react";
+// Alert UI (FR-SHELL-22–25): the flash overlay and the players' Sound preference section
+// (FR-SHELL-73; the top-bar speaker retired). Alert Toasts go to the client's one Toaster
+// (ShellToaster). State lives in the alert controller (ShellContext).
 import { useId, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "../../components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger, Slider, Switch } from "../../components/ui/menus";
-import { Tooltip } from "../../components/ui/overlays";
+import { Slider, Switch } from "../../components/ui/menus";
 import { cn } from "../../lib/utils";
-import { flashAnimation, speakerState } from "./alerts";
+import { type AlertController, flashAnimation, type SpeakerState, speakerState } from "./alerts";
+import { definePrefSection } from "./PreferencesWindow";
 import { useAlertController, useAlertState } from "./ShellContext";
+import type { SoundSettings } from "./sound-settings";
 
 const prefersReducedMotion = () =>
   typeof window.matchMedia === "function" &&
@@ -61,77 +62,77 @@ function FlashFrame({ id, flashKey }: { id: string; flashKey: number }) {
   );
 }
 
-const SPEAKER_TIP = {
-  on: "Sound on",
-  muted: "Sound muted",
-  locked: "Click anywhere to enable sounds",
-} as const;
-
-const SPEAKER_ICON = { on: Volume2Icon, muted: VolumeXIcon, locked: VolumeOffIcon } as const;
-
-/** Player top-bar speaker (FR-SHELL-24): mute, volume, Test. Browser-only settings. */
-export function SoundControl() {
-  const controller = useAlertController();
-  const settings = useAlertState((s) => s.settings);
-  const state = useAlertState(speakerState);
+/**
+ * Sound section (FR-SHELL-73, players): FR-SHELL-24's controls, key and defaults, moved. Alerts
+ * read the same controller, so a change applies to the next alert.
+ */
+export function SoundControls({
+  settings,
+  state,
+  controller,
+}: {
+  settings: SoundSettings;
+  state: SpeakerState;
+  controller: Pick<AlertController, "setSettings" | "test">;
+}) {
   const uid = useId();
-  const Icon = SPEAKER_ICON[state];
   return (
-    <Popover>
-      <Tooltip content={SPEAKER_TIP[state]}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8"
-            data-testid="ui-sound-button"
-            data-state={state}
-            aria-label={`Sound settings: ${SPEAKER_TIP[state]}`}
-          >
-            {/* The unlock on this pointerdown swaps the icon; with the svg hit-testable the
-                pressed node would vanish and the click (opening the Popover) would be lost. */}
-            <Icon className="pointer-events-none size-4" />
-          </Button>
-        </PopoverTrigger>
-      </Tooltip>
-      <PopoverContent align="end" className="flex w-60 flex-col gap-3">
-        <div className="flex items-center justify-between gap-2 text-sm">
-          <label htmlFor={`${uid}-mute`}>Mute alert sounds</label>
-          <Switch
-            id={`${uid}-mute`}
-            data-testid="ui-sound-mute"
-            checked={settings.muted}
-            onCheckedChange={(muted) => controller.setSettings({ muted })}
-          />
+    <div className="flex flex-col gap-3 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={`${uid}-mute`}>Mute alert sounds</label>
+        <Switch
+          id={`${uid}-mute`}
+          data-testid="ui-sound-mute"
+          checked={settings.muted}
+          onCheckedChange={(muted) => controller.setSettings({ muted })}
+        />
+      </div>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span id={`${uid}-volume`}>Volume</span>
+          <span className="text-muted-foreground tabular-nums">{settings.volume}</span>
         </div>
-        <div className="flex flex-col gap-2 text-sm">
-          <div className="flex items-center justify-between">
-            <span id={`${uid}-volume`}>Volume</span>
-            <span className="text-muted-foreground tabular-nums">{settings.volume}</span>
-          </div>
-          <Slider
-            data-testid="ui-sound-volume"
-            data-value={settings.volume}
-            aria-labelledby={`${uid}-volume`}
-            min={0}
-            max={100}
-            step={1}
-            value={[settings.volume]}
-            onValueChange={([volume]) => {
-              if (volume !== undefined) controller.setSettings({ volume });
-            }}
-          />
-        </div>
+        <Slider
+          data-testid="ui-sound-volume"
+          data-value={settings.volume}
+          aria-labelledby={`${uid}-volume`}
+          min={0}
+          max={100}
+          step={1}
+          value={[settings.volume]}
+          onValueChange={([volume]) => {
+            if (volume !== undefined) controller.setSettings({ volume });
+          }}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        {/* FR-SHELL-25: the click that opened the window normally unlocked audio already. */}
+        <span data-testid="ui-sound-locked" className="text-xs text-muted-foreground">
+          {state === "locked" ? "Click anywhere to enable sounds" : null}
+        </span>
         <Button
           size="sm"
           variant="outline"
-          className="self-end"
           data-testid="ui-sound-test"
           onClick={() => controller.test()}
         >
           Test
         </Button>
-      </PopoverContent>
-    </Popover>
+      </div>
+    </div>
   );
 }
+
+function SoundSection() {
+  const controller = useAlertController();
+  const settings = useAlertState((s) => s.settings);
+  const state = useAlertState(speakerState);
+  return <SoundControls settings={settings} state={state} controller={controller} />;
+}
+
+export const soundSection = definePrefSection({
+  id: "shell.sound",
+  title: "Sound",
+  order: 20,
+  Component: SoundSection,
+});

@@ -823,10 +823,10 @@ Plus CHARX's `FR-CHARX-60 card fields` / `FR-CHARX-64 card rolls`, ENT's `FR-ENT
 | # | DM (A) | Players (B, C) | Expected |
 |---|---|---|---|
 | S1 | Encounters → "Ambush at the Ford" → Start | B, C watch | Preview lists the Owlbear under Mira and the Wolf under Thorn, both ticked (tokens on the map); after Start: the Owlbear row "After Mira" under Mira; the Wolf as a line inside Thorn's row (CP2) |
-| S2 | Set initiatives, Start round 1, Next to Mira, Next | B, C watch | B "Your turn — Mira", then "Your turn — Owlbear (Mira)"; at Thorn: C "Your turn — Thorn + Wolf" (CP2) |
+| S2 | Set initiatives, Start round 1, Next to Mira, Next | B, C watch | B "Your turn — Mira", then "Your turn — Owlbear (Mira)"; at Thorn: C "Your turn — Thorn + Wolf 2" (companions-start numbers the pet next to the ambush's Wolf) (CP2) |
 | S3 | Owlbear → Companion ▸ Turn mode → Own initiative; then back to After the owner | — | Its row moves to rank by Mira's number, then back under Mira; the Owlbear's Party mode unchanged (CP2) |
 | S4 | — | B: Owlbear's card; Claws **Attack + damage**; C: Wolf card → Bite **Attack** | Cards reach A's popup as player cards; roll lines only in B's / C's own logs (CP4) |
-| S5 | Load `companions-ally`; Goblin 2 → Companion ▸ Turn hostile | B, C watch | Before: Goblin 2 "After Mira", B's card lists it (CP4: card, Scimitar Roll); after: "Enemy" chip, owner chip gone, B's picker drops it (CP2) |
+| S5 | Load `companions-ally`; Goblin 2 → Companion ▸ Turn hostile | B, C watch | Before: Goblin 2 "After Mira", B's card lists it (CP4: card, Scimitar Roll); after: owner and Ally chips gone (no "Enemy" chip: a monster on its default side shows none, FR-CBT-98; integrator, CP2 walkthrough), B's picker drops it (CP2) |
 | S6 | Reload all; reconnect C | All rejoin | Same rows, chips and cards; leak scan of B, C frames clean |
 
 | # | DM (A) | Players (B, C) | Expected |

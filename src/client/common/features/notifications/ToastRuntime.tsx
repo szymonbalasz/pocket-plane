@@ -4,11 +4,12 @@
 // memory only (per page, `ToastMemory`). Player: bottom-right. DM: top-centre below the top bar (#149): the DM's right
 // column (`cbt.initiative`, protocol §24) reaches the bottom-right corner, and sticky damage-card
 // toasts covered its lower rows; the map gap between the columns is free in the default layout.
-// Wherever Initiative is, the DM stack keeps clear of it (FR-NOTE-32, `keep-out.ts`).
+// Wherever Initiative is, the DM stack keeps clear of it (FR-NOTE-32, `keep-out.ts`), stays in
+// its top-centre band (FR-NOTE-42) and off the active tool bar (FR-NOTE-43); it reports its
+// rendered rect for the Fit (FR-SHELL-59).
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { XIcon } from "lucide-react";
 import {
-  type RefObject,
   useCallback,
   useContext,
   useEffect,
@@ -25,13 +26,19 @@ import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
 import { EDGE_GAP, LAUNCHER_CLEAR, type Rect, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
+import { hardRects, useKeepOuts } from "../play-shell/keep-outs";
 import {
   useAvailableKinds,
   useOpenWindow,
   useRegistry,
   useShellState,
 } from "../play-shell/ShellContext";
-import { DM_TOAST_TOP, NOTE_EDGE, PLAYER_TOAST_BOTTOM } from "../play-shell/toast-region";
+import {
+  DM_TOAST_TOP,
+  NOTE_EDGE,
+  PLAYER_TOAST_BOTTOM,
+  reportShownStack,
+} from "../play-shell/toast-region";
 import { tokenScreenBoxes } from "../play-shell/token-boxes";
 import { dmStackPlacement } from "./keep-out";
 import {
@@ -45,6 +52,7 @@ import {
 } from "./logic";
 import type { NoteClient } from "./note-client";
 import { NoteBody, NoteStripe, useNoteActions, useNoteStripe } from "./parts";
+import { useStackHeight } from "./stack-height";
 import {
   advance,
   closeToast,
@@ -218,27 +226,14 @@ function useAvoidTokens(
   }, [isDm, toasts, rows, views, store]);
 }
 
-/**
- * FR-NOTE-32: the stack's rendered height (DM), re-measured when it mounts (`shown` flips) and on
- * resize while mounted.
- */
-function useStackHeight(ref: RefObject<HTMLElement | null>, on: boolean, shown: boolean): number {
-  const [h, setH] = useState(0);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!on || !shown || !el) {
-      setH(0);
-      return;
-    }
-    const measure = () => setH(Math.ceil(el.getBoundingClientRect().height));
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [ref, on, shown]);
-  return h;
+/** FR-NOTE-43: the DM's hard keep-out rects (the active tool bar), re-read when they change. */
+function useHardKeepOuts(isDm: boolean): Rect[] {
+  const list = useKeepOuts("dm");
+  return useMemo(() => (isDm ? hardRects(list) : []), [isDm, list]);
 }
+
+/** Id of this stack's FR-SHELL-59 report. */
+export const SHOWN_STACK_ID = "note.toasts";
 
 export function ToastRuntime({
   views,
@@ -309,6 +304,8 @@ export function ToastRuntime({
   // when the stack, Initiative or the viewport change (never on hover: the stack holds still).
   const avoidKey = useAvoidTokens(isDm, state.toasts, rows, views).join(",");
   const windowRects = useWindowRects(isDm);
+  // FR-NOTE-43: a tool opening, closing or its bar wrapping re-places the stack.
+  const hard = useHardKeepOuts(isDm);
   // P3 E1: token boxes re-read once the map settles (resize refit, pan, zoom), not while the
   // pointer is on the stack.
   const settled = useMapSettled(isDm && state.toasts.length > 0);
@@ -325,9 +322,23 @@ export function ToastRuntime({
         undefined,
         tokenScreenBoxes(avoidKey ? avoidKey.split(",") : []),
         windowRects,
+        hard,
       ),
-    [vp, initiative, stackH, avoidKey, windowRects, tick],
+    [vp, initiative, stackH, avoidKey, windowRects, hard, tick],
   );
+
+  // FR-SHELL-59: the DM's rendered stack rect for the Fit, null while nothing shows.
+  useLayoutEffect(() => {
+    const el = stackRef.current;
+    if (!isDm || !el || stackH === 0) {
+      reportShownStack(SHOWN_STACK_ID, null);
+      return;
+    }
+    // Fixed at `at`; the width and measured height as rendered.
+    const w = Math.round(el.getBoundingClientRect().width);
+    reportShownStack(SHOWN_STACK_ID, { x: at.left, y: at.top, w, h: stackH });
+  }, [isDm, at.left, at.top, stackH]);
+  useEffect(() => () => reportShownStack(SHOWN_STACK_ID, null), []);
 
   // P3 E3: the stack always fits the viewport: while it is taller than the room (DM: below the
   // top row, above the launcher; player: above its corner, below the top bar), one more toast

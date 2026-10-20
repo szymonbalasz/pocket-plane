@@ -505,9 +505,9 @@ test("FR-SHELL-40 toast keep-out: player Initiative stays off the bottom-right b
   }
 });
 
-test("FR-SHELL-42 player handout viewer registers restoreOpen: false; nothing else does", () => {
+test("FR-SHELL-42 player handout viewer and Preferences (FR-SHELL-71) register restoreOpen: false; nothing else does", () => {
   const off = playerWindows.defs.filter((d) => d.restoreOpen === false).map((d) => d.kind);
-  expect(off).toEqual(["party.handout"]);
+  expect(off).toEqual(["party.handout", "shell.prefs"]);
 });
 
 test("FR-SHELL-44 freeAreas: the player 1280×800 default layout yields both the strip above the Game log and the one right of it", () => {
@@ -670,7 +670,8 @@ const withNewWindows = (): WindowRegistry =>
   ]);
 
 /** FR-SHELL-62 (d): the player's non-default product kinds on `main` when WF1 started. */
-const GOLDEN_KINDS = ["note.history", "dicex.tray", "party.board", "cmp.compendium"];
+// PF1 appended `shell.prefs` with its goldens (FR-SHELL-62 (d)).
+const GOLDEN_KINDS = ["note.history", "dicex.tray", "party.board", "cmp.compendium", "shell.prefs"];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */
 const userOpened = (registry: WindowRegistry) =>

@@ -42,6 +42,8 @@ DM notes in brackets ([#285](../decisions-log.md)). "sim-9" = the [session-sim-9
 | 2026-10-20 | Merged: **reopened windows no longer stack** — a window whose old spot is now covered is re-placed, otherwise it keeps your spot; windows keep clear of whole PC tokens, and a window is only parked when no free spot exists [#292](../decisions-log.md). Try Reset layout, open Compendium / Party / Encounters, close, resize to 1280×720, reopen |
 | 2026-10-20 | Merged: **free player colours (server)** — any colour that passes the contrast / colour-blind distance rules, stored as hex, old palette colours migrated [#293](../decisions-log.md); **Initiative rows** — names, trigger chips and the AC / HP line never cut, nothing under "↓ N more" [#294](../decisions-log.md); **companions core** (server: owners, turn modes, pets, who sees what) [#295](../decisions-log.md) |
 | 2026-10-20 | Merged: **image search in every picker** — type "Gob el" in token Image…, New scene, Props, Portrait, handout or compendium From library; tag chips, tag editor, Manage tags [#296](../decisions-log.md). Try it in bundle `image-search` |
+| 2026-10-20 | Merged: **your pending-actions toast stays top-centre** and never covers the Fog / AoE / Structure bars [#297](../decisions-log.md); **dice tray Roll always visible** at the small default size, and a kept template shows "· by ‹name›" on **hover** [#298](../decisions-log.md) |
+| 2026-10-20 | Merged: **Preferences** — click your name chip at the top right: Sound (moved from the speaker), Reset layout, and for you Log out; **loot Subtract** — a negative amount reads "Subtract" with a hint, empty / 0 disabled [#299](../decisions-log.md). The colour picker and dice settings join Preferences next |
 
 ## Check `main` any time (DM)
 
