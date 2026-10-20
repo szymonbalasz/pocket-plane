@@ -55,7 +55,7 @@ import {
 import { Input, Skeleton } from "@ui/components/ui/primitives";
 import { characterOf, deadPc, deathStateFor, MORE_W } from "@ui/features/combat-extras/logic";
 import { NameLine } from "@ui/features/combat-extras/parts";
-import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
+import { MoreFooter, useBelowFold, useListViewport } from "@ui/features/combat-tracker/below-fold";
 import { BandBadge, Portrait, SideChip, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { manualFields, pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
 import {
@@ -1137,10 +1137,13 @@ function DmInitiativeBody() {
   const openWindow = useOpenWindow();
   const { send, disabled } = useCbtIntent();
   const rootRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLButtonElement>(null);
   const activeIds = rows.filter((c) => !c.removed).map((c) => c.id);
   // FR-CBT-77 (G4): new rows / the Pending section scroll into view; "↓ N more" below the fold.
   const fold = useBelowFold(rootRef, footerRef, activeIds, cards.length > 0);
+  // FR-CBT-125: the row list clips and scrolls; the footer sits under it.
+  const clip = useListViewport(rootRef, listRef, footerRef, [...activeIds, `${cards.length}`]);
   if (!everLive) return <Skeleton className="h-24" />;
   if (!enc) {
     return (
@@ -1158,16 +1161,22 @@ function DmInitiativeBody() {
   const removed = rows.filter((c) => c.removed);
   const wideInit = active.some((c) => canRollInitiative(enc.round, c.initiative));
   return (
-    // Header + pending cards stay put; the rows scroll inside the window (glitch 3).
+    // Header + pending cards stay put; the rows scroll inside the window (glitch 3), in their
+    // own clipping viewport above "↓ N more" (FR-CBT-125).
     <div
       ref={rootRef}
       data-testid="cbt-init"
       data-record-id={enc.id}
       className="flex h-full min-h-0 flex-col gap-2"
+      style={clip === null ? undefined : { maxHeight: clip }}
     >
       <Header enc={enc} rows={rows} />
       <PendingCards cards={cards} />
-      <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+      <div
+        ref={listRef}
+        data-testid="cbt-init-list"
+        className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1"
+      >
         <div
           aria-hidden
           className="sticky top-0 z-10 flex items-center gap-0.5 bg-card px-1 pb-0.5 text-[11px] text-muted-foreground"
