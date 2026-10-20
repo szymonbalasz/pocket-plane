@@ -3,7 +3,7 @@
 // shorter folded name, folded name, id. Visibility (FR-CMP-14) and filters narrow first, then
 // duplicate names collapse into one group row (FR-CMP-35), then the page. The cursor is an
 // opaque keyset of the row's tuple (a group: its best member's), validated on the way in.
-import { nameTier, queryWords, type SearchTier, searchTier } from "@shared/compendium/match";
+
 import {
   type EntrySummary,
   HOMEBREW_LABEL,
@@ -12,6 +12,7 @@ import {
 } from "@shared/compendium/rest";
 import { LINE_MAX } from "@shared/compendium/schemas";
 import { CR_VALUES } from "@shared/entities/schemas";
+import { nameTier, queryWords, type SearchTier, searchTier } from "@shared/search/match";
 import { z } from "zod";
 import { invalid } from "../../commands/errors";
 import type { Db } from "../../db/client";
