@@ -3,11 +3,18 @@
 // player's, or the DM's) are disabled with "‹Key› — taken by ‹name›"; the target's own key is
 // checked. A click sends `camp.setColor`; nothing is optimistic (ADR-0021 E): every swatch and the
 // trigger read the `player` / `campaign` records, so a reject (Toast) leaves the server's colour.
+// Sprint 6 (PF0, until PF2's `ColorPicker` replaces it): records hold hex; a swatch sends its
+// palette hex and is taken when FR-CAMP-32's distance rule blocks it.
 import {
+  type ColorHolder,
+  colorClash,
   colorLabel,
-  isPlayerColor,
+  colorName,
+  normalizeColor,
+  type PaletteKey,
   PLAYER_COLOR_KEYS,
-  type PlayerColor,
+  PLAYER_COLORS,
+  paletteKeyOf,
 } from "@shared/campaign-management/colors";
 import type {
   CampaignRecord,
@@ -30,7 +37,7 @@ export const SET_COLOR_INTENT = "camp.setColor";
 export type ColorTarget = string | null;
 
 export interface Swatch {
-  key: PlayerColor;
+  key: PaletteKey;
   hex: string;
   /** "Rose", or "Rose — taken by Player 2" (aria-label and Tooltip). */
   label: string;
@@ -44,22 +51,31 @@ export interface ColorHolders {
   dmColor: string | undefined;
 }
 
-/** FR-CAMP-26 as the picker shows it: a key held by anyone but the target is taken. */
+/**
+ * FR-CAMP-26 / -32 as the picker shows it: a palette colour too close to (or equal to) the colour
+ * of anyone but the target is taken. Holders' colours may be hex or old keys.
+ */
 export function colorSwatches(
   { players, dmColor }: ColorHolders,
   target: ColorTarget,
-  hex: (key: PlayerColor) => string = colorHex,
+  hex: (key: PaletteKey) => string = colorHex,
 ): Swatch[] {
-  const own = target === null ? dmColor : players.find((p) => p.id === target)?.color;
+  const own = normalizeColor(
+    target === null ? dmColor : players.find((p) => p.id === target)?.color,
+  );
+  const others: ColorHolder[] = [
+    ...(target !== null && dmColor ? [{ by: "dm", name: "DM", color: dmColor }] : []),
+    ...players
+      .filter((p) => p.id !== target)
+      .map((p) => ({ by: p.id, name: p.name, color: p.color })),
+  ];
   return PLAYER_COLOR_KEYS.map((key) => {
-    // The own key is never taken, even when a repeated default (past 8) shares it.
-    const mine = own === key;
-    const byPlayer = mine ? undefined : players.find((p) => p.id !== target && p.color === key);
-    const byDm = !mine && target !== null && dmColor === key;
-    const takenBy = byDm ? "dm" : (byPlayer?.id ?? null);
-    const name = byDm ? "DM" : byPlayer?.name;
-    const label = name ? `${colorLabel(key)} — taken by ${name}` : colorLabel(key);
-    return { key, hex: hex(key), label, takenBy, checked: mine };
+    // The own colour is never taken, even when a repeated default shares it.
+    const mine = own === PLAYER_COLORS[key];
+    const clash = mine ? null : colorClash(PLAYER_COLORS[key], others);
+    const reason = clash ? clash.message.charAt(0).toLowerCase() + clash.message.slice(1) : "";
+    const label = clash ? `${colorLabel(key)} — ${reason}` : colorLabel(key);
+    return { key, hex: hex(key), label, takenBy: clash?.by ?? null, checked: mine };
   });
 }
 
@@ -67,7 +83,7 @@ export function colorSwatches(
 export function pickColor(
   send: (name: string, payload: unknown) => Promise<unknown>,
   target: ColorTarget,
-  color: PlayerColor,
+  color: string,
   onReject: (err: unknown) => void = toastReject,
 ): Promise<void> {
   const input: SetColorInput = { playerId: target, color };
@@ -82,7 +98,7 @@ export function ColorSwatches({
 }: {
   swatches: readonly Swatch[];
   disabled: boolean;
-  onPick: (key: PlayerColor) => void;
+  onPick: (key: PaletteKey) => void;
 }) {
   return (
     <div className="grid grid-cols-4 gap-2">
@@ -129,7 +145,7 @@ function useHolders(): ColorHolders & { store: Parameters<typeof colorOf>[0] } {
 
 /**
  * The swatch Button (`size` px round, the colour itself; `testId`, `data-value` = the target's
- * key) and its Popover. Swatches are
+ * palette name, or its hex for any other colour) and its Popover. Swatches are
  * disabled while not live (FR-CAMP-25); the trigger stays usable so the Popover still opens.
  */
 export function ColorPopover({
@@ -160,11 +176,13 @@ export function ColorPopover({
       target === null ? { role: "dm" } : { role: "player", playerId: target },
     ) ?? undefined;
   const swatches = colorSwatches(holders, target);
-  const pick = (key: PlayerColor) => {
+  const pick = (key: PaletteKey) => {
     setOpen(false);
-    void pickColor((n, p) => connection.sendIntent(n, p), target, key);
+    void pickColor((n, p) => connection.sendIntent(n, p), target, PLAYER_COLORS[key]);
   };
-  const name = value && isPlayerColor(value) ? colorLabel(value) : "Unknown";
+  const stored = normalizeColor(value);
+  const dataValue = stored ? (paletteKeyOf(stored) ?? stored) : value;
+  const name = stored ? colorName(stored) : "Unknown";
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <Tooltip content={tip}>
@@ -179,7 +197,7 @@ export function ColorPopover({
             style={{ backgroundColor: hex }}
             data-testid={testId}
             data-record-id={recordId}
-            data-value={value}
+            data-value={dataValue}
             aria-label={`${tip}: ${name}`}
           />
         </PopoverTrigger>

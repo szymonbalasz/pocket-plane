@@ -1,7 +1,6 @@
 // Drizzle schema. Shared file (AGENTS §9.9). Entities and rules: docs/data-model/README.md.
 // Timestamps are ISO-8601 UTC strings from ctx.clock.
 
-import { DM_DEFAULT_COLOR, PLAYER_COLOR_KEYS } from "@shared/campaign-management/colors";
 import { CONDITIONS } from "@shared/combat-extras/conditions";
 import {
   type DeathCounters,
@@ -53,8 +52,11 @@ export const campaign = sqliteTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     active: integer("active", { mode: "boolean" }).notNull().default(false),
-    /** FR-CAMP-24: the DM colour, a palette key; the default makes the push-time add safe. */
-    dmColor: text("dm_color", { enum: PLAYER_COLOR_KEYS }).notNull().default(DM_DEFAULT_COLOR),
+    /**
+     * FR-CAMP-24, -30: the DM colour, a lowercase `#rrggbb`. The `'amber'` default only made the
+     * push-time add safe; every insert writes a hex and the boot migration converts old keys.
+     */
+    dmColor: text("dm_color").notNull().default("amber"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -77,11 +79,11 @@ export const player = sqliteTable(
     /** Never in a sync record, event or log entry (FR-CAMP-13). */
     linkToken: text("link_token").notNull(),
     /**
-     * FR-CAMP-23: a palette key. Nullable only so drizzle push can add it to a populated table;
-     * the boot backfill fills it before any snapshot (the wire record is non-null). Not unique:
-     * defaults repeat past 8 players (FR-CAMP-26).
+     * FR-CAMP-23, -30: a lowercase `#rrggbb`. Nullable only so drizzle push can add it to a
+     * populated table; the boot migration fills it before any snapshot (the wire record is
+     * non-null). Not unique: defaults may repeat once no palette colour is far enough (FR-CAMP-32).
      */
-    color: text("color", { enum: PLAYER_COLOR_KEYS }),
+    color: text("color"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },

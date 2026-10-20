@@ -1,6 +1,6 @@
 // campaign-management boundary schemas (CAMP §6, §9). Used by server and both clients.
 import { z } from "zod";
-import { PlayerColor } from "./colors";
+import { HexColorInput } from "./colors";
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control characters is the point (CAMP §11).
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
@@ -27,8 +27,9 @@ export const LinkToken = z.string().regex(/^[A-Za-z0-9_-]{22}$/);
 
 // ---- Sync record types (wire shapes; no token field exists) ----
 /**
- * A colour on the wire (FR-CAMP-28, -29): a palette key, never null (the boot backfill runs
- * first). Read as any string so a client survives a key it doesn't know (role-accent fallback).
+ * A colour on the wire (FR-CAMP-29, -30): a `#rrggbb`, never null (the boot migration runs
+ * first). Read as any string so a client survives a value it doesn't know (an old key maps to
+ * its palette hex, anything else to the role accent; FR-CAMP-36).
  */
 const WireColor = z.string().min(1);
 
@@ -44,9 +45,9 @@ export const PlayerRecord = z.object({
 export type PlayerRecord = z.infer<typeof PlayerRecord>;
 
 // ---- WS intents ----
-/** `camp.setColor` (FR-CAMP-25): `playerId` null = the DM colour. */
+/** `camp.setColor` (FR-CAMP-25, -33): `playerId` null = the DM colour; `color` a `#rrggbb`. */
 export const SetColorInput = z
-  .object({ playerId: z.string().min(1).max(64).nullable(), color: PlayerColor })
+  .object({ playerId: z.string().min(1).max(64).nullable(), color: HexColorInput })
   .strict();
 export type SetColorInput = z.infer<typeof SetColorInput>;
 

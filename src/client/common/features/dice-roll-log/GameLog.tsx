@@ -5,7 +5,6 @@
 // Sprint 5: a line this client's dice haven't landed yet shows blank chips and "…" (FR-DICE-40);
 // a `roll` line's actor name in the roller's player colour (FR-DICE-60, -61).
 
-import type { PlayerColor } from "@shared/campaign-management/colors";
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
   COMBATANT_TYPE,
@@ -176,7 +175,7 @@ function Entry({
   e: GameLogEntryView;
   isDm: boolean;
   look: DiceLook;
-  color: PlayerColor | null;
+  color: string | null;
   focused: boolean;
 }) {
   const { segments } = useMemo(() => formatEntry(e), [e]);
