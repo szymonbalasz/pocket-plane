@@ -10,6 +10,9 @@ import {
   NOTE_STACK_SELECTOR,
   popupRegion,
   ROLL_POPUP_W,
+  shownStack,
+  shownStacks,
+  subscribeShownStack,
   toastKeepOut,
   toastRegion,
 } from "./toast-region";
@@ -116,6 +119,8 @@ export function ShellToaster({ client }: { client: ShellClient }) {
   const region = toastRegion(client, noteH);
   const popups = popupRegion(client, noteH, useSonnerHeight());
   const box = toastKeepOut(client, useViewport());
+  const reports = useSyncExternalStore(subscribeShownStack, shownStacks, shownStacks);
+  const stack = shownStack(client, reports);
   return (
     <>
       {/* FR-SHELL-49: the region's box (players' toast corner, the DM's top-centre box), for
@@ -123,6 +128,12 @@ export function ShellToaster({ client }: { client: ShellClient }) {
       <div
         data-testid="ui-toast-corner"
         data-rect={`${box.x},${box.y},${box.w},${box.h}`}
+        // FR-SHELL-59: the DM's rendered toasts + popups (absent while nothing shows).
+        data-shown={
+          stack
+            ? `${Math.round(stack.x)},${Math.round(stack.y)},${Math.round(stack.w)},${Math.round(stack.h)}`
+            : undefined
+        }
         aria-hidden
         className="pointer-events-none fixed"
         style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
