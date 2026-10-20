@@ -1,5 +1,7 @@
 // Player window registry (FR-SHELL-07, ADR-0025). APPEND-ONLY (AGENTS §9.9): a feature adds one
 // import and one line in the list for each of its player window types; nothing else changes here.
+
+import { prefsWindow } from "@ui/features/play-shell/PreferencesWindow";
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
 import { playerCharSheetWindow } from "./features/character-sheet/sheet-window";
@@ -10,6 +12,7 @@ import { playerDiceLogWindow } from "./features/dice-roll-log/log-window";
 import { notificationsHistoryWindow } from "./features/notifications/history-window";
 import { playerPartyBoardWindow } from "./features/party-board/board-window";
 import { playerHandoutWindow } from "./features/party-board/handout-window";
+import { playerPrefSections } from "./pref-sections";
 
 const windows: WindowDef[] = [
   syncProbesWindow, // sync.probes, test mode (play-shell, FR-SHELL-21)
@@ -22,6 +25,7 @@ const windows: WindowDef[] = [
   playerPartyBoardWindow, // party.board (party-board, FR-PARTY-11)
   { ...playerHandoutWindow, restoreOpen: false }, // party.handout (party-board, FR-PARTY-14; FR-SHELL-42)
   playerCompendiumWindow, // cmp.compendium (compendium, FR-CMP-18)
+  prefsWindow("player", playerPrefSections), // shell.prefs, no launcher (play-shell, FR-SHELL-71)
 ];
 
 export const playerWindows = createWindowRegistry("player", windows);

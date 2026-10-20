@@ -626,9 +626,9 @@ test('FR-SHELL-08 FR-SHELL-56 user opens keep a clear stored rect (the DM soft b
   }
 });
 
-test("FR-SHELL-42 DM handout viewer registers restoreOpen: false; nothing else does", () => {
+test("FR-SHELL-42 DM handout viewer and Preferences (FR-SHELL-71) register restoreOpen: false; nothing else does", () => {
   const off = dmWindows.defs.filter((d) => d.restoreOpen === false).map((d) => d.kind);
-  expect(off).toEqual(["party.handout"]);
+  expect(off).toEqual(["party.handout", "shell.prefs"]);
 });
 
 test("FR-SHELL-43 dm launcher, test-mode kinds included, at 1280 / 1440 / 1600 wide: every button inside the viewport with 8 px gutters or in the overflow menu; icon-only before any overflow; open windows stay in the bar", () => {
@@ -802,6 +802,7 @@ const GOLDEN_KINDS = [
   "dicex.tray",
   "party.board",
   "cmp.compendium",
+  "shell.prefs", // PF1 (FR-SHELL-62 (d): appended with its goldens)
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */

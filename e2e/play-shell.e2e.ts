@@ -241,20 +241,19 @@ test("FR-SHELL-13 keys from windows never reach the base; window drags drop on t
   await win.getByTestId("shell-test-drag").dragTo(p.getByTestId("ui-base-empty"));
   await expect(base).toHaveAttribute("data-test-last-drop", "shell.test:main");
 });
-
-test("FR-SHELL-22/24/25/27 Test window Alert: flash + Toast + ping; mute and volume persist per player; no DM speaker", async ({
+test("FR-SHELL-22/24/25/27/73 Test window Alert: flash + Toast + ping; mute and volume (Preferences' Sound section) persist per player; the DM has no sound state", async ({
   browser,
 }) => {
   const { secret, link } = e2eEnv();
   const p = await rolePage(browser);
   await p.goto(link("Player 1"));
   const topbar = p.getByTestId("ui-topbar");
-  const speaker = p.getByTestId("ui-sound-button");
-  await expect(speaker).toHaveAttribute("data-state", "locked"); // no interaction yet
+  const chip = p.getByTestId("ui-prefs-open");
+  await expect(chip).toHaveAttribute("data-sound-state", "locked"); // no interaction yet
   await expect(topbar).toHaveAttribute("data-test-last-sound", "");
 
   const win = await openWindow(p, "shell.test"); // the launcher click unlocks audio
-  await expect(speaker).toHaveAttribute("data-state", "on");
+  await expect(chip).toHaveAttribute("data-sound-state", "on");
   await win.getByTestId("shell-test-alert").click();
   const flash = p.getByTestId("ui-alert-flash");
   await expect(flash).toHaveAttribute("data-alert-id", "shell.test");
@@ -263,44 +262,53 @@ test("FR-SHELL-22/24/25/27 Test window Alert: flash + Toast + ping; mute and vol
   await expect(flash).toHaveCount(0); // ends by itself (≈ 1.2 s)
 
   // Volume 40 + mute, reload: settings restored from this player's entry; alert stays silent.
-  await speaker.click();
+  await chip.click();
+  await expect(shellWindow(p, "shell.prefs")).toBeVisible();
   const thumb = p.getByTestId("ui-sound-volume").getByRole("slider");
   await thumb.focus();
   await thumb.press("Home");
   for (let i = 0; i < 4; i++) await thumb.press("PageUp");
   await expect(p.getByTestId("ui-sound-volume")).toHaveAttribute("data-value", "40");
   await p.getByTestId("ui-sound-mute").click();
-  await expect(speaker).toHaveAttribute("data-state", "muted");
+  await expect(chip).toHaveAttribute("data-sound-state", "muted");
+  await expect(chip.getByTestId("ui-prefs-chip-sound")).toBeVisible();
   await p.reload();
-  await expect(speaker).toHaveAttribute("data-state", "muted");
-  await speaker.click();
+  await expect(chip).toHaveAttribute("data-sound-state", "muted");
+  await expect(chip).toHaveAttribute("data-state", "closed"); // FR-SHELL-71: loads closed
+  await chip.click();
   await expect(p.getByTestId("ui-sound-volume")).toHaveAttribute("data-value", "40");
-  await p.keyboard.press("Escape");
+  await chip.click(); // on top → closed
+  await expect(chip).toHaveAttribute("data-state", "closed");
   await openWindow(p, "shell.test");
   await shellWindow(p, "shell.test").getByTestId("shell-test-alert").click();
   await expect(topbar).toHaveAttribute("data-test-last-sound", "ping:muted:1");
 
-  // Another player's entry is separate (defaults); the DM has no speaker (#154).
+  // Another player's entry is separate (defaults); the DM has no sound state or section (#154).
   const p2 = await rolePage(browser);
   await p2.goto(link("Player 2"));
-  await expect(p2.getByTestId("ui-sound-button")).toHaveAttribute("data-state", "locked");
+  await expect(p2.getByTestId("ui-prefs-open")).toHaveAttribute("data-sound-state", "locked");
   const dm = await rolePage(browser);
   await loginDm(dm, secret);
-  await expect(dm.getByTestId("ui-topbar")).toBeVisible();
+  const dmChip = dm.getByTestId("ui-prefs-open");
+  await expect(dmChip).toBeVisible();
+  await expect(dmChip).not.toHaveAttribute("data-sound-state", /.*/);
+  await dmChip.click();
+  await expect(dm.getByTestId("ui-prefs-window")).toBeVisible();
+  await expect(dm.getByTestId("ui-sound-mute")).toHaveCount(0);
   await expect(dm.getByTestId("ui-sound-button")).toHaveCount(0);
 });
 
-test("FR-SHELL-24/25 speaker: the first click on a fresh page unlocks audio and opens the popover", async ({
+test("FR-SHELL-25/70 chip: the first click on a fresh page unlocks audio and opens Preferences", async ({
   browser,
 }) => {
   const { link } = e2eEnv();
   const p = await rolePage(browser);
   await p.goto(link("Player 2"));
-  const speaker = p.getByTestId("ui-sound-button");
-  await expect(speaker).toHaveAttribute("data-state", "locked");
-  await speaker.click();
-  await expect(speaker).toHaveAttribute("data-state", "on");
-  await expect(speaker).toHaveAttribute("aria-expanded", "true");
+  const chip = p.getByTestId("ui-prefs-open");
+  await expect(chip).toHaveAttribute("data-sound-state", "locked");
+  await chip.click();
+  await expect(chip).toHaveAttribute("data-sound-state", "on");
+  await expect(chip).toHaveAttribute("data-state", "open");
   await expect(p.getByTestId("ui-sound-mute")).toBeVisible();
   await p.context().close();
 });
