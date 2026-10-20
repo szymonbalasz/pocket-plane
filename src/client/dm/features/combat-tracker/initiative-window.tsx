@@ -2,9 +2,12 @@
 // FR-CBT-35), Roll monsters (FR-CBT-46), End encounter (FR-CBT-51), Pending (FR-CBT-79), rows by
 // `position` (initiative roll / set, AC, HP, band or PC Down (FR-CBT-49), moved (FR-CBT-39),
 // Attack; menu Check ▸ / Save ▸ (FR-CBT-44), Damage / heal, Set as ally / enemy (FR-CBT-104),
-// Remove; the side chip), Removed.
+// Remove; the side chip), Removed. Sprint 6 (FR-CBT-118): companions' owner chip and mode icon,
+// `after-owner` rows indented under the owner, `in-owner-turn` ones as lines in its row,
+// Companion ▸ in the menus.
 import { signed } from "@shared/character-sheet/logic";
 import { notRestoredText } from "@shared/combat-extras/rules";
+import { isCompanion } from "@shared/combat-tracker/companion";
 import {
   canRollInitiative,
   d20Expression,
@@ -56,6 +59,12 @@ import { Input, Skeleton } from "@ui/components/ui/primitives";
 import { characterOf, deadPc, deathStateFor, MORE_W } from "@ui/features/combat-extras/logic";
 import { NameLine } from "@ui/features/combat-extras/parts";
 import { MoreFooter, useBelowFold, useListViewport } from "@ui/features/combat-tracker/below-fold";
+import {
+  companionLayout,
+  ModeIcon,
+  modeLabel,
+  OwnerChip,
+} from "@ui/features/combat-tracker/companions";
 import { BandBadge, Portrait, SideChip, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { manualFields, pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
 import {
@@ -125,6 +134,7 @@ import { skipText } from "../combat-extras/skip";
 import { useCbtxDialogs } from "../combat-extras/store";
 import { type AttackAction, attackChoices, attackRolls } from "./attack-choices";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
+import { CompanionMenu } from "./companion-menu";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
 import { EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { useHoverSafeSub } from "./hover-sub";
@@ -567,7 +577,7 @@ const sumWidths = (els: readonly Element[], gap: number) =>
  * AC / HP line when that line has room for it. Natural widths only, so it never flips back and
  * forth; re-measured on resize and when the row changes.
  */
-function useMovedBelow(rowRef: RefObject<HTMLLIElement | null>, deps: unknown): boolean {
+function useMovedBelow(rowRef: RefObject<HTMLElement | null>, deps: unknown): boolean {
   const [below, setBelow] = useState(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the row changes
   useLayoutEffect(() => {
@@ -605,21 +615,74 @@ function useMovedBelow(rowRef: RefObject<HTMLLIElement | null>, deps: unknown): 
   return below;
 }
 
-function Row({
+/**
+ * Sprint 6 (FR-CBT-107, -108): a companion acting with its owner shows the owner's number, no
+ * input or roll ("After Mira"); an in-turn line shows none.
+ */
+function OwnerInitCell({
   c,
-  def,
-  turn,
-  round,
-  defs,
-  wideInit,
+  owner,
+  ownerName,
+  wide,
 }: {
+  c: CombatantView;
+  owner: CombatantView | null;
+  ownerName: string;
+  wide: boolean;
+}) {
+  const label = modeLabel(c.turnMode ?? "after-owner", ownerName);
+  return (
+    <Tooltip content={label}>
+      <span
+        data-testid="cbt-init-row-init"
+        data-record-id={c.id}
+        data-missing="false"
+        data-value={owner?.initiative ?? ""}
+        className={cn(
+          "shrink-0 text-center text-xs text-muted-foreground tabular-nums",
+          INIT_W[wide ? "wide" : "narrow"],
+        )}
+      >
+        <span className="sr-only">{label}: </span>
+        {owner?.initiative ?? "–"}
+      </span>
+    </Tooltip>
+  );
+}
+
+interface RowProps {
   c: CombatantView;
   def: DefinitionRecord | undefined;
   turn: boolean;
   round: number;
   defs: Map<string, DefinitionRecord>;
   wideInit: boolean;
-}) {
+  /** Sprint 6 (FR-CBT-118): a companion's owner row (null: not a companion, or not listed). */
+  owner?: CombatantView | null;
+  /** The owner PC's name (chip, mode Tooltip). */
+  ownerName?: string;
+  /** `in-owner-turn` companions shown as lines inside this row (FR-CBT-107). */
+  lines?: CombatantView[];
+  /** Ranked by its owner: indented one step under it. */
+  indent?: boolean;
+}
+
+/**
+ * One combatant's row content: portrait, name line, AC / HP line, initiative, Attack ▸, menu.
+ * `line`: an in-owner-turn companion's compact line inside its owner's row (FR-CBT-118: no turn
+ * marker or initiative of its own; its own Attack ▸ and menu).
+ */
+function RowMain({
+  c,
+  def,
+  turn,
+  round,
+  defs,
+  wideInit,
+  owner,
+  ownerName,
+  line,
+}: Omit<RowProps, "lines" | "indent"> & { line: boolean }) {
   const { send, disabled } = useCbtIntent();
   const openHp = useCombatDialogs((s) => s.openHp);
   const hp = hpOf(c, defs);
@@ -641,22 +704,19 @@ function Row({
   // FR-CBT-50 (G4): Next / Prev skip a monster at 0 HP — and a dead PC (FR-CBTX-25); the row is
   // muted with a skip icon.
   const skipped = (c.kind === "monster" && !c.removed && c.hpCurrent === 0) || dead;
-  const rowRef = useRef<HTMLLIElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
   const movedBelow = useMovedBelow(
-    rowRef,
-    `${c.name}:${c.movedFt}:${round}:${wideInit}:${skipped}:${c.hidden}:${hp?.cur}:${down}:${hasDeathState}:${c.side}:${c.publicSide}`,
+    mainRef,
+    `${c.name}:${c.movedFt}:${round}:${wideInit}:${skipped}:${c.hidden}:${hp?.cur}:${down}:${hasDeathState}:${c.side}:${c.publicSide}:${c.ownerCharacterId}:${c.turnMode}`,
   );
+  const companion = isCompanion(c) && c.turnMode;
+  const byOwner = companion && c.turnMode !== "own" && owner !== null && owner !== undefined;
   return (
-    <li
-      ref={rowRef}
-      data-testid="cbt-init-row"
-      data-record-id={c.id}
-      data-turn={turn}
-      data-hidden={c.hidden === true}
-      data-skipped={skipped}
+    <div
+      ref={mainRef}
+      data-row-main
       className={cn(
-        "relative flex items-center gap-0.5 rounded-md px-1 py-0.5",
-        turn && "bg-accent",
+        "relative flex items-center gap-0.5",
         c.hidden && "opacity-70",
         skipped && "opacity-50",
       )}
@@ -669,9 +729,18 @@ function Row({
         <NameLine
           name={c.name}
           testId="cbt-init-row-name"
-          className="text-sm font-medium"
+          className={cn("text-sm", !line && "font-medium")}
           marks={
             <>
+              {/* FR-CBT-118 (sprint 6): the mode icon, Tooltip "After Mira". */}
+              {companion && (
+                <ModeIcon
+                  id={c.id}
+                  mode={c.turnMode ?? "after-owner"}
+                  ownerName={ownerName ?? ""}
+                  testId="cbt-init-row-mode"
+                />
+              )}
               {c.hidden && (
                 <EyeOffIcon
                   className="size-3.5 shrink-0 text-muted-foreground"
@@ -695,7 +764,15 @@ function Row({
             </>
           }
           // FR-CBT-104 (#252): the side chip never folds; before the effect chips (FR-CBTX-54).
-          side={<SideChip c={c} testId="cbt-init-row-ally" />}
+          // Sprint 6 (FR-CBT-118): the owner chip with it (a line sits in its owner's row).
+          side={
+            <>
+              {companion && !line && (
+                <OwnerChip c={c} ownerName={ownerName ?? ""} testId="cbt-init-row-owner" />
+              )}
+              <SideChip c={c} testId="cbt-init-row-ally" />
+            </>
+          }
           // On the name line, right-aligned; below when the name needs the room. From round 1
           // only: before the first turn nothing has moved in combat (P3 glitch 10, ruling A).
           end={round >= 1 && !movedBelow && <Moved c={c} speed={stats?.speed} />}
@@ -722,7 +799,13 @@ function Row({
           {round >= 1 && movedBelow && <Moved c={c} speed={stats?.speed} />}
         </div>
       </div>
-      <InitiativeCell c={c} def={def} round={round} wide={wideInit} />
+      {line ? (
+        <span aria-hidden className={cn("shrink-0", INIT_W[wideInit ? "wide" : "narrow"])} />
+      ) : byOwner ? (
+        <OwnerInitCell c={c} owner={owner} ownerName={ownerName ?? ""} wide={wideInit} />
+      ) : (
+        <InitiativeCell c={c} def={def} round={round} wide={wideInit} />
+      )}
       <AttackButton c={c} def={def} />
       {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸, out of the flow
           (no gaps: the name line keeps the room, FR-CBTX-46). */}
@@ -770,6 +853,8 @@ function Row({
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <SideMenu c={c} testId="cbt-init-row-side" />
+          {/* FR-CBT-118 (sprint 6): owner, turn mode, release, turn hostile. */}
+          <CompanionMenu c={c} testId="cbt-init-row-companion" />
           <DropdownMenuItem
             variant="destructive"
             data-testid="cbt-init-row-remove"
@@ -780,6 +865,53 @@ function Row({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+    </div>
+  );
+}
+
+/**
+ * One Initiative row (`cbt-init-row`); sprint 6 (FR-CBT-118): an `after-owner` companion sits
+ * indented under its owner, an owner's `in-owner-turn` companions are lines inside its row
+ * (`cbt-init-companion`), each with its own HP, AC, band, chips, Attack ▸ and menu.
+ */
+export function Row({ lines = [], indent = false, ...p }: RowProps) {
+  const { c, turn, defs } = p;
+  const dead = useDeadPc(c);
+  const skipped = (c.kind === "monster" && !c.removed && c.hpCurrent === 0) || dead;
+  return (
+    <li
+      data-testid="cbt-init-row"
+      data-record-id={c.id}
+      data-turn={turn}
+      data-hidden={c.hidden === true}
+      data-skipped={skipped}
+      data-indent={indent || undefined}
+      className={cn(
+        "flex flex-col gap-0.5 rounded-md px-1 py-0.5",
+        turn && "bg-accent",
+        indent && "ml-3",
+      )}
+    >
+      <RowMain {...p} line={false} />
+      {lines.map((l) => (
+        <div
+          key={l.id}
+          data-testid="cbt-init-companion"
+          data-record-id={l.id}
+          data-hidden={l.hidden === true}
+          className="border-l border-border/60 pl-1"
+        >
+          <RowMain
+            {...p}
+            c={l}
+            def={l.entityId ? defs.get(l.entityId) : undefined}
+            turn={false}
+            owner={c}
+            ownerName={c.name}
+            line
+          />
+        </div>
+      ))}
     </li>
   );
 }
@@ -1136,6 +1268,11 @@ function DmInitiativeBody() {
   const rows = useCombatants(enc?.id);
   const defs = useDefinitions();
   const cards = usePendingCards(enc?.id);
+  // A companion whose owner row isn't listed (removed): the character's name.
+  const ownerNameOf = (c: CombatantView) =>
+    rows.find((r) => r.kind === "pc" && r.entityId === c.ownerCharacterId)?.name ??
+    (c.ownerCharacterId ? defs.get(c.ownerCharacterId)?.name : undefined) ??
+    "";
   const openWindow = useOpenWindow();
   const { send, disabled } = useCbtIntent();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -1161,6 +1298,8 @@ function DmInitiativeBody() {
   }
   const active = rows.filter((c) => !c.removed);
   const removed = rows.filter((c) => c.removed);
+  // FR-CBT-107 / -118 (sprint 6): in-turn companions as lines in their owner's row.
+  const layout = companionLayout(active, "position");
   const wideInit = active.some((c) => canRollInitiative(enc.round, c.initiative));
   return (
     // Header + pending cards stay put; the rows scroll inside the window (glitch 3), in their
@@ -1188,7 +1327,7 @@ function DmInitiativeBody() {
           <span className="w-[58px]" />
         </div>
         <ul className="flex flex-col gap-0.5">
-          {active.map((c) => (
+          {layout.map(({ c, lines, owner, indent }) => (
             <Row
               key={c.id}
               c={c}
@@ -1197,6 +1336,10 @@ function DmInitiativeBody() {
               round={enc.round}
               defs={defs}
               wideInit={wideInit}
+              owner={owner}
+              ownerName={owner?.name ?? ownerNameOf(c)}
+              lines={lines}
+              indent={indent}
             />
           ))}
         </ul>

@@ -1,12 +1,13 @@
 // Combat's token menu entries (FR-CBT-30, FR-MAP-29): "Damage / heal…", "Set as ally / enemy"
-// (FR-CBT-104, #252) and "Remove from combat" on a token bound to an active, non-removed combatant.
-// Items render nothing otherwise.
+// (FR-CBT-104, #252), "Companion ▸" (FR-CBT-118, sprint 6: monsters) and "Remove from combat" on
+// a token bound to an active, non-removed combatant. Items render nothing otherwise.
 import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@ui/components/ui/menus";
 import { useCbtIntent } from "@ui/features/combat-tracker/store";
 import { useRecords } from "@ui/sync/store";
 import { HeartPulseIcon, UserMinusIcon } from "lucide-react";
 import type { TokenMenuEntry, TokenMenuItemProps } from "../scenes-map/token-menu";
+import { CompanionMenu } from "./companion-menu";
 import { useCombatDialogs } from "./popup-store";
 import { SideMenu } from "./side-menu";
 
@@ -40,6 +41,15 @@ export const combatTokenMenu: readonly TokenMenuEntry[] = [
       const c = useBound(token.id);
       if (!c) return null;
       return <SideMenu c={c} testId="cbt-token-menu-side" />;
+    },
+  },
+  {
+    id: "cbt.companion",
+    order: 70.6,
+    Item: function CompanionItem({ token }: TokenMenuItemProps) {
+      const c = useBound(token.id);
+      if (!c) return null;
+      return <CompanionMenu c={c} testId="cbt-token-menu-companion" />;
     },
   },
   {
