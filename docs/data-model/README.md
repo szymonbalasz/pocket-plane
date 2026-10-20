@@ -2167,3 +2167,19 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-110, -112,
 - **Persisted runtime state:** none new beyond the column and the notification rows.
 - **Fixtures:** unit `cp-combat` (pets join through Add; Thorn's Conjure Elemental; Fire Elemental for Mira after-owner, Brakka in-owner-turn, Thorn own 9 + linked), appended to `companions` and `session-sim-10` (loads on `session-sim-9`'s running fight).
 - **CON-44** (`snapshot-size.test.ts` heavy harness, measured with a throwaway probe): `summoned` on every combatant row → DM 765,752 → 766,523 B (+771 B; 806,341 B left of 1.5 MiB); players unchanged (the flag is never redacted in). `session-sim-10` with `cp-combat`: DM 64,264 B, players 32,243 / 24,394 B (+6,384 / +4,493 B over sim-9).
+
+## 96. Sprint 7: window frame (FU1)
+
+From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-56 (OQ-SHELL-55 B), -77–81, -85–88 and [notifications](../specs/notifications.md#8-data-model) FR-NOTE-44. **Built by `fix/fu-frame`**: no table, column, record type or payload change. Protocol side: [protocol §125](../protocol/README.md#125-sprint-7-window-frame--auto-minimise-instead-of-covering-pcs-useful-sizes-pushed-windows-return-space--focus-tooltips-fu1).
+
+| Data | Where | Rule | Source |
+|---|---|---|---|
+| `WindowState.userSpot` | browser layout entry (`localStorage`, #121) | `true`, optional: set at a user move / resize end; dropped when the shell places the window; restored with a returned pre-push rect; older entries parse as absent | [FR-SHELL-56](../specs/play-shell.md#6-functional-requirements) |
+| Pre-push rects | client memory (`ShellState.prePush`) | per pushed window: its rect and `userSpot` before the first push of a tool use, and the rect the push wrote; dropped on move, resize, close, minimise, reset, return, reload | [FR-SHELL-81](../specs/play-shell.md#6-functional-requirements) |
+| Auto-minimised for, auto-minimise log | client memory (`autoMinimisedFor`, `autoMinimiseLog`) | the newcomer each auto-minimised window made room for; the last placement's moves | [FR-SHELL-88](../specs/play-shell.md#6-functional-requirements) |
+| `WindowDef.usefulSize`, band, size table | code (registry; `size-table.ts` test data) | not sent or stored | [FR-SHELL-79](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-85](../specs/play-shell.md#6-functional-requirements) |
+| Fit requests | client memory (`free-area.ts` counter) | one per Reset layout on this page | [FR-SHELL-80](../specs/play-shell.md#6-functional-requirements) |
+
+- **Fixtures:** no new unit (pure tests on `session-sim-10`'s Goblin Ambush cells in `test-cells.ts`; the e2e reads `session-sim-10`); `session-sim-11` gets a comment line only.
+- **Persisted runtime state:** only `userSpot` in the layout entry.
+- **CON-44:** 0 B.
