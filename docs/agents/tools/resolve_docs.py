@@ -29,5 +29,13 @@ def resolve(path):
     s = pat.sub(sub, s)
     open(path, "w", encoding="utf-8", newline="\n").write(s)
 
+def dupes(path):
+    # git may append two branches' new sections without a conflict: same number twice
+    nums = re.findall(r"^## (\d+)\.", open(path, encoding="utf-8").read(), re.M)
+    d = sorted({n for n in nums if nums.count(n) > 1}, key=int)
+    if d:
+        print(path, "DUPLICATE section numbers:", d, "- renumber the branch's and fix links (fixlinks.py)")
+
 for p in sys.argv[1:]:
     resolve(p)
+    dupes(p)
