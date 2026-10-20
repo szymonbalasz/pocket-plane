@@ -392,6 +392,8 @@ export function MapCanvas(props: MapCanvasProps) {
   // the toast box) refits once while `fitted`, after the frame is applied; a burst coalesces.
   const [reveal] = useState(() => createRevealRefit(() => onCamera("reveal")));
   useEffect(() => () => reveal.dispose(), [reveal]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a scene switch drops a pending refit
+  useEffect(() => reveal.dispose(), [reveal, scene.id]);
   const obstaclesRef = useRef(obstacles);
   obstaclesRef.current = obstacles;
   const sizeRef = useRef(size);
