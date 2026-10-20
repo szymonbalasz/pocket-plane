@@ -27,35 +27,22 @@ import {
   type DmRollActorRef,
   GAME_LOG_ENTRY_TYPE,
   type GameLogEntryView,
-  type ManualEntry,
   ROLL_CATEGORIES,
   type RollCategory,
   RollEntryPayload,
   type RollMode,
 } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
-import type { RecordStore } from "@shared/protocol/store";
 import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
 import {
-  CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   DicesIcon,
   EyeIcon,
   EyeOffIcon,
   HandIcon,
-  XIcon,
 } from "lucide-react";
-import {
-  type ReactNode,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { toast } from "sonner";
+import { type ReactNode, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
@@ -66,8 +53,9 @@ import { useRecords, useSync } from "../../sync/store";
 import { colorHex } from "../campaign-management/colors";
 import { DieShape } from "../dice-extras/DieShape";
 import { useLanded, useLandingFade } from "../dice-extras/landing";
-import { diceExtras, stageTray, type TrayRequest } from "../dice-extras/store";
-import { actionsFor, type EntryAction, entryActions } from "./entry-actions";
+import { stageTray, type TrayRequest } from "../dice-extras/store";
+import { EntryActions } from "./entry-action-button";
+import { type EntryAction, entryActions } from "./entry-actions";
 import { focusLogEntry, scrollToEntry, useLogFocus } from "./focus";
 import {
   type ActorOption,
@@ -182,176 +170,6 @@ function tooltipOf(e: GameLogEntryView, landed: boolean): ReactNode {
           </span>
         ))}
     </div>
-  );
-}
-
-/** FR-DICE-68: how long an action's confirm ("Spend?" ✓ ✗) stays open. */
-export const ACTION_CONFIRM_MS = 4000;
-
-const ACTION_BUTTON = "size-6 shrink-0";
-
-/**
- * FR-DICE-68: one entry action. A `confirm` action asks first ("Spend?" ✓ ✗, 4 s); a `roll`
- * action's ✓ (or button) is a `RollButton`, so physical-dice mode asks for the dice (FR-DICE-07)
- * and the throw waits for the new entry (FR-DICEX-09). A reject → Toast.
- */
-function EntryActionButton({
-  action,
-  entry,
-  store,
-}: {
-  action: EntryAction;
-  entry: GameLogEntryView;
-  store: RecordStore;
-}) {
-  const connection = useSync((s) => s.connection);
-  const live = useSync((s) => s.state === "live");
-  const [asking, setAsking] = useState(false);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (!asking) return;
-    const t = setTimeout(() => setAsking(false), ACTION_CONFIRM_MS);
-    return () => clearTimeout(t);
-  }, [asking]);
-  const roll = action.roll?.(entry) ?? null;
-  const go = (manual?: ManualEntry) => {
-    setAsking(false);
-    setBusy(true);
-    action
-      .run(entry, {
-        store,
-        send: (name, payload) => connection.sendIntent(name, payload),
-        ...(manual ? { manual } : {}),
-      })
-      .catch((err: unknown) => {
-        if (roll) diceExtras.failed();
-        toast.error(errorText(err));
-      })
-      .finally(() => setBusy(false));
-  };
-  const control = useRollControl({
-    expressions: [roll?.expression ?? "1d20"],
-    category: roll?.category ?? entry.category,
-    label: roll?.label ?? action.label,
-    mode: roll?.mode ?? "normal",
-    onRoll: (r) => go(r.manual?.[0]),
-  });
-  const disabled = !live || busy;
-  const ids = { "data-value": action.id, "data-record-id": entry.id };
-  const Icon = action.Icon;
-  // A roll action keeps the line's mode: the control rolls without Shift / Ctrl.
-  const start = () => (roll ? control.roll() : go());
-  if (asking) {
-    const yes = {
-      "data-testid": "dice-log-action-yes",
-      ...ids,
-      "aria-label": `${action.label}: yes`,
-      size: "icon" as const,
-      variant: "ghost" as const,
-      className: ACTION_BUTTON,
-      disabled,
-    };
-    return (
-      <span
-        data-testid="dice-log-action-confirm"
-        {...ids}
-        className="flex shrink-0 items-center gap-0.5 text-xs"
-      >
-        <span>{action.confirm}</span>
-        {roll ? (
-          <RollButton
-            control={control}
-            hint={false}
-            type="button"
-            {...yes}
-            onClick={(e) => {
-              e.preventDefault();
-              control.roll();
-            }}
-          >
-            <CheckIcon className="size-3.5" />
-          </RollButton>
-        ) : (
-          <Button type="button" {...yes} onClick={() => go()}>
-            <CheckIcon className="size-3.5" />
-          </Button>
-        )}
-        <Button
-          type="button"
-          data-testid="dice-log-action-no"
-          {...ids}
-          aria-label={`${action.label}: no`}
-          size="icon"
-          variant="ghost"
-          className={ACTION_BUTTON}
-          onClick={() => setAsking(false)}
-        >
-          <XIcon className="size-3.5" />
-        </Button>
-      </span>
-    );
-  }
-  const button = (
-    <Button
-      type="button"
-      data-testid="dice-log-action"
-      {...ids}
-      aria-label={action.label}
-      size="icon"
-      variant="ghost"
-      className={cn(ACTION_BUTTON, "text-muted-foreground")}
-      disabled={disabled}
-      onClick={() => (action.confirm !== undefined ? setAsking(true) : start())}
-    >
-      <Icon className="size-3.5" />
-    </Button>
-  );
-  // A roll action without a confirm anchors its physical form on the button itself.
-  return (
-    <Tooltip content={action.label}>
-      {roll && action.confirm === undefined ? (
-        <RollButton
-          control={control}
-          hint={false}
-          type="button"
-          data-testid="dice-log-action"
-          {...ids}
-          aria-label={action.label}
-          size="icon"
-          variant="ghost"
-          className={cn(ACTION_BUTTON, "text-muted-foreground")}
-          disabled={disabled}
-          onClick={(e) => {
-            e.preventDefault();
-            control.roll();
-          }}
-        >
-          <Icon className="size-3.5" />
-        </RollButton>
-      ) : (
-        button
-      )}
-    </Tooltip>
-  );
-}
-
-/**
- * FR-DICE-68: the line's available actions, shown on hover / keyboard focus of the line (always
- * on touch) and while one asks to confirm; none → nothing rendered (lines unchanged).
- */
-function EntryActions({ e, actions }: { e: GameLogEntryView; actions: readonly EntryAction[] }) {
-  const store = useSync((s) => s.store);
-  const shown = useMemo(() => actionsFor(actions, store, e), [actions, store, e]);
-  if (shown.length === 0) return null;
-  return (
-    <span
-      data-testid="dice-log-actions"
-      className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover/entry:opacity-100 has-[[data-testid=dice-log-action-confirm]]:opacity-100 [@media(hover:none)]:opacity-100"
-    >
-      {shown.map((a) => (
-        <EntryActionButton key={a.id} action={a} entry={e} store={store} />
-      ))}
-    </span>
   );
 }
 
