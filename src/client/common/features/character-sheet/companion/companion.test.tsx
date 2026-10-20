@@ -785,7 +785,7 @@ describe("FR-CBT-112 Dismiss from the card (CP3)", () => {
     );
     const tag = tagOf(turn, "cbt-companion-dismiss");
     expect(isDisabled(tag)).toBe(true);
-    expect(tag).toContain(`title="${DISMISS_TURN_HINT}"`);
+    expect(tag).toContain(`data-reason="${DISMISS_TURN_HINT}"`);
     // Offline: disabled.
     const off = render(
       storeOf(P1, { entities: [mira], combatants: [feC] }),

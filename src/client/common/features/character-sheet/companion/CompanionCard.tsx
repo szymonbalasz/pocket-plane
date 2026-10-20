@@ -19,6 +19,7 @@ import { Trash2Icon } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { Button } from "../../../components/ui/button";
+import { Tooltip } from "../../../components/ui/overlays";
 import { Badge, Input, Skeleton } from "../../../components/ui/primitives";
 import { cn } from "../../../lib/utils";
 import { useRecords, useSync } from "../../../sync/store";
@@ -507,20 +508,29 @@ function DismissRow({
   const c = e.combatant as CombatantView;
   const turn = turnCombatantId === c.id;
   if (!confirming) {
+    const button = (
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7"
+        data-testid="cbt-companion-dismiss"
+        data-record-id={c.id}
+        data-reason={turn ? DISMISS_TURN_HINT : undefined}
+        disabled={!live || turn}
+        onClick={() => setConfirming(true)}
+      >
+        Dismiss
+      </Button>
+    );
     return (
       <div className="flex justify-end">
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7"
-          data-testid="cbt-companion-dismiss"
-          data-record-id={c.id}
-          disabled={!live || turn}
-          title={turn ? DISMISS_TURN_HINT : undefined}
-          onClick={() => setConfirming(true)}
-        >
-          Dismiss
-        </Button>
+        {turn ? (
+          <Tooltip content={DISMISS_TURN_HINT}>
+            <span>{button}</span>
+          </Tooltip>
+        ) : (
+          button
+        )}
       </div>
     );
   }

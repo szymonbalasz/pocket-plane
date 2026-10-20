@@ -1,10 +1,11 @@
-// Sprint 6 CP1 (FR-ENT-36 / -37) over real sockets on `companions` (Town active: no pet present).
+// Sprint 6 CP1 (FR-ENT-36 / -37) over real sockets on `companions` without CP3's `cp-combat` (the
+// pets stay out of the fight; Town active: no pet present).
 // `player-1` adjusts the Owlbear's kept HP; `player-2` gets nothing while it isn't present, the
 // redacted row with its band once its scene is shown, never a number; `player-2`'s own adjust is
 // rejected; snapshots before and after reconnect pass the leak scan.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
-import { loadBundle } from "@fixtures/index";
+import { library } from "@fixtures/index";
 import { PET_ADJUST_HP } from "@shared/entities/pet-hp";
 import { ENTITY_TYPE, RedactedPet } from "@shared/entities/schemas";
 import { MAP_INTENTS } from "@shared/scenes-map/schemas";
@@ -14,6 +15,8 @@ import { entity, player, scene } from "../../db/schema";
 import { startTestServer, type TestClient } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
 import { leakScan } from "../../ws/testing/convergence";
+import { defineBundle, type FixtureLibrary } from "../fixtures-adapters/fixture-types";
+import { loadInProcess } from "../fixtures-adapters/loader";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
 
@@ -45,8 +48,16 @@ const redactedOnly = (c: TestClient, id: string) => {
   for (const r of rows) expect(RedactedPet.safeParse(r).success).toBe(true);
 };
 
+/** `companions` before CP3's `cp-combat` joins the pets to the running fight. */
+const PETS_OUT = defineBundle({
+  name: "test-companions-pets-out",
+  includes: ["late-damage"],
+  fixtures: ["cp-srd", "pet-owlbear", "pet-drake"],
+});
+const lib: FixtureLibrary = { ...library, bundles: [...library.bundles, PETS_OUT] };
+
 describe("FR-ENT-36 pet.adjustHp over WS (companions)", () => {
-  let loaded: Awaited<ReturnType<typeof loadBundle>>;
+  let loaded: Awaited<ReturnType<typeof loadInProcess>>;
   let db: ReturnType<typeof openFileDb>;
   let h: Awaited<ReturnType<typeof startTestServer>>;
   let owlbear: string;
@@ -54,7 +65,7 @@ describe("FR-ENT-36 pet.adjustHp over WS (companions)", () => {
   let ambush: string;
 
   beforeAll(async () => {
-    loaded = await loadBundle("companions", { dmSecret: TEST_SECRET, testMode: true });
+    loaded = await loadInProcess(lib, PETS_OUT.name, { dmSecret: TEST_SECRET, testMode: true });
     db = openFileDb(loaded.config.dbPath);
     owlbear = db
       .select()

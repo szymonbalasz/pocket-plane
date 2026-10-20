@@ -163,6 +163,7 @@ describe("CP3 crash (PP_TEST_CRASH seams)", () => {
         (n) => named(b.db, n).tokenId as string,
       );
       const petToken = named(b.db, "Owlbear").tokenId as string;
+      const kept = (named(b.db, "Owlbear").hpCurrent ?? 0) as number;
       b.close();
       await crashBoth(
         loaded.openDb,
@@ -174,7 +175,7 @@ describe("CP3 crash (PP_TEST_CRASH seams)", () => {
             .from(entity)
             .all()
             .find((e) => e.name === "Owlbear" && e.companionOf !== null);
-          expect(owlbear?.hpCurrent).toBe(24);
+          expect(owlbear?.hpCurrent).toBe(kept);
           for (const t of summonTokens) expect(hasToken(db, t)).toBe(false);
           expect(hasToken(db, petToken)).toBe(true);
         },
