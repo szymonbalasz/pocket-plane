@@ -549,9 +549,10 @@ export type PlaceTokenSpec = z.output<typeof PlaceTokenInput>;
  * FR-MAP-13: name = definition name, numbered (FR-MAP-16); image = portrait or none; size =
  * `statBlock.size`; shape = definition `tokenShape`, else round (FR-MAP-35); speed =
  * `statBlock.speed`, else null (FR-MAP-36); `creatureType` = the monster's `statBlock.type`, else
- * null (FR-ENT-27); owner = the character's or (FR-MAP-74) the pet's owner, else none; visible; `characterId` copy
- * (FR-MAP-50); `fogged` / `seenBy` derived (FR-FOG-10). Optional overrides (fixtures) for name,
- * image, owner, hidden, shape; never size, speed, `creatureType`, `characterId` or `fogged`.
+ * null (FR-ENT-27); owner = the character's or (FR-MAP-74, sprint 6) the pet's owner, else none;
+ * visible; `characterId` copy (FR-MAP-50); `fogged` / `seenBy` derived (FR-FOG-10). Optional
+ * overrides (fixtures) for name, image, owner, hidden, shape; never size, speed,
+ * `creatureType`, `characterId` or `fogged`.
  * `dependants` = the visibility hooks' `rederive` rows (FR-FOG-35, ADR-0042); a caller lists them
  * after `change` in its event (none until vision sources exist, V2).
  */
