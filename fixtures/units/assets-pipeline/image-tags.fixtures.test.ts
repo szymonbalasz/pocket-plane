@@ -117,7 +117,7 @@ describe("image-tags fixtures (ASSET §13.1)", () => {
 });
 
 describe("CON-44 session-sim-10 (#256 ceilings)", () => {
-  test("CON-44 session-sim-10 under the ceilings: DM ≤ 1.5 MiB, players ≤ 512 KiB; players byte-identical to session-sim-9 (image-tags adds DM assets only)", async () => {
+  test("CON-44 session-sim-10 under the ceilings: DM ≤ 1.5 MiB, players ≤ 512 KiB (image-tags adds DM assets only; CP3's cp-combat adds the companions players see)", async () => {
     const sizes = async (bundle: string) => {
       const b = await servicesFromBundle(await loadBundle(bundle, { testMode: true }));
       try {
@@ -130,15 +130,14 @@ describe("CON-44 session-sim-10 (#256 ceilings)", () => {
     const sim10 = await sizes("session-sim-10");
     for (const v of sim10)
       expect([v.label, v.bytes <= SNAPSHOT_CEILING[v.role]]).toEqual([v.label, true]);
-    expect(sim10.slice(1).map((v) => [v.label, v.bytes])).toEqual(
-      sim9.slice(1).map((v) => [v.label, v.bytes]),
-    );
+    // Players: no asset rows (tags are DM-only); they grow only by cp-combat's pets + summons.
+    for (const v of sim10.slice(1)) expect(v.types.asset?.rows ?? 0).toBe(0);
     const [dm9, dm10] = [sim9[0]?.bytes ?? 0, sim10[0]?.bytes ?? 0];
     console.log(
       `CON-44 session-sim-10: DM ${dm10} B (+${dm10 - dm9} B over session-sim-9, ${sim10[0]?.types.asset?.rows} assets); players ${sim10
         .slice(1)
-        .map((v) => `${v.label} ${v.bytes} B`)
-        .join(", ")} (unchanged)`,
+        .map((v, i) => `${v.label} ${v.bytes} B (+${v.bytes - (sim9[i + 1]?.bytes ?? 0)})`)
+        .join(", ")}`,
     );
   }, 120_000);
 });

@@ -21,5 +21,8 @@ export default defineBundle({
     // CP: companions + summons
     // CP0: the SRD Owlbear and Fire Elemental (imported, DM-only; CP1 / CP3 add the pets and the fight)
     "cp-srd",
+    // CP3: the pets join sim-9's running ambush (pulls in `pet-owlbear` / `pet-drake`, CP1's lines);
+    // Fire Elementals for Mira (after her), Brakka (in her turn), Thorn (own 9, linked concentration)
+    "cp-combat",
   ],
 });

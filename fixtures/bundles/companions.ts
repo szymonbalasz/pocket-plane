@@ -12,5 +12,8 @@ export default defineBundle({
     // CP0: Mira's Owlbear (after-owner) and Brakka's Drake Companion (in-owner-turn), tokens placed
     "pet-owlbear",
     "pet-drake",
+    // CP3: both pets join the ambush; Fire Elementals summoned for Mira (after her), Brakka (in her
+    // turn) and Thorn (own initiative 9, linked to his Conjure Elemental)
+    "cp-combat",
   ],
 });
