@@ -403,6 +403,8 @@ describe("entities commands", () => {
     expect(t.s.commands.names().filter((n) => n.startsWith("entities."))).toEqual([
       "entities.create",
       "entities.update",
+      // Sprint 6 (FR-ENT-32): `POST /api/pets` creates; it deletes nothing.
+      "entities.createPet",
     ]);
     const routes = createApi(t.s).routes.filter((r) => r.path.includes("entities"));
     // Middleware shows up as extra entries per route: compare the distinct method + path set.

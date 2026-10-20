@@ -2,47 +2,18 @@
 // Next resets the new turn combatant's `movedFt`; Prev keeps it (FR-CBT-40). Start round 1 resets
 // everyone's: round-0 positioning never counts (FR-CBT-39, BL-03). Dead PCs skip
 // (FR-CBTX-25); `turnChanged` rule hooks run after the event (FR-CBTX-01, ADR-0035).
-import { DEATH_SAVES_MAX } from "@shared/combat-extras/schemas";
-import { stepTurn } from "@shared/combat-tracker/rules";
-import {
-  CBT_INTENTS,
-  type CombatantRecord,
-  TurnInput,
-  type TurnResult,
-} from "@shared/combat-tracker/schemas";
+import { inTurnCompanionsOf, stepTurn } from "@shared/combat-tracker/rules";
+import { CBT_INTENTS, TurnInput, type TurnResult } from "@shared/combat-tracker/schemas";
 import { TurnChanged } from "@shared/events/combat-tracker";
-import { and, eq, gte, inArray } from "drizzle-orm";
-import { type CommandEnv, defineCommand } from "../../commands/commands";
+import { eq } from "drizzle-orm";
+import { defineCommand } from "../../commands/commands";
 import { conflict } from "../../commands/errors";
-import { combatant, encounter, entity } from "../../db/schema";
+import { combatant, encounter } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { clearTrails } from "../scenes-map/trail";
-import { playerTurnOf } from "./ranks";
-import {
-  campaignOf,
-  combatantChange,
-  combatantsOf,
-  encounterChange,
-  getEncounter,
-  readCombatant,
-  readEncounter,
-} from "./rows";
+import { combatantDiff, deadPcs, playerTurnOf, rerank } from "./ranks";
+import { campaignOf, combatantsOf, encounterChange, getEncounter, readEncounter } from "./rows";
 import { CombatRuleHooks } from "./rule-hooks";
-
-/** FR-CBTX-25: PC combatants whose character is dead (3 failures); they skip like removed ones. */
-export function deadPcs(env: Pick<CommandEnv, "tx">, rows: readonly CombatantRecord[]) {
-  const pcIds = rows.filter((r) => r.kind === "pc").map((r) => r.entityId);
-  if (pcIds.length === 0) return new Set<string>();
-  const dead = new Set(
-    env.tx
-      .select({ id: entity.id })
-      .from(entity)
-      .where(and(inArray(entity.id, pcIds), gte(entity.deathFailures, DEATH_SAVES_MAX)))
-      .all()
-      .map((e) => e.id),
-  );
-  return new Set(rows.filter((r) => r.kind === "pc" && dead.has(r.entityId)).map((r) => r.id));
-}
 
 export function turnCommand(direction: "next" | "prev", hooks: CombatRuleHooks) {
   return defineCommand({
@@ -55,6 +26,10 @@ export function turnCommand(direction: "next" | "prev", hooks: CombatRuleHooks) 
       if (before.round !== expectedRound || before.turnCombatantId !== expectedTurnId) {
         throw conflict("The turn has changed — try again");
       }
+      const rows0 = combatantsOf(env.tx, encounterId);
+      // FR-CBT-108 (sprint 6): fresh ranks first, so an owner who died since the last rerank no
+      // longer holds its in-turn companions (they take their own turn in its slot).
+      rerank(env.tx, encounterId);
       const rows = combatantsOf(env.tx, encounterId);
       const dead = deadPcs(env, rows);
       const step = stepTurn(
@@ -75,20 +50,29 @@ export function turnCommand(direction: "next" | "prev", hooks: CombatRuleHooks) 
         })
         .where(eq(encounter.id, encounterId))
         .run();
+      // FR-CBT-108: a companion that kept its rank only as the turn combatant (its owner was
+      // restored) goes back inside the owner's turn now that the turn moved on.
+      rerank(env.tx, encounterId);
       const after = readEncounter(env.tx, encounterId);
       const changes: RecordChange[] = [encounterChange(before, after)];
-      // FR-CBT-40: the new turn combatant; on Start round 1 everyone (BL-03).
+      // FR-CBT-40: the new turn combatant and (FR-CBT-108) its in-turn companions; on Start
+      // round 1 everyone (BL-03).
+      const ranked = combatantsOf(env.tx, encounterId);
+      const turnIds = new Set([
+        step.turnCombatantId,
+        ...inTurnCompanionsOf(ranked, step.turnCombatantId).map((c) => c.id),
+      ]);
       const reset =
         direction !== "next"
           ? []
           : before.round === 0
-            ? rows
-            : rows.filter((r) => r.id === step.turnCombatantId);
+            ? ranked
+            : ranked.filter((r) => turnIds.has(r.id));
       for (const r of reset) {
         if (r.movedFt === 0) continue;
         env.tx.update(combatant).set({ movedFt: 0 }).where(eq(combatant.id, r.id)).run();
-        changes.push(combatantChange(r, readCombatant(env.tx, r.id)));
       }
+      changes.push(...combatantDiff(env.tx, rows0));
       // FR-CBT-97 (sprint 5): every turn change (Next, Prev, Start round 1) clears the trails.
       if (after.sceneId) changes.push(...clearTrails(env, after.sceneId));
       env.emit({

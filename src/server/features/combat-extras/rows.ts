@@ -128,7 +128,9 @@ export function effectCombatantId(
 
 /** FR-CBTX-13: `effect.hidden` = the target's bound combatant `hidden` (PCs: active one; none → false). */
 export function hiddenOf(tx: Read, cid: string, t: Target): boolean {
-  return combatantOf(tx, cid, t)?.hidden ?? false;
+  const c = combatantOf(tx, cid, t);
+  // Sprint 6 (FR-CBT-116): a companion of a hidden owner is hidden from players too.
+  return (c?.hidden || c?.ownerHidden) ?? false;
 }
 
 /** Active effects of a target (by column), oldest first. */

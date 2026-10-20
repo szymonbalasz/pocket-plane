@@ -1,8 +1,9 @@
-// DM handout editor in `party.handout` (FR-PARTY-15): title, body with a counter, images strip
-// (add via the image attach control: upload, drop, paste anywhere in the editor, From library,
-// FR-PARTY-39; remove, move left / right), Save / Cancel. Save disabled while invalid
-// (FR-PARTY-02 mirrored), unchanged, not live or in flight; a reject keeps the values; a remote
-// change to the open handout keeps the draft and shows "Changed in another tab".
+// DM handout editor in `party.handout` (FR-PARTY-15): title, images strip (add via the image
+// attach control: upload, drop, paste anywhere in the editor, From library, FR-PARTY-39; remove,
+// move left / right; above the body so the attach row is never below the fold, FR-PARTY-48;
+// uploads tagged Handouts, FR-PARTY-47), body with a counter, Save / Cancel. Save disabled
+// while invalid (FR-PARTY-02 mirrored), unchanged, not live or in flight; a reject keeps the
+// values; a remote change to the open handout keeps the draft and shows "Changed in another tab".
 import type { HandoutBodyRecord, HandoutRecord } from "@shared/party-board/schemas";
 import { HANDOUT_IMAGES_MAX, HANDOUT_TITLE_MAX } from "@shared/party-board/schemas";
 import { Button } from "@ui/components/ui/button";
@@ -110,21 +111,6 @@ export function HandoutEditor({ stored, onSaved, onCancel }: EditorProps) {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <div className="flex items-baseline justify-between">
-              <Label htmlFor="party-editor-body">Text</Label>
-              <span data-testid="party-editor-counter" className="text-xs text-muted-foreground">
-                {bodyCounter(draft.body)}
-              </span>
-            </div>
-            <Textarea
-              id="party-editor-body"
-              data-testid="party-editor-body"
-              rows={8}
-              value={draft.body}
-              onChange={(e) => set({ body: e.target.value })}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
             <span className="text-sm font-medium">
               Images ({draft.imageAssetIds.length}/{HANDOUT_IMAGES_MAX})
             </span>
@@ -179,6 +165,7 @@ export function HandoutEditor({ stored, onSaved, onCancel }: EditorProps) {
             </ul>
             <ImageAttach
               owner="party-editor"
+              context="handout"
               max={HANDOUT_IMAGES_MAX}
               count={draft.imageAssetIds.length}
               onAdd={attach}
@@ -191,6 +178,21 @@ export function HandoutEditor({ stored, onSaved, onCancel }: EditorProps) {
                 {ALREADY_IN_HANDOUT}
               </p>
             )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="party-editor-body">Text</Label>
+              <span data-testid="party-editor-counter" className="text-xs text-muted-foreground">
+                {bodyCounter(draft.body)}
+              </span>
+            </div>
+            <Textarea
+              id="party-editor-body"
+              data-testid="party-editor-body"
+              rows={8}
+              value={draft.body}
+              onChange={(e) => set({ body: e.target.value })}
+            />
           </div>
         </fieldset>
       </ScrollArea>

@@ -397,6 +397,96 @@ export function withAttackIds<S extends { attacks: Attack[] }>(s: S, nextId: () 
   return { ...s, attacks: s.attacks.map((a) => (a.id === undefined ? { ...a, id: nextId() } : a)) };
 }
 
+// ---------- companions (sprint 6, #252: FR-ENT-31, FR-CBT-106, FR-CHARX-60) ----------
+
+/** FR-CBT-106: when a companion acts; `after-owner` is the default (pets and summons). */
+export const TURN_MODES = ["after-owner", "in-owner-turn", "own"] as const;
+export const TurnMode = z.enum(TURN_MODES);
+export type TurnMode = z.infer<typeof TurnMode>;
+
+/** FR-CHARX-60: the card shows the first 8 attack rows ("+N more" beyond). */
+export const CARD_ATTACKS_MAX = 8;
+
+/** One card row (FR-CHARX-60): a stat-block attack with a stable `id` (FR-CBT-117). */
+export const CompanionCardAttack = z.strictObject({
+  id: Id,
+  name: z.string().max(40),
+  toHit: z.int(),
+  bonus: z.int().optional(),
+  damage: z.string().max(20),
+  damageType: DamageType.optional(),
+  extraDamage: z.array(ExtraDamage).max(EXTRA_DAMAGE_MAX).optional(),
+});
+export type CompanionCardAttack = z.infer<typeof CompanionCardAttack>;
+
+/**
+ * FR-CHARX-60: the companion card's data, one shape for pet and summon (combatant `card`,
+ * FR-CBT-117). Not a sheet: no abilities, saves, skills or spells. ≤ 2,038 B at the max.
+ */
+export const CompanionCard = z.strictObject({
+  size: Size,
+  type: CreatureType.optional(),
+  ac: z.int(),
+  hpMax: z.int(),
+  speed: z.int().optional(),
+  attacks: z.array(CompanionCardAttack).max(CARD_ATTACKS_MAX),
+  /** Stat-block rows past the 8 shown ("+N more"); absent = none. */
+  more: z.int().min(1).optional(),
+});
+export type CompanionCard = z.infer<typeof CompanionCard>;
+
+/**
+ * FR-CHARX-60 / FR-CBT-117: pure card copy of a stat block. Each row's `id` = the stat-block
+ * row's own; else the id `prev` gave the row at that index while it keeps its name; else
+ * `nextId()` (`ctx.ids` at copy time). A renamed row gets a new id, so a stale `attackId` never
+ * names another row.
+ */
+export function companionCard(
+  statBlock: MonsterStatBlock | CharacterStatBlock,
+  nextId: () => string,
+  prev?: CompanionCard | null,
+): CompanionCard {
+  const shown = statBlock.attacks.slice(0, CARD_ATTACKS_MAX);
+  const attacks = shown.map((a, i): CompanionCardAttack => {
+    const old = prev?.attacks[i];
+    const id = a.id ?? (old && old.name === a.name ? old.id : nextId());
+    return {
+      id,
+      name: a.name,
+      toHit: a.toHit,
+      ...(a.bonus !== undefined ? { bonus: a.bonus } : {}),
+      damage: a.damage,
+      ...(a.damageType !== undefined ? { damageType: a.damageType } : {}),
+      ...(a.extraDamage !== undefined ? { extraDamage: a.extraDamage } : {}),
+    };
+  });
+  const type = "type" in statBlock ? statBlock.type : undefined;
+  const more = statBlock.attacks.length - shown.length;
+  return {
+    size: statBlock.size,
+    ...(type !== undefined ? { type } : {}),
+    ac: statBlock.ac,
+    hpMax: statBlock.hpMax,
+    ...(statBlock.speed !== undefined ? { speed: statBlock.speed } : {}),
+    attacks,
+    ...(more > 0 ? { more } : {}),
+  };
+}
+
+/** The stat-block row a card row names (FR-CBT-114): same id, else the same index and name. */
+export function cardRowIndex(
+  card: CompanionCard,
+  attacks: readonly Attack[],
+  cardRowId: string,
+): number {
+  const i = card.attacks.findIndex((a) => a.id === cardRowId);
+  if (i < 0) return -1;
+  const row = card.attacks[i] as CompanionCardAttack;
+  const byId = attacks.findIndex((a) => a.id === row.id);
+  if (byId >= 0) return byId;
+  return attacks[i]?.name === row.name && attacks[i]?.id === undefined ? i : -1;
+}
+
 // ---------- token shape (FR-ENT-22, FR-MAP-35) ----------
 
 export const TOKEN_SHAPES = ["round", "square", "none"] as const;
@@ -465,6 +555,16 @@ const recordBase = {
   updatedAt: z.string(),
 };
 
+/**
+ * FR-ENT-31 / -37 (sprint 6, #252): pet fields on a campaign monster; all null / false on a
+ * non-pet. Defaults let records built before sprint 6 parse. `petPresent` is DM-only.
+ */
+const petFields = {
+  companionOf: z.string().nullable().default(null),
+  turnMode: TurnMode.nullable().default(null),
+  petPresent: z.boolean().default(false),
+};
+
 /** `entity` (campaign scope): customs + characters, row minus provenance. DM full view. */
 export const EntityRecord = z.discriminatedUnion("kind", [
   z.object({
@@ -472,8 +572,11 @@ export const EntityRecord = z.discriminatedUnion("kind", [
     kind: z.literal("monster"),
     campaignId: z.string(),
     statBlock: MonsterStatBlock,
-    ownerPlayerId: z.null(),
-    hpCurrent: z.null(),
+    /** FR-ENT-31 (sprint 6): a pet's owner copy (its `companionOf`'s player); else null. */
+    ownerPlayerId: z.string().nullable(),
+    /** FR-ENT-31: a pet's kept HP (0…hpMax); else null. */
+    hpCurrent: z.number().int().nullable(),
+    ...petFields,
   }),
   z.object({
     ...recordBase,
@@ -525,6 +628,33 @@ export type RedactedCharacter = z.infer<typeof RedactedCharacter>;
 export const REDACTED_CHARACTER_KEYS = Object.keys(
   RedactedCharacter.shape,
 ) as readonly (keyof RedactedCharacter)[];
+
+/** FR-CBT-26's health band; a pet's for other players (FR-ENT-37), a monster combatant's. */
+export const HealthBand = z.enum(["healthy", "bloodied", "down"]);
+export type HealthBand = z.infer<typeof HealthBand>;
+
+/**
+ * FR-ENT-37 (ADR-0056): what another player receives of a **present** pet; nothing while it is
+ * not present. `band` derived in the visibility fn; never stats, HP or the turn mode.
+ */
+export const RedactedPet = z.strictObject({
+  id: z.string(),
+  kind: z.literal("monster"),
+  name: z.string(),
+  portraitAssetId: z.string().nullable(),
+  ownerPlayerId: z.string(),
+  companionOf: z.string(),
+  band: HealthBand,
+});
+export type RedactedPet = z.infer<typeof RedactedPet>;
+export const REDACTED_PET_KEYS = Object.keys(RedactedPet.shape) as readonly (keyof RedactedPet)[];
+
+/** FR-ENT-37: the owner's pet row: full minus `derivedFromId` and the DM-only `petPresent`. */
+export const OWNER_PET_OMITTED = ["derivedFromId", "petPresent"] as const;
+
+/** `isPet` (FR-ENT-31, derived): a campaign monster with an owner PC. */
+export const isPet = (e: { kind: string; companionOf?: string | null }): boolean =>
+  e.kind === "monster" && (e.companionOf ?? null) !== null;
 
 export const Provenance = z.object({
   source: z.string(),
@@ -595,8 +725,30 @@ export const UpdateEntityBody = z.strictObject({
   tokenShape,
   statBlock: z.record(z.string(), z.unknown()),
   ownerPlayerId: Id.optional(),
+  /**
+   * FR-ENT-33 (sprint 6): monsters only. Whole replace: omitted = null, so a pet's caller sends
+   * what it loaded; null releases a pet; a character → `invalid`.
+   */
+  companionOf: Id.nullable().optional(),
+  turnMode: TurnMode.nullable().optional(),
 });
 export type UpdateEntityBody = z.input<typeof UpdateEntityBody>;
+
+/** FR-ENT-35: pets per PC and per campaign. */
+export const PETS_PER_PC_MAX = 3;
+export const PETS_PER_CAMPAIGN_MAX = 60;
+
+/**
+ * `POST /api/pets` (FR-ENT-32, DM): the server copies the base's stat block, portrait and
+ * `tokenShape` (any monster, imported included); name defaults to the base's.
+ */
+export const CreatePetBody = z.strictObject({
+  baseDefinitionId: Id,
+  companionOf: Id,
+  name: EntityName.optional(),
+  turnMode: TurnMode.optional(),
+});
+export type CreatePetBody = z.input<typeof CreatePetBody>;
 
 export const EntityResponse = z.object({ entity: EntityRecord });
 export type EntityResponse = z.infer<typeof EntityResponse>;

@@ -8,6 +8,7 @@ import type { Feature } from "../../services";
 import { rollAbility } from "./abilities";
 import { ApplyHooks, applyHooks, bindApplyHooks } from "./apply-hooks";
 import { attackCommand } from "./attack";
+import { setCompanionCommand } from "./companions";
 import { rollDamageCommand } from "./damage";
 import { createEncounter, deleteEncounter, updateEncounter } from "./encounters";
 import { applyHitCommand } from "./hit";
@@ -46,6 +47,7 @@ export const combatTracker: Feature = {
       rollAbility,
       applyHitCommand,
       setSideCommand,
+      setCompanionCommand,
     ] as unknown as CommandDef[];
     for (const c of intents) r.command(c, { intent: true });
     for (const t of combatRecordTypes) r.recordType(t);

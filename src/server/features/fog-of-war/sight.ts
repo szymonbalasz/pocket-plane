@@ -33,7 +33,7 @@ import {
 } from "@shared/fog-of-war/vision";
 import { sightOccluders } from "@shared/scene-tools/geometry";
 import { footprint } from "@shared/scenes-map/geometry";
-import { and, asc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { effect, entity, scene, sceneStructure, token } from "../../db/schema";
 import { type Logger, silentLogger } from "../../log";
 import type { SceneRead } from "../scenes-map/visibility-hooks";
@@ -123,7 +123,8 @@ export function blindedCharacters(read: SceneRead, ids: readonly string[]): Map<
 }
 
 /**
- * Each player's sources on a scene (≤ 4, oldest `seq` first); only the campaign's players. With
+ * Each player's sources on a scene (≤ 4: PC tokens first, then oldest `seq` first, FR-MAP-78);
+ * only the campaign's players. With
  * `party` (FR-FOG-52): then ≤ 12 for the whole party, round robin over `players` in order.
  */
 export function sceneSources(
@@ -143,7 +144,9 @@ export function sceneSources(
     })
     .from(token)
     .where(and(eq(token.sceneId, sceneId), isNotNull(token.ownerPlayerId), eq(token.hidden, false)))
-    .orderBy(asc(token.seq))
+    // FR-MAP-78 (OQ-MAP-56 C, sprint 6): PC tokens first, then the rest (companions) by `seq`,
+    // so a pet placed before its PC never takes the PC's sight within the 4-source cap.
+    .orderBy(sql`${token.characterId} is null`, asc(token.seq))
     .all();
   const out = new Map<string, SourceToken[]>();
   if (rows.length === 0) return out;

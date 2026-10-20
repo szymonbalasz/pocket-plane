@@ -11,13 +11,18 @@ import {
 } from "@shared/dice-roll-log/schemas";
 import { desc, eq } from "drizzle-orm";
 import { gameLogEntry } from "../../db/schema";
-import { defineRecordType, type Visibility } from "../../ws/records";
+import { defineRecordType, type Viewer, type Visibility } from "../../ws/records";
 import { toEntryRecord } from "./game-log";
 import { readSettings } from "./settings";
 
-/** FR-DICE-15: player sees public entries redacted; hidden ones not at all. */
-export const entryVisibility = (r: GameLogEntryRecord): Visibility =>
-  r.public ? "redacted" : "hidden";
+/**
+ * FR-DICE-15: player sees public entries redacted; hidden ones not at all. Sprint 6 (ADR-0056):
+ * a non-public entry reaches the player it names (`audiencePlayerId`: a companion's owner).
+ */
+export const entryVisibility = (r: GameLogEntryRecord, v: Viewer): Visibility =>
+  r.public || (r.audiencePlayerId !== null && r.audiencePlayerId === v.playerId)
+    ? "redacted"
+    : "hidden";
 
 export function redactEntry(r: GameLogEntryRecord): RedactedGameLogEntry {
   const { dmPayload: _dm, ...rest } = r;
