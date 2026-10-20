@@ -146,9 +146,15 @@ test("FR-DICE-77 FR-DICE-78 the roll bar rolls as the sheet's PC; a manual pick 
   await live(p1);
   await closePresent(p1);
 
+  // A fresh browser: the sheet shows its first own PC (Brakka) without a pick; the bar follows.
   const sheet = await openWindow(p1, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(mira);
+  await expect(sheet.getByTestId("char-sheet-picker")).toHaveValue(brakka);
   const log = await openWindow(p1, "dice.log");
+  const opts = log.getByTestId("dice-roll-options");
+  if ((await opts.getAttribute("data-state")) !== "open") await opts.click();
+  await expect(log.getByTestId("dice-roll-actor")).toHaveValue(brakka);
+  await sheet.getByTestId("char-sheet-picker").selectOption(mira);
+  await expect(log.getByTestId("dice-roll-actor")).toHaveValue(mira);
   const rolled = log.getByTestId("dice-log-entry").filter({ hasText: "— 1d20+2:" });
   const before = await rolled.count();
   await log.getByTestId("dice-roll-expression").fill("1d20+2");
